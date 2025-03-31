@@ -10,6 +10,8 @@ namespace graphicsGadgetLab
 		void Update() noexcept;
 		void Finalize() noexcept;
 
+		HWND GetHwnd() const noexcept { return m_Hwnd; };
+
 		static void CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
 		static Application* Get() noexcept;
 

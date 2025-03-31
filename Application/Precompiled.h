@@ -30,3 +30,4 @@ using namespace DirectX;
 #include <string>
 #include <memory>
 #include <stdexcept>
+#include <cassert>

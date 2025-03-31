@@ -3,6 +3,7 @@ namespace graphicsGadgetLab
 {
 	namespace utility 
 	{
+		// Throw a runtime_error exception with the given message
 		inline std::string HrToString(HRESULT hr)
 		{
 			char s_str[64] = {};
@@ -26,6 +27,22 @@ namespace graphicsGadgetLab
 				throw HrException(hr);
 			}
 		}
+
+		// Assert process
+#ifdef BUILD_DEBUG
+#define ASSERT_MSG(condition, ...) \
+        if (!(condition)) { \
+            fprintf(stderr, "[ASSERT] %s:%d | %s\n  Failed: %s\n  Message: ", \
+                __FILE__, __LINE__, __func__, #condition); \
+            fprintf(stderr, __VA_ARGS__); \
+            fputc('\n', stderr); \
+            fflush(stderr); \
+            std::abort(); \
+        }
+#else
+#define ASSERT_MSG(condition, ...) ((void)0)
+#endif
+
 	};
 }
 
