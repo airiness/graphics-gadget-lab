@@ -1,17 +1,62 @@
-#include "Application.h"
 #include "Precompiled.h"
+#include "Application.h"
 namespace graphicsGadgetLab
 {
-	void Application::Initialize()
+	Application::Application(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept :
+		mWindowName(windowName),
+		mWindowWidth(windowWidth),
+		mWindowHeight(windowHeight),
+		mHInstance(hInstance)
 	{
 	}
-	void Application::Update()
+
+	void Application::Initialize() noexcept
+	{
+		InitializeWindow();
+	}
+
+	void Application::Update() noexcept
+	{
+		MSG msg = {};
+		while (msg.message != WM_QUIT)
+		{
+			if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+		}
+	}
+
+	void Application::Finalize() noexcept
 	{
 	}
-	void Application::Finalize()
+
+	LRESULT Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
+		Application* app = reinterpret_cast<Application*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+		switch (message)
+		{
+		case WM_CREATE:
+		{
+			LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
+			SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+		}
+		return 0;
+		case WM_DESTROY:
+		{
+			PostQuitMessage(0);
+		}
+		return 0;
+		case WM_PAINT:
+		{
+		}
+		return 0;
+		}
+		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
-	void Application::InitializeWindow()
+
+	void Application::InitializeWindow() noexcept
 	{
 		// Set the working directory to the path of the executable.
 		WCHAR path[MAX_PATH];
@@ -33,16 +78,16 @@ namespace graphicsGadgetLab
 		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
 		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		wcex.lpszMenuName = nullptr;
-		wcex.lpszClassName = mName.data();
+		wcex.lpszClassName = mWindowName.data();
 		wcex.hIconSm = LoadIcon(mHInstance, IDI_APPLICATION);
 		RegisterClassEx(&wcex);
 
-		RECT rc = { 0 , 0, static_cast<LONG>(mWidth), static_cast<LONG>(mHeight) };
+		RECT rc = { 0 , 0, static_cast<LONG>(mWindowWidth), static_cast<LONG>(mWindowHeight) };
 		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
 		mHwnd = CreateWindow(
-			mName.data(),
-			mName.data(),
+			mWindowName.data(),
+			mWindowName.data(),
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
