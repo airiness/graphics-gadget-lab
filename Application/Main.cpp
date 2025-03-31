@@ -4,7 +4,8 @@
 int main(int argc, char* argv[])
 {
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
-	auto app = std::make_unique<graphicsGadgetLab::Application>(L"GraphicsGadgetLab", 1280, 720, hInstance);
+	graphicsGadgetLab::Application::CreateApplicationInstance(L"GraphicsGadgetLab", 1280, 720, hInstance);
+	auto* app = graphicsGadgetLab::Application::Get();
 
 	app->Initialize();
 	app->Update();

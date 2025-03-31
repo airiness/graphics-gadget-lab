@@ -9,6 +9,10 @@ namespace graphicsGadgetLab
 		void Initialize() noexcept;
 		void Update() noexcept;
 		void Finalize() noexcept;
+
+		static void CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
+		static Application* Get() noexcept;
+
 	private:
 		static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -16,14 +20,16 @@ namespace graphicsGadgetLab
 		void InitializeWindow() noexcept;
 
 	private:
-		uint32_t mWindowWidth = 0;
-		uint32_t mWindowHeight = 0;
+		static std::unique_ptr<Application> s_Application;
 
-		std::wstring mWindowName;
+	private:
+		uint32_t m_WindowWidth = 0;
+		uint32_t m_WindowHeight = 0;
 
-		HWND mHwnd = nullptr;
-		HINSTANCE mHInstance = nullptr;
+		std::wstring m_WindowName;
 
+		HWND m_Hwnd = nullptr;
+		HINSTANCE m_HInstance = nullptr;
 	};
 }
 

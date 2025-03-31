@@ -1,5 +1,9 @@
 #pragma once
 
+#if _DEBUG
+#define BUILD_DEBUG
+#endif
+
 // Windows
 #ifndef NOMINMIX
 #define NOMINMAX
@@ -12,7 +16,17 @@
 #include <Windows.h>
 #include <Shlwapi.h>	// PathRemoveFileSpecW
 
+#include <wrl.h>
+using namespace Microsoft::WRL;
+
+// DirectX
+#include <d3dx12.h>
+#include <dxgi1_6.h>
+#include <DirectXMath.h>
+using namespace DirectX;
+
 // C++
 #include <cstdint>
 #include <string>
 #include <memory>
+#include <stdexcept>

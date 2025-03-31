@@ -2,11 +2,27 @@
 #include "Application.h"
 namespace graphicsGadgetLab
 {
+	std::unique_ptr<Application> Application::s_Application;
+
+	void Application::CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept
+	{
+		if (s_Application == nullptr)
+		{
+			s_Application = std::make_unique<Application>(windowName, windowWidth, windowHeight, hInstance);
+		}
+	}
+
+	Application* Application::Get() noexcept
+	{	
+
+		return s_Application.get();
+	}
+
 	Application::Application(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept :
-		mWindowName(windowName),
-		mWindowWidth(windowWidth),
-		mWindowHeight(windowHeight),
-		mHInstance(hInstance)
+		m_WindowName(windowName),
+		m_WindowWidth(windowWidth),
+		m_WindowHeight(windowHeight),
+		m_HInstance(hInstance)
 	{
 	}
 
@@ -73,21 +89,21 @@ namespace graphicsGadgetLab
 		wcex.lpfnWndProc = WindowProc;
 		wcex.cbClsExtra = 0;
 		wcex.cbWndExtra = 0;
-		wcex.hInstance = mHInstance;
-		wcex.hIcon = LoadIcon(mHInstance, IDI_APPLICATION);
+		wcex.hInstance = m_HInstance;
+		wcex.hIcon = LoadIcon(m_HInstance, IDI_APPLICATION);
 		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
 		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		wcex.lpszMenuName = nullptr;
-		wcex.lpszClassName = mWindowName.data();
-		wcex.hIconSm = LoadIcon(mHInstance, IDI_APPLICATION);
+		wcex.lpszClassName = m_WindowName.data();
+		wcex.hIconSm = LoadIcon(m_HInstance, IDI_APPLICATION);
 		RegisterClassEx(&wcex);
 
-		RECT rc = { 0 , 0, static_cast<LONG>(mWindowWidth), static_cast<LONG>(mWindowHeight) };
+		RECT rc = { 0 , 0, static_cast<LONG>(m_WindowWidth), static_cast<LONG>(m_WindowHeight) };
 		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
-		mHwnd = CreateWindow(
-			mWindowName.data(),
-			mWindowName.data(),
+		m_Hwnd = CreateWindow(
+			m_WindowName.data(),
+			m_WindowName.data(),
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -95,9 +111,9 @@ namespace graphicsGadgetLab
 			rc.bottom - rc.top,
 			nullptr,
 			nullptr,
-			mHInstance,
+			m_HInstance,
 			this);
 
-		ShowWindow(mHwnd, SW_SHOWDEFAULT);
+		ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
 	}
 }
