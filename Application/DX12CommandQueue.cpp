@@ -10,17 +10,9 @@ namespace graphicsGadgetLab
 	{	
 	}
 
-	DX12CommandQueue::~DX12CommandQueue() noexcept
-	{
-	}
-
 	ComPtr<ID3D12CommandQueue> DX12CommandQueue::CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept
 	{
 		auto* device = Application::Get()->GetRenderer()->GetDevice().Get();
-		if (!device)
-		{
-			throw std::runtime_error("D3D12Device is not initialized.");
-		}
 
 		D3D12_COMMAND_QUEUE_DESC desc = {};
 		desc.Type = type;

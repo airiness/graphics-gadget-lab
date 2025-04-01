@@ -7,7 +7,7 @@ namespace graphicsGadgetLab
 	class Renderer
 	{
 	public:
-		explicit Renderer() noexcept;
+		Renderer() noexcept;
 		~Renderer() noexcept;
 
 		Renderer(const Renderer&) = delete;
