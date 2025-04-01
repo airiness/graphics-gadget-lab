@@ -15,6 +15,7 @@
 
 #include <Windows.h>
 #include <Shlwapi.h>	// PathRemoveFileSpecW
+#include <comdef.h>
 
 #include <wrl.h>
 using namespace Microsoft::WRL;
@@ -22,6 +23,9 @@ using namespace Microsoft::WRL;
 // DirectX
 #include <d3dx12.h>
 #include <dxgi1_6.h>
+#if defined(BUILD_DEBUG)
+#include <dxgidebug.h>
+#endif
 #include <DirectXMath.h>
 using namespace DirectX;
 
