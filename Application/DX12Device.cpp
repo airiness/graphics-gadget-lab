@@ -7,23 +7,13 @@ namespace graphicsGadgetLab
 {
 	DX12Device::DX12Device() noexcept
 	{
+		InitializeDXGIFactory();
+		InitializeDXGIAdapter();
+		InitializeD3D12Device();
+		CheckFeatureSupport();
 	}
 
 	DX12Device::~DX12Device() noexcept
-	{
-	}
-
-	void DX12Device::Initialize() noexcept
-	{
-		InitializeDXGIFactory();
-		InitializeDXGIAdapter();
-	}
-
-	void DX12Device::Update() noexcept
-	{
-	}
-
-	void DX12Device::Finalize() noexcept
 	{
 	}
 
@@ -114,9 +104,6 @@ namespace graphicsGadgetLab
 		}
 
 		utility::ThrowIfFailed(hr);
-
-		// Check feature support
-		CheckFeatureSupport();
 	}
 
 	void DX12Device::CheckFeatureSupport() noexcept

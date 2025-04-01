@@ -29,6 +29,8 @@ namespace graphicsGadgetLab
 	void Application::Initialize() noexcept
 	{
 		InitializeWindow();
+
+		m_Renderer = std::make_unique<Renderer>();
 	}
 
 	void Application::Update() noexcept

@@ -1,4 +1,5 @@
 #pragma once
+#include "Renderer.h"
 namespace graphicsGadgetLab
 {
 	class Application
@@ -11,6 +12,8 @@ namespace graphicsGadgetLab
 		void Finalize() noexcept;
 
 		HWND GetHwnd() const noexcept { return m_Hwnd; };
+
+		Renderer* GetRenderer() noexcept { return m_Renderer.get(); }
 
 		static void CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
 		static Application* Get() noexcept;
@@ -32,6 +35,9 @@ namespace graphicsGadgetLab
 
 		HWND m_Hwnd = nullptr;
 		HINSTANCE m_HInstance = nullptr;
+
+		// Renderer
+		std::unique_ptr<Renderer> m_Renderer;
 	};
 }
 
