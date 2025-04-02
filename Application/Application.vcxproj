@@ -78,6 +78,7 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="DX12CommandQueue.cpp" />
     <ClCompile Include="DX12Device.cpp" />
+    <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -89,6 +90,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="DX12CommandQueue.h" />
     <ClInclude Include="DX12Device.h" />
+    <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Utility.h" />

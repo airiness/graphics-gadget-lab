@@ -8,6 +8,8 @@ namespace graphicsGadgetLab
 		~DX12Device() noexcept;
 
 		ID3D12Device* Get() const noexcept { return m_D3D12Device.Get(); }
+		IDXGIFactory7* GetDXGIFactory() const noexcept { m_DxgiFactory.Get(); }
+		IDXGIAdapter1* GetDXGIAdapter() const noexcept { m_DxgiAdapter.Get(); }
 
 	private:
 		void InitializeDXGIFactory() noexcept;
@@ -18,7 +20,7 @@ namespace graphicsGadgetLab
 
 	private:
 		ComPtr<IDXGIFactory7> m_DxgiFactory;
-		ComPtr<IDXGIAdapter> m_DxgiAdapter;
+		ComPtr<IDXGIAdapter1> m_DxgiAdapter;
 		ComPtr<ID3D12Device> m_D3D12Device;
 
 		D3D_FEATURE_LEVEL m_FeatureLevel = D3D_FEATURE_LEVEL_12_0;
@@ -26,5 +28,6 @@ namespace graphicsGadgetLab
 		// supported features
 		bool m_RayTracingSupported = false;
 		bool m_MeshShaderSupported = false;
+		bool m_TearingSupported = false;
 	};
 }

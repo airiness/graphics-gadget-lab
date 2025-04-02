@@ -57,7 +57,7 @@ namespace graphicsGadgetLab
 			}
 		}
 
-		void SetDebugName(ID3D12Object* object, LPCWSTR name) 
+		inline void SetDebugName(ID3D12Object* object, LPCWSTR name) 
 		{
 #if defined(BUILD_DEBUG)
 			if (object) 

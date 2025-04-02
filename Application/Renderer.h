@@ -20,17 +20,17 @@ namespace graphicsGadgetLab
 		void Update() noexcept;
 		void Finalize() noexcept;
 
-		const DX12Device& GetDevice() const noexcept { return m_Device; }
-		const DX12CommandQueue& GetDirectCommandQueue() const noexcept { return m_DirectCommandQueue; }
-		const DX12CommandQueue& GetComputeCommandQueue() const noexcept { return m_ComputeCommandQueue; }
-		const DX12CommandQueue& GetCopyCommandQueue() const noexcept { return m_CopyCommandQueue; }
+		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
+		DX12CommandQueue* GetDirectCommandQueue() const noexcept { return m_DirectCommandQueue.get(); }
+		DX12CommandQueue* GetComputeCommandQueue() const noexcept { return m_ComputeCommandQueue.get(); }
+		DX12CommandQueue* GetCopyCommandQueue() const noexcept { return m_CopyCommandQueue.get(); }
 
 	private:
-		DX12Device m_Device;
+		std::unique_ptr<DX12Device> m_Device;
 
-		DX12CommandQueue m_DirectCommandQueue;
-		DX12CommandQueue m_ComputeCommandQueue;
-		DX12CommandQueue m_CopyCommandQueue;
+		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
+		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
+		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
 
 	};
 }

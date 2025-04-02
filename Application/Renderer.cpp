@@ -3,12 +3,13 @@
 
 namespace graphicsGadgetLab
 {
-	Renderer::Renderer() noexcept :
-		m_Device(),
-		m_DirectCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT),
-		m_ComputeCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE),
-		m_CopyCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY)
+	Renderer::Renderer() noexcept
 	{
+		m_Device = std::make_unique<DX12Device>();
+
+		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(m_Device->Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(m_Device->Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(m_Device->Get(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 	}
 
 	Renderer::~Renderer() noexcept

@@ -91,7 +91,6 @@ namespace graphicsGadgetLab
 			D3D_FEATURE_LEVEL_12_0
 		};
 
-
 		HRESULT hr = E_FAIL;
 		for (auto level : featureLevels)
 		{
@@ -120,6 +119,13 @@ namespace graphicsGadgetLab
 		if (SUCCEEDED(m_D3D12Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(options7))))
 		{
 			m_MeshShaderSupported = (options7.MeshShaderTier != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED);
+		}
+
+		// Tearing support
+		if (m_DxgiFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, 
+			&m_TearingSupported, sizeof(m_TearingSupported)) == S_OK)
+		{
+			m_TearingSupported = false;
 		}
 
 		// VRS, Sampler feedback?
