@@ -11,6 +11,9 @@ namespace graphicsGadgetLab
 		void Update() noexcept;
 		void Finalize() noexcept;
 
+		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
+		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
+
 		HWND GetHwnd() const noexcept { return m_Hwnd; };
 
 		Renderer* GetRenderer() noexcept { return m_Renderer.get(); }

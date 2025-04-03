@@ -44,27 +44,25 @@ namespace graphicsGadgetLab
 #endif
 
 		// Get the name of a command list type
-		constexpr const char* GetCommandListTypeName(D3D12_COMMAND_LIST_TYPE type)
+		constexpr const std::wstring GetCommandListTypeName(D3D12_COMMAND_LIST_TYPE type)
 		{
 			switch (type)
 			{
-			case D3D12_COMMAND_LIST_TYPE_DIRECT:		return "Direct";
-			case D3D12_COMMAND_LIST_TYPE_COMPUTE:		return "Compute";
-			case D3D12_COMMAND_LIST_TYPE_COPY:			return "Copy";
-			case D3D12_COMMAND_LIST_TYPE_VIDEO_DECODE:  return "VideoDecode";
-			case D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS: return "VideoProcess";
-			default: return "Unknown";
+			case D3D12_COMMAND_LIST_TYPE_DIRECT:		return L"Direct";
+			case D3D12_COMMAND_LIST_TYPE_COMPUTE:		return L"Compute";
+			case D3D12_COMMAND_LIST_TYPE_COPY:			return L"Copy";
+			case D3D12_COMMAND_LIST_TYPE_VIDEO_DECODE:  return L"VideoDecode";
+			case D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS: return L"VideoProcess";
+			default: return L"Unknown";
 			}
 		}
 
 		inline void SetDebugName(ID3D12Object* object, LPCWSTR name) 
 		{
-#if defined(BUILD_DEBUG)
 			if (object) 
 			{
 				object->SetName(name);
 			}
-#endif
 		}
 	};
 }

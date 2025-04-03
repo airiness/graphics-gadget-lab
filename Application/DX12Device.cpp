@@ -34,11 +34,6 @@ namespace graphicsGadgetLab
 		ComPtr<IDXGIFactory7> dxgiFactory;
 		utility::ThrowIfFailed(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
-		// Disable Alt+Enter
-		auto* application = Application::Get();
-		auto hWnd = application->GetHwnd();
-		utility::ThrowIfFailed(dxgiFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES));
-
 		m_DxgiFactory = dxgiFactory;
 	}
 
@@ -103,6 +98,11 @@ namespace graphicsGadgetLab
 		}
 
 		utility::ThrowIfFailed(hr);
+
+		// Get IncrementSize
+		m_RTVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		m_DSVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		m_SRVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
 	void DX12Device::CheckFeatureSupport() noexcept

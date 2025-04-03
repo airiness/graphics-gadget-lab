@@ -1,6 +1,7 @@
 #pragma once
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
+#include "DX12SwapChain.h"
 
 namespace graphicsGadgetLab
 {
@@ -31,6 +32,8 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
+
+		std::unique_ptr<DX12SwapChain> m_SwapChain;
 
 	};
 }

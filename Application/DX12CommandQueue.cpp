@@ -29,6 +29,11 @@ namespace graphicsGadgetLab
 		ComPtr<ID3D12CommandQueue> commandQueue;
 		utility::ThrowIfFailed(m_DX12Device->Get()->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)));
 
+#if defined (BUILD_DEBUG)
+		utility::SetDebugName(commandQueue.Get(), 
+			std::format(L"CommandQueue[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
+#endif
+
 		return commandQueue;
 	}
 }
