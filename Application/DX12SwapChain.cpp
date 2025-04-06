@@ -1,7 +1,9 @@
 #include "Precompiled.h"
 #include "DX12SwapChain.h"
-#include "Utility.h"
 #include "Application.h"
+#include "DX12Device.h"
+#include "DX12CommandQueue.h"
+#include "Utility.h"
 
 namespace graphicsGadgetLab
 {
@@ -27,6 +29,7 @@ namespace graphicsGadgetLab
 		auto hWnd = Application::Get()->GetHwnd();
 		auto factory = m_DX12Device->GetDXGIFactory();
 		auto isTearingSupport = m_DX12Device->SupportTearing();
+		const auto bufferCount = DX12Device::GetBufferCount();
 
 		ComPtr<IDXGISwapChain1> swapChain1;
 		DXGI_SWAP_CHAIN_DESC1 desc = {};
@@ -37,7 +40,7 @@ namespace graphicsGadgetLab
 		desc.SampleDesc.Count = 1;
 		desc.SampleDesc.Quality = 0;
 		desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		desc.BufferCount = BufferCount;
+		desc.BufferCount = bufferCount;
 		desc.Scaling = DXGI_SCALING_STRETCH;
 		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
@@ -68,10 +71,12 @@ namespace graphicsGadgetLab
 		m_RTVHandles.clear();
 		m_RTVHeap.Reset();
 
+		const auto bufferCount = DX12Device::GetBufferCount();
+
 		// Create Descriptor Heap	
 		auto device = m_DX12Device->Get();
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = BufferCount;
+		desc.NumDescriptors = bufferCount;
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		desc.NodeMask = 0;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
@@ -79,9 +84,9 @@ namespace graphicsGadgetLab
 		
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RTVHeap->GetCPUDescriptorHandleForHeapStart());
 
-		m_BackBuffers.resize(BufferCount);
-		m_RTVHandles.resize(BufferCount);
-		for (uint32_t i = 0; i < BufferCount; ++i)
+		m_BackBuffers.resize(bufferCount);
+		m_RTVHandles.resize(bufferCount);
+		for (uint32_t i = 0; i < bufferCount; ++i)
 		{
 			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_BackBuffers[i])));
 			device->CreateRenderTargetView(m_BackBuffers[i].Get(), nullptr, rtvHandle);

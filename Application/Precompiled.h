@@ -36,3 +36,4 @@ using namespace DirectX;
 #include <stdexcept>
 #include <cassert>
 #include <format>
+#include <array>

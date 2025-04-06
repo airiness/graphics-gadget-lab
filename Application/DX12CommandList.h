@@ -6,7 +6,8 @@ namespace graphicsGadgetLab
 	class DX12CommandList
 	{
 	public:
-		DX12CommandList() noexcept = default;
+		explicit DX12CommandList(DX12Device* dx12Device,
+			D3D12_COMMAND_LIST_TYPE type) noexcept;
 		~DX12CommandList() noexcept;
 
 		DX12CommandList(const DX12CommandList&) = delete;
@@ -15,11 +16,6 @@ namespace graphicsGadgetLab
 		DX12CommandList(DX12CommandList&&) = delete;
 		DX12CommandList& operator=(DX12CommandList&&) = delete;
 
-		void Initialize(DX12Device* dx12Device,
-			D3D12_COMMAND_LIST_TYPE type) noexcept;
-
-		void Finalize() noexcept;
-
 		void Begin() noexcept;
 		void End() noexcept;
 
@@ -27,7 +23,6 @@ namespace graphicsGadgetLab
 
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_D3D12GraphicsCommandList.Get(); }
 		ID3D12CommandAllocator* GetCommandAllocator() const noexcept { return m_D3D12CommandAllocator.Get(); }
-
 
 	private:
 		void CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept;

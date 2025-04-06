@@ -5,22 +5,16 @@
 
 namespace graphicsGadgetLab
 {
-	DX12CommandList::~DX12CommandList() noexcept
+	DX12CommandList::DX12CommandList(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept :
+		m_DX12Device(dx12Device),
+		m_Type(type)
 	{
-	}
-
-	void DX12CommandList::Initialize(DX12Device* dx12Device,
-		D3D12_COMMAND_LIST_TYPE type) noexcept
-	{
-		m_DX12Device = dx12Device;
-		m_Type = type;
 		CreateCommandAllocator(type);
 		CreateCommandList(type);
 	}
 
-	void DX12CommandList::Finalize() noexcept
+	DX12CommandList::~DX12CommandList() noexcept
 	{
-
 	}
 
 	void DX12CommandList::Begin() noexcept
@@ -66,4 +60,5 @@ namespace graphicsGadgetLab
 
 		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
 	}
+
 }

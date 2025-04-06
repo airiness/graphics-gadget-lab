@@ -1,6 +1,10 @@
 #include "Precompiled.h"
 #include "DX12Device.h"
 #include "Application.h"
+#include "DX12CommandQueue.h"
+#include "DX12SwapChain.h"
+#include "DX12CommandList.h"
+#include "DX12Descriptor.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -15,6 +19,26 @@ namespace graphicsGadgetLab
 
 	DX12Device::~DX12Device() noexcept
 	{
+	}
+
+	void DX12Device::Initialize() noexcept
+	{
+		// CommandQueue
+		InitializeCommandQueues();
+		InitializeSwapChain();
+
+		InitializeCommandLists();
+		InitializeDescriptorHeaps();
+	}
+
+	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
+	{
+		// TODO: Window resize Process 
+	}
+
+	void DX12Device::Finalize() noexcept
+	{
+		// TODO: Finalize process
 	}
 
 	void DX12Device::InitializeDXGIFactory() noexcept
@@ -103,6 +127,40 @@ namespace graphicsGadgetLab
 		m_RTVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		m_DSVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 		m_SRVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+
+	void DX12Device::InitializeCommandQueues() noexcept
+	{
+		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+	}
+
+	void DX12Device::InitializeSwapChain() noexcept
+	{
+		auto* app = Application::Get();
+		auto width = app->GetWindowWidth();
+		auto height = app->GetWindowHeight();
+
+		m_SwapChain = std::make_unique<DX12SwapChain>(this, m_DirectCommandQueue.get(), width, height);
+	}
+
+	void DX12Device::InitializeCommandLists() noexcept
+	{
+		for (int32_t i = 0; i < BufferCount; i++)
+		{
+			m_GraphicsCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
+			m_CopyCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+		}
+	}
+
+	void DX12Device::InitializeDescriptorHeaps() noexcept
+	{
+		m_CbvSrvUavDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1024);
+		m_RtvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 32);
+		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
+		m_SamplerDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 1024);
 	}
 
 	void DX12Device::CheckFeatureSupport() noexcept

@@ -1,10 +1,8 @@
 #pragma once
-#include "DX12Device.h"
-#include "DX12CommandQueue.h"
-#include "DX12SwapChain.h"
 
 namespace graphicsGadgetLab
 {
+	class DX12Device;
 	class Renderer
 	{
 	public:
@@ -19,21 +17,13 @@ namespace graphicsGadgetLab
 
 		void Initialize() noexcept;
 		void Update() noexcept;
+		void Render() noexcept;
 		void Finalize() noexcept;
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		DX12CommandQueue* GetDirectCommandQueue() const noexcept { return m_DirectCommandQueue.get(); }
-		DX12CommandQueue* GetComputeCommandQueue() const noexcept { return m_ComputeCommandQueue.get(); }
-		DX12CommandQueue* GetCopyCommandQueue() const noexcept { return m_CopyCommandQueue.get(); }
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
-
-		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
-		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
-		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
-
-		std::unique_ptr<DX12SwapChain> m_SwapChain;
 
 	};
 }

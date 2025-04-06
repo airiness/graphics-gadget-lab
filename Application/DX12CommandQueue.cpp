@@ -1,7 +1,8 @@
 #include "Precompiled.h"
 #include "DX12CommandQueue.h"
-#include "Utility.h"
 #include "Application.h"
+#include "DX12Device.h"
+#include "Utility.h"
 
 namespace graphicsGadgetLab
 {

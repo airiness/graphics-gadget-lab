@@ -1,67 +1,82 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
+    <Filter Include="Core">
+      <UniqueIdentifier>{bb74519f-06d0-430b-9631-02634c26ac92}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\DX12">
+    <Filter Include="Graphics\DX12">
       <UniqueIdentifier>{f5b4b727-4377-4dc7-8d7e-b4405ebffc37}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Application.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Precompiled.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Renderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="DX12CommandQueue.cpp">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12Device.cpp">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12SwapChain.cpp">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12CommandList.cpp">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="Utility.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Precompiled.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Application.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12Descriptor.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12PipelineState.cpp">
+      <Filter>Graphics\DX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="DX12Device.h">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="DX12SwapChain.h">
-      <Filter>Source Files\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility.h">
-      <Filter>Source Files</Filter>
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Renderer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Precompiled.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Application.h">
-      <Filter>Source Files</Filter>
+      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="DX12CommandList.h">
-      <Filter>Source Files\DX12</Filter>
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="Utility.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Precompiled.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Application.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12Descriptor.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12PipelineState.h">
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

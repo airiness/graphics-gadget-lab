@@ -21,9 +21,6 @@ namespace graphicsGadgetLab
 		void CreateRTVs() noexcept;
 
 	private:
-		static constexpr uint32_t BufferCount = 2;
-
-	private:
 		DX12Device* m_DX12Device = nullptr;
 		DX12CommandQueue* m_DX12CommandQueue = nullptr;
 
