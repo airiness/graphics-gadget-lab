@@ -33,4 +33,10 @@ namespace graphicsGadgetLab
 	void Renderer::Finalize() noexcept
 	{
 	}
+	void Renderer::InitializeRootSignatures() noexcept
+	{
+	}
+	void Renderer::InitializePipelineStates() noexcept
+	{
+	}
 }

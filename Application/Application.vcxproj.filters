@@ -46,6 +46,9 @@
     <ClCompile Include="DX12PipelineState.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="DX12RootSignature.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -76,6 +79,18 @@
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="DX12PipelineState.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12RootSignature.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12ConstantBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12Buffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12Texture.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>

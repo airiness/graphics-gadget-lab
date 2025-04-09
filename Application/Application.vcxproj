@@ -81,6 +81,7 @@
     <ClCompile Include="DX12Descriptor.cpp" />
     <ClCompile Include="DX12Device.cpp" />
     <ClCompile Include="DX12PipelineState.cpp" />
+    <ClCompile Include="DX12RootSignature.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Precompiled.cpp">
@@ -91,12 +92,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />
+    <ClInclude Include="DX12ConstantBuffer.h" />
     <ClInclude Include="DX12Descriptor.h" />
     <ClInclude Include="DX12Device.h" />
     <ClInclude Include="DX12PipelineState.h" />
+    <ClInclude Include="DX12RootSignature.h" />
     <ClInclude Include="DX12SwapChain.h" />
+    <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Utility.h" />
