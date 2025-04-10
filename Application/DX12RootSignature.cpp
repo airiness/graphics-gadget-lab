@@ -25,5 +25,6 @@ namespace graphicsGadgetLab
 		auto device = m_DX12Device->Get();
 
 
+
 	}
 } // namespace graphicsGadgetLab
