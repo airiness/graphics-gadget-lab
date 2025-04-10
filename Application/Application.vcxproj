@@ -88,6 +88,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RendererConstant.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -104,6 +105,7 @@
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RendererConstant.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>
   <ItemGroup>

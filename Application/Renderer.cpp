@@ -2,6 +2,8 @@
 #include "Renderer.h"
 #include "Application.h"
 #include "DX12Device.h"
+#include "DX12RootSignature.h"
+#include "DX12PipelineState.h"
 
 namespace graphicsGadgetLab
 {
@@ -37,7 +39,9 @@ namespace graphicsGadgetLab
 	void Renderer::InitializeRootSignatures() noexcept
 	{
 		// Common RootSignature
-
+		{
+			CD3DX12_ROOT_PARAMETER1 rootParameters[4];
+		}
 
 	}
 
