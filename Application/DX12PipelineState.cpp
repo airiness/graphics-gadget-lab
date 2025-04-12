@@ -47,7 +47,7 @@ namespace graphicsGadgetLab
 	void DX12ComputePipelineState::CreateComputePipelineState() noexcept
 	{
 		auto device = m_DX12Device->Get();
-		utility::ThrowIfFailed(device->CreateComputePipelineState(&m_ComputePSODesc.m_Desc, IID_PPV_ARGS(&m_PipelineState);
+		utility::ThrowIfFailed(device->CreateComputePipelineState(&m_ComputePSODesc.m_Desc, IID_PPV_ARGS(&m_PipelineState)));
 
 		// TODO: debug name
 	}

@@ -11,6 +11,9 @@
     <Filter Include="Graphics\DX12">
       <UniqueIdentifier>{f5b4b727-4377-4dc7-8d7e-b4405ebffc37}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{e898ac8d-f0d5-4655-8f87-f8004c50a20b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -72,9 +75,6 @@
     <ClInclude Include="Utility.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Precompiled.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="Application.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -99,8 +99,19 @@
     <ClInclude Include="RendererConstant.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Precompiled.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Shaders\TexturedModelVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

@@ -1,8 +1,8 @@
 #pragma once
 namespace graphicsGadgetLab
 {
-	class DX12RootSifnature;
-	class DX12PipelinseState;
+	class DX12RootSignature;
+	class DX12PipelineState;
 
 	enum class CommonRSRootParamIndex : uint32_t
 	{
@@ -20,8 +20,16 @@ namespace graphicsGadgetLab
 
 	enum class PSOIndex : uint32_t
 	{
-		NormalTexturePSO = 0,
+		NormalTexturedModelPSO = 0,
 		PSOCount
 	};
-	using PSOArray = std::array<std::unique_ptr<DX12PipelinseState>, static_cast<size_t>(PSOIndex::PSOCount)>;
+	using PSOArray = std::array<std::unique_ptr<DX12PipelineState>, static_cast<size_t>(PSOIndex::PSOCount)>;
+
+
+	struct Vertex
+	{
+		XMFLOAT3 m_Position;
+		XMFLOAT3 m_Normal;
+		XMFLOAT2 m_TexCoord;
+	};
 }

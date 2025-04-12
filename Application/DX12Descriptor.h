@@ -7,6 +7,7 @@ namespace graphicsGadgetLab
 	public:
 		explicit DX12DescriptorHeap(DX12Device* device,
 			D3D12_DESCRIPTOR_HEAP_TYPE type,
+			D3D12_DESCRIPTOR_HEAP_FLAGS flags,
 			uint32_t descriptorCount) noexcept;
 
 		DX12DescriptorHeap(const DX12DescriptorHeap&) = delete;
