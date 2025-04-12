@@ -31,6 +31,7 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12Device> m_Device;
 
 		// RenderTargets
+		
 		// DepthStencil
 
 		RootSignatureArray m_RootSignatures;

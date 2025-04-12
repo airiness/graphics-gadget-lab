@@ -20,7 +20,7 @@ namespace graphicsGadgetLab
 
 	enum class PSOIndex : uint32_t
 	{
-		NormalTexturedModelPSO = 0,
+		TexturedModelPSO = 0,
 		PSOCount
 	};
 	using PSOArray = std::array<std::unique_ptr<DX12PipelineState>, static_cast<size_t>(PSOIndex::PSOCount)>;

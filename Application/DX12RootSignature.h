@@ -13,7 +13,7 @@ namespace graphicsGadgetLab
 		explicit DX12RootSignature(DX12Device* dx12Device, const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept;
 		~DX12RootSignature() noexcept;
 
-		bool IsValid() const noexcept { return m_RootSignature != nullptr; }
+		ID3D12RootSignature* Get() const noexcept { return m_RootSignature.Get(); }
 	private:
 		void CreateRootSignature() noexcept;
 	private:

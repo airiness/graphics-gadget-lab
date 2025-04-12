@@ -14,11 +14,7 @@ namespace graphicsGadgetLab
 
 	DX12RootSignature::~DX12RootSignature() noexcept
 	{
-		if (m_RootSignature)
-		{
-			m_RootSignature->Release();
-			m_RootSignature = nullptr;
-		}
+		// TODO: Finalize DX12 object safety.
 	}
 
 	void DX12RootSignature::CreateRootSignature() noexcept
