@@ -14,6 +14,12 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{e898ac8d-f0d5-4655-8f87-f8004c50a20b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Externals">
+      <UniqueIdentifier>{6c9be8e9-f3c0-480e-b08c-55933a3aeb4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\D3D12MemAlloc">
+      <UniqueIdentifier>{7847d186-1580-4b5a-b232-ed9305fc091c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -54,6 +60,9 @@
     </ClCompile>
     <ClCompile Include="RendererConstant.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
+      <Filter>Externals\D3D12MemAlloc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -101,6 +110,9 @@
     </ClInclude>
     <ClInclude Include="Precompiled.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
+      <Filter>Externals\D3D12MemAlloc</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

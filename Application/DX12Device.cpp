@@ -6,6 +6,7 @@
 #include "DX12CommandList.h"
 #include "DX12Descriptor.h"
 #include "Utility.h"
+#include <D3D12MemAlloc.h>
 
 namespace graphicsGadgetLab
 {
@@ -29,6 +30,8 @@ namespace graphicsGadgetLab
 
 		InitializeCommandLists();
 		InitializeDescriptorHeaps();
+
+		InitializeMemAllocator();
 	}
 
 	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
@@ -38,7 +41,7 @@ namespace graphicsGadgetLab
 
 	void DX12Device::Finalize() noexcept
 	{
-		// TODO: Finalize process
+		FinalizeMemAllocator();
 	}
 
 	void DX12Device::InitializeDXGIFactory() noexcept
@@ -161,6 +164,25 @@ namespace graphicsGadgetLab
 		m_RtvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
 		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 1);
 		m_SamplerDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
+	}
+
+	void DX12Device::InitializeMemAllocator() noexcept
+	{
+		using namespace D3D12MA;
+		D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
+		allocatorDesc.Flags = D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS;
+		allocatorDesc.pDevice = m_D3D12Device.Get();
+		allocatorDesc.pAdapter = m_DxgiAdapter.Get();
+		utility::ThrowIfFailed(D3D12MA::CreateAllocator(&allocatorDesc, &m_MemAllocator));
+	}
+
+	void DX12Device::FinalizeMemAllocator() noexcept
+	{
+		if (m_MemAllocator)
+		{
+			m_MemAllocator->Release();
+			m_MemAllocator = nullptr;
+		}
 	}
 
 	void DX12Device::CheckFeatureSupport() noexcept
