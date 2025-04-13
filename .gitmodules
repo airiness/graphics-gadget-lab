@@ -1,0 +1,3 @@
+[submodule "Externals/Vender/D3D12MemoryAllocator"]
+	path = Externals/Vender/D3D12MemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git
