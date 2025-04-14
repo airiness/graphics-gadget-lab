@@ -64,6 +64,9 @@
     <ClCompile Include="..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClCompile>
+    <ClCompile Include="DX12Resource.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -113,6 +116,9 @@
     </ClInclude>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
       <Filter>Externals\D3D12MemAlloc</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12Resource.h">
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
