@@ -38,3 +38,4 @@ using namespace DirectX;
 #include <cassert>
 #include <format>
 #include <array>
+#include <optional>
