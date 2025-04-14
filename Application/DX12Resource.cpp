@@ -20,8 +20,12 @@ namespace graphicsGadgetLab
 		allocationDesc.ExtraHeapFlags = D3D12_HEAP_FLAG_NONE;
 		allocationDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 		allocationDesc.HeapType = ; //TODO:heap
+		allocationDesc.pPrivateData = nullptr;
 
-		utility::ThrowIfFailed(allocator->CreateResource()
+		D3D12_RESOURCE_DESC desc;
+		CD3DX12_RESOURCE_DESC desc;
+
+		utility::ThrowIfFailed(allocator->CreateResource(&allocationDesc, )
 
 	}
 }
