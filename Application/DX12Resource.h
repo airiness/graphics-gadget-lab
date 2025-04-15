@@ -25,10 +25,10 @@ namespace graphicsGadgetLab
 
 		ID3D12Resource* Get() const;
 
-	private:
+	protected:
 		void CreateAllocation(D3D12_HEAP_TYPE heapType);
 
-	private:
+	protected:
 		DX12Device* m_DX12Deivce = nullptr;
 		CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
 		D3D12_RESOURCE_STATES m_ResourceState = D3D12_RESOURCE_STATE_COMMON;

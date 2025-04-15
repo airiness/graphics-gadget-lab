@@ -90,6 +90,7 @@
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
+    <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
