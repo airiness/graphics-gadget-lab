@@ -17,4 +17,13 @@ namespace graphicsGadgetLab
 	};
 
 	// TODO: A template support constant buffer class
+	template<typename T>
+	class DX12ConstantBuffer
+	{
+	public:
+		
+	private:
+		std::unique_ptr<DX12Buffer> m_ConstantBuffer;
+		T* m_MappedData = nullptr;
+	};
 }

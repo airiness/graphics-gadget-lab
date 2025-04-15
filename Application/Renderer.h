@@ -37,7 +37,7 @@ namespace graphicsGadgetLab
 		RenderTargetArray mRenderTargets;
 
 		// ConstantBuffer
-		std::unique_ptr<DX12Buffer> mMainConstantBuffer;
+		std::unique_ptr<DX12Buffer> m_GlobalConstantBuffer;
 
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;
