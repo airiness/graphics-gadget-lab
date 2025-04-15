@@ -4,6 +4,7 @@
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
+#include "DX12Texture.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -56,8 +57,8 @@ namespace graphicsGadgetLab
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 			rootSignatureDesc.Init_1_1(
-				static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters, 
-				1, staticSamplers, 
+				static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters,
+				1, staticSamplers,
 				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
 			m_RootSignatures[static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)] = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
@@ -107,6 +108,41 @@ namespace graphicsGadgetLab
 
 			m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)] = std::make_unique<DX12GraphicsPipelineState>(m_Device.get(), graphicsPSODesc);
 
+		}
+	}
+
+	void Renderer::InitializeRenderTargets() noexcept
+	{
+		auto app = Application::Get();
+		auto width = app->GetWindowWidth();
+		auto height = app->GetWindowHeight();
+
+		// RenderTargets
+		for (uint32_t i = 0; i < static_cast<uint32_t>(RenderTargetIndex::DS0); ++i)
+		{
+			auto rtFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+			auto rtResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(rtFormat, width, height);
+			const float rtClearColor[] = { 0.0f,0.4f,0.5f,1.0f };
+			auto rtClearValue = CD3DX12_CLEAR_VALUE(rtFormat, rtClearColor);
+
+			mRenderTargets[i] = std::make_unique<DX12Texture>(m_Device.get(),
+				D3D12_HEAP_TYPE_DEFAULT,
+				rtResourceDesc,
+				D3D12_RESOURCE_STATE_RENDER_TARGET,
+				rtClearValue);
+		}
+
+		// DepthStencil
+		{
+			auto dsFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+			auto dsResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(dsFormat, width, height);
+			auto dsClearValue = CD3DX12_CLEAR_VALUE(dsFormat, 1.0f, 0);
+
+			mRenderTargets[static_cast<uint32_t>(RenderTargetIndex::DS0)] = std::make_unique<DX12Texture>(m_Device.get(),
+				D3D12_HEAP_TYPE_DEFAULT,
+				dsResourceDesc,
+				D3D12_RESOURCE_STATE_DEPTH_WRITE,
+				dsClearValue);
 		}
 	}
 }

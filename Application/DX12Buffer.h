@@ -11,5 +11,10 @@ namespace graphicsGadgetLab
 			D3D12_RESOURCE_STATES initState,
 			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
 		virtual ~DX12Buffer() noexcept;
+
+		void* Map();
+		void UnMap();
 	};
+
+	// TODO: A template support constant buffer class
 }

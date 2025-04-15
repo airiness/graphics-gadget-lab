@@ -3,6 +3,7 @@ namespace graphicsGadgetLab
 {
 	class DX12RootSignature;
 	class DX12PipelineState;
+	class DX12Texture;
 
 	enum class CommonRSRootParamIndex : uint32_t
 	{
@@ -25,11 +26,25 @@ namespace graphicsGadgetLab
 	};
 	using PSOArray = std::array<std::unique_ptr<DX12PipelineState>, static_cast<size_t>(PSOIndex::PSOCount)>;
 
-
 	struct Vertex
 	{
 		XMFLOAT3 m_Position;
 		XMFLOAT3 m_Normal;
 		XMFLOAT2 m_TexCoord;
+	};
+
+	enum class RenderTargetIndex : uint32_t
+	{
+		RT0,
+		RT1,
+		RT2,
+		DS0,
+		RTCount
+	};
+	using RenderTargetArray = std::array<std::unique_ptr<DX12Texture>, static_cast<uint32_t>(RenderTargetIndex::RTCount)>;
+
+	struct MainConstantBuffer
+	{
+
 	};
 }

@@ -1,8 +1,5 @@
 #pragma once
-namespace D3D12MA
-{
-	class Allocation;
-}
+#include <D3D12MemAlloc.h>
 
 namespace graphicsGadgetLab
 {
@@ -20,7 +17,7 @@ namespace graphicsGadgetLab
 		DX12Resource(const DX12Resource&) = delete;
 		DX12Resource& operator=(DX12Resource&) = delete;
 
-		DX12Resource(const DX12Resource&&) = default;
+		DX12Resource(DX12Resource&&) = default;
 		DX12Resource& operator=(DX12Resource&&) = default;
 
 		ID3D12Resource* Get() const;

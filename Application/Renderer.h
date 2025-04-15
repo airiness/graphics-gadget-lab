@@ -4,6 +4,8 @@
 namespace graphicsGadgetLab
 {
 	class DX12Device;
+	class DX12Texture;
+	class DX12Buffer;
 	class Renderer
 	{
 	public:
@@ -26,13 +28,16 @@ namespace graphicsGadgetLab
 	private:
 		void InitializeRootSignatures() noexcept;
 		void InitializePipelineStates() noexcept;
+		void InitializeRenderTargets() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 
-		// RenderTargets
-		
-		// DepthStencil
+		// RenderTargets & DepthStencilBuffer
+		RenderTargetArray mRenderTargets;
+
+		// ConstantBuffer
+		std::unique_ptr<DX12Buffer> mMainConstantBuffer;
 
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;

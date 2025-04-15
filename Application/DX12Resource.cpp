@@ -2,7 +2,6 @@
 #include "DX12Resource.h"
 #include "DX12Device.h"
 #include "Utility.h"
-#include <D3D12MemAlloc.h>
 
 namespace graphicsGadgetLab
 {
@@ -16,7 +15,7 @@ namespace graphicsGadgetLab
 		m_ResourceState(initState),
 		m_ClearValue(clearValue)
 	{
-		CreateAllocation();
+		CreateAllocation(heapType);
 	}
 	ID3D12Resource* DX12Resource::Get() const
 	{
