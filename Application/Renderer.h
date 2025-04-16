@@ -6,6 +6,8 @@ namespace graphicsGadgetLab
 	class DX12Device;
 	class DX12Texture;
 	class DX12Buffer;
+	template<typename T>
+	class DX12ConstantBuffer;
 	class Renderer
 	{
 	public:
@@ -29,6 +31,9 @@ namespace graphicsGadgetLab
 		void InitializeRootSignatures() noexcept;
 		void InitializePipelineStates() noexcept;
 		void InitializeRenderTargets() noexcept;
+		void InitializeConstantBuffer() noexcept;
+
+		void UpdateGpuBuffers() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
@@ -37,7 +42,7 @@ namespace graphicsGadgetLab
 		RenderTargetArray mRenderTargets;
 
 		// ConstantBuffer
-		std::unique_ptr<DX12Buffer> m_GlobalConstantBuffer;
+		std::unique_ptr<DX12ConstantBuffer<GlobalConstantBuffer>> m_GlobalConstantBuffer;
 
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;

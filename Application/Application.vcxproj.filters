@@ -73,6 +73,9 @@
     <ClCompile Include="DX12Buffer.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="DX12Fence.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -124,6 +127,9 @@
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClInclude>
     <ClInclude Include="DX12Resource.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12Fence.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>

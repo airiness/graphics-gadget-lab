@@ -87,6 +87,7 @@
     <ClCompile Include="DX12CommandQueue.cpp" />
     <ClCompile Include="DX12Descriptor.cpp" />
     <ClCompile Include="DX12Device.cpp" />
+    <ClCompile Include="DX12Fence.cpp" />
     <ClCompile Include="DX12PipelineState.cpp" />
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
@@ -109,6 +110,7 @@
     <ClInclude Include="DX12ConstantBuffer.h" />
     <ClInclude Include="DX12Descriptor.h" />
     <ClInclude Include="DX12Device.h" />
+    <ClInclude Include="DX12Fence.h" />
     <ClInclude Include="DX12PipelineState.h" />
     <ClInclude Include="DX12Resource.h" />
     <ClInclude Include="DX12RootSignature.h" />

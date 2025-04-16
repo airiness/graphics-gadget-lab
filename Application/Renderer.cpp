@@ -35,6 +35,8 @@ namespace graphicsGadgetLab
 
 	void Renderer::Render() noexcept
 	{
+
+
 	}
 
 	void Renderer::Finalize() noexcept
@@ -145,5 +147,13 @@ namespace graphicsGadgetLab
 				D3D12_RESOURCE_STATE_DEPTH_WRITE,
 				dsClearValue);
 		}
+	}
+	void Renderer::InitializeConstantBuffer() noexcept
+	{
+		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
+
+	}
+	void Renderer::UpdateGpuBuffers() noexcept
+	{
 	}
 }
