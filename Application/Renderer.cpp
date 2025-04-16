@@ -4,6 +4,7 @@
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
+#include "DX12Buffer.h"
 #include "DX12Texture.h"
 #include "Utility.h"
 

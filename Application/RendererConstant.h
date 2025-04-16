@@ -43,7 +43,7 @@ namespace graphicsGadgetLab
 	};
 	using RenderTargetArray = std::array<std::unique_ptr<DX12Texture>, static_cast<uint32_t>(RenderTargetIndex::RTCount)>;
 
-	struct MainConstantBuffer
+	struct GlobalConstantBuffer
 	{
 
 	};
