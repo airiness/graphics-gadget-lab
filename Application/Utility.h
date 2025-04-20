@@ -28,21 +28,6 @@ namespace graphicsGadgetLab
 			}
 		}
 
-		// Assert process
-#ifdef BUILD_DEBUG
-#define ASSERT_MSG(condition, ...) \
-        if (!(condition)) { \
-            fprintf(stderr, "[ASSERT] %s:%d | %s\n  Failed: %s\n  Message: ", \
-                __FILE__, __LINE__, __func__, #condition); \
-            fprintf(stderr, __VA_ARGS__); \
-            fputc('\n', stderr); \
-            fflush(stderr); \
-            std::abort(); \
-        }
-#else
-#define ASSERT_MSG(condition, ...) ((void)0)
-#endif
-
 		// Get the name of a command list type
 		constexpr const std::wstring GetCommandListTypeName(D3D12_COMMAND_LIST_TYPE type)
 		{

@@ -6,7 +6,7 @@
 #include "DX12CommandList.h"
 #include "DX12Descriptor.h"
 #include "Utility.h"
-#include <D3D12MemAlloc.h>
+
 
 namespace graphicsGadgetLab
 {
@@ -85,7 +85,7 @@ namespace graphicsGadgetLab
 			}
 		}
 
-		ASSERT_MSG(m_DxgiAdapter != nullptr, "Create DxgiAdapter failed.");
+		GGLAB_ASSERT_MSG(m_DxgiAdapter != nullptr, "Create DxgiAdapter failed.");
 	}
 
 	void DX12Device::InitializeD3D12Device() noexcept
@@ -127,9 +127,9 @@ namespace graphicsGadgetLab
 		utility::ThrowIfFailed(hr);
 
 		// Get IncrementSize
-		m_RTVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		m_DSVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-		m_SRVDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		m_RtvDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		m_DsvDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		m_CbvSrvUavDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
 	void DX12Device::InitializeCommandQueues() noexcept

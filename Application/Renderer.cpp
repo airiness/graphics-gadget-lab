@@ -4,8 +4,11 @@
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
+#include "DX12CommandList.h"
+#include "DX12SwapChain.h"
 #include "DX12Buffer.h"
 #include "DX12Texture.h"
+#include "DX12Fence.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -35,7 +38,26 @@ namespace graphicsGadgetLab
 
 	void Renderer::Render() noexcept
 	{
+		auto swapChain = m_Device->GetSwapChain();
+		auto cbvDescriptorHeap = m_Device->GetCbvSrvUavDescriptorHeap();
+		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+		auto bufferWidth = swapChain->GetBufferWidth();
+		auto bufferHeight = swapChain->GetBufferHeight();
 
+		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
+		commandList->Begin();
+
+		commandList->SetGraphicsRootSignature(m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)).get());
+		commandList->SetDescriptorHeap(cbvDescriptorHeap);
+
+		commandList->SetViewport(0, 0, bufferWidth, bufferHeight);
+		commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
+
+		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// TODO: raw Command
+		
+
+		// TODO: Management Model Info in another place
 
 	}
 
@@ -153,7 +175,17 @@ namespace graphicsGadgetLab
 		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
 
 	}
+	void Renderer::InitializeSyncObjects() noexcept
+	{
+		m_Fence = std::make_unique<DX12Fence>(m_Device.get());
+
+	}
 	void Renderer::UpdateGpuBuffers() noexcept
+	{
+		UpdateGlobalConstantBuffer();
+
+	}
+	void Renderer::UpdateGlobalConstantBuffer() noexcept
 	{
 	}
 }

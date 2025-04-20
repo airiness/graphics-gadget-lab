@@ -108,9 +108,6 @@
     <ClInclude Include="DX12RootSignature.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="DX12ConstantBuffer.h">
-      <Filter>Graphics\DX12</Filter>
-    </ClInclude>
     <ClInclude Include="DX12Buffer.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
@@ -131,6 +128,9 @@
     </ClInclude>
     <ClInclude Include="DX12Fence.h">
       <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="CoreDef.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

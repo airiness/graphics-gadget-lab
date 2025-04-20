@@ -30,6 +30,9 @@ using namespace Microsoft::WRL;
 #include <DirectXMath.h>
 using namespace DirectX;
 
+// D3D12MA
+#include <D3D12MemAlloc.h>
+
 // C++
 #include <cstdint>
 #include <string>
@@ -39,3 +42,6 @@ using namespace DirectX;
 #include <format>
 #include <array>
 #include <optional>
+
+// Porject define
+#include "CoreDef.h"

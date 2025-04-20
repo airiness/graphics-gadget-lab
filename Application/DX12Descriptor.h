@@ -9,11 +9,7 @@ namespace graphicsGadgetLab
 			D3D12_DESCRIPTOR_HEAP_TYPE type,
 			D3D12_DESCRIPTOR_HEAP_FLAGS flags,
 			uint32_t descriptorCount) noexcept;
-
-		DX12DescriptorHeap(const DX12DescriptorHeap&) = delete;
-		DX12DescriptorHeap& operator=(const DX12DescriptorHeap&) = delete;
-		DX12DescriptorHeap(DX12DescriptorHeap&&) = delete;
-		DX12DescriptorHeap& operator=(DX12DescriptorHeap&&) = delete;
+		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorHeap);
 		~DX12DescriptorHeap() noexcept;
 
 		ID3D12DescriptorHeap* Get() const noexcept { return m_DescriptorHeap.Get(); }

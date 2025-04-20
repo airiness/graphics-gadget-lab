@@ -104,10 +104,10 @@
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="CoreDef.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />
-    <ClInclude Include="DX12ConstantBuffer.h" />
     <ClInclude Include="DX12Descriptor.h" />
     <ClInclude Include="DX12Device.h" />
     <ClInclude Include="DX12Fence.h" />

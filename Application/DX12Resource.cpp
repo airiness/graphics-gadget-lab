@@ -19,7 +19,7 @@ namespace graphicsGadgetLab
 	}
 	ID3D12Resource* DX12Resource::Get() const
 	{
-		return m_D3D12MAAllocation->GetResource();
+		return m_Allocation->GetResource();
 	}
 
 	void DX12Resource::CreateAllocation(D3D12_HEAP_TYPE heapType)
@@ -38,9 +38,8 @@ namespace graphicsGadgetLab
 			&m_ResourceDesc,
 			m_ResourceState,
 			m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
-			&m_D3D12MAAllocation,
-			IID_NULL, nullptr));
-
+			&m_Allocation,
+			IID_PPV_ARGS(&m_ResourcePtr)));
 	}
 }
 

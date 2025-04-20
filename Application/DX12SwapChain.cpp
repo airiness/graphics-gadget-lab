@@ -17,11 +17,35 @@ namespace graphicsGadgetLab
 		m_Format(bufferFormat),
 		m_DxgiSwapChain(CreateSwapChain())
 	{
+		m_BackBufferIndex = m_DxgiSwapChain->GetCurrentBackBufferIndex();
 		CreateRTVs();
 	}
 
 	DX12SwapChain::~DX12SwapChain() noexcept
 	{
+	}
+
+	void DX12SwapChain::OnResize(uint32_t width, uint32_t height) noexcept
+	{
+		m_Width = width;
+		m_Height = height;
+
+		DXGI_SWAP_CHAIN_DESC desc = {};
+		utility::ThrowIfFailed(m_DxgiSwapChain->GetDesc(&desc));
+
+		utility::ThrowIfFailed(m_DxgiSwapChain->ResizeBuffers(desc.BufferCount, m_Width, m_Height, desc.BufferDesc.Format, desc.Flags));
+
+		CreateRTVs();
+	}
+
+	void DX12SwapChain::Present() noexcept
+	{
+
+	}
+
+	ID3D12Resource* DX12SwapChain::GetCurrentBackBuffer() const noexcept
+	{
+		return m_BackBuffers.at(m_BackBufferIndex).Get();
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -96,7 +120,7 @@ namespace graphicsGadgetLab
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
 #endif
-			rtvHandle.Offset(1, m_DX12Device->GetRTVDescriptorSize());
+			rtvHandle.Offset(1, m_DX12Device->GetRtvDescriptorSize());
 		}
 	}
 }

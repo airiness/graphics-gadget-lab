@@ -3,26 +3,30 @@
 namespace graphicsGadgetLab
 {
 	class DX12Device;
+	class DX12CommandQueue;
+	class DX12RootSignature;
+	class DX12DescriptorHeap;
 	class DX12CommandList
 	{
 	public:
 		explicit DX12CommandList(DX12Device* dx12Device,
 			D3D12_COMMAND_LIST_TYPE type) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(DX12CommandList);
 		~DX12CommandList() noexcept;
-
-		DX12CommandList(const DX12CommandList&) = delete;
-		DX12CommandList& operator=(const DX12CommandList&) = delete;
-
-		DX12CommandList(DX12CommandList&&) = delete;
-		DX12CommandList& operator=(DX12CommandList&&) = delete;
 
 		void Begin() noexcept;
 		void End() noexcept;
 
-		void Execute(ID3D12CommandQueue* commandQueue) noexcept;
+		void Execute(DX12CommandQueue* commandQueue) noexcept;
 
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_D3D12GraphicsCommandList.Get(); }
 		ID3D12CommandAllocator* GetCommandAllocator() const noexcept { return m_D3D12CommandAllocator.Get(); }
+
+		void SetGraphicsRootSignature(DX12RootSignature* rootSignature) noexcept;
+		void SetDescriptorHeap(DX12DescriptorHeap* descriptorHeap) noexcept;
+		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept;
+		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) noexcept;
+		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) noexcept;
 
 	private:
 		void CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept;

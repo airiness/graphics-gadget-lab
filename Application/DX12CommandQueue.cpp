@@ -2,6 +2,7 @@
 #include "DX12CommandQueue.h"
 #include "Application.h"
 #include "DX12Device.h"
+#include "DX12Fence.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -14,6 +15,11 @@ namespace graphicsGadgetLab
 		m_DX12Device(dx12Device),
 		m_D3D12CommandQueue(CreateCommandQueue(type, priority, flags))
 	{	
+	}
+
+	void DX12CommandQueue::Signal(DX12Fence* fence, uint64_t value) noexcept
+	{
+		utility::ThrowIfFailed(m_D3D12CommandQueue->Signal(fence->Get(), value));
 	}
 
 	ComPtr<ID3D12CommandQueue> DX12CommandQueue::CreateCommandQueue(

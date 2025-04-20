@@ -8,17 +8,14 @@ namespace graphicsGadgetLab
 	class DX12Buffer;
 	template<typename T>
 	class DX12ConstantBuffer;
+	class DX12Fence;
 	class Renderer
 	{
 	public:
 		Renderer() noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
 		~Renderer() noexcept;
 
-		Renderer(const Renderer&) = delete;
-		Renderer& operator=(const Renderer&) = delete;
-
-		Renderer(Renderer&&) = delete;
-		Renderer& operator=(Renderer&&) = delete;
 
 		void Initialize() noexcept;
 		void Update() noexcept;
@@ -32,8 +29,10 @@ namespace graphicsGadgetLab
 		void InitializePipelineStates() noexcept;
 		void InitializeRenderTargets() noexcept;
 		void InitializeConstantBuffer() noexcept;
+		void InitializeSyncObjects() noexcept;
 
 		void UpdateGpuBuffers() noexcept;
+		void UpdateGlobalConstantBuffer() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
@@ -47,5 +46,6 @@ namespace graphicsGadgetLab
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;
 
+		std::unique_ptr<DX12Fence> m_Fence;
 	};
 }

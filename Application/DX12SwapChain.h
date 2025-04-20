@@ -13,8 +13,16 @@ namespace graphicsGadgetLab
 			DXGI_FORMAT bufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM) noexcept;
 		~DX12SwapChain() noexcept;
 
-		// TODO: Resize SwapChain support
-		//void Resize(uint32_t width, uint32_t height) noexcept;
+		void OnResize(uint32_t width, uint32_t height) noexcept;
+
+		uint32_t GetBufferWidth() const noexcept { return m_Width; }
+		uint32_t GetBufferHeight() const noexcept { return m_Height; }
+
+		void Present() noexcept;
+
+		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
+
+		ID3D12Resource* GetCurrentBackBuffer() const noexcept;
 
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
@@ -34,6 +42,8 @@ namespace graphicsGadgetLab
 		ComPtr<ID3D12DescriptorHeap> m_RTVHeap;
 		std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_RTVHandles;
 		std::vector<ComPtr<ID3D12Resource>> m_BackBuffers;
+
+		uint32_t m_BackBufferIndex = 0;
 	};
 }
 

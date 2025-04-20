@@ -39,7 +39,7 @@ namespace graphicsGadgetLab
 		m_BufferSize(CalcBufferSize())
 	{
 		auto rtResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_BufferSize);
-		m_ConstantBuffer = std::make_unique<DX12Buffer>(device, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ, std::nullopt);
+		m_ConstantBuffer = std::make_unique<DX12Buffer>(device, D3D12_HEAP_TYPE_UPLOAD, rtResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, std::nullopt);
 		m_MappedData = reinterpret_cast<T*>(m_ConstantBuffer->Map());
 	}
 

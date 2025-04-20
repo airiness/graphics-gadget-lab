@@ -1,6 +1,9 @@
 #include "Precompiled.h"
 #include "DX12CommandList.h"
+#include "DX12CommandQueue.h"
 #include "DX12Device.h"
+#include "DX12RootSignature.h"
+#include "DX12Descriptor.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -21,7 +24,6 @@ namespace graphicsGadgetLab
 	{
 		utility::ThrowIfFailed(m_D3D12CommandAllocator->Reset());
 		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Reset(m_D3D12CommandAllocator.Get(), nullptr));
-
 	}
 
 	void DX12CommandList::End() noexcept
@@ -29,10 +31,40 @@ namespace graphicsGadgetLab
 		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
 	}
 
-	void DX12CommandList::Execute(ID3D12CommandQueue* commandQueue) noexcept
+	void DX12CommandList::Execute(DX12CommandQueue* commandQueue) noexcept
 	{
 		ID3D12CommandList* const commandLists[] = { m_D3D12GraphicsCommandList.Get() };
-		commandQueue->ExecuteCommandLists(_countof(commandLists), commandLists);
+		commandQueue->Get()->ExecuteCommandLists(_countof(commandLists), commandLists);
+	}
+
+	void DX12CommandList::SetGraphicsRootSignature(DX12RootSignature* rootSignature) noexcept
+	{
+		m_D3D12GraphicsCommandList->SetGraphicsRootSignature(rootSignature->Get());
+	}
+
+	void DX12CommandList::SetDescriptorHeap(DX12DescriptorHeap* descriptorHeap) noexcept
+	{
+		ID3D12DescriptorHeap* heaps[] = { descriptorHeap->Get() };
+		m_D3D12GraphicsCommandList->SetDescriptorHeaps(1, heaps);
+	}
+
+	void DX12CommandList::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept
+	{
+		CD3DX12_VIEWPORT viewport(static_cast<FLOAT>(x), static_cast<FLOAT>(y), static_cast<FLOAT>(width), static_cast<FLOAT>(height));
+		m_D3D12GraphicsCommandList->RSSetViewports(1, &viewport);
+	}
+
+	void DX12CommandList::SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) noexcept
+	{
+		auto right = left + width;
+		auto bottom = top + height;
+		CD3DX12_RECT scissorRect(left, top, right, bottom);
+		m_D3D12GraphicsCommandList->RSSetScissorRects(1, &scissorRect);
+	}
+
+	void DX12CommandList::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) noexcept
+	{
+		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
 	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept

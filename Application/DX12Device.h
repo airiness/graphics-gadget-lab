@@ -15,10 +15,7 @@ namespace graphicsGadgetLab
 	{
 	public:
 		DX12Device() noexcept;
-		DX12Device(const DX12Device&) = delete;
-		DX12Device& operator=(const DX12Device&) = delete;
-		DX12Device(DX12Device&&) = delete;
-		DX12Device& operator=(DX12Device&&) = delete;
+		GGLAB_DELETE_COPYABLE_MOVABLE(DX12Device);
 		~DX12Device() noexcept;
 
 		void Initialize() noexcept;
@@ -28,16 +25,27 @@ namespace graphicsGadgetLab
 		ID3D12Device* Get() const noexcept { return m_D3D12Device.Get(); }
 		IDXGIFactory7* GetDXGIFactory() const noexcept { return m_DxgiFactory.Get(); }
 		IDXGIAdapter1* GetDXGIAdapter() const noexcept { return m_DxgiAdapter.Get(); }
-
+		
 		D3D12MA::Allocator* GetMemAllocator() const noexcept { return m_MemAllocator.Get(); }
 
-		DX12CommandQueue* GetDirectCommandQueue() const noexcept { return m_DirectCommandQueue.get(); }
+		DX12SwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
+
+		DX12CommandQueue* GetGraphicsCommandQueue() const noexcept { return m_DirectCommandQueue.get(); }
 		DX12CommandQueue* GetComputeCommandQueue() const noexcept { return m_ComputeCommandQueue.get(); }
 		DX12CommandQueue* GetCopyCommandQueue() const noexcept { return m_CopyCommandQueue.get(); }
 
-		uint32_t GetRTVDescriptorSize() const noexcept { return m_RTVDescriptorSize; }
-		uint32_t GetDSVDescriptorSize() const noexcept { return m_DSVDescriptorSize; }
-		uint32_t GetSRVDescriptorSize() const noexcept { return m_SRVDescriptorSize; }
+		DX12CommandList* GetGraphicsCommandList(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandLists.at(bufferIndex).get(); }
+		DX12CommandList* GetComputeCommandList(uint32_t bufferIndex) const noexcept { return m_ComputeCommandLists.at(bufferIndex).get(); }
+		DX12CommandList* GetCopyCommandList(uint32_t bufferIndex) const noexcept { return m_CopyCommandLists.at(bufferIndex).get(); }
+
+		uint32_t GetRtvDescriptorSize() const noexcept { return m_RtvDescriptorSize; }
+		uint32_t GetDsvDescriptorSize() const noexcept { return m_DsvDescriptorSize; }
+		uint32_t GetCbvSrvUavDescriptorSize() const noexcept { return m_CbvSrvUavDescriptorSize; }
+
+		DX12DescriptorHeap* GetRtvDescriptorHeap() const noexcept { return m_RtvDescriptorHeap.get(); }
+		DX12DescriptorHeap* GetDsvDescriptorHeap() const noexcept { return m_DsvDescriptorHeap.get(); }
+		DX12DescriptorHeap* GetCbvSrvUavDescriptorHeap() const noexcept { return m_CbvSrvUavDescriptorHeap.get(); }
+		DX12DescriptorHeap* GetSamplerDescriptorHeap() const noexcept { return m_SamplerDescriptorHeap.get(); }
 
 		bool SupportRayTracing() const noexcept { return m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_MeshShaderSupported; }
@@ -75,15 +83,16 @@ namespace graphicsGadgetLab
 
 		D3D_FEATURE_LEVEL m_FeatureLevel = D3D_FEATURE_LEVEL_12_0;
 
-		uint32_t m_RTVDescriptorSize = 0;
-		uint32_t m_SRVDescriptorSize = 0;
-		uint32_t m_DSVDescriptorSize = 0;
+		uint32_t m_RtvDescriptorSize = 0;
+		uint32_t m_DsvDescriptorSize = 0;
+		uint32_t m_CbvSrvUavDescriptorSize = 0;
 
 		// supported features
 		bool m_RayTracingSupported = false;
 		bool m_MeshShaderSupported = false;
 		bool m_TearingSupported = false;
 
+		// TODO: CommandList pool?
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_CopyCommandLists;
