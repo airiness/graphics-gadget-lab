@@ -3,6 +3,7 @@
 #include "Application.h"
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
+#include "DX12CommandList.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -46,6 +47,32 @@ namespace graphicsGadgetLab
 	ID3D12Resource* DX12SwapChain::GetCurrentBackBuffer() const noexcept
 	{
 		return m_BackBuffers.at(m_BackBufferIndex).Get();
+	}
+
+	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) noexcept
+	{
+
+		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT,
+			D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+		commandList->GetCommandAllocator
+
+
+	}
+
+	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList, int32_t bufferIndex) noexcept
+	{
+	}
+
+	void DX12SwapChain::TransitionBackBufferState(DX12CommandList* commandList, 
+		int32_t bufferIndex, 
+		D3D12_RESOURCE_STATES stateBefore, 
+		D3D12_RESOURCE_STATES stateAfter)
+	{
+		auto& backBuffer = m_BackBuffers[bufferIndex];
+		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),before, )
+
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept

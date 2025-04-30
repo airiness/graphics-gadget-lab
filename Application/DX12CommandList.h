@@ -27,6 +27,7 @@ namespace graphicsGadgetLab
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) noexcept;
 		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) noexcept;
+		void ResourceBarriers(const std::) noexcept;
 
 	private:
 		void CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept;

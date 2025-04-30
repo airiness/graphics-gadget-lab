@@ -67,6 +67,12 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
+	void DX12CommandList::ResourceBarriers() noexcept
+	{
+
+
+	}
+
 	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept
 	{
 		auto device = m_DX12Device->Get();

@@ -24,6 +24,14 @@ namespace graphicsGadgetLab
 
 		ID3D12Resource* GetCurrentBackBuffer() const noexcept;
 
+		void PrepareBackBuffer(DX12CommandList* commandList) noexcept;
+		void FinishBackBuffer(DX12CommandList* commandList) noexcept;
+
+		void TransitionBackBufferState(DX12CommandList* commandList, 
+			int32_t bufferIndex, 
+			D3D12_RESOURCE_STATES before, 
+			D3D12_RESOURCE_STATES after);
+
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
 		void CreateRTVs() noexcept;

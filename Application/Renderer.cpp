@@ -54,8 +54,9 @@ namespace graphicsGadgetLab
 		commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
 
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		// TODO: raw Command
 		
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapChain)
+
 
 		// TODO: Management Model Info in another place
 
