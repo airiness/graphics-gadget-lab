@@ -14,6 +14,15 @@ namespace graphicsGadgetLab
 	class DX12Device
 	{
 	public:
+		struct DX12FeatureSupport
+		{
+			bool m_RayTracingSupported = false;
+			bool m_MeshShaderSupported = false;
+			bool m_TearingSupported = false;
+			bool m_EnhancedBarriers = false;
+		};
+
+	public:
 		DX12Device() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12Device);
 		~DX12Device() noexcept;
@@ -47,9 +56,9 @@ namespace graphicsGadgetLab
 		DX12DescriptorHeap* GetCbvSrvUavDescriptorHeap() const noexcept { return m_CbvSrvUavDescriptorHeap.get(); }
 		DX12DescriptorHeap* GetSamplerDescriptorHeap() const noexcept { return m_SamplerDescriptorHeap.get(); }
 
-		bool SupportRayTracing() const noexcept { return m_RayTracingSupported; }
-		bool SupportMeshShader() const noexcept { return m_MeshShaderSupported; }
-		bool SupportTearing() const noexcept { return m_TearingSupported; }
+		bool SupportRayTracing() const noexcept { return m_DX12FeatureSupport.m_RayTracingSupported; }
+		bool SupportMeshShader() const noexcept { return m_DX12FeatureSupport.m_MeshShaderSupported; }
+		bool SupportTearing() const noexcept { return m_DX12FeatureSupport.m_TearingSupported; }
 
 		static uint32_t GetBufferCount() noexcept { return BufferCount; }
 	private:
@@ -88,9 +97,7 @@ namespace graphicsGadgetLab
 		uint32_t m_CbvSrvUavDescriptorSize = 0;
 
 		// supported features
-		bool m_RayTracingSupported = false;
-		bool m_MeshShaderSupported = false;
-		bool m_TearingSupported = false;
+		DX12FeatureSupport m_DX12FeatureSupport;
 
 		// TODO: CommandList pool?
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;

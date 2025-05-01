@@ -67,9 +67,29 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
-	void DX12CommandList::ResourceBarriers() noexcept
+	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
 	{
+		m_TextureBarriers.push_back(textureBarrier);
+	}
 
+	void DX12CommandList::AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept
+	{
+		m_BufferBarriers.push_back(bufferBarrier);
+	}
+
+	void DX12CommandList::AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept
+	{
+		m_GlobalBarriers.push_back(globalBarrier);
+	}
+
+	void DX12CommandList::FlushBarriers() noexcept
+	{
+		std::vector<CD3DX12_BARRIER_GROUP> barrierGroups;
+		if (!m_TextureBarriers.empty())
+		{
+			CD3DX12_BARRIER_GROUP group(static_cast<UINT32>(m_TextureBarriers.size()), m_TextureBarriers.data());
+			barrierGroups.push_back(group);
+		}
 
 	}
 
@@ -82,8 +102,6 @@ namespace graphicsGadgetLab
 		utility::SetDebugName(m_D3D12CommandAllocator.Get(),
 			std::format(L"CommandAllocator[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
 #endif
-
-
 	}
 	void DX12CommandList::CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept
 	{

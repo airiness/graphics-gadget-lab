@@ -51,17 +51,16 @@ namespace graphicsGadgetLab
 
 	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) noexcept
 	{
-
 		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_PRESENT,
 			D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-		commandList->GetCommandAllocator
+		commandList->
 
 
 	}
 
-	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList, int32_t bufferIndex) noexcept
+	void DX12SwapChain::FinishBackBuffer(DX12CommandList* commandList) noexcept
 	{
 	}
 

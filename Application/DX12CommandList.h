@@ -27,19 +27,25 @@ namespace graphicsGadgetLab
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) noexcept;
 		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) noexcept;
-		void ResourceBarriers(const std::) noexcept;
+		void AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept;
+		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
+		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
+		void FlushBarriers() noexcept;
 
 	private:
 		void CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept;
 		void CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept;
-
 	private:
 		DX12Device* m_DX12Device = nullptr;
 
 		D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-		ComPtr<ID3D12GraphicsCommandList> m_D3D12GraphicsCommandList;
+		ComPtr<ID3D12GraphicsCommandList7> m_D3D12GraphicsCommandList;
 		ComPtr<ID3D12CommandAllocator> m_D3D12CommandAllocator;
+
+		std::vector<CD3DX12_TEXTURE_BARRIER> m_TextureBarriers;
+		std::vector<CD3DX12_BUFFER_BARRIER> m_BufferBarriers;
+		std::vector<CD3DX12_GLOBAL_BARRIER> m_GlobalBarriers;
 
 	};
 }

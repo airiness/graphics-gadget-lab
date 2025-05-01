@@ -187,27 +187,23 @@ namespace graphicsGadgetLab
 
 	void DX12Device::CheckFeatureSupport() noexcept
 	{
+		CD3DX12FeatureSupport featureSupport;
+		featureSupport.Init(m_D3D12Device.Get());
+
 		// RatTracing support
-		D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-		if (SUCCEEDED(m_D3D12Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS5))))
-		{
-			m_RayTracingSupported = (options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED);
-		}
+		m_DX12FeatureSupport.m_RayTracingSupported = featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
 
 		// MeshShader support
-		D3D12_FEATURE_DATA_D3D12_OPTIONS7 options7 = {};
-		if (SUCCEEDED(m_D3D12Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options7, sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS7))))
-		{
-			m_MeshShaderSupported = (options7.MeshShaderTier != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED);
-		}
+		m_DX12FeatureSupport.m_MeshShaderSupported = featureSupport.MeshShaderTier() != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED;
+
+		// Enhanced Barrier
+		m_DX12FeatureSupport.m_EnhancedBarriers = featureSupport.EnhancedBarriersSupported();
 
 		// Tearing support
-		if (m_DxgiFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, 
-			&m_TearingSupported, sizeof(BOOL)) == S_OK)
+		BOOL tearSupport = FALSE;
+		if (m_DxgiFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearSupport, sizeof(BOOL)) == S_OK)
 		{
-			m_TearingSupported = false;
+			m_DX12FeatureSupport.m_TearingSupported = tearSupport;
 		}
-
-		// VRS, Sampler feedback?
 	}
 }
