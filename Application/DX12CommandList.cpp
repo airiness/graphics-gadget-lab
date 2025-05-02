@@ -91,6 +91,11 @@ namespace graphicsGadgetLab
 			barrierGroups.push_back(group);
 		}
 
+		if (!m_BufferBarriers.empty())
+		{
+			
+		}
+
 	}
 
 	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept
