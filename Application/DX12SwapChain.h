@@ -3,6 +3,7 @@ namespace graphicsGadgetLab
 {
 	class DX12Device;
 	class DX12CommandQueue;
+	class DX12CommandList;
 	class DX12SwapChain
 	{
 	public:

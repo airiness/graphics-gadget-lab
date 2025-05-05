@@ -55,8 +55,7 @@ namespace graphicsGadgetLab
 
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(swapChain)
-
+		// TODO: SetRenderTarget
 
 		// TODO: Management Model Info in another place
 

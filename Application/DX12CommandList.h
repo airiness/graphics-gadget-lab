@@ -27,6 +27,7 @@ namespace graphicsGadgetLab
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) noexcept;
 		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) noexcept;
+		void SetRenderTargets(std::span<DX12Descriptor*> rtDescriptors, DX12Descriptor* dsDescriptor) noexcept;
 		void AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept;
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;

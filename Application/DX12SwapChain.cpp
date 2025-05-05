@@ -51,11 +51,8 @@ namespace graphicsGadgetLab
 
 	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) noexcept
 	{
-		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
-			D3D12_RESOURCE_STATE_PRESENT,
-			D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-		commandList->
+		CD3DX12_TEXTURE_BARRIER backBufferBarrier()
+		commandList->AddTextureBarrier()
 
 
 	}

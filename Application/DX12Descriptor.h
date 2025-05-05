@@ -22,6 +22,16 @@ namespace graphicsGadgetLab
 		ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
 	};
 
+
+	class DX12Descriptor
+	{
+	public:
+
+
+	private:
+		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle;
+	};
 }
 
 

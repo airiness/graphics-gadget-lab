@@ -93,9 +93,21 @@ namespace graphicsGadgetLab
 
 		if (!m_BufferBarriers.empty())
 		{
-			
+			CD3DX12_BARRIER_GROUP group(static_cast<UINT32>(m_BufferBarriers.size()), m_BufferBarriers.data());
+			barrierGroups.push_back(group);
 		}
 
+		if (!m_GlobalBarriers.empty())
+		{
+			CD3DX12_BARRIER_GROUP group(static_cast<UINT32>(m_GlobalBarriers.size()), m_GlobalBarriers.data());
+			barrierGroups.push_back(group);
+		}
+
+		m_D3D12GraphicsCommandList->Barrier(static_cast<UINT32>(barrierGroups.size()), barrierGroups.data());
+
+		m_TextureBarriers.clear();
+		m_BufferBarriers.clear();
+		m_GlobalBarriers.clear();
 	}
 
 	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept
