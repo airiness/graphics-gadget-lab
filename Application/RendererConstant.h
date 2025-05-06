@@ -45,8 +45,8 @@ namespace graphicsGadgetLab
 
 	struct GlobalConstantBuffer
 	{
-		XMFLOAT4X4 mModelMatrix;
-		XMFLOAT4X4 mViewMatrix;
-		XMFLOAT4X4 mProjectionMatrix;
+		XMFLOAT4X4 m_ModelMatrix;
+		XMFLOAT4X4 m_ViewMatrix;
+		XMFLOAT4X4 m_ProjectionMatrix;
 	};
 }

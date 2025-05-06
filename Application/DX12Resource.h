@@ -6,6 +6,7 @@ namespace graphicsGadgetLab
 	class DX12Resource
 	{
 	public:
+		DX12Resource() = default;
 		explicit DX12Resource(DX12Device* device, 
 			D3D12_HEAP_TYPE heapType,
 			const CD3DX12_RESOURCE_DESC& resourceDesc,

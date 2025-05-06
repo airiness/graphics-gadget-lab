@@ -60,7 +60,7 @@ namespace graphicsGadgetLab
 		commandList->FlushBarriers();
 
 		DX12Descriptor rtDescriptors[] = { swapChain->GetCurrentBackBuffer() };
-		commandList->SetRenderTargets()
+		commandList->SetRenderTargets();
 		// TODO: Management Model Info in another place
 
 	}
