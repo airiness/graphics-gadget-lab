@@ -49,26 +49,23 @@ namespace graphicsGadgetLab
 		return m_BackBuffers.at(m_BackBufferIndex).Get();
 	}
 
-	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) noexcept
+	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) const noexcept
 	{
-		CD3DX12_TEXTURE_BARRIER backBufferBarrier()
-		commandList->AddTextureBarrier()
-
-
+		CD3DX12_TEXTURE_BARRIER barrier(
+			D3D12_BARRIER_SYNC_NONE,
+			D3D12_BARRIER_SYNC_RENDER_TARGET,
+			D3D12_BARRIER_ACCESS_COMMON,
+			D3D12_BARRIER_ACCESS_RENDER_TARGET,
+			D3D12_BARRIER_LAYOUT_PRESENT,
+			D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+			GetCurrentBackBuffer(),
+			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0)
+		);
+		commandList->AddTextureBarrier(barrier);
 	}
 
 	void DX12SwapChain::FinishBackBuffer(DX12CommandList* commandList) noexcept
 	{
-	}
-
-	void DX12SwapChain::TransitionBackBufferState(DX12CommandList* commandList, 
-		int32_t bufferIndex, 
-		D3D12_RESOURCE_STATES stateBefore, 
-		D3D12_RESOURCE_STATES stateAfter)
-	{
-		auto& backBuffer = m_BackBuffers[bufferIndex];
-		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer.Get(),before, )
-
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -115,30 +112,30 @@ namespace graphicsGadgetLab
 	void DX12SwapChain::CreateRTVs() noexcept
 	{
 		m_BackBuffers.clear();	// TODO: Clear backbuffers in Resize()
-		m_RTVHandles.clear();
-		m_RTVHeap.Reset();
+		m_BackBufferDescriptors.clear();
+		//m_RtvHeap.Reset();
 
 		const auto bufferCount = DX12Device::GetBufferCount();
 
 		// Create Descriptor Heap	
-		auto device = m_DX12Device->Get();
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = bufferCount;
-		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		desc.NodeMask = 0;
-		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		utility::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_RTVHeap)));
-		
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RTVHeap->GetCPUDescriptorHandleForHeapStart());
+		//auto device = m_DX12Device->Get();
+		//D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+		//desc.NumDescriptors = bufferCount;
+		//desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		//desc.NodeMask = 0;
+		//desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		//utility::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_RtvHeap)));
+		//
+		//CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart());
 
 		m_BackBuffers.resize(bufferCount);
-		m_RTVHandles.resize(bufferCount);
+		//m_RtvHandles.resize(bufferCount);
 		for (uint32_t i = 0; i < bufferCount; ++i)
 		{
 			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_BackBuffers[i])));
 			device->CreateRenderTargetView(m_BackBuffers[i].Get(), nullptr, rtvHandle);
 
-			m_RTVHandles.push_back(rtvHandle);
+			m_RtvHandles.push_back(rtvHandle);
 
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());

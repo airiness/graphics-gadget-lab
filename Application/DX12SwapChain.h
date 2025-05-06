@@ -25,14 +25,8 @@ namespace graphicsGadgetLab
 
 		ID3D12Resource* GetCurrentBackBuffer() const noexcept;
 
-		void PrepareBackBuffer(DX12CommandList* commandList) noexcept;
+		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
 		void FinishBackBuffer(DX12CommandList* commandList) noexcept;
-
-		void TransitionBackBufferState(DX12CommandList* commandList, 
-			int32_t bufferIndex, 
-			D3D12_RESOURCE_STATES before, 
-			D3D12_RESOURCE_STATES after);
-
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
 		void CreateRTVs() noexcept;
@@ -48,8 +42,8 @@ namespace graphicsGadgetLab
 
 		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
 
-		ComPtr<ID3D12DescriptorHeap> m_RTVHeap;
-		std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_RTVHandles;
+		//ComPtr<ID3D12DescriptorHeap> m_RtvHeap; // TODO: Get Descriptor From Device; Make Descriptor Allocator
+		std::vector<DX12Descriptor> m_BackBufferDescriptors;
 		std::vector<ComPtr<ID3D12Resource>> m_BackBuffers;
 
 		uint32_t m_BackBufferIndex = 0;

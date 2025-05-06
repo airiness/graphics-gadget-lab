@@ -9,6 +9,7 @@
 #include "DX12Buffer.h"
 #include "DX12Texture.h"
 #include "DX12Fence.h"
+#include "DX12Descriptor.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -55,8 +56,11 @@ namespace graphicsGadgetLab
 
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		
-		// TODO: SetRenderTarget
+		swapChain->PrepareBackBuffer(commandList);
+		commandList->FlushBarriers();
 
+		DX12Descriptor rtDescriptors[] = { swapChain->GetCurrentBackBuffer() };
+		commandList->SetRenderTargets()
 		// TODO: Management Model Info in another place
 
 	}

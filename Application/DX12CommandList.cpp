@@ -67,6 +67,25 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
+	void DX12CommandList::SetRenderTargets(std::span<DX12Descriptor> rtDescriptors, DX12Descriptor* dsDescriptor) noexcept
+	{
+		auto rtCount = rtDescriptors.size();
+
+		std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> rtHandles(rtCount);
+		for (int32_t index = 0; index < rtCount; ++index)
+		{
+			rtHandles.at(index) = (rtDescriptors[index].m_CpuHandle);
+		}
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE* dsHandle = nullptr;
+		if (dsDescriptor)
+		{
+			dsHandle = &dsDescriptor->m_CpuHandle;
+		}
+
+		m_D3D12GraphicsCommandList->OMSetRenderTargets(rtCount, rtHandles.data(), FALSE, dsHandle);
+	}
+
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
 	{
 		m_TextureBarriers.push_back(textureBarrier);

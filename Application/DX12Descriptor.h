@@ -2,6 +2,13 @@
 namespace graphicsGadgetLab
 {
 	class DX12Device;
+
+	struct DX12Descriptor
+	{
+		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle;
+	};
+
 	class DX12DescriptorHeap
 	{
 	public:
@@ -23,15 +30,6 @@ namespace graphicsGadgetLab
 	};
 
 
-	class DX12Descriptor
-	{
-	public:
-
-
-	private:
-		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle;
-	};
 }
 
 
