@@ -22,12 +22,13 @@ namespace graphicsGadgetLab
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		DX12Descriptor GetCurrentBackBufferDescriptor() const noexcept;
-
-		//ID3D12Resource* GetCurrentBackBuffer() const noexcept;
+		DX12Descriptor GetBackBufferDescriptor(int32_t bufferIndex) const noexcept;
+		ID3D12Resource* GetCurrentBackBuffer() const noexcept;
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
 		void FinishBackBuffer(DX12CommandList* commandList) noexcept;
+		void ClearBackBuffer(DX12CommandList* commandList) noexcept;
+
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
 		void CreateRTVs() noexcept;

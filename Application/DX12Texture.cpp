@@ -15,8 +15,11 @@ namespace graphicsGadgetLab
 	DX12Texture::~DX12Texture() noexcept
 	{
 	}
-	void DX12Texture::CreateFromSwapChain() noexcept
+
+	void DX12Texture::CreateFromSwapChain(ID3D12Resource* backBuffer) noexcept
 	{
+		
+
 	}
 }
 

@@ -31,20 +31,20 @@ namespace graphicsGadgetLab
 		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
 	}
 
-	void DX12CommandList::Execute(DX12CommandQueue* commandQueue) noexcept
+	void DX12CommandList::Execute(const DX12CommandQueue& commandQueue) noexcept
 	{
 		ID3D12CommandList* const commandLists[] = { m_D3D12GraphicsCommandList.Get() };
 		commandQueue->Get()->ExecuteCommandLists(_countof(commandLists), commandLists);
 	}
 
-	void DX12CommandList::SetGraphicsRootSignature(DX12RootSignature* rootSignature) noexcept
+	void DX12CommandList::SetGraphicsRootSignature(const DX12RootSignature& rootSignature) noexcept
 	{
-		m_D3D12GraphicsCommandList->SetGraphicsRootSignature(rootSignature->Get());
+		m_D3D12GraphicsCommandList->SetGraphicsRootSignature(rootSignature.Get());
 	}
 
-	void DX12CommandList::SetDescriptorHeap(DX12DescriptorHeap* descriptorHeap) noexcept
+	void DX12CommandList::SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) noexcept
 	{
-		ID3D12DescriptorHeap* heaps[] = { descriptorHeap->Get() };
+		ID3D12DescriptorHeap* heaps[] = { descriptorHeap.Get() };
 		m_D3D12GraphicsCommandList->SetDescriptorHeaps(1, heaps);
 	}
 
@@ -127,6 +127,15 @@ namespace graphicsGadgetLab
 		m_TextureBarriers.clear();
 		m_BufferBarriers.clear();
 		m_GlobalBarriers.clear();
+	}
+
+	void DX12CommandList::ClearRenderTarget(DX12Descriptor rtDescriptor, const float* clearColor) noexcept
+	{
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.m_CpuHandle, clearColor, 0, nullptr);
+	}
+
+	void DX12CommandList::ClearDepthStencil(DX12Descriptor dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue) noexcept
+	{
 	}
 
 	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept

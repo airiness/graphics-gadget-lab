@@ -4,6 +4,7 @@
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
+#include "DX12Descriptor.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -44,6 +45,11 @@ namespace graphicsGadgetLab
 
 	}
 
+	DX12Descriptor DX12SwapChain::GetBackBufferDescriptor(int32_t bufferIndex) const noexcept
+	{
+		return m_BackBufferDescriptors[bufferIndex];
+	}
+
 	ID3D12Resource* DX12SwapChain::GetCurrentBackBuffer() const noexcept
 	{
 		return m_BackBuffers.at(m_BackBufferIndex).Get();
@@ -66,6 +72,11 @@ namespace graphicsGadgetLab
 
 	void DX12SwapChain::FinishBackBuffer(DX12CommandList* commandList) noexcept
 	{
+	}
+
+	void DX12SwapChain::ClearBackBuffer(DX12CommandList* commandList) noexcept
+	{
+		commandList->
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -113,29 +124,24 @@ namespace graphicsGadgetLab
 	{
 		m_BackBuffers.clear();	// TODO: Clear backbuffers in Resize()
 		m_BackBufferDescriptors.clear();
-		//m_RtvHeap.Reset();
 
 		const auto bufferCount = DX12Device::GetBufferCount();
 
 		// Create Descriptor Heap	
-		//auto device = m_DX12Device->Get();
-		//D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		//desc.NumDescriptors = bufferCount;
-		//desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		//desc.NodeMask = 0;
-		//desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		//utility::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_RtvHeap)));
-		//
-		//CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_RtvHeap->GetCPUDescriptorHandleForHeapStart());
+		auto device = m_DX12Device->Get();
+		auto rtHeap = m_DX12Device->GetRtvDescriptorHeap()->Get();
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtHeap->GetCPUDescriptorHandleForHeapStart());
 
 		m_BackBuffers.resize(bufferCount);
-		//m_RtvHandles.resize(bufferCount);
+		m_BackBufferDescriptors.resize(bufferCount);
 		for (uint32_t i = 0; i < bufferCount; ++i)
 		{
 			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_BackBuffers[i])));
 			device->CreateRenderTargetView(m_BackBuffers[i].Get(), nullptr, rtvHandle);
-
-			m_RtvHandles.push_back(rtvHandle);
+			DX12Descriptor descriptor = {};
+			descriptor.m_CpuHandle = rtvHandle;
+			m_BackBufferDescriptors[i] = descriptor;
 
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());

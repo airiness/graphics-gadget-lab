@@ -14,7 +14,7 @@ namespace graphicsGadgetLab
 			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
 		virtual ~DX12Texture() noexcept;
 
-		void CreateFromSwapChain() noexcept;
+		void CreateFromSwapChain(ID3D12Resource* backBuffer) noexcept;
 
 	private:
 

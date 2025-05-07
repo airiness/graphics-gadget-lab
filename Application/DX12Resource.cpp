@@ -17,6 +17,7 @@ namespace graphicsGadgetLab
 	{
 		CreateAllocation(heapType);
 	}
+
 	DX12Resource::DX12Resource(DX12Device* device, 
 		ComPtr<ID3D12Resource> resource,
 		D3D12_RESOURCE_STATES resourceState,
@@ -28,6 +29,7 @@ namespace graphicsGadgetLab
 	{
 		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
 	}
+
 	ID3D12Resource* DX12Resource::Get() const
 	{
 		return m_Resource.Get();

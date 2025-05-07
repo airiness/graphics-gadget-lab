@@ -59,8 +59,8 @@ namespace graphicsGadgetLab
 		swapChain->PrepareBackBuffer(commandList);
 		commandList->FlushBarriers();
 
-		DX12Descriptor rtDescriptors[] = { swapChain->GetCurrentBackBuffer() };
-		commandList->SetRenderTargets();
+		DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())};
+		commandList->SetRenderTargets(rtDescriptors, nullptr);
 		// TODO: Management Model Info in another place
 
 	}
@@ -174,21 +174,24 @@ namespace graphicsGadgetLab
 				dsClearValue);
 		}
 	}
+
 	void Renderer::InitializeConstantBuffer() noexcept
 	{
 		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
 
 	}
+
 	void Renderer::InitializeSyncObjects() noexcept
 	{
 		m_Fence = std::make_unique<DX12Fence>(m_Device.get());
 
 	}
+
 	void Renderer::UpdateGpuBuffers() noexcept
 	{
 		UpdateGlobalConstantBuffer();
-
 	}
+
 	void Renderer::UpdateGlobalConstantBuffer() noexcept
 	{
 	}
