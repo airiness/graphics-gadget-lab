@@ -4,6 +4,8 @@ namespace graphicsGadgetLab
 	class DX12Device;
 	class DX12CommandQueue;
 	class DX12CommandList;
+	class DX12Descriptor;
+	class DX12Texture;
 	class DX12SwapChain
 	{
 	public:
@@ -19,15 +21,17 @@ namespace graphicsGadgetLab
 		uint32_t GetBufferWidth() const noexcept { return m_Width; }
 		uint32_t GetBufferHeight() const noexcept { return m_Height; }
 
+		void SetClearColor(float r, float g, float b, float a) noexcept;
+
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		DX12Descriptor GetBackBufferDescriptor(int32_t bufferIndex) const noexcept;
-		ID3D12Resource* GetCurrentBackBuffer() const noexcept;
+		const DX12Descriptor& GetBackBufferDescriptor(int32_t bufferIndex) const noexcept;
+		DX12Texture* GetCurrentBackBuffer() const noexcept;
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
 		void FinishBackBuffer(DX12CommandList* commandList) noexcept;
-		void ClearBackBuffer(DX12CommandList* commandList) noexcept;
+		void ClearBackBuffer(DX12CommandList* commandList) const noexcept;
 
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
@@ -44,9 +48,10 @@ namespace graphicsGadgetLab
 
 		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
 
-		//ComPtr<ID3D12DescriptorHeap> m_RtvHeap; // TODO: Get Descriptor From Device; Make Descriptor Allocator
 		std::vector<DX12Descriptor> m_BackBufferDescriptors;
-		std::vector<ComPtr<ID3D12Resource>> m_BackBuffers;
+		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
+
+		float m_ClearColor[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
 
 		uint32_t m_BackBufferIndex = 0;
 	};

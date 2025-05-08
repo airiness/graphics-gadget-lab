@@ -18,7 +18,9 @@ namespace graphicsGadgetLab
 
 	void DX12Texture::CreateFromSwapChain(ID3D12Resource* backBuffer) noexcept
 	{
-		
+		m_Resource.Attach(backBuffer);
+		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
+
 
 	}
 }

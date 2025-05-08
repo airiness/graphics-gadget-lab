@@ -48,8 +48,8 @@ namespace graphicsGadgetLab
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
 		commandList->Begin();
 
-		commandList->SetGraphicsRootSignature(m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)).get());
-		commandList->SetDescriptorHeap(cbvDescriptorHeap);
+		commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
+		commandList->SetDescriptorHeap(*cbvDescriptorHeap);
 
 		commandList->SetViewport(0, 0, bufferWidth, bufferHeight);
 		commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
@@ -61,8 +61,9 @@ namespace graphicsGadgetLab
 
 		DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())};
 		commandList->SetRenderTargets(rtDescriptors, nullptr);
-		// TODO: Management Model Info in another place
 
+		swapChain->ClearBackBuffer(commandList);
+		
 	}
 
 	void Renderer::Finalize() noexcept
@@ -172,6 +173,9 @@ namespace graphicsGadgetLab
 				dsResourceDesc,
 				D3D12_RESOURCE_STATE_DEPTH_WRITE,
 				dsClearValue);
+
+			// Create depth stencil view
+			m_Device->;
 		}
 	}
 

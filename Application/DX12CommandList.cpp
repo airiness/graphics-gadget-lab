@@ -34,7 +34,7 @@ namespace graphicsGadgetLab
 	void DX12CommandList::Execute(const DX12CommandQueue& commandQueue) noexcept
 	{
 		ID3D12CommandList* const commandLists[] = { m_D3D12GraphicsCommandList.Get() };
-		commandQueue->Get()->ExecuteCommandLists(_countof(commandLists), commandLists);
+		commandQueue.Get()->ExecuteCommandLists(_countof(commandLists), commandLists);
 	}
 
 	void DX12CommandList::SetGraphicsRootSignature(const DX12RootSignature& rootSignature) noexcept
@@ -136,6 +136,14 @@ namespace graphicsGadgetLab
 
 	void DX12CommandList::ClearDepthStencil(DX12Descriptor dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue) noexcept
 	{
+		uint8_t stencilValue = 0;
+		D3D12_CLEAR_FLAGS flags = D3D12_CLEAR_FLAG_DEPTH;
+		if (stencilClearValue.has_value())
+		{
+			stencilValue = stencilClearValue.value();
+			flags |= D3D12_CLEAR_FLAG_STENCIL;
+		}
+		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.m_CpuHandle, flags, depthClearValue, stencilValue, 0, nullptr);
 	}
 
 	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept

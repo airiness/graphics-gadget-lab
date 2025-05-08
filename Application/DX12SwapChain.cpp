@@ -5,13 +5,15 @@
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12Descriptor.h"
+#include "DX12Texture.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
 {
 	DX12SwapChain::DX12SwapChain(DX12Device* dx12Device, 
 		DX12CommandQueue* dx12CommandQueue,
-		uint32_t width, uint32_t height, DXGI_FORMAT bufferFormat) noexcept :
+		uint32_t width, uint32_t height,
+		DXGI_FORMAT bufferFormat) noexcept :
 		m_DX12Device(dx12Device),
 		m_DX12CommandQueue(dx12CommandQueue),
 		m_Width(width),
@@ -40,19 +42,27 @@ namespace graphicsGadgetLab
 		CreateRTVs();
 	}
 
+	void DX12SwapChain::SetClearColor(float r, float g, float b, float a) noexcept
+	{
+		m_ClearColor[0] = r;
+		m_ClearColor[1] = g;
+		m_ClearColor[2] = b;
+		m_ClearColor[3] = a;
+	}
+
 	void DX12SwapChain::Present() noexcept
 	{
 
 	}
 
-	DX12Descriptor DX12SwapChain::GetBackBufferDescriptor(int32_t bufferIndex) const noexcept
+	const DX12Descriptor& DX12SwapChain::GetBackBufferDescriptor(int32_t bufferIndex) const noexcept
 	{
 		return m_BackBufferDescriptors[bufferIndex];
 	}
 
-	ID3D12Resource* DX12SwapChain::GetCurrentBackBuffer() const noexcept
+	DX12Texture* DX12SwapChain::GetCurrentBackBuffer() const noexcept
 	{
-		return m_BackBuffers.at(m_BackBufferIndex).Get();
+		return m_BackBuffers.at(m_BackBufferIndex).get();
 	}
 
 	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) const noexcept
@@ -64,7 +74,7 @@ namespace graphicsGadgetLab
 			D3D12_BARRIER_ACCESS_RENDER_TARGET,
 			D3D12_BARRIER_LAYOUT_PRESENT,
 			D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-			GetCurrentBackBuffer(),
+			GetCurrentBackBuffer()->Get(),
 			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0)
 		);
 		commandList->AddTextureBarrier(barrier);
@@ -74,9 +84,9 @@ namespace graphicsGadgetLab
 	{
 	}
 
-	void DX12SwapChain::ClearBackBuffer(DX12CommandList* commandList) noexcept
+	void DX12SwapChain::ClearBackBuffer(DX12CommandList* commandList) const noexcept
 	{
-		commandList->
+		commandList->ClearRenderTarget(GetBackBufferDescriptor(GetCurrentBackBufferIndex()), m_ClearColor);
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -137,14 +147,19 @@ namespace graphicsGadgetLab
 		m_BackBufferDescriptors.resize(bufferCount);
 		for (uint32_t i = 0; i < bufferCount; ++i)
 		{
-			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&m_BackBuffers[i])));
-			device->CreateRenderTargetView(m_BackBuffers[i].Get(), nullptr, rtvHandle);
+			ComPtr<ID3D12Resource> backBuffer;
+			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+			device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
 			DX12Descriptor descriptor = {};
 			descriptor.m_CpuHandle = rtvHandle;
 			m_BackBufferDescriptors[i] = descriptor;
 
+			auto& tex = m_BackBuffers[i];
+			tex = std::make_unique<DX12Texture>();
+			tex->CreateFromSwapChain(backBuffer.Get());
+
 #if defined (BUILD_DEBUG)
-			utility::SetDebugName(m_BackBuffers[i].Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
+			utility::SetDebugName(m_BackBuffers[i].get()->Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
 #endif
 			rtvHandle.Offset(1, m_DX12Device->GetRtvDescriptorSize());
 		}

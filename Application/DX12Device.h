@@ -108,5 +108,6 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12DescriptorHeap> m_RtvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_DsvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerDescriptorHeap;
+		// TODO: Descriptor Allocator!
 	};
 }

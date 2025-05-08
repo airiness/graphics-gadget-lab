@@ -16,7 +16,6 @@ namespace graphicsGadgetLab
 		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
 		~Renderer() noexcept;
 
-
 		void Initialize() noexcept;
 		void Update() noexcept;
 		void Render() noexcept;
