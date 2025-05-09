@@ -162,7 +162,7 @@ namespace graphicsGadgetLab
 	{
 		m_CbvSrvUavDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
 		m_RtvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
-		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 1);
+		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 16);
 		m_SamplerDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
 	}
 

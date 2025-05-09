@@ -18,18 +18,6 @@ namespace graphicsGadgetLab
 		CreateAllocation(heapType);
 	}
 
-	DX12Resource::DX12Resource(DX12Device* device, 
-		ComPtr<ID3D12Resource> resource,
-		D3D12_RESOURCE_STATES resourceState,
-		std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept :
-		m_DX12Deivce(device),
-		m_Resource(resource),
-		m_ResourceState(resourceState),
-		m_ClearValue(clearValue)
-	{
-		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
-	}
-
 	ID3D12Resource* DX12Resource::Get() const
 	{
 		return m_Resource.Get();

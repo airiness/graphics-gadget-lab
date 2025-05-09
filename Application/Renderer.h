@@ -37,10 +37,12 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12Device> m_Device;
 
 		// RenderTargets & DepthStencilBuffer
-		RenderTargetArray mRenderTargets;
+		RenderTargetArray m_RenderTargets;
+		RenderTargetDescriptors m_RenderTargetDescriptors;
 
 		// ConstantBuffer
 		std::unique_ptr<DX12ConstantBuffer<GlobalConstantBuffer>> m_GlobalConstantBuffer;
+		DX12Descriptor m_ConstantBufferDescriptor;
 
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;

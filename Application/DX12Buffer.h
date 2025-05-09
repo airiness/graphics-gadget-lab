@@ -24,6 +24,9 @@ namespace graphicsGadgetLab
 		~DX12ConstantBuffer();
 
 		void Update(const T& data) noexcept;
+		uint32_t GetBufferSize() const noexcept { return m_BufferSize; }
+
+		DX12Buffer* GetBuffer() const noexcept { return m_ConstantBuffer.get(); }
 
 	private:
 		static uint32_t CalcBufferSize();

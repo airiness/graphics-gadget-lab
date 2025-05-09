@@ -20,8 +20,7 @@ namespace graphicsGadgetLab
 	{
 		m_Resource.Attach(backBuffer);
 		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
-
-
+		m_ResourceState = D3D12_RESOURCE_STATE_PRESENT;
 	}
 }
 

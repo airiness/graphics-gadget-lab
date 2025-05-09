@@ -2,13 +2,14 @@
 namespace graphicsGadgetLab
 {
 	class DX12Device;
-
-	struct DX12Descriptor
+	class DX12Descriptor
 	{
+	public:
 		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle;
 		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle;
 	};
 
+	// TODO: Descriptor Management
 	class DX12DescriptorHeap
 	{
 	public:
@@ -21,12 +22,16 @@ namespace graphicsGadgetLab
 
 		ID3D12DescriptorHeap* Get() const noexcept { return m_DescriptorHeap.Get(); }
 
+		DX12Descriptor CreateDescriptor() noexcept;
+
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		D3D12_DESCRIPTOR_HEAP_TYPE m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		uint32_t m_DescriptorCount = 0;
 		uint32_t m_DescriptorSize = 0;
 		ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
+
+		uint32_t m_CurrentDescriptorIndex = 0;
 	};
 
 

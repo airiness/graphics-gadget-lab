@@ -1,4 +1,5 @@
 #pragma once
+#include "DX12Descriptor.h"
 namespace graphicsGadgetLab
 {
 	class DX12RootSignature;
@@ -42,6 +43,7 @@ namespace graphicsGadgetLab
 		RTCount
 	};
 	using RenderTargetArray = std::array<std::unique_ptr<DX12Texture>, static_cast<uint32_t>(RenderTargetIndex::RTCount)>;
+	using RenderTargetDescriptors = std::array<DX12Descriptor, static_cast<uint32_t>(RenderTargetIndex::RTCount)>;
 
 	struct GlobalConstantBuffer
 	{
@@ -49,4 +51,6 @@ namespace graphicsGadgetLab
 		XMFLOAT4X4 m_ViewMatrix;
 		XMFLOAT4X4 m_ProjectionMatrix;
 	};
+
+	// Simple Cube Model
 }

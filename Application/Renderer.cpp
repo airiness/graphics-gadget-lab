@@ -60,9 +60,18 @@ namespace graphicsGadgetLab
 		commandList->FlushBarriers();
 
 		DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())};
-		commandList->SetRenderTargets(rtDescriptors, nullptr);
+		auto& dsDescriptor = m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)];
+		commandList->SetRenderTargets(rtDescriptors, &dsDescriptor);
 
 		swapChain->ClearBackBuffer(commandList);
+		commandList->ClearDepthStencil(dsDescriptor, 1.0f);
+
+		// Render Object
+		{
+
+		}
+
+		commandList->End();
 		
 	}
 
@@ -146,6 +155,7 @@ namespace graphicsGadgetLab
 		auto app = Application::Get();
 		auto width = app->GetWindowWidth();
 		auto height = app->GetWindowHeight();
+		auto rtHeap = m_Device->GetRtvDescriptorHeap();
 
 		// RenderTargets
 		for (uint32_t i = 0; i < static_cast<uint32_t>(RenderTargetIndex::DS0); ++i)
@@ -155,27 +165,47 @@ namespace graphicsGadgetLab
 			const float rtClearColor[] = { 0.0f,0.4f,0.5f,1.0f };
 			auto rtClearValue = CD3DX12_CLEAR_VALUE(rtFormat, rtClearColor);
 
-			mRenderTargets[i] = std::make_unique<DX12Texture>(m_Device.get(),
+			auto& rtTexture = m_RenderTargets[i];
+			rtTexture = std::make_unique<DX12Texture>(m_Device.get(),
 				D3D12_HEAP_TYPE_DEFAULT,
 				rtResourceDesc,
 				D3D12_RESOURCE_STATE_RENDER_TARGET,
 				rtClearValue);
+
+			// Create Render target view
+			auto descriptor = rtHeap->CreateDescriptor();
+			D3D12_RENDER_TARGET_VIEW_DESC rtDesc = {};
+			rtDesc.Format = rtFormat;
+			rtDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			rtDesc.Texture2D.MipSlice = 0;
+			rtDesc.Texture2D.PlaneSlice = 0;
+			m_Device->Get()->CreateRenderTargetView(rtTexture->Get(), &rtDesc, descriptor.m_CpuHandle);
+			m_RenderTargetDescriptors[i] = descriptor;
 		}
 
+		auto dsHeap = m_Device->GetDsvDescriptorHeap();
 		// DepthStencil
 		{
 			auto dsFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 			auto dsResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(dsFormat, width, height);
 			auto dsClearValue = CD3DX12_CLEAR_VALUE(dsFormat, 1.0f, 0);
 
-			mRenderTargets[static_cast<uint32_t>(RenderTargetIndex::DS0)] = std::make_unique<DX12Texture>(m_Device.get(),
+			auto& dsTexture = m_RenderTargets[static_cast<uint32_t>(RenderTargetIndex::DS0)];
+			dsTexture = std::make_unique<DX12Texture>(m_Device.get(),
 				D3D12_HEAP_TYPE_DEFAULT,
 				dsResourceDesc,
 				D3D12_RESOURCE_STATE_DEPTH_WRITE,
 				dsClearValue);
 
 			// Create depth stencil view
-			m_Device->;
+			auto descriptor = dsHeap->CreateDescriptor();
+			D3D12_DEPTH_STENCIL_VIEW_DESC dsDesc = {};
+			dsDesc.Format = dsFormat;
+			dsDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+			dsDesc.Flags = D3D12_DSV_FLAG_NONE;
+			dsDesc.Texture2D.MipSlice = 0;
+			m_Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsDesc, descriptor.m_CpuHandle);
+			m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)] = descriptor;
 		}
 	}
 
@@ -183,12 +213,20 @@ namespace graphicsGadgetLab
 	{
 		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
 
+		// Constant Buffer View
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbDesc = {};
+		cbDesc.SizeInBytes = static_cast<UINT>(m_GlobalConstantBuffer->GetBufferSize());
+		cbDesc.BufferLocation = m_GlobalConstantBuffer->GetBuffer()->Get()->GetGPUVirtualAddress();
+
+		auto cbHeap = m_Device->GetCbvSrvUavDescriptorHeap();
+		m_ConstantBufferDescriptor = cbHeap->CreateDescriptor();
+
+		m_Device->Get()->CreateConstantBufferView(&cbDesc, m_ConstantBufferDescriptor.m_CpuHandle);
 	}
 
 	void Renderer::InitializeSyncObjects() noexcept
 	{
 		m_Fence = std::make_unique<DX12Fence>(m_Device.get());
-
 	}
 
 	void Renderer::UpdateGpuBuffers() noexcept
@@ -198,5 +236,26 @@ namespace graphicsGadgetLab
 
 	void Renderer::UpdateGlobalConstantBuffer() noexcept
 	{
+		GlobalConstantBuffer buffer = {};
+
+		static float angle = 0.0f;
+		angle += 1.6f;
+		const XMVECTOR rotationAxis = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+		XMMATRIX modelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
+		XMStoreFloat4x4(&buffer.m_ModelMatrix, modelMatrix);
+
+		const XMVECTOR eyePosition = XMVectorSet(0.f, 10.f, -30.f, 0.f);
+		const XMVECTOR focusPoint = XMVectorSet(0.f, 10.f, 0.f, 0.f);
+		const XMVECTOR upDirection = XMVectorSet(0.f, 1.f, 0.f, 0.f);
+		XMMATRIX viewMatrix = ::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+		auto swapChain = m_Device->GetSwapChain();
+
+		float aspectRatio = static_cast<float>(swapChain->GetBufferWidth()) / swapChain->GetBufferHeight();
+		XMMATRIX projectionMatrix = ::XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), aspectRatio, 0.1f, 1000.f);
+
+		XMStoreFloat4x4(&buffer.m_ViewMatrix, XMMatrixTranspose(viewMatrix));
+		XMStoreFloat4x4(&buffer.m_ProjectionMatrix, XMMatrixTranspose(projectionMatrix));
+
+		m_GlobalConstantBuffer->Update(buffer);
 	}
 }

@@ -139,9 +139,7 @@ namespace graphicsGadgetLab
 
 		// Create Descriptor Heap	
 		auto device = m_DX12Device->Get();
-		auto rtHeap = m_DX12Device->GetRtvDescriptorHeap()->Get();
-
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtHeap->GetCPUDescriptorHandleForHeapStart());
+		auto rtHeap = m_DX12Device->GetRtvDescriptorHeap();
 
 		m_BackBuffers.resize(bufferCount);
 		m_BackBufferDescriptors.resize(bufferCount);
@@ -149,9 +147,9 @@ namespace graphicsGadgetLab
 		{
 			ComPtr<ID3D12Resource> backBuffer;
 			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
-			device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtvHandle);
-			DX12Descriptor descriptor = {};
-			descriptor.m_CpuHandle = rtvHandle;
+
+			auto descriptor = rtHeap->CreateDescriptor();
+			device->CreateRenderTargetView(backBuffer.Get(), nullptr, descriptor.m_CpuHandle);
 			m_BackBufferDescriptors[i] = descriptor;
 
 			auto& tex = m_BackBuffers[i];
@@ -161,7 +159,6 @@ namespace graphicsGadgetLab
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].get()->Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
 #endif
-			rtvHandle.Offset(1, m_DX12Device->GetRtvDescriptorSize());
 		}
 	}
 }

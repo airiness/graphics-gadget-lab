@@ -83,7 +83,7 @@ namespace graphicsGadgetLab
 			dsHandle = &dsDescriptor->m_CpuHandle;
 		}
 
-		m_D3D12GraphicsCommandList->OMSetRenderTargets(rtCount, rtHandles.data(), FALSE, dsHandle);
+		m_D3D12GraphicsCommandList->OMSetRenderTargets(static_cast<UINT>(rtCount), rtHandles.data(), FALSE, dsHandle);
 	}
 
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept

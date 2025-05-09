@@ -12,10 +12,6 @@ namespace graphicsGadgetLab
 			const CD3DX12_RESOURCE_DESC& resourceDesc,
 			D3D12_RESOURCE_STATES initState,
 			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
-		explicit DX12Resource(DX12Device* device, 
-			ComPtr<ID3D12Resource> resource, 
-			D3D12_RESOURCE_STATES resourceState,
-			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Resource);
 		virtual ~DX12Resource() noexcept = default;
 

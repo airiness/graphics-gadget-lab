@@ -26,4 +26,22 @@ namespace graphicsGadgetLab
 	DX12DescriptorHeap::~DX12DescriptorHeap() noexcept
 	{
 	}
+
+	DX12Descriptor DX12DescriptorHeap::CreateDescriptor() noexcept
+	{
+		DX12Descriptor descriptor = {};
+		++m_CurrentDescriptorIndex;
+		GGLAB_ASSERT_MSG(m_CurrentDescriptorIndex <= m_DescriptorCount, "DescriptorHeap is Boooooom! you should make a new one!");
+
+		descriptor.m_CpuHandle = m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		descriptor.m_CpuHandle.Offset(m_CurrentDescriptorIndex);
+
+		if (m_DescriptorHeap->GetDesc().Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+		{
+			descriptor.m_GpuHandle = m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+			descriptor.m_GpuHandle.Offset(m_CurrentDescriptorIndex);
+		}
+
+		return descriptor;
+	}
 }
