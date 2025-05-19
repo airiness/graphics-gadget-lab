@@ -3,7 +3,10 @@
 
 namespace graphicsGadgetLab
 {
-	Model::Model()
+	Mesh::Mesh()
+	{
+	}
+	Mesh::~Mesh()
 	{
 	}
 }

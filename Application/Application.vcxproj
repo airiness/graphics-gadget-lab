@@ -94,6 +94,7 @@
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
     </ClCompile>
@@ -116,6 +117,7 @@
     <ClInclude Include="DX12RootSignature.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererConstant.h" />
