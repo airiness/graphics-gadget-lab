@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "DX12Descriptor.h"
 namespace graphicsGadgetLab
 {

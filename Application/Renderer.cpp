@@ -1,4 +1,4 @@
-#include "Precompiled.h"
+﻿#include "Precompiled.h"
 #include "Renderer.h"
 #include "Application.h"
 #include "DX12Device.h"

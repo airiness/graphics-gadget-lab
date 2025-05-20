@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cassert>
 
 #define GGLAB_ASSERT_MSG(expression, message) assert(expression && message)

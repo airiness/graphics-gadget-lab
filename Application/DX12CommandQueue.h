@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 namespace graphicsGadgetLab
 {
 	class DX12Device;

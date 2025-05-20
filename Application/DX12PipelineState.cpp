@@ -1,4 +1,4 @@
-#include "Precompiled.h"
+﻿#include "Precompiled.h"
 #include "DX12PipelineState.h"
 #include "DX12Device.h"
 #include "Utility.h"

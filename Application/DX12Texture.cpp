@@ -1,4 +1,4 @@
-#include "Precompiled.h"
+﻿#include "Precompiled.h"
 #include "DX12Texture.h"
 
 namespace graphicsGadgetLab

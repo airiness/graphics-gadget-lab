@@ -1,4 +1,4 @@
-#include "Precompiled.h"
+﻿#include "Precompiled.h"
 #include "DX12Fence.h"
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
