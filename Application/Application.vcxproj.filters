@@ -79,6 +79,9 @@
     <ClCompile Include="Mesh.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Geometry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -136,6 +139,9 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Mesh.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>

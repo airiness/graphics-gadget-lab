@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace D3D12MA
 {
@@ -60,7 +60,12 @@ namespace graphicsGadgetLab
 		bool SupportMeshShader() const noexcept { return m_DX12FeatureSupport.m_MeshShaderSupported; }
 		bool SupportTearing() const noexcept { return m_DX12FeatureSupport.m_TearingSupported; }
 
+		void BeginUpload() noexcept;
+		void EndUpload() noexcept;
+
+	public:
 		static uint32_t GetBufferCount() noexcept { return BufferCount; }
+
 	private:
 		void InitializeDXGIFactory() noexcept;
 		void InitializeDXGIAdapter() noexcept;

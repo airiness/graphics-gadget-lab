@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace graphicsGadgetLab
 {
@@ -45,6 +45,8 @@ namespace graphicsGadgetLab
 		D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
 		ComPtr<ID3D12GraphicsCommandList7> m_D3D12GraphicsCommandList;
+
+		// TODO: Create AllocatorPool, member of DX12CommandList is not good.
 		ComPtr<ID3D12CommandAllocator> m_D3D12CommandAllocator;
 
 		std::vector<CD3DX12_TEXTURE_BARRIER> m_TextureBarriers;
