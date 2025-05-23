@@ -43,6 +43,8 @@ using namespace DirectX;
 #include <array>
 #include <optional>
 #include <span>
+#include <queue>
+#include <mutex>
 
 // Porject define
 #include "CoreDef.h"
