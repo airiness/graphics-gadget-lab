@@ -82,6 +82,9 @@
     <ClCompile Include="Geometry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="DX12CommandAllocator.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -143,6 +146,9 @@
     </ClInclude>
     <ClInclude Include="Geometry.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12CommandAllocator.h">
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

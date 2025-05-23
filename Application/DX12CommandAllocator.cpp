@@ -22,16 +22,34 @@ namespace graphicsGadgetLab
 #endif
 	}
 
-
 	// DX12CommandAllocatorPool
-	DX12CommandAllocatorPool::DX12CommandAllocatorPool(DX12Device* dx12Device) noexcept :
-		m_DX12Device(dx12Device)
+	DX12CommandAllocatorPool::DX12CommandAllocatorPool(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept :
+		m_DX12Device(dx12Device),
+		m_Type(type)
 	{
 	}
+
 	DX12CommandAllocatorPool::~DX12CommandAllocatorPool() noexcept
 	{
 	}
 
+	DX12CommandAllocator* DX12CommandAllocatorPool::RequestCommandAllocator(uint64_t fenceValue) noexcept
+	{
+		std::lock_guard lock(m_Mutex);
 
+		
+
+
+		return nullptr;
+	}
+
+	void DX12CommandAllocatorPool::RecycleCommandAllocator(DX12CommandAllocator* allocator, uint64_t fenceValue) noexcept
+	{
+		std::lock_guard lock(m_Mutex);
+
+		allocator->SetFenceValue(fenceValue);
+		allocator->SetInUse(false);
+		m_AvailableAllocators.push(allocator);
+	}
 }
 

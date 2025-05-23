@@ -83,6 +83,7 @@
     </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
+    <ClCompile Include="DX12CommandAllocator.cpp" />
     <ClCompile Include="DX12CommandList.cpp" />
     <ClCompile Include="DX12CommandQueue.cpp" />
     <ClCompile Include="DX12Descriptor.cpp" />
@@ -108,6 +109,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="CoreDef.h" />
     <ClInclude Include="DX12Buffer.h" />
+    <ClInclude Include="DX12CommandAllocator.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />
     <ClInclude Include="DX12Descriptor.h" />

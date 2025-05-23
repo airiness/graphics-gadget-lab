@@ -27,17 +27,18 @@ namespace graphicsGadgetLab
 	class DX12CommandAllocatorPool final
 	{
 	public:
-		explicit DX12CommandAllocatorPool(DX12Device* dx12Device) noexcept;
+		explicit DX12CommandAllocatorPool(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept;
 		~DX12CommandAllocatorPool() noexcept;
 
-		ComPtr<ID3D12CommandAllocator> RequestCommandAllocator() noexcept;
+		DX12CommandAllocator* RequestCommandAllocator(uint64_t fenceValue) noexcept;
+		void RecycleCommandAllocator(DX12CommandAllocator* allocator, uint64_t fenceValue) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		D3D12_COMMAND_LIST_TYPE m_Type;
 
-		std::vector<> m_Pool;	
-		std::queue<> m_ReadyCommandAllocators;
+		std::vector<std::unique_ptr<DX12CommandAllocator>> m_Pool;	
+		std::queue<DX12CommandAllocator*> m_AvailableAllocators;
 
 		std::mutex m_Mutex;
 	};
