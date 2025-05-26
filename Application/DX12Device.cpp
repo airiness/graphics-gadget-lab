@@ -26,12 +26,10 @@ namespace graphicsGadgetLab
 	{
 		// CommandQueue
 		InitializeCommandQueues();
-		InitializeSwapChain();
-
-		InitializeCommandLists();
 		InitializeDescriptorHeaps();
-
 		InitializeMemAllocator();
+		InitializeSwapChain();
+		InitializeCommandLists();
 	}
 
 	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept

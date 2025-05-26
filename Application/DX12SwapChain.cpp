@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12SwapChain.h"
 #include "Application.h"
 #include "DX12Device.h"
@@ -150,7 +150,7 @@ namespace graphicsGadgetLab
 
 			auto descriptor = rtHeap->CreateDescriptor();
 			device->CreateRenderTargetView(backBuffer.Get(), nullptr, descriptor.m_CpuHandle);
-			m_BackBufferDescriptors[i] = descriptor;
+			m_BackBufferDescriptors[i] = std::move(descriptor);
 
 			auto& tex = m_BackBuffers[i];
 			tex = std::make_unique<DX12Texture>();

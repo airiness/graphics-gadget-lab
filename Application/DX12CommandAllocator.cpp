@@ -37,10 +37,25 @@ namespace graphicsGadgetLab
 	{
 		std::lock_guard lock(m_Mutex);
 
-		
+		if (!m_AvailableAllocators.empty())
+		{
+			auto allocator = m_AvailableAllocators.front();
+			m_AvailableAllocators.pop();
+			allocator->SetFenceValue(fenceValue);
+			allocator->SetInUse(true);
+			return allocator;
+		}
 
+		auto newAllocator = std::make_unique<DX12CommandAllocator>(m_DX12Device, m_Type);
+		newAllocator->SetFenceValue(fenceValue);
+		newAllocator->SetInUse(true);
+		auto allocatorPtr = newAllocator.get();
+		m_Pool.push_back(std::move(newAllocator));
 
-		return nullptr;
+		utility::SetDebugName(allocatorPtr->Get(), 
+			std::format(L"CommandAllocator[{:p}]_{} ", (void*)allocatorPtr, utility::GetCommandListTypeName(m_Type)).c_str());
+
+		return allocatorPtr;
 	}
 
 	void DX12CommandAllocatorPool::RecycleCommandAllocator(DX12CommandAllocator* allocator, uint64_t fenceValue) noexcept
