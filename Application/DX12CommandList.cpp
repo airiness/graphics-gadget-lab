@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12CommandList.h"
 #include "DX12CommandQueue.h"
 #include "DX12Device.h"
@@ -12,7 +12,6 @@ namespace graphicsGadgetLab
 		m_DX12Device(dx12Device),
 		m_Type(type)
 	{
-		CreateCommandAllocator(type);
 		CreateCommandList(type);
 	}
 
@@ -22,8 +21,8 @@ namespace graphicsGadgetLab
 
 	void DX12CommandList::Begin() noexcept
 	{
-		utility::ThrowIfFailed(m_D3D12CommandAllocator->Reset());
-		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Reset(m_D3D12CommandAllocator.Get(), nullptr));
+		//utility::ThrowIfFailed(m_D3D12CommandAllocator->Reset());
+		//utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Reset(m_D3D12CommandAllocator.Get(), nullptr));
 	}
 
 	void DX12CommandList::End() noexcept
@@ -146,20 +145,10 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.m_CpuHandle, flags, depthClearValue, stencilValue, 0, nullptr);
 	}
 
-	void DX12CommandList::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept
-	{
-		auto device = m_DX12Device->Get();
-		utility::ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(&m_D3D12CommandAllocator)));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(m_D3D12CommandAllocator.Get(),
-			std::format(L"CommandAllocator[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
-#endif
-	}
 	void DX12CommandList::CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept
 	{
 		auto device = m_DX12Device->Get();
-		utility::ThrowIfFailed(device->CreateCommandList(0, type, m_D3D12CommandAllocator.Get(), nullptr,
+		utility::ThrowIfFailed(device->CreateCommandList1(0, type, D3D12_COMMAND_LIST_FLAG_NONE,
 			IID_PPV_ARGS(&m_D3D12GraphicsCommandList)));
 
 #if defined (BUILD_DEBUG)
@@ -167,7 +156,7 @@ namespace graphicsGadgetLab
 			std::format(L"CommandList[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
 #endif
 
-		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
+		// CommandList created by CreateCommandList1 is already closed.
+		//utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
 	}
-
 }

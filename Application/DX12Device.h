@@ -11,6 +11,8 @@ namespace graphicsGadgetLab
 	class DX12SwapChain;
 	class DX12CommandList;
 	class DX12DescriptorHeap;
+	class DX12Fence;
+	class DX12CommandAllocatorPool;
 	class DX12Device
 	{
 	public:
@@ -31,7 +33,7 @@ namespace graphicsGadgetLab
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 		void Finalize() noexcept;
 
-		ID3D12Device* Get() const noexcept { return m_D3D12Device.Get(); }
+		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }
 		IDXGIFactory7* GetDXGIFactory() const noexcept { return m_DxgiFactory.Get(); }
 		IDXGIAdapter1* GetDXGIAdapter() const noexcept { return m_DxgiAdapter.Get(); }
 		
@@ -73,7 +75,9 @@ namespace graphicsGadgetLab
 		void InitializeCommandQueues() noexcept;
 		void InitializeSwapChain() noexcept;
 		void InitializeCommandLists() noexcept;
+		void InitializeCommandAllocatorPools() noexcept;
 		void InitializeDescriptorHeaps() noexcept;
+		void InitializeSyncObjects() noexcept;
 		void InitializeMemAllocator() noexcept;
 		void FinalizeMemAllocator() noexcept;
 
@@ -85,13 +89,14 @@ namespace graphicsGadgetLab
 	private:
 		ComPtr<IDXGIFactory7> m_DxgiFactory;
 		ComPtr<IDXGIAdapter1> m_DxgiAdapter;
-		ComPtr<ID3D12Device> m_D3D12Device;
+		ComPtr<ID3D12Device10> m_D3D12Device;
 
 		ComPtr<D3D12MA::Allocator> m_MemAllocator;
 
 		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
+		std::unique_ptr<DX12CommandQueue> m_UploadCommmandQueue;
 
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
 
@@ -104,15 +109,23 @@ namespace graphicsGadgetLab
 		// supported features
 		DX12FeatureSupport m_DX12FeatureSupport;
 
-		// TODO: CommandList pool?
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_CopyCommandLists;
+		std::unique_ptr<DX12CommandList> m_UploadCommandList;
 
+		// Command Allocator Pool
+		std::unique_ptr<DX12CommandAllocatorPool> m_GraphicsCommandAllocatorPool;
+		std::unique_ptr<DX12CommandAllocatorPool> m_ComputeCommandAllocatorPool;
+		std::unique_ptr<DX12CommandAllocatorPool> m_CopyCommandAllocatorPool;
+		std::unique_ptr<DX12CommandAllocatorPool> m_UploadCommandAllocatorPool;
+		
 		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_RtvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_DsvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerDescriptorHeap;
 		// TODO: Descriptor Allocator!
+
+		std::unique_ptr<DX12Fence> m_UploadFence;
 	};
 }

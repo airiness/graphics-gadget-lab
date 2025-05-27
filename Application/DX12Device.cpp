@@ -1,9 +1,10 @@
 #include "Precompiled.h"
 #include "DX12Device.h"
 #include "Application.h"
-#include "DX12CommandQueue.h"
 #include "DX12SwapChain.h"
+#include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
+#include "DX12CommandAllocator.h"
 #include "DX12Descriptor.h"
 #include "Utility.h"
 
@@ -24,12 +25,13 @@ namespace graphicsGadgetLab
 
 	void DX12Device::Initialize() noexcept
 	{
-		// CommandQueue
 		InitializeCommandQueues();
 		InitializeDescriptorHeaps();
 		InitializeMemAllocator();
 		InitializeSwapChain();
 		InitializeCommandLists();
+		InitializeCommandAllocatorPools();
+		InitializeSyncObjects();
 	}
 
 	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
@@ -44,6 +46,9 @@ namespace graphicsGadgetLab
 
 	void DX12Device::BeginUpload() noexcept
 	{
+		m_UploadCommandList->Begin();
+
+
 	}
 
 	void DX12Device::EndUpload() noexcept
@@ -141,8 +146,9 @@ namespace graphicsGadgetLab
 	void DX12Device::InitializeCommandQueues() noexcept
 	{
 		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
-		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
-		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
+		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+		m_UploadCommmandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
 	void DX12Device::InitializeSwapChain() noexcept
@@ -162,6 +168,15 @@ namespace graphicsGadgetLab
 			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 			m_CopyCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 		}
+		m_UploadCommandList = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+	}
+
+	void DX12Device::InitializeCommandAllocatorPools() noexcept
+	{
+		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
+		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+		m_UploadCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
 	void DX12Device::InitializeDescriptorHeaps() noexcept
@@ -170,6 +185,11 @@ namespace graphicsGadgetLab
 		m_RtvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
 		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 16);
 		m_SamplerDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
+	}
+
+	void DX12Device::InitializeSyncObjects() noexcept
+	{
+		m_UploadFence = std::make_unique<DX12Fence>(this);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

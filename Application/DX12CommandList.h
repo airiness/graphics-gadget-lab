@@ -21,7 +21,6 @@ namespace graphicsGadgetLab
 		void Execute(const DX12CommandQueue& commandQueue) noexcept;
 
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_D3D12GraphicsCommandList.Get(); }
-		ID3D12CommandAllocator* GetCommandAllocator() const noexcept { return m_D3D12CommandAllocator.Get(); }
 
 		void SetGraphicsRootSignature(const DX12RootSignature& rootSignature) noexcept;
 		void SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) noexcept;
@@ -37,7 +36,6 @@ namespace graphicsGadgetLab
 		void ClearDepthStencil(DX12Descriptor dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) noexcept;
 
 	private:
-		void CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type) noexcept;
 		void CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept;
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -45,9 +43,6 @@ namespace graphicsGadgetLab
 		D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
 		ComPtr<ID3D12GraphicsCommandList7> m_D3D12GraphicsCommandList;
-
-		// TODO: Create AllocatorPool, member of DX12CommandList is not good.
-		ComPtr<ID3D12CommandAllocator> m_D3D12CommandAllocator;
 
 		std::vector<CD3DX12_TEXTURE_BARRIER> m_TextureBarriers;
 		std::vector<CD3DX12_BUFFER_BARRIER> m_BufferBarriers;

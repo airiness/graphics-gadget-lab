@@ -1,10 +1,10 @@
 #pragma once
 #include "RendererConstant.h"
 #include "DX12Buffer.h"
+#include "DX12Device.h"
 
 namespace graphicsGadgetLab
 {
-	class DX12Device;
 	template<typename VertexType = Vertex, typename IndexType = uint16_t>
 	class Mesh final
 	{
@@ -36,7 +36,8 @@ namespace graphicsGadgetLab
 	template<typename VertexType, typename IndexType>
 	inline bool Mesh<VertexType, IndexType>::UploadMesh(DX12Device* device)
 	{
-
+		device->BeginUpload();
+		device->EndUpload();
 
 		return false;
 	}
