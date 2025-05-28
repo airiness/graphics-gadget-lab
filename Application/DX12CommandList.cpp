@@ -4,6 +4,7 @@
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12Descriptor.h"
+#include "DX12CommandAllocator.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -19,10 +20,10 @@ namespace graphicsGadgetLab
 	{
 	}
 
-	void DX12CommandList::Begin() noexcept
+	void DX12CommandList::Begin(DX12CommandAllocator* allocator) noexcept
 	{
-		//utility::ThrowIfFailed(m_D3D12CommandAllocator->Reset());
-		//utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Reset(m_D3D12CommandAllocator.Get(), nullptr));
+		utility::ThrowIfFailed(allocator->Get()->Reset());
+		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Reset(allocator->Get(), nullptr));
 	}
 
 	void DX12CommandList::End() noexcept

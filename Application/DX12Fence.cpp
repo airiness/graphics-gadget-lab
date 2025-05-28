@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12Fence.h"
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
@@ -22,31 +22,33 @@ namespace graphicsGadgetLab
 		}
 	}
 
-	uint64_t DX12Fence::GetCurrentValue() const noexcept
+	uint64_t DX12Fence::GetCompletedValue() const noexcept
 	{
 		return m_D3D12Fence->GetCompletedValue();
 	}
 
-	bool DX12Fence::IsCompleted(uint64_t value) const noexcept
+	bool DX12Fence::IsCompleted(uint64_t fenceValue) const noexcept
 	{
-		return m_D3D12Fence->GetCompletedValue() >= value;
+		return GetCompletedValue() >= fenceValue;
 	}
 
-	void DX12Fence::Signal(DX12CommandQueue* dx12CommandQueue, uint64_t value) noexcept
+	DX12FencePoint DX12Fence::Signal(DX12CommandQueue* dx12CommandQueue) noexcept
 	{
-		if (!IsCompleted(value))
-		{
-			m_D3D12Fence->Signal(value);
-		}
+		dx12CommandQueue->Get()->Signal(Get(), m_CurrentValue);
+
+		DX12FencePoint fencePoint(this, m_CurrentValue);
+
+		m_CurrentValue++;
+
+		return fencePoint;
 	}
 
-	void DX12Fence::WaitForValue(uint64_t value, uint32_t timeout) noexcept
+	void DX12Fence::WaitCompletion(uint64_t fenceValue, uint32_t timeout) noexcept
 	{
-		if (!IsCompleted(value))
+		if (!IsCompleted(fenceValue))
 		{
-			m_D3D12Fence->SetEventOnCompletion(value, m_EventHandle);
+			m_D3D12Fence->SetEventOnCompletion(fenceValue, m_EventHandle);
 			WaitForSingleObjectEx(m_EventHandle, timeout, FALSE);
 		}
 	}
-
 }

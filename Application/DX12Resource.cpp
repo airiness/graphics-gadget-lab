@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12Resource.h"
 #include "DX12Device.h"
 #include "Utility.h"
@@ -33,7 +33,6 @@ namespace graphicsGadgetLab
 		allocationDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 		allocationDesc.HeapType = heapType;
 		allocationDesc.pPrivateData = nullptr;
-
 
 		ComPtr<D3D12MA::Allocation> allocation;
 		utility::ThrowIfFailed(allocator->CreateResource(

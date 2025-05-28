@@ -1,13 +1,14 @@
 #include "Precompiled.h"
 #include "DX12Device.h"
-#include "Application.h"
 #include "DX12SwapChain.h"
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
 #include "DX12Descriptor.h"
+#include "DX12Fence.h"
+#include "DX12Resource.h"
+#include "Application.h"
 #include "Utility.h"
-
 
 namespace graphicsGadgetLab
 {
@@ -31,7 +32,6 @@ namespace graphicsGadgetLab
 		InitializeSwapChain();
 		InitializeCommandLists();
 		InitializeCommandAllocatorPools();
-		InitializeSyncObjects();
 	}
 
 	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
@@ -46,12 +46,30 @@ namespace graphicsGadgetLab
 
 	void DX12Device::BeginUpload() noexcept
 	{
-		m_UploadCommandList->Begin();
+		if (m_UploadFencePoint.IsCompleted())
+		{
+			m_UploadIntermediateResources.clear();
+		}
 
+		auto commandAllocator = m_UploadCommandAllocatorPool->RequestCommandAllocator(); // TODO : correct value need here
+		m_UploadCommandList->Begin(commandAllocator);
+	}
+
+	void DX12Device::EndUpload(bool wait) noexcept
+	{
+		m_UploadCommandList->End();
+		DX12CommandList* const commandLists[] = { m_UploadCommandList.get() };
+		m_UploadCommmandQueue->Execute(std::span{ commandLists });
+		m_UploadFencePoint = m_UploadCommmandQueue->Signal();
+
+		if (wait)
+		{
+			m_UploadFencePoint.Wait();
+		}
 
 	}
 
-	void DX12Device::EndUpload() noexcept
+	void DX12Device::UploadResource(DX12Resource* resource) noexcept
 	{
 	}
 
@@ -185,11 +203,6 @@ namespace graphicsGadgetLab
 		m_RtvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
 		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 16);
 		m_SamplerDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
-	}
-
-	void DX12Device::InitializeSyncObjects() noexcept
-	{
-		m_UploadFence = std::make_unique<DX12Fence>(this);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

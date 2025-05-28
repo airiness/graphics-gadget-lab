@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "Renderer.h"
 #include "Application.h"
 #include "DX12Device.h"
@@ -10,6 +10,7 @@
 #include "DX12Texture.h"
 #include "DX12Fence.h"
 #include "DX12Descriptor.h"
+#include "DX12CommandAllocator.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -46,7 +47,9 @@ namespace graphicsGadgetLab
 		auto bufferHeight = swapChain->GetBufferHeight();
 
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
-		commandList->Begin();
+
+		auto commandAllocator = m_Device->GetGraphicsCommandAllocatorPool()->RequestCommandAllocator();
+		commandList->Begin(commandAllocator);
 
 		commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
 		commandList->SetDescriptorHeap(*cbvDescriptorHeap);

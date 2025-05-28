@@ -1,4 +1,5 @@
 #pragma once
+#include "DX12FencePoint.h"
 
 namespace D3D12MA
 {
@@ -13,6 +14,7 @@ namespace graphicsGadgetLab
 	class DX12DescriptorHeap;
 	class DX12Fence;
 	class DX12CommandAllocatorPool;
+	class DX12Resource;
 	class DX12Device
 	{
 	public:
@@ -49,6 +51,10 @@ namespace graphicsGadgetLab
 		DX12CommandList* GetComputeCommandList(uint32_t bufferIndex) const noexcept { return m_ComputeCommandLists.at(bufferIndex).get(); }
 		DX12CommandList* GetCopyCommandList(uint32_t bufferIndex) const noexcept { return m_CopyCommandLists.at(bufferIndex).get(); }
 
+		DX12CommandAllocatorPool* GetGraphicsCommandAllocatorPool() const noexcept { return m_GraphicsCommandAllocatorPool.get(); }
+		DX12CommandAllocatorPool* GetComputeCommandAllocatorPool() const noexcept { return m_ComputeCommandAllocatorPool.get(); }
+		DX12CommandAllocatorPool* GetCopyCommandAllocatorPool() const noexcept { return m_CopyCommandAllocatorPool.get(); }
+
 		uint32_t GetRtvDescriptorSize() const noexcept { return m_RtvDescriptorSize; }
 		uint32_t GetDsvDescriptorSize() const noexcept { return m_DsvDescriptorSize; }
 		uint32_t GetCbvSrvUavDescriptorSize() const noexcept { return m_CbvSrvUavDescriptorSize; }
@@ -63,7 +69,9 @@ namespace graphicsGadgetLab
 		bool SupportTearing() const noexcept { return m_DX12FeatureSupport.m_TearingSupported; }
 
 		void BeginUpload() noexcept;
-		void EndUpload() noexcept;
+		void EndUpload(bool wait) noexcept;
+
+		void UploadResource(DX12Resource* resource) noexcept;
 
 	public:
 		static uint32_t GetBufferCount() noexcept { return BufferCount; }
@@ -77,7 +85,6 @@ namespace graphicsGadgetLab
 		void InitializeCommandLists() noexcept;
 		void InitializeCommandAllocatorPools() noexcept;
 		void InitializeDescriptorHeaps() noexcept;
-		void InitializeSyncObjects() noexcept;
 		void InitializeMemAllocator() noexcept;
 		void FinalizeMemAllocator() noexcept;
 
@@ -126,6 +133,7 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerDescriptorHeap;
 		// TODO: Descriptor Allocator!
 
-		std::unique_ptr<DX12Fence> m_UploadFence;
+		DX12FencePoint m_UploadFencePoint;
+		std::vector<std::unique_ptr<DX12Resource>> m_UploadIntermediateResources;
 	};
 }

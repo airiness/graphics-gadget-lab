@@ -1,8 +1,9 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12CommandQueue.h"
-#include "Application.h"
+#include "DX12CommandList.h"
 #include "DX12Device.h"
 #include "DX12Fence.h"
+#include "Application.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -13,13 +14,27 @@ namespace graphicsGadgetLab
 		int32_t priority, 
 		D3D12_COMMAND_QUEUE_FLAGS flags) noexcept :
 		m_DX12Device(dx12Device),
-		m_D3D12CommandQueue(CreateCommandQueue(type, priority, flags))
+		m_D3D12CommandQueue(CreateCommandQueue(type, priority, flags)),
+		m_Fence(std::make_unique<DX12Fence>(dx12Device))
 	{	
 	}
 
-	void DX12CommandQueue::Signal(DX12Fence* fence, uint64_t value) noexcept
+	void DX12CommandQueue::Execute(std::span<const DX12CommandList* const> commandLists) noexcept
 	{
-		utility::ThrowIfFailed(m_D3D12CommandQueue->Signal(fence->Get(), value));
+		std::vector<ID3D12CommandList*> d3d12CommandLists;
+		d3d12CommandLists.reserve(commandLists.size());
+
+		for (const auto& commandList : commandLists)
+		{
+			d3d12CommandLists.push_back(commandList->Get());
+		}
+
+		m_D3D12CommandQueue->ExecuteCommandLists(static_cast<UINT>(d3d12CommandLists.size()), d3d12CommandLists.data());
+	}
+
+	DX12FencePoint DX12CommandQueue::Signal() noexcept
+	{
+		return m_Fence->Signal(this);
 	}
 
 	ComPtr<ID3D12CommandQueue> DX12CommandQueue::CreateCommandQueue(

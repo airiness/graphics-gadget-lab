@@ -7,6 +7,7 @@ namespace graphicsGadgetLab
 	class DX12RootSignature;
 	class DX12Descriptor;
 	class DX12DescriptorHeap;
+	class DX12CommandAllocator;
 	class DX12CommandList
 	{
 	public:
@@ -15,7 +16,7 @@ namespace graphicsGadgetLab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12CommandList);
 		~DX12CommandList() noexcept;
 
-		void Begin() noexcept;
+		void Begin(DX12CommandAllocator* allocator) noexcept;
 		void End() noexcept;
 
 		void Execute(const DX12CommandQueue& commandQueue) noexcept;

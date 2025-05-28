@@ -37,7 +37,7 @@ namespace graphicsGadgetLab
 	inline bool Mesh<VertexType, IndexType>::UploadMesh(DX12Device* device)
 	{
 		device->BeginUpload();
-		device->EndUpload();
+		device->EndUpload(true);
 
 		return false;
 	}

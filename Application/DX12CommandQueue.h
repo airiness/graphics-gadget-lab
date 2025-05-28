@@ -1,8 +1,11 @@
-﻿#pragma once
+#pragma once
+#include "DX12FencePoint.h"
+
 namespace graphicsGadgetLab
 {
 	class DX12Device;
 	class DX12Fence;
+	class DX12CommandList;
 	class DX12CommandQueue
 	{
 	public:
@@ -16,7 +19,8 @@ namespace graphicsGadgetLab
 
 		ID3D12CommandQueue* Get() const noexcept { return m_D3D12CommandQueue.Get(); }
 
-		void Signal(DX12Fence* fence, uint64_t value) noexcept;
+		void Execute(std::span<const DX12CommandList* const> commandLists) noexcept;
+		DX12FencePoint Signal() noexcept;
 
 	private:
 		ComPtr<ID3D12CommandQueue> CreateCommandQueue(
@@ -27,5 +31,7 @@ namespace graphicsGadgetLab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		ComPtr<ID3D12CommandQueue> m_D3D12CommandQueue;
+
+		std::unique_ptr<DX12Fence> m_Fence;
 	};
 }

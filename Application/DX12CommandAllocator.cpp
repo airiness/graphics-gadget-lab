@@ -33,38 +33,36 @@ namespace graphicsGadgetLab
 	{
 	}
 
-	DX12CommandAllocator* DX12CommandAllocatorPool::RequestCommandAllocator(uint64_t fenceValue) noexcept
+	DX12CommandAllocator* DX12CommandAllocatorPool::RequestCommandAllocator() noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 
-		if (!m_AvailableAllocators.empty())
+		if (!mRecycledAllocators.empty())
 		{
-			auto allocator = m_AvailableAllocators.front();
-			m_AvailableAllocators.pop();
-			allocator->SetFenceValue(fenceValue);
-			allocator->SetInUse(true);
-			return allocator;
+			const auto& allocatorPair = mRecycledAllocators.front();
+			if (allocatorPair.second.IsCompleted())
+			{
+				mRecycledAllocators.pop();
+				return allocatorPair.first;
+			}
 		}
 
 		auto newAllocator = std::make_unique<DX12CommandAllocator>(m_DX12Device, m_Type);
-		newAllocator->SetFenceValue(fenceValue);
-		newAllocator->SetInUse(true);
 		auto allocatorPtr = newAllocator.get();
 		m_Pool.push_back(std::move(newAllocator));
 
+#if defined (BUILD_DEBUG)
 		utility::SetDebugName(allocatorPtr->Get(), 
 			std::format(L"CommandAllocator[{:p}]_{} ", (void*)allocatorPtr, utility::GetCommandListTypeName(m_Type)).c_str());
+#endif
 
 		return allocatorPtr;
 	}
 
-	void DX12CommandAllocatorPool::RecycleCommandAllocator(DX12CommandAllocator* allocator, uint64_t fenceValue) noexcept
+	void DX12CommandAllocatorPool::RecycleCommandAllocator(DX12CommandAllocator* allocator, DX12FencePoint fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
-
-		allocator->SetFenceValue(fenceValue);
-		allocator->SetInUse(false);
-		m_AvailableAllocators.push(allocator);
+		mRecycledAllocators.emplace(allocator, fencePoint);
 	}
 }
 
