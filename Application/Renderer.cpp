@@ -11,6 +11,7 @@
 #include "DX12Fence.h"
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
+#include "Geometry.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -32,6 +33,7 @@ namespace graphicsGadgetLab
 	{
 		InitializeRootSignatures();
 		InitializePipelineStates();
+		InitializeRenderObjects();
 	}
 
 	void Renderer::Update() noexcept
@@ -230,6 +232,12 @@ namespace graphicsGadgetLab
 	void Renderer::InitializeSyncObjects() noexcept
 	{
 		m_Fence = std::make_unique<DX12Fence>(m_Device.get());
+	}
+
+	void Renderer::InitializeRenderObjects() noexcept
+	{
+		m_TestCube = std::make_unique<Cube>(m_Device.get());
+		m_TestCube->Initialize();
 	}
 
 	void Renderer::UpdateGpuBuffers() noexcept

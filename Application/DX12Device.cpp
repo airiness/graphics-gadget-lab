@@ -6,7 +6,7 @@
 #include "DX12CommandAllocator.h"
 #include "DX12Descriptor.h"
 #include "DX12Fence.h"
-#include "DX12Resource.h"
+#include "DX12Buffer.h"
 #include "Application.h"
 #include "Utility.h"
 
@@ -69,8 +69,21 @@ namespace graphicsGadgetLab
 
 	}
 
-	void DX12Device::UploadResource(DX12Resource* resource) noexcept
+	void DX12Device::UploadResource(const void* data, size_t dataSize, const DX12Resource* destResource) noexcept
 	{
+		std::unique_ptr<DX12Buffer> uploadBuffer = std::make_unique<DX12Buffer>(this,
+			D3D12_HEAP_TYPE_UPLOAD,
+			CD3DX12_RESOURCE_DESC::Buffer(dataSize),
+			D3D12_RESOURCE_STATE_GENERIC_READ);
+		
+		D3D12_SUBRESOURCE_DATA subResourceData = {};
+		subResourceData.pData = data;
+		subResourceData.RowPitch = static_cast<LONG_PTR>(dataSize);
+		subResourceData.SlicePitch = static_cast<LONG_PTR>(dataSize);
+
+		UpdateSubresources<1>(m_UploadCommandList->Get(), destResource->Get(), uploadBuffer->Get(), 0, 0, 1, &subResourceData);
+
+		m_UploadIntermediateResources.push_back(std::move(uploadBuffer));
 	}
 
 	void DX12Device::InitializeDXGIFactory() noexcept

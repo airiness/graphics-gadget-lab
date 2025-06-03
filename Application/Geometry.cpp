@@ -30,7 +30,6 @@ namespace graphicsGadgetLab
 	Cube::Cube(DX12Device* dx12Device) noexcept :
 		Geometry(dx12Device)
 	{
-		Initialize();
 	}
 
 	Cube::~Cube() noexcept

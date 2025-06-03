@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "RendererConstant.h"
 
 namespace graphicsGadgetLab
@@ -9,6 +9,9 @@ namespace graphicsGadgetLab
 	template<typename T>
 	class DX12ConstantBuffer;
 	class DX12Fence;
+
+	class Cube;
+
 	class Renderer
 	{
 	public:
@@ -30,6 +33,8 @@ namespace graphicsGadgetLab
 		void InitializeConstantBuffer() noexcept;
 		void InitializeSyncObjects() noexcept;
 
+		void InitializeRenderObjects() noexcept;
+
 		void UpdateGpuBuffers() noexcept;
 		void UpdateGlobalConstantBuffer() noexcept;
 
@@ -48,5 +53,8 @@ namespace graphicsGadgetLab
 		PSOArray m_PipelineStates;
 
 		std::unique_ptr<DX12Fence> m_Fence;
+
+		// TODO: temopary declare cube here
+		std::unique_ptr<Cube> m_TestCube;
 	};
 }
