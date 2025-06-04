@@ -45,12 +45,12 @@ namespace graphicsGadgetLab
 			m_VertexBuffer = std::make_unique<DX12Buffer>(device, 
 				D3D12_HEAP_TYPE_DEFAULT,
 				CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize), 
-				D3D12_RESOURCE_STATE_GENERIC_READ);
+				D3D12_RESOURCE_STATE_COMMON);
 
 			m_IndexBuffer = std::make_unique<DX12Buffer>(device,
 				D3D12_HEAP_TYPE_DEFAULT,
 				CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize),
-				D3D12_RESOURCE_STATE_GENERIC_READ);
+				D3D12_RESOURCE_STATE_COMMON);
 
 			device->UploadResource(m_VerticesData.data(), vertexBufferSize, m_VertexBuffer.get());
 			device->UploadResource(m_IndicesData.data(), indexBufferSize, m_IndexBuffer.get());
