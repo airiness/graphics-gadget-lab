@@ -38,6 +38,8 @@ namespace graphicsGadgetLab
 		void UpdateGpuBuffers() noexcept;
 		void UpdateGlobalConstantBuffer() noexcept;
 
+		void RenderObjects() noexcept;
+
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 

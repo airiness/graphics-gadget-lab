@@ -5,6 +5,7 @@
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
 #include "DX12CommandList.h"
+#include "DX12CommandQueue.h"
 #include "DX12SwapChain.h"
 #include "DX12Buffer.h"
 #include "DX12Texture.h"
@@ -49,6 +50,7 @@ namespace graphicsGadgetLab
 		auto bufferHeight = swapChain->GetBufferHeight();
 
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
+		auto commandQueue = m_Device->GetGraphicsCommandQueue();
 
 		auto commandAllocator = m_Device->GetGraphicsCommandAllocatorPool()->RequestCommandAllocator();
 		commandList->Begin(commandAllocator);
@@ -72,11 +74,12 @@ namespace graphicsGadgetLab
 		commandList->ClearDepthStencil(dsDescriptor, 1.0f);
 
 		// Render Object
-		{
-
-		}
+		RenderObjects();
 
 		commandList->End();
+
+		const DX12CommandList* commandLists[] = { commandList };
+		commandQueue->Execute(commandLists);
 		
 	}
 
@@ -268,5 +271,12 @@ namespace graphicsGadgetLab
 		XMStoreFloat4x4(&buffer.m_ProjectionMatrix, XMMatrixTranspose(projectionMatrix));
 
 		m_GlobalConstantBuffer->Update(buffer);
+	}
+
+	void Renderer::RenderObjects() noexcept
+	{
+
+
+
 	}
 }

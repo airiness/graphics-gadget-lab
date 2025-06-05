@@ -19,7 +19,7 @@ namespace graphicsGadgetLab
 	{	
 	}
 
-	void DX12CommandQueue::Execute(std::span<const DX12CommandList* const> commandLists) noexcept
+	DX12FencePoint DX12CommandQueue::Execute(std::span<const DX12CommandList* const> commandLists) noexcept
 	{
 		std::vector<ID3D12CommandList*> d3d12CommandLists;
 		d3d12CommandLists.reserve(commandLists.size());
@@ -30,6 +30,8 @@ namespace graphicsGadgetLab
 		}
 
 		m_D3D12CommandQueue->ExecuteCommandLists(static_cast<UINT>(d3d12CommandLists.size()), d3d12CommandLists.data());
+
+		return Signal();
 	}
 
 	DX12FencePoint DX12CommandQueue::Signal() noexcept

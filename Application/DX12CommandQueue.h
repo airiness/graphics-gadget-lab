@@ -19,10 +19,11 @@ namespace graphicsGadgetLab
 
 		ID3D12CommandQueue* Get() const noexcept { return m_D3D12CommandQueue.Get(); }
 
-		void Execute(std::span<const DX12CommandList* const> commandLists) noexcept;
-		DX12FencePoint Signal() noexcept;
+		DX12FencePoint Execute(std::span<const DX12CommandList* const> commandLists) noexcept;
 
 	private:
+		DX12FencePoint Signal() noexcept;
+
 		ComPtr<ID3D12CommandQueue> CreateCommandQueue(
 			D3D12_COMMAND_LIST_TYPE type, 
 			int32_t priority, 

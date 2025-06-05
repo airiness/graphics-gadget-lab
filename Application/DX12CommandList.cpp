@@ -28,6 +28,9 @@ namespace graphicsGadgetLab
 
 	void DX12CommandList::End() noexcept
 	{
+		// TODO: should flush resource barrier here
+		FlushBarriers();
+
 		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
 	}
 
