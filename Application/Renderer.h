@@ -8,8 +8,8 @@ namespace graphicsGadgetLab
 	class DX12Buffer;
 	template<typename T>
 	class DX12ConstantBuffer;
+	class DX12CommandList;
 	class DX12Fence;
-
 	class Cube;
 
 	class Renderer
@@ -24,6 +24,8 @@ namespace graphicsGadgetLab
 		void Render() noexcept;
 		void Finalize() noexcept;
 
+		bool IsInitialized() const noexcept { return m_IsInitialized; }
+
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
 
 	private:
@@ -31,32 +33,30 @@ namespace graphicsGadgetLab
 		void InitializePipelineStates() noexcept;
 		void InitializeRenderTargets() noexcept;
 		void InitializeConstantBuffer() noexcept;
-		void InitializeSyncObjects() noexcept;
-
 		void InitializeRenderObjects() noexcept;
 
 		void UpdateGpuBuffers() noexcept;
 		void UpdateGlobalConstantBuffer() noexcept;
 
-		void RenderObjects() noexcept;
+		void RenderObjects(DX12CommandList* commandList) noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 
 		// RenderTargets & DepthStencilBuffer
 		RenderTargetArray m_RenderTargets;
-		RenderTargetDescriptors m_RenderTargetDescriptors;
+		RenderTargetDescriptors m_RenderTargetDescriptors = {};
 
 		// ConstantBuffer
 		std::unique_ptr<DX12ConstantBuffer<GlobalConstantBuffer>> m_GlobalConstantBuffer;
-		DX12Descriptor m_ConstantBufferDescriptor;
+		DX12Descriptor m_ConstantBufferDescriptor = {};
 
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;
 
-		std::unique_ptr<DX12Fence> m_Fence;
-
 		// TODO: temopary declare cube here
 		std::unique_ptr<Cube> m_TestCube;
+
+		bool m_IsInitialized = false;
 	};
 }

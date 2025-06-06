@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "Application.h"
 namespace graphicsGadgetLab
 {
@@ -69,6 +69,11 @@ namespace graphicsGadgetLab
 		return 0;
 		case WM_PAINT:
 		{
+			if (app->GetRenderer()->IsInitialized())
+			{
+				app->GetRenderer()->Update();
+				app->GetRenderer()->Render();
+			}
 		}
 		return 0;
 		}

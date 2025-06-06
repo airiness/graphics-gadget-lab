@@ -13,6 +13,7 @@
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
 #include "Geometry.h"
+#include "Mesh.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -34,11 +35,16 @@ namespace graphicsGadgetLab
 	{
 		InitializeRootSignatures();
 		InitializePipelineStates();
+		InitializeRenderTargets();
+		InitializeConstantBuffer();
 		InitializeRenderObjects();
+
+		m_IsInitialized = true;
 	}
 
 	void Renderer::Update() noexcept
 	{
+		UpdateGpuBuffers();
 	}
 
 	void Renderer::Render() noexcept
@@ -74,7 +80,7 @@ namespace graphicsGadgetLab
 		commandList->ClearDepthStencil(dsDescriptor, 1.0f);
 
 		// Render Object
-		RenderObjects();
+		RenderObjects(commandList);
 
 		commandList->End();
 
@@ -85,6 +91,10 @@ namespace graphicsGadgetLab
 
 	void Renderer::Finalize() noexcept
 	{
+		if (m_IsInitialized)
+		{
+			m_IsInitialized = false;
+		}
 	}
 
 	void Renderer::InitializeRootSignatures() noexcept
@@ -170,6 +180,7 @@ namespace graphicsGadgetLab
 		{
 			auto rtFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 			auto rtResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(rtFormat, width, height);
+			rtResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 			const float rtClearColor[] = { 0.0f,0.4f,0.5f,1.0f };
 			auto rtClearValue = CD3DX12_CLEAR_VALUE(rtFormat, rtClearColor);
 
@@ -196,6 +207,7 @@ namespace graphicsGadgetLab
 		{
 			auto dsFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 			auto dsResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(dsFormat, width, height);
+			dsResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 			auto dsClearValue = CD3DX12_CLEAR_VALUE(dsFormat, 1.0f, 0);
 
 			auto& dsTexture = m_RenderTargets[static_cast<uint32_t>(RenderTargetIndex::DS0)];
@@ -230,11 +242,6 @@ namespace graphicsGadgetLab
 		m_ConstantBufferDescriptor = cbHeap->CreateDescriptor();
 
 		m_Device->Get()->CreateConstantBufferView(&cbDesc, m_ConstantBufferDescriptor.m_CpuHandle);
-	}
-
-	void Renderer::InitializeSyncObjects() noexcept
-	{
-		m_Fence = std::make_unique<DX12Fence>(m_Device.get());
 	}
 
 	void Renderer::InitializeRenderObjects() noexcept
@@ -273,10 +280,15 @@ namespace graphicsGadgetLab
 		m_GlobalConstantBuffer->Update(buffer);
 	}
 
-	void Renderer::RenderObjects() noexcept
+	void Renderer::RenderObjects(DX12CommandList* commandList) noexcept
 	{
+		const auto& mesh = m_TestCube->GetMesh();
 
+		D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { mesh->GetVertexBufferView() };
+		commandList->SetVertexBuffers(0, vertexBufferViews);
+		commandList->SetIndexBuffer(mesh->GetIndexBufferView());
 
+		commandList->DrawIndexed(mesh->GetIndexCount());
 
 	}
 }

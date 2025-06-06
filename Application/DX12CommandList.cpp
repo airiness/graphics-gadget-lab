@@ -89,6 +89,16 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->OMSetRenderTargets(static_cast<UINT>(rtCount), rtHandles.data(), FALSE, dsHandle);
 	}
 
+	void DX12CommandList::SetVertexBuffers(uint32_t startSlot, std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) noexcept
+	{
+		m_D3D12GraphicsCommandList->IASetVertexBuffers(startSlot, vertexBufferViews.size(), vertexBufferViews.data());
+	}
+
+	void DX12CommandList::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) noexcept
+	{
+		m_D3D12GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
+	}
+
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
 	{
 		m_TextureBarriers.push_back(textureBarrier);
@@ -147,6 +157,11 @@ namespace graphicsGadgetLab
 			flags |= D3D12_CLEAR_FLAG_STENCIL;
 		}
 		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.m_CpuHandle, flags, depthClearValue, stencilValue, 0, nullptr);
+	}
+
+	void DX12CommandList::DrawIndexed(uint32_t indexCount) noexcept
+	{
+		m_D3D12GraphicsCommandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
 	}
 
 	void DX12CommandList::CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept

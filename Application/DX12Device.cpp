@@ -59,8 +59,7 @@ namespace graphicsGadgetLab
 	{
 		m_UploadCommandList->End();
 		DX12CommandList* const commandLists[] = { m_UploadCommandList.get() };
-		m_UploadCommmandQueue->Execute(std::span{ commandLists });
-		m_UploadFencePoint = m_UploadCommmandQueue->Signal();
+		m_UploadFencePoint = m_UploadCommmandQueue->Execute(std::span{ commandLists });
 
 		if (wait)
 		{
