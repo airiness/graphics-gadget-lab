@@ -5,6 +5,18 @@
 
 namespace graphicsGadgetLab
 {
+	template<typename T> struct DXGIIndexFormat;
+
+	template<> struct DXGIIndexFormat<uint16_t> 
+	{
+		static constexpr DXGI_FORMAT Value = DXGI_FORMAT_R16_UINT;
+	};
+
+	template<> struct DXGIIndexFormat<uint32_t> 
+	{
+		static constexpr DXGI_FORMAT Value = DXGI_FORMAT_R32_UINT;
+	};
+
 	template<typename VertexType = Vertex, typename IndexType = uint16_t>
 	class Mesh final
 	{
@@ -12,7 +24,7 @@ namespace graphicsGadgetLab
 		explicit Mesh(std::vector<VertexType>&& vertices, std::vector<IndexType>&& indices) noexcept;
 		~Mesh() = default;
 
-		bool UploadMesh(DX12Device* device);
+		void UploadMesh(DX12Device* device) noexcept;
 
 		const DX12Buffer* GetVertexBuffer() const noexcept { return m_VertexBuffer.get(); }
 		const DX12Buffer* GetIndexBuffer() const noexcept { return m_IndexBuffer.get(); }
@@ -49,7 +61,7 @@ namespace graphicsGadgetLab
 	}
 
 	template<typename VertexType, typename IndexType>
-	inline bool Mesh<VertexType, IndexType>::UploadMesh(DX12Device* device)
+	inline void Mesh<VertexType, IndexType>::UploadMesh(DX12Device* device) noexcept
 	{
 		device->BeginUpload();
 		{
@@ -68,13 +80,21 @@ namespace graphicsGadgetLab
 
 			device->UploadResource(m_VerticesData.data(), vertexBufferSize, m_VertexBuffer.get());
 			device->UploadResource(m_IndicesData.data(), indexBufferSize, m_IndexBuffer.get());
+
+			// Initialize buffer view
+			m_VertexBufferView.BufferLocation = m_VertexBuffer->Get()->GetGPUVirtualAddress();
+			m_VertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
+			m_VertexBufferView.StrideInBytes = sizeof(VertexType);
+
+			m_IndexBufferView.BufferLocation = m_IndexBuffer->Get()->GetGPUVirtualAddress();
+			m_IndexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
+			m_IndexBufferView.Format = DXGIIndexFormat<IndexType>::Value;
+
 		}
 		device->EndUpload(true);
 
 		m_Uploaded = true;
 		m_VerticesData.clear();
 		m_IndicesData.clear();
-
-		return true;
 	}
 }

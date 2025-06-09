@@ -98,7 +98,7 @@ namespace graphicsGadgetLab
 
 	void DX12CommandList::SetVertexBuffers(uint32_t startSlot, std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) noexcept
 	{
-		m_D3D12GraphicsCommandList->IASetVertexBuffers(startSlot, vertexBufferViews.size(), vertexBufferViews.data());
+		m_D3D12GraphicsCommandList->IASetVertexBuffers(startSlot, static_cast<UINT>(vertexBufferViews.size()), vertexBufferViews.data());
 	}
 
 	void DX12CommandList::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) noexcept
@@ -142,7 +142,10 @@ namespace graphicsGadgetLab
 			barrierGroups.push_back(group);
 		}
 
-		m_D3D12GraphicsCommandList->Barrier(static_cast<UINT32>(barrierGroups.size()), barrierGroups.data());
+		if (!barrierGroups.empty())
+		{
+			m_D3D12GraphicsCommandList->Barrier(static_cast<UINT32>(barrierGroups.size()), barrierGroups.data());
+		}
 
 		m_TextureBarriers.clear();
 		m_BufferBarriers.clear();
