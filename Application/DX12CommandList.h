@@ -8,6 +8,7 @@ namespace graphicsGadgetLab
 	class DX12Descriptor;
 	class DX12DescriptorHeap;
 	class DX12CommandAllocator;
+	class DX12PipelineState;
 	class DX12CommandList
 	{
 	public:
@@ -24,6 +25,7 @@ namespace graphicsGadgetLab
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_D3D12GraphicsCommandList.Get(); }
 
 		void SetGraphicsRootSignature(const DX12RootSignature& rootSignature) noexcept;
+		void SetPipelineState(const DX12PipelineState& pipelineState) noexcept;
 		void SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) noexcept;
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) noexcept;

@@ -3,6 +3,7 @@
 #include "DX12CommandQueue.h"
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
+#include "DX12PipelineState.h"
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
 #include "Utility.h"
@@ -43,6 +44,12 @@ namespace graphicsGadgetLab
 	void DX12CommandList::SetGraphicsRootSignature(const DX12RootSignature& rootSignature) noexcept
 	{
 		m_D3D12GraphicsCommandList->SetGraphicsRootSignature(rootSignature.Get());
+	}
+
+	void DX12CommandList::SetPipelineState(const DX12PipelineState& pipelineState) noexcept
+	{
+		// TODO: for RayTracing change into ID3D12GraphicsCommandList::SetPipelineState1(...).
+		m_D3D12GraphicsCommandList->SetPipelineState(pipelineState.Get());
 	}
 
 	void DX12CommandList::SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) noexcept

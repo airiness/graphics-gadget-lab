@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+#include "DX12FencePoint.h"
+
 namespace graphicsGadgetLab
 {
 	class DX12Device;
@@ -23,6 +25,8 @@ namespace graphicsGadgetLab
 
 		void SetClearColor(float r, float g, float b, float a) noexcept;
 
+		void WaitFrameCompletion() noexcept;
+		void UpdateFrameSyncObject(DX12FencePoint&& fencePoint) noexcept;
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
@@ -36,6 +40,7 @@ namespace graphicsGadgetLab
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
 		void CreateRTVs() noexcept;
+		void CreateSyncObjects() noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -50,6 +55,7 @@ namespace graphicsGadgetLab
 
 		std::vector<DX12Descriptor> m_BackBufferDescriptors;
 		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
+		std::vector<DX12FencePoint> m_SyncObjects;
 
 		float m_ClearColor[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
 

@@ -23,6 +23,7 @@ namespace graphicsGadgetLab
 	{
 		m_BackBufferIndex = m_DxgiSwapChain->GetCurrentBackBufferIndex();
 		CreateRTVs();
+		CreateSyncObjects();
 	}
 
 	DX12SwapChain::~DX12SwapChain() noexcept
@@ -33,6 +34,8 @@ namespace graphicsGadgetLab
 	{
 		m_Width = width;
 		m_Height = height;
+
+		// TODO: Check Sync here
 
 		DXGI_SWAP_CHAIN_DESC desc = {};
 		utility::ThrowIfFailed(m_DxgiSwapChain->GetDesc(&desc));
@@ -50,9 +53,22 @@ namespace graphicsGadgetLab
 		m_ClearColor[3] = a;
 	}
 
+	void DX12SwapChain::WaitFrameCompletion() noexcept
+	{
+		auto& currentFencePoint = m_SyncObjects[m_BackBufferIndex];
+		currentFencePoint.Wait();
+	}
+
+	void DX12SwapChain::UpdateFrameSyncObject(DX12FencePoint&& fencePoint) noexcept
+	{
+		m_SyncObjects[m_BackBufferIndex] = fencePoint;
+	}
+
 	void DX12SwapChain::Present() noexcept
 	{
+		m_DxgiSwapChain->Present(1, 0);
 
+		m_BackBufferIndex = (m_BackBufferIndex + 1) % DX12Device::GetBufferCount();
 	}
 
 	const DX12Descriptor& DX12SwapChain::GetBackBufferDescriptor(int32_t bufferIndex) const noexcept
@@ -68,7 +84,7 @@ namespace graphicsGadgetLab
 	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) const noexcept
 	{
 		CD3DX12_TEXTURE_BARRIER barrier(
-			D3D12_BARRIER_SYNC_NONE,
+			D3D12_BARRIER_SYNC_ALL,
 			D3D12_BARRIER_SYNC_RENDER_TARGET,
 			D3D12_BARRIER_ACCESS_COMMON,
 			D3D12_BARRIER_ACCESS_RENDER_TARGET,
@@ -159,6 +175,17 @@ namespace graphicsGadgetLab
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].get()->Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
 #endif
+		}
+	}
+
+	void DX12SwapChain::CreateSyncObjects() noexcept
+	{
+		const auto bufferCount = DX12Device::GetBufferCount();
+		m_SyncObjects.reserve(bufferCount);
+
+		for (int32_t bufferIndex = 0; bufferIndex < static_cast<int32_t>(bufferCount); bufferIndex++)
+		{
+			m_SyncObjects.push_back(DX12FencePoint());
 		}
 	}
 }

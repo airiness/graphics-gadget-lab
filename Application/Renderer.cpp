@@ -54,25 +54,28 @@ namespace graphicsGadgetLab
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 		auto bufferWidth = swapChain->GetBufferWidth();
 		auto bufferHeight = swapChain->GetBufferHeight();
-
+		auto commandAllocatorPool = m_Device->GetGraphicsCommandAllocatorPool();
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
 		auto commandQueue = m_Device->GetGraphicsCommandQueue();
 
-		auto commandAllocator = m_Device->GetGraphicsCommandAllocatorPool()->RequestCommandAllocator();
+		swapChain->WaitFrameCompletion();
+
+		auto commandAllocator = commandAllocatorPool->RequestCommandAllocator();
 		commandList->Begin(commandAllocator);
 
 		commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
+		commandList->SetPipelineState(*m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)].get());
 		commandList->SetDescriptorHeap(*cbvDescriptorHeap);
 
 		commandList->SetViewport(0, 0, bufferWidth, bufferHeight);
 		commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
 
 		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		
+
 		swapChain->PrepareBackBuffer(commandList);
 		commandList->FlushBarriers();
 
-		DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())};
+		DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex()) };
 		auto& dsDescriptor = m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)];
 		commandList->SetRenderTargets(rtDescriptors, &dsDescriptor);
 
@@ -85,8 +88,13 @@ namespace graphicsGadgetLab
 		commandList->End();
 
 		const DX12CommandList* commandLists[] = { commandList };
-		commandQueue->Execute(commandLists);
-		
+		auto fencePoint = commandQueue->Execute(commandLists);
+
+		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, fencePoint);
+
+		swapChain->UpdateFrameSyncObject(std::move(fencePoint));
+		swapChain->Present();
+
 	}
 
 	void Renderer::Finalize() noexcept
