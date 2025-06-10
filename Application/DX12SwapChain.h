@@ -34,7 +34,7 @@ namespace graphicsGadgetLab
 		DX12Texture* GetCurrentBackBuffer() const noexcept;
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
-		void FinishBackBuffer(DX12CommandList* commandList) noexcept;
+		void FinishBackBuffer(DX12CommandList* commandList) const noexcept;
 		void ClearBackBuffer(DX12CommandList* commandList) const noexcept;
 
 	private:

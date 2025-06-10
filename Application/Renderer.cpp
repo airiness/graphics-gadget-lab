@@ -85,6 +85,8 @@ namespace graphicsGadgetLab
 		// Render Object
 		RenderObjects(commandList);
 
+		swapChain->PrepareBackBuffer
+
 		commandList->End();
 
 		const DX12CommandList* commandLists[] = { commandList };

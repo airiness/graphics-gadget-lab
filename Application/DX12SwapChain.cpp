@@ -10,7 +10,7 @@
 
 namespace graphicsGadgetLab
 {
-	DX12SwapChain::DX12SwapChain(DX12Device* dx12Device, 
+	DX12SwapChain::DX12SwapChain(DX12Device* dx12Device,
 		DX12CommandQueue* dx12CommandQueue,
 		uint32_t width, uint32_t height,
 		DXGI_FORMAT bufferFormat) noexcept :
@@ -91,13 +91,24 @@ namespace graphicsGadgetLab
 			D3D12_BARRIER_LAYOUT_PRESENT,
 			D3D12_BARRIER_LAYOUT_RENDER_TARGET,
 			GetCurrentBackBuffer()->Get(),
-			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0)
-		);
+			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+
 		commandList->AddTextureBarrier(barrier);
 	}
 
-	void DX12SwapChain::FinishBackBuffer(DX12CommandList* commandList) noexcept
+	void DX12SwapChain::FinishBackBuffer(DX12CommandList* commandList) const noexcept
 	{
+		CD3DX12_TEXTURE_BARRIER barrier(
+			D3D12_BARRIER_SYNC_RENDER_TARGET,
+			D3D12_BARRIER_SYNC_ALL,
+			D3D12_BARRIER_ACCESS_RENDER_TARGET,
+			D3D12_BARRIER_ACCESS_COMMON,
+			D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+			D3D12_BARRIER_LAYOUT_PRESENT,
+			GetCurrentBackBuffer()->Get(),
+			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+
+		commandList->AddTextureBarrier(barrier);
 	}
 
 	void DX12SwapChain::ClearBackBuffer(DX12CommandList* commandList) const noexcept
@@ -129,17 +140,17 @@ namespace graphicsGadgetLab
 
 		utility::ThrowIfFailed(factory->CreateSwapChainForHwnd(
 			m_DX12CommandQueue->Get(),
-			hWnd, 
-			&desc, 
-			nullptr, 
-			nullptr, 
+			hWnd,
+			&desc,
+			nullptr,
+			nullptr,
 			&swapChain1));
 
 		// Invalid Alet+Enter Fullscreen
-		utility::ThrowIfFailed(factory->MakeWindowAssociation(hWnd, 
+		utility::ThrowIfFailed(factory->MakeWindowAssociation(hWnd,
 			DXGI_MWA_NO_ALT_ENTER |
 			DXGI_MWA_NO_WINDOW_CHANGES));	// TODO: support window changes
-	
+
 		ComPtr<IDXGISwapChain4> swapChain4;
 		utility::ThrowIfFailed(swapChain1.As(&swapChain4));
 
