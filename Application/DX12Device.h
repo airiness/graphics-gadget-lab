@@ -79,6 +79,7 @@ namespace graphicsGadgetLab
 	private:
 		void InitializeDXGIFactory() noexcept;
 		void InitializeDXGIAdapter() noexcept;
+		void InitializeDebugLayer() noexcept;
 		void InitializeD3D12Device() noexcept;
 		void InitializeCommandQueues() noexcept;
 		void InitializeSwapChain() noexcept;
@@ -89,6 +90,9 @@ namespace graphicsGadgetLab
 		void FinalizeMemAllocator() noexcept;
 
 		void CheckFeatureSupport() noexcept;
+
+	private:
+		static std::wstring GetLatestWinPixGpuCapturerPath() noexcept;
 
 	private:
 		static constexpr uint32_t BufferCount = 2;

@@ -15,6 +15,7 @@
 
 #include <Windows.h>
 #include <Shlwapi.h>	// PathRemoveFileSpecW
+#include <shlobj.h>
 #include <comdef.h>
 
 #include <wrl.h>
@@ -45,6 +46,7 @@ using namespace DirectX;
 #include <span>
 #include <queue>
 #include <mutex>
+#include <filesystem>
 
 // Porject define
 #include "CoreDef.h"

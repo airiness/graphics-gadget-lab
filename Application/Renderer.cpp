@@ -82,10 +82,13 @@ namespace graphicsGadgetLab
 		swapChain->ClearBackBuffer(commandList);
 		commandList->ClearDepthStencil(dsDescriptor, 1.0f);
 
+		commandList->SetGraphicsConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex), m_GlobalConstantBuffer->GetBuffer()->Get()->GetGPUVirtualAddress());
+
 		// Render Object
 		RenderObjects(commandList);
 
-		swapChain->PrepareBackBuffer
+		swapChain->FinishBackBuffer(commandList);
+		commandList->FlushBarriers();
 
 		commandList->End();
 

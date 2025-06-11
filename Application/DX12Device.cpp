@@ -16,6 +16,7 @@ namespace graphicsGadgetLab
 	{
 		InitializeDXGIFactory();
 		InitializeDXGIAdapter();
+		InitializeDebugLayer();
 		InitializeD3D12Device();
 		CheckFeatureSupport();
 	}
@@ -129,10 +130,10 @@ namespace graphicsGadgetLab
 		GGLAB_ASSERT_MSG(m_DxgiAdapter != nullptr, "Create DxgiAdapter failed.");
 	}
 
-	void DX12Device::InitializeD3D12Device() noexcept
+	void DX12Device::InitializeDebugLayer() noexcept
 	{
-		// Validate Debug Layer
 #if defined(BUILD_DEBUG)
+		// Validate Debug Layer
 		ComPtr<ID3D12Debug> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
@@ -145,8 +146,22 @@ namespace graphicsGadgetLab
 				debugController1->SetEnableGPUBasedValidation(true);
 			}
 		}
-#endif
 
+		// Try to load `WinPixGpuCapturer.dll` for Frame Capture.
+		if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+		{	
+			const auto& dllPath = GetLatestWinPixGpuCapturerPath();
+			if (!dllPath.empty())
+			{
+				LoadLibrary(dllPath.c_str());
+			}
+		}
+
+#endif
+	}
+
+	void DX12Device::InitializeD3D12Device() noexcept
+	{
 		// Feature check and Create Device
 		constexpr D3D_FEATURE_LEVEL featureLevels[] = {
 			D3D_FEATURE_LEVEL_12_2,
@@ -256,5 +271,34 @@ namespace graphicsGadgetLab
 		{
 			m_DX12FeatureSupport.m_TearingSupported = tearSupport;
 		}
+	}
+
+	std::wstring DX12Device::GetLatestWinPixGpuCapturerPath() noexcept
+	{
+		LPWSTR programFilesPath = nullptr;
+		SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+
+		std::filesystem::path pixInstallationPath = programFilesPath;
+		pixInstallationPath /= "Microsoft PIX";
+
+		std::wstring newestVersionFound;
+
+		for (auto const& directory_entry : std::filesystem::directory_iterator(pixInstallationPath))
+		{
+			if (directory_entry.is_directory())
+			{
+				if (newestVersionFound.empty() || newestVersionFound < directory_entry.path().filename().c_str())
+				{
+					newestVersionFound = directory_entry.path().filename().c_str();
+				}
+			}
+		}
+
+		if (newestVersionFound.empty())
+		{
+			return L"";
+		}
+
+		return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
 	}
 }

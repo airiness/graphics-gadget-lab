@@ -106,6 +106,11 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->IASetIndexBuffer(&indexBufferView);
 	}
 
+	void DX12CommandList::SetGraphicsConstantBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) noexcept
+	{
+		m_D3D12GraphicsCommandList->SetGraphicsRootConstantBufferView(static_cast<UINT>(parameterIndex), gpuAddress);
+	}
+
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
 	{
 		m_TextureBarriers.push_back(textureBarrier);

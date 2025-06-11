@@ -57,7 +57,7 @@ namespace graphicsGadgetLab
 		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
 		std::vector<DX12FencePoint> m_SyncObjects;
 
-		float m_ClearColor[4] = { 0.2f, 0.2f, 0.2f, 1.0f };
+		float m_ClearColor[4] = { 0.6f, 0.6f, 0.6f, 1.0f };
 
 		uint32_t m_BackBufferIndex = 0;
 	};
