@@ -61,10 +61,10 @@ namespace graphicsGadgetLab
 		constexpr std::array<std::array<int, 4>, 6> faceIndices =
 		{ {
 			{{0, 1, 2, 3}}, // Front
-			{{4, 5, 6, 7}}, // Back
+			{{5, 6, 7, 4}}, // Back
 			{{1, 6, 5, 2}}, // Top
-			{{0, 3, 4, 7}}, // Bottom
-			{{7, 6, 1, 0}}, // Left
+			{{7, 0, 3, 4}}, // Bottom
+			{{6, 1, 0, 7}}, // Left
 			{{3, 2, 5, 4}}, // Right
 		} };
 

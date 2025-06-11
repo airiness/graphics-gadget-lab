@@ -157,12 +157,16 @@ namespace graphicsGadgetLab
 			inputLayoutDesc.pInputElementDescs = inputLayout;
 			inputLayoutDesc.NumElements = ARRAYSIZE(inputLayout);
 
+			CD3DX12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+			rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
+
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 			psoDesc.InputLayout = inputLayoutDesc;
 			psoDesc.pRootSignature = m_RootSignatures[static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)]->Get();
 			psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
 			psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
-			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			psoDesc.RasterizerState = rasterizerDesc;
 			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC2(D3D12_DEFAULT);
 			psoDesc.SampleMask = UINT_MAX;
