@@ -174,9 +174,14 @@ namespace graphicsGadgetLab
 		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.m_CpuHandle, flags, depthClearValue, stencilValue, 0, nullptr);
 	}
 
-	void DX12CommandList::DrawIndexed(uint32_t indexCount) noexcept
+	void DX12CommandList::DrawIndexedInstanced(uint32_t indexCount) noexcept
 	{
 		m_D3D12GraphicsCommandList->DrawIndexedInstanced(indexCount, 1, 0, 0, 0);
+	}
+
+	void DX12CommandList::DrawInstanced(uint32_t vertexCount) noexcept
+	{
+		m_D3D12GraphicsCommandList->DrawInstanced(vertexCount, 1, 0, 0);
 	}
 
 	void DX12CommandList::CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept

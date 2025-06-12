@@ -40,7 +40,8 @@ namespace graphicsGadgetLab
 		void FlushBarriers() noexcept;
 		void ClearRenderTarget(DX12Descriptor rtDescriptor, const float* clearColor) noexcept;
 		void ClearDepthStencil(DX12Descriptor dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) noexcept;
-		void DrawIndexed(uint32_t indexCount) noexcept;
+		void DrawIndexedInstanced(uint32_t indexCount) noexcept;
+		void DrawInstanced(uint32_t vertexCount) noexcept;
 
 	private:
 		void CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept;

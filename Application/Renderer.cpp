@@ -305,7 +305,8 @@ namespace graphicsGadgetLab
 		commandList->SetVertexBuffers(0, vertexBufferViews);
 		commandList->SetIndexBuffer(mesh->GetIndexBufferView());
 
-		commandList->DrawIndexed(mesh->GetIndexCount());
+		//commandList->DrawInstanced(mesh->GetVertexCount());
+		commandList->DrawIndexedInstanced(mesh->GetIndexCount());
 
 	}
 }
