@@ -1,3 +1,9 @@
 [submodule "Externals/Vender/D3D12MemoryAllocator"]
 	path = Externals/Vender/D3D12MemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator.git
+[submodule "Externals/Vender/DirectXMesh"]
+	path = Externals/Vender/DirectXMesh
+	url = https://github.com/microsoft/DirectXMesh.git
+[submodule "Externals/Vender/DirectXTex"]
+	path = Externals/Vender/DirectXTex
+	url = https://github.com/microsoft/DirectXTex.git
