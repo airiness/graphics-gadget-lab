@@ -159,7 +159,8 @@ namespace graphicsGadgetLab
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
-			rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
+			//rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;	// Wireframe mode for debugging
+			rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 			psoDesc.InputLayout = inputLayoutDesc;

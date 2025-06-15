@@ -16,6 +16,7 @@ struct VertexShaderOutput
 {
     float4 Position : SV_POSITION;
     float2 TexCoord : TEXCOORD;
+    float3 Color : COLOR;
 };
 
 VertexShaderOutput main(VertexPosColor IN)
@@ -29,6 +30,7 @@ VertexShaderOutput main(VertexPosColor IN)
     
     OUT.Position = pos;
     OUT.TexCoord = IN.TexCoord;
+    OUT.Color = IN.Normal; // Assuming Normal is used as color for demonstration
 
     return OUT;
 }
