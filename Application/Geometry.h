@@ -42,5 +42,9 @@ namespace graphicsGadgetLab
 		virtual std::vector<GeometryVertexType> CreateVertices() noexcept override;
 		virtual std::vector<GeometryIndexType> CreateIndices() noexcept override;
 
+	private:
+		static constexpr uint32_t FaceCount = 6;
+		static constexpr uint32_t VertexCountPerFace = 4;
+
 	};
 }

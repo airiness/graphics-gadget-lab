@@ -38,23 +38,23 @@ namespace graphicsGadgetLab
 
 	std::vector<GeometryVertexType> Cube::CreateVertices() noexcept
 	{
-		constexpr std::array<std::array<XMFLOAT3, 4>, 6> facePositions =
+		constexpr std::array<std::array<XMFLOAT3, VertexCountPerFace>, FaceCount> facePositions = 
 		{ {
 			// Front face (-Z)
-			{{{-1, -1, -1}, {-1,  1, -1}, { 1,  1, -1}, { 1, -1, -1}}},
+			{{{-1.0f, -1.0f, -1.0f}, {-1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}}},
 			// Back face (+Z)
-			{{{ 1, -1,  1}, { 1,  1,  1}, {-1,  1,  1}, {-1, -1,  1}}},
+			{{{ 1.0f, -1.0f,  1.0f}, { 1.0f,  1.0f,  1.0f}, {-1.0f,  1.0f,  1.0f}, {-1.0f, -1.0f,  1.0f}}},
 			// Top face (+Y)
-			{{{-1,  1, -1}, {-1,  1,  1}, { 1,  1,  1}, { 1,  1, -1}}},
+			{{{-1.0f,  1.0f, -1.0f}, {-1.0f,  1.0f,  1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f,  1.0f, -1.0f}}},
 			// Bottom face (-Y)
-			{{{-1, -1,  1}, {-1, -1, -1}, { 1, -1, -1}, { 1, -1,  1}}},
+			{{{-1.0f, -1.0f,  1.0f}, {-1.0f, -1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}, { 1.0f, -1.0f,  1.0f}}},
 			// Left face (-X)
-			{{{-1, -1,  1}, {-1,  1,  1}, {-1,  1, -1}, {-1, -1, -1}}},
+			{{{-1.0f, -1.0f,  1.0f}, {-1.0f,  1.0f,  1.0f}, {-1.0f,  1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}}},
 			// Right face (+X)
-			{{{ 1, -1, -1}, { 1,  1, -1}, { 1,  1,  1}, { 1, -1,  1}}},
+			{{{ 1.0f, -1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f, -1.0f,  1.0f}}},
 		} };
 
-		constexpr std::array<XMFLOAT2, 4> texCoords =
+		constexpr std::array<XMFLOAT2, VertexCountPerFace> texCoords =
 		{ {
 			{ 0.0f, 1.0f },
 			{ 0.0f, 0.0f },
@@ -62,17 +62,7 @@ namespace graphicsGadgetLab
 			{ 1.0f, 1.0f },
 		} };
 
-		//constexpr std::array<std::array<int, 4>, 6> faceIndices =
-		//{ {
-		//	{{0, 1, 2, 3}}, // Front
-		//	{{4, 5, 6, 7}}, // Back
-		//	{{1, 6, 5, 2}}, // Top
-		//	{{0, 3, 4, 7}}, // Bottom
-		//	{{7, 6, 1, 0}}, // Left
-		//	{{3, 2, 5, 4}}, // Right
-		//} };
-
-		constexpr std::array<XMFLOAT3, 6> faceNormals =
+		constexpr std::array<XMFLOAT3, FaceCount> faceNormals =
 		{ {
 			{ 0.0f,  0.0f, -1.0f }, // Front
 			{ 0.0f,  0.0f,  1.0f }, // Back
@@ -83,28 +73,17 @@ namespace graphicsGadgetLab
 		} };
 
 		std::vector<GeometryVertexType> vertices;
-		vertices.reserve(36); // 6 faces * 2 triangles * 3 verts
+		vertices.reserve(FaceCount * VertexCountPerFace);
 
-		for (size_t face = 0; face < 6; ++face)
+		for (size_t face = 0; face < FaceCount; ++face)
 		{
 			const auto& n = faceNormals[face];
 			const auto& p = facePositions[face];
 
-			vertices.push_back({ p[0], n, texCoords[0] });
-			vertices.push_back({ p[1], n, texCoords[1] });
-			vertices.push_back({ p[2], n, texCoords[2] });
-
-			vertices.push_back({ p[0], n, texCoords[0] });
-			vertices.push_back({ p[2], n, texCoords[2] });
-			vertices.push_back({ p[3], n, texCoords[3] });
-
-			//vertices.push_back({ positions[idx[0]], n, texCoords[0] });
-			//vertices.push_back({ positions[idx[1]], n, texCoords[1] });
-			//vertices.push_back({ positions[idx[2]], n, texCoords[2] });
-
-			//vertices.push_back({ positions[idx[0]], n, texCoords[0] });
-			//vertices.push_back({ positions[idx[2]], n, texCoords[2] });
-			//vertices.push_back({ positions[idx[3]], n, texCoords[3] });
+			for (size_t i = 0; i < VertexCountPerFace; ++i)
+			{
+				vertices.push_back({ p[i], n, texCoords[i] });
+			}
 		}
 
 		return vertices;
@@ -115,16 +94,16 @@ namespace graphicsGadgetLab
 		std::vector<GeometryIndexType> indices;
 		indices.reserve(36); // 6 faces * 2 triangles * 3 indices
 
-		for (GeometryIndexType face = 0; face < 6; ++face)
+		for (GeometryIndexType face = 0; face < FaceCount; ++face)
 		{
-			GeometryIndexType base = face * 6;
+			GeometryIndexType base = face * VertexCountPerFace;
 			indices.push_back(base + 0);
 			indices.push_back(base + 1);
 			indices.push_back(base + 2);
 
+			indices.push_back(base + 0);
+			indices.push_back(base + 2);
 			indices.push_back(base + 3);
-			indices.push_back(base + 4);
-			indices.push_back(base + 5);
 		}
 
 		return indices;
