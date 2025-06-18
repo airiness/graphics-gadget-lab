@@ -88,9 +88,6 @@
     <ClCompile Include="DX12FencePoint.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Texture.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="TextureManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -161,9 +158,6 @@
     </ClInclude>
     <ClInclude Include="DX12FencePoint.h">
       <Filter>Graphics\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="Texture.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="TextureManager.h">
       <Filter>Graphics</Filter>

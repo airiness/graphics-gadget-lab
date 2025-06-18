@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "DX12Resource.h"
 namespace graphicsGadgetLab
 {
@@ -20,8 +20,8 @@ namespace graphicsGadgetLab
 	class DX12ConstantBuffer
 	{
 	public:
-		explicit DX12ConstantBuffer(DX12Device* device);
-		~DX12ConstantBuffer();
+		explicit DX12ConstantBuffer(DX12Device* device) noexcept;
+		~DX12ConstantBuffer() noexcept;
 
 		void Update(const T& data) noexcept;
 		uint32_t GetBufferSize() const noexcept { return m_BufferSize; }
@@ -38,7 +38,7 @@ namespace graphicsGadgetLab
 	};
 
 	template<typename T>
-	inline DX12ConstantBuffer<T>::DX12ConstantBuffer(DX12Device* device) :
+	inline DX12ConstantBuffer<T>::DX12ConstantBuffer(DX12Device* device) noexcept :
 		m_BufferSize(CalcBufferSize())
 	{
 		auto rtResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(m_BufferSize);
@@ -47,7 +47,7 @@ namespace graphicsGadgetLab
 	}
 
 	template<typename T>
-	inline DX12ConstantBuffer<T>::~DX12ConstantBuffer()
+	inline DX12ConstantBuffer<T>::~DX12ConstantBuffer() noexcept
 	{
 	}
 

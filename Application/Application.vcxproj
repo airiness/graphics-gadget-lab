@@ -113,7 +113,6 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RendererConstant.cpp" />
-    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
@@ -139,7 +138,6 @@
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererConstant.h" />
-    <ClInclude Include="Texture.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>
