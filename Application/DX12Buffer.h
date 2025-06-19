@@ -10,6 +10,7 @@ namespace graphicsGadgetLab
 			const CD3DX12_RESOURCE_DESC& resourceDesc,
 			D3D12_RESOURCE_STATES initState,
 			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Buffer);
 		virtual ~DX12Buffer() noexcept;
 
 		void* Map();
@@ -54,7 +55,7 @@ namespace graphicsGadgetLab
 	template<typename T>
 	inline void DX12ConstantBuffer<T>::Update(const T& data) noexcept
 	{
-		assert(m_MappedData != nullptr);
+		GGLAB_ASSERT_MSG(m_MappedData != nullptr, "");
 		std::memcpy(m_MappedData, &data, m_BufferSize);
 	}
 

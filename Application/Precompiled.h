@@ -39,7 +39,6 @@ using namespace DirectX;
 #include <string>
 #include <memory>
 #include <stdexcept>
-#include <cassert>
 #include <format>
 #include <array>
 #include <optional>
@@ -47,6 +46,7 @@ using namespace DirectX;
 #include <queue>
 #include <mutex>
 #include <filesystem>
+#include <unordered_map>
 
 // Porject define
 #include "CoreDef.h"

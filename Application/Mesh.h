@@ -22,9 +22,9 @@ namespace graphicsGadgetLab
 	{
 	public:
 		explicit Mesh(std::vector<VertexType>&& vertices, std::vector<IndexType>&& indices) noexcept;
-		~Mesh() = default;
+		~Mesh() noexcept = default;
 
-		void UploadMesh(DX12Device* device) noexcept;
+		void Upload(DX12Device* dx12Device) noexcept;
 
 		const DX12Buffer* GetVertexBuffer() const noexcept { return m_VertexBuffer.get(); }
 		const DX12Buffer* GetIndexBuffer() const noexcept { return m_IndexBuffer.get(); }
@@ -61,25 +61,25 @@ namespace graphicsGadgetLab
 	}
 
 	template<typename VertexType, typename IndexType>
-	inline void Mesh<VertexType, IndexType>::UploadMesh(DX12Device* device) noexcept
+	inline void Mesh<VertexType, IndexType>::Upload(DX12Device* dx12Device) noexcept
 	{
-		device->BeginUpload();
+		dx12Device->BeginUpload();
 		{
 			size_t vertexBufferSize = m_VerticesData.size() * sizeof(VertexType);
 			size_t indexBufferSize = m_IndicesData.size() * sizeof(IndexType);
 
-			m_VertexBuffer = std::make_unique<DX12Buffer>(device,
+			m_VertexBuffer = std::make_unique<DX12Buffer>(dx12Device,
 				D3D12_HEAP_TYPE_DEFAULT,
 				CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
 				D3D12_RESOURCE_STATE_COMMON);
 
-			m_IndexBuffer = std::make_unique<DX12Buffer>(device,
+			m_IndexBuffer = std::make_unique<DX12Buffer>(dx12Device,
 				D3D12_HEAP_TYPE_DEFAULT,
 				CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize),
 				D3D12_RESOURCE_STATE_COMMON);
 
-			device->UploadResource(m_VerticesData.data(), vertexBufferSize, m_VertexBuffer.get());
-			device->UploadResource(m_IndicesData.data(), indexBufferSize, m_IndexBuffer.get());
+			dx12Device->UploadResource(m_VerticesData.data(), vertexBufferSize, m_VertexBuffer.get());
+			dx12Device->UploadResource(m_IndicesData.data(), indexBufferSize, m_IndexBuffer.get());
 
 			// Initialize buffer view
 			m_VertexBufferView.BufferLocation = m_VertexBuffer->Get()->GetGPUVirtualAddress();
@@ -91,7 +91,7 @@ namespace graphicsGadgetLab
 			m_IndexBufferView.Format = DXGIIndexFormat<IndexType>::Value;
 
 		}
-		device->EndUpload(true);
+		dx12Device->EndUpload(true);
 
 		m_Uploaded = true;
 		m_VerticesData.clear();

@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "TextureManager.h"
 #include "DX12Device.h"
-#include "DX12Texture.h"
+#include "Texture.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -17,8 +17,15 @@ namespace graphicsGadgetLab
 
 	Texture* TextureManager::LoadTexture(const std::filesystem::path& texPath) noexcept
 	{
+		std::lock_guard lock(m_Mutex);
+
 		// Use canonical path as unordered map key.
 		auto cannonicalPath = std::filesystem::canonical(texPath);
+		auto searchIter = m_Textures.find(cannonicalPath);
+		if (searchIter != m_Textures.end())
+		{
+			return searchIter->second.get();
+		}
 
 		const auto extension = texPath.extension().string();
 
@@ -34,23 +41,19 @@ namespace graphicsGadgetLab
 			utility::ThrowIfFailed(LoadFromWICFile(texPath.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, &metaData, scratchImage));
 		}
 
-		auto texture = std::make_unique<Texture>();
-		texture->;
+		auto pair = m_Textures.emplace(cannonicalPath, std::make_unique<Texture>());
+		GGLAB_ASSERT_MSG(pair.second == true, "Create Texture failed.");
 
-		auto dx12Texture = std::make_unique<DX12Texture>(m_DX12Device,
-			D3D12_HEAP_TYPE_DEFAULT,
-			CD3DX12_RESOURCE_DESC::Tex2D(metaData.format,
-				static_cast<UINT64>(metaData.width),
-				static_cast<UINT>(metaData.height),
-				static_cast<UINT16>(metaData.arraySize)),
-			D3D12_RESOURCE_STATE_COMMON);
+		auto& tex = pair.first->second;
+		tex->m_ScratchImage = std::move(scratchImage);
 
-		
-
-
-		return nullptr;
+		tex->m_ScratchImage.GetMetadata();
+		UploadTexture(tex.get());
+		return tex.get();
 	}
+
 	void TextureManager::UploadTexture(Texture* texture) noexcept
 	{
+		texture->Upload(m_DX12Device);
 	}
 }

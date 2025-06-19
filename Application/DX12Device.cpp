@@ -81,7 +81,28 @@ namespace graphicsGadgetLab
 		subResourceData.RowPitch = static_cast<LONG_PTR>(dataSize);
 		subResourceData.SlicePitch = static_cast<LONG_PTR>(dataSize);
 
-		UpdateSubresources<1>(m_UploadCommandList->Get(), destResource->Get(), uploadBuffer->Get(), 0, 0, 1, &subResourceData);
+		UpdateSubresources<1>(m_UploadCommandList->Get(), 
+			destResource->Get(), 
+			uploadBuffer->Get(), 
+			0, 0, 1, &subResourceData);
+
+		m_UploadIntermediateResources.push_back(std::move(uploadBuffer));
+	}
+
+	void DX12Device::UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept
+	{
+		auto subResourceCount = static_cast<UINT>(subResourceData.size());
+		auto uploadSize = GetRequiredIntermediateSize(destResource->Get(), 0, subResourceCount);
+
+		std::unique_ptr uploadBuffer = std::make_unique<DX12Buffer>(this,
+			D3D12_HEAP_TYPE_UPLOAD,
+			CD3DX12_RESOURCE_DESC::Buffer(uploadSize),
+			D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		UpdateSubresources(m_UploadCommandList->Get(),
+			destResource->Get(),
+			uploadBuffer->Get(), 
+			0, 0, subResourceCount, subResourceData.data());
 
 		m_UploadIntermediateResources.push_back(std::move(uploadBuffer));
 	}

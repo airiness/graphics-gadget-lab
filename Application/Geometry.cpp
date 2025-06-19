@@ -18,7 +18,7 @@ namespace graphicsGadgetLab
 	void Geometry::Initialize() noexcept
 	{
 		m_Mesh = std::make_unique<GeometryMesh>(CreateVertices(), CreateIndices());
-		m_Mesh->UploadMesh(m_DX12Device);
+		m_Mesh->Upload(m_DX12Device);
 	}
 
 	const GeometryMesh* Geometry::GetMesh() const noexcept

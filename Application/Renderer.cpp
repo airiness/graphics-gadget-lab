@@ -12,6 +12,7 @@
 #include "DX12Fence.h"
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
+#include "TextureManager.h"
 #include "Geometry.h"
 #include "Mesh.h"
 #include "Utility.h"
@@ -33,6 +34,9 @@ namespace graphicsGadgetLab
 
 	void Renderer::Initialize() noexcept
 	{
+		// Init TextureManager
+		m_TextureManager = std::make_unique<TextureManager>(m_Device.get());
+
 		InitializeRootSignatures();
 		InitializePipelineStates();
 		InitializeRenderTargets();
@@ -264,6 +268,9 @@ namespace graphicsGadgetLab
 
 	void Renderer::InitializeRenderObjects() noexcept
 	{
+		// Load UVChecker Texture. TODO: Maybe load assets in Application? make a AssetDataBase?
+		m_TextureManager->LoadTexture("Assets/textures/UVChecker1K.png");
+
 		m_TestCube = std::make_unique<Cube>(m_Device.get());
 		m_TestCube->Initialize();
 	}

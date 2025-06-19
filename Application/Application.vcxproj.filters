@@ -91,6 +91,9 @@
     <ClCompile Include="TextureManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Texture.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -160,6 +163,9 @@
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="TextureManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>

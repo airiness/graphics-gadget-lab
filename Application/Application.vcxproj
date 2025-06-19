@@ -43,6 +43,7 @@
     <Import Project="..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\PropertySheets\DirectXMeshImport.props" />
     <Import Project="..\PropertySheets\DirectXTexImport.props" />
+    <Import Project="..\PropertySheets\PreBuildEvents.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -50,6 +51,7 @@
     <Import Project="..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\PropertySheets\DirectXMeshImport.props" />
     <Import Project="..\PropertySheets\DirectXTexImport.props" />
+    <Import Project="..\PropertySheets\PreBuildEvents.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -113,6 +115,7 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RendererConstant.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
@@ -138,6 +141,7 @@
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererConstant.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>

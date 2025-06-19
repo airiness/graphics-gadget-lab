@@ -1,12 +1,15 @@
-﻿#pragma once
+#pragma once
 namespace graphicsGadgetLab
 {
 	class DX12Device;
 	class DX12Descriptor
 	{
 	public:
-		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle;
+		DX12Descriptor() noexcept = default;
+		~DX12Descriptor() noexcept = default;
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle = {};
+		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle = {};
 	};
 
 	// TODO: Descriptor Management

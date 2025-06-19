@@ -72,7 +72,7 @@ namespace graphicsGadgetLab
 		void EndUpload(bool wait) noexcept;
 
 		void UploadResource(const void* data, size_t dataSize, const DX12Resource* destResource) noexcept;
-
+		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept;
 	public:
 		static uint32_t GetBufferCount() noexcept { return BufferCount; }
 

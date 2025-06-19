@@ -10,6 +10,7 @@ namespace graphicsGadgetLab
 	class DX12ConstantBuffer;
 	class DX12CommandList;
 	class DX12Fence;
+	class TextureManager;
 	class Cube;
 
 	class Renderer
@@ -42,6 +43,7 @@ namespace graphicsGadgetLab
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
+		std::unique_ptr<TextureManager> m_TextureManager;
 
 		// RenderTargets & DepthStencilBuffer
 		RenderTargetArray m_RenderTargets;
