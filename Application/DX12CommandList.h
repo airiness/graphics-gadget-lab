@@ -44,8 +44,6 @@ namespace graphicsGadgetLab
 		void DrawInstanced(uint32_t vertexCount) noexcept;
 
 	private:
-		void CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept;
-	private:
 		DX12Device* m_DX12Device = nullptr;
 
 		D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;

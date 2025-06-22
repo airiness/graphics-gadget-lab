@@ -10,6 +10,8 @@ namespace graphicsGadgetLab
 		explicit DX12FencePoint(DX12Fence* fence, uint64_t fenceValue) noexcept;
 		~DX12FencePoint() noexcept;
 
+		bool IsValid() const noexcept { return m_FencePtr != nullptr; }
+
 		const DX12Fence* GetFence() const noexcept { return m_FencePtr; }
 		uint64_t GetValue() const noexcept { return m_PointValue; }
 

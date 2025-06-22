@@ -24,11 +24,6 @@ namespace graphicsGadgetLab
 	private:
 		DX12FencePoint Signal() noexcept;
 
-		ComPtr<ID3D12CommandQueue> CreateCommandQueue(
-			D3D12_COMMAND_LIST_TYPE type, 
-			int32_t priority, 
-			D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept;
-
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		ComPtr<ID3D12CommandQueue> m_D3D12CommandQueue;

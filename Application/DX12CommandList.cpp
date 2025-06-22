@@ -12,9 +12,9 @@ namespace graphicsGadgetLab
 {
 	DX12CommandList::DX12CommandList(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept :
 		m_DX12Device(dx12Device),
-		m_Type(type)
+		m_Type(type),
+		m_D3D12GraphicsCommandList(m_DX12Device->CreateDirectX12CommandGraphicsList(type))
 	{
-		CreateCommandList(type);
 	}
 
 	DX12CommandList::~DX12CommandList() noexcept
@@ -182,20 +182,5 @@ namespace graphicsGadgetLab
 	void DX12CommandList::DrawInstanced(uint32_t vertexCount) noexcept
 	{
 		m_D3D12GraphicsCommandList->DrawInstanced(vertexCount, 1, 0, 0);
-	}
-
-	void DX12CommandList::CreateCommandList(D3D12_COMMAND_LIST_TYPE type) noexcept
-	{
-		auto device = m_DX12Device->Get();
-		utility::ThrowIfFailed(device->CreateCommandList1(0, type, D3D12_COMMAND_LIST_FLAG_NONE,
-			IID_PPV_ARGS(&m_D3D12GraphicsCommandList)));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(m_D3D12GraphicsCommandList.Get(),
-			std::format(L"CommandList[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
-#endif
-
-		// CommandList created by CreateCommandList1 is already closed.
-		//utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
 	}
 }

@@ -105,6 +105,7 @@
     <ClCompile Include="DX12PipelineState.cpp" />
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
+    <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="Geometry.cpp" />
@@ -134,6 +135,7 @@
     <ClInclude Include="DX12PipelineState.h" />
     <ClInclude Include="DX12Resource.h" />
     <ClInclude Include="DX12RootSignature.h" />
+    <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="Geometry.h" />

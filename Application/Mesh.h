@@ -2,6 +2,7 @@
 #include "RendererConstant.h"
 #include "DX12Buffer.h"
 #include "DX12Device.h"
+#include "DX12ResourceUploader.h"
 
 namespace graphicsGadgetLab
 {
@@ -63,7 +64,8 @@ namespace graphicsGadgetLab
 	template<typename VertexType, typename IndexType>
 	inline void Mesh<VertexType, IndexType>::Upload(DX12Device* dx12Device) noexcept
 	{
-		dx12Device->BeginUpload();
+		auto* dx12ResourceUploader = dx12Device->GetResourceUploader();
+		dx12ResourceUploader->BeginUpload();
 		{
 			size_t vertexBufferSize = m_VerticesData.size() * sizeof(VertexType);
 			size_t indexBufferSize = m_IndicesData.size() * sizeof(IndexType);
@@ -78,8 +80,8 @@ namespace graphicsGadgetLab
 				CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize),
 				D3D12_RESOURCE_STATE_COMMON);
 
-			dx12Device->UploadResource(m_VerticesData.data(), vertexBufferSize, m_VertexBuffer.get());
-			dx12Device->UploadResource(m_IndicesData.data(), indexBufferSize, m_IndexBuffer.get());
+			dx12ResourceUploader->UploadResource(m_VerticesData.data(), vertexBufferSize, m_VertexBuffer.get());
+			dx12ResourceUploader->UploadResource(m_IndicesData.data(), indexBufferSize, m_IndexBuffer.get());
 
 			// Initialize buffer view
 			m_VertexBufferView.BufferLocation = m_VertexBuffer->Get()->GetGPUVirtualAddress();
@@ -91,7 +93,7 @@ namespace graphicsGadgetLab
 			m_IndexBufferView.Format = DXGIIndexFormat<IndexType>::Value;
 
 		}
-		dx12Device->EndUpload(true);
+		dx12ResourceUploader->EndUpload(true);
 
 		m_Uploaded = true;
 		m_VerticesData.clear();

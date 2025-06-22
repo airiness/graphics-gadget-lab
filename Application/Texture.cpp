@@ -1,12 +1,14 @@
 #include "Precompiled.h"
 #include "Texture.h"
 #include "DX12Device.h"
+#include "DX12ResourceUploader.h"
 
 namespace graphicsGadgetLab
 {
 	void Texture::Upload(DX12Device* dx12Device) noexcept
 	{
-		dx12Device->BeginUpload();
+		auto* dx12ReousceUploader = dx12Device->GetResourceUploader();
+		dx12ReousceUploader->BeginUpload();
 		{
 			const auto& texMedaData = m_ScratchImage.GetMetadata();
 			m_DX12Texture = DX12Texture(dx12Device,
@@ -28,9 +30,9 @@ namespace graphicsGadgetLab
 				subResourceDatas[imageIndex].SlicePitch = images[imageIndex].slicePitch;
 			}
 
-			dx12Device->UploadResource(subResourceDatas, &m_DX12Texture);
+			dx12ReousceUploader->UploadResource(subResourceDatas, &m_DX12Texture);
 		}
-		dx12Device->EndUpload(true);
+		dx12ReousceUploader->EndUpload(true);
 
 		m_ScratchImage.Release();
 		m_Uploaded = true;

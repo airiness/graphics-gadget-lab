@@ -16,8 +16,6 @@ namespace graphicsGadgetLab
 		DX12FencePoint Signal(DX12CommandQueue* dx12CommandQueue) noexcept;
 		void WaitCompletion(uint64_t fenceValue, uint32_t timeout = INFINITE) noexcept;
 
-
-
 		ID3D12Fence* Get() const noexcept { return m_D3D12Fence.Get(); }
 
 	private:

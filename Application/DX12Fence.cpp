@@ -29,7 +29,9 @@ namespace graphicsGadgetLab
 
 	bool DX12Fence::IsCompleted(uint64_t fenceValue) const noexcept
 	{
-		return GetCompletedValue() >= fenceValue;
+		const auto completedValue = GetCompletedValue();
+		OutputDebugString(std::format(L"Completed fence value: {}, Checked fence value: {}\n", completedValue, fenceValue).c_str());
+		return completedValue >= fenceValue;
 	}
 
 	DX12FencePoint DX12Fence::Signal(DX12CommandQueue* dx12CommandQueue) noexcept

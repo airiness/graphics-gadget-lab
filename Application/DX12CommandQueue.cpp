@@ -14,8 +14,8 @@ namespace graphicsGadgetLab
 		int32_t priority, 
 		D3D12_COMMAND_QUEUE_FLAGS flags) noexcept :
 		m_DX12Device(dx12Device),
-		m_D3D12CommandQueue(CreateCommandQueue(type, priority, flags)),
-		m_Fence(std::make_unique<DX12Fence>(dx12Device))
+		m_D3D12CommandQueue(m_DX12Device->CreateDirectX12CommandQueue(type, priority, flags)),
+		m_Fence(std::make_unique<DX12Fence>(m_DX12Device))
 	{	
 	}
 
@@ -37,27 +37,5 @@ namespace graphicsGadgetLab
 	DX12FencePoint DX12CommandQueue::Signal() noexcept
 	{
 		return m_Fence->Signal(this);
-	}
-
-	ComPtr<ID3D12CommandQueue> DX12CommandQueue::CreateCommandQueue(
-		D3D12_COMMAND_LIST_TYPE type, 
-		int32_t priority, 
-		D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept
-	{
-		D3D12_COMMAND_QUEUE_DESC desc = {};
-		desc.Type = type;
-		desc.Priority = priority;
-		desc.Flags = flags;
-		desc.NodeMask = 0;
-
-		ComPtr<ID3D12CommandQueue> commandQueue;
-		utility::ThrowIfFailed(m_DX12Device->Get()->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(commandQueue.Get(), 
-			std::format(L"CommandQueue[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
-#endif
-
-		return commandQueue;
 	}
 }

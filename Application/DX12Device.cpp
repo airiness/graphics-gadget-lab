@@ -7,6 +7,7 @@
 #include "DX12Descriptor.h"
 #include "DX12Fence.h"
 #include "DX12Buffer.h"
+#include "DX12ResourceUploader.h"
 #include "Application.h"
 #include "Utility.h"
 
@@ -33,6 +34,7 @@ namespace graphicsGadgetLab
 		InitializeSwapChain();
 		InitializeCommandLists();
 		InitializeCommandAllocatorPools();
+		InitializeResourceUploader();
 	}
 
 	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
@@ -45,66 +47,37 @@ namespace graphicsGadgetLab
 		FinalizeMemAllocator();
 	}
 
-	void DX12Device::BeginUpload() noexcept
+	ComPtr<ID3D12CommandQueue> DX12Device::CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept
 	{
-		if (m_UploadFencePoint.IsCompleted())
-		{
-			m_UploadIntermediateResources.clear();
-		}
+		D3D12_COMMAND_QUEUE_DESC desc = {};
+		desc.Type = type;
+		desc.Priority = priority;
+		desc.Flags = flags;
+		desc.NodeMask = 0;
 
-		auto commandAllocator = m_UploadCommandAllocatorPool->RequestCommandAllocator(); // TODO : correct value need here
-		m_UploadCommandList->Begin(commandAllocator);
+		ComPtr<ID3D12CommandQueue> commandQueue;
+		utility::ThrowIfFailed(m_D3D12Device->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)));
+
+#if defined (BUILD_DEBUG)
+		utility::SetDebugName(commandQueue.Get(),
+			std::format(L"CommandQueue[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
+#endif
+
+		return commandQueue;
 	}
 
-	void DX12Device::EndUpload(bool wait) noexcept
+	ComPtr<ID3D12GraphicsCommandList7> DX12Device::CreateDirectX12CommandGraphicsList(D3D12_COMMAND_LIST_TYPE type) const noexcept
 	{
-		m_UploadCommandList->End();
-		DX12CommandList* const commandLists[] = { m_UploadCommandList.get() };
-		m_UploadFencePoint = m_UploadCommmandQueue->Execute(std::span{ commandLists });
+		ComPtr<ID3D12GraphicsCommandList7> commandList;
+		utility::ThrowIfFailed(m_D3D12Device->CreateCommandList1(0, type, D3D12_COMMAND_LIST_FLAG_NONE,
+			IID_PPV_ARGS(&commandList)));
 
-		if (wait)
-		{
-			m_UploadFencePoint.Wait();
-		}
+#if defined (BUILD_DEBUG)
+		utility::SetDebugName(commandList.Get(),
+			std::format(L"CommandList[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
+#endif
 
-	}
-
-	void DX12Device::UploadResource(const void* data, size_t dataSize, const DX12Resource* destResource) noexcept
-	{
-		std::unique_ptr<DX12Buffer> uploadBuffer = std::make_unique<DX12Buffer>(this,
-			D3D12_HEAP_TYPE_UPLOAD,
-			CD3DX12_RESOURCE_DESC::Buffer(dataSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ);
-		
-		D3D12_SUBRESOURCE_DATA subResourceData = {};
-		subResourceData.pData = data;
-		subResourceData.RowPitch = static_cast<LONG_PTR>(dataSize);
-		subResourceData.SlicePitch = static_cast<LONG_PTR>(dataSize);
-
-		UpdateSubresources<1>(m_UploadCommandList->Get(), 
-			destResource->Get(), 
-			uploadBuffer->Get(), 
-			0, 0, 1, &subResourceData);
-
-		m_UploadIntermediateResources.push_back(std::move(uploadBuffer));
-	}
-
-	void DX12Device::UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept
-	{
-		auto subResourceCount = static_cast<UINT>(subResourceData.size());
-		auto uploadSize = GetRequiredIntermediateSize(destResource->Get(), 0, subResourceCount);
-
-		std::unique_ptr uploadBuffer = std::make_unique<DX12Buffer>(this,
-			D3D12_HEAP_TYPE_UPLOAD,
-			CD3DX12_RESOURCE_DESC::Buffer(uploadSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ);
-
-		UpdateSubresources(m_UploadCommandList->Get(),
-			destResource->Get(),
-			uploadBuffer->Get(), 
-			0, 0, subResourceCount, subResourceData.data());
-
-		m_UploadIntermediateResources.push_back(std::move(uploadBuffer));
+		return commandList;
 	}
 
 	void DX12Device::InitializeDXGIFactory() noexcept
@@ -214,7 +187,6 @@ namespace graphicsGadgetLab
 		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-		m_UploadCommmandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
 	void DX12Device::InitializeSwapChain() noexcept
@@ -234,7 +206,11 @@ namespace graphicsGadgetLab
 			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 			m_CopyCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 		}
-		m_UploadCommandList = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+	}
+
+	void DX12Device::InitializeResourceUploader() noexcept
+	{
+		m_ResourceUploader = std::make_unique<DX12ResourceUploader>(this);
 	}
 
 	void DX12Device::InitializeCommandAllocatorPools() noexcept
@@ -242,7 +218,6 @@ namespace graphicsGadgetLab
 		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-		m_UploadCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
 	void DX12Device::InitializeDescriptorHeaps() noexcept

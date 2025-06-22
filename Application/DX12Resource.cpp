@@ -23,6 +23,13 @@ namespace graphicsGadgetLab
 		return m_Resource.Get();
 	}
 
+	void DX12Resource::SetDebugName(const wchar_t* name) noexcept
+	{
+#if defined (BUILD_DEBUG)
+		utility::SetDebugName(m_Resource.Get(), name);
+#endif
+	}
+
 	void DX12Resource::CreateAllocation(D3D12_HEAP_TYPE heapType)
 	{
 		auto allocator = m_DX12Deivce->GetMemAllocator();

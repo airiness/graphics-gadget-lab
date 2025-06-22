@@ -15,6 +15,7 @@ namespace graphicsGadgetLab
 	class DX12Fence;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;
+	class DX12ResourceUploader;
 	class DX12Device
 	{
 	public:
@@ -64,15 +65,16 @@ namespace graphicsGadgetLab
 		DX12DescriptorHeap* GetCbvSrvUavDescriptorHeap() const noexcept { return m_CbvSrvUavDescriptorHeap.get(); }
 		DX12DescriptorHeap* GetSamplerDescriptorHeap() const noexcept { return m_SamplerDescriptorHeap.get(); }
 
+		DX12ResourceUploader* GetResourceUploader() const noexcept { return m_ResourceUploader.get(); }
+
 		bool SupportRayTracing() const noexcept { return m_DX12FeatureSupport.m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_DX12FeatureSupport.m_MeshShaderSupported; }
 		bool SupportTearing() const noexcept { return m_DX12FeatureSupport.m_TearingSupported; }
 
-		void BeginUpload() noexcept;
-		void EndUpload(bool wait) noexcept;
+		ComPtr<ID3D12CommandQueue> CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, 
+			int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept;
+		ComPtr<ID3D12GraphicsCommandList7> CreateDirectX12CommandGraphicsList(D3D12_COMMAND_LIST_TYPE type) const noexcept;
 
-		void UploadResource(const void* data, size_t dataSize, const DX12Resource* destResource) noexcept;
-		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept;
 	public:
 		static uint32_t GetBufferCount() noexcept { return BufferCount; }
 
@@ -84,6 +86,7 @@ namespace graphicsGadgetLab
 		void InitializeCommandQueues() noexcept;
 		void InitializeSwapChain() noexcept;
 		void InitializeCommandLists() noexcept;
+		void InitializeResourceUploader() noexcept;
 		void InitializeCommandAllocatorPools() noexcept;
 		void InitializeDescriptorHeaps() noexcept;
 		void InitializeMemAllocator() noexcept;
@@ -107,7 +110,6 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
-		std::unique_ptr<DX12CommandQueue> m_UploadCommmandQueue;
 
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
 
@@ -123,21 +125,18 @@ namespace graphicsGadgetLab
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_CopyCommandLists;
-		std::unique_ptr<DX12CommandList> m_UploadCommandList;
 
 		// Command Allocator Pool
 		std::unique_ptr<DX12CommandAllocatorPool> m_GraphicsCommandAllocatorPool;
 		std::unique_ptr<DX12CommandAllocatorPool> m_ComputeCommandAllocatorPool;
 		std::unique_ptr<DX12CommandAllocatorPool> m_CopyCommandAllocatorPool;
-		std::unique_ptr<DX12CommandAllocatorPool> m_UploadCommandAllocatorPool;
-		
+
 		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_RtvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_DsvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerDescriptorHeap;
-		// TODO: Descriptor Allocator!
 
-		DX12FencePoint m_UploadFencePoint;
-		std::vector<std::unique_ptr<DX12Resource>> m_UploadIntermediateResources;
+		std::unique_ptr<DX12ResourceUploader> m_ResourceUploader = nullptr;
+
 	};
 }

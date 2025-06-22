@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 namespace graphicsGadgetLab
 {
@@ -16,6 +16,8 @@ namespace graphicsGadgetLab
 		virtual ~DX12Resource() noexcept = default;
 
 		ID3D12Resource* Get() const;
+
+		void SetDebugName(const wchar_t* name) noexcept;
 
 	protected:
 		void CreateAllocation(D3D12_HEAP_TYPE heapType);
