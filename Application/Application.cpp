@@ -49,6 +49,7 @@ namespace graphicsGadgetLab
 
 	void Application::Finalize() noexcept
 	{
+		GetRenderer()->Finalize();
 	}
 
 	LRESULT Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

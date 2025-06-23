@@ -71,6 +71,9 @@ namespace graphicsGadgetLab
 		bool SupportMeshShader() const noexcept { return m_DX12FeatureSupport.m_MeshShaderSupported; }
 		bool SupportTearing() const noexcept { return m_DX12FeatureSupport.m_TearingSupported; }
 
+		void FlushGPU() noexcept;
+
+	public:
 		ComPtr<ID3D12CommandQueue> CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, 
 			int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept;
 		ComPtr<ID3D12GraphicsCommandList7> CreateDirectX12CommandGraphicsList(D3D12_COMMAND_LIST_TYPE type) const noexcept;
@@ -111,8 +114,6 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
 
-		std::unique_ptr<DX12SwapChain> m_SwapChain;
-
 		D3D_FEATURE_LEVEL m_FeatureLevel = D3D_FEATURE_LEVEL_12_0;
 
 		uint32_t m_RtvDescriptorSize = 0;
@@ -135,6 +136,8 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12DescriptorHeap> m_RtvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_DsvDescriptorHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerDescriptorHeap;
+
+		std::unique_ptr<DX12SwapChain> m_SwapChain;
 
 		std::unique_ptr<DX12ResourceUploader> m_ResourceUploader = nullptr;
 

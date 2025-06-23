@@ -108,10 +108,14 @@ namespace graphicsGadgetLab
 
 	void Renderer::Finalize() noexcept
 	{
-		if (m_IsInitialized)
+		if (!m_IsInitialized)
 		{
-			m_IsInitialized = false;
+			return;
 		}
+
+		m_IsInitialized = false;
+
+		m_Device->FlushGPU();
 	}
 
 	void Renderer::InitializeRootSignatures() noexcept

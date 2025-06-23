@@ -59,6 +59,6 @@ namespace graphicsGadgetLab
 		// TODO: temopary declare cube here
 		std::unique_ptr<Cube> m_TestCube;
 
-		bool m_IsInitialized = false;
+		std::atomic_bool m_IsInitialized = false;
 	};
 }

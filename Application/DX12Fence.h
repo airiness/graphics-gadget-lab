@@ -12,6 +12,7 @@ namespace graphicsGadgetLab
 		~DX12Fence() noexcept;
 
 		uint64_t GetCompletedValue() const noexcept;
+		uint64_t GetCurrentValue() const noexcept { return m_CurrentValue; }
 		bool IsCompleted(uint64_t fenceValue) const noexcept;
 		DX12FencePoint Signal(DX12CommandQueue* dx12CommandQueue) noexcept;
 		void WaitCompletion(uint64_t fenceValue, uint32_t timeout = INFINITE) noexcept;

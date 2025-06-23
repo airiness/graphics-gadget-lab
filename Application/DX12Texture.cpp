@@ -1,4 +1,4 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12Texture.h"
 
 namespace graphicsGadgetLab
@@ -16,9 +16,9 @@ namespace graphicsGadgetLab
 	{
 	}
 
-	void DX12Texture::CreateFromSwapChain(ID3D12Resource* backBuffer) noexcept
+	void DX12Texture::CreateFromSwapChain(ComPtr<ID3D12Resource> backBuffer) noexcept
 	{
-		m_Resource.Attach(backBuffer);
+		m_Resource = backBuffer;
 		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
 		m_ResourceState = D3D12_RESOURCE_STATE_PRESENT;
 	}

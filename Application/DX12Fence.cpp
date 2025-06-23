@@ -7,7 +7,7 @@
 namespace graphicsGadgetLab
 {
 	DX12Fence::DX12Fence(DX12Device* device, uint64_t initValue) noexcept :
-		m_CurrentValue(initValue)
+		m_NextRequestValue(initValue)
 	{
 		utility::ThrowIfFailed(device->Get()->CreateFence(m_CurrentValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_D3D12Fence)));
 		m_EventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -36,11 +36,12 @@ namespace graphicsGadgetLab
 
 	DX12FencePoint DX12Fence::Signal(DX12CommandQueue* dx12CommandQueue) noexcept
 	{
-		dx12CommandQueue->Get()->Signal(Get(), m_CurrentValue);
+		dx12CommandQueue->Get()->Signal(Get(), m_NextRequestValue);
 
-		DX12FencePoint fencePoint(this, m_CurrentValue);
+		DX12FencePoint fencePoint(this, m_NextRequestValue);
 
-		m_CurrentValue++;
+		m_CurrentValue = m_NextRequestValue;
+		++m_NextRequestValue;
 
 		return fencePoint;
 	}

@@ -51,11 +51,11 @@ namespace graphicsGadgetLab
 
 		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
 
-		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
-
 		std::vector<DX12Descriptor> m_BackBufferDescriptors;
 		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
 		std::vector<DX12FencePoint> m_SyncObjects;
+
+		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
 
 		float m_ClearColor[4] = { 0.6f, 0.6f, 0.6f, 1.0f };
 

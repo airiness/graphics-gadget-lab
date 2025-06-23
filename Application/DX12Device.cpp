@@ -47,6 +47,13 @@ namespace graphicsGadgetLab
 		FinalizeMemAllocator();
 	}
 
+	void DX12Device::FlushGPU() noexcept
+	{
+		m_DirectCommandQueue->FlushCommandQueue();
+		m_ComputeCommandQueue->FlushCommandQueue();
+		m_CopyCommandQueue->FlushCommandQueue();
+	}
+
 	ComPtr<ID3D12CommandQueue> DX12Device::CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept
 	{
 		D3D12_COMMAND_QUEUE_DESC desc = {};

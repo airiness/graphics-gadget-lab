@@ -15,7 +15,7 @@ namespace graphicsGadgetLab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Texture);
 		virtual ~DX12Texture() noexcept;
 
-		void CreateFromSwapChain(ID3D12Resource* backBuffer) noexcept;
+		void CreateFromSwapChain(ComPtr<ID3D12Resource> backBuffer) noexcept;
 
 	private:
 

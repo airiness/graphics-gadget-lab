@@ -21,6 +21,8 @@ namespace graphicsGadgetLab
 
 		DX12FencePoint Execute(std::span<const DX12CommandList* const> commandLists) noexcept;
 
+		void FlushCommandQueue() noexcept;
+
 	private:
 		DX12FencePoint Signal() noexcept;
 

@@ -34,6 +34,11 @@ namespace graphicsGadgetLab
 		return Signal();
 	}
 
+	void DX12CommandQueue::FlushCommandQueue() noexcept
+	{
+		m_Fence->WaitCompletion(m_Fence->GetCurrentValue());
+	}
+
 	DX12FencePoint DX12CommandQueue::Signal() noexcept
 	{
 		return m_Fence->Signal(this);

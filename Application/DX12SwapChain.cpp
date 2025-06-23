@@ -28,6 +28,11 @@ namespace graphicsGadgetLab
 
 	DX12SwapChain::~DX12SwapChain() noexcept
 	{
+		for (auto& fencePoint : m_SyncObjects)
+		{
+			fencePoint.Wait();
+		}
+		m_BackBuffers.clear();
 	}
 
 	void DX12SwapChain::OnResize(uint32_t width, uint32_t height) noexcept
@@ -181,7 +186,7 @@ namespace graphicsGadgetLab
 
 			auto& tex = m_BackBuffers[i];
 			tex = std::make_unique<DX12Texture>();
-			tex->CreateFromSwapChain(backBuffer.Get());
+			tex->CreateFromSwapChain(backBuffer);
 
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].get()->Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
