@@ -28,11 +28,6 @@ namespace graphicsGadgetLab
 
 	DX12SwapChain::~DX12SwapChain() noexcept
 	{
-		for (auto& fencePoint : m_SyncObjects)
-		{
-			fencePoint.Wait();
-		}
-		m_BackBuffers.clear();
 	}
 
 	void DX12SwapChain::OnResize(uint32_t width, uint32_t height) noexcept

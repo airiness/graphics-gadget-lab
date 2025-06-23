@@ -23,7 +23,6 @@ namespace graphicsGadgetLab
 
 		void FlushCommandQueue() noexcept;
 
-	private:
 		DX12FencePoint Signal() noexcept;
 
 	private:
