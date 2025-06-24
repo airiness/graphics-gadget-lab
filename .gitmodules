@@ -7,3 +7,6 @@
 [submodule "Externals/Vender/DirectXTex"]
 	path = Externals/Vender/DirectXTex
 	url = https://github.com/microsoft/DirectXTex.git
+[submodule "Externals/Vender/assimp"]
+	path = Externals/Vender/assimp
+	url = https://github.com/assimp/assimp.git
