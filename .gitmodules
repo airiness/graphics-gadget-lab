@@ -10,3 +10,6 @@
 [submodule "Externals/Vender/assimp"]
 	path = Externals/Vender/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "Externals/Vender/entt"]
+	path = Externals/Vender/entt
+	url = https://github.com/skypjack/entt.git
