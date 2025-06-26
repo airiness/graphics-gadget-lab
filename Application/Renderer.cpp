@@ -286,27 +286,29 @@ namespace graphicsGadgetLab
 
 	void Renderer::UpdateGlobalConstantBuffer() noexcept
 	{
-		GlobalConstantBuffer buffer = {};
+		GlobalConstantBuffer cbBuffer = {};
 
 		static float angle = 0.0f;
 		angle += 1.6f;
-		const XMVECTOR rotationAxis = XMVectorSet(0.f, 1.f, 0.f, 0.f);
-		XMMATRIX modelMatrix = XMMatrixRotationAxis(rotationAxis, XMConvertToRadians(angle));
-		XMStoreFloat4x4(&buffer.m_ModelMatrix, modelMatrix);
+		const auto rotationAxis = Vector3(0.f, 1.f, 0.f);
+		
+		Matrix modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
+		cbBuffer.m_ModelMatrix = modelMatrix;
 
-		const XMVECTOR eyePosition = XMVectorSet(0.f, 10.f, -30.f, 0.f);
-		const XMVECTOR focusPoint = XMVectorSet(0.f, 10.f, 0.f, 0.f);
-		const XMVECTOR upDirection = XMVectorSet(0.f, 1.f, 0.f, 0.f);
-		XMMATRIX viewMatrix = ::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+		const auto eyePosition = Vector4(0.f, 10.f, -30.f, 0.f);
+		const auto focusPoint = Vector4(0.f, 10.f, 0.f, 0.f);
+		const auto upDirection = Vector4(0.f, 1.f, 0.f, 0.f);
+		Matrix viewMatrix = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
+
 		auto swapChain = m_Device->GetSwapChain();
-
 		float aspectRatio = static_cast<float>(swapChain->GetBufferWidth()) / swapChain->GetBufferHeight();
-		XMMATRIX projectionMatrix = ::XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), aspectRatio, 0.1f, 1000.f);
 
-		XMStoreFloat4x4(&buffer.m_ViewMatrix, XMMatrixTranspose(viewMatrix));
-		XMStoreFloat4x4(&buffer.m_ProjectionMatrix, XMMatrixTranspose(projectionMatrix));
+		Matrix projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), aspectRatio, 0.01f, 1000.f);
 
-		m_GlobalConstantBuffer->Update(buffer);
+		cbBuffer.m_ViewMatrix = DirectX::XMMatrixTranspose(viewMatrix);
+		cbBuffer.m_ProjectionMatrix = DirectX::XMMatrixTranspose(projectionMatrix);
+
+		m_GlobalConstantBuffer->Update(cbBuffer);
 	}
 
 	void Renderer::RenderObjects(DX12CommandList* commandList) noexcept

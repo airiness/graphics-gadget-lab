@@ -28,8 +28,6 @@ using namespace Microsoft::WRL;
 #if defined(BUILD_DEBUG)
 #include <dxgidebug.h>
 #endif
-#include <DirectXMath.h>
-using namespace DirectX;
 
 // D3D12MA
 #include <D3D12MemAlloc.h>
@@ -50,3 +48,6 @@ using namespace DirectX;
 
 // Porject define
 #include "CoreDef.h"
+
+#include <DirectX/SimpleMath.h>
+using namespace DirectX::SimpleMath;

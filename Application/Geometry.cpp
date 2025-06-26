@@ -38,7 +38,7 @@ namespace graphicsGadgetLab
 
 	std::vector<GeometryVertexType> Cube::CreateVertices() noexcept
 	{
-		constexpr std::array<std::array<XMFLOAT3, VertexCountPerFace>, FaceCount> facePositions = 
+		constexpr std::array<std::array<Vector3, VertexCountPerFace>, FaceCount> facePositions = 
 		{ {
 			// Front face (-Z)
 			{{{-1.0f, -1.0f, -1.0f}, {-1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}}},
@@ -54,7 +54,7 @@ namespace graphicsGadgetLab
 			{{{ 1.0f, -1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f, -1.0f,  1.0f}}},
 		} };
 
-		constexpr std::array<XMFLOAT2, VertexCountPerFace> texCoords =
+		constexpr std::array<Vector2, VertexCountPerFace> texCoords =
 		{ {
 			{ 0.0f, 1.0f },
 			{ 0.0f, 0.0f },
@@ -62,7 +62,7 @@ namespace graphicsGadgetLab
 			{ 1.0f, 1.0f },
 		} };
 
-		constexpr std::array<XMFLOAT3, FaceCount> faceNormals =
+		constexpr std::array<Vector3, FaceCount> faceNormals =
 		{ {
 			{ 0.0f,  0.0f, -1.0f }, // Front
 			{ 0.0f,  0.0f,  1.0f }, // Back

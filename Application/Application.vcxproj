@@ -98,6 +98,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="Components.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
     <ClCompile Include="DX12CommandList.cpp" />
@@ -128,6 +129,7 @@
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="Components.h" />
     <ClInclude Include="CoreDef.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12CommandAllocator.h" />

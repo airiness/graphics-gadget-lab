@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "DX12Descriptor.h"
 namespace graphicsGadgetLab
 {
@@ -29,9 +29,9 @@ namespace graphicsGadgetLab
 
 	struct Vertex
 	{
-		XMFLOAT3 m_Position;
-		XMFLOAT3 m_Normal;
-		XMFLOAT2 m_TexCoord;
+		Vector3 m_Position;
+		Vector3 m_Normal;
+		Vector2 m_TexCoord;
 	};
 
 	enum class RenderTargetIndex : uint32_t
@@ -47,9 +47,9 @@ namespace graphicsGadgetLab
 
 	struct GlobalConstantBuffer
 	{
-		XMFLOAT4X4 m_ModelMatrix;
-		XMFLOAT4X4 m_ViewMatrix;
-		XMFLOAT4X4 m_ProjectionMatrix;
+		Matrix m_ModelMatrix;
+		Matrix m_ViewMatrix;
+		Matrix m_ProjectionMatrix;
 	};
 
 	// Simple Cube Model
