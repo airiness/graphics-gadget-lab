@@ -10,7 +10,6 @@ namespace graphicsGadgetLab
 	class DX12ConstantBuffer;
 	class DX12CommandList;
 	class DX12Fence;
-	class TextureManager;
 	class Cube;
 
 	class Renderer
@@ -43,7 +42,6 @@ namespace graphicsGadgetLab
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
-		std::unique_ptr<TextureManager> m_TextureManager;
 
 		// RenderTargets & DepthStencilBuffer
 		RenderTargetArray m_RenderTargets;
@@ -56,8 +54,7 @@ namespace graphicsGadgetLab
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;
 
-		// TODO: temopary declare cube here
-		std::unique_ptr<Cube> m_TestCube;
+		entt::entity m_TestCube;
 
 		std::atomic_bool m_IsInitialized = false;
 	};

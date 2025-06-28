@@ -1,31 +1,40 @@
-﻿#pragma once
-#include "Renderer.h"
+#pragma once
+
 namespace graphicsGadgetLab
 {
+	class Renderer;
+	class AssetManager;
 	class Application
 	{
 	public:
 		explicit Application(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(Application);
 		~Application() noexcept = default;
-		void Initialize() noexcept;
-		void Update() noexcept;
-		void Finalize() noexcept;
+		void Run() noexcept;
 
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
 		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
 
 		HWND GetHwnd() const noexcept { return m_Hwnd; };
 
-		Renderer* GetRenderer() noexcept { return m_Renderer.get(); }
+		Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
+		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
+
+		entt::registry& GetEnttRegistry() noexcept { return m_Registry; }
 
 		static void CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
-		static Application* Get() noexcept;
+		static Application* GetInstance() noexcept;
+		static void DestroyApplicationInstance() noexcept;
 
 	private:
 		static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	private:
+		void Initialize() noexcept;
+		void Finalize() noexcept;
+
 		void InitializeWindow() noexcept;
+		void InitializeAssets() noexcept;
 
 	private:
 		static std::unique_ptr<Application> s_Application;
@@ -41,6 +50,9 @@ namespace graphicsGadgetLab
 
 		// Renderer
 		std::unique_ptr<Renderer> m_Renderer;
+		std::unique_ptr<AssetManager> m_AssetManager;
+
+		entt::registry m_Registry;
 	};
 }
 

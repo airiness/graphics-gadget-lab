@@ -12,17 +12,16 @@
 #include "DX12Fence.h"
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
-#include "TextureManager.h"
+#include "Components.h"
 #include "Geometry.h"
-#include "Mesh.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
 {
 	Renderer::Renderer() noexcept
 	{
-		auto width = Application::Get()->GetWindowWidth();
-		auto height = Application::Get()->GetWindowHeight();
+		auto width = Application::GetInstance()->GetWindowWidth();
+		auto height = Application::GetInstance()->GetWindowHeight();
 
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
@@ -34,9 +33,6 @@ namespace graphicsGadgetLab
 
 	void Renderer::Initialize() noexcept
 	{
-		// Init TextureManager
-		m_TextureManager = std::make_unique<TextureManager>(m_Device.get());
-
 		InitializeRootSignatures();
 		InitializePipelineStates();
 		InitializeRenderTargets();
@@ -196,7 +192,7 @@ namespace graphicsGadgetLab
 
 	void Renderer::InitializeRenderTargets() noexcept
 	{
-		auto app = Application::Get();
+		auto app = Application::GetInstance();
 		auto width = app->GetWindowWidth();
 		auto height = app->GetWindowHeight();
 		auto rtHeap = m_Device->GetRtvDescriptorHeap();
@@ -272,11 +268,7 @@ namespace graphicsGadgetLab
 
 	void Renderer::InitializeRenderObjects() noexcept
 	{
-		// Load UVChecker Texture. TODO: Maybe load assets in Application? make a AssetDataBase?
-		m_TextureManager->LoadTexture("Assets/textures/UVChecker1K.png");
-
-		m_TestCube = std::make_unique<Cube>(m_Device.get());
-		m_TestCube->Initialize();
+		m_TestCube = primitiveGeometry::Cube::Create();
 	}
 
 	void Renderer::UpdateGpuBuffers() noexcept
@@ -313,14 +305,15 @@ namespace graphicsGadgetLab
 
 	void Renderer::RenderObjects(DX12CommandList* commandList) noexcept
 	{
-		const auto& mesh = m_TestCube->GetMesh();
+		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
+		auto* testCubeMesh = enttRegistry.try_get<Mesh>(m_TestCube);
 
-		D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { mesh->GetVertexBufferView() };
+		D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { testCubeMesh->m_VertexBufferView };
 		commandList->SetVertexBuffers(0, vertexBufferViews);
-		commandList->SetIndexBuffer(mesh->GetIndexBufferView());
+		commandList->SetIndexBuffer(testCubeMesh->m_IndexBufferView);
 
 		//commandList->DrawInstanced(mesh->GetVertexCount());
-		commandList->DrawIndexedInstanced(mesh->GetIndexCount());
+		commandList->DrawIndexedInstanced(static_cast<uint32_t>(testCubeMesh->m_IndexCount));
 
 	}
 }

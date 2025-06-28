@@ -198,7 +198,7 @@ namespace graphicsGadgetLab
 
 	void DX12Device::InitializeSwapChain() noexcept
 	{
-		auto* app = Application::Get();
+		auto* app = Application::GetInstance();
 		auto width = app->GetWindowWidth();
 		auto height = app->GetWindowHeight();
 

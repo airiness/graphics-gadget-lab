@@ -20,6 +20,9 @@
     <Filter Include="Externals\D3D12MemAlloc">
       <UniqueIdentifier>{7847d186-1580-4b5a-b232-ed9305fc091c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Externals\DirectXSimpleMath">
+      <UniqueIdentifier>{53450643-fb3f-4f95-8824-f673ebb33beb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -76,9 +79,6 @@
     <ClCompile Include="DX12Fence.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Mesh.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="Geometry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -88,17 +88,17 @@
     <ClCompile Include="DX12FencePoint.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="TextureManager.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="Texture.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="DX12ResourceUploader.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="Components.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
+      <Filter>Externals\DirectXSimpleMath</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -156,9 +156,6 @@
     <ClInclude Include="CoreDef.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Mesh.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="Geometry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -168,21 +165,27 @@
     <ClInclude Include="DX12FencePoint.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="TextureManager.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="Texture.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="DX12ResourceUploader.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Components.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="AssetManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphicsDef.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h">
+      <Filter>Externals\DirectXSimpleMath</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
+      <Filter>Externals\DirectXSimpleMath</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">

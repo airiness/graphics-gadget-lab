@@ -118,7 +118,7 @@ namespace graphicsGadgetLab
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
 	{
-		auto hWnd = Application::Get()->GetHwnd();
+		auto hWnd = Application::GetInstance()->GetHwnd();
 		auto factory = m_DX12Device->GetDXGIFactory();
 		auto isTearingSupport = m_DX12Device->SupportTearing();
 		const auto bufferCount = DX12Device::GetBufferCount();

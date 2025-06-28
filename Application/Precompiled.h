@@ -42,12 +42,18 @@ using namespace Microsoft::WRL;
 #include <optional>
 #include <span>
 #include <queue>
+#include <tuple>
 #include <mutex>
 #include <filesystem>
 #include <unordered_map>
 
-// Porject define
+// Project definitions
 #include "CoreDef.h"
 
-#include <DirectX/SimpleMath.h>
+// Graphics definitions
+#include "GraphicsDef.h"
+
+#include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
+
+#include <entt/entt.hpp>

@@ -1,5 +1,8 @@
 #include "Precompiled.h"
 #include "Application.h"
+#include "Renderer.h"
+#include "AssetManager.h"
+
 namespace graphicsGadgetLab
 {
 	std::unique_ptr<Application> Application::s_Application;
@@ -9,13 +12,23 @@ namespace graphicsGadgetLab
 		if (s_Application == nullptr)
 		{
 			s_Application = std::make_unique<Application>(windowName, windowWidth, windowHeight, hInstance);
+			s_Application->Initialize();
 		}
 	}
 
-	Application* Application::Get() noexcept
-	{	
-
+	Application* Application::GetInstance() noexcept
+	{
+		GGLAB_ASSERT_MSG(s_Application != nullptr, "Application instance is not created. Call CreateApplicationInstance first.");
 		return s_Application.get();
+	}
+
+	void Application::DestroyApplicationInstance() noexcept
+	{
+		if (s_Application)
+		{
+			s_Application->Finalize();
+			s_Application.reset();
+		}
 	}
 
 	Application::Application(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept :
@@ -26,15 +39,7 @@ namespace graphicsGadgetLab
 	{
 	}
 
-	void Application::Initialize() noexcept
-	{
-		InitializeWindow();
-
-		m_Renderer = std::make_unique<Renderer>();
-		m_Renderer->Initialize();
-	}
-
-	void Application::Update() noexcept
+	void Application::Run() noexcept
 	{
 		MSG msg = {};
 		while (msg.message != WM_QUIT)
@@ -45,11 +50,6 @@ namespace graphicsGadgetLab
 				DispatchMessage(&msg);
 			}
 		}
-	}
-
-	void Application::Finalize() noexcept
-	{
-		GetRenderer()->Finalize();
 	}
 
 	LRESULT Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -79,6 +79,24 @@ namespace graphicsGadgetLab
 		return 0;
 		}
 		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+
+	void Application::Initialize() noexcept
+	{
+		InitializeWindow();
+
+		m_Renderer = std::make_unique<Renderer>();
+		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
+
+		m_Renderer->Initialize();
+		m_AssetManager->Initialize();
+
+		InitializeAssets();
+	}
+
+	void Application::Finalize() noexcept
+	{
+		GetRenderer()->Finalize();
 	}
 
 	void Application::InitializeWindow() noexcept
@@ -124,5 +142,8 @@ namespace graphicsGadgetLab
 			this);
 
 		ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
+	}
+	void Application::InitializeAssets() noexcept
+	{
 	}
 }
