@@ -73,6 +73,8 @@ namespace graphicsGadgetLab
 		UploadTexture(resourceUploader, texture.get(), uploadData);
 		resourceUploader->EndUpload(true);
 
+		// TODO: Allocate Descriptor
+
 		return textureId;
 	}
 
@@ -146,7 +148,6 @@ namespace graphicsGadgetLab
 				}
 			}
 		}
-
 
 		auto pathIdPair = m_MeshContainer.m_PathIDMap.emplace(cannonicalPath, std::vector<MeshID>());
 		GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path&meshIds pair failed.");

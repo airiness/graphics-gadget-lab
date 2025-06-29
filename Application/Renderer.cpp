@@ -13,6 +13,7 @@
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
 #include "Components.h"
+#include "AssetManager.h"
 #include "Geometry.h"
 #include "Utility.h"
 
@@ -268,7 +269,23 @@ namespace graphicsGadgetLab
 
 	void Renderer::InitializeRenderObjects() noexcept
 	{
-		m_TestCube = primitiveGeometry::Cube::Create();
+		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
+		auto* assetManager = Application::GetInstance()->GetAssetManager();
+
+		// Make a test cube 
+		{
+			m_TestCube = primitiveGeometry::Cube::Create();
+
+			Material mat;
+			mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/UVChecker1K.png");
+			enttRegistry.emplace<Material>(m_TestCube, mat);
+		}
+	
+		// Make a test module
+		{
+			m_TestModel = enttRegistry.create();
+			enttRegistry.emplace<Transform>(m_TestModel, Transform());
+		}
 	}
 
 	void Renderer::UpdateGpuBuffers() noexcept
@@ -307,13 +324,27 @@ namespace graphicsGadgetLab
 	{
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
 		auto* testCubeMesh = enttRegistry.try_get<Mesh>(m_TestCube);
+		if (testCubeMesh != nullptr)
+		{
+			D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { testCubeMesh->m_VertexBufferView };
+			commandList->SetVertexBuffers(0, vertexBufferViews);
+			commandList->SetIndexBuffer(testCubeMesh->m_IndexBufferView);
 
-		D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { testCubeMesh->m_VertexBufferView };
-		commandList->SetVertexBuffers(0, vertexBufferViews);
-		commandList->SetIndexBuffer(testCubeMesh->m_IndexBufferView);
+			
+			auto* material = enttRegistry.try_get<Material>(m_TestCube);
+			if (material != nullptr)
+			{
+				auto* assetManager = Application::GetInstance()->GetAssetManager();
 
-		//commandList->DrawInstanced(mesh->GetVertexCount());
-		commandList->DrawIndexedInstanced(static_cast<uint32_t>(testCubeMesh->m_IndexCount));
+				auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
 
+				//commandList->SetGraphicsDescriptor(
+				//	static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
+				//	texture->m_Descriptor.get());
+			}
+
+			//commandList->DrawInstanced(mesh->GetVertexCount());
+			commandList->DrawIndexedInstanced(static_cast<uint32_t>(testCubeMesh->m_IndexCount));
+		}
 	}
 }

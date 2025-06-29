@@ -34,6 +34,7 @@ namespace graphicsGadgetLab
 		void SetVertexBuffers(uint32_t startSlot, std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) noexcept;
 		void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) noexcept;
 		void SetGraphicsConstantBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) noexcept;
+		void SetGraphicsDescriptor(uint32_t parameterIndex, const DX12Descriptor& descriptor) noexcept;
 		void AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept;
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;

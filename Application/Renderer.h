@@ -54,7 +54,9 @@ namespace graphicsGadgetLab
 		RootSignatureArray m_RootSignatures;
 		PSOArray m_PipelineStates;
 
-		entt::entity m_TestCube;
+		// TODO: management assets load in property place(maybe SceneLoader?)
+		entt::entity m_TestCube = {};
+		entt::entity m_TestModel = {};
 
 		std::atomic_bool m_IsInitialized = false;
 	};

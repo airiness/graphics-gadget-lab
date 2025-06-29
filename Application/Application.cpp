@@ -143,6 +143,7 @@ namespace graphicsGadgetLab
 
 		ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
 	}
+
 	void Application::InitializeAssets() noexcept
 	{
 	}
