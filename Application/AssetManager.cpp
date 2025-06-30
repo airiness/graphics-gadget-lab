@@ -52,7 +52,7 @@ namespace graphicsGadgetLab
 		else
 		{
 			utility::ThrowIfFailed(LoadFromWICFile(path.c_str(),
-				DirectX::WIC_FLAGS_FORCE_RGB,
+				DirectX::WIC_FLAGS::WIC_FLAGS_FORCE_RGB,
 				&metaData,
 				scratchImage));
 		}
@@ -73,7 +73,19 @@ namespace graphicsGadgetLab
 		UploadTexture(resourceUploader, texture.get(), uploadData);
 		resourceUploader->EndUpload(true);
 
-		// TODO: Allocate Descriptor
+		// Allocate Descriptor& create srv
+		auto* srvHeap = m_DX12Device->GetCbvSrvUavDescriptorHeap();
+		texture->m_Descriptor = srvHeap->CreateDescriptor();
+
+		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = textureDesc.Format;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
+		m_DX12Device->Get()->CreateShaderResourceView(texture->m_Texture->Get(),
+			&srvDesc,
+			texture->m_Descriptor.m_CpuHandle);
 
 		return textureId;
 	}

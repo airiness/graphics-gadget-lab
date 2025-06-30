@@ -29,6 +29,7 @@ namespace graphicsGadgetLab
 
 	DX12Descriptor DX12DescriptorHeap::CreateDescriptor() noexcept
 	{
+		// TODO: make a cool DesctiptorAllocator
 		DX12Descriptor descriptor = {};
 		GGLAB_ASSERT_MSG(m_CurrentDescriptorIndex <= m_DescriptorCount, "DescriptorHeap is Boooooom! you should make a new one!");
 

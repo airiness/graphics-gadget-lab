@@ -127,8 +127,11 @@ namespace graphicsGadgetLab
 			rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
 
 			CD3DX12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
-			staticSamplers[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-
+			staticSamplers[0].Init(0, 
+				D3D12_FILTER_MIN_MAG_MIP_LINEAR, 
+				D3D12_TEXTURE_ADDRESS_MODE_WRAP, 
+				D3D12_TEXTURE_ADDRESS_MODE_WRAP, 
+				D3D12_TEXTURE_ADDRESS_MODE_WRAP);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 			rootSignatureDesc.Init_1_1(
@@ -138,7 +141,6 @@ namespace graphicsGadgetLab
 
 			m_RootSignatures[static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)] = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
 		}
-
 	}
 
 	void Renderer::InitializePipelineStates() noexcept
@@ -329,18 +331,17 @@ namespace graphicsGadgetLab
 			D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { testCubeMesh->m_VertexBufferView };
 			commandList->SetVertexBuffers(0, vertexBufferViews);
 			commandList->SetIndexBuffer(testCubeMesh->m_IndexBufferView);
-
-			
+		
 			auto* material = enttRegistry.try_get<Material>(m_TestCube);
-			if (material != nullptr)
+			if (material != nullptr && material->m_MaterialID != InvalidTextureID)
 			{
 				auto* assetManager = Application::GetInstance()->GetAssetManager();
 
 				auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
 
-				//commandList->SetGraphicsDescriptor(
-				//	static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
-				//	texture->m_Descriptor.get());
+				commandList->SetGraphicsDescriptor(
+					static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
+					texture->m_Descriptor);
 			}
 
 			//commandList->DrawInstanced(mesh->GetVertexCount());
