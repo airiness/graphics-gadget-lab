@@ -279,8 +279,8 @@ namespace graphicsGadgetLab
 			m_TestCube = primitiveGeometry::Cube::Create();
 
 			Material mat;
-			//mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/UVChecker1K.png");
-			mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/Test_White.png");
+			mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/UVChecker1K.png");
+			//mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/Test_White.png");
 			//mat.m_TexBaseColor = assetManager->LoadTexture("Assets/models/FlightHelmet/FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.png");
 			enttRegistry.emplace<Material>(m_TestCube, mat);
 		}

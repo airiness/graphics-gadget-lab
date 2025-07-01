@@ -7,7 +7,7 @@ namespace graphicsGadgetLab
 	{
 	public:
 		DX12Resource() = default;
-		explicit DX12Resource(DX12Device* device, 
+		explicit DX12Resource(DX12Device* device,
 			D3D12_HEAP_TYPE heapType,
 			const CD3DX12_RESOURCE_DESC& resourceDesc,
 			D3D12_RESOURCE_STATES initState,
@@ -27,7 +27,7 @@ namespace graphicsGadgetLab
 		CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
 		D3D12_RESOURCE_STATES m_ResourceState = D3D12_RESOURCE_STATE_COMMON;
 		std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
-		//D3D12MA::Allocation* m_Allocation;
+		ComPtr<D3D12MA::Allocation> m_Allocation;
 		ComPtr<ID3D12Resource> m_Resource;
 	};
 }
