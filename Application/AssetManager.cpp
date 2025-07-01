@@ -5,6 +5,7 @@
 #include "DX12Resource.h"
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
+#include "DX12CommandList.h"
 #include "Utility.h"
 
 #include <assimp/Importer.hpp>
@@ -71,6 +72,25 @@ namespace graphicsGadgetLab
 		auto* resourceUploader = m_DX12Device->GetResourceUploader();
 		resourceUploader->BeginUpload();
 		UploadTexture(resourceUploader, texture.get(), uploadData);
+
+
+		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(
+			texture.get()->m_Texture->Get(),
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		resourceUploader->GetUploadCommandList()->Get()->ResourceBarrier(1, &transition);
+		//CD3DX12_TEXTURE_BARRIER barrier(D3D12_BARRIER_SYNC::D3D12_BARRIER_SYNC_ALL,
+  //      D3D12_BARRIER_SYNC::,
+  //      D3D12_BARRIER_ACCESS accessBefore,
+  //      D3D12_BARRIER_ACCESS accessAfter,
+  //      D3D12_BARRIER_LAYOUT layoutBefore,
+  //      D3D12_BARRIER_LAYOUT layoutAfter,
+  //      ID3D12Resource *pRes,
+  //      const D3D12_BARRIER_SUBRESOURCE_RANGE &subresources,
+  //      D3D12_TEXTURE_BARRIER_FLAGS flag = D3D12_TEXTURE_BARRIER_FLAG_NONE);
+		//
+		//resourceUploader->GetUploadCommandList()->AddTextureBarrier();
+
 		resourceUploader->EndUpload(true);
 
 		// Allocate Descriptor& create srv
@@ -244,7 +264,35 @@ namespace graphicsGadgetLab
 			subResourceDatas[imageIndex].SlicePitch = images[imageIndex].slicePitch;
 		}
 
-		resourceUploader->UploadResource(subResourceDatas, texture->m_Texture.get());
+		auto subResourceCount = static_cast<UINT>(subResourceDatas.size());
+		auto uploadSize = GetRequiredIntermediateSize(texture->m_Texture.get()->Get(), 0, subResourceCount);
+
+		auto* commandList = resourceUploader->GetUploadCommandList()->Get();
+
+		auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadSize);
+		m_DX12Device->Get()->CreateCommittedResource(
+			&heapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_TestUploadInterResource));
+
+		//std::unique_ptr uploadBuffer = std::make_unique<DX12Buffer>(m_DX12Device,
+		//	D3D12_HEAP_TYPE_UPLOAD,
+		//	CD3DX12_RESOURCE_DESC::Buffer(uploadSize),
+		//	D3D12_RESOURCE_STATE_GENERIC_READ);
+		//uploadBuffer->SetDebugName(L"UploadIntermediateBuffer");
+
+		UpdateSubresources(commandList,
+			texture->m_Texture->Get(),
+			m_TestUploadInterResource.Get(),
+			0, 0, subResourceCount, subResourceDatas.data());
+
+
+
+		//resourceUploader->UploadResource(subResourceDatas, texture->m_Texture.get());
 	}
 
 	void AssetManager::UploadMesh(DX12ResourceUploader* resourceUploader,

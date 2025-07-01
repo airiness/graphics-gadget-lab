@@ -66,5 +66,9 @@ namespace graphicsGadgetLab
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;
+
+
+
+		ComPtr<ID3D12Resource> m_TestUploadInterResource;
 	};
 }

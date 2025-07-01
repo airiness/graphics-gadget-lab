@@ -25,6 +25,8 @@ namespace graphicsGadgetLab
 		void UploadResource(const void* data, size_t dataSize, const DX12Resource* destResource) noexcept;
 		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept;
 
+		DX12CommandList* GetUploadCommandList() const { return m_UploadCommandList.get(); }
+
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		std::unique_ptr<DX12CommandQueue> m_UploadCommandQueue = nullptr;
