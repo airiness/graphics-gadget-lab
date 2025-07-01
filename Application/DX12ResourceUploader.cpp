@@ -10,9 +10,9 @@ namespace graphicsGadgetLab
 {
 	DX12ResourceUploader::DX12ResourceUploader(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device),
-		m_UploadCommandQueue(std::make_unique<DX12CommandQueue>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_COPY)),
-		m_UploadCommandList(std::make_unique<DX12CommandList>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_COPY)),
-		m_UploadCommandAllocatorPool(std::make_unique<DX12CommandAllocatorPool>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_COPY))
+		m_UploadCommandQueue(std::make_unique<DX12CommandQueue>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
+		m_UploadCommandList(std::make_unique<DX12CommandList>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
+		m_UploadCommandAllocatorPool(std::make_unique<DX12CommandAllocatorPool>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT))
 	{
 	}
 
