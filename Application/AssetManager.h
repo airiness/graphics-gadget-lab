@@ -42,6 +42,8 @@ namespace graphicsGadgetLab
 		void Initialize() noexcept;
 		void Finalize() noexcept;
 
+		Model LoadModel(const std::filesystem::path& path) noexcept;
+
 		TextureID LoadTexture(const std::filesystem::path& path) noexcept;
 		std::vector<MeshID> LoadMeshes(const std::filesystem::path& path) noexcept;
 
@@ -57,6 +59,8 @@ namespace graphicsGadgetLab
 
 		void UploadMesh(DX12ResourceUploader* resourceUploader,
 			Mesh* mesh, const MeshUploadData& uploadData) noexcept;
+
+		void LoadModelGlTF();
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

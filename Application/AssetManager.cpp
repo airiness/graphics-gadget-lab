@@ -26,6 +26,11 @@ namespace graphicsGadgetLab
 	{
 	}
 
+	Model AssetManager::LoadModel(const std::filesystem::path& path) noexcept
+	{
+		
+	}
+
 	TextureID AssetManager::LoadTexture(const std::filesystem::path& path) noexcept
 	{
 		// Use canonical path as unordered map key.
@@ -186,6 +191,7 @@ namespace graphicsGadgetLab
 
 			auto& mesh = idMeshPair.first->second;
 			UploadMesh(resourceUploader, mesh.get(), uploadDatas[meshIdIndex]);
+			meshIds.push_back(meshId);
 		}
 		resourceUploader->EndUpload(true);
 

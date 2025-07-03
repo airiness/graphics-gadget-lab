@@ -274,6 +274,11 @@ namespace graphicsGadgetLab
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
 		auto* assetManager = Application::GetInstance()->GetAssetManager();
 
+		// test load meshes
+		{
+			assetManager->LoadMeshes("Assets/models/FlightHelmet/FlightHelmet.gltf");
+		}
+
 		// Make a test cube 
 		{
 			m_TestCube = primitiveGeometry::Cube::Create();

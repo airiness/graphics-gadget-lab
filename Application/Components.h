@@ -53,8 +53,15 @@ namespace graphicsGadgetLab
 		};
 		DEFINE_COMPONENT_TYPE(Mesh);
 
+		enum class ModelFileType : uint8_t
+		{
+			glTF
+		};
+
 		struct Model
 		{
+			ModelFileType m_Type;
+
 			std::string m_ModelName;
 			std::vector<Material> m_Materials;
 			std::vector<Mesh> m_Meshes;
