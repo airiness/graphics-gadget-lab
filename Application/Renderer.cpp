@@ -127,10 +127,10 @@ namespace graphicsGadgetLab
 			rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
 
 			CD3DX12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
-			staticSamplers[0].Init(0, 
-				D3D12_FILTER_MIN_MAG_MIP_LINEAR, 
-				D3D12_TEXTURE_ADDRESS_MODE_WRAP, 
-				D3D12_TEXTURE_ADDRESS_MODE_WRAP, 
+			staticSamplers[0].Init(0,
+				D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+				D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+				D3D12_TEXTURE_ADDRESS_MODE_WRAP,
 				D3D12_TEXTURE_ADDRESS_MODE_WRAP);
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
@@ -165,7 +165,7 @@ namespace graphicsGadgetLab
 			inputLayoutDesc.NumElements = ARRAYSIZE(inputLayout);
 
 			CD3DX12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 			//rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;	// Wireframe mode for debugging
 			rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
@@ -274,26 +274,17 @@ namespace graphicsGadgetLab
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
 		auto* assetManager = Application::GetInstance()->GetAssetManager();
 
-		// test load meshes
-		{
-			assetManager->LoadMeshes("Assets/models/FlightHelmet/FlightHelmet.gltf");
-		}
-
 		// Make a test cube 
 		{
-			m_TestCube = primitiveGeometry::Cube::Create();
-
-			Material mat;
-			mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/UVChecker1K.png");
-			//mat.m_TexBaseColor = assetManager->LoadTexture("Assets/textures/Test_White.png");
-			//mat.m_TexBaseColor = assetManager->LoadTexture("Assets/models/FlightHelmet/FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.png");
-			enttRegistry.emplace<Material>(m_TestCube, mat);
+			//m_TestCube = primitiveGeometry::Cube::Create();
 		}
-	
+
 		// Make a test module
 		{
+			auto model = assetManager->LoadModel("Assets/models/FlightHelmet/FlightHelmet.gltf");
 			m_TestModel = enttRegistry.create();
 			enttRegistry.emplace<Transform>(m_TestModel, Transform());
+			enttRegistry.emplace<Model>(m_TestModel, std::move(model));
 		}
 	}
 
@@ -309,12 +300,12 @@ namespace graphicsGadgetLab
 		static float angle = 0.0f;
 		angle += 1.6f;
 		const auto rotationAxis = Vector3(0.f, 1.f, 0.f);
-		
+
 		Matrix modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
 		cbBuffer.m_ModelMatrix = modelMatrix;
 
-		const auto eyePosition = Vector4(0.f, 10.f, -30.f, 0.f);
-		const auto focusPoint = Vector4(0.f, 10.f, 0.f, 0.f);
+		const auto eyePosition = Vector4(0.f, 1.5f, -4.f, 0.f);
+		const auto focusPoint = Vector4(0.f, 0.f, 0.f, 0.f);
 		const auto upDirection = Vector4(0.f, 1.f, 0.f, 0.f);
 		Matrix viewMatrix = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
 
@@ -332,27 +323,37 @@ namespace graphicsGadgetLab
 	void Renderer::RenderObjects(DX12CommandList* commandList) noexcept
 	{
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
-		auto* testCubeMesh = enttRegistry.try_get<Mesh>(m_TestCube);
-		if (testCubeMesh != nullptr)
-		{
-			D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { testCubeMesh->m_VertexBufferView };
-			commandList->SetVertexBuffers(0, vertexBufferViews);
-			commandList->SetIndexBuffer(testCubeMesh->m_IndexBufferView);
-		
-			auto* material = enttRegistry.try_get<Material>(m_TestCube);
-			if (material != nullptr && material->m_MaterialID != InvalidTextureID)
+
+		const auto DrawModel = [](DX12CommandList* commandList, const Model& model)
 			{
 				auto* assetManager = Application::GetInstance()->GetAssetManager();
+				for (const auto& mesh : model.m_Meshes)
+				{
+					auto* meshPtr = assetManager->GetMesh(mesh);
+					if (meshPtr != nullptr)
+					{
+						D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { meshPtr->m_VertexBufferView };
+						commandList->SetVertexBuffers(0, vertexBufferViews);
+						commandList->SetIndexBuffer(meshPtr->m_IndexBufferView);
+						auto* material = assetManager->GetMaterial(meshPtr->m_Material);
+						if (material != nullptr && material->m_MaterialID != InvalidTextureID)
+						{
+							auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
+							commandList->SetGraphicsDescriptor(
+								static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
+								texture->m_Descriptor);
+						}
+						commandList->DrawIndexedInstanced(static_cast<uint32_t>(meshPtr->m_IndexCount));
+					}
+				}
+			};
 
-				auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
-
-				commandList->SetGraphicsDescriptor(
-					static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
-					texture->m_Descriptor);
-			}
-
-			//commandList->DrawInstanced(mesh->GetVertexCount());
-			commandList->DrawIndexedInstanced(static_cast<uint32_t>(testCubeMesh->m_IndexCount));
+		// Get all models in the registry
+		auto view = enttRegistry.view<Model>();
+		for (auto entity : view)
+		{
+			auto& model = view.get<Model>(entity);
+			DrawModel(commandList, model);
 		}
 	}
 }

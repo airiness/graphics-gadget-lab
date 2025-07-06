@@ -50,10 +50,11 @@ using namespace Microsoft::WRL;
 // Project definitions
 #include "CoreDef.h"
 
-// Graphics definitions
-#include "GraphicsDef.h"
 
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
+
+// Graphics definitions
+#include "GraphicsDef.h"
 
 #include <entt/entt.hpp>

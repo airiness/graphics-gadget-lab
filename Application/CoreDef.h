@@ -1,7 +1,14 @@
-﻿#pragma once
+#pragma once
 #include <cassert>
 
 #define GGLAB_ASSERT_MSG(expression, message) assert(expression && message)
+
+// Define unreachable and abort application
+#define GGLAB_UNREACHABLE(message) \
+	do { \
+		GGLAB_ASSERT_MSG(false, message); \
+		std::abort(); \
+	} while (0)
 
 #define GGLAB_DELETE_COPYABLE(className) \
 	className(const className&) noexcept = delete; \

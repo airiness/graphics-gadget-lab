@@ -27,20 +27,37 @@ namespace graphicsGadgetLab
 
 			std::unique_ptr<DX12Texture> m_Texture;
 			DX12Descriptor m_Descriptor;
+
+			bool m_IsUploaded = false;
 		};
 		DEFINE_COMPONENT_TYPE(Texture);
 
 		struct Material
 		{
 			MaterialID m_MaterialID = 0;
+			std::string m_MaterialName;
 
-			TextureID m_TexBaseColor = 0;
+			TextureID m_TexBaseColor = InvalidTextureID;
+			TextureID m_TexMetallicRoughness = InvalidTextureID;
+			TextureID m_NormalTex = InvalidTextureID;
+			TextureID m_OcclusionTex = InvalidTextureID;
+			TextureID m_EmissiveTex = InvalidTextureID;
+
+			Color m_BaseColor = ggLabColor::White;
+			float m_MetallicFactor = 0.0f;
+			float m_RoughnessFactor = 1.0f;
+			Color m_EmissiveColor = ggLabColor::Black;
+
+			bool m_DoubleSided = false;
 		};
 		DEFINE_COMPONENT_TYPE(Material);
 
 		struct Mesh
 		{
 			MeshID m_MeshID = 0;
+			std::string m_MeshName;
+
+			MaterialID m_Material = InvalidMaterialID;
 
 			std::unique_ptr<DX12Buffer> m_VertexBuffer;
 			std::unique_ptr<DX12Buffer> m_IndexBuffer;
@@ -50,21 +67,18 @@ namespace graphicsGadgetLab
 
 			D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView = {};
 			D3D12_INDEX_BUFFER_VIEW m_IndexBufferView = {};
+
+			bool m_IsUploaded = false;
 		};
 		DEFINE_COMPONENT_TYPE(Mesh);
 
-		enum class ModelFileType : uint8_t
-		{
-			glTF
-		};
-
 		struct Model
 		{
-			ModelFileType m_Type;
-
+			ModelType m_Type = ModelType::ModelType_Invalid;
 			std::string m_ModelName;
-			std::vector<Material> m_Materials;
-			std::vector<Mesh> m_Meshes;
+
+			//Matrix m_WorldTransform = Matrix::Identity;
+			std::vector<MeshID> m_Meshes;
 		};
 		DEFINE_COMPONENT_TYPE(Model);
 	}

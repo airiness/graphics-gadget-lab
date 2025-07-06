@@ -10,6 +10,7 @@ namespace graphicsGadgetLab
 {
 	namespace primitiveGeometry
 	{
+		const char* const Cube::TextPath = "Assets/textures/UVChecker1K.png";
 		entt::entity Cube::Create() noexcept
 		{
 			auto assetManager = Application::GetInstance()->GetAssetManager();
@@ -20,19 +21,34 @@ namespace graphicsGadgetLab
 			Transform transform;
 			enttRegistry.emplace<Transform>(cubeEntity, transform);
 
-			Mesh mesh;
-			mesh.m_MeshID = IndividualMeshID;
+			Model cubeModel;
+			cubeModel.m_Type = ModelType::ModelType_Procedual;
 
-			AssetManager::MeshUploadData meshUploadData;
-			meshUploadData.m_VerticesData = GetVerticesData();
-			meshUploadData.m_IndicesData = GetIndicesData();
+			if (assetManager->GetMesh(PocedualCubeMeshID) == nullptr)
+			{
+				std::unique_ptr<Mesh> cubeMesh = std::make_unique<Mesh>();
+				cubeMesh->m_MeshID = PocedualCubeMeshID;
 
-			auto meshTuple = std::make_tuple(&mesh, meshUploadData);
-			std::vector<std::tuple<Mesh*, const AssetManager::MeshUploadData&>> meshTuples;
-			meshTuples.push_back(meshTuple);
-			assetManager->UploadMeshes(meshTuples);
+				AssetManager::MeshUploadData meshUploadData;
+				meshUploadData.m_MeshID = PocedualCubeMeshID;
+				meshUploadData.m_VerticesData = GetVerticesData();
+				meshUploadData.m_IndicesData = GetIndicesData();
 
-			enttRegistry.emplace<Mesh>(cubeEntity, std::move(mesh));
+				if (assetManager->GetMaterial(PocedualCubeMaterialID) == nullptr)
+				{
+					std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
+					cubeMaterial->m_MaterialID = PocedualCubeMaterialID;
+					cubeMaterial->m_TexBaseColor = assetManager->GetTextureID(TextPath);
+					assetManager->AddMaterial(std::move(cubeMaterial));
+				};
+
+				cubeMesh->m_Material = PocedualCubeMaterialID;
+				assetManager->AddMesh(std::move(cubeMesh), meshUploadData);
+			}
+
+			cubeModel.m_Meshes.push_back(PocedualCubeMeshID);
+
+			enttRegistry.emplace<Model>(cubeEntity, std::move(cubeModel));
 
 			return cubeEntity;
 		}

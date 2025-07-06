@@ -12,11 +12,13 @@ namespace graphicsGadgetLab
 	public:
 		struct TextureUploadData
 		{
+			TextureID m_TextureID = InvalidTextureID;
 			DirectX::ScratchImage m_ScratchImage;
 		};
 
 		struct MeshUploadData
 		{
+			MeshID m_MeshID = InvalidMeshID;
 			std::vector<Vertex> m_VerticesData;
 			std::vector<uint32_t> m_IndicesData;
 		};
@@ -28,10 +30,15 @@ namespace graphicsGadgetLab
 			std::unordered_map<TextureID, std::unique_ptr<Texture>> m_TextureIDMap;
 		};
 
-		struct MeshContainer
+		struct MeshesContainer
 		{
 			std::unordered_map<std::filesystem::path, std::vector<MeshID>> m_PathIDMap;
 			std::unordered_map<MeshID, std::unique_ptr<Mesh>> m_MeshIDMap;
+		};
+
+		struct MaterialContainer
+		{
+			std::unordered_map<MaterialID, std::unique_ptr<Material>> m_MaterialIDMap;
 		};
 
 	public:
@@ -43,36 +50,39 @@ namespace graphicsGadgetLab
 		void Finalize() noexcept;
 
 		Model LoadModel(const std::filesystem::path& path) noexcept;
-
-		TextureID LoadTexture(const std::filesystem::path& path) noexcept;
-		std::vector<MeshID> LoadMeshes(const std::filesystem::path& path) noexcept;
+		TextureID GetTextureID(const std::filesystem::path& path) noexcept;
 
 		Texture* GetTexture(TextureID textureId) noexcept;
 		Mesh* GetMesh(MeshID meshId) noexcept;
+		Material* GetMaterial(MaterialID materialId) noexcept;
 
-		// Upload meshes management by caller self.
-		void UploadMeshes(const std::vector<std::tuple<Mesh*, const MeshUploadData&>>& meshes) noexcept;
+		void AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
+		void AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 
 	private:
-		void UploadTexture(DX12ResourceUploader* resourceUploader,
-			Texture* texture, const TextureUploadData& uploadData) noexcept;
+		void UploadTexture(DX12ResourceUploader* resourceUploader, const TextureUploadData& uploadData) noexcept;
+		void UploadMesh(DX12ResourceUploader* resourceUploader, const MeshUploadData& uploadData) noexcept;
 
-		void UploadMesh(DX12ResourceUploader* resourceUploader,
-			Mesh* mesh, const MeshUploadData& uploadData) noexcept;
+		Model LoadModelGltf(const std::filesystem::path& path) noexcept;
 
-		void LoadModelGlTF();
+		TextureID CreateTexture(const std::filesystem::path& cannonicalPath) noexcept;
+		MeshID CreateMesh() noexcept;
+		MaterialID CreateMaterial() noexcept;
+
+		TextureID HasTexture(const std::filesystem::path& path) const noexcept;
+
+		TextureUploadData& LoadTextureScratchImage(const std::filesystem::path& texPath,
+			TextureUploadData& uploadData) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
 
 		TextureID m_NextTextureID = ReservedTextureID + 1;
-		MeshID m_NextMeshID = InvalidMeshID + 1;
+		MeshID m_NextMeshID = ReservedMeshID + 1;
+		MaterialID m_NextMaterialID = ReservedMaterialID + 1;
 
 		TextureContainer m_TextureContainer;
-		MeshContainer m_MeshContainer;
-
-
-		ComPtr<ID3D12Resource> m_TestTextureResource;
-		ComPtr<ID3D12Resource> m_TestUploadInterResource;
+		MeshesContainer m_MeshContainer;
+		MaterialContainer m_MaterialContainer;
 	};
 }
