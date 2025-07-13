@@ -13,6 +13,13 @@
 #define WIN32_LEAN_AND_MEAN
 #endif // !WIN32_LEAN_AND_MEAN
 
+#ifndef WINRT_LEAN_AND_MEAN
+#define WINRT_LEAN_AND_MEAN
+#endif // ! WINRT_LEAN_AND_MEAN
+
+#define WINRT_NO_MODULE_LOCK
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+
 #include <Windows.h>
 #include <Shlwapi.h>	// PathRemoveFileSpecW
 #include <shlobj.h>
@@ -53,6 +60,9 @@ using namespace Microsoft::WRL;
 
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
+
+#include <GameInput.h>
+#pragma comment(lib, "gameinput.lib")
 
 // Graphics definitions
 #include "GraphicsDef.h"

@@ -2,10 +2,17 @@
 #include "Application.h"
 #include "Renderer.h"
 #include "AssetManager.h"
+#include "InputManager.h"
+#include "Keyboard.h"
 
 namespace graphicsGadgetLab
 {
 	std::unique_ptr<Application> Application::s_Application;
+
+	Keyboard* Application::GetKeyboard() const noexcept
+	{
+		return GetInputManager()->GetKeyboard();
+	}
 
 	void Application::CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept
 	{
@@ -70,11 +77,26 @@ namespace graphicsGadgetLab
 		return 0;
 		case WM_PAINT:
 		{
-			if (app->GetRenderer()->IsInitialized())
+			if (app)
 			{
-				app->GetRenderer()->Update();
-				app->GetRenderer()->Render();
+				app->Update();
 			}
+			
+		}
+		return 0;
+		case WM_SIZE:
+		{
+			if (wParam == SIZE_MINIMIZED)
+			{
+				if (app)
+				{
+					int32_t width = LOWORD(lParam);
+					int32_t height = HIWORD(lParam);
+					app->OnResize(width, height);
+				}
+			}
+
+
 		}
 		return 0;
 		}
@@ -83,7 +105,16 @@ namespace graphicsGadgetLab
 
 	void Application::Initialize() noexcept
 	{
+		if (m_IsInitialized)
+		{
+			return;
+		}
+
 		InitializeWindow();
+
+		// Initilize InputManager
+		m_InputManager = std::make_unique<InputManager>();
+		m_InputManager->Initialize();
 
 		m_Renderer = std::make_unique<Renderer>();
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
@@ -92,11 +123,43 @@ namespace graphicsGadgetLab
 		m_AssetManager->Initialize();
 
 		InitializeAssets();
+
+
+		m_IsInitialized = true;
+	}
+
+	void Application::Update() noexcept
+	{
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
+		m_InputManager->Update();
+
+		auto keyboard = GetKeyboard();
+		if (keyboard->IsKeyPressed(KeyCode::A))
+		{
+			int a = 0;
+		}
+
+		if (keyboard->IsKeyReleased(KeyCode::A))
+		{
+			int b = 0;
+		}
+
+		m_Renderer->Update();
+		m_Renderer->Render();
 	}
 
 	void Application::Finalize() noexcept
 	{
-		GetRenderer()->Finalize();
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
+		m_Renderer->Finalize();
 	}
 
 	void Application::InitializeWindow() noexcept
@@ -145,6 +208,26 @@ namespace graphicsGadgetLab
 	}
 
 	void Application::InitializeAssets() noexcept
+	{
+	}
+
+	void Application::OnActive() noexcept
+	{
+	}
+
+	void Application::OnInactive() noexcept
+	{
+	}
+
+	void Application::OnSuspend() noexcept
+	{
+	}
+
+	void Application::OnResume() noexcept
+	{
+	}
+
+	void Application::OnResize(int32_t width, int32_t height) noexcept
 	{
 	}
 }

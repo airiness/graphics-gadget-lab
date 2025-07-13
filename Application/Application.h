@@ -4,6 +4,8 @@ namespace graphicsGadgetLab
 {
 	class Renderer;
 	class AssetManager;
+	class InputManager;
+	class Keyboard;
 	class Application
 	{
 	public:
@@ -19,6 +21,8 @@ namespace graphicsGadgetLab
 
 		Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
 		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
+		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
+		Keyboard* GetKeyboard() const noexcept;
 
 		entt::registry& GetEnttRegistry() noexcept { return m_Registry; }
 
@@ -31,10 +35,18 @@ namespace graphicsGadgetLab
 
 	private:
 		void Initialize() noexcept;
+		void Update() noexcept;
 		void Finalize() noexcept;
 
 		void InitializeWindow() noexcept;
 		void InitializeAssets() noexcept;
+
+		// Functions called by the WindowProc
+		void OnActive() noexcept;
+		void OnInactive() noexcept;
+		void OnSuspend() noexcept;
+		void OnResume() noexcept;
+		void OnResize(int32_t width, int32_t height) noexcept;
 
 	private:
 		static std::unique_ptr<Application> s_Application;
@@ -51,8 +63,11 @@ namespace graphicsGadgetLab
 		// Renderer
 		std::unique_ptr<Renderer> m_Renderer;
 		std::unique_ptr<AssetManager> m_AssetManager;
+		std::unique_ptr<InputManager> m_InputManager;
 
 		entt::registry m_Registry;
+
+		bool m_IsInitialized = false;
 	};
 }
 

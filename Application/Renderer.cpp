@@ -45,11 +45,21 @@ namespace graphicsGadgetLab
 
 	void Renderer::Update() noexcept
 	{
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
 		UpdateGpuBuffers();
 	}
 
 	void Renderer::Render() noexcept
 	{
+		if (m_IsInitialized == false)
+		{
+			return;
+		}
+
 		auto swapChain = m_Device->GetSwapChain();
 		auto cbvDescriptorHeap = m_Device->GetCbvSrvUavDescriptorHeap();
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
@@ -281,10 +291,18 @@ namespace graphicsGadgetLab
 
 		// Make a test module
 		{
-			auto model = assetManager->LoadModel("Assets/models/FlightHelmet/FlightHelmet.gltf");
-			m_TestModel = enttRegistry.create();
-			enttRegistry.emplace<Transform>(m_TestModel, Transform());
-			enttRegistry.emplace<Model>(m_TestModel, std::move(model));
+			//auto model = assetManager->LoadModel("Assets/models/FlightHelmet/FlightHelmet.gltf");
+			//m_TestModel = enttRegistry.create();
+			//enttRegistry.emplace<Transform>(m_TestModel, Transform());
+			//enttRegistry.emplace<Model>(m_TestModel, std::move(model));
+		}
+
+		// Test Sponza
+		{
+			auto model = assetManager->LoadModel("Assets/models/Sponza/Sponza.gltf");
+			auto sponzaEntity = enttRegistry.create();
+			enttRegistry.emplace<Transform>(sponzaEntity, Transform());
+			enttRegistry.emplace<Model>(sponzaEntity, std::move(model));
 		}
 	}
 
@@ -298,14 +316,14 @@ namespace graphicsGadgetLab
 		GlobalConstantBuffer cbBuffer = {};
 
 		static float angle = 0.0f;
-		angle += 1.6f;
+		//angle += 1.6f;
 		const auto rotationAxis = Vector3(0.f, 1.f, 0.f);
 
 		Matrix modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
 		cbBuffer.m_ModelMatrix = modelMatrix;
 
-		const auto eyePosition = Vector4(0.f, 1.5f, -4.f, 0.f);
-		const auto focusPoint = Vector4(0.f, 0.f, 0.f, 0.f);
+		const auto eyePosition = Vector4(0.f, 7.5f, -4.f, 0.f);
+		const auto focusPoint = Vector4(0.f, 7.f, 0.f, 0.f);
 		const auto upDirection = Vector4(0.f, 1.f, 0.f, 0.f);
 		Matrix viewMatrix = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
 

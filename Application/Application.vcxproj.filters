@@ -23,6 +23,9 @@
     <Filter Include="Externals\DirectXSimpleMath">
       <UniqueIdentifier>{53450643-fb3f-4f95-8824-f673ebb33beb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Input">
+      <UniqueIdentifier>{b2b02cd2-6196-43e9-8f44-f9314263c7b5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -99,6 +102,18 @@
     </ClCompile>
     <ClCompile Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
       <Filter>Externals\DirectXSimpleMath</Filter>
+    </ClCompile>
+    <ClCompile Include="InputManager.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Mouse.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Keyboard.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="InputBase.cpp">
+      <Filter>Core\Input</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -179,6 +194,19 @@
     </ClInclude>
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h">
       <Filter>Externals\DirectXSimpleMath</Filter>
+    </ClInclude>
+    <ClInclude Include="InputManager.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Mouse.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Keyboard.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="IGameInputDevice.h" />
+    <ClInclude Include="InputBase.h">
+      <Filter>Core\Input</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
