@@ -4,6 +4,7 @@
 #include "AssetManager.h"
 #include "InputManager.h"
 #include "Keyboard.h"
+#include "Mouse.h"
 
 namespace graphicsGadgetLab
 {

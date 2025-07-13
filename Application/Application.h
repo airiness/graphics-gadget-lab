@@ -6,6 +6,7 @@ namespace graphicsGadgetLab
 	class AssetManager;
 	class InputManager;
 	class Keyboard;
+	class Mouse;
 	class Application
 	{
 	public:

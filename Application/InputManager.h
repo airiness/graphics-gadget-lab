@@ -1,9 +1,8 @@
 #pragma once
-
 namespace graphicsGadgetLab
 {
 	class Keyboard;
-	//class Mouse;
+	class Mouse;
 	//class GamePad;
 	class InputManager final
 	{
@@ -16,7 +15,8 @@ namespace graphicsGadgetLab
 		void Update() noexcept;
 		void Finalize() noexcept;
 
-		Keyboard* GetKeyboard() const noexcept { return m_Keyboard.get(); }
+		Keyboard* GetKeyboard() const noexcept;
+		Mouse* GetMouse() const noexcept;
 
 		void OnActive() noexcept;
 		void OnInactive() noexcept;
@@ -25,5 +25,7 @@ namespace graphicsGadgetLab
 
 	private:
 		std::unique_ptr<Keyboard> m_Keyboard;
+
+		std::unique_ptr<Mouse> m_Mouse;
 	};
 }
