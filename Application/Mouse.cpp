@@ -11,10 +11,29 @@ namespace graphicsGadgetLab
 
 	void Mouse::Update() noexcept
 	{
-		GetState();
+		if (IsConnected())
+		{
+			auto state = GetState();
+		}
 
 	}
-	void Mouse::GetState() noexcept
+
+	bool Mouse::IsMouseButtonPressed(MouseButton button) const noexcept
+	{
+		return false;
+	}
+
+	bool Mouse::IsMouseButtonReleased(MouseButton button) const noexcept
+	{
+		return false;
+	}
+
+	Mouse::MouseMode Mouse::GetMouseMode() const noexcept
+	{
+		return MouseMode();
+	}
+
+	Mouse::State Mouse::GetState() noexcept
 	{
 		if (m_GameInput)
 		{
