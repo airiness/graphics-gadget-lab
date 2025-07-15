@@ -11,7 +11,7 @@ namespace graphicsGadgetLab
 
 	void Keyboard::Update() noexcept
 	{
-		if (IsConnected())
+		if (m_GameInput && IsConnected())
 		{
 			auto state = GetState();
 			m_StateTracker.Update(state);

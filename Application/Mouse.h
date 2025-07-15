@@ -27,21 +27,9 @@ namespace graphicsGadgetLab
 		{
 			int32_t m_CoordX = 0;
 			int32_t m_CoordY = 0;
-
 			int32_t m_ScrollWheelValue = 0;
 
 			bool m_Buttons[MouseButtonCount] = {};
-			MouseMode m_MouseMode = MouseMode::Absolute;
-
-			bool IsButtonDown(MouseButton button) const noexcept
-			{
-				return m_Buttons[button];
-			}
-
-			bool IsButtonUp(MouseButton button) const noexcept
-			{
-				return !m_Buttons[button];
-			}
 		};
 
 		struct StateTracker
@@ -49,6 +37,10 @@ namespace graphicsGadgetLab
 			State m_LastState;
 			bool m_ButtonPressed[MouseButtonCount];
 			bool m_ButtonReleased[MouseButtonCount];
+
+			int32_t m_DeltaPositionY = 0;
+
+			MouseMode m_Mode = MouseMode::Absolute;
 
 			StateTracker() noexcept { Reset(); }
 			void Update(const State& state) noexcept;
@@ -62,12 +54,14 @@ namespace graphicsGadgetLab
 
 		virtual void Update() noexcept override;
 
+		Vector2 GetPosition() const noexcept;
+		Vector2 GetDeltaPosition() const noexcept;
+
 		bool IsMouseButtonPressed(MouseButton button) const noexcept;
 		bool IsMouseButtonReleased(MouseButton button) const noexcept;
 		bool IsMouseButtonHeld(MouseButton button) const noexcept;
 
 		MouseMode GetMouseMode() const noexcept;
-
 
 	private:
 		State GetState() noexcept;
