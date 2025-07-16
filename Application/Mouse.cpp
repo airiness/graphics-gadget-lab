@@ -19,6 +19,11 @@ namespace graphicsGadgetLab
 
 	}
 
+	void Mouse::SetWindowHandle(HWND window) noexcept
+	{
+		m_WindowHandle = window;
+	}
+
 	bool Mouse::IsMouseButtonPressed(MouseButton button) const noexcept
 	{
 		return false;
@@ -39,10 +44,67 @@ namespace graphicsGadgetLab
 		return MouseMode();
 	}
 
+	void Mouse::SetMouseMode(MouseMode mode) noexcept
+	{
+		if (m_Mode == mode)
+		{
+			return;
+		}
+
+		m_Mode = mode;
+	}
+
+	bool Mouse::IsCursorVisible() const noexcept
+	{
+		if (m_Mode == MouseMode::Relative)
+		{
+			return false;
+		}
+
+		// Get cursor info
+		CURSORINFO info = {
+			.cbSize = sizeof(CURSORINFO),
+			.flags = 0,
+			.hCursor = nullptr,
+			.ptScreenPos = {} };
+		if (!GetCursorInfo(&info))
+		{
+			return false;
+		}
+
+		return (info.flags & CURSOR_SHOWING) != 0;
+	}
+
+	void Mouse::SetCursorVisible(bool visible) const noexcept
+	{
+		if (m_Mode == MouseMode::Relative)
+		{
+			return;
+		}
+
+		// Get cursor info
+		CURSORINFO info = {
+			.cbSize = sizeof(CURSORINFO),
+			.flags = 0,
+			.hCursor = nullptr,
+			.ptScreenPos = {} };
+		if (!GetCursorInfo(&info))
+		{
+			// TODO: ADD error log
+			return;
+		}
+
+		bool isVisible = (info.flags & CURSOR_SHOWING) != 0;
+		if (isVisible != visible)
+		{
+			ShowCursor(visible);
+		}
+	}
+
 	Mouse::State Mouse::GetState() noexcept
 	{
 		State state = {};
-		
+
 		ComPtr<IGameInputReading> reading;
 		if (SUCCEEDED(m_GameInput->GetCurrentReading(GameInputKindMouse, nullptr, &reading)))
 		{
@@ -69,7 +131,7 @@ namespace graphicsGadgetLab
 				std::cout << "mouse-wheelx:" << mouse.wheelX << std::endl;
 				std::cout << "mouse-wheely:" << mouse.wheelY << std::endl;
 
-				
+
 			}
 		}
 

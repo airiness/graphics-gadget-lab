@@ -70,21 +70,21 @@ namespace graphicsGadgetLab
 			LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
 		}
-		return 0;
+		break;
 		case WM_DESTROY:
 		{
 			PostQuitMessage(0);
 		}
-		return 0;
+		break;
 		case WM_PAINT:
 		{
 			if (app)
 			{
 				app->Update();
 			}
-			
+
 		}
-		return 0;
+		break;
 		case WM_SIZE:
 		{
 			if (wParam == SIZE_MINIMIZED)
@@ -96,10 +96,12 @@ namespace graphicsGadgetLab
 					app->OnResize(width, height);
 				}
 			}
-
-
 		}
-		return 0;
+		break;
+		default:
+		{
+		}
+		break;
 		}
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}

@@ -40,7 +40,6 @@ namespace graphicsGadgetLab
 
 			int32_t m_DeltaPositionY = 0;
 
-			MouseMode m_Mode = MouseMode::Absolute;
 
 			StateTracker() noexcept { Reset(); }
 			void Update(const State& state) noexcept;
@@ -54,6 +53,7 @@ namespace graphicsGadgetLab
 
 		virtual void Update() noexcept override;
 
+		void SetWindowHandle(HWND window) noexcept;
 		Vector2 GetPosition() const noexcept;
 		Vector2 GetDeltaPosition() const noexcept;
 
@@ -62,12 +62,19 @@ namespace graphicsGadgetLab
 		bool IsMouseButtonHeld(MouseButton button) const noexcept;
 
 		MouseMode GetMouseMode() const noexcept;
+		void SetMouseMode(MouseMode mode) noexcept;
+
+		bool IsCursorVisible() const noexcept;
+		void SetCursorVisible(bool visible) const noexcept;
 
 	private:
 		State GetState() noexcept;
 
 	private:
 		StateTracker m_StateTracker;
+		MouseMode m_Mode = MouseMode::Relative;
+
+		HWND m_WindowHandle = nullptr;
 
 	};
 }
