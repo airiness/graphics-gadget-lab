@@ -53,6 +53,7 @@ using namespace Microsoft::WRL;
 #include <mutex>
 #include <filesystem>
 #include <unordered_map>
+#include <limits>
 
 // Project definitions
 #include "CoreDef.h"

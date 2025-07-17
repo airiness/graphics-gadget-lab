@@ -41,6 +41,7 @@ namespace graphicsGadgetLab
 			int32_t m_DeltaPositionY = 0;
 
 
+
 			StateTracker() noexcept { Reset(); }
 			void Update(const State& state) noexcept;
 			void Reset() noexcept;
@@ -70,9 +71,18 @@ namespace graphicsGadgetLab
 	private:
 		State GetState() noexcept;
 
+		void ClipToWindow() const noexcept;
+
 	private:
 		StateTracker m_StateTracker;
 		MouseMode m_Mode = MouseMode::Relative;
+
+		int64_t m_RelativeX = std::numeric_limits<int64_t>::max();
+		int64_t m_RelativeY = std::numeric_limits<int64_t>::max();
+		int64_t m_LastX = std::numeric_limits<int64_t>::max();
+		int64_t m_LastY = std::numeric_limits<int64_t>::max();
+
+
 
 		HWND m_WindowHandle = nullptr;
 

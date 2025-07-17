@@ -52,6 +52,22 @@ namespace graphicsGadgetLab
 		}
 
 		m_Mode = mode;
+
+		m_RelativeX = m_RelativeY =
+			m_LastX = m_LastY =
+			std::numeric_limits<int64_t>::max();
+
+		if (m_Mode == MouseMode::Relative)
+		{
+			ShowCursor(FALSE);
+			ClipToWindow();
+		}
+		else
+		{
+			ShowCursor(TRUE);
+
+			
+		}
 	}
 
 	bool Mouse::IsCursorVisible() const noexcept
@@ -122,14 +138,14 @@ namespace graphicsGadgetLab
 				state.m_ScrollWheelValue = mouse.wheelY;
 
 
-				std::cout << "mouse-left:" << (mouse.buttons & GameInputMouseLeftButton) << std::endl;
-				std::cout << "mouse-right:" << (mouse.buttons & GameInputMouseRightButton) << std::endl;
-				std::cout << "mouse-middle:" << (mouse.buttons & GameInputMouseMiddleButton) << std::endl;
-				std::cout << "mouse-buttons:" << (mouse.buttons) << std::endl;
-				std::cout << "mouse-posx:" << mouse.positionX << std::endl;
-				std::cout << "mouse-posy:" << mouse.positionY << std::endl;
-				std::cout << "mouse-wheelx:" << mouse.wheelX << std::endl;
-				std::cout << "mouse-wheely:" << mouse.wheelY << std::endl;
+				//std::cout << "mouse-left:" << (mouse.buttons & GameInputMouseLeftButton) << std::endl;
+				//std::cout << "mouse-right:" << (mouse.buttons & GameInputMouseRightButton) << std::endl;
+				//std::cout << "mouse-middle:" << (mouse.buttons & GameInputMouseMiddleButton) << std::endl;
+				//std::cout << "mouse-buttons:" << (mouse.buttons) << std::endl;
+				//std::cout << "mouse-posx:" << mouse.positionX << std::endl;
+				//std::cout << "mouse-posy:" << mouse.positionY << std::endl;
+				//std::cout << "mouse-wheelx:" << mouse.wheelX << std::endl;
+				//std::cout << "mouse-wheely:" << mouse.wheelY << std::endl;
 
 
 			}
@@ -138,10 +154,45 @@ namespace graphicsGadgetLab
 		return state;
 	}
 
+	void Mouse::ClipToWindow() const noexcept
+	{
+		if (!m_WindowHandle)
+		{
+			// TODO:error log
+			return;
+		}
+
+		RECT rect;
+		GetClientRect(m_WindowHandle, &rect);
+
+		POINT ul;
+		ul.x = rect.left;
+		ul.y = rect.top;
+
+		POINT lr;
+		lr.x = rect.right;
+		lr.y = rect.bottom;
+
+		std::ignore = MapWindowPoints(m_WindowHandle, nullptr, &ul, 1);
+		std::ignore = MapWindowPoints(m_WindowHandle, nullptr, &lr, 1);
+
+		rect.left = ul.x;
+		rect.top = ul.y;
+
+		rect.right = lr.x;
+		rect.bottom = lr.y;
+
+		ClipCursor(&rect);
+
+	}
+
 
 
 	void Mouse::StateTracker::Update(const State& state) noexcept
 	{
+		m_LastState = state;
+
+
 
 	}
 
