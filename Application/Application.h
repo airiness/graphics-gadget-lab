@@ -24,6 +24,7 @@ namespace graphicsGadgetLab
 		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
 		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
 		Keyboard* GetKeyboard() const noexcept;
+		Mouse* GetMouse() const noexcept;
 
 		entt::registry& GetEnttRegistry() noexcept { return m_Registry; }
 

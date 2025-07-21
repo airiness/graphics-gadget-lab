@@ -6,10 +6,11 @@
 
 namespace graphicsGadgetLab
 {
-	void InputManager::Initialize() noexcept
+	void InputManager::Initialize(HWND windowHandle) noexcept
 	{
 		m_Keyboard = std::make_unique<Keyboard>();
 		m_Mouse = std::make_unique<Mouse>();
+		m_Mouse->SetWindowHandle(windowHandle);
 	}
 
 	void InputManager::Update() noexcept
@@ -23,7 +24,7 @@ namespace graphicsGadgetLab
 	}
 
 	Keyboard* InputManager::GetKeyboard() const noexcept
-	{ 
+	{
 		return m_Keyboard.get(); 
 	}
 

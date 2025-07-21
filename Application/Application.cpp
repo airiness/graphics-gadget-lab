@@ -12,7 +12,22 @@ namespace graphicsGadgetLab
 
 	Keyboard* Application::GetKeyboard() const noexcept
 	{
-		return GetInputManager()->GetKeyboard();
+		if (const auto input = GetInputManager())
+		{
+			return input->GetKeyboard();
+		}
+
+		return nullptr;
+	}
+
+	Mouse* Application::GetMouse() const noexcept\
+	{
+		if (const auto input = GetInputManager())
+		{
+			return input->GetMouse();
+		}
+
+		return nullptr;
 	}
 
 	void Application::CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept
@@ -57,6 +72,10 @@ namespace graphicsGadgetLab
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
 			}
+			else
+			{
+				Update();
+			}
 		}
 	}
 
@@ -78,11 +97,6 @@ namespace graphicsGadgetLab
 		break;
 		case WM_PAINT:
 		{
-			if (app)
-			{
-				app->Update();
-			}
-
 		}
 		break;
 		case WM_SIZE:
@@ -117,7 +131,7 @@ namespace graphicsGadgetLab
 
 		// Initilize InputManager
 		m_InputManager = std::make_unique<InputManager>();
-		m_InputManager->Initialize();
+		m_InputManager->Initialize(m_Hwnd);
 
 		m_Renderer = std::make_unique<Renderer>();
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
@@ -141,14 +155,15 @@ namespace graphicsGadgetLab
 		m_InputManager->Update();
 
 		auto keyboard = GetKeyboard();
-		if (keyboard->IsKeyPressed(KeyCode::A))
+		if (keyboard && keyboard->IsKeyPressed(KeyCode::T))
 		{
-			int a = 0;
-		}
-
-		if (keyboard->IsKeyReleased(KeyCode::A))
-		{
-			int b = 0;
+			if (auto mouse = GetMouse())
+			{
+				mouse->SetMouseMode(
+					(mouse->GetMouseMode() == Mouse::MouseMode::Absolute) ?
+					Mouse::MouseMode::Relative :
+					Mouse::MouseMode::Absolute);
+			}
 		}
 
 		m_Renderer->Update();

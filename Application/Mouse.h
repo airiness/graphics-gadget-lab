@@ -19,31 +19,36 @@ namespace graphicsGadgetLab
 	public:
 		enum class MouseMode : uint32_t
 		{
-			Absolute,
-			Relative
+			Absolute,	// absolute coordinate: used in ui, debug menu and so on.
+			Relative	// relative coordinate: used in fps camera and so on.
 		};
 	private:
 		struct State
 		{
-			int32_t m_CoordX = 0;
-			int32_t m_CoordY = 0;
-			int32_t m_ScrollWheelValue = 0;
+			int64_t m_CoordX = 0;
+			int64_t m_CoordY = 0;
+			int64_t m_ScrollWheelY = 0;
 
 			bool m_Buttons[MouseButtonCount] = {};
+
+			MouseMode m_ModeState = MouseMode::Absolute;
 		};
 
 		struct StateTracker
 		{
 			State m_LastState;
-			bool m_ButtonPressed[MouseButtonCount];
-			bool m_ButtonReleased[MouseButtonCount];
+			bool m_ButtonPressed[MouseButtonCount] = {};
+			bool m_ButtonReleased[MouseButtonCount] = {};
+			bool m_ButtonHeld[MouseButtonCount] = {};
 
-			int32_t m_DeltaPositionY = 0;
+			int64_t m_ScrollWheelDeltaY = 0;
+			int64_t m_RelativeX = 0;
+			int64_t m_RelativeY = 0;
+			int64_t m_AbsoluteX = 0;
+			int64_t m_AbsoluteY = 0;
 
-
-
-			StateTracker() noexcept { Reset(); }
-			void Update(const State& state) noexcept;
+			StateTracker() noexcept = default;
+			void Update(const State& state, HWND windowHandle) noexcept;
 			void Reset() noexcept;
 		};
 
@@ -55,8 +60,9 @@ namespace graphicsGadgetLab
 		virtual void Update() noexcept override;
 
 		void SetWindowHandle(HWND window) noexcept;
-		Vector2 GetPosition() const noexcept;
-		Vector2 GetDeltaPosition() const noexcept;
+
+		Vector2 GetMouseCoord() const noexcept;
+		int64_t GetScrollWheelDeltaY() const noexcept;
 
 		bool IsMouseButtonPressed(MouseButton button) const noexcept;
 		bool IsMouseButtonReleased(MouseButton button) const noexcept;
@@ -68,23 +74,14 @@ namespace graphicsGadgetLab
 		bool IsCursorVisible() const noexcept;
 		void SetCursorVisible(bool visible) const noexcept;
 
+		void SetClipToWindow(bool isClip) const noexcept;
+
 	private:
 		State GetState() noexcept;
-
-		void ClipToWindow() const noexcept;
 
 	private:
 		StateTracker m_StateTracker;
 		MouseMode m_Mode = MouseMode::Relative;
-
-		int64_t m_RelativeX = std::numeric_limits<int64_t>::max();
-		int64_t m_RelativeY = std::numeric_limits<int64_t>::max();
-		int64_t m_LastX = std::numeric_limits<int64_t>::max();
-		int64_t m_LastY = std::numeric_limits<int64_t>::max();
-
-
-
 		HWND m_WindowHandle = nullptr;
-
 	};
 }

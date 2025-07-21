@@ -14,9 +14,19 @@ namespace graphicsGadgetLab
 		if (m_GameInput && IsConnected())
 		{
 			auto state = GetState();
-			m_StateTracker.Update(state);
+			m_StateTracker.Update(state, m_WindowHandle);
 		}
 
+		if (GetForegroundWindow() == m_WindowHandle && m_Mode == MouseMode::Relative)
+		{
+			SetCursorVisible(false);
+			SetClipToWindow(true);
+		}
+		else
+		{
+			SetCursorVisible(true);
+			SetClipToWindow(false);
+		}
 	}
 
 	void Mouse::SetWindowHandle(HWND window) noexcept
@@ -24,24 +34,49 @@ namespace graphicsGadgetLab
 		m_WindowHandle = window;
 	}
 
+	Vector2 Mouse::GetMouseCoord() const noexcept
+	{
+		switch (m_Mode)
+		{
+		case MouseMode::Absolute:
+			return Vector2(
+				static_cast<float>(m_StateTracker.m_AbsoluteX),
+				static_cast<float>(m_StateTracker.m_AbsoluteY));
+		case MouseMode::Relative:
+			return Vector2(
+				static_cast<float>(m_StateTracker.m_RelativeX),
+				static_cast<float>(m_StateTracker.m_RelativeY));
+		default:
+			GGLAB_UNREACHABLE("Invalid Mouse Mode.");
+			break;
+		}
+
+		return Vector2::Zero;
+	}
+
+	int64_t Mouse::GetScrollWheelDeltaY() const noexcept
+	{
+		return m_StateTracker.m_ScrollWheelDeltaY;
+	}
+
 	bool Mouse::IsMouseButtonPressed(MouseButton button) const noexcept
 	{
-		return false;
+		return m_StateTracker.m_ButtonPressed[button];
 	}
 
 	bool Mouse::IsMouseButtonReleased(MouseButton button) const noexcept
 	{
-		return false;
+		return m_StateTracker.m_ButtonReleased[button];
 	}
 
 	bool Mouse::IsMouseButtonHeld(MouseButton button) const noexcept
 	{
-		return false;
+		return m_StateTracker.m_ButtonHeld[button];
 	}
 
 	Mouse::MouseMode Mouse::GetMouseMode() const noexcept
 	{
-		return MouseMode();
+		return m_Mode;
 	}
 
 	void Mouse::SetMouseMode(MouseMode mode) noexcept
@@ -52,31 +87,10 @@ namespace graphicsGadgetLab
 		}
 
 		m_Mode = mode;
-
-		m_RelativeX = m_RelativeY =
-			m_LastX = m_LastY =
-			std::numeric_limits<int64_t>::max();
-
-		if (m_Mode == MouseMode::Relative)
-		{
-			ShowCursor(FALSE);
-			ClipToWindow();
-		}
-		else
-		{
-			ShowCursor(TRUE);
-
-			
-		}
 	}
 
 	bool Mouse::IsCursorVisible() const noexcept
 	{
-		if (m_Mode == MouseMode::Relative)
-		{
-			return false;
-		}
-
 		// Get cursor info
 		CURSORINFO info = {
 			.cbSize = sizeof(CURSORINFO),
@@ -93,24 +107,7 @@ namespace graphicsGadgetLab
 
 	void Mouse::SetCursorVisible(bool visible) const noexcept
 	{
-		if (m_Mode == MouseMode::Relative)
-		{
-			return;
-		}
-
-		// Get cursor info
-		CURSORINFO info = {
-			.cbSize = sizeof(CURSORINFO),
-			.flags = 0,
-			.hCursor = nullptr,
-			.ptScreenPos = {} };
-		if (!GetCursorInfo(&info))
-		{
-			// TODO: ADD error log
-			return;
-		}
-
-		bool isVisible = (info.flags & CURSOR_SHOWING) != 0;
+		bool isVisible = IsCursorVisible();
 		if (isVisible != visible)
 		{
 			ShowCursor(visible);
@@ -135,27 +132,27 @@ namespace graphicsGadgetLab
 
 				state.m_CoordX = mouse.positionX;
 				state.m_CoordY = mouse.positionY;
-				state.m_ScrollWheelValue = mouse.wheelY;
-
-
-				//std::cout << "mouse-left:" << (mouse.buttons & GameInputMouseLeftButton) << std::endl;
-				//std::cout << "mouse-right:" << (mouse.buttons & GameInputMouseRightButton) << std::endl;
-				//std::cout << "mouse-middle:" << (mouse.buttons & GameInputMouseMiddleButton) << std::endl;
-				//std::cout << "mouse-buttons:" << (mouse.buttons) << std::endl;
-				//std::cout << "mouse-posx:" << mouse.positionX << std::endl;
-				//std::cout << "mouse-posy:" << mouse.positionY << std::endl;
-				//std::cout << "mouse-wheelx:" << mouse.wheelX << std::endl;
-				//std::cout << "mouse-wheely:" << mouse.wheelY << std::endl;
-
-
+				state.m_ScrollWheelY = mouse.wheelY;
 			}
 		}
+		else
+		{
+			//TODO: error log
+		}
+
+		state.m_ModeState = m_Mode;
 
 		return state;
 	}
 
-	void Mouse::ClipToWindow() const noexcept
+	void Mouse::SetClipToWindow(bool isClip) const noexcept
 	{
+		if (!isClip)
+		{
+			ClipCursor(nullptr);
+			return;
+		}
+
 		if (!m_WindowHandle)
 		{
 			// TODO:error log
@@ -186,18 +183,39 @@ namespace graphicsGadgetLab
 
 	}
 
-
-
-	void Mouse::StateTracker::Update(const State& state) noexcept
+	void Mouse::StateTracker::Update(const State& state, HWND windowHandle) noexcept
 	{
+		for (int32_t buttonIndex = 0; buttonIndex < (int32_t)MouseButtonCount; buttonIndex++)
+		{
+			m_ButtonPressed[buttonIndex] = state.m_Buttons[buttonIndex] && !m_LastState.m_Buttons[buttonIndex];
+			m_ButtonReleased[buttonIndex] = !state.m_Buttons[buttonIndex] && m_LastState.m_Buttons[buttonIndex];
+			m_ButtonHeld[buttonIndex] = m_LastState.m_Buttons[buttonIndex];
+		}
+
+		if (state.m_ModeState == MouseMode::Absolute)
+		{
+			POINT pt;
+			if (GetCursorPos(&pt))
+			{
+				ScreenToClient(windowHandle, &pt);
+			}
+
+			m_AbsoluteX = static_cast<int64_t>(pt.x);
+			m_AbsoluteY = static_cast<int64_t>(pt.y);
+		}
+		else if (state.m_ModeState == MouseMode::Relative)
+		{
+			m_RelativeX = state.m_CoordX - m_LastState.m_CoordX;
+			m_RelativeY = state.m_CoordY - m_LastState.m_CoordY;
+		}
+
+		m_ScrollWheelDeltaY = state.m_ScrollWheelY - m_LastState.m_ScrollWheelY;
+
 		m_LastState = state;
-
-
-
 	}
 
 	void Mouse::StateTracker::Reset() noexcept
 	{
-
+		*this = StateTracker();
 	}
 }
