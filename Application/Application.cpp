@@ -2,6 +2,7 @@
 #include "Application.h"
 #include "Renderer.h"
 #include "AssetManager.h"
+#include "Time.h"
 #include "InputManager.h"
 #include "Keyboard.h"
 #include "Mouse.h"
@@ -129,6 +130,9 @@ namespace graphicsGadgetLab
 
 		InitializeWindow();
 
+		m_Time = std::make_unique<Time>();
+		m_Time->Initialize();
+
 		// Initilize InputManager
 		m_InputManager = std::make_unique<InputManager>();
 		m_InputManager->Initialize(m_Hwnd);
@@ -138,6 +142,7 @@ namespace graphicsGadgetLab
 
 		m_Renderer->Initialize();
 		m_AssetManager->Initialize();
+
 
 		InitializeAssets();
 

@@ -4,6 +4,7 @@ namespace graphicsGadgetLab
 {
 	class Renderer;
 	class AssetManager;
+	class Time;
 	class InputManager;
 	class Keyboard;
 	class Mouse;
@@ -25,6 +26,7 @@ namespace graphicsGadgetLab
 		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
 		Keyboard* GetKeyboard() const noexcept;
 		Mouse* GetMouse() const noexcept;
+		Time* GetTime() const noexcept { return m_Time.get(); }
 
 		entt::registry& GetEnttRegistry() noexcept { return m_Registry; }
 
@@ -64,6 +66,7 @@ namespace graphicsGadgetLab
 
 		// Renderer
 		std::unique_ptr<Renderer> m_Renderer;
+		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<AssetManager> m_AssetManager;
 		std::unique_ptr<InputManager> m_InputManager;
 

@@ -133,6 +133,7 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RendererConstant.cpp" />
+    <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -166,6 +167,7 @@
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererConstant.h" />
+    <ClInclude Include="Time.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>
   <ItemGroup>

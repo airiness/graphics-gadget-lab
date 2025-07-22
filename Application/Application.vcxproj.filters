@@ -115,6 +115,9 @@
     <ClCompile Include="InputBase.cpp">
       <Filter>Core\Input</Filter>
     </ClCompile>
+    <ClCompile Include="Time.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -207,6 +210,9 @@
     <ClInclude Include="IGameInputDevice.h" />
     <ClInclude Include="InputBase.h">
       <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="Time.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
