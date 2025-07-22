@@ -157,8 +157,10 @@ namespace graphicsGadgetLab
 			return;
 		}
 
+		m_Time->Update();
 		m_InputManager->Update();
 
+		// Toggle Mouse Input Mode
 		auto keyboard = GetKeyboard();
 		if (keyboard && keyboard->IsKeyPressed(KeyCode::T))
 		{

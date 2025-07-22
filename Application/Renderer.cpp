@@ -14,6 +14,7 @@
 #include "DX12CommandAllocator.h"
 #include "Components.h"
 #include "AssetManager.h"
+#include "Camera.h"
 #include "Geometry.h"
 #include "Utility.h"
 
@@ -21,8 +22,9 @@ namespace graphicsGadgetLab
 {
 	Renderer::Renderer() noexcept
 	{
-		auto width = Application::GetInstance()->GetWindowWidth();
-		auto height = Application::GetInstance()->GetWindowHeight();
+		auto app = Application::GetInstance();
+		auto width = app->GetWindowWidth();
+		auto height = app->GetWindowHeight();
 
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
@@ -38,6 +40,7 @@ namespace graphicsGadgetLab
 		InitializePipelineStates();
 		InitializeRenderTargets();
 		InitializeConstantBuffer();
+		InitializeCamera();
 		InitializeRenderObjects();
 
 		m_IsInitialized = true;
@@ -49,6 +52,8 @@ namespace graphicsGadgetLab
 		{
 			return;
 		}
+
+		m_Camera->Update();
 
 		UpdateGpuBuffers();
 	}
@@ -306,6 +311,23 @@ namespace graphicsGadgetLab
 		}
 	}
 
+	void Renderer::InitializeCamera() noexcept
+	{
+		auto app = Application::GetInstance();
+
+		Camera::Info info = {};
+		info.m_Position = Vector3::Zero;
+		info.m_Forward = Vector3::UnitZ;
+		info.m_Width = app->GetWindowWidth();
+		info.m_Height = app->GetWindowHeight();
+		info.m_Near = 0.1f;
+		info.m_Far = 1000.0f;
+		info.m_Fov = 45.0f;
+
+		m_Camera = std::make_unique<Camera>(info);
+
+	}
+
 	void Renderer::UpdateGpuBuffers() noexcept
 	{
 		UpdateGlobalConstantBuffer();
@@ -322,18 +344,11 @@ namespace graphicsGadgetLab
 		Matrix modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
 		cbBuffer.m_ModelMatrix = modelMatrix;
 
-		const auto eyePosition = Vector4(0.f, 7.5f, -4.f, 0.f);
-		const auto focusPoint = Vector4(0.f, 7.f, 0.f, 0.f);
-		const auto upDirection = Vector4(0.f, 1.f, 0.f, 0.f);
-		Matrix viewMatrix = DirectX::XMMatrixLookAtLH(eyePosition, focusPoint, upDirection);
-
-		auto swapChain = m_Device->GetSwapChain();
-		float aspectRatio = static_cast<float>(swapChain->GetBufferWidth()) / swapChain->GetBufferHeight();
-
-		Matrix projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(45.0f), aspectRatio, 0.01f, 1000.f);
+		Matrix viewMatrix = m_Camera->GetViewMatrix();
+		Matrix projMatrix = m_Camera->GetProjMatrix();
 
 		cbBuffer.m_ViewMatrix = DirectX::XMMatrixTranspose(viewMatrix);
-		cbBuffer.m_ProjectionMatrix = DirectX::XMMatrixTranspose(projectionMatrix);
+		cbBuffer.m_ProjectionMatrix = DirectX::XMMatrixTranspose(projMatrix);
 
 		m_GlobalConstantBuffer->Update(cbBuffer);
 	}

@@ -10,6 +10,7 @@ namespace graphicsGadgetLab
 	class DX12ConstantBuffer;
 	class DX12CommandList;
 	class DX12Fence;
+	class Camera;
 	class Cube;
 
 	class Renderer
@@ -34,6 +35,7 @@ namespace graphicsGadgetLab
 		void InitializeRenderTargets() noexcept;
 		void InitializeConstantBuffer() noexcept;
 		void InitializeRenderObjects() noexcept;
+		void InitializeCamera() noexcept;
 
 		void UpdateGpuBuffers() noexcept;
 		void UpdateGlobalConstantBuffer() noexcept;
@@ -42,6 +44,8 @@ namespace graphicsGadgetLab
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
+
+		std::unique_ptr<Camera> m_Camera;
 
 		// RenderTargets & DepthStencilBuffer
 		RenderTargetArray m_RenderTargets;
