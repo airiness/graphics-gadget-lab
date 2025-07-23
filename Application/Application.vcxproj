@@ -162,7 +162,6 @@
     <ClInclude Include="Geometry.h" />
     <ClInclude Include="GraphicsDef.h" />
     <ClInclude Include="AssetManager.h" />
-    <ClInclude Include="IGameInputDevice.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="Keyboard.h" />
     <ClInclude Include="Mouse.h" />

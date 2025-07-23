@@ -6,13 +6,17 @@ namespace graphicsGadgetLab
 	public:
 		struct Info
 		{
+			Vector3 m_Forward = Vector3::UnitZ;
+			Vector3 m_Up = Vector3::UnitY;
+			Vector3 m_Right = Vector3::UnitX;
+			Vector3 m_Position = Vector3::Zero;
+
 			float m_Near = 0.01f;
 			float m_Far = 1000.0f;
 			float m_Fov = 60.0f;
-			uint32_t m_Width = 1920;
+
+			uint32_t m_Width = 1280;
 			uint32_t m_Height = 720;
-			Vector3 m_Position = Vector3::Zero;
-			Vector3 m_Forward = Vector3::UnitZ;
 		};
 
 	public:
@@ -26,16 +30,14 @@ namespace graphicsGadgetLab
 		Matrix GetProjMatrix() const noexcept;
 
 		Vector3 GetPosition() const noexcept { return m_Position; }
-		Vector3 GetDirection() const noexcept;
 
 		float GetNear() const noexcept { return m_Near; }
 		float GetFar() const noexcept { return m_Far; }
 		float GetFov() const noexcept { return m_Fov; }
 
 	private:
-		void RotateCamera(float yaw, float pitch);
-		void SetProjMatrix(float fov, float aspect, float nearZ, float farZ) noexcept;
-
+		void UpdateProjMatrix() noexcept;
+		void UpdateViewMatrix() noexcept;
 	private:
 		static constexpr float SmoothStepT = 0.5f;
 
@@ -43,16 +45,21 @@ namespace graphicsGadgetLab
 		Matrix m_ViewMatrix = Matrix::Identity;
 		Matrix m_ProjMatrix = Matrix::Identity;
 
-		Quaternion m_Oritation;
-
+		Vector3 m_Forward = Vector3::UnitZ;
+		Vector3 m_Up = Vector3::UnitY;
+		Vector3 m_Right = Vector3::UnitX;
 		Vector3 m_Position = Vector3::Zero;
 		Vector3 m_Velocity = Vector3::Zero;
+
 		float m_Near = 0.01f;
 		float m_Far = 1000.0f;
 		float m_Aspect = 1.0f;
 		float m_Fov = 60.0f;
 
-		float m_MovementSpeed = 1.0f;
-		float m_RotationSpeed = 0.5f;
+		float m_MovementSpeed = 120.0f;
+		float m_RotationSpeed = 0.25f;
+
+		float m_Pitch = 0.0f;
+		float m_Yaw = 0.0f;
 	};
 }

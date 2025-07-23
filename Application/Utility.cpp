@@ -1,2 +1,2 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "Utility.h"

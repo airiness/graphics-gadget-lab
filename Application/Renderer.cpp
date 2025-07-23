@@ -316,16 +316,14 @@ namespace graphicsGadgetLab
 		auto app = Application::GetInstance();
 
 		Camera::Info info = {};
-		info.m_Position = Vector3::Zero;
-		info.m_Forward = Vector3::UnitZ;
+		info.m_Position = Vector3(-100.0f, 128.0f, 30.0f);
 		info.m_Width = app->GetWindowWidth();
 		info.m_Height = app->GetWindowHeight();
 		info.m_Near = 0.1f;
-		info.m_Far = 1000.0f;
-		info.m_Fov = 45.0f;
+		info.m_Far = 10000.0f;
+		info.m_Fov = 90.0f;
 
 		m_Camera = std::make_unique<Camera>(info);
-
 	}
 
 	void Renderer::UpdateGpuBuffers() noexcept

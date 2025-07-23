@@ -210,7 +210,6 @@
     <ClInclude Include="Keyboard.h">
       <Filter>Core\Input</Filter>
     </ClInclude>
-    <ClInclude Include="IGameInputDevice.h" />
     <ClInclude Include="InputBase.h">
       <Filter>Core\Input</Filter>
     </ClInclude>

@@ -8,15 +8,17 @@
 namespace graphicsGadgetLab
 {
 	Camera::Camera(const Info& info) noexcept :
+		m_Forward(info.m_Forward),
+		m_Up(info.m_Up),
+		m_Right(info.m_Right),
+		m_Position(info.m_Position),
 		m_Near(info.m_Near),
 		m_Far(info.m_Far),
 		m_Aspect(static_cast<float>(info.m_Width) / info.m_Height),
 		m_Fov(info.m_Fov)
 	{
-		auto yaw = std::atan2(info.m_Forward.x, info.m_Forward.z);
-		auto pitch = std::asin(std::clamp(info.m_Forward.y, -0.98f, 0.98f));
-
-		RotateCamera(yaw, pitch);
+		UpdateViewMatrix();
+		UpdateProjMatrix();
 	}
 
 	void Camera::Update() noexcept
@@ -32,7 +34,11 @@ namespace graphicsGadgetLab
 		{
 			auto mouseCoord = mouse->GetMouseCoord();
 
-			RotateCamera(mouseCoord.x * dt * m_RotationSpeed, mouseCoord.y * dt * m_RotationSpeed);
+			auto yawDelta = static_cast<float>(dt * mouseCoord.x * m_RotationSpeed);
+			auto pitchDelta = static_cast<float>(dt * -mouseCoord.y * m_RotationSpeed);
+
+			m_Yaw += yawDelta;
+			m_Pitch += pitchDelta;
 		}
 
 		Vector3 movement = {};
@@ -66,7 +72,6 @@ namespace graphicsGadgetLab
 			movement.y -= 1.0f;
 		}
 
-		movement = Vector3::Transform(movement, m_Oritation);
 		m_Velocity = Vector3::SmoothStep(m_Velocity, movement, SmoothStepT);
 
 		if (m_Velocity.LengthSquared() > std::numeric_limits<float>::epsilon())
@@ -77,20 +82,20 @@ namespace graphicsGadgetLab
 				speedFactor *= 3.0f;
 			}
 
-			m_Position += m_Velocity * dt * m_MovementSpeed * speedFactor;
+			auto v = m_Velocity * dt * m_MovementSpeed * speedFactor;
+
+			m_Position += v.x * m_Right;
+			m_Position += v.z * m_Forward;
+			m_Position += v.y * Vector3::UnitY;
 		}
 
-		Matrix viewInverse = Matrix::CreateFromQuaternion(m_Oritation) * Matrix::CreateTranslation(m_Position);
-		viewInverse.Invert(m_ViewMatrix);
-		SetProjMatrix(m_Fov, m_Aspect, m_Near, m_Far);
+		UpdateViewMatrix();
 	}
 
 	void Camera::OnResize(uint32_t width, uint32_t height) noexcept
 	{
 		m_Aspect = static_cast<float>(width) / height;
-
-		m_ProjMatrix = DirectX::XMMatrixPerspectiveFovLH(
-			DirectX::XMConvertToRadians(m_Fov), m_Aspect, m_Near, m_Far);
+		UpdateProjMatrix();
 	}
 
 	Matrix Camera::GetViewMatrix() const noexcept
@@ -103,22 +108,25 @@ namespace graphicsGadgetLab
 		return m_ProjMatrix;
 	}
 
-	Vector3 Camera::GetDirection() const noexcept
-	{
-		return Vector3::UnitZ * m_Oritation;
-	}
-
-	void Camera::RotateCamera(float yaw, float pitch)
-	{
-		Quaternion pitchQua = Quaternion::CreateFromYawPitchRoll(0.0f, pitch, 0.0f);
-		Quaternion yawQua = Quaternion::CreateFromYawPitchRoll(yaw, 0.0f, 0.0f);
-
-		m_Oritation = pitchQua * m_Oritation * yawQua;
-	}
-
-	void Camera::SetProjMatrix(float fov, float aspect, float nearZ, float farZ) noexcept
+	void Camera::UpdateProjMatrix() noexcept
 	{
 		m_ProjMatrix = DirectX::XMMatrixPerspectiveFovLH(
-			DirectX::XMConvertToRadians(fov), aspect, nearZ, farZ);
+			DirectX::XMConvertToRadians(m_Fov), m_Aspect, m_Near, m_Far);
+	}
+
+	void Camera::UpdateViewMatrix() noexcept
+	{
+		constexpr float PitchLimit = DirectX::XMConvertToRadians(85.0f);
+		m_Pitch = std::clamp(m_Pitch, -PitchLimit, +PitchLimit);
+
+		m_Forward = Vector3(std::cos(m_Pitch) * std::sin(m_Yaw), std::sin(m_Pitch), std::cos(m_Pitch) * std::cos(m_Yaw));
+		m_Right = Vector3::UnitY.Cross(m_Forward);
+		m_Right.Normalize();
+
+		m_Up = m_Forward.Cross(m_Right);
+		m_Up.Normalize();
+
+		m_ViewMatrix = DirectX::XMMatrixLookAtLH(m_Position, m_Position + m_Forward, m_Up);
+
 	}
 }
