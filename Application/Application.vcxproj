@@ -47,6 +47,7 @@
     <Import Project="..\PropertySheets\AssimpImport.props" />
     <Import Project="..\PropertySheets\EnttImport.props" />
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
+    <Import Project="..\PropertySheets\SpdlogImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -59,6 +60,7 @@
     <Import Project="..\PropertySheets\EnttImport.props" />
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\PropertySheets\DirectXInputImport.props" />
+    <Import Project="..\PropertySheets\SpdlogImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -126,6 +128,10 @@
     <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="Keyboard.cpp" />
+    <ClCompile Include="Logger.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Mouse.cpp" />
     <ClCompile Include="Precompiled.cpp">
@@ -164,6 +170,7 @@
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="Keyboard.h" />
+    <ClInclude Include="Logger.h" />
     <ClInclude Include="Mouse.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />

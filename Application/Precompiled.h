@@ -58,7 +58,6 @@ using namespace Microsoft::WRL;
 // Project definitions
 #include "CoreDef.h"
 
-
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
 

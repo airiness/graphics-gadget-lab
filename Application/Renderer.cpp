@@ -335,13 +335,6 @@ namespace graphicsGadgetLab
 	{
 		GlobalConstantBuffer cbBuffer = {};
 
-		static float angle = 0.0f;
-		//angle += 1.6f;
-		const auto rotationAxis = Vector3(0.f, 1.f, 0.f);
-
-		Matrix modelMatrix = DirectX::XMMatrixRotationAxis(rotationAxis, DirectX::XMConvertToRadians(angle));
-		cbBuffer.m_ModelMatrix = modelMatrix;
-
 		Matrix viewMatrix = m_Camera->GetViewMatrix();
 		Matrix projMatrix = m_Camera->GetProjMatrix();
 

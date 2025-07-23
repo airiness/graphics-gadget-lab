@@ -121,6 +121,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -218,6 +221,9 @@
     </ClInclude>
     <ClInclude Include="Camera.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
