@@ -82,7 +82,7 @@ namespace graphicsGadgetLab
 				speedFactor *= 3.0f;
 			}
 
-			auto v = m_Velocity * dt * m_MovementSpeed * speedFactor;
+			auto v = m_Velocity * static_cast<float>(dt) * m_MovementSpeed * speedFactor;
 
 			m_Position += v.x * m_Right;
 			m_Position += v.z * m_Forward;

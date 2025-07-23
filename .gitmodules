@@ -13,3 +13,6 @@
 [submodule "Externals/Vender/entt"]
 	path = Externals/Vender/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "Externals/Vender/spdlog"]
+	path = Externals/Vender/spdlog
+	url = https://github.com/gabime/spdlog.git
