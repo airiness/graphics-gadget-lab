@@ -321,7 +321,7 @@ namespace graphicsGadgetLab
 		info.m_Height = app->GetWindowHeight();
 		info.m_Near = 0.1f;
 		info.m_Far = 10000.0f;
-		info.m_Fov = 90.0f;
+		info.m_Fov = 60.0f;
 
 		m_Camera = std::make_unique<Camera>(info);
 	}
