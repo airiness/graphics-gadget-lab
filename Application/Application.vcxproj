@@ -124,13 +124,13 @@
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
+    <ClCompile Include="GraphicsTypes.cpp" />
     <ClCompile Include="InputBase.cpp" />
     <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="Keyboard.cpp" />
     <ClCompile Include="Logger.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Mouse.cpp" />
@@ -149,7 +149,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Components.h" />
-    <ClInclude Include="CoreDef.h" />
+    <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12CommandAllocator.h" />
     <ClInclude Include="DX12CommandList.h" />
@@ -164,9 +164,10 @@
     <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
+    <ClInclude Include="GraphicsTypes.h" />
     <ClInclude Include="InputBase.h" />
     <ClInclude Include="Geometry.h" />
-    <ClInclude Include="GraphicsDef.h" />
+    <ClInclude Include="GraphicsConstants.h" />
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="Keyboard.h" />

@@ -124,6 +124,9 @@
     <ClCompile Include="Logger.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="GraphicsTypes.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -177,7 +180,7 @@
     <ClInclude Include="DX12Fence.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="CoreDef.h">
+    <ClInclude Include="CoreMacros.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Geometry.h">
@@ -198,7 +201,7 @@
     <ClInclude Include="AssetManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="GraphicsDef.h">
+    <ClInclude Include="GraphicsConstants.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h">
@@ -224,6 +227,9 @@
     </ClInclude>
     <ClInclude Include="Logger.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphicsTypes.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

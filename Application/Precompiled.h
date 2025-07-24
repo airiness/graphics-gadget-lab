@@ -56,7 +56,7 @@ using namespace Microsoft::WRL;
 #include <limits>
 
 // Project definitions
-#include "CoreDef.h"
+#include "CoreMacros.h"
 
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
@@ -65,6 +65,6 @@ using namespace DirectX::SimpleMath;
 #pragma comment(lib, "gameinput.lib")
 
 // Graphics definitions
-#include "GraphicsDef.h"
+#include "GraphicsConstants.h"
 
 #include <entt/entt.hpp>

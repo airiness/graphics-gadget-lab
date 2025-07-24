@@ -20,13 +20,6 @@ namespace graphicsGadgetLab
 	inline constexpr MaterialID PocedualCubeMaterialID = (MaterialID)(0);
 	inline constexpr MaterialID ReservedMaterialID = (MaterialID)(PocedualCubeMaterialID + 1);
 
-	enum class ModelType : uint8_t
-	{
-		ModelType_Invalid,
-		ModelType_glTF,
-		ModelType_Procedual,
-	};
-
 	namespace ggLabColor
 	{
 		inline constexpr Color White = Color(1.f, 1.f, 1.f, 1.f);

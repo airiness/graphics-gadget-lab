@@ -2,6 +2,7 @@
 #include "DX12Buffer.h"
 #include "DX12Texture.h"
 #include "DX12Descriptor.h"
+#include "GraphicsTypes.h"
 
 namespace graphicsGadgetLab
 {
