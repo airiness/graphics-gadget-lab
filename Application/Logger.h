@@ -12,12 +12,14 @@ namespace graphicsGadgetLab
 		enum class LoggerType : uint32_t
 		{
 			Application,
-			Renderer,
+			Graphics,
 
 			Count
 		};
 	public:
 		static void Initialize() noexcept;
+
+		static std::shared_ptr<spdlog::logger>& GetLogger(LoggerType type) noexcept;
 
 	private:
 		static std::array<std::shared_ptr<spdlog::logger>, static_cast<uint32_t>(LoggerType::Count)> s_Loggers;

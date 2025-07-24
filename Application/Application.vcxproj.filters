@@ -26,6 +26,9 @@
     <Filter Include="Core\Input">
       <UniqueIdentifier>{b2b02cd2-6196-43e9-8f44-f9314263c7b5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Log">
+      <UniqueIdentifier>{8c7f7a3c-a663-4ba5-8084-885d84c9751a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -121,11 +124,11 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Logger.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="GraphicsTypes.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>Core\Log</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -225,11 +228,14 @@
     <ClInclude Include="Camera.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Logger.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="GraphicsTypes.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="LogMacros.h">
+      <Filter>Core\Log</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

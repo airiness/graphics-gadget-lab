@@ -91,7 +91,7 @@ namespace graphicsGadgetLab
 	{
 		UINT createFactoryFlags = 0;
 
-#ifdef BUILD_DEBUG
+#if defined (BUILD_DEBUG)
 		createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
 
 		ComPtr<IDXGIInfoQueue> dxgiInfoQueue;

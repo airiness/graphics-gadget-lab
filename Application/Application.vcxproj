@@ -172,6 +172,7 @@
     <ClInclude Include="InputManager.h" />
     <ClInclude Include="Keyboard.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="LogMacros.h" />
     <ClInclude Include="Mouse.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />

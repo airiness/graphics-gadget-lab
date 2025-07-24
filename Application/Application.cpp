@@ -128,24 +128,28 @@ namespace graphicsGadgetLab
 			return;
 		}
 
+		// Logger
+		Logger::Initialize();
+
+		// Windows
 		InitializeWindow();
 
+		// Time
 		m_Time = std::make_unique<Time>();
 		m_Time->Initialize();
 
-		// Initilize InputManager
+		// InputManager
 		m_InputManager = std::make_unique<InputManager>();
 		m_InputManager->Initialize(m_Hwnd);
 
 		m_Renderer = std::make_unique<Renderer>();
+
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
 
 		m_Renderer->Initialize();
 		m_AssetManager->Initialize();
 
-
 		InitializeAssets();
-
 
 		m_IsInitialized = true;
 	}

@@ -57,6 +57,7 @@ using namespace Microsoft::WRL;
 
 // Project definitions
 #include "CoreMacros.h"
+#include "LogMacros.h"
 
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
