@@ -183,6 +183,7 @@
   <ItemGroup>
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="..\Shaders\BRDF.hlsli" />
+    <None Include="..\Shaders\Common.hlsli" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
