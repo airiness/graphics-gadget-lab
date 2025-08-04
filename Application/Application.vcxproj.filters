@@ -130,6 +130,9 @@
     <ClCompile Include="Logger.cpp">
       <Filter>Core\Log</Filter>
     </ClCompile>
+    <ClCompile Include="GPUStuctures.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -236,6 +239,9 @@
     </ClInclude>
     <ClInclude Include="LogMacros.h">
       <Filter>Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUStuctures.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

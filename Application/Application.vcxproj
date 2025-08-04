@@ -124,6 +124,7 @@
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
+    <ClCompile Include="GPUStuctures.cpp" />
     <ClCompile Include="GraphicsTypes.cpp" />
     <ClCompile Include="InputBase.cpp" />
     <ClCompile Include="Geometry.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
+    <ClInclude Include="GPUStuctures.h" />
     <ClInclude Include="GraphicsTypes.h" />
     <ClInclude Include="InputBase.h" />
     <ClInclude Include="Geometry.h" />

@@ -82,6 +82,11 @@ namespace graphicsGadgetLab
 			std::vector<MeshID> m_Meshes;
 		};
 		DEFINE_COMPONENT_TYPE(Model);
+
+		struct Light
+		{
+			LightType m_LightType = LightType::LightType_Directional;
+		};
 	}
 	using namespace components;
 }
