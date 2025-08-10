@@ -1,6 +1,7 @@
 #pragma once
 namespace graphicsGadgetLab 
 {
+	// TODO: Refactor this file
 	namespace utility 
 	{
 		// Throw a runtime_error exception with the given message
