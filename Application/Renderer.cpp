@@ -12,6 +12,7 @@
 #include "DX12Fence.h"
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
+#include "DX12ConstantBuffer.h"
 #include "Components.h"
 #include "AssetManager.h"
 #include "Camera.h"

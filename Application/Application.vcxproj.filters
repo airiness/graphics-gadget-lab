@@ -29,6 +29,12 @@
     <Filter Include="Core\Log">
       <UniqueIdentifier>{8c7f7a3c-a663-4ba5-8084-885d84c9751a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\RenderPass">
+      <UniqueIdentifier>{f396d8f7-debe-4fd8-bd28-d936e057431f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderGraph">
+      <UniqueIdentifier>{e1396d2d-a721-499a-bfb4-18812535ff1d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -132,6 +138,33 @@
     </ClCompile>
     <ClCompile Include="GPUStuctures.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderGraph.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="RGPass.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="RGArenaAllocator.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="RGResourceHandle.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="StringId.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPassTexColor.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="GpuResourceRegistry.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="RGResource.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12ConstantBuffer.cpp">
+      <Filter>Graphics\DX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -242,6 +275,42 @@
     </ClInclude>
     <ClInclude Include="GPUStuctures.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassSkybox.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassBase.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderGraph.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RGResourceHandle.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RGPass.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RGResource.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RGArenaAllocator.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassTexColor.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="StringId.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuResourceRegistry.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12ConstantBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="EnumFlags.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

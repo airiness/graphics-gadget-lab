@@ -54,6 +54,10 @@ using namespace Microsoft::WRL;
 #include <filesystem>
 #include <unordered_map>
 #include <limits>
+#include <functional>
+#include <utility>
+#include <string_view>
+#include <shared_mutex>
 
 // Project definitions
 #include "CoreMacros.h"

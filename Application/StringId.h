@@ -24,12 +24,12 @@ namespace graphicsGadgetLab
 
 	constexpr uint64_t Crc64(std::string_view stringView)
 	{
-		uint64_t crc = 0xFFFFFFFFFFFFFFFFull;
+		uint64_t crc = std::numeric_limits<uint64_t>::max(); 
 		for (unsigned char c : stringView)
 		{
 			crc = CRC64_TABLE[(crc ^ c) & 0xFF] ^ (crc >> 8);
 		}
-		return crc ^ 0xFFFFFFFFFFFFFFFFull;
+		return crc ^ std::numeric_limits<uint64_t>::max();
 	}
 
 #if defined(BUILD_DEBUG)
@@ -43,7 +43,7 @@ namespace graphicsGadgetLab
 
 			if (auto iter = m_Dictionary.find(hash); iter != m_Dictionary.end())
 			{
-				GGLAB_LOG_ERROR("Hash collision: {}<->{}.", iter->second.c_str(), stringView.data());
+				GGLAB_LOG_INFO("Hash collision: {}<->{}.", iter->second.c_str(), stringView.data());
 			}
 			m_Dictionary.emplace(hash, std::string(stringView));
 		}

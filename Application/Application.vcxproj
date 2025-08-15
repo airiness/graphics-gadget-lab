@@ -114,6 +114,7 @@
     <ClCompile Include="DX12CommandAllocator.cpp" />
     <ClCompile Include="DX12CommandList.cpp" />
     <ClCompile Include="DX12CommandQueue.cpp" />
+    <ClCompile Include="DX12ConstantBuffer.cpp" />
     <ClCompile Include="DX12Descriptor.cpp" />
     <ClCompile Include="DX12Device.cpp" />
     <ClCompile Include="DX12Fence.cpp" />
@@ -124,6 +125,7 @@
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
+    <ClCompile Include="GpuResourceRegistry.cpp" />
     <ClCompile Include="GPUStuctures.cpp" />
     <ClCompile Include="GraphicsTypes.cpp" />
     <ClCompile Include="InputBase.cpp" />
@@ -141,6 +143,13 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RendererConstant.cpp" />
+    <ClCompile Include="RenderGraph.cpp" />
+    <ClCompile Include="RenderPassTexColor.cpp" />
+    <ClCompile Include="RGArenaAllocator.cpp" />
+    <ClCompile Include="RGPass.cpp" />
+    <ClCompile Include="RGResource.cpp" />
+    <ClCompile Include="RGResourceHandle.cpp" />
+    <ClCompile Include="StringId.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
   </ItemGroup>
@@ -155,6 +164,7 @@
     <ClInclude Include="DX12CommandAllocator.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />
+    <ClInclude Include="DX12ConstantBuffer.h" />
     <ClInclude Include="DX12Descriptor.h" />
     <ClInclude Include="DX12Device.h" />
     <ClInclude Include="DX12Fence.h" />
@@ -165,6 +175,8 @@
     <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
+    <ClInclude Include="EnumFlags.h" />
+    <ClInclude Include="GpuResourceRegistry.h" />
     <ClInclude Include="GPUStuctures.h" />
     <ClInclude Include="GraphicsTypes.h" />
     <ClInclude Include="InputBase.h" />
@@ -172,6 +184,7 @@
     <ClInclude Include="GraphicsConstants.h" />
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="InputManager.h" />
+    <ClInclude Include="RenderPassBase.h" />
     <ClInclude Include="Keyboard.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="LogMacros.h" />
@@ -179,6 +192,14 @@
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RendererConstant.h" />
+    <ClInclude Include="RenderGraph.h" />
+    <ClInclude Include="RenderPassSkybox.h" />
+    <ClInclude Include="RenderPassTexColor.h" />
+    <ClInclude Include="RGArenaAllocator.h" />
+    <ClInclude Include="RGPass.h" />
+    <ClInclude Include="RGResource.h" />
+    <ClInclude Include="RGResourceHandle.h" />
+    <ClInclude Include="StringId.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="Utility.h" />
   </ItemGroup>
