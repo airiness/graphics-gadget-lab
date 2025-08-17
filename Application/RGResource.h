@@ -4,6 +4,15 @@
 
 namespace graphicsGadgetLab
 {
+	enum RGResourceType : uint8_t
+	{
+		Texture,
+		Buffer,
+	};
+
+	template<typename RESOURCE>
+	struct RGResourceTraits;
+
 	// TODO: Wrap DXGI_FORMAT& Resource States
 	using RGResourceFormat = DXGI_FORMAT;
 	//using RGResourceUsage = D3D12_RESOURCE_STATES;
@@ -154,4 +163,30 @@ namespace graphicsGadgetLab
 		static constexpr RGBufferUsage DefaultNoneUsage = RGBufferUsage::None;
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
+
+	template<>
+	struct RGResourceTraits<RGTextureResource>
+	{
+		using Usage = RGTextureUsage;
+		using Bits = std::underlying_type_t<Usage>;
+		static constexpr RGResourceType ResourceType = RGResourceType::Texture;
+		static D3D12_RESOURCE_STATES ToState(Bits bits, bool depthReadOnly = false) noexcept
+		{
+			return ToD3D12ResourceStates<Usage>(static_cast<Usage>(bits), depthReadOnly);
+		}
+		static_assert(std::is_unsigned_v<Bits>, "Usage underlying type should be unsigned");
+	};
+
+	template<>
+	struct RGResourceTraits<RGBufferResource>
+	{
+		using Usage = RGBufferUsage;
+		using Bits = std::underlying_type_t<Usage>;
+		static constexpr RGResourceType ResourceType = RGResourceType::Buffer;
+		static D3D12_RESOURCE_STATES ToState(Bits bits, bool depthReadOnly = false) noexcept
+		{
+			return ToD3D12ResourceStates<Usage>(static_cast<Usage>(bits), depthReadOnly);
+		}
+		static_assert(std::is_unsigned_v<Bits>, "Usage underlying type should be unsigned");
+	};
 }

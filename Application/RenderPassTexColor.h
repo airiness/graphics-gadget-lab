@@ -10,7 +10,7 @@ namespace graphicsGadgetLab
 		virtual void AddPass(RenderGraph& rg) noexcept override;
 
 	private:
-
+		void CreatePSO() noexcept;
 
 	private:
 
