@@ -9,7 +9,6 @@
 namespace graphicsGadgetLab
 {
 	RenderGraph::RenderGraph(DX12Device* dx12Device) noexcept :
-		m_DX12Device(dx12Device),
 		m_GpuResourceRegistry(dx12Device),
 		m_ArenaAllocator(1u << 20)
 	{
@@ -119,11 +118,9 @@ namespace graphicsGadgetLab
 		}
 	}
 
-	void RenderGraph::Execute() noexcept
+	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
-		auto* swapChain = m_DX12Device->GetSwapChain();
-		const auto currentBufferIndex = swapChain->GetCurrentBackBufferIndex();
-		auto* graphicsCommandList = m_DX12Device->GetGraphicsCommandList(currentBufferIndex);
+		auto* graphicsCommandList = executeContext.m_GraphicsCommandList;
 
 		for (auto& passNode : m_PassNodes)
 		{

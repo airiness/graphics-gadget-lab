@@ -13,6 +13,7 @@
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
 #include "DX12ConstantBuffer.h"
+#include "RenderGraph.h"
 #include "Components.h"
 #include "AssetManager.h"
 #include "Camera.h"
@@ -79,6 +80,14 @@ namespace graphicsGadgetLab
 
 		auto commandAllocator = commandAllocatorPool->RequestCommandAllocator();
 		commandList->Begin(commandAllocator);
+
+		// Render Graph
+		{
+			RenderGraph rg(m_Device.get());
+
+
+		}
+
 
 		commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
 		commandList->SetPipelineState(*m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)].get());

@@ -6,8 +6,8 @@ namespace graphicsGadgetLab
 {
 	enum RGResourceType : uint8_t
 	{
-		Texture,
-		Buffer,
+		RGTexture,
+		RGBuffer,
 	};
 
 	template<typename RESOURCE>
@@ -169,7 +169,7 @@ namespace graphicsGadgetLab
 	{
 		using Usage = RGTextureUsage;
 		using Bits = std::underlying_type_t<Usage>;
-		static constexpr RGResourceType ResourceType = RGResourceType::Texture;
+		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 		static D3D12_RESOURCE_STATES ToState(Bits bits, bool depthReadOnly = false) noexcept
 		{
 			return ToD3D12ResourceStates<Usage>(static_cast<Usage>(bits), depthReadOnly);
@@ -182,7 +182,7 @@ namespace graphicsGadgetLab
 	{
 		using Usage = RGBufferUsage;
 		using Bits = std::underlying_type_t<Usage>;
-		static constexpr RGResourceType ResourceType = RGResourceType::Buffer;
+		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;
 		static D3D12_RESOURCE_STATES ToState(Bits bits, bool depthReadOnly = false) noexcept
 		{
 			return ToD3D12ResourceStates<Usage>(static_cast<Usage>(bits), depthReadOnly);

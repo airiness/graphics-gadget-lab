@@ -8,12 +8,19 @@
 namespace graphicsGadgetLab
 {
 	class DX12Device;
+	class DX12COmmandList;
 	class RGPassBase;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
 
 	struct RGPassNode;
 	struct RGResourceNode;
+
+	struct RGExecuteContext
+	{
+		DX12CommandList* m_GraphicsCommandList = nullptr;
+		DX12COmmandList* m_ComputeCommandList = nullptr;
+	};
 
 	struct RGVirtualResourceBase
 	{
@@ -31,7 +38,7 @@ namespace graphicsGadgetLab
 
 		D3D12_RESOURCE_STATES m_CurrentStates = D3D12_RESOURCE_STATE_COMMON;
 
-		RGResourceType m_ResourceType = RGResourceType::Texture;
+		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 
 		using Index = int32_t;
 		static constexpr Index InvalidIndex = static_cast<Index>(-1);
@@ -110,7 +117,7 @@ namespace graphicsGadgetLab
 
 			RGResourceNode::Index m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
 			uint64_t m_UsageBits = 0;
-			RGResourceType m_ResourceType = RGResourceType::Texture;
+			RGResourceType m_ResourceType = RGResourceType::RGTexture;
 			Type m_AccessType = Type::Read;
 		};
 		std::vector<Access> m_Accesses;
@@ -197,7 +204,7 @@ namespace graphicsGadgetLab
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
 
 		void Compile() noexcept;
-		void Execute() noexcept;
+		void Execute(RGExecuteContext& executeContext) noexcept;
 
 	private:
 		template<typename RESOURCE>
@@ -220,7 +227,6 @@ namespace graphicsGadgetLab
 		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept;
 
 	private:
-		DX12Device* m_DX12Device = nullptr;
 		GpuResourceRegistry m_GpuResourceRegistry;
 		RGArenaAllocator m_ArenaAllocator;
 
