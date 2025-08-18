@@ -38,12 +38,12 @@ namespace graphicsGadgetLab
 
 	void Renderer::Initialize() noexcept
 	{
-		InitializeRootSignatures();
-		InitializePipelineStates();
 		InitializeRenderTargets();
 		InitializeConstantBuffer();
 		InitializeCamera();
 		InitializeRenderObjects();
+
+		CreateCommonRootSignature();
 
 		m_IsInitialized = true;
 	}
@@ -89,32 +89,32 @@ namespace graphicsGadgetLab
 		}
 
 
-		commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
-		commandList->SetPipelineState(*m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)].get());
-		commandList->SetDescriptorHeap(*cbvDescriptorHeap);
+		//commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
+		//commandList->SetPipelineState(*m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)].get());
+		//commandList->SetDescriptorHeap(*cbvDescriptorHeap);
 
-		commandList->SetViewport(0, 0, bufferWidth, bufferHeight);
-		commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
+		//commandList->SetViewport(0, 0, bufferWidth, bufferHeight);
+		//commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
 
-		commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		//commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		swapChain->PrepareBackBuffer(commandList);
-		commandList->FlushBarriers();
+		//swapChain->PrepareBackBuffer(commandList);
+		//commandList->FlushBarriers();
 
-		DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex()) };
-		auto& dsDescriptor = m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)];
-		commandList->SetRenderTargets(rtDescriptors, &dsDescriptor);
+		//DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex()) };
+		//auto& dsDescriptor = m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)];
+		//commandList->SetRenderTargets(rtDescriptors, &dsDescriptor);
 
-		swapChain->ClearBackBuffer(commandList);
-		commandList->ClearDepthStencil(dsDescriptor, 1.0f);
+		//swapChain->ClearBackBuffer(commandList);
+		//commandList->ClearDepthStencil(dsDescriptor, 1.0f);
 
-		commandList->SetGraphicsConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex), m_GlobalConstantBuffer->GetBuffer()->Get()->GetGPUVirtualAddress());
+		//commandList->SetGraphicsConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex), m_GlobalConstantBuffer->GetBuffer()->Get()->GetGPUVirtualAddress());
 
-		// Render Object
-		RenderObjects(commandList);
+		//// Render Object
+		//RenderObjects(commandList);
 
-		swapChain->FinishBackBuffer(commandList);
-		commandList->FlushBarriers();
+		//swapChain->FinishBackBuffer(commandList);
+		//commandList->FlushBarriers();
 
 		commandList->End();
 
@@ -140,82 +140,29 @@ namespace graphicsGadgetLab
 		m_Device->FlushGPU();
 	}
 
-	void Renderer::InitializeRootSignatures() noexcept
+	void Renderer::CreateCommonRootSignature() noexcept
 	{
-		// Common RootSignature
-		{
-			CD3DX12_DESCRIPTOR_RANGE1 range = {};
-			range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		CD3DX12_DESCRIPTOR_RANGE1 range = {};
+		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
-			CD3DX12_ROOT_PARAMETER1 rootParameters[(uint32_t)CommonRSRootParamIndex::RootParamCount] = {};
-			rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex)].InitAsConstantBufferView(0);
-			rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+		CD3DX12_ROOT_PARAMETER1 rootParameters[(uint32_t)CommonRSRootParamIndex::RootParamCount] = {};
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex)].InitAsConstantBufferView(0);
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
 
-			CD3DX12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
-			staticSamplers[0].Init(0,
-				D3D12_FILTER_MIN_MAG_MIP_LINEAR,
-				D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-				D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-				D3D12_TEXTURE_ADDRESS_MODE_WRAP);
+		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
+		staticSamplers[0].Init(0,
+			D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+			D3D12_TEXTURE_ADDRESS_MODE_WRAP);
 
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-			rootSignatureDesc.Init_1_1(
-				static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters,
-				1, staticSamplers,
-				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
+		rootSignatureDesc.Init_1_1(
+			static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters,
+			1, staticSamplers,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
-			m_RootSignatures[static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)] = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
-		}
-	}
-
-	void Renderer::InitializePipelineStates() noexcept
-	{
-		// Normal Texture Model PSO
-		{
-			ComPtr<ID3DBlob> vertexShaderBlob;
-			utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelVS.cso", &vertexShaderBlob));
-
-			ComPtr<ID3DBlob> pixelShaderBlob;
-			utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelPS.cso", &pixelShaderBlob));
-
-			// Input Layout
-			D3D12_INPUT_ELEMENT_DESC inputLayout[] =
-			{
-				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			};
-			D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
-			inputLayoutDesc.pInputElementDescs = inputLayout;
-			inputLayoutDesc.NumElements = ARRAYSIZE(inputLayout);
-
-			CD3DX12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-			rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
-			//rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;	// Wireframe mode for debugging
-			rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
-
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-			psoDesc.InputLayout = inputLayoutDesc;
-			psoDesc.pRootSignature = m_RootSignatures[static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)]->Get();
-			psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
-			psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
-			psoDesc.RasterizerState = rasterizerDesc;
-			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC2(D3D12_DEFAULT);
-			psoDesc.SampleMask = UINT_MAX;
-			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			psoDesc.NumRenderTargets = 1;
-			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-			psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-			psoDesc.SampleDesc.Count = 1;
-			psoDesc.SampleDesc.Quality = 0;
-
-			DX12GraphicsPipelineStateDesc graphicsPSODesc = {};
-			graphicsPSODesc.m_Desc = psoDesc;
-
-			m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)] = std::make_unique<DX12GraphicsPipelineState>(m_Device.get(), graphicsPSODesc);
-
-		}
+		m_CommonRootSignature = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
 	}
 
 	void Renderer::InitializeRenderTargets() noexcept

@@ -29,9 +29,11 @@ namespace graphicsGadgetLab
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
 
+		DX12RootSignature* GetCommonRootSignature() const noexcept { return m_CommonRootSignature.get(); }
+
 	private:
-		void InitializeRootSignatures() noexcept;
-		void InitializePipelineStates() noexcept;
+		//void InitializeRootSignatures() noexcept;
+		//void InitializePipelineStates() noexcept;
 		void InitializeRenderTargets() noexcept;
 		void InitializeConstantBuffer() noexcept;
 		void InitializeRenderObjects() noexcept;
@@ -41,6 +43,8 @@ namespace graphicsGadgetLab
 		void UpdateGlobalConstantBuffer() noexcept;
 
 		void RenderObjects(DX12CommandList* commandList) noexcept;
+
+		void CreateCommonRootSignature() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
@@ -55,8 +59,10 @@ namespace graphicsGadgetLab
 		std::unique_ptr<DX12ConstantBuffer<GlobalConstantBuffer>> m_GlobalConstantBuffer;
 		DX12Descriptor m_ConstantBufferDescriptor = {};
 
-		RootSignatureArray m_RootSignatures;
-		PSOArray m_PipelineStates;
+		std::unique_ptr<DX12RootSignature> m_CommonRootSignature;
+
+		//RootSignatureArray m_RootSignatures;
+		//PSOArray m_PipelineStates;
 
 		// TODO: management assets load in property place(maybe SceneLoader?)
 		entt::entity m_TestCube = {};

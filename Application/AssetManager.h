@@ -1,6 +1,7 @@
 #pragma once
 #include "Components.h"
 #include "RendererConstant.h"
+#include "VertexData.h"
 #include <DirectXTex.h>
 
 namespace graphicsGadgetLab

@@ -3,17 +3,22 @@
 
 namespace graphicsGadgetLab
 {
+	class DX12Device;
+	class DX12PipelineState;
 	class RenderGraph;
 	class RenderPassTexColor : public RenderPassBase
 	{
 	public:
+		explicit RenderPassTexColor(DX12Device* dx12Device) noexcept;
+		virtual ~RenderPassTexColor() = default;
 		virtual void AddPass(RenderGraph& rg) noexcept override;
 
 	private:
-		void CreatePSO() noexcept;
+		void InitializePSO() noexcept;
 
 	private:
+		DX12Device* m_DX12Device = nullptr;
 
-
+		std::unique_ptr<DX12PipelineState> m_PSO;
 	};
 }

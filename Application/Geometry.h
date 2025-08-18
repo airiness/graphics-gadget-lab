@@ -1,5 +1,6 @@
 #pragma once
 #include "RendererConstant.h"
+#include "VertexData.h"
 
 namespace graphicsGadgetLab
 {

@@ -166,6 +166,9 @@
     <ClCompile Include="DX12ConstantBuffer.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="VertexData.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -311,6 +314,9 @@
     </ClInclude>
     <ClInclude Include="EnumFlags.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="VertexData.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

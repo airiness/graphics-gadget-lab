@@ -1,7 +1,8 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12RootSignature.h"
 #include "DX12Device.h"
 #include "Utility.h"
+#include "RenderPassTexColor.h"
 
 namespace graphicsGadgetLab
 {

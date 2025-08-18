@@ -13,27 +13,6 @@ namespace graphicsGadgetLab
 		RootParamCount
 	};
 
-	enum class RootSignatureIndex : uint32_t
-	{
-		CommonRootSignature = 0,
-		RootSignatureCount
-	};
-	using RootSignatureArray = std::array<std::unique_ptr<DX12RootSignature>, static_cast<size_t>(RootSignatureIndex::RootSignatureCount)>;
-
-	enum class PSOIndex : uint32_t
-	{
-		TexturedModelPSO = 0,
-		PSOCount
-	};
-	using PSOArray = std::array<std::unique_ptr<DX12PipelineState>, static_cast<size_t>(PSOIndex::PSOCount)>;
-
-	struct Vertex
-	{
-		Vector3 m_Position = Vector3::Zero;
-		Vector3 m_Normal = Vector3::UnitX;
-		Vector2 m_TexCoord = Vector2::Zero;
-	};
-
 	enum class RenderTargetIndex : uint32_t
 	{
 		RT0,
@@ -51,6 +30,4 @@ namespace graphicsGadgetLab
 		Matrix m_ViewMatrix;
 		Matrix m_ProjectionMatrix;
 	};
-
-	// Simple Cube Model
 }

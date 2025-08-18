@@ -152,6 +152,7 @@
     <ClCompile Include="StringId.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
+    <ClCompile Include="VertexData.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -202,6 +203,7 @@
     <ClInclude Include="StringId.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="Utility.h" />
+    <ClInclude Include="VertexData.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
