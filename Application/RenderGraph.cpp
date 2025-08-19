@@ -23,14 +23,6 @@ namespace graphicsGadgetLab
 		std::vector<RGPassNode*> stack;
 		std::unordered_set<RGPassNode*> reachable;
 
-		for (auto& passNode : m_PassNodes)
-		{
-			if (passNode.m_SideEffect)
-			{
-				stack.push_back(&passNode);
-			}
-		}
-
 		auto addPass = [&stack, &reachable](RGPassNode* passNode) 
 			{
 				if (!passNode)
@@ -42,6 +34,14 @@ namespace graphicsGadgetLab
 					stack.push_back(passNode);
 				}
 			};
+
+		for (auto& passNode : m_PassNodes)
+		{
+			if (passNode.m_SideEffect)
+			{
+				addPass(&passNode);
+			}
+		}
 
 		while (!stack.empty())
 		{

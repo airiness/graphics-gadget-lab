@@ -12,6 +12,7 @@ namespace graphicsGadgetLab
 	class DX12Fence;
 	class Camera;
 	class Cube;
+	class RenderPassTexColor;
 
 	class Renderer
 	{
@@ -31,9 +32,10 @@ namespace graphicsGadgetLab
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept { return m_CommonRootSignature.get(); }
 
+		const DX12Descriptor& GetRenderTarget(RenderTargetIndex rtIndex) const noexcept;
+			
+		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); };
 	private:
-		//void InitializeRootSignatures() noexcept;
-		//void InitializePipelineStates() noexcept;
 		void InitializeRenderTargets() noexcept;
 		void InitializeConstantBuffer() noexcept;
 		void InitializeRenderObjects() noexcept;
@@ -61,13 +63,12 @@ namespace graphicsGadgetLab
 
 		std::unique_ptr<DX12RootSignature> m_CommonRootSignature;
 
-		//RootSignatureArray m_RootSignatures;
-		//PSOArray m_PipelineStates;
-
 		// TODO: management assets load in property place(maybe SceneLoader?)
 		entt::entity m_TestCube = {};
 		entt::entity m_TestModel = {};
 
 		std::atomic_bool m_IsInitialized = false;
+
+		std::unique_ptr<RenderPassTexColor> m_TexColorPass;
 	};
 }

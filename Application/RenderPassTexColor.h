@@ -4,6 +4,7 @@
 namespace graphicsGadgetLab
 {
 	class DX12Device;
+	class DX12CommandList;
 	class DX12PipelineState;
 	class RenderGraph;
 	class RenderPassTexColor : public RenderPassBase
@@ -16,6 +17,7 @@ namespace graphicsGadgetLab
 	private:
 		void InitializePSO() noexcept;
 
+		void DrawModels(DX12CommandList* commandList) noexcept;
 	private:
 		DX12Device* m_DX12Device = nullptr;
 

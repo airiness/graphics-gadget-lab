@@ -18,6 +18,7 @@
 #include "AssetManager.h"
 #include "Camera.h"
 #include "Geometry.h"
+#include "RenderPassTexColor.h"
 #include "Utility.h"
 
 namespace graphicsGadgetLab
@@ -44,6 +45,8 @@ namespace graphicsGadgetLab
 		InitializeRenderObjects();
 
 		CreateCommonRootSignature();
+
+		m_TexColorPass = std::make_unique<RenderPassTexColor>(m_Device.get());
 
 		m_IsInitialized = true;
 	}
@@ -85,36 +88,15 @@ namespace graphicsGadgetLab
 		{
 			RenderGraph rg(m_Device.get());
 
+			m_TexColorPass->AddPass(rg);
+
+			rg.Compile();
+
+			RGExecuteContext executeContext = {};
+			executeContext.m_GraphicsCommandList = commandList;
+			rg.Execute(executeContext);
 
 		}
-
-
-		//commandList->SetGraphicsRootSignature(*m_RootSignatures.at(static_cast<uint32_t>(RootSignatureIndex::CommonRootSignature)));
-		//commandList->SetPipelineState(*m_PipelineStates[static_cast<uint32_t>(PSOIndex::TexturedModelPSO)].get());
-		//commandList->SetDescriptorHeap(*cbvDescriptorHeap);
-
-		//commandList->SetViewport(0, 0, bufferWidth, bufferHeight);
-		//commandList->SetScissorRect(0, 0, bufferWidth, bufferHeight);
-
-		//commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		//swapChain->PrepareBackBuffer(commandList);
-		//commandList->FlushBarriers();
-
-		//DX12Descriptor rtDescriptors[] = { swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex()) };
-		//auto& dsDescriptor = m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)];
-		//commandList->SetRenderTargets(rtDescriptors, &dsDescriptor);
-
-		//swapChain->ClearBackBuffer(commandList);
-		//commandList->ClearDepthStencil(dsDescriptor, 1.0f);
-
-		//commandList->SetGraphicsConstantBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex), m_GlobalConstantBuffer->GetBuffer()->Get()->GetGPUVirtualAddress());
-
-		//// Render Object
-		//RenderObjects(commandList);
-
-		//swapChain->FinishBackBuffer(commandList);
-		//commandList->FlushBarriers();
 
 		commandList->End();
 
@@ -163,6 +145,11 @@ namespace graphicsGadgetLab
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
 		m_CommonRootSignature = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
+	}
+
+	const DX12Descriptor& Renderer::GetRenderTarget(RenderTargetIndex rtIndex) const noexcept
+	{
+		return m_RenderTargetDescriptors[static_cast<uint32_t>(rtIndex)];
 	}
 
 	void Renderer::InitializeRenderTargets() noexcept
