@@ -5,17 +5,18 @@
 
 namespace graphicsGadgetLab
 {
-	DX12Resource::DX12Resource(DX12Device* device,
-		D3D12_HEAP_TYPE heapType,
-		const CD3DX12_RESOURCE_DESC& resourceDesc,
-		D3D12_RESOURCE_STATES initState,
-		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept :
-		m_DX12Deivce(device),
-		m_ResourceDesc(resourceDesc),
-		m_ResourceState(initState),
-		m_ClearValue(clearValue)
+	DX12Resource::DX12Resource(const CreateInfo& createInfo) noexcept :
+		m_ResourceDesc(createInfo.m_ResourceDesc),
+		m_ResourceState(createInfo.m_InitStates),
+		m_ClearValue(createInfo.m_ClearValue)
 	{
-		CreateAllocation(heapType);
+		utility::ThrowIfFailed(createInfo.m_Allocator->CreateResource(
+			&createInfo.m_AllocDesc,
+			&createInfo.m_ResourceDesc,
+			createInfo.m_InitStates,
+			createInfo.m_ClearValue.has_value() ? &createInfo.m_ClearValue.value() : nullptr,
+			&m_Allocation,
+			IID_PPV_ARGS(&m_Resource)));
 	}
 
 	ID3D12Resource* DX12Resource::Get() const
@@ -26,24 +27,16 @@ namespace graphicsGadgetLab
 	void DX12Resource::SetDebugName(const wchar_t* name) noexcept
 	{
 #if defined (BUILD_DEBUG)
-		utility::SetDebugName(m_Resource.Get(), name);
+		if (m_Resource)
+		{
+			utility::SetDebugName(m_Resource.Get(), name);
+		}
+
+		if (m_Allocation)
+		{
+			m_Allocation->SetName(name);
+		}
 #endif
-	}
-
-	void DX12Resource::CreateAllocation(D3D12_HEAP_TYPE heapType)
-	{
-		auto* allocator = m_DX12Deivce->GetMemAllocator();
-
-		D3D12MA::ALLOCATION_DESC allocationDesc = {};
-		allocationDesc.HeapType = heapType;
-
-		utility::ThrowIfFailed(allocator->CreateResource(
-			&allocationDesc,
-			&m_ResourceDesc,
-			m_ResourceState,
-			m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
-			&m_Allocation,
-			IID_PPV_ARGS(&m_Resource)));
 	}
 }
 

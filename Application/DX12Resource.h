@@ -6,24 +6,40 @@ namespace graphicsGadgetLab
 	class DX12Resource
 	{
 	public:
+		struct CreateInfo
+		{
+			D3D12MA::Allocator* m_Allocator = nullptr;
+			D3D12MA::ALLOCATION_DESC m_AllocDesc = {};
+			CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
+			D3D12_RESOURCE_STATES m_InitStates = D3D12_RESOURCE_STATE_COMMON;
+			std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
+		};
+
+		struct AliasingInfo
+		{
+			D3D12MA::Allocator* m_Allocator = nullptr;
+			uint64_t m_LocalOffset = 0;
+			CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
+			D3D12_RESOURCE_STATES m_InitStates = D3D12_RESOURCE_STATE_COMMON;
+			std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
+		};
+
+	public:
 		DX12Resource() = default;
-		explicit DX12Resource(DX12Device* device,
-			D3D12_HEAP_TYPE heapType,
-			const CD3DX12_RESOURCE_DESC& resourceDesc,
-			D3D12_RESOURCE_STATES initState,
-			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
+		explicit DX12Resource(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Resource);
 		virtual ~DX12Resource() noexcept = default;
 
-		ID3D12Resource* Get() const;
+		ID3D12Resource* Get() const noexcept;
+
+		bool TransitionNeeded(D3D12_RESOURCE_STATES newStates) const noexcept;
+		void AdoptExternal(ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept;
+		void RebindAliasing(const AliasingInfo& aliasingInfo) noexcept;
+		void Reset() noexcept;
 
 		void SetDebugName(const wchar_t* name) noexcept;
 
 	protected:
-		void CreateAllocation(D3D12_HEAP_TYPE heapType);
-
-	protected:
-		DX12Device* m_DX12Deivce = nullptr;
 		CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
 		D3D12_RESOURCE_STATES m_ResourceState = D3D12_RESOURCE_STATE_COMMON;
 		std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
