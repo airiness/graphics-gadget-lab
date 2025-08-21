@@ -6,15 +6,17 @@
 namespace graphicsGadgetLab
 {
 	DX12Resource::DX12Resource(const CreateInfo& createInfo) noexcept :
+		m_Allocator(createInfo.m_Allocator),
 		m_ResourceDesc(createInfo.m_ResourceDesc),
 		m_ResourceState(createInfo.m_InitStates),
 		m_ClearValue(createInfo.m_ClearValue)
 	{
-		utility::ThrowIfFailed(createInfo.m_Allocator->CreateResource(
+		GGLAB_ASSERT_MSG(m_Allocator, "Allocator can not be null.");
+		utility::ThrowIfFailed(m_Allocator->CreateResource(
 			&createInfo.m_AllocDesc,
-			&createInfo.m_ResourceDesc,
+			&m_ResourceDesc,
 			createInfo.m_InitStates,
-			createInfo.m_ClearValue.has_value() ? &createInfo.m_ClearValue.value() : nullptr,
+			m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
 			&m_Allocation,
 			IID_PPV_ARGS(&m_Resource)));
 	}
@@ -41,11 +43,42 @@ namespace graphicsGadgetLab
 
 	void DX12Resource::RebindAliasing(const AliasingInfo& aliasingInfo) noexcept
 	{
-		
+		m_Resource.Reset();
+		m_Allocation = aliasingInfo.m_Allocation;
+
+		D3D12MA::Allocator* allocator = aliasingInfo.m_Allocator ? aliasingInfo.m_Allocator : m_Allocator;
+		utility::ThrowIfFailed(allocator->CreateAliasingResource(m_Allocation.Get(),
+			aliasingInfo.m_LocalOffset,
+			&aliasingInfo.m_ResourceDesc,
+			aliasingInfo.m_InitStates,
+			aliasingInfo.m_ClearValue.has_value() ? &aliasingInfo.m_ClearValue.value() : nullptr,
+			IID_PPV_ARGS(&m_Resource)));
+
+		m_ResourceDesc = aliasingInfo.m_ResourceDesc;
+		m_ResourceState = aliasingInfo.m_InitStates;
+		m_ClearValue = aliasingInfo.m_ClearValue;
 	}
 
 	void DX12Resource::Reset() noexcept
 	{
+		m_Resource.Reset();
+		m_Allocation.Reset();
+		m_ClearValue.reset();
+		m_ResourceDesc = {};
+		m_ResourceState = D3D12_RESOURCE_STATE_COMMON;
+	}
+
+	D3D12_RESOURCE_BARRIER DX12Resource::MakeTransition(D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept
+	{
+		D3D12_RESOURCE_BARRIER barrier = {};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = m_Resource.Get();
+		barrier.Transition.Subresource = static_cast<UINT>(subResource);
+		barrier.Transition.StateBefore = m_ResourceState;
+		barrier.Transition.StateAfter = newState;
+
+		return barrier;
 	}
 
 	void DX12Resource::SetDebugName(const wchar_t* name) noexcept
@@ -62,6 +95,15 @@ namespace graphicsGadgetLab
 		}
 #endif
 	}
+
+	D3D12_RESOURCE_BARRIER DX12Resource::MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept
+	{
+		D3D12_RESOURCE_BARRIER barrier = {};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Aliasing.pResourceBefore = before ? before->Get() : nullptr;
+		barrier.Aliasing.pResourceAfter = after ? after->Get() : nullptr;
+
+		return barrier;
+	}
 }
-
-

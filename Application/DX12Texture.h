@@ -6,6 +6,8 @@ namespace graphicsGadgetLab
 	class DX12Texture : public DX12Resource
 	{
 	public:
+		using DX12Resource = DX12Resource;
+
 		DX12Texture() = default;
 		explicit DX12Texture(DX12Device* device,
 			D3D12_HEAP_TYPE heapType,
