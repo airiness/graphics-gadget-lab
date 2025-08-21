@@ -37,6 +37,8 @@ namespace graphicsGadgetLab
 		void RebindAliasing(const AliasingInfo& aliasingInfo) noexcept;
 		void Reset() noexcept;
 
+		D3D12_RESOURCE_BARRIER MakeTransition(D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept;
+
 		void SetDebugName(const wchar_t* name) noexcept;
 
 	protected:
