@@ -2,20 +2,19 @@
 #include "DX12Resource.h"
 namespace graphicsGadgetLab
 {
-
-
 	class DX12Buffer : public DX12Resource
 	{
 	public:
-		explicit DX12Buffer(DX12Device* device,
-			D3D12_HEAP_TYPE heapType,
-			const CD3DX12_RESOURCE_DESC& resourceDesc,
-			D3D12_RESOURCE_STATES initState,
-			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept;
+		DX12Buffer() noexcept = default;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Buffer);
-		virtual ~DX12Buffer() noexcept;
+		virtual ~DX12Buffer() = default;
 
-		void* Map();
-		void UnMap();
+		void* Map(uint32_t subResource = 0, const D3D12_RANGE* readRange = nullptr);
+		void Unmap(uint32_t eubResource = 0, const D3D12_RANGE* writtenRange = nullptr);
+
+		uint64_t SizeInBytes() const noexcept;
+		D3D12_GPU_VIRTUAL_ADDRESS GPUVirtualAddress() const noexcept;
+
+		static CreateInfo UploadBufferCreateInfo(D3D12MA::Allocator* allocator, uint64_t sizeInBytes) noexcept;
 	};
 }

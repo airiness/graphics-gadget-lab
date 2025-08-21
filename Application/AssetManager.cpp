@@ -154,15 +154,14 @@ namespace graphicsGadgetLab
 		auto* texture = GetTexture(uploadData.m_TextureID);
 
 		const auto& texMedaData = uploadData.m_ScratchImage.GetMetadata();
-		texture->m_Texture = std::make_unique<DX12Texture>(m_DX12Device,
-			D3D12_HEAP_TYPE_DEFAULT,
-			CD3DX12_RESOURCE_DESC::Tex2D(texMedaData.format,
-				static_cast<UINT64>(texMedaData.width),
-				static_cast<UINT>(texMedaData.height),
-				static_cast<UINT16>(texMedaData.arraySize),
-				static_cast<UINT16>(texMedaData.mipLevels)),
-			D3D12_RESOURCE_STATE_COMMON);
-
+		texture->m_Texture = std::make_unique<DX12Texture>();
+		texture->m_Texture->Create2D(*m_DX12Device->GetMemAllocator(),
+			texMedaData.format,
+			texMedaData.width, 
+			texMedaData.height, 
+			texMedaData.arraySize, 
+			texMedaData.mipLevels);
+		
 		const auto imageCount = uploadData.m_ScratchImage.GetImageCount();
 		std::vector<D3D12_SUBRESOURCE_DATA> subResourceDatas(imageCount);
 
@@ -173,15 +172,6 @@ namespace graphicsGadgetLab
 			subResourceDatas[imageIndex].RowPitch = images[imageIndex].rowPitch;
 			subResourceDatas[imageIndex].SlicePitch = images[imageIndex].slicePitch;
 		}
-
-		auto subResourceCount = static_cast<UINT>(subResourceDatas.size());
-		auto uploadSize = GetRequiredIntermediateSize(texture->m_Texture.get()->Get(), 0, subResourceCount);
-
-		std::unique_ptr uploadBuffer = std::make_unique<DX12Buffer>(m_DX12Device,
-			D3D12_HEAP_TYPE_UPLOAD,
-			CD3DX12_RESOURCE_DESC::Buffer(uploadSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ);
-		uploadBuffer->SetDebugName(L"UploadIntermediateBuffer");
 
 		resourceUploader->UploadResource(subResourceDatas, texture->m_Texture.get());
 

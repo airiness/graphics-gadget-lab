@@ -3,24 +3,23 @@
 
 namespace graphicsGadgetLab
 {
-	DX12Texture::DX12Texture(DX12Device* device,
+	void DX12Texture::Create2D(D3D12MA::Allocator& allocator,
+		DXGI_FORMAT format,
+		uint32_t width,
+		uint32_t height,
+		uint16_t arraySize,
+		uint16_t miplevels,
+		uint32_t sampleCount,
+		D3D12_RESOURCE_FLAGS flags,
+		D3D12_RESOURCE_STATES initStates,
+		const std::optional<D3D12_CLEAR_VALUE>& clearValue,
 		D3D12_HEAP_TYPE heapType,
-		const CD3DX12_RESOURCE_DESC& resourceDesc,
-		D3D12_RESOURCE_STATES initState,
-		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept :
-		DX12Resource(device, heapType, resourceDesc, initState, clearValue)
+		D3D12MA::ALLOCATION_FLAGS allocFlags) noexcept
 	{
 	}
 
-	DX12Texture::~DX12Texture() noexcept
+	void DX12Texture::AdoptFromSwapChain(ComPtr<ID3D12Resource> backBuffer) noexcept
 	{
-	}
-
-	void DX12Texture::CreateFromSwapChain(ComPtr<ID3D12Resource> backBuffer) noexcept
-	{
-		m_Resource = backBuffer;
-		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
-		m_ResourceState = D3D12_RESOURCE_STATE_PRESENT;
+		AdoptExternal(std::move(backBuffer), D3D12_RESOURCE_STATE_PRESENT);
 	}
 }
-

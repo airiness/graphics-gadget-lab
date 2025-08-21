@@ -26,19 +26,26 @@ namespace graphicsGadgetLab
 		};
 
 	public:
-		DX12Resource() = default;
-		explicit DX12Resource(const CreateInfo& createInfo) noexcept;
+		DX12Resource() noexcept = default;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Resource);
-		virtual ~DX12Resource() noexcept = default;
+		virtual ~DX12Resource() = default;
+
+		void Create(const CreateInfo& createInfo) noexcept;
 
 		ID3D12Resource* Get() const noexcept;
+		D3D12_RESOURCE_DESC GetDesc() const noexcept;
+		D3D12_RESOURCE_STATES GetState() const noexcept;
 
 		bool TransitionNeeded(D3D12_RESOURCE_STATES newStates) const noexcept;
 		void AdoptExternal(ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept;
-		void RebindAliasing(const AliasingInfo& aliasingInfo) noexcept;
-		void Reset() noexcept;
+		void AliasTo(const AliasingInfo& aliasingInfo) noexcept;
+		void Release() noexcept;
 		D3D12_RESOURCE_BARRIER MakeTransition(D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept;
 		void SetDebugName(const wchar_t* name) noexcept;
+
+		bool IsValid() const noexcept;
+		bool IsExternal() const noexcept;
+		bool OwnsAllocation() const noexcept;
 
 	public:
 		static D3D12_RESOURCE_BARRIER MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept;
@@ -52,4 +59,3 @@ namespace graphicsGadgetLab
 		ComPtr<ID3D12Resource> m_Resource;
 	};
 }
-

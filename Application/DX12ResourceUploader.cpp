@@ -1,5 +1,6 @@
 #include "Precompiled.h"
 #include "DX12ResourceUploader.h"
+#include "DX12Device.h"
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
@@ -87,10 +88,8 @@ namespace graphicsGadgetLab
 		auto subResourceCount = static_cast<UINT>(subResourceData.size());
 		auto uploadSize = GetRequiredIntermediateSize(destResource->Get(), 0, subResourceCount);
 
-		std::unique_ptr uploadBuffer = std::make_unique<DX12Buffer>(m_DX12Device,
-			D3D12_HEAP_TYPE_UPLOAD,
-			CD3DX12_RESOURCE_DESC::Buffer(uploadSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ);
+		std::unique_ptr uploadBuffer = std::make_unique<DX12Buffer>();
+		uploadBuffer->Create(DX12Buffer::UploadBufferCreateInfo(m_DX12Device->GetMemAllocator(), static_cast<uint64_t>(uploadSize)));
 		uploadBuffer->SetDebugName(L"UploadIntermediateBuffer");
 
 		UpdateSubresources(m_UploadCommandList->Get(),

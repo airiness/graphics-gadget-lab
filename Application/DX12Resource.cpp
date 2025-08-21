@@ -5,13 +5,19 @@
 
 namespace graphicsGadgetLab
 {
-	DX12Resource::DX12Resource(const CreateInfo& createInfo) noexcept :
-		m_Allocator(createInfo.m_Allocator),
-		m_ResourceDesc(createInfo.m_ResourceDesc),
-		m_ResourceState(createInfo.m_InitStates),
-		m_ClearValue(createInfo.m_ClearValue)
+	void DX12Resource::Create(const CreateInfo& createInfo) noexcept
 	{
+		if (IsValid())
+		{
+			Release();
+		}
+
+		m_ResourceDesc = createInfo.m_ResourceDesc;
+		m_ResourceState = createInfo.m_InitStates;
+		m_ClearValue = createInfo.m_ClearValue;
+
 		GGLAB_ASSERT_MSG(m_Allocator, "Allocator can not be null.");
+
 		utility::ThrowIfFailed(m_Allocator->CreateResource(
 			&createInfo.m_AllocDesc,
 			&m_ResourceDesc,
@@ -19,11 +25,22 @@ namespace graphicsGadgetLab
 			m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
 			&m_Allocation,
 			IID_PPV_ARGS(&m_Resource)));
+
 	}
 
 	ID3D12Resource* DX12Resource::Get() const
 	{
 		return m_Resource.Get();
+	}
+
+	D3D12_RESOURCE_DESC DX12Resource::GetDesc() const noexcept
+	{
+		return m_ResourceDesc;
+	}
+
+	D3D12_RESOURCE_STATES DX12Resource::GetState() const noexcept
+	{
+		return m_ResourceState;
 	}
 
 	bool DX12Resource::TransitionNeeded(D3D12_RESOURCE_STATES newStates) const noexcept
@@ -41,7 +58,7 @@ namespace graphicsGadgetLab
 		m_ClearValue.reset();
 	}
 
-	void DX12Resource::RebindAliasing(const AliasingInfo& aliasingInfo) noexcept
+	void DX12Resource::AliasTo(const AliasingInfo& aliasingInfo) noexcept
 	{
 		m_Resource.Reset();
 		m_Allocation = aliasingInfo.m_Allocation;
@@ -59,7 +76,7 @@ namespace graphicsGadgetLab
 		m_ClearValue = aliasingInfo.m_ClearValue;
 	}
 
-	void DX12Resource::Reset() noexcept
+	void DX12Resource::Release() noexcept
 	{
 		m_Resource.Reset();
 		m_Allocation.Reset();
@@ -96,6 +113,21 @@ namespace graphicsGadgetLab
 #endif
 	}
 
+	bool DX12Resource::IsValid() const noexcept
+	{
+		return m_Resource != nullptr;
+	}
+
+	bool DX12Resource::IsExternal() const noexcept
+	{
+		return IsValid() && !OwnsAllocation();
+	}
+
+	bool DX12Resource::OwnsAllocation() const noexcept
+	{
+		return m_Allocation != nullptr;
+	}
+
 	D3D12_RESOURCE_BARRIER DX12Resource::MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept
 	{
 		D3D12_RESOURCE_BARRIER barrier = {};
@@ -105,5 +137,13 @@ namespace graphicsGadgetLab
 		barrier.Aliasing.pResourceAfter = after ? after->Get() : nullptr;
 
 		return barrier;
+	}
+
+	DX12Resource::CreateInfo DX12Resource::CreateInfo::UploadBufferInfo(D3D12MA::Allocator& allocator) noexcept
+	{
+		CreateInfo createInfo = {};
+
+
+		return CreateInfo();
 	}
 }
