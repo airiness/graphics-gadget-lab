@@ -46,6 +46,7 @@ namespace graphicsGadgetLab
 
 	bool DX12Resource::TransitionNeeded(D3D12_RESOURCE_STATES newStates) const noexcept
 	{
+		// TODO: per subresource?
 		return m_ResourceState != newStates;
 	}
 
@@ -53,8 +54,9 @@ namespace graphicsGadgetLab
 	{
 		// Reset old Allocation
 		m_Allocation.Reset();
-		m_Resource = resource;
-		m_ResourceDesc = CD3DX12_RESOURCE_DESC(resource->GetDesc());
+		m_Allocator = nullptr;
+		m_Resource = std::move(resource);
+		m_ResourceDesc = CD3DX12_RESOURCE_DESC(m_Resource->GetDesc());
 		m_ResourceState = initStates;
 		m_ClearValue.reset();
 	}
