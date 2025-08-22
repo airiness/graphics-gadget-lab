@@ -15,6 +15,7 @@ namespace graphicsGadgetLab
 		m_ResourceDesc = createInfo.m_ResourceDesc;
 		m_ResourceState = createInfo.m_InitStates;
 		m_ClearValue = createInfo.m_ClearValue;
+		m_Allocator = createInfo.m_Allocator;
 
 		GGLAB_ASSERT_MSG(m_Allocator, "Allocator can not be null.");
 
@@ -28,7 +29,7 @@ namespace graphicsGadgetLab
 
 	}
 
-	ID3D12Resource* DX12Resource::Get() const
+	ID3D12Resource* DX12Resource::Get() const noexcept
 	{
 		return m_Resource.Get();
 	}
@@ -137,13 +138,5 @@ namespace graphicsGadgetLab
 		barrier.Aliasing.pResourceAfter = after ? after->Get() : nullptr;
 
 		return barrier;
-	}
-
-	DX12Resource::CreateInfo DX12Resource::CreateInfo::UploadBufferInfo(D3D12MA::Allocator& allocator) noexcept
-	{
-		CreateInfo createInfo = {};
-
-
-		return CreateInfo();
 	}
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "RGResource.h"
+#include "DX12Device.h"
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 
@@ -45,18 +46,32 @@ namespace graphicsGadgetLab
 	template<>
 	inline int32_t GpuResourceRegistry::AcquireResource(const RGTextureDesc& desc) noexcept
 	{
+		// TODO: Create texture like render target use allocation flag 'Comitted'
 		auto index = static_cast<int32_t>(m_Textures.size());
-		m_Textures.emplace_back(std::make_unique<DX12Texture>(
-			m_DX12Device,
-			D3D12_HEAP_TYPE_DEFAULT,
-			CD3DX12_RESOURCE_DESC::Tex2D(
-				desc.m_Format,
-				desc.m_Width,
-				desc.m_Height,
-				desc.m_ArraySize,
-				desc.m_MipLevels,
-				desc.m_SampleCount),
-			ToD3D12ResourceStates<RGTextureUsage>(desc.m_Usage)));
+		m_Textures.emplace_back(std::make_unique<DX12Texture>());
+		auto& texIter = m_Textures.back();
+
+		DX12Resource::CreateInfo createInfo = {};
+		createInfo.m_Allocator = m_DX12Device->GetMemAllocator();
+		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+
+		auto allocFlag = D3D12MA::ALLOCATION_FLAG_NONE;
+		if (Test(desc.m_Usage, RGTextureUsage::RenderTarget))
+		{
+			allocFlag = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+		}
+		createInfo.m_AllocDesc.Flags = allocFlag;
+
+		createInfo.m_InitStates = ToD3D12ResourceStates<RGTextureUsage>(desc.m_Usage);
+		createInfo.m_ResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+			desc.m_Format,
+			desc.m_Width,
+			desc.m_Height,
+			desc.m_ArraySize,
+			desc.m_MipLevels,
+			desc.m_SampleCount);
+
+		texIter->Create(createInfo);
 
 		return index;
 	}
@@ -65,11 +80,17 @@ namespace graphicsGadgetLab
 	inline int32_t GpuResourceRegistry::AcquireResource(const RGBufferDesc& desc) noexcept
 	{
 		auto index = static_cast<int32_t>(m_Buffers.size());
-		m_Buffers.emplace_back(std::make_unique<DX12Buffer>(
-			m_DX12Device,
-			D3D12_HEAP_TYPE_DEFAULT,
-			CD3DX12_RESOURCE_DESC::Buffer(desc.m_Size),
-			ToD3D12ResourceStates<RGBufferUsage>(desc.m_Usage)));
+
+		m_Buffers.emplace_back(std::make_unique<DX12Buffer>());
+		auto& bufferIter = m_Buffers.back();
+
+		DX12Resource::CreateInfo createInfo = {};
+		createInfo.m_Allocator = m_DX12Device->GetMemAllocator();
+		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+		createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+		createInfo.m_InitStates = ToD3D12ResourceStates<RGBufferUsage>(desc.m_Usage);
+		createInfo.m_ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(desc.m_Size);
+		bufferIter->Create(createInfo);
 
 		return index;
 	}

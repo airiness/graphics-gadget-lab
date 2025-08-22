@@ -155,13 +155,13 @@ namespace graphicsGadgetLab
 
 		const auto& texMedaData = uploadData.m_ScratchImage.GetMetadata();
 		texture->m_Texture = std::make_unique<DX12Texture>();
-		texture->m_Texture->Create2D(*m_DX12Device->GetMemAllocator(),
-			texMedaData.format,
-			texMedaData.width, 
-			texMedaData.height, 
-			texMedaData.arraySize, 
-			texMedaData.mipLevels);
-		
+		texture->m_Texture->Create(DX12Texture::AssetTextureCreateInfo(m_DX12Device->GetMemAllocator(),
+			CD3DX12_RESOURCE_DESC::Tex2D(texMedaData.format,
+				static_cast<UINT64>(texMedaData.width),
+				static_cast<UINT>(texMedaData.height),
+				static_cast<UINT16>(texMedaData.arraySize),
+				static_cast<UINT16>(texMedaData.mipLevels))));
+
 		const auto imageCount = uploadData.m_ScratchImage.GetImageCount();
 		std::vector<D3D12_SUBRESOURCE_DATA> subResourceDatas(imageCount);
 
@@ -220,16 +220,12 @@ namespace graphicsGadgetLab
 		const auto vertexBufferSize = vertexCount * sizeof(Vertex);
 		const auto indexBufferSize = indexCount * sizeof(uint32_t);
 
-		mesh->m_VertexBuffer = std::make_unique<DX12Buffer>(m_DX12Device,
-			D3D12_HEAP_TYPE_DEFAULT,
-			CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize),
-			D3D12_RESOURCE_STATE_COMMON);
+		mesh->m_VertexBuffer = std::make_unique<DX12Buffer>();
+		mesh->m_VertexBuffer->Create(DX12Buffer::VertexOrIndexBufferCreateInfo(m_DX12Device->GetMemAllocator(), vertexBufferSize));
 
-		mesh->m_IndexBuffer = std::make_unique<DX12Buffer>(m_DX12Device,
-			D3D12_HEAP_TYPE_DEFAULT,
-			CD3DX12_RESOURCE_DESC::Buffer(indexBufferSize),
-			D3D12_RESOURCE_STATE_COMMON);
-
+		mesh->m_IndexBuffer = std::make_unique<DX12Buffer>();
+		mesh->m_IndexBuffer->Create(DX12Buffer::VertexOrIndexBufferCreateInfo(m_DX12Device->GetMemAllocator(), indexBufferSize));
+		
 		resourceUploader->UploadResource(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.get());
 		resourceUploader->UploadResource(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.get());
 

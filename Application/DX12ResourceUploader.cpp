@@ -62,12 +62,10 @@ namespace graphicsGadgetLab
 		m_UploadingInfo = nullptr;
 	}
 
-	void DX12ResourceUploader::UploadResource(const void* data, size_t dataSize, const DX12Resource* destResource) noexcept
+	void DX12ResourceUploader::UploadResource(const void* data, uint64_t dataSize, const DX12Resource* destResource) noexcept
 	{
-		std::unique_ptr<DX12Buffer> uploadBuffer = std::make_unique<DX12Buffer>(m_DX12Device,
-			D3D12_HEAP_TYPE_UPLOAD,
-			CD3DX12_RESOURCE_DESC::Buffer(dataSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ);
+		std::unique_ptr<DX12Buffer> uploadBuffer = std::make_unique<DX12Buffer>();
+		uploadBuffer->Create(DX12Buffer::UploadBufferCreateInfo(m_DX12Device->GetMemAllocator(), dataSize));
 		uploadBuffer->SetDebugName(L"UploadIntermediateBuffer");
 
 		D3D12_SUBRESOURCE_DATA subResourceData = {};

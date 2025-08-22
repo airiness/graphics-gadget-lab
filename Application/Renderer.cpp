@@ -165,16 +165,20 @@ namespace graphicsGadgetLab
 			auto rtFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 			auto rtResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(rtFormat, width, height);
 			rtResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-			const float rtClearColor[] = { 0.0f,0.4f,0.5f,1.0f };
+			const float rtClearColor[] = { 0.0f, 0.4f, 0.5f, 1.0f };
 			auto rtClearValue = CD3DX12_CLEAR_VALUE(rtFormat, rtClearColor);
 
 			auto& rtTexture = m_RenderTargets[i];
-			rtTexture = std::make_unique<DX12Texture>(m_Device.get(),
-				D3D12_HEAP_TYPE_DEFAULT,
-				rtResourceDesc,
-				D3D12_RESOURCE_STATE_RENDER_TARGET,
-				rtClearValue);
-
+			rtTexture = std::make_unique<DX12Texture>();
+			DX12Resource::CreateInfo rtCreateInfo = {};
+			rtCreateInfo.m_Allocator = m_Device->GetMemAllocator();
+			rtCreateInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+			rtCreateInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+			rtCreateInfo.m_InitStates = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			rtCreateInfo.m_ResourceDesc = rtResourceDesc;
+			rtCreateInfo.m_ClearValue = rtClearValue;
+			rtTexture->Create(rtCreateInfo);
+			
 			// Create Render target view
 			auto descriptor = rtHeap->CreateDescriptor();
 			D3D12_RENDER_TARGET_VIEW_DESC rtDesc = {};
@@ -195,11 +199,15 @@ namespace graphicsGadgetLab
 			auto dsClearValue = CD3DX12_CLEAR_VALUE(dsFormat, 1.0f, 0);
 
 			auto& dsTexture = m_RenderTargets[static_cast<uint32_t>(RenderTargetIndex::DS0)];
-			dsTexture = std::make_unique<DX12Texture>(m_Device.get(),
-				D3D12_HEAP_TYPE_DEFAULT,
-				dsResourceDesc,
-				D3D12_RESOURCE_STATE_DEPTH_WRITE,
-				dsClearValue);
+			dsTexture = std::make_unique<DX12Texture>();
+			DX12Resource::CreateInfo dsCreateInfo = {};
+			dsCreateInfo.m_Allocator = m_Device->GetMemAllocator();
+			dsCreateInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+			dsCreateInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+			dsCreateInfo.m_InitStates = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+			dsCreateInfo.m_ResourceDesc = dsResourceDesc;
+			dsCreateInfo.m_ClearValue = dsClearValue;
+			dsTexture->Create(dsCreateInfo);
 
 			// Create depth stencil view
 			auto descriptor = dsHeap->CreateDescriptor();

@@ -181,7 +181,7 @@ namespace graphicsGadgetLab
 
 			auto& tex = m_BackBuffers[i];
 			tex = std::make_unique<DX12Texture>();
-			tex->CreateFromSwapChain(backBuffer);
+			tex->AdoptFromSwapChain(backBuffer);
 
 #if defined (BUILD_DEBUG)
 			utility::SetDebugName(m_BackBuffers[i].get()->Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
