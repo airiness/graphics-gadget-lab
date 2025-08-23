@@ -35,6 +35,9 @@
     <Filter Include="Graphics\RenderGraph">
       <UniqueIdentifier>{e1396d2d-a721-499a-bfb4-18812535ff1d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Hash">
+      <UniqueIdentifier>{9c9a2b8f-4af1-4b73-8e6e-50c967e193ef}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -157,9 +160,6 @@
     <ClCompile Include="RenderPassTexColor.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="GpuResourceRegistry.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
     <ClCompile Include="RGResource.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -168,6 +168,9 @@
     </ClCompile>
     <ClCompile Include="VertexData.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RGGpuResAllocator.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -306,9 +309,6 @@
     <ClInclude Include="StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="GpuResourceRegistry.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
     <ClInclude Include="DX12ConstantBuffer.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
@@ -318,8 +318,11 @@
     <ClInclude Include="VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="GpuResourceAllocator.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="RGGpuResAllocator.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="FNV1a.h">
+      <Filter>Core\Hash</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

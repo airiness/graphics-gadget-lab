@@ -34,36 +34,36 @@ namespace gglab
 	GGLAB_ENUM_FLAGS(RGTextureUsage);
 
 	template<>
-	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGTextureUsage>(RGTextureUsage usage, bool depthReadOnly) noexcept
+	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGTextureUsage>(RGTextureUsage rgTexUsage, bool depthReadOnly) noexcept
 	{
 		using U = RGTextureUsage;
 		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
 
-		if (Test(usage, U::Sample))
+		if (Test(rgTexUsage, U::Sample))
 		{
 			states |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		}
-		if (Test(usage, U::RenderTarget))
+		if (Test(rgTexUsage, U::RenderTarget))
 		{
 			states |= D3D12_RESOURCE_STATE_RENDER_TARGET;
 		}
-		if (Test(usage, U::DepthStencil))
+		if (Test(rgTexUsage, U::DepthStencil))
 		{
 			states |= depthReadOnly ? D3D12_RESOURCE_STATE_DEPTH_READ : D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		}
-		if (Test(usage, U::UAV))
+		if (Test(rgTexUsage, U::UAV))
 		{
 			states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		}
-		if (Test(usage, U::CopySrc))
+		if (Test(rgTexUsage, U::CopySrc))
 		{
 			states |= D3D12_RESOURCE_STATE_COPY_SOURCE;
 		}
-		if (Test(usage, U::CopyDst))
+		if (Test(rgTexUsage, U::CopyDst))
 		{
 			states |= D3D12_RESOURCE_STATE_COPY_DEST;
 		}
-		if (Test(usage, U::Present))
+		if (Test(rgTexUsage, U::Present))
 		{
 			states |= D3D12_RESOURCE_STATE_PRESENT;
 		}
@@ -84,28 +84,28 @@ namespace gglab
 	GGLAB_ENUM_FLAGS(RGBufferUsage);
 
 	template<>
-	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGBufferUsage>(RGBufferUsage usage, bool) noexcept
+	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGBufferUsage>(RGBufferUsage rgBufUsage, bool) noexcept
 	{
 		using U = RGBufferUsage;
 		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
 
-		if (Test(usage, U::Vertex | U::Constant))
+		if (Test(rgBufUsage, U::Vertex | U::Constant))
 		{
 			states |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 		}
-		if (Test(usage, U::Index))
+		if (Test(rgBufUsage, U::Index))
 		{
 			states |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
 		}
-		if (Test(usage, U::UAV))
+		if (Test(rgBufUsage, U::UAV))
 		{
 			states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		}
-		if (Test(usage, U::CopySrc))
+		if (Test(rgBufUsage, U::CopySrc))
 		{
 			states |= D3D12_RESOURCE_STATE_COPY_SOURCE;
 		}
-		if (Test(usage, U::CopyDst))
+		if (Test(rgBufUsage, U::CopyDst))
 		{
 			states |= D3D12_RESOURCE_STATE_COPY_DEST;
 		}
@@ -115,6 +115,7 @@ namespace gglab
 
 	struct RGTextureDesc
 	{
+		// TODO: 3d texture support
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		uint16_t m_ArraySize = 1;
@@ -134,7 +135,7 @@ namespace gglab
 
 	struct RGBufferDesc
 	{
-		uint64_t m_Size = 0;
+		uint64_t m_SizeInBytes = 0;
 		uint32_t m_Stride = 0;
 		RGResourceFormat m_Format = DXGI_FORMAT_UNKNOWN;
 		RGBufferUsage m_Usage = RGBufferUsage::None;
@@ -189,4 +190,39 @@ namespace gglab
 		}
 		static_assert(std::is_unsigned_v<Bits>, "Usage underlying type should be unsigned");
 	};
+
+	inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGTextureUsage& rgTexUsage) noexcept
+	{
+		return
+			(Test(rgTexUsage, RGTextureUsage::RenderTarget) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) |
+			(Test(rgTexUsage, RGTextureUsage::DepthStencil) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE) |
+			(Test(rgTexUsage, RGTextureUsage::UAV) ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE);
+	}
+
+	inline CD3DX12_RESOURCE_DESC ToD3D12ResourceDesc(const RGTextureDesc& rgTexDesc) noexcept
+	{
+		D3D12_RESOURCE_FLAGS flags = ToD3D12ResourceFlags(rgTexDesc.m_Usage);
+		return CD3DX12_RESOURCE_DESC::Tex2D(
+			rgTexDesc.m_Format,
+			static_cast<UINT64>(rgTexDesc.m_Width),
+			static_cast<UINT>(rgTexDesc.m_Height),
+			static_cast<UINT16>(rgTexDesc.m_ArraySize),
+			static_cast<UINT16>(rgTexDesc.m_MipLevels),
+			static_cast<UINT>(rgTexDesc.m_SampleCount),
+			0,
+			flags);
+	}
+
+	inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGBufferUsage& rgBufUsage) noexcept
+	{
+		return (Test(rgBufUsage, RGBufferUsage::UAV) ?
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS :
+			D3D12_RESOURCE_FLAG_NONE);
+	}
+
+	inline CD3DX12_RESOURCE_DESC ToD3D12ResourceDesc(const RGBufferDesc& rgBufDesc) noexcept
+	{
+		D3D12_RESOURCE_FLAGS flags = ToD3D12ResourceFlags(rgBufDesc.m_Usage);
+		return CD3DX12_RESOURCE_DESC::Buffer(static_cast<UINT64>(rgBufDesc.m_SizeInBytes), flags);
+	}
 }

@@ -41,10 +41,11 @@ namespace gglab
 			// Use unique_lock when write.
 			std::unique_lock lock(m_Mutex);
 
-			if (auto iter = m_Dictionary.find(hash); iter != m_Dictionary.end())
+			// TODO: need log here?
+			/*if (auto iter = m_Dictionary.find(hash); iter != m_Dictionary.end())
 			{
 				GGLAB_LOG_INFO("Hash collision: {}<->{}.", iter->second.c_str(), stringView.data());
-			}
+			}*/
 			m_Dictionary.emplace(hash, std::string(stringView));
 		}
 

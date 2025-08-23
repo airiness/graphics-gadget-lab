@@ -9,7 +9,7 @@
 namespace gglab
 {
 	RenderGraph::RenderGraph(DX12Device* dx12Device) noexcept :
-		m_GpuResourceRegistry(dx12Device),
+		m_GpuResourceAllocator(dx12Device),
 		m_ArenaAllocator(1u << 20)
 	{
 	}
@@ -132,7 +132,7 @@ namespace gglab
 			// Devirtualize Gpu resources
 			for (auto* virtualResource : passNode.m_DevirtualizeVirtualResources)
 			{
-				virtualResource->Devirtualize(m_GpuResourceRegistry);
+				virtualResource->Devirtualize(m_GpuResourceAllocator);
 			}
 
 			// Execute passes
@@ -143,7 +143,7 @@ namespace gglab
 
 			for (auto* virtualResource : passNode.m_DestroyVirtualResources)
 			{
-				virtualResource->Destroy(m_GpuResourceRegistry);
+				virtualResource->Destroy(m_GpuResourceAllocator);
 			}
 		}
 	}

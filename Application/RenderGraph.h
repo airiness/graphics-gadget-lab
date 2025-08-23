@@ -1,6 +1,6 @@
 #pragma once
 #include "RGArenaAllocator.h"
-#include "GpuResourceRegistry.h"
+#include "GpuResourceAllocator.h"
 #include "RGResource.h"
 #include "RGPass.h"
 #include "StringId.h"
@@ -25,8 +25,8 @@ namespace gglab
 	struct RGVirtualResourceBase
 	{
 		virtual ~RGVirtualResourceBase() = default;
-		virtual void Devirtualize(GpuResourceRegistry&) noexcept = 0;
-		virtual void Destroy(GpuResourceRegistry&) noexcept = 0;
+		virtual void Devirtualize(RGGpuResAllocator&) noexcept = 0;
+		virtual void Destroy(RGGpuResAllocator&) noexcept = 0;
 
 		StringId m_NameId;
 		bool m_Imported = false;
@@ -42,7 +42,7 @@ namespace gglab
 
 		using Index = int32_t;
 		static constexpr Index InvalidIndex = static_cast<Index>(-1);
-		using GpuResourceIndex = int32_t;
+		using GpuResourceIndex = RGGpuResAllocator::ResourceIndex;
 		static constexpr GpuResourceIndex InvalidGpuResourceIndex = static_cast<GpuResourceIndex>(-1);
 	};
 
@@ -58,18 +58,18 @@ namespace gglab
 		Usage m_Usage = RESOURCE::DefaultNoneUsage;
 		GpuResourceIndex m_GpuResourceIndex = InvalidGpuResourceIndex;
 
-		void Devirtualize(GpuResourceRegistry& reg) noexcept override
+		void Devirtualize(RGGpuResAllocator& allocator) noexcept override
 		{
 			if (m_Devirtualized)
 			{
 				return;
 			}
 			m_CurrentStates = RGResourceTraits<RESOURCE>::ToState(static_cast<RGResourceTraits<RESOURCE>::Bits>(m_Usage));
-			m_GpuResourceIndex = reg.AcquireResource<Desc>(m_Desc);
+			m_GpuResourceIndex = allocator.AcquireResource<Desc>(m_Desc);
 			m_Devirtualized = true;
 		}
 
-		void Destroy(GpuResourceRegistry& reg) noexcept override
+		void Destroy(RGGpuResAllocator& allocator) noexcept override
 		{
 			if (!m_Devirtualized)
 			{
@@ -205,7 +205,7 @@ namespace gglab
 
 		void Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
-
+		void Retire(DX12FencePoint fencePoint) noexcept;
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
@@ -227,7 +227,7 @@ namespace gglab
 		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept;
 
 	private:
-		GpuResourceRegistry m_GpuResourceRegistry;
+		RGGpuResAllocator m_GpuResourceAllocator;
 		RGArenaAllocator m_ArenaAllocator;
 
 		std::vector<RGResourceNode> m_ResourceNodes;

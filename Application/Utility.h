@@ -29,6 +29,7 @@ namespace gglab
 			}
 		}
 
+		// TODO: Move to other place
 		// Get the name of a command list type
 		constexpr const std::wstring GetCommandListTypeName(D3D12_COMMAND_LIST_TYPE type)
 		{

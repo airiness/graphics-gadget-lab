@@ -8,15 +8,17 @@ namespace gglab
 	public:
 		DX12FencePoint() noexcept = default;
 		explicit DX12FencePoint(DX12Fence* fence, uint64_t fenceValue) noexcept;
-		~DX12FencePoint() noexcept;
+		~DX12FencePoint() = default;
 
 		bool IsValid() const noexcept { return m_FencePtr != nullptr; }
+		explicit operator bool() const noexcept { return IsValid(); }
 
 		const DX12Fence* GetFence() const noexcept { return m_FencePtr; }
 		uint64_t GetValue() const noexcept { return m_PointValue; }
 
 		bool IsCompleted() const noexcept;
-		void Wait() noexcept;
+		void Wait(uint32_t timeout = GGLAB_INFINITE) noexcept;
+		void Reset() noexcept;
 
 	private:
 		DX12Fence* m_FencePtr = nullptr;
