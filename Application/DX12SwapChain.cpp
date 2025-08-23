@@ -8,7 +8,7 @@
 #include "DX12Texture.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12SwapChain::DX12SwapChain(DX12Device* dx12Device,
 		DX12CommandQueue* dx12CommandQueue,

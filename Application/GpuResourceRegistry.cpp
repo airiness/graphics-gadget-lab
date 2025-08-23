@@ -3,7 +3,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	GpuResourceRegistry::GpuResourceRegistry(DX12Device* device) noexcept :
 		m_DX12Device(device)

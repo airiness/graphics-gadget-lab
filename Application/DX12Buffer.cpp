@@ -2,7 +2,7 @@
 #include "DX12Buffer.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	void* DX12Buffer::Map(uint32_t subResource, const D3D12_RANGE* readRange)
 	{

@@ -21,7 +21,7 @@
 #include "RenderPassTexColor.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	Renderer::Renderer() noexcept
 	{

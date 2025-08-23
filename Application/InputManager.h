@@ -1,5 +1,5 @@
 #pragma once
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class Keyboard;
 	class Mouse;

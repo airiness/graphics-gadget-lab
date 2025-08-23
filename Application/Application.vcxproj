@@ -177,6 +177,7 @@
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="EnumFlags.h" />
+    <ClInclude Include="GpuResourceAllocator.h" />
     <ClInclude Include="GpuResourceRegistry.h" />
     <ClInclude Include="GPUStuctures.h" />
     <ClInclude Include="GraphicsTypes.h" />

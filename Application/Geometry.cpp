@@ -6,7 +6,7 @@
 #include "Components.h"
 #include "AssetManager.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	namespace primitiveGeometry
 	{

@@ -2,7 +2,7 @@
 #include "InputBase.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	InputBase::InputBase(GameInputKind inputKind) noexcept
 	{

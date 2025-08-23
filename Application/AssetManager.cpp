@@ -12,7 +12,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	AssetManager::AssetManager(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device)

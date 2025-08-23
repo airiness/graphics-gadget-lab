@@ -4,9 +4,9 @@
 int main(int argc, char* argv[])
 {
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
-	graphicsGadgetLab::Application::CreateApplicationInstance(L"GraphicsGadgetLab", 1920, 1080, hInstance);
-	graphicsGadgetLab::Application::GetInstance()->Run();
-	graphicsGadgetLab::Application::DestroyApplicationInstance();
+	gglab::Application::CreateApplicationInstance(L"GraphicsGadgetLab", 1920, 1080, hInstance);
+	gglab::Application::GetInstance()->Run();
+	gglab::Application::DestroyApplicationInstance();
 
 	return 0;
 }

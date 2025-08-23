@@ -4,7 +4,7 @@
 #include "DX12CommandQueue.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12Fence::DX12Fence(DX12Device* device, uint64_t initValue) noexcept :
 		m_NextRequestValue(initValue)

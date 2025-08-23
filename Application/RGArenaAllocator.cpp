@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "RGArenaAllocator.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	RGArenaAllocator::RGArenaAllocator(size_t initCapacity) noexcept
 		: m_Capacity(initCapacity)

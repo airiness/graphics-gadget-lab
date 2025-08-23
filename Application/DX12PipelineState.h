@@ -1,5 +1,5 @@
-﻿#pragma once
-namespace graphicsGadgetLab
+#pragma once
+namespace gglab
 {
 	class DX12Device;
 	class DX12PipelineState

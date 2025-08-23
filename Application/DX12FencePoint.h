@@ -1,6 +1,6 @@
 #pragma once
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Fence;
 	class DX12FencePoint final

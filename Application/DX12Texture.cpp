@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "DX12Texture.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	void DX12Texture::AdoptFromSwapChain(ComPtr<ID3D12Resource> backBuffer) noexcept
 	{

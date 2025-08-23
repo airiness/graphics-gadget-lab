@@ -3,7 +3,7 @@
 #include "DX12Device.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	void DX12Resource::Create(const CreateInfo& createInfo) noexcept
 	{

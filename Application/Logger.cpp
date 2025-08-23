@@ -3,7 +3,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	std::array<std::shared_ptr<spdlog::logger>, static_cast<uint32_t>(Logger::LoggerType::Count)> Logger::s_Loggers;
 

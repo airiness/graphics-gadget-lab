@@ -1,6 +1,6 @@
 #pragma once
 #include "DX12Descriptor.h"
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12RootSignature;
 	class DX12PipelineState;

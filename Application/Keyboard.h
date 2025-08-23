@@ -1,7 +1,7 @@
 #pragma once
 #include "InputBase.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	enum KeyCode : unsigned char
 	{

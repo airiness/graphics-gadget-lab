@@ -2,7 +2,7 @@
 #include "Keyboard.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	Keyboard::Keyboard() noexcept : 
 		InputBase(GameInputKind::GameInputKindKeyboard)

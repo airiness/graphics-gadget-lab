@@ -11,7 +11,7 @@
 #include "Application.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12Device::DX12Device() noexcept
 	{

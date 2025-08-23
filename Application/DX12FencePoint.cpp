@@ -2,7 +2,7 @@
 #include "DX12FencePoint.h"
 #include "DX12Fence.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12FencePoint::DX12FencePoint(DX12Fence* fence, uint64_t fenceValue) noexcept :
 		m_FencePtr(fence),

@@ -5,7 +5,7 @@
 #include "Keyboard.h"
 #include "Time.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	Camera::Camera(const Info& info) noexcept :
 		m_Forward(info.m_Forward),

@@ -3,7 +3,7 @@
 #include "DX12Device.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	// DX12CommandAllocator
 	DX12CommandAllocator::DX12CommandAllocator(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept

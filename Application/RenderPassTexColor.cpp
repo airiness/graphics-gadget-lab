@@ -14,7 +14,7 @@
 #include "Components.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	RenderPassTexColor::RenderPassTexColor(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device)

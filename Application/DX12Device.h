@@ -6,7 +6,7 @@ namespace D3D12MA
 	class Allocator;
 }
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12CommandQueue;
 	class DX12SwapChain;

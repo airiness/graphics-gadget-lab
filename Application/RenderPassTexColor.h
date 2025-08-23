@@ -1,7 +1,7 @@
 #pragma once
 #include "RenderPassBase.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Device;
 	class DX12CommandList;

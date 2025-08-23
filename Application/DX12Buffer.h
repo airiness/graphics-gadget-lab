@@ -1,6 +1,6 @@
 #pragma once
 #include "DX12Resource.h"
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Buffer : public DX12Resource
 	{

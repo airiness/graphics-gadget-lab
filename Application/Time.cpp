@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "Time.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	void Time::Initialize() noexcept
 	{

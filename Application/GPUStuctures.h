@@ -2,7 +2,7 @@
 
 // struct member name without m_ for GPU using
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	struct alignas(16) LightGPU
 	{

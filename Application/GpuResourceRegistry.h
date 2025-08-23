@@ -4,7 +4,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Device;
 	class GpuResourceRegistry

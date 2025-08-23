@@ -1,7 +1,7 @@
 #pragma once
 #include <type_traits>
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 #define GGLAB_ENUM_FLAGS(EnumType)                                                  \
 constexpr inline EnumType operator|(EnumType a, EnumType b) noexcept {				\

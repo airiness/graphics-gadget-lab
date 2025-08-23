@@ -7,7 +7,7 @@
 #include "Keyboard.h"
 #include "Mouse.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	std::unique_ptr<Application> Application::s_Application;
 

@@ -318,6 +318,9 @@
     <ClInclude Include="VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="GpuResourceAllocator.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

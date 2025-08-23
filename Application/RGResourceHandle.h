@@ -1,6 +1,6 @@
 #pragma once
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class RGResourceHandle
 	{

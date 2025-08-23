@@ -1,5 +1,5 @@
 #pragma once
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12CommandList;
 	class RGBuilder;

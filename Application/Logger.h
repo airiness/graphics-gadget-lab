@@ -4,7 +4,7 @@
 #include <memory>
 #include <spdlog/spdlog.h>
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class Logger
 	{

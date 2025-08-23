@@ -1,7 +1,7 @@
 #pragma once
 #include "DX12Resource.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Texture : public DX12Resource
 	{

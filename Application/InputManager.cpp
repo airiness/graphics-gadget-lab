@@ -4,7 +4,7 @@
 #include "Keyboard.h"
 #include "Mouse.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	void InputManager::Initialize(HWND windowHandle) noexcept
 	{

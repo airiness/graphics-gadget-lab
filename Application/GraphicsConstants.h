@@ -4,7 +4,7 @@
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	using TextureID = uint32_t;
 	inline constexpr TextureID InvalidTextureID = (TextureID)(-1);

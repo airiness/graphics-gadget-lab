@@ -4,7 +4,7 @@
 #include "Utility.h"
 #include "RenderPassTexColor.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12RootSignature::DX12RootSignature(DX12Device* dx12Device, const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept :
 		m_DX12Device(dx12Device),

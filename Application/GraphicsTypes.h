@@ -1,5 +1,5 @@
 #pragma once
-namespace graphicsGadgetLab
+namespace gglab
 {
 	enum class ModelType : uint32_t
 	{

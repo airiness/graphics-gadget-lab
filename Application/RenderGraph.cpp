@@ -6,7 +6,7 @@
 #include "DX12Buffer.h"
 #include "DX12SwapChain.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	RenderGraph::RenderGraph(DX12Device* dx12Device) noexcept :
 		m_GpuResourceRegistry(dx12Device),

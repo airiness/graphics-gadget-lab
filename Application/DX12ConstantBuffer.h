@@ -2,7 +2,7 @@
 #include "DX12Device.h"
 #include "DX12Buffer.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Buffer;
 

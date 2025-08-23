@@ -8,7 +8,7 @@
 #include "DX12CommandAllocator.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12CommandList::DX12CommandList(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept :
 		m_DX12Device(dx12Device),

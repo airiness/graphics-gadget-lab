@@ -1,7 +1,7 @@
 #pragma once
 #include "RendererConstant.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Device;
 	class DX12Texture;

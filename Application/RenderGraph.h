@@ -5,7 +5,7 @@
 #include "RGPass.h"
 #include "StringId.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	class DX12Device;
 	class DX12COmmandList;

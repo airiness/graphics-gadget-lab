@@ -1,9 +1,9 @@
-﻿#include "Precompiled.h"
+#include "Precompiled.h"
 #include "DX12PipelineState.h"
 #include "DX12Device.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12PipelineState::DX12PipelineState(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device)
@@ -52,4 +52,4 @@ namespace graphicsGadgetLab
 		// TODO: debug name
 	}
 
-} // namespace graphicsGadgetLab
+} // namespace gglab

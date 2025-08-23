@@ -1,6 +1,6 @@
 #pragma once
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	constexpr uint64_t CRC64_POLY = 0x42F0E1EBA9EA3693ull;
 
@@ -128,9 +128,9 @@ namespace graphicsGadgetLab
 // StringId hash for using as a key
 namespace std
 {
-	template<> struct hash<graphicsGadgetLab::StringId>
+	template<> struct hash<gglab::StringId>
 	{
-		size_t operator()(const graphicsGadgetLab::StringId& id) const noexcept
+		size_t operator()(const gglab::StringId& id) const noexcept
 		{
 			return std::hash<uint64_t>{}(id.Value());
 		}

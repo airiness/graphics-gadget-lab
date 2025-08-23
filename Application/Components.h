@@ -4,7 +4,7 @@
 #include "DX12Descriptor.h"
 #include "GraphicsTypes.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	namespace components
 	{

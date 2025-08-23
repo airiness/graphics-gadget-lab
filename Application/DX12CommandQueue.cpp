@@ -6,7 +6,7 @@
 #include "Application.h"
 #include "Utility.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12CommandQueue::DX12CommandQueue(
 		DX12Device* dx12Device,

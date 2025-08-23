@@ -2,7 +2,7 @@
 #include "Mouse.h"
 #include "Utility.h"
 #include <iostream>
-namespace graphicsGadgetLab
+namespace gglab
 {
 	Mouse::Mouse() noexcept :
 		InputBase(GameInputKind::GameInputKindMouse)

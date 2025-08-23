@@ -7,7 +7,7 @@
 #include "DX12Fence.h"
 #include "DX12Buffer.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	DX12ResourceUploader::DX12ResourceUploader(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device),

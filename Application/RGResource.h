@@ -2,7 +2,7 @@
 #include "RGResourceHandle.h"
 #include "EnumFlags.h"
 
-namespace graphicsGadgetLab
+namespace gglab
 {
 	enum RGResourceType : uint8_t
 	{
