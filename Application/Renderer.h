@@ -33,11 +33,8 @@ namespace gglab
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept { return m_CommonRootSignature.get(); }
 
-		const DX12Descriptor& GetRenderTarget(RenderTargetIndex rtIndex) const noexcept;
-			
 		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); };
 	private:
-		void InitializeRenderTargets() noexcept;
 		void InitializeConstantBuffer() noexcept;
 		void InitializeRenderObjects() noexcept;
 		void InitializeCamera() noexcept;
@@ -51,10 +48,6 @@ namespace gglab
 		std::unique_ptr<DX12Device> m_Device;
 
 		std::unique_ptr<Camera> m_Camera;
-
-		// RenderTargets & DepthStencilBuffer
-		RenderTargetArray m_RenderTargets;
-		RenderTargetDescriptors m_RenderTargetDescriptors = {};
 
 		// ConstantBuffer
 		std::unique_ptr<DX12ConstantBuffer<GlobalConstantBuffer>> m_GlobalConstantBuffer;

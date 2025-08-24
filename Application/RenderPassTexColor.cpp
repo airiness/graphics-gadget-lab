@@ -26,15 +26,28 @@ namespace gglab
 	{
 		struct TexColorData 
 		{
-
+			RGTextureId m_Depth;
 		};
 
 		const auto& texColorPass = rg.AddPass<TexColorData>("RenderPassTexColor",
-			[](RenderGraph::RGBuilder& builder, TexColorData& data)
+			[this](RenderGraph::RGBuilder& builder, TexColorData& data)
 			{
 				builder.SideEffect();
+
+				auto* swapChain = m_DX12Device->GetSwapChain();
+
+				RGTextureDesc dsDesc = {};
+				dsDesc.m_Width = swapChain->GetBufferWidth();
+				dsDesc.m_Height = swapChain->GetBufferHeight();
+				dsDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				dsDesc.m_Usage = RGTextureUsage::DepthStencil;
+
+				data.m_Depth = builder.CreateTexture("Depth", dsDesc);
+
+				builder.Write<RGTextureResource>(data.m_Depth, RGTextureUsage::DepthStencil);
+
 			},
-			[this](DX12CommandList* commandList, TexColorData& data)
+			[this, &rg](DX12CommandList* commandList, TexColorData& data)
 			{
 				auto* renderer = Application::GetInstance()->GetRenderer();
 				auto* rootSignature = renderer->GetCommonRootSignature();
@@ -60,11 +73,21 @@ namespace gglab
 					swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())
 				};
 
-				auto ds = renderer->GetRenderTarget(RenderTargetIndex::DS0);
-				commandList->SetRenderTargets(rtvs, &ds);
+				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
+				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
+				auto dsHeap = m_DX12Device->GetDsvDescriptorHeap(); //TODO: view cache?
+				auto dsDescriptorHandle = dsHeap->CreateDescriptor();
+				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+				dsvDesc.Format = dsTexture->GetDesc().Format;
+				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+				dsvDesc.Texture2D.MipSlice = 0;
+
+				m_DX12Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsvDesc, dsDescriptorHandle.m_CpuHandle);
+				commandList->SetRenderTargets(rtvs, &dsDescriptorHandle);
 
 				swapChain->ClearBackBuffer(commandList);
-				commandList->ClearDepthStencil(ds, 1.0f);
+				commandList->ClearDepthStencil(dsDescriptorHandle, 1.0f);
 
 				// globals
 				commandList->SetGraphicsConstantBuffer(

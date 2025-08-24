@@ -190,6 +190,9 @@ namespace gglab
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		void Retire(DX12FencePoint fencePoint) noexcept;
 
+		DX12Texture* GetTexture(RGTextureId texId) noexcept;
+		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;
+
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;

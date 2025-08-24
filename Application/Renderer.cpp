@@ -40,7 +40,6 @@ namespace gglab
 
 	void Renderer::Initialize() noexcept
 	{
-		InitializeRenderTargets();
 		InitializeConstantBuffer();
 		InitializeCamera();
 		InitializeRenderObjects();
@@ -149,80 +148,6 @@ namespace gglab
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
 		m_CommonRootSignature = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
-	}
-
-	const DX12Descriptor& Renderer::GetRenderTarget(RenderTargetIndex rtIndex) const noexcept
-	{
-		return m_RenderTargetDescriptors[static_cast<uint32_t>(rtIndex)];
-	}
-
-	void Renderer::InitializeRenderTargets() noexcept
-	{
-		auto app = Application::GetInstance();
-		auto width = app->GetWindowWidth();
-		auto height = app->GetWindowHeight();
-		auto rtHeap = m_Device->GetRtvDescriptorHeap();
-
-		// RenderTargets
-		for (uint32_t i = 0; i < static_cast<uint32_t>(RenderTargetIndex::DS0); ++i)
-		{
-			auto rtFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-			auto rtResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(rtFormat, width, height);
-			rtResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-			const float rtClearColor[] = { 0.0f, 0.4f, 0.5f, 1.0f };
-			auto rtClearValue = CD3DX12_CLEAR_VALUE(rtFormat, rtClearColor);
-
-			auto& rtTexture = m_RenderTargets[i];
-			rtTexture = std::make_unique<DX12Texture>();
-			DX12Resource::CreateInfo rtCreateInfo = {};
-			rtCreateInfo.m_Allocator = m_Device->GetMemAllocator();
-			rtCreateInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-			rtCreateInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
-			rtCreateInfo.m_InitStates = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			rtCreateInfo.m_ResourceDesc = rtResourceDesc;
-			rtCreateInfo.m_ClearValue = rtClearValue;
-			rtTexture->Create(rtCreateInfo);
-
-			// Create Render target view
-			auto descriptor = rtHeap->CreateDescriptor();
-			D3D12_RENDER_TARGET_VIEW_DESC rtDesc = {};
-			rtDesc.Format = rtFormat;
-			rtDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			rtDesc.Texture2D.MipSlice = 0;
-			rtDesc.Texture2D.PlaneSlice = 0;
-			m_Device->Get()->CreateRenderTargetView(rtTexture->Get(), &rtDesc, descriptor.m_CpuHandle);
-			m_RenderTargetDescriptors[i] = descriptor;
-		}
-
-		auto dsHeap = m_Device->GetDsvDescriptorHeap();
-		// DepthStencil
-		{
-			auto dsFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-			auto dsResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(dsFormat, width, height);
-			dsResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-			auto dsClearValue = CD3DX12_CLEAR_VALUE(dsFormat, 1.0f, 0);
-
-			auto& dsTexture = m_RenderTargets[static_cast<uint32_t>(RenderTargetIndex::DS0)];
-			dsTexture = std::make_unique<DX12Texture>();
-			DX12Resource::CreateInfo dsCreateInfo = {};
-			dsCreateInfo.m_Allocator = m_Device->GetMemAllocator();
-			dsCreateInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-			dsCreateInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
-			dsCreateInfo.m_InitStates = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-			dsCreateInfo.m_ResourceDesc = dsResourceDesc;
-			dsCreateInfo.m_ClearValue = dsClearValue;
-			dsTexture->Create(dsCreateInfo);
-
-			// Create depth stencil view
-			auto descriptor = dsHeap->CreateDescriptor();
-			D3D12_DEPTH_STENCIL_VIEW_DESC dsDesc = {};
-			dsDesc.Format = dsFormat;
-			dsDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-			dsDesc.Flags = D3D12_DSV_FLAG_NONE;
-			dsDesc.Texture2D.MipSlice = 0;
-			m_Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsDesc, descriptor.m_CpuHandle);
-			m_RenderTargetDescriptors[static_cast<uint32_t>(RenderTargetIndex::DS0)] = descriptor;
-		}
 	}
 
 	void Renderer::InitializeConstantBuffer() noexcept

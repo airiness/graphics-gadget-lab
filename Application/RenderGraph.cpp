@@ -163,6 +163,26 @@ namespace gglab
 		m_MarkedReleaseBufferIndices.clear();
 	}
 
+	DX12Texture* RenderGraph::GetTexture(RGTextureId texId) noexcept
+	{
+		auto* virtualRes = static_cast<RGVirtualResource<RGTextureResource>*>(GetVirtualResource(texId));
+		if (!virtualRes || virtualRes->m_GpuResourceIndex == RGVirtualResourceBase::InvalidGpuResourceIndex)
+		{
+			return nullptr;
+		}
+		return m_GpuResourceAllocator.GetTexture(virtualRes->m_GpuResourceIndex);
+	}
+
+	DX12Buffer* RenderGraph::GetBuffer(RGBufferId bufId) noexcept
+	{
+		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
+		if (!virtualRes || virtualRes->m_GpuResourceIndex == RGVirtualResourceBase::InvalidGpuResourceIndex)
+		{
+			return nullptr;
+		}
+		return m_GpuResourceAllocator.GetBuffer(virtualRes->m_GpuResourceIndex);
+	}
+
 	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) noexcept
 	{
 		if (!handle.IsValid())

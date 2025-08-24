@@ -13,17 +13,6 @@ namespace gglab
 		RootParamCount
 	};
 
-	enum class RenderTargetIndex : uint32_t
-	{
-		RT0,
-		RT1,
-		RT2,
-		DS0,
-		RTCount
-	};
-	using RenderTargetArray = std::array<std::unique_ptr<DX12Texture>, static_cast<uint32_t>(RenderTargetIndex::RTCount)>;
-	using RenderTargetDescriptors = std::array<DX12Descriptor, static_cast<uint32_t>(RenderTargetIndex::RTCount)>;
-
 	// TODO: move to GpuStructures.h
 	struct GlobalConstantBuffer
 	{
