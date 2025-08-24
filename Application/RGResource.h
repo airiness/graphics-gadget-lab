@@ -191,6 +191,42 @@ namespace gglab
 		static_assert(std::is_unsigned_v<Bits>, "Usage underlying type should be unsigned");
 	};
 
+	// Get default clear value from RGResouceDesc, Texture can be use when Render target and Depth stencil.
+	template<typename RGResourceDesc>
+	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue(const RGResourceDesc&) noexcept = delete;
+
+	template<>
+	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGTextureDesc>(const RGTextureDesc& rgTexDesc) noexcept
+	{
+		if (Test(rgTexDesc.m_Usage, RGTextureUsage::RenderTarget))
+		{
+			D3D12_CLEAR_VALUE clearValue = {};
+			clearValue.Format = rgTexDesc.m_Format;
+			clearValue.Color[0] = 0.0f;
+			clearValue.Color[1] = 0.0f;
+			clearValue.Color[2] = 0.0f;
+			clearValue.Color[3] = 1.0f;
+			return std::optional<D3D12_CLEAR_VALUE>(clearValue);
+		}
+		else if (Test(rgTexDesc.m_Usage, RGTextureUsage::DepthStencil))
+		{
+			D3D12_CLEAR_VALUE clearValue = {};
+			clearValue.Format = rgTexDesc.m_Format;
+			clearValue.DepthStencil.Depth = 1.0f;
+			clearValue.DepthStencil.Stencil = 0;
+			return std::optional<D3D12_CLEAR_VALUE>(clearValue);
+		}
+
+		return std::nullopt;
+	}
+
+	//  Buffer do not need default clear value.
+	template<>
+	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGBufferDesc>(const RGBufferDesc&) noexcept
+	{
+		return std::nullopt;
+	}
+
 	inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGTextureUsage& rgTexUsage) noexcept
 	{
 		return

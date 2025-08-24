@@ -8,7 +8,7 @@
 namespace gglab
 {
 	class DX12Device;
-	class RGGpuResAllocator
+	class RGGpuResourceAllocator
 	{
 	public:
 		using ResourceIndex = int32_t;
@@ -37,10 +37,25 @@ namespace gglab
 			{
 				return std::tie(m_Width, m_Height, m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Flags);
 			}
+
+			static TextureKey ConvertResourceDescToKey(D3D12_RESOURCE_DESC resDesc) noexcept
+			{
+				TextureKey texKey
+				{
+					.m_Width = static_cast<uint32_t>(resDesc.Width),
+					.m_Height = static_cast<uint32_t>(resDesc.Height),
+					.m_ArraySize = static_cast<uint16_t>(resDesc.DepthOrArraySize),
+					.m_MipLevels = static_cast<uint16_t>(resDesc.MipLevels),
+					.m_SampleCount = static_cast<uint16_t>(resDesc.SampleDesc.Count),
+					.m_Format = resDesc.Format,
+					.m_Flags = resDesc.Flags
+				};
+				return texKey;
+			}
 		};
 		using TextureKeyHash = KeyHash<TextureKey>;
 
-		struct BufferKey 
+		struct BufferKey
 		{
 			uint64_t m_SizeInBytes = 0;
 			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -50,6 +65,16 @@ namespace gglab
 			auto AsTuple() const noexcept
 			{
 				return std::tie(m_SizeInBytes, m_Flags);
+			}
+
+			static BufferKey ConvertResourceDescToKey(D3D12_RESOURCE_DESC resDesc) noexcept
+			{
+				BufferKey bufKey
+				{
+					.m_SizeInBytes = static_cast<uint64_t>(resDesc.Width),
+					.m_Flags = resDesc.Flags
+				};
+				return bufKey;
 			}
 		};
 		using BufferKeyHash = KeyHash<BufferKey>;
@@ -77,12 +102,6 @@ namespace gglab
 			};
 		}
 
-		struct FreeItem
-		{
-			ResourceIndex m_Index = InvalidResourceIndex;
-			uint64_t m_LastUsedFrame = 0;
-		};
-
 		struct Pending
 		{
 			Type m_Type;
@@ -91,23 +110,26 @@ namespace gglab
 		};
 
 	public:
-		explicit RGGpuResAllocator(DX12Device* dx12device) noexcept;
-		~RGGpuResAllocator() = default;
+		explicit RGGpuResourceAllocator(DX12Device* dx12device) noexcept;
+		~RGGpuResourceAllocator() = default;
 
 		template<typename ResourceDesc>
-		ResourceIndex AcquireResource(const ResourceDesc& rgResourceDesc,
+		ResourceIndex Acquire(const ResourceDesc& rgResourceDesc,
 			D3D12_RESOURCE_STATES initStates = D3D12_RESOURCE_STATE_COMMON,
 			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept = delete;
 
+		void ReleaseTexture(ResourceIndex texIndex, DX12FencePoint fencePoint) noexcept;
+		void ReleaseBuffer(ResourceIndex bufIndex, DX12FencePoint fencePoint) noexcept;
+
 		template<typename ResourceDesc>
-		void ReleaseResource(ResourceIndex resourceIndex, 
-			D3D12_RESOURCE_STATES lastKnownStates, 
+		void ReleaseResource(ResourceIndex resourceIndex,
+			D3D12_RESOURCE_STATES lastKnownStates,
 			DX12FencePoint fencePoint) noexcept = delete;
 
 		DX12Texture* GetTexture(ResourceIndex texIndex) const noexcept;
 		DX12Buffer* GetBuffer(ResourceIndex bufIndex) const noexcept;
 
-		void Tick(DX12FencePoint fencePoint) noexcept;
+		void Tick() noexcept;
 
 		void TrimPerKey(uint32_t maxCachedPerKey) noexcept;
 
@@ -127,90 +149,50 @@ namespace gglab
 		std::vector<std::unique_ptr<DX12Texture>> m_Textures;
 		std::vector<std::unique_ptr<DX12Buffer>> m_Buffers;
 
-		std::unordered_map<TextureKey, std::deque<FreeItem>, TextureKeyHash> m_FreeTextures;
-		std::unordered_map<BufferKey, std::deque<FreeItem>, BufferKeyHash> m_FreeBuffers;
+		std::unordered_map<TextureKey, std::deque<ResourceIndex>, TextureKeyHash> m_FreeTextures;
+		std::unordered_map<BufferKey, std::deque<ResourceIndex>, BufferKeyHash> m_FreeBuffers;
 
 		std::deque<Pending> m_Pendings;
+
+		uint32_t m_MaxCachedPerKey = 8;
 	};
 
 	template<>
-	inline RGGpuResAllocator::ResourceIndex RGGpuResAllocator::AcquireResource<RGTextureDesc>(
+	inline RGGpuResourceAllocator::ResourceIndex RGGpuResourceAllocator::Acquire<RGTextureDesc>(
 		const RGTextureDesc& rgTexDesc,
 		D3D12_RESOURCE_STATES initStates,
 		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
 	{
 		const auto texKey = MakeKey(rgTexDesc);
-		auto iter = m_FreeTextures.find(texKey);
-		if (iter != m_FreeTextures.end() && !iter->second.empty())
+
+		if (auto iter = m_FreeTextures.find(texKey);
+			iter != m_FreeTextures.end() && !iter->second.empty())
 		{
-			FreeItem freeItem = iter->second.back();
-			return freeItem.m_Index;
+			const auto texIndex = iter->second.back();
+			iter->second.pop_back();
+
+			return texIndex;
 		}
 
 		return CreateTexture(rgTexDesc, initStates, clearValue);
 	}
 
 	template<>
-	inline RGGpuResAllocator::ResourceIndex RGGpuResAllocator::AcquireResource<RGBufferDesc>(
+	inline RGGpuResourceAllocator::ResourceIndex RGGpuResourceAllocator::Acquire<RGBufferDesc>(
 		const RGBufferDesc& rgBufDesc,
 		D3D12_RESOURCE_STATES initStates,
 		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
 	{
 		const auto bufKey = MakeKey(rgBufDesc);
-		auto iter = m_FreeBuffers.find(bufKey);
-		if (iter != m_FreeBuffers.end() && !iter->second.empty())
+		if (auto iter = m_FreeBuffers.find(bufKey);
+			iter != m_FreeBuffers.end() && !iter->second.empty())
 		{
-			FreeItem freeItem = iter->second.back();
-			return freeItem.m_Index;
+			const auto bufIndex = iter->second.back();
+			iter->second.pop_back();
+
+			return bufIndex;
 		}
 
 		return CreateBuffer(rgBufDesc, initStates);
 	}
-
-	template<>
-	inline void RGGpuResAllocator::ReleaseResource<RGTextureDesc>(ResourceIndex texIndex, 
-		D3D12_RESOURCE_STATES lastKnownStates, 
-		DX12FencePoint fencePoint) noexcept
-	{
-		if (texIndex < 0 || static_cast<size_t>(texIndex) >= m_Textures.size())
-		{
-			GGLAB_LOG_WARN("RGGpuResAllocator::ReleaseResource() : Release Invalid texture.");
-			return;
-		}
-
-		auto* tex = m_Textures[texIndex].get();
-
-		// TODO: last know state
-		m_Pendings.emplace_back(
-			std::move(Pending
-				{
-					.m_Type = Type::Texture,
-					.m_Index = texIndex,
-					.m_FencePoint = fencePoint,
-				}));
-	}
-
-	template<>
-	inline void RGGpuResAllocator::ReleaseResource<RGBufferDesc>(ResourceIndex bufIndex,
-		D3D12_RESOURCE_STATES lastKnownStates,
-		DX12FencePoint fencePoint) noexcept
-	{
-		if (bufIndex < 0 || static_cast<size_t>(bufIndex) >= m_Buffers.size())
-		{
-			GGLAB_LOG_WARN("RGGpuResAllocator::ReleaseResource() : Release Invalid buffer.");
-			return;
-		}
-
-		auto* buf = m_Buffers[bufIndex].get();
-
-		// TODO: last know state
-		m_Pendings.emplace_back(
-			std::move(Pending
-				{
-					.m_Type = Type::Texture,
-					.m_Index = bufIndex,
-					.m_FencePoint = fencePoint,
-				}));
-	}
-
 }

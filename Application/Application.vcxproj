@@ -125,7 +125,7 @@
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
-    <ClCompile Include="RGGpuResAllocator.cpp" />
+    <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="GPUStuctures.cpp" />
     <ClCompile Include="GraphicsTypes.cpp" />
     <ClCompile Include="InputBase.cpp" />
@@ -178,7 +178,7 @@
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="EnumFlags.h" />
     <ClInclude Include="FNV1a.h" />
-    <ClInclude Include="RGGpuResAllocator.h" />
+    <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStuctures.h" />
     <ClInclude Include="GraphicsTypes.h" />
     <ClInclude Include="InputBase.h" />

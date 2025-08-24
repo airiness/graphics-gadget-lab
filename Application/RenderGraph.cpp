@@ -8,8 +8,8 @@
 
 namespace gglab
 {
-	RenderGraph::RenderGraph(DX12Device* dx12Device) noexcept :
-		m_GpuResourceAllocator(dx12Device),
+	RenderGraph::RenderGraph(RGGpuResourceAllocator& gpuResAllocator) noexcept :
+		m_GpuResourceAllocator(gpuResAllocator),
 		m_ArenaAllocator(1u << 20)
 	{
 	}
@@ -23,7 +23,7 @@ namespace gglab
 		std::vector<RGPassNode*> stack;
 		std::unordered_set<RGPassNode*> reachable;
 
-		auto addPass = [&stack, &reachable](RGPassNode* passNode) 
+		auto addPass = [&stack, &reachable](RGPassNode* passNode)
 			{
 				if (!passNode)
 				{
@@ -83,7 +83,7 @@ namespace gglab
 				continue;
 			}
 
-			auto markUse = [this, &passNode](RGResourceNode::Index index) 
+			auto markUse = [this, &passNode](RGResourceNode::Index index)
 				{
 					RGResourceNode& resourceNode = m_ResourceNodes[index];
 					auto* virtualResource = resourceNode.m_VirtualResource;
@@ -124,7 +124,7 @@ namespace gglab
 
 		for (auto& passNode : m_PassNodes)
 		{
-			if(passNode.m_Culled)
+			if (passNode.m_Culled)
 			{
 				continue;
 			}
@@ -143,9 +143,24 @@ namespace gglab
 
 			for (auto* virtualResource : passNode.m_DestroyVirtualResources)
 			{
-				virtualResource->Destroy(m_GpuResourceAllocator);
+				virtualResource->Destroy(*this);
 			}
 		}
+	}
+
+	void RenderGraph::Retire(DX12FencePoint fencePoint) noexcept
+	{
+		for (const auto texIndex : m_MarkedReleaseTextureIndices)
+		{
+			m_GpuResourceAllocator.ReleaseTexture(texIndex, fencePoint);
+		}
+		m_MarkedReleaseTextureIndices.clear();
+
+		for (const auto bufIndex : m_MarkedReleaseBufferIndices)
+		{
+			m_GpuResourceAllocator.ReleaseBuffer(bufIndex, fencePoint);
+		}
+		m_MarkedReleaseBufferIndices.clear();
 	}
 
 	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) noexcept

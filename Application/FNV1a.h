@@ -35,7 +35,7 @@ namespace gglab
 		static size_t HashTuple(const Tuple& tuple) noexcept
 		{
 			uint64_t hash = OffsetBasis;
-			std::apply([](auto const&... values)
+			std::apply([&hash](auto const&... values)
 				{
 					(Mix(hash, ToU64(values)), ...);
 				}, tuple);

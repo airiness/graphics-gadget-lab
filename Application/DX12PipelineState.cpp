@@ -10,10 +10,6 @@ namespace gglab
 	{
 	}
 
-	DX12PipelineState::~DX12PipelineState() noexcept
-	{
-	}
-
 	DX12GraphicsPipelineState::DX12GraphicsPipelineState(DX12Device* dx12Device, const DX12GraphicsPipelineStateDesc& desc) noexcept :
 		DX12PipelineState(dx12Device),
 		m_GraphicsPSODesc(desc)

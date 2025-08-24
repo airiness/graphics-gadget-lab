@@ -12,6 +12,7 @@ namespace gglab
 	class DX12Fence;
 	class Camera;
 	class Cube;
+	class RGGpuResourceAllocator;
 	class RenderPassTexColor;
 
 	class Renderer
@@ -19,7 +20,7 @@ namespace gglab
 	public:
 		Renderer() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
-		~Renderer() noexcept;
+		~Renderer();
 
 		void Initialize() noexcept;
 		void Update() noexcept;
@@ -44,8 +45,6 @@ namespace gglab
 		void UpdateGpuBuffers() noexcept;
 		void UpdateGlobalConstantBuffer() noexcept;
 
-		void RenderObjects(DX12CommandList* commandList) noexcept;
-
 		void CreateCommonRootSignature() noexcept;
 
 	private:
@@ -69,6 +68,7 @@ namespace gglab
 
 		std::atomic_bool m_IsInitialized = false;
 
+		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<RenderPassTexColor> m_TexColorPass;
 	};
 }

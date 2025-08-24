@@ -14,6 +14,7 @@
 #include "DX12CommandAllocator.h"
 #include "DX12ConstantBuffer.h"
 #include "RenderGraph.h"
+#include "RGGpuResourceAllocator.h"
 #include "Components.h"
 #include "AssetManager.h"
 #include "Camera.h"
@@ -33,7 +34,7 @@ namespace gglab
 		m_Device->Initialize();
 	}
 
-	Renderer::~Renderer() noexcept
+	Renderer::~Renderer()
 	{
 	}
 
@@ -45,6 +46,8 @@ namespace gglab
 		InitializeRenderObjects();
 
 		CreateCommonRootSignature();
+
+		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		m_TexColorPass = std::make_unique<RenderPassTexColor>(m_Device.get());
 
@@ -85,23 +88,24 @@ namespace gglab
 		commandList->Begin(commandAllocator);
 
 		// Render Graph
-		{
-			RenderGraph rg(m_Device.get());
+		RenderGraph rg(*m_RGGpuAllocator.get());
 
-			m_TexColorPass->AddPass(rg);
+		m_TexColorPass->AddPass(rg);
 
-			rg.Compile();
+		rg.Compile();
 
-			RGExecuteContext executeContext = {};
-			executeContext.m_GraphicsCommandList = commandList;
-			rg.Execute(executeContext);
-
-		}
+		RGExecuteContext executeContext = {};
+		executeContext.m_GraphicsCommandList = commandList;
+		rg.Execute(executeContext);
 
 		commandList->End();
 
 		const DX12CommandList* commandLists[] = { commandList };
 		auto fencePoint = commandQueue->Execute(commandLists);
+
+		rg.Retire(fencePoint);
+
+		m_RGGpuAllocator->Tick();
 
 		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, fencePoint);
 
@@ -178,7 +182,7 @@ namespace gglab
 			rtCreateInfo.m_ResourceDesc = rtResourceDesc;
 			rtCreateInfo.m_ClearValue = rtClearValue;
 			rtTexture->Create(rtCreateInfo);
-			
+
 			// Create Render target view
 			auto descriptor = rtHeap->CreateDescriptor();
 			D3D12_RENDER_TARGET_VIEW_DESC rtDesc = {};
@@ -294,42 +298,5 @@ namespace gglab
 		cbBuffer.m_ProjectionMatrix = DirectX::XMMatrixTranspose(projMatrix);
 
 		m_GlobalConstantBuffer->Update(cbBuffer);
-	}
-
-	void Renderer::RenderObjects(DX12CommandList* commandList) noexcept
-	{
-		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
-
-		const auto DrawModel = [](DX12CommandList* commandList, const Model& model)
-			{
-				auto* assetManager = Application::GetInstance()->GetAssetManager();
-				for (const auto& mesh : model.m_Meshes)
-				{
-					auto* meshPtr = assetManager->GetMesh(mesh);
-					if (meshPtr != nullptr)
-					{
-						D3D12_VERTEX_BUFFER_VIEW vertexBufferViews[] = { meshPtr->m_VertexBufferView };
-						commandList->SetVertexBuffers(0, vertexBufferViews);
-						commandList->SetIndexBuffer(meshPtr->m_IndexBufferView);
-						auto* material = assetManager->GetMaterial(meshPtr->m_Material);
-						if (material != nullptr && material->m_MaterialID != InvalidTextureID)
-						{
-							auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
-							commandList->SetGraphicsDescriptor(
-								static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
-								texture->m_Descriptor);
-						}
-						commandList->DrawIndexedInstanced(static_cast<uint32_t>(meshPtr->m_IndexCount));
-					}
-				}
-			};
-
-		// Get all models in the registry
-		auto view = enttRegistry.view<Model>();
-		for (auto entity : view)
-		{
-			auto& model = view.get<Model>(entity);
-			DrawModel(commandList, model);
-		}
 	}
 }

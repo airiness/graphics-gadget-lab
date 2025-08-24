@@ -169,7 +169,7 @@
     <ClCompile Include="VertexData.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="RGGpuResAllocator.cpp">
+    <ClCompile Include="RGGpuResourceAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
   </ItemGroup>
@@ -318,7 +318,7 @@
     <ClInclude Include="VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="RGGpuResAllocator.h">
+    <ClInclude Include="RGGpuResourceAllocator.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="FNV1a.h">

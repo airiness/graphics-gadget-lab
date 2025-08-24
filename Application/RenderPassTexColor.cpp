@@ -24,7 +24,10 @@ namespace gglab
 
 	void RenderPassTexColor::AddPass(RenderGraph& rg) noexcept
 	{
-		struct TexColorData {};
+		struct TexColorData 
+		{
+
+		};
 
 		const auto& texColorPass = rg.AddPass<TexColorData>("RenderPassTexColor",
 			[](RenderGraph::RGBuilder& builder, TexColorData& data)

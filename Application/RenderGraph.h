@@ -1,6 +1,6 @@
 #pragma once
 #include "RGArenaAllocator.h"
-#include "GpuResourceAllocator.h"
+#include "RGGpuResourceAllocator.h"
 #include "RGResource.h"
 #include "RGPass.h"
 #include "StringId.h"
@@ -8,7 +8,7 @@
 namespace gglab
 {
 	class DX12Device;
-	class DX12COmmandList;
+	class DX12CommandList;
 	class RGPassBase;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
@@ -16,17 +16,19 @@ namespace gglab
 	struct RGPassNode;
 	struct RGResourceNode;
 
+	class RenderGraph;
+
 	struct RGExecuteContext
 	{
 		DX12CommandList* m_GraphicsCommandList = nullptr;
-		DX12COmmandList* m_ComputeCommandList = nullptr;
+		DX12CommandList* m_ComputeCommandList = nullptr;
 	};
 
 	struct RGVirtualResourceBase
 	{
 		virtual ~RGVirtualResourceBase() = default;
-		virtual void Devirtualize(RGGpuResAllocator&) noexcept = 0;
-		virtual void Destroy(RGGpuResAllocator&) noexcept = 0;
+		virtual void Devirtualize(RGGpuResourceAllocator&) noexcept = 0;
+		virtual void Destroy(RenderGraph&) noexcept = 0;
 
 		StringId m_NameId;
 		bool m_Imported = false;
@@ -42,8 +44,8 @@ namespace gglab
 
 		using Index = int32_t;
 		static constexpr Index InvalidIndex = static_cast<Index>(-1);
-		using GpuResourceIndex = RGGpuResAllocator::ResourceIndex;
-		static constexpr GpuResourceIndex InvalidGpuResourceIndex = static_cast<GpuResourceIndex>(-1);
+		using GpuResourceIndex = RGGpuResourceAllocator::ResourceIndex;
+		static constexpr GpuResourceIndex InvalidGpuResourceIndex = RGGpuResourceAllocator::InvalidResourceIndex;
 	};
 
 	template<typename RESOURCE>
@@ -58,27 +60,8 @@ namespace gglab
 		Usage m_Usage = RESOURCE::DefaultNoneUsage;
 		GpuResourceIndex m_GpuResourceIndex = InvalidGpuResourceIndex;
 
-		void Devirtualize(RGGpuResAllocator& allocator) noexcept override
-		{
-			if (m_Devirtualized)
-			{
-				return;
-			}
-			m_CurrentStates = RGResourceTraits<RESOURCE>::ToState(static_cast<RGResourceTraits<RESOURCE>::Bits>(m_Usage));
-			m_GpuResourceIndex = allocator.AcquireResource<Desc>(m_Desc);
-			m_Devirtualized = true;
-		}
-
-		void Destroy(RGGpuResAllocator& allocator) noexcept override
-		{
-			if (!m_Devirtualized)
-			{
-				return;
-			}
-			reg.ReleaseResource<Desc>(m_GpuResourceIndex);
-			m_GpuResourceIndex = InvalidGpuResourceIndex;
-			m_Devirtualized = false;
-		}
+		void Devirtualize(RGGpuResourceAllocator& allocator) noexcept override;
+		void Destroy(RenderGraph& rg) noexcept override;
 	};
 
 	struct RGResourceNode
@@ -189,7 +172,7 @@ namespace gglab
 		};
 
 	public:
-		explicit RenderGraph(DX12Device* dx12Device) noexcept;
+		explicit RenderGraph(RGGpuResourceAllocator& gpuResAllocator) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderGraph);
 		~RenderGraph() noexcept;
 
@@ -206,6 +189,7 @@ namespace gglab
 		void Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		void Retire(DX12FencePoint fencePoint) noexcept;
+
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
@@ -215,6 +199,9 @@ namespace gglab
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
+
+		template<typename RESOURCE>
+		void MarkDestroyResourceIndex(RGGpuResourceAllocator::ResourceIndex resIndex) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) noexcept;
 
@@ -227,7 +214,7 @@ namespace gglab
 		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept;
 
 	private:
-		RGGpuResAllocator m_GpuResourceAllocator;
+		RGGpuResourceAllocator& m_GpuResourceAllocator;
 		RGArenaAllocator m_ArenaAllocator;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
@@ -237,7 +224,13 @@ namespace gglab
 
 		std::unordered_map<StringId, RGResourceHandle> m_NameHandleMap;
 
+		std::vector<RGGpuResourceAllocator::ResourceIndex> m_MarkedReleaseTextureIndices;
+		std::vector<RGGpuResourceAllocator::ResourceIndex> m_MarkedReleaseBufferIndices;
+
 		friend class RGBuilder;
+
+		template<typename RESOURCE>
+		friend struct RGVirtualResource;
 	};
 
 	template<typename PassData, typename SetupFunc, typename ExecuteFunc>
@@ -409,9 +402,49 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
+	inline void RenderGraph::MarkDestroyResourceIndex(RGGpuResourceAllocator::ResourceIndex resIndex) noexcept
+	{
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			m_MarkedReleaseTextureIndices.push_back(resIndex);
+		}
+		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
+		{
+			m_MarkedReleaseBufferIndices.push_back(resIndex);
+		}
+	}
+
+	template<typename RESOURCE>
 	inline void RenderGraph::AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept
 	{
 		auto* virtualResource = static_cast<RGVirtualResource<RESOURCE>*>(resourceNode.m_VirtualResource);
 		virtualResource->m_Usage |= usage;
+	}
+
+	// RGVirtualResource functions
+	template<typename RESOURCE>
+	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGGpuResourceAllocator& allocator) noexcept
+	{
+		if (m_Devirtualized)
+		{
+			return;
+		}
+
+		m_CurrentStates = RGResourceTraits<RESOURCE>::ToState(static_cast<RGResourceTraits<RESOURCE>::Bits>(m_Usage));
+		std::optional<D3D12_CLEAR_VALUE> clearValue = DefaultClearValue<Desc>(m_Desc);
+		m_GpuResourceIndex = allocator.Acquire<Desc>(m_Desc, m_CurrentStates, clearValue);
+		m_Devirtualized = true;
+	}
+
+	template<typename RESOURCE>
+	inline void RGVirtualResource<RESOURCE>::Destroy(RenderGraph& rg) noexcept
+	{
+		if (!m_Devirtualized)
+		{
+			return;
+		}
+		rg.MarkDestroyResourceIndex<RESOURCE>(m_GpuResourceIndex);
+		m_GpuResourceIndex = InvalidGpuResourceIndex;
+		m_Devirtualized = false;
 	}
 }

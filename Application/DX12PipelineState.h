@@ -6,7 +6,7 @@ namespace gglab
 	{
 	public:
 		explicit DX12PipelineState(DX12Device* dx12Device) noexcept;
-		virtual ~DX12PipelineState() noexcept;
+		virtual ~DX12PipelineState() = default;
 
 		ID3D12PipelineState* Get() const noexcept { return m_PipelineState.Get(); }
 	protected:
