@@ -5,43 +5,28 @@
 
 namespace gglab
 {
-	DX12DescriptorHeap::DX12DescriptorHeap(DX12Device* device,
-		D3D12_DESCRIPTOR_HEAP_TYPE type,
-		D3D12_DESCRIPTOR_HEAP_FLAGS flags,
-		uint32_t descriptorCount) noexcept :
-		m_DX12Device(device),
-		m_Type(type),
-		m_DescriptorCount(descriptorCount)
+	bool DX12Descriptor::IsValid() const noexcept
 	{
-		m_DescriptorSize = m_DX12Device->Get()->GetDescriptorHandleIncrementSize(m_Type);
-
-		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-		desc.NumDescriptors = m_DescriptorCount;
-		desc.Type = m_Type;
-		desc.Flags = flags;
-		desc.NodeMask = 0;
-		utility::ThrowIfFailed(m_DX12Device->Get()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_DescriptorHeap)));
+		return m_CpuHandle.ptr != 0 && m_Index != InvalidIndex;
 	}
 
-	DX12DescriptorHeap::~DX12DescriptorHeap() noexcept
+	bool DX12Descriptor::IsShaderVisible() const noexcept
 	{
+		return m_GpuHandle.ptr != 0;
 	}
 
-	DX12Descriptor DX12DescriptorHeap::CreateDescriptor() noexcept
+	D3D12_DESCRIPTOR_HEAP_TYPE DX12Descriptor::Type() const noexcept
 	{
-		// TODO: make a cool DesctiptorAllocator
-		DX12Descriptor descriptor = {};
-		GGLAB_ASSERT_MSG(m_CurrentDescriptorIndex <= m_DescriptorCount, "DescriptorHeap is Boooooom! you should make a new one!");
+		return m_Type;
+	}
 
-		descriptor.m_CpuHandle = m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		descriptor.m_CpuHandle.Offset(m_CurrentDescriptorIndex * m_DescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12Descriptor::CpuHandleAt(Index index, uint32_t stride) const noexcept
+	{
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_CpuHandle, static_cast<INT>(index) * stride);
+	}
 
-		if (m_DescriptorHeap->GetDesc().Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
-		{
-			descriptor.m_GpuHandle = m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-			descriptor.m_GpuHandle.Offset(m_CurrentDescriptorIndex * m_DescriptorSize);
-		}
-		++m_CurrentDescriptorIndex;
-		return descriptor;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12Descriptor::GpuHandleAt(Index index, uint32_t stride) const noexcept
+	{
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE(m_GpuHandle, static_cast<INT>(index) * stride);
 	}
 }

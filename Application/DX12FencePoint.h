@@ -10,6 +10,9 @@ namespace gglab
 		explicit DX12FencePoint(DX12Fence* fence, uint64_t fenceValue) noexcept;
 		~DX12FencePoint() = default;
 
+		bool operator==(const DX12FencePoint& other) const noexcept;
+		bool operator<(const DX12FencePoint& other) const noexcept;
+
 		bool IsValid() const noexcept { return m_FencePtr != nullptr; }
 		explicit operator bool() const noexcept { return IsValid(); }
 

@@ -10,6 +10,19 @@ namespace gglab
 	{
 	}
 
+	bool DX12FencePoint::operator==(const DX12FencePoint& other) const noexcept
+	{
+		return m_FencePtr == other.m_FencePtr &&
+			m_PointValue == other.m_PointValue;
+	}
+
+	bool DX12FencePoint::operator<(const DX12FencePoint& other) const noexcept
+	{
+		return m_FencePtr == other.m_FencePtr ?
+			m_PointValue < other.m_PointValue :
+			m_FencePtr < other.m_FencePtr;
+	}
+
 	bool DX12FencePoint::IsCompleted() const noexcept
 	{
 		return m_FencePtr && m_FencePtr->IsCompleted(m_PointValue);
@@ -19,7 +32,7 @@ namespace gglab
 	{
 		if (m_FencePtr)
 		{
-			m_FencePtr->WaitCompletion(m_PointValue);
+			m_FencePtr->WaitCompletion(m_PointValue, timeout);
 		}
 	}
 

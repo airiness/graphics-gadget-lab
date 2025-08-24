@@ -172,6 +172,9 @@
     <ClCompile Include="RGGpuResourceAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
+    <ClCompile Include="DX12DescriptorAllocator.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -323,6 +326,12 @@
     </ClInclude>
     <ClInclude Include="FNV1a.h">
       <Filter>Core\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12DescriptorRingAllocator.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12DescriptorAllocator.h">
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
