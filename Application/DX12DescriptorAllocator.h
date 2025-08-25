@@ -7,12 +7,14 @@ namespace gglab
 	class DX12DescriptorAllocator
 	{
 	private:
+		using OffsetType = uint32_t;
+		using CountType = uint32_t;
 		struct FreeBlock;
-		using FreeBlocksByOffset = std::map<uint32_t, FreeBlock>;
-		using FreeBlocksByCount = std::multimap<uint32_t, FreeBlocksByOffset::iterator>;
+		using FreeBlocksByOffset = std::map<OffsetType, FreeBlock>;
+		using FreeBlocksByCount = std::multimap<CountType, FreeBlocksByOffset::iterator>;
 		struct FreeBlock
 		{
-			uint32_t m_Count = 0;
+			CountType m_Count = 0;
 			FreeBlocksByCount::iterator m_OrderBySizeIter;
 		};
 
@@ -36,7 +38,7 @@ namespace gglab
 		uint32_t FreeCount() const noexcept;
 
 	private:
-
+		void AddBlock(OffsetType offset, CountType count) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

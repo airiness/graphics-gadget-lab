@@ -8,6 +8,9 @@ namespace gglab
 		using Index = uint32_t;
 
 	public:
+		DX12Descriptor() noexcept = default;
+		~DX12Descriptor() = default;
+
 		bool IsValid() const noexcept;
 		bool IsShaderVisible() const noexcept;
 		D3D12_DESCRIPTOR_HEAP_TYPE Type() const noexcept;

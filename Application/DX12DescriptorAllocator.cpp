@@ -15,6 +15,8 @@ namespace gglab
 		m_DescriptorCount(descriptorCount),
 		m_DescriptorIncrementSize(m_DX12Device->Get()->GetDescriptorHandleIncrementSize(type))
 	{
+		AddBlock(0, descriptorCount);
+
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.Type = m_Type;
 		desc.NumDescriptors = m_DescriptorCount;
@@ -27,9 +29,10 @@ namespace gglab
 	DX12Descriptor DX12DescriptorAllocator::Allocate(uint32_t count) noexcept
 	{
 		DX12Descriptor descriptor = {};
+		auto countMapIter = m_FreeBlocksByCount.lower_bound(count);
 
 
-		return DX12Descriptor();
+		return descriptor;
 	}
 
 	void DX12DescriptorAllocator::Free(DX12Descriptor::Index index, uint32_t count) noexcept
@@ -65,9 +68,16 @@ namespace gglab
 	{
 		return m_AllocatedCount;
 	}
+
 	uint32_t DX12DescriptorAllocator::FreeCount() const noexcept
 	{
 		return m_DescriptorCount - m_AllocatedCount;
+	}
+
+	void DX12DescriptorAllocator::AddBlock(OffsetType offset, CountType count) noexcept
+	{
+
+
 	}
 }
 
