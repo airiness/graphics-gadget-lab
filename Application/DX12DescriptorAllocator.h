@@ -6,6 +6,16 @@ namespace gglab
 	class DX12Device;
 	class DX12DescriptorAllocator
 	{
+	private:
+		struct FreeBlock;
+		using FreeBlocksByOffset = std::map<uint32_t, FreeBlock>;
+		using FreeBlocksByCount = std::multimap<uint32_t, FreeBlocksByOffset::iterator>;
+		struct FreeBlock
+		{
+			uint32_t m_Count = 0;
+			FreeBlocksByCount::iterator m_OrderBySizeIter;
+		};
+
 	public:
 		explicit DX12DescriptorAllocator(DX12Device* dx12Device,
 			D3D12_DESCRIPTOR_HEAP_TYPE type,
@@ -26,16 +36,23 @@ namespace gglab
 		uint32_t FreeCount() const noexcept;
 
 	private:
+
+
+	private:
 		DX12Device* m_DX12Device = nullptr;
 		D3D12_DESCRIPTOR_HEAP_TYPE m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		D3D12_DESCRIPTOR_HEAP_FLAGS m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		uint32_t m_DescriptorCount = 0;
 		uint32_t m_DescriptorIncrementSize = 0;
 		ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
+		
+		FreeBlocksByOffset m_FreeBlocksByOffset;
+		FreeBlocksByCount m_FreeBlocksByCount;
 
 		uint32_t m_AllocatedCount = 0;
+		uint32_t m_FreeSize = 0;
+		uint32_t m_Generation = 0;
 
-		// TODO: Variable size allocator?
 		std::mutex m_Mutex;
 	};
 }
