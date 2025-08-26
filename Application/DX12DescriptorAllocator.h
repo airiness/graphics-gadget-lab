@@ -39,6 +39,7 @@ namespace gglab
 
 	private:
 		void AddBlock(OffsetType offset, CountType count) noexcept;
+		DX12Descriptor AllocateInternal(OffsetType offset, CountType count) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -51,8 +52,7 @@ namespace gglab
 		FreeBlocksByOffset m_FreeBlocksByOffset;
 		FreeBlocksByCount m_FreeBlocksByCount;
 
-		uint32_t m_AllocatedCount = 0;
-		uint32_t m_FreeSize = 0;
+		uint32_t m_FreeCount = 0;
 		uint32_t m_Generation = 0;
 
 		std::mutex m_Mutex;

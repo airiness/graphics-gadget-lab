@@ -13,7 +13,8 @@ namespace gglab
 		m_Type(type),
 		m_Flags(flags),
 		m_DescriptorCount(descriptorCount),
-		m_DescriptorIncrementSize(m_DX12Device->Get()->GetDescriptorHandleIncrementSize(type))
+		m_DescriptorIncrementSize(m_DX12Device->Get()->GetDescriptorHandleIncrementSize(type)),
+		m_FreeCount(descriptorCount)
 	{
 		AddBlock(0, descriptorCount);
 
@@ -28,11 +29,30 @@ namespace gglab
 
 	DX12Descriptor DX12DescriptorAllocator::Allocate(uint32_t count) noexcept
 	{
-		DX12Descriptor descriptor = {};
-		auto countMapIter = m_FreeBlocksByCount.lower_bound(count);
+		const auto countMapIter = m_FreeBlocksByCount.lower_bound(count);
+		if (countMapIter == m_FreeBlocksByCount.end())
+		{
+			// TODO: Support add new descriptor page
+			GGLAB_LOG_WARN("Descriptor Allocator do not have enough continuous count. need:{}", count);
+			return DX12Descriptor();
+		}
 
+		const auto& offsetMapIter = countMapIter->second;
+		const auto allocOffset = offsetMapIter->first;
+		const auto newOffset = allocOffset + count;
+		const auto newCount = countMapIter->first - count;
 
-		return descriptor;
+		// Erase offset iterator first.
+		m_FreeBlocksByOffset.erase(offsetMapIter);
+		m_FreeBlocksByCount.erase(countMapIter);
+
+		if (newCount > 0)
+		{
+			AddBlock(newOffset, newCount);
+		}
+		m_FreeCount -= count;
+
+		return AllocateInternal(allocOffset, count);
 	}
 
 	void DX12DescriptorAllocator::Free(DX12Descriptor::Index index, uint32_t count) noexcept
@@ -52,6 +72,8 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(index >= 0 && index < m_DescriptorCount, "Invalid Gpu Descriptor index.");
 
+		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuStart{ m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart() };
+		return gpuStart.Offset(static_cast<INT>(index), static_cast<UINT>(m_DescriptorIncrementSize));
 	}
 
 	uint32_t DX12DescriptorAllocator::Capacity() const noexcept
@@ -66,12 +88,12 @@ namespace gglab
 
 	uint32_t DX12DescriptorAllocator::AllocatedCount() const noexcept
 	{
-		return m_AllocatedCount;
+		return m_DescriptorCount - m_FreeCount;
 	}
 
 	uint32_t DX12DescriptorAllocator::FreeCount() const noexcept
 	{
-		return m_DescriptorCount - m_AllocatedCount;
+		return m_FreeCount;
 	}
 
 	void DX12DescriptorAllocator::AddBlock(OffsetType offset, CountType count) noexcept
@@ -79,6 +101,18 @@ namespace gglab
 
 
 	}
+
+	DX12Descriptor DX12DescriptorAllocator::AllocateInternal(OffsetType offset, CountType count) noexcept
+	{
+		DX12Descriptor descriptor = {};
+		descriptor.m_Count = count;
+		descriptor.m_CpuHandle.InitOffsetted(m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart(), offset, m_DescriptorIncrementSize);
+		descriptor.m_GpuHandle.InitOffsetted(m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart(), offset, m_DescriptorIncrementSize);
+		descriptor.m_Generation = m_Generation;
+		descriptor.m_Type = m_Type;
+		return DX12Descriptor();
+	}
+
 }
 
 
