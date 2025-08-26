@@ -14,6 +14,7 @@ namespace gglab
 		using FreeBlocksByCount = std::multimap<CountType, FreeBlocksByOffset::iterator>;
 		struct FreeBlock
 		{
+			FreeBlock(CountType count) : m_Count(count) {};
 			CountType m_Count = 0;
 			FreeBlocksByCount::iterator m_OrderBySizeIter;
 		};
@@ -27,10 +28,7 @@ namespace gglab
 		~DX12DescriptorAllocator() = default;
 
 		DX12Descriptor Allocate(uint32_t count = 1) noexcept;
-		void Free(DX12Descriptor::Index index, uint32_t count = 1) noexcept;
-
-		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleAt(DX12Descriptor::Index index) const noexcept;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleAt(DX12Descriptor::Index index) const noexcept;
+		void Free(DX12Descriptor& descriptor) noexcept;
 
 		uint32_t Capacity() const noexcept;
 		uint32_t DescriptorIncrementSize() const noexcept;
