@@ -3,8 +3,6 @@
 #include "DX12CommandList.h"
 #include "DX12Device.h"
 #include "DX12Fence.h"
-#include "Application.h"
-#include "Utility.h"
 
 namespace gglab
 {

@@ -26,6 +26,7 @@ namespace gglab
 
 	struct RGVirtualResourceBase
 	{
+		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
 		virtual void Devirtualize(RGGpuResourceAllocator&) noexcept = 0;
 		virtual void Destroy(RenderGraph&) noexcept = 0;
@@ -42,10 +43,10 @@ namespace gglab
 
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 
-		using Index = int32_t;
-		static constexpr Index InvalidIndex = static_cast<Index>(-1);
-		using GpuResourceIndex = RGGpuResourceAllocator::ResourceIndex;
-		static constexpr GpuResourceIndex InvalidGpuResourceIndex = RGGpuResourceAllocator::InvalidResourceIndex;
+		using IndexType = int32_t;
+		static constexpr IndexType InvalidIndex = -1;
+		using GpuResourceIndexType = RGGpuResourceAllocator::ResourceIndex;
+		static constexpr GpuResourceIndexType InvalidGpuResourceIndex = RGGpuResourceAllocator::InvalidResourceIndex;
 	};
 
 	template<typename RESOURCE>
@@ -58,7 +59,7 @@ namespace gglab
 		Desc m_Desc = {};
 		SubresourceDesc m_SubresourceDesc = {};
 		Usage m_Usage = RESOURCE::DefaultNoneUsage;
-		GpuResourceIndex m_GpuResourceIndex = InvalidGpuResourceIndex;
+		GpuResourceIndexType m_GpuResourceIndex = InvalidGpuResourceIndex;
 
 		void Devirtualize(RGGpuResourceAllocator& allocator) noexcept override;
 		void Destroy(RenderGraph& rg) noexcept override;
@@ -66,8 +67,8 @@ namespace gglab
 
 	struct RGResourceNode
 	{
-		using Index = int32_t;
-		static constexpr Index InvalidIndex = static_cast<Index>(-1);
+		using IndexType = int32_t;
+		static constexpr IndexType InvalidIndex = -1;
 
 		RGResourceHandle m_ResourceHandle;
 		RGVirtualResourceBase* m_VirtualResource = nullptr;
@@ -83,8 +84,8 @@ namespace gglab
 
 	struct RGPassNode
 	{
-		using Index = int32_t;
-		static constexpr Index InvalidIndex = static_cast<Index>(-1);
+		using IndexType = int32_t;
+		static constexpr IndexType InvalidIndex = -1;
 
 		StringId m_NameId;
 		bool m_SideEffect = false;
@@ -98,7 +99,7 @@ namespace gglab
 				Write,
 			};
 
-			RGResourceNode::Index m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
+			RGResourceNode::IndexType m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
 			uint64_t m_UsageBits = 0;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
 			Type m_AccessType = Type::Read;
@@ -113,8 +114,8 @@ namespace gglab
 
 	struct RGResourceSlot
 	{
-		RGVirtualResourceBase::Index m_VirtualResourceIndex = RGVirtualResourceBase::InvalidIndex;
-		RGResourceNode::Index m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
+		RGVirtualResourceBase::IndexType m_VirtualResourceIndex = RGVirtualResourceBase::InvalidIndex;
+		RGResourceNode::IndexType m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
 		RGResourceHandle::Version m_Version = RGResourceHandle::UnintializedVersion;
 	};
 
@@ -124,7 +125,7 @@ namespace gglab
 		class RGBuilder
 		{
 		public:
-			RGBuilder(RenderGraph& rg, RGPassNode::Index passNodeIndex) :
+			RGBuilder(RenderGraph& rg, RGPassNode::IndexType passNodeIndex) :
 				m_RG(rg),
 				m_PassNodeIndex(passNodeIndex)
 			{
@@ -168,7 +169,7 @@ namespace gglab
 
 		private:
 			RenderGraph& m_RG;
-			RGPassNode::Index m_PassNodeIndex = RGPassNode::InvalidIndex;
+			RGPassNode::IndexType m_PassNodeIndex = RGPassNode::InvalidIndex;
 		};
 
 	public:
@@ -198,10 +199,10 @@ namespace gglab
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
+		RGResourceId<RESOURCE> ReadInternal(RGPassNode::IndexType passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
+		RGResourceId<RESOURCE> WriteInternal(RGPassNode::IndexType passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
 
 		template<typename RESOURCE>
 		void MarkDestroyResourceIndex(RGGpuResourceAllocator::ResourceIndex resIndex) noexcept;
@@ -210,7 +211,7 @@ namespace gglab
 
 		RGResourceNode& GetActiveResourceNode(RGResourceHandle handle) noexcept;
 
-		RGPassNode& GetPassNode(RGPassNode::Index index) noexcept;
+		RGPassNode& GetPassNode(RGPassNode::IndexType index) noexcept;
 
 	private:
 		template<typename RESOURCE>
@@ -251,7 +252,7 @@ namespace gglab
 		passNode.m_NameId = StringId(passName);
 		passNode.m_Pass = pass;
 
-		uint32_t passIndex = static_cast<uint32_t>(m_PassNodes.size());
+		const auto passIndex = static_cast<RGPassNode::IndexType>(m_PassNodes.size());
 		m_PassNodes.push_back(passNode);
 
 		RGBuilder builder(*this, passIndex);
@@ -264,7 +265,7 @@ namespace gglab
 	inline auto* RenderGraph::AddPass(const char* passName, SetupFunc setupFunc) noexcept
 	{
 		using PassDataType = std::decay_t<PassData>;
-		using PassType = RGPassConcrete<PassDataType>;
+		using PassType = RGPass<PassDataType>;
 
 		GGLAB_ASSERT_MSG(passName && *passName, "Pass name must not be null.");
 
@@ -274,7 +275,7 @@ namespace gglab
 		passNode.m_NameId = StringId(passName);
 		passNode.m_Pass = pass;
 
-		uint32_t passIndex = static_cast<uint32_t>(m_PassNodes.size());
+		const auto passIndex = static_cast<RGPassNode::IndexType>(m_PassNodes.size());
 		m_PassNodes.push_back(passNode);
 
 		RGBuilder builder(*this, passIndex);
@@ -306,8 +307,8 @@ namespace gglab
 
 		RGResourceSlot slot
 		{
-			.m_VirtualResourceIndex = static_cast<RGVirtualResourceBase::Index>(m_VirtualResouces.size()),
-			.m_ResourceNodeIndex = static_cast<RGResourceNode::Index>(m_ResourceNodes.size()),
+			.m_VirtualResourceIndex = static_cast<RGVirtualResourceBase::IndexType>(m_VirtualResouces.size()),
+			.m_ResourceNodeIndex = static_cast<RGResourceNode::IndexType>(m_ResourceNodes.size()),
 			.m_Version = static_cast<RGResourceHandle::Version>(1)
 		};
 		m_ResourceSlots.push_back(slot);
@@ -334,7 +335,7 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept
+	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::IndexType passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
 
@@ -361,7 +362,7 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept
+	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::IndexType passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
 
@@ -378,7 +379,7 @@ namespace gglab
 			RGResourceNode nextResourceNode = {};
 			nextResourceNode.m_ResourceHandle = resourceId;
 			nextResourceNode.m_VirtualResource = curResourceNode->m_VirtualResource;
-			slot.m_ResourceNodeIndex = static_cast<RGResourceNode::Index>(m_ResourceNodes.size());
+			slot.m_ResourceNodeIndex = static_cast<RGResourceNode::IndexType>(m_ResourceNodes.size());
 			m_ResourceNodes.push_back(nextResourceNode);
 
 			curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex];

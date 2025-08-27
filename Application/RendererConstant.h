@@ -1,5 +1,5 @@
 #pragma once
-#include "DX12Descriptor.h"
+
 namespace gglab
 {
 	class DX12RootSignature;

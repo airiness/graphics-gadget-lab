@@ -4,7 +4,6 @@
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
-#include "DX12Fence.h"
 #include "DX12Buffer.h"
 
 namespace gglab

@@ -24,11 +24,15 @@
 
 #define GGLAB_DEFAULT_COPYABLE(className) \
 	className(const className&) noexcept = default; \
-	clasaName& operator=(const className&) noexcept = default;
+	className& operator=(const className&) noexcept = default;
 
 #define GGLAB_DEFAULT_MOVABLE(className) \
 	className(className&&) noexcept = default; \
 	className& operator=(className&&) noexcept = default;
+
+#define GGLAB_DEFAULT_COPYABLE_MOVABLE(className) \
+	GGLAB_DEFAULT_COPYABLE(className) \
+	GGLAB_DEFAULT_MOVABLE(className)
 
 #define GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(className) \
 	GGLAB_DELETE_COPYABLE(className) \

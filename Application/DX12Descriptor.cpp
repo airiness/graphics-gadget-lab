@@ -1,8 +1,6 @@
 #include "Precompiled.h"
 #include "DX12Descriptor.h"
-#include "DX12Device.h"
 #include "DX12DescriptorAllocator.h"
-#include "Utility.h"
 
 namespace gglab
 {
@@ -24,13 +22,13 @@ namespace gglab
 		}
 	}
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12Descriptor::CpuHandleAt(Index index) const noexcept
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12Descriptor::CpuHandleAt(IndexType index) const noexcept
 	{
 		GGLAB_ASSERT_MSG(index < m_Count, "Invalid Cpu Descriptor index.");
 		return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_CpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize));
 	}
 
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12Descriptor::GpuHandleAt(Index index) const noexcept
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12Descriptor::GpuHandleAt(IndexType index) const noexcept
 	{
 		GGLAB_ASSERT_MSG(index < m_Count, "Invalid Gpu Descriptor index.");
 		return CD3DX12_GPU_DESCRIPTOR_HANDLE(m_GpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize));
@@ -43,8 +41,8 @@ namespace gglab
 		m_Count = 0;
 		m_IncrementSize = 0;
 		m_Generation = 0;
-		m_CpuHandle = {};
-		m_GpuHandle = {};
+		m_CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE();
+		m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE();
 		m_Owner = nullptr;
 	}
 }

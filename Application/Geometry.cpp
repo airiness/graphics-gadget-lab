@@ -1,8 +1,6 @@
 #include "Precompiled.h"
 #include "Geometry.h"
 #include "Application.h"
-#include "DX12Device.h"
-#include "DX12Buffer.h"
 #include "Components.h"
 #include "AssetManager.h"
 

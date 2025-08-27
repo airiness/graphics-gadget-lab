@@ -22,7 +22,6 @@ namespace gglab
 		desc.Type = m_Type;
 		desc.NumDescriptors = m_DescriptorCount;
 		desc.Flags = m_Flags;
-		desc.NodeMask = 0;
 
 		utility::ThrowIfFailed(m_DX12Device->Get()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_DescriptorHeap)));
 	}
@@ -152,7 +151,7 @@ namespace gglab
 		}
 		else
 		{
-			descriptor.m_GpuHandle = {};
+			descriptor.m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE();
 		}
 		descriptor.m_Owner = this;
 		return descriptor;

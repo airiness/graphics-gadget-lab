@@ -1,10 +1,9 @@
 #pragma once
-#include "RendererConstant.h"
 #include "VertexData.h"
 
 namespace gglab
 {
-	namespace primitiveGeometry
+	namespace primitive
 	{
 		class Cube
 		{

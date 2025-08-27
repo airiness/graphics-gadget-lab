@@ -1,6 +1,5 @@
 #include "Precompiled.h"
 #include "Keyboard.h"
-#include "Utility.h"
 
 namespace gglab
 {

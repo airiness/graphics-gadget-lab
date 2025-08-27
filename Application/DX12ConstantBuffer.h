@@ -72,7 +72,7 @@ namespace gglab
 	template<typename CBType>
 	inline D3D12_CONSTANT_BUFFER_VIEW_DESC DX12ConstantBuffer<CBType>::MakeCBVDesc() const noexcept
 	{
-		D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+		D3D12_CONSTANT_BUFFER_VIEW_DESC desc;
 		desc.BufferLocation = GetGPUVirtualAddress();
 		desc.SizeInBytes = m_BufferSize;
 		return desc;

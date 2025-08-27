@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <type_traits>
 #include <tuple>
-#include <utility>
 
 namespace gglab
 {

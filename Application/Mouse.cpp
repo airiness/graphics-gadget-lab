@@ -1,7 +1,6 @@
 #include "Precompiled.h"
 #include "Mouse.h"
-#include "Utility.h"
-#include <iostream>
+
 namespace gglab
 {
 	Mouse::Mouse() noexcept :
@@ -48,10 +47,7 @@ namespace gglab
 				static_cast<float>(m_StateTracker.m_RelativeY));
 		default:
 			GGLAB_UNREACHABLE("Invalid Mouse Mode.");
-			break;
 		}
-
-		return Vector2::Zero;
 	}
 
 	int64_t Mouse::GetScrollWheelDeltaY() const noexcept

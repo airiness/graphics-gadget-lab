@@ -1,5 +1,4 @@
 #pragma once
-#include "DX12FencePoint.h"
 
 namespace D3D12MA
 {
