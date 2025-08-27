@@ -189,7 +189,7 @@ namespace gglab
 
 		void Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
-		void Retire(DX12FencePoint fencePoint) noexcept;
+		void Retire(const DX12FencePoint& fencePoint) noexcept;
 
 		DX12Texture* GetTexture(RGTextureId texId) noexcept;
 		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;

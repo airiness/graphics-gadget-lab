@@ -15,7 +15,7 @@ namespace gglab
 	}
 
 	void DX12Descriptor::Free() noexcept
-	{ 
+	{
 		if (m_Owner)
 		{
 			m_Owner->Free(*this);

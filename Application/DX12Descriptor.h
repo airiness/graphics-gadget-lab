@@ -15,7 +15,10 @@ namespace gglab
 		D3D12_DESCRIPTOR_HEAP_TYPE Type() const noexcept { return m_Type; }
 		uint32_t Index() const noexcept { return m_Index; }
 		uint32_t Count() const noexcept { return m_Count; }
+		uint32_t Increment() const noexcept { return m_IncrementSize; }
 		void Free() noexcept;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle() const noexcept { return m_CpuHandle; }
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandle() const noexcept { return m_GpuHandle; }
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleAt(IndexType index) const noexcept;
 		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleAt(IndexType index) const noexcept;
 
@@ -23,7 +26,7 @@ namespace gglab
 
 	private:
 		DX12Descriptor() noexcept = default;
-		GGLAB_DEFAULT_COPYABLE_MOVABLE(DX12Descriptor);
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Descriptor);
 
 		void Reset() noexcept;
 

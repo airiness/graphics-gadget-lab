@@ -11,7 +11,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Allocator != nullptr, "Allocator must not be null.");
 	}
 
-	void RGGpuResourceAllocator::ReleaseTexture(ResourceIndex texIndex, DX12FencePoint fencePoint) noexcept
+	void RGGpuResourceAllocator::ReleaseTexture(ResourceIndex texIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		if (texIndex < 0 || static_cast<size_t>(texIndex) >= m_Textures.size())
 		{
@@ -31,7 +31,7 @@ namespace gglab
 				}));
 	}
 
-	void RGGpuResourceAllocator::ReleaseBuffer(ResourceIndex bufIndex, DX12FencePoint fencePoint) noexcept
+	void RGGpuResourceAllocator::ReleaseBuffer(ResourceIndex bufIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		if (bufIndex < 0 || static_cast<size_t>(bufIndex) >= m_Buffers.size())
 		{

@@ -118,8 +118,8 @@ namespace gglab
 			D3D12_RESOURCE_STATES initStates = D3D12_RESOURCE_STATE_COMMON,
 			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept = delete;
 
-		void ReleaseTexture(ResourceIndex texIndex, DX12FencePoint fencePoint) noexcept;
-		void ReleaseBuffer(ResourceIndex bufIndex, DX12FencePoint fencePoint) noexcept;
+		void ReleaseTexture(ResourceIndex texIndex, const DX12FencePoint& fencePoint) noexcept;
+		void ReleaseBuffer(ResourceIndex bufIndex, const DX12FencePoint& fencePoint) noexcept;
 
 		template<typename ResourceDesc>
 		void ReleaseResource(ResourceIndex resourceIndex,

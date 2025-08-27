@@ -35,6 +35,12 @@ namespace gglab
 		uint32_t AllocatedCount() const noexcept;
 		uint32_t FreeCount() const noexcept;
 
+		ID3D12DescriptorHeap* Heap() const noexcept;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuStart() const noexcept;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuStart() const noexcept;
+		D3D12_DESCRIPTOR_HEAP_TYPE Type() const noexcept { return m_Type; }
+		D3D12_DESCRIPTOR_HEAP_FLAGS Flags() const noexcept { return m_Flags; }
+
 	private:
 		void AddBlock(OffsetType offset, CountType count) noexcept;
 		DX12Descriptor AllocateInternal(OffsetType offset, CountType count) noexcept;

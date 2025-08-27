@@ -34,7 +34,8 @@ namespace gglab
 		if (countMapIter == m_FreeBlocksByCount.end())
 		{
 			// TODO: Add new descriptor page
-			GGLAB_LOG_WARN("Descriptor Allocator do not have enough continuous count. need:{}", count);
+			GGLAB_LOG_WARN("Descriptor Allocator do not have enough continuous count. requestCount:{}, capacity:{}, freeCount:{}, type:{}, flags:{}",
+				count, m_DescriptorCount, m_FreeCount, m_Type, m_Flags);
 			return DX12Descriptor();
 		}
 
@@ -124,6 +125,23 @@ namespace gglab
 	uint32_t DX12DescriptorAllocator::FreeCount() const noexcept
 	{
 		return m_FreeCount;
+	}
+
+	ID3D12DescriptorHeap* DX12DescriptorAllocator::Heap() const noexcept
+	{
+		return m_DescriptorHeap.Get();
+	}
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorAllocator::CpuStart() const noexcept
+	{
+		return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	}
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorAllocator::GpuStart() const noexcept
+	{
+		return (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) ?
+			CD3DX12_GPU_DESCRIPTOR_HANDLE(m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart()) :
+			CD3DX12_GPU_DESCRIPTOR_HANDLE();
 	}
 
 	void DX12DescriptorAllocator::AddBlock(OffsetType offset, CountType count) noexcept

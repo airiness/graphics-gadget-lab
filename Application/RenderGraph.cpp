@@ -148,7 +148,7 @@ namespace gglab
 		}
 	}
 
-	void RenderGraph::Retire(DX12FencePoint fencePoint) noexcept
+	void RenderGraph::Retire(const DX12FencePoint& fencePoint) noexcept
 	{
 		for (const auto texIndex : m_MarkedReleaseTextureIndices)
 		{
