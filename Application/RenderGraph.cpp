@@ -83,7 +83,7 @@ namespace gglab
 				continue;
 			}
 
-			auto markUse = [this, &passNode](RGResourceNode::Index index)
+			auto markUse = [this, &passNode](RGResourceNode::IndexType index)
 				{
 					RGResourceNode& resourceNode = m_ResourceNodes[index];
 					auto* virtualResource = resourceNode.m_VirtualResource;
@@ -205,7 +205,7 @@ namespace gglab
 		return m_ResourceNodes[slot.m_ResourceNodeIndex];
 	}
 
-	RGPassNode& RenderGraph::GetPassNode(RGPassNode::Index index) noexcept
+	RGPassNode& RenderGraph::GetPassNode(RGPassNode::IndexType index) noexcept
 	{
 		return m_PassNodes[index];
 	}
