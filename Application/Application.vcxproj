@@ -117,6 +117,7 @@
     <ClCompile Include="DX12ConstantBuffer.cpp" />
     <ClCompile Include="DX12Descriptor.cpp" />
     <ClCompile Include="DX12DescriptorAllocator.cpp" />
+    <ClCompile Include="DX12DescriptorRingAllocator.cpp" />
     <ClCompile Include="DX12Device.cpp" />
     <ClCompile Include="DX12Fence.cpp" />
     <ClCompile Include="DX12FencePoint.cpp" />
