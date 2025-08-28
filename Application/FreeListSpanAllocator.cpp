@@ -14,7 +14,7 @@ namespace gglab
 		if (count == 0)
 		{
 			GGLAB_LOG_WARN("FreeListSpanAllocator: Allocate(). count is 0, nothing allocated.");
-			return IndexSpan{};
+			return IndexSpan();
 		}
 
 		std::lock_guard lock(m_Mutex);
@@ -24,7 +24,7 @@ namespace gglab
 		{
 			GGLAB_LOG_WARN("FreeListSpanAllocator: Allocate(). Don't have enough count. needed:{}, total:{}, free:{}",
 				count, m_Capacity, m_FreeCount);
-			return IndexSpan{};
+			return IndexSpan();
 		}
 
 		const auto& offsetMapIt = countMapIt->second;
