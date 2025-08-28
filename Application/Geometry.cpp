@@ -6,7 +6,7 @@
 
 namespace gglab
 {
-	namespace primitiveGeometry
+	namespace primitive
 	{
 		const char* const Cube::TextPath = "Assets/textures/UVChecker1K.png";
 		entt::entity Cube::Create() noexcept

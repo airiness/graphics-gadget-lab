@@ -172,7 +172,7 @@ namespace gglab
 
 		// Make a test cube 
 		{
-			//m_TestCube = primitiveGeometry::Cube::Create();
+			//m_TestCube = primitive::Cube::Create();
 		}
 
 		// Make a test module

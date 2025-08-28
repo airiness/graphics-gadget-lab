@@ -1,6 +1,5 @@
 #include "Precompiled.h"
 #include "InputManager.h"
-#include "Utility.h"
 #include "Keyboard.h"
 #include "Mouse.h"
 
