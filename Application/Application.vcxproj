@@ -127,6 +127,7 @@
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
+    <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="GPUStuctures.cpp" />
     <ClCompile Include="GraphicsTypes.cpp" />
@@ -151,6 +152,7 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RGResourceHandle.cpp" />
+    <ClCompile Include="RingSpanAllocator.cpp" />
     <ClCompile Include="StringId.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
@@ -159,6 +161,7 @@
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h" />
+    <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Components.h" />
@@ -182,6 +185,7 @@
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="EnumFlags.h" />
     <ClInclude Include="FNV1a.h" />
+    <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStuctures.h" />
     <ClInclude Include="GraphicsTypes.h" />
@@ -205,6 +209,7 @@
     <ClInclude Include="RGPass.h" />
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
+    <ClInclude Include="RingSpanAllocator.h" />
     <ClInclude Include="StringId.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="Utility.h" />

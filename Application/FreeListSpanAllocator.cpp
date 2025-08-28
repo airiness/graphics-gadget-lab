@@ -3,29 +3,34 @@
 
 namespace gglab
 {
-	FreeListSpanAllocator::FreeListSpanAllocator(CountType totalCount) noexcept :
-		m_TotalCount(totalCount),
-		m_FreeCount(totalCount)
+	FreeListSpanAllocator::FreeListSpanAllocator(CountType capacity) noexcept :
+		AllocatorBase(capacity)
 	{
-		AddBlock(0, m_TotalCount);
+		AddBlock(0, capacity);
 	}
 
-	FreeListSpanAllocator::OffsetType FreeListSpanAllocator::Allocate(CountType count) noexcept
+	FreeListSpanAllocator::IndexSpan FreeListSpanAllocator::Allocate(CountType count) noexcept
 	{
+		if (count == 0)
+		{
+			GGLAB_LOG_WARN("FreeListSpanAllocator: Allocate(). count is 0, nothing allocated.");
+			return IndexSpan{};
+		}
+
 		std::lock_guard lock(m_Mutex);
 
 		const auto countMapIt = m_CountMap.lower_bound(count);
 		if (countMapIt == m_CountMap.end())
 		{
-			GGLAB_LOG_WARN("FreeListSpanAllocator: Don't have enough count. needed:{}, total:{}, free:{}",
-				count, m_TotalCount, m_FreeCount);
-			return InvalidOffset;
+			GGLAB_LOG_WARN("FreeListSpanAllocator: Allocate(). Don't have enough count. needed:{}, total:{}, free:{}",
+				count, m_Capacity, m_FreeCount);
+			return IndexSpan{};
 		}
 
 		const auto& offsetMapIt = countMapIt->second;
 		const auto allocOffset = offsetMapIt->first;
-		OffsetType newOffset = allocOffset + count;
-		CountType newCount = countMapIt->first - count;
+		const OffsetType newOffset = allocOffset + count;
+		const CountType newCount = countMapIt->first - count;
 
 		// Erase offset map iterator first.
 		m_OffsetMap.erase(offsetMapIt);
@@ -37,12 +42,15 @@ namespace gglab
 		}
 		m_FreeCount -= count;
 
-		return allocOffset;
+		return IndexSpan{ .m_Index = allocOffset, .m_Count = count };
 	}
 
-	void FreeListSpanAllocator::Free(OffsetType offset, CountType count) noexcept
+	void FreeListSpanAllocator::Free(const IndexSpan& indexSpan) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
+
+		const auto offset = indexSpan.m_Index;
+		const auto count = indexSpan.m_Count;
 
 		const auto nextOffsetIt = m_OffsetMap.upper_bound(offset);
 		auto prevOffsetIt = nextOffsetIt;

@@ -38,6 +38,9 @@
     <Filter Include="Core\Hash">
       <UniqueIdentifier>{9c9a2b8f-4af1-4b73-8e6e-50c967e193ef}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Allocator">
+      <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -177,6 +180,12 @@
     </ClCompile>
     <ClCompile Include="DX12DescriptorRingAllocator.cpp">
       <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="FreeListSpanAllocator.cpp">
+      <Filter>Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="RingSpanAllocator.cpp">
+      <Filter>Core\Allocator</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -335,6 +344,15 @@
     </ClInclude>
     <ClInclude Include="DX12DescriptorAllocator.h">
       <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeListSpanAllocator.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="RingSpanAllocator.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="AllocatorBase.h">
+      <Filter>Core\Allocator</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

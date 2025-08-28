@@ -1,15 +1,10 @@
 #pragma once
+#include "AllocatorBase.h"
 
 namespace gglab
 {
-	class FreeListSpanAllocator
+	class FreeListSpanAllocator : public AllocatorBase
 	{
-	public:
-		using OffsetType = uint32_t;
-		using CountType = uint32_t;
-
-		static constexpr OffsetType InvalidOffset = std::numeric_limits<OffsetType>::max();
-
 	private:
 		struct FreeBlock;
 		using FreeBlocksByOffset = std::map<OffsetType, FreeBlock>;
@@ -22,20 +17,17 @@ namespace gglab
 		};
 
 	public:
-		explicit FreeListSpanAllocator(CountType totalCount) noexcept;
+		explicit FreeListSpanAllocator(CountType capacity) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(FreeListSpanAllocator);
-		~FreeListSpanAllocator() = default;
+		~FreeListSpanAllocator() override = default;
 
-		OffsetType Allocate(CountType count = 1) noexcept;
-		void Free(OffsetType offset, CountType count) noexcept;
+		IndexSpan Allocate(CountType count = 1) noexcept override;
+		void Free(const IndexSpan& indexSpan) noexcept;
 
 	private:
 		void AddBlock(OffsetType offset, CountType count) noexcept;
 
 	private:
-		CountType m_TotalCount = 0;
-		CountType m_FreeCount = 0;
-
 		FreeBlocksByOffset m_OffsetMap;
 		FreeBlocksByCount m_CountMap;
 
