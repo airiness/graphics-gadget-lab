@@ -17,8 +17,6 @@ namespace gglab
 			return IndexSpan();
 		}
 
-		std::lock_guard lock(m_Mutex);
-
 		const auto countMapIt = m_CountMap.lower_bound(count);
 		if (countMapIt == m_CountMap.end())
 		{
@@ -47,8 +45,6 @@ namespace gglab
 
 	void FreeListSpanAllocator::Free(const IndexSpan& indexSpan) noexcept
 	{
-		std::lock_guard lock(m_Mutex);
-
 		const auto offset = indexSpan.m_Index;
 		const auto count = indexSpan.m_Count;
 

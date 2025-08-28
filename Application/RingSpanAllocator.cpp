@@ -23,8 +23,6 @@ namespace gglab
 			return IndexSpan();
 		}
 
-		std::lock_guard lock(m_Mutex);
-
 		OffsetType index = 0;
 		if (m_Tail >= m_Head)
 		{
@@ -62,18 +60,7 @@ namespace gglab
 			return;
 		}
 
-		// Make sure version is incremental
-		auto trueVersion = version;
-		if (!m_RetireRecords.empty())
-		{
-			auto& back = m_RetireRecords.back();
-			if (version < back.m_Version)
-			{
-				trueVersion = back.m_Version;
-			}
-		}
-
-		m_RetireRecords.emplace_back(indexSpan, trueVersion);
+		m_RetireRecords.emplace_back(indexSpan, version);
 	}
 
 	void RingSpanAllocator::FreeCompletedVersion(VersionType version) noexcept

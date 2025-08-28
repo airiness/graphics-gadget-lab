@@ -19,9 +19,7 @@ namespace gglab
 		~RingSpanAllocator() override = default;
 
 		IndexSpan Allocate(CountType count) noexcept override;
-
 		void RecordRetire(IndexSpan indexSpan, VersionType version) noexcept;
-
 		void FreeCompletedVersion(VersionType version) noexcept;
 
 	private:
@@ -29,7 +27,5 @@ namespace gglab
 		OffsetType m_Tail = 0;
 
 		std::deque<RetireRecord> m_RetireRecords;
-
-		std::mutex m_Mutex;
 	};
 }

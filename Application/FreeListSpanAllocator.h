@@ -30,7 +30,5 @@ namespace gglab
 	private:
 		FreeBlocksByOffset m_OffsetMap;
 		FreeBlocksByCount m_CountMap;
-
-		std::mutex m_Mutex;
 	};
 }
