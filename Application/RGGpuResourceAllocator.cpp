@@ -19,7 +19,7 @@ namespace gglab
 			return;
 		}
 
-		auto* tex = m_Textures[texIndex].get();
+		//auto* tex = m_Textures[texIndex].get();
 
 		// TODO: last know state
 		m_Pendings.emplace_back(
@@ -39,7 +39,7 @@ namespace gglab
 			return;
 		}
 
-		auto* buf = m_Buffers[bufIndex].get();
+		//auto* buf = m_Buffers[bufIndex].get();
 
 		// TODO: last know state
 		m_Pendings.emplace_back(
@@ -158,7 +158,6 @@ namespace gglab
 				}
 				default:
 					GGLAB_UNREACHABLE("switch error");
-					return false;
 				}
 			});
 	}

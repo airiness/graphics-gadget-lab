@@ -71,9 +71,9 @@ namespace gglab
 		m_BackBufferIndex = (m_BackBufferIndex + 1) % DX12Device::GetBufferCount();
 	}
 
-	const DX12Descriptor& DX12SwapChain::GetBackBufferDescriptor(int32_t bufferIndex) const noexcept
+	DX12DescriptorView DX12SwapChain::GetBackBufferDescriptor(int32_t bufferIndex) const noexcept
 	{
-		return m_BackBufferDescriptors[bufferIndex];
+		return m_BackBufferDescriptors[bufferIndex].ToView();
 	}
 
 	DX12Texture* DX12SwapChain::GetCurrentBackBuffer() const noexcept
@@ -113,7 +113,7 @@ namespace gglab
 
 	void DX12SwapChain::ClearBackBuffer(DX12CommandList* commandList) const noexcept
 	{
-		commandList->ClearRenderTarget(GetBackBufferDescriptor(GetCurrentBackBufferIndex()), m_ClearColor);
+		commandList->ClearRenderTarget(m_BackBufferDescriptors[m_BackBufferIndex], m_ClearColor);
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -166,26 +166,19 @@ namespace gglab
 
 		// Create Descriptor Heap	
 		auto device = m_DX12Device->Get();
-		auto rtHeap = m_DX12Device->GetRtvDescriptorHeap();
+		auto rtvDescriptorAllocator = m_DX12Device->GetRtvDescriptorAllocator();
 
-		m_BackBuffers.resize(bufferCount);
-		m_BackBufferDescriptors.resize(bufferCount);
 		for (uint32_t i = 0; i < bufferCount; ++i)
 		{
 			ComPtr<ID3D12Resource> backBuffer;
 			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
-			auto descriptor = rtHeap->CreateDescriptor();
-			device->CreateRenderTargetView(backBuffer.Get(), nullptr, descriptor.m_CpuHandle);
-			m_BackBufferDescriptors[i] = std::move(descriptor);
+			m_BackBufferDescriptors.push_back(std::move(rtvDescriptorAllocator->Allocate()));
+			device->CreateRenderTargetView(backBuffer.Get(), nullptr, m_BackBufferDescriptors[i].CpuHandle());
 
-			auto& tex = m_BackBuffers[i];
-			tex = std::make_unique<DX12Texture>();
+			auto tex = std::make_unique<DX12Texture>();
 			tex->AdoptFromSwapChain(backBuffer);
-
-#if defined (BUILD_DEBUG)
-			utility::SetDebugName(m_BackBuffers[i].get()->Get(), std::format(L"SwapChainBuffer[{:p}]_{}, ", (void*)this, i).c_str());
-#endif
+			m_BackBuffers.push_back(std::move(tex));
 		}
 	}
 
@@ -194,7 +187,7 @@ namespace gglab
 		const auto bufferCount = DX12Device::GetBufferCount();
 		m_SyncObjects.reserve(bufferCount);
 
-		for (int32_t bufferIndex = 0; bufferIndex < static_cast<int32_t>(bufferCount); bufferIndex++)
+		for (int32_t bufferIndex = 0; bufferIndex < static_cast<int32_t>(bufferCount); ++bufferIndex)
 		{
 			m_SyncObjects.push_back(DX12FencePoint());
 		}

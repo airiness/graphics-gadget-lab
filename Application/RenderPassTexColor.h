@@ -11,8 +11,8 @@ namespace gglab
 	{
 	public:
 		explicit RenderPassTexColor(DX12Device* dx12Device) noexcept;
-		virtual ~RenderPassTexColor() = default;
-		virtual void AddPass(RenderGraph& rg) noexcept override;
+		~RenderPassTexColor() override = default;
+		void AddPass(RenderGraph& rg) noexcept override;
 
 	private:
 		void InitializePSO() noexcept;

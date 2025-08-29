@@ -1,12 +1,11 @@
 #pragma once
-#include "DX12FencePoint.h"
+#include "DX12Descriptor.h"
 
 namespace gglab
 {
 	class DX12Device;
 	class DX12CommandQueue;
 	class DX12CommandList;
-	class DX12Descriptor;
 	class DX12Texture;
 	class DX12SwapChain
 	{
@@ -30,7 +29,7 @@ namespace gglab
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		const DX12Descriptor& GetBackBufferDescriptor(int32_t bufferIndex) const noexcept;
+		DX12DescriptorView GetBackBufferDescriptor(int32_t bufferIndex) const noexcept;
 		DX12Texture* GetCurrentBackBuffer() const noexcept;
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;

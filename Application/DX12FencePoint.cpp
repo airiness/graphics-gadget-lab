@@ -28,7 +28,7 @@ namespace gglab
 		return m_FencePtr && m_FencePtr->IsCompleted(m_PointValue);
 	}
 
-	void DX12FencePoint::Wait(uint32_t timeout) noexcept
+	void DX12FencePoint::Wait(uint32_t timeout) const noexcept
 	{
 		if (m_FencePtr)
 		{

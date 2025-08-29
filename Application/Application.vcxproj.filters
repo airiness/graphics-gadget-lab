@@ -175,7 +175,7 @@
     <ClCompile Include="RGGpuResourceAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="DX12DescriptorAllocator.cpp">
+    <ClCompile Include="DX12DescriptorFreeListAllocator.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12DescriptorRingAllocator.cpp">
@@ -186,6 +186,9 @@
     </ClCompile>
     <ClCompile Include="RingSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12DescriptorAllocatorBase.cpp">
+      <Filter>Graphics\DX12</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -342,7 +345,7 @@
     <ClInclude Include="DX12DescriptorRingAllocator.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="DX12DescriptorAllocator.h">
+    <ClInclude Include="DX12DescriptorFreeListAllocator.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="FreeListSpanAllocator.h">
@@ -353,6 +356,9 @@
     </ClInclude>
     <ClInclude Include="AllocatorBase.h">
       <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12DescriptorAllocatorBase.h">
+      <Filter>Graphics\DX12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

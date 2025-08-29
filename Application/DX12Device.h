@@ -1,4 +1,5 @@
 #pragma once
+#include "DX12DescriptorFreeListAllocator.h"
 
 namespace D3D12MA
 {
@@ -10,7 +11,7 @@ namespace gglab
 	class DX12CommandQueue;
 	class DX12SwapChain;
 	class DX12CommandList;
-	class DX12DescriptorHeap;
+	class DX12DescriptorFreeListAllocator;
 	class DX12Fence;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;
@@ -55,14 +56,10 @@ namespace gglab
 		DX12CommandAllocatorPool* GetComputeCommandAllocatorPool() const noexcept { return m_ComputeCommandAllocatorPool.get(); }
 		DX12CommandAllocatorPool* GetCopyCommandAllocatorPool() const noexcept { return m_CopyCommandAllocatorPool.get(); }
 
-		uint32_t GetRtvDescriptorSize() const noexcept { return m_RtvDescriptorSize; }
-		uint32_t GetDsvDescriptorSize() const noexcept { return m_DsvDescriptorSize; }
-		uint32_t GetCbvSrvUavDescriptorSize() const noexcept { return m_CbvSrvUavDescriptorSize; }
-
-		DX12DescriptorHeap* GetRtvDescriptorHeap() const noexcept { return m_RtvDescriptorHeap.get(); }
-		DX12DescriptorHeap* GetDsvDescriptorHeap() const noexcept { return m_DsvDescriptorHeap.get(); }
-		DX12DescriptorHeap* GetCbvSrvUavDescriptorHeap() const noexcept { return m_CbvSrvUavDescriptorHeap.get(); }
-		DX12DescriptorHeap* GetSamplerDescriptorHeap() const noexcept { return m_SamplerDescriptorHeap.get(); }
+		DX12DescriptorFreeListAllocator* GetRtvDescriptorAllocator() const noexcept { return m_RtvDescriptorAllocator.get(); }
+		DX12DescriptorFreeListAllocator* GetDsvDescriptorAllocator() const noexcept { return m_DsvDescriptorAllocator.get(); }
+		DX12DescriptorFreeListAllocator* GetCbvSrvUavDescriptorAllocator() const noexcept { return m_CbvSrvUavDescriptorAllocator.get(); }
+		DX12DescriptorFreeListAllocator* GetSamplerDescriptorAllocator() const noexcept { return m_SamplerDescriptorAllocator.get(); }
 
 		DX12ResourceUploader* GetResourceUploader() const noexcept { return m_ResourceUploader.get(); }
 
@@ -90,7 +87,7 @@ namespace gglab
 		void InitializeCommandLists() noexcept;
 		void InitializeResourceUploader() noexcept;
 		void InitializeCommandAllocatorPools() noexcept;
-		void InitializeDescriptorHeaps() noexcept;
+		void InitializeDescriptorAllocators() noexcept;
 		void InitializeMemAllocator() noexcept;
 		void FinalizeMemAllocator() noexcept;
 
@@ -115,10 +112,6 @@ namespace gglab
 
 		D3D_FEATURE_LEVEL m_FeatureLevel = D3D_FEATURE_LEVEL_12_0;
 
-		uint32_t m_RtvDescriptorSize = 0;
-		uint32_t m_DsvDescriptorSize = 0;
-		uint32_t m_CbvSrvUavDescriptorSize = 0;
-
 		// supported features
 		DX12FeatureSupport m_DX12FeatureSupport;
 
@@ -131,10 +124,10 @@ namespace gglab
 		std::unique_ptr<DX12CommandAllocatorPool> m_ComputeCommandAllocatorPool;
 		std::unique_ptr<DX12CommandAllocatorPool> m_CopyCommandAllocatorPool;
 
-		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavDescriptorHeap;
-		std::unique_ptr<DX12DescriptorHeap> m_RtvDescriptorHeap;
-		std::unique_ptr<DX12DescriptorHeap> m_DsvDescriptorHeap;
-		std::unique_ptr<DX12DescriptorHeap> m_SamplerDescriptorHeap;
+		std::unique_ptr<DX12DescriptorFreeListAllocator> m_CbvSrvUavDescriptorAllocator;
+		std::unique_ptr<DX12DescriptorFreeListAllocator> m_RtvDescriptorAllocator;
+		std::unique_ptr<DX12DescriptorFreeListAllocator> m_DsvDescriptorAllocator;
+		std::unique_ptr<DX12DescriptorFreeListAllocator> m_SamplerDescriptorAllocator;
 
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
 

@@ -17,10 +17,6 @@ namespace gglab
 		CreateGraphicsPipelineState();
 	}
 
-	DX12GraphicsPipelineState::~DX12GraphicsPipelineState() noexcept
-	{
-	}
-
 	void DX12GraphicsPipelineState::CreateGraphicsPipelineState() noexcept
 	{
 		auto device = m_DX12Device->Get();
@@ -36,10 +32,6 @@ namespace gglab
 		CreateComputePipelineState();
 	}
 
-	DX12ComputePipelineState::~DX12ComputePipelineState() noexcept
-	{
-	}
-
 	void DX12ComputePipelineState::CreateComputePipelineState() noexcept
 	{
 		auto device = m_DX12Device->Get();
@@ -48,4 +40,4 @@ namespace gglab
 		// TODO: debug name
 	}
 
-} // namespace gglab
+}

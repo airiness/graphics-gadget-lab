@@ -183,8 +183,8 @@ namespace gglab
 		resourceUploader->GetUploadCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor& create srv
-		auto* srvHeap = m_DX12Device->GetCbvSrvUavDescriptorHeap();
-		texture->m_Descriptor = srvHeap->CreateDescriptor();
+		auto* srvDescriptorAllocator = m_DX12Device->GetCbvSrvUavDescriptorAllocator();
+		texture->m_Descriptor = std::move(srvDescriptorAllocator->Allocate());
 
 		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -194,7 +194,7 @@ namespace gglab
 		srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
 		m_DX12Device->Get()->CreateShaderResourceView(texture->m_Texture->Get(),
 			&srvDesc,
-			texture->m_Descriptor.m_CpuHandle);
+			texture->m_Descriptor.CpuHandle());
 
 		texture->m_IsUploaded = true;
 	}

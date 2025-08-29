@@ -20,7 +20,7 @@ namespace gglab
 		uint64_t GetValue() const noexcept { return m_PointValue; }
 
 		bool IsCompleted() const noexcept;
-		void Wait(uint32_t timeout = GGLAB_INFINITE) noexcept;
+		void Wait(uint32_t timeout = GGLAB_INFINITE) const noexcept;
 		void Reset() noexcept;
 
 	private:

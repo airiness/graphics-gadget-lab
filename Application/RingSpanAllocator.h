@@ -6,7 +6,7 @@ namespace gglab
 	class RingSpanAllocator : public AllocatorBase
 	{
 	private:
-		using VersionType = uint32_t;
+		using VersionType = uint64_t;
 		struct RetireRecord
 		{
 			IndexSpan m_IndexSpan;

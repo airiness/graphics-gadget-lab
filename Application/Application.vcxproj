@@ -116,7 +116,8 @@
     <ClCompile Include="DX12CommandQueue.cpp" />
     <ClCompile Include="DX12ConstantBuffer.cpp" />
     <ClCompile Include="DX12Descriptor.cpp" />
-    <ClCompile Include="DX12DescriptorAllocator.cpp" />
+    <ClCompile Include="DX12DescriptorFreeListAllocator.cpp" />
+    <ClCompile Include="DX12DescriptorAllocatorBase.cpp" />
     <ClCompile Include="DX12DescriptorRingAllocator.cpp" />
     <ClCompile Include="DX12Device.cpp" />
     <ClCompile Include="DX12Fence.cpp" />
@@ -172,7 +173,8 @@
     <ClInclude Include="DX12CommandQueue.h" />
     <ClInclude Include="DX12ConstantBuffer.h" />
     <ClInclude Include="DX12Descriptor.h" />
-    <ClInclude Include="DX12DescriptorAllocator.h" />
+    <ClInclude Include="DX12DescriptorFreeListAllocator.h" />
+    <ClInclude Include="DX12DescriptorAllocatorBase.h" />
     <ClInclude Include="DX12DescriptorRingAllocator.h" />
     <ClInclude Include="DX12Device.h" />
     <ClInclude Include="DX12Fence.h" />

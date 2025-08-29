@@ -59,35 +59,34 @@ namespace gglab
 
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*m_PSO);
-				commandList->SetDescriptorHeap(*m_DX12Device->GetCbvSrvUavDescriptorHeap());
+				commandList->SetDescriptorHeap(*m_DX12Device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
 				commandList->SetViewport(0, 0, w, h);
 				commandList->SetScissorRect(0, 0, w, h);
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				// backbuffer on / clear
+				// back buffer on / clear
 				swapChain->PrepareBackBuffer(commandList);
 				commandList->FlushBarriers();
 
-				DX12Descriptor rtvs[] = {
-					swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())
-				};
+	/*			std::vector<const DX12Descriptor&> rtvs; 
+					rtvs.push_back(swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex()));*/
 
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
-				auto dsHeap = m_DX12Device->GetDsvDescriptorHeap(); //TODO: view cache?
-				auto dsDescriptorHandle = dsHeap->CreateDescriptor();
+				auto dsvDescriptorAllocator = m_DX12Device->GetDsvDescriptorAllocator(); //TODO: view cache?
+				auto dsvDescriptor = dsvDescriptorAllocator->Allocate();
 				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 				dsvDesc.Format = dsTexture->GetDesc().Format;
 				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 				dsvDesc.Texture2D.MipSlice = 0;
 
-				m_DX12Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsvDesc, dsDescriptorHandle.m_CpuHandle);
-				commandList->SetRenderTargets(rtvs, &dsDescriptorHandle);
+				m_DX12Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsvDesc, dsvDescriptor.CpuHandle());
+				//commandList->SetRenderTargets(rtvs, &dsvDescriptor);
 
 				swapChain->ClearBackBuffer(commandList);
-				commandList->ClearDepthStencil(dsDescriptorHandle, 1.0f);
+				commandList->ClearDepthStencil(dsvDescriptor, 1.0f);
 
 				// globals
 				commandList->SetGraphicsConstantBuffer(

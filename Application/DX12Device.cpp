@@ -29,7 +29,7 @@ namespace gglab
 	void DX12Device::Initialize() noexcept
 	{
 		InitializeCommandQueues();
-		InitializeDescriptorHeaps();
+		InitializeDescriptorAllocators();
 		InitializeMemAllocator();
 		InitializeSwapChain();
 		InitializeCommandLists();
@@ -150,7 +150,7 @@ namespace gglab
 
 		// Try to load `WinPixGpuCapturer.dll` for Frame Capture.
 		if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
-		{	
+		{
 			const auto& dllPath = GetLatestWinPixGpuCapturerPath();
 			if (!dllPath.empty())
 			{
@@ -170,23 +170,18 @@ namespace gglab
 			D3D_FEATURE_LEVEL_12_0
 		};
 
-		HRESULT hr = E_FAIL;
+		HRESULT result = E_FAIL;
 		for (auto level : featureLevels)
 		{
-			hr = D3D12CreateDevice(m_DxgiAdapter.Get(), level, IID_PPV_ARGS(&m_D3D12Device));
-			if (SUCCEEDED(hr))
+			result = D3D12CreateDevice(m_DxgiAdapter.Get(), level, IID_PPV_ARGS(&m_D3D12Device));
+			if (SUCCEEDED(result))
 			{
 				m_FeatureLevel = level;
 				break;
 			}
 		}
 
-		utility::ThrowIfFailed(hr);
-
-		// Get IncrementSize
-		m_RtvDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		m_DsvDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-		m_CbvSrvUavDescriptorSize = m_D3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		utility::ThrowIfFailed(result);
 	}
 
 	void DX12Device::InitializeCommandQueues() noexcept
@@ -227,12 +222,19 @@ namespace gglab
 		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
-	void DX12Device::InitializeDescriptorHeaps() noexcept
+	void DX12Device::InitializeDescriptorAllocators() noexcept
 	{
-		m_CbvSrvUavDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
-		m_RtvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
-		m_DsvDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 16);
-		m_SamplerDescriptorHeap = std::make_unique<DX12DescriptorHeap>(this, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
+		m_CbvSrvUavDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
+
+		m_RtvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
+			D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
+
+		m_DsvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
+			D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 16);
+
+		m_SamplerDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
+			D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 256);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

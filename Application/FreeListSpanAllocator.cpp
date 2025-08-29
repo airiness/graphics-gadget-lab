@@ -82,6 +82,8 @@ namespace gglab
 		}
 
 		AddBlock(newOffset, newCount);
+
+		m_FreeCount += count;
 	}
 
 	void FreeListSpanAllocator::AddBlock(OffsetType offset, CountType count) noexcept

@@ -13,24 +13,18 @@ namespace gglab
 		if (count == 0)
 		{
 			GGLAB_LOG_WARN("RingSpanAllocator: Allocate(). count is 0, nothing allocated.");
-			return IndexSpan();
-		}
-
-		if (count >= m_FreeCount)
-		{
-			GGLAB_LOG_WARN("RingSpanAllocator: Allocate(). Don't have enough count. needed:{}, total:{}, free:{}",
-				count, m_Capacity, m_FreeCount);
-			return IndexSpan();
+			return {};
 		}
 
 		OffsetType index = 0;
 		if (m_Tail >= m_Head)
 		{
 			OffsetType right = m_Capacity - m_Tail;
-			if (count < right - (m_Head == 0 ? 1u : 0u))
+			if (count <= right - (m_Head == 0 ? 1u : 0u))
 			{
 				index = m_Tail;
 				m_Tail = (m_Tail + count) % m_Capacity;
+				m_FreeCount -= count;
 				return IndexSpan{ .m_Index = index, .m_Count = count };
 			}
 
@@ -38,19 +32,21 @@ namespace gglab
 			{
 				index = 0;
 				m_Tail = count % m_Capacity;
+				m_FreeCount -= count;
 				return IndexSpan{ .m_Index = 0, .m_Count = count };
 			}
 		}
 
-		auto available = m_Head - m_Tail - 1;
+		const auto available = m_Head - m_Tail - 1;
 		if (count <= available)
 		{
 			index = m_Tail;
 			m_Tail = (m_Tail + count) % m_Capacity;
+			m_FreeCount -= count;
 			return IndexSpan{ .m_Index = index, .m_Count = count };
 		}
 
-		return IndexSpan();
+		return {};
 	}
 
 	void RingSpanAllocator::RecordRetire(IndexSpan indexSpan, VersionType version) noexcept
@@ -76,6 +72,8 @@ namespace gglab
 			{
 				m_Head = (front.m_IndexSpan.m_Index + front.m_IndexSpan.m_Count) % m_Capacity;
 			}
+
+			m_FreeCount += front.m_IndexSpan.m_Count;
 			m_RetireRecords.pop_front();
 		}
 	}

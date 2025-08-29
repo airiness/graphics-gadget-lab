@@ -1,5 +1,7 @@
 #include "Precompiled.h"
 #include "DX12Descriptor.h"
+
+#include "DX12DescriptorAllocatorBase.h"
 #include "DX12Device.h"
 #include "Utility.h"
 
@@ -18,13 +20,31 @@ namespace gglab
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12Descriptor::CpuHandleAt(IndexType index) const noexcept
 	{
 		GGLAB_ASSERT_MSG(index < m_Count, "Invalid Cpu Descriptor index.");
-		return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_CpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize));
+		return { m_CpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize) };
 	}
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12Descriptor::GpuHandleAt(IndexType index) const noexcept
 	{
 		GGLAB_ASSERT_MSG(index < m_Count, "Invalid Gpu Descriptor index.");
-		return CD3DX12_GPU_DESCRIPTOR_HANDLE(m_GpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize));
+		return { m_GpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize) };
+	}
+
+	void DX12Descriptor::Free() noexcept
+	{
+		if (!m_Owner)
+		{
+			GGLAB_ASSERT_MSG(false, "Free(): Descriptor owner is null.");
+		}
+		m_Owner->FreeDescriptorInternal(*this);
+	}
+
+	void DX12Descriptor::Retire(const DX12FencePoint& fencePoint) const noexcept
+	{
+		if (!m_Owner)
+		{
+			GGLAB_ASSERT_MSG(false, "Retire(): Descriptor owner is null.");
+		}
+		m_Owner->RetireDescriptorInternal(*this, fencePoint);
 	}
 
 	void DX12Descriptor::Reset() noexcept
@@ -33,10 +53,18 @@ namespace gglab
 		m_Index = InvalidIndex;
 		m_Count = 0;
 		m_IncrementSize = 0;
-		m_Generation = 0;
 		m_CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE();
 		m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE();
 		m_Owner = nullptr;
+	}
+
+	DX12DescriptorView DX12Descriptor::ToView(IndexType index) const noexcept
+	{
+		DX12DescriptorView descriptorView;
+		descriptorView.m_CpuHandle = CpuHandleAt(index);
+		descriptorView.m_GpuHandle = GpuHandleAt(index);
+
+		return descriptorView;
 	}
 
 	DX12DescriptorHeap::DX12DescriptorHeap(DX12Device* dx12Device,

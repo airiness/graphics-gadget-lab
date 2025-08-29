@@ -6,6 +6,7 @@ namespace gglab
 	{
 	public:
 		explicit DX12PipelineState(DX12Device* dx12Device) noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PipelineState);
 		virtual ~DX12PipelineState() = default;
 
 		ID3D12PipelineState* Get() const noexcept { return m_PipelineState.Get(); }
@@ -23,7 +24,8 @@ namespace gglab
 	{
 	public:
 		explicit DX12GraphicsPipelineState(DX12Device* dx12Device, const DX12GraphicsPipelineStateDesc& desc) noexcept;
-		virtual ~DX12GraphicsPipelineState() noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12GraphicsPipelineState);
+		~DX12GraphicsPipelineState() override = default;
 
 	private:
 		void CreateGraphicsPipelineState() noexcept;
@@ -41,7 +43,8 @@ namespace gglab
 	{
 	public:
 		explicit DX12ComputePipelineState(DX12Device* dx12Device, const DX12ComputePipeLineStateDesc& desc) noexcept;
-		virtual ~DX12ComputePipelineState() noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ComputePipelineState);
+		~DX12ComputePipelineState() override = default;
 
 	private:
 		void CreateComputePipelineState() noexcept;

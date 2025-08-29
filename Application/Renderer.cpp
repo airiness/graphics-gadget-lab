@@ -3,14 +3,9 @@
 #include "Application.h"
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
-#include "DX12PipelineState.h"
 #include "DX12CommandList.h"
 #include "DX12CommandQueue.h"
 #include "DX12SwapChain.h"
-#include "DX12Buffer.h"
-#include "DX12Texture.h"
-#include "DX12Fence.h"
-#include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
 #include "DX12ConstantBuffer.h"
 #include "RenderGraph.h"
@@ -18,24 +13,14 @@
 #include "Components.h"
 #include "AssetManager.h"
 #include "Camera.h"
-#include "Geometry.h"
 #include "RenderPassTexColor.h"
-#include "Utility.h"
 
 namespace gglab
 {
 	Renderer::Renderer() noexcept
 	{
-		auto app = Application::GetInstance();
-		auto width = app->GetWindowWidth();
-		auto height = app->GetWindowHeight();
-
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
-	}
-
-	Renderer::~Renderer()
-	{
 	}
 
 	void Renderer::Initialize() noexcept
@@ -73,10 +58,7 @@ namespace gglab
 		}
 
 		auto swapChain = m_Device->GetSwapChain();
-		auto cbvDescriptorHeap = m_Device->GetCbvSrvUavDescriptorHeap();
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
-		auto bufferWidth = swapChain->GetBufferWidth();
-		auto bufferHeight = swapChain->GetBufferHeight();
 		auto commandAllocatorPool = m_Device->GetGraphicsCommandAllocatorPool();
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
 		auto commandQueue = m_Device->GetGraphicsCommandQueue();
@@ -130,7 +112,7 @@ namespace gglab
 		CD3DX12_DESCRIPTOR_RANGE1 range = {};
 		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
-		CD3DX12_ROOT_PARAMETER1 rootParameters[(uint32_t)CommonRSRootParamIndex::RootParamCount] = {};
+		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
 		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex)].InitAsConstantBufferView(0);
 		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
 
@@ -153,35 +135,12 @@ namespace gglab
 	void Renderer::InitializeConstantBuffer() noexcept
 	{
 		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
-
-		// Constant Buffer View
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbDesc = {};
-		cbDesc.SizeInBytes = static_cast<UINT>(m_GlobalConstantBuffer->GetBufferSize());
-		cbDesc.BufferLocation = m_GlobalConstantBuffer->GetBuffer()->Get()->GetGPUVirtualAddress();
-
-		auto cbHeap = m_Device->GetCbvSrvUavDescriptorHeap();
-		m_ConstantBufferDescriptor = cbHeap->CreateDescriptor();
-
-		m_Device->Get()->CreateConstantBufferView(&cbDesc, m_ConstantBufferDescriptor.m_CpuHandle);
 	}
 
 	void Renderer::InitializeRenderObjects() noexcept
 	{
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
 		auto* assetManager = Application::GetInstance()->GetAssetManager();
-
-		// Make a test cube 
-		{
-			//m_TestCube = primitive::Cube::Create();
-		}
-
-		// Make a test module
-		{
-			//auto model = assetManager->LoadModel("Assets/models/FlightHelmet/FlightHelmet.gltf");
-			//m_TestModel = enttRegistry.create();
-			//enttRegistry.emplace<Transform>(m_TestModel, Transform());
-			//enttRegistry.emplace<Model>(m_TestModel, std::move(model));
-		}
 
 		// Test Sponza
 		{

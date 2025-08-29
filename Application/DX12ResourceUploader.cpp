@@ -5,6 +5,7 @@
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
 #include "DX12Buffer.h"
+#include "DX12Fence.h"
 
 namespace gglab
 {
@@ -13,14 +14,6 @@ namespace gglab
 		m_UploadCommandQueue(std::make_unique<DX12CommandQueue>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
 		m_UploadCommandList(std::make_unique<DX12CommandList>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
 		m_UploadCommandAllocatorPool(std::make_unique<DX12CommandAllocatorPool>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT))
-	{
-	}
-
-	DX12ResourceUploader::~DX12ResourceUploader() noexcept
-	{
-	}
-
-	void DX12ResourceUploader::Finalize() noexcept
 	{
 	}
 

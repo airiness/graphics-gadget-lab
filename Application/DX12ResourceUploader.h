@@ -15,9 +15,7 @@ namespace gglab
 	public:
 		explicit DX12ResourceUploader(DX12Device* dx12Device) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12ResourceUploader);
-		~DX12ResourceUploader() noexcept;
-
-		void Finalize() noexcept;
+		~DX12ResourceUploader() = default;
 
 		void BeginUpload() noexcept;
 		void EndUpload(bool wait) noexcept;

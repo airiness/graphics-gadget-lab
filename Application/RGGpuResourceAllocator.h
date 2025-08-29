@@ -111,6 +111,7 @@ namespace gglab
 
 	public:
 		explicit RGGpuResourceAllocator(DX12Device* dx12device) noexcept;
+		GGLAB_DEFAULT_COPYABLE_MOVABLE(RGGpuResourceAllocator);
 		~RGGpuResourceAllocator() = default;
 
 		template<typename ResourceDesc>
