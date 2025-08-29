@@ -69,8 +69,9 @@ namespace gglab
 				swapChain->PrepareBackBuffer(commandList);
 				commandList->FlushBarriers();
 
-	/*			std::vector<const DX12Descriptor&> rtvs; 
-					rtvs.push_back(swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex()));*/
+				DX12DescriptorView rtvs[] = {
+					swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())
+				};		
 
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
@@ -83,7 +84,7 @@ namespace gglab
 				dsvDesc.Texture2D.MipSlice = 0;
 
 				m_DX12Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsvDesc, dsvDescriptor.CpuHandle());
-				//commandList->SetRenderTargets(rtvs, &dsvDescriptor);
+				commandList->SetRenderTargets(rtvs, &dsvDescriptor);
 
 				swapChain->ClearBackBuffer(commandList);
 				commandList->ClearDepthStencil(dsvDescriptor, 1.0f);

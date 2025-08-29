@@ -9,7 +9,7 @@ namespace gglab
 {
 	bool DX12Descriptor::IsValid() const noexcept
 	{
-		return m_CpuHandle.ptr != 0 && m_Index != InvalidIndex;
+		return m_CpuHandle.ptr != 0 && m_Index != InvalidIndex && m_Count > 0;
 	}
 
 	bool DX12Descriptor::IsShaderVisible() const noexcept

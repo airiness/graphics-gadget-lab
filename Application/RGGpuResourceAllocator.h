@@ -142,7 +142,6 @@ namespace gglab
 		ResourceIndex CreateBuffer(const RGBufferDesc& rgBufDesc,
 			D3D12_RESOURCE_STATES initStates) noexcept;
 
-
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		D3D12MA::Allocator* m_Allocator = nullptr;

@@ -190,6 +190,9 @@
     <ClCompile Include="DX12DescriptorAllocatorBase.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="ViewCache.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -359,6 +362,9 @@
     </ClInclude>
     <ClInclude Include="DX12DescriptorAllocatorBase.h">
       <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="ViewCache.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

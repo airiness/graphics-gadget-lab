@@ -158,6 +158,7 @@
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="VertexData.cpp" />
+    <ClCompile Include="ViewCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -216,6 +217,7 @@
     <ClInclude Include="Time.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="VertexData.h" />
+    <ClInclude Include="ViewCache.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />

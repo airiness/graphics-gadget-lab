@@ -18,7 +18,7 @@ namespace gglab
 	//using RGResourceUsage = D3D12_RESOURCE_STATES;
 
 	template<typename ResourceUsage>
-	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates(ResourceUsage usage, bool unuse = false) noexcept = delete;
+	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates(ResourceUsage usage, bool unuse = false) noexcept = delete;
 
 	enum class RGTextureUsage : uint32_t
 	{
@@ -34,7 +34,7 @@ namespace gglab
 	GGLAB_ENUM_FLAGS(RGTextureUsage);
 
 	template<>
-	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGTextureUsage>(RGTextureUsage rgTexUsage, bool depthReadOnly) noexcept
+	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGTextureUsage>(RGTextureUsage rgTexUsage, bool depthReadOnly) noexcept
 	{
 		using U = RGTextureUsage;
 		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
@@ -84,7 +84,7 @@ namespace gglab
 	GGLAB_ENUM_FLAGS(RGBufferUsage);
 
 	template<>
-	inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGBufferUsage>(RGBufferUsage rgBufUsage, bool) noexcept
+	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGBufferUsage>(RGBufferUsage rgBufUsage, bool) noexcept
 	{
 		using U = RGBufferUsage;
 		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
@@ -193,10 +193,10 @@ namespace gglab
 
 	// Get default clear value from RGResouceDesc, Texture can be use when Render target and Depth stencil.
 	template<typename RGResourceDesc>
-	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue(const RGResourceDesc&) noexcept = delete;
+	constexpr inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue(const RGResourceDesc&) noexcept = delete;
 
 	template<>
-	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGTextureDesc>(const RGTextureDesc& rgTexDesc) noexcept
+	constexpr inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGTextureDesc>(const RGTextureDesc& rgTexDesc) noexcept
 	{
 		if (Test(rgTexDesc.m_Usage, RGTextureUsage::RenderTarget))
 		{
@@ -222,12 +222,12 @@ namespace gglab
 
 	//  Buffer do not need default clear value.
 	template<>
-	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGBufferDesc>(const RGBufferDesc&) noexcept
+	constexpr inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGBufferDesc>(const RGBufferDesc&) noexcept
 	{
 		return std::nullopt;
 	}
 
-	inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGTextureUsage& rgTexUsage) noexcept
+	constexpr inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGTextureUsage& rgTexUsage) noexcept
 	{
 		return
 			(Test(rgTexUsage, RGTextureUsage::RenderTarget) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) |
@@ -249,7 +249,7 @@ namespace gglab
 			flags);
 	}
 
-	inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGBufferUsage& rgBufUsage) noexcept
+	constexpr inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(const RGBufferUsage& rgBufUsage) noexcept
 	{
 		return (Test(rgBufUsage, RGBufferUsage::UAV) ?
 			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS :
