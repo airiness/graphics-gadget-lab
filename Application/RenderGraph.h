@@ -9,6 +9,7 @@ namespace gglab
 {
 	class DX12Device;
 	class DX12CommandList;
+	class ViewCache;
 	class RGPassBase;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
