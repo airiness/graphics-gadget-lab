@@ -26,9 +26,9 @@ namespace gglab
 			Type m_Type = Type::RTV;
 			uint32_t m_ResouceIndex = 0;
 			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
-			uint16_t m_MipSlice = 1;
-			uint16_t m_ArraySlice = 1;
-			uint8_t m_PlaneSlice = 1;
+			uint16_t m_MipSlice = 0;
+			uint16_t m_ArraySlice = 0;
+			uint8_t m_PlaneSlice = 0;
 			uint8_t m_Dimension = 0;
 			uint8_t m_Flags = 0;
 
@@ -36,31 +36,40 @@ namespace gglab
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_Type, m_ResouceIndex, m_MipSlice, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
+				return std::tie(m_Type, m_ResouceIndex, m_Format, m_MipSlice, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
 			}
-
-			static ViewKey CreateRTVKey(uint32_t resourceIndex,
-				DX12Texture* texture,
-				const D3D12_RENDER_TARGET_VIEW_DESC& inDesc,
-				D3D12_RENDER_TARGET_VIEW_DESC& outDesc) noexcept;
-
-			static ViewKey CreateDSVKey(uint32_t resourceIndex,
-				DX12Texture* texture,
-				const D3D12_DEPTH_STENCIL_VIEW_DESC& inDesc,
-				D3D12_DEPTH_STENCIL_VIEW_DESC& outDesc);
 		};
 		using ViewKeyHash = KeyHash<ViewKey>;
 		
+		struct BuiltRTV
+		{
+			ViewKey m_ViewKey;
+			D3D12_RENDER_TARGET_VIEW_DESC m_Desc;
+		};
+
+		struct BuiltDSV
+		{
+			ViewKey m_ViewKey;
+			D3D12_DEPTH_STENCIL_VIEW_DESC m_Desc;
+		};
+
+		static BuiltRTV CreateRTVKey(uint32_t resourceIndex,
+			DX12Texture* texture,
+			const D3D12_RENDER_TARGET_VIEW_DESC& inDesc) noexcept;
+
+		static BuiltDSV CreateDSVKey(uint32_t resourceIndex,
+			DX12Texture* texture,
+			const D3D12_DEPTH_STENCIL_VIEW_DESC& inDesc) noexcept;
 
 	public:
-		explicit ViewCache(DX12Device*, const DescriptorsAllocatorArray& descritproAllocators) noexcept;
+		explicit ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(ViewCache);
 		~ViewCache();
 
 		const DX12Descriptor& GetRenderTargetView(uint32_t resourceIndex, DX12Texture* texture, 
 			std::optional<D3D12_RENDER_TARGET_VIEW_DESC> desc) noexcept;
 
-		const DX12Descriptor& GetDepthStenciView(uint32_t resourceIndex, DX12Texture* texture,
+		const DX12Descriptor& GetDepthStencilView(uint32_t resourceIndex, DX12Texture* texture,
 			std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> desc) noexcept;
 
 		void RetireResourceAllViews(uint32_t resourceIndex, const DX12FencePoint& fencePoint) noexcept;
