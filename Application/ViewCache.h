@@ -78,7 +78,6 @@ namespace gglab
 
 		void RetireResourceAllViewsImmediately(uint32_t resourceIndex) noexcept;
 
-
 	private:
 		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(Type type) const noexcept;
 

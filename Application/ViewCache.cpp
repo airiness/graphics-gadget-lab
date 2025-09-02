@@ -1,11 +1,13 @@
 #include "Precompiled.h"
 #include "ViewCache.h"
+#include "DX12Device.h"
 #include "DX12Texture.h"
+#include "DX12DescriptorFreeListAllocator.h"
 
 namespace gglab
 {
-	ViewCache::BuiltRTV ViewCache::CreateRTVKey(uint32_t resourceIndex, 
-		DX12Texture* texture, 
+	ViewCache::BuiltRTV ViewCache::CreateRTVKey(uint32_t resourceIndex,
+		DX12Texture* texture,
 		const D3D12_RENDER_TARGET_VIEW_DESC& inDesc) noexcept
 	{
 		BuiltRTV built{};
@@ -52,11 +54,11 @@ namespace gglab
 		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
 		key.m_Flags = 0;
 
-		return built;	
+		return built;
 	}
 
-	ViewCache::BuiltDSV ViewCache::CreateDSVKey(uint32_t resourceIndex, 
-		DX12Texture* texture, 
+	ViewCache::BuiltDSV ViewCache::CreateDSVKey(uint32_t resourceIndex,
+		DX12Texture* texture,
 		const D3D12_DEPTH_STENCIL_VIEW_DESC& inDesc) noexcept
 	{
 		BuiltDSV built{};
@@ -89,10 +91,30 @@ namespace gglab
 			break;
 		}
 
+		constexpr auto encodeDsvFlags = [](D3D12_DSV_FLAGS flags)
+			{
+				using U = std::underlying_type_t<D3D12_DSV_FLAGS>;
+				constexpr uint8_t bits = static_cast<uint8_t>(
+					static_cast<U>(D3D12_DSV_FLAG_READ_ONLY_DEPTH) |
+					static_cast<U>(D3D12_DSV_FLAG_READ_ONLY_STENCIL));
 
+				return static_cast<uint8_t>(static_cast<U>(flags)) & bits;
+			};
+
+		auto& key = built.m_ViewKey;
+		key.m_Type = Type::DSV;
+		key.m_ResouceIndex = resourceIndex;
+		key.m_Format = outDesc.Format;
+		key.m_MipSlice = mipSlice;
+		key.m_ArraySlice = 0;
+		key.m_PlaneSlice = 0;
+		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
+		key.m_Flags = encodeDsvFlags(outDesc.Flags);
+
+		return built;
 	}
 
-	ViewCache::ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept:
+	ViewCache::ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept :
 		m_DX12Device(dx12Device),
 		m_DescriptorAllocators(descriptorAllocators)
 	{
@@ -100,7 +122,121 @@ namespace gglab
 
 	ViewCache::~ViewCache()
 	{
+		GarbageCollect();
 
+		// Release all descriptors
+		for (auto& pending : m_Pendings)
+		{
+			for (auto& descriptor : pending.m_Descriptors)
+			{
+				if (descriptor.IsValid())
+				{
+					descriptor.Free();
+				}
+			}
+		}
+
+		m_Pendings.clear();
+		m_ResourceViews.clear();
 	}
 
+	const DX12Descriptor& ViewCache::GetRenderTargetView(uint32_t resourceIndex,
+		DX12Texture* texture,
+		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> desc) noexcept
+	{
+		// TODO: Need lock here?
+		std::scoped_lock lock(m_Mutex);
+
+		const auto inDesc = desc.value_or(D3D12_RENDER_TARGET_VIEW_DESC{});
+		auto built = CreateRTVKey(resourceIndex, texture, inDesc);
+
+		const auto& key = built.m_ViewKey;
+		const auto& rtvDesc = built.m_Desc;
+
+		if (auto it = m_Cache.find(key); it != m_Cache.end())
+		{
+			return it->second;
+		}
+
+		auto* allocator = GetDescriptorAllocator(Type::RTV);
+		DX12Descriptor descriptor = allocator->Allocate(1);
+		m_DX12Device->Get()->CreateRenderTargetView(texture->Get(), &rtvDesc, descriptor.CpuHandle());
+
+		m_ResourceViews[resourceIndex].push_back(key);
+		auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
+		return it->second;
+	}
+
+	const DX12Descriptor& ViewCache::GetDepthStencilView(uint32_t resourceIndex, DX12Texture* texture, std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> desc) noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+
+		const auto inDesc = desc.value_or(D3D12_DEPTH_STENCIL_VIEW_DESC{});
+		auto built = CreateDSVKey(resourceIndex, texture, inDesc);
+
+		const auto& key = built.m_ViewKey;
+		const auto& dsvDesc = built.m_Desc;
+
+		if (auto it = m_Cache.find(key); it != m_Cache.end())
+		{
+			return it->second;
+		}
+
+		auto* allocator = GetDescriptorAllocator(Type::DSV);
+		DX12Descriptor descriptor = allocator->Allocate(1);
+		m_DX12Device->Get()->CreateDepthStencilView(texture->Get(), &dsvDesc, descriptor.CpuHandle());
+
+		m_ResourceViews[resourceIndex].push_back(key);
+		auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
+		return it->second;
+	}
+
+	void ViewCache::RetireResourceAllViews(uint32_t resourceIndex, const DX12FencePoint& fencePoint) noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+
+		auto it = m_ResourceViews.find(resourceIndex);
+		if (it == m_ResourceViews.end())
+		{
+			return;
+		}
+
+		Pending pending
+		{
+			.m_ResourceIndex = resourceIndex,
+			.m_FencePoint = fencePoint
+		};
+
+		for (const auto& key : it->second)
+		{
+			auto descriptorIt = m_Cache.find(key);
+			if (descriptorIt != m_Cache.end())
+			{
+				continue;
+			}
+
+			pending.m_Descriptors.push_back(std::move(descriptorIt->second));
+			m_Cache.erase(descriptorIt);
+		}
+
+		m_ResourceViews.erase(it);
+
+		if (!pending.m_Descriptors.empty())
+		{
+			m_Pendings.emplace_back(std::move(pending));
+		}
+	}
+
+	void ViewCache::GarbageCollect() noexcept
+	{
+	}
+
+	void ViewCache::RetireResourceAllViewsImmediately(uint32_t resourceIndex) noexcept
+	{
+	}
+
+	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(Type type) const noexcept
+	{
+		return m_DescriptorAllocators[static_cast<uint32_t>(type)];
+	}
 }
