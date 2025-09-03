@@ -229,10 +229,69 @@ namespace gglab
 
 	void ViewCache::GarbageCollect() noexcept
 	{
+		std::scoped_lock lock(m_Mutex);
+		while (!m_Pendings.empty())
+		{
+			auto& pending = m_Pendings.front();
+			if (!pending.m_FencePoint.IsCompleted())
+			{
+				break;
+			}
+
+			for (auto& descriptor : pending.m_Descriptors)
+			{
+				if (descriptor.IsValid())
+				{
+					descriptor.Free();
+				}
+			}
+
+			m_Pendings.pop_front();
+		}
 	}
 
 	void ViewCache::RetireResourceAllViewsImmediately(uint32_t resourceIndex) noexcept
 	{
+		std::scoped_lock lock(m_Mutex);
+
+		if (auto it = m_ResourceViews.find(resourceIndex); it != m_ResourceViews.end())
+		{
+			for (const auto& key : it->second)
+			{
+				if (auto descriptorIt = m_Cache.find(key); descriptorIt != m_Cache.end())
+				{
+					if (descriptorIt->second.IsValid())
+					{
+						descriptorIt->second.Free();
+					}
+					m_Cache.erase(descriptorIt);
+				}
+			}
+			m_ResourceViews.erase(it);
+		}
+
+		if (!m_Pendings.empty())
+		{
+			auto pendingIt = m_Pendings.begin();
+			while (pendingIt != m_Pendings.end())
+			{
+				if (pendingIt->m_ResourceIndex == resourceIndex)
+				{
+					for (auto& descriptor : pendingIt->m_Descriptors)
+					{
+						if (descriptor.IsValid())
+						{
+							descriptor.Free();
+						}
+						pendingIt = m_Pendings.erase(pendingIt);
+					}
+				}
+				else
+				{
+					++pendingIt;
+				}
+			}
+		}
 	}
 
 	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(Type type) const noexcept
