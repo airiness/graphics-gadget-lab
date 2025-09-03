@@ -124,7 +124,7 @@ namespace gglab
 	{
 		GarbageCollect();
 
-		// Release all descriptors
+		// Release all pending descriptors
 		for (auto& pending : m_Pendings)
 		{
 			for (auto& descriptor : pending.m_Descriptors)
@@ -135,8 +135,18 @@ namespace gglab
 				}
 			}
 		}
-
 		m_Pendings.clear();
+
+		// Release descriptor still in cache
+		for (auto& [key, descriptor] : m_Cache)
+		{
+			if (descriptor.IsValid())
+			{
+				descriptor.Free();
+			}
+		}
+		m_Cache.clear();
+
 		m_ResourceViews.clear();
 	}
 
