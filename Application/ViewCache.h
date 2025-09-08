@@ -45,26 +45,6 @@ namespace gglab
 		};
 		using ViewKeyHash = KeyHash<ViewKey>;
 		
-		//struct BuiltRTV
-		//{
-		//	ViewKey m_ViewKey;
-		//	D3D12_RENDER_TARGET_VIEW_DESC m_Desc;
-		//};
-
-		//struct BuiltDSV
-		//{
-		//	ViewKey m_ViewKey;
-		//	D3D12_DEPTH_STENCIL_VIEW_DESC m_Desc;
-		//};
-
-		//static BuiltRTV CreateRTVKey(uint32_t resourceIndex,
-		//	DX12Texture* texture,
-		//	const D3D12_RENDER_TARGET_VIEW_DESC& inDesc) noexcept;
-
-		//static BuiltDSV CreateDSVKey(uint32_t resourceIndex,
-		//	DX12Texture* texture,
-		//	const D3D12_DEPTH_STENCIL_VIEW_DESC& inDesc) noexcept;
-
 	public:
 		explicit ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(ViewCache);
@@ -91,36 +71,6 @@ namespace gglab
 	private:
 		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(Type type) const noexcept;
 
-		//template<ViewCache::Type T>
-		//const DX12Descriptor CreateViewImpl(uint32_t resourceIndex, DX12Texture* texture,
-		//	std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
-		//{
-		//	using Traits = ViewTraits<T>;
-		//	const typename Traits::Desc inDesc = descOpt.value_or(typename Traits::Desc{});
-
-		//	std::scoped_lock lock(m_Mutex);
-
-		//	auto built = Traits::Build(resourceIndex, texture, inDesc);
-
-		//	const auto& key = built.m_ViewKey;
-		//	const auto& desc = built.m_Desc;
-
-		//	if (auto it = m_Cache.find(key); it != m_Cache.end())
-		//	{
-		//		return it->second;
-		//	}
-
-		//	auto* allocator = GetDescriptorAllocator(T);
-		//	auto descriptor = allocator->Allocate(1);
-		//	Traits::CreateView(m_DX12Device->Get(), texture->Get(), &desc, descriptor.CpuHandle());
-
-		//	m_ResourceViews[resourceIndex].push_back(key);
-
-		//	auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-
-		//	return it->second;
-		//}
-
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		DescriptorsAllocatorArray m_DescriptorAllocators;
@@ -141,17 +91,4 @@ namespace gglab
 	};
 
 	template<ViewCache::Type T> struct ViewTraits;
-
-	template<>
-	struct ViewTraits<ViewCache::Type::RTV>
-	{
-		using Desc = D3D12_RENDER_TARGET_VIEW_DESC;
-		using Built = ViewCache::BuiltRTV;
-
-		static Built Build(uint32_t resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;
-		static void
-	};
-
-
-
 }

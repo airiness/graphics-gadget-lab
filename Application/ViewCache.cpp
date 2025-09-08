@@ -6,6 +6,21 @@
 
 namespace gglab
 {
+	template<> struct ViewTraits<ViewCache::Type::RTV>
+	{
+		using Desc = D3D12_RENDER_TARGET_VIEW_DESC;
+
+		struct Built
+		{
+			ViewCache::ViewKey m_Key;
+			Desc m_Desc;
+		};
+
+		static Built Build(ViewCache::ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;
+	};
+
+
+
 	ViewCache::BuiltRTV ViewCache::CreateRTVKey(uint32_t resourceIndex,
 		DX12Texture* texture,
 		const D3D12_RENDER_TARGET_VIEW_DESC& inDesc) noexcept
@@ -150,7 +165,7 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	const DX12Descriptor& ViewCache::GetRenderTargetView(uint32_t resourceIndex,
+	const DX12Descriptor& ViewCache::GetRTV(uint32_t resourceIndex,
 		DX12Texture* texture,
 		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> desc) noexcept
 	{
