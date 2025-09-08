@@ -177,7 +177,9 @@ namespace gglab
 		return it->second;
 	}
 
-	const DX12Descriptor& ViewCache::GetDepthStencilView(uint32_t resourceIndex, DX12Texture* texture, std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> desc) noexcept
+	const DX12Descriptor& ViewCache::GetDepthStencilView(uint32_t resourceIndex, 
+		DX12Texture* texture, 
+		std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> desc) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 
@@ -217,10 +219,11 @@ namespace gglab
 			.m_FencePoint = fencePoint
 		};
 
+		pending.m_Descriptors.reserve(it->second.size());
 		for (const auto& key : it->second)
 		{
 			auto descriptorIt = m_Cache.find(key);
-			if (descriptorIt != m_Cache.end())
+			if (descriptorIt == m_Cache.end())
 			{
 				continue;
 			}
@@ -293,8 +296,8 @@ namespace gglab
 						{
 							descriptor.Free();
 						}
-						pendingIt = m_Pendings.erase(pendingIt);
 					}
+					pendingIt = m_Pendings.erase(pendingIt);
 				}
 				else
 				{
