@@ -17,7 +17,7 @@ namespace gglab
 			RTV,
 			DSV,
 			SRV,
-			UVA,
+			UAV,
 			Count,
 		};
 
@@ -51,16 +51,16 @@ namespace gglab
 		~ViewCache();
 
 		const DX12Descriptor& GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_RENDER_TARGET_VIEW_DESC> desc) noexcept;
+			std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept;
 
 		const DX12Descriptor& GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> desc) noexcept;
+			std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> descOpt) noexcept;
 
 		const DX12Descriptor& GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> desc) noexcept;
+			std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> descOpt) noexcept;
 
 		const DX12Descriptor& GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> desc) noexcept;
+			std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> descOpt) noexcept;
 
 		void RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept;
 
@@ -70,6 +70,11 @@ namespace gglab
 
 	private:
 		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(Type type) const noexcept;
+
+		template<Type T>
+		const DX12Descriptor& GetOrCreateImpl(ResourceIndex resourceIndex,
+			DX12Texture* texture,
+			std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -91,4 +96,26 @@ namespace gglab
 	};
 
 	template<ViewCache::Type T> struct ViewTraits;
+
+#define DEF_VIEW_TRAITS(viewType, descType)																							\
+	template<>																														\
+	struct ViewTraits<viewType>																										\
+	{																																\
+		using Desc = descType;																										\
+		struct Built																												\
+		{																															\
+			ViewCache::ViewKey m_Key;																								\
+			Desc m_Desc;																											\
+		};																															\
+		static Built Build(ViewCache::ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;				\
+		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept;	\
+	};
+
+	DEF_VIEW_TRAITS(ViewCache::Type::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewCache::Type::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewCache::Type::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewCache::Type::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
+
+#undef DEF_VIEW_TRAITS
+
 }

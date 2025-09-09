@@ -6,129 +6,6 @@
 
 namespace gglab
 {
-	template<> struct ViewTraits<ViewCache::Type::RTV>
-	{
-		using Desc = D3D12_RENDER_TARGET_VIEW_DESC;
-
-		struct Built
-		{
-			ViewCache::ViewKey m_Key;
-			Desc m_Desc;
-		};
-
-		static Built Build(ViewCache::ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;
-	};
-
-
-
-	ViewCache::BuiltRTV ViewCache::CreateRTVKey(uint32_t resourceIndex,
-		DX12Texture* texture,
-		const D3D12_RENDER_TARGET_VIEW_DESC& inDesc) noexcept
-	{
-		BuiltRTV built{};
-		auto& outDesc = built.m_Desc;
-
-		const auto& texDesc = texture->GetDesc();
-		outDesc = inDesc;
-
-		// TODO: typeless resource? format mapping?
-		if (outDesc.Format == DXGI_FORMAT_UNKNOWN)
-		{
-			outDesc.Format = texDesc.Format;
-		}
-
-		if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_UNKNOWN)
-		{
-			outDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ?
-				D3D12_RTV_DIMENSION_TEXTURE2DMS :
-				D3D12_RTV_DIMENSION_TEXTURE2D;
-		}
-
-		uint16_t mipSlice = 0;
-		uint8_t planeSlice = 0;
-
-		switch (outDesc.ViewDimension)
-		{
-		case D3D12_RTV_DIMENSION_TEXTURE2D:
-			mipSlice = static_cast<uint16_t>(outDesc.Texture2D.MipSlice);
-			planeSlice = static_cast<uint8_t>(outDesc.Texture2D.PlaneSlice);
-			break;
-		case D3D12_RTV_DIMENSION_TEXTURE2DMS:
-			break;
-		default:
-			break;
-		}
-
-		auto& key = built.m_ViewKey;
-		key.m_Type = Type::RTV;
-		key.m_ResouceIndex = resourceIndex;
-		key.m_Format = outDesc.Format;
-		key.m_MipSlice = mipSlice;
-		key.m_ArraySlice = 0;
-		key.m_PlaneSlice = planeSlice;
-		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
-		key.m_Flags = 0;
-
-		return built;
-	}
-
-	ViewCache::BuiltDSV ViewCache::CreateDSVKey(uint32_t resourceIndex,
-		DX12Texture* texture,
-		const D3D12_DEPTH_STENCIL_VIEW_DESC& inDesc) noexcept
-	{
-		BuiltDSV built{};
-		auto& outDesc = built.m_Desc;
-
-		const auto& texDesc = texture->GetDesc();
-		outDesc = inDesc;
-
-		if (outDesc.Format == DXGI_FORMAT_UNKNOWN)
-		{
-			outDesc.Format = texDesc.Format;
-		}
-
-		if (outDesc.ViewDimension == D3D12_DSV_DIMENSION_UNKNOWN)
-		{
-			outDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ?
-				D3D12_DSV_DIMENSION_TEXTURE2DMS :
-				D3D12_DSV_DIMENSION_TEXTURE2D;
-		}
-
-		uint16_t mipSlice = 0;
-		switch (outDesc.ViewDimension)
-		{
-		case D3D12_DSV_DIMENSION_TEXTURE2D:
-			mipSlice = static_cast<uint16_t>(outDesc.Texture2D.MipSlice);
-			break;
-		case D3D12_DSV_DIMENSION_TEXTURE2DMS:
-			break;
-		default:
-			break;
-		}
-
-		constexpr auto encodeDsvFlags = [](D3D12_DSV_FLAGS flags)
-			{
-				using U = std::underlying_type_t<D3D12_DSV_FLAGS>;
-				constexpr uint8_t bits = static_cast<uint8_t>(
-					static_cast<U>(D3D12_DSV_FLAG_READ_ONLY_DEPTH) |
-					static_cast<U>(D3D12_DSV_FLAG_READ_ONLY_STENCIL));
-
-				return static_cast<uint8_t>(static_cast<U>(flags)) & bits;
-			};
-
-		auto& key = built.m_ViewKey;
-		key.m_Type = Type::DSV;
-		key.m_ResouceIndex = resourceIndex;
-		key.m_Format = outDesc.Format;
-		key.m_MipSlice = mipSlice;
-		key.m_ArraySlice = 0;
-		key.m_PlaneSlice = 0;
-		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
-		key.m_Flags = encodeDsvFlags(outDesc.Flags);
-
-		return built;
-	}
-
 	ViewCache::ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept :
 		m_DX12Device(dx12Device),
 		m_DescriptorAllocators(descriptorAllocators)
@@ -165,60 +42,31 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	const DX12Descriptor& ViewCache::GetRTV(uint32_t resourceIndex,
-		DX12Texture* texture,
-		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> desc) noexcept
+	const DX12Descriptor& ViewCache::GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
+		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept
 	{
-		// TODO: Need lock here?
-		std::scoped_lock lock(m_Mutex);
-
-		const auto inDesc = desc.value_or(D3D12_RENDER_TARGET_VIEW_DESC{});
-		auto built = CreateRTVKey(resourceIndex, texture, inDesc);
-
-		const auto& key = built.m_ViewKey;
-		const auto& rtvDesc = built.m_Desc;
-
-		if (auto it = m_Cache.find(key); it != m_Cache.end())
-		{
-			return it->second;
-		}
-
-		auto* allocator = GetDescriptorAllocator(Type::RTV);
-		DX12Descriptor descriptor = allocator->Allocate(1);
-		m_DX12Device->Get()->CreateRenderTargetView(texture->Get(), &rtvDesc, descriptor.CpuHandle());
-
-		m_ResourceViews[resourceIndex].push_back(key);
-		auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-		return it->second;
+		// TODO: insert return statement here
 	}
 
-	const DX12Descriptor& ViewCache::GetDepthStencilView(uint32_t resourceIndex, 
-		DX12Texture* texture, 
-		std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> desc) noexcept
+	const DX12Descriptor& ViewCache::GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
+		std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> descOpt) noexcept
 	{
-		std::scoped_lock lock(m_Mutex);
-
-		const auto inDesc = desc.value_or(D3D12_DEPTH_STENCIL_VIEW_DESC{});
-		auto built = CreateDSVKey(resourceIndex, texture, inDesc);
-
-		const auto& key = built.m_ViewKey;
-		const auto& dsvDesc = built.m_Desc;
-
-		if (auto it = m_Cache.find(key); it != m_Cache.end())
-		{
-			return it->second;
-		}
-
-		auto* allocator = GetDescriptorAllocator(Type::DSV);
-		DX12Descriptor descriptor = allocator->Allocate(1);
-		m_DX12Device->Get()->CreateDepthStencilView(texture->Get(), &dsvDesc, descriptor.CpuHandle());
-
-		m_ResourceViews[resourceIndex].push_back(key);
-		auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-		return it->second;
+		// TODO: insert return statement here
 	}
 
-	void ViewCache::RetireResourceAllViews(uint32_t resourceIndex, const DX12FencePoint& fencePoint) noexcept
+	const DX12Descriptor& ViewCache::GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
+		std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> descOpt) noexcept
+	{
+		// TODO: insert return statement here
+	}
+
+	const DX12Descriptor& ViewCache::GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
+		std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> descOpt) noexcept
+	{
+		// TODO: insert return statement here
+	}
+
+	void ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 
@@ -278,7 +126,7 @@ namespace gglab
 		}
 	}
 
-	void ViewCache::RetireResourceAllViewsImmediately(uint32_t resourceIndex) noexcept
+	void ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 
@@ -325,5 +173,13 @@ namespace gglab
 	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(Type type) const noexcept
 	{
 		return m_DescriptorAllocators[static_cast<uint32_t>(type)];
+	}
+
+	template<ViewCache::Type T>
+	const DX12Descriptor& ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex,
+		DX12Texture* texture,
+		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
+	{
+		return DX12Descriptor();
 	}
 }
