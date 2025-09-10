@@ -197,16 +197,74 @@ namespace gglab
 
 		// Allocate and create
 		DX12Descriptor descriptor = GetDescriptorAllocator(T)->Allocate(1);
+		Traits::Create(m_DX12Device, texture, &built.m_Desc, descriptor);
 
-
+		// Cache descriptor
+		std::scoped_lock lock(m_Mutex);
+		m_ResourceViews[resourceIndex].push_back(key);
+		auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
+		return it->second;
 	}
 
-#define DECL_GET_OR_CREATE_TEMPLATE_FUN(viewType, descType)	\
+	ViewTraits<ViewType::RTV>::Built ViewTraits<ViewType::RTV>::Build(
+		ViewCache::ResourceIndex resourceIndex,
+		DX12Texture* texture,
+		const Desc& inDesc) noexcept
+	{
+		Built built{};
+		auto outDesc = built.m_Desc;
+		const auto& texDesc = texture->GetDesc();
+		outDesc = inDesc;
+
+		if (outDesc.Format == DXGI_FORMAT_UNKNOWN)
+		{
+			outDesc.Format = texDesc.Format;// TODO: typeless->typed?
+		}
+
+		if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_UNKNOWN)
+		{
+			// Sample count is bigger than 1, multi-sample
+			outDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ?
+				D3D12_RTV_DIMENSION_TEXTURE2DMS :
+				D3D12_RTV_DIMENSION_TEXTURE2D;
+		}
+
+		uint16_t mip = 0;
+		uint8_t plane = 0;
+		if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2D)
+		{
+			mip = static_cast<uint16_t>(outDesc.Texture2D.MipSlice);
+			plane = static_cast<uint8_t>(outDesc.Texture2D.PlaneSlice);
+		}
+
+		auto& key = built.m_Key;
+		key.m_Type = ViewType::RTV;
+		key.m_ResouceIndex = resourceIndex;
+		key.m_Format = outDesc.Format;
+		key.m_MipSlice = mip;
+		key.m_ArraySlice = 0;
+		key.m_PlaneSlice = plane;
+		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
+		key.m_Flags = 0;
+		key.m_ComponentMapping = 0;
+		key.m_MipLevels = 0;
+
+		return built;
+	}
+
+	void ViewTraits<ViewType::RTV>::Create(DX12Device* device,
+		DX12Texture* texture, const Desc* desc, const DX12Descriptor& outDesc) noexcept
+	{
+		device->Get()->CreateRenderTargetView(texture->Get(), desc, outDesc.CpuHandle());
+	}
+
+#define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
 	template const DX12Descriptor& ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;
 
-	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
-	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
-	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
-	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
-#undef DECL_GET_OR_CREATE_TEMPLATE_FUN
+	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
+	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
+	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
+	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
+
+#undef DECL_GET_OR_CREATE_TEMPLATE_FUNC
 }
