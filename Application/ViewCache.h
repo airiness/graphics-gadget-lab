@@ -8,24 +8,26 @@ namespace gglab
 	class DX12Texture;
 	class DX12DescriptorFreeListAllocator;
 	class DX12FencePoint;
+
+	enum class ViewType : uint8_t
+	{
+		RTV,
+		DSV,
+		SRV,
+		UAV,
+		Count,
+	};
+
+	template<ViewType T> struct ViewTraits;
+
 	class ViewCache
 	{
 	public:
 		using ResourceIndex = uint32_t;
-		enum class Type : uint32_t
-		{
-			RTV,
-			DSV,
-			SRV,
-			UAV,
-			Count,
-		};
-
-		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, static_cast<uint32_t>(Type::Count)>;
+		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, static_cast<uint32_t>(ViewType::Count)>;
 
 		struct ViewKey
 		{
-			Type m_Type = Type::RTV;
 			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
 			uint32_t m_ResouceIndex = 0;
 			uint32_t m_ComponentMapping = 0;
@@ -35,6 +37,7 @@ namespace gglab
 			uint8_t m_PlaneSlice = 0;
 			uint8_t m_Dimension = 0;
 			uint8_t m_Flags = 0;
+			ViewType m_Type = ViewType::RTV;
 
 			bool operator==(const ViewKey& other) const noexcept = default;
 
@@ -69,9 +72,9 @@ namespace gglab
 		void FreeAllImmediately(ResourceIndex resourceIndex) noexcept;
 
 	private:
-		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(Type type) const noexcept;
+		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(ViewType type) const noexcept;
 
-		template<Type T>
+		template<ViewType T>
 		const DX12Descriptor& GetOrCreateImpl(ResourceIndex resourceIndex,
 			DX12Texture* texture,
 			std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept;
@@ -95,8 +98,6 @@ namespace gglab
 		std::mutex m_Mutex;
 	};
 
-	template<ViewCache::Type T> struct ViewTraits;
-
 #define DEF_VIEW_TRAITS(viewType, descType)																							\
 	template<>																														\
 	struct ViewTraits<viewType>																										\
@@ -111,10 +112,10 @@ namespace gglab
 		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept;	\
 	};
 
-	DEF_VIEW_TRAITS(ViewCache::Type::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
-	DEF_VIEW_TRAITS(ViewCache::Type::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
-	DEF_VIEW_TRAITS(ViewCache::Type::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
-	DEF_VIEW_TRAITS(ViewCache::Type::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
 
 #undef DEF_VIEW_TRAITS
 

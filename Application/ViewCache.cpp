@@ -170,16 +170,43 @@ namespace gglab
 		}
 	}
 
-	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(Type type) const noexcept
+	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(ViewType type) const noexcept
 	{
 		return m_DescriptorAllocators[static_cast<uint32_t>(type)];
 	}
 
-	template<ViewCache::Type T>
+	template<ViewType T>
 	const DX12Descriptor& ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex,
 		DX12Texture* texture,
 		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
 	{
-		return DX12Descriptor();
+		using Traits = ViewTraits<T>;
+		const typename Traits::Desc inDesc = descOpt.value_or(typename Traits::Desc{});
+
+		const auto built = Traits::Build(resourceIndex, texture, inDesc);
+		const auto& key = built.m_Key;
+
+		// Check the Key has existed in cache
+		{
+			std::scoped_lock lock(m_Mutex);
+			if (auto it = m_Cache.find(key); key != m_Cache.end())
+			{
+				return it->second;
+			}
+		}
+
+		// Allocate and create
+		DX12Descriptor descriptor = GetDescriptorAllocator(T)->Allocate(1);
+
+
 	}
+
+#define DECL_GET_OR_CREATE_TEMPLATE_FUN(viewType, descType)	\
+	template const DX12Descriptor& ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;
+
+	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
+	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
+	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
+	DECL_GET_OR_CREATE_TEMPLATE_FUN(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
+#undef DECL_GET_OR_CREATE_TEMPLATE_FUN
 }
