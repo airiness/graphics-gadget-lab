@@ -25,16 +25,22 @@ namespace gglab
 
 	void Renderer::Initialize() noexcept
 	{
-		InitializeConstantBuffer();
-		InitializeCamera();
-		InitializeRenderObjects();
+		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
 
+		CreateCamera();
+		CreateRenderObjects();
 		CreateCommonRootSignature();
-
+	
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
-
 		m_TexColorPass = std::make_unique<RenderPassTexColor>(m_Device.get());
 
+		ViewCache::DescriptorsAllocatorArray descriptorAllocators =
+		{
+			m_Device->GetRtvDescriptorAllocator(),
+			m_Device->GetDsvDescriptorAllocator(),
+			m_Device->GetCbvSrvUavDescriptorAllocator()
+		};
+		m_ViewCache = std::make_unique<ViewCache>(m_Device.get(), descriptorAllocators);
 		m_IsInitialized = true;
 	}
 
@@ -132,12 +138,7 @@ namespace gglab
 		m_CommonRootSignature = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
 	}
 
-	void Renderer::InitializeConstantBuffer() noexcept
-	{
-		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
-	}
-
-	void Renderer::InitializeRenderObjects() noexcept
+	void Renderer::CreateRenderObjects() noexcept
 	{
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
 		auto* assetManager = Application::GetInstance()->GetAssetManager();
@@ -151,7 +152,7 @@ namespace gglab
 		}
 	}
 
-	void Renderer::InitializeCamera() noexcept
+	void Renderer::CreateCamera() noexcept
 	{
 		auto app = Application::GetInstance();
 

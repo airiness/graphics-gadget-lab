@@ -15,7 +15,7 @@ namespace gglab
 		DSV,
 		SRV,
 		UAV,
-		Count,
+		Count = UAV,
 	};
 
 	template<ViewType T> struct ViewTraits;

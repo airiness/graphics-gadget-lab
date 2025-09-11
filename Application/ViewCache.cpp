@@ -45,25 +45,25 @@ namespace gglab
 	const DX12Descriptor& ViewCache::GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept
 	{
-		// TODO: insert return statement here
+		return GetOrCreateImpl<ViewType::RTV>(resourceIndex, texture, descOpt);
 	}
 
 	const DX12Descriptor& ViewCache::GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> descOpt) noexcept
 	{
-		// TODO: insert return statement here
+		return GetOrCreateImpl<ViewType::DSV>(resourceIndex, texture, descOpt);
 	}
 
 	const DX12Descriptor& ViewCache::GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> descOpt) noexcept
 	{
-		// TODO: insert return statement here
+		return GetOrCreateImpl<ViewType::SRV>(resourceIndex, texture, descOpt);
 	}
 
 	const DX12Descriptor& ViewCache::GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> descOpt) noexcept
 	{
-		// TODO: insert return statement here
+		return GetOrCreateImpl<ViewType::UAV>(resourceIndex, texture, descOpt);
 	}
 
 	void ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
@@ -76,23 +76,19 @@ namespace gglab
 			return;
 		}
 
-		Pending pending
-		{
-			.m_ResourceIndex = resourceIndex,
-			.m_FencePoint = fencePoint
-		};
+		Pending pending{};
+		pending.m_ResourceIndex = resourceIndex;
+		pending.m_FencePoint = fencePoint;
+		pending.m_Descriptors.reserve(it->second.size());	
 
-		pending.m_Descriptors.reserve(it->second.size());
 		for (const auto& key : it->second)
 		{
 			auto descriptorIt = m_Cache.find(key);
-			if (descriptorIt == m_Cache.end())
+			if (descriptorIt != m_Cache.end())
 			{
-				continue;
+				pending.m_Descriptors.push_back(std::move(descriptorIt->second));
+				m_Cache.erase(descriptorIt);
 			}
-
-			pending.m_Descriptors.push_back(std::move(descriptorIt->second));
-			m_Cache.erase(descriptorIt);
 		}
 
 		m_ResourceViews.erase(it);
@@ -172,7 +168,18 @@ namespace gglab
 
 	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(ViewType type) const noexcept
 	{
-		return m_DescriptorAllocators[static_cast<uint32_t>(type)];
+		switch (type)
+		{
+		case ViewType::RTV:
+		case ViewType::DSV:
+			return m_DescriptorAllocators[static_cast<uint32_t>(type)];
+		case ViewType::SRV:
+		case ViewType::UAV:
+			return m_DescriptorAllocators[static_cast<uint32_t>(ViewType::SRV)];
+		default:
+			GGLAB_UNREACHABLE("Unknow View Type.");
+			break;
+		}
 	}
 
 	template<ViewType T>
@@ -189,7 +196,7 @@ namespace gglab
 		// Check the Key has existed in cache
 		{
 			std::scoped_lock lock(m_Mutex);
-			if (auto it = m_Cache.find(key); key != m_Cache.end())
+			if (auto it = m_Cache.find(key); it != m_Cache.end())
 			{
 				return it->second;
 			}
@@ -206,13 +213,11 @@ namespace gglab
 		return it->second;
 	}
 
-	ViewTraits<ViewType::RTV>::Built ViewTraits<ViewType::RTV>::Build(
-		ViewCache::ResourceIndex resourceIndex,
-		DX12Texture* texture,
-		const Desc& inDesc) noexcept
+	auto ViewTraits<ViewType::RTV>::Build(ViewCache::ResourceIndex resourceIndex,
+		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
 	{
 		Built built{};
-		auto outDesc = built.m_Desc;
+		auto& outDesc = built.m_Desc;
 		const auto& texDesc = texture->GetDesc();
 		outDesc = inDesc;
 
@@ -256,6 +261,169 @@ namespace gglab
 		DX12Texture* texture, const Desc* desc, const DX12Descriptor& outDesc) noexcept
 	{
 		device->Get()->CreateRenderTargetView(texture->Get(), desc, outDesc.CpuHandle());
+	}
+
+	auto ViewTraits<ViewType::DSV>::Build(ViewCache::ResourceIndex resourceIndex,
+		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
+	{
+		Built built{};
+		auto& outDesc = built.m_Desc;
+		const auto& texDesc = texture->GetDesc();
+		outDesc = inDesc;
+
+		if (outDesc.Format == DXGI_FORMAT_UNKNOWN)
+		{
+			outDesc.Format = texDesc.Format;
+		}
+
+		if (outDesc.ViewDimension == D3D12_DSV_DIMENSION_UNKNOWN)
+		{
+			outDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ?
+				D3D12_DSV_DIMENSION_TEXTURE2DMS :
+				D3D12_DSV_DIMENSION_TEXTURE2D;
+		}
+
+		uint16_t mip = 0;
+		if (outDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2D)
+		{
+			mip = static_cast<uint16_t>(outDesc.Texture2D.MipSlice);
+		}
+
+		// Encode flags
+		const auto encodeDsvFlags = [](D3D12_DSV_FLAGS flags) noexcept
+			{
+				using U = std::underlying_type_t<D3D12_DSV_FLAGS>;
+				constexpr uint8_t kBits = static_cast<uint8_t>(
+					static_cast<U>(D3D12_DSV_FLAG_READ_ONLY_DEPTH) |
+					static_cast<U>(D3D12_DSV_FLAG_READ_ONLY_STENCIL));
+
+				return static_cast<uint8_t>(static_cast<U>(flags)) & kBits;
+			};
+
+		auto& key = built.m_Key;
+		key.m_Type = ViewType::DSV;
+		key.m_ResouceIndex = resourceIndex;
+		key.m_Format = outDesc.Format;
+		key.m_MipSlice = mip;
+		key.m_ArraySlice = 0;
+		key.m_PlaneSlice = 0;
+		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
+		key.m_Flags = encodeDsvFlags(outDesc.Flags);
+		key.m_ComponentMapping = 0;
+		key.m_MipLevels = 0;
+
+		return built;
+	}
+
+	void ViewTraits<ViewType::DSV>::Create(DX12Device* device,
+		DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept
+	{
+		device->Get()->CreateDepthStencilView(texture->Get(), desc, descriptor.CpuHandle());
+	}
+
+	auto ViewTraits<ViewType::SRV>::Build(ViewCache::ResourceIndex resourceIndex,
+		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
+	{
+		Built built{};
+		auto& outDesc = built.m_Desc;
+		const auto& texDesc = texture->GetDesc();
+		outDesc = inDesc;
+
+		if (outDesc.Format == DXGI_FORMAT_UNKNOWN)
+		{
+			outDesc.Format = texDesc.Format; // TODO: sRGB/ linear
+		}
+
+		if (outDesc.Shader4ComponentMapping == 0)
+		{
+			outDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		}
+
+		if (outDesc.ViewDimension == D3D12_SRV_DIMENSION_UNKNOWN)
+		{
+			outDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ?
+				D3D12_SRV_DIMENSION_TEXTURE2DMS :
+				D3D12_SRV_DIMENSION_TEXTURE2D;
+		}
+
+		uint16_t most = 0;
+		uint16_t levels = 0;
+		uint8_t plane = 0;
+		if (outDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
+		{
+			most = static_cast<uint16_t>(outDesc.Texture2D.MostDetailedMip);
+			plane = static_cast<uint8_t>(outDesc.Texture2D.PlaneSlice);
+			levels = (outDesc.Texture2D.MipLevels == UINT(-1)) ?
+				0 :
+				static_cast<uint16_t>(outDesc.Texture2D.MipLevels);
+		}
+
+		auto& key = built.m_Key;
+		key.m_Type = ViewType::SRV;
+		key.m_ResouceIndex = resourceIndex;
+		key.m_Format = outDesc.Format;
+		key.m_MipSlice = most;
+		key.m_MipLevels = levels;
+		key.m_ArraySlice = 0;
+		key.m_PlaneSlice = plane;
+		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
+		key.m_Flags = 0;
+		key.m_ComponentMapping = outDesc.Shader4ComponentMapping;
+
+		return built;
+	}
+
+	void ViewTraits<ViewType::SRV>::Create(DX12Device* device,
+		DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept
+	{
+		device->Get()->CreateShaderResourceView(texture->Get(), desc, descriptor.CpuHandle());
+	}
+
+	auto ViewTraits<ViewType::UAV>::Build(ViewCache::ResourceIndex resourceIndex,
+		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
+	{
+		Built built{};
+		auto& outDesc = built.m_Desc;
+		const auto& texDesc = texture->GetDesc();
+		outDesc = inDesc;
+
+		if (outDesc.Format == DXGI_FORMAT_UNKNOWN)
+		{
+			outDesc.Format = texDesc.Format;
+		}
+
+		if (outDesc.ViewDimension == D3D12_UAV_DIMENSION_UNKNOWN)
+		{
+			outDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		}
+
+		uint16_t mip = 0;
+		uint8_t plane = 0;
+		if (outDesc.ViewDimension == D3D12_UAV_DIMENSION_TEXTURE2D)
+		{
+			mip = static_cast<uint16_t>(outDesc.Texture2D.MipSlice);
+			plane = static_cast<uint8_t>(outDesc.Texture2D.PlaneSlice);
+		}
+
+		auto& key = built.m_Key;
+		key.m_Type = ViewType::UAV;
+		key.m_ResouceIndex = resourceIndex;
+		key.m_Format = outDesc.Format;
+		key.m_MipSlice = mip;
+		key.m_ArraySlice = 0;
+		key.m_PlaneSlice = plane;
+		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
+		key.m_Flags = 0;
+		key.m_ComponentMapping = 0;
+		key.m_MipLevels = 0;
+
+		return built;
+	}
+
+	void ViewTraits<ViewType::UAV>::Create(DX12Device* device,
+		DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept
+	{
+		device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, desc, descriptor.CpuHandle());
 	}
 
 #define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
