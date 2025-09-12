@@ -25,10 +25,9 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-
 		DX12RootSignature* GetCommonRootSignature() const noexcept { return m_CommonRootSignature.get(); }
-
-		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); };
+		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); }
+		ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 	private:
 		void CreateRenderObjects() noexcept;
 		void CreateCamera() noexcept;

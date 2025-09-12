@@ -29,7 +29,7 @@ namespace gglab
 	{
 		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
-		virtual void Devirtualize(RGGpuResourceAllocator&) noexcept = 0;
+		virtual void Devirtualize(RGGpuResourceAllocator*) noexcept = 0;
 		virtual void Destroy(RenderGraph&) noexcept = 0;
 
 		StringId m_NameId;
@@ -62,7 +62,7 @@ namespace gglab
 		Usage m_Usage = RESOURCE::DefaultNoneUsage;
 		GpuResourceIndexType m_GpuResourceIndex = InvalidGpuResourceIndex;
 
-		void Devirtualize(RGGpuResourceAllocator& allocator) noexcept override;
+		void Devirtualize(RGGpuResourceAllocator* allocator) noexcept override;
 		void Destroy(RenderGraph& rg) noexcept override;
 	};
 
@@ -123,6 +123,12 @@ namespace gglab
 	class RenderGraph
 	{
 	public:
+		struct CreateInfo
+		{
+			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
+			ViewCache* m_ViewCache = nullptr;
+		};
+
 		class RGBuilder
 		{
 		public:
@@ -174,7 +180,7 @@ namespace gglab
 		};
 
 	public:
-		explicit RenderGraph(RGGpuResourceAllocator& gpuResAllocator) noexcept;
+		explicit RenderGraph(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderGraph);
 		~RenderGraph() noexcept;
 
@@ -195,6 +201,7 @@ namespace gglab
 		DX12Texture* GetTexture(RGTextureId texId) noexcept;
 		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;
 
+		ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
@@ -219,7 +226,9 @@ namespace gglab
 		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept;
 
 	private:
-		RGGpuResourceAllocator& m_GpuResourceAllocator;
+		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
+		ViewCache* m_ViewCache = nullptr;
+
 		RGArenaAllocator m_ArenaAllocator;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
@@ -428,7 +437,7 @@ namespace gglab
 
 	// RGVirtualResource functions
 	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGGpuResourceAllocator& allocator) noexcept
+	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGGpuResourceAllocator* allocator) noexcept
 	{
 		if (m_Devirtualized)
 		{
@@ -437,7 +446,7 @@ namespace gglab
 
 		m_CurrentStates = RGResourceTraits<RESOURCE>::ToState(static_cast<RGResourceTraits<RESOURCE>::Bits>(m_Usage));
 		std::optional<D3D12_CLEAR_VALUE> clearValue = DefaultClearValue<Desc>(m_Desc);
-		m_GpuResourceIndex = allocator.Acquire<Desc>(m_Desc, m_CurrentStates, clearValue);
+		m_GpuResourceIndex = allocator->Acquire<Desc>(m_Desc, m_CurrentStates, clearValue);
 		m_Devirtualized = true;
 	}
 

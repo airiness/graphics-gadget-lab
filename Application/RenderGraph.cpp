@@ -8,15 +8,16 @@
 
 namespace gglab
 {
-	RenderGraph::RenderGraph(RGGpuResourceAllocator& gpuResAllocator) noexcept :
-		m_GpuResourceAllocator(gpuResAllocator),
+	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
+		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
+		m_ViewCache(createInfo.m_ViewCache),
 		m_ArenaAllocator(1u << 20)
 	{
+		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
+		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "ViewCache can not be null.");
 	}
 
-	RenderGraph::~RenderGraph() noexcept
-	{
-	}
+	RenderGraph::~RenderGraph() noexcept = default;
 
 	void RenderGraph::Compile() noexcept
 	{
@@ -152,13 +153,13 @@ namespace gglab
 	{
 		for (const auto texIndex : m_MarkedReleaseTextureIndices)
 		{
-			m_GpuResourceAllocator.ReleaseTexture(texIndex, fencePoint);
+			m_GpuResourceAllocator->ReleaseTexture(texIndex, fencePoint);
 		}
 		m_MarkedReleaseTextureIndices.clear();
 
 		for (const auto bufIndex : m_MarkedReleaseBufferIndices)
 		{
-			m_GpuResourceAllocator.ReleaseBuffer(bufIndex, fencePoint);
+			m_GpuResourceAllocator->ReleaseBuffer(bufIndex, fencePoint);
 		}
 		m_MarkedReleaseBufferIndices.clear();
 	}
@@ -170,7 +171,7 @@ namespace gglab
 		{
 			return nullptr;
 		}
-		return m_GpuResourceAllocator.GetTexture(virtualRes->m_GpuResourceIndex);
+		return m_GpuResourceAllocator->GetTexture(virtualRes->m_GpuResourceIndex);
 	}
 
 	DX12Buffer* RenderGraph::GetBuffer(RGBufferId bufId) noexcept
@@ -180,7 +181,7 @@ namespace gglab
 		{
 			return nullptr;
 		}
-		return m_GpuResourceAllocator.GetBuffer(virtualRes->m_GpuResourceIndex);
+		return m_GpuResourceAllocator->GetBuffer(virtualRes->m_GpuResourceIndex);
 	}
 
 	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) noexcept

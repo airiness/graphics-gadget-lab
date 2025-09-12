@@ -75,7 +75,10 @@ namespace gglab
 		commandList->Begin(commandAllocator);
 
 		// Render Graph
-		RenderGraph rg(*m_RGGpuAllocator.get());
+		RenderGraph::CreateInfo rgCreateInfo{};
+		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuAllocator.get();
+		rgCreateInfo.m_ViewCache = m_ViewCache.get();
+		RenderGraph rg(rgCreateInfo);
 
 		m_TexColorPass->AddPass(rg);
 

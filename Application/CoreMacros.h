@@ -1,7 +1,7 @@
 #pragma once
 #include <cassert>
 
-#define GGLAB_ASSERT_MSG(expression, message) assert(expression && message)
+#define GGLAB_ASSERT_MSG(expression, message) assert((expression) && (message))
 
 // Define unreachable and abort application
 #define GGLAB_UNREACHABLE(message) \
