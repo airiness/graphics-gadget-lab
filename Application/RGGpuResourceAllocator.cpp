@@ -13,7 +13,7 @@ namespace gglab
 
 	void RGGpuResourceAllocator::ReleaseTexture(ResourceIndex texIndex, const DX12FencePoint& fencePoint) noexcept
 	{
-		if (texIndex < 0 || static_cast<size_t>(texIndex) >= m_Textures.size())
+		if (texIndex.Value() < 0 || texIndex.Value() >= m_Textures.size())
 		{
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::ReleaseResource() : Release Invalid texture.");
 			return;
@@ -33,7 +33,7 @@ namespace gglab
 
 	void RGGpuResourceAllocator::ReleaseBuffer(ResourceIndex bufIndex, const DX12FencePoint& fencePoint) noexcept
 	{
-		if (bufIndex < 0 || static_cast<size_t>(bufIndex) >= m_Buffers.size())
+		if (bufIndex.Value() < 0 || bufIndex.Value() >= m_Buffers.size())
 		{
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::ReleaseResource() : Release Invalid buffer.");
 			return;
@@ -51,11 +51,11 @@ namespace gglab
 				}));
 	}
 
-	RGGpuResourceAllocator::ResourceIndex RGGpuResourceAllocator::CreateTexture(const RGTextureDesc& rgTexDesc,
+	ResourceIndex RGGpuResourceAllocator::CreateTexture(const RGTextureDesc& rgTexDesc,
 		D3D12_RESOURCE_STATES initStates,
 		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
 	{
-		ResourceIndex index = static_cast<ResourceIndex>(m_Textures.size());
+		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Textures.size()));
 		m_Textures.emplace_back(std::make_unique<DX12Texture>());
 		auto& tex = m_Textures.back();
 
@@ -73,10 +73,10 @@ namespace gglab
 		return index;
 	}
 
-	RGGpuResourceAllocator::ResourceIndex RGGpuResourceAllocator::CreateBuffer(const RGBufferDesc& rgBufDesc,
+	ResourceIndex RGGpuResourceAllocator::CreateBuffer(const RGBufferDesc& rgBufDesc,
 		D3D12_RESOURCE_STATES initStates) noexcept
 	{
-		ResourceIndex index = static_cast<ResourceIndex>(m_Buffers.size());
+		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Buffers.size()));
 		m_Buffers.emplace_back(std::make_unique<DX12Buffer>());
 		auto& buf = m_Buffers.back();
 
@@ -93,26 +93,22 @@ namespace gglab
 
 	DX12Texture* RGGpuResourceAllocator::GetTexture(ResourceIndex texIndex) const noexcept
 	{
-		if (texIndex == InvalidResourceIndex ||
-			static_cast<size_t>(texIndex) >= m_Textures.size())
+		if (!texIndex.IsValid() || texIndex.Value() >= m_Textures.size())
 		{
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::GetTexture() : Invalid texIndex.");
 			return nullptr;
 		}
-
-		return m_Textures[texIndex].get();
+		return m_Textures[texIndex.Value()].get();
 	}
 
 	DX12Buffer* RGGpuResourceAllocator::GetBuffer(ResourceIndex bufIndex) const noexcept
 	{
-		if (bufIndex == InvalidResourceIndex ||
-			static_cast<size_t>(bufIndex) >= m_Buffers.size())
+		if (!bufIndex.IsValid() || bufIndex.Value() >= m_Buffers.size())
 		{
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::GetBuffer() : Invalid bufIndex.");
 			return nullptr;
 		}
-
-		return m_Buffers[bufIndex].get();
+		return m_Buffers[bufIndex.Value()].get();
 	}
 
 	void RGGpuResourceAllocator::Tick() noexcept
@@ -130,7 +126,7 @@ namespace gglab
 				{
 				case Type::Texture:
 				{
-					auto texKey = TextureKey::ConvertResourceDescToKey(m_Textures[pending.m_Index]->GetDesc());
+					auto texKey = TextureKey::ConvertResourceDescToKey(m_Textures[pending.m_Index.Value()]->GetDesc());
 					auto& list = m_FreeTextures[texKey];
 					list.push_back(pending.m_Index);
 
@@ -138,13 +134,13 @@ namespace gglab
 					{
 						auto releaseResIndex = list.front();
 						list.pop_front();
-						m_Textures[releaseResIndex]->Release();
+						m_Textures[releaseResIndex.Value()]->Release();
 					}
 					return true;
 				}
 				case Type::Buffer:
 				{
-					auto bufKey = BufferKey::ConvertResourceDescToKey(m_Buffers[pending.m_Index]->GetDesc());
+					auto bufKey = BufferKey::ConvertResourceDescToKey(m_Buffers[pending.m_Index.Value()]->GetDesc());
 					auto& list = m_FreeBuffers[bufKey];
 					list.push_back(pending.m_Index);
 
@@ -152,7 +148,7 @@ namespace gglab
 					{
 						auto releaseResIndex = list.front();
 						list.pop_front();
-						m_Buffers[releaseResIndex]->Release();
+						m_Buffers[releaseResIndex.Value()]->Release();
 					}
 					return true;
 				}
@@ -176,9 +172,9 @@ namespace gglab
 					{
 						auto releaseResIndex = list.front();
 						list.pop_front();
-						if (releaseResIndex >= 0 && releaseResIndex < static_cast<int32_t>(storeVec.size()) && storeVec[releaseResIndex])
+						if (releaseResIndex.Value() >= 0 && releaseResIndex.Value() < storeVec.size() && storeVec[releaseResIndex.Value()])
 						{
-							storeVec[releaseResIndex]->Release();
+							storeVec[releaseResIndex.Value()]->Release();
 						}
 					}
 				}

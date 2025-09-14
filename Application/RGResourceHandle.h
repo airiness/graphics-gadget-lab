@@ -1,19 +1,20 @@
 #pragma once
+#include "TypedIndex.h"
 
 namespace gglab
 {
 	class RGResourceHandle
 	{
 	public:
-		using Handle = uint16_t;
+		GGLAB_DEFINE_NESTED_TYPED_INDEX(Handle, uint16_t);
+
 		using Version = uint16_t;
-		static constexpr Handle InvalidHandle = std::numeric_limits<Handle>::max();
 		static constexpr Version UnintializedVersion = 0;
 
 	public:
 		bool IsValid() const noexcept
 		{
-			return m_Handle != InvalidHandle;
+			return m_Handle.IsValid();
 		}
 
 		void Clear() noexcept

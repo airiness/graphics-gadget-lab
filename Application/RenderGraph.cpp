@@ -5,6 +5,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12SwapChain.h"
+#include "ViewCache.h"
 
 namespace gglab
 {
@@ -53,7 +54,7 @@ namespace gglab
 			{
 				if (access.m_AccessType == RGPassNode::Access::Type::Read)
 				{
-					RGResourceNode& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex];
+					RGResourceNode& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
 					if (resourceNode.m_Writer)
 					{
 						addPass(resourceNode.m_Writer);
@@ -84,9 +85,9 @@ namespace gglab
 				continue;
 			}
 
-			auto markUse = [this, &passNode](RGResourceNode::IndexType index)
+			auto markUse = [this, &passNode](RGResourceNode::Index index)
 				{
-					RGResourceNode& resourceNode = m_ResourceNodes[index];
+					RGResourceNode& resourceNode = m_ResourceNodes[index.Value()];
 					auto* virtualResource = resourceNode.m_VirtualResource;
 					if (!virtualResource)
 					{
@@ -153,21 +154,26 @@ namespace gglab
 	{
 		for (const auto texIndex : m_MarkedReleaseTextureIndices)
 		{
+			GGLAB_ASSERT_MSG(texIndex.IsValid(), "Releasing an invalid texture index.");
+			m_ViewCache->RetireResourceAllViews(texIndex, fencePoint);
 			m_GpuResourceAllocator->ReleaseTexture(texIndex, fencePoint);
 		}
 		m_MarkedReleaseTextureIndices.clear();
 
 		for (const auto bufIndex : m_MarkedReleaseBufferIndices)
 		{
+			GGLAB_ASSERT_MSG(bufIndex.IsValid(), "Releasing an invalid buffer index.");
 			m_GpuResourceAllocator->ReleaseBuffer(bufIndex, fencePoint);
 		}
 		m_MarkedReleaseBufferIndices.clear();
+
+		m_ViewCache->GarbageCollect();
 	}
 
 	DX12Texture* RenderGraph::GetTexture(RGTextureId texId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGTextureResource>*>(GetVirtualResource(texId));
-		if (!virtualRes || virtualRes->m_GpuResourceIndex == RGVirtualResourceBase::InvalidGpuResourceIndex)
+		if (!virtualRes || !virtualRes->m_GpuResourceIndex.IsValid())
 		{
 			return nullptr;
 		}
@@ -177,11 +183,21 @@ namespace gglab
 	DX12Buffer* RenderGraph::GetBuffer(RGBufferId bufId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
-		if (!virtualRes || virtualRes->m_GpuResourceIndex == RGVirtualResourceBase::InvalidGpuResourceIndex)
+		if (!virtualRes || !virtualRes->m_GpuResourceIndex.IsValid())
 		{
 			return nullptr;
 		}
 		return m_GpuResourceAllocator->GetBuffer(virtualRes->m_GpuResourceIndex);
+	}
+
+	ResourceIndex RenderGraph::GetResourceIndex(RGTextureId texId) noexcept
+	{
+		return GetResourceIndexImpl<RGTextureResource>(texId);
+	}
+
+	ResourceIndex RenderGraph::GetResourceIndex(RGBufferId bufId) noexcept
+	{
+		return GetResourceIndexImpl<RGBufferResource>(bufId);
 	}
 
 	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) noexcept
@@ -191,23 +207,23 @@ namespace gglab
 			return nullptr;
 		}
 
-		const auto& slot = m_ResourceSlots[handle.GetHandle()];
+		const auto& slot = m_ResourceSlots[handle.GetHandle().Value()];
 		if (slot.m_Version != handle.GetVersion())
 		{
 			return nullptr;
 		}
 
-		return m_VirtualResouces[slot.m_VirtualResourceIndex];
+		return m_VirtualResouces[slot.m_VirtualResourceIndex.Value()];
 	}
 
 	RGResourceNode& RenderGraph::GetActiveResourceNode(RGResourceHandle handle) noexcept
 	{
-		auto& slot = m_ResourceSlots[handle.GetHandle()];
-		return m_ResourceNodes[slot.m_ResourceNodeIndex];
+		auto& slot = m_ResourceSlots[handle.GetHandle().Value()];
+		return m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 	}
 
-	RGPassNode& RenderGraph::GetPassNode(RGPassNode::IndexType index) noexcept
+	RGPassNode& RenderGraph::GetPassNode(RGPassNode::Index index) noexcept
 	{
-		return m_PassNodes[index];
+		return m_PassNodes[index.Value()];
 	}
 }

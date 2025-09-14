@@ -1,5 +1,6 @@
 #pragma once
 #include "DX12Descriptor.h"
+#include "GraphicsTypes.h"
 #include "FNV1a.h"
 
 namespace gglab
@@ -23,13 +24,12 @@ namespace gglab
 	class ViewCache
 	{
 	public:
-		using ResourceIndex = uint32_t;
 		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, static_cast<uint32_t>(ViewType::Count)>;
 
 		struct ViewKey
 		{
 			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
-			uint32_t m_ResouceIndex = 0;
+			uint32_t m_ResouceIndexValue;
 			uint32_t m_ComponentMapping = 0;
 			uint16_t m_MipSlice = 0;
 			uint16_t m_MipLevels = 0;
@@ -43,11 +43,11 @@ namespace gglab
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_Type, m_Format, m_ResouceIndex, m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
+				return std::tie(m_Type, m_Format, m_ResouceIndexValue, m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
 			}
 		};
 		using ViewKeyHash = KeyHash<ViewKey>;
-		
+
 	public:
 		explicit ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(ViewCache);
@@ -84,11 +84,11 @@ namespace gglab
 		DescriptorsAllocatorArray m_DescriptorAllocators;
 
 		std::unordered_map<ViewKey, DX12Descriptor, ViewKeyHash> m_Cache;
-		std::unordered_map<uint32_t, std::vector<ViewKey>> m_ResourceViews;
+		std::unordered_map<ResourceIndex, std::vector<ViewKey>> m_ResourceViews;
 
 		struct Pending
 		{
-			uint32_t m_ResourceIndex = 0;
+			ResourceIndex m_ResourceIndex;
 			DX12FencePoint m_FencePoint;
 			std::vector<DX12Descriptor> m_Descriptors;
 		};
@@ -108,7 +108,7 @@ namespace gglab
 			ViewCache::ViewKey m_Key;																								\
 			Desc m_Desc;																											\
 		};																															\
-		static Built Build(ViewCache::ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;				\
+		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;							\
 		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept;	\
 	};
 

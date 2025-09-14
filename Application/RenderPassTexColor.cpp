@@ -81,12 +81,11 @@ namespace gglab
 				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 				dsvDesc.Texture2D.MipSlice = 0;
+
 				auto viewCache = rg.GetViewCache();
-				viewCache->GetDSV()
+				auto& dsvDescriptor = viewCache->GetDSV(rg.GetResourceIndex(data.m_Depth), dsTexture, dsvDesc);
 
-				m_DX12Device->Get()->CreateDepthStencilView(dsTexture->Get(), &dsvDesc, dsvDescriptor.CpuHandle());
 				commandList->SetRenderTargets(rtvs, &dsvDescriptor);
-
 				swapChain->ClearBackBuffer(commandList);
 				commandList->ClearDepthStencil(dsvDescriptor, 1.0f);
 

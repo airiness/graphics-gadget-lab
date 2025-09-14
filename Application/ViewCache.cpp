@@ -79,7 +79,7 @@ namespace gglab
 		Pending pending{};
 		pending.m_ResourceIndex = resourceIndex;
 		pending.m_FencePoint = fencePoint;
-		pending.m_Descriptors.reserve(it->second.size());	
+		pending.m_Descriptors.reserve(it->second.size());
 
 		for (const auto& key : it->second)
 		{
@@ -205,15 +205,28 @@ namespace gglab
 		// Allocate and create
 		DX12Descriptor descriptor = GetDescriptorAllocator(T)->Allocate(1);
 		Traits::Create(m_DX12Device, texture, &built.m_Desc, descriptor);
+		{
+			std::scoped_lock lock(m_Mutex);
+			if (auto it = m_Cache.find(key); it != m_Cache.end())
+			{
+				// Other thread inserted, release it
+				if (descriptor.IsValid())
+				{
+					descriptor.Free();
+				}
+			}
 
-		// Cache descriptor
-		std::scoped_lock lock(m_Mutex);
-		m_ResourceViews[resourceIndex].push_back(key);
-		auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-		return it->second;
+			m_ResourceViews[resourceIndex].push_back(key);
+			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
+			if (!inserted)
+			{
+				it->second.Free();
+			}
+			return it->second;
+		}
 	}
 
-	auto ViewTraits<ViewType::RTV>::Build(ViewCache::ResourceIndex resourceIndex,
+	auto ViewTraits<ViewType::RTV>::Build(ResourceIndex resourceIndex,
 		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
 	{
 		Built built{};
@@ -244,7 +257,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::RTV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResouceIndexValue = resourceIndex.Value();
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -263,7 +276,7 @@ namespace gglab
 		device->Get()->CreateRenderTargetView(texture->Get(), desc, outDesc.CpuHandle());
 	}
 
-	auto ViewTraits<ViewType::DSV>::Build(ViewCache::ResourceIndex resourceIndex,
+	auto ViewTraits<ViewType::DSV>::Build(ResourceIndex resourceIndex,
 		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
 	{
 		Built built{};
@@ -302,7 +315,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::DSV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResouceIndexValue = resourceIndex.Value();
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -321,7 +334,7 @@ namespace gglab
 		device->Get()->CreateDepthStencilView(texture->Get(), desc, descriptor.CpuHandle());
 	}
 
-	auto ViewTraits<ViewType::SRV>::Build(ViewCache::ResourceIndex resourceIndex,
+	auto ViewTraits<ViewType::SRV>::Build(ResourceIndex resourceIndex,
 		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
 	{
 		Built built{};
@@ -360,7 +373,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::SRV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResouceIndexValue = resourceIndex.Value();
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = most;
 		key.m_MipLevels = levels;
@@ -379,7 +392,7 @@ namespace gglab
 		device->Get()->CreateShaderResourceView(texture->Get(), desc, descriptor.CpuHandle());
 	}
 
-	auto ViewTraits<ViewType::UAV>::Build(ViewCache::ResourceIndex resourceIndex,
+	auto ViewTraits<ViewType::UAV>::Build(ResourceIndex resourceIndex,
 		DX12Texture* texture, const Desc& inDesc) noexcept -> Built
 	{
 		Built built{};
@@ -407,7 +420,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::UAV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResouceIndexValue = resourceIndex.Value();
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;

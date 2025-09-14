@@ -3,6 +3,7 @@
 #include "DX12Buffer.h"
 #include "DX12FencePoint.h"
 #include "RGResource.h"
+#include "GraphicsTypes.h"
 #include "FNV1a.h"
 
 namespace gglab
@@ -10,10 +11,6 @@ namespace gglab
 	class DX12Device;
 	class RGGpuResourceAllocator
 	{
-	public:
-		using ResourceIndex = int32_t;
-		static constexpr ResourceIndex InvalidResourceIndex = static_cast<ResourceIndex>(-1);
-
 	private:
 		enum class Type : uint8_t
 		{
@@ -105,7 +102,7 @@ namespace gglab
 		struct Pending
 		{
 			Type m_Type;
-			ResourceIndex m_Index = 0;
+			ResourceIndex m_Index;
 			DX12FencePoint m_FencePoint;
 		};
 
@@ -158,7 +155,7 @@ namespace gglab
 	};
 
 	template<>
-	inline RGGpuResourceAllocator::ResourceIndex RGGpuResourceAllocator::Acquire<RGTextureDesc>(
+	inline ResourceIndex RGGpuResourceAllocator::Acquire<RGTextureDesc>(
 		const RGTextureDesc& rgTexDesc,
 		D3D12_RESOURCE_STATES initStates,
 		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
@@ -178,7 +175,7 @@ namespace gglab
 	}
 
 	template<>
-	inline RGGpuResourceAllocator::ResourceIndex RGGpuResourceAllocator::Acquire<RGBufferDesc>(
+	inline ResourceIndex RGGpuResourceAllocator::Acquire<RGBufferDesc>(
 		const RGBufferDesc& rgBufDesc,
 		D3D12_RESOURCE_STATES initStates,
 		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept

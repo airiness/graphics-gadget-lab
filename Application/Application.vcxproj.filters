@@ -136,9 +136,6 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="GraphicsTypes.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>Core\Log</Filter>
     </ClCompile>
@@ -152,9 +149,6 @@
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="RGArenaAllocator.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
-    <ClCompile Include="RGResourceHandle.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="StringId.cpp">
@@ -365,6 +359,9 @@
     </ClInclude>
     <ClInclude Include="ViewCache.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="TypedIndex.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
