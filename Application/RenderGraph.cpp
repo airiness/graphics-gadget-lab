@@ -5,7 +5,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12SwapChain.h"
-#include "ViewCache.h"
+#include "DX12ViewCache.h"
 
 namespace gglab
 {
@@ -15,7 +15,7 @@ namespace gglab
 		m_ArenaAllocator(1u << 20)
 	{
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
-		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "ViewCache can not be null.");
+		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;

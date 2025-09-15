@@ -1,18 +1,18 @@
 #include "Precompiled.h"
-#include "ViewCache.h"
+#include "DX12ViewCache.h"
 #include "DX12Device.h"
 #include "DX12Texture.h"
 #include "DX12DescriptorFreeListAllocator.h"
 
 namespace gglab
 {
-	ViewCache::ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept :
+	DX12ViewCache::DX12ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept :
 		m_DX12Device(dx12Device),
 		m_DescriptorAllocators(descriptorAllocators)
 	{
 	}
 
-	ViewCache::~ViewCache()
+	DX12ViewCache::~DX12ViewCache()
 	{
 		GarbageCollect();
 
@@ -42,31 +42,31 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	const DX12Descriptor& ViewCache::GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
+	const DX12Descriptor& DX12ViewCache::GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept
 	{
 		return GetOrCreateImpl<ViewType::RTV>(resourceIndex, texture, descOpt);
 	}
 
-	const DX12Descriptor& ViewCache::GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
+	const DX12Descriptor& DX12ViewCache::GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> descOpt) noexcept
 	{
 		return GetOrCreateImpl<ViewType::DSV>(resourceIndex, texture, descOpt);
 	}
 
-	const DX12Descriptor& ViewCache::GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
+	const DX12Descriptor& DX12ViewCache::GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> descOpt) noexcept
 	{
 		return GetOrCreateImpl<ViewType::SRV>(resourceIndex, texture, descOpt);
 	}
 
-	const DX12Descriptor& ViewCache::GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
+	const DX12Descriptor& DX12ViewCache::GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> descOpt) noexcept
 	{
 		return GetOrCreateImpl<ViewType::UAV>(resourceIndex, texture, descOpt);
 	}
 
-	void ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
+	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 
@@ -99,7 +99,7 @@ namespace gglab
 		}
 	}
 
-	void ViewCache::GarbageCollect() noexcept
+	void DX12ViewCache::GarbageCollect() noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 		while (!m_Pendings.empty())
@@ -122,7 +122,7 @@ namespace gglab
 		}
 	}
 
-	void ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
+	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 
@@ -166,7 +166,7 @@ namespace gglab
 		}
 	}
 
-	DX12DescriptorFreeListAllocator* ViewCache::GetDescriptorAllocator(ViewType type) const noexcept
+	DX12DescriptorFreeListAllocator* DX12ViewCache::GetDescriptorAllocator(ViewType type) const noexcept
 	{
 		switch (type)
 		{
@@ -183,7 +183,7 @@ namespace gglab
 	}
 
 	template<ViewType T>
-	const DX12Descriptor& ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex,
+	const DX12Descriptor& DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex,
 		DX12Texture* texture,
 		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
 	{
@@ -440,7 +440,7 @@ namespace gglab
 	}
 
 #define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
-	template const DX12Descriptor& ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;
+	template const DX12Descriptor& DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;
 
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);

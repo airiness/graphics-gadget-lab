@@ -21,7 +21,7 @@ namespace gglab
 
 	template<ViewType T> struct ViewTraits;
 
-	class ViewCache
+	class DX12ViewCache
 	{
 	public:
 		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, static_cast<uint32_t>(ViewType::Count)>;
@@ -49,9 +49,9 @@ namespace gglab
 		using ViewKeyHash = KeyHash<ViewKey>;
 
 	public:
-		explicit ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
-		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(ViewCache);
-		~ViewCache();
+		explicit DX12ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ViewCache);
+		~DX12ViewCache();
 
 		const DX12Descriptor& GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
 			std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept;
@@ -105,7 +105,7 @@ namespace gglab
 		using Desc = descType;																										\
 		struct Built																												\
 		{																															\
-			ViewCache::ViewKey m_Key;																								\
+			DX12ViewCache::ViewKey m_Key;																							\
 			Desc m_Desc;																											\
 		};																															\
 		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;							\

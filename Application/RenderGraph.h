@@ -10,7 +10,7 @@ namespace gglab
 {
 	class DX12Device;
 	class DX12CommandList;
-	class ViewCache;
+	class DX12ViewCache;
 	class RGPassBase;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
@@ -122,7 +122,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
-			ViewCache* m_ViewCache = nullptr;
+			DX12ViewCache* m_ViewCache = nullptr;
 		};
 
 		class RGBuilder
@@ -200,7 +200,7 @@ namespace gglab
 		ResourceIndex GetResourceIndex(RGTextureId texId) noexcept;
 		ResourceIndex GetResourceIndex(RGBufferId bufId) noexcept;
 
-		ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
+		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
@@ -229,7 +229,7 @@ namespace gglab
 
 	private:
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
-		ViewCache* m_ViewCache = nullptr;
+		DX12ViewCache* m_ViewCache = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 

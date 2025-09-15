@@ -34,13 +34,13 @@ namespace gglab
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 		m_TexColorPass = std::make_unique<RenderPassTexColor>(m_Device.get());
 
-		ViewCache::DescriptorsAllocatorArray descriptorAllocators =
+		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
 		{
 			m_Device->GetRtvDescriptorAllocator(),
 			m_Device->GetDsvDescriptorAllocator(),
 			m_Device->GetCbvSrvUavDescriptorAllocator()
 		};
-		m_ViewCache = std::make_unique<ViewCache>(m_Device.get(), descriptorAllocators);
+		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
 		m_IsInitialized = true;
 	}
 

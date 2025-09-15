@@ -123,6 +123,7 @@
     <ClCompile Include="DX12Fence.cpp" />
     <ClCompile Include="DX12FencePoint.cpp" />
     <ClCompile Include="DX12PipelineState.cpp" />
+    <ClCompile Include="DX12PSOCache.cpp" />
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
     <ClCompile Include="DX12ResourceUploader.cpp" />
@@ -156,7 +157,7 @@
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
     <ClCompile Include="VertexData.cpp" />
-    <ClCompile Include="ViewCache.cpp" />
+    <ClCompile Include="DX12ViewCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -179,6 +180,7 @@
     <ClInclude Include="DX12Fence.h" />
     <ClInclude Include="DX12FencePoint.h" />
     <ClInclude Include="DX12PipelineState.h" />
+    <ClInclude Include="DX12PSOCache.h" />
     <ClInclude Include="DX12Resource.h" />
     <ClInclude Include="DX12RootSignature.h" />
     <ClInclude Include="DX12ResourceUploader.h" />
@@ -216,7 +218,7 @@
     <ClInclude Include="TypedIndex.h" />
     <ClInclude Include="Utility.h" />
     <ClInclude Include="VertexData.h" />
-    <ClInclude Include="ViewCache.h" />
+    <ClInclude Include="DX12ViewCache.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />

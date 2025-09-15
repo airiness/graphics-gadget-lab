@@ -4,7 +4,7 @@
 #include "RenderPassTexColor.h"
 #include "DX12RootSignature.h"
 #include "DX12ConstantBuffer.h"
-#include "ViewCache.h"
+#include "DX12ViewCache.h"
 #include "Camera.h"
 
 namespace gglab
@@ -27,7 +27,7 @@ namespace gglab
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
 		DX12RootSignature* GetCommonRootSignature() const noexcept { return m_CommonRootSignature.get(); }
 		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); }
-		ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
+		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 	private:
 		void CreateRenderObjects() noexcept;
 		void CreateCamera() noexcept;
@@ -43,7 +43,7 @@ namespace gglab
 		std::unique_ptr<DX12RootSignature> m_CommonRootSignature;
 		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<RenderPassTexColor> m_TexColorPass;
-		std::unique_ptr<ViewCache> m_ViewCache;
+		std::unique_ptr<DX12ViewCache> m_ViewCache;
 
 		std::atomic_bool m_IsInitialized = false;
 	};
