@@ -28,7 +28,7 @@ namespace gglab
 			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
 			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
 
-			bool operator==(const TextureKey& other) const noexcept = default;
+			bool operator==(const TextureKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{
@@ -57,7 +57,7 @@ namespace gglab
 			uint64_t m_SizeInBytes = 0;
 			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
 
-			bool operator==(const BufferKey& other) const noexcept = default;
+			bool operator==(const BufferKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{

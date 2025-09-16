@@ -1,4 +1,5 @@
 #pragma once
+#include "FNV1a.h"
 
 namespace gglab
 {
@@ -19,7 +20,17 @@ namespace gglab
 		struct PSOKey
 		{
 
+
+
+			bool operator==(const PSOKey&) const noexcept = default;
+
+			auto AsTuple() const noexcept
+			{
+				return std::tie();
+			}
 		};
+		using POSKeyHash = KeyHash<PSOKey>;
+
 	public:
 		explicit DX12PSOCache(DX12Device* dx12Device) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PSOCache);

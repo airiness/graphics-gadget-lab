@@ -39,7 +39,7 @@ namespace gglab
 			uint8_t m_Flags = 0;
 			ViewType m_Type = ViewType::RTV;
 
-			bool operator==(const ViewKey& other) const noexcept = default;
+			bool operator==(const ViewKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{
