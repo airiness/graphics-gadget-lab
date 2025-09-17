@@ -130,6 +130,8 @@
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="FreeListSpanAllocator.cpp" />
+    <ClCompile Include="PipelineDesc.cpp" />
+    <ClCompile Include="PSOKey.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="GPUStuctures.cpp" />
     <ClCompile Include="InputBase.cpp" />
@@ -189,6 +191,8 @@
     <ClInclude Include="EnumFlags.h" />
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
+    <ClInclude Include="PipelineDesc.h" />
+    <ClInclude Include="PSOKey.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStuctures.h" />
     <ClInclude Include="GraphicsTypes.h" />

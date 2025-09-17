@@ -41,6 +41,9 @@
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\DX12\Cache">
+      <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -185,10 +188,16 @@
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12ViewCache.cpp">
-      <Filter>Graphics\DX12</Filter>
+      <Filter>Graphics\DX12\Cache</Filter>
     </ClCompile>
     <ClCompile Include="DX12PSOCache.cpp">
-      <Filter>Graphics\DX12</Filter>
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="PSOKey.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="PipelineDesc.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -364,10 +373,16 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="DX12ViewCache.h">
-      <Filter>Graphics\DX12</Filter>
+      <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
     <ClInclude Include="DX12PSOCache.h">
-      <Filter>Graphics\DX12</Filter>
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="PSOKey.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="PipelineDesc.h">
+      <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
