@@ -29,7 +29,7 @@ namespace gglab
 		struct ViewKey
 		{
 			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
-			uint32_t m_ResouceIndexValue;
+			ResourceIndex m_ResouceIndex;
 			uint32_t m_ComponentMapping = 0;
 			uint16_t m_MipSlice = 0;
 			uint16_t m_MipLevels = 0;
@@ -43,7 +43,7 @@ namespace gglab
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_Type, m_Format, m_ResouceIndexValue, m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
+				return std::make_tuple(m_Type, m_Format, m_ResouceIndex.Value(), m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
 			}
 		};
 		using ViewKeyHash = KeyHash<ViewKey>;

@@ -1,11 +1,7 @@
 #pragma once
-#include "FNV1a.h"
-#include "TypedIndex.h"
-
+#include "PSOKey.h"
 namespace gglab
 {
-
-
 	// Descript Graphics PSO
 	struct GraphicsPipelineDesc
 	{
@@ -44,17 +40,5 @@ namespace gglab
 		// Generate PSO Key
 		PSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
 			ShaderHash128 dsHash = {}, ShaderHash128 hsHash = {}, ShaderHash128 gsHash = {}) const noexcept;
-
-
-	};
-
-
-	class DX12Device;
-	class DX12PSOCache
-	{
-	public:
-		explicit DX12PSOCache(DX12Device* dx12Device) noexcept;
-		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PSOCache);
-		~DX12PSOCache();
 	};
 }
