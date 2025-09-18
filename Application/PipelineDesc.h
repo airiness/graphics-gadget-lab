@@ -31,7 +31,7 @@ namespace gglab
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 
 		D3D12_RASTERIZER_DESC m_RasterizerDesc{};
-		D3D12_DEPTH_STENCIL_DESC m_DepthDesc{};
+		D3D12_DEPTH_STENCIL_DESC1 m_DepthDesc{};
 		D3D12_BLEND_DESC m_BlendDesc{};
 
 		// Build Stream
@@ -40,5 +40,7 @@ namespace gglab
 		// Generate PSO Key
 		PSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
 			ShaderHash128 dsHash = {}, ShaderHash128 hsHash = {}, ShaderHash128 gsHash = {}) const noexcept;
+
+		bool Validate() const noexcept;
 	};
 }

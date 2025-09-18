@@ -131,6 +131,7 @@
     <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
+    <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="GPUStuctures.cpp" />
@@ -192,6 +193,7 @@
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="PipelineDesc.h" />
+    <ClInclude Include="PSOCreator.h" />
     <ClInclude Include="PSOKey.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStuctures.h" />

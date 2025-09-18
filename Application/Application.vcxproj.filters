@@ -199,6 +199,9 @@
     <ClCompile Include="PipelineDesc.cpp">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClCompile>
+    <ClCompile Include="PSOCreator.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -382,6 +385,9 @@
       <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
     <ClInclude Include="PipelineDesc.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="PSOCreator.h">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
   </ItemGroup>

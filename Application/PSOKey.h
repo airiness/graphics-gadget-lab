@@ -26,7 +26,7 @@ namespace gglab
 		uint32_t m_Bits = 0;
 
 		// Pack DepthStencilDesc into 32 bits
-		void PackDepthBits(const D3D12_DEPTH_STENCIL_DESC& desc) noexcept;
+		void PackDepthBits(const D3D12_DEPTH_STENCIL_DESC1& desc) noexcept;
 	};
 
 	struct PackedBlend
@@ -82,5 +82,5 @@ namespace gglab
 				m_Blend.m_Bits);
 		}
 	};
-	using POSKeyHash = KeyHash<PSOKey>;
+	using PSOKeyHash = KeyHash<PSOKey>;
 }
