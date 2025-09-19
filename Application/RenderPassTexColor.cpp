@@ -7,6 +7,7 @@
 #include "DX12ConstantBuffer.h"
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
+#include "DX12PSOCache.h"
 #include "VertexData.h"
 #include "Application.h"
 #include "AssetManager.h"
@@ -19,7 +20,7 @@ namespace gglab
 	RenderPassTexColor::RenderPassTexColor(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device)
 	{
-		InitializePSO();
+		//InitializePSO();
 	}
 
 	void RenderPassTexColor::AddPass(RenderGraph& rg) noexcept
@@ -51,11 +52,57 @@ namespace gglab
 			{
 				auto* renderer = Application::GetInstance()->GetRenderer();
 				auto* rootSignature = renderer->GetCommonRootSignature();
-
 				auto* swapChain = m_DX12Device->GetSwapChain();
+				const auto w = swapChain->GetBufferWidth();
+				const auto h = swapChain->GetBufferHeight();
 
-				const uint32_t w = swapChain->GetBufferWidth();
-				const uint32_t h = swapChain->GetBufferHeight();
+				ComPtr<ID3DBlob> vertexShaderBlob;
+				utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelVS.cso", &vertexShaderBlob));
+
+				ComPtr<ID3DBlob> pixelShaderBlob;
+				utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelPS.cso", &pixelShaderBlob));
+
+				GraphicsPipelineDesc graphicsPSODesc = {};
+				graphicsPSODesc.m_RootSignature = rootSignature->Get();
+				graphicsPSODesc.m_RootSignatureId = RootSignatureId(11);
+
+				// Input Layout
+				D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
+					{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+					{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+					{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				};
+				graphicsPSODesc.m_InputLayout = std::vector<D3D12_INPUT_ELEMENT_DESC>(
+					std::begin(inputLayout), std::end(inputLayout));
+
+				graphicsPSODesc.m_VertexShader = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+				graphicsPSODesc.m_PixelShader = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
+
+				graphicsPSODesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+				graphicsPSODesc.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+				graphicsPSODesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+				graphicsPSODesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+
+				graphicsPSODesc.m_RtvFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+				graphicsPSODesc.m_RtvCount = 1;
+				graphicsPSODesc.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				graphicsPSODesc.m_SampleCount = 1;
+				graphicsPSODesc.m_SampleQuality = 0;
+
+
+				auto hashShader = [](ID3DBlob* shaderBlob) -> ShaderHash128
+					{
+						ShaderHash128 hash = {};
+						if (shaderBlob != nullptr && shaderBlob->GetBufferSize() > 0)
+						{
+							auto hashValue = utility::Hash128(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize());
+							hash.m_LowBits = hashValue.m_LowBits;
+							hash.m_HighBits = hashValue.m_HighBits;
+						}
+						return hash;
+					};
+
+				const auto vsHash = hashShader(vertexShaderBlob.Get());
 
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*m_PSO);

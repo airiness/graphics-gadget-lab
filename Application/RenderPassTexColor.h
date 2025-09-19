@@ -15,12 +15,12 @@ namespace gglab
 		void AddPass(RenderGraph& rg) noexcept override;
 
 	private:
-		void InitializePSO() noexcept;
+		//void InitializePSO() noexcept;
 
 		void DrawModels(DX12CommandList* commandList) noexcept;
 	private:
 		DX12Device* m_DX12Device = nullptr;
 
-		std::unique_ptr<DX12PipelineState> m_PSO;
+		//std::unique_ptr<DX12PipelineState> m_PSO;
 	};
 }
