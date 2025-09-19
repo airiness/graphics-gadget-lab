@@ -2,7 +2,7 @@
 #include "PSOKey.h"
 namespace gglab
 {
-	// Descript Graphics PSO
+	// Graphics PSO desc
 	struct GraphicsPipelineDesc
 	{
 		// Rootsignature
@@ -38,8 +38,24 @@ namespace gglab
 		D3D12_PIPELINE_STATE_STREAM_DESC ToStreamDesc(void** outStreamStorage, size_t outStreamCount) const noexcept;
 
 		// Generate PSO Key
-		PSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
+		GraphicsPSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
 			ShaderHash128 dsHash = {}, ShaderHash128 hsHash = {}, ShaderHash128 gsHash = {}) const noexcept;
+
+		bool Validate() const noexcept;
+	};
+
+	// Compute PSO desc
+	struct ComputePipelineDesc
+	{
+		// Rootsignature
+		RootSignatureId m_RootSignatureId{};
+		ID3D12RootSignature* m_RootSignature = nullptr;
+		// Shader
+		D3D12_SHADER_BYTECODE m_ComputeShader{};
+		// Build Stream
+		D3D12_PIPELINE_STATE_STREAM_DESC ToStreamDesc(void** outStreamStorage, size_t outStreamCount) const noexcept;
+
+		ComputePSOKey MakeKey(ShaderHash128 csHash) const noexcept;
 
 		bool Validate() const noexcept;
 	};

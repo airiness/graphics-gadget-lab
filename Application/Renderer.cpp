@@ -41,6 +41,9 @@ namespace gglab
 			m_Device->GetCbvSrvUavDescriptorAllocator()
 		};
 		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
+
+		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
+
 		m_IsInitialized = true;
 	}
 

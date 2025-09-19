@@ -37,7 +37,8 @@ namespace gglab
 		void PackBlendBits(const D3D12_BLEND_DESC& desc, uint32_t rtvCount) noexcept;
 	};
 
-	struct PSOKey
+	// GraphicsPSOKey
+	struct GraphicsPSOKey
 	{
 		RootSignatureId m_RootSignatureId{};
 
@@ -61,8 +62,6 @@ namespace gglab
 		PackedDepth m_Depth{};
 		PackedBlend m_Blend{};
 
-		bool operator==(const PSOKey&) const noexcept = default;
-
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(m_RootSignatureId.Value(),
@@ -81,6 +80,30 @@ namespace gglab
 				m_Depth.m_Bits,
 				m_Blend.m_Bits);
 		}
+
+		bool operator==(const GraphicsPSOKey& rhs) const noexcept
+		{
+			return AsTuple() == rhs.AsTuple();
+		}
 	};
-	using PSOKeyHash = KeyHash<PSOKey>;
+	using GraphicsPSOKeyHash = KeyHash<GraphicsPSOKey>;
+
+	// ComputePSOKey
+	struct ComputePSOKey
+	{
+		RootSignatureId m_RootSignatureId{};
+		ShaderHash128 m_ComputeShader{};
+
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(m_RootSignatureId.Value(),
+				m_ComputeShader.m_LowBits, m_ComputeShader.m_HighBits);
+		}
+
+		bool operator==(const ComputePSOKey& rhs) const noexcept
+		{
+			return AsTuple() == rhs.AsTuple();
+		}
+	};
+	using ComputePSOKeyHash = KeyHash<ComputePSOKey>;
 }

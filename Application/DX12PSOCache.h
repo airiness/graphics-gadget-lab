@@ -14,14 +14,18 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PSOCache);
 		~DX12PSOCache();
 
-		ID3D12PipelineState* GetOrCreate(const PSOKey& key, const GraphicsPipelineDesc& desc) noexcept;
+		ID3D12PipelineState* GetOrCreate(const GraphicsPSOKey& key, const GraphicsPipelineDesc& desc) noexcept;
+		ID3D12PipelineState* GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept;
 
 		void Clear() noexcept;
+		void ClearGraphicsPSOCache() noexcept;
+		void ClearComputePSOCache() noexcept;
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		std::unique_ptr<IPSOCreator> m_Creator;
-		std::unordered_map<PSOKey, ComPtr<ID3D12PipelineState>, PSOKeyHash> m_PSOMap;
+		std::unordered_map<GraphicsPSOKey, ComPtr<ID3D12PipelineState>, GraphicsPSOKeyHash> m_GraphicsPSOMap;
+		std::unordered_map<ComputePSOKey, ComPtr<ID3D12PipelineState>, ComputePSOKeyHash> m_ComputePSOMap;
 
-		mutable std::mutex m_Mutex;
+		mutable std::shared_mutex m_Mutex;
 	};
 }

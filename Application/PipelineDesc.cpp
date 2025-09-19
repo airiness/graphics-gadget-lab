@@ -38,7 +38,7 @@ namespace gglab
 		{
 			D3D12_PIPELINE_STATE_SUBOBJECT_TYPE m_Type;
 			D3D12_DEPTH_STENCIL_DESC1 m_DepthStencilDesc;
-		} depthStencil{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL , m_DepthDesc };
+		} depthStencil{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1 , m_DepthDesc };
 
 		struct SubObjBlend
 		{
@@ -110,38 +110,41 @@ namespace gglab
 		void* subObjects[] = {
 			&rootSignature,
 			m_InputLayout.size() > 0 ? static_cast<void*>(&inputLayout) : nullptr,
-			&m_VertexShader.BytecodeLength > 0 ? static_cast<void*>(&vs) : nullptr,
-			&m_PixelShader.BytecodeLength > 0 ? static_cast<void*>(&ps) : nullptr,
-			&m_DomainShader.BytecodeLength > 0 ? static_cast<void*>(&ds) : nullptr,
-			&m_HullShader.BytecodeLength > 0 ? static_cast<void*>(&hs) : nullptr,
-			&m_GeometryShader.BytecodeLength > 0 ? static_cast<void*>(&gs) : nullptr,
+			(m_VertexShader.BytecodeLength) > 0 ? static_cast<void*>(&vs) : nullptr,
+			(m_PixelShader.BytecodeLength) > 0 ? static_cast<void*>(&ps) : nullptr,
+			(m_DomainShader.BytecodeLength) > 0 ? static_cast<void*>(&ds) : nullptr,
+			(m_HullShader.BytecodeLength) > 0 ? static_cast<void*>(&hs) : nullptr,
+			(m_GeometryShader.BytecodeLength) > 0 ? static_cast<void*>(&gs) : nullptr,
 			&primitiveTopology,
 			&rasterizer,
 			&depthStencil,
 			&blend,
-			&m_RtvCount > 0 ? static_cast<void*>(&rtvFormat) : nullptr,
+			(m_RtvCount > 0) ? static_cast<void*>(&rtvFormat) : nullptr,
 			m_DsvFormat != DXGI_FORMAT_UNKNOWN ? static_cast<void*>(&dsvFormat) : nullptr,
 			(m_SampleCount > 1 || m_SampleQuality > 0) ? static_cast<void*>(&sampleDesc) : nullptr,
 			m_SampleMask != std::numeric_limits<uint32_t>::max() ? static_cast<void*>(&sampleMask) : nullptr,
 		};
 
 		// temp storage for non-null sub-objects
-		const size_t count = std::min(std::size(subObjects), outStreamCount);
-		for (size_t i = 0; i < count; ++i)
+		size_t count = 0;
+		for (void* obj : subObjects)
 		{
-			outStreamStorage[i] = subObjects[i];
+			if (obj != nullptr)
+			{
+				outStreamStorage[count++] = obj;
+			}
 		}
 
 		D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{};
 		streamDesc.pPipelineStateSubobjectStream = outStreamStorage;
-		streamDesc.SizeInBytes = sizeof(subObjects);
+		streamDesc.SizeInBytes = count * sizeof(void*);
 		return streamDesc;
 	}
 
-	PSOKey GraphicsPipelineDesc::MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
+	GraphicsPSOKey GraphicsPipelineDesc::MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
 		ShaderHash128 dsHash, ShaderHash128 hsHash, ShaderHash128 gsHash) const noexcept
 	{
-		PSOKey key{};
+		GraphicsPSOKey key{};
 		key.m_RootSignatureId = m_RootSignatureId;
 		key.m_VertexShader = vsHash;
 		key.m_PixelShader = psHash;
@@ -221,6 +224,65 @@ namespace gglab
 			}
 		}
 
+		return true;
+	}
+
+	D3D12_PIPELINE_STATE_STREAM_DESC ComputePipelineDesc::ToStreamDesc(void** outStreamStorage, size_t outStreamCount) const noexcept
+	{
+		struct SubObjRootSignature
+		{
+			D3D12_PIPELINE_STATE_SUBOBJECT_TYPE m_Type;
+			ID3D12RootSignature* m_RootSignature;
+		} rootSignature{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE , m_RootSignature };
+
+		struct SubObjCS
+		{
+			D3D12_PIPELINE_STATE_SUBOBJECT_TYPE m_Type;
+			D3D12_SHADER_BYTECODE m_ShaderBytecode;
+		} cs{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS , m_ComputeShader };
+
+		// Collect sub-objects
+		void* subObjects[] = {
+			&rootSignature,
+			(m_ComputeShader.BytecodeLength > 0) ? static_cast<void*>(&cs) : nullptr,
+		};
+
+		// temp storage for non-null sub-objects
+		size_t count = 0;
+		for (void* obj : subObjects)
+		{
+			if (obj != nullptr)
+			{
+				outStreamStorage[count++] = obj;
+			}
+		}
+
+		D3D12_PIPELINE_STATE_STREAM_DESC streamDesc{};
+		streamDesc.pPipelineStateSubobjectStream = outStreamStorage;
+		streamDesc.SizeInBytes = count * sizeof(void*);
+		return streamDesc;
+	}
+
+	ComputePSOKey ComputePipelineDesc::MakeKey(ShaderHash128 csHash) const noexcept
+	{		
+		ComputePSOKey key{};
+		key.m_RootSignatureId = m_RootSignatureId;
+		key.m_ComputeShader = csHash;
+		return key;
+	}
+
+	bool ComputePipelineDesc::Validate() const noexcept
+	{	
+		// RootSignature must be set
+		if (m_RootSignature == nullptr)
+		{
+			return false;
+		}
+		// ComputeShader must be set
+		if (m_ComputeShader.BytecodeLength == 0 || m_ComputeShader.pShaderBytecode == nullptr)
+		{
+			return false;
+		}
 		return true;
 	}
 }

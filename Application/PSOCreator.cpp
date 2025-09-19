@@ -8,7 +8,6 @@ namespace gglab
 	ComPtr<ID3D12PipelineState> StreamPSOCreator::CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc)
 	{
 		ComPtr<ID3D12PipelineState> pso;
-
 		if (!desc.Validate())
 		{
 			GGLAB_LOG_ERROR("Invalid GraphicsPipelineDesc");
@@ -19,6 +18,20 @@ namespace gglab
 		auto streamDesc = desc.ToStreamDesc(subObjects, std::size(subObjects));
 		utility::ThrowIfFailed(dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&pso)));
 
+		return pso;
+	}
+
+	ComPtr<ID3D12PipelineState> StreamPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
+	{	
+		ComPtr<ID3D12PipelineState> pso;
+		if (!desc.Validate())
+		{
+			GGLAB_LOG_ERROR("Invalid ComputePipelineDesc");
+			return nullptr;
+		}
+		void* subObjects[4]{};
+		auto streamDesc = desc.ToStreamDesc(subObjects, std::size(subObjects));
+		utility::ThrowIfFailed(dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&pso)));
 		return pso;
 	}
 
@@ -33,6 +46,18 @@ namespace gglab
 		}
 		return pso;
 
+		// TODO : Management PSO by Library
+	}
+
+	ComPtr<ID3D12PipelineState> LibraryPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
+	{		
+		ComPtr<ID3D12PipelineState> pso;
+		if (!desc.Validate())
+		{
+			GGLAB_LOG_ERROR("Invalid ComputePipelineDesc");
+			return nullptr;
+		}
+		return pso;
 		// TODO : Management PSO by Library
 	}
 }
