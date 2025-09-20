@@ -30,12 +30,9 @@ namespace gglab
 		uint32_t m_SampleQuality = 0;
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 
-		D3D12_RASTERIZER_DESC m_RasterizerDesc{};
-		D3D12_DEPTH_STENCIL_DESC1 m_DepthDesc{};
-		D3D12_BLEND_DESC m_BlendDesc{};
-
-		// Build Stream
-		D3D12_PIPELINE_STATE_STREAM_DESC ToStreamDesc(void** outStreamStorage, size_t outStreamCount) const noexcept;
+		CD3DX12_RASTERIZER_DESC m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		CD3DX12_DEPTH_STENCIL_DESC1 m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+		CD3DX12_BLEND_DESC m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
 		// Generate PSO Key
 		GraphicsPSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
@@ -52,8 +49,6 @@ namespace gglab
 		ID3D12RootSignature* m_RootSignature = nullptr;
 		// Shader
 		D3D12_SHADER_BYTECODE m_ComputeShader{};
-		// Build Stream
-		D3D12_PIPELINE_STATE_STREAM_DESC ToStreamDesc(void** outStreamStorage, size_t outStreamCount) const noexcept;
 
 		ComputePSOKey MakeKey(ShaderHash128 csHash) const noexcept;
 

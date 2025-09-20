@@ -81,7 +81,9 @@ namespace gglab
 		void InitializeDXGIFactory() noexcept;
 		void InitializeDXGIAdapter() noexcept;
 		void InitializeDebugLayer() noexcept;
+		void InitializeWinPIX() noexcept;
 		void InitializeD3D12Device() noexcept;
+		void InitializeInfoQueue() noexcept;
 		void InitializeCommandQueues() noexcept;
 		void InitializeSwapChain() noexcept;
 		void InitializeCommandLists() noexcept;

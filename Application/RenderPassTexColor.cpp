@@ -95,17 +95,24 @@ namespace gglab
 						ShaderHash128 hash = {};
 						if (shaderBlob != nullptr && shaderBlob->GetBufferSize() > 0)
 						{
-							auto hashValue = utility::Hash128(shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize());
-							hash.m_LowBits = hashValue.m_LowBits;
-							hash.m_HighBits = hashValue.m_HighBits;
+							static int64_t hashSalt = 0x9E3779B97F4A7C15;
+
+							
+							hash.m_LowBits = hashSalt++;
+							hash.m_HighBits = hashSalt++;
 						}
 						return hash;
 					};
 
 				const auto vsHash = hashShader(vertexShaderBlob.Get());
+				const auto psHash = hashShader(pixelShaderBlob.Get());
+				const auto key = graphicsPSODesc.MakeKey(vsHash, psHash);
+
+				auto* psoCache = renderer->GetPSOCache();
+				auto* pso = psoCache->GetOrCreate(key, graphicsPSODesc);
 
 				commandList->SetGraphicsRootSignature(*rootSignature);
-				commandList->SetPipelineState(*m_PSO);
+				commandList->SetPipelineState(*pso);
 				commandList->SetDescriptorHeap(*m_DX12Device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
 				commandList->SetViewport(0, 0, w, h);
@@ -150,54 +157,54 @@ namespace gglab
 			});
 	}
 
-	void RenderPassTexColor::InitializePSO() noexcept
-	{
-		auto* renderer = Application::GetInstance()->GetRenderer();
-		auto* commonRootSignature = renderer->GetCommonRootSignature();
+	//void RenderPassTexColor::InitializePSO() noexcept
+	//{
+	//	auto* renderer = Application::GetInstance()->GetRenderer();
+	//	auto* commonRootSignature = renderer->GetCommonRootSignature();
 
-		ComPtr<ID3DBlob> vertexShaderBlob;
-		utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelVS.cso", &vertexShaderBlob));
+	//	ComPtr<ID3DBlob> vertexShaderBlob;
+	//	utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelVS.cso", &vertexShaderBlob));
 
-		ComPtr<ID3DBlob> pixelShaderBlob;
-		utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelPS.cso", &pixelShaderBlob));
+	//	ComPtr<ID3DBlob> pixelShaderBlob;
+	//	utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelPS.cso", &pixelShaderBlob));
 
-		// Input Layout
-		D3D12_INPUT_ELEMENT_DESC inputLayout[] =
-		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-		};
-		D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
-		inputLayoutDesc.pInputElementDescs = inputLayout;
-		inputLayoutDesc.NumElements = ARRAYSIZE(inputLayout);
+	//	// Input Layout
+	//	D3D12_INPUT_ELEMENT_DESC inputLayout[] =
+	//	{
+	//		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+	//		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+	//		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+	//	};
+	//	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
+	//	inputLayoutDesc.pInputElementDescs = inputLayout;
+	//	inputLayoutDesc.NumElements = ARRAYSIZE(inputLayout);
 
-		CD3DX12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
-		//rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;	// Wireframe mode for debugging
-		rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+	//	CD3DX12_RASTERIZER_DESC rasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	//	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	//	//rasterizerDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;	// Wireframe mode for debugging
+	//	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = inputLayoutDesc;
-		psoDesc.pRootSignature = commonRootSignature->Get();
-		psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
-		psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
-		psoDesc.RasterizerState = rasterizerDesc;
-		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC2(D3D12_DEFAULT);
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		psoDesc.SampleDesc.Count = 1;
-		psoDesc.SampleDesc.Quality = 0;
+	//	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+	//	psoDesc.InputLayout = inputLayoutDesc;
+	//	psoDesc.pRootSignature = commonRootSignature->Get();
+	//	psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+	//	psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
+	//	psoDesc.RasterizerState = rasterizerDesc;
+	//	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	//	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC2(D3D12_DEFAULT);
+	//	psoDesc.SampleMask = UINT_MAX;
+	//	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	//	psoDesc.NumRenderTargets = 1;
+	//	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	//	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	//	psoDesc.SampleDesc.Count = 1;
+	//	psoDesc.SampleDesc.Quality = 0;
 
-		DX12GraphicsPipelineStateDesc graphicsPSODesc = {};
-		graphicsPSODesc.m_Desc = psoDesc;
+	//	DX12GraphicsPipelineStateDesc graphicsPSODesc = {};
+	//	graphicsPSODesc.m_Desc = psoDesc;
 
-		m_PSO = std::make_unique<DX12GraphicsPipelineState>(m_DX12Device, graphicsPSODesc);
-	}
+	//	m_PSO = std::make_unique<DX12GraphicsPipelineState>(m_DX12Device, graphicsPSODesc);
+	//}
 
 	void RenderPassTexColor::DrawModels(DX12CommandList* commandList) noexcept
 	{

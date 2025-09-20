@@ -7,6 +7,7 @@
 namespace gglab
 {
 	class DX12Device;
+	class DX12PipelineState;
 	class DX12PSOCache
 	{
 	public:
@@ -14,8 +15,8 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PSOCache);
 		~DX12PSOCache();
 
-		ID3D12PipelineState* GetOrCreate(const GraphicsPSOKey& key, const GraphicsPipelineDesc& desc) noexcept;
-		ID3D12PipelineState* GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept;
+		DX12PipelineState* GetOrCreate(const GraphicsPSOKey& key, const GraphicsPipelineDesc& desc) noexcept;
+		DX12PipelineState* GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept;
 
 		void Clear() noexcept;
 		void ClearGraphicsPSOCache() noexcept;
@@ -23,8 +24,8 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		std::unique_ptr<IPSOCreator> m_Creator;
-		std::unordered_map<GraphicsPSOKey, ComPtr<ID3D12PipelineState>, GraphicsPSOKeyHash> m_GraphicsPSOMap;
-		std::unordered_map<ComputePSOKey, ComPtr<ID3D12PipelineState>, ComputePSOKeyHash> m_ComputePSOMap;
+		std::unordered_map<GraphicsPSOKey, std::unique_ptr<DX12PipelineState>, GraphicsPSOKeyHash> m_GraphicsPSOMap;
+		std::unordered_map<ComputePSOKey, std::unique_ptr<DX12PipelineState>, ComputePSOKeyHash> m_ComputePSOMap;
 
 		mutable std::shared_mutex m_Mutex;
 	};

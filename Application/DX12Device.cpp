@@ -15,10 +15,12 @@ namespace gglab
 {
 	DX12Device::DX12Device() noexcept
 	{
+		InitializeWinPIX();
 		InitializeDXGIFactory();
 		InitializeDXGIAdapter();
 		InitializeDebugLayer();
 		InitializeD3D12Device();
+		InitializeInfoQueue();
 		CheckFeatureSupport();
 	}
 
@@ -135,19 +137,24 @@ namespace gglab
 	{
 #if defined(BUILD_DEBUG)
 		// Validate Debug Layer
-		ComPtr<ID3D12Debug> debugController;
+		ComPtr<ID3D12Debug1> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
-
-			// 
-			ComPtr<ID3D12Debug1> debugController1;
-			if (SUCCEEDED(debugController.As(&debugController1)))
+			debugController->SetEnableGPUBasedValidation(true);
+			
+			ComPtr<ID3D12Debug5> debugController5;
+			if (SUCCEEDED(debugController.As(&debugController5)))
 			{
-				debugController1->SetEnableGPUBasedValidation(true);
+				debugController5->SetEnableAutoName(true);
 			}
 		}
+#endif
+	}
 
+	void DX12Device::InitializeWinPIX() noexcept
+	{
+#if defined(BUILD_DEBUG)
 		// Try to load `WinPixGpuCapturer.dll` for Frame Capture.
 		if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
 		{
@@ -157,7 +164,6 @@ namespace gglab
 				LoadLibrary(dllPath.c_str());
 			}
 		}
-
 #endif
 	}
 
@@ -182,6 +188,44 @@ namespace gglab
 		}
 
 		utility::ThrowIfFailed(result);
+	}
+
+	void DX12Device::InitializeInfoQueue() noexcept
+	{
+#if defined(BUILD_DEBUG)
+		ComPtr<ID3D12InfoQueue> infoQueue;
+		if (SUCCEEDED(m_D3D12Device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
+		{		
+			// Break on DXGI_ERROR_DEVICE_REMOVED and DXGI_ERROR_DEVICE_RESET
+			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, TRUE);
+			// Suppress whole categories of messages
+			//D3D12_MESSAGE_CATEGORY categories[] = {};
+			// Suppress messages based on their severity level
+			D3D12_MESSAGE_SEVERITY severities[] =
+			{
+				D3D12_MESSAGE_SEVERITY_INFO
+			};
+			// Suppress individual messages by their ID
+			D3D12_MESSAGE_ID denyIds[] =
+			{
+				D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE, // I'm really not sure why this is an error.  I often clear with different color than the resource was created with.
+				D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                       // This warning occurs when mapping a buffer with NULL range (which is valid).
+				D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                     // This warning occurs when unmapping a buffer with NULL range (which is valid).
+				D3D12_MESSAGE_ID_EXECUTECOMMANDLISTS_WRONGSWAPCHAINBUFFERREFERENCE, // This warning occurs when a command list that was recorded with one swapchain is executed with another swapchain (which is valid).
+			};
+			D3D12_INFO_QUEUE_FILTER filter = {};
+			//filter.DenyList.NumCategories = _countof(categories);
+			//filter.DenyList.pCategoryList = categories;
+			filter.DenyList.NumSeverities = _countof(severities);
+			filter.DenyList.pSeverityList = severities;
+			//filter.DenyList.NumIDs = _countof(denyIds);
+			//filter.DenyList.pIDList = denyIds;
+			utility::ThrowIfFailed(infoQueue->PushStorageFilter(&filter));
+		}
+
+#endif
 	}
 
 	void DX12Device::InitializeCommandQueues() noexcept

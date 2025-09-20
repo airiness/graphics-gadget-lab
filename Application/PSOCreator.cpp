@@ -5,59 +5,160 @@
 
 namespace gglab
 {
-	ComPtr<ID3D12PipelineState> StreamPSOCreator::CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc)
+	std::unique_ptr<DX12PipelineState> StreamPSOCreator::CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc)
 	{
-		ComPtr<ID3D12PipelineState> pso;
 		if (!desc.Validate())
 		{
 			GGLAB_LOG_ERROR("Invalid GraphicsPipelineDesc");
 			return nullptr;
 		}
 
-		void* subObjects[16]{};
-		auto streamDesc = desc.ToStreamDesc(subObjects, std::size(subObjects));
-		utility::ThrowIfFailed(dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&pso)));
+		/*
+		alignas(void*) std::array<std::byte, 1024> a{};
+		a.fill(std::byte{ 0 });
 
-		return pso;
+		struct AAA
+		{
+			uint64_t aaa = 0xeeee5555;
+			uint64_t bbb = 0xeeee5555;
+			uint64_t ccc = 0xeeee5555;
+			uint64_t ddd = 0xeeee5555;
+		} ahtas{};
+		auto asdfasrs = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature);
+
+		std::memcpy(&a, &asdfasrs, sizeof(CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE));*/
+
+
+		alignas(void*) std::array<std::byte, 1024> storage{};
+		storage.fill(std::byte{ 0 });
+		StreamWriter writer(storage.data(), storage.size());
+		auto streamDesc = BuildGraphicsStream(desc, writer);
+
+
+
+		//struct Stream
+		//{
+		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE rs;
+		//	CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT il;
+		//	CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY tp;
+		//	CD3DX12_PIPELINE_STATE_STREAM_VS vs;
+		//	CD3DX12_PIPELINE_STATE_STREAM_PS ps;
+		//	CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT dsf;
+		//	CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS rtf;
+		//	CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER rz;
+		//	CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC bd;
+		//	CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL1 dd;
+		//} stream;
+
+		//stream.rs = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature);
+		//stream.il = CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT(
+		//	D3D12_INPUT_LAYOUT_DESC(desc.m_InputLayout.data(), static_cast<UINT>(desc.m_InputLayout.size())));
+		//stream.tp = CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY(desc.m_Topology);
+
+		//stream.vs = CD3DX12_PIPELINE_STATE_STREAM_VS(desc.m_VertexShader);
+		//stream.ps = CD3DX12_PIPELINE_STATE_STREAM_PS(desc.m_PixelShader);
+		//stream.dsf = CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT(desc.m_DsvFormat);
+		//if (desc.m_RtvCount > 0)
+		//{
+		//	D3D12_RT_FORMAT_ARRAY rtvFormats{};
+		//	rtvFormats.NumRenderTargets = desc.m_RtvCount;
+		//	for (uint32_t i = 0; i < desc.m_RtvCount && i < 8; ++i)
+		//	{
+		//		rtvFormats.RTFormats[i] = desc.m_RtvFormats[i];
+		//	}
+		//	stream.rtf = CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS(rtvFormats);
+		//}
+		//stream.rz = CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER(desc.m_RasterizerDesc);
+		//stream.bd = CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC(desc.m_BlendDesc);
+		//stream.dd = CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL1(desc.m_DepthDesc);
+		//D3D12_PIPELINE_STATE_STREAM_DESC streamDesct = { sizeof(stream), &stream };
+
+
+
+
+
+		return std::make_unique<DX12PipelineState>(dx12Device, streamDesc);
 	}
 
-	ComPtr<ID3D12PipelineState> StreamPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
+	std::unique_ptr<DX12PipelineState> StreamPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
 	{	
-		ComPtr<ID3D12PipelineState> pso;
 		if (!desc.Validate())
 		{
 			GGLAB_LOG_ERROR("Invalid ComputePipelineDesc");
 			return nullptr;
 		}
-		void* subObjects[4]{};
-		auto streamDesc = desc.ToStreamDesc(subObjects, std::size(subObjects));
-		utility::ThrowIfFailed(dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&pso)));
-		return pso;
+
+		alignas(64) std::array<std::byte, 1024> storage{};
+		StreamWriter writer(storage.data(), storage.size());
+		auto streamDesc = BuildComputeStream(desc, writer);
+
+		return std::make_unique<DX12PipelineState>(dx12Device, streamDesc);
 	}
 
-	ComPtr<ID3D12PipelineState> LibraryPSOCreator::CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc)
+	D3D12_PIPELINE_STATE_STREAM_DESC StreamPSOCreator::BuildGraphicsStream(const GraphicsPipelineDesc& desc, StreamWriter& writer) noexcept
 	{
-		ComPtr<ID3D12PipelineState> pso;
+		auto rs = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature);
+		writer.Add(rs);
+		writer.AddIf(!desc.m_InputLayout.empty(), CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT(
+			D3D12_INPUT_LAYOUT_DESC(desc.m_InputLayout.data(), static_cast<UINT>(desc.m_InputLayout.size()))));
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY(desc.m_Topology));
 
+		writer.AddIf(desc.m_VertexShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_VS(desc.m_VertexShader));
+		writer.AddIf(desc.m_PixelShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_PS(desc.m_PixelShader));
+		writer.AddIf(desc.m_HullShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_HS(desc.m_HullShader));
+		writer.AddIf(desc.m_DomainShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_DS(desc.m_DomainShader));
+		writer.AddIf(desc.m_GeometryShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_GS(desc.m_GeometryShader));
+
+		writer.AddIf(desc.m_DsvFormat != DXGI_FORMAT_UNKNOWN, CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT(desc.m_DsvFormat));
+
+		if (desc.m_RtvCount > 0)
+		{
+			D3D12_RT_FORMAT_ARRAY rtvFormats{};
+			rtvFormats.NumRenderTargets = desc.m_RtvCount;
+			for (uint32_t i = 0; i < desc.m_RtvCount && i < 8; ++i)
+			{
+				rtvFormats.RTFormats[i] = desc.m_RtvFormats[i];
+			}
+			writer.Add(CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS(rtvFormats));
+		}
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER(desc.m_RasterizerDesc));
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC(desc.m_BlendDesc));
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL1(desc.m_DepthDesc));
+		writer.AddIf((desc.m_SampleCount > 1 || desc.m_SampleQuality > 0),
+			CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC({ desc.m_SampleCount, desc.m_SampleQuality }));
+		writer.AddIf(desc.m_SampleMask != std::numeric_limits<uint32_t>::max(),
+			CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_MASK(desc.m_SampleMask));
+
+		return writer.GetDesc();
+	}
+
+	D3D12_PIPELINE_STATE_STREAM_DESC StreamPSOCreator::BuildComputeStream(const ComputePipelineDesc& desc, StreamWriter& writer) noexcept
+	{
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature));
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_CS(desc.m_ComputeShader));
+
+		return writer.GetDesc();		
+	}
+
+	std::unique_ptr<DX12PipelineState> LibraryPSOCreator::CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc)
+	{
 		if (!desc.Validate())
 		{
 			GGLAB_LOG_ERROR("Invalid GraphicsPipelineDesc");
 			return nullptr;
 		}
-		return pso;
-
+		return nullptr;
 		// TODO : Management PSO by Library
 	}
 
-	ComPtr<ID3D12PipelineState> LibraryPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
+	std::unique_ptr<DX12PipelineState> LibraryPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
 	{		
-		ComPtr<ID3D12PipelineState> pso;
 		if (!desc.Validate())
 		{
 			GGLAB_LOG_ERROR("Invalid ComputePipelineDesc");
 			return nullptr;
 		}
-		return pso;
+		return nullptr;
 		// TODO : Management PSO by Library
 	}
 }
