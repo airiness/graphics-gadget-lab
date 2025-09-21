@@ -56,11 +56,22 @@ namespace gglab
 				const auto w = swapChain->GetBufferWidth();
 				const auto h = swapChain->GetBufferHeight();
 
-				ComPtr<ID3DBlob> vertexShaderBlob;
-				utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelVS.cso", &vertexShaderBlob));
+				ComPtr<IDxcUtils> dxcUtils;
+				utility::ThrowIfFailed(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils)));
 
-				ComPtr<ID3DBlob> pixelShaderBlob;
-				utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelPS.cso", &pixelShaderBlob));
+				// load shaders
+				ComPtr<IDxcBlobEncoding> vertexShaderSource;
+				utility::ThrowIfFailed(dxcUtils->LoadFile(L"Shaders/TexturedModelVS.dxil", nullptr, &vertexShaderSource));
+				// load shaders
+				ComPtr<IDxcBlobEncoding> pixelShaderSource;
+				utility::ThrowIfFailed(dxcUtils->LoadFile(L"Shaders/TexturedModelPS.dxil", nullptr, &pixelShaderSource));
+
+
+				//ComPtr<ID3DBlob> vertexShaderBlob;
+				//utility::ThrowIfFailed(IDxcUtils::LoadFile(L"TexturedModelVS.cso", &vertexShaderBlob));
+
+				//ComPtr<ID3DBlob> pixelShaderBlob;
+				//utility::ThrowIfFailed(D3DReadFileToBlob(L"TexturedModelPS.cso", &pixelShaderBlob));
 
 				GraphicsPipelineDesc graphicsPSODesc = {};
 				graphicsPSODesc.m_RootSignature = rootSignature->Get();
@@ -75,8 +86,8 @@ namespace gglab
 				graphicsPSODesc.m_InputLayout = std::vector<D3D12_INPUT_ELEMENT_DESC>(
 					std::begin(inputLayout), std::end(inputLayout));
 
-				graphicsPSODesc.m_VertexShader = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
-				graphicsPSODesc.m_PixelShader = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
+				graphicsPSODesc.m_VertexShader = CD3DX12_SHADER_BYTECODE(vertexShaderSource->GetBufferPointer(), vertexShaderSource->GetBufferSize());
+				graphicsPSODesc.m_PixelShader = CD3DX12_SHADER_BYTECODE(pixelShaderSource->GetBufferPointer(), pixelShaderSource->GetBufferSize());
 
 				graphicsPSODesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 				graphicsPSODesc.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -90,7 +101,7 @@ namespace gglab
 				graphicsPSODesc.m_SampleQuality = 0;
 
 
-				auto hashShader = [](ID3DBlob* shaderBlob) -> ShaderHash128
+				auto hashShader = [](IDxcBlobEncoding* shaderBlob) -> ShaderHash128
 					{
 						ShaderHash128 hash = {};
 						if (shaderBlob != nullptr && shaderBlob->GetBufferSize() > 0)
@@ -104,8 +115,8 @@ namespace gglab
 						return hash;
 					};
 
-				const auto vsHash = hashShader(vertexShaderBlob.Get());
-				const auto psHash = hashShader(pixelShaderBlob.Get());
+				const auto vsHash = hashShader(vertexShaderSource.Get());
+				const auto psHash = hashShader(pixelShaderSource.Get());
 				const auto key = graphicsPSODesc.MakeKey(vsHash, psHash);
 
 				auto* psoCache = renderer->GetPSOCache();

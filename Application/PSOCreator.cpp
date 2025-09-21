@@ -13,69 +13,10 @@ namespace gglab
 			return nullptr;
 		}
 
-		/*
-		alignas(void*) std::array<std::byte, 1024> a{};
-		a.fill(std::byte{ 0 });
-
-		struct AAA
-		{
-			uint64_t aaa = 0xeeee5555;
-			uint64_t bbb = 0xeeee5555;
-			uint64_t ccc = 0xeeee5555;
-			uint64_t ddd = 0xeeee5555;
-		} ahtas{};
-		auto asdfasrs = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature);
-
-		std::memcpy(&a, &asdfasrs, sizeof(CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE));*/
-
-
 		alignas(void*) std::array<std::byte, 1024> storage{};
-		storage.fill(std::byte{ 0 });
+		//storage.fill(std::byte{ 0 });	// initialize with 0 for safety
 		StreamWriter writer(storage.data(), storage.size());
 		auto streamDesc = BuildGraphicsStream(desc, writer);
-
-
-
-		//struct Stream
-		//{
-		//	CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE rs;
-		//	CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT il;
-		//	CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY tp;
-		//	CD3DX12_PIPELINE_STATE_STREAM_VS vs;
-		//	CD3DX12_PIPELINE_STATE_STREAM_PS ps;
-		//	CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT dsf;
-		//	CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS rtf;
-		//	CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER rz;
-		//	CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC bd;
-		//	CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL1 dd;
-		//} stream;
-
-		//stream.rs = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature);
-		//stream.il = CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT(
-		//	D3D12_INPUT_LAYOUT_DESC(desc.m_InputLayout.data(), static_cast<UINT>(desc.m_InputLayout.size())));
-		//stream.tp = CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY(desc.m_Topology);
-
-		//stream.vs = CD3DX12_PIPELINE_STATE_STREAM_VS(desc.m_VertexShader);
-		//stream.ps = CD3DX12_PIPELINE_STATE_STREAM_PS(desc.m_PixelShader);
-		//stream.dsf = CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT(desc.m_DsvFormat);
-		//if (desc.m_RtvCount > 0)
-		//{
-		//	D3D12_RT_FORMAT_ARRAY rtvFormats{};
-		//	rtvFormats.NumRenderTargets = desc.m_RtvCount;
-		//	for (uint32_t i = 0; i < desc.m_RtvCount && i < 8; ++i)
-		//	{
-		//		rtvFormats.RTFormats[i] = desc.m_RtvFormats[i];
-		//	}
-		//	stream.rtf = CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS(rtvFormats);
-		//}
-		//stream.rz = CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER(desc.m_RasterizerDesc);
-		//stream.bd = CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC(desc.m_BlendDesc);
-		//stream.dd = CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL1(desc.m_DepthDesc);
-		//D3D12_PIPELINE_STATE_STREAM_DESC streamDesct = { sizeof(stream), &stream };
-
-
-
-
 
 		return std::make_unique<DX12PipelineState>(dx12Device, streamDesc);
 	}

@@ -32,7 +32,7 @@ namespace gglab
 				static_assert(std::is_trivially_copyable_v<SubObjType>, "SubObj must be trivially copyable.");
 				m_Current = AlignUp(m_Current, alignof(void*));
 				GGLAB_ASSERT_MSG(m_Current + sizeof(SubObjType) <= m_End, "Stream memory is overflow.");
-				std::memcpy(m_Current, std::addressof(subObj), sizeof(SubObjType)); // this place must be std::addressof, & is overloaded, can not get right address.
+				std::memcpy(m_Current, std::addressof(subObj), sizeof(SubObjType)); // this place must be std::addressof, operator& is overloaded, can not get right address.
 				m_Current += sizeof(SubObjType);
 			}
 
@@ -78,9 +78,6 @@ namespace gglab
 	public:
 		std::unique_ptr<DX12PipelineState> CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc) override;
 		std::unique_ptr<DX12PipelineState> CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc) override;
-
-	//private:
-	//	static std::wstring MakePipelineName(const GraphicsPSOKey& key);
 
 	private:
 		ID3D12PipelineLibrary* m_PipelineLibrary = nullptr;
