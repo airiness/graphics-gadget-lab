@@ -31,10 +31,12 @@ using namespace Microsoft::WRL;
 // DirectX
 #include <d3dx12.h>
 #include <dxgi1_6.h>
-#include <d3dcompiler.h>
 #if defined(BUILD_DEBUG)
 #include <dxgidebug.h>
 #endif
+
+// Shader Compiler
+#include <dxcapi.h>
 
 // D3D12MA
 #include <D3D12MemAlloc.h>
@@ -58,6 +60,8 @@ using namespace Microsoft::WRL;
 #include <utility>
 #include <string_view>
 #include <shared_mutex>
+#include <bit>
+#include <concepts>
 
 // Project definitions
 #include "CoreMacros.h"

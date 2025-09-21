@@ -202,6 +202,9 @@
     <ClCompile Include="PSOCreator.cpp">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClCompile>
+    <ClCompile Include="ShaderManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -389,6 +392,9 @@
     </ClInclude>
     <ClInclude Include="PSOCreator.h">
       <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderManager.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
