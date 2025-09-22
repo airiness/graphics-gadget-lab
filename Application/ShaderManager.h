@@ -35,7 +35,7 @@ namespace gglab
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(m_PathHash, m_Stage, m_EntryHash, m_TargetHash);
+			return std::make_tuple(m_PathHash.Value(), m_Stage, m_EntryHash, m_TargetHash);
 		}
 	};
 	using ShaderKeyHash = KeyHash<ShaderKey>;
@@ -60,15 +60,12 @@ namespace gglab
 
 		ShaderId LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept;
 		D3D12_SHADER_BYTECODE GetBytecode(ShaderId shaderId) const noexcept;
-		const ComPtr<ShaderBlob>& GetBlob(ShaderId shaderId) const noexcept;
+		ShaderBlob* GetBlob(ShaderId shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderId shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderId shaderId) const noexcept;
 
 		void Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept;
 		int32_t ReloadChanged() noexcept;
-
-	private:
-		ShaderId InsertOrGet(const ShaderKey& key, ComPtr<ShaderBlob>&& blob, ShaderStage stage) noexcept;
 
 	private:
 		static bool GetDxilValidatorHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;

@@ -2,8 +2,9 @@
 #include "Application.h"
 #include "Renderer.h"
 #include "AssetManager.h"
-#include "Time.h"
 #include "InputManager.h"
+#include "ShaderManager.h"
+#include "Time.h"
 #include "Keyboard.h"
 #include "Mouse.h"
 
@@ -143,11 +144,11 @@ namespace gglab
 		m_InputManager->Initialize(m_Hwnd);
 
 		m_Renderer = std::make_unique<Renderer>();
-
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
 
 		m_Renderer->Initialize();
 		m_AssetManager->Initialize();
+		m_ShaderManager = std::make_unique<ShaderManager>();
 
 		InitializeAssets();
 
@@ -238,6 +239,21 @@ namespace gglab
 
 	void Application::InitializeAssets() noexcept
 	{
+		// Shader preload
+		{
+			m_ShaderManager->Preload({
+				{"Shaders/TexturedModelVS.dxil", ShaderStage::Vertex},
+				{"Shaders/TexturedModelPS.dxil", ShaderStage::Pixel},
+				});
+		}
+
+		// Test Sponza
+		{
+			auto model = m_AssetManager->LoadModel("Assets/models/Sponza/Sponza.gltf");
+			auto sponzaEntity = m_Registry.create();
+			m_Registry.emplace<Transform>(sponzaEntity, Transform());
+			m_Registry.emplace<Model>(sponzaEntity, std::move(model));
+		}
 	}
 
 	void Application::OnActive() noexcept

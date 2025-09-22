@@ -149,13 +149,7 @@ namespace gglab
 		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
 		auto* assetManager = Application::GetInstance()->GetAssetManager();
 
-		// Test Sponza
-		{
-			auto model = assetManager->LoadModel("Assets/models/Sponza/Sponza.gltf");
-			auto sponzaEntity = enttRegistry.create();
-			enttRegistry.emplace<Transform>(sponzaEntity, Transform());
-			enttRegistry.emplace<Model>(sponzaEntity, std::move(model));
-		}
+
 	}
 
 	void Renderer::CreateCamera() noexcept

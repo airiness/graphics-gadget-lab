@@ -24,7 +24,7 @@ namespace gglab
 
 		{
 			std::shared_lock lock(m_Mutex);
-			if(auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
+			if (auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
 			{
 				return it->second;
 			}
@@ -37,7 +37,7 @@ namespace gglab
 
 		{
 			std::unique_lock lock(m_Mutex);
-			if(auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
+			if (auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
 			{
 				return it->second;
 			}
@@ -50,7 +50,7 @@ namespace gglab
 			record.m_Timestamp = timestamp;
 			record.m_Hash = HashBlob(record.m_Blob.Get());
 
-			const auto shaderId = static_cast<ShaderId>(m_Records.size());
+			const auto shaderId = static_cast<ShaderId>(static_cast<int32_t>(m_Records.size()));
 			m_Records.push_back(std::move(record));
 			m_KeyIdMap.emplace(key, shaderId);
 			return shaderId;
@@ -59,53 +59,113 @@ namespace gglab
 
 	D3D12_SHADER_BYTECODE ShaderManager::GetBytecode(ShaderId shaderId) const noexcept
 	{
-		return D3D12_SHADER_BYTECODE();
+		std::shared_lock lock(m_Mutex);
+		D3D12_SHADER_BYTECODE bytecode{};
+		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		{
+			const auto& record = m_Records[shaderId.Value()];
+			if (record.m_Blob)
+			{
+				bytecode.pShaderBytecode = record.m_Blob->GetBufferPointer();
+				bytecode.BytecodeLength = record.m_Blob->GetBufferSize();
+				return bytecode;
+			}
+			else
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Shader blob is null for shader ID {}", shaderId.Value());
+			}
+		}
+		else
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Invalid shader ID {}", shaderId.Value());
+		}
+
+		return bytecode;
 	}
 
-	const ComPtr<ShaderBlob>& ShaderManager::GetBlob(ShaderId shaderId) const noexcept
+	ShaderBlob* ShaderManager::GetBlob(ShaderId shaderId) const noexcept
 	{
-		// TODO: insert return statement here
+		std::shared_lock lock(m_Mutex);
+		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		{
+			return m_Records[shaderId.Value()].m_Blob.Get();
+		}
 		return nullptr;
 	}
 
 	ShaderHash128 ShaderManager::GetHash(ShaderId shaderId) const noexcept
 	{
-		return ShaderHash128();
+		std::shared_lock lock(m_Mutex);
+		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		{
+			return m_Records[shaderId.Value()].m_Hash;
+		}
+		return {};
 	}
 
 	uint64_t ShaderManager::GetGeneration(ShaderId shaderId) const noexcept
 	{
+		std::shared_lock lock(m_Mutex);
+		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		{
+			return m_Records[shaderId.Value()].m_Generation;
+		}
 		return 0;
 	}
 
 	void ShaderManager::Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept
 	{
+		for (const auto& [path, stage] : shaders)
+		{
+			LoadShader(path, stage);
+		}
 	}
 
 	int32_t ShaderManager::ReloadChanged() noexcept
 	{
-		return 0;
-	}
-
-	ShaderId ShaderManager::InsertOrGet(const ShaderKey& key, ComPtr<ShaderBlob>&& blob, ShaderStage stage) noexcept
-	{
-		if(auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
+		std::unique_lock lock(m_Mutex);
+		int32_t reloadCount = 0;
+		for (auto& record : m_Records)
 		{
-			return it->second;
+			if (!std::filesystem::exists(record.m_Path))
+			{
+				GGLAB_LOG_GRAPHICS_WARN("ShaderManager::ReloadChanged: File not found: {}", record.m_Path.string());
+				continue;
+			}
+			auto currentTimestamp = std::filesystem::last_write_time(record.m_Path);
+			if (currentTimestamp != record.m_Timestamp)
+			{
+				ComPtr<ShaderBlob> newBlob;
+				if (SUCCEEDED(m_DxcUtils->LoadFile(record.m_Path.wstring().c_str(), nullptr, &newBlob)))
+				{
+					auto newHash = HashBlob(newBlob.Get());
+					if (newHash.m_LowBits != record.m_Hash.m_LowBits || newHash.m_HighBits != record.m_Hash.m_HighBits)
+					{
+						record.m_Blob = std::move(newBlob);
+						record.m_Hash = newHash;
+						record.m_Timestamp = currentTimestamp;
+						++record.m_Generation;
+						++reloadCount;
+						GGLAB_LOG_GRAPHICS_INFO("ShaderManager::ReloadChanged: Reloaded shader: {}", record.m_Path.string());
+					}
+					else
+					{
+						record.m_Timestamp = currentTimestamp; // Update timestamp even if content is the same
+					}
+				}
+				else
+				{
+					GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::ReloadChanged: Failed to reload shader: {}", record.m_Path.string());
+				}
+			}
 		}
-
-		ShaderRecord record{};
-		record.m_Key = key;
-		record.m_Path = key.m_PathHash.GetString();
-
-
-		return ShaderId();
+		return reloadCount;
 	}
 
 	bool ShaderManager::GetDxilValidatorHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
 	{
 		constexpr size_t MinDxilSize = 20;
-		if(data == nullptr || size < MinDxilSize)
+		if (data == nullptr || size < MinDxilSize)
 		{
 			return false;
 		}
@@ -136,7 +196,7 @@ namespace gglab
 		const auto* ptr = static_cast<const uint8_t*>(blob->GetBufferPointer());
 		const auto size = blob->GetBufferSize();
 
-		if(GetDxilValidatorHash(ptr, size, hash))
+		if (GetDxilValidatorHash(ptr, size, hash))
 		{
 			return hash;
 		}
