@@ -2,11 +2,6 @@
 namespace gglab
 {
 	class DX12Device;
-	struct DX12RootSignatureDesc
-	{
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC m_Desc;
-	};
-
 	class DX12RootSignature
 	{
 	public:

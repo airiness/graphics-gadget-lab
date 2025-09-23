@@ -11,15 +11,21 @@ namespace gglab
 
 	ShaderId ShaderManager::LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept
 	{
-		// path check
+		// Path check
 		if (!std::filesystem::exists(path))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: File not found: {}", path.string());
 			return ShaderId();
 		}
 
+		// Make path canonical
+		std::error_code ec;
+		auto canonicalPath = std::filesystem::weakly_canonical(path, ec);
+		auto normalPath = ec ? path.lexically_normal() : std::move(canonicalPath);
+		normalPath.make_preferred();
+
 		ShaderKey key{};
-		key.m_PathHash = StringId(path.string());
+		key.m_PathHash = StringId(normalPath.string());
 		key.m_Stage = stage;
 
 		{
@@ -50,7 +56,7 @@ namespace gglab
 			record.m_Timestamp = timestamp;
 			record.m_Hash = HashBlob(record.m_Blob.Get());
 
-			const auto shaderId = static_cast<ShaderId>(static_cast<int32_t>(m_Records.size()));
+			ShaderId shaderId{ static_cast<uint32_t>(m_Records.size()) };
 			m_Records.push_back(std::move(record));
 			m_KeyIdMap.emplace(key, shaderId);
 			return shaderId;
@@ -162,7 +168,7 @@ namespace gglab
 		return reloadCount;
 	}
 
-	bool ShaderManager::GetDxilValidatorHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
+	bool ShaderManager::GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
 	{
 		constexpr size_t MinDxilSize = 20;
 		if (data == nullptr || size < MinDxilSize)
@@ -196,7 +202,7 @@ namespace gglab
 		const auto* ptr = static_cast<const uint8_t*>(blob->GetBufferPointer());
 		const auto size = blob->GetBufferSize();
 
-		if (GetDxilValidatorHash(ptr, size, hash))
+		if (GetDxilContainerHash(ptr, size, hash))
 		{
 			return hash;
 		}

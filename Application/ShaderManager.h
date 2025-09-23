@@ -21,7 +21,7 @@ namespace gglab
 		Hull,
 		Domain,
 		Geometry,
-		Copute
+		Compute
 	};
 
 	struct ShaderKey
@@ -65,10 +65,10 @@ namespace gglab
 		uint64_t GetGeneration(ShaderId shaderId) const noexcept;
 
 		void Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept;
-		int32_t ReloadChanged() noexcept;
+		int32_t ReloadChanged() noexcept;	// TODO: Reload tick
 
 	private:
-		static bool GetDxilValidatorHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;
+		static bool GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;
 		static ShaderHash128 HashBlob(ShaderBlob* blob) noexcept;
 
 	private:
