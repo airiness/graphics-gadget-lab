@@ -82,9 +82,6 @@
     <ClCompile Include="DX12RootSignature.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="RendererConstant.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClCompile>
@@ -141,9 +138,6 @@
     </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>Core\Log</Filter>
-    </ClCompile>
-    <ClCompile Include="GPUStuctures.cpp">
-      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="RenderGraph.cpp">
       <Filter>Graphics\RenderGraph</Filter>
@@ -249,9 +243,6 @@
     <ClInclude Include="DX12Texture.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="RendererConstant.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="Precompiled.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -318,7 +309,7 @@
     <ClInclude Include="LogMacros.h">
       <Filter>Core\Log</Filter>
     </ClInclude>
-    <ClInclude Include="GPUStuctures.h">
+    <ClInclude Include="GPUStructures.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="RenderPassSkybox.h">

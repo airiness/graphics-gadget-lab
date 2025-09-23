@@ -6,6 +6,13 @@ using namespace DirectX::SimpleMath;
 
 namespace gglab
 {
+	enum class CommonRSRootParamIndex : uint32_t
+	{
+		ConstantBufferIndex,
+		TextureDescriptorTable,
+		RootParamCount
+	};
+
 	using TextureID = uint32_t;
 	inline constexpr TextureID InvalidTextureID = (TextureID)(-1);
 	inline constexpr TextureID ReservedTextureID = (TextureID)(5);

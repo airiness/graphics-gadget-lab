@@ -26,12 +26,7 @@ namespace gglab
 	void Renderer::Initialize() noexcept
 	{
 		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
-
-		CreateCamera();
-		CreateCommonRootSignature();
-	
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
-		m_TexColorPass = std::make_unique<RenderPassTexColor>(m_Device.get());
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
 		{
@@ -40,10 +35,12 @@ namespace gglab
 			m_Device->GetCbvSrvUavDescriptorAllocator()
 		};
 		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
-
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
-
+		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(Application::GetInstance()->GetShaderManager());
+
+		CreateCamera();
+		CreateCommonRootSignature();
 
 		m_IsInitialized = true;
 	}
@@ -84,7 +81,8 @@ namespace gglab
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
 		RenderGraph rg(rgCreateInfo);
 
-		m_TexColorPass->AddPass(rg);
+		RenderPassTexColor texColorPass{};
+		texColorPass.AddPass(rg);
 
 		rg.Compile();
 
@@ -120,6 +118,11 @@ namespace gglab
 		m_Device->FlushGPU();
 	}
 
+	DX12RootSignature* Renderer::GetCommonRootSignature() const noexcept
+	{
+		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
+	}
+
 	void Renderer::CreateCommonRootSignature() noexcept
 	{
 		CD3DX12_DESCRIPTOR_RANGE1 range = {};
@@ -142,7 +145,8 @@ namespace gglab
 			1, staticSamplers,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
-		m_CommonRootSignature = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
+		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
+		m_CommonRootSignatureId = id;
 	}
 
 	void Renderer::CreateCamera() noexcept

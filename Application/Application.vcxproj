@@ -139,7 +139,6 @@
     <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
-    <ClCompile Include="GPUStuctures.cpp" />
     <ClCompile Include="InputBase.cpp" />
     <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="InputManager.cpp" />
@@ -154,7 +153,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="RendererConstant.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
     <ClCompile Include="RenderPassTexColor.cpp" />
     <ClCompile Include="RGArenaAllocator.cpp" />
@@ -204,7 +202,7 @@
     <ClInclude Include="PSOCreator.h" />
     <ClInclude Include="PSOKey.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
-    <ClInclude Include="GPUStuctures.h" />
+    <ClInclude Include="GPUStructures.h" />
     <ClInclude Include="GraphicsTypes.h" />
     <ClInclude Include="InputBase.h" />
     <ClInclude Include="Geometry.h" />
@@ -218,7 +216,6 @@
     <ClInclude Include="Mouse.h" />
     <ClInclude Include="Precompiled.h" />
     <ClInclude Include="Renderer.h" />
-    <ClInclude Include="RendererConstant.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderPassSkybox.h" />
     <ClInclude Include="RenderPassTexColor.h" />

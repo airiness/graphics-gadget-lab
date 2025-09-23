@@ -18,11 +18,6 @@
 
 namespace gglab
 {
-	RenderPassTexColor::RenderPassTexColor(DX12Device* dx12Device) noexcept :
-		m_DX12Device(dx12Device)
-	{
-	}
-
 	void RenderPassTexColor::AddPass(RenderGraph& rg) noexcept
 	{
 		struct TexColorData
@@ -34,8 +29,8 @@ namespace gglab
 			[this](RenderGraph::RGBuilder& builder, TexColorData& data)
 			{
 				builder.SideEffect();
-
-				auto* swapChain = m_DX12Device->GetSwapChain();
+				auto* renderer = Application::GetInstance()->GetRenderer();
+				auto* swapChain = renderer->GetDevice()->GetSwapChain();
 
 				RGTextureDesc dsDesc = {};
 				dsDesc.m_Width = swapChain->GetBufferWidth();
@@ -52,10 +47,11 @@ namespace gglab
 			{
 				auto* renderer = Application::GetInstance()->GetRenderer();
 				auto* shaderManager = Application::GetInstance()->GetShaderManager();
+				auto* device = renderer->GetDevice();
 				auto* passRegistry = renderer->GetRenderPassRecipeRegistry();
 				auto* rootSignature = renderer->GetCommonRootSignature();
 				auto* psoCache = renderer->GetPSOCache();
-				auto* swapChain = m_DX12Device->GetSwapChain();
+				auto* swapChain = device->GetSwapChain();
 
 				const auto w = swapChain->GetBufferWidth();
 				const auto h = swapChain->GetBufferHeight();
@@ -118,7 +114,7 @@ namespace gglab
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
 
-				commandList->SetDescriptorHeap(*m_DX12Device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
+				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
 				commandList->SetViewport(0, 0, w, h);
 				commandList->SetScissorRect(0, 0, w, h);
