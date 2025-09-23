@@ -88,6 +88,15 @@ namespace gglab
 			}
 		}
 
+		template<typename... Ts>
+		static constexpr void MixValue(uint64_t& hash, const std::tuple<Ts...> values) noexcept
+		{
+			std::apply([&hash](auto const&... vals)
+				{
+					(MixValue(hash, vals), ...);
+				}, values);
+		}
+
 		template<Fnv1aScalar T>
 		[[nodiscard]] static constexpr size_t HashValue(const T& value) noexcept
 		{

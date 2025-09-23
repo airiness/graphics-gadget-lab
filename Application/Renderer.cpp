@@ -44,6 +44,8 @@ namespace gglab
 
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
 
+		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(Application::GetInstance()->GetShaderManager());
+
 		m_IsInitialized = true;
 	}
 
@@ -142,14 +144,6 @@ namespace gglab
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
 		m_CommonRootSignature = std::make_unique<DX12RootSignature>(m_Device.get(), rootSignatureDesc);
-	}
-
-	void Renderer::CreateRenderObjects() noexcept
-	{
-		auto& enttRegistry = Application::GetInstance()->GetEnttRegistry();
-		auto* assetManager = Application::GetInstance()->GetAssetManager();
-
-
 	}
 
 	void Renderer::CreateCamera() noexcept

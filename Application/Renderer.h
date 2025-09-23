@@ -6,6 +6,7 @@
 #include "DX12ConstantBuffer.h"
 #include "DX12ViewCache.h"
 #include "DX12PSOCache.h"
+#include "RenderPassRecipeRegistry.h"
 #include "Camera.h"
 
 namespace gglab
@@ -30,9 +31,9 @@ namespace gglab
 		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
+		RenderPassRecipeRegistry* GetRenderPassRecipeRegistry() const noexcept { return m_RenderPassRecipeRegistry.get(); }
 
 	private:
-		void CreateRenderObjects() noexcept;
 		void CreateCamera() noexcept;
 		void CreateCommonRootSignature() noexcept;
 
@@ -48,6 +49,7 @@ namespace gglab
 		std::unique_ptr<RenderPassTexColor> m_TexColorPass;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
+		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
 
 		std::atomic_bool m_IsInitialized = false;
 	};

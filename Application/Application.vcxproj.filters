@@ -205,6 +205,9 @@
     <ClCompile Include="ShaderManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="RenderPassRecipeRegistry.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -395,6 +398,9 @@
     </ClInclude>
     <ClInclude Include="ShaderManager.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassRecipeRegistry.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -145,10 +145,10 @@ namespace gglab
 
 		m_Renderer = std::make_unique<Renderer>();
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
+		m_ShaderManager = std::make_unique<ShaderManager>();
 
 		m_Renderer->Initialize();
 		m_AssetManager->Initialize();
-		m_ShaderManager = std::make_unique<ShaderManager>();
 
 		InitializeAssets();
 

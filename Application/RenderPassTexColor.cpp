@@ -12,6 +12,7 @@
 #include "AssetManager.h"
 #include "ShaderManager.h"
 #include "Renderer.h"
+#include "RenderPassRecipeRegistry.h"
 #include "Components.h"
 #include "Utility.h"
 
@@ -51,50 +52,72 @@ namespace gglab
 			{
 				auto* renderer = Application::GetInstance()->GetRenderer();
 				auto* shaderManager = Application::GetInstance()->GetShaderManager();
+				auto* passRegistry = renderer->GetRenderPassRecipeRegistry();
 				auto* rootSignature = renderer->GetCommonRootSignature();
+				auto* psoCache = renderer->GetPSOCache();
 				auto* swapChain = m_DX12Device->GetSwapChain();
+
 				const auto w = swapChain->GetBufferWidth();
 				const auto h = swapChain->GetBufferHeight();
 
-				GraphicsPipelineDesc graphicsPSODesc = {};
-				graphicsPSODesc.m_RootSignature = rootSignature->Get();
-				graphicsPSODesc.m_RootSignatureId = RootSignatureId(11);
-
-				// Input Layout
-				D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-					{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-					{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-					{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-				};
-				graphicsPSODesc.m_InputLayout = std::vector<D3D12_INPUT_ELEMENT_DESC>(
-					std::begin(inputLayout), std::end(inputLayout));
-
+				// GraphicsKeyInputs build.
 				auto vertexShaderId = shaderManager->LoadShader("Shaders/TexturedModelVS.dxil", ShaderStage::Vertex);
 				auto pixelShaderId = shaderManager->LoadShader("Shaders/TexturedModelPS.dxil", ShaderStage::Pixel);
 
-				graphicsPSODesc.m_VertexShader = shaderManager->GetBytecode(vertexShaderId);
-				graphicsPSODesc.m_PixelShader = shaderManager->GetBytecode(pixelShaderId);
+				GraphicsKeyInputs keyInputs = {};
+				keyInputs.m_RootSignatureId = RootSignatureId(11);
+				keyInputs.m_VSId = vertexShaderId;
+				keyInputs.m_PSId = pixelShaderId;
+				keyInputs.m_VSGen = shaderManager->GetGeneration(vertexShaderId);
+				keyInputs.m_PSGen = shaderManager->GetGeneration(pixelShaderId);
+				keyInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+				keyInputs.m_SampleMask = std::numeric_limits<uint32_t>::max();
+				keyInputs.m_Formats.m_RtvCount = 1;
+				keyInputs.m_Formats.m_Rtv[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+				keyInputs.m_Formats.m_Dsv = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				keyInputs.m_Formats.m_SampleCount = 1;
+				keyInputs.m_Formats.m_SampleQuality = 0;
 
-				graphicsPSODesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-				graphicsPSODesc.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-				graphicsPSODesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-				graphicsPSODesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+				// TODO: multi thread safety?
+				const auto& cached = passRegistry->GetOrCreateGraphics(
+					"RenderPassTexColor.main", keyInputs,
+					[&](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
+					{
+						outDesc.m_RootSignatureId = input.m_RootSignatureId;
+						outDesc.m_RootSignature = rootSignature->Get();
 
-				graphicsPSODesc.m_RtvFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-				graphicsPSODesc.m_RtvCount = 1;
-				graphicsPSODesc.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-				graphicsPSODesc.m_SampleCount = 1;
-				graphicsPSODesc.m_SampleQuality = 0;
+						D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
+							{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+							{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+							{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+						};
+						outDesc.m_InputLayout.assign(std::begin(inputLayout), std::end(inputLayout));
 
-				const auto vsHash = shaderManager->GetHash(vertexShaderId);
-				const auto psHash = shaderManager->GetHash(pixelShaderId);
-				const auto key = graphicsPSODesc.MakeKey(vsHash, psHash);
+						outDesc.m_VertexShader = sm->GetBytecode(input.m_VSId);
+						outDesc.m_PixelShader = sm->GetBytecode(input.m_PSId);
 
-				auto* psoCache = renderer->GetPSOCache();
-				auto* pso = psoCache->GetOrCreate(key, graphicsPSODesc);
+						outDesc.m_Topology = input.m_Topology;
+						outDesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+						outDesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+						outDesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
+						outDesc.m_SampleMask = input.m_SampleMask;
 
+						outDesc.m_RtvCount = input.m_Formats.m_RtvCount;
+						for (uint32_t i = 0; i < input.m_Formats.m_RtvCount; ++i)
+						{
+							outDesc.m_RtvFormats[i] = input.m_Formats.m_Rtv[i];
+						}
+						outDesc.m_DsvFormat = input.m_Formats.m_Dsv;
+						outDesc.m_SampleCount = input.m_Formats.m_SampleCount;
+						outDesc.m_SampleQuality = input.m_Formats.m_SampleQuality;
+					});
+
+				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+
+				// TODO: last state cache to avoid redundant state setting.(root signature, pso)
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
+
 				commandList->SetDescriptorHeap(*m_DX12Device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
 				commandList->SetViewport(0, 0, w, h);
