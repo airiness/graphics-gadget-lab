@@ -28,12 +28,14 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
 		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
 		RenderPassRecipeRegistry* GetRenderPassRecipeRegistry() const noexcept { return m_RenderPassRecipeRegistry.get(); }
+
+		DX12RootSignature* GetCommonRootSignature() const noexcept;
+		RootSignatureId GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 
 	private:
 		void CreateCamera() noexcept;

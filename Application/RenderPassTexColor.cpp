@@ -61,7 +61,7 @@ namespace gglab
 				auto pixelShaderId = shaderManager->LoadShader("Shaders/TexturedModelPS.dxil", ShaderStage::Pixel);
 
 				GraphicsKeyInputs keyInputs = {};
-				keyInputs.m_RootSignatureId = RootSignatureId(11);
+				keyInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
 				keyInputs.m_VSId = vertexShaderId;
 				keyInputs.m_PSId = pixelShaderId;
 				keyInputs.m_VSGen = shaderManager->GetGeneration(vertexShaderId);
@@ -77,10 +77,11 @@ namespace gglab
 				// TODO: multi thread safety?
 				const auto& cached = passRegistry->GetOrCreateGraphics(
 					"RenderPassTexColor.main", keyInputs,
-					[&](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
+					[](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
 					{
+						auto* renderer = Application::GetInstance()->GetRenderer();
 						outDesc.m_RootSignatureId = input.m_RootSignatureId;
-						outDesc.m_RootSignature = rootSignature->Get();
+						outDesc.m_RootSignature = renderer->GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
 
 						D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
 							{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
