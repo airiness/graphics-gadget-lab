@@ -134,6 +134,7 @@
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="FreeListSpanAllocator.cpp" />
+    <ClCompile Include="InputLayoutLibrary.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -163,7 +164,6 @@
     <ClCompile Include="StringId.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Utility.cpp" />
-    <ClCompile Include="VertexData.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +197,7 @@
     <ClInclude Include="EnumFlags.h" />
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
+    <ClInclude Include="InputLayoutLibrary.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />

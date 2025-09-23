@@ -160,9 +160,6 @@
     <ClCompile Include="DX12ConstantBuffer.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="VertexData.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="RGGpuResourceAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -203,6 +200,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="DX12RootSignatureCache.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="InputLayoutLibrary.cpp">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClCompile>
   </ItemGroup>
@@ -397,6 +397,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="DX12RootSignatureCache.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="InputLayoutLibrary.h">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
   </ItemGroup>
