@@ -6,6 +6,7 @@
 #include "DX12ConstantBuffer.h"
 #include "DX12ViewCache.h"
 #include "DX12PSOCache.h"
+#include "DX12RootSignatureCache.h"
 #include "RenderPassRecipeRegistry.h"
 #include "Camera.h"
 
@@ -49,6 +50,7 @@ namespace gglab
 		std::unique_ptr<RenderPassTexColor> m_TexColorPass;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
+		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
 
 		std::atomic_bool m_IsInitialized = false;

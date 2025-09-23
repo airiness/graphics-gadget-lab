@@ -130,9 +130,11 @@
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
     <ClCompile Include="DX12ResourceUploader.cpp" />
+    <ClCompile Include="DX12RootSignatureCache.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
     <ClCompile Include="FreeListSpanAllocator.cpp" />
+    <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
@@ -191,11 +193,13 @@
     <ClInclude Include="DX12Resource.h" />
     <ClInclude Include="DX12RootSignature.h" />
     <ClInclude Include="DX12ResourceUploader.h" />
+    <ClInclude Include="DX12RootSignatureCache.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="EnumFlags.h" />
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
+    <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />
     <ClInclude Include="PSOKey.h" />

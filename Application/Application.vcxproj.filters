@@ -208,6 +208,9 @@
     <ClCompile Include="RenderPassRecipeRegistry.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="DX12RootSignatureCache.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -401,6 +404,9 @@
     </ClInclude>
     <ClInclude Include="RenderPassRecipeRegistry.h">
       <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12RootSignatureCache.h">
+      <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

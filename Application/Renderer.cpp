@@ -28,7 +28,6 @@ namespace gglab
 		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
 
 		CreateCamera();
-		CreateRenderObjects();
 		CreateCommonRootSignature();
 	
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());

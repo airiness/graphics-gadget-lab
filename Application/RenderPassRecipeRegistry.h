@@ -52,6 +52,7 @@ namespace gglab
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 		uint64_t m_VariantBits = 0;
 
+		constexpr bool operator==(const GraphicsKeyInputs&) const noexcept = default;
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(
@@ -74,11 +75,6 @@ namespace gglab
 				m_SampleMask,
 				m_VariantBits);
 		}
-
-		bool operator==(const GraphicsKeyInputs& rhs) const noexcept
-		{
-			return AsTuple() == rhs.AsTuple();
-		}
 	};
 
 	struct ComputeKeyInputs
@@ -87,6 +83,7 @@ namespace gglab
 		ShaderId m_CSId{};
 		uint64_t m_CSGen = 0;
 		uint64_t m_VariantBits = 0;
+
 		constexpr bool operator==(const ComputeKeyInputs&) const noexcept = default;
 		auto AsTuple() const noexcept
 		{

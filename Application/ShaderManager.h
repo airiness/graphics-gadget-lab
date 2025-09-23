@@ -3,11 +3,10 @@
 #include "StringId.h"
 #include "PSOKey.h"
 #include "FNV1a.h"
+#include "GraphicsTypes.h"
 
 namespace gglab
 {
-	GGLAB_DEFINE_TYPED_INDEX(ShaderId, uint32_t);
-
 	// DXC shader blob
 	using ShaderBlob = IDxcBlobEncoding;
 

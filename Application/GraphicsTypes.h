@@ -1,5 +1,5 @@
 #pragma once
-//#include <cstdint>
+#include <cstdint>
 #include <limits>
 #include <compare>
 #include "TypedIndex.h"
@@ -23,5 +23,9 @@ namespace gglab
 	// ResourceIndex for render graph.
 	GGLAB_DEFINE_TYPED_INDEX(ResourceIndex, uint32_t);
 
-
+	// RootSignatureId
+	GGLAB_DEFINE_TYPED_INDEX(RootSignatureId, uint64_t);
+	
+	// ShaderId
+	GGLAB_DEFINE_TYPED_INDEX(ShaderId, uint32_t);
 }

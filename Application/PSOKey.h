@@ -1,12 +1,10 @@
 #pragma once
 #include "FNV1a.h"
 #include "TypedIndex.h"
+#include "GraphicsTypes.h"
 
 namespace gglab
 {
-	// RootSignatureId
-	GGLAB_DEFINE_TYPED_INDEX(RootSignatureId, uint64_t);
-
 	struct ShaderHash128
 	{
 		uint64_t m_LowBits = 0;
