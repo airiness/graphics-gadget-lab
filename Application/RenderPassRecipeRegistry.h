@@ -9,15 +9,16 @@ namespace gglab
 	struct FormatStamp
 	{
 		uint32_t m_RtvCount = 0;
-		DXGI_FORMAT m_Rtv[8]{};
+		std::array<DXGI_FORMAT, 8> m_RtvFormats{};
 		DXGI_FORMAT m_Dsv = DXGI_FORMAT_UNKNOWN;
 		uint32_t m_SampleCount = 1;
 		uint32_t m_SampleQuality = 0;
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(m_RtvCount, m_Rtv[0], m_Rtv[1], m_Rtv[2], m_Rtv[3],
-				m_Rtv[4], m_Rtv[5], m_Rtv[6], m_Rtv[7],
+			return std::make_tuple(m_RtvCount, 
+				m_RtvFormats[0], m_RtvFormats[1], m_RtvFormats[2], m_RtvFormats[3],
+				m_RtvFormats[4], m_RtvFormats[5], m_RtvFormats[6], m_RtvFormats[7],
 				m_Dsv, m_SampleCount, m_SampleQuality);
 		}
 

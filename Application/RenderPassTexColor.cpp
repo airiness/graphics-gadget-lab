@@ -13,6 +13,7 @@
 #include "ShaderManager.h"
 #include "Renderer.h"
 #include "RenderPassRecipeRegistry.h"
+#include "InputLayoutLibrary.h"
 #include "Components.h"
 #include "Utility.h"
 
@@ -69,7 +70,7 @@ namespace gglab
 				keyInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 				keyInputs.m_SampleMask = std::numeric_limits<uint32_t>::max();
 				keyInputs.m_Formats.m_RtvCount = 1;
-				keyInputs.m_Formats.m_Rtv[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+				keyInputs.m_Formats.m_RtvFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 				keyInputs.m_Formats.m_Dsv = DXGI_FORMAT_D24_UNORM_S8_UINT;
 				keyInputs.m_Formats.m_SampleCount = 1;
 				keyInputs.m_Formats.m_SampleQuality = 0;
@@ -82,28 +83,16 @@ namespace gglab
 						auto* renderer = Application::GetInstance()->GetRenderer();
 						outDesc.m_RootSignatureId = input.m_RootSignatureId;
 						outDesc.m_RootSignature = renderer->GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
-
-						D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-							{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Position), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-							{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, m_Normal), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-							{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, offsetof(Vertex, m_TexCoord), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-						};
-						outDesc.m_InputLayout.assign(std::begin(inputLayout), std::end(inputLayout));
-
+						outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(InputLayoutId::P3N3T2);
 						outDesc.m_VertexShader = sm->GetBytecode(input.m_VSId);
 						outDesc.m_PixelShader = sm->GetBytecode(input.m_PSId);
-
 						outDesc.m_Topology = input.m_Topology;
 						outDesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 						outDesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 						outDesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
 						outDesc.m_SampleMask = input.m_SampleMask;
-
 						outDesc.m_RtvCount = input.m_Formats.m_RtvCount;
-						for (uint32_t i = 0; i < input.m_Formats.m_RtvCount; ++i)
-						{
-							outDesc.m_RtvFormats[i] = input.m_Formats.m_Rtv[i];
-						}
+						outDesc.m_RtvFormats = input.m_Formats.m_RtvFormats;
 						outDesc.m_DsvFormat = input.m_Formats.m_Dsv;
 						outDesc.m_SampleCount = input.m_Formats.m_SampleCount;
 						outDesc.m_SampleQuality = input.m_Formats.m_SampleQuality;

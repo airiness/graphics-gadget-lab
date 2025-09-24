@@ -40,10 +40,8 @@ namespace gglab
 	{
 		auto rs = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(desc.m_RootSignature);
 		writer.Add(rs);
-		writer.AddIf(!desc.m_InputLayout.empty(), CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT(
-			D3D12_INPUT_LAYOUT_DESC(desc.m_InputLayout.data(), static_cast<UINT>(desc.m_InputLayout.size()))));
+		writer.AddIf(desc.m_InputLayoutDesc.NumElements > 0, CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT(desc.m_InputLayoutDesc));
 		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY(desc.m_Topology));
-
 		writer.AddIf(desc.m_VertexShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_VS(desc.m_VertexShader));
 		writer.AddIf(desc.m_PixelShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_PS(desc.m_PixelShader));
 		writer.AddIf(desc.m_HullShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_HS(desc.m_HullShader));
