@@ -8,24 +8,18 @@ namespace gglab
 	{
 		GraphicsPSOKey key{};
 		key.m_RootSignatureId = m_RootSignatureId;
+		key.m_InputLayoutId = m_InputLayoutId;
 		key.m_VertexShader = vsHash;
 		key.m_PixelShader = psHash;
 		key.m_DomainShader = dsHash;
 		key.m_HullShader = hsHash;
 		key.m_GeometryShader = gsHash;
-		key.m_RtvCount = m_RtvCount;
-		for (uint32_t i = 0; i < m_RtvCount && i < 8; ++i)
-		{
-			key.m_Rtv[i] = m_RtvFormats[i];
-		}
-		key.m_Dsv = m_DsvFormat;
+		key.m_Formats = m_Formats;
 		key.m_Topology = m_Topology;
-		key.m_SampleCount = m_SampleCount;
-		key.m_SampleQuality = m_SampleQuality;
 		key.m_SampleMask = m_SampleMask;
 		key.m_Rasterizer.PackRasterizerBits(m_RasterizerDesc);
 		key.m_Depth.PackDepthBits(m_DepthDesc);
-		key.m_Blend.PackBlendBits(m_BlendDesc, m_RtvCount);
+		key.m_Blend.PackBlendBits(m_BlendDesc, m_Formats.m_RtvFormats.NumRenderTargets);
 		return key;
 	}
 
@@ -43,44 +37,31 @@ namespace gglab
 			return false;
 		}
 
-		// If PixelShader is set, it must have valid bytecode
-		if ((m_PixelShader.BytecodeLength > 0 && m_PixelShader.pShaderBytecode == nullptr) ||
-			(m_PixelShader.BytecodeLength == 0 && m_PixelShader.pShaderBytecode != nullptr))
-		{
-			return false;
-		}
+		const auto validIfSet = [](const D3D12_SHADER_BYTECODE& shader) noexcept
+			{
+				return (shader.BytecodeLength == 0 && shader.pShaderBytecode == nullptr) ||
+					(shader.BytecodeLength > 0 && shader.pShaderBytecode != nullptr);
+			};
 
-		// If DomainShader is set, it must have valid bytecode
-		if ((m_DomainShader.BytecodeLength > 0 && m_DomainShader.pShaderBytecode == nullptr) ||
-			(m_DomainShader.BytecodeLength == 0 && m_DomainShader.pShaderBytecode != nullptr))
-		{
-			return false;
-		}
-
-		// If HullShader is set, it must have valid bytecode
-		if ((m_HullShader.BytecodeLength > 0 && m_HullShader.pShaderBytecode == nullptr) ||
-			(m_HullShader.BytecodeLength == 0 && m_HullShader.pShaderBytecode != nullptr))
-		{
-			return false;
-		}
-
-		// If GeometryShader is set, it must have valid bytecode
-		if ((m_GeometryShader.BytecodeLength > 0 && m_GeometryShader.pShaderBytecode == nullptr) ||
-			(m_GeometryShader.BytecodeLength == 0 && m_GeometryShader.pShaderBytecode != nullptr))
+		if (!validIfSet(m_PixelShader) ||
+			!validIfSet(m_DomainShader) ||
+			!validIfSet(m_HullShader) ||
+			!validIfSet(m_GeometryShader))
 		{
 			return false;
 		}
 
 		// RtvCount must be between 0 and 8
-		if (m_RtvCount > 8)
+		const auto& rtvFormats = m_Formats.m_RtvFormats;
+		if (rtvFormats.NumRenderTargets > 8)
 		{
 			return false;
 		}
 
 		// If RtvCount > 0, RtvFormats must be valid
-		for (uint32_t i = 0; i < m_RtvCount; ++i)
+		for (uint32_t i = 0; i < rtvFormats.NumRenderTargets; ++i)
 		{
-			if (m_RtvFormats[i] == DXGI_FORMAT_UNKNOWN)
+			if (rtvFormats.RTFormats[i] == DXGI_FORMAT_UNKNOWN)
 			{
 				return false;
 			}
@@ -90,7 +71,7 @@ namespace gglab
 	}
 
 	ComputePSOKey ComputePipelineDesc::MakeKey(ShaderHash128 csHash) const noexcept
-	{		
+	{
 		ComputePSOKey key{};
 		key.m_RootSignatureId = m_RootSignatureId;
 		key.m_ComputeShader = csHash;
@@ -98,7 +79,7 @@ namespace gglab
 	}
 
 	bool ComputePipelineDesc::Validate() const noexcept
-	{	
+	{
 		// RootSignature must be set
 		if (m_RootSignature == nullptr)
 		{

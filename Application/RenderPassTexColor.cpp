@@ -63,15 +63,16 @@ namespace gglab
 
 				GraphicsKeyInputs keyInputs = {};
 				keyInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+				keyInputs.m_InputLayoutId = InputLayoutId::P3N3T2;
 				keyInputs.m_VSId = vertexShaderId;
 				keyInputs.m_PSId = pixelShaderId;
 				keyInputs.m_VSGen = shaderManager->GetGeneration(vertexShaderId);
 				keyInputs.m_PSGen = shaderManager->GetGeneration(pixelShaderId);
 				keyInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 				keyInputs.m_SampleMask = std::numeric_limits<uint32_t>::max();
-				keyInputs.m_Formats.m_RtvCount = 1;
-				keyInputs.m_Formats.m_RtvFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-				keyInputs.m_Formats.m_Dsv = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				keyInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+				keyInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
+				keyInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 				keyInputs.m_Formats.m_SampleCount = 1;
 				keyInputs.m_Formats.m_SampleQuality = 0;
 
@@ -83,19 +84,17 @@ namespace gglab
 						auto* renderer = Application::GetInstance()->GetRenderer();
 						outDesc.m_RootSignatureId = input.m_RootSignatureId;
 						outDesc.m_RootSignature = renderer->GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
+						outDesc.m_InputLayoutId = input.m_InputLayoutId;
 						outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(InputLayoutId::P3N3T2);
 						outDesc.m_VertexShader = sm->GetBytecode(input.m_VSId);
 						outDesc.m_PixelShader = sm->GetBytecode(input.m_PSId);
 						outDesc.m_Topology = input.m_Topology;
+						outDesc.m_SampleMask = input.m_SampleMask;
+						outDesc.m_Formats = input.m_Formats;
 						outDesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 						outDesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 						outDesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
-						outDesc.m_SampleMask = input.m_SampleMask;
-						outDesc.m_RtvCount = input.m_Formats.m_RtvCount;
-						outDesc.m_RtvFormats = input.m_Formats.m_RtvFormats;
-						outDesc.m_DsvFormat = input.m_Formats.m_Dsv;
-						outDesc.m_SampleCount = input.m_Formats.m_SampleCount;
-						outDesc.m_SampleQuality = input.m_Formats.m_SampleQuality;
+		
 					});
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);

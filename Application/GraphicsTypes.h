@@ -20,6 +20,16 @@ namespace gglab
 		LightType_Point,
 	};
 
+	enum class InputLayoutId : uint32_t
+	{
+		P3,				// Position(3)
+		P3T2,			// Position(3), TexCoord(2)
+		P3N3,			// Position(3), Normal(3)
+		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
+
+		Count
+	};
+
 	// ResourceIndex for render graph.
 	GGLAB_DEFINE_TYPED_INDEX(ResourceIndex, uint32_t);
 

@@ -29,7 +29,7 @@ namespace gglab
 			return nullptr;
 		}
 
-		alignas(64) std::array<std::byte, 1024> storage{};
+		alignas(void*) std::array<std::byte, 1024> storage{};
 		StreamWriter writer(storage.data(), storage.size());
 		auto streamDesc = BuildComputeStream(desc, writer);
 
@@ -47,24 +47,13 @@ namespace gglab
 		writer.AddIf(desc.m_HullShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_HS(desc.m_HullShader));
 		writer.AddIf(desc.m_DomainShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_DS(desc.m_DomainShader));
 		writer.AddIf(desc.m_GeometryShader.BytecodeLength > 0, CD3DX12_PIPELINE_STATE_STREAM_GS(desc.m_GeometryShader));
-
-		writer.AddIf(desc.m_DsvFormat != DXGI_FORMAT_UNKNOWN, CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT(desc.m_DsvFormat));
-
-		if (desc.m_RtvCount > 0)
-		{
-			D3D12_RT_FORMAT_ARRAY rtvFormats{};
-			rtvFormats.NumRenderTargets = desc.m_RtvCount;
-			for (uint32_t i = 0; i < desc.m_RtvCount && i < 8; ++i)
-			{
-				rtvFormats.RTFormats[i] = desc.m_RtvFormats[i];
-			}
-			writer.Add(CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS(rtvFormats));
-		}
+		writer.AddIf(desc.m_Formats.m_DsvFormat != DXGI_FORMAT_UNKNOWN, CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT(desc.m_Formats.m_DsvFormat));
+		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS(desc.m_Formats.m_RtvFormats));
 		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER(desc.m_RasterizerDesc));
 		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC(desc.m_BlendDesc));
 		writer.Add(CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL1(desc.m_DepthDesc));
-		writer.AddIf((desc.m_SampleCount > 1 || desc.m_SampleQuality > 0),
-			CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC({ desc.m_SampleCount, desc.m_SampleQuality }));
+		writer.AddIf((desc.m_Formats.m_SampleCount > 1 || desc.m_Formats.m_SampleQuality > 0),
+			CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC({ desc.m_Formats.m_SampleCount, desc.m_Formats.m_SampleQuality }));
 		writer.AddIf(desc.m_SampleMask != std::numeric_limits<uint32_t>::max(),
 			CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_MASK(desc.m_SampleMask));
 

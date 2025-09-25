@@ -6,31 +6,10 @@
 
 namespace gglab
 {
-	struct FormatStamp
-	{
-		uint32_t m_RtvCount = 0;
-		std::array<DXGI_FORMAT, 8> m_RtvFormats{};
-		DXGI_FORMAT m_Dsv = DXGI_FORMAT_UNKNOWN;
-		uint32_t m_SampleCount = 1;
-		uint32_t m_SampleQuality = 0;
-
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_RtvCount, 
-				m_RtvFormats[0], m_RtvFormats[1], m_RtvFormats[2], m_RtvFormats[3],
-				m_RtvFormats[4], m_RtvFormats[5], m_RtvFormats[6], m_RtvFormats[7],
-				m_Dsv, m_SampleCount, m_SampleQuality);
-		}
-
-		bool operator==(const FormatStamp& rhs) const noexcept
-		{
-			return AsTuple() == rhs.AsTuple();
-		}
-	};
-
 	struct GraphicsKeyInputs
 	{
 		RootSignatureId m_RootSignatureId{};
+		InputLayoutId m_InputLayoutId{};
 
 		ShaderId m_VSId{};
 		ShaderId m_PSId{};
@@ -44,13 +23,15 @@ namespace gglab
 		uint64_t m_HSGen = 0;
 		uint64_t m_GSGen = 0;
 
-		FormatStamp m_Formats{};
-		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		PackedRasterizer m_Rasterizer{};
-		PackedDepth m_Depth{};
-		PackedBlend m_Blend{};
+		PipelineFormats m_Formats{};
 
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
+
+		RasterizerPreset m_RasterizerPreset = RasterizerPreset::Default;
+		DepthPreset m_DepthPreset = DepthPreset::Default;
+		BlendPreset m_BlendPreset = BlendPreset::Default;
+
 		uint64_t m_VariantBits = 0;
 
 		constexpr bool operator==(const GraphicsKeyInputs&) const noexcept = default;
@@ -58,6 +39,7 @@ namespace gglab
 		{
 			return std::make_tuple(
 				m_RootSignatureId.Value(),
+				m_InputLayoutId,
 				m_VSId.Value(),
 				m_PSId.Value(),
 				m_DSId.Value(),
@@ -69,11 +51,11 @@ namespace gglab
 				m_HSGen,
 				m_GSGen,
 				m_Formats.AsTuple(),
-				m_Topology,
-				m_Rasterizer.m_Bits,
-				m_Depth.m_Bits,
-				m_Blend.m_Bits,
+				m_Topology,		
 				m_SampleMask,
+				m_RasterizerPreset,
+				m_DepthPreset,
+				m_BlendPreset,
 				m_VariantBits);
 		}
 	};

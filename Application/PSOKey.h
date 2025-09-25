@@ -9,11 +9,69 @@ namespace gglab
 	{
 		uint64_t m_LowBits = 0;
 		uint64_t m_HighBits = 0;
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(m_LowBits, m_HighBits);
+		}
+		constexpr bool operator==(const ShaderHash128& rhs) const noexcept = default;
+	};
+
+	struct PipelineFormats
+	{
+		D3D12_RT_FORMAT_ARRAY m_RtvFormats = {};
+		DXGI_FORMAT m_DsvFormat = DXGI_FORMAT_UNKNOWN;
+		uint32_t m_SampleCount = 1;
+		uint32_t m_SampleQuality = 0;
+
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(m_RtvFormats.NumRenderTargets,
+				m_RtvFormats.RTFormats[0],
+				m_RtvFormats.RTFormats[1],
+				m_RtvFormats.RTFormats[2],
+				m_RtvFormats.RTFormats[3],
+				m_RtvFormats.RTFormats[4],
+				m_RtvFormats.RTFormats[5],
+				m_RtvFormats.RTFormats[6],
+				m_RtvFormats.RTFormats[7],
+				m_DsvFormat,
+				m_SampleCount,
+				m_SampleQuality);
+		}
+		constexpr bool operator==(const PipelineFormats& rhs) const noexcept
+		{
+			return AsTuple() == rhs.AsTuple();
+		}
+	};
+
+	enum class RasterizerPreset : uint8_t
+	{
+		Default,
+		Wireframe,
+	};
+
+	enum class BlendPreset : uint8_t
+	{
+		Default,
+		Opaque,
+		AlphaBlend,
+		Additive,
+	};
+
+	enum class DepthPreset : uint8_t
+	{
+		Default,
+		None,
+		ReadOnly,
+		ReverseZ,
+		ReverseZReadOnly,
 	};
 
 	struct PackedRasterizer
 	{
 		uint32_t m_Bits = 0;
+
+		constexpr bool operator==(const PackedRasterizer&) const noexcept = default;
 
 		// Pack RasterizerDesc into 32 bits
 		void PackRasterizerBits(const D3D12_RASTERIZER_DESC& desc) noexcept;
@@ -22,6 +80,8 @@ namespace gglab
 	struct PackedDepth
 	{
 		uint32_t m_Bits = 0;
+	
+		constexpr bool operator==(const PackedDepth&) const noexcept = default;
 
 		// Pack DepthStencilDesc into 32 bits
 		void PackDepthBits(const D3D12_DEPTH_STENCIL_DESC1& desc) noexcept;
@@ -31,6 +91,8 @@ namespace gglab
 	{
 		uint32_t m_Bits = 0;
 
+		constexpr bool operator==(const PackedBlend&) const noexcept = default;
+
 		// Pack BlendDesc into 32 bits
 		void PackBlendBits(const D3D12_BLEND_DESC& desc, uint32_t rtvCount) noexcept;
 	};
@@ -39,6 +101,7 @@ namespace gglab
 	struct GraphicsPSOKey
 	{
 		RootSignatureId m_RootSignatureId{};
+		InputLayoutId m_InputLayoutId{};
 
 		ShaderHash128 m_VertexShader{};
 		ShaderHash128 m_PixelShader{};
@@ -46,14 +109,10 @@ namespace gglab
 		ShaderHash128 m_HullShader{};
 		ShaderHash128 m_GeometryShader{};
 
-		uint32_t m_RtvCount = 0;
-		DXGI_FORMAT m_Rtv[8]{};
-		DXGI_FORMAT m_Dsv = DXGI_FORMAT_UNKNOWN;
+		PipelineFormats m_Formats{};
 
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 
-		uint32_t m_SampleCount = 1;
-		uint32_t m_SampleQuality = 0;
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 
 		PackedRasterizer m_Rasterizer{};
@@ -63,26 +122,20 @@ namespace gglab
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(m_RootSignatureId.Value(),
+				m_InputLayoutId,
 				m_VertexShader.m_LowBits, m_VertexShader.m_HighBits,
 				m_PixelShader.m_LowBits, m_PixelShader.m_HighBits,
 				m_DomainShader.m_LowBits, m_DomainShader.m_HighBits,
 				m_HullShader.m_LowBits, m_HullShader.m_HighBits,
-				m_RtvCount,
-				m_Rtv[0], m_Rtv[1], m_Rtv[2], m_Rtv[3], m_Rtv[4], m_Rtv[5], m_Rtv[6], m_Rtv[7],
-				m_Dsv,
+				m_GeometryShader.m_LowBits, m_GeometryShader.m_HighBits,
+				m_Formats.AsTuple(),
 				m_Topology,
-				m_SampleCount,
-				m_SampleQuality,
 				m_SampleMask,
 				m_Rasterizer.m_Bits,
 				m_Depth.m_Bits,
 				m_Blend.m_Bits);
 		}
-
-		bool operator==(const GraphicsPSOKey& rhs) const noexcept
-		{
-			return AsTuple() == rhs.AsTuple();
-		}
+		constexpr bool operator==(const GraphicsPSOKey&) const noexcept = default;
 	};
 	using GraphicsPSOKeyHash = KeyHash<GraphicsPSOKey>;
 
@@ -97,11 +150,7 @@ namespace gglab
 			return std::make_tuple(m_RootSignatureId.Value(),
 				m_ComputeShader.m_LowBits, m_ComputeShader.m_HighBits);
 		}
-
-		bool operator==(const ComputePSOKey& rhs) const noexcept
-		{
-			return AsTuple() == rhs.AsTuple();
-		}
+		constexpr bool operator==(const ComputePSOKey&) const noexcept = default;
 	};
 	using ComputePSOKeyHash = KeyHash<ComputePSOKey>;
 }

@@ -10,6 +10,7 @@ namespace gglab
 		ID3D12RootSignature* m_RootSignature = nullptr;
 
 		// InputLayout
+		InputLayoutId m_InputLayoutId{};
 		D3D12_INPUT_LAYOUT_DESC m_InputLayoutDesc{};
 
 		// Shaders
@@ -20,14 +21,10 @@ namespace gglab
 		D3D12_SHADER_BYTECODE m_GeometryShader{};
 
 		// Formats
-		std::array<DXGI_FORMAT, 8> m_RtvFormats{};
-		uint32_t m_RtvCount = 0;
-		DXGI_FORMAT m_DsvFormat = DXGI_FORMAT_UNKNOWN;
+		PipelineFormats m_Formats{};
 
 		// Other states
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		uint32_t m_SampleCount = 1;
-		uint32_t m_SampleQuality = 0;
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 
 		CD3DX12_RASTERIZER_DESC m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -35,10 +32,10 @@ namespace gglab
 		CD3DX12_BLEND_DESC m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
 		// Generate PSO Key
-		GraphicsPSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
+		[[nodiscard]] GraphicsPSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
 			ShaderHash128 dsHash = {}, ShaderHash128 hsHash = {}, ShaderHash128 gsHash = {}) const noexcept;
 
-		bool Validate() const noexcept;
+		[[nodiscard]] bool Validate() const noexcept;
 	};
 
 	// Compute PSO desc
@@ -50,8 +47,8 @@ namespace gglab
 		// Shader
 		D3D12_SHADER_BYTECODE m_ComputeShader{};
 
-		ComputePSOKey MakeKey(ShaderHash128 csHash) const noexcept;
+		[[nodiscard]] ComputePSOKey MakeKey(ShaderHash128 csHash) const noexcept;
 
-		bool Validate() const noexcept;
+		[[nodiscard]] bool Validate() const noexcept;
 	};
 }
