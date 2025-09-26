@@ -20,8 +20,8 @@ namespace gglab
 		void BeginUpload() noexcept;
 		void EndUpload(bool wait) noexcept;
 
-		void UploadResource(const void* data, uint64_t dataSize, const DX12Resource* destResource) noexcept;
-		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept;
+		void UploadResource(const void* data, uint64_t dataSize, const DX12Resource* destResource) const noexcept;
+		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) const noexcept;
 
 		DX12CommandList* GetUploadCommandList() const { return m_UploadCommandList.get(); }
 

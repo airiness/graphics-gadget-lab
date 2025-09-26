@@ -217,7 +217,7 @@ namespace gglab
 		template<typename RESOURCE>
 		void MarkDestroyResourceIndex(ResourceIndex resIndex) noexcept;
 
-		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) noexcept;
+		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
 
 		RGResourceNode& GetActiveResourceNode(RGResourceHandle handle) noexcept;
 

@@ -8,7 +8,7 @@ namespace gglab
 	public:
 		DX12Texture() noexcept = default;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Texture);
-		virtual ~DX12Texture() = default;
+		~DX12Texture() override = default;
 
 		void AdoptFromSwapChain(ComPtr<ID3D12Resource> backBuffer) noexcept;
 

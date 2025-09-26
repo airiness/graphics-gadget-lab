@@ -10,7 +10,6 @@
 #include "DX12ConstantBuffer.h"
 #include "RenderGraph.h"
 #include "RGGpuResourceAllocator.h"
-#include "Components.h"
 #include "AssetManager.h"
 #include "Camera.h"
 #include "RenderPassTexColor.h"

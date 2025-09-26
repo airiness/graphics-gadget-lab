@@ -4,7 +4,6 @@
 #include "DX12Device.h"
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
-#include "DX12SwapChain.h"
 #include "DX12ViewCache.h"
 
 namespace gglab
@@ -200,7 +199,7 @@ namespace gglab
 		return GetResourceIndexImpl<RGBufferResource>(bufId);
 	}
 
-	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) noexcept
+	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) const noexcept
 	{
 		if (!handle.IsValid())
 		{

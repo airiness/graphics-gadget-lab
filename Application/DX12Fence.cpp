@@ -46,7 +46,7 @@ namespace gglab
 		return fencePoint;
 	}
 
-	void DX12Fence::WaitCompletion(uint64_t fenceValue, uint32_t timeout) noexcept
+	void DX12Fence::WaitCompletion(uint64_t fenceValue, uint32_t timeout) const noexcept
 	{
 		if (!IsCompleted(fenceValue))
 		{

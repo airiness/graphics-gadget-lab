@@ -7,7 +7,6 @@
 #include "DX12RootSignatureCache.h"
 #include "RenderPassRecipeRegistry.h"
 #include "GPUStructures.h"
-#include "GraphicsConstants.h"
 #include "Camera.h"
 
 namespace gglab

@@ -15,7 +15,6 @@
 #include "RenderPassRecipeRegistry.h"
 #include "InputLayoutLibrary.h"
 #include "Components.h"
-#include "Utility.h"
 
 namespace gglab
 {
@@ -26,7 +25,7 @@ namespace gglab
 			RGTextureId m_Depth;
 		};
 
-		const auto& texColorPass = rg.AddPass<TexColorData>("RenderPassTexColor",
+		rg.AddPass<TexColorData>("RenderPassTexColor",
 			[this](RenderGraph::RGBuilder& builder, TexColorData& data)
 			{
 				builder.SideEffect();
@@ -94,7 +93,7 @@ namespace gglab
 						outDesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 						outDesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 						outDesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
-		
+
 					});
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
@@ -120,7 +119,7 @@ namespace gglab
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
 
-				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
 				dsvDesc.Format = dsTexture->GetDesc().Format;
 				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;

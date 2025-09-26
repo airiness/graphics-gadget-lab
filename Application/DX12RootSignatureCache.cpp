@@ -1,8 +1,6 @@
 #include "Precompiled.h"
 #include "DX12RootSignatureCache.h"
-#include "DX12Device.h"
 #include "DX12RootSignature.h"
-#include "Utility.h"
 
 namespace gglab
 {

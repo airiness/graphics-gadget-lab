@@ -1,6 +1,5 @@
 #pragma once
 #include "FNV1a.h"
-#include "TypedIndex.h"
 #include "PSOKey.h"
 #include "PSOCreator.h"
 

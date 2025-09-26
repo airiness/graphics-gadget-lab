@@ -54,7 +54,7 @@ namespace gglab
 		m_UploadingInfo = nullptr;
 	}
 
-	void DX12ResourceUploader::UploadResource(const void* data, uint64_t dataSize, const DX12Resource* destResource) noexcept
+	void DX12ResourceUploader::UploadResource(const void* data, uint64_t dataSize, const DX12Resource* destResource) const noexcept
 	{
 		std::unique_ptr<DX12Buffer> uploadBuffer = std::make_unique<DX12Buffer>();
 		uploadBuffer->Create(DX12Buffer::UploadBufferCreateInfo(m_DX12Device->GetMemAllocator(), dataSize));
@@ -73,7 +73,7 @@ namespace gglab
 		m_UploadingInfo->m_UploadIntermediateResources.push_back(std::move(uploadBuffer));
 	}
 
-	void DX12ResourceUploader::UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) noexcept
+	void DX12ResourceUploader::UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) const noexcept
 	{
 		auto subResourceCount = static_cast<UINT>(subResourceData.size());
 		auto uploadSize = GetRequiredIntermediateSize(destResource->Get(), 0, subResourceCount);

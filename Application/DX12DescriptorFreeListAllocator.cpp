@@ -1,7 +1,5 @@
 #include "Precompiled.h"
 #include "DX12DescriptorFreeListAllocator.h"
-#include "DX12Device.h"
-#include "Utility.h"
 
 namespace gglab
 {

@@ -124,7 +124,7 @@ namespace gglab
 		const auto bufferCount = DX12Device::GetBufferCount();
 
 		ComPtr<IDXGISwapChain1> swapChain1;
-		DXGI_SWAP_CHAIN_DESC1 desc = {};
+		DXGI_SWAP_CHAIN_DESC1 desc{};
 		desc.Width = m_Width;
 		desc.Height = m_Height;
 		desc.Format = m_Format;

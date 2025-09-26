@@ -42,12 +42,9 @@ namespace gglab
 		{
 		case ModelType::ModelType_glTF:
 			return LoadModelGltf(path);
-			break;
 		default:
 			GGLAB_UNREACHABLE("Unknown model file type.");
-			break;
 		}
-		return Model();
 	}
 
 	TextureID AssetManager::GetTextureID(const std::filesystem::path& path) noexcept

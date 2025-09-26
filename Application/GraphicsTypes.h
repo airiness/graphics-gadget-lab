@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <limits>
-#include <compare>
 #include "TypedIndex.h"
 
 namespace gglab

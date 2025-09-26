@@ -200,7 +200,7 @@ namespace gglab
 	{
 		if (Test(rgTexDesc.m_Usage, RGTextureUsage::RenderTarget))
 		{
-			D3D12_CLEAR_VALUE clearValue = {};
+			D3D12_CLEAR_VALUE clearValue{};
 			clearValue.Format = rgTexDesc.m_Format;
 			clearValue.Color[0] = 0.0f;
 			clearValue.Color[1] = 0.0f;
@@ -210,7 +210,7 @@ namespace gglab
 		}
 		else if (Test(rgTexDesc.m_Usage, RGTextureUsage::DepthStencil))
 		{
-			D3D12_CLEAR_VALUE clearValue = {};
+			D3D12_CLEAR_VALUE clearValue{};
 			clearValue.Format = rgTexDesc.m_Format;
 			clearValue.DepthStencil.Depth = 1.0f;
 			clearValue.DepthStencil.Stencil = 0;

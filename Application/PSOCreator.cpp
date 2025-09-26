@@ -1,7 +1,5 @@
 #include "Precompiled.h"
 #include "PSOCreator.h"
-#include "DX12Device.h"
-#include "Utility.h"
 
 namespace gglab
 {

@@ -178,7 +178,6 @@ namespace gglab
 			return m_DescriptorAllocators[static_cast<uint32_t>(ViewType::SRV)];
 		default:
 			GGLAB_UNREACHABLE("Unknow View Type.");
-			break;
 		}
 	}
 

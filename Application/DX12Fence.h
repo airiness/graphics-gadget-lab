@@ -15,7 +15,7 @@ namespace gglab
 		uint64_t GetCurrentValue() const noexcept { return m_CurrentValue; }
 		bool IsCompleted(uint64_t fenceValue) const noexcept;
 		DX12FencePoint Signal(DX12CommandQueue* dx12CommandQueue) noexcept;
-		void WaitCompletion(uint64_t fenceValue, uint32_t timeout = GGLAB_INFINITE) noexcept;
+		void WaitCompletion(uint64_t fenceValue, uint32_t timeout = GGLAB_INFINITE) const noexcept;
 
 		ID3D12Fence* Get() const noexcept { return m_D3D12Fence.Get(); }
 
