@@ -198,6 +198,7 @@
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="InputLayoutLibrary.h" />
+    <ClInclude Include="PipelinePresets.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />

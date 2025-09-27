@@ -2,6 +2,7 @@
 #include "FNV1a.h"
 #include "TypedIndex.h"
 #include "GraphicsTypes.h"
+#include "PipelinePresets.h"
 
 namespace gglab
 {
@@ -42,29 +43,6 @@ namespace gglab
 		{
 			return AsTuple() == rhs.AsTuple();
 		}
-	};
-
-	enum class RasterizerPreset : uint8_t
-	{
-		Default,
-		Wireframe,
-	};
-
-	enum class BlendPreset : uint8_t
-	{
-		Default,
-		Opaque,
-		AlphaBlend,
-		Additive,
-	};
-
-	enum class DepthPreset : uint8_t
-	{
-		Default,
-		None,
-		ReadOnly,
-		ReverseZ,
-		ReverseZReadOnly,
 	};
 
 	struct PackedRasterizer

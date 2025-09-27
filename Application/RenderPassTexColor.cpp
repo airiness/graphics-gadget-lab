@@ -15,6 +15,7 @@
 #include "RenderPassRecipeRegistry.h"
 #include "InputLayoutLibrary.h"
 #include "Components.h"
+#include "PipelinePresets.h"
 
 namespace gglab
 {
@@ -90,10 +91,9 @@ namespace gglab
 						outDesc.m_Topology = input.m_Topology;
 						outDesc.m_SampleMask = input.m_SampleMask;
 						outDesc.m_Formats = input.m_Formats;
-						outDesc.m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-						outDesc.m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-						outDesc.m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
-
+						outDesc.m_RasterizerDesc = ApplyRasterizerPreset(input.m_RasterizerPreset);
+						outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
+						outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
 					});
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);

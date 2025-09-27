@@ -402,6 +402,9 @@
     <ClInclude Include="InputLayoutLibrary.h">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClInclude>
+    <ClInclude Include="PipelinePresets.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
