@@ -42,33 +42,29 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	const DX12Descriptor& DX12ViewCache::GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
-		std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept
+	const DX12Descriptor& DX12ViewCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
 	{
-		return GetOrCreateImpl<ViewType::RTV>(resourceIndex, texture, descOpt);
-	}
+		{
+			std::shared_lock lock(m_Mutex);
+			if (auto it = m_Cache.find(key); it != m_Cache.end())
+			{
+				return it->second;
+			}
+		}
 
-	const DX12Descriptor& DX12ViewCache::GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
-		std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> descOpt) noexcept
-	{
-		return GetOrCreateImpl<ViewType::DSV>(resourceIndex, texture, descOpt);
-	}
-
-	const DX12Descriptor& DX12ViewCache::GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
-		std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> descOpt) noexcept
-	{
-		return GetOrCreateImpl<ViewType::SRV>(resourceIndex, texture, descOpt);
-	}
-
-	const DX12Descriptor& DX12ViewCache::GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
-		std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> descOpt) noexcept
-	{
-		return GetOrCreateImpl<ViewType::UAV>(resourceIndex, texture, descOpt);
+		switch (key.m_Type)
+		{
+		case ViewType::RTV: return CreateFromKey<ViewType::RTV>(key, texture);
+		case ViewType::DSV: return CreateFromKey<ViewType::DSV>(key, texture);
+		case ViewType::SRV: return CreateFromKey<ViewType::SRV>(key, texture);
+		case ViewType::UAV: return CreateFromKey<ViewType::UAV>(key, texture);
+		default: GGLAB_UNREACHABLE("Unkown View Tyoe.");
+		}
 	}
 
 	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
-		std::scoped_lock lock(m_Mutex);
+		std::unique_lock lock(m_Mutex);
 
 		auto it = m_ResourceViews.find(resourceIndex);
 		if (it == m_ResourceViews.end())
@@ -101,7 +97,7 @@ namespace gglab
 
 	void DX12ViewCache::GarbageCollect() noexcept
 	{
-		std::scoped_lock lock(m_Mutex);
+		std::unique_lock lock(m_Mutex);
 		while (!m_Pendings.empty())
 		{
 			auto& pending = m_Pendings.front();
@@ -124,7 +120,7 @@ namespace gglab
 
 	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
 	{
-		std::scoped_lock lock(m_Mutex);
+		std::unique_lock lock(m_Mutex);
 
 		if (auto it = m_ResourceViews.find(resourceIndex); it != m_ResourceViews.end())
 		{
@@ -177,13 +173,12 @@ namespace gglab
 		case ViewType::UAV:
 			return m_DescriptorAllocators[static_cast<uint32_t>(ViewType::SRV)];
 		default:
-			GGLAB_UNREACHABLE("Unknow View Type.");
+			GGLAB_UNREACHABLE("Unknown View Type.");
 		}
 	}
 
 	template<ViewType T>
-	const DX12Descriptor& DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex,
-		DX12Texture* texture,
+	const DX12Descriptor& DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
 	{
 		using Traits = ViewTraits<T>;
@@ -194,7 +189,7 @@ namespace gglab
 
 		// Check the Key has existed in cache
 		{
-			std::scoped_lock lock(m_Mutex);
+			std::shared_lock lock(m_Mutex);
 			if (auto it = m_Cache.find(key); it != m_Cache.end())
 			{
 				return it->second;
@@ -205,7 +200,7 @@ namespace gglab
 		DX12Descriptor descriptor = GetDescriptorAllocator(T)->Allocate(1);
 		Traits::Create(m_DX12Device, texture, &built.m_Desc, descriptor);
 		{
-			std::scoped_lock lock(m_Mutex);
+			std::unique_lock lock(m_Mutex);
 			if (auto it = m_Cache.find(key); it != m_Cache.end())
 			{
 				// Other thread inserted, release it
@@ -213,14 +208,38 @@ namespace gglab
 				{
 					descriptor.Free();
 				}
+				return it->second;
+			}
+	
+			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
+			GGLAB_ASSERT_MSG(inserted, "ViewCache: duplicate insertion after double-checked locking");
+			m_ResourceViews[resourceIndex].push_back(key);
+			return it->second;
+		}
+	}
+
+	template<ViewType T>
+	const DX12Descriptor& DX12ViewCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
+	{
+		using Traits = ViewTraits<T>;
+		auto desc = DescFromKey<T>(key);
+
+		DX12Descriptor descriptor = GetDescriptorAllocator(key.m_Type)->Allocate(1);
+		Traits::Create(m_DX12Device, texture, &desc, descriptor);
+		{
+			std::unique_lock lock(m_Mutex);
+			if (auto it = m_Cache.find(key); it != m_Cache.end())
+			{
+				if (descriptor.IsValid())
+				{
+					descriptor.Free();
+				}
+				return it->second;
 			}
 
-			m_ResourceViews[resourceIndex].push_back(key);
 			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-			if (!inserted)
-			{
-				it->second.Free();
-			}
+			GGLAB_ASSERT_MSG(inserted, "ViewCache: duplicate insertion after double-checked locking");
+			m_ResourceViews[key.m_ResouceIndex].push_back(key);
 			return it->second;
 		}
 	}
@@ -438,8 +457,68 @@ namespace gglab
 		device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, desc, descriptor.CpuHandle());
 	}
 
+
+	template<>
+	inline D3D12_RENDER_TARGET_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::RTV>(const ViewKey& key) noexcept
+	{
+		D3D12_RENDER_TARGET_VIEW_DESC d{};
+		d.Format = key.m_Format;
+		d.ViewDimension = static_cast<D3D12_RTV_DIMENSION>(key.m_Dimension);
+		if (d.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2D)
+		{
+			d.Texture2D.MipSlice = key.m_MipSlice;
+			d.Texture2D.PlaneSlice = key.m_PlaneSlice;
+		}
+		return d;
+	}
+
+	template<>
+	inline D3D12_DEPTH_STENCIL_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::DSV>(const ViewKey& key) noexcept
+	{
+		D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
+		desc.Format = key.m_Format;
+		desc.ViewDimension = static_cast<D3D12_DSV_DIMENSION>(key.m_Dimension);
+		desc.Flags = static_cast<D3D12_DSV_FLAGS>(key.m_Flags);
+		if (desc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2D)
+		{
+			desc.Texture2D.MipSlice = key.m_MipSlice;
+		}
+		return desc;
+	}
+
+	template<>
+	inline D3D12_SHADER_RESOURCE_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::SRV>(const ViewKey& key) noexcept
+	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+		desc.Format = key.m_Format;
+		desc.ViewDimension = static_cast<D3D12_SRV_DIMENSION>(key.m_Dimension);
+		desc.Shader4ComponentMapping = key.m_ComponentMapping ? key.m_ComponentMapping : D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		if (desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
+		{
+			desc.Texture2D.MostDetailedMip = key.m_MipSlice;
+			desc.Texture2D.MipLevels = (key.m_MipLevels == 0) ? UINT(-1) : key.m_MipLevels;
+			desc.Texture2D.PlaneSlice = key.m_PlaneSlice;
+		}
+		return desc;
+	}
+
+	template<>
+	inline D3D12_UNORDERED_ACCESS_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::UAV>(const ViewKey& key) noexcept
+	{
+		D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
+		desc.Format = key.m_Format;
+		desc.ViewDimension = static_cast<D3D12_UAV_DIMENSION>(key.m_Dimension);
+		if (desc.ViewDimension == D3D12_UAV_DIMENSION_TEXTURE2D)
+		{
+			desc.Texture2D.MipSlice = key.m_MipSlice;
+			desc.Texture2D.PlaneSlice = key.m_PlaneSlice;
+		}
+		return desc;
+	}
+
 #define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
-	template const DX12Descriptor& DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;
+	template const DX12Descriptor& DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
+	template const DX12Descriptor& DX12ViewCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
 
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);

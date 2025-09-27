@@ -119,14 +119,9 @@ namespace gglab
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
 
-				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-				dsvDesc.Format = dsTexture->GetDesc().Format;
-				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-				dsvDesc.Texture2D.MipSlice = 0;
-
+				auto dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(rg.GetResourceIndex(data.m_Depth), dsTexture);
 				auto viewCache = rg.GetViewCache();
-				auto& dsvDescriptor = viewCache->GetDSV(rg.GetResourceIndex(data.m_Depth), dsTexture, dsvDesc);
+				auto& dsvDescriptor = viewCache->GetOrCreate(dsvKey, dsTexture);
 
 				commandList->SetRenderTargets(rtvs, &dsvDescriptor);
 				swapChain->ClearBackBuffer(commandList);

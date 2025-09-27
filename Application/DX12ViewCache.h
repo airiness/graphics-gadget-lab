@@ -16,60 +16,63 @@ namespace gglab
 		DSV,
 		SRV,
 		UAV,
-		Count = UAV,
 	};
+	static constexpr uint32_t AllocatorSlotCount = 3;
 
 	template<ViewType T> struct ViewTraits;
+
+	struct ViewKey
+	{
+		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
+		ResourceIndex m_ResouceIndex;
+		uint32_t m_ComponentMapping = 0;
+		uint16_t m_MipSlice = 0;
+		uint16_t m_MipLevels = 0;
+		uint16_t m_ArraySlice = 0;
+		uint8_t m_PlaneSlice = 0;
+		uint8_t m_Dimension = 0;
+		uint8_t m_Flags = 0;
+		ViewType m_Type = ViewType::RTV;
+
+		constexpr bool operator==(const ViewKey&) const noexcept = default;
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(m_Type, m_Format, m_ResouceIndex.Value(), m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
+		}
+	};
+	using ViewKeyHash = KeyHash<ViewKey>;
 
 	class DX12ViewCache
 	{
 	public:
-		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, static_cast<uint32_t>(ViewType::Count)>;
-
-		struct ViewKey
-		{
-			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
-			ResourceIndex m_ResouceIndex;
-			uint32_t m_ComponentMapping = 0;
-			uint16_t m_MipSlice = 0;
-			uint16_t m_MipLevels = 0;
-			uint16_t m_ArraySlice = 0;
-			uint8_t m_PlaneSlice = 0;
-			uint8_t m_Dimension = 0;
-			uint8_t m_Flags = 0;
-			ViewType m_Type = ViewType::RTV;
-
-			bool operator==(const ViewKey&) const noexcept = default;
-
-			auto AsTuple() const noexcept
-			{
-				return std::make_tuple(m_Type, m_Format, m_ResouceIndex.Value(), m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
-			}
-		};
-		using ViewKeyHash = KeyHash<ViewKey>;
+		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, AllocatorSlotCount>;
 
 	public:
 		explicit DX12ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ViewCache);
 		~DX12ViewCache();
 
-		const DX12Descriptor& GetRTV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_RENDER_TARGET_VIEW_DESC> descOpt) noexcept;
+		const DX12Descriptor& GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
 
-		const DX12Descriptor& GetDSV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_DEPTH_STENCIL_VIEW_DESC> descOpt) noexcept;
-
-		const DX12Descriptor& GetSRV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_SHADER_RESOURCE_VIEW_DESC> descOpt) noexcept;
-
-		const DX12Descriptor& GetUAV(ResourceIndex resourceIndex, DX12Texture* texture,
-			std::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> descOpt) noexcept;
+		template<ViewType T>
+		const DX12Descriptor& GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
+			std::optional<typename ViewTraits<T>::Desc> descOpt = std::nullopt) noexcept
+		{
+			return GetOrCreateImpl<T>(resourceIndex, texture, descOpt);
+		}
 
 		void RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept;
-
 		void GarbageCollect() noexcept;
-
 		void FreeAllImmediately(ResourceIndex resourceIndex) noexcept;
+
+		template<ViewType T>
+		static ViewKey BuildKey(ResourceIndex resourceIndex, DX12Texture* texture,
+			std::optional<typename ViewTraits<T>::Desc> descOpt = std::nullopt) noexcept
+		{
+			using Traits = ViewTraits<T>;
+			const typename Traits::Desc inDesc = descOpt.value_or(typename Traits::Desc{});
+			return Traits::Build(resourceIndex, texture, inDesc).m_Key;
+		}
 
 	private:
 		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(ViewType type) const noexcept;
@@ -78,6 +81,12 @@ namespace gglab
 		const DX12Descriptor& GetOrCreateImpl(ResourceIndex resourceIndex,
 			DX12Texture* texture,
 			std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept;
+
+		template<ViewType T>
+		const DX12Descriptor& CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept;
+
+		template<ViewType T>
+		static typename ViewTraits<T>::Desc DescFromKey(const ViewKey& key) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -94,8 +103,7 @@ namespace gglab
 		};
 
 		std::deque<Pending> m_Pendings;
-
-		std::mutex m_Mutex;
+		mutable std::shared_mutex m_Mutex;
 	};
 
 #define DEF_VIEW_TRAITS(viewType, descType)																							\
@@ -105,7 +113,7 @@ namespace gglab
 		using Desc = descType;																										\
 		struct Built																												\
 		{																															\
-			DX12ViewCache::ViewKey m_Key;																							\
+			ViewKey m_Key;																											\
 			Desc m_Desc;																											\
 		};																															\
 		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;							\
