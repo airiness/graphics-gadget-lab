@@ -22,6 +22,7 @@ namespace gglab
 	inline constexpr MeshID PocedualCubeMeshID = (MeshID)(0);
 	inline constexpr MeshID ReservedMeshID = (MeshID)(PocedualCubeMeshID + 1);
 
+	// TODO: Use TypedIndex
 	using MaterialID = uint32_t;
 	inline constexpr MaterialID InvalidMaterialID = (MaterialID)(-1);
 	inline constexpr MaterialID PocedualCubeMaterialID = (MaterialID)(0);

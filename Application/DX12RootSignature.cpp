@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "DX12RootSignature.h"
 #include "DX12Device.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -12,12 +12,12 @@ namespace gglab
 
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
-		utility::ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&m_Desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+		GGLAB_HR(D3DX12SerializeVersionedRootSignature(&m_Desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 
-		utility::ThrowIfFailed(dx12Device->Get()->CreateRootSignature(
+		GGLAB_HR_DX(dx12Device->Get()->CreateRootSignature(
 			0,
 			signature->GetBufferPointer(),
 			signature->GetBufferSize(),
-			IID_PPV_ARGS(&m_RootSignature)));
+			IID_PPV_ARGS(&m_RootSignature)), dx12Device->Get());
 	}
 }

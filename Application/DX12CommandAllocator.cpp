@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "DX12CommandAllocator.h"
 #include "DX12Device.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -13,13 +13,8 @@ namespace gglab
 
 	void DX12CommandAllocator::CreateCommandAllocator(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept
 	{
-		auto device = dx12Device->Get();
-		utility::ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(&m_D3D12CommandAllocator)));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(m_D3D12CommandAllocator.Get(),
-			std::format(L"CommandAllocator[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
-#endif
+		auto* device = dx12Device->Get();
+		GGLAB_HR(device->CreateCommandAllocator(type, IID_PPV_ARGS(&m_D3D12CommandAllocator)), device);
 	}
 
 	// DX12CommandAllocatorPool
@@ -50,11 +45,6 @@ namespace gglab
 		auto newAllocator = std::make_unique<DX12CommandAllocator>(m_DX12Device, m_Type);
 		auto allocatorPtr = newAllocator.get();
 		m_Pool.push_back(std::move(newAllocator));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(allocatorPtr->Get(), 
-			std::format(L"CommandAllocator[{:p}]_{} ", (void*)allocatorPtr, utility::GetCommandListTypeName(m_Type)).c_str());
-#endif
 
 		return allocatorPtr;
 	}

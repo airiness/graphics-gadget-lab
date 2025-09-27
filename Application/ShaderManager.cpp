@@ -1,12 +1,12 @@
 #include "Precompiled.h"
 #include "ShaderManager.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
 	ShaderManager::ShaderManager() noexcept
 	{
-		utility::ThrowIfFailed(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_DxcUtils)));
+		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_DxcUtils)));
 	}
 
 	ShaderId ShaderManager::LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept
@@ -37,7 +37,7 @@ namespace gglab
 		}
 
 		ComPtr<ShaderBlob> blob;
-		utility::ThrowIfFailed(m_DxcUtils->LoadFile(path.wstring().c_str(), nullptr, &blob));
+		GGLAB_HR(m_DxcUtils->LoadFile(path.wstring().c_str(), nullptr, &blob));
 
 		auto timestamp = std::filesystem::last_write_time(path);
 

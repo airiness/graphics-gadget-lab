@@ -1,14 +1,13 @@
 #include "Precompiled.h"
 #include "InputBase.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
 	InputBase::InputBase(GameInputKind inputKind) noexcept
 	{
-		utility::ThrowIfFailed(GameInputCreate(&m_GameInput));
-
-		utility::ThrowIfFailed(m_GameInput->RegisterDeviceCallback(
+		GGLAB_HR(GameInputCreate(&m_GameInput));
+		GGLAB_HR(m_GameInput->RegisterDeviceCallback(
 			nullptr,
 			inputKind,
 			GameInputDeviceConnected,

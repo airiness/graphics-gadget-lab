@@ -1,13 +1,13 @@
 #include "Precompiled.h"
 #include "DX12Buffer.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
 	void* DX12Buffer::Map(uint32_t subResource, const D3D12_RANGE* readRange)
 	{
 		void* pointer = nullptr;
-		utility::ThrowIfFailed(Get()->Map(static_cast<UINT>(subResource), readRange, &pointer));
+		GGLAB_HR(Get()->Map(static_cast<UINT>(subResource), readRange, &pointer));
 		return pointer;
 	}
 

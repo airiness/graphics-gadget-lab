@@ -6,7 +6,7 @@
 #include "DX12PipelineState.h"
 #include "DX12Descriptor.h"
 #include "DX12CommandAllocator.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -19,8 +19,8 @@ namespace gglab
 
 	void DX12CommandList::Begin(DX12CommandAllocator* allocator) const noexcept
 	{
-		utility::ThrowIfFailed(allocator->Get()->Reset());
-		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Reset(allocator->Get(), nullptr));
+		GGLAB_HR(allocator->Get()->Reset());
+		GGLAB_HR(m_D3D12GraphicsCommandList->Reset(allocator->Get(), nullptr));
 	}
 
 	void DX12CommandList::End() noexcept
@@ -28,7 +28,7 @@ namespace gglab
 		// TODO: should flush resource barrier here
 		FlushBarriers();
 
-		utility::ThrowIfFailed(m_D3D12GraphicsCommandList->Close());
+		GGLAB_HR(m_D3D12GraphicsCommandList->Close());
 	}
 
 	void DX12CommandList::Execute(const DX12CommandQueue& commandQueue) const noexcept

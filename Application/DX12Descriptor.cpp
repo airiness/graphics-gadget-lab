@@ -3,7 +3,7 @@
 
 #include "DX12DescriptorAllocatorBase.h"
 #include "DX12Device.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -82,7 +82,7 @@ namespace gglab
 		desc.NumDescriptors = m_DescriptorCount;
 		desc.Flags = m_Flags;
 
-		utility::ThrowIfFailed(m_DX12Device->Get()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_D3D12DescriptorHeap)));
+		GGLAB_HR_DX(m_DX12Device->Get()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_D3D12DescriptorHeap)), m_DX12Device->Get());
 	}
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::CpuStart() const noexcept

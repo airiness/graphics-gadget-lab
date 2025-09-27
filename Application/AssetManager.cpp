@@ -6,7 +6,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12CommandList.h"
-#include "Utility.h"
+#include "HResult.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -534,14 +534,14 @@ namespace gglab
 
 		if (extension == ".dds")
 		{
-			utility::ThrowIfFailed(LoadFromDDSFile(texPath.c_str(),
+			GGLAB_HR(LoadFromDDSFile(texPath.c_str(),
 				DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB,
 				&metaData,
 				scratchImage));
 		}
 		else
 		{
-			utility::ThrowIfFailed(LoadFromWICFile(texPath.c_str(),
+			GGLAB_HR(LoadFromWICFile(texPath.c_str(),
 				DirectX::WIC_FLAGS::WIC_FLAGS_FORCE_RGB,
 				&metaData,
 				scratchImage));

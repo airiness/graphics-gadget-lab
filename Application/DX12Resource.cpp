@@ -1,6 +1,6 @@
 #include "Precompiled.h"
 #include "DX12Resource.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -18,7 +18,7 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(m_Allocator, "Allocator can not be null.");
 
-		utility::ThrowIfFailed(m_Allocator->CreateResource(
+		GGLAB_HR(m_Allocator->CreateResource(
 			&createInfo.m_AllocDesc,
 			&m_ResourceDesc,
 			createInfo.m_InitStates,
@@ -66,7 +66,7 @@ namespace gglab
 		m_Allocation = aliasingInfo.m_Allocation;
 
 		D3D12MA::Allocator* allocator = aliasingInfo.m_Allocator ? aliasingInfo.m_Allocator : m_Allocator;
-		utility::ThrowIfFailed(allocator->CreateAliasingResource(m_Allocation.Get(),
+		GGLAB_HR(allocator->CreateAliasingResource(m_Allocation.Get(),
 			aliasingInfo.m_LocalOffset,
 			&aliasingInfo.m_ResourceDesc,
 			aliasingInfo.m_InitStates,
@@ -105,7 +105,7 @@ namespace gglab
 #if defined (BUILD_DEBUG)
 		if (m_Resource)
 		{
-			utility::SetDebugName(m_Resource.Get(), name);
+			//utility::SetDebugName(m_Resource.Get(), name); // TODO: Process Debug Name Settings
 		}
 
 		if (m_Allocation)

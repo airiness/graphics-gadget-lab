@@ -1,6 +1,6 @@
 #pragma once
 
-#if _DEBUG
+#if defined(_DEBUG) || defined(DEBUG)
 #define BUILD_DEBUG
 #endif
 

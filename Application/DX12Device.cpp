@@ -8,7 +8,7 @@
 #include "DX12Buffer.h"
 #include "DX12ResourceUploader.h"
 #include "Application.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -64,12 +64,7 @@ namespace gglab
 		desc.NodeMask = 0;
 
 		ComPtr<ID3D12CommandQueue> commandQueue;
-		utility::ThrowIfFailed(m_D3D12Device->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(commandQueue.Get(),
-			std::format(L"CommandQueue[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
-#endif
+		GGLAB_HR_DX(m_D3D12Device->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)), m_D3D12Device.Get());
 
 		return commandQueue;
 	}
@@ -77,13 +72,8 @@ namespace gglab
 	ComPtr<ID3D12GraphicsCommandList7> DX12Device::CreateDirectX12CommandGraphicsList(D3D12_COMMAND_LIST_TYPE type) const noexcept
 	{
 		ComPtr<ID3D12GraphicsCommandList7> commandList;
-		utility::ThrowIfFailed(m_D3D12Device->CreateCommandList1(0, type, D3D12_COMMAND_LIST_FLAG_NONE,
-			IID_PPV_ARGS(&commandList)));
-
-#if defined (BUILD_DEBUG)
-		utility::SetDebugName(commandList.Get(),
-			std::format(L"CommandList[{:p}]_{} ", (void*)this, utility::GetCommandListTypeName(type)).c_str());
-#endif
+		GGLAB_HR_DX(m_D3D12Device->CreateCommandList1(0, type, D3D12_COMMAND_LIST_FLAG_NONE,IID_PPV_ARGS(&commandList)),
+			m_D3D12Device.Get());
 
 		return commandList;
 	}
@@ -103,7 +93,7 @@ namespace gglab
 		}
 #endif
 		ComPtr<IDXGIFactory7> dxgiFactory;
-		utility::ThrowIfFailed(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
+		GGLAB_HR(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
 
 		m_DxgiFactory = dxgiFactory;
 	}
@@ -186,7 +176,7 @@ namespace gglab
 			}
 		}
 
-		utility::ThrowIfFailed(result);
+		GGLAB_HR(result);
 	}
 
 	void DX12Device::InitializeInfoQueue() noexcept
@@ -221,7 +211,7 @@ namespace gglab
 			filter.DenyList.pSeverityList = severities;
 			//filter.DenyList.NumIDs = _countof(denyIds);
 			//filter.DenyList.pIDList = denyIds;
-			utility::ThrowIfFailed(infoQueue->PushStorageFilter(&filter));
+			GGLAB_HR(infoQueue->PushStorageFilter(&filter));
 		}
 
 #endif
@@ -287,7 +277,7 @@ namespace gglab
 		allocatorDesc.Flags = D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS;
 		allocatorDesc.pDevice = m_D3D12Device.Get();
 		allocatorDesc.pAdapter = m_DxgiAdapter.Get();
-		utility::ThrowIfFailed(D3D12MA::CreateAllocator(&allocatorDesc, &m_MemAllocator));
+		GGLAB_HR(D3D12MA::CreateAllocator(&allocatorDesc, &m_MemAllocator));
 	}
 
 	void DX12Device::FinalizeMemAllocator() noexcept

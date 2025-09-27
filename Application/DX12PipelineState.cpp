@@ -1,7 +1,7 @@
 #include "Precompiled.h"
 #include "DX12PipelineState.h"
 #include "DX12Device.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -12,6 +12,6 @@ namespace gglab
 
 	DX12PipelineState::DX12PipelineState(DX12Device* dx12Device, const D3D12_PIPELINE_STATE_STREAM_DESC& streamDesc) noexcept
 	{
-		dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&m_PipelineState));
+		GGLAB_HR_DX(dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&m_PipelineState)), dx12Device->Get());
 	}
 }

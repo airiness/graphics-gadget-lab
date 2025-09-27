@@ -61,9 +61,6 @@
     <ClCompile Include="DX12CommandList.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Utility.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="Precompiled.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -205,6 +202,9 @@
     <ClCompile Include="InputLayoutLibrary.cpp">
       <Filter>Graphics\DX12\Cache</Filter>
     </ClCompile>
+    <ClCompile Include="HResult.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -221,9 +221,6 @@
     </ClInclude>
     <ClInclude Include="DX12CommandList.h">
       <Filter>Graphics\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="Application.h">
       <Filter>Core</Filter>
@@ -404,6 +401,9 @@
     </ClInclude>
     <ClInclude Include="PipelinePresets.h">
       <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="HResult.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

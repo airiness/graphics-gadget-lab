@@ -2,14 +2,14 @@
 #include "DX12Fence.h"
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
 	DX12Fence::DX12Fence(DX12Device* device, uint64_t initValue) noexcept :
 		m_NextRequestValue(initValue)
 	{
-		utility::ThrowIfFailed(device->Get()->CreateFence(m_CurrentValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_D3D12Fence)));
+		GGLAB_HR_DX(device->Get()->CreateFence(m_CurrentValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_D3D12Fence)), device->Get());
 		m_EventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	}
 

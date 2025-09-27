@@ -6,7 +6,7 @@
 #include "DX12CommandList.h"
 #include "DX12Descriptor.h"
 #include "DX12Texture.h"
-#include "Utility.h"
+#include "HResult.h"
 
 namespace gglab
 {
@@ -38,9 +38,9 @@ namespace gglab
 		// TODO: Check Sync here
 
 		DXGI_SWAP_CHAIN_DESC desc = {};
-		utility::ThrowIfFailed(m_DxgiSwapChain->GetDesc(&desc));
+		GGLAB_HR(m_DxgiSwapChain->GetDesc(&desc));
 
-		utility::ThrowIfFailed(m_DxgiSwapChain->ResizeBuffers(desc.BufferCount, m_Width, m_Height, desc.BufferDesc.Format, desc.Flags));
+		GGLAB_HR(m_DxgiSwapChain->ResizeBuffers(desc.BufferCount, m_Width, m_Height, desc.BufferDesc.Format, desc.Flags));
 
 		CreateRTVs();
 	}
@@ -138,7 +138,7 @@ namespace gglab
 		desc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 		desc.Flags = isTearingSupport ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
 
-		utility::ThrowIfFailed(factory->CreateSwapChainForHwnd(
+		GGLAB_HR(factory->CreateSwapChainForHwnd(
 			m_DX12CommandQueue->Get(),
 			hWnd,
 			&desc,
@@ -147,12 +147,12 @@ namespace gglab
 			&swapChain1));
 
 		// Invalid Alet+Enter Fullscreen
-		utility::ThrowIfFailed(factory->MakeWindowAssociation(hWnd,
+		GGLAB_HR(factory->MakeWindowAssociation(hWnd,
 			DXGI_MWA_NO_ALT_ENTER |
 			DXGI_MWA_NO_WINDOW_CHANGES));	// TODO: support window changes
 
 		ComPtr<IDXGISwapChain4> swapChain4;
-		utility::ThrowIfFailed(swapChain1.As(&swapChain4));
+		GGLAB_HR(swapChain1.As(&swapChain4));
 
 		return swapChain4;
 	}
@@ -171,7 +171,7 @@ namespace gglab
 		for (uint32_t i = 0; i < bufferCount; ++i)
 		{
 			ComPtr<ID3D12Resource> backBuffer;
-			utility::ThrowIfFailed(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+			GGLAB_HR(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
 			m_BackBufferDescriptors.push_back(std::move(rtvDescriptorAllocator->Allocate()));
 			device->CreateRenderTargetView(backBuffer.Get(), nullptr, m_BackBufferDescriptors[i].CpuHandle());
