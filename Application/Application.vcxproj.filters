@@ -273,7 +273,7 @@
     <ClInclude Include="AssetManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="GraphicsConstants.h">
+    <ClInclude Include="Color.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h">

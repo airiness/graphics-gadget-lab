@@ -25,22 +25,22 @@ namespace gglab
 			if (assetManager->GetMesh(PocedualCubeMeshID) == nullptr)
 			{
 				std::unique_ptr<Mesh> cubeMesh = std::make_unique<Mesh>();
-				cubeMesh->m_MeshID = PocedualCubeMeshID;
+				cubeMesh->m_MeshId = PocedualCubeMeshID;
 
 				AssetManager::MeshUploadData meshUploadData;
-				meshUploadData.m_MeshID = PocedualCubeMeshID;
+				meshUploadData.m_MeshId = PocedualCubeMeshID;
 				meshUploadData.m_VerticesData = GetVerticesData();
 				meshUploadData.m_IndicesData = GetIndicesData();
 
 				if (assetManager->GetMaterial(PocedualCubeMaterialID) == nullptr)
 				{
 					std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
-					cubeMaterial->m_MaterialID = PocedualCubeMaterialID;
+					cubeMaterial->m_MaterialId = PocedualCubeMaterialID;
 					cubeMaterial->m_TexBaseColor = assetManager->GetTextureID(TextPath);
 					assetManager->AddMaterial(std::move(cubeMaterial));
 				};
 
-				cubeMesh->m_Material = PocedualCubeMaterialID;
+				cubeMesh->m_MaterialId = PocedualCubeMaterialID;
 				assetManager->AddMesh(std::move(cubeMesh), meshUploadData);
 			}
 

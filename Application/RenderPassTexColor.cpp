@@ -160,9 +160,9 @@ namespace gglab
 					commandList->SetVertexBuffers(0, vbs);
 					commandList->SetIndexBuffer(mesh->m_IndexBufferView);
 
-					if (auto* material = assetManager->GetMaterial(mesh->m_Material))
+					if (auto* material = assetManager->GetMaterial(mesh->m_MaterialId))
 					{
-						if (material->m_MaterialID != InvalidTextureID)
+						if (material->m_MaterialId.IsValid())
 						{
 							auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
 							commandList->SetGraphicsDescriptor(static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable), texture->m_Descriptor);

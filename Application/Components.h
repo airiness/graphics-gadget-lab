@@ -3,6 +3,7 @@
 #include "DX12Texture.h"
 #include "DX12Descriptor.h"
 #include "GraphicsTypes.h"
+#include "Color.h"
 
 namespace gglab
 {
@@ -24,7 +25,7 @@ namespace gglab
 
 		struct Texture
 		{
-			TextureID m_TextureID = 0;
+			TextureId m_TextureId{};
 
 			std::unique_ptr<DX12Texture> m_Texture;
 			DX12Descriptor m_Descriptor;
@@ -35,19 +36,19 @@ namespace gglab
 
 		struct Material
 		{
-			MaterialID m_MaterialID = 0;
+			MaterialId m_MaterialId{};
 			std::string m_MaterialName;
 
-			TextureID m_TexBaseColor = InvalidTextureID;
-			TextureID m_TexMetallicRoughness = InvalidTextureID;
-			TextureID m_NormalTex = InvalidTextureID;
-			TextureID m_OcclusionTex = InvalidTextureID;
-			TextureID m_EmissiveTex = InvalidTextureID;
+			TextureId m_TexBaseColor{};
+			TextureId m_TexMetallicRoughness{};
+			TextureId m_NormalTex{};
+			TextureId m_OcclusionTex{};
+			TextureId m_EmissiveTex{};
 
-			Color m_BaseColor = ggLabColor::White;
+			Color m_BaseColor = color::White;
 			float m_MetallicFactor = 0.0f;
 			float m_RoughnessFactor = 1.0f;
-			Color m_EmissiveColor = ggLabColor::Black;
+			Color m_EmissiveColor = color::Black;
 
 			bool m_DoubleSided = false;
 		};
@@ -55,10 +56,10 @@ namespace gglab
 
 		struct Mesh
 		{
-			MeshID m_MeshID = 0;
+			MeshId m_MeshId{};
 			std::string m_MeshName;
 
-			MaterialID m_Material = InvalidMaterialID;
+			MaterialId m_MaterialId{};
 
 			std::unique_ptr<DX12Buffer> m_VertexBuffer;
 			std::unique_ptr<DX12Buffer> m_IndexBuffer;
@@ -79,7 +80,7 @@ namespace gglab
 			std::string m_ModelName;
 
 			//Matrix m_WorldTransform = Matrix::Identity;
-			std::vector<MeshID> m_Meshes;
+			std::vector<MeshId> m_Meshes;
 		};
 		DEFINE_COMPONENT_TYPE(Model);
 

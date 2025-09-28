@@ -5,6 +5,13 @@
 
 namespace gglab
 {
+	enum class CommonRSRootParamIndex : uint32_t
+	{
+		ConstantBufferIndex,
+		TextureDescriptorTable,
+		RootParamCount
+	};
+
 	enum class ModelType : uint32_t
 	{
 		ModelType_Invalid,
@@ -37,4 +44,16 @@ namespace gglab
 	
 	// ShaderId
 	GGLAB_DEFINE_TYPED_INDEX(ShaderId, uint32_t);
+
+	// TextureId
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureId, uint32_t);
+	inline constexpr TextureId ReservedTextureID{ 5u };
+
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshId, uint32_t);
+	inline constexpr MeshId PocedualCubeMeshID{ 0u };
+	inline constexpr MeshId ReservedMeshID{ 5u };
+
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialId, uint32_t);
+	inline constexpr MaterialId PocedualCubeMaterialID{ 0u };
+	inline constexpr MaterialId ReservedMaterialID{ 5u };
 }

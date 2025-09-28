@@ -14,7 +14,7 @@ namespace gglab
 	void DX12CommandAllocator::CreateCommandAllocator(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept
 	{
 		auto* device = dx12Device->Get();
-		GGLAB_HR(device->CreateCommandAllocator(type, IID_PPV_ARGS(&m_D3D12CommandAllocator)), device);
+		GGLAB_HR_DX(device->CreateCommandAllocator(type, IID_PPV_ARGS(&m_D3D12CommandAllocator)), device);
 	}
 
 	// DX12CommandAllocatorPool

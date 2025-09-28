@@ -18,13 +18,6 @@ namespace gglab
 		m_DX12Device(dx12Device)
 	{
 	}
-	void AssetManager::Initialize() noexcept
-	{
-	}
-
-	void AssetManager::Finalize() noexcept
-	{
-	}
 
 	Model AssetManager::LoadModel(const std::filesystem::path& path) noexcept
 	{
@@ -47,14 +40,14 @@ namespace gglab
 		}
 	}
 
-	TextureID AssetManager::GetTextureID(const std::filesystem::path& path) noexcept
+	TextureId AssetManager::GetTextureID(const std::filesystem::path& path) noexcept
 	{
 		const auto cannonicalPath = std::filesystem::canonical(path);
 		auto textureId = HasTexture(cannonicalPath);
-		if (textureId == InvalidTextureID)
+		if (!textureId.IsValid())
 		{
 			textureId = CreateTexture(cannonicalPath);
-			TextureUploadData texUploadData{ .m_TextureID = textureId };
+			TextureUploadData texUploadData{ .m_TextureId = textureId };
 			LoadTextureScratchImage(path, texUploadData);
 
 			// Upload texture to GPU
@@ -67,7 +60,7 @@ namespace gglab
 		return textureId;
 	}
 
-	Texture* AssetManager::GetTexture(TextureID textureId) noexcept
+	Texture* AssetManager::GetTexture(TextureId textureId) noexcept
 	{
 		auto iter = m_TextureContainer.m_TextureIDMap.find(textureId);
 		if (iter != m_TextureContainer.m_TextureIDMap.end())
@@ -79,7 +72,7 @@ namespace gglab
 		return nullptr;
 	}
 
-	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
+	Mesh* AssetManager::GetMesh(MeshId meshId) noexcept
 	{
 		auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
 		if (iter != m_MeshContainer.m_MeshIDMap.end())
@@ -91,7 +84,7 @@ namespace gglab
 		return nullptr;
 	}
 
-	Material* AssetManager::GetMaterial(MaterialID materialId) noexcept
+	Material* AssetManager::GetMaterial(MaterialId materialId) noexcept
 	{	
 		auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
 		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
@@ -104,14 +97,14 @@ namespace gglab
 
 	void AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
-		auto meshId = mesh->m_MeshID;
-		if (meshId == InvalidMeshID)
+		auto meshId = mesh->m_MeshId;
+		if (!meshId.IsValid())
 		{
-			meshId = m_NextMeshID++;
-			mesh->m_MeshID = meshId;	
+			meshId = m_MeshIdCounter.Acquire();
+			mesh->m_MeshId = meshId;	
 		}
 		
-		const auto iter = m_MeshContainer.m_MeshIDMap.find(meshUploadData.m_MeshID);
+		const auto iter = m_MeshContainer.m_MeshIDMap.find(meshUploadData.m_MeshId);
 		if (iter == m_MeshContainer.m_MeshIDMap.end())
 		{
 			m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
@@ -121,7 +114,7 @@ namespace gglab
 			return;
 		}
 		
-		meshUploadData.m_MeshID = meshId;
+		meshUploadData.m_MeshId = meshId;
 
 		// Upload Mesh to GPU
 		auto* resourceUploader = m_DX12Device->GetResourceUploader();
@@ -132,11 +125,11 @@ namespace gglab
 
 	void AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
 	{
-		auto materialId = material->m_MaterialID;
-		if (materialId == InvalidMaterialID)
+		auto materialId = material->m_MaterialId;
+		if (!materialId.IsValid())
 		{
-			materialId = m_NextMaterialID++;
-			material->m_MaterialID = materialId;
+			materialId = m_MaterialIdCounter.Acquire();
+			material->m_MaterialId = materialId;
 		}
 
 		const auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
@@ -148,7 +141,7 @@ namespace gglab
 
 	void AssetManager::UploadTexture(DX12ResourceUploader* resourceUploader, const TextureUploadData& uploadData) noexcept
 	{
-		auto* texture = GetTexture(uploadData.m_TextureID);
+		auto* texture = GetTexture(uploadData.m_TextureId);
 
 		const auto& texMedaData = uploadData.m_ScratchImage.GetMetadata();
 		texture->m_Texture = std::make_unique<DX12Texture>();
@@ -198,7 +191,7 @@ namespace gglab
 
 	void AssetManager::UploadMesh(DX12ResourceUploader* resourceUploader, const MeshUploadData& uploadData) noexcept
 	{
-		auto* mesh = GetMesh(uploadData.m_MeshID);
+		auto* mesh = GetMesh(uploadData.m_MeshId);
 		if (mesh == nullptr)
 		{
 			GGLAB_ASSERT_MSG(false, "Invalid MeshID, check it!");
@@ -262,13 +255,14 @@ namespace gglab
 
 		// Parse material datas	
 		const auto aiMaterialCount = aiScene->mNumMaterials;
-		std::vector<MaterialID> materialIds(aiMaterialCount, InvalidMaterialID);
+		std::vector<MaterialId> materialIds(aiMaterialCount);
 		std::vector<TextureUploadData> texUploadDatas;
 		for (uint32_t materialIndex = 0; materialIndex < aiMaterialCount; ++materialIndex)
 		{
 			const auto materialId = CreateMaterial();
 			materialIds[materialIndex] = materialId;
 			auto* material = GetMaterial(materialId);
+			material->m_MaterialId = materialId;
 
 			const auto& aiMaterial = aiScene->mMaterials[materialIndex];
 
@@ -278,11 +272,11 @@ namespace gglab
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
 				auto baseColorTexId = HasTexture(texPath);
-				if (baseColorTexId == InvalidTextureID)
+				if (!baseColorTexId.IsValid())
 				{
 					baseColorTexId = CreateTexture(texPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
-					texUploadData.m_TextureID = baseColorTexId;
+					texUploadData.m_TextureId = baseColorTexId;
 					LoadTextureScratchImage(texPath, texUploadData);	
 				}
 				material->m_TexBaseColor = baseColorTexId;
@@ -301,11 +295,11 @@ namespace gglab
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
 				auto metalicRoughnessTexId = HasTexture(texPath);
-				if (metalicRoughnessTexId == InvalidTextureID)
+				if (!metalicRoughnessTexId.IsValid())
 				{
 					metalicRoughnessTexId = CreateTexture(texPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
-					texUploadData.m_TextureID = metalicRoughnessTexId;
+					texUploadData.m_TextureId = metalicRoughnessTexId;
 					LoadTextureScratchImage(texPath, texUploadData);
 				}
 				material->m_TexMetallicRoughness = metalicRoughnessTexId;
@@ -329,11 +323,11 @@ namespace gglab
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
 				auto normalTexId = HasTexture(texPath);
-				if (normalTexId == InvalidTextureID)
+				if (!normalTexId.IsValid())
 				{
 					normalTexId = CreateTexture(texPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
-					texUploadData.m_TextureID = normalTexId;
+					texUploadData.m_TextureId = normalTexId;
 					LoadTextureScratchImage(texPath, texUploadData);
 				}
 				material->m_NormalTex = normalTexId;
@@ -344,11 +338,11 @@ namespace gglab
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
 				auto occlusionTexId = HasTexture(texPath);
-				if (occlusionTexId == InvalidTextureID)
+				if (!occlusionTexId.IsValid())
 				{
 					occlusionTexId = CreateTexture(texPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
-					texUploadData.m_TextureID = occlusionTexId;
+					texUploadData.m_TextureId = occlusionTexId;
 					LoadTextureScratchImage(texPath, texUploadData);
 				}
 				material->m_OcclusionTex = occlusionTexId;
@@ -359,11 +353,11 @@ namespace gglab
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
 				auto emissiveTexId = HasTexture(texPath);
-				if (emissiveTexId == InvalidTextureID)
+				if (!emissiveTexId.IsValid())
 				{
 					emissiveTexId = CreateTexture(texPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
-					texUploadData.m_TextureID = emissiveTexId;
+					texUploadData.m_TextureId = emissiveTexId;
 					LoadTextureScratchImage(texPath, texUploadData);
 				}
 				material->m_EmissiveTex = emissiveTexId;
@@ -382,10 +376,10 @@ namespace gglab
 	
 		const auto aiMeshCount = aiScene->mNumMeshes;
 		// Add path & meshIds pair to MeshContainer
-		auto pathIdPair = m_MeshContainer.m_PathIDMap.emplace(cannonicalPath, std::vector<MeshID>());
+		auto pathIdPair = m_MeshContainer.m_PathIDMap.emplace(cannonicalPath, std::vector<MeshId>());
 		GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path&meshIds pair failed.");
 		auto& meshIds = pathIdPair.first->second;
-		meshIds.resize(aiMeshCount, InvalidMeshID);
+		meshIds.resize(aiMeshCount);
 
 		// Prepare meshes upload data
 		std::vector<MeshUploadData> meshUploadDatas;
@@ -400,11 +394,11 @@ namespace gglab
 			{
 				const auto meshId = CreateMesh();
 				meshIds[aiMeshIndex] = meshId;
-				uploadData.m_MeshID = meshId;
+				uploadData.m_MeshId = meshId;
 
 				// Link Material Index to mesh
 				auto mesh = GetMesh(meshId);
-				mesh->m_Material = materialIds[aiMesh->mMaterialIndex];
+				mesh->m_MaterialId = materialIds[aiMesh->mMaterialIndex];
 				mesh->m_MeshName = aiMesh->mName.C_Str();
 			}
 
@@ -478,10 +472,10 @@ namespace gglab
 		return model;
 	}
 
-	TextureID AssetManager::CreateTexture(const std::filesystem::path& cannonicalPath) noexcept
+	TextureId AssetManager::CreateTexture(const std::filesystem::path& cannonicalPath) noexcept
 	{
 		// Create new texture ID and emplace to TextureContainer.
-		const auto textureId = m_NextTextureID++;
+		const auto textureId = m_TextureIdCounter.Acquire();
 		auto pathIdPair = m_TextureContainer.m_PathIDMap.emplace(cannonicalPath, textureId);
 		GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path&textureID pair failed.");
 
@@ -491,25 +485,25 @@ namespace gglab
 		return textureId;
 	}
 
-	MeshID AssetManager::CreateMesh() noexcept
+	MeshId AssetManager::CreateMesh() noexcept
 	{
-		const auto meshId = m_NextMeshID++;
+		const auto meshId = m_MeshIdCounter.Acquire();
 		auto idMeshPair = m_MeshContainer.m_MeshIDMap.emplace(meshId, std::make_unique<Mesh>());
 		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace meshId&meshPtr pair failed.");
 
 		return meshId;
 	}
 
-	MaterialID AssetManager::CreateMaterial() noexcept
+	MaterialId AssetManager::CreateMaterial() noexcept
 	{
-		const auto materialId = m_NextMaterialID++;
+		const auto materialId = m_MaterialIdCounter.Acquire();
 		auto idMatPair = m_MaterialContainer.m_MaterialIDMap.emplace(materialId, std::make_unique<Material>());
 		GGLAB_ASSERT_MSG(idMatPair.second == true, "Emplace materialId&materialPtr pair failed.");
 
 		return materialId;
 	}
 
-	TextureID AssetManager::HasTexture(const std::filesystem::path& path) const noexcept
+	TextureId AssetManager::HasTexture(const std::filesystem::path& path) const noexcept
 	{		
 		auto& texNameIdsMap = m_TextureContainer.m_PathIDMap;
 		auto searchIter = texNameIdsMap.find(path);
@@ -517,14 +511,14 @@ namespace gglab
 		{
 			return searchIter->second;
 		}
-		return InvalidTextureID;
+		return InvalidTextureId;
 	}
 
 	AssetManager::TextureUploadData& AssetManager::LoadTextureScratchImage(
 		const std::filesystem::path& texPath, 
 		TextureUploadData& uploadData) noexcept
 	{
-		GGLAB_ASSERT_MSG(uploadData.m_TextureID != InvalidTextureID, "Invalid TextureUploadData");
+		GGLAB_ASSERT_MSG(uploadData.m_TextureId != InvalidTextureId, "Invalid TextureUploadData");
 		GGLAB_ASSERT_MSG(std::filesystem::exists(texPath), "Invalid texture file path.");
 
 		const auto extension = texPath.extension().string();

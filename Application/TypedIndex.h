@@ -3,6 +3,7 @@
 #include <limits>
 #include <functional>
 #include <compare>
+#include <type_traits>
 
 namespace gglab
 {
@@ -31,6 +32,32 @@ namespace gglab
 		ValueType m_Value = InvalidValue;
 	};
 
+	template<typename IndexType>
+	class IndexCounter
+	{
+	public:
+		using Rep = typename IndexType::ValueType;
+		static_assert(std::is_unsigned_v<Rep>, "Rep must be unsigned integer type.");
+
+		constexpr IndexCounter(Rep start = 0) noexcept : m_Next((start == IndexType::InvalidValue) ? 0 : start) {}
+
+		void Reset(Rep start = 0) noexcept
+		{
+			m_Next = (start == IndexType::InvalidValue) ? 0 : start;
+		}
+
+		[[nodiscard]] Rep Next() const noexcept { return m_Next; }
+
+		[[nodiscard]] IndexType Acquire() noexcept
+		{
+			if (m_Next == IndexType::InvalidValue) { m_Next = 0; }
+			return IndexType{ m_Next++ };
+		}
+
+	private:
+		Rep m_Next = 0;
+	};
+
 	// TypedIndex define helper macro.
 #define GGLAB_DEFINE_TYPED_INDEX(name, repType)				\
 	struct name##Tag {};									\
@@ -42,6 +69,21 @@ namespace gglab
 	struct name##Tag {};									\
 	using name = ::gglab::TypedIndex<name##Tag, repType>;	\
 	inline static constexpr name Invalid##name = name::Invalid();
+
+	// TypedIndex with counter define helper macro.
+#define GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(name, repType)	\
+    struct name##Tag {};										\
+    using name = ::gglab::TypedIndex<name##Tag, repType>;		\
+    inline constexpr name Invalid##name = name::Invalid();		\
+    using name##Counter = ::gglab::IndexCounter<name>;
+
+	// Nested TypedIndex with counter define helper macro.
+#define GGLAB_DEFINE_NESTED_TYPED_INDEX_WITH_COUNTER(name, repType)	\
+    struct name##Tag {};                                            \
+    using name = ::gglab::TypedIndex<name##Tag, repType>;           \
+    inline static constexpr name Invalid##name = name::Invalid();   \
+    using name##Counter = ::gglab::IndexCounter<name>;
+
 }
 
 namespace std

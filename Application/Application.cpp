@@ -148,7 +148,6 @@ namespace gglab
 		m_ShaderManager = std::make_unique<ShaderManager>();
 
 		m_Renderer->Initialize();
-		m_AssetManager->Initialize();
 
 		InitializeAssets();
 

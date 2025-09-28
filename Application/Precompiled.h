@@ -73,7 +73,4 @@ using namespace DirectX::SimpleMath;
 #include <GameInput.h>
 #pragma comment(lib, "gameinput.lib")
 
-// Graphics definitions
-#include "GraphicsConstants.h"
-
 #include <entt/entt.hpp>
