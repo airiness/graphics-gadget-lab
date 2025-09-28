@@ -39,8 +39,8 @@ namespace gglab
 			MaterialId m_MaterialId{};
 			std::string m_MaterialName;
 
-			TextureId m_TexBaseColor{};
-			TextureId m_TexMetallicRoughness{};
+			TextureId m_BaseColorTex{};
+			TextureId m_MetallicRoughnessTex{};
 			TextureId m_NormalTex{};
 			TextureId m_OcclusionTex{};
 			TextureId m_EmissiveTex{};
@@ -48,9 +48,11 @@ namespace gglab
 			Color m_BaseColor = color::White;
 			float m_MetallicFactor = 0.0f;
 			float m_RoughnessFactor = 1.0f;
+			float m_NormalScale = 1.0f;
+			float m_OcclusionStrength = 1.0f;
 			Color m_EmissiveColor = color::Black;
 
-			bool m_DoubleSided = false;
+			uint32_t m_Flags; // TODO: double sided and so on
 		};
 		DEFINE_COMPONENT_TYPE(Material);
 

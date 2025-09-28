@@ -12,13 +12,36 @@
 #include "AssetManager.h"
 #include "ShaderManager.h"
 #include "Renderer.h"
-#include "RenderPassRecipeRegistry.h"
 #include "InputLayoutLibrary.h"
 #include "Components.h"
 #include "PipelinePresets.h"
 
 namespace gglab
 {
+	RenderPassTexColor::RenderPassTexColor() noexcept
+	{
+		// GraphicsKeyInputs build.
+		auto* renderer = Application::GetInstance()->GetRenderer();
+		auto* shaderManager = Application::GetInstance()->GetShaderManager();
+
+		auto vertexShaderId = shaderManager->LoadShader("Shaders/TexturedModelVS.dxil", ShaderStage::Vertex);
+		auto pixelShaderId = shaderManager->LoadShader("Shaders/TexturedModelPS.dxil", ShaderStage::Pixel);
+
+		m_KeyInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+		m_KeyInputs.m_InputLayoutId = InputLayoutId::P3N3T2;
+		m_KeyInputs.m_VSId = vertexShaderId;
+		m_KeyInputs.m_PSId = pixelShaderId;
+		m_KeyInputs.m_VSGen = shaderManager->GetGeneration(vertexShaderId);
+		m_KeyInputs.m_PSGen = shaderManager->GetGeneration(pixelShaderId);
+		m_KeyInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		m_KeyInputs.m_SampleMask = std::numeric_limits<uint32_t>::max();
+		m_KeyInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		m_KeyInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
+		m_KeyInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		m_KeyInputs.m_Formats.m_SampleCount = 1;
+		m_KeyInputs.m_Formats.m_SampleQuality = 0;
+	}
+
 	void RenderPassTexColor::AddPass(RenderGraph& rg) noexcept
 	{
 		struct TexColorData
@@ -47,38 +70,18 @@ namespace gglab
 			[this, &rg](DX12CommandList* commandList, TexColorData& data)
 			{
 				auto* renderer = Application::GetInstance()->GetRenderer();
-				auto* shaderManager = Application::GetInstance()->GetShaderManager();
 				auto* device = renderer->GetDevice();
 				auto* passRegistry = renderer->GetRenderPassRecipeRegistry();
 				auto* rootSignature = renderer->GetCommonRootSignature();
 				auto* psoCache = renderer->GetPSOCache();
 				auto* swapChain = device->GetSwapChain();
 
-				const auto w = swapChain->GetBufferWidth();
-				const auto h = swapChain->GetBufferHeight();
-
-				// GraphicsKeyInputs build.
-				auto vertexShaderId = shaderManager->LoadShader("Shaders/TexturedModelVS.dxil", ShaderStage::Vertex);
-				auto pixelShaderId = shaderManager->LoadShader("Shaders/TexturedModelPS.dxil", ShaderStage::Pixel);
-
-				GraphicsKeyInputs keyInputs = {};
-				keyInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
-				keyInputs.m_InputLayoutId = InputLayoutId::P3N3T2;
-				keyInputs.m_VSId = vertexShaderId;
-				keyInputs.m_PSId = pixelShaderId;
-				keyInputs.m_VSGen = shaderManager->GetGeneration(vertexShaderId);
-				keyInputs.m_PSGen = shaderManager->GetGeneration(pixelShaderId);
-				keyInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-				keyInputs.m_SampleMask = std::numeric_limits<uint32_t>::max();
-				keyInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-				keyInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
-				keyInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-				keyInputs.m_Formats.m_SampleCount = 1;
-				keyInputs.m_Formats.m_SampleQuality = 0;
+				const auto width = swapChain->GetBufferWidth();
+				const auto height = swapChain->GetBufferHeight();
 
 				// TODO: multi thread safety?
 				const auto& cached = passRegistry->GetOrCreateGraphics(
-					"RenderPassTexColor.main", keyInputs,
+					"RenderPassTexColor.main", m_KeyInputs,
 					[](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
 					{
 						auto* renderer = Application::GetInstance()->GetRenderer();
@@ -104,8 +107,8 @@ namespace gglab
 
 				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
-				commandList->SetViewport(0, 0, w, h);
-				commandList->SetScissorRect(0, 0, w, h);
+				commandList->SetViewport(0, 0, width, height);
+				commandList->SetScissorRect(0, 0, width, height);
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				// back buffer on / clear
@@ -164,7 +167,7 @@ namespace gglab
 					{
 						if (material->m_MaterialId.IsValid())
 						{
-							auto* texture = assetManager->GetTexture(material->m_TexBaseColor);
+							auto* texture = assetManager->GetTexture(material->m_BaseColorTex);
 							commandList->SetGraphicsDescriptor(static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable), texture->m_Descriptor);
 						}
 					}

@@ -36,7 +36,7 @@ namespace gglab
 				{
 					std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
 					cubeMaterial->m_MaterialId = PocedualCubeMaterialID;
-					cubeMaterial->m_TexBaseColor = assetManager->GetTextureID(TextPath);
+					cubeMaterial->m_BaseColorTex = assetManager->GetTextureID(TextPath);
 					assetManager->AddMaterial(std::move(cubeMaterial));
 				};
 

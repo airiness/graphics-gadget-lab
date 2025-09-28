@@ -279,7 +279,7 @@ namespace gglab
 					texUploadData.m_TextureId = baseColorTexId;
 					LoadTextureScratchImage(texPath, texUploadData);	
 				}
-				material->m_TexBaseColor = baseColorTexId;
+				material->m_BaseColorTex = baseColorTexId;
 			}
 			else
 			{
@@ -302,7 +302,7 @@ namespace gglab
 					texUploadData.m_TextureId = metalicRoughnessTexId;
 					LoadTextureScratchImage(texPath, texUploadData);
 				}
-				material->m_TexMetallicRoughness = metalicRoughnessTexId;
+				material->m_MetallicRoughnessTex = metalicRoughnessTexId;
 			}
 			else
 			{

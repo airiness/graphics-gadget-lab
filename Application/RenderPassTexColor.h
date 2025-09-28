@@ -1,5 +1,6 @@
 #pragma once
 #include "RenderPassBase.h"
+#include "RenderPassRecipeRegistry.h"
 
 namespace gglab
 {
@@ -8,9 +9,15 @@ namespace gglab
 	class RenderPassTexColor : public RenderPassBase
 	{
 	public:
+		RenderPassTexColor() noexcept;
+		~RenderPassTexColor() = default;
+
 		void AddPass(RenderGraph& rg) noexcept override;
 
 	private:
 		void DrawModels(DX12CommandList* commandList) noexcept;
+
+	private:
+		GraphicsKeyInputs m_KeyInputs{};
 	};
 }
