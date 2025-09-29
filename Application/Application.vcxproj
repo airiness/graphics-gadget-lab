@@ -237,10 +237,11 @@
   <ItemGroup>
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="..\Shaders\BRDF.hlsli" />
-    <None Include="..\Shaders\Common.hlsli" />
+    <None Include="..\Shaders\MathCommon.hlsli" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\Shaders\PassForwardLitOpaque.hlsl" />
     <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>

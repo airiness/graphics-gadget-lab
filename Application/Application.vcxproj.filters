@@ -44,6 +44,15 @@
     <Filter Include="Graphics\DX12\Cache">
       <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{256c3528-7cfd-452f-863b-d87394ecb89a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{4fc4e433-58ca-4a56-b4b7-4ec47bf850dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{5aa86216-9dd0-4d2a-a8a0-7166dc2709fc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -412,10 +421,10 @@
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
     <None Include="..\Shaders\BRDF.hlsli">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\PBR</Filter>
     </None>
-    <None Include="..\Shaders\Common.hlsli">
-      <Filter>Shaders</Filter>
+    <None Include="..\Shaders\MathCommon.hlsli">
+      <Filter>Shaders\Common</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -424,6 +433,9 @@
     </FxCompile>
     <FxCompile Include="..\Shaders\TexturedModelVS.hlsl">
       <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Shaders\PassForwardLitOpaque.hlsl">
+      <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
