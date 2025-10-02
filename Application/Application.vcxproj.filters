@@ -420,22 +420,5 @@
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
-    <None Include="..\Shaders\BRDF.hlsli">
-      <Filter>Shaders\PBR</Filter>
-    </None>
-    <None Include="..\Shaders\MathCommon.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Shaders\TexturedModelVS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Shaders\PassForwardLitOpaque.hlsl">
-      <Filter>Shaders\Passes</Filter>
-    </FxCompile>
   </ItemGroup>
 </Project>

@@ -91,4 +91,5 @@ namespace gglab
 			LightType m_LightType = LightType::LightType_Directional;
 		};
 	}
+	using namespace components;
 }

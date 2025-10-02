@@ -236,23 +236,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
-    <None Include="..\Shaders\BRDF.hlsli" />
-    <None Include="..\Shaders\MathCommon.hlsli" />
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\Shaders\PassForwardLitOpaque.hlsl" />
-    <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.6</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="..\Shaders\TexturedModelVS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.6</ShaderModel>
-      <FileType>Document</FileType>
-    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Externals\Vender\DirectXMesh\DirectXMesh\DirectXMesh_Desktop_2022_Win10.vcxproj">

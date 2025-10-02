@@ -175,8 +175,8 @@ namespace gglab
 		Matrix viewMatrix = m_Camera->GetViewMatrix();
 		Matrix projMatrix = m_Camera->GetProjMatrix();
 
-		cbBuffer.m_ViewMatrix = DirectX::XMMatrixTranspose(viewMatrix);
-		cbBuffer.m_ProjectionMatrix = DirectX::XMMatrixTranspose(projMatrix);
+		cbBuffer.view = DirectX::XMMatrixTranspose(viewMatrix);
+		cbBuffer.viewProj = DirectX::XMMatrixTranspose(projMatrix);
 
 		m_GlobalConstantBuffer->Update(cbBuffer);
 	}
