@@ -1,32 +1,97 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Root -->
+  <PropertyGroup>
+    <ShaderRootDir Condition="'$(ShaderRootDir)'==''">$(SolutionDir)Shaders\</ShaderRootDir>
+  </PropertyGroup>
+
+  <!-- Defaults for FxCompile -->
   <ItemDefinitionGroup>
     <FxCompile>
-      <EntryPointName>main</EntryPointName>
+      <EntryPointName>Main</EntryPointName>        <!-- Will be overridden per stage -->
       <ShaderModel>6.6</ShaderModel>
-      <ObjectFileOutput>$(OutDir)Shaders\%(Filename).dxil</ObjectFileOutput>
+      <ObjectFileOutput>$(OutDir)Shaders\%(RecursiveDir)%(Filename).dxil</ObjectFileOutput>
       <AdditionalIncludeDirectories>
-        $(ProjectDir)Shaders\;
+        $(ShaderRootDir);
+        $(ShaderRootDir)Common\;
+        $(ShaderRootDir)Pbr\;
+        $(ShaderRootDir)Passes\;
         %(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>
-        PLATFORM_WINDOWS;%(PreprocessorDefinitions)
-      </PreprocessorDefinitions>
+      <PreprocessorDefinitions>PLATFORM_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>-HV 2021 %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
+
+  <!-- Debug / Release -->
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <FxCompile>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
       <DisableOptimizations>true</DisableOptimizations>
       <AdditionalOptions>-Zi -Qembed_debug %(AdditionalOptions)</AdditionalOptions>
-      <!-- <AdditionalOptions>-Zi -Fd &quot;$(OutDir)%(Filename).pdb&quot; %(AdditionalOptions)</AdditionalOptions> -->
     </FxCompile>
   </ItemDefinitionGroup>
+
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <FxCompile>
       <DisableOptimizations>false</DisableOptimizations>
       <AdditionalOptions>-O3 -Qstrip_debug -Qstrip_reflect %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
+
+  <!-- Default metadata for our custom item -->
+  <ItemDefinitionGroup>
+    <HlslPass>
+      <BuildVS>true</BuildVS>
+      <BuildPS>false</BuildPS>
+      <BuildCS>false</BuildCS>
+      <VSEntry>VSMain</VSEntry>
+      <PSEntry>PSMain</PSEntry>
+      <CSEntry>CSMain</CSEntry>
+    </HlslPass>
+  </ItemDefinitionGroup>
+
+  <!-- Collect all .hlsl (exclude .hlsli) -->
+  <ItemGroup>
+    <HlslPass Include="$(ShaderRootDir)**\*.hlsl"
+              Exclude="$(ShaderRootDir)**\*.hlsli" />
+  </ItemGroup>
+
+  <!-- Auto-expand to FxCompile (Vertex/Pixel/Compute).
+       NOTE: no Condition on Include; we gate with ExcludedFromBuild. -->
+  <ItemGroup>
+    <!-- VS -->
+    <FxCompile Include="@(HlslPass)">
+      <ShaderType>Vertex</ShaderType>
+      <ShaderProfile>vs_6_6</ShaderProfile>  <!-- ensure -T -->
+      <EntryPointName>%(HlslPass.VSEntry)</EntryPointName>
+      <ObjectFileOutput>$(OutDir)Shaders\%(RecursiveDir)%(Filename).vs.dxil</ObjectFileOutput>
+      <ExcludedFromBuild Condition="'%(HlslPass.BuildVS)'!='true'">true</ExcludedFromBuild>
+    </FxCompile>
+
+    <!-- PS -->
+    <FxCompile Include="@(HlslPass)">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderProfile>ps_6_6</ShaderProfile>
+      <EntryPointName>%(HlslPass.PSEntry)</EntryPointName>
+      <ObjectFileOutput>$(OutDir)Shaders\%(RecursiveDir)%(Filename).ps.dxil</ObjectFileOutput>
+      <ExcludedFromBuild Condition="'%(HlslPass.BuildPS)'!='true'">true</ExcludedFromBuild>
+    </FxCompile>
+
+    <!-- CS (optional) -->
+    <FxCompile Include="@(HlslPass)">
+      <ShaderType>Compute</ShaderType>
+      <ShaderProfile>cs_6_6</ShaderProfile>
+      <EntryPointName>%(HlslPass.CSEntry)</EntryPointName>
+      <ObjectFileOutput>$(OutDir)Shaders\%(RecursiveDir)%(Filename).cs.dxil</ObjectFileOutput>
+      <ExcludedFromBuild Condition="'%(HlslPass.BuildCS)'!='true'">true</ExcludedFromBuild>
+    </FxCompile>
+  </ItemGroup>
+
+  <!-- Ensure output folders exist -->
+  <Target Name="PrepareShaderOutputDirs" BeforeTargets="Build">
+    <MakeDir Directories="@(HlslPass->'$(OutDir)Shaders\%(RecursiveDir)')" />
+  </Target>
+
 </Project>
