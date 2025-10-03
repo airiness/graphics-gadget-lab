@@ -214,6 +214,9 @@
     <ClCompile Include="HResult.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="ShaderBuilder.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -413,6 +416,9 @@
     </ClInclude>
     <ClInclude Include="HResult.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderBuilder.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
