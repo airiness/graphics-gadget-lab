@@ -75,6 +75,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -89,6 +90,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +135,7 @@
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
+    <ClCompile Include="PathUtils.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -159,9 +162,11 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RingSpanAllocator.cpp" />
-    <ClCompile Include="ShaderBuilder.cpp" />
+    <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
     <ClCompile Include="StringId.cpp" />
+    <ClCompile Include="StringUtils.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
   </ItemGroup>
@@ -198,6 +203,7 @@
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="HResult.h" />
     <ClInclude Include="InputLayoutLibrary.h" />
+    <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
@@ -226,11 +232,13 @@
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
     <ClInclude Include="RingSpanAllocator.h" />
-    <ClInclude Include="ShaderBuilder.h" />
+    <ClInclude Include="Shader.h" />
+    <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TypedIndex.h" />
+    <ClInclude Include="StringUtils.h" />
     <ClInclude Include="VertexData.h" />
     <ClInclude Include="DX12ViewCache.h" />
   </ItemGroup>

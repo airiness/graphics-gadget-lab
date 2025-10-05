@@ -4,24 +4,16 @@
 #include "PSOKey.h"
 #include "FNV1a.h"
 #include "GraphicsTypes.h"
+#include "Shader.h"
 
 namespace gglab
 {
 	// DXC shader blob
-	using ShaderBlob = IDxcBlobEncoding;
+	//using ShaderBlob = IDxcBlobEncoding;
 
 	// D3D shader blob
 	// using ShaderBlob = ID3DBlob;
 
-	enum class ShaderStage
-	{
-		Vertex,
-		Pixel,
-		Hull,
-		Domain,
-		Geometry,
-		Compute
-	};
 
 	struct ShaderKey
 	{
@@ -39,16 +31,16 @@ namespace gglab
 	};
 	using ShaderKeyHash = KeyHash<ShaderKey>;
 
-	struct ShaderRecord
-	{
-		ShaderKey m_Key{};
-		std::filesystem::path m_Path{};
-		ShaderStage m_Stage = ShaderStage::Vertex;
-		ComPtr<ShaderBlob> m_Blob;
-		ShaderHash128 m_Hash{};
-		std::filesystem::file_time_type m_Timestamp{};
-		uint64_t m_Generation = 1;
-	};
+	//struct ShaderRecord
+	//{
+	//	ShaderKey m_Key{};
+	//	std::filesystem::path m_Path{};
+	//	ShaderStage m_Stage = ShaderStage::Vertex;
+	//	ComPtr<ShaderBlob> m_Blob;
+	//	ShaderHash128 m_Hash{};
+	//	std::filesystem::file_time_type m_Timestamp{};
+	//	uint64_t m_Generation = 1;
+	//};
 
 	class ShaderManager
 	{
@@ -73,7 +65,7 @@ namespace gglab
 	private:
 		mutable std::shared_mutex m_Mutex;
 		std::unordered_map<ShaderKey, ShaderId, ShaderKeyHash> m_KeyIdMap;
-		std::vector<ShaderRecord> m_Records;
+		std::vector<std::unique_ptr<Shader>> m_Shaders;
 
 		ComPtr<IDxcUtils> m_DxcUtils;
 	};

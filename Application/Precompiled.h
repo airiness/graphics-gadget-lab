@@ -62,6 +62,7 @@ using namespace Microsoft::WRL;
 #include <shared_mutex>
 #include <bit>
 #include <concepts>
+#include <fstream>
 
 // Project definitions
 #include "CoreMacros.h"

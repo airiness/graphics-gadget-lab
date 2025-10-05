@@ -22,14 +22,24 @@ namespace gglab
 			}(std::make_index_sequence<256>{});
 		}();
 
-	constexpr uint64_t Crc64(std::string_view stringView)
+	constexpr uint64_t Crc64Bytes(const unsigned char* data, size_t size) noexcept
 	{
-		uint64_t crc = std::numeric_limits<uint64_t>::max(); 
-		for (unsigned char c : stringView)
+		uint64_t crc = std::numeric_limits<uint64_t>::max();
+		for (size_t i = 0; i < size; ++i)
 		{
-			crc = CRC64_TABLE[(crc ^ c) & 0xFF] ^ (crc >> 8);
+			crc = CRC64_TABLE[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
 		}
 		return crc ^ std::numeric_limits<uint64_t>::max();
+	}
+
+	constexpr uint64_t Crc64(std::string_view stringView)
+	{
+		return Crc64Bytes(reinterpret_cast<const unsigned char*>(stringView.data()), stringView.size());
+	}
+
+	constexpr uint64_t Crc64(std::wstring_view wideStringView)
+	{
+		return Crc64Bytes(reinterpret_cast<const unsigned char*>(wideStringView.data()), wideStringView.size() * sizeof(wchar_t));
 	}
 
 #if defined(BUILD_DEBUG)

@@ -48,7 +48,11 @@ namespace gglab
 				return it->second;
 			}
 
-			ShaderRecord record{};
+			Shader shader{};
+
+			ShaderDesc shaderDesc{};
+			shaderDesc.
+
 			record.m_Key = key;
 			record.m_Path = path;
 			record.m_Stage = stage;
