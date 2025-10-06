@@ -8,7 +8,7 @@
 	do { \
 		GGLAB_ASSERT_MSG(false, message); \
 		std::abort(); \
-	} while (0)
+	} while (false)
 
 #define GGLAB_DELETE_COPYABLE(className) \
 	className(const className&) noexcept = delete; \

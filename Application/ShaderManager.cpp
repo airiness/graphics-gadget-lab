@@ -6,7 +6,7 @@ namespace gglab
 {
 	ShaderManager::ShaderManager() noexcept
 	{
-		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_DxcUtils)));
+		
 	}
 
 	ShaderId ShaderManager::LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept
@@ -135,37 +135,37 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 		int32_t reloadCount = 0;
-		for (auto& record : m_Records)
+		for (auto& shader : m_Shaders)
 		{
-			if (!std::filesystem::exists(record.m_Path))
+			if (!std::filesystem::exists(shader.m_Path))
 			{
-				GGLAB_LOG_GRAPHICS_WARN("ShaderManager::ReloadChanged: File not found: {}", record.m_Path.string());
+				GGLAB_LOG_GRAPHICS_WARN("ShaderManager::ReloadChanged: File not found: {}", shader.m_Path.string());
 				continue;
 			}
-			auto currentTimestamp = std::filesystem::last_write_time(record.m_Path);
-			if (currentTimestamp != record.m_Timestamp)
+			auto currentTimestamp = std::filesystem::last_write_time(shader.m_Path);
+			if (currentTimestamp != shader.m_Timestamp)
 			{
 				ComPtr<ShaderBlob> newBlob;
-				if (SUCCEEDED(m_DxcUtils->LoadFile(record.m_Path.wstring().c_str(), nullptr, &newBlob)))
+				if (SUCCEEDED(m_DxcUtils->LoadFile(shader.m_Path.wstring().c_str(), nullptr, &newBlob)))
 				{
 					auto newHash = HashBlob(newBlob.Get());
-					if (newHash.m_LowBits != record.m_Hash.m_LowBits || newHash.m_HighBits != record.m_Hash.m_HighBits)
+					if (newHash.m_LowBits != shader.m_Hash.m_LowBits || newHash.m_HighBits != shader.m_Hash.m_HighBits)
 					{
-						record.m_Blob = std::move(newBlob);
-						record.m_Hash = newHash;
-						record.m_Timestamp = currentTimestamp;
-						++record.m_Generation;
+						shader.m_Blob = std::move(newBlob);
+						shader.m_Hash = newHash;
+						shader.m_Timestamp = currentTimestamp;
+						++shader.m_Generation;
 						++reloadCount;
-						GGLAB_LOG_GRAPHICS_INFO("ShaderManager::ReloadChanged: Reloaded shader: {}", record.m_Path.string());
+						GGLAB_LOG_GRAPHICS_INFO("ShaderManager::ReloadChanged: Reloaded shader: {}", shader.m_Path.string());
 					}
 					else
 					{
-						record.m_Timestamp = currentTimestamp; // Update timestamp even if content is the same
+						shader.m_Timestamp = currentTimestamp; // Update timestamp even if content is the same
 					}
 				}
 				else
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::ReloadChanged: Failed to reload shader: {}", record.m_Path.string());
+					GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::ReloadChanged: Failed to reload shader: {}", shader.m_Path.string());
 				}
 			}
 		}

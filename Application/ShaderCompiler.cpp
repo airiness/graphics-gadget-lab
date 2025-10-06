@@ -309,7 +309,7 @@ namespace gglab
 
 	std::wstring ShaderCompiler::ToTarget(ShaderStage stage, ShaderModel model) noexcept
 	{
-		std::wstring target = L"";
+		std::wstring target;
 		switch (stage)
 		{
 		case ShaderStage::Vertex:

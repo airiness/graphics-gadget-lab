@@ -5,6 +5,7 @@
 #include "FNV1a.h"
 #include "GraphicsTypes.h"
 #include "Shader.h"
+#include "ShaderCompiler.h"
 
 namespace gglab
 {
@@ -67,6 +68,8 @@ namespace gglab
 		std::unordered_map<ShaderKey, ShaderId, ShaderKeyHash> m_KeyIdMap;
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
 
-		ComPtr<IDxcUtils> m_DxcUtils;
+		std::unique_ptr<ShaderCompiler> m_Compiler;
+
+		/*ComPtr<IDxcUtils> m_DxcUtils;*/
 	};
 }

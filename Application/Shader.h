@@ -1,4 +1,5 @@
 #pragma once
+#include "PSOKey.h"
 #include "EnumFlags.h"
 
 namespace gglab
@@ -62,6 +63,8 @@ namespace gglab
 		std::filesystem::file_time_type m_SourceTimeStamp{};
 	};
 
+	class ShaderCompiler;
+
 	class Shader
 	{
 	public:
@@ -69,11 +72,19 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(Shader);
 		~Shader() = default;
 
+		bool EnsureCompiled(ShaderCompiler& compiler) noexcept;
+
+		bool ForceRecompile(ShaderCompiler& compiler) noexcept;
+
+		D3D12_SHADER_BYTECODE GetByteCode() const noexcept;
 		const ShaderDesc& GetDesc() const noexcept { return m_Desc; }
 		const ShaderCompileSnapshot& GetSnapshot() const noexcept { return m_Snapshot; }
+		uint64_t GetGeneration() const noexcept { return m_Generation; }
+		bool IsValid() const noexcept { return m_Snapshot.m_Blob != nullptr; }
 
 	private:
 		ShaderDesc m_Desc;
 		ShaderCompileSnapshot m_Snapshot;
+		uint64_t m_Generation = 0;
 	};
 }
