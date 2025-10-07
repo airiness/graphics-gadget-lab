@@ -53,15 +53,15 @@ namespace gglab
 
 	};
 
-	// TODO: User Shader directly
-	struct ShaderCompileResult
-	{
-		std::filesystem::path m_DxilPath;
-		std::filesystem::path m_MetaPath;
+	//// TODO: User Shader directly
+	//struct ShaderCompileResult
+	//{
+	//	std::filesystem::path m_DxilPath;
+	//	std::filesystem::path m_MetaPath;
 
-		ComPtr<ShaderBlob> m_DxilBlob;
-		bool m_FromCache = false;
-	};
+	//	ComPtr<ShaderBlob> m_DxilBlob;
+	//	bool m_FromCache = false;
+	//};
 
 	class ShaderCompiler
 	{
@@ -75,7 +75,7 @@ namespace gglab
 		const std::filesystem::path& GetCacheRootDirectory() const noexcept { return m_CacheRootDir; }
 
 		// TODO: Rename this function
-		ShaderCompileResult EnsureCompiled(const ShaderDesc& desc) noexcept;
+		ShaderCompileArtifact EnsureCompiled(const ShaderDesc& desc) noexcept;
 
 		bool LinkOrMirrorToOutDir(const std::filesystem::path& outDirShaders) noexcept;
 

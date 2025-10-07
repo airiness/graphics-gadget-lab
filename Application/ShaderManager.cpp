@@ -1,12 +1,13 @@
 #include "Precompiled.h"
 #include "ShaderManager.h"
+#include "ShaderCompiler.h"
 #include "HResult.h"
 
 namespace gglab
 {
 	ShaderManager::ShaderManager() noexcept
 	{
-		
+		m_Compiler = std::make_unique<ShaderCompiler>();
 	}
 
 	ShaderId ShaderManager::LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept
@@ -129,47 +130,6 @@ namespace gglab
 		{
 			LoadShader(path, stage);
 		}
-	}
-
-	int32_t ShaderManager::ReloadChanged() noexcept
-	{
-		std::unique_lock lock(m_Mutex);
-		int32_t reloadCount = 0;
-		for (auto& shader : m_Shaders)
-		{
-			if (!std::filesystem::exists(shader.m_Path))
-			{
-				GGLAB_LOG_GRAPHICS_WARN("ShaderManager::ReloadChanged: File not found: {}", shader.m_Path.string());
-				continue;
-			}
-			auto currentTimestamp = std::filesystem::last_write_time(shader.m_Path);
-			if (currentTimestamp != shader.m_Timestamp)
-			{
-				ComPtr<ShaderBlob> newBlob;
-				if (SUCCEEDED(m_DxcUtils->LoadFile(shader.m_Path.wstring().c_str(), nullptr, &newBlob)))
-				{
-					auto newHash = HashBlob(newBlob.Get());
-					if (newHash.m_LowBits != shader.m_Hash.m_LowBits || newHash.m_HighBits != shader.m_Hash.m_HighBits)
-					{
-						shader.m_Blob = std::move(newBlob);
-						shader.m_Hash = newHash;
-						shader.m_Timestamp = currentTimestamp;
-						++shader.m_Generation;
-						++reloadCount;
-						GGLAB_LOG_GRAPHICS_INFO("ShaderManager::ReloadChanged: Reloaded shader: {}", shader.m_Path.string());
-					}
-					else
-					{
-						shader.m_Timestamp = currentTimestamp; // Update timestamp even if content is the same
-					}
-				}
-				else
-				{
-					GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::ReloadChanged: Failed to reload shader: {}", shader.m_Path.string());
-				}
-			}
-		}
-		return reloadCount;
 	}
 
 	bool ShaderManager::GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept

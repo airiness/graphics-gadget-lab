@@ -26,9 +26,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(result, "Create Shader cache root directory failed.");
 	}
 
-	ShaderCompileResult ShaderCompiler::EnsureCompiled(const ShaderDesc& desc) noexcept
+	ShaderCompileArtifact ShaderCompiler::EnsureCompiled(const ShaderDesc& desc) noexcept
 	{
-		ShaderCompileResult result{};
+		ShaderCompileArtifact artifact{};
 		const auto keyStr = BuildKeyString(desc);
 		const auto keyHex = HashKeyString(keyStr);
 		const auto dxil = MakeCacheDxilPath(keyHex, desc.m_Stage);
@@ -36,8 +36,8 @@ namespace gglab
 		auto meta = dxil;
 		meta.replace_extension(L"meta.txt");
 
-		result.m_DxilPath = dxil;
-		result.m_MetaPath = meta;
+		artifact.m_DxilPath = dxil;
+		artifact.m_MetaPath = meta;
 
 		// Exist
 		std::error_code errorCode;
@@ -47,9 +47,9 @@ namespace gglab
 			{
 				ComPtr<IDxcBlobEncoding> blobEncoding;
 				GGLAB_HR(m_Utils->LoadFile(dxil.c_str(), nullptr, &blobEncoding));
-				result.m_DxilBlob = blobEncoding;
-				result.m_FromCache = true;
-				return result;
+				artifact.m_DxilBlob = blobEncoding;
+				artifact.m_FromCache = true;
+				return artifact;
 			}
 		}
 
@@ -64,9 +64,9 @@ namespace gglab
 		// result
 		ComPtr<IDxcBlobEncoding> blobEncoding;
 		GGLAB_HR(m_Utils->LoadFile(dxil.c_str(), nullptr, &blobEncoding));
-		result.m_DxilBlob = blobEncoding;
-		result.m_FromCache = false;
-		return result;
+		artifact.m_DxilBlob = blobEncoding;
+		artifact.m_FromCache = false;
+		return artifact;
 	}
 
 	std::filesystem::path ShaderCompiler::MakeCacheDxilPath(const std::wstring& keyHex, ShaderStage stage) const noexcept

@@ -14,7 +14,7 @@ namespace gglab
 		{
 			return std::make_tuple(m_LowBits, m_HighBits);
 		}
-		constexpr bool operator==(const ShaderHash128& rhs) const noexcept = default;
+		constexpr bool operator==(const ShaderHash128&) const noexcept = default;
 	};
 
 	struct PipelineFormats
