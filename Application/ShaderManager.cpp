@@ -2,6 +2,7 @@
 #include "ShaderManager.h"
 #include "ShaderCompiler.h"
 #include "HResult.h"
+#include "PathUtils.h"
 
 namespace gglab
 {
@@ -20,10 +21,13 @@ namespace gglab
 		}
 
 		// Make path canonical
-		std::error_code ec;
-		auto canonicalPath = std::filesystem::weakly_canonical(path, ec);
-		auto normalPath = ec ? path.lexically_normal() : std::move(canonicalPath);
-		normalPath.make_preferred();
+		auto normalPath = utils::Canonical(path);
+
+
+		ShaderDesc desc{};
+		desc.m_SourcePath = normalPath;
+		desc.m_Stage = stage;
+
 
 		ShaderKey key{};
 		key.m_PathHash = StringId(normalPath.string());
