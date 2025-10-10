@@ -11,6 +11,16 @@ namespace gglab
 		m_Compiler = std::make_unique<ShaderCompiler>();
 	}
 
+	ShaderId ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
+	{
+		auto merge = MergeDefaultShaderDesc(desc);
+
+
+		return ShaderId();
+	}
+
+
+
 	ShaderId ShaderManager::LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept
 	{
 		// Path check
@@ -128,12 +138,37 @@ namespace gglab
 		return 0;
 	}
 
+
 	void ShaderManager::Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept
 	{
 		for (const auto& [path, stage] : shaders)
 		{
 			LoadShader(path, stage);
 		}
+	}
+
+	std::wstring Shader::DefaultEntry(ShaderStage& stage) noexcept
+	{
+		switch (stage)
+		{
+		case ShaderStage::Vertex:
+			return L"VSMain";
+		case ShaderStage::Pixel:
+			return L"PSMain";
+		case ShaderStage::Hull:
+			return L"HSMain";
+		case ShaderStage::Domain:
+			return L"DSMain";
+		case ShaderStage::Geometry:
+			return L"GSMain";
+		case ShaderStage::Mesh:
+			return L"MSMain";
+		case ShaderStage::Compute:
+			return L"CSMain";
+		default:
+			break;
+		}
+		return L"Main";
 	}
 
 	bool ShaderManager::GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
@@ -180,5 +215,24 @@ namespace gglab
 		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
 		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
 		return hash;
+	}
+
+	ShaderDesc ShaderManager::MergeDefaultShaderDesc(const ShaderDesc& desc) noexcept
+	{
+		ShaderDesc merge = desc;
+		if (merge.m_Entry.empty())
+		{
+			merge.m_Entry = DefaultEntry(merge.m_Stage);
+		}
+
+		merge.m_IncludeDirs.insert(merge.m_IncludeDirs.end(), { L"Shaders", L"Shaders/Common", L"Shaders/PBR", L"Shaders/Passes" });
+		//merge.m_Defines.insert(merge.m_Defines.end(), {});
+		if (merge.m_HlslVersion.empty()) { merge.m_HlslVersion = L"2021"; }
+		if (merge.m_OptLevel.empty()) { merge.m_OptLevel = L"O3"; }
+		if (merge.m_Flags == ShaderCompileFlag::None)
+		{
+			merge.m_Flags = ShaderCompileFlag::Optimization | (IsDebuggerPresent() ? ShaderCompileFlag::Debug : ShaderCompileFlag::None);
+		}
+		return merge;
 	}
 }

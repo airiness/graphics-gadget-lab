@@ -3,10 +3,63 @@
 #include "HResult.h"
 #include "StringId.h"
 #include "StringUtils.h"
+#include "PathUtils.h"
 #include "FNV1a.h"
 
 namespace gglab
 {
+	namespace
+	{
+		class ShaderIncludeHandler final : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IDxcIncludeHandler>
+		{
+		public:
+			HRESULT Initialize(ComPtr<IDxcUtils> utils, const std::vector<std::filesystem::path>& includeDirs) noexcept
+			{
+				m_Utils = utils;
+				m_IncludeDirs = includeDirs;
+				return S_OK;
+			}
+
+			HRESULT STDMETHODCALLTYPE
+				LoadSource(_In_z_ LPCWSTR pFilename, _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource) override
+			{
+				const auto path = utils::Canonical(pFilename);
+				ComPtr<IDxcBlobEncoding> blob;
+
+				if (SUCCEEDED(m_Utils->LoadFile(path.c_str(), nullptr, &blob)))
+				{
+					m_IncludeDirs.push_back(path);
+					*ppIncludeSource = blob.Detach();
+					return S_OK;
+				}
+
+				for (auto& dir : m_IncludeDirs)
+				{
+					const auto pathInDir = utils::Canonical(dir / pFilename);
+					if (SUCCEEDED(m_Utils->LoadFile(pathInDir.c_str(), nullptr, &blob)))
+					{
+						m_Includes.push_back(pathInDir);
+						*ppIncludeSource = blob.Detach();
+						return S_OK;
+					}
+				}
+
+				*ppIncludeSource = nullptr;
+				return E_FAIL;
+			}
+
+			const std::vector<std::filesystem::path>& Includes() const noexcept { return m_Includes; }
+
+		private:
+			ComPtr<IDxcUtils> m_Utils;
+
+			std::vector<std::filesystem::path> m_IncludeDirs;
+			std::vector<std::filesystem::path> m_Includes;
+
+		};
+	}
+
+
 	ShaderCompiler::ShaderCompiler() noexcept
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Utils)));
@@ -16,6 +69,14 @@ namespace gglab
 			L"Build" / L"ShaderCache" / (IsDebuggerPresent() ? L"Debug" : L"Release");
 
 		SetCacheRootDirectory(defaultRootDir);
+	}
+
+	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
+	{
+		ShaderCompileArtifact artifact{};
+		const auto recipeHash = ComputeRecipeHash
+
+		return ShaderCompileArtifact();
 	}
 
 	void ShaderCompiler::SetCacheRootDirectory(std::filesystem::path root) noexcept
@@ -67,6 +128,19 @@ namespace gglab
 		artifact.m_DxilBlob = blobEncoding;
 		artifact.m_FromCache = false;
 		return artifact;
+	}
+
+	ShaderHash128 ShaderCompiler::ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept
+	{
+		const auto keyString = BuildKeyString(mergedDesc);
+		const auto* bytes = reinterpret_cast<const uint8_t*>(keyString.data());
+
+		const auto keySize = keyString.size() * sizeof(wchar_t);
+		ShaderHash128 hash{};
+		hash.m_LowBits = FNV1a64::HashBytes64(bytes, keySize);
+		hash.m_HighBits = FNV1a64::HashBytes64(bytes, keySize, 0x9ae16a3b2f90404full);
+
+		return hash;
 	}
 
 	std::filesystem::path ShaderCompiler::MakeCacheDxilPath(const std::wstring& keyHex, ShaderStage stage) const noexcept

@@ -1,6 +1,5 @@
 #pragma once
 #include "TypedIndex.h"
-#include "StringId.h"
 #include "PSOKey.h"
 #include "FNV1a.h"
 #include "GraphicsTypes.h"
@@ -10,17 +9,9 @@ namespace gglab
 {
 	struct ShaderKey
 	{
-		StringId m_PathHash{};
-		ShaderStage m_Stage = ShaderStage::Vertex;
-		uint64_t m_EntryHash = 0;
-		uint64_t m_TargetHash = 0;
-
-		bool operator==(const ShaderKey&) const noexcept = default;
-
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_PathHash.Value(), m_Stage, m_EntryHash, m_TargetHash);
-		}
+		ShaderHash128 m_Key;
+		auto AsTuple() const noexcept { return m_Key.AsTuple(); }
+		constexpr bool operator==(const ShaderKey&) const noexcept = default;
 	};
 	using ShaderKeyHash = KeyHash<ShaderKey>;
 
@@ -32,18 +23,23 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
 		~ShaderManager() = default;
 
-		ShaderId LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept;
+
+		ShaderId LoadShader(const ShaderDesc& desc) noexcept;
+		void Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept;
+		int32_t ReloadChanged() noexcept;
 
 		D3D12_SHADER_BYTECODE GetBytecode(ShaderId shaderId) const noexcept;
 		ShaderBlob* GetBlob(ShaderId shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderId shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderId shaderId) const noexcept;
 
-		void Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept;
+		bool LinkOrMirrorCacheToOutDir(const std::filesystem::path& outDirShaders) noexcept;
 
 	private:
+		static std::wstring DefaultEntry(ShaderStage& stage) noexcept;
 		static bool GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;
 		static ShaderHash128 HashBlob(ShaderBlob* blob) noexcept;
+		static ShaderDesc MergeDefaultShaderDesc(const ShaderDesc& desc) noexcept;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
