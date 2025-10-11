@@ -240,10 +240,7 @@ namespace gglab
 	{
 		// Shader preload
 		{
-			m_ShaderManager->Preload({
-				{"Shaders/TexturedModelVS.dxil", ShaderStage::Vertex},
-				{"Shaders/TexturedModelPS.dxil", ShaderStage::Pixel},
-				});
+			//m_ShaderManager->Preload({}); // TODO: Preload shaders
 		}
 
 		// Test Sponza

@@ -36,6 +36,9 @@ namespace gglab
 	{
 		std::wstring m_Name;
 		std::wstring m_Value;
+
+		bool operator==(const ShaderDefine&) const noexcept = default;
+		auto operator<=>(const ShaderDefine&) const noexcept = default;
 	};
 
 	struct ShaderDesc
@@ -72,8 +75,7 @@ namespace gglab
 		}
 	};
 
-	class ShaderCompiler;
-
+	class ShaderManager;
 	class Shader
 	{
 	public:
@@ -88,11 +90,7 @@ namespace gglab
 		bool IsValid() const noexcept { return m_Artifact.m_DxilBlob != nullptr; }
 
 	private:
-		bool EnsureCompiled(ShaderCompiler& compiler) noexcept;
-
-		static std::wstring DefaultEntry(ShaderStage& stage) noexcept;
-		static bool GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;
-		static ShaderHash128 CalculateFromBlob(ShaderBlob* blob) noexcept;
+		void SetCompileArtifact(ShaderCompileArtifact artifact, bool changed) noexcept;
 
 	private:
 		ShaderDesc m_Desc;

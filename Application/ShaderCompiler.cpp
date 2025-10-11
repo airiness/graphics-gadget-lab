@@ -10,10 +10,20 @@ namespace gglab
 {
 	namespace
 	{
+#if defined (BUILD_DEBUG)
+		void AssertSourceUtf8(ShaderBlob* blob) noexcept
+		{
+			BOOL known = FALSE; UINT32 codePage = 0;
+			blob->GetEncoding(&known, &codePage);
+			GGLAB_ASSERT_MSG(known != FALSE, "Shader source encoding unknown. Please save as UTF-8 (no BOM).");
+			GGLAB_ASSERT_MSG(codePage == DXC_CP_UTF8, "Shader source must be UTF-8 (no BOM).");
+		}
+#endif
+
 		class ShaderIncludeHandler final : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IDxcIncludeHandler>
 		{
 		public:
-			HRESULT Initialize(ComPtr<IDxcUtils> utils, const std::vector<std::filesystem::path>& includeDirs) noexcept
+			HRESULT RuntimeClassInitialize(ComPtr<IDxcUtils> utils, const std::vector<std::filesystem::path>& includeDirs) noexcept
 			{
 				m_Utils = utils;
 				m_IncludeDirs = includeDirs;
@@ -28,7 +38,10 @@ namespace gglab
 
 				if (SUCCEEDED(m_Utils->LoadFile(path.c_str(), nullptr, &blob)))
 				{
-					m_IncludeDirs.push_back(path);
+#if defined(BUILD_DEBUG)
+					AssertSourceUtf8(blob.Get());
+#endif
+					m_Includes.push_back(path);
 					*ppIncludeSource = blob.Detach();
 					return S_OK;
 				}
@@ -38,6 +51,9 @@ namespace gglab
 					const auto pathInDir = utils::Canonical(dir / pFilename);
 					if (SUCCEEDED(m_Utils->LoadFile(pathInDir.c_str(), nullptr, &blob)))
 					{
+#if defined(BUILD_DEBUG)
+						AssertSourceUtf8(blob.Get());
+#endif
 						m_Includes.push_back(pathInDir);
 						*ppIncludeSource = blob.Detach();
 						return S_OK;
@@ -59,24 +75,13 @@ namespace gglab
 		};
 	}
 
-
 	ShaderCompiler::ShaderCompiler() noexcept
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Utils)));
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Compiler)));
 
-		std::filesystem::path defaultRootDir = std::filesystem::path{ SOLUTION_DIR } /
-			L"Build" / L"ShaderCache" / (IsDebuggerPresent() ? L"Debug" : L"Release");
-
+		const auto defaultRootDir = utils::GetExeOutDir() / L"ShaderCache";
 		SetCacheRootDirectory(defaultRootDir);
-	}
-
-	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
-	{
-		ShaderCompileArtifact artifact{};
-		const auto recipeHash = ComputeRecipeHash
-
-		return ShaderCompileArtifact();
 	}
 
 	void ShaderCompiler::SetCacheRootDirectory(std::filesystem::path root) noexcept
@@ -87,11 +92,14 @@ namespace gglab
 		GGLAB_ASSERT_MSG(result, "Create Shader cache root directory failed.");
 	}
 
-	ShaderCompileArtifact ShaderCompiler::EnsureCompiled(const ShaderDesc& desc) noexcept
+	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
 	{
+		GGLAB_ASSERT_MSG(!desc.m_Entry.empty(), "Shader entry is empty, ShaderDesc may not be normalized.");
+		GGLAB_ASSERT_MSG(utils::Canonical(desc.m_SourcePath) == desc.m_SourcePath, "Shader source path is not be canonical, ShaderDesc may not be normalized.");
+
 		ShaderCompileArtifact artifact{};
-		const auto keyStr = BuildKeyString(desc);
-		const auto keyHex = HashKeyString(keyStr);
+		const auto recipeHash = ComputeRecipeHash(desc);
+		const auto keyHex = ToHex(recipeHash);
 		const auto dxil = MakeCacheDxilPath(keyHex, desc.m_Stage);
 
 		auto meta = dxil;
@@ -110,6 +118,7 @@ namespace gglab
 				GGLAB_HR(m_Utils->LoadFile(dxil.c_str(), nullptr, &blobEncoding));
 				artifact.m_DxilBlob = blobEncoding;
 				artifact.m_FromCache = true;
+				artifact.m_Hash = ComputeHashFromBlob(blobEncoding.Get());
 				return artifact;
 			}
 		}
@@ -124,10 +133,64 @@ namespace gglab
 
 		// result
 		ComPtr<IDxcBlobEncoding> blobEncoding;
-		GGLAB_HR(m_Utils->LoadFile(dxil.c_str(), nullptr, &blobEncoding));
+		GGLAB_HR(m_Utils->CreateBlob(dxilBlob->GetBufferPointer(), static_cast<UINT32>(dxilBlob->GetBufferSize()), 0, &blobEncoding));
 		artifact.m_DxilBlob = blobEncoding;
 		artifact.m_FromCache = false;
+		artifact.m_Hash = ComputeHashFromBlob(blobEncoding.Get());
 		return artifact;
+	}
+
+	ShaderDesc ShaderCompiler::NormalizeShaderDesc(const ShaderDesc& userDesc) const noexcept
+	{
+		ShaderDesc desc = userDesc;
+
+		if (desc.m_Entry.empty())
+		{
+			desc.m_Entry = DefaultEntry(desc.m_Stage);
+		}
+
+		desc.m_IncludeDirs.insert(desc.m_IncludeDirs.end(), m_DefaultShaderConfig.m_IncludeDirs.begin(), m_DefaultShaderConfig.m_IncludeDirs.end());
+		desc.m_Defines.insert(desc.m_Defines.end(), m_DefaultShaderConfig.m_Defines.begin(), m_DefaultShaderConfig.m_Defines.end());
+		desc.m_ExtraArgs.insert(desc.m_ExtraArgs.end(), m_DefaultShaderConfig.m_ExtraArgs.begin(), m_DefaultShaderConfig.m_ExtraArgs.end());
+		if (desc.m_HlslVersion.empty()) { desc.m_HlslVersion = m_DefaultShaderConfig.m_HlslVersion; }
+		if (desc.m_OptLevel.empty()) { desc.m_OptLevel = m_DefaultShaderConfig.m_OptLevel; }
+		if (desc.m_Flags == ShaderCompileFlag::None) { desc.m_Flags = m_DefaultShaderConfig.m_Flags; }
+
+		// includes: normalize path, exclude duplicate
+		desc.m_SourcePath = utils::Canonical(desc.m_SourcePath);
+		for (auto& include : desc.m_IncludeDirs)
+		{
+			include = utils::Canonical(include);
+		}
+		{
+			std::unordered_set<std::wstring> seen;
+			std::vector<std::filesystem::path> uniqueIncludeDirs;
+			uniqueIncludeDirs.reserve(desc.m_IncludeDirs.size());
+			for (auto& dir : desc.m_IncludeDirs)
+			{
+				auto dirStr = dir.wstring();
+				if (seen.insert(dirStr).second) { uniqueIncludeDirs.emplace_back(std::move(dirStr)); }
+			}
+			desc.m_IncludeDirs.swap(uniqueIncludeDirs);
+		}
+
+		// defines: sort, exclude duplicate
+		std::sort(desc.m_Defines.begin(), desc.m_Defines.end());
+		desc.m_Defines.erase(std::unique(desc.m_Defines.begin(), desc.m_Defines.end()), desc.m_Defines.end());
+
+		// extra arguments, exclude duplicate
+		{
+			std::unordered_set<std::wstring> seen;
+			std::vector<std::wstring> uniqueExtraArgs;
+			uniqueExtraArgs.reserve(desc.m_ExtraArgs.size());
+			for (auto& arg : desc.m_ExtraArgs)
+			{
+				if (seen.insert(arg).second) { uniqueExtraArgs.push_back(std::move(arg)); }
+			}
+			desc.m_ExtraArgs.swap(uniqueExtraArgs);
+		}
+
+		return desc;
 	}
 
 	ShaderHash128 ShaderCompiler::ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept
@@ -137,8 +200,8 @@ namespace gglab
 
 		const auto keySize = keyString.size() * sizeof(wchar_t);
 		ShaderHash128 hash{};
-		hash.m_LowBits = FNV1a64::HashBytes64(bytes, keySize);
-		hash.m_HighBits = FNV1a64::HashBytes64(bytes, keySize, 0x9ae16a3b2f90404full);
+		hash.m_LowBits = Crc64(keyString);
+		hash.m_HighBits = FNV1a64::HashBytes64(bytes, keySize);
 
 		return hash;
 	}
@@ -183,6 +246,11 @@ namespace gglab
 	{
 		ComPtr<IDxcBlobEncoding> src;
 		GGLAB_HR(m_Utils->LoadFile(utils::Canonical(desc.m_SourcePath).c_str(), nullptr, &src));
+
+		// source file code check. shader source must be utf-8
+#if defined(BUILD_DEBUG)
+		AssertSourceUtf8(src.Get());
+#endif
 
 		DxcBuffer buffer{};
 		buffer.Ptr = src->GetBufferPointer();
@@ -236,7 +304,7 @@ namespace gglab
 
 		// -D
 		std::vector<std::wstring> defines;
-		defines.resize(desc.m_Defines.size());
+		defines.reserve(desc.m_Defines.size());
 		for (const auto& define : desc.m_Defines)
 		{
 			std::wstring arg = define.m_Name;
@@ -334,6 +402,8 @@ namespace gglab
 		}
 		out << "\n";
 
+		out << "dep=" << utils::Canonical(desc.m_SourcePath).string()
+			<< "|mtime=" << utils::LastWriteTimeTicks(desc.m_SourcePath) << "\n";
 		for (const auto& d : deps)
 		{
 			out << "dep=" << d.string() << "|mtime=" << utils::LastWriteTimeTicks(d) << "\n";
@@ -379,6 +449,35 @@ namespace gglab
 			}
 		}
 		return true;
+	}
+
+	std::wstring ShaderCompiler::DefaultEntry(const ShaderStage& stage) noexcept
+	{
+		switch (stage)
+		{
+		case ShaderStage::Vertex:
+			return L"VSMain";
+		case ShaderStage::Pixel:
+			return L"PSMain";
+		case ShaderStage::Hull:
+			return L"HSMain";
+		case ShaderStage::Domain:
+			return L"DSMain";
+		case ShaderStage::Geometry:
+			return L"GSMain";
+		case ShaderStage::Mesh:
+			return L"MSMain";
+		case ShaderStage::Compute:
+			return L"CSMain";
+		default:
+			break;
+		}
+		return L"Main";
+	}
+
+	std::wstring ShaderCompiler::ToHex(ShaderHash128 hash) noexcept
+	{
+		return std::format(L"{:016x}{:016x}", hash.m_HighBits, hash.m_LowBits);
 	}
 
 	std::wstring ShaderCompiler::ToTarget(ShaderStage stage, ShaderModel model) noexcept
@@ -443,14 +542,11 @@ namespace gglab
 		str += L"target:" + target + L";";
 		str += L"hv:" + desc.m_HlslVersion + L";";
 		str += L"optimization:" + desc.m_OptLevel + L";";
+		str += L"flags:" + std::to_wstring(static_cast<uint32_t>(desc.m_Flags)) + L";";
 
 		// defines
-		std::vector<ShaderDefine> defines = desc.m_Defines;
-		std::sort(defines.begin(), defines.end(),
-			[](const auto& a, const auto& b)
-			{
-				return (a.m_Name < b.m_Name) || (a.m_Name == b.m_Name && a.m_Value < b.m_Value);
-			});
+		auto defines = desc.m_Defines;
+		std::sort(defines.begin(), defines.end());
 		str += L"defines:";
 		for (auto& define : defines)
 		{
@@ -458,7 +554,7 @@ namespace gglab
 		}
 
 		// include dirs
-		std::vector<std::filesystem::path> includes = desc.m_IncludeDirs;
+		auto includes = desc.m_IncludeDirs;
 		std::sort(includes.begin(), includes.end());
 		str += L";includes:";
 		for (auto& path : includes)
@@ -467,7 +563,10 @@ namespace gglab
 		}
 
 		// extra args
-		for (auto& arg : desc.m_ExtraArgs)
+		auto extras = desc.m_ExtraArgs;
+		std::sort(extras.begin(), extras.end());
+		str += L";extra:";
+		for (auto& arg : extras)
 		{
 			str += arg + L",";
 		}
@@ -475,15 +574,49 @@ namespace gglab
 		return str;
 	}
 
-	std::wstring ShaderCompiler::HashKeyString(std::wstring_view keyStr) noexcept
+	bool ShaderCompiler::GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
 	{
-		const auto* bytes = reinterpret_cast<const uint8_t*>(keyStr.data());
-		size_t size = keyStr.size();
+		constexpr size_t MinDxilSize = 20;
+		if (data == nullptr || size < MinDxilSize)
+		{
+			return false;
+		}
 
-		uint64_t low = Crc64(keyStr);
-		uint64_t high = FNV1a64::HashBytes64(bytes, size, 0x9ae16a3b2f90404full);
+		// magic number for DirectX Container
+		// https://llvm.org/docs/DirectX/DXContainer.html?utm_source=chatgpt.com#file-header
+		static const unsigned char DXBCMagicNumber[] = { 'D', 'X', 'B', 'C' };
+		if (std::memcmp(data, DXBCMagicNumber, 4) != 0)
+		{
+			return false;
+		}
+		const unsigned char* ptr = static_cast<const unsigned char*>(data);
+		std::memcpy(&outHash.m_LowBits, ptr + 4, sizeof(uint64_t));
+		std::memcpy(&outHash.m_HighBits, ptr + 12, sizeof(uint64_t));
 
-		std::wstring heyHash = std::format(L"{:016x}{:016x}", high, low);
-		return heyHash;
+		return true;
+	}
+
+	ShaderHash128 ShaderCompiler::ComputeHashFromBlob(IDxcBlob* blob) noexcept
+	{
+		ShaderHash128 hash{};
+		if (!blob)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBlob: blob is null.");
+			return hash;
+		}
+
+		const auto* ptr = static_cast<const uint8_t*>(blob->GetBufferPointer());
+		const auto size = blob->GetBufferSize();
+
+		if (GetDxilContainerHash(ptr, size, hash))
+		{
+			return hash;
+		}
+
+		// FNV-1a 64-bit hash
+		GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBlob: Failed to get DXIL validator hash, fallback to FNV-1a hash.");
+		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
+		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
+		return hash;
 	}
 }

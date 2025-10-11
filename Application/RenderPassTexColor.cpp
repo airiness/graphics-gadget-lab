@@ -24,8 +24,12 @@ namespace gglab
 		auto* renderer = Application::GetInstance()->GetRenderer();
 		auto* shaderManager = Application::GetInstance()->GetShaderManager();
 
-		auto vertexShaderId = shaderManager->LoadShader("Shaders/TexturedModelVS.dxil", ShaderStage::Vertex);
-		auto pixelShaderId = shaderManager->LoadShader("Shaders/TexturedModelPS.dxil", ShaderStage::Pixel);
+		ShaderDesc shaderDesc{};
+		shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
+		shaderDesc.m_Stage = ShaderStage::Vertex;
+		auto vertexShaderId = shaderManager->LoadShader(shaderDesc);
+		shaderDesc.m_Stage = ShaderStage::Pixel;
+		auto pixelShaderId = shaderManager->LoadShader(shaderDesc);
 
 		m_KeyInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
 		m_KeyInputs.m_InputLayoutId = InputLayoutId::P3N3T2;

@@ -44,7 +44,6 @@
     <Import Project="..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\PropertySheets\DirectXMeshImport.props" />
     <Import Project="..\PropertySheets\DirectXTexImport.props" />
-    <Import Project="..\PropertySheets\PreBuildEvents.props" />
     <Import Project="..\PropertySheets\AssimpImport.props" />
     <Import Project="..\PropertySheets\EnttImport.props" />
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
@@ -56,7 +55,6 @@
     <Import Project="..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\PropertySheets\DirectXMeshImport.props" />
     <Import Project="..\PropertySheets\DirectXTexImport.props" />
-    <Import Project="..\PropertySheets\PreBuildEvents.props" />
     <Import Project="..\PropertySheets\AssimpImport.props" />
     <Import Project="..\PropertySheets\EnttImport.props" />
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
