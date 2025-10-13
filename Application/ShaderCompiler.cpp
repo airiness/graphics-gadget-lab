@@ -10,16 +10,6 @@ namespace gglab
 {
 	namespace
 	{
-#if defined (BUILD_DEBUG)
-		void AssertSourceUtf8(ShaderBlob* blob) noexcept
-		{
-			BOOL known = FALSE; UINT32 codePage = 0;
-			blob->GetEncoding(&known, &codePage);
-			GGLAB_ASSERT_MSG(known != FALSE, "Shader source encoding unknown. Please save as UTF-8 (no BOM).");
-			GGLAB_ASSERT_MSG(codePage == DXC_CP_UTF8, "Shader source must be UTF-8 (no BOM).");
-		}
-#endif
-
 		class ShaderIncludeHandler final : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IDxcIncludeHandler>
 		{
 		public:
@@ -38,9 +28,6 @@ namespace gglab
 
 				if (SUCCEEDED(m_Utils->LoadFile(path.c_str(), nullptr, &blob)))
 				{
-#if defined(BUILD_DEBUG)
-					AssertSourceUtf8(blob.Get());
-#endif
 					m_Includes.push_back(path);
 					*ppIncludeSource = blob.Detach();
 					return S_OK;
@@ -51,9 +38,6 @@ namespace gglab
 					const auto pathInDir = utils::Canonical(dir / pFilename);
 					if (SUCCEEDED(m_Utils->LoadFile(pathInDir.c_str(), nullptr, &blob)))
 					{
-#if defined(BUILD_DEBUG)
-						AssertSourceUtf8(blob.Get());
-#endif
 						m_Includes.push_back(pathInDir);
 						*ppIncludeSource = blob.Detach();
 						return S_OK;
@@ -246,11 +230,6 @@ namespace gglab
 	{
 		ComPtr<IDxcBlobEncoding> src;
 		GGLAB_HR(m_Utils->LoadFile(utils::Canonical(desc.m_SourcePath).c_str(), nullptr, &src));
-
-		// source file code check. shader source must be utf-8
-#if defined(BUILD_DEBUG)
-		AssertSourceUtf8(src.Get());
-#endif
 
 		DxcBuffer buffer{};
 		buffer.Ptr = src->GetBufferPointer();

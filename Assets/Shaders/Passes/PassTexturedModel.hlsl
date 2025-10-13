@@ -1,3 +1,5 @@
+#include "../Common/MathCommon.hlsli"
+
 cbuffer ConstatBuffer : register(b0)
 {
 	float4x4 ModelMat;
@@ -19,13 +21,6 @@ struct VertexShaderOutput
 	float3 Color : COLOR;
 };
 
-// struct PixelShaderInput
-// {
-// 	float4 Position : SV_POSITION;
-// 	float2 TexCoord : TEXCOORD;
-// 	float3 Color : COLOR;
-// };
-
 Texture2D tex01 : register(t0);
 SamplerState sampler01 : register(s0);
 
@@ -35,7 +30,6 @@ float4 PSMain(VertexShaderOutput IN) : SV_Target
 	//float3 color = abs(IN.Color);
 	//return float4(color, 1.0);
 }
-
 
 VertexShaderOutput VSMain(VertexPosColor IN)
 {

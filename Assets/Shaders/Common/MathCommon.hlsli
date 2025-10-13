@@ -9,3 +9,8 @@ float Pow5(float x)
 	float xx = x * x;
 	return xx * xx * x;
 }
+
+float Pow2(float x)
+{
+	return x * x;
+}

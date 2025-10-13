@@ -447,5 +447,13 @@
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
+    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
