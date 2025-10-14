@@ -1,8 +1,6 @@
 #include "Precompiled.h"
 #include "ShaderManager.h"
 #include "ShaderCompiler.h"
-#include "HResult.h"
-#include "PathUtils.h"
 
 namespace gglab
 {
@@ -12,7 +10,8 @@ namespace gglab
 
 		ShaderDesc defaultDesc{};
 		defaultDesc.m_Flags |= IsDebuggerPresent() ? ShaderCompileFlag::Debug : ShaderCompileFlag::None;
-		defaultDesc.m_IncludeDirs = { L"Assets/Shaders/" }; //{ L"Assets/Shaders", L"Shaders/Common", L"Shaders/Pbr", L"Shaders/Passes" };
+		defaultDesc.m_IncludeDirs = { L"Assets/Shaders", L"Assets/Shaders/Common", L"Assets/Shaders/Pbr", L"Assets/Shaders/Passes" };
+		//defaultDesc.m_IncludeDirs = { L"Assets/Shaders/" }; 
 		defaultDesc.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(defaultDesc);
 	}

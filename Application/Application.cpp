@@ -245,7 +245,7 @@ namespace gglab
 
 		// Test Sponza
 		{
-			auto model = m_AssetManager->LoadModel("Assets/models/Sponza/Sponza.gltf");
+			auto model = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
 			auto sponzaEntity = m_Registry.create();
 			m_Registry.emplace<Transform>(sponzaEntity, Transform());
 			m_Registry.emplace<Model>(sponzaEntity, std::move(model));

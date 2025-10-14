@@ -13,7 +13,8 @@ namespace gglab
 		class ShaderIncludeHandler final : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IDxcIncludeHandler>
 		{
 		public:
-			HRESULT RuntimeClassInitialize(ComPtr<IDxcUtils> utils, const std::vector<std::filesystem::path>& includeDirs) noexcept
+			HRESULT RuntimeClassInitialize(ComPtr<IDxcUtils> utils,
+				const std::vector<std::filesystem::path>& includeDirs) noexcept
 			{
 				m_Utils = utils;
 				m_IncludeDirs = includeDirs;
@@ -52,7 +53,6 @@ namespace gglab
 
 		private:
 			ComPtr<IDxcUtils> m_Utils;
-
 			std::vector<std::filesystem::path> m_IncludeDirs;
 			std::vector<std::filesystem::path> m_Includes;
 

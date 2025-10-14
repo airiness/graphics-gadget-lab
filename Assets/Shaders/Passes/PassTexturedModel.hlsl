@@ -1,4 +1,4 @@
-#include "../Common/MathCommon.hlsli"
+#include <Common/MathCommon.hlsli>
 
 cbuffer ConstatBuffer : register(b0)
 {
