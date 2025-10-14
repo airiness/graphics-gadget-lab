@@ -72,17 +72,17 @@ namespace gglab
 
 	// TypedIndex with counter define helper macro.
 #define GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(name, repType)	\
-    struct name##Tag {};										\
-    using name = ::gglab::TypedIndex<name##Tag, repType>;		\
-    inline constexpr name Invalid##name = name::Invalid();		\
-    using name##Counter = ::gglab::IndexCounter<name>;
+	struct name##Tag {};										\
+	using name = ::gglab::TypedIndex<name##Tag, repType>;		\
+	inline constexpr name Invalid##name = name::Invalid();		\
+	using name##Counter = ::gglab::IndexCounter<name>;
 
 	// Nested TypedIndex with counter define helper macro.
 #define GGLAB_DEFINE_NESTED_TYPED_INDEX_WITH_COUNTER(name, repType)	\
-    struct name##Tag {};                                            \
-    using name = ::gglab::TypedIndex<name##Tag, repType>;           \
-    inline static constexpr name Invalid##name = name::Invalid();   \
-    using name##Counter = ::gglab::IndexCounter<name>;
+	struct name##Tag {};                                            \
+	using name = ::gglab::TypedIndex<name##Tag, repType>;           \
+	inline static constexpr name Invalid##name = name::Invalid();   \
+	using name##Counter = ::gglab::IndexCounter<name>;
 
 }
 

@@ -7,9 +7,9 @@ namespace gglab
 {
 	struct GlobalConstantBuffer
 	{
-		Matrix m_ModelMatrix;
-		Matrix m_ViewMatrix;
-		Matrix m_ProjectionMatrix;
+		Matrix view;
+		Matrix proj;
+		Matrix viewProj;
 	};
 
 	struct alignas(16) LightGPU

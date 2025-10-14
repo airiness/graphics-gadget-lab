@@ -41,7 +41,7 @@ namespace gglab
 
 	private:
 		void Initialize() noexcept;
-		void Update() noexcept;
+		bool Update() noexcept;
 		void Finalize() noexcept;
 
 		void InitializeWindow() noexcept;

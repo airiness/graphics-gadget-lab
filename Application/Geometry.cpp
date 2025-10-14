@@ -20,31 +20,31 @@ namespace gglab
 			enttRegistry.emplace<Transform>(cubeEntity, transform);
 
 			Model cubeModel;
-			cubeModel.m_Type = ModelType::ModelType_Procedual;
+			cubeModel.m_Type = ModelType::ModelType_Procedural;
 
-			if (assetManager->GetMesh(PocedualCubeMeshID) == nullptr)
+			if (assetManager->GetMesh(ProceduralCubeMeshID) == nullptr)
 			{
 				std::unique_ptr<Mesh> cubeMesh = std::make_unique<Mesh>();
-				cubeMesh->m_MeshId = PocedualCubeMeshID;
+				cubeMesh->m_MeshId = ProceduralCubeMeshID;
 
 				AssetManager::MeshUploadData meshUploadData;
-				meshUploadData.m_MeshId = PocedualCubeMeshID;
+				meshUploadData.m_MeshId = ProceduralCubeMeshID;
 				meshUploadData.m_VerticesData = GetVerticesData();
 				meshUploadData.m_IndicesData = GetIndicesData();
 
-				if (assetManager->GetMaterial(PocedualCubeMaterialID) == nullptr)
+				if (assetManager->GetMaterial(ProceduralCubeMaterialID) == nullptr)
 				{
 					std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
-					cubeMaterial->m_MaterialId = PocedualCubeMaterialID;
+					cubeMaterial->m_MaterialId = ProceduralCubeMaterialID;
 					cubeMaterial->m_BaseColorTex = assetManager->GetTextureID(TextPath);
 					assetManager->AddMaterial(std::move(cubeMaterial));
 				};
 
-				cubeMesh->m_MaterialId = PocedualCubeMaterialID;
+				cubeMesh->m_MaterialId = ProceduralCubeMaterialID;
 				assetManager->AddMesh(std::move(cubeMesh), meshUploadData);
 			}
 
-			cubeModel.m_Meshes.push_back(PocedualCubeMeshID);
+			cubeModel.m_Meshes.push_back(ProceduralCubeMeshID);
 
 			enttRegistry.emplace<Model>(cubeEntity, std::move(cubeModel));
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <CmdExe>$(ComSpec)</CmdExe>
+    <CmdExe Condition="'$(CmdExe)'==''">$(SystemRoot)\System32\cmd.exe</CmdExe>
+  </PropertyGroup>
+
+  <Target Name="LinkAssetsIntoOutDir"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(OS)'=='Windows_NT' and '$(_IsAppProject)'=='true' and Exists('$(AssetSrcDir)')">
+    <MakeDir Directories="$(OutDir)" />
+    <Exec Command="&quot;$(CmdExe)&quot; /D /C if exist &quot;$(AssetOutDir)&quot; rmdir &quot;$(AssetOutDir)&quot;"
+          IgnoreExitCode="true" />
+    <Exec Command="&quot;$(CmdExe)&quot; /D /C if not exist &quot;$(AssetOutDir)&quot; mklink /J &quot;$(AssetOutDir)&quot; &quot;$(AssetSrcDir)&quot;" />
+  </Target>
+
+  <Target Name="UnlinkAssetsFromOutDir"
+          AfterTargets="Clean"
+          Condition="'$(OS)'=='Windows_NT' and '$(_IsAppProject)'=='true'">
+    <Exec Command="&quot;$(CmdExe)&quot; /D /C if exist &quot;$(AssetOutDir)&quot; rmdir &quot;$(AssetOutDir)&quot;"
+          IgnoreExitCode="true" />
+  </Target>
+</Project>

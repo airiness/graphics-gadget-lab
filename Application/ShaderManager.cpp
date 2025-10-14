@@ -1,33 +1,34 @@
 #include "Precompiled.h"
 #include "ShaderManager.h"
-#include "HResult.h"
+#include "ShaderCompiler.h"
 
 namespace gglab
 {
 	ShaderManager::ShaderManager() noexcept
 	{
-		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_DxcUtils)));
+		m_Compiler = std::make_unique<ShaderCompiler>();
+
+		ShaderDesc defaultDesc{};
+		defaultDesc.m_Flags |= IsDebuggerPresent() ? ShaderCompileFlag::Debug : ShaderCompileFlag::None;
+		defaultDesc.m_IncludeDirs = { L"Assets/Shaders" };
+		defaultDesc.m_Defines = {};
+		m_Compiler->SetDefaultShaderConfig(defaultDesc);
 	}
 
-	ShaderId ShaderManager::LoadShader(const std::filesystem::path& path, ShaderStage stage) noexcept
+	void ShaderManager::SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept
 	{
-		// Path check
-		if (!std::filesystem::exists(path))
-		{
-			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: File not found: {}", path.string());
-			return ShaderId();
-		}
+		std::unique_lock lock(m_Mutex);
+		m_Compiler->SetDefaultShaderConfig(defaultDesc);
+	}
 
-		// Make path canonical
-		std::error_code ec;
-		auto canonicalPath = std::filesystem::weakly_canonical(path, ec);
-		auto normalPath = ec ? path.lexically_normal() : std::move(canonicalPath);
-		normalPath.make_preferred();
+	ShaderId ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
+	{
+		ShaderDesc norm = m_Compiler->NormalizeShaderDesc(desc);
 
-		ShaderKey key{};
-		key.m_PathHash = StringId(normalPath.string());
-		key.m_Stage = stage;
+		const auto keyHash = ShaderCompiler::ComputeRecipeHash(norm);
+		ShaderKey key{ .m_KeyHash = keyHash };
 
+		// return if exist.
 		{
 			std::shared_lock lock(m_Mutex);
 			if (auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
@@ -36,10 +37,19 @@ namespace gglab
 			}
 		}
 
-		ComPtr<ShaderBlob> blob;
-		GGLAB_HR(m_DxcUtils->LoadFile(path.wstring().c_str(), nullptr, &blob));
+		// create shader if not exist
+		if (!std::filesystem::exists(norm.m_SourcePath))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: File not found: {}", norm.m_SourcePath.string());
+			return ShaderId();
+		}
 
-		auto timestamp = std::filesystem::last_write_time(path);
+		std::unique_ptr<Shader> shader = std::make_unique<Shader>(desc);
+		if (!RefreshShaderInternal(*shader, norm))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: Shader compile failed: {}", norm.m_SourcePath.string());
+			return ShaderId();
+		}
 
 		{
 			std::unique_lock lock(m_Mutex);
@@ -48,53 +58,70 @@ namespace gglab
 				return it->second;
 			}
 
-			ShaderRecord record{};
-			record.m_Key = key;
-			record.m_Path = path;
-			record.m_Stage = stage;
-			record.m_Blob = std::move(blob);
-			record.m_Timestamp = timestamp;
-			record.m_Hash = HashBlob(record.m_Blob.Get());
-
-			ShaderId shaderId{ static_cast<uint32_t>(m_Records.size()) };
-			m_Records.push_back(std::move(record));
-			m_KeyIdMap.emplace(key, shaderId);
-			return shaderId;
+			ShaderId id{ static_cast<uint32_t>(m_Shaders.size()) };
+			m_Shaders.push_back(std::move(shader));
+			m_KeyIdMap.emplace(key, id);
+			return id;
 		}
+	}
+
+	void ShaderManager::Preload(const std::vector<ShaderDesc>& descList) noexcept
+	{
+		for (const auto& desc : descList)
+		{
+			LoadShader(desc);
+		}
+	}
+
+	int32_t ShaderManager::RefreshChanged() noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+		int32_t count = 0;
+		for (auto& shader : m_Shaders)
+		{
+			if (shader)
+			{
+				if (RefreshShaderInternal(*shader))
+				{
+					++count;
+				}
+				else
+				{
+					GGLAB_LOG_GRAPHICS_ERROR("RefreshChanged: recompile failed: {}", shader->GetDesc().m_SourcePath.string());
+				}
+			}
+		}
+		return count;
+	}
+
+	bool ShaderManager::RefreshShader(ShaderId shaderId) noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+		if (!shaderId.IsValid() || shaderId.Value() >= m_Shaders.size() || !m_Shaders[shaderId.Value()])
+		{
+			return false;
+		}
+		return RefreshShaderInternal(*m_Shaders[shaderId.Value()]);
 	}
 
 	D3D12_SHADER_BYTECODE ShaderManager::GetBytecode(ShaderId shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		D3D12_SHADER_BYTECODE bytecode{};
-		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
 		{
-			const auto& record = m_Records[shaderId.Value()];
-			if (record.m_Blob)
-			{
-				bytecode.pShaderBytecode = record.m_Blob->GetBufferPointer();
-				bytecode.BytecodeLength = record.m_Blob->GetBufferSize();
-				return bytecode;
-			}
-			else
-			{
-				GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Shader blob is null for shader ID {}", shaderId.Value());
-			}
+			return m_Shaders[shaderId.Value()]->GetByteCode();
 		}
-		else
-		{
-			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Invalid shader ID {}", shaderId.Value());
-		}
-
+		GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Invalid shader ID {}", shaderId.Value());
 		return bytecode;
 	}
 
 	ShaderBlob* ShaderManager::GetBlob(ShaderId shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
 		{
-			return m_Records[shaderId.Value()].m_Blob.Get();
+			return m_Shaders[shaderId.Value()]->GetCompileArtifact().m_DxilBlob.Get();
 		}
 		return nullptr;
 	}
@@ -102,9 +129,9 @@ namespace gglab
 	ShaderHash128 ShaderManager::GetHash(ShaderId shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
 		{
-			return m_Records[shaderId.Value()].m_Hash;
+			return m_Shaders[shaderId.Value()]->GetCompileArtifact().m_Hash;
 		}
 		return {};
 	}
@@ -112,105 +139,32 @@ namespace gglab
 	uint64_t ShaderManager::GetGeneration(ShaderId shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Records.size())
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
 		{
-			return m_Records[shaderId.Value()].m_Generation;
+			return m_Shaders[shaderId.Value()]->GetGeneration();
 		}
 		return 0;
 	}
 
-	void ShaderManager::Preload(const std::vector<std::pair<std::filesystem::path, ShaderStage>>& shaders) noexcept
+	bool ShaderManager::RefreshShaderInternal(Shader& shader) noexcept
 	{
-		for (const auto& [path, stage] : shaders)
-		{
-			LoadShader(path, stage);
-		}
+		ShaderDesc norm = m_Compiler->NormalizeShaderDesc(shader.GetDesc());
+		return RefreshShaderInternal(shader, norm);
 	}
 
-	int32_t ShaderManager::ReloadChanged() noexcept
+	bool ShaderManager::RefreshShaderInternal(Shader& shader, const ShaderDesc& normalizedDesc) noexcept
 	{
-		std::unique_lock lock(m_Mutex);
-		int32_t reloadCount = 0;
-		for (auto& record : m_Records)
-		{
-			if (!std::filesystem::exists(record.m_Path))
-			{
-				GGLAB_LOG_GRAPHICS_WARN("ShaderManager::ReloadChanged: File not found: {}", record.m_Path.string());
-				continue;
-			}
-			auto currentTimestamp = std::filesystem::last_write_time(record.m_Path);
-			if (currentTimestamp != record.m_Timestamp)
-			{
-				ComPtr<ShaderBlob> newBlob;
-				if (SUCCEEDED(m_DxcUtils->LoadFile(record.m_Path.wstring().c_str(), nullptr, &newBlob)))
-				{
-					auto newHash = HashBlob(newBlob.Get());
-					if (newHash.m_LowBits != record.m_Hash.m_LowBits || newHash.m_HighBits != record.m_Hash.m_HighBits)
-					{
-						record.m_Blob = std::move(newBlob);
-						record.m_Hash = newHash;
-						record.m_Timestamp = currentTimestamp;
-						++record.m_Generation;
-						++reloadCount;
-						GGLAB_LOG_GRAPHICS_INFO("ShaderManager::ReloadChanged: Reloaded shader: {}", record.m_Path.string());
-					}
-					else
-					{
-						record.m_Timestamp = currentTimestamp; // Update timestamp even if content is the same
-					}
-				}
-				else
-				{
-					GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::ReloadChanged: Failed to reload shader: {}", record.m_Path.string());
-				}
-			}
-		}
-		return reloadCount;
-	}
+		ShaderCompileArtifact artifact = m_Compiler->CompileOrLoadArtifact(normalizedDesc);
 
-	bool ShaderManager::GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
-	{
-		constexpr size_t MinDxilSize = 20;
-		if (data == nullptr || size < MinDxilSize)
-		{
-			return false;
-		}
+		const auto changed = (shader.GetGeneration() == 0) ||
+			(artifact.m_Hash != shader.GetCompileArtifact().m_Hash);
 
-		// magic number for DirectX Container
-		// https://llvm.org/docs/DirectX/DXContainer.html?utm_source=chatgpt.com#file-header
-		static const unsigned char DXBCMagicNumber[] = { 'D', 'X', 'B', 'C' };
-		if (std::memcmp(data, DXBCMagicNumber, 4) != 0)
-		{
-			return false;
-		}
-		const unsigned char* ptr = static_cast<const unsigned char*>(data);
-		std::memcpy(&outHash.m_LowBits, ptr + 4, sizeof(uint64_t));
-		std::memcpy(&outHash.m_HighBits, ptr + 12, sizeof(uint64_t));
+		std::error_code errorCode;
+		artifact.m_SourceTimeStamp = std::filesystem::exists(normalizedDesc.m_SourcePath, errorCode) ?
+			std::filesystem::last_write_time(normalizedDesc.m_SourcePath, errorCode) :
+			std::filesystem::file_time_type{};
 
-		return true;
-	}
-
-	ShaderHash128 ShaderManager::HashBlob(ShaderBlob* blob) noexcept
-	{
-		ShaderHash128 hash{};
-		if (!blob)
-		{
-			GGLAB_LOG_GRAPHICS_WARN("ShaderManager::HashBlob: blob is null.");
-			return hash;
-		}
-
-		const auto* ptr = static_cast<const uint8_t*>(blob->GetBufferPointer());
-		const auto size = blob->GetBufferSize();
-
-		if (GetDxilContainerHash(ptr, size, hash))
-		{
-			return hash;
-		}
-
-		// FNV-1a 64-bit hash
-		GGLAB_LOG_GRAPHICS_WARN("ShaderManager::HashBlob: Failed to get DXIL validator hash, fallback to FNV-1a hash.");
-		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
-		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
-		return hash;
+		shader.SetCompileArtifact(std::move(artifact), changed);
+		return changed;
 	}
 }

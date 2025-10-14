@@ -1,7 +1,5 @@
-#ifndef __BRDF_INCLUDED__
-#define __BRDF_INCLUDED__
-
-#include "Common.hlsli"
+#pragma once
+#include "MathCommon.hlsli"
 
 float D_GGX(float NoH, float a)
 {
@@ -29,5 +27,3 @@ float Fd_Lambert()
 	return 1.0 / PI;
 }
 
-
-#endif 

@@ -16,7 +16,7 @@ namespace gglab
 	{
 		ModelType_Invalid,
 		ModelType_glTF,
-		ModelType_Procedual,
+		ModelType_Procedural,
 	};
 
 	enum class LightType : uint32_t
@@ -50,10 +50,10 @@ namespace gglab
 	inline constexpr TextureId ReservedTextureID{ 5u };
 
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshId, uint32_t);
-	inline constexpr MeshId PocedualCubeMeshID{ 0u };
+	inline constexpr MeshId ProceduralCubeMeshID{ 0u };
 	inline constexpr MeshId ReservedMeshID{ 5u };
 
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialId, uint32_t);
-	inline constexpr MaterialId PocedualCubeMaterialID{ 0u };
+	inline constexpr MaterialId ProceduralCubeMaterialID{ 0u };
 	inline constexpr MaterialId ReservedMaterialID{ 5u };
 }

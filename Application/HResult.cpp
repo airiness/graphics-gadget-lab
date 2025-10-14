@@ -1,23 +1,11 @@
 #include "Precompiled.h"
 #include "HResult.h"
+#include "StringUtils.h"
 
 namespace gglab
 {
 	namespace
 	{
-		std::string NarrowFromWide(const wchar_t* wide)
-		{
-			if (!wide) { return {}; }
-			int32_t length = ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
-			if (length < 1)
-			{
-				return {};
-			}
-			std::string str(length - 1, '\0');
-			::WideCharToMultiByte(CP_UTF8, 0, wide, -1, str.data(), length, nullptr, nullptr);
-			return str;
-		}
-
 		std::string HexHr(HRESULT hr)
 		{
 			std::ostringstream os;
@@ -70,7 +58,7 @@ namespace gglab
 						<< " SubSysId=" << desc.SubSysId
 						<< " Revision=" << desc.Revision
 						<< " | Luid=(" << desc.AdapterLuid.HighPart << "," << desc.AdapterLuid.LowPart << ")\n"
-						<< "         Desc=\"" << NarrowFromWide(desc.Description) << "\"\n";
+						<< "         Desc=\"" << utils::ToString(desc.Description) << "\"\n";
 				}
 				adapter->Release();
 			}
@@ -81,7 +69,7 @@ namespace gglab
 	std::string FormatHResult(HRESULT hr)
 	{
 		_com_error e(hr);
-		std::string msg = NarrowFromWide(e.ErrorMessage());
+		std::string msg = utils::ToString(e.ErrorMessage());
 		if (msg.empty())
 		{
 			return HexHr(hr);

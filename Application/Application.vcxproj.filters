@@ -44,6 +44,18 @@
     <Filter Include="Graphics\DX12\Cache">
       <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{256c3528-7cfd-452f-863b-d87394ecb89a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{4fc4e433-58ca-4a56-b4b7-4ec47bf850dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{5aa86216-9dd0-4d2a-a8a0-7166dc2709fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Utility">
+      <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -204,6 +216,18 @@
     </ClCompile>
     <ClCompile Include="HResult.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderCompiler.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Shader.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="PathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="StringUtils.cpp">
+      <Filter>Core\Utility</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -405,25 +429,31 @@
     <ClInclude Include="HResult.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="ShaderCompiler.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="PathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="StringUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
-    <None Include="..\Shaders\BRDF.hlsli">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="..\Shaders\Common.hlsli">
-      <Filter>Shaders</Filter>
+    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli">
+      <Filter>Shaders\Common</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\Shaders\TexturedModelVS.hlsl">
-      <Filter>Shaders</Filter>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl">
+      <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

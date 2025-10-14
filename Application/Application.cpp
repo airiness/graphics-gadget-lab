@@ -76,7 +76,10 @@ namespace gglab
 			}
 			else
 			{
-				Update();
+				if (!Update())
+				{
+					return;
+				}
 			}
 		}
 	}
@@ -154,11 +157,11 @@ namespace gglab
 		m_IsInitialized = true;
 	}
 
-	void Application::Update() noexcept
+	bool Application::Update() noexcept
 	{
 		if (!m_IsInitialized)
 		{
-			return;
+			return true;
 		}
 
 		m_Time->Update();
@@ -166,19 +169,31 @@ namespace gglab
 
 		// Toggle Mouse Input Mode
 		auto keyboard = GetKeyboard();
-		if (keyboard && keyboard->IsKeyPressed(KeyCode::T))
+		if (keyboard)
 		{
-			if (auto mouse = GetMouse())
+			if (keyboard->IsKeyPressed(KeyCode::T))
 			{
-				mouse->SetMouseMode(
-					(mouse->GetMouseMode() == Mouse::MouseMode::Absolute) ?
-					Mouse::MouseMode::Relative :
-					Mouse::MouseMode::Absolute);
+
+				if (auto mouse = GetMouse())
+				{
+					mouse->SetMouseMode(
+						(mouse->GetMouseMode() == Mouse::MouseMode::Absolute) ?
+						Mouse::MouseMode::Relative :
+						Mouse::MouseMode::Absolute);
+				}
+			}
+
+			// Exit application when ESC pressed
+			if (keyboard->IsKeyPressed(KeyCode::Escape))
+			{
+				return false;
 			}
 		}
 
 		m_Renderer->Update();
 		m_Renderer->Render();
+
+		return true;
 	}
 
 	void Application::Finalize() noexcept
@@ -240,15 +255,19 @@ namespace gglab
 	{
 		// Shader preload
 		{
-			m_ShaderManager->Preload({
-				{"Shaders/TexturedModelVS.dxil", ShaderStage::Vertex},
-				{"Shaders/TexturedModelPS.dxil", ShaderStage::Pixel},
-				});
+			std::vector<ShaderDesc> shaderDescs;
+			ShaderDesc desc{};
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+			m_ShaderManager->Preload(shaderDescs);
 		}
 
 		// Test Sponza
 		{
-			auto model = m_AssetManager->LoadModel("Assets/models/Sponza/Sponza.gltf");
+			auto model = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
 			auto sponzaEntity = m_Registry.create();
 			m_Registry.emplace<Transform>(sponzaEntity, Transform());
 			m_Registry.emplace<Model>(sponzaEntity, std::move(model));

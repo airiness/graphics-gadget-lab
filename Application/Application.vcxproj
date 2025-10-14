@@ -40,29 +40,27 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\PropertySheets\ShaderCompile.props" />
     <Import Project="..\PropertySheets\Common.props" />
     <Import Project="..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\PropertySheets\DirectXMeshImport.props" />
     <Import Project="..\PropertySheets\DirectXTexImport.props" />
-    <Import Project="..\PropertySheets\PreBuildEvents.props" />
     <Import Project="..\PropertySheets\AssimpImport.props" />
     <Import Project="..\PropertySheets\EnttImport.props" />
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\PropertySheets\SpdlogImport.props" />
+    <Import Project="..\PropertySheets\AssetDirectorys.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\PropertySheets\ShaderCompile.props" />
     <Import Project="..\PropertySheets\Common.props" />
     <Import Project="..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\PropertySheets\DirectXMeshImport.props" />
     <Import Project="..\PropertySheets\DirectXTexImport.props" />
-    <Import Project="..\PropertySheets\PreBuildEvents.props" />
     <Import Project="..\PropertySheets\AssimpImport.props" />
     <Import Project="..\PropertySheets\EnttImport.props" />
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\PropertySheets\SpdlogImport.props" />
+    <Import Project="..\PropertySheets\AssetDirectorys.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -77,6 +75,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -91,6 +90,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,6 +135,7 @@
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
+    <ClCompile Include="PathUtils.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -161,8 +162,11 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RingSpanAllocator.cpp" />
+    <ClCompile Include="Shader.cpp" />
+    <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
     <ClCompile Include="StringId.cpp" />
+    <ClCompile Include="StringUtils.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
   </ItemGroup>
@@ -199,6 +203,7 @@
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="HResult.h" />
     <ClInclude Include="InputLayoutLibrary.h" />
+    <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
@@ -227,31 +232,20 @@
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
     <ClInclude Include="RingSpanAllocator.h" />
+    <ClInclude Include="Shader.h" />
+    <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TypedIndex.h" />
+    <ClInclude Include="StringUtils.h" />
     <ClInclude Include="VertexData.h" />
     <ClInclude Include="DX12ViewCache.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
-    <None Include="..\Shaders\BRDF.hlsli" />
-    <None Include="..\Shaders\Common.hlsli" />
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\Shaders\TexturedModelPS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.6</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="..\Shaders\TexturedModelVS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.6</ShaderModel>
-      <FileType>Document</FileType>
-    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Externals\Vender\DirectXMesh\DirectXMesh\DirectXMesh_Desktop_2022_Win10.vcxproj">
@@ -261,8 +255,12 @@
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\PropertySheets\LinkAssetDirectory.targets" Condition="Exists('..\PropertySheets\LinkAssetDirectory.targets')" />
     <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets" Condition="Exists('..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets')" />
   </ImportGroup>
