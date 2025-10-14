@@ -196,25 +196,25 @@ namespace gglab
 		switch (stage)
 		{
 		case ShaderStage::Vertex:
-			extension = L"vs.dxil";
+			extension = L".vs.dxil";
 			break;
 		case ShaderStage::Pixel:
-			extension = L"ps.dxil";
+			extension = L".ps.dxil";
 			break;
 		case ShaderStage::Hull:
-			extension = L"hs.dxil";
+			extension = L".hs.dxil";
 			break;
 		case ShaderStage::Domain:
-			extension = L"ds.dxil";
+			extension = L".ds.dxil";
 			break;
 		case ShaderStage::Geometry:
-			extension = L"gs.dxil";
+			extension = L".gs.dxil";
 			break;
 		case ShaderStage::Mesh:
-			extension = L"ms.dxil";
+			extension = L".ms.dxil";
 			break;
 		case ShaderStage::Compute:
-			extension = L"cs.dxil";
+			extension = L".cs.dxil";
 			break;
 		default:
 			extension = L".dxil";

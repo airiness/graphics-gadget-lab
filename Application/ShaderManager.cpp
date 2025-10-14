@@ -10,8 +10,7 @@ namespace gglab
 
 		ShaderDesc defaultDesc{};
 		defaultDesc.m_Flags |= IsDebuggerPresent() ? ShaderCompileFlag::Debug : ShaderCompileFlag::None;
-		defaultDesc.m_IncludeDirs = { L"Assets/Shaders", L"Assets/Shaders/Common", L"Assets/Shaders/Pbr", L"Assets/Shaders/Passes" };
-		//defaultDesc.m_IncludeDirs = { L"Assets/Shaders/" }; 
+		defaultDesc.m_IncludeDirs = { L"Assets/Shaders" };
 		defaultDesc.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(defaultDesc);
 	}

@@ -240,7 +240,14 @@ namespace gglab
 	{
 		// Shader preload
 		{
-			//m_ShaderManager->Preload({}); // TODO: Preload shaders
+			std::vector<ShaderDesc> shaderDescs;
+			ShaderDesc desc{};
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+			m_ShaderManager->Preload(shaderDescs);
 		}
 
 		// Test Sponza
