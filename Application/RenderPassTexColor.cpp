@@ -105,11 +105,10 @@ namespace gglab
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 
+				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 				// TODO: last state cache to avoid redundant state setting.(root signature, pso)
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
-
-				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
 				commandList->SetViewport(0, 0, width, height);
 				commandList->SetScissorRect(0, 0, width, height);

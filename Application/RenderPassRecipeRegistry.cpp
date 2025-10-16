@@ -36,11 +36,11 @@ namespace gglab
 				builder(desc, input, m_ShaderManager);
 				GGLAB_ASSERT_MSG(desc.Validate(), "GraphicsPipelineDesc is not valid");
 
-				const ShaderHash128 vsHash = input.m_VSId.Value() ? m_ShaderManager->GetHash(input.m_VSId) : ShaderHash128{};
-				const ShaderHash128 psHash = input.m_PSId.Value() ? m_ShaderManager->GetHash(input.m_PSId) : ShaderHash128{};
-				const ShaderHash128 dsHash = input.m_DSId.Value() ? m_ShaderManager->GetHash(input.m_DSId) : ShaderHash128{};
-				const ShaderHash128 hsHash = input.m_HSId.Value() ? m_ShaderManager->GetHash(input.m_HSId) : ShaderHash128{};
-				const ShaderHash128 gsHash = input.m_GSId.Value() ? m_ShaderManager->GetHash(input.m_GSId) : ShaderHash128{};
+				const ShaderHash128 vsHash = input.m_VSId.IsValid() ? m_ShaderManager->GetHash(input.m_VSId) : ShaderHash128{};
+				const ShaderHash128 psHash = input.m_PSId.IsValid() ? m_ShaderManager->GetHash(input.m_PSId) : ShaderHash128{};
+				const ShaderHash128 dsHash = input.m_DSId.IsValid() ? m_ShaderManager->GetHash(input.m_DSId) : ShaderHash128{};
+				const ShaderHash128 hsHash = input.m_HSId.IsValid() ? m_ShaderManager->GetHash(input.m_HSId) : ShaderHash128{};
+				const ShaderHash128 gsHash = input.m_GSId.IsValid() ? m_ShaderManager->GetHash(input.m_GSId) : ShaderHash128{};
 
 				GraphicsPSOKey key = desc.MakeKey(vsHash, psHash, dsHash, hsHash, gsHash);
 				entry.m_Cached = { key, std::move(desc) };
