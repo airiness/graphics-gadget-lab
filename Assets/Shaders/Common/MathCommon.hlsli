@@ -10,7 +10,13 @@ float Pow5(float x)
 	return xx * xx * x;
 }
 
-float Pow2(float x)
+// IEC 61966-2-1:2003
+float3 SRGBToLinear(float c)
 {
-	return x * x;
+	return c < 0.04045 ? (c / 12.92) : pow((c + 0.055) / 1.055, 2.4);
+}
+
+float3 LinearToSRGB(float3 c)
+{
+	return (c < 0.0031308) ? (12.92 * c) : (1.055 * pow(c, 1.0 / 2.4) - 0.055);
 }

@@ -243,7 +243,9 @@
     <ClInclude Include="DX12ViewCache.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Assets\Shaders\Common\CBLayout.hlsli" />
     <None Include="..\Assets\Shaders\Common\MathCommon.hlsli" />
+    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="packages.config" />
   </ItemGroup>
@@ -256,6 +258,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

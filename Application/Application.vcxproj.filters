@@ -450,9 +450,18 @@
     <None Include="..\Assets\Shaders\Common\MathCommon.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\Common\CBLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>

@@ -1,5 +1,5 @@
 #pragma once
-#include "MathCommon.hlsli"
+#include <Common/MathCommon.hlsli>
 
 float D_GGX(float NoH, float a)
 {
@@ -12,7 +12,6 @@ float3 F_Schlick(float u, float3 f0)
 {
 	return f0 + (float3(1.0) - f0) * Pow5(1.0 - u);
 }
-
 
 float V_SmithGGXCorrelated(float NoV, float NoL, float a)
 {
