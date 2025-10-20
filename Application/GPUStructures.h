@@ -5,7 +5,9 @@ using namespace DirectX::SimpleMath;
 
 namespace gglab
 {
-	struct alignas(16) GlobalCBData
+#define GGLAB_GPU_STRUCTURE_ALIGNAS alignas(16)
+
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS GlobalCBData
 	{
 		Matrix ViewMat;
 		Matrix ProjMat;
@@ -15,12 +17,12 @@ namespace gglab
 		float Exposure;
 	};
 
-	struct alignas(16) ObjectCBData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectCBData
 	{
 		Matrix ModelMat;
 	};
 
-	struct alignas(16) MaterialCBData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialCBData
 	{
 		Vector4 BaseColor;
 		float Metallic;
@@ -30,7 +32,7 @@ namespace gglab
 		Vector4 EmissiveColor;
 	};
 
-	struct alignas(16) LightData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS LightData
 	{
 		Vector4 Position;
 		Vector4 Direction;

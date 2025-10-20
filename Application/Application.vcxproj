@@ -136,6 +136,7 @@
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
     <ClCompile Include="PathUtils.cpp" />
+    <ClCompile Include="RenderPassForwardPBR.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -205,6 +206,7 @@
     <ClInclude Include="InputLayoutLibrary.h" />
     <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
+    <ClInclude Include="RenderPassForwardPBR.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />

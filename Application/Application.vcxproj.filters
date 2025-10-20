@@ -229,6 +229,9 @@
     <ClCompile Include="StringUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="RenderPassForwardPBR.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -440,6 +443,9 @@
     </ClInclude>
     <ClInclude Include="StringUtils.h">
       <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassForwardPBR.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

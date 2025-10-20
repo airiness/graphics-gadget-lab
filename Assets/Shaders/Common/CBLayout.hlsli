@@ -4,7 +4,7 @@ struct FrameCBData
 {
 	float4x4 ViewMat;
 	float4x4 ProjMat;
-	float4 CameraPos;
+	float4 CameraPosWS;
 	float4 MainLightDir;
 	float3 MainLightColor;
 	float Exposure;
