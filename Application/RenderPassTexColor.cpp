@@ -119,7 +119,7 @@ namespace gglab
 				commandList->FlushBarriers();
 
 				DX12DescriptorView rtvs[] = {
-					swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())
+					swapChain->GetCurrentBackBufferView()
 				};
 
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);

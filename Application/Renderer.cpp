@@ -24,7 +24,7 @@ namespace gglab
 
 	void Renderer::Initialize() noexcept
 	{
-		m_GlobalConstantBuffer = std::make_unique<DX12ConstantBuffer<GlobalConstantBuffer>>(m_Device.get());
+		m_GlobalCB = std::make_unique<DX12ConstantBuffer<GlobalCBData>>(m_Device.get());
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
@@ -170,14 +170,14 @@ namespace gglab
 
 	void Renderer::UpdateGlobalConstantBuffer() noexcept
 	{
-		GlobalConstantBuffer cbBuffer = {};
+		GlobalCBData globalCB = {};
 
 		Matrix viewMatrix = m_Camera->GetViewMatrix();
 		Matrix projMatrix = m_Camera->GetProjMatrix();
 
-		cbBuffer.ViewMat = DirectX::XMMatrixTranspose(viewMatrix);
-		cbBuffer.viewProj = DirectX::XMMatrixTranspose(projMatrix);
+		globalCB.ViewMat = DirectX::XMMatrixTranspose(viewMatrix);
+		globalCB.ProjMat = DirectX::XMMatrixTranspose(projMatrix);
 
-		m_GlobalConstantBuffer->Update(cbBuffer);
+		m_GlobalCB->Update(globalCB);
 	}
 }
