@@ -110,6 +110,11 @@ namespace gglab
 
 				DX12DescriptorView rtv = swapChain->GetCurrentBackBufferView();
 
+				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
+				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
+				auto dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(rg.GetResourceIndex(data.m_Depth), dsTexture);
+				auto viewCache = rg.GetViewCache();
+				auto& dsvDescriptor = viewCache->GetOrCreate(dsvKey, dsTexture);
 			});
 
 	}
