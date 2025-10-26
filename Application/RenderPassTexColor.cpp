@@ -118,7 +118,8 @@ namespace gglab
 				swapChain->PrepareBackBuffer(commandList);
 				commandList->FlushBarriers();
 
-				DX12DescriptorView rtvs[] = {
+				DX12DescriptorView rtvs[] = 
+				{
 					swapChain->GetCurrentBackBufferView()
 				};
 
@@ -127,11 +128,11 @@ namespace gglab
 
 				auto dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(rg.GetResourceIndex(data.m_Depth), dsTexture);
 				auto viewCache = rg.GetViewCache();
-				auto& dsvDescriptor = viewCache->GetOrCreate(dsvKey, dsTexture);
+				auto& dsv = viewCache->GetOrCreate(dsvKey, dsTexture);
 
-				commandList->SetRenderTargets(rtvs, &dsvDescriptor);
+				commandList->SetRenderTargets(rtvs, &dsv);
 				swapChain->ClearBackBuffer(commandList);
-				commandList->ClearDepthStencil(dsvDescriptor, 1.0f);
+				commandList->ClearDepthStencil(dsv, 1.0f);
 
 				// globals
 				commandList->SetGraphicsConstantBuffer(

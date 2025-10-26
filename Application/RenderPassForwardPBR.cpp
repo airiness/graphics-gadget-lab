@@ -6,6 +6,8 @@
 #include "DX12SwapChain.h"
 #include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
+#include "AssetManager.h"
+#include "Components.h"
 
 namespace gglab
 {
@@ -108,15 +110,67 @@ namespace gglab
 				swapChain->PrepareBackBuffer(commandList);
 				commandList->FlushBarriers();
 
-				DX12DescriptorView rtv = swapChain->GetCurrentBackBufferView();
+				DX12DescriptorView rtvs[] =
+				{
+					swapChain->GetCurrentBackBufferView()
+				};
 
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
 				auto dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(rg.GetResourceIndex(data.m_Depth), dsTexture);
 				auto viewCache = rg.GetViewCache();
-				auto& dsvDescriptor = viewCache->GetOrCreate(dsvKey, dsTexture);
+				auto& dsv = viewCache->GetOrCreate(dsvKey, dsTexture);
+
+				commandList->SetRenderTargets(rtvs, &dsv);
+				swapChain->ClearBackBuffer(commandList);
+				commandList->ClearDepthStencil(dsv, 1.0f, 0);
+
+				commandList->SetGraphicsConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex),
+					renderer->GetGlobalConstantBuffer()->GetBuffer()->Get()->GetGPUVirtualAddress());
+
+				DrawModels(commandList);
+
+				swapChain->FinishBackBuffer(commandList);
+				commandList->FlushBarriers();
+
 			});
-
 	}
-}
 
+
+	void RenderPassForwardPBR::DrawModels(DX12CommandList* commandList) noexcept
+	{
+		auto& reg = Application::GetInstance()->GetEnttRegistry();
+		auto* assetManager = Application::GetInstance()->GetAssetManager();
+
+		auto view = reg.view<Model>();
+		for (auto entity : view)
+		{
+			auto& model = view.get<Model>(entity);
+			for (const auto& meshId : model.m_Meshes)
+			{
+				const auto* mesh = assetManager->GetMesh(meshId);
+				if (!mesh || mesh->m_IndexCount == 0) { continue; }
+
+				D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
+				commandList->SetVertexBuffers(0, vbs);
+				commandList->SetIndexBuffer(mesh->m_IndexBufferView);
+
+				if (const auto* material = assetManager->GetMaterial(mesh->m_MaterialId);
+					material && material->m_MaterialId.IsValid())
+				{
+					if (auto* texture = assetManager->GetTexture(material->m_BaseColorTex))
+					{
+						commandList->SetGraphicsDescriptor(
+							static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
+							texture->m_Descriptor);
+					}
+				}
+				commandList->DrawIndexedInstanced(static_cast<uint32_t>(mesh->m_IndexCount));
+			}
+		}
+	}
+
+	// TODO: Add default base color descriptor when material or texture is missing.
+	// TODO: Sort and batch draw calls by PSO, Material and Texture.
+}

@@ -12,7 +12,8 @@
 #include "RGGpuResourceAllocator.h"
 #include "AssetManager.h"
 #include "Camera.h"
-#include "RenderPassTexColor.h"
+#include "RenderPassForwardPBR.h"
+#include "MathUtils.h"
 
 namespace gglab
 {
@@ -80,8 +81,8 @@ namespace gglab
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
 		RenderGraph rg(rgCreateInfo);
 
-		RenderPassTexColor texColorPass{};
-		texColorPass.AddPass(rg);
+		RenderPassForwardPBR forwardPbrPass{};
+		forwardPbrPass.AddPass(rg);
 
 		rg.Compile();
 
@@ -125,13 +126,24 @@ namespace gglab
 	void Renderer::CreateCommonRootSignature() noexcept
 	{
 		CD3DX12_DESCRIPTOR_RANGE1 range = {};
-		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
+			1, // numDescriptors
+			0, // baseShaderRegister
+			0, // registerSpace
+			D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex)].InitAsConstantBufferView(0);
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::GlobalCB)].
+			InitAsConstantBufferView(0);
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB)].
+			InitAsConstantBufferView(1);
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialCB)].
+			InitAsConstantBufferView(2);
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].
+			InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
 
-		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
+		constexpr uint32_t StaticSamplerCount = 1;
+		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};
 		staticSamplers[0].Init(0,
 			D3D12_FILTER_MIN_MAG_MIP_LINEAR,
 			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
@@ -141,8 +153,9 @@ namespace gglab
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Init_1_1(
 			static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters,
-			1, staticSamplers,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
+			StaticSamplerCount, staticSamplers,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
 
 		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
 		m_CommonRootSignatureId = id;
@@ -177,6 +190,7 @@ namespace gglab
 
 		globalCB.ViewMat = DirectX::XMMatrixTranspose(viewMatrix);
 		globalCB.ProjMat = DirectX::XMMatrixTranspose(projMatrix);
+		globalCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
 
 		m_GlobalCB->Update(globalCB);
 	}

@@ -135,6 +135,7 @@
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
+    <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="PathUtils.cpp" />
     <ClCompile Include="RenderPassForwardPBR.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
@@ -204,6 +205,7 @@
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="HResult.h" />
     <ClInclude Include="InputLayoutLibrary.h" />
+    <ClInclude Include="MathUtils.h" />
     <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
     <ClInclude Include="RenderPassForwardPBR.h" />
@@ -246,7 +248,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Assets\Shaders\Common\CBLayout.hlsli" />
-    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli" />
+    <None Include="..\Assets\Shaders\Common\Common.hlsli" />
     <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="packages.config" />

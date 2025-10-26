@@ -7,7 +7,9 @@ namespace gglab
 {
 	enum class CommonRSRootParamIndex : uint32_t
 	{
-		ConstantBufferIndex,
+		GlobalCB = 0,
+		ObjectCB,
+		MaterialCB,
 		TextureDescriptorTable,
 		RootParamCount
 	};

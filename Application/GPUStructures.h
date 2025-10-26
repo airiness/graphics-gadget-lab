@@ -7,36 +7,40 @@ namespace gglab
 {
 #define GGLAB_GPU_STRUCTURE_ALIGNAS alignas(16)
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS GlobalCBData
-	{
-		Matrix ViewMat;
-		Matrix ProjMat;
-		Vector4 CameraPos;
-		Vector4 MainLightDir;
-		Vector3 MainLightColor;
-		float Exposure;
-	};
-
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectCBData
-	{
-		Matrix ModelMat;
-	};
-
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialCBData
-	{
-		Vector4 BaseColor;
-		float Metallic;
-		float Roughness;
-		float NormalScale;
-		float OcclusionStrength;
-		Vector4 EmissiveColor;
-	};
-
 	struct GGLAB_GPU_STRUCTURE_ALIGNAS LightData
 	{
 		Vector4 Position;
 		Vector4 Direction;
 		Vector4 Color;
-		uint8_t LightType;
+		float Intensity;
+		float Range;
+		float SpotAngle;
+		uint32_t LightType;
+	};
+
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS GlobalCBData
+	{
+		Matrix ViewMat;
+		Matrix ProjMat;
+		Vector4 CameraPos;
+		LightData MainLight;
+		float Exposure;
+		Vector3 Padding;
+	};
+
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectCBData
+	{
+		Matrix ModelMat;
+		Matrix NormalMat;
+	};
+
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialCBData
+	{
+		Vector4 BaseColorFactor;
+		float MetallicFactor;
+		float RoughnessFactor;
+		float NormalScale;
+		float OcclusionStrength;
+		Vector4 EmissiveColorFactor;
 	};
 }

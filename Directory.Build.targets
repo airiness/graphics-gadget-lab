@@ -2,15 +2,21 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ShaderRoot>$(SolutionDir)Assets\Shaders</ShaderRoot>
+    <DefaultHlslShaderModel>6_7</DefaultHlslShaderModel>
+    <DefaultHlslLanguageVersion>2021</DefaultHlslLanguageVersion>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <FxCompile>
       <ExcludedFromBuild>true</ExcludedFromBuild>
       <AdditionalIncludeDirectories>$(ShaderRoot);$(SolutionDir)Assets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ShaderModel>6_7</ShaderModel>
+      <AdditionalOptions>-noLogo %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
     <Hlsl>
       <ExcludedFromBuild>true</ExcludedFromBuild>
       <AdditionalIncludeDirectories>$(ShaderRoot);$(SolutionDir)Assets;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ShaderModel>$(DefaultHlslShaderModel)</ShaderModel>
+      <AdditionalOptions>-HV $(DefaultHlslLanguageVersion) %(AdditionalOptions)</AdditionalOptions>
     </Hlsl>
   </ItemDefinitionGroup>
 </Project>

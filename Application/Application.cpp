@@ -257,11 +257,21 @@ namespace gglab
 		{
 			std::vector<ShaderDesc> shaderDescs;
 			ShaderDesc desc{};
+
+			// Textured Model Pass
 			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			shaderDescs.push_back(desc);
 			desc.m_Stage = ShaderStage::Pixel;
 			shaderDescs.push_back(desc);
+
+			// Forward PBR
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+
 			m_ShaderManager->Preload(shaderDescs);
 		}
 

@@ -232,6 +232,9 @@
     <ClCompile Include="RenderPassForwardPBR.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="MathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -447,13 +450,16 @@
     <ClInclude Include="RenderPassForwardPBR.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="MathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
-    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli">
+    <None Include="..\Assets\Shaders\Common\Common.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\Assets\Shaders\PBR\BRDF.hlsli">
