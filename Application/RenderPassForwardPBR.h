@@ -9,7 +9,7 @@ namespace gglab
 	{
 	public:
 		RenderPassForwardPBR() noexcept;
-		~RenderPassForwardPBR() = default;
+		~RenderPassForwardPBR() override = default;
 
 		void AddPass(RenderGraph& rg) noexcept override;
 

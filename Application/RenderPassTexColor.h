@@ -10,7 +10,7 @@ namespace gglab
 	{
 	public:
 		RenderPassTexColor() noexcept;
-		~RenderPassTexColor() = default;
+		~RenderPassTexColor() override = default;
 
 		void AddPass(RenderGraph& rg) noexcept override;
 
