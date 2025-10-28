@@ -247,7 +247,8 @@
     <ClInclude Include="DX12ViewCache.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Assets\Shaders\Common\CBLayout.hlsli" />
+    <None Include="..\Assets\Shaders\Common\Binding.hlsli" />
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli" />
     <None Include="..\Assets\Shaders\Common\Common.hlsli" />
     <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />

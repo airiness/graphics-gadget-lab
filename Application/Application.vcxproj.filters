@@ -465,7 +465,10 @@
     <None Include="..\Assets\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
-    <None Include="..\Assets\Shaders\Common\CBLayout.hlsli">
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\Common\Binding.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
   </ItemGroup>
