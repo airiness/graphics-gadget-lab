@@ -1,5 +1,6 @@
 #pragma once
 #include "DX12FencePoint.h"
+#include "RingSpanAllocator.h"
 
 namespace gglab
 {
@@ -13,7 +14,8 @@ namespace gglab
 	class DX12ResourceUploader final
 	{
 	public:
-		explicit DX12ResourceUploader(DX12Device* dx12Device) noexcept;
+		explicit DX12ResourceUploader(DX12Device* dx12Device,
+			uint32_t uploadBufferSize) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12ResourceUploader);
 		~DX12ResourceUploader() = default;
 
@@ -24,6 +26,9 @@ namespace gglab
 		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResourceData, const DX12Resource* destResource) const noexcept;
 
 		DX12CommandList* GetUploadCommandList() const { return m_UploadCommandList.get(); }
+
+	private:
+
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -40,5 +45,18 @@ namespace gglab
 
 		std::unique_ptr<UploadTracedInfo> m_UploadingInfo = nullptr;
 		std::vector<std::unique_ptr<UploadTracedInfo>> m_UploadTracedInfos;
+
+		struct PersistentRingUploadBuffer
+		{
+			explicit PersistentRingUploadBuffer(AllocatorBase::CountType capacity) noexcept :
+				m_Allocator(capacity) 
+			{
+			}
+
+			std::unique_ptr<DX12Buffer> m_Buffer = nullptr;
+			void* m_MappedPtr = nullptr;
+			RingSpanAllocator m_Allocator;
+		};
+		PersistentRingUploadBuffer m_PersistentRingUploadBuffer;
 	};
 }
