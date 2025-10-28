@@ -11,7 +11,7 @@ struct LightCBData
 	uint LightType; // 0: Directional, 1: Point, 2: Spot
 };
 
-struct GlobalCBData
+struct FrameCBData
 {
 	float4x4 ViewMat;
 	float4x4 ProjMat;
@@ -21,13 +21,15 @@ struct GlobalCBData
 	float3 Padding;
 };
 
-struct ObjectCBData
+struct ObjectData
 {
 	float4x4 ModelMat;
 	float4x4 NormalMat;
+	uint MaterialIndex;
+	uint3 Padding;
 };
 
-struct MaterialCBData
+struct MaterialData
 {
 	float4 BaseColorFactor;
 	float MetallicFactor;

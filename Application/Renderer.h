@@ -27,7 +27,7 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		DX12ConstantBuffer<GlobalCBData>* GetGlobalConstantBuffer() const noexcept { return m_GlobalCB.get(); }
+		DX12ConstantBuffer<FrameCBData>* GetGlobalConstantBuffer() const noexcept { return m_GlobalCB.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
 		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
@@ -46,7 +46,7 @@ namespace gglab
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 		std::unique_ptr<Camera> m_Camera;
-		std::unique_ptr<DX12ConstantBuffer<GlobalCBData>> m_GlobalCB;
+		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_GlobalCB;
 		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;

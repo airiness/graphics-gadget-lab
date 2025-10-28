@@ -18,7 +18,7 @@ namespace gglab
 		uint32_t LightType;
 	};
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS GlobalCBData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS FrameCBData
 	{
 		Matrix ViewMat;
 		Matrix ProjMat;
@@ -28,13 +28,13 @@ namespace gglab
 		Vector3 Padding;
 	};
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectCBData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectGPU
 	{
 		Matrix ModelMat;
 		Matrix NormalMat;
 	};
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialCBData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialGPU
 	{
 		Vector4 BaseColorFactor;
 		float MetallicFactor;
