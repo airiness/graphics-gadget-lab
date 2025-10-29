@@ -9,20 +9,12 @@
 
 namespace gglab
 {
-	DX12ResourceUploader::DX12ResourceUploader(DX12Device* dx12Device,
-		uint32_t uploadBufferSize) noexcept :
+	DX12ResourceUploader::DX12ResourceUploader(DX12Device* dx12Device) noexcept :
 		m_DX12Device(dx12Device),
 		m_UploadCommandQueue(std::make_unique<DX12CommandQueue>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
 		m_UploadCommandList(std::make_unique<DX12CommandList>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
-		m_UploadCommandAllocatorPool(std::make_unique<DX12CommandAllocatorPool>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT)),
-		m_PersistentRingUploadBuffer(uploadBufferSize)
+		m_UploadCommandAllocatorPool(std::make_unique<DX12CommandAllocatorPool>(m_DX12Device, D3D12_COMMAND_LIST_TYPE_DIRECT))
 	{
-		m_PersistentRingUploadBuffer.m_Buffer = std::make_unique<DX12Buffer>();
-		m_PersistentRingUploadBuffer.m_Buffer->Create(DX12Buffer::UploadBufferCreateInfo(
-			m_DX12Device->GetMemAllocator(),
-			static_cast<uint64_t>(uploadBufferSize)));
-		m_PersistentRingUploadBuffer.m_Buffer->SetDebugName(L"PersistentRingUploadBuffer");
-		m_PersistentRingUploadBuffer.m_MappedPtr = m_PersistentRingUploadBuffer.m_Buffer->Map();
 	}
 
 	void DX12ResourceUploader::BeginUpload() noexcept
