@@ -113,6 +113,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Components.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
+    <ClCompile Include="DX12GpuBufferRingAllocator.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
     <ClCompile Include="DX12CommandList.cpp" />
     <ClCompile Include="DX12CommandQueue.cpp" />
@@ -181,6 +182,7 @@
     <ClInclude Include="Components.h" />
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DX12Buffer.h" />
+    <ClInclude Include="DX12GpuBufferRingAllocator.h" />
     <ClInclude Include="DX12CommandAllocator.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />

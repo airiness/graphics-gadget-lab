@@ -40,20 +40,29 @@ namespace gglab
 		void CreateCamera() noexcept;
 		void CreateCommonRootSignature() noexcept;
 
+		void InitializeGpuBuffers() noexcept;
+
 		void UpdateGpuBuffers() noexcept;
 		void UpdateGlobalConstantBuffer() noexcept;
+		void UpdateStructuredBuffers() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 		std::unique_ptr<Camera> m_Camera;
-		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_GlobalCB;
 		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
-
 		RootSignatureId m_CommonRootSignatureId{};
+
+		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_GlobalCB;
+
+
+		std::unique_ptr<DX12Buffer> mObjectBuffer;
+		std::unique_ptr<DX12Buffer> mMaterialBuffer;
+
+
 
 		std::atomic_bool m_IsInitialized = false;
 	};

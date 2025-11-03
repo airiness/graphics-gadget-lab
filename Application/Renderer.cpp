@@ -25,7 +25,6 @@ namespace gglab
 
 	void Renderer::Initialize() noexcept
 	{
-		m_GlobalCB = std::make_unique<DX12ConstantBuffer<FrameCBData>>(m_Device.get());
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
@@ -41,6 +40,7 @@ namespace gglab
 
 		CreateCamera();
 		CreateCommonRootSignature();
+		InitializeGpuBuffers();
 
 		m_IsInitialized = true;
 	}
@@ -161,6 +161,22 @@ namespace gglab
 		m_CommonRootSignatureId = id;
 	}
 
+	void Renderer::InitializeGpuBuffers() noexcept
+	{
+		// Initialize global constant buffer
+		{
+			m_GlobalCB = std::make_unique<DX12ConstantBuffer<FrameCBData>>(m_Device.get());
+		}
+
+		// Initialize structured buffers objects and materials
+		{
+
+		}
+
+
+
+	}
+
 	void Renderer::CreateCamera() noexcept
 	{
 		auto app = Application::GetInstance();
@@ -193,5 +209,9 @@ namespace gglab
 		globalCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
 
 		m_GlobalCB->Update(globalCB);
+	}
+
+	void Renderer::UpdateStructuredBuffers() noexcept
+	{
 	}
 }
