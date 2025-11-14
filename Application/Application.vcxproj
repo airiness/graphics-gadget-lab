@@ -128,6 +128,7 @@
     <ClCompile Include="DX12PipelineState.cpp" />
     <ClCompile Include="DX12PSOCache.cpp" />
     <ClCompile Include="DX12Resource.cpp" />
+    <ClCompile Include="DX12RingStructuredBuffer.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12RootSignatureCache.cpp" />
@@ -197,6 +198,7 @@
     <ClInclude Include="DX12PipelineState.h" />
     <ClInclude Include="DX12PSOCache.h" />
     <ClInclude Include="DX12Resource.h" />
+    <ClInclude Include="DX12RingStructuredBuffer.h" />
     <ClInclude Include="DX12RootSignature.h" />
     <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12RootSignatureCache.h" />
