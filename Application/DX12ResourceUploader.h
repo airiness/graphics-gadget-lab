@@ -27,9 +27,6 @@ namespace gglab
 		DX12CommandList* GetUploadCommandList() const { return m_UploadCommandList.get(); }
 
 	private:
-
-
-	private:
 		DX12Device* m_DX12Device = nullptr;
 		std::unique_ptr<DX12CommandQueue> m_UploadCommandQueue = nullptr;
 		std::unique_ptr<DX12CommandList> m_UploadCommandList = nullptr;

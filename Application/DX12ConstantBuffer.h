@@ -1,6 +1,7 @@
 #pragma once
 #include "DX12Device.h"
 #include "DX12Buffer.h"
+#include "MathUtils.h"
 
 namespace gglab
 {
@@ -10,14 +11,14 @@ namespace gglab
 	class DX12ConstantBuffer
 	{
 	public:
-		explicit DX12ConstantBuffer(DX12Device* device, uint32_t framesInFlight = 1) noexcept :
+		explicit DX12ConstantBuffer(DX12Device* dx12Device, uint32_t framesInFlight = 1) noexcept :
 			m_Frames(framesInFlight ? framesInFlight : 1),
-			m_StrideAligned(AlignConstantBufferSize(sizeof(T))),
+			m_StrideAligned(utils::AlignUpPow2(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)),
 			m_TotalSize(m_StrideAligned* m_Frames)
 		{
 			m_Buffer = std::make_unique<DX12Buffer>();
 			DX12Resource::CreateInfo createInfo{};
-			createInfo.m_Allocator = device->GetMemAllocator();
+			createInfo.m_Allocator = dx12Device->GetMemAllocator();
 			createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
 			createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 			createInfo.m_InitStates = D3D12_RESOURCE_STATE_GENERIC_READ;
@@ -76,13 +77,6 @@ namespace gglab
 		uint32_t GetTotalSize() const noexcept { return m_TotalSize; }
 		uint32_t GetFrameCount() const noexcept { return m_Frames; }
 		DX12Buffer* GetBuffer() const noexcept { return m_Buffer.get(); }
-
-	private:
-		static constexpr uint32_t AlignConstantBufferSize(uint32_t size) noexcept
-		{
-			return (size + D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1u) &
-				~(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1u);
-		}
 
 	private:
 		std::unique_ptr<DX12Buffer> m_Buffer;
