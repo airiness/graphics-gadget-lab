@@ -235,11 +235,14 @@
     <ClCompile Include="MathUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="DX12GpuBufferRingAllocator.cpp">
+    <ClCompile Include="DX12RingBuffer.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12RingStructuredBuffer.cpp">
       <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="StructuredBufferStager.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -459,11 +462,14 @@
     <ClInclude Include="MathUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
-    <ClInclude Include="DX12GpuBufferRingAllocator.h">
+    <ClInclude Include="DX12RingBuffer.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="DX12RingStructuredBuffer.h">
       <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="StructuredBufferStager.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

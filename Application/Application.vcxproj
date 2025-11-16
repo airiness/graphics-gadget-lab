@@ -113,7 +113,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Components.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
-    <ClCompile Include="DX12GpuBufferRingAllocator.cpp" />
+    <ClCompile Include="DX12RingBuffer.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
     <ClCompile Include="DX12CommandList.cpp" />
     <ClCompile Include="DX12CommandQueue.cpp" />
@@ -171,6 +171,7 @@
     <ClCompile Include="ShaderManager.cpp" />
     <ClCompile Include="StringId.cpp" />
     <ClCompile Include="StringUtils.cpp" />
+    <ClCompile Include="StructuredBufferStager.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
   </ItemGroup>
@@ -183,7 +184,7 @@
     <ClInclude Include="Components.h" />
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DX12Buffer.h" />
-    <ClInclude Include="DX12GpuBufferRingAllocator.h" />
+    <ClInclude Include="DX12RingBuffer.h" />
     <ClInclude Include="DX12CommandAllocator.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />
@@ -244,6 +245,7 @@
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
+    <ClInclude Include="StructuredBufferStager.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TypedIndex.h" />
     <ClInclude Include="StringUtils.h" />
