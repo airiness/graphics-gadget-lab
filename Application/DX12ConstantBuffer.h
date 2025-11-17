@@ -13,7 +13,8 @@ namespace gglab
 	public:
 		explicit DX12ConstantBuffer(DX12Device* dx12Device, uint32_t framesInFlight = 1) noexcept :
 			m_Frames(framesInFlight ? framesInFlight : 1),
-			m_StrideAligned(utils::AlignUpPow2(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)),
+			m_StrideAligned(utils::AlignUpPow2(static_cast<uint32_t>(sizeof(T)), 
+				static_cast<uint32_t>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT))),
 			m_TotalSize(m_StrideAligned* m_Frames)
 		{
 			m_Buffer = std::make_unique<DX12Buffer>();

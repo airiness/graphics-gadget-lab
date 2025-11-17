@@ -31,6 +31,7 @@ namespace gglab
 		void ReclaimCompleted(uint64_t completedFence) noexcept;
 
 		DX12Buffer* GetBuffer() const noexcept { return m_Buffer.get(); }
+		ID3D12Resource* GetResource() const noexcept { m_Buffer ? m_Buffer->Get() : nullptr; }
 		uint32_t GetCapacity() const noexcept { return m_Capacity; }
 		uint32_t GetHighWater() const noexcept { return m_HighWater; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const noexcept { return m_GpuVirtualAddress; }

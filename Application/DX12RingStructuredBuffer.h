@@ -24,18 +24,21 @@ namespace gglab
 
 	public:
 		explicit DX12RingStructuredBuffer(DX12Device* dx12Device, uint32_t elementsCapacity) noexcept :
-			m_Buffer(std::make_unique<DX12Buffer>()),
 			m_ElementCapacity(elementsCapacity)
 		{
 			GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device pointer can not be null.");
 			GGLAB_ASSERT_MSG(elementsCapacity > 0, "DX12RingStructuredBuffer elementsCapacity must be greater than zero.");
 
-			const auto totalSizeInBytes = static_cast<uint32_t>(sizeof(T)) * elementsCapacity;
+			const uint32_t stride = GetElementStride();
+
+			GGLAB_ASSERT_MSG(static_cast<uint64_t>(stride) * elementsCapacity <= UINT32_MAX,
+				"DX12RingStructuredBuffer: total bytes overflow.");
+
+			const auto totalSizeInBytes = stride * elementsCapacity;
 
 			auto createInfo = DX12Buffer::VertexOrIndexBufferCreateInfo(dx12Device->GetMemAllocator(), totalSizeInBytes);
-			m_Buffer->Create(createInfo);
 
-			m_Allocator = std::make_unique<DX12RingBuffer>(m_Buffer.get(), totalSizeInBytes);
+			m_RingBuffer = std::make_unique<DX12RingBuffer>(createInfo, totalSizeInBytes);
 
 			m_SrvDescriptor = dx12Device->GetCbvSrvUavDescriptorAllocator()->Allocate();
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -47,7 +50,7 @@ namespace gglab
 			srvDesc.Buffer.StructureByteStride = stride;
 			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-			dx12Device->Get()->CreateShaderResourceView(m_Buffer->Get(), &srvDesc, m_SrvDescriptor.CpuHandle());
+			dx12Device->Get()->CreateShaderResourceView(m_RingBuffer->GetResource(), &srvDesc, m_SrvDescriptor.CpuHandle());
 
 		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingStructuredBuffer);
@@ -61,15 +64,18 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_WARN("DX12RingStructuredBuffer::Allocate called with elementCount = 0.");
 				return result;
 			}
-			const uint32_t sizeInBytes = static_cast<uint32_t>(sizeof(T)) * elementCount;
 
-			auto span = m_Allocator->Allocate(alignedSizeInBytes, alignment);
+			const uint32_t stride = GetElementStride();
+			const uint32_t sizeInBytes = stride * elementCount;
+
+			auto span = m_RingBuffer->Allocate(sizeInBytes, alignment);
 			if (!span.IsValid())
 			{
 				GGLAB_LOG_GRAPHICS_WARN("DX12RingStructuredBuffer::Allocate failed: not enough free space for element count {}.", elementCount);
 				return result;
 			}
-			result.m_FirstElementIndex = span.m_Offset / static_cast<uint32_t>(sizeof(T));
+
+			result.m_FirstElementIndex = span.m_Offset / stride;
 			result.m_ElementCount = elementCount;
 			result.m_OffsetInBytes = span.m_Offset;
 			result.m_SizeInBytes = sizeInBytes;
@@ -85,12 +91,12 @@ namespace gglab
 				return;
 			}
 
-			m_Allocator->Retire(allocation.m_TargetSpan, fencePoint);
+			m_RingBuffer->Retire(allocation.m_TargetSpan, fencePoint);
 		}
 
 		void ReclaimCompleted(const DX12FencePoint& fencePoint) noexcept
 		{
-			m_Allocator->ReclaimCompleted(fencePoint);
+			m_RingBuffer->ReclaimCompleted(fencePoint);
 		}
 
 		DX12DescriptorView GetSRVDescriptorView() const noexcept
@@ -98,14 +104,12 @@ namespace gglab
 			return m_SrvDescriptor.ToView();
 		}
 
-		DX12Buffer* GetBuffer() const noexcept { return m_Buffer.get(); }
+		DX12Buffer* GetBuffer() const noexcept { return m_RingBuffer->GetBuffer(); }
 		uint32_t GetElementCapacity() const noexcept { return m_ElementCapacity; }
 		uint32_t GetElementStride() const noexcept { return static_cast<uint32_t>(sizeof(T)); }
 
 	private:
-		std::unique_ptr<DX12Buffer> m_Buffer;
-		std::unique_ptr<DX12RingBuffer> m_Allocator;
-
+		std::unique_ptr<DX12RingBuffer> m_RingBuffer;
 		DX12Descriptor m_SrvDescriptor{};
 		uint32_t m_ElementCapacity = 0;
 	};
