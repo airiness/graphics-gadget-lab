@@ -112,6 +112,7 @@
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Components.cpp" />
+    <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
     <ClCompile Include="DX12RingBuffer.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
@@ -161,7 +162,6 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
-    <ClCompile Include="RenderPassTexColor.cpp" />
     <ClCompile Include="RGArenaAllocator.cpp" />
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
@@ -171,9 +171,10 @@
     <ClCompile Include="ShaderManager.cpp" />
     <ClCompile Include="StringId.cpp" />
     <ClCompile Include="StringUtils.cpp" />
-    <ClCompile Include="StructuredBufferStager.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
+    <ClCompile Include="TransferBatch.cpp" />
+    <ClCompile Include="TransferManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -182,6 +183,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Components.h" />
+    <ClInclude Include="CopyContext.h" />
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12RingBuffer.h" />
@@ -235,7 +237,6 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderPassSkybox.h" />
-    <ClInclude Include="RenderPassTexColor.h" />
     <ClInclude Include="RGArenaAllocator.h" />
     <ClInclude Include="RGPass.h" />
     <ClInclude Include="RGResource.h" />
@@ -245,8 +246,9 @@
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
-    <ClInclude Include="StructuredBufferStager.h" />
     <ClInclude Include="Time.h" />
+    <ClInclude Include="TransferBatch.h" />
+    <ClInclude Include="TransferManager.h" />
     <ClInclude Include="TypedIndex.h" />
     <ClInclude Include="StringUtils.h" />
     <ClInclude Include="VertexData.h" />

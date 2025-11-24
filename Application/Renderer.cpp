@@ -38,6 +38,8 @@ namespace gglab
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(Application::GetInstance()->GetShaderManager());
 
+		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), 8192);
+
 		CreateCamera();
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
@@ -165,16 +167,15 @@ namespace gglab
 	{
 		// Initialize global constant buffer
 		{
-			m_GlobalCB = std::make_unique<DX12ConstantBuffer<FrameCBData>>(m_Device.get());
+			const auto constantBufferFrames = m_Device->GetBufferCount();
+			m_FrameCB = std::make_unique<DX12ConstantBuffer<FrameCBData>>(m_Device.get(), constantBufferFrames);
 		}
 
 		// Initialize structured buffers objects and materials
 		{
-
+			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(m_Device.get(), 1024); // max element count
+			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(m_Device.get(), 256); // max element count
 		}
-
-
-
 	}
 
 	void Renderer::CreateCamera() noexcept
@@ -194,24 +195,38 @@ namespace gglab
 
 	void Renderer::UpdateGpuBuffers() noexcept
 	{
-		UpdateGlobalConstantBuffer();
+		UpdateFrameConstantBuffer();
+
+		UpdateStructuredBuffers();
 	}
 
-	void Renderer::UpdateGlobalConstantBuffer() noexcept
+	void Renderer::UpdateFrameConstantBuffer() noexcept
 	{
-		FrameCBData globalCB = {};
+		if (m_IsInitialized == false)
+		{
+			return;
+		}
+
+		FrameCBData frameCB = {};
 
 		Matrix viewMatrix = m_Camera->GetViewMatrix();
 		Matrix projMatrix = m_Camera->GetProjMatrix();
 
-		globalCB.ViewMat = DirectX::XMMatrixTranspose(viewMatrix);
-		globalCB.ProjMat = DirectX::XMMatrixTranspose(projMatrix);
-		globalCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
+		frameCB.ViewMat = DirectX::XMMatrixTranspose(viewMatrix);
+		frameCB.ProjMat = DirectX::XMMatrixTranspose(projMatrix);
+		frameCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
 
-		m_GlobalCB->Update(globalCB);
+		m_FrameCB->Update(frameCB);
 	}
 
 	void Renderer::UpdateStructuredBuffers() noexcept
 	{
+		if (m_IsInitialized == false)
+		{
+			return;
+		}
+
+
+
 	}
 }

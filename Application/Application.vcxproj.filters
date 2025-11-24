@@ -160,9 +160,6 @@
     <ClCompile Include="StringId.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="RenderPassTexColor.cpp">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
     <ClCompile Include="RGResource.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -241,7 +238,13 @@
     <ClCompile Include="DX12RingStructuredBuffer.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="StructuredBufferStager.cpp">
+    <ClCompile Include="TransferManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="CopyContext.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="TransferBatch.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
@@ -369,9 +372,6 @@
     <ClInclude Include="RGArenaAllocator.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="RenderPassTexColor.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -468,7 +468,13 @@
     <ClInclude Include="DX12RingStructuredBuffer.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="StructuredBufferStager.h">
+    <ClInclude Include="TransferManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="CopyContext.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="TransferBatch.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>

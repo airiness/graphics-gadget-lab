@@ -127,7 +127,7 @@ namespace gglab
 
 				commandList->SetGraphicsConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::GlobalCB),
-					renderer->GetGlobalConstantBuffer()->GetBuffer()->Get()->GetGPUVirtualAddress());
+					renderer->GetFrameConstantBuffer()->GetBuffer()->Get()->GetGPUVirtualAddress());
 
 				DrawModels(commandList);
 

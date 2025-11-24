@@ -30,6 +30,7 @@ namespace gglab
 			GGLAB_ASSERT_MSG(elementsCapacity > 0, "DX12RingStructuredBuffer elementsCapacity must be greater than zero.");
 
 			const uint32_t stride = GetElementStride();
+			const uint32_t totalSizeInBytes = stride * elementsCapacity;
 
 			GGLAB_ASSERT_MSG(static_cast<uint64_t>(stride) * elementsCapacity <= UINT32_MAX,
 				"DX12RingStructuredBuffer: total bytes overflow.");
@@ -39,9 +40,10 @@ namespace gglab
 			createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 			createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 			createInfo.m_InitStates = D3D12_RESOURCE_STATE_COMMON;
-			createInfo.m_ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(static_cast<UINT64>(totalSizeInBytes));;
+			createInfo.m_ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(static_cast<UINT64>(totalSizeInBytes));
 
-			m_RingBuffer = std::make_unique<DX12RingBuffer>(createInfo, totalSizeInBytes);
+			m_RingBuffer = std::make_unique<DX12RingBuffer>();
+			m_RingBuffer->Create(createInfo, totalSizeInBytes);
 
 			m_SrvDescriptor = dx12Device->GetCbvSrvUavDescriptorAllocator()->Allocate();
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};

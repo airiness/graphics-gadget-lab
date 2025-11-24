@@ -47,14 +47,16 @@ namespace gglab
 		DX12CommandQueue* GetGraphicsCommandQueue() const noexcept { return m_DirectCommandQueue.get(); }
 		DX12CommandQueue* GetComputeCommandQueue() const noexcept { return m_ComputeCommandQueue.get(); }
 		DX12CommandQueue* GetCopyCommandQueue() const noexcept { return m_CopyCommandQueue.get(); }
+		DX12CommandQueue* GetUploadCommandQueue() const noexcept { return m_UploadCommandQueue.get(); }
 
 		DX12CommandList* GetGraphicsCommandList(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandLists.at(bufferIndex).get(); }
 		DX12CommandList* GetComputeCommandList(uint32_t bufferIndex) const noexcept { return m_ComputeCommandLists.at(bufferIndex).get(); }
-		DX12CommandList* GetCopyCommandList(uint32_t bufferIndex) const noexcept { return m_CopyCommandLists.at(bufferIndex).get(); }
+		DX12CommandList* GetCopyCommandList() const noexcept { return m_CopyCommandList.get(); }
 
 		DX12CommandAllocatorPool* GetGraphicsCommandAllocatorPool() const noexcept { return m_GraphicsCommandAllocatorPool.get(); }
 		DX12CommandAllocatorPool* GetComputeCommandAllocatorPool() const noexcept { return m_ComputeCommandAllocatorPool.get(); }
 		DX12CommandAllocatorPool* GetCopyCommandAllocatorPool() const noexcept { return m_CopyCommandAllocatorPool.get(); }
+		DX12CommandAllocatorPool* GetUploadCommandAllocatorPool() const noexcept { return m_UploadCommandAllocatorPool.get(); }
 
 		DX12DescriptorFreeListAllocator* GetRtvDescriptorAllocator() const noexcept { return m_RtvDescriptorAllocator.get(); }
 		DX12DescriptorFreeListAllocator* GetDsvDescriptorAllocator() const noexcept { return m_DsvDescriptorAllocator.get(); }
@@ -111,6 +113,7 @@ namespace gglab
 		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
 		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
+		std::unique_ptr<DX12CommandQueue> m_UploadCommandQueue;
 
 		D3D_FEATURE_LEVEL m_FeatureLevel = D3D_FEATURE_LEVEL_12_0;
 
@@ -119,12 +122,13 @@ namespace gglab
 
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
-		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_CopyCommandLists;
+		std::unique_ptr<DX12CommandList> m_CopyCommandList;
 
 		// Command Allocator Pool
 		std::unique_ptr<DX12CommandAllocatorPool> m_GraphicsCommandAllocatorPool;
 		std::unique_ptr<DX12CommandAllocatorPool> m_ComputeCommandAllocatorPool;
 		std::unique_ptr<DX12CommandAllocatorPool> m_CopyCommandAllocatorPool;
+		std::unique_ptr<DX12CommandAllocatorPool> m_UploadCommandAllocatorPool;
 
 		std::unique_ptr<DX12DescriptorFreeListAllocator> m_CbvSrvUavDescriptorAllocator;
 		std::unique_ptr<DX12DescriptorFreeListAllocator> m_RtvDescriptorAllocator;

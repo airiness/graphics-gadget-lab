@@ -6,6 +6,7 @@
 #include "DX12PSOCache.h"
 #include "DX12RootSignatureCache.h"
 #include "RenderPassRecipeRegistry.h"
+#include "TransferManager.h"
 #include "GPUStructures.h"
 #include "Camera.h"
 
@@ -27,7 +28,7 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		DX12ConstantBuffer<FrameCBData>* GetGlobalConstantBuffer() const noexcept { return m_GlobalCB.get(); }
+		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
 		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
@@ -43,7 +44,8 @@ namespace gglab
 		void InitializeGpuBuffers() noexcept;
 
 		void UpdateGpuBuffers() noexcept;
-		void UpdateGlobalConstantBuffer() noexcept;
+
+		void UpdateFrameConstantBuffer() noexcept;
 		void UpdateStructuredBuffers() noexcept;
 
 	private:
@@ -54,15 +56,13 @@ namespace gglab
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
+		std::unique_ptr<TransferManager> m_TransferManager;
+
+		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_FrameCB;
+		std::unique_ptr<DX12RingStructuredBuffer<ObjectGPU>> m_ObjectSB;
+		std::unique_ptr<DX12RingStructuredBuffer<MaterialGPU>> m_MaterialSB;
+
 		RootSignatureId m_CommonRootSignatureId{};
-
-		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_GlobalCB;
-
-
-		std::unique_ptr<DX12Buffer> mObjectBuffer;
-		std::unique_ptr<DX12Buffer> mMaterialBuffer;
-
-
 
 		std::atomic_bool m_IsInitialized = false;
 	};

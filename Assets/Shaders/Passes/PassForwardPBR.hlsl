@@ -29,7 +29,7 @@ struct VSOutput
 VSOutput VSMain(VSInput IN)
 {
 	VSOutput OUT;
-	ObjectData objData = g_Objects[g_ObjectIndex];
+	ObjectData objData = g_Objects[g_Frame.ObjectBaseIndex];
 	
 	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
 	float3 normalWS = normalize(mul(IN.Normal, (float3x3) objData.NormalMat));
@@ -53,6 +53,9 @@ VSOutput VSMain(VSInput IN)
 
 float4 PSMain(VSOutput IN) : SV_Target
 {
+	uint objIndex = IN.
+	
+	
 	float3 N = normalize(IN.NormalWS);
 	float3 V = normalize(g_Frame.CameraPosWS.xyz - IN.PositionWS); // View direction
 	float3 L = normalize(-g_Frame.MainLight.DirWS.xyz); // DirWS is light to surface, so L = -DirWS

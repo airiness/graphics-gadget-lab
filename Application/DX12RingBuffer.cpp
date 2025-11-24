@@ -6,12 +6,22 @@
 
 namespace gglab
 {
-	DX12RingBuffer::DX12RingBuffer(const DX12Resource::CreateInfo& createInfo, uint32_t capacityInBytes) noexcept :
-		m_Buffer(std::make_unique<DX12Buffer>()),
-		m_Allocator(capacityInBytes),
-		m_Capacity(capacityInBytes)
+	DX12RingBuffer::~DX12RingBuffer()
+	{
+		if (m_Buffer && m_MappedData)
+		{
+			m_Buffer->Unmap();
+			m_MappedData = nullptr;
+		}
+	}
+
+	void DX12RingBuffer::Create(const DX12Resource::CreateInfo& createInfo, uint32_t capacityInBytes) noexcept
 	{
 		GGLAB_ASSERT_MSG(capacityInBytes > 0, "DX12RingBuffer capacityInBytes must be greater than zero.");
+
+		m_Buffer = std::make_unique<DX12Buffer>();
+		m_Allocator = std::make_unique<RingSpanAllocator>(capacityInBytes);
+		m_Capacity = capacityInBytes;
 
 		auto modifiedCreateInfo = createInfo;
 		modifiedCreateInfo.m_ResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(static_cast<UINT64>(capacityInBytes));
@@ -28,15 +38,6 @@ namespace gglab
 
 		// Get base GPU address 
 		m_GpuVirtualAddress = m_Buffer->GPUVirtualAddress();
-	}
-
-	DX12RingBuffer::~DX12RingBuffer()
-	{
-		if (m_Buffer && m_MappedData)
-		{
-			m_Buffer->Unmap();
-			m_MappedData = nullptr;
-		}
 	}
 
 	DX12RingBuffer::Span DX12RingBuffer::Allocate(uint32_t sizeInBytes, uint32_t alignment) noexcept
@@ -56,7 +57,7 @@ namespace gglab
 			return result;
 		}
 
-		auto indexSpan = m_Allocator.Allocate(alignedSize);
+		auto indexSpan = m_Allocator->Allocate(alignedSize);
 		if (!indexSpan.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_WARN("DX12RingBuffer::Allocate failed: not enough free space for size {}.", alignedSize);
@@ -98,7 +99,7 @@ namespace gglab
 			return;
 		}
 
-		m_Allocator.RecordRetire(span.m_IndexSpan, fencePoint.GetValue());
+		m_Allocator->RecordRetire(span.m_IndexSpan, fencePoint.GetValue());
 	}
 
 	void DX12RingBuffer::ReclaimCompleted(const DX12FencePoint& fencePoint) noexcept
@@ -113,7 +114,7 @@ namespace gglab
 
 	void DX12RingBuffer::ReclaimCompleted(uint64_t fenceValue) noexcept
 	{
-		m_Allocator.FreeCompletedVersion(fenceValue);
+		m_Allocator->FreeCompletedVersion(fenceValue);
 	}
 
 	D3D12_GPU_VIRTUAL_ADDRESS DX12RingBuffer::GetGPUVirtualAddressAtOffset(uint32_t offsetInBytes) const noexcept

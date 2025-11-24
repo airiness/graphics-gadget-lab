@@ -20,9 +20,11 @@ namespace gglab
 		};
 
 	public:
-		explicit DX12RingBuffer(const DX12Resource::CreateInfo& createInfo, uint32_t capacityInBytes) noexcept;
+		DX12RingBuffer() noexcept = default;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingBuffer);
 		~DX12RingBuffer();
+
+		void Create(const DX12Resource::CreateInfo& createInfo, uint32_t capacityInBytes) noexcept;
 
 		Span Allocate(uint32_t sizeInBytes, uint32_t alignment = GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE) noexcept;
 		Span Upload(const void* src, uint32_t sizeInBytes, uint32_t alignment = GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE) noexcept;
@@ -30,6 +32,7 @@ namespace gglab
 		void ReclaimCompleted(const DX12FencePoint& fencePoint) noexcept;
 		void ReclaimCompleted(uint64_t completedFence) noexcept;
 
+		bool IsValid() const noexcept { return m_Buffer != nullptr && m_Allocator != nullptr; }
 		DX12Buffer* GetBuffer() const noexcept { return m_Buffer.get(); }
 		ID3D12Resource* GetResource() const noexcept { m_Buffer ? m_Buffer->Get() : nullptr; }
 		uint32_t GetCapacity() const noexcept { return m_Capacity; }
@@ -41,7 +44,7 @@ namespace gglab
 
 	private:
 		std::unique_ptr<DX12Buffer> m_Buffer;
-		RingSpanAllocator m_Allocator;
+		std::unique_ptr<RingSpanAllocator> m_Allocator;
 		D3D12_GPU_VIRTUAL_ADDRESS m_GpuVirtualAddress = 0;
 		uint32_t m_Capacity = 0;
 		uint32_t m_HighWater = 0;

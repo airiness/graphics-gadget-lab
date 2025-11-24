@@ -16,9 +16,14 @@ struct FrameCBData
 	float4x4 ViewMat;
 	float4x4 ProjMat;
 	float4 CameraPosWS;
-	LightCBData MainLight;
 	float Exposure;
-	float3 Padding;
+
+	uint ObjectBaseIndex;
+	uint MaterialBaseIndex;
+	uint Padding; //uint g_TextureBaseIndex; // TODO: bindless textures
+	
+	LightCBData MainLight;
+	
 };
 
 struct ObjectData
