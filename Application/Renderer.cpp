@@ -129,13 +129,13 @@ namespace gglab
 	{
 		CD3DX12_DESCRIPTOR_RANGE1 range = {};
 		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
-			1, // numDescriptors
+			3, // numDescriptors: t0, t1, t2
 			0, // baseShaderRegister
 			0, // registerSpace
 			D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::GlobalCB)].
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB)].
 			InitAsConstantBufferView(0);
 		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB)].
 			InitAsConstantBufferView(1);
@@ -173,8 +173,8 @@ namespace gglab
 
 		// Initialize structured buffers objects and materials
 		{
-			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(m_Device.get(), 1024); // max element count
-			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(m_Device.get(), 256); // max element count
+			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(m_Device.get(), MaxObjectCapacity); // max element count
+			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(m_Device.get(), MaxMaterialCapacity); // max element count
 		}
 	}
 
@@ -226,6 +226,15 @@ namespace gglab
 			return;
 		}
 
+		GGLAB_ASSERT(m_TransferManager);
+		GGLAB_ASSERT(m_ObjectSB);
+		GGLAB_ASSERT(m_MaterialSB);
+
+		std::vector<ObjectGPU> objectData;
+		std::vector<MaterialGPU> materialData;
+
+		ObjectGPU objGpu{};
+		
 
 
 	}

@@ -24,9 +24,25 @@ namespace gglab
 		Matrix ViewMat;
 		Matrix ProjMat;
 		Vector4 CameraPos;
-		LightData MainLight;
 		float Exposure;
-		Vector3 Padding;
+		
+		uint32_t ObjectBaseIndex;
+		uint32_t MaterialBaseIndex;
+		uint32_t Padding;
+
+		LightData MainLight;
+	};
+
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectCBData
+	{
+		uint32_t ObjectIndex;
+		uint32_t Padding[3];
+	};
+
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialCBData
+	{
+		uint32_t MaterialIndex;
+		uint32_t Padding[3];
 	};
 
 	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectGPU

@@ -126,7 +126,7 @@ namespace gglab
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 
 				commandList->SetGraphicsConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::GlobalCB),
+					static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB),
 					renderer->GetFrameConstantBuffer()->GetBuffer()->Get()->GetGPUVirtualAddress());
 
 				DrawModels(commandList);

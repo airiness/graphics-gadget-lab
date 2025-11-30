@@ -20,7 +20,7 @@ struct VSOutput
 	float3 NormalWS : TEXCOORD1;
 	float2 UV : TEXCOORD2;
 	
-	nointerpolation float4 BaseColorFactor : TEXCOORD4;
+	nointerpolation float4 BaseColorFactor : TEXCOORD3;
 	nointerpolation float2 MetallicRoughnessFactor : TEXCOORD4;
 	nointerpolation float3 EmissiveColorFactor : TEXCOORD5;
 	nointerpolation uint MaterialIndex : TEXCOORD6;
@@ -29,7 +29,9 @@ struct VSOutput
 VSOutput VSMain(VSInput IN)
 {
 	VSOutput OUT;
-	ObjectData objData = g_Objects[g_Frame.ObjectBaseIndex];
+	
+	const uint objectIndex = g_Frame.ObjectBaseIndex + g_ObjectIndex;
+	ObjectData objData = g_Objects[objectIndex];
 	
 	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
 	float3 normalWS = normalize(mul(IN.Normal, (float3x3) objData.NormalMat));
@@ -42,8 +44,12 @@ VSOutput VSMain(VSInput IN)
 	OUT.NormalWS = normalWS;
 	OUT.UV = IN.UV;
 	
-	MaterialData matData = g_Materials[objData.MaterialIndex];
-	OUT.BaseColorFactor = matData.BaseColorFactor.rgb;
+	uint materialIndex = objData.MaterialIndex;
+	//const uint materialIndex = g_Frame.MaterialBaseIndex + g_MaterialIndex;
+	
+	MaterialData matData = g_Materials[materialIndex];
+	
+	OUT.BaseColorFactor = matData.BaseColorFactor;
 	OUT.MetallicRoughnessFactor = float2(matData.MetallicFactor, max(0.045, matData.RoughnessFactor));
 	OUT.EmissiveColorFactor = matData.EmissiveColorFactor.rgb;
 	OUT.MaterialIndex = objData.MaterialIndex;
@@ -52,10 +58,7 @@ VSOutput VSMain(VSInput IN)
 }
 
 float4 PSMain(VSOutput IN) : SV_Target
-{
-	uint objIndex = IN.
-	
-	
+{	
 	float3 N = normalize(IN.NormalWS);
 	float3 V = normalize(g_Frame.CameraPosWS.xyz - IN.PositionWS); // View direction
 	float3 L = normalize(-g_Frame.MainLight.DirWS.xyz); // DirWS is light to surface, so L = -DirWS
@@ -86,7 +89,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	
 	float3 Lo = (diffuse + specular) * g_Frame.MainLight.Color.rgb * g_Frame.MainLight.Intensity * NoL;
 	
-	Lo += IN.EmissiveColorFactor.rgb;
+	Lo += IN.EmissiveColorFactor;
 	
 	float3 color = ACESFitted(Lo * g_Frame.Exposure);
 	color = LinearToSRGB(color);

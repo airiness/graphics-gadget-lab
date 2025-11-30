@@ -23,7 +23,6 @@ struct FrameCBData
 	uint Padding; //uint g_TextureBaseIndex; // TODO: bindless textures
 	
 	LightCBData MainLight;
-	
 };
 
 struct ObjectData
