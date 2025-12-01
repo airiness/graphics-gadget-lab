@@ -1,5 +1,4 @@
 #pragma once
-#include "Components.h"
 #include "VertexData.h"
 #include "GraphicsTypes.h"
 #include <DirectXTex.h>
@@ -7,7 +6,8 @@
 namespace gglab
 {
 	class DX12Device;
-	class DX12ResourceUploader;
+	class TransferManager;
+
 	class AssetManager
 	{
 	public:
@@ -31,9 +31,8 @@ namespace gglab
 			std::unordered_map<TextureId, std::unique_ptr<Texture>> m_TextureIDMap;
 		};
 
-		struct MeshesContainer
+		struct MeshContainer
 		{
-			std::unordered_map<std::filesystem::path, std::vector<MeshId>> m_PathIDMap;
 			std::unordered_map<MeshId, std::unique_ptr<Mesh>> m_MeshIDMap;
 		};
 
@@ -42,8 +41,14 @@ namespace gglab
 			std::unordered_map<MaterialId, std::unique_ptr<Material>> m_MaterialIDMap;
 		};
 
+		struct ModelContainer
+		{
+			std::unordered_map<std::filesystem::path, ModelId> m_PathIDMap;
+			std::unordered_map<ModelId, std::unique_ptr<Model>> m_MeshIDMap;
+		};
+
 	public:
-		explicit AssetManager(DX12Device* dx12Device) noexcept;
+		explicit AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager() noexcept = default;
 
@@ -74,13 +79,16 @@ namespace gglab
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
+		TransferManager* m_TransferManager = nullptr;
 
 		TextureIdCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
 		MeshIdCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
 		MaterialIdCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
+		ModelIdCounter m_ModelIdCounter{};
 
 		TextureContainer m_TextureContainer;
-		MeshesContainer m_MeshContainer;
+		MeshContainer m_MeshContainer;
 		MaterialContainer m_MaterialContainer;
+		ModelContainer m_ModelContainer;
 	};
 }

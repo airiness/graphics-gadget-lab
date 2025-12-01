@@ -24,8 +24,8 @@ namespace gglab
 		// Check extension, load glTF file
 		const auto getModelFileType = [](const std::string& extension) -> ModelType
 			{
-				if (extension == ".gltf") { return ModelType::ModelType_glTF; }
-				return ModelType::ModelType_Invalid;
+				if (extension == ".gltf") { return ModelType::GlTF; }
+				return ModelType::Invalid;
 			};
 
 		const auto extension = path.extension().string();
@@ -33,7 +33,7 @@ namespace gglab
 
 		switch (modelFileType)
 		{
-		case ModelType::ModelType_glTF:
+		case ModelType::GlTF:
 			return LoadModelGltf(path);
 		default:
 			GGLAB_UNREACHABLE("Unknown model file type.");
@@ -466,7 +466,7 @@ namespace gglab
 		resourceUploader->EndUpload(true);
 
 		Model model;
-		model.m_Type = ModelType::ModelType_glTF;
+		model.m_Type = ModelType::GlTF;
 		model.m_ModelName = cannonicalPath.stem().string();
 		model.m_Meshes = meshIds;
 		return model;

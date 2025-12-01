@@ -138,7 +138,7 @@ namespace gglab
 		desc.m_ExtraArgs.insert(desc.m_ExtraArgs.end(), m_DefaultShaderConfig.m_ExtraArgs.begin(), m_DefaultShaderConfig.m_ExtraArgs.end());
 		if (desc.m_HlslVersion.empty()) { desc.m_HlslVersion = m_DefaultShaderConfig.m_HlslVersion; }
 		if (desc.m_OptLevel.empty()) { desc.m_OptLevel = m_DefaultShaderConfig.m_OptLevel; }
-		if (desc.m_Flags == ShaderCompileFlag::None) { desc.m_Flags = m_DefaultShaderConfig.m_Flags; }
+		if (desc.m_Flags == ShaderCompileFlags::None) { desc.m_Flags = m_DefaultShaderConfig.m_Flags; }
 
 		// includes: normalize path, exclude duplicate
 		desc.m_SourcePath = utils::Canonical(desc.m_SourcePath);
@@ -252,7 +252,7 @@ namespace gglab
 		args.push_back(L"-HV");
 		args.push_back(desc.m_HlslVersion.c_str());
 
-		if (Test(desc.m_Flags, ShaderCompileFlag::Debug))
+		if (Test(desc.m_Flags, ShaderCompileFlags::Debug))
 		{
 			args.insert(args.end(), { DXC_ARG_DEBUG, L"-Qembed_debug" });
 		}
@@ -261,7 +261,7 @@ namespace gglab
 			args.insert(args.end(), { L"-Qstrip_debug", L"-Qstrip_reflect" });
 		}
 
-		if (Test(desc.m_Flags, ShaderCompileFlag::Optimization))
+		if (Test(desc.m_Flags, ShaderCompileFlags::Optimization))
 		{
 			const std::wstring optFlag = L"-" + desc.m_OptLevel;
 			args.push_back(optFlag.c_str());

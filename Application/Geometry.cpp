@@ -20,7 +20,7 @@ namespace gglab
 			enttRegistry.emplace<Transform>(cubeEntity, transform);
 
 			Model cubeModel;
-			cubeModel.m_Type = ModelType::ModelType_Procedural;
+			cubeModel.m_Type = ModelType::Procedural;
 
 			if (assetManager->GetMesh(ProceduralCubeMeshID) == nullptr)
 			{

@@ -9,7 +9,7 @@ namespace gglab
 		m_Compiler = std::make_unique<ShaderCompiler>();
 
 		ShaderDesc defaultDesc{};
-		defaultDesc.m_Flags |= IsDebuggerPresent() ? ShaderCompileFlag::Debug : ShaderCompileFlag::None;
+		defaultDesc.m_Flags |= IsDebuggerPresent() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
 		defaultDesc.m_IncludeDirs = { L"Assets/Shaders" };
 		defaultDesc.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(defaultDesc);
