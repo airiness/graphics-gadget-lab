@@ -52,27 +52,36 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager() noexcept = default;
 
-		Model LoadModel(const std::filesystem::path& path) noexcept;
-		TextureId GetTextureID(const std::filesystem::path& path) noexcept;
+		ModelId LoadModel(const std::filesystem::path& path) noexcept;
+		TextureId LoadTexture(const std::filesystem::path& path) noexcept;
 
 		Texture* GetTexture(TextureId textureId) noexcept;
+		const Texture* GetTexture(TextureId textureId) const noexcept;
+
 		Mesh* GetMesh(MeshId meshId) noexcept;
+		const Mesh* GetMesh(MeshId meshId) const noexcept;
+
 		Material* GetMaterial(MaterialId materialId) noexcept;
+		const Material* GetMaterial(MaterialId materialId) const noexcept;
+
+		uint32_t GetTextureDescriptorIndex(TextureId textureId) const noexcept;
 
 		void AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
 		void AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 
 	private:
-		void UploadTexture(DX12ResourceUploader* resourceUploader, const TextureUploadData& uploadData) noexcept;
-		void UploadMesh(DX12ResourceUploader* resourceUploader, const MeshUploadData& uploadData) noexcept;
+		void UploadTexture(const TextureUploadData& uploadData) noexcept;
+		void UploadMesh(const MeshUploadData& uploadData) noexcept;
 
-		Model LoadModelGltf(const std::filesystem::path& path) noexcept;
+		ModelId LoadModelGltf(const std::filesystem::path& path) noexcept;
 
 		TextureId CreateTexture(const std::filesystem::path& cannonicalPath) noexcept;
 		MeshId CreateMesh() noexcept;
 		MaterialId CreateMaterial() noexcept;
+		ModelId CreateModel(const std::filesystem::path& path) noexcept;
 
-		TextureId HasTexture(const std::filesystem::path& path) const noexcept;
+		TextureId FindTexture(const std::filesystem::path& path) const noexcept;
+		ModelId FindModel(const std::filesystem::path& path) const noexcept;
 
 		TextureUploadData& LoadTextureScratchImage(const std::filesystem::path& texPath,
 			TextureUploadData& uploadData) noexcept;

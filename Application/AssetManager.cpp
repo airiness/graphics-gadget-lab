@@ -1,12 +1,13 @@
 #include "Precompiled.h"
 #include "AssetManager.h"
 #include "DX12Device.h"
-#include "DX12ResourceUploader.h"
+#include "TransferManager.h"
 #include "DX12Resource.h"
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12CommandList.h"
 #include "HResult.h"
+#include "PathUtils.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -14,13 +15,24 @@
 
 namespace gglab
 {
-	AssetManager::AssetManager(DX12Device* dx12Device) noexcept :
-		m_DX12Device(dx12Device)
+	AssetManager::AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept :
+		m_DX12Device(dx12Device),
+		m_TransferManager(transferManager)
 	{
+		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device is null!");
+		GGLAB_ASSERT_MSG(transferManager != nullptr, "TransferManager is null!");
 	}
 
-	Model AssetManager::LoadModel(const std::filesystem::path& path) noexcept
+	ModelId AssetManager::LoadModel(const std::filesystem::path& path) noexcept
 	{
+		const auto canonicalPath = utils::Canonical(path);
+
+		// Check if model is already loaded
+		if (auto existing = FindModel(canonicalPath); existing.IsValid())
+		{
+			return existing;
+		}
+
 		// Check extension, load glTF file
 		const auto getModelFileType = [](const std::string& extension) -> ModelType
 			{
@@ -28,33 +40,35 @@ namespace gglab
 				return ModelType::Invalid;
 			};
 
-		const auto extension = path.extension().string();
+		const auto extension = canonicalPath.extension().string();
 		const auto modelFileType = getModelFileType(extension);
 
 		switch (modelFileType)
 		{
 		case ModelType::GlTF:
-			return LoadModelGltf(path);
+			return LoadModelGltf(canonicalPath);
 		default:
 			GGLAB_UNREACHABLE("Unknown model file type.");
 		}
 	}
 
-	TextureId AssetManager::GetTextureID(const std::filesystem::path& path) noexcept
+	TextureId AssetManager::LoadTexture(const std::filesystem::path& path) noexcept
 	{
-		const auto cannonicalPath = std::filesystem::canonical(path);
-		auto textureId = HasTexture(cannonicalPath);
+		const auto canonicalPath = utils::Canonical(path);
+
+		auto textureId = FindTexture(canonicalPath);
 		if (!textureId.IsValid())
 		{
-			textureId = CreateTexture(cannonicalPath);
-			TextureUploadData texUploadData{ .m_TextureId = textureId };
-			LoadTextureScratchImage(path, texUploadData);
+			textureId = CreateTexture(canonicalPath);
+
+			TextureUploadData texUploadData{};
+			texUploadData.m_TextureId = textureId;
+			LoadTextureScratchImage(canonicalPath, texUploadData);
 
 			// Upload texture to GPU
-			auto* resourceUploader = m_DX12Device->GetResourceUploader();
-			resourceUploader->BeginUpload();
-			UploadTexture(resourceUploader, texUploadData);
-			resourceUploader->EndUpload(true);
+			auto batch = m_TransferManager->BeginBatch();
+			UploadTexture(texUploadData);
+			batch.Submit(true);
 		}
 		
 		return textureId;
@@ -139,7 +153,7 @@ namespace gglab
 		}
 	}
 
-	void AssetManager::UploadTexture(DX12ResourceUploader* resourceUploader, const TextureUploadData& uploadData) noexcept
+	void AssetManager::UploadTexture(const TextureUploadData& uploadData) noexcept
 	{
 		auto* texture = GetTexture(uploadData.m_TextureId);
 
@@ -189,7 +203,7 @@ namespace gglab
 		texture->m_IsUploaded = true;
 	}
 
-	void AssetManager::UploadMesh(DX12ResourceUploader* resourceUploader, const MeshUploadData& uploadData) noexcept
+	void AssetManager::UploadMesh(const MeshUploadData& uploadData) noexcept
 	{
 		auto* mesh = GetMesh(uploadData.m_MeshId);
 		if (mesh == nullptr)
@@ -230,7 +244,7 @@ namespace gglab
 		mesh->m_IsUploaded = true;
 	}
 
-	Model AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
+	ModelId AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
 	{
 		const auto cannonicalPath = std::filesystem::canonical(path);
 		const auto directory = cannonicalPath.parent_path();

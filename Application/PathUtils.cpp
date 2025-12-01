@@ -6,8 +6,19 @@ namespace gglab::utils
 	std::filesystem::path Canonical(const std::filesystem::path& path) noexcept
 	{
 		std::error_code errorCode;
-		auto canonical = std::filesystem::weakly_canonical(path, errorCode);
-		return (errorCode ? path.lexically_normal() : canonical).make_preferred();
+		auto weak = std::filesystem::weakly_canonical(path, errorCode);
+		if (!errorCode)
+		{
+			return weak.make_preferred();
+		}
+
+		auto abs = std::filesystem::absolute(path, errorCode);
+		if (!errorCode)
+		{
+			return abs.lexically_normal().make_preferred();
+		}
+
+		return path.lexically_normal().make_preferred();
 	}
 
 	bool CreateDirectoryIfNotExist(const std::filesystem::path& dir) noexcept
