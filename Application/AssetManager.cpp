@@ -70,11 +70,16 @@ namespace gglab
 			UploadTexture(texUploadData);
 			batch.Submit(true);
 		}
-		
+
 		return textureId;
 	}
 
 	Texture* AssetManager::GetTexture(TextureId textureId) noexcept
+	{
+		return const_cast<Texture*>(std::as_const(*this).GetTexture(textureId));
+	}
+
+	const Texture* AssetManager::GetTexture(TextureId textureId) const noexcept
 	{
 		auto iter = m_TextureContainer.m_TextureIDMap.find(textureId);
 		if (iter != m_TextureContainer.m_TextureIDMap.end())
@@ -88,6 +93,11 @@ namespace gglab
 
 	Mesh* AssetManager::GetMesh(MeshId meshId) noexcept
 	{
+		return const_cast<Mesh*>(std::as_const(*this).GetMesh(meshId));
+	}
+
+	const Mesh* AssetManager::GetMesh(MeshId meshId) const noexcept
+	{
 		auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
 		if (iter != m_MeshContainer.m_MeshIDMap.end())
 		{
@@ -99,65 +109,99 @@ namespace gglab
 	}
 
 	Material* AssetManager::GetMaterial(MaterialId materialId) noexcept
-	{	
+	{
+		return const_cast<Material*>(std::as_const(*this).GetMaterial(materialId));
+	}
+
+	const Material* AssetManager::GetMaterial(MaterialId materialId) const noexcept
+	{
 		auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
 		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
 		{
 			return iter->second.get();
 		}
 		//GGLAB_ASSERT_MSG(false, "Invalid MaterialID, check it!");
-		return nullptr;	
+		return nullptr;
+	}
+
+	Model* AssetManager::GetModel(ModelId modelId) noexcept
+	{
+		return const_cast<Model*>(std::as_const(*this).GetModel(modelId));
+	}
+
+	const Model* AssetManager::GetModel(ModelId modelId) const noexcept
+	{
+		auto iter = m_ModelContainer.m_ModelIDMap.find(modelId);
+		if (iter != m_ModelContainer.m_ModelIDMap.end())
+		{
+			return iter->second.get();
+		}
+
+		//GGLAB_ASSERT_MSG(false, "Invalid ModelID, check it!");
+		return nullptr;
+	}
+
+	uint32_t AssetManager::GetTextureDescriptorIndex(TextureId textureId) const noexcept
+	{
+		const auto* texture = GetTexture(textureId);
+		if (texture == nullptr || !texture->m_IsUploaded)
+		{
+			return 0u;
+		}
+		return texture->m_DescriptorIndex;
 	}
 
 	void AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
-		auto meshId = mesh->m_MeshId;
+		// Assign Mesh ID
+		auto meshId = mesh->m_Id;
 		if (!meshId.IsValid())
 		{
 			meshId = m_MeshIdCounter.Acquire();
-			mesh->m_MeshId = meshId;	
+			mesh->m_Id = meshId;
 		}
-		
-		const auto iter = m_MeshContainer.m_MeshIDMap.find(meshUploadData.m_MeshId);
-		if (iter == m_MeshContainer.m_MeshIDMap.end())
-		{
-			m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
-		}
-		else
+
+		// Check if mesh already exists
+		const auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
+		if (iter != m_MeshContainer.m_MeshIDMap.end())
 		{
 			return;
 		}
-		
+
+		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
 
 		// Upload Mesh to GPU
-		auto* resourceUploader = m_DX12Device->GetResourceUploader();
-		resourceUploader->BeginUpload();
-		UploadMesh(resourceUploader, meshUploadData);
-		resourceUploader->EndUpload(true);
+		auto batch = m_TransferManager->BeginBatch();
+		UploadMesh(meshUploadData);
+		batch.Submit(true);
 	}
 
 	void AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
 	{
-		auto materialId = material->m_MaterialId;
+		auto materialId = material->m_Id;
 		if (!materialId.IsValid())
 		{
 			materialId = m_MaterialIdCounter.Acquire();
-			material->m_MaterialId = materialId;
+			material->m_Id = materialId;
 		}
 
 		const auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
-		if (iter == m_MaterialContainer.m_MaterialIDMap.end())
+		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
 		{
-			m_MaterialContainer.m_MaterialIDMap.emplace(materialId, std::move(material));
+			return;
 		}
+
+		m_MaterialContainer.m_MaterialIDMap.emplace(materialId, std::move(material));
 	}
 
 	void AssetManager::UploadTexture(const TextureUploadData& uploadData) noexcept
 	{
 		auto* texture = GetTexture(uploadData.m_TextureId);
+		GGLAB_ASSERT_MSG(texture != nullptr, "UploadTexture: Invalid TextureID, check it!");
 
 		const auto& texMedaData = uploadData.m_ScratchImage.GetMetadata();
+
 		texture->m_Texture = std::make_unique<DX12Texture>();
 		texture->m_Texture->Create(DX12Texture::AssetTextureCreateInfo(m_DX12Device->GetMemAllocator(),
 			CD3DX12_RESOURCE_DESC::Tex2D(texMedaData.format,
@@ -177,14 +221,15 @@ namespace gglab
 			subResourceDatas[imageIndex].SlicePitch = images[imageIndex].slicePitch;
 		}
 
-		resourceUploader->UploadResource(subResourceDatas, texture->m_Texture.get());
+		auto* copyContext = m_TransferManager->GetCopyContext();
+		copyContext->UploadResource(subResourceDatas, texture->m_Texture.get());
 
 		// Convert Texture State to Pixel Shader Resource. TODO: have better way to management resource state?
 		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(
 			texture->m_Texture.get()->Get(),
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		resourceUploader->GetUploadCommandList()->Get()->ResourceBarrier(1, &transition);
+		copyContext->GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor& create srv
 		auto* srvDescriptorAllocator = m_DX12Device->GetCbvSrvUavDescriptorAllocator();
@@ -196,9 +241,12 @@ namespace gglab
 		srvDesc.Format = textureDesc.Format;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
-		m_DX12Device->Get()->CreateShaderResourceView(texture->m_Texture->Get(),
+		m_DX12Device->Get()->CreateShaderResourceView(
+			texture->m_Texture->Get(),
 			&srvDesc,
 			texture->m_Descriptor.CpuHandle());
+
+		texture->m_DescriptorIndex = 0;	// TODO: get global descriptor index
 
 		texture->m_IsUploaded = true;
 	}
@@ -208,7 +256,7 @@ namespace gglab
 		auto* mesh = GetMesh(uploadData.m_MeshId);
 		if (mesh == nullptr)
 		{
-			GGLAB_ASSERT_MSG(false, "Invalid MeshID, check it!");
+			GGLAB_ASSERT_MSG(false, "UploadMesh: Invalid MeshID, check it!");
 			return;
 		}
 
@@ -225,13 +273,18 @@ namespace gglab
 		const auto indexBufferSize = indexCount * sizeof(uint32_t);
 
 		mesh->m_VertexBuffer = std::make_unique<DX12Buffer>();
-		mesh->m_VertexBuffer->Create(DX12Buffer::VertexOrIndexBufferCreateInfo(m_DX12Device->GetMemAllocator(), vertexBufferSize));
+		mesh->m_VertexBuffer->Create(
+			DX12Buffer::VertexOrIndexBufferCreateInfo(
+				m_DX12Device->GetMemAllocator(), vertexBufferSize));
 
 		mesh->m_IndexBuffer = std::make_unique<DX12Buffer>();
-		mesh->m_IndexBuffer->Create(DX12Buffer::VertexOrIndexBufferCreateInfo(m_DX12Device->GetMemAllocator(), indexBufferSize));
-		
-		resourceUploader->UploadResource(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.get());
-		resourceUploader->UploadResource(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.get());
+		mesh->m_IndexBuffer->Create(
+			DX12Buffer::VertexOrIndexBufferCreateInfo(
+				m_DX12Device->GetMemAllocator(), indexBufferSize));
+
+		auto* copyContext = m_TransferManager->GetCopyContext();
+		copyContext->UploadResource(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.get());
+		copyContext->UploadResource(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.get());
 
 		mesh->m_VertexBufferView.BufferLocation = mesh->m_VertexBuffer->Get()->GetGPUVirtualAddress();
 		mesh->m_VertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
@@ -246,7 +299,7 @@ namespace gglab
 
 	ModelId AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
 	{
-		const auto cannonicalPath = std::filesystem::canonical(path);
+		const auto cannonicalPath = utils::Canonical(path);
 		const auto directory = cannonicalPath.parent_path();
 
 		// Load model file
@@ -267,7 +320,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(aiScene != nullptr, "Assimp load file failed.");
 		GGLAB_ASSERT_MSG(aiScene->HasMeshes(), "Model file do not has mesh data.");
 
-		// Parse material datas	
+		// Parse material datas
 		const auto aiMaterialCount = aiScene->mNumMaterials;
 		std::vector<MaterialId> materialIds(aiMaterialCount);
 		std::vector<TextureUploadData> texUploadDatas;
@@ -276,7 +329,7 @@ namespace gglab
 			const auto materialId = CreateMaterial();
 			materialIds[materialIndex] = materialId;
 			auto* material = GetMaterial(materialId);
-			material->m_MaterialId = materialId;
+			material->m_Id = materialId;
 
 			const auto& aiMaterial = aiScene->mMaterials[materialIndex];
 
@@ -285,13 +338,13 @@ namespace gglab
 			if (aiMaterial->GetTexture(aiTextureType_BASE_COLOR, 0, &aiTexPath) == aiReturn_SUCCESS)
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
-				auto baseColorTexId = HasTexture(texPath);
+				auto baseColorTexId = FindTexture(texPath);
 				if (!baseColorTexId.IsValid())
 				{
 					baseColorTexId = CreateTexture(texPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
 					texUploadData.m_TextureId = baseColorTexId;
-					LoadTextureScratchImage(texPath, texUploadData);	
+					LoadTextureScratchImage(texPath, texUploadData);
 				}
 				material->m_BaseColorTex = baseColorTexId;
 			}
@@ -308,7 +361,7 @@ namespace gglab
 			if (aiMaterial->GetTexture(aiTextureType_METALNESS, 0, &aiTexPath) == aiReturn_SUCCESS)
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
-				auto metalicRoughnessTexId = HasTexture(texPath);
+				auto metalicRoughnessTexId = FindTexture(texPath);
 				if (!metalicRoughnessTexId.IsValid())
 				{
 					metalicRoughnessTexId = CreateTexture(texPath);
@@ -336,7 +389,7 @@ namespace gglab
 			if (aiMaterial->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == aiReturn_SUCCESS)
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
-				auto normalTexId = HasTexture(texPath);
+				auto normalTexId = FindTexture(texPath);
 				if (!normalTexId.IsValid())
 				{
 					normalTexId = CreateTexture(texPath);
@@ -351,7 +404,7 @@ namespace gglab
 			if (aiMaterial->GetTexture(aiTextureType_AMBIENT_OCCLUSION, 0, &aiTexPath) == aiReturn_SUCCESS)
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
-				auto occlusionTexId = HasTexture(texPath);
+				auto occlusionTexId = FindTexture(texPath);
 				if (!occlusionTexId.IsValid())
 				{
 					occlusionTexId = CreateTexture(texPath);
@@ -366,7 +419,7 @@ namespace gglab
 			if (aiMaterial->GetTexture(aiTextureType_EMISSIVE, 0, &aiTexPath) == aiReturn_SUCCESS)
 			{
 				const auto texPath = cannonicalPath.parent_path() / aiTexPath.C_Str();
-				auto emissiveTexId = HasTexture(texPath);
+				auto emissiveTexId = FindTexture(texPath);
 				if (!emissiveTexId.IsValid())
 				{
 					emissiveTexId = CreateTexture(texPath);
@@ -385,15 +438,23 @@ namespace gglab
 				}
 			}
 
-			material->m_MaterialName = aiMaterial->GetName().C_Str();
+			material->m_Name = StringId(aiMaterial->GetName().C_Str());
 		}
-	
+
+		// Create Model and Meshes.
 		const auto aiMeshCount = aiScene->mNumMeshes;
-		// Add path & meshIds pair to MeshContainer
-		auto pathIdPair = m_MeshContainer.m_PathIDMap.emplace(cannonicalPath, std::vector<MeshId>());
-		GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path&meshIds pair failed.");
-		auto& meshIds = pathIdPair.first->second;
-		meshIds.resize(aiMeshCount);
+
+		const ModelId modelId = CreateModel(cannonicalPath);
+		auto* model = GetModel(modelId);
+		GGLAB_ASSERT(model);
+		model->m_Type = ModelType::GlTF;
+		model->m_MeshInstance.resize(aiMeshCount);
+
+		//// Add path & meshIds pair to MeshContainer
+		//auto pathIdPair = m_MeshContainer.m_PathIDMap.emplace(cannonicalPath, std::vector<MeshId>());
+		//GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path&meshIds pair failed.");
+		//auto& meshIds = pathIdPair.first->second;
+		//meshIds.resize(aiMeshCount);
 
 		// Prepare meshes upload data
 		std::vector<MeshUploadData> meshUploadDatas;
@@ -404,86 +465,87 @@ namespace gglab
 			auto& uploadData = meshUploadDatas[aiMeshIndex];
 			const auto* aiMesh = aiScene->mMeshes[aiMeshIndex];
 
-			// Create mesh ID and emplace to meshIds
+			const MeshId meshId = CreateMesh();
+			uploadData.m_MeshId = meshId;
+
+			auto* mesh = GetMesh(meshId);
+			GGLAB_ASSERT(mesh);
+			mesh->m_Id = meshId;
+			mesh->m_Name = StringId(aiMesh->mName.C_Str());
+
+			ModelMesh modelMesh{};
+			modelMesh.m_MeshId = meshId;
+			modelMesh.m_MaterialId = materialIds[aiMesh->mMaterialIndex];
+			model->m_MeshInstance[aiMeshIndex] = modelMesh;
+
+			// Vertex data
+			const auto aiVertexCount = aiMesh->mNumVertices;
+			auto& verticesData = uploadData.m_VerticesData;
+			verticesData.resize(aiVertexCount);
+
+			for (uint32_t aiVertexIndex = 0; aiVertexIndex < aiVertexCount; ++aiVertexIndex)
 			{
-				const auto meshId = CreateMesh();
-				meshIds[aiMeshIndex] = meshId;
-				uploadData.m_MeshId = meshId;
+				auto& vertex = verticesData[aiVertexIndex];
 
-				// Link Material Index to mesh
-				auto mesh = GetMesh(meshId);
-				mesh->m_MaterialId = materialIds[aiMesh->mMaterialIndex];
-				mesh->m_MeshName = aiMesh->mName.C_Str();
-			}
+				const auto& aiPosition = aiMesh->mVertices[aiVertexIndex];
+				vertex.m_Position = Vector3(aiPosition.x, aiPosition.y, aiPosition.z);
 
-			// Vertices data
-			{
-				const auto aiVertexCount = aiMesh->mNumVertices;
-				auto& verticesData = uploadData.m_VerticesData;
-				verticesData.resize(aiVertexCount);
-
-				for (uint32_t aiVertexIndex = 0; aiVertexIndex < aiVertexCount; ++aiVertexIndex)
+				if (aiMesh->HasNormals())
 				{
-					auto& vertex = verticesData[aiVertexIndex];
-
-					const auto& aiPosition = aiMesh->mVertices[aiVertexIndex];
-					vertex.m_Position = Vector3(aiPosition.x, aiPosition.y, aiPosition.z);
-
-					if (aiMesh->HasNormals())
-					{
-						const auto& aiNormal = aiMesh->mNormals[aiVertexIndex];
-						vertex.m_Normal = Vector3(aiNormal.x, aiNormal.y, aiNormal.z);
-					}
-
-					if (aiMesh->HasTextureCoords(0)) // TODO: support more texture coordinates
-					{
-						const auto& aiTexCoord = aiMesh->mTextureCoords[0][aiVertexIndex];
-						vertex.m_TexCoord = Vector2(aiTexCoord.x, aiTexCoord.y);
-					}
-
-					// TODO: targent vertex data?
+					const auto& aiNormal = aiMesh->mNormals[aiVertexIndex];
+					vertex.m_Normal = Vector3(aiNormal.x, aiNormal.y, aiNormal.z);
 				}
-			}
 
-			// Indices data
-			{
-				const auto aiFaceCount = aiMesh->mNumFaces;
-				auto& indicesData = uploadData.m_IndicesData;
-
-				constexpr auto IndicesCountPerFace = 3;
-				indicesData.reserve(static_cast<size_t>(aiFaceCount * IndicesCountPerFace));
-				for (uint32_t aiFaceIndex = 0; aiFaceIndex < aiFaceCount; ++aiFaceIndex)
+				if (aiMesh->HasTextureCoords(0)) // TODO: support more texture coordinates
 				{
-					const auto& aiFace = aiMesh->mFaces[aiFaceIndex];
-					for (uint32_t aiIndIndex = 0; aiIndIndex < aiFace.mNumIndices; ++aiIndIndex)
-					{
-						indicesData.push_back(static_cast<uint32_t>(aiFace.mIndices[aiIndIndex]));
-					}
+					const auto& aiTexCoord = aiMesh->mTextureCoords[0][aiVertexIndex];
+					vertex.m_TexCoord = Vector2(aiTexCoord.x, aiTexCoord.y);
 				}
+
+				//// TODO: targent vertex data?
+				//if (aiMesh->HasTangentsAndBitangents())
+				//{
+				//	// Tangent
+				//	const auto& aiTangent = aiMesh->mTangents[aiVertexIndex];
+				//	vertex.m_Tangent = Vector3(aiTangent.x, aiTangent.y, aiTangent.z);
+				//	// Bitangent
+				//	const auto& aiBitangent = aiMesh->mBitangents[aiVertexIndex];
+				//	vertex.m_Bitangent = Vector3(aiBitangent.x, aiBitangent.y, aiBitangent.z);
+				//}			
 			}
+
+			// Indices data		
+			const auto aiFaceCount = aiMesh->mNumFaces;
+			auto& indicesData = uploadData.m_IndicesData;
+
+			constexpr auto IndicesCountPerFace = 3;
+			indicesData.reserve(static_cast<size_t>(aiFaceCount * IndicesCountPerFace));
+
+			for (uint32_t aiFaceIndex = 0; aiFaceIndex < aiFaceCount; ++aiFaceIndex)
+			{
+				const auto& aiFace = aiMesh->mFaces[aiFaceIndex];
+				for (uint32_t aiIndIndex = 0; aiIndIndex < aiFace.mNumIndices; ++aiIndIndex)
+				{
+					indicesData.push_back(static_cast<uint32_t>(aiFace.mIndices[aiIndIndex]));
+				}
+			}		
 		}
 
-
 		// Upload to GPU
-		auto* resourceUploader = m_DX12Device->GetResourceUploader();
-		resourceUploader->BeginUpload();
+		auto batch = m_TransferManager->BeginBatch();
 		// Upload textures
 		for (const auto& texUploadData : texUploadDatas)
 		{
-			UploadTexture(resourceUploader, texUploadData);
+			UploadTexture(texUploadData);
 		}
 		// Upload meshes
 		for (const auto& meshUploadData : meshUploadDatas)
 		{
-			UploadMesh(resourceUploader, meshUploadData);
+			UploadMesh(meshUploadData);
 		}
-		resourceUploader->EndUpload(true);
-
-		Model model;
-		model.m_Type = ModelType::GlTF;
-		model.m_ModelName = cannonicalPath.stem().string();
-		model.m_Meshes = meshIds;
-		return model;
+		batch.Submit(true);
+		
+		return modelId;
 	}
 
 	TextureId AssetManager::CreateTexture(const std::filesystem::path& cannonicalPath) noexcept
@@ -518,7 +580,7 @@ namespace gglab
 	}
 
 	TextureId AssetManager::HasTexture(const std::filesystem::path& path) const noexcept
-	{		
+	{
 		auto& texNameIdsMap = m_TextureContainer.m_PathIDMap;
 		auto searchIter = texNameIdsMap.find(path);
 		if (searchIter != texNameIdsMap.end())
@@ -529,7 +591,7 @@ namespace gglab
 	}
 
 	AssetManager::TextureUploadData& AssetManager::LoadTextureScratchImage(
-		const std::filesystem::path& texPath, 
+		const std::filesystem::path& texPath,
 		TextureUploadData& uploadData) noexcept
 	{
 		GGLAB_ASSERT_MSG(uploadData.m_TextureId != InvalidTextureId, "Invalid TextureUploadData");

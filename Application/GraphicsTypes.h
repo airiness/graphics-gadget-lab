@@ -1,11 +1,17 @@
 #pragma once
 #include <cstdint>
 #include <limits>
+#include "Color.h"
+#include "StringId.h"
 #include "TypedIndex.h"
 #include "EnumFlags.h"
+#include "DX12Descriptor.h"
 
 namespace gglab
 {
+	class DX12Texture;
+	class DX12Buffer;
+
 	enum class CommonRSRootParamIndex : uint32_t
 	{
 		FrameCB = 0,

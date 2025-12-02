@@ -44,7 +44,7 @@ namespace gglab
 		struct ModelContainer
 		{
 			std::unordered_map<std::filesystem::path, ModelId> m_PathIDMap;
-			std::unordered_map<ModelId, std::unique_ptr<Model>> m_MeshIDMap;
+			std::unordered_map<ModelId, std::unique_ptr<Model>> m_ModelIDMap;
 		};
 
 	public:
@@ -63,6 +63,9 @@ namespace gglab
 
 		Material* GetMaterial(MaterialId materialId) noexcept;
 		const Material* GetMaterial(MaterialId materialId) const noexcept;
+
+		Model* GetModel(ModelId modelId) noexcept;
+		const Model* GetModel(ModelId modelId) const noexcept;
 
 		uint32_t GetTextureDescriptorIndex(TextureId textureId) const noexcept;
 
