@@ -1,6 +1,7 @@
 #pragma once
 #include "VertexData.h"
 #include "GraphicsTypes.h"
+#include "CopyContext.h"
 #include <DirectXTex.h>
 
 namespace gglab
@@ -73,18 +74,18 @@ namespace gglab
 		void AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 
 	private:
-		void UploadTexture(const TextureUploadData& uploadData) noexcept;
-		void UploadMesh(const MeshUploadData& uploadData) noexcept;
+		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
+		void UploadMesh(const MeshUploadData& uploadData, CopyContext& copyContext) noexcept;
 
 		ModelId LoadModelGltf(const std::filesystem::path& path) noexcept;
 
-		TextureId CreateTexture(const std::filesystem::path& cannonicalPath) noexcept;
+		TextureId CreateTexture(const std::filesystem::path& canonicalPath) noexcept;
 		MeshId CreateMesh() noexcept;
 		MaterialId CreateMaterial() noexcept;
-		ModelId CreateModel(const std::filesystem::path& path) noexcept;
+		ModelId CreateModel(const std::filesystem::path& canonicalPath) noexcept;
 
-		TextureId FindTexture(const std::filesystem::path& path) const noexcept;
-		ModelId FindModel(const std::filesystem::path& path) const noexcept;
+		TextureId FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
+		ModelId FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 
 		TextureUploadData& LoadTextureScratchImage(const std::filesystem::path& texPath,
 			TextureUploadData& uploadData) noexcept;

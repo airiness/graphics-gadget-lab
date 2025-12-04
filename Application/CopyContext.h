@@ -30,7 +30,8 @@ namespace gglab
 		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResources,
 			const DX12Resource* dstResource) noexcept;
 
-		DX12CommandList* GetCommandList() const noexcept { return m_CommandList.get(); }
+		DX12CommandList* GetCommandList() noexcept { return m_CommandList.get(); }
+		const DX12CommandList* GetCommandList() const noexcept { return m_CommandList.get(); }
 
 	private:
 		struct InFlightInfo
