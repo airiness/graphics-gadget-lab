@@ -11,6 +11,7 @@
 #include "RenderGraph.h"
 #include "RGGpuResourceAllocator.h"
 #include "AssetManager.h"
+#include "Components.h"
 #include "Camera.h"
 #include "RenderPassForwardPBR.h"
 #include "MathUtils.h"
@@ -137,9 +138,9 @@ namespace gglab
 		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
 		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB)].
 			InitAsConstantBufferView(0);
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB)].
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB)].
 			InitAsConstantBufferView(1);
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialCB)].
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB)].
 			InitAsConstantBufferView(2);
 		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].
 			InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -230,12 +231,28 @@ namespace gglab
 		GGLAB_ASSERT(m_ObjectSB);
 		GGLAB_ASSERT(m_MaterialSB);
 
+		auto& registry = Application::GetInstance()->GetEnttRegistry();
+		
 		std::vector<ObjectGPU> objectData;
 		std::vector<MaterialGPU> materialData;
 
 		ObjectGPU objGpu{};
 		
+		registry.view<components::TransformComponent, components::ModelComponent>().each(
+			[](auto entity, const components::TransformComponent& transformComp, const components::ModelComponent& modelComp) 
+			{
+				auto* assetManager = Application::GetInstance()->GetAssetManager();
+				const auto* model = assetManager->GetModel(modelComp.m_ModelId);
+				if (!model)
+				{
+					GGLAB_LOG_GRAPHICS_WARN("Entity has no model.");
+					return;
+				}
 
+				
+
+
+			});
 
 	}
 }

@@ -57,12 +57,18 @@ namespace gglab
 
 	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialGPU
 	{
-		Vector4 BaseColorFactor;
+		Color BaseColorFactor;
 		float MetallicFactor;
 		float RoughnessFactor;
 		float NormalScale;
 		float OcclusionStrength;
-		Vector4 EmissiveColorFactor;
+		Vector3 EmissiveColorFactor;
+
+		uint32_t BaseColorTexIndex;
+		uint32_t MaterialRoughnessTexIndex;
+		uint32_t NormalTexIndex;
+		uint32_t OcclusionTexIndex;
+		uint32_t EmissiveTexIndex;
 	};
 	static constexpr uint32_t MaxMaterialCapacity = 256;
 }
