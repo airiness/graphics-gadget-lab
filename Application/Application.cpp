@@ -4,6 +4,7 @@
 #include "AssetManager.h"
 #include "InputManager.h"
 #include "ShaderManager.h"
+#include "Components.h"
 #include "Time.h"
 #include "Keyboard.h"
 #include "Mouse.h"
@@ -277,10 +278,14 @@ namespace gglab
 
 		// Test Sponza
 		{
-			auto model = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
+			auto modelId = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
 			auto sponzaEntity = m_Registry.create();
-			m_Registry.emplace<Transform>(sponzaEntity, Transform());
-			m_Registry.emplace<Model>(sponzaEntity, std::move(model));
+
+			m_Registry.emplace<components::TransformComponent>(sponzaEntity, components::TransformComponent());
+
+			components::ModelComponent modelComp{};
+			modelComp.m_ModelId = modelId;
+			m_Registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
 		}
 	}
 
