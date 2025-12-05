@@ -1,9 +1,9 @@
 #pragma once
 
-struct LightCBData
+struct LightData
 {
-	float4 PosWS;
-	float4 DirWS;
+	float4 Position;
+	float4 Direction;
 	float4 Color;
 	float Intensity;
 	float Range;
@@ -22,7 +22,7 @@ struct FrameCBData
 	uint MaterialBaseIndex;
 	uint Padding; //uint g_TextureBaseIndex; // TODO: bindless textures
 	
-	LightCBData MainLight;
+	LightData MainLight;
 };
 
 struct ObjectData
