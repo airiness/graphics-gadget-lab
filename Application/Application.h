@@ -6,6 +6,7 @@ namespace gglab
 	class AssetManager;
 	class InputManager;
 	class ShaderManager;
+	class TransferManager;
 	class Time;
 	class Keyboard;
 	class Mouse;
@@ -26,6 +27,7 @@ namespace gglab
 		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
 		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager.get(); }
+		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
 		Keyboard* GetKeyboard() const noexcept;
 		Mouse* GetMouse() const noexcept;
 		Time* GetTime() const noexcept { return m_Time.get(); }
@@ -72,6 +74,7 @@ namespace gglab
 		std::unique_ptr<AssetManager> m_AssetManager;
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
+		std::unique_ptr<TransferManager> m_TransferManager;
 
 		entt::registry m_Registry;
 

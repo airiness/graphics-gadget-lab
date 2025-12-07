@@ -20,9 +20,9 @@ namespace gglab::components
 	struct LightComponent
 	{
 		LightType m_Type = LightType::Directional;
-		Color m_Color;
-		float Intensity;
-		float Range;
-		float SpotAngle;
+		Color m_Color = color::White;
+		float m_Intensity = 1.0f;
+		float m_Range = 1000.0f;
+		float m_SpotAngle = 60.0f;
 	};
 }

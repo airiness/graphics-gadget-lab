@@ -14,10 +14,11 @@ namespace gglab
 
 	enum class CommonRSRootParamIndex : uint32_t
 	{
-		FrameCB = 0,
-		ObjectSB,
-		MaterialSB,
-		TextureDescriptorTable,
+		FrameCB = 0,	// b0
+		ObjectCB,	// g_ObjectIndex, b1
+		ObjectSB,	// g_Objects, t1
+		MaterialSB,	// g_Materials, t2
+		TextureDescriptorTable,	// g_BaseColorTex, t0
 		RootParamCount
 	};
 
@@ -74,6 +75,8 @@ namespace gglab
 	inline constexpr MaterialId ReservedMaterialID{ 5u };
 
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelId, uint32_t);
+	inline constexpr ModelId ProceduralCubeModelID{ 0u };
+	inline constexpr ModelId ReservedModelID{ 5u };
 
 	struct Texture
 	{
@@ -132,6 +135,7 @@ namespace gglab
 
 	struct Model
 	{
+		ModelId m_Id{};
 		StringId m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		std::vector<ModelMesh> m_MeshInstance;

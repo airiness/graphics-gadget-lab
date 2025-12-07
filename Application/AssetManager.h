@@ -70,8 +70,9 @@ namespace gglab
 
 		uint32_t GetTextureDescriptorIndex(TextureId textureId) const noexcept;
 
-		void AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
-		void AddMaterial(std::unique_ptr<Material>&& material) noexcept;
+		MeshId AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
+		MaterialId AddMaterial(std::unique_ptr<Material>&& material) noexcept;
+		ModelId AddModel(std::unique_ptr<Model>&& model) noexcept;
 
 	private:
 		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
@@ -97,7 +98,7 @@ namespace gglab
 		TextureIdCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
 		MeshIdCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
 		MaterialIdCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
-		ModelIdCounter m_ModelIdCounter{};
+		ModelIdCounter m_ModelIdCounter{ ReservedModelID.Value() + 1u };
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;

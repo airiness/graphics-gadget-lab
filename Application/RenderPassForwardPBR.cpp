@@ -125,10 +125,24 @@ namespace gglab
 				swapChain->ClearBackBuffer(commandList);
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 
+				const auto frameIndex = swapChain->GetCurrentBackBufferIndex();
 				commandList->SetGraphicsConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB),
-					renderer->GetFrameConstantBuffer()->GetBuffer()->Get()->GetGPUVirtualAddress());
+					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(frameIndex));
 
+				// Set object structured buffer
+				const auto& objectSB = renderer->GetObjectSB();
+				commandList->Get()->SetGraphicsRootShaderResourceView(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
+					objectSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
+
+				// Set material structured buffer
+				const auto& materialSB = renderer->GetMaterialSB();
+				commandList->Get()->SetGraphicsRootShaderResourceView(
+					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
+					materialSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
+
+				// Model Draw
 				DrawModels(commandList);
 
 				swapChain->FinishBackBuffer(commandList);
@@ -140,37 +154,46 @@ namespace gglab
 
 	void RenderPassForwardPBR::DrawModels(DX12CommandList* commandList) noexcept
 	{
-		auto& reg = Application::GetInstance()->GetEnttRegistry();
-		auto* assetManager = Application::GetInstance()->GetAssetManager();
+		auto* app = Application::GetInstance();
+		auto* renderer = app->GetRenderer();
+		auto* assetManager = app->GetAssetManager();
 
-		auto view = reg.view<Model>();
-		for (auto entity : view)
+		const auto& drawItems = renderer->GetDrawItems();
+		for (const auto& drawItem : drawItems)
 		{
-			auto& model = view.get<Model>(entity);
-			for (const auto& meshId : model.m_Meshes)
+			const Mesh* mesh = assetManager->GetMesh(drawItem.m_MeshId);
+			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
 			{
-				const auto* mesh = assetManager->GetMesh(meshId);
-				if (!mesh || mesh->m_IndexCount == 0) { continue; }
-
-				D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
-				commandList->SetVertexBuffers(0, vbs);
-				commandList->SetIndexBuffer(mesh->m_IndexBufferView);
-
-				if (const auto* material = assetManager->GetMaterial(mesh->m_MaterialId);
-					material && material->m_MaterialId.IsValid())
-				{
-					if (auto* texture = assetManager->GetTexture(material->m_BaseColorTex))
-					{
-						commandList->SetGraphicsDescriptor(
-							static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
-							texture->m_Descriptor);
-					}
-				}
-				commandList->DrawIndexedInstanced(static_cast<uint32_t>(mesh->m_IndexCount));
+				continue;
 			}
-		}
-	}
 
-	// TODO: Add default base color descriptor when material or texture is missing.
-	// TODO: Sort and batch draw calls by PSO, Material and Texture.
+			D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
+			commandList->SetVertexBuffers(0, vbs);
+			commandList->SetIndexBuffer(mesh->m_IndexBufferView);
+
+			commandList->Get()->SetGraphicsRoot32BitConstant(
+				static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
+				drawItem.m_ObjectOffset, 0);
+
+			const Material* material = assetManager->GetMaterial(drawItem.m_MaterialId);
+			if (material && material->m_BaseColorTex.IsValid())
+			{
+				if (auto* texture = assetManager->GetTexture(material->m_BaseColorTex))
+				{
+					commandList->SetGraphicsDescriptor(
+						static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
+						texture->m_Descriptor);
+				}
+			}
+			else
+			{
+				// TODO: Dummy texture binding.
+			}
+
+			commandList->DrawIndexedInstanced(static_cast<uint32_t>(mesh->m_IndexCount));
+		}
+
+		// TODO: Add default base color descriptor when material or texture is missing.
+		// TODO: Sort and batch draw calls by PSO, Material and Texture.
+	}
 }

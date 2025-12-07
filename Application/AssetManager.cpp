@@ -152,8 +152,10 @@ namespace gglab
 		return texture->m_DescriptorIndex;
 	}
 
-	void AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
+	MeshId AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
+		GGLAB_ASSERT(mesh);
+
 		// Assign Mesh ID
 		auto meshId = mesh->m_Id;
 		if (!meshId.IsValid())
@@ -166,7 +168,7 @@ namespace gglab
 		const auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
 		if (iter != m_MeshContainer.m_MeshIDMap.end())
 		{
-			return;
+			return meshId;
 		}
 
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
@@ -177,10 +179,14 @@ namespace gglab
 		auto* copyContext = m_TransferManager->GetCopyContext();
 		UploadMesh(meshUploadData, *copyContext);
 		batch.Submit(true);
+
+		return meshId;
 	}
 
-	void AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
+	MaterialId AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
 	{
+		GGLAB_ASSERT(material);
+
 		auto materialId = material->m_Id;
 		if (!materialId.IsValid())
 		{
@@ -191,10 +197,40 @@ namespace gglab
 		const auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
 		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
 		{
-			return;
+			return materialId;
 		}
 
 		m_MaterialContainer.m_MaterialIDMap.emplace(materialId, std::move(material));
+
+		return materialId;
+	}
+
+	ModelId AssetManager::AddModel(std::unique_ptr<Model>&& model) noexcept
+	{
+		GGLAB_ASSERT(model);
+
+		auto modelId = model->m_Id;
+		if (!modelId.IsValid())
+		{
+			modelId = m_ModelIdCounter.Acquire();
+			model->m_Id = modelId;
+		}
+
+		const auto iter = m_ModelContainer.m_ModelIDMap.find(modelId);
+		if (iter != m_ModelContainer.m_ModelIDMap.end())
+		{
+			// This id is already have.
+			return modelId;
+		}
+
+		if (model->m_Type == ModelType::Invalid)
+		{
+			model->m_Type = ModelType::Procedural;
+		}
+
+		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
+
+		return modelId;
 	}
 
 	void AssetManager::UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept
@@ -452,6 +488,7 @@ namespace gglab
 		const ModelId modelId = CreateModel(canonicalPath);
 		auto* model = GetModel(modelId);
 		GGLAB_ASSERT(model);
+		model->m_Id = modelId;
 		model->m_Type = ModelType::GlTF;
 		model->m_MeshInstance.resize(aiMeshCount);
 

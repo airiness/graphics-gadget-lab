@@ -11,11 +11,7 @@ cbuffer ObjectCB : register(b1)
 	uint g_ObjectIndex;
 };
 
-cbuffer MaterialCB : register(b2)
-{
-	uint g_MaterialIndex;
-};
-
+Texture2D g_BaseColorTex : register(t0);
 StructuredBuffer<ObjectData> g_Objects : register(t1);
 StructuredBuffer<MaterialData> g_Materials : register(t2);
 

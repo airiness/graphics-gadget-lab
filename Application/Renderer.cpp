@@ -39,8 +39,6 @@ namespace gglab
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(Application::GetInstance()->GetShaderManager());
 
-		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), 8192);
-
 		CreateCamera();
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
@@ -129,25 +127,34 @@ namespace gglab
 	void Renderer::CreateCommonRootSignature() noexcept
 	{
 		CD3DX12_DESCRIPTOR_RANGE1 range = {};
-		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 
-			3, // numDescriptors: t0, t1, t2
+		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+			1, // numDescriptors: t0
 			0, // baseShaderRegister
 			0, // registerSpace
 			D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB)].
-			InitAsConstantBufferView(0);
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB)].
-			InitAsConstantBufferView(1);
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB)].
-			InitAsConstantBufferView(2);
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)].
-			InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+
+		// b0: FrameCB
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB)].InitAsConstantBufferView(0);
+
+		// b1: ObjectCB, num32BitValues: 1, shaderRegister: b1
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(1, 1);
+
+		// t1: ObjectSB
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
+
+		// t2: materialSB
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
+
+		// t0: BaseColorTex descriptor table
+		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)]
+			.InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
 
 		constexpr uint32_t StaticSamplerCount = 1;
 		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};
-		staticSamplers[0].Init(0,
+		staticSamplers[0].Init(
+			0,	// register s0
 			D3D12_FILTER_MIN_MAG_MIP_LINEAR,
 			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
 			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
@@ -174,8 +181,8 @@ namespace gglab
 
 		// Initialize structured buffers objects and materials
 		{
-			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(m_Device.get(), MaxObjectCapacity); // max element count
-			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(m_Device.get(), MaxMaterialCapacity); // max element count
+			m_ObjectSB.m_StructuredBuffer = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(m_Device.get(), MaxObjectCapacity); // max element count
+			m_MaterialSB.m_StructuredBuffer = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(m_Device.get(), MaxMaterialCapacity); // max element count
 		}
 	}
 
@@ -196,52 +203,46 @@ namespace gglab
 
 	void Renderer::UpdateGpuBuffers() noexcept
 	{
-		UpdateFrameConstantBuffer();
-
-		UpdateStructuredBuffers();
-	}
-
-	void Renderer::UpdateFrameConstantBuffer() noexcept
-	{
-		if (m_IsInitialized == false)
+		if (!m_IsInitialized)
 		{
 			return;
 		}
 
-		FrameCBData frameCB = {};
+		GGLAB_ASSERT(m_ObjectSB.m_StructuredBuffer);
+		GGLAB_ASSERT(m_MaterialSB.m_StructuredBuffer);
 
-		Matrix viewMatrix = m_Camera->GetViewMatrix();
-		Matrix projMatrix = m_Camera->GetProjMatrix();
+		auto* app = Application::GetInstance();
+		auto& registry = app->GetEnttRegistry();
+		auto* transferManager = app->GetTransferManager();
+		GGLAB_ASSERT(transferManager);
 
-		frameCB.ViewMat = DirectX::XMMatrixTranspose(viewMatrix);
-		frameCB.ProjMat = DirectX::XMMatrixTranspose(projMatrix);
-		frameCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
-
-		m_FrameCB->Update(frameCB);
-	}
-
-	void Renderer::UpdateStructuredBuffers() noexcept
-	{
-		if (m_IsInitialized == false)
+		// Reclaim RingBuffer
 		{
-			return;
+			const DX12FencePoint completedFence = transferManager->Reclaim();
+			if (completedFence.IsValid())
+			{
+				m_ObjectSB.m_StructuredBuffer->ReclaimCompleted(completedFence);
+				m_MaterialSB.m_StructuredBuffer->ReclaimCompleted(completedFence);
+			}
 		}
 
-		GGLAB_ASSERT(m_TransferManager);
-		GGLAB_ASSERT(m_ObjectSB);
-		GGLAB_ASSERT(m_MaterialSB);
+		m_DrawItems.clear();
 
-		auto& registry = Application::GetInstance()->GetEnttRegistry();
-		
+		// Update Object and Material Structured Buffer
 		std::vector<ObjectGPU> objectData;
 		std::vector<MaterialGPU> materialData;
+		objectData.reserve(MaxObjectCapacity);
+		materialData.reserve(MaxMaterialCapacity);
 
-		ObjectGPU objGpu{};
-		
+		std::unordered_map<MaterialId, uint32_t> materialIndexMap;
+
 		registry.view<components::TransformComponent, components::ModelComponent>().each(
-			[](auto entity, const components::TransformComponent& transformComp, const components::ModelComponent& modelComp) 
+			[this, &objectData, &materialData, &materialIndexMap](auto entity,
+				const components::TransformComponent& transformComp,
+				const components::ModelComponent& modelComp)
 			{
 				auto* assetManager = Application::GetInstance()->GetAssetManager();
+
 				const auto* model = assetManager->GetModel(modelComp.m_ModelId);
 				if (!model)
 				{
@@ -249,10 +250,160 @@ namespace gglab
 					return;
 				}
 
-				
+				Matrix world =
+					Matrix::CreateScale(transformComp.m_Scale) *
+					Matrix::CreateFromQuaternion(transformComp.m_Rotation) *
+					Matrix::CreateTranslation(transformComp.m_Position);
 
+				Matrix normalMat = world;
+				normalMat.Translation(Vector3::Zero);
+				normalMat = normalMat.Invert().Transpose();
 
+				for (const ModelMesh& modelMesh : model->m_MeshInstance)
+				{
+					const Mesh* mesh = assetManager->GetMesh(modelMesh.m_MeshId);
+					if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
+					{
+						continue;
+					}
+
+					uint32_t materialIndex = 0;
+					auto iter = materialIndexMap.find(modelMesh.m_MaterialId);
+					if (iter == materialIndexMap.end())
+					{
+						const Material* material = assetManager->GetMaterial(modelMesh.m_MaterialId);
+						if (!material)
+						{
+							GGLAB_LOG_GRAPHICS_WARN("Mesh has invalid MaterialId.");
+							continue;
+						}
+
+						materialIndex = static_cast<uint32_t>(materialData.size());
+						materialIndexMap.emplace(modelMesh.m_MaterialId, materialIndex);
+
+						MaterialGPU materialGpu{};
+						materialGpu.BaseColorFactor = material->m_BaseColor;
+						materialGpu.MetallicFactor = material->m_MetallicFactor;
+						materialGpu.RoughnessFactor = material->m_RoughnessFactor;
+						materialGpu.NormalScale = material->m_NormalScale;
+						materialGpu.OcclusionStrength = material->m_OcclusionStrength;
+						materialGpu.EmissiveColorFactor = material->m_EmissiveColor;
+
+						materialGpu.BaseColorTexIndex = assetManager->GetTextureDescriptorIndex(material->m_BaseColorTex);
+						materialGpu.MetallicRoughnessTexIndex = assetManager->GetTextureDescriptorIndex(material->m_MetallicRoughnessTex);
+						materialGpu.NormalTexIndex = assetManager->GetTextureDescriptorIndex(material->m_NormalTex);
+						materialGpu.OcclusionTexIndex = assetManager->GetTextureDescriptorIndex(material->m_OcclusionTex);
+						materialGpu.EmissiveTexIndex = assetManager->GetTextureDescriptorIndex(material->m_EmissiveTex);
+
+						materialData.push_back(materialGpu);
+
+					}
+					else
+					{
+						materialIndex = iter->second;
+					}
+
+					uint32_t objectOffset = static_cast<uint32_t>(objectData.size());
+
+					ObjectGPU objectGpu{};
+					objectGpu.ModelMat = world;
+					objectGpu.NormalMat = normalMat;
+					objectGpu.MaterialIndex = materialIndex;
+					objectData.push_back(objectGpu);
+
+					DrawItem drawItem{};
+					drawItem.m_MeshId = modelMesh.m_MeshId;
+					drawItem.m_MaterialId = modelMesh.m_MaterialId;
+					drawItem.m_ObjectOffset = objectOffset;
+					m_DrawItems.push_back(drawItem);
+
+				}
 			});
 
+		// Upload structured buffer to GPU
+		if (!objectData.empty() || !materialData.empty())
+		{
+			auto batch = transferManager->BeginBatch();
+
+			if (!objectData.empty())
+			{
+				std::span<const ObjectGPU> objectSpan(objectData.data(), objectData.size());
+				m_ObjectSB.m_BufferRange = batch.StageStructuredBufferWrite<ObjectGPU>(*m_ObjectSB.m_StructuredBuffer, objectSpan);
+			}
+			else
+			{
+				m_ObjectSB.m_BufferRange = {};
+			}
+
+			if (!materialData.empty())
+			{
+				std::span<const MaterialGPU> materialSpan(materialData.data(), materialData.size());
+				m_MaterialSB.m_BufferRange = batch.StageStructuredBufferWrite<MaterialGPU>(*m_MaterialSB.m_StructuredBuffer, materialSpan);
+			}
+			else
+			{
+				m_MaterialSB.m_BufferRange = {};
+			}
+
+			batch.Submit(false);
+		}
+		else
+		{
+			m_ObjectSB.m_BufferRange = {};
+			m_MaterialSB.m_BufferRange = {};
+		}
+
+		// Update FrameCB
+		FrameCBData frameCB{};
+
+		Matrix viewMatrix = m_Camera->GetViewMatrix();
+		Matrix projMatrix = m_Camera->GetProjMatrix();
+
+		frameCB.ViewMat = viewMatrix.Transpose();
+		frameCB.ProjMat = projMatrix.Transpose();
+		frameCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
+		frameCB.Exposure = 1.0f;	// TODO: camera exposure
+
+		frameCB.ObjectBaseIndex = m_ObjectSB.m_BufferRange.m_FirstElementIndex;
+		frameCB.MaterialBaseIndex = m_MaterialSB.m_BufferRange.m_FirstElementIndex;
+
+		// MainLight data
+		{
+			LightGPU lightGpu{};
+			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
+
+			bool found = false;
+			for (auto [entity, transComp, lightComp] : lightView.each())
+			{
+				lightGpu.Position = utils::ToVector4(transComp.m_Position, 1.0f);
+
+				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
+				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
+				lightGpu.Direction = utils::ToVector4(forward, 1.0f);
+
+				lightGpu.Color = lightComp.m_Color;
+				lightGpu.Intensity = lightComp.m_Intensity;
+				lightGpu.Range = lightComp.m_Range;
+				lightGpu.SpotAngle = lightComp.m_SpotAngle;
+				lightGpu.LightType = static_cast<uint32_t>(lightComp.m_Type);
+
+				found = true;
+				break;
+			}
+
+			// Dummy main light
+			if (!found)
+			{
+				lightGpu.Direction = -Vector4::UnitY;
+				lightGpu.Color = color::White;
+				lightGpu.Intensity = 1.0f;
+				lightGpu.LightType = static_cast<uint32_t>(LightType::Directional);
+			}
+
+			frameCB.MainLight = lightGpu;
+		}
+
+		const auto currentIndex = m_Device->GetSwapChain()->GetCurrentBackBufferIndex();
+		m_FrameCB->Update(frameCB, currentIndex);
 	}
 }

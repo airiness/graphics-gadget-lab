@@ -4,6 +4,7 @@
 #include "AssetManager.h"
 #include "InputManager.h"
 #include "ShaderManager.h"
+#include "TransferManager.h"
 #include "Components.h"
 #include "Time.h"
 #include "Keyboard.h"
@@ -148,7 +149,9 @@ namespace gglab
 		m_InputManager->Initialize(m_Hwnd);
 
 		m_Renderer = std::make_unique<Renderer>();
-		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
+
+		m_TransferManager = std::make_unique<TransferManager>(m_Renderer->GetDevice(), 8 * 1024 * 1024);
+		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice(), m_TransferManager.get());
 		m_ShaderManager = std::make_unique<ShaderManager>();
 
 		m_Renderer->Initialize();
@@ -286,6 +289,22 @@ namespace gglab
 			components::ModelComponent modelComp{};
 			modelComp.m_ModelId = modelId;
 			m_Registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
+		}
+
+		// Main Light
+		{
+			auto mainLightEntity = m_Registry.create();
+
+			components::TransformComponent transComp{};
+			transComp.m_Rotation.CreateFromYawPitchRoll(Vector3(0.0f, 90.0f, 0.0f));
+			m_Registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
+
+			components::LightComponent lightComp{};
+			lightComp.m_Intensity = 10.0f;
+			lightComp.m_Color = color::Cyan;
+			lightComp.m_Type = LightType::Directional;
+			lightComp.m_Range = 1000.0f;
+			m_Registry.emplace<components::LightComponent>(mainLightEntity, lightComp);
 		}
 	}
 

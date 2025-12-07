@@ -3,9 +3,6 @@
 #include <Common/Binding.hlsli>
 #include <PBR/BRDF.hlsli>
 
-// texture
-Texture2D g_BaseColorTex : register(t0);
-
 struct VSInput
 {
 	float3 Position : POSITION;
@@ -44,24 +41,24 @@ VSOutput VSMain(VSInput IN)
 	OUT.NormalWS = normalWS;
 	OUT.UV = IN.UV;
 	
-	uint materialIndex = objData.MaterialIndex;
-	//const uint materialIndex = g_Frame.MaterialBaseIndex + g_MaterialIndex;
+	//uint materialIndex = objData.MaterialIndex;
+	const uint materialIndex = g_Frame.MaterialBaseIndex + objData.MaterialIndex;
 	
 	MaterialData matData = g_Materials[materialIndex];
 	
 	OUT.BaseColorFactor = matData.BaseColorFactor;
 	OUT.MetallicRoughnessFactor = float2(matData.MetallicFactor, max(0.045, matData.RoughnessFactor));
 	OUT.EmissiveColorFactor = matData.EmissiveColorFactor.rgb;
-	OUT.MaterialIndex = objData.MaterialIndex;
+	OUT.MaterialIndex = materialIndex;
 
 	return OUT;
 }
 
 float4 PSMain(VSOutput IN) : SV_Target
-{	
+{
 	float3 N = normalize(IN.NormalWS);
-	float3 V = normalize(g_Frame.CameraPosWS.xyz - IN.PositionWS); // View direction
-	float3 L = normalize(-g_Frame.MainLight.DirWS.xyz); // DirWS is light to surface, so L = -DirWS
+	float3 V = normalize(g_Frame.CameraPos.xyz - IN.PositionWS); // View direction
+	float3 L = normalize(-g_Frame.MainLight.Direction.xyz); // DirWS is light to surface, so L = -DirWS
 	
 	float NoL = saturate(dot(N, L));
 	float NoV = saturate(dot(N, V));
@@ -87,7 +84,9 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
 	float3 diffuse = kd * Fd_Lambert(baseColor);
 	
-	float3 Lo = (diffuse + specular) * g_Frame.MainLight.Color.rgb * g_Frame.MainLight.Intensity * NoL;
+	float3 Lo = (diffuse + specular) *
+		g_Frame.MainLight.Color.rgb *
+		g_Frame.MainLight.Intensity * NoL;
 	
 	Lo += IN.EmissiveColorFactor;
 	

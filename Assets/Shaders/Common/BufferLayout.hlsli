@@ -15,7 +15,7 @@ struct FrameCBData
 {
 	float4x4 ViewMat;
 	float4x4 ProjMat;
-	float4 CameraPosWS;
+	float4 CameraPos;
 	float Exposure;
 
 	uint ObjectBaseIndex;
@@ -41,4 +41,10 @@ struct MaterialData
 	float NormalScale;
 	float OcclusionStrength;
 	float4 EmissiveColorFactor;
+	
+	uint BaseColorTexIndex;
+	uint MetallicRoughnessTexIndex;
+	uint NormalTexIndex;
+	uint OcclusionTexIndex;
+	uint EmissiveTexIndex;
 };

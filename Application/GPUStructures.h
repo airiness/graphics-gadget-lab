@@ -8,7 +8,7 @@ namespace gglab
 #define GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE (16)
 #define GGLAB_GPU_STRUCTURE_ALIGNAS alignas(GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE)
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS LightData
+	struct GGLAB_GPU_STRUCTURE_ALIGNAS LightGPU
 	{
 		Vector4 Position;
 		Vector4 Direction;
@@ -30,19 +30,7 @@ namespace gglab
 		uint32_t MaterialBaseIndex;
 		uint32_t Padding;
 
-		LightData MainLight;
-	};
-
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectCBData
-	{
-		uint32_t ObjectIndex;
-		uint32_t Padding[3];
-	};
-
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialCBData
-	{
-		uint32_t MaterialIndex;
-		uint32_t Padding[3];
+		LightGPU MainLight;
 	};
 
 	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectGPU
@@ -62,10 +50,10 @@ namespace gglab
 		float RoughnessFactor;
 		float NormalScale;
 		float OcclusionStrength;
-		Vector3 EmissiveColorFactor;
+		Color EmissiveColorFactor;
 
 		uint32_t BaseColorTexIndex;
-		uint32_t MaterialRoughnessTexIndex;
+		uint32_t MetallicRoughnessTexIndex;
 		uint32_t NormalTexIndex;
 		uint32_t OcclusionTexIndex;
 		uint32_t EmissiveTexIndex;
