@@ -302,7 +302,7 @@ namespace gglab
 			m_Registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
 
 			components::LightComponent lightComp{};
-			lightComp.m_Intensity = 10.0f;
+			lightComp.m_Intensity = 1.0f;
 			lightComp.m_Color = color::White;
 			lightComp.m_Type = LightType::Directional;
 			lightComp.m_Range = 1000.0f;
