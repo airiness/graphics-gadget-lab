@@ -131,7 +131,7 @@ namespace gglab
 			1, // numDescriptors: t0
 			0, // baseShaderRegister
 			0, // registerSpace
-			D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
 
@@ -328,7 +328,7 @@ namespace gglab
 			if (!objectData.empty())
 			{
 				std::span<const ObjectGPU> objectSpan(objectData.data(), objectData.size());
-				m_ObjectSB.m_BufferRange = batch.StageStructuredBufferWrite<ObjectGPU>(*m_ObjectSB.m_StructuredBuffer, objectSpan);
+				m_ObjectSB.m_BufferRange = batch.StageStructuredBufferWrite<ObjectGPU>(*m_ObjectSB.m_StructuredBuffer, objectSpan, 4);
 			}
 			else
 			{
@@ -338,7 +338,7 @@ namespace gglab
 			if (!materialData.empty())
 			{
 				std::span<const MaterialGPU> materialSpan(materialData.data(), materialData.size());
-				m_MaterialSB.m_BufferRange = batch.StageStructuredBufferWrite<MaterialGPU>(*m_MaterialSB.m_StructuredBuffer, materialSpan);
+				m_MaterialSB.m_BufferRange = batch.StageStructuredBufferWrite<MaterialGPU>(*m_MaterialSB.m_StructuredBuffer, materialSpan, 4);
 			}
 			else
 			{
@@ -359,8 +359,8 @@ namespace gglab
 		Matrix viewMatrix = m_Camera->GetViewMatrix();
 		Matrix projMatrix = m_Camera->GetProjMatrix();
 
-		frameCB.ViewMat = viewMatrix.Transpose();
-		frameCB.ProjMat = projMatrix.Transpose();
+		frameCB.ViewMat = viewMatrix;
+		frameCB.ProjMat = projMatrix;
 		frameCB.CameraPos = utils::ToVector4(m_Camera->GetPosition(), 1.0f);
 		frameCB.Exposure = 1.0f;	// TODO: camera exposure
 
@@ -379,6 +379,7 @@ namespace gglab
 
 				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
 				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
+				forward.Normalize();
 				lightGpu.Direction = utils::ToVector4(forward, 1.0f);
 
 				lightGpu.Color = lightComp.m_Color;

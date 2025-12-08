@@ -32,7 +32,7 @@ VSOutput VSMain(VSInput IN)
 	
 	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
 	float3 normalWS = normalize(mul(IN.Normal, (float3x3) objData.NormalMat));
-	
+
 	float4 posVS = mul(posWS, g_Frame.ViewMat);
 	float4 posCS = mul(posVS, g_Frame.ProjMat);
 	

@@ -296,12 +296,14 @@ namespace gglab
 			auto mainLightEntity = m_Registry.create();
 
 			components::TransformComponent transComp{};
-			transComp.m_Rotation.CreateFromYawPitchRoll(Vector3(0.0f, 90.0f, 0.0f));
+			Vector3 direction = -Vector3::One;
+			direction.Normalize();
+			Quaternion::FromToRotation(-Vector3::UnitZ, direction, transComp.m_Rotation);
 			m_Registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
 
 			components::LightComponent lightComp{};
 			lightComp.m_Intensity = 10.0f;
-			lightComp.m_Color = color::Cyan;
+			lightComp.m_Color = color::White;
 			lightComp.m_Type = LightType::Directional;
 			lightComp.m_Range = 1000.0f;
 			m_Registry.emplace<components::LightComponent>(mainLightEntity, lightComp);

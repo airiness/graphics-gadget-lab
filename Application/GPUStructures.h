@@ -8,7 +8,7 @@ namespace gglab
 #define GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE (16)
 #define GGLAB_GPU_STRUCTURE_ALIGNAS alignas(GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE)
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS LightGPU
+	struct LightGPU
 	{
 		Vector4 Position;
 		Vector4 Direction;
@@ -19,7 +19,7 @@ namespace gglab
 		uint32_t LightType;
 	};
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS FrameCBData
+	struct FrameCBData
 	{
 		Matrix ViewMat;
 		Matrix ProjMat;
@@ -33,7 +33,7 @@ namespace gglab
 		LightGPU MainLight;
 	};
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS ObjectGPU
+	struct ObjectGPU
 	{
 		Matrix ModelMat;
 		Matrix NormalMat;
@@ -43,7 +43,7 @@ namespace gglab
 	static constexpr uint32_t MaxObjectCapacity = 1024;
 
 
-	struct GGLAB_GPU_STRUCTURE_ALIGNAS MaterialGPU
+	struct MaterialGPU
 	{
 		Color BaseColorFactor;
 		float MetallicFactor;
@@ -58,5 +58,5 @@ namespace gglab
 		uint32_t OcclusionTexIndex;
 		uint32_t EmissiveTexIndex;
 	};
-	static constexpr uint32_t MaxMaterialCapacity = 256;
+	static constexpr uint32_t MaxMaterialCapacity = 128;
 }
