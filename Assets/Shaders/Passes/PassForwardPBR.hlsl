@@ -90,6 +90,14 @@ float4 PSMain(VSOutput IN) : SV_Target
 	
 	Lo += IN.EmissiveColorFactor;
 	
+	// TODO: temperary ambient
+	float up = saturate(N.y * 0.5f + 0.5f);
+	float3 sky = float3(0.4, 0.5, 0.8);
+	float3 ground = float3(0.05, 0.04, 0.03);
+	float3 hemi = lerp(ground, sky, up);
+	float3 ambient = hemi * baseColor * 0.2;
+	Lo += ambient;
+		
 	float3 color = ACESFitted(Lo * g_Frame.Exposure);
 	color = LinearToSRGB(color);
 	
