@@ -49,7 +49,7 @@ namespace gglab
 			return result;
 		}
 
-		const uint32_t alignedSize = utils::AlignUpPow2(sizeInBytes, alignment);
+		const uint32_t alignedSize = utils::AlignUp(sizeInBytes, alignment);
 		if (alignedSize > m_Capacity)
 		{
 			// Requested size exceeds total capacity

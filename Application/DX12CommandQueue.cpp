@@ -42,4 +42,17 @@ namespace gglab
 	{
 		return m_Fence->Signal(this);
 	}
+
+	void DX12CommandQueue::Wait(const DX12FencePoint& fencePoint) noexcept
+	{
+		if(!fencePoint.IsValid())
+		{
+			return;
+		}
+
+		auto* fence = fencePoint.GetFence()->Get();
+		auto value = fencePoint.GetValue();
+
+		m_D3D12CommandQueue->Wait(fence, value);
+	}
 }

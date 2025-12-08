@@ -33,8 +33,9 @@ namespace gglab
 			uint32_t alignment = GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE) noexcept;
 
 		template<typename T>
-		StageBufferWriteResult<T> StageStructuredBufferWrite(DX12RingStructuredBuffer<T>& dstStructuredBuffer,
-			std::span<const T> srcData, uint32_t alignment = GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE) noexcept
+		StageBufferWriteResult<T> StageStructuredBufferWrite(
+			DX12RingStructuredBuffer<T>& dstStructuredBuffer,
+			std::span<const T> srcData) noexcept
 		{
 			StageBufferWriteResult<T> result{};
 
@@ -43,11 +44,13 @@ namespace gglab
 				return result;
 			}
 
-			auto alloc = dstStructuredBuffer.Allocate(static_cast<uint32_t>(srcData.size()), alignment);
+			auto alloc = dstStructuredBuffer.Allocate(static_cast<uint32_t>(srcData.size()));
 			GGLAB_ASSERT_MSG(alloc.IsValid(),
 				"TransferBatch::StageStructuredBufferWrite: failed to allocate structured buffer space.");
 
-			const auto bytes = static_cast<uint32_t>(srcData.size() * sizeof(T));
+			const auto stride = static_cast<uint32_t>(sizeof(T));
+			const auto bytes = static_cast<uint32_t>(srcData.size() * stride);
+			const auto alignment = stride;
 
 			auto span = m_UploadRing.Allocate(bytes, alignment);
 

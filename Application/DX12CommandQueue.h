@@ -25,6 +25,8 @@ namespace gglab
 
 		DX12FencePoint Signal() noexcept;
 
+		void Wait(const DX12FencePoint& fencePoint) noexcept;
+
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		ComPtr<ID3D12CommandQueue> m_D3D12CommandQueue;

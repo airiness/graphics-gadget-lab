@@ -71,6 +71,16 @@ namespace gglab
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
 		auto commandQueue = m_Device->GetGraphicsCommandQueue();
 
+		// Wait Structured Buffer upload
+		if (m_UploadFencePoint.IsValid())
+		{
+			if (!m_UploadFencePoint.IsCompleted())
+			{
+				commandQueue->Wait(m_UploadFencePoint);
+			}
+			m_UploadFencePoint = {};
+		}
+
 		swapChain->WaitFrameCompletion();
 
 		auto commandAllocator = commandAllocatorPool->RequestCommandAllocator();
@@ -320,6 +330,8 @@ namespace gglab
 				}
 			});
 
+		DX12FencePoint uploadFencePoint{};
+
 		// Upload structured buffer to GPU
 		if (!objectData.empty() || !materialData.empty())
 		{
@@ -328,7 +340,7 @@ namespace gglab
 			if (!objectData.empty())
 			{
 				std::span<const ObjectGPU> objectSpan(objectData.data(), objectData.size());
-				m_ObjectSB.m_BufferRange = batch.StageStructuredBufferWrite<ObjectGPU>(*m_ObjectSB.m_StructuredBuffer, objectSpan, 4);
+				m_ObjectSB.m_BufferRange = batch.StageStructuredBufferWrite<ObjectGPU>(*m_ObjectSB.m_StructuredBuffer, objectSpan);
 			}
 			else
 			{
@@ -338,20 +350,22 @@ namespace gglab
 			if (!materialData.empty())
 			{
 				std::span<const MaterialGPU> materialSpan(materialData.data(), materialData.size());
-				m_MaterialSB.m_BufferRange = batch.StageStructuredBufferWrite<MaterialGPU>(*m_MaterialSB.m_StructuredBuffer, materialSpan, 4);
+				m_MaterialSB.m_BufferRange = batch.StageStructuredBufferWrite<MaterialGPU>(*m_MaterialSB.m_StructuredBuffer, materialSpan);
 			}
 			else
 			{
 				m_MaterialSB.m_BufferRange = {};
 			}
 
-			batch.Submit(false);
+			uploadFencePoint = batch.Submit(false);
 		}
 		else
 		{
 			m_ObjectSB.m_BufferRange = {};
 			m_MaterialSB.m_BufferRange = {};
 		}
+
+		m_UploadFencePoint = uploadFencePoint;
 
 		// Update FrameCB
 		FrameCBData frameCB{};

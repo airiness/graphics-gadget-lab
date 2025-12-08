@@ -83,5 +83,7 @@ namespace gglab
 		std::vector<DrawItem> m_DrawItems;
 
 		std::atomic_bool m_IsInitialized = false;
+
+		DX12FencePoint m_UploadFencePoint;
 	};
 }

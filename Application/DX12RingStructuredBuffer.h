@@ -61,7 +61,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingStructuredBuffer);
 		~DX12RingStructuredBuffer() = default;
 
-		AllocateResult Allocate(uint32_t elementCount, uint32_t alignment = GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE) noexcept
+		AllocateResult Allocate(uint32_t elementCount) noexcept
 		{
 			AllocateResult result{};
 			if (elementCount == 0)
@@ -71,6 +71,7 @@ namespace gglab
 			}
 
 			const uint32_t stride = GetElementStride();
+			const uint32_t alignment = stride;
 			const uint32_t sizeInBytes = stride * elementCount;
 
 			auto span = m_RingBuffer->Allocate(sizeInBytes, alignment);
