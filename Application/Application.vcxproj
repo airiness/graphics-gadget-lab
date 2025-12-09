@@ -166,6 +166,7 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RingSpanAllocator.cpp" />
+    <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
@@ -220,6 +221,7 @@
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />
     <ClInclude Include="PSOKey.h" />
+    <ClInclude Include="RenderView.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStructures.h" />
     <ClInclude Include="GraphicsTypes.h" />
@@ -242,6 +244,8 @@
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
     <ClInclude Include="RingSpanAllocator.h" />
+    <ClInclude Include="SceneBase.h" />
+    <ClInclude Include="SceneManager.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />

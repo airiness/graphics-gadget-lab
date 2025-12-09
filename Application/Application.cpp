@@ -78,7 +78,7 @@ namespace gglab
 			}
 			else
 			{
-				if (!Update())
+				if (!Tick())
 				{
 					return;
 				}
@@ -161,7 +161,7 @@ namespace gglab
 		m_IsInitialized = true;
 	}
 
-	bool Application::Update() noexcept
+	bool Application::Tick() noexcept
 	{
 		if (!m_IsInitialized)
 		{
