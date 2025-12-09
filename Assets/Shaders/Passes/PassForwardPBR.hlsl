@@ -1,5 +1,5 @@
 #include <Common/Common.hlsli>
-#include <Common/BufferLayout.hlsli>
+//#include <Common/BufferLayout.hlsli>
 #include <Common/Binding.hlsli>
 #include <PBR/BRDF.hlsli>
 

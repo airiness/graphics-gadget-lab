@@ -74,10 +74,7 @@ namespace gglab
 		// Wait Structured Buffer upload
 		if (m_UploadFencePoint.IsValid())
 		{
-			if (!m_UploadFencePoint.IsCompleted())
-			{
-				commandQueue->Wait(m_UploadFencePoint);
-			}
+			commandQueue->Wait(m_UploadFencePoint);
 			m_UploadFencePoint = {};
 		}
 
