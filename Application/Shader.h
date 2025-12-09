@@ -24,13 +24,13 @@ namespace gglab
 		SM_6_8
 	};
 
-	enum class ShaderCompileFlag : uint32_t
+	enum class ShaderCompileFlags : uint32_t
 	{
 		None = 0u,
 		Debug = 1u << 0,
 		Optimization = 1u << 1,
 	};
-	GGLAB_ENUM_FLAGS(ShaderCompileFlag);
+	GGLAB_ENUM_FLAGS(ShaderCompileFlags);
 
 	struct ShaderDefine
 	{
@@ -49,7 +49,7 @@ namespace gglab
 		std::wstring m_Entry;
 		std::vector<std::filesystem::path> m_IncludeDirs;
 		std::vector<ShaderDefine> m_Defines;
-		ShaderCompileFlag m_Flags;
+		ShaderCompileFlags m_Flags;
 		std::vector<std::wstring> m_ExtraArgs;
 		std::wstring m_HlslVersion = L"2021";
 		std::wstring m_OptLevel = L"O3";

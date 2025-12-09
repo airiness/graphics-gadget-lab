@@ -4,6 +4,8 @@
 #include "AssetManager.h"
 #include "InputManager.h"
 #include "ShaderManager.h"
+#include "TransferManager.h"
+#include "Components.h"
 #include "Time.h"
 #include "Keyboard.h"
 #include "Mouse.h"
@@ -147,7 +149,9 @@ namespace gglab
 		m_InputManager->Initialize(m_Hwnd);
 
 		m_Renderer = std::make_unique<Renderer>();
-		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice());
+
+		m_TransferManager = std::make_unique<TransferManager>(m_Renderer->GetDevice(), 8 * 1024 * 1024);
+		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice(), m_TransferManager.get());
 		m_ShaderManager = std::make_unique<ShaderManager>();
 
 		m_Renderer->Initialize();
@@ -257,20 +261,52 @@ namespace gglab
 		{
 			std::vector<ShaderDesc> shaderDescs;
 			ShaderDesc desc{};
+
+			// Textured Model Pass
 			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			shaderDescs.push_back(desc);
 			desc.m_Stage = ShaderStage::Pixel;
 			shaderDescs.push_back(desc);
+
+			// Forward PBR
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+
 			m_ShaderManager->Preload(shaderDescs);
 		}
 
 		// Test Sponza
 		{
-			auto model = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
+			auto modelId = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
 			auto sponzaEntity = m_Registry.create();
-			m_Registry.emplace<Transform>(sponzaEntity, Transform());
-			m_Registry.emplace<Model>(sponzaEntity, std::move(model));
+
+			m_Registry.emplace<components::TransformComponent>(sponzaEntity, components::TransformComponent());
+
+			components::ModelComponent modelComp{};
+			modelComp.m_ModelId = modelId;
+			m_Registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
+		}
+
+		// Main Light
+		{
+			auto mainLightEntity = m_Registry.create();
+
+			components::TransformComponent transComp{};
+			Vector3 direction = -Vector3::One;
+			direction.Normalize();
+			Quaternion::FromToRotation(-Vector3::UnitZ, direction, transComp.m_Rotation);
+			m_Registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
+
+			components::LightComponent lightComp{};
+			lightComp.m_Intensity = 1.0f;
+			lightComp.m_Color = color::White;
+			lightComp.m_Type = LightType::Directional;
+			lightComp.m_Range = 1000.0f;
+			m_Registry.emplace<components::LightComponent>(mainLightEntity, lightComp);
 		}
 	}
 

@@ -160,9 +160,6 @@
     <ClCompile Include="StringId.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="RenderPassTexColor.cpp">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
     <ClCompile Include="RGResource.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -228,6 +225,27 @@
     </ClCompile>
     <ClCompile Include="StringUtils.cpp">
       <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPassForwardPBR.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="MathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12RingBuffer.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12RingStructuredBuffer.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="TransferManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="CopyContext.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="TransferBatch.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -354,9 +372,6 @@
     <ClInclude Include="RGArenaAllocator.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="RenderPassTexColor.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -441,18 +456,51 @@
     <ClInclude Include="StringUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="RenderPassForwardPBR.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="MathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12RingBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12RingStructuredBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="TransferManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="CopyContext.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="TransferBatch.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
-    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli">
+    <None Include="..\Assets\Shaders\Common\Common.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\Common\Binding.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>

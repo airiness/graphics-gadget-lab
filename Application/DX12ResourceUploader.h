@@ -1,5 +1,6 @@
 #pragma once
 #include "DX12FencePoint.h"
+#include "RingSpanAllocator.h"
 
 namespace gglab
 {
@@ -40,5 +41,6 @@ namespace gglab
 
 		std::unique_ptr<UploadTracedInfo> m_UploadingInfo = nullptr;
 		std::vector<std::unique_ptr<UploadTracedInfo>> m_UploadTracedInfos;
+
 	};
 }

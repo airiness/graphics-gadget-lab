@@ -222,6 +222,7 @@ namespace gglab
 		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+		m_UploadCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);	//d3dx12 upload resource uses direct type
 	}
 
 	void DX12Device::InitializeSwapChain() noexcept
@@ -239,8 +240,8 @@ namespace gglab
 		{
 			m_GraphicsCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
-			m_CopyCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 		}
+		m_CopyCommandList = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
 	void DX12Device::InitializeResourceUploader() noexcept
@@ -253,6 +254,7 @@ namespace gglab
 		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
+		m_UploadCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	}
 
 	void DX12Device::InitializeDescriptorAllocators() noexcept

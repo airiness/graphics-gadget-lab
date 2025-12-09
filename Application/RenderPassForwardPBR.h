@@ -5,12 +5,11 @@
 namespace gglab
 {
 	class DX12CommandList;
-	class RenderGraph;
-	class RenderPassTexColor : public RenderPassBase
+	class RenderPassForwardPBR : public RenderPassBase
 	{
 	public:
-		RenderPassTexColor() noexcept;
-		~RenderPassTexColor() = default;
+		RenderPassForwardPBR() noexcept;
+		~RenderPassForwardPBR() override = default;
 
 		void AddPass(RenderGraph& rg) noexcept override;
 

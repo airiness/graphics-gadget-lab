@@ -29,7 +29,7 @@ namespace gglab
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		DX12DescriptorView GetBackBufferDescriptor(int32_t bufferIndex) const noexcept;
+		DX12DescriptorView GetCurrentBackBufferView() const noexcept;
 		DX12Texture* GetCurrentBackBuffer() const noexcept;
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;

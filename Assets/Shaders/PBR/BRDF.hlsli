@@ -1,18 +1,17 @@
 #pragma once
-#include "MathCommon.hlsli"
+#include <Common/Common.hlsli>
 
 float D_GGX(float NoH, float a)
 {
 	float a2 = a * a;
 	float f = (NoH * a2 - NoH) * NoH + 1.0;
-	return a2 / (PI * f * f);
+	return a2 / (PI * f * f + 1e-5);
 }
 
-float3 F_Schlick(float u, float3 f0)
+float3 F_Schlick(float3 F0, float3 F90, float cosTheta)
 {
-	return f0 + (float3(1.0) - f0) * Pow5(1.0 - u);
+	return F0 + (F90 - F0) * Pow5(1.0 - cosTheta);
 }
-
 
 float V_SmithGGXCorrelated(float NoV, float NoL, float a)
 {
@@ -22,8 +21,7 @@ float V_SmithGGXCorrelated(float NoV, float NoL, float a)
 	return 0.5 / (GGXV + GGXL);
 }
 
-float Fd_Lambert()
+float3 Fd_Lambert(float3 DiffuseColor)
 {
-	return 1.0 / PI;
+	return DiffuseColor * (1.0 / PI);
 }
-

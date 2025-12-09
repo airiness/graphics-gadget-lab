@@ -112,7 +112,9 @@
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Components.cpp" />
+    <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
+    <ClCompile Include="DX12RingBuffer.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
     <ClCompile Include="DX12CommandList.cpp" />
     <ClCompile Include="DX12CommandQueue.cpp" />
@@ -127,6 +129,7 @@
     <ClCompile Include="DX12PipelineState.cpp" />
     <ClCompile Include="DX12PSOCache.cpp" />
     <ClCompile Include="DX12Resource.cpp" />
+    <ClCompile Include="DX12RingStructuredBuffer.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
     <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12RootSignatureCache.cpp" />
@@ -135,7 +138,9 @@
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
+    <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="PathUtils.cpp" />
+    <ClCompile Include="RenderPassForwardPBR.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -157,7 +162,6 @@
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RenderGraph.cpp" />
-    <ClCompile Include="RenderPassTexColor.cpp" />
     <ClCompile Include="RGArenaAllocator.cpp" />
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
@@ -169,6 +173,8 @@
     <ClCompile Include="StringUtils.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
+    <ClCompile Include="TransferBatch.cpp" />
+    <ClCompile Include="TransferManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -177,8 +183,10 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Components.h" />
+    <ClInclude Include="CopyContext.h" />
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DX12Buffer.h" />
+    <ClInclude Include="DX12RingBuffer.h" />
     <ClInclude Include="DX12CommandAllocator.h" />
     <ClInclude Include="DX12CommandList.h" />
     <ClInclude Include="DX12CommandQueue.h" />
@@ -193,6 +201,7 @@
     <ClInclude Include="DX12PipelineState.h" />
     <ClInclude Include="DX12PSOCache.h" />
     <ClInclude Include="DX12Resource.h" />
+    <ClInclude Include="DX12RingStructuredBuffer.h" />
     <ClInclude Include="DX12RootSignature.h" />
     <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12RootSignatureCache.h" />
@@ -203,8 +212,10 @@
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="HResult.h" />
     <ClInclude Include="InputLayoutLibrary.h" />
+    <ClInclude Include="MathUtils.h" />
     <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
+    <ClInclude Include="RenderPassForwardPBR.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />
@@ -226,7 +237,6 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderPassSkybox.h" />
-    <ClInclude Include="RenderPassTexColor.h" />
     <ClInclude Include="RGArenaAllocator.h" />
     <ClInclude Include="RGPass.h" />
     <ClInclude Include="RGResource.h" />
@@ -237,13 +247,18 @@
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
     <ClInclude Include="Time.h" />
+    <ClInclude Include="TransferBatch.h" />
+    <ClInclude Include="TransferManager.h" />
     <ClInclude Include="TypedIndex.h" />
     <ClInclude Include="StringUtils.h" />
     <ClInclude Include="VertexData.h" />
     <ClInclude Include="DX12ViewCache.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Assets\Shaders\Common\MathCommon.hlsli" />
+    <None Include="..\Assets\Shaders\Common\Binding.hlsli" />
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli" />
+    <None Include="..\Assets\Shaders\Common\Common.hlsli" />
+    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="packages.config" />
   </ItemGroup>
@@ -256,6 +271,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -263,6 +279,7 @@
     <Import Project="..\PropertySheets\LinkAssetDirectory.targets" Condition="Exists('..\PropertySheets\LinkAssetDirectory.targets')" />
     <Import Project="..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets" Condition="Exists('..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets')" />
+    <Import Project="..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -272,5 +289,6 @@
     <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets'))" />
     <Error Condition="!Exists('..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props'))" />
     <Error Condition="!Exists('..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets'))" />
+    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))" />
   </Target>
 </Project>

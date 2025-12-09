@@ -6,11 +6,26 @@
 #include "DX12PSOCache.h"
 #include "DX12RootSignatureCache.h"
 #include "RenderPassRecipeRegistry.h"
+#include "TransferManager.h"
 #include "GPUStructures.h"
 #include "Camera.h"
 
 namespace gglab
 {
+	template<typename T>
+	struct StructuredBuffer
+	{
+		std::unique_ptr<DX12RingStructuredBuffer<T>> m_StructuredBuffer;
+		TransferBatch::StageBufferWriteResult<T> m_BufferRange{};
+	};
+
+	struct DrawItem
+	{
+		MeshId m_MeshId{};
+		MaterialId m_MaterialId{};
+		uint32_t m_ObjectOffset = 0;
+	};
+
 	class DX12Device;
 	class Renderer
 	{
@@ -27,7 +42,6 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		DX12ConstantBuffer<GlobalConstantBuffer>* GetGlobalConstantBuffer() const noexcept { return m_GlobalConstantBuffer.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
 		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
@@ -36,17 +50,23 @@ namespace gglab
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureId GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 
+		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }
+		const StructuredBuffer<ObjectGPU>& GetObjectSB() const noexcept { return m_ObjectSB; }
+		const StructuredBuffer<MaterialGPU>& GetMaterialSB() const noexcept { return m_MaterialSB; }
+
+		const std::vector<DrawItem>& GetDrawItems() const noexcept { return m_DrawItems; }
+
 	private:
 		void CreateCamera() noexcept;
 		void CreateCommonRootSignature() noexcept;
 
+		void InitializeGpuBuffers() noexcept;
+
 		void UpdateGpuBuffers() noexcept;
-		void UpdateGlobalConstantBuffer() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 		std::unique_ptr<Camera> m_Camera;
-		std::unique_ptr<DX12ConstantBuffer<GlobalConstantBuffer>> m_GlobalConstantBuffer;
 		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
@@ -55,6 +75,15 @@ namespace gglab
 
 		RootSignatureId m_CommonRootSignatureId{};
 
+		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_FrameCB;
+
+		StructuredBuffer<ObjectGPU> m_ObjectSB;
+		StructuredBuffer<MaterialGPU> m_MaterialSB;
+
+		std::vector<DrawItem> m_DrawItems;
+
 		std::atomic_bool m_IsInitialized = false;
+
+		DX12FencePoint m_UploadFencePoint;
 	};
 }

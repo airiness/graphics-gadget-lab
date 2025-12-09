@@ -1,60 +1,58 @@
 #include "Precompiled.h"
-#include "RenderPassTexColor.h"
+#include "RenderPassForwardPBR.h"
+#include "Application.h"
+#include "Renderer.h"
 #include "RenderGraph.h"
-#include "DX12Device.h"
 #include "DX12SwapChain.h"
 #include "DX12CommandList.h"
-#include "DX12ConstantBuffer.h"
-#include "DX12RootSignature.h"
-#include "DX12PSOCache.h"
-#include "VertexData.h"
-#include "Application.h"
-#include "AssetManager.h"
-#include "ShaderManager.h"
-#include "Renderer.h"
 #include "InputLayoutLibrary.h"
+#include "AssetManager.h"
 #include "Components.h"
-#include "PipelinePresets.h"
 
 namespace gglab
 {
-	RenderPassTexColor::RenderPassTexColor() noexcept
+	RenderPassForwardPBR::RenderPassForwardPBR() noexcept
 	{
-		// GraphicsKeyInputs build.
 		auto* renderer = Application::GetInstance()->GetRenderer();
 		auto* shaderManager = Application::GetInstance()->GetShaderManager();
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Vertex;
-		auto vertexShaderId = shaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Stage = ShaderStage::Pixel;
-		auto pixelShaderId = shaderManager->LoadShader(shaderDesc);
+		// Shader
+		ShaderDesc sd{};
+		sd.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+		sd.m_Stage = ShaderStage::Vertex;
+		sd.m_Entry = L"VSMain";
+		const auto vsId = shaderManager->LoadShader(sd);
+		sd.m_Stage = ShaderStage::Pixel;
+		sd.m_Entry = L"PSMain";
+		const auto psId = shaderManager->LoadShader(sd);
 
+		// KeyInputs
 		m_KeyInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
 		m_KeyInputs.m_InputLayoutId = InputLayoutId::P3N3T2;
-		m_KeyInputs.m_VSId = vertexShaderId;
-		m_KeyInputs.m_PSId = pixelShaderId;
-		m_KeyInputs.m_VSGen = shaderManager->GetGeneration(vertexShaderId);
-		m_KeyInputs.m_PSGen = shaderManager->GetGeneration(pixelShaderId);
+		m_KeyInputs.m_VSId = vsId;
+		m_KeyInputs.m_PSId = psId;
+		m_KeyInputs.m_VSGen = shaderManager->GetGeneration(vsId);
+		m_KeyInputs.m_PSGen = shaderManager->GetGeneration(psId);
 		m_KeyInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		m_KeyInputs.m_SampleMask = std::numeric_limits<uint32_t>::max();
 		m_KeyInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		m_KeyInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
 		m_KeyInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		m_KeyInputs.m_Formats.m_SampleCount = 1;
 		m_KeyInputs.m_Formats.m_SampleQuality = 0;
+		m_KeyInputs.m_RasterizerPreset = RasterizerPreset::Default;
+		m_KeyInputs.m_BlendPreset = BlendPreset::Default;
+		m_KeyInputs.m_DepthPreset = DepthPreset::Default;
 	}
 
-	void RenderPassTexColor::AddPass(RenderGraph& rg) noexcept
+	void RenderPassForwardPBR::AddPass(RenderGraph& rg) noexcept
 	{
-		struct TexColorData
+		struct ForwardPBRData
 		{
 			RGTextureId m_Depth;
 		};
 
-		rg.AddPass<TexColorData>("RenderPassTexColor",
-			[this](RenderGraph::RGBuilder& builder, TexColorData& data)
+		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
+			[this](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 				auto* renderer = Application::GetInstance()->GetRenderer();
@@ -67,11 +65,9 @@ namespace gglab
 				dsDesc.m_Usage = RGTextureUsage::DepthStencil;
 
 				data.m_Depth = builder.CreateTexture("Depth", dsDesc);
-
 				builder.Write<RGTextureResource>(data.m_Depth, RGTextureUsage::DepthStencil);
-
 			},
-			[this, &rg](DX12CommandList* commandList, TexColorData& data)
+			[this, &rg](DX12CommandList* commandList, ForwardPBRData& data)
 			{
 				auto* renderer = Application::GetInstance()->GetRenderer();
 				auto* device = renderer->GetDevice();
@@ -83,9 +79,8 @@ namespace gglab
 				const auto width = swapChain->GetBufferWidth();
 				const auto height = swapChain->GetBufferHeight();
 
-				// TODO: multi thread safety?
 				const auto& cached = passRegistry->GetOrCreateGraphics(
-					"RenderPassTexColor.main", m_KeyInputs,
+					"RenderPassForwardPBR.main", m_KeyInputs,
 					[](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
 					{
 						auto* renderer = Application::GetInstance()->GetRenderer();
@@ -102,88 +97,103 @@ namespace gglab
 						outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
 						outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
 					});
-
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 
-				// TODO: last state cache to avoid redundant state setting.(root signature, pso)
+				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
-
-				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 
 				commandList->SetViewport(0, 0, width, height);
 				commandList->SetScissorRect(0, 0, width, height);
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				// back buffer on / clear
 				swapChain->PrepareBackBuffer(commandList);
 				commandList->FlushBarriers();
 
-				DX12DescriptorView rtvs[] = {
-					swapChain->GetBackBufferDescriptor(swapChain->GetCurrentBackBufferIndex())
+				DX12DescriptorView rtvs[] =
+				{
+					swapChain->GetCurrentBackBufferView()
 				};
 
 				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
-
 				auto dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(rg.GetResourceIndex(data.m_Depth), dsTexture);
 				auto viewCache = rg.GetViewCache();
-				auto& dsvDescriptor = viewCache->GetOrCreate(dsvKey, dsTexture);
+				auto& dsv = viewCache->GetOrCreate(dsvKey, dsTexture);
 
-				commandList->SetRenderTargets(rtvs, &dsvDescriptor);
+				commandList->SetRenderTargets(rtvs, &dsv);
 				swapChain->ClearBackBuffer(commandList);
-				commandList->ClearDepthStencil(dsvDescriptor, 1.0f);
+				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 
-				// globals
+				const auto frameIndex = swapChain->GetCurrentBackBufferIndex();
 				commandList->SetGraphicsConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ConstantBufferIndex),
-					renderer->GetGlobalConstantBuffer()->GetBuffer()->Get()->GetGPUVirtualAddress());
+					static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB),
+					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(frameIndex));
 
-				// draw scene
+				// Set object structured buffer
+				const auto& objectSB = renderer->GetObjectSB();
+				commandList->Get()->SetGraphicsRootShaderResourceView(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
+					objectSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
+
+				// Set material structured buffer
+				const auto& materialSB = renderer->GetMaterialSB();
+				commandList->Get()->SetGraphicsRootShaderResourceView(
+					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
+					materialSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
+
+				// Model Draw
 				DrawModels(commandList);
 
-				// backbuffer off
 				swapChain->FinishBackBuffer(commandList);
 				commandList->FlushBarriers();
+
 			});
 	}
 
-	void RenderPassTexColor::DrawModels(DX12CommandList* commandList) noexcept
+
+	void RenderPassForwardPBR::DrawModels(DX12CommandList* commandList) noexcept
 	{
-		auto& reg = Application::GetInstance()->GetEnttRegistry();
-		auto* assetManager = Application::GetInstance()->GetAssetManager();
+		auto* app = Application::GetInstance();
+		auto* renderer = app->GetRenderer();
+		auto* assetManager = app->GetAssetManager();
 
-		const auto drawModel = [&assetManager, &commandList](const Model& model)
-			{
-				for (const auto& meshId : model.m_Meshes)
-				{
-					auto* mesh = assetManager->GetMesh(meshId);
-					if (!mesh)
-					{
-						continue;
-					}
-
-					D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
-					commandList->SetVertexBuffers(0, vbs);
-					commandList->SetIndexBuffer(mesh->m_IndexBufferView);
-
-					if (auto* material = assetManager->GetMaterial(mesh->m_MaterialId))
-					{
-						if (material->m_MaterialId.IsValid())
-						{
-							auto* texture = assetManager->GetTexture(material->m_BaseColorTex);
-							commandList->SetGraphicsDescriptor(static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable), texture->m_Descriptor);
-						}
-					}
-
-					commandList->DrawIndexedInstanced(static_cast<uint32_t>(mesh->m_IndexCount));
-				}
-			};
-
-		auto view = reg.view<Model>();
-		for (auto entity : view)
+		const auto& drawItems = renderer->GetDrawItems();
+		for (const auto& drawItem : drawItems)
 		{
-			drawModel(view.get<Model>(entity));
+			const Mesh* mesh = assetManager->GetMesh(drawItem.m_MeshId);
+			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
+			{
+				continue;
+			}
+
+			D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
+			commandList->SetVertexBuffers(0, vbs);
+			commandList->SetIndexBuffer(mesh->m_IndexBufferView);
+
+			commandList->Get()->SetGraphicsRoot32BitConstant(
+				static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
+				drawItem.m_ObjectOffset, 0);
+
+			const Material* material = assetManager->GetMaterial(drawItem.m_MaterialId);
+			if (material && material->m_BaseColorTex.IsValid())
+			{
+				if (auto* texture = assetManager->GetTexture(material->m_BaseColorTex))
+				{
+					commandList->SetGraphicsDescriptor(
+						static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
+						texture->m_Descriptor);
+				}
+			}
+			else
+			{
+				// TODO: Dummy texture binding.
+			}
+
+			commandList->DrawIndexedInstanced(static_cast<uint32_t>(mesh->m_IndexCount));
 		}
+
+		// TODO: Add default base color descriptor when material or texture is missing.
+		// TODO: Sort and batch draw calls by PSO, Material and Texture.
 	}
 }
