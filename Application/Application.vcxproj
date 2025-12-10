@@ -166,7 +166,6 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RingSpanAllocator.cpp" />
-    <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
@@ -176,6 +175,7 @@
     <ClCompile Include="DX12ViewCache.cpp" />
     <ClCompile Include="TransferBatch.cpp" />
     <ClCompile Include="TransferManager.cpp" />
+    <ClCompile Include="World.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -244,8 +244,6 @@
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
     <ClInclude Include="RingSpanAllocator.h" />
-    <ClInclude Include="SceneBase.h" />
-    <ClInclude Include="SceneManager.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
@@ -257,6 +255,7 @@
     <ClInclude Include="StringUtils.h" />
     <ClInclude Include="VertexData.h" />
     <ClInclude Include="DX12ViewCache.h" />
+    <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Assets\Shaders\Common\Binding.hlsli" />

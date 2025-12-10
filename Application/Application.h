@@ -10,6 +10,7 @@ namespace gglab
 	class Time;
 	class Keyboard;
 	class Mouse;
+	class World;
 	class Application
 	{
 	public:
@@ -75,8 +76,8 @@ namespace gglab
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
-
-		entt::registry m_Registry;
+		std::unique_ptr<World> m_World;
+		//entt::registry m_Registry;
 
 		bool m_IsInitialized = false;
 	};

@@ -56,9 +56,6 @@
     <Filter Include="Core\Utility">
       <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Scene">
-      <UniqueIdentifier>{10465680-02ea-4c9c-a02b-472c23b7309d}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -250,8 +247,8 @@
     <ClCompile Include="TransferBatch.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="SceneManager.cpp">
-      <Filter>Core\Scene</Filter>
+    <ClCompile Include="World.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -483,14 +480,11 @@
     <ClInclude Include="TransferBatch.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="SceneBase.h">
-      <Filter>Core\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="SceneManager.h">
-      <Filter>Core\Scene</Filter>
-    </ClInclude>
     <ClInclude Include="RenderView.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="World.h">
+      <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
