@@ -250,6 +250,9 @@
     <ClCompile Include="World.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="RenderView.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">

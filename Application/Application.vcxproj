@@ -145,6 +145,7 @@
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
+    <ClCompile Include="RenderView.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="InputBase.cpp" />
     <ClCompile Include="Geometry.cpp" />
