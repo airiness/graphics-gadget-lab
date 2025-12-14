@@ -110,6 +110,7 @@
     </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetManager.cpp" />
+    <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Components.cpp" />
     <ClCompile Include="CopyContext.cpp" />
@@ -141,13 +142,14 @@
     <ClCompile Include="InputLayoutLibrary.cpp" />
     <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="PathUtils.cpp" />
-    <ClCompile Include="PlaygroundDemo.cpp" />
+    <ClCompile Include="DemoPlayground.cpp" />
     <ClCompile Include="RenderPassForwardPBR.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
-    <ClCompile Include="RenderView.cpp" />
+    <ClCompile Include="RenderPipelineForwardPBR.cpp" />
+    <ClCompile Include="RenderSceneBuilder.cpp" />
     <ClCompile Include="RenderViewBuilder.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="InputBase.cpp" />
@@ -186,6 +188,7 @@
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h" />
     <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="Blackboard.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Components.h" />
     <ClInclude Include="CopyContext.h" />
@@ -222,13 +225,15 @@
     <ClInclude Include="MathUtils.h" />
     <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
-    <ClInclude Include="PlaygroundDemo.h" />
+    <ClInclude Include="DemoPlayground.h" />
+    <ClInclude Include="RenderContexts.h" />
     <ClInclude Include="RenderPassForwardPBR.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />
     <ClInclude Include="PSOKey.h" />
     <ClInclude Include="RenderPipelineBase.h" />
+    <ClInclude Include="RenderPipelineForwardPBR.h" />
     <ClInclude Include="RenderScene.h" />
     <ClInclude Include="RenderSceneBuilder.h" />
     <ClInclude Include="RenderView.h" />
@@ -259,6 +264,7 @@
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
+    <ClInclude Include="StructuredBuffer.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TransferBatch.h" />
     <ClInclude Include="TransferManager.h" />

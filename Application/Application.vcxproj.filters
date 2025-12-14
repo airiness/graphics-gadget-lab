@@ -256,17 +256,23 @@
     <ClCompile Include="World.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="RenderView.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="DemoManager.cpp">
       <Filter>Core\Demo</Filter>
     </ClCompile>
-    <ClCompile Include="PlaygroundDemo.cpp">
+    <ClCompile Include="DemoPlayground.cpp">
       <Filter>Core\Demo</Filter>
     </ClCompile>
     <ClCompile Include="RenderViewBuilder.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSceneBuilder.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPipelineForwardPBR.cpp">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="Blackboard.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -513,7 +519,7 @@
     <ClInclude Include="DemoBase.h">
       <Filter>Core\Demo</Filter>
     </ClInclude>
-    <ClInclude Include="PlaygroundDemo.h">
+    <ClInclude Include="DemoPlayground.h">
       <Filter>Core\Demo</Filter>
     </ClInclude>
     <ClInclude Include="RenderPipelineBase.h">
@@ -523,6 +529,18 @@
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="RenderSceneBuilder.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="StructuredBuffer.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPipelineForwardPBR.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="Blackboard.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderContexts.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
