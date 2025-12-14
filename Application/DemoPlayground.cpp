@@ -4,6 +4,7 @@
 #include "Application.h"
 #include "AssetManager.h"
 #include "Components.h"
+#include "RenderPipelineForwardPBR.h"
 
 namespace gglab
 {
@@ -21,6 +22,9 @@ namespace gglab
 		info.m_Far = 10000.0f;
 		info.m_Fov = 60.0f;
 		m_Camera = std::make_unique<Camera>(info);
+
+		// RenderPipeline
+		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
 
 		// Scene intialize
 		InitializeScene();

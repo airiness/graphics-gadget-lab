@@ -1,10 +1,10 @@
 #pragma once
 #include "FNV1a.h"
 #include "StringId.h"
+#include "RGArenaAllocator.h"
 
 namespace gglab
 {
-	class RGArenaAllocator;
 
 	struct RGTypeId
 	{

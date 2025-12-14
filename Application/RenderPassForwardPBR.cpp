@@ -2,7 +2,9 @@
 #include "RenderPassForwardPBR.h"
 #include "Application.h"
 #include "Renderer.h"
+#include "RenderScene.h"
 #include "RenderGraph.h"
+#include "RGFrameTargets.h"
 #include "DX12SwapChain.h"
 #include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
@@ -23,27 +25,30 @@ namespace gglab
 		};
 
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
-			[](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
+			[&context, &services](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 
-				auto& target = builder.GetBlackboard().GetOrCreate<>();
+				auto& targets = builder.GetBlackboard().GetOrCreate<RGFrameTargets>(MainViewName);
+				if (!targets.m_Depth.IsValid())
+				{
+					auto* swapChain = services.m_Renderer->GetDevice()->GetSwapChain();
 
-				auto* renderer = Application::GetInstance()->GetRenderer();
-				auto* swapChain = renderer->GetDevice()->GetSwapChain();
+					RGTextureDesc dsDesc = {};
+					dsDesc.m_Width = swapChain->GetBufferWidth();
+					dsDesc.m_Height = swapChain->GetBufferHeight();
+					dsDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+					dsDesc.m_Usage = RGTextureUsage::DepthStencil;
 
-				RGTextureDesc dsDesc = {};
-				dsDesc.m_Width = swapChain->GetBufferWidth();
-				dsDesc.m_Height = swapChain->GetBufferHeight();
-				dsDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-				dsDesc.m_Usage = RGTextureUsage::DepthStencil;
+					targets.m_Depth = builder.CreateTexture("MainView.Depth", dsDesc);
+				}
 
-				data.m_Depth = builder.CreateTexture("Depth", dsDesc);
+				data.m_Depth = targets.m_Depth;
 				builder.Write<RGTextureResource>(data.m_Depth, RGTextureUsage::DepthStencil);
 			},
-			[this, &rg](DX12CommandList* commandList, ForwardPBRData& data)
+			[this, &rg, &context, &services](DX12CommandList* commandList, ForwardPBRData& data)
 			{
-				auto* renderer = Application::GetInstance()->GetRenderer();
+				auto* renderer = services.m_Renderer;
 				auto* device = renderer->GetDevice();
 				auto* passRegistry = renderer->GetRenderPassRecipeRegistry();
 				auto* rootSignature = renderer->GetCommonRootSignature();
@@ -55,9 +60,8 @@ namespace gglab
 
 				const auto& cached = passRegistry->GetOrCreateGraphics(
 					"RenderPassForwardPBR.main", m_KeyInputs,
-					[](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
+					[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
 					{
-						auto* renderer = Application::GetInstance()->GetRenderer();
 						outDesc.m_RootSignatureId = input.m_RootSignatureId;
 						outDesc.m_RootSignature = renderer->GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
 						outDesc.m_InputLayoutId = input.m_InputLayoutId;
@@ -71,6 +75,7 @@ namespace gglab
 						outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
 						outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
 					});
+
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 
 				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
@@ -99,10 +104,9 @@ namespace gglab
 				swapChain->ClearBackBuffer(commandList);
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 
-				const auto frameIndex = swapChain->GetCurrentBackBufferIndex();
 				commandList->SetGraphicsConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB),
-					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(frameIndex));
+					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(context.m_BackBufferIndex));
 
 				// Set object structured buffer
 				const auto& objectSB = renderer->GetObjectSB();
@@ -117,7 +121,7 @@ namespace gglab
 					materialSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
 
 				// Model Draw
-				DrawModels(commandList);
+				DrawModels(commandList, context, services);
 
 				swapChain->FinishBackBuffer(commandList);
 				commandList->FlushBarriers();
@@ -167,13 +171,14 @@ namespace gglab
 	}
 
 
-	void RenderPassForwardPBR::DrawModels(DX12CommandList* commandList) noexcept
+	void RenderPassForwardPBR::DrawModels(DX12CommandList* commandList,
+		const RenderFrameContext& context,
+		const RenderServices& services) noexcept
 	{
-		auto* app = Application::GetInstance();
-		auto* renderer = app->GetRenderer();
-		auto* assetManager = app->GetAssetManager();
+		auto* renderer = services.m_Renderer;
+		auto* assetManager = services.m_AssetManager;
 
-		const auto& drawItems = renderer->GetDrawItems();
+		const auto& drawItems = context.m_RenderScene->m_DrawItems;
 		for (const auto& drawItem : drawItems)
 		{
 			const Mesh* mesh = assetManager->GetMesh(drawItem.m_MeshId);

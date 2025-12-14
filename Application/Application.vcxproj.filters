@@ -543,6 +543,9 @@
     <ClInclude Include="RenderContexts.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="RGFrameTargets.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

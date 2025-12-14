@@ -238,6 +238,7 @@
     <ClInclude Include="RenderSceneBuilder.h" />
     <ClInclude Include="RenderView.h" />
     <ClInclude Include="RenderViewBuilder.h" />
+    <ClInclude Include="RGFrameTargets.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStructures.h" />
     <ClInclude Include="GraphicsTypes.h" />

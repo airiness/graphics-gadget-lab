@@ -8,13 +8,13 @@ namespace gglab::utils
 		return Vector4(vec3.x, vec3.y, vec3.z, a);
 	}
 
-	constexpr float ToRadians(float degrees) noexcept
-	{
-		return DirectX::XMConvertToRadians(degrees);
-	}
+	//constexpr float ToRadians(float degrees) noexcept
+	//{
+	//	return DirectX::XMConvertToRadians(degrees);
+	//}
 
-	constexpr float ToDegrees(float radians) noexcept
-	{
-		return DirectX::XMConvertToDegrees(radians);
-	}
+	//constexpr float ToDegrees(float radians) noexcept
+	//{
+	//	return DirectX::XMConvertToDegrees(radians);
+	//}
 }

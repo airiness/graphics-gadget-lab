@@ -4,8 +4,8 @@
 
 namespace gglab
 {
+	struct RenderView;
 	class World;
-	class RenderView;
 	class AssetManager;
 	class TransferManager;
 	class RenderSceneBuilder
@@ -31,8 +31,5 @@ namespace gglab
 
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
-
-	private:
-		void ReclaimRingBuffers(TransferManager& transferManager) noexcept;
 	};
 }

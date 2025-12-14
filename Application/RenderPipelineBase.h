@@ -5,10 +5,10 @@
 
 namespace gglab
 {
-	class RenderGraph;
-	class RenderView;
-	class RenderScene;
+	struct RenderView;
+	struct RenderScene;
 	class Renderer;
+	class RenderGraph;
 
 	class RenderPipelineBase
 	{

@@ -5,8 +5,8 @@
 
 namespace gglab
 {
-	class RenderView;
-	class RenderScene;
+	struct RenderView;
+	struct RenderScene;
 	class Renderer;
 	class AssetManager;
 	class ShaderManager;

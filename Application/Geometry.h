@@ -3,12 +3,22 @@
 
 namespace gglab
 {
+	class AssetManager;
+	class World;
+
 	namespace primitive
 	{
 		class Cube
 		{
 		public:
-			static entt::entity Create() noexcept;
+			struct CreateInfo
+			{
+				AssetManager* m_AssetManager = nullptr;
+				World* m_World = nullptr;
+			};
+
+		public:
+			static entt::entity Create(const CreateInfo& info) noexcept;
 
 		private:
 			static std::vector<Vertex> GetVerticesData() noexcept;

@@ -3,8 +3,15 @@
 namespace gglab::utils
 {
 	Vector4 ToVector4(const Vector3& vec3, float a) noexcept;
-	constexpr float ToRadians(float degrees) noexcept;
-	constexpr float ToDegrees(float radians) noexcept;
+	constexpr float ToRadians(float degrees) noexcept
+	{
+		return DirectX::XMConvertToRadians(degrees);
+	}
+
+	constexpr float ToDegrees(float radians) noexcept
+	{
+		return DirectX::XMConvertToDegrees(radians);
+	}
 
 	template<typename T>
 	concept UnsignedInteger = std::is_unsigned_v<T> && std::is_integral_v<T>;

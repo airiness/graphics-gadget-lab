@@ -201,5 +201,7 @@ namespace gglab
 
 			result.m_RenderScene.m_MainLight = lightGpu;
 		}
+
+		return result;
 	}
 }

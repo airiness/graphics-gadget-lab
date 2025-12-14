@@ -1,6 +1,7 @@
 #pragma once
 #include "DemoBase.h"
 #include "World.h"
+#include "RenderPipelineBase.h"
 
 namespace gglab
 {
@@ -12,6 +13,8 @@ namespace gglab
 	public:
 		DemoPlayground() noexcept;
 		~DemoPlayground() override = default;
+
+		std::string_view GetName() const noexcept override { return "Demo.Playgorund"; }
 
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
