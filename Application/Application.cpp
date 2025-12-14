@@ -5,10 +5,14 @@
 #include "InputManager.h"
 #include "ShaderManager.h"
 #include "TransferManager.h"
-#include "Components.h"
+#include "DemoManager.h"
+#include "RenderViewBuilder.h"
+#include "RenderSceneBuilder.h"
 #include "Time.h"
 #include "Keyboard.h"
 #include "Mouse.h"
+#include "RenderPipelineBase.h"
+#include "DemoPlayground.h"
 
 namespace gglab
 {
@@ -153,10 +157,18 @@ namespace gglab
 		m_TransferManager = std::make_unique<TransferManager>(m_Renderer->GetDevice(), 8 * 1024 * 1024);
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice(), m_TransferManager.get());
 		m_ShaderManager = std::make_unique<ShaderManager>();
+		m_DemoManager = std::make_unique<DemoManager>();
 
 		m_Renderer->Initialize();
 
 		InitializeAssets();
+
+		// InitializeDemos
+		const auto demoIndex = m_DemoManager->CreateDemo<DemoPlayground>();
+		m_DemoManager->SetActiveDemo(demoIndex);
+
+		m_RenderViewBuilder = std::make_unique<RenderViewBuilder>();
+		m_RenderSceneBuilder = std::make_unique<RenderSceneBuilder>();
 
 		m_IsInitialized = true;
 	}
@@ -194,8 +206,56 @@ namespace gglab
 			}
 		}
 
-		m_Renderer->Update();
-		m_Renderer->Render();
+		// Update demo
+		auto* demo = m_DemoManager->GetActiveDemo();
+		demo->Update();
+
+		// Build render view
+		auto& camera = demo->GetCamera();
+		RenderViewBuilder::BuildInfo viewBuildInfo{
+			.m_Camera = camera,
+			.m_Width = m_WindowWidth,
+			.m_Height = m_WindowHeight 
+		};
+		RenderView renderView = m_RenderViewBuilder->Build(viewBuildInfo);
+
+		// BDuild render scene
+		auto& world = demo->GetWorld();
+		RenderSceneBuilder::BuildInfo sceneBuildInfo{
+			.m_World = world,
+			.m_RenderView = renderView,
+			.m_AssetManager = *m_AssetManager,
+			.m_TransferManager = *m_TransferManager,
+			.m_Objects = m_Renderer->GetObjectSB(),
+			.m_Materials = m_Renderer->GetMaterialSB()
+		};
+		auto renderSceneBuildResult = m_RenderSceneBuilder->Build(sceneBuildInfo);
+
+		// Update frame constant buffer
+		m_Renderer->UpdateFrameConstants(renderView, renderSceneBuildResult.m_RenderScene);
+
+
+		RenderFrameContext renderContext{
+			.m_RenderView = &renderView,
+			.m_RenderScene = &renderSceneBuildResult.m_RenderScene,
+			.m_BackBufferIndex = m_Renderer->GetCurrentBackBufferIndex(),
+			.m_UploadFencePoint = renderSceneBuildResult.m_UploadFencePoint
+		};
+		
+		RenderServices services{
+			.m_Renderer = m_Renderer.get(),
+			.m_AssetManager = m_AssetManager.get(),
+			.m_ShaderManager = m_ShaderManager.get()
+		};
+
+		// Build RenderGraph
+		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
+		auto& renderPipeline = demo->GetRenderPipeline();
+		renderPipeline.BuildRenderGraph(rg, renderContext, services);
+		rg.Compile();
+
+		// Render
+		m_Renderer->Render(rg, renderContext);
 
 		return true;
 	}
@@ -277,36 +337,6 @@ namespace gglab
 			shaderDescs.push_back(desc);
 
 			m_ShaderManager->Preload(shaderDescs);
-		}
-
-		// Test Sponza
-		{
-			auto modelId = m_AssetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
-			auto sponzaEntity = m_Registry.create();
-
-			m_Registry.emplace<components::TransformComponent>(sponzaEntity, components::TransformComponent());
-
-			components::ModelComponent modelComp{};
-			modelComp.m_ModelId = modelId;
-			m_Registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
-		}
-
-		// Main Light
-		{
-			auto mainLightEntity = m_Registry.create();
-
-			components::TransformComponent transComp{};
-			Vector3 direction = -Vector3::One;
-			direction.Normalize();
-			Quaternion::FromToRotation(-Vector3::UnitZ, direction, transComp.m_Rotation);
-			m_Registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
-
-			components::LightComponent lightComp{};
-			lightComp.m_Intensity = 1.0f;
-			lightComp.m_Color = color::White;
-			lightComp.m_Type = LightType::Directional;
-			lightComp.m_Range = 1000.0f;
-			m_Registry.emplace<components::LightComponent>(mainLightEntity, lightComp);
 		}
 	}
 

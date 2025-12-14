@@ -16,18 +16,18 @@ namespace gglab
 	{
 		{
 			std::shared_lock lock(m_Mutex);
-			auto it = m_GraphicsPSOMap.find(key);
-			if (it != m_GraphicsPSOMap.end())
+			auto iter = m_GraphicsPSOMap.find(key);
+			if (iter != m_GraphicsPSOMap.end())
 			{
-				return it->second.get();
+				return iter->second.get();
 			}
 		}
 
 		std::unique_lock lock(m_Mutex);
-		auto it = m_GraphicsPSOMap.find(key);
-		if (it != m_GraphicsPSOMap.end())
+		auto iter = m_GraphicsPSOMap.find(key);
+		if (iter != m_GraphicsPSOMap.end())
 		{
-			return it->second.get();
+			return iter->second.get();
 		}
 
 		GGLAB_ASSERT_MSG(m_Creator, "PSO Creator is null");
@@ -43,18 +43,18 @@ namespace gglab
 	{
 		{
 			std::shared_lock lock(m_Mutex);
-			auto it = m_ComputePSOMap.find(key);
-			if (it != m_ComputePSOMap.end())
+			auto iter = m_ComputePSOMap.find(key);
+			if (iter != m_ComputePSOMap.end())
 			{
-				return it->second.get();
+				return iter->second.get();
 			}
 		}
 
 		std::unique_lock lock(m_Mutex);
-		auto it = m_ComputePSOMap.find(key);
-		if (it != m_ComputePSOMap.end())
+		auto iter = m_ComputePSOMap.find(key);
+		if (iter != m_ComputePSOMap.end())
 		{
-			return it->second.get();
+			return iter->second.get();
 		}
 		GGLAB_ASSERT_MSG(m_Creator, "PSO Creator is null");
 		auto pso = m_Creator->CreateComputePSO(m_DX12Device, desc);

@@ -46,9 +46,9 @@ namespace gglab
 	{
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto it = m_Cache.find(key); it != m_Cache.end())
+			if (auto iter = m_Cache.find(key); iter != m_Cache.end())
 			{
-				return it->second;
+				return iter->second;
 			}
 		}
 
@@ -66,8 +66,8 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 
-		auto it = m_ResourceViews.find(resourceIndex);
-		if (it == m_ResourceViews.end())
+		auto iter = m_ResourceViews.find(resourceIndex);
+		if (iter == m_ResourceViews.end())
 		{
 			return;
 		}
@@ -75,9 +75,9 @@ namespace gglab
 		Pending pending{};
 		pending.m_ResourceIndex = resourceIndex;
 		pending.m_FencePoint = fencePoint;
-		pending.m_Descriptors.reserve(it->second.size());
+		pending.m_Descriptors.reserve(iter->second.size());
 
-		for (const auto& key : it->second)
+		for (const auto& key : iter->second)
 		{
 			auto descriptorIt = m_Cache.find(key);
 			if (descriptorIt != m_Cache.end())
@@ -87,7 +87,7 @@ namespace gglab
 			}
 		}
 
-		m_ResourceViews.erase(it);
+		m_ResourceViews.erase(iter);
 
 		if (!pending.m_Descriptors.empty())
 		{
@@ -190,9 +190,9 @@ namespace gglab
 		// Check the Key has existed in cache
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto it = m_Cache.find(key); it != m_Cache.end())
+			if (auto iter = m_Cache.find(key); iter != m_Cache.end())
 			{
-				return it->second;
+				return iter->second;
 			}
 		}
 

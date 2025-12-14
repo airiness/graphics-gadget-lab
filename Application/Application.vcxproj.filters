@@ -56,6 +56,12 @@
     <Filter Include="Core\Utility">
       <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Demo">
+      <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderPipeline">
+      <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -251,6 +257,15 @@
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="RenderView.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="DemoManager.cpp">
+      <Filter>Core\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="PlaygroundDemo.cpp">
+      <Filter>Core\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderViewBuilder.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
@@ -488,6 +503,27 @@
     </ClInclude>
     <ClInclude Include="World.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderScene.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DemoManager.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="DemoBase.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="PlaygroundDemo.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPipelineBase.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderViewBuilder.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderSceneBuilder.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

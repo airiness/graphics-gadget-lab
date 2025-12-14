@@ -63,7 +63,7 @@ namespace gglab
 	DX12FencePoint CopyContext::ReclaimCompleted() noexcept
 	{
 		DX12FencePoint doneFencePoint;
-		auto it = std::remove_if(m_InFlightInfos.begin(), m_InFlightInfos.end(),
+		auto iter = std::remove_if(m_InFlightInfos.begin(), m_InFlightInfos.end(),
 			[&doneFencePoint](const std::unique_ptr<InFlightInfo>& info)
 			{
 				if (info->m_FencePoint.IsCompleted())
@@ -77,7 +77,7 @@ namespace gglab
 				return false;
 			});
 
-		m_InFlightInfos.erase(it, m_InFlightInfos.end());
+		m_InFlightInfos.erase(iter, m_InFlightInfos.end());
 
 		return doneFencePoint;
 	}

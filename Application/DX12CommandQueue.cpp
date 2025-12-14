@@ -8,13 +8,13 @@ namespace gglab
 {
 	DX12CommandQueue::DX12CommandQueue(
 		DX12Device* dx12Device,
-		D3D12_COMMAND_LIST_TYPE type, 
-		int32_t priority, 
+		D3D12_COMMAND_LIST_TYPE type,
+		int32_t priority,
 		D3D12_COMMAND_QUEUE_FLAGS flags) noexcept :
 		m_DX12Device(dx12Device),
 		m_D3D12CommandQueue(m_DX12Device->CreateDirectX12CommandQueue(type, priority, flags)),
 		m_Fence(std::make_unique<DX12Fence>(m_DX12Device))
-	{	
+	{
 	}
 
 	DX12FencePoint DX12CommandQueue::Execute(std::span<const DX12CommandList* const> commandLists) noexcept
@@ -43,9 +43,9 @@ namespace gglab
 		return m_Fence->Signal(this);
 	}
 
-	void DX12CommandQueue::Wait(const DX12FencePoint& fencePoint) noexcept
+	void DX12CommandQueue::Wait(const DX12FencePoint& fencePoint) const noexcept
 	{
-		if(!fencePoint.IsValid())
+		if (!fencePoint.IsValid())
 		{
 			return;
 		}

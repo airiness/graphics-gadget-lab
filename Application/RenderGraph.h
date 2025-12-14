@@ -3,6 +3,7 @@
 #include "RGGpuResourceAllocator.h"
 #include "RGResource.h"
 #include "RGPass.h"
+#include "Blackboard.h"
 #include "GraphicsTypes.h"
 #include "StringId.h"
 
@@ -170,6 +171,9 @@ namespace gglab
 				m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_SideEffect = true;
 			}
 
+			Blackboard& GetBlackboard() noexcept { return m_RG.m_Blackboard; }
+			const Blackboard GetBlackboard() const noexcept { return m_RG.m_Blackboard; }
+
 		private:
 			RenderGraph& m_RG;
 			RGPassNode::Index m_PassNodeIndex = RGPassNode::InvalidIndex;
@@ -201,6 +205,10 @@ namespace gglab
 		ResourceIndex GetResourceIndex(RGBufferId bufId) noexcept;
 
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
+
+		Blackboard& GetBlackboard() noexcept { return m_Blackboard; }
+		const Blackboard GetBlackboard() const noexcept { return m_Blackboard; }
+
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
@@ -232,6 +240,7 @@ namespace gglab
 		DX12ViewCache* m_ViewCache = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
+		Blackboard m_Blackboard;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
 		std::vector<RGPassNode> m_PassNodes;
@@ -317,7 +326,7 @@ namespace gglab
 		slot.m_VirtualResourceIndex = static_cast<uint32_t>(m_VirtualResouces.size());
 		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
 		slot.m_Version = 1;
-		
+
 		m_ResourceSlots.push_back(slot);
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();

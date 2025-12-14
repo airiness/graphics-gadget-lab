@@ -11,7 +11,8 @@ namespace gglab
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
 		m_ViewCache(createInfo.m_ViewCache),
-		m_ArenaAllocator(1u << 20)
+		m_ArenaAllocator(1u << 20),
+		m_Blackboard(m_ArenaAllocator)
 	{
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
 		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");

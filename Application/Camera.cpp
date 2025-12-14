@@ -4,10 +4,11 @@
 #include "Mouse.h"
 #include "Keyboard.h"
 #include "Time.h"
+#include "MathUtils.h"
 
 namespace gglab
 {
-	Camera::Camera(const Info& info) noexcept :
+	Camera::Camera(const CreateInfo& info) noexcept :
 		m_Forward(info.m_Forward),
 		m_Up(info.m_Up),
 		m_Right(info.m_Right),
@@ -111,7 +112,7 @@ namespace gglab
 	void Camera::UpdateProjMatrix() noexcept
 	{
 		m_ProjMatrix = DirectX::XMMatrixPerspectiveFovLH(
-			DirectX::XMConvertToRadians(m_Fov), m_Aspect, m_Near, m_Far);
+			utils::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
 	}
 
 	void Camera::UpdateViewMatrix() noexcept

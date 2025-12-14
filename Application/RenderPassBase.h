@@ -1,4 +1,5 @@
 #pragma once
+#include "RenderContexts.h"
 
 namespace gglab
 {
@@ -7,6 +8,8 @@ namespace gglab
 	{
 	public:
 		virtual ~RenderPassBase() = default;
-		virtual void AddPass(RenderGraph& rg) = 0;
+		virtual void AddPass(RenderGraph& rg,
+			const RenderFrameContext& context,
+			const RenderServices& services) = 0;
 	};
 }

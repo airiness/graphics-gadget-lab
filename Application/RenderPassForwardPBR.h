@@ -8,15 +8,23 @@ namespace gglab
 	class RenderPassForwardPBR : public RenderPassBase
 	{
 	public:
-		RenderPassForwardPBR() noexcept;
+		RenderPassForwardPBR() noexcept = default;
 		~RenderPassForwardPBR() override = default;
 
-		void AddPass(RenderGraph& rg) noexcept override;
+		void AddPass(RenderGraph& rg,
+			const RenderFrameContext& context,
+			const RenderServices& services) noexcept override;
 
 	private:
-		void DrawModels(DX12CommandList* commandList) noexcept;
+		void EnsureInitialized(const RenderServices& services) noexcept;
+
+		void DrawModels(DX12CommandList* commandList,
+			const RenderFrameContext& context,
+			const RenderServices& services) noexcept;
 
 	private:
 		GraphicsKeyInputs m_KeyInputs{};
+
+		bool m_IsInitialized = false;
 	};
 }

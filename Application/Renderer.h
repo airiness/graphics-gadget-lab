@@ -8,25 +8,14 @@
 #include "RenderPassRecipeRegistry.h"
 #include "TransferManager.h"
 #include "GPUStructures.h"
-#include "Camera.h"
+#include "StructuredBuffer.h"
+#include "RenderGraph.h"
+#include "RenderContexts.h"
 
 namespace gglab
 {
-	template<typename T>
-	struct StructuredBuffer
-	{
-		std::unique_ptr<DX12RingStructuredBuffer<T>> m_StructuredBuffer;
-		TransferBatch::StageBufferWriteResult<T> m_BufferRange{};
-	};
-
-	struct DrawItem
-	{
-		MeshId m_MeshId{};
-		MaterialId m_MaterialId{};
-		uint32_t m_ObjectOffset = 0;
-	};
-
 	class DX12Device;
+
 	class Renderer
 	{
 	public:
@@ -35,11 +24,10 @@ namespace gglab
 		~Renderer() = default;
 
 		void Initialize() noexcept;
-		void Update() noexcept;
-		void Render() noexcept;
 		void Finalize() noexcept;
-
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
+
+		void Render(RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
@@ -52,21 +40,22 @@ namespace gglab
 
 		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }
 		const StructuredBuffer<ObjectGPU>& GetObjectSB() const noexcept { return m_ObjectSB; }
+		StructuredBuffer<ObjectGPU>& GetObjectSB() noexcept { return m_ObjectSB; }
 		const StructuredBuffer<MaterialGPU>& GetMaterialSB() const noexcept { return m_MaterialSB; }
+		StructuredBuffer<MaterialGPU>& GetMaterialSB() noexcept { return m_MaterialSB; }
 
-		const std::vector<DrawItem>& GetDrawItems() const noexcept { return m_DrawItems; }
+		void UpdateFrameConstants(const RenderView& view, const RenderScene& scene) noexcept;
+
+		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
+
+		uint32_t GetCurrentBackBufferIndex() const noexcept;
 
 	private:
-		void CreateCamera() noexcept;
 		void CreateCommonRootSignature() noexcept;
-
 		void InitializeGpuBuffers() noexcept;
-
-		void UpdateGpuBuffers() noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
-		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
@@ -80,10 +69,6 @@ namespace gglab
 		StructuredBuffer<ObjectGPU> m_ObjectSB;
 		StructuredBuffer<MaterialGPU> m_MaterialSB;
 
-		std::vector<DrawItem> m_DrawItems;
-
 		std::atomic_bool m_IsInitialized = false;
-
-		DX12FencePoint m_UploadFencePoint;
 	};
 }
