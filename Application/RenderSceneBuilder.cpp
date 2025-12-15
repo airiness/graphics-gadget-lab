@@ -11,10 +11,6 @@ namespace gglab
 	{
 		BuildResult result{};
 
-		GGLAB_ASSERT(
-			info.m_Objects.m_StructuredBuffer &&
-			info.m_Materials.m_StructuredBuffer);
-
 		auto& registry = info.m_World.GetRegistry();
 		auto& transferManager = info.m_TransferManager;
 		auto& assetManager = info.m_AssetManager;
@@ -23,8 +19,8 @@ namespace gglab
 		const DX12FencePoint completedFence = transferManager.Reclaim();
 		if (completedFence.IsValid())
 		{
-			info.m_Objects.m_StructuredBuffer->ReclaimCompleted(completedFence);
-			info.m_Materials.m_StructuredBuffer->ReclaimCompleted(completedFence);
+			info.m_ObjectsSB.ReclaimCompleted(completedFence);
+			info.m_MaterialsSB.ReclaimCompleted(completedFence);
 		}
 
 		// Assembly object/material data
@@ -121,6 +117,8 @@ namespace gglab
 			});
 
 		DX12FencePoint uploadFencePoint{};
+		TransferBatch::StageBufferWriteResult<ObjectGPU> objectsBufferResult{};
+		TransferBatch::StageBufferWriteResult<MaterialGPU> materialsBufferResult{};
 
 		// Upload structured buffer to GPU
 		if (!objectData.empty() || !materialData.empty())
@@ -130,40 +128,25 @@ namespace gglab
 			if (!objectData.empty())
 			{
 				std::span<const ObjectGPU> objectSpan(objectData.data(), objectData.size());
-				info.m_Objects.m_BufferRange = 
-					batch.StageStructuredBufferWrite<ObjectGPU>(*info.m_Objects.m_StructuredBuffer, objectSpan);
-			}
-			else
-			{
-				info.m_Objects.m_BufferRange = {};
+				objectsBufferResult = batch.StageStructuredBufferWrite<ObjectGPU>(info.m_ObjectsSB, objectSpan);
 			}
 
 			if (!materialData.empty())
 			{
 				std::span<const MaterialGPU> materialSpan(materialData.data(), materialData.size());
-				info.m_Materials.m_BufferRange = 
-					batch.StageStructuredBufferWrite<MaterialGPU>(*info.m_Materials.m_StructuredBuffer, materialSpan);
-			}
-			else
-			{
-				info.m_Materials.m_BufferRange = {};
+				materialsBufferResult = batch.StageStructuredBufferWrite<MaterialGPU>(info.m_MaterialsSB, materialSpan);
 			}
 
 			uploadFencePoint = batch.Submit(false);
 		}
-		else
-		{
-			info.m_Objects.m_BufferRange = {};
-			info.m_Materials.m_BufferRange = {};
-		}
 
 		result.m_UploadFencePoint = uploadFencePoint;
 
-		result.m_RenderScene.m_ObjectBaseIndex = info.m_Objects.m_BufferRange.m_FirstElementIndex;
-		result.m_RenderScene.m_ObjectCount = info.m_Objects.m_BufferRange.m_ElementCount;
+		result.m_RenderScene.m_ObjectBaseIndex = objectsBufferResult.m_FirstElementIndex;
+		result.m_RenderScene.m_ObjectCount = objectsBufferResult.m_ElementCount;
 
-		result.m_RenderScene.m_MaterialBaseIndex = info.m_Materials.m_BufferRange.m_FirstElementIndex;
-		result.m_RenderScene.m_MaterialCount = info.m_Materials.m_BufferRange.m_ElementCount;
+		result.m_RenderScene.m_MaterialBaseIndex = materialsBufferResult.m_FirstElementIndex;
+		result.m_RenderScene.m_MaterialCount = materialsBufferResult.m_ElementCount;
 
 		// MainLight data
 		{

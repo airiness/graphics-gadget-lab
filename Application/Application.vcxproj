@@ -264,7 +264,6 @@
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
     <ClInclude Include="StringId.h" />
-    <ClInclude Include="StructuredBuffer.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TransferBatch.h" />
     <ClInclude Include="TransferManager.h" />

@@ -528,9 +528,6 @@
     <ClInclude Include="RenderSceneBuilder.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="StructuredBuffer.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="RenderPipelineForwardPBR.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>

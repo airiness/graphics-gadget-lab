@@ -8,7 +8,6 @@
 #include "RenderPassRecipeRegistry.h"
 #include "TransferManager.h"
 #include "GPUStructures.h"
-#include "StructuredBuffer.h"
 #include "RenderGraph.h"
 #include "RenderContexts.h"
 
@@ -38,11 +37,12 @@ namespace gglab
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureId GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 
-		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }
-		const StructuredBuffer<ObjectGPU>& GetObjectSB() const noexcept { return m_ObjectSB; }
-		StructuredBuffer<ObjectGPU>& GetObjectSB() noexcept { return m_ObjectSB; }
-		const StructuredBuffer<MaterialGPU>& GetMaterialSB() const noexcept { return m_MaterialSB; }
-		StructuredBuffer<MaterialGPU>& GetMaterialSB() noexcept { return m_MaterialSB; }
+		const DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }	
+		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() noexcept { return m_FrameCB.get(); }
+		const DX12RingStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept { return m_ObjectSB.get(); }
+		DX12RingStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept { return m_ObjectSB.get(); }
+		const DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept { return m_MaterialSB.get(); }
+		DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
 
 		void UpdateFrameConstants(const RenderView& view, const RenderScene& scene) noexcept;
 
@@ -66,8 +66,8 @@ namespace gglab
 
 		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_FrameCB;
 
-		StructuredBuffer<ObjectGPU> m_ObjectSB;
-		StructuredBuffer<MaterialGPU> m_MaterialSB;
+		std::unique_ptr<DX12RingStructuredBuffer<ObjectGPU>> m_ObjectSB;
+		std::unique_ptr<DX12RingStructuredBuffer<MaterialGPU>> m_MaterialSB;
 
 		std::atomic_bool m_IsInitialized = false;
 	};

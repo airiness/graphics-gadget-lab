@@ -226,8 +226,8 @@ namespace gglab
 			.m_RenderView = renderView,
 			.m_AssetManager = *m_AssetManager,
 			.m_TransferManager = *m_TransferManager,
-			.m_Objects = m_Renderer->GetObjectSB(),
-			.m_Materials = m_Renderer->GetMaterialSB()
+			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
+			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer()
 		};
 		auto renderSceneBuildResult = m_RenderSceneBuilder->Build(sceneBuildInfo);
 

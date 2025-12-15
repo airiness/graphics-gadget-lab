@@ -1,6 +1,6 @@
 #pragma once
 #include "RenderScene.h"
-#include "StructuredBuffer.h"
+#include "DX12RingStructuredBuffer.h"
 
 namespace gglab
 {
@@ -19,8 +19,8 @@ namespace gglab
 			AssetManager& m_AssetManager;
 			TransferManager& m_TransferManager;
 
-			StructuredBuffer<ObjectGPU>& m_Objects;
-			StructuredBuffer<MaterialGPU>& m_Materials;
+			DX12RingStructuredBuffer<ObjectGPU>& m_ObjectsSB;
+			DX12RingStructuredBuffer<MaterialGPU>& m_MaterialsSB;
 		};
 
 		struct BuildResult

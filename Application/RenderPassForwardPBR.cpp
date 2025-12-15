@@ -107,16 +107,16 @@ namespace gglab
 					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(context.m_BackBufferIndex));
 
 				// Set object structured buffer
-				const auto& objectSB = renderer->GetObjectSB();
+				const auto& objectSB = renderer->GetObjectStructuredBuffer();
 				commandList->Get()->SetGraphicsRootShaderResourceView(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
+					objectSB->GetBuffer()->GPUVirtualAddress());
 
 				// Set material structured buffer
-				const auto& materialSB = renderer->GetMaterialSB();
+				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
 				commandList->Get()->SetGraphicsRootShaderResourceView(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB.m_StructuredBuffer->GetBuffer()->GPUVirtualAddress());
+					materialSB->GetBuffer()->GPUVirtualAddress());
 
 				// Model Draw
 				DrawModels(commandList, context, services);
