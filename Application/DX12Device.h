@@ -15,7 +15,6 @@ namespace gglab
 	class DX12Fence;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;
-	class DX12ResourceUploader;
 	class DX12Device
 	{
 	public:
@@ -39,7 +38,7 @@ namespace gglab
 		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }
 		IDXGIFactory7* GetDXGIFactory() const noexcept { return m_DxgiFactory.Get(); }
 		IDXGIAdapter1* GetDXGIAdapter() const noexcept { return m_DxgiAdapter.Get(); }
-		
+
 		D3D12MA::Allocator* GetMemAllocator() const noexcept { return m_MemAllocator.Get(); }
 
 		DX12SwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
@@ -63,8 +62,6 @@ namespace gglab
 		DX12DescriptorFreeListAllocator* GetCbvSrvUavDescriptorAllocator() const noexcept { return m_CbvSrvUavDescriptorAllocator.get(); }
 		DX12DescriptorFreeListAllocator* GetSamplerDescriptorAllocator() const noexcept { return m_SamplerDescriptorAllocator.get(); }
 
-		DX12ResourceUploader* GetResourceUploader() const noexcept { return m_ResourceUploader.get(); }
-
 		bool SupportRayTracing() const noexcept { return m_DX12FeatureSupport.m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_DX12FeatureSupport.m_MeshShaderSupported; }
 		bool SupportTearing() const noexcept { return m_DX12FeatureSupport.m_TearingSupported; }
@@ -72,7 +69,7 @@ namespace gglab
 		void FlushGPU() noexcept;
 
 	public:
-		ComPtr<ID3D12CommandQueue> CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, 
+		ComPtr<ID3D12CommandQueue> CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type,
 			int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept;
 		ComPtr<ID3D12GraphicsCommandList7> CreateDirectX12CommandGraphicsList(D3D12_COMMAND_LIST_TYPE type) const noexcept;
 
@@ -89,7 +86,6 @@ namespace gglab
 		void InitializeCommandQueues() noexcept;
 		void InitializeSwapChain() noexcept;
 		void InitializeCommandLists() noexcept;
-		void InitializeResourceUploader() noexcept;
 		void InitializeCommandAllocatorPools() noexcept;
 		void InitializeDescriptorAllocators() noexcept;
 		void InitializeMemAllocator() noexcept;
@@ -136,8 +132,5 @@ namespace gglab
 		std::unique_ptr<DX12DescriptorFreeListAllocator> m_SamplerDescriptorAllocator;
 
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
-
-		std::unique_ptr<DX12ResourceUploader> m_ResourceUploader = nullptr;
-
 	};
 }

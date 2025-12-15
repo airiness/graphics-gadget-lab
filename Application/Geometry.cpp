@@ -1,10 +1,8 @@
 #include "Precompiled.h"
 #include "Geometry.h"
-#include "Application.h"
 #include "Components.h"
 #include "AssetManager.h"
 #include "World.h"
-#include "DX12Buffer.h"
 
 namespace gglab
 {

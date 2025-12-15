@@ -132,7 +132,6 @@
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RingStructuredBuffer.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
-    <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12RootSignatureCache.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
@@ -212,7 +211,6 @@
     <ClInclude Include="DX12Resource.h" />
     <ClInclude Include="DX12RingStructuredBuffer.h" />
     <ClInclude Include="DX12RootSignature.h" />
-    <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12RootSignatureCache.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />

@@ -49,6 +49,4 @@ namespace gglab::utils
 		GGLAB_ASSERT_MSG(IsPow2(alignment), "Alignment must be a power of two.");
 		return (alignment == 0) ? value : ((value + alignment - 1) & ~(alignment - 1));
 	}
-
-
 }

@@ -234,7 +234,6 @@ namespace gglab
 		// Update frame constant buffer
 		m_Renderer->UpdateFrameConstants(renderView, renderSceneBuildResult.m_RenderScene);
 
-
 		RenderFrameContext renderContext{
 			.m_RenderView = &renderView,
 			.m_RenderScene = &renderSceneBuildResult.m_RenderScene,
