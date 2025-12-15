@@ -112,7 +112,6 @@
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="Components.cpp" />
     <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DemoManager.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />

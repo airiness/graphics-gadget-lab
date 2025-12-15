@@ -16,6 +16,7 @@ namespace gglab
 		virtual std::string_view GetName() const noexcept = 0;
 
 		virtual void OnEnter() {}
+		virtual void OnResize() {}
 		virtual void OnExit() {}
 
 		virtual void Update() = 0;
@@ -24,10 +25,5 @@ namespace gglab
 		virtual Camera& GetCamera() noexcept = 0;
 
 		virtual RenderPipelineBase& GetRenderPipeline() noexcept = 0;
-
-	protected:
-		virtual void InitializeScene() noexcept {}
-		virtual void InitializeAsset() noexcept {}
-
 	};
 }

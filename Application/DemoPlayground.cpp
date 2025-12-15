@@ -11,8 +11,7 @@ namespace gglab
 	DemoPlayground::DemoPlayground() noexcept
 	{
 		auto* app = Application::GetInstance();
-		auto* assetManager = app->GetAssetManager();
-		
+
 		// Camera
 		Camera::CreateInfo info{};
 		info.m_Position = Vector3(-100.0f, 128.0f, 30.0f);
@@ -26,11 +25,15 @@ namespace gglab
 		// RenderPipeline
 		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
 
-		// Scene intialize
+		// Scene initialize
 		InitializeScene();
 	}
 
 	void DemoPlayground::OnEnter() noexcept
+	{
+	}
+
+	void DemoPlayground::OnResize() noexcept
 	{
 	}
 
@@ -41,7 +44,6 @@ namespace gglab
 	void DemoPlayground::Update() noexcept
 	{
 		m_Camera->Update();
-
 	}
 
 	void DemoPlayground::InitializeScene() noexcept

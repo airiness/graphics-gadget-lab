@@ -105,7 +105,7 @@ namespace gglab
 			key.m_TypeId = MakeRGTypeId<T>();
 			key.m_Name = nameId;
 
-			return m_Container.find(key) != m_Container.end();
+			return m_Container.contains(key);
 		}
 
 		template<typename T>
@@ -140,7 +140,7 @@ namespace gglab
 			key.m_TypeId = MakeRGTypeId<T>();
 			key.m_Name = nameId;
 
-			GGLAB_ASSERT_MSG(m_Container.find(key) == m_Container.end(),
+			GGLAB_ASSERT_MSG(!m_Container.contains(key),
 				"RGBlackboard::Create() duplicated entry.");
 
 			T* object = m_ArenaAllocator.MakeTracked<T>(std::forward<ARGS>(args)...);

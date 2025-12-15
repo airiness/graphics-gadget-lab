@@ -14,9 +14,10 @@ namespace gglab
 		DemoPlayground() noexcept;
 		~DemoPlayground() override = default;
 
-		std::string_view GetName() const noexcept override { return "Demo.Playgorund"; }
+		std::string_view GetName() const noexcept override { return "Demo.Playground"; }
 
 		void OnEnter() noexcept override;
+		void OnResize() noexcept override;
 		void OnExit() noexcept override;
 
 		void Update() noexcept override;
@@ -26,7 +27,7 @@ namespace gglab
 		RenderPipelineBase& GetRenderPipeline() noexcept override { return *m_RenderPipeline; }
 
 	private:
-		void InitializeScene() noexcept override;
+		void InitializeScene() noexcept;
 
 	private:
 		World m_World;

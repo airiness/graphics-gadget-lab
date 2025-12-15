@@ -124,9 +124,6 @@
     <ClCompile Include="DX12ResourceUploader.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="Components.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="AssetManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>

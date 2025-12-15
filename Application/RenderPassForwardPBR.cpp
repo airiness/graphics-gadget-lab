@@ -1,6 +1,5 @@
 #include "Precompiled.h"
 #include "RenderPassForwardPBR.h"
-#include "Application.h"
 #include "Renderer.h"
 #include "RenderScene.h"
 #include "RenderGraph.h"
@@ -9,7 +8,6 @@
 #include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
 #include "AssetManager.h"
-#include "Components.h"
 
 namespace gglab
 {
@@ -25,7 +23,7 @@ namespace gglab
 		};
 
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
-			[&context, &services](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
+			[&services](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 
@@ -175,7 +173,6 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
 		auto* assetManager = services.m_AssetManager;
 
 		const auto& drawItems = context.m_RenderScene->m_DrawItems;
@@ -210,7 +207,7 @@ namespace gglab
 				// TODO: Dummy texture binding.
 			}
 
-			commandList->DrawIndexedInstanced(static_cast<uint32_t>(mesh->m_IndexCount));
+			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}
 
 		// TODO: Add default base color descriptor when material or texture is missing.

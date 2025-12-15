@@ -71,7 +71,7 @@ namespace gglab
 			passNode.m_DestroyVirtualResources.clear();
 		}
 
-		for (auto& virtualResource : m_VirtualResouces)
+		for (auto& virtualResource : m_VirtualResources)
 		{
 			virtualResource->m_RefCount = 0;
 			virtualResource->m_FirstUser = nullptr;
@@ -108,7 +108,7 @@ namespace gglab
 			}
 		}
 
-		for (auto* virtualResource : m_VirtualResouces)
+		for (auto* virtualResource : m_VirtualResources)
 		{
 			if (virtualResource->m_RefCount == 0)
 			{
@@ -213,7 +213,7 @@ namespace gglab
 			return nullptr;
 		}
 
-		return m_VirtualResouces[slot.m_VirtualResourceIndex.Value()];
+		return m_VirtualResources[slot.m_VirtualResourceIndex.Value()];
 	}
 
 	RGResourceNode& RenderGraph::GetActiveResourceNode(RGResourceHandle handle) noexcept

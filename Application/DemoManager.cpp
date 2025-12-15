@@ -29,7 +29,7 @@ namespace gglab
 		}
 
 		DemoBase* selectedDemo = m_Demos[index].get();
-		if (selectedDemo = m_ActiveDemo)
+		if (selectedDemo == m_ActiveDemo)
 		{
 			GGLAB_LOG_GRAPHICS_INFO(
 				"DemoManager: SetActive, Selected same demo with current.");
