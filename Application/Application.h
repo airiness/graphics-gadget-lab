@@ -7,9 +7,13 @@ namespace gglab
 	class InputManager;
 	class ShaderManager;
 	class TransferManager;
+	class DemoManager;
+	class RenderViewBuilder;
+	class RenderSceneBuilder;
 	class Time;
 	class Keyboard;
 	class Mouse;
+	class World;
 	class Application
 	{
 	public:
@@ -32,8 +36,6 @@ namespace gglab
 		Mouse* GetMouse() const noexcept;
 		Time* GetTime() const noexcept { return m_Time.get(); }
 
-		entt::registry& GetEnttRegistry() noexcept { return m_Registry; }
-
 		static void CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
 		static Application* GetInstance() noexcept;
 		static void DestroyApplicationInstance() noexcept;
@@ -43,7 +45,7 @@ namespace gglab
 
 	private:
 		void Initialize() noexcept;
-		bool Update() noexcept;
+		bool Tick() noexcept;
 		void Finalize() noexcept;
 
 		void InitializeWindow() noexcept;
@@ -75,8 +77,9 @@ namespace gglab
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
-
-		entt::registry m_Registry;
+		std::unique_ptr<DemoManager> m_DemoManager;
+		std::unique_ptr<RenderViewBuilder> m_RenderViewBuilder;
+		std::unique_ptr<RenderSceneBuilder> m_RenderSceneBuilder;
 
 		bool m_IsInitialized = false;
 	};

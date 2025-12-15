@@ -4,7 +4,7 @@ namespace gglab
 	class Camera
 	{
 	public:
-		struct Info
+		struct CreateInfo
 		{
 			Vector3 m_Forward = Vector3::UnitZ;
 			Vector3 m_Up = Vector3::UnitY;
@@ -20,7 +20,7 @@ namespace gglab
 		};
 
 	public:
-		explicit Camera(const Info& info) noexcept;
+		explicit Camera(const CreateInfo& info) noexcept;
 		~Camera() noexcept = default;
 
 		void Update() noexcept;
@@ -34,6 +34,7 @@ namespace gglab
 		float GetNear() const noexcept { return m_Near; }
 		float GetFar() const noexcept { return m_Far; }
 		float GetFov() const noexcept { return m_Fov; }
+		float GetAspect() const noexcept { return m_Aspect; }
 
 	private:
 		void UpdateProjMatrix() noexcept;

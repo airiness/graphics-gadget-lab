@@ -110,9 +110,10 @@
     </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetManager.cpp" />
+    <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="Components.cpp" />
     <ClCompile Include="CopyContext.cpp" />
+    <ClCompile Include="DemoManager.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
     <ClCompile Include="DX12RingBuffer.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
@@ -131,7 +132,6 @@
     <ClCompile Include="DX12Resource.cpp" />
     <ClCompile Include="DX12RingStructuredBuffer.cpp" />
     <ClCompile Include="DX12RootSignature.cpp" />
-    <ClCompile Include="DX12ResourceUploader.cpp" />
     <ClCompile Include="DX12RootSignatureCache.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
@@ -140,11 +140,15 @@
     <ClCompile Include="InputLayoutLibrary.cpp" />
     <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="PathUtils.cpp" />
+    <ClCompile Include="DemoPlayground.cpp" />
     <ClCompile Include="RenderPassForwardPBR.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
+    <ClCompile Include="RenderPipelineForwardPBR.cpp" />
+    <ClCompile Include="RenderSceneBuilder.cpp" />
+    <ClCompile Include="RenderViewBuilder.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="InputBase.cpp" />
     <ClCompile Include="Geometry.cpp" />
@@ -175,16 +179,20 @@
     <ClCompile Include="DX12ViewCache.cpp" />
     <ClCompile Include="TransferBatch.cpp" />
     <ClCompile Include="TransferManager.cpp" />
+    <ClCompile Include="World.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h" />
     <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="Blackboard.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Components.h" />
     <ClInclude Include="CopyContext.h" />
     <ClInclude Include="CoreMacros.h" />
+    <ClInclude Include="DemoBase.h" />
+    <ClInclude Include="DemoManager.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12RingBuffer.h" />
     <ClInclude Include="DX12CommandAllocator.h" />
@@ -203,7 +211,6 @@
     <ClInclude Include="DX12Resource.h" />
     <ClInclude Include="DX12RingStructuredBuffer.h" />
     <ClInclude Include="DX12RootSignature.h" />
-    <ClInclude Include="DX12ResourceUploader.h" />
     <ClInclude Include="DX12RootSignatureCache.h" />
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
@@ -215,11 +222,20 @@
     <ClInclude Include="MathUtils.h" />
     <ClInclude Include="PathUtils.h" />
     <ClInclude Include="PipelinePresets.h" />
+    <ClInclude Include="DemoPlayground.h" />
+    <ClInclude Include="RenderContexts.h" />
     <ClInclude Include="RenderPassForwardPBR.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />
     <ClInclude Include="PSOKey.h" />
+    <ClInclude Include="RenderPipelineBase.h" />
+    <ClInclude Include="RenderPipelineForwardPBR.h" />
+    <ClInclude Include="RenderScene.h" />
+    <ClInclude Include="RenderSceneBuilder.h" />
+    <ClInclude Include="RenderView.h" />
+    <ClInclude Include="RenderViewBuilder.h" />
+    <ClInclude Include="RGFrameTargets.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStructures.h" />
     <ClInclude Include="GraphicsTypes.h" />
@@ -253,6 +269,7 @@
     <ClInclude Include="StringUtils.h" />
     <ClInclude Include="VertexData.h" />
     <ClInclude Include="DX12ViewCache.h" />
+    <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Assets\Shaders\Common\Binding.hlsli" />

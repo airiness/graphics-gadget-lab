@@ -16,9 +16,9 @@ namespace gglab
 
 		{
 			std::shared_lock lock(m_Mutex);
-			if (const auto it = m_RootSignatureMap.find(key); it != m_RootSignatureMap.end())
+			if (const auto iter = m_RootSignatureMap.find(key); iter != m_RootSignatureMap.end())
 			{
-				const RootSignatureId id = it->second;
+				const RootSignatureId id = iter->second;
 				if (id.IsValid() && id.Value() < m_RootSignatures.size())
 				{
 					return RootSignatureHandle{ id, m_RootSignatures[id.Value()]->Get() };
@@ -35,9 +35,9 @@ namespace gglab
 
 		{
 			std::unique_lock lock(m_Mutex);
-			if (const auto it = m_RootSignatureMap.find(key); it != m_RootSignatureMap.end())
+			if (const auto iter = m_RootSignatureMap.find(key); iter != m_RootSignatureMap.end())
 			{
-				const RootSignatureId id = it->second;
+				const RootSignatureId id = iter->second;
 				if (id.IsValid() && id.Value() < m_RootSignatures.size())
 				{
 					return RootSignatureHandle{ id, m_RootSignatures[id.Value()]->Get() };

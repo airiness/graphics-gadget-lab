@@ -6,7 +6,6 @@
 #include "DX12CommandAllocator.h"
 #include "DX12Fence.h"
 #include "DX12Buffer.h"
-#include "DX12ResourceUploader.h"
 #include "Application.h"
 #include "HResult.h"
 
@@ -35,7 +34,6 @@ namespace gglab
 		InitializeSwapChain();
 		InitializeCommandLists();
 		InitializeCommandAllocatorPools();
-		InitializeResourceUploader();
 	}
 
 	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
@@ -242,11 +240,6 @@ namespace gglab
 			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		}
 		m_CopyCommandList = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-	}
-
-	void DX12Device::InitializeResourceUploader() noexcept
-	{
-		m_ResourceUploader = std::make_unique<DX12ResourceUploader>(this);
 	}
 
 	void DX12Device::InitializeCommandAllocatorPools() noexcept

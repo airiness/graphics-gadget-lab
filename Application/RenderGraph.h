@@ -3,6 +3,7 @@
 #include "RGGpuResourceAllocator.h"
 #include "RGResource.h"
 #include "RGPass.h"
+#include "Blackboard.h"
 #include "GraphicsTypes.h"
 #include "StringId.h"
 
@@ -136,7 +137,7 @@ namespace gglab
 			~RGBuilder() = default;
 
 			template<typename RESOURCE>
-			RGResourceId<RESOURCE> Create(const char* name, const typename RESOURCE::Descriptor& desc = {}) noexcept
+			RGResourceId<RESOURCE> Create(const char* name, const RESOURCE::Descriptor& desc = {}) noexcept
 			{
 				return m_RG.CreateInternal<RESOURCE>(name, desc);
 			}
@@ -152,13 +153,13 @@ namespace gglab
 			}
 
 			template<typename RESOURCE>
-			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage = RESOURCE::DefaultReadUsage) noexcept
+			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage = RESOURCE::DefaultReadUsage) noexcept
 			{
 				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, usage);
 			}
 
 			template<typename RESOURCE>
-			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage = RESOURCE::DefaultWriteUsage) noexcept
+			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage = RESOURCE::DefaultWriteUsage) noexcept
 			{
 				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, usage);
 			}
@@ -169,6 +170,9 @@ namespace gglab
 
 				m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_SideEffect = true;
 			}
+
+			Blackboard& GetBlackboard() noexcept { return m_RG.m_Blackboard; }
+			const Blackboard& GetBlackboard() const noexcept { return m_RG.m_Blackboard; }
 
 		private:
 			RenderGraph& m_RG;
@@ -186,7 +190,7 @@ namespace gglab
 		template<typename PassData, typename SetupFunc>
 		auto* AddPass(const char* passName, SetupFunc setupFunc) noexcept;
 
-		// Add a pass only have execute function
+		// Add a pass only have exe function
 		template<typename ExecuteFunc>
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
 
@@ -201,15 +205,19 @@ namespace gglab
 		ResourceIndex GetResourceIndex(RGBufferId bufId) noexcept;
 
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
+
+		Blackboard& GetBlackboard() noexcept { return m_Blackboard; }
+		const Blackboard& GetBlackboard() const noexcept { return m_Blackboard; }
+
 	private:
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
+		RGResourceId<RESOURCE> CreateInternal(const char* name, const RESOURCE::Descriptor& desc) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
+		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept;
+		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
 
 		template<typename RESOURCE>
 		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
@@ -225,17 +233,18 @@ namespace gglab
 
 	private:
 		template<typename RESOURCE>
-		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept;
+		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, RESOURCE::Usage usage) noexcept;
 
 	private:
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 		DX12ViewCache* m_ViewCache = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
+		Blackboard m_Blackboard;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
 		std::vector<RGPassNode> m_PassNodes;
-		std::vector<RGVirtualResourceBase*> m_VirtualResouces;
+		std::vector<RGVirtualResourceBase*> m_VirtualResources;
 		std::vector<RGResourceSlot> m_ResourceSlots;
 
 		std::unordered_map<StringId, RGResourceHandle> m_NameHandleMap;
@@ -314,10 +323,10 @@ namespace gglab
 		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
 		RGResourceSlot slot;
-		slot.m_VirtualResourceIndex = static_cast<uint32_t>(m_VirtualResouces.size());
+		slot.m_VirtualResourceIndex = static_cast<uint32_t>(m_VirtualResources.size());
 		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
 		slot.m_Version = 1;
-		
+
 		m_ResourceSlots.push_back(slot);
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
@@ -326,7 +335,7 @@ namespace gglab
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		virtualResource->m_Usage = RESOURCE::DefaultNoneUsage;
-		m_VirtualResouces.push_back(virtualResource);
+		m_VirtualResources.push_back(virtualResource);
 
 		RGResourceNode resourceNode
 		{

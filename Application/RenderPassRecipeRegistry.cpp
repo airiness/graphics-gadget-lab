@@ -152,16 +152,16 @@ namespace gglab
 			};
 
 		size_t removedCount = 0;
-		for (auto it = m_GraphicsMap.begin(); it != m_GraphicsMap.end(); )
+		for (auto iter = m_GraphicsMap.begin(); iter != m_GraphicsMap.end(); )
 		{
-			if (hitGraphics(it->second.m_Inputs))
+			if (hitGraphics(iter->second.m_Inputs))
 			{
-				it = m_GraphicsMap.erase(it);
+				iter = m_GraphicsMap.erase(iter);
 				++removedCount;
 			}
 			else
 			{
-				++it;
+				++iter;
 			}
 		}
 

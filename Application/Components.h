@@ -1,7 +1,6 @@
 #pragma once
 #include "GraphicsTypes.h"
 #include "Color.h"
-#include "StringId.h"
 
 namespace gglab::components
 {

@@ -56,6 +56,12 @@
     <Filter Include="Core\Utility">
       <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Demo">
+      <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderPipeline">
+      <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -114,12 +120,6 @@
     </ClCompile>
     <ClCompile Include="DX12FencePoint.cpp">
       <Filter>Graphics\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="DX12ResourceUploader.cpp">
-      <Filter>Graphics\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="Components.cpp">
-      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="AssetManager.cpp">
       <Filter>Graphics</Filter>
@@ -247,6 +247,27 @@
     <ClCompile Include="TransferBatch.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="DemoManager.cpp">
+      <Filter>Core\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="DemoPlayground.cpp">
+      <Filter>Core\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderViewBuilder.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSceneBuilder.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPipelineForwardPBR.cpp">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="Blackboard.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -304,9 +325,6 @@
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="DX12FencePoint.h">
-      <Filter>Graphics\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="DX12ResourceUploader.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="Components.h">
@@ -476,6 +494,45 @@
     </ClInclude>
     <ClInclude Include="TransferBatch.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderView.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="World.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderScene.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DemoManager.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="DemoBase.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="DemoPlayground.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPipelineBase.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderViewBuilder.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderSceneBuilder.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPipelineForwardPBR.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="Blackboard.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderContexts.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RGFrameTargets.h">
+      <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

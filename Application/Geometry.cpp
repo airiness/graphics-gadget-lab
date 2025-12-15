@@ -1,19 +1,18 @@
 #include "Precompiled.h"
 #include "Geometry.h"
-#include "Application.h"
 #include "Components.h"
 #include "AssetManager.h"
-#include "DX12Buffer.h"
+#include "World.h"
 
 namespace gglab
 {
 	namespace primitive
 	{
 		const char* const Cube::TextPath = "Assets/textures/UVChecker1K.png";
-		entt::entity Cube::Create() noexcept
+		entt::entity Cube::Create(const CreateInfo& info) noexcept
 		{
-			auto assetManager = Application::GetInstance()->GetAssetManager();
-			auto& registry = Application::GetInstance()->GetEnttRegistry();
+			auto assetManager = info.m_AssetManager;
+			auto& registry = info.m_World->GetRegistry();
 
 			if (assetManager->GetModel(ProceduralCubeModelID) == nullptr)
 			{
