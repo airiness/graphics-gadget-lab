@@ -21,6 +21,7 @@ namespace gglab
 
 		uint32_t GetBufferWidth() const noexcept { return m_Width; }
 		uint32_t GetBufferHeight() const noexcept { return m_Height; }
+		DXGI_FORMAT GetFormat() const noexcept { return m_Format; }
 
 		void SetClearColor(float r, float g, float b, float a) noexcept;
 

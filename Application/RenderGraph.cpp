@@ -173,7 +173,17 @@ namespace gglab
 	DX12Texture* RenderGraph::GetTexture(RGTextureId texId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGTextureResource>*>(GetVirtualResource(texId));
-		if (!virtualRes || !virtualRes->m_GpuResourceIndex.IsValid())
+		if (!virtualRes)
+		{
+			return nullptr;
+		}
+
+		if (virtualRes->m_Imported)
+		{
+			return virtualRes->m_ImportedNative;
+		}
+
+		if (!virtualRes->m_GpuResourceIndex.IsValid())
 		{
 			return nullptr;
 		}
@@ -183,7 +193,17 @@ namespace gglab
 	DX12Buffer* RenderGraph::GetBuffer(RGBufferId bufId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
-		if (!virtualRes || !virtualRes->m_GpuResourceIndex.IsValid())
+		if (!virtualRes)
+		{
+			return nullptr;
+		}
+
+		if (virtualRes->m_Imported)
+		{
+			return virtualRes->m_ImportedNative;
+		}
+
+		if (!virtualRes->m_GpuResourceIndex.IsValid())
 		{
 			return nullptr;
 		}

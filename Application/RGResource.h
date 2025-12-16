@@ -165,11 +165,14 @@ namespace gglab
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
 
+	class DX12Texture;
+
 	template<>
 	struct RGResourceTraits<RGTextureResource>
 	{
 		using Usage = RGTextureUsage;
 		using Bits = std::underlying_type_t<Usage>;
+		using Native = DX12Texture;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 		static D3D12_RESOURCE_STATES ToState(Bits bits, bool depthReadOnly = false) noexcept
 		{
@@ -178,11 +181,14 @@ namespace gglab
 		static_assert(std::is_unsigned_v<Bits>, "Usage underlying type should be unsigned");
 	};
 
+	class DX12Buffer;
+
 	template<>
 	struct RGResourceTraits<RGBufferResource>
 	{
 		using Usage = RGBufferUsage;
 		using Bits = std::underlying_type_t<Usage>;
+		using Native = DX12Buffer;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;
 		static D3D12_RESOURCE_STATES ToState(Bits bits, bool depthReadOnly = false) noexcept
 		{
