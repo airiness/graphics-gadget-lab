@@ -65,7 +65,8 @@ namespace gglab
 		}
 		if (Test(rgTexUsage, U::Present))
 		{
-			states |= D3D12_RESOURCE_STATE_PRESENT;
+			GGLAB_ASSERT_MSG(rgTexUsage == U::Present, "RGTextureUsage::Present must be exclusive.");
+			return D3D12_RESOURCE_STATE_PRESENT;
 		}
 
 		return states;

@@ -1,5 +1,6 @@
 #pragma once
 #include "DX12Descriptor.h"
+#include "Color.h"
 
 namespace gglab
 {
@@ -23,7 +24,8 @@ namespace gglab
 		uint32_t GetBufferHeight() const noexcept { return m_Height; }
 		DXGI_FORMAT GetFormat() const noexcept { return m_Format; }
 
-		void SetClearColor(float r, float g, float b, float a) noexcept;
+		void SetClearColor(const Color& color) noexcept { m_ClearColor = color; }
+		const Color& GetClearColor() const noexcept { return m_ClearColor; }
 
 		void WaitFrameCompletion() noexcept;
 		void UpdateFrameSyncObject(DX12FencePoint&& fencePoint) noexcept;
@@ -51,17 +53,15 @@ namespace gglab
 
 		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
 
+		// TODO: delete swapChain descriptors, created by viewCache.
 		std::vector<DX12Descriptor> m_BackBufferDescriptors;
 		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
 		std::vector<DX12FencePoint> m_SyncObjects;
 
 		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
 
-		float m_ClearColor[4] = { 0.6f, 0.6f, 0.6f, 1.0f };
+		Color m_ClearColor = color::Gray;
 
 		uint32_t m_BackBufferIndex = 0;
 	};
 }
-
-
-

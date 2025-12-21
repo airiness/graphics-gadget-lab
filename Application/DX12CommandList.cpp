@@ -158,8 +158,9 @@ namespace gglab
 		m_GlobalBarriers.clear();
 	}
 
-	void DX12CommandList::ClearRenderTarget(const DX12Descriptor& rtDescriptor, const float* clearColor) const noexcept
+	void DX12CommandList::ClearRenderTarget(const DX12Descriptor& rtDescriptor, const Color& color) const noexcept
 	{
+		float clearColor[4] = { color.R(), color.G(), color.B(), color.A() };
 		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.CpuHandle(), clearColor, 0, nullptr);
 	}
 

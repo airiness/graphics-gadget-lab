@@ -246,4 +246,52 @@ namespace gglab
 	{
 		return m_PassNodes[index.Value()];
 	}
+
+	ResourceIndex RenderGraph::GetOrCreateExternalIndex(const DX12Texture* texture) noexcept
+	{
+		return GetOrCreateExternalIndexImpl(texture,
+			m_ExternalTextureIndices,
+			m_NextExternalTextureId,
+			ExternalResourceIndex::Type::Texture);
+	}
+
+	ResourceIndex RenderGraph::GetOrCreateExternalIndex(const DX12Buffer* buffer) noexcept
+	{
+		return GetOrCreateExternalIndexImpl(buffer,
+			m_ExternalBufferIndices,
+			m_NextExternalBufferId,
+			ExternalResourceIndex::Type::Buffer);
+	}
+
+	void RenderGraph::ForgetExternal(DX12Texture* texture, bool freeViewsImmediately) noexcept
+	{
+		if (!texture)
+		{
+			return;
+		}
+
+		auto iter = m_ExternalTextureIndices.find(texture);
+		if (iter == m_ExternalTextureIndices.end())
+		{
+			return;
+		}
+
+		const ResourceIndex index = iter->second;
+		if (freeViewsImmediately && m_ViewCache)
+		{
+			m_ViewCache->FreeAllImmediately(index);
+		}
+
+		m_ExternalTextureIndices.erase(iter);
+	}
+
+	void RenderGraph::ForgetExternal(DX12Buffer* buffer) noexcept
+	{
+		if (!buffer)
+		{
+			return;
+		}
+
+		m_ExternalBufferIndices.erase(buffer);
+	}
 }

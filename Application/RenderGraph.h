@@ -9,9 +9,11 @@
 
 namespace gglab
 {
-	class DX12Device;
 	class DX12CommandList;
 	class DX12ViewCache;
+	class DX12Buffer;
+	class DX12Texture;
+
 	class RGPassBase;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
@@ -52,9 +54,9 @@ namespace gglab
 	template<typename RESOURCE>
 	struct RGVirtualResource : RGVirtualResourceBase
 	{
-		using Desc = RESOURCE::Descriptor;
-		using SubresourceDesc = RESOURCE::SubresourceDescriptor;
-		using Usage = RESOURCE::Usage;
+		using Desc = typename RESOURCE::Descriptor;
+		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
+		using Usage = typename RESOURCE::Usage;
 		using Native = typename RGResourceTraits<RESOURCE>::Native;
 
 		Desc m_Desc = {};
@@ -157,32 +159,38 @@ namespace gglab
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Import(const char* name,
 				typename RGResourceTraits<RESOURCE>::Native* native,
-				const RESOURCE::Descriptor& desc,
+				const typename RESOURCE::Descriptor& desc,
 				D3D12_RESOURCE_STATES initializeState) noexcept
 			{
-				return m_RG.ImportInternal(name, native, desc, initializeState);
+				return m_RG.ImportInternal<RESOURCE>(name, native, desc, initializeState);
 			}
 
-			RGTextureId ImportTexture(const char* name, DX12Texture* texture,
-				const RGTextureDesc& desc, D3D12_RESOURCE_STATES initializeState) noexcept
+			RGTextureId ImportTexture(const char* name,
+				DX12Texture* texture,
+				const RGTextureDesc& desc,
+				D3D12_RESOURCE_STATES initializeState) noexcept
 			{
 				return Import<RGTextureResource>(name, texture, desc, initializeState);
 			}
 
-			RGBufferId ImportBuffer(const char* name, DX12Buffer* buffer,
-				const RGBufferDesc& desc, D3D12_RESOURCE_STATES initializeState) noexcept
+			RGBufferId ImportBuffer(const char* name,
+				DX12Buffer* buffer,
+				const RGBufferDesc& desc,
+				D3D12_RESOURCE_STATES initializeState) noexcept
 			{
 				return Import<RGBufferResource>(name, buffer, desc, initializeState);
 			}
 
 			template<typename RESOURCE>
-			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage = RESOURCE::DefaultReadUsage) noexcept
+			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Usage usage = RESOURCE::DefaultReadUsage) noexcept
 			{
 				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, usage);
 			}
 
 			template<typename RESOURCE>
-			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage = RESOURCE::DefaultWriteUsage) noexcept
+			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Usage usage = RESOURCE::DefaultWriteUsage) noexcept
 			{
 				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, usage);
 			}
@@ -235,19 +243,21 @@ namespace gglab
 	private:
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name,
-			const RESOURCE::Descriptor& desc) noexcept;
+			const typename RESOURCE::Descriptor& desc) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ImportInternal(const char* name,
 			typename RGResourceTraits<RESOURCE>::Native* native,
-			const RESOURCE::Descriptor& desc,
+			const typename RESOURCE::Descriptor& desc,
 			D3D12_RESOURCE_STATES initializeState) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
+		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex,
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
+		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex,
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
 
 		template<typename RESOURCE>
 		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
@@ -260,6 +270,19 @@ namespace gglab
 		RGResourceNode& GetActiveResourceNode(RGResourceHandle handle) noexcept;
 
 		RGPassNode& GetPassNode(RGPassNode::Index index) noexcept;
+
+		ResourceIndex GetOrCreateExternalIndex(const DX12Texture* texture) noexcept;
+		ResourceIndex GetOrCreateExternalIndex(const DX12Buffer* buffer) noexcept;
+
+		template<typename NativeType>
+		ResourceIndex GetOrCreateExternalIndexImpl(
+			const NativeType* ptr,
+			std::unordered_map<const NativeType*, ResourceIndex>& table,
+			ExternalResourceIndex::Rep& nextId,
+			ExternalResourceIndex::Type type) noexcept;
+
+		void ForgetExternal(DX12Texture* texture, bool freeViewsImmediately) noexcept;
+		void ForgetExternal(DX12Buffer* buffer) noexcept;
 
 	private:
 		template<typename RESOURCE>
@@ -281,6 +304,12 @@ namespace gglab
 
 		std::vector<ResourceIndex> m_MarkedReleaseTextureIndices;
 		std::vector<ResourceIndex> m_MarkedReleaseBufferIndices;
+
+		ExternalResourceIndex::Rep m_NextExternalTextureId = 1;
+		ExternalResourceIndex::Rep m_NextExternalBufferId = 1;
+
+		std::unordered_map<const DX12Texture*, ResourceIndex> m_ExternalTextureIndices;
+		std::unordered_map<const DX12Buffer*, ResourceIndex> m_ExternalBufferIndices;
 
 		friend class RGBuilder;
 
@@ -316,23 +345,9 @@ namespace gglab
 	inline auto* RenderGraph::AddPass(const char* passName, SetupFunc setupFunc) noexcept
 	{
 		using PassDataType = std::decay_t<PassData>;
-		using PassType = RGPass<PassDataType>;
 
-		GGLAB_ASSERT_MSG(passName && *passName, "Pass name must not be null.");
-
-		auto* pass = m_ArenaAllocator.MakeTracked<PassType>();
-
-		RGPassNode passNode = {};
-		passNode.m_NameId = StringId(passName);
-		passNode.m_Pass = pass;
-
-		RGPassNode::Index passIndex{ static_cast<uint32_t>(m_PassNodes.size()) };
-		m_PassNodes.push_back(passNode);
-
-		RGBuilder builder(*this, passIndex);
-		setupFunc(builder, pass->GetData());
-
-		return pass;
+		return AddPass<PassDataType>(passName, std::move(setupFunc), 
+			[](DX12CommandList*, PassDataType&) noexcept {});
 	}
 
 	template<typename ExecuteFunc>
@@ -348,7 +363,8 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::CreateInternal(const char* name, const typename RESOURCE::Descriptor& desc) noexcept
+	inline RGResourceId<RESOURCE> RenderGraph::CreateInternal(const char* name,
+		const typename RESOURCE::Descriptor& desc) noexcept
 	{
 		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
@@ -384,7 +400,7 @@ namespace gglab
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ImportInternal(const char* name,
 		typename RGResourceTraits<RESOURCE>::Native* native,
-		const RESOURCE::Descriptor& desc,
+		const typename RESOURCE::Descriptor& desc,
 		D3D12_RESOURCE_STATES initializeState) noexcept
 	{
 		GGLAB_ASSERT_MSG(name && *name, "Import name must be valid.");
@@ -401,8 +417,9 @@ namespace gglab
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringId(name);
+		virtualResource->m_GpuResourceIndex = GetOrCreateExternalIndex(native);
 		virtualResource->m_Imported = true;
-		virtualResource->m_Devirtualized = true;
+		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.
 		virtualResource->m_CurrentStates = initializeState;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
@@ -422,11 +439,12 @@ namespace gglab
 		GGLAB_ASSERT_MSG(inserted, "ImportInternal duplicated resource name.");
 
 		return RGResourceId<RESOURCE>{handle};
-		return RGResourceId<RESOURCE>();
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept
+	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> resourceId,
+		typename RESOURCE::Usage usage) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
 
@@ -453,7 +471,9 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex, RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage usage) noexcept
+	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> resourceId,
+		typename RESOURCE::Usage usage) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
 
@@ -529,6 +549,29 @@ namespace gglab
 		{
 			m_MarkedReleaseBufferIndices.push_back(resIndex);
 		}
+	}
+
+	template<typename NativeType>
+	inline ResourceIndex RenderGraph::GetOrCreateExternalIndexImpl(
+		const NativeType* ptr, 
+		std::unordered_map<const NativeType*, ResourceIndex>& table, 
+		ExternalResourceIndex::Rep& nextId,
+		ExternalResourceIndex::Type type) noexcept
+	{
+		GGLAB_ASSERT_MSG(ptr, "External native must not be null.");
+
+		if (auto iter = table.find(ptr); iter != table.end())
+		{
+			return iter->second;
+		}
+
+		GGLAB_ASSERT_MSG(nextId != 0, "External id wrapped around.");
+		GGLAB_ASSERT_MSG((nextId & ~ExternalResourceIndex::IdMask) == 0, "External id overflowed.");
+
+		const ResourceIndex index = ExternalResourceIndex::MakeIndex(type, nextId++);
+
+		table.emplace(ptr, index);
+		return index;
 	}
 
 	template<typename RESOURCE>

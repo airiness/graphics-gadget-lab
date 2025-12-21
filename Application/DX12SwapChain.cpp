@@ -45,14 +45,6 @@ namespace gglab
 		CreateRTVs();
 	}
 
-	void DX12SwapChain::SetClearColor(float r, float g, float b, float a) noexcept
-	{
-		m_ClearColor[0] = r;
-		m_ClearColor[1] = g;
-		m_ClearColor[2] = b;
-		m_ClearColor[3] = a;
-	}
-
 	void DX12SwapChain::WaitFrameCompletion() noexcept
 	{
 		auto& currentFencePoint = m_SyncObjects[m_BackBufferIndex];
@@ -68,7 +60,8 @@ namespace gglab
 	{
 		m_DxgiSwapChain->Present(1, 0);
 
-		m_BackBufferIndex = (m_BackBufferIndex + 1) % DX12Device::GetBufferCount();
+		m_BackBufferIndex = m_DxgiSwapChain->GetCurrentBackBufferIndex();
+		//m_BackBufferIndex = (m_BackBufferIndex + 1) % DX12Device::GetBufferCount();
 	}
 
 	DX12DescriptorView DX12SwapChain::GetCurrentBackBufferView() const noexcept
@@ -160,7 +153,7 @@ namespace gglab
 	void DX12SwapChain::CreateRTVs() noexcept
 	{
 		m_BackBuffers.clear();	// TODO: Clear backbuffers in Resize()
-		m_BackBufferDescriptors.clear();
+		m_BackBufferDescriptors.clear();	// TODO: Descriptor is not RAII, make it RAII
 
 		const auto bufferCount = DX12Device::GetBufferCount();
 

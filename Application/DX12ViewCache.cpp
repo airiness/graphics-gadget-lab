@@ -64,6 +64,10 @@ namespace gglab
 
 	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			ExternalResourceIndex::GetType(resourceIndex) == ExternalResourceIndex::Type::Texture,
+			"Expected external texture index.");
+
 		std::unique_lock lock(m_Mutex);
 
 		auto iter = m_ResourceViews.find(resourceIndex);
@@ -120,6 +124,10 @@ namespace gglab
 
 	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			ExternalResourceIndex::GetType(resourceIndex) == ExternalResourceIndex::Type::Texture,
+			"Expected external texture index.");
+
 		std::unique_lock lock(m_Mutex);
 
 		if (auto it = m_ResourceViews.find(resourceIndex); it != m_ResourceViews.end())
@@ -275,7 +283,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::RTV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -333,7 +341,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::DSV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -391,7 +399,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::SRV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = most;
 		key.m_MipLevels = levels;
@@ -438,7 +446,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::UAV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
