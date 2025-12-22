@@ -228,7 +228,9 @@ namespace gglab
 		}
 
 		const auto& slot = m_ResourceSlots[handle.GetHandle().Value()];
-		if (slot.m_Version != handle.GetVersion())
+		const auto handleVersion = handle.GetVersion();
+		if (handleVersion == RGResourceHandle::UnintializedVersion ||
+			handleVersion > slot.m_Version)
 		{
 			return nullptr;
 		}
@@ -279,6 +281,10 @@ namespace gglab
 		const ResourceIndex index = iter->second;
 		if (freeViewsImmediately && m_ViewCache)
 		{
+			GGLAB_ASSERT_MSG(
+				ExternalResourceIndex::GetType(index) == ExternalResourceIndex::Type::Texture,
+				"Expected external texture index.");
+
 			m_ViewCache->FreeAllImmediately(index);
 		}
 

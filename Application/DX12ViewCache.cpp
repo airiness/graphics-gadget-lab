@@ -64,10 +64,6 @@ namespace gglab
 
 	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			ExternalResourceIndex::GetType(resourceIndex) == ExternalResourceIndex::Type::Texture,
-			"Expected external texture index.");
-
 		std::unique_lock lock(m_Mutex);
 
 		auto iter = m_ResourceViews.find(resourceIndex);
@@ -124,10 +120,6 @@ namespace gglab
 
 	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			ExternalResourceIndex::GetType(resourceIndex) == ExternalResourceIndex::Type::Texture,
-			"Expected external texture index.");
-
 		std::unique_lock lock(m_Mutex);
 
 		if (auto it = m_ResourceViews.find(resourceIndex); it != m_ResourceViews.end())

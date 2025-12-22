@@ -46,7 +46,7 @@ namespace gglab
 				RGTextureDesc depthBufferDesc{};
 				depthBufferDesc.m_Width = width;
 				depthBufferDesc.m_Height = height;
-				depthBufferDesc.m_Format = DXGI_FORMAT_D32_FLOAT;
+				depthBufferDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 				depthBufferDesc.m_Usage = RGTextureUsage::DepthStencil;
 
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer",
@@ -56,10 +56,14 @@ namespace gglab
 				targets.m_Height = height;
 
 				// RTVview Key
+				auto* backTexture = rg.GetTexture(targets.m_BackBuffer);
+
 				const auto resourceIndex = rg.GetResourceIndex(targets.m_BackBuffer);
 				targets.m_BackBufferRTVKey = DX12ViewCache::BuildKey<ViewType::RTV>(
 					resourceIndex,
-					swapChain->GetCurrentBackBuffer());
+					backTexture);
+
+				rg.GetViewCache()->GetOrCreate(targets.m_BackBufferRTVKey, backTexture);
 			});
 
 		// SwapChain prepare backbuffer
@@ -76,9 +80,23 @@ namespace gglab
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
 			},
-			[swapChain](DX12CommandList* commandList, PrepareBackBufferData&) 
+			[&rg](DX12CommandList* commandList, PrepareBackBufferData& data) 
 			{
-				swapChain->PrepareBackBuffer(commandList);
+				/*swapChain->PrepareBackBuffer(commandList);*/
+
+				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
+				GGLAB_ASSERT(backTexture);
+
+				CD3DX12_TEXTURE_BARRIER barrier(
+					D3D12_BARRIER_SYNC_ALL,
+					D3D12_BARRIER_SYNC_RENDER_TARGET,
+					D3D12_BARRIER_ACCESS_COMMON,
+					D3D12_BARRIER_ACCESS_RENDER_TARGET,
+					D3D12_BARRIER_LAYOUT_PRESENT,
+					D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+					backTexture->Get(),
+					CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+				commandList->AddTextureBarrier(barrier);
 				commandList->FlushBarriers();
 			});
 
@@ -107,6 +125,7 @@ namespace gglab
 				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
 
 				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());		
+				//swapChain->ClearBackBuffer(commandList);
 			});
 
 		// RenderPass ForwardPBR
@@ -129,9 +148,21 @@ namespace gglab
 					RGTextureUsage::RenderTarget);
 
 			},
-			[swapChain](DX12CommandList* commandList, FinishBackBufferData& data)
+			[&rg](DX12CommandList* commandList, FinishBackBufferData& data)
 			{
-				swapChain->FinishBackBuffer(commandList);
+				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
+
+				CD3DX12_TEXTURE_BARRIER barrier(
+					D3D12_BARRIER_SYNC_RENDER_TARGET,
+					D3D12_BARRIER_SYNC_ALL,
+					D3D12_BARRIER_ACCESS_RENDER_TARGET,
+					D3D12_BARRIER_ACCESS_COMMON,
+					D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+					D3D12_BARRIER_LAYOUT_PRESENT,
+					backTexture->Get(),
+					CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+				//swapChain->FinishBackBuffer(commandList);
+				commandList->AddTextureBarrier(barrier);
 				commandList->FlushBarriers();
 			});
 	}

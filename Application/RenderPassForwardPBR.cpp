@@ -58,7 +58,9 @@ namespace gglab
 				const ResourceIndex depthIndex = rg.GetResourceIndex(data.m_Depth);
 				const ViewKey dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(
 					depthIndex, depthTexture);
+
 				const auto& dsv = viewCache->GetOrCreate(dsvKey, depthTexture);
+				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 
 				DX12DescriptorView rtvs[] =
 				{

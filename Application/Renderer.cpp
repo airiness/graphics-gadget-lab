@@ -55,6 +55,8 @@ namespace gglab
 		}
 
 		auto swapChain = m_Device->GetSwapChain();
+		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
+
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 		auto commandAllocatorPool = m_Device->GetGraphicsCommandAllocatorPool();
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
