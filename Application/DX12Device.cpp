@@ -51,6 +51,7 @@ namespace gglab
 		m_DirectCommandQueue->FlushCommandQueue();
 		m_ComputeCommandQueue->FlushCommandQueue();
 		m_CopyCommandQueue->FlushCommandQueue();
+		m_TransferCommandQueue->FlushCommandQueue();
 	}
 
 	ComPtr<ID3D12CommandQueue> DX12Device::CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept
@@ -220,7 +221,7 @@ namespace gglab
 		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-		m_UploadCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);	//d3dx12 upload resource uses direct type
+		m_TransferCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);	//d3dx12 upload resource uses direct type
 	}
 
 	void DX12Device::InitializeSwapChain() noexcept
@@ -247,7 +248,7 @@ namespace gglab
 		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-		m_UploadCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		m_TransferCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 	}
 
 	void DX12Device::InitializeDescriptorAllocators() noexcept
@@ -290,19 +291,19 @@ namespace gglab
 		featureSupport.Init(m_D3D12Device.Get());
 
 		// RatTracing support
-		m_DX12FeatureSupport.m_RayTracingSupported = featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+		m_FeatureSupport.m_RayTracingSupported = featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
 
 		// MeshShader support
-		m_DX12FeatureSupport.m_MeshShaderSupported = featureSupport.MeshShaderTier() != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED;
+		m_FeatureSupport.m_MeshShaderSupported = featureSupport.MeshShaderTier() != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED;
 
 		// Enhanced Barrier
-		m_DX12FeatureSupport.m_EnhancedBarriers = featureSupport.EnhancedBarriersSupported();
+		m_FeatureSupport.m_EnhancedBarriers = featureSupport.EnhancedBarriersSupported();
 
 		// Tearing support
 		BOOL tearSupport = FALSE;
 		if (m_DxgiFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearSupport, sizeof(BOOL)) == S_OK)
 		{
-			m_DX12FeatureSupport.m_TearingSupported = tearSupport;
+			m_FeatureSupport.m_TearingSupported = tearSupport;
 		}
 	}
 

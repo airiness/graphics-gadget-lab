@@ -12,8 +12,8 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device pointer can not be null.");
 
-		m_CommandQueue = dx12Device->GetUploadCommandQueue();
-		m_CommandAllocatorPool = dx12Device->GetUploadCommandAllocatorPool();
+		m_CommandQueue = dx12Device->GetTransferCommandQueue();
+		m_CommandAllocatorPool = dx12Device->GetTransferCommandAllocatorPool();
 		GGLAB_ASSERT_MSG(m_CommandQueue != nullptr && m_CommandAllocatorPool != nullptr,
 			"Copy Command Queue or Command Allocator Pool is null.");
 
