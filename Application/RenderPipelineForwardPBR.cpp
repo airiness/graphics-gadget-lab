@@ -22,6 +22,8 @@ namespace gglab
 		rg.AddPass<SetupData>("MainView.Setup",
 			[swapChain, &rg](RenderGraph::RGBuilder& builder, SetupData&)
 			{
+				GGLAB_LOG_GRAPHICS_INFO("MainView.Setup(Setup)");
+
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
@@ -75,6 +77,8 @@ namespace gglab
 		rg.AddPass<PrepareBackBufferData>("SwapChain.PrepareBackBuffer",
 			[](RenderGraph::RGBuilder& builder, PrepareBackBufferData& data)
 			{
+				GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Setup)");
+
 				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
@@ -82,6 +86,8 @@ namespace gglab
 			},
 			[&rg](DX12CommandList* commandList, PrepareBackBufferData& data) 
 			{
+				GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Execute)");
+
 				/*swapChain->PrepareBackBuffer(commandList);*/
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
@@ -109,6 +115,9 @@ namespace gglab
 		rg.AddPass<ClearBackBufferData>("SwapChain.ClearBackBuffer",
 			[](RenderGraph::RGBuilder& builder, ClearBackBufferData& data)
 			{
+				GGLAB_LOG_GRAPHICS_INFO("SwapChain.ClearBackBuffer(Setup)");
+
+
 				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
@@ -117,6 +126,8 @@ namespace gglab
 			},
 			[&rg, swapChain](DX12CommandList* commandList, ClearBackBufferData& data)
 			{
+				GGLAB_LOG_GRAPHICS_INFO("SwapChain.ClearBackBuffer(Execute)");
+
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 
 				GGLAB_ASSERT(backTexture);
@@ -142,6 +153,9 @@ namespace gglab
 		rg.AddPass<FinishBackBufferData>("SwapChain.FinishBackBuffer",
 			[](RenderGraph::RGBuilder& builder, FinishBackBufferData& data)
 			{
+				GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
+
+
 				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
@@ -150,6 +164,8 @@ namespace gglab
 			},
 			[&rg](DX12CommandList* commandList, FinishBackBufferData& data)
 			{
+				GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Execute)");
+
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 
 				CD3DX12_TEXTURE_BARRIER barrier(
