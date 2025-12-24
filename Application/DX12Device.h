@@ -27,13 +27,11 @@ namespace gglab
 
 		struct CreateInfo
 		{
-			bool m_EnableDebugLayer = true;
-			bool m_EnableGpuBasedValidation = true;
 			bool m_TryLoadWinPix = true;
 		};
 
 	public:
-		DX12Device() noexcept;
+		DX12Device() noexcept = default;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12Device);
 		~DX12Device();
 
@@ -86,8 +84,6 @@ namespace gglab
 		void InitializeCommandAllocatorPools() noexcept;
 		void InitializeDescriptorAllocators() noexcept;
 		void InitializeMemAllocator() noexcept;
-		void FinalizeMemAllocator() noexcept;
-
 		void CheckFeatureSupport() noexcept;
 
 	private:
@@ -115,7 +111,6 @@ namespace gglab
 
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
-		std::unique_ptr<DX12CommandList> m_CopyCommandList;
 
 		// Command Allocator Pool
 		std::unique_ptr<DX12CommandAllocatorPool> m_GraphicsCommandAllocatorPool;
@@ -127,6 +122,8 @@ namespace gglab
 		std::unique_ptr<DX12DescriptorFreeListAllocator> m_RtvDescriptorAllocator;
 		std::unique_ptr<DX12DescriptorFreeListAllocator> m_DsvDescriptorAllocator;
 		std::unique_ptr<DX12DescriptorFreeListAllocator> m_SamplerDescriptorAllocator;
+
+		bool m_IsInitialized = false;
 
 	};
 }

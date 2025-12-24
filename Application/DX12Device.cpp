@@ -11,70 +11,86 @@
 
 namespace gglab
 {
-	DX12Device::DX12Device() noexcept
+	DX12Device::~DX12Device()
 	{
-		InitializeWinPIX();
+		if (m_IsInitialized)
+		{
+			Finalize();
+		}
+	}
+
+	void DX12Device::Initialize(const CreateInfo& info) noexcept
+	{
+		if (m_IsInitialized)
+		{
+			return;
+		}
+
+#if defined(BUILD_DEBUG)
+		if (info.m_TryLoadWinPix)
+		{
+			InitializeWinPIX();
+		}
+#endif
+
 		InitializeDXGIFactory();
 		InitializeDXGIAdapter();
+#if defined(BUILD_DEBUG)
 		InitializeDebugLayer();
+#endif
 		InitializeD3D12Device();
 		InitializeInfoQueue();
 		CheckFeatureSupport();
-	}
-
-	DX12Device::~DX12Device() noexcept
-	{
-	}
-
-	void DX12Device::Initialize() noexcept
-	{
 		InitializeCommandQueues();
 		InitializeDescriptorAllocators();
 		InitializeMemAllocator();
-		InitializeSwapChain();
 		InitializeCommandLists();
 		InitializeCommandAllocatorPools();
-	}
 
-	void DX12Device::OnResize(uint32_t width, uint32_t height) noexcept
-	{
-		// TODO: Window resize Process 
+		m_IsInitialized = true;
 	}
 
 	void DX12Device::Finalize() noexcept
 	{
-		FinalizeMemAllocator();
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
+		FlushGPU();
+		m_MemAllocator.Reset();
+
+		m_GraphicsCommandAllocatorPool.reset();
+		m_ComputeCommandAllocatorPool.reset();
+		m_CopyCommandAllocatorPool.reset();
+		m_TransferCommandAllocatorPool.reset();
+
+		m_GraphicsCommandLists = {};
+		m_ComputeCommandLists = {};
+
+		m_CbvSrvUavDescriptorAllocator.reset();
+		m_RtvDescriptorAllocator.reset();
+		m_DsvDescriptorAllocator.reset();
+		m_SamplerDescriptorAllocator.reset();
+
+		m_DirectCommandQueue.reset();
+		m_ComputeCommandQueue.reset();
+		m_CopyCommandQueue.reset();
+		m_TransferCommandQueue.reset();
+
+		m_D3D12Device.Reset();
+		m_DxgiAdapter.Reset();
+		m_DxgiFactory.Reset();
+
+		m_IsInitialized = false;
 	}
 
 	void DX12Device::FlushGPU() noexcept
 	{
-		m_DirectCommandQueue->FlushCommandQueue();
-		m_ComputeCommandQueue->FlushCommandQueue();
-		m_CopyCommandQueue->FlushCommandQueue();
-		m_TransferCommandQueue->FlushCommandQueue();
-	}
-
-	ComPtr<ID3D12CommandQueue> DX12Device::CreateDirectX12CommandQueue(D3D12_COMMAND_LIST_TYPE type, int32_t priority, D3D12_COMMAND_QUEUE_FLAGS flags) const noexcept
-	{
-		D3D12_COMMAND_QUEUE_DESC desc = {};
-		desc.Type = type;
-		desc.Priority = priority;
-		desc.Flags = flags;
-		desc.NodeMask = 0;
-
-		ComPtr<ID3D12CommandQueue> commandQueue;
-		GGLAB_HR_DX(m_D3D12Device->CreateCommandQueue(&desc, IID_PPV_ARGS(&commandQueue)), m_D3D12Device.Get());
-
-		return commandQueue;
-	}
-
-	ComPtr<ID3D12GraphicsCommandList7> DX12Device::CreateDirectX12CommandGraphicsList(D3D12_COMMAND_LIST_TYPE type) const noexcept
-	{
-		ComPtr<ID3D12GraphicsCommandList7> commandList;
-		GGLAB_HR_DX(m_D3D12Device->CreateCommandList1(0, type, D3D12_COMMAND_LIST_FLAG_NONE,IID_PPV_ARGS(&commandList)),
-			m_D3D12Device.Get());
-
-		return commandList;
+		if (m_DirectCommandQueue) { m_DirectCommandQueue->FlushCommandQueue(); }
+		if (m_ComputeCommandQueue) { m_ComputeCommandQueue->FlushCommandQueue(); }
+		if (m_CopyCommandQueue) { m_CopyCommandQueue->FlushCommandQueue(); }
+		if (m_TransferCommandQueue) { m_TransferCommandQueue->FlushCommandQueue(); }
 	}
 
 	void DX12Device::InitializeDXGIFactory() noexcept
@@ -130,7 +146,7 @@ namespace gglab
 		{
 			debugController->EnableDebugLayer();
 			debugController->SetEnableGPUBasedValidation(true);
-			
+
 			ComPtr<ID3D12Debug5> debugController5;
 			if (SUCCEEDED(debugController.As(&debugController5)))
 			{
@@ -144,15 +160,62 @@ namespace gglab
 	{
 #if defined(BUILD_DEBUG)
 		// Try to load `WinPixGpuCapturer.dll` for Frame Capture.
-		if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+		if (GetModuleHandle(L"WinPixGpuCapturer.dll") != 0)
 		{
-			const auto& dllPath = GetLatestWinPixGpuCapturerPath();
-			if (!dllPath.empty())
-			{
-				LoadLibrary(dllPath.c_str());
-			}
+			return;
+		}
+
+		const auto dllPath = GetLatestWinPixGpuCapturerPath();
+		if (!dllPath.empty())
+		{
+			LoadLibrary(dllPath.c_str());
 		}
 #endif
+	}
+
+	void DX12Device::InitializeDXGIFactory() noexcept
+	{
+		UINT createFactoryFlags = 0;
+
+#if defined (BUILD_DEBUG)
+		createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
+		ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
+		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
+		{
+			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+		}
+#endif
+		ComPtr<IDXGIFactory7> dxgiFactory;
+		GGLAB_HR(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
+
+		m_DxgiFactory = dxgiFactory;
+	}
+
+	void DX12Device::InitializeDXGIAdapter() noexcept
+	{
+		ComPtr<IDXGIAdapter1> dxgiAdapter;
+		for (UINT i = 0; m_DxgiFactory->EnumAdapterByGpuPreference(i,
+			DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&dxgiAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
+		{
+			DXGI_ADAPTER_DESC1 desc = {};
+			dxgiAdapter->GetDesc1(&desc);
+
+			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+			{
+				continue;
+			}
+
+			if (SUCCEEDED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr)))
+			{
+				m_DxgiAdapter = dxgiAdapter;
+				break;
+			}
+		}
+
+		GGLAB_ASSERT_MSG(m_DxgiAdapter != nullptr, "Create DxgiAdapter failed.");
+
 	}
 
 	void DX12Device::InitializeD3D12Device() noexcept
@@ -183,7 +246,7 @@ namespace gglab
 #if defined(BUILD_DEBUG)
 		ComPtr<ID3D12InfoQueue> infoQueue;
 		if (SUCCEEDED(m_D3D12Device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
-		{		
+		{
 			// Break on DXGI_ERROR_DEVICE_REMOVED and DXGI_ERROR_DEVICE_RESET
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
@@ -212,7 +275,6 @@ namespace gglab
 			//filter.DenyList.pIDList = denyIds;
 			GGLAB_HR(infoQueue->PushStorageFilter(&filter));
 		}
-
 #endif
 	}
 
@@ -224,15 +286,6 @@ namespace gglab
 		m_TransferCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);	//d3dx12 upload resource uses direct type
 	}
 
-	void DX12Device::InitializeSwapChain() noexcept
-	{
-		auto* app = Application::GetInstance();
-		auto width = app->GetWindowWidth();
-		auto height = app->GetWindowHeight();
-
-		m_SwapChain = std::make_unique<DX12SwapChain>(this, m_DirectCommandQueue.get(), width, height);
-	}
-
 	void DX12Device::InitializeCommandLists() noexcept
 	{
 		for (int32_t i = 0; i < BufferCount; i++)
@@ -240,7 +293,6 @@ namespace gglab
 			m_GraphicsCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
 			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		}
-		m_CopyCommandList = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COPY);
 	}
 
 	void DX12Device::InitializeCommandAllocatorPools() noexcept
@@ -276,15 +328,6 @@ namespace gglab
 		GGLAB_HR(D3D12MA::CreateAllocator(&allocatorDesc, &m_MemAllocator));
 	}
 
-	void DX12Device::FinalizeMemAllocator() noexcept
-	{
-		if (m_MemAllocator)
-		{
-			m_MemAllocator->Release();
-			m_MemAllocator = nullptr;
-		}
-	}
-
 	void DX12Device::CheckFeatureSupport() noexcept
 	{
 		CD3DX12FeatureSupport featureSupport;
@@ -310,20 +353,30 @@ namespace gglab
 	std::wstring DX12Device::GetLatestWinPixGpuCapturerPath() noexcept
 	{
 		LPWSTR programFilesPath = nullptr;
-		SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+		if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath)))
+		{
+			return L"";
+		}
 
 		std::filesystem::path pixInstallationPath = programFilesPath;
+		CoTaskMemFree(programFilesPath);
+
 		pixInstallationPath /= "Microsoft PIX";
 
-		std::wstring newestVersionFound;
-
-		for (auto const& directory_entry : std::filesystem::directory_iterator(pixInstallationPath))
+		if (!std::filesystem::exists(pixInstallationPath))
 		{
-			if (directory_entry.is_directory())
+			return L"";
+		}
+
+		std::wstring newestVersionFound;
+		for (auto const& directoryEntry : std::filesystem::directory_iterator(pixInstallationPath))
+		{
+			if (directoryEntry.is_directory())
 			{
-				if (newestVersionFound.empty() || newestVersionFound < directory_entry.path().filename().c_str())
+				const auto name = directoryEntry.path().filename().wstring();
+				if (newestVersionFound.empty() || newestVersionFound < name)
 				{
-					newestVersionFound = directory_entry.path().filename().c_str();
+					newestVersionFound = name;
 				}
 			}
 		}
@@ -333,6 +386,6 @@ namespace gglab
 			return L"";
 		}
 
-		return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
+		return (pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll");
 	}
 }

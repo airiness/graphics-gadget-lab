@@ -30,6 +30,11 @@ namespace gglab
 	{
 	}
 
+	DX12SwapChain::~DX12SwapChain()
+	{
+		Finalize();
+	}
+
 	void DX12SwapChain::OnResize(uint32_t width, uint32_t height) noexcept
 	{
 		m_Width = width;
