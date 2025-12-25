@@ -23,7 +23,7 @@ namespace gglab
 			DXGI_FORMAT m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 			uint32_t m_BufferCount = 0;
 
-			bool m_AllowTearing = true;
+			bool m_AllowTearing = false;
 			bool m_Vsync = true;
 		};
 
@@ -34,10 +34,12 @@ namespace gglab
 
 		bool Initialize(const CreateInfo& info) noexcept;
 		void Finalize() noexcept;
-		void OnResize(uint32_t width, uint32_t height) noexcept;
 
 		bool IsValid() const noexcept { return m_DxgiSwapChain != nullptr; }
 
+		void OnResize(uint32_t width, uint32_t height) noexcept;
+
+		uint32_t GetBufferCount() const noexcept { return m_BufferCount; }
 		uint32_t GetBufferWidth() const noexcept { return m_Width; }
 		uint32_t GetBufferHeight() const noexcept { return m_Height; }
 		DXGI_FORMAT GetFormat() const noexcept { return m_Format; }
@@ -50,8 +52,8 @@ namespace gglab
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		DX12DescriptorView GetCurrentBackBufferView() const noexcept;
-		DX12Texture* GetCurrentBackBuffer() const noexcept;
+		DX12Texture* GetBackBuffre(uint32_t bufferIndex) const noexcept;
+		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffre(m_BackBufferIndex); }
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
 		void FinishBackBuffer(DX12CommandList* commandList) const noexcept;
@@ -73,15 +75,16 @@ namespace gglab
 		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
 
 		uint32_t m_BufferCount = 2;
+		uint32_t m_BackBufferIndex = 0;
+
 		bool m_AllowTearing = false;
-
-		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
-		std::vector<DX12FencePoint> m_SyncObjects;
-
-		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
+		bool m_Vsync = true;
 
 		Color m_ClearColor = color::Gray;
 
-		uint32_t m_BackBufferIndex = 0;
+		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
+
+		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
+		std::vector<DX12FencePoint> m_SyncObjects;
 	};
 }

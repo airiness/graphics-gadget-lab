@@ -69,6 +69,11 @@ namespace gglab
 		//m_BackBufferIndex = (m_BackBufferIndex + 1) % DX12Device::GetBufferCount();
 	}
 
+	DX12Texture* DX12SwapChain::GetBackBuffre(uint32_t bufferIndex) const noexcept
+	{
+		return nullptr;
+	}
+
 	DX12DescriptorView DX12SwapChain::GetCurrentBackBufferView() const noexcept
 	{
 		return m_BackBufferDescriptors[m_BackBufferIndex].ToView();
