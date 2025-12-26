@@ -35,7 +35,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12Device);
 		~DX12Device();
 
-		void Initialize(const CreateInfo& info = {}) noexcept;
+		void Initialize(const CreateInfo& createInfo = {}) noexcept;
 		void Finalize() noexcept;
 
 		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }

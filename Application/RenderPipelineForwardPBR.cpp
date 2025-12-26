@@ -15,7 +15,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 
 		auto* renderer = services.m_Renderer;
-		auto* swapChain = renderer->GetDevice()->GetSwapChain();
+		auto* swapChain = renderer->GetSwapChain();
 
 		// MainView Setup
 		struct SetupData {};

@@ -1,6 +1,5 @@
 #include "Precompiled.h"
 #include "Renderer.h"
-#include "Application.h"
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12CommandList.h"
@@ -8,6 +7,7 @@
 #include "DX12SwapChain.h"
 #include "DX12CommandAllocator.h"
 #include "DX12ConstantBuffer.h"
+#include "DX12Fence.h"
 #include "RenderGraph.h"
 #include "RGGpuResourceAllocator.h"
 #include "AssetManager.h"
@@ -20,14 +20,22 @@
 
 namespace gglab
 {
-	Renderer::Renderer() noexcept
+	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
-	}
 
-	void Renderer::Initialize() noexcept
-	{
+		m_SwapChain = std::make_unique<DX12SwapChain>();
+		DX12SwapChain::CreateInfo swapChainCreateInfo{};
+		swapChainCreateInfo.m_DX12Device = m_Device.get();
+		swapChainCreateInfo.m_PresentQueue = m_Device->GetGraphicsCommandQueue();
+		swapChainCreateInfo.m_Hwnd = createInfo.m_Hwnd;
+		swapChainCreateInfo.m_Width = createInfo.m_Width;
+		swapChainCreateInfo.m_Height = createInfo.m_Height;
+		swapChainCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+
+		m_SwapChain->Initialize(swapChainCreateInfo);
+
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
@@ -39,7 +47,7 @@ namespace gglab
 		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
-		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(Application::GetInstance()->GetShaderManager());
+		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
 
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
@@ -54,7 +62,7 @@ namespace gglab
 			return;
 		}
 
-		auto swapChain = m_Device->GetSwapChain();
+		auto swapChain = m_SwapChain.get();
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
 
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
@@ -124,7 +132,7 @@ namespace gglab
 
 		frameCB.MainLight = scene.m_MainLight;
 
-		const auto currentIndex = m_Device->GetSwapChain()->GetCurrentBackBufferIndex();
+		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();
 		m_FrameCB->Update(frameCB, currentIndex);
 	}
 
@@ -135,11 +143,6 @@ namespace gglab
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
 
 		return rgCreateInfo;
-	}
-
-	uint32_t Renderer::GetCurrentBackBufferIndex() const noexcept
-	{
-		return m_Device->GetSwapChain()->GetCurrentBackBufferIndex();
 	}
 
 	void Renderer::CreateCommonRootSignature() noexcept

@@ -14,7 +14,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			DX12Device* m_DX12Device = nullptr;
-			DX12CommandQueue* m_DX12CommandQueue = nullptr;
+			DX12CommandQueue* m_PresentQueue = nullptr;
 			HWND m_Hwnd = nullptr;
 
 			uint32_t m_Width = 0;
@@ -29,10 +29,10 @@ namespace gglab
 
 	public:
 		DX12SwapChain() noexcept = default;
-		GGLAB_DELETE_COPYABLE_MOVABLE(DX12SwapChain);
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12SwapChain);
 		~DX12SwapChain();
 
-		bool Initialize(const CreateInfo& info) noexcept;
+		bool Initialize(const CreateInfo& createInfo) noexcept;
 		void Finalize() noexcept;
 
 		bool IsValid() const noexcept { return m_DxgiSwapChain != nullptr; }
@@ -52,8 +52,8 @@ namespace gglab
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		DX12Texture* GetBackBuffre(uint32_t bufferIndex) const noexcept;
-		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffre(m_BackBufferIndex); }
+		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
+		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffer(m_BackBufferIndex); }
 
 		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
 		void FinishBackBuffer(DX12CommandList* commandList) const noexcept;
@@ -61,8 +61,10 @@ namespace gglab
 
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
-		void CreateRTVs() noexcept;
+		void AcquireBackBuffers() noexcept;
+		void ReleaseBackBuffers() noexcept;
 		void CreateSyncObjects() noexcept;
+		void RefreshCurrentBackBufferIndex() noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

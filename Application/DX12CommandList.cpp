@@ -10,11 +10,18 @@
 
 namespace gglab
 {
-	DX12CommandList::DX12CommandList(DX12Device* dx12Device, D3D12_COMMAND_LIST_TYPE type) noexcept :
-		m_DX12Device(dx12Device),
-		m_Type(type),
-		m_D3D12GraphicsCommandList(m_DX12Device->CreateDirectX12CommandGraphicsList(type))
+	DX12CommandList::DX12CommandList(const CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device),
+		m_Type(createInfo.m_Type)
 	{
+		GGLAB_ASSERT(m_DX12Device);
+
+		GGLAB_HR_DX(
+			m_DX12Device->Get()->CreateCommandList1(0,
+				m_Type,
+				D3D12_COMMAND_LIST_FLAG_NONE,
+				IID_PPV_ARGS(&m_D3D12GraphicsCommandList)),
+			m_DX12Device->Get());
 	}
 
 	void DX12CommandList::Begin(DX12CommandAllocator* allocator) const noexcept

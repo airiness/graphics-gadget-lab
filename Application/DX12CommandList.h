@@ -12,8 +12,14 @@ namespace gglab
 	class DX12CommandList
 	{
 	public:
-		explicit DX12CommandList(DX12Device* dx12Device,
-			D3D12_COMMAND_LIST_TYPE type) noexcept;
+		struct CreateInfo
+		{
+			DX12Device* m_DX12Device = nullptr;
+			D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		};
+
+	public:
+		explicit DX12CommandList(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12CommandList);
 		~DX12CommandList() = default;
 

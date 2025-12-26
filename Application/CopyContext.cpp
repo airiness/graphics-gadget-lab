@@ -17,7 +17,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_CommandQueue != nullptr && m_CommandAllocatorPool != nullptr,
 			"Copy Command Queue or Command Allocator Pool is null.");
 
-		m_CommandList = std::make_unique<DX12CommandList>(dx12Device, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		DX12CommandList::CreateInfo createInfo{};
+		createInfo.m_DX12Device = m_DX12Device;
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		m_CommandList = std::make_unique<DX12CommandList>(createInfo);
 	}
 
 	void CopyContext::Begin() noexcept

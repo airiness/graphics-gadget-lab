@@ -3,18 +3,26 @@
 #include "DX12CommandList.h"
 #include "DX12Device.h"
 #include "DX12Fence.h"
+#include "HResult.h"
 
 namespace gglab
 {
-	DX12CommandQueue::DX12CommandQueue(
-		DX12Device* dx12Device,
-		D3D12_COMMAND_LIST_TYPE type,
-		int32_t priority,
-		D3D12_COMMAND_QUEUE_FLAGS flags) noexcept :
-		m_DX12Device(dx12Device),
-		m_D3D12CommandQueue(m_DX12Device->CreateDirectX12CommandQueue(type, priority, flags)),
+	DX12CommandQueue::DX12CommandQueue(const CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device),
 		m_Fence(std::make_unique<DX12Fence>(m_DX12Device))
 	{
+		GGLAB_ASSERT(m_DX12Device);
+
+		D3D12_COMMAND_QUEUE_DESC desc = {};
+		desc.Type = createInfo.m_Type;
+		desc.Priority = createInfo.m_Priority;
+		desc.Flags = createInfo.m_Flags;
+		desc.NodeMask = 0;
+
+		GGLAB_HR_DX(
+			m_DX12Device->Get()->CreateCommandQueue(
+				&desc, IID_PPV_ARGS(&m_D3D12CommandQueue)),
+			m_DX12Device->Get());
 	}
 
 	DX12FencePoint DX12CommandQueue::Execute(std::span<const DX12CommandList* const> commandLists) noexcept

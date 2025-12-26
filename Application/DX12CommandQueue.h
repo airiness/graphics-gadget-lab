@@ -9,11 +9,16 @@ namespace gglab
 	class DX12CommandQueue
 	{
 	public:
-		explicit DX12CommandQueue(
-			DX12Device* dx12Device, 
-			D3D12_COMMAND_LIST_TYPE type,
-			int32_t priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL, 
-			D3D12_COMMAND_QUEUE_FLAGS flags = D3D12_COMMAND_QUEUE_FLAG_NONE) noexcept;
+		struct CreateInfo
+		{
+			DX12Device* m_DX12Device = nullptr;
+			D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+			int32_t m_Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+			D3D12_COMMAND_QUEUE_FLAGS m_Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		};
+
+	public:
+		explicit DX12CommandQueue(const CreateInfo& crateInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12CommandQueue);
 		~DX12CommandQueue() noexcept = default;
 

@@ -152,14 +152,21 @@ namespace gglab
 		m_InputManager = std::make_unique<InputManager>();
 		m_InputManager->Initialize(m_Hwnd);
 
+		// ShaderManager
+		m_ShaderManager = std::make_unique<ShaderManager>();
+
+		// Renderer
 		m_Renderer = std::make_unique<Renderer>();
+		Renderer::CreateInfo rendererCreateInfo{};
+		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
+		rendererCreateInfo.m_Hwnd = m_Hwnd;
+		rendererCreateInfo.m_Width = m_WindowWidth;
+		rendererCreateInfo.m_Height = m_WindowHeight;
+		m_Renderer->Initialize(rendererCreateInfo);
 
 		m_TransferManager = std::make_unique<TransferManager>(m_Renderer->GetDevice(), 8 * 1024 * 1024);
 		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice(), m_TransferManager.get());
-		m_ShaderManager = std::make_unique<ShaderManager>();
 		m_DemoManager = std::make_unique<DemoManager>();
-
-		m_Renderer->Initialize();
 
 		InitializeAssets();
 
@@ -237,7 +244,7 @@ namespace gglab
 		RenderFrameContext renderContext{
 			.m_RenderView = &renderView,
 			.m_RenderScene = &renderSceneBuildResult.m_RenderScene,
-			.m_BackBufferIndex = m_Renderer->GetCurrentBackBufferIndex(),
+			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
 			.m_UploadFencePoint = renderSceneBuildResult.m_UploadFencePoint
 		};
 		

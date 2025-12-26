@@ -19,7 +19,7 @@ namespace gglab
 		}
 	}
 
-	void DX12Device::Initialize(const CreateInfo& info) noexcept
+	void DX12Device::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		if (m_IsInitialized)
 		{
@@ -27,7 +27,7 @@ namespace gglab
 		}
 
 #if defined(BUILD_DEBUG)
-		if (info.m_TryLoadWinPix)
+		if (createInfo.m_TryLoadWinPix)
 		{
 			InitializeWinPIX();
 		}
@@ -91,50 +91,6 @@ namespace gglab
 		if (m_ComputeCommandQueue) { m_ComputeCommandQueue->FlushCommandQueue(); }
 		if (m_CopyCommandQueue) { m_CopyCommandQueue->FlushCommandQueue(); }
 		if (m_TransferCommandQueue) { m_TransferCommandQueue->FlushCommandQueue(); }
-	}
-
-	void DX12Device::InitializeDXGIFactory() noexcept
-	{
-		UINT createFactoryFlags = 0;
-
-#if defined (BUILD_DEBUG)
-		createFactoryFlags = DXGI_CREATE_FACTORY_DEBUG;
-
-		ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
-		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
-		{
-			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
-		}
-#endif
-		ComPtr<IDXGIFactory7> dxgiFactory;
-		GGLAB_HR(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&dxgiFactory)));
-
-		m_DxgiFactory = dxgiFactory;
-	}
-
-	void DX12Device::InitializeDXGIAdapter() noexcept
-	{
-		ComPtr<IDXGIAdapter1> dxgiAdapter;
-		for (UINT i = 0; m_DxgiFactory->EnumAdapterByGpuPreference(i,
-			DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&dxgiAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
-		{
-			DXGI_ADAPTER_DESC1 desc = {};
-			dxgiAdapter->GetDesc1(&desc);
-
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-			{
-				continue;
-			}
-
-			if (SUCCEEDED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr)))
-			{
-				m_DxgiAdapter = dxgiAdapter;
-				break;
-			}
-		}
-
-		GGLAB_ASSERT_MSG(m_DxgiAdapter != nullptr, "Create DxgiAdapter failed.");
 	}
 
 	void DX12Device::InitializeDebugLayer() noexcept
@@ -280,18 +236,34 @@ namespace gglab
 
 	void DX12Device::InitializeCommandQueues() noexcept
 	{
-		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
-		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
-		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-		m_TransferCommandQueue = std::make_unique<DX12CommandQueue>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);	//d3dx12 upload resource uses direct type
+		DX12CommandQueue::CreateInfo createInfo{};
+		createInfo.m_DX12Device = this;
+
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);
+		m_TransferCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);	//d3dx12 upload resource uses direct type
+
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);
+
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
+		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);
 	}
 
 	void DX12Device::InitializeCommandLists() noexcept
 	{
+		DX12CommandList::CreateInfo createInfo{};
+		createInfo.m_DX12Device = this;
+
 		for (int32_t i = 0; i < BufferCount; i++)
 		{
-			m_GraphicsCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
-			m_ComputeCommandLists[i] = std::make_unique<DX12CommandList>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
+			createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+			m_GraphicsCommandLists[i] =
+				std::make_unique<DX12CommandList>(createInfo);
+
+			createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+			m_ComputeCommandLists[i] =
+				std::make_unique<DX12CommandList>(createInfo);
 		}
 	}
 
