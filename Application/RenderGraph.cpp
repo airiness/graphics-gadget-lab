@@ -17,6 +17,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
 		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");
+		GGLAB_ASSERT_MSG(m_ExternalResourceRegistry != nullptr, "ExternalResourceRegistry can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
