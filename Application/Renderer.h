@@ -7,6 +7,7 @@
 #include "DX12RootSignatureCache.h"
 #include "DX12SwapChain.h"
 #include "RenderPassRecipeRegistry.h"
+#include "ExternalResourceRegistry.h"
 #include "TransferManager.h"
 #include "GPUStructures.h"
 #include "RenderGraph.h"
@@ -45,6 +46,7 @@ namespace gglab
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
 		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
 		RenderPassRecipeRegistry* GetRenderPassRecipeRegistry() const noexcept { return m_RenderPassRecipeRegistry.get(); }
+		ExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResourceRegistry.get(); }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureId GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
@@ -60,6 +62,11 @@ namespace gglab
 
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
 
+		void OnResize(uint32_t width, uint32_t height) noexcept;
+		void OnSuspend() noexcept;
+		void OnResume() noexcept;
+		bool IsSuspended() const noexcept;
+
 	private:
 		void CreateCommonRootSignature() noexcept;
 		void InitializeGpuBuffers() noexcept;
@@ -72,6 +79,7 @@ namespace gglab
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
+		std::unique_ptr<ExternalResourceRegistry> m_ExternalResourceRegistry;
 
 		RootSignatureId m_CommonRootSignatureId{};
 
@@ -81,5 +89,6 @@ namespace gglab
 		std::unique_ptr<DX12RingStructuredBuffer<MaterialGPU>> m_MaterialSB;
 
 		std::atomic_bool m_IsInitialized = false;
+		std::atomic_bool m_IsSuspended = false;
 	};
 }

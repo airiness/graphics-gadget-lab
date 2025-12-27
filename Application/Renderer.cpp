@@ -49,6 +49,7 @@ namespace gglab
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
+		m_ExternalResourceRegistry = std::make_unique<ExternalResourceRegistry>(m_ViewCache.get());
 
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
@@ -56,9 +57,60 @@ namespace gglab
 		m_IsInitialized = true;
 	}
 
+	void Renderer::Finalize() noexcept
+	{
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
+		m_IsSuspended.store(true, std::memory_order_relaxed);
+
+		if (m_Device)
+		{
+			m_Device->FlushGPU();
+		}
+
+		m_ExternalResourceRegistry.reset();
+		m_RenderPassRecipeRegistry.reset();
+		m_RootSignatureCache.reset();
+		m_PSOCache.reset();
+		m_ViewCache.reset();
+		m_RGGpuAllocator.reset();
+
+		if (m_SwapChain)
+		{
+			m_SwapChain->Finalize();
+			m_SwapChain.reset();
+		}
+
+		if (m_Device)
+		{
+			m_Device->Finalize();
+			m_Device.reset();
+		}
+
+		m_FrameCB.reset();
+		m_ObjectSB.reset();
+		m_MaterialSB.reset();
+
+		m_IsInitialized = false;
+	}
+
 	void Renderer::Render(RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
 	{
 		if (m_IsInitialized == false)
+		{
+			return;
+		}
+
+		// Window suspended do nothing
+		if (m_IsSuspended.load(std::memory_order_relaxed))
+		{
+			return;
+		}
+
+		if (!m_SwapChain || !m_SwapChain->IsValid())
 		{
 			return;
 		}
@@ -102,18 +154,6 @@ namespace gglab
 
 	}
 
-	void Renderer::Finalize() noexcept
-	{
-		if (!m_IsInitialized)
-		{
-			return;
-		}
-
-		m_IsInitialized = false;
-
-		m_Device->FlushGPU();
-	}
-
 	DX12RootSignature* Renderer::GetCommonRootSignature() const noexcept
 	{
 		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
@@ -142,8 +182,70 @@ namespace gglab
 		RenderGraph::CreateInfo rgCreateInfo{};
 		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuAllocator.get();
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
+		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResourceRegistry.get();
 
 		return rgCreateInfo;
+	}
+
+	void Renderer::OnResize(uint32_t width, uint32_t height) noexcept
+	{
+		if (!m_IsInitialized)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. Renderer is not initialized.");
+			return;
+		}
+
+		if (m_IsSuspended.load(std::memory_order_relaxed))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize ignored because renderer is suspended.");
+			return;
+		}
+
+		if (!m_SwapChain || !m_SwapChain->IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. SwapChain is invalid.");
+			return;
+		}
+
+		if (width == 0 || height == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. Invalid resize resolution.");
+			return;
+		}
+
+		m_Device->FlushGPU();
+
+		if (m_ExternalResourceRegistry)
+		{
+			const uint32_t bufferCount = m_SwapChain->GetBufferCount();
+			for (uint32_t index = 0; index < bufferCount; ++index)
+			{
+				DX12Texture* backBuffer = m_SwapChain->GetBackBuffer(index);
+				if (!backBuffer)
+				{
+					continue;
+				}
+
+				m_ExternalResourceRegistry->Forget(backBuffer, true);
+			}
+		}
+
+		m_SwapChain->OnResize(width, height);
+	}
+
+	void Renderer::OnSuspend() noexcept
+	{
+		m_IsSuspended.store(true, std::memory_order_relaxed);
+	}
+
+	void Renderer::OnResume() noexcept
+	{
+		m_IsSuspended.store(false, std::memory_order_relaxed);
+	}
+
+	bool Renderer::IsSuspended() const noexcept
+	{
+		return m_IsSuspended.load(std::memory_order_relaxed);
 	}
 
 	void Renderer::CreateCommonRootSignature() noexcept

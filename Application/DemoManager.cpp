@@ -49,4 +49,14 @@ namespace gglab
 			m_ActiveDemo->OnEnter();
 		}
 	}
+
+	void DemoManager::OnResize(uint32_t width, uint32_t height) noexcept
+	{
+		if (!m_ActiveDemo)
+		{
+			return;
+		}
+
+		m_ActiveDemo->OnResize(width, height);
+	}
 }

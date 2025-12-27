@@ -28,7 +28,7 @@ namespace gglab
 		return nullptr;
 	}
 
-	Mouse* Application::GetMouse() const noexcept\
+	Mouse* Application::GetMouse() const noexcept
 	{
 		if (const auto input = GetInputManager())
 		{
@@ -38,18 +38,19 @@ namespace gglab
 		return nullptr;
 	}
 
-	void Application::CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept
+	void Application::CreateApplicationInstance(const CreateInfo& createInfo) noexcept
 	{
 		if (s_Application == nullptr)
 		{
-			s_Application = std::make_unique<Application>(windowName, windowWidth, windowHeight, hInstance);
+			s_Application = std::make_unique<Application>(createInfo);
 			s_Application->Initialize();
 		}
 	}
 
 	Application* Application::GetInstance() noexcept
 	{
-		GGLAB_ASSERT_MSG(s_Application != nullptr, "Application instance is not created. Call CreateApplicationInstance first.");
+		GGLAB_ASSERT_MSG(s_Application != nullptr,
+			"Application instance is not created. Call CreateApplicationInstance first.");
 		return s_Application.get();
 	}
 
@@ -62,11 +63,11 @@ namespace gglab
 		}
 	}
 
-	Application::Application(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept :
-		m_WindowName(windowName),
-		m_WindowWidth(windowWidth),
-		m_WindowHeight(windowHeight),
-		m_HInstance(hInstance)
+	Application::Application(const CreateInfo& createInfo) noexcept :
+		m_WindowName(createInfo.m_WindowName),
+		m_WindowWidth(createInfo.m_WindowWidth),
+		m_WindowHeight(createInfo.m_WindowHeight),
+		m_HInstance(createInfo.m_HInstance)
 	{
 	}
 
@@ -99,28 +100,101 @@ namespace gglab
 		{
 			LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+			return 0;
 		}
 		break;
 		case WM_DESTROY:
 		{
 			PostQuitMessage(0);
+			return 0;
 		}
 		break;
 		case WM_PAINT:
 		{
+			PAINTSTRUCT ps{};
+			BeginPaint(hWnd, &ps);
+			EndPaint(hWnd, &ps);
+			return 0;
+		}
+		break;
+		case WM_ACTIVATEAPP:
+		{
+			if (!app)
+			{
+				break;
+			}
+			if (wParam)
+			{
+				app->OnActive();
+			}
+			else
+			{
+				app->OnInactive();
+			}
+			return 0;
+		}
+		break;
+		case WM_ENTERSIZEMOVE:
+		{
+			if (!app)
+			{
+				break;
+			}
+
+			app->m_InSizeMove = true;
+			app->OnSuspend();
+			return 0;
+		}
+		break;
+		case WM_EXITSIZEMOVE:
+		{
+			if (!app)
+			{
+				break;
+			}
+
+			app->m_InSizeMove = false;
+			app->OnResume();
+
+			RECT rc{};
+			GetClientRect(hWnd, &rc);
+			const auto width = static_cast<uint32_t>(rc.right - rc.left);
+			const auto height = static_cast<uint32_t>(rc.bottom - rc.top);
+			app->OnResize(width, height);
+
+			return 0;
 		}
 		break;
 		case WM_SIZE:
 		{
+			if (!app)
+			{
+				break;
+			}
+
+			const uint32_t width = LOWORD(lParam);
+			const uint32_t height = HIWORD(lParam);
+
 			if (wParam == SIZE_MINIMIZED)
 			{
-				if (app)
-				{
-					int32_t width = LOWORD(lParam);
-					int32_t height = HIWORD(lParam);
-					app->OnResize(width, height);
-				}
+				app->m_IsMinimized = true;
+				app->OnSuspend();
+				return 0;
 			}
+
+			const bool wasMinimized = app->m_IsMinimized;
+			app->m_IsMinimized = false;
+
+			if (wasMinimized)
+			{
+				app->OnResume();
+			}
+
+			if (!app->m_InSizeMove)
+			{
+				app->OnResize(width, height);
+			}
+			return 0;
 		}
 		break;
 		default:
@@ -187,6 +261,12 @@ namespace gglab
 			return true;
 		}
 
+		if (m_IsMinimized || m_IsSuspended)
+		{
+			WaitMessage();
+			return true;
+		}
+
 		m_Time->Update();
 		m_InputManager->Update();
 
@@ -222,7 +302,7 @@ namespace gglab
 		RenderViewBuilder::BuildInfo viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
-			.m_Height = m_WindowHeight 
+			.m_Height = m_WindowHeight
 		};
 		RenderView renderView = m_RenderViewBuilder->Build(viewBuildInfo);
 
@@ -247,7 +327,7 @@ namespace gglab
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
 			.m_UploadFencePoint = renderSceneBuildResult.m_UploadFencePoint
 		};
-		
+
 		RenderServices services{
 			.m_Renderer = m_Renderer.get(),
 			.m_AssetManager = m_AssetManager.get(),
@@ -273,7 +353,21 @@ namespace gglab
 			return;
 		}
 
-		m_Renderer->Finalize();
+		m_DemoManager.reset();
+		m_AssetManager.reset();
+		m_TransferManager.reset();
+
+		if (m_Renderer)
+		{
+			m_Renderer->Finalize();
+			m_Renderer.reset();
+		}
+
+		m_ShaderManager.reset();
+		m_InputManager.reset();
+		m_Time.reset();
+
+		m_IsInitialized = false;
 	}
 
 	void Application::InitializeWindow() noexcept
@@ -298,7 +392,7 @@ namespace gglab
 		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
 		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 		wcex.lpszMenuName = nullptr;
-		wcex.lpszClassName = m_WindowName.data();
+		wcex.lpszClassName = m_WindowName.c_str();
 		wcex.hIconSm = LoadIcon(m_HInstance, IDI_APPLICATION);
 		RegisterClassEx(&wcex);
 
@@ -306,8 +400,8 @@ namespace gglab
 		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
 		m_Hwnd = CreateWindow(
-			m_WindowName.data(),
-			m_WindowName.data(),
+			m_WindowName.c_str(),
+			m_WindowName.c_str(),
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -356,13 +450,62 @@ namespace gglab
 
 	void Application::OnSuspend() noexcept
 	{
+		if (m_IsSuspended)
+		{
+			return;
+		}
+
+		m_IsSuspended = true;
+
+		if (m_Renderer)
+		{
+			m_Renderer->OnSuspend();
+		}
 	}
 
 	void Application::OnResume() noexcept
 	{
+		if (!m_IsSuspended)
+		{
+			return;
+		}
+
+		m_IsSuspended = false;
+
+		if (m_Renderer)
+		{
+			m_Renderer->OnResume();
+		}
 	}
 
-	void Application::OnResize(int32_t width, int32_t height) noexcept
+	void Application::OnResize(uint32_t width, uint32_t height) noexcept
 	{
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
+		if (width == 0 || height == 0)
+		{
+			return;
+		}
+
+		if (width == m_WindowWidth && height == m_WindowHeight)
+		{
+			return;
+		}
+
+		m_WindowWidth = width;
+		m_WindowHeight = height;
+
+		if (m_Renderer)
+		{
+			m_Renderer->OnResize(width, height);
+		}
+
+		if (m_DemoManager)
+		{
+			m_DemoManager->OnResize(width, height);
+		}
 	}
 }

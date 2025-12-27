@@ -55,7 +55,6 @@ namespace gglab
 		}
 
 		FlushGPU();
-		m_MemAllocator.Reset();
 
 		m_GraphicsCommandAllocatorPool.reset();
 		m_ComputeCommandAllocatorPool.reset();
@@ -74,6 +73,8 @@ namespace gglab
 		m_ComputeCommandQueue.reset();
 		m_CopyCommandQueue.reset();
 		m_TransferCommandQueue.reset();
+
+		m_MemAllocator.Reset();
 
 		m_D3D12Device.Reset();
 		m_DxgiAdapter.Reset();

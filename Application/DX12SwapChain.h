@@ -1,5 +1,5 @@
 #pragma once
-#include "DX12Descriptor.h"
+#include "DX12FencePoint.h"
 #include "Color.h"
 
 namespace gglab
@@ -55,16 +55,14 @@ namespace gglab
 		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
 		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffer(m_BackBufferIndex); }
 
-		void PrepareBackBuffer(DX12CommandList* commandList) const noexcept;
-		void FinishBackBuffer(DX12CommandList* commandList) const noexcept;
-		void ClearBackBuffer(DX12CommandList* commandList) const noexcept;
-
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
 		void AcquireBackBuffers() noexcept;
 		void ReleaseBackBuffers() noexcept;
 		void CreateSyncObjects() noexcept;
 		void RefreshCurrentBackBufferIndex() noexcept;
+		void WaitAllSyncObjects() noexcept;
+		void Reset() noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

@@ -17,13 +17,14 @@ namespace gglab
 		auto* renderer = services.m_Renderer;
 		auto* swapChain = renderer->GetSwapChain();
 
+		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
+
 		// MainView Setup
 		struct SetupData {};
 		rg.AddPass<SetupData>("MainView.Setup",
-			[swapChain, &rg](RenderGraph::RGBuilder& builder, SetupData&)
+			[swapChain, &rg, renderer, frameBackBufferIndex](RenderGraph::RGBuilder& builder, SetupData&)
 			{
-				GGLAB_LOG_GRAPHICS_INFO("MainView.Setup(Setup)");
-
+				//GGLAB_LOG_GRAPHICS_INFO("MainView.Setup(Setup)");
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
@@ -31,6 +32,13 @@ namespace gglab
 
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
+
+				targets.m_Width = width;
+				targets.m_Height = height;
+
+				targets.m_BackBufferIndex = frameBackBufferIndex;
+				auto* backTexture = swapChain->GetBackBuffer(frameBackBufferIndex);
+				GGLAB_ASSERT(backTexture);
 
 				// Import backbuffer
 				RGTextureDesc backBufferDesc{};
@@ -40,7 +48,7 @@ namespace gglab
 				backBufferDesc.m_Usage = RGTextureUsage::RenderTarget;
 
 				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
-					swapChain->GetCurrentBackBuffer(),
+					backTexture,
 					backBufferDesc,
 					D3D12_RESOURCE_STATE_PRESENT);
 
@@ -51,19 +59,17 @@ namespace gglab
 				depthBufferDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 				depthBufferDesc.m_Usage = RGTextureUsage::DepthStencil;
 
-				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer",
-					depthBufferDesc);
+				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
 
-				targets.m_Width = width;
-				targets.m_Height = height;
+				// BackBuffer ResourceIndex
+				const ResourceIndex backBufferResourceIndex = rg.GetResourceIndex(targets.m_BackBuffer);
+				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(backBufferResourceIndex),
+					"BackBuffer must be external ResourceIndex.");
+				targets.m_BackBufferResourceIndex = backBufferResourceIndex;
 
 				// RTVview Key
-				auto* backTexture = rg.GetTexture(targets.m_BackBuffer);
-
-				const auto resourceIndex = rg.GetResourceIndex(targets.m_BackBuffer);
 				targets.m_BackBufferRTVKey = DX12ViewCache::BuildKey<ViewType::RTV>(
-					resourceIndex,
-					backTexture);
+					backBufferResourceIndex, backTexture);
 
 				rg.GetViewCache()->GetOrCreate(targets.m_BackBufferRTVKey, backTexture);
 			});
@@ -72,27 +78,29 @@ namespace gglab
 		struct PrepareBackBufferData
 		{
 			RGTextureId m_BackBuffer{};
+			ViewKey m_RTVKey{};
 		};
 
 		rg.AddPass<PrepareBackBufferData>("SwapChain.PrepareBackBuffer",
 			[](RenderGraph::RGBuilder& builder, PrepareBackBufferData& data)
 			{
-				GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Setup)");
+				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Setup)");
+				builder.SideEffect();
 
 				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
+				data.m_RTVKey = targets.m_BackBufferRTVKey;
 			},
-			[&rg](DX12CommandList* commandList, PrepareBackBufferData& data) 
+			[&rg, swapChain](DX12CommandList* commandList, PrepareBackBufferData& data)
 			{
-				GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Execute)");
-
-				/*swapChain->PrepareBackBuffer(commandList);*/
+				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Execute)");
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
 
+				// TODO: RenderGraph resource auto barrier
 				CD3DX12_TEXTURE_BARRIER barrier(
 					D3D12_BARRIER_SYNC_ALL,
 					D3D12_BARRIER_SYNC_RENDER_TARGET,
@@ -104,39 +112,12 @@ namespace gglab
 					CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
 				commandList->AddTextureBarrier(barrier);
 				commandList->FlushBarriers();
-			});
-
-		// Clear backbuffer
-		struct ClearBackBufferData
-		{
-			RGTextureId m_BackBuffer{};
-			ViewKey m_RTVKey{};
-		};
-		rg.AddPass<ClearBackBufferData>("SwapChain.ClearBackBuffer",
-			[](RenderGraph::RGBuilder& builder, ClearBackBufferData& data)
-			{
-				GGLAB_LOG_GRAPHICS_INFO("SwapChain.ClearBackBuffer(Setup)");
-
-
-				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
-
-				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
-					RGTextureUsage::RenderTarget);
-				data.m_RTVKey = targets.m_BackBufferRTVKey;
-			},
-			[&rg, swapChain](DX12CommandList* commandList, ClearBackBufferData& data)
-			{
-				GGLAB_LOG_GRAPHICS_INFO("SwapChain.ClearBackBuffer(Execute)");
-
-				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-
-				GGLAB_ASSERT(backTexture);
 
 				auto* viewCache = rg.GetViewCache();
 				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
 
-				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());		
-				//swapChain->ClearBackBuffer(commandList);
+				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());
+
 			});
 
 		// RenderPass ForwardPBR
@@ -153,20 +134,19 @@ namespace gglab
 		rg.AddPass<FinishBackBufferData>("SwapChain.FinishBackBuffer",
 			[](RenderGraph::RGBuilder& builder, FinishBackBufferData& data)
 			{
-				GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
-
+				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
+				builder.SideEffect();
 
 				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
-
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
-
 			},
 			[&rg](DX12CommandList* commandList, FinishBackBufferData& data)
 			{
-				GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Execute)");
+				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Execute)");
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
+				GGLAB_ASSERT(backTexture);
 
 				CD3DX12_TEXTURE_BARRIER barrier(
 					D3D12_BARRIER_SYNC_RENDER_TARGET,
@@ -177,7 +157,7 @@ namespace gglab
 					D3D12_BARRIER_LAYOUT_PRESENT,
 					backTexture->Get(),
 					CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-				//swapChain->FinishBackBuffer(commandList);
+
 				commandList->AddTextureBarrier(barrier);
 				commandList->FlushBarriers();
 			});

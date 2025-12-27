@@ -1,0 +1,281 @@
+#include "Precompiled.h"
+#include "ExternalResourceRegistry.h"
+#include "DX12ViewCache.h"
+#include "DX12Texture.h"
+#include "DX12Buffer.h"
+
+namespace gglab
+{
+	ExternalResourceRegistry::ExternalResourceRegistry(DX12ViewCache* viewCache) noexcept :
+		m_ViewCache(viewCache)
+	{
+	}
+
+	ExternalResourceRegistry::~ExternalResourceRegistry()
+	{
+		// Make sure destruct before ViewCache
+		Clear(true);
+	}
+
+	ResourceIndex ExternalResourceRegistry::GetOrCreate(const DX12Texture* texture) noexcept
+	{
+		GGLAB_ASSERT_MSG(texture != nullptr, "ExternalResourceRegistry::GetOrCreate(texture): texture is null.");
+		return GetOrCreateImpl(texture->Get(), ExternalResourceIndex::Type::Texture);
+	}
+
+	ResourceIndex ExternalResourceRegistry::GetOrCreate(const DX12Buffer* buffer) noexcept
+	{
+		GGLAB_ASSERT_MSG(buffer != nullptr, "ExternalResourceRegistry::GetOrCreate(buffer): buffer is null.");
+		return GetOrCreateImpl(buffer->Get(), ExternalResourceIndex::Type::Buffer);
+	}
+
+	std::optional<ResourceIndex> ExternalResourceRegistry::TryGet(const DX12Texture* texture) const noexcept
+	{
+		if (!texture)
+		{
+			return std::nullopt;
+		}
+
+		auto indexOpt = TryGetImpl(texture->Get());
+		if (!indexOpt)
+		{
+			return std::nullopt;
+		}
+
+		GGLAB_ASSERT_MSG(
+			ExternalResourceIndex::IsExternal(*indexOpt) &&
+			ExternalResourceIndex::GetType(*indexOpt) == ExternalResourceIndex::Type::Texture,
+			"ExternalResourceRegistry::TryGet(texture): type mismatch or non-external index.");
+
+		return indexOpt;
+	}
+
+	std::optional<ResourceIndex> ExternalResourceRegistry::TryGet(const DX12Buffer* buffer) const noexcept
+	{
+		if (!buffer)
+		{
+			return std::nullopt;
+		}
+
+		auto indexOpt = TryGetImpl(buffer->Get());
+		if (!indexOpt)
+		{
+			return std::nullopt;
+		}
+
+		GGLAB_ASSERT_MSG(
+			ExternalResourceIndex::IsExternal(*indexOpt) &&
+			ExternalResourceIndex::GetType(*indexOpt) == ExternalResourceIndex::Type::Buffer,
+			"ExternalResourceRegistry::TryGet(buffer): type mismatch or non-external index.");
+
+		return indexOpt;
+	}
+
+	void ExternalResourceRegistry::Forget(const DX12Texture* texture,
+		bool freeViewsImmediately,
+		const DX12FencePoint* fencePointOpt) noexcept
+	{
+		if (!texture)
+		{
+			return;
+		}
+
+		ForgetTexture(texture->Get(), freeViewsImmediately, fencePointOpt);
+	}
+
+	void ExternalResourceRegistry::Forget(const DX12Buffer* buffer) noexcept
+	{
+		if (!buffer)
+		{
+			return;
+		}
+
+		ForgetBuffer(buffer->Get());
+	}
+
+	void ExternalResourceRegistry::Clear(bool freeViewsImmediately) noexcept
+	{
+		std::vector<ResourceIndex> textureIndices;
+
+		{
+			std::unique_lock lock(m_Mutex);
+
+			if (m_ViewCache && freeViewsImmediately)
+			{
+				textureIndices.reserve(m_Table.size());
+				for (const auto& [resource, index] : m_Table)
+				{
+					if (ExternalResourceIndex::IsExternal(index) &&
+						ExternalResourceIndex::GetType(index) == ExternalResourceIndex::Type::Texture)
+					{
+						textureIndices.push_back(index);
+					}
+				}
+			}
+
+			m_Table.clear();
+
+		}
+
+		if (m_ViewCache && freeViewsImmediately)
+		{
+			for (auto index : textureIndices)
+			{
+				m_ViewCache->FreeAllImmediately(index);
+			}
+		}
+	}
+
+	ResourceIndex ExternalResourceRegistry::GetOrCreateImpl(const ID3D12Resource* resource, ExternalResourceIndex::Type type) noexcept
+	{
+		GGLAB_ASSERT_MSG(resource != nullptr, "ExternalResourceRegistry::GetOrCreate: resource is null.");
+
+		{
+			std::shared_lock lock(m_Mutex);
+			if (auto iter = m_Table.find(resource); iter != m_Table.end())
+			{
+				const ResourceIndex index = iter->second;
+
+				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
+					"ExternalResourceRegistry: stored index is not external.");
+
+				GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == type,
+					"ExternalResourceRegistry: same ID3D12Resource registered with a different type.");
+
+				return index;
+			}
+		}
+
+		{
+			std::unique_lock lock(m_Mutex);
+			if (auto iter = m_Table.find(resource); iter != m_Table.end())
+			{
+				const ResourceIndex index = iter->second;
+
+				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
+					"ExternalResourceRegistry: stored index is not external.");
+
+				GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == type,
+					"ExternalResourceRegistry: same ID3D12Resource registered with a different type.");
+
+				return index;
+			}
+
+			GGLAB_ASSERT_MSG(m_NextId != 0, "ExternalResourceRegistry: id wrapped around to 0.");
+			GGLAB_ASSERT_MSG((m_NextId & ~ExternalResourceIndex::IdMask) == 0,
+				"ExternalResourceRegistry: external id overflowed.");
+
+			const auto id = m_NextId++;
+			const ResourceIndex index = ExternalResourceIndex::MakeIndex(type, id);
+
+			m_Table.emplace(resource, index);
+			return index;
+		}
+	}
+
+	std::optional<ResourceIndex> ExternalResourceRegistry::TryGetImpl(const ID3D12Resource* resource) const noexcept
+	{
+		if (!resource)
+		{
+			return std::nullopt;
+		}
+
+		std::shared_lock lock(m_Mutex);
+		if (auto iter = m_Table.find(resource); iter != m_Table.end())
+		{
+			return iter->second;
+		}
+
+		return std::nullopt;
+	}
+
+	void ExternalResourceRegistry::ForgetTexture(const ID3D12Resource* resource,
+		bool freeViewsImmediately,
+		const DX12FencePoint* fencePointOpt) noexcept
+	{
+		if (!resource)
+		{
+			return;
+		}
+
+		// Remove from table under lock, capture needs
+		ResourceIndex index{};
+		bool needFreeImmediately = false;
+		bool needRetire = false;
+		DX12FencePoint fencePointCopy{};
+
+		{
+			std::unique_lock lock(m_Mutex);
+
+			auto iter = m_Table.find(resource);
+			if (iter == m_Table.end())
+			{
+				return;
+			}
+
+			index = iter->second;
+
+			GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
+				"ExternalResourceRegistry::ForgetTexture: stored index is not external.");
+
+			GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == ExternalResourceIndex::Type::Texture,
+				"ForgetTexture called on non-texture external entry.");
+
+			m_Table.erase(iter);
+
+			if (m_ViewCache)
+			{
+				if (freeViewsImmediately)
+				{
+					needFreeImmediately = true;
+				}
+				else
+				{
+					GGLAB_ASSERT_MSG(fencePointOpt != nullptr,
+						"ForgetTexture: fencePointOpt is required when not freeing immediately.");
+					fencePointCopy = *fencePointOpt;
+					needRetire = true;
+				}
+			}
+		}
+
+		// Call ViewCache outside registry lock to avoid deadlocks
+		if (m_ViewCache)
+		{
+			if (needFreeImmediately)
+			{
+				m_ViewCache->FreeAllImmediately(index);
+			}
+			else if (needRetire)
+			{
+				m_ViewCache->RetireResourceAllViews(index, fencePointCopy);
+			}
+		}
+	}
+
+	void ExternalResourceRegistry::ForgetBuffer(const ID3D12Resource* resource) noexcept
+	{
+		if (!resource)
+		{
+			return;
+		}
+
+		std::unique_lock lock(m_Mutex);
+
+		auto it = m_Table.find(resource);
+		if (it == m_Table.end())
+		{
+			return;
+		}
+
+		const ResourceIndex index = it->second;
+
+		GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
+			"ExternalResourceRegistry::ForgetBuffer: stored index is not external.");
+
+		GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == ExternalResourceIndex::Type::Buffer,
+			"ForgetBuffer called on non-buffer external entry.");
+
+		m_Table.erase(it);
+	}
+}

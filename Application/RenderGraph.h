@@ -4,6 +4,7 @@
 #include "RGResource.h"
 #include "RGPass.h"
 #include "Blackboard.h"
+#include "ExternalResourceRegistry.h"
 #include "GraphicsTypes.h"
 #include "StringId.h"
 
@@ -128,6 +129,7 @@ namespace gglab
 		{
 			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 			DX12ViewCache* m_ViewCache = nullptr;
+			ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		};
 
 		class RGBuilder
@@ -271,19 +273,6 @@ namespace gglab
 
 		RGPassNode& GetPassNode(RGPassNode::Index index) noexcept;
 
-		ResourceIndex GetOrCreateExternalIndex(const DX12Texture* texture) noexcept;
-		ResourceIndex GetOrCreateExternalIndex(const DX12Buffer* buffer) noexcept;
-
-		template<typename NativeType>
-		ResourceIndex GetOrCreateExternalIndexImpl(
-			const NativeType* ptr,
-			std::unordered_map<const NativeType*, ResourceIndex>& table,
-			ExternalResourceIndex::Rep& nextId,
-			ExternalResourceIndex::Type type) noexcept;
-
-		void ForgetExternal(DX12Texture* texture, bool freeViewsImmediately) noexcept;
-		void ForgetExternal(DX12Buffer* buffer) noexcept;
-
 	private:
 		template<typename RESOURCE>
 		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, RESOURCE::Usage usage) noexcept;
@@ -291,6 +280,7 @@ namespace gglab
 	private:
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 		DX12ViewCache* m_ViewCache = nullptr;
+		ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 		Blackboard m_Blackboard;
@@ -304,12 +294,6 @@ namespace gglab
 
 		std::vector<ResourceIndex> m_MarkedReleaseTextureIndices;
 		std::vector<ResourceIndex> m_MarkedReleaseBufferIndices;
-
-		ExternalResourceIndex::Rep m_NextExternalTextureId = 1;
-		ExternalResourceIndex::Rep m_NextExternalBufferId = 1;
-
-		std::unordered_map<const DX12Texture*, ResourceIndex> m_ExternalTextureIndices;
-		std::unordered_map<const DX12Buffer*, ResourceIndex> m_ExternalBufferIndices;
 
 		friend class RGBuilder;
 
@@ -417,7 +401,7 @@ namespace gglab
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringId(name);
-		virtualResource->m_GpuResourceIndex = GetOrCreateExternalIndex(native);
+		virtualResource->m_GpuResourceIndex = m_ExternalResourceRegistry->GetOrCreate(native);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.
 		virtualResource->m_CurrentStates = initializeState;
@@ -549,29 +533,6 @@ namespace gglab
 		{
 			m_MarkedReleaseBufferIndices.push_back(resIndex);
 		}
-	}
-
-	template<typename NativeType>
-	inline ResourceIndex RenderGraph::GetOrCreateExternalIndexImpl(
-		const NativeType* ptr, 
-		std::unordered_map<const NativeType*, ResourceIndex>& table, 
-		ExternalResourceIndex::Rep& nextId,
-		ExternalResourceIndex::Type type) noexcept
-	{
-		GGLAB_ASSERT_MSG(ptr, "External native must not be null.");
-
-		if (auto iter = table.find(ptr); iter != table.end())
-		{
-			return iter->second;
-		}
-
-		GGLAB_ASSERT_MSG(nextId != 0, "External id wrapped around.");
-		GGLAB_ASSERT_MSG((nextId & ~ExternalResourceIndex::IdMask) == 0, "External id overflowed.");
-
-		const ResourceIndex index = ExternalResourceIndex::MakeIndex(type, nextId++);
-
-		table.emplace(ptr, index);
-		return index;
 	}
 
 	template<typename RESOURCE>

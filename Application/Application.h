@@ -17,9 +17,19 @@ namespace gglab
 	class Application
 	{
 	public:
-		explicit Application(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
+		struct CreateInfo
+		{
+			std::wstring_view m_WindowName;
+			uint32_t m_WindowWidth = 0;
+			uint32_t m_WindowHeight = 0;
+			HINSTANCE m_HInstance = nullptr;
+		};
+
+	public:
+		explicit Application(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Application);
-		~Application() noexcept = default;
+		~Application() = default;
+
 		void Run() noexcept;
 
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
@@ -32,11 +42,12 @@ namespace gglab
 		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager.get(); }
 		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
+
 		Keyboard* GetKeyboard() const noexcept;
 		Mouse* GetMouse() const noexcept;
 		Time* GetTime() const noexcept { return m_Time.get(); }
 
-		static void CreateApplicationInstance(const std::wstring& windowName, uint32_t windowWidth, uint32_t windowHeight, HINSTANCE hInstance) noexcept;
+		static void CreateApplicationInstance(const CreateInfo& createInfo) noexcept;
 		static Application* GetInstance() noexcept;
 		static void DestroyApplicationInstance() noexcept;
 
@@ -56,7 +67,7 @@ namespace gglab
 		void OnInactive() noexcept;
 		void OnSuspend() noexcept;
 		void OnResume() noexcept;
-		void OnResize(int32_t width, int32_t height) noexcept;
+		void OnResize(uint32_t width, uint32_t height) noexcept;
 
 	private:
 		static std::unique_ptr<Application> s_Application;
@@ -82,7 +93,8 @@ namespace gglab
 		std::unique_ptr<RenderSceneBuilder> m_RenderSceneBuilder;
 
 		bool m_IsInitialized = false;
+		bool m_IsMinimized = false;
+		bool m_InSizeMove = false;
+		bool m_IsSuspended = false;
 	};
 }
-
-

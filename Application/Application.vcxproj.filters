@@ -268,6 +268,9 @@
     <ClCompile Include="Blackboard.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
+    <ClCompile Include="ExternalResourceRegistry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -533,6 +536,9 @@
     </ClInclude>
     <ClInclude Include="RGFrameTargets.h">
       <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="ExternalResourceRegistry.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

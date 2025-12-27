@@ -33,8 +33,9 @@ namespace gglab
 	{
 	}
 
-	void DemoPlayground::OnResize() noexcept
+	void DemoPlayground::OnResize(uint32_t width, uint32_t height) noexcept
 	{
+		m_Camera->OnResize(width, height);
 	}
 
 	void DemoPlayground::OnExit() noexcept

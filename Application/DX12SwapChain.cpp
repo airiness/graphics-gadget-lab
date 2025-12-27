@@ -1,10 +1,7 @@
 #include "Precompiled.h"
 #include "DX12SwapChain.h"
-#include "Application.h"
 #include "DX12Device.h"
 #include "DX12CommandQueue.h"
-#include "DX12CommandList.h"
-#include "DX12Descriptor.h"
 #include "DX12Texture.h"
 #include "HResult.h"
 
@@ -41,6 +38,7 @@ namespace gglab
 		m_DxgiSwapChain = CreateSwapChain();
 		if (!m_DxgiSwapChain)
 		{
+			Reset();
 			return false;
 		}
 
@@ -53,21 +51,14 @@ namespace gglab
 
 	void DX12SwapChain::Finalize() noexcept
 	{
-		ReleaseBackBuffers();
+		if (!IsValid())
+		{
+			Reset();
+			return;
+		}
 
-		m_SyncObjects.clear();
-		m_DxgiSwapChain.Reset();
-
-		m_DX12Device = nullptr;
-		m_PresentQueue = nullptr;
-		m_Hwnd = nullptr;
-		m_Width = 0;
-		m_Height = 0;
-		m_Format = DXGI_FORMAT_UNKNOWN;
-		m_BufferCount = 2;
-		m_BackBufferIndex = 0;
-		m_AllowTearing = false;
-		m_Vsync = true;
+		WaitAllSyncObjects();
+		Reset();
 	}
 
 	void DX12SwapChain::OnResize(uint32_t width, uint32_t height) noexcept
@@ -85,10 +76,7 @@ namespace gglab
 		}
 
 		// Wait sync objects finished
-		for (auto& fencePoint : m_SyncObjects)
-		{
-			fencePoint.Wait();
-		}
+		WaitAllSyncObjects();
 
 		m_Width = width;
 		m_Height = height;
@@ -99,7 +87,7 @@ namespace gglab
 		DXGI_SWAP_CHAIN_DESC desc = {};
 		GGLAB_HR(m_DxgiSwapChain->GetDesc(&desc));
 
-		GGLAB_HR(m_DxgiSwapChain->ResizeBuffers(desc.BufferCount, m_Width, m_Height, desc.BufferDesc.Format, desc.Flags));
+		GGLAB_HR(m_DxgiSwapChain->ResizeBuffers(m_BufferCount, m_Width, m_Height, m_Format, desc.Flags));
 
 		RefreshCurrentBackBufferIndex();
 		AcquireBackBuffers();
@@ -148,40 +136,6 @@ namespace gglab
 		GGLAB_ASSERT_MSG(bufferIndex < m_BackBuffers.size(), "BackBuffer index out of range.");
 
 		return m_BackBuffers[bufferIndex].get();
-	}
-
-	void DX12SwapChain::PrepareBackBuffer(DX12CommandList* commandList) const noexcept
-	{
-		CD3DX12_TEXTURE_BARRIER barrier(
-			D3D12_BARRIER_SYNC_ALL,
-			D3D12_BARRIER_SYNC_RENDER_TARGET,
-			D3D12_BARRIER_ACCESS_COMMON,
-			D3D12_BARRIER_ACCESS_RENDER_TARGET,
-			D3D12_BARRIER_LAYOUT_PRESENT,
-			D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-			GetCurrentBackBuffer()->Get(),
-			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-		commandList->AddTextureBarrier(barrier);
-	}
-
-	void DX12SwapChain::FinishBackBuffer(DX12CommandList* commandList) const noexcept
-	{
-		CD3DX12_TEXTURE_BARRIER barrier(
-			D3D12_BARRIER_SYNC_RENDER_TARGET,
-			D3D12_BARRIER_SYNC_ALL,
-			D3D12_BARRIER_ACCESS_RENDER_TARGET,
-			D3D12_BARRIER_ACCESS_COMMON,
-			D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-			D3D12_BARRIER_LAYOUT_PRESENT,
-			GetCurrentBackBuffer()->Get(),
-			CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-		commandList->AddTextureBarrier(barrier);
-	}
-
-	void DX12SwapChain::ClearBackBuffer(DX12CommandList* commandList) const noexcept
-	{
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -241,6 +195,7 @@ namespace gglab
 
 			auto tex = std::make_unique<DX12Texture>();
 			tex->AdoptFromSwapChain(backBuffer);
+			// TODO: Add backbuffer debug name.
 			m_BackBuffers[i] = std::move(tex);
 		}
 	}
@@ -261,5 +216,34 @@ namespace gglab
 		GGLAB_ASSERT_MSG(IsValid(), "RefreshCurrentBackBufferIndex called on invalid swapchain.");
 		m_BackBufferIndex = m_DxgiSwapChain->GetCurrentBackBufferIndex();
 		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_BufferCount, "DXGI returned invalid back buffer index.");
+	}
+
+	void DX12SwapChain::WaitAllSyncObjects() noexcept
+	{
+		for (auto& fencePoint : m_SyncObjects)
+		{
+			if (fencePoint.IsValid())
+			{
+				fencePoint.Wait();
+			}
+		}
+	}
+
+	void DX12SwapChain::Reset() noexcept
+	{
+		ReleaseBackBuffers();
+		m_SyncObjects.clear();
+		m_DxgiSwapChain.Reset();
+
+		m_DX12Device = nullptr;
+		m_PresentQueue = nullptr;
+		m_Hwnd = nullptr;
+		m_Width = 0;
+		m_Height = 0;
+		m_Format = DXGI_FORMAT_UNKNOWN;
+		m_BufferCount = 2;
+		m_BackBufferIndex = 0;
+		m_AllowTearing = false;
+		m_Vsync = true;
 	}
 }
