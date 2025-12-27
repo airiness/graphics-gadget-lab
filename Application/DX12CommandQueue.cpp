@@ -25,6 +25,8 @@ namespace gglab
 			m_DX12Device->Get());
 	}
 
+	DX12CommandQueue::~DX12CommandQueue() = default;
+
 	DX12FencePoint DX12CommandQueue::Execute(std::span<const DX12CommandList* const> commandLists) noexcept
 	{
 		std::vector<ID3D12CommandList*> d3d12CommandLists;

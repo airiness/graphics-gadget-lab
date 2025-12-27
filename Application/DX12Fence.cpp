@@ -13,7 +13,7 @@ namespace gglab
 		m_EventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	}
 
-	DX12Fence::~DX12Fence() noexcept
+	DX12Fence::~DX12Fence()
 	{
 		if (m_EventHandle)
 		{

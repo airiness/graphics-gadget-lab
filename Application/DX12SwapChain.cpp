@@ -111,7 +111,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::WaitFrameCompletion called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
 
-		m_SyncObjects[m_BackBufferIndex].Wait();
+		auto& fencePoint = m_SyncObjects[m_BackBufferIndex];
+		if (fencePoint.IsValid())
+		{
+			fencePoint.Wait();
+		}
 	}
 
 	void DX12SwapChain::UpdateFrameSyncObject(DX12FencePoint&& fencePoint) noexcept

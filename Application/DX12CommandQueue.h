@@ -20,7 +20,7 @@ namespace gglab
 	public:
 		explicit DX12CommandQueue(const CreateInfo& crateInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12CommandQueue);
-		~DX12CommandQueue() noexcept = default;
+		~DX12CommandQueue();
 
 		ID3D12CommandQueue* Get() const noexcept { return m_D3D12CommandQueue.Get(); }
 

@@ -1,12 +1,9 @@
 #include "Precompiled.h"
 #include "DX12Device.h"
-#include "DX12SwapChain.h"
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
-#include "DX12Fence.h"
-#include "DX12Buffer.h"
-#include "Application.h"
+#include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 
 namespace gglab

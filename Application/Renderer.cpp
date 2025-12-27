@@ -33,6 +33,7 @@ namespace gglab
 		swapChainCreateInfo.m_Width = createInfo.m_Width;
 		swapChainCreateInfo.m_Height = createInfo.m_Height;
 		swapChainCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+		swapChainCreateInfo.m_AllowTearing = m_Device->SupportTearing();
 
 		m_SwapChain->Initialize(swapChainCreateInfo);
 

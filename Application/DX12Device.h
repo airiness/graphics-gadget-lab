@@ -1,5 +1,4 @@
 #pragma once
-#include "DX12DescriptorFreeListAllocator.h"
 
 namespace D3D12MA
 {
@@ -11,7 +10,6 @@ namespace gglab
 	class DX12CommandQueue;
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
-	class DX12Fence;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;
 	class DX12Device

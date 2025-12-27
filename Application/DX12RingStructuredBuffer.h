@@ -3,6 +3,7 @@
 #include "DX12Buffer.h"
 #include "DX12Descriptor.h"
 #include "DX12RingBuffer.h"
+#include "DX12DescriptorFreeListAllocator.h"
 #include "MathUtils.h"
 
 namespace gglab
