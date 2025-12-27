@@ -66,9 +66,10 @@ namespace gglab
 
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
-		if (m_Device)
+		if (m_SwapChain)
 		{
-			m_Device->FlushGPU();
+			m_SwapChain->Finalize();
+			m_SwapChain.reset();
 		}
 
 		m_ExternalResourceRegistry.reset();
@@ -78,21 +79,15 @@ namespace gglab
 		m_ViewCache.reset();
 		m_RGGpuAllocator.reset();
 
-		if (m_SwapChain)
-		{
-			m_SwapChain->Finalize();
-			m_SwapChain.reset();
-		}
+		m_FrameCB.reset();
+		m_ObjectSB.reset();
+		m_MaterialSB.reset();
 
 		if (m_Device)
 		{
 			m_Device->Finalize();
 			m_Device.reset();
 		}
-
-		m_FrameCB.reset();
-		m_ObjectSB.reset();
-		m_MaterialSB.reset();
 
 		m_IsInitialized = false;
 	}

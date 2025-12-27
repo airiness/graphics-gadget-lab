@@ -267,10 +267,18 @@ namespace gglab
 
 	void DX12Device::InitializeCommandAllocatorPools() noexcept
 	{
-		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
-		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COMPUTE);
-		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_COPY);
-		m_TransferCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(this, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		DX12CommandAllocator::CreateInfo createInfo{};
+		createInfo.m_DX12Device = this;
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+		m_TransferCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+
+		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
+		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
 	}
 
 	void DX12Device::InitializeDescriptorAllocators() noexcept

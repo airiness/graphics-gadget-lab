@@ -353,6 +353,12 @@ namespace gglab
 			return;
 		}
 
+		if (m_Renderer)
+		{
+			// Must flush here for gpu resource safe release next
+			m_Renderer->GetDevice()->FlushGPU();
+		}
+
 		m_DemoManager.reset();
 		m_AssetManager.reset();
 		m_TransferManager.reset();
