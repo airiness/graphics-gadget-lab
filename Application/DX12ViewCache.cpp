@@ -275,7 +275,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::RTV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -333,7 +333,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::DSV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -391,7 +391,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::SRV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = most;
 		key.m_MipLevels = levels;
@@ -438,7 +438,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::UAV;
-		key.m_ResouceIndex = resourceIndex.Value();
+		key.m_ResouceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;

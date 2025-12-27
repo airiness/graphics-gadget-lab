@@ -135,6 +135,7 @@
     <ClCompile Include="DX12RootSignatureCache.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
+    <ClCompile Include="ExternalResourceRegistry.cpp" />
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
@@ -215,6 +216,7 @@
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="EnumFlags.h" />
+    <ClInclude Include="ExternalResourceRegistry.h" />
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="HResult.h" />

@@ -33,6 +33,8 @@ namespace gglab
 			return m_ActiveDemoIndex;
 		}
 
+		void OnResize(uint32_t width, uint32_t height) noexcept;
+
 	private:
 		static constexpr uint32_t InvalidDemoIndex = std::numeric_limits<uint32_t>::max();
 

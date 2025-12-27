@@ -12,8 +12,14 @@ namespace gglab
 	class DX12CommandList
 	{
 	public:
-		explicit DX12CommandList(DX12Device* dx12Device,
-			D3D12_COMMAND_LIST_TYPE type) noexcept;
+		struct CreateInfo
+		{
+			DX12Device* m_DX12Device = nullptr;
+			D3D12_COMMAND_LIST_TYPE m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		};
+
+	public:
+		explicit DX12CommandList(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12CommandList);
 		~DX12CommandList() = default;
 
@@ -39,7 +45,7 @@ namespace gglab
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
 		void FlushBarriers() noexcept;
-		void ClearRenderTarget(const DX12Descriptor& rtDescriptor, const float* clearColor) const noexcept;
+		void ClearRenderTarget(const DX12Descriptor& rtDescriptor, const Color& clearColor) const noexcept;
 		void ClearDepthStencil(const DX12Descriptor& dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) const noexcept;
 		void DrawIndexedInstanced(uint32_t indexCount) const noexcept;
 		void DrawInstanced(uint32_t vertexCount) const noexcept;

@@ -1,11 +1,12 @@
 #include "Precompiled.h"
 #include "AssetManager.h"
-#include "DX12Device.h"
 #include "TransferManager.h"
+#include "DX12Device.h"
 #include "DX12Resource.h"
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12CommandList.h"
+#include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 #include "PathUtils.h"
 

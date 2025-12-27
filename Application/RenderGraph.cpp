@@ -11,11 +11,13 @@ namespace gglab
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
 		m_ViewCache(createInfo.m_ViewCache),
+		m_ExternalResourceRegistry(createInfo.m_ExternalResourceRegistry),
 		m_ArenaAllocator(1u << 20),
 		m_Blackboard(m_ArenaAllocator)
 	{
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
 		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");
+		GGLAB_ASSERT_MSG(m_ExternalResourceRegistry != nullptr, "ExternalResourceRegistry can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
@@ -173,7 +175,17 @@ namespace gglab
 	DX12Texture* RenderGraph::GetTexture(RGTextureId texId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGTextureResource>*>(GetVirtualResource(texId));
-		if (!virtualRes || !virtualRes->m_GpuResourceIndex.IsValid())
+		if (!virtualRes)
+		{
+			return nullptr;
+		}
+
+		if (virtualRes->m_Imported)
+		{
+			return virtualRes->m_ImportedNative;
+		}
+
+		if (!virtualRes->m_GpuResourceIndex.IsValid())
 		{
 			return nullptr;
 		}
@@ -183,7 +195,17 @@ namespace gglab
 	DX12Buffer* RenderGraph::GetBuffer(RGBufferId bufId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
-		if (!virtualRes || !virtualRes->m_GpuResourceIndex.IsValid())
+		if (!virtualRes)
+		{
+			return nullptr;
+		}
+
+		if (virtualRes->m_Imported)
+		{
+			return virtualRes->m_ImportedNative;
+		}
+
+		if (!virtualRes->m_GpuResourceIndex.IsValid())
 		{
 			return nullptr;
 		}
@@ -208,7 +230,9 @@ namespace gglab
 		}
 
 		const auto& slot = m_ResourceSlots[handle.GetHandle().Value()];
-		if (slot.m_Version != handle.GetVersion())
+		const auto handleVersion = handle.GetVersion();
+		if (handleVersion == RGResourceHandle::UnintializedVersion ||
+			handleVersion > slot.m_Version)
 		{
 			return nullptr;
 		}

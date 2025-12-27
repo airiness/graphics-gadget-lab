@@ -19,42 +19,60 @@ namespace gglab
 
 		struct ForwardPBRData
 		{
-			RGTextureId m_Depth;
+			RGTextureId m_BackBuffer{};
+			RGTextureId m_Depth{};
+
+			ViewKey m_RTVKey{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
 		};
 
+		auto* contextPtr = &context;
+		auto* servicesPtr = &services;
+
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
-			[&services](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
+			[](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 
 				auto& targets = builder.GetBlackboard().GetOrCreate<RGFrameTargets>(MainViewName);
-				if (!targets.m_Depth.IsValid())
-				{
-					auto* swapChain = services.m_Renderer->GetDevice()->GetSwapChain();
+				data.m_BackBuffer = builder.Write(targets.m_BackBuffer, RGTextureUsage::RenderTarget);
+				data.m_Depth = builder.Write(targets.m_Depth, RGTextureUsage::DepthStencil);
 
-					RGTextureDesc dsDesc = {};
-					dsDesc.m_Width = swapChain->GetBufferWidth();
-					dsDesc.m_Height = swapChain->GetBufferHeight();
-					dsDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-					dsDesc.m_Usage = RGTextureUsage::DepthStencil;
-
-					targets.m_Depth = builder.CreateTexture("MainView.Depth", dsDesc);
-				}
-
-				data.m_Depth = targets.m_Depth;
-				builder.Write<RGTextureResource>(data.m_Depth, RGTextureUsage::DepthStencil);
+				data.m_RTVKey = targets.m_BackBufferRTVKey;
+				data.m_Width = targets.m_Width;
+				data.m_Height = targets.m_Height;
 			},
-			[this, &rg, &context, &services](DX12CommandList* commandList, ForwardPBRData& data)
+			[this, &rg, contextPtr, servicesPtr](DX12CommandList* commandList, ForwardPBRData& data)
 			{
-				auto* renderer = services.m_Renderer;
+				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
+				auto* depthTexture = rg.GetTexture(data.m_Depth);
+
+				GGLAB_ASSERT(backTexture && depthTexture);
+
+				auto* viewCache = rg.GetViewCache();
+
+				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
+
+				const ResourceIndex depthIndex = rg.GetResourceIndex(data.m_Depth);
+				const ViewKey dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(
+					depthIndex, depthTexture);
+
+				const auto& dsv = viewCache->GetOrCreate(dsvKey, depthTexture);
+				commandList->ClearDepthStencil(dsv, 1.0f, 0);
+
+				DX12DescriptorView rtvs[] =
+				{
+					rtv.ToView()
+				};
+				commandList->SetRenderTargets(rtvs, &dsv);
+
+				auto* renderer = servicesPtr->m_Renderer;
 				auto* device = renderer->GetDevice();
 				auto* passRegistry = renderer->GetRenderPassRecipeRegistry();
 				auto* rootSignature = renderer->GetCommonRootSignature();
 				auto* psoCache = renderer->GetPSOCache();
-				auto* swapChain = device->GetSwapChain();
-
-				const auto width = swapChain->GetBufferWidth();
-				const auto height = swapChain->GetBufferHeight();
 
 				const auto& cached = passRegistry->GetOrCreateGraphics(
 					"RenderPassForwardPBR.main", m_KeyInputs,
@@ -80,31 +98,13 @@ namespace gglab
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
 
-				commandList->SetViewport(0, 0, width, height);
-				commandList->SetScissorRect(0, 0, width, height);
+				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
+				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				swapChain->PrepareBackBuffer(commandList);
-				commandList->FlushBarriers();
-
-				DX12DescriptorView rtvs[] =
-				{
-					swapChain->GetCurrentBackBufferView()
-				};
-
-				DX12Texture* dsTexture = rg.GetTexture(data.m_Depth);
-				GGLAB_ASSERT_MSG(dsTexture != nullptr, "Resource must be Devirtualized.");
-				auto dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(rg.GetResourceIndex(data.m_Depth), dsTexture);
-				auto viewCache = rg.GetViewCache();
-				auto& dsv = viewCache->GetOrCreate(dsvKey, dsTexture);
-
-				commandList->SetRenderTargets(rtvs, &dsv);
-				swapChain->ClearBackBuffer(commandList);
-				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 
 				commandList->SetGraphicsConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB),
-					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(context.m_BackBufferIndex));
+					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
 
 				// Set object structured buffer
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();
@@ -119,10 +119,7 @@ namespace gglab
 					materialSB->GetBuffer()->GPUVirtualAddress());
 
 				// Model Draw
-				DrawModels(commandList, context, services);
-
-				swapChain->FinishBackBuffer(commandList);
-				commandList->FlushBarriers();
+				DrawModels(commandList, *contextPtr, *servicesPtr);
 
 			});
 	}

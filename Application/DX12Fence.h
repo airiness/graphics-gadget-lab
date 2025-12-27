@@ -9,7 +9,7 @@ namespace gglab
 	{
 	public:
 		explicit DX12Fence(DX12Device* device, uint64_t initValue = 1) noexcept;
-		~DX12Fence() noexcept;
+		~DX12Fence();
 
 		uint64_t GetCompletedValue() const noexcept;
 		uint64_t GetCurrentValue() const noexcept { return m_CurrentValue; }

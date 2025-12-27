@@ -1,6 +1,5 @@
 #include "Precompiled.h"
 #include "Renderer.h"
-#include "Application.h"
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12CommandList.h"
@@ -8,6 +7,7 @@
 #include "DX12SwapChain.h"
 #include "DX12CommandAllocator.h"
 #include "DX12ConstantBuffer.h"
+#include "DX12Fence.h"
 #include "RenderGraph.h"
 #include "RGGpuResourceAllocator.h"
 #include "AssetManager.h"
@@ -20,14 +20,23 @@
 
 namespace gglab
 {
-	Renderer::Renderer() noexcept
+	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
-	}
 
-	void Renderer::Initialize() noexcept
-	{
+		m_SwapChain = std::make_unique<DX12SwapChain>();
+		DX12SwapChain::CreateInfo swapChainCreateInfo{};
+		swapChainCreateInfo.m_DX12Device = m_Device.get();
+		swapChainCreateInfo.m_PresentQueue = m_Device->GetGraphicsCommandQueue();
+		swapChainCreateInfo.m_Hwnd = createInfo.m_Hwnd;
+		swapChainCreateInfo.m_Width = createInfo.m_Width;
+		swapChainCreateInfo.m_Height = createInfo.m_Height;
+		swapChainCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+		swapChainCreateInfo.m_AllowTearing = m_Device->SupportTearing();
+
+		m_SwapChain->Initialize(swapChainCreateInfo);
+
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
@@ -39,12 +48,48 @@ namespace gglab
 		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
-		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(Application::GetInstance()->GetShaderManager());
+		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
+		m_ExternalResourceRegistry = std::make_unique<ExternalResourceRegistry>(m_ViewCache.get());
 
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
 
 		m_IsInitialized = true;
+	}
+
+	void Renderer::Finalize() noexcept
+	{
+		if (!m_IsInitialized)
+		{
+			return;
+		}
+
+		m_IsSuspended.store(true, std::memory_order_relaxed);
+
+		if (m_SwapChain)
+		{
+			m_SwapChain->Finalize();
+			m_SwapChain.reset();
+		}
+
+		m_ExternalResourceRegistry.reset();
+		m_RenderPassRecipeRegistry.reset();
+		m_RootSignatureCache.reset();
+		m_PSOCache.reset();
+		m_ViewCache.reset();
+		m_RGGpuAllocator.reset();
+
+		m_FrameCB.reset();
+		m_ObjectSB.reset();
+		m_MaterialSB.reset();
+
+		if (m_Device)
+		{
+			m_Device->Finalize();
+			m_Device.reset();
+		}
+
+		m_IsInitialized = false;
 	}
 
 	void Renderer::Render(RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
@@ -54,7 +99,20 @@ namespace gglab
 			return;
 		}
 
-		auto swapChain = m_Device->GetSwapChain();
+		// Window suspended do nothing
+		if (m_IsSuspended.load(std::memory_order_relaxed))
+		{
+			return;
+		}
+
+		if (!m_SwapChain || !m_SwapChain->IsValid())
+		{
+			return;
+		}
+
+		auto swapChain = m_SwapChain.get();
+		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
+
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 		auto commandAllocatorPool = m_Device->GetGraphicsCommandAllocatorPool();
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
@@ -91,18 +149,6 @@ namespace gglab
 
 	}
 
-	void Renderer::Finalize() noexcept
-	{
-		if (!m_IsInitialized)
-		{
-			return;
-		}
-
-		m_IsInitialized = false;
-
-		m_Device->FlushGPU();
-	}
-
 	DX12RootSignature* Renderer::GetCommonRootSignature() const noexcept
 	{
 		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
@@ -122,7 +168,7 @@ namespace gglab
 
 		frameCB.MainLight = scene.m_MainLight;
 
-		const auto currentIndex = m_Device->GetSwapChain()->GetCurrentBackBufferIndex();
+		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();
 		m_FrameCB->Update(frameCB, currentIndex);
 	}
 
@@ -131,13 +177,70 @@ namespace gglab
 		RenderGraph::CreateInfo rgCreateInfo{};
 		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuAllocator.get();
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
+		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResourceRegistry.get();
 
 		return rgCreateInfo;
 	}
 
-	uint32_t Renderer::GetCurrentBackBufferIndex() const noexcept
+	void Renderer::OnResize(uint32_t width, uint32_t height) noexcept
 	{
-		return m_Device->GetSwapChain()->GetCurrentBackBufferIndex();
+		if (!m_IsInitialized)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. Renderer is not initialized.");
+			return;
+		}
+
+		if (m_IsSuspended.load(std::memory_order_relaxed))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize ignored because renderer is suspended.");
+			return;
+		}
+
+		if (!m_SwapChain || !m_SwapChain->IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. SwapChain is invalid.");
+			return;
+		}
+
+		if (width == 0 || height == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. Invalid resize resolution.");
+			return;
+		}
+
+		m_Device->FlushGPU();
+
+		if (m_ExternalResourceRegistry)
+		{
+			const uint32_t bufferCount = m_SwapChain->GetBufferCount();
+			for (uint32_t index = 0; index < bufferCount; ++index)
+			{
+				DX12Texture* backBuffer = m_SwapChain->GetBackBuffer(index);
+				if (!backBuffer)
+				{
+					continue;
+				}
+
+				m_ExternalResourceRegistry->Forget(backBuffer, true);
+			}
+		}
+
+		m_SwapChain->OnResize(width, height);
+	}
+
+	void Renderer::OnSuspend() noexcept
+	{
+		m_IsSuspended.store(true, std::memory_order_relaxed);
+	}
+
+	void Renderer::OnResume() noexcept
+	{
+		m_IsSuspended.store(false, std::memory_order_relaxed);
+	}
+
+	bool Renderer::IsSuspended() const noexcept
+	{
+		return m_IsSuspended.load(std::memory_order_relaxed);
 	}
 
 	void Renderer::CreateCommonRootSignature() noexcept

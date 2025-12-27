@@ -31,7 +31,7 @@ namespace gglab
 		{
 		}
 
-		virtual void Execute(DX12CommandList* commandList) noexcept override final
+		void Execute(DX12CommandList* commandList) noexcept override final
 		{
 			m_Execute(commandList, this->m_PassData);
 		}

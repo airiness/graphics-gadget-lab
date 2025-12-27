@@ -17,7 +17,7 @@ namespace gglab
 		std::string_view GetName() const noexcept override { return "Demo.Playground"; }
 
 		void OnEnter() noexcept override;
-		void OnResize() noexcept override;
+		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void OnExit() noexcept override;
 
 		void Update() noexcept override;
