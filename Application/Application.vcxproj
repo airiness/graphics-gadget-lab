@@ -49,6 +49,7 @@
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\PropertySheets\AssetDirectorys.props" />
+    <Import Project="..\PropertySheets\ImGuiImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -61,6 +62,7 @@
     <Import Project="..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\PropertySheets\AssetDirectorys.props" />
+    <Import Project="..\PropertySheets\ImGuiImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -108,12 +110,41 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\Externals\Vender\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DemoManager.cpp" />
+    <ClCompile Include="DevelopGui.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
     <ClCompile Include="DX12RingBuffer.cpp" />
     <ClCompile Include="DX12CommandAllocator.cpp" />
@@ -185,6 +216,10 @@
   <ItemGroup>
     <ClInclude Include="..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.h" />
+    <ClInclude Include="..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
+    <ClInclude Include="..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\Externals\Vender\imgui\imconfig.h" />
+    <ClInclude Include="..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
     <ClInclude Include="Blackboard.h" />
@@ -194,6 +229,7 @@
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DemoBase.h" />
     <ClInclude Include="DemoManager.h" />
+    <ClInclude Include="DevelopGui.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12RingBuffer.h" />
     <ClInclude Include="DX12CommandAllocator.h" />
