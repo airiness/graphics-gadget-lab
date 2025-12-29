@@ -28,6 +28,7 @@ namespace gglab
 
 		void NewFrame() noexcept;
 		void Render(DX12CommandList* commandList, const DX12Descriptor& rtv) noexcept;
+		void EndFrame() noexcept;
 
 	private:
 		static void DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
@@ -40,6 +41,7 @@ namespace gglab
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_DescriptorAllocator;
+
+		bool m_FrameOpen = false;
 	};
 }

@@ -12,10 +12,7 @@ namespace gglab
 		using IndexType = uint32_t;
 		using CountType = uint32_t;
 	public:
-		explicit DX12DescriptorAllocatorBase(DX12Device* dx12Device,
-			D3D12_DESCRIPTOR_HEAP_TYPE type,
-			D3D12_DESCRIPTOR_HEAP_FLAGS flags,
-			uint32_t descriptorCount) noexcept;
+		explicit DX12DescriptorAllocatorBase(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12DescriptorAllocatorBase);
 		virtual ~DX12DescriptorAllocatorBase() = default;
 

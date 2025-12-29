@@ -57,7 +57,7 @@ namespace gglab
 
 	void DX12CommandList::SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) const noexcept
 	{
-		ID3D12DescriptorHeap* heaps[] = { descriptorHeap.Heap() };
+		ID3D12DescriptorHeap* heaps[] = { descriptorHeap.Get() };
 		m_D3D12GraphicsCommandList->SetDescriptorHeaps(1, heaps);
 	}
 
@@ -93,7 +93,7 @@ namespace gglab
 			rtHandles.at(index) = (rtDescriptors[index].m_CpuHandle);
 		}
 
-		const auto dsDescriptorView = dsDescriptor->ToView();
+		const auto dsDescriptorView = dsDescriptor ? dsDescriptor->ToView() : DX12DescriptorView{};
 		m_D3D12GraphicsCommandList->OMSetRenderTargets(static_cast<UINT>(rtCount),
 			rtHandles.data(), FALSE,
 			dsDescriptor ? &dsDescriptorView.m_CpuHandle : nullptr);

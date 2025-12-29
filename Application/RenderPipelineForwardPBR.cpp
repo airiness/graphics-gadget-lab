@@ -4,6 +4,7 @@
 #include "DX12Device.h"
 #include "DX12SwapChain.h"
 #include "RGFrameTargets.h"
+#include "RenderPassDevelopGui.h"
 
 namespace gglab
 {
@@ -124,6 +125,13 @@ namespace gglab
 		if (m_Settings.m_EnableForwardPBRPass)
 		{
 			m_ForwardPBRPass.AddPass(rg, context, services);
+		}
+
+		// DevelopGui
+		if (m_Settings.m_EnableDevelopGuiPass)
+		{
+			RenderPassDevelopGui developGuiPass{};
+			developGuiPass.AddPass(rg, context, services);
 		}
 
 		// Finish backbuffer

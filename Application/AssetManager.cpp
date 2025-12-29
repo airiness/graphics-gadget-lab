@@ -24,6 +24,15 @@ namespace gglab
 		GGLAB_ASSERT_MSG(transferManager != nullptr, "TransferManager is null!");
 	}
 
+	AssetManager::~AssetManager()
+	{
+		// Release Descriptor for texture
+		for (auto& texture : m_TextureContainer.m_TextureIDMap)
+		{
+			texture.second->m_Descriptor.Free();
+		}
+	}
+
 	ModelId AssetManager::LoadModel(const std::filesystem::path& path) noexcept
 	{
 		const auto canonicalPath = utils::Canonical(path);

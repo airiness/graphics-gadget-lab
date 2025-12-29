@@ -7,9 +7,41 @@
 
 namespace gglab
 {
+	DX12Descriptor::DX12Descriptor(DX12Descriptor&& rhs) noexcept
+	{
+		MoveFrom(rhs);
+	}
+
+	DX12Descriptor& DX12Descriptor::operator=(DX12Descriptor&& rhs) noexcept
+	{
+		if (this != &rhs)
+		{
+#if defined (BUILD_DEBUG)
+			GGLAB_ASSERT_MSG(!IsValid(), "DX12Descriptor overwritten while still valid (leak). Call Free/Retire first.");
+#endif
+			Reset();
+			MoveFrom(rhs);
+		}
+		return *this;
+	}
+
+	DX12Descriptor::~DX12Descriptor()
+	{
+#if defined (BUILD_DEBUG)
+		if (IsValid())
+		{
+			GGLAB_ASSERT_MSG(false, "DX12Descriptor leaked: must Free()/Retire() before destruction.");
+		}
+#endif
+	}
+
 	bool DX12Descriptor::IsValid() const noexcept
 	{
-		return m_CpuHandle.ptr != 0 && m_Index != InvalidIndex && m_Count > 0;
+		return 
+			m_CpuHandle.ptr != 0 &&
+			m_Index != InvalidIndex &&
+			m_Count > 0 && 
+			m_Owner != nullptr;
 	}
 
 	bool DX12Descriptor::IsShaderVisible() const noexcept
@@ -31,20 +63,26 @@ namespace gglab
 
 	void DX12Descriptor::Free() noexcept
 	{
-		if (!m_Owner)
+		GGLAB_ASSERT_MSG(m_Owner, "Free(): Descriptor owner is null.");
+		if (!IsValid())
 		{
-			GGLAB_ASSERT_MSG(false, "Free(): Descriptor owner is null.");
+			return;
 		}
+		
 		m_Owner->FreeDescriptorInternal(*this);
+		Reset();
 	}
 
-	void DX12Descriptor::Retire(const DX12FencePoint& fencePoint) const noexcept
+	void DX12Descriptor::Retire(const DX12FencePoint& fencePoint) noexcept
 	{
-		if (!m_Owner)
+		GGLAB_ASSERT_MSG(m_Owner, "Retire(): Descriptor owner is null.");
+		if (!IsValid())
 		{
-			GGLAB_ASSERT_MSG(false, "Retire(): Descriptor owner is null.");
+			return;
 		}
+		
 		m_Owner->RetireDescriptorInternal(*this, fencePoint);
+		Reset();
 	}
 
 	void DX12Descriptor::Reset() noexcept
@@ -67,22 +105,32 @@ namespace gglab
 		return descriptorView;
 	}
 
-	DX12DescriptorHeap::DX12DescriptorHeap(DX12Device* dx12Device,
-		D3D12_DESCRIPTOR_HEAP_TYPE type,
-		D3D12_DESCRIPTOR_HEAP_FLAGS flags,
-		uint32_t descriptorCount) noexcept :
-		m_DX12Device(dx12Device),
-		m_Type(type),
-		m_Flags(flags),
-		m_DescriptorCount(descriptorCount),
-		m_IncrementSize(dx12Device->Get()->GetDescriptorHandleIncrementSize(type))
+	void DX12Descriptor::MoveFrom(DX12Descriptor& rhs) noexcept
+	{
+		m_Type = rhs.m_Type;
+		m_Index = rhs.m_Index;
+		m_Count = rhs.m_Count;
+		m_IncrementSize = rhs.m_IncrementSize;
+		m_CpuHandle = rhs.m_CpuHandle;
+		m_GpuHandle = rhs.m_GpuHandle;
+		m_Owner = rhs.m_Owner;
+		rhs.Reset();
+	}
+
+	DX12DescriptorHeap::DX12DescriptorHeap(const CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device),
+		m_Type(createInfo.m_Type),
+		m_Flags(createInfo.m_Flags),
+		m_DescriptorCount(createInfo.m_DescriptorCount),
+		m_IncrementSize(m_DX12Device->Get()->GetDescriptorHandleIncrementSize(m_Type))
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.Type = m_Type;
 		desc.NumDescriptors = m_DescriptorCount;
 		desc.Flags = m_Flags;
 
-		GGLAB_HR_DX(m_DX12Device->Get()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_D3D12DescriptorHeap)), m_DX12Device->Get());
+		GGLAB_HR_DX(m_DX12Device->Get()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_D3D12DescriptorHeap)),
+			m_DX12Device->Get());
 	}
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::CpuStart() const noexcept

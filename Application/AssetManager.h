@@ -51,7 +51,7 @@ namespace gglab
 	public:
 		explicit AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
-		~AssetManager() noexcept = default;
+		~AssetManager();
 
 		ModelId LoadModel(const std::filesystem::path& path) noexcept;
 		TextureId LoadTexture(const std::filesystem::path& path) noexcept;

@@ -65,7 +65,7 @@
     <Filter Include="Externals\ImGui">
       <UniqueIdentifier>{fcaf4650-56ee-4d51-9d13-291379cac5b5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DevelopGui">
+    <Filter Include="Graphics\DevelopGui">
       <UniqueIdentifier>{829376d1-6b70-4ce7-9785-ae216f890dbf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -299,7 +299,10 @@
       <Filter>Externals\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="DevelopGui.cpp">
-      <Filter>DevelopGui</Filter>
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPassDevelopGui.cpp">
+      <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -583,7 +586,10 @@
       <Filter>Externals\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="DevelopGui.h">
-      <Filter>DevelopGui</Filter>
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassDevelopGui.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

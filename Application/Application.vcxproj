@@ -173,6 +173,7 @@
     <ClCompile Include="MathUtils.cpp" />
     <ClCompile Include="PathUtils.cpp" />
     <ClCompile Include="DemoPlayground.cpp" />
+    <ClCompile Include="RenderPassDevelopGui.cpp" />
     <ClCompile Include="RenderPassForwardPBR.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
@@ -262,6 +263,7 @@
     <ClInclude Include="PipelinePresets.h" />
     <ClInclude Include="DemoPlayground.h" />
     <ClInclude Include="RenderContexts.h" />
+    <ClInclude Include="RenderPassDevelopGui.h" />
     <ClInclude Include="RenderPassForwardPBR.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />

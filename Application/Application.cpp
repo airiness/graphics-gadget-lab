@@ -301,6 +301,15 @@ namespace gglab
 			}
 		}
 
+		auto* developGui = m_Renderer->GetDevelopGui();
+		if (developGui)
+		{
+			developGui->NewFrame();
+
+			// ImGui test
+			ImGui::ShowDemoWindow();
+		}
+
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
 		demo->Update();
@@ -350,6 +359,11 @@ namespace gglab
 
 		// Render
 		m_Renderer->Render(rg, renderContext);
+
+		if (developGui)
+		{
+			developGui->EndFrame();
+		}
 
 		return true;
 	}

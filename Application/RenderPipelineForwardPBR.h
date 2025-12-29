@@ -10,6 +10,7 @@ namespace gglab
 		struct Settings
 		{
 			bool m_EnableForwardPBRPass = true;
+			bool m_EnableDevelopGuiPass = true;
 		};
 
 	public:
@@ -21,6 +22,9 @@ namespace gglab
 		void BuildRenderGraph(RenderGraph& rg,
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
+
+		bool IsRenderPassForwardPBREnabled() const noexcept { return m_Settings.m_EnableForwardPBRPass; }
+		bool IsRenderPassDevelopGuiEnabled() const noexcept { return m_Settings.m_EnableDevelopGuiPass; }
 
 	private:
 		Settings m_Settings{};

@@ -60,7 +60,10 @@ namespace gglab
 
 		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingStructuredBuffer);
-		~DX12RingStructuredBuffer() = default;
+		~DX12RingStructuredBuffer()
+		{
+			m_SrvDescriptor.Free();
+		}
 
 		AllocateResult Allocate(uint32_t elementCount) noexcept
 		{
