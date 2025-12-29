@@ -3,11 +3,8 @@
 
 namespace gglab
 {
-	DX12DescriptorAllocatorBase::DX12DescriptorAllocatorBase(DX12Device* dx12Device,
-		D3D12_DESCRIPTOR_HEAP_TYPE type,
-		D3D12_DESCRIPTOR_HEAP_FLAGS flags,
-		uint32_t descriptorCount) noexcept :
-		m_Heap(std::make_unique<DX12DescriptorHeap>(dx12Device, type, flags, descriptorCount))
+	DX12DescriptorAllocatorBase::DX12DescriptorAllocatorBase(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept :
+		m_Heap(std::make_unique<DX12DescriptorHeap>(createInfo))
 	{
 	}
 

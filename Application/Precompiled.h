@@ -68,10 +68,18 @@ using namespace Microsoft::WRL;
 #include "CoreMacros.h"
 #include "LogMacros.h"
 
+// SimpleMath
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
 
+// GameInput
 #include <GameInput.h>
 #pragma comment(lib, "gameinput.lib")
 
+// entt
 #include <entt/entt.hpp>
+
+// ImGui
+#include <imgui.h>
+#include <backends/imgui_impl_win32.h>
+#include <backends/imgui_impl_dx12.h>

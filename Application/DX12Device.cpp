@@ -283,17 +283,28 @@ namespace gglab
 
 	void DX12Device::InitializeDescriptorAllocators() noexcept
 	{
-		m_CbvSrvUavDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
-			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 1024);
+		DX12DescriptorHeap::CreateInfo createInfo{};
+		createInfo.m_DX12Device = this;
 
-		m_RtvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
-			D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 32);
+		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		createInfo.m_DescriptorCount = 1024;
+		m_CbvSrvUavDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
 
-		m_DsvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
-			D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 16);
+		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		createInfo.m_DescriptorCount = 32;
+		m_RtvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
 
-		m_SamplerDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(this,
-			D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 256);
+		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		createInfo.m_DescriptorCount = 16;
+		m_DsvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
+
+		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		createInfo.m_DescriptorCount = 256;
+		m_SamplerDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

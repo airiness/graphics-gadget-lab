@@ -14,6 +14,8 @@
 #include "RenderPipelineBase.h"
 #include "DemoPlayground.h"
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+
 namespace gglab
 {
 	std::unique_ptr<Application> Application::s_Application;
@@ -94,6 +96,12 @@ namespace gglab
 	LRESULT Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		Application* app = reinterpret_cast<Application*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+		if (app && app->m_IsInitialized && ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+		{
+			return 1;
+		}
+
 		switch (message)
 		{
 		case WM_CREATE:
@@ -293,6 +301,15 @@ namespace gglab
 			}
 		}
 
+		auto* developGui = m_Renderer->GetDevelopGui();
+		if (developGui)
+		{
+			developGui->NewFrame();
+
+			// ImGui test
+			ImGui::ShowDemoWindow();
+		}
+
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
 		demo->Update();
@@ -342,6 +359,11 @@ namespace gglab
 
 		// Render
 		m_Renderer->Render(rg, renderContext);
+
+		if (developGui)
+		{
+			developGui->EndFrame();
+		}
 
 		return true;
 	}

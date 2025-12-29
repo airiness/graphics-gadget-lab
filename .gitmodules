@@ -16,3 +16,6 @@
 [submodule "Externals/Vender/spdlog"]
 	path = Externals/Vender/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "Externals/Vender/imgui"]
+	path = Externals/Vender/imgui
+	url = https://github.com/ocornut/imgui.git

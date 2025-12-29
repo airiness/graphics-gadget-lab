@@ -51,6 +51,13 @@ namespace gglab
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
 		m_ExternalResourceRegistry = std::make_unique<ExternalResourceRegistry>(m_ViewCache.get());
 
+		m_DevelopGui = std::make_unique<DevelopGui>();
+		DevelopGui::CreateInfo developGuiCreateInfo{};
+		developGuiCreateInfo.m_Hwnd = createInfo.m_Hwnd;
+		developGuiCreateInfo.m_DX12Device = m_Device.get();
+		developGuiCreateInfo.m_SwapChain = m_SwapChain.get();
+		m_DevelopGui->Initialize(developGuiCreateInfo);
+
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
 
@@ -72,6 +79,7 @@ namespace gglab
 			m_SwapChain.reset();
 		}
 
+		m_DevelopGui->Finalize();
 		m_ExternalResourceRegistry.reset();
 		m_RenderPassRecipeRegistry.reset();
 		m_RootSignatureCache.reset();
@@ -143,6 +151,11 @@ namespace gglab
 		m_RGGpuAllocator->Tick();
 
 		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, fencePoint);
+
+		m_Device->GetRtvDescriptorAllocator()->EndFrame(fencePoint);
+		m_Device->GetCbvSrvUavDescriptorAllocator()->EndFrame(fencePoint);
+		m_Device->GetDsvDescriptorAllocator()->EndFrame(fencePoint);
+		m_Device->GetSamplerDescriptorAllocator()->EndFrame(fencePoint);
 
 		swapChain->UpdateFrameSyncObject(std::move(fencePoint));
 		swapChain->Present();
