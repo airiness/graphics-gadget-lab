@@ -97,7 +97,7 @@ namespace gglab
 	{
 		Application* app = reinterpret_cast<Application*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
-		if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+		if (app && app->m_IsInitialized && ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
 		{
 			return 1;
 		}
