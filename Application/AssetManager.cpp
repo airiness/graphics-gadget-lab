@@ -16,12 +16,14 @@
 
 namespace gglab
 {
-	AssetManager::AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept :
-		m_DX12Device(dx12Device),
-		m_TransferManager(transferManager)
+	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device),
+		m_TransferManager(createInfo.m_TransferManager),
+		m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
-		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device is null!");
-		GGLAB_ASSERT_MSG(transferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "DX12Device is null!");
+		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DescriptorManager is null!");
 	}
 
 	AssetManager::~AssetManager()
@@ -279,7 +281,7 @@ namespace gglab
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor& create srv
-		auto* srvDescriptorAllocator = m_DX12Device->GetCbvSrvUavDescriptorAllocator();
+		auto* srvDescriptorAllocator = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator();
 		texture->m_Descriptor = std::move(srvDescriptorAllocator->Allocate());
 
 		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();

@@ -4,6 +4,7 @@
 #include "RenderScene.h"
 #include "RenderGraph.h"
 #include "RGFrameTargets.h"
+#include "DescriptorManager.h"
 #include "DX12SwapChain.h"
 #include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
@@ -70,6 +71,7 @@ namespace gglab
 
 				auto* renderer = servicesPtr->m_Renderer;
 				auto* device = renderer->GetDevice();
+				auto* descriptorManager = renderer->GetDescriptorManager();
 				auto* passRegistry = renderer->GetRenderPassRecipeRegistry();
 				auto* rootSignature = renderer->GetCommonRootSignature();
 				auto* psoCache = renderer->GetPSOCache();
@@ -94,7 +96,7 @@ namespace gglab
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 
-				commandList->SetDescriptorHeap(*device->GetCbvSrvUavDescriptorAllocator()->GetHeap());
+				commandList->SetDescriptorHeap(*descriptorManager->GetCbvSrvUavDescriptorAllocator()->GetHeap());
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
 

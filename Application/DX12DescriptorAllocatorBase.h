@@ -11,12 +11,18 @@ namespace gglab
 	public:
 		using IndexType = uint32_t;
 		using CountType = uint32_t;
+
+		struct CreateInfo
+		{
+			DX12DescriptorHeap* m_DescriptorHeap = nullptr;
+		};
+
 	public:
-		explicit DX12DescriptorAllocatorBase(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept;
+		explicit DX12DescriptorAllocatorBase(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12DescriptorAllocatorBase);
 		virtual ~DX12DescriptorAllocatorBase() = default;
 
-		DX12DescriptorHeap* GetHeap() const noexcept { return m_Heap.get(); }
+		DX12DescriptorHeap* GetHeap() const noexcept { return m_DescriptorHeap; }
 
 	protected:
 		DX12Descriptor CreateDescriptor(const AllocatorBase::IndexSpan& indexSpan) noexcept;
@@ -25,7 +31,9 @@ namespace gglab
 		virtual void RetireDescriptorInternal(const DX12Descriptor&, const DX12FencePoint&) noexcept;
 
 	protected:
-		std::unique_ptr<DX12DescriptorHeap> m_Heap;
+		//std::unique_ptr<DX12DescriptorHeap> m_Heap;
+
+		DX12DescriptorHeap* m_DescriptorHeap;
 
 		friend class DX12Descriptor;
 	};

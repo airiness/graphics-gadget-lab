@@ -8,10 +8,18 @@ namespace gglab
 {
 	class DX12Device;
 	class TransferManager;
+	class DescriptorManager;
 
 	class AssetManager
 	{
 	public:
+		struct CreateInfo
+		{
+			DX12Device* m_DX12Device = nullptr;
+			TransferManager* m_TransferManager = nullptr;
+			DescriptorManager* m_DescriptorManager = nullptr;
+		};
+
 		struct TextureUploadData
 		{
 			TextureId m_TextureId{};
@@ -49,7 +57,7 @@ namespace gglab
 		};
 
 	public:
-		explicit AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept;
+		explicit AssetManager(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
@@ -94,6 +102,7 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
+		DescriptorManager* m_DescriptorManager = nullptr;
 
 		TextureIdCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
 		MeshIdCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };

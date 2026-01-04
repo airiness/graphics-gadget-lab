@@ -144,6 +144,7 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DemoManager.cpp" />
+    <ClCompile Include="DescriptorManager.cpp" />
     <ClCompile Include="DevelopGui.cpp" />
     <ClCompile Include="DX12Buffer.cpp" />
     <ClCompile Include="DX12RingBuffer.cpp" />
@@ -230,6 +231,7 @@
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DemoBase.h" />
     <ClInclude Include="DemoManager.h" />
+    <ClInclude Include="DescriptorManager.h" />
     <ClInclude Include="DevelopGui.h" />
     <ClInclude Include="DX12Buffer.h" />
     <ClInclude Include="DX12RingBuffer.h" />

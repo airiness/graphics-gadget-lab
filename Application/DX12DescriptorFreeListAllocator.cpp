@@ -1,12 +1,13 @@
 #include "Precompiled.h"
 #include "DX12DescriptorFreeListAllocator.h"
+#include "DX12Descriptor.h"
 
 namespace gglab
 {
 	DX12DescriptorFreeListAllocator::DX12DescriptorFreeListAllocator(
-		const DX12DescriptorHeap::CreateInfo& createInfo) noexcept :
+		const DX12DescriptorAllocatorBase::CreateInfo& createInfo) noexcept :
 		DX12DescriptorAllocatorBase(createInfo),
-		m_Allocator(createInfo.m_DescriptorCount)
+		m_Allocator(GetHeap()->DescriptorCount())
 	{
 	}
 

@@ -4,7 +4,6 @@
 #include "AssetManager.h"
 #include "InputManager.h"
 #include "ShaderManager.h"
-#include "TransferManager.h"
 #include "DemoManager.h"
 #include "RenderViewBuilder.h"
 #include "RenderSceneBuilder.h"
@@ -246,8 +245,12 @@ namespace gglab
 		rendererCreateInfo.m_Height = m_WindowHeight;
 		m_Renderer->Initialize(rendererCreateInfo);
 
-		m_TransferManager = std::make_unique<TransferManager>(m_Renderer->GetDevice(), 8 * 1024 * 1024);
-		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice(), m_TransferManager.get());
+		AssetManager::CreateInfo assetManagerCreateInfo{};
+		assetManagerCreateInfo.m_DX12Device = m_Renderer->GetDevice();
+		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
+		assetManagerCreateInfo.m_DescriptorManager = m_Renderer->GetDescriptorManager();
+		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
+
 		m_DemoManager = std::make_unique<DemoManager>();
 
 		InitializeAssets();
@@ -329,7 +332,7 @@ namespace gglab
 			.m_World = world,
 			.m_RenderView = renderView,
 			.m_AssetManager = *m_AssetManager,
-			.m_TransferManager = *m_TransferManager,
+			.m_TransferManager = *m_Renderer->GetTransferManager(),
 			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer()
 		};
@@ -383,7 +386,6 @@ namespace gglab
 
 		m_DemoManager.reset();
 		m_AssetManager.reset();
-		m_TransferManager.reset();
 
 		if (m_Renderer)
 		{

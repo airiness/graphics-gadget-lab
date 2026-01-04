@@ -4,9 +4,9 @@
 namespace gglab
 {
 	DX12DescriptorRingAllocator::DX12DescriptorRingAllocator(
-		const DX12DescriptorHeap::CreateInfo& createInfo) noexcept :
+		const DX12DescriptorAllocatorBase::CreateInfo& createInfo) noexcept :
 		DX12DescriptorAllocatorBase(createInfo),
-		m_Allocator(createInfo.m_DescriptorCount)
+		m_Allocator(GetHeap()->DescriptorCount())
 	{
 	}
 

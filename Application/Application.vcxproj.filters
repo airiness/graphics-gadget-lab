@@ -304,6 +304,9 @@
     <ClCompile Include="RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="DescriptorManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -590,6 +593,9 @@
     </ClInclude>
     <ClInclude Include="RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="DescriptorManager.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

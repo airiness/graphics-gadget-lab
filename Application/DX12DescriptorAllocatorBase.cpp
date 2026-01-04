@@ -3,12 +3,14 @@
 
 namespace gglab
 {
-	DX12DescriptorAllocatorBase::DX12DescriptorAllocatorBase(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept :
-		m_Heap(std::make_unique<DX12DescriptorHeap>(createInfo))
+	DX12DescriptorAllocatorBase::DX12DescriptorAllocatorBase(
+		const CreateInfo& createInfo) noexcept :
+		m_DescriptorHeap(createInfo.m_DescriptorHeap)
 	{
 	}
 
-	DX12Descriptor DX12DescriptorAllocatorBase::CreateDescriptor(const AllocatorBase::IndexSpan& indexSpan) noexcept
+	DX12Descriptor DX12DescriptorAllocatorBase::CreateDescriptor(
+		const AllocatorBase::IndexSpan& indexSpan) noexcept
 	{
 		if (!indexSpan.IsValid())
 		{
@@ -17,17 +19,17 @@ namespace gglab
 
 		const auto index = indexSpan.m_Index;
 		const auto count = indexSpan.m_Count;
-		const auto incrementSize = m_Heap->DescriptorIncrementSize();
+		const auto incrementSize = m_DescriptorHeap->DescriptorIncrementSize();
 
 		DX12Descriptor descriptor = {};
-		descriptor.m_Type = m_Heap->Type();
+		descriptor.m_Type = m_DescriptorHeap->Type();
 		descriptor.m_Index = index;
 		descriptor.m_Count = count;
 		descriptor.m_IncrementSize = incrementSize;
-		descriptor.m_CpuHandle.InitOffsetted(m_Heap->CpuStart(), index, incrementSize);
-		if (m_Heap->Flags() & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+		descriptor.m_CpuHandle.InitOffsetted(m_DescriptorHeap->CpuStart(), index, incrementSize);
+		if (m_DescriptorHeap->Flags() & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
 		{
-			descriptor.m_GpuHandle.InitOffsetted(m_Heap->GpuStart(), index, incrementSize);
+			descriptor.m_GpuHandle.InitOffsetted(m_DescriptorHeap->GpuStart(), index, incrementSize);
 		}
 		else
 		{

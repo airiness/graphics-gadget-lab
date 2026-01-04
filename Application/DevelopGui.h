@@ -8,6 +8,7 @@ namespace gglab
 	class DX12DescriptorHeap;
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
+	class DescriptorManager;
 	class DevelopGui
 	{
 	public:
@@ -16,6 +17,7 @@ namespace gglab
 			HWND m_Hwnd = nullptr;
 			DX12Device* m_DX12Device = nullptr;
 			DX12SwapChain* m_SwapChain = nullptr;
+			DescriptorManager* m_DescriptorManager = nullptr;
 		};
 
 	public:
@@ -41,6 +43,7 @@ namespace gglab
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
+		DescriptorManager* m_DescriptorManager = nullptr;
 
 		bool m_FrameOpen = false;
 	};

@@ -14,7 +14,8 @@ namespace gglab
 		};
 
 	public:
-		explicit DX12DescriptorFreeListAllocator(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept;
+		explicit DX12DescriptorFreeListAllocator(
+			const DX12DescriptorAllocatorBase::CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorFreeListAllocator);
 		~DX12DescriptorFreeListAllocator() override = default;
 

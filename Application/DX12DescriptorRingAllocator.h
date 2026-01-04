@@ -9,7 +9,8 @@ namespace gglab
 	class DX12DescriptorRingAllocator : public DX12DescriptorAllocatorBase
 	{
 	public:
-		explicit DX12DescriptorRingAllocator(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept;
+		explicit DX12DescriptorRingAllocator(
+			const DX12DescriptorAllocatorBase::CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorRingAllocator);
 		~DX12DescriptorRingAllocator() override = default;
 

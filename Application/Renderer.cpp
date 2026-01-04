@@ -11,6 +11,7 @@
 #include "RenderGraph.h"
 #include "RGGpuResourceAllocator.h"
 #include "AssetManager.h"
+#include "TransferManager.h"
 #include "Components.h"
 #include "Camera.h"
 #include "RenderView.h"
@@ -37,13 +38,23 @@ namespace gglab
 
 		m_SwapChain->Initialize(swapChainCreateInfo);
 
+		DescriptorManager::CreateInfo descriptorManagerCreateInfo{};
+		descriptorManagerCreateInfo.m_DX12Device = m_Device.get();
+		descriptorManagerCreateInfo.m_CbvSrvUavCount = 65536;
+		descriptorManagerCreateInfo.m_RtvCount = 4096;
+		descriptorManagerCreateInfo.m_DsvCount = 1024;
+		descriptorManagerCreateInfo.m_SamplerCount = 2048;
+		m_DescriptorManager = std::make_unique<DescriptorManager>(descriptorManagerCreateInfo);
+
+		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), createInfo.m_TransferManagerBufferSize);
+
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
 		{
-			m_Device->GetRtvDescriptorAllocator(),
-			m_Device->GetDsvDescriptorAllocator(),
-			m_Device->GetCbvSrvUavDescriptorAllocator()
+			m_DescriptorManager->GetRtvDescriptorAllocator(),
+			m_DescriptorManager->GetDsvDescriptorAllocator(),
+			m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()
 		};
 		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
@@ -56,6 +67,7 @@ namespace gglab
 		developGuiCreateInfo.m_Hwnd = createInfo.m_Hwnd;
 		developGuiCreateInfo.m_DX12Device = m_Device.get();
 		developGuiCreateInfo.m_SwapChain = m_SwapChain.get();
+		developGuiCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		m_DevelopGui->Initialize(developGuiCreateInfo);
 
 		CreateCommonRootSignature();
@@ -90,6 +102,9 @@ namespace gglab
 		m_FrameCB.reset();
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
+
+		m_DescriptorManager.reset();
+		m_TransferManager.reset();
 
 		if (m_Device)
 		{
@@ -152,10 +167,7 @@ namespace gglab
 
 		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, fencePoint);
 
-		m_Device->GetRtvDescriptorAllocator()->EndFrame(fencePoint);
-		m_Device->GetCbvSrvUavDescriptorAllocator()->EndFrame(fencePoint);
-		m_Device->GetDsvDescriptorAllocator()->EndFrame(fencePoint);
-		m_Device->GetSamplerDescriptorAllocator()->EndFrame(fencePoint);
+		m_DescriptorManager->EndFrame(fencePoint);
 
 		swapChain->UpdateFrameSyncObject(std::move(fencePoint));
 		swapChain->Present();
@@ -307,14 +319,23 @@ namespace gglab
 	{
 		// Initialize global constant buffer
 		{
-			const auto constantBufferFrames = m_Device->GetBufferCount();
+			const auto constantBufferFrames = DX12Device::GetBufferCount();
 			m_FrameCB = std::make_unique<DX12ConstantBuffer<FrameCBData>>(m_Device.get(), constantBufferFrames);
 		}
 
 		// Initialize structured buffers objects and materials
 		{
-			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(m_Device.get(), MaxObjectCapacity); // max element count
-			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(m_Device.get(), MaxMaterialCapacity); // max element count
+			DX12RingStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
+			objectSBCreateInfo.m_DX12Device = m_Device.get();
+			objectSBCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+			objectSBCreateInfo.m_ElementsCapacity = MaxObjectCapacity;
+			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
+
+			DX12RingStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
+			materialSBCreateInfo.m_DX12Device = m_Device.get();
+			materialSBCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+			materialSBCreateInfo.m_ElementsCapacity = MaxMaterialCapacity;
+			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 		}
 	}
 }

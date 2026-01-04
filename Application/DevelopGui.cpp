@@ -2,6 +2,7 @@
 #include "DevelopGui.h"
 #include "DX12Device.h"
 #include "DX12SwapChain.h"
+#include "DescriptorManager.h"
 #include "DX12Descriptor.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "DX12CommandQueue.h"
@@ -11,7 +12,11 @@ namespace gglab
 {
 	void DevelopGui::Initialize(const CreateInfo& createInfo) noexcept
 	{
+		GGLAB_ASSERT(createInfo.m_DX12Device);
+		GGLAB_ASSERT(createInfo.m_DescriptorManager);
+
 		m_DX12Device = createInfo.m_DX12Device;
+		m_DescriptorManager = createInfo.m_DescriptorManager;
 
 		// ImGui initialize
 		{
@@ -32,7 +37,7 @@ namespace gglab
 			initInfo.NumFramesInFlight = DX12Device::GetBufferCount();
 			initInfo.RTVFormat = createInfo.m_SwapChain->GetFormat();
 			initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
-			initInfo.SrvDescriptorHeap = m_DX12Device->GetCbvSrvUavDescriptorAllocator()->GetHeap()->Get();
+			initInfo.SrvDescriptorHeap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->GetHeap()->Get();
 			initInfo.SrvDescriptorAllocFn = DescriptorAlloc;
 			initInfo.SrvDescriptorFreeFn = DescriptorFree;
 			initInfo.UserData = this;
@@ -51,7 +56,7 @@ namespace gglab
 
 	void DevelopGui::NewFrame() noexcept
 	{
-		GGLAB_ASSERT_MSG(!m_FrameOpen, 
+		GGLAB_ASSERT_MSG(!m_FrameOpen,
 			"DevelopGui::NewFrame called twice without ending previous frame.");
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
@@ -73,7 +78,7 @@ namespace gglab
 		};
 		commandList->SetRenderTargets(rtvs, nullptr);
 
-		auto* heap = m_DX12Device->GetCbvSrvUavDescriptorAllocator()->GetHeap();
+		auto* heap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->GetHeap();
 		commandList->SetDescriptorHeap(*heap);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList->Get());
@@ -95,7 +100,7 @@ namespace gglab
 		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
 		auto* developGui = static_cast<DevelopGui*>(info->UserData);
-		auto descriptorView = developGui->m_DX12Device->GetCbvSrvUavDescriptorAllocator()->AllocateRaw();
+		auto descriptorView = developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->AllocateRaw();
 		*outCpuHandle = descriptorView.m_CpuHandle;
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
@@ -112,6 +117,6 @@ namespace gglab
 			.m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuHandle)
 		};
 
-		developGui->m_DX12Device->GetCbvSrvUavDescriptorAllocator()->FreeRaw(view);
+		developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->FreeRaw(view);
 	}
 }

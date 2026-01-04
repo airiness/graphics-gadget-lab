@@ -3,6 +3,7 @@
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
+#include "DX12Descriptor.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 
@@ -39,7 +40,6 @@ namespace gglab
 		InitializeInfoQueue();
 		CheckFeatureSupport();
 		InitializeCommandQueues();
-		InitializeDescriptorAllocators();
 		InitializeMemAllocator();
 		InitializeCommandLists();
 		InitializeCommandAllocatorPools();
@@ -63,11 +63,6 @@ namespace gglab
 
 		m_GraphicsCommandLists = {};
 		m_ComputeCommandLists = {};
-
-		m_CbvSrvUavDescriptorAllocator.reset();
-		m_RtvDescriptorAllocator.reset();
-		m_DsvDescriptorAllocator.reset();
-		m_SamplerDescriptorAllocator.reset();
 
 		m_DirectCommandQueue.reset();
 		m_ComputeCommandQueue.reset();
@@ -279,32 +274,6 @@ namespace gglab
 
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
 		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
-	}
-
-	void DX12Device::InitializeDescriptorAllocators() noexcept
-	{
-		DX12DescriptorHeap::CreateInfo createInfo{};
-		createInfo.m_DX12Device = this;
-
-		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		createInfo.m_DescriptorCount = 1024;
-		m_CbvSrvUavDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
-
-		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		createInfo.m_DescriptorCount = 32;
-		m_RtvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
-
-		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		createInfo.m_DescriptorCount = 16;
-		m_DsvDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
-
-		createInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-		createInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		createInfo.m_DescriptorCount = 256;
-		m_SamplerDescriptorAllocator = std::make_unique<DX12DescriptorFreeListAllocator>(createInfo);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept
