@@ -2,7 +2,7 @@
 #include "DevelopGui.h"
 #include "DX12Device.h"
 #include "DX12SwapChain.h"
-#include "DescriptorManager.h"
+#include "DX12DescriptorManager.h"
 #include "DX12Descriptor.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "DX12CommandQueue.h"
@@ -37,7 +37,7 @@ namespace gglab
 			initInfo.NumFramesInFlight = DX12Device::GetBufferCount();
 			initInfo.RTVFormat = createInfo.m_SwapChain->GetFormat();
 			initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
-			initInfo.SrvDescriptorHeap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->GetHeap()->Get();
+			initInfo.SrvDescriptorHeap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().GetHeap()->Get();
 			initInfo.SrvDescriptorAllocFn = DescriptorAlloc;
 			initInfo.SrvDescriptorFreeFn = DescriptorFree;
 			initInfo.UserData = this;
@@ -65,7 +65,7 @@ namespace gglab
 
 	}
 
-	void DevelopGui::Render(DX12CommandList* commandList, const DX12Descriptor& rtv) noexcept
+	void DevelopGui::Render(DX12CommandList* commandList, const DX12DescriptorHandle& rtv) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_FrameOpen, "DevelopGui::Render called without NewFrame.");
 
@@ -78,7 +78,7 @@ namespace gglab
 		};
 		commandList->SetRenderTargets(rtvs, nullptr);
 
-		auto* heap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->GetHeap();
+		auto* heap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().GetHeap();
 		commandList->SetDescriptorHeap(*heap);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList->Get());
@@ -100,7 +100,7 @@ namespace gglab
 		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
 		auto* developGui = static_cast<DevelopGui*>(info->UserData);
-		auto descriptorView = developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->AllocateRaw();
+		auto descriptorView = developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().AllocateRaw();
 		*outCpuHandle = descriptorView.m_CpuHandle;
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
@@ -117,6 +117,6 @@ namespace gglab
 			.m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuHandle)
 		};
 
-		developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->FreeRaw(view);
+		developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().FreeRaw(view);
 	}
 }

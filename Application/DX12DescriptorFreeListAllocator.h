@@ -19,12 +19,12 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorFreeListAllocator);
 		~DX12DescriptorFreeListAllocator() override = default;
 
-		DX12Descriptor Allocate(uint32_t count = 1) noexcept;
-		void Free(DX12Descriptor& descriptor) noexcept;
+		DX12DescriptorHandle Allocate(uint32_t count = 1) noexcept;
+		void Free(DX12DescriptorHandle& descriptor) noexcept;
 
-		void Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept;
+		void Retire(DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept;
 
-		void FreeInFrame(DX12Descriptor& descriptor) noexcept;
+		void FreeInFrame(DX12DescriptorHandle& descriptor) noexcept;
 
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 		
@@ -32,16 +32,16 @@ namespace gglab
 		void FreeRaw(DX12DescriptorView view) noexcept;
 
 	protected:
-		void FreeDescriptorInternal(DX12Descriptor& descriptor) noexcept override;
-		void RetireDescriptorInternal(const DX12Descriptor& descriptor, 
+		void FreeDescriptorInternal(DX12DescriptorHandle& descriptor) noexcept override;
+		void RetireDescriptorInternal(const DX12DescriptorHandle& descriptor, 
 			const DX12FencePoint& fencePoint) noexcept override;
 
 	private:
 		void FreeCompleted() noexcept;
-		void RetireImpl(const DX12Descriptor& descriptor,
+		void RetireImpl(const DX12DescriptorHandle& descriptor,
 			const DX12FencePoint& fencePoint) noexcept;
 
-		static FreeListSpanAllocator::IndexSpan ToIndexSpan(const DX12Descriptor& descriptor) noexcept;
+		static FreeListSpanAllocator::IndexSpan ToIndexSpan(const DX12DescriptorHandle& descriptor) noexcept;
 		static FreeListSpanAllocator::IndexSpan ToIndexSpan(uint32_t index, uint32_t count) noexcept;
 
 	private:

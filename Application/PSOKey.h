@@ -78,7 +78,7 @@ namespace gglab
 	// GraphicsPSOKey
 	struct GraphicsPSOKey
 	{
-		RootSignatureId m_RootSignatureId{};
+		RootSignatureID m_RootSignatureId{};
 		InputLayoutId m_InputLayoutId{};
 
 		ShaderHash128 m_VertexShader{};
@@ -120,7 +120,7 @@ namespace gglab
 	// ComputePSOKey
 	struct ComputePSOKey
 	{
-		RootSignatureId m_RootSignatureId{};
+		RootSignatureID m_RootSignatureId{};
 		ShaderHash128 m_ComputeShader{};
 
 		auto AsTuple() const noexcept

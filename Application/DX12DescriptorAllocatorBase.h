@@ -25,16 +25,16 @@ namespace gglab
 		DX12DescriptorHeap* GetHeap() const noexcept { return m_DescriptorHeap; }
 
 	protected:
-		DX12Descriptor CreateDescriptor(const AllocatorBase::IndexSpan& indexSpan) noexcept;
+		DX12DescriptorHandle CreateDescriptor(const AllocatorBase::IndexSpan& indexSpan) noexcept;
 
-		virtual void FreeDescriptorInternal(DX12Descriptor&) noexcept;
-		virtual void RetireDescriptorInternal(const DX12Descriptor&, const DX12FencePoint&) noexcept;
+		virtual void FreeDescriptorInternal(DX12DescriptorHandle&) noexcept;
+		virtual void RetireDescriptorInternal(const DX12DescriptorHandle&, const DX12FencePoint&) noexcept;
 
 	protected:
 		//std::unique_ptr<DX12DescriptorHeap> m_Heap;
 
 		DX12DescriptorHeap* m_DescriptorHeap;
 
-		friend class DX12Descriptor;
+		friend class DX12DescriptorHandle;
 	};
 }

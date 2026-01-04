@@ -11,7 +11,7 @@ namespace gglab
 	{
 	}
 
-	DX12Descriptor DX12DescriptorFreeListAllocator::Allocate(uint32_t count) noexcept
+	DX12DescriptorHandle DX12DescriptorFreeListAllocator::Allocate(uint32_t count) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 
@@ -20,7 +20,7 @@ namespace gglab
 		return CreateDescriptor(m_Allocator.Allocate(count));
 	}
 
-	void DX12DescriptorFreeListAllocator::Free(DX12Descriptor& descriptor) noexcept
+	void DX12DescriptorFreeListAllocator::Free(DX12DescriptorHandle& descriptor) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 
@@ -37,13 +37,13 @@ namespace gglab
 		descriptor.Reset();
 	}
 
-	void DX12DescriptorFreeListAllocator::Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorFreeListAllocator::Retire(DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept
 	{
 		RetireImpl(descriptor, fencePoint);
 		descriptor.Reset();
 	}
 
-	void DX12DescriptorFreeListAllocator::FreeInFrame(DX12Descriptor& descriptor) noexcept
+	void DX12DescriptorFreeListAllocator::FreeInFrame(DX12DescriptorHandle& descriptor) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 	
@@ -122,12 +122,12 @@ namespace gglab
 		m_FreeInFrameSpans.emplace_back(ToIndexSpan(index, 1));
 	}
 
-	void DX12DescriptorFreeListAllocator::FreeDescriptorInternal(DX12Descriptor& descriptor) noexcept
+	void DX12DescriptorFreeListAllocator::FreeDescriptorInternal(DX12DescriptorHandle& descriptor) noexcept
 	{
 		Free(descriptor);
 	}
 
-	void DX12DescriptorFreeListAllocator::RetireDescriptorInternal(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorFreeListAllocator::RetireDescriptorInternal(const DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept
 	{
 		RetireImpl(descriptor, fencePoint);
 	}
@@ -147,7 +147,7 @@ namespace gglab
 		}
 	}
 
-	void DX12DescriptorFreeListAllocator::RetireImpl(const DX12Descriptor& descriptor, 
+	void DX12DescriptorFreeListAllocator::RetireImpl(const DX12DescriptorHandle& descriptor, 
 		const DX12FencePoint& fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
@@ -164,7 +164,7 @@ namespace gglab
 	}
 
 	FreeListSpanAllocator::IndexSpan DX12DescriptorFreeListAllocator::ToIndexSpan(
-		const DX12Descriptor& descriptor) noexcept
+		const DX12DescriptorHandle& descriptor) noexcept
 	{
 		return FreeListSpanAllocator::IndexSpan
 		{

@@ -128,7 +128,7 @@ namespace gglab
 
 	private:
 		std::unique_ptr<DX12RingBuffer> m_RingBuffer;
-		DX12Descriptor m_SrvDescriptor{};
+		DX12DescriptorHandle m_SrvDescriptor{};
 		uint32_t m_ElementCapacity = 0;
 	};
 }

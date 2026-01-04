@@ -32,7 +32,7 @@ namespace gglab
 		objectData.reserve(MaxObjectCapacity);
 		materialData.reserve(MaxMaterialCapacity);
 
-		std::unordered_map<MaterialId, uint32_t> materialIndexMap;
+		std::unordered_map<MaterialID, uint32_t> materialIndexMap;
 
 		registry.view<components::TransformComponent, components::ModelComponent>().each(
 			[&result, &assetManager, &objectData, &materialData, &materialIndexMap](auto entity,
@@ -70,7 +70,7 @@ namespace gglab
 						const Material* material = assetManager.GetMaterial(modelMesh.m_MaterialId);
 						if (!material)
 						{
-							GGLAB_LOG_GRAPHICS_WARN("Mesh has invalid MaterialId.");
+							GGLAB_LOG_GRAPHICS_WARN("Mesh has invalid MaterialID.");
 							continue;
 						}
 

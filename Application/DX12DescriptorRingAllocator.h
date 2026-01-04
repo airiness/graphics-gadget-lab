@@ -14,15 +14,15 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorRingAllocator);
 		~DX12DescriptorRingAllocator() override = default;
 
-		DX12Descriptor Allocate(uint32_t count) noexcept;
-		void Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept;
+		DX12DescriptorHandle Allocate(uint32_t count) noexcept;
+		void Retire(DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept;
 
 	protected:
-		void RetireDescriptorInternal(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept override;
+		void RetireDescriptorInternal(const DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept override;
 
 	private:
 		void FreeCompleted() noexcept;
-		void RetireImpl(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept;
+		void RetireImpl(const DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept;
 	private:
 		RingSpanAllocator m_Allocator;
 		std::deque<DX12FencePoint> m_Pendings;

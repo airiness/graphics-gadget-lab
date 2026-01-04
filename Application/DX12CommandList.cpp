@@ -83,7 +83,7 @@ namespace gglab
 		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
-	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12Descriptor* dsDescriptor) const noexcept
+	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12DescriptorHandle* dsDescriptor) const noexcept
 	{
 		const auto rtCount = rtDescriptors.size();
 
@@ -114,7 +114,7 @@ namespace gglab
 		m_D3D12GraphicsCommandList->SetGraphicsRootConstantBufferView(parameterIndex, gpuAddress);
 	}
 
-	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12Descriptor& descriptor) const noexcept
+	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorHandle& descriptor) const noexcept
 	{
 		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.GpuHandle());
 	}
@@ -165,13 +165,13 @@ namespace gglab
 		m_GlobalBarriers.clear();
 	}
 
-	void DX12CommandList::ClearRenderTarget(const DX12Descriptor& rtDescriptor, const Color& color) const noexcept
+	void DX12CommandList::ClearRenderTarget(const DX12DescriptorHandle& rtDescriptor, const Color& color) const noexcept
 	{
 		float clearColor[4] = { color.R(), color.G(), color.B(), color.A() };
 		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.CpuHandle(), clearColor, 0, nullptr);
 	}
 
-	void DX12CommandList::ClearDepthStencil(const DX12Descriptor& dsDescriptor,
+	void DX12CommandList::ClearDepthStencil(const DX12DescriptorHandle& dsDescriptor,
 		float depthClearValue, std::optional<uint8_t> stencilClearValue) const noexcept
 	{
 		uint8_t stencilValue = 0;

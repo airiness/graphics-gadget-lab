@@ -19,7 +19,7 @@ namespace gglab
 
 	struct RootSignatureHandle
 	{
-		RootSignatureId m_Id{};
+		RootSignatureID m_Id{};
 		ID3D12RootSignature* m_RootSignature = nullptr;
 		bool IsValid() const noexcept { return m_Id.IsValid() && m_RootSignature != nullptr; }
 	};
@@ -34,7 +34,7 @@ namespace gglab
 		~DX12RootSignatureCache() = default;
 
 		RootSignatureHandle GetOrCreate(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept;
-		DX12RootSignature* GetDX12RootSignature(RootSignatureId id) const noexcept;
+		DX12RootSignature* GetDX12RootSignature(RootSignatureID id) const noexcept;
 
 		void Clear() noexcept;
 
@@ -43,7 +43,7 @@ namespace gglab
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
-		std::unordered_map<RootSignatureKey, RootSignatureId, RootSignatureKeyHash> m_RootSignatureMap;
+		std::unordered_map<RootSignatureKey, RootSignatureID, RootSignatureKeyHash> m_RootSignatureMap;
 		std::vector<std::unique_ptr<DX12RootSignature>> m_RootSignatures;
 		mutable std::shared_mutex m_Mutex;
 	};

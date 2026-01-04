@@ -4,7 +4,7 @@ namespace gglab
 {
 	class DX12Device;
 	class DX12SwapChain;
-	class DX12Descriptor;
+	class DX12DescriptorHandle;
 	class DX12DescriptorHeap;
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
@@ -29,7 +29,7 @@ namespace gglab
 		void Finalize() noexcept;
 
 		void NewFrame() noexcept;
-		void Render(DX12CommandList* commandList, const DX12Descriptor& rtv) noexcept;
+		void Render(DX12CommandList* commandList, const DX12DescriptorHandle& rtv) noexcept;
 		void EndFrame() noexcept;
 
 	private:

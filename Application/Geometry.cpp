@@ -19,7 +19,7 @@ namespace gglab
 				std::unique_ptr<Model> cubeModel = std::make_unique<Model>();
 				cubeModel->m_Id = ProceduralCubeModelID;
 				cubeModel->m_Type = ModelType::Procedural;
-				cubeModel->m_Name = StringId("ProceduralCube");
+				cubeModel->m_Name = StringID("ProceduralCube");
 
 				if (assetManager->GetMesh(ProceduralCubeMeshID) == nullptr)
 				{

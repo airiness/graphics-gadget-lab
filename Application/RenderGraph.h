@@ -39,7 +39,7 @@ namespace gglab
 		virtual void Devirtualize(RGGpuResourceAllocator*) noexcept = 0;
 		virtual void Destroy(RenderGraph&) noexcept = 0;
 
-		StringId m_NameId;
+		StringID m_NameId;
 		bool m_Imported = false;
 		bool m_Devirtualized = false;
 		int32_t m_RefCount = 0;
@@ -80,9 +80,9 @@ namespace gglab
 		RGPassNode* m_Writer = nullptr;
 		std::vector<RGPassNode*> m_Readers;
 
-		StringId NameId() const noexcept
+		StringID NameId() const noexcept
 		{
-			return m_VirtualResource ? m_VirtualResource->m_NameId : StringId();
+			return m_VirtualResource ? m_VirtualResource->m_NameId : StringID();
 		}
 	};
 
@@ -90,7 +90,7 @@ namespace gglab
 	{
 		GGLAB_DEFINE_NESTED_TYPED_INDEX(Index, uint32_t);
 
-		StringId m_NameId;
+		StringID m_NameId;
 		bool m_SideEffect = false;
 		bool m_Culled = false;
 
@@ -290,7 +290,7 @@ namespace gglab
 		std::vector<RGVirtualResourceBase*> m_VirtualResources;
 		std::vector<RGResourceSlot> m_ResourceSlots;
 
-		std::unordered_map<StringId, RGResourceHandle> m_NameHandleMap;
+		std::unordered_map<StringID, RGResourceHandle> m_NameHandleMap;
 
 		std::vector<ResourceIndex> m_MarkedReleaseTextureIndices;
 		std::vector<ResourceIndex> m_MarkedReleaseBufferIndices;
@@ -313,7 +313,7 @@ namespace gglab
 		auto* pass = m_ArenaAllocator.MakeTracked<PassType>(std::forward<ExecuteFunc>(executeFunc));
 
 		RGPassNode passNode = {};
-		passNode.m_NameId = StringId(passName);
+		passNode.m_NameId = StringID(passName);
 		passNode.m_Pass = pass;
 
 		RGPassNode::Index passIndex{ static_cast<uint32_t>(m_PassNodes.size()) };
@@ -360,7 +360,7 @@ namespace gglab
 		m_ResourceSlots.push_back(slot);
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
-		virtualResource->m_NameId = StringId(name);
+		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Devirtualized = false;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
@@ -400,7 +400,7 @@ namespace gglab
 		m_ResourceSlots.push_back(slot);
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
-		virtualResource->m_NameId = StringId(name);
+		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_GpuResourceIndex = m_ExternalResourceRegistry->GetOrCreate(native);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.

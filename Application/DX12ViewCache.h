@@ -52,10 +52,10 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ViewCache);
 		~DX12ViewCache();
 
-		const DX12Descriptor& GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
+		const DX12DescriptorHandle& GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
 
 		template<ViewType T>
-		const DX12Descriptor& GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
+		const DX12DescriptorHandle& GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
 			std::optional<typename ViewTraits<T>::Desc> descOpt = std::nullopt) noexcept
 		{
 			return GetOrCreateImpl<T>(resourceIndex, texture, descOpt);
@@ -78,12 +78,12 @@ namespace gglab
 		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(ViewType type) const noexcept;
 
 		template<ViewType T>
-		const DX12Descriptor& GetOrCreateImpl(ResourceIndex resourceIndex,
+		const DX12DescriptorHandle& GetOrCreateImpl(ResourceIndex resourceIndex,
 			DX12Texture* texture,
 			std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept;
 
 		template<ViewType T>
-		const DX12Descriptor& CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept;
+		const DX12DescriptorHandle& CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept;
 
 		template<ViewType T>
 		static typename ViewTraits<T>::Desc DescFromKey(const ViewKey& key) noexcept;
@@ -92,14 +92,14 @@ namespace gglab
 		DX12Device* m_DX12Device = nullptr;
 		DescriptorsAllocatorArray m_DescriptorAllocators;
 
-		std::unordered_map<ViewKey, DX12Descriptor, ViewKeyHash> m_Cache;
+		std::unordered_map<ViewKey, DX12DescriptorHandle, ViewKeyHash> m_Cache;
 		std::unordered_map<ResourceIndex, std::vector<ViewKey>> m_ResourceViews;
 
 		struct Pending
 		{
 			ResourceIndex m_ResourceIndex;
 			DX12FencePoint m_FencePoint;
-			std::vector<DX12Descriptor> m_Descriptors;
+			std::vector<DX12DescriptorHandle> m_Descriptors;
 		};
 
 		std::deque<Pending> m_Pendings;
@@ -117,7 +117,7 @@ namespace gglab
 			Desc m_Desc;																											\
 		};																															\
 		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;							\
-		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept;	\
+		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept;	\
 	};
 
 	DEF_VIEW_TRAITS(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);

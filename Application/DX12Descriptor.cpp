@@ -7,17 +7,17 @@
 
 namespace gglab
 {
-	DX12Descriptor::DX12Descriptor(DX12Descriptor&& rhs) noexcept
+	DX12DescriptorHandle::DX12DescriptorHandle(DX12DescriptorHandle&& rhs) noexcept
 	{
 		MoveFrom(rhs);
 	}
 
-	DX12Descriptor& DX12Descriptor::operator=(DX12Descriptor&& rhs) noexcept
+	DX12DescriptorHandle& DX12DescriptorHandle::operator=(DX12DescriptorHandle&& rhs) noexcept
 	{
 		if (this != &rhs)
 		{
 #if defined (BUILD_DEBUG)
-			GGLAB_ASSERT_MSG(!IsValid(), "DX12Descriptor overwritten while still valid (leak). Call Free/Retire first.");
+			GGLAB_ASSERT_MSG(!IsValid(), "DX12DescriptorHandle overwritten while still valid (leak). Call Free/Retire first.");
 #endif
 			Reset();
 			MoveFrom(rhs);
@@ -25,17 +25,17 @@ namespace gglab
 		return *this;
 	}
 
-	DX12Descriptor::~DX12Descriptor()
+	DX12DescriptorHandle::~DX12DescriptorHandle()
 	{
 #if defined (BUILD_DEBUG)
 		if (IsValid())
 		{
-			GGLAB_ASSERT_MSG(false, "DX12Descriptor leaked: must Free()/Retire() before destruction.");
+			GGLAB_ASSERT_MSG(false, "DX12DescriptorHandle leaked: must Free()/Retire() before destruction.");
 		}
 #endif
 	}
 
-	bool DX12Descriptor::IsValid() const noexcept
+	bool DX12DescriptorHandle::IsValid() const noexcept
 	{
 		return 
 			m_CpuHandle.ptr != 0 &&
@@ -44,24 +44,24 @@ namespace gglab
 			m_Owner != nullptr;
 	}
 
-	bool DX12Descriptor::IsShaderVisible() const noexcept
+	bool DX12DescriptorHandle::IsShaderVisible() const noexcept
 	{
 		return m_GpuHandle.ptr != 0;
 	}
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12Descriptor::CpuHandleAt(IndexType index) const noexcept
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHandle::CpuHandleAt(IndexType index) const noexcept
 	{
 		GGLAB_ASSERT_MSG(index < m_Count, "Invalid Cpu Descriptor index.");
 		return { m_CpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize) };
 	}
 
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12Descriptor::GpuHandleAt(IndexType index) const noexcept
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorHandle::GpuHandleAt(IndexType index) const noexcept
 	{
 		GGLAB_ASSERT_MSG(index < m_Count, "Invalid Gpu Descriptor index.");
 		return { m_GpuHandle, static_cast<INT>(index), static_cast<UINT>(m_IncrementSize) };
 	}
 
-	void DX12Descriptor::Free() noexcept
+	void DX12DescriptorHandle::Free() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Owner, "Free(): Descriptor owner is null.");
 		if (!IsValid())
@@ -73,7 +73,7 @@ namespace gglab
 		Reset();
 	}
 
-	void DX12Descriptor::Retire(const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorHandle::Retire(const DX12FencePoint& fencePoint) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Owner, "Retire(): Descriptor owner is null.");
 		if (!IsValid())
@@ -85,7 +85,7 @@ namespace gglab
 		Reset();
 	}
 
-	void DX12Descriptor::Reset() noexcept
+	void DX12DescriptorHandle::Reset() noexcept
 	{
 		m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		m_Index = InvalidIndex;
@@ -96,7 +96,7 @@ namespace gglab
 		m_Owner = nullptr;
 	}
 
-	DX12DescriptorView DX12Descriptor::ToView(IndexType index) const noexcept
+	DX12DescriptorView DX12DescriptorHandle::ToView(IndexType index) const noexcept
 	{
 		DX12DescriptorView descriptorView;
 		descriptorView.m_CpuHandle = CpuHandleAt(index);
@@ -105,7 +105,7 @@ namespace gglab
 		return descriptorView;
 	}
 
-	void DX12Descriptor::MoveFrom(DX12Descriptor& rhs) noexcept
+	void DX12DescriptorHandle::MoveFrom(DX12DescriptorHandle& rhs) noexcept
 	{
 		m_Type = rhs.m_Type;
 		m_Index = rhs.m_Index;

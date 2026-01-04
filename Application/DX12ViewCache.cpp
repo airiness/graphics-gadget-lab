@@ -42,7 +42,7 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	const DX12Descriptor& DX12ViewCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
+	const DX12DescriptorHandle& DX12ViewCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
 	{
 		{
 			std::shared_lock lock(m_Mutex);
@@ -178,7 +178,7 @@ namespace gglab
 	}
 
 	template<ViewType T>
-	const DX12Descriptor& DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
+	const DX12DescriptorHandle& DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
 	{
 		using Traits = ViewTraits<T>;
@@ -197,7 +197,7 @@ namespace gglab
 		}
 
 		// Allocate and create
-		DX12Descriptor descriptor = GetDescriptorAllocator(T)->Allocate(1);
+		DX12DescriptorHandle descriptor = GetDescriptorAllocator(T)->Allocate(1);
 		Traits::Create(m_DX12Device, texture, &built.m_Desc, descriptor);
 		{
 			std::unique_lock lock(m_Mutex);
@@ -219,12 +219,12 @@ namespace gglab
 	}
 
 	template<ViewType T>
-	const DX12Descriptor& DX12ViewCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
+	const DX12DescriptorHandle& DX12ViewCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
 	{
 		using Traits = ViewTraits<T>;
 		auto desc = DescFromKey<T>(key);
 
-		DX12Descriptor descriptor = GetDescriptorAllocator(key.m_Type)->Allocate(1);
+		DX12DescriptorHandle descriptor = GetDescriptorAllocator(key.m_Type)->Allocate(1);
 		Traits::Create(m_DX12Device, texture, &desc, descriptor);
 		{
 			std::unique_lock lock(m_Mutex);
@@ -289,7 +289,7 @@ namespace gglab
 	}
 
 	void ViewTraits<ViewType::RTV>::Create(DX12Device* device,
-		DX12Texture* texture, const Desc* desc, const DX12Descriptor& outDesc) noexcept
+		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& outDesc) noexcept
 	{
 		device->Get()->CreateRenderTargetView(texture->Get(), desc, outDesc.CpuHandle());
 	}
@@ -347,7 +347,7 @@ namespace gglab
 	}
 
 	void ViewTraits<ViewType::DSV>::Create(DX12Device* device,
-		DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept
+		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept
 	{
 		device->Get()->CreateDepthStencilView(texture->Get(), desc, descriptor.CpuHandle());
 	}
@@ -405,7 +405,7 @@ namespace gglab
 	}
 
 	void ViewTraits<ViewType::SRV>::Create(DX12Device* device,
-		DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept
+		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept
 	{
 		device->Get()->CreateShaderResourceView(texture->Get(), desc, descriptor.CpuHandle());
 	}
@@ -452,7 +452,7 @@ namespace gglab
 	}
 
 	void ViewTraits<ViewType::UAV>::Create(DX12Device* device,
-		DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept
+		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept
 	{
 		device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, desc, descriptor.CpuHandle());
 	}
@@ -517,8 +517,8 @@ namespace gglab
 	}
 
 #define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
-	template const DX12Descriptor& DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
-	template const DX12Descriptor& DX12ViewCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
+	template const DX12DescriptorHandle& DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
+	template const DX12DescriptorHandle& DX12ViewCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
 
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);

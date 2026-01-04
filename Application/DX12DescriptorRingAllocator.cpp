@@ -10,7 +10,7 @@ namespace gglab
 	{
 	}
 
-	DX12Descriptor DX12DescriptorRingAllocator::Allocate(uint32_t count) noexcept
+	DX12DescriptorHandle DX12DescriptorRingAllocator::Allocate(uint32_t count) noexcept
 	{
 		std::lock_guard	lock(m_Mutex);
 
@@ -18,13 +18,13 @@ namespace gglab
 		return CreateDescriptor(m_Allocator.Allocate(count));
 	}
 
-	void DX12DescriptorRingAllocator::Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorRingAllocator::Retire(DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept
 	{
 		RetireImpl(descriptor, fencePoint);
 		descriptor.Reset();
 	}
 
-	void DX12DescriptorRingAllocator::RetireDescriptorInternal(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorRingAllocator::RetireDescriptorInternal(const DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept
 	{
 		RetireImpl(descriptor, fencePoint);
 	}
@@ -47,7 +47,7 @@ namespace gglab
 		m_Allocator.FreeCompletedVersion(latestCompletedFenceValue);
 	}
 
-	void DX12DescriptorRingAllocator::RetireImpl(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorRingAllocator::RetireImpl(const DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 		if (!descriptor.IsValid())

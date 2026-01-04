@@ -8,14 +8,14 @@ namespace gglab
 {
 	struct GraphicsKeyInputs
 	{
-		RootSignatureId m_RootSignatureId{};
+		RootSignatureID m_RootSignatureId{};
 		InputLayoutId m_InputLayoutId{};
 
-		ShaderId m_VSId{};
-		ShaderId m_PSId{};
-		ShaderId m_DSId{};
-		ShaderId m_HSId{};
-		ShaderId m_GSId{};
+		ShaderID m_VSId{};
+		ShaderID m_PSId{};
+		ShaderID m_DSId{};
+		ShaderID m_HSId{};
+		ShaderID m_GSId{};
 
 		uint64_t m_VSGen = 0;
 		uint64_t m_PSGen = 0;
@@ -62,8 +62,8 @@ namespace gglab
 
 	struct ComputeKeyInputs
 	{
-		RootSignatureId m_RootSignatureId{};
-		ShaderId m_CSId{};
+		RootSignatureID m_RootSignatureId{};
+		ShaderID m_CSId{};
 		uint64_t m_CSGen = 0;
 		uint64_t m_VariantBits = 0;
 
@@ -107,7 +107,7 @@ namespace gglab
 		bool EraseGraphics(std::string_view passId) noexcept;
 		bool EraseCompute(std::string_view passId) noexcept;
 
-		size_t InvalidateByShader(const std::vector<ShaderId>& shaderIds) noexcept;
+		size_t InvalidateByShader(const std::vector<ShaderID>& shaderIds) noexcept;
 
 	private:
 		struct GraphicsEntry
@@ -125,8 +125,8 @@ namespace gglab
 		};
 
 		ShaderManager* m_ShaderManager = nullptr;
-		std::unordered_map<StringId, GraphicsEntry> m_GraphicsMap;
-		std::unordered_map<StringId, ComputeEntry> m_ComputeMap;
+		std::unordered_map<StringID, GraphicsEntry> m_GraphicsMap;
+		std::unordered_map<StringID, ComputeEntry> m_ComputeMap;
 
 		mutable std::shared_mutex m_Mutex;
 	};

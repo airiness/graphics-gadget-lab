@@ -56,7 +56,7 @@ namespace gglab
 		DevelopGui* GetDevelopGui() const noexcept { return m_DevelopGui.get(); }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
-		RootSignatureId GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
+		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 
 		const DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }
 		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() noexcept { return m_FrameCB.get(); }
@@ -91,7 +91,7 @@ namespace gglab
 		std::unique_ptr<ExternalResourceRegistry> m_ExternalResourceRegistry;
 		std::unique_ptr<DevelopGui> m_DevelopGui;
 
-		RootSignatureId m_CommonRootSignatureId{};
+		RootSignatureID m_CommonRootSignatureId{};
 
 		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_FrameCB;
 
