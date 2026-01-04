@@ -8,7 +8,7 @@ namespace gglab
 {
 	class DX12Device;
 	class TransferManager;
-	class DescriptorManager;
+	class DX12DescriptorManager;
 
 	class AssetManager
 	{
@@ -17,7 +17,7 @@ namespace gglab
 		{
 			DX12Device* m_DX12Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
-			DescriptorManager* m_DescriptorManager = nullptr;
+			DX12DescriptorManager* m_DescriptorManager = nullptr;
 		};
 
 		struct TextureUploadData
@@ -102,7 +102,7 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
-		DescriptorManager* m_DescriptorManager = nullptr;
+		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
 		TextureIdCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
 		MeshIdCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };

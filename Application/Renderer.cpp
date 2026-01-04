@@ -38,13 +38,13 @@ namespace gglab
 
 		m_SwapChain->Initialize(swapChainCreateInfo);
 
-		DescriptorManager::CreateInfo descriptorManagerCreateInfo{};
+		DX12DescriptorManager::CreateInfo descriptorManagerCreateInfo{};
 		descriptorManagerCreateInfo.m_DX12Device = m_Device.get();
 		descriptorManagerCreateInfo.m_CbvSrvUavCount = 65536;
 		descriptorManagerCreateInfo.m_RtvCount = 4096;
 		descriptorManagerCreateInfo.m_DsvCount = 1024;
 		descriptorManagerCreateInfo.m_SamplerCount = 2048;
-		m_DescriptorManager = std::make_unique<DescriptorManager>(descriptorManagerCreateInfo);
+		m_DescriptorManager = std::make_unique<DX12DescriptorManager>(descriptorManagerCreateInfo);
 
 		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), createInfo.m_TransferManagerBufferSize);
 

@@ -6,7 +6,6 @@ namespace gglab
 	class AssetManager;
 	class InputManager;
 	class ShaderManager;
-	class TransferManager;
 	class DemoManager;
 	class RenderViewBuilder;
 	class RenderSceneBuilder;

@@ -6,7 +6,7 @@ namespace gglab
 	class DX12Device;
 	class DX12DescriptorHeap;
 	class DX12DescriptorFreeListAllocator;
-	class DescriptorManager
+	class DX12DescriptorManager
 	{
 	public:
 		struct CreateInfo
@@ -20,8 +20,8 @@ namespace gglab
 		};
 
 	public:
-		explicit DescriptorManager(const CreateInfo& createInfo) noexcept;
-		~DescriptorManager() = default;
+		explicit DX12DescriptorManager(const CreateInfo& createInfo) noexcept;
+		~DX12DescriptorManager() = default;
 
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;

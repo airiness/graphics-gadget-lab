@@ -4,7 +4,7 @@
 #include "DX12Descriptor.h"
 #include "DX12RingBuffer.h"
 #include "DX12DescriptorFreeListAllocator.h"
-#include "DescriptorManager.h"
+#include "DX12DescriptorManager.h"
 #include "MathUtils.h"
 
 namespace gglab
@@ -16,7 +16,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			DX12Device* m_DX12Device = nullptr;
-			DescriptorManager* m_DescriptorManager = nullptr;
+			DX12DescriptorManager* m_DescriptorManager = nullptr;
 			uint32_t m_ElementsCapacity = 4096;
 		};
 

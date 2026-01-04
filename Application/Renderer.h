@@ -6,7 +6,7 @@
 #include "DX12PSOCache.h"
 #include "DX12RootSignatureCache.h"
 #include "DX12SwapChain.h"
-#include "DescriptorManager.h"
+#include "DX12DescriptorManager.h"
 #include "RenderPassRecipeRegistry.h"
 #include "ExternalResourceRegistry.h"
 #include "TransferManager.h"
@@ -46,7 +46,7 @@ namespace gglab
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
 		DX12SwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
-		DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager.get(); }
+		DX12DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager.get(); }
 		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
@@ -81,7 +81,7 @@ namespace gglab
 	private:
 		std::unique_ptr<DX12Device> m_Device;
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
-		std::unique_ptr<DescriptorManager> m_DescriptorManager;
+		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
 		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;

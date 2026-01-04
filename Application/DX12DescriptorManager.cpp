@@ -1,11 +1,11 @@
 #include "Precompiled.h"
-#include "DescriptorManager.h"
+#include "DX12DescriptorManager.h"
 #include "DX12Descriptor.h"
 #include "DX12DescriptorFreeListAllocator.h"
 
 namespace gglab
 {
-	DescriptorManager::DescriptorManager(const CreateInfo& createInfo) noexcept
+	DX12DescriptorManager::DX12DescriptorManager(const CreateInfo& createInfo) noexcept
 	{
 		GGLAB_ASSERT(createInfo.m_DX12Device);
 
@@ -14,7 +14,7 @@ namespace gglab
 
 		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		heapCreateInfo.m_DescriptorCount = 1024;
+		heapCreateInfo.m_DescriptorCount = createInfo.m_CbvSrvUavCount;
 		m_CbvSrvUavHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 		DX12DescriptorAllocatorBase::CreateInfo descriptorCreateInfo{};
@@ -24,7 +24,7 @@ namespace gglab
 
 		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		heapCreateInfo.m_DescriptorCount = 32;
+		heapCreateInfo.m_DescriptorCount = createInfo.m_RtvCount;
 		m_RtvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 		descriptorCreateInfo.m_DescriptorHeap = m_RtvHeap.get();
@@ -33,7 +33,7 @@ namespace gglab
 
 		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		heapCreateInfo.m_DescriptorCount = 16;
+		heapCreateInfo.m_DescriptorCount = createInfo.m_DsvCount;
 		m_DsvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 		descriptorCreateInfo.m_DescriptorHeap = m_DsvHeap.get();
@@ -42,7 +42,7 @@ namespace gglab
 
 		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
 		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		heapCreateInfo.m_DescriptorCount = 256;
+		heapCreateInfo.m_DescriptorCount = createInfo.m_SamplerCount;
 		m_SamplerHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 		descriptorCreateInfo.m_DescriptorHeap = m_SamplerHeap.get();
@@ -50,11 +50,15 @@ namespace gglab
 			std::make_unique<DX12DescriptorFreeListAllocator>(descriptorCreateInfo);
 	}
 
-	void DescriptorManager::Tick() noexcept
+	void DX12DescriptorManager::Tick() noexcept
 	{
 	}
 
-	void DescriptorManager::EndFrame(const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorManager::EndFrame(const DX12FencePoint& fencePoint) noexcept
 	{
+		m_CbvSrvUavDescriptorAllocator->EndFrame(fencePoint);
+		m_RtvDescriptorAllocator->EndFrame(fencePoint);
+		m_DsvDescriptorAllocator->EndFrame(fencePoint);
+		m_SamplerDescriptorAllocator->EndFrame(fencePoint);
 	}
 }

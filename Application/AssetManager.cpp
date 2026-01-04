@@ -23,7 +23,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "DX12Device is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
-		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DescriptorManager is null!");
+		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DX12DescriptorManager is null!");
 	}
 
 	AssetManager::~AssetManager()
