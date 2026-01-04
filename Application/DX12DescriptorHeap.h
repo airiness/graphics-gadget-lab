@@ -26,8 +26,10 @@ namespace gglab
 		D3D12_DESCRIPTOR_HEAP_TYPE Type() const noexcept { return m_Type; }
 		D3D12_DESCRIPTOR_HEAP_FLAGS Flags() const noexcept { return m_Flags; }
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuStart() const noexcept;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuStart() const noexcept;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleStart() const noexcept;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleStart() const noexcept;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleAt(uint32_t index) const noexcept;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleAt(uint32_t index) const noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -37,5 +39,4 @@ namespace gglab
 		uint32_t m_IncrementSize = 0;
 		ComPtr<ID3D12DescriptorHeap> m_D3D12DescriptorHeap;
 	};
-
 }

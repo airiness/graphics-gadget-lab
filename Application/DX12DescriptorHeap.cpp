@@ -23,15 +23,30 @@ namespace gglab
 
 	DX12DescriptorHeap::~DX12DescriptorHeap() = default;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::CpuStart() const noexcept
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::CpuHandleStart() const noexcept
 	{
-		return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_D3D12DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+		return CpuHandleAt(0);
 	}
 
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::GpuStart() const noexcept
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::GpuHandleStart() const noexcept
 	{
-		return (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) ?
-			CD3DX12_GPU_DESCRIPTOR_HANDLE(m_D3D12DescriptorHeap->GetGPUDescriptorHandleForHeapStart()) :
-			CD3DX12_GPU_DESCRIPTOR_HANDLE();
+		return GpuHandleAt(0);
+	}
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::CpuHandleAt(uint32_t index) const noexcept
+	{
+		GGLAB_ASSERT_MSG(index < m_DescriptorCount, "Invalid Descriptor index.");
+		return { m_D3D12DescriptorHeap->GetCPUDescriptorHandleForHeapStart(), static_cast<INT>(index), static_cast<UINT>(m_IncrementSize) };
+	}
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorHeap::GpuHandleAt(uint32_t index) const noexcept
+	{
+		GGLAB_ASSERT_MSG(index < m_DescriptorCount, "Invalid Descriptor index.");
+		if (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+		{
+			return { m_D3D12DescriptorHeap->GetGPUDescriptorHandleForHeapStart(), static_cast<INT>(index), static_cast<UINT>(m_IncrementSize) };
+		}
+
+		return CD3DX12_GPU_DESCRIPTOR_HANDLE();
 	}
 }

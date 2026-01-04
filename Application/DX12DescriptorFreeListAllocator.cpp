@@ -88,8 +88,8 @@ namespace gglab
 
 		auto* heap = GetHeap();
 		const auto incrementSize = heap->DescriptorIncrementSize();
-		const auto cpuStart = heap->CpuStart();
-		const auto gpuStart = heap->GpuStart();
+		const auto cpuStart = heap->CpuHandleStart();
+		const auto gpuStart = heap->GpuHandleStart();
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle{};
 		cpuHandle.InitOffsetted(cpuStart, span.m_Index, incrementSize);
@@ -105,7 +105,7 @@ namespace gglab
 		const auto computeIndex = [this](CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle)
 			{
 				auto* heap = GetHeap();
-				const auto cpuStart = heap->CpuStart().ptr;
+				const auto cpuStart = heap->CpuHandleStart().ptr;
 				const auto incrementSize = heap->DescriptorIncrementSize();
 
 				GGLAB_ASSERT_MSG(cpuHandle.ptr >= cpuStart, "CPU handle not from this heap.");

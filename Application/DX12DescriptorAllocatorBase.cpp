@@ -23,19 +23,8 @@ namespace gglab
 		const auto incrementSize = m_DescriptorHeap->DescriptorIncrementSize();
 
 		DX12DescriptorHandle descriptor = {};
-		descriptor.m_Type = m_DescriptorHeap->Type();
 		descriptor.m_Index = index;
 		descriptor.m_Count = count;
-		descriptor.m_IncrementSize = incrementSize;
-		descriptor.m_CpuHandle.InitOffsetted(m_DescriptorHeap->CpuStart(), index, incrementSize);
-		if (m_DescriptorHeap->Flags() & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
-		{
-			descriptor.m_GpuHandle.InitOffsetted(m_DescriptorHeap->GpuStart(), index, incrementSize);
-		}
-		else
-		{
-			descriptor.m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE();
-		}
 		descriptor.m_Owner = this;
 		return descriptor;
 	}
