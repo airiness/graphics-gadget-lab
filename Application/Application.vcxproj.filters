@@ -68,6 +68,9 @@
     <Filter Include="Graphics\DevelopGui">
       <UniqueIdentifier>{829376d1-6b70-4ce7-9785-ae216f890dbf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\DX12\Descriptor">
+      <UniqueIdentifier>{bbedd216-a444-41bc-8acd-a22ddeebbd53}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderer.cpp">
@@ -93,9 +96,6 @@
     </ClCompile>
     <ClCompile Include="Application.cpp">
       <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="DX12Descriptor.cpp">
-      <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12PipelineState.cpp">
       <Filter>Graphics\DX12</Filter>
@@ -175,20 +175,11 @@
     <ClCompile Include="RGGpuResourceAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="DX12DescriptorFreeListAllocator.cpp">
-      <Filter>Graphics\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="DX12DescriptorRingAllocator.cpp">
-      <Filter>Graphics\DX12</Filter>
-    </ClCompile>
     <ClCompile Include="FreeListSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
     </ClCompile>
     <ClCompile Include="RingSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
-    </ClCompile>
-    <ClCompile Include="DX12DescriptorAllocatorBase.cpp">
-      <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="DX12ViewCache.cpp">
       <Filter>Graphics\DX12\Cache</Filter>
@@ -304,8 +295,23 @@
     <ClCompile Include="RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="DX12DescriptorFreeListAllocator.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12DescriptorAllocatorBase.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12Descriptor.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12DescriptorRingAllocator.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
     <ClCompile Include="DX12DescriptorManager.cpp">
-      <Filter>Graphics\DX12</Filter>
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="DX12DescriptorHeap.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -326,9 +332,6 @@
     </ClInclude>
     <ClInclude Include="Application.h">
       <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="DX12Descriptor.h">
-      <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="DX12PipelineState.h">
       <Filter>Graphics\DX12</Filter>
@@ -447,12 +450,6 @@
     <ClInclude Include="FNV1a.h">
       <Filter>Core\Hash</Filter>
     </ClInclude>
-    <ClInclude Include="DX12DescriptorRingAllocator.h">
-      <Filter>Graphics\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="DX12DescriptorFreeListAllocator.h">
-      <Filter>Graphics\DX12</Filter>
-    </ClInclude>
     <ClInclude Include="FreeListSpanAllocator.h">
       <Filter>Core\Allocator</Filter>
     </ClInclude>
@@ -461,9 +458,6 @@
     </ClInclude>
     <ClInclude Include="AllocatorBase.h">
       <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="DX12DescriptorAllocatorBase.h">
-      <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="TypedIndex.h">
       <Filter>Core</Filter>
@@ -594,8 +588,23 @@
     <ClInclude Include="RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="DX12DescriptorHeap.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12DescriptorFreeListAllocator.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12DescriptorAllocatorBase.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12Descriptor.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="DX12DescriptorRingAllocator.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
     <ClInclude Include="DX12DescriptorManager.h">
-      <Filter>Graphics\DX12</Filter>
+      <Filter>Graphics\DX12\Descriptor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

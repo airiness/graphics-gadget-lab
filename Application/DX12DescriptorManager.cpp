@@ -1,6 +1,7 @@
 #include "Precompiled.h"
 #include "DX12DescriptorManager.h"
 #include "DX12Descriptor.h"
+#include "DX12DescriptorHeap.h"
 #include "DX12DescriptorFreeListAllocator.h"
 
 namespace gglab
@@ -49,6 +50,8 @@ namespace gglab
 		m_SamplerDescriptorAllocator =
 			std::make_unique<DX12DescriptorFreeListAllocator>(descriptorCreateInfo);
 	}
+
+	DX12DescriptorManager::~DX12DescriptorManager() = default;
 
 	void DX12DescriptorManager::Tick() noexcept
 	{

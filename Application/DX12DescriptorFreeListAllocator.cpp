@@ -1,6 +1,7 @@
 #include "Precompiled.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "DX12Descriptor.h"
+#include "DX12DescriptorHeap.h"
 
 namespace gglab
 {

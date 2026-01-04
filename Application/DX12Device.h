@@ -9,7 +9,6 @@ namespace gglab
 {
 	class DX12CommandQueue;
 	class DX12CommandList;
-	class DX12DescriptorHeap;
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;

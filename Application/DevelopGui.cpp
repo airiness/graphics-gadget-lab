@@ -4,6 +4,7 @@
 #include "DX12SwapChain.h"
 #include "DX12DescriptorManager.h"
 #include "DX12Descriptor.h"
+#include "DX12DescriptorHeap.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"

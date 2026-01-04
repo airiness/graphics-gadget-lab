@@ -6,6 +6,7 @@
 namespace gglab
 {
 	class DX12Device;
+	class DX12DescriptorHeap;
 	class DX12DescriptorAllocatorBase
 	{
 	public:
@@ -31,8 +32,6 @@ namespace gglab
 		virtual void RetireDescriptorInternal(const DX12DescriptorHandle&, const DX12FencePoint&) noexcept;
 
 	protected:
-		//std::unique_ptr<DX12DescriptorHeap> m_Heap;
-
 		DX12DescriptorHeap* m_DescriptorHeap;
 
 		friend class DX12DescriptorHandle;

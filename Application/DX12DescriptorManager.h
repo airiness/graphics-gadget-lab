@@ -21,7 +21,8 @@ namespace gglab
 
 	public:
 		explicit DX12DescriptorManager(const CreateInfo& createInfo) noexcept;
-		~DX12DescriptorManager() = default;
+		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorManager);
+		~DX12DescriptorManager();
 
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;

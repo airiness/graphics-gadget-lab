@@ -5,6 +5,7 @@
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
 #include "DX12Descriptor.h"
+#include "DX12DescriptorHeap.h"
 #include "DX12CommandAllocator.h"
 #include "HResult.h"
 
