@@ -6,6 +6,25 @@ namespace gglab
 	class DX12Device;
 	class DX12DescriptorAllocatorBase;
 
+	struct DX12DescriptorRange
+	{
+		uint32_t m_Begin = 0;
+		uint32_t m_Count = 0;
+
+		bool IsValid() const noexcept { return m_Count > 0; }
+		uint32_t End() const noexcept { return m_Begin + m_Count; }
+	};
+
+	struct DX12DescriptorSpan
+	{
+		static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
+		uint32_t m_Index = InvalidIndex;
+		uint32_t m_Count = 0;
+
+		bool IsValid() const noexcept { return m_Index != InvalidIndex && m_Count > 0; }
+		uint32_t End() const noexcept { return m_Index + m_Count; }
+	};
+
 	struct DX12DescriptorView
 	{
 		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle = {};

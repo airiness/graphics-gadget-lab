@@ -1,7 +1,7 @@
 #pragma once
 #include "DX12Device.h"
 #include "DX12Buffer.h"
-#include "DX12Descriptor.h"
+#include "DX12DescriptorTypes.h"
 #include "DX12RingBuffer.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "DX12DescriptorManager.h"

@@ -3,7 +3,6 @@
 #include "DX12CommandQueue.h"
 #include "DX12CommandList.h"
 #include "DX12CommandAllocator.h"
-#include "DX12Descriptor.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 

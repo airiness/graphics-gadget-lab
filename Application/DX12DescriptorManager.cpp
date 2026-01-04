@@ -1,6 +1,6 @@
 #include "Precompiled.h"
 #include "DX12DescriptorManager.h"
-#include "DX12Descriptor.h"
+#include "DX12DescriptorTypes.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12DescriptorFreeListAllocator.h"
 

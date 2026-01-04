@@ -1,5 +1,5 @@
 #include "Precompiled.h"
-#include "DX12Descriptor.h"
+#include "DX12DescriptorTypes.h"
 #include "DX12DescriptorAllocatorBase.h"
 #include "DX12Device.h"
 #include "HResult.h"

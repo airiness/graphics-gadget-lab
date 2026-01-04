@@ -1,5 +1,5 @@
 #pragma once
-#include "DX12Descriptor.h"
+#include "DX12DescriptorTypes.h"
 
 namespace gglab
 {

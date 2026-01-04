@@ -301,7 +301,7 @@
     <ClCompile Include="DX12DescriptorAllocatorBase.cpp">
       <Filter>Graphics\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="DX12Descriptor.cpp">
+    <ClCompile Include="DX12DescriptorTypes.cpp">
       <Filter>Graphics\DX12\Descriptor</Filter>
     </ClCompile>
     <ClCompile Include="DX12DescriptorRingAllocator.cpp">
@@ -597,7 +597,7 @@
     <ClInclude Include="DX12DescriptorAllocatorBase.h">
       <Filter>Graphics\DX12\Descriptor</Filter>
     </ClInclude>
-    <ClInclude Include="DX12Descriptor.h">
+    <ClInclude Include="DX12DescriptorTypes.h">
       <Filter>Graphics\DX12\Descriptor</Filter>
     </ClInclude>
     <ClInclude Include="DX12DescriptorRingAllocator.h">

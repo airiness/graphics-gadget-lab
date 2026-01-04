@@ -6,7 +6,7 @@
 #include "TypedIndex.h"
 #include "EnumFlags.h"
 #include "DX12Buffer.h"
-#include "DX12Descriptor.h"
+#include "DX12DescriptorTypes.h"
 
 namespace gglab
 {
@@ -16,9 +16,9 @@ namespace gglab
 	enum class CommonRSRootParamIndex : uint32_t
 	{
 		FrameCB = 0,	// b0
-		ObjectCB,	// g_ObjectIndex, b1
-		ObjectSB,	// g_Objects, t1
-		MaterialSB,	// g_Materials, t2
+		ObjectCB,		// g_ObjectIndex, b1
+		ObjectSB,		// g_Objects, t1
+		MaterialSB,		// g_Materials, t2
 		TextureDescriptorTable,	// g_BaseColorTex, t0
 		RootParamCount
 	};
