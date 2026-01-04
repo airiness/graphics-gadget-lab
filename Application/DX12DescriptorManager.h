@@ -26,10 +26,17 @@ namespace gglab
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 
-		DX12DescriptorFreeListAllocator* GetCbvSrvUavDescriptorAllocator() noexcept { return m_CbvSrvUavDescriptorAllocator.get(); }
-		DX12DescriptorFreeListAllocator* GetRtvDescriptorAllocator() noexcept { return m_RtvDescriptorAllocator.get(); };
-		DX12DescriptorFreeListAllocator* GetDsvDescriptorAllocator() noexcept { return m_DsvDescriptorAllocator.get(); };
-		DX12DescriptorFreeListAllocator* GetSamplerDescriptorAllocator() noexcept { return m_SamplerDescriptorAllocator.get(); };
+		DX12DescriptorFreeListAllocator& GetCbvSrvUavDescriptorAllocator() noexcept { return *m_CbvSrvUavDescriptorAllocator; }
+		const DX12DescriptorFreeListAllocator& GetCbvSrvUavDescriptorAllocator() const noexcept { return *m_CbvSrvUavDescriptorAllocator; }
+		
+		DX12DescriptorFreeListAllocator& GetRtvDescriptorAllocator() noexcept { return *m_RtvDescriptorAllocator; };
+		const DX12DescriptorFreeListAllocator& GetRtvDescriptorAllocator() const noexcept { return *m_RtvDescriptorAllocator; };
+		
+		DX12DescriptorFreeListAllocator& GetDsvDescriptorAllocator() noexcept { return *m_DsvDescriptorAllocator; };
+		const DX12DescriptorFreeListAllocator& GetDsvDescriptorAllocator() const noexcept { return *m_DsvDescriptorAllocator; };
+		
+		DX12DescriptorFreeListAllocator& GetSamplerDescriptorAllocator() noexcept { return *m_SamplerDescriptorAllocator; };
+		const DX12DescriptorFreeListAllocator& GetSamplerDescriptorAllocator() const noexcept { return *m_SamplerDescriptorAllocator; };
 
 	private:
 		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavHeap;

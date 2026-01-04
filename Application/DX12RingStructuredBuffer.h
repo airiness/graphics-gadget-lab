@@ -54,7 +54,7 @@ namespace gglab
 			m_RingBuffer = std::make_unique<DX12RingBuffer>();
 			m_RingBuffer->Create(resourceCreateInfo, totalSizeInBytes);
 
-			m_SrvDescriptor = createInfo.m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()->Allocate();
+			m_SrvDescriptor = createInfo.m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().Allocate();
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;

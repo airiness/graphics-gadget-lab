@@ -52,9 +52,9 @@ namespace gglab
 
 		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
 		{
-			m_DescriptorManager->GetRtvDescriptorAllocator(),
-			m_DescriptorManager->GetDsvDescriptorAllocator(),
-			m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()
+			&m_DescriptorManager->GetRtvDescriptorAllocator(),
+			&m_DescriptorManager->GetDsvDescriptorAllocator(),
+			&m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()
 		};
 		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());

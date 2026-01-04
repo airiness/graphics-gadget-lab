@@ -96,7 +96,7 @@ namespace gglab
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 
-				commandList->SetDescriptorHeap(*descriptorManager->GetCbvSrvUavDescriptorAllocator()->GetHeap());
+				commandList->SetDescriptorHeap(*descriptorManager->GetCbvSrvUavDescriptorAllocator().GetHeap());
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
 

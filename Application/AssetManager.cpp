@@ -281,8 +281,8 @@ namespace gglab
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor& create srv
-		auto* srvDescriptorAllocator = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator();
-		texture->m_Descriptor = std::move(srvDescriptorAllocator->Allocate());
+		auto& srvDescriptorAllocator = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator();
+		texture->m_Descriptor = std::move(srvDescriptorAllocator.Allocate());
 
 		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
