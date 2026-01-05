@@ -67,7 +67,6 @@ namespace gglab
 		void Retire(const DX12FencePoint& fencePoint) noexcept;
 		void Reset() noexcept;
 
-
 	private:
 		void MoveFrom(DX12DescriptorHandle& rhs) noexcept;
 
