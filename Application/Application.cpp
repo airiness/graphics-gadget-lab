@@ -275,13 +275,12 @@ namespace gglab
 		m_InputManager->Update();
 
 		// Toggle Mouse Input Mode
-		auto keyboard = GetKeyboard();
-		if (keyboard)
+		if (const auto keyboard = GetKeyboard())
 		{
 			if (keyboard->IsKeyPressed(KeyCode::T))
 			{
 
-				if (auto mouse = GetMouse())
+				if (const auto mouse = GetMouse())
 				{
 					mouse->SetMouseMode(
 						(mouse->GetMouseMode() == Mouse::MouseMode::Absolute) ?
@@ -311,17 +310,17 @@ namespace gglab
 		demo->Update();
 
 		// Build render view
-		auto& camera = demo->GetCamera();
-		RenderViewBuilder::BuildInfo viewBuildInfo{
+		const auto& camera = demo->GetCamera();
+		const RenderViewBuilder::BuildInfo viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight
 		};
 		RenderView renderView = m_RenderViewBuilder->Build(viewBuildInfo);
 
-		// BDuild render scene
-		auto& world = demo->GetWorld();
-		RenderSceneBuilder::BuildInfo sceneBuildInfo{
+		// Build render scene
+		const auto& world = demo->GetWorld();
+		const RenderSceneBuilder::BuildInfo sceneBuildInfo{
 			.m_World = world,
 			.m_RenderView = renderView,
 			.m_AssetManager = *m_AssetManager,
@@ -329,19 +328,19 @@ namespace gglab
 			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer()
 		};
-		auto renderSceneBuildResult = m_RenderSceneBuilder->Build(sceneBuildInfo);
+		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
 
 		// Update frame constant buffer
-		m_Renderer->UpdateFrameConstants(renderView, renderSceneBuildResult.m_RenderScene);
+		m_Renderer->UpdateFrameConstants(renderView, renderScene);
 
-		RenderFrameContext renderContext{
+		const RenderFrameContext renderContext{
 			.m_RenderView = &renderView,
-			.m_RenderScene = &renderSceneBuildResult.m_RenderScene,
+			.m_RenderScene = &renderScene,
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
-			.m_UploadFencePoint = renderSceneBuildResult.m_UploadFencePoint
+			.m_UploadFencePoint = uploadFencePoint
 		};
 
-		RenderServices services{
+		const RenderServices services{
 			.m_Renderer = m_Renderer.get(),
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get()
