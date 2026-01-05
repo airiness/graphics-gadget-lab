@@ -109,13 +109,11 @@ namespace gglab
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
 			return 0;
 		}
-		break;
 		case WM_DESTROY:
 		{
 			PostQuitMessage(0);
 			return 0;
 		}
-		break;
 		case WM_PAINT:
 		{
 			PAINTSTRUCT ps{};
@@ -123,7 +121,6 @@ namespace gglab
 			EndPaint(hWnd, &ps);
 			return 0;
 		}
-		break;
 		case WM_ACTIVATEAPP:
 		{
 			if (!app)
@@ -140,7 +137,6 @@ namespace gglab
 			}
 			return 0;
 		}
-		break;
 		case WM_ENTERSIZEMOVE:
 		{
 			if (!app)
@@ -152,7 +148,6 @@ namespace gglab
 			app->OnSuspend();
 			return 0;
 		}
-		break;
 		case WM_EXITSIZEMOVE:
 		{
 			if (!app)
@@ -171,7 +166,6 @@ namespace gglab
 
 			return 0;
 		}
-		break;
 		case WM_SIZE:
 		{
 			if (!app)
@@ -203,7 +197,6 @@ namespace gglab
 			}
 			return 0;
 		}
-		break;
 		default:
 		{
 		}
