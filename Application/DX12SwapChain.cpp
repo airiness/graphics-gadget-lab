@@ -170,7 +170,7 @@ namespace gglab
 			nullptr,
 			&swapChain1));
 
-		// Invalid Alet+Enter Fullscreen
+		// Invalid Alt+Enter Fullscreen
 		GGLAB_HR(factory->MakeWindowAssociation(m_Hwnd,
 			DXGI_MWA_NO_ALT_ENTER |
 			DXGI_MWA_NO_WINDOW_CHANGES));	// TODO: support window changes

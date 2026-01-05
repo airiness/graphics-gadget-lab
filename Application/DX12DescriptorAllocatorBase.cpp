@@ -20,7 +20,6 @@ namespace gglab
 
 		const auto index = indexSpan.m_Index;
 		const auto count = indexSpan.m_Count;
-		const auto incrementSize = m_DescriptorHeap->DescriptorIncrementSize();
 
 		DX12DescriptorHandle descriptor = {};
 		descriptor.m_Index = index;

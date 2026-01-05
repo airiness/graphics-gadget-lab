@@ -2,8 +2,6 @@
 #include "DX12DescriptorTypes.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12DescriptorAllocatorBase.h"
-#include "DX12Device.h"
-#include "HResult.h"
 
 namespace gglab
 {
@@ -54,10 +52,11 @@ namespace gglab
 
 	DX12DescriptorView DX12DescriptorHandle::ToView(uint32_t localIndex) const noexcept
 	{
-		DX12DescriptorView descriptorView{};
-		descriptorView.m_CpuHandle = CpuHandle(localIndex);
-		descriptorView.m_GpuHandle = GpuHandle(localIndex);
-
+		DX12DescriptorView descriptorView
+		{
+			.m_CpuHandle = CpuHandle(localIndex),
+			.m_GpuHandle = GpuHandle(localIndex)
+		};
 		return descriptorView;
 	}
 
