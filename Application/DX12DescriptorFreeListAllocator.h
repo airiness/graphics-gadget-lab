@@ -23,19 +23,22 @@ namespace gglab
 		DX12DescriptorID AllocateID() noexcept;
 		void RetireID(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 
+		void DeferFreeFromCpuHandleInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, uint32_t count = 1) noexcept;
+		void DeferFreeFromGpuHandleInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle, uint32_t count = 1) noexcept;
+
 		void Tick() noexcept override;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept override;
 		
 	protected:
-		void FreeHandleInternal(DX12DescriptorHandle& descriptor) noexcept override;
-		void RetireHandleInternal(const DX12DescriptorHandle& descriptor,
+		void FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept override;
+		void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
 			const DX12FencePoint& fencePoint) noexcept override;
 
 	private:
 		void FreeCompleted() noexcept;
-		void RetireImpl(const DX12DescriptorHandle& descriptor,
-			const DX12FencePoint& fencePoint) noexcept;
+		void FreeLocalSpanImmediately(const DX12DescriptorSpan& localSpan) noexcept;
 
+	private:
 		static DX12DescriptorSpan ToSpan(const AllocatorBase::IndexSpan& indexSpan) noexcept;
 
 	private:

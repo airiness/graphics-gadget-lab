@@ -63,6 +63,7 @@ using namespace Microsoft::WRL;
 #include <bit>
 #include <concepts>
 #include <fstream>
+#include <utility>
 
 // Project definitions
 #include "CoreMacros.h"

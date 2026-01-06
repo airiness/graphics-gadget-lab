@@ -19,6 +19,17 @@ namespace gglab
 			uint32_t m_SamplerCount = 2048;
 		};
 
+		enum class FreeListAllocatorType : uint8_t
+		{
+			GeneralCbvSrvUav,
+			GeneralRtv,
+			GeneralDsv,
+			DevelopGui,
+			BindlessTexture,
+
+			Count
+		};
+
 	public:
 		explicit DX12DescriptorManager(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorManager);

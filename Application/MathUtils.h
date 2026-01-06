@@ -1,10 +1,8 @@
 #pragma once
+#include "TypeUtils.h"
 
 namespace gglab::utils
 {
-	template<typename T>
-	concept UnsignedInt = std::is_unsigned_v<T> && std::is_integral_v<T>;
-
 	Vector4 ToVector4(const Vector3& vec3, float a) noexcept;
 	constexpr float ToRadians(float degrees) noexcept
 	{
