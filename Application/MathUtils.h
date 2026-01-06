@@ -2,6 +2,9 @@
 
 namespace gglab::utils
 {
+	template<typename T>
+	concept UnsignedInt = std::is_unsigned_v<T> && std::is_integral_v<T>;
+
 	Vector4 ToVector4(const Vector3& vec3, float a) noexcept;
 	constexpr float ToRadians(float degrees) noexcept
 	{
@@ -13,10 +16,7 @@ namespace gglab::utils
 		return DirectX::XMConvertToDegrees(radians);
 	}
 
-	template<typename T>
-	concept UnsignedInteger = std::is_unsigned_v<T> && std::is_integral_v<T>;
-
-	template<UnsignedInteger T>
+	template<UnsignedInt T>
 	constexpr T AlignUp(T value, T multiple) noexcept
 	{
 		if (multiple == 0)
@@ -27,7 +27,7 @@ namespace gglab::utils
 		return result ? (value + multiple - result) : value;
 	}
 
-	template<UnsignedInteger T>
+	template<UnsignedInt T>
 	constexpr T AlignDown(T value, T multiple) noexcept
 	{
 		if (multiple == 0)
@@ -37,13 +37,13 @@ namespace gglab::utils
 		return value - (value % multiple);
 	}
 
-	template<UnsignedInteger T>
+	template<UnsignedInt T>
 	constexpr bool IsPow2(T value) noexcept
 	{
 		return (value != 0) && ((value & (value - 1)) == 0);
 	}
 
-	template<UnsignedInteger T>
+	template<UnsignedInt T>
 	constexpr T AlignUpPow2(T value, T alignment) noexcept
 	{
 		GGLAB_ASSERT_MSG(IsPow2(alignment), "Alignment must be a power of two.");

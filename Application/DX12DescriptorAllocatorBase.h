@@ -24,10 +24,10 @@ namespace gglab
 		virtual void EndFrame(const DX12FencePoint& fencePoint) noexcept {}
 
 		DX12DescriptorHeap* GetHeap() const noexcept { return m_DescriptorHeap; }
-		const DX12DescriptorRange& GetRange() const noexcept { return m_Range; }
+		const DX12DescriptorRange& Range() const noexcept { return m_Range; }
 
 		D3D12_DESCRIPTOR_HEAP_TYPE HeapType() const noexcept { return m_Type; }
-		bool IsShaderVisibleHeap() const noexcept { return (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) != 0; }
+		bool IsShaderVisible() const noexcept { return (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) != 0; }
 		uint32_t IncrementSize() const noexcept { return m_IncrementSize; }
 
 		uint32_t ToLocalIndex(uint32_t globalIndex) const noexcept;
@@ -42,33 +42,24 @@ namespace gglab
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleAtGlobalIndex(uint32_t globalIndex) const noexcept;
 		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleAtGlobalIndex(uint32_t globalIndex) const noexcept;
 
-		virtual DX12DescriptorHandle AllocateHandle(uint32_t count) noexcept;
-		virtual DX12DescriptorID AllocateID() noexcept;
-		virtual DX12DescriptorView AllocateView() noexcept;
-		virtual DX12DescriptorSpan AllocateSpan(uint32_t count) noexcept;
-
-		virtual void FreeHandle(DX12DescriptorHandle& descriptorHandle) noexcept;
-		virtual void RetireHandle(DX12DescriptorHandle& descriptorHandle, const DX12FencePoint& fencePoint) noexcept;
-
-		virtual void FreeID(const DX12DescriptorID& descriptorId) noexcept;
-		virtual void FreeView(const DX12DescriptorView& descriptorView) noexcept;
-		virtual void FreeSpan(const DX12DescriptorSpan& descriptorSpan) noexcept;
-
 	protected:
+		DX12DescriptorHandle CreateHandleFromGlobalSpan(const DX12DescriptorSpan& globalSpan, uint32_t generation) noexcept;
 
+		virtual void FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept = 0;
+		virtual void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle, const DX12FencePoint& fencePoint) noexcept = 0;
 
 	protected:
 		DX12DescriptorHeap* m_DescriptorHeap;
 		DX12DescriptorRange m_Range{};
 
-		// Descriptor heap info cache
 		D3D12_DESCRIPTOR_HEAP_TYPE m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		D3D12_DESCRIPTOR_HEAP_FLAGS m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle{};
-		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle{};
+		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuStart{};
+		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuStart{};
 
 		uint32_t m_IncrementSize = 0;
 
+		friend class DX12DescriptorHandle;
 	};
 }

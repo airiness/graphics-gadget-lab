@@ -64,7 +64,7 @@ namespace gglab
 			srvDesc.Buffer.StructureByteStride = stride;
 			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-			createInfo.m_DX12Device->Get()->CreateShaderResourceView(m_RingBuffer->GetResource(), &srvDesc, m_SrvDescriptor.CpuHandle());
+			createInfo.m_DX12Device->Get()->CreateShaderResourceView(m_RingBuffer->GetResource(), &srvDesc, m_SrvDescriptor.CpuHandleAt());
 
 		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingStructuredBuffer);

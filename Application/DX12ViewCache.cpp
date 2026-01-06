@@ -17,7 +17,7 @@ namespace gglab
 		GarbageCollect();
 
 		// Release all pending descriptors
-		for (auto& pending : m_Pendings)
+		for (auto& pending : m_Pending)
 		{
 			for (auto& descriptor : pending.m_Descriptors)
 			{
@@ -27,7 +27,7 @@ namespace gglab
 				}
 			}
 		}
-		m_Pendings.clear();
+		m_Pending.clear();
 
 		// Release descriptor still in cache
 		for (auto& [key, descriptor] : m_Cache)
@@ -91,16 +91,16 @@ namespace gglab
 
 		if (!pending.m_Descriptors.empty())
 		{
-			m_Pendings.emplace_back(std::move(pending));
+			m_Pending.emplace_back(std::move(pending));
 		}
 	}
 
 	void DX12ViewCache::GarbageCollect() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
-		while (!m_Pendings.empty())
+		while (!m_Pending.empty())
 		{
-			auto& pending = m_Pendings.front();
+			auto& pending = m_Pending.front();
 			if (!pending.m_FencePoint.IsCompleted())
 			{
 				break;
@@ -114,7 +114,7 @@ namespace gglab
 				}
 			}
 
-			m_Pendings.pop_front();
+			m_Pending.pop_front();
 		}
 	}
 
@@ -138,10 +138,10 @@ namespace gglab
 			m_ResourceViews.erase(it);
 		}
 
-		if (!m_Pendings.empty())
+		if (!m_Pending.empty())
 		{
-			auto pendingIt = m_Pendings.begin();
-			while (pendingIt != m_Pendings.end())
+			auto pendingIt = m_Pending.begin();
+			while (pendingIt != m_Pending.end())
 			{
 				if (pendingIt->m_ResourceIndex == resourceIndex)
 				{
@@ -152,7 +152,7 @@ namespace gglab
 							descriptor.Free();
 						}
 					}
-					pendingIt = m_Pendings.erase(pendingIt);
+					pendingIt = m_Pending.erase(pendingIt);
 				}
 				else
 				{
@@ -291,7 +291,7 @@ namespace gglab
 	void ViewTraits<ViewType::RTV>::Create(DX12Device* device,
 		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& outDesc) noexcept
 	{
-		device->Get()->CreateRenderTargetView(texture->Get(), desc, outDesc.CpuHandle());
+		device->Get()->CreateRenderTargetView(texture->Get(), desc, outDesc.CpuHandleAt());
 	}
 
 	auto ViewTraits<ViewType::DSV>::Build(ResourceIndex resourceIndex,
@@ -349,7 +349,7 @@ namespace gglab
 	void ViewTraits<ViewType::DSV>::Create(DX12Device* device,
 		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept
 	{
-		device->Get()->CreateDepthStencilView(texture->Get(), desc, descriptor.CpuHandle());
+		device->Get()->CreateDepthStencilView(texture->Get(), desc, descriptor.CpuHandleAt());
 	}
 
 	auto ViewTraits<ViewType::SRV>::Build(ResourceIndex resourceIndex,
@@ -407,7 +407,7 @@ namespace gglab
 	void ViewTraits<ViewType::SRV>::Create(DX12Device* device,
 		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept
 	{
-		device->Get()->CreateShaderResourceView(texture->Get(), desc, descriptor.CpuHandle());
+		device->Get()->CreateShaderResourceView(texture->Get(), desc, descriptor.CpuHandleAt());
 	}
 
 	auto ViewTraits<ViewType::UAV>::Build(ResourceIndex resourceIndex,
@@ -454,7 +454,7 @@ namespace gglab
 	void ViewTraits<ViewType::UAV>::Create(DX12Device* device,
 		DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept
 	{
-		device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, desc, descriptor.CpuHandle());
+		device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, desc, descriptor.CpuHandleAt());
 	}
 
 

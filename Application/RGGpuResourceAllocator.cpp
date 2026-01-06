@@ -22,7 +22,7 @@ namespace gglab
 		//auto* tex = m_Textures[texIndex].get();
 
 		// TODO: last know state
-		m_Pendings.emplace_back(
+		m_Pending.emplace_back(
 			std::move(Pending
 				{
 					.m_Type = Type::Texture,
@@ -42,7 +42,7 @@ namespace gglab
 		//auto* buf = m_Buffers[bufIndex].get();
 
 		// TODO: last know state
-		m_Pendings.emplace_back(
+		m_Pending.emplace_back(
 			std::move(Pending
 				{
 					.m_Type = Type::Buffer,
@@ -113,7 +113,7 @@ namespace gglab
 
 	void RGGpuResourceAllocator::Tick() noexcept
 	{
-		std::erase_if(m_Pendings,
+		std::erase_if(m_Pending,
 			[this](const Pending& pending)
 			{
 				const auto done = pending.m_FencePoint.IsCompleted();

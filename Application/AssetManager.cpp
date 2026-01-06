@@ -293,7 +293,7 @@ namespace gglab
 		m_DX12Device->Get()->CreateShaderResourceView(
 			texture->m_Texture->Get(),
 			&srvDesc,
-			texture->m_Descriptor.CpuHandle());
+			texture->m_Descriptor.CpuHandleAt());
 
 		texture->m_DescriptorIndex = 0;	// TODO: get global descriptor index
 

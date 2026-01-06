@@ -8,6 +8,7 @@ namespace gglab
 	DX12DescriptorHandle::DX12DescriptorHandle(DX12DescriptorHandle&& rhs) noexcept
 	{
 		MoveFrom(rhs);
+		rhs.Reset();
 	}
 
 	DX12DescriptorHandle& DX12DescriptorHandle::operator=(DX12DescriptorHandle&& rhs) noexcept
@@ -19,6 +20,7 @@ namespace gglab
 #endif
 			Reset();
 			MoveFrom(rhs);
+			rhs.Reset();
 		}
 		return *this;
 	}
@@ -38,65 +40,67 @@ namespace gglab
 		return
 			m_Index != InvalidIndex &&
 			m_Count > 0 &&
-			m_Owner != nullptr &&
-			m_Owner->GetHeap() != nullptr;
+			m_OwnerAllocator != nullptr &&
+			m_OwnerAllocator->GetHeap() != nullptr;
 	}
 
 	bool DX12DescriptorHandle::IsShaderVisible() const noexcept
 	{
-		auto* heap = m_Owner->GetHeap();
-		GGLAB_ASSERT(heap);
-
-		return (heap->Flags() & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+		GGLAB_ASSERT_MSG(IsValid(), "IsShaderVisible(), Invalid DX12DescriptorHandle.");
+		return m_OwnerAllocator->IsShaderVisible();
 	}
 
-	DX12DescriptorView DX12DescriptorHandle::ToView(uint32_t localIndex) const noexcept
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHandle::CpuHandleAt(uint32_t offset) const noexcept
 	{
-		DX12DescriptorView descriptorView
-		{
-			.m_CpuHandle = CpuHandle(localIndex),
-			.m_GpuHandle = GpuHandle(localIndex)
+		GGLAB_ASSERT_MSG(IsValid(), "CpuHandleAt(): Invalid DX12DescriptorHandle.");
+		GGLAB_ASSERT_MSG(offset < m_Count, "CpuHandleAt(): offset out of range.");
+		return m_OwnerAllocator->CpuHandleAtGlobalIndex(m_Index + offset);
+	}
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorHandle::GpuHandleAt(uint32_t offset) const noexcept
+	{
+		GGLAB_ASSERT_MSG(IsValid(), "GpuHandleAt(): Invalid DX12DescriptorHandle.");
+		GGLAB_ASSERT_MSG(offset < m_Count, "GpuHandleAt(): offset out of range.");
+		return m_OwnerAllocator->GpuHandleAtGlobalIndex(m_Index + offset);
+	}
+
+	D3D12_DESCRIPTOR_HEAP_TYPE DX12DescriptorHandle::HeapType() const noexcept
+	{
+		GGLAB_ASSERT_MSG(IsValid(), "Type(), Invalid DX12DescriptorHandle.");
+		return m_OwnerAllocator->HeapType();
+	}
+
+	DX12DescriptorView DX12DescriptorHandle::ToDescriptorView(uint32_t offset) const noexcept
+	{
+		return {
+			.m_CpuHandle = CpuHandleAt(offset),
+			.m_GpuHandle = IsShaderVisible() ? GpuHandleAt(offset) : CD3DX12_GPU_DESCRIPTOR_HANDLE{}
 		};
-		return descriptorView;
 	}
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DX12DescriptorHandle::CpuHandle(uint32_t localIndex) const noexcept
+	DX12DescriptorID DX12DescriptorHandle::ToDescriptorID() const noexcept
 	{
-		auto* heap = m_Owner->GetHeap();
-		GGLAB_ASSERT(heap);
-
-		return heap->CpuHandleAt(m_Index + localIndex);
-	}
-
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DX12DescriptorHandle::GpuHandle(uint32_t localIndex) const noexcept
-	{
-		auto* heap = m_Owner->GetHeap();
-		GGLAB_ASSERT(heap);
-
-		return heap->GpuHandleAt(m_Index + localIndex);
+		return { .m_Index = m_Index, .m_Generation = m_Generation };
 	}
 
 	void DX12DescriptorHandle::Free() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_Owner, "Free(): Descriptor owner is null.");
 		if (!IsValid())
 		{
 			return;
 		}
-
-		m_Owner->FreeDescriptorInternal(*this);
+		m_OwnerAllocator->FreeHandleInternal(*this);
 		Reset();
 	}
 
 	void DX12DescriptorHandle::Retire(const DX12FencePoint& fencePoint) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_Owner, "Retire(): Descriptor owner is null.");
 		if (!IsValid())
 		{
 			return;
 		}
 
-		m_Owner->RetireDescriptorInternal(*this, fencePoint);
+		m_OwnerAllocator->RetireHandleInternal(*this, fencePoint);
 		Reset();
 	}
 
@@ -104,14 +108,16 @@ namespace gglab
 	{
 		m_Index = InvalidIndex;
 		m_Count = 0;
-		m_Owner = nullptr;
+		m_Generation = 0;
+		m_OwnerAllocator = nullptr;
 	}
 
 	void DX12DescriptorHandle::MoveFrom(DX12DescriptorHandle& rhs) noexcept
 	{
 		m_Index = rhs.m_Index;
 		m_Count = rhs.m_Count;
-		m_Owner = rhs.m_Owner;
+		m_Generation = rhs.m_Generation;
+		m_OwnerAllocator = rhs.m_OwnerAllocator;
 		rhs.Reset();
 	}
 }

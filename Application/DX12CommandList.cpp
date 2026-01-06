@@ -116,7 +116,7 @@ namespace gglab
 
 	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorHandle& descriptor) const noexcept
 	{
-		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.GpuHandle());
+		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.GpuHandleAt());
 	}
 
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
@@ -168,7 +168,7 @@ namespace gglab
 	void DX12CommandList::ClearRenderTarget(const DX12DescriptorHandle& rtDescriptor, const Color& color) const noexcept
 	{
 		float clearColor[4] = { color.R(), color.G(), color.B(), color.A() };
-		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.CpuHandle(), clearColor, 0, nullptr);
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.CpuHandleAt(), clearColor, 0, nullptr);
 	}
 
 	void DX12CommandList::ClearDepthStencil(const DX12DescriptorHandle& dsDescriptor,
@@ -181,7 +181,7 @@ namespace gglab
 			stencilValue = stencilClearValue.value();
 			flags |= D3D12_CLEAR_FLAG_STENCIL;
 		}
-		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.CpuHandle(), flags, depthClearValue, stencilValue, 0, nullptr);
+		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.CpuHandleAt(), flags, depthClearValue, stencilValue, 0, nullptr);
 	}
 
 	void DX12CommandList::DrawIndexedInstanced(uint32_t indexCount) const noexcept

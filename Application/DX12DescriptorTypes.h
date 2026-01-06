@@ -18,7 +18,7 @@ namespace gglab
 	struct DX12DescriptorSpan
 	{
 		static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
-		uint32_t m_Index = InvalidIndex;
+		uint32_t m_Index = InvalidIndex;	// Heap global index
 		uint32_t m_Count = 0;
 
 		bool IsValid() const noexcept { return m_Index != InvalidIndex && m_Count > 0; }
@@ -34,7 +34,7 @@ namespace gglab
 	struct DX12DescriptorID
 	{
 		static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
-		uint32_t m_Index = InvalidIndex;
+		uint32_t m_Index = InvalidIndex;	//  Heap global index
 		uint32_t m_Generation = 0;
 
 		bool IsValid() const noexcept { return m_Index != InvalidIndex; }
@@ -50,24 +50,29 @@ namespace gglab
 		~DX12DescriptorHandle();
 
 		bool IsValid() const noexcept;
+		explicit operator bool() const noexcept { return IsValid(); }
+
 		bool IsShaderVisible() const noexcept;
 
 		uint32_t Index() const noexcept { return m_Index; }
 		uint32_t Count() const noexcept { return m_Count; }
+		uint32_t Generation() const noexcept { return m_Generation; }
 
-		DX12DescriptorView ToView(uint32_t localIndex = 0) const noexcept;
-		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandle(uint32_t localIndex = 0) const noexcept;
-		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandle(uint32_t localIndex = 0) const noexcept;
+		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleAt(uint32_t offset = 0) const noexcept;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleAt(uint32_t offset = 0) const noexcept;
 
-		DX12DescriptorAllocatorBase* Owner() const noexcept { return m_Owner; }
+		D3D12_DESCRIPTOR_HEAP_TYPE HeapType() const noexcept;
 
-		explicit operator bool() const noexcept { return IsValid(); }
+		DX12DescriptorAllocatorBase* OwnerAllocator() const noexcept { return m_OwnerAllocator; }
+
+		DX12DescriptorView ToDescriptorView(uint32_t offset = 0) const noexcept;
+		DX12DescriptorID ToDescriptorID() const noexcept;
 
 		void Free() noexcept;
 		void Retire(const DX12FencePoint& fencePoint) noexcept;
-		void Reset() noexcept;
 
 	private:
+		void Reset() noexcept;
 		void MoveFrom(DX12DescriptorHandle& rhs) noexcept;
 
 	private:
@@ -76,10 +81,9 @@ namespace gglab
 	private:
 		uint32_t m_Index = InvalidIndex;
 		uint32_t m_Count = 0;
+		uint32_t m_Generation = 0;
+		DX12DescriptorAllocatorBase* m_OwnerAllocator = nullptr;
 
-		DX12DescriptorAllocatorBase* m_Owner = nullptr;
-
-	private:
 		friend class DX12DescriptorAllocatorBase;
 	};
 }

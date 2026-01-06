@@ -25,7 +25,7 @@ namespace gglab
 		void RetireImpl(const DX12DescriptorHandle& descriptor, const DX12FencePoint& fencePoint) noexcept;
 	private:
 		RingSpanAllocator m_Allocator;
-		std::deque<DX12FencePoint> m_Pendings;
+		std::deque<DX12FencePoint> m_Pending;
 
 		std::mutex m_Mutex;
 	};

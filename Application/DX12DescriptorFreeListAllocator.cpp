@@ -5,12 +5,61 @@
 
 namespace gglab
 {
-	DX12DescriptorFreeListAllocator::DX12DescriptorFreeListAllocator(
-		const DX12DescriptorAllocatorBase::CreateInfo& createInfo) noexcept :
+	DX12DescriptorFreeListAllocator::DX12DescriptorFreeListAllocator(const CreateInfo& createInfo) noexcept :
 		DX12DescriptorAllocatorBase(createInfo),
-		m_Allocator(GetHeap()->DescriptorCount())
+		m_Allocator(createInfo.m_Range.m_Count),
+		m_Generation(createInfo.m_Range.m_Count, 1)
 	{
 	}
+
+	DX12DescriptorHandle DX12DescriptorFreeListAllocator::AllocateHandle(uint32_t count) noexcept
+	{
+		std::lock_guard lock(m_Mutex);
+
+		FreeCompleted();
+
+		const auto local = m_Allocator.Allocate(count);
+		if (!local.IsValid())
+		{
+			return {};
+		}
+
+		const auto localSpan = ToSpan(local);
+		const auto globalSpan = ToGlobalSpan(localSpan);
+		const auto generation = (count == 1) ? m_Generation[localSpan.m_Index] : 0;
+
+		return CreateHandleFromGlobalSpan(globalSpan, generation);
+	}
+
+	DX12DescriptorView DX12DescriptorFreeListAllocator::AllocateView(uint32_t count) noexcept
+	{
+		std::lock_guard lock(m_Mutex);
+
+		FreeCompleted();
+
+		const auto local = m_Allocator.Allocate(count);
+		if (!local.IsValid())
+		{
+			return {};
+		}
+
+		const auto localSpan = ToSpan(local);
+		const auto [globalIndex, globalCount] = ToGlobalSpan(localSpan);
+
+		return {
+			CpuHandleAtGlobalIndex(globalIndex),
+			IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex) : CD3DX12_GPU_DESCRIPTOR_HANDLE{}
+		};
+	}
+
+
+
+
+
+
+
+
+
 
 	DX12DescriptorHandle DX12DescriptorFreeListAllocator::Allocate(uint32_t count) noexcept
 	{
@@ -58,6 +107,8 @@ namespace gglab
 		descriptor.Reset();
 	}
 
+
+
 	void DX12DescriptorFreeListAllocator::EndFrame(const DX12FencePoint& fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
@@ -68,7 +119,7 @@ namespace gglab
 
 			for (const auto& span : m_FreeInFrameSpans)
 			{
-				m_Pendings.emplace_back(Pending{ span, fencePoint });
+				m_Pending.emplace_back(Pending{ span, fencePoint });
 			}
 
 			m_FreeInFrameSpans.clear();
@@ -123,7 +174,7 @@ namespace gglab
 		m_FreeInFrameSpans.emplace_back(ToIndexSpan(index, 1));
 	}
 
-	void DX12DescriptorFreeListAllocator::FreeDescriptorInternal(DX12DescriptorHandle& descriptor) noexcept
+	void DX12DescriptorFreeListAllocator::FreeHandleInternal(DX12DescriptorHandle& descriptor) noexcept
 	{
 		Free(descriptor);
 	}
@@ -135,16 +186,16 @@ namespace gglab
 
 	void DX12DescriptorFreeListAllocator::FreeCompleted() noexcept
 	{
-		while (!m_Pendings.empty())
+		while (!m_Pending.empty())
 		{
-			auto& front = m_Pendings.front();
+			auto& front = m_Pending.front();
 			if (!front.m_FencePoint.IsCompleted())
 			{
 				break;
 			}
 
 			m_Allocator.Free(front.m_Span);
-			m_Pendings.pop_front();
+			m_Pending.pop_front();
 		}
 	}
 
@@ -161,7 +212,7 @@ namespace gglab
 		}
 		GGLAB_ASSERT_MSG(descriptor.Owner() == this, "Descriptor does not belong to this allocator.");
 
-		m_Pendings.emplace_back(Pending{ ToIndexSpan(descriptor), fencePoint });
+		m_Pending.emplace_back(Pending{ ToIndexSpan(descriptor), fencePoint });
 	}
 
 	FreeListSpanAllocator::IndexSpan DX12DescriptorFreeListAllocator::ToIndexSpan(

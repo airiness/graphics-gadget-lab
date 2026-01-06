@@ -102,7 +102,7 @@ namespace gglab
 			std::vector<DX12DescriptorHandle> m_Descriptors;
 		};
 
-		std::deque<Pending> m_Pendings;
+		std::deque<Pending> m_Pending;
 		mutable std::shared_mutex m_Mutex;
 	};
 

@@ -33,16 +33,16 @@ namespace gglab
 	void DX12DescriptorRingAllocator::FreeCompleted() noexcept
 	{
 		uint64_t latestCompletedFenceValue = 0;
-		while (!m_Pendings.empty())
+		while (!m_Pending.empty())
 		{
-			auto& front = m_Pendings.front();
+			auto& front = m_Pending.front();
 			if (!front.IsCompleted())
 			{
 				break;
 			}
 
 			latestCompletedFenceValue = front.GetValue();
-			m_Pendings.pop_front();
+			m_Pending.pop_front();
 		}
 
 		m_Allocator.FreeCompletedVersion(latestCompletedFenceValue);
@@ -63,6 +63,6 @@ namespace gglab
 
 		m_Allocator.RecordRetire({ index, count }, fencePoint.GetValue());
 
-		m_Pendings.emplace_back(fencePoint);
+		m_Pending.emplace_back(fencePoint);
 	}
 }

@@ -1,8 +1,12 @@
 #pragma once
+//#include "MathUtils.h"
+
 #include <cstdint>
 
 namespace gglab
 {
+	// TODO: use concept define offset and count type.
+	//template<utils::UnsignedInt OffsetType = uint32_t, utils::UnsignedInt CountType = uint32_t>
 	class AllocatorBase
 	{
 	public:
