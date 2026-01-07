@@ -38,27 +38,18 @@ namespace gglab
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 
-		DX12DescriptorFreeListAllocator& GetCbvSrvUavDescriptorAllocator() noexcept { return *m_CbvSrvUavDescriptorAllocator; }
-		const DX12DescriptorFreeListAllocator& GetCbvSrvUavDescriptorAllocator() const noexcept { return *m_CbvSrvUavDescriptorAllocator; }
-		
-		DX12DescriptorFreeListAllocator& GetRtvDescriptorAllocator() noexcept { return *m_RtvDescriptorAllocator; };
-		const DX12DescriptorFreeListAllocator& GetRtvDescriptorAllocator() const noexcept { return *m_RtvDescriptorAllocator; };
-		
-		DX12DescriptorFreeListAllocator& GetDsvDescriptorAllocator() noexcept { return *m_DsvDescriptorAllocator; };
-		const DX12DescriptorFreeListAllocator& GetDsvDescriptorAllocator() const noexcept { return *m_DsvDescriptorAllocator; };
-		
-		DX12DescriptorFreeListAllocator& GetSamplerDescriptorAllocator() noexcept { return *m_SamplerDescriptorAllocator; };
-		const DX12DescriptorFreeListAllocator& GetSamplerDescriptorAllocator() const noexcept { return *m_SamplerDescriptorAllocator; };
+		DX12DescriptorFreeListAllocator& GetFreeListAllocator(FreeListAllocatorType type) noexcept;
 
 	private:
+		using AllocatorArray = std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>,
+			static_cast<uint8_t>(FreeListAllocatorType::Count)>;
+
 		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_RtvHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_DsvHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerHeap;
 
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_CbvSrvUavDescriptorAllocator;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_RtvDescriptorAllocator;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_DsvDescriptorAllocator;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_SamplerDescriptorAllocator;
+		AllocatorArray m_FreeListAllocators;
+
 	};
 }

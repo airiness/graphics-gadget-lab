@@ -55,13 +55,24 @@ namespace gglab
 
 	void DX12DescriptorManager::Tick() noexcept
 	{
+		for (auto& allocator : m_FreeListAllocators)
+		{
+			allocator->Tick();
+		}
 	}
 
 	void DX12DescriptorManager::EndFrame(const DX12FencePoint& fencePoint) noexcept
 	{
-		m_CbvSrvUavDescriptorAllocator->EndFrame(fencePoint);
-		m_RtvDescriptorAllocator->EndFrame(fencePoint);
-		m_DsvDescriptorAllocator->EndFrame(fencePoint);
-		m_SamplerDescriptorAllocator->EndFrame(fencePoint);
+		for (auto& allocator : m_FreeListAllocators)
+		{
+			allocator->EndFrame(fencePoint);
+		}
+	}
+
+	DX12DescriptorFreeListAllocator& DX12DescriptorManager::GetFreeListAllocator(FreeListAllocatorType type) noexcept
+	{
+
+
+		return *m_FreeListAllocators[static_cast<uint8_t>(type)].get();
 	}
 }
