@@ -17,6 +17,9 @@ namespace gglab
 			uint32_t m_RtvCount = 4096;
 			uint32_t m_DsvCount = 1024;
 			uint32_t m_SamplerCount = 2048;
+
+			uint32_t m_DevelopGuiSrvCount = 1024;
+			uint32_t m_BindlessSrvCount = 26000;
 		};
 
 		enum class FreeListAllocatorType : uint8_t
@@ -24,8 +27,9 @@ namespace gglab
 			GeneralCbvSrvUav,
 			GeneralRtv,
 			GeneralDsv,
-			DevelopGui,
-			BindlessTexture,
+			GeneralSampler,
+			DevelopGuiSrv,
+			BindlessSrv,
 
 			Count
 		};
@@ -34,7 +38,7 @@ namespace gglab
 		explicit DX12DescriptorManager(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorManager);
 		~DX12DescriptorManager();
-
+		
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 

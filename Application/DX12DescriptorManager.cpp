@@ -10,45 +10,77 @@ namespace gglab
 	{
 		GGLAB_ASSERT(createInfo.m_DX12Device);
 
-		DX12DescriptorHeap::CreateInfo heapCreateInfo{};
-		heapCreateInfo.m_DX12Device = createInfo.m_DX12Device;
+		// Create Descriptor Heaps
+		{
+			DX12DescriptorHeap::CreateInfo heapCreateInfo{};
+			heapCreateInfo.m_DX12Device = createInfo.m_DX12Device;
 
-		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		heapCreateInfo.m_DescriptorCount = createInfo.m_CbvSrvUavCount;
-		m_CbvSrvUavHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			heapCreateInfo.m_DescriptorCount = createInfo.m_CbvSrvUavCount;
+			m_CbvSrvUavHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
-		DX12DescriptorAllocatorBase::CreateInfo descriptorCreateInfo{};
-		descriptorCreateInfo.m_DescriptorHeap = m_CbvSrvUavHeap.get();
-		m_CbvSrvUavDescriptorAllocator =
-			std::make_unique<DX12DescriptorFreeListAllocator>(descriptorCreateInfo);
+			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+			heapCreateInfo.m_DescriptorCount = createInfo.m_RtvCount;
+			m_RtvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
-		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		heapCreateInfo.m_DescriptorCount = createInfo.m_RtvCount;
-		m_RtvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+			heapCreateInfo.m_DescriptorCount = createInfo.m_DsvCount;
+			m_DsvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
-		descriptorCreateInfo.m_DescriptorHeap = m_RtvHeap.get();
-		m_RtvDescriptorAllocator =
-			std::make_unique<DX12DescriptorFreeListAllocator>(descriptorCreateInfo);
+			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+			heapCreateInfo.m_DescriptorCount = createInfo.m_SamplerCount;
+			m_SamplerHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+		}
 
-		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		heapCreateInfo.m_DescriptorCount = createInfo.m_DsvCount;
-		m_DsvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+		// Create Descriptor Allocators
+		{
+			const uint32_t totalSrvCount = createInfo.m_CbvSrvUavCount;
+			const uint32_t developGuiSrvCount = createInfo.m_DevelopGuiSrvCount;
+			const uint32_t bindlessSrvCount = createInfo.m_BindlessSrvCount;
 
-		descriptorCreateInfo.m_DescriptorHeap = m_DsvHeap.get();
-		m_DsvDescriptorAllocator =
-			std::make_unique<DX12DescriptorFreeListAllocator>(descriptorCreateInfo);
+			GGLAB_ASSERT_MSG(developGuiSrvCount + bindlessSrvCount < totalSrvCount,
+				"Srv range overflow.");
 
-		heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
-		heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		heapCreateInfo.m_DescriptorCount = createInfo.m_SamplerCount;
-		m_SamplerHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			// DevelopGui Srv
+			DX12DescriptorAllocatorBase::CreateInfo allocatorCreateInfo{};
+			allocatorCreateInfo.m_DescriptorHeap = m_CbvSrvUavHeap.get();
+			allocatorCreateInfo.m_Range = { 0, developGuiSrvCount };
+			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::DevelopGuiSrv)] =
+				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
-		descriptorCreateInfo.m_DescriptorHeap = m_SamplerHeap.get();
-		m_SamplerDescriptorAllocator =
-			std::make_unique<DX12DescriptorFreeListAllocator>(descriptorCreateInfo);
+			// Bindless Srv
+			allocatorCreateInfo.m_Range = { developGuiSrvCount, bindlessSrvCount };
+			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::BindlessSrv)] =
+				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
+
+			// General Srv
+			allocatorCreateInfo.m_Range = { developGuiSrvCount + bindlessSrvCount,
+				createInfo.m_CbvSrvUavCount - (developGuiSrvCount + bindlessSrvCount) };
+			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralCbvSrvUav)] =
+				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
+
+			// General Rtv
+			allocatorCreateInfo.m_DescriptorHeap = m_RtvHeap.get();
+			allocatorCreateInfo.m_Range = { 0, createInfo.m_RtvCount };
+			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralRtv)] =
+				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
+
+			// General Dsv
+			allocatorCreateInfo.m_DescriptorHeap = m_DsvHeap.get();
+			allocatorCreateInfo.m_Range = { 0, createInfo.m_DsvCount };
+			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralDsv)] =
+				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
+
+			// General Sampler
+			allocatorCreateInfo.m_DescriptorHeap = m_SamplerHeap.get();
+			allocatorCreateInfo.m_Range = { 0, createInfo.m_SamplerCount };
+			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralSampler)] =
+				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
+		}
 	}
 
 	DX12DescriptorManager::~DX12DescriptorManager() = default;
@@ -57,7 +89,10 @@ namespace gglab
 	{
 		for (auto& allocator : m_FreeListAllocators)
 		{
-			allocator->Tick();
+			if (allocator)
+			{
+				allocator->Tick();
+			}
 		}
 	}
 
@@ -65,14 +100,15 @@ namespace gglab
 	{
 		for (auto& allocator : m_FreeListAllocators)
 		{
-			allocator->EndFrame(fencePoint);
+			if (allocator)
+			{
+				allocator->EndFrame(fencePoint);
+			}
 		}
 	}
 
 	DX12DescriptorFreeListAllocator& DX12DescriptorManager::GetFreeListAllocator(FreeListAllocatorType type) noexcept
 	{
-
-
 		return *m_FreeListAllocators[static_cast<uint8_t>(type)].get();
 	}
 }
