@@ -41,15 +41,15 @@ namespace gglab
 		DX12DescriptorFreeListAllocator& GetFreeListAllocator(FreeListAllocatorType type) noexcept;
 
 	private:
-		using AllocatorArray = std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>,
-			static_cast<uint8_t>(FreeListAllocatorType::Count)>;
+		using FreeListAllocatorArray =
+			std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>, static_cast<uint8_t>(FreeListAllocatorType::Count)>;
 
 		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_RtvHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_DsvHeap;
 		std::unique_ptr<DX12DescriptorHeap> m_SamplerHeap;
 
-		AllocatorArray m_FreeListAllocators;
+		FreeListAllocatorArray m_FreeListAllocators;
 
 	};
 }
