@@ -28,7 +28,7 @@ namespace gglab
 
 		void Tick() noexcept override;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept override;
-		
+
 	protected:
 		void FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept override;
 		void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
