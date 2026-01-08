@@ -2,6 +2,8 @@
 
 #if defined(_DEBUG) || defined(DEBUG)
 #define BUILD_DEBUG
+#else
+#define BUILD_RELEASE
 #endif
 
 // Windows

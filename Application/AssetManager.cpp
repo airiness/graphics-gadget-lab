@@ -6,6 +6,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12CommandList.h"
+#include "DX12DescriptorManager.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 #include "PathUtils.h"
@@ -281,8 +282,10 @@ namespace gglab
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor& create srv
-		auto& srvDescriptorAllocator = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator();
-		texture->m_Descriptor = std::move(srvDescriptorAllocator.Allocate());
+		// TODO: Bindless texture
+		auto* srvDescriptorAllocator = 
+			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
+		texture->m_Descriptor = std::move(srvDescriptorAllocator->AllocateHandle());
 
 		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};

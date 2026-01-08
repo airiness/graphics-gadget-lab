@@ -67,18 +67,14 @@ namespace gglab
 
 	}
 
-	void DevelopGui::Render(DX12CommandList* commandList, const DX12DescriptorHandle& rtv) noexcept
+	void DevelopGui::Render(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_FrameOpen, "DevelopGui::Render called without NewFrame.");
 
 		ImGui::Render();
 		m_FrameOpen = false;
 
-		DX12DescriptorView rtvs[] =
-		{
-			rtv.ToDescriptorView()
-		};
-		commandList->SetRenderTargets(rtvs, nullptr);
+		commandList->SetRenderTarget(rtv, {});
 
 		auto* heap = m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->GetHeap();
 		commandList->SetDescriptorHeap(*heap);

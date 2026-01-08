@@ -50,16 +50,17 @@ namespace gglab
 
 		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
-		DX12ViewCache::DescriptorsAllocatorArray descriptorAllocators =
-		{
-			&m_DescriptorManager->GetRtvDescriptorAllocator(),
-			&m_DescriptorManager->GetDsvDescriptorAllocator(),
-			&m_DescriptorManager->GetCbvSrvUavDescriptorAllocator()
-		};
-		m_ViewCache = std::make_unique<DX12ViewCache>(m_Device.get(), descriptorAllocators);
+		DX12ViewCache::CreateInfo viewCacheCreateInfo{};
+		viewCacheCreateInfo.m_DX12Device = m_Device.get();
+		viewCacheCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		m_ViewCache = std::make_unique<DX12ViewCache>(viewCacheCreateInfo);
+
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
+
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
+
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
+
 		m_ExternalResourceRegistry = std::make_unique<ExternalResourceRegistry>(m_ViewCache.get());
 
 		m_DevelopGui = std::make_unique<DevelopGui>();
@@ -327,13 +328,11 @@ namespace gglab
 		{
 			DX12RingStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
 			objectSBCreateInfo.m_DX12Device = m_Device.get();
-			objectSBCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 			objectSBCreateInfo.m_ElementsCapacity = MaxObjectCapacity;
 			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 
 			DX12RingStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
 			materialSBCreateInfo.m_DX12Device = m_Device.get();
-			materialSBCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 			materialSBCreateInfo.m_ElementsCapacity = MaxMaterialCapacity;
 			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 		}

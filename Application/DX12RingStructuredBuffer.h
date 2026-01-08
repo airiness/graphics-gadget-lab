@@ -16,7 +16,6 @@ namespace gglab
 		struct CreateInfo
 		{
 			DX12Device* m_DX12Device = nullptr;
-			DX12DescriptorManager* m_DescriptorManager = nullptr;
 			uint32_t m_ElementsCapacity = 4096;
 		};
 
@@ -53,25 +52,9 @@ namespace gglab
 
 			m_RingBuffer = std::make_unique<DX12RingBuffer>();
 			m_RingBuffer->Create(resourceCreateInfo, totalSizeInBytes);
-
-			m_SrvDescriptor = createInfo.m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().Allocate();
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Buffer.FirstElement = 0;
-			srvDesc.Buffer.NumElements = m_ElementCapacity;
-			srvDesc.Buffer.StructureByteStride = stride;
-			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-
-			createInfo.m_DX12Device->Get()->CreateShaderResourceView(m_RingBuffer->GetResource(), &srvDesc, m_SrvDescriptor.CpuHandleAt());
-
 		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingStructuredBuffer);
-		~DX12RingStructuredBuffer()
-		{
-			m_SrvDescriptor.Free();
-		}
+		~DX12RingStructuredBuffer() = default;
 
 		AllocateResult Allocate(uint32_t elementCount) noexcept
 		{
@@ -117,18 +100,12 @@ namespace gglab
 			m_RingBuffer->ReclaimCompleted(fencePoint);
 		}
 
-		DX12DescriptorView GetSRVDescriptorView() const noexcept
-		{
-			return m_SrvDescriptor.ToView();
-		}
-
 		DX12Buffer* GetBuffer() const noexcept { return m_RingBuffer->GetBuffer(); }
 		uint32_t GetElementCapacity() const noexcept { return m_ElementCapacity; }
 		uint32_t GetElementStride() const noexcept { return static_cast<uint32_t>(sizeof(T)); }
 
 	private:
 		std::unique_ptr<DX12RingBuffer> m_RingBuffer;
-		DX12DescriptorHandle m_SrvDescriptor{};
 		uint32_t m_ElementCapacity = 0;
 	};
 }

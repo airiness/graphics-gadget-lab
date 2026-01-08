@@ -83,8 +83,8 @@ namespace gglab
 		DX12DescriptorHandle AllocateHandle() const noexcept
 		{
 			constexpr auto allocatorType = ViewTraits<T>::AllocatorType;
-			auto& allocator = m_DescriptorManager->GetFreeListAllocator(allocatorType);
-			return allocator.AllocateHandle();
+			auto* allocator = m_DescriptorManager->GetFreeListAllocator(allocatorType);
+			return allocator->AllocateHandle();
 		}
 
 		template<ViewType T>

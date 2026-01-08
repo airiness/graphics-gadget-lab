@@ -29,6 +29,13 @@ namespace gglab
 	{
 		CD3DX12_CPU_DESCRIPTOR_HANDLE m_CpuHandle = {};
 		CD3DX12_GPU_DESCRIPTOR_HANDLE m_GpuHandle = {};
+
+#if defined(BUILD_DEBUG)
+		D3D12_DESCRIPTOR_HEAP_TYPE m_DebugType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
+#endif
+
+		bool IsValid() const noexcept { return m_CpuHandle.ptr != 0; }
+		explicit operator bool() const noexcept { return IsValid(); }
 	};
 
 	struct DX12DescriptorID

@@ -47,8 +47,11 @@ namespace gglab
 		const auto [globalIndex, globalCount] = ToGlobalSpan(localSpan);
 
 		return {
-			CpuHandleAtGlobalIndex(globalIndex),
-			IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex) : CD3DX12_GPU_DESCRIPTOR_HANDLE{}
+			.m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
+			.m_GpuHandle = IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex) : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
+#if defined(BUILD_DEBUG)
+			.m_DebugType = m_DescriptorHeap->Type()
+#endif
 		};
 	}
 

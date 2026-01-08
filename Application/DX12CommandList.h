@@ -3,10 +3,12 @@
 
 namespace gglab
 {
+	struct DX12DescriptorView;
+
 	class DX12Device;
 	class DX12CommandQueue;
-	class DX12RootSignature;
 	class DX12DescriptorHeap;
+	class DX12RootSignature;
 	class DX12CommandAllocator;
 	class DX12PipelineState;
 	class DX12CommandList
@@ -36,7 +38,9 @@ namespace gglab
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) const noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) const noexcept;
 		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) const noexcept;
-		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, DX12DescriptorView dsDescriptor) const noexcept;
+		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors) const noexcept;
+		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12DescriptorView& dsDescriptor) const noexcept;
+		void SetRenderTarget(const DX12DescriptorView& rtDsescriptor, const DX12DescriptorView& dsDescriptor) const noexcept;
 		void SetVertexBuffers(uint32_t startSlot, std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) const noexcept;
 		void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) const noexcept;
 		void SetGraphicsConstantBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept;
@@ -45,8 +49,8 @@ namespace gglab
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
 		void FlushBarriers() noexcept;
-		void ClearRenderTarget(const DX12DescriptorHandle& rtDescriptor, const Color& clearColor) const noexcept;
-		void ClearDepthStencil(const DX12DescriptorHandle& dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) const noexcept;
+		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& clearColor) const noexcept;
+		void ClearDepthStencil(const DX12DescriptorView& dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) const noexcept;
 		void DrawIndexedInstanced(uint32_t indexCount) const noexcept;
 		void DrawInstanced(uint32_t vertexCount) const noexcept;
 

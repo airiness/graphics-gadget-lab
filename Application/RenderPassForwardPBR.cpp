@@ -5,6 +5,7 @@
 #include "RenderGraph.h"
 #include "RGFrameTargets.h"
 #include "DX12SwapChain.h"
+#include "DX12DescriptorHeap.h"
 #include "DX12DescriptorManager.h"
 #include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
@@ -62,12 +63,7 @@ namespace gglab
 
 				const auto& dsv = viewCache->GetOrCreate(dsvKey, depthTexture);
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
-
-				DX12DescriptorView rtvs[] =
-				{
-					rtv.ToDescriptorView()
-				};
-				commandList->SetRenderTargets(rtvs, &dsv);
+				commandList->SetRenderTarget(rtv, dsv);
 
 				auto* renderer = servicesPtr->m_Renderer;
 				auto* device = renderer->GetDevice();
@@ -96,7 +92,7 @@ namespace gglab
 
 				auto* pso = psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 
-				commandList->SetDescriptorHeap(*descriptorManager->GetCbvSrvUavDescriptorAllocator().GetHeap());
+				commandList->SetDescriptorHeap(*descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav));
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
 
