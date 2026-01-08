@@ -109,14 +109,15 @@ namespace gglab
 
 	DX12DescriptorHeap* DX12DescriptorManager::GetHeap(HeapType heapType) const noexcept
 	{
-		GGLAB_ASSERT(heapType != HeapType::Count);
+		GGLAB_ASSERT(static_cast<uint8_t>(heapType) < static_cast<uint8_t>(HeapType::Count));
 
 		return m_Heaps[static_cast<uint8_t>(heapType)].get();
 	}
 
 	DX12DescriptorFreeListAllocator* DX12DescriptorManager::GetFreeListAllocator(FreeListAllocatorType allocatorType) const noexcept
 	{
-		GGLAB_ASSERT(allocatorType != FreeListAllocatorType::Invalid || allocatorType != FreeListAllocatorType::Count);
+		GGLAB_ASSERT(static_cast<uint8_t>(allocatorType) < static_cast<uint8_t>(FreeListAllocatorType::Invalid));
+		GGLAB_ASSERT(static_cast<uint8_t>(allocatorType) < static_cast<uint8_t>(FreeListAllocatorType::Count));
 
 		return m_FreeListAllocators[static_cast<uint8_t>(allocatorType)].get();
 	}
