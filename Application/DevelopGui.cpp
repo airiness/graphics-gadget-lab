@@ -38,7 +38,8 @@ namespace gglab
 			initInfo.NumFramesInFlight = DX12Device::GetBufferCount();
 			initInfo.RTVFormat = createInfo.m_SwapChain->GetFormat();
 			initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
-			initInfo.SrvDescriptorHeap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().GetHeap()->Get();
+			initInfo.SrvDescriptorHeap =
+				m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->GetHeap()->Get();
 			initInfo.SrvDescriptorAllocFn = DescriptorAlloc;
 			initInfo.SrvDescriptorFreeFn = DescriptorFree;
 			initInfo.UserData = this;
@@ -75,11 +76,11 @@ namespace gglab
 
 		DX12DescriptorView rtvs[] =
 		{
-			rtv.ToView()
+			rtv.ToDescriptorView()
 		};
 		commandList->SetRenderTargets(rtvs, nullptr);
 
-		auto* heap = m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().GetHeap();
+		auto* heap = m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->GetHeap();
 		commandList->SetDescriptorHeap(*heap);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList->Get());
@@ -101,7 +102,8 @@ namespace gglab
 		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
 		auto* developGui = static_cast<DevelopGui*>(info->UserData);
-		auto descriptorView = developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().AllocateRaw();
+		auto descriptorView = developGui->m_DescriptorManager->
+			GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->AllocateView();
 		*outCpuHandle = descriptorView.m_CpuHandle;
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
@@ -111,13 +113,7 @@ namespace gglab
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
 	{
 		auto* developGui = static_cast<DevelopGui*>(info->UserData);
-
-		DX12DescriptorView view
-		{
-			.m_CpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(cpuHandle),
-			.m_GpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuHandle)
-		};
-
-		developGui->m_DescriptorManager->GetCbvSrvUavDescriptorAllocator().FreeRaw(view);
+		developGui->m_DescriptorManager->GetFreeListAllocator(
+			DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->DeferFreeFromGpuHandleInFrame(gpuHandle);
 	}
 }

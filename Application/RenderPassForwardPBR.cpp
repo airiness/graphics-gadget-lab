@@ -65,7 +65,7 @@ namespace gglab
 
 				DX12DescriptorView rtvs[] =
 				{
-					rtv.ToView()
+					rtv.ToDescriptorView()
 				};
 				commandList->SetRenderTargets(rtvs, &dsv);
 

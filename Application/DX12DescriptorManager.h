@@ -22,6 +22,16 @@ namespace gglab
 			uint32_t m_BindlessSrvCount = 26000;
 		};
 
+		enum class HeapType : uint8_t
+		{
+			CbvSrvUav,
+			Rtv,
+			Dsv,
+			Sampler,
+
+			Count
+		};
+
 		enum class FreeListAllocatorType : uint8_t
 		{
 			GeneralCbvSrvUav,
@@ -31,7 +41,8 @@ namespace gglab
 			DevelopGuiSrv,
 			BindlessSrv,
 
-			Count
+			Count,
+			Invalid = Count
 		};
 
 	public:
@@ -42,18 +53,15 @@ namespace gglab
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 
-		DX12DescriptorFreeListAllocator& GetFreeListAllocator(FreeListAllocatorType type) noexcept;
+		DX12DescriptorHeap* GetHeap(HeapType heapType) const noexcept;
+		DX12DescriptorFreeListAllocator* GetFreeListAllocator(FreeListAllocatorType allocatorType) const noexcept;
 
 	private:
+		using HeapArray = std::array<std::unique_ptr<DX12DescriptorHeap>, static_cast<uint8_t>(HeapType::Count)>;
 		using FreeListAllocatorArray =
 			std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>, static_cast<uint8_t>(FreeListAllocatorType::Count)>;
 
-		std::unique_ptr<DX12DescriptorHeap> m_CbvSrvUavHeap;
-		std::unique_ptr<DX12DescriptorHeap> m_RtvHeap;
-		std::unique_ptr<DX12DescriptorHeap> m_DsvHeap;
-		std::unique_ptr<DX12DescriptorHeap> m_SamplerHeap;
-
+		HeapArray m_Heaps;
 		FreeListAllocatorArray m_FreeListAllocators;
-
 	};
 }

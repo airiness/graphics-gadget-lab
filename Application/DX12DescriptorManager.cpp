@@ -18,22 +18,22 @@ namespace gglab
 			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 			heapCreateInfo.m_DescriptorCount = createInfo.m_CbvSrvUavCount;
-			m_CbvSrvUavHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			m_Heaps[static_cast<uint8_t>(HeapType::CbvSrvUav)] = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 			heapCreateInfo.m_DescriptorCount = createInfo.m_RtvCount;
-			m_RtvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			m_Heaps[static_cast<uint8_t>(HeapType::Rtv)] = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 			heapCreateInfo.m_DescriptorCount = createInfo.m_DsvCount;
-			m_DsvHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			m_Heaps[static_cast<uint8_t>(HeapType::Dsv)] = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 
 			heapCreateInfo.m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
 			heapCreateInfo.m_Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 			heapCreateInfo.m_DescriptorCount = createInfo.m_SamplerCount;
-			m_SamplerHeap = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
+			m_Heaps[static_cast<uint8_t>(HeapType::Sampler)] = std::make_unique<DX12DescriptorHeap>(heapCreateInfo);
 		}
 
 		// Create Descriptor Allocators
@@ -47,7 +47,7 @@ namespace gglab
 
 			// DevelopGui Srv
 			DX12DescriptorAllocatorBase::CreateInfo allocatorCreateInfo{};
-			allocatorCreateInfo.m_DescriptorHeap = m_CbvSrvUavHeap.get();
+			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::CbvSrvUav)].get();
 			allocatorCreateInfo.m_Range = { 0, developGuiSrvCount };
 			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::DevelopGuiSrv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
@@ -64,19 +64,19 @@ namespace gglab
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Rtv
-			allocatorCreateInfo.m_DescriptorHeap = m_RtvHeap.get();
+			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::Rtv)].get();
 			allocatorCreateInfo.m_Range = { 0, createInfo.m_RtvCount };
 			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralRtv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Dsv
-			allocatorCreateInfo.m_DescriptorHeap = m_DsvHeap.get();
+			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::Dsv)].get();
 			allocatorCreateInfo.m_Range = { 0, createInfo.m_DsvCount };
 			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralDsv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Sampler
-			allocatorCreateInfo.m_DescriptorHeap = m_SamplerHeap.get();
+			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::Sampler)].get();
 			allocatorCreateInfo.m_Range = { 0, createInfo.m_SamplerCount };
 			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralSampler)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
@@ -107,8 +107,17 @@ namespace gglab
 		}
 	}
 
-	DX12DescriptorFreeListAllocator& DX12DescriptorManager::GetFreeListAllocator(FreeListAllocatorType type) noexcept
+	DX12DescriptorHeap* DX12DescriptorManager::GetHeap(HeapType heapType) const noexcept
 	{
-		return *m_FreeListAllocators[static_cast<uint8_t>(type)].get();
+		GGLAB_ASSERT(heapType != HeapType::Count);
+
+		return m_Heaps[static_cast<uint8_t>(heapType)].get();
+	}
+
+	DX12DescriptorFreeListAllocator* DX12DescriptorManager::GetFreeListAllocator(FreeListAllocatorType allocatorType) const noexcept
+	{
+		GGLAB_ASSERT(allocatorType != FreeListAllocatorType::Invalid || allocatorType != FreeListAllocatorType::Count);
+
+		return m_FreeListAllocators[static_cast<uint8_t>(allocatorType)].get();
 	}
 }

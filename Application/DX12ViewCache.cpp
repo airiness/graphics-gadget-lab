@@ -2,14 +2,17 @@
 #include "DX12ViewCache.h"
 #include "DX12Device.h"
 #include "DX12Texture.h"
+#include "DX12DescriptorManager.h"
 #include "DX12DescriptorFreeListAllocator.h"
 
 namespace gglab
 {
-	DX12ViewCache::DX12ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept :
-		m_DX12Device(dx12Device),
-		m_DescriptorAllocators(descriptorAllocators)
+	DX12ViewCache::DX12ViewCache(const CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device),
+		m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
+		GGLAB_ASSERT(m_DX12Device);
+		GGLAB_ASSERT(m_DescriptorManager);
 	}
 
 	DX12ViewCache::~DX12ViewCache()
@@ -30,7 +33,7 @@ namespace gglab
 		m_Pending.clear();
 
 		// Release descriptor still in cache
-		for (auto& [key, descriptor] : m_Cache)
+		for (auto& descriptor : m_Cache | std::views::values)
 		{
 			if (descriptor.IsValid())
 			{
@@ -42,23 +45,35 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	const DX12DescriptorHandle& DX12ViewCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
+	DX12DescriptorView DX12ViewCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
 	{
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto iter = m_Cache.find(key); iter != m_Cache.end())
+			if (auto iterator = m_Cache.find(key); iterator != m_Cache.end())
 			{
-				return iter->second;
+				return iterator->second.ToDescriptorView();
 			}
 		}
 
 		switch (key.m_Type)
 		{
-		case ViewType::RTV: return CreateFromKey<ViewType::RTV>(key, texture);
-		case ViewType::DSV: return CreateFromKey<ViewType::DSV>(key, texture);
-		case ViewType::SRV: return CreateFromKey<ViewType::SRV>(key, texture);
-		case ViewType::UAV: return CreateFromKey<ViewType::UAV>(key, texture);
-		default: GGLAB_UNREACHABLE("Unkown View Tyoe.");
+		case ViewType::RTV:
+		{
+			return CreateFromKey<ViewType::RTV>(key, texture);
+		}
+		case ViewType::DSV:
+		{
+			return CreateFromKey<ViewType::DSV>(key, texture);
+		}
+		case ViewType::SRV:
+		{
+			return CreateFromKey<ViewType::SRV>(key, texture);
+		}
+		case ViewType::UAV:
+		{
+			return CreateFromKey<ViewType::UAV>(key, texture);
+		}
+		default: GGLAB_UNREACHABLE("Unknown View Type.");
 		}
 	}
 
@@ -66,8 +81,8 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 
-		auto iter = m_ResourceViews.find(resourceIndex);
-		if (iter == m_ResourceViews.end())
+		auto iterator = m_ResourceViews.find(resourceIndex);
+		if (iterator == m_ResourceViews.end())
 		{
 			return;
 		}
@@ -75,9 +90,9 @@ namespace gglab
 		Pending pending{};
 		pending.m_ResourceIndex = resourceIndex;
 		pending.m_FencePoint = fencePoint;
-		pending.m_Descriptors.reserve(iter->second.size());
+		pending.m_Descriptors.reserve(iterator->second.size());
 
-		for (const auto& key : iter->second)
+		for (const auto& key : iterator->second)
 		{
 			auto descriptorIt = m_Cache.find(key);
 			if (descriptorIt != m_Cache.end())
@@ -87,7 +102,7 @@ namespace gglab
 			}
 		}
 
-		m_ResourceViews.erase(iter);
+		m_ResourceViews.erase(iterator);
 
 		if (!pending.m_Descriptors.empty())
 		{
@@ -162,23 +177,8 @@ namespace gglab
 		}
 	}
 
-	DX12DescriptorFreeListAllocator* DX12ViewCache::GetDescriptorAllocator(ViewType type) const noexcept
-	{
-		switch (type)
-		{
-		case ViewType::RTV:
-		case ViewType::DSV:
-			return m_DescriptorAllocators[static_cast<uint32_t>(type)];
-		case ViewType::SRV:
-		case ViewType::UAV:
-			return m_DescriptorAllocators[static_cast<uint32_t>(ViewType::SRV)];
-		default:
-			GGLAB_UNREACHABLE("Unknown View Type.");
-		}
-	}
-
 	template<ViewType T>
-	const DX12DescriptorHandle& DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
+	DX12DescriptorView DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
 	{
 		using Traits = ViewTraits<T>;
@@ -190,41 +190,41 @@ namespace gglab
 		// Check the Key has existed in cache
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto iter = m_Cache.find(key); iter != m_Cache.end())
+			if (auto iterator = m_Cache.find(key); iterator != m_Cache.end())
 			{
-				return iter->second;
+				return iterator->second.ToDescriptorView();
 			}
 		}
 
 		// Allocate and create
-		DX12DescriptorHandle descriptor = GetDescriptorAllocator(T)->Allocate(1);
+		DX12DescriptorHandle descriptor = AllocateHandle<T>();
 		Traits::Create(m_DX12Device, texture, &built.m_Desc, descriptor);
 		{
 			std::unique_lock lock(m_Mutex);
-			if (auto it = m_Cache.find(key); it != m_Cache.end())
+			if (auto iterator = m_Cache.find(key); iterator != m_Cache.end())
 			{
 				// Other thread inserted, release it
 				if (descriptor.IsValid())
 				{
 					descriptor.Free();
 				}
-				return it->second;
+				return iterator->second.ToDescriptorView();
 			}
-	
+
 			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
 			GGLAB_ASSERT_MSG(inserted, "ViewCache: duplicate insertion after double-checked locking");
 			m_ResourceViews[resourceIndex].push_back(key);
-			return it->second;
+			return it->second.ToDescriptorView();
 		}
 	}
 
 	template<ViewType T>
-	const DX12DescriptorHandle& DX12ViewCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
+	DX12DescriptorView DX12ViewCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
 	{
 		using Traits = ViewTraits<T>;
 		auto desc = DescFromKey<T>(key);
 
-		DX12DescriptorHandle descriptor = GetDescriptorAllocator(key.m_Type)->Allocate(1);
+		DX12DescriptorHandle descriptor = AllocateHandle<T>();
 		Traits::Create(m_DX12Device, texture, &desc, descriptor);
 		{
 			std::unique_lock lock(m_Mutex);
@@ -234,13 +234,13 @@ namespace gglab
 				{
 					descriptor.Free();
 				}
-				return it->second;
+				return it->second.ToDescriptorView();
 			}
 
 			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
 			GGLAB_ASSERT_MSG(inserted, "ViewCache: duplicate insertion after double-checked locking");
-			m_ResourceViews[key.m_ResouceIndex].push_back(key);
-			return it->second;
+			m_ResourceViews[key.m_ResourceIndex].push_back(key);
+			return it->second.ToDescriptorView();
 		}
 	}
 
@@ -275,7 +275,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::RTV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResourceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -321,7 +321,7 @@ namespace gglab
 		}
 
 		// Encode flags
-		const auto encodeDsvFlags = [](D3D12_DSV_FLAGS flags) noexcept
+		const auto encodeDsvFlags = [](D3D12_DSV_FLAGS flags) noexcept -> uint8_t
 			{
 				using U = std::underlying_type_t<D3D12_DSV_FLAGS>;
 				constexpr uint8_t kBits = static_cast<uint8_t>(
@@ -333,7 +333,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::DSV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResourceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -391,7 +391,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::SRV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResourceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = most;
 		key.m_MipLevels = levels;
@@ -438,7 +438,7 @@ namespace gglab
 
 		auto& key = built.m_Key;
 		key.m_Type = ViewType::UAV;
-		key.m_ResouceIndex = resourceIndex;
+		key.m_ResourceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
 		key.m_ArraySlice = 0;
@@ -496,7 +496,7 @@ namespace gglab
 		if (desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
 		{
 			desc.Texture2D.MostDetailedMip = key.m_MipSlice;
-			desc.Texture2D.MipLevels = (key.m_MipLevels == 0) ? UINT(-1) : key.m_MipLevels;
+			desc.Texture2D.MipLevels = (key.m_MipLevels == 0) ? static_cast<UINT>(-1) : key.m_MipLevels;
 			desc.Texture2D.PlaneSlice = key.m_PlaneSlice;
 		}
 		return desc;
@@ -517,8 +517,8 @@ namespace gglab
 	}
 
 #define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
-	template const DX12DescriptorHandle& DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
-	template const DX12DescriptorHandle& DX12ViewCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
+	template DX12DescriptorView DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
+	template DX12DescriptorView DX12ViewCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
 
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);

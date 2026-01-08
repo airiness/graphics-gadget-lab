@@ -36,7 +36,7 @@ namespace gglab
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) const noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) const noexcept;
 		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) const noexcept;
-		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12DescriptorHandle* dsDescriptor) const noexcept;
+		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, DX12DescriptorView dsDescriptor) const noexcept;
 		void SetVertexBuffers(uint32_t startSlot, std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) const noexcept;
 		void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) const noexcept;
 		void SetGraphicsConstantBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept;

@@ -83,7 +83,7 @@ namespace gglab
 		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
-	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12DescriptorHandle* dsDescriptor) const noexcept
+	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, DX12DescriptorView dsDescriptor) const noexcept
 	{
 		const auto rtCount = rtDescriptors.size();
 
@@ -93,7 +93,7 @@ namespace gglab
 			rtHandles.at(index) = (rtDescriptors[index].m_CpuHandle);
 		}
 
-		const auto dsDescriptorView = dsDescriptor ? dsDescriptor->ToView() : DX12DescriptorView{};
+		const auto dsDescriptorView = dsDescriptor ? dsDescriptor->ToDescriptorView() : DX12DescriptorView{};
 		m_D3D12GraphicsCommandList->OMSetRenderTargets(static_cast<UINT>(rtCount),
 			rtHandles.data(), FALSE,
 			dsDescriptor ? &dsDescriptorView.m_CpuHandle : nullptr);
