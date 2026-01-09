@@ -21,7 +21,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(FreeListSpanAllocator);
 		~FreeListSpanAllocator() override = default;
 
-		IndexSpan Allocate(CountType count = 1) noexcept override;
+		IndexSpan Allocate(CountType count) noexcept override;
 		void Free(const IndexSpan& indexSpan) noexcept;
 
 	private:

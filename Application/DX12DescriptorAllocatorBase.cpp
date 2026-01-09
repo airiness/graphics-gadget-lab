@@ -97,5 +97,4 @@ namespace gglab
 		h.m_OwnerAllocator = this;
 		return h;
 	}
-
 }

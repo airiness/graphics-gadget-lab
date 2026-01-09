@@ -1,5 +1,6 @@
 #pragma once
 #include "DX12FencePoint.h"
+#include "DX12DescriptorTypes.h"
 
 namespace gglab
 {
@@ -55,6 +56,9 @@ namespace gglab
 
 		DX12DescriptorHeap* GetHeap(HeapType heapType) const noexcept;
 		DX12DescriptorFreeListAllocator* GetFreeListAllocator(FreeListAllocatorType allocatorType) const noexcept;
+
+		DX12DescriptorID AllocateBindlessDescriptorId() const noexcept;
+		void RetireBindlessDescriptorId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) const noexcept;
 
 	private:
 		using HeapArray = std::array<std::unique_ptr<DX12DescriptorHeap>, static_cast<uint8_t>(HeapType::Count)>;

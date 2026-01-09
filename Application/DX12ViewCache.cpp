@@ -20,7 +20,7 @@ namespace gglab
 		GarbageCollect();
 
 		// Release all pending descriptors
-		for (auto& pending : m_Pending)
+		for (auto& pending : m_PendingQueue)
 		{
 			for (auto& descriptor : pending.m_Descriptors)
 			{
@@ -30,7 +30,7 @@ namespace gglab
 				}
 			}
 		}
-		m_Pending.clear();
+		m_PendingQueue.clear();
 
 		// Release descriptor still in cache
 		for (auto& descriptor : m_Cache | std::views::values)
@@ -106,16 +106,16 @@ namespace gglab
 
 		if (!pending.m_Descriptors.empty())
 		{
-			m_Pending.emplace_back(std::move(pending));
+			m_PendingQueue.emplace_back(std::move(pending));
 		}
 	}
 
 	void DX12ViewCache::GarbageCollect() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
-		while (!m_Pending.empty())
+		while (!m_PendingQueue.empty())
 		{
-			auto& pending = m_Pending.front();
+			auto& pending = m_PendingQueue.front();
 			if (!pending.m_FencePoint.IsCompleted())
 			{
 				break;
@@ -129,7 +129,7 @@ namespace gglab
 				}
 			}
 
-			m_Pending.pop_front();
+			m_PendingQueue.pop_front();
 		}
 	}
 
@@ -153,10 +153,10 @@ namespace gglab
 			m_ResourceViews.erase(it);
 		}
 
-		if (!m_Pending.empty())
+		if (!m_PendingQueue.empty())
 		{
-			auto pendingIt = m_Pending.begin();
-			while (pendingIt != m_Pending.end())
+			auto pendingIt = m_PendingQueue.begin();
+			while (pendingIt != m_PendingQueue.end())
 			{
 				if (pendingIt->m_ResourceIndex == resourceIndex)
 				{
@@ -167,7 +167,7 @@ namespace gglab
 							descriptor.Free();
 						}
 					}
-					pendingIt = m_Pending.erase(pendingIt);
+					pendingIt = m_PendingQueue.erase(pendingIt);
 				}
 				else
 				{

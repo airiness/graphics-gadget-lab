@@ -17,7 +17,6 @@ namespace gglab
 		SRV,
 		UAV,
 	};
-	static constexpr uint32_t AllocatorSlotCount = 3;
 
 	template<ViewType T> struct ViewTraits;
 
@@ -112,7 +111,7 @@ namespace gglab
 			std::vector<DX12DescriptorHandle> m_Descriptors;
 		};
 
-		std::deque<Pending> m_Pending;
+		std::deque<Pending> m_PendingQueue;
 		mutable std::shared_mutex m_Mutex;
 	};
 

@@ -121,4 +121,14 @@ namespace gglab
 
 		return m_FreeListAllocators[static_cast<uint8_t>(allocatorType)].get();
 	}
+
+	DX12DescriptorID DX12DescriptorManager::AllocateBindlessDescriptorId() const noexcept
+	{
+		return GetFreeListAllocator(FreeListAllocatorType::BindlessSrv)->AllocateId();
+	}
+
+	void DX12DescriptorManager::RetireBindlessDescriptorId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) const noexcept
+	{
+		GetFreeListAllocator(FreeListAllocatorType::BindlessSrv)->RetireId(descriptorId, fencePoint);
+	}
 }
