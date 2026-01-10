@@ -13,11 +13,19 @@ namespace gglab
 			DX12FencePoint m_FencePoint;
 		};
 
+		enum class SlotState : uint8_t
+		{
+			Free,
+			Allocated,
+			Pending
+		};
+
 	public:
 		explicit DX12DescriptorFreeListAllocator(const CreateInfo& createInfo) noexcept;
 		~DX12DescriptorFreeListAllocator() override = default;
 
 		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
+
 		DX12DescriptorView AllocateView() noexcept;
 
 		DX12DescriptorID AllocateId() noexcept;
@@ -35,33 +43,31 @@ namespace gglab
 			const DX12FencePoint& fencePoint) noexcept override;
 
 	private:
-		void FreeCompleted() noexcept;
-		void FreeLocalSpanImmediately(const DX12DescriptorSpan& localSpan) noexcept;
+		bool TryMarkAllocated(const DX12DescriptorSpan& localSpan) noexcept;
+		bool TryMarkPending(const DX12DescriptorSpan& localSpan) noexcept;
+		bool MarkFreed(const DX12DescriptorSpan& localSpan) noexcept;
 
 		void AddPending(const Pending& pending) noexcept;
 
-		void MarkAllocated(const DX12DescriptorSpan& localSpan) noexcept;
-		void MarkFreed(const DX12DescriptorSpan& localSpan) noexcept;
+		void FreeCompleted() noexcept;
+		void FreeLocalSpanImmediately(const DX12DescriptorSpan& localSpan) noexcept;
+
+		void DeferFreeFromGlobalIndexInFrame(uint32_t globalIndex) noexcept;
 
 	private:
 		static DX12DescriptorSpan ToSpan(const AllocatorBase::IndexSpan& indexSpan) noexcept;
 
 	private:
+		static constexpr uint32_t FreeInFrameSpansReserveSize = 256;
+	private:
 		FreeListSpanAllocator m_Allocator;
+
 		std::deque<Pending> m_PendingQueue;
 		std::vector<DX12DescriptorSpan> m_FreeInFrameSpans;
+
 		std::vector<uint32_t> m_Generation;
+		std::vector<SlotState> m_SlotStates;
+
 		std::mutex m_Mutex;
-
-#if defined (BUILD_DEBUG)
-		struct AllocateState
-		{
-			static constexpr uint8_t Free = 0;
-			static constexpr uint8_t Allocated = 1;
-			static constexpr uint8_t Pending = 2;
-		};
-		std::vector<uint8_t> m_Allocated;
-
-#endif
 	};
 }

@@ -84,7 +84,8 @@ namespace gglab
 		TextureID m_Id{};
 		StringID m_Name{};
 		std::unique_ptr<DX12Texture> m_Texture;
-		DX12DescriptorID m_DescriptorID{};
+		DX12DescriptorHandle m_Descriptor{};
+		uint32_t m_DescriptorIndex = 0;
 		bool m_IsUploaded = false;
 	};
 
