@@ -98,8 +98,7 @@ namespace gglab
 		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
 		auto* developGui = static_cast<DevelopGui*>(info->UserData);
-		auto descriptorView = developGui->m_DescriptorManager->
-			GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->AllocateView();
+		auto descriptorView = developGui->m_DescriptorManager->AllocateDevelopGuiSrvView();
 		*outCpuHandle = descriptorView.m_CpuHandle;
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
@@ -109,7 +108,6 @@ namespace gglab
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
 	{
 		auto* developGui = static_cast<DevelopGui*>(info->UserData);
-		developGui->m_DescriptorManager->GetFreeListAllocator(
-			DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->DeferFreeFromGpuHandleInFrame(gpuHandle);
+		developGui->m_DescriptorManager->DeferFreeDevelopGuiSrvInFrame(gpuHandle);
 	}
 }

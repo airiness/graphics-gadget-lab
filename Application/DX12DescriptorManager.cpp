@@ -122,13 +122,45 @@ namespace gglab
 		return m_FreeListAllocators[static_cast<uint8_t>(allocatorType)].get();
 	}
 
-	DX12DescriptorID DX12DescriptorManager::AllocateBindlessDescriptorId() const noexcept
+	DX12DescriptorID DX12DescriptorManager::AllocateBindlessSrvId() noexcept
 	{
-		return GetFreeListAllocator(FreeListAllocatorType::BindlessSrv)->AllocateId();
+		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::BindlessSrv);
+		GGLAB_ASSERT(allocator != nullptr);
+
+		return allocator->AllocateId();
 	}
 
-	void DX12DescriptorManager::RetireBindlessDescriptorId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) const noexcept
+	void DX12DescriptorManager::RetireBindlessSrvId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept
 	{
-		GetFreeListAllocator(FreeListAllocatorType::BindlessSrv)->RetireId(descriptorId, fencePoint);
+		GGLAB_ASSERT(descriptorId.IsValid());
+
+		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::BindlessSrv);
+		GGLAB_ASSERT(allocator != nullptr);
+
+		allocator->RetireId(descriptorId, fencePoint);
+	}
+
+	DX12DescriptorView DX12DescriptorManager::AllocateDevelopGuiSrvView() noexcept
+	{
+		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::DevelopGuiSrv);
+		GGLAB_ASSERT(allocator != nullptr);
+
+		return allocator->AllocateView();
+	}
+
+	void DX12DescriptorManager::DeferFreeDevelopGuiSrvInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept
+	{
+		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::DevelopGuiSrv);
+		GGLAB_ASSERT(allocator != nullptr);
+
+		allocator->DeferFreeFromCpuHandleInFrame(cpuHandle);
+	}
+
+	void DX12DescriptorManager::DeferFreeDevelopGuiSrvInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept
+	{
+		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::DevelopGuiSrv);
+		GGLAB_ASSERT(allocator != nullptr);
+
+		allocator->DeferFreeFromGpuHandleInFrame(gpuHandle);
 	}
 }
