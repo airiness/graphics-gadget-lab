@@ -55,11 +55,6 @@ namespace gglab
 		DX12CommandAllocatorPool* GetCopyCommandAllocatorPool() const noexcept { return m_CopyCommandAllocatorPool.get(); }
 		DX12CommandAllocatorPool* GetTransferCommandAllocatorPool() const noexcept { return m_TransferCommandAllocatorPool.get(); }
 
-		DX12DescriptorFreeListAllocator* GetRtvDescriptorAllocator() const noexcept { return m_RtvDescriptorAllocator.get(); }
-		DX12DescriptorFreeListAllocator* GetDsvDescriptorAllocator() const noexcept { return m_DsvDescriptorAllocator.get(); }
-		DX12DescriptorFreeListAllocator* GetCbvSrvUavDescriptorAllocator() const noexcept { return m_CbvSrvUavDescriptorAllocator.get(); }
-		DX12DescriptorFreeListAllocator* GetSamplerDescriptorAllocator() const noexcept { return m_SamplerDescriptorAllocator.get(); }
-
 		bool SupportRayTracing() const noexcept { return m_FeatureSupport.m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_FeatureSupport.m_MeshShaderSupported; }
 		bool SupportTearing() const noexcept { return m_FeatureSupport.m_TearingSupported; }
@@ -80,7 +75,6 @@ namespace gglab
 		void InitializeCommandQueues() noexcept;
 		void InitializeCommandLists() noexcept;
 		void InitializeCommandAllocatorPools() noexcept;
-		void InitializeDescriptorAllocators() noexcept;
 		void InitializeMemAllocator() noexcept;
 		void CheckFeatureSupport() noexcept;
 
@@ -116,12 +110,6 @@ namespace gglab
 		std::unique_ptr<DX12CommandAllocatorPool> m_CopyCommandAllocatorPool;
 		std::unique_ptr<DX12CommandAllocatorPool> m_TransferCommandAllocatorPool;
 
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_CbvSrvUavDescriptorAllocator;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_RtvDescriptorAllocator;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_DsvDescriptorAllocator;
-		std::unique_ptr<DX12DescriptorFreeListAllocator> m_SamplerDescriptorAllocator;
-
 		bool m_IsInitialized = false;
-
 	};
 }

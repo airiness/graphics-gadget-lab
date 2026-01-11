@@ -4,7 +4,7 @@
 #include "DX12Device.h"
 #include "DX12RootSignature.h"
 #include "DX12PipelineState.h"
-#include "DX12Descriptor.h"
+#include "DX12DescriptorHeap.h"
 #include "DX12CommandAllocator.h"
 #include "HResult.h"
 
@@ -83,20 +83,42 @@ namespace gglab
 		m_D3D12GraphicsCommandList->IASetPrimitiveTopology(topology);
 	}
 
-	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12Descriptor* dsDescriptor) const noexcept
+	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors) const noexcept
 	{
-		const auto rtCount = rtDescriptors.size();
+		SetRenderTargets(rtDescriptors, {});
+	}
+
+	void DX12CommandList::SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors, const DX12DescriptorView& dsDescriptor) const noexcept
+	{
+		const UINT rtCount = static_cast<UINT>(rtDescriptors.size());
+
+		GGLAB_ASSERT_MSG(rtCount <= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT, "Too many RenderTargets.");
 
 		std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> rtHandles(rtCount);
-		for (int32_t index = 0; index < rtCount; ++index)
+		for (int32_t index = 0; index < static_cast<int32_t>(rtCount); ++index)
 		{
+			GGLAB_ASSERT(rtDescriptors[index].IsValid());
 			rtHandles.at(index) = (rtDescriptors[index].m_CpuHandle);
 		}
 
-		const auto dsDescriptorView = dsDescriptor ? dsDescriptor->ToView() : DX12DescriptorView{};
-		m_D3D12GraphicsCommandList->OMSetRenderTargets(static_cast<UINT>(rtCount),
-			rtHandles.data(), FALSE,
-			dsDescriptor ? &dsDescriptorView.m_CpuHandle : nullptr);
+		const D3D12_CPU_DESCRIPTOR_HANDLE* dsHandlePtr = nullptr;
+		D3D12_CPU_DESCRIPTOR_HANDLE dsHandle{};
+		if (dsDescriptor.IsValid())
+		{
+			dsHandle = dsDescriptor.m_CpuHandle;
+			dsHandlePtr = &dsHandle;
+		}
+		
+		m_D3D12GraphicsCommandList->OMSetRenderTargets(rtCount, rtHandles.data(), FALSE, dsHandlePtr);
+	}
+
+	void DX12CommandList::SetRenderTarget(const DX12DescriptorView& rtDsescriptor, const DX12DescriptorView& dsDescriptor) const noexcept
+	{
+		DX12DescriptorView rtDescriptors[] =
+		{
+			rtDsescriptor
+		};
+		SetRenderTargets(rtDescriptors, dsDescriptor);
 	}
 
 	void DX12CommandList::SetVertexBuffers(uint32_t startSlot, std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) const noexcept
@@ -114,9 +136,9 @@ namespace gglab
 		m_D3D12GraphicsCommandList->SetGraphicsRootConstantBufferView(parameterIndex, gpuAddress);
 	}
 
-	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12Descriptor& descriptor) const noexcept
+	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorHandle& descriptor) const noexcept
 	{
-		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.GpuHandle());
+		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.GpuHandleAt());
 	}
 
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
@@ -165,15 +187,27 @@ namespace gglab
 		m_GlobalBarriers.clear();
 	}
 
-	void DX12CommandList::ClearRenderTarget(const DX12Descriptor& rtDescriptor, const Color& color) const noexcept
+	void DX12CommandList::ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& color) const noexcept
 	{
+		GGLAB_ASSERT(rtDescriptor.m_DebugType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		if (!rtDescriptor.IsValid())
+		{
+			return;
+		}
+
 		float clearColor[4] = { color.R(), color.G(), color.B(), color.A() };
-		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.CpuHandle(), clearColor, 0, nullptr);
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.m_CpuHandle, clearColor, 0, nullptr);
 	}
 
-	void DX12CommandList::ClearDepthStencil(const DX12Descriptor& dsDescriptor,
+	void DX12CommandList::ClearDepthStencil(const DX12DescriptorView& dsDescriptor,
 		float depthClearValue, std::optional<uint8_t> stencilClearValue) const noexcept
 	{
+		GGLAB_ASSERT(dsDescriptor.m_DebugType == D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		if (!dsDescriptor.IsValid())
+		{
+			return;
+		}
+
 		uint8_t stencilValue = 0;
 		D3D12_CLEAR_FLAGS flags = D3D12_CLEAR_FLAG_DEPTH;
 		if (stencilClearValue.has_value())
@@ -181,7 +215,7 @@ namespace gglab
 			stencilValue = stencilClearValue.value();
 			flags |= D3D12_CLEAR_FLAG_STENCIL;
 		}
-		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.CpuHandle(), flags, depthClearValue, stencilValue, 0, nullptr);
+		m_D3D12GraphicsCommandList->ClearDepthStencilView(dsDescriptor.m_CpuHandle, flags, depthClearValue, stencilValue, 0, nullptr);
 	}
 
 	void DX12CommandList::DrawIndexedInstanced(uint32_t indexCount) const noexcept

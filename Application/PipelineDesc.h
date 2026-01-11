@@ -6,7 +6,7 @@ namespace gglab
 	struct GraphicsPipelineDesc
 	{
 		// Rootsignature
-		RootSignatureId m_RootSignatureId{};
+		RootSignatureID m_RootSignatureId{};
 		ID3D12RootSignature* m_RootSignature = nullptr;
 
 		// InputLayout
@@ -42,7 +42,7 @@ namespace gglab
 	struct ComputePipelineDesc
 	{
 		// Rootsignature
-		RootSignatureId m_RootSignatureId{};
+		RootSignatureID m_RootSignatureId{};
 		ID3D12RootSignature* m_RootSignature = nullptr;
 		// Shader
 		D3D12_SHADER_BYTECODE m_ComputeShader{};

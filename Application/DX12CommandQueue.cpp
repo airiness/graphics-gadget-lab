@@ -13,11 +13,13 @@ namespace gglab
 	{
 		GGLAB_ASSERT(m_DX12Device);
 
-		D3D12_COMMAND_QUEUE_DESC desc = {};
-		desc.Type = createInfo.m_Type;
-		desc.Priority = createInfo.m_Priority;
-		desc.Flags = createInfo.m_Flags;
-		desc.NodeMask = 0;
+		D3D12_COMMAND_QUEUE_DESC desc = 
+		{
+			.Type = createInfo.m_Type,
+			.Priority = createInfo.m_Priority,
+			.Flags = createInfo.m_Flags,
+			.NodeMask = 0
+		};
 
 		GGLAB_HR_DX(
 			m_DX12Device->Get()->CreateCommandQueue(

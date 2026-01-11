@@ -7,8 +7,8 @@ namespace gglab
 {
 	struct DrawItem
 	{
-		MeshId m_MeshId{};
-		MaterialId m_MaterialId{};
+		MeshID m_MeshId{};
+		MaterialID m_MaterialId{};
 		uint32_t m_ObjectOffset = 0;
 	};
 

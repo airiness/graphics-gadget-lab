@@ -13,7 +13,7 @@ namespace gglab::components
 
 	struct ModelComponent
 	{
-		ModelId m_ModelId{};
+		ModelID m_ModelId{};
 	};
 
 	struct LightComponent

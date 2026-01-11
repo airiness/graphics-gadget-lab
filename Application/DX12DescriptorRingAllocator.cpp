@@ -1,67 +1,76 @@
 #include "Precompiled.h"
 #include "DX12DescriptorRingAllocator.h"
+#include "DX12DescriptorHeap.h"
 
 namespace gglab
 {
-	DX12DescriptorRingAllocator::DX12DescriptorRingAllocator(
-		const DX12DescriptorHeap::CreateInfo& createInfo) noexcept :
+	DX12DescriptorRingAllocator::DX12DescriptorRingAllocator(const CreateInfo& createInfo) noexcept :
 		DX12DescriptorAllocatorBase(createInfo),
-		m_Allocator(createInfo.m_DescriptorCount)
+		m_Allocator(createInfo.m_Range.m_Count)
 	{
 	}
 
-	DX12Descriptor DX12DescriptorRingAllocator::Allocate(uint32_t count) noexcept
+	DX12DescriptorHandle DX12DescriptorRingAllocator::AllocateHandle(uint32_t count) noexcept
 	{
 		std::lock_guard	lock(m_Mutex);
 
 		FreeCompleted();
-		return CreateDescriptor(m_Allocator.Allocate(count));
+
+		const auto local = m_Allocator.Allocate(count);
+		if (!local.IsValid())
+		{
+			return {};
+		}
+
+		const DX12DescriptorSpan localSpan{ local.m_Index, local.m_Count };
+		const DX12DescriptorSpan globalSpan = ToGlobalSpan(localSpan);
+
+		return CreateHandleFromGlobalSpan(globalSpan, 0);
 	}
 
-	void DX12DescriptorRingAllocator::Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorRingAllocator::Tick() noexcept
 	{
-		RetireImpl(descriptor, fencePoint);
-		descriptor.Reset();
+		std::lock_guard lock(m_Mutex);
+
+		FreeCompleted();
 	}
 
-	void DX12DescriptorRingAllocator::RetireDescriptorInternal(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorRingAllocator::FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept
 	{
-		RetireImpl(descriptor, fencePoint);
+		GGLAB_ASSERT_MSG(false, "DX12DescriptorRingAllocator does not support Free(). Use Retire().");
+	}
+
+	void DX12DescriptorRingAllocator::RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
+		const DX12FencePoint& fencePoint) noexcept
+	{
+		std::lock_guard lock(m_Mutex);
+
+		GGLAB_ASSERT_MSG(descriptorHandle.OwnerAllocator() == this, "RetireHandleInternal: wrong owner.");
+		const DX12DescriptorSpan globalSpan{ descriptorHandle.Index(), descriptorHandle.Count() };
+		const DX12DescriptorSpan localSpan = ToLocalSpan(globalSpan);
+
+		m_Allocator.RecordRetire({ localSpan.m_Index, localSpan.m_Count }, fencePoint.GetValue());
+		m_PendingFences.push_back(fencePoint);
 	}
 
 	void DX12DescriptorRingAllocator::FreeCompleted() noexcept
 	{
 		uint64_t latestCompletedFenceValue = 0;
-		while (!m_Pendings.empty())
+		while (!m_PendingFences.empty())
 		{
-			auto& front = m_Pendings.front();
+			auto& front = m_PendingFences.front();
 			if (!front.IsCompleted())
 			{
 				break;
 			}
 
 			latestCompletedFenceValue = front.GetValue();
-			m_Pendings.pop_front();
+			m_PendingFences.pop_front();
 		}
 
-		m_Allocator.FreeCompletedVersion(latestCompletedFenceValue);
-	}
-
-	void DX12DescriptorRingAllocator::RetireImpl(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept
-	{
-		std::lock_guard lock(m_Mutex);
-		if (!descriptor.IsValid())
+		if (latestCompletedFenceValue != 0)
 		{
-			return;
+			m_Allocator.FreeCompletedVersion(latestCompletedFenceValue);
 		}
-
-		GGLAB_ASSERT_MSG(descriptor.Owner() == this, "Descriptor does not belong to this allocator.");
-
-		const auto index = descriptor.Index();
-		const auto count = descriptor.Count();
-
-		m_Allocator.RecordRetire({ index, count }, fencePoint.GetValue());
-
-		m_Pendings.emplace_back(fencePoint);
 	}
 }

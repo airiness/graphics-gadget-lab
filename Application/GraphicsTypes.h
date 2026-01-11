@@ -6,7 +6,7 @@
 #include "TypedIndex.h"
 #include "EnumFlags.h"
 #include "DX12Buffer.h"
-#include "DX12Descriptor.h"
+#include "DX12DescriptorTypes.h"
 
 namespace gglab
 {
@@ -16,9 +16,9 @@ namespace gglab
 	enum class CommonRSRootParamIndex : uint32_t
 	{
 		FrameCB = 0,	// b0
-		ObjectCB,	// g_ObjectIndex, b1
-		ObjectSB,	// g_Objects, t1
-		MaterialSB,	// g_Materials, t2
+		ObjectCB,		// g_ObjectIndex, b1
+		ObjectSB,		// g_Objects, t1
+		MaterialSB,		// g_Materials, t2
 		TextureDescriptorTable,	// g_BaseColorTex, t0
 		RootParamCount
 	};
@@ -57,48 +57,48 @@ namespace gglab
 	// ResourceIndex for render graph.
 	GGLAB_DEFINE_TYPED_INDEX(ResourceIndex, uint32_t);
 
-	// RootSignatureId
-	GGLAB_DEFINE_TYPED_INDEX(RootSignatureId, uint64_t);
+	// RootSignatureID
+	GGLAB_DEFINE_TYPED_INDEX(RootSignatureID, uint64_t);
 
-	// ShaderId
-	GGLAB_DEFINE_TYPED_INDEX(ShaderId, uint32_t);
+	// ShaderID
+	GGLAB_DEFINE_TYPED_INDEX(ShaderID, uint32_t);
 
-	// TextureId
-	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureId, uint32_t);
-	inline constexpr TextureId ReservedTextureID{ 5u };
+	// TextureID
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureID, uint32_t);
+	inline constexpr TextureID ReservedTextureID{ 5u };
 
-	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshId, uint32_t);
-	inline constexpr MeshId ProceduralCubeMeshID{ 0u };
-	inline constexpr MeshId ReservedMeshID{ 5u };
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshID, uint32_t);
+	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
+	inline constexpr MeshID ReservedMeshID{ 5u };
 
-	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialId, uint32_t);
-	inline constexpr MaterialId ProceduralCubeMaterialID{ 0u };
-	inline constexpr MaterialId ReservedMaterialID{ 5u };
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialID, uint32_t);
+	inline constexpr MaterialID ProceduralCubeMaterialID{ 0u };
+	inline constexpr MaterialID ReservedMaterialID{ 5u };
 
-	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelId, uint32_t);
-	inline constexpr ModelId ProceduralCubeModelID{ 0u };
-	inline constexpr ModelId ReservedModelID{ 5u };
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelID, uint32_t);
+	inline constexpr ModelID ProceduralCubeModelID{ 0u };
+	inline constexpr ModelID ReservedModelID{ 5u };
 
 	struct Texture
 	{
-		TextureId m_Id{};
-		StringId m_Name{};
+		TextureID m_Id{};
+		StringID m_Name{};
 		std::unique_ptr<DX12Texture> m_Texture;
-		DX12Descriptor m_Descriptor{};
+		DX12DescriptorHandle m_Descriptor{};
 		uint32_t m_DescriptorIndex = 0;
 		bool m_IsUploaded = false;
 	};
 
 	struct Material
 	{
-		MaterialId m_Id{};
-		StringId m_Name{};
+		MaterialID m_Id{};
+		StringID m_Name{};
 
-		TextureId m_BaseColorTex{};
-		TextureId m_MetallicRoughnessTex{};
-		TextureId m_NormalTex{};
-		TextureId m_OcclusionTex{};
-		TextureId m_EmissiveTex{};
+		TextureID m_BaseColorTex{};
+		TextureID m_MetallicRoughnessTex{};
+		TextureID m_NormalTex{};
+		TextureID m_OcclusionTex{};
+		TextureID m_EmissiveTex{};
 
 		Color m_BaseColor = color::White;
 		float m_MetallicFactor = 0.0f;
@@ -112,8 +112,8 @@ namespace gglab
 
 	struct Mesh
 	{
-		MeshId m_Id{};
-		StringId m_Name{};
+		MeshID m_Id{};
+		StringID m_Name{};
 
 		std::unique_ptr<DX12Buffer> m_VertexBuffer;
 		std::unique_ptr<DX12Buffer> m_IndexBuffer;
@@ -130,14 +130,14 @@ namespace gglab
 
 	struct ModelMesh
 	{
-		MeshId m_MeshId{};
-		MaterialId m_MaterialId{};
+		MeshID m_MeshId{};
+		MaterialID m_MaterialId{};
 	};
 
 	struct Model
 	{
-		ModelId m_Id{};
-		StringId m_Name;
+		ModelID m_Id{};
+		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		std::vector<ModelMesh> m_MeshInstance;
 	};

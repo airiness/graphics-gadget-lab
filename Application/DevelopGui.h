@@ -2,12 +2,14 @@
 
 namespace gglab
 {
+	struct DX12DescriptorView;
+
 	class DX12Device;
 	class DX12SwapChain;
-	class DX12Descriptor;
 	class DX12DescriptorHeap;
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
+	class DX12DescriptorManager;
 	class DevelopGui
 	{
 	public:
@@ -16,6 +18,7 @@ namespace gglab
 			HWND m_Hwnd = nullptr;
 			DX12Device* m_DX12Device = nullptr;
 			DX12SwapChain* m_SwapChain = nullptr;
+			DX12DescriptorManager* m_DescriptorManager = nullptr;
 		};
 
 	public:
@@ -27,7 +30,7 @@ namespace gglab
 		void Finalize() noexcept;
 
 		void NewFrame() noexcept;
-		void Render(DX12CommandList* commandList, const DX12Descriptor& rtv) noexcept;
+		void Render(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept;
 		void EndFrame() noexcept;
 
 	private:
@@ -41,6 +44,7 @@ namespace gglab
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
+		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
 		bool m_FrameOpen = false;
 	};

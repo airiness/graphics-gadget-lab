@@ -2,6 +2,8 @@
 
 #if defined(_DEBUG) || defined(DEBUG)
 #define BUILD_DEBUG
+#else
+#define BUILD_RELEASE
 #endif
 
 // Windows
@@ -63,6 +65,7 @@ using namespace Microsoft::WRL;
 #include <bit>
 #include <concepts>
 #include <fstream>
+#include <utility>
 
 // Project definitions
 #include "CoreMacros.h"

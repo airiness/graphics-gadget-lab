@@ -21,7 +21,7 @@ namespace gglab
 		m_Compiler->SetDefaultShaderConfig(defaultDesc);
 	}
 
-	ShaderId ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
+	ShaderID ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
 	{
 		ShaderDesc norm = m_Compiler->NormalizeShaderDesc(desc);
 
@@ -41,14 +41,14 @@ namespace gglab
 		if (!std::filesystem::exists(norm.m_SourcePath))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: File not found: {}", norm.m_SourcePath.string());
-			return ShaderId();
+			return ShaderID();
 		}
 
 		std::unique_ptr<Shader> shader = std::make_unique<Shader>(desc);
 		if (!RefreshShaderInternal(*shader, norm))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: Shader compile failed: {}", norm.m_SourcePath.string());
-			return ShaderId();
+			return ShaderID();
 		}
 
 		{
@@ -58,7 +58,7 @@ namespace gglab
 				return it->second;
 			}
 
-			ShaderId id{ static_cast<uint32_t>(m_Shaders.size()) };
+			ShaderID id{ static_cast<uint32_t>(m_Shaders.size()) };
 			m_Shaders.push_back(std::move(shader));
 			m_KeyIdMap.emplace(key, id);
 			return id;
@@ -94,7 +94,7 @@ namespace gglab
 		return count;
 	}
 
-	bool ShaderManager::RefreshShader(ShaderId shaderId) noexcept
+	bool ShaderManager::RefreshShader(ShaderID shaderId) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		if (!shaderId.IsValid() || shaderId.Value() >= m_Shaders.size() || !m_Shaders[shaderId.Value()])
@@ -104,7 +104,7 @@ namespace gglab
 		return RefreshShaderInternal(*m_Shaders[shaderId.Value()]);
 	}
 
-	D3D12_SHADER_BYTECODE ShaderManager::GetBytecode(ShaderId shaderId) const noexcept
+	D3D12_SHADER_BYTECODE ShaderManager::GetBytecode(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		D3D12_SHADER_BYTECODE bytecode{};
@@ -116,7 +116,7 @@ namespace gglab
 		return bytecode;
 	}
 
-	ShaderBlob* ShaderManager::GetBlob(ShaderId shaderId) const noexcept
+	ShaderBlob* ShaderManager::GetBlob(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
@@ -126,7 +126,7 @@ namespace gglab
 		return nullptr;
 	}
 
-	ShaderHash128 ShaderManager::GetHash(ShaderId shaderId) const noexcept
+	ShaderHash128 ShaderManager::GetHash(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
@@ -136,7 +136,7 @@ namespace gglab
 		return {};
 	}
 
-	uint64_t ShaderManager::GetGeneration(ShaderId shaderId) const noexcept
+	uint64_t ShaderManager::GetGeneration(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])

@@ -4,7 +4,6 @@
 #include "AssetManager.h"
 #include "InputManager.h"
 #include "ShaderManager.h"
-#include "TransferManager.h"
 #include "DemoManager.h"
 #include "RenderViewBuilder.h"
 #include "RenderSceneBuilder.h"
@@ -110,13 +109,11 @@ namespace gglab
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
 			return 0;
 		}
-		break;
 		case WM_DESTROY:
 		{
 			PostQuitMessage(0);
 			return 0;
 		}
-		break;
 		case WM_PAINT:
 		{
 			PAINTSTRUCT ps{};
@@ -124,7 +121,6 @@ namespace gglab
 			EndPaint(hWnd, &ps);
 			return 0;
 		}
-		break;
 		case WM_ACTIVATEAPP:
 		{
 			if (!app)
@@ -141,7 +137,6 @@ namespace gglab
 			}
 			return 0;
 		}
-		break;
 		case WM_ENTERSIZEMOVE:
 		{
 			if (!app)
@@ -153,7 +148,6 @@ namespace gglab
 			app->OnSuspend();
 			return 0;
 		}
-		break;
 		case WM_EXITSIZEMOVE:
 		{
 			if (!app)
@@ -172,7 +166,6 @@ namespace gglab
 
 			return 0;
 		}
-		break;
 		case WM_SIZE:
 		{
 			if (!app)
@@ -204,7 +197,6 @@ namespace gglab
 			}
 			return 0;
 		}
-		break;
 		default:
 		{
 		}
@@ -246,8 +238,12 @@ namespace gglab
 		rendererCreateInfo.m_Height = m_WindowHeight;
 		m_Renderer->Initialize(rendererCreateInfo);
 
-		m_TransferManager = std::make_unique<TransferManager>(m_Renderer->GetDevice(), 8 * 1024 * 1024);
-		m_AssetManager = std::make_unique<AssetManager>(m_Renderer->GetDevice(), m_TransferManager.get());
+		AssetManager::CreateInfo assetManagerCreateInfo{};
+		assetManagerCreateInfo.m_DX12Device = m_Renderer->GetDevice();
+		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
+		assetManagerCreateInfo.m_DescriptorManager = m_Renderer->GetDescriptorManager();
+		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
+
 		m_DemoManager = std::make_unique<DemoManager>();
 
 		InitializeAssets();
@@ -279,13 +275,12 @@ namespace gglab
 		m_InputManager->Update();
 
 		// Toggle Mouse Input Mode
-		auto keyboard = GetKeyboard();
-		if (keyboard)
+		if (const auto keyboard = GetKeyboard())
 		{
 			if (keyboard->IsKeyPressed(KeyCode::T))
 			{
 
-				if (auto mouse = GetMouse())
+				if (const auto mouse = GetMouse())
 				{
 					mouse->SetMouseMode(
 						(mouse->GetMouseMode() == Mouse::MouseMode::Absolute) ?
@@ -315,37 +310,37 @@ namespace gglab
 		demo->Update();
 
 		// Build render view
-		auto& camera = demo->GetCamera();
-		RenderViewBuilder::BuildInfo viewBuildInfo{
+		const auto& camera = demo->GetCamera();
+		const RenderViewBuilder::BuildInfo viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight
 		};
 		RenderView renderView = m_RenderViewBuilder->Build(viewBuildInfo);
 
-		// BDuild render scene
-		auto& world = demo->GetWorld();
-		RenderSceneBuilder::BuildInfo sceneBuildInfo{
+		// Build render scene
+		const auto& world = demo->GetWorld();
+		const RenderSceneBuilder::BuildInfo sceneBuildInfo{
 			.m_World = world,
 			.m_RenderView = renderView,
 			.m_AssetManager = *m_AssetManager,
-			.m_TransferManager = *m_TransferManager,
+			.m_TransferManager = *m_Renderer->GetTransferManager(),
 			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer()
 		};
-		auto renderSceneBuildResult = m_RenderSceneBuilder->Build(sceneBuildInfo);
+		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
 
 		// Update frame constant buffer
-		m_Renderer->UpdateFrameConstants(renderView, renderSceneBuildResult.m_RenderScene);
+		m_Renderer->UpdateFrameConstants(renderView, renderScene);
 
-		RenderFrameContext renderContext{
+		const RenderFrameContext renderContext{
 			.m_RenderView = &renderView,
-			.m_RenderScene = &renderSceneBuildResult.m_RenderScene,
+			.m_RenderScene = &renderScene,
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
-			.m_UploadFencePoint = renderSceneBuildResult.m_UploadFencePoint
+			.m_UploadFencePoint = uploadFencePoint
 		};
 
-		RenderServices services{
+		const RenderServices services{
 			.m_Renderer = m_Renderer.get(),
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get()
@@ -383,7 +378,6 @@ namespace gglab
 
 		m_DemoManager.reset();
 		m_AssetManager.reset();
-		m_TransferManager.reset();
 
 		if (m_Renderer)
 		{

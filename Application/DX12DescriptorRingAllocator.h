@@ -9,22 +9,24 @@ namespace gglab
 	class DX12DescriptorRingAllocator : public DX12DescriptorAllocatorBase
 	{
 	public:
-		explicit DX12DescriptorRingAllocator(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorRingAllocator);
+		explicit DX12DescriptorRingAllocator(const CreateInfo& createInfo) noexcept;
 		~DX12DescriptorRingAllocator() override = default;
 
-		DX12Descriptor Allocate(uint32_t count) noexcept;
-		void Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept;
+		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
+
+		void Tick() noexcept override;
 
 	protected:
-		void RetireDescriptorInternal(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept override;
+		void FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept override;
+		void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
+			const DX12FencePoint& fencePoint) noexcept override;
 
 	private:
 		void FreeCompleted() noexcept;
-		void RetireImpl(const DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept;
+
 	private:
 		RingSpanAllocator m_Allocator;
-		std::deque<DX12FencePoint> m_Pendings;
+		std::deque<DX12FencePoint> m_PendingFences;
 
 		std::mutex m_Mutex;
 	};

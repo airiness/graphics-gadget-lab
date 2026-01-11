@@ -6,6 +6,7 @@
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 #include "DX12CommandList.h"
+#include "DX12DescriptorManager.h"
 #include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 #include "PathUtils.h"
@@ -16,12 +17,14 @@
 
 namespace gglab
 {
-	AssetManager::AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept :
-		m_DX12Device(dx12Device),
-		m_TransferManager(transferManager)
+	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device),
+		m_TransferManager(createInfo.m_TransferManager),
+		m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
-		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device is null!");
-		GGLAB_ASSERT_MSG(transferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "DX12Device is null!");
+		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DX12DescriptorManager is null!");
 	}
 
 	AssetManager::~AssetManager()
@@ -33,7 +36,7 @@ namespace gglab
 		}
 	}
 
-	ModelId AssetManager::LoadModel(const std::filesystem::path& path) noexcept
+	ModelID AssetManager::LoadModel(const std::filesystem::path& path) noexcept
 	{
 		const auto canonicalPath = utils::Canonical(path);
 
@@ -62,7 +65,7 @@ namespace gglab
 		}
 	}
 
-	TextureId AssetManager::LoadTexture(const std::filesystem::path& path) noexcept
+	TextureID AssetManager::LoadTexture(const std::filesystem::path& path) noexcept
 	{
 		const auto canonicalPath = utils::Canonical(path);
 
@@ -85,12 +88,12 @@ namespace gglab
 		return textureId;
 	}
 
-	Texture* AssetManager::GetTexture(TextureId textureId) noexcept
+	Texture* AssetManager::GetTexture(TextureID textureId) noexcept
 	{
 		return const_cast<Texture*>(std::as_const(*this).GetTexture(textureId));
 	}
 
-	const Texture* AssetManager::GetTexture(TextureId textureId) const noexcept
+	const Texture* AssetManager::GetTexture(TextureID textureId) const noexcept
 	{
 		auto iter = m_TextureContainer.m_TextureIDMap.find(textureId);
 		if (iter != m_TextureContainer.m_TextureIDMap.end())
@@ -102,12 +105,12 @@ namespace gglab
 		return nullptr;
 	}
 
-	Mesh* AssetManager::GetMesh(MeshId meshId) noexcept
+	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
 	{
 		return const_cast<Mesh*>(std::as_const(*this).GetMesh(meshId));
 	}
 
-	const Mesh* AssetManager::GetMesh(MeshId meshId) const noexcept
+	const Mesh* AssetManager::GetMesh(MeshID meshId) const noexcept
 	{
 		auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
 		if (iter != m_MeshContainer.m_MeshIDMap.end())
@@ -119,12 +122,12 @@ namespace gglab
 		return nullptr;
 	}
 
-	Material* AssetManager::GetMaterial(MaterialId materialId) noexcept
+	Material* AssetManager::GetMaterial(MaterialID materialId) noexcept
 	{
 		return const_cast<Material*>(std::as_const(*this).GetMaterial(materialId));
 	}
 
-	const Material* AssetManager::GetMaterial(MaterialId materialId) const noexcept
+	const Material* AssetManager::GetMaterial(MaterialID materialId) const noexcept
 	{
 		auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
 		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
@@ -135,12 +138,12 @@ namespace gglab
 		return nullptr;
 	}
 
-	Model* AssetManager::GetModel(ModelId modelId) noexcept
+	Model* AssetManager::GetModel(ModelID modelId) noexcept
 	{
 		return const_cast<Model*>(std::as_const(*this).GetModel(modelId));
 	}
 
-	const Model* AssetManager::GetModel(ModelId modelId) const noexcept
+	const Model* AssetManager::GetModel(ModelID modelId) const noexcept
 	{
 		auto iter = m_ModelContainer.m_ModelIDMap.find(modelId);
 		if (iter != m_ModelContainer.m_ModelIDMap.end())
@@ -152,7 +155,7 @@ namespace gglab
 		return nullptr;
 	}
 
-	uint32_t AssetManager::GetTextureDescriptorIndex(TextureId textureId) const noexcept
+	uint32_t AssetManager::GetTextureDescriptorIndex(TextureID textureId) const noexcept
 	{
 		const auto* texture = GetTexture(textureId);
 		if (texture == nullptr || !texture->m_IsUploaded)
@@ -162,7 +165,7 @@ namespace gglab
 		return texture->m_DescriptorIndex;
 	}
 
-	MeshId AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
+	MeshID AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
 		GGLAB_ASSERT(mesh);
 
@@ -193,7 +196,7 @@ namespace gglab
 		return meshId;
 	}
 
-	MaterialId AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
+	MaterialID AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
 	{
 		GGLAB_ASSERT(material);
 
@@ -215,7 +218,7 @@ namespace gglab
 		return materialId;
 	}
 
-	ModelId AssetManager::AddModel(std::unique_ptr<Model>&& model) noexcept
+	ModelID AssetManager::AddModel(std::unique_ptr<Model>&& model) noexcept
 	{
 		GGLAB_ASSERT(model);
 
@@ -279,8 +282,10 @@ namespace gglab
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor& create srv
-		auto* srvDescriptorAllocator = m_DX12Device->GetCbvSrvUavDescriptorAllocator();
-		texture->m_Descriptor = std::move(srvDescriptorAllocator->Allocate());
+		// TODO: Bindless texture
+		auto* srvDescriptorAllocator = 
+			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
+		texture->m_Descriptor = std::move(srvDescriptorAllocator->AllocateHandle());
 
 		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -291,7 +296,7 @@ namespace gglab
 		m_DX12Device->Get()->CreateShaderResourceView(
 			texture->m_Texture->Get(),
 			&srvDesc,
-			texture->m_Descriptor.CpuHandle());
+			texture->m_Descriptor.CpuHandleAt());
 
 		texture->m_DescriptorIndex = 0;	// TODO: get global descriptor index
 
@@ -343,7 +348,7 @@ namespace gglab
 		mesh->m_IsUploaded = true;
 	}
 
-	ModelId AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
+	ModelID AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
 	{
 		const auto canonicalPath = utils::Canonical(path);
 		const auto directory = canonicalPath.parent_path();
@@ -368,7 +373,7 @@ namespace gglab
 
 		// Parse material datas
 		const auto aiMaterialCount = aiScene->mNumMaterials;
-		std::vector<MaterialId> materialIds(aiMaterialCount);
+		std::vector<MaterialID> materialIds(aiMaterialCount);
 		std::vector<TextureUploadData> texUploadDatas;
 		for (uint32_t materialIndex = 0; materialIndex < aiMaterialCount; ++materialIndex)
 		{
@@ -489,13 +494,13 @@ namespace gglab
 				}
 			}
 
-			material->m_Name = StringId(aiMaterial->GetName().C_Str());
+			material->m_Name = StringID(aiMaterial->GetName().C_Str());
 		}
 
 		// Create Model and Meshes.
 		const auto aiMeshCount = aiScene->mNumMeshes;
 
-		const ModelId modelId = CreateModel(canonicalPath);
+		const ModelID modelId = CreateModel(canonicalPath);
 		auto* model = GetModel(modelId);
 		GGLAB_ASSERT(model);
 		model->m_Id = modelId;
@@ -511,13 +516,13 @@ namespace gglab
 			auto& uploadData = meshUploadDatas[aiMeshIndex];
 			const auto* aiMesh = aiScene->mMeshes[aiMeshIndex];
 
-			const MeshId meshId = CreateMesh();
+			const MeshID meshId = CreateMesh();
 			uploadData.m_MeshId = meshId;
 
 			auto* mesh = GetMesh(meshId);
 			GGLAB_ASSERT(mesh);
 			mesh->m_Id = meshId;
-			mesh->m_Name = StringId(aiMesh->mName.C_Str());
+			mesh->m_Name = StringID(aiMesh->mName.C_Str());
 
 			ModelMesh modelMesh{};
 			modelMesh.m_MeshId = meshId;
@@ -595,7 +600,7 @@ namespace gglab
 		return modelId;
 	}
 
-	TextureId AssetManager::CreateTexture(const std::filesystem::path& canonicalPath) noexcept
+	TextureID AssetManager::CreateTexture(const std::filesystem::path& canonicalPath) noexcept
 	{
 		// Create new texture ID and emplace to TextureContainer.
 		const auto textureId = m_TextureIdCounter.Acquire();
@@ -608,36 +613,36 @@ namespace gglab
 		return textureId;
 	}
 
-	MeshId AssetManager::CreateMesh() noexcept
+	MeshID AssetManager::CreateMesh() noexcept
 	{
 		const auto meshId = m_MeshIdCounter.Acquire();
 		auto idMeshPair = m_MeshContainer.m_MeshIDMap.emplace(meshId, std::make_unique<Mesh>());
-		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace MeshId & meshPtr pair failed.");
+		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace MeshID & meshPtr pair failed.");
 
 		return meshId;
 	}
 
-	MaterialId AssetManager::CreateMaterial() noexcept
+	MaterialID AssetManager::CreateMaterial() noexcept
 	{
 		const auto materialId = m_MaterialIdCounter.Acquire();
 		auto idMatPair = m_MaterialContainer.m_MaterialIDMap.emplace(materialId, std::make_unique<Material>());
-		GGLAB_ASSERT_MSG(idMatPair.second == true, "Emplace MaterialId & materialPtr pair failed.");
+		GGLAB_ASSERT_MSG(idMatPair.second == true, "Emplace MaterialID & materialPtr pair failed.");
 
 		return materialId;
 	}
 
-	ModelId AssetManager::CreateModel(const std::filesystem::path& canonicalPath) noexcept
+	ModelID AssetManager::CreateModel(const std::filesystem::path& canonicalPath) noexcept
 	{
 		const auto modelId = m_ModelIdCounter.Acquire();
 		auto pathIdPair = m_ModelContainer.m_PathIDMap.emplace(canonicalPath, modelId);
-		GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path & ModelId pair failed.");
+		GGLAB_ASSERT_MSG(pathIdPair.second == true, "Emplace path & ModelID pair failed.");
 
 		auto idModelPair = m_ModelContainer.m_ModelIDMap.emplace(modelId, std::make_unique<Model>());
-		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelId & ModelPtr pair failed.");
+		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelID & ModelPtr pair failed.");
 		return modelId;
 	}
 
-	TextureId AssetManager::FindTexture(const std::filesystem::path& canonicalPath) const noexcept
+	TextureID AssetManager::FindTexture(const std::filesystem::path& canonicalPath) const noexcept
 	{
 		auto& texNameIdsMap = m_TextureContainer.m_PathIDMap;
 		auto searchIter = texNameIdsMap.find(canonicalPath);
@@ -645,10 +650,10 @@ namespace gglab
 		{
 			return searchIter->second;
 		}
-		return InvalidTextureId;
+		return InvalidTextureID;
 	}
 
-	ModelId AssetManager::FindModel(const std::filesystem::path& canonicalPath) const noexcept
+	ModelID AssetManager::FindModel(const std::filesystem::path& canonicalPath) const noexcept
 	{
 		auto& modelPathMap = m_ModelContainer.m_PathIDMap;
 		auto searchIter = modelPathMap.find(canonicalPath);
@@ -656,14 +661,14 @@ namespace gglab
 		{
 			return searchIter->second;
 		}
-		return InvalidModelId;
+		return InvalidModelID;
 	}
 
 	AssetManager::TextureUploadData& AssetManager::LoadTextureScratchImage(
 		const std::filesystem::path& texPath,
 		TextureUploadData& uploadData) noexcept
 	{
-		GGLAB_ASSERT_MSG(uploadData.m_TextureId != InvalidTextureId, "Invalid TextureUploadData");
+		GGLAB_ASSERT_MSG(uploadData.m_TextureId != InvalidTextureID, "Invalid TextureUploadData");
 		GGLAB_ASSERT_MSG(std::filesystem::exists(texPath), "Invalid texture file path.");
 
 		const auto extension = texPath.extension().string();

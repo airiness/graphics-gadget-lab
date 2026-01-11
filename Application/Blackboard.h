@@ -23,7 +23,7 @@ namespace gglab
 	struct BlackboardKey
 	{
 		RGTypeId m_TypeId;
-		StringId m_Name;
+		StringID m_Name;
 
 		auto AsTuple() const noexcept
 		{
@@ -44,62 +44,62 @@ namespace gglab
 		void Reset() noexcept;
 
 		template<typename T>
-		bool Contains() const noexcept { return Contains<T>(StringId{}); }
+		bool Contains() const noexcept { return Contains<T>(StringID{}); }
 
 		template<typename T>
-		bool Contains(const char* name) const noexcept { return Contains<T>(StringId(name)); }
+		bool Contains(const char* name) const noexcept { return Contains<T>(StringID(name)); }
 
 		template<typename T>
-		T* TryGet() noexcept { return TryGet<T>(StringId{}); }
+		T* TryGet() noexcept { return TryGet<T>(StringID{}); }
 
 		template<typename T>
-		T* TryGet(const char* name) noexcept { return TryGet<T>(StringId(name)); }
+		T* TryGet(const char* name) noexcept { return TryGet<T>(StringID(name)); }
 
 		template<typename T>
-		const T* TryGet() const noexcept { return TryGet<T>(StringId{}); }
+		const T* TryGet() const noexcept { return TryGet<T>(StringID{}); }
 
 		template<typename T>
-		const T* TryGet(const char* name) const noexcept { return TryGet<T>(StringId(name)); }
+		const T* TryGet(const char* name) const noexcept { return TryGet<T>(StringID(name)); }
 
 		template<typename T>
-		T& Get() noexcept { return Get<T>(StringId{}); }
+		T& Get() noexcept { return Get<T>(StringID{}); }
 
 		template<typename T>
-		T& Get(const char* name) noexcept { return Get<T>(StringId(name)); }
+		T& Get(const char* name) noexcept { return Get<T>(StringID(name)); }
 
 		template<typename T, typename... ARGS>
 		T& Create(ARGS&&... args) noexcept
 		{
-			return Create<T>(StringId{}, std::forward<ARGS>(args)...);
+			return Create<T>(StringID{}, std::forward<ARGS>(args)...);
 		}
 
 		template<typename T, typename... ARGS>
 		T& Create(const char* name, ARGS&&... args) noexcept
 		{
-			return Create<T>(StringId(name), std::forward<ARGS>(args)...);
+			return Create<T>(StringID(name), std::forward<ARGS>(args)...);
 		}
 
 		template<typename T, typename... ARGS>
 		T& GetOrCreate(ARGS&&... args) noexcept
 		{
-			return GetOrCreate<T>(StringId{}, std::forward<ARGS>(args)...);
+			return GetOrCreate<T>(StringID{}, std::forward<ARGS>(args)...);
 		}
 
 		template<typename T, typename... ARGS>
 		T& GetOrCreate(const char* name, ARGS&&... args) noexcept
 		{
-			return GetOrCreate<T>(StringId(name), std::forward<ARGS>(args)...);
+			return GetOrCreate<T>(StringID(name), std::forward<ARGS>(args)...);
 		}
 
 		template<typename T>
-		void Set(const T& value) noexcept { Set<T>(StringId{}, value); }
+		void Set(const T& value) noexcept { Set<T>(StringID{}, value); }
 
 		template<typename T>
-		void Set(const char* name, const T& value) noexcept { Set<T>(StringId(name), value); }
+		void Set(const char* name, const T& value) noexcept { Set<T>(StringID(name), value); }
 
 	private:
 		template<typename T>
-		bool Contains(StringId nameId) const noexcept
+		bool Contains(StringID nameId) const noexcept
 		{
 			BlackboardKey key{};
 			key.m_TypeId = MakeRGTypeId<T>();
@@ -109,7 +109,7 @@ namespace gglab
 		}
 
 		template<typename T>
-		T* TryGet(StringId nameId) noexcept
+		T* TryGet(StringID nameId) noexcept
 		{
 			BlackboardKey key{};
 			key.m_TypeId = MakeRGTypeId<T>();
@@ -125,7 +125,7 @@ namespace gglab
 		}
 
 		template<typename T>
-		T& Get(StringId nameId) noexcept
+		T& Get(StringID nameId) noexcept
 		{
 			T* ptr = TryGet<T>(nameId);
 			GGLAB_ASSERT_MSG(ptr != nullptr,
@@ -134,7 +134,7 @@ namespace gglab
 		}
 
 		template<typename T, typename... ARGS>
-		T& Create(StringId nameId, ARGS&&... args) noexcept
+		T& Create(StringID nameId, ARGS&&... args) noexcept
 		{
 			BlackboardKey key{};
 			key.m_TypeId = MakeRGTypeId<T>();
@@ -150,7 +150,7 @@ namespace gglab
 		}
 
 		template<typename T, typename... ARGS>
-		T& GetOrCreate(StringId nameId, ARGS&&... args) noexcept
+		T& GetOrCreate(StringID nameId, ARGS&&... args) noexcept
 		{
 			if (T* ptr = TryGet<T>(nameId))
 			{
@@ -160,7 +160,7 @@ namespace gglab
 		}
 
 		template<typename T>
-		void Set(StringId nameId, const T& value) noexcept
+		void Set(StringID nameId, const T& value) noexcept
 		{
 			T& object = GetOrCreate<T>(nameId);
 			object = value;

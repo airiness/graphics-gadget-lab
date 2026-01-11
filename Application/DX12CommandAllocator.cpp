@@ -35,10 +35,11 @@ namespace gglab
 			}
 		}
 
-		DX12CommandAllocator::CreateInfo createInfo{};
-		createInfo.m_DX12Device = m_DX12Device;
-		createInfo.m_Type = m_Type;
-
+		DX12CommandAllocator::CreateInfo createInfo
+		{
+			.m_DX12Device = m_DX12Device,
+			.m_Type = m_Type
+		};
 		auto newAllocator = std::make_unique<DX12CommandAllocator>(createInfo);
 		auto allocatorPtr = newAllocator.get();
 		m_Pool.push_back(std::move(newAllocator));

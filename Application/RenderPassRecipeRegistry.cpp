@@ -13,7 +13,7 @@ namespace gglab
 	const CachedGraphics& RenderPassRecipeRegistry::GetOrCreateGraphics(std::string_view passId, const GraphicsKeyInputs& input, const GraphicsBuilder& builder) noexcept
 	{
 		const size_t hash = KeyHash<GraphicsKeyInputs>{}(input);
-		StringId passIdKey(passId);
+		StringID passIdKey(passId);
 
 		{
 			std::shared_lock lock(m_Mutex);
@@ -54,7 +54,7 @@ namespace gglab
 	const CachedCompute& RenderPassRecipeRegistry::GetOrCreateCompute(std::string_view passId, const ComputeKeyInputs& input, const ComputeBuilder& builder) noexcept
 	{
 		const size_t hash = KeyHash<ComputeKeyInputs>{}(input);
-		StringId passIdKey(passId);
+		StringID passIdKey(passId);
 	
 		{
 			std::shared_lock lock(m_Mutex);
@@ -97,16 +97,16 @@ namespace gglab
 	bool RenderPassRecipeRegistry::EraseGraphics(std::string_view passId) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
-		return m_GraphicsMap.erase(StringId(passId)) > 0;
+		return m_GraphicsMap.erase(StringID(passId)) > 0;
 	}
 
 	bool RenderPassRecipeRegistry::EraseCompute(std::string_view passId) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
-		return m_ComputeMap.erase(StringId(passId)) > 0;
+		return m_ComputeMap.erase(StringID(passId)) > 0;
 	}
 
-	size_t RenderPassRecipeRegistry::InvalidateByShader(const std::vector<ShaderId>& shaderIds) noexcept
+	size_t RenderPassRecipeRegistry::InvalidateByShader(const std::vector<ShaderID>& shaderIds) noexcept
 	{
 		if (shaderIds.empty())
 		{
@@ -116,7 +116,7 @@ namespace gglab
 		std::unique_lock lock(m_Mutex);
 		auto hitGraphics = [&](const GraphicsKeyInputs& input) -> bool
 			{
-				for (ShaderId id : shaderIds)
+				for (ShaderID id : shaderIds)
 				{
 					if (!id.IsValid())
 					{
@@ -137,7 +137,7 @@ namespace gglab
 
 		auto hitCompute = [&](const ComputeKeyInputs& input) -> bool
 			{
-				for (ShaderId id : shaderIds)
+				for (ShaderID id : shaderIds)
 				{
 					if (!id.IsValid())
 					{

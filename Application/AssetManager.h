@@ -8,19 +8,27 @@ namespace gglab
 {
 	class DX12Device;
 	class TransferManager;
+	class DX12DescriptorManager;
 
 	class AssetManager
 	{
 	public:
+		struct CreateInfo
+		{
+			DX12Device* m_DX12Device = nullptr;
+			TransferManager* m_TransferManager = nullptr;
+			DX12DescriptorManager* m_DescriptorManager = nullptr;
+		};
+
 		struct TextureUploadData
 		{
-			TextureId m_TextureId{};
+			TextureID m_TextureId{};
 			DirectX::ScratchImage m_ScratchImage;
 		};
 
 		struct MeshUploadData
 		{
-			MeshId m_MeshId{};
+			MeshID m_MeshId{};
 			std::vector<Vertex> m_VerticesData;
 			std::vector<uint32_t> m_IndicesData;
 		};
@@ -28,65 +36,65 @@ namespace gglab
 	private:
 		struct TextureContainer
 		{
-			std::unordered_map<std::filesystem::path, TextureId> m_PathIDMap;
-			std::unordered_map<TextureId, std::unique_ptr<Texture>> m_TextureIDMap;
+			std::unordered_map<std::filesystem::path, TextureID> m_PathIDMap;
+			std::unordered_map<TextureID, std::unique_ptr<Texture>> m_TextureIDMap;
 		};
 
 		struct MeshContainer
 		{
-			std::unordered_map<MeshId, std::unique_ptr<Mesh>> m_MeshIDMap;
+			std::unordered_map<MeshID, std::unique_ptr<Mesh>> m_MeshIDMap;
 		};
 
 		struct MaterialContainer
 		{
-			std::unordered_map<MaterialId, std::unique_ptr<Material>> m_MaterialIDMap;
+			std::unordered_map<MaterialID, std::unique_ptr<Material>> m_MaterialIDMap;
 		};
 
 		struct ModelContainer
 		{
-			std::unordered_map<std::filesystem::path, ModelId> m_PathIDMap;
-			std::unordered_map<ModelId, std::unique_ptr<Model>> m_ModelIDMap;
+			std::unordered_map<std::filesystem::path, ModelID> m_PathIDMap;
+			std::unordered_map<ModelID, std::unique_ptr<Model>> m_ModelIDMap;
 		};
 
 	public:
-		explicit AssetManager(DX12Device* dx12Device, TransferManager* transferManager) noexcept;
+		explicit AssetManager(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
-		ModelId LoadModel(const std::filesystem::path& path) noexcept;
-		TextureId LoadTexture(const std::filesystem::path& path) noexcept;
+		ModelID LoadModel(const std::filesystem::path& path) noexcept;
+		TextureID LoadTexture(const std::filesystem::path& path) noexcept;
 
-		Texture* GetTexture(TextureId textureId) noexcept;
-		const Texture* GetTexture(TextureId textureId) const noexcept;
+		Texture* GetTexture(TextureID textureId) noexcept;
+		const Texture* GetTexture(TextureID textureId) const noexcept;
 
-		Mesh* GetMesh(MeshId meshId) noexcept;
-		const Mesh* GetMesh(MeshId meshId) const noexcept;
+		Mesh* GetMesh(MeshID meshId) noexcept;
+		const Mesh* GetMesh(MeshID meshId) const noexcept;
 
-		Material* GetMaterial(MaterialId materialId) noexcept;
-		const Material* GetMaterial(MaterialId materialId) const noexcept;
+		Material* GetMaterial(MaterialID materialId) noexcept;
+		const Material* GetMaterial(MaterialID materialId) const noexcept;
 
-		Model* GetModel(ModelId modelId) noexcept;
-		const Model* GetModel(ModelId modelId) const noexcept;
+		Model* GetModel(ModelID modelId) noexcept;
+		const Model* GetModel(ModelID modelId) const noexcept;
 
-		uint32_t GetTextureDescriptorIndex(TextureId textureId) const noexcept;
+		uint32_t GetTextureDescriptorIndex(TextureID textureId) const noexcept;
 
-		MeshId AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
-		MaterialId AddMaterial(std::unique_ptr<Material>&& material) noexcept;
-		ModelId AddModel(std::unique_ptr<Model>&& model) noexcept;
+		MeshID AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
+		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
+		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
 
 	private:
 		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
 		void UploadMesh(const MeshUploadData& uploadData, CopyContext& copyContext) noexcept;
 
-		ModelId LoadModelGltf(const std::filesystem::path& path) noexcept;
+		ModelID LoadModelGltf(const std::filesystem::path& path) noexcept;
 
-		TextureId CreateTexture(const std::filesystem::path& canonicalPath) noexcept;
-		MeshId CreateMesh() noexcept;
-		MaterialId CreateMaterial() noexcept;
-		ModelId CreateModel(const std::filesystem::path& canonicalPath) noexcept;
+		TextureID CreateTexture(const std::filesystem::path& canonicalPath) noexcept;
+		MeshID CreateMesh() noexcept;
+		MaterialID CreateMaterial() noexcept;
+		ModelID CreateModel(const std::filesystem::path& canonicalPath) noexcept;
 
-		TextureId FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
-		ModelId FindModel(const std::filesystem::path& canonicalPath) const noexcept;
+		TextureID FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
+		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 
 		TextureUploadData& LoadTextureScratchImage(const std::filesystem::path& texPath,
 			TextureUploadData& uploadData) noexcept;
@@ -94,11 +102,12 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
+		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
-		TextureIdCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
-		MeshIdCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
-		MaterialIdCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
-		ModelIdCounter m_ModelIdCounter{ ReservedModelID.Value() + 1u };
+		TextureIDCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
+		MeshIDCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
+		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
+		ModelIDCounter m_ModelIdCounter{ ReservedModelID.Value() + 1u };
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;

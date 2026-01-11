@@ -6,7 +6,6 @@ namespace gglab
 	class AssetManager;
 	class InputManager;
 	class ShaderManager;
-	class TransferManager;
 	class DemoManager;
 	class RenderViewBuilder;
 	class RenderSceneBuilder;
@@ -41,7 +40,6 @@ namespace gglab
 		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
 		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager.get(); }
-		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
 
 		Keyboard* GetKeyboard() const noexcept;
 		Mouse* GetMouse() const noexcept;
@@ -87,7 +85,6 @@ namespace gglab
 		std::unique_ptr<AssetManager> m_AssetManager;
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
-		std::unique_ptr<TransferManager> m_TransferManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<RenderViewBuilder> m_RenderViewBuilder;
 		std::unique_ptr<RenderSceneBuilder> m_RenderSceneBuilder;

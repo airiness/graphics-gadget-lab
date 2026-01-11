@@ -9,44 +9,64 @@ namespace gglab
 	private:
 		struct Pending
 		{
-			FreeListSpanAllocator::IndexSpan m_Span;
+			DX12DescriptorSpan m_Span;
 			DX12FencePoint m_FencePoint;
 		};
 
+		enum class SlotState : uint8_t
+		{
+			Free,
+			Allocated,
+			Pending
+		};
+
 	public:
-		explicit DX12DescriptorFreeListAllocator(const DX12DescriptorHeap::CreateInfo& createInfo) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorFreeListAllocator);
+		explicit DX12DescriptorFreeListAllocator(const CreateInfo& createInfo) noexcept;
 		~DX12DescriptorFreeListAllocator() override = default;
 
-		DX12Descriptor Allocate(uint32_t count = 1) noexcept;
-		void Free(DX12Descriptor& descriptor) noexcept;
+		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
 
-		void Retire(DX12Descriptor& descriptor, const DX12FencePoint& fencePoint) noexcept;
+		DX12DescriptorView AllocateView() noexcept;
 
-		void FreeInFrame(DX12Descriptor& descriptor) noexcept;
+		DX12DescriptorID AllocateId() noexcept;
+		void RetireId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 
-		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
-		
-		DX12DescriptorView AllocateRaw() noexcept;
-		void FreeRaw(DX12DescriptorView view) noexcept;
+		void DeferFreeFromCpuHandleInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept;
+		void DeferFreeFromGpuHandleInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept;
+
+		void Tick() noexcept override;
+		void EndFrame(const DX12FencePoint& fencePoint) noexcept override;
 
 	protected:
-		void FreeDescriptorInternal(DX12Descriptor& descriptor) noexcept override;
-		void RetireDescriptorInternal(const DX12Descriptor& descriptor, 
+		void FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept override;
+		void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
 			const DX12FencePoint& fencePoint) noexcept override;
 
 	private:
-		void FreeCompleted() noexcept;
-		void RetireImpl(const DX12Descriptor& descriptor,
-			const DX12FencePoint& fencePoint) noexcept;
+		bool TryMarkAllocated(const DX12DescriptorSpan& localSpan) noexcept;
+		bool TryMarkPending(const DX12DescriptorSpan& localSpan) noexcept;
+		bool MarkFreed(const DX12DescriptorSpan& localSpan) noexcept;
 
-		static FreeListSpanAllocator::IndexSpan ToIndexSpan(const DX12Descriptor& descriptor) noexcept;
-		static FreeListSpanAllocator::IndexSpan ToIndexSpan(uint32_t index, uint32_t count) noexcept;
+		void AddPending(const Pending& pending) noexcept;
+
+		void FreeCompleted() noexcept;
+		void FreeLocalSpanImmediately(const DX12DescriptorSpan& localSpan) noexcept;
+
+		void DeferFreeFromGlobalIndexInFrame(uint32_t globalIndex) noexcept;
 
 	private:
+		static DX12DescriptorSpan ToSpan(const AllocatorBase::IndexSpan& indexSpan) noexcept;
+
+	private:
+		static constexpr uint32_t FreeInFrameSpansReserveSize = 256;
+	private:
 		FreeListSpanAllocator m_Allocator;
-		std::deque<Pending> m_Pendings;
-		std::vector<FreeListSpanAllocator::IndexSpan> m_FreeInFrameSpans;
+
+		std::deque<Pending> m_PendingQueue;
+		std::vector<DX12DescriptorSpan> m_FreeInFrameSpans;
+
+		std::vector<uint32_t> m_Generation;
+		std::vector<SlotState> m_SlotStates;
 
 		std::mutex m_Mutex;
 	};

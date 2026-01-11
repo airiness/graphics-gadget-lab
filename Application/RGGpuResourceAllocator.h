@@ -149,7 +149,7 @@ namespace gglab
 		std::unordered_map<TextureKey, std::deque<ResourceIndex>, TextureKeyHash> m_FreeTextures;
 		std::unordered_map<BufferKey, std::deque<ResourceIndex>, BufferKeyHash> m_FreeBuffers;
 
-		std::deque<Pending> m_Pendings;
+		std::deque<Pending> m_Pending;
 
 		uint32_t m_MaxCachedPerKey = 8;
 	};

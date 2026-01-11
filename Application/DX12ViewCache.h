@@ -1,5 +1,5 @@
 #pragma once
-#include "DX12Descriptor.h"
+#include "DX12DescriptorManager.h"
 #include "GraphicsTypes.h"
 #include "FNV1a.h"
 
@@ -7,7 +7,7 @@ namespace gglab
 {
 	class DX12Device;
 	class DX12Texture;
-	class DX12DescriptorFreeListAllocator;
+	class DX12DescriptorManager;
 	class DX12FencePoint;
 
 	enum class ViewType : uint8_t
@@ -17,14 +17,13 @@ namespace gglab
 		SRV,
 		UAV,
 	};
-	static constexpr uint32_t AllocatorSlotCount = 3;
 
 	template<ViewType T> struct ViewTraits;
 
 	struct ViewKey
 	{
 		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
-		ResourceIndex m_ResouceIndex;
+		ResourceIndex m_ResourceIndex;
 		uint32_t m_ComponentMapping = 0;
 		uint16_t m_MipSlice = 0;
 		uint16_t m_MipLevels = 0;
@@ -37,7 +36,7 @@ namespace gglab
 		constexpr bool operator==(const ViewKey&) const noexcept = default;
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(m_Type, m_Format, m_ResouceIndex.Value(), m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
+			return std::make_tuple(m_Type, m_Format, m_ResourceIndex.Value(), m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
 		}
 	};
 	using ViewKeyHash = KeyHash<ViewKey>;
@@ -45,17 +44,21 @@ namespace gglab
 	class DX12ViewCache
 	{
 	public:
-		using DescriptorsAllocatorArray = std::array<DX12DescriptorFreeListAllocator*, AllocatorSlotCount>;
+		struct CreateInfo
+		{
+			DX12Device* m_DX12Device = nullptr;
+			DX12DescriptorManager* m_DescriptorManager = nullptr;
+		};
 
 	public:
-		explicit DX12ViewCache(DX12Device* dx12Device, const DescriptorsAllocatorArray& descriptorAllocators) noexcept;
+		explicit DX12ViewCache(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ViewCache);
 		~DX12ViewCache();
 
-		const DX12Descriptor& GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
+		DX12DescriptorView GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
 
 		template<ViewType T>
-		const DX12Descriptor& GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
+		DX12DescriptorView GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
 			std::optional<typename ViewTraits<T>::Desc> descOpt = std::nullopt) noexcept
 		{
 			return GetOrCreateImpl<T>(resourceIndex, texture, descOpt);
@@ -75,55 +78,62 @@ namespace gglab
 		}
 
 	private:
-		DX12DescriptorFreeListAllocator* GetDescriptorAllocator(ViewType type) const noexcept;
+		template<ViewType T>
+		DX12DescriptorHandle AllocateHandle() const noexcept
+		{
+			constexpr auto allocatorType = ViewTraits<T>::AllocatorType;
+			auto* allocator = m_DescriptorManager->GetFreeListAllocator(allocatorType);
+			return allocator->AllocateHandle();
+		}
 
 		template<ViewType T>
-		const DX12Descriptor& GetOrCreateImpl(ResourceIndex resourceIndex,
+		DX12DescriptorView GetOrCreateImpl(ResourceIndex resourceIndex,
 			DX12Texture* texture,
 			std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept;
 
 		template<ViewType T>
-		const DX12Descriptor& CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept;
+		DX12DescriptorView CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept;
 
 		template<ViewType T>
-		static typename ViewTraits<T>::Desc DescFromKey(const ViewKey& key) noexcept;
+		static typename ViewTraits<T>::Desc DescFromKey(const ViewKey&) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
-		DescriptorsAllocatorArray m_DescriptorAllocators;
+		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
-		std::unordered_map<ViewKey, DX12Descriptor, ViewKeyHash> m_Cache;
+		std::unordered_map<ViewKey, DX12DescriptorHandle, ViewKeyHash> m_Cache;
 		std::unordered_map<ResourceIndex, std::vector<ViewKey>> m_ResourceViews;
 
 		struct Pending
 		{
 			ResourceIndex m_ResourceIndex;
 			DX12FencePoint m_FencePoint;
-			std::vector<DX12Descriptor> m_Descriptors;
+			std::vector<DX12DescriptorHandle> m_Descriptors;
 		};
 
-		std::deque<Pending> m_Pendings;
+		std::deque<Pending> m_PendingQueue;
 		mutable std::shared_mutex m_Mutex;
 	};
 
-#define DEF_VIEW_TRAITS(viewType, descType)																							\
-	template<>																														\
-	struct ViewTraits<viewType>																										\
-	{																																\
-		using Desc = descType;																										\
-		struct Built																												\
-		{																															\
-			ViewKey m_Key;																											\
-			Desc m_Desc;																											\
-		};																															\
-		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;							\
-		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12Descriptor& descriptor) noexcept;	\
+#define DEF_VIEW_TRAITS(viewType, descType, allocatorType)																					\
+	template<>																																\
+	struct ViewTraits<viewType>																												\
+	{																																		\
+		using Desc = descType;																												\
+		struct Built																														\
+		{																																	\
+			ViewKey m_Key;																													\
+			Desc m_Desc;																													\
+		};																																	\
+		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;									\
+		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept;	\
+		static constexpr DX12DescriptorManager::FreeListAllocatorType AllocatorType = (allocatorType);										\
 	};
 
-	DEF_VIEW_TRAITS(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
-	DEF_VIEW_TRAITS(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);
-	DEF_VIEW_TRAITS(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC);
-	DEF_VIEW_TRAITS(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC);
+	DEF_VIEW_TRAITS(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralRtv);
+	DEF_VIEW_TRAITS(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralDsv);
+	DEF_VIEW_TRAITS(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
+	DEF_VIEW_TRAITS(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
 
 #undef DEF_VIEW_TRAITS
 

@@ -25,15 +25,15 @@ namespace gglab
 
 		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
 
-		ShaderId LoadShader(const ShaderDesc& desc) noexcept;
+		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
 		void Preload(const std::vector<ShaderDesc>& descList) noexcept;
 		
 		int32_t RefreshChanged() noexcept;
-		bool RefreshShader(ShaderId shaderId) noexcept;
-		D3D12_SHADER_BYTECODE GetBytecode(ShaderId shaderId) const noexcept;
-		ShaderBlob* GetBlob(ShaderId shaderId) const noexcept;
-		ShaderHash128 GetHash(ShaderId shaderId) const noexcept;
-		uint64_t GetGeneration(ShaderId shaderId) const noexcept;
+		bool RefreshShader(ShaderID shaderId) noexcept;
+		D3D12_SHADER_BYTECODE GetBytecode(ShaderID shaderId) const noexcept;
+		ShaderBlob* GetBlob(ShaderID shaderId) const noexcept;
+		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
+		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
 
 	private:
 		bool RefreshShaderInternal(Shader& shader) noexcept;
@@ -41,7 +41,7 @@ namespace gglab
 
 	private:
 		mutable std::shared_mutex m_Mutex;
-		std::unordered_map<ShaderKey, ShaderId, ShaderKeyHash> m_KeyIdMap;
+		std::unordered_map<ShaderKey, ShaderID, ShaderKeyHash> m_KeyIdMap;
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
 
 		std::unique_ptr<ShaderCompiler> m_Compiler;

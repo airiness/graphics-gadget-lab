@@ -84,7 +84,7 @@ namespace gglab
 		~StringIdRegistry() noexcept = default;
 		GGLAB_DELETE_COPYABLE_MOVABLE(StringIdRegistry);
 
-		friend class StringId;
+		friend class StringID;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
@@ -93,17 +93,16 @@ namespace gglab
 
 #endif
 
-
-	class StringId
+	class StringID
 	{
 	public:
-		constexpr explicit StringId(uint64_t v) noexcept :
+		constexpr explicit StringID(uint64_t v) noexcept :
 			m_Value(v)
 		{
 		}
-		constexpr StringId() = default;
+		constexpr StringID() = default;
 
-		explicit StringId(std::string_view stringView) noexcept :
+		explicit StringID(std::string_view stringView) noexcept :
 			m_Value(Crc64(stringView))
 		{
 #if defined(BUILD_DEBUG)
@@ -116,7 +115,7 @@ namespace gglab
 			return m_Value;
 		}
 
-		constexpr auto operator<=>(const StringId&) const = default;
+		constexpr auto operator<=>(const StringID&) const = default;
 
 #if defined(BUILD_DEBUG)
 		[[nodiscard]] std::string_view DebugString() const
@@ -130,18 +129,18 @@ namespace gglab
 	};
 
 	// Generate Id in compile time
-	consteval StringId operator"" _id(const char* str, size_t len)
+	consteval StringID operator"" _id(const char* str, size_t len)
 	{
-		return StringId{ Crc64(std::string_view{ str, len }) };
+		return StringID{ Crc64(std::string_view{ str, len }) };
 	}
 }
 
-// StringId hash for using as a key
+// StringID hash for using as a key
 namespace std
 {
-	template<> struct hash<gglab::StringId>
+	template<> struct hash<gglab::StringID>
 	{
-		size_t operator()(const gglab::StringId& id) const noexcept
+		size_t operator()(const gglab::StringID& id) const noexcept
 		{
 			return std::hash<uint64_t>{}(id.Value());
 		}

@@ -18,7 +18,7 @@ namespace gglab
 			std::shared_lock lock(m_Mutex);
 			if (const auto iter = m_RootSignatureMap.find(key); iter != m_RootSignatureMap.end())
 			{
-				const RootSignatureId id = iter->second;
+				const RootSignatureID id = iter->second;
 				if (id.IsValid() && id.Value() < m_RootSignatures.size())
 				{
 					return RootSignatureHandle{ id, m_RootSignatures[id.Value()]->Get() };
@@ -37,21 +37,21 @@ namespace gglab
 			std::unique_lock lock(m_Mutex);
 			if (const auto iter = m_RootSignatureMap.find(key); iter != m_RootSignatureMap.end())
 			{
-				const RootSignatureId id = iter->second;
+				const RootSignatureID id = iter->second;
 				if (id.IsValid() && id.Value() < m_RootSignatures.size())
 				{
 					return RootSignatureHandle{ id, m_RootSignatures[id.Value()]->Get() };
 				}
 			}
 
-			const RootSignatureId id{ static_cast<uint32_t>(m_RootSignatures.size()) };
+			const RootSignatureID id{ static_cast<uint32_t>(m_RootSignatures.size()) };
 			m_RootSignatures.push_back(std::move(rootSignature));
 			m_RootSignatureMap[key] = id;
 			return RootSignatureHandle{ id, m_RootSignatures.back()->Get() };
 		}
 	}
 
-	DX12RootSignature* DX12RootSignatureCache::GetDX12RootSignature(RootSignatureId id) const noexcept
+	DX12RootSignature* DX12RootSignatureCache::GetDX12RootSignature(RootSignatureID id) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		if (id.IsValid() && id.Value() < m_RootSignatures.size())
