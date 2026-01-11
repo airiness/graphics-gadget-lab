@@ -61,6 +61,8 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
+		void Finalize(const DX12FencePoint& fencePoint) noexcept;
+
 		ModelID LoadModel(const std::filesystem::path& path) noexcept;
 		TextureID LoadTexture(const std::filesystem::path& path) noexcept;
 
@@ -75,8 +77,6 @@ namespace gglab
 
 		Model* GetModel(ModelID modelId) noexcept;
 		const Model* GetModel(ModelID modelId) const noexcept;
-
-		uint32_t GetTextureDescriptorIndex(TextureID textureId) const noexcept;
 
 		MeshID AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
 		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;

@@ -85,14 +85,22 @@ namespace gglab
 						materialGpu.OcclusionStrength = material->m_OcclusionStrength;
 						materialGpu.EmissiveColorFactor = material->m_EmissiveColor;
 
-						materialGpu.BaseColorTexIndex = assetManager.GetTextureDescriptorIndex(material->m_BaseColorTex);
-						materialGpu.MetallicRoughnessTexIndex = assetManager.GetTextureDescriptorIndex(material->m_MetallicRoughnessTex);
-						materialGpu.NormalTexIndex = assetManager.GetTextureDescriptorIndex(material->m_NormalTex);
-						materialGpu.OcclusionTexIndex = assetManager.GetTextureDescriptorIndex(material->m_OcclusionTex);
-						materialGpu.EmissiveTexIndex = assetManager.GetTextureDescriptorIndex(material->m_EmissiveTex);
+						auto* baseColorTex = assetManager.GetTexture(material->m_BaseColorTex);
+						materialGpu.BaseColorTexIndex = baseColorTex ? baseColorTex->m_DescriptorId.m_Index : 0;
+
+						auto* metallicRoughnessTex = assetManager.GetTexture(material->m_MetallicRoughnessTex);
+						materialGpu.MetallicRoughnessTexIndex = metallicRoughnessTex ? metallicRoughnessTex->m_DescriptorId.m_Index : 0;
+
+						auto* normalTex = assetManager.GetTexture(material->m_NormalTex);
+						materialGpu.NormalTexIndex = normalTex ? normalTex->m_DescriptorId.m_Index : 0;
+
+						auto* occlusionTex = assetManager.GetTexture(material->m_OcclusionTex);
+						materialGpu.OcclusionTexIndex = occlusionTex ? occlusionTex->m_DescriptorId.m_Index : 0;
+
+						auto* emissiveTex = assetManager.GetTexture(material->m_EmissiveTex);
+						materialGpu.EmissiveTexIndex = emissiveTex ? emissiveTex->m_DescriptorId.m_Index : 0;
 
 						materialData.push_back(materialGpu);
-
 					}
 					else
 					{

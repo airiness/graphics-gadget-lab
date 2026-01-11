@@ -49,36 +49,36 @@ namespace gglab
 			DX12DescriptorAllocatorBase::CreateInfo allocatorCreateInfo{};
 			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::CbvSrvUav)].get();
 			allocatorCreateInfo.m_Range = { 0, developGuiSrvCount };
-			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::DevelopGuiSrv)] =
+			m_FreeListAllocators[static_cast<uint8_t>(AllocatorType::DevelopGuiSrv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// Bindless Srv
 			allocatorCreateInfo.m_Range = { developGuiSrvCount, bindlessSrvCount };
-			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::BindlessSrv)] =
+			m_FreeListAllocators[static_cast<uint8_t>(AllocatorType::BindlessSrv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Srv
 			allocatorCreateInfo.m_Range = { developGuiSrvCount + bindlessSrvCount,
 				createInfo.m_CbvSrvUavCount - (developGuiSrvCount + bindlessSrvCount) };
-			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralCbvSrvUav)] =
+			m_FreeListAllocators[static_cast<uint8_t>(AllocatorType::GeneralCbvSrvUav)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Rtv
 			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::Rtv)].get();
 			allocatorCreateInfo.m_Range = { 0, createInfo.m_RtvCount };
-			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralRtv)] =
+			m_FreeListAllocators[static_cast<uint8_t>(AllocatorType::GeneralRtv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Dsv
 			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::Dsv)].get();
 			allocatorCreateInfo.m_Range = { 0, createInfo.m_DsvCount };
-			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralDsv)] =
+			m_FreeListAllocators[static_cast<uint8_t>(AllocatorType::GeneralDsv)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 
 			// General Sampler
 			allocatorCreateInfo.m_DescriptorHeap = m_Heaps[static_cast<uint8_t>(HeapType::Sampler)].get();
 			allocatorCreateInfo.m_Range = { 0, createInfo.m_SamplerCount };
-			m_FreeListAllocators[static_cast<uint8_t>(FreeListAllocatorType::GeneralSampler)] =
+			m_FreeListAllocators[static_cast<uint8_t>(AllocatorType::GeneralSampler)] =
 				std::make_unique<DX12DescriptorFreeListAllocator>(allocatorCreateInfo);
 		}
 	}
@@ -109,22 +109,17 @@ namespace gglab
 
 	DX12DescriptorHeap* DX12DescriptorManager::GetHeap(HeapType heapType) const noexcept
 	{
-		GGLAB_ASSERT(static_cast<uint8_t>(heapType) < static_cast<uint8_t>(HeapType::Count));
-
-		return m_Heaps[static_cast<uint8_t>(heapType)].get();
+		return m_Heaps[utils::ToIndexChecked(heapType)].get();
 	}
 
-	DX12DescriptorFreeListAllocator* DX12DescriptorManager::GetFreeListAllocator(FreeListAllocatorType allocatorType) const noexcept
+	DX12DescriptorFreeListAllocator* DX12DescriptorManager::GetFreeListAllocator(AllocatorType allocatorType) const noexcept
 	{
-		GGLAB_ASSERT(static_cast<uint8_t>(allocatorType) < static_cast<uint8_t>(FreeListAllocatorType::Invalid));
-		GGLAB_ASSERT(static_cast<uint8_t>(allocatorType) < static_cast<uint8_t>(FreeListAllocatorType::Count));
-
-		return m_FreeListAllocators[static_cast<uint8_t>(allocatorType)].get();
+		return m_FreeListAllocators[utils::ToIndexChecked(allocatorType)].get();
 	}
 
 	DX12DescriptorID DX12DescriptorManager::AllocateBindlessSrvId() noexcept
 	{
-		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::BindlessSrv);
+		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
 		GGLAB_ASSERT(allocator != nullptr);
 
 		return allocator->AllocateId();
@@ -134,15 +129,23 @@ namespace gglab
 	{
 		GGLAB_ASSERT(descriptorId.IsValid());
 
-		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::BindlessSrv);
+		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
 		GGLAB_ASSERT(allocator != nullptr);
 
 		allocator->RetireId(descriptorId, fencePoint);
 	}
 
+	DX12DescriptorView DX12DescriptorManager::BindlessSrvIdToView(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
+		GGLAB_ASSERT(allocator != nullptr);
+
+		return allocator->ViewAtGlobalIndex(descriptorId.m_Index);
+	}
+
 	DX12DescriptorView DX12DescriptorManager::AllocateDevelopGuiSrvView() noexcept
 	{
-		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::DevelopGuiSrv);
+		auto* allocator = GetFreeListAllocator(AllocatorType::DevelopGuiSrv);
 		GGLAB_ASSERT(allocator != nullptr);
 
 		return allocator->AllocateView();
@@ -150,7 +153,7 @@ namespace gglab
 
 	void DX12DescriptorManager::DeferFreeDevelopGuiSrvInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept
 	{
-		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::DevelopGuiSrv);
+		auto* allocator = GetFreeListAllocator(AllocatorType::DevelopGuiSrv);
 		GGLAB_ASSERT(allocator != nullptr);
 
 		allocator->DeferFreeFromCpuHandleInFrame(cpuHandle);
@@ -158,7 +161,7 @@ namespace gglab
 
 	void DX12DescriptorManager::DeferFreeDevelopGuiSrvInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept
 	{
-		auto* allocator = GetFreeListAllocator(FreeListAllocatorType::DevelopGuiSrv);
+		auto* allocator = GetFreeListAllocator(AllocatorType::DevelopGuiSrv);
 		GGLAB_ASSERT(allocator != nullptr);
 
 		allocator->DeferFreeFromGpuHandleInFrame(gpuHandle);

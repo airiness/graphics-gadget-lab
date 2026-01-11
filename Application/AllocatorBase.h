@@ -6,7 +6,7 @@
 namespace gglab
 {
 	// TODO: use concept define offset and count type.
-	//template<utils::UnsignedInt OffsetType = uint32_t, utils::UnsignedInt CountType = uint32_t>
+	//template<utils::UnsignedInteger OffsetType = uint32_t, utils::UnsignedInteger CountType = uint32_t>
 	class AllocatorBase
 	{
 	public:

@@ -127,13 +127,13 @@ namespace gglab
 		};																																	\
 		static Built Build(ResourceIndex resourceIndex, DX12Texture* texture, const Desc& inDesc) noexcept;									\
 		static void Create(DX12Device* device, DX12Texture* texture, const Desc* desc, const DX12DescriptorHandle& descriptor) noexcept;	\
-		static constexpr DX12DescriptorManager::FreeListAllocatorType AllocatorType = (allocatorType);										\
+		static constexpr DX12DescriptorManager::AllocatorType AllocatorType = (allocatorType);										\
 	};
 
-	DEF_VIEW_TRAITS(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralRtv);
-	DEF_VIEW_TRAITS(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralDsv);
-	DEF_VIEW_TRAITS(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
-	DEF_VIEW_TRAITS(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC, DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
+	DEF_VIEW_TRAITS(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC, DX12DescriptorManager::AllocatorType::GeneralRtv);
+	DEF_VIEW_TRAITS(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC, DX12DescriptorManager::AllocatorType::GeneralDsv);
+	DEF_VIEW_TRAITS(ViewType::SRV, D3D12_SHADER_RESOURCE_VIEW_DESC, DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
+	DEF_VIEW_TRAITS(ViewType::UAV, D3D12_UNORDERED_ACCESS_VIEW_DESC, DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
 
 #undef DEF_VIEW_TRAITS
 

@@ -34,12 +34,12 @@ namespace gglab
 
 			ImGui_ImplDX12_InitInfo initInfo{};
 			initInfo.Device = m_DX12Device->Get();
-			initInfo.CommandQueue = m_DX12Device->GetGraphicsCommandQueue()->Get();
+			initInfo.CommandQueue = m_DX12Device->GetCommandQueue(CommandQueueType::Graphics)->Get();
 			initInfo.NumFramesInFlight = DX12Device::GetBufferCount();
 			initInfo.RTVFormat = createInfo.m_SwapChain->GetFormat();
 			initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
 			initInfo.SrvDescriptorHeap =
-				m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->GetHeap()->Get();
+				m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap()->Get();
 			initInfo.SrvDescriptorAllocFn = DescriptorAlloc;
 			initInfo.SrvDescriptorFreeFn = DescriptorFree;
 			initInfo.UserData = this;
@@ -76,7 +76,7 @@ namespace gglab
 
 		commandList->SetRenderTarget(rtv, {});
 
-		auto* heap = m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::DevelopGuiSrv)->GetHeap();
+		auto* heap = m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap();
 		commandList->SetDescriptorHeap(*heap);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList->Get());

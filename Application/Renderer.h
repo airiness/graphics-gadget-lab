@@ -74,6 +74,8 @@ namespace gglab
 		void OnResume() noexcept;
 		bool IsSuspended() const noexcept;
 
+		DX12FencePoint GetLastSubmittedFencePoint() const noexcept { return m_LastSubmittedFencePoint; }
+
 	private:
 		void CreateCommonRootSignature() noexcept;
 		void InitializeGpuBuffers() noexcept;
@@ -100,5 +102,7 @@ namespace gglab
 
 		std::atomic_bool m_IsInitialized = false;
 		std::atomic_bool m_IsSuspended = false;
+
+		DX12FencePoint m_LastSubmittedFencePoint = {};
 	};
 }

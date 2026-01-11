@@ -55,18 +55,17 @@ namespace gglab
 
 		FlushGPU();
 
-		m_GraphicsCommandAllocatorPool.reset();
-		m_ComputeCommandAllocatorPool.reset();
-		m_CopyCommandAllocatorPool.reset();
-		m_TransferCommandAllocatorPool.reset();
+		for (const auto queueType : utils::EnumRange<CommandQueueType>())
+		{
+			auto& commandAllocatorPool = m_CommandAllocatorPools[utils::ToIndex(queueType)];
+			commandAllocatorPool.reset();
+
+			auto& commandQueue = m_CommandQueues[utils::ToIndex(queueType)];
+			commandQueue.reset();
+		}
 
 		m_GraphicsCommandLists = {};
 		m_ComputeCommandLists = {};
-
-		m_DirectCommandQueue.reset();
-		m_ComputeCommandQueue.reset();
-		m_CopyCommandQueue.reset();
-		m_TransferCommandQueue.reset();
 
 		m_MemAllocator.Reset();
 
@@ -79,10 +78,11 @@ namespace gglab
 
 	void DX12Device::FlushGPU() noexcept
 	{
-		if (m_DirectCommandQueue) { m_DirectCommandQueue->FlushCommandQueue(); }
-		if (m_ComputeCommandQueue) { m_ComputeCommandQueue->FlushCommandQueue(); }
-		if (m_CopyCommandQueue) { m_CopyCommandQueue->FlushCommandQueue(); }
-		if (m_TransferCommandQueue) { m_TransferCommandQueue->FlushCommandQueue(); }
+		for (const auto queueType : utils::EnumRange<CommandQueueType>())
+		{
+			auto& commandQueue = m_CommandQueues[utils::ToIndex(queueType)];
+			commandQueue->FlushCommandQueue();
+		}
 	}
 
 	void DX12Device::InitializeDebugLayer() noexcept
@@ -176,12 +176,12 @@ namespace gglab
 		};
 
 		HRESULT result = E_FAIL;
+
 		for (auto level : featureLevels)
 		{
 			result = D3D12CreateDevice(m_DxgiAdapter.Get(), level, IID_PPV_ARGS(&m_D3D12Device));
 			if (SUCCEEDED(result))
 			{
-				m_FeatureLevel = level;
 				break;
 			}
 		}
@@ -232,14 +232,14 @@ namespace gglab
 		createInfo.m_DX12Device = this;
 
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		m_DirectCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);
-		m_TransferCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);	//d3dx12 upload resource uses direct type
+		m_CommandQueues[utils::ToIndex(CommandQueueType::Graphics)] = std::make_unique<DX12CommandQueue>(createInfo);
+		m_CommandQueues[utils::ToIndex(CommandQueueType::Transfer)] = std::make_unique<DX12CommandQueue>(createInfo);	//d3dx12 upload resource uses direct type
 
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-		m_ComputeCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);
+		m_CommandQueues[utils::ToIndex(CommandQueueType::Compute)] = std::make_unique<DX12CommandQueue>(createInfo);
 
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
-		m_CopyCommandQueue = std::make_unique<DX12CommandQueue>(createInfo);
+		m_CommandQueues[utils::ToIndex(CommandQueueType::Copy)] = std::make_unique<DX12CommandQueue>(createInfo);
 	}
 
 	void DX12Device::InitializeCommandLists() noexcept
@@ -265,14 +265,14 @@ namespace gglab
 		createInfo.m_DX12Device = this;
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-		m_GraphicsCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
-		m_TransferCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Graphics)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Transfer)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
 
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-		m_ComputeCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Compute)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
 
 		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
-		m_CopyCommandAllocatorPool = std::make_unique<DX12CommandAllocatorPool>(createInfo);
+		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Copy)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

@@ -370,21 +370,17 @@ namespace gglab
 			return;
 		}
 
-		if (m_Renderer)
-		{
-			// Must flush here for gpu resource safe release next
-			m_Renderer->GetDevice()->FlushGPU();
-		}
+		// Must flush here for gpu resource safe release next
+		m_Renderer->GetDevice()->FlushGPU();
 
 		m_DemoManager.reset();
+
+		m_AssetManager->Finalize(m_Renderer->GetLastSubmittedFencePoint());
 		m_AssetManager.reset();
-
-		if (m_Renderer)
-		{
-			m_Renderer->Finalize();
-			m_Renderer.reset();
-		}
-
+	
+		m_Renderer->Finalize();
+		m_Renderer.reset();
+		
 		m_ShaderManager.reset();
 		m_InputManager.reset();
 		m_Time.reset();

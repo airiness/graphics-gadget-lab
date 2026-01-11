@@ -29,7 +29,7 @@ namespace gglab
 		m_SwapChain = std::make_unique<DX12SwapChain>();
 		DX12SwapChain::CreateInfo swapChainCreateInfo{};
 		swapChainCreateInfo.m_DX12Device = m_Device.get();
-		swapChainCreateInfo.m_PresentQueue = m_Device->GetGraphicsCommandQueue();
+		swapChainCreateInfo.m_PresentQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 		swapChainCreateInfo.m_Hwnd = createInfo.m_Hwnd;
 		swapChainCreateInfo.m_Width = createInfo.m_Width;
 		swapChainCreateInfo.m_Height = createInfo.m_Height;
@@ -104,6 +104,7 @@ namespace gglab
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
 
+		m_DescriptorManager->Tick();
 		m_DescriptorManager.reset();
 		m_TransferManager.reset();
 
@@ -138,9 +139,9 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
 
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
-		auto commandAllocatorPool = m_Device->GetGraphicsCommandAllocatorPool();
+		auto commandAllocatorPool = m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
-		auto commandQueue = m_Device->GetGraphicsCommandQueue();
+		auto commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 
 		// Wait Structured Buffer upload
 		if (renderContext.m_UploadFencePoint.IsValid())
@@ -160,17 +161,17 @@ namespace gglab
 		commandList->End();
 
 		const DX12CommandList* commandLists[] = { commandList };
-		auto fencePoint = commandQueue->Execute(commandLists);
+		m_LastSubmittedFencePoint = commandQueue->Execute(commandLists);
 
-		rg.Retire(fencePoint);
+		rg.Retire(m_LastSubmittedFencePoint);
 
 		m_RGGpuAllocator->Tick();
 
-		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, fencePoint);
+		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, m_LastSubmittedFencePoint);
 
-		m_DescriptorManager->EndFrame(fencePoint);
+		m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
 
-		swapChain->UpdateFrameSyncObject(std::move(fencePoint));
+		swapChain->UpdateFrameSyncObject(m_LastSubmittedFencePoint);
 		swapChain->Present();
 
 	}
@@ -277,6 +278,7 @@ namespace gglab
 			0, // baseShaderRegister
 			0, // registerSpace
 			D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+		// D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
 

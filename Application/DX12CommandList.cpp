@@ -136,9 +136,9 @@ namespace gglab
 		m_D3D12GraphicsCommandList->SetGraphicsRootConstantBufferView(parameterIndex, gpuAddress);
 	}
 
-	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorHandle& descriptor) const noexcept
+	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorView& descriptor) const noexcept
 	{
-		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.GpuHandleAt());
+		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.m_GpuHandle);
 	}
 
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept

@@ -27,12 +27,19 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DX12DescriptorManager is null!");
 	}
 
-	AssetManager::~AssetManager()
+	AssetManager::~AssetManager() = default;
+
+	void AssetManager::Finalize(const DX12FencePoint& fencePoint) noexcept
 	{
-		// Release Descriptor for texture
-		for (auto& texture : m_TextureContainer.m_TextureIDMap)
+		// Retire all DescriptorId of textures
+		for (auto& [textureId, texture] : m_TextureContainer.m_TextureIDMap)
 		{
-			texture.second->m_Descriptor.Free();
+			if (texture->m_DescriptorId.IsValid())
+			{
+				m_DescriptorManager->RetireBindlessSrvId(texture->m_DescriptorId, fencePoint);
+				texture->m_DescriptorId = {};
+			}
+			texture->m_Texture.reset();
 		}
 	}
 
@@ -155,16 +162,6 @@ namespace gglab
 		return nullptr;
 	}
 
-	uint32_t AssetManager::GetTextureDescriptorIndex(TextureID textureId) const noexcept
-	{
-		const auto* texture = GetTexture(textureId);
-		if (texture == nullptr || !texture->m_IsUploaded)
-		{
-			return 0u;
-		}
-		return texture->m_DescriptorIndex;
-	}
-
 	MeshID AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
 		GGLAB_ASSERT(mesh);
@@ -281,11 +278,8 @@ namespace gglab
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
-		// Allocate Descriptor& create srv
-		// TODO: Bindless texture
-		auto* srvDescriptorAllocator = 
-			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::FreeListAllocatorType::GeneralCbvSrvUav);
-		texture->m_Descriptor = std::move(srvDescriptorAllocator->AllocateHandle());
+		// Allocate Descriptor and create srv
+		const auto srvDescriptorId = m_DescriptorManager->AllocateBindlessSrvId();
 
 		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -296,9 +290,9 @@ namespace gglab
 		m_DX12Device->Get()->CreateShaderResourceView(
 			texture->m_Texture->Get(),
 			&srvDesc,
-			texture->m_Descriptor.CpuHandleAt());
+			m_DescriptorManager->BindlessSrvIdToView(srvDescriptorId).m_CpuHandle);
 
-		texture->m_DescriptorIndex = 0;	// TODO: get global descriptor index
+		texture->m_DescriptorId = srvDescriptorId;
 
 		texture->m_IsUploaded = true;
 	}

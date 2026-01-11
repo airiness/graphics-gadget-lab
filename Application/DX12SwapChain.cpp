@@ -106,12 +106,12 @@ namespace gglab
 		}
 	}
 
-	void DX12SwapChain::UpdateFrameSyncObject(DX12FencePoint&& fencePoint) noexcept
+	void DX12SwapChain::UpdateFrameSyncObject(const DX12FencePoint& fencePoint) noexcept
 	{
 		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::UpdateFrameSyncObject called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
 
-		m_SyncObjects[m_BackBufferIndex] = std::move(fencePoint);
+		m_SyncObjects[m_BackBufferIndex] = fencePoint;
 	}
 
 	void DX12SwapChain::Present() noexcept
