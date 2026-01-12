@@ -66,8 +66,11 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float NoH = saturate(dot(N, H));
 	float VoH = saturate(dot(V, H));
 	
-	float3 baseColorTex = g_BaseColorTex.Sample(g_SamplerLinear, IN.UV).rgb;
-	float3 baseColor = SRGBToLinear(baseColorTex) * IN.BaseColorFactor.rgb; // need SRGB to Linear?
+	MaterialData matData = g_Materials[IN.MaterialIndex];
+	Texture2D baseColorTex = GetTexture2D(matData.BaseColorTexIndex);
+	float3 baseColorSampled = baseColorTex.Sample(g_SamplerLinear, IN.UV).rgb;
+	
+	float3 baseColor = SRGBToLinear(baseColorSampled) * IN.BaseColorFactor.rgb; // need SRGB to Linear?
 	
 	float roughness = saturate(IN.MetallicRoughnessFactor.y);
 	float metallic = saturate(IN.MetallicRoughnessFactor.x);

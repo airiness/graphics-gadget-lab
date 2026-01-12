@@ -188,21 +188,6 @@ namespace gglab
 				static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
 				drawItem.m_ObjectOffset, 0);
 
-			const Material* material = assetManager->GetMaterial(drawItem.m_MaterialId);
-			if (material && material->m_BaseColorTex.IsValid())
-			{
-				if (auto* texture = assetManager->GetTexture(material->m_BaseColorTex))
-				{
-					commandList->SetGraphicsDescriptor(
-						static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
-						renderer->GetDescriptorManager()->BindlessSrvIdToView(texture->m_DescriptorId));
-				}
-			}
-			else
-			{
-				// TODO: Dummy texture binding.
-			}
-
 			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}
 

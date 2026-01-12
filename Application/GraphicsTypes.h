@@ -19,8 +19,8 @@ namespace gglab
 		ObjectCB,		// g_ObjectIndex, b1
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
-		TextureDescriptorTable,	// g_BaseColorTex, t0
-		RootParamCount
+
+		Count
 	};
 
 	enum class ModelType : uint32_t

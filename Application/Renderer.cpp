@@ -18,6 +18,7 @@
 #include "RenderScene.h"
 #include "RenderPassForwardPBR.h"
 #include "MathUtils.h"
+#include "TypeUtils.h"
 
 namespace gglab
 {
@@ -280,23 +281,19 @@ namespace gglab
 			D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
 		// D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE
 
-		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
+		CD3DX12_ROOT_PARAMETER1 rootParameters[utils::EnumCount<CommonRSRootParamIndex>()] = {};
 
 		// b0: FrameCB
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB)].InitAsConstantBufferView(0);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::FrameCB)].InitAsConstantBufferView(0);
 
 		// b1: ObjectCB, num32BitValues: 1, shaderRegister: b1
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(1, 1);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(1, 1);
 
 		// t1: ObjectSB
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
 
 		// t2: materialSB
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
-
-		// t0: BaseColorTex descriptor table
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)]
-			.InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
 
 		constexpr uint32_t StaticSamplerCount = 1;
 		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};
@@ -309,10 +306,13 @@ namespace gglab
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Init_1_1(
-			static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters,
-			StaticSamplerCount, staticSamplers,
+			static_cast<UINT>(utils::EnumCount<CommonRSRootParamIndex>()),
+			rootParameters,
+			StaticSamplerCount,
+			staticSamplers,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
+			// D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
 
 		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
 		m_CommonRootSignatureId = id;

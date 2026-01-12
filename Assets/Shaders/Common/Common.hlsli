@@ -41,3 +41,9 @@ float3 SRGBToLinear(float3 c)
 	const float3 higher = pow((c * (1.0 / 1.055) + 0.0521327), 2.4);
 	return lerp(lower, higher, t);
 }
+
+// Get texture by descriptor
+Texture2D GetTexture2D(uint srvIndex)
+{
+	return ResourceDescriptorHeap[srvIndex];
+}
