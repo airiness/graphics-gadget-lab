@@ -107,7 +107,7 @@ namespace gglab
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
 		MeshIDCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
 		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
-		ModelIDCounter m_ModelIdCounter{ ReservedModelID.Value() + 1u };
+		ModelIDCounter m_ModelIdCounter{ ReservedModelCount.Value() + 1u };
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;

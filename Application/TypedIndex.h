@@ -43,6 +43,7 @@ namespace gglab
 
 		void Reset(Rep start = 0) noexcept
 		{
+			GGLAB_ASSERT_MSG(start < IndexType::InvalidValue, "Start value must be less than InvalidValue.");
 			m_Next = (start == IndexType::InvalidValue) ? 0 : start;
 		}
 
@@ -50,7 +51,11 @@ namespace gglab
 
 		[[nodiscard]] IndexType Acquire() noexcept
 		{
-			if (m_Next == IndexType::InvalidValue) { m_Next = 0; }
+			if (m_Next == IndexType::InvalidValue) 
+			{
+				GGLAB_ASSERT_MSG(false, "IndexCounter overflowed.");
+				return IndexType::Invalid();
+			}
 			return IndexType{ m_Next++ };
 		}
 

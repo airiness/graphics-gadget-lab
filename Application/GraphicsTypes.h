@@ -65,19 +65,47 @@ namespace gglab
 
 	// TextureID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureID, uint32_t);
-	inline constexpr TextureID ReservedTextureID{ 5u };
+	enum class ReservedTextureIDIndex: uint32_t
+	{
+		BaseColorWhite,
+		MissingTextureChecker,
+		NormalFlat,
+		DefaultMetallicRoughness,
+		OcclusionWhite,
+		EmissiveBlack,
+		ErrorRed,
+		UVTest,
 
+		Count,
+
+		ReservedCount = 64u
+	};
+	static_assert(utils::ToIndex(ReservedTextureIDIndex::Count) < utils::ToIndex(ReservedTextureIDIndex::ReservedCount),
+		"ReservedTextureID::Count must be less than ReservedTextureID::ReservedCount");
+	inline constexpr TextureID::ValueType ReservedTextureCount = utils::ToIndex(ReservedTextureIDIndex::ReservedCount);
+	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
+	{
+		return TextureID{ utils::ToIndex(index) };
+	}
+	constexpr bool IsReservedTextureId(TextureID id) noexcept
+	{
+		return id.IsValid() && id.Value() < ReservedTextureCount;
+	}
+
+	// MeshID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshID, uint32_t);
 	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
-	inline constexpr MeshID ReservedMeshID{ 5u };
+	inline constexpr MeshID::ValueType ReservedMeshCount = 5u;
 
+	// MaterialID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialID, uint32_t);
 	inline constexpr MaterialID ProceduralCubeMaterialID{ 0u };
-	inline constexpr MaterialID ReservedMaterialID{ 5u };
+	inline constexpr MaterialID::ValueType ReservedMaterialCount = 5u;
 
+	// ModelID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelID, uint32_t);
 	inline constexpr ModelID ProceduralCubeModelID{ 0u };
-	inline constexpr ModelID ReservedModelID{ 5u };
+	inline constexpr ModelID::ValueType ReservedModelCount = 5u;
 
 	struct Texture
 	{
