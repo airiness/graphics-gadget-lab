@@ -7,6 +7,7 @@
 #include "EnumFlags.h"
 #include "DX12Buffer.h"
 #include "DX12DescriptorTypes.h"
+#include "TypeUtils.h"
 
 namespace gglab
 {
@@ -85,7 +86,7 @@ namespace gglab
 	inline constexpr TextureID::ValueType ReservedTextureCount = utils::ToIndex(ReservedTextureIDIndex::ReservedCount);
 	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
 	{
-		return TextureID{ utils::ToIndex(index) };
+		return TextureID{ static_cast<TextureID::ValueType>(utils::ToIndex(index)) };
 	}
 	constexpr bool IsReservedTextureId(TextureID id) noexcept
 	{
