@@ -9,6 +9,7 @@
 #include "DX12DescriptorManager.h"
 #include "HResult.h"
 #include "PathUtils.h"
+#include "TypeUtils.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -249,8 +250,22 @@ namespace gglab
 
 	void AssetManager::InitializeReservedTextureSet() noexcept
 	{
-		
+		if (GetTexture(ToTextureId(ReservedTextureIDIndex::BaseColorWhite)) == nullptr)
+		{
+			auto pair = m_TextureContainer.m_TextureIDMap.emplace(
+				ToTextureId(ReservedTextureIDIndex::BaseColorWhite),
+				std::make_unique<Texture>());
 
+			if (pair.second)
+			{
+				auto& texture = pair.first->second;
+				texture->m_Id = ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
+				texture->m_Name = StringID("ReservedTexture.BaseColorWhite");
+				texture->m_IsUploaded = false;
+				texture->m_DescriptorId = {};
+				texture->m_Texture = nullptr;
+			}
+		}
 	}
 
 	void AssetManager::UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept

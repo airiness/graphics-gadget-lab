@@ -107,10 +107,10 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
-		TextureIDCounter m_TextureIdCounter{ ReservedMeshCount + 1u };
-		MeshIDCounter m_MeshIdCounter{ ReservedMeshCount + 1u };
-		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialCount + 1u };
-		ModelIDCounter m_ModelIdCounter{ ReservedModelCount + 1u };
+		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
+		MeshIDCounter m_MeshIdCounter{ ReservedMeshCount };
+		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialCount };
+		ModelIDCounter m_ModelIdCounter{ ReservedModelCount };
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;
