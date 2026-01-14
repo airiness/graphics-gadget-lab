@@ -7,7 +7,6 @@
 #include "DX12Buffer.h"
 #include "DX12CommandList.h"
 #include "DX12DescriptorManager.h"
-#include "DX12DescriptorFreeListAllocator.h"
 #include "HResult.h"
 #include "PathUtils.h"
 
@@ -29,10 +28,15 @@ namespace gglab
 
 	AssetManager::~AssetManager() = default;
 
+	void AssetManager::Initialize() noexcept
+	{
+		InitializeReservedTextureSet();
+	}
+
 	void AssetManager::Finalize(const DX12FencePoint& fencePoint) noexcept
 	{
 		// Retire all DescriptorId of textures
-		for (auto& [textureId, texture] : m_TextureContainer.m_TextureIDMap)
+		for (const auto& texture : m_TextureContainer.m_TextureIDMap | std::views::values)
 		{
 			if (texture->m_DescriptorId.IsValid())
 			{
@@ -61,12 +65,12 @@ namespace gglab
 			};
 
 		const auto extension = canonicalPath.extension().string();
-		const auto modelFileType = getModelFileType(extension);
-
-		switch (modelFileType)
+		switch (getModelFileType(extension))
 		{
 		case ModelType::GlTF:
 			return LoadModelGltf(canonicalPath);
+		case ModelType::Invalid:
+			return ModelID::Invalid();
 		default:
 			GGLAB_UNREACHABLE("Unknown model file type.");
 		}
@@ -102,10 +106,10 @@ namespace gglab
 
 	const Texture* AssetManager::GetTexture(TextureID textureId) const noexcept
 	{
-		auto iter = m_TextureContainer.m_TextureIDMap.find(textureId);
-		if (iter != m_TextureContainer.m_TextureIDMap.end())
+		auto iterator = m_TextureContainer.m_TextureIDMap.find(textureId);
+		if (iterator != m_TextureContainer.m_TextureIDMap.end())
 		{
-			return iter->second.get();
+			return iterator->second.get();
 		}
 
 		//GGLAB_ASSERT_MSG(false, "Invalid TextureID, check it!");
@@ -119,10 +123,10 @@ namespace gglab
 
 	const Mesh* AssetManager::GetMesh(MeshID meshId) const noexcept
 	{
-		auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
-		if (iter != m_MeshContainer.m_MeshIDMap.end())
+		auto iterator = m_MeshContainer.m_MeshIDMap.find(meshId);
+		if (iterator != m_MeshContainer.m_MeshIDMap.end())
 		{
-			return iter->second.get();
+			return iterator->second.get();
 		}
 
 		//GGLAB_ASSERT_MSG(false, "Invalid MeshID, check it!");
@@ -136,10 +140,10 @@ namespace gglab
 
 	const Material* AssetManager::GetMaterial(MaterialID materialId) const noexcept
 	{
-		auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
-		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
+		auto iterator = m_MaterialContainer.m_MaterialIDMap.find(materialId);
+		if (iterator != m_MaterialContainer.m_MaterialIDMap.end())
 		{
-			return iter->second.get();
+			return iterator->second.get();
 		}
 		//GGLAB_ASSERT_MSG(false, "Invalid MaterialID, check it!");
 		return nullptr;
@@ -152,10 +156,10 @@ namespace gglab
 
 	const Model* AssetManager::GetModel(ModelID modelId) const noexcept
 	{
-		auto iter = m_ModelContainer.m_ModelIDMap.find(modelId);
-		if (iter != m_ModelContainer.m_ModelIDMap.end())
+		auto iterator = m_ModelContainer.m_ModelIDMap.find(modelId);
+		if (iterator != m_ModelContainer.m_ModelIDMap.end())
 		{
-			return iter->second.get();
+			return iterator->second.get();
 		}
 
 		//GGLAB_ASSERT_MSG(false, "Invalid ModelID, check it!");
@@ -175,8 +179,8 @@ namespace gglab
 		}
 
 		// Check if mesh already exists
-		const auto iter = m_MeshContainer.m_MeshIDMap.find(meshId);
-		if (iter != m_MeshContainer.m_MeshIDMap.end())
+		const auto iterator = m_MeshContainer.m_MeshIDMap.find(meshId);
+		if (iterator != m_MeshContainer.m_MeshIDMap.end())
 		{
 			return meshId;
 		}
@@ -204,8 +208,8 @@ namespace gglab
 			material->m_Id = materialId;
 		}
 
-		const auto iter = m_MaterialContainer.m_MaterialIDMap.find(materialId);
-		if (iter != m_MaterialContainer.m_MaterialIDMap.end())
+		const auto iterator = m_MaterialContainer.m_MaterialIDMap.find(materialId);
+		if (iterator != m_MaterialContainer.m_MaterialIDMap.end())
 		{
 			return materialId;
 		}
@@ -226,8 +230,8 @@ namespace gglab
 			model->m_Id = modelId;
 		}
 
-		const auto iter = m_ModelContainer.m_ModelIDMap.find(modelId);
-		if (iter != m_ModelContainer.m_ModelIDMap.end())
+		const auto iterator = m_ModelContainer.m_ModelIDMap.find(modelId);
+		if (iterator != m_ModelContainer.m_ModelIDMap.end())
 		{
 			// This id is already have.
 			return modelId;
@@ -241,6 +245,12 @@ namespace gglab
 		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
 
 		return modelId;
+	}
+
+	void AssetManager::InitializeReservedTextureSet() noexcept
+	{
+		
+
 	}
 
 	void AssetManager::UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept
@@ -262,7 +272,7 @@ namespace gglab
 		std::vector<D3D12_SUBRESOURCE_DATA> subResourceDatas(imageCount);
 
 		const auto& images = uploadData.m_ScratchImage.GetImages();
-		for (int32_t imageIndex = 0; imageIndex < imageCount; ++imageIndex)
+		for (int32_t imageIndex = 0; imageIndex < static_cast<int32_t>(imageCount); ++imageIndex)
 		{
 			subResourceDatas[imageIndex].pData = images[imageIndex].pixels;
 			subResourceDatas[imageIndex].RowPitch = images[imageIndex].rowPitch;
@@ -273,7 +283,7 @@ namespace gglab
 
 		// Convert Texture State to Pixel Shader Resource. TODO: have better way to management resource state?
 		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(
-			texture->m_Texture.get()->Get(),
+			texture->m_Texture->Get(),
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
@@ -408,15 +418,15 @@ namespace gglab
 			{
 				const auto texPath = canonicalPath.parent_path() / aiTexPath.C_Str();
 				const auto canonicalTexPath = utils::Canonical(texPath);
-				auto metalicRoughnessTexId = FindTexture(canonicalTexPath);
-				if (!metalicRoughnessTexId.IsValid())
+				auto metallicRoughnessTexId = FindTexture(canonicalTexPath);
+				if (!metallicRoughnessTexId.IsValid())
 				{
-					metalicRoughnessTexId = CreateTexture(canonicalTexPath);
+					metallicRoughnessTexId = CreateTexture(canonicalTexPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
-					texUploadData.m_TextureId = metalicRoughnessTexId;
+					texUploadData.m_TextureId = metallicRoughnessTexId;
 					LoadTextureScratchImage(canonicalTexPath, texUploadData);
 				}
-				material->m_MetallicRoughnessTex = metalicRoughnessTexId;
+				material->m_MetallicRoughnessTex = metallicRoughnessTexId;
 			}
 			else
 			{
@@ -639,10 +649,10 @@ namespace gglab
 	TextureID AssetManager::FindTexture(const std::filesystem::path& canonicalPath) const noexcept
 	{
 		auto& texNameIdsMap = m_TextureContainer.m_PathIDMap;
-		auto searchIter = texNameIdsMap.find(canonicalPath);
-		if (searchIter != texNameIdsMap.end())
+		auto iterator = texNameIdsMap.find(canonicalPath);
+		if (iterator != texNameIdsMap.end())
 		{
-			return searchIter->second;
+			return iterator->second;
 		}
 		return InvalidTextureID;
 	}
@@ -650,10 +660,10 @@ namespace gglab
 	ModelID AssetManager::FindModel(const std::filesystem::path& canonicalPath) const noexcept
 	{
 		auto& modelPathMap = m_ModelContainer.m_PathIDMap;
-		auto searchIter = modelPathMap.find(canonicalPath);
-		if (searchIter != modelPathMap.end())
+		auto iterator = modelPathMap.find(canonicalPath);
+		if (iterator != modelPathMap.end())
 		{
-			return searchIter->second;
+			return iterator->second;
 		}
 		return InvalidModelID;
 	}

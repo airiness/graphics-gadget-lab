@@ -61,6 +61,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
+		void Initialize() noexcept;
 		void Finalize(const DX12FencePoint& fencePoint) noexcept;
 
 		ModelID LoadModel(const std::filesystem::path& path) noexcept;
@@ -83,6 +84,8 @@ namespace gglab
 		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
 
 	private:
+		void InitializeReservedTextureSet() noexcept;
+
 		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
 		void UploadMesh(const MeshUploadData& uploadData, CopyContext& copyContext) noexcept;
 
@@ -104,10 +107,10 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
-		TextureIDCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
-		MeshIDCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
-		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
-		ModelIDCounter m_ModelIdCounter{ ReservedModelCount.Value() + 1u };
+		TextureIDCounter m_TextureIdCounter{ ReservedMeshCount + 1u };
+		MeshIDCounter m_MeshIdCounter{ ReservedMeshCount + 1u };
+		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialCount + 1u };
+		ModelIDCounter m_ModelIdCounter{ ReservedModelCount + 1u };
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;
