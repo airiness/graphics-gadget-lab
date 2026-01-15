@@ -70,6 +70,7 @@ namespace gglab
 		{
 		case ModelType::GlTF:
 			return LoadModelGltf(canonicalPath);
+		case ModelType::Procedural:
 		case ModelType::Invalid:
 			return ModelID::Invalid();
 		default:
