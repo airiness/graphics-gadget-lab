@@ -251,21 +251,199 @@ namespace gglab
 
 	void AssetManager::InitializeReservedTextureSet() noexcept
 	{
-		if (GetTexture(ToTextureId(ReservedTextureIDIndex::BaseColorWhite)) == nullptr)
-		{
-			auto pair = m_TextureContainer.m_TextureIDMap.emplace(
-				ToTextureId(ReservedTextureIDIndex::BaseColorWhite),
-				std::make_unique<Texture>());
-
-			if (pair.second)
+		// Helper function to make texture entry
+		const auto makeTextureEntry = [this](TextureID id, const char* texName)
 			{
-				auto& texture = pair.first->second;
-				texture->m_Id = ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
-				texture->m_Name = StringID("ReservedTexture.BaseColorWhite");
-				texture->m_IsUploaded = false;
-				texture->m_DescriptorId = {};
-				texture->m_Texture = nullptr;
+				if (GetTexture(id) == nullptr)
+				{
+					auto [iterator, result] = m_TextureContainer.m_TextureIDMap.emplace(id, std::make_unique<Texture>());
+					if (result)
+					{
+						auto& texture = iterator->second;
+						texture->m_Id = id;
+						texture->m_Name = StringID(texName);
+						texture->m_IsUploaded = false;
+						texture->m_DescriptorId = {};
+						texture->m_Texture.reset();
+					}
+				}
+			};
+
+		// Helper function to create ScratchImage with pixel function
+		const auto makeScratchImage = [](DXGI_FORMAT format, uint32_t width, uint32_t height, auto&& pixelFunc) -> DirectX::ScratchImage
+			{
+				GGLAB_ASSERT(width > 0 && height > 0);
+				GGLAB_ASSERT(format == DXGI_FORMAT_R8G8B8A8_UNORM || format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+				constexpr size_t formatBytes = 4;
+
+				DirectX::ScratchImage scratchImage;
+				HRESULT hr = scratchImage.Initialize2D(
+					format,
+					width,
+					height,
+					1,
+					1,
+					DirectX::CP_FLAGS_NONE);
+				GGLAB_HR(hr);
+
+				auto* image = scratchImage.GetImage(0, 0, 0);
+				GGLAB_ASSERT(image != nullptr && image->pixels != nullptr);
+
+				for (uint32_t y = 0; y < height; ++y)
+				{
+					uint8_t* row = image->pixels + static_cast<size_t>(y) * image->rowPitch;
+					for (uint32_t x = 0; x < width; ++x)
+					{
+						const auto color = pixelFunc(x, y);
+						uint8_t* pixel = row + static_cast<size_t>(x) * formatBytes;
+						pixel[0] = color[0];
+						pixel[1] = color[1];
+						pixel[2] = color[2];
+						pixel[3] = color[3]; 
+					}
+				}
+				return scratchImage;
+			};
+
+		// Helper function to make TextureUploadData
+		const auto makeUploadData = [&](ReservedTextureIDIndex idIndex,
+			const char* texName,
+			DirectX::ScratchImage&& image)
+			{
+				const auto& id = ToTextureId(idIndex);
+				makeTextureEntry(id, texName);
+
+				TextureUploadData texUploadData{};
+				texUploadData.m_TextureId = id;
+				texUploadData.m_ScratchImage = std::move(image);
+				return texUploadData;
+			};
+
+		// Prepare reserved texture upload datas
+		std::vector<TextureUploadData> uploads;
+		uploads.reserve(utils::ToIndex(ReservedTextureIDIndex::Count));
+
+		// BaseColorWhite
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::BaseColorWhite, "BaseColorWhite",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+				1,
+				1,
+				[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
+				{
+					return { 255, 255, 255, 255 };
+				})));
+
+		// MissingTextureChecker
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::MissingTextureChecker, "MissingTextureChecker",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+				64,
+				64,
+				[](uint32_t x, uint32_t y) -> std::array<uint8_t, 4>
+				{
+					const uint32_t tile = 8;
+					const bool isPurple = ((x / tile) + (y / tile)) & 1;
+					return isPurple ?
+						std::array<uint8_t, 4>{ 255, 0, 255, 255 } :
+						std::array<uint8_t, 4>{ 0, 0, 0, 255 };
+				})));
+
+		// NormalFlat
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::NormalFlat, "NormalFlat",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM,
+				1,
+				1,
+				[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
+				{
+					return { 128, 128, 255, 255 };
+				})));
+
+		// DefaultMetallicRoughness
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::DefaultMetallicRoughness, "DefaultMetallicRoughness",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM,
+				1,
+				1,
+				[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
+				{
+					// glTF: G=Roughness(1), B=Metallic(0). R unused (or AO in separate texture)
+					return { 0, 255, 0, 255 };
+				})));
+
+		// OcclusionWhite
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::OcclusionWhite, "OcclusionWhite",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM,
+				1,
+				1,
+				[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
+				{
+					return { 255, 255, 255, 255 };
+				})));
+
+		// EmissiveBlack
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::EmissiveBlack, "EmissiveBlack",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+				1,
+				1,
+				[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
+				{
+					return { 0, 0, 0, 255 };
+				})));
+
+		// ErrorRed
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::ErrorRed, "ErrorRed",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+				1,
+				1,
+				[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
+				{
+					return { 255, 0, 0, 255 };
+				})));
+
+		// UVTest
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::UVTest, "UVTest",
+			makeScratchImage(
+				DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+				256,
+				256,
+				[](uint32_t x, uint32_t y) -> std::array<uint8_t, 4>
+				{
+					const uint32_t grid = 32;
+					uint8_t r = static_cast<uint8_t>(x / (256 - 1) * 8);
+					uint8_t g = static_cast<uint8_t>(y / (256 - 1) * 8);
+					uint8_t b = 255;
+
+					if ((grid != 0) && ((x % grid) == 0 || (y % grid) == 0))
+					{
+						r = g = b = 0;
+					}
+
+					return { r, g, b, 255 };
+				})));
+
+		// Upload reserved textures
+		if (!uploads.empty())
+		{
+			auto batch = m_TransferManager->BeginBatch();
+			auto* copyContext = m_TransferManager->GetCopyContext();
+			for (const auto& data : uploads)
+			{
+				UploadTexture(data, *copyContext);
 			}
+			batch.Submit(true);
 		}
 	}
 
