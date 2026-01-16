@@ -439,9 +439,9 @@ namespace gglab
 				256,
 				[](uint32_t x, uint32_t y) -> std::array<uint8_t, 4>
 				{	
-					uint8_t r = static_cast<uint8_t>(static_cast<float>(x) / (256-1));
-					uint8_t g = static_cast<uint8_t>(static_cast<float>(y) / (256-1));
-					uint8_t b = 255;
+					uint8_t r = static_cast<uint8_t>(x);
+					uint8_t g = static_cast<uint8_t>(y);
+					uint8_t b = 0;
 
 					const uint32_t grid = 32;
 					if ((grid != 0) && ((x % grid) == 0 || (y % grid) == 0))

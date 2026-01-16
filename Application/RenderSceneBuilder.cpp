@@ -85,7 +85,7 @@ namespace gglab
 						materialGpu.OcclusionStrength = material->m_OcclusionStrength;
 						materialGpu.EmissiveColorFactor = material->m_EmissiveColor;
 
-						materialGpu.BaseColorTexIndex = assetManager.GetTexture( ToTextureId(ReservedTextureIDIndex::UVTest))->m_DescriptorId.m_Index; // assetManager.ResolveSrvIndex(material->m_BaseColorTex, ReservedTextureIDIndex::BaseColorWhite);
+						materialGpu.BaseColorTexIndex = assetManager.ResolveSrvIndex(material->m_BaseColorTex, ReservedTextureIDIndex::BaseColorWhite);
 						materialGpu.MetallicRoughnessTexIndex = assetManager.ResolveSrvIndex(material->m_MetallicRoughnessTex, ReservedTextureIDIndex::DefaultMetallicRoughness);
 						materialGpu.NormalTexIndex = assetManager.ResolveSrvIndex(material->m_NormalTex, ReservedTextureIDIndex::NormalFlat);
 						materialGpu.OcclusionTexIndex = assetManager.ResolveSrvIndex(material->m_OcclusionTex, ReservedTextureIDIndex::OcclusionWhite);
