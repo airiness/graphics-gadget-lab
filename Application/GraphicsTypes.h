@@ -76,6 +76,8 @@ namespace gglab
 		EmissiveBlack,
 		ErrorRed,
 		UVTest,
+		UVTestTexture1K,
+		UVTestTexture4K,
 
 		Count,
 
@@ -84,7 +86,8 @@ namespace gglab
 	static_assert(utils::ToIndex(ReservedTextureIDIndex::Count) < utils::ToIndex(ReservedTextureIDIndex::ReservedCount),
 		"ReservedTextureID::Count must be less than ReservedTextureID::ReservedCount");
 
-	inline constexpr TextureID::ValueType ReservedTextureCount = utils::ToIndex(ReservedTextureIDIndex::ReservedCount);
+	inline constexpr TextureID::ValueType ReservedTextureCount = 
+		static_cast<TextureID::ValueType>(utils::ToIndex(ReservedTextureIDIndex::ReservedCount));
 
 	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
 	{

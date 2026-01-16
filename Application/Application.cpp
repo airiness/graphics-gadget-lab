@@ -243,6 +243,7 @@ namespace gglab
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_DescriptorManager = m_Renderer->GetDescriptorManager();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
+		m_AssetManager->Initialize();
 
 		m_DemoManager = std::make_unique<DemoManager>();
 

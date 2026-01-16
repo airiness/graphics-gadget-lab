@@ -83,6 +83,8 @@ namespace gglab
 		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
 
+		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
+
 	private:
 		void InitializeReservedTextureSet() noexcept;
 
@@ -99,8 +101,7 @@ namespace gglab
 		TextureID FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
 		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 
-		TextureUploadData& LoadTextureScratchImage(const std::filesystem::path& texPath,
-			TextureUploadData& uploadData) noexcept;
+		DirectX::ScratchImage LoadTextureScratchImage(const std::filesystem::path& texPath) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

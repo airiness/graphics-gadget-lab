@@ -89,7 +89,7 @@ namespace gglab
 
 			TextureUploadData texUploadData{};
 			texUploadData.m_TextureId = textureId;
-			LoadTextureScratchImage(canonicalPath, texUploadData);
+			texUploadData.m_ScratchImage = LoadTextureScratchImage(canonicalPath);
 
 			// Upload texture to GPU
 			auto batch = m_TransferManager->BeginBatch();
@@ -249,6 +249,24 @@ namespace gglab
 		return modelId;
 	}
 
+	uint32_t AssetManager::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
+	{
+		if (const auto* texture = GetTexture(textureId); texture != nullptr)
+		{
+			if (texture->m_IsUploaded && texture->m_DescriptorId.IsValid())
+			{
+				return texture->m_DescriptorId.m_Index;
+			}
+		}
+
+		const auto fallbackId = ToTextureId(fallback);
+		const auto* fallbackTexture = GetTexture(fallbackId);
+
+		GGLAB_ASSERT(fallbackTexture != nullptr && fallbackTexture->m_DescriptorId.IsValid());
+
+		return fallbackTexture->m_DescriptorId.m_Index;
+	}
+
 	void AssetManager::InitializeReservedTextureSet() noexcept
 	{
 		// Helper function to make texture entry
@@ -263,7 +281,7 @@ namespace gglab
 						texture->m_Id = id;
 						texture->m_Name = StringID(texName);
 						texture->m_IsUploaded = false;
-						texture->m_DescriptorId = {};
+						texture->m_DescriptorId = {};	// Allocate when uploaded
 						texture->m_Texture.reset();
 					}
 				}
@@ -299,7 +317,7 @@ namespace gglab
 						pixel[0] = color[0];
 						pixel[1] = color[1];
 						pixel[2] = color[2];
-						pixel[3] = color[3]; 
+						pixel[3] = color[3];
 					}
 				}
 				return scratchImage;
@@ -420,12 +438,12 @@ namespace gglab
 				256,
 				256,
 				[](uint32_t x, uint32_t y) -> std::array<uint8_t, 4>
-				{
-					const uint32_t grid = 32;
-					uint8_t r = static_cast<uint8_t>(x / (256 - 1) * 8);
-					uint8_t g = static_cast<uint8_t>(y / (256 - 1) * 8);
+				{	
+					uint8_t r = static_cast<uint8_t>(static_cast<float>(x) / (256-1));
+					uint8_t g = static_cast<uint8_t>(static_cast<float>(y) / (256-1));
 					uint8_t b = 255;
 
+					const uint32_t grid = 32;
 					if ((grid != 0) && ((x % grid) == 0 || (y % grid) == 0))
 					{
 						r = g = b = 0;
@@ -433,6 +451,24 @@ namespace gglab
 
 					return { r, g, b, 255 };
 				})));
+
+		// UVTest Texture 1k from path
+		{
+			auto texPath = utils::Canonical(std::filesystem::path("Assets/Textures/UVTest1K.png"));
+			uploads.emplace_back(makeUploadData(
+				ReservedTextureIDIndex::UVTestTexture1K, "UVTestTexture1K",
+				LoadTextureScratchImage(texPath)));
+			m_TextureContainer.m_PathIDMap[texPath] = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);	
+		}
+
+		// UVTest Texture 4k from path
+		{
+			auto texPath = utils::Canonical(std::filesystem::path("Assets/Textures/UVTest4K.png"));
+			uploads.emplace_back(makeUploadData(
+				ReservedTextureIDIndex::UVTestTexture4K, "UVTestTexture4K",
+				LoadTextureScratchImage(texPath)));
+			m_TextureContainer.m_PathIDMap[texPath] = ToTextureId(ReservedTextureIDIndex::UVTestTexture4K);
+		}
 
 		// Upload reserved textures
 		if (!uploads.empty())
@@ -594,7 +630,7 @@ namespace gglab
 					baseColorTexId = CreateTexture(canonicalTexPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
 					texUploadData.m_TextureId = baseColorTexId;
-					LoadTextureScratchImage(canonicalTexPath, texUploadData);
+					texUploadData.m_ScratchImage = LoadTextureScratchImage(canonicalTexPath);
 				}
 				material->m_BaseColorTex = baseColorTexId;
 			}
@@ -618,7 +654,7 @@ namespace gglab
 					metallicRoughnessTexId = CreateTexture(canonicalTexPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
 					texUploadData.m_TextureId = metallicRoughnessTexId;
-					LoadTextureScratchImage(canonicalTexPath, texUploadData);
+					texUploadData.m_ScratchImage = LoadTextureScratchImage(canonicalTexPath);
 				}
 				material->m_MetallicRoughnessTex = metallicRoughnessTexId;
 			}
@@ -647,7 +683,7 @@ namespace gglab
 					normalTexId = CreateTexture(canonicalTexPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
 					texUploadData.m_TextureId = normalTexId;
-					LoadTextureScratchImage(canonicalTexPath, texUploadData);
+					texUploadData.m_ScratchImage = LoadTextureScratchImage(canonicalTexPath);
 				}
 				material->m_NormalTex = normalTexId;
 			}
@@ -663,7 +699,7 @@ namespace gglab
 					occlusionTexId = CreateTexture(canonicalTexPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
 					texUploadData.m_TextureId = occlusionTexId;
-					LoadTextureScratchImage(canonicalTexPath, texUploadData);
+					texUploadData.m_ScratchImage = LoadTextureScratchImage(canonicalTexPath);
 				}
 				material->m_OcclusionTex = occlusionTexId;
 			}
@@ -679,7 +715,7 @@ namespace gglab
 					emissiveTexId = CreateTexture(canonicalTexPath);
 					auto& texUploadData = texUploadDatas.emplace_back();
 					texUploadData.m_TextureId = emissiveTexId;
-					LoadTextureScratchImage(canonicalTexPath, texUploadData);
+					texUploadData.m_ScratchImage = LoadTextureScratchImage(canonicalTexPath);
 				}
 				material->m_EmissiveTex = emissiveTexId;
 			}
@@ -862,11 +898,8 @@ namespace gglab
 		return InvalidModelID;
 	}
 
-	AssetManager::TextureUploadData& AssetManager::LoadTextureScratchImage(
-		const std::filesystem::path& texPath,
-		TextureUploadData& uploadData) noexcept
+	DirectX::ScratchImage AssetManager::LoadTextureScratchImage(const std::filesystem::path& texPath) noexcept
 	{
-		GGLAB_ASSERT_MSG(uploadData.m_TextureId != InvalidTextureID, "Invalid TextureUploadData");
 		GGLAB_ASSERT_MSG(std::filesystem::exists(texPath), "Invalid texture file path.");
 
 		const auto extension = texPath.extension().string();
@@ -889,7 +922,6 @@ namespace gglab
 				scratchImage));
 		}
 
-		uploadData.m_ScratchImage = std::move(scratchImage);
-		return uploadData;
+		return scratchImage;
 	}
 }
