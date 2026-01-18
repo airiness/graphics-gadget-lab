@@ -80,7 +80,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	
 	// BaseColor
 	float4 baseColorSampled = SampleTexture2D(matData.BaseColorTexIndex, g_SamplerLinear, IN.UV);
-	float3 baseColor = SRGBToLinear(baseColorSampled.rgb) * matData.BaseColorFactor.rgb; // TODO: sample sRGB without sRGB->Linear conversion
+	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
 	float alpha = baseColorSampled.a * matData.BaseColorFactor.a; // TODO: alpha mode handling
 	
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
@@ -121,7 +121,6 @@ float4 PSMain(VSOutput IN) : SV_Target
 	
 	// Emissive texture(sRGB)
 	float3 emissiveSampled = SampleTexture2D(matData.EmissiveTexIndex, g_SamplerLinear, IN.UV).rgb;
-	emissiveSampled = SRGBToLinear(emissiveSampled); // TODO: sample sRGB without sRGB->Linear conversion	
 	float3 emissive = emissiveSampled * matData.EmissiveColorFactor.rgb;
 	
 	// Add emissive

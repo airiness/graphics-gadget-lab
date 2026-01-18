@@ -38,12 +38,75 @@ namespace gglab
 		Point,
 	};
 
+	enum class TextureColorSpace : uint8_t
+	{
+		Linear,
+		SRGB
+	};
+
+	enum class TextureSemantic : uint32_t
+	{
+		BaseColor,
+		Emissive,
+		Normal,
+		MetallicRoughness,
+		Occlusion,
+		UVTest,
+		GenericColor,
+		GenericData,
+		Unknown
+	};
+
+	[[nodiscard]] constexpr TextureColorSpace GetTextureColorSpaceFromSemantic(TextureSemantic semantic) noexcept
+	{
+		switch (semantic)
+		{
+		case TextureSemantic::BaseColor:
+		case TextureSemantic::Emissive:
+		case TextureSemantic::UVTest:
+		case TextureSemantic::GenericColor:
+			return TextureColorSpace::SRGB;
+		default:
+			return TextureColorSpace::Linear;
+		}
+	}
+
 	enum class MaterialFlags : uint32_t
 	{
 		None = 0u,
 		DoubleSided = 1u << 0,
 	};
 	GGLAB_ENUM_FLAGS(MaterialFlags);
+
+	enum class MaterialTextureSlot : uint32_t
+	{
+		BaseColor,
+		MetallicRoughness,
+		Normal,
+		Occlusion,
+		Emissive,
+
+		Count
+	};
+
+	constexpr TextureSemantic GetMaterialTextureSlotSemantic(MaterialTextureSlot slot) noexcept
+	{
+		switch (slot)
+		{
+		case MaterialTextureSlot::BaseColor:
+			return TextureSemantic::BaseColor;
+		case MaterialTextureSlot::MetallicRoughness:
+			return TextureSemantic::MetallicRoughness;
+		case MaterialTextureSlot::Normal:
+			return TextureSemantic::Normal;
+		case MaterialTextureSlot::Occlusion:
+			return TextureSemantic::Occlusion;
+		case MaterialTextureSlot::Emissive:
+			return TextureSemantic::Emissive;
+		default:
+			return TextureSemantic::Unknown;
+		}
+	}
 
 	enum class InputLayoutId : uint32_t
 	{
@@ -66,7 +129,7 @@ namespace gglab
 
 	// TextureID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureID, uint32_t);
-	enum class ReservedTextureIDIndex: uint32_t
+	enum class ReservedTextureIDIndex : uint32_t
 	{
 		BaseColorWhite,
 		MissingTextureChecker,
@@ -86,7 +149,7 @@ namespace gglab
 	static_assert(utils::ToIndex(ReservedTextureIDIndex::Count) < utils::ToIndex(ReservedTextureIDIndex::ReservedCount),
 		"ReservedTextureID::Count must be less than ReservedTextureID::ReservedCount");
 
-	inline constexpr TextureID::ValueType ReservedTextureCount = 
+	inline constexpr TextureID::ValueType ReservedTextureCount =
 		static_cast<TextureID::ValueType>(utils::ToIndex(ReservedTextureIDIndex::ReservedCount));
 
 	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
@@ -118,9 +181,10 @@ namespace gglab
 	{
 		TextureID m_Id{};
 		DX12DescriptorID m_DescriptorId{};
-		bool m_IsUploaded = false;
+		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
 		std::unique_ptr<DX12Texture> m_Texture;
+		bool m_IsUploaded = false;
 	};
 
 	struct Material

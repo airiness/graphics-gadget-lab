@@ -2,6 +2,7 @@
 #include "VertexData.h"
 #include "GraphicsTypes.h"
 #include "CopyContext.h"
+
 #include <DirectXTex.h>
 
 namespace gglab
@@ -23,7 +24,9 @@ namespace gglab
 		struct TextureUploadData
 		{
 			TextureID m_TextureId{};
+			TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 			DirectX::ScratchImage m_ScratchImage;
+			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
 		};
 
 		struct MeshUploadData
@@ -65,7 +68,8 @@ namespace gglab
 		void Finalize(const DX12FencePoint& fencePoint) noexcept;
 
 		ModelID LoadModel(const std::filesystem::path& path) noexcept;
-		TextureID LoadTexture(const std::filesystem::path& path) noexcept;
+		TextureID LoadTexture(const std::filesystem::path& path,
+			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
 
 		Texture* GetTexture(TextureID textureId) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
@@ -101,7 +105,14 @@ namespace gglab
 		TextureID FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
 		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 
-		DirectX::ScratchImage LoadTextureScratchImage(const std::filesystem::path& texPath) noexcept;
+		DirectX::ScratchImage LoadTextureScratchImage(
+			const std::filesystem::path& texPath, TextureColorSpace colorSpace) noexcept;
+
+		TextureUploadData MakeTextureUploadData(TextureID textureId,
+			const std::filesystem::path& canonicalPath, TextureSemantic semantic) noexcept;
+
+		TextureUploadData MakeTextureUploadData(TextureID textureId,
+			DirectX::ScratchImage&& scratchImage, TextureSemantic semantic) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
