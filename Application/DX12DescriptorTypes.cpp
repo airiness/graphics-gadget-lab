@@ -81,7 +81,7 @@ namespace gglab
 		};
 	}
 
-	DX12DescriptorID DX12DescriptorHandle::ToDescriptorID() const noexcept
+	DX12DescriptorID DX12DescriptorHandle::ToDescriptorId() const noexcept
 	{
 		return { .m_Index = m_Index, .m_Generation = m_Generation };
 	}

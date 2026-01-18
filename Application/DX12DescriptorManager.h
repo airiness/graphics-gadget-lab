@@ -1,6 +1,7 @@
 #pragma once
 #include "DX12FencePoint.h"
 #include "DX12DescriptorTypes.h"
+#include "TypeUtils.h"
 
 namespace gglab
 {
@@ -33,7 +34,7 @@ namespace gglab
 			Count
 		};
 
-		enum class FreeListAllocatorType : uint8_t
+		enum class AllocatorType : uint8_t
 		{
 			GeneralCbvSrvUav,
 			GeneralRtv,
@@ -55,19 +56,20 @@ namespace gglab
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 
 		DX12DescriptorHeap* GetHeap(HeapType heapType) const noexcept;
-		DX12DescriptorFreeListAllocator* GetFreeListAllocator(FreeListAllocatorType allocatorType) const noexcept;
+		DX12DescriptorFreeListAllocator* GetFreeListAllocator(AllocatorType allocatorType) const noexcept;
 
 		DX12DescriptorID AllocateBindlessSrvId() noexcept;
 		void RetireBindlessSrvId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
+		DX12DescriptorView BindlessSrvIdToView(const DX12DescriptorID& descriptorId) const noexcept;
 
 		DX12DescriptorView AllocateDevelopGuiSrvView() noexcept;
 		void DeferFreeDevelopGuiSrvInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept;
 		void DeferFreeDevelopGuiSrvInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept;
 
 	private:
-		using HeapArray = std::array<std::unique_ptr<DX12DescriptorHeap>, static_cast<uint8_t>(HeapType::Count)>;
+		using HeapArray = std::array<std::unique_ptr<DX12DescriptorHeap>, utils::EnumCount<HeapType>()>;
 		using FreeListAllocatorArray =
-			std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>, static_cast<uint8_t>(FreeListAllocatorType::Count)>;
+			std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>, utils::EnumCount<AllocatorType>()>;
 
 		HeapArray m_Heaps;
 		FreeListAllocatorArray m_FreeListAllocators;

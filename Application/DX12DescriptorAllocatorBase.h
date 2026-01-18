@@ -45,6 +45,8 @@ namespace gglab
 		CD3DX12_CPU_DESCRIPTOR_HANDLE CpuHandleAtGlobalIndex(uint32_t globalIndex) const noexcept;
 		CD3DX12_GPU_DESCRIPTOR_HANDLE GpuHandleAtGlobalIndex(uint32_t globalIndex) const noexcept;
 
+		DX12DescriptorView ViewAtGlobalIndex(uint32_t globalIndex) const noexcept;
+
 	protected:
 		DX12DescriptorHandle CreateHandleFromGlobalSpan(const DX12DescriptorSpan& globalSpan, uint32_t generation) noexcept;
 

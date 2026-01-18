@@ -7,6 +7,7 @@
 #include "EnumFlags.h"
 #include "DX12Buffer.h"
 #include "DX12DescriptorTypes.h"
+#include "TypeUtils.h"
 
 namespace gglab
 {
@@ -19,8 +20,8 @@ namespace gglab
 		ObjectCB,		// g_ObjectIndex, b1
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
-		TextureDescriptorTable,	// g_BaseColorTex, t0
-		RootParamCount
+
+		Count
 	};
 
 	enum class ModelType : uint32_t
@@ -65,28 +66,61 @@ namespace gglab
 
 	// TextureID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureID, uint32_t);
-	inline constexpr TextureID ReservedTextureID{ 5u };
+	enum class ReservedTextureIDIndex: uint32_t
+	{
+		BaseColorWhite,
+		MissingTextureChecker,
+		NormalFlat,
+		DefaultMetallicRoughness,
+		OcclusionWhite,
+		EmissiveBlack,
+		ErrorRed,
+		UVTest,
+		UVTestTexture1K,
+		UVTestTexture4K,
 
+		Count,
+
+		ReservedCount = 64u
+	};
+	static_assert(utils::ToIndex(ReservedTextureIDIndex::Count) < utils::ToIndex(ReservedTextureIDIndex::ReservedCount),
+		"ReservedTextureID::Count must be less than ReservedTextureID::ReservedCount");
+
+	inline constexpr TextureID::ValueType ReservedTextureCount = 
+		static_cast<TextureID::ValueType>(utils::ToIndex(ReservedTextureIDIndex::ReservedCount));
+
+	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
+	{
+		return TextureID{ static_cast<TextureID::ValueType>(utils::ToIndex(index)) };
+	}
+
+	constexpr bool IsReservedTextureId(TextureID id) noexcept
+	{
+		return id.IsValid() && id.Value() < ReservedTextureCount;
+	}
+
+	// MeshID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshID, uint32_t);
 	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
-	inline constexpr MeshID ReservedMeshID{ 5u };
+	inline constexpr MeshID::ValueType ReservedMeshCount = 8u;
 
+	// MaterialID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialID, uint32_t);
 	inline constexpr MaterialID ProceduralCubeMaterialID{ 0u };
-	inline constexpr MaterialID ReservedMaterialID{ 5u };
+	inline constexpr MaterialID::ValueType ReservedMaterialCount = 8u;
 
+	// ModelID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelID, uint32_t);
 	inline constexpr ModelID ProceduralCubeModelID{ 0u };
-	inline constexpr ModelID ReservedModelID{ 5u };
+	inline constexpr ModelID::ValueType ReservedModelCount = 8u;
 
 	struct Texture
 	{
 		TextureID m_Id{};
+		DX12DescriptorID m_DescriptorId{};
+		bool m_IsUploaded = false;
 		StringID m_Name{};
 		std::unique_ptr<DX12Texture> m_Texture;
-		DX12DescriptorHandle m_Descriptor{};
-		uint32_t m_DescriptorIndex = 0;
-		bool m_IsUploaded = false;
 	};
 
 	struct Material
@@ -107,7 +141,7 @@ namespace gglab
 		float m_OcclusionStrength = 1.0f;
 		Color m_EmissiveColor = color::Black;
 
-		MaterialFlags m_Flags;
+		MaterialFlags m_Flags = MaterialFlags::None;
 	};
 
 	struct Mesh

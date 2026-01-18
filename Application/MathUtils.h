@@ -14,7 +14,7 @@ namespace gglab::utils
 		return DirectX::XMConvertToDegrees(radians);
 	}
 
-	template<UnsignedInt T>
+	template<UnsignedInteger T>
 	constexpr T AlignUp(T value, T multiple) noexcept
 	{
 		if (multiple == 0)
@@ -25,7 +25,7 @@ namespace gglab::utils
 		return result ? (value + multiple - result) : value;
 	}
 
-	template<UnsignedInt T>
+	template<UnsignedInteger T>
 	constexpr T AlignDown(T value, T multiple) noexcept
 	{
 		if (multiple == 0)
@@ -35,13 +35,13 @@ namespace gglab::utils
 		return value - (value % multiple);
 	}
 
-	template<UnsignedInt T>
+	template<UnsignedInteger T>
 	constexpr bool IsPow2(T value) noexcept
 	{
 		return (value != 0) && ((value & (value - 1)) == 0);
 	}
 
-	template<UnsignedInt T>
+	template<UnsignedInteger T>
 	constexpr T AlignUpPow2(T value, T alignment) noexcept
 	{
 		GGLAB_ASSERT_MSG(IsPow2(alignment), "Alignment must be a power of two.");

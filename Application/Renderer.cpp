@@ -18,6 +18,7 @@
 #include "RenderScene.h"
 #include "RenderPassForwardPBR.h"
 #include "MathUtils.h"
+#include "TypeUtils.h"
 
 namespace gglab
 {
@@ -29,7 +30,7 @@ namespace gglab
 		m_SwapChain = std::make_unique<DX12SwapChain>();
 		DX12SwapChain::CreateInfo swapChainCreateInfo{};
 		swapChainCreateInfo.m_DX12Device = m_Device.get();
-		swapChainCreateInfo.m_PresentQueue = m_Device->GetGraphicsCommandQueue();
+		swapChainCreateInfo.m_PresentQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 		swapChainCreateInfo.m_Hwnd = createInfo.m_Hwnd;
 		swapChainCreateInfo.m_Width = createInfo.m_Width;
 		swapChainCreateInfo.m_Height = createInfo.m_Height;
@@ -104,6 +105,7 @@ namespace gglab
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
 
+		m_DescriptorManager->Tick();
 		m_DescriptorManager.reset();
 		m_TransferManager.reset();
 
@@ -138,9 +140,9 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
 
 		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
-		auto commandAllocatorPool = m_Device->GetGraphicsCommandAllocatorPool();
+		auto commandAllocatorPool = m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
-		auto commandQueue = m_Device->GetGraphicsCommandQueue();
+		auto commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 
 		// Wait Structured Buffer upload
 		if (renderContext.m_UploadFencePoint.IsValid())
@@ -160,17 +162,17 @@ namespace gglab
 		commandList->End();
 
 		const DX12CommandList* commandLists[] = { commandList };
-		auto fencePoint = commandQueue->Execute(commandLists);
+		m_LastSubmittedFencePoint = commandQueue->Execute(commandLists);
 
-		rg.Retire(fencePoint);
+		rg.Retire(m_LastSubmittedFencePoint);
 
 		m_RGGpuAllocator->Tick();
 
-		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, fencePoint);
+		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, m_LastSubmittedFencePoint);
 
-		m_DescriptorManager->EndFrame(fencePoint);
+		m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
 
-		swapChain->UpdateFrameSyncObject(std::move(fencePoint));
+		swapChain->UpdateFrameSyncObject(m_LastSubmittedFencePoint);
 		swapChain->Present();
 
 	}
@@ -277,24 +279,21 @@ namespace gglab
 			0, // baseShaderRegister
 			0, // registerSpace
 			D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+		// D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE
 
-		CD3DX12_ROOT_PARAMETER1 rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount)] = {};
+		CD3DX12_ROOT_PARAMETER1 rootParameters[utils::EnumCount<CommonRSRootParamIndex>()] = {};
 
 		// b0: FrameCB
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB)].InitAsConstantBufferView(0);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::FrameCB)].InitAsConstantBufferView(0);
 
 		// b1: ObjectCB, num32BitValues: 1, shaderRegister: b1
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(1, 1);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(1, 1);
 
 		// t1: ObjectSB
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
 
 		// t2: materialSB
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
-
-		// t0: BaseColorTex descriptor table
-		rootParameters[static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable)]
-			.InitAsDescriptorTable(1, &range, D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
 
 		constexpr uint32_t StaticSamplerCount = 1;
 		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};
@@ -307,10 +306,13 @@ namespace gglab
 
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Init_1_1(
-			static_cast<uint32_t>(CommonRSRootParamIndex::RootParamCount), rootParameters,
-			StaticSamplerCount, staticSamplers,
+			static_cast<UINT>(utils::EnumCount<CommonRSRootParamIndex>()),
+			rootParameters,
+			StaticSamplerCount,
+			staticSamplers,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
+			// D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
 
 		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
 		m_CommonRootSignatureId = id;

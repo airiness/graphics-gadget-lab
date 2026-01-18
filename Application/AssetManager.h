@@ -61,6 +61,9 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
+		void Initialize() noexcept;
+		void Finalize(const DX12FencePoint& fencePoint) noexcept;
+
 		ModelID LoadModel(const std::filesystem::path& path) noexcept;
 		TextureID LoadTexture(const std::filesystem::path& path) noexcept;
 
@@ -76,13 +79,15 @@ namespace gglab
 		Model* GetModel(ModelID modelId) noexcept;
 		const Model* GetModel(ModelID modelId) const noexcept;
 
-		uint32_t GetTextureDescriptorIndex(TextureID textureId) const noexcept;
-
 		MeshID AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
 		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
 
+		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
+
 	private:
+		void InitializeReservedTextureSet() noexcept;
+
 		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
 		void UploadMesh(const MeshUploadData& uploadData, CopyContext& copyContext) noexcept;
 
@@ -96,18 +101,17 @@ namespace gglab
 		TextureID FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
 		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 
-		TextureUploadData& LoadTextureScratchImage(const std::filesystem::path& texPath,
-			TextureUploadData& uploadData) noexcept;
+		DirectX::ScratchImage LoadTextureScratchImage(const std::filesystem::path& texPath) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
-		TextureIDCounter m_TextureIdCounter{ ReservedTextureID.Value() + 1u };
-		MeshIDCounter m_MeshIdCounter{ ReservedMeshID.Value() + 1u };
-		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialID.Value() + 1u };
-		ModelIDCounter m_ModelIdCounter{ ReservedModelID.Value() + 1u };
+		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
+		MeshIDCounter m_MeshIdCounter{ ReservedMeshCount };
+		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialCount };
+		ModelIDCounter m_ModelIdCounter{ ReservedModelCount };
 
 		TextureContainer m_TextureContainer;
 		MeshContainer m_MeshContainer;

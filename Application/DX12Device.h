@@ -1,4 +1,5 @@
 #pragma once
+#include "TypeUtils.h"
 
 namespace D3D12MA
 {
@@ -7,6 +8,16 @@ namespace D3D12MA
 
 namespace gglab
 {
+	enum class CommandQueueType : uint32_t
+	{
+		Graphics,
+		Compute,
+		Copy,
+		Transfer,
+
+		Count
+	};
+
 	class DX12CommandQueue;
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
@@ -42,18 +53,11 @@ namespace gglab
 
 		D3D12MA::Allocator* GetMemAllocator() const noexcept { return m_MemAllocator.Get(); }
 
-		DX12CommandQueue* GetGraphicsCommandQueue() const noexcept { return m_DirectCommandQueue.get(); }
-		DX12CommandQueue* GetComputeCommandQueue() const noexcept { return m_ComputeCommandQueue.get(); }
-		DX12CommandQueue* GetCopyCommandQueue() const noexcept { return m_CopyCommandQueue.get(); }
-		DX12CommandQueue* GetTransferCommandQueue() const noexcept { return m_TransferCommandQueue.get(); }
+		DX12CommandQueue* GetCommandQueue(CommandQueueType type) const noexcept { return m_CommandQueues[utils::ToIndexChecked(type)].get(); }
+		DX12CommandAllocatorPool* GetCommandAllocatorPool(CommandQueueType type) const noexcept { return m_CommandAllocatorPools[utils::ToIndexChecked(type)].get(); }
 
 		DX12CommandList* GetGraphicsCommandList(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandLists.at(bufferIndex).get(); }
 		DX12CommandList* GetComputeCommandList(uint32_t bufferIndex) const noexcept { return m_ComputeCommandLists.at(bufferIndex).get(); }
-
-		DX12CommandAllocatorPool* GetGraphicsCommandAllocatorPool() const noexcept { return m_GraphicsCommandAllocatorPool.get(); }
-		DX12CommandAllocatorPool* GetComputeCommandAllocatorPool() const noexcept { return m_ComputeCommandAllocatorPool.get(); }
-		DX12CommandAllocatorPool* GetCopyCommandAllocatorPool() const noexcept { return m_CopyCommandAllocatorPool.get(); }
-		DX12CommandAllocatorPool* GetTransferCommandAllocatorPool() const noexcept { return m_TransferCommandAllocatorPool.get(); }
 
 		bool SupportRayTracing() const noexcept { return m_FeatureSupport.m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_FeatureSupport.m_MeshShaderSupported; }
@@ -91,24 +95,17 @@ namespace gglab
 
 		ComPtr<D3D12MA::Allocator> m_MemAllocator;
 
-		std::unique_ptr<DX12CommandQueue> m_DirectCommandQueue;
-		std::unique_ptr<DX12CommandQueue> m_ComputeCommandQueue;
-		std::unique_ptr<DX12CommandQueue> m_CopyCommandQueue;
-		std::unique_ptr<DX12CommandQueue> m_TransferCommandQueue;
+		// Command Queues
+		std::array<std::unique_ptr<DX12CommandQueue>, utils::EnumCount<CommandQueueType>()> m_CommandQueues;
 
-		D3D_FEATURE_LEVEL m_FeatureLevel = D3D_FEATURE_LEVEL_12_0;
-
-		// supported features
-		FeatureSupport m_FeatureSupport;
+		// Command Allocator Pools
+		std::array<std::unique_ptr<DX12CommandAllocatorPool>, utils::EnumCount<CommandQueueType>()> m_CommandAllocatorPools;
 
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
 
-		// Command Allocator Pool
-		std::unique_ptr<DX12CommandAllocatorPool> m_GraphicsCommandAllocatorPool;
-		std::unique_ptr<DX12CommandAllocatorPool> m_ComputeCommandAllocatorPool;
-		std::unique_ptr<DX12CommandAllocatorPool> m_CopyCommandAllocatorPool;
-		std::unique_ptr<DX12CommandAllocatorPool> m_TransferCommandAllocatorPool;
+		// supported features
+		FeatureSupport m_FeatureSupport;
 
 		bool m_IsInitialized = false;
 	};

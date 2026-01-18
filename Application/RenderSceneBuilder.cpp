@@ -85,14 +85,13 @@ namespace gglab
 						materialGpu.OcclusionStrength = material->m_OcclusionStrength;
 						materialGpu.EmissiveColorFactor = material->m_EmissiveColor;
 
-						materialGpu.BaseColorTexIndex = assetManager.GetTextureDescriptorIndex(material->m_BaseColorTex);
-						materialGpu.MetallicRoughnessTexIndex = assetManager.GetTextureDescriptorIndex(material->m_MetallicRoughnessTex);
-						materialGpu.NormalTexIndex = assetManager.GetTextureDescriptorIndex(material->m_NormalTex);
-						materialGpu.OcclusionTexIndex = assetManager.GetTextureDescriptorIndex(material->m_OcclusionTex);
-						materialGpu.EmissiveTexIndex = assetManager.GetTextureDescriptorIndex(material->m_EmissiveTex);
+						materialGpu.BaseColorTexIndex = assetManager.ResolveSrvIndex(material->m_BaseColorTex, ReservedTextureIDIndex::BaseColorWhite);
+						materialGpu.MetallicRoughnessTexIndex = assetManager.ResolveSrvIndex(material->m_MetallicRoughnessTex, ReservedTextureIDIndex::DefaultMetallicRoughness);
+						materialGpu.NormalTexIndex = assetManager.ResolveSrvIndex(material->m_NormalTex, ReservedTextureIDIndex::NormalFlat);
+						materialGpu.OcclusionTexIndex = assetManager.ResolveSrvIndex(material->m_OcclusionTex, ReservedTextureIDIndex::OcclusionWhite);
+						materialGpu.EmissiveTexIndex = assetManager.ResolveSrvIndex(material->m_EmissiveTex, ReservedTextureIDIndex::EmissiveBlack);
 
 						materialData.push_back(materialGpu);
-
 					}
 					else
 					{

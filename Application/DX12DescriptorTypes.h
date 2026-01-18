@@ -73,7 +73,7 @@ namespace gglab
 		DX12DescriptorAllocatorBase* OwnerAllocator() const noexcept { return m_OwnerAllocator; }
 
 		DX12DescriptorView ToDescriptorView(uint32_t offset = 0) const noexcept;
-		DX12DescriptorID ToDescriptorID() const noexcept;
+		DX12DescriptorID ToDescriptorId() const noexcept;
 
 		void Free() noexcept;
 		void Retire(const DX12FencePoint& fencePoint) noexcept;

@@ -48,7 +48,7 @@ namespace gglab
 		const Color& GetClearColor() const noexcept { return m_ClearColor; }
 
 		void WaitFrameCompletion() noexcept;
-		void UpdateFrameSyncObject(DX12FencePoint&& fencePoint) noexcept;
+		void UpdateFrameSyncObject(const DX12FencePoint& fencePoint) noexcept;
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }

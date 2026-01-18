@@ -168,6 +168,7 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		auto* renderer = services.m_Renderer;
 		auto* assetManager = services.m_AssetManager;
 
 		const auto& drawItems = context.m_RenderScene->m_DrawItems;
@@ -186,21 +187,6 @@ namespace gglab
 			commandList->Get()->SetGraphicsRoot32BitConstant(
 				static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
 				drawItem.m_ObjectOffset, 0);
-
-			const Material* material = assetManager->GetMaterial(drawItem.m_MaterialId);
-			if (material && material->m_BaseColorTex.IsValid())
-			{
-				if (auto* texture = assetManager->GetTexture(material->m_BaseColorTex))
-				{
-					commandList->SetGraphicsDescriptor(
-						static_cast<uint32_t>(CommonRSRootParamIndex::TextureDescriptorTable),
-						texture->m_Descriptor);
-				}
-			}
-			else
-			{
-				// TODO: Dummy texture binding.
-			}
 
 			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}
