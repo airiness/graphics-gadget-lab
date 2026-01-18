@@ -8,7 +8,6 @@ namespace gglab
 {
 	namespace primitive
 	{
-		const char* const Cube::TextPath = "Assets/textures/UVChecker1K.png";
 		entt::entity Cube::Create(const CreateInfo& info) noexcept
 		{
 			auto assetManager = info.m_AssetManager;
@@ -35,7 +34,7 @@ namespace gglab
 					{
 						std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
 						cubeMaterial->m_Id = ProceduralCubeMaterialID;
-						cubeMaterial->m_BaseColorTex = assetManager->LoadTexture(TextPath);
+						cubeMaterial->m_BaseColorTex = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
 						assetManager->AddMaterial(std::move(cubeMaterial));
 					};
 
