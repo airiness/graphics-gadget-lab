@@ -141,7 +141,7 @@ namespace gglab
 		float m_OcclusionStrength = 1.0f;
 		Color m_EmissiveColor = color::Black;
 
-		MaterialFlags m_Flags;
+		MaterialFlags m_Flags = MaterialFlags::None;
 	};
 
 	struct Mesh

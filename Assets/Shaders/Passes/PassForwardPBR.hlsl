@@ -90,7 +90,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	roughness = max(0.045, roughness); // to avoid 0 roughness)
 
 	// Normal (linear)
-	float3 normalWS = normalize(IN.NormalWS);	
+	float3 normalWS = normalize(IN.NormalWS);
 	float3 N = SampleNormalWS(matData, normalWS, IN.PositionWS, IN.UV);
 	
 	// Shading
