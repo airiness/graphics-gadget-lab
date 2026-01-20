@@ -277,6 +277,7 @@
     <ClInclude Include="PSOKey.h" />
     <ClInclude Include="RenderPipelineBase.h" />
     <ClInclude Include="RenderPipelineForwardPBR.h" />
+    <ClInclude Include="RenderQueue.h" />
     <ClInclude Include="RenderScene.h" />
     <ClInclude Include="RenderSceneBuilder.h" />
     <ClInclude Include="RenderView.h" />

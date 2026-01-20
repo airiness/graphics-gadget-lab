@@ -24,7 +24,7 @@ namespace gglab
 		view.m_Aspect = camera.GetAspect();
 
 		view.m_Width = info.m_Width;
-		view.M_Height = info.m_Height;
+		view.m_Height = info.m_Height;
 
 		return view;
 	}

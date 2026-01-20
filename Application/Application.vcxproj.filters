@@ -609,6 +609,9 @@
     <ClInclude Include="TypeUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="RenderQueue.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -20,6 +20,6 @@ namespace gglab
 		float m_Aspect = 1.0f;
 
 		uint32_t m_Width = 0;
-		uint32_t M_Height = 0;
+		uint32_t m_Height = 0;
 	};
 }

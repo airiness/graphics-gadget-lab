@@ -191,7 +191,6 @@ namespace gglab
 			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}
 
-		// TODO: Add default base color descriptor when material or texture is missing.
 		// TODO: Sort and batch draw calls by PSO, Material and Texture.
 	}
 }
