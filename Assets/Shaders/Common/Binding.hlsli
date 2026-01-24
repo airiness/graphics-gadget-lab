@@ -1,9 +1,9 @@
 #pragma once
 #include <Common/BufferLayout.hlsli>
 
-cbuffer FrameCB : register(b0)
+cbuffer SceneCB : register(b0)
 {
-	FrameCBData g_Frame;
+	SceneCBData g_Scene;
 };
 
 cbuffer ObjectCB : register(b1)

@@ -101,9 +101,10 @@ namespace gglab
 		m_ViewCache.reset();
 		m_RGGpuAllocator.reset();
 
-		m_FrameCB.reset();
+		m_SceneCB.reset();
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
+		m_ViewSB.reset();
 
 		m_DescriptorManager->Tick();
 		m_DescriptorManager.reset();
@@ -182,22 +183,21 @@ namespace gglab
 		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
 	}
 
-	void Renderer::UpdateFrameConstants(const RenderView& view, const RenderScene& scene) noexcept
+	void Renderer::UpdateFrameConstants(const RenderScene& scene) noexcept
 	{
-		// Update FrameCB
-		FrameCBData frameCB{};
-		frameCB.ViewMat = view.m_View;
-		frameCB.ProjMat = view.m_Proj;
-		frameCB.CameraPos = utils::ToVector4(view.m_CameraPosition, 1.0f);
-		frameCB.Exposure = 1.0f;	// TODO: camera exposure
+		// Update SceneCB
+		SceneGPU sceneCB{};
+		sceneCB.ObjectBaseIndex = scene.m_ObjectBaseIndex;
+		sceneCB.ObjectCount = scene.m_ObjectCount;
+		sceneCB.MaterialBaseIndex = scene.m_MaterialBaseIndex;
+		sceneCB.MaterialCount = scene.m_MaterialCount;
+		sceneCB.ViewBaseIndex = scene.m_ViewBaseIndex;
+		sceneCB.ViewCount = scene.m_ViewCount;
 
-		frameCB.ObjectBaseIndex = scene.m_ObjectBaseIndex;
-		frameCB.MaterialBaseIndex = scene.m_MaterialBaseIndex;
-
-		frameCB.MainLight = scene.m_MainLight;
+		sceneCB.MainLight = scene.m_MainLight;
 
 		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();
-		m_FrameCB->Update(frameCB, currentIndex);
+		m_SceneCB->Update(sceneCB, currentIndex);
 	}
 
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
@@ -320,13 +320,13 @@ namespace gglab
 
 	void Renderer::InitializeGpuBuffers() noexcept
 	{
-		// Initialize global constant buffer
+		// Initialize Scene Constant Buffer
 		{
-			const auto constantBufferFrames = DX12Device::GetBufferCount();
-			m_FrameCB = std::make_unique<DX12ConstantBuffer<FrameCBData>>(m_Device.get(), constantBufferFrames);
+			const auto constantBufferCount = DX12Device::GetBufferCount();
+			m_SceneCB = std::make_unique<DX12ConstantBuffer<SceneGPU>>(m_Device.get(), constantBufferCount);
 		}
 
-		// Initialize structured buffers objects and materials
+		// Initialize Structured Buffers
 		{
 			DX12RingStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
 			objectSBCreateInfo.m_DX12Device = m_Device.get();
@@ -337,6 +337,11 @@ namespace gglab
 			materialSBCreateInfo.m_DX12Device = m_Device.get();
 			materialSBCreateInfo.m_ElementsCapacity = MaxMaterialCapacity;
 			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
+
+			DX12RingStructuredBuffer<ViewGPU>::CreateInfo viewSBCreateInfo{};
+			viewSBCreateInfo.m_DX12Device = m_Device.get();
+			viewSBCreateInfo.m_ElementsCapacity = MaxViewCapacity;
+			m_ViewSB = std::make_unique<DX12RingStructuredBuffer<ViewGPU>>(viewSBCreateInfo);
 		}
 	}
 }

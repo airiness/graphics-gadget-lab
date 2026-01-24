@@ -13,16 +13,18 @@ namespace gglab
 
 	struct RenderFrameContext
 	{
-		const RenderView* m_RenderView = nullptr;
+		std::span<RenderView> m_RenderViews;
 		const RenderScene* m_RenderScene = nullptr;
 
 		uint32_t m_BackBufferIndex = 0;
 
-		DX12FencePoint m_UploadFencePoint{};	// TODO: std::vector save wait fences
+		DX12FencePoint m_UploadFencePoint{};	// TODO: multi fence points support
 
 		bool IsValid() const noexcept
 		{
-			return m_RenderView && m_RenderScene;
+			return m_RenderViews.size() > 0 &&
+				m_RenderScene &&
+				m_UploadFencePoint.IsValid();
 		}
 	};
 

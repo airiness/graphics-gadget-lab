@@ -1,6 +1,4 @@
 #pragma once
-#include <cstdint>
-#include <limits>
 #include "Color.h"
 #include "StringId.h"
 #include "TypedIndex.h"
@@ -8,6 +6,9 @@
 #include "DX12Buffer.h"
 #include "DX12DescriptorTypes.h"
 #include "TypeUtils.h"
+
+#include <cstdint>
+#include <limits>
 
 namespace gglab
 {
@@ -29,6 +30,13 @@ namespace gglab
 		Invalid,
 		GlTF,
 		Procedural,
+	};
+
+	enum class AlphaMode : uint32_t
+	{
+		Opaque,
+		Mask,
+		Blend,
 	};
 
 	enum class LightType : uint32_t
@@ -114,6 +122,25 @@ namespace gglab
 		P3T2,			// Position(3), TexCoord(2)
 		P3N3,			// Position(3), Normal(3)
 		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
+
+		Count
+	};
+
+	// RenderViewID definition
+	enum class RenderViewID : uint32_t
+	{
+		Main,
+
+		Count,
+		Unknown = Count
+	};
+
+	// RenderBucket definition
+	enum class RenderBucket : uint32_t
+	{
+		Opaque,
+		AlphaTest,
+		Transparent,
 
 		Count
 	};

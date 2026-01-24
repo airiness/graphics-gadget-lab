@@ -253,12 +253,6 @@
     <ClCompile Include="DemoPlayground.cpp">
       <Filter>Core\Demo</Filter>
     </ClCompile>
-    <ClCompile Include="RenderViewBuilder.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderSceneBuilder.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
@@ -312,6 +306,15 @@
     </ClCompile>
     <ClCompile Include="DX12DescriptorHeap.cpp">
       <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderView.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderScene.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderQueue.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -548,12 +551,6 @@
     </ClInclude>
     <ClInclude Include="RenderPipelineBase.h">
       <Filter>Graphics\RenderPipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderViewBuilder.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderSceneBuilder.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="RenderPipelineForwardPBR.h">
       <Filter>Graphics\RenderPipeline</Filter>

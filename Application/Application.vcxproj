@@ -184,8 +184,9 @@
     <ClCompile Include="PSOCreator.cpp" />
     <ClCompile Include="PSOKey.cpp" />
     <ClCompile Include="RenderPipelineForwardPBR.cpp" />
-    <ClCompile Include="RenderSceneBuilder.cpp" />
-    <ClCompile Include="RenderViewBuilder.cpp" />
+    <ClCompile Include="RenderQueue.cpp" />
+    <ClCompile Include="RenderScene.cpp" />
+    <ClCompile Include="RenderView.cpp" />
     <ClCompile Include="RGGpuResourceAllocator.cpp" />
     <ClCompile Include="InputBase.cpp" />
     <ClCompile Include="Geometry.cpp" />
@@ -279,9 +280,7 @@
     <ClInclude Include="RenderPipelineForwardPBR.h" />
     <ClInclude Include="RenderQueue.h" />
     <ClInclude Include="RenderScene.h" />
-    <ClInclude Include="RenderSceneBuilder.h" />
     <ClInclude Include="RenderView.h" />
-    <ClInclude Include="RenderViewBuilder.h" />
     <ClInclude Include="RGFrameTargets.h" />
     <ClInclude Include="RGGpuResourceAllocator.h" />
     <ClInclude Include="GPUStructures.h" />

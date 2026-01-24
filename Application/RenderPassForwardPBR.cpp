@@ -102,7 +102,7 @@ namespace gglab
 
 				commandList->SetGraphicsConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::FrameCB),
-					renderer->GetFrameConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
 
 				// Set object structured buffer
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();

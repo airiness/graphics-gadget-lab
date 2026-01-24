@@ -1,9 +1,10 @@
 #include "Precompiled.h"
-#include "RenderSceneBuilder.h"
+#include "RenderScene.h"
 #include "TransferManager.h"
 #include "AssetManager.h"
 #include "World.h"
 #include "Components.h"
+#include "RenderView.h"
 
 namespace gglab
 {
@@ -15,22 +16,27 @@ namespace gglab
 		auto& transferManager = info.m_TransferManager;
 		auto& assetManager = info.m_AssetManager;
 
+		const auto& renderViews = info.m_RenderViews;
+
 		// Reclaim ring buffer
 		const DX12FencePoint completedFence = transferManager.Reclaim();
 		if (completedFence.IsValid())
 		{
 			info.m_ObjectsSB.ReclaimCompleted(completedFence);
 			info.m_MaterialsSB.ReclaimCompleted(completedFence);
+			info.m_ViewsSB.ReclaimCompleted(completedFence);
 		}
 
-		// Assembly object/material data
-		result.m_RenderScene.m_DrawItems.clear();
+		// Assembly RenderInstaces
+		result.m_RenderScene.m_RenderInstances.clear();
 
 		// Update Object and Material Structured Buffer
 		std::vector<ObjectGPU> objectData;
 		std::vector<MaterialGPU> materialData;
+		std::vector<ViewGPU> viewData;
 		objectData.reserve(MaxObjectCapacity);
 		materialData.reserve(MaxMaterialCapacity);
+		viewData.reserve(renderViews.size());
 
 		std::unordered_map<MaterialID, uint32_t> materialIndexMap;
 
@@ -106,21 +112,42 @@ namespace gglab
 					objectGpu.MaterialIndex = materialIndex;
 					objectData.push_back(objectGpu);
 
-					DrawItem drawItem{};
-					drawItem.m_MeshId = modelMesh.m_MeshId;
-					drawItem.m_MaterialId = modelMesh.m_MaterialId;
-					drawItem.m_ObjectOffset = objectOffset;
-					result.m_RenderScene.m_DrawItems.push_back(drawItem);
-
+					RenderInstance renderInstance{};
+					renderInstance.m_MeshId = modelMesh.m_MeshId;
+					renderInstance.m_MaterialId = modelMesh.m_MaterialId;
+					renderInstance.m_ObjectOffset = objectOffset;
+					result.m_RenderScene.m_RenderInstances.push_back(renderInstance);
 				}
 			});
 
+		// View data
+		for (const RenderView& renderView : renderViews)
+		{
+			ViewGPU viewGpu{};
+			viewGpu.ViewMat = renderView.m_View;
+			viewGpu.ProjMat = renderView.m_Proj;
+			viewGpu.InvViewMat = renderView.m_InvView;
+			viewGpu.InvProjMat = renderView.m_InvProj;
+			viewGpu.CameraPos = utils::ToVector4(renderView.m_CameraPosition, 1.0f);
+			viewGpu.Near = renderView.m_Near;
+			viewGpu.Far = renderView.m_Far;
+			viewGpu.FovRadians = renderView.m_FovRadians;
+			viewGpu.Aspect = renderView.m_Aspect;
+			viewGpu.Width = renderView.m_Width;
+			viewGpu.Height = renderView.m_Height;
+			viewData.push_back(viewGpu);
+		}
+
+		// Update View Structured Buffer
 		DX12FencePoint uploadFencePoint{};
 		TransferBatch::StageBufferWriteResult<ObjectGPU> objectsBufferResult{};
 		TransferBatch::StageBufferWriteResult<MaterialGPU> materialsBufferResult{};
+		TransferBatch::StageBufferWriteResult<ViewGPU> viewsBufferResult{};
 
 		// Upload structured buffer to GPU
-		if (!objectData.empty() || !materialData.empty())
+		if (!objectData.empty() ||
+			!materialData.empty() ||
+			!viewData.empty())
 		{
 			auto batch = transferManager.BeginBatch();
 
@@ -136,6 +163,12 @@ namespace gglab
 				materialsBufferResult = batch.StageStructuredBufferWrite<MaterialGPU>(info.m_MaterialsSB, materialSpan);
 			}
 
+			if (!viewData.empty())
+			{
+				std::span<const ViewGPU> viewSpan(viewData.data(), viewData.size());
+				viewsBufferResult = batch.StageStructuredBufferWrite<ViewGPU>(info.m_ViewsSB, viewSpan);
+			}
+
 			uploadFencePoint = batch.Submit(false);
 		}
 
@@ -146,6 +179,9 @@ namespace gglab
 
 		result.m_RenderScene.m_MaterialBaseIndex = materialsBufferResult.m_FirstElementIndex;
 		result.m_RenderScene.m_MaterialCount = materialsBufferResult.m_ElementCount;
+
+		result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
+		result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
 
 		// MainLight data
 		{

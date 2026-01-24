@@ -5,8 +5,9 @@
 #include "InputManager.h"
 #include "ShaderManager.h"
 #include "DemoManager.h"
-#include "RenderViewBuilder.h"
-#include "RenderSceneBuilder.h"
+#include "RenderView.h"
+#include "RenderScene.h"
+#include "RenderQueue.h"
 #include "Time.h"
 #include "Keyboard.h"
 #include "Mouse.h"
@@ -310,32 +311,39 @@ namespace gglab
 		auto* demo = m_DemoManager->GetActiveDemo();
 		demo->Update();
 
-		// Build render view
+		// Build render views
+		std::vector<RenderView> renderViews;
+		renderViews.resize(utils::ToIndex(RenderViewID::Count));
+
+		// Main view
 		const auto& camera = demo->GetCamera();
 		const RenderViewBuilder::BuildInfo viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
-			.m_Height = m_WindowHeight
+			.m_Height = m_WindowHeight,
+			.m_Name = StringID("MainView"),
+			.m_ViewId = RenderViewID::Main
 		};
-		RenderView renderView = m_RenderViewBuilder->Build(viewBuildInfo);
+		renderViews[utils::ToIndex(RenderViewID::Main)] = m_RenderViewBuilder->Build(viewBuildInfo);
 
 		// Build render scene
 		const auto& world = demo->GetWorld();
 		const RenderSceneBuilder::BuildInfo sceneBuildInfo{
 			.m_World = world,
-			.m_RenderView = renderView,
 			.m_AssetManager = *m_AssetManager,
 			.m_TransferManager = *m_Renderer->GetTransferManager(),
+			.m_RenderViews = std::span<RenderView>(renderViews),
 			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
-			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer()
+			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer(),
+			.m_ViewsSB = *m_Renderer->GetViewStructuredBuffer()
 		};
 		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
 
 		// Update frame constant buffer
-		m_Renderer->UpdateFrameConstants(renderView, renderScene);
+		m_Renderer->UpdateFrameConstants(renderScene);
 
 		const RenderFrameContext renderContext{
-			.m_RenderView = &renderView,
+			.m_RenderViews = std::span<RenderView>(renderViews),
 			.m_RenderScene = &renderScene,
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
 			.m_UploadFencePoint = uploadFencePoint

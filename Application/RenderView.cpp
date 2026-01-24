@@ -1,5 +1,5 @@
 #include "Precompiled.h"
-#include "RenderViewBuilder.h"
+#include "RenderView.h"
 #include "Camera.h"
 #include "MathUtils.h"
 
@@ -8,6 +8,9 @@ namespace gglab
 	RenderView RenderViewBuilder::Build(const BuildInfo& info) noexcept
 	{
 		RenderView view{};
+		view.m_Name = info.m_Name;
+		view.m_ViewId = info.m_ViewId;
+
 		auto& camera = info.m_Camera;
 
 		view.m_View = camera.GetViewMatrix();
