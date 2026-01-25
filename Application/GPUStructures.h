@@ -22,23 +22,6 @@ namespace gglab
 		uint32_t LightType;
 	};
 
-	struct ViewGPU
-	{
-		Matrix ViewMat;
-		Matrix ProjMat;
-		Matrix InvViewMat;
-		Matrix InvProjMat;
-		Vector4 CameraPos;
-		float Near;
-		float Far;
-		float FovRadians;
-		float Aspect;
-		uint32_t Width;
-		uint32_t Height;
-		uint32_t Padding[2];
-	};
-	static constexpr uint32_t MaxViewCapacity = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
-
 	struct SceneGPU
 	{
 		uint32_t ObjectBaseIndex;
@@ -50,7 +33,6 @@ namespace gglab
 		uint32_t Padding[2];
 
 		LightGPU MainLight; // todo: move to structured buffer lights
-
 	};
 
 	struct ObjectGPU
@@ -79,4 +61,23 @@ namespace gglab
 		uint32_t EmissiveTexIndex;
 	};
 	static constexpr uint32_t MaxMaterialCapacity = 128;
+
+	struct ViewGPU
+	{
+		Matrix ViewMat;
+		Matrix ProjMat;
+		Matrix InvViewMat;
+		Matrix InvProjMat;
+		Vector4 CameraPos;
+		float Near;
+		float Far;
+		float FovRadians;
+		float Aspect;
+		float Exposure;
+		uint32_t Width;
+		uint32_t Height;
+		uint32_t Padding;
+	};
+	static constexpr uint32_t MaxViewCapacity = 
+		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
 }

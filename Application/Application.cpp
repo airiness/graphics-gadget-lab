@@ -339,12 +339,20 @@ namespace gglab
 		};
 		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
 
+		// Build render queues
+		const RenderQueueBuilder::BuildInfo queueBuildInfo{
+			.m_AssetManager = *m_AssetManager,
+			.m_RenderScene = renderScene
+		};
+		const auto renderQueue = m_RenderQueueBuilder->Build(queueBuildInfo);
+
 		// Update frame constant buffer
 		m_Renderer->UpdateFrameConstants(renderScene);
 
 		const RenderFrameContext renderContext{
 			.m_RenderViews = std::span<RenderView>(renderViews),
-			.m_RenderScene = &renderScene,
+			.m_RenderScene = renderScene,
+			.m_RenderQueue = renderQueue,
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
 			.m_UploadFencePoint = uploadFencePoint
 		};

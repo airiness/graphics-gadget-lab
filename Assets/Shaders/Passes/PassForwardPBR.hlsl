@@ -17,6 +17,7 @@ struct VSOutput
 	float2 UV : TEXCOORD2;
 	
 	nointerpolation uint MaterialIndex : TEXCOORD3;
+	nointerpolation uint ViewIndex : TEXCOORD4;
 };
 
 VSOutput VSMain(VSInput IN)
@@ -24,18 +25,22 @@ VSOutput VSMain(VSInput IN)
 	VSOutput OUT;
 	
 	// Get object data
-	const uint objectIndex = g_Frame.ObjectBaseIndex + g_ObjectIndex;
+	const uint objectIndex = g_Scene.ObjectBaseIndex + g_ObjectIndex;
 	ObjectData objData = g_Objects[objectIndex];
+	
+	// Get view data
+	const uint viewIndex = g_Scene.ViewBaseIndex + g_ViewIndex;
+	ViewData viewData = g_Views[viewIndex];
 	
 	// World space position and normal
 	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
 	float3 normalWS = normalize(mul(IN.Normal, (float3x3) objData.NormalMat));
 
 	// View space position
-	float4 posVS = mul(posWS, g_Frame.ViewMat);
+	float4 posVS = mul(posWS, viewData.ViewMat);
 	
 	// Clip space position
-	float4 posCS = mul(posVS, g_Frame.ProjMat);
+	float4 posCS = mul(posVS, viewData.ProjMat);
 	
 	OUT.PositionCS = posCS;
 	OUT.PositionWS = posWS.xyz;
@@ -43,8 +48,9 @@ VSOutput VSMain(VSInput IN)
 	OUT.UV = IN.UV;
 	
 	// output material index
-	const uint materialIndex = g_Frame.MaterialBaseIndex + objData.MaterialIndex;
+	const uint materialIndex = g_Scene.MaterialBaseIndex + objData.MaterialIndex;
 	OUT.MaterialIndex = materialIndex;
+	OUT.ViewIndex = viewIndex;
 	
 	return OUT;
 }
@@ -78,6 +84,9 @@ float4 PSMain(VSOutput IN) : SV_Target
 {
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 	
+	// Get view data
+	ViewData viewData = g_Views[IN.ViewIndex];
+	
 	// BaseColor
 	float4 baseColorSampled = SampleTexture2D(matData.BaseColorTexIndex, g_SamplerLinear, IN.UV);
 	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
@@ -94,8 +103,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 N = SampleNormalWS(matData, normalWS, IN.PositionWS, IN.UV);
 	
 	// Shading
-	float3 V = normalize(g_Frame.CameraPos.xyz - IN.PositionWS); // View direction
-	float3 L = normalize(-g_Frame.MainLight.Direction.xyz); // DirWS is light to surface, so L = -DirWS
+	float3 V = normalize(viewData.CameraPos.xyz - IN.PositionWS); // View direction
+	float3 L = normalize(-g_Scene.MainLight.Direction.xyz); // DirWS is light to surface, so L = -DirWS
 	
 	float NoL = saturate(dot(N, L));
 	float NoV = saturate(dot(N, V));
@@ -116,8 +125,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 diffuse = kd * Fd_Lambert(baseColor);
 	
 	float3 Lo = (diffuse + specular) *
-		g_Frame.MainLight.Color.rgb *
-		g_Frame.MainLight.Intensity * NoL;
+		g_Scene.MainLight.Color.rgb *
+		g_Scene.MainLight.Intensity * NoL;
 	
 	// Emissive texture(sRGB)
 	float3 emissiveSampled = SampleTexture2D(matData.EmissiveTexIndex, g_SamplerLinear, IN.UV).rgb;
@@ -141,7 +150,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	Lo += ambient * ao;
 	
 	// Tonemap
-	float3 color = ACESFitted(Lo * g_Frame.Exposure);
+	float3 color = ACESFitted(Lo * viewData.Exposure);
 	color = LinearToSRGB(color);
 	
 	return float4(color, alpha);

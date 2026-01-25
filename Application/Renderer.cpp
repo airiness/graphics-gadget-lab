@@ -283,17 +283,20 @@ namespace gglab
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[utils::EnumCount<CommonRSRootParamIndex>()] = {};
 
-		// b0: FrameCB
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::FrameCB)].InitAsConstantBufferView(0);
+		// b0: SceneCB
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::SceneCB)].InitAsConstantBufferView(0);
 
-		// b1: ObjectCB, num32BitValues: 1, shaderRegister: b1
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(1, 1);
+		// b1: ObjectCB, num32BitValues: 2, shaderRegister: b1
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectCB)].InitAsConstants(2, 1);
 
 		// t1: ObjectSB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
 
 		// t2: materialSB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
+
+		// t3: ViewSB
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ViewSB)].InitAsShaderResourceView(3);
 
 		constexpr uint32_t StaticSamplerCount = 1;
 		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};

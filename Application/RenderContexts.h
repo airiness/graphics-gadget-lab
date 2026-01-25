@@ -1,12 +1,15 @@
 #pragma once
 #include "DX12FencePoint.h"
+#include "RenderView.h"
 
 #include <cstdint>
+#include <span>
 
 namespace gglab
 {
 	struct RenderView;
 	struct RenderScene;
+	struct RenderQueue;
 	class Renderer;
 	class AssetManager;
 	class ShaderManager;
@@ -14,7 +17,8 @@ namespace gglab
 	struct RenderFrameContext
 	{
 		std::span<RenderView> m_RenderViews;
-		const RenderScene* m_RenderScene = nullptr;
+		const RenderScene& m_RenderScene;
+		const RenderQueue& m_RenderQueue;
 
 		uint32_t m_BackBufferIndex = 0;
 
@@ -22,9 +26,7 @@ namespace gglab
 
 		bool IsValid() const noexcept
 		{
-			return m_RenderViews.size() > 0 &&
-				m_RenderScene &&
-				m_UploadFencePoint.IsValid();
+			return (m_RenderViews.size() > 0) && m_UploadFencePoint.IsValid();
 		}
 	};
 

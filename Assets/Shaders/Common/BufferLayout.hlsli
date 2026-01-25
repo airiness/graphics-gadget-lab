@@ -11,24 +11,23 @@ struct LightData
 	uint LightType; // 0: Directional, 1: Point, 2: Spot
 };
 
-struct FrameCBData
+struct SceneData
 {
-	float4x4 ViewMat;
-	float4x4 ProjMat;
-	float4 CameraPos;
-	float Exposure;
-
 	uint ObjectBaseIndex;
+	uint ObjectCount;
 	uint MaterialBaseIndex;
-	uint Padding; //uint g_TextureBaseIndex; // TODO: bindless textures
+	uint MaterialCount;
+	uint ViewBaseIndex;
+	uint ViewCount;
+	uint2 Padding;
 	
 	LightData MainLight;
 };
 
 struct ObjectData
 {
-	float4x4 ModelMat;
-	float4x4 NormalMat;
+	matrix ModelMat;
+	matrix NormalMat;
 	uint MaterialIndex;
 	uint3 Padding;
 };
@@ -47,4 +46,21 @@ struct MaterialData
 	uint NormalTexIndex;
 	uint OcclusionTexIndex;
 	uint EmissiveTexIndex;
+};
+
+struct ViewData
+{
+	matrix ViewMat;
+	matrix ProjMat;
+	matrix InvViewMat;
+	matrix InvProjMat;
+	float4 CameraPos;
+	float Near;
+	float Far;
+	float FovRadians;
+	float Aspect;
+	float Exposure;
+	uint Width;
+	uint Height;
+	uint Padding;
 };

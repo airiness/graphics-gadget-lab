@@ -1,10 +1,10 @@
 #pragma once
 #include "GPUStructures.h"
+#include "RenderView.h"
 #include "DX12RingStructuredBuffer.h"
 
 namespace gglab
 {
-	struct RenderView;
 	class World;
 	class AssetManager;
 	class TransferManager;

@@ -14,6 +14,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/pbrmaterial.h>
 
 namespace gglab
 {
@@ -728,6 +729,45 @@ namespace gglab
 			if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor) == aiReturn_SUCCESS)
 			{
 				material->m_EmissiveColor = Color(emissiveColor.r, emissiveColor.g, emissiveColor.b, 1.0f);
+			}
+
+			// AlphaMode
+			aiString alphaModeStr;
+			if (aiMaterial->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaModeStr) == aiReturn_SUCCESS)
+			{
+				std::string_view modeStr = alphaModeStr.C_Str();
+				if (modeStr == "MASK")
+				{
+					material->m_AlphaMode = AlphaMode::Mask;
+					material->m_AlphaCutoffMode = AlphaCutoffMode::AlphaCutoff;
+
+					float alphaCutoff = 0.5f;
+					aiMaterial->Get(AI_MATKEY_GLTF_ALPHACUTOFF, alphaCutoff);
+					material->m_AlphaCutoff = alphaCutoff;
+				}
+				else if (modeStr == "BLEND")
+				{
+					material->m_AlphaMode = AlphaMode::Blend;
+				}
+				else
+				{
+					material->m_AlphaMode = AlphaMode::Opaque;
+				}
+			}
+			else
+			{
+				material->m_AlphaMode = AlphaMode::Opaque;
+				material->m_AlphaCutoffMode = AlphaCutoffMode::Disabled;
+			}
+
+			// Material flags
+			int32_t doubleSided = 0;
+			if (aiMaterial->Get(AI_MATKEY_TWOSIDED, doubleSided) == aiReturn_SUCCESS)
+			{
+				if (doubleSided != 0)
+				{
+					material->m_Flags |= MaterialFlags::DoubleSided;
+				}
 			}
 
 			material->m_Name = StringID(aiMaterial->GetName().C_Str());

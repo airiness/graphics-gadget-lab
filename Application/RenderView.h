@@ -20,6 +20,7 @@ namespace gglab
 		float m_Far = 10000.0f;
 		float m_FovRadians = 0.0f;
 		float m_Aspect = 1.0f;
+		float m_Exposure = 1.0f;
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

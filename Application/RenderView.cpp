@@ -25,6 +25,7 @@ namespace gglab
 		view.m_Far = camera.GetFar();
 		view.m_FovRadians = utils::ToRadians(camera.GetFov());
 		view.m_Aspect = camera.GetAspect();
+		view.m_Exposure = 1.0f; //camera.GetExposure();
 
 		view.m_Width = info.m_Width;
 		view.m_Height = info.m_Height;

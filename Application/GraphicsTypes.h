@@ -17,10 +17,11 @@ namespace gglab
 
 	enum class CommonRSRootParamIndex : uint32_t
 	{
-		FrameCB = 0,	// b0
+		SceneCB = 0,	// b0
 		ObjectCB,		// g_ObjectIndex, b1
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
+		ViewSB,			// g_Views, t3
 
 		Count
 	};
@@ -37,6 +38,13 @@ namespace gglab
 		Opaque,
 		Mask,
 		Blend,
+	};
+
+	enum class AlphaCutoffMode : uint32_t
+	{
+		Disabled,
+		AlphaToCoverage,
+		AlphaCutoff
 	};
 
 	enum class LightType : uint32_t
@@ -123,6 +131,7 @@ namespace gglab
 		P3N3,			// Position(3), Normal(3)
 		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
 
+		// TODO: Add Tangent
 		Count
 	};
 
@@ -217,8 +226,7 @@ namespace gglab
 	struct Material
 	{
 		MaterialID m_Id{};
-		StringID m_Name{};
-
+		
 		TextureID m_BaseColorTex{};
 		TextureID m_MetallicRoughnessTex{};
 		TextureID m_NormalTex{};
@@ -233,6 +241,12 @@ namespace gglab
 		Color m_EmissiveColor = color::Black;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
+		AlphaMode m_AlphaMode = AlphaMode::Opaque;
+		AlphaCutoffMode m_AlphaCutoffMode = AlphaCutoffMode::Disabled;
+
+		float m_AlphaCutoff = 0.5f;
+
+		StringID m_Name{};
 	};
 
 	struct Mesh
