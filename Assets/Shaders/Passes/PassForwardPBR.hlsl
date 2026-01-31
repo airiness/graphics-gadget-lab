@@ -135,12 +135,6 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
 	float3 diffuse = kd * Fd_Lambert(baseColor);
 	
-	// Diffuse with alpha
-	if (matData.AlphaMode == 2) // BLEND
-	{
-		diffuse *= alpha;		
-	}
-	
 	float3 Lo = (diffuse + specular) *
 		g_Scene.MainLight.Color.rgb *
 		g_Scene.MainLight.Intensity * NoL;
