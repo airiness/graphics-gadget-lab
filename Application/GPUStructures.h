@@ -59,6 +59,10 @@ namespace gglab
 		uint32_t NormalTexIndex;
 		uint32_t OcclusionTexIndex;
 		uint32_t EmissiveTexIndex;
+
+		int32_t AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
+		float AlphaCutoff;
+		uint32_t Flags; // bit 0: doubleSided
 	};
 	static constexpr uint32_t MaxMaterialCapacity = 128;
 

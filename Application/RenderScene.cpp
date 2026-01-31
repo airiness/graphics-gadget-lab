@@ -97,6 +97,10 @@ namespace gglab
 						materialGpu.OcclusionTexIndex = assetManager.ResolveSrvIndex(material->m_OcclusionTex, ReservedTextureIDIndex::OcclusionWhite);
 						materialGpu.EmissiveTexIndex = assetManager.ResolveSrvIndex(material->m_EmissiveTex, ReservedTextureIDIndex::EmissiveBlack);
 
+						materialGpu.AlphaMode = static_cast<int32_t>(material->m_AlphaMode);
+						materialGpu.AlphaCutoff = material->m_AlphaCutoff;
+						materialGpu.Flags = static_cast<uint32_t>(material->m_Flags);
+
 						materialData.push_back(materialGpu);
 					}
 					else

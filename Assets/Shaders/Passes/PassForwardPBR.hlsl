@@ -90,7 +90,18 @@ float4 PSMain(VSOutput IN) : SV_Target
 	// BaseColor
 	float4 baseColorSampled = SampleTexture2D(matData.BaseColorTexIndex, g_SamplerLinear, IN.UV);
 	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
-	float alpha = baseColorSampled.a * matData.BaseColorFactor.a; // TODO: alpha mode handling
+	
+	float alpha = baseColorSampled.a * matData.BaseColorFactor.a;	
+	// Alpha mode handling
+	if (matData.AlphaMode == 0) // OPAQUE
+	{
+		alpha = 1.0;
+	}
+	else if (matData.AlphaMode == 1) // MASK
+	{
+		clip(alpha - matData.AlphaCutoff);
+		alpha = 1.0;
+	}
 	
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
 	float4 mrSampled = SampleTexture2D(matData.MetallicRoughnessTexIndex, g_SamplerLinear, IN.UV);
@@ -123,6 +134,12 @@ float4 PSMain(VSOutput IN) : SV_Target
 	
 	float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
 	float3 diffuse = kd * Fd_Lambert(baseColor);
+	
+	// Diffuse with alpha
+	if (matData.AlphaMode == 2) // BLEND
+	{
+		diffuse *= alpha;		
+	}
 	
 	float3 Lo = (diffuse + specular) *
 		g_Scene.MainLight.Color.rgb *

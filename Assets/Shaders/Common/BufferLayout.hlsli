@@ -46,6 +46,10 @@ struct MaterialData
 	uint NormalTexIndex;
 	uint OcclusionTexIndex;
 	uint EmissiveTexIndex;
+	
+	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
+	float AlphaCutoff;
+	uint Flags; // bit 0: doubleSided
 };
 
 struct ViewData
