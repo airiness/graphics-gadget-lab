@@ -52,17 +52,71 @@ namespace gglab
 		auto* assetManager = Application::GetInstance()->GetAssetManager();	
 		auto& registry = m_World.GetRegistry();
 
+		auto createEntityWithModel = [&](
+			const std::filesystem::path& modelPath,
+			const Vector3& position,
+			const Vector3& rotation,
+			const Vector3& scale)
+			{
+				auto modelId = assetManager->LoadModel(modelPath);
+				auto entity = registry.create();
+				components::TransformComponent transformComp{};
+				transformComp.m_Position = position;
+				transformComp.m_Rotation = Quaternion::CreateFromYawPitchRoll(
+					utils::ToRadians(rotation.y),
+					utils::ToRadians(rotation.x),
+					utils::ToRadians(rotation.z));
+				transformComp.m_Scale = scale;
+				registry.emplace<components::TransformComponent>(entity, transformComp);
+
+				components::ModelComponent modelComp{};
+				modelComp.m_ModelId = modelId;
+				registry.emplace<components::ModelComponent>(entity, modelComp);
+			};
 		// Test Sponza
-		{
-			auto modelId = assetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
-			auto sponzaEntity = registry.create();
+		createEntityWithModel(
+			"Assets/Models/Sponza/Sponza.gltf",
+			Vector3::Zero,
+			Vector3::Zero,
+			Vector3::One * 0.1f);
 
-			registry.emplace<components::TransformComponent>(sponzaEntity, components::TransformComponent());
+		// Flight helmet
+		createEntityWithModel(
+			"Assets/Models/FlightHelmet/FlightHelmet.gltf",
+			Vector3(10.0f, 20.0f, 0.0f),
+			Vector3::Zero,
+			Vector3::One);
 
-			components::ModelComponent modelComp{};
-			modelComp.m_ModelId = modelId;
-			registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
-		}
+		// Alpha Blend Model Test
+		createEntityWithModel(
+			"Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf",
+			Vector3(-10.0f, 20.0f, 0.0f),
+			Vector3::Zero,
+			Vector3::One);
+
+
+		//{
+		//	auto modelId = assetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
+		//	auto sponzaEntity = registry.create();
+
+		//	registry.emplace<components::TransformComponent>(sponzaEntity, components::TransformComponent());
+
+		//	components::ModelComponent modelComp{};
+		//	modelComp.m_ModelId = modelId;
+		//	registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
+		//}
+
+		//// Alpha Blend Test
+		//{
+		//	auto modelId = assetManager->LoadModel("Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf");
+		//	auto alphaBlendEntity = registry.create();
+		//	registry.emplace<components::TransformComponent>(alphaBlendEntity, components::TransformComponent());
+
+		//	components::ModelComponent modelComp{};
+		//	modelComp.m_ModelId = modelId;
+		//	registry.emplace<components::ModelComponent>(alphaBlendEntity, modelComp);
+		//}
+
 
 		// Main Light
 		{

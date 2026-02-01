@@ -342,7 +342,8 @@ namespace gglab
 		// Build render queues
 		const RenderQueueBuilder::BuildInfo queueBuildInfo{
 			.m_AssetManager = *m_AssetManager,
-			.m_RenderScene = renderScene
+			.m_RenderScene = renderScene,
+			.m_RenderView = renderViews[utils::ToIndex(RenderViewID::Main)]
 		};
 		const auto renderQueue = m_RenderQueueBuilder->Build(queueBuildInfo);
 

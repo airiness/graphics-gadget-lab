@@ -13,6 +13,7 @@ namespace gglab
 		RenderBucket m_Bucket = RenderBucket::Opaque;
 		uint64_t m_VariantBits = 0;
 		uint64_t m_SortKey = 0;
+		uint32_t mDepthKey = 0;
 	};
 
 	struct DrawItemsRange
@@ -26,6 +27,8 @@ namespace gglab
 		std::vector<DrawItem> m_DrawItems;
 
 		std::array<DrawItemsRange, utils::ToIndex(RenderBucket::Count)> m_BucketDrawRanges{};
+
+		RenderViewID m_ViewId = RenderViewID::Unknown;
 	};
 
 	class RenderQueueBuilder
@@ -35,6 +38,7 @@ namespace gglab
 		{
 			AssetManager& m_AssetManager;
 			const RenderScene& m_RenderScene;
+			const RenderView& m_RenderView;
 		};
 
 		enum VariantBit : uint64_t
@@ -60,10 +64,11 @@ namespace gglab
 		static constexpr uint8_t BucketSortOrder(RenderBucket bucket) noexcept;
 		static constexpr uint64_t EncodeVariantBits(RenderBucket bucket, bool doubleSided) noexcept;
 		static constexpr uint64_t PackSortKey(uint8_t bucketOrder,
-			uint16_t variantBits,
+			uint8_t variantBits,
 			uint32_t materialKey,
 			uint32_t meshKey) noexcept;
 		static RenderBucket DecideRenderBucket(const Material* material) noexcept;
 		static bool IsDoubleSided(const Material* material) noexcept;
+		static uint32_t MakeDepthKey(const RenderView& renderView, const Vector3& worldCenterPos) noexcept;
 	};
 }

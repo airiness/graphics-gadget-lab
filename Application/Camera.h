@@ -57,8 +57,8 @@ namespace gglab
 		float m_Aspect = 1.0f;
 		float m_Fov = 60.0f;
 
-		float m_MovementSpeed = 120.0f;
-		float m_RotationSpeed = 0.25f;
+		float m_MovementSpeed = 10.0f;
+		float m_RotationSpeed = 0.15f;
 
 		float m_Pitch = 0.0f;
 		float m_Yaw = 0.0f;

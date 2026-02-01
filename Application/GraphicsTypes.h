@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <limits>
 
+#include <SimpleMath.h>
+
 namespace gglab
 {
 	class DX12Texture;
@@ -252,6 +254,10 @@ namespace gglab
 	struct Mesh
 	{
 		MeshID m_Id{};
+
+		bool m_IsUploaded = false;
+		bool m_HasBounds = false;
+
 		StringID m_Name{};
 
 		std::unique_ptr<DX12Buffer> m_VertexBuffer;
@@ -263,8 +269,8 @@ namespace gglab
 		uint32_t m_VertexCount = 0;
 		uint32_t m_IndexCount = 0;
 
-		bool m_IsUploaded = false;
-
+		DirectX::BoundingSphere m_BoundingSphere{};
+		DirectX::BoundingBox m_BoundingBox{};
 	};
 
 	struct ModelMesh

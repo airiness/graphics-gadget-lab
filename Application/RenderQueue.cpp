@@ -7,6 +7,7 @@ namespace gglab
 	RenderQueue RenderQueueBuilder::Build(const BuildInfo& info) noexcept
 	{
 		RenderQueue renderQueue{};
+		renderQueue.m_ViewId = info.m_RenderView.m_ViewId;
 
 		const auto& instances = info.m_RenderScene.m_RenderInstances;
 		renderQueue.m_DrawItems.reserve(instances.size());
@@ -16,7 +17,6 @@ namespace gglab
 			const auto* mesh = info.m_AssetManager.GetMesh(instance.m_MeshId);
 			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
 			{
-				GGLAB_LOG_GRAPHICS_INFO("RenderQueueBuilder: Mesh is invalid, skip it.");
 				continue;
 			}
 
@@ -29,10 +29,10 @@ namespace gglab
 			variantBits |= EncodeVariantBits(bucket, doubleSided);
 
 			const uint8_t bucketOrder = BucketSortOrder(bucket);
-			const uint16_t variantBits16 = static_cast<uint16_t>(variantBits & 0xFFFFull);
+			const uint8_t variantBits8 = static_cast<uint8_t>(variantBits & 0xFFull);
 			const uint32_t materialKey = static_cast<uint32_t>(instance.m_MaterialId.IsValid() ? instance.m_MaterialId.Value() : 0);
 			const uint32_t meshKey = static_cast<uint32_t>(instance.m_MeshId.IsValid() ? instance.m_MeshId.Value() : 0);
-			uint64_t sortKey = PackSortKey(bucketOrder, variantBits16, materialKey, meshKey);
+			uint64_t sortKey = PackSortKey(bucketOrder, variantBits8, materialKey, meshKey);
 
 			DrawItem drawItem{};
 			drawItem.m_MeshId = instance.m_MeshId;
@@ -41,6 +41,7 @@ namespace gglab
 			drawItem.m_Bucket = bucket;
 			drawItem.m_VariantBits = variantBits;
 			drawItem.m_SortKey = sortKey;
+			drawItem.mDepthKey = MakeDepthKey(info.m_RenderView, instance.m_WorldCenterPos);
 
 			renderQueue.m_DrawItems.push_back(drawItem);
 		}
@@ -49,17 +50,18 @@ namespace gglab
 		std::stable_sort(renderQueue.m_DrawItems.begin(), renderQueue.m_DrawItems.end(),
 			[](const DrawItem& a, const DrawItem& b)
 			{
-				const uint8_t aBucketOrder = BucketSortOrder(a.m_Bucket);
-				const uint8_t bBucketOrder = BucketSortOrder(b.m_Bucket);
-				if (aBucketOrder != bBucketOrder)
+				if (a.m_Bucket != b.m_Bucket)
 				{
-					return aBucketOrder < bBucketOrder;
+					return a.m_Bucket < b.m_Bucket;
 				}
 
-				// TODO: transparent sorting by depth
+				// Transparent sorting by depth
 				if (a.m_Bucket == RenderBucket::Transparent)
 				{
-					return false;
+					if (a.mDepthKey != b.mDepthKey)
+					{
+						return a.mDepthKey < b.mDepthKey;
+					}
 				}
 
 				return a.m_SortKey < b.m_SortKey;
@@ -111,7 +113,7 @@ namespace gglab
 	// [24 bits]  Material Key
 	// [24 bits]  Mesh Key
 	constexpr uint64_t RenderQueueBuilder::PackSortKey(uint8_t bucketOrder,
-		uint16_t variantBits, uint32_t materialKey, uint32_t meshKey) noexcept
+		uint8_t variantBits, uint32_t materialKey, uint32_t meshKey) noexcept
 	{
 		const uint64_t bucketPart = (static_cast<uint64_t>(bucketOrder) & 0xFFull) << 56;
 		const uint64_t variantPart = (static_cast<uint64_t>(variantBits) & 0xFFull) << 48;
@@ -147,5 +149,34 @@ namespace gglab
 			return false;
 		}
 		return (material->m_Flags & MaterialFlags::DoubleSided) != MaterialFlags::None;
+	}
+
+	uint32_t RenderQueueBuilder::MakeDepthKey(const RenderView& renderView, const Vector3& worldCenterPos) noexcept
+	{
+		const Vector3 centerViewPos = Vector3::Transform(worldCenterPos, renderView.m_View);
+
+		const float nearZ = renderView.m_Near;
+		const float farZ = renderView.m_Far;
+
+		const float denom = farZ - nearZ;
+		if (denom <= 0.0f)
+		{
+			// Invalid near/far plane, return 0 depth key.
+			return 0u;
+		}
+
+		// Clamp Z to the valid [near, far] range from the view.
+		float z = centerViewPos.z;
+		z = std::clamp(z, nearZ, farZ);
+
+		float t = (z - nearZ) / denom;
+		t = std::clamp(t, 0.0f, 1.0f);
+
+		constexpr uint32_t Max = (1u << 24) - 1;
+
+		// far -> 0, near -> Max, so ascending sort = back-to-front
+		const float inv = 1.0f - t;
+		const uint32_t key = static_cast<uint32_t>(inv * static_cast<float>(Max) + 0.5f);
+		return (key > Max) ? Max : key;
 	}
 }

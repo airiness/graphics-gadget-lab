@@ -114,6 +114,9 @@ namespace gglab
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			DirectX::ScratchImage&& scratchImage, TextureSemantic semantic) noexcept;
 
+	public:
+		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
+
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;

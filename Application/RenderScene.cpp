@@ -116,10 +116,18 @@ namespace gglab
 					objectGpu.MaterialIndex = materialIndex;
 					objectData.push_back(objectGpu);
 
+					Vector3 worldCenter = transformComp.m_Position;
+					if (mesh->m_HasBounds)
+					{
+						const Vector3 localCenter = mesh->m_BoundingBox.Center;
+						worldCenter = Vector3::Transform(localCenter, world);
+					}
+
 					RenderInstance renderInstance{};
 					renderInstance.m_MeshId = modelMesh.m_MeshId;
 					renderInstance.m_MaterialId = modelMesh.m_MaterialId;
 					renderInstance.m_ObjectOffset = objectOffset;
+					renderInstance.m_WorldCenterPos = worldCenter;
 					result.m_RenderScene.m_RenderInstances.push_back(renderInstance);
 				}
 			});

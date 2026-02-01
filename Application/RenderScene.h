@@ -15,6 +15,8 @@ namespace gglab
 		MaterialID m_MaterialId{};
 
 		uint32_t m_ObjectOffset = 0;
+
+		Vector3 m_WorldCenterPos = Vector3::Zero;
 	};
 
 	struct RenderScene
