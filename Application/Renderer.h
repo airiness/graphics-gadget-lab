@@ -58,14 +58,16 @@ namespace gglab
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 
-		const DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() const noexcept { return m_FrameCB.get(); }
-		DX12ConstantBuffer<FrameCBData>* GetFrameConstantBuffer() noexcept { return m_FrameCB.get(); }
+		const DX12ConstantBuffer<SceneGPU>* GetSceneConstantBuffer() const noexcept { return m_SceneCB.get(); }
+		DX12ConstantBuffer<SceneGPU>* GetSceneConstantBuffer() noexcept { return m_SceneCB.get(); }
 		const DX12RingStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept { return m_ObjectSB.get(); }
 		DX12RingStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept { return m_ObjectSB.get(); }
 		const DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept { return m_MaterialSB.get(); }
 		DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
+		const DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
+		DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
 
-		void UpdateFrameConstants(const RenderView& view, const RenderScene& scene) noexcept;
+		void UpdateFrameConstants(const RenderScene& scene) noexcept;
 
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
 
@@ -95,10 +97,11 @@ namespace gglab
 
 		RootSignatureID m_CommonRootSignatureId{};
 
-		std::unique_ptr<DX12ConstantBuffer<FrameCBData>> m_FrameCB;
+		std::unique_ptr<DX12ConstantBuffer<SceneGPU>> m_SceneCB;
 
 		std::unique_ptr<DX12RingStructuredBuffer<ObjectGPU>> m_ObjectSB;
 		std::unique_ptr<DX12RingStructuredBuffer<MaterialGPU>> m_MaterialSB;
+		std::unique_ptr<DX12RingStructuredBuffer<ViewGPU>> m_ViewSB;
 
 		std::atomic_bool m_IsInitialized = false;
 		std::atomic_bool m_IsSuspended = false;

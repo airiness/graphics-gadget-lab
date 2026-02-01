@@ -1,4 +1,7 @@
 #pragma once
+#include "TypedIndex.h"
+#include "GraphicsTypes.h"
+
 #include <SimpleMath.h>
 using namespace DirectX::SimpleMath;
 // struct member name without m_ for GPU using
@@ -19,18 +22,17 @@ namespace gglab
 		uint32_t LightType;
 	};
 
-	struct FrameCBData
+	struct SceneGPU
 	{
-		Matrix ViewMat;
-		Matrix ProjMat;
-		Vector4 CameraPos;
-		float Exposure;
-		
 		uint32_t ObjectBaseIndex;
+		uint32_t ObjectCount;
 		uint32_t MaterialBaseIndex;
-		uint32_t Padding;
+		uint32_t MaterialCount;
+		uint32_t ViewBaseIndex;
+		uint32_t ViewCount;
+		uint32_t Padding[2];
 
-		LightGPU MainLight;
+		LightGPU MainLight; // todo: move to structured buffer lights
 	};
 
 	struct ObjectGPU
@@ -38,10 +40,10 @@ namespace gglab
 		Matrix ModelMat;
 		Matrix NormalMat;
 		uint32_t MaterialIndex;
-		uint32_t Padding[3];
+		uint32_t ViewIndex;
+		uint32_t Padding[2];
 	};
 	static constexpr uint32_t MaxObjectCapacity = 1024;
-
 
 	struct MaterialGPU
 	{
@@ -57,6 +59,29 @@ namespace gglab
 		uint32_t NormalTexIndex;
 		uint32_t OcclusionTexIndex;
 		uint32_t EmissiveTexIndex;
+
+		int32_t AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
+		float AlphaCutoff;
+		uint32_t Flags; // bit 0: doubleSided
 	};
 	static constexpr uint32_t MaxMaterialCapacity = 128;
+
+	struct ViewGPU
+	{
+		Matrix ViewMat;
+		Matrix ProjMat;
+		Matrix InvViewMat;
+		Matrix InvProjMat;
+		Vector4 CameraPos;
+		float Near;
+		float Far;
+		float FovRadians;
+		float Aspect;
+		float Exposure;
+		uint32_t Width;
+		uint32_t Height;
+		uint32_t Padding;
+	};
+	static constexpr uint32_t MaxViewCapacity = 
+		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
 }

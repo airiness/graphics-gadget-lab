@@ -14,6 +14,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/GltfMaterial.h>
 
 namespace gglab
 {
@@ -730,6 +731,45 @@ namespace gglab
 				material->m_EmissiveColor = Color(emissiveColor.r, emissiveColor.g, emissiveColor.b, 1.0f);
 			}
 
+			// AlphaMode
+			aiString alphaModeStr;
+			if (aiMaterial->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaModeStr) == aiReturn_SUCCESS)
+			{
+				std::string_view modeStr = alphaModeStr.C_Str();
+				if (modeStr == "MASK")
+				{
+					material->m_AlphaMode = AlphaMode::Mask;
+					material->m_AlphaCutoffMode = AlphaCutoffMode::AlphaCutoff;
+
+					float alphaCutoff = 0.5f;
+					aiMaterial->Get(AI_MATKEY_GLTF_ALPHACUTOFF, alphaCutoff);
+					material->m_AlphaCutoff = alphaCutoff;
+				}
+				else if (modeStr == "BLEND")
+				{
+					material->m_AlphaMode = AlphaMode::Blend;
+				}
+				else
+				{
+					material->m_AlphaMode = AlphaMode::Opaque;
+				}
+			}
+			else
+			{
+				material->m_AlphaMode = AlphaMode::Opaque;
+				material->m_AlphaCutoffMode = AlphaCutoffMode::Disabled;
+			}
+
+			// Material flags
+			int32_t doubleSided = 0;
+			if (aiMaterial->Get(AI_MATKEY_TWOSIDED, doubleSided) == aiReturn_SUCCESS)
+			{
+				if (doubleSided != 0)
+				{
+					material->m_Flags |= MaterialFlags::DoubleSided;
+				}
+			}
+
 			material->m_Name = StringID(aiMaterial->GetName().C_Str());
 		}
 
@@ -816,6 +856,9 @@ namespace gglab
 					indicesData.push_back(static_cast<uint32_t>(aiFace.mIndices[aiIndIndex]));
 				}
 			}
+
+			// Compute Bounding infos
+			ComputeMeshBounds(*mesh, verticesData);
 		}
 
 		// Upload to GPU
@@ -958,5 +1001,30 @@ namespace gglab
 		uploadData.m_ColorSpace = GetTextureColorSpaceFromSemantic(semantic);
 		uploadData.m_ScratchImage = std::move(scratchImage);
 		return uploadData;
+	}
+
+	void AssetManager::ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept
+	{
+		static_assert(std::is_base_of_v<DirectX::XMFLOAT3, decltype(Vertex::m_Position)>,
+			"Vertex position must be XMFLOAT3 or derived type.");
+
+		if (vertices.empty())
+		{
+			mesh.m_BoundingBox = DirectX::BoundingBox{};
+			mesh.m_BoundingSphere = DirectX::BoundingSphere{};
+			mesh.m_HasBounds = false;
+			return;
+		}
+
+		const auto* firstPos = std::addressof(vertices[0].m_Position);
+		const auto* firstPoint = static_cast<const DirectX::XMFLOAT3*>(firstPos);
+
+		constexpr size_t stride = sizeof(Vertex);
+
+		DirectX::BoundingBox::CreateFromPoints(mesh.m_BoundingBox, vertices.size(), firstPoint, stride);
+		DirectX::BoundingSphere::CreateFromBoundingBox(mesh.m_BoundingSphere, mesh.m_BoundingBox);
+		//DirectX::BoundingSphere::CreateFromPoints(mesh.m_BoundingSphere, vertices.size(), firstPoint, stride);
+
+		mesh.m_HasBounds = true;
 	}
 }

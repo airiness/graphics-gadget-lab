@@ -1,5 +1,5 @@
 #include "Precompiled.h"
-#include "RenderViewBuilder.h"
+#include "RenderView.h"
 #include "Camera.h"
 #include "MathUtils.h"
 
@@ -8,6 +8,9 @@ namespace gglab
 	RenderView RenderViewBuilder::Build(const BuildInfo& info) noexcept
 	{
 		RenderView view{};
+		view.m_Name = info.m_Name;
+		view.m_ViewId = info.m_ViewId;
+
 		auto& camera = info.m_Camera;
 
 		view.m_View = camera.GetViewMatrix();
@@ -22,9 +25,10 @@ namespace gglab
 		view.m_Far = camera.GetFar();
 		view.m_FovRadians = utils::ToRadians(camera.GetFov());
 		view.m_Aspect = camera.GetAspect();
+		view.m_Exposure = 1.0f; //camera.GetExposure();
 
 		view.m_Width = info.m_Width;
-		view.M_Height = info.m_Height;
+		view.m_Height = info.m_Height;
 
 		return view;
 	}

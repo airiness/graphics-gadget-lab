@@ -1,6 +1,4 @@
 #pragma once
-#include <cstdint>
-#include <limits>
 #include "Color.h"
 #include "StringId.h"
 #include "TypedIndex.h"
@@ -9,6 +7,11 @@
 #include "DX12DescriptorTypes.h"
 #include "TypeUtils.h"
 
+#include <cstdint>
+#include <limits>
+
+#include <SimpleMath.h>
+
 namespace gglab
 {
 	class DX12Texture;
@@ -16,10 +19,11 @@ namespace gglab
 
 	enum class CommonRSRootParamIndex : uint32_t
 	{
-		FrameCB = 0,	// b0
+		SceneCB = 0,	// b0
 		ObjectCB,		// g_ObjectIndex, b1
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
+		ViewSB,			// g_Views, t3
 
 		Count
 	};
@@ -29,6 +33,20 @@ namespace gglab
 		Invalid,
 		GlTF,
 		Procedural,
+	};
+
+	enum class AlphaMode : uint32_t
+	{
+		Opaque,
+		Mask,
+		Blend,
+	};
+
+	enum class AlphaCutoffMode : uint32_t
+	{
+		Disabled,
+		AlphaToCoverage,
+		AlphaCutoff
 	};
 
 	enum class LightType : uint32_t
@@ -115,6 +133,26 @@ namespace gglab
 		P3N3,			// Position(3), Normal(3)
 		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
 
+		// TODO: Add Tangent
+		Count
+	};
+
+	// RenderViewID definition
+	enum class RenderViewID : uint32_t
+	{
+		Main,
+
+		Count,
+		Unknown = Count
+	};
+
+	// RenderBucket definition
+	enum class RenderBucket : uint32_t
+	{
+		Opaque,
+		AlphaTest,
+		Transparent,
+
 		Count
 	};
 
@@ -190,8 +228,7 @@ namespace gglab
 	struct Material
 	{
 		MaterialID m_Id{};
-		StringID m_Name{};
-
+		
 		TextureID m_BaseColorTex{};
 		TextureID m_MetallicRoughnessTex{};
 		TextureID m_NormalTex{};
@@ -206,11 +243,21 @@ namespace gglab
 		Color m_EmissiveColor = color::Black;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
+		AlphaMode m_AlphaMode = AlphaMode::Opaque;
+		AlphaCutoffMode m_AlphaCutoffMode = AlphaCutoffMode::Disabled;
+
+		float m_AlphaCutoff = 0.5f;
+
+		StringID m_Name{};
 	};
 
 	struct Mesh
 	{
 		MeshID m_Id{};
+
+		bool m_IsUploaded = false;
+		bool m_HasBounds = false;
+
 		StringID m_Name{};
 
 		std::unique_ptr<DX12Buffer> m_VertexBuffer;
@@ -222,8 +269,8 @@ namespace gglab
 		uint32_t m_VertexCount = 0;
 		uint32_t m_IndexCount = 0;
 
-		bool m_IsUploaded = false;
-
+		DirectX::BoundingSphere m_BoundingSphere{};
+		DirectX::BoundingBox m_BoundingBox{};
 	};
 
 	struct ModelMesh

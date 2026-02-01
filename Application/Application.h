@@ -9,6 +9,7 @@ namespace gglab
 	class DemoManager;
 	class RenderViewBuilder;
 	class RenderSceneBuilder;
+	class RenderQueueBuilder;
 	class Time;
 	class Keyboard;
 	class Mouse;
@@ -88,6 +89,7 @@ namespace gglab
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<RenderViewBuilder> m_RenderViewBuilder;
 		std::unique_ptr<RenderSceneBuilder> m_RenderSceneBuilder;
+		std::unique_ptr<RenderQueueBuilder> m_RenderQueueBuilder;
 
 		bool m_IsInitialized = false;
 		bool m_IsMinimized = false;
