@@ -13,6 +13,7 @@
 #include "Mouse.h"
 #include "RenderPipelineBase.h"
 #include "DemoPlayground.h"
+#include "DevelopGuiContext.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -298,13 +299,11 @@ namespace gglab
 			}
 		}
 
+		// DevelopGui new frame
 		auto* developGui = m_Renderer->GetDevelopGui();
 		if (developGui)
 		{
 			developGui->NewFrame();
-
-			// ImGui test
-			ImGui::ShowDemoWindow();
 		}
 
 		// Update demo
@@ -375,6 +374,13 @@ namespace gglab
 
 		if (developGui)
 		{
+			DevelopGuiContext guiContext{};
+			guiContext.m_Camera = &camera;
+			guiContext.m_Renderer = nullptr;
+			guiContext.m_MainRenderView = nullptr;
+			guiContext.m_AssetManager = m_AssetManager.get();
+			guiContext.m_RenderGraph = nullptr;
+
 			developGui->EndFrame();
 		}
 

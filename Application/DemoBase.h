@@ -20,6 +20,7 @@ namespace gglab
 		virtual void OnExit() noexcept {}
 
 		virtual void Update()  noexcept = 0;
+		virtual void UpdateDevGui() noexcept {}
 
 		virtual World& GetWorld() noexcept = 0;
 		virtual Camera& GetCamera() noexcept = 0;

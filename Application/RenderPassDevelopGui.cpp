@@ -22,9 +22,10 @@ namespace gglab
 			{
 				builder.SideEffect();
 
-				auto& targets = builder.GetBlackboard().GetOrCreate<RGFrameTargets>(MainViewName);
-				data.m_BackBuffer = builder.Write(targets.m_BackBuffer, RGTextureUsage::RenderTarget);
-				data.m_RTVKey = targets.m_BackBufferRTVKey;
+				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				data.m_BackBuffer = builder.Write(viewTargets.m_Color, RGTextureUsage::RenderTarget);
+				data.m_RTVKey = viewTargets.m_BackBufferRTVKey;
 			},
 			[&rg, &services](DX12CommandList* commandList, DevelopGuiData& data)
 			{

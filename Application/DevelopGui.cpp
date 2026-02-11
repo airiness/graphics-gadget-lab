@@ -93,6 +93,28 @@ namespace gglab
 		m_FrameOpen = false;
 	}
 
+	void DevelopGui::Draw(DevelopGuiContext& context) noexcept
+	{
+		m_Registry.DrawMenuBar();
+
+		if (ImGui::BeginMenuBar())
+		{
+			if (ImGui::BeginMenu("Develop Menu"))
+			{
+				ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowImGuiDemo);
+				ImGui::EndMenu();
+			}
+			ImGui::EndMenuBar();
+		}
+
+		m_Registry.DrawPanels(context);
+
+		if (m_ShowImGuiDemo)
+		{
+			ImGui::ShowDemoWindow(&m_ShowImGuiDemo);
+		}
+	}
+
 	void DevelopGui::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
 		D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)

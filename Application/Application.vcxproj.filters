@@ -163,9 +163,6 @@
     <ClCompile Include="RGArenaAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="StringId.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="RGResource.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -315,6 +312,9 @@
     </ClCompile>
     <ClCompile Include="RenderQueue.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="DevelopGuiRegistry.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -608,6 +608,12 @@
     </ClInclude>
     <ClInclude Include="RenderQueue.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiRegistry.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiContext.h">
+      <Filter>Graphics\DevelopGui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

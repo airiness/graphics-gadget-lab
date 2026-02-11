@@ -31,5 +31,26 @@ namespace gglab::utils
 		}
 		return str;
 	}
+
+	std::string_view FindLeaf(std::string_view path) noexcept
+	{
+		while (!path.empty() && path.back() == '/')
+		{
+			path.remove_prefix(1);
+		}
+
+		if (path.empty())
+		{
+			return {};
+		}
+
+		const size_t pos = path.find_last_of('/');
+		if (pos == std::string_view::npos)
+		{
+			return path;
+		}
+
+		return path.substr(pos + 1);
+	}
 }
 

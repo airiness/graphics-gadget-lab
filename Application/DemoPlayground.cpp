@@ -47,6 +47,12 @@ namespace gglab
 		m_Camera->Update();
 	}
 
+	void DemoPlayground::UpdateDevGui() noexcept
+	{
+
+
+	}
+
 	void DemoPlayground::InitializeScene() noexcept
 	{
 		auto* assetManager = Application::GetInstance()->GetAssetManager();

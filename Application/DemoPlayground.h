@@ -22,6 +22,8 @@ namespace gglab
 
 		void Update() noexcept override;
 
+		void UpdateDevGui() noexcept override;
+
 		World& GetWorld() noexcept override { return m_World; }
 		Camera& GetCamera() noexcept override { return *m_Camera; }
 		RenderPipelineBase& GetRenderPipeline() noexcept override { return *m_RenderPipeline; }

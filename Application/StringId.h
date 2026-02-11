@@ -1,5 +1,15 @@
 #pragma once
 
+#include <cstdint>
+#include <array>
+#include <limits>
+#include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
+#include <string>
+#include <string_view>
+#include <compare>
+
 namespace gglab
 {
 	constexpr uint64_t CRC64_POLY = 0x42F0E1EBA9EA3693ull;

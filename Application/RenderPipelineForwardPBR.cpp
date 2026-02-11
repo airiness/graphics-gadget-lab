@@ -29,7 +29,8 @@ namespace gglab
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
-				auto& targets = blackboard.GetOrCreate<RGFrameTargets>(MainViewName);
+				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
@@ -48,7 +49,7 @@ namespace gglab
 				backBufferDesc.m_Format = swapChain->GetFormat();
 				backBufferDesc.m_Usage = RGTextureUsage::RenderTarget;
 
-				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
+				targets.m_Color = builder.ImportTexture("MainView.BackBuffer",
 					backTexture,
 					backBufferDesc,
 					D3D12_RESOURCE_STATE_PRESENT);
@@ -63,7 +64,7 @@ namespace gglab
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
 
 				// BackBuffer ResourceIndex
-				const ResourceIndex backBufferResourceIndex = rg.GetResourceIndex(targets.m_BackBuffer);
+				const ResourceIndex backBufferResourceIndex = rg.GetResourceIndex(targets.m_Color);
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(backBufferResourceIndex),
 					"BackBuffer must be external ResourceIndex.");
 				targets.m_BackBufferResourceIndex = backBufferResourceIndex;
@@ -88,16 +89,15 @@ namespace gglab
 				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Setup)");
 				builder.SideEffect();
 
-				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
+				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 
-				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
+				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
 				data.m_RTVKey = targets.m_BackBufferRTVKey;
 			},
 			[&rg, swapChain](DX12CommandList* commandList, PrepareBackBufferData& data)
 			{
-				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Execute)");
-
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
 
@@ -145,14 +145,13 @@ namespace gglab
 				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
 				builder.SideEffect();
 
-				auto& targets = builder.GetBlackboard().Get<RGFrameTargets>(MainViewName);
-				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
+				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
+				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
 			},
 			[&rg](DX12CommandList* commandList, FinishBackBufferData& data)
 			{
-				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Execute)");
-
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
 
