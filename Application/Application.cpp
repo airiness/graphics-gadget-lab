@@ -315,7 +315,7 @@ namespace gglab
 		renderViews.resize(utils::ToIndex(RenderViewID::Count));
 
 		// Main view
-		const auto& camera = demo->GetCamera();
+		auto& camera = demo->GetCamera();
 		const RenderViewBuilder::BuildInfo viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
@@ -369,18 +369,24 @@ namespace gglab
 		renderPipeline.BuildRenderGraph(rg, renderContext, services);
 		rg.Compile();
 
+		// Draw menus before Renderer::Render()
+		if (developGui)
+		{
+			DevelopGuiContext guiContext{};
+			guiContext.m_Camera = &camera;
+			guiContext.m_Renderer = m_Renderer.get();
+			guiContext.m_MainRenderView = &renderViews[utils::ToIndex(RenderViewID::Main)];
+			guiContext.m_AssetManager = m_AssetManager.get();
+			guiContext.m_RenderGraph = &rg;
+
+			developGui->Draw(guiContext);
+		}
+
 		// Render
 		m_Renderer->Render(rg, renderContext);
 
 		if (developGui)
 		{
-			DevelopGuiContext guiContext{};
-			guiContext.m_Camera = &camera;
-			guiContext.m_Renderer = nullptr;
-			guiContext.m_MainRenderView = nullptr;
-			guiContext.m_AssetManager = m_AssetManager.get();
-			guiContext.m_RenderGraph = nullptr;
-
 			developGui->EndFrame();
 		}
 
