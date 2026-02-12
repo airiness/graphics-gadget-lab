@@ -46,6 +46,23 @@ namespace gglab
 
 			ImGui_ImplDX12_Init(&initInfo);
 		}
+
+		// Add Menus to Registry
+		{
+			DevelopGuiPanelDesc panelDesc{};
+			panelDesc.m_Path = "ImGui/Demo";
+			panelDesc.m_Title = "ImGuiDemo";
+			panelDesc.m_Order = 0;
+			panelDesc.m_DefaultOpen = false;
+			panelDesc.m_DrawFunc =
+				[](DevelopGuiContext& context) 
+				{
+					ImGui::TextUnformatted("Hello!");
+					//ImGui::ShowDemoWindow();
+				};
+
+			m_Registry.RegisterPanel(panelDesc);
+		}
 	}
 
 	void DevelopGui::Finalize() noexcept
@@ -97,22 +114,22 @@ namespace gglab
 	{
 		m_Registry.DrawMenuBar();
 
-		if (ImGui::BeginMenuBar())
-		{
-			if (ImGui::BeginMenu("Develop Menu"))
-			{
-				ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowImGuiDemo);
-				ImGui::EndMenu();
-			}
-			ImGui::EndMenuBar();
-		}
+		//if (ImGui::BeginMenuBar())
+		//{
+		//	if (ImGui::BeginMenu("Develop Menu"))
+		//	{
+		//		ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowImGuiDemo);
+		//		ImGui::EndMenu();
+		//	}
+		//	ImGui::EndMenuBar();
+		//}
 
 		m_Registry.DrawPanels(context);
 
-		if (m_ShowImGuiDemo)
-		{
-			ImGui::ShowDemoWindow(&m_ShowImGuiDemo);
-		}
+		//if (m_ShowImGuiDemo)
+		//{
+		//	ImGui::ShowDemoWindow(&m_ShowImGuiDemo);
+		//}
 	}
 
 	void DevelopGui::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,

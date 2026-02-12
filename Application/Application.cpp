@@ -304,6 +304,9 @@ namespace gglab
 		if (developGui)
 		{
 			developGui->NewFrame();
+
+			static bool show = true;
+			ImGui::ShowMetricsWindow(&show);
 		}
 
 		// Update demo
