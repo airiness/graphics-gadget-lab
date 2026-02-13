@@ -388,11 +388,6 @@ namespace gglab
 		// Render
 		m_Renderer->Render(rg, renderContext);
 
-		if (developGui)
-		{
-			developGui->EndFrame();
-		}
-
 		return true;
 	}
 

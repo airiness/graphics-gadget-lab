@@ -112,24 +112,16 @@ namespace gglab
 
 	void DevelopGui::Draw(DevelopGuiContext& context) noexcept
 	{
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+		{
+			ImGui::DockSpaceOverViewport(0,
+				ImGui::GetMainViewport(),
+				ImGuiDockNodeFlags_PassthruCentralNode);
+		}
+
 		m_Registry.DrawMenuBar();
-
-		//if (ImGui::BeginMenuBar())
-		//{
-		//	if (ImGui::BeginMenu("Develop Menu"))
-		//	{
-		//		ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowImGuiDemo);
-		//		ImGui::EndMenu();
-		//	}
-		//	ImGui::EndMenuBar();
-		//}
-
 		m_Registry.DrawPanels(context);
-
-		//if (m_ShowImGuiDemo)
-		//{
-		//	ImGui::ShowDemoWindow(&m_ShowImGuiDemo);
-		//}
 	}
 
 	void DevelopGui::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
