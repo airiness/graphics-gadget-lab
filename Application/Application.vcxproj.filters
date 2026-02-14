@@ -615,6 +615,15 @@
     <ClInclude Include="DevelopGuiContext.h">
       <Filter>Graphics\DevelopGui</Filter>
     </ClInclude>
+    <ClInclude Include="DevelopGuiCameraPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiStateStore.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiImGuiToolsPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

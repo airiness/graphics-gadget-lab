@@ -46,27 +46,12 @@ namespace gglab
 
 			ImGui_ImplDX12_Init(&initInfo);
 		}
-
-		// Add Menus to Registry
-		{
-			DevelopGuiPanelDesc panelDesc{};
-			panelDesc.m_Path = "ImGui/Demo";
-			panelDesc.m_Title = "ImGuiDemo";
-			panelDesc.m_Order = 0;
-			panelDesc.m_DefaultOpen = false;
-			panelDesc.m_DrawFunc =
-				[](DevelopGuiContext& context) 
-				{
-					ImGui::TextUnformatted("Hello!");
-					//ImGui::ShowDemoWindow();
-				};
-
-			m_Registry.RegisterPanel(panelDesc);
-		}
 	}
 
 	void DevelopGui::Finalize() noexcept
 	{
+		m_Registry.Reset();
+
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 

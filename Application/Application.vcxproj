@@ -235,6 +235,9 @@
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DemoBase.h" />
     <ClInclude Include="DemoManager.h" />
+    <ClInclude Include="DevelopGuiImGuiToolsPanel.h" />
+    <ClInclude Include="DevelopGuiStateStore.h" />
+    <ClInclude Include="DevelopGuiCameraPanel.h" />
     <ClInclude Include="DevelopGuiContext.h" />
     <ClInclude Include="DevelopGuiRegistry.h" />
     <ClInclude Include="DX12DescriptorHeap.h" />

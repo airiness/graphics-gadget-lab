@@ -1,5 +1,6 @@
 #include "Precompiled.h"
 #include "DevelopGuiRegistry.h"
+#include "DevelopGuiContext.h"
 #include "StringUtils.h"
 
 namespace gglab
@@ -155,12 +156,19 @@ namespace gglab
 
 	void DevelopGuiRegistry::DrawPanels(DevelopGuiContext& context) noexcept
 	{
+		auto* prevStore = context.m_StateStore;
+		const uint64_t prevKey = context.m_CurrentPanelKey;
+
+		context.m_StateStore = &m_StateStore;
+
 		for (auto& panel : m_Panels)
 		{
 			if (!panel.m_Open)
 			{
 				continue;
 			}
+
+			context.m_CurrentPanelKey = panel.m_Key;
 
 			if (ImGui::Begin(panel.m_ImGuiWindowTitle.c_str(), &panel.m_Open))
 			{
@@ -175,6 +183,27 @@ namespace gglab
 			}
 			ImGui::End();
 		}
+
+		context.m_CurrentPanelKey = prevKey;
+		context.m_StateStore = prevStore;
+	}
+
+	void DevelopGuiRegistry::ClearPanels() noexcept
+	{
+		m_Panels.clear();
+		m_Root = {};
+		m_IsBuilt = false;
+	}
+
+	void DevelopGuiRegistry::ClearStateStore() noexcept
+	{
+		m_StateStore.Clear();
+	}
+
+	void DevelopGuiRegistry::Reset() noexcept
+	{
+		ClearPanels();
+		ClearStateStore();
 	}
 
 	DevelopGuiRegistry::MenuNode* DevelopGuiRegistry::FindOrCreateChildMenuNode(

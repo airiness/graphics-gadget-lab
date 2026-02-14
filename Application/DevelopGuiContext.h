@@ -8,6 +8,8 @@ namespace gglab
 	class AssetManager;
 	class RenderGraph;
 
+	class DevelopGuiStateStore;
+
 	struct DevelopGuiContext
 	{
 		Camera* m_Camera = nullptr;
@@ -15,5 +17,22 @@ namespace gglab
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
+
+		DevelopGuiStateStore* m_StateStore = nullptr;
+		uint64_t m_CurrentPanelKey = 0;
+
+		template<typename T, typename... ARGS>
+		T& PanelState(ARGS&&... args) noexcept
+		{
+			GGLAB_ASSERT(m_StateStore);
+			return m_StateStore->GetOrCreate<T>(m_CurrentPanelKey, std::forward<ARGS>(args)...);
+		}
+
+		template<typename T, typename... ARGS>
+		T& StateFor(uint64_t key, ARGS&&... args) noexcept
+		{
+			GGLAB_ASSERT(m_StateStore);
+			return m_StateStore->GetOrCreate<T>(key, std::forward<ARGS>(args)...);
+		}
 	};
 }

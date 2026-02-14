@@ -1,5 +1,6 @@
 #pragma once
 #include "StringId.h"
+#include "DevelopGuiStateStore.h"
 
 namespace gglab
 {
@@ -68,6 +69,10 @@ namespace gglab
 		void DrawMenuBar() noexcept;
 		void DrawPanels(DevelopGuiContext& context) noexcept;
 
+		void ClearPanels() noexcept;
+		void ClearStateStore() noexcept;
+		void Reset() noexcept;
+
 	private:
 		MenuNode* FindOrCreateChildMenuNode(MenuNode& parent, std::string_view name) noexcept;
 
@@ -82,6 +87,8 @@ namespace gglab
 
 		static constexpr std::string_view DefaultLeaf = "Panel";
 	private:
+		DevelopGuiStateStore m_StateStore;
+
 		std::vector<PanelRuntime> m_Panels;
 		MenuNode m_Root{};
 
