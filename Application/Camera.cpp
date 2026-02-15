@@ -12,22 +12,13 @@ namespace gglab
 		m_Fov(info.m_Fov)
 	{
 		// sanitize
-		if (!utils::IsFinite(m_Near) || m_Near <= 0.0f)
-		{
-			m_Near = 0.01f;
-		}
-		if (!utils::IsFinite(m_Far) || m_Far <= m_Near)
-		{
-			m_Far = m_Near + 0.1f;
-		}
-		if (!utils::IsFinite(m_Fov))
-		{
-			m_Fov = 60.0f;
-		}
+		m_Near = ClampNear(m_Near);
+		m_Far = ClampFar(m_Near, m_Far);
+		m_Fov = ClampFov(m_Fov);
+
 		auto width = std::max(1u, info.m_Width);
 		auto height = std::max(1u, info.m_Height);
 		m_Aspect = static_cast<float>(width) / static_cast<float>(height);
-		m_Fov = std::clamp(m_Fov, 1.0f, 179.0f);
 
 		ComputeYawPitchFromForward(m_Forward);
 
@@ -81,11 +72,8 @@ namespace gglab
 			return;
 		}
 
-		nearZ = std::max(0.0001f, nearZ);
-		farZ = std::max(nearZ + 0.0001f, farZ);
-
-		m_Near = nearZ;
-		m_Far = farZ;
+		m_Near = ClampNear(nearZ);
+		m_Far = ClampFar(m_Near, farZ);
 
 		MarkProjDirty();
 	}
@@ -97,7 +85,7 @@ namespace gglab
 			return;
 		}
 
-		m_Fov = std::clamp(fovDegrees, 1.0f, 179.0f);
+		m_Fov = ClampFov(m_Fov);
 		MarkProjDirty();
 	}
 
@@ -128,6 +116,21 @@ namespace gglab
 		ComputeYawPitchFromForward(forward);
 
 		MarkViewDirty();
+	}
+
+	float Camera::ClampNear(float nearZ) noexcept
+	{
+		return std::max(0.0001f, nearZ);
+	}
+
+	float Camera::ClampFar(float nearZ, float farZ) noexcept
+	{
+		return std::max(nearZ + 0.0001f, farZ);
+	}
+
+	float Camera::ClampFov(float fov) noexcept
+	{
+		return std::clamp(fov, 1.0f, 179.0f);
 	}
 
 	void Camera::UpdateProjMatrix() noexcept

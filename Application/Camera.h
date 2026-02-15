@@ -51,6 +51,11 @@ namespace gglab
 
 		void LookAt(const Vector3& eye, const Vector3& target) noexcept;
 
+	public:
+		static float ClampNear(float nearZ) noexcept;
+		static float ClampFar(float nearZ, float farZ) noexcept;
+		static float ClampFov(float fov) noexcept;
+
 	private:
 		void MarkViewDirty() noexcept { m_ViewDirty = true; }
 		void MarkProjDirty() noexcept { m_ProjDirty = true; }

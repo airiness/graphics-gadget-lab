@@ -15,6 +15,7 @@
 #include "DemoPlayground.h"
 #include "DevelopGuiContext.h"
 #include "DevelopGuiImGuiToolsPanel.h"
+#include "DevelopGuiCameraPanel.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -374,6 +375,7 @@ namespace gglab
 		{
 			DevelopGuiContext guiContext{};
 			guiContext.m_Camera = &camera;
+			guiContext.m_CameraController = &demo->GetCameraController();
 			guiContext.m_Renderer = m_Renderer.get();
 			guiContext.m_MainRenderView = &renderViews[utils::ToIndex(RenderViewID::Main)];
 			guiContext.m_AssetManager = m_AssetManager.get();
@@ -496,10 +498,10 @@ namespace gglab
 		panelRegistry.RegisterPanel(desc);
 
 		// CameraPanel
-		//desc.m_Path = "Menu/Application/Camera";
-		//desc.m_Title = "Camera";
-		//desc.m_DrawFunc = &DevelopGuiCameraPanel;
-		//panelRegistry.RegisterPanel(desc);
+		desc.m_Path = "Menu/Application/Camera";
+		desc.m_Title = "Camera";
+		desc.m_DrawFunc = &DevelopGuiCameraPanel;
+		panelRegistry.RegisterPanel(desc);
 	}
 
 	void Application::OnActive() noexcept

@@ -19,8 +19,8 @@ namespace gglab
 		// Mouse relative mode, process yaw and pitch
 		if (input.m_IsMouseRelative)
 		{
-			const float yawDelta = deltaTime * input.m_MouseDelta.x * m_Params.m_RotationSpeed;
-			const float pitchDelta = deltaTime * (-input.m_MouseDelta.y) * m_Params.m_RotationSpeed;
+			const float yawDelta = input.m_MouseDelta.x * m_Params.m_MouseSensitivityRadPerCount;
+			const float pitchDelta = (-input.m_MouseDelta.y) * m_Params.m_MouseSensitivityRadPerCount;
 
 			camera.SetYawPitch(camera.GetYaw() + yawDelta, camera.GetPitch() + pitchDelta);
 		}
@@ -76,7 +76,7 @@ namespace gglab
 	CameraController::Params CameraController::Sanitize(Params params) noexcept
 	{
 		params.m_MovementSpeed = std::max(0.0f, params.m_MovementSpeed);
-		params.m_RotationSpeed = std::max(0.0f, params.m_RotationSpeed);
+		params.m_MouseSensitivityRadPerCount = std::max(0.0f, params.m_MouseSensitivityRadPerCount);
 		params.m_AccelerateMultiplier = std::max(1.0f, params.m_AccelerateMultiplier);
 		params.m_SmoothStepT = std::clamp(params.m_SmoothStepT, 0.0f, 1.0f);
 		return params;

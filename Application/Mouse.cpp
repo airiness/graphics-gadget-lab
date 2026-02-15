@@ -5,8 +5,7 @@ namespace gglab
 {
 	Mouse::Mouse() noexcept :
 		InputBase(GameInputKind::GameInputKindMouse)
-	{
-	}
+	{}
 
 	void Mouse::Update() noexcept
 	{
@@ -185,7 +184,7 @@ namespace gglab
 		{
 			m_ButtonPressed[buttonIndex] = state.m_Buttons[buttonIndex] && !m_LastState.m_Buttons[buttonIndex];
 			m_ButtonReleased[buttonIndex] = !state.m_Buttons[buttonIndex] && m_LastState.m_Buttons[buttonIndex];
-			m_ButtonHeld[buttonIndex] = m_LastState.m_Buttons[buttonIndex];
+			m_ButtonHeld[buttonIndex] = state.m_Buttons[buttonIndex];
 		}
 
 		if (state.m_ModeState == MouseMode::Absolute)

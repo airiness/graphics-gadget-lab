@@ -1,9 +1,11 @@
 #pragma once
+#include "DevelopGuiStateStore.h"
 
 namespace gglab
 {
 	struct RenderView;
 	class Camera;
+	class CameraController;
 	class Renderer;
 	class AssetManager;
 	class RenderGraph;
@@ -13,6 +15,7 @@ namespace gglab
 	struct DevelopGuiContext
 	{
 		Camera* m_Camera = nullptr;
+		CameraController* m_CameraController = nullptr;
 		Renderer* m_Renderer = nullptr;
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;

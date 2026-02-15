@@ -19,7 +19,7 @@ namespace gglab
 
 		// Camera
 		Camera::CreateInfo camCreateInfo{};
-		camCreateInfo.m_Position = Vector3(-10.0f, 30.0f, 10.0f);
+		camCreateInfo.m_Position = Vector3(-10.0f, 22.0f, -10.0f);
 		camCreateInfo.m_Width = app->GetWindowWidth();
 		camCreateInfo.m_Height = app->GetWindowHeight();
 		camCreateInfo.m_Near = 0.1f;
@@ -30,7 +30,7 @@ namespace gglab
 		// CameraController
 		CameraController::CreateInfo camCtrlCreateInfo{};
 		camCtrlCreateInfo.m_Params.m_MovementSpeed = 10.0f;
-		camCtrlCreateInfo.m_Params.m_RotationSpeed = 0.15f;
+		camCtrlCreateInfo.m_Params.m_MouseSensitivityRadPerCount = 0.0018f;
 		camCtrlCreateInfo.m_Params.m_AccelerateMultiplier = 3.0f;
 		camCtrlCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(camCtrlCreateInfo);
@@ -79,12 +79,6 @@ namespace gglab
 		m_CameraController->Update(*m_Camera, camInput, deltaTime);
 
 		m_Camera->Update();
-	}
-
-	void DemoPlayground::UpdateDevGui() noexcept
-	{
-
-
 	}
 
 	void DemoPlayground::InitializeScene() noexcept

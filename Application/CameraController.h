@@ -24,7 +24,7 @@ namespace gglab
 		struct Params
 		{
 			float m_MovementSpeed = 10.0f;
-			float m_RotationSpeed = 0.15f;
+			float m_MouseSensitivityRadPerCount = 0.001f;
 			float m_AccelerateMultiplier = 3.0f;
 			float m_SmoothStepT = 0.5f;
 		};
@@ -45,12 +45,12 @@ namespace gglab
 		void SetParams(const Params& params) noexcept { m_Params = Sanitize(params); }
 
 		float GetMovementSpeed() const noexcept { return m_Params.m_MovementSpeed; }
-		float GetRotationSpeed() const noexcept { return m_Params.m_RotationSpeed; }
+		float GetRotationSpeed() const noexcept { return m_Params.m_MouseSensitivityRadPerCount; }
 		float GetAccelerateMultiplier() const noexcept { return m_Params.m_AccelerateMultiplier; }
 		float GetSmoothStepT() const noexcept { return m_Params.m_SmoothStepT; }
 
 		void SetMovementSpeed(float value) noexcept { m_Params.m_MovementSpeed = value; }
-		void SetRotationSpeed(float value) noexcept { m_Params.m_RotationSpeed = value; }
+		void SetRotationSpeed(float value) noexcept { m_Params.m_MouseSensitivityRadPerCount = value; }
 		void SetAccelerateMultiplier(float value) noexcept { m_Params.m_AccelerateMultiplier = value; }
 		void SetSmoothStepT(float value) noexcept { m_Params.m_SmoothStepT = value; }
 

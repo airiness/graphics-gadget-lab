@@ -147,6 +147,7 @@
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DemoManager.cpp" />
+    <ClCompile Include="DevelopGuiCameraPanel.cpp" />
     <ClCompile Include="DevelopGuiRegistry.cpp" />
     <ClCompile Include="DX12DescriptorHeap.cpp" />
     <ClCompile Include="DX12DescriptorManager.cpp" />
