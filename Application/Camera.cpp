@@ -1,6 +1,5 @@
 #include "Precompiled.h"
 #include "Camera.h"
-#include "MathUtils.h"
 
 namespace gglab
 {
