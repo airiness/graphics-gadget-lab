@@ -199,12 +199,9 @@ namespace gglab
 		{
 			ImGui::Separator();
 			if (ImGui::Button("Apply"))
-			{
-				if (camChanged)
-				{
-					PushToCamera(state, *camera);
-				}
-				if (cameraCtrl && ctrlChanged)
+			{	
+				PushToCamera(state, *camera);		
+				if (cameraCtrl)
 				{
 					PushToController(state, *cameraCtrl);
 				}
