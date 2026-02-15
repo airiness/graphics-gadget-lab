@@ -9,8 +9,8 @@ namespace gglab
 	{
 		while (!m_Rest.empty() && m_Rest.front() == '/')
 		{
-			// remove '/' from begin
-			m_Rest.remove_prefix(1);
+			// remove '/' from end
+			m_Rest.remove_suffix(1);
 		}
 
 		if (m_Rest.empty())

@@ -84,7 +84,7 @@ namespace gglab
 			return;
 		}
 
-		m_Fov = ClampFov(m_Fov);
+		m_Fov = ClampFov(fovDegrees);
 		MarkProjDirty();
 	}
 
