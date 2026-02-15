@@ -1,4 +1,6 @@
 #pragma once
+#include "MathUtils.h"
+
 namespace gglab
 {
 	class Camera
@@ -7,8 +9,6 @@ namespace gglab
 		struct CreateInfo
 		{
 			Vector3 m_Forward = Vector3::UnitZ;
-			Vector3 m_Up = Vector3::UnitY;
-			Vector3 m_Right = Vector3::UnitX;
 			Vector3 m_Position = Vector3::Zero;
 
 			float m_Near = 0.01f;
@@ -24,23 +24,44 @@ namespace gglab
 		~Camera() noexcept = default;
 
 		void Update() noexcept;
-		void OnResize(uint32_t width, uint32_t height) noexcept;
 
-		Matrix GetViewMatrix() const noexcept;
-		Matrix GetProjMatrix() const noexcept;
+		const Matrix& GetViewMatrix() const noexcept { return m_ViewMatrix; }
+		const Matrix& GetProjMatrix() const noexcept { return m_ProjMatrix; }
 
-		Vector3 GetPosition() const noexcept { return m_Position; }
+		const Vector3& GetPosition() const noexcept { return m_Position; }
+		const Vector3& GetForward() const noexcept { return m_Forward; }
+		const Vector3& GetRight() const noexcept { return m_Right; }
+		const Vector3& GetUp() const noexcept { return m_Up; }
 
 		float GetNear() const noexcept { return m_Near; }
 		float GetFar() const noexcept { return m_Far; }
 		float GetFov() const noexcept { return m_Fov; }
 		float GetAspect() const noexcept { return m_Aspect; }
 
+		float GetYaw() const noexcept { return m_Yaw; }
+		float GetPitch() const noexcept { return m_Pitch; }
+
+		void SetPosition(const Vector3& pos) noexcept;
+		void SetYawPitch(float yawRadians, float pitchRadians) noexcept;
+		void SetNearFar(float nearZ, float farZ) noexcept;
+		void SetFov(float fovDegrees) noexcept;
+		void SetAspect(float aspect) noexcept;
+
+		void OnResize(uint32_t width, uint32_t height) noexcept;
+
+		void LookAt(const Vector3& eye, const Vector3& target) noexcept;
+
 	private:
+		void MarkViewDirty() noexcept { m_ViewDirty = true; }
+		void MarkProjDirty() noexcept { m_ProjDirty = true; }
+
 		void UpdateProjMatrix() noexcept;
 		void UpdateViewMatrix() noexcept;
+
+		void ComputeYawPitchFromForward(const Vector3& forward) noexcept;
+
 	private:
-		static constexpr float SmoothStepT = 0.5f;
+		static constexpr float PitchLimitRadians = utils::ToRadians(85.0f);
 
 	private:
 		Matrix m_ViewMatrix = Matrix::Identity;
@@ -50,17 +71,16 @@ namespace gglab
 		Vector3 m_Up = Vector3::UnitY;
 		Vector3 m_Right = Vector3::UnitX;
 		Vector3 m_Position = Vector3::Zero;
-		Vector3 m_Velocity = Vector3::Zero;
 
 		float m_Near = 0.01f;
 		float m_Far = 1000.0f;
 		float m_Aspect = 1.0f;
-		float m_Fov = 60.0f;
+		float m_Fov = 60.0f;	// degrees
 
-		float m_MovementSpeed = 10.0f;
-		float m_RotationSpeed = 0.15f;
+		float m_Pitch = 0.0f;	// radians
+		float m_Yaw = 0.0f;		// radians
 
-		float m_Pitch = 0.0f;
-		float m_Yaw = 0.0f;
+		bool m_ViewDirty = true;
+		bool m_ProjDirty = true;
 	};
 }

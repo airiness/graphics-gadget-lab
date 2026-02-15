@@ -144,6 +144,7 @@
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DemoManager.cpp" />
     <ClCompile Include="DevelopGuiRegistry.cpp" />
@@ -230,6 +231,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="Blackboard.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CameraController.h" />
     <ClInclude Include="Components.h" />
     <ClInclude Include="CopyContext.h" />
     <ClInclude Include="CoreMacros.h" />

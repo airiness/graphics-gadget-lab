@@ -1,7 +1,12 @@
 #include "Precompiled.h"
 #include "DemoPlayground.h"
 #include "Camera.h"
+#include "CameraController.h"
 #include "Application.h"
+#include "Time.h"
+#include "InputManager.h"
+#include "Mouse.h"
+#include "Keyboard.h"
 #include "AssetManager.h"
 #include "Components.h"
 #include "RenderPipelineForwardPBR.h"
@@ -13,14 +18,22 @@ namespace gglab
 		auto* app = Application::GetInstance();
 
 		// Camera
-		Camera::CreateInfo info{};
-		info.m_Position = Vector3(-100.0f, 128.0f, 30.0f);
-		info.m_Width = app->GetWindowWidth();
-		info.m_Height = app->GetWindowHeight();
-		info.m_Near = 0.1f;
-		info.m_Far = 10000.0f;
-		info.m_Fov = 60.0f;
-		m_Camera = std::make_unique<Camera>(info);
+		Camera::CreateInfo camCreateInfo{};
+		camCreateInfo.m_Position = Vector3(-10.0f, 30.0f, 10.0f);
+		camCreateInfo.m_Width = app->GetWindowWidth();
+		camCreateInfo.m_Height = app->GetWindowHeight();
+		camCreateInfo.m_Near = 0.1f;
+		camCreateInfo.m_Far = 1000.0f;
+		camCreateInfo.m_Fov = 60.0f;
+		m_Camera = std::make_unique<Camera>(camCreateInfo);
+
+		// CameraController
+		CameraController::CreateInfo camCtrlCreateInfo{};
+		camCtrlCreateInfo.m_Params.m_MovementSpeed = 10.0f;
+		camCtrlCreateInfo.m_Params.m_RotationSpeed = 0.15f;
+		camCtrlCreateInfo.m_Params.m_AccelerateMultiplier = 3.0f;
+		camCtrlCreateInfo.m_Params.m_SmoothStepT = 0.5f;
+		m_CameraController = std::make_unique<CameraController>(camCtrlCreateInfo);
 
 		// RenderPipeline
 		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
@@ -44,6 +57,27 @@ namespace gglab
 
 	void DemoPlayground::Update() noexcept
 	{
+		auto* app = Application::GetInstance();
+		auto* inputManager = app->GetInputManager();
+		auto* time = app->GetTime();
+		auto* mouse = inputManager->GetMouse();
+		auto* keyboard = inputManager->GetKeyboard();
+		const auto mouseCoord = mouse->GetMouseCoord();
+		const auto deltaTime = static_cast<float>(time->GetDeltaTime());
+
+		CameraInput camInput{};
+		camInput.m_Front = keyboard->IsKeyHeld(KeyCode::W);
+		camInput.m_Back = keyboard->IsKeyHeld(KeyCode::S);
+		camInput.m_Left = keyboard->IsKeyHeld(KeyCode::A);
+		camInput.m_Right = keyboard->IsKeyHeld(KeyCode::D);
+		camInput.m_Up = keyboard->IsKeyHeld(KeyCode::Q);
+		camInput.m_Down = keyboard->IsKeyHeld(KeyCode::E);
+		camInput.m_Accelerate = keyboard->IsKeyHeld(KeyCode::LeftShift);
+		camInput.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
+		camInput.m_MouseDelta = mouseCoord;
+
+		m_CameraController->Update(*m_Camera, camInput, deltaTime);
+
 		m_Camera->Update();
 	}
 

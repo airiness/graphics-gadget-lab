@@ -6,6 +6,7 @@
 namespace gglab
 {
 	class Camera;
+	class CameraController;
 	class RenderPipelineBase;
 
 	class DemoPlayground : public DemoBase
@@ -34,6 +35,7 @@ namespace gglab
 	private:
 		World m_World;
 		std::unique_ptr<Camera> m_Camera;
+		std::unique_ptr<CameraController> m_CameraController;
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 	};
 }

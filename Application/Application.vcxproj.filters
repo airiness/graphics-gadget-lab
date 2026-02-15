@@ -316,6 +316,9 @@
     <ClCompile Include="DevelopGuiRegistry.cpp">
       <Filter>Graphics\DevelopGui</Filter>
     </ClCompile>
+    <ClCompile Include="CameraController.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -623,6 +626,9 @@
     </ClInclude>
     <ClInclude Include="DevelopGuiImGuiToolsPanel.h">
       <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraController.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
