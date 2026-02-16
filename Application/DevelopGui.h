@@ -1,8 +1,10 @@
 #pragma once
+#include "DevelopGuiRegistry.h"
 
 namespace gglab
 {
 	struct DX12DescriptorView;
+	struct DevelopGuiContext;
 
 	class DX12Device;
 	class DX12SwapChain;
@@ -10,6 +12,7 @@ namespace gglab
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
 	class DX12DescriptorManager;
+
 	class DevelopGui
 	{
 	public:
@@ -33,6 +36,10 @@ namespace gglab
 		void Render(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept;
 		void EndFrame() noexcept;
 
+		void Draw(DevelopGuiContext& context) noexcept;
+
+		DevelopGuiRegistry& GetRegistry() noexcept { return m_Registry; }
+
 	private:
 		static void DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
 			D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle,
@@ -46,6 +53,9 @@ namespace gglab
 		DX12Device* m_DX12Device = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
+		DevelopGuiRegistry m_Registry;
+
+		bool m_ShowImGuiDemo = false;
 		bool m_FrameOpen = false;
 	};
 }

@@ -1,20 +1,39 @@
 #pragma once
 #include "RGResource.h"
+#include "RenderView.h"
 
 namespace gglab
 {
-	struct RGFrameTargets
+	struct RGViewTargets
 	{
-		RGTextureId m_BackBuffer{};
+		RGTextureId m_Color{};
 		RGTextureId m_Depth{};
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+
+		// TODO: next members maybe not needed
 		uint32_t m_BackBufferIndex = 0;
 
 		ResourceIndex m_BackBufferResourceIndex{};
 
 		ViewKey m_BackBufferRTVKey{};
 	};
-	inline constexpr const char* MainViewName = "MainView";
+
+	struct RGViewTargetsTable
+	{
+		std::array<RGViewTargets, utils::ToIndex(RenderViewID::Count)> m_Views{};
+
+		RGViewTargets& GetViewTargets(RenderViewID viewId) noexcept
+		{
+			return m_Views[utils::ToIndex(viewId)];
+		}
+
+		const RGViewTargets& GetViewTargets(RenderViewID viewId) const noexcept
+		{
+			return m_Views[utils::ToIndex(viewId)];
+		}
+	};
+
+	inline constexpr const char* ViewTargetsTableName = "RGViewTargetsTable";
 }

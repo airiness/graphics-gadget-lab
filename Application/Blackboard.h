@@ -5,7 +5,6 @@
 
 namespace gglab
 {
-
 	struct RGTypeId
 	{
 		const void* m_Ptr = nullptr;

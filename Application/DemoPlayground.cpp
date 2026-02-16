@@ -1,7 +1,12 @@
 #include "Precompiled.h"
 #include "DemoPlayground.h"
 #include "Camera.h"
+#include "CameraController.h"
 #include "Application.h"
+#include "Time.h"
+#include "InputManager.h"
+#include "Mouse.h"
+#include "Keyboard.h"
 #include "AssetManager.h"
 #include "Components.h"
 #include "RenderPipelineForwardPBR.h"
@@ -13,14 +18,22 @@ namespace gglab
 		auto* app = Application::GetInstance();
 
 		// Camera
-		Camera::CreateInfo info{};
-		info.m_Position = Vector3(-100.0f, 128.0f, 30.0f);
-		info.m_Width = app->GetWindowWidth();
-		info.m_Height = app->GetWindowHeight();
-		info.m_Near = 0.1f;
-		info.m_Far = 10000.0f;
-		info.m_Fov = 60.0f;
-		m_Camera = std::make_unique<Camera>(info);
+		Camera::CreateInfo camCreateInfo{};
+		camCreateInfo.m_Position = Vector3(-10.0f, 22.0f, -10.0f);
+		camCreateInfo.m_Width = app->GetWindowWidth();
+		camCreateInfo.m_Height = app->GetWindowHeight();
+		camCreateInfo.m_Near = 0.1f;
+		camCreateInfo.m_Far = 1000.0f;
+		camCreateInfo.m_Fov = 60.0f;
+		m_Camera = std::make_unique<Camera>(camCreateInfo);
+
+		// CameraController
+		CameraController::CreateInfo camCtrlCreateInfo{};
+		camCtrlCreateInfo.m_Params.m_MovementSpeed = 10.0f;
+		camCtrlCreateInfo.m_Params.m_MouseSensitivityRadPerCount = 0.0018f;
+		camCtrlCreateInfo.m_Params.m_AccelerateMultiplier = 3.0f;
+		camCtrlCreateInfo.m_Params.m_SmoothStepT = 0.5f;
+		m_CameraController = std::make_unique<CameraController>(camCtrlCreateInfo);
 
 		// RenderPipeline
 		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
@@ -44,12 +57,33 @@ namespace gglab
 
 	void DemoPlayground::Update() noexcept
 	{
+		auto* app = Application::GetInstance();
+		auto* inputManager = app->GetInputManager();
+		auto* time = app->GetTime();
+		auto* mouse = inputManager->GetMouse();
+		auto* keyboard = inputManager->GetKeyboard();
+		const auto mouseCoord = mouse->GetMouseCoord();
+		const auto deltaTime = static_cast<float>(time->GetDeltaTime());
+
+		CameraInput camInput{};
+		camInput.m_Front = keyboard->IsKeyHeld(KeyCode::W);
+		camInput.m_Back = keyboard->IsKeyHeld(KeyCode::S);
+		camInput.m_Left = keyboard->IsKeyHeld(KeyCode::A);
+		camInput.m_Right = keyboard->IsKeyHeld(KeyCode::D);
+		camInput.m_Up = keyboard->IsKeyHeld(KeyCode::Q);
+		camInput.m_Down = keyboard->IsKeyHeld(KeyCode::E);
+		camInput.m_Accelerate = keyboard->IsKeyHeld(KeyCode::LeftShift);
+		camInput.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
+		camInput.m_MouseDelta = mouseCoord;
+
+		m_CameraController->Update(*m_Camera, camInput, deltaTime);
+
 		m_Camera->Update();
 	}
 
 	void DemoPlayground::InitializeScene() noexcept
 	{
-		auto* assetManager = Application::GetInstance()->GetAssetManager();	
+		auto* assetManager = Application::GetInstance()->GetAssetManager();
 		auto& registry = m_World.GetRegistry();
 
 		auto createEntityWithModel = [&](
@@ -73,6 +107,7 @@ namespace gglab
 				modelComp.m_ModelId = modelId;
 				registry.emplace<components::ModelComponent>(entity, modelComp);
 			};
+
 		// Test Sponza
 		createEntityWithModel(
 			"Assets/Models/Sponza/Sponza.gltf",
@@ -93,30 +128,6 @@ namespace gglab
 			Vector3(-10.0f, 20.0f, 0.0f),
 			Vector3::Zero,
 			Vector3::One);
-
-
-		//{
-		//	auto modelId = assetManager->LoadModel("Assets/Models/Sponza/Sponza.gltf");
-		//	auto sponzaEntity = registry.create();
-
-		//	registry.emplace<components::TransformComponent>(sponzaEntity, components::TransformComponent());
-
-		//	components::ModelComponent modelComp{};
-		//	modelComp.m_ModelId = modelId;
-		//	registry.emplace<components::ModelComponent>(sponzaEntity, modelComp);
-		//}
-
-		//// Alpha Blend Test
-		//{
-		//	auto modelId = assetManager->LoadModel("Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf");
-		//	auto alphaBlendEntity = registry.create();
-		//	registry.emplace<components::TransformComponent>(alphaBlendEntity, components::TransformComponent());
-
-		//	components::ModelComponent modelComp{};
-		//	modelComp.m_ModelId = modelId;
-		//	registry.emplace<components::ModelComponent>(alphaBlendEntity, modelComp);
-		//}
-
 
 		// Main Light
 		{

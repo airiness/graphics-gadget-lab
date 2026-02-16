@@ -3,7 +3,7 @@ namespace gglab
 {
 	class Keyboard;
 	class Mouse;
-	//class GamePad;
+	// class GamePad; // todo: GamePad
 	class InputManager final
 	{
 	public:
@@ -25,7 +25,6 @@ namespace gglab
 
 	private:
 		std::unique_ptr<Keyboard> m_Keyboard;
-
 		std::unique_ptr<Mouse> m_Mouse;
 	};
 }

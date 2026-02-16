@@ -1,112 +1,135 @@
 #include "Precompiled.h"
 #include "Camera.h"
-#include "Application.h"
-#include "Mouse.h"
-#include "Keyboard.h"
-#include "Time.h"
-#include "MathUtils.h"
 
 namespace gglab
 {
 	Camera::Camera(const CreateInfo& info) noexcept :
 		m_Forward(info.m_Forward),
-		m_Up(info.m_Up),
-		m_Right(info.m_Right),
 		m_Position(info.m_Position),
 		m_Near(info.m_Near),
 		m_Far(info.m_Far),
-		m_Aspect(static_cast<float>(info.m_Width) / info.m_Height),
 		m_Fov(info.m_Fov)
 	{
+		// sanitize
+		m_Near = ClampNear(m_Near);
+		m_Far = ClampFar(m_Near, m_Far);
+		m_Fov = ClampFov(m_Fov);
+
+		auto width = std::max(1u, info.m_Width);
+		auto height = std::max(1u, info.m_Height);
+		m_Aspect = static_cast<float>(width) / static_cast<float>(height);
+
+		ComputeYawPitchFromForward(m_Forward);
+
 		UpdateViewMatrix();
 		UpdateProjMatrix();
+
+		m_ViewDirty = false;
+		m_ProjDirty = false;
 	}
 
 	void Camera::Update() noexcept
 	{
-		const auto app = Application::GetInstance();
-		const auto time = app->GetTime();
-		const auto dt = time->GetDeltaTime();
-
-		const auto mouse = app->GetMouse();
-		const auto keyboard = app->GetKeyboard();
-
-		if (mouse->GetMouseMode() == Mouse::MouseMode::Relative)
+		if (m_ViewDirty)
 		{
-			auto mouseCoord = mouse->GetMouseCoord();
-
-			auto yawDelta = static_cast<float>(dt * mouseCoord.x * m_RotationSpeed);
-			auto pitchDelta = static_cast<float>(dt * -mouseCoord.y * m_RotationSpeed);
-
-			m_Yaw += yawDelta;
-			m_Pitch += pitchDelta;
+			UpdateViewMatrix();
+			m_ViewDirty = false;
 		}
 
-		Vector3 movement = {};
-		if (keyboard->IsKeyHeld(KeyCode::W))
+		if (m_ProjDirty)
 		{
-			movement.z += 1.0f;
+			UpdateProjMatrix();
+			m_ProjDirty = false;
+		}
+	}
+
+	void Camera::SetPosition(const Vector3& pos) noexcept
+	{
+		m_Position = pos;
+		MarkViewDirty();
+	}
+
+	void Camera::SetYawPitch(float yawRadians, float pitchRadians) noexcept
+	{
+		if (!utils::IsFinite(yawRadians) ||
+			!utils::IsFinite(pitchRadians))
+		{
+			return;
 		}
 
-		if (keyboard->IsKeyHeld(KeyCode::S))
+		m_Yaw = yawRadians;
+		m_Pitch = std::clamp(pitchRadians, -PitchLimitRadians, +PitchLimitRadians);
+
+		MarkViewDirty();
+	}
+
+	void Camera::SetNearFar(float nearZ, float farZ) noexcept
+	{
+		if (!utils::IsFinite(nearZ) ||
+			!utils::IsFinite(farZ))
 		{
-			movement.z -= 1.0f;
+			return;
 		}
 
-		if (keyboard->IsKeyHeld(KeyCode::D))
+		m_Near = ClampNear(nearZ);
+		m_Far = ClampFar(m_Near, farZ);
+
+		MarkProjDirty();
+	}
+
+	void Camera::SetFov(float fovDegrees) noexcept
+	{
+		if (!utils::IsFinite(fovDegrees))
 		{
-			movement.x += 1.0f;
+			return;
 		}
 
-		if (keyboard->IsKeyHeld(KeyCode::A))
+		m_Fov = ClampFov(fovDegrees);
+		MarkProjDirty();
+	}
+
+	void Camera::SetAspect(float aspect) noexcept
+	{
+		if (!utils::IsFinite(aspect) || aspect <= 0.0f)
 		{
-			movement.x -= 1.0f;
+			return;
 		}
 
-		if (keyboard->IsKeyHeld(KeyCode::Q))
-		{
-			movement.y += 1.0f;
-		}
-
-		if (keyboard->IsKeyHeld(KeyCode::E))
-		{
-			movement.y -= 1.0f;
-		}
-
-		m_Velocity = Vector3::SmoothStep(m_Velocity, movement, SmoothStepT);
-
-		if (m_Velocity.LengthSquared() > std::numeric_limits<float>::epsilon())
-		{
-			float speedFactor = 1.0f;
-			if (keyboard->IsKeyHeld(KeyCode::LeftShift))
-			{
-				speedFactor *= 3.0f;
-			}
-
-			auto v = m_Velocity * static_cast<float>(dt) * m_MovementSpeed * speedFactor;
-
-			m_Position += v.x * m_Right;
-			m_Position += v.z * m_Forward;
-			m_Position += v.y * Vector3::UnitY;
-		}
-
-		UpdateViewMatrix();
+		m_Aspect = aspect;
+		MarkProjDirty();
 	}
 
 	void Camera::OnResize(uint32_t width, uint32_t height) noexcept
 	{
-		m_Aspect = static_cast<float>(width) / height;
-		UpdateProjMatrix();
+		width = std::max(1u, width);
+		height = std::max(1u, height);
+		m_Aspect = static_cast<float>(width) / static_cast<float>(height);
+		MarkProjDirty();
 	}
 
-	Matrix Camera::GetViewMatrix() const noexcept
+	void Camera::LookAt(const Vector3& eye, const Vector3& target) noexcept
 	{
-		return m_ViewMatrix;
+		m_Position = eye;
+
+		Vector3 forward = utils::SafeNormalize(target - eye, Vector3::UnitZ);
+		ComputeYawPitchFromForward(forward);
+
+		MarkViewDirty();
 	}
 
-	Matrix Camera::GetProjMatrix() const noexcept
+	float Camera::ClampNear(float nearZ) noexcept
 	{
-		return m_ProjMatrix;
+		return std::max(0.0001f, nearZ);
+	}
+
+	float Camera::ClampFar(float nearZ, float farZ) noexcept
+	{
+		return std::max(nearZ + 0.0001f, farZ);
+	}
+
+	float Camera::ClampFov(float fov) noexcept
+	{
+		return std::clamp(fov, 1.0f, 179.0f);
 	}
 
 	void Camera::UpdateProjMatrix() noexcept
@@ -117,17 +140,32 @@ namespace gglab
 
 	void Camera::UpdateViewMatrix() noexcept
 	{
-		constexpr float PitchLimit = DirectX::XMConvertToRadians(85.0f);
-		m_Pitch = std::clamp(m_Pitch, -PitchLimit, +PitchLimit);
+		// normalize yaw to [-PI, PI]
+		m_Yaw = std::remainder(m_Yaw, DirectX::XM_2PI);
+		m_Pitch = std::clamp(m_Pitch, -PitchLimitRadians, +PitchLimitRadians);
 
-		m_Forward = Vector3(std::cos(m_Pitch) * std::sin(m_Yaw), std::sin(m_Pitch), std::cos(m_Pitch) * std::cos(m_Yaw));
+		// forward = (cos(pitch)*sin(yaw), sin(pitch), cos(pitch)*cos(yaw))
+		const float cosP = std::cos(m_Pitch);
+		m_Forward = Vector3(cosP * std::sin(m_Yaw), std::sin(m_Pitch), cosP * std::cos(m_Yaw));
+
 		m_Right = Vector3::UnitY.Cross(m_Forward);
-		m_Right.Normalize();
+		m_Right = utils::SafeNormalize(m_Right, Vector3::UnitX);
 
 		m_Up = m_Forward.Cross(m_Right);
-		m_Up.Normalize();
+		m_Up = utils::SafeNormalize(m_Up, Vector3::UnitY);
 
 		m_ViewMatrix = DirectX::XMMatrixLookAtLH(m_Position, m_Position + m_Forward, m_Up);
+	}
 
+	void Camera::ComputeYawPitchFromForward(const Vector3& forward) noexcept
+	{
+		// forward is expected normalized
+		// pitch = asin(y)
+		// yaw = atan2(x, z)
+		const Vector3 normForward = utils::SafeNormalize(forward, Vector3::UnitZ);
+		auto pitch = std::asin(std::clamp(normForward.y, -1.0f, 1.0f));
+		m_Yaw = std::atan2(normForward.x, normForward.z);
+
+		m_Pitch = std::clamp(pitch, -PitchLimitRadians, +PitchLimitRadians);
 	}
 }

@@ -118,6 +118,8 @@ namespace gglab
 		{
 			LoadLibrary(dllPath.c_str());
 		}
+
+		PIXSetHUDOptions(PIX_HUD_SHOW_ON_NO_WINDOWS);
 #endif
 	}
 

@@ -35,6 +35,9 @@ using namespace Microsoft::WRL;
 #include <dxgi1_6.h>
 #if defined(BUILD_DEBUG)
 #include <dxgidebug.h>
+
+// PIX
+#include <pix3.h>
 #endif
 
 // Shader Compiler

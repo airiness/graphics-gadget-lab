@@ -6,6 +6,7 @@
 namespace gglab
 {
 	class Camera;
+	class CameraController;
 	class RenderPipelineBase;
 
 	class DemoPlayground : public DemoBase
@@ -24,6 +25,7 @@ namespace gglab
 
 		World& GetWorld() noexcept override { return m_World; }
 		Camera& GetCamera() noexcept override { return *m_Camera; }
+		CameraController& GetCameraController() noexcept override { return *m_CameraController; }
 		RenderPipelineBase& GetRenderPipeline() noexcept override { return *m_RenderPipeline; }
 
 	private:
@@ -32,6 +34,7 @@ namespace gglab
 	private:
 		World m_World;
 		std::unique_ptr<Camera> m_Camera;
+		std::unique_ptr<CameraController> m_CameraController;
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 	};
 }

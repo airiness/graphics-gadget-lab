@@ -60,6 +60,7 @@ namespace gglab
 
 		void InitializeWindow() noexcept;
 		void InitializeAssets() noexcept;
+		void InitializeDevelopGuiPanels() noexcept;
 
 		// Functions called by the WindowProc
 		void OnActive() noexcept;

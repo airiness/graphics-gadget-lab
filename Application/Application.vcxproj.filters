@@ -163,9 +163,6 @@
     <ClCompile Include="RGArenaAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="StringId.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="RGResource.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -315,6 +312,15 @@
     </ClCompile>
     <ClCompile Include="RenderQueue.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="DevelopGuiRegistry.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraController.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="DevelopGuiCameraPanel.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -607,6 +613,24 @@
       <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="RenderQueue.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiRegistry.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiContext.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiCameraPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiStateStore.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiImGuiToolsPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraController.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>

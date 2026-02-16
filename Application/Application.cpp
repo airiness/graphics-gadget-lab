@@ -13,6 +13,9 @@
 #include "Mouse.h"
 #include "RenderPipelineBase.h"
 #include "DemoPlayground.h"
+#include "DevelopGuiContext.h"
+#include "DevelopGuiImGuiToolsPanel.h"
+#include "DevelopGuiCameraPanel.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -70,8 +73,7 @@ namespace gglab
 		m_WindowWidth(createInfo.m_WindowWidth),
 		m_WindowHeight(createInfo.m_WindowHeight),
 		m_HInstance(createInfo.m_HInstance)
-	{
-	}
+	{}
 
 	void Application::Run() noexcept
 	{
@@ -249,6 +251,7 @@ namespace gglab
 		m_DemoManager = std::make_unique<DemoManager>();
 
 		InitializeAssets();
+		InitializeDevelopGuiPanels();
 
 		// InitializeDemos
 		const auto demoIndex = m_DemoManager->CreateDemo<DemoPlayground>();
@@ -281,7 +284,6 @@ namespace gglab
 		{
 			if (keyboard->IsKeyPressed(KeyCode::T))
 			{
-
 				if (const auto mouse = GetMouse())
 				{
 					mouse->SetMouseMode(
@@ -298,13 +300,11 @@ namespace gglab
 			}
 		}
 
+		// DevelopGui new frame
 		auto* developGui = m_Renderer->GetDevelopGui();
 		if (developGui)
 		{
 			developGui->NewFrame();
-
-			// ImGui test
-			ImGui::ShowDemoWindow();
 		}
 
 		// Update demo
@@ -316,7 +316,7 @@ namespace gglab
 		renderViews.resize(utils::ToIndex(RenderViewID::Count));
 
 		// Main view
-		const auto& camera = demo->GetCamera();
+		auto& camera = demo->GetCamera();
 		const RenderViewBuilder::BuildInfo viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
@@ -370,13 +370,22 @@ namespace gglab
 		renderPipeline.BuildRenderGraph(rg, renderContext, services);
 		rg.Compile();
 
-		// Render
-		m_Renderer->Render(rg, renderContext);
-
+		// Draw menus before Renderer::Render()
 		if (developGui)
 		{
-			developGui->EndFrame();
+			DevelopGuiContext guiContext{};
+			guiContext.m_Camera = &camera;
+			guiContext.m_CameraController = &demo->GetCameraController();
+			guiContext.m_Renderer = m_Renderer.get();
+			guiContext.m_MainRenderView = &renderViews[utils::ToIndex(RenderViewID::Main)];
+			guiContext.m_AssetManager = m_AssetManager.get();
+			guiContext.m_RenderGraph = &rg;
+
+			developGui->Draw(guiContext);
 		}
+
+		// Render
+		m_Renderer->Render(rg, renderContext);
 
 		return true;
 	}
@@ -395,10 +404,10 @@ namespace gglab
 
 		m_AssetManager->Finalize(m_Renderer->GetLastSubmittedFencePoint());
 		m_AssetManager.reset();
-	
+
 		m_Renderer->Finalize();
 		m_Renderer.reset();
-		
+
 		m_ShaderManager.reset();
 		m_InputManager.reset();
 		m_Time.reset();
@@ -476,13 +485,30 @@ namespace gglab
 		}
 	}
 
-	void Application::OnActive() noexcept
+	void Application::InitializeDevelopGuiPanels() noexcept
 	{
+		auto* developGui = m_Renderer->GetDevelopGui();
+		auto& panelRegistry = developGui->GetRegistry();
+
+		// ImGuiToolsPanel
+		DevelopGuiPanelDesc desc{};
+		desc.m_Path = "Menu/ImGui/Tools";
+		desc.m_Title = "ImGui Tools";
+		desc.m_DrawFunc = &DevelopGuiImGuiToolsPanel;
+		panelRegistry.RegisterPanel(desc);
+
+		// CameraPanel
+		desc.m_Path = "Menu/Application/Camera";
+		desc.m_Title = "Camera";
+		desc.m_DrawFunc = &DevelopGuiCameraPanel;
+		panelRegistry.RegisterPanel(desc);
 	}
 
+	void Application::OnActive() noexcept
+	{}
+
 	void Application::OnInactive() noexcept
-	{
-	}
+	{}
 
 	void Application::OnSuspend() noexcept
 	{

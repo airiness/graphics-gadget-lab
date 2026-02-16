@@ -38,13 +38,14 @@ namespace gglab
 			{
 				builder.SideEffect();
 
-				auto& targets = builder.GetBlackboard().GetOrCreate<RGFrameTargets>(MainViewName);
-				data.m_BackBuffer = builder.Write(targets.m_BackBuffer, RGTextureUsage::RenderTarget);
-				data.m_Depth = builder.Write(targets.m_Depth, RGTextureUsage::DepthStencil);
+				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
+				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
 
-				data.m_RTVKey = targets.m_BackBufferRTVKey;
-				data.m_Width = targets.m_Width;
-				data.m_Height = targets.m_Height;
+				data.m_RTVKey = mainTargets.m_BackBufferRTVKey;
+				data.m_Width = mainTargets.m_Width;
+				data.m_Height = mainTargets.m_Height;
 			},
 			[this, &rg, contextPtr, servicesPtr](DX12CommandList* commandList, ForwardPBRData& data)
 			{

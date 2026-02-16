@@ -5,6 +5,7 @@ namespace gglab
 {
 	class World;
 	class Camera;
+	class CameraController;
 	class RenderPipelineBase;
 
 	class DemoBase
@@ -18,11 +19,11 @@ namespace gglab
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept {}
 		virtual void OnExit() noexcept {}
-
 		virtual void Update()  noexcept = 0;
 
 		virtual World& GetWorld() noexcept = 0;
 		virtual Camera& GetCamera() noexcept = 0;
+		virtual CameraController& GetCameraController() noexcept = 0;
 
 		virtual RenderPipelineBase& GetRenderPipeline() noexcept = 0;
 	};

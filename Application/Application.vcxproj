@@ -144,8 +144,11 @@
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="Blackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="CopyContext.cpp" />
     <ClCompile Include="DemoManager.cpp" />
+    <ClCompile Include="DevelopGuiCameraPanel.cpp" />
+    <ClCompile Include="DevelopGuiRegistry.cpp" />
     <ClCompile Include="DX12DescriptorHeap.cpp" />
     <ClCompile Include="DX12DescriptorManager.cpp" />
     <ClCompile Include="DevelopGui.cpp" />
@@ -211,7 +214,6 @@
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
-    <ClCompile Include="StringId.cpp" />
     <ClCompile Include="StringUtils.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="DX12ViewCache.cpp" />
@@ -230,11 +232,17 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="Blackboard.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CameraController.h" />
     <ClInclude Include="Components.h" />
     <ClInclude Include="CopyContext.h" />
     <ClInclude Include="CoreMacros.h" />
     <ClInclude Include="DemoBase.h" />
     <ClInclude Include="DemoManager.h" />
+    <ClInclude Include="DevelopGuiImGuiToolsPanel.h" />
+    <ClInclude Include="DevelopGuiStateStore.h" />
+    <ClInclude Include="DevelopGuiCameraPanel.h" />
+    <ClInclude Include="DevelopGuiContext.h" />
+    <ClInclude Include="DevelopGuiRegistry.h" />
     <ClInclude Include="DX12DescriptorHeap.h" />
     <ClInclude Include="DX12DescriptorManager.h" />
     <ClInclude Include="DevelopGui.h" />

@@ -50,6 +50,8 @@ namespace gglab
 
 	void DevelopGui::Finalize() noexcept
 	{
+		m_Registry.Reset();
+
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 
@@ -91,6 +93,20 @@ namespace gglab
 
 		ImGui::EndFrame();
 		m_FrameOpen = false;
+	}
+
+	void DevelopGui::Draw(DevelopGuiContext& context) noexcept
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+		{
+			ImGui::DockSpaceOverViewport(0,
+				ImGui::GetMainViewport(),
+				ImGuiDockNodeFlags_PassthruCentralNode);
+		}
+
+		m_Registry.DrawMenuBar();
+		m_Registry.DrawPanels(context);
 	}
 
 	void DevelopGui::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
