@@ -36,7 +36,7 @@ namespace gglab::utils
 	{
 		while (!path.empty() && path.back() == '/')
 		{
-			path.remove_prefix(1);
+			path.remove_suffix(1);
 		}
 
 		if (path.empty())
