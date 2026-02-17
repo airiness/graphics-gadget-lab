@@ -42,8 +42,12 @@ namespace gglab
 
 	D3D12_INPUT_LAYOUT_DESC InputLayoutLibrary::Get(InputLayoutId id) noexcept
 	{
+		if (id >= InputLayoutId::None)
+		{
+			return D3D12_INPUT_LAYOUT_DESC{ nullptr, 0 };
+		}
+
 		const auto index = static_cast<size_t>(id);
-		GGLAB_ASSERT_MSG(index < static_cast<size_t>(InputLayoutId::Count), "Invalid InputLayoutId.");
 		return InputLayouts[index];
 	}
 }

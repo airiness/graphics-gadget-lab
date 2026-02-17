@@ -182,6 +182,7 @@
     <ClCompile Include="DemoPlayground.cpp" />
     <ClCompile Include="RenderPassDevelopGui.cpp" />
     <ClCompile Include="RenderPassForwardPBR.cpp" />
+    <ClCompile Include="RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -280,6 +281,7 @@
     <ClInclude Include="RenderContexts.h" />
     <ClInclude Include="RenderPassDevelopGui.h" />
     <ClInclude Include="RenderPassForwardPBR.h" />
+    <ClInclude Include="RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />

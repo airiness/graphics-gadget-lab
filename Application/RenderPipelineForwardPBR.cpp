@@ -80,7 +80,7 @@ namespace gglab
 		struct PrepareBackBufferData
 		{
 			RGTextureId m_BackBuffer{};
-			ViewKey m_RTVKey{};
+			ViewKey m_RtvKey{};
 		};
 
 		rg.AddPass<PrepareBackBufferData>("SwapChain.PrepareBackBuffer",
@@ -94,7 +94,7 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
-				data.m_RTVKey = targets.m_BackBufferRTVKey;
+				data.m_RtvKey = targets.m_BackBufferRTVKey;
 			},
 			[&rg, swapChain](DX12CommandList* commandList, PrepareBackBufferData& data)
 			{
@@ -115,7 +115,7 @@ namespace gglab
 				commandList->FlushBarriers();
 
 				auto* viewCache = rg.GetViewCache();
-				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
+				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 
 				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());
 

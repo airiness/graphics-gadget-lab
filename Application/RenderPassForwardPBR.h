@@ -40,7 +40,6 @@ namespace gglab
 
 	private:
 		GraphicsKeyInputs m_BaseInputs{};
-
 		bool m_IsInitialized = false;
 	};
 }

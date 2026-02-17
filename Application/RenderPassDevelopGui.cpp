@@ -14,7 +14,7 @@ namespace gglab
 		struct DevelopGuiData
 		{
 			RGTextureId m_BackBuffer{};
-			ViewKey m_RTVKey{};
+			ViewKey m_RtvKey{};
 		};
 
 		rg.AddPass<DevelopGuiData>("RenderPassDevelopGui",
@@ -25,7 +25,7 @@ namespace gglab
 				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(viewTargets.m_Color, RGTextureUsage::RenderTarget);
-				data.m_RTVKey = viewTargets.m_BackBufferRTVKey;
+				data.m_RtvKey = viewTargets.m_BackBufferRTVKey;
 			},
 			[&rg, &services](DX12CommandList* commandList, DevelopGuiData& data)
 			{
@@ -33,7 +33,7 @@ namespace gglab
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				auto* viewCache = rg.GetViewCache();
-				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
+				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 				developGui->Render(commandList, rtv);
 			});
 	}

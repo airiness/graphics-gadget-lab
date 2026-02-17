@@ -134,7 +134,9 @@ namespace gglab
 		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
 
 		// TODO: Add Tangent
-		Count
+
+		None,
+		Count = None
 	};
 
 	// RenderViewID definition

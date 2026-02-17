@@ -17,21 +17,23 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		EnsureInitialized(services);
-
 		struct ForwardPBRData
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_Depth{};
 
-			ViewKey m_RTVKey{};
+			ViewKey m_RtvKey{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 		};
 
 		auto* contextPtr = &context;
+		GGLAB_ASSERT(contextPtr);
 		auto* servicesPtr = &services;
+		GGLAB_ASSERT(servicesPtr);
+
+		EnsureInitialized(services);
 
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
 			[](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
@@ -43,7 +45,7 @@ namespace gglab
 				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
 
-				data.m_RTVKey = mainTargets.m_BackBufferRTVKey;
+				data.m_RtvKey = mainTargets.m_BackBufferRTVKey;
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 			},
@@ -56,7 +58,7 @@ namespace gglab
 
 				auto* viewCache = rg.GetViewCache();
 
-				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
+				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 
 				const ResourceIndex depthIndex = rg.GetResourceIndex(data.m_Depth);
 				const ViewKey dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(
@@ -113,19 +115,21 @@ namespace gglab
 	void RenderPassForwardPBR::EnsureInitialized(const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT(renderer);
 		auto* shaderManager = services.m_ShaderManager;
+		GGLAB_ASSERT(shaderManager);
 
 		if (!m_IsInitialized)
 		{
 			// Shader
-			ShaderDesc sd{};
-			sd.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
-			sd.m_Stage = ShaderStage::Vertex;
-			sd.m_Entry = L"VSMain";
-			const auto vsId = shaderManager->LoadShader(sd);
-			sd.m_Stage = ShaderStage::Pixel;
-			sd.m_Entry = L"PSMain";
-			const auto psId = shaderManager->LoadShader(sd);
+			ShaderDesc shaderDesc{};
+			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+			shaderDesc.m_Stage = ShaderStage::Vertex;
+			shaderDesc.m_Entry = L"VSMain";
+			const auto vsId = shaderManager->LoadShader(shaderDesc);
+			shaderDesc.m_Stage = ShaderStage::Pixel;
+			shaderDesc.m_Entry = L"PSMain";
+			const auto psId = shaderManager->LoadShader(shaderDesc);
 
 			// KeyInputs
 			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
@@ -233,7 +237,9 @@ namespace gglab
 		const Renderer& renderer, uint64_t variantBits) noexcept
 	{
 		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
+		GGLAB_ASSERT(passRegistry);
 		auto* psoCache = renderer.GetPSOCache();
+		GGLAB_ASSERT(psoCache);
 
 		GraphicsKeyInputs inputs = m_BaseInputs;
 		inputs.m_VariantBits = variantBits;
@@ -247,14 +253,14 @@ namespace gglab
 
 		const auto& cached = passRegistry->GetOrCreateGraphics(
 			psoPassId, inputs,
-			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
+			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
 			{
 				outDesc.m_RootSignatureId = input.m_RootSignatureId;
 				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
 				outDesc.m_InputLayoutId = input.m_InputLayoutId;
-				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(InputLayoutId::P3N3T2);
-				outDesc.m_VertexShader = sm->GetBytecode(input.m_VSId);
-				outDesc.m_PixelShader = sm->GetBytecode(input.m_PSId);
+				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(input.m_InputLayoutId);
+				outDesc.m_VertexShader = shaderManager->GetBytecode(input.m_VSId);
+				outDesc.m_PixelShader = shaderManager->GetBytecode(input.m_PSId);
 				outDesc.m_Topology = input.m_Topology;
 				outDesc.m_SampleMask = input.m_SampleMask;
 				outDesc.m_Formats = input.m_Formats;

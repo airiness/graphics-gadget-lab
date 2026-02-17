@@ -322,6 +322,9 @@
     <ClCompile Include="DevelopGuiCameraPanel.cpp">
       <Filter>Graphics\DevelopGui</Filter>
     </ClCompile>
+    <ClCompile Include="RenderPassIBLBrdfLUT.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -632,6 +635,9 @@
     </ClInclude>
     <ClInclude Include="CameraController.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderPassIBLBrdfLUT.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
