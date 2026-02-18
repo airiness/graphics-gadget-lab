@@ -124,8 +124,6 @@ namespace gglab
 
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
-		auto* graphicsCommandList = executeContext.m_GraphicsCommandList;
-
 		for (auto& passNode : m_PassNodes)
 		{
 			if (passNode.m_Culled)
@@ -142,7 +140,7 @@ namespace gglab
 			// Execute passes
 			if (passNode.m_Pass)
 			{
-				passNode.m_Pass->Execute(graphicsCommandList);
+				passNode.m_Pass->Execute(executeContext);
 			}
 
 			for (auto* virtualResource : passNode.m_DestroyVirtualResources)

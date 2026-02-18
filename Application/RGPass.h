@@ -1,14 +1,14 @@
 #pragma once
 namespace gglab
 {
-	class DX12CommandList;
+	struct RGExecuteContext;
 	class RGBuilder;
 	class RGPassBase
 	{
 	public:
 		virtual ~RGPassBase() noexcept = default;
 
-		virtual void Execute(DX12CommandList*) noexcept = 0;
+		virtual void Execute(RGExecuteContext&) noexcept = 0;
 	};
 
 	template <typename PassData>
@@ -31,12 +31,12 @@ namespace gglab
 		{
 		}
 
-		void Execute(DX12CommandList* commandList) noexcept override final
+		void Execute(RGExecuteContext& executeContext) noexcept override final
 		{
-			m_Execute(commandList, this->m_PassData);
+			m_Execute(executeContext, this->m_PassData);
 		}
 	private:
-		static_assert(std::is_invocable_v<ExecuteFunc, DX12CommandList*, PassData&>,
+		static_assert(std::is_invocable_v<ExecuteFunc, RGExecuteContext&, PassData&>,
 			"ExecuteFunc must be callable as RenderGraph Pass Executor.");
 
 		ExecuteFunc m_Execute;

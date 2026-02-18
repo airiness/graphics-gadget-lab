@@ -7,7 +7,6 @@
 #include "DX12SwapChain.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12DescriptorManager.h"
-#include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
 #include "AssetManager.h"
 
@@ -49,7 +48,7 @@ namespace gglab
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 			},
-			[this, &rg, contextPtr, servicesPtr](DX12CommandList* commandList, ForwardPBRData& data)
+			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				auto* depthTexture = rg.GetTexture(data.m_Depth);
@@ -57,6 +56,7 @@ namespace gglab
 				GGLAB_ASSERT(backTexture && depthTexture);
 
 				auto* viewCache = rg.GetViewCache();
+				auto* commandList = executeContext.m_GraphicsCommandList;
 
 				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 

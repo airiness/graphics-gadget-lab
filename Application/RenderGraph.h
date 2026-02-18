@@ -3,7 +3,7 @@
 #include "RGGpuResourceAllocator.h"
 #include "RGResource.h"
 #include "RGPass.h"
-#include "Blackboard.h"
+#include "RGBlackboard.h"
 #include "ExternalResourceRegistry.h"
 #include "GraphicsTypes.h"
 #include "StringId.h"
@@ -204,8 +204,8 @@ namespace gglab
 				m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_SideEffect = true;
 			}
 
-			Blackboard& GetBlackboard() noexcept { return m_RG.m_Blackboard; }
-			const Blackboard& GetBlackboard() const noexcept { return m_RG.m_Blackboard; }
+			RGBlackboard& GetBlackboard() noexcept { return m_RG.m_Blackboard; }
+			const RGBlackboard& GetBlackboard() const noexcept { return m_RG.m_Blackboard; }
 
 		private:
 			RenderGraph& m_RG;
@@ -239,8 +239,8 @@ namespace gglab
 
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
 
-		Blackboard& GetBlackboard() noexcept { return m_Blackboard; }
-		const Blackboard& GetBlackboard() const noexcept { return m_Blackboard; }
+		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
+		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
 
 	private:
 		template<typename RESOURCE>
@@ -283,7 +283,7 @@ namespace gglab
 		ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
-		Blackboard m_Blackboard;
+		RGBlackboard m_Blackboard;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
 		std::vector<RGPassNode> m_PassNodes;
@@ -331,7 +331,7 @@ namespace gglab
 		using PassDataType = std::decay_t<PassData>;
 
 		return AddPass<PassDataType>(passName, std::move(setupFunc), 
-			[](DX12CommandList*, PassDataType&) noexcept {});
+			[](RGExecuteContext&, PassDataType&) noexcept {});
 	}
 
 	template<typename ExecuteFunc>

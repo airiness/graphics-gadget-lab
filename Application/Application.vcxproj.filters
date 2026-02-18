@@ -253,7 +253,7 @@
     <ClCompile Include="RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
-    <ClCompile Include="Blackboard.cpp">
+    <ClCompile Include="RGBlackboard.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="ExternalResourceRegistry.cpp">
@@ -564,7 +564,7 @@
     <ClInclude Include="RenderPipelineForwardPBR.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
-    <ClInclude Include="Blackboard.h">
+    <ClInclude Include="RGBlackboard.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="RenderContexts.h">

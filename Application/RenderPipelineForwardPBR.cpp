@@ -96,10 +96,12 @@ namespace gglab
 					RGTextureUsage::RenderTarget);
 				data.m_RtvKey = targets.m_BackBufferRTVKey;
 			},
-			[&rg, swapChain](DX12CommandList* commandList, PrepareBackBufferData& data)
+			[&rg, swapChain](RGExecuteContext& executeContext, PrepareBackBufferData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
+
+				auto* commandList = executeContext.m_GraphicsCommandList;
 
 				// TODO: RenderGraph resource auto barrier
 				CD3DX12_TEXTURE_BARRIER barrier(
@@ -150,10 +152,12 @@ namespace gglab
 				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
 			},
-			[&rg](DX12CommandList* commandList, FinishBackBufferData& data)
+			[&rg](RGExecuteContext& executeContext, FinishBackBufferData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
+
+				auto* commandList = executeContext.m_GraphicsCommandList;
 
 				CD3DX12_TEXTURE_BARRIER barrier(
 					D3D12_BARRIER_SYNC_RENDER_TARGET,

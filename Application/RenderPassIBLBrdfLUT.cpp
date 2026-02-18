@@ -24,12 +24,17 @@ namespace gglab
 
 		EnsuredInitialized(services);
 
-		rg.AddPass("IBL.BuildBrdfLUT",
-			[](RenderGraph::RGBuilder& builder, PassData& data) 
+		rg.AddPass<PassData>("IBL.BuildBrdfLUT",
+			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
+				builder.SideEffect();
+
 
 			},
-			[]() {});
+			[](RGExecuteContext& executeContext, PassData& data)
+			{
+
+			});
 
 
 	}

@@ -27,14 +27,14 @@ namespace gglab
 				data.m_BackBuffer = builder.Write(viewTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_RtvKey = viewTargets.m_BackBufferRTVKey;
 			},
-			[&rg, &services](DX12CommandList* commandList, DevelopGuiData& data)
+			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
 			{
 				auto* developGui = services.m_Renderer->GetDevelopGui();
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				auto* viewCache = rg.GetViewCache();
 				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
-				developGui->Render(commandList, rtv);
+				developGui->Render(executeContext.m_GraphicsCommandList, rtv);
 			});
 	}
 }
