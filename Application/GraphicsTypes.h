@@ -126,7 +126,7 @@ namespace gglab
 		}
 	}
 
-	enum class InputLayoutId : uint32_t
+	enum class InputLayoutID : uint32_t
 	{
 		P3,				// Position(3)
 		P3T2,			// Position(3), TexCoord(2)

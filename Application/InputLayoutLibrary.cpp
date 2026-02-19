@@ -27,7 +27,7 @@ namespace gglab
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		};
 
-		static const D3D12_INPUT_LAYOUT_DESC InputLayouts[static_cast<size_t>(InputLayoutId::Count)] =
+		static const D3D12_INPUT_LAYOUT_DESC InputLayouts[static_cast<size_t>(InputLayoutID::Count)] =
 		{
 			// P3
 			{ P3Elements, _countof(P3Elements) },
@@ -40,9 +40,9 @@ namespace gglab
 		};
 	}
 
-	D3D12_INPUT_LAYOUT_DESC InputLayoutLibrary::Get(InputLayoutId id) noexcept
+	D3D12_INPUT_LAYOUT_DESC InputLayoutLibrary::Get(InputLayoutID id) noexcept
 	{
-		if (id >= InputLayoutId::None)
+		if (id >= InputLayoutID::None)
 		{
 			return D3D12_INPUT_LAYOUT_DESC{ nullptr, 0 };
 		}

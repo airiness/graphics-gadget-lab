@@ -79,7 +79,7 @@ namespace gglab
 	struct GraphicsPSOKey
 	{
 		RootSignatureID m_RootSignatureId{};
-		InputLayoutId m_InputLayoutId{};
+		InputLayoutID m_InputLayoutId{};
 
 		ShaderHash128 m_VertexShader{};
 		ShaderHash128 m_PixelShader{};

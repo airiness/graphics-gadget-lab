@@ -9,7 +9,7 @@ namespace gglab
 	struct GraphicsKeyInputs
 	{
 		RootSignatureID m_RootSignatureId{};
-		InputLayoutId m_InputLayoutId{};
+		InputLayoutID m_InputLayoutId{};
 
 		ShaderID m_VSId{};
 		ShaderID m_PSId{};

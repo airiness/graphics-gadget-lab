@@ -142,6 +142,7 @@
     </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetManager.cpp" />
+    <ClCompile Include="RenderResourceRegistry.cpp" />
     <ClCompile Include="RGBlackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraController.cpp" />
@@ -231,6 +232,7 @@
     <ClInclude Include="..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="RenderResourceRegistry.h" />
     <ClInclude Include="RGBlackboard.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraController.h" />

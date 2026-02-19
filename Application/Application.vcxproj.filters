@@ -325,6 +325,9 @@
     <ClCompile Include="RenderPassIBLBrdfLUT.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="RenderResourceRegistry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX12CommandQueue.h">
@@ -638,6 +641,9 @@
     </ClInclude>
     <ClInclude Include="RenderPassIBLBrdfLUT.h">
       <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderResourceRegistry.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

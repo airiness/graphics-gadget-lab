@@ -60,7 +60,7 @@ namespace gglab
 
 			// KeyInputs
 			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
-			m_BaseInputs.m_InputLayoutId = InputLayoutId::None;
+			m_BaseInputs.m_InputLayoutId = InputLayoutID::None;
 			m_BaseInputs.m_VSId = vsId;
 			m_BaseInputs.m_PSId = psId;
 

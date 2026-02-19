@@ -10,7 +10,7 @@ namespace gglab
 		ID3D12RootSignature* m_RootSignature = nullptr;
 
 		// InputLayout
-		InputLayoutId m_InputLayoutId{};
+		InputLayoutID m_InputLayoutId{};
 		D3D12_INPUT_LAYOUT_DESC m_InputLayoutDesc{};
 
 		// Shaders
