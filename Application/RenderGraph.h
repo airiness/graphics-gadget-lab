@@ -4,7 +4,7 @@
 #include "RGResource.h"
 #include "RGPass.h"
 #include "RGBlackboard.h"
-#include "ExternalResourceRegistry.h"
+#include "RGExternalResourceRegistry.h"
 #include "GraphicsTypes.h"
 #include "StringId.h"
 
@@ -129,7 +129,7 @@ namespace gglab
 		{
 			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 			DX12ViewCache* m_ViewCache = nullptr;
-			ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
+			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		};
 
 		class RGBuilder
@@ -280,7 +280,7 @@ namespace gglab
 	private:
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 		DX12ViewCache* m_ViewCache = nullptr;
-		ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
+		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 		RGBlackboard m_Blackboard;

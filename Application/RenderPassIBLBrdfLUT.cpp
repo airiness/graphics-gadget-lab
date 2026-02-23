@@ -28,6 +28,12 @@ namespace gglab
 			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
+				auto& blackboard = builder.GetBlackboard();
+				auto& iblRes = blackboard.GetOrCreate<RGIBLResources>(IBLResourcesName);
+
+
+
+
 
 
 			},

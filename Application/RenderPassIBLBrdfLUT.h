@@ -1,9 +1,16 @@
 #pragma once
 #include "RenderPassBase.h"
 #include "RenderPassRecipeRegistry.h"
+#include "RGResource.h"
 
 namespace gglab
 {
+	struct RGIBLResources
+	{
+		RGTextureId m_BrdfLut{};
+	};
+	inline constexpr const char* IBLResourcesName = "RGIBLResources";
+
 	class DX12PipelineState;
 	class RenderPassIBLBrdfLUT : public RenderPassBase
 	{

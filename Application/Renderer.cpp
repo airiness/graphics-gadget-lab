@@ -62,7 +62,7 @@ namespace gglab
 
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
 
-		m_ExternalResourceRegistry = std::make_unique<ExternalResourceRegistry>(m_ViewCache.get());
+		m_ExternalResourceRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
 
 		m_DevelopGui = std::make_unique<DevelopGui>();
 		DevelopGui::CreateInfo developGuiCreateInfo{};

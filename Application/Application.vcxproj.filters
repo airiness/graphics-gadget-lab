@@ -256,9 +256,6 @@
     <ClCompile Include="RGBlackboard.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="ExternalResourceRegistry.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\Externals\Vender\imgui\imgui.cpp">
       <Filter>Externals\ImGui</Filter>
     </ClCompile>
@@ -327,6 +324,9 @@
     </ClCompile>
     <ClCompile Include="RenderResourceRegistry.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RGExternalResourceRegistry.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -576,9 +576,6 @@
     <ClInclude Include="RGFrameTargets.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="ExternalResourceRegistry.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\Externals\Vender\imgui\imgui.h">
       <Filter>Externals\ImGui</Filter>
     </ClInclude>
@@ -644,6 +641,9 @@
     </ClInclude>
     <ClInclude Include="RenderResourceRegistry.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RGExternalResourceRegistry.h">
+      <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
