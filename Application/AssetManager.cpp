@@ -577,19 +577,11 @@ namespace gglab
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor and create srv
-		const auto srvDescriptorId = m_DescriptorManager->AllocateBindlessSrvId();
+		DX12DescriptorManager::TextureSrvCreateInfo srvInfo{};
+		srvInfo.m_Format = srvFormat;
+		srvInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
-		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = srvFormat;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
-		m_DX12Device->Get()->CreateShaderResourceView(
-			texture->m_Texture->Get(),
-			&srvDesc,
-			m_DescriptorManager->BindlessSrvIdToView(srvDescriptorId).m_CpuHandle);
-
+		const auto srvDescriptorId = m_DescriptorManager->CreateBindlessSrv(texture->m_Texture.get(), srvInfo);
 		texture->m_DescriptorId = srvDescriptorId;
 		texture->m_Semantic = uploadData.m_Semantic;
 		texture->m_IsUploaded = true;

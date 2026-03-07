@@ -124,6 +124,8 @@ namespace gglab
 		uint16_t m_SampleCount = 1;
 		RGResourceFormat m_Format = DXGI_FORMAT_UNKNOWN;
 		RGTextureUsage m_Usage = RGTextureUsage::None;
+
+		bool operator==(const RGTextureDesc&) const noexcept = default;
 	};
 
 	struct RGTextureSubresourceDesc
@@ -140,6 +142,8 @@ namespace gglab
 		uint32_t m_Stride = 0;
 		RGResourceFormat m_Format = DXGI_FORMAT_UNKNOWN;
 		RGBufferUsage m_Usage = RGBufferUsage::None;
+
+		bool operator==(const RGBufferDesc&) const noexcept = default;
 	};
 
 	struct RGTextureResource

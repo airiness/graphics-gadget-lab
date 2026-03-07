@@ -35,7 +35,7 @@ namespace gglab
 
 	D3D12_RESOURCE_DESC DX12Resource::GetDesc() const noexcept
 	{
-		return m_ResourceDesc;
+		return m_Resource->GetDesc();
 	}
 
 	D3D12_RESOURCE_STATES DX12Resource::GetState() const noexcept

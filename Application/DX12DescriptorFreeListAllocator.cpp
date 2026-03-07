@@ -95,6 +95,67 @@ namespace gglab
 		return { .m_Index = globalIndex, .m_Generation = m_Generation[localSpan.m_Index] };
 	}
 
+	bool DX12DescriptorFreeListAllocator::IsIdAlive(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		if (!descriptorId.IsValid())
+		{
+			return false;
+		}
+
+		std::lock_guard lock(m_Mutex);
+		if (!ContainsGlobalIndex(descriptorId.m_Index))
+		{
+			return false;
+		}
+
+		const auto localIndex = ToLocalIndex(descriptorId.m_Index);
+
+		// generation mismatch => stale
+		if (m_Generation[localIndex] != descriptorId.m_Generation)
+		{
+			return false;
+		}
+
+		return m_SlotStates[localIndex] == SlotState::Allocated;
+	}
+
+	DX12DescriptorView DX12DescriptorFreeListAllocator::ViewAtId(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		if (!descriptorId.IsValid())
+		{
+			return {};
+		}
+
+		std::lock_guard lock(m_Mutex);
+		if (!ContainsGlobalIndex(descriptorId.m_Index))
+		{
+#if defined(BUILD_DEBUG)
+			GGLAB_ASSERT_MSG(false, "ViewAtId: descriptor id not in allocator range.");
+#endif
+			return {};
+		}
+
+		const uint32_t localIndex = ToLocalIndex(descriptorId.m_Index);
+
+		if (m_Generation[localIndex] != descriptorId.m_Generation)
+		{
+#if defined(BUILD_DEBUG)
+			GGLAB_ASSERT_MSG(false, "ViewAtId: stale descriptor id (generation mismatch).");
+#endif
+			return {};
+		}
+
+		if (m_SlotStates[localIndex] != SlotState::Allocated)
+		{
+#if defined(BUILD_DEBUG)
+			GGLAB_ASSERT_MSG(false, "ViewAtId: descriptor id is not currently allocated.");
+#endif
+			return {};
+		}
+
+		return ViewAtGlobalIndex(descriptorId.m_Index);
+	}
+
 	void DX12DescriptorFreeListAllocator::RetireId(
 		const DX12DescriptorID& descriptorId,
 		const DX12FencePoint& fencePoint) noexcept

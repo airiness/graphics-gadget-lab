@@ -25,10 +25,12 @@ namespace gglab
 		~DX12DescriptorFreeListAllocator() override = default;
 
 		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
-
 		DX12DescriptorView AllocateView() noexcept;
-
 		DX12DescriptorID AllocateId() noexcept;
+
+		bool IsIdAlive(const DX12DescriptorID& descriptorId) const noexcept;
+		DX12DescriptorView ViewAtId(const DX12DescriptorID& descriptorId) const noexcept;
+
 		void RetireId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 
 		void DeferFreeFromCpuHandleInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept;
@@ -68,6 +70,6 @@ namespace gglab
 		std::vector<uint32_t> m_Generation;
 		std::vector<SlotState> m_SlotStates;
 
-		std::mutex m_Mutex;
+		mutable std::mutex m_Mutex;
 	};
 }
