@@ -23,7 +23,7 @@ namespace gglab
 			const RenderServices& services) noexcept override;
 
 	private:
-		void EnsuredInitialized(const RenderServices& services) noexcept;
+		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		DX12PipelineState* GetOrCreatePSO(const Renderer& renderer) noexcept;
 
