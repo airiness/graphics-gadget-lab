@@ -671,5 +671,8 @@
     <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

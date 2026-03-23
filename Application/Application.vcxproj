@@ -348,6 +348,7 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
+    <FxCompile Include="..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

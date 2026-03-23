@@ -49,7 +49,7 @@ namespace gglab
 
 		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), createInfo.m_TransferManagerBufferSize);
 
-		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
+		m_RGGpuResAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::CreateInfo viewCacheCreateInfo{};
 		viewCacheCreateInfo.m_DX12Device = m_Device.get();
@@ -62,7 +62,13 @@ namespace gglab
 
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
 
-		m_ExternalResourceRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
+		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
+
+		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
+		renderResRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
+		renderResRegistryCreateInfo.m_RGGpuResAllocator = m_RGGpuResAllocator.get();
+		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
 		m_DevelopGui = std::make_unique<DevelopGui>();
 		DevelopGui::CreateInfo developGuiCreateInfo{};
@@ -94,12 +100,14 @@ namespace gglab
 		}
 
 		m_DevelopGui->Finalize();
-		m_ExternalResourceRegistry.reset();
+		
+		m_RenderResRegistry.reset();
+		m_ExternalResRegistry.reset();
 		m_RenderPassRecipeRegistry.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
 		m_ViewCache.reset();
-		m_RGGpuAllocator.reset();
+		m_RGGpuResAllocator.reset();
 
 		m_SceneCB.reset();
 		m_ObjectSB.reset();
@@ -167,7 +175,7 @@ namespace gglab
 
 		rg.Retire(m_LastSubmittedFencePoint);
 
-		m_RGGpuAllocator->Tick();
+		m_RGGpuResAllocator->Tick();
 
 		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, m_LastSubmittedFencePoint);
 
@@ -203,9 +211,9 @@ namespace gglab
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
-		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuAllocator.get();
+		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuResAllocator.get();
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
-		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResourceRegistry.get();
+		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
 
 		return rgCreateInfo;
 	}
@@ -238,7 +246,7 @@ namespace gglab
 
 		m_Device->FlushGPU();
 
-		if (m_ExternalResourceRegistry)
+		if (m_ExternalResRegistry)
 		{
 			const uint32_t bufferCount = m_SwapChain->GetBufferCount();
 			for (uint32_t index = 0; index < bufferCount; ++index)
@@ -249,7 +257,7 @@ namespace gglab
 					continue;
 				}
 
-				m_ExternalResourceRegistry->Forget(backBuffer, true);
+				m_ExternalResRegistry->Forget(backBuffer, true);
 			}
 		}
 
