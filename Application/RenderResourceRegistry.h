@@ -18,7 +18,7 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
-			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
+			RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
 			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 			DX12DescriptorManager* m_DescriptorManager = nullptr;
 		};
@@ -70,7 +70,7 @@ namespace gglab
 		void DestroyTexture(TextureIndex index, const DX12FencePoint& fencePoint) noexcept;
 
 	private:
-		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
+		RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
 		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 

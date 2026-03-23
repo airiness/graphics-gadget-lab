@@ -7,13 +7,13 @@
 namespace gglab
 {
 	RenderResourceRegistry::RenderResourceRegistry(const CreateInfo& createInfo) noexcept :
-		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
+		m_RGGpuResAllocator(createInfo.m_RGGpuResAllocator),
 		m_ExternalResourceRegistry(createInfo.m_ExternalResourceRegistry),
 		m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
-		GGLAB_ASSERT(m_GpuResourceAllocator);
-		GGLAB_ASSERT(m_ExternalResourceRegistry);
-		GGLAB_ASSERT(m_DescriptorManager);
+		GGLAB_ASSERT_NOT_NULL(m_RGGpuResAllocator);
+		GGLAB_ASSERT_NOT_NULL(m_ExternalResourceRegistry);
+		GGLAB_ASSERT_NOT_NULL(m_DescriptorManager);
 	}
 
 	void RenderResourceRegistry::EnsureIblResources(uint32_t brdfLutSize,
@@ -50,7 +50,7 @@ namespace gglab
 	DX12Texture* RenderResourceRegistry::GetTexture(TextureIndex index) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
-		return entry.m_Allocated ? m_GpuResourceAllocator->GetTexture(entry.m_InternalIndex) : nullptr;
+		return entry.m_Allocated ? m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex) : nullptr;
 	}
 
 	ResourceIndex RenderResourceRegistry::GetExternalIndex(TextureIndex index) const noexcept
@@ -88,13 +88,13 @@ namespace gglab
 		auto createTexture = [this](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
 			{
 				const auto clearValue = DefaultClearValue<RGTextureDesc>(desc);
-				const auto texIndex = m_GpuResourceAllocator->Acquire<RGTextureDesc>(
+				const auto texIndex = m_RGGpuResAllocator->Acquire<RGTextureDesc>(
 					desc, D3D12_RESOURCE_STATE_COMMON, clearValue);
 
 				GGLAB_ASSERT_MSG(texIndex.IsValid(),
 					"RenderResourceRegistry: Acquire texture failed.");
 
-				auto* texture = m_GpuResourceAllocator->GetTexture(texIndex);
+				auto* texture = m_RGGpuResAllocator->GetTexture(texIndex);
 				GGLAB_ASSERT_MSG(texture != nullptr,
 					"RenderResourceRegistry: allocator returned null texture.");
 
@@ -124,7 +124,7 @@ namespace gglab
 		// Already exist. Check compatible
 		if (entry.m_Allocated && entry.m_InternalIndex.IsValid())
 		{
-			if (m_GpuResourceAllocator->IsCompatibleTexture(entry.m_InternalIndex, desc))
+			if (m_RGGpuResAllocator->IsCompatibleTexture(entry.m_InternalIndex, desc))
 			{
 				entry.m_RgTexDesc = desc;
 				return;
@@ -142,12 +142,12 @@ namespace gglab
 				return;
 			}
 
-			if (auto* oldTexture = m_GpuResourceAllocator->GetTexture(entry.m_InternalIndex))
+			if (auto* oldTexture = m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex))
 			{
 				m_ExternalResourceRegistry->Forget(oldTexture, false, retireFenceOpt);
 			}
 
-			m_GpuResourceAllocator->ReleaseTexture(entry.m_InternalIndex, *retireFenceOpt);
+			m_RGGpuResAllocator->ReleaseTexture(entry.m_InternalIndex, *retireFenceOpt);
 
 			// Create new
 			createTexture(entry, desc);
@@ -168,12 +168,12 @@ namespace gglab
 			return;
 		}
 
-		auto* texture = m_GpuResourceAllocator->GetTexture(entry.m_InternalIndex);
+		auto* texture = m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex);
 		if (texture)
 		{
 			m_ExternalResourceRegistry->Forget(texture, false, &fencePoint);
 		}
-		m_GpuResourceAllocator->ReleaseTexture(entry.m_InternalIndex, fencePoint);
+		m_RGGpuResAllocator->ReleaseTexture(entry.m_InternalIndex, fencePoint);
 
 		// clear but keep srv id
 		const auto keepSrvId = entry.m_SrvId;
