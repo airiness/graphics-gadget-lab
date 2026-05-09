@@ -68,6 +68,25 @@ namespace gglab
 		return m_DescriptorManager->BindlessSrvIdToGlobalIndex(m_TextureEntries[utils::ToIndex(index)].m_SrvId);
 	}
 
+	D3D12_GPU_DESCRIPTOR_HANDLE RenderResourceRegistry::GetBindlessSrvGpuHandle(TextureIndex index) const noexcept
+	{
+		const auto srvId = GetBindlessSrvId(index);
+		GGLAB_ASSERT_MSG(srvId.IsValid(), "RenderResourceRegistry: invalid bindless SRV id.");
+
+		return m_DescriptorManager->GetBindlessSrvGpuHandle(srvId);
+	}
+
+	void RenderResourceRegistry::FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept
+	{
+		out = {};
+
+		const auto& entry = m_TextureEntries[utils::ToIndex(TextureIndex::IBL_BrdfLut)];
+		GGLAB_ASSERT_MSG(entry.m_Allocated, "IBL BRDF LUT is not allocated.");
+		GGLAB_ASSERT_MSG(entry.m_SrvId.IsValid(), "IBL BRDF LUT SRV is invalid.");
+
+		out.BrdfLutIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
+	}
+
 	void RenderResourceRegistry::ReleaseAll(const DX12FencePoint& fencePoint) noexcept
 	{
 		for (size_t index = 0; index < m_TextureEntries.size(); ++index)

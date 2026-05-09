@@ -22,6 +22,14 @@ namespace gglab
 		uint32_t LightType;
 	};
 
+	struct IBLResourceGPU
+	{
+		uint32_t BrdfLutIndex;
+		uint32_t IrradianceMapIndex;
+		uint32_t PrefilteredEnvMapIndex;
+		uint32_t Padding;
+	};
+
 	struct SceneGPU
 	{
 		uint32_t ObjectBaseIndex;
@@ -32,7 +40,9 @@ namespace gglab
 		uint32_t ViewCount;
 		uint32_t Padding[2];
 
-		LightGPU MainLight; // todo: move to structured buffer lights
+		IBLResourceGPU IBLResource;
+
+		LightGPU MainLight; // TODO: move to structured buffer lights
 	};
 
 	struct ObjectGPU

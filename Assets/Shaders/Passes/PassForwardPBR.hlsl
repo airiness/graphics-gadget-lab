@@ -107,7 +107,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float4 mrSampled = SampleTexture2D(matData.MetallicRoughnessTexIndex, g_SamplerLinear, IN.UV);
 	float metallic = saturate(matData.MetallicFactor * mrSampled.b);
 	float roughness = saturate(matData.RoughnessFactor * mrSampled.g);
-	roughness = max(0.045, roughness); // to avoid 0 roughness)
+	roughness = ClampPerceptualRoughnessForBRDF(roughness);
 
 	// Normal (linear)
 	float3 normalWS = normalize(IN.NormalWS);
@@ -123,7 +123,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float NoH = saturate(dot(N, H));
 	float VoH = saturate(dot(V, H));
 	
-	float a = roughness * roughness; // convert artistic roughness to physical roughness
+	// convert artistic roughness to physical roughness
+	float a = PerceptualRoughnessToAlpha(roughness);
 		
 	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor	
 	float D = D_GGX(NoH, a);

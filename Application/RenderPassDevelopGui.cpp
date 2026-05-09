@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "RenderGraph.h"
 #include "RGFrameTargets.h"
+#include "RGIBLResources.h"
 #include "DevelopGui.h"
 
 namespace gglab
@@ -14,6 +15,7 @@ namespace gglab
 		struct DevelopGuiData
 		{
 			RGTextureId m_BackBuffer{};
+			RGTextureId m_BrdfLut{};
 			ViewKey m_RtvKey{};
 		};
 
@@ -22,10 +24,15 @@ namespace gglab
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& blackboard = builder.GetBlackboard();
+
+				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(viewTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_RtvKey = viewTargets.m_BackBufferRTVKey;
+
+				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 			},
 			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
 			{

@@ -4,6 +4,7 @@
 #include "RenderScene.h"
 #include "RenderGraph.h"
 #include "RGFrameTargets.h"
+#include "RGIBLResources.h"
 #include "DX12SwapChain.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12DescriptorManager.h"
@@ -20,6 +21,7 @@ namespace gglab
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_Depth{};
+			RGTextureId m_BrdfLut{};
 
 			ViewKey m_RtvKey{};
 
@@ -28,9 +30,10 @@ namespace gglab
 		};
 
 		auto* contextPtr = &context;
-		GGLAB_ASSERT(contextPtr);
+		GGLAB_ASSERT_NOT_NULL(contextPtr);
+
 		auto* servicesPtr = &services;
-		GGLAB_ASSERT(servicesPtr);
+		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		EnsureInitialized(services);
 
@@ -39,10 +42,15 @@ namespace gglab
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& blackboard = builder.GetBlackboard();
+
+				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+
 				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
+				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 
 				data.m_RtvKey = mainTargets.m_BackBufferRTVKey;
 				data.m_Width = mainTargets.m_Width;
@@ -51,9 +59,10 @@ namespace gglab
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-				auto* depthTexture = rg.GetTexture(data.m_Depth);
+				GGLAB_ASSERT_NOT_NULL(backTexture);
 
-				GGLAB_ASSERT(backTexture && depthTexture);
+				auto* depthTexture = rg.GetTexture(data.m_Depth);
+				GGLAB_ASSERT_NOT_NULL(depthTexture);
 
 				auto* viewCache = rg.GetViewCache();
 				auto* commandList = executeContext.m_GraphicsCommandList;
@@ -101,7 +110,7 @@ namespace gglab
 				commandList->Get()->SetGraphicsRootShaderResourceView(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
-				
+
 				// Set view index constant	
 				commandList->Get()->SetGraphicsRoot32BitConstant(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
@@ -115,9 +124,10 @@ namespace gglab
 	void RenderPassForwardPBR::EnsureInitialized(const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT(renderer);
+		GGLAB_ASSERT_NOT_NULL(renderer);
+
 		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT(shaderManager);
+		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
 		{
@@ -237,9 +247,10 @@ namespace gglab
 		const Renderer& renderer, uint64_t variantBits) noexcept
 	{
 		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
-		GGLAB_ASSERT(passRegistry);
+		GGLAB_ASSERT_NOT_NULL(passRegistry);
+
 		auto* psoCache = renderer.GetPSOCache();
-		GGLAB_ASSERT(psoCache);
+		GGLAB_ASSERT_NOT_NULL(psoCache);
 
 		GraphicsKeyInputs inputs = m_BaseInputs;
 		inputs.m_VariantBits = variantBits;

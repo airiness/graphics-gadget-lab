@@ -231,6 +231,17 @@ namespace gglab
 		return descriptorId.m_Index;
 	}
 
+	D3D12_GPU_DESCRIPTOR_HANDLE DX12DescriptorManager::GetBindlessSrvGpuHandle(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		const uint32_t globalIndex = BindlessSrvIdToGlobalIndex(descriptorId);
+
+		auto* heap = GetHeap(HeapType::CbvSrvUav);
+		GGLAB_ASSERT_NOT_NULL(heap);
+
+		auto gpuHandle = heap->GpuHandleAt(globalIndex);
+		return gpuHandle;
+	}
+
 	void DX12DescriptorManager::RetireBindlessSrvId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept
 	{
 		GGLAB_ASSERT(descriptorId.IsValid());

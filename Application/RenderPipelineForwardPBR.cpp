@@ -123,18 +123,15 @@ namespace gglab
 
 			});
 
-		// RenderPass ForwardPBR
-		if (m_Settings.m_EnableForwardPBRPass)
-		{
-			m_ForwardPBRPass.AddPass(rg, context, services);
-		}
+		// RenderPass IBLBrdfLUT	
+		m_IBLBrdfLUTPass.AddPass(rg, context, services);
 
-		// DevelopGui
-		if (m_Settings.m_EnableDevelopGuiPass)
-		{
-			RenderPassDevelopGui developGuiPass{};
-			developGuiPass.AddPass(rg, context, services);
-		}
+		// RenderPass ForwardPBR
+		m_ForwardPBRPass.AddPass(rg, context, services);
+
+		// DevelopGui	
+		RenderPassDevelopGui developGuiPass{};
+		developGuiPass.AddPass(rg, context, services);
 
 		// Finish backbuffer
 		struct FinishBackBufferData

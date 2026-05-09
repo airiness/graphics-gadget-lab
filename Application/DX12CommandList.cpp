@@ -6,6 +6,7 @@
 #include "DX12PipelineState.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12CommandAllocator.h"
+#include "DX12Resource.h"
 #include "HResult.h"
 
 namespace gglab
@@ -196,7 +197,32 @@ namespace gglab
 		}
 
 		float clearColor[4] = { color.R(), color.G(), color.B(), color.A() };
-		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.m_CpuHandle, clearColor, 0, nullptr);
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(
+			rtDescriptor.m_CpuHandle,
+			clearColor,
+			0,
+			nullptr);
+	}
+
+	void DX12CommandList::ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const DX12Resource& resource) const noexcept
+	{
+		GGLAB_ASSERT(rtDescriptor.m_DebugType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		if (!rtDescriptor.IsValid())
+		{
+			return;
+		}
+
+		const auto* clearValue = resource.GetClearValue();
+		if (!clearValue)
+		{
+			return;
+		}
+
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(
+			rtDescriptor.m_CpuHandle,
+			clearValue->Color,
+			0,
+			nullptr);
 	}
 
 	void DX12CommandList::ClearDepthStencil(const DX12DescriptorView& dsDescriptor,

@@ -16,6 +16,7 @@
 #include "DevelopGuiContext.h"
 #include "DevelopGuiImGuiToolsPanel.h"
 #include "DevelopGuiCameraPanel.h"
+#include "DevelopGuiPBRPanel.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -347,7 +348,7 @@ namespace gglab
 		};
 		const auto renderQueue = m_RenderQueueBuilder->Build(queueBuildInfo);
 
-		// Update frame constant buffer
+		// Update frame constant buffer. TODO: move this to RenderSceneBuilder
 		m_Renderer->UpdateFrameConstants(renderScene);
 
 		const RenderFrameContext renderContext{
@@ -490,17 +491,26 @@ namespace gglab
 		auto* developGui = m_Renderer->GetDevelopGui();
 		auto& panelRegistry = developGui->GetRegistry();
 
-		// ImGuiToolsPanel
 		DevelopGuiPanelDesc desc{};
-		desc.m_Path = "Menu/ImGui/Tools";
+
+		// CameraPanel
+		desc.m_Path = "Application/Camera";
+		desc.m_Title = "Camera";
+		desc.m_DrawFunc = &DevelopGuiCameraPanel;
+		panelRegistry.RegisterPanel(desc);
+
+		// ImGuiToolsPanel
+		desc.m_Path = "ImGui/Tools";
 		desc.m_Title = "ImGui Tools";
 		desc.m_DrawFunc = &DevelopGuiImGuiToolsPanel;
 		panelRegistry.RegisterPanel(desc);
 
-		// CameraPanel
-		desc.m_Path = "Menu/Application/Camera";
-		desc.m_Title = "Camera";
-		desc.m_DrawFunc = &DevelopGuiCameraPanel;
+		// PBR Panel
+		desc = {};
+		desc.m_Path = "Rendering/PBR";
+		desc.m_Title = "PBR";
+		desc.m_DrawFunc = &DevelopGuiPBRPanel;
+		//desc.m_DefaultOpen = true;
 		panelRegistry.RegisterPanel(desc);
 	}
 

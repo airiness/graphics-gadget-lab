@@ -6,6 +6,7 @@ namespace gglab
 	struct DX12DescriptorView;
 
 	class DX12Device;
+	class DX12Resource;
 	class DX12CommandQueue;
 	class DX12DescriptorHeap;
 	class DX12RootSignature;
@@ -50,6 +51,7 @@ namespace gglab
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
 		void FlushBarriers() noexcept;
 		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& clearColor) const noexcept;
+		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const DX12Resource& resource) const noexcept;
 		void ClearDepthStencil(const DX12DescriptorView& dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) const noexcept;
 		void DrawIndexedInstanced(uint32_t indexCount) const noexcept;
 		void DrawInstanced(uint32_t vertexCount) const noexcept;

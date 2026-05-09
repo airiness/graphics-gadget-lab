@@ -11,6 +11,14 @@ struct LightData
 	uint LightType; // 0: Directional, 1: Point, 2: Spot
 };
 
+struct IBLResource
+{
+	uint BrdfLutIndex;
+	uint IrradianceMapIndex;
+	uint PrefilteredEnvMapIndex;
+	uint Padding;
+};
+
 struct SceneData
 {
 	uint ObjectBaseIndex;
@@ -20,6 +28,8 @@ struct SceneData
 	uint ViewBaseIndex;
 	uint ViewCount;
 	uint2 Padding;
+	
+	IBLResource IBLResource;
 	
 	LightData MainLight;
 };

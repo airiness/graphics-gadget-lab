@@ -202,6 +202,10 @@ namespace gglab
 		sceneCB.ViewBaseIndex = scene.m_ViewBaseIndex;
 		sceneCB.ViewCount = scene.m_ViewCount;
 
+		m_RenderResRegistry->EnsureIblResources();
+		m_RenderResRegistry->FillIBLBindlessGPU(sceneCB.IBLResource);
+
+		// Main Light
 		sceneCB.MainLight = scene.m_MainLight;
 
 		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();

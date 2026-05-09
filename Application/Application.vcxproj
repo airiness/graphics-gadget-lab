@@ -142,6 +142,7 @@
     </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetManager.cpp" />
+    <ClCompile Include="DevelopGuiPBRPanel.cpp" />
     <ClCompile Include="RenderResourceRegistry.cpp" />
     <ClCompile Include="RGBlackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
@@ -232,6 +233,7 @@
     <ClInclude Include="..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
+    <ClInclude Include="DevelopGuiPBRPanel.h" />
     <ClInclude Include="RenderResourceRegistry.h" />
     <ClInclude Include="RGBlackboard.h" />
     <ClInclude Include="Camera.h" />
@@ -312,6 +314,7 @@
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderPassSkybox.h" />
     <ClInclude Include="RGArenaAllocator.h" />
+    <ClInclude Include="RGIBLResources.h" />
     <ClInclude Include="RGPass.h" />
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />

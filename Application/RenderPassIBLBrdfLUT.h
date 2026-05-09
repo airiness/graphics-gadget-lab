@@ -2,16 +2,12 @@
 #include "RenderPassBase.h"
 #include "RenderPassRecipeRegistry.h"
 #include "RGResource.h"
+#include "RGIBLResources.h"
 
 namespace gglab
 {
-	struct RGIBLResources
-	{
-		RGTextureId m_BrdfLut{};
-	};
-	inline constexpr const char* IBLResourcesName = "RGIBLResources";
-
 	class DX12PipelineState;
+	class Renderer;
 	class RenderPassIBLBrdfLUT : public RenderPassBase
 	{
 	public:
@@ -26,6 +22,8 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		DX12PipelineState* GetOrCreatePSO(const Renderer& renderer) noexcept;
+
+		static RGTextureDesc BuildRGTextureDescFromNative(const DX12Texture& texture) noexcept;
 
 	private:
 		GraphicsKeyInputs m_BaseInputs{};

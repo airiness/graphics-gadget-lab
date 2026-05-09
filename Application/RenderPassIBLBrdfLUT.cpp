@@ -10,10 +10,11 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		GGLAB_UNUSED(context);
+
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(shaderManager);
+
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 
@@ -22,59 +23,70 @@ namespace gglab
 		renderResRegistry->EnsureIblResources();
 		const auto shouldBuild = renderResRegistry->IsDirty(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 
-		struct PassData
-		{
-			RGTextureId m_BrdfLut{};
-			ViewKey m_RtvKey{};
+		struct SetupPassData {};
 
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-		};
-
-		rg.AddPass<PassData>("IBL.BuildBrdfLUT",
-			[renderer, renderResRegistry, shouldBuild](RenderGraph::RGBuilder& builder, PassData& data)
+		rg.AddPass<SetupPassData>("RenderPassIBL.SetupResources",
+			[renderResRegistry, shouldBuild](RenderGraph::RGBuilder& builder, SetupPassData& data)
 			{
+				builder.SideEffect();
+
 				auto& blackboard = builder.GetBlackboard();
 				auto& iblRes = blackboard.GetOrCreate<RGIBLResources>(IBLResourcesName);
 
 				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
 
-				const auto nativeDesc = brdfLutTexture->GetDesc();
-				RGTextureDesc rgDesc{};
-				rgDesc.m_Width = static_cast<uint32_t>(nativeDesc.Width);
-				rgDesc.m_Height = static_cast<uint32_t>(nativeDesc.Height);
-				rgDesc.m_ArraySize = static_cast<uint16_t>(nativeDesc.DepthOrArraySize);
-				rgDesc.m_MipLevels = static_cast<uint16_t>(nativeDesc.MipLevels);
-				rgDesc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
-				rgDesc.m_Format = nativeDesc.Format;
-				rgDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+				const auto rgDesc = BuildRGTextureDescFromNative(*brdfLutTexture);
 
 				iblRes.m_BrdfLut = builder.ImportTexture("IBL.BRDFLut",
 					brdfLutTexture,
 					rgDesc,
 					D3D12_RESOURCE_STATE_COMMON);
+			},
+			[](RGExecuteContext& executeContext, SetupPassData& data)
+			{
+			});
 
-				data.m_BrdfLut = iblRes.m_BrdfLut;
-				data.m_Width = rgDesc.m_Width;
-				data.m_Height = rgDesc.m_Height;
+		// Nothing to build this frame. The texture is still imported into RG by RenderPassIBL.SetupResources
+		if (!shouldBuild)
+		{
+			return;
+		}
+
+		struct BuildPassData
+		{
+			RGTextureId m_BrdfLut;
+			ViewKey m_RtvKey;
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+		};
+
+		rg.AddPass<BuildPassData>("RenderPassIBL.BuildBrdfLUT",
+			[renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
+			{
+				builder.SideEffect();
+
+				auto& blackboard = builder.GetBlackboard();
+				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+
+				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
+				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
+
+				const auto rgDesc = BuildRGTextureDescFromNative(*brdfLutTexture);
+
+				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
 
 				const auto externalIndex = renderResRegistry->GetExternalIndex(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
+				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
+					"IBL BRDF LUT must be imported as an external RenderGraph resource.");
 				data.m_RtvKey = DX12ViewCache::BuildKey<ViewType::RTV>(externalIndex, brdfLutTexture);
 
-				if (shouldBuild)
-				{
-					builder.SideEffect();
-					data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
-				}
+				data.m_Width = rgDesc.m_Width;
+				data.m_Height = rgDesc.m_Height;
 			},
-			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, PassData& data)
+			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, BuildPassData& data)
 			{
-				if (!shouldBuild)
-				{
-					return;
-				}
-
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
@@ -86,7 +98,8 @@ namespace gglab
 
 				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, brdfLutTexture);
 
-				// Resource Barrier. TODO: auto resource barrier by RG
+				// Temporary manual barrier.
+				// TODO: Remove this after RenderGraph supports automatic barrier inference from builder.Write/Read.
 				{
 					CD3DX12_TEXTURE_BARRIER toRenderTarget(
 						D3D12_BARRIER_SYNC_ALL,
@@ -102,21 +115,20 @@ namespace gglab
 					commandList->FlushBarriers();
 				}
 
-				commandList->ClearRenderTarget(rtv, color::Clear);
+				commandList->ClearRenderTarget(rtv, *brdfLutTexture);
 
 				auto* pso = GetOrCreatePSO(*renderer);
 				GGLAB_ASSERT_NOT_NULL(pso);
-				commandList->SetPipelineState(*pso);
-
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
-				commandList->SetDescriptorHeap(
-					*descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav));
 
 				auto* rootSignature = renderer->GetCommonRootSignature();
 				GGLAB_ASSERT_NOT_NULL(rootSignature);
-				commandList->SetGraphicsRootSignature(*rootSignature);
 
+				auto* descriptorManager = renderer->GetDescriptorManager();
+				GGLAB_ASSERT_NOT_NULL(descriptorManager);
+
+				commandList->SetDescriptorHeap(*descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav));
+				commandList->SetGraphicsRootSignature(*rootSignature);
+				commandList->SetPipelineState(*pso);
 				commandList->SetRenderTarget(rtv);
 				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
 				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
@@ -148,6 +160,7 @@ namespace gglab
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
+
 		auto* shaderManager = services.m_ShaderManager;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
@@ -192,6 +205,7 @@ namespace gglab
 	{
 		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
 		GGLAB_ASSERT_NOT_NULL(passRegistry);
+
 		auto* psoCache = renderer.GetPSOCache();
 		GGLAB_ASSERT_NOT_NULL(psoCache);
 
@@ -215,5 +229,20 @@ namespace gglab
 			});
 
 		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+	}
+
+	RGTextureDesc RenderPassIBLBrdfLUT::BuildRGTextureDescFromNative(const DX12Texture& texture) noexcept
+	{
+		const auto nativeDesc = texture.GetDesc();
+
+		RGTextureDesc rgDesc{};
+		rgDesc.m_Width = static_cast<uint32_t>(nativeDesc.Width);
+		rgDesc.m_Height = static_cast<uint32_t>(nativeDesc.Height);
+		rgDesc.m_ArraySize = static_cast<uint16_t>(nativeDesc.DepthOrArraySize);
+		rgDesc.m_MipLevels = static_cast<uint16_t>(nativeDesc.MipLevels);
+		rgDesc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
+		rgDesc.m_Format = nativeDesc.Format;
+		rgDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+		return rgDesc;
 	}
 }

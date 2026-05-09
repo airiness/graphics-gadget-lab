@@ -78,6 +78,7 @@ namespace gglab
 		void WriteBindlessSrv(const DX12DescriptorID& descriptorId,
 			DX12Texture* texture, const TextureSrvCreateInfo& info = {}) noexcept;
 		uint32_t BindlessSrvIdToGlobalIndex(const DX12DescriptorID& descriptorId) const noexcept;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSrvGpuHandle(const DX12DescriptorID& descriptorId) const noexcept;
 
 		void RetireBindlessSrvId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 		DX12DescriptorView BindlessSrvIdToView(const DX12DescriptorID& descriptorId) const noexcept;

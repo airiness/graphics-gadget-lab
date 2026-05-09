@@ -145,3 +145,42 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
     //   n_ws = normalize(mul(n_ts, float3x3(T,B,N)));
 	return float3x3(T, B, N);
 }
+
+// Reverses the bit order of a 32-bit unsigned integer.
+//
+// Example using a shortened 8-bit representation:
+//   input : 00000110b
+//   output: 01100000b
+uint ReverseBits32(uint bits)
+{
+	bits = (bits << 16) | (bits >> 16);
+	bits = ((bits & 0x00ff00ffu) << 8) | ((bits & 0xff00ff00u) >> 8);
+	bits = ((bits & 0x0f0f0f0fu) << 4) | ((bits & 0xf0f0f0f0u) >> 4);
+	bits = ((bits & 0x33333333u) << 2) | ((bits & 0xccccccccu) >> 2);
+	bits = ((bits & 0x55555555u) << 1) | ((bits & 0xaaaaaaaau) >> 1);
+	return bits;
+}
+
+// Computes the base-2 radical inverse, also known as the Van der Corput sequence in base 2.
+//
+// Conceptually, the binary digits of the integer are reversed and interpreted as fractional bits.
+//
+// Example:
+//   6 = 110b -> 0.011b = 0.375
+float RadicalInverseVdC(uint bits)
+{
+	bits = ReverseBits32(bits);
+	return float(bits) * 2.3283064365386963e-10; // 1 / 2^32
+}
+
+// Returns the 2D Hammersley sample point for index i out of N samples.
+//
+// The sequence is:
+//   (i / N, RadicalInverse_VdC(i))
+//
+// This produces a deterministic low-discrepancy point in [0, 1)^2, useful for
+// importance sampling and numerical integration.
+float2 Hammersley(uint i, uint N)
+{
+	return float2((float) i / (float) N, RadicalInverseVdC(i));
+}

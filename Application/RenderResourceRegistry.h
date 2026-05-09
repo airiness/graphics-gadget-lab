@@ -1,6 +1,7 @@
 #pragma once
 #include "RGResource.h"
 #include "GraphicsTypes.h"
+#include "GPUStructures.h"
 #include "TypeUtils.h"
 
 namespace gglab
@@ -59,6 +60,9 @@ namespace gglab
 		ResourceIndex GetExternalIndex(TextureIndex index) const noexcept;
 		DX12DescriptorID GetBindlessSrvId(TextureIndex index) const noexcept;
 		uint32_t GetBindlessSrvIndex(TextureIndex index) const noexcept;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSrvGpuHandle(TextureIndex index) const noexcept;
+
+		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
 		void ReleaseAll(const DX12FencePoint& fencePoint) noexcept;
 

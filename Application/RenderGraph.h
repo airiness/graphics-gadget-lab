@@ -138,8 +138,7 @@ namespace gglab
 			RGBuilder(RenderGraph& rg, RGPassNode::Index passNodeIndex) :
 				m_RG(rg),
 				m_PassNodeIndex(passNodeIndex)
-			{
-			}
+			{}
 			~RGBuilder() = default;
 
 			template<typename RESOURCE>
@@ -330,7 +329,7 @@ namespace gglab
 	{
 		using PassDataType = std::decay_t<PassData>;
 
-		return AddPass<PassDataType>(passName, std::move(setupFunc), 
+		return AddPass<PassDataType>(passName, std::move(setupFunc),
 			[](RGExecuteContext&, PassDataType&) noexcept {});
 	}
 
@@ -435,7 +434,7 @@ namespace gglab
 		const auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
 		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Read with stale handle.Version");
 
-		RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex];
+		RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 
 		GGLAB_ASSERT_MSG(resourceNode.m_Writer != &passNode, "Pass can not read this resource and write same resource.");
