@@ -13,6 +13,39 @@
 
 namespace gglab
 {
+	namespace
+	{
+		void TransitionTextureCommonToPixelShaderResource(DX12CommandList* commandList, DX12Texture* texture) noexcept
+		{
+			CD3DX12_TEXTURE_BARRIER barrier(
+				D3D12_BARRIER_SYNC_ALL,
+				D3D12_BARRIER_SYNC_PIXEL_SHADING,
+				D3D12_BARRIER_ACCESS_COMMON,
+				D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+				D3D12_BARRIER_LAYOUT_COMMON,
+				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+				texture->Get(),
+				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+			commandList->AddTextureBarrier(barrier);
+			commandList->FlushBarriers();
+		}
+
+		void TransitionTexturePixelShaderResourceToCommon(DX12CommandList* commandList, DX12Texture* texture) noexcept
+		{
+			CD3DX12_TEXTURE_BARRIER barrier(
+				D3D12_BARRIER_SYNC_PIXEL_SHADING,
+				D3D12_BARRIER_SYNC_ALL,
+				D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+				D3D12_BARRIER_ACCESS_COMMON,
+				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+				D3D12_BARRIER_LAYOUT_COMMON,
+				texture->Get(),
+				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+			commandList->AddTextureBarrier(barrier);
+			commandList->FlushBarriers();
+		}
+	}
+
 	void RenderPassForwardPBR::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -117,7 +150,12 @@ namespace gglab
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					1);
 
+				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
+				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture);
+
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
+
+				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture);
 			});
 	}
 
