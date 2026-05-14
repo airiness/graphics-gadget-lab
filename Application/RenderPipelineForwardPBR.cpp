@@ -80,7 +80,7 @@ namespace gglab
 		struct PrepareBackBufferData
 		{
 			RGTextureId m_BackBuffer{};
-			ViewKey m_RTVKey{};
+			ViewKey m_RtvKey{};
 		};
 
 		rg.AddPass<PrepareBackBufferData>("SwapChain.PrepareBackBuffer",
@@ -94,12 +94,14 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
-				data.m_RTVKey = targets.m_BackBufferRTVKey;
+				data.m_RtvKey = targets.m_BackBufferRTVKey;
 			},
-			[&rg, swapChain](DX12CommandList* commandList, PrepareBackBufferData& data)
+			[&rg, swapChain](RGExecuteContext& executeContext, PrepareBackBufferData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
+
+				auto* commandList = executeContext.m_GraphicsCommandList;
 
 				// TODO: RenderGraph resource auto barrier
 				CD3DX12_TEXTURE_BARRIER barrier(
@@ -115,24 +117,21 @@ namespace gglab
 				commandList->FlushBarriers();
 
 				auto* viewCache = rg.GetViewCache();
-				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
+				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 
 				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());
 
 			});
 
-		// RenderPass ForwardPBR
-		if (m_Settings.m_EnableForwardPBRPass)
-		{
-			m_ForwardPBRPass.AddPass(rg, context, services);
-		}
+		// RenderPass IBLBrdfLUT	
+		m_IBLBrdfLUTPass.AddPass(rg, context, services);
 
-		// DevelopGui
-		if (m_Settings.m_EnableDevelopGuiPass)
-		{
-			RenderPassDevelopGui developGuiPass{};
-			developGuiPass.AddPass(rg, context, services);
-		}
+		// RenderPass ForwardPBR
+		m_ForwardPBRPass.AddPass(rg, context, services);
+
+		// DevelopGui	
+		RenderPassDevelopGui developGuiPass{};
+		developGuiPass.AddPass(rg, context, services);
 
 		// Finish backbuffer
 		struct FinishBackBufferData
@@ -150,10 +149,12 @@ namespace gglab
 				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
 			},
-			[&rg](DX12CommandList* commandList, FinishBackBufferData& data)
+			[&rg](RGExecuteContext& executeContext, FinishBackBufferData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				GGLAB_ASSERT(backTexture);
+
+				auto* commandList = executeContext.m_GraphicsCommandList;
 
 				CD3DX12_TEXTURE_BARRIER barrier(
 					D3D12_BARRIER_SYNC_RENDER_TARGET,

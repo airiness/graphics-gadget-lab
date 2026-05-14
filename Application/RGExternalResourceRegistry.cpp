@@ -1,35 +1,35 @@
 #include "Precompiled.h"
-#include "ExternalResourceRegistry.h"
+#include "RGExternalResourceRegistry.h"
 #include "DX12ViewCache.h"
 #include "DX12Texture.h"
 #include "DX12Buffer.h"
 
 namespace gglab
 {
-	ExternalResourceRegistry::ExternalResourceRegistry(DX12ViewCache* viewCache) noexcept :
+	RGExternalResourceRegistry::RGExternalResourceRegistry(DX12ViewCache* viewCache) noexcept :
 		m_ViewCache(viewCache)
 	{
 	}
 
-	ExternalResourceRegistry::~ExternalResourceRegistry()
+	RGExternalResourceRegistry::~RGExternalResourceRegistry()
 	{
 		// Make sure destruct before ViewCache
 		Clear(true);
 	}
 
-	ResourceIndex ExternalResourceRegistry::GetOrCreate(const DX12Texture* texture) noexcept
+	ResourceIndex RGExternalResourceRegistry::GetOrCreate(const DX12Texture* texture) noexcept
 	{
-		GGLAB_ASSERT_MSG(texture != nullptr, "ExternalResourceRegistry::GetOrCreate(texture): texture is null.");
+		GGLAB_ASSERT_MSG(texture != nullptr, "RGExternalResourceRegistry::GetOrCreate(texture): texture is null.");
 		return GetOrCreateImpl(texture->Get(), ExternalResourceIndex::Type::Texture);
 	}
 
-	ResourceIndex ExternalResourceRegistry::GetOrCreate(const DX12Buffer* buffer) noexcept
+	ResourceIndex RGExternalResourceRegistry::GetOrCreate(const DX12Buffer* buffer) noexcept
 	{
-		GGLAB_ASSERT_MSG(buffer != nullptr, "ExternalResourceRegistry::GetOrCreate(buffer): buffer is null.");
+		GGLAB_ASSERT_MSG(buffer != nullptr, "RGExternalResourceRegistry::GetOrCreate(buffer): buffer is null.");
 		return GetOrCreateImpl(buffer->Get(), ExternalResourceIndex::Type::Buffer);
 	}
 
-	std::optional<ResourceIndex> ExternalResourceRegistry::TryGet(const DX12Texture* texture) const noexcept
+	std::optional<ResourceIndex> RGExternalResourceRegistry::TryGet(const DX12Texture* texture) const noexcept
 	{
 		if (!texture)
 		{
@@ -45,12 +45,12 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			ExternalResourceIndex::IsExternal(*indexOpt) &&
 			ExternalResourceIndex::GetType(*indexOpt) == ExternalResourceIndex::Type::Texture,
-			"ExternalResourceRegistry::TryGet(texture): type mismatch or non-external index.");
+			"RGExternalResourceRegistry::TryGet(texture): type mismatch or non-external index.");
 
 		return indexOpt;
 	}
 
-	std::optional<ResourceIndex> ExternalResourceRegistry::TryGet(const DX12Buffer* buffer) const noexcept
+	std::optional<ResourceIndex> RGExternalResourceRegistry::TryGet(const DX12Buffer* buffer) const noexcept
 	{
 		if (!buffer)
 		{
@@ -66,12 +66,12 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			ExternalResourceIndex::IsExternal(*indexOpt) &&
 			ExternalResourceIndex::GetType(*indexOpt) == ExternalResourceIndex::Type::Buffer,
-			"ExternalResourceRegistry::TryGet(buffer): type mismatch or non-external index.");
+			"RGExternalResourceRegistry::TryGet(buffer): type mismatch or non-external index.");
 
 		return indexOpt;
 	}
 
-	void ExternalResourceRegistry::Forget(const DX12Texture* texture,
+	void RGExternalResourceRegistry::Forget(const DX12Texture* texture,
 		bool freeViewsImmediately,
 		const DX12FencePoint* fencePointOpt) noexcept
 	{
@@ -83,7 +83,7 @@ namespace gglab
 		ForgetTexture(texture->Get(), freeViewsImmediately, fencePointOpt);
 	}
 
-	void ExternalResourceRegistry::Forget(const DX12Buffer* buffer) noexcept
+	void RGExternalResourceRegistry::Forget(const DX12Buffer* buffer) noexcept
 	{
 		if (!buffer)
 		{
@@ -93,7 +93,7 @@ namespace gglab
 		ForgetBuffer(buffer->Get());
 	}
 
-	void ExternalResourceRegistry::Clear(bool freeViewsImmediately) noexcept
+	void RGExternalResourceRegistry::Clear(bool freeViewsImmediately) noexcept
 	{
 		std::vector<ResourceIndex> textureIndices;
 
@@ -126,9 +126,9 @@ namespace gglab
 		}
 	}
 
-	ResourceIndex ExternalResourceRegistry::GetOrCreateImpl(const ID3D12Resource* resource, ExternalResourceIndex::Type type) noexcept
+	ResourceIndex RGExternalResourceRegistry::GetOrCreateImpl(const ID3D12Resource* resource, ExternalResourceIndex::Type type) noexcept
 	{
-		GGLAB_ASSERT_MSG(resource != nullptr, "ExternalResourceRegistry::GetOrCreate: resource is null.");
+		GGLAB_ASSERT_MSG(resource != nullptr, "RGExternalResourceRegistry::GetOrCreate: resource is null.");
 
 		{
 			std::shared_lock lock(m_Mutex);
@@ -137,10 +137,10 @@ namespace gglab
 				const ResourceIndex index = iter->second;
 
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
-					"ExternalResourceRegistry: stored index is not external.");
+					"RGExternalResourceRegistry: stored index is not external.");
 
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == type,
-					"ExternalResourceRegistry: same ID3D12Resource registered with a different type.");
+					"RGExternalResourceRegistry: same ID3D12Resource registered with a different type.");
 
 				return index;
 			}
@@ -153,17 +153,17 @@ namespace gglab
 				const ResourceIndex index = iter->second;
 
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
-					"ExternalResourceRegistry: stored index is not external.");
+					"RGExternalResourceRegistry: stored index is not external.");
 
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == type,
-					"ExternalResourceRegistry: same ID3D12Resource registered with a different type.");
+					"RGExternalResourceRegistry: same ID3D12Resource registered with a different type.");
 
 				return index;
 			}
 
-			GGLAB_ASSERT_MSG(m_NextId != 0, "ExternalResourceRegistry: id wrapped around to 0.");
+			GGLAB_ASSERT_MSG(m_NextId != 0, "RGExternalResourceRegistry: id wrapped around to 0.");
 			GGLAB_ASSERT_MSG((m_NextId & ~ExternalResourceIndex::IdMask) == 0,
-				"ExternalResourceRegistry: external id overflowed.");
+				"RGExternalResourceRegistry: external id overflowed.");
 
 			const auto id = m_NextId++;
 			const ResourceIndex index = ExternalResourceIndex::MakeIndex(type, id);
@@ -173,7 +173,7 @@ namespace gglab
 		}
 	}
 
-	std::optional<ResourceIndex> ExternalResourceRegistry::TryGetImpl(const ID3D12Resource* resource) const noexcept
+	std::optional<ResourceIndex> RGExternalResourceRegistry::TryGetImpl(const ID3D12Resource* resource) const noexcept
 	{
 		if (!resource)
 		{
@@ -189,7 +189,7 @@ namespace gglab
 		return std::nullopt;
 	}
 
-	void ExternalResourceRegistry::ForgetTexture(const ID3D12Resource* resource,
+	void RGExternalResourceRegistry::ForgetTexture(const ID3D12Resource* resource,
 		bool freeViewsImmediately,
 		const DX12FencePoint* fencePointOpt) noexcept
 	{
@@ -216,7 +216,7 @@ namespace gglab
 			index = iter->second;
 
 			GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
-				"ExternalResourceRegistry::ForgetTexture: stored index is not external.");
+				"RGExternalResourceRegistry::ForgetTexture: stored index is not external.");
 
 			GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == ExternalResourceIndex::Type::Texture,
 				"ForgetTexture called on non-texture external entry.");
@@ -253,7 +253,7 @@ namespace gglab
 		}
 	}
 
-	void ExternalResourceRegistry::ForgetBuffer(const ID3D12Resource* resource) noexcept
+	void RGExternalResourceRegistry::ForgetBuffer(const ID3D12Resource* resource) noexcept
 	{
 		if (!resource)
 		{
@@ -271,7 +271,7 @@ namespace gglab
 		const ResourceIndex index = it->second;
 
 		GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(index),
-			"ExternalResourceRegistry::ForgetBuffer: stored index is not external.");
+			"RGExternalResourceRegistry::ForgetBuffer: stored index is not external.");
 
 		GGLAB_ASSERT_MSG(ExternalResourceIndex::GetType(index) == ExternalResourceIndex::Type::Buffer,
 			"ForgetBuffer called on non-buffer external entry.");

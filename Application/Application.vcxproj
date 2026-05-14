@@ -34,10 +34,8 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Label="Shared">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionSettings"></ImportGroup>
+  <ImportGroup Label="Shared"></ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\PropertySheets\Common.props" />
@@ -142,7 +140,9 @@
     </ClCompile>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetManager.cpp" />
-    <ClCompile Include="Blackboard.cpp" />
+    <ClCompile Include="DevelopGuiPBRPanel.cpp" />
+    <ClCompile Include="RenderResourceRegistry.cpp" />
+    <ClCompile Include="RGBlackboard.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="CopyContext.cpp" />
@@ -173,7 +173,7 @@
     <ClCompile Include="DX12RootSignatureCache.cpp" />
     <ClCompile Include="DX12SwapChain.cpp" />
     <ClCompile Include="DX12Texture.cpp" />
-    <ClCompile Include="ExternalResourceRegistry.cpp" />
+    <ClCompile Include="RGExternalResourceRegistry.cpp" />
     <ClCompile Include="FreeListSpanAllocator.cpp" />
     <ClCompile Include="HResult.cpp" />
     <ClCompile Include="InputLayoutLibrary.cpp" />
@@ -182,6 +182,7 @@
     <ClCompile Include="DemoPlayground.cpp" />
     <ClCompile Include="RenderPassDevelopGui.cpp" />
     <ClCompile Include="RenderPassForwardPBR.cpp" />
+    <ClCompile Include="RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="PipelineDesc.cpp" />
     <ClCompile Include="PSOCreator.cpp" />
@@ -211,6 +212,7 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RingSpanAllocator.cpp" />
+    <ClCompile Include="SamplerRegistry.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
@@ -230,7 +232,9 @@
     <ClInclude Include="..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="AllocatorBase.h" />
     <ClInclude Include="Application.h" />
-    <ClInclude Include="Blackboard.h" />
+    <ClInclude Include="DevelopGuiPBRPanel.h" />
+    <ClInclude Include="RenderResourceRegistry.h" />
+    <ClInclude Include="RGBlackboard.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="Components.h" />
@@ -268,7 +272,7 @@
     <ClInclude Include="DX12SwapChain.h" />
     <ClInclude Include="DX12Texture.h" />
     <ClInclude Include="EnumFlags.h" />
-    <ClInclude Include="ExternalResourceRegistry.h" />
+    <ClInclude Include="RGExternalResourceRegistry.h" />
     <ClInclude Include="FNV1a.h" />
     <ClInclude Include="FreeListSpanAllocator.h" />
     <ClInclude Include="HResult.h" />
@@ -280,6 +284,7 @@
     <ClInclude Include="RenderContexts.h" />
     <ClInclude Include="RenderPassDevelopGui.h" />
     <ClInclude Include="RenderPassForwardPBR.h" />
+    <ClInclude Include="RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="RenderPassRecipeRegistry.h" />
     <ClInclude Include="PipelineDesc.h" />
     <ClInclude Include="PSOCreator.h" />
@@ -308,10 +313,12 @@
     <ClInclude Include="RenderGraph.h" />
     <ClInclude Include="RenderPassSkybox.h" />
     <ClInclude Include="RGArenaAllocator.h" />
+    <ClInclude Include="RGIBLResources.h" />
     <ClInclude Include="RGPass.h" />
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
     <ClInclude Include="RingSpanAllocator.h" />
+    <ClInclude Include="SamplerRegistry.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
@@ -327,10 +334,6 @@
     <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Assets\Shaders\Common\Binding.hlsli" />
-    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli" />
-    <None Include="..\Assets\Shaders\Common\Common.hlsli" />
-    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="packages.config" />
   </ItemGroup>
@@ -343,8 +346,16 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Assets\Shaders\Common\ApplicationBinding.hlsli" />
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli" />
+    <None Include="..\Assets\Shaders\Common\Common.hlsli" />
+    <None Include="..\Assets\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\Assets\Shaders\shadertoolsconfig.json" />
+  </ItemGroup>
+  <ItemGroup>
     <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
-    <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl" />
+    <FxCompile Include="..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -19,7 +19,7 @@ namespace gglab
 			bool m_ShowMatrices = false;
 
 			// cached edit values
-			float m_Pos[3] = { 0,0,0 };
+			float m_Pos[3] = { 0, 0, 0 };
 			float m_YawDegree = 0.0f;
 			float m_PitchDegree = 0.0f;
 
@@ -199,8 +199,8 @@ namespace gglab
 		{
 			ImGui::Separator();
 			if (ImGui::Button("Apply"))
-			{	
-				PushToCamera(state, *camera);		
+			{
+				PushToCamera(state, *camera);
 				if (cameraCtrl)
 				{
 					PushToController(state, *cameraCtrl);

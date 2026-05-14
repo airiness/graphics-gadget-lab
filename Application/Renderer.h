@@ -1,5 +1,4 @@
 #pragma once
-#include "RGGpuResourceAllocator.h"
 #include "DX12RootSignature.h"
 #include "DX12ConstantBuffer.h"
 #include "DX12ViewCache.h"
@@ -8,10 +7,13 @@
 #include "DX12SwapChain.h"
 #include "DX12DescriptorManager.h"
 #include "RenderPassRecipeRegistry.h"
-#include "ExternalResourceRegistry.h"
 #include "TransferManager.h"
 #include "GPUStructures.h"
 #include "RenderGraph.h"
+#include "RGGpuResourceAllocator.h"
+#include "RGExternalResourceRegistry.h"
+#include "RenderResourceRegistry.h"
+#include "SamplerRegistry.h"
 #include "DevelopGui.h"
 #include "RenderContexts.h"
 
@@ -52,7 +54,9 @@ namespace gglab
 		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
 		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
 		RenderPassRecipeRegistry* GetRenderPassRecipeRegistry() const noexcept { return m_RenderPassRecipeRegistry.get(); }
-		ExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResourceRegistry.get(); }
+		RGExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResRegistry.get(); }
+		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
+		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		DevelopGui* GetDevelopGui() const noexcept { return m_DevelopGui.get(); }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
@@ -87,12 +91,14 @@ namespace gglab
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
-		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuAllocator;
+		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuResAllocator;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
-		std::unique_ptr<ExternalResourceRegistry> m_ExternalResourceRegistry;
+		std::unique_ptr<RGExternalResourceRegistry> m_ExternalResRegistry;
+		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
+		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<DevelopGui> m_DevelopGui;
 
 		RootSignatureID m_CommonRootSignatureId{};

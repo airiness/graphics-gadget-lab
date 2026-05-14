@@ -119,17 +119,15 @@ namespace gglab
 		void ReleaseTexture(ResourceIndex texIndex, const DX12FencePoint& fencePoint) noexcept;
 		void ReleaseBuffer(ResourceIndex bufIndex, const DX12FencePoint& fencePoint) noexcept;
 
-		template<typename ResourceDesc>
-		void ReleaseResource(ResourceIndex resourceIndex,
-			D3D12_RESOURCE_STATES lastKnownStates,
-			DX12FencePoint fencePoint) noexcept = delete;
-
 		DX12Texture* GetTexture(ResourceIndex texIndex) const noexcept;
 		DX12Buffer* GetBuffer(ResourceIndex bufIndex) const noexcept;
 
 		void Tick() noexcept;
 
 		void TrimPerKey(uint32_t maxCachedPerKey) noexcept;
+
+		// Check Texture ResourceIndex is compatible with RGTextureDesc, for texture recreate.
+		bool IsCompatibleTexture(ResourceIndex texIndex, const RGTextureDesc& desc) const noexcept;
 
 	private:
 		ResourceIndex CreateTexture(const RGTextureDesc& rgTexDesc,

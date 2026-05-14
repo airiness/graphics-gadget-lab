@@ -3,8 +3,8 @@
 #include "RGGpuResourceAllocator.h"
 #include "RGResource.h"
 #include "RGPass.h"
-#include "Blackboard.h"
-#include "ExternalResourceRegistry.h"
+#include "RGBlackboard.h"
+#include "RGExternalResourceRegistry.h"
 #include "GraphicsTypes.h"
 #include "StringId.h"
 
@@ -129,7 +129,7 @@ namespace gglab
 		{
 			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 			DX12ViewCache* m_ViewCache = nullptr;
-			ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
+			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		};
 
 		class RGBuilder
@@ -138,8 +138,7 @@ namespace gglab
 			RGBuilder(RenderGraph& rg, RGPassNode::Index passNodeIndex) :
 				m_RG(rg),
 				m_PassNodeIndex(passNodeIndex)
-			{
-			}
+			{}
 			~RGBuilder() = default;
 
 			template<typename RESOURCE>
@@ -204,8 +203,8 @@ namespace gglab
 				m_RG.m_PassNodes[m_PassNodeIndex.Value()].m_SideEffect = true;
 			}
 
-			Blackboard& GetBlackboard() noexcept { return m_RG.m_Blackboard; }
-			const Blackboard& GetBlackboard() const noexcept { return m_RG.m_Blackboard; }
+			RGBlackboard& GetBlackboard() noexcept { return m_RG.m_Blackboard; }
+			const RGBlackboard& GetBlackboard() const noexcept { return m_RG.m_Blackboard; }
 
 		private:
 			RenderGraph& m_RG;
@@ -223,7 +222,7 @@ namespace gglab
 		template<typename PassData, typename SetupFunc>
 		auto* AddPass(const char* passName, SetupFunc setupFunc) noexcept;
 
-		// Add a pass only have exe function
+		// Add an always - executed pass with no pass data or resource declarations.
 		template<typename ExecuteFunc>
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
 
@@ -239,8 +238,8 @@ namespace gglab
 
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
 
-		Blackboard& GetBlackboard() noexcept { return m_Blackboard; }
-		const Blackboard& GetBlackboard() const noexcept { return m_Blackboard; }
+		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
+		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
 
 	private:
 		template<typename RESOURCE>
@@ -280,10 +279,10 @@ namespace gglab
 	private:
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 		DX12ViewCache* m_ViewCache = nullptr;
-		ExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
+		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
-		Blackboard m_Blackboard;
+		RGBlackboard m_Blackboard;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
 		std::vector<RGPassNode> m_PassNodes;
@@ -330,8 +329,8 @@ namespace gglab
 	{
 		using PassDataType = std::decay_t<PassData>;
 
-		return AddPass<PassDataType>(passName, std::move(setupFunc), 
-			[](DX12CommandList*, PassDataType&) noexcept {});
+		return AddPass<PassDataType>(passName, std::move(setupFunc),
+			[](RGExecuteContext&, PassDataType&) noexcept {});
 	}
 
 	template<typename ExecuteFunc>
@@ -340,9 +339,9 @@ namespace gglab
 		struct EmptyData {};
 		return AddPass<EmptyData>(passName,
 			[](RGBuilder& builder, EmptyData&) { builder.SideEffect(); },
-			[fn = std::forward<ExecuteFunc>(executeFunc)](DX12CommandList* commandList, EmptyData&)
+			[fn = std::forward<ExecuteFunc>(executeFunc)](RGExecuteContext& executeContext, EmptyData&)
 			{
-				fn(commandList);
+				fn(executeContext);
 			});
 	}
 
@@ -435,7 +434,7 @@ namespace gglab
 		const auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
 		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Read with stale handle.Version");
 
-		RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex];
+		RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 
 		GGLAB_ASSERT_MSG(resourceNode.m_Writer != &passNode, "Pass can not read this resource and write same resource.");

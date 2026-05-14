@@ -4,6 +4,7 @@
 namespace gglab
 {
 	class AssetManager;
+	class SamplerRegistry;
 	class World;
 
 	namespace primitive
@@ -14,6 +15,7 @@ namespace gglab
 			struct CreateInfo
 			{
 				AssetManager* m_AssetManager = nullptr;
+				SamplerRegistry* m_SamplerRegistry = nullptr;
 				World* m_World = nullptr;
 			};
 

@@ -47,6 +47,9 @@ namespace gglab
 		bool IsExternal() const noexcept;
 		bool OwnsAllocation() const noexcept;
 
+		bool HasClearValue() const noexcept;
+		const D3D12_CLEAR_VALUE* GetClearValue() const noexcept;
+
 	public:
 		static D3D12_RESOURCE_BARRIER MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept;
 

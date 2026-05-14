@@ -161,7 +161,10 @@ namespace gglab
 	void RGGpuResourceAllocator::TrimPerKey(uint32_t maxCachedPerKey) noexcept
 	{
 		m_MaxCachedPerKey = maxCachedPerKey;
-		if (maxCachedPerKey == 0) return;
+		if (maxCachedPerKey == 0) 
+		{
+			return;
+		}
 
 		auto trim = [&](auto& map, auto& storeVec)
 			{
@@ -181,5 +184,31 @@ namespace gglab
 			};
 		trim(m_FreeTextures, m_Textures);
 		trim(m_FreeBuffers, m_Buffers);
+	}
+
+	bool RGGpuResourceAllocator::IsCompatibleTexture(ResourceIndex texIndex, const RGTextureDesc& desc) const noexcept
+	{
+		if (!texIndex.IsValid())
+		{
+			return false;
+		}
+
+		auto* texture = GetTexture(texIndex);
+		if (!texture)
+		{
+			return false;
+		}
+
+		// Only check 2D texture
+		const auto currentDesc = texture->Get()->GetDesc();
+		if (currentDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+		{
+			return false;
+		}
+
+		const auto currentKey = TextureKey::ConvertResourceDescToKey(currentDesc);
+		const auto wantKey = MakeKey(desc);
+
+		return currentKey == wantKey;
 	}
 }

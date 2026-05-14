@@ -16,6 +16,7 @@
 #include "DevelopGuiContext.h"
 #include "DevelopGuiImGuiToolsPanel.h"
 #include "DevelopGuiCameraPanel.h"
+#include "DevelopGuiPBRPanel.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -245,6 +246,7 @@ namespace gglab
 		assetManagerCreateInfo.m_DX12Device = m_Renderer->GetDevice();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_DescriptorManager = m_Renderer->GetDescriptorManager();
+		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_AssetManager->Initialize();
 
@@ -347,7 +349,7 @@ namespace gglab
 		};
 		const auto renderQueue = m_RenderQueueBuilder->Build(queueBuildInfo);
 
-		// Update frame constant buffer
+		// Update frame constant buffer. TODO: move this to RenderSceneBuilder
 		m_Renderer->UpdateFrameConstants(renderScene);
 
 		const RenderFrameContext renderContext{
@@ -467,13 +469,6 @@ namespace gglab
 			std::vector<ShaderDesc> shaderDescs;
 			ShaderDesc desc{};
 
-			// Textured Model Pass
-			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTexturedModel.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			shaderDescs.push_back(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			shaderDescs.push_back(desc);
-
 			// Forward PBR
 			desc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
@@ -490,17 +485,26 @@ namespace gglab
 		auto* developGui = m_Renderer->GetDevelopGui();
 		auto& panelRegistry = developGui->GetRegistry();
 
-		// ImGuiToolsPanel
 		DevelopGuiPanelDesc desc{};
-		desc.m_Path = "Menu/ImGui/Tools";
+
+		// CameraPanel
+		desc.m_Path = "Application/Camera";
+		desc.m_Title = "Camera";
+		desc.m_DrawFunc = &DevelopGuiCameraPanel;
+		panelRegistry.RegisterPanel(desc);
+
+		// ImGuiToolsPanel
+		desc.m_Path = "ImGui/Tools";
 		desc.m_Title = "ImGui Tools";
 		desc.m_DrawFunc = &DevelopGuiImGuiToolsPanel;
 		panelRegistry.RegisterPanel(desc);
 
-		// CameraPanel
-		desc.m_Path = "Menu/Application/Camera";
-		desc.m_Title = "Camera";
-		desc.m_DrawFunc = &DevelopGuiCameraPanel;
+		// PBR Panel
+		desc = {};
+		desc.m_Path = "Rendering/PBR";
+		desc.m_Title = "PBR";
+		desc.m_DrawFunc = &DevelopGuiPBRPanel;
+		//desc.m_DefaultOpen = true;
 		panelRegistry.RegisterPanel(desc);
 	}
 

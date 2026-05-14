@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "RenderGraph.h"
 #include "RGFrameTargets.h"
+#include "RGIBLResources.h"
 #include "DevelopGui.h"
 
 namespace gglab
@@ -14,7 +15,8 @@ namespace gglab
 		struct DevelopGuiData
 		{
 			RGTextureId m_BackBuffer{};
-			ViewKey m_RTVKey{};
+			RGTextureId m_BrdfLut{};
+			ViewKey m_RtvKey{};
 		};
 
 		rg.AddPass<DevelopGuiData>("RenderPassDevelopGui",
@@ -22,19 +24,24 @@ namespace gglab
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& blackboard = builder.GetBlackboard();
+
+				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(viewTargets.m_Color, RGTextureUsage::RenderTarget);
-				data.m_RTVKey = viewTargets.m_BackBufferRTVKey;
+				data.m_RtvKey = viewTargets.m_BackBufferRTVKey;
+
+				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 			},
-			[&rg, &services](DX12CommandList* commandList, DevelopGuiData& data)
+			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
 			{
 				auto* developGui = services.m_Renderer->GetDevelopGui();
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				auto* viewCache = rg.GetViewCache();
-				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
-				developGui->Render(commandList, rtv);
+				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
+				developGui->Render(executeContext.m_GraphicsCommandList, rtv);
 			});
 	}
 }

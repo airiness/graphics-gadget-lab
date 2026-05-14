@@ -1,7 +1,9 @@
 #pragma once
 #include "VertexData.h"
 #include "GraphicsTypes.h"
+#include "GPUStructures.h"
 #include "CopyContext.h"
+#include "SamplerRegistry.h"
 
 #include <DirectXTex.h>
 
@@ -18,6 +20,7 @@ namespace gglab
 		{
 			DX12Device* m_DX12Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
+			SamplerRegistry* m_SamplerRegistry = nullptr;
 			DX12DescriptorManager* m_DescriptorManager = nullptr;
 		};
 
@@ -88,6 +91,9 @@ namespace gglab
 		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
 
 		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
+		TextureBindingGPU ResolveTextureBinding(const MaterialTextureBinding& binding, 
+			ReservedTextureIDIndex fallback, 
+			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
 		void InitializeReservedTextureSet() noexcept;
@@ -118,8 +124,12 @@ namespace gglab
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
 
 	private:
+		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
+
+	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
+		SamplerRegistry* m_SamplerRegistry = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };

@@ -49,7 +49,7 @@ namespace gglab
 
 		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), createInfo.m_TransferManagerBufferSize);
 
-		m_RGGpuAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
+		m_RGGpuResAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
 
 		DX12ViewCache::CreateInfo viewCacheCreateInfo{};
 		viewCacheCreateInfo.m_DX12Device = m_Device.get();
@@ -62,7 +62,19 @@ namespace gglab
 
 		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
 
-		m_ExternalResourceRegistry = std::make_unique<ExternalResourceRegistry>(m_ViewCache.get());
+		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
+
+		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
+		samplerRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
+		m_SamplerRegistry->InitializePresetSamplers();
+
+		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
+		renderResRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
+		renderResRegistryCreateInfo.m_RGGpuResAllocator = m_RGGpuResAllocator.get();
+		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
+		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
 		m_DevelopGui = std::make_unique<DevelopGui>();
 		DevelopGui::CreateInfo developGuiCreateInfo{};
@@ -94,12 +106,14 @@ namespace gglab
 		}
 
 		m_DevelopGui->Finalize();
-		m_ExternalResourceRegistry.reset();
+		
+		m_RenderResRegistry.reset();
+		m_ExternalResRegistry.reset();
 		m_RenderPassRecipeRegistry.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
 		m_ViewCache.reset();
-		m_RGGpuAllocator.reset();
+		m_RGGpuResAllocator.reset();
 
 		m_SceneCB.reset();
 		m_ObjectSB.reset();
@@ -167,7 +181,7 @@ namespace gglab
 
 		rg.Retire(m_LastSubmittedFencePoint);
 
-		m_RGGpuAllocator->Tick();
+		m_RGGpuResAllocator->Tick();
 
 		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, m_LastSubmittedFencePoint);
 
@@ -194,6 +208,10 @@ namespace gglab
 		sceneCB.ViewBaseIndex = scene.m_ViewBaseIndex;
 		sceneCB.ViewCount = scene.m_ViewCount;
 
+		m_RenderResRegistry->EnsureIblResources();
+		m_RenderResRegistry->FillIBLBindlessGPU(sceneCB.IBLResource);
+
+		// Main Light
 		sceneCB.MainLight = scene.m_MainLight;
 
 		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();
@@ -203,9 +221,9 @@ namespace gglab
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
-		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuAllocator.get();
+		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuResAllocator.get();
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
-		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResourceRegistry.get();
+		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
 
 		return rgCreateInfo;
 	}
@@ -238,7 +256,7 @@ namespace gglab
 
 		m_Device->FlushGPU();
 
-		if (m_ExternalResourceRegistry)
+		if (m_ExternalResRegistry)
 		{
 			const uint32_t bufferCount = m_SwapChain->GetBufferCount();
 			for (uint32_t index = 0; index < bufferCount; ++index)
@@ -249,7 +267,7 @@ namespace gglab
 					continue;
 				}
 
-				m_ExternalResourceRegistry->Forget(backBuffer, true);
+				m_ExternalResRegistry->Forget(backBuffer, true);
 			}
 		}
 
@@ -298,24 +316,15 @@ namespace gglab
 		// t3: ViewSB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ViewSB)].InitAsShaderResourceView(3);
 
-		constexpr uint32_t StaticSamplerCount = 1;
-		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};
-		staticSamplers[0].Init(
-			0,	// register s0
-			D3D12_FILTER_MIN_MAG_MIP_LINEAR,
-			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Init_1_1(
 			static_cast<UINT>(utils::EnumCount<CommonRSRootParamIndex>()),
 			rootParameters,
-			StaticSamplerCount,
-			staticSamplers,
+			0,
+			nullptr,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
-			// D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
 
 		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
 		m_CommonRootSignatureId = id;

@@ -6,6 +6,7 @@
 #include "DX12PipelineState.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12CommandAllocator.h"
+#include "DX12Resource.h"
 #include "HResult.h"
 
 namespace gglab
@@ -59,6 +60,17 @@ namespace gglab
 	{
 		ID3D12DescriptorHeap* heaps[] = { descriptorHeap.Get() };
 		m_D3D12GraphicsCommandList->SetDescriptorHeaps(1, heaps);
+	}
+
+	void DX12CommandList::SetDescriptorHeaps(std::span<const DX12DescriptorHeap*> descriptorHeaps) const noexcept
+	{
+		std::vector<ID3D12DescriptorHeap*> heaps(descriptorHeaps.size());
+		for (int32_t index = 0; index < static_cast<int32_t>(descriptorHeaps.size()); ++index)
+		{
+			GGLAB_ASSERT_NOT_NULL(descriptorHeaps[index]);
+			heaps.at(index) = descriptorHeaps[index]->Get();
+		}
+		m_D3D12GraphicsCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
 	}
 
 	void DX12CommandList::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) const noexcept
@@ -196,7 +208,32 @@ namespace gglab
 		}
 
 		float clearColor[4] = { color.R(), color.G(), color.B(), color.A() };
-		m_D3D12GraphicsCommandList->ClearRenderTargetView(rtDescriptor.m_CpuHandle, clearColor, 0, nullptr);
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(
+			rtDescriptor.m_CpuHandle,
+			clearColor,
+			0,
+			nullptr);
+	}
+
+	void DX12CommandList::ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const DX12Resource& resource) const noexcept
+	{
+		GGLAB_ASSERT(rtDescriptor.m_DebugType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		if (!rtDescriptor.IsValid())
+		{
+			return;
+		}
+
+		const auto* clearValue = resource.GetClearValue();
+		if (!clearValue)
+		{
+			return;
+		}
+
+		m_D3D12GraphicsCommandList->ClearRenderTargetView(
+			rtDescriptor.m_CpuHandle,
+			clearValue->Color,
+			0,
+			nullptr);
 	}
 
 	void DX12CommandList::ClearDepthStencil(const DX12DescriptorView& dsDescriptor,

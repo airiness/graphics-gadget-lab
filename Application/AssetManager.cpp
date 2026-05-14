@@ -21,7 +21,7 @@ namespace gglab
 	namespace
 	{
 		// MaterialTextureSlot to assimp Texture type mapping
-		static aiTextureType ToAssimpTextureType(MaterialTextureSlot slot) noexcept
+		aiTextureType ToAssimpTextureType(MaterialTextureSlot slot) noexcept
 		{
 			switch (slot)
 			{
@@ -40,39 +40,58 @@ namespace gglab
 			}
 		}
 
-		// Write Material texture
-		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, TextureID textureId) noexcept
+		D3D12_TEXTURE_ADDRESS_MODE ToD3D12AddressMode(aiTextureMapMode mode) noexcept
 		{
-			switch (slot)
+			switch (mode)
 			{
-			case MaterialTextureSlot::BaseColor:
-				material.m_BaseColorTex = textureId;
-				break;
-			case MaterialTextureSlot::MetallicRoughness:
-				material.m_MetallicRoughnessTex = textureId;
-				break;
-			case MaterialTextureSlot::Normal:
-				material.m_NormalTex = textureId;
-				break;
-			case MaterialTextureSlot::Occlusion:
-				material.m_OcclusionTex = textureId;
-				break;
-			case MaterialTextureSlot::Emissive:
-				material.m_EmissiveTex = textureId;
-				break;
+			case aiTextureMapMode_Wrap:
+				return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+			case aiTextureMapMode_Clamp:
+				return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+			case aiTextureMapMode_Mirror:
+				return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+			case aiTextureMapMode_Decal:
+				return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 			default:
-				GGLAB_UNREACHABLE("Unknown MaterialTextureSlot.");
+				return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 			}
+		}
+
+		static SamplerKey MakeSamplerKeyFromAssimpTextureParams(const aiTextureMapMode mapMode[3]) noexcept
+		{
+			SamplerKey key{};
+
+			key.m_Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+
+			key.m_AddressU = ToD3D12AddressMode(mapMode[0]);
+			key.m_AddressV = ToD3D12AddressMode(mapMode[1]);
+			key.m_AddressW = ToD3D12AddressMode(mapMode[2]);
+
+			key.m_MipLODBias = 0.0f;
+			key.m_MaxAnisotropy = 1;
+			key.m_ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+
+			key.m_BorderColor[0] = 0.0f;
+			key.m_BorderColor[1] = 0.0f;
+			key.m_BorderColor[2] = 0.0f;
+			key.m_BorderColor[3] = 0.0f;
+
+			key.m_MinLOD = 0.0f;
+			key.m_MaxLOD = D3D12_FLOAT32_MAX;
+
+			return key;
 		}
 	}
 
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_DX12Device(createInfo.m_DX12Device),
 		m_TransferManager(createInfo.m_TransferManager),
+		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
 		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "DX12Device is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
 		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DX12DescriptorManager is null!");
 	}
 
@@ -136,7 +155,7 @@ namespace gglab
 		{
 			if (const auto* tex = GetTexture(textureId); tex && tex->m_IsUploaded)
 			{
-				if (tex->m_Semantic != TextureSemantic::Unknown || tex->m_Semantic != semantic)
+				if (tex->m_Semantic != TextureSemantic::Unknown && tex->m_Semantic != semantic)
 				{
 					GGLAB_LOG_GRAPHICS_WARN("Texture '{}' is already loaded with different semantic (existing: {}, requested: {}).",
 						canonicalPath.string(),
@@ -306,7 +325,7 @@ namespace gglab
 		{
 			if (texture->m_IsUploaded && texture->m_DescriptorId.IsValid())
 			{
-				return texture->m_DescriptorId.m_Index;
+				return m_DescriptorManager->BindlessSrvIdToGlobalIndex(texture->m_DescriptorId);
 			}
 		}
 
@@ -315,7 +334,20 @@ namespace gglab
 
 		GGLAB_ASSERT(fallbackTexture != nullptr && fallbackTexture->m_DescriptorId.IsValid());
 
-		return fallbackTexture->m_DescriptorId.m_Index;
+		return m_DescriptorManager->BindlessSrvIdToGlobalIndex(fallbackTexture->m_DescriptorId);
+	}
+
+	TextureBindingGPU AssetManager::ResolveTextureBinding(const MaterialTextureBinding& binding, ReservedTextureIDIndex fallback, SamplerPreset fallbackSampler) const noexcept
+	{
+		TextureBindingGPU bindingGpu{};
+
+		bindingGpu.TextureIndex = ResolveSrvIndex(binding.m_TextureId, fallback);
+		bindingGpu.SamplerIndex = m_SamplerRegistry->ResolveSamplerIndex(binding.m_SamplerId, fallbackSampler);
+
+		bindingGpu.TexCoordIndex = binding.m_TexCoordIndex;
+		bindingGpu.Padding = 0;
+
+		return bindingGpu;
 	}
 
 	void AssetManager::InitializeReservedTextureSet() noexcept
@@ -577,19 +609,11 @@ namespace gglab
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
 		// Allocate Descriptor and create srv
-		const auto srvDescriptorId = m_DescriptorManager->AllocateBindlessSrvId();
+		DX12DescriptorManager::TextureSrvCreateInfo srvInfo{};
+		srvInfo.m_Format = srvFormat;
+		srvInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
-		const auto& textureDesc = texture->m_Texture->Get()->GetDesc();
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = srvFormat;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = textureDesc.MipLevels;
-		m_DX12Device->Get()->CreateShaderResourceView(
-			texture->m_Texture->Get(),
-			&srvDesc,
-			m_DescriptorManager->BindlessSrvIdToView(srvDescriptorId).m_CpuHandle);
-
+		const auto srvDescriptorId = m_DescriptorManager->CreateBindlessSrv(texture->m_Texture.get(), srvInfo);
 		texture->m_DescriptorId = srvDescriptorId;
 		texture->m_Semantic = uploadData.m_Semantic;
 		texture->m_IsUploaded = true;
@@ -688,7 +712,25 @@ namespace gglab
 				}
 
 				aiString aiTexPath{};
-				if (aiMaterial->GetTexture(aiTexType, 0, &aiTexPath) != aiReturn_SUCCESS)
+				aiTextureMapping mapping = aiTextureMapping_UV;
+				unsigned int uvIndex = 0;
+				ai_real blend = 1.0f;
+				aiTextureOp op = aiTextureOp_Multiply;
+				aiTextureMapMode mapMode[3] =
+				{
+					aiTextureMapMode_Wrap,
+					aiTextureMapMode_Wrap,
+					aiTextureMapMode_Wrap
+				};
+
+				if (aiMaterial->GetTexture(aiTexType, 
+					0,
+					&aiTexPath,
+					&mapping,
+					&uvIndex,
+					&blend,
+					&op,
+					mapMode) != aiReturn_SUCCESS)
 				{
 					continue;
 				}
@@ -703,7 +745,15 @@ namespace gglab
 					texUploadDatas.emplace_back(MakeTextureUploadData(texId, canonicalTexPath, semantic));
 				}
 
-				SetMaterialTexture(*material, slot, texId);
+				const auto samplerKey = MakeSamplerKeyFromAssimpTextureParams(mapMode);
+				const auto samplerId = m_SamplerRegistry->GetOrCreateSampler(samplerKey);
+
+				MaterialTextureBinding binding{};
+				binding.m_TextureId = texId;
+				binding.m_SamplerId = samplerId;
+				binding.m_TexCoordIndex = uvIndex;
+
+				SetMaterialTexture(*material, slot, binding);
 			}
 
 			// Get factors
@@ -1026,5 +1076,29 @@ namespace gglab
 		//DirectX::BoundingSphere::CreateFromPoints(mesh.m_BoundingSphere, vertices.size(), firstPoint, stride);
 
 		mesh.m_HasBounds = true;
+	}
+
+	void AssetManager::SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept
+	{
+		switch (slot)
+		{
+		case MaterialTextureSlot::BaseColor:
+			material.m_BaseColorBinding = binding;
+			break;
+		case MaterialTextureSlot::MetallicRoughness:
+			material.m_MetallicRoughnessBinding = binding;
+			break;
+		case MaterialTextureSlot::Normal:
+			material.m_NormalBinding = binding;
+			break;
+		case MaterialTextureSlot::Occlusion:
+			material.m_OcclusionBinding = binding;
+			break;
+		case MaterialTextureSlot::Emissive:
+			material.m_EmissiveBinding = binding;
+			break;
+		default:
+			GGLAB_UNREACHABLE("Unknown MaterialTextureSlot.");
+		}
 	}
 }

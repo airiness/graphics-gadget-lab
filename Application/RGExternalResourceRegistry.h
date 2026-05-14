@@ -71,12 +71,12 @@ namespace gglab
 	class DX12ViewCache;
 	class DX12Texture;
 	class DX12Buffer;
-	class ExternalResourceRegistry
+	class RGExternalResourceRegistry
 	{
 	public:
-		explicit ExternalResourceRegistry(DX12ViewCache* viewCache) noexcept;
-		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(ExternalResourceRegistry);
-		~ExternalResourceRegistry();
+		explicit RGExternalResourceRegistry(DX12ViewCache* viewCache) noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(RGExternalResourceRegistry);
+		~RGExternalResourceRegistry();
 
 		ResourceIndex GetOrCreate(const DX12Texture* texture) noexcept;
 		ResourceIndex GetOrCreate(const DX12Buffer* buffer) noexcept;

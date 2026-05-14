@@ -35,10 +35,10 @@ namespace gglab
 	using BlackboardKeyHash = KeyHash<BlackboardKey>;
 
 
-	class Blackboard
+	class RGBlackboard
 	{
 	public:
-		explicit Blackboard(RGArenaAllocator& arenaAllocator) noexcept;
+		explicit RGBlackboard(RGArenaAllocator& arenaAllocator) noexcept;
 
 		void Reset() noexcept;
 
@@ -128,7 +128,7 @@ namespace gglab
 		{
 			T* ptr = TryGet<T>(nameId);
 			GGLAB_ASSERT_MSG(ptr != nullptr,
-				"Blackboard::Get() failed. Entry not found.");
+				"RGBlackboard::Get() failed. Entry not found.");
 			return *ptr;
 		}
 

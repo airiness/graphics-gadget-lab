@@ -22,6 +22,14 @@ namespace gglab
 		uint32_t LightType;
 	};
 
+	struct IBLResourceGPU
+	{
+		uint32_t BrdfLutTexIndex;
+		uint32_t BrdfLutSamplerIndex;
+
+		uint32_t Padding[2];
+	};
+
 	struct SceneGPU
 	{
 		uint32_t ObjectBaseIndex;
@@ -32,7 +40,9 @@ namespace gglab
 		uint32_t ViewCount;
 		uint32_t Padding[2];
 
-		LightGPU MainLight; // todo: move to structured buffer lights
+		IBLResourceGPU IBLResource;
+
+		LightGPU MainLight; // TODO: move to structured buffer lights
 	};
 
 	struct ObjectGPU
@@ -45,24 +55,35 @@ namespace gglab
 	};
 	static constexpr uint32_t MaxObjectCapacity = 1024;
 
+	struct TextureBindingGPU
+	{
+		uint32_t TextureIndex;
+		uint32_t SamplerIndex;
+		uint32_t TexCoordIndex;
+		uint32_t Padding;
+	};
+
 	struct MaterialGPU
 	{
+		TextureBindingGPU BaseColorBinding;
+		TextureBindingGPU EmissiveBinding;
+		TextureBindingGPU MetallicRoughnessBinding;
+		TextureBindingGPU NormalBinding;
+		TextureBindingGPU OcclusionBinding;
+
 		Color BaseColorFactor;
+		Color EmissiveColorFactor;
+
 		float MetallicFactor;
 		float RoughnessFactor;
 		float NormalScale;
 		float OcclusionStrength;
-		Color EmissiveColorFactor;
-
-		uint32_t BaseColorTexIndex;
-		uint32_t MetallicRoughnessTexIndex;
-		uint32_t NormalTexIndex;
-		uint32_t OcclusionTexIndex;
-		uint32_t EmissiveTexIndex;
 
 		int32_t AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
 		float AlphaCutoff;
 		uint32_t Flags; // bit 0: doubleSided
+
+		uint32_t Padding;
 	};
 	static constexpr uint32_t MaxMaterialCapacity = 128;
 

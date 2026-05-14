@@ -3,6 +3,9 @@
 
 #define GGLAB_ASSERT(expression) assert(expression)
 #define GGLAB_ASSERT_MSG(expression, message) assert((expression) && (message))
+#define GGLAB_ASSERT_NOT_NULL(expression) assert(expression != nullptr)
+
+#define GGLAB_UNUSED(variable) (void)(variable)
 
 // Define unreachable and abort application
 #define GGLAB_UNREACHABLE(message) \

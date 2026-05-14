@@ -1,5 +1,6 @@
 #include <Common/Common.hlsli>
-#include <Common/Binding.hlsli>	// Included BuffurLayout.hlsli in Binding.hlsli
+#include <Common/MaterialSampling.hlsli>
+#include <Common/ApplicationBinding.hlsli>
 #include <PBR/BRDF.hlsli>
 
 struct VSInput
@@ -19,6 +20,42 @@ struct VSOutput
 	nointerpolation uint MaterialIndex : TEXCOORD3;
 	nointerpolation uint ViewIndex : TEXCOORD4;
 };
+
+// Sample normal map and compute perturbed normal in world space
+float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, float2 uv)
+{
+	// TODO: flip Y for normal map?
+	
+	// Sample normal texture
+	float4 normalSampled = SampleTextureBinding(matData.NormalBinding, uv);
+	
+	// Remap from [0,1] to [-1,1], xy only
+	normalSampled.xy = normalSampled.xy * 2.0 - 1.0;
+	
+	// Apply normal scale xy
+	normalSampled.xy *= matData.NormalScale; // apply normal scale
+	
+	// rebuild z, avoid normalization issues
+	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
+	
+	// Build TBN matrix
+	float3x3 TBN = BuildTBN(normalize(normalWS), positionWS, uv); // TODO: Support vertex tangent in VertexAttribute	
+	
+	// Transform normal from tangent space to world space
+	float3 perturbedNormalWS = normalize(mul(normalSampled.xyz, TBN));
+	return perturbedNormalWS;
+}
+
+float2 SampleIBLBrdfLUT(float NoV, float preceptualRoughness)
+{
+	float4 value = SampleTexture2DLevel(
+		g_Scene.IBLResource.BrdfLutTexIndex,
+		g_Scene.IBLResource.BrdfLutSamplerIndex,
+		float2(saturate(NoV), saturate(preceptualRoughness)),
+		0);
+	
+	return value.rg;
+}
 
 VSOutput VSMain(VSInput IN)
 {
@@ -55,31 +92,6 @@ VSOutput VSMain(VSInput IN)
 	return OUT;
 }
 
-// Sample normal map and compute perturbed normal in world space
-float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, float2 uv)
-{
-	// TODO: flip Y for normal map?
-	
-	// Sample normal texture
-	float4 normalSampled = SampleTexture2D(matData.NormalTexIndex, g_SamplerLinear, uv);
-	
-	// Remap from [0,1] to [-1,1], xy only
-	normalSampled.xy = normalSampled.xy * 2.0 - 1.0;
-	
-	// Apply normal scale xy
-	normalSampled.xy *= matData.NormalScale; // apply normal scale
-	
-	// rebuild z, avoid normalization issues
-	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
-	
-	// Build TBN matrix
-	float3x3 TBN = BuildTBN(normalize(normalWS), positionWS, uv); // TODO: Support vertex tangent in VertexAttribute	
-	
-	// Transform normal from tangent space to world space
-	float3 perturbedNormalWS = normalize(mul(normalSampled.xyz, TBN));
-	return perturbedNormalWS;
-}
-
 float4 PSMain(VSOutput IN) : SV_Target
 {
 	MaterialData matData = g_Materials[IN.MaterialIndex];
@@ -88,10 +100,10 @@ float4 PSMain(VSOutput IN) : SV_Target
 	ViewData viewData = g_Views[IN.ViewIndex];
 	
 	// BaseColor
-	float4 baseColorSampled = SampleTexture2D(matData.BaseColorTexIndex, g_SamplerLinear, IN.UV);
+	float4 baseColorSampled = SampleTextureBinding(matData.BaseColorBinding, IN.UV);
 	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
 	
-	float alpha = baseColorSampled.a * matData.BaseColorFactor.a;	
+	float alpha = baseColorSampled.a * matData.BaseColorFactor.a;
 	// Alpha mode handling
 	if (matData.AlphaMode == 0) // OPAQUE
 	{
@@ -104,10 +116,10 @@ float4 PSMain(VSOutput IN) : SV_Target
 	}
 	
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
-	float4 mrSampled = SampleTexture2D(matData.MetallicRoughnessTexIndex, g_SamplerLinear, IN.UV);
+	float4 mrSampled = SampleTextureBinding(matData.MetallicRoughnessBinding, IN.UV);
 	float metallic = saturate(matData.MetallicFactor * mrSampled.b);
-	float roughness = saturate(matData.RoughnessFactor * mrSampled.g);
-	roughness = max(0.045, roughness); // to avoid 0 roughness)
+	float perceptualRoughness = saturate(matData.RoughnessFactor * mrSampled.g);
+	perceptualRoughness = ClampPerceptualRoughnessForBRDF(perceptualRoughness);
 
 	// Normal (linear)
 	float3 normalWS = normalize(IN.NormalWS);
@@ -123,7 +135,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float NoH = saturate(dot(N, H));
 	float VoH = saturate(dot(V, H));
 	
-	float a = roughness * roughness; // convert artistic roughness to physical roughness
+	// convert artistic roughness to physical roughness
+	float a = PerceptualRoughnessToAlpha(perceptualRoughness);
 		
 	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor	
 	float D = D_GGX(NoH, a);
@@ -140,11 +153,19 @@ float4 PSMain(VSOutput IN) : SV_Target
 		g_Scene.MainLight.Intensity * NoL;
 	
 	// Emissive texture(sRGB)
-	float3 emissiveSampled = SampleTexture2D(matData.EmissiveTexIndex, g_SamplerLinear, IN.UV).rgb;
+	float3 emissiveSampled = SampleTextureBinding(matData.EmissiveBinding, IN.UV).rgb;
 	float3 emissive = emissiveSampled * matData.EmissiveColorFactor.rgb;
 	
 	// Add emissive
 	Lo += emissive;
+	
+	// LUT for IBL specular
+	float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
+	float3 specularIBLFactor = F0 * brdfLUT.x + brdfLUT.y;
+	
+	// TODO: sample prefiltered environment map with roughness as mip level
+	float3 fakePrefilteredEnv = 1.0.xxx;
+	float3 specularIBL = fakePrefilteredEnv * specularIBLFactor;
 	
 	// TODO: temperary ambient
 	float up = saturate(normalWS.y * 0.5f + 0.5f);
@@ -153,12 +174,15 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 hemi = lerp(ground, sky, up);
 	
 	// AO texture
-	float aoSampled = SampleTexture2D(matData.OcclusionTexIndex, g_SamplerLinear, IN.UV).r;
+	float aoSampled = SampleTextureBinding(matData.OcclusionBinding, IN.UV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 	
 	float3 ambient = hemi * baseColor * 0.2;
 	Lo += ambient * ao;
+	
+	// TODO: Specular IBL
+	Lo += specularIBL * 0.1;
 	
 	// Tonemap
 	float3 color = ACESFitted(Lo * viewData.Exposure);

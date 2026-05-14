@@ -17,7 +17,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
 		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");
-		GGLAB_ASSERT_MSG(m_ExternalResourceRegistry != nullptr, "ExternalResourceRegistry can not be null.");
+		GGLAB_ASSERT_MSG(m_ExternalResourceRegistry != nullptr, "RGExternalResourceRegistry can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
@@ -124,8 +124,6 @@ namespace gglab
 
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
-		auto* graphicsCommandList = executeContext.m_GraphicsCommandList;
-
 		for (auto& passNode : m_PassNodes)
 		{
 			if (passNode.m_Culled)
@@ -142,7 +140,7 @@ namespace gglab
 			// Execute passes
 			if (passNode.m_Pass)
 			{
-				passNode.m_Pass->Execute(graphicsCommandList);
+				passNode.m_Pass->Execute(executeContext);
 			}
 
 			for (auto* virtualResource : passNode.m_DestroyVirtualResources)

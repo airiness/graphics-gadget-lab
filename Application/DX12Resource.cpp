@@ -35,7 +35,7 @@ namespace gglab
 
 	D3D12_RESOURCE_DESC DX12Resource::GetDesc() const noexcept
 	{
-		return m_ResourceDesc;
+		return m_Resource->GetDesc();
 	}
 
 	D3D12_RESOURCE_STATES DX12Resource::GetState() const noexcept
@@ -128,6 +128,21 @@ namespace gglab
 	bool DX12Resource::OwnsAllocation() const noexcept
 	{
 		return m_Allocation != nullptr;
+	}
+
+	bool DX12Resource::HasClearValue() const noexcept
+	{
+		return m_ClearValue.has_value();
+	}
+
+	const D3D12_CLEAR_VALUE* DX12Resource::GetClearValue() const noexcept
+	{
+		if (m_ClearValue.has_value())
+		{
+			return &m_ClearValue.value();
+		}
+		
+		return nullptr;
 	}
 
 	D3D12_RESOURCE_BARRIER DX12Resource::MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept

@@ -2,6 +2,7 @@
 #include "Geometry.h"
 #include "Components.h"
 #include "AssetManager.h"
+#include "SamplerRegistry.h"
 #include "World.h"
 
 namespace gglab
@@ -10,7 +11,8 @@ namespace gglab
 	{
 		entt::entity Cube::Create(const CreateInfo& info) noexcept
 		{
-			auto assetManager = info.m_AssetManager;
+			auto* assetManager = info.m_AssetManager;
+			auto* samplerRegistry = info.m_SamplerRegistry;
 			auto& registry = info.m_World->GetRegistry();
 
 			if (assetManager->GetModel(ProceduralCubeModelID) == nullptr)
@@ -34,7 +36,8 @@ namespace gglab
 					{
 						std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
 						cubeMaterial->m_Id = ProceduralCubeMaterialID;
-						cubeMaterial->m_BaseColorTex = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
+						cubeMaterial->m_BaseColorBinding.m_TextureId = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
+						cubeMaterial->m_BaseColorBinding.m_SamplerId = samplerRegistry->GetPresetSamplerId(SamplerPreset::AnisotropicClamp);
 						assetManager->AddMaterial(std::move(cubeMaterial));
 					};
 

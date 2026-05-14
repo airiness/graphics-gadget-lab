@@ -4,59 +4,103 @@
 #include "RenderScene.h"
 #include "RenderGraph.h"
 #include "RGFrameTargets.h"
+#include "RGIBLResources.h"
 #include "DX12SwapChain.h"
 #include "DX12DescriptorHeap.h"
 #include "DX12DescriptorManager.h"
-#include "DX12CommandList.h"
 #include "InputLayoutLibrary.h"
 #include "AssetManager.h"
 
 namespace gglab
 {
+	namespace
+	{
+		void TransitionTextureCommonToPixelShaderResource(DX12CommandList* commandList, DX12Texture* texture) noexcept
+		{
+			CD3DX12_TEXTURE_BARRIER barrier(
+				D3D12_BARRIER_SYNC_ALL,
+				D3D12_BARRIER_SYNC_PIXEL_SHADING,
+				D3D12_BARRIER_ACCESS_COMMON,
+				D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+				D3D12_BARRIER_LAYOUT_COMMON,
+				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+				texture->Get(),
+				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+			commandList->AddTextureBarrier(barrier);
+			commandList->FlushBarriers();
+		}
+
+		void TransitionTexturePixelShaderResourceToCommon(DX12CommandList* commandList, DX12Texture* texture) noexcept
+		{
+			CD3DX12_TEXTURE_BARRIER barrier(
+				D3D12_BARRIER_SYNC_PIXEL_SHADING,
+				D3D12_BARRIER_SYNC_ALL,
+				D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+				D3D12_BARRIER_ACCESS_COMMON,
+				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+				D3D12_BARRIER_LAYOUT_COMMON,
+				texture->Get(),
+				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+			commandList->AddTextureBarrier(barrier);
+			commandList->FlushBarriers();
+		}
+	}
+
 	void RenderPassForwardPBR::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		EnsureInitialized(services);
-
 		struct ForwardPBRData
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_Depth{};
+			RGTextureId m_BrdfLut{};
 
-			ViewKey m_RTVKey{};
+			ViewKey m_RtvKey{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 		};
 
 		auto* contextPtr = &context;
+		GGLAB_ASSERT_NOT_NULL(contextPtr);
+
 		auto* servicesPtr = &services;
+		GGLAB_ASSERT_NOT_NULL(servicesPtr);
+
+		EnsureInitialized(services);
 
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
 			[](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& blackboard = builder.GetBlackboard();
+
+				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+
 				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
+				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 
-				data.m_RTVKey = mainTargets.m_BackBufferRTVKey;
+				data.m_RtvKey = mainTargets.m_BackBufferRTVKey;
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 			},
-			[this, &rg, contextPtr, servicesPtr](DX12CommandList* commandList, ForwardPBRData& data)
+			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
 			{
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-				auto* depthTexture = rg.GetTexture(data.m_Depth);
+				GGLAB_ASSERT_NOT_NULL(backTexture);
 
-				GGLAB_ASSERT(backTexture && depthTexture);
+				auto* depthTexture = rg.GetTexture(data.m_Depth);
+				GGLAB_ASSERT_NOT_NULL(depthTexture);
 
 				auto* viewCache = rg.GetViewCache();
+				auto* commandList = executeContext.m_GraphicsCommandList;
 
-				const auto& rtv = viewCache->GetOrCreate(data.m_RTVKey, backTexture);
+				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 
 				const ResourceIndex depthIndex = rg.GetResourceIndex(data.m_Depth);
 				const ViewKey dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(
@@ -71,7 +115,11 @@ namespace gglab
 				auto* rootSignature = renderer->GetCommonRootSignature();
 
 				// Global bindings
-				commandList->SetDescriptorHeap(*descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav));
+				const DX12DescriptorHeap* descriptorHeaps[] = {
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
+				};
+				commandList->SetDescriptorHeaps(descriptorHeaps);
 				commandList->SetGraphicsRootSignature(*rootSignature);
 
 				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
@@ -99,37 +147,45 @@ namespace gglab
 				commandList->Get()->SetGraphicsRootShaderResourceView(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
-				
+
 				// Set view index constant	
 				commandList->Get()->SetGraphicsRoot32BitConstant(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					1);
 
+				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
+				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture);
+
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
+
+				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture);
 			});
 	}
 
 	void RenderPassForwardPBR::EnsureInitialized(const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+
 		auto* shaderManager = services.m_ShaderManager;
+		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
 		{
 			// Shader
-			ShaderDesc sd{};
-			sd.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
-			sd.m_Stage = ShaderStage::Vertex;
-			sd.m_Entry = L"VSMain";
-			const auto vsId = shaderManager->LoadShader(sd);
-			sd.m_Stage = ShaderStage::Pixel;
-			sd.m_Entry = L"PSMain";
-			const auto psId = shaderManager->LoadShader(sd);
+			ShaderDesc shaderDesc{};
+			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+			shaderDesc.m_Stage = ShaderStage::Vertex;
+			shaderDesc.m_Entry = L"VSMain";
+			const auto vsId = shaderManager->LoadShader(shaderDesc);
+			shaderDesc.m_Stage = ShaderStage::Pixel;
+			shaderDesc.m_Entry = L"PSMain";
+			const auto psId = shaderManager->LoadShader(shaderDesc);
 
 			// KeyInputs
 			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
-			m_BaseInputs.m_InputLayoutId = InputLayoutId::P3N3T2;
+			m_BaseInputs.m_InputLayoutId = InputLayoutID::P3N3T2;
 			m_BaseInputs.m_VSId = vsId;
 			m_BaseInputs.m_PSId = psId;
 
@@ -233,7 +289,10 @@ namespace gglab
 		const Renderer& renderer, uint64_t variantBits) noexcept
 	{
 		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
+		GGLAB_ASSERT_NOT_NULL(passRegistry);
+
 		auto* psoCache = renderer.GetPSOCache();
+		GGLAB_ASSERT_NOT_NULL(psoCache);
 
 		GraphicsKeyInputs inputs = m_BaseInputs;
 		inputs.m_VariantBits = variantBits;
@@ -247,14 +306,14 @@ namespace gglab
 
 		const auto& cached = passRegistry->GetOrCreateGraphics(
 			psoPassId, inputs,
-			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* sm)
+			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
 			{
 				outDesc.m_RootSignatureId = input.m_RootSignatureId;
 				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
 				outDesc.m_InputLayoutId = input.m_InputLayoutId;
-				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(InputLayoutId::P3N3T2);
-				outDesc.m_VertexShader = sm->GetBytecode(input.m_VSId);
-				outDesc.m_PixelShader = sm->GetBytecode(input.m_PSId);
+				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(input.m_InputLayoutId);
+				outDesc.m_VertexShader = shaderManager->GetBytecode(input.m_VSId);
+				outDesc.m_PixelShader = shaderManager->GetBytecode(input.m_PSId);
 				outDesc.m_Topology = input.m_Topology;
 				outDesc.m_SampleMask = input.m_SampleMask;
 				outDesc.m_Formats = input.m_Formats;

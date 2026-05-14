@@ -1,4 +1,5 @@
 #pragma once
+#pragma pack_matrix(row_major) // Use row-major matrices
 
 struct LightData
 {
@@ -11,6 +12,14 @@ struct LightData
 	uint LightType; // 0: Directional, 1: Point, 2: Spot
 };
 
+struct IBLResourceData
+{
+	uint BrdfLutTexIndex;
+	uint BrdfLutSamplerIndex;
+	
+	uint2 Padding;
+};
+
 struct SceneData
 {
 	uint ObjectBaseIndex;
@@ -20,6 +29,8 @@ struct SceneData
 	uint ViewBaseIndex;
 	uint ViewCount;
 	uint2 Padding;
+	
+	IBLResourceData IBLResource;
 	
 	LightData MainLight;
 };
@@ -32,24 +43,35 @@ struct ObjectData
 	uint3 Padding;
 };
 
+struct TextureBindingData
+{
+	uint TextureIndex;
+	uint SamplerIndex;
+	uint TexCoordIndex;
+	uint Padding;
+};
+
 struct MaterialData
 {
+	TextureBindingData BaseColorBinding;
+	TextureBindingData EmissiveBinding;	
+	TextureBindingData MetallicRoughnessBinding;
+	TextureBindingData NormalBinding;
+	TextureBindingData OcclusionBinding;
+	
 	float4 BaseColorFactor;
+	float4 EmissiveColorFactor;
+	
 	float MetallicFactor;
 	float RoughnessFactor;
 	float NormalScale;
 	float OcclusionStrength;
-	float4 EmissiveColorFactor;
-	
-	uint BaseColorTexIndex;
-	uint MetallicRoughnessTexIndex;
-	uint NormalTexIndex;
-	uint OcclusionTexIndex;
-	uint EmissiveTexIndex;
 	
 	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
 	float AlphaCutoff;
 	uint Flags; // bit 0: doubleSided
+	
+	uint Padding;
 };
 
 struct ViewData

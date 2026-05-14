@@ -1,6 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{7055A31A-176E-6667-6124-331A716C7890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{62248322-C2D0-4200-1D1B-93BC655BF9CC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{3217C814-FEFD-56B4-3CC0-76A01096884F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{8D727DF1-1ACE-168D-EB4F-C640631BA613}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
     <Filter Include="Core">
       <UniqueIdentifier>{bb74519f-06d0-430b-9631-02634c26ac92}</UniqueIdentifier>
     </Filter>
@@ -10,9 +24,6 @@
     </Filter>
     <Filter Include="Graphics\DX12">
       <UniqueIdentifier>{f5b4b727-4377-4dc7-8d7e-b4405ebffc37}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{e898ac8d-f0d5-4655-8f87-f8004c50a20b}</UniqueIdentifier>
     </Filter>
     <Filter Include="Externals">
       <UniqueIdentifier>{6c9be8e9-f3c0-480e-b08c-55933a3aeb4c}</UniqueIdentifier>
@@ -43,15 +54,6 @@
     </Filter>
     <Filter Include="Graphics\DX12\Cache">
       <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\PBR">
-      <UniqueIdentifier>{256c3528-7cfd-452f-863b-d87394ecb89a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Common">
-      <UniqueIdentifier>{4fc4e433-58ca-4a56-b4b7-4ec47bf850dc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Passes">
-      <UniqueIdentifier>{5aa86216-9dd0-4d2a-a8a0-7166dc2709fc}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core\Utility">
       <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
@@ -253,11 +255,8 @@
     <ClCompile Include="RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
-    <ClCompile Include="Blackboard.cpp">
+    <ClCompile Include="RGBlackboard.cpp">
       <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
-    <ClCompile Include="ExternalResourceRegistry.cpp">
-      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\Externals\Vender\imgui\imgui.cpp">
       <Filter>Externals\ImGui</Filter>
@@ -321,6 +320,21 @@
     </ClCompile>
     <ClCompile Include="DevelopGuiCameraPanel.cpp">
       <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderPassIBLBrdfLUT.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderResourceRegistry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="RGExternalResourceRegistry.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="DevelopGuiPBRPanel.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="SamplerRegistry.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -561,7 +575,7 @@
     <ClInclude Include="RenderPipelineForwardPBR.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
-    <ClInclude Include="Blackboard.h">
+    <ClInclude Include="RGBlackboard.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="RenderContexts.h">
@@ -569,9 +583,6 @@
     </ClInclude>
     <ClInclude Include="RGFrameTargets.h">
       <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="ExternalResourceRegistry.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\Externals\Vender\imgui\imgui.h">
       <Filter>Externals\ImGui</Filter>
@@ -633,30 +644,56 @@
     <ClInclude Include="CameraController.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="RenderPassIBLBrdfLUT.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderResourceRegistry.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="RGExternalResourceRegistry.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="DevelopGuiPBRPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="RGIBLResources.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="SamplerRegistry.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Assets\Shaders\Common\ApplicationBinding.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\Assets\Shaders\Common\Common.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\Assets\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\Assets\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
-    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli">
-      <Filter>Shaders\Common</Filter>
-    </None>
-    <None Include="..\Assets\Shaders\Common\Binding.hlsli">
-      <Filter>Shaders\Common</Filter>
+    <None Include="..\Assets\Shaders\shadertoolsconfig.json">
+      <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Assets\Shaders\Passes\PassTexturedModel.hlsl">
+    <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
+    <FxCompile Include="..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>
