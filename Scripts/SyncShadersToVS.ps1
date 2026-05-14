@@ -55,8 +55,8 @@ function Remove-ShaderItems {
         [System.Xml.XmlNamespaceManager]$NamespaceManager
     )
 
-    $nodes = @($Document.SelectNodes("//msb:None[starts-with(@Include, '..\Assets\Shaders\') or starts-with(@Include, '../Assets/Shaders/')]", $NamespaceManager))
-    $nodes += @($Document.SelectNodes("//msb:FxCompile[starts-with(@Include, '..\Assets\Shaders\') or starts-with(@Include, '../Assets/Shaders/')]", $NamespaceManager))
+    $nodes = @($Document.SelectNodes("//msb:None[contains(@Include, 'Assets\Shaders\') or contains(@Include, 'Assets/Shaders/')]", $NamespaceManager))
+    $nodes += @($Document.SelectNodes("//msb:FxCompile[contains(@Include, 'Assets\Shaders\') or contains(@Include, 'Assets/Shaders/')]", $NamespaceManager))
 
     foreach ($node in $nodes) {
         [void]$node.ParentNode.RemoveChild($node)
@@ -258,7 +258,7 @@ function Add-ShaderItemsToFilters {
 
 $root = Get-RepoRoot $RootDir
 $shaderDir = Join-Path $root "Assets\Shaders"
-$projectDir = Join-Path $root "Application"
+$projectDir = Join-Path $root "Projects\Application"
 $projectPath = Join-Path $projectDir "Application.vcxproj"
 $filtersPath = Join-Path $projectDir "Application.vcxproj.filters"
 
