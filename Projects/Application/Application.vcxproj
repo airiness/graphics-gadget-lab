@@ -1,0 +1,381 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
+  <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{805c79e6-a919-4d77-9a57-a4b66cdcf3c2}</ProjectGuid>
+    <RootNamespace>Application</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings"></ImportGroup>
+  <ImportGroup Label="Shared"></ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\DirectXMeshImport.props" />
+    <Import Project="..\..\PropertySheets\DirectXTexImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\EnttImport.props" />
+    <Import Project="..\..\PropertySheets\DirectXSimpleMathImport.props" />
+    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
+    <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
+    <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\DirectXMeshImport.props" />
+    <Import Project="..\..\PropertySheets\DirectXTexImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\EnttImport.props" />
+    <Import Project="..\..\PropertySheets\DirectXSimpleMathImport.props" />
+    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
+    <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
+    <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>$(SolutionName)App</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>$(SolutionName)App</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>Core/Precompiled.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>Core/Precompiled.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Application.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\CopyContext.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiCameraPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGui.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Buffer.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandList.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorRingAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Device.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Fence.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12FencePoint.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12PipelineState.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Resource.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RootSignature.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12SwapChain.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Texture.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\InputLayoutLibrary.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Demo\DemoPlayground.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderQueue.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderScene.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Input\Keyboard.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Main.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Input\Mouse.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGPass.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGResource.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Shader.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\ShaderCompiler.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\ShaderManager.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Time.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
+    <ClCompile Include="..\..\Sources\Core\World.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
+    <ClInclude Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
+    <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
+    <ClInclude Include="..\..\Sources\Core\Application.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
+    <ClInclude Include="..\..\Sources\Graphics\CameraController.h" />
+    <ClInclude Include="..\..\Sources\Core\Components.h" />
+    <ClInclude Include="..\..\Sources\Graphics\CopyContext.h" />
+    <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
+    <ClInclude Include="..\..\Sources\Core\Demo\DemoBase.h" />
+    <ClInclude Include="..\..\Sources\Core\Demo\DemoManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiImGuiToolsPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiStateStore.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiCameraPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiContext.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGui.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Buffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandList.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorRingAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Device.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Fence.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12FencePoint.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12PipelineState.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Resource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RootSignature.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12SwapChain.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h" />
+    <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h" />
+    <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h" />
+    <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\Core\HResult.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\InputLayoutLibrary.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelinePresets.h" />
+    <ClInclude Include="..\..\Sources\Core\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderScene.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderView.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
+    <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
+    <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Color.h" />
+    <ClInclude Include="..\..\Sources\Graphics\AssetManager.h" />
+    <ClInclude Include="..\..\Sources\Core\Input\InputManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h" />
+    <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h" />
+    <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
+    <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
+    <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
+    <ClInclude Include="..\..\Sources\Core\Precompiled.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGPass.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceHandle.h" />
+    <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Shader.h" />
+    <ClInclude Include="..\..\Sources\Graphics\ShaderCompiler.h" />
+    <ClInclude Include="..\..\Sources\Graphics\ShaderManager.h" />
+    <ClInclude Include="..\..\Sources\Core\StringId.h" />
+    <ClInclude Include="..\..\Sources\Core\Time.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TransferManager.h" />
+    <ClInclude Include="..\..\Sources\Core\TypedIndex.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\VertexData.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.h" />
+    <ClInclude Include="..\..\Sources\Core\World.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Externals\Vender\DirectXMesh\DirectXMesh\DirectXMesh_Desktop_2022_Win10.vcxproj">
+      <Project>{6857f086-f6fe-4150-9ed7-7446f1c1c220}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
+      <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\Common.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\..\Assets\Shaders\shadertoolsconfig.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\PropertySheets\LinkAssetDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkAssetDirectory.targets')" />
+    <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets')" />
+    <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets')" />
+    <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets'))" />
+    <Error Condition="!Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))" />
+  </Target>
+</Project>

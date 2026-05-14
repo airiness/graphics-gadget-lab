@@ -1,0 +1,700 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{7055A31A-176E-6667-6124-331A716C7890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{62248322-C2D0-4200-1D1B-93BC655BF9CC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{3217C814-FEFD-56B4-3CC0-76A01096884F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{8D727DF1-1ACE-168D-EB4F-C640631BA613}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Core">
+      <UniqueIdentifier>{bb74519f-06d0-430b-9631-02634c26ac92}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Graphics\DX12">
+      <UniqueIdentifier>{f5b4b727-4377-4dc7-8d7e-b4405ebffc37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals">
+      <UniqueIdentifier>{6c9be8e9-f3c0-480e-b08c-55933a3aeb4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\D3D12MemAlloc">
+      <UniqueIdentifier>{7847d186-1580-4b5a-b232-ed9305fc091c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\DirectXSimpleMath">
+      <UniqueIdentifier>{53450643-fb3f-4f95-8824-f673ebb33beb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Input">
+      <UniqueIdentifier>{b2b02cd2-6196-43e9-8f44-f9314263c7b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Log">
+      <UniqueIdentifier>{8c7f7a3c-a663-4ba5-8084-885d84c9751a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderPass">
+      <UniqueIdentifier>{f396d8f7-debe-4fd8-bd28-d936e057431f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderGraph">
+      <UniqueIdentifier>{e1396d2d-a721-499a-bfb4-18812535ff1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Hash">
+      <UniqueIdentifier>{9c9a2b8f-4af1-4b73-8e6e-50c967e193ef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Allocator">
+      <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\DX12\Cache">
+      <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Utility">
+      <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Demo">
+      <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderPipeline">
+      <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\ImGui">
+      <UniqueIdentifier>{fcaf4650-56ee-4d51-9d13-291379cac5b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\DevelopGui">
+      <UniqueIdentifier>{829376d1-6b70-4ce7-9785-ae216f890dbf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\DX12\Descriptor">
+      <UniqueIdentifier>{bbedd216-a444-41bc-8acd-a22ddeebbd53}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Device.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12SwapChain.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandList.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Main.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Application.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12PipelineState.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RootSignature.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
+      <Filter>Externals\D3D12MemAlloc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Resource.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Texture.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Buffer.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Fence.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12FencePoint.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
+      <Filter>Externals\DirectXSimpleMath</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Input\Mouse.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Input\Keyboard.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Time.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Camera.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
+      <Filter>Core\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGPass.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGResource.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
+      <Filter>Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp">
+      <Filter>Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\ShaderManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\InputLayoutLibrary.cpp">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\HResult.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\ShaderCompiler.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Shader.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.cpp">
+      <Filter>Graphics\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\CopyContext.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\World.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp">
+      <Filter>Core\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Demo\DemoPlayground.cpp">
+      <Filter>Core\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_demo.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_draw.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_tables.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_widgets.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>Externals\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGui.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorRingAllocator.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.cpp">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderScene.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderQueue.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRegistry.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiCameraPanel.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Device.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12SwapChain.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Renderer.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandList.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Application.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12PipelineState.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RootSignature.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Buffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Precompiled.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
+      <Filter>Externals\D3D12MemAlloc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Resource.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Fence.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\CoreMacros.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Geometry.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12FencePoint.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Components.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Color.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.h">
+      <Filter>Externals\DirectXSimpleMath</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Input\InputManager.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Input\Mouse.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Input\InputBase.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Time.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Camera.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Log\Logger.h">
+      <Filter>Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h">
+      <Filter>Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceHandle.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGPass.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\StringId.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\EnumFlags.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\VertexData.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h">
+      <Filter>Core\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\TypedIndex.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\ShaderManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\InputLayoutLibrary.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelinePresets.h">
+      <Filter>Graphics\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\HResult.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\ShaderCompiler.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Shader.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\TransferManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\CopyContext.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderView.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\World.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderScene.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Demo\DemoManager.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Demo\DemoBase.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Demo\DemoPlayground.h">
+      <Filter>Core\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h">
+      <Filter>Externals\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h">
+      <Filter>Externals\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h">
+      <Filter>Externals\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h">
+      <Filter>Externals\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGui.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorRingAllocator.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.h">
+      <Filter>Graphics\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRegistry.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiContext.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiCameraPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiStateStore.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiImGuiToolsPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\CameraController.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
+      <Filter>Externals\DirectXSimpleMath</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\Common.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\shadertoolsconfig.json">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+  </ItemGroup>
+</Project>
