@@ -1,5 +1,6 @@
 #include <Common/Common.hlsli>
-#include <Common/Binding.hlsli>	// Included BuffurLayout.hlsli in Binding.hlsli
+#include <Common/MaterialSampling.hlsli>
+#include <Common/ApplicationBinding.hlsli>
 #include <PBR/BRDF.hlsli>
 
 struct VSInput
@@ -26,7 +27,7 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, 
 	// TODO: flip Y for normal map?
 	
 	// Sample normal texture
-	float4 normalSampled = SampleTexture2D(matData.NormalTexIndex, g_SamplerLinear, uv);
+	float4 normalSampled = SampleTextureBinding(matData.NormalBinding, uv);
 	
 	// Remap from [0,1] to [-1,1], xy only
 	normalSampled.xy = normalSampled.xy * 2.0 - 1.0;
@@ -47,14 +48,11 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, 
 
 float2 SampleIBLBrdfLUT(float NoV, float preceptualRoughness)
 {
-	NoV = saturate(NoV);
-	preceptualRoughness = saturate(preceptualRoughness);
-	
-	Texture2D<float4> brdfLut = GetTexture2D(g_Scene.IBLResource.BrdfLutIndex);
-	
-	float2 uv = float2(NoV, preceptualRoughness);
-	
-	float4 value = brdfLut.SampleLevel(g_SamplerLinear, uv, 0.0);
+	float4 value = SampleTexture2DLevel(
+		g_Scene.IBLResource.BrdfLutTexIndex,
+		g_Scene.IBLResource.BrdfLutSamplerIndex,
+		float2(saturate(NoV), saturate(preceptualRoughness)),
+		0);
 	
 	return value.rg;
 }
@@ -102,7 +100,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	ViewData viewData = g_Views[IN.ViewIndex];
 	
 	// BaseColor
-	float4 baseColorSampled = SampleTexture2D(matData.BaseColorTexIndex, g_SamplerLinear, IN.UV);
+	float4 baseColorSampled = SampleTextureBinding(matData.BaseColorBinding, IN.UV);
 	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
 	
 	float alpha = baseColorSampled.a * matData.BaseColorFactor.a;
@@ -118,7 +116,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	}
 	
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
-	float4 mrSampled = SampleTexture2D(matData.MetallicRoughnessTexIndex, g_SamplerLinear, IN.UV);
+	float4 mrSampled = SampleTextureBinding(matData.MetallicRoughnessBinding, IN.UV);
 	float metallic = saturate(matData.MetallicFactor * mrSampled.b);
 	float perceptualRoughness = saturate(matData.RoughnessFactor * mrSampled.g);
 	perceptualRoughness = ClampPerceptualRoughnessForBRDF(perceptualRoughness);
@@ -155,7 +153,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 		g_Scene.MainLight.Intensity * NoL;
 	
 	// Emissive texture(sRGB)
-	float3 emissiveSampled = SampleTexture2D(matData.EmissiveTexIndex, g_SamplerLinear, IN.UV).rgb;
+	float3 emissiveSampled = SampleTextureBinding(matData.EmissiveBinding, IN.UV).rgb;
 	float3 emissive = emissiveSampled * matData.EmissiveColorFactor.rgb;
 	
 	// Add emissive
@@ -176,7 +174,7 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 hemi = lerp(ground, sky, up);
 	
 	// AO texture
-	float aoSampled = SampleTexture2D(matData.OcclusionTexIndex, g_SamplerLinear, IN.UV).r;
+	float aoSampled = SampleTextureBinding(matData.OcclusionBinding, IN.UV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 	

@@ -9,6 +9,7 @@ namespace gglab
 	class DX12DescriptorHeap;
 	class DX12DescriptorFreeListAllocator;
 	class DX12Texture;
+
 	class DX12DescriptorManager
 	{
 	public:
@@ -65,7 +66,7 @@ namespace gglab
 		explicit DX12DescriptorManager(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12DescriptorManager);
 		~DX12DescriptorManager();
-		
+
 		void Tick() noexcept;
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 
@@ -73,20 +74,31 @@ namespace gglab
 		DX12DescriptorFreeListAllocator* GetFreeListAllocator(AllocatorType allocatorType) const noexcept;
 
 		DX12DescriptorID AllocateBindlessSrvId() noexcept;
-
 		DX12DescriptorID CreateBindlessSrv(DX12Texture* texture, const TextureSrvCreateInfo& info = {}) noexcept;
-		void WriteBindlessSrv(const DX12DescriptorID& descriptorId,
-			DX12Texture* texture, const TextureSrvCreateInfo& info = {}) noexcept;
+		void WriteBindlessSrv(const DX12DescriptorID& descriptorId, DX12Texture* texture, const TextureSrvCreateInfo& info = {}) noexcept;
 		uint32_t BindlessSrvIdToGlobalIndex(const DX12DescriptorID& descriptorId) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSrvGpuHandle(const DX12DescriptorID& descriptorId) const noexcept;
-
 		void RetireBindlessSrvId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 		DX12DescriptorView BindlessSrvIdToView(const DX12DescriptorID& descriptorId) const noexcept;
 
-		DX12DescriptorView AllocateDevelopGuiSrvView() noexcept;
+		DX12DescriptorID AllocateBindlessSamplerId() noexcept;
+		DX12DescriptorID CreateBindlessSampler(const D3D12_SAMPLER_DESC& samplerDesc) noexcept;
+		void WriteBindlessSampler(const DX12DescriptorID& descriptorId, const D3D12_SAMPLER_DESC& samplerDesc) noexcept;
+		uint32_t BindlessSamplerIdToGlobalIndex(const DX12DescriptorID& descriptorId) const noexcept;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSamplerGpuHandle(const DX12DescriptorID& descriptorId) const noexcept;
+		void RetireBindlessSamplerId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
+		DX12DescriptorView BindlessSamplerIdToView(const DX12DescriptorID& descriptorId) const noexcept;
 
+		DX12DescriptorView AllocateDevelopGuiSrvView() noexcept;
 		void DeferFreeDevelopGuiSrvInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept;
 		void DeferFreeDevelopGuiSrvInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept;
+
+	private:
+		DX12DescriptorID AllocateDescriptorId(AllocatorType allocatorType) noexcept;
+		DX12DescriptorView DescriptorIdToView(AllocatorType allocatorType, const DX12DescriptorID& descriptorId) const noexcept;
+		uint32_t DescriptorIdToGlobalIndex(AllocatorType allocatorType, const DX12DescriptorID& descriptorId) const noexcept;
+		D3D12_GPU_DESCRIPTOR_HANDLE DescriptorIdToGpuHandle(HeapType heapType, AllocatorType allocatorType, const DX12DescriptorID& descriptorId) const noexcept;
+		void RetireDescriptorId(AllocatorType allocatorType, const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 
 	private:
 		using HeapArray = std::array<std::unique_ptr<DX12DescriptorHeap>, utils::EnumCount<HeapType>()>;

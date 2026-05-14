@@ -202,6 +202,9 @@ namespace gglab
 		return id.IsValid() && id.Value() < ReservedTextureCount;
 	}
 
+	// SamplerID
+	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(SamplerID, uint32_t);
+
 	// MeshID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshID, uint32_t);
 	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
@@ -227,22 +230,35 @@ namespace gglab
 		bool m_IsUploaded = false;
 	};
 
+	struct Sampler
+	{
+		SamplerID m_Id{};
+		DX12DescriptorID m_DescriptorId{};
+	};
+
+	struct MaterialTextureBinding
+	{
+		TextureID m_TextureId{};
+		SamplerID m_SamplerId{};
+		uint32_t m_TexCoordIndex = 0; // TODO: support glTF textureInfo.texCoord.
+	};
+
 	struct Material
 	{
 		MaterialID m_Id{};
 		
-		TextureID m_BaseColorTex{};
-		TextureID m_MetallicRoughnessTex{};
-		TextureID m_NormalTex{};
-		TextureID m_OcclusionTex{};
-		TextureID m_EmissiveTex{};
+		MaterialTextureBinding m_BaseColorBinding{};
+		MaterialTextureBinding m_EmissiveBinding{};
+		MaterialTextureBinding m_MetallicRoughnessBinding{};
+		MaterialTextureBinding m_NormalBinding{};
+		MaterialTextureBinding m_OcclusionBinding{};
 
 		Color m_BaseColor = color::White;
+		Color m_EmissiveColor = color::Black;
 		float m_MetallicFactor = 0.0f;
 		float m_RoughnessFactor = 1.0f;
 		float m_NormalScale = 1.0f;
 		float m_OcclusionStrength = 1.0f;
-		Color m_EmissiveColor = color::Black;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;

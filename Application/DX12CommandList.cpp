@@ -62,6 +62,17 @@ namespace gglab
 		m_D3D12GraphicsCommandList->SetDescriptorHeaps(1, heaps);
 	}
 
+	void DX12CommandList::SetDescriptorHeaps(std::span<const DX12DescriptorHeap*> descriptorHeaps) const noexcept
+	{
+		std::vector<ID3D12DescriptorHeap*> heaps(descriptorHeaps.size());
+		for (int32_t index = 0; index < static_cast<int32_t>(descriptorHeaps.size()); ++index)
+		{
+			GGLAB_ASSERT_NOT_NULL(descriptorHeaps[index]);
+			heaps.at(index) = descriptorHeaps[index]->Get();
+		}
+		m_D3D12GraphicsCommandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+	}
+
 	void DX12CommandList::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) const noexcept
 	{
 		const CD3DX12_VIEWPORT viewport(static_cast<FLOAT>(x), static_cast<FLOAT>(y), static_cast<FLOAT>(width), static_cast<FLOAT>(height));

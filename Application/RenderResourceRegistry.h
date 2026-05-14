@@ -10,6 +10,7 @@ namespace gglab
 	class RGExternalResourceRegistry;
 	class DX12Texture;
 	class DX12DescriptorManager;
+	class SamplerRegistry;
 
 	/*
 	* Management runtime generated GPU Textures
@@ -22,6 +23,7 @@ namespace gglab
 			RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
 			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 			DX12DescriptorManager* m_DescriptorManager = nullptr;
+			SamplerRegistry* m_SamplerRegistry = nullptr;
 		};
 
 		enum class TextureIndex : uint8_t
@@ -77,6 +79,7 @@ namespace gglab
 		RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
 		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
+		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
 	};

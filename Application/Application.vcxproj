@@ -34,10 +34,8 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Label="Shared">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionSettings"></ImportGroup>
+  <ImportGroup Label="Shared"></ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\PropertySheets\Common.props" />
@@ -214,6 +212,7 @@
     <ClCompile Include="RGPass.cpp" />
     <ClCompile Include="RGResource.cpp" />
     <ClCompile Include="RingSpanAllocator.cpp" />
+    <ClCompile Include="SamplerRegistry.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
@@ -319,6 +318,7 @@
     <ClInclude Include="RGResource.h" />
     <ClInclude Include="RGResourceHandle.h" />
     <ClInclude Include="RingSpanAllocator.h" />
+    <ClInclude Include="SamplerRegistry.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="ShaderManager.h" />
@@ -334,10 +334,6 @@
     <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Assets\Shaders\Common\Binding.hlsli" />
-    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli" />
-    <None Include="..\Assets\Shaders\Common\Common.hlsli" />
-    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="packages.config" />
   </ItemGroup>
@@ -348,6 +344,14 @@
     <ProjectReference Include="..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Assets\Shaders\Common\ApplicationBinding.hlsli" />
+    <None Include="..\Assets\Shaders\Common\BufferLayout.hlsli" />
+    <None Include="..\Assets\Shaders\Common\Common.hlsli" />
+    <None Include="..\Assets\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\Assets\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\Assets\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />

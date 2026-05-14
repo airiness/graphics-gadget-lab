@@ -36,6 +36,7 @@ namespace gglab
 		void SetGraphicsRootSignature(const DX12RootSignature& rootSignature) const noexcept;
 		void SetPipelineState(const DX12PipelineState& pipelineState) const noexcept;
 		void SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) const noexcept;
+		void SetDescriptorHeaps(std::span<const DX12DescriptorHeap*> descriptorHeaps) const noexcept;
 		void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) const noexcept;
 		void SetScissorRect(uint32_t left, uint32_t top, uint32_t width, uint32_t height) const noexcept;
 		void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY topology) const noexcept;

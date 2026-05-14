@@ -3,17 +3,20 @@
 #include "RGGpuResourceAllocator.h"
 #include "RGExternalResourceRegistry.h"
 #include "DX12DescriptorManager.h"
+#include "SamplerRegistry.h"
 
 namespace gglab
 {
 	RenderResourceRegistry::RenderResourceRegistry(const CreateInfo& createInfo) noexcept :
 		m_RGGpuResAllocator(createInfo.m_RGGpuResAllocator),
 		m_ExternalResourceRegistry(createInfo.m_ExternalResourceRegistry),
-		m_DescriptorManager(createInfo.m_DescriptorManager)
+		m_DescriptorManager(createInfo.m_DescriptorManager),
+		m_SamplerRegistry(createInfo.m_SamplerRegistry)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_RGGpuResAllocator);
 		GGLAB_ASSERT_NOT_NULL(m_ExternalResourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(m_DescriptorManager);
+		GGLAB_ASSERT_NOT_NULL(m_SamplerRegistry);
 	}
 
 	void RenderResourceRegistry::EnsureIblResources(uint32_t brdfLutSize,
@@ -84,7 +87,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(entry.m_Allocated, "IBL BRDF LUT is not allocated.");
 		GGLAB_ASSERT_MSG(entry.m_SrvId.IsValid(), "IBL BRDF LUT SRV is invalid.");
 
-		out.BrdfLutIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
+		out.BrdfLutTexIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
+		out.BrdfLutSamplerIndex = m_SamplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp);
 	}
 
 	void RenderResourceRegistry::ReleaseAll(const DX12FencePoint& fencePoint) noexcept

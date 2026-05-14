@@ -115,7 +115,11 @@ namespace gglab
 				auto* rootSignature = renderer->GetCommonRootSignature();
 
 				// Global bindings
-				commandList->SetDescriptorHeap(*descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav));
+				const DX12DescriptorHeap* descriptorHeaps[] = {
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
+				};
+				commandList->SetDescriptorHeaps(descriptorHeaps);
 				commandList->SetGraphicsRootSignature(*rootSignature);
 
 				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);

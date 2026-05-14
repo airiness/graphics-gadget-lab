@@ -126,7 +126,11 @@ namespace gglab
 				auto* descriptorManager = renderer->GetDescriptorManager();
 				GGLAB_ASSERT_NOT_NULL(descriptorManager);
 
-				commandList->SetDescriptorHeap(*descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav));
+				const DX12DescriptorHeap* descriptorHeaps[] = {
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
+				};
+				commandList->SetDescriptorHeaps(descriptorHeaps);
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
 				commandList->SetRenderTarget(rtv);

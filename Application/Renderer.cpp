@@ -64,10 +64,16 @@ namespace gglab
 
 		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
 
+		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
+		samplerRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
+		m_SamplerRegistry->InitializePresetSamplers();
+
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
 		renderResRegistryCreateInfo.m_RGGpuResAllocator = m_RGGpuResAllocator.get();
+		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
 		m_DevelopGui = std::make_unique<DevelopGui>();
@@ -310,24 +316,15 @@ namespace gglab
 		// t3: ViewSB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ViewSB)].InitAsShaderResourceView(3);
 
-		constexpr uint32_t StaticSamplerCount = 1;
-		CD3DX12_STATIC_SAMPLER_DESC staticSamplers[StaticSamplerCount] = {};
-		staticSamplers[0].Init(
-			0,	// register s0
-			D3D12_FILTER_MIN_MAG_MIP_LINEAR,
-			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-			D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
 		rootSignatureDesc.Init_1_1(
 			static_cast<UINT>(utils::EnumCount<CommonRSRootParamIndex>()),
 			rootParameters,
-			StaticSamplerCount,
-			staticSamplers,
+			0,
+			nullptr,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED);
-			// D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
 
 		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
 		m_CommonRootSignatureId = id;

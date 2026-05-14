@@ -246,6 +246,7 @@ namespace gglab
 		assetManagerCreateInfo.m_DX12Device = m_Renderer->GetDevice();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_DescriptorManager = m_Renderer->GetDescriptorManager();
+		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_AssetManager->Initialize();
 

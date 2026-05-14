@@ -91,11 +91,25 @@ namespace gglab
 						materialGpu.OcclusionStrength = material->m_OcclusionStrength;
 						materialGpu.EmissiveColorFactor = material->m_EmissiveColor;
 
-						materialGpu.BaseColorTexIndex = assetManager.ResolveSrvIndex(material->m_BaseColorTex, ReservedTextureIDIndex::BaseColorWhite);
-						materialGpu.MetallicRoughnessTexIndex = assetManager.ResolveSrvIndex(material->m_MetallicRoughnessTex, ReservedTextureIDIndex::DefaultMetallicRoughness);
-						materialGpu.NormalTexIndex = assetManager.ResolveSrvIndex(material->m_NormalTex, ReservedTextureIDIndex::NormalFlat);
-						materialGpu.OcclusionTexIndex = assetManager.ResolveSrvIndex(material->m_OcclusionTex, ReservedTextureIDIndex::OcclusionWhite);
-						materialGpu.EmissiveTexIndex = assetManager.ResolveSrvIndex(material->m_EmissiveTex, ReservedTextureIDIndex::EmissiveBlack);
+						materialGpu.BaseColorBinding = assetManager.ResolveTextureBinding(material->m_BaseColorBinding,
+							ReservedTextureIDIndex::BaseColorWhite,
+							SamplerPreset::LinearWrap);
+
+						materialGpu.EmissiveBinding = assetManager.ResolveTextureBinding(material->m_EmissiveBinding,
+							ReservedTextureIDIndex::EmissiveBlack,
+							SamplerPreset::LinearWrap);
+
+						materialGpu.MetallicRoughnessBinding = assetManager.ResolveTextureBinding(material->m_MetallicRoughnessBinding,
+							ReservedTextureIDIndex::DefaultMetallicRoughness,
+							SamplerPreset::LinearWrap);
+
+						materialGpu.NormalBinding = assetManager.ResolveTextureBinding(material->m_NormalBinding,
+							ReservedTextureIDIndex::NormalFlat,
+							SamplerPreset::LinearWrap);
+
+						materialGpu.OcclusionBinding = assetManager.ResolveTextureBinding(material->m_OcclusionBinding,
+							ReservedTextureIDIndex::OcclusionWhite,
+							SamplerPreset::LinearWrap);
 
 						materialGpu.AlphaMode = static_cast<int32_t>(material->m_AlphaMode);
 						materialGpu.AlphaCutoff = material->m_AlphaCutoff;

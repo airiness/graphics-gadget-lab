@@ -13,6 +13,7 @@
 #include "RGGpuResourceAllocator.h"
 #include "RGExternalResourceRegistry.h"
 #include "RenderResourceRegistry.h"
+#include "SamplerRegistry.h"
 #include "DevelopGui.h"
 #include "RenderContexts.h"
 
@@ -55,6 +56,7 @@ namespace gglab
 		RenderPassRecipeRegistry* GetRenderPassRecipeRegistry() const noexcept { return m_RenderPassRecipeRegistry.get(); }
 		RGExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResRegistry.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
+		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		DevelopGui* GetDevelopGui() const noexcept { return m_DevelopGui.get(); }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
@@ -96,6 +98,7 @@ namespace gglab
 		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
 		std::unique_ptr<RGExternalResourceRegistry> m_ExternalResRegistry;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
+		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<DevelopGui> m_DevelopGui;
 
 		RootSignatureID m_CommonRootSignatureId{};

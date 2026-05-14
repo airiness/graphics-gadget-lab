@@ -1,5 +1,4 @@
 #include <Common/Common.hlsli>
-#include <Common/Binding.hlsli>	// Included BuffurLayout.hlsli in Binding.hlsli
 #include <PBR/BRDF.hlsli>
 
 struct VSOutput

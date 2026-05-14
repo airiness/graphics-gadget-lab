@@ -1,5 +1,5 @@
 #pragma once
-#pragma pack_matrix(row_major) // Use row-major matrices
+
 static const float PI = 3.14159265359f;
 static const float TWO_PI = 6.28318530718f;
 static const float INV_PI = 0.31830988618f;
@@ -40,33 +40,6 @@ float3 SRGBToLinear(float3 c)
 	const float3 lower = c * (1.0 / 12.92);
 	const float3 higher = pow((c * (1.0 / 1.055) + 0.0521327), 2.4);
 	return lerp(lower, higher, t);
-}
-
-// Get texture by descriptor index
-Texture2D<float4> GetTexture2D(uint srvIndex)
-{
-	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];
-}
-
-// Get sampler by descriptor index
-SamplerState GetSamplerState(uint samplerIndex)
-{
-	return SamplerDescriptorHeap[NonUniformResourceIndex(samplerIndex)];
-}
-
-// Sampler texture2D with srv and sampler indices
-float4 SampleTexture2D(uint srvIndex, uint samplerIndex, float2 uv)
-{
-	Texture2D<float4> tex = GetTexture2D(srvIndex);
-	SamplerState samp = GetSamplerState(samplerIndex);
-	return tex.Sample(samp, uv);
-}
-
-// Sampler texture2D with srv index and sampler state
-float4 SampleTexture2D(uint srvIndex, SamplerState samplerState, float2 uv)
-{
-	Texture2D<float4> tex = GetTexture2D(srvIndex);
-	return tex.Sample(samplerState, uv);
 }
 
 // BuildTBN()

@@ -122,10 +122,7 @@ namespace gglab
 
 	DX12DescriptorID DX12DescriptorManager::AllocateBindlessSrvId() noexcept
 	{
-		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
-		GGLAB_ASSERT(allocator != nullptr);
-
-		return allocator->AllocateId();
+		return AllocateDescriptorId(AllocatorType::BindlessSrv);
 	}
 
 	DX12DescriptorID DX12DescriptorManager::CreateBindlessSrv(DX12Texture* texture, const TextureSrvCreateInfo& info) noexcept
@@ -161,7 +158,7 @@ namespace gglab
 		const auto totalMips = (texDesc.MipLevels == 0) ? 1u : static_cast<uint32_t>(texDesc.MipLevels);
 		const auto mipLevels = (info.m_MipLevels == std::numeric_limits<uint32_t>::max()) ?
 			totalMips - info.m_MostDetailedMip :
-			std::min(info.m_MipLevels, totalMips - info.m_FirstArraySlice);
+			std::min(info.m_MipLevels, totalMips - info.m_MostDetailedMip);
 
 		// array
 		const uint32_t totalArray = static_cast<uint32_t>(texDesc.DepthOrArraySize);
@@ -222,45 +219,71 @@ namespace gglab
 
 	uint32_t DX12DescriptorManager::BindlessSrvIdToGlobalIndex(const DX12DescriptorID& descriptorId) const noexcept
 	{
-		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
-		GGLAB_ASSERT_NOT_NULL(allocator);
-
-		GGLAB_ASSERT_MSG(allocator->IsIdAlive(descriptorId),
-			"BindlessSrvIdToGlobalIndex: descriptor id is stale or invalid.");
-
-		return descriptorId.m_Index;
+		return DescriptorIdToGlobalIndex(AllocatorType::BindlessSrv, descriptorId);
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12DescriptorManager::GetBindlessSrvGpuHandle(const DX12DescriptorID& descriptorId) const noexcept
 	{
-		const uint32_t globalIndex = BindlessSrvIdToGlobalIndex(descriptorId);
-
-		auto* heap = GetHeap(HeapType::CbvSrvUav);
-		GGLAB_ASSERT_NOT_NULL(heap);
-
-		auto gpuHandle = heap->GpuHandleAt(globalIndex);
-		return gpuHandle;
+		return DescriptorIdToGpuHandle(HeapType::CbvSrvUav, AllocatorType::BindlessSrv, descriptorId);
 	}
 
 	void DX12DescriptorManager::RetireBindlessSrvId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept
 	{
-		GGLAB_ASSERT(descriptorId.IsValid());
-
-		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
-		GGLAB_ASSERT_NOT_NULL(allocator);
-
-		allocator->RetireId(descriptorId, fencePoint);
+		RetireDescriptorId(AllocatorType::BindlessSrv, descriptorId, fencePoint);
 	}
 
 	DX12DescriptorView DX12DescriptorManager::BindlessSrvIdToView(const DX12DescriptorID& descriptorId) const noexcept
 	{
-		auto* allocator = GetFreeListAllocator(AllocatorType::BindlessSrv);
-		GGLAB_ASSERT_NOT_NULL(allocator);
+		return DescriptorIdToView(AllocatorType::BindlessSrv, descriptorId);
+	}
 
-		GGLAB_ASSERT_MSG(allocator->IsIdAlive(descriptorId),
-			"BindlessSrvIdToView: descriptor id is stale or invalid.");
+	DX12DescriptorID DX12DescriptorManager::AllocateBindlessSamplerId() noexcept
+	{
+		return AllocateDescriptorId(AllocatorType::GeneralSampler);
+	}
 
-		return allocator->ViewAtId(descriptorId);
+	DX12DescriptorID DX12DescriptorManager::CreateBindlessSampler(const D3D12_SAMPLER_DESC& samplerDesc) noexcept
+	{
+		const DX12DescriptorID descriptorId = AllocateBindlessSamplerId();
+		GGLAB_ASSERT(descriptorId.IsValid());
+
+		WriteBindlessSampler(descriptorId, samplerDesc);
+
+		return descriptorId;
+	}
+
+	void DX12DescriptorManager::WriteBindlessSampler(const DX12DescriptorID& descriptorId, const D3D12_SAMPLER_DESC& samplerDesc) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_DX12Device);
+		GGLAB_ASSERT_NOT_NULL(m_DX12Device->Get());
+		GGLAB_ASSERT(descriptorId.IsValid());
+
+		const DX12DescriptorView descriptorView = BindlessSamplerIdToView(descriptorId);
+		GGLAB_ASSERT(descriptorView.IsValid());
+
+		m_DX12Device->Get()->CreateSampler(
+			&samplerDesc,
+			descriptorView.m_CpuHandle);
+	}
+
+	uint32_t DX12DescriptorManager::BindlessSamplerIdToGlobalIndex(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		return DescriptorIdToGlobalIndex(AllocatorType::GeneralSampler, descriptorId);
+	}
+
+	D3D12_GPU_DESCRIPTOR_HANDLE DX12DescriptorManager::GetBindlessSamplerGpuHandle(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		return DescriptorIdToGpuHandle(HeapType::Sampler, AllocatorType::GeneralSampler, descriptorId);
+	}
+
+	void DX12DescriptorManager::RetireBindlessSamplerId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept
+	{
+		RetireDescriptorId(AllocatorType::GeneralSampler, descriptorId, fencePoint);
+	}
+
+	DX12DescriptorView DX12DescriptorManager::BindlessSamplerIdToView(const DX12DescriptorID& descriptorId) const noexcept
+	{
+		return DescriptorIdToView(AllocatorType::GeneralSampler, descriptorId);
 	}
 
 	DX12DescriptorView DX12DescriptorManager::AllocateDevelopGuiSrvView() noexcept
@@ -285,5 +308,65 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(allocator);
 
 		allocator->DeferFreeFromGpuHandleInFrame(gpuHandle);
+	}
+
+	DX12DescriptorID DX12DescriptorManager::AllocateDescriptorId(AllocatorType allocatorType) noexcept
+	{
+		auto* allocator = GetFreeListAllocator(allocatorType);
+		GGLAB_ASSERT_NOT_NULL(allocator);
+
+		const auto descriptorId = allocator->AllocateId();
+
+		GGLAB_ASSERT_MSG(descriptorId.IsValid(), "DX12DescriptorManager: AllocateDescriptorId failed.");
+
+		return descriptorId;
+	}
+
+	DX12DescriptorView DX12DescriptorManager::DescriptorIdToView(AllocatorType allocatorType, const DX12DescriptorID& descriptorId) const noexcept
+	{
+		auto* allocator = GetFreeListAllocator(allocatorType);
+		GGLAB_ASSERT_NOT_NULL(allocator);
+
+		GGLAB_ASSERT_MSG(descriptorId.IsValid(), "DX12DescriptorManager: invalid descriptor id.");
+
+		GGLAB_ASSERT_MSG(allocator->IsIdAlive(descriptorId),
+			"DX12DescriptorManager: descriptor id is stale or belongs to a different allocator.");
+
+		return allocator->ViewAtId(descriptorId);
+	}
+
+	uint32_t DX12DescriptorManager::DescriptorIdToGlobalIndex(AllocatorType allocatorType, const DX12DescriptorID& descriptorId) const noexcept
+	{
+		auto* allocator = GetFreeListAllocator(allocatorType);
+		GGLAB_ASSERT_NOT_NULL(allocator);
+
+		GGLAB_ASSERT_MSG(descriptorId.IsValid(), "DX12DescriptorManager: invalid descriptor id.");
+
+		GGLAB_ASSERT_MSG(allocator->IsIdAlive(descriptorId),
+			"DX12DescriptorManager: descriptor id is stale or belongs to a different allocator.");
+
+		return descriptorId.m_Index;
+	}
+
+	D3D12_GPU_DESCRIPTOR_HANDLE DX12DescriptorManager::DescriptorIdToGpuHandle(HeapType heapType, AllocatorType allocatorType, const DX12DescriptorID& descriptorId) const noexcept
+	{
+		const uint32_t globalIndex = DescriptorIdToGlobalIndex(allocatorType, descriptorId);
+
+		auto* heap = GetHeap(heapType);
+		GGLAB_ASSERT_NOT_NULL(heap);
+
+		return heap->GpuHandleAt(globalIndex);
+	}
+
+	void DX12DescriptorManager::RetireDescriptorId(AllocatorType allocatorType, const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept
+	{
+		auto* allocator = GetFreeListAllocator(allocatorType);
+		GGLAB_ASSERT_NOT_NULL(allocator);
+
+		GGLAB_ASSERT_MSG(descriptorId.IsValid(), "DX12DescriptorManager: invalid descriptor id.");
+		GGLAB_ASSERT_MSG(allocator->IsIdAlive(descriptorId),
+			"DX12DescriptorManager: descriptor id is stale or belongs to a different allocator.");
+
+		allocator->RetireId(descriptorId, fencePoint);
 	}
 }

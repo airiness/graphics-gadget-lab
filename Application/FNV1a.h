@@ -51,12 +51,22 @@ namespace gglab
 			}
 			else if constexpr (std::same_as<U, const char*> || std::same_as<U, char*>)
 			{
-				const char* str = reinterpret_cast<const char*>(value);
-				const size_t length = std::char_traits<char>::length(str);
-				MixBytes(hash, str, length);
+				if (value == nullptr)
+				{
+					const size_t length = 0;
+					MixBytes(hash, std::addressof(length), sizeof(length));
+				}
+				else
+				{
+					const size_t length = std::char_traits<char>::length(value);
+					MixBytes(hash, std::addressof(length), sizeof(length));
+					MixBytes(hash, value, length);
+				}
 			}
 			else if constexpr (std::same_as<U, std::string_view>)
 			{
+				const size_t length = value.size();
+				MixBytes(hash, std::addressof(length), sizeof(length));
 				MixBytes(hash, value.data(), value.size());
 			}
 			else if constexpr (std::is_pointer_v<U>)
@@ -89,7 +99,7 @@ namespace gglab
 		}
 
 		template<typename... Ts>
-		static constexpr void MixValue(uint64_t& hash, const std::tuple<Ts...> values) noexcept
+		static constexpr void MixValue(uint64_t& hash, const std::tuple<Ts...>& values) noexcept
 		{
 			std::apply([&hash](auto const&... vals)
 				{
