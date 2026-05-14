@@ -222,7 +222,7 @@ namespace gglab
 		template<typename PassData, typename SetupFunc>
 		auto* AddPass(const char* passName, SetupFunc setupFunc) noexcept;
 
-		// Add a pass only have exe function
+		// Add an always - executed pass with no pass data or resource declarations.
 		template<typename ExecuteFunc>
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
 
@@ -339,9 +339,9 @@ namespace gglab
 		struct EmptyData {};
 		return AddPass<EmptyData>(passName,
 			[](RGBuilder& builder, EmptyData&) { builder.SideEffect(); },
-			[fn = std::forward<ExecuteFunc>(executeFunc)](DX12CommandList* commandList, EmptyData&)
+			[fn = std::forward<ExecuteFunc>(executeFunc)](RGExecuteContext& executeContext, EmptyData&)
 			{
-				fn(commandList);
+				fn(executeContext);
 			});
 	}
 
