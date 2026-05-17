@@ -1,13 +1,19 @@
 #pragma once
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
-#include "Graphics/DX12/DX12RingStructuredBuffer.h"
 
 namespace gglab
 {
 	class World;
 	class AssetManager;
 	class TransferManager;
+	class RenderResourceRegistry;
+
+	template<typename T>
+	class DX12ConstantBuffer;
+
+	template<typename T>
+	class DX12RingStructuredBuffer;
 
 	struct RenderInstance
 	{
@@ -43,12 +49,15 @@ namespace gglab
 			const World& m_World;
 			AssetManager& m_AssetManager;
 			TransferManager& m_TransferManager;
+			RenderResourceRegistry& m_RenderResourceRegistry;
 
 			std::span<RenderView> m_RenderViews;
 
+			DX12ConstantBuffer<SceneGPU>& m_SceneCB;
 			DX12RingStructuredBuffer<ObjectGPU>& m_ObjectsSB;
 			DX12RingStructuredBuffer<MaterialGPU>& m_MaterialsSB;
 			DX12RingStructuredBuffer<ViewGPU>& m_ViewsSB;
+			uint32_t m_CurrentBackBufferIndex = 0;
 		};
 
 		struct BuildResult

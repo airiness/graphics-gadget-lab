@@ -73,8 +73,6 @@ namespace gglab
 		const DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
 		DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
 
-		void UpdateFrameConstants(const RenderScene& scene) noexcept;
-
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
 
 		void OnResize(uint32_t width, uint32_t height) noexcept;

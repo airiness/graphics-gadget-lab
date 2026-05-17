@@ -207,27 +207,6 @@ namespace gglab
 		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
 	}
 
-	void Renderer::UpdateFrameConstants(const RenderScene& scene) noexcept
-	{
-		// Update SceneCB
-		SceneGPU sceneCB{};
-		sceneCB.ObjectBaseIndex = scene.m_ObjectBaseIndex;
-		sceneCB.ObjectCount = scene.m_ObjectCount;
-		sceneCB.MaterialBaseIndex = scene.m_MaterialBaseIndex;
-		sceneCB.MaterialCount = scene.m_MaterialCount;
-		sceneCB.ViewBaseIndex = scene.m_ViewBaseIndex;
-		sceneCB.ViewCount = scene.m_ViewCount;
-
-		m_RenderResRegistry->EnsureIblResources();
-		m_RenderResRegistry->FillIBLBindlessGPU(sceneCB.IBLResource);
-
-		// Main Light
-		sceneCB.MainLight = scene.m_MainLight;
-
-		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();
-		m_SceneCB->Update(sceneCB, currentIndex);
-	}
-
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};

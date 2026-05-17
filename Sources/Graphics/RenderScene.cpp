@@ -2,6 +2,9 @@
 #include "Graphics/RenderScene.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/DX12/DX12ConstantBuffer.h"
+#include "Graphics/DX12/DX12RingStructuredBuffer.h"
 #include "Core/World.h"
 #include "Core/Components.h"
 #include "Graphics/RenderView.h"
@@ -246,6 +249,20 @@ namespace gglab
 
 			result.m_RenderScene.m_MainLight = lightGpu;
 		}
+
+		SceneGPU sceneCB{};
+		sceneCB.ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex;
+		sceneCB.ObjectCount = result.m_RenderScene.m_ObjectCount;
+		sceneCB.MaterialBaseIndex = result.m_RenderScene.m_MaterialBaseIndex;
+		sceneCB.MaterialCount = result.m_RenderScene.m_MaterialCount;
+		sceneCB.ViewBaseIndex = result.m_RenderScene.m_ViewBaseIndex;
+		sceneCB.ViewCount = result.m_RenderScene.m_ViewCount;
+
+		info.m_RenderResourceRegistry.EnsureIblResources();
+		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
+
+		sceneCB.MainLight = result.m_RenderScene.m_MainLight;
+		info.m_SceneCB.Update(sceneCB, info.m_CurrentBackBufferIndex);
 
 		return result;
 	}

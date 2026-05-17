@@ -333,10 +333,13 @@ namespace gglab
 			.m_World = world,
 			.m_AssetManager = *m_AssetManager,
 			.m_TransferManager = *m_Renderer->GetTransferManager(),
+			.m_RenderResourceRegistry = *m_Renderer->GetRenderResourceRegistry(),
 			.m_RenderViews = std::span<RenderView>(renderViews),
+			.m_SceneCB = *m_Renderer->GetSceneConstantBuffer(),
 			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer(),
-			.m_ViewsSB = *m_Renderer->GetViewStructuredBuffer()
+			.m_ViewsSB = *m_Renderer->GetViewStructuredBuffer(),
+			.m_CurrentBackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex()
 		};
 		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
 
@@ -347,9 +350,6 @@ namespace gglab
 			.m_RenderView = renderViews[utils::ToIndex(RenderViewID::Main)]
 		};
 		const auto renderQueue = m_RenderQueueBuilder->Build(queueBuildInfo);
-
-		// Update frame constant buffer. TODO: move this to RenderSceneBuilder
-		m_Renderer->UpdateFrameConstants(renderScene);
 
 		const RenderFrameContext renderContext{
 			.m_RenderViews = std::span<RenderView>(renderViews),
