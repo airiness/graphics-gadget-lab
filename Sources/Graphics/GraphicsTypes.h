@@ -169,38 +169,6 @@ namespace gglab
 
 	// TextureID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(TextureID, uint32_t);
-	enum class ReservedTextureIDIndex : uint32_t
-	{
-		BaseColorWhite,
-		MissingTextureChecker,
-		NormalFlat,
-		DefaultMetallicRoughness,
-		OcclusionWhite,
-		EmissiveBlack,
-		ErrorRed,
-		UVTest,
-		UVTestTexture1K,
-		UVTestTexture4K,
-
-		Count,
-
-		ReservedCount = 64u
-	};
-	static_assert(utils::ToIndex(ReservedTextureIDIndex::Count) < utils::ToIndex(ReservedTextureIDIndex::ReservedCount),
-		"ReservedTextureID::Count must be less than ReservedTextureID::ReservedCount");
-
-	inline constexpr TextureID::ValueType ReservedTextureCount =
-		static_cast<TextureID::ValueType>(utils::ToIndex(ReservedTextureIDIndex::ReservedCount));
-
-	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
-	{
-		return TextureID{ static_cast<TextureID::ValueType>(utils::ToIndex(index)) };
-	}
-
-	constexpr bool IsReservedTextureId(TextureID id) noexcept
-	{
-		return id.IsValid() && id.Value() < ReservedTextureCount;
-	}
 
 	// SamplerID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(SamplerID, uint32_t);
@@ -246,7 +214,7 @@ namespace gglab
 	struct Material
 	{
 		MaterialID m_Id{};
-		
+
 		MaterialTextureBinding m_BaseColorBinding{};
 		MaterialTextureBinding m_EmissiveBinding{};
 		MaterialTextureBinding m_MetallicRoughnessBinding{};

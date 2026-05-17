@@ -245,10 +245,9 @@ namespace gglab
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_DX12Device = m_Renderer->GetDevice();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
-		assetManagerCreateInfo.m_DescriptorManager = m_Renderer->GetDescriptorManager();
+		assetManagerCreateInfo.m_TextureRegistry = m_Renderer->GetTextureRegistry();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
-		m_AssetManager->Initialize();
 
 		m_DemoManager = std::make_unique<DemoManager>();
 
@@ -403,8 +402,6 @@ namespace gglab
 		m_Renderer->GetDevice()->FlushGPU();
 
 		m_DemoManager.reset();
-
-		m_AssetManager->Finalize(m_Renderer->GetLastSubmittedFencePoint());
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();

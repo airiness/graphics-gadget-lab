@@ -69,6 +69,13 @@ namespace gglab
 		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
 		m_SamplerRegistry->InitializePresetSamplers();
 
+		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
+		textureRegistryCreateInfo.m_DX12Device = m_Device.get();
+		textureRegistryCreateInfo.m_TransferManager = m_TransferManager.get();
+		textureRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
+		m_TextureRegistry->InitializeReservedTextures();
+
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
@@ -106,8 +113,11 @@ namespace gglab
 		}
 
 		m_DevelopGui->Finalize();
-		
+
 		m_RenderResRegistry.reset();
+		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
+		m_TextureRegistry.reset();
+		m_SamplerRegistry.reset();
 		m_ExternalResRegistry.reset();
 		m_RenderPassRecipeRegistry.reset();
 		m_RootSignatureCache.reset();
