@@ -1,0 +1,38 @@
+* text=auto
+
+*.c      text eol=crlf
+*.cc     text eol=crlf
+*.cpp    text eol=crlf
+*.cxx    text eol=crlf
+*.h      text eol=crlf
+*.hh     text eol=crlf
+*.hpp    text eol=crlf
+*.hxx    text eol=crlf
+*.inl    text eol=crlf
+*.ixx    text eol=crlf
+*.hlsl   text eol=crlf
+*.hlsli  text eol=crlf
+
+*.sln      text eol=crlf
+*.vcxproj  text eol=crlf
+*.filters  text eol=crlf
+*.props    text eol=crlf
+*.targets  text eol=crlf
+*.natvis   text eol=crlf
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+*.json     text eol=crlf
+
+*.sh     text eol=lf
+
+*.bin    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.dds    binary
+*.tga    binary
+*.fbx    binary
+*.glb    binary
+*.gltf   text eol=lf
+*.blend  binary

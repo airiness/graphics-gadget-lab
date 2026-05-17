@@ -69,6 +69,13 @@ namespace gglab
 		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
 		m_SamplerRegistry->InitializePresetSamplers();
 
+		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
+		textureRegistryCreateInfo.m_DX12Device = m_Device.get();
+		textureRegistryCreateInfo.m_TransferManager = m_TransferManager.get();
+		textureRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
+		m_TextureRegistry->InitializeReservedTextures();
+
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
@@ -106,8 +113,11 @@ namespace gglab
 		}
 
 		m_DevelopGui->Finalize();
-		
+
 		m_RenderResRegistry.reset();
+		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
+		m_TextureRegistry.reset();
+		m_SamplerRegistry.reset();
 		m_ExternalResRegistry.reset();
 		m_RenderPassRecipeRegistry.reset();
 		m_RootSignatureCache.reset();
@@ -195,27 +205,6 @@ namespace gglab
 	DX12RootSignature* Renderer::GetCommonRootSignature() const noexcept
 	{
 		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
-	}
-
-	void Renderer::UpdateFrameConstants(const RenderScene& scene) noexcept
-	{
-		// Update SceneCB
-		SceneGPU sceneCB{};
-		sceneCB.ObjectBaseIndex = scene.m_ObjectBaseIndex;
-		sceneCB.ObjectCount = scene.m_ObjectCount;
-		sceneCB.MaterialBaseIndex = scene.m_MaterialBaseIndex;
-		sceneCB.MaterialCount = scene.m_MaterialCount;
-		sceneCB.ViewBaseIndex = scene.m_ViewBaseIndex;
-		sceneCB.ViewCount = scene.m_ViewCount;
-
-		m_RenderResRegistry->EnsureIblResources();
-		m_RenderResRegistry->FillIBLBindlessGPU(sceneCB.IBLResource);
-
-		// Main Light
-		sceneCB.MainLight = scene.m_MainLight;
-
-		const auto currentIndex = m_SwapChain->GetCurrentBackBufferIndex();
-		m_SceneCB->Update(sceneCB, currentIndex);
 	}
 
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept

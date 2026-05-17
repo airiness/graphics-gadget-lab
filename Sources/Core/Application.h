@@ -4,6 +4,7 @@ namespace gglab
 {
 	class Renderer;
 	class AssetManager;
+	class TextureRegistry;
 	class InputManager;
 	class ShaderManager;
 	class DemoManager;

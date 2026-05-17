@@ -14,6 +14,7 @@
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Graphics/TextureRegistry.h"
 #include "Graphics/DevelopGui/DevelopGui.h"
 #include "Graphics/RenderContexts.h"
 
@@ -57,6 +58,7 @@ namespace gglab
 		RGExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResRegistry.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
+		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
 		DevelopGui* GetDevelopGui() const noexcept { return m_DevelopGui.get(); }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
@@ -70,8 +72,6 @@ namespace gglab
 		DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
 		const DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
 		DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
-
-		void UpdateFrameConstants(const RenderScene& scene) noexcept;
 
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
 
@@ -99,6 +99,7 @@ namespace gglab
 		std::unique_ptr<RGExternalResourceRegistry> m_ExternalResRegistry;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
+		std::unique_ptr<TextureRegistry> m_TextureRegistry;
 		std::unique_ptr<DevelopGui> m_DevelopGui;
 
 		RootSignatureID m_CommonRootSignatureId{};

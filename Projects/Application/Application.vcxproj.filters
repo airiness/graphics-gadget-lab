@@ -336,6 +336,9 @@
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h">
@@ -660,6 +663,9 @@
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>

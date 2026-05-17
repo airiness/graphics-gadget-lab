@@ -33,5 +33,4 @@ namespace gglab
 		CountType m_Capacity = 0;
 		CountType m_FreeCount = 0;
 	};
-
 }
