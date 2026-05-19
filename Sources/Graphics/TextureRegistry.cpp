@@ -364,7 +364,7 @@ namespace gglab
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
 
-		DX12DescriptorManager::TextureSrvCreateInfo srvInfo{};
+		TextureSrvCreateInfo srvInfo{};
 		srvInfo.m_Format = srvFormat;
 		srvInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 
