@@ -12,11 +12,22 @@ struct LightData
 	uint LightType; // 0: Directional, 1: Point, 2: Spot
 };
 
+struct TextureSamplerBindingData
+{
+	uint TextureIndex;
+	uint SamplerIndex;
+};
+
 struct IBLResourceData
 {
-	uint BrdfLutTexIndex;
-	uint BrdfLutSamplerIndex;
-	
+	// Nested struct is aligned to 16bytes in ConstantBuffer, use uint2 replace struct TextureSamplerBindingData
+	uint2 EnvironmentBinding;
+	uint2 IrradianceBinding;
+	uint2 PrefilteredSpecularBinding;
+	uint2 BrdfLutBinding;
+
+	uint PrefilteredSpecularMipLevels;
+	float EnvironmentIntensity;
 	uint2 Padding;
 };
 
@@ -43,21 +54,20 @@ struct ObjectData
 	uint3 Padding;
 };
 
-struct TextureBindingData
+struct MaterialTextureBindingData
 {
-	uint TextureIndex;
-	uint SamplerIndex;
+	TextureSamplerBindingData TextureSamplerBinding;
 	uint TexCoordIndex;
 	uint Padding;
 };
 
 struct MaterialData
 {
-	TextureBindingData BaseColorBinding;
-	TextureBindingData EmissiveBinding;	
-	TextureBindingData MetallicRoughnessBinding;
-	TextureBindingData NormalBinding;
-	TextureBindingData OcclusionBinding;
+	MaterialTextureBindingData BaseColorBinding;
+	MaterialTextureBindingData EmissiveBinding;	
+	MaterialTextureBindingData MetallicRoughnessBinding;
+	MaterialTextureBindingData NormalBinding;
+	MaterialTextureBindingData OcclusionBinding;
 	
 	float4 BaseColorFactor;
 	float4 EmissiveColorFactor;

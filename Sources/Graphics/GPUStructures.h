@@ -22,11 +22,21 @@ namespace gglab
 		uint32_t LightType;
 	};
 
+	struct TextureSamplerBindingGPU
+	{
+		uint32_t TextureIndex;
+		uint32_t SamplerIndex;
+	};
+
 	struct IBLResourceGPU
 	{
-		uint32_t BrdfLutTexIndex;
-		uint32_t BrdfLutSamplerIndex;
+		TextureSamplerBindingGPU EnvironmentBinding;
+		TextureSamplerBindingGPU IrradianceBinding;
+		TextureSamplerBindingGPU PrefilteredSpecularBinding;
+		TextureSamplerBindingGPU BrdfLutBinding;
 
+		uint32_t PrefilteredSpecularMipLevels;
+		float EnvironmentIntensity;
 		uint32_t Padding[2];
 	};
 
@@ -55,21 +65,20 @@ namespace gglab
 	};
 	static constexpr uint32_t MaxObjectCapacity = 1024;
 
-	struct TextureBindingGPU
+	struct MaterialTextureBindingGPU
 	{
-		uint32_t TextureIndex;
-		uint32_t SamplerIndex;
+		TextureSamplerBindingGPU TextureSamplerBinding;
 		uint32_t TexCoordIndex;
 		uint32_t Padding;
 	};
 
 	struct MaterialGPU
 	{
-		TextureBindingGPU BaseColorBinding;
-		TextureBindingGPU EmissiveBinding;
-		TextureBindingGPU MetallicRoughnessBinding;
-		TextureBindingGPU NormalBinding;
-		TextureBindingGPU OcclusionBinding;
+		MaterialTextureBindingGPU BaseColorBinding;
+		MaterialTextureBindingGPU EmissiveBinding;
+		MaterialTextureBindingGPU MetallicRoughnessBinding;
+		MaterialTextureBindingGPU NormalBinding;
+		MaterialTextureBindingGPU OcclusionBinding;
 
 		Color BaseColorFactor;
 		Color EmissiveColorFactor;

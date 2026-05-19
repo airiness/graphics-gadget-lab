@@ -87,8 +87,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(entry.m_Allocated, "IBL BRDF LUT is not allocated.");
 		GGLAB_ASSERT_MSG(entry.m_SrvId.IsValid(), "IBL BRDF LUT SRV is invalid.");
 
-		out.BrdfLutTexIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
-		out.BrdfLutSamplerIndex = m_SamplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp);
+		out.BrdfLutBinding.TextureIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
+		out.BrdfLutBinding.SamplerIndex = m_SamplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp);
 	}
 
 	void RenderResourceRegistry::ReleaseAll(const DX12FencePoint& fencePoint) noexcept

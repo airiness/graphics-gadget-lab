@@ -28,6 +28,9 @@ namespace gglab
 
 		enum class TextureIndex : uint8_t
 		{
+			IBL_EnvironmentCubemap,
+			IBL_IrradianceCubemap,
+			IBL_PrefilteredSpecularCubemap,
 			IBL_BrdfLut,
 
 			Count

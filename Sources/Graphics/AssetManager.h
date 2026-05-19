@@ -67,7 +67,7 @@ namespace gglab
 		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
 
 		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
-		TextureBindingGPU ResolveTextureBinding(const MaterialTextureBinding& binding,
+		MaterialTextureBindingGPU ResolveTextureBinding(const MaterialTextureBinding& binding,
 			ReservedTextureIDIndex fallback,
 			SamplerPreset fallbackSampler) const noexcept;
 

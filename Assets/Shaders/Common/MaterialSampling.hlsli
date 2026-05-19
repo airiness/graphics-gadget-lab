@@ -37,13 +37,22 @@ float4 SampleTexture2D(uint srvIndex, SamplerState samplerState, float2 uv)
 }
 
 // Sample texture2DLevel with srv index and sampler state
-float4 SampleTextureBinding(TextureBindingData binding, float2 uv)
+float4 SampleTextureBinding(TextureSamplerBindingData bindingData, float2 uv)
 {
-	return SampleTexture2D(binding.TextureIndex, binding.SamplerIndex, uv);
+	return SampleTexture2D(bindingData.TextureIndex, bindingData.SamplerIndex, uv);
 }
 
 // Sample texture2DLevel with srv index and sampler state
-float4 SampleTextureBindingLevel(TextureBindingData binding, float2 uv, float lod)
+float4 SampleTextureBindingLevel(TextureSamplerBindingData bindingData, float2 uv, float lod)
 {
-	return SampleTexture2DLevel(binding.TextureIndex, binding.SamplerIndex, uv, lod);
+	return SampleTexture2DLevel(bindingData.TextureIndex, bindingData.SamplerIndex, uv, lod);
+}
+
+// Make TextureSamplerBindingData by uint2 binding data
+TextureSamplerBindingData MakeTextureSamplerBinding(uint2 binding)
+{
+	TextureSamplerBindingData result;
+	result.TextureIndex = binding.x;
+	result.SamplerIndex = binding.y;
+	return result;
 }

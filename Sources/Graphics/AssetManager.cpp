@@ -253,12 +253,12 @@ namespace gglab
 		return m_TextureRegistry->ResolveSrvIndex(textureId, fallback);
 	}
 
-	TextureBindingGPU AssetManager::ResolveTextureBinding(const MaterialTextureBinding& binding, ReservedTextureIDIndex fallback, SamplerPreset fallbackSampler) const noexcept
+	MaterialTextureBindingGPU AssetManager::ResolveTextureBinding(const MaterialTextureBinding& binding, ReservedTextureIDIndex fallback, SamplerPreset fallbackSampler) const noexcept
 	{
-		TextureBindingGPU bindingGpu{};
+		MaterialTextureBindingGPU bindingGpu{};
 
-		bindingGpu.TextureIndex = ResolveSrvIndex(binding.m_TextureId, fallback);
-		bindingGpu.SamplerIndex = m_SamplerRegistry->ResolveSamplerIndex(binding.m_SamplerId, fallbackSampler);
+		bindingGpu.TextureSamplerBinding.TextureIndex = ResolveSrvIndex(binding.m_TextureId, fallback);
+		bindingGpu.TextureSamplerBinding.SamplerIndex = m_SamplerRegistry->ResolveSamplerIndex(binding.m_SamplerId, fallbackSampler);
 
 		bindingGpu.TexCoordIndex = binding.m_TexCoordIndex;
 		bindingGpu.Padding = 0;
