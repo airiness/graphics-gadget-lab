@@ -10,6 +10,21 @@ namespace gglab
 	class DX12DescriptorFreeListAllocator;
 	class DX12Texture;
 
+	struct TextureSrvCreateInfo
+	{
+		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
+		D3D12_SRV_DIMENSION m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+
+		uint32_t m_MostDetailedMip = 0;
+		uint32_t m_MipLevels = std::numeric_limits<uint32_t>::max();
+		uint32_t m_FirstArraySlice = 0;
+		uint32_t m_ArraySize = std::numeric_limits<uint32_t>::max();
+		uint32_t m_PlaneSlice = 0;
+		float m_ResourceMinLODClamp = 0.0f;
+
+		bool operator==(const TextureSrvCreateInfo&) const noexcept = default;
+	};
+
 	class DX12DescriptorManager
 	{
 	public:
@@ -47,19 +62,6 @@ namespace gglab
 
 			Count,
 			Invalid = Count
-		};
-
-		struct TextureSrvCreateInfo
-		{
-			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
-			D3D12_SRV_DIMENSION m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-
-			uint32_t m_MostDetailedMip = 0;
-			uint32_t m_MipLevels = std::numeric_limits<uint32_t>::max();
-			uint32_t m_FirstArraySlice = 0;
-			uint32_t m_ArraySize = std::numeric_limits<uint32_t>::max();
-			uint32_t m_PlaneSlice = 0;
-			float m_ResourceMinLODClamp = 0.0f;
 		};
 
 	public:

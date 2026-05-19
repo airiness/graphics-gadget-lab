@@ -2,8 +2,9 @@
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/SamplerRegistry.h"
+
+#include <algorithm>
 
 namespace gglab
 {
@@ -19,20 +20,101 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_SamplerRegistry);
 	}
 
-	void RenderResourceRegistry::EnsureIblResources(uint32_t brdfLutSize,
-		DXGI_FORMAT brdfLutFormat,
-		const DX12FencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureIblResources(const IBLResourceCreateInfo& createInfo, const DX12FencePoint* retireFenceOpt) noexcept
 	{
-		RGTextureDesc desc{};
-		desc.m_Width = brdfLutSize;
-		desc.m_Height = brdfLutSize;
-		desc.m_ArraySize = 1;
-		desc.m_MipLevels = 1;
-		desc.m_SampleCount = 1;
-		desc.m_Format = brdfLutFormat;
-		desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+		constexpr uint16_t CubemapArraySize = 6;
 
-		EnsureTexture(TextureIndex::IBL_BrdfLut, desc, retireFenceOpt);
+		// IBL_EnvironmentCubemap
+		{
+			RGTextureDesc desc{};
+			desc.m_Width = createInfo.m_EnvironmentCubemapSize;
+			desc.m_Height = createInfo.m_EnvironmentCubemapSize;
+			desc.m_ArraySize = CubemapArraySize;
+			desc.m_MipLevels = 1;
+			desc.m_SampleCount = 1;
+			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
+			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+
+			TextureSrvCreateInfo srvCreateInfo{};
+			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
+
+			EnsureTexture(TextureIndex::IBL_EnvironmentCubemap, desc, srvCreateInfo, retireFenceOpt);
+		}
+
+		// IBL_IrradianceCubemap
+		{
+			RGTextureDesc desc{};
+			desc.m_Width = createInfo.m_IrradianceCubemapSize;
+			desc.m_Height = createInfo.m_IrradianceCubemapSize;
+			desc.m_ArraySize = CubemapArraySize;
+			desc.m_MipLevels = 1;
+			desc.m_SampleCount = 1;
+			desc.m_Format = createInfo.m_IrradianceCubemapFormat;
+			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+
+			TextureSrvCreateInfo srvCreateInfo{};
+			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
+
+			EnsureTexture(TextureIndex::IBL_IrradianceCubemap, desc, srvCreateInfo, retireFenceOpt);
+		}
+
+		// IBL_PrefilteredSpecularCubemap
+		{
+			auto maxMipLevels = [](uint32_t size) noexcept -> uint32_t
+				{
+					uint32_t levels = 1;
+					while (size > 1)
+					{
+						size >>= 1;
+						++levels;
+					}
+					return levels;
+				};
+
+			const uint32_t prefilteredMipLevels = std::clamp(
+				createInfo.m_PrefilteredSpecularMipLevels,
+				1u,
+				maxMipLevels(createInfo.m_PrefilteredSpecularCubemapSize));
+
+			RGTextureDesc desc{};
+			desc.m_Width = createInfo.m_PrefilteredSpecularCubemapSize;
+			desc.m_Height = createInfo.m_PrefilteredSpecularCubemapSize;
+			desc.m_ArraySize = CubemapArraySize;
+			desc.m_MipLevels = static_cast<uint16_t>(prefilteredMipLevels);
+			desc.m_SampleCount = 1;
+			desc.m_Format = createInfo.m_PrefilteredSpecularCubemapFormat;
+			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+
+			TextureSrvCreateInfo srvCreateInfo{};
+			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
+
+			EnsureTexture(TextureIndex::IBL_PrefilteredSpecularCubemap, desc, srvCreateInfo, retireFenceOpt);
+		}
+
+		// IBL_BrdfLut
+		{
+			RGTextureDesc desc{};
+			desc.m_Width = createInfo.m_BrdfLutSize;
+			desc.m_Height = createInfo.m_BrdfLutSize;
+			desc.m_ArraySize = 1;
+			desc.m_MipLevels = 1;
+			desc.m_SampleCount = 1;
+			desc.m_Format = createInfo.m_BrdfLutFormat;
+			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+
+			TextureSrvCreateInfo srvCreateInfo{};
+			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
+
+			EnsureTexture(TextureIndex::IBL_BrdfLut, desc, srvCreateInfo, retireFenceOpt);
+		}
 	}
 
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
@@ -83,12 +165,38 @@ namespace gglab
 	{
 		out = {};
 
-		const auto& entry = m_TextureEntries[utils::ToIndex(TextureIndex::IBL_BrdfLut)];
-		GGLAB_ASSERT_MSG(entry.m_Allocated, "IBL BRDF LUT is not allocated.");
-		GGLAB_ASSERT_MSG(entry.m_SrvId.IsValid(), "IBL BRDF LUT SRV is invalid.");
+		auto fillTextureSamplerBinding = [this](
+			TextureIndex index,
+			TextureSamplerBindingGPU& outBinding,
+			SamplerPreset samplerPreset) noexcept
+			{
+				const auto& entry = m_TextureEntries[utils::ToIndex(index)];
+				GGLAB_ASSERT_MSG(entry.m_Allocated, "IBL resource is not allocated.");
+				GGLAB_ASSERT_MSG(entry.m_SrvId.IsValid(), "IBL resource SRV is invalid.");
 
-		out.BrdfLutBinding.TextureIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
-		out.BrdfLutBinding.SamplerIndex = m_SamplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp);
+				outBinding.TextureIndex = m_DescriptorManager->BindlessSrvIdToGlobalIndex(entry.m_SrvId);
+				outBinding.SamplerIndex = m_SamplerRegistry->GetSamplerIndex(samplerPreset);
+			};
+
+		fillTextureSamplerBinding(TextureIndex::IBL_EnvironmentCubemap,
+			out.EnvironmentBinding,
+			SamplerPreset::LinearClamp);
+
+		fillTextureSamplerBinding(TextureIndex::IBL_IrradianceCubemap,
+			out.IrradianceBinding,
+			SamplerPreset::LinearClamp);
+
+		fillTextureSamplerBinding(TextureIndex::IBL_PrefilteredSpecularCubemap,
+			out.PrefilteredSpecularBinding,
+			SamplerPreset::LinearClamp);
+
+		fillTextureSamplerBinding(TextureIndex::IBL_BrdfLut,
+			out.BrdfLutBinding,
+			SamplerPreset::LinearClamp);
+
+		const auto& prefilteredEntry = m_TextureEntries[utils::ToIndex(TextureIndex::IBL_PrefilteredSpecularCubemap)];
+		out.PrefilteredSpecularMipLevels = prefilteredEntry.m_RgTexDesc.m_MipLevels;
+		out.EnvironmentIntensity = 1.0f;
 	}
 
 	void RenderResourceRegistry::ReleaseAll(const DX12FencePoint& fencePoint) noexcept
@@ -103,12 +211,15 @@ namespace gglab
 		}
 	}
 
-	void RenderResourceRegistry::EnsureTexture(TextureIndex index, const RGTextureDesc& desc, const DX12FencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureTexture(TextureIndex index,
+		const RGTextureDesc& desc,
+		const TextureSrvCreateInfo& srvCreateInfo,
+		const DX12FencePoint* retireFenceOpt) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
 
 		// Create new texture and ResourceIndex
-		auto createTexture = [this](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
+		auto createTexture = [this, &srvCreateInfo](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
 			{
 				const auto clearValue = DefaultClearValue<RGTextureDesc>(desc);
 				const auto texIndex = m_RGGpuResAllocator->Acquire<RGTextureDesc>(
@@ -129,18 +240,16 @@ namespace gglab
 
 				outEntry.m_Allocated = true;
 				outEntry.m_Dirty = true;
+				outEntry.m_SrvCreateInfo = srvCreateInfo;
 
 				// Make srv
-				DX12DescriptorManager::TextureSrvCreateInfo srvInfo{};
-				srvInfo.m_Format = desc.m_Format;
-				srvInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 				if (outEntry.m_SrvId.IsValid())
 				{
-					m_DescriptorManager->WriteBindlessSrv(outEntry.m_SrvId, texture, srvInfo);
+					m_DescriptorManager->WriteBindlessSrv(outEntry.m_SrvId, texture, srvCreateInfo);
 				}
 				else
 				{
-					outEntry.m_SrvId = m_DescriptorManager->CreateBindlessSrv(texture, srvInfo);
+					outEntry.m_SrvId = m_DescriptorManager->CreateBindlessSrv(texture, srvCreateInfo);
 				}
 			};
 
@@ -150,6 +259,25 @@ namespace gglab
 			if (m_RGGpuResAllocator->IsCompatibleTexture(entry.m_InternalIndex, desc))
 			{
 				entry.m_RgTexDesc = desc;
+
+				// If Srv create info changed, update the texture DescriptorID
+				if (entry.m_SrvCreateInfo != srvCreateInfo)
+				{
+					auto* texture = m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex);
+					GGLAB_ASSERT_NOT_NULL(texture);
+
+					if (entry.m_SrvId.IsValid())
+					{
+						m_DescriptorManager->WriteBindlessSrv(entry.m_SrvId, texture, srvCreateInfo);
+					}
+					else
+					{
+						entry.m_SrvId = m_DescriptorManager->CreateBindlessSrv(texture, srvCreateInfo);
+					}
+
+					entry.m_SrvCreateInfo = srvCreateInfo;
+				}
+
 				return;
 			}
 

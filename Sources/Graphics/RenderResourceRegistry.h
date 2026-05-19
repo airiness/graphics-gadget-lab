@@ -2,6 +2,7 @@
 #include "Graphics/RenderGraph/RGResource.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace gglab
@@ -26,6 +27,22 @@ namespace gglab
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 		};
 
+		struct IBLResourceCreateInfo
+		{
+			uint32_t m_EnvironmentCubemapSize = 512;
+			DXGI_FORMAT m_EnvironmentCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+			uint32_t m_IrradianceCubemapSize = 32;
+			DXGI_FORMAT m_IrradianceCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+			uint32_t m_PrefilteredSpecularCubemapSize = 128;
+			uint32_t m_PrefilteredSpecularMipLevels = 5;
+			DXGI_FORMAT m_PrefilteredSpecularCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+			uint32_t m_BrdfLutSize = 256;
+			DXGI_FORMAT m_BrdfLutFormat = DXGI_FORMAT_R16G16_FLOAT;
+		};
+
 		enum class TextureIndex : uint8_t
 		{
 			IBL_EnvironmentCubemap,
@@ -43,6 +60,7 @@ namespace gglab
 			ResourceIndex m_InternalIndex{};
 			ResourceIndex m_ExternalIndex{};
 			DX12DescriptorID m_SrvId{};
+			TextureSrvCreateInfo m_SrvCreateInfo{};
 
 			bool m_Allocated = false;
 			bool m_Dirty = false;
@@ -53,8 +71,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderResourceRegistry);
 		~RenderResourceRegistry() = default;
 
-		void EnsureIblResources(uint32_t brdfLutSize = 256,
-			DXGI_FORMAT brdfLutFormat = DXGI_FORMAT_R16G16_FLOAT,
+		void EnsureIblResources(const IBLResourceCreateInfo& createInfo = {},
 			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void MarkDirty(TextureIndex index) noexcept;
@@ -74,6 +91,7 @@ namespace gglab
 	private:
 		void EnsureTexture(TextureIndex index,
 			const RGTextureDesc& desc,
+			const TextureSrvCreateInfo& srvCreateInfo,
 			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void DestroyTexture(TextureIndex index, const DX12FencePoint& fencePoint) noexcept;
