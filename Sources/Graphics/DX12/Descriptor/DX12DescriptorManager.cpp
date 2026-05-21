@@ -5,6 +5,7 @@
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/DX12/DX12Texture.h"
+#include "Graphics/GraphicsTypes.h"
 
 namespace gglab
 {
@@ -195,7 +196,7 @@ namespace gglab
 		}
 		case D3D12_SRV_DIMENSION_TEXTURECUBEARRAY:
 		{
-			const auto totalCubes = totalArray / 6;
+			const auto totalCubes = totalArray / CubemapFaceCount;
 			const auto firstCube = info.m_FirstArraySlice;
 			const auto cubeCount = (info.m_ArraySize == std::numeric_limits<uint32_t>::max()) ?
 				(totalCubes - firstCube) :
@@ -203,7 +204,7 @@ namespace gglab
 
 			srvDesc.TextureCubeArray.MostDetailedMip = info.m_MostDetailedMip;
 			srvDesc.TextureCubeArray.MipLevels = mipLevels;
-			srvDesc.TextureCubeArray.First2DArrayFace = firstCube * 6;
+			srvDesc.TextureCubeArray.First2DArrayFace = firstCube * CubemapFaceCount;
 			srvDesc.TextureCubeArray.NumCubes = cubeCount;
 			srvDesc.TextureCubeArray.ResourceMinLODClamp = info.m_ResourceMinLODClamp;
 			break;

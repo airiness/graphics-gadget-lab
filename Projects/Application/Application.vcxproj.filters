@@ -73,6 +73,9 @@
     <Filter Include="Graphics\DX12\Descriptor">
       <UniqueIdentifier>{bbedd216-a444-41bc-8acd-a22ddeebbd53}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\Utility">
+      <UniqueIdentifier>{d892a0d4-9889-4a83-a0fe-d9ee5889cd10}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp">
@@ -370,6 +373,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h">
       <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Utility\ViewDescUtils.h">
+      <Filter>Graphics\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Precompiled.h">
       <Filter>Core</Filter>

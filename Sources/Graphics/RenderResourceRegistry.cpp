@@ -22,14 +22,12 @@ namespace gglab
 
 	void RenderResourceRegistry::EnsureIblResources(const IBLResourceCreateInfo& createInfo, const DX12FencePoint* retireFenceOpt) noexcept
 	{
-		constexpr uint16_t CubemapArraySize = 6;
-
 		// IBL_EnvironmentCubemap
 		{
 			RGTextureDesc desc{};
 			desc.m_Width = createInfo.m_EnvironmentCubemapSize;
 			desc.m_Height = createInfo.m_EnvironmentCubemapSize;
-			desc.m_ArraySize = CubemapArraySize;
+			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
@@ -48,7 +46,7 @@ namespace gglab
 			RGTextureDesc desc{};
 			desc.m_Width = createInfo.m_IrradianceCubemapSize;
 			desc.m_Height = createInfo.m_IrradianceCubemapSize;
-			desc.m_ArraySize = CubemapArraySize;
+			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_IrradianceCubemapFormat;
@@ -83,7 +81,7 @@ namespace gglab
 			RGTextureDesc desc{};
 			desc.m_Width = createInfo.m_PrefilteredSpecularCubemapSize;
 			desc.m_Height = createInfo.m_PrefilteredSpecularCubemapSize;
-			desc.m_ArraySize = CubemapArraySize;
+			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = static_cast<uint16_t>(prefilteredMipLevels);
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_PrefilteredSpecularCubemapFormat;

@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/Utility/ViewDescUtils.h"
 #include "Core/Hash/FNV1a.h"
 
 namespace gglab
@@ -22,21 +23,54 @@ namespace gglab
 
 	struct ViewKey
 	{
+		static constexpr uint16_t AllRemainingMipLevelsEncoded = 0;
+		static constexpr UINT UnspecifiedMipLevelsInDesc = 0;
+		static constexpr UINT AllRemainingMipLevelsD3D12 = static_cast<UINT>(-1);
+
 		DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
 		ResourceIndex m_ResourceIndex;
 		uint32_t m_ComponentMapping = 0;
 		uint16_t m_MipSlice = 0;
 		uint16_t m_MipLevels = 0;
 		uint16_t m_ArraySlice = 0;
+		uint16_t m_ArraySize = 0;
+		float m_ResourceMinLODClamp = 0.0f;
 		uint8_t m_PlaneSlice = 0;
 		uint8_t m_Dimension = 0;
 		uint8_t m_Flags = 0;
 		ViewType m_Type = ViewType::RTV;
 
 		constexpr bool operator==(const ViewKey&) const noexcept = default;
+
+		static constexpr uint16_t EncodeMipLevels(UINT mipLevels) noexcept
+		{
+			return (mipLevels == AllRemainingMipLevelsD3D12) ?
+				AllRemainingMipLevelsEncoded :
+				static_cast<uint16_t>(mipLevels);
+		}
+
+		static constexpr UINT DecodeMipLevels(uint16_t mipLevels) noexcept
+		{
+			return (mipLevels == AllRemainingMipLevelsEncoded) ?
+				AllRemainingMipLevelsD3D12 :
+				mipLevels;
+		}
+
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(m_Type, m_Format, m_ResourceIndex.Value(), m_ComponentMapping, m_MipSlice, m_MipLevels, m_ArraySlice, m_PlaneSlice, m_Dimension, m_Flags);
+			return std::make_tuple(
+				m_Type,
+				m_Format,
+				m_ResourceIndex.Value(),
+				m_ComponentMapping,
+				m_MipSlice,
+				m_MipLevels,
+				m_ArraySlice,
+				m_ArraySize,
+				m_ResourceMinLODClamp,
+				m_PlaneSlice,
+				m_Dimension,
+				m_Flags);
 		}
 	};
 	using ViewKeyHash = KeyHash<ViewKey>;

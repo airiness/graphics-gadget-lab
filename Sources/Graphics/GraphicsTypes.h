@@ -89,6 +89,8 @@ namespace gglab
 		}
 	}
 
+	inline constexpr uint32_t CubemapFaceCount = 6u;
+
 	enum class MaterialFlags : uint32_t
 	{
 		None = 0u,

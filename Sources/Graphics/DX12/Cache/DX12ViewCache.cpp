@@ -260,17 +260,56 @@ namespace gglab
 		if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_UNKNOWN)
 		{
 			// Sample count is bigger than 1, multi-sample
-			outDesc.ViewDimension = (texDesc.SampleDesc.Count > 1) ?
-				D3D12_RTV_DIMENSION_TEXTURE2DMS :
-				D3D12_RTV_DIMENSION_TEXTURE2D;
+			if (texDesc.SampleDesc.Count > 1)
+			{
+				outDesc.ViewDimension = (texDesc.DepthOrArraySize > 1) ?
+					D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY :
+					D3D12_RTV_DIMENSION_TEXTURE2DMS;
+			}
+			else
+			{
+				outDesc.ViewDimension = (texDesc.DepthOrArraySize > 1) ?
+					D3D12_RTV_DIMENSION_TEXTURE2DARRAY :
+					D3D12_RTV_DIMENSION_TEXTURE2D;
+			}
 		}
 
 		uint16_t mip = 0;
+		uint16_t arraySlice = 0;
+		uint16_t arraySize = 0;
 		uint8_t plane = 0;
 		if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2D)
 		{
 			mip = static_cast<uint16_t>(outDesc.Texture2D.MipSlice);
 			plane = static_cast<uint8_t>(outDesc.Texture2D.PlaneSlice);
+		}
+		else if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2DARRAY)
+		{
+			const UINT firstSlice = outDesc.Texture2DArray.FirstArraySlice;
+			UINT viewArraySize = outDesc.Texture2DArray.ArraySize;
+			if (viewArraySize == 0)
+			{
+				viewArraySize = static_cast<UINT>(texDesc.DepthOrArraySize) - firstSlice;
+				outDesc.Texture2DArray.ArraySize = viewArraySize;
+			}
+
+			mip = static_cast<uint16_t>(outDesc.Texture2DArray.MipSlice);
+			arraySlice = static_cast<uint16_t>(firstSlice);
+			arraySize = static_cast<uint16_t>(viewArraySize);
+			plane = static_cast<uint8_t>(outDesc.Texture2DArray.PlaneSlice);
+		}
+		else if (outDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY)
+		{
+			const UINT firstSlice = outDesc.Texture2DMSArray.FirstArraySlice;
+			UINT viewArraySize = outDesc.Texture2DMSArray.ArraySize;
+			if (viewArraySize == 0)
+			{
+				viewArraySize = static_cast<UINT>(texDesc.DepthOrArraySize) - firstSlice;
+				outDesc.Texture2DMSArray.ArraySize = viewArraySize;
+			}
+
+			arraySlice = static_cast<uint16_t>(firstSlice);
+			arraySize = static_cast<uint16_t>(viewArraySize);
 		}
 
 		auto& key = built.m_Key;
@@ -278,12 +317,14 @@ namespace gglab
 		key.m_ResourceIndex = resourceIndex;
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = mip;
-		key.m_ArraySlice = 0;
+		key.m_ArraySlice = arraySlice;
+		key.m_ArraySize = arraySize;
 		key.m_PlaneSlice = plane;
 		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
 		key.m_Flags = 0;
 		key.m_ComponentMapping = 0;
 		key.m_MipLevels = 0;
+		key.m_ResourceMinLODClamp = 0.0f;
 
 		return built;
 	}
@@ -379,14 +420,73 @@ namespace gglab
 
 		uint16_t most = 0;
 		uint16_t levels = 0;
+		uint16_t arraySlice = 0;
+		uint16_t arraySize = 0;
 		uint8_t plane = 0;
+		float minLodClamp = 0.0f;
 		if (outDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
 		{
+			if (outDesc.Texture2D.MipLevels == ViewKey::UnspecifiedMipLevelsInDesc)
+			{
+				outDesc.Texture2D.MipLevels = ViewKey::AllRemainingMipLevelsD3D12;
+			}
+
 			most = static_cast<uint16_t>(outDesc.Texture2D.MostDetailedMip);
 			plane = static_cast<uint8_t>(outDesc.Texture2D.PlaneSlice);
-			levels = (outDesc.Texture2D.MipLevels == UINT(-1)) ?
-				0 :
-				static_cast<uint16_t>(outDesc.Texture2D.MipLevels);
+			levels = ViewKey::EncodeMipLevels(outDesc.Texture2D.MipLevels);
+			minLodClamp = outDesc.Texture2D.ResourceMinLODClamp;
+		}
+		else if (outDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
+		{
+			const UINT firstSlice = outDesc.Texture2DArray.FirstArraySlice;
+			UINT viewArraySize = outDesc.Texture2DArray.ArraySize;
+			if (viewArraySize == 0)
+			{
+				viewArraySize = static_cast<UINT>(texDesc.DepthOrArraySize) - firstSlice;
+				outDesc.Texture2DArray.ArraySize = viewArraySize;
+			}
+			if (outDesc.Texture2DArray.MipLevels == ViewKey::UnspecifiedMipLevelsInDesc)
+			{
+				outDesc.Texture2DArray.MipLevels = ViewKey::AllRemainingMipLevelsD3D12;
+			}
+
+			most = static_cast<uint16_t>(outDesc.Texture2DArray.MostDetailedMip);
+			levels = ViewKey::EncodeMipLevels(outDesc.Texture2DArray.MipLevels);
+			arraySlice = static_cast<uint16_t>(firstSlice);
+			arraySize = static_cast<uint16_t>(viewArraySize);
+			plane = static_cast<uint8_t>(outDesc.Texture2DArray.PlaneSlice);
+			minLodClamp = outDesc.Texture2DArray.ResourceMinLODClamp;
+		}
+		else if (outDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
+		{
+			if (outDesc.TextureCube.MipLevels == ViewKey::UnspecifiedMipLevelsInDesc)
+			{
+				outDesc.TextureCube.MipLevels = ViewKey::AllRemainingMipLevelsD3D12;
+			}
+
+			most = static_cast<uint16_t>(outDesc.TextureCube.MostDetailedMip);
+			levels = ViewKey::EncodeMipLevels(outDesc.TextureCube.MipLevels);
+			minLodClamp = outDesc.TextureCube.ResourceMinLODClamp;
+		}
+		else if (outDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
+		{
+			const UINT firstFace = outDesc.TextureCubeArray.First2DArrayFace;
+			UINT numCubes = outDesc.TextureCubeArray.NumCubes;
+			if (numCubes == 0)
+			{
+				numCubes = (static_cast<UINT>(texDesc.DepthOrArraySize) - firstFace) / CubemapFaceCount;
+				outDesc.TextureCubeArray.NumCubes = numCubes;
+			}
+			if (outDesc.TextureCubeArray.MipLevels == ViewKey::UnspecifiedMipLevelsInDesc)
+			{
+				outDesc.TextureCubeArray.MipLevels = ViewKey::AllRemainingMipLevelsD3D12;
+			}
+
+			most = static_cast<uint16_t>(outDesc.TextureCubeArray.MostDetailedMip);
+			levels = ViewKey::EncodeMipLevels(outDesc.TextureCubeArray.MipLevels);
+			arraySlice = static_cast<uint16_t>(firstFace);
+			arraySize = static_cast<uint16_t>(numCubes);
+			minLodClamp = outDesc.TextureCubeArray.ResourceMinLODClamp;
 		}
 
 		auto& key = built.m_Key;
@@ -395,11 +495,13 @@ namespace gglab
 		key.m_Format = outDesc.Format;
 		key.m_MipSlice = most;
 		key.m_MipLevels = levels;
-		key.m_ArraySlice = 0;
+		key.m_ArraySlice = arraySlice;
+		key.m_ArraySize = arraySize;
 		key.m_PlaneSlice = plane;
 		key.m_Dimension = static_cast<uint8_t>(outDesc.ViewDimension);
 		key.m_Flags = 0;
 		key.m_ComponentMapping = outDesc.Shader4ComponentMapping;
+		key.m_ResourceMinLODClamp = minLodClamp;
 
 		return built;
 	}
@@ -457,7 +559,6 @@ namespace gglab
 		device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, desc, descriptor.CpuHandleAt());
 	}
 
-
 	template<>
 	inline D3D12_RENDER_TARGET_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::RTV>(const ViewKey& key) noexcept
 	{
@@ -468,6 +569,18 @@ namespace gglab
 		{
 			d.Texture2D.MipSlice = key.m_MipSlice;
 			d.Texture2D.PlaneSlice = key.m_PlaneSlice;
+		}
+		else if (d.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2DARRAY)
+		{
+			d.Texture2DArray.MipSlice = key.m_MipSlice;
+			d.Texture2DArray.FirstArraySlice = key.m_ArraySlice;
+			d.Texture2DArray.ArraySize = key.m_ArraySize;
+			d.Texture2DArray.PlaneSlice = key.m_PlaneSlice;
+		}
+		else if (d.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY)
+		{
+			d.Texture2DMSArray.FirstArraySlice = key.m_ArraySlice;
+			d.Texture2DMSArray.ArraySize = key.m_ArraySize;
 		}
 		return d;
 	}
@@ -496,8 +609,32 @@ namespace gglab
 		if (desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
 		{
 			desc.Texture2D.MostDetailedMip = key.m_MipSlice;
-			desc.Texture2D.MipLevels = (key.m_MipLevels == 0) ? static_cast<UINT>(-1) : key.m_MipLevels;
+			desc.Texture2D.MipLevels = ViewKey::DecodeMipLevels(key.m_MipLevels);
 			desc.Texture2D.PlaneSlice = key.m_PlaneSlice;
+			desc.Texture2D.ResourceMinLODClamp = key.m_ResourceMinLODClamp;
+		}
+		else if (desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
+		{
+			desc.Texture2DArray.MostDetailedMip = key.m_MipSlice;
+			desc.Texture2DArray.MipLevels = ViewKey::DecodeMipLevels(key.m_MipLevels);
+			desc.Texture2DArray.FirstArraySlice = key.m_ArraySlice;
+			desc.Texture2DArray.ArraySize = key.m_ArraySize;
+			desc.Texture2DArray.PlaneSlice = key.m_PlaneSlice;
+			desc.Texture2DArray.ResourceMinLODClamp = key.m_ResourceMinLODClamp;
+		}
+		else if (desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
+		{
+			desc.TextureCube.MostDetailedMip = key.m_MipSlice;
+			desc.TextureCube.MipLevels = ViewKey::DecodeMipLevels(key.m_MipLevels);
+			desc.TextureCube.ResourceMinLODClamp = key.m_ResourceMinLODClamp;
+		}
+		else if (desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
+		{
+			desc.TextureCubeArray.MostDetailedMip = key.m_MipSlice;
+			desc.TextureCubeArray.MipLevels = ViewKey::DecodeMipLevels(key.m_MipLevels);
+			desc.TextureCubeArray.First2DArrayFace = key.m_ArraySlice;
+			desc.TextureCubeArray.NumCubes = key.m_ArraySize;
+			desc.TextureCubeArray.ResourceMinLODClamp = key.m_ResourceMinLODClamp;
 		}
 		return desc;
 	}
