@@ -276,6 +276,7 @@
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12SwapChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Utility\ViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h" />
