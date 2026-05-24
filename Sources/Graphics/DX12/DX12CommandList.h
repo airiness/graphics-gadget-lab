@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorTypes.h"
 
 namespace gglab

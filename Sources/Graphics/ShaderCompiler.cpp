@@ -10,7 +10,10 @@ namespace gglab
 {
 	namespace
 	{
-		class ShaderIncludeHandler final : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IDxcIncludeHandler>
+		class ShaderIncludeHandler final :
+			public Microsoft::WRL::RuntimeClass<
+				Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+				IDxcIncludeHandler>
 		{
 		public:
 			HRESULT RuntimeClassInitialize(ComPtr<IDxcUtils> utils,
