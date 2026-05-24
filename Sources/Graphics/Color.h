@@ -1,6 +1,5 @@
 #pragma once
-#include <SimpleMath.h>
-using namespace DirectX::SimpleMath;
+#include "Core/Math/MathTypes.h"
 
 namespace gglab::color
 {

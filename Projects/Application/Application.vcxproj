@@ -309,6 +309,7 @@
     <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h" />
     <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
     <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\MathTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
     <ClInclude Include="..\..\Sources\Core\Precompiled.h" />
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />

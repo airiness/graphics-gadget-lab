@@ -1,7 +1,7 @@
 #pragma once
+#include "Core/Math/MathTypes.h"
 #include "Graphics/GraphicsTypes.h"
 
-#include <SimpleMath.h>
 #include <algorithm>
 #include <array>
 
@@ -20,10 +20,8 @@ namespace gglab
 		};
 	}
 
-	[[nodiscard]] inline DirectX::SimpleMath::Vector3 GetCubemapFaceDirection(CubemapFace face) noexcept
+	[[nodiscard]] inline Vector3 GetCubemapFaceDirection(CubemapFace face) noexcept
 	{
-		using DirectX::SimpleMath::Vector3;
-
 		switch (face)
 		{
 		case CubemapFace::PositiveX: return Vector3::UnitX;
@@ -36,10 +34,8 @@ namespace gglab
 		}
 	}
 
-	[[nodiscard]] inline DirectX::SimpleMath::Vector3 GetCubemapFaceUp(CubemapFace face) noexcept
+	[[nodiscard]] inline Vector3 GetCubemapFaceUp(CubemapFace face) noexcept
 	{
-		using DirectX::SimpleMath::Vector3;
-
 		// Left-handed capture basis. This keeps generated cubemap faces aligned with D3D TextureCube sampling.
 		switch (face)
 		{
@@ -49,15 +45,15 @@ namespace gglab
 		}
 	}
 
-	[[nodiscard]] inline DirectX::SimpleMath::Matrix BuildCubemapViewMatrix(CubemapFace face,
-		const DirectX::SimpleMath::Vector3& origin) noexcept
+	[[nodiscard]] inline Matrix BuildCubemapViewMatrix(CubemapFace face,
+		const Vector3& origin) noexcept
 	{
-		const DirectX::SimpleMath::Vector3 direction = GetCubemapFaceDirection(face);
-		const DirectX::SimpleMath::Vector3 up = GetCubemapFaceUp(face);
+		const Vector3 direction = GetCubemapFaceDirection(face);
+		const Vector3 up = GetCubemapFaceUp(face);
 		return DirectX::XMMatrixLookAtLH(origin, origin + direction, up);
 	}
 
-	[[nodiscard]] inline DirectX::SimpleMath::Matrix BuildCubemapProjectionMatrix(float nearZ, float farZ) noexcept
+	[[nodiscard]] inline Matrix BuildCubemapProjectionMatrix(float nearZ, float farZ) noexcept
 	{
 		nearZ = std::max(0.0001f, nearZ);
 		farZ = std::max(nearZ + 0.0001f, farZ);
