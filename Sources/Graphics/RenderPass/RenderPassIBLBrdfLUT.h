@@ -1,7 +1,6 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderPass/RenderPassRecipeRegistry.h"
-#include "Graphics/RenderGraph/RGResource.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 
 namespace gglab
@@ -22,8 +21,6 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		DX12PipelineState* GetOrCreatePSO(const Renderer& renderer) noexcept;
-
-		static RGTextureDesc BuildRGTextureDescFromNative(const DX12Texture& texture) noexcept;
 
 	private:
 		GraphicsKeyInputs m_BaseInputs{};

@@ -2,6 +2,7 @@
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/SamplerRegistry.h"
 
 #include <algorithm>

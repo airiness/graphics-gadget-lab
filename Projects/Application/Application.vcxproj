@@ -145,6 +145,7 @@
     <ClCompile Include="..\..\Sources\Core\Application.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
@@ -233,6 +234,7 @@
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Core\Application.h" />
     <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
@@ -321,6 +323,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGPass.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceHandle.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h" />

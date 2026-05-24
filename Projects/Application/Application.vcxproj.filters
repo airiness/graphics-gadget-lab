@@ -336,6 +336,9 @@
     <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h">
@@ -459,6 +462,9 @@
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h">
@@ -679,6 +685,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureViewDescUtils.h">
       <Filter>Graphics\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/DX12/DX12Device.h"
 
 namespace gglab
@@ -161,7 +162,7 @@ namespace gglab
 	void RGGpuResourceAllocator::TrimPerKey(uint32_t maxCachedPerKey) noexcept
 	{
 		m_MaxCachedPerKey = maxCachedPerKey;
-		if (maxCachedPerKey == 0) 
+		if (maxCachedPerKey == 0)
 		{
 			return;
 		}

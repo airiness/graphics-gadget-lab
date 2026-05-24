@@ -3,6 +3,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/DX12/Cache/InputLayoutLibrary.h"
 #include "Graphics/DX12/Cache/DX12PSOCache.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
 
 namespace gglab
 {
@@ -18,40 +19,15 @@ namespace gglab
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 
-		EnsureInitialized(services);
-
-		renderResRegistry->EnsureIblResources();
 		const auto shouldBuild = renderResRegistry->IsDirty(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
-
-		struct SetupPassData {};
-
-		rg.AddPass<SetupPassData>("RenderPassIBL.SetupResources",
-			[renderResRegistry, shouldBuild](RenderGraph::RGBuilder& builder, SetupPassData& data)
-			{
-				builder.SideEffect();
-
-				auto& blackboard = builder.GetBlackboard();
-				auto& iblRes = blackboard.GetOrCreate<RGIBLResources>(IBLResourcesName);
-
-				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
-				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
-
-				const auto rgDesc = BuildRGTextureDescFromNative(*brdfLutTexture);
-
-				iblRes.m_BrdfLut = builder.ImportTexture("IBL.BRDFLut",
-					brdfLutTexture,
-					rgDesc,
-					D3D12_RESOURCE_STATE_COMMON);
-			},
-			[](RGExecuteContext& executeContext, SetupPassData& data)
-			{
-			});
 
 		// Nothing to build this frame. The texture is still imported into RG by RenderPassIBL.SetupResources
 		if (!shouldBuild)
 		{
 			return;
 		}
+
+		EnsureInitialized(services);
 
 		struct BuildPassData
 		{
@@ -73,7 +49,8 @@ namespace gglab
 				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
 
-				const auto rgDesc = BuildRGTextureDescFromNative(*brdfLutTexture);
+				const auto rgDesc = ToRGTextureDesc(*brdfLutTexture,
+					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
 				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
 
@@ -235,18 +212,4 @@ namespace gglab
 		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 	}
 
-	RGTextureDesc RenderPassIBLBrdfLUT::BuildRGTextureDescFromNative(const DX12Texture& texture) noexcept
-	{
-		const auto nativeDesc = texture.GetDesc();
-
-		RGTextureDesc rgDesc{};
-		rgDesc.m_Width = static_cast<uint32_t>(nativeDesc.Width);
-		rgDesc.m_Height = static_cast<uint32_t>(nativeDesc.Height);
-		rgDesc.m_ArraySize = static_cast<uint16_t>(nativeDesc.DepthOrArraySize);
-		rgDesc.m_MipLevels = static_cast<uint16_t>(nativeDesc.MipLevels);
-		rgDesc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
-		rgDesc.m_Format = nativeDesc.Format;
-		rgDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
-		return rgDesc;
-	}
 }
