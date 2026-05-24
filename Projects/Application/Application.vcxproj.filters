@@ -162,17 +162,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGPass.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGResource.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.cpp">
-      <Filter>Graphics\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
@@ -234,9 +225,6 @@
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.cpp">
       <Filter>Graphics\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.cpp">
-      <Filter>Graphics\DX12</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -245,9 +233,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp">
       <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\World.cpp">
-      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp">
       <Filter>Core\Demo</Filter>
@@ -374,7 +359,7 @@
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Utility\ViewDescUtils.h">
+    <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h">
       <Filter>Graphics\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Precompiled.h">
@@ -673,6 +658,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h">
+      <Filter>Graphics\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Utility\TextureViewDescUtils.h">
+      <Filter>Graphics\Utility</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

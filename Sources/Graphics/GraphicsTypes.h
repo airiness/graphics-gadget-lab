@@ -75,21 +75,20 @@ namespace gglab
 		Unknown
 	};
 
-	[[nodiscard]] constexpr TextureColorSpace GetTextureColorSpaceFromSemantic(TextureSemantic semantic) noexcept
-	{
-		switch (semantic)
-		{
-		case TextureSemantic::BaseColor:
-		case TextureSemantic::Emissive:
-		case TextureSemantic::UVTest:
-		case TextureSemantic::GenericColor:
-			return TextureColorSpace::SRGB;
-		default:
-			return TextureColorSpace::Linear;
-		}
-	}
-
 	inline constexpr uint32_t CubemapFaceCount = 6u;
+	enum class CubemapFace : uint8_t
+	{
+		// Matches the D3D TextureCube array-slice order.
+		PositiveX,
+		NegativeX,
+		PositiveY,
+		NegativeY,
+		PositiveZ,
+		NegativeZ,
+
+		Count
+	};
+	static_assert(static_cast<uint32_t>(CubemapFace::Count) == CubemapFaceCount);
 
 	enum class MaterialFlags : uint32_t
 	{
