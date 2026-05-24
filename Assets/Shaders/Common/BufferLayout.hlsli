@@ -51,7 +51,8 @@ struct ObjectData
 	matrix ModelMat;
 	matrix NormalMat;
 	uint MaterialIndex;
-	uint3 Padding;
+	uint ViewIndex;
+	uint2 Padding;
 };
 
 struct MaterialTextureBindingData

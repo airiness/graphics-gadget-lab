@@ -73,7 +73,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
@@ -91,7 +91,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
@@ -161,7 +161,6 @@
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandList.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp" />
@@ -172,7 +171,6 @@
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12PipelineState.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Resource.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RootSignature.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12SwapChain.cpp" />
@@ -213,8 +211,6 @@
     <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGPass.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGResource.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp" />
@@ -226,7 +222,6 @@
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
-    <ClCompile Include="..\..\Sources\Core\World.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -276,7 +271,8 @@
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12SwapChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Utility\ViewDescUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h" />
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h" />
@@ -336,6 +332,7 @@
     <ClInclude Include="..\..\Sources\Core\TypedIndex.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Utility\TextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\VertexData.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.h" />
     <ClInclude Include="..\..\Sources\Core\World.h" />

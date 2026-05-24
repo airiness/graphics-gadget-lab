@@ -46,14 +46,29 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, 
 	return perturbedNormalWS;
 }
 
-float2 SampleIBLBrdfLUT(float NoV, float preceptualRoughness)
+float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
 {
 	float4 value = SampleTextureBindingLevel(
 		MakeTextureSamplerBinding(g_Scene.IBLResource.BrdfLutBinding),
-		float2(saturate(NoV), saturate(preceptualRoughness)),
+		float2(saturate(NoV), saturate(perceptualRoughness)),
 		0);
 	
 	return value.rg;
+}
+
+float3 SampleIBLIrradiance(float3 normalWS)
+{
+	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.IrradianceBinding);
+	return SampleTextureCube(binding, normalize(normalWS)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+}
+
+float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
+{
+	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.PrefilteredSpecularBinding);
+	const uint mipLevels = max(g_Scene.IBLResource.PrefilteredSpecularMipLevels, 1u);
+	const float maxMipLevel = (float) (mipLevels - 1u);
+	const float lod = saturate(perceptualRoughness) * maxMipLevel;
+	return SampleTextureCubeLevel(binding, normalize(reflectWS), lod).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 VSOutput VSMain(VSInput IN)

@@ -5,6 +5,7 @@
 #include "Graphics/DX12/DX12Texture.h"
 #include "Graphics/DX12/DX12CommandList.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/Utility/TextureUtils.h"
 #include "Core/HResult.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"

@@ -1,7 +1,6 @@
 #pragma once
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/Utility/ViewDescUtils.h"
 #include "Core/Hash/FNV1a.h"
 
 namespace gglab
