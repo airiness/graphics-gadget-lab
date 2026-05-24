@@ -5,9 +5,6 @@
 #include <shlobj.h>
 #include <comdef.h>
 
-#include <wrl.h>
-using namespace Microsoft::WRL;
-
 // DirectX
 #include <d3dx12.h>
 #include <dxgi1_6.h>
@@ -51,6 +48,7 @@ using namespace Microsoft::WRL;
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Math/MathTypes.h"
+#include "Core/Platform/Win/ComTypes.h"
 
 // GameInput
 #include <GameInput.h>

@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Platform/Win/ComTypes.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace D3D12MA

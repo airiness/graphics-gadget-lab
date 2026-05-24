@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/Shader.h"
 
 namespace gglab
