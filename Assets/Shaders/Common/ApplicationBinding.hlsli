@@ -6,10 +6,12 @@ cbuffer SceneCB : register(b0)
 	SceneData g_Scene;
 };
 
-cbuffer ObjectCB : register(b1)
+cbuffer DrawCB : register(b1)
 {
 	uint g_ObjectIndex;
 	uint g_ViewIndex;
+	uint g_DrawParam0;
+	uint g_DrawParam1;
 };
 
 StructuredBuffer<ObjectData> g_Objects : register(t1);
