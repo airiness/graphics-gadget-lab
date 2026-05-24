@@ -58,6 +58,9 @@
     <Filter Include="Core\Utility">
       <UniqueIdentifier>{4d720f9d-cfd4-4d36-aff2-b0116f684059}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Math">
+      <UniqueIdentifier>{9dc1a5f4-8328-4f82-9f05-e848e9be5f7c}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Demo">
       <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
     </Filter>
@@ -403,6 +406,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h">
       <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\MathTypes.h">
+      <Filter>Core\Math</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h">
       <Filter>Core\Input</Filter>

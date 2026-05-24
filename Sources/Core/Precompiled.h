@@ -50,10 +50,7 @@ using namespace Microsoft::WRL;
 // Project definitions
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-
-// SimpleMath
-#include <SimpleMath.h>
-using namespace DirectX::SimpleMath;
+#include "Core/Math/MathTypes.h"
 
 // GameInput
 #include <GameInput.h>

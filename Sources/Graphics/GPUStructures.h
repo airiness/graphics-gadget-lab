@@ -1,9 +1,7 @@
 #pragma once
+#include "Core/Math/MathTypes.h"
 #include "Core/TypedIndex.h"
 #include "Graphics/GraphicsTypes.h"
-
-#include <SimpleMath.h>
-using namespace DirectX::SimpleMath;
 // struct member name without m_ for GPU using
 
 namespace gglab

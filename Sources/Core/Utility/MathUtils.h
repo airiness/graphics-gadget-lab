@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Math/MathTypes.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace gglab::utils
