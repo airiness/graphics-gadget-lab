@@ -20,10 +20,20 @@ namespace gglab
 	enum class CommonRSRootParamIndex : uint32_t
 	{
 		SceneCB = 0,	// b0
-		ObjectCB,		// g_ObjectIndex, b1
+		DrawCB,			// g_ObjectIndex, g_ViewIndex, g_DrawParam0, g_DrawParam1, b1
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
 		ViewSB,			// g_Views, t3
+
+		Count
+	};
+
+	enum class CommonDrawCBIndex : uint32_t
+	{
+		ObjectIndex = 0,
+		ViewIndex,
+		DrawParam0,
+		DrawParam1,
 
 		Count
 	};

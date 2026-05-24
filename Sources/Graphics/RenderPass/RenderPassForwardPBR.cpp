@@ -148,11 +148,11 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
 
-				// Set view index constant	
+				// Set view index constant
 				commandList->Get()->SetGraphicsRoot32BitConstant(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
+					static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
-					1);
+					static_cast<uint32_t>(CommonDrawCBIndex::ViewIndex));
 
 				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
 				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture);
@@ -278,8 +278,9 @@ namespace gglab
 
 			// Per draw item bindings
 			commandList->Get()->SetGraphicsRoot32BitConstant(
-				static_cast<uint32_t>(CommonRSRootParamIndex::ObjectCB),
-				drawItem.m_ObjectOffset, 0);
+				static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+				drawItem.m_ObjectOffset,
+				static_cast<uint32_t>(CommonDrawCBIndex::ObjectIndex));
 
 			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}
