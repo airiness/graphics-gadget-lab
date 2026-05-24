@@ -123,8 +123,8 @@ namespace gglab
 
 			});
 
-		// RenderPass IBLBrdfLUT	
-		m_IBLBrdfLUTPass.AddPass(rg, context, services);
+		// IBL Pass
+		m_IBLPass.AddPass(rg, context, services);
 
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);

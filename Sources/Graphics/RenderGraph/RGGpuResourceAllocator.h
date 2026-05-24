@@ -2,7 +2,7 @@
 #include "Graphics/DX12/DX12Texture.h"
 #include "Graphics/DX12/DX12Buffer.h"
 #include "Graphics/DX12/DX12FencePoint.h"
-#include "Graphics/RenderGraph/RGResource.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
 

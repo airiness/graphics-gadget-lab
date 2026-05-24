@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
-#include "Graphics/RenderGraph/RGResource.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
@@ -557,7 +557,7 @@ namespace gglab
 			return;
 		}
 
-		m_CurrentStates = RGResourceTraits<RESOURCE>::ToState(static_cast<RGResourceTraits<RESOURCE>::Bits>(m_Usage));
+		m_CurrentStates = ToD3D12ResourceStates<Usage>(m_Usage);
 		std::optional<D3D12_CLEAR_VALUE> clearValue = DefaultClearValue<Desc>(m_Desc);
 		m_GpuResourceIndex = allocator->Acquire<Desc>(m_Desc, m_CurrentStates, clearValue);
 		m_Devirtualized = true;

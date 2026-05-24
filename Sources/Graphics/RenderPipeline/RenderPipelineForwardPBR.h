@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
-#include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
+#include "Graphics/RenderPass/RenderPassIBL.h"
 
 namespace gglab
 {
@@ -19,6 +19,6 @@ namespace gglab
 
 	private:
 		RenderPassForwardPBR m_ForwardPBRPass;
-		RenderPassIBLBrdfLUT m_IBLBrdfLUTPass;
+		RenderPassIBL m_IBLPass;
 	};
 }
