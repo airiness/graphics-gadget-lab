@@ -1,15 +1,17 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
+#include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
-#include "Graphics/DX12/Cache/DX12PSOCache.h"
+#include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/Utility/TextureViewDescUtils.h"
 
 namespace gglab
 {
-	void RenderPassIBLBrdfLUT::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassIBLEnvironment::AddPass(RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
 
@@ -19,9 +21,8 @@ namespace gglab
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 
-		const auto shouldBuild = renderResRegistry->IsDirty(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
+		const auto shouldBuild = renderResRegistry->IsDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 
-		// Nothing to build this frame. The texture is still imported into RG by RenderPassIBL.SetupResources
 		if (!shouldBuild)
 		{
 			return;
@@ -31,14 +32,14 @@ namespace gglab
 
 		struct BuildPassData
 		{
-			RGTextureId m_BrdfLut;
-			ViewKey m_RtvKey;
+			RGTextureId m_EnvironmentCubemap;
+			std::array<ViewKey, CubemapFaceCount> m_RtvKeys;
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 		};
 
-		rg.AddPass<BuildPassData>("RenderPassIBL.BuildBrdfLUT",
+		rg.AddPass<BuildPassData>("RenderPassIBL.BuildEnvironmentCubemap",
 			[renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
 			{
 				builder.SideEffect();
@@ -46,34 +47,41 @@ namespace gglab
 				auto& blackboard = builder.GetBlackboard();
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
-				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
-				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
+				auto* envCubemapTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				GGLAB_ASSERT_NOT_NULL(envCubemapTexture);
+	
+				data.m_EnvironmentCubemap = builder.Write(iblRes.m_EnvironmentCubemap, RGTextureUsage::RenderTarget);
 
-				const auto rgDesc = ToRGTextureDesc(*brdfLutTexture,
+				const auto rgDesc = ToRGTextureDesc(*envCubemapTexture,
 					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
-				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
-
-				const auto externalIndex = renderResRegistry->GetExternalIndex(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
+				const auto externalIndex = renderResRegistry->GetExternalIndex(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
-					"IBL BRDF LUT must be imported as an external RenderGraph resource.");
-				data.m_RtvKey = DX12ViewCache::BuildKey<ViewType::RTV>(externalIndex, brdfLutTexture);
+					"IBL Environment Cubemap must be imported as an external RenderGraph resource.");
+
+				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
+				{
+					auto rtvDesc = MakeTexture2DArrayRtvDesc(rgDesc.m_Format, 0, face, 1);
+
+					data.m_RtvKeys[face] = DX12ViewCache::BuildKey<ViewType::RTV>(
+						externalIndex,
+						envCubemapTexture,
+						rtvDesc);
+				}
 
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;
 			},
-			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, BuildPassData& data)
+			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, BuildPassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
-				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
-				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
+				auto* texture = rg.GetTexture(data.m_EnvironmentCubemap);
+				GGLAB_ASSERT_NOT_NULL(texture);
 
 				auto* viewCache = rg.GetViewCache();
 				GGLAB_ASSERT_NOT_NULL(viewCache);
-
-				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, brdfLutTexture);
 
 				// Temporary manual barrier.
 				// TODO: Remove this after RenderGraph supports automatic barrier inference from builder.Write/Read.
@@ -85,14 +93,12 @@ namespace gglab
 						D3D12_BARRIER_ACCESS_RENDER_TARGET,
 						D3D12_BARRIER_LAYOUT_COMMON,
 						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						brdfLutTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+						texture->Get(),
+						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
 
 					commandList->AddTextureBarrier(toRenderTarget);
 					commandList->FlushBarriers();
 				}
-
-				commandList->ClearRenderTarget(rtv, *brdfLutTexture);
 
 				auto* pso = GetOrCreatePSO(*renderer);
 				GGLAB_ASSERT_NOT_NULL(pso);
@@ -110,12 +116,23 @@ namespace gglab
 				commandList->SetDescriptorHeaps(descriptorHeaps);
 				commandList->SetGraphicsRootSignature(*rootSignature);
 				commandList->SetPipelineState(*pso);
-				commandList->SetRenderTarget(rtv);
 				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
 				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				commandList->DrawInstanced(3);
+				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
+				{
+					const auto rtv = viewCache->GetOrCreate(data.m_RtvKeys[face], texture);
+					commandList->SetRenderTarget(rtv);
+					commandList->ClearRenderTarget(rtv, *texture);
+
+					commandList->Get()->SetGraphicsRoot32BitConstant(
+						static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+						face,
+						static_cast<uint32_t>(CommonDrawCBIndex::DrawParam0));
+
+					commandList->DrawInstanced(3);
+				}
 
 				// Resource Barrier
 				{
@@ -126,18 +143,18 @@ namespace gglab
 						D3D12_BARRIER_ACCESS_COMMON,
 						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
 						D3D12_BARRIER_LAYOUT_COMMON,
-						brdfLutTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+						texture->Get(),
+						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
 
 					commandList->AddTextureBarrier(toCommon);
 					commandList->FlushBarriers();
 				}
 
-				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
+				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 			});
-	}
 
-	void RenderPassIBLBrdfLUT::EnsureInitialized(const RenderServices& services) noexcept
+	}
+	void RenderPassIBLEnvironment::EnsureInitialized(const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
@@ -149,7 +166,7 @@ namespace gglab
 		{
 			// Shader
 			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassIBLBrdfLUT.hlsl";
+			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassIBLEnvironment.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Vertex;
 			shaderDesc.m_Entry = L"VSMain";
 			const auto vsId = shaderManager->LoadShader(shaderDesc);
@@ -165,7 +182,7 @@ namespace gglab
 			m_BaseInputs.m_PSId = psId;
 
 			m_BaseInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R16G16_FLOAT;
+			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
 			m_BaseInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
 			m_BaseInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_UNKNOWN;
 			m_BaseInputs.m_Formats.m_SampleCount = 1;
@@ -182,7 +199,7 @@ namespace gglab
 		m_BaseInputs.m_PSGen = shaderManager->GetGeneration(m_BaseInputs.m_PSId);
 	}
 
-	DX12PipelineState* RenderPassIBLBrdfLUT::GetOrCreatePSO(const Renderer& renderer) noexcept
+	DX12PipelineState* RenderPassIBLEnvironment::GetOrCreatePSO(const Renderer & renderer) noexcept
 	{
 		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
 		GGLAB_ASSERT_NOT_NULL(passRegistry);
@@ -191,7 +208,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(psoCache);
 
 		GraphicsKeyInputs inputs = m_BaseInputs;
-		const auto& cached = passRegistry->GetOrCreateGraphics("RenderPassIBLBrdfLUT",
+		const auto& cached = passRegistry->GetOrCreateGraphics("RenderPassIBLEnvironment",
 			inputs,
 			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
 			{

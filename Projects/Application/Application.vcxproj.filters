@@ -339,6 +339,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h">
@@ -689,6 +692,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -706,6 +712,12 @@
     <None Include="..\..\Assets\Shaders\Common\Common.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -721,6 +733,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>

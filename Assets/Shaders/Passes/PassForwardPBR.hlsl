@@ -46,6 +46,12 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, 
 	return perturbedNormalWS;
 }
 
+float3 SampleIBLEnvironment(float3 dirWS)
+{
+	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.EnvironmentBinding);
+	return SampleTextureCube(binding, normalize(dirWS)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+}
+
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
 {
 	float4 value = SampleTextureBindingLevel(
@@ -178,7 +184,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 specularIBLFactor = F0 * brdfLUT.x + brdfLUT.y;
 	
 	// TODO: sample prefiltered environment map with roughness as mip level
-	float3 fakePrefilteredEnv = 1.0.xxx;
+	float3 reflectWS = reflect(-V, N);
+	float3 fakePrefilteredEnv = SampleIBLEnvironment(reflectWS);
 	float3 specularIBL = fakePrefilteredEnv * specularIBLFactor;
 	
 	// TODO: temperary ambient
