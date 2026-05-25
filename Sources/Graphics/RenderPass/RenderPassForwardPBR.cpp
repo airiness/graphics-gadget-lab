@@ -15,7 +15,8 @@ namespace gglab
 {
 	namespace
 	{
-		void TransitionTextureCommonToPixelShaderResource(DX12CommandList* commandList, DX12Texture* texture) noexcept
+		void TransitionTextureCommonToPixelShaderResource(DX12CommandList* commandList,
+			DX12Texture* texture, uint32_t mipCount, uint32_t arrayCount) noexcept
 		{
 			CD3DX12_TEXTURE_BARRIER barrier(
 				D3D12_BARRIER_SYNC_ALL,
@@ -25,12 +26,13 @@ namespace gglab
 				D3D12_BARRIER_LAYOUT_COMMON,
 				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
 				texture->Get(),
-				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, mipCount, 0, arrayCount));
 			commandList->AddTextureBarrier(barrier);
 			commandList->FlushBarriers();
 		}
 
-		void TransitionTexturePixelShaderResourceToCommon(DX12CommandList* commandList, DX12Texture* texture) noexcept
+		void TransitionTexturePixelShaderResourceToCommon(DX12CommandList* commandList,
+			DX12Texture* texture, uint32_t mipCount, uint32_t arrayCount) noexcept
 		{
 			CD3DX12_TEXTURE_BARRIER barrier(
 				D3D12_BARRIER_SYNC_PIXEL_SHADING,
@@ -40,7 +42,7 @@ namespace gglab
 				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
 				D3D12_BARRIER_LAYOUT_COMMON,
 				texture->Get(),
-				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
+				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, mipCount, 0, arrayCount));
 			commandList->AddTextureBarrier(barrier);
 			commandList->FlushBarriers();
 		}
@@ -54,6 +56,7 @@ namespace gglab
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_Depth{};
+			RGTextureId m_EnvironmentCubemap{};
 			RGTextureId m_BrdfLut{};
 
 			ViewKey m_RtvKey{};
@@ -83,6 +86,7 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
+				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureUsage::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 
 				data.m_RtvKey = mainTargets.m_BackBufferRTVKey;
@@ -154,12 +158,16 @@ namespace gglab
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					static_cast<uint32_t>(CommonDrawCBIndex::ViewIndex));
 
+				auto* environmentCubemap = rg.GetTexture(data.m_EnvironmentCubemap);
+				TransitionTextureCommonToPixelShaderResource(commandList, environmentCubemap, 1, CubemapFaceCount);
+
 				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
-				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture);
+				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture, 1, 1);
 
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
 
-				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture);
+				TransitionTexturePixelShaderResourceToCommon(commandList, environmentCubemap, 1, CubemapFaceCount);
+				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture, 1, 1);
 			});
 	}
 

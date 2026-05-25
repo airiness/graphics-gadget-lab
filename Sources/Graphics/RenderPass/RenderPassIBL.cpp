@@ -46,7 +46,10 @@ namespace gglab
 					"IBL.BrdfLut");
 			});
 
-		// IBL BRDF LUT Pass
+		// Add IBL Environment Pass
+		m_IBLEnvironmentPass.AddPass(rg, context, services);
+
+		// Add IBL BRDF LUT Pass
 		m_IBLBrdfLUTPass.AddPass(rg, context, services);
 	}
 

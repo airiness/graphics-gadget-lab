@@ -45,8 +45,7 @@ namespace gglab
 		}
 	}
 
-	[[nodiscard]] inline Matrix BuildCubemapViewMatrix(CubemapFace face,
-		const Vector3& origin) noexcept
+	[[nodiscard]] inline Matrix BuildCubemapViewMatrix(CubemapFace face, const Vector3& origin) noexcept
 	{
 		const Vector3 direction = GetCubemapFaceDirection(face);
 		const Vector3 up = GetCubemapFaceUp(face);

@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
+#include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderResourceRegistry.h"
 
@@ -20,6 +21,7 @@ namespace gglab
 			const char* name) noexcept;
 
 	private:
+		RenderPassIBLEnvironment m_IBLEnvironmentPass;
 		RenderPassIBLBrdfLUT m_IBLBrdfLUTPass;
 	};
 }

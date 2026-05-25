@@ -35,8 +35,8 @@ namespace gglab
 
 	struct ShaderDefine
 	{
-		std::wstring m_Name;
-		std::wstring m_Value;
+		std::wstring m_Name{};
+		std::wstring m_Value{};
 
 		bool operator==(const ShaderDefine&) const noexcept = default;
 		auto operator<=>(const ShaderDefine&) const noexcept = default;
@@ -44,13 +44,13 @@ namespace gglab
 
 	struct ShaderDesc
 	{
-		std::filesystem::path m_SourcePath;
-		ShaderStage m_Stage;
-		ShaderModel m_Model;
-		std::wstring m_Entry;
+		std::filesystem::path m_SourcePath{};
+		ShaderStage m_Stage = ShaderStage::Pixel;
+		ShaderModel m_Model = ShaderModel::SM_6_7;
+		std::wstring m_Entry{};
 		std::vector<std::filesystem::path> m_IncludeDirs;
 		std::vector<ShaderDefine> m_Defines;
-		ShaderCompileFlags m_Flags;
+		ShaderCompileFlags m_Flags = ShaderCompileFlags::None;
 		std::vector<std::wstring> m_ExtraArgs;
 		std::wstring m_HlslVersion = L"2021";
 		std::wstring m_OptLevel = L"O3";
@@ -58,10 +58,10 @@ namespace gglab
 
 	struct ShaderCompileArtifact
 	{
-		std::filesystem::path m_DxilPath;
-		std::filesystem::path m_MetaPath;
-		ComPtr<ShaderBlob> m_DxilBlob;
-		ShaderHash128 m_Hash;
+		std::filesystem::path m_DxilPath{};
+		std::filesystem::path m_MetaPath{};
+		ComPtr<ShaderBlob> m_DxilBlob{};
+		ShaderHash128 m_Hash{};
 		std::filesystem::file_time_type m_SourceTimeStamp{};
 		bool m_FromCache = false;
 
