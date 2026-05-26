@@ -32,6 +32,7 @@ namespace gglab
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			uint32_t m_DisplayLayout = 0;
 		};
 
 		auto* contextPtr = &context;
@@ -71,6 +72,7 @@ namespace gglab
 				data.m_RtvKey = DX12ViewCache::BuildKey<ViewType::RTV>(externalIndex, previewTexture);
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
+				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLDebugPreviewLayout());
 			},
 			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, PreviewData& data)
 			{
@@ -139,6 +141,11 @@ namespace gglab
 				commandList->SetGraphicsConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+
+				commandList->Get()->SetGraphicsRoot32BitConstant(
+					static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+					data.m_DisplayLayout,
+					static_cast<uint32_t>(CommonDrawCBIndex::DrawParam0));
 
 				commandList->DrawInstanced(3);
 
