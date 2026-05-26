@@ -22,6 +22,8 @@ namespace gglab
 	struct RGPassNode;
 	struct RGResourceNode;
 
+	GGLAB_DEFINE_TYPED_INDEX(RGPassNodeIndex, uint32_t);
+
 	class RenderGraph;
 
 	struct RGExecuteContext
@@ -44,8 +46,8 @@ namespace gglab
 		bool m_Devirtualized = false;
 		int32_t m_RefCount = 0;
 
-		RGPassNode* m_FirstUser = nullptr;
-		RGPassNode* m_LastUser = nullptr;
+		RGPassNodeIndex m_FirstUser = InvalidRGPassNodeIndex;
+		RGPassNodeIndex m_LastUser = InvalidRGPassNodeIndex;
 
 		D3D12_RESOURCE_STATES m_CurrentStates = D3D12_RESOURCE_STATE_COMMON;
 
@@ -77,8 +79,8 @@ namespace gglab
 		RGResourceHandle m_ResourceHandle;
 		RGVirtualResourceBase* m_VirtualResource = nullptr;
 
-		RGPassNode* m_Writer = nullptr;
-		std::vector<RGPassNode*> m_Readers;
+		RGPassNodeIndex m_Writer = InvalidRGPassNodeIndex;
+		std::vector<RGPassNodeIndex> m_Readers;
 
 		StringID NameId() const noexcept
 		{
@@ -436,10 +438,11 @@ namespace gglab
 
 		RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
+		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
 
-		GGLAB_ASSERT_MSG(resourceNode.m_Writer != &passNode, "Pass can not read this resource and write same resource.");
+		GGLAB_ASSERT_MSG(resourceNode.m_Writer != stablePassNodeIndex, "Pass can not read this resource and write same resource.");
 
-		resourceNode.m_Readers.push_back(&passNode);
+		resourceNode.m_Readers.push_back(stablePassNodeIndex);
 
 		AccumulateUsageToVirtual<RESOURCE>(resourceNode, usage);
 
@@ -463,9 +466,10 @@ namespace gglab
 		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
 		RGResourceNode* curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
+		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
 
 		// version update
-		if ((curResourceNode->m_Writer != nullptr) || (!curResourceNode->m_Readers.empty()))
+		if ((curResourceNode->m_Writer.IsValid()) || (!curResourceNode->m_Readers.empty()))
 		{
 			++slot.m_Version;
 			resourceId.m_Version = slot.m_Version;
@@ -478,7 +482,7 @@ namespace gglab
 
 			curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		}
-		curResourceNode->m_Writer = &passNode;
+		curResourceNode->m_Writer = stablePassNodeIndex;
 
 		// Accumulate usage
 		AccumulateUsageToVirtual<RESOURCE>(*curResourceNode, usage);

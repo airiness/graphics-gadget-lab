@@ -24,40 +24,42 @@ namespace gglab
 
 	void RenderGraph::Compile() noexcept
 	{
-		std::vector<RGPassNode*> stack;
-		std::unordered_set<RGPassNode*> reachable;
+		std::vector<RGPassNodeIndex> stack;
+		std::unordered_set<RGPassNodeIndex> reachable;
 
-		auto addPass = [&stack, &reachable](RGPassNode* passNode)
+		auto addPass = [&stack, &reachable](RGPassNodeIndex passNodeIndex)
 			{
-				if (!passNode)
+				if (!passNodeIndex.IsValid())
 				{
 					return;
 				}
-				if (reachable.insert(passNode).second)
+				if (reachable.insert(passNodeIndex).second)
 				{
-					stack.push_back(passNode);
+					stack.push_back(passNodeIndex);
 				}
 			};
 
-		for (auto& passNode : m_PassNodes)
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
 		{
+			auto& passNode = m_PassNodes[passNodeIndex];
 			if (passNode.m_SideEffect)
 			{
-				addPass(&passNode);
+				addPass(RGPassNodeIndex{ passNodeIndex });
 			}
 		}
 
 		while (!stack.empty())
 		{
-			RGPassNode* passNode = stack.back();
+			const RGPassNodeIndex passNodeIndex = stack.back();
 			stack.pop_back();
 
-			for (const auto& access : passNode->m_Accesses)
+			RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
+			for (const auto& access : passNode.m_Accesses)
 			{
 				if (access.m_AccessType == RGPassNode::Access::Type::Read)
 				{
 					RGResourceNode& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
-					if (resourceNode.m_Writer)
+					if (resourceNode.m_Writer.IsValid())
 					{
 						addPass(resourceNode.m_Writer);
 					}
@@ -65,9 +67,10 @@ namespace gglab
 			}
 		}
 
-		for (auto& passNode : m_PassNodes)
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
 		{
-			passNode.m_Culled = (reachable.find(&passNode) == reachable.end());
+			auto& passNode = m_PassNodes[passNodeIndex];
+			passNode.m_Culled = (reachable.find(RGPassNodeIndex{ passNodeIndex }) == reachable.end());
 
 			passNode.m_DevirtualizeVirtualResources.clear();
 			passNode.m_DestroyVirtualResources.clear();
@@ -76,18 +79,20 @@ namespace gglab
 		for (auto& virtualResource : m_VirtualResources)
 		{
 			virtualResource->m_RefCount = 0;
-			virtualResource->m_FirstUser = nullptr;
-			virtualResource->m_LastUser = nullptr;
+			virtualResource->m_FirstUser = InvalidRGPassNodeIndex;
+			virtualResource->m_LastUser = InvalidRGPassNodeIndex;
 		}
 
-		for (auto& passNode : m_PassNodes)
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
 		{
+			auto& passNode = m_PassNodes[passNodeIndex];
 			if (passNode.m_Culled)
 			{
 				continue;
 			}
 
-			auto markUse = [this, &passNode](RGResourceNode::Index index)
+			const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex };
+			auto markUse = [this, stablePassNodeIndex](RGResourceNode::Index index)
 				{
 					RGResourceNode& resourceNode = m_ResourceNodes[index.Value()];
 					auto* virtualResource = resourceNode.m_VirtualResource;
@@ -96,11 +101,11 @@ namespace gglab
 						return;
 					}
 					++virtualResource->m_RefCount;
-					if (!virtualResource->m_FirstUser)
+					if (!virtualResource->m_FirstUser.IsValid())
 					{
-						virtualResource->m_FirstUser = &passNode;
+						virtualResource->m_FirstUser = stablePassNodeIndex;
 					}
-					virtualResource->m_LastUser = &passNode;
+					virtualResource->m_LastUser = stablePassNodeIndex;
 
 				};
 
@@ -117,8 +122,8 @@ namespace gglab
 				continue;
 			}
 
-			virtualResource->m_FirstUser->m_DevirtualizeVirtualResources.push_back(virtualResource);
-			virtualResource->m_LastUser->m_DestroyVirtualResources.push_back(virtualResource);
+			m_PassNodes[virtualResource->m_FirstUser.Value()].m_DevirtualizeVirtualResources.push_back(virtualResource);
+			m_PassNodes[virtualResource->m_LastUser.Value()].m_DestroyVirtualResources.push_back(virtualResource);
 		}
 	}
 
