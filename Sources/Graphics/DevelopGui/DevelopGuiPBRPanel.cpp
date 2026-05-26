@@ -35,6 +35,20 @@ namespace gglab
 				return "Unknown / Other";
 			}
 		}
+
+		static const char* PreviewLayoutToString(RenderResourceRegistry::IBLDebugPreviewLayout layout) noexcept
+		{
+			using Layout = RenderResourceRegistry::IBLDebugPreviewLayout;
+			switch (layout)
+			{
+			case Layout::Grid2x3:
+				return "2x3 Grid";
+			case Layout::Cross:
+				return "Cross";
+			default:
+				return "Unknown";
+			}
+		}
 	}
 
 	void DevelopGuiPBRPanel(DevelopGuiContext& context) noexcept
@@ -204,6 +218,33 @@ namespace gglab
 			const auto environmentDesc = environmentTexture->GetDesc();
 			const auto environmentPreviewDesc = environmentPreviewTexture->GetDesc();
 
+			using PreviewLayout = RenderResourceRegistry::IBLDebugPreviewLayout;
+			PreviewLayout previewLayout = renderResRegistry->GetIBLDebugPreviewLayout();
+
+			if (ImGui::BeginCombo("Display Mode", PreviewLayoutToString(previewLayout)))
+			{
+				const PreviewLayout layouts[] = {
+					PreviewLayout::Grid2x3,
+					PreviewLayout::Cross,
+				};
+
+				for (const auto layout : layouts)
+				{
+					const bool selected = (previewLayout == layout);
+					if (ImGui::Selectable(PreviewLayoutToString(layout), selected))
+					{
+						renderResRegistry->SetIBLDebugPreviewLayout(layout);
+						previewLayout = layout;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+
+				ImGui::EndCombo();
+			}
+
 			if (state.m_ShowMetadata)
 			{
 				const uint32_t environmentBindlessIndex = renderResRegistry->GetBindlessSrvIndex(EnvironmentIndex);
@@ -216,19 +257,19 @@ namespace gglab
 				ImGui::Text("Environment Format: %s", FormatToString(environmentDesc.Format));
 				ImGui::Text("Environment Bindless SRV Index: %u", environmentBindlessIndex);
 
-			ImGui::Text("Atlas Size: %llu x %u",
-				static_cast<unsigned long long>(environmentPreviewDesc.Width),
-				static_cast<uint32_t>(environmentPreviewDesc.Height));
-			ImGui::Text("Atlas Format: %s", FormatToString(environmentPreviewDesc.Format));
-			ImGui::Text("Atlas Bindless SRV Index: %u", previewBindlessIndex);
-		}
+				ImGui::Text("Preview Canvas Size: %llu x %u",
+					static_cast<unsigned long long>(environmentPreviewDesc.Width),
+					static_cast<uint32_t>(environmentPreviewDesc.Height));
+				ImGui::Text("Preview Format: %s", FormatToString(environmentPreviewDesc.Format));
+				ImGui::Text("Preview Bindless SRV Index: %u", previewBindlessIndex);
+			}
 
-		ImGui::SliderFloat(
-			"Environment Atlas Width",
-			&state.m_EnvironmentPreviewWidth,
-			192.0f,
-			768.0f,
-			"%.0f");
+			ImGui::SliderFloat(
+				"Environment Preview Width",
+				&state.m_EnvironmentPreviewWidth,
+				192.0f,
+				768.0f,
+				"%.0f");
 
 			D3D12_GPU_DESCRIPTOR_HANDLE environmentPreviewGpuHandle =
 				renderResRegistry->GetBindlessSrvGpuHandle(EnvironmentPreviewIndex);
@@ -237,17 +278,27 @@ namespace gglab
 			{
 				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Environment preview SRV GPU handle is invalid.");
 				return;
-		}
+			}
 
-		const ImTextureID environmentPreviewTextureId = ToImGuiTextureID(environmentPreviewGpuHandle);
-		const float environmentPreviewWidth = std::clamp(state.m_EnvironmentPreviewWidth, 16.0f, 2048.0f);
-		const float aspect = environmentPreviewDesc.Width > 0
-			? static_cast<float>(environmentPreviewDesc.Height) / static_cast<float>(environmentPreviewDesc.Width)
-			: (2.0f / 3.0f);
-		const ImVec2 environmentImageSize(environmentPreviewWidth, environmentPreviewWidth * aspect);
+			const ImTextureID environmentPreviewTextureId = ToImGuiTextureID(environmentPreviewGpuHandle);
+			const float environmentPreviewWidth = std::clamp(state.m_EnvironmentPreviewWidth, 16.0f, 2048.0f);
 
-		ImGui::TextUnformatted("Atlas Layout: +X -X +Y / -Y +Z -Z");
-		ImGui::Image(environmentPreviewTextureId, environmentImageSize);
+			ImVec2 uv0(0.0f, 0.0f);
+			ImVec2 uv1(1.0f, 1.0f);
+			float aspect = 3.0f / 4.0f;
+			const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
+
+			if (previewLayout == PreviewLayout::Grid2x3)
+			{
+				uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
+				aspect = 2.0f / 3.0f;
+				layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
+			}
+
+			const ImVec2 environmentImageSize(environmentPreviewWidth, environmentPreviewWidth * aspect);
+
+			ImGui::TextUnformatted(layoutHint);
+			ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
 	}
 }
 }

@@ -118,8 +118,8 @@ namespace gglab
 		// DebugPreview_IBL_EnvironmentCubemap
 		{
 			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_DebugPreviewIBLEnvironmentCubemapFaceSize * 3u;
-			desc.m_Height = createInfo.m_DebugPreviewIBLEnvironmentCubemapFaceSize * 2u;
+			desc.m_Width = createInfo.m_DebugPreviewIBLEnvironmentCubemapFaceSize * 4u;
+			desc.m_Height = createInfo.m_DebugPreviewIBLEnvironmentCubemapFaceSize * 3u;
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
@@ -177,6 +177,16 @@ namespace gglab
 		GGLAB_ASSERT_MSG(srvId.IsValid(), "RenderResourceRegistry: invalid bindless SRV id.");
 
 		return m_DescriptorManager->GetBindlessSrvGpuHandle(srvId);
+	}
+
+	void RenderResourceRegistry::SetIBLDebugPreviewLayout(IBLDebugPreviewLayout layout) noexcept
+	{
+		if (layout >= IBLDebugPreviewLayout::Count)
+		{
+			return;
+		}
+
+		m_IBLDebugPreviewLayout = layout;
 	}
 
 	void RenderResourceRegistry::FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept

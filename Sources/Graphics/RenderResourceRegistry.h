@@ -57,6 +57,14 @@ namespace gglab
 			Count
 		};
 
+		enum class IBLDebugPreviewLayout : uint32_t
+		{
+			Grid2x3,
+			Cross,
+
+			Count
+		};
+
 	private:
 		struct TextureEntry
 		{
@@ -88,6 +96,9 @@ namespace gglab
 		uint32_t GetBindlessSrvIndex(TextureIndex index) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSrvGpuHandle(TextureIndex index) const noexcept;
 
+		void SetIBLDebugPreviewLayout(IBLDebugPreviewLayout layout) noexcept;
+		IBLDebugPreviewLayout GetIBLDebugPreviewLayout() const noexcept { return m_IBLDebugPreviewLayout; }
+
 		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
 		void ReleaseAll(const DX12FencePoint& fencePoint) noexcept;
@@ -107,5 +118,6 @@ namespace gglab
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
+		IBLDebugPreviewLayout m_IBLDebugPreviewLayout = IBLDebugPreviewLayout::Grid2x3;
 	};
 }
