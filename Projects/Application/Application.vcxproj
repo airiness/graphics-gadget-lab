@@ -144,7 +144,7 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Application.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp" />
@@ -235,7 +235,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Core\Application.h" />
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiPBRPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h" />

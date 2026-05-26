@@ -118,6 +118,6 @@ namespace gglab
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
-		IBLDebugPreviewLayout m_IBLDebugPreviewLayout = IBLDebugPreviewLayout::Grid2x3;
+		IBLDebugPreviewLayout m_IBLDebugPreviewLayout = IBLDebugPreviewLayout::Cross;
 	};
 }
