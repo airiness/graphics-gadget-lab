@@ -4,6 +4,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
+#include "Graphics/RenderGraph/RGIBLDebugPreviewResources.h"
 #include "Graphics/DevelopGui/DevelopGui.h"
 
 namespace gglab
@@ -12,10 +13,13 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		GGLAB_UNUSED(context);
+
 		struct DevelopGuiData
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_BrdfLut{};
+			RGTextureId m_EnvironmentCubemapPreview{};
 			ViewKey m_RtvKey{};
 		};
 
@@ -33,9 +37,17 @@ namespace gglab
 
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
+
+				auto& iblDebugPreviewRes = blackboard.Get<RGIBLDebugPreviewResources>(IBLDebugPreviewResourcesName);
+				data.m_EnvironmentCubemapPreview = builder.Read(
+					iblDebugPreviewRes.m_EnvironmentCubemapPreview,
+					RGTextureUsage::Sample);
 			},
 			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
 			{
+				GGLAB_UNUSED(data.m_BrdfLut);
+				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
+
 				auto* developGui = services.m_Renderer->GetDevelopGui();
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);

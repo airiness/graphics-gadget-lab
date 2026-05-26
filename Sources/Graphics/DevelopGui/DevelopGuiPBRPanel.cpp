@@ -9,6 +9,7 @@ namespace gglab
 		struct PBRPanelState
 		{
 			float m_BrdfLutPreviewSize = 256.0f;
+			float m_EnvironmentPreviewWidth = 512.0f;
 			bool m_ShowMetadata = true;
 			bool m_FlipPreviewY = false;
 		};
@@ -58,6 +59,8 @@ namespace gglab
 		}
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
+		constexpr TextureIndex EnvironmentIndex = TextureIndex::IBL_EnvironmentCubemap;
+		constexpr TextureIndex EnvironmentPreviewIndex = TextureIndex::DebugPreview_IBL_EnvironmentCubemap;
 		constexpr TextureIndex BrdfLutIndex = TextureIndex::IBL_BrdfLut;
 
 		// Make sure the persistent BRDF LUT resource exists.
@@ -74,99 +77,177 @@ namespace gglab
 
 		const auto desc = brdfLutTexture->GetDesc();
 
-		ImGui::TextUnformatted("IBL BRDF LUT");
-		ImGui::Separator();
-
-		if (ImGui::Button("Rebuild BRDF LUT"))
+		if (ImGui::CollapsingHeader("IBL BRDF LUT", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			renderResRegistry->MarkDirty(BrdfLutIndex);
-		}
-
-		ImGui::SameLine();
-
-		const bool isDirty = renderResRegistry->IsDirty(BrdfLutIndex);
-		if (isDirty)
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
-		}
-		else
-		{
-			ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
-		}
-
-		ImGui::Checkbox("Show Metadata", &state.m_ShowMetadata);
-
-		if (state.m_ShowMetadata)
-		{
-			const uint32_t bindlessIndex = renderResRegistry->GetBindlessSrvIndex(BrdfLutIndex);
-
-			ImGui::Text("Size: %llu x %u",
-				static_cast<unsigned long long>(desc.Width),
-				static_cast<uint32_t>(desc.Height));
-
-			ImGui::Text("MipLevels: %u", static_cast<uint32_t>(desc.MipLevels));
-			ImGui::Text("Format: %s", FormatToString(desc.Format));
-			ImGui::Text("Bindless SRV Index: %u", bindlessIndex);
-		}
-
-		ImGui::Separator();
-
-		ImGui::SliderFloat(
-			"Preview Size",
-			&state.m_BrdfLutPreviewSize,
-			64.0f,
-			512.0f,
-			"%.0f");
-
-		ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
-
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = renderResRegistry->GetBindlessSrvGpuHandle(BrdfLutIndex);
-
-		if (gpuHandle.ptr == 0)
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "BRDF LUT SRV GPU handle is invalid.");
-			return;
-		}
-
-		const ImTextureID textureId = ToImGuiTextureID(gpuHandle);
-		const float previewSize = std::clamp(state.m_BrdfLutPreviewSize, 16.0f, 2048.0f);
-		const ImVec2 imageSize(previewSize, previewSize);
-
-		const ImVec2 uv0 = state.m_FlipPreviewY
-			? ImVec2(0.0f, 1.0f)
-			: ImVec2(0.0f, 0.0f);
-
-		const ImVec2 uv1 = state.m_FlipPreviewY
-			? ImVec2(1.0f, 0.0f)
-			: ImVec2(1.0f, 1.0f);
-
-		ImGui::TextUnformatted("Preview");
-		ImGui::Image(textureId, imageSize, uv0, uv1);
-
-		ImVec2 imageMin = ImGui::GetItemRectMin();
-		ImVec2 imageMax = ImGui::GetItemRectMax();
-
-		if (ImGui::IsItemHovered())
-		{
-			ImVec2 mouse = ImGui::GetMousePos();
-
-			float u = (mouse.x - imageMin.x) / (imageMax.x - imageMin.x);
-			float v = (mouse.y - imageMin.y) / (imageMax.y - imageMin.y);
-
-			u = std::clamp(u, 0.0f, 1.0f);
-			v = std::clamp(v, 0.0f, 1.0f);
-
-			if (state.m_FlipPreviewY)
+			if (ImGui::Button("Rebuild BRDF LUT"))
 			{
-				v = 1.0f - v;
+				renderResRegistry->MarkDirty(BrdfLutIndex);
 			}
 
-			ImGui::BeginTooltip();
-			ImGui::Text("NoV: %.3f", u);
-			ImGui::Text("Perceptual Roughness: %.3f", v);
-			ImGui::EndTooltip();
+			ImGui::SameLine();
+
+			const bool isDirty = renderResRegistry->IsDirty(BrdfLutIndex);
+			if (isDirty)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
+			}
+			else
+			{
+				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
+			}
+
+			ImGui::Checkbox("Show Metadata", &state.m_ShowMetadata);
+
+			if (state.m_ShowMetadata)
+			{
+				const uint32_t bindlessIndex = renderResRegistry->GetBindlessSrvIndex(BrdfLutIndex);
+
+				ImGui::Text("Size: %llu x %u",
+					static_cast<unsigned long long>(desc.Width),
+					static_cast<uint32_t>(desc.Height));
+
+				ImGui::Text("MipLevels: %u", static_cast<uint32_t>(desc.MipLevels));
+				ImGui::Text("Format: %s", FormatToString(desc.Format));
+				ImGui::Text("Bindless SRV Index: %u", bindlessIndex);
+			}
+
+			ImGui::Separator();
+
+			ImGui::SliderFloat(
+				"Preview Size",
+				&state.m_BrdfLutPreviewSize,
+				64.0f,
+				512.0f,
+				"%.0f");
+
+			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
+
+			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = renderResRegistry->GetBindlessSrvGpuHandle(BrdfLutIndex);
+
+			if (gpuHandle.ptr == 0)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "BRDF LUT SRV GPU handle is invalid.");
+				return;
+			}
+
+			const ImTextureID textureId = ToImGuiTextureID(gpuHandle);
+			const float previewSize = std::clamp(state.m_BrdfLutPreviewSize, 16.0f, 2048.0f);
+			const ImVec2 imageSize(previewSize, previewSize);
+
+			const ImVec2 uv0 = state.m_FlipPreviewY
+				? ImVec2(0.0f, 1.0f)
+				: ImVec2(0.0f, 0.0f);
+
+			const ImVec2 uv1 = state.m_FlipPreviewY
+				? ImVec2(1.0f, 0.0f)
+				: ImVec2(1.0f, 1.0f);
+
+			ImGui::TextUnformatted("Preview");
+			ImGui::Image(textureId, imageSize, uv0, uv1);
+
+			ImVec2 imageMin = ImGui::GetItemRectMin();
+			ImVec2 imageMax = ImGui::GetItemRectMax();
+
+			if (ImGui::IsItemHovered())
+			{
+				ImVec2 mouse = ImGui::GetMousePos();
+
+				float u = (mouse.x - imageMin.x) / (imageMax.x - imageMin.x);
+				float v = (mouse.y - imageMin.y) / (imageMax.y - imageMin.y);
+
+				u = std::clamp(u, 0.0f, 1.0f);
+				v = std::clamp(v, 0.0f, 1.0f);
+
+				if (state.m_FlipPreviewY)
+				{
+					v = 1.0f - v;
+				}
+
+				ImGui::BeginTooltip();
+				ImGui::Text("NoV: %.3f", u);
+				ImGui::Text("Perceptual Roughness: %.3f", v);
+				ImGui::EndTooltip();
+			}
+
+			ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
 		}
 
-		ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
+		ImGui::Spacing();
+
+		DX12Texture* environmentTexture = renderResRegistry->GetTexture(EnvironmentIndex);
+		DX12Texture* environmentPreviewTexture = renderResRegistry->GetTexture(EnvironmentPreviewIndex);
+
+		if (ImGui::CollapsingHeader("IBL Environment", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::Button("Rebuild Environment"))
+			{
+				renderResRegistry->MarkDirty(EnvironmentIndex);
+			}
+
+			ImGui::SameLine();
+
+			if (renderResRegistry->IsDirty(EnvironmentIndex))
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
+			}
+			else
+			{
+				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
+			}
+
+			if (!environmentTexture || !environmentPreviewTexture)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Environment preview texture is not allocated.");
+				return;
+			}
+
+			const auto environmentDesc = environmentTexture->GetDesc();
+			const auto environmentPreviewDesc = environmentPreviewTexture->GetDesc();
+
+			if (state.m_ShowMetadata)
+			{
+				const uint32_t environmentBindlessIndex = renderResRegistry->GetBindlessSrvIndex(EnvironmentIndex);
+				const uint32_t previewBindlessIndex = renderResRegistry->GetBindlessSrvIndex(EnvironmentPreviewIndex);
+
+				ImGui::Text("Environment Size: %llu x %u x %u",
+					static_cast<unsigned long long>(environmentDesc.Width),
+					static_cast<uint32_t>(environmentDesc.Height),
+					static_cast<uint32_t>(environmentDesc.DepthOrArraySize));
+				ImGui::Text("Environment Format: %s", FormatToString(environmentDesc.Format));
+				ImGui::Text("Environment Bindless SRV Index: %u", environmentBindlessIndex);
+
+			ImGui::Text("Atlas Size: %llu x %u",
+				static_cast<unsigned long long>(environmentPreviewDesc.Width),
+				static_cast<uint32_t>(environmentPreviewDesc.Height));
+			ImGui::Text("Atlas Format: %s", FormatToString(environmentPreviewDesc.Format));
+			ImGui::Text("Atlas Bindless SRV Index: %u", previewBindlessIndex);
+		}
+
+		ImGui::SliderFloat(
+			"Environment Atlas Width",
+			&state.m_EnvironmentPreviewWidth,
+			192.0f,
+			768.0f,
+			"%.0f");
+
+			D3D12_GPU_DESCRIPTOR_HANDLE environmentPreviewGpuHandle =
+				renderResRegistry->GetBindlessSrvGpuHandle(EnvironmentPreviewIndex);
+
+			if (environmentPreviewGpuHandle.ptr == 0)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Environment preview SRV GPU handle is invalid.");
+				return;
+		}
+
+		const ImTextureID environmentPreviewTextureId = ToImGuiTextureID(environmentPreviewGpuHandle);
+		const float environmentPreviewWidth = std::clamp(state.m_EnvironmentPreviewWidth, 16.0f, 2048.0f);
+		const float aspect = environmentPreviewDesc.Width > 0
+			? static_cast<float>(environmentPreviewDesc.Height) / static_cast<float>(environmentPreviewDesc.Width)
+			: (2.0f / 3.0f);
+		const ImVec2 environmentImageSize(environmentPreviewWidth, environmentPreviewWidth * aspect);
+
+		ImGui::TextUnformatted("Atlas Layout: +X -X +Y / -Y +Z -Z");
+		ImGui::Image(environmentPreviewTextureId, environmentImageSize);
 	}
+}
 }

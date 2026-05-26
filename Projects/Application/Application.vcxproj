@@ -186,6 +186,7 @@
     <ClCompile Include="..\..\Sources\Core\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLDebugPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.cpp" />
@@ -290,6 +291,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLDebugPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.h" />
@@ -301,6 +303,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLDebugPreviewResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
@@ -370,6 +373,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentDebugPreview.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

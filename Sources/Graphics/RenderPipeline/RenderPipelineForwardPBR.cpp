@@ -4,7 +4,6 @@
 #include "Graphics/DX12/DX12Device.h"
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
-#include "Graphics/RenderPass/RenderPassDevelopGui.h"
 
 namespace gglab
 {
@@ -129,9 +128,11 @@ namespace gglab
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);
 
+		// IBL Debug Preview
+		m_IBLDebugPreviewPass.AddPass(rg, context, services);
+
 		// DevelopGui	
-		RenderPassDevelopGui developGuiPass{};
-		developGuiPass.AddPass(rg, context, services);
+		m_DevelopGuiPass.AddPass(rg, context, services);
 
 		// Finish backbuffer
 		struct FinishBackBufferData
