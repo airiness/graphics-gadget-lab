@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/DevelopGui/DevelopGuiPBRPanel.h"
+#include "Graphics/DevelopGui/DevelopGuiIBLPanel.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -51,11 +51,11 @@ namespace gglab
 		}
 	}
 
-	void DevelopGuiPBRPanel(DevelopGuiContext& context) noexcept
+	void DevelopGuiIBLPanel(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<PBRPanelState>();
 
-		ImGui::TextUnformatted("PBR");
+		ImGui::TextUnformatted("IBL");
 		ImGui::Separator();
 
 		auto* renderer = context.m_Renderer;
@@ -91,7 +91,7 @@ namespace gglab
 
 		const auto desc = brdfLutTexture->GetDesc();
 
-		if (ImGui::CollapsingHeader("IBL BRDF LUT", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("IBL BRDF LUT"))
 		{
 			if (ImGui::Button("Rebuild BRDF LUT"))
 			{
@@ -191,7 +191,7 @@ namespace gglab
 		DX12Texture* environmentTexture = renderResRegistry->GetTexture(EnvironmentIndex);
 		DX12Texture* environmentPreviewTexture = renderResRegistry->GetTexture(EnvironmentPreviewIndex);
 
-		if (ImGui::CollapsingHeader("IBL Environment", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("IBL Environment"))
 		{
 			if (ImGui::Button("Rebuild Environment"))
 			{
@@ -299,6 +299,6 @@ namespace gglab
 
 			ImGui::TextUnformatted(layoutHint);
 			ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
+		}
 	}
-}
 }

@@ -5,5 +5,5 @@ namespace gglab
 {
 	struct DevelopGuiContext;
 
-	void DevelopGuiPBRPanel(DevelopGuiContext& context) noexcept;
+	void DevelopGuiIBLPanel(DevelopGuiContext& context) noexcept;
 }

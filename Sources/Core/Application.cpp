@@ -16,7 +16,7 @@
 #include "Graphics/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/DevelopGui/DevelopGuiImGuiToolsPanel.h"
 #include "Graphics/DevelopGui/DevelopGuiCameraPanel.h"
-#include "Graphics/DevelopGui/DevelopGuiPBRPanel.h"
+#include "Graphics/DevelopGui/DevelopGuiIBLPanel.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -496,11 +496,11 @@ namespace gglab
 		desc.m_DrawFunc = &DevelopGuiImGuiToolsPanel;
 		panelRegistry.RegisterPanel(desc);
 
-		// PBR Panel
+		// IBL Panel
 		desc = {};
-		desc.m_Path = "Rendering/PBR";
-		desc.m_Title = "PBR";
-		desc.m_DrawFunc = &DevelopGuiPBRPanel;
+		desc.m_Path = "Rendering/PBR/IBL";
+		desc.m_Title = "IBL";
+		desc.m_DrawFunc = &DevelopGuiIBLPanel;
 		//desc.m_DefaultOpen = true;
 		panelRegistry.RegisterPanel(desc);
 	}
