@@ -114,6 +114,25 @@ namespace gglab
 
 			EnsureTexture(TextureIndex::IBL_BrdfLut, desc, srvCreateInfo, retireFenceOpt);
 		}
+
+		// DebugPreview_IBL_EnvironmentCubemap
+		{
+			RGTextureDesc desc{};
+			desc.m_Width = createInfo.m_DebugPreviewIBLEnvironmentCubemapFaceSize * 3u;
+			desc.m_Height = createInfo.m_DebugPreviewIBLEnvironmentCubemapFaceSize * 2u;
+			desc.m_ArraySize = 1;
+			desc.m_MipLevels = 1;
+			desc.m_SampleCount = 1;
+			desc.m_Format = createInfo.m_DebugPreviewIBLEnvironmentCubemapFormat;
+			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+
+			TextureSrvCreateInfo srvCreateInfo{};
+			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
+
+			EnsureTexture(TextureIndex::DebugPreview_IBL_EnvironmentCubemap, desc, srvCreateInfo, retireFenceOpt);
+		}
 	}
 
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept

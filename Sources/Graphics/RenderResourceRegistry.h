@@ -41,6 +41,9 @@ namespace gglab
 
 			uint32_t m_BrdfLutSize = 256;
 			DXGI_FORMAT m_BrdfLutFormat = DXGI_FORMAT_R16G16_FLOAT;
+
+			uint32_t m_DebugPreviewIBLEnvironmentCubemapFaceSize = 256;
+			DXGI_FORMAT m_DebugPreviewIBLEnvironmentCubemapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		};
 
 		enum class TextureIndex : uint8_t
@@ -49,6 +52,7 @@ namespace gglab
 			IBL_IrradianceCubemap,
 			IBL_PrefilteredSpecularCubemap,
 			IBL_BrdfLut,
+			DebugPreview_IBL_EnvironmentCubemap,
 
 			Count
 		};

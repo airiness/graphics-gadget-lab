@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
-#include "Graphics/RenderPass/RenderPassRecipeRegistry.h"
 
 namespace gglab
 {
@@ -13,6 +12,5 @@ namespace gglab
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
-
 	};
 }
