@@ -4,6 +4,16 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
+uint GetDisplayLayout()
+{
+	return g_LocalParam0;
+}
+
+TextureSamplerBindingData GetEnvironmentBinding()
+{
+	return MakeTextureSamplerBinding(uint2(g_LocalParam1, g_LocalParam2));
+}
+
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 {
 	return FullscreenTriangleVS(vid);
@@ -71,13 +81,13 @@ bool TryGetCrossFace(float2 uv, out uint face, out float2 faceUv)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.EnvironmentBinding);
+	TextureSamplerBindingData binding = GetEnvironmentBinding();
 
 	uint face = 0u;
 	float2 faceUv = 0.0.xx;
 	bool isValidFace = false;
 
-	if (g_DrawParam0 == IBL_DEBUG_PREVIEW_LAYOUT_CROSS)
+	if (GetDisplayLayout() == IBL_DEBUG_PREVIEW_LAYOUT_CROSS)
 	{
 		isValidFace = TryGetCrossFace(IN.UV, face, faceUv);
 	}

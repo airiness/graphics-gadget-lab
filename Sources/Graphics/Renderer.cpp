@@ -293,9 +293,9 @@ namespace gglab
 		// b0: SceneCB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::SceneCB)].InitAsConstantBufferView(0);
 
-		// b1: DrawCB, shaderRegister: b1
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::DrawCB)].InitAsConstants(
-			static_cast<UINT>(utils::EnumCount<CommonDrawCBIndex>()), 1);
+		// b1: LocalConstants, shaderRegister: b1
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::LocalConstants)].InitAsConstants(
+			static_cast<UINT>(utils::EnumCount<CommonLocalConstantIndex>()), 1);
 
 		// t1: ObjectSB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);

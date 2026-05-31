@@ -120,7 +120,7 @@ namespace gglab
 			dsHandle = dsDescriptor.m_CpuHandle;
 			dsHandlePtr = &dsHandle;
 		}
-		
+
 		m_D3D12GraphicsCommandList->OMSetRenderTargets(rtCount, rtHandles.data(), FALSE, dsHandlePtr);
 	}
 
@@ -151,6 +151,22 @@ namespace gglab
 	void DX12CommandList::SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorView& descriptor) const noexcept
 	{
 		m_D3D12GraphicsCommandList->SetGraphicsRootDescriptorTable(parameterIndex, descriptor.m_GpuHandle);
+	}
+
+	void DX12CommandList::SetGraphicsRoot32BitConstant(uint32_t parameterIndex, uint32_t value, uint32_t destOffset) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetGraphicsRoot32BitConstant(parameterIndex, value, destOffset);
+	}
+
+	void DX12CommandList::SetGraphicsRoot32BitConstants(uint32_t parameterIndex,
+		std::span<const uint32_t> values,
+		uint32_t destOffset) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetGraphicsRoot32BitConstants(
+			parameterIndex,
+			static_cast<UINT>(values.size()),
+			values.data(),
+			destOffset);
 	}
 
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept

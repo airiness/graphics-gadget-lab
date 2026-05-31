@@ -126,10 +126,10 @@ namespace gglab
 					commandList->SetRenderTarget(rtv);
 					commandList->ClearRenderTarget(rtv, *texture);
 
-					commandList->Get()->SetGraphicsRoot32BitConstant(
-						static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+					commandList->SetGraphicsRoot32BitConstant(
+						static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
 						face,
-						static_cast<uint32_t>(CommonDrawCBIndex::DrawParam0));
+						static_cast<uint32_t>(CommonLocalConstantIndex::Param0));
 
 					commandList->DrawInstanced(3);
 				}
