@@ -148,6 +148,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
@@ -240,6 +241,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
@@ -378,6 +380,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentDebugPreview.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
