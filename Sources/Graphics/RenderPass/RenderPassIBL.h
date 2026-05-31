@@ -3,6 +3,7 @@
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
+#include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderResourceRegistry.h"
 
@@ -24,6 +25,7 @@ namespace gglab
 	private:
 		RenderPassIBLEnvironment m_IBLEnvironmentPass;
 		RenderPassIBLIrradiance m_IBLIrradiancePass;
+		RenderPassIBLPrefilteredSpecular m_IBLPrefilteredSpecularPass;
 		RenderPassIBLBrdfLUT m_IBLBrdfLUTPass;
 	};
 }

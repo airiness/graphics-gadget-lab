@@ -345,6 +345,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLDebugPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
@@ -704,6 +707,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLDebugPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -760,6 +766,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>
