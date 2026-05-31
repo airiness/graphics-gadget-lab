@@ -109,6 +109,8 @@ namespace gglab
 			const TextureSrvCreateInfo& srvCreateInfo,
 			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
 
+		void InvalidateDependents(TextureIndex index) noexcept;
+
 		void DestroyTexture(TextureIndex index, const DX12FencePoint& fencePoint) noexcept;
 
 	private:

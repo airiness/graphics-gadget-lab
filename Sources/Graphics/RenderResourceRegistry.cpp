@@ -138,11 +138,15 @@ namespace gglab
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
 	{
 		m_TextureEntries[utils::ToIndex(index)].m_Dirty = true;
+		InvalidateDependents(index);
+	}
 
+	void RenderResourceRegistry::InvalidateDependents(TextureIndex index) noexcept
+	{
 		if (index == TextureIndex::IBL_EnvironmentCubemap)
 		{
-			m_TextureEntries[utils::ToIndex(TextureIndex::IBL_IrradianceCubemap)].m_Dirty = true;
-			m_TextureEntries[utils::ToIndex(TextureIndex::IBL_PrefilteredSpecularCubemap)].m_Dirty = true;
+			MarkDirty(TextureIndex::IBL_IrradianceCubemap);
+			MarkDirty(TextureIndex::IBL_PrefilteredSpecularCubemap);
 		}
 	}
 
@@ -253,7 +257,7 @@ namespace gglab
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
 
 		// Create new texture and ResourceIndex
-		auto createTexture = [this, &srvCreateInfo](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
+		auto createTexture = [this, index, &srvCreateInfo](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
 			{
 				const auto clearValue = DefaultClearValue<RGTextureDesc>(desc);
 				const auto texIndex = m_RGGpuResAllocator->Acquire<RGTextureDesc>(
@@ -273,7 +277,6 @@ namespace gglab
 					"ExternalIndex is not external.");
 
 				outEntry.m_Allocated = true;
-				outEntry.m_Dirty = true;
 				outEntry.m_SrvCreateInfo = srvCreateInfo;
 
 				// Make srv
@@ -285,6 +288,8 @@ namespace gglab
 				{
 					outEntry.m_SrvId = m_DescriptorManager->CreateBindlessSrv(texture, srvCreateInfo);
 				}
+
+				MarkDirty(index);
 			};
 
 		// Already exist. Check compatible
