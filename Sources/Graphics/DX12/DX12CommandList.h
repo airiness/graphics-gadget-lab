@@ -48,6 +48,8 @@ namespace gglab
 		void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) const noexcept;
 		void SetGraphicsConstantBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept;
 		void SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorView& descriptor) const noexcept;
+		void SetGraphicsRoot32BitConstant(uint32_t parameterIndex, uint32_t value, uint32_t destOffset = 0) const noexcept;
+		void SetGraphicsRoot32BitConstants(uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset = 0) const noexcept;
 		void AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept;
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;

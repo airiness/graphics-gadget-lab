@@ -7,6 +7,7 @@
 #include "Graphics/DX12/Cache/InputLayoutLibrary.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/SamplerRegistry.h"
 #include "Graphics/Utility/TextureViewDescUtils.h"
 
 namespace gglab
@@ -15,6 +16,8 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		GGLAB_UNUSED(context);
+
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
 
@@ -39,11 +42,12 @@ namespace gglab
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
 		};
 
-		auto* contextPtr = &context;
 		rg.AddPass<BuildPassData>("RenderPassIBL.BuildIrradianceCubemap",
-			[renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
+			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
 			{
 				builder.SideEffect();
 
@@ -77,8 +81,12 @@ namespace gglab
 
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;
+				data.m_EnvironmentTextureIndex = renderResRegistry->GetBindlessSrvIndex(
+					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+					SamplerPreset::LinearClamp);
 			},
-			[this, &rg, renderer, renderResRegistry, contextPtr](RGExecuteContext& executeContext, BuildPassData& data)
+			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, BuildPassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -140,20 +148,20 @@ namespace gglab
 				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-				commandList->SetGraphicsConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
-
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
 					const auto rtv = viewCache->GetOrCreate(data.m_RtvKeys[face], irradianceTexture);
 					commandList->SetRenderTarget(rtv);
 					commandList->ClearRenderTarget(rtv, *irradianceTexture);
 
-					commandList->Get()->SetGraphicsRoot32BitConstant(
-						static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+					const uint32_t localConstants[] = {
 						face,
-						static_cast<uint32_t>(CommonDrawCBIndex::DrawParam0));
+						data.m_EnvironmentTextureIndex,
+						data.m_EnvironmentSamplerIndex,
+					};
+					commandList->SetGraphicsRoot32BitConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
+						localConstants);
 
 					commandList->DrawInstanced(3);
 				}

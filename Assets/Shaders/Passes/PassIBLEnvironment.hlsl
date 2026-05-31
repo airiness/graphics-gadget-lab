@@ -3,7 +3,10 @@
 #include <Common/Cubemap.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-#define g_CubemapFaceIndex g_DrawParam0
+uint GetCubemapFaceIndex()
+{
+	return g_LocalParam0;
+}
 
 float3 ProcedualSkybox(float3 dir)
 {
@@ -19,7 +22,7 @@ float3 ProcedualSkybox(float3 dir)
 	float3 sunDir = normalize(float3(0.2, 0.8, 0.3));
 	float sun = pow(saturate(dot(dir, sunDir)), 512.0);
 	color += sun * float3(8.0, 6.5, 4.0);
-	
+
 	return color;
 }
 
@@ -30,6 +33,6 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	float3 dir = CubemapFaceUvToDirection(g_CubemapFaceIndex, IN.UV);
+	float3 dir = CubemapFaceUvToDirection(GetCubemapFaceIndex(), IN.UV);
 	return float4(ProcedualSkybox(dir), 1.0);
 }

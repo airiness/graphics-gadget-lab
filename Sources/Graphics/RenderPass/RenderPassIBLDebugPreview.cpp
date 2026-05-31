@@ -8,6 +8,7 @@
 #include "Graphics/DX12/Cache/InputLayoutLibrary.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/SamplerRegistry.h"
 
 namespace gglab
 {
@@ -33,11 +34,13 @@ namespace gglab
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			uint32_t m_DisplayLayout = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
 		};
 
 		auto* contextPtr = &context;
 		rg.AddPass<PreviewData>("RenderPassIBLDebugPreview.EnvironmentCubemap",
-			[renderResRegistry](RenderGraph::RGBuilder& builder, PreviewData& data)
+			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PreviewData& data)
 			{
 				builder.SideEffect();
 
@@ -73,6 +76,10 @@ namespace gglab
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLDebugPreviewLayout());
+				data.m_EnvironmentTextureIndex = renderResRegistry->GetBindlessSrvIndex(
+					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+					SamplerPreset::LinearClamp);
 			},
 			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, PreviewData& data)
 			{
@@ -142,10 +149,14 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
 
-				commandList->Get()->SetGraphicsRoot32BitConstant(
-					static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+				const uint32_t localConstants[] = {
 					data.m_DisplayLayout,
-					static_cast<uint32_t>(CommonDrawCBIndex::DrawParam0));
+					data.m_EnvironmentTextureIndex,
+					data.m_EnvironmentSamplerIndex,
+				};
+				commandList->SetGraphicsRoot32BitConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
+					localConstants);
 
 				commandList->DrawInstanced(3);
 

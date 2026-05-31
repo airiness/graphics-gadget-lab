@@ -153,10 +153,10 @@ namespace gglab
 					viewSB->GetBuffer()->GPUVirtualAddress());
 
 				// Set view index constant
-				commandList->Get()->SetGraphicsRoot32BitConstant(
-					static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+				commandList->SetGraphicsRoot32BitConstant(
+					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
-					static_cast<uint32_t>(CommonDrawCBIndex::ViewIndex));
+					static_cast<uint32_t>(CommonLocalConstantIndex::Param1));
 
 				auto* environmentCubemap = rg.GetTexture(data.m_EnvironmentCubemap);
 				TransitionTextureCommonToPixelShaderResource(commandList, environmentCubemap, 1, CubemapFaceCount);
@@ -285,10 +285,10 @@ namespace gglab
 			}
 
 			// Per draw item bindings
-			commandList->Get()->SetGraphicsRoot32BitConstant(
-				static_cast<uint32_t>(CommonRSRootParamIndex::DrawCB),
+			commandList->SetGraphicsRoot32BitConstant(
+				static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
 				drawItem.m_ObjectOffset,
-				static_cast<uint32_t>(CommonDrawCBIndex::ObjectIndex));
+				static_cast<uint32_t>(CommonLocalConstantIndex::Param0));
 
 			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}

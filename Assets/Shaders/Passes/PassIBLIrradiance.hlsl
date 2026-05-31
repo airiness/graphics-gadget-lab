@@ -5,7 +5,15 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-#define g_CubemapFaceIndex g_DrawParam0
+uint GetCubemapFaceIndex()
+{
+	return g_LocalParam0;
+}
+
+TextureSamplerBindingData GetEnvironmentBinding()
+{
+	return MakeTextureSamplerBinding(uint2(g_LocalParam1, g_LocalParam2));
+}
 
 float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 normalWS)
 {
@@ -35,9 +43,8 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	float3 normalWS = CubemapFaceUvToDirection(g_CubemapFaceIndex, IN.UV);
-	TextureSamplerBindingData environmentBinding =
-		MakeTextureSamplerBinding(g_Scene.IBLResource.EnvironmentBinding);
+	float3 normalWS = CubemapFaceUvToDirection(GetCubemapFaceIndex(), IN.UV);
+	TextureSamplerBindingData environmentBinding = GetEnvironmentBinding();
 
 	return float4(IntegrateIrradiance(environmentBinding, normalWS), 1.0);
 }
