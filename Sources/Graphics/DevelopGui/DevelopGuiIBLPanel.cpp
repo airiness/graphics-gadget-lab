@@ -6,7 +6,7 @@ namespace gglab
 {
 	namespace
 	{
-		struct PBRPanelState
+		struct IBLPanelState
 		{
 			float m_BrdfLutPreviewSize = 256.0f;
 			float m_EnvironmentPreviewWidth = 512.0f;
@@ -53,7 +53,7 @@ namespace gglab
 
 	void DevelopGuiIBLPanel(DevelopGuiContext& context) noexcept
 	{
-		auto& state = context.PanelState<PBRPanelState>();
+		auto& state = context.PanelState<IBLPanelState>();
 
 		ImGui::TextUnformatted("IBL");
 		ImGui::Separator();

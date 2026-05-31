@@ -342,6 +342,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLDebugPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
@@ -698,6 +701,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLDebugPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -730,6 +736,9 @@
     <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
@@ -748,6 +757,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentDebugPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>
