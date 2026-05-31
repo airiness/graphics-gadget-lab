@@ -8,7 +8,7 @@ uint GetCubemapFaceIndex()
 	return g_LocalParam0;
 }
 
-float3 ProcedualSkybox(float3 dir)
+float3 ProceduralSkybox(float3 dir)
 {
 	float t = saturate(dir.y * 0.5 + 0.5);
 
@@ -34,5 +34,5 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float3 dir = CubemapFaceUvToDirection(GetCubemapFaceIndex(), IN.UV);
-	return float4(ProcedualSkybox(dir), 1.0);
+	return float4(ProceduralSkybox(dir), 1.0);
 }
