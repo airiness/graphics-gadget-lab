@@ -49,6 +49,9 @@ namespace gglab
 		// Add IBL Environment Pass
 		m_IBLEnvironmentPass.AddPass(rg, context, services);
 
+		// Add IBL Irradiance Pass
+		m_IBLIrradiancePass.AddPass(rg, context, services);
+
 		// Add IBL BRDF LUT Pass
 		m_IBLBrdfLUTPass.AddPass(rg, context, services);
 	}

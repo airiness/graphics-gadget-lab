@@ -147,6 +147,7 @@
     <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
@@ -238,6 +239,7 @@
     <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
@@ -366,6 +368,7 @@
     <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli" />
     <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Assets\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
@@ -374,6 +377,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentDebugPreview.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

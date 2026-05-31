@@ -138,6 +138,12 @@ namespace gglab
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
 	{
 		m_TextureEntries[utils::ToIndex(index)].m_Dirty = true;
+
+		if (index == TextureIndex::IBL_EnvironmentCubemap)
+		{
+			m_TextureEntries[utils::ToIndex(TextureIndex::IBL_IrradianceCubemap)].m_Dirty = true;
+			m_TextureEntries[utils::ToIndex(TextureIndex::IBL_PrefilteredSpecularCubemap)].m_Dirty = true;
+		}
 	}
 
 	bool RenderResourceRegistry::IsDirty(TextureIndex index) const noexcept

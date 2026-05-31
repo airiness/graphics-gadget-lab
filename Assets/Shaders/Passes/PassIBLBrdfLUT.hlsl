@@ -1,4 +1,5 @@
 #include <Common/Common.hlsli>
+#include <Common/Sampling.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <PBR/BRDF.hlsli>
 
