@@ -184,10 +184,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	Lo += emissive;
 
 	// IBL
-	float3 iblF = F_Schlick(
-		F0,
-		max((1.0 - perceptualRoughness).xxx, F0),
-		NoV);
+	float3 iblF = F_Schlick(F0, max((1.0 - perceptualRoughness).xxx, F0), NoV);
+	
 	float3 diffuseIBLFactor = (1.0.xxx - iblF) * (1.0 - metallic);
 	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseIBLFactor * Fd_Lambert(baseColor);
 

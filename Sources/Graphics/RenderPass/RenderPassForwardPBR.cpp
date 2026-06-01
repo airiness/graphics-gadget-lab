@@ -56,7 +56,8 @@ namespace gglab
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_Depth{};
-			RGTextureId m_EnvironmentCubemap{};
+			RGTextureId m_IrradianceCubemap{};
+			RGTextureId m_PrefilteredSpecularCubemap{};
 			RGTextureId m_BrdfLut{};
 
 			ViewKey m_RtvKey{};
@@ -86,7 +87,8 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
-				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureUsage::Sample);
+				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureUsage::Sample);
+				data.m_PrefilteredSpecularCubemap = builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureUsage::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 
 				data.m_RtvKey = mainTargets.m_BackBufferRTVKey;
@@ -158,15 +160,19 @@ namespace gglab
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					static_cast<uint32_t>(CommonLocalConstantIndex::Param1));
 
-				auto* environmentCubemap = rg.GetTexture(data.m_EnvironmentCubemap);
-				TransitionTextureCommonToPixelShaderResource(commandList, environmentCubemap, 1, CubemapFaceCount);
+				auto* irradianceCubemap = rg.GetTexture(data.m_IrradianceCubemap);
+				TransitionTextureCommonToPixelShaderResource(commandList, irradianceCubemap, 1, CubemapFaceCount);
+
+				auto* prefilteredSpecularCubemap = rg.GetTexture(data.m_PrefilteredSpecularCubemap);
+				TransitionTextureCommonToPixelShaderResource(commandList, prefilteredSpecularCubemap, 1, CubemapFaceCount);
 
 				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
 				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture, 1, 1);
 
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
 
-				TransitionTexturePixelShaderResourceToCommon(commandList, environmentCubemap, 1, CubemapFaceCount);
+				TransitionTexturePixelShaderResourceToCommon(commandList, irradianceCubemap, 1, CubemapFaceCount);
+				TransitionTexturePixelShaderResourceToCommon(commandList, prefilteredSpecularCubemap, 1, CubemapFaceCount);
 				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture, 1, 1);
 			});
 	}
