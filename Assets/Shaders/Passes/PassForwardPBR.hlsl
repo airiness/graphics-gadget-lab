@@ -56,12 +56,6 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, 
 	return perturbedNormalWS;
 }
 
-float3 SampleIBLEnvironment(float3 dirWS)
-{
-	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.EnvironmentBinding);
-	return SampleTextureCube(binding, normalize(dirWS)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
-}
-
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
 {
 	float4 value = SampleTextureBindingLevel(
@@ -189,31 +183,27 @@ float4 PSMain(VSOutput IN) : SV_Target
 	// Add emissive
 	Lo += emissive;
 
-	// LUT for IBL specular
+	// IBL
+	float3 iblF = F_Schlick(
+		F0,
+		max((1.0 - perceptualRoughness).xxx, F0),
+		NoV);
+	float3 diffuseIBLFactor = (1.0.xxx - iblF) * (1.0 - metallic);
+	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseIBLFactor * Fd_Lambert(baseColor);
+
 	float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
 	float3 specularIBLFactor = F0 * brdfLUT.x + brdfLUT.y;
 
-	// TODO: sample prefiltered environment map with roughness as mip level
 	float3 reflectWS = reflect(-V, N);
-	float3 fakePrefilteredEnv = SampleIBLEnvironment(reflectWS);
-	float3 specularIBL = fakePrefilteredEnv * specularIBLFactor;
-
-	// TODO: temperary ambient
-	float up = saturate(normalWS.y * 0.5f + 0.5f);
-	float3 sky = float3(0.4, 0.5, 0.8);
-	float3 ground = float3(0.05, 0.04, 0.03);
-	float3 hemi = lerp(ground, sky, up);
+	float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
+	float3 specularIBL = prefilteredEnv * specularIBLFactor;
 
 	// AO texture
 	float aoSampled = SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, IN.UV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 
-	float3 ambient = hemi * baseColor * 0.2;
-	Lo += ambient * ao;
-
-	// TODO: Specular IBL
-	Lo += specularIBL * 0.1;
+	Lo += (diffuseIBL + specularIBL) * ao;
 
 	// Tonemap
 	float3 color = ACESFitted(Lo * viewData.Exposure);
