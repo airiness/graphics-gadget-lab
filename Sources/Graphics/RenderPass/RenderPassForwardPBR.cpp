@@ -164,7 +164,9 @@ namespace gglab
 				TransitionTextureCommonToPixelShaderResource(commandList, irradianceCubemap, 1, CubemapFaceCount);
 
 				auto* prefilteredSpecularCubemap = rg.GetTexture(data.m_PrefilteredSpecularCubemap);
-				TransitionTextureCommonToPixelShaderResource(commandList, prefilteredSpecularCubemap, 1, CubemapFaceCount);
+				const auto prefilteredSpecularMipCount = prefilteredSpecularCubemap->GetDesc().MipLevels;
+				TransitionTextureCommonToPixelShaderResource(commandList, prefilteredSpecularCubemap,
+					prefilteredSpecularMipCount, CubemapFaceCount);
 
 				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
 				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture, 1, 1);
@@ -172,7 +174,7 @@ namespace gglab
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
 
 				TransitionTexturePixelShaderResourceToCommon(commandList, irradianceCubemap, 1, CubemapFaceCount);
-				TransitionTexturePixelShaderResourceToCommon(commandList, prefilteredSpecularCubemap, 1, CubemapFaceCount);
+				TransitionTexturePixelShaderResourceToCommon(commandList, prefilteredSpecularCubemap, prefilteredSpecularMipCount, CubemapFaceCount);
 				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture, 1, 1);
 			});
 	}
