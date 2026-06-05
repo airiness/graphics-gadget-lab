@@ -75,23 +75,6 @@ namespace gglab
 
 				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, brdfLutTexture);
 
-				// Temporary manual barrier.
-				// TODO: Remove this after RenderGraph supports automatic barrier inference from builder.Write/Read.
-				{
-					CD3DX12_TEXTURE_BARRIER toRenderTarget(
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						brdfLutTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-					commandList->AddTextureBarrier(toRenderTarget);
-					commandList->FlushBarriers();
-				}
-
 				commandList->ClearRenderTarget(rtv, *brdfLutTexture);
 
 				auto* pso = GetOrCreatePSO(*renderer);
@@ -116,22 +99,6 @@ namespace gglab
 				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				commandList->DrawInstanced(3);
-
-				// Resource Barrier
-				{
-					CD3DX12_TEXTURE_BARRIER toCommon(
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						brdfLutTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-					commandList->AddTextureBarrier(toCommon);
-					commandList->FlushBarriers();
-				}
 
 				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 			});

@@ -10,6 +10,12 @@ namespace gglab
 		RGBuffer,
 	};
 
+	enum class RGResourceAccessType : uint8_t
+	{
+		Read,
+		Write,
+	};
+
 	template<typename RESOURCE>
 	struct RGResourceTraits;
 
@@ -27,6 +33,7 @@ namespace gglab
 		CopySrc = 1u << 4,
 		CopyDst = 1u << 5,
 		Present = 1u << 6,		// BackBuffer
+		DepthStencilRead = 1u << 7,
 	};
 	GGLAB_ENUM_FLAGS(RGTextureUsage);
 

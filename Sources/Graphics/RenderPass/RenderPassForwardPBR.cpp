@@ -13,41 +13,6 @@
 
 namespace gglab
 {
-	namespace
-	{
-		void TransitionTextureCommonToPixelShaderResource(DX12CommandList* commandList,
-			DX12Texture* texture, uint32_t mipCount, uint32_t arrayCount) noexcept
-		{
-			CD3DX12_TEXTURE_BARRIER barrier(
-				D3D12_BARRIER_SYNC_ALL,
-				D3D12_BARRIER_SYNC_PIXEL_SHADING,
-				D3D12_BARRIER_ACCESS_COMMON,
-				D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-				D3D12_BARRIER_LAYOUT_COMMON,
-				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-				texture->Get(),
-				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, mipCount, 0, arrayCount));
-			commandList->AddTextureBarrier(barrier);
-			commandList->FlushBarriers();
-		}
-
-		void TransitionTexturePixelShaderResourceToCommon(DX12CommandList* commandList,
-			DX12Texture* texture, uint32_t mipCount, uint32_t arrayCount) noexcept
-		{
-			CD3DX12_TEXTURE_BARRIER barrier(
-				D3D12_BARRIER_SYNC_PIXEL_SHADING,
-				D3D12_BARRIER_SYNC_ALL,
-				D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-				D3D12_BARRIER_ACCESS_COMMON,
-				D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-				D3D12_BARRIER_LAYOUT_COMMON,
-				texture->Get(),
-				CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, mipCount, 0, arrayCount));
-			commandList->AddTextureBarrier(barrier);
-			commandList->FlushBarriers();
-		}
-	}
-
 	void RenderPassForwardPBR::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -160,22 +125,7 @@ namespace gglab
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					static_cast<uint32_t>(CommonLocalConstantIndex::Param1));
 
-				auto* irradianceCubemap = rg.GetTexture(data.m_IrradianceCubemap);
-				TransitionTextureCommonToPixelShaderResource(commandList, irradianceCubemap, 1, CubemapFaceCount);
-
-				auto* prefilteredSpecularCubemap = rg.GetTexture(data.m_PrefilteredSpecularCubemap);
-				const auto prefilteredSpecularMipCount = prefilteredSpecularCubemap->GetDesc().MipLevels;
-				TransitionTextureCommonToPixelShaderResource(commandList, prefilteredSpecularCubemap,
-					prefilteredSpecularMipCount, CubemapFaceCount);
-
-				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
-				TransitionTextureCommonToPixelShaderResource(commandList, brdfLutTexture, 1, 1);
-
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
-
-				TransitionTexturePixelShaderResourceToCommon(commandList, irradianceCubemap, 1, CubemapFaceCount);
-				TransitionTexturePixelShaderResourceToCommon(commandList, prefilteredSpecularCubemap, prefilteredSpecularMipCount, CubemapFaceCount);
-				TransitionTexturePixelShaderResourceToCommon(commandList, brdfLutTexture, 1, 1);
 			});
 	}
 
