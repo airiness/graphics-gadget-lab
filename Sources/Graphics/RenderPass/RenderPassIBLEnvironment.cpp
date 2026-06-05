@@ -83,23 +83,6 @@ namespace gglab
 				auto* viewCache = rg.GetViewCache();
 				GGLAB_ASSERT_NOT_NULL(viewCache);
 
-				// Temporary manual barrier.
-				// TODO: Remove this after RenderGraph supports automatic barrier inference from builder.Write/Read.
-				{
-					CD3DX12_TEXTURE_BARRIER toRenderTarget(
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						texture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
-
-					commandList->AddTextureBarrier(toRenderTarget);
-					commandList->FlushBarriers();
-				}
-
 				auto* pso = GetOrCreatePSO(*renderer);
 				GGLAB_ASSERT_NOT_NULL(pso);
 
@@ -132,22 +115,6 @@ namespace gglab
 						static_cast<uint32_t>(CommonLocalConstantIndex::Param0));
 
 					commandList->DrawInstanced(3);
-				}
-
-				// Resource Barrier
-				{
-					CD3DX12_TEXTURE_BARRIER toCommon(
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						texture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
-
-					commandList->AddTextureBarrier(toCommon);
-					commandList->FlushBarriers();
 				}
 
 				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);

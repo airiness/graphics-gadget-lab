@@ -61,7 +61,7 @@ namespace gglab
 					"DebugPreview.IBL.EnvironmentCubemap",
 					previewTexture,
 					previewDesc,
-					D3D12_RESOURCE_STATE_COMMON);
+					RGTextureUsage::None);
 
 				data.m_EnvironmentCubemapPreview = builder.Write(
 					debugPreviewRes.m_EnvironmentCubemapPreview,
@@ -94,32 +94,6 @@ namespace gglab
 
 				auto* viewCache = rg.GetViewCache();
 				GGLAB_ASSERT_NOT_NULL(viewCache);
-
-				{
-					CD3DX12_TEXTURE_BARRIER environmentToShaderResource(
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_SYNC_PIXEL_SHADING,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-						environmentTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
-
-					CD3DX12_TEXTURE_BARRIER previewToRenderTarget(
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						previewTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-					commandList->AddTextureBarrier(environmentToShaderResource);
-					commandList->AddTextureBarrier(previewToRenderTarget);
-					commandList->FlushBarriers();
-				}
 
 				const auto rtv = viewCache->GetOrCreate(data.m_RtvKey, previewTexture);
 				commandList->ClearRenderTarget(rtv, *previewTexture);
@@ -160,31 +134,6 @@ namespace gglab
 
 				commandList->DrawInstanced(3);
 
-				{
-					CD3DX12_TEXTURE_BARRIER previewToCommon(
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						previewTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-					CD3DX12_TEXTURE_BARRIER environmentToCommon(
-						D3D12_BARRIER_SYNC_PIXEL_SHADING,
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						environmentTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
-
-					commandList->AddTextureBarrier(previewToCommon);
-					commandList->AddTextureBarrier(environmentToCommon);
-					commandList->FlushBarriers();
-				}
 			});
 	}
 

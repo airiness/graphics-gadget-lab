@@ -51,7 +51,7 @@ namespace gglab
 				targets.m_Color = builder.ImportTexture("MainView.BackBuffer",
 					backTexture,
 					backBufferDesc,
-					D3D12_RESOURCE_STATE_PRESENT);
+					RGTextureUsage::Present);
 
 				// Create depth buffer
 				RGTextureDesc depthBufferDesc{};
@@ -102,19 +102,6 @@ namespace gglab
 
 				auto* commandList = executeContext.m_GraphicsCommandList;
 
-				// TODO: RenderGraph resource auto barrier
-				CD3DX12_TEXTURE_BARRIER barrier(
-					D3D12_BARRIER_SYNC_ALL,
-					D3D12_BARRIER_SYNC_RENDER_TARGET,
-					D3D12_BARRIER_ACCESS_COMMON,
-					D3D12_BARRIER_ACCESS_RENDER_TARGET,
-					D3D12_BARRIER_LAYOUT_PRESENT,
-					D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-					backTexture->Get(),
-					CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-				commandList->AddTextureBarrier(barrier);
-				commandList->FlushBarriers();
-
 				auto* viewCache = rg.GetViewCache();
 				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
 
@@ -149,26 +136,7 @@ namespace gglab
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(targets.m_Color,
 					RGTextureUsage::RenderTarget);
-			},
-			[&rg](RGExecuteContext& executeContext, FinishBackBufferData& data)
-			{
-				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-				GGLAB_ASSERT(backTexture);
-
-				auto* commandList = executeContext.m_GraphicsCommandList;
-
-				CD3DX12_TEXTURE_BARRIER barrier(
-					D3D12_BARRIER_SYNC_RENDER_TARGET,
-					D3D12_BARRIER_SYNC_ALL,
-					D3D12_BARRIER_ACCESS_RENDER_TARGET,
-					D3D12_BARRIER_ACCESS_COMMON,
-					D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-					D3D12_BARRIER_LAYOUT_PRESENT,
-					backTexture->Get(),
-					CD3DX12_BARRIER_SUBRESOURCE_RANGE(0));
-
-				commandList->AddTextureBarrier(barrier);
-				commandList->FlushBarriers();
+				builder.Export(data.m_BackBuffer, RGTextureUsage::Present);
 			});
 	}
 }

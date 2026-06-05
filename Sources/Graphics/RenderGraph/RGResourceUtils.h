@@ -4,6 +4,199 @@
 
 namespace gglab
 {
+	struct RGBarrierState
+	{
+		D3D12_BARRIER_SYNC m_Sync = D3D12_BARRIER_SYNC_ALL;
+		D3D12_BARRIER_ACCESS m_Access = D3D12_BARRIER_ACCESS_COMMON;
+		D3D12_BARRIER_LAYOUT m_Layout = D3D12_BARRIER_LAYOUT_COMMON;
+
+		bool operator==(const RGBarrierState&) const noexcept = default;
+	};
+
+	constexpr inline RGBarrierState CommonRGBarrierState() noexcept
+	{
+		return {};
+	}
+
+	constexpr inline bool HasUavAccess(const RGBarrierState& state) noexcept
+	{
+		return (state.m_Access & D3D12_BARRIER_ACCESS_UNORDERED_ACCESS) != 0;
+	}
+
+	constexpr inline bool NeedsRGBarrier(const RGBarrierState& before, const RGBarrierState& after) noexcept
+	{
+		return before != after || (HasUavAccess(before) && HasUavAccess(after));
+	}
+
+	template<typename ResourceUsage>
+	constexpr inline RGBarrierState ToRGBarrierState(ResourceUsage usage) noexcept = delete;
+
+	template<>
+	constexpr inline RGBarrierState ToRGBarrierState<RGTextureUsage>(RGTextureUsage usage) noexcept
+	{
+		using U = RGTextureUsage;
+
+		GGLAB_ASSERT_MSG(
+			usage == U::None ||
+			usage == U::Sample ||
+			usage == U::RenderTarget ||
+			usage == U::DepthStencil ||
+			usage == U::DepthStencilRead ||
+			usage == U::UAV ||
+			usage == U::CopySrc ||
+			usage == U::CopyDst ||
+			usage == U::Present,
+			"RGTextureUsage must describe exactly one access type.");
+
+		switch (usage)
+		{
+		case U::None:
+			return CommonRGBarrierState();
+		case U::Sample:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_ALL_SHADING,
+				.m_Access = D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
+				.m_Layout = D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
+			};
+		case U::RenderTarget:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_RENDER_TARGET,
+				.m_Access = D3D12_BARRIER_ACCESS_RENDER_TARGET,
+				.m_Layout = D3D12_BARRIER_LAYOUT_RENDER_TARGET,
+			};
+		case U::DepthStencil:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+				.m_Access = D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE,
+				.m_Layout = D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE,
+			};
+		case U::DepthStencilRead:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_DEPTH_STENCIL,
+				.m_Access = D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ,
+				.m_Layout = D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ,
+			};
+		case U::UAV:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_ALL_SHADING,
+				.m_Access = D3D12_BARRIER_ACCESS_UNORDERED_ACCESS,
+				.m_Layout = D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS,
+			};
+		case U::CopySrc:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_COPY,
+				.m_Access = D3D12_BARRIER_ACCESS_COPY_SOURCE,
+				.m_Layout = D3D12_BARRIER_LAYOUT_COPY_SOURCE,
+			};
+		case U::CopyDst:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_COPY,
+				.m_Access = D3D12_BARRIER_ACCESS_COPY_DEST,
+				.m_Layout = D3D12_BARRIER_LAYOUT_COPY_DEST,
+			};
+		case U::Present:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_ALL,
+				.m_Access = D3D12_BARRIER_ACCESS_COMMON,
+				.m_Layout = D3D12_BARRIER_LAYOUT_PRESENT,
+			};
+		}
+
+		GGLAB_UNREACHABLE("Unhandled RGTextureUsage.");
+	}
+
+	template<>
+	constexpr inline RGBarrierState ToRGBarrierState<RGBufferUsage>(RGBufferUsage usage) noexcept
+	{
+		using U = RGBufferUsage;
+
+		constexpr U readUsages = U::Vertex | U::Index | U::Constant;
+		const bool hasReadUsage = Any(usage & readUsages);
+		const bool hasExclusiveUsage = Test(usage, U::UAV | U::CopySrc | U::CopyDst);
+		GGLAB_ASSERT_MSG(
+			usage == U::None ||
+			(hasReadUsage && !hasExclusiveUsage) ||
+			usage == U::UAV ||
+			usage == U::CopySrc ||
+			usage == U::CopyDst,
+			"RGBufferUsage contains incompatible access types.");
+
+		if (usage == U::None)
+		{
+			return CommonRGBarrierState();
+		}
+
+		if (hasReadUsage)
+		{
+			RGBarrierState state =
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_NONE,
+				.m_Access = D3D12_BARRIER_ACCESS_COMMON,
+			};
+			if (Test(usage, U::Vertex))
+			{
+				state.m_Sync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
+				state.m_Access |= D3D12_BARRIER_ACCESS_VERTEX_BUFFER;
+			}
+			if (Test(usage, U::Index))
+			{
+				state.m_Sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
+				state.m_Access |= D3D12_BARRIER_ACCESS_INDEX_BUFFER;
+			}
+			if (Test(usage, U::Constant))
+			{
+				state.m_Sync |= D3D12_BARRIER_SYNC_ALL_SHADING;
+				state.m_Access |= D3D12_BARRIER_ACCESS_CONSTANT_BUFFER;
+			}
+			return state;
+		}
+
+		switch (usage)
+		{
+		case U::UAV:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_ALL_SHADING,
+				.m_Access = D3D12_BARRIER_ACCESS_UNORDERED_ACCESS,
+			};
+		case U::CopySrc:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_COPY,
+				.m_Access = D3D12_BARRIER_ACCESS_COPY_SOURCE,
+			};
+		case U::CopyDst:
+			return
+			{
+				.m_Sync = D3D12_BARRIER_SYNC_COPY,
+				.m_Access = D3D12_BARRIER_ACCESS_COPY_DEST,
+			};
+		}
+
+		GGLAB_UNREACHABLE("Unhandled RGBufferUsage.");
+	}
+
+	constexpr inline RGBarrierState ToRGBarrierState(uint64_t usageBits, RGResourceType resourceType) noexcept
+	{
+		switch (resourceType)
+		{
+		case RGResourceType::RGTexture:
+			return ToRGBarrierState(static_cast<RGTextureUsage>(usageBits));
+		case RGResourceType::RGBuffer:
+			return ToRGBarrierState(static_cast<RGBufferUsage>(usageBits));
+		}
+
+		GGLAB_UNREACHABLE("Unhandled RGResourceType.");
+	}
+
 	template<typename ResourceUsage>
 	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates(ResourceUsage usage, bool unuse = false) noexcept = delete;
 
@@ -24,6 +217,10 @@ namespace gglab
 		if (Test(rgTexUsage, U::DepthStencil))
 		{
 			states |= depthReadOnly ? D3D12_RESOURCE_STATE_DEPTH_READ : D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		}
+		if (Test(rgTexUsage, U::DepthStencilRead))
+		{
+			states |= D3D12_RESOURCE_STATE_DEPTH_READ;
 		}
 		if (Test(rgTexUsage, U::UAV))
 		{

@@ -109,34 +109,6 @@ namespace gglab
 				auto* viewCache = rg.GetViewCache();
 				GGLAB_ASSERT_NOT_NULL(viewCache);
 
-				// Temporary manual barriers.
-				// TODO: Remove these after RenderGraph supports automatic barrier inference from builder.Write/Read.
-				{
-					CD3DX12_TEXTURE_BARRIER environmentToShaderResource(
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_SYNC_PIXEL_SHADING,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-						environmentTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
-
-					CD3DX12_TEXTURE_BARRIER prefilteredSpecularToRenderTarget(
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						prefilteredSpecularTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, data.m_MipLevels, 0, CubemapFaceCount));
-
-					commandList->AddTextureBarrier(environmentToShaderResource);
-					commandList->AddTextureBarrier(prefilteredSpecularToRenderTarget);
-					commandList->FlushBarriers();
-				}
-
 				auto* pso = GetOrCreatePSO(*renderer);
 				GGLAB_ASSERT_NOT_NULL(pso);
 
@@ -185,32 +157,6 @@ namespace gglab
 
 						commandList->DrawInstanced(3);
 					}
-				}
-
-				{
-					CD3DX12_TEXTURE_BARRIER prefilteredSpecularToCommon(
-						D3D12_BARRIER_SYNC_RENDER_TARGET,
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_ACCESS_RENDER_TARGET,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_LAYOUT_RENDER_TARGET,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						prefilteredSpecularTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, data.m_MipLevels, 0, CubemapFaceCount));
-
-					CD3DX12_TEXTURE_BARRIER environmentToCommon(
-						D3D12_BARRIER_SYNC_PIXEL_SHADING,
-						D3D12_BARRIER_SYNC_ALL,
-						D3D12_BARRIER_ACCESS_SHADER_RESOURCE,
-						D3D12_BARRIER_ACCESS_COMMON,
-						D3D12_BARRIER_LAYOUT_SHADER_RESOURCE,
-						D3D12_BARRIER_LAYOUT_COMMON,
-						environmentTexture->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(0, 1, 0, CubemapFaceCount));
-
-					commandList->AddTextureBarrier(prefilteredSpecularToCommon);
-					commandList->AddTextureBarrier(environmentToCommon);
-					commandList->FlushBarriers();
 				}
 
 				renderResRegistry->ClearDirty(
