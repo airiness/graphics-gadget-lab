@@ -42,8 +42,11 @@ namespace gglab
 			uint32_t m_BrdfLutSize = 256;
 			DXGI_FORMAT m_BrdfLutFormat = DXGI_FORMAT_R16G16_FLOAT;
 
-			uint32_t m_DebugPreviewIBLEnvironmentCubemapFaceSize = 256;
-			DXGI_FORMAT m_DebugPreviewIBLEnvironmentCubemapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+			uint32_t m_PreviewIBLEnvironmentCubemapFaceSize = 256;
+			DXGI_FORMAT m_PreviewIBLEnvironmentCubemapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+			uint32_t m_PreviewIBLPrefilteredSpecularCubemapFaceSize = 256;
+			DXGI_FORMAT m_PreviewIBLPrefilteredSpecularCubemapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		};
 
 		enum class TextureIndex : uint8_t
@@ -52,12 +55,13 @@ namespace gglab
 			IBL_IrradianceCubemap,
 			IBL_PrefilteredSpecularCubemap,
 			IBL_BrdfLut,
-			DebugPreview_IBL_EnvironmentCubemap,
+			Preview_IBL_EnvironmentCubemap,
+			Preview_IBL_PrefilteredSpecularCubemap,
 
 			Count
 		};
 
-		enum class IBLDebugPreviewLayout : uint32_t
+		enum class IBLPreviewLayout : uint32_t
 		{
 			Grid2x3,
 			Cross,
@@ -96,8 +100,14 @@ namespace gglab
 		uint32_t GetBindlessSrvIndex(TextureIndex index) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSrvGpuHandle(TextureIndex index) const noexcept;
 
-		void SetIBLDebugPreviewLayout(IBLDebugPreviewLayout layout) noexcept;
-		IBLDebugPreviewLayout GetIBLDebugPreviewLayout() const noexcept { return m_IBLDebugPreviewLayout; }
+		void SetIBLEnvironmentPreviewLayout(IBLPreviewLayout layout) noexcept;
+		IBLPreviewLayout GetIBLEnvironmentPreviewLayout() const noexcept { return m_IBLEnvironmentPreviewLayout; }
+
+		void SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept;
+		IBLPreviewLayout GetIBLPrefilteredSpecularPreviewLayout() const noexcept { return m_IBLPrefilteredSpecularPreviewLayout; }
+
+		void SetIBLPrefilteredSpecularPreviewMip(uint32_t mip) noexcept;
+		uint32_t GetIBLPrefilteredSpecularPreviewMip() const noexcept { return m_IBLPrefilteredSpecularPreviewMip; }
 
 		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
@@ -120,6 +130,8 @@ namespace gglab
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
-		IBLDebugPreviewLayout m_IBLDebugPreviewLayout = IBLDebugPreviewLayout::Cross;
+		IBLPreviewLayout m_IBLEnvironmentPreviewLayout = IBLPreviewLayout::Cross;
+		IBLPreviewLayout m_IBLPrefilteredSpecularPreviewLayout = IBLPreviewLayout::Cross;
+		uint32_t m_IBLPrefilteredSpecularPreviewMip = 0;
 	};
 }

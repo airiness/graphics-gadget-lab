@@ -4,7 +4,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
-#include "Graphics/RenderGraph/RGIBLDebugPreviewResources.h"
+#include "Graphics/RenderGraph/RGIBLPreviewResources.h"
 #include "Graphics/DevelopGui/DevelopGui.h"
 
 namespace gglab
@@ -20,6 +20,7 @@ namespace gglab
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_EnvironmentCubemapPreview{};
+			RGTextureId m_PrefilteredSpecularCubemapPreview{};
 			ViewKey m_RtvKey{};
 		};
 
@@ -38,15 +39,19 @@ namespace gglab
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 
-				auto& iblDebugPreviewRes = blackboard.Get<RGIBLDebugPreviewResources>(IBLDebugPreviewResourcesName);
+				auto& iblPreviewRes = blackboard.Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
 				data.m_EnvironmentCubemapPreview = builder.Read(
-					iblDebugPreviewRes.m_EnvironmentCubemapPreview,
+					iblPreviewRes.m_EnvironmentCubemapPreview,
+					RGTextureUsage::Sample);
+				data.m_PrefilteredSpecularCubemapPreview = builder.Read(
+					iblPreviewRes.m_PrefilteredSpecularCubemapPreview,
 					RGTextureUsage::Sample);
 			},
 			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
 			{
 				GGLAB_UNUSED(data.m_BrdfLut);
 				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
+				GGLAB_UNUSED(data.m_PrefilteredSpecularCubemapPreview);
 
 				auto* developGui = services.m_Renderer->GetDevelopGui();
 

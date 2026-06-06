@@ -115,8 +115,8 @@ namespace gglab
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);
 
-		// IBL Debug Preview
-		m_IBLDebugPreviewPass.AddPass(rg, context, services);
+		// IBL Preview
+		m_IBLPreviewPass.AddPass(rg, context, services);
 
 		// DevelopGui	
 		m_DevelopGuiPass.AddPass(rg, context, services);
