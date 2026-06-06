@@ -7,4 +7,9 @@ namespace gglab::utils
 
 	// return the last segment not null
 	std::string_view FindLeaf(std::string_view path) noexcept;
+
+	constexpr const char* BoolToString(bool value) noexcept
+	{
+		return value ? "Yes" : "No";
+	}
 }

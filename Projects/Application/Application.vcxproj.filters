@@ -76,14 +76,23 @@
     <Filter Include="Externals\ImGui">
       <UniqueIdentifier>{fcaf4650-56ee-4d51-9d13-291379cac5b5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\DevelopGui">
-      <UniqueIdentifier>{829376d1-6b70-4ce7-9785-ae216f890dbf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\DX12\Descriptor">
       <UniqueIdentifier>{bbedd216-a444-41bc-8acd-a22ddeebbd53}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\Utility">
       <UniqueIdentifier>{d892a0d4-9889-4a83-a0fe-d9ee5889cd10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools">
+      <UniqueIdentifier>{7d8e678e-3509-4f8e-86ff-5cb9c6ac8c50}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui">
+      <UniqueIdentifier>{11ed597e-3cda-4a93-8640-fb77231c31d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Panels">
+      <UniqueIdentifier>{554b19f9-b68e-4b10-b1ef-61957f195b37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\EnumText">
+      <UniqueIdentifier>{c0a6f692-b901-4083-b468-2b64d223c3e6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -276,8 +285,8 @@
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
       <Filter>Externals\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGui.cpp">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGui.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
@@ -309,14 +318,14 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderQueue.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRegistry.cpp">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiCameraPanel.cpp">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp">
       <Filter>Graphics\RenderPass</Filter>
@@ -327,11 +336,17 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.cpp">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRenderGraphInspectorPanel.cpp">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
       <Filter>Graphics</Filter>
@@ -354,7 +369,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphInspector.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
   </ItemGroup>
@@ -376,6 +391,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Application.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDX12.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h">
+      <Filter>DevTools\EnumText</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12PipelineState.h">
       <Filter>Graphics\DX12</Filter>
@@ -629,8 +659,8 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h">
       <Filter>Externals\ImGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGui.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGui.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>
@@ -659,20 +689,26 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRegistry.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiContext.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiContext.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiCameraPanel.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiStateStore.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiStateStore.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiImGuiToolsPanel.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanel.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\CameraController.h">
       <Filter>Graphics</Filter>
@@ -686,11 +722,11 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRenderGraphInspectorPanel.h">
-      <Filter>Graphics\DevelopGui</Filter>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h">
       <Filter>Graphics\RenderGraph</Filter>
@@ -725,7 +761,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphInspector.h">
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
   </ItemGroup>

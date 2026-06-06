@@ -1,14 +1,14 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderGraph/RenderGraphInspector.h"
+#include "Graphics/RenderGraph/RenderGraphSnapshot.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 
 namespace gglab
 {
 	namespace
 	{
-		constexpr uint32_t InvalidInspectorResourceIndex = std::numeric_limits<uint32_t>::max();
+		constexpr uint32_t InvalidSnapshotResourceIndex = std::numeric_limits<uint32_t>::max();
 
-		static std::string ToInspectorName(StringID nameId) noexcept
+		static std::string ToSnapshotName(StringID nameId) noexcept
 		{
 			const std::string_view name = nameId.Name();
 			if (!name.empty())
@@ -19,7 +19,7 @@ namespace gglab
 			return std::format("0x{:016X}", nameId.Value());
 		}
 
-		static int32_t ToInspectorPassIndex(RGPassNodeIndex passIndex) noexcept
+		static int32_t ToSnapshotPassIndex(RGPassNodeIndex passIndex) noexcept
 		{
 			return passIndex.IsValid() ? static_cast<int32_t>(passIndex.Value()) : -1;
 		}
@@ -54,24 +54,24 @@ namespace gglab
 			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
 		}
 
-		static std::string GetPassInspectorName(const std::vector<RGPassNode>& passNodes, int32_t passIndex) noexcept
+		static std::string GetPassSnapshotName(const std::vector<RGPassNode>& passNodes, int32_t passIndex) noexcept
 		{
 			if (passIndex < 0 || static_cast<size_t>(passIndex) >= passNodes.size())
 			{
 				return "External";
 			}
 
-			return ToInspectorName(passNodes[passIndex].m_NameId);
+			return ToSnapshotName(passNodes[passIndex].m_NameId);
 		}
 
-		class RGInspectorSnapshotBuilder
+		class RGSnapshotBuilder
 		{
 		public:
-			RGInspectorSnapshotBuilder(
+			RGSnapshotBuilder(
 				const std::vector<RGResourceNode>& resourceNodes,
 				const std::vector<RGPassNode>& passNodes,
 				const std::vector<RGVirtualResourceBase*>& virtualResources,
-				RGInspectorSnapshot& outSnapshot) noexcept :
+				RGSnapshot& outSnapshot) noexcept :
 				m_ResourceNodes(resourceNodes),
 				m_PassNodes(passNodes),
 				m_VirtualResources(virtualResources),
@@ -108,10 +108,10 @@ namespace gglab
 				{
 					const auto& passNode = m_PassNodes[passIndex];
 
-					RGInspectorPassInfo passInfo = {};
+					RGSnapshotPassInfo passInfo = {};
 					passInfo.m_Index = passIndex;
 					passInfo.m_ExecutionOrder = passNode.m_Culled ? -1 : executionOrder++;
-					passInfo.m_Name = ToInspectorName(passNode.m_NameId);
+					passInfo.m_Name = ToSnapshotName(passNode.m_NameId);
 					passInfo.m_SideEffect = passNode.m_SideEffect;
 					passInfo.m_Culled = passNode.m_Culled;
 					passInfo.m_Accesses.reserve(passNode.m_Accesses.size());
@@ -156,15 +156,15 @@ namespace gglab
 					const auto* virtualResource = m_VirtualResources[resourceIndex];
 					GGLAB_ASSERT_NOT_NULL(virtualResource);
 
-					RGInspectorResourceInfo resourceInfo = {};
+					RGSnapshotResourceInfo resourceInfo = {};
 					resourceInfo.m_Index = resourceIndex;
-					resourceInfo.m_Name = ToInspectorName(virtualResource->m_NameId);
+					resourceInfo.m_Name = ToSnapshotName(virtualResource->m_NameId);
 					resourceInfo.m_ResourceType = virtualResource->m_ResourceType;
 					resourceInfo.m_Imported = virtualResource->m_Imported;
 					resourceInfo.m_Devirtualized = virtualResource->m_Devirtualized;
 					resourceInfo.m_RefCount = virtualResource->m_RefCount;
-					resourceInfo.m_FirstUserPassIndex = ToInspectorPassIndex(virtualResource->m_FirstUser);
-					resourceInfo.m_LastUserPassIndex = ToInspectorPassIndex(virtualResource->m_LastUser);
+					resourceInfo.m_FirstUserPassIndex = ToSnapshotPassIndex(virtualResource->m_FirstUser);
+					resourceInfo.m_LastUserPassIndex = ToSnapshotPassIndex(virtualResource->m_LastUser);
 					resourceInfo.m_UsageBits = GetVirtualResourceUsageBits(virtualResource);
 					resourceInfo.m_GpuResourceIndex = GetVirtualResourceGpuIndex(virtualResource);
 					resourceInfo.m_InitialBarrierState = virtualResource->m_InitialBarrierState;
@@ -180,20 +180,20 @@ namespace gglab
 				{
 					const auto& resourceNode = m_ResourceNodes[resourceNodeIndex];
 
-					RGInspectorResourceNodeInfo resourceNodeInfo = {};
+					RGSnapshotResourceNodeInfo resourceNodeInfo = {};
 					resourceNodeInfo.m_Index = resourceNodeIndex;
 					resourceNodeInfo.m_ResourceSlot = resourceNode.m_ResourceHandle.GetHandle().Value();
 					resourceNodeInfo.m_ResourceVersion = resourceNode.m_ResourceHandle.GetVersion();
 					resourceNodeInfo.m_VirtualResourceIndex = LookupVirtualResourceIndex(resourceNode.m_VirtualResource);
-					resourceNodeInfo.m_ResourceName = ToInspectorName(resourceNode.NameId());
+					resourceNodeInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());
 					resourceNodeInfo.m_ResourceType = resourceNode.m_VirtualResource ?
 						resourceNode.m_VirtualResource->m_ResourceType :
 						RGResourceType::RGTexture;
-					resourceNodeInfo.m_WriterPassIndex = ToInspectorPassIndex(resourceNode.m_Writer);
+					resourceNodeInfo.m_WriterPassIndex = ToSnapshotPassIndex(resourceNode.m_Writer);
 					resourceNodeInfo.m_ReaderPassIndices.reserve(resourceNode.m_Readers.size());
 					for (const auto readerPassIndex : resourceNode.m_Readers)
 					{
-						resourceNodeInfo.m_ReaderPassIndices.push_back(ToInspectorPassIndex(readerPassIndex));
+						resourceNodeInfo.m_ReaderPassIndices.push_back(ToSnapshotPassIndex(readerPassIndex));
 					}
 					m_OutSnapshot.m_ResourceNodes.push_back(std::move(resourceNodeInfo));
 
@@ -204,47 +204,47 @@ namespace gglab
 				}
 			}
 
-			RGInspectorAccessInfo BuildAccessInfo(const RGPassNode::Access& access) const noexcept
+			RGSnapshotAccessInfo BuildAccessInfo(const RGPassNode::Access& access) const noexcept
 			{
 				const auto& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
 
-				RGInspectorAccessInfo accessInfo = {};
+				RGSnapshotAccessInfo accessInfo = {};
 				accessInfo.m_ResourceNodeIndex = access.m_ResourceNodeIndex.Value();
 				accessInfo.m_ResourceSlot = resourceNode.m_ResourceHandle.GetHandle().Value();
 				accessInfo.m_ResourceVersion = resourceNode.m_ResourceHandle.GetVersion();
 				accessInfo.m_VirtualResourceIndex = LookupVirtualResourceIndex(resourceNode.m_VirtualResource);
-				accessInfo.m_ResourceName = ToInspectorName(resourceNode.NameId());
+				accessInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());
 				accessInfo.m_ResourceType = access.m_ResourceType;
 				accessInfo.m_AccessType = access.m_AccessType;
 				accessInfo.m_UsageBits = access.m_UsageBits;
 				return accessInfo;
 			}
 
-			RGInspectorBarrierInfo BuildBarrierInfo(const RGPassNode::BarrierIntent& intent) const noexcept
+			RGSnapshotBarrierInfo BuildBarrierInfo(const RGPassNode::BarrierIntent& intent) const noexcept
 			{
 				GGLAB_ASSERT_NOT_NULL(intent.m_VirtualResource);
 
-				RGInspectorBarrierInfo info = {};
+				RGSnapshotBarrierInfo info = {};
 				info.m_VirtualResourceIndex = LookupVirtualResourceIndex(intent.m_VirtualResource);
-				info.m_ResourceName = ToInspectorName(intent.m_VirtualResource->m_NameId);
+				info.m_ResourceName = ToSnapshotName(intent.m_VirtualResource->m_NameId);
 				info.m_ResourceType = intent.m_VirtualResource->m_ResourceType;
 				info.m_Before = intent.m_Before;
 				info.m_After = intent.m_After;
 				return info;
 			}
 
-			RGInspectorDependencyEdge BuildDependencyEdge(
+			RGSnapshotDependencyEdge BuildDependencyEdge(
 				const RGResourceNode& resourceNode,
 				uint32_t resourceNodeIndex,
 				RGPassNodeIndex readerPassIndex) const noexcept
 			{
-				RGInspectorDependencyEdge edge = {};
-				edge.m_FromPassIndex = ToInspectorPassIndex(resourceNode.m_Writer);
-				edge.m_ToPassIndex = ToInspectorPassIndex(readerPassIndex);
+				RGSnapshotDependencyEdge edge = {};
+				edge.m_FromPassIndex = ToSnapshotPassIndex(resourceNode.m_Writer);
+				edge.m_ToPassIndex = ToSnapshotPassIndex(readerPassIndex);
 				edge.m_ResourceNodeIndex = resourceNodeIndex;
-				edge.m_FromPassName = GetPassInspectorName(m_PassNodes, edge.m_FromPassIndex);
-				edge.m_ToPassName = GetPassInspectorName(m_PassNodes, edge.m_ToPassIndex);
-				edge.m_ResourceName = ToInspectorName(resourceNode.NameId());
+				edge.m_FromPassName = GetPassSnapshotName(m_PassNodes, edge.m_FromPassIndex);
+				edge.m_ToPassName = GetPassSnapshotName(m_PassNodes, edge.m_ToPassIndex);
+				edge.m_ResourceName = ToSnapshotName(resourceNode.NameId());
 				return edge;
 			}
 
@@ -252,25 +252,25 @@ namespace gglab
 			{
 				if (!virtualResource)
 				{
-					return InvalidInspectorResourceIndex;
+					return InvalidSnapshotResourceIndex;
 				}
 
 				auto iter = m_VirtualResourceIndices.find(virtualResource);
-				return iter != m_VirtualResourceIndices.end() ? iter->second : InvalidInspectorResourceIndex;
+				return iter != m_VirtualResourceIndices.end() ? iter->second : InvalidSnapshotResourceIndex;
 			}
 
 		private:
 			const std::vector<RGResourceNode>& m_ResourceNodes;
 			const std::vector<RGPassNode>& m_PassNodes;
 			const std::vector<RGVirtualResourceBase*>& m_VirtualResources;
-			RGInspectorSnapshot& m_OutSnapshot;
+			RGSnapshot& m_OutSnapshot;
 			std::unordered_map<const RGVirtualResourceBase*, uint32_t> m_VirtualResourceIndices;
 		};
 	}
 
-	void BuildRenderGraphInspectorSnapshot(const RenderGraph& rg, RGInspectorSnapshot& outSnapshot) noexcept
+	void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept
 	{
-		RGInspectorSnapshotBuilder(
+		RGSnapshotBuilder(
 			rg.m_ResourceNodes,
 			rg.m_PassNodes,
 			rg.m_VirtualResources,

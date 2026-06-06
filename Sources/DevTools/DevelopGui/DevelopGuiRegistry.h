@@ -1,22 +1,13 @@
 #pragma once
 #include "Core/StringId.h"
-#include "Graphics/DevelopGui/DevelopGuiStateStore.h"
+#include "DevTools/DevelopGui/DevelopGuiPanel.h"
+#include "DevTools/DevelopGui/DevelopGuiStateStore.h"
+
+#include <memory>
 
 namespace gglab
 {
 	struct DevelopGuiContext;
-	using DevelopGuiDrawFunc = void(*)(DevelopGuiContext&);
-
-	struct DevelopGuiPanelDesc
-	{
-		const char* m_Path = nullptr;
-		const char* m_Title = nullptr;
-
-		int32_t m_Order = 0;
-		bool m_DefaultOpen = false;
-
-		DevelopGuiDrawFunc m_DrawFunc = nullptr;
-	};
 
 	class DevelopGuiRegistry
 	{
@@ -31,7 +22,7 @@ namespace gglab
 			int32_t m_Order = 0;
 			bool m_Open = false;
 
-			DevelopGuiDrawFunc m_DrawFunc = nullptr;
+			std::unique_ptr<DevelopGuiPanelBase> m_Panel;
 
 			uint64_t m_Key = 0;
 			std::string m_ImGuiMenuLabel;
@@ -63,7 +54,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DevelopGuiRegistry);
 		~DevelopGuiRegistry() = default;
 
-		void RegisterPanel(const DevelopGuiPanelDesc& desc) noexcept;
+		void RegisterPanel(std::unique_ptr<DevelopGuiPanelBase> panel) noexcept;
 		void BuildMenuTree() noexcept;
 
 		void DrawMenuBar() noexcept;
@@ -81,7 +72,6 @@ namespace gglab
 
 		static uint64_t MakePanelKey(std::string_view fullPath,
 			std::string_view titleForKey,
-			DevelopGuiDrawFunc drawFunc,
 			const std::vector<PanelRuntime>& existingPanels) noexcept;
 		static std::string MakeImGuiLabeledId(std::string_view display, uint64_t key) noexcept;
 

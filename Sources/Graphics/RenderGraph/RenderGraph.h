@@ -130,8 +130,8 @@ namespace gglab
 		RGResourceHandle::Version m_Version = RGResourceHandle::UnintializedVersion;
 	};
 
-	struct RGInspectorSnapshot;
-	void BuildRenderGraphInspectorSnapshot(const RenderGraph& rg, RGInspectorSnapshot& outSnapshot) noexcept;
+	struct RGSnapshot;
+	void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
 
 	class RenderGraph
 	{
@@ -324,7 +324,7 @@ namespace gglab
 		template<typename RESOURCE>
 		friend struct RGVirtualResource;
 
-		friend void BuildRenderGraphInspectorSnapshot(const RenderGraph& rg, RGInspectorSnapshot& outSnapshot) noexcept;
+		friend void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
 	};
 
 	template<typename PassData, typename SetupFunc, typename ExecuteFunc>
