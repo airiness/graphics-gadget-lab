@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/DevelopGui/DevelopGuiRegistry.h"
-#include "Graphics/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiRegistry.h"
+#include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Core/Utility/StringUtils.h"
 
 namespace gglab
@@ -38,20 +38,22 @@ namespace gglab
 		return true;
 	}
 
-	void DevelopGuiRegistry::RegisterPanel(const DevelopGuiPanelDesc& desc) noexcept
+	void DevelopGuiRegistry::RegisterPanel(std::unique_ptr<DevelopGuiPanelBase> panel) noexcept
 	{
-		PanelRuntime runtime{};
-		runtime.m_Open = desc.m_DefaultOpen;
-		runtime.m_Order = desc.m_Order;
-		runtime.m_DrawFunc = desc.m_DrawFunc;
+		GGLAB_ASSERT(panel);
 
-		runtime.m_FullPath = desc.m_Path ? desc.m_Path : "";
+		PanelRuntime runtime{};
+		runtime.m_Open = panel->IsDefaultOpen();
+		runtime.m_Order = panel->GetOrder();
+
+		runtime.m_FullPath = panel->GetPath();
 		const std::string_view fullPathView = runtime.m_FullPath;
 
 		std::string_view titleForKey{};
-		if (desc.m_Title && desc.m_Title[0] != '\0')
+		const std::string_view panelTitle = panel->GetTitle();
+		if (!panelTitle.empty())
 		{
-			runtime.m_TitleStorage = desc.m_Title;
+			runtime.m_TitleStorage = panelTitle;
 			titleForKey = runtime.m_TitleStorage;
 		}
 		else
@@ -62,7 +64,8 @@ namespace gglab
 				titleForKey = DefaultLeaf;
 			}
 		}
-		runtime.m_Key = MakePanelKey(fullPathView, titleForKey, runtime.m_DrawFunc, m_Panels);
+		runtime.m_Key = MakePanelKey(fullPathView, titleForKey, m_Panels);
+		runtime.m_Panel = std::move(panel);
 
 		m_Panels.push_back(std::move(runtime));
 		m_IsBuilt = false;
@@ -171,13 +174,13 @@ namespace gglab
 
 			if (ImGui::Begin(panel.m_ImGuiWindowTitle.c_str(), &panel.m_Open))
 			{
-				if (panel.m_DrawFunc)
+				if (panel.m_Panel)
 				{
-					panel.m_DrawFunc(context);
+					panel.m_Panel->Draw(context);
 				}
 				else
 				{
-					ImGui::TextUnformatted("Panel has no DrawFunc.");
+					ImGui::TextUnformatted("Panel is null.");
 				}
 			}
 			ImGui::End();
@@ -282,7 +285,6 @@ namespace gglab
 
 	uint64_t DevelopGuiRegistry::MakePanelKey(std::string_view fullPath,
 		std::string_view titleForKey,
-		DevelopGuiDrawFunc drawFunc,
 		const std::vector<PanelRuntime>& existingPanels) noexcept
 	{
 		// "path|title"
@@ -310,15 +312,11 @@ namespace gglab
 			return key;
 		}
 
-		// Collision process, use drawFunc and dupIndex to expand the key
+		// Collision process, use dupIndex to expand the key.
 		uint32_t dupIndex = 0;
 		while (true)
 		{
 			std::string dis = baseInput;
-			dis.push_back('|');
-
-			std::format_to(std::back_inserter(dis), "{:016X}", static_cast<uint64_t>(reinterpret_cast<uintptr_t>(drawFunc)));
-
 			dis.push_back('|');
 			std::format_to(std::back_inserter(dis), "{}", dupIndex);
 

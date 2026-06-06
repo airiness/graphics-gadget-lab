@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/DevelopGui/DevelopGuiRegistry.h"
+#include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 
 namespace gglab
 {

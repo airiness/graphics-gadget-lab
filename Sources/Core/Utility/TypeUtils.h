@@ -57,7 +57,7 @@ namespace gglab::utils
 			else
 			{
 				using UT = std::underlying_type_t<E>;
-				const UT value = std::to_underlying(e);
+				const UT value = ToUnderlying(e);
 
 				if constexpr (std::is_signed_v<UT>)
 				{

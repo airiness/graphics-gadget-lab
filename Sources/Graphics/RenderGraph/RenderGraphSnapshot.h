@@ -6,7 +6,7 @@ namespace gglab
 {
 	class RenderGraph;
 
-	struct RGInspectorAccessInfo
+	struct RGSnapshotAccessInfo
 	{
 		uint32_t m_ResourceNodeIndex = 0;
 		uint32_t m_ResourceSlot = 0;
@@ -18,7 +18,7 @@ namespace gglab
 		uint64_t m_UsageBits = 0;
 	};
 
-	struct RGInspectorBarrierInfo
+	struct RGSnapshotBarrierInfo
 	{
 		uint32_t m_VirtualResourceIndex = 0;
 		std::string m_ResourceName;
@@ -27,21 +27,21 @@ namespace gglab
 		RGBarrierState m_After = CommonRGBarrierState();
 	};
 
-	struct RGInspectorPassInfo
+	struct RGSnapshotPassInfo
 	{
 		uint32_t m_Index = 0;
 		int32_t m_ExecutionOrder = -1;
 		std::string m_Name;
 		bool m_SideEffect = false;
 		bool m_Culled = false;
-		std::vector<RGInspectorAccessInfo> m_Accesses;
-		std::vector<RGInspectorBarrierInfo> m_PreBarriers;
-		std::vector<RGInspectorBarrierInfo> m_PostBarriers;
+		std::vector<RGSnapshotAccessInfo> m_Accesses;
+		std::vector<RGSnapshotBarrierInfo> m_PreBarriers;
+		std::vector<RGSnapshotBarrierInfo> m_PostBarriers;
 		std::vector<uint32_t> m_DevirtualizeResources;
 		std::vector<uint32_t> m_DestroyResources;
 	};
 
-	struct RGInspectorResourceInfo
+	struct RGSnapshotResourceInfo
 	{
 		uint32_t m_Index = 0;
 		std::string m_Name;
@@ -58,7 +58,7 @@ namespace gglab
 		RGBarrierState m_FinalBarrierState = CommonRGBarrierState();
 	};
 
-	struct RGInspectorResourceNodeInfo
+	struct RGSnapshotResourceNodeInfo
 	{
 		uint32_t m_Index = 0;
 		uint32_t m_ResourceSlot = 0;
@@ -70,7 +70,7 @@ namespace gglab
 		std::vector<int32_t> m_ReaderPassIndices;
 	};
 
-	struct RGInspectorDependencyEdge
+	struct RGSnapshotDependencyEdge
 	{
 		int32_t m_FromPassIndex = -1;
 		int32_t m_ToPassIndex = -1;
@@ -80,13 +80,13 @@ namespace gglab
 		std::string m_ResourceName;
 	};
 
-	struct RGInspectorSnapshot
+	struct RGSnapshot
 	{
-		std::vector<RGInspectorPassInfo> m_Passes;
-		std::vector<RGInspectorResourceInfo> m_Resources;
-		std::vector<RGInspectorResourceNodeInfo> m_ResourceNodes;
-		std::vector<RGInspectorDependencyEdge> m_DependencyEdges;
+		std::vector<RGSnapshotPassInfo> m_Passes;
+		std::vector<RGSnapshotResourceInfo> m_Resources;
+		std::vector<RGSnapshotResourceNodeInfo> m_ResourceNodes;
+		std::vector<RGSnapshotDependencyEdge> m_DependencyEdges;
 	};
 
-	void BuildRenderGraphInspectorSnapshot(const RenderGraph& rg, RGInspectorSnapshot& outSnapshot) noexcept;
+	void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
 }

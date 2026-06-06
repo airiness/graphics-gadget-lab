@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/DevelopGui/DevelopGui.h"
+#include "DevTools/DevelopGui/DevelopGui.h"
 #include "Graphics/DX12/DX12Device.h"
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"

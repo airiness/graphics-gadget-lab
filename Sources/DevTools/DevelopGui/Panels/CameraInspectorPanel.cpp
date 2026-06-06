@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/DevelopGui/DevelopGuiCameraPanel.h"
-#include "Graphics/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
+#include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Core/Utility/MathUtils.h"
@@ -19,7 +19,7 @@ namespace gglab
 			bool m_ShowMatrices = false;
 
 			// cached edit values
-			float m_Pos[3] = { 0, 0, 0 };
+			float m_Pos[3] = { 0.0f, 0.0f, 0.0f };
 			float m_YawDegree = 0.0f;
 			float m_PitchDegree = 0.0f;
 
@@ -97,7 +97,7 @@ namespace gglab
 		}
 	}
 
-	void DevelopGuiCameraPanel(DevelopGuiContext& context) noexcept
+	void CameraInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		Camera* camera = context.m_Camera;
 		CameraController* cameraCtrl = context.m_CameraController;

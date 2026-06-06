@@ -5,7 +5,7 @@
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
-#include "Graphics/DevelopGui/DevelopGui.h"
+#include "DevTools/DevelopGui/DevelopGui.h"
 
 namespace gglab
 {

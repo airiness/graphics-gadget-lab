@@ -1,12 +1,15 @@
 #include "Core/Precompiled.h"
-#include "Graphics/DevelopGui/DevelopGuiIBLPanel.h"
+#include "DevTools/EnumText/EnumTextDXGI.h"
+#include "DevTools/EnumText/EnumTextGraphics.h"
+#include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
+#include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
 {
 	namespace
 	{
-		struct IBLPanelState
+		struct IBLViewerPanelState
 		{
 			float m_BrdfLutPreviewSize = 256.0f;
 			float m_EnvironmentPreviewWidth = 512.0f;
@@ -20,43 +23,12 @@ namespace gglab
 			return static_cast<ImTextureID>(handle.ptr);
 		}
 
-		static const char* FormatToString(DXGI_FORMAT format) noexcept
-		{
-			switch (format)
-			{
-			case DXGI_FORMAT_R16G16_FLOAT:
-				return "DXGI_FORMAT_R16G16_FLOAT";
-			case DXGI_FORMAT_R16G16B16A16_FLOAT:
-				return "DXGI_FORMAT_R16G16B16A16_FLOAT";
-			case DXGI_FORMAT_R8G8B8A8_UNORM:
-				return "DXGI_FORMAT_R8G8B8A8_UNORM";
-			case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-				return "DXGI_FORMAT_R8G8B8A8_UNORM_SRGB";
-			default:
-				return "Unknown / Other";
-			}
-		}
-
-		static const char* PreviewLayoutToString(RenderResourceRegistry::IBLPreviewLayout layout) noexcept
-		{
-			using Layout = RenderResourceRegistry::IBLPreviewLayout;
-			switch (layout)
-			{
-			case Layout::Grid2x3:
-				return "2x3 Grid";
-			case Layout::Cross:
-				return "Cross";
-			default:
-				return "Unknown";
-			}
-		}
-
 		static bool DrawPreviewLayoutCombo(const char* label, RenderResourceRegistry::IBLPreviewLayout& layout) noexcept
 		{
 			using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
 			bool changed = false;
 
-			if (ImGui::BeginCombo(label, PreviewLayoutToString(layout)))
+			if (ImGui::BeginCombo(label, devtools::EnumText(layout).data()))
 			{
 				const PreviewLayout layouts[] = {
 					PreviewLayout::Grid2x3,
@@ -66,7 +38,7 @@ namespace gglab
 				for (const auto candidate : layouts)
 				{
 					const bool selected = (layout == candidate);
-					if (ImGui::Selectable(PreviewLayoutToString(candidate), selected))
+					if (ImGui::Selectable(devtools::EnumText(candidate).data(), selected))
 					{
 						layout = candidate;
 						changed = true;
@@ -84,11 +56,11 @@ namespace gglab
 		}
 	}
 
-	void DevelopGuiIBLPanel(DevelopGuiContext& context) noexcept
+	void IBLViewerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		auto& state = context.PanelState<IBLPanelState>();
+		auto& state = context.PanelState<IBLViewerPanelState>();
 
-		ImGui::TextUnformatted("IBL");
+		ImGui::TextUnformatted("IBL Viewer");
 		ImGui::Separator();
 
 		auto* renderer = context.m_Renderer;
@@ -156,7 +128,7 @@ namespace gglab
 					static_cast<uint32_t>(desc.Height));
 
 				ImGui::Text("MipLevels: %u", static_cast<uint32_t>(desc.MipLevels));
-				ImGui::Text("Format: %s", FormatToString(desc.Format));
+				ImGui::Text("Format: %s", devtools::EnumText(desc.Format).data());
 				ImGui::Text("Bindless SRV Index: %u", bindlessIndex);
 			}
 
@@ -269,13 +241,13 @@ namespace gglab
 					static_cast<unsigned long long>(environmentDesc.Width),
 					static_cast<uint32_t>(environmentDesc.Height),
 					static_cast<uint32_t>(environmentDesc.DepthOrArraySize));
-				ImGui::Text("Environment Format: %s", FormatToString(environmentDesc.Format));
+				ImGui::Text("Environment Format: %s", devtools::EnumText(environmentDesc.Format).data());
 				ImGui::Text("Environment Bindless SRV Index: %u", environmentBindlessIndex);
 
 				ImGui::Text("Preview Canvas Size: %llu x %u",
 					static_cast<unsigned long long>(environmentPreviewDesc.Width),
 					static_cast<uint32_t>(environmentPreviewDesc.Height));
-				ImGui::Text("Preview Format: %s", FormatToString(environmentPreviewDesc.Format));
+				ImGui::Text("Preview Format: %s", devtools::EnumText(environmentPreviewDesc.Format).data());
 				ImGui::Text("Preview Bindless SRV Index: %u", previewBindlessIndex);
 			}
 
@@ -385,13 +357,13 @@ namespace gglab
 					static_cast<uint32_t>(prefilteredSpecularDesc.Height),
 					static_cast<uint32_t>(prefilteredSpecularDesc.DepthOrArraySize));
 				ImGui::Text("Cubemap MipLevels: %u", mipLevels);
-				ImGui::Text("Cubemap Format: %s", FormatToString(prefilteredSpecularDesc.Format));
+				ImGui::Text("Cubemap Format: %s", devtools::EnumText(prefilteredSpecularDesc.Format).data());
 				ImGui::Text("Cubemap Bindless SRV Index: %u", prefilteredSpecularBindlessIndex);
 
 				ImGui::Text("Preview Canvas Size: %llu x %u",
 					static_cast<unsigned long long>(prefilteredSpecularPreviewDesc.Width),
 					static_cast<uint32_t>(prefilteredSpecularPreviewDesc.Height));
-				ImGui::Text("Preview Format: %s", FormatToString(prefilteredSpecularPreviewDesc.Format));
+				ImGui::Text("Preview Format: %s", devtools::EnumText(prefilteredSpecularPreviewDesc.Format).data());
 				ImGui::Text("Preview Bindless SRV Index: %u", previewBindlessIndex);
 			}
 

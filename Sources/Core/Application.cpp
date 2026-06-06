@@ -13,11 +13,8 @@
 #include "Core/Input/Mouse.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Core/Demo/DemoPlayground.h"
-#include "Graphics/DevelopGui/DevelopGuiContext.h"
-#include "Graphics/DevelopGui/DevelopGuiImGuiToolsPanel.h"
-#include "Graphics/DevelopGui/DevelopGuiCameraPanel.h"
-#include "Graphics/DevelopGui/DevelopGuiIBLPanel.h"
-#include "Graphics/DevelopGui/DevelopGuiRenderGraphInspectorPanel.h"
+#include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -481,36 +478,7 @@ namespace gglab
 	void Application::InitializeDevelopGuiPanels() noexcept
 	{
 		auto* developGui = m_Renderer->GetDevelopGui();
-		auto& panelRegistry = developGui->GetRegistry();
-
-		DevelopGuiPanelDesc desc{};
-
-		// CameraPanel
-		desc.m_Path = "Application/Camera";
-		desc.m_Title = "Camera";
-		desc.m_DrawFunc = &DevelopGuiCameraPanel;
-		panelRegistry.RegisterPanel(desc);
-
-		// ImGuiToolsPanel
-		desc.m_Path = "ImGui/Tools";
-		desc.m_Title = "ImGui Tools";
-		desc.m_DrawFunc = &DevelopGuiImGuiToolsPanel;
-		panelRegistry.RegisterPanel(desc);
-
-		// IBL Panel
-		desc = {};
-		desc.m_Path = "Rendering/PBR/IBL";
-		desc.m_Title = "IBL";
-		desc.m_DrawFunc = &DevelopGuiIBLPanel;
-		//desc.m_DefaultOpen = true;
-		panelRegistry.RegisterPanel(desc);
-
-		// RenderGraph Inspector
-		desc = {};
-		desc.m_Path = "Rendering/RenderGraph/Inspector";
-		desc.m_Title = "RenderGraph Inspector";
-		desc.m_DrawFunc = &DevelopGuiRenderGraphInspectorPanel;
-		panelRegistry.RegisterPanel(desc);
+		devtools::RegisterDefaultDevelopGuiPanels(developGui->GetRegistry());
 	}
 
 	void Application::OnActive() noexcept

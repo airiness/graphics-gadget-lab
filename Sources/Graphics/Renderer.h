@@ -15,8 +15,8 @@
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
-#include "Graphics/DevelopGui/DevelopGui.h"
 #include "Graphics/RenderContexts.h"
+#include "DevTools/DevelopGui/DevelopGui.h"
 
 namespace gglab
 {

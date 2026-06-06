@@ -1,17 +1,18 @@
-#pragma once
-#include "Graphics/DevelopGui/DevelopGuiContext.h"
-
-#include <imgui.h>
-#include <cstdint>
+#include "Core/Precompiled.h"
+#include "DevTools/DevelopGui/Panels/ImGuiToolsPanel.h"
+#include "DevTools/DevelopGui/DevelopGuiContext.h"
 
 namespace gglab
 {
-	struct ImGuiToolsState
+	namespace
 	{
-		int32_t m_ClickCount = 0;
-	};
+		struct ImGuiToolsState
+		{
+			int32_t m_ClickCount = 0;
+		};
+	}
 
-	void DevelopGuiImGuiToolsPanel(DevelopGuiContext& context) noexcept
+	void ImGuiToolsPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<ImGuiToolsState>();
 
@@ -42,7 +43,7 @@ namespace gglab
 		ImGui::SameLine();
 		ImGui::Text("Count: %d", state.m_ClickCount);
 
-		// Controlled by window itself
+		// Controlled by window itself.
 		if (isDemoShow)
 		{
 			ImGui::ShowDemoWindow(&isDemoShow);
@@ -53,7 +54,7 @@ namespace gglab
 			ImGui::ShowMetricsWindow(&isMetricsShow);
 		}
 
-		// Write bool flag back to storage
+		// Write bool flag back to storage.
 		storage.SetBool(demoId, isDemoShow);
 		storage.SetBool(metricsId, isMetricsShow);
 	}
