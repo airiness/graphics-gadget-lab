@@ -7,11 +7,11 @@ namespace gglab
 	class DX12PipelineState;
 	class Renderer;
 
-	class RenderPassIBLDebugPreview : public RenderPassBase
+	class RenderPassIBLPreview : public RenderPassBase
 	{
 	public:
-		RenderPassIBLDebugPreview() noexcept = default;
-		~RenderPassIBLDebugPreview() override = default;
+		RenderPassIBLPreview() noexcept = default;
+		~RenderPassIBLPreview() override = default;
 
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
@@ -20,10 +20,10 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
-		DX12PipelineState* GetOrCreateEnvironmentCubemapPreviewPSO(const Renderer& renderer) noexcept;
+		DX12PipelineState* GetOrCreateCubemapPreviewPSO(const Renderer& renderer) noexcept;
 
 	private:
-		GraphicsKeyInputs m_EnvironmentCubemapPreviewInputs{};
+		GraphicsKeyInputs m_CubemapPreviewInputs{};
 		bool m_IsInitialized = false;
 	};
 }

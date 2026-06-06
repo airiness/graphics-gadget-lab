@@ -10,6 +10,7 @@ namespace gglab
 		{
 			float m_BrdfLutPreviewSize = 256.0f;
 			float m_EnvironmentPreviewWidth = 512.0f;
+			float m_PrefilteredSpecularPreviewWidth = 512.0f;
 			bool m_ShowMetadata = true;
 			bool m_FlipPreviewY = false;
 		};
@@ -36,9 +37,9 @@ namespace gglab
 			}
 		}
 
-		static const char* PreviewLayoutToString(RenderResourceRegistry::IBLDebugPreviewLayout layout) noexcept
+		static const char* PreviewLayoutToString(RenderResourceRegistry::IBLPreviewLayout layout) noexcept
 		{
-			using Layout = RenderResourceRegistry::IBLDebugPreviewLayout;
+			using Layout = RenderResourceRegistry::IBLPreviewLayout;
 			switch (layout)
 			{
 			case Layout::Grid2x3:
@@ -48,6 +49,38 @@ namespace gglab
 			default:
 				return "Unknown";
 			}
+		}
+
+		static bool DrawPreviewLayoutCombo(const char* label, RenderResourceRegistry::IBLPreviewLayout& layout) noexcept
+		{
+			using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
+			bool changed = false;
+
+			if (ImGui::BeginCombo(label, PreviewLayoutToString(layout)))
+			{
+				const PreviewLayout layouts[] = {
+					PreviewLayout::Grid2x3,
+					PreviewLayout::Cross,
+				};
+
+				for (const auto candidate : layouts)
+				{
+					const bool selected = (layout == candidate);
+					if (ImGui::Selectable(PreviewLayoutToString(candidate), selected))
+					{
+						layout = candidate;
+						changed = true;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+
+				ImGui::EndCombo();
+			}
+
+			return changed;
 		}
 	}
 
@@ -74,7 +107,9 @@ namespace gglab
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		constexpr TextureIndex EnvironmentIndex = TextureIndex::IBL_EnvironmentCubemap;
-		constexpr TextureIndex EnvironmentPreviewIndex = TextureIndex::DebugPreview_IBL_EnvironmentCubemap;
+		constexpr TextureIndex EnvironmentPreviewIndex = TextureIndex::Preview_IBL_EnvironmentCubemap;
+		constexpr TextureIndex PrefilteredSpecularIndex = TextureIndex::IBL_PrefilteredSpecularCubemap;
+		constexpr TextureIndex PrefilteredSpecularPreviewIndex = TextureIndex::Preview_IBL_PrefilteredSpecularCubemap;
 		constexpr TextureIndex BrdfLutIndex = TextureIndex::IBL_BrdfLut;
 
 		// Make sure the persistent BRDF LUT resource exists.
@@ -218,31 +253,11 @@ namespace gglab
 			const auto environmentDesc = environmentTexture->GetDesc();
 			const auto environmentPreviewDesc = environmentPreviewTexture->GetDesc();
 
-			using PreviewLayout = RenderResourceRegistry::IBLDebugPreviewLayout;
-			PreviewLayout previewLayout = renderResRegistry->GetIBLDebugPreviewLayout();
-
-			if (ImGui::BeginCombo("Display Mode", PreviewLayoutToString(previewLayout)))
+			using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
+			PreviewLayout previewLayout = renderResRegistry->GetIBLEnvironmentPreviewLayout();
+			if (DrawPreviewLayoutCombo("Display Mode##EnvironmentPreviewLayout", previewLayout))
 			{
-				const PreviewLayout layouts[] = {
-					PreviewLayout::Grid2x3,
-					PreviewLayout::Cross,
-				};
-
-				for (const auto layout : layouts)
-				{
-					const bool selected = (previewLayout == layout);
-					if (ImGui::Selectable(PreviewLayoutToString(layout), selected))
-					{
-						renderResRegistry->SetIBLDebugPreviewLayout(layout);
-						previewLayout = layout;
-					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-
-				ImGui::EndCombo();
+				renderResRegistry->SetIBLEnvironmentPreviewLayout(previewLayout);
 			}
 
 			if (state.m_ShowMetadata)
@@ -299,6 +314,125 @@ namespace gglab
 
 			ImGui::TextUnformatted(layoutHint);
 			ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
+		}
+
+		ImGui::Spacing();
+
+		DX12Texture* prefilteredSpecularTexture = renderResRegistry->GetTexture(PrefilteredSpecularIndex);
+		DX12Texture* prefilteredSpecularPreviewTexture = renderResRegistry->GetTexture(PrefilteredSpecularPreviewIndex);
+
+		if (ImGui::CollapsingHeader("IBL Prefiltered Specular"))
+		{
+			if (ImGui::Button("Rebuild Prefiltered Specular"))
+			{
+				renderResRegistry->MarkDirty(PrefilteredSpecularIndex);
+			}
+
+			ImGui::SameLine();
+
+			if (renderResRegistry->IsDirty(PrefilteredSpecularIndex))
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
+			}
+			else
+			{
+				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
+			}
+
+			if (!prefilteredSpecularTexture || !prefilteredSpecularPreviewTexture)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Prefiltered specular preview texture is not allocated.");
+				return;
+			}
+
+			const auto prefilteredSpecularDesc = prefilteredSpecularTexture->GetDesc();
+			const auto prefilteredSpecularPreviewDesc = prefilteredSpecularPreviewTexture->GetDesc();
+			const uint32_t mipLevels = static_cast<uint32_t>(prefilteredSpecularDesc.MipLevels);
+			const uint32_t maxMip = mipLevels > 0 ? mipLevels - 1u : 0u;
+
+			uint32_t selectedMip = std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(), maxMip);
+			if (selectedMip != renderResRegistry->GetIBLPrefilteredSpecularPreviewMip())
+			{
+				renderResRegistry->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
+			}
+
+			int selectedMipInt = static_cast<int>(selectedMip);
+			if (ImGui::SliderInt("Preview Mip", &selectedMipInt, 0, static_cast<int>(maxMip)))
+			{
+				selectedMip = static_cast<uint32_t>(std::clamp(selectedMipInt, 0, static_cast<int>(maxMip)));
+				renderResRegistry->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
+			}
+
+			const float roughness = maxMip > 0 ? static_cast<float>(selectedMip) / static_cast<float>(maxMip) : 0.0f;
+			ImGui::Text("Approx Roughness: %.3f", roughness);
+
+			using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
+			PreviewLayout previewLayout = renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout();
+			if (DrawPreviewLayoutCombo("Display Mode##PrefilteredSpecularPreviewLayout", previewLayout))
+			{
+				renderResRegistry->SetIBLPrefilteredSpecularPreviewLayout(previewLayout);
+			}
+
+			if (state.m_ShowMetadata)
+			{
+				const uint32_t prefilteredSpecularBindlessIndex =
+					renderResRegistry->GetBindlessSrvIndex(PrefilteredSpecularIndex);
+				const uint32_t previewBindlessIndex =
+					renderResRegistry->GetBindlessSrvIndex(PrefilteredSpecularPreviewIndex);
+
+				ImGui::Text("Cubemap Size: %llu x %u x %u",
+					static_cast<unsigned long long>(prefilteredSpecularDesc.Width),
+					static_cast<uint32_t>(prefilteredSpecularDesc.Height),
+					static_cast<uint32_t>(prefilteredSpecularDesc.DepthOrArraySize));
+				ImGui::Text("Cubemap MipLevels: %u", mipLevels);
+				ImGui::Text("Cubemap Format: %s", FormatToString(prefilteredSpecularDesc.Format));
+				ImGui::Text("Cubemap Bindless SRV Index: %u", prefilteredSpecularBindlessIndex);
+
+				ImGui::Text("Preview Canvas Size: %llu x %u",
+					static_cast<unsigned long long>(prefilteredSpecularPreviewDesc.Width),
+					static_cast<uint32_t>(prefilteredSpecularPreviewDesc.Height));
+				ImGui::Text("Preview Format: %s", FormatToString(prefilteredSpecularPreviewDesc.Format));
+				ImGui::Text("Preview Bindless SRV Index: %u", previewBindlessIndex);
+			}
+
+			ImGui::SliderFloat(
+				"Prefiltered Specular Preview Width",
+				&state.m_PrefilteredSpecularPreviewWidth,
+				192.0f,
+				768.0f,
+				"%.0f");
+
+			D3D12_GPU_DESCRIPTOR_HANDLE prefilteredSpecularPreviewGpuHandle =
+				renderResRegistry->GetBindlessSrvGpuHandle(PrefilteredSpecularPreviewIndex);
+
+			if (prefilteredSpecularPreviewGpuHandle.ptr == 0)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Prefiltered specular preview SRV GPU handle is invalid.");
+				return;
+			}
+
+			const ImTextureID prefilteredSpecularPreviewTextureId = ToImGuiTextureID(prefilteredSpecularPreviewGpuHandle);
+			const float prefilteredSpecularPreviewWidth =
+				std::clamp(state.m_PrefilteredSpecularPreviewWidth, 16.0f, 2048.0f);
+
+			ImVec2 uv0(0.0f, 0.0f);
+			ImVec2 uv1(1.0f, 1.0f);
+			float aspect = 3.0f / 4.0f;
+			const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
+
+			if (previewLayout == RenderResourceRegistry::IBLPreviewLayout::Grid2x3)
+			{
+				uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
+				aspect = 2.0f / 3.0f;
+				layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
+			}
+
+			const ImVec2 prefilteredSpecularImageSize(
+				prefilteredSpecularPreviewWidth,
+				prefilteredSpecularPreviewWidth * aspect);
+
+			ImGui::TextUnformatted(layoutHint);
+			ImGui::Image(prefilteredSpecularPreviewTextureId, prefilteredSpecularImageSize, uv0, uv1);
 		}
 	}
 }
