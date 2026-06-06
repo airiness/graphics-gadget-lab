@@ -330,6 +330,9 @@
     <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.cpp">
       <Filter>Graphics\DevelopGui</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRenderGraphInspectorPanel.cpp">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -350,6 +353,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphInspector.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -683,6 +689,9 @@
     <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.h">
       <Filter>Graphics\DevelopGui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRenderGraphInspectorPanel.h">
+      <Filter>Graphics\DevelopGui</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -714,6 +723,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphInspector.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
   </ItemGroup>

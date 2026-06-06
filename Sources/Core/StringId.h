@@ -52,7 +52,7 @@ namespace gglab
 		return Crc64Bytes(reinterpret_cast<const unsigned char*>(wideStringView.data()), wideStringView.size() * sizeof(wchar_t));
 	}
 
-#if defined(BUILD_DEBUG)
+#if defined(GGLAB_ENABLE_STRING_ID_REGISTRY)
 	class StringIdRegistry
 	{
 	public:
@@ -115,7 +115,7 @@ namespace gglab
 		explicit StringID(std::string_view stringView) noexcept :
 			m_Value(Crc64(stringView))
 		{
-#if defined(BUILD_DEBUG)
+#if defined(GGLAB_ENABLE_STRING_ID_REGISTRY)
 			StringIdRegistry::Instance().RegisterName(m_Value, stringView);
 #endif
 		}
@@ -127,12 +127,19 @@ namespace gglab
 
 		constexpr auto operator<=>(const StringID&) const = default;
 
-#if defined(BUILD_DEBUG)
-		[[nodiscard]] std::string_view DebugString() const
+		[[nodiscard]] static std::string_view LookupName(uint64_t hash) noexcept
 		{
-			return StringIdRegistry::Instance().Lookup(m_Value);
-		}
+#if defined(GGLAB_ENABLE_STRING_ID_REGISTRY)
+			return StringIdRegistry::Instance().Lookup(hash);
+#else
+			return {};
 #endif
+		}
+
+		[[nodiscard]] std::string_view Name() const noexcept
+		{
+			return LookupName(m_Value);
+		}
 
 	private:
 		uint64_t m_Value = 0;
