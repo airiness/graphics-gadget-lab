@@ -52,8 +52,7 @@ namespace gglab
 		if (desc.m_Title && desc.m_Title[0] != '\0')
 		{
 			runtime.m_TitleStorage = desc.m_Title;
-			//runtime.m_TitleText = runtime.m_TitleStorage;
-			titleForKey = runtime.m_TitleText;
+			titleForKey = runtime.m_TitleStorage;
 		}
 		else
 		{

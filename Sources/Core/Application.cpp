@@ -17,6 +17,7 @@
 #include "Graphics/DevelopGui/DevelopGuiImGuiToolsPanel.h"
 #include "Graphics/DevelopGui/DevelopGuiCameraPanel.h"
 #include "Graphics/DevelopGui/DevelopGuiIBLPanel.h"
+#include "Graphics/DevelopGui/DevelopGuiRenderGraphInspectorPanel.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -502,6 +503,13 @@ namespace gglab
 		desc.m_Title = "IBL";
 		desc.m_DrawFunc = &DevelopGuiIBLPanel;
 		//desc.m_DefaultOpen = true;
+		panelRegistry.RegisterPanel(desc);
+
+		// RenderGraph Inspector
+		desc = {};
+		desc.m_Path = "Rendering/RenderGraph/Inspector";
+		desc.m_Title = "RenderGraph Inspector";
+		desc.m_DrawFunc = &DevelopGuiRenderGraphInspectorPanel;
 		panelRegistry.RegisterPanel(desc);
 	}
 

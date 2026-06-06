@@ -145,6 +145,7 @@
     <ClCompile Include="..\..\Sources\Core\Application.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRenderGraphInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12SwapChain.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Texture.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphInspector.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
@@ -238,6 +240,7 @@
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Core\Application.h" />
     <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiIBLPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DevelopGui\DevelopGuiRenderGraphInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
@@ -326,6 +329,7 @@
     <ClInclude Include="..\..\Sources\Core\Precompiled.h" />
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphInspector.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h" />
