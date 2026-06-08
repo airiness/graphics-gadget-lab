@@ -46,6 +46,12 @@ namespace gglab::devtools
 			EnumTextTraits<E>::SeparatorText;
 		};
 
+		template<typename E>
+		concept HasAliasSeparatorText = requires
+		{
+			EnumTextTraits<E>::AliasSeparatorText;
+		};
+
 		template<utils::Enum E>
 		[[nodiscard]] constexpr std::string_view UnknownText() noexcept
 		{
@@ -84,31 +90,50 @@ namespace gglab::devtools
 				return " | ";
 			}
 		}
+
+		template<utils::Enum E>
+		[[nodiscard]] constexpr std::string_view AliasSeparatorText() noexcept
+		{
+			if constexpr (HasAliasSeparatorText<E>)
+			{
+				return EnumTextTraits<E>::AliasSeparatorText;
+			}
+			else
+			{
+				return "/";
+			}
+		}
 	}
 
 	template<utils::Enum E>
-	[[nodiscard]] constexpr std::string_view EnumText(E value) noexcept
+	[[nodiscard]] std::string EnumText(E value)
 		requires detail::HasEnumTextEntries<E>
 	{
+		std::string result;
+		const std::string_view separator = detail::AliasSeparatorText<E>();
 		for (const auto& entry : EnumTextTraits<E>::Entries)
 		{
 			if (entry.m_Value == value)
 			{
-				return entry.m_Text;
+				if (!result.empty())
+				{
+					result.append(separator);
+				}
+				result.append(entry.m_Text);
 			}
 		}
 
-		return detail::UnknownText<E>();
+		return result.empty() ? std::string(detail::UnknownText<E>()) : result;
 	}
 
 	template<utils::Enum E>
 	[[nodiscard]] std::string EnumValueText(E value)
 		requires detail::HasEnumTextEntries<E>
 	{
-		const std::string_view text = EnumText(value);
-		if (text != detail::UnknownText<E>())
+		const std::string text = EnumText(value);
+		if (std::string_view(text.data(), text.size()) != detail::UnknownText<E>())
 		{
-			return std::string(text);
+			return text;
 		}
 
 		return std::format("{}({})", text, static_cast<uint64_t>(utils::ToUnderlying(value)));
@@ -133,11 +158,12 @@ namespace gglab::devtools
 		}
 
 		std::string result;
+		auto remainingBits = bits;
 		const std::string_view separator = detail::SeparatorText<E>();
 		for (const auto& entry : EnumTextTraits<E>::Entries)
 		{
 			const auto flag = utils::ToUnderlying(entry.m_Value);
-			if (flag == 0 || (bits & flag) == 0)
+			if (flag == 0 || (remainingBits & flag) != flag)
 			{
 				continue;
 			}
@@ -146,7 +172,17 @@ namespace gglab::devtools
 			{
 				result.append(separator);
 			}
-			result.append(entry.m_Text);
+			result.append(EnumText(entry.m_Value));
+			remainingBits = static_cast<std::underlying_type_t<E>>(remainingBits & ~flag);
+		}
+
+		if (remainingBits != 0)
+		{
+			if (!result.empty())
+			{
+				result.append(separator);
+			}
+			result.append(std::format("UnknownBits(0x{:X})", static_cast<uint64_t>(remainingBits)));
 		}
 
 		return result.empty() ? std::string(detail::UnknownText<E>()) : result;
