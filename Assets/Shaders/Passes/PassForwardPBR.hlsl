@@ -17,7 +17,9 @@ struct VSInput
 {
 	float3 Position : POSITION;
 	float3 Normal : NORMAL;
-	float2 UV : TEXCOORD0;
+	float2 UV0 : TEXCOORD0;
+	float2 UV1 : TEXCOORD1;
+	float4 Tangent : TANGENT;
 };
 
 struct VSOutput
@@ -25,14 +27,21 @@ struct VSOutput
 	float4 PositionCS : SV_POSITION;
 	float3 PositionWS : TEXCOORD0;
 	float3 NormalWS : TEXCOORD1;
-	float2 UV : TEXCOORD2;
+	float2 UV0 : TEXCOORD2;
+	float2 UV1 : TEXCOORD3;
+	float4 TangentWS : TEXCOORD4;
 
-	nointerpolation uint MaterialIndex : TEXCOORD3;
-	nointerpolation uint ViewIndex : TEXCOORD4;
+	nointerpolation uint MaterialIndex : TEXCOORD5;
+	nointerpolation uint ViewIndex : TEXCOORD6;
 };
 
+float2 SelectUV(MaterialTextureBindingData bindingData, float2 uv0, float2 uv1)
+{
+	return (bindingData.TexCoordIndex == 1u) ? uv1 : uv0;
+}
+
 // Sample normal map and compute perturbed normal in world space
-float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, float2 uv)
+float3 SampleNormalWS(MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
 {
 	// TODO: flip Y for normal map?
 
@@ -49,7 +58,7 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float3 positionWS, 
 	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
 
 	// Build TBN matrix
-	float3x3 TBN = BuildTBN(normalize(normalWS), positionWS, uv); // TODO: Support vertex tangent in VertexAttribute
+	float3x3 TBN = BuildTBNFromTangent(normalize(normalWS), tangentWS, positionWS, uv);
 
 	// Transform normal from tangent space to world space
 	float3 perturbedNormalWS = normalize(mul(normalSampled.xyz, TBN));
@@ -95,7 +104,8 @@ VSOutput VSMain(VSInput IN)
 
 	// World space position and normal
 	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
-	float3 normalWS = normalize(mul(IN.Normal, (float3x3) objData.NormalMat));
+	float3 normalWS = SafeNormalize(mul(IN.Normal, (float3x3) objData.NormalMat), float3(0.0, 1.0, 0.0));
+	float3 tangentWS = SafeNormalize(mul(IN.Tangent.xyz, (float3x3) objData.ModelMat), float3(1.0, 0.0, 0.0));
 
 	// View space position
 	float4 posVS = mul(posWS, viewData.ViewMat);
@@ -106,7 +116,9 @@ VSOutput VSMain(VSInput IN)
 	OUT.PositionCS = posCS;
 	OUT.PositionWS = posWS.xyz;
 	OUT.NormalWS = normalWS;
-	OUT.UV = IN.UV;
+	OUT.UV0 = IN.UV0;
+	OUT.UV1 = IN.UV1;
+	OUT.TangentWS = float4(tangentWS, IN.Tangent.w);
 
 	// output material index
 	const uint materialIndex = g_Scene.MaterialBaseIndex + objData.MaterialIndex;
@@ -116,7 +128,7 @@ VSOutput VSMain(VSInput IN)
 	return OUT;
 }
 
-float4 PSMain(VSOutput IN) : SV_Target
+float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 {
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 
@@ -124,7 +136,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	ViewData viewData = g_Views[IN.ViewIndex];
 
 	// BaseColor
-	float4 baseColorSampled = SampleTextureBinding(matData.BaseColorBinding.TextureSamplerBinding, IN.UV);
+	float2 baseColorUV = SelectUV(matData.BaseColorBinding, IN.UV0, IN.UV1);
+	float4 baseColorSampled = SampleTextureBinding(matData.BaseColorBinding.TextureSamplerBinding, baseColorUV);
 	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
 
 	float alpha = baseColorSampled.a * matData.BaseColorFactor.a;
@@ -140,14 +153,21 @@ float4 PSMain(VSOutput IN) : SV_Target
 	}
 
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
-	float4 mrSampled = SampleTextureBinding(matData.MetallicRoughnessBinding.TextureSamplerBinding, IN.UV);
+	float2 metallicRoughnessUV = SelectUV(matData.MetallicRoughnessBinding, IN.UV0, IN.UV1);
+	float4 mrSampled = SampleTextureBinding(matData.MetallicRoughnessBinding.TextureSamplerBinding, metallicRoughnessUV);
 	float metallic = saturate(matData.MetallicFactor * mrSampled.b);
 	float perceptualRoughness = saturate(matData.RoughnessFactor * mrSampled.g);
 	perceptualRoughness = ClampPerceptualRoughnessForBRDF(perceptualRoughness);
 
 	// Normal (linear)
 	float3 normalWS = normalize(IN.NormalWS);
-	float3 N = SampleNormalWS(matData, normalWS, IN.PositionWS, IN.UV);
+	float4 tangentWS = IN.TangentWS;
+	if ((matData.Flags & 1u) != 0u && !isFrontFace)
+	{
+		normalWS = -normalWS;
+	}
+	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
+	float3 N = SampleNormalWS(matData, normalWS, tangentWS, IN.PositionWS, normalUV);
 
 	// Shading
 	float3 V = normalize(viewData.CameraPos.xyz - IN.PositionWS); // View direction
@@ -177,7 +197,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 		g_Scene.MainLight.Intensity * NoL;
 
 	// Emissive texture(sRGB)
-	float3 emissiveSampled = SampleTextureBinding(matData.EmissiveBinding.TextureSamplerBinding, IN.UV).rgb;
+	float2 emissiveUV = SelectUV(matData.EmissiveBinding, IN.UV0, IN.UV1);
+	float3 emissiveSampled = SampleTextureBinding(matData.EmissiveBinding.TextureSamplerBinding, emissiveUV).rgb;
 	float3 emissive = emissiveSampled * matData.EmissiveColorFactor.rgb;
 
 	// Add emissive
@@ -197,7 +218,8 @@ float4 PSMain(VSOutput IN) : SV_Target
 	float3 specularIBL = prefilteredEnv * specularIBLFactor;
 
 	// AO texture
-	float aoSampled = SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, IN.UV).r;
+	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
+	float aoSampled = SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, occlusionUV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 

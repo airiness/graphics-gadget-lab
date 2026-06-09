@@ -42,6 +42,12 @@ float3 SRGBToLinear(float3 c)
 	return lerp(lower, higher, t);
 }
 
+float3 SafeNormalize(float3 v, float3 fallback)
+{
+	float len2 = dot(v, v);
+	return (len2 > 1.0e-8) ? v * rsqrt(len2) : fallback;
+}
+
 // BuildTBN()
 // Reconstruct a tangent basis (T, B, N) per-pixel using screen-space derivatives.
 // This is a common fallback when the mesh does NOT provide vertex tangents.
@@ -61,6 +67,8 @@ float3 SRGBToLinear(float3 c)
 // - For mirrored UV islands, we need to handle handedness (sign) to keep normal maps consistent.
 float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 {
+	N = SafeNormalize(N, float3(0.0, 1.0, 0.0));
+
     // Screen-space partial derivatives of world position:
     //   deltaPosX ≈ ∂positionWS / ∂screenX   (difference to the right neighbor pixel)
     //   deltaPosY ≈ ∂positionWS / ∂screenY   (difference to the bottom neighbor pixel)
@@ -93,9 +101,17 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 	float3 B = deltaPosYPerp * deltaUVX.y + deltaPosXPerp * deltaUVY.y;
 
     // If the triangle/UV mapping is degenerate, T/B may become very small.
-    // We compute a safe scale to avoid division by zero.
 	float tLen2 = dot(T, T);
 	float bLen2 = dot(B, B);
+	if (max(tLen2, bLen2) <= 1.0e-8)
+	{
+		float3 up = (abs(N.y) < 0.999) ? float3(0.0, 1.0, 0.0) : float3(0.0, 0.0, 1.0);
+		T = SafeNormalize(cross(up, N), float3(1.0, 0.0, 0.0));
+		B = SafeNormalize(cross(N, T), float3(0.0, 0.0, 1.0));
+		return float3x3(T, B, N);
+	}
+
+    // We compute a safe scale to avoid division by zero.
 	float invMax = rsqrt(max(tLen2, bLen2) + 1e-8);
 
 	T *= invMax;
@@ -103,7 +119,8 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 
     // --- Orthonormalize and fix handedness --------------------
     // 1) Make T orthogonal to N (Gram-Schmidt). This helps reduce skew due to interpolation.
-	T = normalize(T - N * dot(N, T));
+	T = T - N * dot(N, T);
+	T = SafeNormalize(T, float3(1.0, 0.0, 0.0));
 
     // 2) Determine handedness sign to handle mirrored UVs:
     //    If (T,B,N) form a left-handed basis, flip B.
@@ -111,10 +128,32 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 	float handedness = (dot(cross(T, B), N) < 0.0) ? -1.0 : 1.0;
 
     // 3) Recompute B from N and T to guarantee orthogonality, then apply handedness.
-	B = normalize(cross(N, T)) * handedness;
+	B = SafeNormalize(cross(N, T), float3(0.0, 0.0, 1.0)) * handedness;
 
     // Return TBN basis.
     // IMPORTANT: This uses row-vector convention:
     //   n_ws = normalize(mul(n_ts, float3x3(T,B,N)));
+	return float3x3(T, B, N);
+}
+
+float3x3 BuildTBNFromTangent(float3 N, float4 tangentWS, float3 positionWS, float2 uv)
+{
+	N = SafeNormalize(N, float3(0.0, 1.0, 0.0));
+
+	float3 T = tangentWS.xyz;
+	if (dot(T, T) <= 1.0e-8)
+	{
+		return BuildTBN(N, positionWS, uv);
+	}
+
+	T = T - N * dot(N, T);
+	if (dot(T, T) <= 1.0e-8)
+	{
+		return BuildTBN(N, positionWS, uv);
+	}
+
+	T = normalize(T);
+	float handedness = (tangentWS.w < 0.0) ? -1.0 : 1.0;
+	float3 B = SafeNormalize(cross(N, T), float3(0.0, 0.0, 1.0)) * handedness;
 	return float3x3(T, B, N);
 }
