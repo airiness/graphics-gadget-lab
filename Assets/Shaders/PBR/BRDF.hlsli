@@ -37,10 +37,15 @@ float3 F_Schlick(float3 F0, float3 F90, float cosTheta)
 // Approximates the combined masking and shadowing effect for view and light directions.
 float V_SmithGGXCorrelated(float NoV, float NoL, float a)
 {
+	if (NoV <= 0.0 || NoL <= 0.0)
+	{
+		return 0.0;
+	}
+
 	float a2 = a * a;
 	float GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);
 	float GGXV = NoL * sqrt((-NoV * a2 + NoV) * NoV + a2);
-	return 0.5 / (GGXV + GGXL);
+	return 0.5 / max(GGXV + GGXL, 1e-6);
 }
 
 // Lambertian diffuse BRDF.

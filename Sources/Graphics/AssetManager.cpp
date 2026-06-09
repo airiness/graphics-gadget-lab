@@ -15,6 +15,9 @@ namespace gglab
 {
 	namespace
 	{
+		constexpr float TangentLengthEpsilon = 1.0e-4f;
+		constexpr float TangentLengthSqEpsilon = TangentLengthEpsilon * TangentLengthEpsilon;
+
 		// MaterialTextureSlot to assimp Texture type mapping
 		aiTextureType ToAssimpTextureType(MaterialTextureSlot slot) noexcept
 		{
@@ -23,7 +26,7 @@ namespace gglab
 			case MaterialTextureSlot::BaseColor:
 				return aiTextureType_BASE_COLOR;
 			case MaterialTextureSlot::MetallicRoughness:
-				return aiTextureType_METALNESS;
+				return aiTextureType_GLTF_METALLIC_ROUGHNESS;
 			case MaterialTextureSlot::Normal:
 				return aiTextureType_NORMALS;
 			case MaterialTextureSlot::Occlusion:
@@ -75,6 +78,32 @@ namespace gglab
 			key.m_MaxLOD = D3D12_FLOAT32_MAX;
 
 			return key;
+		}
+
+		Vector4 MakeFallbackTangent(const Vector3& normal) noexcept
+		{
+			Vector3 n = normal;
+			if (n.LengthSquared() <= TangentLengthSqEpsilon)
+			{
+				n = Vector3::UnitY;
+			}
+			else
+			{
+				n.Normalize();
+			}
+
+			const Vector3 up = (std::abs(n.y) < 0.999f) ? Vector3::UnitY : Vector3::UnitZ;
+			Vector3 tangent = up.Cross(n);
+			if (tangent.LengthSquared() <= TangentLengthSqEpsilon)
+			{
+				tangent = Vector3::UnitX;
+			}
+			else
+			{
+				tangent.Normalize();
+			}
+
+			return Vector4(tangent.x, tangent.y, tangent.z, 1.0f);
 		}
 	}
 
@@ -398,6 +427,13 @@ namespace gglab
 				MaterialTextureBinding binding{};
 				binding.m_TextureId = texId;
 				binding.m_SamplerId = samplerId;
+				if (uvIndex > 1)
+				{
+					GGLAB_LOG_GRAPHICS_WARN("Texture '{}' requests TEXCOORD{}, but only TEXCOORD0/1 are supported. Falling back to TEXCOORD0.",
+						canonicalTexPath.string(),
+						uvIndex);
+					uvIndex = 0;
+				}
 				binding.m_TexCoordIndex = uvIndex;
 
 				SetMaterialTexture(*material, slot, binding);
@@ -520,22 +556,57 @@ namespace gglab
 					vertex.m_Normal = Vector3(aiNormal.x, aiNormal.y, aiNormal.z);
 				}
 
-				if (aiMesh->HasTextureCoords(0)) // TODO: support more texture coordinates
+				if (aiMesh->HasTextureCoords(0))
 				{
 					const auto& aiTexCoord = aiMesh->mTextureCoords[0][aiVertexIndex];
-					vertex.m_TexCoord = Vector2(aiTexCoord.x, aiTexCoord.y);
+					vertex.m_TexCoord0 = Vector2(aiTexCoord.x, aiTexCoord.y);
+					vertex.m_TexCoord1 = vertex.m_TexCoord0;
 				}
 
-				//// TODO: targent vertex data?
-				//if (aiMesh->HasTangentsAndBitangents())
-				//{
-				//	// Tangent
-				//	const auto& aiTangent = aiMesh->mTangents[aiVertexIndex];
-				//	vertex.m_Tangent = Vector3(aiTangent.x, aiTangent.y, aiTangent.z);
-				//	// Bitangent
-				//	const auto& aiBitangent = aiMesh->mBitangents[aiVertexIndex];
-				//	vertex.m_Bitangent = Vector3(aiBitangent.x, aiBitangent.y, aiBitangent.z);
-				//}
+				if (aiMesh->HasTextureCoords(1))
+				{
+					const auto& aiTexCoord = aiMesh->mTextureCoords[1][aiVertexIndex];
+					vertex.m_TexCoord1 = Vector2(aiTexCoord.x, aiTexCoord.y);
+				}
+
+				if (aiMesh->HasTangentsAndBitangents())
+				{
+					Vector3 normal = vertex.m_Normal;
+					if (normal.LengthSquared() <= TangentLengthSqEpsilon)
+					{
+						normal = Vector3::UnitY;
+					}
+					else
+					{
+						normal.Normalize();
+					}
+
+					const auto& aiTangent = aiMesh->mTangents[aiVertexIndex];
+					Vector3 tangent(aiTangent.x, aiTangent.y, aiTangent.z);
+					if (tangent.LengthSquared() <= TangentLengthSqEpsilon)
+					{
+						vertex.m_Tangent = MakeFallbackTangent(normal);
+					}
+					else
+					{
+						tangent.Normalize();
+
+						const auto& aiBitangent = aiMesh->mBitangents[aiVertexIndex];
+						Vector3 bitangent(aiBitangent.x, aiBitangent.y, aiBitangent.z);
+						float handedness = 1.0f;
+						if (bitangent.LengthSquared() > TangentLengthSqEpsilon)
+						{
+							bitangent.Normalize();
+							handedness = (tangent.Cross(bitangent).Dot(normal) < 0.0f) ? -1.0f : 1.0f;
+						}
+
+						vertex.m_Tangent = Vector4(tangent.x, tangent.y, tangent.z, handedness);
+					}
+				}
+				else
+				{
+					vertex.m_Tangent = MakeFallbackTangent(vertex.m_Normal);
+				}
 			}
 
 			// Indices data

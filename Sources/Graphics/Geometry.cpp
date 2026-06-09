@@ -101,6 +101,16 @@ namespace gglab
 				{ 1.0f,  0.0f,  0.0f }, // Right
 			} };
 
+			constexpr std::array<Vector4, FaceCount> faceTangents =
+			{ {
+				{ 1.0f, 0.0f,  0.0f, 1.0f }, // Front
+				{-1.0f, 0.0f,  0.0f, 1.0f }, // Back
+				{ 1.0f, 0.0f,  0.0f, 1.0f }, // Top
+				{ 1.0f, 0.0f,  0.0f, 1.0f }, // Bottom
+				{ 0.0f, 0.0f, -1.0f, 1.0f }, // Left
+				{ 0.0f, 0.0f,  1.0f, 1.0f }, // Right
+			} };
+
 			std::vector<Vertex> vertices;
 			vertices.reserve(FaceCount * VertexCountPerFace);
 
@@ -108,10 +118,11 @@ namespace gglab
 			{
 				const auto& n = faceNormals[face];
 				const auto& p = facePositions[face];
+				const auto& t = faceTangents[face];
 
 				for (size_t i = 0; i < VertexCountPerFace; ++i)
 				{
-					vertices.push_back({ p[i], n, texCoords[i] });
+					vertices.push_back({ p[i], n, texCoords[i], texCoords[i], t });
 				}
 			}
 

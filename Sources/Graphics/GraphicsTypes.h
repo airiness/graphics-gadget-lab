@@ -147,8 +147,7 @@ namespace gglab
 		P3T2,			// Position(3), TexCoord(2)
 		P3N3,			// Position(3), Normal(3)
 		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
-
-		// TODO: Add Tangent
+		P3N3T2T2Tan4,	// Position(3), Normal(3), TexCoord0(2), TexCoord1(2), Tangent(4)
 
 		None,
 		Count = None
@@ -223,7 +222,7 @@ namespace gglab
 	{
 		TextureID m_TextureId{};
 		SamplerID m_SamplerId{};
-		uint32_t m_TexCoordIndex = 0; // TODO: support glTF textureInfo.texCoord.
+		uint32_t m_TexCoordIndex = 0;
 	};
 
 	struct Material
