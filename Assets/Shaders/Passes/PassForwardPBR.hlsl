@@ -106,6 +106,7 @@ VSOutput VSMain(VSInput IN)
 	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
 	float3 normalWS = SafeNormalize(mul(IN.Normal, (float3x3) objData.NormalMat), float3(0.0, 1.0, 0.0));
 	float3 tangentWS = SafeNormalize(mul(IN.Tangent.xyz, (float3x3) objData.ModelMat), float3(1.0, 0.0, 0.0));
+	float transformHandedness = determinant((float3x3) objData.ModelMat) < 0.0 ? -1.0 : 1.0;
 
 	// View space position
 	float4 posVS = mul(posWS, viewData.ViewMat);
@@ -118,7 +119,7 @@ VSOutput VSMain(VSInput IN)
 	OUT.NormalWS = normalWS;
 	OUT.UV0 = IN.UV0;
 	OUT.UV1 = IN.UV1;
-	OUT.TangentWS = float4(tangentWS, IN.Tangent.w);
+	OUT.TangentWS = float4(tangentWS, IN.Tangent.w * transformHandedness);
 
 	// output material index
 	const uint materialIndex = g_Scene.MaterialBaseIndex + objData.MaterialIndex;
