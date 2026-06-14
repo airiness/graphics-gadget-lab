@@ -237,6 +237,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
@@ -599,6 +602,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
@@ -767,6 +773,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGShadowResources.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -796,7 +805,16 @@
     <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Assets\Shaders\Common\MaterialUtils.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\VertexInput.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\VertexTransform.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli">
@@ -807,6 +825,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDirectionalShadowMap.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

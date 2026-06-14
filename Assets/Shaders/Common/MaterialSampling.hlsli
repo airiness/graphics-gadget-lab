@@ -18,6 +18,11 @@ SamplerState GetSamplerState(uint samplerIndex)
 	return SamplerDescriptorHeap[NonUniformResourceIndex(samplerIndex)];
 }
 
+SamplerComparisonState GetSamplerComparisonState(uint samplerIndex)
+{
+	return SamplerDescriptorHeap[NonUniformResourceIndex(samplerIndex)];
+}
+
 // Sample texture2D with srv and sampler indices
 float4 SampleTexture2D(uint srvIndex, uint samplerIndex, float2 uv)
 {

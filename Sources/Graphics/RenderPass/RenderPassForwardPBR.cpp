@@ -5,11 +5,13 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
+#include "Graphics/RenderGraph/RGShadowResources.h"
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/DX12/Cache/InputLayoutLibrary.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/SamplerRegistry.h"
 
 namespace gglab
 {
@@ -24,9 +26,12 @@ namespace gglab
 			RGTextureId m_IrradianceCubemap{};
 			RGTextureId m_PrefilteredSpecularCubemap{};
 			RGTextureId m_BrdfLut{};
+			RGTextureId m_ShadowMap{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			uint32_t m_ShadowMapSize = 0;
+			uint32_t m_ShadowSamplerIndex = 0;
 		};
 
 		auto* contextPtr = &context;
@@ -38,7 +43,7 @@ namespace gglab
 		EnsureInitialized(services);
 
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
-			[](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
+			[servicesPtr](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 
@@ -47,15 +52,23 @@ namespace gglab
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 
 				data.m_SceneColor = builder.Write(mainTargets.m_SceneColor, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureUsage::Sample);
 				data.m_PrefilteredSpecularCubemap = builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureUsage::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
+				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureUsage::Sample);
 
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
+				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
+
+				auto* renderer = servicesPtr->m_Renderer;
+				GGLAB_ASSERT_NOT_NULL(renderer);
+				data.m_ShadowSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+					SamplerPreset::ShadowCmpLinearClamp);
 			},
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
 			{
@@ -64,6 +77,9 @@ namespace gglab
 
 				auto* depthTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_NOT_NULL(depthTexture);
+
+				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);
+				GGLAB_ASSERT_NOT_NULL(shadowMapTexture);
 
 				auto* viewCache = rg.GetViewCache();
 				auto* commandList = executeContext.m_GraphicsCommandList;
@@ -81,6 +97,22 @@ namespace gglab
 				commandList->ClearRenderTarget(rtv, *sceneColorTexture);
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 				commandList->SetRenderTarget(rtv, dsv);
+
+				const ResourceIndex shadowMapIndex = rg.GetResourceIndex(data.m_ShadowMap);
+				D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrvDesc{};
+				shadowSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+				shadowSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				shadowSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				shadowSrvDesc.Texture2D.MostDetailedMip = 0;
+				shadowSrvDesc.Texture2D.MipLevels = 1;
+				shadowSrvDesc.Texture2D.PlaneSlice = 0;
+				shadowSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+				const auto shadowSrv = viewCache->GetOrCreate<ViewType::SRV>(
+					shadowMapIndex,
+					shadowMapTexture,
+					shadowSrvDesc);
+				GGLAB_ASSERT_MSG(shadowSrv.m_Index != std::numeric_limits<uint32_t>::max(),
+					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
 
 				auto* renderer = servicesPtr->m_Renderer;
 				auto* descriptorManager = renderer->GetDescriptorManager();
@@ -120,11 +152,20 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
 
-				// Set view index constant
-				commandList->SetGraphicsRoot32BitConstant(
-					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
+				const uint32_t shadowDepthBiasBits = std::bit_cast<uint32_t>(0.0015f);
+				const uint32_t localConstants[] = {
+					0u,
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
-					static_cast<uint32_t>(CommonLocalConstantIndex::Param1));
+					shadowSrv.m_Index,
+					data.m_ShadowSamplerIndex,
+					data.m_ShadowMapSize,
+					1u,
+					shadowDepthBiasBits,
+					static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
+				};
+				commandList->SetGraphicsRoot32BitConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
+					localConstants);
 
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
 			});
@@ -178,7 +219,7 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		const auto& renderQueue = context.m_RenderQueue;
+		const auto& renderQueue = context.GetRenderQueue(RenderViewID::Main);
 		if (renderQueue.m_DrawItems.empty())
 		{
 			return;
@@ -189,14 +230,15 @@ namespace gglab
 		DrawItemsRange alphaTestRange = ranges[utils::ToIndex(RenderBucket::AlphaTest)];
 		DrawItemsRange transparentRange = ranges[utils::ToIndex(RenderBucket::Transparent)];
 
-		DrawRange(commandList, context, services, opaqueRange);
-		DrawRange(commandList, context, services, alphaTestRange);
-		DrawRange(commandList, context, services, transparentRange);
+		DrawRange(commandList, context, services, renderQueue, opaqueRange);
+		DrawRange(commandList, context, services, renderQueue, alphaTestRange);
+		DrawRange(commandList, context, services, renderQueue, transparentRange);
 	}
 
 	void RenderPassForwardPBR::DrawRange(DX12CommandList* commandList,
 		const RenderFrameContext& context,
 		const RenderServices& services,
+		const RenderQueue& renderQueue,
 		const DrawItemsRange& range) noexcept
 	{
 		if (range.m_Count == 0)
@@ -207,8 +249,7 @@ namespace gglab
 		auto* renderer = services.m_Renderer;
 		auto* assetManager = services.m_AssetManager;
 
-		const auto& drawItems = context.m_RenderQueue.m_DrawItems;
-		const auto& renderQueue = context.m_RenderQueue;
+		const auto& drawItems = renderQueue.m_DrawItems;
 
 		uint64_t lastVariantBits = std::numeric_limits<uint64_t>::max();
 		MeshID lastMeshId{};

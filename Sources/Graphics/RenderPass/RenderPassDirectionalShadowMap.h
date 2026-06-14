@@ -7,11 +7,13 @@ namespace gglab
 {
 	class DX12CommandList;
 	class DX12PipelineState;
-	class RenderPassForwardPBR : public RenderPassBase
+	class Renderer;
+
+	class RenderPassDirectionalShadowMap final : public RenderPassBase
 	{
 	public:
-		RenderPassForwardPBR() noexcept = default;
-		~RenderPassForwardPBR() override = default;
+		RenderPassDirectionalShadowMap() noexcept = default;
+		~RenderPassDirectionalShadowMap() override = default;
 
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
@@ -34,8 +36,7 @@ namespace gglab
 			const Renderer& renderer,
 			uint64_t variantBits) noexcept;
 
-		std::tuple<RasterizerPreset, DepthPreset, BlendPreset>
-			GetPresetsFromVariantBits(uint64_t variantBits) const noexcept;
+		RasterizerPreset GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept;
 
 		std::string MakeVariantPSOPassId(std::string_view baseName, uint64_t variantBits) const noexcept;
 

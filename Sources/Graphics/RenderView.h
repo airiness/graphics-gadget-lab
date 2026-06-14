@@ -6,6 +6,12 @@ namespace gglab
 {
 	class Camera;
 
+	template<RenderViewID ViewId>
+	struct RenderViewBuildInfo;
+
+	template<RenderViewID ViewId>
+	struct RenderViewBuildTraits;
+
 	struct RenderView
 	{
 		Matrix m_View = Matrix::Identity;
@@ -32,17 +38,44 @@ namespace gglab
 	class RenderViewBuilder
 	{
 	public:
-		struct BuildInfo
+		template<RenderViewID ViewId>
+		RenderView Build(const RenderViewBuildInfo<ViewId>& info) const noexcept
 		{
-			const Camera& m_Camera;
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
+			return RenderViewBuildTraits<ViewId>::Build(info);
+		}
+	};
 
-			StringID m_Name{};
-			RenderViewID m_ViewId = RenderViewID::Unknown;
-		};
+	template<>
+	struct RenderViewBuildInfo<RenderViewID::Main>
+	{
+		const Camera& m_Camera;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		StringID m_Name = StringID("MainView");
+	};
 
-	public:
-		RenderView Build(const BuildInfo& info) noexcept;
+	template<>
+	struct RenderViewBuildInfo<RenderViewID::DirectionalShadow>
+	{
+		const RenderView& m_MainView;
+		Vector3 m_LightDirection = -Vector3::UnitY;
+		uint32_t m_ShadowMapSize = 2048;
+		float m_MaxShadowDistance = 200.0f;
+		float m_CasterExtrusionDistance = 600.0f;
+		float m_OrthoPadding = 2.0f;
+		float m_DepthPadding = 60.0f;
+		StringID m_Name = StringID("DirectionalShadowView");
+	};
+
+	template<>
+	struct RenderViewBuildTraits<RenderViewID::Main>
+	{
+		static RenderView Build(const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept;
+	};
+
+	template<>
+	struct RenderViewBuildTraits<RenderViewID::DirectionalShadow>
+	{
+		static RenderView Build(const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
 	};
 }

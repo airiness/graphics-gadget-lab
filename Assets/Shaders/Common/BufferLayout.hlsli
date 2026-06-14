@@ -78,7 +78,7 @@ struct MaterialData
 	float NormalScale;
 	float OcclusionStrength;
 	
-	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
+	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND. Defined in MaterialUtils.hlsli
 	float AlphaCutoff;
 	uint Flags; // bit 0: doubleSided
 	

@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Core/Application.h"
+#include "Core/Components.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Input/InputManager.h"
@@ -8,7 +9,9 @@
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderQueue.h"
+#include "Graphics/RenderGraph/RGShadowResources.h"
 #include "Core/Time.h"
+#include "Core/World.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
@@ -21,6 +24,31 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 namespace gglab
 {
 	std::unique_ptr<Application> Application::s_Application;
+
+	namespace
+	{
+		Vector3 ResolveMainLightDirection(const World& world) noexcept
+		{
+			const auto& registry = world.GetRegistry();
+			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
+			for (auto [entity, transComp, lightComp] : lightView.each())
+			{
+				GGLAB_UNUSED(entity);
+				GGLAB_UNUSED(lightComp);
+
+				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
+				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
+				if (forward.LengthSquared() > 1.0e-8f)
+				{
+					forward.Normalize();
+					return forward;
+				}
+			}
+
+			return -Vector3::UnitY;
+		}
+
+	}
 
 	Keyboard* Application::GetKeyboard() const noexcept
 	{
@@ -258,6 +286,7 @@ namespace gglab
 
 		m_RenderViewBuilder = std::make_unique<RenderViewBuilder>();
 		m_RenderSceneBuilder = std::make_unique<RenderSceneBuilder>();
+		m_RenderQueueBuilder = std::make_unique<RenderQueueBuilder>();
 
 		m_IsInitialized = true;
 	}
@@ -314,19 +343,34 @@ namespace gglab
 		std::vector<RenderView> renderViews;
 		renderViews.resize(utils::ToIndex(RenderViewID::Count));
 
+		const auto& world = demo->GetWorld();
+
 		// Main view
 		auto& camera = demo->GetCamera();
-		const RenderViewBuilder::BuildInfo viewBuildInfo{
+		const RenderViewBuildInfo<RenderViewID::Main> viewBuildInfo{
 			.m_Camera = camera,
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
 			.m_Name = StringID("MainView"),
-			.m_ViewId = RenderViewID::Main
 		};
-		renderViews[utils::ToIndex(RenderViewID::Main)] = m_RenderViewBuilder->Build(viewBuildInfo);
+		renderViews[utils::ToIndex(RenderViewID::Main)] =
+			m_RenderViewBuilder->Build<RenderViewID::Main>(viewBuildInfo);
+
+		// Directional shadow view
+		const RenderViewBuildInfo<RenderViewID::DirectionalShadow> shadowViewBuildInfo{
+			.m_MainView = renderViews[utils::ToIndex(RenderViewID::Main)],
+			.m_LightDirection = ResolveMainLightDirection(world),
+			.m_ShadowMapSize = DefaultDirectionalShadowMapSize,
+			.m_MaxShadowDistance = 200.0f,
+			.m_CasterExtrusionDistance = 600.0f,
+			.m_OrthoPadding = 2.0f,
+			.m_DepthPadding = 60.0f,
+			.m_Name = StringID("DirectionalShadowView"),
+		};
+		renderViews[utils::ToIndex(RenderViewID::DirectionalShadow)] =
+			m_RenderViewBuilder->Build<RenderViewID::DirectionalShadow>(shadowViewBuildInfo);
 
 		// Build render scene
-		const auto& world = demo->GetWorld();
 		const RenderSceneBuilder::BuildInfo sceneBuildInfo{
 			.m_World = world,
 			.m_AssetManager = *m_AssetManager,
@@ -342,17 +386,26 @@ namespace gglab
 		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
 
 		// Build render queues
-		const RenderQueueBuilder::BuildInfo queueBuildInfo{
-			.m_AssetManager = *m_AssetManager,
-			.m_RenderScene = renderScene,
-			.m_RenderView = renderViews[utils::ToIndex(RenderViewID::Main)]
-		};
-		const auto renderQueue = m_RenderQueueBuilder->Build(queueBuildInfo);
+		std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> renderQueues;
+		for (const RenderView& renderView : renderViews)
+		{
+			if (renderView.m_ViewId == RenderViewID::Unknown)
+			{
+				continue;
+			}
+
+			const RenderQueueBuilder::BuildInfo queueBuildInfo{
+				.m_AssetManager = *m_AssetManager,
+				.m_RenderScene = renderScene,
+				.m_RenderView = renderView
+			};
+			renderQueues[utils::ToIndex(renderView.m_ViewId)] = m_RenderQueueBuilder->Build(queueBuildInfo);
+		}
 
 		const RenderFrameContext renderContext{
 			.m_RenderViews = std::span<RenderView>(renderViews),
 			.m_RenderScene = renderScene,
-			.m_RenderQueue = renderQueue,
+			.m_RenderQueues = std::span<const RenderQueue>(renderQueues),
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
 			.m_UploadFencePoint = uploadFencePoint
 		};
@@ -466,6 +519,13 @@ namespace gglab
 
 			// Forward PBR
 			desc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+
+			// Directional Shadow Map
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassDirectionalShadowMap.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			shaderDescs.push_back(desc);
 			desc.m_Stage = ShaderStage::Pixel;
