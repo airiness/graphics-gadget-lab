@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
+#include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
@@ -21,6 +22,7 @@ namespace gglab
 			const RenderServices& services) noexcept override;
 
 	private:
+		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassForwardPBR m_ForwardPBRPass;
 		RenderPassTonemap m_TonemapPass;
 		RenderPassIBL m_IBLPass;

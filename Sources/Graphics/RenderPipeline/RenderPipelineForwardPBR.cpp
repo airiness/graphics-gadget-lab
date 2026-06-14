@@ -4,6 +4,7 @@
 #include "Graphics/DX12/DX12Device.h"
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
+#include "Graphics/RenderGraph/RGShadowResources.h"
 
 namespace gglab
 {
@@ -83,6 +84,24 @@ namespace gglab
 				rg.GetViewCache()->GetOrCreate(targets.m_BackBufferRTVKey, backTexture);
 			});
 
+		// Shadow Setup
+		struct ShadowSetupData {};
+		rg.AddPass<ShadowSetupData>("ShadowMap.Setup",
+			[](RenderGraph::RGBuilder& builder, ShadowSetupData&)
+			{
+				auto& shadowRes = builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
+				shadowRes.m_ShadowMapSize = DefaultDirectionalShadowMapSize;
+
+				RGTextureDesc shadowMapDesc{};
+				shadowMapDesc.m_Width = shadowRes.m_ShadowMapSize;
+				shadowMapDesc.m_Height = shadowRes.m_ShadowMapSize;
+				shadowMapDesc.m_Format = DXGI_FORMAT_R32_TYPELESS;
+				shadowMapDesc.m_Usage = RGTextureUsage::DepthStencil | RGTextureUsage::Sample;
+				shadowRes.m_DirectionalShadowMap = builder.CreateTexture(
+					"Shadow.DirectionalShadowMap",
+					shadowMapDesc);
+			});
+
 		// SwapChain prepare backbuffer
 		struct PrepareBackBufferData
 		{
@@ -119,6 +138,9 @@ namespace gglab
 
 		// IBL Pass
 		m_IBLPass.AddPass(rg, context, services);
+
+		// Directional Shadow Map
+		m_DirectionalShadowMapPass.AddPass(rg, context, services);
 
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);

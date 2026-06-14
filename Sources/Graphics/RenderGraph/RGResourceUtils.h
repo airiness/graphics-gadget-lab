@@ -293,7 +293,9 @@ namespace gglab
 		else if (Test(rgTexDesc.m_Usage, RGTextureUsage::DepthStencil))
 		{
 			D3D12_CLEAR_VALUE clearValue{};
-			clearValue.Format = rgTexDesc.m_Format;
+			clearValue.Format = (rgTexDesc.m_Format == DXGI_FORMAT_R32_TYPELESS) ?
+				DXGI_FORMAT_D32_FLOAT :
+				rgTexDesc.m_Format;
 			clearValue.DepthStencil.Depth = 1.0f;
 			clearValue.DepthStencil.Stencil = 0;
 			return std::optional<D3D12_CLEAR_VALUE>(clearValue);

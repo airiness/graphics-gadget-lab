@@ -146,6 +146,7 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
@@ -249,6 +250,7 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
@@ -323,6 +325,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGShadowResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
@@ -385,11 +388,15 @@
     <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\MaterialUtils.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\VertexInput.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Assets\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDirectionalShadowMap.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLCubemapPreview.hlsl" />

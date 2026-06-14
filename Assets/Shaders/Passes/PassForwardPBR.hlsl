@@ -1,26 +1,38 @@
 #include <Common/Common.hlsli>
 #include <Common/MaterialSampling.hlsli>
-#include <Common/ApplicationBinding.hlsli>
+#include <Common/MaterialUtils.hlsli>
+#include <Common/VertexTransform.hlsli>
 #include <PBR/BRDF.hlsli>
 
-uint GetObjectIndex()
+uint GetShadowMapTextureIndex()
 {
-	return g_LocalParam0;
+	return g_LocalParam2;
 }
 
-uint GetViewIndex()
+uint GetShadowMapSamplerIndex()
 {
-	return g_LocalParam1;
+	return g_LocalParam3;
 }
 
-struct VSInput
+uint GetShadowMapSize()
 {
-	float3 Position : POSITION;
-	float3 Normal : NORMAL;
-	float2 UV0 : TEXCOORD0;
-	float2 UV1 : TEXCOORD1;
-	float4 Tangent : TANGENT;
-};
+	return g_LocalParam4;
+}
+
+bool IsShadowEnabled()
+{
+	return g_LocalParam5 != 0u;
+}
+
+float GetShadowDepthBias()
+{
+	return asfloat(g_LocalParam6);
+}
+
+uint GetShadowViewIndex()
+{
+	return g_LocalParam7;
+}
 
 struct VSOutput
 {
@@ -34,11 +46,6 @@ struct VSOutput
 	nointerpolation uint MaterialIndex : TEXCOORD5;
 	nointerpolation uint ViewIndex : TEXCOORD6;
 };
-
-float2 SelectUV(MaterialTextureBindingData bindingData, float2 uv0, float2 uv1)
-{
-	return (bindingData.TexCoordIndex == 1u) ? uv1 : uv0;
-}
 
 // Sample normal map and compute perturbed normal in world space
 float3 SampleNormalWS(MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
@@ -90,41 +97,78 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 	return SampleTextureCubeLevel(binding, normalize(reflectWS), lod).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
 
-VSOutput VSMain(VSInput IN)
+float SampleDirectionalShadow(float3 positionWS, float NoL)
+{
+	if (!IsShadowEnabled() || NoL <= 0.0)
+	{
+		return 1.0;
+	}
+
+	const ViewData shadowView = LoadViewData(GetShadowViewIndex());
+
+	const float4 shadowPosVS = TransformPositionVS(float4(positionWS, 1.0), shadowView);
+	const float4 shadowPosCS = TransformPositionCS(shadowPosVS, shadowView);
+	if (shadowPosCS.w <= 0.0)
+	{
+		return 1.0;
+	}
+
+	const float3 shadowNDC = shadowPosCS.xyz / shadowPosCS.w;
+	const float2 shadowUV = shadowNDC.xy * float2(0.5, -0.5) + 0.5;
+	const float receiverDepth = shadowNDC.z;
+
+	if (shadowUV.x <= 0.0 || shadowUV.x >= 1.0 ||
+		shadowUV.y <= 0.0 || shadowUV.y >= 1.0 ||
+		receiverDepth <= 0.0 || receiverDepth >= 1.0)
+	{
+		return 1.0;
+	}
+
+	Texture2D<float> shadowMap = ResourceDescriptorHeap[NonUniformResourceIndex(GetShadowMapTextureIndex())];
+	SamplerComparisonState shadowSampler = GetSamplerComparisonState(GetShadowMapSamplerIndex());
+
+	const float texelSize = 1.0 / max((float) GetShadowMapSize(), 1.0);
+	const float compareDepth = saturate(receiverDepth - GetShadowDepthBias());
+
+	float visibility = 0.0;
+	[unroll]
+	for (int y = -1; y <= 1; ++y)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; ++x)
+		{
+			const float2 offset = float2((float) x, (float) y) * texelSize;
+			visibility += shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV + offset, compareDepth);
+		}
+	}
+
+	return visibility * (1.0 / 9.0);
+}
+
+VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 {
 	VSOutput OUT;
 
-	// Get object data
-	const uint objectIndex = g_Scene.ObjectBaseIndex + GetObjectIndex();
-	ObjectData objData = g_Objects[objectIndex];
+	const ObjectData objData = LoadCurrentObjectData();
+	const ViewData viewData = LoadCurrentViewData();
 
-	// Get view data
-	const uint viewIndex = g_Scene.ViewBaseIndex + GetViewIndex();
-	ViewData viewData = g_Views[viewIndex];
-
-	// World space position and normal
-	float4 posWS = mul(float4(IN.Position, 1.0), objData.ModelMat);
-	float3 normalWS = SafeNormalize(mul(IN.Normal, (float3x3) objData.NormalMat), float3(0.0, 1.0, 0.0));
-	float3 tangentWS = SafeNormalize(mul(IN.Tangent.xyz, (float3x3) objData.ModelMat), float3(1.0, 0.0, 0.0));
-	float transformHandedness = determinant((float3x3) objData.ModelMat) < 0.0 ? -1.0 : 1.0;
-
-	// View space position
-	float4 posVS = mul(posWS, viewData.ViewMat);
-
-	// Clip space position
-	float4 posCS = mul(posVS, viewData.ProjMat);
+	const float4 posWS = TransformPositionWS(IN.Position, objData);
+	const float4 posVS = TransformPositionVS(posWS, viewData);
+	const float4 posCS = TransformPositionCS(posVS, viewData);
+	const float3 normalWS = TransformNormalWS(IN.Normal, objData);
+	const float4 tangentWS = TransformTangentWS(IN.Tangent, objData);
 
 	OUT.PositionCS = posCS;
 	OUT.PositionWS = posWS.xyz;
 	OUT.NormalWS = normalWS;
 	OUT.UV0 = IN.UV0;
 	OUT.UV1 = IN.UV1;
-	OUT.TangentWS = float4(tangentWS, IN.Tangent.w * transformHandedness);
+	OUT.TangentWS = tangentWS;
 
 	// output material index
 	const uint materialIndex = g_Scene.MaterialBaseIndex + objData.MaterialIndex;
 	OUT.MaterialIndex = materialIndex;
-	OUT.ViewIndex = viewIndex;
+	OUT.ViewIndex = GetCurrentViewDataIndex();
 
 	return OUT;
 }
@@ -137,21 +181,13 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	ViewData viewData = g_Views[IN.ViewIndex];
 
 	// BaseColor
-	float2 baseColorUV = SelectUV(matData.BaseColorBinding, IN.UV0, IN.UV1);
+	const float2 baseColorUV = SelectUV(matData.BaseColorBinding, IN.UV0, IN.UV1);
 	float4 baseColorSampled = SampleTextureBinding(matData.BaseColorBinding.TextureSamplerBinding, baseColorUV);
 	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
 
-	float alpha = baseColorSampled.a * matData.BaseColorFactor.a;
-	// Alpha mode handling
-	if (matData.AlphaMode == 0) // OPAQUE
-	{
-		alpha = 1.0;
-	}
-	else if (matData.AlphaMode == 1) // MASK
-	{
-		clip(alpha - matData.AlphaCutoff);
-		alpha = 1.0;
-	}
+	float alpha = ResolveMaterialAlpha(
+		matData,
+		baseColorSampled.a * matData.BaseColorFactor.a);
 
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
 	float2 metallicRoughnessUV = SelectUV(matData.MetallicRoughnessBinding, IN.UV0, IN.UV1);
@@ -193,9 +229,11 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
 	float3 diffuse = kd * Fd_Lambert(baseColor);
 
+	float shadowVisibility = SampleDirectionalShadow(IN.PositionWS, NoL);
+
 	float3 Lo = (diffuse + specular) *
 		g_Scene.MainLight.Color.rgb *
-		g_Scene.MainLight.Intensity * NoL;
+		g_Scene.MainLight.Intensity * NoL * shadowVisibility;
 
 	// Emissive texture(sRGB)
 	float2 emissiveUV = SelectUV(matData.EmissiveBinding, IN.UV0, IN.UV1);

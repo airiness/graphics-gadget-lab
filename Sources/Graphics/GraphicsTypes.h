@@ -157,6 +157,7 @@ namespace gglab
 	enum class RenderViewID : uint32_t
 	{
 		Main,
+		DirectionalShadow,
 
 		Count,
 		Unknown = Count
