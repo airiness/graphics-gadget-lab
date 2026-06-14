@@ -41,6 +41,14 @@ namespace gglab
 				auto* backTexture = swapChain->GetBackBuffer(frameBackBufferIndex);
 				GGLAB_ASSERT(backTexture);
 
+				// Create HDR scene color
+				RGTextureDesc sceneColorDesc{};
+				sceneColorDesc.m_Width = width;
+				sceneColorDesc.m_Height = height;
+				sceneColorDesc.m_Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+				sceneColorDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+				targets.m_SceneColor = builder.CreateTexture("MainView.SceneColor", sceneColorDesc);
+
 				// Import backbuffer
 				RGTextureDesc backBufferDesc{};
 				backBufferDesc.m_Width = width;
@@ -48,7 +56,7 @@ namespace gglab
 				backBufferDesc.m_Format = swapChain->GetFormat();
 				backBufferDesc.m_Usage = RGTextureUsage::RenderTarget;
 
-				targets.m_Color = builder.ImportTexture("MainView.BackBuffer",
+				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
 					backTexture,
 					backBufferDesc,
 					RGTextureUsage::Present);
@@ -63,7 +71,7 @@ namespace gglab
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
 
 				// BackBuffer ResourceIndex
-				const ResourceIndex backBufferResourceIndex = rg.GetResourceIndex(targets.m_Color);
+				const ResourceIndex backBufferResourceIndex = rg.GetResourceIndex(targets.m_BackBuffer);
 				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(backBufferResourceIndex),
 					"BackBuffer must be external ResourceIndex.");
 				targets.m_BackBufferResourceIndex = backBufferResourceIndex;
@@ -91,7 +99,7 @@ namespace gglab
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 
-				data.m_BackBuffer = builder.Write(targets.m_Color,
+				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
 				data.m_RtvKey = targets.m_BackBufferRTVKey;
 			},
@@ -115,6 +123,9 @@ namespace gglab
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);
 
+		// Tonemap
+		m_TonemapPass.AddPass(rg, context, services);
+
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);
 
@@ -134,7 +145,7 @@ namespace gglab
 
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
-				data.m_BackBuffer = builder.Write(targets.m_Color,
+				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
 				builder.Export(data.m_BackBuffer, RGTextureUsage::Present);
 			});

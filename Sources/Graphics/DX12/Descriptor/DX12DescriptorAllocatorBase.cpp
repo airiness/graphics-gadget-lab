@@ -121,7 +121,8 @@ namespace gglab
 	{
 		return {
 			.m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
-			.m_GpuHandle = GpuHandleAtGlobalIndex(globalIndex)
+			.m_GpuHandle = GpuHandleAtGlobalIndex(globalIndex),
+			.m_Index = globalIndex,
 		};
 	}
 

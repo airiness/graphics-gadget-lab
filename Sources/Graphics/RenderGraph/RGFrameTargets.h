@@ -6,7 +6,8 @@ namespace gglab
 {
 	struct RGViewTargets
 	{
-		RGTextureId m_Color{};
+		RGTextureId m_SceneColor{};
+		RGTextureId m_BackBuffer{};
 		RGTextureId m_Depth{};
 
 		uint32_t m_Width = 0;

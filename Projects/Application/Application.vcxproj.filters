@@ -369,6 +369,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -758,6 +761,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -817,6 +823,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>

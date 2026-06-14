@@ -4,6 +4,7 @@
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "Graphics/RenderPass/RenderPassTonemap.h"
 
 namespace gglab
 {
@@ -21,6 +22,7 @@ namespace gglab
 
 	private:
 		RenderPassForwardPBR m_ForwardPBRPass;
+		RenderPassTonemap m_TonemapPass;
 		RenderPassIBL m_IBLPass;
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDevelopGui m_DevelopGuiPass;

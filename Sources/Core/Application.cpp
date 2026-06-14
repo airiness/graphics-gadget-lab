@@ -471,6 +471,13 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Pixel;
 			shaderDescs.push_back(desc);
 
+			// Tonemap
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTonemap.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+
 			m_ShaderManager->Preload(shaderDescs);
 		}
 	}
