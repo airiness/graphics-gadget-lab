@@ -1,0 +1,190 @@
+#include "Core/Precompiled.h"
+#include "Graphics/RenderPass/RenderPassTonemap.h"
+#include "Graphics/Renderer.h"
+#include "Graphics/SamplerRegistry.h"
+#include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderGraph/RGFrameTargets.h"
+#include "Graphics/DX12/DX12SwapChain.h"
+#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+
+namespace gglab
+{
+	void RenderPassTonemap::AddPass(RenderGraph& rg,
+		const RenderFrameContext& context,
+		const RenderServices& services) noexcept
+	{
+		struct TonemapData
+		{
+			RGTextureId m_SceneColor{};
+			RGTextureId m_BackBuffer{};
+			ViewKey m_BackBufferRtvKey{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_SamplerIndex = 0;
+		};
+
+		auto* contextPtr = &context;
+		GGLAB_ASSERT_NOT_NULL(contextPtr);
+
+		auto* servicesPtr = &services;
+		GGLAB_ASSERT_NOT_NULL(servicesPtr);
+
+		EnsureInitialized(services);
+
+		rg.AddPass<TonemapData>("RenderPassTonemap",
+			[servicesPtr](RenderGraph::RGBuilder& builder, TonemapData& data)
+			{
+				builder.SideEffect();
+
+				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+
+				data.m_SceneColor = builder.Read(mainTargets.m_SceneColor, RGTextureUsage::Sample);
+				data.m_BackBuffer = builder.Write(mainTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
+				data.m_BackBufferRtvKey = mainTargets.m_BackBufferRTVKey;
+				data.m_Width = mainTargets.m_Width;
+				data.m_Height = mainTargets.m_Height;
+
+				auto* renderer = servicesPtr->m_Renderer;
+				GGLAB_ASSERT_NOT_NULL(renderer);
+				data.m_SamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+			},
+			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, TonemapData& data)
+			{
+				auto* commandList = executeContext.m_GraphicsCommandList;
+				GGLAB_ASSERT_NOT_NULL(commandList);
+
+				auto* sceneColorTexture = rg.GetTexture(data.m_SceneColor);
+				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
+
+				auto* backBufferTexture = rg.GetTexture(data.m_BackBuffer);
+				GGLAB_ASSERT_NOT_NULL(backBufferTexture);
+
+				auto* viewCache = rg.GetViewCache();
+				GGLAB_ASSERT_NOT_NULL(viewCache);
+
+				const ResourceIndex sceneColorIndex = rg.GetResourceIndex(data.m_SceneColor);
+				const auto sceneColorSrv = viewCache->GetOrCreate<ViewType::SRV>(
+					sceneColorIndex,
+					sceneColorTexture);
+				GGLAB_ASSERT_MSG(sceneColorSrv.m_Index != std::numeric_limits<uint32_t>::max(),
+					"Tonemap scene color SRV must expose a descriptor heap index.");
+
+				const auto backBufferRtv = viewCache->GetOrCreate(data.m_BackBufferRtvKey, backBufferTexture);
+
+				auto* renderer = servicesPtr->m_Renderer;
+				GGLAB_ASSERT_NOT_NULL(renderer);
+
+				auto* descriptorManager = renderer->GetDescriptorManager();
+				GGLAB_ASSERT_NOT_NULL(descriptorManager);
+
+				const DX12DescriptorHeap* descriptorHeaps[] = {
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
+				};
+				commandList->SetDescriptorHeaps(descriptorHeaps);
+				commandList->SetGraphicsRootSignature(*renderer->GetCommonRootSignature());
+				commandList->SetPipelineState(*GetOrCreatePSO(*renderer));
+				commandList->SetRenderTarget(backBufferRtv);
+				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
+				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
+				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				commandList->SetGraphicsConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+
+				const auto& viewSB = renderer->GetViewStructuredBuffer();
+				commandList->Get()->SetGraphicsRootShaderResourceView(
+					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+					viewSB->GetBuffer()->GPUVirtualAddress());
+
+				const uint32_t localConstants[] = {
+					sceneColorSrv.m_Index,
+					data.m_SamplerIndex,
+					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
+					0u,
+				};
+				commandList->SetGraphicsRoot32BitConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
+					localConstants);
+
+				commandList->DrawInstanced(3);
+			});
+	}
+
+	void RenderPassTonemap::EnsureInitialized(const RenderServices& services) noexcept
+	{
+		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+
+		auto* shaderManager = services.m_ShaderManager;
+		GGLAB_ASSERT_NOT_NULL(shaderManager);
+
+		if (!m_IsInitialized)
+		{
+			ShaderDesc shaderDesc{};
+			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassTonemap.hlsl";
+			shaderDesc.m_Stage = ShaderStage::Vertex;
+			shaderDesc.m_Entry = L"VSMain";
+			const auto vsId = shaderManager->LoadShader(shaderDesc);
+
+			shaderDesc.m_Stage = ShaderStage::Pixel;
+			shaderDesc.m_Entry = L"PSMain";
+			const auto psId = shaderManager->LoadShader(shaderDesc);
+
+			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+			m_BaseInputs.m_InputLayoutId = InputLayoutID::None;
+			m_BaseInputs.m_VSId = vsId;
+			m_BaseInputs.m_PSId = psId;
+
+			m_BaseInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = renderer->GetSwapChain()->GetFormat();
+			m_BaseInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
+			m_BaseInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_UNKNOWN;
+			m_BaseInputs.m_Formats.m_SampleCount = 1;
+			m_BaseInputs.m_Formats.m_SampleQuality = 0;
+
+			m_BaseInputs.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseInputs.m_BlendPreset = BlendPreset::Default;
+			m_BaseInputs.m_DepthPreset = DepthPreset::DepthDisabled;
+
+			m_IsInitialized = true;
+		}
+
+		m_BaseInputs.m_VSGen = shaderManager->GetGeneration(m_BaseInputs.m_VSId);
+		m_BaseInputs.m_PSGen = shaderManager->GetGeneration(m_BaseInputs.m_PSId);
+	}
+
+	DX12PipelineState* RenderPassTonemap::GetOrCreatePSO(const Renderer& renderer) noexcept
+	{
+		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
+		GGLAB_ASSERT_NOT_NULL(passRegistry);
+
+		auto* psoCache = renderer.GetPSOCache();
+		GGLAB_ASSERT_NOT_NULL(psoCache);
+
+		const auto& cached = passRegistry->GetOrCreateGraphics("RenderPassTonemap",
+			m_BaseInputs,
+			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
+			{
+				outDesc.m_RootSignatureId = input.m_RootSignatureId;
+				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
+				outDesc.m_InputLayoutId = input.m_InputLayoutId;
+				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(input.m_InputLayoutId);
+				outDesc.m_VertexShader = shaderManager->GetBytecode(input.m_VSId);
+				outDesc.m_PixelShader = shaderManager->GetBytecode(input.m_PSId);
+				outDesc.m_Topology = input.m_Topology;
+				outDesc.m_SampleMask = input.m_SampleMask;
+				outDesc.m_Formats = input.m_Formats;
+				outDesc.m_RasterizerDesc = ApplyRasterizerPreset(input.m_RasterizerPreset);
+				outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
+				outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
+			});
+
+		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+	}
+}

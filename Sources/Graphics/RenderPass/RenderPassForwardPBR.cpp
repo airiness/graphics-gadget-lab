@@ -19,13 +19,11 @@ namespace gglab
 	{
 		struct ForwardPBRData
 		{
-			RGTextureId m_BackBuffer{};
+			RGTextureId m_SceneColor{};
 			RGTextureId m_Depth{};
 			RGTextureId m_IrradianceCubemap{};
 			RGTextureId m_PrefilteredSpecularCubemap{};
 			RGTextureId m_BrdfLut{};
-
-			ViewKey m_RtvKey{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
@@ -50,20 +48,19 @@ namespace gglab
 				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
-				data.m_BackBuffer = builder.Write(mainTargets.m_Color, RGTextureUsage::RenderTarget);
+				data.m_SceneColor = builder.Write(mainTargets.m_SceneColor, RGTextureUsage::RenderTarget);
 				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureUsage::DepthStencil);
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureUsage::Sample);
 				data.m_PrefilteredSpecularCubemap = builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureUsage::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 
-				data.m_RtvKey = mainTargets.m_BackBufferRTVKey;
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 			},
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
 			{
-				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-				GGLAB_ASSERT_NOT_NULL(backTexture);
+				auto* sceneColorTexture = rg.GetTexture(data.m_SceneColor);
+				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
 
 				auto* depthTexture = rg.GetTexture(data.m_Depth);
 				GGLAB_ASSERT_NOT_NULL(depthTexture);
@@ -71,13 +68,17 @@ namespace gglab
 				auto* viewCache = rg.GetViewCache();
 				auto* commandList = executeContext.m_GraphicsCommandList;
 
-				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
+				const ResourceIndex sceneColorIndex = rg.GetResourceIndex(data.m_SceneColor);
+				const auto rtv = viewCache->GetOrCreate<ViewType::RTV>(
+					sceneColorIndex,
+					sceneColorTexture);
 
 				const ResourceIndex depthIndex = rg.GetResourceIndex(data.m_Depth);
 				const ViewKey dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(
 					depthIndex, depthTexture);
 
 				const auto& dsv = viewCache->GetOrCreate(dsvKey, depthTexture);
+				commandList->ClearRenderTarget(rtv, *sceneColorTexture);
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 				commandList->SetRenderTarget(rtv, dsv);
 
@@ -156,7 +157,7 @@ namespace gglab
 			m_BaseInputs.m_PSId = psId;
 
 			m_BaseInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
 			m_BaseInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
 			m_BaseInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 			m_BaseInputs.m_Formats.m_SampleCount = 1;

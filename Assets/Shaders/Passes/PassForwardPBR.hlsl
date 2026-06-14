@@ -226,9 +226,5 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 
 	Lo += (diffuseIBL + specularIBL) * ao;
 
-	// Tonemap
-	float3 color = ACESFitted(Lo * viewData.Exposure);
-	color = LinearToSRGB(color);
-
-	return float4(color, alpha);
+	return float4(Lo, alpha);
 }

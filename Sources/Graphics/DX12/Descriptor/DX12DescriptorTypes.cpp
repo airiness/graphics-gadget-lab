@@ -75,6 +75,7 @@ namespace gglab
 		return {
 			.m_CpuHandle = CpuHandleAt(offset),
 			.m_GpuHandle = IsShaderVisible() ? GpuHandleAt(offset) : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
+			.m_Index = m_Index + offset,
 #if defined(BUILD_DEBUG)
 			.m_DebugType = HeapType()
 #endif

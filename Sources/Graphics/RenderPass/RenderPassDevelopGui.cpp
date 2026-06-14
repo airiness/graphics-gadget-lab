@@ -33,7 +33,7 @@ namespace gglab
 
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
-				data.m_BackBuffer = builder.Write(viewTargets.m_Color, RGTextureUsage::RenderTarget);
+				data.m_BackBuffer = builder.Write(viewTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
 				data.m_RtvKey = viewTargets.m_BackBufferRTVKey;
 
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);

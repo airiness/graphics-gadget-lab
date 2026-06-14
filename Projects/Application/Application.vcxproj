@@ -193,6 +193,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.cpp" />
@@ -308,6 +309,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.h" />
@@ -394,6 +396,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
