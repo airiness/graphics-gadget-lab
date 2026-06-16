@@ -7,6 +7,9 @@
     <Filter Include="Shaders\Common">
       <UniqueIdentifier>{62248322-C2D0-4200-1D1B-93BC655BF9CC}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Lighting">
+      <UniqueIdentifier>{284C9BF7-B704-DD8F-353B-466C74CAA455}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Shaders\Passes">
       <UniqueIdentifier>{3217C814-FEFD-56B4-3CC0-76A01096884F}</UniqueIdentifier>
     </Filter>
@@ -264,6 +267,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderFrameBuilder.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -288,7 +294,7 @@
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
       <Filter>Externals\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGui.cpp">
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
@@ -321,8 +327,14 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderQueue.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderWorldExtractor.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp">
       <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp">
+      <Filter>DevTools</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp">
       <Filter>Graphics</Filter>
@@ -375,8 +387,14 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp">
       <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -668,7 +686,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h">
       <Filter>Externals\ImGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGui.h">
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
@@ -698,8 +716,14 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderFrameBuilder.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h">
       <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h">
+      <Filter>DevTools</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiContext.h">
       <Filter>DevTools\DevelopGui</Filter>
@@ -737,6 +761,9 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -770,6 +797,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -778,6 +808,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -788,6 +824,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Assets\Shaders\Common\BindlessResources.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli">
@@ -817,6 +856,9 @@
     <None Include="..\..\Assets\Shaders\Common\VertexTransform.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Assets\Shaders\Lighting\ShadowSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
@@ -844,6 +886,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl">

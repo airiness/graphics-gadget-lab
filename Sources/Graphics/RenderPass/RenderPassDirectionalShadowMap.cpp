@@ -10,6 +10,55 @@
 
 namespace gglab
 {
+	namespace
+	{
+		constexpr uint32_t ShadowDepthBiasBitCount = 20;
+		constexpr uint32_t ShadowDepthBiasShift = RenderQueueBuilder::VariantBitCount;
+
+		constexpr uint32_t ShadowSlopeBiasBitCount = 16;
+		constexpr uint32_t ShadowSlopeBiasShift = ShadowDepthBiasShift + ShadowDepthBiasBitCount;
+
+		constexpr float ShadowSlopeBiasQuantizationScale = 256.0f;
+
+		static_assert(ShadowSlopeBiasShift + ShadowSlopeBiasBitCount <= 64);
+
+		constexpr int32_t SignedFieldMin(uint32_t bitCount) noexcept
+		{
+			return -static_cast<int32_t>(uint32_t{ 1 } << (bitCount - 1));
+		}
+
+		constexpr int32_t SignedFieldMax(uint32_t bitCount) noexcept
+		{
+			return static_cast<int32_t>((uint32_t{ 1 } << (bitCount - 1)) - 1);
+		}
+
+		constexpr uint64_t BitMask(uint32_t bitCount) noexcept
+		{
+			return (uint64_t{ 1 } << bitCount) - 1ull;
+		}
+
+		uint64_t PackSignedVariantField(int32_t value, uint32_t bitCount, uint32_t bitShift) noexcept
+		{
+			const int32_t clamped = std::clamp(value, SignedFieldMin(bitCount), SignedFieldMax(bitCount));
+			return (static_cast<uint64_t>(static_cast<uint32_t>(clamped)) & BitMask(bitCount)) << bitShift;
+		}
+
+		uint64_t EncodeShadowRasterizerBiasVariantBits(const DirectionalShadowSettings& settings) noexcept
+		{
+			const int32_t slopeBias = static_cast<int32_t>(
+				std::round(settings.m_RasterizerSlopeScaledDepthBias * ShadowSlopeBiasQuantizationScale));
+
+			return PackSignedVariantField(
+				settings.m_RasterizerDepthBias,
+				ShadowDepthBiasBitCount,
+				ShadowDepthBiasShift) |
+				PackSignedVariantField(
+					slopeBias,
+					ShadowSlopeBiasBitCount,
+					ShadowSlopeBiasShift);
+		}
+	}
+
 	void RenderPassDirectionalShadowMap::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -186,7 +235,10 @@ namespace gglab
 
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
-				auto* pso = GetOrCreatePSOForVariant(*renderer, drawItem.m_VariantBits);
+				auto* pso = GetOrCreatePSOForVariant(
+					*renderer,
+					drawItem.m_VariantBits,
+					context.GetDirectionalShadowSettings());
 				commandList->SetPipelineState(*pso);
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -219,7 +271,8 @@ namespace gglab
 
 	DX12PipelineState* RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
 		const Renderer& renderer,
-		uint64_t variantBits) noexcept
+		uint64_t variantBits,
+		const DirectionalShadowSettings& shadowSettings) noexcept
 	{
 		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
 		GGLAB_ASSERT_NOT_NULL(passRegistry);
@@ -228,15 +281,17 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(psoCache);
 
 		GraphicsKeyInputs inputs = m_BaseInputs;
-		inputs.m_VariantBits = variantBits;
+		const uint64_t shadowBiasBits = EncodeShadowRasterizerBiasVariantBits(shadowSettings);
+		const uint64_t psoVariantBits = variantBits | shadowBiasBits;
+		inputs.m_VariantBits = psoVariantBits;
 		inputs.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
 
-		const auto psoPassId = MakeVariantPSOPassId("RenderPassDirectionalShadowMap.variant", variantBits);
+		const auto psoPassId = MakeVariantPSOPassId("RenderPassDirectionalShadowMap.variant", psoVariantBits);
 
 		const auto& cached = passRegistry->GetOrCreateGraphics(
 			psoPassId,
 			inputs,
-			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
+			[&renderer, &shadowSettings](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
 			{
 				outDesc.m_RootSignatureId = input.m_RootSignatureId;
 				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
@@ -248,8 +303,8 @@ namespace gglab
 				outDesc.m_SampleMask = input.m_SampleMask;
 				outDesc.m_Formats = input.m_Formats;
 				outDesc.m_RasterizerDesc = ApplyRasterizerPreset(input.m_RasterizerPreset);
-				outDesc.m_RasterizerDesc.DepthBias = 1000;
-				outDesc.m_RasterizerDesc.SlopeScaledDepthBias = 1.5f;
+				outDesc.m_RasterizerDesc.DepthBias = shadowSettings.m_RasterizerDepthBias;
+				outDesc.m_RasterizerDesc.SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;
 				outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
 				outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
 			});

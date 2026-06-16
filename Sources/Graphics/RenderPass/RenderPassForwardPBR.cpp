@@ -32,6 +32,8 @@ namespace gglab
 			uint32_t m_Height = 0;
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
+			uint32_t m_ShadowFlags = 0;
+			float m_ShadowReceiverDepthBias = 0.0f;
 		};
 
 		auto* contextPtr = &context;
@@ -43,7 +45,7 @@ namespace gglab
 		EnsureInitialized(services);
 
 		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
-			[servicesPtr](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
+			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
 			{
 				builder.SideEffect();
 
@@ -69,6 +71,12 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(renderer);
 				data.m_ShadowSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::ShadowCmpLinearClamp);
+
+				const auto& shadowSettings = contextPtr->GetDirectionalShadowSettings();
+				data.m_ShadowFlags =
+					(shadowSettings.m_Enable ? 1u : 0u) |
+					(shadowSettings.m_EnablePCF ? 2u : 0u);
+				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
 			{
@@ -152,14 +160,14 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
 
-				const uint32_t shadowDepthBiasBits = std::bit_cast<uint32_t>(0.0015f);
+				const uint32_t shadowDepthBiasBits = std::bit_cast<uint32_t>(data.m_ShadowReceiverDepthBias);
 				const uint32_t localConstants[] = {
 					0u,
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					shadowSrv.m_Index,
 					data.m_ShadowSamplerIndex,
 					data.m_ShadowMapSize,
-					1u,
+					data.m_ShadowFlags,
 					shadowDepthBiasBits,
 					static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
 				};

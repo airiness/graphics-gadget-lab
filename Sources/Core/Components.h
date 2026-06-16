@@ -1,6 +1,9 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Color.h"
+#include "Graphics/ShadowSettings.h"
+
+#include <optional>
 
 namespace gglab::components
 {
@@ -23,5 +26,6 @@ namespace gglab::components
 		float m_Intensity = 1.0f;
 		float m_Range = 1000.0f;
 		float m_SpotAngle = 60.0f;
+		std::optional<DirectionalShadowSettings> m_DirectionalShadowSettings;
 	};
 }

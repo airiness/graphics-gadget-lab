@@ -83,13 +83,13 @@ namespace gglab
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
-		m_DevelopGui = std::make_unique<DevelopGui>();
-		DevelopGui::CreateInfo developGuiCreateInfo{};
-		developGuiCreateInfo.m_Hwnd = createInfo.m_Hwnd;
-		developGuiCreateInfo.m_DX12Device = m_Device.get();
-		developGuiCreateInfo.m_SwapChain = m_SwapChain.get();
-		developGuiCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
-		m_DevelopGui->Initialize(developGuiCreateInfo);
+		m_DevelopGuiBackend = std::make_unique<DevelopGuiBackend>();
+		DevelopGuiBackend::CreateInfo developGuiBackendCreateInfo{};
+		developGuiBackendCreateInfo.m_Hwnd = createInfo.m_Hwnd;
+		developGuiBackendCreateInfo.m_DX12Device = m_Device.get();
+		developGuiBackendCreateInfo.m_SwapChain = m_SwapChain.get();
+		developGuiBackendCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		m_DevelopGuiBackend->Initialize(developGuiBackendCreateInfo);
 
 		CreateCommonRootSignature();
 		InitializeGpuBuffers();
@@ -112,7 +112,8 @@ namespace gglab
 			m_SwapChain.reset();
 		}
 
-		m_DevelopGui->Finalize();
+		m_DevelopGuiBackend->Finalize();
+		m_DevelopGuiBackend.reset();
 
 		m_RenderResRegistry.reset();
 		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);

@@ -2,6 +2,7 @@
 #include "Graphics/RenderGraph/RGResource.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
+#include "Graphics/ShadowSettings.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Core/Utility/TypeUtils.h"
 
@@ -57,6 +58,7 @@ namespace gglab
 			IBL_BrdfLut,
 			Preview_IBL_EnvironmentCubemap,
 			Preview_IBL_PrefilteredSpecularCubemap,
+			Preview_Shadow_DirectionalShadowMap,
 
 			Count
 		};
@@ -88,6 +90,8 @@ namespace gglab
 		~RenderResourceRegistry() = default;
 
 		void EnsureIblResources(const IBLResourceCreateInfo& createInfo = {},
+			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
+		void EnsureShadowPreviewResources(uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void MarkDirty(TextureIndex index) noexcept;

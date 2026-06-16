@@ -1,9 +1,11 @@
 #pragma once
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
+#include "Graphics/RenderView.h"
+#include "Graphics/ShadowSettings.h"
 
 namespace gglab
 {
-	struct RenderView;
+	class World;
 	class Camera;
 	class CameraController;
 	class Renderer;
@@ -17,9 +19,13 @@ namespace gglab
 		Camera* m_Camera = nullptr;
 		CameraController* m_CameraController = nullptr;
 		Renderer* m_Renderer = nullptr;
+		World* m_World = nullptr;
+		std::span<RenderView> m_RenderViews;
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
+		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
+		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 
 		DevelopGuiStateStore* m_StateStore = nullptr;
 		uint64_t m_CurrentPanelKey = 0;

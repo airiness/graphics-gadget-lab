@@ -16,7 +16,7 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 #include "Graphics/RenderContexts.h"
-#include "DevTools/DevelopGui/DevelopGui.h"
+#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab
 {
@@ -59,7 +59,7 @@ namespace gglab
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
-		DevelopGui* GetDevelopGui() const noexcept { return m_DevelopGui.get(); }
+		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
@@ -100,7 +100,7 @@ namespace gglab
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<TextureRegistry> m_TextureRegistry;
-		std::unique_ptr<DevelopGui> m_DevelopGui;
+		std::unique_ptr<DevelopGuiBackend> m_DevelopGuiBackend;
 
 		RootSignatureID m_CommonRootSignatureId{};
 

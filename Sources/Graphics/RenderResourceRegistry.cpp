@@ -154,6 +154,27 @@ namespace gglab
 		}
 	}
 
+	void RenderResourceRegistry::EnsureShadowPreviewResources(uint32_t previewSize, const DX12FencePoint* retireFenceOpt) noexcept
+	{
+		const uint32_t size = std::max(previewSize, 1u);
+
+		RGTextureDesc desc{};
+		desc.m_Width = size;
+		desc.m_Height = size;
+		desc.m_ArraySize = 1;
+		desc.m_MipLevels = 1;
+		desc.m_SampleCount = 1;
+		desc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+
+		TextureSrvCreateInfo srvCreateInfo{};
+		srvCreateInfo.m_Format = desc.m_Format;
+		srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvCreateInfo.m_MipLevels = desc.m_MipLevels;
+
+		EnsureTexture(TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvCreateInfo, retireFenceOpt);
+	}
+
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
 	{
 		m_TextureEntries[utils::ToIndex(index)].m_Dirty = true;

@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/ShadowSettings.h"
 
 namespace gglab
 {
@@ -59,11 +60,11 @@ namespace gglab
 	{
 		const RenderView& m_MainView;
 		Vector3 m_LightDirection = -Vector3::UnitY;
-		uint32_t m_ShadowMapSize = 2048;
-		float m_MaxShadowDistance = 200.0f;
-		float m_CasterExtrusionDistance = 600.0f;
-		float m_OrthoPadding = 2.0f;
-		float m_DepthPadding = 60.0f;
+		uint32_t m_ShadowMapSize = DefaultDirectionalShadowMapSize;
+		float m_MaxShadowDistance = DefaultDirectionalShadowMaxDistance;
+		float m_CasterExtrusionDistance = DefaultDirectionalShadowCasterExtrusionDistance;
+		float m_OrthoPadding = DefaultDirectionalShadowOrthoPadding;
+		float m_DepthPadding = DefaultDirectionalShadowDepthPadding;
 		StringID m_Name = StringID("DirectionalShadowView");
 	};
 

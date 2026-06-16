@@ -1,21 +1,17 @@
 #include "Core/Precompiled.h"
 #include "Core/Application.h"
-#include "Core/Components.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Input/InputManager.h"
 #include "Graphics/ShaderManager.h"
 #include "Core/Demo/DemoManager.h"
-#include "Graphics/RenderView.h"
-#include "Graphics/RenderScene.h"
-#include "Graphics/RenderQueue.h"
-#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RenderFrameBuilder.h"
 #include "Core/Time.h"
-#include "Core/World.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Core/Demo/DemoPlayground.h"
+#include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 
@@ -24,31 +20,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 namespace gglab
 {
 	std::unique_ptr<Application> Application::s_Application;
-
-	namespace
-	{
-		Vector3 ResolveMainLightDirection(const World& world) noexcept
-		{
-			const auto& registry = world.GetRegistry();
-			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
-			for (auto [entity, transComp, lightComp] : lightView.each())
-			{
-				GGLAB_UNUSED(entity);
-				GGLAB_UNUSED(lightComp);
-
-				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
-				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
-				if (forward.LengthSquared() > 1.0e-8f)
-				{
-					forward.Normalize();
-					return forward;
-				}
-			}
-
-			return -Vector3::UnitY;
-		}
-
-	}
 
 	Keyboard* Application::GetKeyboard() const noexcept
 	{
@@ -278,15 +249,14 @@ namespace gglab
 		m_DemoManager = std::make_unique<DemoManager>();
 
 		InitializeAssets();
-		InitializeDevelopGuiPanels();
+		m_DevToolsRuntime = std::make_unique<DevToolsRuntime>();
+		InitializeDevToolsPanels();
 
 		// InitializeDemos
 		const auto demoIndex = m_DemoManager->CreateDemo<DemoPlayground>();
 		m_DemoManager->SetActiveDemo(demoIndex);
 
-		m_RenderViewBuilder = std::make_unique<RenderViewBuilder>();
-		m_RenderSceneBuilder = std::make_unique<RenderSceneBuilder>();
-		m_RenderQueueBuilder = std::make_unique<RenderQueueBuilder>();
+		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
 
 		m_IsInitialized = true;
 	}
@@ -329,86 +299,30 @@ namespace gglab
 		}
 
 		// DevelopGui new frame
-		auto* developGui = m_Renderer->GetDevelopGui();
-		if (developGui)
+		auto* developGuiBackend = m_Renderer->GetDevelopGuiBackend();
+		if (developGuiBackend)
 		{
-			developGui->NewFrame();
+			developGuiBackend->NewFrame();
 		}
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
 		demo->Update();
 
-		// Build render views
-		std::vector<RenderView> renderViews;
-		renderViews.resize(utils::ToIndex(RenderViewID::Count));
-
-		const auto& world = demo->GetWorld();
-
-		// Main view
+		auto& world = demo->GetWorld();
 		auto& camera = demo->GetCamera();
-		const RenderViewBuildInfo<RenderViewID::Main> viewBuildInfo{
-			.m_Camera = camera,
-			.m_Width = m_WindowWidth,
-			.m_Height = m_WindowHeight,
-			.m_Name = StringID("MainView"),
-		};
-		renderViews[utils::ToIndex(RenderViewID::Main)] =
-			m_RenderViewBuilder->Build<RenderViewID::Main>(viewBuildInfo);
-
-		// Directional shadow view
-		const RenderViewBuildInfo<RenderViewID::DirectionalShadow> shadowViewBuildInfo{
-			.m_MainView = renderViews[utils::ToIndex(RenderViewID::Main)],
-			.m_LightDirection = ResolveMainLightDirection(world),
-			.m_ShadowMapSize = DefaultDirectionalShadowMapSize,
-			.m_MaxShadowDistance = 200.0f,
-			.m_CasterExtrusionDistance = 600.0f,
-			.m_OrthoPadding = 2.0f,
-			.m_DepthPadding = 60.0f,
-			.m_Name = StringID("DirectionalShadowView"),
-		};
-		renderViews[utils::ToIndex(RenderViewID::DirectionalShadow)] =
-			m_RenderViewBuilder->Build<RenderViewID::DirectionalShadow>(shadowViewBuildInfo);
-
-		// Build render scene
-		const RenderSceneBuilder::BuildInfo sceneBuildInfo{
+		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
+			.m_Camera = camera,
+			.m_Renderer = *m_Renderer,
 			.m_AssetManager = *m_AssetManager,
-			.m_TransferManager = *m_Renderer->GetTransferManager(),
-			.m_RenderResourceRegistry = *m_Renderer->GetRenderResourceRegistry(),
-			.m_RenderViews = std::span<RenderView>(renderViews),
-			.m_SceneCB = *m_Renderer->GetSceneConstantBuffer(),
-			.m_ObjectsSB = *m_Renderer->GetObjectStructuredBuffer(),
-			.m_MaterialsSB = *m_Renderer->GetMaterialStructuredBuffer(),
-			.m_ViewsSB = *m_Renderer->GetViewStructuredBuffer(),
-			.m_CurrentBackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex()
-		};
-		const auto [renderScene, uploadFencePoint] = m_RenderSceneBuilder->Build(sceneBuildInfo);
-
-		// Build render queues
-		std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> renderQueues;
-		for (const RenderView& renderView : renderViews)
-		{
-			if (renderView.m_ViewId == RenderViewID::Unknown)
-			{
-				continue;
-			}
-
-			const RenderQueueBuilder::BuildInfo queueBuildInfo{
-				.m_AssetManager = *m_AssetManager,
-				.m_RenderScene = renderScene,
-				.m_RenderView = renderView
-			};
-			renderQueues[utils::ToIndex(renderView.m_ViewId)] = m_RenderQueueBuilder->Build(queueBuildInfo);
-		}
-
-		const RenderFrameContext renderContext{
-			.m_RenderViews = std::span<RenderView>(renderViews),
-			.m_RenderScene = renderScene,
-			.m_RenderQueues = std::span<const RenderQueue>(renderQueues),
+			.m_ShadowVisualizationSettings = m_DevToolsRuntime->GetRenderVisualizationSettings().m_Shadow,
+			.m_WindowWidth = m_WindowWidth,
+			.m_WindowHeight = m_WindowHeight,
 			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
-			.m_UploadFencePoint = uploadFencePoint
 		};
+		auto frame = m_RenderFrameBuilder->Build(frameBuildInfo);
+		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
 		const RenderServices services{
 			.m_Renderer = m_Renderer.get(),
@@ -423,17 +337,20 @@ namespace gglab
 		rg.Compile();
 
 		// Draw menus before Renderer::Render()
-		if (developGui)
+		if (m_DevToolsRuntime)
 		{
 			DevelopGuiContext guiContext{};
 			guiContext.m_Camera = &camera;
 			guiContext.m_CameraController = &demo->GetCameraController();
 			guiContext.m_Renderer = m_Renderer.get();
-			guiContext.m_MainRenderView = &renderViews[utils::ToIndex(RenderViewID::Main)];
+			guiContext.m_World = &world;
+			guiContext.m_RenderViews = std::span<RenderView>(frame.m_RenderViews);
+			guiContext.m_MainRenderView = &frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)];
 			guiContext.m_AssetManager = m_AssetManager.get();
 			guiContext.m_RenderGraph = &rg;
+			guiContext.m_DirectionalShadowSettings = frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
 
-			developGui->Draw(guiContext);
+			m_DevToolsRuntime->Draw(guiContext);
 		}
 
 		// Render
@@ -453,6 +370,12 @@ namespace gglab
 		m_Renderer->GetDevice()->FlushGPU();
 
 		m_DemoManager.reset();
+		m_RenderFrameBuilder.reset();
+		if (m_DevToolsRuntime)
+		{
+			m_DevToolsRuntime->Reset();
+			m_DevToolsRuntime.reset();
+		}
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();
@@ -531,6 +454,13 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Pixel;
 			shaderDescs.push_back(desc);
 
+			// Shadow Map Preview
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+
 			// Tonemap
 			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTonemap.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
@@ -542,10 +472,9 @@ namespace gglab
 		}
 	}
 
-	void Application::InitializeDevelopGuiPanels() noexcept
+	void Application::InitializeDevToolsPanels() noexcept
 	{
-		auto* developGui = m_Renderer->GetDevelopGui();
-		devtools::RegisterDefaultDevelopGuiPanels(developGui->GetRegistry());
+		devtools::RegisterDefaultDevelopGuiPanels(m_DevToolsRuntime->GetRegistry());
 	}
 
 	void Application::OnActive() noexcept

@@ -49,6 +49,10 @@ namespace gglab
 			BucketMask = 0x3ull << BucketShift,
 		};
 
+		static constexpr uint32_t VariantBitCount = 8;
+		static constexpr uint64_t VariantMask = (1ull << VariantBitCount) - 1ull;
+		static_assert((BucketMask & ~VariantMask) == 0);
+
 	public:
 		RenderQueue Build(const BuildInfo& info) noexcept;
 

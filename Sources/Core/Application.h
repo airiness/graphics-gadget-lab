@@ -8,9 +8,8 @@ namespace gglab
 	class InputManager;
 	class ShaderManager;
 	class DemoManager;
-	class RenderViewBuilder;
-	class RenderSceneBuilder;
-	class RenderQueueBuilder;
+	class RenderFrameBuilder;
+	class DevToolsRuntime;
 	class Time;
 	class Keyboard;
 	class Mouse;
@@ -61,7 +60,7 @@ namespace gglab
 
 		void InitializeWindow() noexcept;
 		void InitializeAssets() noexcept;
-		void InitializeDevelopGuiPanels() noexcept;
+		void InitializeDevToolsPanels() noexcept;
 
 		// Functions called by the WindowProc
 		void OnActive() noexcept;
@@ -89,9 +88,8 @@ namespace gglab
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
-		std::unique_ptr<RenderViewBuilder> m_RenderViewBuilder;
-		std::unique_ptr<RenderSceneBuilder> m_RenderSceneBuilder;
-		std::unique_ptr<RenderQueueBuilder> m_RenderQueueBuilder;
+		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
+		std::unique_ptr<DevToolsRuntime> m_DevToolsRuntime;
 
 		bool m_IsInitialized = false;
 		bool m_IsMinimized = false;

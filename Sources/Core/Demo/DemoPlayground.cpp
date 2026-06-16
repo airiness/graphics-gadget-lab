@@ -19,7 +19,7 @@ namespace gglab
 
 		// Camera
 		Camera::CreateInfo camCreateInfo{};
-		camCreateInfo.m_Position = Vector3(-10.0f, 22.0f, -10.0f);
+		camCreateInfo.m_Position = Vector3(60.0f, 36.0f, 1.0f);
 		camCreateInfo.m_Width = app->GetWindowWidth();
 		camCreateInfo.m_Height = app->GetWindowHeight();
 		camCreateInfo.m_Near = 0.1f;
@@ -134,16 +134,17 @@ namespace gglab
 			auto mainLightEntity = registry.create();
 
 			components::TransformComponent transComp{};
-			Vector3 direction = -Vector3::One;
+			Vector3 direction = Vector3(-0.406f, -0.906f, -0.123f);
 			direction.Normalize();
 			Quaternion::FromToRotation(-Vector3::UnitZ, direction, transComp.m_Rotation);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
 
 			components::LightComponent lightComp{};
-			lightComp.m_Intensity = 1.0f;
+			lightComp.m_Intensity = 3.0f;
 			lightComp.m_Color = color::White;
 			lightComp.m_Type = LightType::Directional;
 			lightComp.m_Range = 1000.0f;
+			lightComp.m_DirectionalShadowSettings.emplace();
 			registry.emplace<components::LightComponent>(mainLightEntity, lightComp);
 		}
 	}
