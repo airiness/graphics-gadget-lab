@@ -22,7 +22,7 @@ namespace gglab
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
 
-		const DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
+		DirectionalShadowSettings m_DirectionalShadowSettings = DisabledDirectionalShadowSettings();
 		const ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 
 		uint32_t m_BackBufferIndex = 0;
@@ -38,7 +38,7 @@ namespace gglab
 
 		const DirectionalShadowSettings& GetDirectionalShadowSettings() const noexcept
 		{
-			return m_DirectionalShadowSettings ? *m_DirectionalShadowSettings : DisabledDirectionalShadowSettings();
+			return m_DirectionalShadowSettings;
 		}
 
 		const ShadowVisualizationSettings& GetShadowVisualizationSettings() const noexcept

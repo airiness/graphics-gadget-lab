@@ -134,7 +134,9 @@ namespace gglab
 
 		constexpr float ShadowNear = 0.1f;
 		const float shadowFar = std::max((maxLS.z - minLS.z) + ShadowNear, ShadowNear + 1.0f);
-		const Vector3 lightEye = lightEyeForBounds + lightDir * (minLS.z - ShadowNear);
+		// CreateLookAt is right-handed here, so upstream casters sit on the high-z bound.
+		const float lightEyeOffset = -ShadowNear - maxLS.z;
+		const Vector3 lightEye = lightEyeForBounds + lightDir * lightEyeOffset;
 		const Vector3 lightTarget = lightEye + lightDir;
 
 		RenderView view{};
