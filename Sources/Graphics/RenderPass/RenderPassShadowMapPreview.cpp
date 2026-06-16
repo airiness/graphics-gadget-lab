@@ -1,0 +1,206 @@
+#include "Core/Precompiled.h"
+#include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
+#include "Graphics/Renderer.h"
+#include "Graphics/SamplerRegistry.h"
+#include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+
+namespace gglab
+{
+	void RenderPassShadowMapPreview::AddPass(RenderGraph& rg,
+		const RenderFrameContext& context,
+		const RenderServices& services) noexcept
+	{
+		struct ShadowMapPreviewData
+		{
+			RGTextureId m_ShadowMap{};
+			RGTextureId m_ShadowMapPreview{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_SamplerIndex = 0;
+			float m_MinDepth = 0.0f;
+			float m_MaxDepth = 1.0f;
+			uint32_t m_Invert = 0;
+		};
+
+		auto* contextPtr = &context;
+		GGLAB_ASSERT_NOT_NULL(contextPtr);
+
+		auto* servicesPtr = &services;
+		GGLAB_ASSERT_NOT_NULL(servicesPtr);
+
+		EnsureInitialized(services);
+
+		rg.AddPass<ShadowMapPreviewData>("RenderPassShadowMapPreview",
+			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, ShadowMapPreviewData& data)
+			{
+				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+
+				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureUsage::Sample);
+				data.m_ShadowMapPreview = builder.Write(
+					shadowRes.m_DirectionalShadowMapPreview,
+					RGTextureUsage::RenderTarget);
+				data.m_Width = shadowRes.m_ShadowMapPreviewSize;
+				data.m_Height = shadowRes.m_ShadowMapPreviewSize;
+
+				auto* renderer = servicesPtr->m_Renderer;
+				GGLAB_ASSERT_NOT_NULL(renderer);
+				data.m_SamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::PointClamp);
+
+				const auto& settings = contextPtr->GetShadowVisualizationSettings();
+				data.m_MinDepth = std::clamp(settings.m_PreviewMinDepth, 0.0f, 1.0f);
+				data.m_MaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
+				data.m_Invert = settings.m_PreviewInvert ? 1u : 0u;
+			},
+			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ShadowMapPreviewData& data)
+			{
+				auto* commandList = executeContext.m_GraphicsCommandList;
+				GGLAB_ASSERT_NOT_NULL(commandList);
+
+				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);
+				GGLAB_ASSERT_NOT_NULL(shadowMapTexture);
+
+				auto* previewTexture = rg.GetTexture(data.m_ShadowMapPreview);
+				GGLAB_ASSERT_NOT_NULL(previewTexture);
+
+				auto* viewCache = rg.GetViewCache();
+				GGLAB_ASSERT_NOT_NULL(viewCache);
+
+				const ResourceIndex shadowMapIndex = rg.GetResourceIndex(data.m_ShadowMap);
+				D3D12_SHADER_RESOURCE_VIEW_DESC shadowMapSrvDesc{};
+				shadowMapSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+				shadowMapSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				shadowMapSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				shadowMapSrvDesc.Texture2D.MostDetailedMip = 0;
+				shadowMapSrvDesc.Texture2D.MipLevels = 1;
+				shadowMapSrvDesc.Texture2D.PlaneSlice = 0;
+				shadowMapSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+				const auto shadowMapSrv = viewCache->GetOrCreate<ViewType::SRV>(
+					shadowMapIndex,
+					shadowMapTexture,
+					shadowMapSrvDesc);
+				GGLAB_ASSERT_MSG(shadowMapSrv.m_Index != std::numeric_limits<uint32_t>::max(),
+					"Shadow map preview SRV must expose a descriptor heap index.");
+
+				const ResourceIndex previewIndex = rg.GetResourceIndex(data.m_ShadowMapPreview);
+				const auto previewRtv = viewCache->GetOrCreate<ViewType::RTV>(
+					previewIndex,
+					previewTexture);
+				commandList->ClearRenderTarget(previewRtv, *previewTexture);
+
+				auto* renderer = servicesPtr->m_Renderer;
+				GGLAB_ASSERT_NOT_NULL(renderer);
+
+				auto* descriptorManager = renderer->GetDescriptorManager();
+				GGLAB_ASSERT_NOT_NULL(descriptorManager);
+
+				const DX12DescriptorHeap* descriptorHeaps[] = {
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
+				};
+				commandList->SetDescriptorHeaps(descriptorHeaps);
+				commandList->SetGraphicsRootSignature(*renderer->GetCommonRootSignature());
+				commandList->SetPipelineState(*GetOrCreatePSO(*renderer));
+				commandList->SetRenderTarget(previewRtv);
+				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
+				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
+				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				commandList->SetGraphicsConstantBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+
+				const uint32_t minDepthBits = std::bit_cast<uint32_t>(data.m_MinDepth);
+				const uint32_t maxDepthBits = std::bit_cast<uint32_t>(data.m_MaxDepth);
+				const uint32_t localConstants[] = {
+					shadowMapSrv.m_Index,
+					data.m_SamplerIndex,
+					minDepthBits,
+					maxDepthBits,
+					data.m_Invert,
+				};
+				commandList->SetGraphicsRoot32BitConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
+					localConstants);
+
+				commandList->DrawInstanced(3);
+			});
+	}
+
+	void RenderPassShadowMapPreview::EnsureInitialized(const RenderServices& services) noexcept
+	{
+		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+
+		auto* shaderManager = services.m_ShaderManager;
+		GGLAB_ASSERT_NOT_NULL(shaderManager);
+
+		if (!m_IsInitialized)
+		{
+			ShaderDesc shaderDesc{};
+			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl";
+			shaderDesc.m_Stage = ShaderStage::Vertex;
+			shaderDesc.m_Entry = L"VSMain";
+			const auto vsId = shaderManager->LoadShader(shaderDesc);
+
+			shaderDesc.m_Stage = ShaderStage::Pixel;
+			shaderDesc.m_Entry = L"PSMain";
+			const auto psId = shaderManager->LoadShader(shaderDesc);
+
+			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+			m_BaseInputs.m_InputLayoutId = InputLayoutID::None;
+			m_BaseInputs.m_VSId = vsId;
+			m_BaseInputs.m_PSId = psId;
+
+			m_BaseInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			m_BaseInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
+			m_BaseInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_UNKNOWN;
+			m_BaseInputs.m_Formats.m_SampleCount = 1;
+			m_BaseInputs.m_Formats.m_SampleQuality = 0;
+
+			m_BaseInputs.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseInputs.m_BlendPreset = BlendPreset::Default;
+			m_BaseInputs.m_DepthPreset = DepthPreset::DepthDisabled;
+
+			m_IsInitialized = true;
+		}
+
+		m_BaseInputs.m_VSGen = shaderManager->GetGeneration(m_BaseInputs.m_VSId);
+		m_BaseInputs.m_PSGen = shaderManager->GetGeneration(m_BaseInputs.m_PSId);
+	}
+
+	DX12PipelineState* RenderPassShadowMapPreview::GetOrCreatePSO(const Renderer& renderer) noexcept
+	{
+		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
+		GGLAB_ASSERT_NOT_NULL(passRegistry);
+
+		auto* psoCache = renderer.GetPSOCache();
+		GGLAB_ASSERT_NOT_NULL(psoCache);
+
+		const auto& cached = passRegistry->GetOrCreateGraphics("RenderPassShadowMapPreview",
+			m_BaseInputs,
+			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
+			{
+				outDesc.m_RootSignatureId = input.m_RootSignatureId;
+				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
+				outDesc.m_InputLayoutId = input.m_InputLayoutId;
+				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(input.m_InputLayoutId);
+				outDesc.m_VertexShader = shaderManager->GetBytecode(input.m_VSId);
+				outDesc.m_PixelShader = shaderManager->GetBytecode(input.m_PSId);
+				outDesc.m_Topology = input.m_Topology;
+				outDesc.m_SampleMask = input.m_SampleMask;
+				outDesc.m_Formats = input.m_Formats;
+				outDesc.m_RasterizerDesc = ApplyRasterizerPreset(input.m_RasterizerPreset);
+				outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
+				outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
+			});
+
+		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+	}
+}

@@ -29,7 +29,7 @@ namespace gglab
 			variantBits |= EncodeVariantBits(bucket, doubleSided);
 
 			const uint8_t bucketOrder = BucketSortOrder(bucket);
-			const uint8_t variantBits8 = static_cast<uint8_t>(variantBits & 0xFFull);
+			const uint8_t variantBits8 = static_cast<uint8_t>(variantBits & VariantMask);
 			const uint32_t materialKey = static_cast<uint32_t>(instance.m_MaterialId.IsValid() ? instance.m_MaterialId.Value() : 0);
 			const uint32_t meshKey = static_cast<uint32_t>(instance.m_MeshId.IsValid() ? instance.m_MeshId.Value() : 0);
 			uint64_t sortKey = PackSortKey(bucketOrder, variantBits8, materialKey, meshKey);
@@ -116,7 +116,7 @@ namespace gglab
 		uint8_t variantBits, uint32_t materialKey, uint32_t meshKey) noexcept
 	{
 		const uint64_t bucketPart = (static_cast<uint64_t>(bucketOrder) & 0xFFull) << 56;
-		const uint64_t variantPart = (static_cast<uint64_t>(variantBits) & 0xFFull) << 48;
+		const uint64_t variantPart = (static_cast<uint64_t>(variantBits) & VariantMask) << 48;
 		const uint64_t materialPart = (static_cast<uint64_t>(materialKey) & 0xFFFFFFull) << 24;
 		const uint64_t meshPart = static_cast<uint64_t>(meshKey) & 0xFFFFFFull;
 

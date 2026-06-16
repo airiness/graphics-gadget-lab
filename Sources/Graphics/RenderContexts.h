@@ -2,6 +2,7 @@
 #include "Graphics/DX12/DX12FencePoint.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderView.h"
+#include "Graphics/ShadowSettings.h"
 
 #include <cstdint>
 #include <span>
@@ -21,6 +22,9 @@ namespace gglab
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
 
+		const DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
+		const ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
+
 		uint32_t m_BackBufferIndex = 0;
 
 		DX12FencePoint m_UploadFencePoint{};	// TODO: multi fence points support
@@ -30,6 +34,16 @@ namespace gglab
 			const auto index = utils::ToIndex(viewId);
 			GGLAB_ASSERT(index < m_RenderQueues.size());
 			return m_RenderQueues[index];
+		}
+
+		const DirectionalShadowSettings& GetDirectionalShadowSettings() const noexcept
+		{
+			return m_DirectionalShadowSettings ? *m_DirectionalShadowSettings : DisabledDirectionalShadowSettings();
+		}
+
+		const ShadowVisualizationSettings& GetShadowVisualizationSettings() const noexcept
+		{
+			return m_ShadowVisualizationSettings ? *m_ShadowVisualizationSettings : DefaultShadowVisualizationSettings();
 		}
 
 		bool IsValid() const noexcept

@@ -2,6 +2,7 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/MaterialUtils.hlsli>
 #include <Common/VertexTransform.hlsli>
+#include <Lighting/ShadowSampling.hlsli>
 #include <PBR/BRDF.hlsli>
 
 uint GetShadowMapTextureIndex()
@@ -21,7 +22,12 @@ uint GetShadowMapSize()
 
 bool IsShadowEnabled()
 {
-	return g_LocalParam5 != 0u;
+	return (g_LocalParam5 & 1u) != 0u;
+}
+
+bool IsShadowPCFEnabled()
+{
+	return (g_LocalParam5 & 2u) != 0u;
 }
 
 float GetShadowDepthBias()
@@ -104,45 +110,25 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 		return 1.0;
 	}
 
-	const ViewData shadowView = LoadViewData(GetShadowViewIndex());
-
-	const float4 shadowPosVS = TransformPositionVS(float4(positionWS, 1.0), shadowView);
-	const float4 shadowPosCS = TransformPositionCS(shadowPosVS, shadowView);
-	if (shadowPosCS.w <= 0.0)
+	const ShadowProjection shadowProjection = ProjectToShadowMap(positionWS, GetShadowViewIndex());
+	if (!shadowProjection.IsValid)
 	{
 		return 1.0;
 	}
 
-	const float3 shadowNDC = shadowPosCS.xyz / shadowPosCS.w;
-	const float2 shadowUV = shadowNDC.xy * float2(0.5, -0.5) + 0.5;
-	const float receiverDepth = shadowNDC.z;
-
-	if (shadowUV.x <= 0.0 || shadowUV.x >= 1.0 ||
-		shadowUV.y <= 0.0 || shadowUV.y >= 1.0 ||
-		receiverDepth <= 0.0 || receiverDepth >= 1.0)
-	{
-		return 1.0;
-	}
-
-	Texture2D<float> shadowMap = ResourceDescriptorHeap[NonUniformResourceIndex(GetShadowMapTextureIndex())];
+	Texture2D<float> shadowMap = GetTexture2DFloat(GetShadowMapTextureIndex());
 	SamplerComparisonState shadowSampler = GetSamplerComparisonState(GetShadowMapSamplerIndex());
 
-	const float texelSize = 1.0 / max((float) GetShadowMapSize(), 1.0);
-	const float compareDepth = saturate(receiverDepth - GetShadowDepthBias());
+	const float compareDepth = saturate(shadowProjection.ReceiverDepth - GetShadowDepthBias());
 
-	float visibility = 0.0;
-	[unroll]
-	for (int y = -1; y <= 1; ++y)
+	if (!IsShadowPCFEnabled())
 	{
-		[unroll]
-		for (int x = -1; x <= 1; ++x)
-		{
-			const float2 offset = float2((float) x, (float) y) * texelSize;
-			visibility += shadowMap.SampleCmpLevelZero(shadowSampler, shadowUV + offset, compareDepth);
-		}
+		return SampleShadowHard(shadowMap, shadowSampler, shadowProjection.UV, compareDepth);
 	}
 
-	return visibility * (1.0 / 9.0);
+	const float shadowMapSize = max((float) GetShadowMapSize(), 1.0);
+	const float2 shadowTexelSize = 1.0.xx / shadowMapSize;
+	return SampleShadowPCF3x3(shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
 }
 
 VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)

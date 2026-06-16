@@ -146,6 +146,7 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
@@ -161,9 +162,10 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.cpp" />
-    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGui.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Buffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.cpp" />
@@ -194,6 +196,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp" />
@@ -201,9 +204,11 @@
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderFrameBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderQueue.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderScene.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderWorldExtractor.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
@@ -250,6 +255,7 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
@@ -271,9 +277,10 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiContext.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.h" />
-    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGui.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Buffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.h" />
@@ -311,6 +318,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h" />
@@ -319,13 +327,16 @@
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderView.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGShadowResources.h" />
+    <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
@@ -383,6 +394,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\BindlessResources.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\Common.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli" />
@@ -392,6 +404,7 @@
     <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\VertexTransform.hlsli" />
+    <None Include="..\..\Assets\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Assets\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
@@ -403,6 +416,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

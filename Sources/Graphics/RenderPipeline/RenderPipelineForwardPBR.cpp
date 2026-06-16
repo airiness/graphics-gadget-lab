@@ -5,6 +5,8 @@
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderResourceRegistry.h"
 
 namespace gglab
 {
@@ -87,10 +89,11 @@ namespace gglab
 		// Shadow Setup
 		struct ShadowSetupData {};
 		rg.AddPass<ShadowSetupData>("ShadowMap.Setup",
-			[](RenderGraph::RGBuilder& builder, ShadowSetupData&)
+			[renderer, &context](RenderGraph::RGBuilder& builder, ShadowSetupData&)
 			{
+				const auto& shadowSettings = context.GetDirectionalShadowSettings();
 				auto& shadowRes = builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
-				shadowRes.m_ShadowMapSize = DefaultDirectionalShadowMapSize;
+				shadowRes.m_ShadowMapSize = std::max(shadowSettings.m_ShadowMapSize, 1u);
 
 				RGTextureDesc shadowMapDesc{};
 				shadowMapDesc.m_Width = shadowRes.m_ShadowMapSize;
@@ -100,6 +103,25 @@ namespace gglab
 				shadowRes.m_DirectionalShadowMap = builder.CreateTexture(
 					"Shadow.DirectionalShadowMap",
 					shadowMapDesc);
+
+				shadowRes.m_ShadowMapPreviewSize = DefaultDirectionalShadowMapPreviewSize;
+				auto* renderResourceRegistry = renderer->GetRenderResourceRegistry();
+				GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
+				renderResourceRegistry->EnsureShadowPreviewResources(shadowRes.m_ShadowMapPreviewSize);
+
+				auto* shadowMapPreviewTexture = renderResourceRegistry->GetTexture(
+					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
+				GGLAB_ASSERT_NOT_NULL(shadowMapPreviewTexture);
+
+				const auto shadowMapPreviewDesc = ToRGTextureDesc(
+					*shadowMapPreviewTexture,
+					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+
+				shadowRes.m_DirectionalShadowMapPreview = builder.ImportTexture(
+					"Shadow.DirectionalShadowMapPreview",
+					shadowMapPreviewTexture,
+					shadowMapPreviewDesc,
+					RGTextureUsage::None);
 			});
 
 		// SwapChain prepare backbuffer
@@ -141,6 +163,9 @@ namespace gglab
 
 		// Directional Shadow Map
 		m_DirectionalShadowMapPass.AddPass(rg, context, services);
+
+		// ShadowMap Preview
+		m_ShadowMapPreviewPass.AddPass(rg, context, services);
 
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);

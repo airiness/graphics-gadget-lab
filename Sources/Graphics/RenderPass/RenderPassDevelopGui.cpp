@@ -5,7 +5,8 @@
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
-#include "DevTools/DevelopGui/DevelopGui.h"
+#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab
 {
@@ -21,6 +22,7 @@ namespace gglab
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_EnvironmentCubemapPreview{};
 			RGTextureId m_PrefilteredSpecularCubemapPreview{};
+			RGTextureId m_DirectionalShadowMapPreview{};
 			ViewKey m_RtvKey{};
 		};
 
@@ -46,19 +48,25 @@ namespace gglab
 				data.m_PrefilteredSpecularCubemapPreview = builder.Read(
 					iblPreviewRes.m_PrefilteredSpecularCubemapPreview,
 					RGTextureUsage::Sample);
+
+				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
+				data.m_DirectionalShadowMapPreview = builder.Read(
+					shadowRes.m_DirectionalShadowMapPreview,
+					RGTextureUsage::Sample);
 			},
 			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
 			{
 				GGLAB_UNUSED(data.m_BrdfLut);
 				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
 				GGLAB_UNUSED(data.m_PrefilteredSpecularCubemapPreview);
+				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
 
-				auto* developGui = services.m_Renderer->GetDevelopGui();
+				auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
 
 				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
 				auto* viewCache = rg.GetViewCache();
 				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
-				developGui->Render(executeContext.m_GraphicsCommandList, rtv);
+				developGuiBackend->RenderDrawData(executeContext.m_GraphicsCommandList, rtv);
 			});
 	}
 }

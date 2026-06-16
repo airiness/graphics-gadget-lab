@@ -1,19 +1,15 @@
 #pragma once
-#include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 
 namespace gglab
 {
 	struct DX12DescriptorView;
-	struct DevelopGuiContext;
 
 	class DX12Device;
 	class DX12SwapChain;
-	class DX12DescriptorHeap;
 	class DX12CommandList;
-	class DX12DescriptorFreeListAllocator;
 	class DX12DescriptorManager;
 
-	class DevelopGui
+	class DevelopGuiBackend
 	{
 	public:
 		struct CreateInfo
@@ -25,20 +21,16 @@ namespace gglab
 		};
 
 	public:
-		DevelopGui() noexcept = default;
-		GGLAB_DELETE_COPYABLE_MOVABLE(DevelopGui);
-		~DevelopGui() = default;
+		DevelopGuiBackend() noexcept = default;
+		GGLAB_DELETE_COPYABLE_MOVABLE(DevelopGuiBackend);
+		~DevelopGuiBackend() = default;
 
 		void Initialize(const CreateInfo& createInfo) noexcept;
 		void Finalize() noexcept;
 
 		void NewFrame() noexcept;
-		void Render(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept;
+		void RenderDrawData(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept;
 		void EndFrame() noexcept;
-
-		void Draw(DevelopGuiContext& context) noexcept;
-
-		DevelopGuiRegistry& GetRegistry() noexcept { return m_Registry; }
 
 	private:
 		static void DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
@@ -52,10 +44,6 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
-
-		DevelopGuiRegistry m_Registry;
-
-		bool m_ShowImGuiDemo = false;
 		bool m_FrameOpen = false;
 	};
 }

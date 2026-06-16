@@ -8,6 +8,7 @@ namespace gglab
 	class DX12CommandList;
 	class DX12PipelineState;
 	class Renderer;
+	struct DirectionalShadowSettings;
 
 	class RenderPassDirectionalShadowMap final : public RenderPassBase
 	{
@@ -34,7 +35,8 @@ namespace gglab
 
 		DX12PipelineState* GetOrCreatePSOForVariant(
 			const Renderer& renderer,
-			uint64_t variantBits) noexcept;
+			uint64_t variantBits,
+			const DirectionalShadowSettings& shadowSettings) noexcept;
 
 		RasterizerPreset GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept;
 

@@ -5,6 +5,7 @@
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/Panels/ImGuiToolsPanel.h"
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
+#include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 
 namespace gglab::devtools
 {
@@ -14,5 +15,6 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<ImGuiToolsPanel>());
 		registry.RegisterPanel(std::make_unique<IBLViewerPanel>());
 		registry.RegisterPanel(std::make_unique<RenderGraphInspectorPanel>());
+		registry.RegisterPanel(std::make_unique<ShadowInspectorPanel>());
 	}
 }
