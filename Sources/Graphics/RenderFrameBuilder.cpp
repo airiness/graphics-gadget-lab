@@ -12,7 +12,7 @@ namespace gglab
 			.m_RenderViews = std::span<RenderView>(m_RenderViews),
 			.m_RenderScene = m_RenderScene,
 			.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
-			.m_DirectionalShadowSettings = m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
+			.m_DirectionalShadowSettings = m_WorldData.GetMainDirectionalShadowSettings(),
 			.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
 			.m_BackBufferIndex = m_BackBufferIndex,
 			.m_UploadFencePoint = m_UploadFencePoint
