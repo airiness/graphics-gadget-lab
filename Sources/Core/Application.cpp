@@ -312,6 +312,9 @@ namespace gglab
 		auto& world = demo->GetWorld();
 		auto& camera = demo->GetCamera();
 		const uint32_t backBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex();
+		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
+		// Keep the graph alive until after the frame has ended.
+		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
 
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
@@ -334,7 +337,6 @@ namespace gglab
 		};
 
 		// Build RenderGraph
-		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto& renderPipeline = demo->GetRenderPipeline();
 		renderPipeline.BuildRenderGraph(rg, renderContext, services);
 		rg.Compile();

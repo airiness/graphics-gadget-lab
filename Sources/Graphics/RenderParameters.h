@@ -6,7 +6,7 @@
 namespace gglab
 {
 	inline constexpr uint32_t MaxDrawConstantDWORDs = 4;
-	inline constexpr uint32_t MaxPassConstantDWORDs = 8;
+	inline constexpr uint32_t MaxPassConstantDWORDs = 16;
 
 	// CPU semantic object for data that changes at draw-call frequency.
 	// The common root signature binds this object as DrawConstants.
