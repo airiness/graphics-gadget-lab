@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/ShaderManager.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
@@ -181,15 +182,8 @@ namespace gglab
 
 	DX12PipelineState* RenderPassShadowMapPreview::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
-		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
-		GGLAB_ASSERT_NOT_NULL(passRegistry);
-
-		auto* psoCache = renderer.GetPSOCache();
-		GGLAB_ASSERT_NOT_NULL(psoCache);
-
-		const auto& cached =
-			passRegistry->GetOrCreateGraphics("RenderPassShadowMapPreview", m_BaseRecipe);
-
-		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+		auto* pipelineCache = renderer.GetPipelineCache();
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe);
 	}
 }

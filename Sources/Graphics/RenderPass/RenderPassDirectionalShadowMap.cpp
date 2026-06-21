@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/ShaderManager.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
@@ -233,25 +234,19 @@ namespace gglab
 		uint64_t variantBits,
 		const DirectionalShadowSettings& shadowSettings) noexcept
 	{
-		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
-		GGLAB_ASSERT_NOT_NULL(passRegistry);
-
-		auto* psoCache = renderer.GetPSOCache();
-		GGLAB_ASSERT_NOT_NULL(psoCache);
+		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
+		auto* pipelineCache = renderer.GetPipelineCache();
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
 		GraphicsPipelineRecipe recipe = m_BaseRecipe;
 		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
 		recipe.m_DepthBias = shadowSettings.m_RasterizerDepthBias;
 		recipe.m_SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;
 
-		const auto psoPassId =
-			MakeVariantPSOPassId("RenderPassDirectionalShadowMap.variant", variantBits);
-
-		const auto& cached = passRegistry->GetOrCreateGraphics(
-			psoPassId,
-			recipe);
-
-		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+		const size_t slotIndex =
+			static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
+		auto& slot = m_PipelineSlots[slotIndex];
+		return pipelineCache->Resolve(slot, recipe);
 	}
 
 	RasterizerPreset RenderPassDirectionalShadowMap::GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept
@@ -260,10 +255,4 @@ namespace gglab
 		return doubleSided ? RasterizerPreset::TwoSided : RasterizerPreset::Default;
 	}
 
-	std::string RenderPassDirectionalShadowMap::MakeVariantPSOPassId(
-		std::string_view baseName,
-		uint64_t variantBits) const noexcept
-	{
-		return std::format("{}.{:016X}", baseName, variantBits);
-	}
 }

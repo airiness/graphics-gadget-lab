@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/ShaderManager.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
@@ -309,11 +310,9 @@ namespace gglab
 	DX12PipelineState* RenderPassForwardPBR::GetOrCreatePSOForVariant(
 		const Renderer& renderer, uint64_t variantBits) noexcept
 	{
-		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
-		GGLAB_ASSERT_NOT_NULL(passRegistry);
-
-		auto* psoCache = renderer.GetPSOCache();
-		GGLAB_ASSERT_NOT_NULL(psoCache);
+		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
+		auto* pipelineCache = renderer.GetPipelineCache();
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
 		GraphicsPipelineRecipe recipe = m_BaseRecipe;
 
@@ -322,14 +321,10 @@ namespace gglab
 		recipe.m_DepthPreset = depthPreset;
 		recipe.m_BlendPreset = blendPreset;
 
-		const auto psoPassId = MakeVariantPSOPassId("RenderPassForwardPBR.variant", variantBits);
-
-		const auto& cached = passRegistry->GetOrCreateGraphics(
-			psoPassId,
-			recipe);
-
-
-		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+		const size_t slotIndex =
+			static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
+		auto& slot = m_PipelineSlots[slotIndex];
+		return pipelineCache->Resolve(slot, recipe);
 	}
 
 	std::tuple<RasterizerPreset, DepthPreset, BlendPreset>
@@ -353,9 +348,4 @@ namespace gglab
 		return { rasterizerPreset, depthPreset, blendPreset };
 	}
 
-	std::string RenderPassForwardPBR::MakeVariantPSOPassId(
-		std::string_view baseName, uint64_t variantBits) const noexcept
-	{
-		return std::format("{}.{:016X}", baseName, variantBits);
-	}
 }

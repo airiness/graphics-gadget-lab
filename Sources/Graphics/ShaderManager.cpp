@@ -91,6 +91,10 @@ namespace gglab
 				}
 			}
 		}
+		if (count > 0)
+		{
+			m_Revision.fetch_add(1, std::memory_order_relaxed);
+		}
 		return count;
 	}
 
@@ -101,7 +105,12 @@ namespace gglab
 		{
 			return false;
 		}
-		return RefreshShaderInternal(*m_Shaders[shaderId.Value()]);
+		const bool changed = RefreshShaderInternal(*m_Shaders[shaderId.Value()]);
+		if (changed)
+		{
+			m_Revision.fetch_add(1, std::memory_order_relaxed);
+		}
+		return changed;
 	}
 
 	D3D12_SHADER_BYTECODE ShaderManager::GetBytecode(ShaderID shaderId) const noexcept

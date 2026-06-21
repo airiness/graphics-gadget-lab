@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
@@ -306,16 +307,10 @@ namespace gglab
 	DX12PipelineState* RenderPassIBLPreview::GetOrCreateCubemapPreviewPSO(
 		const Renderer& renderer) noexcept
 	{
-		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
-		GGLAB_ASSERT_NOT_NULL(passRegistry);
-
-		auto* psoCache = renderer.GetPSOCache();
-		GGLAB_ASSERT_NOT_NULL(psoCache);
-
-		const auto& cached = passRegistry->GetOrCreateGraphics(
-			"RenderPassIBLPreview.Cubemap",
+		auto* pipelineCache = renderer.GetPipelineCache();
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		return pipelineCache->Resolve(
+			m_CubemapPreviewPipelineSlot,
 			m_CubemapPreviewRecipe);
-
-		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 	}
 }

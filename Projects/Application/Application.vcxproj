@@ -199,7 +199,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\PipelineCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.cpp" />
@@ -322,7 +322,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.h" />

@@ -34,6 +34,10 @@ namespace gglab
 		ShaderBlob* GetBlob(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
+		uint64_t GetRevision() const noexcept
+		{
+			return m_Revision.load(std::memory_order_relaxed);
+		}
 
 	private:
 		bool RefreshShaderInternal(Shader& shader) noexcept;
@@ -45,5 +49,6 @@ namespace gglab
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
 
 		std::unique_ptr<ShaderCompiler> m_Compiler;
+		std::atomic_uint64_t m_Revision = 1;
 	};
 }

@@ -1,12 +1,12 @@
 #pragma once
-#include "Core/StringId.h"
-#include "Graphics/DX12/Cache/PSOKey.h"
 #include "Graphics/DX12/Cache/PipelineDesc.h"
-#include "Graphics/ShaderManager.h"
 
 namespace gglab
 {
+	class DX12PipelineState;
+	class DX12PSOCache;
 	class DX12RootSignatureCache;
+	class ShaderManager;
 
 	struct GraphicsPipelineRecipe
 	{
@@ -69,72 +69,58 @@ namespace gglab
 		}
 	};
 
-	struct CachedGraphics
+	struct GraphicsPipelineSlot
 	{
-		GraphicsPSOKey m_Key{};
-		GraphicsPipelineDesc m_Desc{};
+	public:
+		void Reset() noexcept { *this = {}; }
+
+	private:
+		friend class PipelineCache;
+
+		GraphicsPipelineRecipe m_Recipe{};
+		uint64_t m_ShaderRevision = 0;
+		DX12PipelineState* m_PipelineState = nullptr;
+		uint64_t m_PipelineCacheId = 0;
+		uint64_t m_PSOCacheRevision = 0;
 	};
 
-	struct CachedCompute
+	struct ComputePipelineSlot
 	{
-		ComputePSOKey m_Key{};
-		ComputePipelineDesc m_Desc{};
+	public:
+		void Reset() noexcept { *this = {}; }
+
+	private:
+		friend class PipelineCache;
+
+		ComputePipelineRecipe m_Recipe{};
+		uint64_t m_ShaderRevision = 0;
+		DX12PipelineState* m_PipelineState = nullptr;
+		uint64_t m_PipelineCacheId = 0;
+		uint64_t m_PSOCacheRevision = 0;
 	};
 
-	class RenderPassRecipeRegistry
+	class PipelineCache
 	{
 	public:
 		struct CreateInfo
 		{
 			ShaderManager* m_ShaderManager = nullptr;
 			DX12RootSignatureCache* m_RootSignatureCache = nullptr;
+			DX12PSOCache* m_PSOCache = nullptr;
 		};
 
-		explicit RenderPassRecipeRegistry(const CreateInfo& createInfo) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(RenderPassRecipeRegistry);
-		~RenderPassRecipeRegistry() = default;
+		explicit PipelineCache(const CreateInfo& createInfo) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(PipelineCache);
+		~PipelineCache() = default;
 
-		const CachedGraphics& GetOrCreateGraphics(
-			std::string_view passId,
+		DX12PipelineState* Resolve(
+			GraphicsPipelineSlot& slot,
 			const GraphicsPipelineRecipe& recipe) noexcept;
-		const CachedCompute& GetOrCreateCompute(
-			std::string_view passId,
+		DX12PipelineState* Resolve(
+			ComputePipelineSlot& slot,
 			const ComputePipelineRecipe& recipe) noexcept;
 
-		void Clear() noexcept;
-		bool EraseGraphics(std::string_view passId) noexcept;
-		bool EraseCompute(std::string_view passId) noexcept;
-
-		size_t InvalidateByShader(const std::vector<ShaderID>& shaderIds) noexcept;
-
 	private:
-		struct GraphicsShaderGenerations
-		{
-			uint64_t m_VS = 0;
-			uint64_t m_PS = 0;
-			uint64_t m_DS = 0;
-			uint64_t m_HS = 0;
-			uint64_t m_GS = 0;
-
-			constexpr bool operator==(const GraphicsShaderGenerations&) const noexcept = default;
-		};
-
-		struct GraphicsEntry
-		{
-			CachedGraphics m_Cached;
-			GraphicsPipelineRecipe m_Recipe{};
-			GraphicsShaderGenerations m_ShaderGenerations{};
-		};
-
-		struct ComputeEntry
-		{
-			CachedCompute m_Cached;
-			ComputePipelineRecipe m_Recipe{};
-			uint64_t m_ShaderGeneration = 0;
-		};
-
-		GraphicsShaderGenerations GetShaderGenerations(
-			const GraphicsPipelineRecipe& recipe) const noexcept;
 		GraphicsPipelineDesc BuildGraphicsDesc(
 			const GraphicsPipelineRecipe& recipe) const noexcept;
 		ComputePipelineDesc BuildComputeDesc(
@@ -142,9 +128,7 @@ namespace gglab
 
 		ShaderManager* m_ShaderManager = nullptr;
 		DX12RootSignatureCache* m_RootSignatureCache = nullptr;
-		std::unordered_map<StringID, GraphicsEntry> m_GraphicsMap;
-		std::unordered_map<StringID, ComputeEntry> m_ComputeMap;
-
-		mutable std::shared_mutex m_Mutex;
+		DX12PSOCache* m_PSOCache = nullptr;
+		uint64_t m_CacheId = 0;
 	};
 }

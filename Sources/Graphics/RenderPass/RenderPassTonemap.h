@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
-#include "Graphics/RenderPass/RenderPassRecipeRegistry.h"
+#include "Graphics/PipelineCache.h"
 
 namespace gglab
 {
@@ -24,6 +24,7 @@ namespace gglab
 
 	private:
 		GraphicsPipelineRecipe m_BaseRecipe{};
+		GraphicsPipelineSlot m_PipelineSlot{};
 		bool m_IsInitialized = false;
 	};
 }

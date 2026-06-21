@@ -50,6 +50,7 @@ namespace gglab
 		};
 
 		static constexpr uint32_t VariantBitCount = 8;
+		static constexpr uint32_t VariantCount = 1u << VariantBitCount;
 		static constexpr uint64_t VariantMask = (1ull << VariantBitCount) - 1ull;
 		static_assert((BucketMask & ~VariantMask) == 0);
 
