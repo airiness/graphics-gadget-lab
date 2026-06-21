@@ -3,19 +3,21 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-cbuffer ShadowMapPreviewPassConstants : register(b2)
+struct ShadowMapPreviewPassParameters
 {
-	uint g_ShadowMapTextureIndex;
-	uint g_ShadowMapSamplerIndex;
-	float g_PreviewMinDepth;
-	float g_PreviewMaxDepth;
-	uint g_PreviewInvert;
-	uint3 g_ShadowMapPreviewPassPadding;
+	uint ShadowMapTextureIndex;
+	uint ShadowMapSamplerIndex;
+	float PreviewMinDepth;
+	float PreviewMaxDepth;
+	uint PreviewInvert;
+	uint3 Padding;
 };
+
+ConstantBuffer<ShadowMapPreviewPassParameters> g_Pass : register(b2);
 
 bool IsPreviewInverted()
 {
-	return g_PreviewInvert != 0u;
+	return g_Pass.PreviewInvert != 0u;
 }
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
@@ -25,16 +27,16 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 
 float SampleShadowMapDepth(float2 uv)
 {
-	Texture2D<float> shadowMap = GetTexture2DFloat(g_ShadowMapTextureIndex);
-	SamplerState shadowSampler = GetSamplerState(g_ShadowMapSamplerIndex);
+	Texture2D<float> shadowMap = GetTexture2DFloat(g_Pass.ShadowMapTextureIndex);
+	SamplerState shadowSampler = GetSamplerState(g_Pass.ShadowMapSamplerIndex);
 	return shadowMap.SampleLevel(shadowSampler, uv, 0.0);
 }
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 {
 	const float rawDepth = SampleShadowMapDepth(IN.UV);
-	const float minDepth = saturate(g_PreviewMinDepth);
-	const float maxDepth = max(saturate(g_PreviewMaxDepth), minDepth + 1.0e-5);
+	const float minDepth = saturate(g_Pass.PreviewMinDepth);
+	const float maxDepth = max(saturate(g_Pass.PreviewMaxDepth), minDepth + 1.0e-5);
 
 	float depth = saturate((rawDepth - minDepth) / (maxDepth - minDepth));
 	if (IsPreviewInverted())

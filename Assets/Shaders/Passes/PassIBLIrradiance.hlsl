@@ -5,17 +5,19 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-cbuffer IBLIrradiancePassConstants : register(b2)
+struct IBLIrradiancePassParameters
 {
-	uint g_CubemapFaceIndex;
-	uint g_EnvironmentTextureIndex;
-	uint g_EnvironmentSamplerIndex;
-	uint g_IBLIrradiancePassPadding;
+	uint CubemapFaceIndex;
+	uint EnvironmentTextureIndex;
+	uint EnvironmentSamplerIndex;
+	uint Padding;
 };
+
+ConstantBuffer<IBLIrradiancePassParameters> g_Pass : register(b2);
 
 TextureSamplerBindingData GetEnvironmentBinding()
 {
-	return MakeTextureSamplerBinding(uint2(g_EnvironmentTextureIndex, g_EnvironmentSamplerIndex));
+	return MakeTextureSamplerBinding(uint2(g_Pass.EnvironmentTextureIndex, g_Pass.EnvironmentSamplerIndex));
 }
 
 float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 normalWS)
@@ -46,7 +48,7 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	float3 normalWS = CubemapFaceUvToDirection(g_CubemapFaceIndex, IN.UV);
+	float3 normalWS = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
 	TextureSamplerBindingData environmentBinding = GetEnvironmentBinding();
 
 	return float4(IntegrateIrradiance(environmentBinding, normalWS), 1.0);
