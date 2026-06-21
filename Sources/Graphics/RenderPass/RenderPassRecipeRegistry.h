@@ -6,7 +6,9 @@
 
 namespace gglab
 {
-	struct GraphicsKeyInputs
+	class DX12RootSignatureCache;
+
+	struct GraphicsPipelineRecipe
 	{
 		RootSignatureID m_RootSignatureId{};
 		InputLayoutID m_InputLayoutId{};
@@ -17,12 +19,6 @@ namespace gglab
 		ShaderID m_HSId{};
 		ShaderID m_GSId{};
 
-		uint64_t m_VSGen = 0;
-		uint64_t m_PSGen = 0;
-		uint64_t m_DSGen = 0;
-		uint64_t m_HSGen = 0;
-		uint64_t m_GSGen = 0;
-
 		PipelineFormats m_Formats{};
 
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -32,9 +28,11 @@ namespace gglab
 		DepthPreset m_DepthPreset = DepthPreset::Default;
 		BlendPreset m_BlendPreset = BlendPreset::Default;
 
-		uint64_t m_VariantBits = 0;
+		int32_t m_DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+		float m_DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+		float m_SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
 
-		constexpr bool operator==(const GraphicsKeyInputs&) const noexcept = default;
+		constexpr bool operator==(const GraphicsPipelineRecipe&) const noexcept = default;
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(
@@ -45,41 +43,31 @@ namespace gglab
 				m_DSId.Value(),
 				m_HSId.Value(),
 				m_GSId.Value(),
-				m_VSGen,
-				m_PSGen,
-				m_DSGen,
-				m_HSGen,
-				m_GSGen,
 				m_Formats.AsTuple(),
-				m_Topology,		
+				m_Topology,
 				m_SampleMask,
 				m_RasterizerPreset,
 				m_DepthPreset,
 				m_BlendPreset,
-				m_VariantBits);
+				m_DepthBias,
+				m_DepthBiasClamp,
+				m_SlopeScaledDepthBias);
 		}
 	};
 
-	struct ComputeKeyInputs
+	struct ComputePipelineRecipe
 	{
 		RootSignatureID m_RootSignatureId{};
 		ShaderID m_CSId{};
-		uint64_t m_CSGen = 0;
-		uint64_t m_VariantBits = 0;
 
-		constexpr bool operator==(const ComputeKeyInputs&) const noexcept = default;
+		constexpr bool operator==(const ComputePipelineRecipe&) const noexcept = default;
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(
 				m_RootSignatureId.Value(),
-				m_CSId.Value(),
-				m_CSGen,
-				m_VariantBits);
+				m_CSId.Value());
 		}
 	};
-
-	using GraphicsBuilder = std::function<void(GraphicsPipelineDesc& out, const GraphicsKeyInputs& input, ShaderManager* shaderManager)>;
-	using ComputeBuilder = std::function<void(ComputePipelineDesc& out, const ComputeKeyInputs& input, ShaderManager* shaderManager)>;
 
 	struct CachedGraphics
 	{
@@ -96,12 +84,22 @@ namespace gglab
 	class RenderPassRecipeRegistry
 	{
 	public:
-		explicit RenderPassRecipeRegistry(ShaderManager* shaderManager) noexcept;
+		struct CreateInfo
+		{
+			ShaderManager* m_ShaderManager = nullptr;
+			DX12RootSignatureCache* m_RootSignatureCache = nullptr;
+		};
+
+		explicit RenderPassRecipeRegistry(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderPassRecipeRegistry);
 		~RenderPassRecipeRegistry() = default;
 
-		const CachedGraphics& GetOrCreateGraphics(std::string_view passId, const GraphicsKeyInputs& input, const GraphicsBuilder& builder) noexcept;
-		const CachedCompute& GetOrCreateCompute(std::string_view passId, const ComputeKeyInputs& input, const ComputeBuilder& builder) noexcept;
+		const CachedGraphics& GetOrCreateGraphics(
+			std::string_view passId,
+			const GraphicsPipelineRecipe& recipe) noexcept;
+		const CachedCompute& GetOrCreateCompute(
+			std::string_view passId,
+			const ComputePipelineRecipe& recipe) noexcept;
 
 		void Clear() noexcept;
 		bool EraseGraphics(std::string_view passId) noexcept;
@@ -110,21 +108,40 @@ namespace gglab
 		size_t InvalidateByShader(const std::vector<ShaderID>& shaderIds) noexcept;
 
 	private:
+		struct GraphicsShaderGenerations
+		{
+			uint64_t m_VS = 0;
+			uint64_t m_PS = 0;
+			uint64_t m_DS = 0;
+			uint64_t m_HS = 0;
+			uint64_t m_GS = 0;
+
+			constexpr bool operator==(const GraphicsShaderGenerations&) const noexcept = default;
+		};
+
 		struct GraphicsEntry
 		{
-			size_t m_Hash = 0;
 			CachedGraphics m_Cached;
-			GraphicsKeyInputs m_Inputs{};
+			GraphicsPipelineRecipe m_Recipe{};
+			GraphicsShaderGenerations m_ShaderGenerations{};
 		};
 
 		struct ComputeEntry
 		{
-			size_t m_Hash = 0;
 			CachedCompute m_Cached;
-			ComputeKeyInputs m_Inputs{};
+			ComputePipelineRecipe m_Recipe{};
+			uint64_t m_ShaderGeneration = 0;
 		};
 
+		GraphicsShaderGenerations GetShaderGenerations(
+			const GraphicsPipelineRecipe& recipe) const noexcept;
+		GraphicsPipelineDesc BuildGraphicsDesc(
+			const GraphicsPipelineRecipe& recipe) const noexcept;
+		ComputePipelineDesc BuildComputeDesc(
+			const ComputePipelineRecipe& recipe) const noexcept;
+
 		ShaderManager* m_ShaderManager = nullptr;
+		DX12RootSignatureCache* m_RootSignatureCache = nullptr;
 		std::unordered_map<StringID, GraphicsEntry> m_GraphicsMap;
 		std::unordered_map<StringID, ComputeEntry> m_ComputeMap;
 

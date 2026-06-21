@@ -74,7 +74,12 @@ namespace gglab
 
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 
-		m_RenderPassRecipeRegistry = std::make_unique<RenderPassRecipeRegistry>(createInfo.m_ShaderManager);
+		RenderPassRecipeRegistry::CreateInfo recipeRegistryCreateInfo{
+			.m_ShaderManager = createInfo.m_ShaderManager,
+			.m_RootSignatureCache = m_RootSignatureCache.get(),
+		};
+		m_RenderPassRecipeRegistry =
+			std::make_unique<RenderPassRecipeRegistry>(recipeRegistryCreateInfo);
 
 		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
 

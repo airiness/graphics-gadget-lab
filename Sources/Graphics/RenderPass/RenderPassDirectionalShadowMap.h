@@ -43,7 +43,7 @@ namespace gglab
 		std::string MakeVariantPSOPassId(std::string_view baseName, uint64_t variantBits) const noexcept;
 
 	private:
-		GraphicsKeyInputs m_BaseInputs{};
+		GraphicsPipelineRecipe m_BaseRecipe{};
 		bool m_IsInitialized = false;
 	};
 }

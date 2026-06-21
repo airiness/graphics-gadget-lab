@@ -1,25 +1,32 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassRecipeRegistry.h"
-#include "Core/Hash/FNV1a.h"
+#include "Graphics/DX12/Cache/DX12RootSignatureCache.h"
+#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
+#include "Graphics/DX12/DX12RootSignature.h"
 
 namespace gglab
 {
-	RenderPassRecipeRegistry::RenderPassRecipeRegistry(ShaderManager* shaderManager) noexcept :
-		m_ShaderManager(shaderManager)
+	RenderPassRecipeRegistry::RenderPassRecipeRegistry(const CreateInfo& createInfo) noexcept :
+		m_ShaderManager(createInfo.m_ShaderManager),
+		m_RootSignatureCache(createInfo.m_RootSignatureCache)
 	{
-		GGLAB_ASSERT_MSG(shaderManager != nullptr, "ShaderManager must not be null");
+		GGLAB_ASSERT_NOT_NULL(m_ShaderManager);
+		GGLAB_ASSERT_NOT_NULL(m_RootSignatureCache);
 	}
 
-	const CachedGraphics& RenderPassRecipeRegistry::GetOrCreateGraphics(std::string_view passId, const GraphicsKeyInputs& input, const GraphicsBuilder& builder) noexcept
+	const CachedGraphics& RenderPassRecipeRegistry::GetOrCreateGraphics(
+		std::string_view passId,
+		const GraphicsPipelineRecipe& recipe) noexcept
 	{
-		const size_t hash = KeyHash<GraphicsKeyInputs>{}(input);
-		StringID passIdKey(passId);
+		const GraphicsShaderGenerations shaderGenerations = GetShaderGenerations(recipe);
+		const StringID passIdKey(passId);
 
 		{
 			std::shared_lock lock(m_Mutex);
 			if (const auto it = m_GraphicsMap.find(passIdKey); it != m_GraphicsMap.end())
 			{
-				if (it->second.m_Hash == hash)
+				if (it->second.m_Recipe == recipe &&
+					it->second.m_ShaderGenerations == shaderGenerations)
 				{
 					return it->second.m_Cached;
 				}
@@ -29,38 +36,43 @@ namespace gglab
 		// Can not find, create new
 		{
 			std::unique_lock lock(m_Mutex);
-			auto& entry = m_GraphicsMap[passIdKey];
-			if (entry.m_Hash != hash)
+			auto [it, inserted] = m_GraphicsMap.try_emplace(passIdKey);
+			auto& entry = it->second;
+			if (inserted ||
+				entry.m_Recipe != recipe ||
+				entry.m_ShaderGenerations != shaderGenerations)
 			{
-				GraphicsPipelineDesc desc{};
-				builder(desc, input, m_ShaderManager);
+				GraphicsPipelineDesc desc = BuildGraphicsDesc(recipe);
 				GGLAB_ASSERT_MSG(desc.Validate(), "GraphicsPipelineDesc is not valid");
 
-				const ShaderHash128 vsHash = input.m_VSId.IsValid() ? m_ShaderManager->GetHash(input.m_VSId) : ShaderHash128{};
-				const ShaderHash128 psHash = input.m_PSId.IsValid() ? m_ShaderManager->GetHash(input.m_PSId) : ShaderHash128{};
-				const ShaderHash128 dsHash = input.m_DSId.IsValid() ? m_ShaderManager->GetHash(input.m_DSId) : ShaderHash128{};
-				const ShaderHash128 hsHash = input.m_HSId.IsValid() ? m_ShaderManager->GetHash(input.m_HSId) : ShaderHash128{};
-				const ShaderHash128 gsHash = input.m_GSId.IsValid() ? m_ShaderManager->GetHash(input.m_GSId) : ShaderHash128{};
+				const ShaderHash128 vsHash = recipe.m_VSId.IsValid() ? m_ShaderManager->GetHash(recipe.m_VSId) : ShaderHash128{};
+				const ShaderHash128 psHash = recipe.m_PSId.IsValid() ? m_ShaderManager->GetHash(recipe.m_PSId) : ShaderHash128{};
+				const ShaderHash128 dsHash = recipe.m_DSId.IsValid() ? m_ShaderManager->GetHash(recipe.m_DSId) : ShaderHash128{};
+				const ShaderHash128 hsHash = recipe.m_HSId.IsValid() ? m_ShaderManager->GetHash(recipe.m_HSId) : ShaderHash128{};
+				const ShaderHash128 gsHash = recipe.m_GSId.IsValid() ? m_ShaderManager->GetHash(recipe.m_GSId) : ShaderHash128{};
 
 				GraphicsPSOKey key = desc.MakeKey(vsHash, psHash, dsHash, hsHash, gsHash);
 				entry.m_Cached = { key, std::move(desc) };
-				entry.m_Hash = hash;
-				entry.m_Inputs = input;
+				entry.m_Recipe = recipe;
+				entry.m_ShaderGenerations = shaderGenerations;
 			}
 			return entry.m_Cached;
 		}
 	}
 
-	const CachedCompute& RenderPassRecipeRegistry::GetOrCreateCompute(std::string_view passId, const ComputeKeyInputs& input, const ComputeBuilder& builder) noexcept
+	const CachedCompute& RenderPassRecipeRegistry::GetOrCreateCompute(
+		std::string_view passId,
+		const ComputePipelineRecipe& recipe) noexcept
 	{
-		const size_t hash = KeyHash<ComputeKeyInputs>{}(input);
-		StringID passIdKey(passId);
+		const uint64_t shaderGeneration = m_ShaderManager->GetGeneration(recipe.m_CSId);
+		const StringID passIdKey(passId);
 	
 		{
 			std::shared_lock lock(m_Mutex);
 			if (const auto it = m_ComputeMap.find(passIdKey); it != m_ComputeMap.end())
 			{
-				if (it->second.m_Hash == hash)
+				if (it->second.m_Recipe == recipe &&
+					it->second.m_ShaderGeneration == shaderGeneration)
 				{
 					return it->second.m_Cached;
 				}
@@ -69,22 +81,92 @@ namespace gglab
 		// Can not find, create new
 		{
 			std::unique_lock lock(m_Mutex);
-			auto& entry = m_ComputeMap[passIdKey];
-			if (entry.m_Hash != hash)
+			auto [it, inserted] = m_ComputeMap.try_emplace(passIdKey);
+			auto& entry = it->second;
+			if (inserted ||
+				entry.m_Recipe != recipe ||
+				entry.m_ShaderGeneration != shaderGeneration)
 			{
-				ComputePipelineDesc desc{};
-				builder(desc, input, m_ShaderManager);
+				ComputePipelineDesc desc = BuildComputeDesc(recipe);
 				GGLAB_ASSERT_MSG(desc.Validate(), "ComputePipelineDesc is not valid");
 
-				const ShaderHash128 csHash = input.m_CSId.Value() ? m_ShaderManager->GetHash(input.m_CSId) : ShaderHash128{};
+				const ShaderHash128 csHash = recipe.m_CSId.IsValid() ?
+					m_ShaderManager->GetHash(recipe.m_CSId) :
+					ShaderHash128{};
 				ComputePSOKey key = desc.MakeKey(csHash);
 
 				entry.m_Cached = { key, std::move(desc) };
-				entry.m_Hash = hash;
-				entry.m_Inputs = input;
+				entry.m_Recipe = recipe;
+				entry.m_ShaderGeneration = shaderGeneration;
 			}
 			return entry.m_Cached;
 		}
+	}
+
+	RenderPassRecipeRegistry::GraphicsShaderGenerations
+		RenderPassRecipeRegistry::GetShaderGenerations(
+			const GraphicsPipelineRecipe& recipe) const noexcept
+	{
+		return GraphicsShaderGenerations{
+			.m_VS = m_ShaderManager->GetGeneration(recipe.m_VSId),
+			.m_PS = m_ShaderManager->GetGeneration(recipe.m_PSId),
+			.m_DS = m_ShaderManager->GetGeneration(recipe.m_DSId),
+			.m_HS = m_ShaderManager->GetGeneration(recipe.m_HSId),
+			.m_GS = m_ShaderManager->GetGeneration(recipe.m_GSId),
+		};
+	}
+
+	GraphicsPipelineDesc RenderPassRecipeRegistry::BuildGraphicsDesc(
+		const GraphicsPipelineRecipe& recipe) const noexcept
+	{
+		GraphicsPipelineDesc desc{};
+		desc.m_RootSignatureId = recipe.m_RootSignatureId;
+
+		auto* rootSignature =
+			m_RootSignatureCache->GetDX12RootSignature(recipe.m_RootSignatureId);
+		GGLAB_ASSERT_NOT_NULL(rootSignature);
+		desc.m_RootSignature = rootSignature ? rootSignature->Get() : nullptr;
+
+		desc.m_InputLayoutId = recipe.m_InputLayoutId;
+		desc.m_InputLayoutDesc = InputLayoutLibrary::Get(recipe.m_InputLayoutId);
+		desc.m_VertexShader = m_ShaderManager->GetBytecode(recipe.m_VSId);
+		desc.m_PixelShader = recipe.m_PSId.IsValid() ?
+			m_ShaderManager->GetBytecode(recipe.m_PSId) :
+			D3D12_SHADER_BYTECODE{};
+		desc.m_DomainShader = recipe.m_DSId.IsValid() ?
+			m_ShaderManager->GetBytecode(recipe.m_DSId) :
+			D3D12_SHADER_BYTECODE{};
+		desc.m_HullShader = recipe.m_HSId.IsValid() ?
+			m_ShaderManager->GetBytecode(recipe.m_HSId) :
+			D3D12_SHADER_BYTECODE{};
+		desc.m_GeometryShader = recipe.m_GSId.IsValid() ?
+			m_ShaderManager->GetBytecode(recipe.m_GSId) :
+			D3D12_SHADER_BYTECODE{};
+		desc.m_Formats = recipe.m_Formats;
+		desc.m_Topology = recipe.m_Topology;
+		desc.m_SampleMask = recipe.m_SampleMask;
+		desc.m_RasterizerDesc = ApplyRasterizerPreset(recipe.m_RasterizerPreset);
+		desc.m_RasterizerDesc.DepthBias = recipe.m_DepthBias;
+		desc.m_RasterizerDesc.DepthBiasClamp = recipe.m_DepthBiasClamp;
+		desc.m_RasterizerDesc.SlopeScaledDepthBias =
+			recipe.m_SlopeScaledDepthBias;
+		desc.m_DepthDesc = ApplyDepthPreset(recipe.m_DepthPreset);
+		desc.m_BlendDesc = ApplyBlendPreset(recipe.m_BlendPreset);
+		return desc;
+	}
+
+	ComputePipelineDesc RenderPassRecipeRegistry::BuildComputeDesc(
+		const ComputePipelineRecipe& recipe) const noexcept
+	{
+		ComputePipelineDesc desc{};
+		desc.m_RootSignatureId = recipe.m_RootSignatureId;
+
+		auto* rootSignature =
+			m_RootSignatureCache->GetDX12RootSignature(recipe.m_RootSignatureId);
+		GGLAB_ASSERT_NOT_NULL(rootSignature);
+		desc.m_RootSignature = rootSignature ? rootSignature->Get() : nullptr;
+		desc.m_ComputeShader = m_ShaderManager->GetBytecode(recipe.m_CSId);
+		return desc;
 	}
 
 	void RenderPassRecipeRegistry::Clear() noexcept
@@ -114,7 +196,7 @@ namespace gglab
 		}
 
 		std::unique_lock lock(m_Mutex);
-		auto hitGraphics = [&](const GraphicsKeyInputs& input) -> bool
+		auto hitGraphics = [&](const GraphicsPipelineRecipe& recipe) -> bool
 			{
 				for (ShaderID id : shaderIds)
 				{
@@ -123,11 +205,11 @@ namespace gglab
 						continue;
 					}
 
-					if(input.m_VSId == id ||
-					   input.m_PSId == id ||
-					   input.m_DSId == id ||
-					   input.m_HSId == id ||
-					   input.m_GSId == id)
+					if(recipe.m_VSId == id ||
+					   recipe.m_PSId == id ||
+					   recipe.m_DSId == id ||
+					   recipe.m_HSId == id ||
+					   recipe.m_GSId == id)
 					{
 						return true;
 					}
@@ -135,7 +217,7 @@ namespace gglab
 				return false;
 			};
 
-		auto hitCompute = [&](const ComputeKeyInputs& input) -> bool
+		auto hitCompute = [&](const ComputePipelineRecipe& recipe) -> bool
 			{
 				for (ShaderID id : shaderIds)
 				{
@@ -143,7 +225,7 @@ namespace gglab
 					{
 						continue;
 					}
-					if (input.m_CSId == id)
+					if (recipe.m_CSId == id)
 					{
 						return true;
 					}
@@ -154,7 +236,7 @@ namespace gglab
 		size_t removedCount = 0;
 		for (auto iter = m_GraphicsMap.begin(); iter != m_GraphicsMap.end(); )
 		{
-			if (hitGraphics(iter->second.m_Inputs))
+			if (hitGraphics(iter->second.m_Recipe))
 			{
 				iter = m_GraphicsMap.erase(iter);
 				++removedCount;
@@ -167,7 +249,7 @@ namespace gglab
 
 		for (auto it = m_ComputeMap.begin(); it != m_ComputeMap.end(); )
 		{
-			if (hitCompute(it->second.m_Inputs))
+			if (hitCompute(it->second.m_Recipe))
 			{
 				it = m_ComputeMap.erase(it);
 				++removedCount;

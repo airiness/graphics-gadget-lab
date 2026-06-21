@@ -23,7 +23,7 @@ namespace gglab
 		DX12PipelineState* GetOrCreateCubemapPreviewPSO(const Renderer& renderer) noexcept;
 
 	private:
-		GraphicsKeyInputs m_CubemapPreviewInputs{};
+		GraphicsPipelineRecipe m_CubemapPreviewRecipe{};
 		bool m_IsInitialized = false;
 	};
 }

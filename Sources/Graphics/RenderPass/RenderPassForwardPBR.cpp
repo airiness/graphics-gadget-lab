@@ -9,7 +9,6 @@
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 
@@ -205,28 +204,25 @@ namespace gglab
 			shaderDesc.m_Entry = L"PSMain";
 			const auto psId = shaderManager->LoadShader(shaderDesc);
 
-			// KeyInputs
-			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
-			m_BaseInputs.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
-			m_BaseInputs.m_VSId = vsId;
-			m_BaseInputs.m_PSId = psId;
+			// Pipeline recipe
+			m_BaseRecipe.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			m_BaseRecipe.m_VSId = vsId;
+			m_BaseRecipe.m_PSId = psId;
 
-			m_BaseInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_BaseInputs.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
-			m_BaseInputs.m_Formats.m_RtvFormats.NumRenderTargets = 1;
-			m_BaseInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-			m_BaseInputs.m_Formats.m_SampleCount = 1;
-			m_BaseInputs.m_Formats.m_SampleQuality = 0;
-			m_BaseInputs.m_RasterizerPreset = RasterizerPreset::Default;
-			m_BaseInputs.m_BlendPreset = BlendPreset::Default;
-			m_BaseInputs.m_DepthPreset = DepthPreset::Default;
+			m_BaseRecipe.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			m_BaseRecipe.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			m_BaseRecipe.m_Formats.m_RtvFormats.NumRenderTargets = 1;
+			m_BaseRecipe.m_Formats.m_DsvFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+			m_BaseRecipe.m_Formats.m_SampleCount = 1;
+			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
+			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
+			m_BaseRecipe.m_DepthPreset = DepthPreset::Default;
 
 			m_IsInitialized = true;
 		}
 
-		// For shader hot reload
-		m_BaseInputs.m_VSGen = shaderManager->GetGeneration(m_BaseInputs.m_VSId);
-		m_BaseInputs.m_PSGen = shaderManager->GetGeneration(m_BaseInputs.m_PSId);
 	}
 
 	void RenderPassForwardPBR::DrawRenderQueue(DX12CommandList* commandList,
@@ -319,33 +315,18 @@ namespace gglab
 		auto* psoCache = renderer.GetPSOCache();
 		GGLAB_ASSERT_NOT_NULL(psoCache);
 
-		GraphicsKeyInputs inputs = m_BaseInputs;
-		inputs.m_VariantBits = variantBits;
+		GraphicsPipelineRecipe recipe = m_BaseRecipe;
 
 		auto [rasterizerPreset, depthPreset, blendPreset] = GetPresetsFromVariantBits(variantBits);
-		inputs.m_RasterizerPreset = rasterizerPreset;
-		inputs.m_DepthPreset = depthPreset;
-		inputs.m_BlendPreset = blendPreset;
+		recipe.m_RasterizerPreset = rasterizerPreset;
+		recipe.m_DepthPreset = depthPreset;
+		recipe.m_BlendPreset = blendPreset;
 
 		const auto psoPassId = MakeVariantPSOPassId("RenderPassForwardPBR.variant", variantBits);
 
 		const auto& cached = passRegistry->GetOrCreateGraphics(
-			psoPassId, inputs,
-			[&renderer](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
-			{
-				outDesc.m_RootSignatureId = input.m_RootSignatureId;
-				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
-				outDesc.m_InputLayoutId = input.m_InputLayoutId;
-				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(input.m_InputLayoutId);
-				outDesc.m_VertexShader = shaderManager->GetBytecode(input.m_VSId);
-				outDesc.m_PixelShader = shaderManager->GetBytecode(input.m_PSId);
-				outDesc.m_Topology = input.m_Topology;
-				outDesc.m_SampleMask = input.m_SampleMask;
-				outDesc.m_Formats = input.m_Formats;
-				outDesc.m_RasterizerDesc = ApplyRasterizerPreset(input.m_RasterizerPreset);
-				outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
-				outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
-			});
+			psoPassId,
+			recipe);
 
 
 		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
