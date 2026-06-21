@@ -17,6 +17,7 @@
 #include "Graphics/TextureRegistry.h"
 #include "Graphics/RenderContexts.h"
 #include "Graphics/RenderParameters.h"
+#include "Graphics/RenderScene.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab
@@ -32,11 +33,7 @@ namespace gglab
 		{
 		public:
 			GGLAB_DELETE_COPYABLE_MOVABLE(Frame);
-			~Frame() noexcept
-			{
-				GGLAB_ASSERT_MSG(m_State == State::Ended,
-					"Renderer::Frame destroyed without a matching Renderer::EndFrame.");
-			}
+			~Frame() noexcept;
 
 		private:
 			enum class State : uint8_t
@@ -60,7 +57,7 @@ namespace gglab
 			DX12CommandAllocator* m_CommandAllocator = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
 			DX12FencePoint m_UploadFencePoint = {};
-			RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
+			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 		};
 
 		struct CreateInfo
@@ -76,13 +73,13 @@ namespace gglab
 	public:
 		Renderer() noexcept = default;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
-		~Renderer() = default;
+		~Renderer();
 
 		void Initialize(const CreateInfo& createInfo) noexcept;
 		void Finalize() noexcept;
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
-		Frame BeginFrame(uint32_t backBufferIndex) noexcept;
+		[[nodiscard]] Frame BeginFrame(uint32_t backBufferIndex) noexcept;
 		void Render(
 			Frame& frame,
 			RenderGraph& rg,

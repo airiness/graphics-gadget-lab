@@ -22,6 +22,20 @@
 
 namespace gglab
 {
+	Renderer::Frame::~Frame() noexcept
+	{
+		if (m_Renderer && m_State != State::Ended)
+		{
+			m_Renderer->AbortFrame(*this);
+		}
+	}
+
+	Renderer::~Renderer()
+	{
+		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
+			"Renderer destroyed while a Renderer::Frame is still active.");
+	}
+
 	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		m_Device = std::make_unique<DX12Device>();
@@ -104,6 +118,9 @@ namespace gglab
 			return;
 		}
 
+		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
+			"Renderer::Finalize called while a Renderer::Frame is still active.");
+
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
 		if (m_SwapChain)
@@ -184,7 +201,11 @@ namespace gglab
 
 		frame.m_RenderGraph = &rg;
 		frame.m_UploadFencePoint = renderContext.m_UploadFencePoint;
-		frame.m_SceneGpuAllocations = renderContext.m_SceneGpuAllocations;
+		if (renderContext.m_SceneGpuAllocations)
+		{
+			frame.m_SceneGpuAllocations = *renderContext.m_SceneGpuAllocations;
+			*renderContext.m_SceneGpuAllocations = {};
+		}
 
 		// Window suspended do nothing
 		if (m_IsSuspended.load(std::memory_order_relaxed))
@@ -249,7 +270,7 @@ namespace gglab
 		const DX12CommandList* commandLists[] = { commandList };
 		m_LastSubmittedFencePoint = commandQueue->Execute(commandLists);
 		RetireSceneGpuAllocations(
-			frame.m_SceneGpuAllocations,
+			&frame.m_SceneGpuAllocations,
 			m_LastSubmittedFencePoint);
 
 		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
@@ -272,6 +293,9 @@ namespace gglab
 			return;
 		}
 
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
+			"Renderer::AbortFrame received a frame created by another Renderer.");
+
 		auto* graphicsQueue = m_Device ?
 			m_Device->GetCommandQueue(CommandQueueType::Graphics) :
 			nullptr;
@@ -280,16 +304,30 @@ namespace gglab
 			graphicsQueue->Wait(frame.m_UploadFencePoint);
 		}
 
-		if (graphicsQueue && frame.m_RenderGraph)
+		if (graphicsQueue)
 		{
 			// No draw commands consume this frame's resources, but uploads may
 			// still be in flight. Signal after the queue wait so every frame-owned
 			// allocation can retire on the graphics timeline.
 			m_LastSubmittedFencePoint = graphicsQueue->Signal();
 			RetireSceneGpuAllocations(
-				frame.m_SceneGpuAllocations,
+				&frame.m_SceneGpuAllocations,
 				m_LastSubmittedFencePoint);
-			frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
+
+			if (frame.m_RenderGraph)
+			{
+				frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
+			}
+
+			if (frame.m_CommandAllocator)
+			{
+				auto* commandAllocatorPool =
+					m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
+				commandAllocatorPool->RecycleCommandAllocator(
+					frame.m_CommandAllocator,
+					m_LastSubmittedFencePoint);
+			}
+
 			m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
 		}
 
@@ -302,7 +340,8 @@ namespace gglab
 		frame.m_CommandAllocator = nullptr;
 		frame.m_RenderGraph = nullptr;
 		frame.m_UploadFencePoint = {};
-		frame.m_SceneGpuAllocations = nullptr;
+		frame.m_SceneGpuAllocations = {};
+		frame.m_Renderer = nullptr;
 		m_HasActiveFrame = false;
 	}
 
