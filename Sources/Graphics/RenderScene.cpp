@@ -199,17 +199,39 @@ namespace gglab
 
 		result.m_UploadFencePoint = uploadFencePoint;
 
-		result.m_RenderScene.m_ObjectBaseIndex = objectsBufferResult.m_FirstElementIndex;
-		result.m_RenderScene.m_ObjectCount = objectsBufferResult.m_ElementCount;
 		result.m_GpuAllocations.m_Objects = objectsBufferResult.m_TargetAllocation;
-
-		result.m_RenderScene.m_MaterialBaseIndex = materialsBufferResult.m_FirstElementIndex;
-		result.m_RenderScene.m_MaterialCount = materialsBufferResult.m_ElementCount;
 		result.m_GpuAllocations.m_Materials = materialsBufferResult.m_TargetAllocation;
-
-		result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
-		result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
 		result.m_GpuAllocations.m_Views = viewsBufferResult.m_TargetAllocation;
+
+		const bool objectsUploadSucceeded =
+			objectData.empty() || objectsBufferResult.IsValid();
+		const bool materialsUploadSucceeded =
+			materialData.empty() || materialsBufferResult.IsValid();
+		const bool viewsUploadSucceeded =
+			viewData.empty() || viewsBufferResult.IsValid();
+
+		if (objectsUploadSucceeded &&
+			materialsUploadSucceeded &&
+			viewsUploadSucceeded)
+		{
+			result.m_Status = RenderSceneBuildStatus::Ready;
+
+			result.m_RenderScene.m_ObjectBaseIndex = objectsBufferResult.m_FirstElementIndex;
+			result.m_RenderScene.m_ObjectCount = objectsBufferResult.m_ElementCount;
+			result.m_RenderScene.m_MaterialBaseIndex = materialsBufferResult.m_FirstElementIndex;
+			result.m_RenderScene.m_MaterialCount = materialsBufferResult.m_ElementCount;
+			result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
+			result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
+		}
+		else
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"RenderSceneBuilder: GPU scene upload failed "
+				"(objects={}, materials={}, views={}). Rendering is disabled for this frame.",
+				objectsUploadSucceeded,
+				materialsUploadSucceeded,
+				viewsUploadSucceeded);
+		}
 
 		// MainLight data
 		{

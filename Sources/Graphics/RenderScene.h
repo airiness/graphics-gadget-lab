@@ -53,6 +53,12 @@ namespace gglab
 		}
 	};
 
+	enum class RenderSceneBuildStatus : uint8_t
+	{
+		Ready,
+		GpuUploadFailed,
+	};
+
 	class RenderSceneBuilder
 	{
 	public:
@@ -77,6 +83,7 @@ namespace gglab
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_GpuAllocations{};
 			DX12FencePoint m_UploadFencePoint{};
+			RenderSceneBuildStatus m_Status = RenderSceneBuildStatus::GpuUploadFailed;
 		};
 
 	public:

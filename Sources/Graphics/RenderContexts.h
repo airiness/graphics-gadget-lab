@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/DX12/DX12FencePoint.h"
 #include "Graphics/RenderQueue.h"
+#include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ShadowSettings.h"
 
@@ -10,8 +11,6 @@
 namespace gglab
 {
 	struct RenderView;
-	struct RenderScene;
-	struct RenderSceneGpuAllocations;
 	struct RenderQueue;
 	class Renderer;
 	class AssetManager;
@@ -30,6 +29,12 @@ namespace gglab
 
 		DX12FencePoint m_UploadFencePoint{};	// TODO: multi fence points support
 		RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
+		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
+
+		bool IsRenderSceneReady() const noexcept
+		{
+			return m_RenderSceneStatus == RenderSceneBuildStatus::Ready;
+		}
 
 		const RenderQueue& GetRenderQueue(RenderViewID viewId) const noexcept
 		{
