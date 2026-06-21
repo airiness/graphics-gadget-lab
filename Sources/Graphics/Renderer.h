@@ -16,16 +16,53 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 #include "Graphics/RenderContexts.h"
+#include "Graphics/RenderParameters.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab
 {
 	class DX12Device;
+	class DX12CommandAllocator;
 	class ShaderManager;
 
 	class Renderer
 	{
 	public:
+		class Frame
+		{
+		public:
+			GGLAB_DELETE_COPYABLE_MOVABLE(Frame);
+			~Frame() noexcept
+			{
+				GGLAB_ASSERT_MSG(m_State == State::Ended,
+					"Renderer::Frame destroyed without a matching Renderer::EndFrame.");
+			}
+
+		private:
+			enum class State : uint8_t
+			{
+				Begun,
+				Recorded,
+				Ended,
+			};
+
+			Frame(Renderer* renderer, uint32_t backBufferIndex) noexcept :
+				m_Renderer(renderer),
+				m_BackBufferIndex(backBufferIndex)
+			{
+			}
+
+			friend class Renderer;
+
+			Renderer* m_Renderer = nullptr;
+			State m_State = State::Begun;
+			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
+			DX12CommandAllocator* m_CommandAllocator = nullptr;
+			RenderGraph* m_RenderGraph = nullptr;
+			DX12FencePoint m_UploadFencePoint = {};
+			RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
+		};
+
 		struct CreateInfo
 		{
 			ShaderManager* m_ShaderManager = nullptr;
@@ -45,7 +82,12 @@ namespace gglab
 		void Finalize() noexcept;
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
-		void Render(RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
+		Frame BeginFrame(uint32_t backBufferIndex) noexcept;
+		void Render(
+			Frame& frame,
+			RenderGraph& rg,
+			const RenderFrameContext& renderContext) noexcept;
+		void EndFrame(Frame& frame) noexcept;
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
 		DX12SwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
@@ -85,6 +127,11 @@ namespace gglab
 	private:
 		void CreateCommonRootSignature() noexcept;
 		void InitializeGpuBuffers() noexcept;
+		void AbortFrame(Frame& frame) noexcept;
+		void EndFrameLifetime(Frame& frame) noexcept;
+		void RetireSceneGpuAllocations(
+			RenderSceneGpuAllocations* allocations,
+			const DX12FencePoint& fencePoint) noexcept;
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
@@ -114,5 +161,6 @@ namespace gglab
 		std::atomic_bool m_IsSuspended = false;
 
 		DX12FencePoint m_LastSubmittedFencePoint = {};
+		bool m_HasActiveFrame = false;
 	};
 }

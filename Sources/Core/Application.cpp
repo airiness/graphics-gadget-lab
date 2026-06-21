@@ -311,6 +311,9 @@ namespace gglab
 
 		auto& world = demo->GetWorld();
 		auto& camera = demo->GetCamera();
+		const uint32_t backBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex();
+		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
+
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_Camera = camera,
@@ -319,7 +322,7 @@ namespace gglab
 			.m_ShadowVisualizationSettings = m_DevToolsRuntime->GetRenderVisualizationSettings().m_Shadow,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
-			.m_BackBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex(),
+			.m_BackBufferIndex = backBufferIndex,
 		};
 		auto frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
@@ -354,7 +357,8 @@ namespace gglab
 		}
 
 		// Render
-		m_Renderer->Render(rg, renderContext);
+		m_Renderer->Render(rendererFrame, rg, renderContext);
+		m_Renderer->EndFrame(rendererFrame);
 
 		return true;
 	}

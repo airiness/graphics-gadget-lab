@@ -144,12 +144,47 @@ namespace gglab
 		m_IsInitialized = false;
 	}
 
-	void Renderer::Render(RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
+	Renderer::Frame Renderer::BeginFrame(uint32_t backBufferIndex) noexcept
 	{
-		if (m_IsInitialized == false)
+		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::BeginFrame called before initialization.");
+		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
+			"Renderer::BeginFrame called without ending the previous frame.");
+		GGLAB_ASSERT_NOT_NULL(m_SwapChain.get());
+		GGLAB_ASSERT(m_SwapChain->GetCurrentBackBufferIndex() == backBufferIndex);
+
+		m_SwapChain->WaitFrameCompletion();
+
+		if (m_LastSubmittedFencePoint.IsValid())
 		{
-			return;
+			const auto completedGraphicsFence =
+				m_LastSubmittedFencePoint.GetFence()->GetCompletedValue();
+			m_ObjectSB->ReclaimCompleted(completedGraphicsFence);
+			m_MaterialSB->ReclaimCompleted(completedGraphicsFence);
+			m_ViewSB->ReclaimCompleted(completedGraphicsFence);
 		}
+
+		m_RGGpuResAllocator->Tick();
+		m_DescriptorManager->Tick();
+
+		m_HasActiveFrame = true;
+		return Frame(this, backBufferIndex);
+	}
+
+	void Renderer::Render(
+		Frame& frame,
+		RenderGraph& rg,
+		const RenderFrameContext& renderContext) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::Render called before initialization.");
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
+			"Renderer::Render received a frame created by another Renderer.");
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.m_State == Frame::State::Begun,
+			"Renderer::Render requires an active frame begun by Renderer::BeginFrame.");
+		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
+
+		frame.m_RenderGraph = &rg;
+		frame.m_UploadFencePoint = renderContext.m_UploadFencePoint;
+		frame.m_SceneGpuAllocations = renderContext.m_SceneGpuAllocations;
 
 		// Window suspended do nothing
 		if (m_IsSuspended.load(std::memory_order_relaxed))
@@ -165,7 +200,7 @@ namespace gglab
 		auto swapChain = m_SwapChain.get();
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
 
-		auto backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+		auto backBufferIndex = frame.m_BackBufferIndex;
 		auto commandAllocatorPool = m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
 		auto commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
@@ -176,31 +211,126 @@ namespace gglab
 			commandQueue->Wait(renderContext.m_UploadFencePoint);
 		}
 
-		swapChain->WaitFrameCompletion();
-
-		auto commandAllocator = commandAllocatorPool->RequestCommandAllocator();
-		commandList->Begin(commandAllocator);
+		frame.m_CommandAllocator = commandAllocatorPool->RequestCommandAllocator();
+		commandList->Begin(frame.m_CommandAllocator);
 
 		RGExecuteContext executeContext = {};
 		executeContext.m_GraphicsCommandList = commandList;
 		rg.Execute(executeContext);
 
 		commandList->End();
+		frame.m_State = Frame::State::Recorded;
+	}
+
+	void Renderer::EndFrame(Frame& frame) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::EndFrame called before initialization.");
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
+			"Renderer::EndFrame received a frame created by another Renderer.");
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.m_State != Frame::State::Ended,
+			"Renderer::EndFrame called without a matching Renderer::BeginFrame.");
+
+		if (frame.m_State != Frame::State::Recorded)
+		{
+			AbortFrame(frame);
+			return;
+		}
+
+		GGLAB_ASSERT_NOT_NULL(m_SwapChain.get());
+		GGLAB_ASSERT_NOT_NULL(frame.m_CommandAllocator);
+		GGLAB_ASSERT_NOT_NULL(frame.m_RenderGraph);
+
+		auto* swapChain = m_SwapChain.get();
+		auto* commandAllocatorPool =
+			m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
+		auto* commandList = m_Device->GetGraphicsCommandList(frame.m_BackBufferIndex);
+		auto* commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 
 		const DX12CommandList* commandLists[] = { commandList };
 		m_LastSubmittedFencePoint = commandQueue->Execute(commandLists);
+		RetireSceneGpuAllocations(
+			frame.m_SceneGpuAllocations,
+			m_LastSubmittedFencePoint);
 
-		rg.Retire(m_LastSubmittedFencePoint);
+		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
 
-		m_RGGpuResAllocator->Tick();
-
-		commandAllocatorPool->RecycleCommandAllocator(commandAllocator, m_LastSubmittedFencePoint);
+		commandAllocatorPool->RecycleCommandAllocator(
+			frame.m_CommandAllocator,
+			m_LastSubmittedFencePoint);
 
 		m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
 
 		swapChain->UpdateFrameSyncObject(m_LastSubmittedFencePoint);
 		swapChain->Present();
+		EndFrameLifetime(frame);
+	}
 
+	void Renderer::AbortFrame(Frame& frame) noexcept
+	{
+		if (frame.m_State == Frame::State::Ended)
+		{
+			return;
+		}
+
+		auto* graphicsQueue = m_Device ?
+			m_Device->GetCommandQueue(CommandQueueType::Graphics) :
+			nullptr;
+		if (graphicsQueue && frame.m_UploadFencePoint.IsValid())
+		{
+			graphicsQueue->Wait(frame.m_UploadFencePoint);
+		}
+
+		if (graphicsQueue && frame.m_RenderGraph)
+		{
+			// No draw commands consume this frame's resources, but uploads may
+			// still be in flight. Signal after the queue wait so every frame-owned
+			// allocation can retire on the graphics timeline.
+			m_LastSubmittedFencePoint = graphicsQueue->Signal();
+			RetireSceneGpuAllocations(
+				frame.m_SceneGpuAllocations,
+				m_LastSubmittedFencePoint);
+			frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
+			m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
+		}
+
+		EndFrameLifetime(frame);
+	}
+
+	void Renderer::EndFrameLifetime(Frame& frame) noexcept
+	{
+		frame.m_State = Frame::State::Ended;
+		frame.m_CommandAllocator = nullptr;
+		frame.m_RenderGraph = nullptr;
+		frame.m_UploadFencePoint = {};
+		frame.m_SceneGpuAllocations = nullptr;
+		m_HasActiveFrame = false;
+	}
+
+	void Renderer::RetireSceneGpuAllocations(
+		RenderSceneGpuAllocations* allocations,
+		const DX12FencePoint& fencePoint) noexcept
+	{
+		if (!allocations || allocations->IsEmpty())
+		{
+			return;
+		}
+
+		GGLAB_ASSERT_MSG(fencePoint.IsValid(),
+			"Scene GPU allocations require a valid graphics fence point.");
+
+		if (allocations->m_Objects.IsValid())
+		{
+			m_ObjectSB->Retire(allocations->m_Objects, fencePoint);
+		}
+		if (allocations->m_Materials.IsValid())
+		{
+			m_MaterialSB->Retire(allocations->m_Materials, fencePoint);
+		}
+		if (allocations->m_Views.IsValid())
+		{
+			m_ViewSB->Retire(allocations->m_Views, fencePoint);
+		}
+		*allocations = {};
 	}
 
 	DX12RootSignature* Renderer::GetCommonRootSignature() const noexcept
@@ -294,9 +424,13 @@ namespace gglab
 		// b0: SceneCB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::SceneCB)].InitAsConstantBufferView(0);
 
-		// b1: LocalConstants, shaderRegister: b1
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::LocalConstants)].InitAsConstants(
-			static_cast<UINT>(utils::EnumCount<CommonLocalConstantIndex>()), 1);
+		// b1: DrawConstants
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::DrawConstants)].InitAsConstants(
+			MaxDrawConstantDWORDs, 1);
+
+		// b2: PassConstants
+		rootParameters[utils::ToIndex(CommonRSRootParamIndex::PassConstants)].InitAsConstants(
+			MaxPassConstantDWORDs, 2);
 
 		// t1: ObjectSB
 		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
@@ -333,17 +467,20 @@ namespace gglab
 		{
 			DX12RingStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
 			objectSBCreateInfo.m_DX12Device = m_Device.get();
-			objectSBCreateInfo.m_ElementsCapacity = MaxObjectCapacity;
+			objectSBCreateInfo.m_ElementsCapacity =
+				MaxObjectCapacity * DX12Device::GetBufferCount();
 			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 
 			DX12RingStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
 			materialSBCreateInfo.m_DX12Device = m_Device.get();
-			materialSBCreateInfo.m_ElementsCapacity = MaxMaterialCapacity;
+			materialSBCreateInfo.m_ElementsCapacity =
+				MaxMaterialCapacity * DX12Device::GetBufferCount();
 			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 
 			DX12RingStructuredBuffer<ViewGPU>::CreateInfo viewSBCreateInfo{};
 			viewSBCreateInfo.m_DX12Device = m_Device.get();
-			viewSBCreateInfo.m_ElementsCapacity = MaxViewCapacity;
+			viewSBCreateInfo.m_ElementsCapacity =
+				MaxViewCapacity * DX12Device::GetBufferCount();
 			m_ViewSB = std::make_unique<DX12RingStructuredBuffer<ViewGPU>>(viewSBCreateInfo);
 		}
 	}

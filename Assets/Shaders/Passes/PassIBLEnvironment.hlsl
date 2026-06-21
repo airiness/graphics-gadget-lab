@@ -3,10 +3,11 @@
 #include <Common/Cubemap.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-uint GetCubemapFaceIndex()
+cbuffer IBLEnvironmentPassConstants : register(b2)
 {
-	return g_LocalParam0;
-}
+	uint g_CubemapFaceIndex;
+	uint3 g_IBLEnvironmentPassPadding;
+};
 
 float3 ProceduralSkybox(float3 dir)
 {
@@ -33,6 +34,6 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	float3 dir = CubemapFaceUvToDirection(GetCubemapFaceIndex(), IN.UV);
+	float3 dir = CubemapFaceUvToDirection(g_CubemapFaceIndex, IN.UV);
 	return float4(ProceduralSkybox(dir), 1.0);
 }

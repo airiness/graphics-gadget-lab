@@ -287,6 +287,7 @@
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandList.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingConstantBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
@@ -339,6 +340,7 @@
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\Graphics\Color.h" />

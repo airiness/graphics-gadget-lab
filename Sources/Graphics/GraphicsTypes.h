@@ -20,24 +20,11 @@ namespace gglab
 	enum class CommonRSRootParamIndex : uint32_t
 	{
 		SceneCB = 0,	// b0
-		LocalConstants,	// 8 DWORD pass-local or draw-local root constants, b1
+		DrawConstants,	// DrawParameters root constants, b1
+		PassConstants,	// Pass-specific root constants, b2
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
 		ViewSB,			// g_Views, t3
-
-		Count
-	};
-
-	enum class CommonLocalConstantIndex : uint32_t
-	{
-		Param0 = 0,
-		Param1,
-		Param2,
-		Param3,
-		Param4,
-		Param5,
-		Param6,
-		Param7,
 
 		Count
 	};

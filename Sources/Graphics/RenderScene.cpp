@@ -21,14 +21,9 @@ namespace gglab
 
 		const auto& renderViews = info.m_RenderViews;
 
-		// Reclaim ring buffer
-		const DX12FencePoint completedFence = transferManager.Reclaim();
-		if (completedFence.IsValid())
-		{
-			info.m_ObjectsSB.ReclaimCompleted(completedFence);
-			info.m_MaterialsSB.ReclaimCompleted(completedFence);
-			info.m_ViewsSB.ReclaimCompleted(completedFence);
-		}
+		// Reclaim staging uploads. GPU-local structured-buffer allocations are
+		// reclaimed by Renderer from the graphics fence timeline.
+		transferManager.Reclaim();
 
 		// Assembly RenderInstaces
 		result.m_RenderScene.m_RenderInstances.clear();
@@ -206,12 +201,15 @@ namespace gglab
 
 		result.m_RenderScene.m_ObjectBaseIndex = objectsBufferResult.m_FirstElementIndex;
 		result.m_RenderScene.m_ObjectCount = objectsBufferResult.m_ElementCount;
+		result.m_GpuAllocations.m_Objects = objectsBufferResult.m_TargetAllocation;
 
 		result.m_RenderScene.m_MaterialBaseIndex = materialsBufferResult.m_FirstElementIndex;
 		result.m_RenderScene.m_MaterialCount = materialsBufferResult.m_ElementCount;
+		result.m_GpuAllocations.m_Materials = materialsBufferResult.m_TargetAllocation;
 
 		result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
 		result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
+		result.m_GpuAllocations.m_Views = viewsBufferResult.m_TargetAllocation;
 
 		// MainLight data
 		{

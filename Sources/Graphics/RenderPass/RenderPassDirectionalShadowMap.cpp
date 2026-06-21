@@ -12,6 +12,14 @@ namespace gglab
 {
 	namespace
 	{
+		struct DirectionalShadowPassParameters
+		{
+			uint32_t ViewIndex = 0;
+			uint32_t Padding[3]{};
+		};
+		static_assert(IsPassRootConstantStruct<DirectionalShadowPassParameters>);
+		static_assert(sizeof(DirectionalShadowPassParameters) == 16);
+
 		constexpr uint32_t ShadowDepthBiasBitCount = 20;
 		constexpr uint32_t ShadowDepthBiasShift = RenderQueueBuilder::VariantBitCount;
 
@@ -144,10 +152,12 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
 
-				commandList->SetGraphicsRoot32BitConstant(
-					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-					static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
-					static_cast<uint32_t>(CommonLocalConstantIndex::Param1));
+				const DirectionalShadowPassParameters passParameters{
+					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
+				};
+				commandList->SetGraphicsRoot32BitConstants(
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+					passParameters);
 
 				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
 			});
@@ -260,10 +270,12 @@ namespace gglab
 				lastMeshId = drawItem.m_MeshId;
 			}
 
-			commandList->SetGraphicsRoot32BitConstant(
-				static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-				drawItem.m_ObjectOffset,
-				static_cast<uint32_t>(CommonLocalConstantIndex::Param0));
+			const DrawParameters drawParameters{
+				.ObjectOffset = drawItem.m_ObjectOffset,
+			};
+			commandList->SetGraphicsRoot32BitConstants(
+				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
+				drawParameters);
 
 			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
 		}

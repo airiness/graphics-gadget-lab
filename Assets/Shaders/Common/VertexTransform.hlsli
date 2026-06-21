@@ -3,16 +3,6 @@
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/VertexInput.hlsli>
 
-uint GetObjectIndex()
-{
-	return g_LocalParam0;
-}
-
-uint GetViewIndex()
-{
-	return g_LocalParam1;
-}
-
 uint GetObjectDataIndex(uint objectOffset)
 {
 	return g_Scene.ObjectBaseIndex + objectOffset;
@@ -20,17 +10,12 @@ uint GetObjectDataIndex(uint objectOffset)
 
 uint GetCurrentObjectDataIndex()
 {
-	return GetObjectDataIndex(GetObjectIndex());
+	return GetObjectDataIndex(g_ObjectOffset);
 }
 
 uint GetViewDataIndex(uint viewOffset)
 {
 	return g_Scene.ViewBaseIndex + viewOffset;
-}
-
-uint GetCurrentViewDataIndex()
-{
-	return GetViewDataIndex(GetViewIndex());
 }
 
 ObjectData LoadObjectData(uint objectOffset)
@@ -40,17 +25,12 @@ ObjectData LoadObjectData(uint objectOffset)
 
 ObjectData LoadCurrentObjectData()
 {
-	return LoadObjectData(GetObjectIndex());
+	return LoadObjectData(g_ObjectOffset);
 }
 
 ViewData LoadViewData(uint viewOffset)
 {
 	return g_Views[GetViewDataIndex(viewOffset)];
-}
-
-ViewData LoadCurrentViewData()
-{
-	return LoadViewData(GetViewIndex());
 }
 
 float4 TransformPositionWS(float3 positionOS, ObjectData objData)

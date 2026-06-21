@@ -4,6 +4,8 @@
 #include "Graphics/CopyContext.h"
 #include "Graphics/GPUStructures.h"
 
+#include <limits>
+
 namespace gglab
 {
 	class DX12Device;
@@ -18,6 +20,7 @@ namespace gglab
 		{
 			uint32_t m_FirstElementIndex = 0;
 			uint32_t m_ElementCount = 0;
+			typename DX12RingStructuredBuffer<T>::AllocateResult m_TargetAllocation{};
 			bool IsValid() const noexcept { return m_ElementCount > 0; }
 		};
 
@@ -44,33 +47,41 @@ namespace gglab
 				return result;
 			}
 
+			const auto stride = static_cast<uint32_t>(sizeof(T));
+			GGLAB_ASSERT_MSG(srcData.size() <=
+				std::numeric_limits<uint32_t>::max() / stride,
+				"TransferBatch::StageStructuredBufferWrite byte size overflow.");
+			if (srcData.size() > std::numeric_limits<uint32_t>::max() / stride)
+			{
+				return result;
+			}
+
+			GGLAB_ASSERT_MSG(srcData.size() <= std::numeric_limits<uint32_t>::max(),
+				"TransferBatch::StageStructuredBufferWrite element count overflow.");
+			if (srcData.size() > std::numeric_limits<uint32_t>::max())
+			{
+				return result;
+			}
+
 			auto alloc = dstStructuredBuffer.Allocate(static_cast<uint32_t>(srcData.size()));
 			GGLAB_ASSERT_MSG(alloc.IsValid(),
 				"TransferBatch::StageStructuredBufferWrite: failed to allocate structured buffer space.");
+			if (!alloc.IsValid())
+			{
+				return result;
+			}
 
-			const auto stride = static_cast<uint32_t>(sizeof(T));
 			const auto bytes = static_cast<uint32_t>(srcData.size() * stride);
-			const auto alignment = stride;
-
-			auto span = m_UploadRing.Allocate(bytes, alignment);
-
-			GGLAB_ASSERT_MSG(span.IsValid(),
-				"TransferBatch::StageStructuredBufferWrite: failed to allocate upload ring buffer span.");
-
-			std::memcpy(m_UploadRing.GetMappedDataAtOffset(span.m_Offset),
-				srcData.data(), bytes);
-
-			m_CopyContext.CopyBuffer(dstStructuredBuffer.GetBuffer(), alloc.m_OffsetInBytes,
-				m_UploadRing.GetBuffer(), span.m_Offset, bytes);
-
-			m_UploadSpans.push_back(span);
-			m_PostSubmitCallbacks.emplace_back([alloc, &dstStructuredBuffer](const DX12FencePoint& fencePoint)
-				{
-					dstStructuredBuffer.Retire(alloc, fencePoint);
-				});
+			StageBufferWrite(
+				dstStructuredBuffer.GetBuffer(),
+				alloc.m_OffsetInBytes,
+				srcData.data(),
+				bytes,
+				stride);
 
 			result.m_FirstElementIndex = alloc.m_FirstElementIndex;
 			result.m_ElementCount = alloc.m_ElementCount;
+			result.m_TargetAllocation = alloc;
 
 			return result;
 		}
@@ -83,6 +94,5 @@ namespace gglab
 		DX12RingBuffer& m_UploadRing;
 
 		std::vector<DX12RingBuffer::Span> m_UploadSpans;
-		std::vector<std::function<void(const DX12FencePoint&)>> m_PostSubmitCallbacks;
 	};
 }

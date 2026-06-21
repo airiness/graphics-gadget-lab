@@ -11,6 +11,17 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct IBLEnvironmentPassParameters
+		{
+			uint32_t CubemapFaceIndex = 0;
+			uint32_t Padding[3]{};
+		};
+		static_assert(IsPassRootConstantStruct<IBLEnvironmentPassParameters>);
+		static_assert(sizeof(IBLEnvironmentPassParameters) == 16);
+	}
+
 	void RenderPassIBLEnvironment::AddPass(RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
@@ -109,10 +120,12 @@ namespace gglab
 					commandList->SetRenderTarget(rtv);
 					commandList->ClearRenderTarget(rtv, *texture);
 
-					commandList->SetGraphicsRoot32BitConstant(
-						static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-						face,
-						static_cast<uint32_t>(CommonLocalConstantIndex::Param0));
+					const IBLEnvironmentPassParameters passParameters{
+						.CubemapFaceIndex = face,
+					};
+					commandList->SetGraphicsRoot32BitConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+						passParameters);
 
 					commandList->DrawInstanced(3);
 				}

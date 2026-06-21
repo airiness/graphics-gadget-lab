@@ -12,6 +12,19 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct IBLIrradiancePassParameters
+		{
+			uint32_t CubemapFaceIndex = 0;
+			uint32_t EnvironmentTextureIndex = 0;
+			uint32_t EnvironmentSamplerIndex = 0;
+			uint32_t Padding = 0;
+		};
+		static_assert(IsPassRootConstantStruct<IBLIrradiancePassParameters>);
+		static_assert(sizeof(IBLIrradiancePassParameters) == 16);
+	}
+
 	void RenderPassIBLIrradiance::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -126,14 +139,14 @@ namespace gglab
 					commandList->SetRenderTarget(rtv);
 					commandList->ClearRenderTarget(rtv, *irradianceTexture);
 
-					const uint32_t localConstants[] = {
-						face,
-						data.m_EnvironmentTextureIndex,
-						data.m_EnvironmentSamplerIndex,
+					const IBLIrradiancePassParameters passParameters{
+						.CubemapFaceIndex = face,
+						.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
+						.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 					};
 					commandList->SetGraphicsRoot32BitConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-						localConstants);
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+						passParameters);
 
 					commandList->DrawInstanced(3);
 				}
