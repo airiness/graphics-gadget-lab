@@ -10,6 +10,23 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct MainViewSetupPassData {};
+		struct ShadowSetupPassData {};
+
+		struct PrepareBackBufferPassData
+		{
+			RGTextureId m_BackBuffer{};
+			RGTextureViewId m_Rtv{};
+		};
+
+		struct FinishBackBufferPassData
+		{
+			RGTextureId m_BackBuffer{};
+		};
+	}
+
 	void RenderPipelineForwardPBR::BuildRenderGraph(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -23,9 +40,8 @@ namespace gglab
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
 
 		// MainView Setup
-		struct SetupData {};
-		rg.AddPass<SetupData>("MainView.Setup",
-			[swapChain, &rg, renderer, frameBackBufferIndex](RenderGraph::RGBuilder& builder, SetupData&)
+		rg.AddPass<MainViewSetupPassData>("MainView.Setup",
+			[swapChain, frameBackBufferIndex](RenderGraph::RGBuilder& builder, MainViewSetupPassData&)
 			{
 				//GGLAB_LOG_GRAPHICS_INFO("MainView.Setup(Setup)");
 				builder.SideEffect();
@@ -40,7 +56,6 @@ namespace gglab
 				targets.m_Width = width;
 				targets.m_Height = height;
 
-				targets.m_BackBufferIndex = frameBackBufferIndex;
 				auto* backTexture = swapChain->GetBackBuffer(frameBackBufferIndex);
 				GGLAB_ASSERT(backTexture);
 
@@ -73,23 +88,11 @@ namespace gglab
 
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
 
-				// BackBuffer ResourceIndex
-				const ResourceIndex backBufferResourceIndex = rg.GetResourceIndex(targets.m_BackBuffer);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(backBufferResourceIndex),
-					"BackBuffer must be external ResourceIndex.");
-				targets.m_BackBufferResourceIndex = backBufferResourceIndex;
-
-				// RTVview Key
-				targets.m_BackBufferRTVKey = DX12ViewCache::BuildKey<ViewType::RTV>(
-					backBufferResourceIndex, backTexture);
-
-				rg.GetViewCache()->GetOrCreate(targets.m_BackBufferRTVKey, backTexture);
 			});
 
 		// Shadow Setup
-		struct ShadowSetupData {};
-		rg.AddPass<ShadowSetupData>("ShadowMap.Setup",
-			[renderer, &context](RenderGraph::RGBuilder& builder, ShadowSetupData&)
+		rg.AddPass<ShadowSetupPassData>("ShadowMap.Setup",
+			[renderer, &context](RenderGraph::RGBuilder& builder, ShadowSetupPassData&)
 			{
 				const auto& shadowSettings = context.GetDirectionalShadowSettings();
 				auto& shadowRes = builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
@@ -125,14 +128,8 @@ namespace gglab
 			});
 
 		// SwapChain prepare backbuffer
-		struct PrepareBackBufferData
-		{
-			RGTextureId m_BackBuffer{};
-			ViewKey m_RtvKey{};
-		};
-
-		rg.AddPass<PrepareBackBufferData>("SwapChain.PrepareBackBuffer",
-			[](RenderGraph::RGBuilder& builder, PrepareBackBufferData& data)
+		rg.AddPass<PrepareBackBufferPassData>("SwapChain.PrepareBackBuffer",
+			[](RenderGraph::RGBuilder& builder, PrepareBackBufferPassData& data)
 			{
 				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Setup)");
 				builder.SideEffect();
@@ -142,17 +139,12 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
-				data.m_RtvKey = targets.m_BackBufferRTVKey;
+				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_BackBuffer);
 			},
-			[&rg, swapChain](RGExecuteContext& executeContext, PrepareBackBufferData& data)
+			[swapChain](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{
-				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-				GGLAB_ASSERT(backTexture);
-
 				auto* commandList = executeContext.m_GraphicsCommandList;
-
-				auto* viewCache = rg.GetViewCache();
-				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
+				const auto rtv = executeContext.GetView(data.m_Rtv);
 
 				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());
 
@@ -183,12 +175,8 @@ namespace gglab
 		m_DevelopGuiPass.AddPass(rg, context, services);
 
 		// Finish backbuffer
-		struct FinishBackBufferData
-		{
-			RGTextureId m_BackBuffer{};
-		};
-		rg.AddPass<FinishBackBufferData>("SwapChain.FinishBackBuffer",
-			[](RenderGraph::RGBuilder& builder, FinishBackBufferData& data)
+		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",
+			[](RenderGraph::RGBuilder& builder, FinishBackBufferPassData& data)
 			{
 				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
 				builder.SideEffect();

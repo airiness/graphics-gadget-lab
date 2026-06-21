@@ -30,13 +30,8 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<ForwardPBRPassParameters>);
 		static_assert(sizeof(ForwardPBRPassParameters) == 32);
-	}
 
-	void RenderPassForwardPBR::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
-	{
-		struct ForwardPBRData
+		struct PassData
 		{
 			RGTextureId m_SceneColor{};
 			RGTextureId m_Depth{};
@@ -45,6 +40,10 @@ namespace gglab
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_ShadowMap{};
 
+			RGTextureViewId m_Rtv{};
+			RGTextureViewId m_Dsv{};
+			RGTextureViewId m_ShadowSrv{};
+
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			uint32_t m_ShadowMapSize = 0;
@@ -52,7 +51,12 @@ namespace gglab
 			uint32_t m_ShadowFlags = 0;
 			float m_ShadowReceiverDepthBias = 0.0f;
 		};
+	}
 
+	void RenderPassForwardPBR::AddPass(RenderGraph& rg,
+		const RenderFrameContext& context,
+		const RenderServices& services) noexcept
+	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
@@ -61,8 +65,8 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<ForwardPBRData>("RenderPassForwardPBR",
-			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, ForwardPBRData& data)
+		rg.AddPass<PassData>("RenderPassForwardPBR",
+			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -80,6 +84,20 @@ namespace gglab
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureUsage::Sample);
 
+				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_SceneColor);
+				data.m_Dsv = builder.CreateView<ViewType::DSV>(data.m_Depth);
+
+				D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrvDesc{};
+				shadowSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+				shadowSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				shadowSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				shadowSrvDesc.Texture2D.MostDetailedMip = 0;
+				shadowSrvDesc.Texture2D.MipLevels = 1;
+				shadowSrvDesc.Texture2D.PlaneSlice = 0;
+				shadowSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+				data.m_ShadowSrv =
+					builder.CreateView<ViewType::SRV>(data.m_ShadowMap, shadowSrvDesc);
+
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
@@ -95,47 +113,20 @@ namespace gglab
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
-			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ForwardPBRData& data)
+			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* sceneColorTexture = rg.GetTexture(data.m_SceneColor);
 				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
 
-				auto* depthTexture = rg.GetTexture(data.m_Depth);
-				GGLAB_ASSERT_NOT_NULL(depthTexture);
-
-				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);
-				GGLAB_ASSERT_NOT_NULL(shadowMapTexture);
-
-				auto* viewCache = rg.GetViewCache();
 				auto* commandList = executeContext.m_GraphicsCommandList;
 
-				const ResourceIndex sceneColorIndex = rg.GetResourceIndex(data.m_SceneColor);
-				const auto rtv = viewCache->GetOrCreate<ViewType::RTV>(
-					sceneColorIndex,
-					sceneColorTexture);
-
-				const ResourceIndex depthIndex = rg.GetResourceIndex(data.m_Depth);
-				const ViewKey dsvKey = DX12ViewCache::BuildKey<ViewType::DSV>(
-					depthIndex, depthTexture);
-
-				const auto& dsv = viewCache->GetOrCreate(dsvKey, depthTexture);
+				const auto rtv = executeContext.GetView(data.m_Rtv);
+				const auto dsv = executeContext.GetView(data.m_Dsv);
 				commandList->ClearRenderTarget(rtv, *sceneColorTexture);
 				commandList->ClearDepthStencil(dsv, 1.0f, 0);
 				commandList->SetRenderTarget(rtv, dsv);
 
-				const ResourceIndex shadowMapIndex = rg.GetResourceIndex(data.m_ShadowMap);
-				D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrvDesc{};
-				shadowSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-				shadowSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				shadowSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				shadowSrvDesc.Texture2D.MostDetailedMip = 0;
-				shadowSrvDesc.Texture2D.MipLevels = 1;
-				shadowSrvDesc.Texture2D.PlaneSlice = 0;
-				shadowSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-				const auto shadowSrv = viewCache->GetOrCreate<ViewType::SRV>(
-					shadowMapIndex,
-					shadowMapTexture,
-					shadowSrvDesc);
+				const auto shadowSrv = executeContext.GetView(data.m_ShadowSrv);
 				GGLAB_ASSERT_MSG(shadowSrv.m_Index != std::numeric_limits<uint32_t>::max(),
 					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
 

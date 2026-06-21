@@ -6,6 +6,11 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct PassData {};
+	}
+
 	void RenderPassIBL::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -18,8 +23,7 @@ namespace gglab
 
 		renderResRegistry->EnsureIblResources();
 
-		struct SetupData {};
-		rg.AddPass<SetupData>("RenderPassIBL.SetupResources", [renderResRegistry](RenderGraph::RGBuilder& builder, SetupData&)
+		rg.AddPass<PassData>("RenderPassIBL.SetupResources", [renderResRegistry](RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();
 

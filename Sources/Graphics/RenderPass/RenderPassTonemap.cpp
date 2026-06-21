@@ -22,23 +22,24 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<TonemapPassParameters>);
 		static_assert(sizeof(TonemapPassParameters) == 16);
+
+		struct PassData
+		{
+			RGTextureId m_SceneColor{};
+			RGTextureId m_BackBuffer{};
+			RGTextureViewId m_SceneColorSrv{};
+			RGTextureViewId m_BackBufferRtv{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_SamplerIndex = 0;
+		};
 	}
 
 	void RenderPassTonemap::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		struct TonemapData
-		{
-			RGTextureId m_SceneColor{};
-			RGTextureId m_BackBuffer{};
-			ViewKey m_BackBufferRtvKey{};
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			uint32_t m_SamplerIndex = 0;
-		};
-
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
@@ -47,8 +48,8 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<TonemapData>("RenderPassTonemap",
-			[servicesPtr](RenderGraph::RGBuilder& builder, TonemapData& data)
+		rg.AddPass<PassData>("RenderPassTonemap",
+			[servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -57,7 +58,10 @@ namespace gglab
 
 				data.m_SceneColor = builder.Read(mainTargets.m_SceneColor, RGTextureUsage::Sample);
 				data.m_BackBuffer = builder.Write(mainTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
-				data.m_BackBufferRtvKey = mainTargets.m_BackBufferRTVKey;
+				data.m_SceneColorSrv =
+					builder.CreateView<ViewType::SRV>(data.m_SceneColor);
+				data.m_BackBufferRtv =
+					builder.CreateView<ViewType::RTV>(data.m_BackBuffer);
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 
@@ -65,28 +69,16 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(renderer);
 				data.m_SamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
 			},
-			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, TonemapData& data)
+			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
-				auto* sceneColorTexture = rg.GetTexture(data.m_SceneColor);
-				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
-
-				auto* backBufferTexture = rg.GetTexture(data.m_BackBuffer);
-				GGLAB_ASSERT_NOT_NULL(backBufferTexture);
-
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
-
-				const ResourceIndex sceneColorIndex = rg.GetResourceIndex(data.m_SceneColor);
-				const auto sceneColorSrv = viewCache->GetOrCreate<ViewType::SRV>(
-					sceneColorIndex,
-					sceneColorTexture);
+				const auto sceneColorSrv = executeContext.GetView(data.m_SceneColorSrv);
 				GGLAB_ASSERT_MSG(sceneColorSrv.m_Index != std::numeric_limits<uint32_t>::max(),
 					"Tonemap scene color SRV must expose a descriptor heap index.");
 
-				const auto backBufferRtv = viewCache->GetOrCreate(data.m_BackBufferRtvKey, backBufferTexture);
+				const auto backBufferRtv = executeContext.GetView(data.m_BackBufferRtv);
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);

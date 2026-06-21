@@ -12,13 +12,6 @@ namespace gglab
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
-
-		// TODO: members maybe no need.
-		uint32_t m_BackBufferIndex = 0;
-
-		ResourceIndex m_BackBufferResourceIndex{};
-
-		ViewKey m_BackBufferRTVKey{};
 	};
 
 	struct RGViewTargetsTable

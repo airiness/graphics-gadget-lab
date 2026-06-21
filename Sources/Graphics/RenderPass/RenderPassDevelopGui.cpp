@@ -10,24 +10,27 @@
 
 namespace gglab
 {
-	void RenderPassDevelopGui::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	namespace
 	{
-		GGLAB_UNUSED(context);
-
-		struct DevelopGuiData
+		struct PassData
 		{
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_EnvironmentCubemapPreview{};
 			RGTextureId m_PrefilteredSpecularCubemapPreview{};
 			RGTextureId m_DirectionalShadowMapPreview{};
-			ViewKey m_RtvKey{};
+			RGTextureViewId m_Rtv{};
 		};
+	}
 
-		rg.AddPass<DevelopGuiData>("RenderPassDevelopGui",
-			[](RenderGraph::RGBuilder& builder, DevelopGuiData& data)
+	void RenderPassDevelopGui::AddPass(RenderGraph& rg,
+		const RenderFrameContext& context,
+		const RenderServices& services) noexcept
+	{
+		GGLAB_UNUSED(context);
+
+		rg.AddPass<PassData>("RenderPassDevelopGui",
+			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -36,7 +39,7 @@ namespace gglab
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(viewTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
-				data.m_RtvKey = viewTargets.m_BackBufferRTVKey;
+				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_BackBuffer);
 
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
@@ -54,7 +57,7 @@ namespace gglab
 					shadowRes.m_DirectionalShadowMapPreview,
 					RGTextureUsage::Sample);
 			},
-			[&rg, &services](RGExecuteContext& executeContext, DevelopGuiData& data)
+			[&services](RGExecuteContext& executeContext, PassData& data)
 			{
 				GGLAB_UNUSED(data.m_BrdfLut);
 				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
@@ -62,10 +65,7 @@ namespace gglab
 				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
 
 				auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
-
-				auto* backTexture = rg.GetTexture(data.m_BackBuffer);
-				auto* viewCache = rg.GetViewCache();
-				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, backTexture);
+				const auto rtv = executeContext.GetView(data.m_Rtv);
 				developGuiBackend->RenderDrawData(executeContext.m_GraphicsCommandList, rtv);
 			});
 	}
