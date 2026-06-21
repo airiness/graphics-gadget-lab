@@ -19,7 +19,7 @@ namespace gglab
 			"TransferBatch destroyed without submitting. Call Submit() before destroying the TransferBatch.");
 	}
 
-	void TransferBatch::StageBufferWrite(
+	bool TransferBatch::StageBufferWrite(
 		DX12Buffer* dstBuffer,
 		uint64_t dstOffset,
 		const void* src,
@@ -43,15 +43,56 @@ namespace gglab
 			dstOffset > dstBuffer->SizeInBytes() ||
 			numBytes > dstBuffer->SizeInBytes() - dstOffset)
 		{
-			return;
+			return false;
 		}
 
+		auto uploadSpan = ReserveUpload(numBytes, alignment);
+		if (!uploadSpan.IsValid())
+		{
+			GGLAB_ASSERT_MSG(false,
+				"TransferBatch::StageBufferWrite failed to allocate upload ring buffer space.");
+			return false;
+		}
+
+		CommitBufferWrite(
+			dstBuffer,
+			dstOffset,
+			src,
+			numBytes,
+			uploadSpan);
+		return true;
+	}
+
+	DX12RingBuffer::Span TransferBatch::ReserveUpload(
+		uint32_t numBytes,
+		uint32_t alignment) noexcept
+	{
 		auto uploadSpan = m_UploadRing.Allocate(numBytes, alignment);
 		if (!uploadSpan.IsValid())
 		{
-			GGLAB_UNREACHABLE(
-				"TransferBatch::StageBufferWrite failed to allocate upload ring buffer space.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"TransferBatch failed to reserve {} bytes in the upload ring.",
+				numBytes);
+			return {};
 		}
+
+		// Record the reservation immediately. If a later target allocation fails,
+		// Submit() still retires this unused upload span safely.
+		m_UploadSpans.push_back(uploadSpan);
+		return uploadSpan;
+	}
+
+	void TransferBatch::CommitBufferWrite(
+		DX12Buffer* dstBuffer,
+		uint64_t dstOffset,
+		const void* src,
+		uint32_t numBytes,
+		const DX12RingBuffer::Span& uploadSpan) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(dstBuffer);
+		GGLAB_ASSERT_NOT_NULL(src);
+		GGLAB_ASSERT_MSG(uploadSpan.IsValid(),
+			"TransferBatch::CommitBufferWrite requires a valid upload span.");
 
 		std::memcpy(
 			m_UploadRing.GetMappedDataAtOffset(uploadSpan.m_Offset),
@@ -64,8 +105,6 @@ namespace gglab
 			m_UploadRing.GetBuffer(),
 			uploadSpan.m_Offset,
 			numBytes);
-
-		m_UploadSpans.push_back(uploadSpan);
 	}
 
 	DX12FencePoint TransferBatch::Submit(bool wait) noexcept

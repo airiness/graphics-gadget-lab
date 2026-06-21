@@ -53,6 +53,13 @@ namespace gglab
 				ConstantBufferAlignment);
 			GGLAB_ASSERT_MSG(span.IsValid(),
 				"DX12RingConstantBuffer failed to allocate constant buffer space.");
+			if (!span.IsValid())
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12RingConstantBuffer::Upload failed: not enough free space for {} bytes.",
+					sizeof(T));
+				return 0;
+			}
 
 			m_PendingSpans.push_back(span);
 			return m_RingBuffer.GetGPUVirtualAddressAtOffset(span.m_Offset);
