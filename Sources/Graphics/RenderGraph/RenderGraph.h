@@ -5,8 +5,11 @@
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
+#include "Graphics/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/StringId.h"
+
+#include <variant>
 
 namespace gglab
 {
@@ -24,6 +27,7 @@ namespace gglab
 	struct RGResourceNode;
 
 	GGLAB_DEFINE_TYPED_INDEX(RGPassNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGTextureViewId, uint32_t);
 
 	class RenderGraph;
 
@@ -31,6 +35,13 @@ namespace gglab
 	{
 		DX12CommandList* m_GraphicsCommandList = nullptr;
 		DX12CommandList* m_ComputeCommandList = nullptr;
+
+		DX12DescriptorView GetView(RGTextureViewId viewId) const noexcept;
+
+	private:
+		RenderGraph* m_RenderGraph = nullptr;
+
+		friend class RenderGraph;
 	};
 
 	struct RGVirtualResourceBase
@@ -185,6 +196,14 @@ namespace gglab
 				return Import<RGTextureResource>(name, texture, desc, initialUsage);
 			}
 
+			template<ViewType T>
+			RGTextureViewId CreateView(
+				RGTextureId textureId,
+				std::optional<typename ViewTraits<T>::Desc> desc = std::nullopt) noexcept
+			{
+				return m_RG.CreateTextureView<T>(textureId, desc);
+			}
+
 			RGBufferId ImportBuffer(const char* name,
 				DX12Buffer* buffer,
 				const RGBufferDesc& desc,
@@ -249,6 +268,7 @@ namespace gglab
 
 		DX12Texture* GetTexture(RGTextureId texId) noexcept;
 		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;
+		DX12DescriptorView GetTextureView(RGTextureViewId viewId) noexcept;
 
 		ResourceIndex GetResourceIndex(RGTextureId texId) noexcept;
 		ResourceIndex GetResourceIndex(RGBufferId bufId) noexcept;
@@ -259,6 +279,20 @@ namespace gglab
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
 
 	private:
+		using TextureViewDesc = std::variant<
+			std::monostate,
+			D3D12_RENDER_TARGET_VIEW_DESC,
+			D3D12_DEPTH_STENCIL_VIEW_DESC,
+			D3D12_SHADER_RESOURCE_VIEW_DESC,
+			D3D12_UNORDERED_ACCESS_VIEW_DESC>;
+
+		struct TextureViewRecord
+		{
+			RGTextureId m_Texture{};
+			TextureViewDesc m_Desc{};
+			ViewType m_Type = ViewType::RTV;
+		};
+
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> CreateInternal(const char* name,
 			const typename RESOURCE::Descriptor& desc) noexcept;
@@ -282,6 +316,11 @@ namespace gglab
 
 		template<typename RESOURCE>
 		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
+
+		template<ViewType T>
+		RGTextureViewId CreateTextureView(
+			RGTextureId textureId,
+			std::optional<typename ViewTraits<T>::Desc> desc) noexcept;
 
 		template<typename RESOURCE>
 		void MarkDestroyResourceIndex(ResourceIndex resIndex) noexcept;
@@ -313,6 +352,7 @@ namespace gglab
 		std::vector<RGPassNode> m_PassNodes;
 		std::vector<RGVirtualResourceBase*> m_VirtualResources;
 		std::vector<RGResourceSlot> m_ResourceSlots;
+		std::vector<TextureViewRecord> m_TextureViews;
 
 		std::unordered_map<StringID, RGResourceHandle> m_NameHandleMap;
 
@@ -349,6 +389,51 @@ namespace gglab
 		setupFunc(builder, pass->GetData());
 
 		return pass;
+	}
+
+	template<ViewType T>
+	inline RGTextureViewId RenderGraph::CreateTextureView(
+		RGTextureId textureId,
+		std::optional<typename ViewTraits<T>::Desc> desc) noexcept
+	{
+		GGLAB_ASSERT_MSG(textureId.IsValid(),
+			"RenderGraph::CreateTextureView requires a valid texture id.");
+		if (!textureId.IsValid())
+		{
+			return InvalidRGTextureViewId;
+		}
+
+		const auto* virtualResource = GetVirtualResource(textureId);
+		GGLAB_ASSERT_MSG(
+			virtualResource && virtualResource->m_ResourceType == RGResourceType::RGTexture,
+			"RenderGraph::CreateTextureView requires a texture resource.");
+		if (!virtualResource ||
+			virtualResource->m_ResourceType != RGResourceType::RGTexture)
+		{
+			return InvalidRGTextureViewId;
+		}
+
+		TextureViewRecord view{
+			.m_Texture = textureId,
+			.m_Type = T,
+		};
+		if (desc)
+		{
+			view.m_Desc = *desc;
+		}
+
+		GGLAB_ASSERT_MSG(m_TextureViews.size() < RGTextureViewId::InvalidValue,
+			"RenderGraph texture view id overflow.");
+		if (m_TextureViews.size() >= RGTextureViewId::InvalidValue)
+		{
+			return InvalidRGTextureViewId;
+		}
+
+		const RGTextureViewId viewId{
+			static_cast<RGTextureViewId::ValueType>(m_TextureViews.size())
+		};
+		m_TextureViews.push_back(std::move(view));
+		return viewId;
 	}
 
 	template<typename PassData, typename SetupFunc>

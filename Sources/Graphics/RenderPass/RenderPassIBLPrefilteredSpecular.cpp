@@ -25,6 +25,19 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
 		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 32);
+
+		struct PassData
+		{
+			RGTextureId m_EnvironmentCubemap{};
+			RGTextureId m_PrefilteredSpecularCubemap{};
+			std::vector<RGTextureViewId> m_Rtvs;
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_MipLevels = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
+		};
 	}
 
 	void RenderPassIBLPrefilteredSpecular::AddPass(RenderGraph& rg,
@@ -49,21 +62,8 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		struct BuildPassData
-		{
-			RGTextureId m_EnvironmentCubemap;
-			RGTextureId m_PrefilteredSpecularCubemap;
-			std::vector<ViewKey> m_RtvKeys;
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			uint32_t m_MipLevels = 0;
-			uint32_t m_EnvironmentTextureIndex = 0;
-			uint32_t m_EnvironmentSamplerIndex = 0;
-		};
-
-		rg.AddPass<BuildPassData>("RenderPassIBL.BuildPrefilteredSpecularCubemap",
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
+		rg.AddPass<PassData>("RenderPassIBL.BuildPrefilteredSpecularCubemap",
+			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -82,12 +82,7 @@ namespace gglab
 				const auto rgDesc = ToRGTextureDesc(*prefilteredSpecularTexture,
 					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
-				const auto externalIndex = renderResRegistry->GetExternalIndex(
-					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
-					"IBL Prefiltered Specular Cubemap must be imported as an external RenderGraph resource.");
-
-				data.m_RtvKeys.resize(rgDesc.m_MipLevels * CubemapFaceCount);
+				data.m_Rtvs.resize(rgDesc.m_MipLevels * CubemapFaceCount);
 				for (uint32_t mip = 0; mip < rgDesc.m_MipLevels; ++mip)
 				{
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
@@ -95,10 +90,10 @@ namespace gglab
 						auto rtvDesc = MakeTexture2DArrayRtvDesc(rgDesc.m_Format, mip, face, 1);
 						const auto rtvIndex = mip * CubemapFaceCount + face;
 
-						data.m_RtvKeys[rtvIndex] = DX12ViewCache::BuildKey<ViewType::RTV>(
-							externalIndex,
-							prefilteredSpecularTexture,
-							rtvDesc);
+						data.m_Rtvs[rtvIndex] =
+							builder.CreateView<ViewType::RTV>(
+								data.m_PrefilteredSpecularCubemap,
+								rtvDesc);
 					}
 				}
 
@@ -110,7 +105,7 @@ namespace gglab
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
 			},
-			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, BuildPassData& data)
+			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -120,9 +115,6 @@ namespace gglab
 
 				auto* prefilteredSpecularTexture = rg.GetTexture(data.m_PrefilteredSpecularCubemap);
 				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularTexture);
-
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
 
 				auto* pso = GetOrCreatePSO(*renderer);
 				GGLAB_ASSERT_NOT_NULL(pso);
@@ -153,9 +145,7 @@ namespace gglab
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 					{
 						const auto rtvIndex = mip * CubemapFaceCount + face;
-						const auto rtv = viewCache->GetOrCreate(
-							data.m_RtvKeys[rtvIndex],
-							prefilteredSpecularTexture);
+						const auto rtv = executeContext.GetView(data.m_Rtvs[rtvIndex]);
 						commandList->SetRenderTarget(rtv);
 						commandList->ClearRenderTarget(rtv, *prefilteredSpecularTexture);
 

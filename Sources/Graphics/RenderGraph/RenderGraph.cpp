@@ -9,6 +9,12 @@
 
 namespace gglab
 {
+	DX12DescriptorView RGExecuteContext::GetView(RGTextureViewId viewId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_RenderGraph);
+		return m_RenderGraph ? m_RenderGraph->GetTextureView(viewId) : DX12DescriptorView{};
+	}
+
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
 		m_ViewCache(createInfo.m_ViewCache),
@@ -225,6 +231,9 @@ namespace gglab
 
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
+		auto* previousRenderGraph = executeContext.m_RenderGraph;
+		executeContext.m_RenderGraph = this;
+
 		for (auto& passNode : m_PassNodes)
 		{
 			if (passNode.m_Culled)
@@ -253,6 +262,8 @@ namespace gglab
 				virtualResource->Destroy(*this);
 			}
 		}
+
+		executeContext.m_RenderGraph = previousRenderGraph;
 	}
 
 	void RenderGraph::Retire(const DX12FencePoint& fencePoint) noexcept
@@ -313,6 +324,70 @@ namespace gglab
 			return nullptr;
 		}
 		return m_GpuResourceAllocator->GetBuffer(virtualRes->m_GpuResourceIndex);
+	}
+
+	DX12DescriptorView RenderGraph::GetTextureView(RGTextureViewId viewId) noexcept
+	{
+		GGLAB_ASSERT_MSG(viewId.IsValid() && viewId.Value() < m_TextureViews.size(),
+			"RenderGraph::GetTextureView received an invalid view id.");
+		if (!viewId.IsValid() || viewId.Value() >= m_TextureViews.size())
+		{
+			return {};
+		}
+
+		const auto& view = m_TextureViews[viewId.Value()];
+		auto* texture = GetTexture(view.m_Texture);
+		GGLAB_ASSERT_NOT_NULL(texture);
+		if (!texture)
+		{
+			return {};
+		}
+
+		const auto resourceIndex = GetResourceIndex(view.m_Texture);
+		GGLAB_ASSERT_MSG(resourceIndex.IsValid(),
+			"RenderGraph texture view requires a valid resource index.");
+		if (!resourceIndex.IsValid())
+		{
+			return {};
+		}
+
+		switch (view.m_Type)
+		{
+		case ViewType::RTV:
+		{
+			const auto* desc = std::get_if<D3D12_RENDER_TARGET_VIEW_DESC>(&view.m_Desc);
+			return m_ViewCache->GetOrCreate<ViewType::RTV>(
+				resourceIndex,
+				texture,
+				desc ? std::optional{ *desc } : std::nullopt);
+		}
+		case ViewType::DSV:
+		{
+			const auto* desc = std::get_if<D3D12_DEPTH_STENCIL_VIEW_DESC>(&view.m_Desc);
+			return m_ViewCache->GetOrCreate<ViewType::DSV>(
+				resourceIndex,
+				texture,
+				desc ? std::optional{ *desc } : std::nullopt);
+		}
+		case ViewType::SRV:
+		{
+			const auto* desc = std::get_if<D3D12_SHADER_RESOURCE_VIEW_DESC>(&view.m_Desc);
+			return m_ViewCache->GetOrCreate<ViewType::SRV>(
+				resourceIndex,
+				texture,
+				desc ? std::optional{ *desc } : std::nullopt);
+		}
+		case ViewType::UAV:
+		{
+			const auto* desc = std::get_if<D3D12_UNORDERED_ACCESS_VIEW_DESC>(&view.m_Desc);
+			return m_ViewCache->GetOrCreate<ViewType::UAV>(
+				resourceIndex,
+				texture,
+				desc ? std::optional{ *desc } : std::nullopt);
+		}
+		default:
+			GGLAB_UNREACHABLE("RenderGraph texture view has an unknown view type.");
+		}
 	}
 
 	ResourceIndex RenderGraph::GetResourceIndex(RGTextureId texId) noexcept

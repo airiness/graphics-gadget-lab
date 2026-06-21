@@ -7,6 +7,18 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct PassData
+		{
+			RGTextureId m_BrdfLut{};
+			RGTextureViewId m_Rtv{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+		};
+	}
+
 	void RenderPassIBLBrdfLUT::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -29,17 +41,8 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		struct BuildPassData
-		{
-			RGTextureId m_BrdfLut;
-			ViewKey m_RtvKey;
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-		};
-
-		rg.AddPass<BuildPassData>("RenderPassIBL.BuildBrdfLUT",
-			[renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
+		rg.AddPass<PassData>("RenderPassIBL.BuildBrdfLUT",
+			[renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -53,16 +56,12 @@ namespace gglab
 					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
 				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
-
-				const auto externalIndex = renderResRegistry->GetExternalIndex(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
-					"IBL BRDF LUT must be imported as an external RenderGraph resource.");
-				data.m_RtvKey = DX12ViewCache::BuildKey<ViewType::RTV>(externalIndex, brdfLutTexture);
+				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_BrdfLut);
 
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;
 			},
-			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, BuildPassData& data)
+			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -70,10 +69,7 @@ namespace gglab
 				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
 				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
 
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
-
-				const auto& rtv = viewCache->GetOrCreate(data.m_RtvKey, brdfLutTexture);
+				const auto rtv = executeContext.GetView(data.m_Rtv);
 
 				commandList->ClearRenderTarget(rtv, *brdfLutTexture);
 

@@ -25,6 +25,34 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<IBLCubemapPreviewPassParameters>);
 		static_assert(sizeof(IBLCubemapPreviewPassParameters) == 16);
+
+		struct EnvironmentPreviewPassData
+		{
+			RGTextureId m_EnvironmentCubemap{};
+			RGTextureId m_EnvironmentCubemapPreview{};
+			RGTextureViewId m_Rtv{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_DisplayLayout = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
+			uint32_t m_SampleMip = 0;
+		};
+
+		struct PrefilteredSpecularPreviewPassData
+		{
+			RGTextureId m_PrefilteredSpecularCubemap{};
+			RGTextureId m_PrefilteredSpecularCubemapPreview{};
+			RGTextureViewId m_Rtv{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_DisplayLayout = 0;
+			uint32_t m_PrefilteredSpecularTextureIndex = 0;
+			uint32_t m_PrefilteredSpecularSamplerIndex = 0;
+			uint32_t m_SampleMip = 0;
+		};
 	}
 
 	void RenderPassIBLPreview::AddPass(RenderGraph& rg,
@@ -40,23 +68,9 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		struct PreviewData
-		{
-			RGTextureId m_EnvironmentCubemap{};
-			RGTextureId m_EnvironmentCubemapPreview{};
-			ViewKey m_RtvKey{};
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			uint32_t m_DisplayLayout = 0;
-			uint32_t m_EnvironmentTextureIndex = 0;
-			uint32_t m_EnvironmentSamplerIndex = 0;
-			uint32_t m_SampleMip = 0;
-		};
-
 		auto* contextPtr = &context;
-		rg.AddPass<PreviewData>("RenderPassIBLPreview.EnvironmentCubemap",
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PreviewData& data)
+		rg.AddPass<EnvironmentPreviewPassData>("RenderPassIBLPreview.EnvironmentCubemap",
+			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, EnvironmentPreviewPassData& data)
 			{
 				builder.SideEffect();
 
@@ -83,12 +97,8 @@ namespace gglab
 					previewRes.m_EnvironmentCubemapPreview,
 					RGTextureUsage::RenderTarget);
 
-				const auto externalIndex = renderResRegistry->GetExternalIndex(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
-					"IBL Environment cubemap preview must be imported as an external RenderGraph resource.");
-
-				data.m_RtvKey = DX12ViewCache::BuildKey<ViewType::RTV>(externalIndex, previewTexture);
+				data.m_Rtv =
+					builder.CreateView<ViewType::RTV>(data.m_EnvironmentCubemapPreview);
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLEnvironmentPreviewLayout());
@@ -98,7 +108,7 @@ namespace gglab
 					SamplerPreset::LinearClamp);
 				data.m_SampleMip = 0;
 			},
-			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, PreviewData& data)
+			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, EnvironmentPreviewPassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -109,10 +119,7 @@ namespace gglab
 				auto* previewTexture = rg.GetTexture(data.m_EnvironmentCubemapPreview);
 				GGLAB_ASSERT_NOT_NULL(previewTexture);
 
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
-
-				const auto rtv = viewCache->GetOrCreate(data.m_RtvKey, previewTexture);
+				const auto rtv = executeContext.GetView(data.m_Rtv);
 				commandList->ClearRenderTarget(rtv, *previewTexture);
 
 				auto* pso = GetOrCreateCubemapPreviewPSO(*renderer);
@@ -154,22 +161,8 @@ namespace gglab
 
 			});
 
-		struct PrefilteredSpecularPreviewData
-		{
-			RGTextureId m_PrefilteredSpecularCubemap{};
-			RGTextureId m_PrefilteredSpecularCubemapPreview{};
-			ViewKey m_RtvKey{};
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			uint32_t m_DisplayLayout = 0;
-			uint32_t m_PrefilteredSpecularTextureIndex = 0;
-			uint32_t m_PrefilteredSpecularSamplerIndex = 0;
-			uint32_t m_SampleMip = 0;
-		};
-
-		rg.AddPass<PrefilteredSpecularPreviewData>("RenderPassIBLPreview.PrefilteredSpecularCubemap",
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PrefilteredSpecularPreviewData& data)
+		rg.AddPass<PrefilteredSpecularPreviewPassData>("RenderPassIBLPreview.PrefilteredSpecularCubemap",
+			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PrefilteredSpecularPreviewPassData& data)
 			{
 				builder.SideEffect();
 
@@ -198,12 +191,8 @@ namespace gglab
 					previewRes.m_PrefilteredSpecularCubemapPreview,
 					RGTextureUsage::RenderTarget);
 
-				const auto externalIndex = renderResRegistry->GetExternalIndex(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
-					"IBL Prefiltered Specular cubemap preview must be imported as an external RenderGraph resource.");
-
-				data.m_RtvKey = DX12ViewCache::BuildKey<ViewType::RTV>(externalIndex, previewTexture);
+				data.m_Rtv =
+					builder.CreateView<ViewType::RTV>(data.m_PrefilteredSpecularCubemapPreview);
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout());
@@ -221,7 +210,7 @@ namespace gglab
 					std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(), mipLevels - 1u) :
 					0u;
 			},
-			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, PrefilteredSpecularPreviewData& data)
+			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, PrefilteredSpecularPreviewPassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -232,10 +221,7 @@ namespace gglab
 				auto* previewTexture = rg.GetTexture(data.m_PrefilteredSpecularCubemapPreview);
 				GGLAB_ASSERT_NOT_NULL(previewTexture);
 
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
-
-				const auto rtv = viewCache->GetOrCreate(data.m_RtvKey, previewTexture);
+				const auto rtv = executeContext.GetView(data.m_Rtv);
 				commandList->ClearRenderTarget(rtv, *previewTexture);
 
 				auto* pso = GetOrCreateCubemapPreviewPSO(*renderer);

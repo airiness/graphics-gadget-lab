@@ -20,6 +20,13 @@ namespace gglab
 		static_assert(IsPassRootConstantStruct<DirectionalShadowPassParameters>);
 		static_assert(sizeof(DirectionalShadowPassParameters) == 16);
 
+		struct PassData
+		{
+			RGTextureId m_ShadowMap{};
+			RGTextureViewId m_Dsv{};
+			uint32_t m_ShadowMapSize = 0;
+		};
+
 		constexpr uint32_t ShadowDepthBiasBitCount = 20;
 		constexpr uint32_t ShadowDepthBiasShift = RenderQueueBuilder::VariantBitCount;
 
@@ -71,12 +78,6 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		struct ShadowMapData
-		{
-			RGTextureId m_ShadowMap{};
-			uint32_t m_ShadowMapSize = 0;
-		};
-
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
@@ -85,14 +86,21 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<ShadowMapData>("RenderPassDirectionalShadowMap",
-			[](RenderGraph::RGBuilder& builder, ShadowMapData& data)
+		rg.AddPass<PassData>("RenderPassDirectionalShadowMap",
+			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 				data.m_ShadowMap = builder.Write(shadowRes.m_DirectionalShadowMap, RGTextureUsage::DepthStencil);
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
+
+				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+				dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+				dsvDesc.Texture2D.MipSlice = 0;
+				data.m_Dsv = builder.CreateView<ViewType::DSV>(data.m_ShadowMap, dsvDesc);
 			},
-			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, ShadowMapData& data)
+			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -100,20 +108,7 @@ namespace gglab
 				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);
 				GGLAB_ASSERT_NOT_NULL(shadowMapTexture);
 
-				const ResourceIndex shadowMapIndex = rg.GetResourceIndex(data.m_ShadowMap);
-
-				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-				dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-				dsvDesc.Texture2D.MipSlice = 0;
-
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
-				const auto dsv = viewCache->GetOrCreate<ViewType::DSV>(
-					shadowMapIndex,
-					shadowMapTexture,
-					dsvDesc);
+				const auto dsv = executeContext.GetView(data.m_Dsv);
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);

@@ -23,6 +23,18 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<IBLIrradiancePassParameters>);
 		static_assert(sizeof(IBLIrradiancePassParameters) == 16);
+
+		struct PassData
+		{
+			RGTextureId m_EnvironmentCubemap{};
+			RGTextureId m_IrradianceCubemap{};
+			std::array<RGTextureViewId, CubemapFaceCount> m_Rtvs{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
+		};
 	}
 
 	void RenderPassIBLIrradiance::AddPass(RenderGraph& rg,
@@ -47,20 +59,8 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		struct BuildPassData
-		{
-			RGTextureId m_EnvironmentCubemap;
-			RGTextureId m_IrradianceCubemap;
-			std::array<ViewKey, CubemapFaceCount> m_RtvKeys;
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			uint32_t m_EnvironmentTextureIndex = 0;
-			uint32_t m_EnvironmentSamplerIndex = 0;
-		};
-
-		rg.AddPass<BuildPassData>("RenderPassIBL.BuildIrradianceCubemap",
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, BuildPassData& data)
+		rg.AddPass<PassData>("RenderPassIBL.BuildIrradianceCubemap",
+			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -77,19 +77,11 @@ namespace gglab
 				const auto rgDesc = ToRGTextureDesc(*irradianceTexture,
 					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
-				const auto externalIndex = renderResRegistry->GetExternalIndex(
-					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(externalIndex),
-					"IBL Irradiance Cubemap must be imported as an external RenderGraph resource.");
-
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
 					auto rtvDesc = MakeTexture2DArrayRtvDesc(rgDesc.m_Format, 0, face, 1);
-
-					data.m_RtvKeys[face] = DX12ViewCache::BuildKey<ViewType::RTV>(
-						externalIndex,
-						irradianceTexture,
-						rtvDesc);
+					data.m_Rtvs[face] =
+						builder.CreateView<ViewType::RTV>(data.m_IrradianceCubemap, rtvDesc);
 				}
 
 				data.m_Width = rgDesc.m_Width;
@@ -99,7 +91,7 @@ namespace gglab
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
 			},
-			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, BuildPassData& data)
+			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandList = executeContext.m_GraphicsCommandList;
 				GGLAB_ASSERT_NOT_NULL(commandList);
@@ -109,9 +101,6 @@ namespace gglab
 
 				auto* irradianceTexture = rg.GetTexture(data.m_IrradianceCubemap);
 				GGLAB_ASSERT_NOT_NULL(irradianceTexture);
-
-				auto* viewCache = rg.GetViewCache();
-				GGLAB_ASSERT_NOT_NULL(viewCache);
 
 				auto* pso = GetOrCreatePSO(*renderer);
 				GGLAB_ASSERT_NOT_NULL(pso);
@@ -135,7 +124,7 @@ namespace gglab
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtv = viewCache->GetOrCreate(data.m_RtvKeys[face], irradianceTexture);
+					const auto rtv = executeContext.GetView(data.m_Rtvs[face]);
 					commandList->SetRenderTarget(rtv);
 					commandList->ClearRenderTarget(rtv, *irradianceTexture);
 
