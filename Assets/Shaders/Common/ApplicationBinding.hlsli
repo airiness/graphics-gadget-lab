@@ -1,15 +1,13 @@
 #pragma once
 #include <Common/BufferLayout.hlsli>
 
-cbuffer SceneCB : register(b0)
+struct DrawParameters
 {
-	SceneData g_Scene;
+	uint ObjectOffset;
 };
 
-cbuffer DrawConstants : register(b1)
-{
-	uint g_ObjectOffset;
-};
+ConstantBuffer<SceneData> g_Scene : register(b0);
+ConstantBuffer<DrawParameters> g_Draw : register(b1);
 
 StructuredBuffer<ObjectData> g_Objects : register(t1);
 StructuredBuffer<MaterialData> g_Materials : register(t2);

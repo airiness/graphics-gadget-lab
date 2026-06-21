@@ -4,17 +4,19 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-cbuffer IBLCubemapPreviewPassConstants : register(b2)
+struct IBLCubemapPreviewPassParameters
 {
-	uint g_DisplayLayout;
-	uint g_CubemapTextureIndex;
-	uint g_CubemapSamplerIndex;
-	uint g_SampleMip;
+	uint DisplayLayout;
+	uint CubemapTextureIndex;
+	uint CubemapSamplerIndex;
+	uint SampleMip;
 };
+
+ConstantBuffer<IBLCubemapPreviewPassParameters> g_Pass : register(b2);
 
 TextureSamplerBindingData GetCubemapBinding()
 {
-	return MakeTextureSamplerBinding(uint2(g_CubemapTextureIndex, g_CubemapSamplerIndex));
+	return MakeTextureSamplerBinding(uint2(g_Pass.CubemapTextureIndex, g_Pass.CubemapSamplerIndex));
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
@@ -90,7 +92,7 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 	float2 faceUv = 0.0.xx;
 	bool isValidFace = false;
 
-	if (g_DisplayLayout == IBL_PREVIEW_LAYOUT_CROSS)
+	if (g_Pass.DisplayLayout == IBL_PREVIEW_LAYOUT_CROSS)
 	{
 		isValidFace = TryGetCrossFace(IN.UV, face, faceUv);
 	}
@@ -105,7 +107,7 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 	}
 
 	float3 dir = CubemapFaceUvToDirection(face, faceUv);
-	float3 hdr = SampleTextureCubeLevel(binding, dir, float(g_SampleMip)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+	float3 hdr = SampleTextureCubeLevel(binding, dir, float(g_Pass.SampleMip)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 	float3 color = LinearToSRGB(ACESFitted(hdr));
 	return float4(color, 1.0);
 }

@@ -10,7 +10,7 @@ uint GetObjectDataIndex(uint objectOffset)
 
 uint GetCurrentObjectDataIndex()
 {
-	return GetObjectDataIndex(g_ObjectOffset);
+	return GetObjectDataIndex(g_Draw.ObjectOffset);
 }
 
 uint GetViewDataIndex(uint viewOffset)
@@ -25,7 +25,7 @@ ObjectData LoadObjectData(uint objectOffset)
 
 ObjectData LoadCurrentObjectData()
 {
-	return LoadObjectData(g_ObjectOffset);
+	return LoadObjectData(g_Draw.ObjectOffset);
 }
 
 ViewData LoadViewData(uint viewOffset)

@@ -3,11 +3,13 @@
 #include <Common/MaterialUtils.hlsli>
 #include <Common/VertexTransform.hlsli>
 
-cbuffer DirectionalShadowPassConstants : register(b2)
+struct DirectionalShadowPassParameters
 {
-	uint g_ViewIndex;
-	uint3 g_DirectionalShadowPassPadding;
+	uint ViewIndex;
+	uint3 Padding;
 };
+
+ConstantBuffer<DirectionalShadowPassParameters> g_Pass : register(b2);
 
 struct VSOutput
 {
@@ -22,7 +24,7 @@ VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 	VSOutput OUT;
 
 	const ObjectData objData = LoadCurrentObjectData();
-	const ViewData viewData = LoadViewData(g_ViewIndex);
+	const ViewData viewData = LoadViewData(g_Pass.ViewIndex);
 
 	const float4 posWS = TransformPositionWS(IN.Position, objData);
 	const float4 posVS = TransformPositionVS(posWS, viewData);

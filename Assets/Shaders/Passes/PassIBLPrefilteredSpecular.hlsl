@@ -6,26 +6,28 @@
 #include <Common/ApplicationBinding.hlsli>
 #include <PBR/BRDF.hlsli>
 
-cbuffer IBLPrefilteredSpecularPassConstants : register(b2)
+struct IBLPrefilteredSpecularPassParameters
 {
-	uint g_CubemapFaceIndex;
-	uint g_MipLevel;
-	uint g_MipLevels;
-	uint g_EnvironmentTextureIndex;
-	uint g_EnvironmentSamplerIndex;
-	uint3 g_IBLPrefilteredSpecularPassPadding;
+	uint CubemapFaceIndex;
+	uint MipLevel;
+	uint MipLevels;
+	uint EnvironmentTextureIndex;
+	uint EnvironmentSamplerIndex;
+	uint3 Padding;
 };
+
+ConstantBuffer<IBLPrefilteredSpecularPassParameters> g_Pass : register(b2);
 
 TextureSamplerBindingData GetEnvironmentBinding()
 {
-	return MakeTextureSamplerBinding(uint2(g_EnvironmentTextureIndex, g_EnvironmentSamplerIndex));
+	return MakeTextureSamplerBinding(uint2(g_Pass.EnvironmentTextureIndex, g_Pass.EnvironmentSamplerIndex));
 }
 
 float GetPerceptualRoughness()
 {
-	uint mipLevels = max(g_MipLevels, 1u);
+	uint mipLevels = max(g_Pass.MipLevels, 1u);
 	return mipLevels > 1u
-		? (float) g_MipLevel / (float) (mipLevels - 1u)
+		? (float) g_Pass.MipLevel / (float) (mipLevels - 1u)
 		: 0.0;
 }
 
@@ -68,7 +70,7 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
-	float3 normalWS = CubemapFaceUvToDirection(g_CubemapFaceIndex, IN.UV);
+	float3 normalWS = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
 	float3 color = IntegratePrefilteredSpecular(
 		GetEnvironmentBinding(),
 		normalWS,

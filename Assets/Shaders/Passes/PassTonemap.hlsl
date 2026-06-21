@@ -3,13 +3,15 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-cbuffer TonemapPassConstants : register(b2)
+struct TonemapPassParameters
 {
-	uint g_SceneColorTextureIndex;
-	uint g_SceneColorSamplerIndex;
-	uint g_ViewIndex;
-	uint g_TonemapPassPadding;
+	uint SceneColorTextureIndex;
+	uint SceneColorSamplerIndex;
+	uint ViewIndex;
+	uint Padding;
 };
+
+ConstantBuffer<TonemapPassParameters> g_Pass : register(b2);
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
@@ -18,12 +20,12 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 {
-	const uint viewIndex = g_Scene.ViewBaseIndex + g_ViewIndex;
+	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 
 	const float3 hdrColor = SampleTexture2D(
-		g_SceneColorTextureIndex,
-		g_SceneColorSamplerIndex,
+		g_Pass.SceneColorTextureIndex,
+		g_Pass.SceneColorSamplerIndex,
 		IN.UV).rgb;
 
 	float3 color = ACESFitted(hdrColor * viewData.Exposure);
