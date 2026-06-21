@@ -23,7 +23,7 @@ namespace gglab
 		DX12PipelineState* GetOrCreatePSO(const Renderer& renderer) noexcept;
 
 	private:
-		GraphicsKeyInputs m_BaseInputs{};
+		GraphicsPipelineRecipe m_BaseRecipe{};
 		bool m_IsInitialized = false;
 	};
 }

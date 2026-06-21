@@ -4,7 +4,6 @@
 #include "Graphics/AssetManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 
@@ -27,51 +26,6 @@ namespace gglab
 			uint32_t m_ShadowMapSize = 0;
 		};
 
-		constexpr uint32_t ShadowDepthBiasBitCount = 20;
-		constexpr uint32_t ShadowDepthBiasShift = RenderQueueBuilder::VariantBitCount;
-
-		constexpr uint32_t ShadowSlopeBiasBitCount = 16;
-		constexpr uint32_t ShadowSlopeBiasShift = ShadowDepthBiasShift + ShadowDepthBiasBitCount;
-
-		constexpr float ShadowSlopeBiasQuantizationScale = 256.0f;
-
-		static_assert(ShadowSlopeBiasShift + ShadowSlopeBiasBitCount <= 64);
-
-		constexpr int32_t SignedFieldMin(uint32_t bitCount) noexcept
-		{
-			return -static_cast<int32_t>(uint32_t{ 1 } << (bitCount - 1));
-		}
-
-		constexpr int32_t SignedFieldMax(uint32_t bitCount) noexcept
-		{
-			return static_cast<int32_t>((uint32_t{ 1 } << (bitCount - 1)) - 1);
-		}
-
-		constexpr uint64_t BitMask(uint32_t bitCount) noexcept
-		{
-			return (uint64_t{ 1 } << bitCount) - 1ull;
-		}
-
-		uint64_t PackSignedVariantField(int32_t value, uint32_t bitCount, uint32_t bitShift) noexcept
-		{
-			const int32_t clamped = std::clamp(value, SignedFieldMin(bitCount), SignedFieldMax(bitCount));
-			return (static_cast<uint64_t>(static_cast<uint32_t>(clamped)) & BitMask(bitCount)) << bitShift;
-		}
-
-		uint64_t EncodeShadowRasterizerBiasVariantBits(const DirectionalShadowSettings& settings) noexcept
-		{
-			const int32_t slopeBias = static_cast<int32_t>(
-				std::round(settings.m_RasterizerSlopeScaledDepthBias * ShadowSlopeBiasQuantizationScale));
-
-			return PackSignedVariantField(
-				settings.m_RasterizerDepthBias,
-				ShadowDepthBiasBitCount,
-				ShadowDepthBiasShift) |
-				PackSignedVariantField(
-					slopeBias,
-					ShadowSlopeBiasBitCount,
-					ShadowSlopeBiasShift);
-		}
 	}
 
 	void RenderPassDirectionalShadowMap::AddPass(RenderGraph& rg,
@@ -178,26 +132,24 @@ namespace gglab
 			shaderDesc.m_Entry = L"PSMain";
 			const auto psId = shaderManager->LoadShader(shaderDesc);
 
-			m_BaseInputs.m_RootSignatureId = renderer->GetCommonRootSignatureId();
-			m_BaseInputs.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
-			m_BaseInputs.m_VSId = vsId;
-			m_BaseInputs.m_PSId = psId;
+			m_BaseRecipe.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			m_BaseRecipe.m_VSId = vsId;
+			m_BaseRecipe.m_PSId = psId;
 
-			m_BaseInputs.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_BaseInputs.m_Formats.m_RtvFormats.NumRenderTargets = 0;
-			m_BaseInputs.m_Formats.m_DsvFormat = DXGI_FORMAT_D32_FLOAT;
-			m_BaseInputs.m_Formats.m_SampleCount = 1;
-			m_BaseInputs.m_Formats.m_SampleQuality = 0;
+			m_BaseRecipe.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			m_BaseRecipe.m_Formats.m_RtvFormats.NumRenderTargets = 0;
+			m_BaseRecipe.m_Formats.m_DsvFormat = DXGI_FORMAT_D32_FLOAT;
+			m_BaseRecipe.m_Formats.m_SampleCount = 1;
+			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
 
-			m_BaseInputs.m_RasterizerPreset = RasterizerPreset::Default;
-			m_BaseInputs.m_BlendPreset = BlendPreset::ColorWriteDisable;
-			m_BaseInputs.m_DepthPreset = DepthPreset::Default;
+			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseRecipe.m_BlendPreset = BlendPreset::ColorWriteDisable;
+			m_BaseRecipe.m_DepthPreset = DepthPreset::Default;
 
 			m_IsInitialized = true;
 		}
 
-		m_BaseInputs.m_VSGen = shaderManager->GetGeneration(m_BaseInputs.m_VSId);
-		m_BaseInputs.m_PSGen = shaderManager->GetGeneration(m_BaseInputs.m_PSId);
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRenderQueue(DX12CommandList* commandList,
@@ -287,34 +239,17 @@ namespace gglab
 		auto* psoCache = renderer.GetPSOCache();
 		GGLAB_ASSERT_NOT_NULL(psoCache);
 
-		GraphicsKeyInputs inputs = m_BaseInputs;
-		const uint64_t shadowBiasBits = EncodeShadowRasterizerBiasVariantBits(shadowSettings);
-		const uint64_t psoVariantBits = variantBits | shadowBiasBits;
-		inputs.m_VariantBits = psoVariantBits;
-		inputs.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
+		GraphicsPipelineRecipe recipe = m_BaseRecipe;
+		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
+		recipe.m_DepthBias = shadowSettings.m_RasterizerDepthBias;
+		recipe.m_SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;
 
-		const auto psoPassId = MakeVariantPSOPassId("RenderPassDirectionalShadowMap.variant", psoVariantBits);
+		const auto psoPassId =
+			MakeVariantPSOPassId("RenderPassDirectionalShadowMap.variant", variantBits);
 
 		const auto& cached = passRegistry->GetOrCreateGraphics(
 			psoPassId,
-			inputs,
-			[&renderer, &shadowSettings](GraphicsPipelineDesc& outDesc, const GraphicsKeyInputs& input, ShaderManager* shaderManager)
-			{
-				outDesc.m_RootSignatureId = input.m_RootSignatureId;
-				outDesc.m_RootSignature = renderer.GetRootSignatureCache()->GetDX12RootSignature(input.m_RootSignatureId)->Get();
-				outDesc.m_InputLayoutId = input.m_InputLayoutId;
-				outDesc.m_InputLayoutDesc = InputLayoutLibrary::Get(input.m_InputLayoutId);
-				outDesc.m_VertexShader = shaderManager->GetBytecode(input.m_VSId);
-				outDesc.m_PixelShader = shaderManager->GetBytecode(input.m_PSId);
-				outDesc.m_Topology = input.m_Topology;
-				outDesc.m_SampleMask = input.m_SampleMask;
-				outDesc.m_Formats = input.m_Formats;
-				outDesc.m_RasterizerDesc = ApplyRasterizerPreset(input.m_RasterizerPreset);
-				outDesc.m_RasterizerDesc.DepthBias = shadowSettings.m_RasterizerDepthBias;
-				outDesc.m_RasterizerDesc.SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;
-				outDesc.m_BlendDesc = ApplyBlendPreset(input.m_BlendPreset);
-				outDesc.m_DepthDesc = ApplyDepthPreset(input.m_DepthPreset);
-			});
+			recipe);
 
 		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
 	}
