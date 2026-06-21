@@ -90,6 +90,7 @@ namespace gglab
 		}
 
 		uint32_t GetCapacity() const noexcept { return m_RingBuffer.GetCapacity(); }
+		uint32_t GetCurrentUsage() const noexcept { return m_RingBuffer.GetCurrentUsage(); }
 		uint32_t GetHighWater() const noexcept { return m_RingBuffer.GetHighWater(); }
 
 	private:

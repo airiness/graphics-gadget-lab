@@ -81,12 +81,6 @@ namespace gglab
 		GGLAB_ASSERT(result.m_Offset + sizeInBytes <=
 			result.m_IndexSpan.m_Index + result.m_IndexSpan.m_Count);
 
-		const auto end = result.m_IndexSpan.m_Index + result.m_IndexSpan.m_Count;
-		if (end > m_HighWater)
-		{
-			m_HighWater = end; // Update
-		}
-
 		return result;
 	}
 

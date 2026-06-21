@@ -35,9 +35,13 @@ namespace gglab
 		void RecordRetire(IndexSpan indexSpan, VersionType version) noexcept;
 		void FreeCompletedVersion(VersionType version) noexcept;
 
+		CountType GetCurrentUsage() const noexcept { return m_Capacity - m_FreeCount; }
+		CountType GetHighWater() const noexcept { return m_HighWater; }
+
 	private:
 		OffsetType m_Head = 0;
 		OffsetType m_Tail = 0;
+		CountType m_HighWater = 0;
 
 		std::deque<RetireRecord> m_RetireRecords;
 	};

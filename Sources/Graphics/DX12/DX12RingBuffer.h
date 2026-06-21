@@ -36,7 +36,8 @@ namespace gglab
 		DX12Buffer* GetBuffer() const noexcept { return m_Buffer.get(); }
 		ID3D12Resource* GetResource() const noexcept { return m_Buffer ? m_Buffer->Get() : nullptr; }
 		uint32_t GetCapacity() const noexcept { return m_Capacity; }
-		uint32_t GetHighWater() const noexcept { return m_HighWater; }
+		uint32_t GetCurrentUsage() const noexcept { return m_Allocator ? m_Allocator->GetCurrentUsage() : 0; }
+		uint32_t GetHighWater() const noexcept { return m_Allocator ? m_Allocator->GetHighWater() : 0; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress() const noexcept { return m_GpuVirtualAddress; }
 		D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddressAtOffset(uint32_t offsetInBytes) const noexcept;
 		bool IsCPUAccessible() const noexcept { return m_HeapType == D3D12_HEAP_TYPE_UPLOAD || m_HeapType == D3D12_HEAP_TYPE_READBACK; }
@@ -47,7 +48,6 @@ namespace gglab
 		std::unique_ptr<RingSpanAllocator> m_Allocator;
 		D3D12_GPU_VIRTUAL_ADDRESS m_GpuVirtualAddress = 0;
 		uint32_t m_Capacity = 0;
-		uint32_t m_HighWater = 0;
 		D3D12_HEAP_TYPE m_HeapType = D3D12_HEAP_TYPE_DEFAULT;
 		std::byte* m_MappedData = nullptr;
 	};

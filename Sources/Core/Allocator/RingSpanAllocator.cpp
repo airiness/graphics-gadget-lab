@@ -52,6 +52,8 @@ namespace gglab
 			{
 				m_Tail = static_cast<OffsetType>((reservedIndex + reservedCount) % m_Capacity);
 				m_FreeCount -= reservedCount;
+				m_HighWater = std::max(m_HighWater, GetCurrentUsage());
+				GGLAB_ASSERT(m_HighWater <= m_Capacity);
 				return AlignedAllocation{
 					.m_ReservedSpan = {
 						.m_Index = reservedIndex,
@@ -132,6 +134,7 @@ namespace gglab
 
 			// Free completed
 			m_FreeCount += front.m_IndexSpan.m_Count;
+			GGLAB_ASSERT(m_FreeCount <= m_Capacity);
 			m_RetireRecords.pop_front();
 
 			if (!m_RetireRecords.empty())
