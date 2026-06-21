@@ -170,8 +170,11 @@ namespace gglab
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);
 
-		// Tonemap
-		m_TonemapPass.AddPass(rg, context, services);
+		if (context.IsRenderSceneReady())
+		{
+			// Tonemap requires View StructuredBuffer data.
+			m_TonemapPass.AddPass(rg, context, services);
+		}
 
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);

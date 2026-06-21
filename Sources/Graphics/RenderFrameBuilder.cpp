@@ -17,6 +17,7 @@ namespace gglab
 			.m_BackBufferIndex = m_BackBufferIndex,
 			.m_UploadFencePoint = m_UploadFencePoint,
 			.m_SceneGpuAllocations = &m_SceneGpuAllocations,
+			.m_RenderSceneStatus = m_RenderSceneStatus,
 		};
 	}
 
@@ -68,10 +69,20 @@ namespace gglab
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);
 		result.m_SceneGpuAllocations = sceneBuildResult.m_GpuAllocations;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
+		result.m_RenderSceneStatus = sceneBuildResult.m_Status;
 
 		for (const RenderView& renderView : result.m_RenderViews)
 		{
 			if (renderView.m_ViewId == RenderViewID::Unknown)
+			{
+				continue;
+			}
+
+			auto& renderQueue =
+				result.m_RenderQueues[utils::ToIndex(renderView.m_ViewId)];
+			renderQueue.m_ViewId = renderView.m_ViewId;
+
+			if (result.m_RenderSceneStatus != RenderSceneBuildStatus::Ready)
 			{
 				continue;
 			}
@@ -81,7 +92,7 @@ namespace gglab
 				.m_RenderScene = result.m_RenderScene,
 				.m_RenderView = renderView
 			};
-			result.m_RenderQueues[utils::ToIndex(renderView.m_ViewId)] = m_QueueBuilder.Build(queueBuildInfo);
+			renderQueue = m_QueueBuilder.Build(queueBuildInfo);
 		}
 
 		return result;
