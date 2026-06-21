@@ -31,7 +31,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(TransferBatch);
 		~TransferBatch();
 
-		void StageBufferWrite(DX12Buffer* dstBuffer, uint64_t dstOffset,
+		bool StageBufferWrite(DX12Buffer* dstBuffer, uint64_t dstOffset,
 			const void* src, uint32_t numBytes,
 			uint32_t alignment = GGLAB_GPU_STRUCTURE_ALIGNAS_VALUE) noexcept;
 
@@ -63,6 +63,15 @@ namespace gglab
 				return result;
 			}
 
+			const auto bytes = static_cast<uint32_t>(srcData.size() * stride);
+			auto uploadSpan = ReserveUpload(bytes, stride);
+			GGLAB_ASSERT_MSG(uploadSpan.IsValid(),
+				"TransferBatch::StageStructuredBufferWrite: failed to allocate upload buffer space.");
+			if (!uploadSpan.IsValid())
+			{
+				return result;
+			}
+
 			auto alloc = dstStructuredBuffer.Allocate(static_cast<uint32_t>(srcData.size()));
 			GGLAB_ASSERT_MSG(alloc.IsValid(),
 				"TransferBatch::StageStructuredBufferWrite: failed to allocate structured buffer space.");
@@ -71,13 +80,12 @@ namespace gglab
 				return result;
 			}
 
-			const auto bytes = static_cast<uint32_t>(srcData.size() * stride);
-			StageBufferWrite(
+			CommitBufferWrite(
 				dstStructuredBuffer.GetBuffer(),
 				alloc.m_OffsetInBytes,
 				srcData.data(),
 				bytes,
-				stride);
+				uploadSpan);
 
 			result.m_FirstElementIndex = alloc.m_FirstElementIndex;
 			result.m_ElementCount = alloc.m_ElementCount;
@@ -87,6 +95,17 @@ namespace gglab
 		}
 
 		DX12FencePoint Submit(bool wait = false) noexcept;
+
+	private:
+		DX12RingBuffer::Span ReserveUpload(
+			uint32_t numBytes,
+			uint32_t alignment) noexcept;
+		void CommitBufferWrite(
+			DX12Buffer* dstBuffer,
+			uint64_t dstOffset,
+			const void* src,
+			uint32_t numBytes,
+			const DX12RingBuffer::Span& uploadSpan) noexcept;
 
 	private:
 		TransferManager& m_TransferManager;
