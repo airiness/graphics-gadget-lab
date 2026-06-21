@@ -11,6 +11,19 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct TonemapPassParameters
+		{
+			uint32_t SceneColorTextureIndex = 0;
+			uint32_t SceneColorSamplerIndex = 0;
+			uint32_t ViewIndex = 0;
+			uint32_t Padding = 0;
+		};
+		static_assert(IsPassRootConstantStruct<TonemapPassParameters>);
+		static_assert(sizeof(TonemapPassParameters) == 16);
+	}
+
 	void RenderPassTonemap::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -102,15 +115,14 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBuffer()->GPUVirtualAddress());
 
-				const uint32_t localConstants[] = {
-					sceneColorSrv.m_Index,
-					data.m_SamplerIndex,
-					static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
-					0u,
+				const TonemapPassParameters passParameters{
+					.SceneColorTextureIndex = sceneColorSrv.m_Index,
+					.SceneColorSamplerIndex = data.m_SamplerIndex,
+					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 				};
 				commandList->SetGraphicsRoot32BitConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-					localConstants);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+					passParameters);
 
 				commandList->DrawInstanced(3);
 			});

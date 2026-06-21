@@ -5,6 +5,18 @@ namespace gglab
 {
 	class RingSpanAllocator : public AllocatorBase
 	{
+	public:
+		struct AlignedAllocation
+		{
+			IndexSpan m_ReservedSpan{};
+			OffsetType m_AlignedIndex = InvalidOffset;
+
+			bool IsValid() const noexcept
+			{
+				return m_ReservedSpan.IsValid() && m_AlignedIndex != InvalidOffset;
+			}
+		};
+
 	private:
 		using VersionType = uint64_t;
 		struct RetireRecord
@@ -19,6 +31,7 @@ namespace gglab
 		~RingSpanAllocator() override = default;
 
 		IndexSpan Allocate(CountType count) noexcept override;
+		AlignedAllocation AllocateAligned(CountType count, CountType alignment) noexcept;
 		void RecordRetire(IndexSpan indexSpan, VersionType version) noexcept;
 		void FreeCompletedVersion(VersionType version) noexcept;
 

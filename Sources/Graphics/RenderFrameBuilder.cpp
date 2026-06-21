@@ -15,7 +15,8 @@ namespace gglab
 			.m_DirectionalShadowSettings = m_WorldData.GetMainDirectionalShadowSettings(),
 			.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
 			.m_BackBufferIndex = m_BackBufferIndex,
-			.m_UploadFencePoint = m_UploadFencePoint
+			.m_UploadFencePoint = m_UploadFencePoint,
+			.m_SceneGpuAllocations = &m_SceneGpuAllocations,
 		};
 	}
 
@@ -65,6 +66,7 @@ namespace gglab
 		};
 		auto sceneBuildResult = m_SceneBuilder.Build(sceneBuildInfo);
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);
+		result.m_SceneGpuAllocations = sceneBuildResult.m_GpuAllocations;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
 
 		for (const RenderView& renderView : result.m_RenderViews)

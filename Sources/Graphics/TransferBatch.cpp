@@ -15,8 +15,57 @@ namespace gglab
 
 	TransferBatch::~TransferBatch()
 	{
-		GGLAB_ASSERT_MSG(m_UploadSpans.empty() && m_PostSubmitCallbacks.empty(),
+		GGLAB_ASSERT_MSG(m_UploadSpans.empty(),
 			"TransferBatch destroyed without submitting. Call Submit() before destroying the TransferBatch.");
+	}
+
+	void TransferBatch::StageBufferWrite(
+		DX12Buffer* dstBuffer,
+		uint64_t dstOffset,
+		const void* src,
+		uint32_t numBytes,
+		uint32_t alignment) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(dstBuffer);
+		GGLAB_ASSERT_NOT_NULL(src);
+		GGLAB_ASSERT_MSG(numBytes > 0,
+			"TransferBatch::StageBufferWrite requires at least one byte.");
+		GGLAB_ASSERT_MSG(dstBuffer->IsValid(),
+			"TransferBatch::StageBufferWrite destination buffer is invalid.");
+		GGLAB_ASSERT_MSG(dstOffset <= dstBuffer->SizeInBytes() &&
+			numBytes <= dstBuffer->SizeInBytes() - dstOffset,
+			"TransferBatch::StageBufferWrite exceeds the destination buffer range.");
+
+		if (!dstBuffer ||
+			!src ||
+			numBytes == 0 ||
+			!dstBuffer->IsValid() ||
+			dstOffset > dstBuffer->SizeInBytes() ||
+			numBytes > dstBuffer->SizeInBytes() - dstOffset)
+		{
+			return;
+		}
+
+		auto uploadSpan = m_UploadRing.Allocate(numBytes, alignment);
+		if (!uploadSpan.IsValid())
+		{
+			GGLAB_UNREACHABLE(
+				"TransferBatch::StageBufferWrite failed to allocate upload ring buffer space.");
+		}
+
+		std::memcpy(
+			m_UploadRing.GetMappedDataAtOffset(uploadSpan.m_Offset),
+			src,
+			numBytes);
+
+		m_CopyContext.CopyBuffer(
+			dstBuffer,
+			dstOffset,
+			m_UploadRing.GetBuffer(),
+			uploadSpan.m_Offset,
+			numBytes);
+
+		m_UploadSpans.push_back(uploadSpan);
 	}
 
 	DX12FencePoint TransferBatch::Submit(bool wait) noexcept
@@ -29,13 +78,6 @@ namespace gglab
 		}
 
 		m_UploadSpans.clear();
-
-		for (auto& callback : m_PostSubmitCallbacks)
-		{
-			callback(fencePoint);
-		}
-
-		m_PostSubmitCallbacks.clear();
 
 		return fencePoint;
 	}

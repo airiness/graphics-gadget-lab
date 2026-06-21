@@ -11,6 +11,7 @@ namespace gglab
 {
 	struct RenderView;
 	struct RenderScene;
+	struct RenderSceneGpuAllocations;
 	struct RenderQueue;
 	class Renderer;
 	class AssetManager;
@@ -28,6 +29,7 @@ namespace gglab
 		uint32_t m_BackBufferIndex = 0;
 
 		DX12FencePoint m_UploadFencePoint{};	// TODO: multi fence points support
+		RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
 
 		const RenderQueue& GetRenderQueue(RenderViewID viewId) const noexcept
 		{

@@ -12,6 +12,21 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct IBLPrefilteredSpecularPassParameters
+		{
+			uint32_t CubemapFaceIndex = 0;
+			uint32_t MipLevel = 0;
+			uint32_t MipLevels = 0;
+			uint32_t EnvironmentTextureIndex = 0;
+			uint32_t EnvironmentSamplerIndex = 0;
+			uint32_t Padding[3]{};
+		};
+		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
+		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 32);
+	}
+
 	void RenderPassIBLPrefilteredSpecular::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -144,16 +159,16 @@ namespace gglab
 						commandList->SetRenderTarget(rtv);
 						commandList->ClearRenderTarget(rtv, *prefilteredSpecularTexture);
 
-						const uint32_t localConstants[] = {
-							face,
-							mip,
-							data.m_MipLevels,
-							data.m_EnvironmentTextureIndex,
-							data.m_EnvironmentSamplerIndex,
+						const IBLPrefilteredSpecularPassParameters passParameters{
+							.CubemapFaceIndex = face,
+							.MipLevel = mip,
+							.MipLevels = data.m_MipLevels,
+							.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
+							.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 						};
 						commandList->SetGraphicsRoot32BitConstants(
-							static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-							localConstants);
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+							passParameters);
 
 						commandList->DrawInstanced(3);
 					}

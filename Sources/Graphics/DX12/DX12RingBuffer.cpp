@@ -49,26 +49,39 @@ namespace gglab
 			return result;
 		}
 
-		const uint32_t alignedSize = utils::AlignUp(sizeInBytes, alignment);
-		if (alignedSize > m_Capacity)
+		if (alignment == 0)
 		{
-			// Requested size exceeds total capacity
-			GGLAB_LOG_GRAPHICS_WARN("DX12RingBuffer::Allocate failed: requested size {} exceeds total capacity {}.", alignedSize, m_Capacity);
+			alignment = 1;
+		}
+
+		if (sizeInBytes > m_Capacity)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12RingBuffer::Allocate failed: requested size {} with alignment {} exceeds total capacity {}.",
+				sizeInBytes,
+				alignment,
+				m_Capacity);
 			return result;
 		}
 
-		auto indexSpan = m_Allocator->Allocate(alignedSize);
-		if (!indexSpan.IsValid())
+		auto allocation = m_Allocator->AllocateAligned(sizeInBytes, alignment);
+		if (!allocation.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12RingBuffer::Allocate failed: not enough free space for size {}.", alignedSize);
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12RingBuffer::Allocate failed: not enough contiguous space for size {} with alignment {}.",
+				sizeInBytes,
+				alignment);
 			return result;
 		}
 
-		result.m_IndexSpan = indexSpan;
-		result.m_Offset = indexSpan.m_Index;
+		result.m_IndexSpan = allocation.m_ReservedSpan;
+		result.m_Offset = allocation.m_AlignedIndex;
 		result.m_Size = sizeInBytes;
+		GGLAB_ASSERT(result.m_Offset % alignment == 0);
+		GGLAB_ASSERT(result.m_Offset + sizeInBytes <=
+			result.m_IndexSpan.m_Index + result.m_IndexSpan.m_Count);
 
-		const auto end = indexSpan.m_Index + indexSpan.m_Count;
+		const auto end = result.m_IndexSpan.m_Index + result.m_IndexSpan.m_Count;
 		if (end > m_HighWater)
 		{
 			m_HighWater = end; // Update

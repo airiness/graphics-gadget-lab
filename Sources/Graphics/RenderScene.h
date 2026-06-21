@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
+#include "Graphics/DX12/DX12RingStructuredBuffer.h"
 
 namespace gglab
 {
@@ -11,9 +12,6 @@ namespace gglab
 
 	template<typename T>
 	class DX12ConstantBuffer;
-
-	template<typename T>
-	class DX12RingStructuredBuffer;
 
 	struct RenderInstance
 	{
@@ -41,6 +39,20 @@ namespace gglab
 		std::vector<RenderInstance> m_RenderInstances;
 	};
 
+	struct RenderSceneGpuAllocations
+	{
+		DX12RingStructuredBuffer<ObjectGPU>::AllocateResult m_Objects{};
+		DX12RingStructuredBuffer<MaterialGPU>::AllocateResult m_Materials{};
+		DX12RingStructuredBuffer<ViewGPU>::AllocateResult m_Views{};
+
+		bool IsEmpty() const noexcept
+		{
+			return !m_Objects.IsValid() &&
+				!m_Materials.IsValid() &&
+				!m_Views.IsValid();
+		}
+	};
+
 	class RenderSceneBuilder
 	{
 	public:
@@ -63,6 +75,7 @@ namespace gglab
 		struct BuildResult
 		{
 			RenderScene m_RenderScene{};
+			RenderSceneGpuAllocations m_GpuAllocations{};
 			DX12FencePoint m_UploadFencePoint{};
 		};
 

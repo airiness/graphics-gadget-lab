@@ -10,6 +10,21 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct ShadowMapPreviewPassParameters
+		{
+			uint32_t ShadowMapTextureIndex = 0;
+			uint32_t ShadowMapSamplerIndex = 0;
+			float PreviewMinDepth = 0.0f;
+			float PreviewMaxDepth = 1.0f;
+			uint32_t PreviewInvert = 0;
+			uint32_t Padding[3]{};
+		};
+		static_assert(IsPassRootConstantStruct<ShadowMapPreviewPassParameters>);
+		static_assert(sizeof(ShadowMapPreviewPassParameters) == 32);
+	}
+
 	void RenderPassShadowMapPreview::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -115,18 +130,16 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
 
-				const uint32_t minDepthBits = std::bit_cast<uint32_t>(data.m_MinDepth);
-				const uint32_t maxDepthBits = std::bit_cast<uint32_t>(data.m_MaxDepth);
-				const uint32_t localConstants[] = {
-					shadowMapSrv.m_Index,
-					data.m_SamplerIndex,
-					minDepthBits,
-					maxDepthBits,
-					data.m_Invert,
+				const ShadowMapPreviewPassParameters passParameters{
+					.ShadowMapTextureIndex = shadowMapSrv.m_Index,
+					.ShadowMapSamplerIndex = data.m_SamplerIndex,
+					.PreviewMinDepth = data.m_MinDepth,
+					.PreviewMaxDepth = data.m_MaxDepth,
+					.PreviewInvert = data.m_Invert,
 				};
 				commandList->SetGraphicsRoot32BitConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-					localConstants);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+					passParameters);
 
 				commandList->DrawInstanced(3);
 			});

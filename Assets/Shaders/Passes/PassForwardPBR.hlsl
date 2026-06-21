@@ -5,39 +5,26 @@
 #include <Lighting/ShadowSampling.hlsli>
 #include <PBR/BRDF.hlsli>
 
-uint GetShadowMapTextureIndex()
+cbuffer ForwardPBRPassConstants : register(b2)
 {
-	return g_LocalParam2;
-}
-
-uint GetShadowMapSamplerIndex()
-{
-	return g_LocalParam3;
-}
-
-uint GetShadowMapSize()
-{
-	return g_LocalParam4;
-}
+	uint g_ViewIndex;
+	uint g_ShadowMapTextureIndex;
+	uint g_ShadowMapSamplerIndex;
+	uint g_ShadowMapSize;
+	uint g_ShadowFlags;
+	float g_ShadowReceiverDepthBias;
+	uint g_ShadowViewIndex;
+	uint g_ForwardPBRPassPadding;
+};
 
 bool IsShadowEnabled()
 {
-	return (g_LocalParam5 & 1u) != 0u;
+	return (g_ShadowFlags & 1u) != 0u;
 }
 
 bool IsShadowPCFEnabled()
 {
-	return (g_LocalParam5 & 2u) != 0u;
-}
-
-float GetShadowDepthBias()
-{
-	return asfloat(g_LocalParam6);
-}
-
-uint GetShadowViewIndex()
-{
-	return g_LocalParam7;
+	return (g_ShadowFlags & 2u) != 0u;
 }
 
 struct VSOutput
@@ -110,23 +97,23 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 		return 1.0;
 	}
 
-	const ShadowProjection shadowProjection = ProjectToShadowMap(positionWS, GetShadowViewIndex());
+	const ShadowProjection shadowProjection = ProjectToShadowMap(positionWS, g_ShadowViewIndex);
 	if (!shadowProjection.IsValid)
 	{
 		return 1.0;
 	}
 
-	Texture2D<float> shadowMap = GetTexture2DFloat(GetShadowMapTextureIndex());
-	SamplerComparisonState shadowSampler = GetSamplerComparisonState(GetShadowMapSamplerIndex());
+	Texture2D<float> shadowMap = GetTexture2DFloat(g_ShadowMapTextureIndex);
+	SamplerComparisonState shadowSampler = GetSamplerComparisonState(g_ShadowMapSamplerIndex);
 
-	const float compareDepth = saturate(shadowProjection.ReceiverDepth - GetShadowDepthBias());
+	const float compareDepth = saturate(shadowProjection.ReceiverDepth - g_ShadowReceiverDepthBias);
 
 	if (!IsShadowPCFEnabled())
 	{
 		return SampleShadowHard(shadowMap, shadowSampler, shadowProjection.UV, compareDepth);
 	}
 
-	const float shadowMapSize = max((float) GetShadowMapSize(), 1.0);
+	const float shadowMapSize = max((float) g_ShadowMapSize, 1.0);
 	const float2 shadowTexelSize = 1.0.xx / shadowMapSize;
 	return SampleShadowPCF3x3(shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
 }
@@ -136,7 +123,7 @@ VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 	VSOutput OUT;
 
 	const ObjectData objData = LoadCurrentObjectData();
-	const ViewData viewData = LoadCurrentViewData();
+	const ViewData viewData = LoadViewData(g_ViewIndex);
 
 	const float4 posWS = TransformPositionWS(IN.Position, objData);
 	const float4 posVS = TransformPositionVS(posWS, viewData);
@@ -154,7 +141,7 @@ VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 	// output material index
 	const uint materialIndex = g_Scene.MaterialBaseIndex + objData.MaterialIndex;
 	OUT.MaterialIndex = materialIndex;
-	OUT.ViewIndex = GetCurrentViewDataIndex();
+	OUT.ViewIndex = GetViewDataIndex(g_ViewIndex);
 
 	return OUT;
 }

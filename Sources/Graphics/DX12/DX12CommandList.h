@@ -2,6 +2,10 @@
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorTypes.h"
 
+#include <array>
+#include <cstring>
+#include <type_traits>
+
 namespace gglab
 {
 	struct DX12DescriptorView;
@@ -50,6 +54,20 @@ namespace gglab
 		void SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorView& descriptor) const noexcept;
 		void SetGraphicsRoot32BitConstant(uint32_t parameterIndex, uint32_t value, uint32_t destOffset = 0) const noexcept;
 		void SetGraphicsRoot32BitConstants(uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset = 0) const noexcept;
+		template<typename T>
+		void SetGraphicsRoot32BitConstants(uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) const noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T>);
+			static_assert(std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+
+			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> data{};
+			std::memcpy(data.data(), &values, sizeof(T));
+			SetGraphicsRoot32BitConstants(
+				parameterIndex,
+				std::span<const uint32_t>(data),
+				destOffset);
+		}
 		void AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept;
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;

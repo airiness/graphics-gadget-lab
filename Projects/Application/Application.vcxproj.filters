@@ -509,6 +509,9 @@
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Log\Logger.h">
       <Filter>Core\Log</Filter>
     </ClInclude>
@@ -546,6 +549,9 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.h">
+      <Filter>Graphics\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingConstantBuffer.h">
       <Filter>Graphics\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h">

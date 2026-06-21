@@ -14,6 +14,19 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct IBLCubemapPreviewPassParameters
+		{
+			uint32_t DisplayLayout = 0;
+			uint32_t CubemapTextureIndex = 0;
+			uint32_t CubemapSamplerIndex = 0;
+			uint32_t SampleMip = 0;
+		};
+		static_assert(IsPassRootConstantStruct<IBLCubemapPreviewPassParameters>);
+		static_assert(sizeof(IBLCubemapPreviewPassParameters) == 16);
+	}
+
 	void RenderPassIBLPreview::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
@@ -127,15 +140,15 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
 
-				const uint32_t localConstants[] = {
-					data.m_DisplayLayout,
-					data.m_EnvironmentTextureIndex,
-					data.m_EnvironmentSamplerIndex,
-					data.m_SampleMip,
+				const IBLCubemapPreviewPassParameters passParameters{
+					.DisplayLayout = data.m_DisplayLayout,
+					.CubemapTextureIndex = data.m_EnvironmentTextureIndex,
+					.CubemapSamplerIndex = data.m_EnvironmentSamplerIndex,
+					.SampleMip = data.m_SampleMip,
 				};
 				commandList->SetGraphicsRoot32BitConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-					localConstants);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+					passParameters);
 
 				commandList->DrawInstanced(3);
 
@@ -250,15 +263,15 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
 
-				const uint32_t localConstants[] = {
-					data.m_DisplayLayout,
-					data.m_PrefilteredSpecularTextureIndex,
-					data.m_PrefilteredSpecularSamplerIndex,
-					data.m_SampleMip,
+				const IBLCubemapPreviewPassParameters passParameters{
+					.DisplayLayout = data.m_DisplayLayout,
+					.CubemapTextureIndex = data.m_PrefilteredSpecularTextureIndex,
+					.CubemapSamplerIndex = data.m_PrefilteredSpecularSamplerIndex,
+					.SampleMip = data.m_SampleMip,
 				};
 				commandList->SetGraphicsRoot32BitConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::LocalConstants),
-					localConstants);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+					passParameters);
 
 				commandList->DrawInstanced(3);
 			});

@@ -10,57 +10,103 @@ namespace gglab
 
 	RingSpanAllocator::IndexSpan RingSpanAllocator::Allocate(CountType count) noexcept
 	{
+		return AllocateAligned(count, 1).m_ReservedSpan;
+	}
+
+	RingSpanAllocator::AlignedAllocation RingSpanAllocator::AllocateAligned(
+		CountType count,
+		CountType alignment) noexcept
+	{
 		if (count == 0)
 		{
-			GGLAB_LOG_WARN("RingSpanAllocator: Allocate failed. count is 0, nothing allocated.");
+			GGLAB_LOG_WARN("RingSpanAllocator: AllocateAligned failed. count is 0, nothing allocated.");
 			return {};
 		}
 
+		alignment = std::max(alignment, CountType{ 1 });
 		if (count > m_FreeCount)
 		{
-			GGLAB_LOG_WARN("RingSpanAllocator: Allocate failed. request={}, free={}",
+			GGLAB_LOG_WARN("RingSpanAllocator: AllocateAligned failed. request={}, free={}",
 				count, m_FreeCount);
 			return {};
 		}
 
-		OffsetType index = 0;
+		// Empty rings have no live position to preserve. Normalizing to zero
+		// avoids consuming the suffix merely to satisfy a large alignment.
+		if (m_FreeCount == m_Capacity)
+		{
+			m_Head = 0;
+			m_Tail = 0;
+		}
+
+		const auto alignUp = [alignment](OffsetType value) noexcept
+			{
+				const auto remainder = value % alignment;
+				return remainder ? value + alignment - remainder : value;
+			};
+
+		const auto reserve = [this](
+			OffsetType reservedIndex,
+			CountType reservedCount,
+			OffsetType alignedIndex) noexcept
+			{
+				m_Tail = static_cast<OffsetType>((reservedIndex + reservedCount) % m_Capacity);
+				m_FreeCount -= reservedCount;
+				return AlignedAllocation{
+					.m_ReservedSpan = {
+						.m_Index = reservedIndex,
+						.m_Count = reservedCount,
+					},
+					.m_AlignedIndex = alignedIndex,
+				};
+			};
+
 		if (m_Tail >= m_Head)
 		{
 			const OffsetType right = m_Capacity - m_Tail;
 
-			// try to allocate at [tail, capacity)
-			const OffsetType guard = (m_Head == 0 ? 1u : 0u);
-			if (count <= right - guard)
+			// Try to allocate at [tail, capacity).
+			const OffsetType alignedIndex = alignUp(m_Tail);
+			if (alignedIndex < m_Capacity)
 			{
-				index = m_Tail;
-				m_Tail = static_cast<OffsetType>((m_Tail + count) % m_Capacity);
-				m_FreeCount -= count;
-				return IndexSpan{ .m_Index = index, .m_Count = count };
+				const CountType padding = alignedIndex - m_Tail;
+				const CountType reservedCount = padding + count;
+				if (reservedCount <= right && reservedCount <= m_FreeCount)
+				{
+					return reserve(m_Tail, reservedCount, alignedIndex);
+				}
 			}
 
-			// try ao allocate at [0, head)
-			if (m_Head > 1 && count <= (m_Head - 1))
+			// Wrap to zero. The unused suffix must belong to this reservation;
+			// otherwise tail can become equal to head while the ring is only
+			// partially occupied, making the next allocation overlap live data.
+			const CountType wrappedReservedCount = right + count;
+			if (m_Head > 0 &&
+				count <= m_Head &&
+				wrappedReservedCount <= m_FreeCount)
 			{
-				index = 0;
-				m_Tail = static_cast<OffsetType>(count % m_Capacity);
-				m_FreeCount -= count;
-				return IndexSpan{ .m_Index = index, .m_Count = count };
+				return reserve(m_Tail, wrappedReservedCount, 0);
 			}
 		}
 
-		// tail is on left of head, free range is (tail, head)
-		const auto available = static_cast<CountType>(m_Head - m_Tail - 1);
-		if (count <= available)
+		// Tail is on the left of head; free range is [tail, head).
+		if (m_Tail < m_Head)
 		{
-			index = m_Tail;
-			m_Tail = static_cast<OffsetType>((m_Tail + count) % m_Capacity);
-			m_FreeCount -= count;
-			return IndexSpan{ .m_Index = index, .m_Count = count };
+			const OffsetType alignedIndex = alignUp(m_Tail);
+			const CountType padding = alignedIndex - m_Tail;
+			const CountType reservedCount = padding + count;
+			const CountType available = m_Head - m_Tail;
+			if (reservedCount <= available && reservedCount <= m_FreeCount)
+			{
+				return reserve(m_Tail, reservedCount, alignedIndex);
+			}
 		}
 
 		GGLAB_LOG_WARN(
-			"RingSpanAllocator::Allocate failed: no contiguous space. request = {}, free = {}.",
-			count, m_FreeCount);
+			"RingSpanAllocator::AllocateAligned failed: no contiguous space. request={}, alignment={}, free={}.",
+			count,
+			alignment,
+			m_FreeCount);
 		return {};
 	}
 

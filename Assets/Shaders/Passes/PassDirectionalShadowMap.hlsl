@@ -3,6 +3,12 @@
 #include <Common/MaterialUtils.hlsli>
 #include <Common/VertexTransform.hlsli>
 
+cbuffer DirectionalShadowPassConstants : register(b2)
+{
+	uint g_ViewIndex;
+	uint3 g_DirectionalShadowPassPadding;
+};
+
 struct VSOutput
 {
 	float4 PositionCS : SV_POSITION;
@@ -16,7 +22,7 @@ VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 	VSOutput OUT;
 
 	const ObjectData objData = LoadCurrentObjectData();
-	const ViewData viewData = LoadCurrentViewData();
+	const ViewData viewData = LoadViewData(g_ViewIndex);
 
 	const float4 posWS = TransformPositionWS(IN.Position, objData);
 	const float4 posVS = TransformPositionVS(posWS, viewData);

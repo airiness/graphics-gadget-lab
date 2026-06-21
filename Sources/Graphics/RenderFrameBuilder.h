@@ -32,6 +32,7 @@ namespace gglab
 			RenderWorldData m_WorldData{};
 			std::vector<RenderView> m_RenderViews;
 			RenderScene m_RenderScene{};
+			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
 			DX12FencePoint m_UploadFencePoint{};
 			uint32_t m_BackBufferIndex = 0;

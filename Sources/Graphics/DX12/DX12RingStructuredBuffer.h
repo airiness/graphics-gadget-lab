@@ -100,6 +100,11 @@ namespace gglab
 			m_RingBuffer->ReclaimCompleted(fencePoint);
 		}
 
+		void ReclaimCompleted(uint64_t completedFenceValue) noexcept
+		{
+			m_RingBuffer->ReclaimCompleted(completedFenceValue);
+		}
+
 		DX12Buffer* GetBuffer() const noexcept { return m_RingBuffer->GetBuffer(); }
 		uint32_t GetElementCapacity() const noexcept { return m_ElementCapacity; }
 		uint32_t GetElementStride() const noexcept { return static_cast<uint32_t>(sizeof(T)); }
