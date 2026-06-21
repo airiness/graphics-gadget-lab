@@ -6,7 +6,7 @@
 #include "Graphics/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/RenderPass/RenderPassRecipeRegistry.h"
+#include "Graphics/PipelineCache.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -91,9 +91,7 @@ namespace gglab
 		DX12DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager.get(); }
 		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
-		DX12PSOCache* GetPSOCache() const noexcept { return m_PSOCache.get(); }
-		DX12RootSignatureCache* GetRootSignatureCache() const noexcept { return m_RootSignatureCache.get(); }
-		RenderPassRecipeRegistry* GetRenderPassRecipeRegistry() const noexcept { return m_RenderPassRecipeRegistry.get(); }
+		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		RGExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResRegistry.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
@@ -139,7 +137,7 @@ namespace gglab
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
-		std::unique_ptr<RenderPassRecipeRegistry> m_RenderPassRecipeRegistry;
+		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<RGExternalResourceRegistry> m_ExternalResRegistry;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;

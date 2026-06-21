@@ -69,17 +69,20 @@ namespace gglab
 		std::unique_lock lock(m_Mutex);
 		m_GraphicsPSOMap.clear();
 		m_ComputePSOMap.clear();
+		m_Revision.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	void DX12PSOCache::ClearGraphicsPSOCache() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		m_GraphicsPSOMap.clear();
+		m_Revision.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	void DX12PSOCache::ClearComputePSOCache() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		m_ComputePSOMap.clear();
+		m_Revision.fetch_add(1, std::memory_order_relaxed);
 	}
 }

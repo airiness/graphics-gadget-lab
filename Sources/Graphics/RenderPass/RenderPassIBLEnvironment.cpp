@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
@@ -168,15 +169,8 @@ namespace gglab
 
 	DX12PipelineState* RenderPassIBLEnvironment::GetOrCreatePSO(const Renderer & renderer) noexcept
 	{
-		auto* passRegistry = renderer.GetRenderPassRecipeRegistry();
-		GGLAB_ASSERT_NOT_NULL(passRegistry);
-
-		auto* psoCache = renderer.GetPSOCache();
-		GGLAB_ASSERT_NOT_NULL(psoCache);
-
-		const auto& cached =
-			passRegistry->GetOrCreateGraphics("RenderPassIBLEnvironment", m_BaseRecipe);
-
-		return psoCache->GetOrCreate(cached.m_Key, cached.m_Desc);
+		auto* pipelineCache = renderer.GetPipelineCache();
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe);
 	}
 }

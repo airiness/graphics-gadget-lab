@@ -74,12 +74,13 @@ namespace gglab
 
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 
-		RenderPassRecipeRegistry::CreateInfo recipeRegistryCreateInfo{
+		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_ShaderManager = createInfo.m_ShaderManager,
 			.m_RootSignatureCache = m_RootSignatureCache.get(),
+			.m_PSOCache = m_PSOCache.get(),
 		};
-		m_RenderPassRecipeRegistry =
-			std::make_unique<RenderPassRecipeRegistry>(recipeRegistryCreateInfo);
+		m_PipelineCache =
+			std::make_unique<PipelineCache>(pipelineCacheCreateInfo);
 
 		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
 
@@ -142,7 +143,7 @@ namespace gglab
 		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_ExternalResRegistry.reset();
-		m_RenderPassRecipeRegistry.reset();
+		m_PipelineCache.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
 		m_ViewCache.reset();

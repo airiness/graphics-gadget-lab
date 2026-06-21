@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
-#include "Graphics/RenderPass/RenderPassRecipeRegistry.h"
+#include "Graphics/PipelineCache.h"
 #include "Graphics/RenderQueue.h"
 
 namespace gglab
@@ -40,10 +40,9 @@ namespace gglab
 
 		RasterizerPreset GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept;
 
-		std::string MakeVariantPSOPassId(std::string_view baseName, uint64_t variantBits) const noexcept;
-
 	private:
 		GraphicsPipelineRecipe m_BaseRecipe{};
+		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};
 }

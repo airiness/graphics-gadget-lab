@@ -213,8 +213,8 @@
     <ClCompile Include="..\..\Sources\Graphics\ShaderManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.cpp">
-      <Filter>Graphics\RenderPass</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\PipelineCache.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.cpp">
       <Filter>Graphics\DX12\Cache</Filter>
@@ -596,8 +596,8 @@
     <ClInclude Include="..\..\Sources\Graphics\ShaderManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassRecipeRegistry.h">
-      <Filter>Graphics\RenderPass</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.h">
       <Filter>Graphics\DX12\Cache</Filter>
