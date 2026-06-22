@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceHandle.h"
+#include "Graphics/RenderGraph/RGTypes.h"
 #include "Core/EnumFlags.h"
 
 namespace gglab
@@ -19,9 +20,7 @@ namespace gglab
 	template<typename RESOURCE>
 	struct RGResourceTraits;
 
-	// TODO: Wrap DXGI_FORMAT& Resource States
-	using RGResourceFormat = DXGI_FORMAT;
-	//using RGResourceUsage = D3D12_RESOURCE_STATES;
+	using RGResourceFormat = RGFormat;
 
 	enum class RGTextureUsage : uint32_t
 	{
@@ -57,7 +56,7 @@ namespace gglab
 		uint16_t m_ArraySize = 1;
 		uint16_t m_MipLevels = 1;
 		uint16_t m_SampleCount = 1;
-		RGResourceFormat m_Format = DXGI_FORMAT_UNKNOWN;
+		RGResourceFormat m_Format = RGResourceFormat::Unknown;
 		RGTextureUsage m_Usage = RGTextureUsage::None;
 
 		bool operator==(const RGTextureDesc&) const noexcept = default;
@@ -75,7 +74,7 @@ namespace gglab
 	{
 		uint64_t m_SizeInBytes = 0;
 		uint32_t m_Stride = 0;
-		RGResourceFormat m_Format = DXGI_FORMAT_UNKNOWN;
+		RGResourceFormat m_Format = RGResourceFormat::Unknown;
 		RGBufferUsage m_Usage = RGBufferUsage::None;
 
 		bool operator==(const RGBufferDesc&) const noexcept = default;

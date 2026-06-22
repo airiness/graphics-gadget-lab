@@ -59,9 +59,9 @@ namespace gglab
 				data.m_SceneColor = builder.Read(mainTargets.m_SceneColor, RGTextureUsage::Sample);
 				data.m_BackBuffer = builder.Write(mainTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
 				data.m_SceneColorSrv =
-					builder.CreateView<ViewType::SRV>(data.m_SceneColor);
+					builder.CreateView<RGTextureViewType::SRV>(data.m_SceneColor);
 				data.m_BackBufferRtv =
-					builder.CreateView<ViewType::RTV>(data.m_BackBuffer);
+					builder.CreateView<RGTextureViewType::RTV>(data.m_BackBuffer);
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 
@@ -71,7 +71,7 @@ namespace gglab
 			},
 			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
 				const auto sceneColorSrv = executeContext.GetView(data.m_SceneColorSrv);

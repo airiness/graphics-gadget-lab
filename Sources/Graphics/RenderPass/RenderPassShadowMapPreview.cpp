@@ -62,18 +62,11 @@ namespace gglab
 					shadowRes.m_DirectionalShadowMapPreview,
 					RGTextureUsage::RenderTarget);
 
-				D3D12_SHADER_RESOURCE_VIEW_DESC shadowMapSrvDesc{};
-				shadowMapSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-				shadowMapSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				shadowMapSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				shadowMapSrvDesc.Texture2D.MostDetailedMip = 0;
-				shadowMapSrvDesc.Texture2D.MipLevels = 1;
-				shadowMapSrvDesc.Texture2D.PlaneSlice = 0;
-				shadowMapSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+				const auto shadowMapSrvDesc = MakeRGTexture2DViewDesc(RGFormat::R32Float, 0, 1);
 				data.m_ShadowMapSrv =
-					builder.CreateView<ViewType::SRV>(data.m_ShadowMap, shadowMapSrvDesc);
+					builder.CreateView<RGTextureViewType::SRV>(data.m_ShadowMap, shadowMapSrvDesc);
 				data.m_PreviewRtv =
-					builder.CreateView<ViewType::RTV>(data.m_ShadowMapPreview);
+					builder.CreateView<RGTextureViewType::RTV>(data.m_ShadowMapPreview);
 
 				data.m_Width = shadowRes.m_ShadowMapPreviewSize;
 				data.m_Height = shadowRes.m_ShadowMapPreviewSize;
@@ -89,7 +82,7 @@ namespace gglab
 			},
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
 				auto* previewTexture = rg.GetTexture(data.m_ShadowMapPreview);

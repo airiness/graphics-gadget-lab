@@ -48,16 +48,12 @@ namespace gglab
 				data.m_ShadowMap = builder.Write(shadowRes.m_DirectionalShadowMap, RGTextureUsage::DepthStencil);
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 
-				D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-				dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-				dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-				dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-				dsvDesc.Texture2D.MipSlice = 0;
-				data.m_Dsv = builder.CreateView<ViewType::DSV>(data.m_ShadowMap, dsvDesc);
+				const auto dsvDesc = MakeRGTexture2DViewDesc(RGFormat::D32Float);
+				data.m_Dsv = builder.CreateView<RGTextureViewType::DSV>(data.m_ShadowMap, dsvDesc);
 			},
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
 				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);

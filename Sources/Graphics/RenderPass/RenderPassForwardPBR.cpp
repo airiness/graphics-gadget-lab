@@ -84,19 +84,12 @@ namespace gglab
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureUsage::Sample);
 
-				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_SceneColor);
-				data.m_Dsv = builder.CreateView<ViewType::DSV>(data.m_Depth);
+				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_SceneColor);
+				data.m_Dsv = builder.CreateView<RGTextureViewType::DSV>(data.m_Depth);
 
-				D3D12_SHADER_RESOURCE_VIEW_DESC shadowSrvDesc{};
-				shadowSrvDesc.Format = DXGI_FORMAT_R32_FLOAT;
-				shadowSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				shadowSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				shadowSrvDesc.Texture2D.MostDetailedMip = 0;
-				shadowSrvDesc.Texture2D.MipLevels = 1;
-				shadowSrvDesc.Texture2D.PlaneSlice = 0;
-				shadowSrvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+				const auto shadowSrvDesc = MakeRGTexture2DViewDesc(RGFormat::R32Float, 0, 1);
 				data.m_ShadowSrv =
-					builder.CreateView<ViewType::SRV>(data.m_ShadowMap, shadowSrvDesc);
+					builder.CreateView<RGTextureViewType::SRV>(data.m_ShadowMap, shadowSrvDesc);
 
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
@@ -118,7 +111,7 @@ namespace gglab
 				auto* sceneColorTexture = rg.GetTexture(data.m_SceneColor);
 				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
 
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 
 				const auto rtv = executeContext.GetView(data.m_Rtv);
 				const auto dsv = executeContext.GetView(data.m_Dsv);

@@ -363,7 +363,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGPass.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceHandle.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGDX12ResourceUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h" />

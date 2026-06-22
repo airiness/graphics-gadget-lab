@@ -31,23 +31,23 @@ namespace gglab
 		struct IBLResourceCreateInfo
 		{
 			uint32_t m_EnvironmentCubemapSize = 512;
-			DXGI_FORMAT m_EnvironmentCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			RGFormat m_EnvironmentCubemapFormat = RGFormat::R16G16B16A16Float;
 
 			uint32_t m_IrradianceCubemapSize = 32;
-			DXGI_FORMAT m_IrradianceCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			RGFormat m_IrradianceCubemapFormat = RGFormat::R16G16B16A16Float;
 
 			uint32_t m_PrefilteredSpecularCubemapSize = 128;
 			uint32_t m_PrefilteredSpecularMipLevels = 5;
-			DXGI_FORMAT m_PrefilteredSpecularCubemapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+			RGFormat m_PrefilteredSpecularCubemapFormat = RGFormat::R16G16B16A16Float;
 
 			uint32_t m_BrdfLutSize = 256;
-			DXGI_FORMAT m_BrdfLutFormat = DXGI_FORMAT_R16G16_FLOAT;
+			RGFormat m_BrdfLutFormat = RGFormat::R16G16Float;
 
 			uint32_t m_PreviewIBLEnvironmentCubemapFaceSize = 256;
-			DXGI_FORMAT m_PreviewIBLEnvironmentCubemapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+			RGFormat m_PreviewIBLEnvironmentCubemapFormat = RGFormat::R8G8B8A8Unorm;
 
 			uint32_t m_PreviewIBLPrefilteredSpecularCubemapFaceSize = 256;
-			DXGI_FORMAT m_PreviewIBLPrefilteredSpecularCubemapFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+			RGFormat m_PreviewIBLPrefilteredSpecularCubemapFormat = RGFormat::R8G8B8A8Unorm;
 		};
 
 		enum class TextureIndex : uint8_t

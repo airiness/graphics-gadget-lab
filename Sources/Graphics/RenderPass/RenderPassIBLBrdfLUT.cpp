@@ -3,7 +3,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/ShaderManager.h"
 #include "Graphics/DX12/Cache/DX12PSOCache.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab
 {
@@ -56,14 +56,14 @@ namespace gglab
 					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
 				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
-				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_BrdfLut);
+				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_BrdfLut);
 
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;
 			},
 			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
 				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);

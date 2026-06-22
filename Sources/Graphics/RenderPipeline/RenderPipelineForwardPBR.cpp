@@ -5,7 +5,7 @@
 #include "Graphics/DX12/DX12SwapChain.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/RenderResourceRegistry.h"
 
 namespace gglab
@@ -63,7 +63,7 @@ namespace gglab
 				RGTextureDesc sceneColorDesc{};
 				sceneColorDesc.m_Width = width;
 				sceneColorDesc.m_Height = height;
-				sceneColorDesc.m_Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+				sceneColorDesc.m_Format = RGFormat::R16G16B16A16Float;
 				sceneColorDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 				targets.m_SceneColor = builder.CreateTexture("MainView.SceneColor", sceneColorDesc);
 
@@ -71,7 +71,7 @@ namespace gglab
 				RGTextureDesc backBufferDesc{};
 				backBufferDesc.m_Width = width;
 				backBufferDesc.m_Height = height;
-				backBufferDesc.m_Format = swapChain->GetFormat();
+				backBufferDesc.m_Format = ToRGFormat(swapChain->GetFormat());
 				backBufferDesc.m_Usage = RGTextureUsage::RenderTarget;
 
 				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
@@ -83,7 +83,7 @@ namespace gglab
 				RGTextureDesc depthBufferDesc{};
 				depthBufferDesc.m_Width = width;
 				depthBufferDesc.m_Height = height;
-				depthBufferDesc.m_Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				depthBufferDesc.m_Format = RGFormat::D24UnormS8Uint;
 				depthBufferDesc.m_Usage = RGTextureUsage::DepthStencil;
 
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
@@ -101,7 +101,7 @@ namespace gglab
 				RGTextureDesc shadowMapDesc{};
 				shadowMapDesc.m_Width = shadowRes.m_ShadowMapSize;
 				shadowMapDesc.m_Height = shadowRes.m_ShadowMapSize;
-				shadowMapDesc.m_Format = DXGI_FORMAT_R32_TYPELESS;
+				shadowMapDesc.m_Format = RGFormat::R32Typeless;
 				shadowMapDesc.m_Usage = RGTextureUsage::DepthStencil | RGTextureUsage::Sample;
 				shadowRes.m_DirectionalShadowMap = builder.CreateTexture(
 					"Shadow.DirectionalShadowMap",
@@ -139,11 +139,11 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
-				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_BackBuffer);
+				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_BackBuffer);
 			},
 			[swapChain](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 				const auto rtv = executeContext.GetView(data.m_Rtv);
 
 				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());
