@@ -241,8 +241,11 @@ namespace gglab
 		frame.m_CommandAllocator = commandAllocatorPool->RequestCommandAllocator();
 		commandList->Begin(frame.m_CommandAllocator);
 
-		RGExecuteContext executeContext = {};
-		executeContext.m_GraphicsCommandList = commandList;
+		RGExecuteContext executeContext{
+			RGBackendExecuteContext{
+				.m_GraphicsCommandList = commandList,
+			}
+		};
 		rg.Execute(executeContext);
 
 		commandList->End();

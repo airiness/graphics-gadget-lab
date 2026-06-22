@@ -2,7 +2,7 @@
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/SamplerRegistry.h"
 
 #include <algorithm>
@@ -35,7 +35,7 @@ namespace gglab
 			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 			TextureSrvCreateInfo srvCreateInfo{};
-			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 
@@ -54,7 +54,7 @@ namespace gglab
 			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 			TextureSrvCreateInfo srvCreateInfo{};
-			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 
@@ -89,7 +89,7 @@ namespace gglab
 			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 			TextureSrvCreateInfo srvCreateInfo{};
-			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 
@@ -108,7 +108,7 @@ namespace gglab
 			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 			TextureSrvCreateInfo srvCreateInfo{};
-			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 
@@ -127,7 +127,7 @@ namespace gglab
 			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 			TextureSrvCreateInfo srvCreateInfo{};
-			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 
@@ -146,7 +146,7 @@ namespace gglab
 			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 			TextureSrvCreateInfo srvCreateInfo{};
-			srvCreateInfo.m_Format = desc.m_Format;
+			srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 			srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 
@@ -164,11 +164,11 @@ namespace gglab
 		desc.m_ArraySize = 1;
 		desc.m_MipLevels = 1;
 		desc.m_SampleCount = 1;
-		desc.m_Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.m_Format = RGFormat::R8G8B8A8Unorm;
 		desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 		TextureSrvCreateInfo srvCreateInfo{};
-		srvCreateInfo.m_Format = desc.m_Format;
+		srvCreateInfo.m_Format = ToD3D12Format(desc.m_Format);
 		srvCreateInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvCreateInfo.m_MipLevels = desc.m_MipLevels;
 

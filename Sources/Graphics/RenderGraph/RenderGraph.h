@@ -1,15 +1,13 @@
 #pragma once
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
 #include "Graphics/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/StringId.h"
-
-#include <variant>
 
 namespace gglab
 {
@@ -31,14 +29,27 @@ namespace gglab
 
 	class RenderGraph;
 
-	struct RGExecuteContext
+	struct RGBackendExecuteContext
 	{
 		DX12CommandList* m_GraphicsCommandList = nullptr;
 		DX12CommandList* m_ComputeCommandList = nullptr;
+	};
+
+	struct RGExecuteContext
+	{
+		explicit RGExecuteContext(RGBackendExecuteContext backend = {}) noexcept :
+			m_Backend(backend)
+		{}
 
 		DX12DescriptorView GetView(RGTextureViewId viewId) const noexcept;
+		DX12CommandList* GetGraphicsCommandList() const noexcept { return m_Backend.m_GraphicsCommandList; }
+		DX12CommandList* GetComputeCommandList() const noexcept { return m_Backend.m_ComputeCommandList; }
+
+		RGBackendExecuteContext& GetBackend() noexcept { return m_Backend; }
+		const RGBackendExecuteContext& GetBackend() const noexcept { return m_Backend; }
 
 	private:
+		RGBackendExecuteContext m_Backend{};
 		RenderGraph* m_RenderGraph = nullptr;
 
 		friend class RenderGraph;
@@ -196,10 +207,10 @@ namespace gglab
 				return Import<RGTextureResource>(name, texture, desc, initialUsage);
 			}
 
-			template<ViewType T>
+			template<RGTextureViewType T>
 			RGTextureViewId CreateView(
 				RGTextureId textureId,
-				std::optional<typename ViewTraits<T>::Desc> desc = std::nullopt) noexcept
+				std::optional<RGTextureViewDesc> desc = std::nullopt) noexcept
 			{
 				return m_RG.CreateTextureView<T>(textureId, desc);
 			}
@@ -279,18 +290,11 @@ namespace gglab
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
 
 	private:
-		using TextureViewDesc = std::variant<
-			std::monostate,
-			D3D12_RENDER_TARGET_VIEW_DESC,
-			D3D12_DEPTH_STENCIL_VIEW_DESC,
-			D3D12_SHADER_RESOURCE_VIEW_DESC,
-			D3D12_UNORDERED_ACCESS_VIEW_DESC>;
-
 		struct TextureViewRecord
 		{
 			RGTextureId m_Texture{};
-			TextureViewDesc m_Desc{};
-			ViewType m_Type = ViewType::RTV;
+			std::optional<RGTextureViewDesc> m_Desc{};
+			RGTextureViewType m_Type = RGTextureViewType::RTV;
 		};
 
 		template<typename RESOURCE>
@@ -317,10 +321,10 @@ namespace gglab
 		template<typename RESOURCE>
 		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
 
-		template<ViewType T>
+		template<RGTextureViewType T>
 		RGTextureViewId CreateTextureView(
 			RGTextureId textureId,
-			std::optional<typename ViewTraits<T>::Desc> desc) noexcept;
+			std::optional<RGTextureViewDesc> desc) noexcept;
 
 		template<typename RESOURCE>
 		void MarkDestroyResourceIndex(ResourceIndex resIndex) noexcept;
@@ -391,10 +395,10 @@ namespace gglab
 		return pass;
 	}
 
-	template<ViewType T>
+	template<RGTextureViewType T>
 	inline RGTextureViewId RenderGraph::CreateTextureView(
 		RGTextureId textureId,
-		std::optional<typename ViewTraits<T>::Desc> desc) noexcept
+		std::optional<RGTextureViewDesc> desc) noexcept
 	{
 		GGLAB_ASSERT_MSG(textureId.IsValid(),
 			"RenderGraph::CreateTextureView requires a valid texture id.");
@@ -415,12 +419,9 @@ namespace gglab
 
 		TextureViewRecord view{
 			.m_Texture = textureId,
+			.m_Desc = desc,
 			.m_Type = T,
 		};
-		if (desc)
-		{
-			view.m_Desc = *desc;
-		}
 
 		GGLAB_ASSERT_MSG(m_TextureViews.size() < RGTextureViewId::InvalidValue,
 			"RenderGraph texture view id overflow.");

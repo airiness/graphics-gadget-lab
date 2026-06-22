@@ -39,7 +39,7 @@ namespace gglab
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(viewTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
-				data.m_Rtv = builder.CreateView<ViewType::RTV>(data.m_BackBuffer);
+				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_BackBuffer);
 
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
@@ -66,7 +66,7 @@ namespace gglab
 
 				auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
 				const auto rtv = executeContext.GetView(data.m_Rtv);
-				developGuiBackend->RenderDrawData(executeContext.m_GraphicsCommandList, rtv);
+				developGuiBackend->RenderDrawData(executeContext.GetGraphicsCommandList(), rtv);
 			});
 	}
 }

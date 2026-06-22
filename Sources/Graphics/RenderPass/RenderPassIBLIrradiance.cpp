@@ -4,11 +4,10 @@
 #include "Graphics/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/Utility/TextureViewDescUtils.h"
 
 namespace gglab
 {
@@ -79,9 +78,9 @@ namespace gglab
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					auto rtvDesc = MakeTexture2DArrayRtvDesc(rgDesc.m_Format, 0, face, 1);
+					const auto rtvDesc = MakeRGTexture2DArrayViewDesc(rgDesc.m_Format, 0, face, 1);
 					data.m_Rtvs[face] =
-						builder.CreateView<ViewType::RTV>(data.m_IrradianceCubemap, rtvDesc);
+						builder.CreateView<RGTextureViewType::RTV>(data.m_IrradianceCubemap, rtvDesc);
 				}
 
 				data.m_Width = rgDesc.m_Width;
@@ -93,7 +92,7 @@ namespace gglab
 			},
 			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.m_GraphicsCommandList;
+				auto* commandList = executeContext.GetGraphicsCommandList();
 				GGLAB_ASSERT_NOT_NULL(commandList);
 
 				auto* environmentTexture = rg.GetTexture(data.m_EnvironmentCubemap);

@@ -2,7 +2,7 @@
 #include "Graphics/DX12/DX12Texture.h"
 #include "Graphics/DX12/DX12Buffer.h"
 #include "Graphics/DX12/DX12FencePoint.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
 
@@ -25,7 +25,7 @@ namespace gglab
 			uint16_t m_ArraySize = 1;
 			uint16_t m_MipLevels = 1;
 			uint16_t m_SampleCount = 1;
-			DXGI_FORMAT m_Format = DXGI_FORMAT_UNKNOWN;
+			RGFormat m_Format = RGFormat::Unknown;
 			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
 
 			bool operator==(const TextureKey&) const noexcept = default;
@@ -44,7 +44,7 @@ namespace gglab
 					.m_ArraySize = static_cast<uint16_t>(resDesc.DepthOrArraySize),
 					.m_MipLevels = static_cast<uint16_t>(resDesc.MipLevels),
 					.m_SampleCount = static_cast<uint16_t>(resDesc.SampleDesc.Count),
-					.m_Format = resDesc.Format,
+					.m_Format = ToRGFormat(resDesc.Format),
 					.m_Flags = resDesc.Flags
 				};
 				return texKey;

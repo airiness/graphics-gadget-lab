@@ -2,7 +2,7 @@
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab
 {

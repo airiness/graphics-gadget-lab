@@ -247,7 +247,7 @@ namespace gglab
 				virtualResource->Devirtualize(m_GpuResourceAllocator);
 			}
 
-			EmitBarriers(executeContext.m_GraphicsCommandList, passNode.m_PreBarriers);
+			EmitBarriers(executeContext.GetGraphicsCommandList(), passNode.m_PreBarriers);
 
 			// Execute passes
 			if (passNode.m_Pass)
@@ -255,7 +255,7 @@ namespace gglab
 				passNode.m_Pass->Execute(executeContext);
 			}
 
-			EmitBarriers(executeContext.m_GraphicsCommandList, passNode.m_PostBarriers);
+			EmitBarriers(executeContext.GetGraphicsCommandList(), passNode.m_PostBarriers);
 
 			for (auto* virtualResource : passNode.m_DestroyVirtualResources)
 			{
@@ -353,37 +353,45 @@ namespace gglab
 
 		switch (view.m_Type)
 		{
-		case ViewType::RTV:
+		case RGTextureViewType::RTV:
 		{
-			const auto* desc = std::get_if<D3D12_RENDER_TARGET_VIEW_DESC>(&view.m_Desc);
+			const auto desc = view.m_Desc ?
+				std::optional{ ToD3D12RenderTargetViewDesc(*view.m_Desc) } :
+				std::nullopt;
 			return m_ViewCache->GetOrCreate<ViewType::RTV>(
 				resourceIndex,
 				texture,
-				desc ? std::optional{ *desc } : std::nullopt);
+				desc);
 		}
-		case ViewType::DSV:
+		case RGTextureViewType::DSV:
 		{
-			const auto* desc = std::get_if<D3D12_DEPTH_STENCIL_VIEW_DESC>(&view.m_Desc);
+			const auto desc = view.m_Desc ?
+				std::optional{ ToD3D12DepthStencilViewDesc(*view.m_Desc) } :
+				std::nullopt;
 			return m_ViewCache->GetOrCreate<ViewType::DSV>(
 				resourceIndex,
 				texture,
-				desc ? std::optional{ *desc } : std::nullopt);
+				desc);
 		}
-		case ViewType::SRV:
+		case RGTextureViewType::SRV:
 		{
-			const auto* desc = std::get_if<D3D12_SHADER_RESOURCE_VIEW_DESC>(&view.m_Desc);
+			const auto desc = view.m_Desc ?
+				std::optional{ ToD3D12ShaderResourceViewDesc(*view.m_Desc) } :
+				std::nullopt;
 			return m_ViewCache->GetOrCreate<ViewType::SRV>(
 				resourceIndex,
 				texture,
-				desc ? std::optional{ *desc } : std::nullopt);
+				desc);
 		}
-		case ViewType::UAV:
+		case RGTextureViewType::UAV:
 		{
-			const auto* desc = std::get_if<D3D12_UNORDERED_ACCESS_VIEW_DESC>(&view.m_Desc);
+			const auto desc = view.m_Desc ?
+				std::optional{ ToD3D12UnorderedAccessViewDesc(*view.m_Desc) } :
+				std::nullopt;
 			return m_ViewCache->GetOrCreate<ViewType::UAV>(
 				resourceIndex,
 				texture,
-				desc ? std::optional{ *desc } : std::nullopt);
+				desc);
 		}
 		default:
 			GGLAB_UNREACHABLE("RenderGraph texture view has an unknown view type.");
@@ -478,22 +486,22 @@ namespace gglab
 			case RGResourceType::RGTexture:
 				commandList->AddTextureBarrier(
 					CD3DX12_TEXTURE_BARRIER(
-						intent.m_Before.m_Sync,
-						intent.m_After.m_Sync,
-						intent.m_Before.m_Access,
-						intent.m_After.m_Access,
-						intent.m_Before.m_Layout,
-						intent.m_After.m_Layout,
+						ToD3D12BarrierSync(intent.m_Before.m_Stage),
+						ToD3D12BarrierSync(intent.m_After.m_Stage),
+						ToD3D12BarrierAccess(intent.m_Before.m_Access),
+						ToD3D12BarrierAccess(intent.m_After.m_Access),
+						ToD3D12BarrierLayout(intent.m_Before.m_Layout),
+						ToD3D12BarrierLayout(intent.m_After.m_Layout),
 						resource->Get(),
 						CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)));
 				break;
 			case RGResourceType::RGBuffer:
 				commandList->AddBufferBarrier(
 					CD3DX12_BUFFER_BARRIER(
-						intent.m_Before.m_Sync,
-						intent.m_After.m_Sync,
-						intent.m_Before.m_Access,
-						intent.m_After.m_Access,
+						ToD3D12BarrierSync(intent.m_Before.m_Stage),
+						ToD3D12BarrierSync(intent.m_After.m_Stage),
+						ToD3D12BarrierAccess(intent.m_Before.m_Access),
+						ToD3D12BarrierAccess(intent.m_After.m_Access),
 						resource->Get()));
 				break;
 			default:
