@@ -56,6 +56,7 @@ namespace gglab
 
 		FlushGPU();
 
+		m_ResourceManager.RetireCompletedResources();
 		m_ResourceManager.Finalize();
 
 		for (const auto queueType : utils::EnumRange<CommandQueueType>())

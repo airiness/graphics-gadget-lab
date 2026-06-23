@@ -12,7 +12,6 @@
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/TransferManager.h"
-#include "Core/Components.h"
 #include "Graphics/Camera.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderScene.h"
@@ -188,6 +187,7 @@ namespace gglab
 
 		m_RGGpuResAllocator->Tick();
 		m_DescriptorManager->Tick();
+		m_Device->RetireCompletedWork();
 
 		m_HasActiveFrame = true;
 		return Frame(this, backBufferIndex);
