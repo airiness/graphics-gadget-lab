@@ -182,6 +182,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp" />
@@ -309,6 +310,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h" />

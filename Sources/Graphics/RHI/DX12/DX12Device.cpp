@@ -40,6 +40,7 @@ namespace gglab
 		CheckFeatureSupport();
 		InitializeCommandQueues();
 		InitializeMemAllocator();
+		m_ResourceManager.Initialize(this);
 		InitializeCommandLists();
 		InitializeCommandAllocatorPools();
 
@@ -54,6 +55,8 @@ namespace gglab
 		}
 
 		FlushGPU();
+
+		m_ResourceManager.Finalize();
 
 		for (const auto queueType : utils::EnumRange<CommandQueueType>())
 		{
@@ -83,6 +86,90 @@ namespace gglab
 			auto& commandQueue = m_CommandQueues[utils::ToIndex(queueType)];
 			commandQueue->FlushCommandQueue();
 		}
+	}
+
+	RHITextureHandle DX12Device::CreateTexture(const RHITextureDesc& desc) noexcept
+	{
+		return m_ResourceManager.CreateTexture(desc);
+	}
+
+	RHIBufferHandle DX12Device::CreateBuffer(const RHIBufferDesc& desc) noexcept
+	{
+		return m_ResourceManager.CreateBuffer(desc);
+	}
+
+	RHITextureViewHandle DX12Device::CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
+	{
+		GGLAB_UNUSED(texture);
+		GGLAB_UNUSED(desc);
+		return {};
+	}
+
+	RHIBufferViewHandle DX12Device::CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
+	{
+		GGLAB_UNUSED(buffer);
+		GGLAB_UNUSED(desc);
+		return {};
+	}
+
+	void DX12Device::DestroyTexture(RHITextureHandle texture) noexcept
+	{
+		m_ResourceManager.DestroyTexture(texture);
+	}
+
+	void DX12Device::DestroyBuffer(RHIBufferHandle buffer) noexcept
+	{
+		m_ResourceManager.DestroyBuffer(buffer);
+	}
+
+	void DX12Device::DestroyTextureView(RHITextureViewHandle view) noexcept
+	{
+		GGLAB_UNUSED(view);
+	}
+
+	void DX12Device::DestroyBufferView(RHIBufferViewHandle view) noexcept
+	{
+		GGLAB_UNUSED(view);
+	}
+
+	bool DX12Device::IsAlive(RHITextureHandle texture) const noexcept
+	{
+		return m_ResourceManager.IsAlive(texture);
+	}
+
+	bool DX12Device::IsAlive(RHIBufferHandle buffer) const noexcept
+	{
+		return m_ResourceManager.IsAlive(buffer);
+	}
+
+	DX12Texture* DX12Device::ResolveTexture(RHITextureHandle texture) noexcept
+	{
+		return m_ResourceManager.ResolveTexture(texture);
+	}
+
+	const DX12Texture* DX12Device::ResolveTexture(RHITextureHandle texture) const noexcept
+	{
+		return m_ResourceManager.ResolveTexture(texture);
+	}
+
+	DX12Buffer* DX12Device::ResolveBuffer(RHIBufferHandle buffer) noexcept
+	{
+		return m_ResourceManager.ResolveBuffer(buffer);
+	}
+
+	const DX12Buffer* DX12Device::ResolveBuffer(RHIBufferHandle buffer) const noexcept
+	{
+		return m_ResourceManager.ResolveBuffer(buffer);
+	}
+
+	void DX12Device::RetireCompletedWork() noexcept
+	{
+		RetireCompletedRHIResources();
+	}
+
+	void DX12Device::RetireCompletedRHIResources() noexcept
+	{
+		m_ResourceManager.RetireCompletedResources();
 	}
 
 	void DX12Device::InitializeDebugLayer() noexcept
@@ -281,7 +368,7 @@ namespace gglab
 	{
 		using namespace D3D12MA;
 		D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
-		allocatorDesc.Flags = D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS;
+		allocatorDesc.Flags = static_cast<D3D12MA::ALLOCATOR_FLAGS>(D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS);
 		allocatorDesc.pDevice = m_D3D12Device.Get();
 		allocatorDesc.pAdapter = m_DxgiAdapter.Get();
 		GGLAB_HR(D3D12MA::CreateAllocator(&allocatorDesc, &m_MemAllocator));

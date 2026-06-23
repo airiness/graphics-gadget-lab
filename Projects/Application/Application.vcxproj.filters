@@ -138,6 +138,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -462,6 +465,9 @@
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.h">
