@@ -146,6 +146,7 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
@@ -183,6 +184,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp" />
@@ -258,6 +260,7 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
@@ -311,6 +314,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h" />

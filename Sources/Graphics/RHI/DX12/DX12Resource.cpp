@@ -105,7 +105,7 @@ namespace gglab
 #if defined (BUILD_DEBUG)
 		if (m_Resource)
 		{
-			//utility::SetDebugName(m_Resource.Get(), name); // TODO: Process Debug Name Settings
+			m_Resource->SetName(name);
 		}
 
 		if (m_Allocation)

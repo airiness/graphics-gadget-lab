@@ -32,6 +32,22 @@ namespace gglab::utils
 		return str;
 	}
 
+	std::string StringIdToString(StringID id) noexcept
+	{
+		if (id.Value() == 0)
+		{
+			return {};
+		}
+
+		const std::string_view name = id.Name();
+		if (!name.empty())
+		{
+			return std::string(name);
+		}
+
+		return std::format("0x{:016X}", id.Value());
+	}
+
 	std::string_view FindLeaf(std::string_view path) noexcept
 	{
 		while (!path.empty() && path.back() == '/')
