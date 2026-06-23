@@ -1,6 +1,11 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
 #include "Core/Utility/TypeUtils.h"
+#include "Graphics/RHI/RHIDevice.h"
+#include "Graphics/RHI/DX12/DX12ResourceManager.h"
+
+#include <array>
+#include <memory>
 
 namespace D3D12MA
 {
@@ -24,7 +29,7 @@ namespace gglab
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;
-	class DX12Device
+	class DX12Device : public RHIDevice
 	{
 	public:
 		struct FeatureSupport
@@ -67,6 +72,32 @@ namespace gglab
 
 		void FlushGPU() noexcept;
 
+		RHIBackendType GetBackendType() const noexcept override { return RHIBackendType::DX12; }
+
+		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept override;
+		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept override;
+		RHITextureViewHandle CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept override;
+		RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept override;
+
+		void DestroyTexture(RHITextureHandle texture) noexcept override;
+		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
+		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
+		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
+
+		bool IsAlive(RHITextureHandle texture) const noexcept override;
+		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
+
+		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;
+		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;
+		DX12Buffer* ResolveBuffer(RHIBufferHandle buffer) noexcept;
+		const DX12Buffer* ResolveBuffer(RHIBufferHandle buffer) const noexcept;
+
+		void RetireCompletedWork() noexcept override;
+		void RetireCompletedRHIResources() noexcept;
+
+		DX12ResourceManager* GetResourceManager() noexcept { return &m_ResourceManager; }
+		const DX12ResourceManager* GetResourceManager() const noexcept { return &m_ResourceManager; }
+
 	public:
 		static uint32_t GetBufferCount() noexcept { return BufferCount; }
 
@@ -107,6 +138,8 @@ namespace gglab
 
 		// supported features
 		FeatureSupport m_FeatureSupport;
+
+		DX12ResourceManager m_ResourceManager;
 
 		bool m_IsInitialized = false;
 	};
