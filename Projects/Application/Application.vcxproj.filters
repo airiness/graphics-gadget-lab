@@ -138,6 +138,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -318,6 +321,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp">
+      <Filter>Graphics\RHI</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
@@ -456,6 +462,9 @@
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h">
@@ -724,6 +733,33 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandList.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h">
+      <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h">
       <Filter>Core\Utility</Filter>
