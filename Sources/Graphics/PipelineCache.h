@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/DX12/Cache/PipelineDesc.h"
+#include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
 
 namespace gglab
 {

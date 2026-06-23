@@ -25,7 +25,10 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Graphics\DX12">
+    <Filter Include="Graphics\RHI">
+      <UniqueIdentifier>{58F6210F-CB8C-45D2-A24A-3FD2B22F4BB0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RHI\DX12">
       <UniqueIdentifier>{f5b4b727-4377-4dc7-8d7e-b4405ebffc37}</UniqueIdentifier>
     </Filter>
     <Filter Include="Externals">
@@ -55,7 +58,7 @@
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\DX12\Cache">
+    <Filter Include="Graphics\RHI\DX12\Cache">
       <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core\Utility">
@@ -79,7 +82,7 @@
     <Filter Include="Externals\ImGui">
       <UniqueIdentifier>{fcaf4650-56ee-4d51-9d13-291379cac5b5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\DX12\Descriptor">
+    <Filter Include="Graphics\RHI\DX12\Descriptor">
       <UniqueIdentifier>{bbedd216-a444-41bc-8acd-a22ddeebbd53}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\Utility">
@@ -102,17 +105,17 @@
     <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Device.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12SwapChain.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandList.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
       <Filter>Core</Filter>
@@ -123,35 +126,35 @@
     <ClCompile Include="..\..\Sources\Core\Application.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12PipelineState.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RootSignature.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Resource.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Texture.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Buffer.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12Fence.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12FencePoint.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp">
       <Filter>Graphics</Filter>
@@ -195,20 +198,20 @@
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12ViewCache.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\ShaderManager.cpp">
       <Filter>Graphics</Filter>
@@ -216,11 +219,11 @@
     <ClCompile Include="..\..\Sources\Graphics\PipelineCache.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Cache\InputLayoutLibrary.cpp">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\InputLayoutLibrary.cpp">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\HResult.cpp">
       <Filter>Core</Filter>
@@ -246,8 +249,8 @@
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.cpp">
-      <Filter>Graphics\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
       <Filter>Graphics</Filter>
@@ -300,23 +303,23 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.cpp">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorRingAllocator.cpp">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.cpp">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.cpp">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.cpp">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp">
       <Filter>Graphics</Filter>
@@ -398,20 +401,20 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandQueue.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Device.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12SwapChain.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandList.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Application.h">
       <Filter>Core</Filter>
@@ -431,17 +434,17 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h">
       <Filter>DevTools\EnumText</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12PipelineState.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RootSignature.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Buffer.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Texture.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h">
       <Filter>Graphics\Utility</Filter>
@@ -452,11 +455,11 @@
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
       <Filter>Externals\D3D12MemAlloc</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Resource.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12Fence.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\CoreMacros.h">
       <Filter>Core</Filter>
@@ -464,11 +467,11 @@
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12CommandAllocator.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12FencePoint.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Components.h">
       <Filter>Core</Filter>
@@ -554,11 +557,11 @@
     <ClInclude Include="..\..\Sources\Core\StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12ConstantBuffer.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ConstantBuffer.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingConstantBuffer.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingConstantBuffer.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h">
       <Filter>Core</Filter>
@@ -584,20 +587,20 @@
     <ClInclude Include="..\..\Sources\Core\TypedIndex.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12ViewCache.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12ViewCache.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12PSOCache.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOKey.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelineDesc.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PSOCreator.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\ShaderManager.h">
       <Filter>Graphics</Filter>
@@ -605,14 +608,14 @@
     <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\DX12RootSignatureCache.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\InputLayoutLibrary.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\InputLayoutLibrary.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Cache\PipelinePresets.h">
-      <Filter>Graphics\DX12\Cache</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelinePresets.h">
+      <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\HResult.h">
       <Filter>Core</Filter>
@@ -638,11 +641,11 @@
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingBuffer.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\DX12RingStructuredBuffer.h">
-      <Filter>Graphics\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingStructuredBuffer.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TransferManager.h">
       <Filter>Graphics</Filter>
@@ -704,23 +707,23 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorHeap.h">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorFreeListAllocator.h">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.h">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorAllocatorBase.h">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorTypes.h">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorRingAllocator.h">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\DX12\Descriptor\DX12DescriptorManager.h">
-      <Filter>Graphics\DX12\Descriptor</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h">
+      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h">
       <Filter>Core\Utility</Filter>

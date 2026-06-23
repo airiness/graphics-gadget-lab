@@ -1,13 +1,13 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
-#include "Graphics/DX12/DX12Device.h"
-#include "Graphics/DX12/DX12SwapChain.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorTypes.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
-#include "Graphics/DX12/DX12CommandQueue.h"
-#include "Graphics/DX12/DX12CommandList.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
+#include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 
 namespace gglab
 {

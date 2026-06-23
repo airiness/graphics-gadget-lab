@@ -1,8 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/TransferManager.h"
-#include "Graphics/DX12/DX12Device.h"
-#include "Graphics/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
 

@@ -5,7 +5,7 @@
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
-#include "Graphics/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/StringId.h"
 

@@ -3,8 +3,8 @@
 #include "Core/StringId.h"
 #include "Core/TypedIndex.h"
 #include "Core/EnumFlags.h"
-#include "Graphics/DX12/DX12Buffer.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorTypes.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Core/Utility/TypeUtils.h"
 
 #include <cstdint>

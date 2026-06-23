@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/DX12/DX12FencePoint.h"
-#include "Graphics/DX12/DX12CommandList.h"
+#include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 
 namespace gglab
 {

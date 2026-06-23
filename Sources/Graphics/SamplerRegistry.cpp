@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 
 namespace gglab
 {

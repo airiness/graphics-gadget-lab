@@ -3,7 +3,7 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ShadowSettings.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace gglab

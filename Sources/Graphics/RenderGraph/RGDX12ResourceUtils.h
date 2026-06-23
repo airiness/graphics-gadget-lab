@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceUtils.h"
-#include "Graphics/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
 
 namespace gglab
 {

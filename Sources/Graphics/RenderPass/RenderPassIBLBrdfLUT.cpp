@@ -2,7 +2,7 @@
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/ShaderManager.h"
-#include "Graphics/DX12/Cache/DX12PSOCache.h"
+#include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab

@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
-#include "Graphics/DX12/DX12RingStructuredBuffer.h"
+#include "Graphics/RHI/DX12/DX12RingStructuredBuffer.h"
 
 namespace gglab
 {

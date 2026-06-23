@@ -1,7 +1,7 @@
 #pragma once
-#include "Graphics/DX12/DX12Texture.h"
-#include "Graphics/DX12/DX12Buffer.h"
-#include "Graphics/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
