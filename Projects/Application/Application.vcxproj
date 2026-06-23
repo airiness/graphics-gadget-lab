@@ -163,6 +163,7 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.cpp" />
@@ -181,6 +182,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.cpp" />
@@ -278,6 +280,15 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiContext.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandList.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h" />
@@ -298,6 +309,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h" />
