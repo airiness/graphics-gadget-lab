@@ -5,9 +5,9 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
-#include "Graphics/DX12/DX12SwapChain.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 
 namespace gglab
 {

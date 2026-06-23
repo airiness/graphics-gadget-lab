@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
-#include "Graphics/DX12/Cache/PSOKey.h"
+#include "Graphics/RHI/DX12/Cache/PSOKey.h"
 #include "Core/EnumFlags.h"
 
 namespace gglab

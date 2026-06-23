@@ -1,9 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Graphics/CopyContext.h"
-#include "Graphics/DX12/DX12Device.h"
-#include "Graphics/DX12/DX12Buffer.h"
-#include "Graphics/DX12/DX12CommandQueue.h"
-#include "Graphics/DX12/DX12CommandAllocator.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 
 namespace gglab
 {

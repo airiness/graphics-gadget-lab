@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
-#include "Graphics/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 
 namespace gglab
 {

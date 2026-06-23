@@ -1,6 +1,6 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
-#include "Graphics/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 #include <d3d12.h>
 
 namespace gglab::devtools

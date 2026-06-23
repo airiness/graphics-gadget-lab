@@ -4,7 +4,7 @@
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
-#include "Graphics/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"

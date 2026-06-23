@@ -1,9 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Graphics/PipelineCache.h"
-#include "Graphics/DX12/Cache/DX12PSOCache.h"
-#include "Graphics/DX12/Cache/DX12RootSignatureCache.h"
-#include "Graphics/DX12/Cache/InputLayoutLibrary.h"
-#include "Graphics/DX12/DX12RootSignature.h"
+#include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
+#include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#include "Graphics/RHI/DX12/Cache/InputLayoutLibrary.h"
+#include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/ShaderManager.h"
 
 namespace gglab

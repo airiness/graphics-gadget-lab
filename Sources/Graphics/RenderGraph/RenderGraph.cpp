@@ -1,11 +1,11 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGPass.h"
-#include "Graphics/DX12/DX12Device.h"
-#include "Graphics/DX12/DX12CommandList.h"
-#include "Graphics/DX12/DX12Texture.h"
-#include "Graphics/DX12/DX12Buffer.h"
-#include "Graphics/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 
 namespace gglab
 {

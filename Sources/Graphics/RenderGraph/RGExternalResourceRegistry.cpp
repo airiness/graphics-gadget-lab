@@ -1,8 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
-#include "Graphics/DX12/Cache/DX12ViewCache.h"
-#include "Graphics/DX12/DX12Texture.h"
-#include "Graphics/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
 
 namespace gglab
 {

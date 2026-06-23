@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"

@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/TypedIndex.h"
-#include "Graphics/DX12/Cache/PSOKey.h"
+#include "Graphics/RHI/DX12/Cache/PSOKey.h"
 #include "Core/Hash/FNV1a.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Shader.h"
