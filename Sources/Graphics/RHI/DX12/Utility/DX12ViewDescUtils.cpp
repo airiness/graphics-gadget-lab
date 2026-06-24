@@ -17,6 +17,33 @@ namespace gglab
 				static_cast<UINT>(-1) :
 				static_cast<UINT>(mipLevels);
 		}
+
+		uint64_t ResolveBufferViewSize(uint64_t offsetInBytes, uint64_t sizeInBytes, uint64_t bufferSizeInBytes) noexcept
+		{
+			if (offsetInBytes >= bufferSizeInBytes)
+			{
+				return 0;
+			}
+
+			const uint64_t remainingSize = bufferSizeInBytes - offsetInBytes;
+			return sizeInBytes == 0 ? remainingSize : std::min(sizeInBytes, remainingSize);
+		}
+
+		uint32_t ResolveBufferElementStride(const RHIBufferViewDesc& desc) noexcept
+		{
+			if (desc.m_StrideInBytes != 0)
+			{
+				return desc.m_StrideInBytes;
+			}
+
+			// Precise typed element sizes should eventually come from RHI format metadata.
+			return 1;
+		}
+
+		uint64_t AlignUp(uint64_t value, uint64_t alignment) noexcept
+		{
+			return (value + alignment - 1) / alignment * alignment;
+		}
 	}
 
 	D3D12_RENDER_TARGET_VIEW_DESC BuildD3D12RenderTargetViewDesc(
@@ -259,6 +286,55 @@ namespace gglab
 			GGLAB_UNREACHABLE("Unexpected unknown RHI texture view dimension.");
 		}
 
+		return nativeDesc;
+	}
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC BuildD3D12ConstantBufferViewDesc(
+		const RHIBufferViewDesc& desc,
+		D3D12_GPU_VIRTUAL_ADDRESS baseGpuAddress,
+		uint64_t bufferSizeInBytes) noexcept
+	{
+		const uint64_t sizeInBytes = ResolveBufferViewSize(desc.m_OffsetInBytes, desc.m_SizeInBytes, bufferSizeInBytes);
+
+		D3D12_CONSTANT_BUFFER_VIEW_DESC nativeDesc{};
+		nativeDesc.BufferLocation = baseGpuAddress + desc.m_OffsetInBytes;
+		nativeDesc.SizeInBytes = static_cast<UINT>(AlignUp(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+		return nativeDesc;
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC BuildD3D12ShaderResourceViewDesc(
+		const RHIBufferViewDesc& desc,
+		uint64_t bufferSizeInBytes) noexcept
+	{
+		const uint64_t sizeInBytes = ResolveBufferViewSize(desc.m_OffsetInBytes, desc.m_SizeInBytes, bufferSizeInBytes);
+		const uint32_t stride = ResolveBufferElementStride(desc);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC nativeDesc{};
+		nativeDesc.Format = desc.m_StrideInBytes == 0 ? ToDXGIFormat(desc.m_Format) : DXGI_FORMAT_UNKNOWN;
+		nativeDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		nativeDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		nativeDesc.Buffer.FirstElement = desc.m_OffsetInBytes / stride;
+		nativeDesc.Buffer.NumElements = static_cast<UINT>(sizeInBytes / stride);
+		nativeDesc.Buffer.StructureByteStride = desc.m_StrideInBytes;
+		nativeDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+		return nativeDesc;
+	}
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC BuildD3D12UnorderedAccessViewDesc(
+		const RHIBufferViewDesc& desc,
+		uint64_t bufferSizeInBytes) noexcept
+	{
+		const uint64_t sizeInBytes = ResolveBufferViewSize(desc.m_OffsetInBytes, desc.m_SizeInBytes, bufferSizeInBytes);
+		const uint32_t stride = ResolveBufferElementStride(desc);
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC nativeDesc{};
+		nativeDesc.Format = desc.m_StrideInBytes == 0 ? ToDXGIFormat(desc.m_Format) : DXGI_FORMAT_UNKNOWN;
+		nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		nativeDesc.Buffer.FirstElement = desc.m_OffsetInBytes / stride;
+		nativeDesc.Buffer.NumElements = static_cast<UINT>(sizeInBytes / stride);
+		nativeDesc.Buffer.StructureByteStride = desc.m_StrideInBytes;
+		nativeDesc.Buffer.CounterOffsetInBytes = 0;
+		nativeDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 		return nativeDesc;
 	}
 }

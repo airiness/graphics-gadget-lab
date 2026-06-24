@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
@@ -30,6 +31,17 @@ namespace gglab
 		m_RHITextureViews.Clear();
 		m_RHITextureViewCache.clear();
 		m_RHITextureResourceViews.clear();
+
+		for (auto& slot : m_RHIBufferViews.Slots())
+		{
+			if (slot.m_Descriptor.IsValid())
+			{
+				slot.m_Descriptor.Free();
+			}
+		}
+		m_RHIBufferViews.Clear();
+		m_RHIBufferViewCache.clear();
+		m_RHIBufferResourceViews.clear();
 
 		// Release all pending descriptors
 		for (auto& pending : m_PendingQueue)
@@ -139,10 +151,72 @@ namespace gglab
 		return view;
 	}
 
+	RHIBufferViewHandle DX12ViewCache::GetOrCreateBufferView(
+		RHIBufferHandle buffer,
+		const RHIBufferViewDesc& desc) noexcept
+	{
+		RHIBufferViewKey key{ .m_Buffer = buffer, .m_Desc = desc };
+
+		{
+			std::shared_lock lock(m_Mutex);
+			if (auto iterator = m_RHIBufferViewCache.find(key); iterator != m_RHIBufferViewCache.end())
+			{
+				if (m_RHIBufferViews.Resolve(iterator->second))
+				{
+					return iterator->second;
+				}
+			}
+		}
+
+		DX12Buffer* nativeBuffer = m_DX12Device->ResolveBuffer(buffer);
+		if (!nativeBuffer)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12ViewCache::GetOrCreateBufferView received a non-live buffer handle.");
+			return {};
+		}
+
+		DX12DescriptorHandle descriptor = CreateBufferDescriptor(key, nativeBuffer);
+		if (!descriptor.IsValid())
+		{
+			return {};
+		}
+
+		std::unique_lock lock(m_Mutex);
+		if (auto iterator = m_RHIBufferViewCache.find(key); iterator != m_RHIBufferViewCache.end())
+		{
+			if (m_RHIBufferViews.Resolve(iterator->second))
+			{
+				descriptor.Free();
+				return iterator->second;
+			}
+		}
+
+		const RHIBufferViewHandle view = m_RHIBufferViews.Allocate();
+		BufferViewSlot& slot = m_RHIBufferViews.SlotAt(view.Index());
+		slot.m_Key = key;
+		slot.m_RetirementPoints.clear();
+		slot.m_Descriptor = std::move(descriptor);
+		m_RHIBufferViewCache[key] = view;
+		m_RHIBufferResourceViews[buffer].push_back(view);
+		return view;
+	}
+
 	DX12DescriptorView DX12ViewCache::ResolveTextureView(RHITextureViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
+		if (!slot || !slot->m_Descriptor.IsValid())
+		{
+			return {};
+		}
+
+		return slot->m_Descriptor.ToDescriptorView();
+	}
+
+	DX12DescriptorView DX12ViewCache::ResolveBufferView(RHIBufferViewHandle view) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
 		if (!slot || !slot->m_Descriptor.IsValid())
 		{
 			return {};
@@ -215,6 +289,37 @@ namespace gglab
 		m_RHITextureResourceViews.erase(iterator);
 	}
 
+	void DX12ViewCache::RetireBufferViews(
+		RHIBufferHandle buffer,
+		std::span<const DX12FencePoint> fencePoints) noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+
+		auto iterator = m_RHIBufferResourceViews.find(buffer);
+		if (iterator == m_RHIBufferResourceViews.end())
+		{
+			return;
+		}
+
+		for (const RHIBufferViewHandle view : iterator->second)
+		{
+			BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
+			if (!slot)
+			{
+				continue;
+			}
+
+			m_RHIBufferViewCache.erase(slot->m_Key);
+			if (m_RHIBufferViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
+			{
+				BufferViewSlot& retiredSlot = m_RHIBufferViews.SlotAt(view.Index());
+				retiredSlot.m_RetirementPoints.assign(fencePoints.begin(), fencePoints.end());
+			}
+		}
+
+		m_RHIBufferResourceViews.erase(iterator);
+	}
+
 	void DX12ViewCache::GarbageCollect() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
@@ -244,6 +349,34 @@ namespace gglab
 			slot.m_Key = {};
 			slot.m_RetirementPoints.clear();
 			m_RHITextureViews.Retire(index);
+		}
+
+		for (uint32_t index = 0; index < m_RHIBufferViews.Size(); ++index)
+		{
+			BufferViewSlot& slot = m_RHIBufferViews.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::PendingRetirement)
+			{
+				continue;
+			}
+
+			const bool completed = std::ranges::all_of(
+				slot.m_RetirementPoints,
+				[](const DX12FencePoint& point)
+				{
+					return !point.IsValid() || point.IsCompleted();
+				});
+			if (!completed)
+			{
+				continue;
+			}
+
+			if (slot.m_Descriptor.IsValid())
+			{
+				slot.m_Descriptor.Free();
+			}
+			slot.m_Key = {};
+			slot.m_RetirementPoints.clear();
+			m_RHIBufferViews.Retire(index);
 		}
 
 		while (!m_PendingQueue.empty())
@@ -306,6 +439,45 @@ namespace gglab
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RHITextureViewType.");
+	}
+
+	DX12DescriptorHandle DX12ViewCache::CreateBufferDescriptor(
+		const RHIBufferViewKey& key,
+		DX12Buffer* buffer) const noexcept
+	{
+		GGLAB_ASSERT(buffer != nullptr);
+
+		DX12DescriptorHandle descriptor = AllocateHandle<ViewType::SRV>();
+		switch (key.m_Desc.m_Type)
+		{
+		case RHIBufferViewType::ConstantBuffer:
+		{
+			const D3D12_CONSTANT_BUFFER_VIEW_DESC desc = BuildD3D12ConstantBufferViewDesc(
+				key.m_Desc,
+				buffer->GPUVirtualAddress(),
+				buffer->SizeInBytes());
+			m_DX12Device->Get()->CreateConstantBufferView(&desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		case RHIBufferViewType::ShaderResource:
+		{
+			const D3D12_SHADER_RESOURCE_VIEW_DESC desc = BuildD3D12ShaderResourceViewDesc(
+				key.m_Desc,
+				buffer->SizeInBytes());
+			m_DX12Device->Get()->CreateShaderResourceView(buffer->Get(), &desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		case RHIBufferViewType::UnorderedAccess:
+		{
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC desc = BuildD3D12UnorderedAccessViewDesc(
+				key.m_Desc,
+				buffer->SizeInBytes());
+			m_DX12Device->Get()->CreateUnorderedAccessView(buffer->Get(), nullptr, &desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		}
+
+		GGLAB_UNREACHABLE("Unhandled RHIBufferViewType.");
 	}
 
 	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
