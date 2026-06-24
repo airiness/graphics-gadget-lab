@@ -2,10 +2,13 @@
 #include "Core/CoreMacros.h"
 #include "Core/StringId.h"
 #include "Graphics/RHI/RHIBuffer.h"
+#include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/RHI/RHITexture.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Core/Platform/Win/ComTypes.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -21,27 +24,30 @@ namespace gglab
 
 	class DX12ResourceManager
 	{
+	public:
+		struct ImportedTextureDesc
+		{
+			RHIImportedTextureDesc m_RHI;
+			ComPtr<ID3D12Resource> m_Resource;
+		};
+
+		struct ImportedBufferDesc
+		{
+			RHIImportedBufferDesc m_RHI;
+			ComPtr<ID3D12Resource> m_Resource;
+		};
+
 	private:
-		enum class ResourceOwnership : uint8_t
-		{
-			Owned,
-			Borrowed,
-		};
-
-		enum class ResourceSlotState : uint8_t
-		{
-			Free,
-			Alive,
-			PendingRetirement,
-		};
-
 		struct Diagnostics
 		{
 			uint64_t m_TextureCreateCount = 0;
 			uint64_t m_BufferCreateCount = 0;
+			uint64_t m_TextureImportCount = 0;
+			uint64_t m_BufferImportCount = 0;
 			uint64_t m_TextureRetireCount = 0;
 			uint64_t m_BufferRetireCount = 0;
 			uint64_t m_CreateFailureCount = 0;
+			uint64_t m_ImportFailureCount = 0;
 			uint64_t m_InvalidDestroyCount = 0;
 			uint64_t m_StaleDestroyCount = 0;
 			uint64_t m_DoubleDestroyCount = 0;
@@ -57,6 +63,8 @@ namespace gglab
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept;
+		RHITextureHandle ImportTexture(const ImportedTextureDesc& desc) noexcept;
+		RHIBufferHandle ImportBuffer(const ImportedBufferDesc& desc) noexcept;
 
 		void DestroyTexture(RHITextureHandle texture) noexcept;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept;
@@ -75,8 +83,8 @@ namespace gglab
 		struct TextureSlot
 		{
 			RHITextureHandle::GenerationType m_Generation = 1;
-			ResourceOwnership m_Ownership = ResourceOwnership::Owned;
-			ResourceSlotState m_State = ResourceSlotState::Free;
+			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
+			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			StringID m_DebugNameId;
 			std::vector<DX12FencePoint> m_RetirementPoints;
 			std::unique_ptr<DX12Texture> m_Texture;
@@ -85,27 +93,30 @@ namespace gglab
 		struct BufferSlot
 		{
 			RHIBufferHandle::GenerationType m_Generation = 1;
-			ResourceOwnership m_Ownership = ResourceOwnership::Owned;
-			ResourceSlotState m_State = ResourceSlotState::Free;
+			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
+			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			StringID m_DebugNameId;
 			std::vector<DX12FencePoint> m_RetirementPoints;
 			std::unique_ptr<DX12Buffer> m_Buffer;
 		};
 
 	private:
-		uint32_t AllocateTextureSlot() noexcept;
-		uint32_t AllocateBufferSlot() noexcept;
+		RHITextureHandle AllocateTextureSlot(
+			std::unique_ptr<DX12Texture> texture,
+			RHIResourceOwnership ownership,
+			std::string_view debugName) noexcept;
+		RHIBufferHandle AllocateBufferSlot(
+			std::unique_ptr<DX12Buffer> buffer,
+			RHIResourceOwnership ownership,
+			std::string_view debugName) noexcept;
 		std::vector<DX12FencePoint> CaptureRetirementPoints() const noexcept;
 		void ReportLiveResources() const noexcept;
 
 	private:
 		DX12Device* m_Device = nullptr;
 
-		std::vector<TextureSlot> m_TextureSlots;
-		std::vector<uint32_t> m_FreeTextureSlots;
-
-		std::vector<BufferSlot> m_BufferSlots;
-		std::vector<uint32_t> m_FreeBufferSlots;
+		RHIHandleTable<RHITextureHandle, TextureSlot> m_Textures;
+		RHIHandleTable<RHIBufferHandle, BufferSlot> m_Buffers;
 
 		Diagnostics m_Diagnostics;
 

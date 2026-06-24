@@ -99,6 +99,16 @@ namespace gglab
 		return m_ResourceManager.CreateBuffer(desc);
 	}
 
+	RHITextureHandle DX12Device::ImportTexture(const DX12ResourceManager::ImportedTextureDesc& desc) noexcept
+	{
+		return m_ResourceManager.ImportTexture(desc);
+	}
+
+	RHIBufferHandle DX12Device::ImportBuffer(const DX12ResourceManager::ImportedBufferDesc& desc) noexcept
+	{
+		return m_ResourceManager.ImportBuffer(desc);
+	}
+
 	RHITextureViewHandle DX12Device::CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
 		GGLAB_UNUSED(texture);

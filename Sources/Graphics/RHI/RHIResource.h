@@ -10,11 +10,23 @@ namespace gglab
 {
 	class RHIDevice;
 
+	enum class RHIResourceOwnership : uint8_t
+	{
+		Owned,
+		Borrowed,
+	};
+
 	struct RHIResourceDesc
 	{
 		RHIResourceType m_Type = RHIResourceType::Unknown;
 		RHIResourceState m_InitialState{};
 		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
+		const char* m_DebugName = nullptr;
+	};
+
+	struct RHIExternalResourceDesc
+	{
+		RHIResourceState m_InitialState{};
 		const char* m_DebugName = nullptr;
 	};
 

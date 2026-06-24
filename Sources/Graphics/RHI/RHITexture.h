@@ -59,6 +59,12 @@ namespace gglab
 		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
 	};
 
+	struct RHIImportedTextureDesc
+	{
+		RHITextureDesc m_Desc;
+		RHIExternalResourceDesc m_External;
+	};
+
 	struct RHITextureViewDesc
 	{
 		static constexpr uint32_t AllMipLevels = std::numeric_limits<uint32_t>::max();

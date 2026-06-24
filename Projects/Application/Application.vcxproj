@@ -289,6 +289,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />

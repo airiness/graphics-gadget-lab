@@ -25,9 +25,12 @@ namespace gglab
 	{
 		uint64_t m_TextureCreateCount = 0;
 		uint64_t m_BufferCreateCount = 0;
+		uint64_t m_TextureImportCount = 0;
+		uint64_t m_BufferImportCount = 0;
 		uint64_t m_TextureRetireCount = 0;
 		uint64_t m_BufferRetireCount = 0;
 		uint64_t m_CreateFailureCount = 0;
+		uint64_t m_ImportFailureCount = 0;
 		uint64_t m_InvalidDestroyCount = 0;
 		uint64_t m_StaleDestroyCount = 0;
 		uint64_t m_DoubleDestroyCount = 0;
