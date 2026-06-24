@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <tuple>
+#include <vector>
 
 namespace gglab
 {
@@ -64,6 +65,23 @@ namespace gglab
 	{
 		RHITextureDesc m_Desc;
 		RHIExternalResourceDesc m_External;
+	};
+
+	struct RHITextureSubresourceData
+	{
+		const void* m_Data = nullptr;
+		uint64_t m_RowPitch = 0;
+		uint64_t m_SlicePitch = 0;
+	};
+
+	struct RHITextureUploadData
+	{
+		std::vector<RHITextureSubresourceData> m_Subresources;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return !m_Subresources.empty();
+		}
 	};
 
 	struct RHITextureViewDesc

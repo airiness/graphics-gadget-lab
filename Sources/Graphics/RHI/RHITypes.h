@@ -30,7 +30,9 @@ namespace gglab
 	{
 		Unknown,
 
+		R8G8B8A8Typeless,
 		R8G8B8A8Unorm,
+		R8G8B8A8UnormSrgb,
 		R16G16Float,
 		R16G16B16A16Float,
 

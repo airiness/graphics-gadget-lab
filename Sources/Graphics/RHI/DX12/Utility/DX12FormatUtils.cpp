@@ -9,8 +9,12 @@ namespace gglab
 		{
 		case RHIFormat::Unknown:
 			return DXGI_FORMAT_UNKNOWN;
+		case RHIFormat::R8G8B8A8Typeless:
+			return DXGI_FORMAT_R8G8B8A8_TYPELESS;
 		case RHIFormat::R8G8B8A8Unorm:
 			return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case RHIFormat::R8G8B8A8UnormSrgb:
+			return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 		case RHIFormat::R16G16Float:
 			return DXGI_FORMAT_R16G16_FLOAT;
 		case RHIFormat::R16G16B16A16Float:
@@ -34,8 +38,12 @@ namespace gglab
 		{
 		case DXGI_FORMAT_UNKNOWN:
 			return RHIFormat::Unknown;
+		case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+			return RHIFormat::R8G8B8A8Typeless;
 		case DXGI_FORMAT_R8G8B8A8_UNORM:
 			return RHIFormat::R8G8B8A8Unorm;
+		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+			return RHIFormat::R8G8B8A8UnormSrgb;
 		case DXGI_FORMAT_R16G16_FLOAT:
 			return RHIFormat::R16G16Float;
 		case DXGI_FORMAT_R16G16B16A16_FLOAT:

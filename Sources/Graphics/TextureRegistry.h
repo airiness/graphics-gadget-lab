@@ -1,8 +1,7 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/CopyContext.h"
-
-#include <DirectXTex.h>
+#include "Graphics/TextureAsset.h"
 
 namespace gglab
 {
@@ -57,7 +56,7 @@ namespace gglab
 		{
 			TextureID m_TextureId{};
 			TextureSemantic m_Semantic = TextureSemantic::GenericColor;
-			DirectX::ScratchImage m_ScratchImage;
+			TextureAssetData m_TextureData;
 			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
 		};
 
@@ -91,15 +90,12 @@ namespace gglab
 			const std::filesystem::path& canonicalPath, TextureSemantic semantic) noexcept;
 
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
-			DirectX::ScratchImage&& scratchImage, TextureSemantic semantic) noexcept;
+			TextureAssetData&& textureData, TextureSemantic semantic) noexcept;
 
 		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
 
 	private:
 		void CreateTextureEntry(TextureID id, const char* texName) noexcept;
-
-		DirectX::ScratchImage LoadTextureScratchImage(
-			const std::filesystem::path& texPath, TextureColorSpace colorSpace) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

@@ -3,6 +3,7 @@
 #include "Core/StringId.h"
 #include "Core/TypedIndex.h"
 #include "Core/EnumFlags.h"
+#include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Core/Utility/TypeUtils.h"
@@ -14,7 +15,6 @@
 
 namespace gglab
 {
-	class DX12Texture;
 	class DX12Buffer;
 
 	enum class CommonRSRootParamIndex : uint32_t
@@ -196,7 +196,7 @@ namespace gglab
 		DX12DescriptorID m_DescriptorId{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
-		std::unique_ptr<DX12Texture> m_Texture;
+		RHITextureHandle m_Texture;
 		bool m_IsUploaded = false;
 	};
 
