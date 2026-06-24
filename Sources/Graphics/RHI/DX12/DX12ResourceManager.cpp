@@ -206,7 +206,13 @@ namespace gglab
 			m_Buffers,
 			buffer,
 			"DX12ResourceManager::DestroyBuffer",
-			[](BufferSlot&) noexcept {});
+			[this, buffer](BufferSlot& slot) noexcept
+			{
+				if (m_ViewCache)
+				{
+					m_ViewCache->RetireBufferViews(buffer, slot.m_RetirementPoints);
+				}
+			});
 	}
 
 	void DX12ResourceManager::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
