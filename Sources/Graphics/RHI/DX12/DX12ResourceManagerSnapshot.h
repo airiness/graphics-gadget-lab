@@ -31,6 +31,7 @@ namespace gglab
 		uint64_t m_BufferRetireCount = 0;
 		uint64_t m_CreateFailureCount = 0;
 		uint64_t m_ImportFailureCount = 0;
+		uint64_t m_InvalidUseCount = 0;
 		uint64_t m_InvalidDestroyCount = 0;
 		uint64_t m_StaleDestroyCount = 0;
 		uint64_t m_DoubleDestroyCount = 0;
@@ -43,6 +44,8 @@ namespace gglab
 		DX12ResourceSnapshotState m_State = DX12ResourceSnapshotState::Free;
 		DX12ResourceSnapshotOwnership m_Ownership = DX12ResourceSnapshotOwnership::Owned;
 		std::string m_DebugName;
+		uint32_t m_LastUseFenceCount = 0;
+		uint32_t m_CompletedLastUseFenceCount = 0;
 		uint32_t m_PendingFenceCount = 0;
 		uint32_t m_CompletedFenceCount = 0;
 		bool m_NativeResourceValid = false;

@@ -25,6 +25,7 @@ namespace gglab
 			.m_BufferRetireCount = manager.m_Diagnostics.m_BufferRetireCount,
 			.m_CreateFailureCount = manager.m_Diagnostics.m_CreateFailureCount,
 			.m_ImportFailureCount = manager.m_Diagnostics.m_ImportFailureCount,
+			.m_InvalidUseCount = manager.m_Diagnostics.m_InvalidUseCount,
 			.m_InvalidDestroyCount = manager.m_Diagnostics.m_InvalidDestroyCount,
 			.m_StaleDestroyCount = manager.m_Diagnostics.m_StaleDestroyCount,
 			.m_DoubleDestroyCount = manager.m_Diagnostics.m_DoubleDestroyCount,
@@ -64,6 +65,13 @@ namespace gglab
 				result.m_State = toSnapshotState(slot.m_State);
 				result.m_Ownership = toSnapshotOwnership(slot.m_Ownership);
 				result.m_DebugName = utils::StringIdToString(slot.m_DebugNameId);
+				result.m_LastUseFenceCount = static_cast<uint32_t>(slot.m_LastUsePoints.size());
+				result.m_CompletedLastUseFenceCount = static_cast<uint32_t>(std::ranges::count_if(
+					slot.m_LastUsePoints,
+					[](const DX12FencePoint& point)
+					{
+						return !point.IsValid() || point.IsCompleted();
+					}));
 				result.m_PendingFenceCount = static_cast<uint32_t>(slot.m_RetirementPoints.size());
 				result.m_CompletedFenceCount = static_cast<uint32_t>(std::ranges::count_if(
 					slot.m_RetirementPoints,

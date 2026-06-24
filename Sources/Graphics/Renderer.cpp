@@ -68,6 +68,7 @@ namespace gglab
 		viewCacheCreateInfo.m_DX12Device = m_Device.get();
 		viewCacheCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		m_ViewCache = std::make_unique<DX12ViewCache>(viewCacheCreateInfo);
+		m_Device->GetResourceManager()->SetViewCache(m_ViewCache.get());
 
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
 
@@ -145,6 +146,7 @@ namespace gglab
 		m_PipelineCache.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
+		m_Device->GetResourceManager()->SetViewCache(nullptr);
 		m_ViewCache.reset();
 		m_RGGpuResAllocator.reset();
 

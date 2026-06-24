@@ -85,6 +85,8 @@ namespace gglab
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
+		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
+		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;

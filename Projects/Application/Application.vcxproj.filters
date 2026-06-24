@@ -85,6 +85,9 @@
     <Filter Include="Graphics\RHI\DX12\Descriptor">
       <UniqueIdentifier>{bbedd216-a444-41bc-8acd-a22ddeebbd53}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\RHI\DX12\Utility">
+      <UniqueIdentifier>{e2db09da-3161-4c5f-9e31-ef12eaeab40f}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\Utility">
       <UniqueIdentifier>{d892a0d4-9889-4a83-a0fe-d9ee5889cd10}</UniqueIdentifier>
     </Filter>
@@ -144,8 +147,20 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
@@ -479,8 +494,20 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RHITypeUtils.h">
-      <Filter>Graphics\RHI\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h">
       <Filter>Graphics\RHI\DX12</Filter>

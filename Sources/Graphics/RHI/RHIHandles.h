@@ -1,9 +1,11 @@
 #pragma once
+#include "Core/Hash/FNV1a.h"
 
 #include <compare>
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <tuple>
 
 namespace gglab
 {
@@ -36,6 +38,11 @@ namespace gglab
 
 		[[nodiscard]] constexpr IndexType Index() const noexcept { return m_Index; }
 		[[nodiscard]] constexpr GenerationType Generation() const noexcept { return m_Generation; }
+
+		[[nodiscard]] constexpr auto AsTuple() const noexcept
+		{
+			return std::make_tuple(m_Index, m_Generation);
+		}
 
 		friend constexpr auto operator<=>(const RHIHandle&, const RHIHandle&) noexcept = default;
 
@@ -72,10 +79,7 @@ namespace std
 	{
 		size_t operator()(const gglab::RHIHandle<Tag>& handle) const noexcept
 		{
-			const uint64_t packed =
-				(static_cast<uint64_t>(handle.Generation()) << 32) |
-				static_cast<uint64_t>(handle.Index());
-			return std::hash<uint64_t>{}(packed);
+			return gglab::KeyHash<gglab::RHIHandle<Tag>>{}(handle);
 		}
 	};
 }

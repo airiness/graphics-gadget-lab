@@ -143,6 +143,16 @@ namespace gglab
 		GGLAB_UNUSED(view);
 	}
 
+	void DX12Device::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
+	{
+		m_ResourceManager.RecordTextureUse(texture, fencePoint);
+	}
+
+	void DX12Device::RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
+	{
+		m_ResourceManager.RecordBufferUse(buffer, fencePoint);
+	}
+
 	bool DX12Device::IsAlive(RHITextureHandle texture) const noexcept
 	{
 		return m_ResourceManager.IsAlive(texture);
