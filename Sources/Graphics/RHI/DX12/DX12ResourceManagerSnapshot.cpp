@@ -87,14 +87,14 @@ namespace gglab
 		for (uint32_t index = 0; index < manager.m_Textures.Size(); ++index)
 		{
 			const auto& slot = manager.m_Textures.SlotAt(index);
-			outSnapshot.m_Textures.push_back(makeSnapshot(index, slot, slot.m_Texture.get()));
+			outSnapshot.m_Textures.push_back(makeSnapshot(index, slot, slot.m_Resource.get()));
 		}
 
 		outSnapshot.m_Buffers.reserve(manager.m_Buffers.Slots().size());
 		for (uint32_t index = 0; index < manager.m_Buffers.Size(); ++index)
 		{
 			const auto& slot = manager.m_Buffers.SlotAt(index);
-			outSnapshot.m_Buffers.push_back(makeSnapshot(index, slot, slot.m_Buffer.get()));
+			outSnapshot.m_Buffers.push_back(makeSnapshot(index, slot, slot.m_Resource.get()));
 		}
 	}
 }

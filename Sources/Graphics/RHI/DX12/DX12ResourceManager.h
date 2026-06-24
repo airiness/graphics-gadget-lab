@@ -85,27 +85,20 @@ namespace gglab
 		void RetireCompletedResources() noexcept;
 
 	private:
-		struct TextureSlot
+		template<typename HandleT, typename ResourceT>
+		struct ResourceSlot
 		{
-			RHITextureHandle::GenerationType m_Generation = 1;
+			typename HandleT::GenerationType m_Generation = 1;
 			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			StringID m_DebugNameId;
 			std::vector<DX12FencePoint> m_LastUsePoints;
 			std::vector<DX12FencePoint> m_RetirementPoints;
-			std::unique_ptr<DX12Texture> m_Texture;
+			std::unique_ptr<ResourceT> m_Resource;
 		};
 
-		struct BufferSlot
-		{
-			RHIBufferHandle::GenerationType m_Generation = 1;
-			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
-			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
-			StringID m_DebugNameId;
-			std::vector<DX12FencePoint> m_LastUsePoints;
-			std::vector<DX12FencePoint> m_RetirementPoints;
-			std::unique_ptr<DX12Buffer> m_Buffer;
-		};
+		using TextureSlot = ResourceSlot<RHITextureHandle, DX12Texture>;
+		using BufferSlot = ResourceSlot<RHIBufferHandle, DX12Buffer>;
 
 	private:
 		RHITextureHandle AllocateTextureSlot(
@@ -119,6 +112,29 @@ namespace gglab
 		static void RecordLastUsePoint(
 			std::vector<DX12FencePoint>& points,
 			const DX12FencePoint& fencePoint) noexcept;
+		template<typename HandleT, typename SlotT, typename ResourceT>
+		static HandleT AllocateResourceSlot(
+			RHIHandleTable<HandleT, SlotT>& table,
+			std::unique_ptr<ResourceT> resource,
+			RHIResourceOwnership ownership,
+			std::string_view debugName) noexcept;
+		template<typename HandleT, typename SlotT, typename OnValidT>
+		void DestroyResource(
+			RHIHandleTable<HandleT, SlotT>& table,
+			HandleT handle,
+			const char* functionName,
+			OnValidT onValid) noexcept;
+		template<typename HandleT, typename SlotT>
+		void RecordResourceUse(
+			RHIHandleTable<HandleT, SlotT>& table,
+			HandleT handle,
+			const DX12FencePoint& fencePoint,
+			const char* functionName,
+			const char* resourceKind) noexcept;
+		template<typename HandleT, typename SlotT>
+		void RetireCompletedResourceTable(
+			RHIHandleTable<HandleT, SlotT>& table,
+			uint64_t& retireCount) noexcept;
 		void ReportLiveResources() const noexcept;
 
 	private:
