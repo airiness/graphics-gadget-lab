@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/RHITexture.h"
 #include "Graphics/Color.h"
 
 namespace gglab
@@ -53,6 +54,8 @@ namespace gglab
 		void Present() noexcept;
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
+		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept;
+		RHITextureHandle GetCurrentBackBufferHandle() const noexcept { return GetBackBufferHandle(m_BackBufferIndex); }
 		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
 		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffer(m_BackBufferIndex); }
 
@@ -85,7 +88,7 @@ namespace gglab
 
 		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
 
-		std::vector<std::unique_ptr<DX12Texture>> m_BackBuffers;
+		std::vector<RHITextureHandle> m_BackBuffers;
 		std::vector<DX12FencePoint> m_SyncObjects;
 	};
 }

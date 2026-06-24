@@ -3,6 +3,7 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Core/HResult.h"
 
 namespace gglab
@@ -132,10 +133,16 @@ namespace gglab
 
 	DX12Texture* DX12SwapChain::GetBackBuffer(uint32_t bufferIndex) const noexcept
 	{
+		const RHITextureHandle handle = GetBackBufferHandle(bufferIndex);
+		return m_DX12Device ? m_DX12Device->ResolveTexture(handle) : nullptr;
+	}
+
+	RHITextureHandle DX12SwapChain::GetBackBufferHandle(uint32_t bufferIndex) const noexcept
+	{
 		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::GetBackBuffer called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(bufferIndex < m_BackBuffers.size(), "BackBuffer index out of range.");
 
-		return m_BackBuffers[bufferIndex].get();
+		return m_BackBuffers[bufferIndex];
 	}
 
 	ComPtr<IDXGISwapChain4> DX12SwapChain::CreateSwapChain() noexcept
@@ -193,15 +200,54 @@ namespace gglab
 			ComPtr<ID3D12Resource> backBuffer;
 			GGLAB_HR(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
-			auto tex = std::make_unique<DX12Texture>();
-			tex->AdoptFromSwapChain(backBuffer);
-			// TODO: Add backbuffer debug name.
-			m_BackBuffers[i] = std::move(tex);
+			const D3D12_RESOURCE_DESC nativeDesc = backBuffer->GetDesc();
+			const std::string debugName = "SwapChain.BackBuffer." + std::to_string(i);
+
+			DX12ResourceManager::ImportedTextureDesc importDesc{};
+			importDesc.m_RHI.m_Desc.m_Dimension = RHITextureDimension::Texture2D;
+			importDesc.m_RHI.m_Desc.m_Format = ToRHIFormat(nativeDesc.Format);
+			importDesc.m_RHI.m_Desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Present;
+			importDesc.m_RHI.m_Desc.m_Extent =
+			{
+				.m_Width = static_cast<uint32_t>(nativeDesc.Width),
+				.m_Height = nativeDesc.Height,
+				.m_Depth = 1,
+			};
+			importDesc.m_RHI.m_Desc.m_ArraySize = nativeDesc.DepthOrArraySize;
+			importDesc.m_RHI.m_Desc.m_MipLevels = nativeDesc.MipLevels;
+			importDesc.m_RHI.m_Desc.m_SampleCount = nativeDesc.SampleDesc.Count;
+			importDesc.m_RHI.m_Desc.m_DebugName = debugName.c_str();
+			importDesc.m_RHI.m_External.m_InitialState =
+			{
+				.m_Access = RHIAccess::Present,
+				.m_Layout = RHILayout::Present,
+			};
+			importDesc.m_RHI.m_External.m_DebugName = debugName.c_str();
+			importDesc.m_Resource = std::move(backBuffer);
+
+			m_BackBuffers[i] = m_DX12Device->ImportTexture(importDesc);
+			GGLAB_ASSERT_MSG(m_BackBuffers[i].IsValid(), "DX12SwapChain failed to import backbuffer.");
 		}
 	}
 
 	void DX12SwapChain::ReleaseBackBuffers() noexcept
 	{
+		if (m_DX12Device)
+		{
+			for (RHITextureHandle& backBuffer : m_BackBuffers)
+			{
+				if (backBuffer.IsValid())
+				{
+					m_DX12Device->DestroyTexture(backBuffer);
+					backBuffer.Reset();
+				}
+			}
+
+			// ResizeBuffers requires all old backbuffer references to be released.
+			// SwapChain waits for its sync objects before calling this path, so
+			// borrowed backbuffers have no remaining GPU use and can retire now.
+			m_DX12Device->RetireCompletedRHIResources();
+		}
 		m_BackBuffers.clear();
 	}
 
