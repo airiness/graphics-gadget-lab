@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
+#include "Graphics/RHI/RHITexture.h"
 
 namespace gglab
 {
@@ -26,6 +27,8 @@ namespace gglab
 			DX12Buffer* src, uint64_t srcOffset,
 			uint64_t numBytes) noexcept;
 		void UploadResource(const void* data, uint64_t sizeInBytes, 
+			const DX12Resource* dstResource) noexcept;
+		void UploadResource(const RHITextureUploadData& uploadData,
 			const DX12Resource* dstResource) noexcept;
 		void UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResources,
 			const DX12Resource* dstResource) noexcept;

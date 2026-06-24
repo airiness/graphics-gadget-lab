@@ -139,4 +139,37 @@ namespace gglab
 
 		m_ExecutingInfo->m_IntermediateBuffers.push_back(std::move(uploadBuffer));
 	}
+
+	void CopyContext::UploadResource(
+		const RHITextureUploadData& uploadData,
+		const DX12Resource* dstResource) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_ExecutingInfo, "UploadResource must be called between Begin() and End().");
+
+		std::vector<D3D12_SUBRESOURCE_DATA> nativeSubresources;
+		nativeSubresources.reserve(uploadData.m_Subresources.size());
+		for (const RHITextureSubresourceData& subresource : uploadData.m_Subresources)
+		{
+			if (!subresource.m_Data || subresource.m_RowPitch == 0 || subresource.m_SlicePitch == 0)
+			{
+				GGLAB_LOG_GRAPHICS_WARN("CopyContext::UploadResource skipped an invalid texture subresource.");
+				continue;
+			}
+
+			nativeSubresources.push_back(
+				{
+					.pData = subresource.m_Data,
+					.RowPitch = static_cast<LONG_PTR>(subresource.m_RowPitch),
+					.SlicePitch = static_cast<LONG_PTR>(subresource.m_SlicePitch),
+				});
+		}
+
+		if (nativeSubresources.empty())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("CopyContext::UploadResource received no valid texture subresources.");
+			return;
+		}
+
+		UploadResource(nativeSubresources, dstResource);
+	}
 }

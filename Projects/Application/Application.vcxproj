@@ -238,6 +238,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TextureLoader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\ShaderCompiler.cpp" />
@@ -395,6 +397,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TextureLoader.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader.h" />
     <ClInclude Include="..\..\Sources\Graphics\ShaderCompiler.h" />
