@@ -3,6 +3,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Graphics/RHI/DX12/DX12ResourceManagerSnapshot.h"
 
@@ -132,6 +133,33 @@ namespace gglab
 				device.DestroyBuffer(entry.m_Buffer);
 			}
 			entry.m_DestroyRequested = true;
+		}
+
+		void RecordTestResourcesUse(DX12Device& device, ResourceManagementPanelState& state) noexcept
+		{
+			auto* graphicsQueue = device.GetCommandQueue(CommandQueueType::Graphics);
+			if (!graphicsQueue)
+			{
+				return;
+			}
+
+			const DX12FencePoint fencePoint = graphicsQueue->Signal();
+			for (const auto& entry : state.m_Resources)
+			{
+				if (entry.m_DestroyRequested)
+				{
+					continue;
+				}
+
+				if (entry.m_Type == TestResourceType::Texture)
+				{
+					device.RecordTextureUse(entry.m_Texture, fencePoint);
+				}
+				else
+				{
+					device.RecordBufferUse(entry.m_Buffer, fencePoint);
+				}
+			}
 		}
 
 		const DX12ResourceSlotSnapshot* FindSlot(
@@ -299,7 +327,7 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (!ImGui::BeginTable(tableId, 8, flags))
+			if (!ImGui::BeginTable(tableId, 10, flags))
 			{
 				return;
 			}
@@ -310,8 +338,10 @@ namespace gglab
 			ImGui::TableSetupColumn("Ownership");
 			ImGui::TableSetupColumn("Debug Name");
 			ImGui::TableSetupColumn("Native");
-			ImGui::TableSetupColumn("Fences");
-			ImGui::TableSetupColumn("Completed");
+			ImGui::TableSetupColumn("Last Use");
+			ImGui::TableSetupColumn("Use Done");
+			ImGui::TableSetupColumn("Retire");
+			ImGui::TableSetupColumn("Retire Done");
 			ImGui::TableHeadersRow();
 
 			for (const auto& slot : slots)
@@ -330,8 +360,12 @@ namespace gglab
 				ImGui::TableSetColumnIndex(5);
 				ImGui::TextUnformatted(slot.m_NativeResourceValid ? "yes" : "no");
 				ImGui::TableSetColumnIndex(6);
-				ImGui::Text("%u", slot.m_PendingFenceCount);
+				ImGui::Text("%u", slot.m_LastUseFenceCount);
 				ImGui::TableSetColumnIndex(7);
+				ImGui::Text("%u", slot.m_CompletedLastUseFenceCount);
+				ImGui::TableSetColumnIndex(8);
+				ImGui::Text("%u", slot.m_PendingFenceCount);
+				ImGui::TableSetColumnIndex(9);
 				ImGui::Text("%u", slot.m_CompletedFenceCount);
 			}
 
@@ -422,6 +456,11 @@ namespace gglab
 			}
 		}
 		ImGui::SameLine();
+		if (ImGui::Button("Signal + Record Use"))
+		{
+			RecordTestResourcesUse(device, state);
+		}
+		ImGui::SameLine();
 		if (ImGui::Button("Clear Destroyed Rows"))
 		{
 			std::erase_if(
@@ -481,9 +520,10 @@ namespace gglab
 			static_cast<unsigned long long>(diagnostics.m_TextureRetireCount),
 			static_cast<unsigned long long>(diagnostics.m_BufferRetireCount));
 		ImGui::Text(
-			"Validation: create failures=%llu import failures=%llu invalid destroys=%llu stale destroys=%llu double destroys=%llu",
+			"Validation: create failures=%llu import failures=%llu invalid uses=%llu invalid destroys=%llu stale destroys=%llu double destroys=%llu",
 			static_cast<unsigned long long>(diagnostics.m_CreateFailureCount),
 			static_cast<unsigned long long>(diagnostics.m_ImportFailureCount),
+			static_cast<unsigned long long>(diagnostics.m_InvalidUseCount),
 			static_cast<unsigned long long>(diagnostics.m_InvalidDestroyCount),
 			static_cast<unsigned long long>(diagnostics.m_StaleDestroyCount),
 			static_cast<unsigned long long>(diagnostics.m_DoubleDestroyCount));

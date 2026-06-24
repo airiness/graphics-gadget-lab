@@ -1,12 +1,12 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
-#include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12RHITypeUtils.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Core/Utility/StringUtils.h"
-#include "Core/Utility/TypeUtils.h"
 
 #include <algorithm>
 
@@ -30,6 +30,7 @@ namespace gglab
 		m_Buffers.Clear();
 
 		m_Device = nullptr;
+		m_ViewCache = nullptr;
 	}
 
 	RHITextureHandle DX12ResourceManager::CreateTexture(const RHITextureDesc& desc) noexcept
@@ -192,7 +193,12 @@ namespace gglab
 		case RHIHandleValidationResult::Valid:
 		{
 			TextureSlot& slot = m_Textures.SlotAt(texture.Index());
-			slot.m_RetirementPoints = CaptureRetirementPoints();
+			slot.m_RetirementPoints = slot.m_LastUsePoints;
+			slot.m_LastUsePoints.clear();
+			if (m_ViewCache)
+			{
+				m_ViewCache->RetireTextureViews(texture, slot.m_RetirementPoints);
+			}
 			return;
 		}
 		case RHIHandleValidationResult::Invalid:
@@ -223,7 +229,8 @@ namespace gglab
 		case RHIHandleValidationResult::Valid:
 		{
 			BufferSlot& slot = m_Buffers.SlotAt(buffer.Index());
-			slot.m_RetirementPoints = CaptureRetirementPoints();
+			slot.m_RetirementPoints = slot.m_LastUsePoints;
+			slot.m_LastUsePoints.clear();
 			return;
 		}
 		case RHIHandleValidationResult::Invalid:
@@ -244,6 +251,42 @@ namespace gglab
 			return;
 		}
 		GGLAB_UNREACHABLE("Unhandled RHI handle validation result.");
+	}
+
+	void DX12ResourceManager::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return;
+		}
+
+		TextureSlot* slot = m_Textures.Resolve(texture);
+		if (!slot || !slot->m_Texture)
+		{
+			++m_Diagnostics.m_InvalidUseCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::RecordTextureUse received a non-live texture handle.");
+			return;
+		}
+
+		RecordLastUsePoint(slot->m_LastUsePoints, fencePoint);
+	}
+
+	void DX12ResourceManager::RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return;
+		}
+
+		BufferSlot* slot = m_Buffers.Resolve(buffer);
+		if (!slot || !slot->m_Buffer)
+		{
+			++m_Diagnostics.m_InvalidUseCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::RecordBufferUse received a non-live buffer handle.");
+			return;
+		}
+
+		RecordLastUsePoint(slot->m_LastUsePoints, fencePoint);
 	}
 
 	bool DX12ResourceManager::IsAlive(RHITextureHandle texture) const noexcept
@@ -312,6 +355,7 @@ namespace gglab
 			}
 
 			slot.m_Texture.reset();
+			slot.m_LastUsePoints.clear();
 			slot.m_RetirementPoints.clear();
 			slot.m_DebugNameId = {};
 			slot.m_Ownership = RHIResourceOwnership::Owned;
@@ -339,6 +383,7 @@ namespace gglab
 			}
 
 			slot.m_Buffer.reset();
+			slot.m_LastUsePoints.clear();
 			slot.m_RetirementPoints.clear();
 			slot.m_DebugNameId = {};
 			slot.m_Ownership = RHIResourceOwnership::Owned;
@@ -358,6 +403,7 @@ namespace gglab
 		TextureSlot& slot = m_Textures.SlotAt(handle.Index());
 		slot.m_Ownership = ownership;
 		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
+		slot.m_LastUsePoints.clear();
 		slot.m_RetirementPoints.clear();
 		slot.m_Texture = std::move(texture);
 		return handle;
@@ -374,32 +420,34 @@ namespace gglab
 		BufferSlot& slot = m_Buffers.SlotAt(handle.Index());
 		slot.m_Ownership = ownership;
 		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
+		slot.m_LastUsePoints.clear();
 		slot.m_RetirementPoints.clear();
 		slot.m_Buffer = std::move(buffer);
 		return handle;
 	}
 
-	std::vector<DX12FencePoint> DX12ResourceManager::CaptureRetirementPoints() const noexcept
+	void DX12ResourceManager::RecordLastUsePoint(
+		std::vector<DX12FencePoint>& points,
+		const DX12FencePoint& fencePoint) noexcept
 	{
-		std::vector<DX12FencePoint> points;
-		if (!m_Device)
+		if (!fencePoint.IsValid())
 		{
-			return points;
+			return;
 		}
 
-		// Phase-one safety model: capture all work submitted before Destroy() on
-		// every queue. Submission-time resource tracking can replace this with
-		// precise last-use fence points later.
-		points.reserve(utils::EnumCount<CommandQueueType>());
-		for (const auto queueType : utils::EnumRange<CommandQueueType>())
+		for (DX12FencePoint& point : points)
 		{
-			auto* queue = m_Device->GetCommandQueue(queueType);
-			if (queue)
+			if (point.GetFence() == fencePoint.GetFence())
 			{
-				points.push_back(queue->Signal());
+				if (point.GetValue() < fencePoint.GetValue())
+				{
+					point = fencePoint;
+				}
+				return;
 			}
 		}
-		return points;
+
+		points.push_back(fencePoint);
 	}
 
 	void DX12ResourceManager::ReportLiveResources() const noexcept

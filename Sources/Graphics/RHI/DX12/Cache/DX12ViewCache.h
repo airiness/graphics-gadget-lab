@@ -1,7 +1,11 @@
 #pragma once
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/RHIDescriptor.h"
+#include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
+
+#include <span>
 
 namespace gglab
 {
@@ -89,6 +93,10 @@ namespace gglab
 		~DX12ViewCache();
 
 		DX12DescriptorView GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
+		RHITextureViewHandle GetOrCreateTextureView(
+			RHITextureHandle texture,
+			const RHITextureViewDesc& desc) noexcept;
+		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
 
 		template<ViewType T>
 		DX12DescriptorView GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
@@ -98,6 +106,9 @@ namespace gglab
 		}
 
 		void RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept;
+		void RetireTextureViews(
+			RHITextureHandle texture,
+			std::span<const DX12FencePoint> fencePoints) noexcept;
 		void GarbageCollect() noexcept;
 		void FreeAllImmediately(ResourceIndex resourceIndex) noexcept;
 
@@ -129,10 +140,26 @@ namespace gglab
 
 		template<ViewType T>
 		static typename ViewTraits<T>::Desc DescFromKey(const ViewKey&) noexcept;
+		DX12DescriptorHandle CreateTextureDescriptor(
+			const RHITextureViewKey& key,
+			DX12Texture* texture) const noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
+
+		struct TextureViewSlot
+		{
+			RHITextureViewHandle::GenerationType m_Generation = 1;
+			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
+			RHITextureViewKey m_Key;
+			std::vector<DX12FencePoint> m_RetirementPoints;
+			DX12DescriptorHandle m_Descriptor;
+		};
+
+		RHIHandleTable<RHITextureViewHandle, TextureViewSlot> m_RHITextureViews;
+		std::unordered_map<RHITextureViewKey, RHITextureViewHandle, RHITextureViewKeyHash> m_RHITextureViewCache;
+		std::unordered_map<RHITextureHandle, std::vector<RHITextureViewHandle>> m_RHITextureResourceViews;
 
 		std::unordered_map<ViewKey, DX12DescriptorHandle, ViewKeyHash> m_Cache;
 		std::unordered_map<ResourceIndex, std::vector<ViewKey>> m_ResourceViews;

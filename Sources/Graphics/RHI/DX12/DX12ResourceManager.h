@@ -17,6 +17,7 @@ namespace gglab
 	class DX12Device;
 	class DX12ResourceManager;
 	class DX12Texture;
+	class DX12ViewCache;
 	struct DX12ResourceManagerSnapshot;
 	void BuildDX12ResourceManagerSnapshot(
 		const DX12ResourceManager& manager,
@@ -48,6 +49,7 @@ namespace gglab
 			uint64_t m_BufferRetireCount = 0;
 			uint64_t m_CreateFailureCount = 0;
 			uint64_t m_ImportFailureCount = 0;
+			uint64_t m_InvalidUseCount = 0;
 			uint64_t m_InvalidDestroyCount = 0;
 			uint64_t m_StaleDestroyCount = 0;
 			uint64_t m_DoubleDestroyCount = 0;
@@ -60,6 +62,7 @@ namespace gglab
 
 		void Initialize(DX12Device* device) noexcept;
 		void Finalize() noexcept;
+		void SetViewCache(DX12ViewCache* viewCache) noexcept { m_ViewCache = viewCache; }
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept;
@@ -68,6 +71,8 @@ namespace gglab
 
 		void DestroyTexture(RHITextureHandle texture) noexcept;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept;
+		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
+		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept;
@@ -86,6 +91,7 @@ namespace gglab
 			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			StringID m_DebugNameId;
+			std::vector<DX12FencePoint> m_LastUsePoints;
 			std::vector<DX12FencePoint> m_RetirementPoints;
 			std::unique_ptr<DX12Texture> m_Texture;
 		};
@@ -96,6 +102,7 @@ namespace gglab
 			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			StringID m_DebugNameId;
+			std::vector<DX12FencePoint> m_LastUsePoints;
 			std::vector<DX12FencePoint> m_RetirementPoints;
 			std::unique_ptr<DX12Buffer> m_Buffer;
 		};
@@ -109,11 +116,14 @@ namespace gglab
 			std::unique_ptr<DX12Buffer> buffer,
 			RHIResourceOwnership ownership,
 			std::string_view debugName) noexcept;
-		std::vector<DX12FencePoint> CaptureRetirementPoints() const noexcept;
+		static void RecordLastUsePoint(
+			std::vector<DX12FencePoint>& points,
+			const DX12FencePoint& fencePoint) noexcept;
 		void ReportLiveResources() const noexcept;
 
 	private:
 		DX12Device* m_Device = nullptr;
+		DX12ViewCache* m_ViewCache = nullptr;
 
 		RHIHandleTable<RHITextureHandle, TextureSlot> m_Textures;
 		RHIHandleTable<RHIBufferHandle, BufferSlot> m_Buffers;

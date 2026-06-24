@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
+#include <tuple>
 
 namespace gglab
 {
@@ -47,5 +48,17 @@ namespace gglab
 		uint64_t m_SizeInBytes = 0;
 		uint32_t m_StrideInBytes = 0;
 		RHIFormat m_Format = RHIFormat::Unknown;
+
+		bool operator==(const RHIBufferViewDesc&) const noexcept = default;
+
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(
+				m_Type,
+				m_OffsetInBytes,
+				m_SizeInBytes,
+				m_StrideInBytes,
+				m_Format);
+		}
 	};
 }

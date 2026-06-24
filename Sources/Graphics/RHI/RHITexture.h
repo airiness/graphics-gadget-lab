@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <tuple>
 
 namespace gglab
 {
@@ -82,5 +83,24 @@ namespace gglab
 		uint32_t m_NumCubes = 1;
 		uint32_t m_PlaneSlice = 0;
 		float m_ResourceMinLODClamp = 0.0f;
+
+		bool operator==(const RHITextureViewDesc&) const noexcept = default;
+
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(
+				m_Type,
+				m_Dimension,
+				m_Format,
+				m_MostDetailedMip,
+				m_MipLevels,
+				m_MipSlice,
+				m_FirstArraySlice,
+				m_ArraySize,
+				m_First2DArrayFace,
+				m_NumCubes,
+				m_PlaneSlice,
+				m_ResourceMinLODClamp);
+		}
 	};
 }

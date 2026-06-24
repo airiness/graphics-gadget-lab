@@ -4,6 +4,7 @@
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
+#include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 
 namespace gglab
 {
@@ -18,6 +19,17 @@ namespace gglab
 	DX12ViewCache::~DX12ViewCache()
 	{
 		GarbageCollect();
+
+		for (auto& slot : m_RHITextureViews.Slots())
+		{
+			if (slot.m_Descriptor.IsValid())
+			{
+				slot.m_Descriptor.Free();
+			}
+		}
+		m_RHITextureViews.Clear();
+		m_RHITextureViewCache.clear();
+		m_RHITextureResourceViews.clear();
 
 		// Release all pending descriptors
 		for (auto& pending : m_PendingQueue)
@@ -77,6 +89,68 @@ namespace gglab
 		}
 	}
 
+	RHITextureViewHandle DX12ViewCache::GetOrCreateTextureView(
+		RHITextureHandle texture,
+		const RHITextureViewDesc& desc) noexcept
+	{
+		RHITextureViewKey key{ .m_Texture = texture, .m_Desc = desc };
+
+		{
+			std::shared_lock lock(m_Mutex);
+			if (auto iterator = m_RHITextureViewCache.find(key); iterator != m_RHITextureViewCache.end())
+			{
+				if (m_RHITextureViews.Resolve(iterator->second))
+				{
+					return iterator->second;
+				}
+			}
+		}
+
+		DX12Texture* nativeTexture = m_DX12Device->ResolveTexture(texture);
+		if (!nativeTexture)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12ViewCache::GetOrCreateTextureView received a non-live texture handle.");
+			return {};
+		}
+
+		DX12DescriptorHandle descriptor = CreateTextureDescriptor(key, nativeTexture);
+		if (!descriptor.IsValid())
+		{
+			return {};
+		}
+
+		std::unique_lock lock(m_Mutex);
+		if (auto iterator = m_RHITextureViewCache.find(key); iterator != m_RHITextureViewCache.end())
+		{
+			if (m_RHITextureViews.Resolve(iterator->second))
+			{
+				descriptor.Free();
+				return iterator->second;
+			}
+		}
+
+		const RHITextureViewHandle view = m_RHITextureViews.Allocate();
+		TextureViewSlot& slot = m_RHITextureViews.SlotAt(view.Index());
+		slot.m_Key = key;
+		slot.m_RetirementPoints.clear();
+		slot.m_Descriptor = std::move(descriptor);
+		m_RHITextureViewCache[key] = view;
+		m_RHITextureResourceViews[texture].push_back(view);
+		return view;
+	}
+
+	DX12DescriptorView DX12ViewCache::ResolveTextureView(RHITextureViewHandle view) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
+		if (!slot || !slot->m_Descriptor.IsValid())
+		{
+			return {};
+		}
+
+		return slot->m_Descriptor.ToDescriptorView();
+	}
+
 	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
@@ -110,9 +184,68 @@ namespace gglab
 		}
 	}
 
+	void DX12ViewCache::RetireTextureViews(
+		RHITextureHandle texture,
+		std::span<const DX12FencePoint> fencePoints) noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+
+		auto iterator = m_RHITextureResourceViews.find(texture);
+		if (iterator == m_RHITextureResourceViews.end())
+		{
+			return;
+		}
+
+		for (const RHITextureViewHandle view : iterator->second)
+		{
+			TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
+			if (!slot)
+			{
+				continue;
+			}
+
+			m_RHITextureViewCache.erase(slot->m_Key);
+			if (m_RHITextureViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
+			{
+				TextureViewSlot& retiredSlot = m_RHITextureViews.SlotAt(view.Index());
+				retiredSlot.m_RetirementPoints.assign(fencePoints.begin(), fencePoints.end());
+			}
+		}
+
+		m_RHITextureResourceViews.erase(iterator);
+	}
+
 	void DX12ViewCache::GarbageCollect() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
+		for (uint32_t index = 0; index < m_RHITextureViews.Size(); ++index)
+		{
+			TextureViewSlot& slot = m_RHITextureViews.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::PendingRetirement)
+			{
+				continue;
+			}
+
+			const bool completed = std::ranges::all_of(
+				slot.m_RetirementPoints,
+				[](const DX12FencePoint& point)
+				{
+					return !point.IsValid() || point.IsCompleted();
+				});
+			if (!completed)
+			{
+				continue;
+			}
+
+			if (slot.m_Descriptor.IsValid())
+			{
+				slot.m_Descriptor.Free();
+			}
+			slot.m_Key = {};
+			slot.m_RetirementPoints.clear();
+			m_RHITextureViews.Retire(index);
+		}
+
 		while (!m_PendingQueue.empty())
 		{
 			auto& pending = m_PendingQueue.front();
@@ -131,6 +264,48 @@ namespace gglab
 
 			m_PendingQueue.pop_front();
 		}
+	}
+
+	DX12DescriptorHandle DX12ViewCache::CreateTextureDescriptor(
+		const RHITextureViewKey& key,
+		DX12Texture* texture) const noexcept
+	{
+		GGLAB_ASSERT(texture != nullptr);
+
+		const D3D12_RESOURCE_DESC resourceDesc = texture->GetDesc();
+		switch (key.m_Desc.m_Type)
+		{
+		case RHITextureViewType::RenderTarget:
+		{
+			DX12DescriptorHandle descriptor = AllocateHandle<ViewType::RTV>();
+			const D3D12_RENDER_TARGET_VIEW_DESC desc = BuildD3D12RenderTargetViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateRenderTargetView(texture->Get(), &desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		case RHITextureViewType::DepthStencil:
+		{
+			DX12DescriptorHandle descriptor = AllocateHandle<ViewType::DSV>();
+			const D3D12_DEPTH_STENCIL_VIEW_DESC desc = BuildD3D12DepthStencilViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateDepthStencilView(texture->Get(), &desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		case RHITextureViewType::ShaderResource:
+		{
+			DX12DescriptorHandle descriptor = AllocateHandle<ViewType::SRV>();
+			const D3D12_SHADER_RESOURCE_VIEW_DESC desc = BuildD3D12ShaderResourceViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateShaderResourceView(texture->Get(), &desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		case RHITextureViewType::UnorderedAccess:
+		{
+			DX12DescriptorHandle descriptor = AllocateHandle<ViewType::UAV>();
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC desc = BuildD3D12UnorderedAccessViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, &desc, descriptor.CpuHandleAt());
+			return descriptor;
+		}
+		}
+
+		GGLAB_UNREACHABLE("Unhandled RHITextureViewType.");
 	}
 
 	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
