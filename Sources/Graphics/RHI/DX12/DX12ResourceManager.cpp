@@ -12,21 +12,6 @@
 
 namespace gglab
 {
-	namespace
-	{
-		template<typename Handle>
-		typename Handle::GenerationType NextHandleGeneration(typename Handle::GenerationType generation) noexcept
-		{
-			++generation;
-			if (generation == Handle::InvalidGeneration)
-			{
-				++generation;
-			}
-
-			return generation;
-		}
-	}
-
 	DX12ResourceManager::~DX12ResourceManager() noexcept = default;
 
 	void DX12ResourceManager::Initialize(DX12Device* device) noexcept
@@ -41,11 +26,8 @@ namespace gglab
 	{
 		ReportLiveResources();
 
-		m_TextureSlots.clear();
-		m_FreeTextureSlots.clear();
-
-		m_BufferSlots.clear();
-		m_FreeBufferSlots.clear();
+		m_Textures.Clear();
+		m_Buffers.Clear();
 
 		m_Device = nullptr;
 	}
@@ -91,17 +73,8 @@ namespace gglab
 			texture->SetDebugName(wideName.c_str());
 		}
 
-		const uint32_t slotIndex = AllocateTextureSlot();
-		TextureSlot& slot = m_TextureSlots[slotIndex];
-		GGLAB_ASSERT_MSG(slot.m_State == ResourceSlotState::Free, "Allocated RHI texture slot is not free.");
-		slot.m_Ownership = ResourceOwnership::Owned;
-		slot.m_State = ResourceSlotState::Alive;
-		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
-		slot.m_RetirementPoints.clear();
-		slot.m_Texture = std::move(texture);
 		++m_Diagnostics.m_TextureCreateCount;
-
-		return RHITextureHandle(slotIndex, slot.m_Generation);
+		return AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Owned, debugName);
 	}
 
 	RHIBufferHandle DX12ResourceManager::CreateBuffer(const RHIBufferDesc& desc) noexcept
@@ -139,117 +112,150 @@ namespace gglab
 			buffer->SetDebugName(wideName.c_str());
 		}
 
-		const uint32_t slotIndex = AllocateBufferSlot();
-		BufferSlot& slot = m_BufferSlots[slotIndex];
-		GGLAB_ASSERT_MSG(slot.m_State == ResourceSlotState::Free, "Allocated RHI buffer slot is not free.");
-		slot.m_Ownership = ResourceOwnership::Owned;
-		slot.m_State = ResourceSlotState::Alive;
-		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
-		slot.m_RetirementPoints.clear();
-		slot.m_Buffer = std::move(buffer);
 		++m_Diagnostics.m_BufferCreateCount;
+		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, debugName);
+	}
 
-		return RHIBufferHandle(slotIndex, slot.m_Generation);
+	RHITextureHandle DX12ResourceManager::ImportTexture(const ImportedTextureDesc& desc) noexcept
+	{
+		if (!desc.m_Resource)
+		{
+			++m_Diagnostics.m_ImportFailureCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::ImportTexture rejected a null native resource.");
+			return {};
+		}
+
+		auto texture = std::make_unique<DX12Texture>();
+		texture->AdoptExternal(
+			desc.m_Resource,
+			ToD3D12ResourceStates(desc.m_RHI.m_External.m_InitialState));
+		if (!texture->IsValid())
+		{
+			++m_Diagnostics.m_ImportFailureCount;
+			GGLAB_LOG_GRAPHICS_ERROR("DX12ResourceManager::ImportTexture failed to adopt the native resource.");
+			return {};
+		}
+
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
+		const std::string_view debugName = debugNameText ? debugNameText : "";
+		if (!debugName.empty())
+		{
+			const std::wstring wideName = utils::ToWideString(debugName);
+			texture->SetDebugName(wideName.c_str());
+		}
+
+		++m_Diagnostics.m_TextureImportCount;
+		return AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Borrowed, debugName);
+	}
+
+	RHIBufferHandle DX12ResourceManager::ImportBuffer(const ImportedBufferDesc& desc) noexcept
+	{
+		if (!desc.m_Resource)
+		{
+			++m_Diagnostics.m_ImportFailureCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::ImportBuffer rejected a null native resource.");
+			return {};
+		}
+
+		auto buffer = std::make_unique<DX12Buffer>();
+		buffer->AdoptExternal(
+			desc.m_Resource,
+			ToD3D12ResourceStates(desc.m_RHI.m_External.m_InitialState));
+		if (!buffer->IsValid())
+		{
+			++m_Diagnostics.m_ImportFailureCount;
+			GGLAB_LOG_GRAPHICS_ERROR("DX12ResourceManager::ImportBuffer failed to adopt the native resource.");
+			return {};
+		}
+
+		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
+			desc.m_RHI.m_External.m_DebugName :
+			desc.m_RHI.m_Desc.m_DebugName;
+		const std::string_view debugName = debugNameText ? debugNameText : "";
+		if (!debugName.empty())
+		{
+			const std::wstring wideName = utils::ToWideString(debugName);
+			buffer->SetDebugName(wideName.c_str());
+		}
+
+		++m_Diagnostics.m_BufferImportCount;
+		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Borrowed, debugName);
 	}
 
 	void DX12ResourceManager::DestroyTexture(RHITextureHandle texture) noexcept
 	{
-		if (!texture.IsValid() || texture.Index() >= m_TextureSlots.size())
+		const RHIHandleValidationResult result = m_Textures.BeginRetirement(texture);
+		switch (result)
 		{
+		case RHIHandleValidationResult::Valid:
+		{
+			TextureSlot& slot = m_Textures.SlotAt(texture.Index());
+			slot.m_RetirementPoints = CaptureRetirementPoints();
+			return;
+		}
+		case RHIHandleValidationResult::Invalid:
 			++m_Diagnostics.m_InvalidDestroyCount;
 			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyTexture received an invalid handle.");
 			return;
-		}
-
-		TextureSlot& slot = m_TextureSlots[texture.Index()];
-		if (slot.m_Generation != texture.Generation())
-		{
-			if (slot.m_State == ResourceSlotState::PendingRetirement &&
-				slot.m_Generation == NextHandleGeneration<RHITextureHandle>(texture.Generation()))
-			{
-				++m_Diagnostics.m_DoubleDestroyCount;
-				GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyTexture detected a double destroy.");
-			}
-			else
-			{
-				++m_Diagnostics.m_StaleDestroyCount;
-				GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyTexture received a stale handle.");
-			}
+		case RHIHandleValidationResult::DoubleDestroy:
+			++m_Diagnostics.m_DoubleDestroyCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyTexture detected a double destroy.");
 			return;
-		}
-		if (slot.m_State != ResourceSlotState::Alive || !slot.m_Texture)
-		{
+		case RHIHandleValidationResult::Stale:
+			++m_Diagnostics.m_StaleDestroyCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyTexture received a stale handle.");
+			return;
+		case RHIHandleValidationResult::NonLive:
 			++m_Diagnostics.m_StaleDestroyCount;
 			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyTexture received a non-live handle.");
 			return;
 		}
-
-		slot.m_State = ResourceSlotState::PendingRetirement;
-		slot.m_Generation = NextHandleGeneration<RHITextureHandle>(slot.m_Generation);
-		slot.m_RetirementPoints = CaptureRetirementPoints();
+		GGLAB_UNREACHABLE("Unhandled RHI handle validation result.");
 	}
 
 	void DX12ResourceManager::DestroyBuffer(RHIBufferHandle buffer) noexcept
 	{
-		if (!buffer.IsValid() || buffer.Index() >= m_BufferSlots.size())
+		const RHIHandleValidationResult result = m_Buffers.BeginRetirement(buffer);
+		switch (result)
 		{
+		case RHIHandleValidationResult::Valid:
+		{
+			BufferSlot& slot = m_Buffers.SlotAt(buffer.Index());
+			slot.m_RetirementPoints = CaptureRetirementPoints();
+			return;
+		}
+		case RHIHandleValidationResult::Invalid:
 			++m_Diagnostics.m_InvalidDestroyCount;
 			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyBuffer received an invalid handle.");
 			return;
-		}
-
-		BufferSlot& slot = m_BufferSlots[buffer.Index()];
-		if (slot.m_Generation != buffer.Generation())
-		{
-			if (slot.m_State == ResourceSlotState::PendingRetirement &&
-				slot.m_Generation == NextHandleGeneration<RHIBufferHandle>(buffer.Generation()))
-			{
-				++m_Diagnostics.m_DoubleDestroyCount;
-				GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyBuffer detected a double destroy.");
-			}
-			else
-			{
-				++m_Diagnostics.m_StaleDestroyCount;
-				GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyBuffer received a stale handle.");
-			}
+		case RHIHandleValidationResult::DoubleDestroy:
+			++m_Diagnostics.m_DoubleDestroyCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyBuffer detected a double destroy.");
 			return;
-		}
-		if (slot.m_State != ResourceSlotState::Alive || !slot.m_Buffer)
-		{
+		case RHIHandleValidationResult::Stale:
+			++m_Diagnostics.m_StaleDestroyCount;
+			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyBuffer received a stale handle.");
+			return;
+		case RHIHandleValidationResult::NonLive:
 			++m_Diagnostics.m_StaleDestroyCount;
 			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::DestroyBuffer received a non-live handle.");
 			return;
 		}
-
-		slot.m_State = ResourceSlotState::PendingRetirement;
-		slot.m_Generation = NextHandleGeneration<RHIBufferHandle>(slot.m_Generation);
-		slot.m_RetirementPoints = CaptureRetirementPoints();
+		GGLAB_UNREACHABLE("Unhandled RHI handle validation result.");
 	}
 
 	bool DX12ResourceManager::IsAlive(RHITextureHandle texture) const noexcept
 	{
-		if (!texture.IsValid() || texture.Index() >= m_TextureSlots.size())
-		{
-			return false;
-		}
-
-		const TextureSlot& slot = m_TextureSlots[texture.Index()];
-		return slot.m_State == ResourceSlotState::Alive &&
-			slot.m_Generation == texture.Generation() &&
-			slot.m_Texture != nullptr;
+		const TextureSlot* slot = m_Textures.Resolve(texture);
+		return slot != nullptr && slot->m_Texture != nullptr;
 	}
 
 	bool DX12ResourceManager::IsAlive(RHIBufferHandle buffer) const noexcept
 	{
-		if (!buffer.IsValid() || buffer.Index() >= m_BufferSlots.size())
-		{
-			return false;
-		}
-
-		const BufferSlot& slot = m_BufferSlots[buffer.Index()];
-		return slot.m_State == ResourceSlotState::Alive &&
-			slot.m_Generation == buffer.Generation() &&
-			slot.m_Buffer != nullptr;
+		const BufferSlot* slot = m_Buffers.Resolve(buffer);
+		return slot != nullptr && slot->m_Buffer != nullptr;
 	}
 
 	DX12Texture* DX12ResourceManager::ResolveTexture(RHITextureHandle texture) noexcept
@@ -259,12 +265,13 @@ namespace gglab
 
 	const DX12Texture* DX12ResourceManager::ResolveTexture(RHITextureHandle texture) const noexcept
 	{
-		if (!IsAlive(texture))
+		const TextureSlot* slot = m_Textures.Resolve(texture);
+		if (!slot || !slot->m_Texture)
 		{
 			return nullptr;
 		}
 
-		return m_TextureSlots[texture.Index()].m_Texture.get();
+		return slot->m_Texture.get();
 	}
 
 	DX12Buffer* DX12ResourceManager::ResolveBuffer(RHIBufferHandle buffer) noexcept
@@ -274,20 +281,21 @@ namespace gglab
 
 	const DX12Buffer* DX12ResourceManager::ResolveBuffer(RHIBufferHandle buffer) const noexcept
 	{
-		if (!IsAlive(buffer))
+		const BufferSlot* slot = m_Buffers.Resolve(buffer);
+		if (!slot || !slot->m_Buffer)
 		{
 			return nullptr;
 		}
 
-		return m_BufferSlots[buffer.Index()].m_Buffer.get();
+		return slot->m_Buffer.get();
 	}
 
 	void DX12ResourceManager::RetireCompletedResources() noexcept
 	{
-		for (uint32_t index = 0; index < static_cast<uint32_t>(m_TextureSlots.size()); ++index)
+		for (uint32_t index = 0; index < m_Textures.Size(); ++index)
 		{
-			auto& slot = m_TextureSlots[index];
-			if (slot.m_State != ResourceSlotState::PendingRetirement)
+			auto& slot = m_Textures.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::PendingRetirement)
 			{
 				continue;
 			}
@@ -306,15 +314,15 @@ namespace gglab
 			slot.m_Texture.reset();
 			slot.m_RetirementPoints.clear();
 			slot.m_DebugNameId = {};
-			slot.m_State = ResourceSlotState::Free;
-			m_FreeTextureSlots.push_back(index);
+			slot.m_Ownership = RHIResourceOwnership::Owned;
+			m_Textures.Retire(index);
 			++m_Diagnostics.m_TextureRetireCount;
 		}
 
-		for (uint32_t index = 0; index < static_cast<uint32_t>(m_BufferSlots.size()); ++index)
+		for (uint32_t index = 0; index < m_Buffers.Size(); ++index)
 		{
-			auto& slot = m_BufferSlots[index];
-			if (slot.m_State != ResourceSlotState::PendingRetirement)
+			auto& slot = m_Buffers.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::PendingRetirement)
 			{
 				continue;
 			}
@@ -333,38 +341,42 @@ namespace gglab
 			slot.m_Buffer.reset();
 			slot.m_RetirementPoints.clear();
 			slot.m_DebugNameId = {};
-			slot.m_State = ResourceSlotState::Free;
-			m_FreeBufferSlots.push_back(index);
+			slot.m_Ownership = RHIResourceOwnership::Owned;
+			m_Buffers.Retire(index);
 			++m_Diagnostics.m_BufferRetireCount;
 		}
 	}
 
-	uint32_t DX12ResourceManager::AllocateTextureSlot() noexcept
+	RHITextureHandle DX12ResourceManager::AllocateTextureSlot(
+		std::unique_ptr<DX12Texture> texture,
+		RHIResourceOwnership ownership,
+		std::string_view debugName) noexcept
 	{
-		if (!m_FreeTextureSlots.empty())
-		{
-			const uint32_t slotIndex = m_FreeTextureSlots.back();
-			m_FreeTextureSlots.pop_back();
-			return slotIndex;
-		}
+		GGLAB_ASSERT_MSG(texture != nullptr, "DX12ResourceManager requires a texture wrapper.");
 
-		const uint32_t slotIndex = static_cast<uint32_t>(m_TextureSlots.size());
-		m_TextureSlots.emplace_back();
-		return slotIndex;
+		const RHITextureHandle handle = m_Textures.Allocate();
+		TextureSlot& slot = m_Textures.SlotAt(handle.Index());
+		slot.m_Ownership = ownership;
+		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
+		slot.m_RetirementPoints.clear();
+		slot.m_Texture = std::move(texture);
+		return handle;
 	}
 
-	uint32_t DX12ResourceManager::AllocateBufferSlot() noexcept
+	RHIBufferHandle DX12ResourceManager::AllocateBufferSlot(
+		std::unique_ptr<DX12Buffer> buffer,
+		RHIResourceOwnership ownership,
+		std::string_view debugName) noexcept
 	{
-		if (!m_FreeBufferSlots.empty())
-		{
-			const uint32_t slotIndex = m_FreeBufferSlots.back();
-			m_FreeBufferSlots.pop_back();
-			return slotIndex;
-		}
+		GGLAB_ASSERT_MSG(buffer != nullptr, "DX12ResourceManager requires a buffer wrapper.");
 
-		const uint32_t slotIndex = static_cast<uint32_t>(m_BufferSlots.size());
-		m_BufferSlots.emplace_back();
-		return slotIndex;
+		const RHIBufferHandle handle = m_Buffers.Allocate();
+		BufferSlot& slot = m_Buffers.SlotAt(handle.Index());
+		slot.m_Ownership = ownership;
+		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
+		slot.m_RetirementPoints.clear();
+		slot.m_Buffer = std::move(buffer);
+		return handle;
 	}
 
 	std::vector<DX12FencePoint> DX12ResourceManager::CaptureRetirementPoints() const noexcept
@@ -392,10 +404,10 @@ namespace gglab
 
 	void DX12ResourceManager::ReportLiveResources() const noexcept
 	{
-		for (uint32_t index = 0; index < static_cast<uint32_t>(m_TextureSlots.size()); ++index)
+		for (uint32_t index = 0; index < m_Textures.Size(); ++index)
 		{
-			const auto& slot = m_TextureSlots[index];
-			if (slot.m_State != ResourceSlotState::Free)
+			const auto& slot = m_Textures.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::Free)
 			{
 				GGLAB_LOG_GRAPHICS_WARN(
 					"DX12ResourceManager finalizing texture slot {} ('{}') in state {}.",
@@ -404,10 +416,10 @@ namespace gglab
 					static_cast<uint32_t>(slot.m_State));
 			}
 		}
-		for (uint32_t index = 0; index < static_cast<uint32_t>(m_BufferSlots.size()); ++index)
+		for (uint32_t index = 0; index < m_Buffers.Size(); ++index)
 		{
-			const auto& slot = m_BufferSlots[index];
-			if (slot.m_State != ResourceSlotState::Free)
+			const auto& slot = m_Buffers.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::Free)
 			{
 				GGLAB_LOG_GRAPHICS_WARN(
 					"DX12ResourceManager finalizing buffer slot {} ('{}') in state {}.",

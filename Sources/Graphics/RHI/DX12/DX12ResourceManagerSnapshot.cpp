@@ -19,35 +19,38 @@ namespace gglab
 		{
 			.m_TextureCreateCount = manager.m_Diagnostics.m_TextureCreateCount,
 			.m_BufferCreateCount = manager.m_Diagnostics.m_BufferCreateCount,
+			.m_TextureImportCount = manager.m_Diagnostics.m_TextureImportCount,
+			.m_BufferImportCount = manager.m_Diagnostics.m_BufferImportCount,
 			.m_TextureRetireCount = manager.m_Diagnostics.m_TextureRetireCount,
 			.m_BufferRetireCount = manager.m_Diagnostics.m_BufferRetireCount,
 			.m_CreateFailureCount = manager.m_Diagnostics.m_CreateFailureCount,
+			.m_ImportFailureCount = manager.m_Diagnostics.m_ImportFailureCount,
 			.m_InvalidDestroyCount = manager.m_Diagnostics.m_InvalidDestroyCount,
 			.m_StaleDestroyCount = manager.m_Diagnostics.m_StaleDestroyCount,
 			.m_DoubleDestroyCount = manager.m_Diagnostics.m_DoubleDestroyCount,
 		};
 
-		const auto toSnapshotState = [](DX12ResourceManager::ResourceSlotState state) noexcept
+		const auto toSnapshotState = [](RHIHandleSlotState state) noexcept
 			{
 				switch (state)
 				{
-				case DX12ResourceManager::ResourceSlotState::Free:
+				case RHIHandleSlotState::Free:
 					return DX12ResourceSnapshotState::Free;
-				case DX12ResourceManager::ResourceSlotState::Alive:
+				case RHIHandleSlotState::Alive:
 					return DX12ResourceSnapshotState::Alive;
-				case DX12ResourceManager::ResourceSlotState::PendingRetirement:
+				case RHIHandleSlotState::PendingRetirement:
 					return DX12ResourceSnapshotState::PendingRetirement;
 				}
 				GGLAB_UNREACHABLE("Unhandled resource slot state.");
 			};
 
-		const auto toSnapshotOwnership = [](DX12ResourceManager::ResourceOwnership ownership) noexcept
+		const auto toSnapshotOwnership = [](RHIResourceOwnership ownership) noexcept
 			{
 				switch (ownership)
 				{
-				case DX12ResourceManager::ResourceOwnership::Owned:
+				case RHIResourceOwnership::Owned:
 					return DX12ResourceSnapshotOwnership::Owned;
-				case DX12ResourceManager::ResourceOwnership::Borrowed:
+				case RHIResourceOwnership::Borrowed:
 					return DX12ResourceSnapshotOwnership::Borrowed;
 				}
 				GGLAB_UNREACHABLE("Unhandled resource ownership.");
@@ -72,17 +75,17 @@ namespace gglab
 				return result;
 			};
 
-		outSnapshot.m_Textures.reserve(manager.m_TextureSlots.size());
-		for (uint32_t index = 0; index < static_cast<uint32_t>(manager.m_TextureSlots.size()); ++index)
+		outSnapshot.m_Textures.reserve(manager.m_Textures.Slots().size());
+		for (uint32_t index = 0; index < manager.m_Textures.Size(); ++index)
 		{
-			const auto& slot = manager.m_TextureSlots[index];
+			const auto& slot = manager.m_Textures.SlotAt(index);
 			outSnapshot.m_Textures.push_back(makeSnapshot(index, slot, slot.m_Texture.get()));
 		}
 
-		outSnapshot.m_Buffers.reserve(manager.m_BufferSlots.size());
-		for (uint32_t index = 0; index < static_cast<uint32_t>(manager.m_BufferSlots.size()); ++index)
+		outSnapshot.m_Buffers.reserve(manager.m_Buffers.Slots().size());
+		for (uint32_t index = 0; index < manager.m_Buffers.Size(); ++index)
 		{
-			const auto& slot = manager.m_BufferSlots[index];
+			const auto& slot = manager.m_Buffers.SlotAt(index);
 			outSnapshot.m_Buffers.push_back(makeSnapshot(index, slot, slot.m_Buffer.get()));
 		}
 	}

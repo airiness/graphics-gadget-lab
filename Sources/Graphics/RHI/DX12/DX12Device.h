@@ -76,6 +76,8 @@ namespace gglab
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept override;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept override;
+		RHITextureHandle ImportTexture(const DX12ResourceManager::ImportedTextureDesc& desc) noexcept;
+		RHIBufferHandle ImportBuffer(const DX12ResourceManager::ImportedBufferDesc& desc) noexcept;
 		RHITextureViewHandle CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept override;
 		RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept override;
 

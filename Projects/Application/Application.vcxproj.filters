@@ -764,6 +764,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>

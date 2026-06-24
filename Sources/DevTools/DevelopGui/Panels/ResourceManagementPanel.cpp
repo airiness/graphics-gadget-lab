@@ -473,14 +473,17 @@ namespace gglab
 
 		ImGui::SeparatorText("Diagnostics");
 		ImGui::Text(
-			"Created: textures=%llu buffers=%llu | Retired: textures=%llu buffers=%llu",
+			"Created: textures=%llu buffers=%llu | Imported: textures=%llu buffers=%llu | Retired: textures=%llu buffers=%llu",
 			static_cast<unsigned long long>(diagnostics.m_TextureCreateCount),
 			static_cast<unsigned long long>(diagnostics.m_BufferCreateCount),
+			static_cast<unsigned long long>(diagnostics.m_TextureImportCount),
+			static_cast<unsigned long long>(diagnostics.m_BufferImportCount),
 			static_cast<unsigned long long>(diagnostics.m_TextureRetireCount),
 			static_cast<unsigned long long>(diagnostics.m_BufferRetireCount));
 		ImGui::Text(
-			"Validation: create failures=%llu invalid destroys=%llu stale destroys=%llu double destroys=%llu",
+			"Validation: create failures=%llu import failures=%llu invalid destroys=%llu stale destroys=%llu double destroys=%llu",
 			static_cast<unsigned long long>(diagnostics.m_CreateFailureCount),
+			static_cast<unsigned long long>(diagnostics.m_ImportFailureCount),
 			static_cast<unsigned long long>(diagnostics.m_InvalidDestroyCount),
 			static_cast<unsigned long long>(diagnostics.m_StaleDestroyCount),
 			static_cast<unsigned long long>(diagnostics.m_DoubleDestroyCount));

@@ -27,6 +27,12 @@ namespace gglab
 		const char* m_DebugName = nullptr;
 	};
 
+	struct RHIImportedBufferDesc
+	{
+		RHIBufferDesc m_Desc;
+		RHIExternalResourceDesc m_External;
+	};
+
 	enum class RHIBufferViewType : uint8_t
 	{
 		ShaderResource,
