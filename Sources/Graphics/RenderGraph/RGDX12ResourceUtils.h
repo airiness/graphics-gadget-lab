@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/RHITypes.h"
 
 namespace gglab
 {
@@ -53,6 +54,31 @@ namespace gglab
 			GGLAB_ASSERT_MSG(false, "Unsupported DXGI_FORMAT for RGFormat conversion.");
 			return RGFormat::Unknown;
 		}
+	}
+
+	constexpr inline RHIFormat ToRHIFormat(RGFormat format) noexcept
+	{
+		switch (format)
+		{
+		case RGFormat::Unknown:
+			return RHIFormat::Unknown;
+		case RGFormat::R8G8B8A8Unorm:
+			return RHIFormat::R8G8B8A8Unorm;
+		case RGFormat::R16G16Float:
+			return RHIFormat::R16G16Float;
+		case RGFormat::R16G16B16A16Float:
+			return RHIFormat::R16G16B16A16Float;
+		case RGFormat::R32Typeless:
+			return RHIFormat::R32Typeless;
+		case RGFormat::R32Float:
+			return RHIFormat::R32Float;
+		case RGFormat::D24UnormS8Uint:
+			return RHIFormat::D24UnormS8Uint;
+		case RGFormat::D32Float:
+			return RHIFormat::D32Float;
+		}
+
+		GGLAB_UNREACHABLE("Unhandled RGFormat.");
 	}
 
 	constexpr inline D3D12_BARRIER_SYNC ToD3D12BarrierSync(RGStage stage) noexcept

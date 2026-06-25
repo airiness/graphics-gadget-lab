@@ -103,7 +103,7 @@ namespace gglab
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLEnvironmentPreviewLayout());
-				data.m_EnvironmentTextureIndex = renderResRegistry->GetBindlessSrvIndex(
+				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
@@ -197,7 +197,7 @@ namespace gglab
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout());
-				data.m_PrefilteredSpecularTextureIndex = renderResRegistry->GetBindlessSrvIndex(
+				data.m_PrefilteredSpecularTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
 				data.m_PrefilteredSpecularSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);

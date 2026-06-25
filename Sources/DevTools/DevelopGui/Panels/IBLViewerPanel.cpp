@@ -3,6 +3,7 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -21,6 +22,27 @@ namespace gglab
 		static ImTextureID ToImGuiTextureID(D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 		{
 			return static_cast<ImTextureID>(handle.ptr);
+		}
+
+		static D3D12_GPU_DESCRIPTOR_HANDLE ToGpuDescriptorHandle(
+			Renderer* renderer,
+			RHIDescriptorHandle descriptor) noexcept
+		{
+			if (!renderer ||
+				!descriptor.IsValid() ||
+				descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
+			{
+				return {};
+			}
+
+			auto* descriptorManager = renderer->GetDescriptorManager();
+			if (!descriptorManager)
+			{
+				return {};
+			}
+
+			auto* heap = descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
+			return heap ? heap->GpuHandleAt(descriptor.m_Index) : D3D12_GPU_DESCRIPTOR_HANDLE{};
 		}
 
 		static bool DrawPreviewLayoutCombo(const char* label, RenderResourceRegistry::IBLPreviewLayout& layout) noexcept
@@ -121,7 +143,7 @@ namespace gglab
 
 			if (state.m_ShowMetadata)
 			{
-				const uint32_t bindlessIndex = renderResRegistry->GetBindlessSrvIndex(BrdfLutIndex);
+				const uint32_t srvIndex = renderResRegistry->GetShaderVisibleSrvIndex(BrdfLutIndex);
 
 				ImGui::Text("Size: %llu x %u",
 					static_cast<unsigned long long>(desc.Width),
@@ -129,7 +151,7 @@ namespace gglab
 
 				ImGui::Text("MipLevels: %u", static_cast<uint32_t>(desc.MipLevels));
 				ImGui::Text("Format: %s", devtools::EnumText(desc.Format).data());
-				ImGui::Text("Bindless SRV Index: %u", bindlessIndex);
+				ImGui::Text("Shader Visible SRV Index: %u", srvIndex);
 			}
 
 			ImGui::Separator();
@@ -143,7 +165,9 @@ namespace gglab
 
 			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
 
-			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = renderResRegistry->GetBindlessSrvGpuHandle(BrdfLutIndex);
+			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = ToGpuDescriptorHandle(
+				renderer,
+				renderResRegistry->GetSrvDescriptor(BrdfLutIndex));
 
 			if (gpuHandle.ptr == 0)
 			{
@@ -234,21 +258,21 @@ namespace gglab
 
 			if (state.m_ShowMetadata)
 			{
-				const uint32_t environmentBindlessIndex = renderResRegistry->GetBindlessSrvIndex(EnvironmentIndex);
-				const uint32_t previewBindlessIndex = renderResRegistry->GetBindlessSrvIndex(EnvironmentPreviewIndex);
+				const uint32_t environmentSrvIndex = renderResRegistry->GetShaderVisibleSrvIndex(EnvironmentIndex);
+				const uint32_t previewSrvIndex = renderResRegistry->GetShaderVisibleSrvIndex(EnvironmentPreviewIndex);
 
 				ImGui::Text("Environment Size: %llu x %u x %u",
 					static_cast<unsigned long long>(environmentDesc.Width),
 					static_cast<uint32_t>(environmentDesc.Height),
 					static_cast<uint32_t>(environmentDesc.DepthOrArraySize));
 				ImGui::Text("Environment Format: %s", devtools::EnumText(environmentDesc.Format).data());
-				ImGui::Text("Environment Bindless SRV Index: %u", environmentBindlessIndex);
+				ImGui::Text("Environment Shader Visible SRV Index: %u", environmentSrvIndex);
 
 				ImGui::Text("Preview Canvas Size: %llu x %u",
 					static_cast<unsigned long long>(environmentPreviewDesc.Width),
 					static_cast<uint32_t>(environmentPreviewDesc.Height));
 				ImGui::Text("Preview Format: %s", devtools::EnumText(environmentPreviewDesc.Format).data());
-				ImGui::Text("Preview Bindless SRV Index: %u", previewBindlessIndex);
+				ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 			}
 
 			ImGui::SliderFloat(
@@ -259,7 +283,9 @@ namespace gglab
 				"%.0f");
 
 			D3D12_GPU_DESCRIPTOR_HANDLE environmentPreviewGpuHandle =
-				renderResRegistry->GetBindlessSrvGpuHandle(EnvironmentPreviewIndex);
+				ToGpuDescriptorHandle(
+					renderer,
+					renderResRegistry->GetSrvDescriptor(EnvironmentPreviewIndex));
 
 			if (environmentPreviewGpuHandle.ptr == 0)
 			{
@@ -347,10 +373,10 @@ namespace gglab
 
 			if (state.m_ShowMetadata)
 			{
-				const uint32_t prefilteredSpecularBindlessIndex =
-					renderResRegistry->GetBindlessSrvIndex(PrefilteredSpecularIndex);
-				const uint32_t previewBindlessIndex =
-					renderResRegistry->GetBindlessSrvIndex(PrefilteredSpecularPreviewIndex);
+				const uint32_t prefilteredSpecularSrvIndex =
+					renderResRegistry->GetShaderVisibleSrvIndex(PrefilteredSpecularIndex);
+				const uint32_t previewSrvIndex =
+					renderResRegistry->GetShaderVisibleSrvIndex(PrefilteredSpecularPreviewIndex);
 
 				ImGui::Text("Cubemap Size: %llu x %u x %u",
 					static_cast<unsigned long long>(prefilteredSpecularDesc.Width),
@@ -358,13 +384,13 @@ namespace gglab
 					static_cast<uint32_t>(prefilteredSpecularDesc.DepthOrArraySize));
 				ImGui::Text("Cubemap MipLevels: %u", mipLevels);
 				ImGui::Text("Cubemap Format: %s", devtools::EnumText(prefilteredSpecularDesc.Format).data());
-				ImGui::Text("Cubemap Bindless SRV Index: %u", prefilteredSpecularBindlessIndex);
+				ImGui::Text("Cubemap Shader Visible SRV Index: %u", prefilteredSpecularSrvIndex);
 
 				ImGui::Text("Preview Canvas Size: %llu x %u",
 					static_cast<unsigned long long>(prefilteredSpecularPreviewDesc.Width),
 					static_cast<uint32_t>(prefilteredSpecularPreviewDesc.Height));
 				ImGui::Text("Preview Format: %s", devtools::EnumText(prefilteredSpecularPreviewDesc.Format).data());
-				ImGui::Text("Preview Bindless SRV Index: %u", previewBindlessIndex);
+				ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 			}
 
 			ImGui::SliderFloat(
@@ -375,7 +401,9 @@ namespace gglab
 				"%.0f");
 
 			D3D12_GPU_DESCRIPTOR_HANDLE prefilteredSpecularPreviewGpuHandle =
-				renderResRegistry->GetBindlessSrvGpuHandle(PrefilteredSpecularPreviewIndex);
+				ToGpuDescriptorHandle(
+					renderer,
+					renderResRegistry->GetSrvDescriptor(PrefilteredSpecularPreviewIndex));
 
 			if (prefilteredSpecularPreviewGpuHandle.ptr == 0)
 			{

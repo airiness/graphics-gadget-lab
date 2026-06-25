@@ -3,16 +3,18 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ShadowSettings.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/RHIDescriptor.h"
+#include "Graphics/RHI/RHITexture.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace gglab
 {
+	class RHIDevice;
 	class RGGpuResourceAllocator;
 	class RGExternalResourceRegistry;
 	class DX12Texture;
-	class DX12DescriptorManager;
 	class SamplerRegistry;
+	class DX12FencePoint;
 
 	/*
 	* Management runtime generated GPU Textures
@@ -22,9 +24,9 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
+			RHIDevice* m_Device = nullptr;
 			RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
 			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
-			DX12DescriptorManager* m_DescriptorManager = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 		};
 
@@ -77,8 +79,8 @@ namespace gglab
 			RGTextureDesc m_RgTexDesc{};
 			ResourceIndex m_InternalIndex{};
 			ResourceIndex m_ExternalIndex{};
-			DX12DescriptorID m_SrvId{};
-			TextureSrvCreateInfo m_SrvCreateInfo{};
+			RHITextureViewHandle m_Srv{};
+			RHITextureViewDesc m_SrvDesc{};
 
 			bool m_Allocated = false;
 			bool m_Dirty = false;
@@ -100,9 +102,8 @@ namespace gglab
 
 		DX12Texture* GetTexture(TextureIndex index) noexcept;
 		ResourceIndex GetExternalIndex(TextureIndex index) const noexcept;
-		DX12DescriptorID GetBindlessSrvId(TextureIndex index) const noexcept;
-		uint32_t GetBindlessSrvIndex(TextureIndex index) const noexcept;
-		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSrvGpuHandle(TextureIndex index) const noexcept;
+		RHIDescriptorHandle GetSrvDescriptor(TextureIndex index) const noexcept;
+		uint32_t GetShaderVisibleSrvIndex(TextureIndex index) const noexcept;
 
 		void SetIBLEnvironmentPreviewLayout(IBLPreviewLayout layout) noexcept;
 		IBLPreviewLayout GetIBLEnvironmentPreviewLayout() const noexcept { return m_IBLEnvironmentPreviewLayout; }
@@ -120,7 +121,7 @@ namespace gglab
 	private:
 		void EnsureTexture(TextureIndex index,
 			const RGTextureDesc& desc,
-			const TextureSrvCreateInfo& srvCreateInfo,
+			const RHITextureViewDesc& srvDesc,
 			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void InvalidateDependents(TextureIndex index) noexcept;
@@ -128,9 +129,9 @@ namespace gglab
 		void DestroyTexture(TextureIndex index, const DX12FencePoint& fencePoint) noexcept;
 
 	private:
+		RHIDevice* m_Device = nullptr;
 		RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
 		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
-		DX12DescriptorManager* m_DescriptorManager = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;

@@ -100,7 +100,7 @@ namespace gglab
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;
 				data.m_MipLevels = rgDesc.m_MipLevels;
-				data.m_EnvironmentTextureIndex = renderResRegistry->GetBindlessSrvIndex(
+				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);

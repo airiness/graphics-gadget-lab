@@ -5,6 +5,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
@@ -33,6 +34,27 @@ namespace gglab
 		static ImTextureID ToImGuiTextureID(D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
 		{
 			return static_cast<ImTextureID>(handle.ptr);
+		}
+
+		static D3D12_GPU_DESCRIPTOR_HANDLE ToGpuDescriptorHandle(
+			Renderer* renderer,
+			RHIDescriptorHandle descriptor) noexcept
+		{
+			if (!renderer ||
+				!descriptor.IsValid() ||
+				descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
+			{
+				return {};
+			}
+
+			auto* descriptorManager = renderer->GetDescriptorManager();
+			if (!descriptorManager)
+			{
+				return {};
+			}
+
+			auto* heap = descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
+			return heap ? heap->GpuHandleAt(descriptor.m_Index) : D3D12_GPU_DESCRIPTOR_HANDLE{};
 		}
 
 		static void DrawMatrix4x4(const char* label, const Matrix& mat) noexcept
@@ -295,16 +317,18 @@ namespace gglab
 			}
 
 			const auto previewDesc = previewTexture->GetDesc();
-			const uint32_t previewSrvIndex = renderResourceRegistry->GetBindlessSrvIndex(ShadowMapPreviewIndex);
+			const uint32_t previewSrvIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
 			const D3D12_GPU_DESCRIPTOR_HANDLE previewSrvGpuHandle =
-				renderResourceRegistry->GetBindlessSrvGpuHandle(ShadowMapPreviewIndex);
+				ToGpuDescriptorHandle(
+					context.m_Renderer,
+					renderResourceRegistry->GetSrvDescriptor(ShadowMapPreviewIndex));
 
 			ImGui::Text("Preview RG Size: %u", shadowRes->m_ShadowMapPreviewSize);
 			ImGui::Text("Preview Texture Size: %llu x %u",
 				static_cast<unsigned long long>(previewDesc.Width),
 				static_cast<uint32_t>(previewDesc.Height));
 			ImGui::Text("Preview Format: %s", devtools::EnumText(previewDesc.Format).data());
-			ImGui::Text("Preview Bindless SRV Index: %u", previewSrvIndex);
+			ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 
 			if (previewSrvGpuHandle.ptr == 0)
 			{
