@@ -24,6 +24,7 @@ namespace gglab
 		~DX12CommandQueue();
 
 		ID3D12CommandQueue* Get() const noexcept { return m_D3D12CommandQueue.Get(); }
+		const DX12Fence* GetFence() const noexcept { return m_Fence.get(); }
 
 		DX12FencePoint Execute(std::span<const DX12CommandList* const> commandLists) noexcept;
 

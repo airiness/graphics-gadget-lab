@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RHI/RHIFence.h"
 
 namespace gglab
 {
@@ -18,6 +19,7 @@ namespace gglab
 
 		const DX12Fence* GetFence() const noexcept { return m_FencePtr; }
 		uint64_t GetValue() const noexcept { return m_PointValue; }
+		RHIFencePoint ToRHI() const noexcept;
 
 		bool IsCompleted() const noexcept;
 		void Wait(uint32_t timeout = GGLAB_INFINITE) const noexcept;

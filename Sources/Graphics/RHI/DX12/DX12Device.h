@@ -2,6 +2,7 @@
 #include "Core/Platform/Win/ComTypes.h"
 #include "Core/Utility/TypeUtils.h"
 #include "Graphics/RHI/RHIDevice.h"
+#include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 
 #include <array>
@@ -28,6 +29,7 @@ namespace gglab
 	class DX12CommandList;
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
+	class DX12FencePoint;
 	class DX12Resource;
 	class DX12ViewCache;
 	class DX12Device : public RHIDevice
@@ -86,8 +88,11 @@ namespace gglab
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
+		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
+		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
+		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept;
 		void SetViewCache(DX12ViewCache* viewCache) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;

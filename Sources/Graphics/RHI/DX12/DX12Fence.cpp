@@ -4,9 +4,21 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Core/HResult.h"
 
+#include <atomic>
+
 namespace gglab
 {
+	namespace
+	{
+		RHIFenceHandle AllocateRHIFenceHandle() noexcept
+		{
+			static std::atomic<RHIFenceHandle::IndexType> nextIndex = 0;
+			return RHIFenceHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
+		}
+	}
+
 	DX12Fence::DX12Fence(DX12Device* device, uint64_t initValue) noexcept :
+		m_RHIHandle(AllocateRHIFenceHandle()),
 		m_NextRequestValue(initValue)
 	{
 		GGLAB_HR_DX(device->Get()->CreateFence(m_CurrentValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_D3D12Fence)), device->Get());

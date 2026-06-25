@@ -272,7 +272,7 @@ namespace gglab
 
 	void DX12ViewCache::RetireTextureViews(
 		RHITextureHandle texture,
-		std::span<const DX12FencePoint> fencePoints) noexcept
+		std::span<const RHIFencePoint> fencePoints) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 
@@ -304,7 +304,7 @@ namespace gglab
 
 	void DX12ViewCache::RetireBufferViews(
 		RHIBufferHandle buffer,
-		std::span<const DX12FencePoint> fencePoints) noexcept
+		std::span<const RHIFencePoint> fencePoints) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 
@@ -347,9 +347,9 @@ namespace gglab
 
 			const bool completed = std::ranges::all_of(
 				slot.m_RetirementPoints,
-				[](const DX12FencePoint& point)
+				[this](const RHIFencePoint& point)
 				{
-					return !point.IsValid() || point.IsCompleted();
+					return m_DX12Device && m_DX12Device->IsFencePointCompleted(point);
 				});
 			if (!completed)
 			{
@@ -375,9 +375,9 @@ namespace gglab
 
 			const bool completed = std::ranges::all_of(
 				slot.m_RetirementPoints,
-				[](const DX12FencePoint& point)
+				[this](const RHIFencePoint& point)
 				{
-					return !point.IsValid() || point.IsCompleted();
+					return m_DX12Device && m_DX12Device->IsFencePointCompleted(point);
 				});
 			if (!completed)
 			{

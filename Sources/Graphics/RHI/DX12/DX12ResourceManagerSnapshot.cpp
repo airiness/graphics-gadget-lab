@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12ResourceManagerSnapshot.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
@@ -68,16 +69,16 @@ namespace gglab
 				result.m_LastUseFenceCount = static_cast<uint32_t>(slot.m_LastUsePoints.size());
 				result.m_CompletedLastUseFenceCount = static_cast<uint32_t>(std::ranges::count_if(
 					slot.m_LastUsePoints,
-					[](const DX12FencePoint& point)
+					[&manager](const RHIFencePoint& point)
 					{
-						return !point.IsValid() || point.IsCompleted();
+						return manager.m_Device && manager.m_Device->IsFencePointCompleted(point);
 					}));
 				result.m_PendingFenceCount = static_cast<uint32_t>(slot.m_RetirementPoints.size());
 				result.m_CompletedFenceCount = static_cast<uint32_t>(std::ranges::count_if(
 					slot.m_RetirementPoints,
-					[](const DX12FencePoint& point)
+					[&manager](const RHIFencePoint& point)
 					{
-						return !point.IsValid() || point.IsCompleted();
+						return manager.m_Device && manager.m_Device->IsFencePointCompleted(point);
 					}));
 				result.m_NativeResourceValid = resource != nullptr && resource->IsValid();
 				return result;
