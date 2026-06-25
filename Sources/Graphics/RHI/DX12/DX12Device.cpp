@@ -3,6 +3,7 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
+#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Core/HResult.h"
 
@@ -56,7 +57,8 @@ namespace gglab
 
 		FlushGPU();
 
-		m_ResourceManager.RetireCompletedResources();
+		RetireCompletedRHIResources();
+		SetViewCache(nullptr);
 		m_ResourceManager.Finalize();
 
 		for (const auto queueType : utils::EnumRange<CommandQueueType>())
@@ -111,16 +113,24 @@ namespace gglab
 
 	RHITextureViewHandle DX12Device::CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
-		GGLAB_UNUSED(texture);
-		GGLAB_UNUSED(desc);
-		return {};
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateTextureView called without a DX12ViewCache.");
+			return {};
+		}
+
+		return m_ViewCache->GetOrCreateTextureView(texture, desc);
 	}
 
 	RHIBufferViewHandle DX12Device::CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
-		GGLAB_UNUSED(buffer);
-		GGLAB_UNUSED(desc);
-		return {};
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateBufferView called without a DX12ViewCache.");
+			return {};
+		}
+
+		return m_ViewCache->GetOrCreateBufferView(buffer, desc);
 	}
 
 	void DX12Device::DestroyTexture(RHITextureHandle texture) noexcept
@@ -135,12 +145,24 @@ namespace gglab
 
 	void DX12Device::DestroyTextureView(RHITextureViewHandle view) noexcept
 	{
-		GGLAB_UNUSED(view);
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyTextureView called without a DX12ViewCache.");
+			return;
+		}
+
+		m_ViewCache->DestroyTextureView(view);
 	}
 
 	void DX12Device::DestroyBufferView(RHIBufferViewHandle view) noexcept
 	{
-		GGLAB_UNUSED(view);
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyBufferView called without a DX12ViewCache.");
+			return;
+		}
+
+		m_ViewCache->DestroyBufferView(view);
 	}
 
 	void DX12Device::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
@@ -151,6 +173,12 @@ namespace gglab
 	void DX12Device::RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
 	{
 		m_ResourceManager.RecordBufferUse(buffer, fencePoint);
+	}
+
+	void DX12Device::SetViewCache(DX12ViewCache* viewCache) noexcept
+	{
+		m_ViewCache = viewCache;
+		m_ResourceManager.SetViewCache(viewCache);
 	}
 
 	bool DX12Device::IsAlive(RHITextureHandle texture) const noexcept
@@ -190,6 +218,11 @@ namespace gglab
 
 	void DX12Device::RetireCompletedRHIResources() noexcept
 	{
+		if (m_ViewCache)
+		{
+			m_ViewCache->GarbageCollect();
+		}
+
 		m_ResourceManager.RetireCompletedResources();
 	}
 

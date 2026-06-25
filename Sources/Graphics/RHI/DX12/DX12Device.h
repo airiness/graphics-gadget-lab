@@ -29,6 +29,7 @@ namespace gglab
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12Resource;
+	class DX12ViewCache;
 	class DX12Device : public RHIDevice
 	{
 	public:
@@ -87,6 +88,7 @@ namespace gglab
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
+		void SetViewCache(DX12ViewCache* viewCache) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
@@ -144,6 +146,7 @@ namespace gglab
 		FeatureSupport m_FeatureSupport;
 
 		DX12ResourceManager m_ResourceManager;
+		DX12ViewCache* m_ViewCache = nullptr;
 
 		bool m_IsInitialized = false;
 	};

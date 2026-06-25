@@ -225,6 +225,18 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
+	void DX12ViewCache::DestroyTextureView(RHITextureViewHandle view) noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+		DestroyTextureViewLocked(view);
+	}
+
+	void DX12ViewCache::DestroyBufferView(RHIBufferViewHandle view) noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+		DestroyBufferViewLocked(view);
+	}
+
 	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
@@ -270,7 +282,10 @@ namespace gglab
 			return;
 		}
 
-		for (const RHITextureViewHandle view : iterator->second)
+		std::vector<RHITextureViewHandle> views = std::move(iterator->second);
+		m_RHITextureResourceViews.erase(iterator);
+
+		for (const RHITextureViewHandle view : views)
 		{
 			TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
 			if (!slot)
@@ -285,8 +300,6 @@ namespace gglab
 				retiredSlot.m_RetirementPoints.assign(fencePoints.begin(), fencePoints.end());
 			}
 		}
-
-		m_RHITextureResourceViews.erase(iterator);
 	}
 
 	void DX12ViewCache::RetireBufferViews(
@@ -301,7 +314,10 @@ namespace gglab
 			return;
 		}
 
-		for (const RHIBufferViewHandle view : iterator->second)
+		std::vector<RHIBufferViewHandle> views = std::move(iterator->second);
+		m_RHIBufferResourceViews.erase(iterator);
+
+		for (const RHIBufferViewHandle view : views)
 		{
 			BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
 			if (!slot)
@@ -316,8 +332,6 @@ namespace gglab
 				retiredSlot.m_RetirementPoints.assign(fencePoints.begin(), fencePoints.end());
 			}
 		}
-
-		m_RHIBufferResourceViews.erase(iterator);
 	}
 
 	void DX12ViewCache::GarbageCollect() noexcept
@@ -478,6 +492,58 @@ namespace gglab
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RHIBufferViewType.");
+	}
+
+	void DX12ViewCache::DestroyTextureViewLocked(RHITextureViewHandle view) noexcept
+	{
+		TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
+		if (!slot)
+		{
+			return;
+		}
+
+		const RHITextureHandle texture = slot->m_Key.m_Texture;
+		m_RHITextureViewCache.erase(slot->m_Key);
+		if (auto iterator = m_RHITextureResourceViews.find(texture); iterator != m_RHITextureResourceViews.end())
+		{
+			std::erase(iterator->second, view);
+			if (iterator->second.empty())
+			{
+				m_RHITextureResourceViews.erase(iterator);
+			}
+		}
+
+		if (m_RHITextureViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
+		{
+			TextureViewSlot& retiredSlot = m_RHITextureViews.SlotAt(view.Index());
+			retiredSlot.m_RetirementPoints.clear();
+		}
+	}
+
+	void DX12ViewCache::DestroyBufferViewLocked(RHIBufferViewHandle view) noexcept
+	{
+		BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
+		if (!slot)
+		{
+			return;
+		}
+
+		const RHIBufferHandle buffer = slot->m_Key.m_Buffer;
+		m_RHIBufferViewCache.erase(slot->m_Key);
+		if (auto iterator = m_RHIBufferResourceViews.find(buffer); iterator != m_RHIBufferResourceViews.end())
+		{
+			std::erase(iterator->second, view);
+			if (iterator->second.empty())
+			{
+				m_RHIBufferResourceViews.erase(iterator);
+			}
+		}
+
+		if (m_RHIBufferViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
+		{
+			BufferViewSlot& retiredSlot = m_RHIBufferViews.SlotAt(view.Index());
+			retiredSlot.m_RetirementPoints.clear();
+		}
 	}
 
 	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
