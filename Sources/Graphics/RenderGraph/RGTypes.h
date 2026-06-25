@@ -1,32 +1,12 @@
 #pragma once
 #include "Core/EnumFlags.h"
+#include "Graphics/RHI/RHITypes.h"
 
 #include <cstdint>
 #include <limits>
 
 namespace gglab
 {
-	enum class RGQueueType : uint8_t
-	{
-		Graphics,
-		Compute,
-		Copy,
-	};
-
-	enum class RGFormat : uint16_t
-	{
-		Unknown,
-
-		R8G8B8A8Unorm,
-		R16G16Float,
-		R16G16B16A16Float,
-
-		R32Typeless,
-		R32Float,
-		D24UnormS8Uint,
-		D32Float,
-	};
-
 	enum class RGStage : uint64_t
 	{
 		None = 0,
@@ -91,7 +71,7 @@ namespace gglab
 	{
 		static constexpr uint32_t AllMipLevels = std::numeric_limits<uint32_t>::max();
 
-		RGFormat m_Format = RGFormat::Unknown;
+		RHIFormat m_Format = RHIFormat::Unknown;
 		RGTextureViewDimension m_Dimension = RGTextureViewDimension::Unknown;
 
 		uint32_t m_MostDetailedMip = 0;
@@ -114,17 +94,8 @@ namespace gglab
 		bool operator==(const RGBarrierState&) const noexcept = default;
 	};
 
-	struct RGClearValue
-	{
-		RGFormat m_Format = RGFormat::Unknown;
-		float m_Color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		float m_Depth = 1.0f;
-		uint8_t m_Stencil = 0;
-		bool m_IsDepthStencil = false;
-	};
-
 	[[nodiscard]] constexpr inline RGTextureViewDesc MakeRGTexture2DArrayViewDesc(
-		RGFormat format,
+		RHIFormat format,
 		uint32_t mip,
 		uint32_t firstSlice,
 		uint32_t arraySize,
@@ -141,7 +112,7 @@ namespace gglab
 	}
 
 	[[nodiscard]] constexpr inline RGTextureViewDesc MakeRGTexture2DViewDesc(
-		RGFormat format,
+		RHIFormat format,
 		uint32_t mip = 0,
 		uint32_t mipLevels = 1,
 		uint32_t planeSlice = 0) noexcept

@@ -67,7 +67,7 @@ namespace gglab
 		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Textures.size()));
 		RHITextureDesc textureDesc{};
 		textureDesc.m_Dimension = RHITextureDimension::Texture2D;
-		textureDesc.m_Format = ToRHIFormat(rgTexDesc.m_Format);
+		textureDesc.m_Format = rgTexDesc.m_Format;
 		textureDesc.m_Usage = ToRHITextureUsage(rgTexDesc.m_Usage);
 		textureDesc.m_Extent =
 		{
@@ -301,7 +301,7 @@ namespace gglab
 		if (Test(desc.m_Usage, RGTextureUsage::RenderTarget))
 		{
 			RHIClearValue clearValue{};
-			clearValue.m_Format = ToRHIFormat(desc.m_Format);
+			clearValue.m_Format = desc.m_Format;
 			clearValue.m_Color[0] = 0.0f;
 			clearValue.m_Color[1] = 0.0f;
 			clearValue.m_Color[2] = 0.0f;
@@ -313,9 +313,9 @@ namespace gglab
 		if (Test(desc.m_Usage, RGTextureUsage::DepthStencil))
 		{
 			RHIClearValue clearValue{};
-			clearValue.m_Format = desc.m_Format == RGFormat::R32Typeless ?
+			clearValue.m_Format = desc.m_Format == RHIFormat::R32Typeless ?
 				RHIFormat::D32Float :
-				ToRHIFormat(desc.m_Format);
+				desc.m_Format;
 			clearValue.m_Depth = 1.0f;
 			clearValue.m_Stencil = 0;
 			clearValue.m_IsDepthStencil = true;

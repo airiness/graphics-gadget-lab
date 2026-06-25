@@ -89,7 +89,7 @@ namespace gglab
 				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_SceneColor);
 				data.m_Dsv = builder.CreateView<RGTextureViewType::DSV>(data.m_Depth);
 
-				const auto shadowSrvDesc = MakeRGTexture2DViewDesc(RGFormat::R32Float, 0, 1);
+				const auto shadowSrvDesc = MakeRGTexture2DViewDesc(RHIFormat::R32Float, 0, 1);
 				data.m_ShadowSrv =
 					builder.CreateView<RGTextureViewType::SRV>(data.m_ShadowMap, shadowSrvDesc);
 

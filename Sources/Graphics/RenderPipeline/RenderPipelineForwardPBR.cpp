@@ -64,7 +64,7 @@ namespace gglab
 				RGTextureDesc sceneColorDesc{};
 				sceneColorDesc.m_Width = width;
 				sceneColorDesc.m_Height = height;
-				sceneColorDesc.m_Format = RGFormat::R16G16B16A16Float;
+				sceneColorDesc.m_Format = RHIFormat::R16G16B16A16Float;
 				sceneColorDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 				targets.m_SceneColor = builder.CreateTexture("MainView.SceneColor", sceneColorDesc);
 
@@ -72,7 +72,7 @@ namespace gglab
 				RGTextureDesc backBufferDesc{};
 				backBufferDesc.m_Width = width;
 				backBufferDesc.m_Height = height;
-				backBufferDesc.m_Format = ToRGFormat(swapChain->GetFormat());
+				backBufferDesc.m_Format = ToRHIFormat(swapChain->GetFormat());
 				backBufferDesc.m_Usage = RGTextureUsage::RenderTarget;
 
 				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
@@ -84,7 +84,7 @@ namespace gglab
 				RGTextureDesc depthBufferDesc{};
 				depthBufferDesc.m_Width = width;
 				depthBufferDesc.m_Height = height;
-				depthBufferDesc.m_Format = RGFormat::D24UnormS8Uint;
+				depthBufferDesc.m_Format = RHIFormat::D24UnormS8Uint;
 				depthBufferDesc.m_Usage = RGTextureUsage::DepthStencil;
 
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
@@ -102,7 +102,7 @@ namespace gglab
 				RGTextureDesc shadowMapDesc{};
 				shadowMapDesc.m_Width = shadowRes.m_ShadowMapSize;
 				shadowMapDesc.m_Height = shadowRes.m_ShadowMapSize;
-				shadowMapDesc.m_Format = RGFormat::R32Typeless;
+				shadowMapDesc.m_Format = RHIFormat::R32Typeless;
 				shadowMapDesc.m_Usage = RGTextureUsage::DepthStencil | RGTextureUsage::Sample;
 				shadowRes.m_DirectionalShadowMap = builder.CreateTexture(
 					"Shadow.DirectionalShadowMap",

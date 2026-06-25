@@ -38,7 +38,7 @@ namespace gglab
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::TextureCube;
-			srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_MipLevels = desc.m_MipLevels;
 			srvDesc.m_NumCubes = 1;
 
@@ -59,7 +59,7 @@ namespace gglab
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::TextureCube;
-			srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_MipLevels = desc.m_MipLevels;
 			srvDesc.m_NumCubes = 1;
 
@@ -96,7 +96,7 @@ namespace gglab
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::TextureCube;
-			srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_MipLevels = desc.m_MipLevels;
 			srvDesc.m_NumCubes = 1;
 
@@ -117,7 +117,7 @@ namespace gglab
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
-			srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_MipLevels = desc.m_MipLevels;
 
 			EnsureTexture(TextureIndex::IBL_BrdfLut, desc, srvDesc, retireFenceOpt);
@@ -137,7 +137,7 @@ namespace gglab
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
-			srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_MipLevels = desc.m_MipLevels;
 
 			EnsureTexture(TextureIndex::Preview_IBL_EnvironmentCubemap, desc, srvDesc, retireFenceOpt);
@@ -157,7 +157,7 @@ namespace gglab
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
-			srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_MipLevels = desc.m_MipLevels;
 
 			EnsureTexture(TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, desc, srvDesc, retireFenceOpt);
@@ -174,13 +174,13 @@ namespace gglab
 		desc.m_ArraySize = 1;
 		desc.m_MipLevels = 1;
 		desc.m_SampleCount = 1;
-		desc.m_Format = RGFormat::R8G8B8A8Unorm;
+		desc.m_Format = RHIFormat::R8G8B8A8Unorm;
 		desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 
 		RHITextureViewDesc srvDesc{};
 		srvDesc.m_Type = RHITextureViewType::ShaderResource;
 		srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
-		srvDesc.m_Format = ToRHIFormat(desc.m_Format);
+		srvDesc.m_Format = desc.m_Format;
 		srvDesc.m_MipLevels = desc.m_MipLevels;
 
 		EnsureTexture(TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);

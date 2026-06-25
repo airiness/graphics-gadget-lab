@@ -25,7 +25,7 @@ namespace gglab
 			uint16_t m_ArraySize = 1;
 			uint16_t m_MipLevels = 1;
 			uint16_t m_SampleCount = 1;
-			RGFormat m_Format = RGFormat::Unknown;
+			RHIFormat m_Format = RHIFormat::Unknown;
 			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
 
 			bool operator==(const TextureKey&) const noexcept = default;
@@ -44,7 +44,7 @@ namespace gglab
 					.m_ArraySize = static_cast<uint16_t>(resDesc.DepthOrArraySize),
 					.m_MipLevels = static_cast<uint16_t>(resDesc.MipLevels),
 					.m_SampleCount = static_cast<uint16_t>(resDesc.SampleDesc.Count),
-					.m_Format = ToRGFormat(resDesc.Format),
+					.m_Format = ToRHIFormat(resDesc.Format),
 					.m_Flags = resDesc.Flags
 				};
 				return texKey;

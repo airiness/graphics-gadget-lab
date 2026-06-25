@@ -63,7 +63,7 @@ namespace gglab
 					shadowRes.m_DirectionalShadowMapPreview,
 					RGTextureUsage::RenderTarget);
 
-				const auto shadowMapSrvDesc = MakeRGTexture2DViewDesc(RGFormat::R32Float, 0, 1);
+				const auto shadowMapSrvDesc = MakeRGTexture2DViewDesc(RHIFormat::R32Float, 0, 1);
 				data.m_ShadowMapSrv =
 					builder.CreateView<RGTextureViewType::SRV>(data.m_ShadowMap, shadowMapSrvDesc);
 				data.m_PreviewRtv =
