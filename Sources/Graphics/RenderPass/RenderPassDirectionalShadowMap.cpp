@@ -50,7 +50,7 @@ namespace gglab
 				data.m_ShadowMap = builder.Write(shadowRes.m_DirectionalShadowMap, RGTextureUsage::DepthStencil);
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 
-				const auto dsvDesc = MakeRGTexture2DViewDesc(RGFormat::D32Float);
+				const auto dsvDesc = MakeRGTexture2DViewDesc(RHIFormat::D32Float);
 				data.m_Dsv = builder.CreateView<RGTextureViewType::DSV>(data.m_ShadowMap, dsvDesc);
 			},
 			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)

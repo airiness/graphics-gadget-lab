@@ -20,8 +20,6 @@ namespace gglab
 	template<typename RESOURCE>
 	struct RGResourceTraits;
 
-	using RGResourceFormat = RGFormat;
-
 	enum class RGTextureUsage : uint32_t
 	{
 		None = 0,
@@ -56,7 +54,7 @@ namespace gglab
 		uint16_t m_ArraySize = 1;
 		uint16_t m_MipLevels = 1;
 		uint16_t m_SampleCount = 1;
-		RGResourceFormat m_Format = RGResourceFormat::Unknown;
+		RHIFormat m_Format = RHIFormat::Unknown;
 		RGTextureUsage m_Usage = RGTextureUsage::None;
 
 		bool operator==(const RGTextureDesc&) const noexcept = default;
@@ -74,7 +72,7 @@ namespace gglab
 	{
 		uint64_t m_SizeInBytes = 0;
 		uint32_t m_Stride = 0;
-		RGResourceFormat m_Format = RGResourceFormat::Unknown;
+		RHIFormat m_Format = RHIFormat::Unknown;
 		RGBufferUsage m_Usage = RGBufferUsage::None;
 
 		bool operator==(const RGBufferDesc&) const noexcept = default;

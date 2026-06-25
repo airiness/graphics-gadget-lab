@@ -1,86 +1,10 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 
 namespace gglab
 {
-	constexpr inline DXGI_FORMAT ToD3D12Format(RGFormat format) noexcept
-	{
-		switch (format)
-		{
-		case RGFormat::Unknown:
-			return DXGI_FORMAT_UNKNOWN;
-		case RGFormat::R8G8B8A8Unorm:
-			return DXGI_FORMAT_R8G8B8A8_UNORM;
-		case RGFormat::R16G16Float:
-			return DXGI_FORMAT_R16G16_FLOAT;
-		case RGFormat::R16G16B16A16Float:
-			return DXGI_FORMAT_R16G16B16A16_FLOAT;
-		case RGFormat::R32Typeless:
-			return DXGI_FORMAT_R32_TYPELESS;
-		case RGFormat::R32Float:
-			return DXGI_FORMAT_R32_FLOAT;
-		case RGFormat::D24UnormS8Uint:
-			return DXGI_FORMAT_D24_UNORM_S8_UINT;
-		case RGFormat::D32Float:
-			return DXGI_FORMAT_D32_FLOAT;
-		}
-
-		GGLAB_UNREACHABLE("Unhandled RGFormat.");
-	}
-
-	constexpr inline RGFormat ToRGFormat(DXGI_FORMAT format) noexcept
-	{
-		switch (format)
-		{
-		case DXGI_FORMAT_UNKNOWN:
-			return RGFormat::Unknown;
-		case DXGI_FORMAT_R8G8B8A8_UNORM:
-			return RGFormat::R8G8B8A8Unorm;
-		case DXGI_FORMAT_R16G16_FLOAT:
-			return RGFormat::R16G16Float;
-		case DXGI_FORMAT_R16G16B16A16_FLOAT:
-			return RGFormat::R16G16B16A16Float;
-		case DXGI_FORMAT_R32_TYPELESS:
-			return RGFormat::R32Typeless;
-		case DXGI_FORMAT_R32_FLOAT:
-			return RGFormat::R32Float;
-		case DXGI_FORMAT_D24_UNORM_S8_UINT:
-			return RGFormat::D24UnormS8Uint;
-		case DXGI_FORMAT_D32_FLOAT:
-			return RGFormat::D32Float;
-		default:
-			GGLAB_ASSERT_MSG(false, "Unsupported DXGI_FORMAT for RGFormat conversion.");
-			return RGFormat::Unknown;
-		}
-	}
-
-	constexpr inline RHIFormat ToRHIFormat(RGFormat format) noexcept
-	{
-		switch (format)
-		{
-		case RGFormat::Unknown:
-			return RHIFormat::Unknown;
-		case RGFormat::R8G8B8A8Unorm:
-			return RHIFormat::R8G8B8A8Unorm;
-		case RGFormat::R16G16Float:
-			return RHIFormat::R16G16Float;
-		case RGFormat::R16G16B16A16Float:
-			return RHIFormat::R16G16B16A16Float;
-		case RGFormat::R32Typeless:
-			return RHIFormat::R32Typeless;
-		case RGFormat::R32Float:
-			return RHIFormat::R32Float;
-		case RGFormat::D24UnormS8Uint:
-			return RHIFormat::D24UnormS8Uint;
-		case RGFormat::D32Float:
-			return RHIFormat::D32Float;
-		}
-
-		GGLAB_UNREACHABLE("Unhandled RGFormat.");
-	}
-
 	constexpr inline D3D12_BARRIER_SYNC ToD3D12BarrierSync(RGStage stage) noexcept
 	{
 		if (stage == RGStage::None)
@@ -275,15 +199,15 @@ namespace gglab
 	}
 
 	template<typename RGResourceDesc>
-	constexpr inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue(const RGResourceDesc&) noexcept = delete;
+	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue(const RGResourceDesc&) noexcept = delete;
 
 	template<>
-	constexpr inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGTextureDesc>(const RGTextureDesc& rgTexDesc) noexcept
+	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGTextureDesc>(const RGTextureDesc& rgTexDesc) noexcept
 	{
 		if (Test(rgTexDesc.m_Usage, RGTextureUsage::RenderTarget))
 		{
 			D3D12_CLEAR_VALUE clearValue{};
-			clearValue.Format = ToD3D12Format(rgTexDesc.m_Format);
+			clearValue.Format = ToDXGIFormat(rgTexDesc.m_Format);
 			clearValue.Color[0] = 0.0f;
 			clearValue.Color[1] = 0.0f;
 			clearValue.Color[2] = 0.0f;
@@ -293,9 +217,9 @@ namespace gglab
 		else if (Test(rgTexDesc.m_Usage, RGTextureUsage::DepthStencil))
 		{
 			D3D12_CLEAR_VALUE clearValue{};
-			clearValue.Format = (rgTexDesc.m_Format == RGFormat::R32Typeless) ?
+			clearValue.Format = (rgTexDesc.m_Format == RHIFormat::R32Typeless) ?
 				DXGI_FORMAT_D32_FLOAT :
-				ToD3D12Format(rgTexDesc.m_Format);
+				ToDXGIFormat(rgTexDesc.m_Format);
 			clearValue.DepthStencil.Depth = 1.0f;
 			clearValue.DepthStencil.Stencil = 0;
 			return std::optional<D3D12_CLEAR_VALUE>(clearValue);
@@ -305,7 +229,7 @@ namespace gglab
 	}
 
 	template<>
-	constexpr inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGBufferDesc>(const RGBufferDesc&) noexcept
+	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGBufferDesc>(const RGBufferDesc&) noexcept
 	{
 		return std::nullopt;
 	}
@@ -322,7 +246,7 @@ namespace gglab
 	{
 		D3D12_RESOURCE_FLAGS flags = ToD3D12ResourceFlags(rgTexDesc.m_Usage);
 		return CD3DX12_RESOURCE_DESC::Tex2D(
-			ToD3D12Format(rgTexDesc.m_Format),
+			ToDXGIFormat(rgTexDesc.m_Format),
 			static_cast<UINT64>(rgTexDesc.m_Width),
 			static_cast<UINT>(rgTexDesc.m_Height),
 			static_cast<UINT16>(rgTexDesc.m_ArraySize),
@@ -353,7 +277,7 @@ namespace gglab
 		rgDesc.m_ArraySize = static_cast<uint16_t>(nativeDesc.DepthOrArraySize);
 		rgDesc.m_MipLevels = static_cast<uint16_t>(nativeDesc.MipLevels);
 		rgDesc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
-		rgDesc.m_Format = ToRGFormat(nativeDesc.Format);
+		rgDesc.m_Format = ToRHIFormat(nativeDesc.Format);
 		rgDesc.m_Usage = usage;
 		return rgDesc;
 	}
@@ -366,7 +290,7 @@ namespace gglab
 	inline D3D12_RENDER_TARGET_VIEW_DESC ToD3D12RenderTargetViewDesc(const RGTextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_RENDER_TARGET_VIEW_DESC desc{};
-		desc.Format = ToD3D12Format(rgDesc.m_Format);
+		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 
 		switch (rgDesc.m_Dimension)
 		{
@@ -393,7 +317,7 @@ namespace gglab
 	inline D3D12_DEPTH_STENCIL_VIEW_DESC ToD3D12DepthStencilViewDesc(const RGTextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
-		desc.Format = ToD3D12Format(rgDesc.m_Format);
+		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 
 		switch (rgDesc.m_Dimension)
 		{
@@ -413,7 +337,7 @@ namespace gglab
 	inline D3D12_SHADER_RESOURCE_VIEW_DESC ToD3D12ShaderResourceViewDesc(const RGTextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-		desc.Format = ToD3D12Format(rgDesc.m_Format);
+		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 		const auto mipLevels =
@@ -462,7 +386,7 @@ namespace gglab
 	inline D3D12_UNORDERED_ACCESS_VIEW_DESC ToD3D12UnorderedAccessViewDesc(const RGTextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
-		desc.Format = ToD3D12Format(rgDesc.m_Format);
+		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 
 		switch (rgDesc.m_Dimension)
 		{
