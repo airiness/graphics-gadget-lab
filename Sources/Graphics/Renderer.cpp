@@ -121,7 +121,7 @@ namespace gglab
 		m_TextureRegistry->InitializeReservedTextures();
 
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
-		renderResRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		renderResRegistryCreateInfo.m_Device = m_Device.get();
 		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
 		renderResRegistryCreateInfo.m_RGGpuResAllocator = m_RGGpuResAllocator.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
@@ -170,9 +170,9 @@ namespace gglab
 		m_PipelineCache.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
+		m_RGGpuResAllocator.reset();
 		m_Device->SetViewCache(nullptr);
 		m_ViewCache.reset();
-		m_RGGpuResAllocator.reset();
 
 		m_SceneCB.reset();
 		m_ObjectSB.reset();

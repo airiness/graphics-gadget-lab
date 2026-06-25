@@ -109,7 +109,7 @@ namespace gglab
 	public:
 		explicit RGGpuResourceAllocator(DX12Device* dx12device) noexcept;
 		GGLAB_DEFAULT_COPYABLE_MOVABLE(RGGpuResourceAllocator);
-		~RGGpuResourceAllocator() = default;
+		~RGGpuResourceAllocator() noexcept;
 
 		template<typename ResourceDesc>
 		ResourceIndex Acquire(const ResourceDesc& rgResourceDesc,
@@ -121,6 +121,7 @@ namespace gglab
 
 		DX12Texture* GetTexture(ResourceIndex texIndex) const noexcept;
 		DX12Buffer* GetBuffer(ResourceIndex bufIndex) const noexcept;
+		RHITextureHandle GetTextureHandle(ResourceIndex texIndex) noexcept;
 
 		void Tick() noexcept;
 
@@ -130,6 +131,10 @@ namespace gglab
 		bool IsCompatibleTexture(ResourceIndex texIndex, const RGTextureDesc& desc) const noexcept;
 
 	private:
+		static RHITextureUsage ToRHITextureUsage(RGTextureUsage usage) noexcept;
+		static std::optional<RHIClearValue> DefaultRHIClearValue(const RGTextureDesc& desc) noexcept;
+		void DestroyTextureHandle(ResourceIndex texIndex) noexcept;
+
 		ResourceIndex CreateTexture(const RGTextureDesc& rgTexDesc,
 			D3D12_RESOURCE_STATES initStates,
 			std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept;
@@ -141,7 +146,7 @@ namespace gglab
 		DX12Device* m_DX12Device = nullptr;
 		D3D12MA::Allocator* m_Allocator = nullptr;
 
-		std::vector<std::unique_ptr<DX12Texture>> m_Textures;
+		std::vector<RHITextureHandle> m_Textures;
 		std::vector<std::unique_ptr<DX12Buffer>> m_Buffers;
 
 		std::unordered_map<TextureKey, std::deque<ResourceIndex>, TextureKeyHash> m_FreeTextures;

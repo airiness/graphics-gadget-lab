@@ -11,6 +11,14 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Allocator != nullptr, "Allocator must not be null.");
 	}
 
+	RGGpuResourceAllocator::~RGGpuResourceAllocator() noexcept
+	{
+		for (uint32_t index = 0; index < m_Textures.size(); ++index)
+		{
+			DestroyTextureHandle(ResourceIndex(index));
+		}
+	}
+
 	void RGGpuResourceAllocator::ReleaseTexture(ResourceIndex texIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		if (texIndex.Value() < 0 || texIndex.Value() >= m_Textures.size())
@@ -18,8 +26,6 @@ namespace gglab
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::ReleaseResource() : Release Invalid texture.");
 			return;
 		}
-
-		//auto* tex = m_Textures[texIndex].get();
 
 		// TODO: last know state
 		m_Pending.emplace_back(
@@ -55,20 +61,29 @@ namespace gglab
 		D3D12_RESOURCE_STATES initStates,
 		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
 	{
-		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Textures.size()));
-		m_Textures.emplace_back(std::make_unique<DX12Texture>());
-		auto& tex = m_Textures.back();
+		GGLAB_UNUSED(initStates);
+		GGLAB_UNUSED(clearValue);
 
-		DX12Resource::CreateInfo createInfo = {};
-		createInfo.m_Allocator = m_Allocator;
-		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-		createInfo.m_AllocDesc.Flags =
-			Test(rgTexDesc.m_Usage, RGTextureUsage::RenderTarget | RGTextureUsage::DepthStencil) ?
-			D3D12MA::ALLOCATION_FLAG_COMMITTED : D3D12MA::ALLOCATION_FLAG_NONE; // RenderTarget & DepthStencil is big resource use Allocation type committed.
-		createInfo.m_InitStates = initStates;
-		createInfo.m_ClearValue = clearValue;
-		createInfo.m_ResourceDesc = ToD3D12ResourceDesc(rgTexDesc);
-		tex->Create(createInfo);
+		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Textures.size()));
+		RHITextureDesc textureDesc{};
+		textureDesc.m_Dimension = RHITextureDimension::Texture2D;
+		textureDesc.m_Format = ToRHIFormat(rgTexDesc.m_Format);
+		textureDesc.m_Usage = ToRHITextureUsage(rgTexDesc.m_Usage);
+		textureDesc.m_Extent =
+		{
+			.m_Width = rgTexDesc.m_Width,
+			.m_Height = rgTexDesc.m_Height,
+			.m_Depth = 1u,
+		};
+		textureDesc.m_ArraySize = rgTexDesc.m_ArraySize;
+		textureDesc.m_MipLevels = rgTexDesc.m_MipLevels;
+		textureDesc.m_SampleCount = rgTexDesc.m_SampleCount;
+		textureDesc.m_DebugName = "RGGpuResourceAllocator.Texture";
+		textureDesc.m_ClearValue = DefaultRHIClearValue(rgTexDesc);
+
+		RHITextureHandle texture = m_DX12Device->CreateTexture(textureDesc);
+		GGLAB_ASSERT_MSG(texture.IsValid(), "RGGpuResourceAllocator: CreateTexture failed.");
+		m_Textures.emplace_back(texture);
 
 		return index;
 	}
@@ -98,7 +113,8 @@ namespace gglab
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::GetTexture() : Invalid texIndex.");
 			return nullptr;
 		}
-		return m_Textures[texIndex.Value()].get();
+
+		return m_DX12Device->ResolveTexture(m_Textures[texIndex.Value()]);
 	}
 
 	DX12Buffer* RGGpuResourceAllocator::GetBuffer(ResourceIndex bufIndex) const noexcept
@@ -109,6 +125,24 @@ namespace gglab
 			return nullptr;
 		}
 		return m_Buffers[bufIndex.Value()].get();
+	}
+
+	RHITextureHandle RGGpuResourceAllocator::GetTextureHandle(ResourceIndex texIndex) noexcept
+	{
+		if (!texIndex.IsValid() || texIndex.Value() >= m_Textures.size())
+		{
+			GGLAB_LOG_WARN("RGGpuResourceAllocator::GetTextureHandle() : Invalid texIndex.");
+			return {};
+		}
+
+		const RHITextureHandle handle = m_Textures[texIndex.Value()];
+		if (handle.IsValid() && m_DX12Device->IsAlive(handle))
+		{
+			return handle;
+		}
+
+		GGLAB_LOG_WARN("RGGpuResourceAllocator::GetTextureHandle() : Texture is not live.");
+		return {};
 	}
 
 	void RGGpuResourceAllocator::Tick() noexcept
@@ -126,7 +160,13 @@ namespace gglab
 				{
 				case Type::Texture:
 				{
-					auto texKey = TextureKey::ConvertResourceDescToKey(m_Textures[pending.m_Index.Value()]->GetDesc());
+					auto* texture = GetTexture(pending.m_Index);
+					if (!texture)
+					{
+						return true;
+					}
+
+					auto texKey = TextureKey::ConvertResourceDescToKey(texture->GetDesc());
 					auto& list = m_FreeTextures[texKey];
 					list.push_back(pending.m_Index);
 
@@ -134,7 +174,7 @@ namespace gglab
 					{
 						auto releaseResIndex = list.front();
 						list.pop_front();
-						m_Textures[releaseResIndex.Value()]->Release();
+						DestroyTextureHandle(releaseResIndex);
 					}
 					return true;
 				}
@@ -182,8 +222,18 @@ namespace gglab
 					}
 				}
 			};
-		trim(m_FreeTextures, m_Textures);
 		trim(m_FreeBuffers, m_Buffers);
+
+		for (auto& keyValue : m_FreeTextures)
+		{
+			auto& list = keyValue.second;
+			while (list.size() > maxCachedPerKey)
+			{
+				auto releaseResIndex = list.front();
+				list.pop_front();
+				DestroyTextureHandle(releaseResIndex);
+			}
+		}
 	}
 
 	bool RGGpuResourceAllocator::IsCompatibleTexture(ResourceIndex texIndex, const RGTextureDesc& desc) const noexcept
@@ -210,5 +260,85 @@ namespace gglab
 		const auto wantKey = MakeKey(desc);
 
 		return currentKey == wantKey;
+	}
+
+	RHITextureUsage RGGpuResourceAllocator::ToRHITextureUsage(RGTextureUsage usage) noexcept
+	{
+		RHITextureUsage result = RHITextureUsage::None;
+		if (Test(usage, RGTextureUsage::Sample))
+		{
+			result |= RHITextureUsage::Sampled;
+		}
+		if (Test(usage, RGTextureUsage::RenderTarget))
+		{
+			result |= RHITextureUsage::RenderTarget;
+		}
+		if (Test(usage, RGTextureUsage::DepthStencil | RGTextureUsage::DepthStencilRead))
+		{
+			result |= RHITextureUsage::DepthStencil;
+		}
+		if (Test(usage, RGTextureUsage::UAV))
+		{
+			result |= RHITextureUsage::UnorderedAccess;
+		}
+		if (Test(usage, RGTextureUsage::CopySrc))
+		{
+			result |= RHITextureUsage::CopySource;
+		}
+		if (Test(usage, RGTextureUsage::CopyDst))
+		{
+			result |= RHITextureUsage::CopyDest;
+		}
+		if (Test(usage, RGTextureUsage::Present))
+		{
+			result |= RHITextureUsage::Present;
+		}
+		return result;
+	}
+
+	std::optional<RHIClearValue> RGGpuResourceAllocator::DefaultRHIClearValue(const RGTextureDesc& desc) noexcept
+	{
+		if (Test(desc.m_Usage, RGTextureUsage::RenderTarget))
+		{
+			RHIClearValue clearValue{};
+			clearValue.m_Format = ToRHIFormat(desc.m_Format);
+			clearValue.m_Color[0] = 0.0f;
+			clearValue.m_Color[1] = 0.0f;
+			clearValue.m_Color[2] = 0.0f;
+			clearValue.m_Color[3] = 1.0f;
+			clearValue.m_IsDepthStencil = false;
+			return clearValue;
+		}
+
+		if (Test(desc.m_Usage, RGTextureUsage::DepthStencil))
+		{
+			RHIClearValue clearValue{};
+			clearValue.m_Format = desc.m_Format == RGFormat::R32Typeless ?
+				RHIFormat::D32Float :
+				ToRHIFormat(desc.m_Format);
+			clearValue.m_Depth = 1.0f;
+			clearValue.m_Stencil = 0;
+			clearValue.m_IsDepthStencil = true;
+			return clearValue;
+		}
+
+		return std::nullopt;
+	}
+
+	void RGGpuResourceAllocator::DestroyTextureHandle(ResourceIndex texIndex) noexcept
+	{
+		if (!texIndex.IsValid() || texIndex.Value() >= m_Textures.size())
+		{
+			return;
+		}
+
+		RHITextureHandle& texture = m_Textures[texIndex.Value()];
+		if (!texture.IsValid())
+		{
+			return;
+		}
+
+		m_DX12Device->DestroyTexture(texture);
+		texture.Reset();
 	}
 }
