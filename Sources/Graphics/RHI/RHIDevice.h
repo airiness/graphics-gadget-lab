@@ -3,6 +3,7 @@
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHIFence.h"
+#include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
 
 namespace gglab
@@ -20,14 +21,19 @@ namespace gglab
 			const RHITextureViewDesc& desc) noexcept = 0;
 		virtual RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer,
 			const RHIBufferViewDesc& desc) noexcept = 0;
+		virtual RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept = 0;
 
 		virtual void DestroyTexture(RHITextureHandle texture) noexcept = 0;
 		virtual void DestroyBuffer(RHIBufferHandle buffer) noexcept = 0;
 		virtual void DestroyTextureView(RHITextureViewHandle view) noexcept = 0;
 		virtual void DestroyBufferView(RHIBufferViewHandle view) noexcept = 0;
+		virtual void DestroySampler(RHISamplerHandle sampler) noexcept = 0;
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
+		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
+
+		virtual RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept = 0;
 
 		virtual void RetireCompletedWork() noexcept = 0;
 	};

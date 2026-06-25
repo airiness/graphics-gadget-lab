@@ -41,6 +41,7 @@ namespace gglab
 		R32G32B32A32Float,
 		R32Typeless,
 		R32Float,
+		R32Uint,
 		D24UnormS8Uint,
 		D32Float,
 	};
@@ -95,6 +96,18 @@ namespace gglab
 		RHILayout m_Layout = RHILayout::Common;
 
 		bool operator==(const RHIResourceState&) const noexcept = default;
+	};
+
+	enum class RHICompareOp : uint8_t
+	{
+		Never,
+		Less,
+		Equal,
+		LessEqual,
+		Greater,
+		NotEqual,
+		GreaterEqual,
+		Always,
 	};
 
 	struct RHIClearValue

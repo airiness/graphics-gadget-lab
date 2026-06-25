@@ -5,6 +5,7 @@
 
 namespace gglab
 {
+	class RHIGraphicsCommandContext;
 	class DX12CommandList;
 	class DX12PipelineState;
 	class RenderPassForwardPBR : public RenderPassBase
@@ -21,10 +22,12 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		void DrawRenderQueue(DX12CommandList* commandList,
+			RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept;
 
 		void DrawRange(DX12CommandList* commandList,
+			RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,
 			const RenderServices& services,
 			const RenderQueue& renderQueue,

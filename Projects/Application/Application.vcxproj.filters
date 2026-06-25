@@ -171,6 +171,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
@@ -539,6 +542,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
@@ -840,6 +846,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h">

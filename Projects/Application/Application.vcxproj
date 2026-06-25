@@ -197,6 +197,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp" />
@@ -305,6 +306,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
@@ -342,6 +344,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h" />

@@ -7,6 +7,7 @@
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
@@ -113,6 +114,8 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
 
 				auto* commandList = executeContext.GetGraphicsCommandList();
+				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
+				GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 				const auto rtv = executeContext.GetView(data.m_Rtv);
 				const auto dsv = executeContext.GetView(data.m_Dsv);
@@ -175,7 +178,7 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
+				DrawRenderQueue(commandList, graphicsContext, *contextPtr, *servicesPtr);
 			});
 	}
 
@@ -221,9 +224,11 @@ namespace gglab
 	}
 
 	void RenderPassForwardPBR::DrawRenderQueue(DX12CommandList* commandList,
+		RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		const auto& renderQueue = context.GetRenderQueue(RenderViewID::Main);
 		if (renderQueue.m_DrawItems.empty())
 		{
@@ -235,12 +240,13 @@ namespace gglab
 		DrawItemsRange alphaTestRange = ranges[utils::ToIndex(RenderBucket::AlphaTest)];
 		DrawItemsRange transparentRange = ranges[utils::ToIndex(RenderBucket::Transparent)];
 
-		DrawRange(commandList, context, services, renderQueue, opaqueRange);
-		DrawRange(commandList, context, services, renderQueue, alphaTestRange);
-		DrawRange(commandList, context, services, renderQueue, transparentRange);
+		DrawRange(commandList, graphicsContext, context, services, renderQueue, opaqueRange);
+		DrawRange(commandList, graphicsContext, context, services, renderQueue, alphaTestRange);
+		DrawRange(commandList, graphicsContext, context, services, renderQueue, transparentRange);
 	}
 
 	void RenderPassForwardPBR::DrawRange(DX12CommandList* commandList,
+		RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
@@ -250,6 +256,7 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 		auto* renderer = services.m_Renderer;
 		auto* assetManager = services.m_AssetManager;
@@ -283,9 +290,10 @@ namespace gglab
 
 			if (drawItem.m_MeshId != lastMeshId)
 			{
-				D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
-				commandList->SetVertexBuffers(0, vbs);
-				commandList->SetIndexBuffer(mesh->m_IndexBufferView);
+				graphicsContext->SetVertexBuffers(
+					0,
+					std::span<const RHIVertexBufferBinding>(&mesh->m_VertexBufferBinding, 1));
+				graphicsContext->SetIndexBuffer(mesh->m_IndexBufferBinding);
 				lastMeshId = drawItem.m_MeshId;
 			}
 
@@ -297,7 +305,7 @@ namespace gglab
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawParameters);
 
-			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
+			graphicsContext->DrawIndexed(mesh->m_IndexCount);
 		}
 	}
 

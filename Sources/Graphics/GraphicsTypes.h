@@ -4,7 +4,8 @@
 #include "Core/TypedIndex.h"
 #include "Core/EnumFlags.h"
 #include "Graphics/RHI/RHIHandles.h"
-#include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/RHIResource.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Core/Utility/TypeUtils.h"
 
@@ -203,7 +204,7 @@ namespace gglab
 	struct Sampler
 	{
 		SamplerID m_Id{};
-		DX12DescriptorID m_DescriptorId{};
+		RHISamplerHandle m_Sampler{};
 	};
 
 	struct MaterialTextureBinding
@@ -248,11 +249,11 @@ namespace gglab
 
 		StringID m_Name{};
 
-		std::unique_ptr<DX12Buffer> m_VertexBuffer;
-		std::unique_ptr<DX12Buffer> m_IndexBuffer;
+		RHIBufferOwner m_VertexBuffer;
+		RHIBufferOwner m_IndexBuffer;
 
-		D3D12_VERTEX_BUFFER_VIEW m_VertexBufferView{};
-		D3D12_INDEX_BUFFER_VIEW m_IndexBufferView{};
+		RHIVertexBufferBinding m_VertexBufferBinding{};
+		RHIIndexBufferBinding m_IndexBufferBinding{};
 
 		uint32_t m_VertexCount = 0;
 		uint32_t m_IndexCount = 0;
