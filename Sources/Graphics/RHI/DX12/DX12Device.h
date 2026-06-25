@@ -104,6 +104,8 @@ namespace gglab
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
+		RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept override;
+		RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept override;
 		RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override;
 
 		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;

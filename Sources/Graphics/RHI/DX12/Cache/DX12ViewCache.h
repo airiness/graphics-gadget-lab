@@ -105,6 +105,8 @@ class DX12FencePoint;
 		RHISamplerHandle GetOrCreateSampler(const RHISamplerDesc& desc) noexcept;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
 		DX12DescriptorView ResolveBufferView(RHIBufferViewHandle view) const noexcept;
+		RHIDescriptorHandle ResolveTextureViewDescriptor(RHITextureViewHandle view) const noexcept;
+		RHIDescriptorHandle ResolveBufferViewDescriptor(RHIBufferViewHandle view) const noexcept;
 		RHIDescriptorHandle ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept;

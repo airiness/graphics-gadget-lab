@@ -2,9 +2,6 @@
 #include "Graphics/TextureRegistry.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/TextureLoader.h"
 #include "Graphics/Utility/TextureUtils.h"
 #include "Core/Utility/PathUtils.h"
@@ -14,12 +11,10 @@ namespace gglab
 {
 	TextureRegistry::TextureRegistry(const CreateInfo& createInfo) noexcept :
 		m_DX12Device(createInfo.m_DX12Device),
-		m_TransferManager(createInfo.m_TransferManager),
-		m_DescriptorManager(createInfo.m_DescriptorManager)
+		m_TransferManager(createInfo.m_TransferManager)
 	{
 		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "DX12Device is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
-		GGLAB_ASSERT_MSG(m_DescriptorManager != nullptr, "DX12DescriptorManager is null!");
 	}
 
 	void TextureRegistry::InitializeReservedTextures() noexcept
@@ -208,17 +203,13 @@ namespace gglab
 	{
 		for (const auto& texture : m_TextureContainer.m_TextureIDMap | std::views::values)
 		{
-			if (texture->m_DescriptorId.IsValid())
-			{
-				m_DescriptorManager->RetireBindlessSrvId(texture->m_DescriptorId, fencePoint);
-				texture->m_DescriptorId = {};
-			}
 			if (texture->m_Texture.IsValid())
 			{
 				m_DX12Device->RecordTextureUse(texture->m_Texture, fencePoint);
 				m_DX12Device->DestroyTexture(texture->m_Texture);
 				texture->m_Texture.Reset();
 			}
+			texture->m_Srv.Reset();
 		}
 	}
 
@@ -270,20 +261,29 @@ namespace gglab
 
 	uint32_t TextureRegistry::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
 	{
+		const auto resolveSrvIndex = [this](RHITextureViewHandle srv) noexcept -> uint32_t
+			{
+				const RHIDescriptorHandle descriptor = m_DX12Device->GetTextureViewDescriptor(srv);
+				GGLAB_ASSERT_MSG(
+					descriptor.IsValid() && descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
+					"TextureRegistry::ResolveSrvIndex: texture SRV descriptor is invalid.");
+				return descriptor.m_Index;
+			};
+
 		if (const auto* texture = GetTexture(textureId); texture != nullptr)
 		{
-			if (texture->m_IsUploaded && texture->m_DescriptorId.IsValid())
+			if (texture->m_IsUploaded && texture->m_Srv.IsValid())
 			{
-				return m_DescriptorManager->BindlessSrvIdToGlobalIndex(texture->m_DescriptorId);
+				return resolveSrvIndex(texture->m_Srv);
 			}
 		}
 
 		const auto fallbackId = ToTextureId(fallback);
 		const auto* fallbackTexture = GetTexture(fallbackId);
 
-		GGLAB_ASSERT(fallbackTexture != nullptr && fallbackTexture->m_DescriptorId.IsValid());
+		GGLAB_ASSERT(fallbackTexture != nullptr && fallbackTexture->m_Srv.IsValid());
 
-		return m_DescriptorManager->BindlessSrvIdToGlobalIndex(fallbackTexture->m_DescriptorId);
+		return resolveSrvIndex(fallbackTexture->m_Srv);
 	}
 
 	TextureID TextureRegistry::CreateTexture(const std::filesystem::path& canonicalPath) noexcept
@@ -348,6 +348,7 @@ namespace gglab
 			m_DX12Device->DestroyTexture(texture->m_Texture);
 			texture->m_Texture.Reset();
 		}
+		texture->m_Srv.Reset();
 
 		const std::string debugName = "TextureRegistry.Texture." + std::to_string(uploadData.m_TextureId.Value());
 		RHITextureDesc textureDesc{};
@@ -362,13 +363,6 @@ namespace gglab
 
 		texture->m_Texture = m_DX12Device->CreateTexture(textureDesc);
 		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture.");
-
-		auto* nativeTexture = m_DX12Device->ResolveTexture(texture->m_Texture);
-		GGLAB_ASSERT_MSG(nativeTexture != nullptr, "TextureRegistry::UploadTexture: failed to resolve RHI texture.");
-		if (!nativeTexture)
-		{
-			return;
-		}
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		transferContext.UploadTexture(textureUploadData, texture->m_Texture);
@@ -389,12 +383,19 @@ namespace gglab
 		};
 		transferContext.TextureBarrier(std::span{ &barrier, 1 });
 
-		TextureSrvCreateInfo srvInfo{};
-		srvInfo.m_Format = ToDXGIFormat(textureData.m_ViewFormat);
-		srvInfo.m_Dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		RHITextureViewDesc srvDesc{};
+		srvDesc.m_Type = RHITextureViewType::ShaderResource;
+		srvDesc.m_Dimension = textureData.m_ArraySize > 1 ?
+			RHITextureViewDimension::Texture2DArray :
+			RHITextureViewDimension::Texture2D;
+		srvDesc.m_Format = textureData.m_ViewFormat;
+		srvDesc.m_MostDetailedMip = 0;
+		srvDesc.m_MipLevels = textureData.m_MipLevels;
+		srvDesc.m_FirstArraySlice = 0;
+		srvDesc.m_ArraySize = textureData.m_ArraySize;
 
-		const auto srvDescriptorId = m_DescriptorManager->CreateBindlessSrv(nativeTexture, srvInfo);
-		texture->m_DescriptorId = srvDescriptorId;
+		texture->m_Srv = m_DX12Device->CreateTextureView(texture->m_Texture, srvDesc);
+		GGLAB_ASSERT_MSG(texture->m_Srv.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture SRV.");
 		texture->m_Semantic = uploadData.m_Semantic;
 		texture->m_IsUploaded = true;
 	}
@@ -410,7 +411,7 @@ namespace gglab
 				texture->m_Id = id;
 				texture->m_Name = StringID(texName);
 				texture->m_IsUploaded = false;
-				texture->m_DescriptorId = {};
+				texture->m_Srv.Reset();
 				texture->m_Texture.Reset();
 			}
 		}

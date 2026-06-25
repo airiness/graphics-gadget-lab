@@ -117,7 +117,6 @@ namespace gglab
 		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
 		textureRegistryCreateInfo.m_DX12Device = m_Device.get();
 		textureRegistryCreateInfo.m_TransferManager = m_TransferManager.get();
-		textureRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
 		m_TextureRegistry->InitializeReservedTextures();
 

@@ -10,6 +10,39 @@
 
 namespace gglab
 {
+	namespace
+	{
+		RHIDescriptorHeapType ToRHIDescriptorHeapType(D3D12_DESCRIPTOR_HEAP_TYPE heapType) noexcept
+		{
+			switch (heapType)
+			{
+			case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV:
+				return RHIDescriptorHeapType::CbvSrvUav;
+			case D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER:
+				return RHIDescriptorHeapType::Sampler;
+			case D3D12_DESCRIPTOR_HEAP_TYPE_RTV:
+				return RHIDescriptorHeapType::RenderTarget;
+			case D3D12_DESCRIPTOR_HEAP_TYPE_DSV:
+				return RHIDescriptorHeapType::DepthStencil;
+			default:
+				GGLAB_UNREACHABLE("Unhandled D3D12 descriptor heap type.");
+			}
+		}
+
+		RHIDescriptorHandle ToRHIDescriptorHandle(const DX12DescriptorHandle& descriptor) noexcept
+		{
+			if (!descriptor.IsValid())
+			{
+				return {};
+			}
+
+			return {
+				.m_HeapType = ToRHIDescriptorHeapType(descriptor.HeapType()),
+				.m_Index = descriptor.Index(),
+			};
+		}
+	}
+
 	DX12ViewCache::DX12ViewCache(const CreateInfo& createInfo) noexcept :
 		m_DX12Device(createInfo.m_DX12Device),
 		m_DescriptorManager(createInfo.m_DescriptorManager)
@@ -274,6 +307,30 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
+	RHIDescriptorHandle DX12ViewCache::ResolveTextureViewDescriptor(RHITextureViewHandle view) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
+		if (!slot)
+		{
+			return {};
+		}
+
+		return ToRHIDescriptorHandle(slot->m_Descriptor);
+	}
+
+	RHIDescriptorHandle DX12ViewCache::ResolveBufferViewDescriptor(RHIBufferViewHandle view) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
+		if (!slot)
+		{
+			return {};
+		}
+
+		return ToRHIDescriptorHandle(slot->m_Descriptor);
+	}
+
 	RHIDescriptorHandle DX12ViewCache::ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
@@ -283,10 +340,7 @@ namespace gglab
 			return {};
 		}
 
-		return {
-			.m_HeapType = RHIDescriptorHeapType::Sampler,
-			.m_Index = slot->m_Descriptor.Index(),
-		};
+		return ToRHIDescriptorHandle(slot->m_Descriptor);
 	}
 
 	void DX12ViewCache::DestroyTextureView(RHITextureViewHandle view) noexcept
