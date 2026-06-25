@@ -102,6 +102,8 @@ class DX12FencePoint;
 			const RHIBufferViewDesc& desc) noexcept;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
 		DX12DescriptorView ResolveBufferView(RHIBufferViewHandle view) const noexcept;
+		void DestroyTextureView(RHITextureViewHandle view) noexcept;
+		void DestroyBufferView(RHIBufferViewHandle view) noexcept;
 
 		template<ViewType T>
 		DX12DescriptorView GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
@@ -154,6 +156,8 @@ class DX12FencePoint;
 		DX12DescriptorHandle CreateBufferDescriptor(
 			const RHIBufferViewKey& key,
 			DX12Buffer* buffer) const noexcept;
+		void DestroyTextureViewLocked(RHITextureViewHandle view) noexcept;
+		void DestroyBufferViewLocked(RHIBufferViewHandle view) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

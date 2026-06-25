@@ -67,6 +67,9 @@ namespace gglab
 		RHIExternalResourceDesc m_External;
 	};
 
+	// Non-owning upload data.
+	// m_Data pointers must remain valid until
+	// CopyContext::UploadResource has recorded the upload commands.
 	struct RHITextureSubresourceData
 	{
 		const void* m_Data = nullptr;
