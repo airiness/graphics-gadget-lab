@@ -3,6 +3,7 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
+#include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Core/HResult.h"
@@ -165,12 +166,48 @@ namespace gglab
 		m_ViewCache->DestroyBufferView(view);
 	}
 
+	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return true;
+		}
+
+		for (const auto& commandQueue : m_CommandQueues)
+		{
+			if (!commandQueue)
+			{
+				continue;
+			}
+
+			const DX12Fence* fence = commandQueue->GetFence();
+			if (fence && fence->GetRHIHandle() == fencePoint.m_Fence)
+			{
+				return fence->IsCompleted(fencePoint.m_Value);
+			}
+		}
+
+		GGLAB_LOG_GRAPHICS_WARN(
+			"DX12Device::IsFencePointCompleted received an unknown RHI fence handle.");
+		return false;
+	}
+
 	void DX12Device::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
+	{
+		RecordTextureUse(texture, fencePoint.ToRHI());
+	}
+
+	void DX12Device::RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
 	{
 		m_ResourceManager.RecordTextureUse(texture, fencePoint);
 	}
 
 	void DX12Device::RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
+	{
+		RecordBufferUse(buffer, fencePoint.ToRHI());
+	}
+
+	void DX12Device::RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept
 	{
 		m_ResourceManager.RecordBufferUse(buffer, fencePoint);
 	}

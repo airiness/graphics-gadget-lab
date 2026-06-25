@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/RHIDescriptor.h"
+#include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
@@ -115,10 +116,10 @@ class DX12FencePoint;
 		void RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept;
 		void RetireTextureViews(
 			RHITextureHandle texture,
-			std::span<const DX12FencePoint> fencePoints) noexcept;
+			std::span<const RHIFencePoint> fencePoints) noexcept;
 		void RetireBufferViews(
 			RHIBufferHandle buffer,
-			std::span<const DX12FencePoint> fencePoints) noexcept;
+			std::span<const RHIFencePoint> fencePoints) noexcept;
 		void GarbageCollect() noexcept;
 		void FreeAllImmediately(ResourceIndex resourceIndex) noexcept;
 
@@ -169,7 +170,7 @@ class DX12FencePoint;
 			typename HandleT::GenerationType m_Generation = 1;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			KeyT m_Key;
-			std::vector<DX12FencePoint> m_RetirementPoints;
+			std::vector<RHIFencePoint> m_RetirementPoints;
 			DX12DescriptorHandle m_Descriptor;
 		};
 

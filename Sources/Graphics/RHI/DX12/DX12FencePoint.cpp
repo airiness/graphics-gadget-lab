@@ -28,6 +28,16 @@ namespace gglab
 		return m_FencePtr && m_FencePtr->IsCompleted(m_PointValue);
 	}
 
+	RHIFencePoint DX12FencePoint::ToRHI() const noexcept
+	{
+		if (!m_FencePtr)
+		{
+			return {};
+		}
+
+		return RHIFencePoint(m_FencePtr->GetRHIHandle(), m_PointValue);
+	}
+
 	void DX12FencePoint::Wait(uint32_t timeout) const noexcept
 	{
 		if (m_FencePtr)

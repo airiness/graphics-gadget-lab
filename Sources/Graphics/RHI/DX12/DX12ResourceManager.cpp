@@ -215,7 +215,7 @@ namespace gglab
 			});
 	}
 
-	void DX12ResourceManager::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
+	void DX12ResourceManager::RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
 	{
 		RecordResourceUse(
 			m_Textures,
@@ -225,7 +225,7 @@ namespace gglab
 			"texture");
 	}
 
-	void DX12ResourceManager::RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
+	void DX12ResourceManager::RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept
 	{
 		RecordResourceUse(
 			m_Buffers,
@@ -362,7 +362,7 @@ namespace gglab
 	void DX12ResourceManager::RecordResourceUse(
 		RHIHandleTable<HandleT, SlotT>& table,
 		HandleT handle,
-		const DX12FencePoint& fencePoint,
+		const RHIFencePoint& fencePoint,
 		const char* functionName,
 		const char* resourceKind) noexcept
 	{
@@ -397,9 +397,9 @@ namespace gglab
 
 			const bool completed = std::ranges::all_of(
 				slot.m_RetirementPoints,
-				[](const DX12FencePoint& point)
+				[this](const RHIFencePoint& point)
 				{
-					return !point.IsValid() || point.IsCompleted();
+					return m_Device && m_Device->IsFencePointCompleted(point);
 				});
 			if (!completed)
 			{
@@ -417,19 +417,19 @@ namespace gglab
 	}
 
 	void DX12ResourceManager::RecordLastUsePoint(
-		std::vector<DX12FencePoint>& points,
-		const DX12FencePoint& fencePoint) noexcept
+		std::vector<RHIFencePoint>& points,
+		const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!fencePoint.IsValid())
 		{
 			return;
 		}
 
-		for (DX12FencePoint& point : points)
+		for (RHIFencePoint& point : points)
 		{
-			if (point.GetFence() == fencePoint.GetFence())
+			if (point.m_Fence == fencePoint.m_Fence)
 			{
-				if (point.GetValue() < fencePoint.GetValue())
+				if (point.m_Value < fencePoint.m_Value)
 				{
 					point = fencePoint;
 				}

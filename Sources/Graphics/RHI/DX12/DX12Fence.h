@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/RHIFence.h"
 
 namespace gglab
 {
@@ -14,6 +15,7 @@ namespace gglab
 
 		uint64_t GetCompletedValue() const noexcept;
 		uint64_t GetCurrentValue() const noexcept { return m_CurrentValue; }
+		RHIFenceHandle GetRHIHandle() const noexcept { return m_RHIHandle; }
 		bool IsCompleted(uint64_t fenceValue) const noexcept;
 		DX12FencePoint Signal(DX12CommandQueue* dx12CommandQueue) noexcept;
 		void WaitCompletion(uint64_t fenceValue, uint32_t timeout = GGLAB_INFINITE) const noexcept;
@@ -23,6 +25,7 @@ namespace gglab
 	private:
 		ComPtr<ID3D12Fence> m_D3D12Fence;
 		HANDLE m_EventHandle = nullptr;
+		RHIFenceHandle m_RHIHandle{};
 		uint64_t m_CurrentValue = 0;
 		uint64_t m_NextRequestValue = 0;
 	};

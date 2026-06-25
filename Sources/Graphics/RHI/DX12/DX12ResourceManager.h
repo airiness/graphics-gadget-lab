@@ -2,9 +2,9 @@
 #include "Core/CoreMacros.h"
 #include "Core/StringId.h"
 #include "Graphics/RHI/RHIBuffer.h"
+#include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/RHI/RHITexture.h"
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Core/Platform/Win/ComTypes.h"
 
 #include <memory>
@@ -71,8 +71,8 @@ namespace gglab
 
 		void DestroyTexture(RHITextureHandle texture) noexcept;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept;
-		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
-		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
+		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
+		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept;
@@ -92,8 +92,8 @@ namespace gglab
 			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			StringID m_DebugNameId;
-			std::vector<DX12FencePoint> m_LastUsePoints;
-			std::vector<DX12FencePoint> m_RetirementPoints;
+			std::vector<RHIFencePoint> m_LastUsePoints;
+			std::vector<RHIFencePoint> m_RetirementPoints;
 			std::unique_ptr<ResourceT> m_Resource;
 		};
 
@@ -110,8 +110,8 @@ namespace gglab
 			RHIResourceOwnership ownership,
 			std::string_view debugName) noexcept;
 		static void RecordLastUsePoint(
-			std::vector<DX12FencePoint>& points,
-			const DX12FencePoint& fencePoint) noexcept;
+			std::vector<RHIFencePoint>& points,
+			const RHIFencePoint& fencePoint) noexcept;
 		template<typename HandleT, typename SlotT, typename ResourceT>
 		static HandleT AllocateResourceSlot(
 			RHIHandleTable<HandleT, SlotT>& table,
@@ -128,7 +128,7 @@ namespace gglab
 		void RecordResourceUse(
 			RHIHandleTable<HandleT, SlotT>& table,
 			HandleT handle,
-			const DX12FencePoint& fencePoint,
+			const RHIFencePoint& fencePoint,
 			const char* functionName,
 			const char* resourceKind) noexcept;
 		template<typename HandleT, typename SlotT>
