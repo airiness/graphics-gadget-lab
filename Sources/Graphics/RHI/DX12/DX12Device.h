@@ -87,11 +87,13 @@ namespace gglab
 		RHIBufferHandle ImportBuffer(const DX12ResourceManager::ImportedBufferDesc& desc) noexcept;
 		RHITextureViewHandle CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept override;
 		RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept override;
+		RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept override;
 
 		void DestroyTexture(RHITextureHandle texture) noexcept override;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
+		void DestroySampler(RHISamplerHandle sampler) noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
@@ -101,6 +103,8 @@ namespace gglab
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
+		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
+		RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override;
 
 		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;
 		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;

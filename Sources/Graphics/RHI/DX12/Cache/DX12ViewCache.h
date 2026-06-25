@@ -3,6 +3,7 @@
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
+#include "Graphics/RHI/RHISampler.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
 
@@ -101,10 +102,14 @@ class DX12FencePoint;
 		RHIBufferViewHandle GetOrCreateBufferView(
 			RHIBufferHandle buffer,
 			const RHIBufferViewDesc& desc) noexcept;
+		RHISamplerHandle GetOrCreateSampler(const RHISamplerDesc& desc) noexcept;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
 		DX12DescriptorView ResolveBufferView(RHIBufferViewHandle view) const noexcept;
+		RHIDescriptorHandle ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept;
+		void DestroySampler(RHISamplerHandle sampler) noexcept;
+		bool IsSamplerAlive(RHISamplerHandle sampler) const noexcept;
 
 		template<ViewType T>
 		DX12DescriptorView GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,
@@ -157,8 +162,10 @@ class DX12FencePoint;
 		DX12DescriptorHandle CreateBufferDescriptor(
 			const RHIBufferViewKey& key,
 			DX12Buffer* buffer) const noexcept;
+		DX12DescriptorHandle CreateSamplerDescriptor(const RHISamplerDesc& desc) const noexcept;
 		void DestroyTextureViewLocked(RHITextureViewHandle view) noexcept;
 		void DestroyBufferViewLocked(RHIBufferViewHandle view) noexcept;
+		void DestroySamplerLocked(RHISamplerHandle sampler) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
@@ -176,11 +183,14 @@ class DX12FencePoint;
 
 		using TextureViewSlot = ViewSlot<RHITextureViewHandle, RHITextureViewKey>;
 		using BufferViewSlot = ViewSlot<RHIBufferViewHandle, RHIBufferViewKey>;
+		using SamplerSlot = ViewSlot<RHISamplerHandle, RHISamplerDesc>;
 
 		RHIHandleTable<RHITextureViewHandle, TextureViewSlot> m_RHITextureViews;
 		RHIHandleTable<RHIBufferViewHandle, BufferViewSlot> m_RHIBufferViews;
+		RHIHandleTable<RHISamplerHandle, SamplerSlot> m_RHISamplers;
 		std::unordered_map<RHITextureViewKey, RHITextureViewHandle, RHITextureViewKeyHash> m_RHITextureViewCache;
 		std::unordered_map<RHIBufferViewKey, RHIBufferViewHandle, RHIBufferViewKeyHash> m_RHIBufferViewCache;
+		std::unordered_map<RHISamplerDesc, RHISamplerHandle, KeyHash<RHISamplerDesc>> m_RHISamplerCache;
 		std::unordered_map<RHITextureHandle, std::vector<RHITextureViewHandle>> m_RHITextureResourceViews;
 		std::unordered_map<RHIBufferHandle, std::vector<RHIBufferViewHandle>> m_RHIBufferResourceViews;
 

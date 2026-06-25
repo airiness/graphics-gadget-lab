@@ -216,9 +216,10 @@ namespace gglab
 
 			if (drawItem.m_MeshId != lastMeshId)
 			{
-				D3D12_VERTEX_BUFFER_VIEW vbs[] = { mesh->m_VertexBufferView };
-				commandList->SetVertexBuffers(0, vbs);
-				commandList->SetIndexBuffer(mesh->m_IndexBufferView);
+				graphicsContext->SetVertexBuffers(
+					0,
+					std::span<const RHIVertexBufferBinding>(&mesh->m_VertexBufferBinding, 1));
+				graphicsContext->SetIndexBuffer(mesh->m_IndexBufferBinding);
 				lastMeshId = drawItem.m_MeshId;
 			}
 

@@ -86,18 +86,6 @@ namespace gglab
 		bool m_DepthClipEnable = true;
 	};
 
-	enum class RHICompareOp : uint8_t
-	{
-		Never,
-		Less,
-		Equal,
-		LessEqual,
-		Greater,
-		NotEqual,
-		GreaterEqual,
-		Always,
-	};
-
 	struct RHIDepthStencilDesc
 	{
 		bool m_DepthTestEnable = true;

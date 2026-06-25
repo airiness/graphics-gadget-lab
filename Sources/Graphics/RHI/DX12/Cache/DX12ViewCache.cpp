@@ -5,6 +5,7 @@
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
+#include "Graphics/RHI/DX12/Utility/DX12SamplerUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 
 namespace gglab
@@ -42,6 +43,16 @@ namespace gglab
 		m_RHIBufferViews.Clear();
 		m_RHIBufferViewCache.clear();
 		m_RHIBufferResourceViews.clear();
+
+		for (auto& slot : m_RHISamplers.Slots())
+		{
+			if (slot.m_Descriptor.IsValid())
+			{
+				slot.m_Descriptor.Free();
+			}
+		}
+		m_RHISamplers.Clear();
+		m_RHISamplerCache.clear();
 
 		// Release all pending descriptors
 		for (auto& pending : m_PendingQueue)
@@ -151,6 +162,44 @@ namespace gglab
 		return view;
 	}
 
+	RHISamplerHandle DX12ViewCache::GetOrCreateSampler(const RHISamplerDesc& desc) noexcept
+	{
+		{
+			std::shared_lock lock(m_Mutex);
+			if (auto iterator = m_RHISamplerCache.find(desc); iterator != m_RHISamplerCache.end())
+			{
+				if (m_RHISamplers.Resolve(iterator->second))
+				{
+					return iterator->second;
+				}
+			}
+		}
+
+		DX12DescriptorHandle descriptor = CreateSamplerDescriptor(desc);
+		if (!descriptor.IsValid())
+		{
+			return {};
+		}
+
+		std::unique_lock lock(m_Mutex);
+		if (auto iterator = m_RHISamplerCache.find(desc); iterator != m_RHISamplerCache.end())
+		{
+			if (m_RHISamplers.Resolve(iterator->second))
+			{
+				descriptor.Free();
+				return iterator->second;
+			}
+		}
+
+		const RHISamplerHandle sampler = m_RHISamplers.Allocate();
+		SamplerSlot& slot = m_RHISamplers.SlotAt(sampler.Index());
+		slot.m_Key = desc;
+		slot.m_RetirementPoints.clear();
+		slot.m_Descriptor = std::move(descriptor);
+		m_RHISamplerCache[desc] = sampler;
+		return sampler;
+	}
+
 	RHIBufferViewHandle DX12ViewCache::GetOrCreateBufferView(
 		RHIBufferHandle buffer,
 		const RHIBufferViewDesc& desc) noexcept
@@ -225,6 +274,21 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
+	RHIDescriptorHandle DX12ViewCache::ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		const SamplerSlot* slot = m_RHISamplers.Resolve(sampler);
+		if (!slot || !slot->m_Descriptor.IsValid())
+		{
+			return {};
+		}
+
+		return {
+			.m_HeapType = RHIDescriptorHeapType::Sampler,
+			.m_Index = slot->m_Descriptor.Index(),
+		};
+	}
+
 	void DX12ViewCache::DestroyTextureView(RHITextureViewHandle view) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
@@ -235,6 +299,18 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 		DestroyBufferViewLocked(view);
+	}
+
+	void DX12ViewCache::DestroySampler(RHISamplerHandle sampler) noexcept
+	{
+		std::unique_lock lock(m_Mutex);
+		DestroySamplerLocked(sampler);
+	}
+
+	bool DX12ViewCache::IsSamplerAlive(RHISamplerHandle sampler) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		return m_RHISamplers.Resolve(sampler) != nullptr;
 	}
 
 	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
@@ -494,6 +570,20 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RHIBufferViewType.");
 	}
 
+	DX12DescriptorHandle DX12ViewCache::CreateSamplerDescriptor(const RHISamplerDesc& desc) const noexcept
+	{
+		DX12DescriptorHandle descriptor =
+			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::GeneralSampler)->AllocateHandle();
+		if (!descriptor.IsValid())
+		{
+			return {};
+		}
+
+		const D3D12_SAMPLER_DESC nativeDesc = ToD3D12SamplerDesc(desc);
+		m_DX12Device->Get()->CreateSampler(&nativeDesc, descriptor.CpuHandleAt());
+		return descriptor;
+	}
+
 	void DX12ViewCache::DestroyTextureViewLocked(RHITextureViewHandle view) noexcept
 	{
 		TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
@@ -543,6 +633,28 @@ namespace gglab
 		{
 			BufferViewSlot& retiredSlot = m_RHIBufferViews.SlotAt(view.Index());
 			retiredSlot.m_RetirementPoints.clear();
+		}
+	}
+
+	void DX12ViewCache::DestroySamplerLocked(RHISamplerHandle sampler) noexcept
+	{
+		SamplerSlot* slot = m_RHISamplers.Resolve(sampler);
+		if (!slot)
+		{
+			return;
+		}
+
+		m_RHISamplerCache.erase(slot->m_Key);
+		if (m_RHISamplers.BeginRetirement(sampler) == RHIHandleValidationResult::Valid)
+		{
+			SamplerSlot& retiredSlot = m_RHISamplers.SlotAt(sampler.Index());
+			if (retiredSlot.m_Descriptor.IsValid())
+			{
+				retiredSlot.m_Descriptor.Free();
+			}
+			retiredSlot.m_Key = {};
+			retiredSlot.m_RetirementPoints.clear();
+			m_RHISamplers.Retire(sampler.Index());
 		}
 	}
 

@@ -1,8 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/TransferManager.h"
+#include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
 
@@ -10,6 +10,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
+#include <limits>
 
 namespace gglab
 {
@@ -38,20 +39,20 @@ namespace gglab
 			}
 		}
 
-		D3D12_TEXTURE_ADDRESS_MODE ToD3D12AddressMode(aiTextureMapMode mode) noexcept
+		RHITextureAddressMode ToRHITextureAddressMode(aiTextureMapMode mode) noexcept
 		{
 			switch (mode)
 			{
 			case aiTextureMapMode_Wrap:
-				return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+				return RHITextureAddressMode::Wrap;
 			case aiTextureMapMode_Clamp:
-				return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+				return RHITextureAddressMode::Clamp;
 			case aiTextureMapMode_Mirror:
-				return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+				return RHITextureAddressMode::Mirror;
 			case aiTextureMapMode_Decal:
-				return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+				return RHITextureAddressMode::Clamp;
 			default:
-				return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+				return RHITextureAddressMode::Wrap;
 			}
 		}
 
@@ -59,15 +60,15 @@ namespace gglab
 		{
 			SamplerKey key{};
 
-			key.m_Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+			key.m_Filter = RHISamplerFilter::MinMagMipLinear;
 
-			key.m_AddressU = ToD3D12AddressMode(mapMode[0]);
-			key.m_AddressV = ToD3D12AddressMode(mapMode[1]);
-			key.m_AddressW = ToD3D12AddressMode(mapMode[2]);
+			key.m_AddressU = ToRHITextureAddressMode(mapMode[0]);
+			key.m_AddressV = ToRHITextureAddressMode(mapMode[1]);
+			key.m_AddressW = ToRHITextureAddressMode(mapMode[2]);
 
 			key.m_MipLODBias = 0.0f;
 			key.m_MaxAnisotropy = 1;
-			key.m_ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+			key.m_CompareOp = RHICompareOp::Never;
 
 			key.m_BorderColor[0] = 0.0f;
 			key.m_BorderColor[1] = 0.0f;
@@ -75,7 +76,6 @@ namespace gglab
 			key.m_BorderColor[3] = 0.0f;
 
 			key.m_MinLOD = 0.0f;
-			key.m_MaxLOD = D3D12_FLOAT32_MAX;
 
 			return key;
 		}
@@ -313,29 +313,68 @@ namespace gglab
 		mesh->m_VertexCount = vertexCount;
 		mesh->m_IndexCount = indexCount;
 
-		const auto vertexBufferSize = vertexCount * sizeof(Vertex);
-		const auto indexBufferSize = indexCount * sizeof(uint32_t);
+		const auto vertexBufferSize = static_cast<uint64_t>(vertexCount) * sizeof(Vertex);
+		const auto indexBufferSize = static_cast<uint64_t>(indexCount) * sizeof(uint32_t);
 
-		mesh->m_VertexBuffer = std::make_unique<DX12Buffer>();
-		mesh->m_VertexBuffer->Create(
-			DX12Buffer::VertexOrIndexBufferCreateInfo(
-				m_DX12Device->GetMemAllocator(), vertexBufferSize));
+		if (vertexBufferSize == 0 || indexBufferSize == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("AssetManager::UploadMesh received an empty mesh.");
+			return;
+		}
 
-		mesh->m_IndexBuffer = std::make_unique<DX12Buffer>();
-		mesh->m_IndexBuffer->Create(
-			DX12Buffer::VertexOrIndexBufferCreateInfo(
-				m_DX12Device->GetMemAllocator(), indexBufferSize));
+		RHIBufferDesc vertexBufferDesc{};
+		vertexBufferDesc.m_SizeInBytes = vertexBufferSize;
+		vertexBufferDesc.m_StrideInBytes = sizeof(Vertex);
+		vertexBufferDesc.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest;
+		vertexBufferDesc.m_DebugName = "AssetManager.Mesh.VertexBuffer";
 
-		transferContext.UploadResource(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.get());
-		transferContext.UploadResource(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.get());
+		RHIBufferDesc indexBufferDesc{};
+		indexBufferDesc.m_SizeInBytes = indexBufferSize;
+		indexBufferDesc.m_StrideInBytes = sizeof(uint32_t);
+		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest;
+		indexBufferDesc.m_DebugName = "AssetManager.Mesh.IndexBuffer";
 
-		mesh->m_VertexBufferView.BufferLocation = mesh->m_VertexBuffer->Get()->GetGPUVirtualAddress();
-		mesh->m_VertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
-		mesh->m_VertexBufferView.StrideInBytes = sizeof(Vertex);
+		const RHIBufferHandle vertexBuffer = m_DX12Device->CreateBuffer(vertexBufferDesc);
+		const RHIBufferHandle indexBuffer = m_DX12Device->CreateBuffer(indexBufferDesc);
+		if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
+		{
+			if (vertexBuffer.IsValid())
+			{
+				m_DX12Device->DestroyBuffer(vertexBuffer);
+			}
+			if (indexBuffer.IsValid())
+			{
+				m_DX12Device->DestroyBuffer(indexBuffer);
+			}
 
-		mesh->m_IndexBufferView.BufferLocation = mesh->m_IndexBuffer->Get()->GetGPUVirtualAddress();
-		mesh->m_IndexBufferView.SizeInBytes = static_cast<UINT>(indexBufferSize);
-		mesh->m_IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
+			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh failed to create RHI mesh buffers.");
+			return;
+		}
+
+		mesh->m_VertexBuffer = RHIBufferOwner(m_DX12Device, vertexBuffer);
+		mesh->m_IndexBuffer = RHIBufferOwner(m_DX12Device, indexBuffer);
+
+		transferContext.UploadBuffer(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.Get());
+		transferContext.UploadBuffer(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.Get());
+
+		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
+			indexBufferSize > std::numeric_limits<uint32_t>::max())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh mesh buffers exceed RHI binding size limits.");
+			mesh->m_VertexBuffer.Reset();
+			mesh->m_IndexBuffer.Reset();
+			return;
+		}
+
+		mesh->m_VertexBufferBinding.m_Buffer = mesh->m_VertexBuffer.Get();
+		mesh->m_VertexBufferBinding.m_Offset = 0;
+		mesh->m_VertexBufferBinding.m_Stride = sizeof(Vertex);
+		mesh->m_VertexBufferBinding.m_SizeInBytes = static_cast<uint32_t>(vertexBufferSize);
+
+		mesh->m_IndexBufferBinding.m_Buffer = mesh->m_IndexBuffer.Get();
+		mesh->m_IndexBufferBinding.m_Offset = 0;
+		mesh->m_IndexBufferBinding.m_SizeInBytes = static_cast<uint32_t>(indexBufferSize);
+		mesh->m_IndexBufferBinding.m_Format = RHIFormat::R32Uint;
 
 		mesh->m_IsUploaded = true;
 	}

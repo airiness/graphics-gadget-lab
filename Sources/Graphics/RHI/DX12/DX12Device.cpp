@@ -141,6 +141,17 @@ namespace gglab
 		return m_ViewCache->GetOrCreateBufferView(buffer, desc);
 	}
 
+	RHISamplerHandle DX12Device::CreateSampler(const RHISamplerDesc& desc) noexcept
+	{
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateSampler called without a DX12ViewCache.");
+			return {};
+		}
+
+		return m_ViewCache->GetOrCreateSampler(desc);
+	}
+
 	void DX12Device::DestroyTexture(RHITextureHandle texture) noexcept
 	{
 		m_ResourceManager.DestroyTexture(texture);
@@ -171,6 +182,17 @@ namespace gglab
 		}
 
 		m_ViewCache->DestroyBufferView(view);
+	}
+
+	void DX12Device::DestroySampler(RHISamplerHandle sampler) noexcept
+	{
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroySampler called without a DX12ViewCache.");
+			return;
+		}
+
+		m_ViewCache->DestroySampler(sampler);
 	}
 
 	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
@@ -233,6 +255,22 @@ namespace gglab
 	bool DX12Device::IsAlive(RHIBufferHandle buffer) const noexcept
 	{
 		return m_ResourceManager.IsAlive(buffer);
+	}
+
+	bool DX12Device::IsAlive(RHISamplerHandle sampler) const noexcept
+	{
+		return m_ViewCache && m_ViewCache->IsSamplerAlive(sampler);
+	}
+
+	RHIDescriptorHandle DX12Device::GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept
+	{
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetSamplerDescriptor called without a DX12ViewCache.");
+			return {};
+		}
+
+		return m_ViewCache->ResolveSamplerDescriptor(sampler);
 	}
 
 	DX12Texture* DX12Device::ResolveTexture(RHITextureHandle texture) noexcept

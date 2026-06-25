@@ -29,6 +29,8 @@ namespace gglab
 			return DXGI_FORMAT_R32_TYPELESS;
 		case RHIFormat::R32Float:
 			return DXGI_FORMAT_R32_FLOAT;
+		case RHIFormat::R32Uint:
+			return DXGI_FORMAT_R32_UINT;
 		case RHIFormat::D24UnormS8Uint:
 			return DXGI_FORMAT_D24_UNORM_S8_UINT;
 		case RHIFormat::D32Float:
@@ -64,6 +66,8 @@ namespace gglab
 			return RHIFormat::R32Typeless;
 		case DXGI_FORMAT_R32_FLOAT:
 			return RHIFormat::R32Float;
+		case DXGI_FORMAT_R32_UINT:
+			return RHIFormat::R32Uint;
 		case DXGI_FORMAT_D24_UNORM_S8_UINT:
 			return RHIFormat::D24UnormS8Uint;
 		case DXGI_FORMAT_D32_FLOAT:

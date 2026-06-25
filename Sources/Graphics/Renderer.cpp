@@ -110,7 +110,7 @@ namespace gglab
 		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
 
 		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
-		samplerRegistryCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		samplerRegistryCreateInfo.m_Device = m_Device.get();
 		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
 		m_SamplerRegistry->InitializePresetSamplers();
 
@@ -257,6 +257,7 @@ namespace gglab
 		auto backBufferIndex = frame.m_BackBufferIndex;
 		auto commandAllocatorPool = m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
 		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
+		auto graphicsCommandContext = m_Device->GetGraphicsCommandContext(backBufferIndex);
 		auto commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 
 		// Wait Structured Buffer upload
@@ -267,10 +268,11 @@ namespace gglab
 
 		frame.m_CommandAllocator = commandAllocatorPool->RequestCommandAllocator();
 		commandList->Begin(frame.m_CommandAllocator);
+		graphicsCommandContext->ClearTrackedResourceUses();
 
 		RGExecuteContext executeContext{
 			RGBackendExecuteContext{
-				.m_GraphicsCommandContext = m_Device->GetGraphicsCommandContext(backBufferIndex),
+				.m_GraphicsCommandContext = graphicsCommandContext,
 				.m_GraphicsCommandList = commandList,
 			}
 		};
@@ -302,10 +304,22 @@ namespace gglab
 		auto* commandAllocatorPool =
 			m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
 		auto* commandList = m_Device->GetGraphicsCommandList(frame.m_BackBufferIndex);
+		auto* graphicsCommandContext = m_Device->GetGraphicsCommandContext(frame.m_BackBufferIndex);
 		auto* commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 
 		const DX12CommandList* commandLists[] = { commandList };
 		m_LastSubmittedFencePoint = commandQueue->Execute(commandLists);
+
+		for (const RHIBufferHandle buffer : graphicsCommandContext->GetUsedBuffers())
+		{
+			m_Device->RecordBufferUse(buffer, m_LastSubmittedFencePoint);
+		}
+		for (const RHITextureHandle texture : graphicsCommandContext->GetUsedTextures())
+		{
+			m_Device->RecordTextureUse(texture, m_LastSubmittedFencePoint);
+		}
+		graphicsCommandContext->ClearTrackedResourceUses();
+
 		RetireSceneGpuAllocations(
 			&frame.m_SceneGpuAllocations,
 			m_LastSubmittedFencePoint);
@@ -339,6 +353,11 @@ namespace gglab
 		if (graphicsQueue && frame.m_UploadFencePoint.IsValid())
 		{
 			graphicsQueue->Wait(frame.m_UploadFencePoint);
+		}
+
+		if (m_Device)
+		{
+			m_Device->GetGraphicsCommandContext(frame.m_BackBufferIndex)->ClearTrackedResourceUses();
 		}
 
 		if (graphicsQueue)
