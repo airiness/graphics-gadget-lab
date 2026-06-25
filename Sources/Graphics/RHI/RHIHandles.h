@@ -60,6 +60,7 @@ namespace gglab
 	struct RHITextureViewHandleTag {};
 	struct RHIBufferViewHandleTag {};
 	struct RHIFenceHandleTag {};
+	struct RHICommandContextHandleTag {};
 
 	using RHITextureHandle = RHIHandle<RHITextureHandleTag>;
 	using RHIBufferHandle = RHIHandle<RHIBufferHandleTag>;
@@ -70,6 +71,7 @@ namespace gglab
 	using RHITextureViewHandle = RHIHandle<RHITextureViewHandleTag>;
 	using RHIBufferViewHandle = RHIHandle<RHIBufferViewHandleTag>;
 	using RHIFenceHandle = RHIHandle<RHIFenceHandleTag>;
+	using RHICommandContextHandle = RHIHandle<RHICommandContextHandleTag>;
 }
 
 namespace std

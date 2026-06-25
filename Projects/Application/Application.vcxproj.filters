@@ -120,6 +120,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -279,8 +282,8 @@
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\CopyContext.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHITransferContext.cpp">
+      <Filter>Graphics\RHI</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp">
       <Filter>Graphics</Filter>
@@ -450,6 +453,9 @@
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Application.h">
@@ -707,8 +713,8 @@
     <ClInclude Include="..\..\Sources\Graphics\TransferManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\CopyContext.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h">
+      <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h">
       <Filter>Graphics</Filter>
@@ -785,7 +791,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandList.h">
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h">

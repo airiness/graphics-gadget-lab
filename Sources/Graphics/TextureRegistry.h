@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/CopyContext.h"
+#include "Graphics/RHI/RHITransferContext.h"
 #include "Graphics/TextureAsset.h"
 
 namespace gglab
@@ -92,7 +92,7 @@ namespace gglab
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			TextureAssetData&& textureData, TextureSemantic semantic) noexcept;
 
-		void UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept;
+		void UploadTexture(const TextureUploadData& uploadData, RHITransferContext& transferContext) noexcept;
 
 	private:
 		void CreateTextureEntry(TextureID id, const char* texName) noexcept;

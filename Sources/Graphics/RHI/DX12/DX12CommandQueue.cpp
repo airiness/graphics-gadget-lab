@@ -44,6 +44,11 @@ namespace gglab
 		return Signal();
 	}
 
+	RHIFencePoint DX12CommandQueue::Submit(std::span<const DX12CommandList* const> commandLists) noexcept
+	{
+		return Execute(commandLists).ToRHI();
+	}
+
 	void DX12CommandQueue::FlushCommandQueue() noexcept
 	{
 		auto fencePoint = Signal();

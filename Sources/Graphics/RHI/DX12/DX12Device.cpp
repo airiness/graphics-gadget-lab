@@ -1,15 +1,20 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12CommandContext.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Core/HResult.h"
 
 namespace gglab
 {
+	DX12Device::DX12Device() noexcept = default;
+
 	DX12Device::~DX12Device()
 	{
 		if (m_IsInitialized)
@@ -71,6 +76,8 @@ namespace gglab
 			commandQueue.reset();
 		}
 
+		m_GraphicsCommandContexts = {};
+		m_ComputeCommandContexts = {};
 		m_GraphicsCommandLists = {};
 		m_ComputeCommandLists = {};
 
@@ -432,10 +439,18 @@ namespace gglab
 			createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 			m_GraphicsCommandLists[i] =
 				std::make_unique<DX12CommandList>(createInfo);
+			m_GraphicsCommandContexts[i] =
+				std::make_unique<DX12GraphicsCommandContext>(
+					this,
+					m_GraphicsCommandLists[i].get());
 
 			createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
 			m_ComputeCommandLists[i] =
 				std::make_unique<DX12CommandList>(createInfo);
+			m_ComputeCommandContexts[i] =
+				std::make_unique<DX12ComputeCommandContext>(
+					this,
+					m_ComputeCommandLists[i].get());
 		}
 	}
 

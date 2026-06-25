@@ -7,6 +7,7 @@ namespace gglab
 	class DX12Device;
 	class DX12Buffer;
 	class DX12RingBuffer;
+	class RHITransferContext;
 
 	class TransferManager
 	{
@@ -21,11 +22,12 @@ namespace gglab
 
 		DX12RingBuffer* GetUploadRingBuffer() noexcept { return &m_UploadRingBuffer; }
 		const DX12RingBuffer* GetUploadRingBuffer() const noexcept { return &m_UploadRingBuffer; }
-		CopyContext* GetCopyContext() noexcept { return m_CopyContext.get(); }
+		RHITransferContext* GetTransferContext() noexcept { return m_TransferContext.get(); }
+		const RHITransferContext* GetTransferContext() const noexcept { return m_TransferContext.get(); }
 
 	private:
 		DX12RingBuffer m_UploadRingBuffer;
 
-		std::unique_ptr<CopyContext> m_CopyContext;
+		std::unique_ptr<RHITransferContext> m_TransferContext;
 	};
 }
