@@ -19,6 +19,12 @@ namespace gglab
 			return DXGI_FORMAT_R16G16_FLOAT;
 		case RHIFormat::R16G16B16A16Float:
 			return DXGI_FORMAT_R16G16B16A16_FLOAT;
+		case RHIFormat::R32G32Float:
+			return DXGI_FORMAT_R32G32_FLOAT;
+		case RHIFormat::R32G32B32Float:
+			return DXGI_FORMAT_R32G32B32_FLOAT;
+		case RHIFormat::R32G32B32A32Float:
+			return DXGI_FORMAT_R32G32B32A32_FLOAT;
 		case RHIFormat::R32Typeless:
 			return DXGI_FORMAT_R32_TYPELESS;
 		case RHIFormat::R32Float:
@@ -48,6 +54,12 @@ namespace gglab
 			return RHIFormat::R16G16Float;
 		case DXGI_FORMAT_R16G16B16A16_FLOAT:
 			return RHIFormat::R16G16B16A16Float;
+		case DXGI_FORMAT_R32G32_FLOAT:
+			return RHIFormat::R32G32Float;
+		case DXGI_FORMAT_R32G32B32_FLOAT:
+			return RHIFormat::R32G32B32Float;
+		case DXGI_FORMAT_R32G32B32A32_FLOAT:
+			return RHIFormat::R32G32B32A32Float;
 		case DXGI_FORMAT_R32_TYPELESS:
 			return RHIFormat::R32Typeless;
 		case DXGI_FORMAT_R32_FLOAT:

@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Hash/FNV1a.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/RHI/RHIBindingLayout.h"
 
 namespace gglab
 {
@@ -34,6 +35,7 @@ namespace gglab
 		~DX12RootSignatureCache() = default;
 
 		RootSignatureHandle GetOrCreate(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept;
+		RootSignatureHandle GetOrCreate(const RHIBindingLayoutDesc& desc) noexcept;
 		DX12RootSignature* GetDX12RootSignature(RootSignatureID id) const noexcept;
 
 		void Clear() noexcept;

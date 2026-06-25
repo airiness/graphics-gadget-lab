@@ -153,7 +153,16 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp">
@@ -244,6 +253,9 @@
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\PipelineCache.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp">
@@ -509,7 +521,16 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h">
@@ -671,6 +692,9 @@
     <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
@@ -791,6 +815,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBindingLayout.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
@@ -807,6 +834,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">

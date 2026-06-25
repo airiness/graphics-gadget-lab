@@ -121,8 +121,6 @@ namespace gglab
 			const ComputePipelineRecipe& recipe) noexcept;
 
 	private:
-		GraphicsPipelineDesc BuildGraphicsDesc(
-			const GraphicsPipelineRecipe& recipe) const noexcept;
 		ComputePipelineDesc BuildComputeDesc(
 			const ComputePipelineRecipe& recipe) const noexcept;
 

@@ -22,6 +22,30 @@
 
 namespace gglab
 {
+	namespace
+	{
+		void AddBindingSlot(
+			RHIBindingLayoutDesc& desc,
+			RHIBindingType type,
+			RHIShaderStage visibility,
+			uint32_t binding,
+			uint32_t space,
+			uint32_t count,
+			uint32_t sizeInBytes,
+			const char* debugName) noexcept
+		{
+			GGLAB_ASSERT(desc.m_SlotCount < RHIBindingLayoutDesc::MaxSlots);
+			auto& slot = desc.m_Slots[desc.m_SlotCount++];
+			slot.m_Type = type;
+			slot.m_Visibility = visibility;
+			slot.m_Binding = binding;
+			slot.m_Space = space;
+			slot.m_Count = count;
+			slot.m_SizeInBytes = sizeInBytes;
+			slot.m_DebugName = debugName;
+		}
+	}
+
 	Renderer::Frame::~Frame() noexcept
 	{
 		if (m_Renderer && m_State != State::Ended)
@@ -390,6 +414,22 @@ namespace gglab
 		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
 	}
 
+	RHIBindingLayoutDesc Renderer::BuildCommonRHIBindingLayoutDesc() noexcept
+	{
+		RHIBindingLayoutDesc desc{};
+		desc.m_DebugName = "RendererCommonBindingLayout";
+
+		AddBindingSlot(desc, RHIBindingType::ConstantBuffer, RHIShaderStage::AllGraphics, 0, 0, 1, 0, "SceneCB");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::AllGraphics, 1, 0, 1, MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::AllGraphics, 2, 0, 1, MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 1, 0, 1, 0, "ObjectSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 2, 0, 1, 0, "MaterialSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 3, 0, 1, 0, "ViewSB");
+		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::AllGraphics, 0, 0, 0, 0, "BindlessTextures");
+		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::AllGraphics, 0, 0, 0, 0, "BindlessSamplers");
+		return desc;
+	}
+
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
@@ -463,47 +503,8 @@ namespace gglab
 
 	void Renderer::CreateCommonRootSignature() noexcept
 	{
-		CD3DX12_DESCRIPTOR_RANGE1 range = {};
-		range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-			1, // numDescriptors: t0
-			0, // baseShaderRegister
-			0, // registerSpace
-			D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
-		// D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE
-
-		CD3DX12_ROOT_PARAMETER1 rootParameters[utils::EnumCount<CommonRSRootParamIndex>()] = {};
-
-		// b0: SceneCB
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::SceneCB)].InitAsConstantBufferView(0);
-
-		// b1: DrawConstants
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::DrawConstants)].InitAsConstants(
-			MaxDrawConstantDWORDs, 1);
-
-		// b2: PassConstants
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::PassConstants)].InitAsConstants(
-			MaxPassConstantDWORDs, 2);
-
-		// t1: ObjectSB
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ObjectSB)].InitAsShaderResourceView(1);
-
-		// t2: materialSB
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::MaterialSB)].InitAsShaderResourceView(2);
-
-		// t3: ViewSB
-		rootParameters[utils::ToIndex(CommonRSRootParamIndex::ViewSB)].InitAsShaderResourceView(3);
-
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {};
-		rootSignatureDesc.Init_1_1(
-			static_cast<UINT>(utils::EnumCount<CommonRSRootParamIndex>()),
-			rootParameters,
-			0,
-			nullptr,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED);
-
-		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(rootSignatureDesc);
+		const RHIBindingLayoutDesc commonBindingLayout = BuildCommonRHIBindingLayoutDesc();
+		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(commonBindingLayout);
 		m_CommonRootSignatureId = id;
 	}
 

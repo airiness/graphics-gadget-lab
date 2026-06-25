@@ -191,7 +191,10 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
@@ -210,6 +213,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\PipelineCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.cpp" />
@@ -292,12 +296,14 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBindingLayout.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
@@ -330,7 +336,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h" />
@@ -354,6 +363,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.h" />
