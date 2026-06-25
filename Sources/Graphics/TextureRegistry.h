@@ -7,7 +7,6 @@ namespace gglab
 {
 	class DX12Device;
 	class TransferManager;
-	class DX12DescriptorManager;
 
 	enum class ReservedTextureIDIndex : uint32_t
 	{
@@ -49,7 +48,6 @@ namespace gglab
 		{
 			DX12Device* m_DX12Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
-			DX12DescriptorManager* m_DescriptorManager = nullptr;
 		};
 
 		struct TextureUploadData
@@ -100,7 +98,6 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
-		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureContainer m_TextureContainer;

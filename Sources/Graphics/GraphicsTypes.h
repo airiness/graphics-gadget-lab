@@ -6,7 +6,6 @@
 #include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIResource.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Core/Utility/TypeUtils.h"
 
 #include <cstdint>
@@ -194,7 +193,7 @@ namespace gglab
 	struct Texture
 	{
 		TextureID m_Id{};
-		DX12DescriptorID m_DescriptorId{};
+		RHITextureViewHandle m_Srv{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
 		RHITextureHandle m_Texture;

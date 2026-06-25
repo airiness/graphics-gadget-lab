@@ -33,6 +33,8 @@ namespace gglab
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
 
+		virtual RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept = 0;
+		virtual RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept = 0;
 		virtual RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept = 0;
 
 		virtual void RetireCompletedWork() noexcept = 0;

@@ -1,6 +1,8 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 
+struct ID3D12Resource;
+
 namespace gglab
 {
 	struct ExternalResourceIndex
@@ -71,6 +73,7 @@ namespace gglab
 	class DX12ViewCache;
 	class DX12Texture;
 	class DX12Buffer;
+	class DX12FencePoint;
 	class RGExternalResourceRegistry
 	{
 	public:

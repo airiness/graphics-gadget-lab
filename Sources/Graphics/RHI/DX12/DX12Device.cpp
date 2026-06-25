@@ -262,6 +262,28 @@ namespace gglab
 		return m_ViewCache && m_ViewCache->IsSamplerAlive(sampler);
 	}
 
+	RHIDescriptorHandle DX12Device::GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept
+	{
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetTextureViewDescriptor called without a DX12ViewCache.");
+			return {};
+		}
+
+		return m_ViewCache->ResolveTextureViewDescriptor(view);
+	}
+
+	RHIDescriptorHandle DX12Device::GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept
+	{
+		if (!m_ViewCache)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetBufferViewDescriptor called without a DX12ViewCache.");
+			return {};
+		}
+
+		return m_ViewCache->ResolveBufferViewDescriptor(view);
+	}
+
 	RHIDescriptorHandle DX12Device::GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept
 	{
 		if (!m_ViewCache)
