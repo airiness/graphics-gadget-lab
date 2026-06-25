@@ -157,7 +157,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\CopyContext.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHITransferContext.cpp" />
     <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
@@ -171,6 +171,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp" />
@@ -278,7 +279,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
     <ClInclude Include="..\..\Sources\Graphics\CameraController.h" />
     <ClInclude Include="..\..\Sources\Core\Components.h" />
-    <ClInclude Include="..\..\Sources\Graphics\CopyContext.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h" />
     <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\Core\Demo\DemoBase.h" />
     <ClInclude Include="..\..\Sources\Core\Demo\DemoManager.h" />
@@ -291,7 +292,7 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandList.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
@@ -306,6 +307,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ConstantBuffer.h" />

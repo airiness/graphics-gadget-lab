@@ -5,6 +5,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 

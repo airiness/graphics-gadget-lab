@@ -5,6 +5,8 @@
 #include "Graphics/AssetManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 
@@ -55,6 +57,8 @@ namespace gglab
 			{
 				auto* commandList = executeContext.GetGraphicsCommandList();
 				GGLAB_ASSERT_NOT_NULL(commandList);
+				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
+				GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);
 				GGLAB_ASSERT_NOT_NULL(shadowMapTexture);
@@ -105,7 +109,7 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				DrawRenderQueue(commandList, *contextPtr, *servicesPtr);
+				DrawRenderQueue(commandList, graphicsContext, *contextPtr, *servicesPtr);
 			});
 	}
 
@@ -150,9 +154,11 @@ namespace gglab
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRenderQueue(DX12CommandList* commandList,
+		RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		const auto& renderQueue = context.GetRenderQueue(RenderViewID::DirectionalShadow);
 		if (renderQueue.m_DrawItems.empty())
 		{
@@ -160,11 +166,12 @@ namespace gglab
 		}
 
 		const auto ranges = renderQueue.m_BucketDrawRanges;
-		DrawRange(commandList, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)]);
-		DrawRange(commandList, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
+		DrawRange(commandList, graphicsContext, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)]);
+		DrawRange(commandList, graphicsContext, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRange(DX12CommandList* commandList,
+		RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
@@ -174,6 +181,7 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 		auto* renderer = services.m_Renderer;
 		auto* assetManager = services.m_AssetManager;
@@ -221,7 +229,7 @@ namespace gglab
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawParameters);
 
-			commandList->DrawIndexedInstanced(mesh->m_IndexCount);
+			graphicsContext->DrawIndexed(mesh->m_IndexCount);
 		}
 	}
 

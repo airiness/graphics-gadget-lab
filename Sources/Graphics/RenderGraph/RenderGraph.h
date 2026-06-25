@@ -11,6 +11,8 @@
 
 namespace gglab
 {
+	class RHIGraphicsCommandContext;
+	class RHIComputeCommandContext;
 	class DX12CommandList;
 	class DX12ViewCache;
 	class DX12Buffer;
@@ -31,6 +33,10 @@ namespace gglab
 
 	struct RGBackendExecuteContext
 	{
+		RHIGraphicsCommandContext* m_GraphicsCommandContext = nullptr;
+		RHIComputeCommandContext* m_ComputeCommandContext = nullptr;
+
+		// Native DX12 escape hatch while RenderGraph passes migrate to RHI command contexts.
 		DX12CommandList* m_GraphicsCommandList = nullptr;
 		DX12CommandList* m_ComputeCommandList = nullptr;
 	};
@@ -42,6 +48,8 @@ namespace gglab
 		{}
 
 		DX12DescriptorView GetView(RGTextureViewId viewId) const noexcept;
+		RHIGraphicsCommandContext* GetGraphicsCommandContext() const noexcept { return m_Backend.m_GraphicsCommandContext; }
+		RHIComputeCommandContext* GetComputeCommandContext() const noexcept { return m_Backend.m_ComputeCommandContext; }
 		DX12CommandList* GetGraphicsCommandList() const noexcept { return m_Backend.m_GraphicsCommandList; }
 		DX12CommandList* GetComputeCommandList() const noexcept { return m_Backend.m_ComputeCommandList; }
 

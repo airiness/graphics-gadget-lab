@@ -3,6 +3,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/ShaderManager.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab

@@ -3,7 +3,6 @@
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/TextureLoader.h"
@@ -196,10 +195,10 @@ namespace gglab
 		if (!uploads.empty())
 		{
 			auto batch = m_TransferManager->BeginBatch();
-			auto* copyContext = m_TransferManager->GetCopyContext();
+			auto* transferContext = m_TransferManager->GetTransferContext();
 			for (const auto& data : uploads)
 			{
-				UploadTexture(data, *copyContext);
+				UploadTexture(data, *transferContext);
 			}
 			batch.Submit(true);
 		}
@@ -247,8 +246,8 @@ namespace gglab
 
 		auto texUploadData = MakeTextureUploadData(textureId, canonicalPath, semantic);
 		auto batch = m_TransferManager->BeginBatch();
-		auto* copyContext = m_TransferManager->GetCopyContext();
-		UploadTexture(texUploadData, *copyContext);
+		auto* transferContext = m_TransferManager->GetTransferContext();
+		UploadTexture(texUploadData, *transferContext);
 		batch.Submit(true);
 
 		return textureId;
@@ -332,7 +331,7 @@ namespace gglab
 		return uploadData;
 	}
 
-	void TextureRegistry::UploadTexture(const TextureUploadData& uploadData, CopyContext& copyContext) noexcept
+	void TextureRegistry::UploadTexture(const TextureUploadData& uploadData, RHITransferContext& transferContext) noexcept
 	{
 		auto* texture = GetTexture(uploadData.m_TextureId);
 		GGLAB_ASSERT_MSG(texture != nullptr, "TextureRegistry::UploadTexture: invalid TextureID.");
@@ -372,13 +371,23 @@ namespace gglab
 		}
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
-		copyContext.UploadResource(textureUploadData, nativeTexture);
+		transferContext.UploadTexture(textureUploadData, texture->m_Texture);
 
-		auto transition = CD3DX12_RESOURCE_BARRIER::Transition(
-			nativeTexture->Get(),
-			D3D12_RESOURCE_STATE_COPY_DEST,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		copyContext.GetCommandList()->Get()->ResourceBarrier(1, &transition);
+		const RHITextureBarrier barrier
+		{
+			.m_Texture = texture->m_Texture,
+			.m_Before =
+			{
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::CopyDest,
+			},
+			.m_After =
+			{
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
+			},
+		};
+		transferContext.TextureBarrier(std::span{ &barrier, 1 });
 
 		TextureSrvCreateInfo srvInfo{};
 		srvInfo.m_Format = ToDXGIFormat(textureData.m_ViewFormat);

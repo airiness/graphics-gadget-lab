@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RHI/DX12/DX12RingStructuredBuffer.h"
-#include "Graphics/CopyContext.h"
+#include "Graphics/RHI/RHITransferContext.h"
 #include "Graphics/GPUStructures.h"
 
 #include <limits>
@@ -26,7 +26,7 @@ namespace gglab
 
 	public:
 		TransferBatch(TransferManager& transferManager,
-			CopyContext& copyContext,
+			RHITransferContext& transferContext,
 			DX12RingBuffer& uploadRing) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(TransferBatch);
 		~TransferBatch();
@@ -109,7 +109,7 @@ namespace gglab
 
 	private:
 		TransferManager& m_TransferManager;
-		CopyContext& m_CopyContext;
+		RHITransferContext& m_TransferContext;
 		DX12RingBuffer& m_UploadRing;
 
 		std::vector<DX12RingBuffer::Span> m_UploadSpans;

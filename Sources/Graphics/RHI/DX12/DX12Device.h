@@ -27,6 +27,8 @@ namespace gglab
 
 	class DX12CommandQueue;
 	class DX12CommandList;
+	class DX12GraphicsCommandContext;
+	class DX12ComputeCommandContext;
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12FencePoint;
@@ -49,7 +51,7 @@ namespace gglab
 		};
 
 	public:
-		DX12Device() noexcept = default;
+		DX12Device() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12Device);
 		~DX12Device();
 
@@ -67,6 +69,8 @@ namespace gglab
 
 		DX12CommandList* GetGraphicsCommandList(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandLists.at(bufferIndex).get(); }
 		DX12CommandList* GetComputeCommandList(uint32_t bufferIndex) const noexcept { return m_ComputeCommandLists.at(bufferIndex).get(); }
+		DX12GraphicsCommandContext* GetGraphicsCommandContext(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandContexts.at(bufferIndex).get(); }
+		DX12ComputeCommandContext* GetComputeCommandContext(uint32_t bufferIndex) const noexcept { return m_ComputeCommandContexts.at(bufferIndex).get(); }
 
 		bool SupportRayTracing() const noexcept { return m_FeatureSupport.m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_FeatureSupport.m_MeshShaderSupported; }
@@ -146,6 +150,8 @@ namespace gglab
 
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
 		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
+		std::array<std::unique_ptr<DX12GraphicsCommandContext>, BufferCount> m_GraphicsCommandContexts;
+		std::array<std::unique_ptr<DX12ComputeCommandContext>, BufferCount> m_ComputeCommandContexts;
 
 		// supported features
 		FeatureSupport m_FeatureSupport;

@@ -6,6 +6,7 @@
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab

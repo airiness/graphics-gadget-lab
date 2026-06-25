@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/RHIFence.h"
 
 namespace gglab
 {
@@ -27,6 +28,7 @@ namespace gglab
 		const DX12Fence* GetFence() const noexcept { return m_Fence.get(); }
 
 		DX12FencePoint Execute(std::span<const DX12CommandList* const> commandLists) noexcept;
+		RHIFencePoint Submit(std::span<const DX12CommandList* const> commandLists) noexcept;
 
 		void FlushCommandQueue() noexcept;
 

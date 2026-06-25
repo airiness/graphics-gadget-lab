@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12CommandContext.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
@@ -245,6 +246,7 @@ namespace gglab
 
 		RGExecuteContext executeContext{
 			RGBackendExecuteContext{
+				.m_GraphicsCommandContext = m_Device->GetGraphicsCommandContext(backBufferIndex),
 				.m_GraphicsCommandList = commandList,
 			}
 		};

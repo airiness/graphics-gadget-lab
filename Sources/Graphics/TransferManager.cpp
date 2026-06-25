@@ -1,11 +1,11 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TransferManager.h"
-#include "Graphics/CopyContext.h"
+#include "Graphics/RHI/RHITransferContext.h"
 
 namespace gglab
 {
 	TransferManager::TransferManager(DX12Device* dx12Device, uint32_t uploadBufferCapacity) noexcept :
-		m_CopyContext(std::make_unique<CopyContext>(dx12Device))
+		m_TransferContext(std::make_unique<RHITransferContext>(dx12Device))
 	{
 		auto createInfo = DX12Buffer::UploadBufferCreateInfo(
 			dx12Device->GetMemAllocator(), 
@@ -15,7 +15,7 @@ namespace gglab
 
 	DX12FencePoint TransferManager::Reclaim() noexcept
 	{
-		const auto completedFence = m_CopyContext->ReclaimCompleted();
+		const auto completedFence = m_TransferContext->ReclaimCompleted();
 		if (completedFence.IsValid())
 		{
 			m_UploadRingBuffer.ReclaimCompleted(completedFence);
@@ -28,7 +28,7 @@ namespace gglab
 		// Reclaim completed uploads before starting a new batch
 		Reclaim();
 
-		m_CopyContext->Begin();
-		return TransferBatch(*this, *m_CopyContext, m_UploadRingBuffer);
+		m_TransferContext->Begin();
+		return TransferBatch(*this, *m_TransferContext, m_UploadRingBuffer);
 	}
 }

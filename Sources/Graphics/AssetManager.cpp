@@ -220,8 +220,8 @@ namespace gglab
 
 		// Upload Mesh to GPU
 		auto batch = m_TransferManager->BeginBatch();
-		auto* copyContext = m_TransferManager->GetCopyContext();
-		UploadMesh(meshUploadData, *copyContext);
+		auto* transferContext = m_TransferManager->GetTransferContext();
+		UploadMesh(meshUploadData, *transferContext);
 		batch.Submit(true);
 
 		return meshId;
@@ -295,7 +295,7 @@ namespace gglab
 		return bindingGpu;
 	}
 
-	void AssetManager::UploadMesh(const MeshUploadData& uploadData, CopyContext& copyContext) noexcept
+	void AssetManager::UploadMesh(const MeshUploadData& uploadData, RHITransferContext& transferContext) noexcept
 	{
 		auto* mesh = GetMesh(uploadData.m_MeshId);
 		if (mesh == nullptr)
@@ -326,8 +326,8 @@ namespace gglab
 			DX12Buffer::VertexOrIndexBufferCreateInfo(
 				m_DX12Device->GetMemAllocator(), indexBufferSize));
 
-		copyContext.UploadResource(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.get());
-		copyContext.UploadResource(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.get());
+		transferContext.UploadResource(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.get());
+		transferContext.UploadResource(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.get());
 
 		mesh->m_VertexBufferView.BufferLocation = mesh->m_VertexBuffer->Get()->GetGPUVirtualAddress();
 		mesh->m_VertexBufferView.SizeInBytes = static_cast<UINT>(vertexBufferSize);
@@ -631,16 +631,16 @@ namespace gglab
 
 		// Upload to GPU
 		auto batch = m_TransferManager->BeginBatch();
-		auto* copyContext = m_TransferManager->GetCopyContext();
+		auto* transferContext = m_TransferManager->GetTransferContext();
 		// Upload textures
 		for (const auto& texUploadData : texUploadDatas)
 		{
-			m_TextureRegistry->UploadTexture(texUploadData, *copyContext);
+			m_TextureRegistry->UploadTexture(texUploadData, *transferContext);
 		}
 		// Upload meshes
 		for (const auto& meshUploadData : meshUploadDatas)
 		{
-			UploadMesh(meshUploadData, *copyContext);
+			UploadMesh(meshUploadData, *transferContext);
 		}
 		batch.Submit(true);
 

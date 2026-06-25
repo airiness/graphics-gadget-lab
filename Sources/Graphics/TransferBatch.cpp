@@ -5,10 +5,10 @@
 namespace gglab
 {
 	TransferBatch::TransferBatch(TransferManager& transferManager,
-		CopyContext& copyContext,
+		RHITransferContext& transferContext,
 		DX12RingBuffer& uploadRing) noexcept :
 		m_TransferManager(transferManager),
-		m_CopyContext(copyContext),
+		m_TransferContext(transferContext),
 		m_UploadRing(uploadRing)
 	{
 	}
@@ -99,7 +99,7 @@ namespace gglab
 			src,
 			numBytes);
 
-		m_CopyContext.CopyBuffer(
+		m_TransferContext.CopyBuffer(
 			dstBuffer,
 			dstOffset,
 			m_UploadRing.GetBuffer(),
@@ -109,7 +109,7 @@ namespace gglab
 
 	DX12FencePoint TransferBatch::Submit(bool wait) noexcept
 	{
-		DX12FencePoint fencePoint = m_TransferManager.GetCopyContext()->End(wait);
+		DX12FencePoint fencePoint = m_TransferManager.GetTransferContext()->End(wait);
 
 		for (auto& span : m_UploadSpans)
 		{
