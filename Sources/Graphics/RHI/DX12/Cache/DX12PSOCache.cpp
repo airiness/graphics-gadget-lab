@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
+#include "Graphics/RHI/DX12/Utility/DX12InputLayoutUtils.h"
 
 namespace gglab
 {
@@ -39,6 +40,50 @@ namespace gglab
 		return slot.get();
 	}
 
+	DX12PipelineState* DX12PSOCache::GetOrCreate(
+		const RHIGraphicsPipelineDesc& desc,
+		const RootSignatureHandle& rootSignature,
+		const DX12GraphicsPipelineShaderInputs& shaderInputs) noexcept
+	{
+		const DX12RHIGraphicsPSOKey key = MakeDX12RHIGraphicsPSOKey(
+			desc,
+			rootSignature.m_Id,
+			shaderInputs);
+
+		{
+			std::shared_lock lock(m_Mutex);
+			auto iter = m_RHIGraphicsPSOMap.find(key);
+			if (iter != m_RHIGraphicsPSOMap.end())
+			{
+				return iter->second.get();
+			}
+		}
+
+		std::unique_lock lock(m_Mutex);
+		auto iter = m_RHIGraphicsPSOMap.find(key);
+		if (iter != m_RHIGraphicsPSOMap.end())
+		{
+			return iter->second.get();
+		}
+
+		DX12InputLayoutBuildResult inputLayout{};
+		BuildDX12InputLayoutDesc(desc.m_VertexInput, inputLayout);
+
+		GraphicsPipelineDesc dx12Desc = BuildDX12GraphicsPipelineDesc(
+			desc,
+			rootSignature,
+			shaderInputs,
+			inputLayout);
+
+		GGLAB_ASSERT_MSG(m_Creator, "PSO Creator is null");
+		auto pso = m_Creator->CreateGraphicsPSO(m_DX12Device, dx12Desc);
+		GGLAB_ASSERT_MSG(pso, "Failed to create PSO");
+
+		auto& slot = m_RHIGraphicsPSOMap[key];
+		slot = std::move(pso);
+		return slot.get();
+	}
+
 	DX12PipelineState* DX12PSOCache::GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept
 	{
 		{
@@ -68,6 +113,7 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 		m_GraphicsPSOMap.clear();
+		m_RHIGraphicsPSOMap.clear();
 		m_ComputePSOMap.clear();
 		m_Revision.fetch_add(1, std::memory_order_relaxed);
 	}
@@ -76,6 +122,7 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 		m_GraphicsPSOMap.clear();
+		m_RHIGraphicsPSOMap.clear();
 		m_Revision.fetch_add(1, std::memory_order_relaxed);
 	}
 

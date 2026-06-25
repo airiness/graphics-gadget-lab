@@ -36,6 +36,9 @@ namespace gglab
 		R16G16Float,
 		R16G16B16A16Float,
 
+		R32G32Float,
+		R32G32B32Float,
+		R32G32B32A32Float,
 		R32Typeless,
 		R32Float,
 		D24UnormS8Uint,

@@ -55,6 +55,7 @@ namespace gglab
 	struct RHIBufferHandleTag {};
 	struct RHISamplerHandleTag {};
 	struct RHIPipelineHandleTag {};
+	struct RHIBindingLayoutHandleTag {};
 	struct RHIRootSignatureHandleTag {};
 	struct RHIShaderHandleTag {};
 	struct RHITextureViewHandleTag {};
@@ -66,6 +67,7 @@ namespace gglab
 	using RHIBufferHandle = RHIHandle<RHIBufferHandleTag>;
 	using RHISamplerHandle = RHIHandle<RHISamplerHandleTag>;
 	using RHIPipelineHandle = RHIHandle<RHIPipelineHandleTag>;
+	using RHIBindingLayoutHandle = RHIHandle<RHIBindingLayoutHandleTag>;
 	using RHIRootSignatureHandle = RHIHandle<RHIRootSignatureHandleTag>;
 	using RHIShaderHandle = RHIHandle<RHIShaderHandleTag>;
 	using RHITextureViewHandle = RHIHandle<RHITextureViewHandleTag>;

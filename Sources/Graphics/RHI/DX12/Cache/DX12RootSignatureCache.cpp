@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
+#include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 
 namespace gglab
 {
@@ -49,6 +50,13 @@ namespace gglab
 			m_RootSignatureMap[key] = id;
 			return RootSignatureHandle{ id, m_RootSignatures.back()->Get() };
 		}
+	}
+
+	RootSignatureHandle DX12RootSignatureCache::GetOrCreate(const RHIBindingLayoutDesc& desc) noexcept
+	{
+		DX12BindingLayoutBuildResult dx12Desc{};
+		BuildDX12RootSignatureDesc(desc, dx12Desc);
+		return GetOrCreate(dx12Desc.m_Desc);
 	}
 
 	DX12RootSignature* DX12RootSignatureCache::GetDX12RootSignature(RootSignatureID id) const noexcept

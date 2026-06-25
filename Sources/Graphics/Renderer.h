@@ -4,6 +4,7 @@
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#include "Graphics/RHI/RHIBindingLayout.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/PipelineCache.h"
@@ -100,6 +101,7 @@ namespace gglab
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
+		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
 
 		const DX12ConstantBuffer<SceneGPU>* GetSceneConstantBuffer() const noexcept { return m_SceneCB.get(); }
 		DX12ConstantBuffer<SceneGPU>* GetSceneConstantBuffer() noexcept { return m_SceneCB.get(); }
