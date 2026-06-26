@@ -2,7 +2,6 @@
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
 #include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 
@@ -326,9 +325,7 @@ namespace gglab
 		// Create new texture and ResourceIndex
 		auto createTexture = [this, index, &srvDesc](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
 			{
-				const auto clearValue = DefaultClearValue<RGTextureDesc>(desc);
-				const auto texIndex = m_RGGpuResAllocator->Acquire<RGTextureDesc>(
-					desc, D3D12_RESOURCE_STATE_COMMON, clearValue);
+				const auto texIndex = m_RGGpuResAllocator->Acquire<RGTextureDesc>(desc);
 
 				GGLAB_ASSERT_MSG(texIndex.IsValid(),
 					"RenderResourceRegistry: Acquire texture failed.");

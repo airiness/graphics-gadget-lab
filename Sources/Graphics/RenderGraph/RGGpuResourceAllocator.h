@@ -1,14 +1,17 @@
 #pragma once
-#include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
+#include "Graphics/RHI/RHIBuffer.h"
+#include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RenderGraph/RGResource.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/Hash/FNV1a.h"
 
 namespace gglab
 {
 	class DX12Device;
+	class DX12Texture;
+	class DX12Buffer;
+	class RHIDevice;
 	class RGGpuResourceAllocator
 	{
 	private:
@@ -26,28 +29,13 @@ namespace gglab
 			uint16_t m_MipLevels = 1;
 			uint16_t m_SampleCount = 1;
 			RHIFormat m_Format = RHIFormat::Unknown;
-			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
+			RGTextureUsage m_Usage = RGTextureUsage::None;
 
 			bool operator==(const TextureKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_Width, m_Height, m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Flags);
-			}
-
-			static TextureKey ConvertResourceDescToKey(D3D12_RESOURCE_DESC resDesc) noexcept
-			{
-				TextureKey texKey
-				{
-					.m_Width = static_cast<uint32_t>(resDesc.Width),
-					.m_Height = static_cast<uint32_t>(resDesc.Height),
-					.m_ArraySize = static_cast<uint16_t>(resDesc.DepthOrArraySize),
-					.m_MipLevels = static_cast<uint16_t>(resDesc.MipLevels),
-					.m_SampleCount = static_cast<uint16_t>(resDesc.SampleDesc.Count),
-					.m_Format = ToRHIFormat(resDesc.Format),
-					.m_Flags = resDesc.Flags
-				};
-				return texKey;
+				return std::tie(m_Width, m_Height, m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage);
 			}
 		};
 		using TextureKeyHash = KeyHash<TextureKey>;
@@ -55,23 +43,13 @@ namespace gglab
 		struct BufferKey
 		{
 			uint64_t m_SizeInBytes = 0;
-			D3D12_RESOURCE_FLAGS m_Flags = D3D12_RESOURCE_FLAG_NONE;
+			RGBufferUsage m_Usage = RGBufferUsage::None;
 
 			bool operator==(const BufferKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_SizeInBytes, m_Flags);
-			}
-
-			static BufferKey ConvertResourceDescToKey(D3D12_RESOURCE_DESC resDesc) noexcept
-			{
-				BufferKey bufKey
-				{
-					.m_SizeInBytes = static_cast<uint64_t>(resDesc.Width),
-					.m_Flags = resDesc.Flags
-				};
-				return bufKey;
+				return std::tie(m_SizeInBytes, m_Usage);
 			}
 		};
 		using BufferKeyHash = KeyHash<BufferKey>;
@@ -86,7 +64,7 @@ namespace gglab
 				.m_MipLevels = desc.m_MipLevels,
 				.m_SampleCount = desc.m_SampleCount,
 				.m_Format = desc.m_Format,
-				.m_Flags = ToD3D12ResourceFlags(desc.m_Usage)
+				.m_Usage = desc.m_Usage
 			};
 		}
 
@@ -95,9 +73,21 @@ namespace gglab
 			return BufferKey
 			{
 				.m_SizeInBytes = desc.m_SizeInBytes,
-				.m_Flags = ToD3D12ResourceFlags(desc.m_Usage)
+				.m_Usage = desc.m_Usage
 			};
 		}
+
+		struct TextureRecord
+		{
+			RHITextureHandle m_Texture;
+			TextureKey m_Key{};
+		};
+
+		struct BufferRecord
+		{
+			RHIBufferHandle m_Buffer;
+			BufferKey m_Key{};
+		};
 
 		struct Pending
 		{
@@ -107,14 +97,12 @@ namespace gglab
 		};
 
 	public:
-		explicit RGGpuResourceAllocator(DX12Device* dx12device) noexcept;
+		explicit RGGpuResourceAllocator(RHIDevice* device) noexcept;
 		GGLAB_DEFAULT_COPYABLE_MOVABLE(RGGpuResourceAllocator);
 		~RGGpuResourceAllocator() noexcept;
 
 		template<typename ResourceDesc>
-		ResourceIndex Acquire(const ResourceDesc& rgResourceDesc,
-			D3D12_RESOURCE_STATES initStates = D3D12_RESOURCE_STATE_COMMON,
-			std::optional<D3D12_CLEAR_VALUE> clearValue = std::nullopt) noexcept = delete;
+		ResourceIndex Acquire(const ResourceDesc& rgResourceDesc) noexcept = delete;
 
 		void ReleaseTexture(ResourceIndex texIndex, const DX12FencePoint& fencePoint) noexcept;
 		void ReleaseBuffer(ResourceIndex bufIndex, const DX12FencePoint& fencePoint) noexcept;
@@ -122,6 +110,7 @@ namespace gglab
 		DX12Texture* GetTexture(ResourceIndex texIndex) const noexcept;
 		DX12Buffer* GetBuffer(ResourceIndex bufIndex) const noexcept;
 		RHITextureHandle GetTextureHandle(ResourceIndex texIndex) noexcept;
+		RHIBufferHandle GetBufferHandle(ResourceIndex bufIndex) noexcept;
 
 		void Tick() noexcept;
 
@@ -132,22 +121,21 @@ namespace gglab
 
 	private:
 		static RHITextureUsage ToRHITextureUsage(RGTextureUsage usage) noexcept;
+		static RHIBufferUsage ToRHIBufferUsage(RGBufferUsage usage) noexcept;
 		static std::optional<RHIClearValue> DefaultRHIClearValue(const RGTextureDesc& desc) noexcept;
 		void DestroyTextureHandle(ResourceIndex texIndex) noexcept;
+		void DestroyBufferHandle(ResourceIndex bufIndex) noexcept;
 
-		ResourceIndex CreateTexture(const RGTextureDesc& rgTexDesc,
-			D3D12_RESOURCE_STATES initStates,
-			std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept;
+		ResourceIndex CreateTexture(const RGTextureDesc& rgTexDesc) noexcept;
 
-		ResourceIndex CreateBuffer(const RGBufferDesc& rgBufDesc,
-			D3D12_RESOURCE_STATES initStates) noexcept;
+		ResourceIndex CreateBuffer(const RGBufferDesc& rgBufDesc) noexcept;
 
 	private:
+		RHIDevice* m_Device = nullptr;
 		DX12Device* m_DX12Device = nullptr;
-		D3D12MA::Allocator* m_Allocator = nullptr;
 
-		std::vector<RHITextureHandle> m_Textures;
-		std::vector<std::unique_ptr<DX12Buffer>> m_Buffers;
+		std::vector<TextureRecord> m_Textures;
+		std::vector<BufferRecord> m_Buffers;
 
 		std::unordered_map<TextureKey, std::deque<ResourceIndex>, TextureKeyHash> m_FreeTextures;
 		std::unordered_map<BufferKey, std::deque<ResourceIndex>, BufferKeyHash> m_FreeBuffers;
@@ -159,9 +147,7 @@ namespace gglab
 
 	template<>
 	inline ResourceIndex RGGpuResourceAllocator::Acquire<RGTextureDesc>(
-		const RGTextureDesc& rgTexDesc,
-		D3D12_RESOURCE_STATES initStates,
-		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
+		const RGTextureDesc& rgTexDesc) noexcept
 	{
 		const auto texKey = MakeKey(rgTexDesc);
 
@@ -174,14 +160,12 @@ namespace gglab
 			return texIndex;
 		}
 
-		return CreateTexture(rgTexDesc, initStates, clearValue);
+		return CreateTexture(rgTexDesc);
 	}
 
 	template<>
 	inline ResourceIndex RGGpuResourceAllocator::Acquire<RGBufferDesc>(
-		const RGBufferDesc& rgBufDesc,
-		D3D12_RESOURCE_STATES initStates,
-		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
+		const RGBufferDesc& rgBufDesc) noexcept
 	{
 		const auto bufKey = MakeKey(rgBufDesc);
 		if (auto iter = m_FreeBuffers.find(bufKey);
@@ -193,6 +177,6 @@ namespace gglab
 			return bufIndex;
 		}
 
-		return CreateBuffer(rgBufDesc, initStates);
+		return CreateBuffer(rgBufDesc);
 	}
 }

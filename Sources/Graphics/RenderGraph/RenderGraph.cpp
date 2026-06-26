@@ -326,6 +326,28 @@ namespace gglab
 		return m_GpuResourceAllocator->GetBuffer(virtualRes->m_GpuResourceIndex);
 	}
 
+	RHIBufferHandle RenderGraph::GetBufferHandle(RGBufferId bufId) noexcept
+	{
+		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
+		if (!virtualRes)
+		{
+			return {};
+		}
+
+		if (virtualRes->m_Imported)
+		{
+			GGLAB_LOG_WARN("RenderGraph::GetBufferHandle() : Imported buffers do not expose RHI handles yet.");
+			return {};
+		}
+
+		if (!virtualRes->m_GpuResourceIndex.IsValid())
+		{
+			return {};
+		}
+
+		return m_GpuResourceAllocator->GetBufferHandle(virtualRes->m_GpuResourceIndex);
+	}
+
 	DX12DescriptorView RenderGraph::GetTextureView(RGTextureViewId viewId) noexcept
 	{
 		GGLAB_ASSERT_MSG(viewId.IsValid() && viewId.Value() < m_TextureViews.size(),
@@ -480,33 +502,12 @@ namespace gglab
 		{
 			auto* resource = GetNativeResource(intent.m_VirtualResource);
 			GGLAB_ASSERT_NOT_NULL(resource);
-
-			switch (intent.m_VirtualResource->m_ResourceType)
-			{
-			case RGResourceType::RGTexture:
-				commandList->AddTextureBarrier(
-					CD3DX12_TEXTURE_BARRIER(
-						ToD3D12BarrierSync(intent.m_Before.m_Stage),
-						ToD3D12BarrierSync(intent.m_After.m_Stage),
-						ToD3D12BarrierAccess(intent.m_Before.m_Access),
-						ToD3D12BarrierAccess(intent.m_After.m_Access),
-						ToD3D12BarrierLayout(intent.m_Before.m_Layout),
-						ToD3D12BarrierLayout(intent.m_After.m_Layout),
-						resource->Get(),
-						CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)));
-				break;
-			case RGResourceType::RGBuffer:
-				commandList->AddBufferBarrier(
-					CD3DX12_BUFFER_BARRIER(
-						ToD3D12BarrierSync(intent.m_Before.m_Stage),
-						ToD3D12BarrierSync(intent.m_After.m_Stage),
-						ToD3D12BarrierAccess(intent.m_Before.m_Access),
-						ToD3D12BarrierAccess(intent.m_After.m_Access),
-						resource->Get()));
-				break;
-			default:
-				GGLAB_UNREACHABLE("Unhandled RGResourceType.");
-			}
+			AddDX12RGBarrier(
+				*commandList,
+				intent.m_VirtualResource->m_ResourceType,
+				*resource,
+				intent.m_Before,
+				intent.m_After);
 		}
 
 		commandList->FlushBarriers();

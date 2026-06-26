@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 
@@ -198,75 +199,38 @@ namespace gglab
 		return states;
 	}
 
-	template<typename RGResourceDesc>
-	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue(const RGResourceDesc&) noexcept = delete;
-
-	template<>
-	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGTextureDesc>(const RGTextureDesc& rgTexDesc) noexcept
+	inline void AddDX12RGBarrier(DX12CommandList& commandList,
+		RGResourceType resourceType,
+		DX12Resource& resource,
+		const RGBarrierState& before,
+		const RGBarrierState& after) noexcept
 	{
-		if (Test(rgTexDesc.m_Usage, RGTextureUsage::RenderTarget))
+		switch (resourceType)
 		{
-			D3D12_CLEAR_VALUE clearValue{};
-			clearValue.Format = ToDXGIFormat(rgTexDesc.m_Format);
-			clearValue.Color[0] = 0.0f;
-			clearValue.Color[1] = 0.0f;
-			clearValue.Color[2] = 0.0f;
-			clearValue.Color[3] = 1.0f;
-			return std::optional<D3D12_CLEAR_VALUE>(clearValue);
+		case RGResourceType::RGTexture:
+			commandList.AddTextureBarrier(
+				CD3DX12_TEXTURE_BARRIER(
+					ToD3D12BarrierSync(before.m_Stage),
+					ToD3D12BarrierSync(after.m_Stage),
+					ToD3D12BarrierAccess(before.m_Access),
+					ToD3D12BarrierAccess(after.m_Access),
+					ToD3D12BarrierLayout(before.m_Layout),
+					ToD3D12BarrierLayout(after.m_Layout),
+					resource.Get(),
+					CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)));
+			break;
+		case RGResourceType::RGBuffer:
+			commandList.AddBufferBarrier(
+				CD3DX12_BUFFER_BARRIER(
+					ToD3D12BarrierSync(before.m_Stage),
+					ToD3D12BarrierSync(after.m_Stage),
+					ToD3D12BarrierAccess(before.m_Access),
+					ToD3D12BarrierAccess(after.m_Access),
+					resource.Get()));
+			break;
+		default:
+			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
 		}
-		else if (Test(rgTexDesc.m_Usage, RGTextureUsage::DepthStencil))
-		{
-			D3D12_CLEAR_VALUE clearValue{};
-			clearValue.Format = (rgTexDesc.m_Format == RHIFormat::R32Typeless) ?
-				DXGI_FORMAT_D32_FLOAT :
-				ToDXGIFormat(rgTexDesc.m_Format);
-			clearValue.DepthStencil.Depth = 1.0f;
-			clearValue.DepthStencil.Stencil = 0;
-			return std::optional<D3D12_CLEAR_VALUE>(clearValue);
-		}
-
-		return std::nullopt;
-	}
-
-	template<>
-	inline std::optional<D3D12_CLEAR_VALUE> DefaultClearValue<RGBufferDesc>(const RGBufferDesc&) noexcept
-	{
-		return std::nullopt;
-	}
-
-	constexpr inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(RGTextureUsage rgTexUsage) noexcept
-	{
-		return
-			(Test(rgTexUsage, RGTextureUsage::RenderTarget) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) |
-			(Test(rgTexUsage, RGTextureUsage::DepthStencil) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE) |
-			(Test(rgTexUsage, RGTextureUsage::UAV) ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE);
-	}
-
-	inline CD3DX12_RESOURCE_DESC ToD3D12ResourceDesc(const RGTextureDesc& rgTexDesc) noexcept
-	{
-		D3D12_RESOURCE_FLAGS flags = ToD3D12ResourceFlags(rgTexDesc.m_Usage);
-		return CD3DX12_RESOURCE_DESC::Tex2D(
-			ToDXGIFormat(rgTexDesc.m_Format),
-			static_cast<UINT64>(rgTexDesc.m_Width),
-			static_cast<UINT>(rgTexDesc.m_Height),
-			static_cast<UINT16>(rgTexDesc.m_ArraySize),
-			static_cast<UINT16>(rgTexDesc.m_MipLevels),
-			static_cast<UINT>(rgTexDesc.m_SampleCount),
-			0,
-			flags);
-	}
-
-	constexpr inline D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(RGBufferUsage rgBufUsage) noexcept
-	{
-		return Test(rgBufUsage, RGBufferUsage::UAV) ?
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS :
-			D3D12_RESOURCE_FLAG_NONE;
-	}
-
-	inline CD3DX12_RESOURCE_DESC ToD3D12ResourceDesc(const RGBufferDesc& rgBufDesc) noexcept
-	{
-		D3D12_RESOURCE_FLAGS flags = ToD3D12ResourceFlags(rgBufDesc.m_Usage);
-		return CD3DX12_RESOURCE_DESC::Buffer(static_cast<UINT64>(rgBufDesc.m_SizeInBytes), flags);
 	}
 
 	inline RGTextureDesc ToRGTextureDesc(const D3D12_RESOURCE_DESC& nativeDesc, RGTextureUsage usage) noexcept

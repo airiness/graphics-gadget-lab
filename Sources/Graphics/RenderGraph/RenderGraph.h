@@ -287,6 +287,7 @@ namespace gglab
 
 		DX12Texture* GetTexture(RGTextureId texId) noexcept;
 		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;
+		RHIBufferHandle GetBufferHandle(RGBufferId bufId) noexcept;
 		DX12DescriptorView GetTextureView(RGTextureViewId viewId) noexcept;
 
 		ResourceIndex GetResourceIndex(RGTextureId texId) noexcept;
@@ -693,8 +694,7 @@ namespace gglab
 			return;
 		}
 
-		std::optional<D3D12_CLEAR_VALUE> clearValue = DefaultClearValue<Desc>(m_Desc);
-		m_GpuResourceIndex = allocator->Acquire<Desc>(m_Desc, D3D12_RESOURCE_STATE_COMMON, clearValue);
+		m_GpuResourceIndex = allocator->Acquire<Desc>(m_Desc);
 		m_Devirtualized = true;
 	}
 
