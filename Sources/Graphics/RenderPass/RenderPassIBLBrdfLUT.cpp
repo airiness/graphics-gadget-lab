@@ -57,7 +57,7 @@ namespace gglab
 					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
 
 				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
-				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_BrdfLut);
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BrdfLut);
 
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;

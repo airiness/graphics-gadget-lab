@@ -87,11 +87,11 @@ namespace gglab
 				{
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 					{
-						const auto rtvDesc = MakeRGTexture2DArrayViewDesc(rgDesc.m_Format, mip, face, 1);
+						const auto rtvDesc = MakeRHITexture2DArrayViewDesc(rgDesc.m_Format, mip, face, 1);
 						const auto rtvIndex = mip * CubemapFaceCount + face;
 
 						data.m_Rtvs[rtvIndex] =
-							builder.CreateView<RGTextureViewType::RTV>(
+							builder.CreateView<RHITextureViewType::RenderTarget>(
 								data.m_PrefilteredSpecularCubemap,
 								rtvDesc);
 					}

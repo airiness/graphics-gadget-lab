@@ -40,7 +40,7 @@ namespace gglab
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(viewTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
-				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_BackBuffer);
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);

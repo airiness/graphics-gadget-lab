@@ -137,7 +137,7 @@ namespace gglab
 		}
 
 		// Track resource barrier states while scanning passes in execution order.
-		std::unordered_map<RGVirtualResourceBase*, RGBarrierState> currentStates;
+		std::unordered_map<RGVirtualResourceBase*, RHIResourceState> currentStates;
 		for (auto* virtualResource : m_VirtualResources)
 		{
 			currentStates.emplace(virtualResource, virtualResource->m_InitialBarrierState);
@@ -185,12 +185,12 @@ namespace gglab
 
 			for (const auto& access : mergedAccesses)
 			{
-				const RGBarrierState requiredState = ToRGBarrierState(
+				const RHIResourceState requiredState = ToRHIResourceState(
 					access.m_UsageBits,
 					access.m_VirtualResource->m_ResourceType);
 				auto& currentState = currentStates.at(access.m_VirtualResource);
 
-				if (NeedsRGBarrier(currentState, requiredState))
+				if (NeedsRHIResourceBarrier(currentState, requiredState))
 				{
 					passNode.m_PreBarriers.push_back(
 						{
@@ -210,11 +210,11 @@ namespace gglab
 				continue;
 			}
 
-			const RGBarrierState requiredFinalState = virtualResource->m_Imported ?
+			const RHIResourceState requiredFinalState = virtualResource->m_Imported ?
 				virtualResource->m_FinalBarrierState.value_or(virtualResource->m_InitialBarrierState) :
-				CommonRGBarrierState();
+				CommonRHIResourceState();
 			auto& currentState = currentStates.at(virtualResource);
-			if (!NeedsRGBarrier(currentState, requiredFinalState))
+			if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
 			{
 				continue;
 			}
@@ -326,6 +326,27 @@ namespace gglab
 		return m_GpuResourceAllocator->GetBuffer(virtualRes->m_GpuResourceIndex);
 	}
 
+	RHITextureHandle RenderGraph::GetTextureHandle(RGTextureId texId) noexcept
+	{
+		auto* virtualRes = static_cast<RGVirtualResource<RGTextureResource>*>(GetVirtualResource(texId));
+		if (!virtualRes)
+		{
+			return {};
+		}
+
+		if (virtualRes->m_Imported)
+		{
+			return {};
+		}
+
+		if (!virtualRes->m_GpuResourceIndex.IsValid())
+		{
+			return {};
+		}
+
+		return m_GpuResourceAllocator->GetTextureHandle(virtualRes->m_GpuResourceIndex);
+	}
+
 	RHIBufferHandle RenderGraph::GetBufferHandle(RGBufferId bufId) noexcept
 	{
 		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
@@ -348,8 +369,36 @@ namespace gglab
 		return m_GpuResourceAllocator->GetBufferHandle(virtualRes->m_GpuResourceIndex);
 	}
 
+	RHITextureViewHandle RenderGraph::GetTextureViewHandle(RGTextureViewId viewId) noexcept
+	{
+		GGLAB_ASSERT_MSG(viewId.IsValid() && viewId.Value() < m_TextureViews.size(),
+			"RenderGraph::GetTextureViewHandle received an invalid view id.");
+		if (!viewId.IsValid() || viewId.Value() >= m_TextureViews.size())
+		{
+			return {};
+		}
+
+		const auto& view = m_TextureViews[viewId.Value()];
+		const RHITextureHandle texture = GetTextureHandle(view.m_Texture);
+		if (!texture.IsValid())
+		{
+			return {};
+		}
+
+		RHITextureViewDesc desc = view.m_Desc.value_or(RHITextureViewDesc{});
+		desc.m_Type = view.m_Type;
+
+		return m_ViewCache->GetOrCreateTextureView(texture, desc);
+	}
+
 	DX12DescriptorView RenderGraph::GetTextureView(RGTextureViewId viewId) noexcept
 	{
+		if (const RHITextureViewHandle viewHandle = GetTextureViewHandle(viewId);
+			viewHandle.IsValid())
+		{
+			return m_ViewCache->ResolveTextureView(viewHandle);
+		}
+
 		GGLAB_ASSERT_MSG(viewId.IsValid() && viewId.Value() < m_TextureViews.size(),
 			"RenderGraph::GetTextureView received an invalid view id.");
 		if (!viewId.IsValid() || viewId.Value() >= m_TextureViews.size())
@@ -375,7 +424,7 @@ namespace gglab
 
 		switch (view.m_Type)
 		{
-		case RGTextureViewType::RTV:
+		case RHITextureViewType::RenderTarget:
 		{
 			const auto desc = view.m_Desc ?
 				std::optional{ ToD3D12RenderTargetViewDesc(*view.m_Desc) } :
@@ -385,7 +434,7 @@ namespace gglab
 				texture,
 				desc);
 		}
-		case RGTextureViewType::DSV:
+		case RHITextureViewType::DepthStencil:
 		{
 			const auto desc = view.m_Desc ?
 				std::optional{ ToD3D12DepthStencilViewDesc(*view.m_Desc) } :
@@ -395,7 +444,7 @@ namespace gglab
 				texture,
 				desc);
 		}
-		case RGTextureViewType::SRV:
+		case RHITextureViewType::ShaderResource:
 		{
 			const auto desc = view.m_Desc ?
 				std::optional{ ToD3D12ShaderResourceViewDesc(*view.m_Desc) } :
@@ -405,7 +454,7 @@ namespace gglab
 				texture,
 				desc);
 		}
-		case RGTextureViewType::UAV:
+		case RHITextureViewType::UnorderedAccess:
 		{
 			const auto desc = view.m_Desc ?
 				std::optional{ ToD3D12UnorderedAccessViewDesc(*view.m_Desc) } :

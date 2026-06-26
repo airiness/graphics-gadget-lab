@@ -60,9 +60,9 @@ namespace gglab
 				data.m_SceneColor = builder.Read(mainTargets.m_SceneColor, RGTextureUsage::Sample);
 				data.m_BackBuffer = builder.Write(mainTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
 				data.m_SceneColorSrv =
-					builder.CreateView<RGTextureViewType::SRV>(data.m_SceneColor);
+					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);
 				data.m_BackBufferRtv =
-					builder.CreateView<RGTextureViewType::RTV>(data.m_BackBuffer);
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;
 

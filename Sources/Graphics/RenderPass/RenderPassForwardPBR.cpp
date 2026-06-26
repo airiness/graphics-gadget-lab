@@ -86,12 +86,12 @@ namespace gglab
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureUsage::Sample);
 
-				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_SceneColor);
-				data.m_Dsv = builder.CreateView<RGTextureViewType::DSV>(data.m_Depth);
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth);
 
-				const auto shadowSrvDesc = MakeRGTexture2DViewDesc(RHIFormat::R32Float, 0, 1);
+				const auto shadowSrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1);
 				data.m_ShadowSrv =
-					builder.CreateView<RGTextureViewType::SRV>(data.m_ShadowMap, shadowSrvDesc);
+					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_ShadowMap, shadowSrvDesc);
 
 				data.m_Width = mainTargets.m_Width;
 				data.m_Height = mainTargets.m_Height;

@@ -169,7 +169,7 @@ namespace gglab
 					resourceInfo.m_GpuResourceIndex = GetVirtualResourceGpuIndex(virtualResource);
 					resourceInfo.m_InitialBarrierState = virtualResource->m_InitialBarrierState;
 					resourceInfo.m_HasFinalBarrierState = virtualResource->m_FinalBarrierState.has_value();
-					resourceInfo.m_FinalBarrierState = virtualResource->m_FinalBarrierState.value_or(CommonRGBarrierState());
+					resourceInfo.m_FinalBarrierState = virtualResource->m_FinalBarrierState.value_or(CommonRHIResourceState());
 					m_OutSnapshot.m_Resources.push_back(std::move(resourceInfo));
 				}
 			}

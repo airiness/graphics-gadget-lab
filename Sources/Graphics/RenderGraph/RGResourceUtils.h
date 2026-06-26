@@ -1,33 +1,33 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
+#include "Graphics/RHI/RHITexture.h"
 
 namespace gglab
 {
-	constexpr inline RGBarrierState CommonRGBarrierState() noexcept
+	constexpr inline RHIResourceState CommonRHIResourceState() noexcept
 	{
 		return
 		{
-			.m_Stage = RGStage::All,
-			.m_Access = RGAccess::Common,
-			.m_Layout = RGLayout::Common,
+			.m_Access = RHIAccess::Common,
+			.m_Layout = RHILayout::Common,
 		};
 	}
 
-	constexpr inline bool HasUavAccess(const RGBarrierState& state) noexcept
+	constexpr inline bool HasUavAccess(const RHIResourceState& state) noexcept
 	{
-		return Test(state.m_Access, RGAccess::UnorderedAccess);
+		return Test(state.m_Access, RHIAccess::UnorderedAccess);
 	}
 
-	constexpr inline bool NeedsRGBarrier(const RGBarrierState& before, const RGBarrierState& after) noexcept
+	constexpr inline bool NeedsRHIResourceBarrier(const RHIResourceState& before, const RHIResourceState& after) noexcept
 	{
 		return before != after || (HasUavAccess(before) && HasUavAccess(after));
 	}
 
 	template<typename ResourceUsage>
-	constexpr inline RGBarrierState ToRGBarrierState(ResourceUsage usage) noexcept = delete;
+	constexpr inline RHIResourceState ToRHIResourceState(ResourceUsage usage) noexcept = delete;
 
 	template<>
-	constexpr inline RGBarrierState ToRGBarrierState<RGTextureUsage>(RGTextureUsage usage) noexcept
+	constexpr inline RHIResourceState ToRHIResourceState<RGTextureUsage>(RGTextureUsage usage) noexcept
 	{
 		using U = RGTextureUsage;
 
@@ -46,62 +46,54 @@ namespace gglab
 		switch (usage)
 		{
 		case U::None:
-			return CommonRGBarrierState();
+			return CommonRHIResourceState();
 		case U::Sample:
 			return
 			{
-				.m_Stage = RGStage::AllShading,
-				.m_Access = RGAccess::ShaderResource,
-				.m_Layout = RGLayout::ShaderResource,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
 			};
 		case U::RenderTarget:
 			return
 			{
-				.m_Stage = RGStage::RenderTarget,
-				.m_Access = RGAccess::RenderTarget,
-				.m_Layout = RGLayout::RenderTarget,
+				.m_Access = RHIAccess::RenderTarget,
+				.m_Layout = RHILayout::RenderTarget,
 			};
 		case U::DepthStencil:
 			return
 			{
-				.m_Stage = RGStage::DepthStencil,
-				.m_Access = RGAccess::DepthStencilWrite,
-				.m_Layout = RGLayout::DepthStencilWrite,
+				.m_Access = RHIAccess::DepthStencilWrite,
+				.m_Layout = RHILayout::DepthStencilWrite,
 			};
 		case U::DepthStencilRead:
 			return
 			{
-				.m_Stage = RGStage::DepthStencil,
-				.m_Access = RGAccess::DepthStencilRead,
-				.m_Layout = RGLayout::DepthStencilRead,
+				.m_Access = RHIAccess::DepthStencilRead,
+				.m_Layout = RHILayout::DepthStencilRead,
 			};
 		case U::UAV:
 			return
 			{
-				.m_Stage = RGStage::AllShading,
-				.m_Access = RGAccess::UnorderedAccess,
-				.m_Layout = RGLayout::UnorderedAccess,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::UnorderedAccess,
 			};
 		case U::CopySrc:
 			return
 			{
-				.m_Stage = RGStage::Copy,
-				.m_Access = RGAccess::CopySource,
-				.m_Layout = RGLayout::CopySource,
+				.m_Access = RHIAccess::CopySource,
+				.m_Layout = RHILayout::CopySource,
 			};
 		case U::CopyDst:
 			return
 			{
-				.m_Stage = RGStage::Copy,
-				.m_Access = RGAccess::CopyDest,
-				.m_Layout = RGLayout::CopyDest,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::CopyDest,
 			};
 		case U::Present:
 			return
 			{
-				.m_Stage = RGStage::All,
-				.m_Access = RGAccess::Common,
-				.m_Layout = RGLayout::Present,
+				.m_Access = RHIAccess::Present,
+				.m_Layout = RHILayout::Present,
 			};
 		}
 
@@ -109,7 +101,7 @@ namespace gglab
 	}
 
 	template<>
-	constexpr inline RGBarrierState ToRGBarrierState<RGBufferUsage>(RGBufferUsage usage) noexcept
+	constexpr inline RHIResourceState ToRHIResourceState<RGBufferUsage>(RGBufferUsage usage) noexcept
 	{
 		using U = RGBufferUsage;
 
@@ -126,31 +118,27 @@ namespace gglab
 
 		if (usage == U::None)
 		{
-			return CommonRGBarrierState();
+			return CommonRHIResourceState();
 		}
 
 		if (hasReadUsage)
 		{
-			RGBarrierState state =
+			RHIResourceState state =
 			{
-				.m_Stage = RGStage::None,
-				.m_Access = RGAccess::Common,
-				.m_Layout = RGLayout::Common,
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
 			};
 			if (Test(usage, U::Vertex))
 			{
-				state.m_Stage |= RGStage::VertexShading;
-				state.m_Access |= RGAccess::VertexBuffer;
+				state.m_Access |= RHIAccess::VertexBuffer;
 			}
 			if (Test(usage, U::Index))
 			{
-				state.m_Stage |= RGStage::IndexInput;
-				state.m_Access |= RGAccess::IndexBuffer;
+				state.m_Access |= RHIAccess::IndexBuffer;
 			}
 			if (Test(usage, U::Constant))
 			{
-				state.m_Stage |= RGStage::AllShading;
-				state.m_Access |= RGAccess::ConstantBuffer;
+				state.m_Access |= RHIAccess::ConstantBuffer;
 			}
 			return state;
 		}
@@ -160,39 +148,37 @@ namespace gglab
 		case U::UAV:
 			return
 			{
-				.m_Stage = RGStage::AllShading,
-				.m_Access = RGAccess::UnorderedAccess,
-				.m_Layout = RGLayout::Common,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::Common,
 			};
 		case U::CopySrc:
 			return
 			{
-				.m_Stage = RGStage::Copy,
-				.m_Access = RGAccess::CopySource,
-				.m_Layout = RGLayout::Common,
+				.m_Access = RHIAccess::CopySource,
+				.m_Layout = RHILayout::Common,
 			};
 		case U::CopyDst:
 			return
 			{
-				.m_Stage = RGStage::Copy,
-				.m_Access = RGAccess::CopyDest,
-				.m_Layout = RGLayout::Common,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::Common,
 			};
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGBufferUsage.");
 	}
 
-	constexpr inline RGBarrierState ToRGBarrierState(uint64_t usageBits, RGResourceType resourceType) noexcept
+	constexpr inline RHIResourceState ToRHIResourceState(uint64_t usageBits, RGResourceType resourceType) noexcept
 	{
 		switch (resourceType)
 		{
 		case RGResourceType::RGTexture:
-			return ToRGBarrierState(static_cast<RGTextureUsage>(usageBits));
+			return ToRHIResourceState(static_cast<RGTextureUsage>(usageBits));
 		case RGResourceType::RGBuffer:
-			return ToRGBarrierState(static_cast<RGBufferUsage>(usageBits));
+			return ToRHIResourceState(static_cast<RGBufferUsage>(usageBits));
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGResourceType.");
 	}
+
 }

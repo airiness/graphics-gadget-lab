@@ -23,8 +23,8 @@ namespace gglab
 		uint32_t m_VirtualResourceIndex = 0;
 		std::string m_ResourceName;
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
-		RGBarrierState m_Before = CommonRGBarrierState();
-		RGBarrierState m_After = CommonRGBarrierState();
+		RHIResourceState m_Before = CommonRHIResourceState();
+		RHIResourceState m_After = CommonRHIResourceState();
 	};
 
 	struct RGSnapshotPassInfo
@@ -53,9 +53,9 @@ namespace gglab
 		int32_t m_LastUserPassIndex = -1;
 		uint64_t m_UsageBits = 0;
 		ResourceIndex m_GpuResourceIndex{};
-		RGBarrierState m_InitialBarrierState = CommonRGBarrierState();
+		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		bool m_HasFinalBarrierState = false;
-		RGBarrierState m_FinalBarrierState = CommonRGBarrierState();
+		RHIResourceState m_FinalBarrierState = CommonRHIResourceState();
 	};
 
 	struct RGSnapshotResourceNodeInfo

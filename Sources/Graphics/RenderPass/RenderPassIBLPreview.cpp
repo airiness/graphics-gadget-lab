@@ -99,7 +99,7 @@ namespace gglab
 					RGTextureUsage::RenderTarget);
 
 				data.m_Rtv =
-					builder.CreateView<RGTextureViewType::RTV>(data.m_EnvironmentCubemapPreview);
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemapPreview);
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLEnvironmentPreviewLayout());
@@ -193,7 +193,7 @@ namespace gglab
 					RGTextureUsage::RenderTarget);
 
 				data.m_Rtv =
-					builder.CreateView<RGTextureViewType::RTV>(data.m_PrefilteredSpecularCubemapPreview);
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_PrefilteredSpecularCubemapPreview);
 				data.m_Width = previewDesc.m_Width;
 				data.m_Height = previewDesc.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout());
