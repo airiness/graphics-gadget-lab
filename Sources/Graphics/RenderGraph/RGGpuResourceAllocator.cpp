@@ -1,14 +1,16 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
+#include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 
 namespace gglab
 {
-	RGGpuResourceAllocator::RGGpuResourceAllocator(DX12Device* dx12device) noexcept :
-		m_DX12Device(dx12device),
-		m_Allocator(dx12device ? dx12device->GetMemAllocator() : nullptr)
+	RGGpuResourceAllocator::RGGpuResourceAllocator(RHIDevice* device) noexcept :
+		m_Device(device),
+		m_DX12Device(dynamic_cast<DX12Device*>(device))
 	{
-		GGLAB_ASSERT_MSG(m_Allocator != nullptr, "Allocator must not be null.");
+		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice must not be null.");
+		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "RGGpuResourceAllocator still requires a DX12 backend.");
 	}
 
 	RGGpuResourceAllocator::~RGGpuResourceAllocator() noexcept
@@ -16,6 +18,10 @@ namespace gglab
 		for (uint32_t index = 0; index < m_Textures.size(); ++index)
 		{
 			DestroyTextureHandle(ResourceIndex(index));
+		}
+		for (uint32_t index = 0; index < m_Buffers.size(); ++index)
+		{
+			DestroyBufferHandle(ResourceIndex(index));
 		}
 	}
 
@@ -57,13 +63,8 @@ namespace gglab
 				}));
 	}
 
-	ResourceIndex RGGpuResourceAllocator::CreateTexture(const RGTextureDesc& rgTexDesc,
-		D3D12_RESOURCE_STATES initStates,
-		std::optional<D3D12_CLEAR_VALUE> clearValue) noexcept
+	ResourceIndex RGGpuResourceAllocator::CreateTexture(const RGTextureDesc& rgTexDesc) noexcept
 	{
-		GGLAB_UNUSED(initStates);
-		GGLAB_UNUSED(clearValue);
-
 		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Textures.size()));
 		RHITextureDesc textureDesc{};
 		textureDesc.m_Dimension = RHITextureDimension::Texture2D;
@@ -81,27 +82,31 @@ namespace gglab
 		textureDesc.m_DebugName = "RGGpuResourceAllocator.Texture";
 		textureDesc.m_ClearValue = DefaultRHIClearValue(rgTexDesc);
 
-		RHITextureHandle texture = m_DX12Device->CreateTexture(textureDesc);
+		RHITextureHandle texture = m_Device->CreateTexture(textureDesc);
 		GGLAB_ASSERT_MSG(texture.IsValid(), "RGGpuResourceAllocator: CreateTexture failed.");
-		m_Textures.emplace_back(texture);
+		m_Textures.push_back(TextureRecord{
+			.m_Texture = texture,
+			.m_Key = MakeKey(rgTexDesc),
+			});
 
 		return index;
 	}
 
-	ResourceIndex RGGpuResourceAllocator::CreateBuffer(const RGBufferDesc& rgBufDesc,
-		D3D12_RESOURCE_STATES initStates) noexcept
+	ResourceIndex RGGpuResourceAllocator::CreateBuffer(const RGBufferDesc& rgBufDesc) noexcept
 	{
 		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Buffers.size()));
-		m_Buffers.emplace_back(std::make_unique<DX12Buffer>());
-		auto& buf = m_Buffers.back();
+		RHIBufferDesc bufferDesc{};
+		bufferDesc.m_SizeInBytes = rgBufDesc.m_SizeInBytes;
+		bufferDesc.m_StrideInBytes = rgBufDesc.m_Stride;
+		bufferDesc.m_Usage = ToRHIBufferUsage(rgBufDesc.m_Usage);
+		bufferDesc.m_DebugName = "RGGpuResourceAllocator.Buffer";
 
-		DX12Resource::CreateInfo createInfo = {};
-		createInfo.m_Allocator = m_Allocator;
-		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-		createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
-		createInfo.m_InitStates = initStates;
-		createInfo.m_ResourceDesc = ToD3D12ResourceDesc(rgBufDesc);
-		buf->Create(createInfo);
+		RHIBufferHandle buffer = m_Device->CreateBuffer(bufferDesc);
+		GGLAB_ASSERT_MSG(buffer.IsValid(), "RGGpuResourceAllocator: CreateBuffer failed.");
+		m_Buffers.push_back(BufferRecord{
+			.m_Buffer = buffer,
+			.m_Key = MakeKey(rgBufDesc),
+			});
 
 		return index;
 	}
@@ -114,7 +119,7 @@ namespace gglab
 			return nullptr;
 		}
 
-		return m_DX12Device->ResolveTexture(m_Textures[texIndex.Value()]);
+		return m_DX12Device->ResolveTexture(m_Textures[texIndex.Value()].m_Texture);
 	}
 
 	DX12Buffer* RGGpuResourceAllocator::GetBuffer(ResourceIndex bufIndex) const noexcept
@@ -124,7 +129,7 @@ namespace gglab
 			GGLAB_LOG_WARN("RGGpuResourceAllocator::GetBuffer() : Invalid bufIndex.");
 			return nullptr;
 		}
-		return m_Buffers[bufIndex.Value()].get();
+		return m_DX12Device->ResolveBuffer(m_Buffers[bufIndex.Value()].m_Buffer);
 	}
 
 	RHITextureHandle RGGpuResourceAllocator::GetTextureHandle(ResourceIndex texIndex) noexcept
@@ -135,13 +140,31 @@ namespace gglab
 			return {};
 		}
 
-		const RHITextureHandle handle = m_Textures[texIndex.Value()];
-		if (handle.IsValid() && m_DX12Device->IsAlive(handle))
+		const RHITextureHandle handle = m_Textures[texIndex.Value()].m_Texture;
+		if (handle.IsValid() && m_Device->IsAlive(handle))
 		{
 			return handle;
 		}
 
 		GGLAB_LOG_WARN("RGGpuResourceAllocator::GetTextureHandle() : Texture is not live.");
+		return {};
+	}
+
+	RHIBufferHandle RGGpuResourceAllocator::GetBufferHandle(ResourceIndex bufIndex) noexcept
+	{
+		if (!bufIndex.IsValid() || bufIndex.Value() >= m_Buffers.size())
+		{
+			GGLAB_LOG_WARN("RGGpuResourceAllocator::GetBufferHandle() : Invalid bufIndex.");
+			return {};
+		}
+
+		const RHIBufferHandle handle = m_Buffers[bufIndex.Value()].m_Buffer;
+		if (handle.IsValid() && m_Device->IsAlive(handle))
+		{
+			return handle;
+		}
+
+		GGLAB_LOG_WARN("RGGpuResourceAllocator::GetBufferHandle() : Buffer is not live.");
 		return {};
 	}
 
@@ -160,13 +183,12 @@ namespace gglab
 				{
 				case Type::Texture:
 				{
-					auto* texture = GetTexture(pending.m_Index);
-					if (!texture)
+					if (pending.m_Index.Value() >= m_Textures.size())
 					{
 						return true;
 					}
 
-					auto texKey = TextureKey::ConvertResourceDescToKey(texture->GetDesc());
+					auto texKey = m_Textures[pending.m_Index.Value()].m_Key;
 					auto& list = m_FreeTextures[texKey];
 					list.push_back(pending.m_Index);
 
@@ -180,7 +202,12 @@ namespace gglab
 				}
 				case Type::Buffer:
 				{
-					auto bufKey = BufferKey::ConvertResourceDescToKey(m_Buffers[pending.m_Index.Value()]->GetDesc());
+					if (pending.m_Index.Value() >= m_Buffers.size())
+					{
+						return true;
+					}
+
+					auto bufKey = m_Buffers[pending.m_Index.Value()].m_Key;
 					auto& list = m_FreeBuffers[bufKey];
 					list.push_back(pending.m_Index);
 
@@ -188,7 +215,7 @@ namespace gglab
 					{
 						auto releaseResIndex = list.front();
 						list.pop_front();
-						m_Buffers[releaseResIndex.Value()]->Release();
+						DestroyBufferHandle(releaseResIndex);
 					}
 					return true;
 				}
@@ -215,9 +242,11 @@ namespace gglab
 					{
 						auto releaseResIndex = list.front();
 						list.pop_front();
-						if (releaseResIndex.Value() >= 0 && releaseResIndex.Value() < storeVec.size() && storeVec[releaseResIndex.Value()])
+						if (releaseResIndex.Value() >= 0 &&
+							releaseResIndex.Value() < storeVec.size() &&
+							storeVec[releaseResIndex.Value()].m_Buffer.IsValid())
 						{
-							storeVec[releaseResIndex.Value()]->Release();
+							DestroyBufferHandle(releaseResIndex);
 						}
 					}
 				}
@@ -243,20 +272,18 @@ namespace gglab
 			return false;
 		}
 
-		auto* texture = GetTexture(texIndex);
-		if (!texture)
+		if (texIndex.Value() >= m_Textures.size())
 		{
 			return false;
 		}
 
-		// Only check 2D texture
-		const auto currentDesc = texture->Get()->GetDesc();
-		if (currentDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+		const auto& record = m_Textures[texIndex.Value()];
+		if (!record.m_Texture.IsValid() || !m_Device->IsAlive(record.m_Texture))
 		{
 			return false;
 		}
 
-		const auto currentKey = TextureKey::ConvertResourceDescToKey(currentDesc);
+		const auto currentKey = record.m_Key;
 		const auto wantKey = MakeKey(desc);
 
 		return currentKey == wantKey;
@@ -292,6 +319,36 @@ namespace gglab
 		if (Test(usage, RGTextureUsage::Present))
 		{
 			result |= RHITextureUsage::Present;
+		}
+		return result;
+	}
+
+	RHIBufferUsage RGGpuResourceAllocator::ToRHIBufferUsage(RGBufferUsage usage) noexcept
+	{
+		RHIBufferUsage result = RHIBufferUsage::None;
+		if (Test(usage, RGBufferUsage::Vertex))
+		{
+			result |= RHIBufferUsage::Vertex;
+		}
+		if (Test(usage, RGBufferUsage::Index))
+		{
+			result |= RHIBufferUsage::Index;
+		}
+		if (Test(usage, RGBufferUsage::Constant))
+		{
+			result |= RHIBufferUsage::Constant;
+		}
+		if (Test(usage, RGBufferUsage::UAV))
+		{
+			result |= RHIBufferUsage::UnorderedAccess;
+		}
+		if (Test(usage, RGBufferUsage::CopySrc))
+		{
+			result |= RHIBufferUsage::CopySource;
+		}
+		if (Test(usage, RGBufferUsage::CopyDst))
+		{
+			result |= RHIBufferUsage::CopyDest;
 		}
 		return result;
 	}
@@ -332,13 +389,30 @@ namespace gglab
 			return;
 		}
 
-		RHITextureHandle& texture = m_Textures[texIndex.Value()];
+		RHITextureHandle& texture = m_Textures[texIndex.Value()].m_Texture;
 		if (!texture.IsValid())
 		{
 			return;
 		}
 
-		m_DX12Device->DestroyTexture(texture);
+		m_Device->DestroyTexture(texture);
 		texture.Reset();
+	}
+
+	void RGGpuResourceAllocator::DestroyBufferHandle(ResourceIndex bufIndex) noexcept
+	{
+		if (!bufIndex.IsValid() || bufIndex.Value() >= m_Buffers.size())
+		{
+			return;
+		}
+
+		RHIBufferHandle& buffer = m_Buffers[bufIndex.Value()].m_Buffer;
+		if (!buffer.IsValid())
+		{
+			return;
+		}
+
+		m_Device->DestroyBuffer(buffer);
+		buffer.Reset();
 	}
 }
