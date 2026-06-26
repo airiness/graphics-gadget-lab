@@ -80,8 +80,8 @@ namespace gglab
 		RGPassNodeIndex m_FirstUser = InvalidRGPassNodeIndex;
 		RGPassNodeIndex m_LastUser = InvalidRGPassNodeIndex;
 
-		RGBarrierState m_InitialBarrierState = CommonRGBarrierState();
-		std::optional<RGBarrierState> m_FinalBarrierState;
+		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
+		std::optional<RHIResourceState> m_FinalBarrierState;
 
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 	};
@@ -133,8 +133,8 @@ namespace gglab
 		struct BarrierIntent
 		{
 			RGVirtualResourceBase* m_VirtualResource = nullptr;
-			RGBarrierState m_Before = CommonRGBarrierState();
-			RGBarrierState m_After = CommonRGBarrierState();
+			RHIResourceState m_Before = CommonRHIResourceState();
+			RHIResourceState m_After = CommonRHIResourceState();
 		};
 
 		GGLAB_DEFINE_NESTED_TYPED_INDEX(Index, uint32_t);
@@ -215,10 +215,10 @@ namespace gglab
 				return Import<RGTextureResource>(name, texture, desc, initialUsage);
 			}
 
-			template<RGTextureViewType T>
+			template<RHITextureViewType T>
 			RGTextureViewId CreateView(
 				RGTextureId textureId,
-				std::optional<RGTextureViewDesc> desc = std::nullopt) noexcept
+				std::optional<RHITextureViewDesc> desc = std::nullopt) noexcept
 			{
 				return m_RG.CreateTextureView<T>(textureId, desc);
 			}
@@ -287,7 +287,9 @@ namespace gglab
 
 		DX12Texture* GetTexture(RGTextureId texId) noexcept;
 		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;
+		RHITextureHandle GetTextureHandle(RGTextureId texId) noexcept;
 		RHIBufferHandle GetBufferHandle(RGBufferId bufId) noexcept;
+		RHITextureViewHandle GetTextureViewHandle(RGTextureViewId viewId) noexcept;
 		DX12DescriptorView GetTextureView(RGTextureViewId viewId) noexcept;
 
 		ResourceIndex GetResourceIndex(RGTextureId texId) noexcept;
@@ -302,8 +304,8 @@ namespace gglab
 		struct TextureViewRecord
 		{
 			RGTextureId m_Texture{};
-			std::optional<RGTextureViewDesc> m_Desc{};
-			RGTextureViewType m_Type = RGTextureViewType::RTV;
+			std::optional<RHITextureViewDesc> m_Desc{};
+			RHITextureViewType m_Type = RHITextureViewType::RenderTarget;
 		};
 
 		template<typename RESOURCE>
@@ -330,10 +332,10 @@ namespace gglab
 		template<typename RESOURCE>
 		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
 
-		template<RGTextureViewType T>
+		template<RHITextureViewType T>
 		RGTextureViewId CreateTextureView(
 			RGTextureId textureId,
-			std::optional<RGTextureViewDesc> desc) noexcept;
+			std::optional<RHITextureViewDesc> desc) noexcept;
 
 		template<typename RESOURCE>
 		void MarkDestroyResourceIndex(ResourceIndex resIndex) noexcept;
@@ -404,10 +406,10 @@ namespace gglab
 		return pass;
 	}
 
-	template<RGTextureViewType T>
+	template<RHITextureViewType T>
 	inline RGTextureViewId RenderGraph::CreateTextureView(
 		RGTextureId textureId,
-		std::optional<RGTextureViewDesc> desc) noexcept
+		std::optional<RHITextureViewDesc> desc) noexcept
 	{
 		GGLAB_ASSERT_MSG(textureId.IsValid(),
 			"RenderGraph::CreateTextureView requires a valid texture id.");
@@ -424,6 +426,11 @@ namespace gglab
 			virtualResource->m_ResourceType != RGResourceType::RGTexture)
 		{
 			return InvalidRGTextureViewId;
+		}
+
+		if (desc)
+		{
+			desc->m_Type = T;
 		}
 
 		TextureViewRecord view{
@@ -525,7 +532,7 @@ namespace gglab
 		virtualResource->m_GpuResourceIndex = m_ExternalResourceRegistry->GetOrCreate(native);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.
-		virtualResource->m_InitialBarrierState = ToRGBarrierState(initialUsage);
+		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialUsage);
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		virtualResource->m_Usage = RESOURCE::DefaultNoneUsage;
@@ -586,7 +593,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(virtualResource != nullptr, "Export resource must exist.");
 		GGLAB_ASSERT_MSG(virtualResource->m_Imported, "Only imported resources may declare an exported state.");
 
-		virtualResource->m_FinalBarrierState = ToRGBarrierState(finalUsage);
+		virtualResource->m_FinalBarrierState = ToRHIResourceState(finalUsage);
 	}
 
 	template<typename RESOURCE>

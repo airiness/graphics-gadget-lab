@@ -68,9 +68,9 @@ namespace gglab
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtvDesc = MakeRGTexture2DArrayViewDesc(rgDesc.m_Format, 0, face, 1);
+					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(rgDesc.m_Format, 0, face, 1);
 					data.m_Rtvs[face] =
-						builder.CreateView<RGTextureViewType::RTV>(data.m_EnvironmentCubemap, rtvDesc);
+						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemap, rtvDesc);
 				}
 
 				data.m_Width = rgDesc.m_Width;

@@ -140,7 +140,7 @@ namespace gglab
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
 					RGTextureUsage::RenderTarget);
-				data.m_Rtv = builder.CreateView<RGTextureViewType::RTV>(data.m_BackBuffer);
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 			},
 			[swapChain](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{

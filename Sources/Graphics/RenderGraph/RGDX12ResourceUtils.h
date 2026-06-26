@@ -2,216 +2,68 @@
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 
 namespace gglab
 {
-	constexpr inline D3D12_BARRIER_SYNC ToD3D12BarrierSync(RGStage stage) noexcept
+	constexpr inline D3D12_BARRIER_SYNC ToD3D12BarrierSync(RHIAccess access) noexcept
 	{
-		if (stage == RGStage::None)
+		if (access == RHIAccess::None)
 		{
 			return D3D12_BARRIER_SYNC_NONE;
 		}
 
 		D3D12_BARRIER_SYNC sync = D3D12_BARRIER_SYNC_NONE;
-		if (Test(stage, RGStage::All))
-		{
-			sync |= D3D12_BARRIER_SYNC_ALL;
-		}
-		if (Test(stage, RGStage::AllShading))
+		if (Test(access, RHIAccess::ShaderResource | RHIAccess::ConstantBuffer | RHIAccess::UnorderedAccess))
 		{
 			sync |= D3D12_BARRIER_SYNC_ALL_SHADING;
 		}
-		if (Test(stage, RGStage::VertexShading))
+		if (Test(access, RHIAccess::VertexBuffer))
 		{
 			sync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
 		}
-		if (Test(stage, RGStage::IndexInput))
+		if (Test(access, RHIAccess::IndexBuffer))
 		{
 			sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
 		}
-		if (Test(stage, RGStage::RenderTarget))
+		if (Test(access, RHIAccess::RenderTarget))
 		{
 			sync |= D3D12_BARRIER_SYNC_RENDER_TARGET;
 		}
-		if (Test(stage, RGStage::DepthStencil))
+		if (Test(access, RHIAccess::DepthStencilRead | RHIAccess::DepthStencilWrite))
 		{
 			sync |= D3D12_BARRIER_SYNC_DEPTH_STENCIL;
 		}
-		if (Test(stage, RGStage::Copy))
+		if (Test(access, RHIAccess::CopySource | RHIAccess::CopyDest))
 		{
 			sync |= D3D12_BARRIER_SYNC_COPY;
 		}
+		if (Test(access, RHIAccess::IndirectArgument))
+		{
+			sync |= D3D12_BARRIER_SYNC_EXECUTE_INDIRECT;
+		}
+		if (sync == D3D12_BARRIER_SYNC_NONE &&
+			Test(access, RHIAccess::Common | RHIAccess::Present))
+		{
+			sync = D3D12_BARRIER_SYNC_ALL;
+		}
 		return sync;
-	}
-
-	constexpr inline D3D12_BARRIER_ACCESS ToD3D12BarrierAccess(RGAccess access) noexcept
-	{
-		if (access == RGAccess::None)
-		{
-			return D3D12_BARRIER_ACCESS_NO_ACCESS;
-		}
-
-		D3D12_BARRIER_ACCESS barrierAccess = D3D12_BARRIER_ACCESS_COMMON;
-		if (Test(access, RGAccess::ShaderResource))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_SHADER_RESOURCE;
-		}
-		if (Test(access, RGAccess::RenderTarget))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_RENDER_TARGET;
-		}
-		if (Test(access, RGAccess::DepthStencilRead))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_DEPTH_STENCIL_READ;
-		}
-		if (Test(access, RGAccess::DepthStencilWrite))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE;
-		}
-		if (Test(access, RGAccess::UnorderedAccess))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_UNORDERED_ACCESS;
-		}
-		if (Test(access, RGAccess::CopySource))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_COPY_SOURCE;
-		}
-		if (Test(access, RGAccess::CopyDest))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_COPY_DEST;
-		}
-		if (Test(access, RGAccess::VertexBuffer))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_VERTEX_BUFFER;
-		}
-		if (Test(access, RGAccess::IndexBuffer))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_INDEX_BUFFER;
-		}
-		if (Test(access, RGAccess::ConstantBuffer))
-		{
-			barrierAccess |= D3D12_BARRIER_ACCESS_CONSTANT_BUFFER;
-		}
-		return barrierAccess;
-	}
-
-	constexpr inline D3D12_BARRIER_LAYOUT ToD3D12BarrierLayout(RGLayout layout) noexcept
-	{
-		switch (layout)
-		{
-		case RGLayout::Common:
-			return D3D12_BARRIER_LAYOUT_COMMON;
-		case RGLayout::ShaderResource:
-			return D3D12_BARRIER_LAYOUT_SHADER_RESOURCE;
-		case RGLayout::RenderTarget:
-			return D3D12_BARRIER_LAYOUT_RENDER_TARGET;
-		case RGLayout::DepthStencilRead:
-			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_READ;
-		case RGLayout::DepthStencilWrite:
-			return D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE;
-		case RGLayout::UnorderedAccess:
-			return D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS;
-		case RGLayout::CopySource:
-			return D3D12_BARRIER_LAYOUT_COPY_SOURCE;
-		case RGLayout::CopyDest:
-			return D3D12_BARRIER_LAYOUT_COPY_DEST;
-		case RGLayout::Present:
-			return D3D12_BARRIER_LAYOUT_PRESENT;
-		}
-
-		GGLAB_UNREACHABLE("Unhandled RGLayout.");
-	}
-
-	template<typename ResourceUsage>
-	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates(ResourceUsage usage, bool unuse = false) noexcept = delete;
-
-	template<>
-	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGTextureUsage>(RGTextureUsage rgTexUsage, bool depthReadOnly) noexcept
-	{
-		using U = RGTextureUsage;
-		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
-
-		if (Test(rgTexUsage, U::Sample))
-		{
-			states |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-		}
-		if (Test(rgTexUsage, U::RenderTarget))
-		{
-			states |= D3D12_RESOURCE_STATE_RENDER_TARGET;
-		}
-		if (Test(rgTexUsage, U::DepthStencil))
-		{
-			states |= depthReadOnly ? D3D12_RESOURCE_STATE_DEPTH_READ : D3D12_RESOURCE_STATE_DEPTH_WRITE;
-		}
-		if (Test(rgTexUsage, U::DepthStencilRead))
-		{
-			states |= D3D12_RESOURCE_STATE_DEPTH_READ;
-		}
-		if (Test(rgTexUsage, U::UAV))
-		{
-			states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		}
-		if (Test(rgTexUsage, U::CopySrc))
-		{
-			states |= D3D12_RESOURCE_STATE_COPY_SOURCE;
-		}
-		if (Test(rgTexUsage, U::CopyDst))
-		{
-			states |= D3D12_RESOURCE_STATE_COPY_DEST;
-		}
-		if (Test(rgTexUsage, U::Present))
-		{
-			GGLAB_ASSERT_MSG(rgTexUsage == U::Present, "RGTextureUsage::Present must be exclusive.");
-			return D3D12_RESOURCE_STATE_PRESENT;
-		}
-
-		return states;
-	}
-
-	template<>
-	constexpr inline D3D12_RESOURCE_STATES ToD3D12ResourceStates<RGBufferUsage>(RGBufferUsage rgBufUsage, bool) noexcept
-	{
-		using U = RGBufferUsage;
-		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
-
-		if (Test(rgBufUsage, U::Vertex | U::Constant))
-		{
-			states |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-		}
-		if (Test(rgBufUsage, U::Index))
-		{
-			states |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
-		}
-		if (Test(rgBufUsage, U::UAV))
-		{
-			states |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		}
-		if (Test(rgBufUsage, U::CopySrc))
-		{
-			states |= D3D12_RESOURCE_STATE_COPY_SOURCE;
-		}
-		if (Test(rgBufUsage, U::CopyDst))
-		{
-			states |= D3D12_RESOURCE_STATE_COPY_DEST;
-		}
-
-		return states;
 	}
 
 	inline void AddDX12RGBarrier(DX12CommandList& commandList,
 		RGResourceType resourceType,
 		DX12Resource& resource,
-		const RGBarrierState& before,
-		const RGBarrierState& after) noexcept
+		const RHIResourceState& before,
+		const RHIResourceState& after) noexcept
 	{
 		switch (resourceType)
 		{
 		case RGResourceType::RGTexture:
 			commandList.AddTextureBarrier(
 				CD3DX12_TEXTURE_BARRIER(
-					ToD3D12BarrierSync(before.m_Stage),
-					ToD3D12BarrierSync(after.m_Stage),
+					ToD3D12BarrierSync(before.m_Access),
+					ToD3D12BarrierSync(after.m_Access),
 					ToD3D12BarrierAccess(before.m_Access),
 					ToD3D12BarrierAccess(after.m_Access),
 					ToD3D12BarrierLayout(before.m_Layout),
@@ -222,8 +74,8 @@ namespace gglab
 		case RGResourceType::RGBuffer:
 			commandList.AddBufferBarrier(
 				CD3DX12_BUFFER_BARRIER(
-					ToD3D12BarrierSync(before.m_Stage),
-					ToD3D12BarrierSync(after.m_Stage),
+					ToD3D12BarrierSync(before.m_Access),
+					ToD3D12BarrierSync(after.m_Access),
 					ToD3D12BarrierAccess(before.m_Access),
 					ToD3D12BarrierAccess(after.m_Access),
 					resource.Get()));
@@ -251,75 +103,75 @@ namespace gglab
 		return ToRGTextureDesc(texture.GetDesc(), usage);
 	}
 
-	inline D3D12_RENDER_TARGET_VIEW_DESC ToD3D12RenderTargetViewDesc(const RGTextureViewDesc& rgDesc) noexcept
+	inline D3D12_RENDER_TARGET_VIEW_DESC ToD3D12RenderTargetViewDesc(const RHITextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_RENDER_TARGET_VIEW_DESC desc{};
 		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 
 		switch (rgDesc.m_Dimension)
 		{
-		case RGTextureViewDimension::Texture2DArray:
+		case RHITextureViewDimension::Texture2DArray:
 			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
 			desc.Texture2DArray.MipSlice = rgDesc.m_MipSlice;
 			desc.Texture2DArray.FirstArraySlice = rgDesc.m_FirstArraySlice;
 			desc.Texture2DArray.ArraySize = rgDesc.m_ArraySize;
 			desc.Texture2DArray.PlaneSlice = rgDesc.m_PlaneSlice;
 			break;
-		case RGTextureViewDimension::Unknown:
-		case RGTextureViewDimension::Texture2D:
+		case RHITextureViewDimension::Unknown:
+		case RHITextureViewDimension::Texture2D:
 			desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 			desc.Texture2D.MipSlice = rgDesc.m_MipSlice;
 			desc.Texture2D.PlaneSlice = rgDesc.m_PlaneSlice;
 			break;
 		default:
-			GGLAB_UNREACHABLE("Unsupported RGTextureViewDimension for RTV.");
+			GGLAB_UNREACHABLE("Unsupported RHITextureViewDimension for RTV.");
 		}
 
 		return desc;
 	}
 
-	inline D3D12_DEPTH_STENCIL_VIEW_DESC ToD3D12DepthStencilViewDesc(const RGTextureViewDesc& rgDesc) noexcept
+	inline D3D12_DEPTH_STENCIL_VIEW_DESC ToD3D12DepthStencilViewDesc(const RHITextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
 		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 
 		switch (rgDesc.m_Dimension)
 		{
-		case RGTextureViewDimension::Unknown:
-		case RGTextureViewDimension::Texture2D:
+		case RHITextureViewDimension::Unknown:
+		case RHITextureViewDimension::Texture2D:
 			desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 			desc.Flags = D3D12_DSV_FLAG_NONE;
 			desc.Texture2D.MipSlice = rgDesc.m_MipSlice;
 			break;
 		default:
-			GGLAB_UNREACHABLE("Unsupported RGTextureViewDimension for DSV.");
+			GGLAB_UNREACHABLE("Unsupported RHITextureViewDimension for DSV.");
 		}
 
 		return desc;
 	}
 
-	inline D3D12_SHADER_RESOURCE_VIEW_DESC ToD3D12ShaderResourceViewDesc(const RGTextureViewDesc& rgDesc) noexcept
+	inline D3D12_SHADER_RESOURCE_VIEW_DESC ToD3D12ShaderResourceViewDesc(const RHITextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
 		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
 		const auto mipLevels =
-			rgDesc.m_MipLevels == RGTextureViewDesc::AllMipLevels ?
+			rgDesc.m_MipLevels == RHITextureViewDesc::AllMipLevels ?
 			static_cast<UINT>(-1) :
 			rgDesc.m_MipLevels;
 
 		switch (rgDesc.m_Dimension)
 		{
-		case RGTextureViewDimension::Unknown:
-		case RGTextureViewDimension::Texture2D:
+		case RHITextureViewDimension::Unknown:
+		case RHITextureViewDimension::Texture2D:
 			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			desc.Texture2D.MostDetailedMip = rgDesc.m_MostDetailedMip;
 			desc.Texture2D.MipLevels = mipLevels;
 			desc.Texture2D.PlaneSlice = rgDesc.m_PlaneSlice;
 			desc.Texture2D.ResourceMinLODClamp = rgDesc.m_ResourceMinLODClamp;
 			break;
-		case RGTextureViewDimension::Texture2DArray:
+		case RHITextureViewDimension::Texture2DArray:
 			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 			desc.Texture2DArray.MostDetailedMip = rgDesc.m_MostDetailedMip;
 			desc.Texture2DArray.MipLevels = mipLevels;
@@ -328,13 +180,13 @@ namespace gglab
 			desc.Texture2DArray.PlaneSlice = rgDesc.m_PlaneSlice;
 			desc.Texture2DArray.ResourceMinLODClamp = rgDesc.m_ResourceMinLODClamp;
 			break;
-		case RGTextureViewDimension::TextureCube:
+		case RHITextureViewDimension::TextureCube:
 			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 			desc.TextureCube.MostDetailedMip = rgDesc.m_MostDetailedMip;
 			desc.TextureCube.MipLevels = mipLevels;
 			desc.TextureCube.ResourceMinLODClamp = rgDesc.m_ResourceMinLODClamp;
 			break;
-		case RGTextureViewDimension::TextureCubeArray:
+		case RHITextureViewDimension::TextureCubeArray:
 			desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 			desc.TextureCubeArray.MostDetailedMip = rgDesc.m_MostDetailedMip;
 			desc.TextureCubeArray.MipLevels = mipLevels;
@@ -347,20 +199,20 @@ namespace gglab
 		return desc;
 	}
 
-	inline D3D12_UNORDERED_ACCESS_VIEW_DESC ToD3D12UnorderedAccessViewDesc(const RGTextureViewDesc& rgDesc) noexcept
+	inline D3D12_UNORDERED_ACCESS_VIEW_DESC ToD3D12UnorderedAccessViewDesc(const RHITextureViewDesc& rgDesc) noexcept
 	{
 		D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
 		desc.Format = ToDXGIFormat(rgDesc.m_Format);
 
 		switch (rgDesc.m_Dimension)
 		{
-		case RGTextureViewDimension::Unknown:
-		case RGTextureViewDimension::Texture2D:
+		case RHITextureViewDimension::Unknown:
+		case RHITextureViewDimension::Texture2D:
 			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 			desc.Texture2D.MipSlice = rgDesc.m_MipSlice;
 			desc.Texture2D.PlaneSlice = rgDesc.m_PlaneSlice;
 			break;
-		case RGTextureViewDimension::Texture2DArray:
+		case RHITextureViewDimension::Texture2DArray:
 			desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
 			desc.Texture2DArray.MipSlice = rgDesc.m_MipSlice;
 			desc.Texture2DArray.FirstArraySlice = rgDesc.m_FirstArraySlice;
@@ -368,7 +220,7 @@ namespace gglab
 			desc.Texture2DArray.PlaneSlice = rgDesc.m_PlaneSlice;
 			break;
 		default:
-			GGLAB_UNREACHABLE("Unsupported RGTextureViewDimension for UAV.");
+			GGLAB_UNREACHABLE("Unsupported RHITextureViewDimension for UAV.");
 		}
 
 		return desc;
