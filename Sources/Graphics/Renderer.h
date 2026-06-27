@@ -93,6 +93,7 @@ namespace gglab
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
+		RGTransientResourcePool* GetTransientResourcePool() const noexcept { return m_RGTransientResourcePool.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
 		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }

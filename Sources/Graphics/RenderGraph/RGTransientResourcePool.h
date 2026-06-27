@@ -8,6 +8,11 @@
 namespace gglab
 {
 	class RHIDevice;
+	class RGTransientResourcePool;
+	struct RGTransientResourcePoolSnapshot;
+	void BuildRGTransientResourcePoolSnapshot(
+		const RGTransientResourcePool& pool,
+		RGTransientResourcePoolSnapshot& outSnapshot) noexcept;
 
 	GGLAB_DEFINE_TYPED_INDEX(RGTransientResourcePoolSlot, uint32_t);
 
@@ -20,6 +25,7 @@ namespace gglab
 		uint16_t m_SampleCount = 1;
 		RHIFormat m_Format = RHIFormat::Unknown;
 		RHITextureUsage m_Usage = RHITextureUsage::None;
+		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
 
 		bool operator==(const RGTransientTextureKey& rhs) const noexcept
 		{
@@ -31,14 +37,45 @@ namespace gglab
 				m_MipLevels == rhs.m_MipLevels &&
 				m_SampleCount == rhs.m_SampleCount &&
 				m_Format == rhs.m_Format &&
-				m_Usage == rhs.m_Usage;
+				m_Usage == rhs.m_Usage &&
+				ClearValuesEqual(m_ClearValue, rhs.m_ClearValue);
 		}
 
 		auto AsTuple() const noexcept
 		{
-			return std::tie(m_Dimension,
+			const RHIClearValue clearValue = m_ClearValue.value_or(RHIClearValue{});
+			return std::make_tuple(m_Dimension,
 				m_Extent.m_Width, m_Extent.m_Height, m_Extent.m_Depth,
-				m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage);
+				m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage,
+				static_cast<uint8_t>(m_ClearValue.has_value()), clearValue.m_Format,
+				clearValue.m_Color[0], clearValue.m_Color[1],
+				clearValue.m_Color[2], clearValue.m_Color[3],
+				clearValue.m_Depth, clearValue.m_Stencil,
+				static_cast<uint8_t>(clearValue.m_IsDepthStencil));
+		}
+
+	private:
+		static bool ClearValuesEqual(
+			const std::optional<RHIClearValue>& lhs,
+			const std::optional<RHIClearValue>& rhs) noexcept
+		{
+			if (lhs.has_value() != rhs.has_value())
+			{
+				return false;
+			}
+			if (!lhs)
+			{
+				return true;
+			}
+
+			return lhs->m_Format == rhs->m_Format &&
+				lhs->m_Color[0] == rhs->m_Color[0] &&
+				lhs->m_Color[1] == rhs->m_Color[1] &&
+				lhs->m_Color[2] == rhs->m_Color[2] &&
+				lhs->m_Color[3] == rhs->m_Color[3] &&
+				lhs->m_Depth == rhs->m_Depth &&
+				lhs->m_Stencil == rhs->m_Stencil &&
+				lhs->m_IsDepthStencil == rhs->m_IsDepthStencil;
 		}
 	};
 
@@ -155,6 +192,10 @@ namespace gglab
 	class RGTransientResourcePool
 	{
 	private:
+		friend void BuildRGTransientResourcePoolSnapshot(
+			const RGTransientResourcePool& pool,
+			RGTransientResourcePoolSnapshot& outSnapshot) noexcept;
+
 		enum class ResourceType : uint8_t
 		{
 			Texture,
