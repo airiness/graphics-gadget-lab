@@ -16,6 +16,13 @@ namespace gglab
 		Borrowed,
 	};
 
+	enum class RHIMemoryUsage : uint8_t
+	{
+		GpuOnly,
+		CpuToGpu,
+		GpuToCpu,
+	};
+
 	struct RHIResourceDesc
 	{
 		RHIResourceType m_Type = RHIResourceType::Unknown;

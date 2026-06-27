@@ -78,17 +78,17 @@ namespace gglab
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
-					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
+					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBufferHandle());
+					objectSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
 
 				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBufferHandle());
+					materialSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
 
 				const auto& viewSB = renderer->GetViewStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(

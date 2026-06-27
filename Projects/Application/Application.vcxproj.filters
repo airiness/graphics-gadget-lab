@@ -52,6 +52,9 @@
     <Filter Include="Graphics\RenderGraph">
       <UniqueIdentifier>{e1396d2d-a721-499a-bfb4-18812535ff1d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\Buffer">
+      <UniqueIdentifier>{c1fd30dc-7593-4891-a844-aaf576e5c8ad}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Hash">
       <UniqueIdentifier>{9c9a2b8f-4af1-4b73-8e6e-50c967e193ef}</UniqueIdentifier>
     </Filter>
@@ -107,6 +110,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.cpp">
+      <Filter>Graphics\Buffer</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
@@ -652,6 +658,24 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ConstantBuffer.h">
       <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\Buffer.h">
+      <Filter>Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.h">
+      <Filter>Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\DynamicConstantBufferAllocator.h">
+      <Filter>Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\DynamicStructuredBufferAllocator.h">
+      <Filter>Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBuffer.h">
+      <Filter>Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h">
+      <Filter>Graphics\Buffer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingConstantBuffer.h">
       <Filter>Graphics\RHI\DX12</Filter>

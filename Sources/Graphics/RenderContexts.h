@@ -56,8 +56,7 @@ namespace gglab
 		bool IsValid() const noexcept
 		{
 			return (m_RenderViews.size() >= utils::ToIndex(RenderViewID::Count)) &&
-				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count)) &&
-				m_UploadFencePoint.IsValid();
+				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}
 	};
 

@@ -1,7 +1,11 @@
 #pragma once
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
-#include "Graphics/RHI/DX12/DX12RingStructuredBuffer.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "Graphics/Buffer/PersistentStructuredBufferTable.h"
+#include "Graphics/RHI/DX12/DX12FencePoint.h"
 
 namespace gglab
 {
@@ -9,9 +13,6 @@ namespace gglab
 	class AssetManager;
 	class TransferManager;
 	class RenderResourceRegistry;
-
-	template<typename T>
-	class DX12ConstantBuffer;
 
 	struct RenderInstance
 	{
@@ -33,6 +34,7 @@ namespace gglab
 
 		uint32_t m_ViewBaseIndex = 0;
 		uint32_t m_ViewCount = 0;
+		uint64_t m_SceneConstantBufferOffset = 0;
 
 		LightGPU m_MainLight{};
 
@@ -41,15 +43,13 @@ namespace gglab
 
 	struct RenderSceneGpuAllocations
 	{
-		DX12RingStructuredBuffer<ObjectGPU>::AllocateResult m_Objects{};
-		DX12RingStructuredBuffer<MaterialGPU>::AllocateResult m_Materials{};
-		DX12RingStructuredBuffer<ViewGPU>::AllocateResult m_Views{};
+		DynamicStructuredBufferAllocator<ViewGPU>::Allocation m_Views{};
+		DynamicBufferAllocation m_SceneConstants{};
 
 		bool IsEmpty() const noexcept
 		{
-			return !m_Objects.IsValid() &&
-				!m_Materials.IsValid() &&
-				!m_Views.IsValid();
+			return !m_Views.IsValid() &&
+				!m_SceneConstants.IsValid();
 		}
 	};
 
@@ -71,10 +71,10 @@ namespace gglab
 
 			std::span<RenderView> m_RenderViews;
 
-			DX12ConstantBuffer<SceneGPU>& m_SceneCB;
-			DX12RingStructuredBuffer<ObjectGPU>& m_ObjectsSB;
-			DX12RingStructuredBuffer<MaterialGPU>& m_MaterialsSB;
-			DX12RingStructuredBuffer<ViewGPU>& m_ViewsSB;
+			DynamicConstantBufferAllocator& m_SceneCB;
+			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
+			PersistentStructuredBuffer<MaterialGPU>& m_MaterialsSB;
+			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_CurrentBackBufferIndex = 0;
 		};
 
@@ -88,5 +88,14 @@ namespace gglab
 
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
+
+	private:
+		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
+		using MaterialTable = PersistentStructuredBufferTable<MaterialID, MaterialGPU>;
+
+		std::unique_ptr<ObjectTable> m_ObjectTable;
+		std::unique_ptr<MaterialTable> m_MaterialTable;
+		RHIBufferHandle m_ObjectBufferIdentity{};
+		RHIBufferHandle m_MaterialBufferIdentity{};
 	};
 }

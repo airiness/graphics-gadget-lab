@@ -1,6 +1,8 @@
 #pragma once
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
-#include "Graphics/RHI/DX12/DX12ConstantBuffer.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
@@ -102,14 +104,14 @@ namespace gglab
 		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
 
-		const DX12ConstantBuffer<SceneGPU>* GetSceneConstantBuffer() const noexcept { return m_SceneCB.get(); }
-		DX12ConstantBuffer<SceneGPU>* GetSceneConstantBuffer() noexcept { return m_SceneCB.get(); }
-		const DX12RingStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept { return m_ObjectSB.get(); }
-		DX12RingStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept { return m_ObjectSB.get(); }
-		const DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept { return m_MaterialSB.get(); }
-		DX12RingStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
-		const DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
-		DX12RingStructuredBuffer<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
+		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept { return m_SceneCB.get(); }
+		DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept { return m_SceneCB.get(); }
+		const PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept { return m_ObjectSB.get(); }
+		PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept { return m_ObjectSB.get(); }
+		const PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept { return m_MaterialSB.get(); }
+		PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
+		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
+		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
 
 		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
 
@@ -146,11 +148,11 @@ namespace gglab
 
 		RootSignatureID m_CommonRootSignatureId{};
 
-		std::unique_ptr<DX12ConstantBuffer<SceneGPU>> m_SceneCB;
+		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 
-		std::unique_ptr<DX12RingStructuredBuffer<ObjectGPU>> m_ObjectSB;
-		std::unique_ptr<DX12RingStructuredBuffer<MaterialGPU>> m_MaterialSB;
-		std::unique_ptr<DX12RingStructuredBuffer<ViewGPU>> m_ViewSB;
+		std::unique_ptr<PersistentStructuredBuffer<ObjectGPU>> m_ObjectSB;
+		std::unique_ptr<PersistentStructuredBuffer<MaterialGPU>> m_MaterialSB;
+		std::unique_ptr<DynamicStructuredBufferAllocator<ViewGPU>> m_ViewSB;
 
 		std::atomic_bool m_IsInitialized = false;
 		std::atomic_bool m_IsSuspended = false;

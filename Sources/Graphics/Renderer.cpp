@@ -7,7 +7,6 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
-#include "Graphics/RHI/DX12/DX12ConstantBuffer.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGTransientResourcePool.h"
@@ -199,14 +198,8 @@ namespace gglab
 
 		m_SwapChain->WaitFrameCompletion();
 
-		if (m_LastSubmittedFencePoint.IsValid())
-		{
-			const auto completedGraphicsFence =
-				m_LastSubmittedFencePoint.GetFence()->GetCompletedValue();
-			m_ObjectSB->ReclaimCompleted(completedGraphicsFence);
-			m_MaterialSB->ReclaimCompleted(completedGraphicsFence);
-			m_ViewSB->ReclaimCompleted(completedGraphicsFence);
-		}
+		m_SceneCB->Tick();
+		m_ViewSB->Tick();
 
 		m_RGTransientResourcePool->Tick();
 		m_DescriptorManager->Tick();
@@ -413,17 +406,13 @@ namespace gglab
 		GGLAB_ASSERT_MSG(fencePoint.IsValid(),
 			"Scene GPU allocations require a valid graphics fence point.");
 
-		if (allocations->m_Objects.IsValid())
-		{
-			m_ObjectSB->Retire(allocations->m_Objects, fencePoint);
-		}
-		if (allocations->m_Materials.IsValid())
-		{
-			m_MaterialSB->Retire(allocations->m_Materials, fencePoint);
-		}
 		if (allocations->m_Views.IsValid())
 		{
-			m_ViewSB->Retire(allocations->m_Views, fencePoint);
+			m_ViewSB->Retire(&allocations->m_Views, fencePoint.ToRHI());
+		}
+		if (allocations->m_SceneConstants.IsValid())
+		{
+			m_SceneCB->Retire(&allocations->m_SceneConstants, fencePoint.ToRHI());
 		}
 		*allocations = {};
 	}
@@ -513,31 +502,40 @@ namespace gglab
 
 	void Renderer::InitializeGpuBuffers() noexcept
 	{
-		// Initialize Scene Constant Buffer
+		// Small, per-frame CPU-visible constant allocations.
 		{
-			const auto constantBufferCount = DX12Device::GetBufferCount();
-			m_SceneCB = std::make_unique<DX12ConstantBuffer<SceneGPU>>(m_Device.get(), constantBufferCount);
+			DynamicConstantBufferAllocator::CreateInfo createInfo{};
+			createInfo.m_Device = m_Device.get();
+			createInfo.m_CapacityInBytes =
+				static_cast<uint32_t>(sizeof(SceneGPU)) * DX12Device::GetBufferCount() * 4;
+			createInfo.m_DebugName = "Renderer.DynamicConstants";
+			m_SceneCB = std::make_unique<DynamicConstantBufferAllocator>(createInfo);
 		}
 
-		// Initialize Structured Buffers
+		// Persistent scene tables are replicated per backbuffer. Each frame only
+		// updates the safe physical version selected by its backbuffer index.
 		{
-			DX12RingStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
-			objectSBCreateInfo.m_DX12Device = m_Device.get();
-			objectSBCreateInfo.m_ElementsCapacity =
-				MaxObjectCapacity * DX12Device::GetBufferCount();
-			m_ObjectSB = std::make_unique<DX12RingStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
+			PersistentStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
+			objectSBCreateInfo.m_Device = m_Device.get();
+			objectSBCreateInfo.m_ElementCapacity = MaxObjectCapacity;
+			objectSBCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+			objectSBCreateInfo.m_DebugName = "Renderer.PersistentObjects";
+			m_ObjectSB = std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 
-			DX12RingStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
-			materialSBCreateInfo.m_DX12Device = m_Device.get();
-			materialSBCreateInfo.m_ElementsCapacity =
-				MaxMaterialCapacity * DX12Device::GetBufferCount();
-			m_MaterialSB = std::make_unique<DX12RingStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
+			PersistentStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
+			materialSBCreateInfo.m_Device = m_Device.get();
+			materialSBCreateInfo.m_ElementCapacity = MaxMaterialCapacity;
+			materialSBCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
+			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 
-			DX12RingStructuredBuffer<ViewGPU>::CreateInfo viewSBCreateInfo{};
-			viewSBCreateInfo.m_DX12Device = m_Device.get();
-			viewSBCreateInfo.m_ElementsCapacity =
+			// View data remains a small per-frame dynamic upload allocation.
+			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};
+			viewSBCreateInfo.m_Device = m_Device.get();
+			viewSBCreateInfo.m_ElementCapacity =
 				MaxViewCapacity * DX12Device::GetBufferCount();
-			m_ViewSB = std::make_unique<DX12RingStructuredBuffer<ViewGPU>>(viewSBCreateInfo);
+			viewSBCreateInfo.m_DebugName = "Renderer.DynamicViews";
+			m_ViewSB = std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
 		}
 	}
 }

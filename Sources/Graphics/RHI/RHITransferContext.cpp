@@ -217,7 +217,7 @@ namespace gglab
 		RecordBufferUse(src);
 	}
 
-	void RHITransferContext::UploadBuffer(const void* data, uint64_t sizeInBytes,
+	bool RHITransferContext::UploadBuffer(const void* data, uint64_t sizeInBytes,
 		RHIBufferHandle dst, uint64_t dstOffset) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_ExecutingInfo, "UploadBuffer must be called between Begin() and End().");
@@ -226,7 +226,7 @@ namespace gglab
 		if (!dstBuffer)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("RHITransferContext::UploadBuffer received a non-live RHI buffer handle.");
-			return;
+			return false;
 		}
 		if (!data ||
 			sizeInBytes == 0 ||
@@ -234,7 +234,7 @@ namespace gglab
 			sizeInBytes > dstBuffer->SizeInBytes() - dstOffset)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("RHITransferContext::UploadBuffer received invalid input or range.");
-			return;
+			return false;
 		}
 
 		auto uploadBuffer = std::make_unique<DX12Buffer>();
@@ -243,14 +243,14 @@ namespace gglab
 		if (!uploadBuffer->IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RHITransferContext::UploadBuffer failed to create an intermediate upload buffer.");
-			return;
+			return false;
 		}
 
 		void* mappedData = uploadBuffer->Map();
 		if (!mappedData)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RHITransferContext::UploadBuffer failed to map the intermediate upload buffer.");
-			return;
+			return false;
 		}
 
 		std::memcpy(mappedData, data, static_cast<size_t>(sizeInBytes));
@@ -259,6 +259,7 @@ namespace gglab
 		CopyBuffer(dstBuffer, dstOffset, uploadBuffer.get(), 0, sizeInBytes);
 		m_ExecutingInfo->m_IntermediateBuffers.push_back(std::move(uploadBuffer));
 		RecordBufferUse(dst);
+		return true;
 	}
 
 	void RHITransferContext::UploadTexture(

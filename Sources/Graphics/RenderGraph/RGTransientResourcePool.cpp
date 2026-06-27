@@ -90,6 +90,7 @@ namespace gglab
 			.m_SizeInBytes = desc.m_SizeInBytes,
 			.m_StrideInBytes = desc.m_StrideInBytes,
 			.m_Usage = desc.m_Usage,
+			.m_MemoryUsage = desc.m_MemoryUsage,
 		};
 	}
 

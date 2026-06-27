@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Core/Application.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Input/InputManager.h"

@@ -63,6 +63,21 @@ namespace gglab
 		return true;
 	}
 
+	bool TransferBatch::StageBufferWrite(
+		RHIBufferHandle dstBuffer,
+		uint64_t dstOffset,
+		const void* src,
+		uint64_t numBytes) noexcept
+	{
+		if (!dstBuffer.IsValid() || !src || numBytes == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("TransferBatch rejected an invalid RHI buffer write.");
+			return false;
+		}
+
+		return m_TransferContext.UploadBuffer(src, numBytes, dstBuffer, dstOffset);
+	}
+
 	DX12RingBuffer::Span TransferBatch::ReserveUpload(
 		uint32_t numBytes,
 		uint32_t alignment) noexcept
