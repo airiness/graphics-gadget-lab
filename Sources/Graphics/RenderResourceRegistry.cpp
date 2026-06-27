@@ -216,6 +216,12 @@ namespace gglab
 		return entry.m_Allocated ? m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex) : nullptr;
 	}
 
+	RHITextureHandle RenderResourceRegistry::GetTextureHandle(TextureIndex index) noexcept
+	{
+		auto& entry = m_TextureEntries[utils::ToIndex(index)];
+		return entry.m_Allocated ? m_RGGpuResAllocator->GetTextureHandle(entry.m_InternalIndex) : RHITextureHandle{};
+	}
+
 	ResourceIndex RenderResourceRegistry::GetExternalIndex(TextureIndex index) const noexcept
 	{
 		return m_TextureEntries[utils::ToIndex(index)].m_ExternalIndex;

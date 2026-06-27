@@ -72,6 +72,6 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(texture);
 
 		const auto desc = ToRGTextureDesc(*texture, RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
-		return builder.ImportTexture(name, texture, desc, RGTextureUsage::None);
+		return builder.ImportTexture(name, registry.GetTextureHandle(texIndex), desc, RGTextureUsage::None);
 	}
 }

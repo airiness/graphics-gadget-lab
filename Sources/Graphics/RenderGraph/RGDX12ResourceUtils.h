@@ -1,90 +1,10 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceUtils.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 
 namespace gglab
 {
-	constexpr inline D3D12_BARRIER_SYNC ToD3D12BarrierSync(RHIAccess access) noexcept
-	{
-		if (access == RHIAccess::None)
-		{
-			return D3D12_BARRIER_SYNC_NONE;
-		}
-
-		D3D12_BARRIER_SYNC sync = D3D12_BARRIER_SYNC_NONE;
-		if (Test(access, RHIAccess::ShaderResource | RHIAccess::ConstantBuffer | RHIAccess::UnorderedAccess))
-		{
-			sync |= D3D12_BARRIER_SYNC_ALL_SHADING;
-		}
-		if (Test(access, RHIAccess::VertexBuffer))
-		{
-			sync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
-		}
-		if (Test(access, RHIAccess::IndexBuffer))
-		{
-			sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
-		}
-		if (Test(access, RHIAccess::RenderTarget))
-		{
-			sync |= D3D12_BARRIER_SYNC_RENDER_TARGET;
-		}
-		if (Test(access, RHIAccess::DepthStencilRead | RHIAccess::DepthStencilWrite))
-		{
-			sync |= D3D12_BARRIER_SYNC_DEPTH_STENCIL;
-		}
-		if (Test(access, RHIAccess::CopySource | RHIAccess::CopyDest))
-		{
-			sync |= D3D12_BARRIER_SYNC_COPY;
-		}
-		if (Test(access, RHIAccess::IndirectArgument))
-		{
-			sync |= D3D12_BARRIER_SYNC_EXECUTE_INDIRECT;
-		}
-		if (sync == D3D12_BARRIER_SYNC_NONE &&
-			Test(access, RHIAccess::Common | RHIAccess::Present))
-		{
-			sync = D3D12_BARRIER_SYNC_ALL;
-		}
-		return sync;
-	}
-
-	inline void AddDX12RGBarrier(DX12CommandList& commandList,
-		RGResourceType resourceType,
-		DX12Resource& resource,
-		const RHIResourceState& before,
-		const RHIResourceState& after) noexcept
-	{
-		switch (resourceType)
-		{
-		case RGResourceType::RGTexture:
-			commandList.AddTextureBarrier(
-				CD3DX12_TEXTURE_BARRIER(
-					ToD3D12BarrierSync(before.m_Access),
-					ToD3D12BarrierSync(after.m_Access),
-					ToD3D12BarrierAccess(before.m_Access),
-					ToD3D12BarrierAccess(after.m_Access),
-					ToD3D12BarrierLayout(before.m_Layout),
-					ToD3D12BarrierLayout(after.m_Layout),
-					resource.Get(),
-					CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)));
-			break;
-		case RGResourceType::RGBuffer:
-			commandList.AddBufferBarrier(
-				CD3DX12_BUFFER_BARRIER(
-					ToD3D12BarrierSync(before.m_Access),
-					ToD3D12BarrierSync(after.m_Access),
-					ToD3D12BarrierAccess(before.m_Access),
-					ToD3D12BarrierAccess(after.m_Access),
-					resource.Get()));
-			break;
-		default:
-			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
-		}
-	}
-
 	inline RGTextureDesc ToRGTextureDesc(const D3D12_RESOURCE_DESC& nativeDesc, RGTextureUsage usage) noexcept
 	{
 		RGTextureDesc rgDesc{};

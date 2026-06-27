@@ -32,15 +32,14 @@ namespace gglab
 		[[nodiscard]] std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept { return m_UsedBuffers; }
 		[[nodiscard]] std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_UsedTextures; }
 		void ClearTrackedResourceUses() noexcept;
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept;
+		void TrackTextureUse(RHITextureHandle texture) noexcept;
 
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
 
 	protected:
 		[[nodiscard]] DX12Device* GetDevice() const noexcept { return m_Device; }
-
-		void TrackBufferUse(RHIBufferHandle buffer) noexcept;
-		void TrackTextureUse(RHITextureHandle texture) noexcept;
 
 	private:
 		friend class DX12GraphicsCommandContext;
@@ -71,6 +70,8 @@ namespace gglab
 		std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_Backend.GetUsedTextures(); }
 		void ClearTrackedResourceUses() noexcept { m_Backend.ClearTrackedResourceUses(); }
 
+		void TrackTextureUse(RHITextureHandle texture) noexcept override { m_Backend.TrackTextureUse(texture); }
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend.TrackBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
@@ -109,6 +110,8 @@ namespace gglab
 		std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_Backend.GetUsedTextures(); }
 		void ClearTrackedResourceUses() noexcept { m_Backend.ClearTrackedResourceUses(); }
 
+		void TrackTextureUse(RHITextureHandle texture) noexcept override { m_Backend.TrackTextureUse(texture); }
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend.TrackBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;

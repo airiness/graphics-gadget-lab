@@ -3,6 +3,50 @@
 
 namespace gglab
 {
+	D3D12_BARRIER_SYNC ToD3D12BarrierSync(RHIAccess access) noexcept
+	{
+		if (access == RHIAccess::None)
+		{
+			return D3D12_BARRIER_SYNC_NONE;
+		}
+
+		D3D12_BARRIER_SYNC sync = D3D12_BARRIER_SYNC_NONE;
+		if (Test(access, RHIAccess::ShaderResource | RHIAccess::ConstantBuffer | RHIAccess::UnorderedAccess))
+		{
+			sync |= D3D12_BARRIER_SYNC_ALL_SHADING;
+		}
+		if (Test(access, RHIAccess::VertexBuffer))
+		{
+			sync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
+		}
+		if (Test(access, RHIAccess::IndexBuffer))
+		{
+			sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
+		}
+		if (Test(access, RHIAccess::RenderTarget))
+		{
+			sync |= D3D12_BARRIER_SYNC_RENDER_TARGET;
+		}
+		if (Test(access, RHIAccess::DepthStencilRead | RHIAccess::DepthStencilWrite))
+		{
+			sync |= D3D12_BARRIER_SYNC_DEPTH_STENCIL;
+		}
+		if (Test(access, RHIAccess::CopySource | RHIAccess::CopyDest))
+		{
+			sync |= D3D12_BARRIER_SYNC_COPY;
+		}
+		if (Test(access, RHIAccess::IndirectArgument))
+		{
+			sync |= D3D12_BARRIER_SYNC_EXECUTE_INDIRECT;
+		}
+		if (sync == D3D12_BARRIER_SYNC_NONE &&
+			Test(access, RHIAccess::Common | RHIAccess::Present))
+		{
+			sync = D3D12_BARRIER_SYNC_ALL;
+		}
+		return sync;
+	}
+
 	D3D12_BARRIER_ACCESS ToD3D12BarrierAccess(RHIAccess access) noexcept
 	{
 		if (access == RHIAccess::None)

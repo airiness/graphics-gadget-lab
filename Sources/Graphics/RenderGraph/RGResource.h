@@ -108,6 +108,7 @@ namespace gglab
 	struct RGResourceTraits<RGTextureResource>
 	{
 		using Usage = RGTextureUsage;
+		using Handle = RHITextureHandle;
 		using Native = DX12Texture;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 	};
@@ -118,6 +119,7 @@ namespace gglab
 	struct RGResourceTraits<RGBufferResource>
 	{
 		using Usage = RGBufferUsage;
+		using Handle = RHIBufferHandle;
 		using Native = DX12Buffer;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;
 	};

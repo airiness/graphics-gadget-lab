@@ -101,6 +101,7 @@ namespace gglab
 		void ClearDirty(TextureIndex index) noexcept;
 
 		DX12Texture* GetTexture(TextureIndex index) noexcept;
+		RHITextureHandle GetTextureHandle(TextureIndex index) noexcept;
 		ResourceIndex GetExternalIndex(TextureIndex index) const noexcept;
 		RHIDescriptorHandle GetSrvDescriptor(TextureIndex index) const noexcept;
 		uint32_t GetShaderVisibleSrvIndex(TextureIndex index) const noexcept;
