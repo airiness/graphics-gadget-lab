@@ -6,9 +6,6 @@
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/SamplerRegistry.h"
 
 #include <algorithm>
@@ -110,44 +107,21 @@ namespace gglab
 					SamplerPreset::LinearClamp);
 				data.m_SampleMip = 0;
 			},
-			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, EnvironmentPreviewPassData& data)
+			[this, renderer, contextPtr](RGExecuteContext& executeContext, EnvironmentPreviewPassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				auto* environmentTexture = rg.GetTexture(data.m_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(environmentTexture);
-
-				auto* previewTexture = rg.GetTexture(data.m_EnvironmentCubemapPreview);
-				GGLAB_ASSERT_NOT_NULL(previewTexture);
-
-				const auto rtv = executeContext.GetView(data.m_Rtv);
-				commandList->ClearRenderTarget(rtv, *previewTexture);
-
-				auto* pso = GetOrCreateCubemapPreviewPSO(*renderer);
-				GGLAB_ASSERT_NOT_NULL(pso);
-
-				auto* rootSignature = renderer->GetCommonRootSignature();
-				GGLAB_ASSERT_NOT_NULL(rootSignature);
-
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
-
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*rootSignature);
-				commandList->SetPipelineState(*pso);
-				commandList->SetRenderTarget(rtv);
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				commandList->SetGraphicsConstantBuffer(
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+				commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(*renderer));
+				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					sceneBuffer->GetBufferHandle(),
+					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
 
 				const IBLCubemapPreviewPassParameters passParameters{
 					.DisplayLayout = data.m_DisplayLayout,
@@ -155,11 +129,11 @@ namespace gglab
 					.CubemapSamplerIndex = data.m_EnvironmentSamplerIndex,
 					.SampleMip = data.m_SampleMip,
 				};
-				commandList->SetGraphicsRoot32BitConstants(
+				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				commandList->DrawInstanced(3);
+				commandContext->Draw(3);
 
 			});
 
@@ -213,44 +187,21 @@ namespace gglab
 					std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(), mipLevels - 1u) :
 					0u;
 			},
-			[this, &rg, renderer, contextPtr](RGExecuteContext& executeContext, PrefilteredSpecularPreviewPassData& data)
+			[this, renderer, contextPtr](RGExecuteContext& executeContext, PrefilteredSpecularPreviewPassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				auto* prefilteredSpecularTexture = rg.GetTexture(data.m_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularTexture);
-
-				auto* previewTexture = rg.GetTexture(data.m_PrefilteredSpecularCubemapPreview);
-				GGLAB_ASSERT_NOT_NULL(previewTexture);
-
-				const auto rtv = executeContext.GetView(data.m_Rtv);
-				commandList->ClearRenderTarget(rtv, *previewTexture);
-
-				auto* pso = GetOrCreateCubemapPreviewPSO(*renderer);
-				GGLAB_ASSERT_NOT_NULL(pso);
-
-				auto* rootSignature = renderer->GetCommonRootSignature();
-				GGLAB_ASSERT_NOT_NULL(rootSignature);
-
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
-
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*rootSignature);
-				commandList->SetPipelineState(*pso);
-				commandList->SetRenderTarget(rtv);
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				commandList->SetGraphicsConstantBuffer(
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+				commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(*renderer));
+				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					sceneBuffer->GetBufferHandle(),
+					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
 
 				const IBLCubemapPreviewPassParameters passParameters{
 					.DisplayLayout = data.m_DisplayLayout,
@@ -258,11 +209,11 @@ namespace gglab
 					.CubemapSamplerIndex = data.m_PrefilteredSpecularSamplerIndex,
 					.SampleMip = data.m_SampleMip,
 				};
-				commandList->SetGraphicsRoot32BitConstants(
+				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				commandList->DrawInstanced(3);
+				commandContext->Draw(3);
 			});
 	}
 
@@ -307,7 +258,7 @@ namespace gglab
 
 	}
 
-	DX12PipelineState* RenderPassIBLPreview::GetOrCreateCubemapPreviewPSO(
+	RHIPipelineHandle RenderPassIBLPreview::GetOrCreateCubemapPreviewPSO(
 		const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();

@@ -12,7 +12,6 @@
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
-#include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
@@ -93,7 +92,6 @@ namespace gglab
 		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
 		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
-		RGExternalResourceRegistry* GetExternalResourceRegistry() const noexcept { return m_ExternalResRegistry.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
@@ -140,7 +138,6 @@ namespace gglab
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
-		std::unique_ptr<RGExternalResourceRegistry> m_ExternalResRegistry;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<TextureRegistry> m_TextureRegistry;

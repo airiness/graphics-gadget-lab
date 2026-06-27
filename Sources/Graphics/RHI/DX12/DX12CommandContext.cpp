@@ -15,6 +15,23 @@
 
 namespace gglab
 {
+	namespace
+	{
+		D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(RHIPrimitiveTopology topology) noexcept
+		{
+			switch (topology)
+			{
+			case RHIPrimitiveTopology::PointList: return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+			case RHIPrimitiveTopology::LineList: return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+			case RHIPrimitiveTopology::LineStrip: return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+			case RHIPrimitiveTopology::TriangleList: return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+			case RHIPrimitiveTopology::TriangleStrip: return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+			case RHIPrimitiveTopology::Unknown:
+			default: return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+			}
+		}
+	}
+
 	RHICommandContextHandle AllocateDX12CommandContextHandle() noexcept
 	{
 		static std::atomic<RHICommandContextHandle::IndexType> nextIndex = 0;
@@ -138,14 +155,153 @@ namespace gglab
 
 	void DX12GraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
-		GGLAB_ASSERT_MSG(!pipeline.IsValid(),
-			"DX12GraphicsCommandContext::SetPipeline(RHIPipelineHandle) needs an RHI pipeline table before it can be used.");
+		DX12PipelineState* pipelineState = nullptr;
+		DX12RootSignature* rootSignature = nullptr;
+		if (!m_Backend.GetDevice()->ResolveGraphicsPipeline(pipeline, pipelineState, rootSignature))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetPipeline received an invalid pipeline handle.");
+			return;
+		}
+
+		if (m_CurrentRootSignature != rootSignature)
+		{
+			m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
+			m_CurrentRootSignature = rootSignature;
+		}
+		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 	}
 
 	void DX12GraphicsCommandContext::SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept
 	{
-		GGLAB_ASSERT_MSG(binding.m_TableIndex == 0 && binding.m_ParameterIndex == 0,
-			"DX12GraphicsCommandContext::SetDescriptorTable needs an RHI descriptor table allocator before it can be used.");
+		const D3D12_GPU_DESCRIPTOR_HANDLE table = m_Backend.GetDevice()->ResolveShaderVisibleDescriptor(
+			binding.m_HeapType,
+			binding.m_TableIndex);
+		if (table.ptr == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetDescriptorTable received an invalid descriptor table binding.");
+			return;
+		}
+		m_Backend.Get()->SetGraphicsRootDescriptorTable(binding.m_ParameterIndex, table);
+	}
+
+	void DX12GraphicsCommandContext::SetRenderTargets(
+		std::span<const RHITextureViewHandle> renderTargets,
+		RHITextureViewHandle depthStencil) noexcept
+	{
+		std::vector<DX12DescriptorView> nativeRenderTargets;
+		nativeRenderTargets.reserve(renderTargets.size());
+		for (const RHITextureViewHandle view : renderTargets)
+		{
+			const DX12DescriptorView nativeView = m_Backend.GetDevice()->ResolveTextureView(view);
+			if (nativeView.IsValid())
+			{
+				nativeRenderTargets.push_back(nativeView);
+			}
+		}
+
+		if (depthStencil.IsValid())
+		{
+			const DX12DescriptorView nativeDepth = m_Backend.GetDevice()->ResolveTextureView(depthStencil);
+			GGLAB_ASSERT_MSG(nativeDepth.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
+			m_Backend.GetCommandList()->SetRenderTargets(nativeRenderTargets, nativeDepth);
+		}
+		else
+		{
+			m_Backend.GetCommandList()->SetRenderTargets(nativeRenderTargets);
+		}
+	}
+
+	void DX12GraphicsCommandContext::ClearColor(
+		RHITextureViewHandle renderTarget,
+		const std::array<float, 4>& color) noexcept
+	{
+		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(renderTarget);
+		GGLAB_ASSERT_MSG(view.IsValid(), "Render-target view must resolve to a DX12 descriptor.");
+		if (view.IsValid())
+		{
+			m_Backend.Get()->ClearRenderTargetView(view.m_CpuHandle, color.data(), 0, nullptr);
+		}
+	}
+
+	void DX12GraphicsCommandContext::ClearDepthStencil(
+		RHITextureViewHandle depthStencil,
+		float depth,
+		std::optional<uint8_t> stencil) noexcept
+	{
+		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(depthStencil);
+		GGLAB_ASSERT_MSG(view.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
+		if (view.IsValid())
+		{
+			m_Backend.GetCommandList()->ClearDepthStencil(view, depth, stencil);
+		}
+	}
+
+	void DX12GraphicsCommandContext::SetViewport(const RHIViewport& viewport) noexcept
+	{
+		D3D12_VIEWPORT nativeViewport{
+			.TopLeftX = viewport.m_X,
+			.TopLeftY = viewport.m_Y,
+			.Width = viewport.m_Width,
+			.Height = viewport.m_Height,
+			.MinDepth = viewport.m_MinDepth,
+			.MaxDepth = viewport.m_MaxDepth,
+		};
+		m_Backend.Get()->RSSetViewports(1, &nativeViewport);
+	}
+
+	void DX12GraphicsCommandContext::SetScissorRect(const RHIScissorRect& rect) noexcept
+	{
+		D3D12_RECT nativeRect{ rect.m_Left, rect.m_Top, rect.m_Right, rect.m_Bottom };
+		m_Backend.Get()->RSSetScissorRects(1, &nativeRect);
+	}
+
+	void DX12GraphicsCommandContext::SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept
+	{
+		const D3D12_PRIMITIVE_TOPOLOGY nativeTopology = ToD3D12PrimitiveTopology(topology);
+		GGLAB_ASSERT_MSG(nativeTopology != D3D_PRIMITIVE_TOPOLOGY_UNDEFINED, "Invalid RHI primitive topology.");
+		m_Backend.GetCommandList()->SetPrimitiveTopology(nativeTopology);
+	}
+
+	void DX12GraphicsCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex,
+		RHIBufferHandle buffer,
+		uint64_t offset) noexcept
+	{
+		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
+		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetConstantBuffer received an invalid buffer binding.");
+			return;
+		}
+		m_Backend.GetCommandList()->SetGraphicsConstantBuffer(
+			parameterIndex,
+			nativeBuffer->GPUVirtualAddress() + offset);
+		m_Backend.TrackBufferUse(buffer);
+	}
+
+	void DX12GraphicsCommandContext::SetReadOnlyBuffer(
+		uint32_t parameterIndex,
+		RHIBufferHandle buffer,
+		uint64_t offset) noexcept
+	{
+		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
+		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			return;
+		}
+		m_Backend.Get()->SetGraphicsRootShaderResourceView(
+			parameterIndex,
+			nativeBuffer->GPUVirtualAddress() + offset);
+		m_Backend.TrackBufferUse(buffer);
+	}
+
+	void DX12GraphicsCommandContext::SetPushConstants(
+		uint32_t parameterIndex,
+		std::span<const uint32_t> values,
+		uint32_t destOffset) noexcept
+	{
+		m_Backend.GetCommandList()->SetGraphicsRoot32BitConstants(parameterIndex, values, destOffset);
 	}
 
 	void DX12GraphicsCommandContext::SetVertexBuffers(uint32_t startSlot,
@@ -219,6 +375,19 @@ namespace gglab
 			instanceCount,
 			startIndexLocation,
 			baseVertexLocation,
+			startInstanceLocation);
+	}
+
+	void DX12GraphicsCommandContext::Draw(
+		uint32_t vertexCount,
+		uint32_t instanceCount,
+		uint32_t startVertexLocation,
+		uint32_t startInstanceLocation) noexcept
+	{
+		m_Backend.Get()->DrawInstanced(
+			vertexCount,
+			instanceCount,
+			startVertexLocation,
 			startInstanceLocation);
 	}
 

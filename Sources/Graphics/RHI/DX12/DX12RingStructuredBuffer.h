@@ -52,6 +52,22 @@ namespace gglab
 
 			m_RingBuffer = std::make_unique<DX12RingBuffer>();
 			m_RingBuffer->Create(resourceCreateInfo, totalSizeInBytes);
+
+			DX12ResourceManager::ImportedBufferDesc importDesc{};
+			importDesc.m_RHI.m_Desc.m_SizeInBytes = totalSizeInBytes;
+			importDesc.m_RHI.m_Desc.m_StrideInBytes = stride;
+			importDesc.m_RHI.m_Desc.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest;
+			importDesc.m_RHI.m_Desc.m_DebugName = "Renderer.RingStructuredBuffer";
+			importDesc.m_RHI.m_External.m_InitialState = {
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
+			};
+			importDesc.m_RHI.m_External.m_DebugName = "Renderer.RingStructuredBuffer";
+			importDesc.m_Resource = m_RingBuffer->GetResource();
+			m_RHIOwner = RHIBufferOwner(
+				createInfo.m_DX12Device,
+				createInfo.m_DX12Device->ImportBuffer(importDesc));
+			GGLAB_ASSERT_MSG(m_RHIOwner, "Failed to import structured buffer into RHI.");
 		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RingStructuredBuffer);
 		~DX12RingStructuredBuffer() = default;
@@ -106,11 +122,13 @@ namespace gglab
 		}
 
 		DX12Buffer* GetBuffer() const noexcept { return m_RingBuffer->GetBuffer(); }
+		RHIBufferHandle GetBufferHandle() const noexcept { return m_RHIOwner.Get(); }
 		uint32_t GetElementCapacity() const noexcept { return m_ElementCapacity; }
 		uint32_t GetElementStride() const noexcept { return static_cast<uint32_t>(sizeof(T)); }
 
 	private:
 		std::unique_ptr<DX12RingBuffer> m_RingBuffer;
+		RHIBufferOwner m_RHIOwner;
 		uint32_t m_ElementCapacity = 0;
 	};
 }

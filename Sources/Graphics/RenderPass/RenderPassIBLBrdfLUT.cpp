@@ -3,7 +3,6 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/ShaderManager.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab
@@ -62,40 +61,17 @@ namespace gglab
 				data.m_Width = rgDesc.m_Width;
 				data.m_Height = rgDesc.m_Height;
 			},
-			[this, &rg, renderer, renderResRegistry, shouldBuild](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				auto* brdfLutTexture = rg.GetTexture(data.m_BrdfLut);
-				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
-
-				const auto rtv = executeContext.GetView(data.m_Rtv);
-
-				commandList->ClearRenderTarget(rtv, *brdfLutTexture);
-
-				auto* pso = GetOrCreatePSO(*renderer);
-				GGLAB_ASSERT_NOT_NULL(pso);
-
-				auto* rootSignature = renderer->GetCommonRootSignature();
-				GGLAB_ASSERT_NOT_NULL(rootSignature);
-
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
-
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*rootSignature);
-				commandList->SetPipelineState(*pso);
-				commandList->SetRenderTarget(rtv);
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				commandList->DrawInstanced(3);
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
+				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+				commandContext->Draw(3);
 
 				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 			});
@@ -144,7 +120,7 @@ namespace gglab
 
 	}
 
-	DX12PipelineState* RenderPassIBLBrdfLUT::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassIBLBrdfLUT::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

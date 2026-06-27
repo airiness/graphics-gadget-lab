@@ -4,6 +4,7 @@
 namespace gglab
 {
 	class DX12PipelineState;
+	class DX12Device;
 	class DX12PSOCache;
 	class DX12RootSignatureCache;
 	class ShaderManager;
@@ -104,6 +105,7 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
+			DX12Device* m_Device = nullptr;
 			ShaderManager* m_ShaderManager = nullptr;
 			DX12RootSignatureCache* m_RootSignatureCache = nullptr;
 			DX12PSOCache* m_PSOCache = nullptr;
@@ -113,7 +115,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(PipelineCache);
 		~PipelineCache() = default;
 
-		DX12PipelineState* Resolve(
+		RHIPipelineHandle Resolve(
 			GraphicsPipelineSlot& slot,
 			const GraphicsPipelineRecipe& recipe) noexcept;
 		DX12PipelineState* Resolve(
@@ -125,6 +127,7 @@ namespace gglab
 			const ComputePipelineRecipe& recipe) const noexcept;
 
 		ShaderManager* m_ShaderManager = nullptr;
+		DX12Device* m_Device = nullptr;
 		DX12RootSignatureCache* m_RootSignatureCache = nullptr;
 		DX12PSOCache* m_PSOCache = nullptr;
 		uint64_t m_CacheId = 0;

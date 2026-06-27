@@ -68,7 +68,11 @@ namespace gglab
 
 		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept { return m_Backend.GetUsedBuffers(); }
 		std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_Backend.GetUsedTextures(); }
-		void ClearTrackedResourceUses() noexcept { m_Backend.ClearTrackedResourceUses(); }
+		void ClearTrackedResourceUses() noexcept
+		{
+			m_Backend.ClearTrackedResourceUses();
+			m_CurrentRootSignature = nullptr;
+		}
 
 		void TrackTextureUse(RHITextureHandle texture) noexcept override { m_Backend.TrackTextureUse(texture); }
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend.TrackBufferUse(buffer); }
@@ -76,6 +80,25 @@ namespace gglab
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
+		void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
+			RHITextureViewHandle depthStencil = {}) noexcept override;
+		void ClearColor(RHITextureViewHandle renderTarget,
+			const std::array<float, 4>& color) noexcept override;
+		void ClearDepthStencil(RHITextureViewHandle depthStencil,
+			float depth,
+			std::optional<uint8_t> stencil = std::nullopt) noexcept override;
+		void SetViewport(const RHIViewport& viewport) noexcept override;
+		void SetScissorRect(const RHIScissorRect& rect) noexcept override;
+		void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept override;
+		void SetConstantBuffer(uint32_t parameterIndex,
+			RHIBufferHandle buffer,
+			uint64_t offset = 0) noexcept override;
+		void SetReadOnlyBuffer(uint32_t parameterIndex,
+			RHIBufferHandle buffer,
+			uint64_t offset = 0) noexcept override;
+		void SetPushConstants(uint32_t parameterIndex,
+			std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
 		void SetVertexBuffers(uint32_t startSlot,
 			std::span<const RHIVertexBufferBinding> bindings) noexcept override;
 		void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept override;
@@ -84,6 +107,10 @@ namespace gglab
 			uint32_t startIndexLocation = 0,
 			int32_t baseVertexLocation = 0,
 			uint32_t startInstanceLocation = 0) noexcept override;
+		void Draw(uint32_t vertexCount,
+			uint32_t instanceCount = 1,
+			uint32_t startVertexLocation = 0,
+			uint32_t startInstanceLocation = 0) noexcept override;
 
 		void SetRootSignature(const DX12RootSignature& rootSignature) noexcept;
 		void SetPipelineState(const DX12PipelineState& pipelineState) noexcept;
@@ -91,6 +118,7 @@ namespace gglab
 
 	private:
 		DX12CommandContext m_Backend;
+		DX12RootSignature* m_CurrentRootSignature = nullptr;
 	};
 
 	class DX12ComputeCommandContext final : public RHIComputeCommandContext

@@ -100,14 +100,13 @@ namespace gglab
 		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
+			.m_Device = m_Device.get(),
 			.m_ShaderManager = createInfo.m_ShaderManager,
 			.m_RootSignatureCache = m_RootSignatureCache.get(),
 			.m_PSOCache = m_PSOCache.get(),
 		};
 		m_PipelineCache =
 			std::make_unique<PipelineCache>(pipelineCacheCreateInfo);
-
-		m_ExternalResRegistry = std::make_unique<RGExternalResourceRegistry>(m_ViewCache.get());
 
 		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
 		samplerRegistryCreateInfo.m_Device = m_Device.get();
@@ -122,7 +121,6 @@ namespace gglab
 
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_Device = m_Device.get();
-		renderResRegistryCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
 		renderResRegistryCreateInfo.m_RGGpuResAllocator = m_RGGpuResAllocator.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
@@ -166,7 +164,6 @@ namespace gglab
 		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
 		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
-		m_ExternalResRegistry.reset();
 		m_PipelineCache.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
@@ -268,11 +265,15 @@ namespace gglab
 		frame.m_CommandAllocator = commandAllocatorPool->RequestCommandAllocator();
 		commandList->Begin(frame.m_CommandAllocator);
 		graphicsCommandContext->ClearTrackedResourceUses();
+		const DX12DescriptorHeap* descriptorHeaps[] = {
+			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler),
+		};
+		commandList->SetDescriptorHeaps(descriptorHeaps);
 
 		RGExecuteContext executeContext{
 			RGBackendExecuteContext{
 				.m_GraphicsCommandContext = graphicsCommandContext,
-				.m_GraphicsCommandList = commandList,
 			}
 		};
 		rg.Execute(executeContext);
@@ -453,7 +454,6 @@ namespace gglab
 		RenderGraph::CreateInfo rgCreateInfo{};
 		rgCreateInfo.m_Device = m_Device.get();
 		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuResAllocator.get();
-		rgCreateInfo.m_ViewCache = m_ViewCache.get();
 
 		return rgCreateInfo;
 	}
@@ -485,21 +485,6 @@ namespace gglab
 		}
 
 		m_Device->FlushGPU();
-
-		if (m_ExternalResRegistry)
-		{
-			const uint32_t bufferCount = m_SwapChain->GetBufferCount();
-			for (uint32_t index = 0; index < bufferCount; ++index)
-			{
-				DX12Texture* backBuffer = m_SwapChain->GetBackBuffer(index);
-				if (!backBuffer)
-				{
-					continue;
-				}
-
-				m_ExternalResRegistry->Forget(backBuffer, true);
-			}
-		}
 
 		m_SwapChain->OnResize(width, height);
 	}

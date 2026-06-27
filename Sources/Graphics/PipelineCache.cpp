@@ -3,6 +3,7 @@
 #include "Graphics/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/ShaderManager.h"
 
@@ -64,16 +65,18 @@ namespace gglab
 
 	PipelineCache::PipelineCache(const CreateInfo& createInfo) noexcept :
 		m_ShaderManager(createInfo.m_ShaderManager),
+		m_Device(createInfo.m_Device),
 		m_RootSignatureCache(createInfo.m_RootSignatureCache),
 		m_PSOCache(createInfo.m_PSOCache),
 		m_CacheId(NextPipelineCacheId.fetch_add(1, std::memory_order_relaxed))
 	{
+		GGLAB_ASSERT_NOT_NULL(m_Device);
 		GGLAB_ASSERT_NOT_NULL(m_ShaderManager);
 		GGLAB_ASSERT_NOT_NULL(m_RootSignatureCache);
 		GGLAB_ASSERT_NOT_NULL(m_PSOCache);
 	}
 
-	DX12PipelineState* PipelineCache::Resolve(
+	RHIPipelineHandle PipelineCache::Resolve(
 		GraphicsPipelineSlot& slot,
 		const GraphicsPipelineRecipe& recipe) noexcept
 	{
@@ -85,7 +88,9 @@ namespace gglab
 			slot.m_Recipe == recipe &&
 			slot.m_ShaderRevision == shaderRevision)
 		{
-			return slot.m_PipelineState;
+			DX12RootSignature* rootSignature =
+				m_RootSignatureCache->GetDX12RootSignature(recipe.m_RootSignatureId);
+			return m_Device->RegisterGraphicsPipeline(slot.m_PipelineState, rootSignature);
 		}
 
 		const RHIGraphicsPipelineDesc rhiDesc = BuildRHIGraphicsPipelineDesc(recipe);
@@ -103,7 +108,9 @@ namespace gglab
 		slot.m_ShaderRevision = shaderRevision;
 		slot.m_PipelineCacheId = m_CacheId;
 		slot.m_PSOCacheRevision = m_PSOCache->GetRevision();
-		return slot.m_PipelineState;
+		DX12RootSignature* registeredRootSignature =
+			m_RootSignatureCache->GetDX12RootSignature(recipe.m_RootSignatureId);
+		return m_Device->RegisterGraphicsPipeline(slot.m_PipelineState, registeredRootSignature);
 	}
 
 	DX12PipelineState* PipelineCache::Resolve(

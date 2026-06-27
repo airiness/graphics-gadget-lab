@@ -5,10 +5,7 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 
 namespace gglab
 {
@@ -72,52 +69,43 @@ namespace gglab
 			},
 			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				const auto sceneColorSrv = executeContext.GetView(data.m_SceneColorSrv);
-				GGLAB_ASSERT_MSG(sceneColorSrv.m_Index != std::numeric_limits<uint32_t>::max(),
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const auto sceneColorSrv = executeContext.GetViewDescriptor(data.m_SceneColorSrv);
+				GGLAB_ASSERT_MSG(sceneColorSrv.IsValid(),
 					"Tonemap scene color SRV must expose a descriptor heap index.");
 
-				const auto backBufferRtv = executeContext.GetView(data.m_BackBufferRtv);
+				const auto backBufferRtv = executeContext.GetViewHandle(data.m_BackBufferRtv);
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
 
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
+				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&backBufferRtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*renderer->GetCommonRootSignature());
-				commandList->SetPipelineState(*GetOrCreatePSO(*renderer));
-				commandList->SetRenderTarget(backBufferRtv);
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				commandList->SetGraphicsConstantBuffer(
+				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					sceneBuffer->GetBufferHandle(),
+					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
 
 				const auto& viewSB = renderer->GetViewStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBuffer()->GPUVirtualAddress());
+					viewSB->GetBufferHandle());
 
 				const TonemapPassParameters passParameters{
 					.SceneColorTextureIndex = sceneColorSrv.m_Index,
 					.SceneColorSamplerIndex = data.m_SamplerIndex,
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 				};
-				commandList->SetGraphicsRoot32BitConstants(
+				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				commandList->DrawInstanced(3);
+				commandContext->Draw(3);
 			});
 	}
 
@@ -162,7 +150,7 @@ namespace gglab
 
 	}
 
-	DX12PipelineState* RenderPassTonemap::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassTonemap::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

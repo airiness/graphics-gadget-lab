@@ -112,6 +112,7 @@ class DX12FencePoint;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept;
 		void DestroySampler(RHISamplerHandle sampler) noexcept;
 		bool IsSamplerAlive(RHISamplerHandle sampler) const noexcept;
+		DX12DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager; }
 
 		template<ViewType T>
 		DX12DescriptorView GetOrCreate(ResourceIndex resourceIndex, DX12Texture* texture,

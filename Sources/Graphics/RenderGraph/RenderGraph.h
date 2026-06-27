@@ -1,12 +1,10 @@
 #pragma once
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/StringId.h"
 
@@ -14,12 +12,6 @@ namespace gglab
 {
 	class RHIGraphicsCommandContext;
 	class RHIComputeCommandContext;
-	class DX12CommandList;
-	class DX12ViewCache;
-	class DX12Buffer;
-	class DX12Texture;
-	class DX12Resource;
-
 	class RGPassBase;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
@@ -36,10 +28,6 @@ namespace gglab
 	{
 		RHIGraphicsCommandContext* m_GraphicsCommandContext = nullptr;
 		RHIComputeCommandContext* m_ComputeCommandContext = nullptr;
-
-		// Native DX12 escape hatch while RenderGraph passes migrate to RHI command contexts.
-		DX12CommandList* m_GraphicsCommandList = nullptr;
-		DX12CommandList* m_ComputeCommandList = nullptr;
 	};
 
 	struct RGExecuteContext
@@ -48,11 +36,10 @@ namespace gglab
 			m_Backend(backend)
 		{}
 
-		DX12DescriptorView GetView(RGTextureViewId viewId) const noexcept;
+		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
+		RHIDescriptorHandle GetViewDescriptor(RGTextureViewId viewId) const noexcept;
 		RHIGraphicsCommandContext* GetGraphicsCommandContext() const noexcept { return m_Backend.m_GraphicsCommandContext; }
 		RHIComputeCommandContext* GetComputeCommandContext() const noexcept { return m_Backend.m_ComputeCommandContext; }
-		DX12CommandList* GetGraphicsCommandList() const noexcept { return m_Backend.m_GraphicsCommandList; }
-		DX12CommandList* GetComputeCommandList() const noexcept { return m_Backend.m_ComputeCommandList; }
 
 		RGBackendExecuteContext& GetBackend() noexcept { return m_Backend; }
 		const RGBackendExecuteContext& GetBackend() const noexcept { return m_Backend; }
@@ -94,7 +81,6 @@ namespace gglab
 		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
 		using Usage = typename RESOURCE::Usage;
 		using Handle = typename RGResourceTraits<RESOURCE>::Handle;
-		using Native = typename RGResourceTraits<RESOURCE>::Native;
 
 		Desc m_Desc = {};
 		SubresourceDesc m_SubresourceDesc = {};
@@ -172,7 +158,6 @@ namespace gglab
 		{
 			RHIDevice* m_Device = nullptr;
 			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
-			DX12ViewCache* m_ViewCache = nullptr;
 		};
 
 		class RGBuilder
@@ -287,17 +272,13 @@ namespace gglab
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		void Retire(const DX12FencePoint& fencePoint) noexcept;
 
-		DX12Texture* GetTexture(RGTextureId texId) noexcept;
-		DX12Buffer* GetBuffer(RGBufferId bufId) noexcept;
 		RHITextureHandle GetTextureHandle(RGTextureId texId) noexcept;
 		RHIBufferHandle GetBufferHandle(RGBufferId bufId) noexcept;
 		RHITextureViewHandle GetTextureViewHandle(RGTextureViewId viewId) noexcept;
-		DX12DescriptorView GetTextureView(RGTextureViewId viewId) noexcept;
+		RHIDescriptorHandle GetTextureViewDescriptor(RGTextureViewId viewId) noexcept;
 
 		ResourceIndex GetResourceIndex(RGTextureId texId) noexcept;
 		ResourceIndex GetResourceIndex(RGBufferId bufId) noexcept;
-
-		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache; }
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
@@ -359,7 +340,6 @@ namespace gglab
 	private:
 		RHIDevice* m_Device = nullptr;
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
-		DX12ViewCache* m_ViewCache = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 		RGBlackboard m_Blackboard;

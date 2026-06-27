@@ -5,9 +5,6 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 
 namespace gglab
 {
@@ -81,42 +78,30 @@ namespace gglab
 				data.m_MaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
 				data.m_Invert = settings.m_PreviewInvert ? 1u : 0u;
 			},
-			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				auto* previewTexture = rg.GetTexture(data.m_ShadowMapPreview);
-				GGLAB_ASSERT_NOT_NULL(previewTexture);
-
-				const auto shadowMapSrv = executeContext.GetView(data.m_ShadowMapSrv);
-				GGLAB_ASSERT_MSG(shadowMapSrv.m_Index != std::numeric_limits<uint32_t>::max(),
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const auto shadowMapSrv = executeContext.GetViewDescriptor(data.m_ShadowMapSrv);
+				GGLAB_ASSERT_MSG(shadowMapSrv.IsValid(),
 					"Shadow map preview SRV must expose a descriptor heap index.");
 
-				const auto previewRtv = executeContext.GetView(data.m_PreviewRtv);
-				commandList->ClearRenderTarget(previewRtv, *previewTexture);
+				const auto previewRtv = executeContext.GetViewHandle(data.m_PreviewRtv);
+				commandContext->ClearColor(previewRtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
 
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
+				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&previewRtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*renderer->GetCommonRootSignature());
-				commandList->SetPipelineState(*GetOrCreatePSO(*renderer));
-				commandList->SetRenderTarget(previewRtv);
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				commandList->SetGraphicsConstantBuffer(
+				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					sceneBuffer->GetBufferHandle(),
+					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
 
 				const ShadowMapPreviewPassParameters passParameters{
 					.ShadowMapTextureIndex = shadowMapSrv.m_Index,
@@ -125,11 +110,11 @@ namespace gglab
 					.PreviewMaxDepth = data.m_MaxDepth,
 					.PreviewInvert = data.m_Invert,
 				};
-				commandList->SetGraphicsRoot32BitConstants(
+				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				commandList->DrawInstanced(3);
+				commandContext->Draw(3);
 			});
 	}
 
@@ -174,7 +159,7 @@ namespace gglab
 
 	}
 
-	DX12PipelineState* RenderPassShadowMapPreview::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassShadowMapPreview::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
