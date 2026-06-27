@@ -6,7 +6,6 @@
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab
@@ -66,8 +65,9 @@ namespace gglab
 				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
 
 				auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
-				const auto rtv = executeContext.GetView(data.m_Rtv);
-				developGuiBackend->RenderDrawData(executeContext.GetGraphicsCommandList(), rtv);
+				developGuiBackend->RenderDrawData(
+					executeContext.GetGraphicsCommandContext(),
+					executeContext.GetViewHandle(data.m_Rtv));
 			});
 	}
 }

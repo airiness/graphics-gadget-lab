@@ -5,9 +5,6 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/SamplerRegistry.h"
 
 namespace gglab
@@ -91,53 +88,30 @@ namespace gglab
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
 			},
-			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				auto* environmentTexture = rg.GetTexture(data.m_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(environmentTexture);
-
-				auto* irradianceTexture = rg.GetTexture(data.m_IrradianceCubemap);
-				GGLAB_ASSERT_NOT_NULL(irradianceTexture);
-
-				auto* pso = GetOrCreatePSO(*renderer);
-				GGLAB_ASSERT_NOT_NULL(pso);
-
-				auto* rootSignature = renderer->GetCommonRootSignature();
-				GGLAB_ASSERT_NOT_NULL(rootSignature);
-
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
-
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*rootSignature);
-				commandList->SetPipelineState(*pso);
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtv = executeContext.GetView(data.m_Rtvs[face]);
-					commandList->SetRenderTarget(rtv);
-					commandList->ClearRenderTarget(rtv, *irradianceTexture);
+					const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[face]);
+					commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+					commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 					const IBLIrradiancePassParameters passParameters{
 						.CubemapFaceIndex = face,
 						.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
 						.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 					};
-					commandList->SetGraphicsRoot32BitConstants(
+					commandContext->SetPushConstants(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 						passParameters);
 
-					commandList->DrawInstanced(3);
+					commandContext->Draw(3);
 				}
 
 				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap);
@@ -185,7 +159,7 @@ namespace gglab
 
 	}
 
-	DX12PipelineState* RenderPassIBLIrradiance::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassIBLIrradiance::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

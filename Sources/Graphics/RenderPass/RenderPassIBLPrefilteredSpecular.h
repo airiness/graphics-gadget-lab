@@ -6,7 +6,6 @@
 
 namespace gglab
 {
-	class DX12PipelineState;
 	class Renderer;
 	class RenderPassIBLPrefilteredSpecular : public RenderPassBase
 	{
@@ -18,7 +17,7 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
-		DX12PipelineState* GetOrCreatePSO(const Renderer& renderer) noexcept;
+		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer) noexcept;
 
 	private:
 		GraphicsPipelineRecipe m_BaseRecipe{};

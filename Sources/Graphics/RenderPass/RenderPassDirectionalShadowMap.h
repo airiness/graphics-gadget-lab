@@ -6,8 +6,6 @@
 namespace gglab
 {
 	class RHIGraphicsCommandContext;
-	class DX12CommandList;
-	class DX12PipelineState;
 	class Renderer;
 	struct DirectionalShadowSettings;
 
@@ -24,19 +22,17 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
-		void DrawRenderQueue(DX12CommandList* commandList,
-			RHIGraphicsCommandContext* graphicsContext,
+		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept;
 
-		void DrawRange(DX12CommandList* commandList,
-			RHIGraphicsCommandContext* graphicsContext,
+		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,
 			const RenderServices& services,
 			const RenderQueue& renderQueue,
 			const DrawItemsRange& range) noexcept;
 
-		DX12PipelineState* GetOrCreatePSOForVariant(
+		RHIPipelineHandle GetOrCreatePSOForVariant(
 			const Renderer& renderer,
 			uint64_t variantBits,
 			const DirectionalShadowSettings& shadowSettings) noexcept;

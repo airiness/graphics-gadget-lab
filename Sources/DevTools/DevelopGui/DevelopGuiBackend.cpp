@@ -8,6 +8,7 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
+#include "Graphics/RHI/DX12/DX12CommandContext.h"
 
 namespace gglab
 {
@@ -63,19 +64,27 @@ namespace gglab
 		m_FrameOpen = true;
 	}
 
-	void DevelopGuiBackend::RenderDrawData(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept
+	void DevelopGuiBackend::RenderDrawData(
+		RHIGraphicsCommandContext* commandContext,
+		RHITextureViewHandle renderTarget) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_FrameOpen, "DevelopGuiBackend::RenderDrawData called without NewFrame.");
+		auto* dx12Context = dynamic_cast<DX12GraphicsCommandContext*>(commandContext);
+		GGLAB_ASSERT_NOT_NULL(dx12Context);
+		if (!dx12Context)
+		{
+			return;
+		}
 
 		ImGui::Render();
 		m_FrameOpen = false;
 
-		commandList->SetRenderTarget(rtv, {});
+		commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&renderTarget, 1));
 
 		auto* heap = m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap();
-		commandList->SetDescriptorHeap(*heap);
+		dx12Context->GetCommandList()->SetDescriptorHeap(*heap);
 
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList->Get());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx12Context->Get());
 	}
 
 	void DevelopGuiBackend::EndFrame() noexcept

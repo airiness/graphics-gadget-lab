@@ -5,9 +5,6 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/SamplerRegistry.h"
 
 namespace gglab
@@ -105,49 +102,26 @@ namespace gglab
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
 			},
-			[this, &rg, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
-
-				auto* environmentTexture = rg.GetTexture(data.m_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(environmentTexture);
-
-				auto* prefilteredSpecularTexture = rg.GetTexture(data.m_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularTexture);
-
-				auto* pso = GetOrCreatePSO(*renderer);
-				GGLAB_ASSERT_NOT_NULL(pso);
-
-				auto* rootSignature = renderer->GetCommonRootSignature();
-				GGLAB_ASSERT_NOT_NULL(rootSignature);
-
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
-
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*rootSignature);
-				commandList->SetPipelineState(*pso);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 				for (uint32_t mip = 0; mip < data.m_MipLevels; ++mip)
 				{
 					const uint32_t mipWidth = std::max(1u, data.m_Width >> mip);
 					const uint32_t mipHeight = std::max(1u, data.m_Height >> mip);
 
-					commandList->SetViewport(0, 0, mipWidth, mipHeight);
-					commandList->SetScissorRect(0, 0, mipWidth, mipHeight);
+					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(mipWidth), static_cast<float>(mipHeight) });
+					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(mipWidth), static_cast<int32_t>(mipHeight) });
 
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 					{
 						const auto rtvIndex = mip * CubemapFaceCount + face;
-						const auto rtv = executeContext.GetView(data.m_Rtvs[rtvIndex]);
-						commandList->SetRenderTarget(rtv);
-						commandList->ClearRenderTarget(rtv, *prefilteredSpecularTexture);
+						const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[rtvIndex]);
+						commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+						commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 						const IBLPrefilteredSpecularPassParameters passParameters{
 							.CubemapFaceIndex = face,
@@ -156,11 +130,11 @@ namespace gglab
 							.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
 							.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 						};
-						commandList->SetGraphicsRoot32BitConstants(
+						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							passParameters);
 
-						commandList->DrawInstanced(3);
+						commandContext->Draw(3);
 					}
 				}
 
@@ -210,7 +184,7 @@ namespace gglab
 
 	}
 
-	DX12PipelineState* RenderPassIBLPrefilteredSpecular::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassIBLPrefilteredSpecular::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

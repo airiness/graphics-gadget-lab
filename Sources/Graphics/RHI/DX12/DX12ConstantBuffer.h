@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/RHIResource.h"
 #include "Core/Utility/MathUtils.h"
 
 namespace gglab
@@ -35,6 +36,19 @@ namespace gglab
 
 			// Get base GPU address 
 			m_BaseGpuVirtualAddress = m_Buffer->GPUVirtualAddress();
+
+			DX12ResourceManager::ImportedBufferDesc importDesc{};
+			importDesc.m_RHI.m_Desc.m_SizeInBytes = m_TotalSize;
+			importDesc.m_RHI.m_Desc.m_Usage = RHIBufferUsage::Constant;
+			importDesc.m_RHI.m_Desc.m_DebugName = "Renderer.SceneConstantBuffer";
+			importDesc.m_RHI.m_External.m_InitialState = {
+				.m_Access = RHIAccess::ConstantBuffer,
+				.m_Layout = RHILayout::Common,
+			};
+			importDesc.m_RHI.m_External.m_DebugName = "Renderer.SceneConstantBuffer";
+			importDesc.m_Resource = m_Buffer->Get();
+			m_RHIOwner = RHIBufferOwner(dx12Device, dx12Device->ImportBuffer(importDesc));
+			GGLAB_ASSERT_MSG(m_RHIOwner, "Failed to import constant buffer into RHI.");
 
 		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ConstantBuffer);
@@ -77,10 +91,16 @@ namespace gglab
 		uint32_t GetStrideAligned() const noexcept { return m_StrideAligned; }
 		uint32_t GetTotalSize() const noexcept { return m_TotalSize; }
 		uint32_t GetFrameCount() const noexcept { return m_Frames; }
+		uint64_t GetFrameOffset(uint32_t frameIndex = 0) const noexcept
+		{
+			return static_cast<uint64_t>((frameIndex % m_Frames) * m_StrideAligned);
+		}
 		DX12Buffer* GetBuffer() const noexcept { return m_Buffer.get(); }
+		RHIBufferHandle GetBufferHandle() const noexcept { return m_RHIOwner.Get(); }
 
 	private:
 		std::unique_ptr<DX12Buffer> m_Buffer;
+		RHIBufferOwner m_RHIOwner;
 		std::byte* m_MappedData = nullptr;
 
 		uint32_t m_Frames = 1;

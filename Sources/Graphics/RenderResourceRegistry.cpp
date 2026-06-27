@@ -1,7 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
-#include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 
@@ -12,12 +11,10 @@ namespace gglab
 	RenderResourceRegistry::RenderResourceRegistry(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_RGGpuResAllocator(createInfo.m_RGGpuResAllocator),
-		m_ExternalResourceRegistry(createInfo.m_ExternalResourceRegistry),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		GGLAB_ASSERT_NOT_NULL(m_RGGpuResAllocator);
-		GGLAB_ASSERT_NOT_NULL(m_ExternalResourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(m_SamplerRegistry);
 	}
 
@@ -222,11 +219,6 @@ namespace gglab
 		return entry.m_Allocated ? m_RGGpuResAllocator->GetTextureHandle(entry.m_InternalIndex) : RHITextureHandle{};
 	}
 
-	ResourceIndex RenderResourceRegistry::GetExternalIndex(TextureIndex index) const noexcept
-	{
-		return m_TextureEntries[utils::ToIndex(index)].m_ExternalIndex;
-	}
-
 	RHIDescriptorHandle RenderResourceRegistry::GetSrvDescriptor(TextureIndex index) const noexcept
 	{
 		const auto& entry = m_TextureEntries[utils::ToIndex(index)];
@@ -342,10 +334,6 @@ namespace gglab
 
 				outEntry.m_RgTexDesc = desc;
 				outEntry.m_InternalIndex = texIndex;
-				outEntry.m_ExternalIndex = m_ExternalResourceRegistry->GetOrCreate(texture);
-				GGLAB_ASSERT_MSG(ExternalResourceIndex::IsExternal(outEntry.m_ExternalIndex),
-					"ExternalIndex is not external.");
-
 				outEntry.m_Allocated = true;
 				outEntry.m_SrvDesc = srvDesc;
 
@@ -396,11 +384,6 @@ namespace gglab
 				return;
 			}
 
-			if (auto* oldTexture = m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex))
-			{
-				m_ExternalResourceRegistry->Forget(oldTexture, false, retireFenceOpt);
-			}
-
 			m_RGGpuResAllocator->ReleaseTexture(entry.m_InternalIndex, *retireFenceOpt);
 
 			// Create new
@@ -422,11 +405,6 @@ namespace gglab
 			return;
 		}
 
-		auto* texture = m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex);
-		if (texture)
-		{
-			m_ExternalResourceRegistry->Forget(texture, false, &fencePoint);
-		}
 		m_RGGpuResAllocator->ReleaseTexture(entry.m_InternalIndex, fencePoint);
 
 		entry = {};

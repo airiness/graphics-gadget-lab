@@ -200,7 +200,6 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\InputLayoutLibrary.cpp" />
@@ -349,7 +348,6 @@
     <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h" />
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Core\HResult.h" />

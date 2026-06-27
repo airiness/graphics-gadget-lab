@@ -6,9 +6,6 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 
 namespace gglab
 {
@@ -53,63 +50,59 @@ namespace gglab
 				const auto dsvDesc = MakeRHITexture2DViewDesc(RHIFormat::D32Float);
 				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
 			},
-			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				GGLAB_ASSERT_NOT_NULL(commandList);
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
-
-				auto* shadowMapTexture = rg.GetTexture(data.m_ShadowMap);
-				GGLAB_ASSERT_NOT_NULL(shadowMapTexture);
-
-				const auto dsv = executeContext.GetView(data.m_Dsv);
+				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
+				graphicsContext->ClearDepthStencil(dsv, 1.0f, 0);
+				graphicsContext->SetRenderTargets({}, dsv);
 
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				GGLAB_ASSERT_NOT_NULL(descriptorManager);
+				const auto& renderQueue = contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
+				if (renderQueue.m_DrawItems.empty())
+				{
+					return;
+				}
+				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
+					*renderer,
+					renderQueue.m_DrawItems.front().m_VariantBits,
+					contextPtr->GetDirectionalShadowSettings()));
+				graphicsContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_ShadowMapSize), static_cast<float>(data.m_ShadowMapSize) });
+				graphicsContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_ShadowMapSize), static_cast<int32_t>(data.m_ShadowMapSize) });
+				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*renderer->GetCommonRootSignature());
-				commandList->SetViewport(0, 0, data.m_ShadowMapSize, data.m_ShadowMapSize);
-				commandList->SetScissorRect(0, 0, data.m_ShadowMapSize, data.m_ShadowMapSize);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-				commandList->ClearDepthStencil(dsv, 1.0f, 0);
-				commandList->SetRenderTargets(std::span<DX12DescriptorView>{}, dsv);
-
-				commandList->SetGraphicsConstantBuffer(
+				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					sceneBuffer->GetBufferHandle(),
+					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
 
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBuffer()->GPUVirtualAddress());
+					objectSB->GetBufferHandle());
 
 				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBuffer()->GPUVirtualAddress());
+					materialSB->GetBufferHandle());
 
 				const auto& viewSB = renderer->GetViewStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBuffer()->GPUVirtualAddress());
+					viewSB->GetBufferHandle());
 
 				const DirectionalShadowPassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
 				};
-				commandList->SetGraphicsRoot32BitConstants(
+				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				DrawRenderQueue(commandList, graphicsContext, *contextPtr, *servicesPtr);
+				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr);
 			});
 	}
 
@@ -153,8 +146,7 @@ namespace gglab
 
 	}
 
-	void RenderPassDirectionalShadowMap::DrawRenderQueue(DX12CommandList* commandList,
-		RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassDirectionalShadowMap::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
@@ -166,12 +158,11 @@ namespace gglab
 		}
 
 		const auto ranges = renderQueue.m_BucketDrawRanges;
-		DrawRange(commandList, graphicsContext, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)]);
-		DrawRange(commandList, graphicsContext, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
+		DrawRange(graphicsContext, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)]);
+		DrawRange(graphicsContext, context, services, renderQueue, ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
 	}
 
-	void RenderPassDirectionalShadowMap::DrawRange(DX12CommandList* commandList,
-		RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassDirectionalShadowMap::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
@@ -197,11 +188,11 @@ namespace gglab
 
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
-				auto* pso = GetOrCreatePSOForVariant(
+				const auto pipeline = GetOrCreatePSOForVariant(
 					*renderer,
 					drawItem.m_VariantBits,
 					context.GetDirectionalShadowSettings());
-				commandList->SetPipelineState(*pso);
+				graphicsContext->SetPipeline(pipeline);
 
 				lastVariantBits = drawItem.m_VariantBits;
 				lastMeshId = {};
@@ -226,7 +217,7 @@ namespace gglab
 			const DrawParameters drawParameters{
 				.ObjectOffset = drawItem.m_ObjectOffset,
 			};
-			commandList->SetGraphicsRoot32BitConstants(
+			graphicsContext->SetPushConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawParameters);
 
@@ -234,7 +225,7 @@ namespace gglab
 		}
 	}
 
-	DX12PipelineState* RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
+	RHIPipelineHandle RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
 		const Renderer& renderer,
 		uint64_t variantBits,
 		const DirectionalShadowSettings& shadowSettings) noexcept

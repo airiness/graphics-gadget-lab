@@ -8,10 +8,7 @@
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 
@@ -108,62 +105,57 @@ namespace gglab
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
-			[this, &rg, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* sceneColorTexture = rg.GetTexture(data.m_SceneColor);
-				GGLAB_ASSERT_NOT_NULL(sceneColorTexture);
-
-				auto* commandList = executeContext.GetGraphicsCommandList();
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
-				const auto rtv = executeContext.GetView(data.m_Rtv);
-				const auto dsv = executeContext.GetView(data.m_Dsv);
-				commandList->ClearRenderTarget(rtv, *sceneColorTexture);
-				commandList->ClearDepthStencil(dsv, 1.0f, 0);
-				commandList->SetRenderTarget(rtv, dsv);
+				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
+				graphicsContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+				graphicsContext->ClearDepthStencil(dsv, 1.0f, 0);
+				graphicsContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
 
-				const auto shadowSrv = executeContext.GetView(data.m_ShadowSrv);
-				GGLAB_ASSERT_MSG(shadowSrv.m_Index != std::numeric_limits<uint32_t>::max(),
+				const auto shadowSrv = executeContext.GetViewDescriptor(data.m_ShadowSrv);
+				GGLAB_ASSERT_MSG(shadowSrv.IsValid(),
 					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
 
 				auto* renderer = servicesPtr->m_Renderer;
-				auto* descriptorManager = renderer->GetDescriptorManager();
-				auto* rootSignature = renderer->GetCommonRootSignature();
+				const auto& renderQueue = contextPtr->GetRenderQueue(RenderViewID::Main);
+				if (renderQueue.m_DrawItems.empty())
+				{
+					return;
+				}
+				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
+					*renderer,
+					renderQueue.m_DrawItems.front().m_VariantBits));
+				graphicsContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+				graphicsContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				// Global bindings
-				const DX12DescriptorHeap* descriptorHeaps[] = {
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-					descriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler)
-				};
-				commandList->SetDescriptorHeaps(descriptorHeaps);
-				commandList->SetGraphicsRootSignature(*rootSignature);
-
-				commandList->SetViewport(0, 0, data.m_Width, data.m_Height);
-				commandList->SetScissorRect(0, 0, data.m_Width, data.m_Height);
-				commandList->SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				commandList->SetGraphicsConstantBuffer(
+				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetGPUVirtualAddress(contextPtr->m_BackBufferIndex));
+					sceneBuffer->GetBufferHandle(),
+					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
 
 				// Set object structured buffer
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBuffer()->GPUVirtualAddress());
+					objectSB->GetBufferHandle());
 
 				// Set material structured buffer
 				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBuffer()->GPUVirtualAddress());
+					materialSB->GetBufferHandle());
 
 				// View structured buffer
 				const auto& viewSB = renderer->GetViewStructuredBuffer();
-				commandList->Get()->SetGraphicsRootShaderResourceView(
+				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBuffer()->GPUVirtualAddress());
+					viewSB->GetBufferHandle());
 
 				const ForwardPBRPassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
@@ -174,11 +166,11 @@ namespace gglab
 					.ShadowReceiverDepthBias = data.m_ShadowReceiverDepthBias,
 					.ShadowViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
 				};
-				commandList->SetGraphicsRoot32BitConstants(
+				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				DrawRenderQueue(commandList, graphicsContext, *contextPtr, *servicesPtr);
+				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr);
 			});
 	}
 
@@ -223,8 +215,7 @@ namespace gglab
 
 	}
 
-	void RenderPassForwardPBR::DrawRenderQueue(DX12CommandList* commandList,
-		RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassForwardPBR::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
@@ -240,13 +231,12 @@ namespace gglab
 		DrawItemsRange alphaTestRange = ranges[utils::ToIndex(RenderBucket::AlphaTest)];
 		DrawItemsRange transparentRange = ranges[utils::ToIndex(RenderBucket::Transparent)];
 
-		DrawRange(commandList, graphicsContext, context, services, renderQueue, opaqueRange);
-		DrawRange(commandList, graphicsContext, context, services, renderQueue, alphaTestRange);
-		DrawRange(commandList, graphicsContext, context, services, renderQueue, transparentRange);
+		DrawRange(graphicsContext, context, services, renderQueue, opaqueRange);
+		DrawRange(graphicsContext, context, services, renderQueue, alphaTestRange);
+		DrawRange(graphicsContext, context, services, renderQueue, transparentRange);
 	}
 
-	void RenderPassForwardPBR::DrawRange(DX12CommandList* commandList,
-		RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassForwardPBR::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
@@ -273,8 +263,8 @@ namespace gglab
 			// Set PSO
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
-				auto* pso = GetOrCreatePSOForVariant(*services.m_Renderer, drawItem.m_VariantBits);
-				commandList->SetPipelineState(*pso);
+				graphicsContext->SetPipeline(
+					GetOrCreatePSOForVariant(*services.m_Renderer, drawItem.m_VariantBits));
 
 				lastVariantBits = drawItem.m_VariantBits;
 				lastMeshId = {}; // Because PSO changed
@@ -301,7 +291,7 @@ namespace gglab
 			const DrawParameters drawParameters{
 				.ObjectOffset = drawItem.m_ObjectOffset,
 			};
-			commandList->SetGraphicsRoot32BitConstants(
+			graphicsContext->SetPushConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
 				drawParameters);
 
@@ -309,7 +299,7 @@ namespace gglab
 		}
 	}
 
-	DX12PipelineState* RenderPassForwardPBR::GetOrCreatePSOForVariant(
+	RHIPipelineHandle RenderPassForwardPBR::GetOrCreatePSOForVariant(
 		const Renderer& renderer, uint64_t variantBits) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);

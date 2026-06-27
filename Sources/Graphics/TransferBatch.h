@@ -86,6 +86,7 @@ namespace gglab
 				srcData.data(),
 				bytes,
 				uploadSpan);
+			m_TransferContext.TrackBufferUse(dstStructuredBuffer.GetBufferHandle());
 
 			result.m_FirstElementIndex = alloc.m_FirstElementIndex;
 			result.m_ElementCount = alloc.m_ElementCount;

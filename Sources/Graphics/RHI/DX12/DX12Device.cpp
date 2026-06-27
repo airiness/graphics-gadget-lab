@@ -9,6 +9,8 @@
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Core/HResult.h"
 
 namespace gglab
@@ -64,6 +66,10 @@ namespace gglab
 		FlushGPU();
 
 		RetireCompletedRHIResources();
+		{
+			std::unique_lock lock(m_GraphicsPipelineMutex);
+			m_GraphicsPipelineBindings.clear();
+		}
 		SetViewCache(nullptr);
 		m_ResourceManager.Finalize();
 
@@ -293,6 +299,90 @@ namespace gglab
 		}
 
 		return m_ViewCache->ResolveSamplerDescriptor(sampler);
+	}
+
+	DX12DescriptorView DX12Device::ResolveTextureView(RHITextureViewHandle view) const noexcept
+	{
+		return m_ViewCache ? m_ViewCache->ResolveTextureView(view) : DX12DescriptorView{};
+	}
+
+	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(
+		RHIDescriptorHeapType heapType,
+		uint32_t descriptorIndex) const noexcept
+	{
+		if (!m_ViewCache || !m_ViewCache->GetDescriptorManager())
+		{
+			return {};
+		}
+
+		DX12DescriptorManager::HeapType nativeHeapType{};
+		switch (heapType)
+		{
+		case RHIDescriptorHeapType::CbvSrvUav:
+			nativeHeapType = DX12DescriptorManager::HeapType::CbvSrvUav;
+			break;
+		case RHIDescriptorHeapType::Sampler:
+			nativeHeapType = DX12DescriptorManager::HeapType::Sampler;
+			break;
+		default:
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::ResolveShaderVisibleDescriptor received a non-shader-visible heap type.");
+			return {};
+		}
+
+		DX12DescriptorHeap* heap = m_ViewCache->GetDescriptorManager()->GetHeap(nativeHeapType);
+		if (!heap || descriptorIndex >= heap->DescriptorCount())
+		{
+			return {};
+		}
+		return heap->GpuHandleAt(descriptorIndex);
+	}
+
+	RHIPipelineHandle DX12Device::RegisterGraphicsPipeline(
+		DX12PipelineState* pipelineState,
+		DX12RootSignature* rootSignature) noexcept
+	{
+		if (!pipelineState || !rootSignature)
+		{
+			return {};
+		}
+
+		std::unique_lock lock(m_GraphicsPipelineMutex);
+		for (uint32_t index = 0; index < m_GraphicsPipelineBindings.size(); ++index)
+		{
+			const auto& binding = m_GraphicsPipelineBindings[index];
+			if (binding.m_PipelineState == pipelineState && binding.m_RootSignature == rootSignature)
+			{
+				return RHIPipelineHandle(index, 1u);
+			}
+		}
+
+		const auto index = static_cast<RHIPipelineHandle::IndexType>(m_GraphicsPipelineBindings.size());
+		m_GraphicsPipelineBindings.push_back({ pipelineState, rootSignature });
+		return RHIPipelineHandle(index, 1u);
+	}
+
+	bool DX12Device::ResolveGraphicsPipeline(
+		RHIPipelineHandle pipeline,
+		DX12PipelineState*& outPipelineState,
+		DX12RootSignature*& outRootSignature) const noexcept
+	{
+		outPipelineState = nullptr;
+		outRootSignature = nullptr;
+		if (!pipeline.IsValid() || pipeline.Generation() != 1u)
+		{
+			return false;
+		}
+
+		std::shared_lock lock(m_GraphicsPipelineMutex);
+		if (pipeline.Index() >= m_GraphicsPipelineBindings.size())
+		{
+			return false;
+		}
+
+		const auto& binding = m_GraphicsPipelineBindings[pipeline.Index()];
+		outPipelineState = binding.m_PipelineState;
+		outRootSignature = binding.m_RootSignature;
+		return outPipelineState != nullptr && outRootSignature != nullptr;
 	}
 
 	DX12Texture* DX12Device::ResolveTexture(RHITextureHandle texture) noexcept

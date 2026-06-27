@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Graphics/RHI/DX12/DX12Texture.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"

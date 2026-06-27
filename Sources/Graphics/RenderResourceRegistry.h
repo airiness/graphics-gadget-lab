@@ -11,7 +11,6 @@ namespace gglab
 {
 	class RHIDevice;
 	class RGGpuResourceAllocator;
-	class RGExternalResourceRegistry;
 	class DX12Texture;
 	class SamplerRegistry;
 	class DX12FencePoint;
@@ -26,7 +25,6 @@ namespace gglab
 		{
 			RHIDevice* m_Device = nullptr;
 			RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
-			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 		};
 
@@ -78,7 +76,6 @@ namespace gglab
 		{
 			RGTextureDesc m_RgTexDesc{};
 			ResourceIndex m_InternalIndex{};
-			ResourceIndex m_ExternalIndex{};
 			RHITextureViewHandle m_Srv{};
 			RHITextureViewDesc m_SrvDesc{};
 
@@ -102,7 +99,6 @@ namespace gglab
 
 		DX12Texture* GetTexture(TextureIndex index) noexcept;
 		RHITextureHandle GetTextureHandle(TextureIndex index) noexcept;
-		ResourceIndex GetExternalIndex(TextureIndex index) const noexcept;
 		RHIDescriptorHandle GetSrvDescriptor(TextureIndex index) const noexcept;
 		uint32_t GetShaderVisibleSrvIndex(TextureIndex index) const noexcept;
 
@@ -132,7 +128,6 @@ namespace gglab
 	private:
 		RHIDevice* m_Device = nullptr;
 		RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
-		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;

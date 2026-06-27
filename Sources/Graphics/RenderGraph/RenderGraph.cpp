@@ -1,30 +1,33 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGPass.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/DX12Buffer.h"
-#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 
 namespace gglab
 {
-	DX12DescriptorView RGExecuteContext::GetView(RGTextureViewId viewId) const noexcept
+	RHITextureViewHandle RGExecuteContext::GetViewHandle(RGTextureViewId viewId) const noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_RenderGraph);
-		return m_RenderGraph ? m_RenderGraph->GetTextureView(viewId) : DX12DescriptorView{};
+		return m_RenderGraph ? m_RenderGraph->GetTextureViewHandle(viewId) : RHITextureViewHandle{};
+	}
+
+	RHIDescriptorHandle RGExecuteContext::GetViewDescriptor(RGTextureViewId viewId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_RenderGraph);
+		if (!m_RenderGraph)
+		{
+			return {};
+		}
+		return m_RenderGraph->GetTextureViewDescriptor(viewId);
 	}
 
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
-		m_ViewCache(createInfo.m_ViewCache),
 		m_ArenaAllocator(1u << 20),
 		m_Blackboard(m_ArenaAllocator)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice can not be null.");
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
-		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
@@ -272,7 +275,6 @@ namespace gglab
 		for (const auto texIndex : m_MarkedReleaseTextureIndices)
 		{
 			GGLAB_ASSERT_MSG(texIndex.IsValid(), "Releasing an invalid texture index.");
-			m_ViewCache->RetireResourceAllViews(texIndex, fencePoint);
 			m_GpuResourceAllocator->ReleaseTexture(texIndex, fencePoint);
 		}
 		m_MarkedReleaseTextureIndices.clear();
@@ -284,49 +286,6 @@ namespace gglab
 		}
 		m_MarkedReleaseBufferIndices.clear();
 
-		m_ViewCache->GarbageCollect();
-	}
-
-	DX12Texture* RenderGraph::GetTexture(RGTextureId texId) noexcept
-	{
-		auto* virtualRes = static_cast<RGVirtualResource<RGTextureResource>*>(GetVirtualResource(texId));
-		if (!virtualRes)
-		{
-			return nullptr;
-		}
-
-		if (virtualRes->m_Imported)
-		{
-			auto* dx12Device = dynamic_cast<DX12Device*>(m_Device);
-			return dx12Device ? dx12Device->ResolveTexture(virtualRes->m_ImportedHandle) : nullptr;
-		}
-
-		if (!virtualRes->m_GpuResourceIndex.IsValid())
-		{
-			return nullptr;
-		}
-		return m_GpuResourceAllocator->GetTexture(virtualRes->m_GpuResourceIndex);
-	}
-
-	DX12Buffer* RenderGraph::GetBuffer(RGBufferId bufId) noexcept
-	{
-		auto* virtualRes = static_cast<RGVirtualResource<RGBufferResource>*>(GetVirtualResource(bufId));
-		if (!virtualRes)
-		{
-			return nullptr;
-		}
-
-		if (virtualRes->m_Imported)
-		{
-			auto* dx12Device = dynamic_cast<DX12Device*>(m_Device);
-			return dx12Device ? dx12Device->ResolveBuffer(virtualRes->m_ImportedHandle) : nullptr;
-		}
-
-		if (!virtualRes->m_GpuResourceIndex.IsValid())
-		{
-			return nullptr;
-		}
-		return m_GpuResourceAllocator->GetBuffer(virtualRes->m_GpuResourceIndex);
 	}
 
 	RHITextureHandle RenderGraph::GetTextureHandle(RGTextureId texId) noexcept
@@ -395,11 +354,10 @@ namespace gglab
 		return m_Device->CreateTextureView(texture, desc);
 	}
 
-	DX12DescriptorView RenderGraph::GetTextureView(RGTextureViewId viewId) noexcept
+	RHIDescriptorHandle RenderGraph::GetTextureViewDescriptor(RGTextureViewId viewId) noexcept
 	{
-		const RHITextureViewHandle viewHandle = GetTextureViewHandle(viewId);
-		GGLAB_ASSERT_MSG(viewHandle.IsValid(), "RenderGraph texture view creation failed.");
-		return viewHandle.IsValid() ? m_ViewCache->ResolveTextureView(viewHandle) : DX12DescriptorView{};
+		const RHITextureViewHandle view = GetTextureViewHandle(viewId);
+		return view.IsValid() ? m_Device->GetTextureViewDescriptor(view) : RHIDescriptorHandle{};
 	}
 
 	ResourceIndex RenderGraph::GetResourceIndex(RGTextureId texId) noexcept

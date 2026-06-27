@@ -1,7 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
@@ -145,11 +144,10 @@ namespace gglab
 			},
 			[swapChain](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{
-				auto* commandList = executeContext.GetGraphicsCommandList();
-				const auto rtv = executeContext.GetView(data.m_Rtv);
-
-				commandList->ClearRenderTarget(rtv, swapChain->GetClearColor());
-
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+				const auto& color = swapChain->GetClearColor();
+				commandContext->ClearColor(rtv, { color.R(), color.G(), color.B(), color.A() });
 			});
 
 		// IBL Pass

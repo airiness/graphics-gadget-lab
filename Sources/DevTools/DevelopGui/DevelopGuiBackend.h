@@ -1,13 +1,12 @@
 #pragma once
+#include "Graphics/RHI/RHITexture.h"
 
 namespace gglab
 {
-	struct DX12DescriptorView;
-
 	class DX12Device;
 	class DX12SwapChain;
-	class DX12CommandList;
 	class DX12DescriptorManager;
+	class RHIGraphicsCommandContext;
 
 	class DevelopGuiBackend
 	{
@@ -29,7 +28,9 @@ namespace gglab
 		void Finalize() noexcept;
 
 		void NewFrame() noexcept;
-		void RenderDrawData(DX12CommandList* commandList, const DX12DescriptorView& rtv) noexcept;
+		void RenderDrawData(
+			RHIGraphicsCommandContext* commandContext,
+			RHITextureViewHandle renderTarget) noexcept;
 		void EndFrame() noexcept;
 
 	private:

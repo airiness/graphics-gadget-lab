@@ -396,9 +396,6 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -898,9 +895,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h">
       <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExternalResourceRegistry.h">
-      <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
