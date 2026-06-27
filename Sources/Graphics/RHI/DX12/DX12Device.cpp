@@ -8,10 +8,12 @@
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/DX12TransferContext.h"
-#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Core/HResult.h"
 
 namespace gglab
@@ -85,7 +87,7 @@ namespace gglab
 			std::unique_lock lock(m_GraphicsPipelineMutex);
 			m_GraphicsPipelineBindings.clear();
 		}
-		SetViewCache(nullptr);
+		SetDescriptorManager(nullptr);
 		m_ResourceManager.Finalize();
 
 		for (const auto queueType : utils::EnumRange<CommandQueueType>())
@@ -125,6 +127,27 @@ namespace gglab
 		return std::make_unique<DX12TransferContext>(this);
 	}
 
+	std::unique_ptr<RHISwapChain> DX12Device::CreateSwapChain(const RHISwapChainDesc& desc) noexcept
+	{
+		DX12SwapChain::CreateInfo createInfo{};
+		createInfo.m_DX12Device = this;
+		createInfo.m_PresentQueue = GetCommandQueue(CommandQueueType::Graphics);
+		createInfo.m_Hwnd = static_cast<HWND>(desc.m_WindowHandle);
+		createInfo.m_Width = desc.m_Width;
+		createInfo.m_Height = desc.m_Height;
+		createInfo.m_Format = ToDXGIFormat(desc.m_Format);
+		createInfo.m_BufferCount = desc.m_BufferCount;
+		createInfo.m_AllowTearing = desc.m_AllowTearing && SupportTearing();
+		createInfo.m_Vsync = desc.m_Vsync;
+
+		auto swapChain = std::make_unique<DX12SwapChain>();
+		if (!swapChain->Initialize(createInfo))
+		{
+			return {};
+		}
+		return swapChain;
+	}
+
 	void DX12Device::WaitForFence(
 		RHIQueueType waitingQueue,
 		const RHIFencePoint& fencePoint) noexcept
@@ -141,6 +164,20 @@ namespace gglab
 			return;
 		}
 		queue->Wait(*fence, fencePoint.m_Value);
+	}
+
+	void DX12Device::WaitForFenceCompletion(const RHIFencePoint& fencePoint) noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return;
+		}
+		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
+		{
+			fence->WaitCompletion(fencePoint.m_Value);
+			return;
+		}
+		GGLAB_LOG_GRAPHICS_WARN("DX12Device::WaitForFenceCompletion received an unknown fence.");
 	}
 
 	RHITextureHandle DX12Device::CreateTexture(const RHITextureDesc& desc) noexcept
@@ -165,35 +202,35 @@ namespace gglab
 
 	RHITextureViewHandle DX12Device::CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateTextureView called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateTextureView called without a DX12DescriptorCache.");
 			return {};
 		}
 
-		return m_ViewCache->GetOrCreateTextureView(texture, desc);
+		return m_DescriptorCache->GetOrCreateTextureView(texture, desc);
 	}
 
 	RHIBufferViewHandle DX12Device::CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateBufferView called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateBufferView called without a DX12DescriptorCache.");
 			return {};
 		}
 
-		return m_ViewCache->GetOrCreateBufferView(buffer, desc);
+		return m_DescriptorCache->GetOrCreateBufferView(buffer, desc);
 	}
 
 	RHISamplerHandle DX12Device::CreateSampler(const RHISamplerDesc& desc) noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateSampler called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateSampler called without a DX12DescriptorCache.");
 			return {};
 		}
 
-		return m_ViewCache->GetOrCreateSampler(desc);
+		return m_DescriptorCache->GetOrCreateSampler(desc);
 	}
 
 	void DX12Device::DestroyTexture(RHITextureHandle texture) noexcept
@@ -208,35 +245,35 @@ namespace gglab
 
 	void DX12Device::DestroyTextureView(RHITextureViewHandle view) noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyTextureView called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyTextureView called without a DX12DescriptorCache.");
 			return;
 		}
 
-		m_ViewCache->DestroyTextureView(view);
+		m_DescriptorCache->DestroyTextureView(view);
 	}
 
 	void DX12Device::DestroyBufferView(RHIBufferViewHandle view) noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyBufferView called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyBufferView called without a DX12DescriptorCache.");
 			return;
 		}
 
-		m_ViewCache->DestroyBufferView(view);
+		m_DescriptorCache->DestroyBufferView(view);
 	}
 
 	void DX12Device::DestroySampler(RHISamplerHandle sampler) noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroySampler called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroySampler called without a DX12DescriptorCache.");
 			return;
 		}
 
-		m_ViewCache->DestroySampler(sampler);
+		m_DescriptorCache->DestroySampler(sampler);
 	}
 
 	void* DX12Device::MapBuffer(RHIBufferHandle buffer) noexcept
@@ -317,10 +354,26 @@ namespace gglab
 		m_ResourceManager.RecordBufferUse(buffer, fencePoint);
 	}
 
-	void DX12Device::SetViewCache(DX12ViewCache* viewCache) noexcept
+	void DX12Device::SetDescriptorManager(DX12DescriptorManager* descriptorManager) noexcept
 	{
-		m_ViewCache = viewCache;
-		m_ResourceManager.SetViewCache(viewCache);
+		if (m_DescriptorManager == descriptorManager)
+		{
+			return;
+		}
+
+		m_ResourceManager.SetDescriptorCache(nullptr);
+		m_DescriptorCache.reset();
+		m_DescriptorManager = descriptorManager;
+		if (!m_DescriptorManager)
+		{
+			return;
+		}
+
+		DX12DescriptorCache::CreateInfo createInfo{};
+		createInfo.m_DX12Device = this;
+		createInfo.m_DescriptorManager = m_DescriptorManager;
+		m_DescriptorCache = std::make_unique<DX12DescriptorCache>(createInfo);
+		m_ResourceManager.SetDescriptorCache(m_DescriptorCache.get());
 	}
 
 	bool DX12Device::IsAlive(RHITextureHandle texture) const noexcept
@@ -335,52 +388,52 @@ namespace gglab
 
 	bool DX12Device::IsAlive(RHISamplerHandle sampler) const noexcept
 	{
-		return m_ViewCache && m_ViewCache->IsSamplerAlive(sampler);
+		return m_DescriptorCache && m_DescriptorCache->IsSamplerAlive(sampler);
 	}
 
 	RHIDescriptorHandle DX12Device::GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetTextureViewDescriptor called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetTextureViewDescriptor called without a DX12DescriptorCache.");
 			return {};
 		}
 
-		return m_ViewCache->ResolveTextureViewDescriptor(view);
+		return m_DescriptorCache->ResolveTextureViewDescriptor(view);
 	}
 
 	RHIDescriptorHandle DX12Device::GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetBufferViewDescriptor called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetBufferViewDescriptor called without a DX12DescriptorCache.");
 			return {};
 		}
 
-		return m_ViewCache->ResolveBufferViewDescriptor(view);
+		return m_DescriptorCache->ResolveBufferViewDescriptor(view);
 	}
 
 	RHIDescriptorHandle DX12Device::GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept
 	{
-		if (!m_ViewCache)
+		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetSamplerDescriptor called without a DX12ViewCache.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetSamplerDescriptor called without a DX12DescriptorCache.");
 			return {};
 		}
 
-		return m_ViewCache->ResolveSamplerDescriptor(sampler);
+		return m_DescriptorCache->ResolveSamplerDescriptor(sampler);
 	}
 
 	DX12DescriptorView DX12Device::ResolveTextureView(RHITextureViewHandle view) const noexcept
 	{
-		return m_ViewCache ? m_ViewCache->ResolveTextureView(view) : DX12DescriptorView{};
+		return m_DescriptorCache ? m_DescriptorCache->ResolveTextureView(view) : DX12DescriptorView{};
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(
 		RHIDescriptorHeapType heapType,
 		uint32_t descriptorIndex) const noexcept
 	{
-		if (!m_ViewCache || !m_ViewCache->GetDescriptorManager())
+		if (!m_DescriptorManager)
 		{
 			return {};
 		}
@@ -399,7 +452,7 @@ namespace gglab
 			return {};
 		}
 
-		DX12DescriptorHeap* heap = m_ViewCache->GetDescriptorManager()->GetHeap(nativeHeapType);
+		DX12DescriptorHeap* heap = m_DescriptorManager->GetHeap(nativeHeapType);
 		if (!heap || descriptorIndex >= heap->DescriptorCount())
 		{
 			return {};
@@ -482,9 +535,9 @@ namespace gglab
 
 	void DX12Device::RetireCompletedRHIResources() noexcept
 	{
-		if (m_ViewCache)
+		if (m_DescriptorCache)
 		{
-			m_ViewCache->GarbageCollect();
+			m_DescriptorCache->GarbageCollect();
 		}
 
 		m_ResourceManager.RetireCompletedResources();

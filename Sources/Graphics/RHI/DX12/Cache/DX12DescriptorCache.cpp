@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
@@ -43,7 +43,7 @@ namespace gglab
 		}
 	}
 
-	DX12ViewCache::DX12ViewCache(const CreateInfo& createInfo) noexcept :
+	DX12DescriptorCache::DX12DescriptorCache(const CreateInfo& createInfo) noexcept :
 		m_DX12Device(createInfo.m_DX12Device),
 		m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
@@ -51,7 +51,7 @@ namespace gglab
 		GGLAB_ASSERT(m_DescriptorManager);
 	}
 
-	DX12ViewCache::~DX12ViewCache()
+	DX12DescriptorCache::~DX12DescriptorCache()
 	{
 		GarbageCollect();
 
@@ -113,7 +113,7 @@ namespace gglab
 		m_ResourceViews.clear();
 	}
 
-	DX12DescriptorView DX12ViewCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
+	DX12DescriptorView DX12DescriptorCache::GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept
 	{
 		{
 			std::shared_lock lock(m_Mutex);
@@ -145,7 +145,7 @@ namespace gglab
 		}
 	}
 
-	RHITextureViewHandle DX12ViewCache::GetOrCreateTextureView(
+	RHITextureViewHandle DX12DescriptorCache::GetOrCreateTextureView(
 		RHITextureHandle texture,
 		const RHITextureViewDesc& desc) noexcept
 	{
@@ -165,7 +165,7 @@ namespace gglab
 		DX12Texture* nativeTexture = m_DX12Device->ResolveTexture(texture);
 		if (!nativeTexture)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12ViewCache::GetOrCreateTextureView received a non-live texture handle.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12DescriptorCache::GetOrCreateTextureView received a non-live texture handle.");
 			return {};
 		}
 
@@ -195,7 +195,7 @@ namespace gglab
 		return view;
 	}
 
-	RHISamplerHandle DX12ViewCache::GetOrCreateSampler(const RHISamplerDesc& desc) noexcept
+	RHISamplerHandle DX12DescriptorCache::GetOrCreateSampler(const RHISamplerDesc& desc) noexcept
 	{
 		{
 			std::shared_lock lock(m_Mutex);
@@ -233,7 +233,7 @@ namespace gglab
 		return sampler;
 	}
 
-	RHIBufferViewHandle DX12ViewCache::GetOrCreateBufferView(
+	RHIBufferViewHandle DX12DescriptorCache::GetOrCreateBufferView(
 		RHIBufferHandle buffer,
 		const RHIBufferViewDesc& desc) noexcept
 	{
@@ -253,7 +253,7 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_DX12Device->ResolveBuffer(buffer);
 		if (!nativeBuffer)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12ViewCache::GetOrCreateBufferView received a non-live buffer handle.");
+			GGLAB_LOG_GRAPHICS_WARN("DX12DescriptorCache::GetOrCreateBufferView received a non-live buffer handle.");
 			return {};
 		}
 
@@ -283,7 +283,7 @@ namespace gglab
 		return view;
 	}
 
-	DX12DescriptorView DX12ViewCache::ResolveTextureView(RHITextureViewHandle view) const noexcept
+	DX12DescriptorView DX12DescriptorCache::ResolveTextureView(RHITextureViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
@@ -295,7 +295,7 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
-	DX12DescriptorView DX12ViewCache::ResolveBufferView(RHIBufferViewHandle view) const noexcept
+	DX12DescriptorView DX12DescriptorCache::ResolveBufferView(RHIBufferViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
@@ -307,7 +307,7 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
-	RHIDescriptorHandle DX12ViewCache::ResolveTextureViewDescriptor(RHITextureViewHandle view) const noexcept
+	RHIDescriptorHandle DX12DescriptorCache::ResolveTextureViewDescriptor(RHITextureViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
@@ -319,7 +319,7 @@ namespace gglab
 		return ToRHIDescriptorHandle(slot->m_Descriptor);
 	}
 
-	RHIDescriptorHandle DX12ViewCache::ResolveBufferViewDescriptor(RHIBufferViewHandle view) const noexcept
+	RHIDescriptorHandle DX12DescriptorCache::ResolveBufferViewDescriptor(RHIBufferViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
@@ -331,7 +331,7 @@ namespace gglab
 		return ToRHIDescriptorHandle(slot->m_Descriptor);
 	}
 
-	RHIDescriptorHandle DX12ViewCache::ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept
+	RHIDescriptorHandle DX12DescriptorCache::ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const SamplerSlot* slot = m_RHISamplers.Resolve(sampler);
@@ -343,31 +343,31 @@ namespace gglab
 		return ToRHIDescriptorHandle(slot->m_Descriptor);
 	}
 
-	void DX12ViewCache::DestroyTextureView(RHITextureViewHandle view) noexcept
+	void DX12DescriptorCache::DestroyTextureView(RHITextureViewHandle view) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		DestroyTextureViewLocked(view);
 	}
 
-	void DX12ViewCache::DestroyBufferView(RHIBufferViewHandle view) noexcept
+	void DX12DescriptorCache::DestroyBufferView(RHIBufferViewHandle view) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		DestroyBufferViewLocked(view);
 	}
 
-	void DX12ViewCache::DestroySampler(RHISamplerHandle sampler) noexcept
+	void DX12DescriptorCache::DestroySampler(RHISamplerHandle sampler) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		DestroySamplerLocked(sampler);
 	}
 
-	bool DX12ViewCache::IsSamplerAlive(RHISamplerHandle sampler) const noexcept
+	bool DX12DescriptorCache::IsSamplerAlive(RHISamplerHandle sampler) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		return m_RHISamplers.Resolve(sampler) != nullptr;
 	}
 
-	void DX12ViewCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorCache::RetireResourceAllViews(ResourceIndex resourceIndex, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 
@@ -400,7 +400,7 @@ namespace gglab
 		}
 	}
 
-	void DX12ViewCache::RetireTextureViews(
+	void DX12DescriptorCache::RetireTextureViews(
 		RHITextureHandle texture,
 		std::span<const RHIFencePoint> fencePoints) noexcept
 	{
@@ -432,7 +432,7 @@ namespace gglab
 		}
 	}
 
-	void DX12ViewCache::RetireBufferViews(
+	void DX12DescriptorCache::RetireBufferViews(
 		RHIBufferHandle buffer,
 		std::span<const RHIFencePoint> fencePoints) noexcept
 	{
@@ -464,7 +464,7 @@ namespace gglab
 		}
 	}
 
-	void DX12ViewCache::GarbageCollect() noexcept
+	void DX12DescriptorCache::GarbageCollect() noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 		for (uint32_t index = 0; index < m_RHITextureViews.Size(); ++index)
@@ -543,7 +543,7 @@ namespace gglab
 		}
 	}
 
-	DX12DescriptorHandle DX12ViewCache::CreateTextureDescriptor(
+	DX12DescriptorHandle DX12DescriptorCache::CreateTextureDescriptor(
 		const RHITextureViewKey& key,
 		DX12Texture* texture) const noexcept
 	{
@@ -585,7 +585,7 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RHITextureViewType.");
 	}
 
-	DX12DescriptorHandle DX12ViewCache::CreateBufferDescriptor(
+	DX12DescriptorHandle DX12DescriptorCache::CreateBufferDescriptor(
 		const RHIBufferViewKey& key,
 		DX12Buffer* buffer) const noexcept
 	{
@@ -624,7 +624,7 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RHIBufferViewType.");
 	}
 
-	DX12DescriptorHandle DX12ViewCache::CreateSamplerDescriptor(const RHISamplerDesc& desc) const noexcept
+	DX12DescriptorHandle DX12DescriptorCache::CreateSamplerDescriptor(const RHISamplerDesc& desc) const noexcept
 	{
 		DX12DescriptorHandle descriptor =
 			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::GeneralSampler)->AllocateHandle();
@@ -638,7 +638,7 @@ namespace gglab
 		return descriptor;
 	}
 
-	void DX12ViewCache::DestroyTextureViewLocked(RHITextureViewHandle view) noexcept
+	void DX12DescriptorCache::DestroyTextureViewLocked(RHITextureViewHandle view) noexcept
 	{
 		TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
 		if (!slot)
@@ -664,7 +664,7 @@ namespace gglab
 		}
 	}
 
-	void DX12ViewCache::DestroyBufferViewLocked(RHIBufferViewHandle view) noexcept
+	void DX12DescriptorCache::DestroyBufferViewLocked(RHIBufferViewHandle view) noexcept
 	{
 		BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
 		if (!slot)
@@ -690,7 +690,7 @@ namespace gglab
 		}
 	}
 
-	void DX12ViewCache::DestroySamplerLocked(RHISamplerHandle sampler) noexcept
+	void DX12DescriptorCache::DestroySamplerLocked(RHISamplerHandle sampler) noexcept
 	{
 		SamplerSlot* slot = m_RHISamplers.Resolve(sampler);
 		if (!slot)
@@ -712,7 +712,7 @@ namespace gglab
 		}
 	}
 
-	void DX12ViewCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
+	void DX12DescriptorCache::FreeAllImmediately(ResourceIndex resourceIndex) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 
@@ -757,7 +757,7 @@ namespace gglab
 	}
 
 	template<ViewType T>
-	DX12DescriptorView DX12ViewCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
+	DX12DescriptorView DX12DescriptorCache::GetOrCreateImpl(ResourceIndex resourceIndex, DX12Texture* texture,
 		std::optional<typename ViewTraits<T>::Desc> descOpt) noexcept
 	{
 		using Traits = ViewTraits<T>;
@@ -791,14 +791,14 @@ namespace gglab
 			}
 
 			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-			GGLAB_ASSERT_MSG(inserted, "ViewCache: duplicate insertion after double-checked locking");
+			GGLAB_ASSERT_MSG(inserted, "DescriptorCache: duplicate insertion after double-checked locking");
 			m_ResourceViews[resourceIndex].push_back(key);
 			return it->second.ToDescriptorView();
 		}
 	}
 
 	template<ViewType T>
-	DX12DescriptorView DX12ViewCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
+	DX12DescriptorView DX12DescriptorCache::CreateFromKey(const ViewKey& key, DX12Texture* texture) noexcept
 	{
 		using Traits = ViewTraits<T>;
 		auto desc = DescFromKey<T>(key);
@@ -817,7 +817,7 @@ namespace gglab
 			}
 
 			auto [it, inserted] = m_Cache.emplace(key, std::move(descriptor));
-			GGLAB_ASSERT_MSG(inserted, "ViewCache: duplicate insertion after double-checked locking");
+			GGLAB_ASSERT_MSG(inserted, "DescriptorCache: duplicate insertion after double-checked locking");
 			m_ResourceViews[key.m_ResourceIndex].push_back(key);
 			return it->second.ToDescriptorView();
 		}
@@ -1139,7 +1139,7 @@ namespace gglab
 	}
 
 	template<>
-	inline D3D12_RENDER_TARGET_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::RTV>(const ViewKey& key) noexcept
+	inline D3D12_RENDER_TARGET_VIEW_DESC DX12DescriptorCache::DescFromKey<ViewType::RTV>(const ViewKey& key) noexcept
 	{
 		D3D12_RENDER_TARGET_VIEW_DESC d{};
 		d.Format = key.m_Format;
@@ -1165,7 +1165,7 @@ namespace gglab
 	}
 
 	template<>
-	inline D3D12_DEPTH_STENCIL_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::DSV>(const ViewKey& key) noexcept
+	inline D3D12_DEPTH_STENCIL_VIEW_DESC DX12DescriptorCache::DescFromKey<ViewType::DSV>(const ViewKey& key) noexcept
 	{
 		D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
 		desc.Format = key.m_Format;
@@ -1179,7 +1179,7 @@ namespace gglab
 	}
 
 	template<>
-	inline D3D12_SHADER_RESOURCE_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::SRV>(const ViewKey& key) noexcept
+	inline D3D12_SHADER_RESOURCE_VIEW_DESC DX12DescriptorCache::DescFromKey<ViewType::SRV>(const ViewKey& key) noexcept
 	{
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
 		desc.Format = key.m_Format;
@@ -1219,7 +1219,7 @@ namespace gglab
 	}
 
 	template<>
-	inline D3D12_UNORDERED_ACCESS_VIEW_DESC DX12ViewCache::DescFromKey<ViewType::UAV>(const ViewKey& key) noexcept
+	inline D3D12_UNORDERED_ACCESS_VIEW_DESC DX12DescriptorCache::DescFromKey<ViewType::UAV>(const ViewKey& key) noexcept
 	{
 		D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
 		desc.Format = key.m_Format;
@@ -1233,8 +1233,8 @@ namespace gglab
 	}
 
 #define DECL_GET_OR_CREATE_TEMPLATE_FUNC(viewType, descType)	\
-	template DX12DescriptorView DX12ViewCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
-	template DX12DescriptorView DX12ViewCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
+	template DX12DescriptorView DX12DescriptorCache::GetOrCreateImpl<viewType>(ResourceIndex, DX12Texture*, std::optional<descType>) noexcept;	\
+	template DX12DescriptorView DX12DescriptorCache::CreateFromKey<viewType>(const ViewKey&, DX12Texture*) noexcept;
 
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::RTV, D3D12_RENDER_TARGET_VIEW_DESC);
 	DECL_GET_OR_CREATE_TEMPLATE_FUNC(ViewType::DSV, D3D12_DEPTH_STENCIL_VIEW_DESC);

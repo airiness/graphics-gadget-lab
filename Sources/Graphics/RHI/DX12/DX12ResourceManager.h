@@ -17,7 +17,7 @@ namespace gglab
 	class DX12Device;
 	class DX12ResourceManager;
 	class DX12Texture;
-	class DX12ViewCache;
+	class DX12DescriptorCache;
 	struct DX12ResourceManagerSnapshot;
 	void BuildDX12ResourceManagerSnapshot(
 		const DX12ResourceManager& manager,
@@ -62,7 +62,7 @@ namespace gglab
 
 		void Initialize(DX12Device* device) noexcept;
 		void Finalize() noexcept;
-		void SetViewCache(DX12ViewCache* viewCache) noexcept { m_ViewCache = viewCache; }
+		void SetDescriptorCache(DX12DescriptorCache* descriptorCache) noexcept { m_DescriptorCache = descriptorCache; }
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept;
@@ -139,7 +139,7 @@ namespace gglab
 
 	private:
 		DX12Device* m_Device = nullptr;
-		DX12ViewCache* m_ViewCache = nullptr;
+		DX12DescriptorCache* m_DescriptorCache = nullptr;
 
 		RHIHandleTable<RHITextureHandle, TextureSlot> m_Textures;
 		RHIHandleTable<RHIBufferHandle, BufferSlot> m_Buffers;

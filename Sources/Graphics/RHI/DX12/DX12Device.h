@@ -29,12 +29,13 @@ namespace gglab
 	class DX12CommandList;
 	class DX12GraphicsCommandContext;
 	class DX12ComputeCommandContext;
+	class DX12DescriptorManager;
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12FencePoint;
 	class DX12Fence;
 	class DX12Resource;
-	class DX12ViewCache;
+	class DX12DescriptorCache;
 	class DX12PipelineState;
 	class DX12RootSignature;
 	struct DX12DescriptorView;
@@ -85,7 +86,9 @@ namespace gglab
 
 		RHIBackendType GetBackendType() const noexcept override { return RHIBackendType::DX12; }
 		std::unique_ptr<RHITransferContext> CreateTransferContext() noexcept override;
+		std::unique_ptr<RHISwapChain> CreateSwapChain(const RHISwapChainDesc& desc) noexcept override;
 		void WaitForFence(RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
+		void WaitForFenceCompletion(const RHIFencePoint& fencePoint) noexcept override;
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept override;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept override;
@@ -109,7 +112,7 @@ namespace gglab
 		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept;
-		void SetViewCache(DX12ViewCache* viewCache) noexcept;
+		void SetDescriptorManager(DX12DescriptorManager* descriptorManager) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
@@ -185,7 +188,8 @@ namespace gglab
 		FeatureSupport m_FeatureSupport;
 
 		DX12ResourceManager m_ResourceManager;
-		DX12ViewCache* m_ViewCache = nullptr;
+		DX12DescriptorManager* m_DescriptorManager = nullptr;
+		std::unique_ptr<DX12DescriptorCache> m_DescriptorCache;
 
 		struct GraphicsPipelineBinding
 		{

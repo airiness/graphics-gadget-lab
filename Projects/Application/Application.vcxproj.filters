@@ -243,7 +243,7 @@
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12ViewCache.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp">
@@ -707,7 +707,7 @@
     <ClInclude Include="..\..\Sources\Core\TypedIndex.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12ViewCache.h">
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h">
@@ -861,6 +861,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISwapChain.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h">

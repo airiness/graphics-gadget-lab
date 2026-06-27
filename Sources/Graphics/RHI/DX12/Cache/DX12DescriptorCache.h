@@ -81,7 +81,7 @@ class DX12FencePoint;
 	};
 	using ViewKeyHash = KeyHash<ViewKey>;
 
-	class DX12ViewCache
+	class DX12DescriptorCache
 	{
 	public:
 		struct CreateInfo
@@ -91,9 +91,9 @@ class DX12FencePoint;
 		};
 
 	public:
-		explicit DX12ViewCache(const CreateInfo& createInfo) noexcept;
-		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ViewCache);
-		~DX12ViewCache();
+		explicit DX12DescriptorCache(const CreateInfo& createInfo) noexcept;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12DescriptorCache);
+		~DX12DescriptorCache();
 
 		DX12DescriptorView GetOrCreate(const ViewKey& key, DX12Texture* texture) noexcept;
 		RHITextureViewHandle GetOrCreateTextureView(

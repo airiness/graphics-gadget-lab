@@ -3,7 +3,7 @@
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
+#include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Core/Utility/StringUtils.h"
@@ -30,7 +30,7 @@ namespace gglab
 		m_Buffers.Clear();
 
 		m_Device = nullptr;
-		m_ViewCache = nullptr;
+		m_DescriptorCache = nullptr;
 	}
 
 	RHITextureHandle DX12ResourceManager::CreateTexture(const RHITextureDesc& desc) noexcept
@@ -208,9 +208,9 @@ namespace gglab
 			"DX12ResourceManager::DestroyTexture",
 			[this, texture](TextureSlot& slot) noexcept
 			{
-				if (m_ViewCache)
+				if (m_DescriptorCache)
 				{
-					m_ViewCache->RetireTextureViews(texture, slot.m_RetirementPoints);
+					m_DescriptorCache->RetireTextureViews(texture, slot.m_RetirementPoints);
 				}
 			});
 	}
@@ -223,9 +223,9 @@ namespace gglab
 			"DX12ResourceManager::DestroyBuffer",
 			[this, buffer](BufferSlot& slot) noexcept
 			{
-				if (m_ViewCache)
+				if (m_DescriptorCache)
 				{
-					m_ViewCache->RetireBufferViews(buffer, slot.m_RetirementPoints);
+					m_DescriptorCache->RetireBufferViews(buffer, slot.m_RetirementPoints);
 				}
 			});
 	}

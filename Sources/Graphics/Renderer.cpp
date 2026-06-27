@@ -5,7 +5,6 @@
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -64,17 +63,13 @@ namespace gglab
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
 
-		m_SwapChain = std::make_unique<DX12SwapChain>();
-		DX12SwapChain::CreateInfo swapChainCreateInfo{};
-		swapChainCreateInfo.m_DX12Device = m_Device.get();
-		swapChainCreateInfo.m_PresentQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
-		swapChainCreateInfo.m_Hwnd = createInfo.m_Hwnd;
+		RHISwapChainDesc swapChainCreateInfo{};
+		swapChainCreateInfo.m_WindowHandle = createInfo.m_Hwnd;
 		swapChainCreateInfo.m_Width = createInfo.m_Width;
 		swapChainCreateInfo.m_Height = createInfo.m_Height;
-		swapChainCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
-		swapChainCreateInfo.m_AllowTearing = m_Device->SupportTearing();
-
-		m_SwapChain->Initialize(swapChainCreateInfo);
+		m_SwapChain = m_Device->CreateSwapChain(swapChainCreateInfo);
+		GGLAB_ASSERT_MSG(m_SwapChain && m_SwapChain->IsValid(),
+			"Renderer failed to create an RHI swapchain.");
 
 		DX12DescriptorManager::CreateInfo descriptorManagerCreateInfo{};
 		descriptorManagerCreateInfo.m_DX12Device = m_Device.get();
@@ -88,11 +83,7 @@ namespace gglab
 
 		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(m_Device.get());
 
-		DX12ViewCache::CreateInfo viewCacheCreateInfo{};
-		viewCacheCreateInfo.m_DX12Device = m_Device.get();
-		viewCacheCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
-		m_ViewCache = std::make_unique<DX12ViewCache>(viewCacheCreateInfo);
-		m_Device->SetViewCache(m_ViewCache.get());
+		m_Device->SetDescriptorManager(m_DescriptorManager.get());
 
 		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
 
@@ -128,7 +119,8 @@ namespace gglab
 		DevelopGuiBackend::CreateInfo developGuiBackendCreateInfo{};
 		developGuiBackendCreateInfo.m_Hwnd = createInfo.m_Hwnd;
 		developGuiBackendCreateInfo.m_DX12Device = m_Device.get();
-		developGuiBackendCreateInfo.m_SwapChain = m_SwapChain.get();
+		developGuiBackendCreateInfo.m_BackBufferFormat = m_SwapChain->GetFormat();
+		developGuiBackendCreateInfo.m_BufferCount = m_SwapChain->GetBufferCount();
 		developGuiBackendCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
 		m_DevelopGuiBackend->Initialize(developGuiBackendCreateInfo);
 
@@ -167,8 +159,7 @@ namespace gglab
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
 		m_RGTransientResourcePool.reset();
-		m_Device->SetViewCache(nullptr);
-		m_ViewCache.reset();
+		m_Device->SetDescriptorManager(nullptr);
 
 		m_SceneCB.reset();
 		m_ObjectTable.reset();
@@ -327,7 +318,7 @@ namespace gglab
 
 		m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
 
-		swapChain->UpdateFrameSyncObject(m_LastSubmittedFencePoint);
+		swapChain->SetFrameCompletionFence(m_LastSubmittedFencePoint.ToRHI());
 		swapChain->Present();
 		EndFrameLifetime(frame);
 	}
@@ -477,7 +468,7 @@ namespace gglab
 
 		m_Device->FlushGPU();
 
-		m_SwapChain->OnResize(width, height);
+		m_SwapChain->Resize(width, height);
 	}
 
 	void Renderer::OnSuspend() noexcept
@@ -509,7 +500,7 @@ namespace gglab
 			DynamicConstantBufferAllocator::CreateInfo createInfo{};
 			createInfo.m_Device = m_Device.get();
 			createInfo.m_CapacityInBytes =
-				static_cast<uint32_t>(sizeof(SceneGPU)) * DX12Device::GetBufferCount() * 4;
+				static_cast<uint32_t>(sizeof(SceneGPU)) * m_SwapChain->GetBufferCount() * 4;
 			createInfo.m_DebugName = "Renderer.DynamicConstants";
 			m_SceneCB = std::make_unique<DynamicConstantBufferAllocator>(createInfo);
 		}
@@ -520,26 +511,26 @@ namespace gglab
 			PersistentStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
 			objectSBCreateInfo.m_Device = m_Device.get();
 			objectSBCreateInfo.m_ElementCapacity = MaxObjectCapacity;
-			objectSBCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+			objectSBCreateInfo.m_BufferCount = m_SwapChain->GetBufferCount();
 			objectSBCreateInfo.m_DebugName = "Renderer.PersistentObjects";
 			m_ObjectSB = std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 			m_ObjectTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, ObjectGPU>>(
-				MaxObjectCapacity, DX12Device::GetBufferCount());
+				MaxObjectCapacity, m_SwapChain->GetBufferCount());
 
 			PersistentStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
 			materialSBCreateInfo.m_Device = m_Device.get();
 			materialSBCreateInfo.m_ElementCapacity = MaxMaterialCapacity;
-			materialSBCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
+			materialSBCreateInfo.m_BufferCount = m_SwapChain->GetBufferCount();
 			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
 			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<MaterialID, MaterialGPU>>(
-				MaxMaterialCapacity, DX12Device::GetBufferCount());
+				MaxMaterialCapacity, m_SwapChain->GetBufferCount());
 
 			// View data remains a small per-frame dynamic upload allocation.
 			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};
 			viewSBCreateInfo.m_Device = m_Device.get();
 			viewSBCreateInfo.m_ElementCapacity =
-				MaxViewCapacity * DX12Device::GetBufferCount();
+				MaxViewCapacity * m_SwapChain->GetBufferCount();
 			viewSBCreateInfo.m_DebugName = "Renderer.DynamicViews";
 			m_ViewSB = std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
 		}

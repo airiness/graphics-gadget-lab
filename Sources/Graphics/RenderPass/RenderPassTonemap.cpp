@@ -5,7 +5,7 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 
 namespace gglab
 {
@@ -135,7 +135,8 @@ namespace gglab
 			m_BaseRecipe.m_PSId = psId;
 
 			m_BaseRecipe.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_BaseRecipe.m_Formats.m_RtvFormats.RTFormats[0] = renderer->GetSwapChain()->GetFormat();
+			m_BaseRecipe.m_Formats.m_RtvFormats.RTFormats[0] =
+				ToDXGIFormat(renderer->GetSwapChain()->GetFormat());
 			m_BaseRecipe.m_Formats.m_RtvFormats.NumRenderTargets = 1;
 			m_BaseRecipe.m_Formats.m_DsvFormat = DXGI_FORMAT_UNKNOWN;
 			m_BaseRecipe.m_Formats.m_SampleCount = 1;
