@@ -24,6 +24,8 @@ namespace gglab
 
 		RHICommandContextHandle GetHandle() const noexcept override { return m_Handle; }
 		RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Copy; }
+		void TrackTextureUse(RHITextureHandle texture) noexcept override { RecordTextureUse(texture); }
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { RecordBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 

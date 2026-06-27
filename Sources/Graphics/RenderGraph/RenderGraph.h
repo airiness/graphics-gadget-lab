@@ -2,9 +2,10 @@
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
 #include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
+#include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
-#include "Graphics/RenderGraph/RGExternalResourceRegistry.h"
+#include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/StringId.h"
@@ -92,13 +93,14 @@ namespace gglab
 		using Desc = typename RESOURCE::Descriptor;
 		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
 		using Usage = typename RESOURCE::Usage;
+		using Handle = typename RGResourceTraits<RESOURCE>::Handle;
 		using Native = typename RGResourceTraits<RESOURCE>::Native;
 
 		Desc m_Desc = {};
 		SubresourceDesc m_SubresourceDesc = {};
 		Usage m_Usage = RESOURCE::DefaultNoneUsage;
 		ResourceIndex m_GpuResourceIndex = {};
-		Native* m_ImportedNative = nullptr;
+		Handle m_ImportedHandle{};
 
 		void Devirtualize(RGGpuResourceAllocator* allocator) noexcept override;
 		void Destroy(RenderGraph& rg) noexcept override;
@@ -168,9 +170,9 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
+			RHIDevice* m_Device = nullptr;
 			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 			DX12ViewCache* m_ViewCache = nullptr;
-			RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 		};
 
 		class RGBuilder
@@ -200,15 +202,15 @@ namespace gglab
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Import(const char* name,
-				typename RGResourceTraits<RESOURCE>::Native* native,
+				typename RGResourceTraits<RESOURCE>::Handle handle,
 				const typename RESOURCE::Descriptor& desc,
 				typename RESOURCE::Usage initialUsage) noexcept
 			{
-				return m_RG.ImportInternal<RESOURCE>(name, native, desc, initialUsage);
+				return m_RG.ImportInternal<RESOURCE>(name, handle, desc, initialUsage);
 			}
 
 			RGTextureId ImportTexture(const char* name,
-				DX12Texture* texture,
+				RHITextureHandle texture,
 				const RGTextureDesc& desc,
 				RGTextureUsage initialUsage) noexcept
 			{
@@ -224,7 +226,7 @@ namespace gglab
 			}
 
 			RGBufferId ImportBuffer(const char* name,
-				DX12Buffer* buffer,
+				RHIBufferHandle buffer,
 				const RGBufferDesc& desc,
 				RGBufferUsage initialUsage) noexcept
 			{
@@ -314,7 +316,7 @@ namespace gglab
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ImportInternal(const char* name,
-			typename RGResourceTraits<RESOURCE>::Native* native,
+			typename RGResourceTraits<RESOURCE>::Handle handle,
 			const typename RESOURCE::Descriptor& desc,
 			typename RESOURCE::Usage initialUsage) noexcept;
 
@@ -346,9 +348,8 @@ namespace gglab
 
 		RGPassNode& GetPassNode(RGPassNode::Index index) noexcept;
 
-		DX12Resource* GetNativeResource(RGVirtualResourceBase* virtualResource) noexcept;
-
-		void EmitBarriers(DX12CommandList* commandList,
+		void TrackPassResourceUses(RHICommandContext* commandContext, const RGPassNode& passNode) noexcept;
+		void EmitBarriers(RHICommandContext* commandContext,
 			const std::vector<RGPassNode::BarrierIntent>& barriers) noexcept;
 
 	private:
@@ -356,9 +357,9 @@ namespace gglab
 		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, RESOURCE::Usage usage) noexcept;
 
 	private:
+		RHIDevice* m_Device = nullptr;
 		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
 		DX12ViewCache* m_ViewCache = nullptr;
-		RGExternalResourceRegistry* m_ExternalResourceRegistry = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 		RGBlackboard m_Blackboard;
@@ -511,12 +512,13 @@ namespace gglab
 
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ImportInternal(const char* name,
-		typename RGResourceTraits<RESOURCE>::Native* native,
+		typename RGResourceTraits<RESOURCE>::Handle importedHandle,
 		const typename RESOURCE::Descriptor& desc,
 		typename RESOURCE::Usage initialUsage) noexcept
 	{
 		GGLAB_ASSERT_MSG(name && *name, "Import name must be valid.");
-		GGLAB_ASSERT_MSG(native != nullptr, "Import native resource ptr must not be null.");
+		GGLAB_ASSERT_MSG(importedHandle.IsValid(), "Import RHI resource handle must be valid.");
+		GGLAB_ASSERT_MSG(m_Device->IsAlive(importedHandle), "Import RHI resource handle must be live.");
 
 		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
@@ -529,14 +531,13 @@ namespace gglab
 
 		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringID(name);
-		virtualResource->m_GpuResourceIndex = m_ExternalResourceRegistry->GetOrCreate(native);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.
 		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialUsage);
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		virtualResource->m_Usage = RESOURCE::DefaultNoneUsage;
-		virtualResource->m_ImportedNative = native;
+		virtualResource->m_ImportedHandle = importedHandle;
 		m_VirtualResources.push_back(virtualResource);
 
 		RGResourceNode resourceNode
@@ -658,6 +659,10 @@ namespace gglab
 		}
 
 		auto* vResource = static_cast<RGVirtualResource<RESOURCE>*>(vResourceBase);
+		if (vResource->m_Imported)
+		{
+			return {};
+		}
 
 		GGLAB_ASSERT_MSG(vResource->m_Devirtualized && vResource->m_GpuResourceIndex.IsValid(),
 			"Resource not devirtualized yet. Check your pass' setup and usages.");
@@ -696,7 +701,7 @@ namespace gglab
 
 		if (m_Imported)
 		{
-			GGLAB_ASSERT_MSG(m_ImportedNative != nullptr, "Imported resource pointer is null.");
+			GGLAB_ASSERT_MSG(m_ImportedHandle.IsValid(), "Imported resource handle is invalid.");
 			m_Devirtualized = true;
 			return;
 		}

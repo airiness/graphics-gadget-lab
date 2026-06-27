@@ -451,9 +451,9 @@ namespace gglab
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
+		rgCreateInfo.m_Device = m_Device.get();
 		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuResAllocator.get();
 		rgCreateInfo.m_ViewCache = m_ViewCache.get();
-		rgCreateInfo.m_ExternalResourceRegistry = m_ExternalResRegistry.get();
 
 		return rgCreateInfo;
 	}

@@ -16,15 +16,15 @@ namespace gglab
 	}
 
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
+		m_Device(createInfo.m_Device),
 		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
 		m_ViewCache(createInfo.m_ViewCache),
-		m_ExternalResourceRegistry(createInfo.m_ExternalResourceRegistry),
 		m_ArenaAllocator(1u << 20),
 		m_Blackboard(m_ArenaAllocator)
 	{
+		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice can not be null.");
 		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
 		GGLAB_ASSERT_MSG(m_ViewCache != nullptr, "DX12ViewCache can not be null.");
-		GGLAB_ASSERT_MSG(m_ExternalResourceRegistry != nullptr, "RGExternalResourceRegistry can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
@@ -247,7 +247,8 @@ namespace gglab
 				virtualResource->Devirtualize(m_GpuResourceAllocator);
 			}
 
-			EmitBarriers(executeContext.GetGraphicsCommandList(), passNode.m_PreBarriers);
+			TrackPassResourceUses(executeContext.GetGraphicsCommandContext(), passNode);
+			EmitBarriers(executeContext.GetGraphicsCommandContext(), passNode.m_PreBarriers);
 
 			// Execute passes
 			if (passNode.m_Pass)
@@ -255,7 +256,7 @@ namespace gglab
 				passNode.m_Pass->Execute(executeContext);
 			}
 
-			EmitBarriers(executeContext.GetGraphicsCommandList(), passNode.m_PostBarriers);
+			EmitBarriers(executeContext.GetGraphicsCommandContext(), passNode.m_PostBarriers);
 
 			for (auto* virtualResource : passNode.m_DestroyVirtualResources)
 			{
@@ -296,7 +297,8 @@ namespace gglab
 
 		if (virtualRes->m_Imported)
 		{
-			return virtualRes->m_ImportedNative;
+			auto* dx12Device = dynamic_cast<DX12Device*>(m_Device);
+			return dx12Device ? dx12Device->ResolveTexture(virtualRes->m_ImportedHandle) : nullptr;
 		}
 
 		if (!virtualRes->m_GpuResourceIndex.IsValid())
@@ -316,7 +318,8 @@ namespace gglab
 
 		if (virtualRes->m_Imported)
 		{
-			return virtualRes->m_ImportedNative;
+			auto* dx12Device = dynamic_cast<DX12Device*>(m_Device);
+			return dx12Device ? dx12Device->ResolveBuffer(virtualRes->m_ImportedHandle) : nullptr;
 		}
 
 		if (!virtualRes->m_GpuResourceIndex.IsValid())
@@ -336,7 +339,8 @@ namespace gglab
 
 		if (virtualRes->m_Imported)
 		{
-			return {};
+			return m_Device->IsAlive(virtualRes->m_ImportedHandle) ?
+				virtualRes->m_ImportedHandle : RHITextureHandle{};
 		}
 
 		if (!virtualRes->m_GpuResourceIndex.IsValid())
@@ -357,8 +361,8 @@ namespace gglab
 
 		if (virtualRes->m_Imported)
 		{
-			GGLAB_LOG_WARN("RenderGraph::GetBufferHandle() : Imported buffers do not expose RHI handles yet.");
-			return {};
+			return m_Device->IsAlive(virtualRes->m_ImportedHandle) ?
+				virtualRes->m_ImportedHandle : RHIBufferHandle{};
 		}
 
 		if (!virtualRes->m_GpuResourceIndex.IsValid())
@@ -388,85 +392,14 @@ namespace gglab
 		RHITextureViewDesc desc = view.m_Desc.value_or(RHITextureViewDesc{});
 		desc.m_Type = view.m_Type;
 
-		return m_ViewCache->GetOrCreateTextureView(texture, desc);
+		return m_Device->CreateTextureView(texture, desc);
 	}
 
 	DX12DescriptorView RenderGraph::GetTextureView(RGTextureViewId viewId) noexcept
 	{
-		if (const RHITextureViewHandle viewHandle = GetTextureViewHandle(viewId);
-			viewHandle.IsValid())
-		{
-			return m_ViewCache->ResolveTextureView(viewHandle);
-		}
-
-		GGLAB_ASSERT_MSG(viewId.IsValid() && viewId.Value() < m_TextureViews.size(),
-			"RenderGraph::GetTextureView received an invalid view id.");
-		if (!viewId.IsValid() || viewId.Value() >= m_TextureViews.size())
-		{
-			return {};
-		}
-
-		const auto& view = m_TextureViews[viewId.Value()];
-		auto* texture = GetTexture(view.m_Texture);
-		GGLAB_ASSERT_NOT_NULL(texture);
-		if (!texture)
-		{
-			return {};
-		}
-
-		const auto resourceIndex = GetResourceIndex(view.m_Texture);
-		GGLAB_ASSERT_MSG(resourceIndex.IsValid(),
-			"RenderGraph texture view requires a valid resource index.");
-		if (!resourceIndex.IsValid())
-		{
-			return {};
-		}
-
-		switch (view.m_Type)
-		{
-		case RHITextureViewType::RenderTarget:
-		{
-			const auto desc = view.m_Desc ?
-				std::optional{ ToD3D12RenderTargetViewDesc(*view.m_Desc) } :
-				std::nullopt;
-			return m_ViewCache->GetOrCreate<ViewType::RTV>(
-				resourceIndex,
-				texture,
-				desc);
-		}
-		case RHITextureViewType::DepthStencil:
-		{
-			const auto desc = view.m_Desc ?
-				std::optional{ ToD3D12DepthStencilViewDesc(*view.m_Desc) } :
-				std::nullopt;
-			return m_ViewCache->GetOrCreate<ViewType::DSV>(
-				resourceIndex,
-				texture,
-				desc);
-		}
-		case RHITextureViewType::ShaderResource:
-		{
-			const auto desc = view.m_Desc ?
-				std::optional{ ToD3D12ShaderResourceViewDesc(*view.m_Desc) } :
-				std::nullopt;
-			return m_ViewCache->GetOrCreate<ViewType::SRV>(
-				resourceIndex,
-				texture,
-				desc);
-		}
-		case RHITextureViewType::UnorderedAccess:
-		{
-			const auto desc = view.m_Desc ?
-				std::optional{ ToD3D12UnorderedAccessViewDesc(*view.m_Desc) } :
-				std::nullopt;
-			return m_ViewCache->GetOrCreate<ViewType::UAV>(
-				resourceIndex,
-				texture,
-				desc);
-		}
-		default:
-			GGLAB_UNREACHABLE("RenderGraph texture view has an unknown view type.");
-		}
+		const RHITextureViewHandle viewHandle = GetTextureViewHandle(viewId);
+		GGLAB_ASSERT_MSG(viewHandle.IsValid(), "RenderGraph texture view creation failed.");
+		return viewHandle.IsValid() ? m_ViewCache->ResolveTextureView(viewHandle) : DX12DescriptorView{};
 	}
 
 	ResourceIndex RenderGraph::GetResourceIndex(RGTextureId texId) noexcept
@@ -508,36 +441,58 @@ namespace gglab
 		return m_PassNodes[index.Value()];
 	}
 
-	DX12Resource* RenderGraph::GetNativeResource(RGVirtualResourceBase* virtualResource) noexcept
+	void RenderGraph::TrackPassResourceUses(RHICommandContext* commandContext, const RGPassNode& passNode) noexcept
 	{
-		GGLAB_ASSERT_NOT_NULL(virtualResource);
-
-		switch (virtualResource->m_ResourceType)
+		GGLAB_ASSERT_NOT_NULL(commandContext);
+		if (!commandContext)
 		{
-		case RGResourceType::RGTexture:
-		{
-			auto* textureResource = static_cast<RGVirtualResource<RGTextureResource>*>(virtualResource);
-			if (textureResource->m_Imported)
-			{
-				return textureResource->m_ImportedNative;
-			}
-			return m_GpuResourceAllocator->GetTexture(textureResource->m_GpuResourceIndex);
-		}
-		case RGResourceType::RGBuffer:
-		{
-			auto* bufferResource = static_cast<RGVirtualResource<RGBufferResource>*>(virtualResource);
-			if (bufferResource->m_Imported)
-			{
-				return bufferResource->m_ImportedNative;
-			}
-			return m_GpuResourceAllocator->GetBuffer(bufferResource->m_GpuResourceIndex);
-		}
+			return;
 		}
 
-		GGLAB_UNREACHABLE("Unhandled RGResourceType.");
+		for (const auto& access : passNode.m_Accesses)
+		{
+			auto* virtualResource = m_ResourceNodes[access.m_ResourceNodeIndex.Value()].m_VirtualResource;
+			GGLAB_ASSERT_NOT_NULL(virtualResource);
+			if (!virtualResource)
+			{
+				continue;
+			}
+
+			switch (virtualResource->m_ResourceType)
+			{
+			case RGResourceType::RGTexture:
+			{
+				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(virtualResource);
+				const RHITextureHandle handle = resource->m_Imported ?
+					resource->m_ImportedHandle :
+					m_GpuResourceAllocator->GetTextureHandle(resource->m_GpuResourceIndex);
+				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture access requires a live RHI handle.");
+				if (handle.IsValid())
+				{
+					commandContext->TrackTextureUse(handle);
+				}
+				break;
+			}
+			case RGResourceType::RGBuffer:
+			{
+				auto* resource = static_cast<RGVirtualResource<RGBufferResource>*>(virtualResource);
+				const RHIBufferHandle handle = resource->m_Imported ?
+					resource->m_ImportedHandle :
+					m_GpuResourceAllocator->GetBufferHandle(resource->m_GpuResourceIndex);
+				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer access requires a live RHI handle.");
+				if (handle.IsValid())
+				{
+					commandContext->TrackBufferUse(handle);
+				}
+				break;
+			}
+			default:
+				GGLAB_UNREACHABLE("Unhandled RGResourceType.");
+			}
+		}
 	}
 
-	void RenderGraph::EmitBarriers(DX12CommandList* commandList,
+	void RenderGraph::EmitBarriers(RHICommandContext* commandContext,
 		const std::vector<RGPassNode::BarrierIntent>& barriers) noexcept
 	{
 		if (barriers.empty())
@@ -545,20 +500,54 @@ namespace gglab
 			return;
 		}
 
-		GGLAB_ASSERT_NOT_NULL(commandList);
+		GGLAB_ASSERT_NOT_NULL(commandContext);
+		if (!commandContext)
+		{
+			return;
+		}
+
+		std::vector<RHITextureBarrier> textureBarriers;
+		std::vector<RHIBufferBarrier> bufferBarriers;
+		textureBarriers.reserve(barriers.size());
+		bufferBarriers.reserve(barriers.size());
 
 		for (const auto& intent : barriers)
 		{
-			auto* resource = GetNativeResource(intent.m_VirtualResource);
-			GGLAB_ASSERT_NOT_NULL(resource);
-			AddDX12RGBarrier(
-				*commandList,
-				intent.m_VirtualResource->m_ResourceType,
-				*resource,
-				intent.m_Before,
-				intent.m_After);
+			GGLAB_ASSERT_NOT_NULL(intent.m_VirtualResource);
+			switch (intent.m_VirtualResource->m_ResourceType)
+			{
+			case RGResourceType::RGTexture:
+			{
+				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(intent.m_VirtualResource);
+				const RHITextureHandle handle = resource->m_Imported ?
+					resource->m_ImportedHandle :
+					m_GpuResourceAllocator->GetTextureHandle(resource->m_GpuResourceIndex);
+				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture barrier requires a live RHI handle.");
+				if (handle.IsValid())
+				{
+					textureBarriers.push_back({ handle, intent.m_Before, intent.m_After });
+				}
+				break;
+			}
+			case RGResourceType::RGBuffer:
+			{
+				auto* resource = static_cast<RGVirtualResource<RGBufferResource>*>(intent.m_VirtualResource);
+				const RHIBufferHandle handle = resource->m_Imported ?
+					resource->m_ImportedHandle :
+					m_GpuResourceAllocator->GetBufferHandle(resource->m_GpuResourceIndex);
+				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer barrier requires a live RHI handle.");
+				if (handle.IsValid())
+				{
+					bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
+				}
+				break;
+			}
+			default:
+				GGLAB_UNREACHABLE("Unhandled RGResourceType.");
+			}
 		}
 
-		commandList->FlushBarriers();
+		commandContext->TextureBarrier(textureBarriers);
+		commandContext->BufferBarrier(bufferBarriers);
 	}
 }

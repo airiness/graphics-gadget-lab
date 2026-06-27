@@ -57,8 +57,8 @@ namespace gglab
 				targets.m_Width = width;
 				targets.m_Height = height;
 
-				auto* backTexture = swapChain->GetBackBuffer(frameBackBufferIndex);
-				GGLAB_ASSERT(backTexture);
+				const RHITextureHandle backTexture = swapChain->GetBackBufferHandle(frameBackBufferIndex);
+				GGLAB_ASSERT(backTexture.IsValid());
 
 				// Create HDR scene color
 				RGTextureDesc sceneColorDesc{};
@@ -123,7 +123,8 @@ namespace gglab
 
 				shadowRes.m_DirectionalShadowMapPreview = builder.ImportTexture(
 					"Shadow.DirectionalShadowMapPreview",
-					shadowMapPreviewTexture,
+					renderResourceRegistry->GetTextureHandle(
+						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
 					shadowMapPreviewDesc,
 					RGTextureUsage::None);
 			});

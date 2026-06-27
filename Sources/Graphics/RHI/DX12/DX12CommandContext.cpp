@@ -51,8 +51,6 @@ namespace gglab
 			return;
 		}
 
-		std::vector<CD3DX12_RESOURCE_BARRIER> nativeBarriers;
-		nativeBarriers.reserve(barriers.size());
 		for (const RHITextureBarrier& barrier : barriers)
 		{
 			DX12Texture* texture = m_Device->ResolveTexture(barrier.m_Texture);
@@ -62,19 +60,20 @@ namespace gglab
 				continue;
 			}
 
-			nativeBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-				texture->Get(),
-				ToD3D12ResourceStates(barrier.m_Before),
-				ToD3D12ResourceStates(barrier.m_After)));
+			m_CommandList->AddTextureBarrier(
+				CD3DX12_TEXTURE_BARRIER(
+					ToD3D12BarrierSync(barrier.m_Before.m_Access),
+					ToD3D12BarrierSync(barrier.m_After.m_Access),
+					ToD3D12BarrierAccess(barrier.m_Before.m_Access),
+					ToD3D12BarrierAccess(barrier.m_After.m_Access),
+					ToD3D12BarrierLayout(barrier.m_Before.m_Layout),
+					ToD3D12BarrierLayout(barrier.m_After.m_Layout),
+					texture->Get(),
+					CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)));
 			TrackTextureUse(barrier.m_Texture);
 		}
 
-		if (!nativeBarriers.empty())
-		{
-			m_CommandList->Get()->ResourceBarrier(
-				static_cast<UINT>(nativeBarriers.size()),
-				nativeBarriers.data());
-		}
+		m_CommandList->FlushBarriers();
 	}
 
 	void DX12CommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
@@ -84,8 +83,6 @@ namespace gglab
 			return;
 		}
 
-		std::vector<CD3DX12_RESOURCE_BARRIER> nativeBarriers;
-		nativeBarriers.reserve(barriers.size());
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
 			DX12Buffer* buffer = m_Device->ResolveBuffer(barrier.m_Buffer);
@@ -95,19 +92,17 @@ namespace gglab
 				continue;
 			}
 
-			nativeBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-				buffer->Get(),
-				ToD3D12ResourceStates(barrier.m_Before),
-				ToD3D12ResourceStates(barrier.m_After)));
+			m_CommandList->AddBufferBarrier(
+				CD3DX12_BUFFER_BARRIER(
+					ToD3D12BarrierSync(barrier.m_Before.m_Access),
+					ToD3D12BarrierSync(barrier.m_After.m_Access),
+					ToD3D12BarrierAccess(barrier.m_Before.m_Access),
+					ToD3D12BarrierAccess(barrier.m_After.m_Access),
+					buffer->Get()));
 			TrackBufferUse(barrier.m_Buffer);
 		}
 
-		if (!nativeBarriers.empty())
-		{
-			m_CommandList->Get()->ResourceBarrier(
-				static_cast<UINT>(nativeBarriers.size()),
-				nativeBarriers.data());
-		}
+		m_CommandList->FlushBarriers();
 	}
 
 	void DX12CommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept

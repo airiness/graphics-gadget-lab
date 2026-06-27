@@ -61,6 +61,8 @@ namespace gglab
 
 		virtual RHICommandContextHandle GetHandle() const noexcept = 0;
 		virtual RHIQueueType GetQueueType() const noexcept = 0;
+		virtual void TrackTextureUse(RHITextureHandle texture) noexcept = 0;
+		virtual void TrackBufferUse(RHIBufferHandle buffer) noexcept = 0;
 		virtual void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept = 0;
 		virtual void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept = 0;
 	};

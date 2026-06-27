@@ -90,7 +90,8 @@ namespace gglab
 
 				previewRes.m_EnvironmentCubemapPreview = builder.ImportTexture(
 					"Preview.IBL.EnvironmentCubemap",
-					previewTexture,
+					renderResRegistry->GetTextureHandle(
+						RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap),
 					previewDesc,
 					RGTextureUsage::None);
 
@@ -184,7 +185,8 @@ namespace gglab
 
 				previewRes.m_PrefilteredSpecularCubemapPreview = builder.ImportTexture(
 					"Preview.IBL.PrefilteredSpecularCubemap",
-					previewTexture,
+					renderResRegistry->GetTextureHandle(
+						RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap),
 					previewDesc,
 					RGTextureUsage::None);
 
