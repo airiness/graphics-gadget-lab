@@ -23,19 +23,22 @@ namespace gglab
 
 		struct TextureKey
 		{
-			uint32_t m_Width = 0;;
+			RHITextureDimension m_Dimension = RHITextureDimension::Texture2D;
+			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			uint32_t m_Depth = 0;
 			uint16_t m_ArraySize = 1;
 			uint16_t m_MipLevels = 1;
 			uint16_t m_SampleCount = 1;
 			RHIFormat m_Format = RHIFormat::Unknown;
-			RGTextureUsage m_Usage = RGTextureUsage::None;
+			RHITextureUsage m_Usage = RHITextureUsage::None;
 
 			bool operator==(const TextureKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_Width, m_Height, m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage);
+				return std::tie(m_Dimension, m_Width, m_Height, m_Depth, m_ArraySize,
+					m_MipLevels, m_SampleCount, m_Format, m_Usage);
 			}
 		};
 		using TextureKeyHash = KeyHash<TextureKey>;
@@ -43,23 +46,26 @@ namespace gglab
 		struct BufferKey
 		{
 			uint64_t m_SizeInBytes = 0;
-			RGBufferUsage m_Usage = RGBufferUsage::None;
+			uint32_t m_StrideInBytes = 0;
+			RHIBufferUsage m_Usage = RHIBufferUsage::None;
 
 			bool operator==(const BufferKey&) const noexcept = default;
 
 			auto AsTuple() const noexcept
 			{
-				return std::tie(m_SizeInBytes, m_Usage);
+				return std::tie(m_SizeInBytes, m_StrideInBytes, m_Usage);
 			}
 		};
 		using BufferKeyHash = KeyHash<BufferKey>;
 
-		static TextureKey MakeKey(const RGTextureDesc& desc) noexcept
+		static TextureKey MakeKey(const RHITextureDesc& desc) noexcept
 		{
 			return TextureKey
 			{
-				.m_Width = desc.m_Width,
-				.m_Height = desc.m_Height,
+				.m_Dimension = desc.m_Dimension,
+				.m_Width = desc.m_Extent.m_Width,
+				.m_Height = desc.m_Extent.m_Height,
+				.m_Depth = desc.m_Extent.m_Depth,
 				.m_ArraySize = desc.m_ArraySize,
 				.m_MipLevels = desc.m_MipLevels,
 				.m_SampleCount = desc.m_SampleCount,
@@ -68,11 +74,12 @@ namespace gglab
 			};
 		}
 
-		static BufferKey MakeKey(const RGBufferDesc& desc) noexcept
+		static BufferKey MakeKey(const RHIBufferDesc& desc) noexcept
 		{
 			return BufferKey
 			{
 				.m_SizeInBytes = desc.m_SizeInBytes,
+				.m_StrideInBytes = desc.m_StrideInBytes,
 				.m_Usage = desc.m_Usage
 			};
 		}
@@ -116,19 +123,17 @@ namespace gglab
 
 		void TrimPerKey(uint32_t maxCachedPerKey) noexcept;
 
-		// Check Texture ResourceIndex is compatible with RGTextureDesc, for texture recreate.
-		bool IsCompatibleTexture(ResourceIndex texIndex, const RGTextureDesc& desc) const noexcept;
+		// Check Texture ResourceIndex is compatible with RHITextureDesc, for texture recreate.
+		bool IsCompatibleTexture(ResourceIndex texIndex, const RHITextureDesc& desc) const noexcept;
 
 	private:
-		static RHITextureUsage ToRHITextureUsage(RGTextureUsage usage) noexcept;
-		static RHIBufferUsage ToRHIBufferUsage(RGBufferUsage usage) noexcept;
-		static std::optional<RHIClearValue> DefaultRHIClearValue(const RGTextureDesc& desc) noexcept;
+		static std::optional<RHIClearValue> DefaultRHIClearValue(const RHITextureDesc& desc) noexcept;
 		void DestroyTextureHandle(ResourceIndex texIndex) noexcept;
 		void DestroyBufferHandle(ResourceIndex bufIndex) noexcept;
 
-		ResourceIndex CreateTexture(const RGTextureDesc& rgTexDesc) noexcept;
+		ResourceIndex CreateTexture(const RHITextureDesc& textureDesc) noexcept;
 
-		ResourceIndex CreateBuffer(const RGBufferDesc& rgBufDesc) noexcept;
+		ResourceIndex CreateBuffer(const RHIBufferDesc& bufferDesc) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -146,10 +151,10 @@ namespace gglab
 	};
 
 	template<>
-	inline ResourceIndex RGGpuResourceAllocator::Acquire<RGTextureDesc>(
-		const RGTextureDesc& rgTexDesc) noexcept
+	inline ResourceIndex RGGpuResourceAllocator::Acquire<RHITextureDesc>(
+		const RHITextureDesc& textureDesc) noexcept
 	{
-		const auto texKey = MakeKey(rgTexDesc);
+		const auto texKey = MakeKey(textureDesc);
 
 		if (auto iter = m_FreeTextures.find(texKey);
 			iter != m_FreeTextures.end() && !iter->second.empty())
@@ -160,14 +165,14 @@ namespace gglab
 			return texIndex;
 		}
 
-		return CreateTexture(rgTexDesc);
+		return CreateTexture(textureDesc);
 	}
 
 	template<>
-	inline ResourceIndex RGGpuResourceAllocator::Acquire<RGBufferDesc>(
-		const RGBufferDesc& rgBufDesc) noexcept
+	inline ResourceIndex RGGpuResourceAllocator::Acquire<RHIBufferDesc>(
+		const RHIBufferDesc& bufferDesc) noexcept
 	{
-		const auto bufKey = MakeKey(rgBufDesc);
+		const auto bufKey = MakeKey(bufferDesc);
 		if (auto iter = m_FreeBuffers.find(bufKey);
 			iter != m_FreeBuffers.end() && !iter->second.empty())
 		{
@@ -177,6 +182,6 @@ namespace gglab
 			return bufIndex;
 		}
 
-		return CreateBuffer(rgBufDesc);
+		return CreateBuffer(bufferDesc);
 	}
 }

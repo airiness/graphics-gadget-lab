@@ -69,7 +69,7 @@ namespace gglab
 			RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 			for (const auto& access : passNode.m_Accesses)
 			{
-				if (access.m_AccessType == RGResourceAccessType::Read)
+				if (access.m_DependencyAccess != RGDependencyAccess::Write)
 				{
 					RGResourceNode& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
 					if (resourceNode.m_Writer.IsValid())
@@ -98,6 +98,7 @@ namespace gglab
 			virtualResource->m_RefCount = 0;
 			virtualResource->m_FirstUser = InvalidRGPassNodeIndex;
 			virtualResource->m_LastUser = InvalidRGPassNodeIndex;
+			virtualResource->ResetCompiledUsage();
 		}
 
 		// Traverse all reachable passes, count reference for virtual resources and find first and last user pass for each virtual resource
@@ -119,6 +120,7 @@ namespace gglab
 					continue;
 				}
 				++virtualResource->m_RefCount;
+				virtualResource->AccumulateAccess(access.m_AccessValue);
 				if (!virtualResource->m_FirstUser.IsValid())
 				{
 					virtualResource->m_FirstUser = rgPassNodeIndex;
@@ -149,8 +151,8 @@ namespace gglab
 		struct MergedAccess
 		{
 			RGVirtualResourceBase* m_VirtualResource = nullptr;
-			uint64_t m_UsageBits = 0;
-			RGResourceAccessType m_AccessType = RGResourceAccessType::Read;
+			uint64_t m_AccessValue = 0;
+			RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
 		};
 
 		for (auto& passNode : m_PassNodes)
@@ -175,21 +177,22 @@ namespace gglab
 					mergedAccesses.push_back(
 						{
 							.m_VirtualResource = virtualResource,
-							.m_UsageBits = access.m_UsageBits,
-							.m_AccessType = access.m_AccessType,
+							.m_AccessValue = access.m_AccessValue,
+							.m_DependencyAccess = access.m_DependencyAccess,
 						});
 					continue;
 				}
 
-				GGLAB_ASSERT_MSG(iter->m_AccessType == access.m_AccessType,
+				GGLAB_ASSERT_MSG(iter->m_DependencyAccess == access.m_DependencyAccess,
 					"A pass may not read and write the same whole resource.");
-				iter->m_UsageBits |= access.m_UsageBits;
+				GGLAB_ASSERT_MSG(iter->m_AccessValue == access.m_AccessValue,
+					"A pass must declare a single access mode for each whole resource.");
 			}
 
 			for (const auto& access : mergedAccesses)
 			{
 				const RHIResourceState requiredState = ToRHIResourceState(
-					access.m_UsageBits,
+					access.m_AccessValue,
 					access.m_VirtualResource->m_ResourceType);
 				auto& currentState = currentStates.at(access.m_VirtualResource);
 

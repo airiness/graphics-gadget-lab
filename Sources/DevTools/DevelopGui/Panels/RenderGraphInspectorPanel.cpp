@@ -48,10 +48,20 @@ namespace gglab
 		{
 			if (resourceType == RGResourceType::RGTexture)
 			{
-				return devtools::EnumFlagsText<RGTextureUsage>(static_cast<std::underlying_type_t<RGTextureUsage>>(bits));
+				return devtools::EnumFlagsText<RHITextureUsage>(static_cast<std::underlying_type_t<RHITextureUsage>>(bits));
 			}
 
-			return devtools::EnumFlagsText<RGBufferUsage>(static_cast<std::underlying_type_t<RGBufferUsage>>(bits));
+			return devtools::EnumFlagsText<RHIBufferUsage>(static_cast<std::underlying_type_t<RHIBufferUsage>>(bits));
+		}
+
+		static std::string AccessText(uint64_t value, RGResourceType resourceType) noexcept
+		{
+			if (resourceType == RGResourceType::RGTexture)
+			{
+				return std::string(devtools::EnumText(static_cast<RGTextureAccess>(value)));
+			}
+
+			return std::string(devtools::EnumText(static_cast<RGBufferAccess>(value)));
 		}
 
 		static std::string PassIndexToString(int32_t passIndex) noexcept
@@ -530,7 +540,7 @@ namespace gglab
 
 				for (const auto& access : pass.m_Accesses)
 				{
-					if (access.m_AccessType != RGResourceAccessType::Read ||
+					if (access.m_DependencyAccess == RGDependencyAccess::Write ||
 						access.m_VirtualResourceIndex >= hasResourceRect.size() ||
 						!hasResourceRect[access.m_VirtualResourceIndex])
 					{
@@ -557,7 +567,7 @@ namespace gglab
 						continue;
 					}
 
-					const bool writeAccess = access.m_AccessType == RGResourceAccessType::Write;
+					const bool writeAccess = access.m_DependencyAccess != RGDependencyAccess::Read;
 					float laneX = passMins[passPosition].x + 18.0f;
 					if (!writeAccess)
 					{
@@ -781,15 +791,15 @@ namespace gglab
 			{
 				ImGui::TableSetupColumn("Resource");
 				ImGui::TableSetupColumn("Type");
+				ImGui::TableSetupColumn("Dependency");
 				ImGui::TableSetupColumn("Access");
-				ImGui::TableSetupColumn("Usage");
 				ImGui::TableSetupColumn("Node");
 				ImGui::TableSetupColumn("Version");
 				ImGui::TableHeadersRow();
 
 				for (const auto& access : pass.m_Accesses)
 				{
-					const std::string usage = UsageBitsText(access.m_UsageBits, access.m_ResourceType);
+					const std::string accessText = AccessText(access.m_AccessValue, access.m_ResourceType);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -797,9 +807,9 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(devtools::EnumText(access.m_ResourceType).data());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(devtools::EnumText(access.m_AccessType).data());
+					ImGui::TextUnformatted(devtools::EnumText(access.m_DependencyAccess).data());
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(usage.c_str());
+					ImGui::TextUnformatted(accessText.c_str());
 					ImGui::TableSetColumnIndex(4);
 					ImGui::Text("%u", access.m_ResourceNodeIndex);
 					ImGui::TableSetColumnIndex(5);

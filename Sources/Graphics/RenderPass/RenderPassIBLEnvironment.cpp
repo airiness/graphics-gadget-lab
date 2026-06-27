@@ -58,20 +58,19 @@ namespace gglab
 				auto* envCubemapTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(envCubemapTexture);
 	
-				data.m_EnvironmentCubemap = builder.Write(iblRes.m_EnvironmentCubemap, RGTextureUsage::RenderTarget);
+				data.m_EnvironmentCubemap = builder.Write(iblRes.m_EnvironmentCubemap, RGTextureAccess::RenderTarget);
 
-				const auto rgDesc = ToRGTextureDesc(*envCubemapTexture,
-					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+				const auto textureDesc = ToRHITextureDesc(*envCubemapTexture);
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(rgDesc.m_Format, 0, face, 1);
+					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc.m_Format, 0, face, 1);
 					data.m_Rtvs[face] =
 						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemap, rtvDesc);
 				}
 
-				data.m_Width = rgDesc.m_Width;
-				data.m_Height = rgDesc.m_Height;
+				data.m_Width = textureDesc.m_Extent.m_Width;
+				data.m_Height = textureDesc.m_Extent.m_Height;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{

@@ -5,22 +5,39 @@
 
 namespace gglab
 {
-	inline RGTextureDesc ToRGTextureDesc(const D3D12_RESOURCE_DESC& nativeDesc, RGTextureUsage usage) noexcept
+	inline RHITextureDesc ToRHITextureDesc(const D3D12_RESOURCE_DESC& nativeDesc) noexcept
 	{
-		RGTextureDesc rgDesc{};
-		rgDesc.m_Width = static_cast<uint32_t>(nativeDesc.Width);
-		rgDesc.m_Height = static_cast<uint32_t>(nativeDesc.Height);
-		rgDesc.m_ArraySize = static_cast<uint16_t>(nativeDesc.DepthOrArraySize);
-		rgDesc.m_MipLevels = static_cast<uint16_t>(nativeDesc.MipLevels);
-		rgDesc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
-		rgDesc.m_Format = ToRHIFormat(nativeDesc.Format);
-		rgDesc.m_Usage = usage;
-		return rgDesc;
+		RHITextureDesc desc{};
+		switch (nativeDesc.Dimension)
+		{
+		case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+			desc.m_Dimension = RHITextureDimension::Texture1D;
+			break;
+		case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+			desc.m_Dimension = RHITextureDimension::Texture2D;
+			break;
+		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+			desc.m_Dimension = RHITextureDimension::Texture3D;
+			break;
+		default:
+			GGLAB_UNREACHABLE("D3D12 resource is not a texture.");
+		}
+
+		desc.m_Format = ToRHIFormat(nativeDesc.Format);
+		desc.m_Extent.m_Width = static_cast<uint32_t>(nativeDesc.Width);
+		desc.m_Extent.m_Height = nativeDesc.Height;
+		desc.m_Extent.m_Depth = nativeDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ?
+			nativeDesc.DepthOrArraySize : 1u;
+		desc.m_ArraySize = nativeDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ?
+			1u : static_cast<uint16_t>(nativeDesc.DepthOrArraySize);
+		desc.m_MipLevels = static_cast<uint16_t>(nativeDesc.MipLevels);
+		desc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
+		return desc;
 	}
 
-	inline RGTextureDesc ToRGTextureDesc(const DX12Texture& texture, RGTextureUsage usage) noexcept
+	inline RHITextureDesc ToRHITextureDesc(const DX12Texture& texture) noexcept
 	{
-		return ToRGTextureDesc(texture.GetDesc(), usage);
+		return ToRHITextureDesc(texture.GetDesc());
 	}
 
 	inline D3D12_RENDER_TARGET_VIEW_DESC ToD3D12RenderTargetViewDesc(const RHITextureViewDesc& rgDesc) noexcept

@@ -63,49 +63,43 @@ namespace gglab
 				}));
 	}
 
-	ResourceIndex RGGpuResourceAllocator::CreateTexture(const RGTextureDesc& rgTexDesc) noexcept
+	ResourceIndex RGGpuResourceAllocator::CreateTexture(const RHITextureDesc& desc) noexcept
 	{
 		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Textures.size()));
-		RHITextureDesc textureDesc{};
-		textureDesc.m_Dimension = RHITextureDimension::Texture2D;
-		textureDesc.m_Format = rgTexDesc.m_Format;
-		textureDesc.m_Usage = ToRHITextureUsage(rgTexDesc.m_Usage);
-		textureDesc.m_Extent =
+		RHITextureDesc textureDesc = desc;
+		if (!textureDesc.m_DebugName)
 		{
-			.m_Width = rgTexDesc.m_Width,
-			.m_Height = rgTexDesc.m_Height,
-			.m_Depth = 1u,
-		};
-		textureDesc.m_ArraySize = rgTexDesc.m_ArraySize;
-		textureDesc.m_MipLevels = rgTexDesc.m_MipLevels;
-		textureDesc.m_SampleCount = rgTexDesc.m_SampleCount;
-		textureDesc.m_DebugName = "RGGpuResourceAllocator.Texture";
-		textureDesc.m_ClearValue = DefaultRHIClearValue(rgTexDesc);
+			textureDesc.m_DebugName = "RGGpuResourceAllocator.Texture";
+		}
+		if (!textureDesc.m_ClearValue)
+		{
+			textureDesc.m_ClearValue = DefaultRHIClearValue(textureDesc);
+		}
 
 		RHITextureHandle texture = m_Device->CreateTexture(textureDesc);
 		GGLAB_ASSERT_MSG(texture.IsValid(), "RGGpuResourceAllocator: CreateTexture failed.");
 		m_Textures.push_back(TextureRecord{
 			.m_Texture = texture,
-			.m_Key = MakeKey(rgTexDesc),
+			.m_Key = MakeKey(desc),
 			});
 
 		return index;
 	}
 
-	ResourceIndex RGGpuResourceAllocator::CreateBuffer(const RGBufferDesc& rgBufDesc) noexcept
+	ResourceIndex RGGpuResourceAllocator::CreateBuffer(const RHIBufferDesc& desc) noexcept
 	{
 		ResourceIndex index = ResourceIndex(static_cast<uint32_t>(m_Buffers.size()));
-		RHIBufferDesc bufferDesc{};
-		bufferDesc.m_SizeInBytes = rgBufDesc.m_SizeInBytes;
-		bufferDesc.m_StrideInBytes = rgBufDesc.m_Stride;
-		bufferDesc.m_Usage = ToRHIBufferUsage(rgBufDesc.m_Usage);
-		bufferDesc.m_DebugName = "RGGpuResourceAllocator.Buffer";
+		RHIBufferDesc bufferDesc = desc;
+		if (!bufferDesc.m_DebugName)
+		{
+			bufferDesc.m_DebugName = "RGGpuResourceAllocator.Buffer";
+		}
 
 		RHIBufferHandle buffer = m_Device->CreateBuffer(bufferDesc);
 		GGLAB_ASSERT_MSG(buffer.IsValid(), "RGGpuResourceAllocator: CreateBuffer failed.");
 		m_Buffers.push_back(BufferRecord{
 			.m_Buffer = buffer,
-			.m_Key = MakeKey(rgBufDesc),
+			.m_Key = MakeKey(desc),
 			});
 
 		return index;
@@ -265,7 +259,7 @@ namespace gglab
 		}
 	}
 
-	bool RGGpuResourceAllocator::IsCompatibleTexture(ResourceIndex texIndex, const RGTextureDesc& desc) const noexcept
+	bool RGGpuResourceAllocator::IsCompatibleTexture(ResourceIndex texIndex, const RHITextureDesc& desc) const noexcept
 	{
 		if (!texIndex.IsValid())
 		{
@@ -289,73 +283,9 @@ namespace gglab
 		return currentKey == wantKey;
 	}
 
-	RHITextureUsage RGGpuResourceAllocator::ToRHITextureUsage(RGTextureUsage usage) noexcept
+	std::optional<RHIClearValue> RGGpuResourceAllocator::DefaultRHIClearValue(const RHITextureDesc& desc) noexcept
 	{
-		RHITextureUsage result = RHITextureUsage::None;
-		if (Test(usage, RGTextureUsage::Sample))
-		{
-			result |= RHITextureUsage::Sampled;
-		}
-		if (Test(usage, RGTextureUsage::RenderTarget))
-		{
-			result |= RHITextureUsage::RenderTarget;
-		}
-		if (Test(usage, RGTextureUsage::DepthStencil | RGTextureUsage::DepthStencilRead))
-		{
-			result |= RHITextureUsage::DepthStencil;
-		}
-		if (Test(usage, RGTextureUsage::UAV))
-		{
-			result |= RHITextureUsage::UnorderedAccess;
-		}
-		if (Test(usage, RGTextureUsage::CopySrc))
-		{
-			result |= RHITextureUsage::CopySource;
-		}
-		if (Test(usage, RGTextureUsage::CopyDst))
-		{
-			result |= RHITextureUsage::CopyDest;
-		}
-		if (Test(usage, RGTextureUsage::Present))
-		{
-			result |= RHITextureUsage::Present;
-		}
-		return result;
-	}
-
-	RHIBufferUsage RGGpuResourceAllocator::ToRHIBufferUsage(RGBufferUsage usage) noexcept
-	{
-		RHIBufferUsage result = RHIBufferUsage::None;
-		if (Test(usage, RGBufferUsage::Vertex))
-		{
-			result |= RHIBufferUsage::Vertex;
-		}
-		if (Test(usage, RGBufferUsage::Index))
-		{
-			result |= RHIBufferUsage::Index;
-		}
-		if (Test(usage, RGBufferUsage::Constant))
-		{
-			result |= RHIBufferUsage::Constant;
-		}
-		if (Test(usage, RGBufferUsage::UAV))
-		{
-			result |= RHIBufferUsage::UnorderedAccess;
-		}
-		if (Test(usage, RGBufferUsage::CopySrc))
-		{
-			result |= RHIBufferUsage::CopySource;
-		}
-		if (Test(usage, RGBufferUsage::CopyDst))
-		{
-			result |= RHIBufferUsage::CopyDest;
-		}
-		return result;
-	}
-
-	std::optional<RHIClearValue> RGGpuResourceAllocator::DefaultRHIClearValue(const RGTextureDesc& desc) noexcept
-	{
-		if (Test(desc.m_Usage, RGTextureUsage::RenderTarget))
+		if (Test(desc.m_Usage, RHITextureUsage::RenderTarget))
 		{
 			RHIClearValue clearValue{};
 			clearValue.m_Format = desc.m_Format;
@@ -367,7 +297,7 @@ namespace gglab
 			return clearValue;
 		}
 
-		if (Test(desc.m_Usage, RGTextureUsage::DepthStencil))
+		if (Test(desc.m_Usage, RHITextureUsage::DepthStencil))
 		{
 			RHIClearValue clearValue{};
 			clearValue.m_Format = desc.m_Format == RHIFormat::R32Typeless ?

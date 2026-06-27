@@ -74,7 +74,7 @@ namespace gglab
 	private:
 		struct TextureEntry
 		{
-			RGTextureDesc m_RgTexDesc{};
+			RHITextureDesc m_TextureDesc{};
 			ResourceIndex m_InternalIndex{};
 			RHITextureViewHandle m_Srv{};
 			RHITextureViewDesc m_SrvDesc{};
@@ -117,7 +117,7 @@ namespace gglab
 
 	private:
 		void EnsureTexture(TextureIndex index,
-			const RGTextureDesc& desc,
+			const RHITextureDesc& desc,
 			const RHITextureViewDesc& srvDesc,
 			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
 
