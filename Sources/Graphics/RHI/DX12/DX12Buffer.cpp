@@ -25,20 +25,4 @@ namespace gglab
 	{
 		return IsValid() ? m_Resource->GetGPUVirtualAddress() : 0;
 	}
-
-	DX12Resource::CreateInfo DX12Buffer::UploadBufferCreateInfo(D3D12MA::Allocator* allocator, uint64_t sizeInBytes) noexcept
-	{
-		GGLAB_ASSERT_MSG(allocator != nullptr, "Allocator can not be null.");
-
-		CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(static_cast<UINT64>(sizeInBytes));
-
-		CreateInfo createInfo = {};
-		createInfo.m_Allocator = allocator;
-		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-		createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
-		createInfo.m_InitStates = D3D12_RESOURCE_STATE_GENERIC_READ;
-		createInfo.m_ResourceDesc = resourceDesc;
-
-		return createInfo;
-	}
 }

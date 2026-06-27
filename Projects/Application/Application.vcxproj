@@ -159,7 +159,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\RHITransferContext.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.cpp" />
     <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
@@ -293,6 +293,7 @@
     <ClInclude Include="..\..\Sources\Graphics\CameraController.h" />
     <ClInclude Include="..\..\Sources\Core\Components.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.h" />
     <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\Core\Demo\DemoBase.h" />
     <ClInclude Include="..\..\Sources\Core\Demo\DemoManager.h" />

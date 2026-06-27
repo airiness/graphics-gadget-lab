@@ -160,7 +160,7 @@ namespace gglab
 		m_DevelopGuiBackend.reset();
 
 		m_RenderResRegistry.reset();
-		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
+		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint.ToRHI());
 		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
@@ -254,7 +254,7 @@ namespace gglab
 		// Wait Structured Buffer upload
 		if (renderContext.m_UploadFencePoint.IsValid())
 		{
-			commandQueue->Wait(renderContext.m_UploadFencePoint);
+			m_Device->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
 		}
 
 		frame.m_CommandAllocator = commandAllocatorPool->RequestCommandAllocator();
@@ -345,9 +345,9 @@ namespace gglab
 		auto* graphicsQueue = m_Device ?
 			m_Device->GetCommandQueue(CommandQueueType::Graphics) :
 			nullptr;
-		if (graphicsQueue && frame.m_UploadFencePoint.IsValid())
+		if (m_Device && frame.m_UploadFencePoint.IsValid())
 		{
-			graphicsQueue->Wait(frame.m_UploadFencePoint);
+			m_Device->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
 		}
 
 		if (m_Device)

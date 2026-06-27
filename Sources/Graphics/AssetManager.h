@@ -2,13 +2,13 @@
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
-#include "Graphics/RHI/RHITransferContext.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 
 namespace gglab
 {
 	class DX12Device;
+	class TransferBatch;
 	class TransferManager;
 
 	class AssetManager
@@ -72,7 +72,7 @@ namespace gglab
 			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
-		void UploadMesh(const MeshUploadData& uploadData, RHITransferContext& transferContext) noexcept;
+		void UploadMesh(const MeshUploadData& uploadData, TransferBatch& transferBatch) noexcept;
 
 		ModelID LoadModelGltf(const std::filesystem::path& path) noexcept;
 

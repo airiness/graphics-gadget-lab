@@ -5,7 +5,7 @@
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/RHIFence.h"
 
 namespace gglab
 {
@@ -84,7 +84,7 @@ namespace gglab
 		{
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_GpuAllocations{};
-			DX12FencePoint m_UploadFencePoint{};
+			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_Status = RenderSceneBuildStatus::GpuUploadFailed;
 		};
 

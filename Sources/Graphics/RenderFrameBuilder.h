@@ -34,7 +34,7 @@ namespace gglab
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
-			DX12FencePoint m_UploadFencePoint{};
+			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
 			uint32_t m_BackBufferIndex = 0;
 			ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;

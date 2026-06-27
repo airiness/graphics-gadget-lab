@@ -69,7 +69,7 @@ namespace gglab
 
 	// Non-owning upload data.
 	// m_Data pointers must remain valid until
-	// RHITransferContext::UploadTexture has recorded the upload commands.
+	// RHITransferContext::UploadTexture records the upload commands.
 	struct RHITextureSubresourceData
 	{
 		const void* m_Data = nullptr;

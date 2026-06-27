@@ -179,7 +179,7 @@ namespace gglab
 		}
 
 		// Update View Structured Buffer
-		DX12FencePoint uploadFencePoint{};
+		RHIFencePoint uploadFencePoint{};
 		DynamicStructuredBufferAllocator<ViewGPU>::Allocation viewsBufferResult{};
 		if (!viewData.empty())
 		{
@@ -204,7 +204,7 @@ namespace gglab
 			for (const auto& range : objectDirtyRanges)
 			{
 				const std::span<const ObjectGPU> data = info.m_ObjectTable.GetData(range);
-				objectsUploadSucceeded &= batch.StageBufferWrite(
+				objectsUploadSucceeded &= batch.UploadBuffer(
 					objectBuffer,
 					static_cast<uint64_t>(range.m_FirstElement) * sizeof(ObjectGPU),
 					data.data(),
@@ -216,7 +216,7 @@ namespace gglab
 			for (const auto& range : materialDirtyRanges)
 			{
 				const std::span<const MaterialGPU> data = info.m_MaterialTable.GetData(range);
-				materialsUploadSucceeded &= batch.StageBufferWrite(
+				materialsUploadSucceeded &= batch.UploadBuffer(
 					materialBuffer,
 					static_cast<uint64_t>(range.m_FirstElement) * sizeof(MaterialGPU),
 					data.data(),

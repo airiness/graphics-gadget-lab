@@ -32,6 +32,7 @@ namespace gglab
 	class DX12DescriptorFreeListAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12FencePoint;
+	class DX12Fence;
 	class DX12Resource;
 	class DX12ViewCache;
 	class DX12PipelineState;
@@ -83,6 +84,8 @@ namespace gglab
 		void FlushGPU() noexcept;
 
 		RHIBackendType GetBackendType() const noexcept override { return RHIBackendType::DX12; }
+		std::unique_ptr<RHITransferContext> CreateTransferContext() noexcept override;
+		void WaitForFence(RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept override;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept override;
@@ -101,6 +104,7 @@ namespace gglab
 		void UnmapBuffer(RHIBufferHandle buffer) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
+		const DX12Fence* ResolveFence(RHIFenceHandle fence) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;

@@ -190,16 +190,15 @@ namespace gglab
 		if (!uploads.empty())
 		{
 			auto batch = m_TransferManager->BeginBatch();
-			auto* transferContext = m_TransferManager->GetTransferContext();
 			for (const auto& data : uploads)
 			{
-				UploadTexture(data, *transferContext);
+				UploadTexture(data, batch);
 			}
-			batch.Submit(true);
+			GGLAB_UNUSED(batch.Submit(true));
 		}
 	}
 
-	void TextureRegistry::Finalize(const DX12FencePoint& fencePoint) noexcept
+	void TextureRegistry::Finalize(const RHIFencePoint& fencePoint) noexcept
 	{
 		for (const auto& texture : m_TextureContainer.m_TextureIDMap | std::views::values)
 		{
@@ -237,9 +236,8 @@ namespace gglab
 
 		auto texUploadData = MakeTextureUploadData(textureId, canonicalPath, semantic);
 		auto batch = m_TransferManager->BeginBatch();
-		auto* transferContext = m_TransferManager->GetTransferContext();
-		UploadTexture(texUploadData, *transferContext);
-		batch.Submit(true);
+		UploadTexture(texUploadData, batch);
+		GGLAB_UNUSED(batch.Submit(true));
 
 		return textureId;
 	}
@@ -331,7 +329,7 @@ namespace gglab
 		return uploadData;
 	}
 
-	void TextureRegistry::UploadTexture(const TextureUploadData& uploadData, RHITransferContext& transferContext) noexcept
+	void TextureRegistry::UploadTexture(const TextureUploadData& uploadData, TransferBatch& transferBatch) noexcept
 	{
 		auto* texture = GetTexture(uploadData.m_TextureId);
 		GGLAB_ASSERT_MSG(texture != nullptr, "TextureRegistry::UploadTexture: invalid TextureID.");
@@ -365,7 +363,13 @@ namespace gglab
 		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture.");
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
-		transferContext.UploadTexture(textureUploadData, texture->m_Texture);
+		if (!transferBatch.UploadTexture(texture->m_Texture, textureUploadData))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture failed to record the texture upload.");
+			m_DX12Device->DestroyTexture(texture->m_Texture);
+			texture->m_Texture.Reset();
+			return;
+		}
 
 		const RHITextureBarrier barrier
 		{
@@ -381,7 +385,7 @@ namespace gglab
 				.m_Layout = RHILayout::ShaderResource,
 			},
 		};
-		transferContext.TextureBarrier(std::span{ &barrier, 1 });
+		transferBatch.TextureBarrier(std::span{ &barrier, 1 });
 
 		RHITextureViewDesc srvDesc{};
 		srvDesc.m_Type = RHITextureViewType::ShaderResource;

@@ -6,14 +6,22 @@
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
 
+#include <memory>
+
 namespace gglab
 {
+	class RHITransferContext;
+
 	class RHIDevice
 	{
 	public:
 		virtual ~RHIDevice() = default;
 
 		virtual RHIBackendType GetBackendType() const noexcept = 0;
+		virtual std::unique_ptr<RHITransferContext> CreateTransferContext() noexcept = 0;
+		virtual void WaitForFence(
+			RHIQueueType waitingQueue,
+			const RHIFencePoint& fencePoint) noexcept = 0;
 
 		virtual RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept = 0;
 		virtual RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept = 0;

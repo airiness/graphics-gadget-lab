@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
@@ -27,7 +27,7 @@ namespace gglab
 
 		uint32_t m_BackBufferIndex = 0;
 
-		DX12FencePoint m_UploadFencePoint{};	// TODO: multi fence points support
+		RHIFencePoint m_UploadFencePoint{};	// TODO: multi fence points support
 		RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
 		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
 

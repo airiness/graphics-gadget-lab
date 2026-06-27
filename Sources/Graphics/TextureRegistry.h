@@ -1,11 +1,12 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/RHI/RHITransferContext.h"
+#include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
 
 namespace gglab
 {
 	class DX12Device;
+	class TransferBatch;
 	class TransferManager;
 
 	enum class ReservedTextureIDIndex : uint32_t
@@ -71,7 +72,7 @@ namespace gglab
 		~TextureRegistry() = default;
 
 		void InitializeReservedTextures() noexcept;
-		void Finalize(const DX12FencePoint& fencePoint) noexcept;
+		void Finalize(const RHIFencePoint& fencePoint) noexcept;
 
 		TextureID LoadTexture(const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
@@ -90,7 +91,7 @@ namespace gglab
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			TextureAssetData&& textureData, TextureSemantic semantic) noexcept;
 
-		void UploadTexture(const TextureUploadData& uploadData, RHITransferContext& transferContext) noexcept;
+		void UploadTexture(const TextureUploadData& uploadData, TransferBatch& transferBatch) noexcept;
 
 	private:
 		void CreateTextureEntry(TextureID id, const char* texName) noexcept;
