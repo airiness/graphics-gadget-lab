@@ -60,31 +60,25 @@ namespace gglab
 				GGLAB_ASSERT(backTexture.IsValid());
 
 				// Create HDR scene color
-				RGTextureDesc sceneColorDesc{};
-				sceneColorDesc.m_Width = width;
-				sceneColorDesc.m_Height = height;
+				RHITextureDesc sceneColorDesc{};
+				sceneColorDesc.m_Extent = { width, height, 1u };
 				sceneColorDesc.m_Format = RHIFormat::R16G16B16A16Float;
-				sceneColorDesc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
 				targets.m_SceneColor = builder.CreateTexture("MainView.SceneColor", sceneColorDesc);
 
 				// Import backbuffer
-				RGTextureDesc backBufferDesc{};
-				backBufferDesc.m_Width = width;
-				backBufferDesc.m_Height = height;
+				RHITextureDesc backBufferDesc{};
+				backBufferDesc.m_Extent = { width, height, 1u };
 				backBufferDesc.m_Format = ToRHIFormat(swapChain->GetFormat());
-				backBufferDesc.m_Usage = RGTextureUsage::RenderTarget;
 
 				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
 					backTexture,
 					backBufferDesc,
-					RGTextureUsage::Present);
+					RGTextureAccess::Present);
 
 				// Create depth buffer
-				RGTextureDesc depthBufferDesc{};
-				depthBufferDesc.m_Width = width;
-				depthBufferDesc.m_Height = height;
+				RHITextureDesc depthBufferDesc{};
+				depthBufferDesc.m_Extent = { width, height, 1u };
 				depthBufferDesc.m_Format = RHIFormat::D24UnormS8Uint;
-				depthBufferDesc.m_Usage = RGTextureUsage::DepthStencil;
 
 				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
 
@@ -98,11 +92,9 @@ namespace gglab
 				auto& shadowRes = builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
 				shadowRes.m_ShadowMapSize = std::max(shadowSettings.m_ShadowMapSize, 1u);
 
-				RGTextureDesc shadowMapDesc{};
-				shadowMapDesc.m_Width = shadowRes.m_ShadowMapSize;
-				shadowMapDesc.m_Height = shadowRes.m_ShadowMapSize;
+				RHITextureDesc shadowMapDesc{};
+				shadowMapDesc.m_Extent = { shadowRes.m_ShadowMapSize, shadowRes.m_ShadowMapSize, 1u };
 				shadowMapDesc.m_Format = RHIFormat::R32Typeless;
-				shadowMapDesc.m_Usage = RGTextureUsage::DepthStencil | RGTextureUsage::Sample;
 				shadowRes.m_DirectionalShadowMap = builder.CreateTexture(
 					"Shadow.DirectionalShadowMap",
 					shadowMapDesc);
@@ -116,16 +108,14 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
 				GGLAB_ASSERT_NOT_NULL(shadowMapPreviewTexture);
 
-				const auto shadowMapPreviewDesc = ToRGTextureDesc(
-					*shadowMapPreviewTexture,
-					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+				const auto shadowMapPreviewDesc = ToRHITextureDesc(*shadowMapPreviewTexture);
 
 				shadowRes.m_DirectionalShadowMapPreview = builder.ImportTexture(
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
 					shadowMapPreviewDesc,
-					RGTextureUsage::None);
+					RGTextureAccess::None);
 			});
 
 		// SwapChain prepare backbuffer
@@ -139,7 +129,7 @@ namespace gglab
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
-					RGTextureUsage::RenderTarget);
+					RGTextureAccess::RenderTarget);
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 			},
 			[swapChain](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
@@ -184,8 +174,8 @@ namespace gglab
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 				data.m_BackBuffer = builder.Write(targets.m_BackBuffer,
-					RGTextureUsage::RenderTarget);
-				builder.Export(data.m_BackBuffer, RGTextureUsage::Present);
+					RGTextureAccess::RenderTarget);
+				builder.Export(data.m_BackBuffer, RGTextureAccess::Present);
 			});
 	}
 }

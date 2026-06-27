@@ -14,8 +14,8 @@ namespace gglab
 		uint32_t m_VirtualResourceIndex = 0;
 		std::string m_ResourceName;
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
-		RGResourceAccessType m_AccessType = RGResourceAccessType::Read;
-		uint64_t m_UsageBits = 0;
+		RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
+		uint64_t m_AccessValue = 0;
 	};
 
 	struct RGSnapshotBarrierInfo

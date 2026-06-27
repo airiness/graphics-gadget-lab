@@ -22,14 +22,13 @@ namespace gglab
 	{
 		// IBL_EnvironmentCubemap
 		{
-			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_EnvironmentCubemapSize;
-			desc.m_Height = createInfo.m_EnvironmentCubemapSize;
+			RHITextureDesc desc{};
+			desc.m_Extent = { createInfo.m_EnvironmentCubemapSize, createInfo.m_EnvironmentCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
-			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -43,14 +42,13 @@ namespace gglab
 
 		// IBL_IrradianceCubemap
 		{
-			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_IrradianceCubemapSize;
-			desc.m_Height = createInfo.m_IrradianceCubemapSize;
+			RHITextureDesc desc{};
+			desc.m_Extent = { createInfo.m_IrradianceCubemapSize, createInfo.m_IrradianceCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_IrradianceCubemapFormat;
-			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -80,14 +78,13 @@ namespace gglab
 				1u,
 				maxMipLevels(createInfo.m_PrefilteredSpecularCubemapSize));
 
-			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_PrefilteredSpecularCubemapSize;
-			desc.m_Height = createInfo.m_PrefilteredSpecularCubemapSize;
+			RHITextureDesc desc{};
+			desc.m_Extent = { createInfo.m_PrefilteredSpecularCubemapSize, createInfo.m_PrefilteredSpecularCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = static_cast<uint16_t>(prefilteredMipLevels);
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_PrefilteredSpecularCubemapFormat;
-			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -101,14 +98,13 @@ namespace gglab
 
 		// IBL_BrdfLut
 		{
-			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_BrdfLutSize;
-			desc.m_Height = createInfo.m_BrdfLutSize;
+			RHITextureDesc desc{};
+			desc.m_Extent = { createInfo.m_BrdfLutSize, createInfo.m_BrdfLutSize, 1u };
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_BrdfLutFormat;
-			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -121,14 +117,16 @@ namespace gglab
 
 		// Preview_IBL_EnvironmentCubemap
 		{
-			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 4u;
-			desc.m_Height = createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 3u;
+			RHITextureDesc desc{};
+			desc.m_Extent = {
+				createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 4u,
+				createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 3u,
+				1u };
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_PreviewIBLEnvironmentCubemapFormat;
-			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -141,14 +139,16 @@ namespace gglab
 
 		// Preview_IBL_PrefilteredSpecularCubemap
 		{
-			RGTextureDesc desc{};
-			desc.m_Width = createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 4u;
-			desc.m_Height = createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 3u;
+			RHITextureDesc desc{};
+			desc.m_Extent = {
+				createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 4u,
+				createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 3u,
+				1u };
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_PreviewIBLPrefilteredSpecularCubemapFormat;
-			desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -164,14 +164,13 @@ namespace gglab
 	{
 		const uint32_t size = std::max(previewSize, 1u);
 
-		RGTextureDesc desc{};
-		desc.m_Width = size;
-		desc.m_Height = size;
+		RHITextureDesc desc{};
+		desc.m_Extent = { size, size, 1u };
 		desc.m_ArraySize = 1;
 		desc.m_MipLevels = 1;
 		desc.m_SampleCount = 1;
 		desc.m_Format = RHIFormat::R8G8B8A8Unorm;
-		desc.m_Usage = RGTextureUsage::RenderTarget | RGTextureUsage::Sample;
+		desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
 
 		RHITextureViewDesc srvDesc{};
 		srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -297,7 +296,7 @@ namespace gglab
 			SamplerPreset::LinearClamp);
 
 		const auto& prefilteredEntry = m_TextureEntries[utils::ToIndex(TextureIndex::IBL_PrefilteredSpecularCubemap)];
-		out.PrefilteredSpecularMipLevels = prefilteredEntry.m_RgTexDesc.m_MipLevels;
+		out.PrefilteredSpecularMipLevels = prefilteredEntry.m_TextureDesc.m_MipLevels;
 		out.EnvironmentIntensity = 1.0f;
 	}
 
@@ -314,16 +313,16 @@ namespace gglab
 	}
 
 	void RenderResourceRegistry::EnsureTexture(TextureIndex index,
-		const RGTextureDesc& desc,
+		const RHITextureDesc& desc,
 		const RHITextureViewDesc& srvDesc,
 		const DX12FencePoint* retireFenceOpt) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
 
 		// Create new texture and ResourceIndex
-		auto createTexture = [this, index, &srvDesc](TextureEntry& outEntry, const RGTextureDesc& desc) noexcept
+		auto createTexture = [this, index, &srvDesc](TextureEntry& outEntry, const RHITextureDesc& desc) noexcept
 			{
-				const auto texIndex = m_RGGpuResAllocator->Acquire<RGTextureDesc>(desc);
+				const auto texIndex = m_RGGpuResAllocator->Acquire<RHITextureDesc>(desc);
 
 				GGLAB_ASSERT_MSG(texIndex.IsValid(),
 					"RenderResourceRegistry: Acquire texture failed.");
@@ -332,7 +331,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(texture != nullptr,
 					"RenderResourceRegistry: allocator returned null texture.");
 
-				outEntry.m_RgTexDesc = desc;
+				outEntry.m_TextureDesc = desc;
 				outEntry.m_InternalIndex = texIndex;
 				outEntry.m_Allocated = true;
 				outEntry.m_SrvDesc = srvDesc;
@@ -353,7 +352,7 @@ namespace gglab
 		{
 			if (m_RGGpuResAllocator->IsCompatibleTexture(entry.m_InternalIndex, desc))
 			{
-				entry.m_RgTexDesc = desc;
+				entry.m_TextureDesc = desc;
 
 				// If Srv create info changed, update the texture DescriptorID
 				if (entry.m_SrvDesc != srvDesc)

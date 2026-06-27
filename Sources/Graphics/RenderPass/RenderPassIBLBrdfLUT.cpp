@@ -52,14 +52,13 @@ namespace gglab
 				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
 
-				const auto rgDesc = ToRGTextureDesc(*brdfLutTexture,
-					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+				const auto textureDesc = ToRHITextureDesc(*brdfLutTexture);
 
-				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureUsage::RenderTarget);
+				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureAccess::RenderTarget);
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BrdfLut);
 
-				data.m_Width = rgDesc.m_Width;
-				data.m_Height = rgDesc.m_Height;
+				data.m_Width = textureDesc.m_Extent.m_Width;
+				data.m_Height = textureDesc.m_Extent.m_Height;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{

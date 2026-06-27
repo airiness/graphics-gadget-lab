@@ -15,40 +15,74 @@ namespace gglab::devtools
 	};
 
 	template<>
-	struct EnumTextTraits<RGResourceAccessType>
+	struct EnumTextTraits<RGDependencyAccess>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGResourceAccessType::Read, "Read" },
-			EnumTextEntry{ RGResourceAccessType::Write, "Write" },
+			EnumTextEntry{ RGDependencyAccess::Read, "Read" },
+			EnumTextEntry{ RGDependencyAccess::Write, "Write" },
+			EnumTextEntry{ RGDependencyAccess::ReadWrite, "ReadWrite" },
 		};
 	};
 
 	template<>
-	struct EnumTextTraits<RGTextureUsage>
+	struct EnumTextTraits<RGTextureAccess>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGTextureUsage::Sample, "Sample" },
-			EnumTextEntry{ RGTextureUsage::RenderTarget, "RTV" },
-			EnumTextEntry{ RGTextureUsage::DepthStencil, "DSV Write" },
-			EnumTextEntry{ RGTextureUsage::DepthStencilRead, "DSV Read" },
-			EnumTextEntry{ RGTextureUsage::UAV, "UAV" },
-			EnumTextEntry{ RGTextureUsage::CopySrc, "CopySrc" },
-			EnumTextEntry{ RGTextureUsage::CopyDst, "CopyDst" },
-			EnumTextEntry{ RGTextureUsage::Present, "Present" },
+			EnumTextEntry{ RGTextureAccess::None, "None" },
+			EnumTextEntry{ RGTextureAccess::Sample, "Sample" },
+			EnumTextEntry{ RGTextureAccess::RenderTarget, "RTV" },
+			EnumTextEntry{ RGTextureAccess::DepthStencilWrite, "DSV Write" },
+			EnumTextEntry{ RGTextureAccess::DepthStencilRead, "DSV Read" },
+			EnumTextEntry{ RGTextureAccess::UnorderedAccess, "UAV" },
+			EnumTextEntry{ RGTextureAccess::CopySource, "CopySrc" },
+			EnumTextEntry{ RGTextureAccess::CopyDest, "CopyDst" },
+			EnumTextEntry{ RGTextureAccess::Present, "Present" },
+		};
+	};
+
+	template<>
+	struct EnumTextTraits<RGBufferAccess>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGBufferAccess::None, "None" },
+			EnumTextEntry{ RGBufferAccess::Vertex, "Vertex" },
+			EnumTextEntry{ RGBufferAccess::Index, "Index" },
+			EnumTextEntry{ RGBufferAccess::Constant, "Constant" },
+			EnumTextEntry{ RGBufferAccess::StructuredRead, "StructuredRead" },
+			EnumTextEntry{ RGBufferAccess::UnorderedAccess, "UAV" },
+			EnumTextEntry{ RGBufferAccess::CopySource, "CopySrc" },
+			EnumTextEntry{ RGBufferAccess::CopyDest, "CopyDst" },
+			EnumTextEntry{ RGBufferAccess::IndirectArgument, "IndirectArgument" },
+		};
+	};
+
+	template<>
+	struct EnumTextTraits<RHITextureUsage>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RHITextureUsage::Sampled, "Sampled" },
+			EnumTextEntry{ RHITextureUsage::RenderTarget, "RenderTarget" },
+			EnumTextEntry{ RHITextureUsage::DepthStencil, "DepthStencil" },
+			EnumTextEntry{ RHITextureUsage::UnorderedAccess, "UnorderedAccess" },
+			EnumTextEntry{ RHITextureUsage::CopySource, "CopySource" },
+			EnumTextEntry{ RHITextureUsage::CopyDest, "CopyDest" },
+			EnumTextEntry{ RHITextureUsage::Present, "Present" },
 		};
 		static constexpr std::string_view NoneText = "None";
 	};
 
 	template<>
-	struct EnumTextTraits<RGBufferUsage>
+	struct EnumTextTraits<RHIBufferUsage>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGBufferUsage::Vertex, "Vertex" },
-			EnumTextEntry{ RGBufferUsage::Index, "Index" },
-			EnumTextEntry{ RGBufferUsage::Constant, "Constant" },
-			EnumTextEntry{ RGBufferUsage::UAV, "UAV" },
-			EnumTextEntry{ RGBufferUsage::CopySrc, "CopySrc" },
-			EnumTextEntry{ RGBufferUsage::CopyDst, "CopyDst" },
+			EnumTextEntry{ RHIBufferUsage::Vertex, "Vertex" },
+			EnumTextEntry{ RHIBufferUsage::Index, "Index" },
+			EnumTextEntry{ RHIBufferUsage::Constant, "Constant" },
+			EnumTextEntry{ RHIBufferUsage::Structured, "Structured" },
+			EnumTextEntry{ RHIBufferUsage::UnorderedAccess, "UnorderedAccess" },
+			EnumTextEntry{ RHIBufferUsage::IndirectArgument, "IndirectArgument" },
+			EnumTextEntry{ RHIBufferUsage::CopySource, "CopySource" },
+			EnumTextEntry{ RHIBufferUsage::CopyDest, "CopyDest" },
 		};
 		static constexpr std::string_view NoneText = "None";
 	};

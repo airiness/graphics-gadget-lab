@@ -30,6 +30,16 @@ namespace gglab
 		const char* m_DebugName = nullptr;
 	};
 
+	struct RHISubresourceRange
+	{
+		uint32_t m_BaseMip = 0;
+		uint32_t m_MipCount = 1;
+		uint32_t m_BaseArraySlice = 0;
+		uint32_t m_ArraySliceCount = 1;
+		uint32_t m_BasePlane = 0;
+		uint32_t m_PlaneCount = 1;
+	};
+
 	class RHITextureOwner
 	{
 	public:

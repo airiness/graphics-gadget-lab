@@ -59,6 +59,9 @@ namespace gglab
 		virtual ~RGVirtualResourceBase() = default;
 		virtual void Devirtualize(RGGpuResourceAllocator*) noexcept = 0;
 		virtual void Destroy(RenderGraph&) noexcept = 0;
+		virtual void ResetCompiledUsage() noexcept = 0;
+		virtual void AccumulateAccess(uint64_t accessValue) noexcept = 0;
+		virtual uint64_t GetCompiledUsageBits() const noexcept = 0;
 
 		StringID m_NameId;
 		bool m_Imported = false;
@@ -79,17 +82,19 @@ namespace gglab
 	{
 		using Desc = typename RESOURCE::Descriptor;
 		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
-		using Usage = typename RESOURCE::Usage;
+		using Access = typename RESOURCE::Access;
 		using Handle = typename RGResourceTraits<RESOURCE>::Handle;
 
 		Desc m_Desc = {};
 		SubresourceDesc m_SubresourceDesc = {};
-		Usage m_Usage = RESOURCE::DefaultNoneUsage;
 		ResourceIndex m_GpuResourceIndex = {};
 		Handle m_ImportedHandle{};
 
 		void Devirtualize(RGGpuResourceAllocator* allocator) noexcept override;
 		void Destroy(RenderGraph& rg) noexcept override;
+		void ResetCompiledUsage() noexcept override;
+		void AccumulateAccess(uint64_t accessValue) noexcept override;
+		uint64_t GetCompiledUsageBits() const noexcept override;
 	};
 
 	struct RGResourceNode
@@ -113,9 +118,9 @@ namespace gglab
 		struct Access
 		{
 			RGResourceNode::Index m_ResourceNodeIndex{};
-			uint64_t m_UsageBits = 0;
+			uint64_t m_AccessValue = 0;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
-			RGResourceAccessType m_AccessType = RGResourceAccessType::Read;
+			RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
 		};
 
 		struct BarrierIntent
@@ -175,12 +180,12 @@ namespace gglab
 				return m_RG.CreateInternal<RESOURCE>(name, desc);
 			}
 
-			RGTextureId CreateTexture(const char* name, const RGTextureDesc& desc = {}) noexcept
+			RGTextureId CreateTexture(const char* name, const RHITextureDesc& desc = {}) noexcept
 			{
 				return Create<RGTextureResource>(name, desc);
 			}
 
-			RGBufferId CreateBuffer(const char* name, const RGBufferDesc& desc = {}) noexcept
+			RGBufferId CreateBuffer(const char* name, const RHIBufferDesc& desc = {}) noexcept
 			{
 				return Create<RGBufferResource>(name, desc);
 			}
@@ -189,17 +194,17 @@ namespace gglab
 			RGResourceId<RESOURCE> Import(const char* name,
 				typename RGResourceTraits<RESOURCE>::Handle handle,
 				const typename RESOURCE::Descriptor& desc,
-				typename RESOURCE::Usage initialUsage) noexcept
+				typename RESOURCE::Access initialAccess) noexcept
 			{
-				return m_RG.ImportInternal<RESOURCE>(name, handle, desc, initialUsage);
+				return m_RG.ImportInternal<RESOURCE>(name, handle, desc, initialAccess);
 			}
 
 			RGTextureId ImportTexture(const char* name,
 				RHITextureHandle texture,
-				const RGTextureDesc& desc,
-				RGTextureUsage initialUsage) noexcept
+				const RHITextureDesc& desc,
+				RGTextureAccess initialAccess) noexcept
 			{
-				return Import<RGTextureResource>(name, texture, desc, initialUsage);
+				return Import<RGTextureResource>(name, texture, desc, initialAccess);
 			}
 
 			template<RHITextureViewType T>
@@ -212,30 +217,37 @@ namespace gglab
 
 			RGBufferId ImportBuffer(const char* name,
 				RHIBufferHandle buffer,
-				const RGBufferDesc& desc,
-				RGBufferUsage initialUsage) noexcept
+				const RHIBufferDesc& desc,
+				RGBufferAccess initialAccess) noexcept
 			{
-				return Import<RGBufferResource>(name, buffer, desc, initialUsage);
+				return Import<RGBufferResource>(name, buffer, desc, initialAccess);
 			}
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Usage usage = RESOURCE::DefaultReadUsage) noexcept
+				typename RESOURCE::Access access = RESOURCE::DefaultReadAccess) noexcept
 			{
-				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, usage);
+				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access);
 			}
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Usage usage = RESOURCE::DefaultWriteUsage) noexcept
+				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess) noexcept
 			{
-				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, usage);
+				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access);
 			}
 
 			template<typename RESOURCE>
-			void Export(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Usage finalUsage) noexcept
+			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Access access) noexcept
 			{
-				m_RG.ExportInternal<RESOURCE>(resourceId, finalUsage);
+				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access);
+			}
+
+			template<typename RESOURCE>
+			void Export(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access finalAccess) noexcept
+			{
+				m_RG.ExportInternal<RESOURCE>(resourceId, finalAccess);
 			}
 
 			void SideEffect() noexcept
@@ -299,18 +311,22 @@ namespace gglab
 		RGResourceId<RESOURCE> ImportInternal(const char* name,
 			typename RGResourceTraits<RESOURCE>::Handle handle,
 			const typename RESOURCE::Descriptor& desc,
-			typename RESOURCE::Usage initialUsage) noexcept;
+			typename RESOURCE::Access initialAccess) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex,
-			RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex,
-			RGResourceId<RESOURCE> resourceId, RESOURCE::Usage usage) noexcept;
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access) noexcept;
 
 		template<typename RESOURCE>
-		void ExportInternal(RGResourceId<RESOURCE> resourceId, RESOURCE::Usage finalUsage) noexcept;
+		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNode::Index passNodeIndex,
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access) noexcept;
+
+		template<typename RESOURCE>
+		void ExportInternal(RGResourceId<RESOURCE> resourceId, RESOURCE::Access finalAccess) noexcept;
 
 		template<typename RESOURCE>
 		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
@@ -332,10 +348,6 @@ namespace gglab
 		void TrackPassResourceUses(RHICommandContext* commandContext, const RGPassNode& passNode) noexcept;
 		void EmitBarriers(RHICommandContext* commandContext,
 			const std::vector<RGPassNode::BarrierIntent>& barriers) noexcept;
-
-	private:
-		template<typename RESOURCE>
-		static void AccumulateUsageToVirtual(RGResourceNode& resourceNode, RESOURCE::Usage usage) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -459,6 +471,10 @@ namespace gglab
 	inline RGResourceId<RESOURCE> RenderGraph::CreateInternal(const char* name,
 		const typename RESOURCE::Descriptor& desc) noexcept
 	{
+		using RHIUsage = std::remove_cvref_t<decltype(desc.m_Usage)>;
+		GGLAB_ASSERT_MSG(desc.m_Usage == RHIUsage::None,
+			"RenderGraph resource usage is inferred from reachable pass accesses during Compile().");
+
 		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
 		RGResourceSlot slot;
@@ -473,7 +489,7 @@ namespace gglab
 		virtualResource->m_Devirtualized = false;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
-		virtualResource->m_Usage = RESOURCE::DefaultNoneUsage;
+		virtualResource->ResetCompiledUsage();
 		m_VirtualResources.push_back(virtualResource);
 
 		RGResourceNode resourceNode
@@ -494,7 +510,7 @@ namespace gglab
 	inline RGResourceId<RESOURCE> RenderGraph::ImportInternal(const char* name,
 		typename RGResourceTraits<RESOURCE>::Handle importedHandle,
 		const typename RESOURCE::Descriptor& desc,
-		typename RESOURCE::Usage initialUsage) noexcept
+		typename RESOURCE::Access initialAccess) noexcept
 	{
 		GGLAB_ASSERT_MSG(name && *name, "Import name must be valid.");
 		GGLAB_ASSERT_MSG(importedHandle.IsValid(), "Import RHI resource handle must be valid.");
@@ -513,10 +529,10 @@ namespace gglab
 		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.
-		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialUsage);
+		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialAccess);
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
-		virtualResource->m_Usage = RESOURCE::DefaultNoneUsage;
+		virtualResource->ResetCompiledUsage();
 		virtualResource->m_ImportedHandle = importedHandle;
 		m_VirtualResources.push_back(virtualResource);
 
@@ -537,7 +553,7 @@ namespace gglab
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Usage usage) noexcept
+		typename RESOURCE::Access resourceAccess) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
 
@@ -552,13 +568,11 @@ namespace gglab
 
 		resourceNode.m_Readers.push_back(stablePassNodeIndex);
 
-		AccumulateUsageToVirtual<RESOURCE>(resourceNode, usage);
-
 		RGPassNode::Access access = {};
 		access.m_ResourceNodeIndex = slot.m_ResourceNodeIndex;
-		access.m_UsageBits = static_cast<uint64_t>(usage);
+		access.m_AccessValue = static_cast<uint64_t>(resourceAccess);
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
-		access.m_AccessType = RGResourceAccessType::Read;
+		access.m_DependencyAccess = RGDependencyAccess::Read;
 		passNode.m_Accesses.push_back(access);
 
 		return resourceId;
@@ -566,7 +580,7 @@ namespace gglab
 
 	template<typename RESOURCE>
 	inline void RenderGraph::ExportInternal(RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Usage finalUsage) noexcept
+		typename RESOURCE::Access finalAccess) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must export valid resource.");
 
@@ -574,13 +588,13 @@ namespace gglab
 		GGLAB_ASSERT_MSG(virtualResource != nullptr, "Export resource must exist.");
 		GGLAB_ASSERT_MSG(virtualResource->m_Imported, "Only imported resources may declare an exported state.");
 
-		virtualResource->m_FinalBarrierState = ToRHIResourceState(finalUsage);
+		virtualResource->m_FinalBarrierState = ToRHIResourceState(finalAccess);
 	}
 
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Usage usage) noexcept
+		typename RESOURCE::Access resourceAccess) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
 
@@ -605,9 +619,6 @@ namespace gglab
 		}
 		curResourceNode->m_Writer = stablePassNodeIndex;
 
-		// Accumulate usage
-		AccumulateUsageToVirtual<RESOURCE>(*curResourceNode, usage);
-
 		// Imported resource -> pass side effect
 		if (curResourceNode->m_VirtualResource && curResourceNode->m_VirtualResource->m_Imported)
 		{
@@ -616,11 +627,58 @@ namespace gglab
 
 		RGPassNode::Access access = {};
 		access.m_ResourceNodeIndex = slot.m_ResourceNodeIndex;
-		access.m_UsageBits = static_cast<uint64_t>(usage);
+		access.m_AccessValue = static_cast<uint64_t>(resourceAccess);
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
-		access.m_AccessType = RGResourceAccessType::Write;
+		access.m_DependencyAccess = RGDependencyAccess::Write;
 		passNode.m_Accesses.push_back(access);
 
+		return resourceId;
+	}
+
+	template<typename RESOURCE>
+	inline RGResourceId<RESOURCE> RenderGraph::ReadWriteInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> resourceId,
+		typename RESOURCE::Access resourceAccess) noexcept
+	{
+		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read-write valid resource.");
+
+		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
+		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "ReadWrite with stale handle.Version");
+
+		const RGResourceNode::Index previousNodeIndex = slot.m_ResourceNodeIndex;
+		RGResourceNode& previousNode = m_ResourceNodes[previousNodeIndex.Value()];
+		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
+		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
+
+		GGLAB_ASSERT_MSG(previousNode.m_Writer != stablePassNodeIndex,
+			"Pass can not read-write a resource it already writes.");
+		GGLAB_ASSERT_MSG(previousNode.m_Writer.IsValid() || previousNode.m_VirtualResource->m_Imported,
+			"ReadWrite requires existing contents. Use Write to initialize a transient resource.");
+
+		previousNode.m_Readers.push_back(stablePassNodeIndex);
+		auto* virtualResource = previousNode.m_VirtualResource;
+
+		++slot.m_Version;
+		resourceId.m_Version = slot.m_Version;
+		RGResourceNode nextResourceNode = {};
+		nextResourceNode.m_ResourceHandle = resourceId;
+		nextResourceNode.m_VirtualResource = virtualResource;
+		nextResourceNode.m_Writer = stablePassNodeIndex;
+		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
+		m_ResourceNodes.push_back(nextResourceNode);
+
+		if (virtualResource && virtualResource->m_Imported)
+		{
+			passNode.m_SideEffect = true;
+		}
+
+		passNode.m_Accesses.push_back(
+			{
+				.m_ResourceNodeIndex = previousNodeIndex,
+				.m_AccessValue = static_cast<uint64_t>(resourceAccess),
+				.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,
+				.m_DependencyAccess = RGDependencyAccess::ReadWrite,
+			});
 		return resourceId;
 	}
 
@@ -663,13 +721,6 @@ namespace gglab
 		}
 	}
 
-	template<typename RESOURCE>
-	inline void RenderGraph::AccumulateUsageToVirtual(RGResourceNode& resourceNode, typename RESOURCE::Usage usage) noexcept
-	{
-		auto* virtualResource = static_cast<RGVirtualResource<RESOURCE>*>(resourceNode.m_VirtualResource);
-		virtualResource->m_Usage |= usage;
-	}
-
 	// RGVirtualResource functions
 	template<typename RESOURCE>
 	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGGpuResourceAllocator* allocator) noexcept
@@ -706,5 +757,23 @@ namespace gglab
 		rg.MarkDestroyResourceIndex<RESOURCE>(m_GpuResourceIndex);
 		m_GpuResourceIndex.Reset();
 		m_Devirtualized = false;
+	}
+
+	template<typename RESOURCE>
+	inline void RGVirtualResource<RESOURCE>::ResetCompiledUsage() noexcept
+	{
+		m_Desc.m_Usage = {};
+	}
+
+	template<typename RESOURCE>
+	inline void RGVirtualResource<RESOURCE>::AccumulateAccess(uint64_t accessValue) noexcept
+	{
+		m_Desc.m_Usage |= ToRHIUsage(static_cast<Access>(accessValue));
+	}
+
+	template<typename RESOURCE>
+	inline uint64_t RGVirtualResource<RESOURCE>::GetCompiledUsageBits() const noexcept
+	{
+		return static_cast<uint64_t>(m_Desc.m_Usage);
 	}
 }

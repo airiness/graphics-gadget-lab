@@ -24,21 +24,6 @@ namespace gglab
 			return passIndex.IsValid() ? static_cast<int32_t>(passIndex.Value()) : -1;
 		}
 
-		static uint64_t GetVirtualResourceUsageBits(const RGVirtualResourceBase* virtualResource) noexcept
-		{
-			GGLAB_ASSERT_NOT_NULL(virtualResource);
-
-			switch (virtualResource->m_ResourceType)
-			{
-			case RGResourceType::RGTexture:
-				return static_cast<uint64_t>(static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource)->m_Usage);
-			case RGResourceType::RGBuffer:
-				return static_cast<uint64_t>(static_cast<const RGVirtualResource<RGBufferResource>*>(virtualResource)->m_Usage);
-			}
-
-			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
-		}
-
 		static ResourceIndex GetVirtualResourceGpuIndex(const RGVirtualResourceBase* virtualResource) noexcept
 		{
 			GGLAB_ASSERT_NOT_NULL(virtualResource);
@@ -165,7 +150,7 @@ namespace gglab
 					resourceInfo.m_RefCount = virtualResource->m_RefCount;
 					resourceInfo.m_FirstUserPassIndex = ToSnapshotPassIndex(virtualResource->m_FirstUser);
 					resourceInfo.m_LastUserPassIndex = ToSnapshotPassIndex(virtualResource->m_LastUser);
-					resourceInfo.m_UsageBits = GetVirtualResourceUsageBits(virtualResource);
+					resourceInfo.m_UsageBits = virtualResource->GetCompiledUsageBits();
 					resourceInfo.m_GpuResourceIndex = GetVirtualResourceGpuIndex(virtualResource);
 					resourceInfo.m_InitialBarrierState = virtualResource->m_InitialBarrierState;
 					resourceInfo.m_HasFinalBarrierState = virtualResource->m_FinalBarrierState.has_value();
@@ -215,8 +200,8 @@ namespace gglab
 				accessInfo.m_VirtualResourceIndex = LookupVirtualResourceIndex(resourceNode.m_VirtualResource);
 				accessInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());
 				accessInfo.m_ResourceType = access.m_ResourceType;
-				accessInfo.m_AccessType = access.m_AccessType;
-				accessInfo.m_UsageBits = access.m_UsageBits;
+				accessInfo.m_DependencyAccess = access.m_DependencyAccess;
+				accessInfo.m_AccessValue = access.m_AccessValue;
 				return accessInfo;
 			}
 

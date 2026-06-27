@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceHandle.h"
 #include "Graphics/RenderGraph/RGTypes.h"
+#include "Graphics/RHI/RHIBuffer.h"
 #include "Core/EnumFlags.h"
 
 namespace gglab
@@ -11,94 +12,68 @@ namespace gglab
 		RGBuffer,
 	};
 
-	enum class RGResourceAccessType : uint8_t
+	// Describes dependency semantics in the render graph.
+	// Read      : the pass depends on previous contents.
+	// Write     : the pass produces new contents and does not depend on previous contents.
+	// ReadWrite : the pass reads previous contents and writes updated contents.
+	enum class RGDependencyAccess : uint8_t
 	{
 		Read,
 		Write,
+		ReadWrite,
+	};
+
+	// Describes how a texture is accessed by a pass.
+	// This is a single-use semantic, not a bitmask.
+	// Resource creation capabilities are inferred by accumulating all pass usages.
+	enum class RGTextureAccess : uint8_t
+	{
+		None,
+		Sample,
+		RenderTarget,
+		DepthStencilWrite,
+		DepthStencilRead,
+		UnorderedAccess,
+		CopySource,
+		CopyDest,
+		Present,
+	};
+
+	enum class RGBufferAccess: uint8_t
+	{
+		None,
+		Vertex,
+		Index,
+		Constant,
+		StructuredRead,
+		UnorderedAccess,
+		CopySource,
+		CopyDest,
+		IndirectArgument,
 	};
 
 	template<typename RESOURCE>
 	struct RGResourceTraits;
 
-	enum class RGTextureUsage : uint32_t
-	{
-		None = 0,
-		Sample = 1u << 0,		// SRV
-		RenderTarget = 1u << 1,	// RTV
-		DepthStencil = 1u << 2,	// DSV
-		UAV = 1u << 3,			// UAV
-		CopySrc = 1u << 4,
-		CopyDst = 1u << 5,
-		Present = 1u << 6,		// BackBuffer
-		DepthStencilRead = 1u << 7,
-	};
-	GGLAB_ENUM_FLAGS(RGTextureUsage);
-
-	enum class RGBufferUsage : uint32_t
-	{
-		None = 0,
-		Vertex = 1u << 0,
-		Index = 1u << 1,
-		Constant = 1u << 2,
-		UAV = 1u << 3,
-		CopySrc = 1u << 4,
-		CopyDst = 1u << 5,
-	};
-	GGLAB_ENUM_FLAGS(RGBufferUsage);
-
-	struct RGTextureDesc
-	{
-		// TODO: 3d texture support
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
-		uint16_t m_ArraySize = 1;
-		uint16_t m_MipLevels = 1;
-		uint16_t m_SampleCount = 1;
-		RHIFormat m_Format = RHIFormat::Unknown;
-		RGTextureUsage m_Usage = RGTextureUsage::None;
-
-		bool operator==(const RGTextureDesc&) const noexcept = default;
-	};
-
-	struct RGTextureSubresourceDesc
-	{
-		uint32_t m_BaseMip = 0;
-		uint32_t m_LevelCount = 1;
-		uint32_t m_BaseArray = 0;
-		uint32_t m_ArrayCount = 1;
-	};
-
-	struct RGBufferDesc
-	{
-		uint64_t m_SizeInBytes = 0;
-		uint32_t m_Stride = 0;
-		RHIFormat m_Format = RHIFormat::Unknown;
-		RGBufferUsage m_Usage = RGBufferUsage::None;
-
-		bool operator==(const RGBufferDesc&) const noexcept = default;
-	};
-
 	struct RGTextureResource
 	{
-		using Descriptor = RGTextureDesc;
-		using SubresourceDescriptor = RGTextureSubresourceDesc;
-		using Usage = RGTextureUsage;
+		using Descriptor = RHITextureDesc;
+		using SubresourceDescriptor = RHISubresourceRange;
+		using Access = RGTextureAccess;
 
-		static constexpr RGTextureUsage DefaultReadUsage = RGTextureUsage::Sample;
-		static constexpr RGTextureUsage DefaultWriteUsage = RGTextureUsage::RenderTarget;
-		static constexpr RGTextureUsage DefaultNoneUsage = RGTextureUsage::None;
+		static constexpr RGTextureAccess DefaultReadAccess = RGTextureAccess::Sample;
+		static constexpr RGTextureAccess DefaultWriteAccess = RGTextureAccess::RenderTarget;
 	};
 	using RGTextureId = RGResourceId<RGTextureResource>;
 
 	struct RGBufferResource
 	{
-		using Descriptor = RGBufferDesc;
+		using Descriptor = RHIBufferDesc;
 		using SubresourceDescriptor = std::monostate;
-		using Usage = RGBufferUsage;
+		using Access = RGBufferAccess;
 
-		static constexpr RGBufferUsage DefaultReadUsage = RGBufferUsage::Vertex;
-		static constexpr RGBufferUsage DefaultWriteUsage = RGBufferUsage::UAV;
-		static constexpr RGBufferUsage DefaultNoneUsage = RGBufferUsage::None;
+		static constexpr RGBufferAccess DefaultReadAccess = RGBufferAccess::Vertex;
+		static constexpr RGBufferAccess DefaultWriteAccess = RGBufferAccess::UnorderedAccess;
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
 
@@ -107,7 +82,7 @@ namespace gglab
 	template<>
 	struct RGResourceTraits<RGTextureResource>
 	{
-		using Usage = RGTextureUsage;
+		using Access = RGTextureAccess;
 		using Handle = RHITextureHandle;
 		using Native = DX12Texture;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
@@ -118,7 +93,7 @@ namespace gglab
 	template<>
 	struct RGResourceTraits<RGBufferResource>
 	{
-		using Usage = RGBufferUsage;
+		using Access = RGBufferAccess;
 		using Handle = RHIBufferHandle;
 		using Native = DX12Buffer;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;

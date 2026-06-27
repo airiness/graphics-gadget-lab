@@ -23,73 +23,89 @@ namespace gglab
 		return before != after || (HasUavAccess(before) && HasUavAccess(after));
 	}
 
-	template<typename ResourceUsage>
-	constexpr inline RHIResourceState ToRHIResourceState(ResourceUsage usage) noexcept = delete;
-
-	template<>
-	constexpr inline RHIResourceState ToRHIResourceState<RGTextureUsage>(RGTextureUsage usage) noexcept
+	constexpr inline RHITextureUsage ToRHIUsage(RGTextureAccess access) noexcept
 	{
-		using U = RGTextureUsage;
-
-		GGLAB_ASSERT_MSG(
-			usage == U::None ||
-			usage == U::Sample ||
-			usage == U::RenderTarget ||
-			usage == U::DepthStencil ||
-			usage == U::DepthStencilRead ||
-			usage == U::UAV ||
-			usage == U::CopySrc ||
-			usage == U::CopyDst ||
-			usage == U::Present,
-			"RGTextureUsage must describe exactly one access type.");
-
-		switch (usage)
+		switch (access)
 		{
-		case U::None:
+		case RGTextureAccess::None: return RHITextureUsage::None;
+		case RGTextureAccess::Sample: return RHITextureUsage::Sampled;
+		case RGTextureAccess::RenderTarget: return RHITextureUsage::RenderTarget;
+		case RGTextureAccess::DepthStencilWrite:
+		case RGTextureAccess::DepthStencilRead: return RHITextureUsage::DepthStencil;
+		case RGTextureAccess::UnorderedAccess: return RHITextureUsage::UnorderedAccess;
+		case RGTextureAccess::CopySource: return RHITextureUsage::CopySource;
+		case RGTextureAccess::CopyDest: return RHITextureUsage::CopyDest;
+		case RGTextureAccess::Present: return RHITextureUsage::Present;
+		}
+		GGLAB_UNREACHABLE("Unhandled RGTextureAccess.");
+	}
+
+	constexpr inline RHIBufferUsage ToRHIUsage(RGBufferAccess access) noexcept
+	{
+		switch (access)
+		{
+		case RGBufferAccess::None: return RHIBufferUsage::None;
+		case RGBufferAccess::Vertex: return RHIBufferUsage::Vertex;
+		case RGBufferAccess::Index: return RHIBufferUsage::Index;
+		case RGBufferAccess::Constant: return RHIBufferUsage::Constant;
+		case RGBufferAccess::StructuredRead: return RHIBufferUsage::Structured;
+		case RGBufferAccess::UnorderedAccess: return RHIBufferUsage::UnorderedAccess;
+		case RGBufferAccess::CopySource: return RHIBufferUsage::CopySource;
+		case RGBufferAccess::CopyDest: return RHIBufferUsage::CopyDest;
+		case RGBufferAccess::IndirectArgument: return RHIBufferUsage::IndirectArgument;
+		}
+		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");
+	}
+
+	constexpr inline RHIResourceState ToRHIResourceState(RGTextureAccess access) noexcept
+	{
+		switch (access)
+		{
+		case RGTextureAccess::None:
 			return CommonRHIResourceState();
-		case U::Sample:
+		case RGTextureAccess::Sample:
 			return
 			{
 				.m_Access = RHIAccess::ShaderResource,
 				.m_Layout = RHILayout::ShaderResource,
 			};
-		case U::RenderTarget:
+		case RGTextureAccess::RenderTarget:
 			return
 			{
 				.m_Access = RHIAccess::RenderTarget,
 				.m_Layout = RHILayout::RenderTarget,
 			};
-		case U::DepthStencil:
+		case RGTextureAccess::DepthStencilWrite:
 			return
 			{
 				.m_Access = RHIAccess::DepthStencilWrite,
 				.m_Layout = RHILayout::DepthStencilWrite,
 			};
-		case U::DepthStencilRead:
+		case RGTextureAccess::DepthStencilRead:
 			return
 			{
 				.m_Access = RHIAccess::DepthStencilRead,
 				.m_Layout = RHILayout::DepthStencilRead,
 			};
-		case U::UAV:
+		case RGTextureAccess::UnorderedAccess:
 			return
 			{
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::UnorderedAccess,
 			};
-		case U::CopySrc:
+		case RGTextureAccess::CopySource:
 			return
 			{
 				.m_Access = RHIAccess::CopySource,
 				.m_Layout = RHILayout::CopySource,
 			};
-		case U::CopyDst:
+		case RGTextureAccess::CopyDest:
 			return
 			{
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::CopyDest,
 			};
-		case U::Present:
+		case RGTextureAccess::Present:
 			return
 			{
 				.m_Access = RHIAccess::Present,
@@ -97,85 +113,56 @@ namespace gglab
 			};
 		}
 
-		GGLAB_UNREACHABLE("Unhandled RGTextureUsage.");
+		GGLAB_UNREACHABLE("Unhandled RGTextureAccess.");
 	}
 
-	template<>
-	constexpr inline RHIResourceState ToRHIResourceState<RGBufferUsage>(RGBufferUsage usage) noexcept
+	constexpr inline RHIResourceState ToRHIResourceState(RGBufferAccess access) noexcept
 	{
-		using U = RGBufferUsage;
-
-		constexpr U readUsages = U::Vertex | U::Index | U::Constant;
-		const bool hasReadUsage = Any(usage & readUsages);
-		const bool hasExclusiveUsage = Test(usage, U::UAV | U::CopySrc | U::CopyDst);
-		GGLAB_ASSERT_MSG(
-			usage == U::None ||
-			(hasReadUsage && !hasExclusiveUsage) ||
-			usage == U::UAV ||
-			usage == U::CopySrc ||
-			usage == U::CopyDst,
-			"RGBufferUsage contains incompatible access types.");
-
-		if (usage == U::None)
+		switch (access)
 		{
+		case RGBufferAccess::None:
 			return CommonRHIResourceState();
-		}
-
-		if (hasReadUsage)
-		{
-			RHIResourceState state =
-			{
-				.m_Access = RHIAccess::Common,
-				.m_Layout = RHILayout::Common,
-			};
-			if (Test(usage, U::Vertex))
-			{
-				state.m_Access |= RHIAccess::VertexBuffer;
-			}
-			if (Test(usage, U::Index))
-			{
-				state.m_Access |= RHIAccess::IndexBuffer;
-			}
-			if (Test(usage, U::Constant))
-			{
-				state.m_Access |= RHIAccess::ConstantBuffer;
-			}
-			return state;
-		}
-
-		switch (usage)
-		{
-		case U::UAV:
+		case RGBufferAccess::Vertex:
+			return { .m_Access = RHIAccess::VertexBuffer, .m_Layout = RHILayout::Common };
+		case RGBufferAccess::Index:
+			return { .m_Access = RHIAccess::IndexBuffer, .m_Layout = RHILayout::Common };
+		case RGBufferAccess::Constant:
+			return { .m_Access = RHIAccess::ConstantBuffer, .m_Layout = RHILayout::Common };
+		case RGBufferAccess::StructuredRead:
+			return { .m_Access = RHIAccess::ShaderResource, .m_Layout = RHILayout::Common };
+		case RGBufferAccess::UnorderedAccess:
 			return
 			{
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::Common,
 			};
-		case U::CopySrc:
+		case RGBufferAccess::CopySource:
 			return
 			{
 				.m_Access = RHIAccess::CopySource,
 				.m_Layout = RHILayout::Common,
 			};
-		case U::CopyDst:
+		case RGBufferAccess::CopyDest:
 			return
 			{
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::Common,
 			};
+		case RGBufferAccess::IndirectArgument:
+			return { .m_Access = RHIAccess::IndirectArgument, .m_Layout = RHILayout::Common };
 		}
 
-		GGLAB_UNREACHABLE("Unhandled RGBufferUsage.");
+		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");
 	}
 
-	constexpr inline RHIResourceState ToRHIResourceState(uint64_t usageBits, RGResourceType resourceType) noexcept
+	constexpr inline RHIResourceState ToRHIResourceState(uint64_t accessValue, RGResourceType resourceType) noexcept
 	{
 		switch (resourceType)
 		{
 		case RGResourceType::RGTexture:
-			return ToRHIResourceState(static_cast<RGTextureUsage>(usageBits));
+			return ToRHIResourceState(static_cast<RGTextureAccess>(accessValue));
 		case RGResourceType::RGBuffer:
-			return ToRHIResourceState(static_cast<RGBufferUsage>(usageBits));
+			return ToRHIResourceState(static_cast<RGBufferAccess>(accessValue));
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGResourceType.");

@@ -76,30 +76,29 @@ namespace gglab
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				auto& previewRes = blackboard.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
 
-				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureUsage::Sample);
+				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
 
 				auto* previewTexture = renderResRegistry->GetTexture(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(previewTexture);
 
-				const auto previewDesc = ToRGTextureDesc(*previewTexture,
-					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+				const auto previewDesc = ToRHITextureDesc(*previewTexture);
 
 				previewRes.m_EnvironmentCubemapPreview = builder.ImportTexture(
 					"Preview.IBL.EnvironmentCubemap",
 					renderResRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap),
 					previewDesc,
-					RGTextureUsage::None);
+					RGTextureAccess::None);
 
 				data.m_EnvironmentCubemapPreview = builder.Write(
 					previewRes.m_EnvironmentCubemapPreview,
-					RGTextureUsage::RenderTarget);
+					RGTextureAccess::RenderTarget);
 
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemapPreview);
-				data.m_Width = previewDesc.m_Width;
-				data.m_Height = previewDesc.m_Height;
+				data.m_Width = previewDesc.m_Extent.m_Width;
+				data.m_Height = previewDesc.m_Extent.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLEnvironmentPreviewLayout());
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
@@ -148,30 +147,29 @@ namespace gglab
 
 				data.m_PrefilteredSpecularCubemap = builder.Read(
 					iblRes.m_PrefilteredSpecularCubemap,
-					RGTextureUsage::Sample);
+					RGTextureAccess::Sample);
 
 				auto* previewTexture = renderResRegistry->GetTexture(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap);
 				GGLAB_ASSERT_NOT_NULL(previewTexture);
 
-				const auto previewDesc = ToRGTextureDesc(*previewTexture,
-					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+				const auto previewDesc = ToRHITextureDesc(*previewTexture);
 
 				previewRes.m_PrefilteredSpecularCubemapPreview = builder.ImportTexture(
 					"Preview.IBL.PrefilteredSpecularCubemap",
 					renderResRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap),
 					previewDesc,
-					RGTextureUsage::None);
+					RGTextureAccess::None);
 
 				data.m_PrefilteredSpecularCubemapPreview = builder.Write(
 					previewRes.m_PrefilteredSpecularCubemapPreview,
-					RGTextureUsage::RenderTarget);
+					RGTextureAccess::RenderTarget);
 
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_PrefilteredSpecularCubemapPreview);
-				data.m_Width = previewDesc.m_Width;
-				data.m_Height = previewDesc.m_Height;
+				data.m_Width = previewDesc.m_Extent.m_Width;
+				data.m_Height = previewDesc.m_Extent.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout());
 				data.m_PrefilteredSpecularTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);

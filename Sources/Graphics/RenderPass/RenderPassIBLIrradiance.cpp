@@ -64,25 +64,24 @@ namespace gglab
 				auto& blackboard = builder.GetBlackboard();
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
-				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureUsage::Sample);
-				data.m_IrradianceCubemap = builder.Write(iblRes.m_IrradianceCubemap, RGTextureUsage::RenderTarget);
+				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
+				data.m_IrradianceCubemap = builder.Write(iblRes.m_IrradianceCubemap, RGTextureAccess::RenderTarget);
 
 				auto* irradianceTexture = renderResRegistry->GetTexture(
 					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap);
 				GGLAB_ASSERT_NOT_NULL(irradianceTexture);
 
-				const auto rgDesc = ToRGTextureDesc(*irradianceTexture,
-					RGTextureUsage::RenderTarget | RGTextureUsage::Sample);
+				const auto textureDesc = ToRHITextureDesc(*irradianceTexture);
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(rgDesc.m_Format, 0, face, 1);
+					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc.m_Format, 0, face, 1);
 					data.m_Rtvs[face] =
 						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_IrradianceCubemap, rtvDesc);
 				}
 
-				data.m_Width = rgDesc.m_Width;
-				data.m_Height = rgDesc.m_Height;
+				data.m_Width = textureDesc.m_Extent.m_Width;
+				data.m_Height = textureDesc.m_Extent.m_Height;
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(

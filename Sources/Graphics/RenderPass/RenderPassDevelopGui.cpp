@@ -38,24 +38,24 @@ namespace gglab
 
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
-				data.m_BackBuffer = builder.Write(viewTargets.m_BackBuffer, RGTextureUsage::RenderTarget);
+				data.m_BackBuffer = builder.Write(viewTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
-				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureUsage::Sample);
+				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
 
 				auto& iblPreviewRes = blackboard.Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
 				data.m_EnvironmentCubemapPreview = builder.Read(
 					iblPreviewRes.m_EnvironmentCubemapPreview,
-					RGTextureUsage::Sample);
+					RGTextureAccess::Sample);
 				data.m_PrefilteredSpecularCubemapPreview = builder.Read(
 					iblPreviewRes.m_PrefilteredSpecularCubemapPreview,
-					RGTextureUsage::Sample);
+					RGTextureAccess::Sample);
 
 				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 				data.m_DirectionalShadowMapPreview = builder.Read(
 					shadowRes.m_DirectionalShadowMapPreview,
-					RGTextureUsage::Sample);
+					RGTextureAccess::Sample);
 			},
 			[&services](RGExecuteContext& executeContext, PassData& data)
 			{
