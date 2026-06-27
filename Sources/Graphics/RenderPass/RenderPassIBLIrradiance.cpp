@@ -4,7 +4,6 @@
 #include "Graphics/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/SamplerRegistry.h"
 
 namespace gglab
@@ -67,21 +66,19 @@ namespace gglab
 				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
 				data.m_IrradianceCubemap = builder.Write(iblRes.m_IrradianceCubemap, RGTextureAccess::RenderTarget);
 
-				auto* irradianceTexture = renderResRegistry->GetTexture(
+				const auto* textureDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap);
-				GGLAB_ASSERT_NOT_NULL(irradianceTexture);
-
-				const auto textureDesc = ToRHITextureDesc(*irradianceTexture);
+				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc.m_Format, 0, face, 1);
+					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc->m_Format, 0, face, 1);
 					data.m_Rtvs[face] =
 						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_IrradianceCubemap, rtvDesc);
 				}
 
-				data.m_Width = textureDesc.m_Extent.m_Width;
-				data.m_Height = textureDesc.m_Extent.m_Height;
+				data.m_Width = textureDesc->m_Extent.m_Width;
+				data.m_Height = textureDesc->m_Extent.m_Height;
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(

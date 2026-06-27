@@ -228,7 +228,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
@@ -656,7 +656,7 @@
     <ClInclude Include="..\..\Sources\Graphics\VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h">
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h">

@@ -3,7 +3,6 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/ShaderManager.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab
 {
@@ -49,16 +48,15 @@ namespace gglab
 				auto& blackboard = builder.GetBlackboard();
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
-				auto* brdfLutTexture = renderResRegistry->GetTexture(RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
-				GGLAB_ASSERT_NOT_NULL(brdfLutTexture);
-
-				const auto textureDesc = ToRHITextureDesc(*brdfLutTexture);
+				const auto* textureDesc = renderResRegistry->GetTextureDesc(
+					RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
+				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
 				data.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureAccess::RenderTarget);
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BrdfLut);
 
-				data.m_Width = textureDesc.m_Extent.m_Width;
-				data.m_Height = textureDesc.m_Extent.m_Height;
+				data.m_Width = textureDesc->m_Extent.m_Width;
+				data.m_Height = textureDesc->m_Extent.m_Height;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{

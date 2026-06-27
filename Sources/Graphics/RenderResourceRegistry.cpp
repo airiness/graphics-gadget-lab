@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderResourceRegistry.h"
-#include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
+#include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 
@@ -10,15 +10,15 @@ namespace gglab
 {
 	RenderResourceRegistry::RenderResourceRegistry(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
-		m_RGGpuResAllocator(createInfo.m_RGGpuResAllocator),
+		m_TransientResourcePool(createInfo.m_TransientResourcePool),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
-		GGLAB_ASSERT_NOT_NULL(m_RGGpuResAllocator);
+		GGLAB_ASSERT_NOT_NULL(m_TransientResourcePool);
 		GGLAB_ASSERT_NOT_NULL(m_SamplerRegistry);
 	}
 
-	void RenderResourceRegistry::EnsureIblResources(const IBLResourceCreateInfo& createInfo, const DX12FencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureIblResources(const IBLResourceCreateInfo& createInfo, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		// IBL_EnvironmentCubemap
 		{
@@ -160,7 +160,7 @@ namespace gglab
 		}
 	}
 
-	void RenderResourceRegistry::EnsureShadowPreviewResources(uint32_t previewSize, const DX12FencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureShadowPreviewResources(uint32_t previewSize, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		const uint32_t size = std::max(previewSize, 1u);
 
@@ -206,16 +206,16 @@ namespace gglab
 		m_TextureEntries[utils::ToIndex(index)].m_Dirty = false;
 	}
 
-	DX12Texture* RenderResourceRegistry::GetTexture(TextureIndex index) noexcept
+	const RHITextureDesc* RenderResourceRegistry::GetTextureDesc(TextureIndex index) const noexcept
 	{
-		auto& entry = m_TextureEntries[utils::ToIndex(index)];
-		return entry.m_Allocated ? m_RGGpuResAllocator->GetTexture(entry.m_InternalIndex) : nullptr;
+		const auto& entry = m_TextureEntries[utils::ToIndex(index)];
+		return entry.m_Allocated ? &entry.m_TextureDesc : nullptr;
 	}
 
 	RHITextureHandle RenderResourceRegistry::GetTextureHandle(TextureIndex index) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
-		return entry.m_Allocated ? m_RGGpuResAllocator->GetTextureHandle(entry.m_InternalIndex) : RHITextureHandle{};
+		return entry.m_Allocated ? entry.m_PhysicalAllocation.m_Texture : RHITextureHandle{};
 	}
 
 	RHIDescriptorHandle RenderResourceRegistry::GetSrvDescriptor(TextureIndex index) const noexcept
@@ -300,7 +300,7 @@ namespace gglab
 		out.EnvironmentIntensity = 1.0f;
 	}
 
-	void RenderResourceRegistry::ReleaseAll(const DX12FencePoint& fencePoint) noexcept
+	void RenderResourceRegistry::ReleaseAll(const RHIFencePoint& fencePoint) noexcept
 	{
 		for (size_t index = 0; index < m_TextureEntries.size(); ++index)
 		{
@@ -315,28 +315,27 @@ namespace gglab
 	void RenderResourceRegistry::EnsureTexture(TextureIndex index,
 		const RHITextureDesc& desc,
 		const RHITextureViewDesc& srvDesc,
-		const DX12FencePoint* retireFenceOpt) noexcept
+		const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
 
-		// Create new texture and ResourceIndex
+		// Acquire a physical texture allocation from the reusable pool.
 		auto createTexture = [this, index, &srvDesc](TextureEntry& outEntry, const RHITextureDesc& desc) noexcept
 			{
-				const auto texIndex = m_RGGpuResAllocator->Acquire<RHITextureDesc>(desc);
-
-				GGLAB_ASSERT_MSG(texIndex.IsValid(),
+				auto allocation = m_TransientResourcePool->AcquireTexture(desc);
+				GGLAB_ASSERT_MSG(allocation.IsValid(),
 					"RenderResourceRegistry: Acquire texture failed.");
-
-				auto* texture = m_RGGpuResAllocator->GetTexture(texIndex);
-				GGLAB_ASSERT_MSG(texture != nullptr,
-					"RenderResourceRegistry: allocator returned null texture.");
+				if (!allocation.IsValid())
+				{
+					return;
+				}
 
 				outEntry.m_TextureDesc = desc;
-				outEntry.m_InternalIndex = texIndex;
+				outEntry.m_PhysicalAllocation = std::move(allocation);
 				outEntry.m_Allocated = true;
 				outEntry.m_SrvDesc = srvDesc;
 
-				const RHITextureHandle textureHandle = m_RGGpuResAllocator->GetTextureHandle(texIndex);
+				const RHITextureHandle textureHandle = outEntry.m_PhysicalAllocation.m_Texture;
 				GGLAB_ASSERT_MSG(textureHandle.IsValid(),
 					"RenderResourceRegistry: failed to import RG texture as RHI texture.");
 
@@ -348,16 +347,16 @@ namespace gglab
 			};
 
 		// Already exist. Check compatible
-		if (entry.m_Allocated && entry.m_InternalIndex.IsValid())
+		if (entry.m_Allocated && entry.m_PhysicalAllocation.IsValid())
 		{
-			if (m_RGGpuResAllocator->IsCompatibleTexture(entry.m_InternalIndex, desc))
+			if (m_TransientResourcePool->IsCompatibleTexture(entry.m_PhysicalAllocation, desc))
 			{
 				entry.m_TextureDesc = desc;
 
 				// If Srv create info changed, update the texture DescriptorID
 				if (entry.m_SrvDesc != srvDesc)
 				{
-					const RHITextureHandle textureHandle = m_RGGpuResAllocator->GetTextureHandle(entry.m_InternalIndex);
+					const RHITextureHandle textureHandle = entry.m_PhysicalAllocation.m_Texture;
 					GGLAB_ASSERT_MSG(textureHandle.IsValid(),
 						"RenderResourceRegistry: failed to import RG texture as RHI texture.");
 
@@ -383,7 +382,9 @@ namespace gglab
 				return;
 			}
 
-			m_RGGpuResAllocator->ReleaseTexture(entry.m_InternalIndex, *retireFenceOpt);
+			m_TransientResourcePool->RetireTexture(
+				std::move(entry.m_PhysicalAllocation),
+				*retireFenceOpt);
 
 			// Create new
 			createTexture(entry, desc);
@@ -396,7 +397,7 @@ namespace gglab
 		}
 	}
 
-	void RenderResourceRegistry::DestroyTexture(TextureIndex index, const DX12FencePoint& fencePoint) noexcept
+	void RenderResourceRegistry::DestroyTexture(TextureIndex index, const RHIFencePoint& fencePoint) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
 		if (!entry.m_Allocated)
@@ -404,7 +405,7 @@ namespace gglab
 			return;
 		}
 
-		m_RGGpuResAllocator->ReleaseTexture(entry.m_InternalIndex, fencePoint);
+		m_TransientResourcePool->RetireTexture(std::move(entry.m_PhysicalAllocation), fencePoint);
 
 		entry = {};
 	}

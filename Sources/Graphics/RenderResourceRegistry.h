@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
+#include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ShadowSettings.h"
@@ -10,10 +11,7 @@
 namespace gglab
 {
 	class RHIDevice;
-	class RGGpuResourceAllocator;
-	class DX12Texture;
 	class SamplerRegistry;
-	class DX12FencePoint;
 
 	/*
 	* Management runtime generated GPU Textures
@@ -24,7 +22,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
-			RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
+			RGTransientResourcePool* m_TransientResourcePool = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 		};
 
@@ -75,7 +73,7 @@ namespace gglab
 		struct TextureEntry
 		{
 			RHITextureDesc m_TextureDesc{};
-			ResourceIndex m_InternalIndex{};
+			RGPhysicalTextureAllocation m_PhysicalAllocation{};
 			RHITextureViewHandle m_Srv{};
 			RHITextureViewDesc m_SrvDesc{};
 
@@ -89,15 +87,15 @@ namespace gglab
 		~RenderResourceRegistry() = default;
 
 		void EnsureIblResources(const IBLResourceCreateInfo& createInfo = {},
-			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
+			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 		void EnsureShadowPreviewResources(uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
-			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
+			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void MarkDirty(TextureIndex index) noexcept;
 		bool IsDirty(TextureIndex index) const noexcept;
 		void ClearDirty(TextureIndex index) noexcept;
 
-		DX12Texture* GetTexture(TextureIndex index) noexcept;
+		const RHITextureDesc* GetTextureDesc(TextureIndex index) const noexcept;
 		RHITextureHandle GetTextureHandle(TextureIndex index) noexcept;
 		RHIDescriptorHandle GetSrvDescriptor(TextureIndex index) const noexcept;
 		uint32_t GetShaderVisibleSrvIndex(TextureIndex index) const noexcept;
@@ -113,21 +111,21 @@ namespace gglab
 
 		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
-		void ReleaseAll(const DX12FencePoint& fencePoint) noexcept;
+		void ReleaseAll(const RHIFencePoint& fencePoint) noexcept;
 
 	private:
 		void EnsureTexture(TextureIndex index,
 			const RHITextureDesc& desc,
 			const RHITextureViewDesc& srvDesc,
-			const DX12FencePoint* retireFenceOpt = nullptr) noexcept;
+			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void InvalidateDependents(TextureIndex index) noexcept;
 
-		void DestroyTexture(TextureIndex index, const DX12FencePoint& fencePoint) noexcept;
+		void DestroyTexture(TextureIndex index, const RHIFencePoint& fencePoint) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
-		RGGpuResourceAllocator* m_RGGpuResAllocator = nullptr;
+		RGTransientResourcePool* m_TransientResourcePool = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;

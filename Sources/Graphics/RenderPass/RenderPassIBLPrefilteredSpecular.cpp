@@ -4,7 +4,6 @@
 #include "Graphics/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/SamplerRegistry.h"
 
 namespace gglab
@@ -72,18 +71,16 @@ namespace gglab
 					iblRes.m_PrefilteredSpecularCubemap,
 					RGTextureAccess::RenderTarget);
 
-				auto* prefilteredSpecularTexture = renderResRegistry->GetTexture(
+				const auto* textureDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularTexture);
+				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
-				const auto textureDesc = ToRHITextureDesc(*prefilteredSpecularTexture);
-
-				data.m_Rtvs.resize(textureDesc.m_MipLevels * CubemapFaceCount);
-				for (uint32_t mip = 0; mip < textureDesc.m_MipLevels; ++mip)
+				data.m_Rtvs.resize(textureDesc->m_MipLevels * CubemapFaceCount);
+				for (uint32_t mip = 0; mip < textureDesc->m_MipLevels; ++mip)
 				{
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 					{
-						const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc.m_Format, mip, face, 1);
+						const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc->m_Format, mip, face, 1);
 						const auto rtvIndex = mip * CubemapFaceCount + face;
 
 						data.m_Rtvs[rtvIndex] =
@@ -93,9 +90,9 @@ namespace gglab
 					}
 				}
 
-				data.m_Width = textureDesc.m_Extent.m_Width;
-				data.m_Height = textureDesc.m_Extent.m_Height;
-				data.m_MipLevels = textureDesc.m_MipLevels;
+				data.m_Width = textureDesc->m_Extent.m_Width;
+				data.m_Height = textureDesc->m_Extent.m_Height;
+				data.m_MipLevels = textureDesc->m_MipLevels;
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(

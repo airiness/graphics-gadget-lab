@@ -5,7 +5,6 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGIBLPreviewResources.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/SamplerRegistry.h"
 
 #include <algorithm>
@@ -78,17 +77,15 @@ namespace gglab
 
 				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
 
-				auto* previewTexture = renderResRegistry->GetTexture(
+				const auto* previewDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(previewTexture);
-
-				const auto previewDesc = ToRHITextureDesc(*previewTexture);
+				GGLAB_ASSERT_NOT_NULL(previewDesc);
 
 				previewRes.m_EnvironmentCubemapPreview = builder.ImportTexture(
 					"Preview.IBL.EnvironmentCubemap",
 					renderResRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap),
-					previewDesc,
+					*previewDesc,
 					RGTextureAccess::None);
 
 				data.m_EnvironmentCubemapPreview = builder.Write(
@@ -97,8 +94,8 @@ namespace gglab
 
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemapPreview);
-				data.m_Width = previewDesc.m_Extent.m_Width;
-				data.m_Height = previewDesc.m_Extent.m_Height;
+				data.m_Width = previewDesc->m_Extent.m_Width;
+				data.m_Height = previewDesc->m_Extent.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLEnvironmentPreviewLayout());
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
@@ -149,17 +146,15 @@ namespace gglab
 					iblRes.m_PrefilteredSpecularCubemap,
 					RGTextureAccess::Sample);
 
-				auto* previewTexture = renderResRegistry->GetTexture(
+				const auto* previewDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(previewTexture);
-
-				const auto previewDesc = ToRHITextureDesc(*previewTexture);
+				GGLAB_ASSERT_NOT_NULL(previewDesc);
 
 				previewRes.m_PrefilteredSpecularCubemapPreview = builder.ImportTexture(
 					"Preview.IBL.PrefilteredSpecularCubemap",
 					renderResRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap),
-					previewDesc,
+					*previewDesc,
 					RGTextureAccess::None);
 
 				data.m_PrefilteredSpecularCubemapPreview = builder.Write(
@@ -168,19 +163,18 @@ namespace gglab
 
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_PrefilteredSpecularCubemapPreview);
-				data.m_Width = previewDesc.m_Extent.m_Width;
-				data.m_Height = previewDesc.m_Extent.m_Height;
+				data.m_Width = previewDesc->m_Extent.m_Width;
+				data.m_Height = previewDesc->m_Extent.m_Height;
 				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout());
 				data.m_PrefilteredSpecularTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
 					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
 				data.m_PrefilteredSpecularSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
 
-				auto* prefilteredSpecularTexture = renderResRegistry->GetTexture(
+				const auto* prefilteredSpecularDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularTexture);
-				const auto prefilteredSpecularDesc = prefilteredSpecularTexture->GetDesc();
-				const uint32_t mipLevels = static_cast<uint32_t>(prefilteredSpecularDesc.MipLevels);
+				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularDesc);
+				const uint32_t mipLevels = prefilteredSpecularDesc->m_MipLevels;
 				data.m_SampleMip = mipLevels > 0 ?
 					std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(), mipLevels - 1u) :
 					0u;

@@ -69,9 +69,9 @@ namespace gglab
 			return passIndex >= 0 ? std::format("{}", passIndex) : "-";
 		}
 
-		static std::string ResourceIndexToString(ResourceIndex resourceIndex) noexcept
+		static std::string PoolSlotToString(RGTransientResourcePoolSlot poolSlot) noexcept
 		{
-			return resourceIndex.IsValid() ? std::format("{}", resourceIndex.Value()) : "-";
+			return poolSlot.IsValid() ? std::format("{}", poolSlot.Value()) : "-";
 		}
 
 		static std::string PassListToString(const std::vector<int32_t>& passIndices) noexcept
@@ -843,7 +843,7 @@ namespace gglab
 				devtools::BarrierStateText(resource.m_FinalBarrierState) :
 				"-";
 			const std::string usage = UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
-			const std::string gpuIndex = ResourceIndexToString(resource.m_GpuResourceIndex);
+			const std::string poolSlot = PoolSlotToString(resource.m_PoolSlot);
 
 			ImGui::SeparatorText("Selected Resource");
 			ImGui::Text("Resource #%u: %s", resource.m_Index, resource.m_Name.c_str());
@@ -852,10 +852,10 @@ namespace gglab
 				utils::BoolToString(resource.m_Imported),
 				utils::BoolToString(resource.m_Devirtualized),
 				resource.m_RefCount);
-			ImGui::Text("First User: %s, Last User: %s, GPU Index: %s",
+			ImGui::Text("First User: %s, Last User: %s, Pool Slot: %s",
 				PassIndexToString(resource.m_FirstUserPassIndex).c_str(),
 				PassIndexToString(resource.m_LastUserPassIndex).c_str(),
-				gpuIndex.c_str());
+				poolSlot.c_str());
 			ImGui::TextWrapped("Accumulated Usage: %s", usage.c_str());
 			ImGui::TextWrapped("Initial State: %s", initialState.c_str());
 			ImGui::TextWrapped("Exported Final State: %s", finalState.c_str());
@@ -947,7 +947,7 @@ namespace gglab
 				ImGui::TableSetupColumn("Ref");
 				ImGui::TableSetupColumn("First");
 				ImGui::TableSetupColumn("Last");
-				ImGui::TableSetupColumn("GPU");
+				ImGui::TableSetupColumn("Pool Slot");
 				ImGui::TableSetupColumn("Usage");
 				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableHeadersRow();
@@ -960,7 +960,7 @@ namespace gglab
 					}
 
 					const std::string usage = UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
-					const std::string gpuIndex = ResourceIndexToString(resource.m_GpuResourceIndex);
+					const std::string poolSlot = PoolSlotToString(resource.m_PoolSlot);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -985,7 +985,7 @@ namespace gglab
 					ImGui::TableSetColumnIndex(7);
 					ImGui::TextUnformatted(PassIndexToString(resource.m_LastUserPassIndex).c_str());
 					ImGui::TableSetColumnIndex(8);
-					ImGui::TextUnformatted(gpuIndex.c_str());
+					ImGui::TextUnformatted(poolSlot.c_str());
 					ImGui::TableSetColumnIndex(9);
 					ImGui::TextUnformatted(usage.c_str());
 				}

@@ -223,7 +223,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderScene.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderWorldExtractor.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp" />
@@ -377,7 +377,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGGpuResourceAllocator.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGShadowResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />

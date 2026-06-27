@@ -10,7 +10,7 @@
 #include "Graphics/RHI/DX12/DX12ConstantBuffer.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
+#include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/Camera.h"
@@ -87,7 +87,7 @@ namespace gglab
 
 		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), createInfo.m_TransferManagerBufferSize);
 
-		m_RGGpuResAllocator = std::make_unique<RGGpuResourceAllocator>(m_Device.get());
+		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(m_Device.get());
 
 		DX12ViewCache::CreateInfo viewCacheCreateInfo{};
 		viewCacheCreateInfo.m_DX12Device = m_Device.get();
@@ -121,7 +121,7 @@ namespace gglab
 
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_Device = m_Device.get();
-		renderResRegistryCreateInfo.m_RGGpuResAllocator = m_RGGpuResAllocator.get();
+		renderResRegistryCreateInfo.m_TransientResourcePool = m_RGTransientResourcePool.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
@@ -167,7 +167,7 @@ namespace gglab
 		m_PipelineCache.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
-		m_RGGpuResAllocator.reset();
+		m_RGTransientResourcePool.reset();
 		m_Device->SetViewCache(nullptr);
 		m_ViewCache.reset();
 
@@ -208,7 +208,7 @@ namespace gglab
 			m_ViewSB->ReclaimCompleted(completedGraphicsFence);
 		}
 
-		m_RGGpuResAllocator->Tick();
+		m_RGTransientResourcePool->Tick();
 		m_DescriptorManager->Tick();
 		m_Device->RetireCompletedWork();
 
@@ -324,7 +324,7 @@ namespace gglab
 			&frame.m_SceneGpuAllocations,
 			m_LastSubmittedFencePoint);
 
-		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
+		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint.ToRHI());
 
 		commandAllocatorPool->RecycleCommandAllocator(
 			frame.m_CommandAllocator,
@@ -372,7 +372,7 @@ namespace gglab
 
 			if (frame.m_RenderGraph)
 			{
-				frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
+				frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint.ToRHI());
 			}
 
 			if (frame.m_CommandAllocator)
@@ -453,7 +453,7 @@ namespace gglab
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
 		rgCreateInfo.m_Device = m_Device.get();
-		rgCreateInfo.m_GpuResourceAllocator = m_RGGpuResAllocator.get();
+		rgCreateInfo.m_TransientResourcePool = m_RGTransientResourcePool.get();
 
 		return rgCreateInfo;
 	}

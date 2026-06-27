@@ -3,9 +3,9 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 #include "Graphics/RenderResourceRegistry.h"
 
 namespace gglab
@@ -104,17 +104,15 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
 				renderResourceRegistry->EnsureShadowPreviewResources(shadowRes.m_ShadowMapPreviewSize);
 
-				auto* shadowMapPreviewTexture = renderResourceRegistry->GetTexture(
+				const auto* shadowMapPreviewDesc = renderResourceRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
-				GGLAB_ASSERT_NOT_NULL(shadowMapPreviewTexture);
-
-				const auto shadowMapPreviewDesc = ToRHITextureDesc(*shadowMapPreviewTexture);
+				GGLAB_ASSERT_NOT_NULL(shadowMapPreviewDesc);
 
 				shadowRes.m_DirectionalShadowMapPreview = builder.ImportTexture(
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
-					shadowMapPreviewDesc,
+					*shadowMapPreviewDesc,
 					RGTextureAccess::None);
 			});
 

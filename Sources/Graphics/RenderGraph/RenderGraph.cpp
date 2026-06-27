@@ -22,12 +22,12 @@ namespace gglab
 
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
-		m_GpuResourceAllocator(createInfo.m_GpuResourceAllocator),
+		m_TransientResourcePool(createInfo.m_TransientResourcePool),
 		m_ArenaAllocator(1u << 20),
 		m_Blackboard(m_ArenaAllocator)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice can not be null.");
-		GGLAB_ASSERT_MSG(m_GpuResourceAllocator != nullptr, "GpuResourceAllocator can not be null.");
+		GGLAB_ASSERT_MSG(m_TransientResourcePool != nullptr, "TransientResourcePool can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
@@ -250,7 +250,7 @@ namespace gglab
 			// Devirtualize Gpu resources
 			for (auto* virtualResource : passNode.m_DevirtualizeVirtualResources)
 			{
-				virtualResource->Devirtualize(m_GpuResourceAllocator);
+				virtualResource->Devirtualize(m_TransientResourcePool);
 			}
 
 			TrackPassResourceUses(executeContext.GetGraphicsCommandContext(), passNode);
@@ -273,21 +273,21 @@ namespace gglab
 		executeContext.m_RenderGraph = previousRenderGraph;
 	}
 
-	void RenderGraph::Retire(const DX12FencePoint& fencePoint) noexcept
+	void RenderGraph::Retire(const RHIFencePoint& fencePoint) noexcept
 	{
-		for (const auto texIndex : m_MarkedReleaseTextureIndices)
+		for (auto& allocation : m_MarkedRetireTextures)
 		{
-			GGLAB_ASSERT_MSG(texIndex.IsValid(), "Releasing an invalid texture index.");
-			m_GpuResourceAllocator->ReleaseTexture(texIndex, fencePoint);
+			GGLAB_ASSERT_MSG(allocation.IsValid(), "Retiring an invalid texture allocation.");
+			m_TransientResourcePool->RetireTexture(std::move(allocation), fencePoint);
 		}
-		m_MarkedReleaseTextureIndices.clear();
+		m_MarkedRetireTextures.clear();
 
-		for (const auto bufIndex : m_MarkedReleaseBufferIndices)
+		for (auto& allocation : m_MarkedRetireBuffers)
 		{
-			GGLAB_ASSERT_MSG(bufIndex.IsValid(), "Releasing an invalid buffer index.");
-			m_GpuResourceAllocator->ReleaseBuffer(bufIndex, fencePoint);
+			GGLAB_ASSERT_MSG(allocation.IsValid(), "Retiring an invalid buffer allocation.");
+			m_TransientResourcePool->RetireBuffer(std::move(allocation), fencePoint);
 		}
-		m_MarkedReleaseBufferIndices.clear();
+		m_MarkedRetireBuffers.clear();
 
 	}
 
@@ -305,12 +305,13 @@ namespace gglab
 				virtualRes->m_ImportedHandle : RHITextureHandle{};
 		}
 
-		if (!virtualRes->m_GpuResourceIndex.IsValid())
+		if (!virtualRes->m_PhysicalAllocation.IsValid())
 		{
 			return {};
 		}
 
-		return m_GpuResourceAllocator->GetTextureHandle(virtualRes->m_GpuResourceIndex);
+		return m_Device->IsAlive(virtualRes->m_PhysicalAllocation.m_Texture) ?
+			virtualRes->m_PhysicalAllocation.m_Texture : RHITextureHandle{};
 	}
 
 	RHIBufferHandle RenderGraph::GetBufferHandle(RGBufferId bufId) noexcept
@@ -327,12 +328,13 @@ namespace gglab
 				virtualRes->m_ImportedHandle : RHIBufferHandle{};
 		}
 
-		if (!virtualRes->m_GpuResourceIndex.IsValid())
+		if (!virtualRes->m_PhysicalAllocation.IsValid())
 		{
 			return {};
 		}
 
-		return m_GpuResourceAllocator->GetBufferHandle(virtualRes->m_GpuResourceIndex);
+		return m_Device->IsAlive(virtualRes->m_PhysicalAllocation.m_Buffer) ?
+			virtualRes->m_PhysicalAllocation.m_Buffer : RHIBufferHandle{};
 	}
 
 	RHITextureViewHandle RenderGraph::GetTextureViewHandle(RGTextureViewId viewId) noexcept
@@ -361,16 +363,6 @@ namespace gglab
 	{
 		const RHITextureViewHandle view = GetTextureViewHandle(viewId);
 		return view.IsValid() ? m_Device->GetTextureViewDescriptor(view) : RHIDescriptorHandle{};
-	}
-
-	ResourceIndex RenderGraph::GetResourceIndex(RGTextureId texId) noexcept
-	{
-		return GetResourceIndexImpl<RGTextureResource>(texId);
-	}
-
-	ResourceIndex RenderGraph::GetResourceIndex(RGBufferId bufId) noexcept
-	{
-		return GetResourceIndexImpl<RGBufferResource>(bufId);
 	}
 
 	RGVirtualResourceBase* RenderGraph::GetVirtualResource(RGResourceHandle handle) const noexcept
@@ -426,7 +418,7 @@ namespace gglab
 				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(virtualResource);
 				const RHITextureHandle handle = resource->m_Imported ?
 					resource->m_ImportedHandle :
-					m_GpuResourceAllocator->GetTextureHandle(resource->m_GpuResourceIndex);
+					resource->m_PhysicalAllocation.m_Texture;
 				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture access requires a live RHI handle.");
 				if (handle.IsValid())
 				{
@@ -439,7 +431,7 @@ namespace gglab
 				auto* resource = static_cast<RGVirtualResource<RGBufferResource>*>(virtualResource);
 				const RHIBufferHandle handle = resource->m_Imported ?
 					resource->m_ImportedHandle :
-					m_GpuResourceAllocator->GetBufferHandle(resource->m_GpuResourceIndex);
+					resource->m_PhysicalAllocation.m_Buffer;
 				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer access requires a live RHI handle.");
 				if (handle.IsValid())
 				{
@@ -482,7 +474,7 @@ namespace gglab
 				auto* resource = static_cast<RGVirtualResource<RGTextureResource>*>(intent.m_VirtualResource);
 				const RHITextureHandle handle = resource->m_Imported ?
 					resource->m_ImportedHandle :
-					m_GpuResourceAllocator->GetTextureHandle(resource->m_GpuResourceIndex);
+					resource->m_PhysicalAllocation.m_Texture;
 				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture barrier requires a live RHI handle.");
 				if (handle.IsValid())
 				{
@@ -495,7 +487,7 @@ namespace gglab
 				auto* resource = static_cast<RGVirtualResource<RGBufferResource>*>(intent.m_VirtualResource);
 				const RHIBufferHandle handle = resource->m_Imported ?
 					resource->m_ImportedHandle :
-					m_GpuResourceAllocator->GetBufferHandle(resource->m_GpuResourceIndex);
+					resource->m_PhysicalAllocation.m_Buffer;
 				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer barrier requires a live RHI handle.");
 				if (handle.IsValid())
 				{

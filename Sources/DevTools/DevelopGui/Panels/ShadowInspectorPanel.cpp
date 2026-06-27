@@ -4,8 +4,8 @@
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
-#include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
@@ -309,14 +309,13 @@ namespace gglab
 			constexpr TextureIndex ShadowMapPreviewIndex = TextureIndex::Preview_Shadow_DirectionalShadowMap;
 
 			renderResourceRegistry->EnsureShadowPreviewResources(shadowRes->m_ShadowMapPreviewSize);
-			DX12Texture* previewTexture = renderResourceRegistry->GetTexture(ShadowMapPreviewIndex);
-			if (!previewTexture)
+			const auto* previewDesc = renderResourceRegistry->GetTextureDesc(ShadowMapPreviewIndex);
+			if (!previewDesc)
 			{
 				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "ShadowMap preview texture is not allocated.");
 				return;
 			}
 
-			const auto previewDesc = previewTexture->GetDesc();
 			const uint32_t previewSrvIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
 			const D3D12_GPU_DESCRIPTOR_HANDLE previewSrvGpuHandle =
 				ToGpuDescriptorHandle(
@@ -325,9 +324,9 @@ namespace gglab
 
 			ImGui::Text("Preview RG Size: %u", shadowRes->m_ShadowMapPreviewSize);
 			ImGui::Text("Preview Texture Size: %llu x %u",
-				static_cast<unsigned long long>(previewDesc.Width),
-				static_cast<uint32_t>(previewDesc.Height));
-			ImGui::Text("Preview Format: %s", devtools::EnumText(previewDesc.Format).data());
+				static_cast<unsigned long long>(previewDesc->m_Extent.m_Width),
+				previewDesc->m_Extent.m_Height);
+			ImGui::Text("Preview Format: %s", devtools::EnumText(ToDXGIFormat(previewDesc->m_Format)).data());
 			ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 
 			if (previewSrvGpuHandle.ptr == 0)
