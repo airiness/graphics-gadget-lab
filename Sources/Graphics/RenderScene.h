@@ -74,6 +74,8 @@ namespace gglab
 			DynamicConstantBufferAllocator& m_SceneCB;
 			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
 			PersistentStructuredBuffer<MaterialGPU>& m_MaterialsSB;
+			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
+			PersistentStructuredBufferTable<MaterialID, MaterialGPU>& m_MaterialTable;
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_CurrentBackBufferIndex = 0;
 		};
@@ -89,13 +91,5 @@ namespace gglab
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
 
-	private:
-		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
-		using MaterialTable = PersistentStructuredBufferTable<MaterialID, MaterialGPU>;
-
-		std::unique_ptr<ObjectTable> m_ObjectTable;
-		std::unique_ptr<MaterialTable> m_MaterialTable;
-		RHIBufferHandle m_ObjectBufferIdentity{};
-		RHIBufferHandle m_MaterialBufferIdentity{};
 	};
 }

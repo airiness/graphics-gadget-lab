@@ -8,6 +8,7 @@
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/TransientResourcePoolPanel.h"
+#include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 
 namespace gglab::devtools
 {
@@ -20,5 +21,6 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<ResourceManagementPanel>());
 		registry.RegisterPanel(std::make_unique<ShadowInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<TransientResourcePoolPanel>());
+		registry.RegisterPanel(std::make_unique<PersistentSceneBuffersPanel>());
 	}
 }
