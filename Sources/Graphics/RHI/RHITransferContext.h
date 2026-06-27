@@ -40,7 +40,7 @@ namespace gglab
 		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset,
 			RHIBufferHandle src, uint64_t srcOffset,
 			uint64_t numBytes) noexcept;
-		void UploadBuffer(const void* data, uint64_t sizeInBytes,
+		[[nodiscard]] bool UploadBuffer(const void* data, uint64_t sizeInBytes,
 			RHIBufferHandle dst, uint64_t dstOffset = 0) noexcept;
 		void UploadTexture(const RHITextureUploadData& uploadData,
 			RHITextureHandle dst) noexcept;

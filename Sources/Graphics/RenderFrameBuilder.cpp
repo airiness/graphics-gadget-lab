@@ -63,7 +63,7 @@ namespace gglab
 			.m_ObjectsSB = *info.m_Renderer.GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *info.m_Renderer.GetMaterialStructuredBuffer(),
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
-			.m_CurrentBackBufferIndex = info.m_BackBufferIndex
+			.m_CurrentBackBufferIndex = info.m_BackBufferIndex,
 		};
 		auto sceneBuildResult = m_SceneBuilder.Build(sceneBuildInfo);
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);

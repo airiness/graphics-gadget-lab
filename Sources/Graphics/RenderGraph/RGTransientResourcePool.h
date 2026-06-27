@@ -84,12 +84,13 @@ namespace gglab
 		uint64_t m_SizeInBytes = 0;
 		uint32_t m_StrideInBytes = 0;
 		RHIBufferUsage m_Usage = RHIBufferUsage::None;
+		RHIMemoryUsage m_MemoryUsage = RHIMemoryUsage::GpuOnly;
 
 		bool operator==(const RGTransientBufferKey&) const noexcept = default;
 
 		auto AsTuple() const noexcept
 		{
-			return std::tie(m_SizeInBytes, m_StrideInBytes, m_Usage);
+			return std::tie(m_SizeInBytes, m_StrideInBytes, m_Usage, m_MemoryUsage);
 		}
 	};
 

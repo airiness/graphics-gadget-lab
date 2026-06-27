@@ -354,8 +354,18 @@ namespace gglab
 		mesh->m_VertexBuffer = RHIBufferOwner(m_DX12Device, vertexBuffer);
 		mesh->m_IndexBuffer = RHIBufferOwner(m_DX12Device, indexBuffer);
 
-		transferContext.UploadBuffer(verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.Get());
-		transferContext.UploadBuffer(indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.Get());
+		const bool vertexUploadSucceeded = transferContext.UploadBuffer(
+			verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.Get());
+		const bool indexUploadSucceeded = transferContext.UploadBuffer(
+			indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.Get());
+		GGLAB_ASSERT_MSG(vertexUploadSucceeded && indexUploadSucceeded,
+			"AssetManager failed to record mesh buffer uploads.");
+		if (!vertexUploadSucceeded || !indexUploadSucceeded)
+		{
+			mesh->m_VertexBuffer.Reset();
+			mesh->m_IndexBuffer.Reset();
+			return;
+		}
 
 		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
 			indexBufferSize > std::numeric_limits<uint32_t>::max())

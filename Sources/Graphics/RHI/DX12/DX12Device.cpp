@@ -201,6 +201,31 @@ namespace gglab
 		m_ViewCache->DestroySampler(sampler);
 	}
 
+	void* DX12Device::MapBuffer(RHIBufferHandle buffer) noexcept
+	{
+		auto* nativeBuffer = ResolveBuffer(buffer);
+		if (!nativeBuffer)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::MapBuffer received a non-live buffer handle.");
+			return nullptr;
+		}
+		return nativeBuffer->Map();
+	}
+
+	void DX12Device::UnmapBuffer(RHIBufferHandle buffer) noexcept
+	{
+		if (auto* nativeBuffer = ResolveBuffer(buffer))
+		{
+			nativeBuffer->Unmap();
+		}
+	}
+
+	uint32_t DX12Device::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
+	{
+		return viewType == RHIBufferViewType::ConstantBuffer ?
+			D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT : 1u;
+	}
+
 	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
 		if (!fencePoint.IsValid())

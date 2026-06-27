@@ -1,6 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHITransferContext.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
 
 namespace gglab
 {

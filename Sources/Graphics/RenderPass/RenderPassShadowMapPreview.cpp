@@ -101,7 +101,7 @@ namespace gglab
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
-					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
+					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
 				const ShadowMapPreviewPassParameters passParameters{
 					.ShadowMapTextureIndex = shadowMapSrv.m_Index,

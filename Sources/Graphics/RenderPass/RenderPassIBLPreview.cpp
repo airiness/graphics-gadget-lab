@@ -117,7 +117,7 @@ namespace gglab
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
-					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
+					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
 				const IBLCubemapPreviewPassParameters passParameters{
 					.DisplayLayout = data.m_DisplayLayout,
@@ -193,7 +193,7 @@ namespace gglab
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
-					sceneBuffer->GetFrameOffset(contextPtr->m_BackBufferIndex));
+					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
 				const IBLCubemapPreviewPassParameters passParameters{
 					.DisplayLayout = data.m_DisplayLayout,

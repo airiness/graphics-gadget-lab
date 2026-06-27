@@ -25,6 +25,7 @@ namespace gglab
 		uint64_t m_SizeInBytes = 0;
 		uint32_t m_StrideInBytes = 0;
 		RHIBufferUsage m_Usage = RHIBufferUsage::None;
+		RHIMemoryUsage m_MemoryUsage = RHIMemoryUsage::GpuOnly;
 		const char* m_DebugName = nullptr;
 	};
 
