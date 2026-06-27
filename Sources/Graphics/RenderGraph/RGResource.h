@@ -2,7 +2,6 @@
 #include "Graphics/RenderGraph/RGResourceHandle.h"
 #include "Graphics/RenderGraph/RGTypes.h"
 #include "Graphics/RHI/RHIBuffer.h"
-#include "Core/EnumFlags.h"
 
 namespace gglab
 {
@@ -42,7 +41,7 @@ namespace gglab
 		Present,
 	};
 
-	enum class RGBufferAccess: uint8_t
+	enum class RGBufferAccess : uint8_t
 	{
 		None,
 		Vertex,
@@ -80,19 +79,14 @@ namespace gglab
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
 
-	class DX12Texture;
-
 	template<>
 	struct RGResourceTraits<RGTextureResource>
 	{
 		using Access = RGTextureAccess;
 		using Handle = RHITextureHandle;
 		using PhysicalAllocation = RGPhysicalTextureAllocation;
-		using Native = DX12Texture;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 	};
-
-	class DX12Buffer;
 
 	template<>
 	struct RGResourceTraits<RGBufferResource>
@@ -100,7 +94,6 @@ namespace gglab
 		using Access = RGBufferAccess;
 		using Handle = RHIBufferHandle;
 		using PhysicalAllocation = RGPhysicalBufferAllocation;
-		using Native = DX12Buffer;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;
 	};
 }

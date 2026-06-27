@@ -450,6 +450,12 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePoolSnapshot.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.h">
@@ -908,6 +914,9 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -957,6 +966,9 @@
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePoolSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h">

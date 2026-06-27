@@ -79,6 +79,7 @@ namespace gglab
 			.m_SampleCount = desc.m_SampleCount,
 			.m_Format = desc.m_Format,
 			.m_Usage = desc.m_Usage,
+			.m_ClearValue = desc.m_ClearValue ? desc.m_ClearValue : DefaultClearValue(desc),
 		};
 	}
 
