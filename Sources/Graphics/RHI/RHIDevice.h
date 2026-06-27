@@ -32,6 +32,7 @@ namespace gglab
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
+		virtual bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept = 0;
 
 		virtual RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept = 0;
 		virtual RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept = 0;

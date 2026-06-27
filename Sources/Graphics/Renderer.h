@@ -11,7 +11,7 @@
 #include "Graphics/TransferManager.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
+#include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
@@ -133,7 +133,7 @@ namespace gglab
 		std::unique_ptr<DX12SwapChain> m_SwapChain;
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
-		std::unique_ptr<RGGpuResourceAllocator> m_RGGpuResAllocator;
+		std::unique_ptr<RGTransientResourcePool> m_RGTransientResourcePool;
 		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;

@@ -24,16 +24,19 @@ namespace gglab
 			return passIndex.IsValid() ? static_cast<int32_t>(passIndex.Value()) : -1;
 		}
 
-		static ResourceIndex GetVirtualResourceGpuIndex(const RGVirtualResourceBase* virtualResource) noexcept
+		static RGTransientResourcePoolSlot GetVirtualResourcePoolSlot(
+			const RGVirtualResourceBase* virtualResource) noexcept
 		{
 			GGLAB_ASSERT_NOT_NULL(virtualResource);
 
 			switch (virtualResource->m_ResourceType)
 			{
 			case RGResourceType::RGTexture:
-				return static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource)->m_GpuResourceIndex;
+				return static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource)
+					->m_PhysicalAllocation.m_PoolSlot;
 			case RGResourceType::RGBuffer:
-				return static_cast<const RGVirtualResource<RGBufferResource>*>(virtualResource)->m_GpuResourceIndex;
+				return static_cast<const RGVirtualResource<RGBufferResource>*>(virtualResource)
+					->m_PhysicalAllocation.m_PoolSlot;
 			}
 
 			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
@@ -151,7 +154,7 @@ namespace gglab
 					resourceInfo.m_FirstUserPassIndex = ToSnapshotPassIndex(virtualResource->m_FirstUser);
 					resourceInfo.m_LastUserPassIndex = ToSnapshotPassIndex(virtualResource->m_LastUser);
 					resourceInfo.m_UsageBits = virtualResource->GetCompiledUsageBits();
-					resourceInfo.m_GpuResourceIndex = GetVirtualResourceGpuIndex(virtualResource);
+					resourceInfo.m_PoolSlot = GetVirtualResourcePoolSlot(virtualResource);
 					resourceInfo.m_InitialBarrierState = virtualResource->m_InitialBarrierState;
 					resourceInfo.m_HasFinalBarrierState = virtualResource->m_FinalBarrierState.has_value();
 					resourceInfo.m_FinalBarrierState = virtualResource->m_FinalBarrierState.value_or(CommonRHIResourceState());

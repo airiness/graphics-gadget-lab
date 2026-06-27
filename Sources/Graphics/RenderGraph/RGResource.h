@@ -6,6 +6,9 @@
 
 namespace gglab
 {
+	struct RGPhysicalTextureAllocation;
+	struct RGPhysicalBufferAllocation;
+
 	enum RGResourceType : uint8_t
 	{
 		RGTexture,
@@ -84,6 +87,7 @@ namespace gglab
 	{
 		using Access = RGTextureAccess;
 		using Handle = RHITextureHandle;
+		using PhysicalAllocation = RGPhysicalTextureAllocation;
 		using Native = DX12Texture;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 	};
@@ -95,6 +99,7 @@ namespace gglab
 	{
 		using Access = RGBufferAccess;
 		using Handle = RHIBufferHandle;
+		using PhysicalAllocation = RGPhysicalBufferAllocation;
 		using Native = DX12Buffer;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;
 	};

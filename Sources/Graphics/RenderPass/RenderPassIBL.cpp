@@ -2,7 +2,6 @@
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGDX12ResourceUtils.h"
 
 namespace gglab
 {
@@ -68,10 +67,9 @@ namespace gglab
 		RenderResourceRegistry::TextureIndex texIndex,
 		const char* name) noexcept
 	{
-		auto* texture = registry.GetTexture(texIndex);
-		GGLAB_ASSERT_NOT_NULL(texture);
+		const auto* desc = registry.GetTextureDesc(texIndex);
+		GGLAB_ASSERT_NOT_NULL(desc);
 
-		const auto desc = ToRHITextureDesc(*texture);
-		return builder.ImportTexture(name, registry.GetTextureHandle(texIndex), desc, RGTextureAccess::None);
+		return builder.ImportTexture(name, registry.GetTextureHandle(texIndex), *desc, RGTextureAccess::None);
 	}
 }

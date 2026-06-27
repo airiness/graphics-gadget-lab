@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
-#include "Graphics/RenderGraph/RGGpuResourceAllocator.h"
+#include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
@@ -57,7 +57,7 @@ namespace gglab
 
 		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
-		virtual void Devirtualize(RGGpuResourceAllocator*) noexcept = 0;
+		virtual void Devirtualize(RGTransientResourcePool*) noexcept = 0;
 		virtual void Destroy(RenderGraph&) noexcept = 0;
 		virtual void ResetCompiledUsage() noexcept = 0;
 		virtual void AccumulateAccess(uint64_t accessValue) noexcept = 0;
@@ -84,13 +84,14 @@ namespace gglab
 		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
 		using Access = typename RESOURCE::Access;
 		using Handle = typename RGResourceTraits<RESOURCE>::Handle;
+		using PhysicalAllocation = typename RGResourceTraits<RESOURCE>::PhysicalAllocation;
 
 		Desc m_Desc = {};
 		SubresourceDesc m_SubresourceDesc = {};
-		ResourceIndex m_GpuResourceIndex = {};
+		PhysicalAllocation m_PhysicalAllocation{};
 		Handle m_ImportedHandle{};
 
-		void Devirtualize(RGGpuResourceAllocator* allocator) noexcept override;
+		void Devirtualize(RGTransientResourcePool* pool) noexcept override;
 		void Destroy(RenderGraph& rg) noexcept override;
 		void ResetCompiledUsage() noexcept override;
 		void AccumulateAccess(uint64_t accessValue) noexcept override;
@@ -162,7 +163,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
-			RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
+			RGTransientResourcePool* m_TransientResourcePool = nullptr;
 		};
 
 		class RGBuilder
@@ -282,15 +283,12 @@ namespace gglab
 
 		void Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
-		void Retire(const DX12FencePoint& fencePoint) noexcept;
+		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
 		RHITextureHandle GetTextureHandle(RGTextureId texId) noexcept;
 		RHIBufferHandle GetBufferHandle(RGBufferId bufId) noexcept;
 		RHITextureViewHandle GetTextureViewHandle(RGTextureViewId viewId) noexcept;
 		RHIDescriptorHandle GetTextureViewDescriptor(RGTextureViewId viewId) noexcept;
-
-		ResourceIndex GetResourceIndex(RGTextureId texId) noexcept;
-		ResourceIndex GetResourceIndex(RGBufferId bufId) noexcept;
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
@@ -328,16 +326,14 @@ namespace gglab
 		template<typename RESOURCE>
 		void ExportInternal(RGResourceId<RESOURCE> resourceId, RESOURCE::Access finalAccess) noexcept;
 
-		template<typename RESOURCE>
-		ResourceIndex GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept;
-
 		template<RHITextureViewType T>
 		RGTextureViewId CreateTextureView(
 			RGTextureId textureId,
 			std::optional<RHITextureViewDesc> desc) noexcept;
 
 		template<typename RESOURCE>
-		void MarkDestroyResourceIndex(ResourceIndex resIndex) noexcept;
+		void MarkRetirePhysicalAllocation(
+			typename RGResourceTraits<RESOURCE>::PhysicalAllocation&& allocation) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
 
@@ -351,7 +347,7 @@ namespace gglab
 
 	private:
 		RHIDevice* m_Device = nullptr;
-		RGGpuResourceAllocator* m_GpuResourceAllocator = nullptr;
+		RGTransientResourcePool* m_TransientResourcePool = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 		RGBlackboard m_Blackboard;
@@ -364,8 +360,8 @@ namespace gglab
 
 		std::unordered_map<StringID, RGResourceHandle> m_NameHandleMap;
 
-		std::vector<ResourceIndex> m_MarkedReleaseTextureIndices;
-		std::vector<ResourceIndex> m_MarkedReleaseBufferIndices;
+		std::vector<RGPhysicalTextureAllocation> m_MarkedRetireTextures;
+		std::vector<RGPhysicalBufferAllocation> m_MarkedRetireBuffers;
 
 		friend class RGBuilder;
 
@@ -683,47 +679,23 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline ResourceIndex RenderGraph::GetResourceIndexImpl(RGResourceId<RESOURCE> id) noexcept
-	{
-		if (!id.IsValid())
-		{
-			return {};
-		}
-
-		auto* vResourceBase = GetVirtualResource(id);
-		if (!vResourceBase)
-		{
-			return {};
-		}
-
-		auto* vResource = static_cast<RGVirtualResource<RESOURCE>*>(vResourceBase);
-		if (vResource->m_Imported)
-		{
-			return {};
-		}
-
-		GGLAB_ASSERT_MSG(vResource->m_Devirtualized && vResource->m_GpuResourceIndex.IsValid(),
-			"Resource not devirtualized yet. Check your pass' setup and usages.");
-
-		return vResource->m_GpuResourceIndex;
-	}
-
-	template<typename RESOURCE>
-	inline void RenderGraph::MarkDestroyResourceIndex(ResourceIndex resIndex) noexcept
+	inline void RenderGraph::MarkRetirePhysicalAllocation(
+		typename RGResourceTraits<RESOURCE>::PhysicalAllocation&& allocation) noexcept
 	{
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 		{
-			m_MarkedReleaseTextureIndices.push_back(resIndex);
+			m_MarkedRetireTextures.push_back(std::move(allocation));
 		}
 		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
 		{
-			m_MarkedReleaseBufferIndices.push_back(resIndex);
+			m_MarkedRetireBuffers.push_back(std::move(allocation));
 		}
+		allocation.Reset();
 	}
 
 	// RGVirtualResource functions
 	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGGpuResourceAllocator* allocator) noexcept
+	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGTransientResourcePool* pool) noexcept
 	{
 		if (m_Devirtualized)
 		{
@@ -737,8 +709,16 @@ namespace gglab
 			return;
 		}
 
-		m_GpuResourceIndex = allocator->Acquire<Desc>(m_Desc);
-		m_Devirtualized = true;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			m_PhysicalAllocation = pool->AcquireTexture(m_Desc);
+		}
+		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
+		{
+			m_PhysicalAllocation = pool->AcquireBuffer(m_Desc);
+		}
+		m_Devirtualized = m_PhysicalAllocation.IsValid();
+		GGLAB_ASSERT_MSG(m_Devirtualized, "Failed to acquire a transient physical resource.");
 	}
 
 	template<typename RESOURCE>
@@ -754,8 +734,7 @@ namespace gglab
 			return;
 		}
 
-		rg.MarkDestroyResourceIndex<RESOURCE>(m_GpuResourceIndex);
-		m_GpuResourceIndex.Reset();
+		rg.MarkRetirePhysicalAllocation<RESOURCE>(std::move(m_PhysicalAllocation));
 		m_Devirtualized = false;
 	}
 
