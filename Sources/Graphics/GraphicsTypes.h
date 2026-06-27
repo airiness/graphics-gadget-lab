@@ -15,8 +15,6 @@
 
 namespace gglab
 {
-	class DX12Buffer;
-
 	enum class CommonRSRootParamIndex : uint32_t
 	{
 		SceneCB = 0,	// b0

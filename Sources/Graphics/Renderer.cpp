@@ -84,7 +84,7 @@ namespace gglab
 		descriptorManagerCreateInfo.m_SamplerCount = 2048;
 		m_DescriptorManager = std::make_unique<DX12DescriptorManager>(descriptorManagerCreateInfo);
 
-		m_TransferManager = std::make_unique<TransferManager>(m_Device.get(), createInfo.m_TransferManagerBufferSize);
+		m_TransferManager = std::make_unique<TransferManager>(m_Device.get());
 
 		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(m_Device.get());
 
@@ -171,6 +171,8 @@ namespace gglab
 		m_ViewCache.reset();
 
 		m_SceneCB.reset();
+		m_ObjectTable.reset();
+		m_MaterialTable.reset();
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
 		m_ViewSB.reset();
@@ -521,6 +523,8 @@ namespace gglab
 			objectSBCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
 			objectSBCreateInfo.m_DebugName = "Renderer.PersistentObjects";
 			m_ObjectSB = std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
+			m_ObjectTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, ObjectGPU>>(
+				MaxObjectCapacity, DX12Device::GetBufferCount());
 
 			PersistentStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
 			materialSBCreateInfo.m_Device = m_Device.get();
@@ -528,6 +532,8 @@ namespace gglab
 			materialSBCreateInfo.m_BufferCount = DX12Device::GetBufferCount();
 			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
 			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
+			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<MaterialID, MaterialGPU>>(
+				MaxMaterialCapacity, DX12Device::GetBufferCount());
 
 			// View data remains a small per-frame dynamic upload allocation.
 			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};

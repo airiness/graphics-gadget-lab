@@ -16,6 +16,5 @@ namespace gglab
 		D3D12_GPU_VIRTUAL_ADDRESS GPUVirtualAddress() const noexcept;
 
 		static CreateInfo UploadBufferCreateInfo(D3D12MA::Allocator* allocator, uint64_t sizeInBytes) noexcept;
-		static CreateInfo VertexOrIndexBufferCreateInfo(D3D12MA::Allocator* allocator, uint64_t sizeInBytes) noexcept;
 	};
 }

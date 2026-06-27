@@ -297,9 +297,6 @@
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -656,9 +653,12 @@
     <ClInclude Include="..\..\Sources\Core\StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ConstantBuffer.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
+    <ClCompile Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.cpp">
+      <Filter>Graphics\Buffer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClInclude Include="..\..\Sources\Graphics\Buffer\Buffer.h">
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
@@ -677,8 +677,11 @@
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingConstantBuffer.h">
-      <Filter>Graphics\RHI\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.h">
+      <Filter>Graphics\Buffer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h">
       <Filter>Core</Filter>
@@ -760,12 +763,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h">
       <Filter>Core\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingStructuredBuffer.h">
-      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TransferManager.h">
       <Filter>Graphics</Filter>

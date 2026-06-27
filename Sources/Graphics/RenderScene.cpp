@@ -27,28 +27,12 @@ namespace gglab
 		// Assembly RenderInstaces
 		result.m_RenderScene.m_RenderInstances.clear();
 
+		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
+		using MaterialTable = PersistentStructuredBufferTable<MaterialID, MaterialGPU>;
 		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_ObjectsSB.GetBufferCount());
 		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_MaterialsSB.GetBufferCount());
-		const RHIBufferHandle objectBufferIdentity = info.m_ObjectsSB.GetBufferHandle();
-		const RHIBufferHandle materialBufferIdentity = info.m_MaterialsSB.GetBufferHandle();
-		if (!m_ObjectTable ||
-			!m_MaterialTable ||
-			m_ObjectBufferIdentity != objectBufferIdentity ||
-			m_MaterialBufferIdentity != materialBufferIdentity)
-		{
-			GGLAB_ASSERT(info.m_ObjectsSB.GetBufferCount() == info.m_MaterialsSB.GetBufferCount());
-			m_ObjectTable = std::make_unique<ObjectTable>(
-				info.m_ObjectsSB.GetElementCapacity(),
-				info.m_ObjectsSB.GetBufferCount());
-			m_MaterialTable = std::make_unique<MaterialTable>(
-				info.m_MaterialsSB.GetElementCapacity(),
-				info.m_MaterialsSB.GetBufferCount());
-			m_ObjectBufferIdentity = objectBufferIdentity;
-			m_MaterialBufferIdentity = materialBufferIdentity;
-		}
-
-		m_ObjectTable->BeginUpdate();
-		m_MaterialTable->BeginUpdate();
+		info.m_ObjectTable.BeginUpdate();
+		info.m_MaterialTable.BeginUpdate();
 
 		std::vector<ViewGPU> viewData;
 		viewData.reserve(renderViews.size());
@@ -56,7 +40,7 @@ namespace gglab
 		std::unordered_map<MaterialID, uint32_t> materialIndexMap;
 
 		registry.view<components::TransformComponent, components::ModelComponent>().each(
-			[&result, &assetManager, this, &materialIndexMap](auto entity,
+			[&result, &assetManager, &info, &materialIndexMap](auto entity,
 				const components::TransformComponent& transformComp,
 				const components::ModelComponent& modelComp)
 			{
@@ -130,7 +114,7 @@ namespace gglab
 						materialGpu.AlphaCutoff = material->m_AlphaCutoff;
 						materialGpu.Flags = static_cast<uint32_t>(material->m_Flags);
 
-						materialIndex = m_MaterialTable->Upsert(modelMesh.m_MaterialId, materialGpu);
+						materialIndex = info.m_MaterialTable.Upsert(modelMesh.m_MaterialId, materialGpu);
 						if (materialIndex == MaterialTable::InvalidSlot)
 						{
 							continue;
@@ -150,7 +134,7 @@ namespace gglab
 					const uint64_t objectKey =
 						(static_cast<uint64_t>(entt::to_integral(entity)) << 32) |
 						modelMeshIndex;
-					const uint32_t objectOffset = m_ObjectTable->Upsert(objectKey, objectGpu);
+					const uint32_t objectOffset = info.m_ObjectTable.Upsert(objectKey, objectGpu);
 					if (objectOffset == ObjectTable::InvalidSlot)
 					{
 						continue;
@@ -172,8 +156,8 @@ namespace gglab
 				}
 			});
 
-		m_ObjectTable->EndUpdate();
-		m_MaterialTable->EndUpdate();
+		info.m_ObjectTable.EndUpdate();
+		info.m_MaterialTable.EndUpdate();
 
 		// View data
 		for (const RenderView& renderView : renderViews)
@@ -203,9 +187,9 @@ namespace gglab
 		}
 
 		const auto objectDirtyRanges =
-			m_ObjectTable->BuildDirtyRanges(info.m_CurrentBackBufferIndex);
+			info.m_ObjectTable.BuildDirtyRanges(info.m_CurrentBackBufferIndex);
 		const auto materialDirtyRanges =
-			m_MaterialTable->BuildDirtyRanges(info.m_CurrentBackBufferIndex);
+			info.m_MaterialTable.BuildDirtyRanges(info.m_CurrentBackBufferIndex);
 		bool objectsUploadSucceeded = true;
 		bool materialsUploadSucceeded = true;
 
@@ -219,7 +203,7 @@ namespace gglab
 				info.m_ObjectsSB.GetBufferHandle(info.m_CurrentBackBufferIndex);
 			for (const auto& range : objectDirtyRanges)
 			{
-				const std::span<const ObjectGPU> data = m_ObjectTable->GetData(range);
+				const std::span<const ObjectGPU> data = info.m_ObjectTable.GetData(range);
 				objectsUploadSucceeded &= batch.StageBufferWrite(
 					objectBuffer,
 					static_cast<uint64_t>(range.m_FirstElement) * sizeof(ObjectGPU),
@@ -231,7 +215,7 @@ namespace gglab
 				info.m_MaterialsSB.GetBufferHandle(info.m_CurrentBackBufferIndex);
 			for (const auto& range : materialDirtyRanges)
 			{
-				const std::span<const MaterialGPU> data = m_MaterialTable->GetData(range);
+				const std::span<const MaterialGPU> data = info.m_MaterialTable.GetData(range);
 				materialsUploadSucceeded &= batch.StageBufferWrite(
 					materialBuffer,
 					static_cast<uint64_t>(range.m_FirstElement) * sizeof(MaterialGPU),
@@ -242,12 +226,17 @@ namespace gglab
 			uploadFencePoint = batch.Submit(false);
 			if (objectsUploadSucceeded)
 			{
-				m_ObjectTable->Commit(info.m_CurrentBackBufferIndex, objectDirtyRanges);
+				info.m_ObjectTable.Commit(info.m_CurrentBackBufferIndex, objectDirtyRanges);
 			}
 			if (materialsUploadSucceeded)
 			{
-				m_MaterialTable->Commit(info.m_CurrentBackBufferIndex, materialDirtyRanges);
+				info.m_MaterialTable.Commit(info.m_CurrentBackBufferIndex, materialDirtyRanges);
 			}
+		}
+		else
+		{
+			info.m_ObjectTable.Commit(info.m_CurrentBackBufferIndex, {});
+			info.m_MaterialTable.Commit(info.m_CurrentBackBufferIndex, {});
 		}
 
 		result.m_UploadFencePoint = uploadFencePoint;
@@ -263,9 +252,9 @@ namespace gglab
 			result.m_Status = RenderSceneBuildStatus::Ready;
 
 			result.m_RenderScene.m_ObjectBaseIndex = 0;
-			result.m_RenderScene.m_ObjectCount = m_ObjectTable->GetLiveCount();
+			result.m_RenderScene.m_ObjectCount = info.m_ObjectTable.GetLiveCount();
 			result.m_RenderScene.m_MaterialBaseIndex = 0;
-			result.m_RenderScene.m_MaterialCount = m_MaterialTable->GetLiveCount();
+			result.m_RenderScene.m_MaterialCount = info.m_MaterialTable.GetLiveCount();
 			result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
 			result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
 		}

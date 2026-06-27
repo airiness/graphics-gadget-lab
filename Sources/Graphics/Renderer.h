@@ -68,8 +68,6 @@ namespace gglab
 			HWND m_Hwnd = nullptr;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
-
-			uint32_t m_TransferManagerBufferSize = 8 * 1024 * 1024;
 		};
 
 	public:
@@ -110,6 +108,10 @@ namespace gglab
 		PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept { return m_ObjectSB.get(); }
 		const PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept { return m_MaterialSB.get(); }
 		PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
+		const PersistentStructuredBufferTable<uint64_t, ObjectGPU>* GetObjectStructuredBufferTable() const noexcept { return m_ObjectTable.get(); }
+		PersistentStructuredBufferTable<uint64_t, ObjectGPU>* GetObjectStructuredBufferTable() noexcept { return m_ObjectTable.get(); }
+		const PersistentStructuredBufferTable<MaterialID, MaterialGPU>* GetMaterialStructuredBufferTable() const noexcept { return m_MaterialTable.get(); }
+		PersistentStructuredBufferTable<MaterialID, MaterialGPU>* GetMaterialStructuredBufferTable() noexcept { return m_MaterialTable.get(); }
 		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
 		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
 
@@ -152,6 +154,8 @@ namespace gglab
 
 		std::unique_ptr<PersistentStructuredBuffer<ObjectGPU>> m_ObjectSB;
 		std::unique_ptr<PersistentStructuredBuffer<MaterialGPU>> m_MaterialSB;
+		std::unique_ptr<PersistentStructuredBufferTable<uint64_t, ObjectGPU>> m_ObjectTable;
+		std::unique_ptr<PersistentStructuredBufferTable<MaterialID, MaterialGPU>> m_MaterialTable;
 		std::unique_ptr<DynamicStructuredBufferAllocator<ViewGPU>> m_ViewSB;
 
 		std::atomic_bool m_IsInitialized = false;

@@ -171,7 +171,6 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.cpp" />
@@ -322,13 +321,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ConstantBuffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingConstantBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
@@ -341,7 +337,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RingStructuredBuffer.h" />
+    <ClCompile Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp" />
+    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h" />
