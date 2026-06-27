@@ -4,7 +4,6 @@
 namespace gglab
 {
 	class DX12Device;
-	class DX12SwapChain;
 	class DX12DescriptorManager;
 	class RHIGraphicsCommandContext;
 
@@ -15,7 +14,8 @@ namespace gglab
 		{
 			HWND m_Hwnd = nullptr;
 			DX12Device* m_DX12Device = nullptr;
-			DX12SwapChain* m_SwapChain = nullptr;
+			RHIFormat m_BackBufferFormat = RHIFormat::R8G8B8A8Unorm;
+			uint32_t m_BufferCount = 2;
 			DX12DescriptorManager* m_DescriptorManager = nullptr;
 		};
 

@@ -1,7 +1,6 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
@@ -9,6 +8,7 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 
 namespace gglab
 {
@@ -16,6 +16,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT(createInfo.m_DX12Device);
 		GGLAB_ASSERT(createInfo.m_DescriptorManager);
+		GGLAB_ASSERT(createInfo.m_BufferCount >= 2);
 
 		m_DX12Device = createInfo.m_DX12Device;
 		m_DescriptorManager = createInfo.m_DescriptorManager;
@@ -34,8 +35,8 @@ namespace gglab
 		ImGui_ImplDX12_InitInfo initInfo{};
 		initInfo.Device = m_DX12Device->Get();
 		initInfo.CommandQueue = m_DX12Device->GetCommandQueue(CommandQueueType::Graphics)->Get();
-		initInfo.NumFramesInFlight = DX12Device::GetBufferCount();
-		initInfo.RTVFormat = createInfo.m_SwapChain->GetFormat();
+		initInfo.NumFramesInFlight = createInfo.m_BufferCount;
+		initInfo.RTVFormat = ToDXGIFormat(createInfo.m_BackBufferFormat);
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		initInfo.SrvDescriptorHeap =
 			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap()->Get();

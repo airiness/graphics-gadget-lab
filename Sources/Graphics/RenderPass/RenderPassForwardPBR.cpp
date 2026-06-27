@@ -8,7 +8,6 @@
 #include "Graphics/RenderGraph/RGIBLResources.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 

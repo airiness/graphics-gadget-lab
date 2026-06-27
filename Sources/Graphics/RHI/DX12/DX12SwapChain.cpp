@@ -62,9 +62,9 @@ namespace gglab
 		Reset();
 	}
 
-	void DX12SwapChain::OnResize(uint32_t width, uint32_t height) noexcept
+	void DX12SwapChain::Resize(uint32_t width, uint32_t height) noexcept
 	{
-		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::OnResize called on invalid swapchain.");
+		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::Resize called on invalid swapchain.");
 
 		if (width == 0 || height == 0)
 		{
@@ -103,16 +103,21 @@ namespace gglab
 		auto& fencePoint = m_SyncObjects[m_BackBufferIndex];
 		if (fencePoint.IsValid())
 		{
-			fencePoint.Wait();
+			m_DX12Device->WaitForFenceCompletion(fencePoint);
 		}
 	}
 
-	void DX12SwapChain::UpdateFrameSyncObject(const DX12FencePoint& fencePoint) noexcept
+	void DX12SwapChain::SetFrameCompletionFence(const RHIFencePoint& fencePoint) noexcept
 	{
-		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::UpdateFrameSyncObject called on invalid swapchain.");
+		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::SetFrameCompletionFence called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
 
 		m_SyncObjects[m_BackBufferIndex] = fencePoint;
+	}
+
+	RHIFormat DX12SwapChain::GetFormat() const noexcept
+	{
+		return ToRHIFormat(m_Format);
 	}
 
 	void DX12SwapChain::Present() noexcept
@@ -139,7 +144,7 @@ namespace gglab
 
 	RHITextureHandle DX12SwapChain::GetBackBufferHandle(uint32_t bufferIndex) const noexcept
 	{
-		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::GetBackBuffer called on invalid swapchain.");
+		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::GetBackBufferHandle called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(bufferIndex < m_BackBuffers.size(), "BackBuffer index out of range.");
 
 		return m_BackBuffers[bufferIndex];
@@ -270,7 +275,7 @@ namespace gglab
 		{
 			if (fencePoint.IsValid())
 			{
-				fencePoint.Wait();
+				m_DX12Device->WaitForFenceCompletion(fencePoint);
 			}
 		}
 	}

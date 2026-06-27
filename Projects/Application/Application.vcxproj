@@ -253,7 +253,7 @@
     <ClCompile Include="..\..\Sources\Graphics\ShaderManager.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Time.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12ViewCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
   </ItemGroup>
@@ -311,6 +311,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISwapChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h" />
@@ -436,7 +437,7 @@
     <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\VertexData.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12ViewCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h" />
     <ClInclude Include="..\..\Sources\Core\World.h" />
   </ItemGroup>
   <ItemGroup>

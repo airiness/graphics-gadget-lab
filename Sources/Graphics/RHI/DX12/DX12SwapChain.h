@@ -1,8 +1,6 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
-#include "Graphics/RHI/RHITexture.h"
-#include "Graphics/Color.h"
+#include "Graphics/RHI/RHISwapChain.h"
 
 namespace gglab
 {
@@ -10,7 +8,7 @@ namespace gglab
 	class DX12CommandQueue;
 	class DX12CommandList;
 	class DX12Texture;
-	class DX12SwapChain
+	class DX12SwapChain final : public RHISwapChain
 	{
 	public:
 		struct CreateInfo
@@ -35,26 +33,23 @@ namespace gglab
 		~DX12SwapChain();
 
 		bool Initialize(const CreateInfo& createInfo) noexcept;
-		void Finalize() noexcept;
+		void Finalize() noexcept override;
 
-		bool IsValid() const noexcept { return m_DxgiSwapChain != nullptr; }
+		bool IsValid() const noexcept override { return m_DxgiSwapChain != nullptr; }
 
-		void OnResize(uint32_t width, uint32_t height) noexcept;
+		void Resize(uint32_t width, uint32_t height) noexcept override;
 
-		uint32_t GetBufferCount() const noexcept { return m_BufferCount; }
-		uint32_t GetBufferWidth() const noexcept { return m_Width; }
-		uint32_t GetBufferHeight() const noexcept { return m_Height; }
-		DXGI_FORMAT GetFormat() const noexcept { return m_Format; }
+		uint32_t GetBufferCount() const noexcept override { return m_BufferCount; }
+		uint32_t GetBufferWidth() const noexcept override { return m_Width; }
+		uint32_t GetBufferHeight() const noexcept override { return m_Height; }
+		RHIFormat GetFormat() const noexcept override;
 
-		void SetClearColor(const Color& color) noexcept { m_ClearColor = color; }
-		const Color& GetClearColor() const noexcept { return m_ClearColor; }
+		void WaitFrameCompletion() noexcept override;
+		void SetFrameCompletionFence(const RHIFencePoint& fencePoint) noexcept override;
+		void Present() noexcept override;
 
-		void WaitFrameCompletion() noexcept;
-		void UpdateFrameSyncObject(const DX12FencePoint& fencePoint) noexcept;
-		void Present() noexcept;
-
-		uint32_t GetCurrentBackBufferIndex() const noexcept { return m_BackBufferIndex; }
-		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept;
+		uint32_t GetCurrentBackBufferIndex() const noexcept override { return m_BackBufferIndex; }
+		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override;
 		RHITextureHandle GetCurrentBackBufferHandle() const noexcept { return GetBackBufferHandle(m_BackBufferIndex); }
 		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
 		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffer(m_BackBufferIndex); }
@@ -84,11 +79,9 @@ namespace gglab
 		bool m_AllowTearing = false;
 		bool m_Vsync = true;
 
-		Color m_ClearColor = color::Gray;
-
 		ComPtr<IDXGISwapChain4> m_DxgiSwapChain;
 
 		std::vector<RHITextureHandle> m_BackBuffers;
-		std::vector<DX12FencePoint> m_SyncObjects;
+		std::vector<RHIFencePoint> m_SyncObjects;
 	};
 }

@@ -3,11 +3,10 @@
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
-#include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RHI/RHIBindingLayout.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/RHISwapChain.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/PipelineCache.h"
 #include "Graphics/TransferManager.h"
@@ -21,6 +20,8 @@
 #include "Graphics/RenderParameters.h"
 #include "Graphics/RenderScene.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
+
+#include <array>
 
 namespace gglab
 {
@@ -87,16 +88,16 @@ namespace gglab
 		void EndFrame(Frame& frame) noexcept;
 
 		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		DX12SwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
+		RHISwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
 		DX12DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager.get(); }
 		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
-		DX12ViewCache* GetViewCache() const noexcept { return m_ViewCache.get(); }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		RGTransientResourcePool* GetTransientResourcePool() const noexcept { return m_RGTransientResourcePool.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
 		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
+		const std::array<float, 4>& GetBackBufferClearColor() const noexcept { return m_BackBufferClearColor; }
 
 		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
@@ -135,11 +136,10 @@ namespace gglab
 
 	private:
 		std::unique_ptr<DX12Device> m_Device;
-		std::unique_ptr<DX12SwapChain> m_SwapChain;
+		std::unique_ptr<RHISwapChain> m_SwapChain;
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
 		std::unique_ptr<RGTransientResourcePool> m_RGTransientResourcePool;
-		std::unique_ptr<DX12ViewCache> m_ViewCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
@@ -149,6 +149,7 @@ namespace gglab
 		std::unique_ptr<DevelopGuiBackend> m_DevelopGuiBackend;
 
 		RootSignatureID m_CommonRootSignatureId{};
+		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 
 		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 

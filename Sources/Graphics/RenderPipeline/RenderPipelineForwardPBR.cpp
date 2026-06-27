@@ -2,8 +2,6 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
 #include "Graphics/RenderResourceRegistry.h"
@@ -68,7 +66,7 @@ namespace gglab
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
 				backBufferDesc.m_Extent = { width, height, 1u };
-				backBufferDesc.m_Format = ToRHIFormat(swapChain->GetFormat());
+				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
 					backTexture,
@@ -130,12 +128,11 @@ namespace gglab
 					RGTextureAccess::RenderTarget);
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 			},
-			[swapChain](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
+			[renderer](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				const auto& color = swapChain->GetClearColor();
-				commandContext->ClearColor(rtv, { color.R(), color.G(), color.B(), color.A() });
+				commandContext->ClearColor(rtv, renderer->GetBackBufferClearColor());
 			});
 
 		// IBL Pass
