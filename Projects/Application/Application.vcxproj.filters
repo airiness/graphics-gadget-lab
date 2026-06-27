@@ -300,8 +300,8 @@
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\RHITransferContext.cpp">
-      <Filter>Graphics\RHI</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp">
       <Filter>Graphics</Filter>
@@ -769,6 +769,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h">
       <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.h">
+      <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h">
       <Filter>Graphics</Filter>

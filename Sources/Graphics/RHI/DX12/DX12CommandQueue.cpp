@@ -67,9 +67,11 @@ namespace gglab
 			return;
 		}
 
-		auto* fence = fencePoint.GetFence()->Get();
-		auto value = fencePoint.GetValue();
+		Wait(*fencePoint.GetFence(), fencePoint.GetValue());
+	}
 
-		m_D3D12CommandQueue->Wait(fence, value);
+	void DX12CommandQueue::Wait(const DX12Fence& fence, uint64_t value) const noexcept
+	{
+		m_D3D12CommandQueue->Wait(fence.Get(), value);
 	}
 }

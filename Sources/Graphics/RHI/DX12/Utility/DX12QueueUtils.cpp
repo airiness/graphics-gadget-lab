@@ -13,6 +13,8 @@ namespace gglab
 			return D3D12_COMMAND_LIST_TYPE_COMPUTE;
 		case RHIQueueType::Copy:
 			return D3D12_COMMAND_LIST_TYPE_COPY;
+		case RHIQueueType::Transfer:
+			return D3D12_COMMAND_LIST_TYPE_DIRECT;
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RHIQueueType.");

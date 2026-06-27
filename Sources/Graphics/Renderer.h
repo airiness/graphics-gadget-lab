@@ -58,7 +58,7 @@ namespace gglab
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			DX12CommandAllocator* m_CommandAllocator = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
-			DX12FencePoint m_UploadFencePoint = {};
+			RHIFencePoint m_UploadFencePoint = {};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 		};
 

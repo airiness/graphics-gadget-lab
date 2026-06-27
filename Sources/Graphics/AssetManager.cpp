@@ -220,9 +220,8 @@ namespace gglab
 
 		// Upload Mesh to GPU
 		auto batch = m_TransferManager->BeginBatch();
-		auto* transferContext = m_TransferManager->GetTransferContext();
-		UploadMesh(meshUploadData, *transferContext);
-		batch.Submit(true);
+		UploadMesh(meshUploadData, batch);
+		GGLAB_UNUSED(batch.Submit(true));
 
 		return meshId;
 	}
@@ -295,7 +294,7 @@ namespace gglab
 		return bindingGpu;
 	}
 
-	void AssetManager::UploadMesh(const MeshUploadData& uploadData, RHITransferContext& transferContext) noexcept
+	void AssetManager::UploadMesh(const MeshUploadData& uploadData, TransferBatch& transferBatch) noexcept
 	{
 		auto* mesh = GetMesh(uploadData.m_MeshId);
 		if (mesh == nullptr)
@@ -354,10 +353,10 @@ namespace gglab
 		mesh->m_VertexBuffer = RHIBufferOwner(m_DX12Device, vertexBuffer);
 		mesh->m_IndexBuffer = RHIBufferOwner(m_DX12Device, indexBuffer);
 
-		const bool vertexUploadSucceeded = transferContext.UploadBuffer(
-			verticesData.data(), vertexBufferSize, mesh->m_VertexBuffer.Get());
-		const bool indexUploadSucceeded = transferContext.UploadBuffer(
-			indicesData.data(), indexBufferSize, mesh->m_IndexBuffer.Get());
+		const bool vertexUploadSucceeded = transferBatch.UploadBuffer(
+			mesh->m_VertexBuffer.Get(), 0, verticesData.data(), vertexBufferSize);
+		const bool indexUploadSucceeded = transferBatch.UploadBuffer(
+			mesh->m_IndexBuffer.Get(), 0, indicesData.data(), indexBufferSize);
 		GGLAB_ASSERT_MSG(vertexUploadSucceeded && indexUploadSucceeded,
 			"AssetManager failed to record mesh buffer uploads.");
 		if (!vertexUploadSucceeded || !indexUploadSucceeded)
@@ -680,18 +679,17 @@ namespace gglab
 
 		// Upload to GPU
 		auto batch = m_TransferManager->BeginBatch();
-		auto* transferContext = m_TransferManager->GetTransferContext();
 		// Upload textures
 		for (const auto& texUploadData : texUploadDatas)
 		{
-			m_TextureRegistry->UploadTexture(texUploadData, *transferContext);
+			m_TextureRegistry->UploadTexture(texUploadData, batch);
 		}
 		// Upload meshes
 		for (const auto& meshUploadData : meshUploadDatas)
 		{
-			UploadMesh(meshUploadData, *transferContext);
+			UploadMesh(meshUploadData, batch);
 		}
-		batch.Submit(true);
+		GGLAB_UNUSED(batch.Submit(true));
 
 		return modelId;
 	}

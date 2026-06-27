@@ -17,6 +17,7 @@ namespace gglab
 		Graphics,
 		Compute,
 		Copy,
+		Transfer,
 	};
 
 	enum class RHIResourceType : uint8_t

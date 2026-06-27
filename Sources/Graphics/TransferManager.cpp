@@ -1,23 +1,25 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TransferManager.h"
+#include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITransferContext.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
 
 namespace gglab
 {
-	TransferManager::TransferManager(DX12Device* dx12Device) noexcept :
-		m_TransferContext(std::make_unique<RHITransferContext>(dx12Device))
+	TransferManager::TransferManager(RHIDevice* device) noexcept :
+		m_TransferContext(device ? device->CreateTransferContext() : nullptr)
 	{
+		GGLAB_ASSERT_MSG(m_TransferContext != nullptr,
+			"TransferManager failed to create an RHI transfer context.");
 	}
 
-	DX12FencePoint TransferManager::Reclaim() noexcept
+	void TransferManager::Reclaim() noexcept
 	{
-		return m_TransferContext->ReclaimCompleted();
+		m_TransferContext->ReclaimCompleted();
 	}
 
 	TransferBatch TransferManager::BeginBatch() noexcept
 	{
-		// Reclaim completed uploads before starting a new batch
+		// Reclaim completed uploads before starting a new batch.
 		Reclaim();
 
 		m_TransferContext->Begin();

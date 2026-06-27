@@ -35,6 +35,7 @@ namespace gglab
 		DX12FencePoint Signal() noexcept;
 
 		void Wait(const DX12FencePoint& fencePoint) const noexcept;
+		void Wait(const DX12Fence& fence, uint64_t value) const noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

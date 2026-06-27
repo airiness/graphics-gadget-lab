@@ -7,6 +7,7 @@
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+#include "Graphics/RHI/DX12/DX12TransferContext.h"
 #include "Graphics/RHI/DX12/Cache/DX12ViewCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
@@ -15,6 +16,20 @@
 
 namespace gglab
 {
+	namespace
+	{
+		CommandQueueType ToCommandQueueType(RHIQueueType queueType) noexcept
+		{
+			switch (queueType)
+			{
+			case RHIQueueType::Graphics: return CommandQueueType::Graphics;
+			case RHIQueueType::Compute: return CommandQueueType::Compute;
+			case RHIQueueType::Copy: return CommandQueueType::Copy;
+			case RHIQueueType::Transfer: return CommandQueueType::Transfer;
+			}
+			GGLAB_UNREACHABLE("Unhandled RHIQueueType.");
+		}
+	}
 	DX12Device::DX12Device() noexcept = default;
 
 	DX12Device::~DX12Device()
@@ -103,6 +118,29 @@ namespace gglab
 			auto& commandQueue = m_CommandQueues[utils::ToIndex(queueType)];
 			commandQueue->FlushCommandQueue();
 		}
+	}
+
+	std::unique_ptr<RHITransferContext> DX12Device::CreateTransferContext() noexcept
+	{
+		return std::make_unique<DX12TransferContext>(this);
+	}
+
+	void DX12Device::WaitForFence(
+		RHIQueueType waitingQueue,
+		const RHIFencePoint& fencePoint) noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return;
+		}
+		const DX12Fence* fence = ResolveFence(fencePoint.m_Fence);
+		DX12CommandQueue* queue = GetCommandQueue(ToCommandQueueType(waitingQueue));
+		if (!fence || !queue)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::WaitForFence received an unknown fence or queue.");
+			return;
+		}
+		queue->Wait(*fence, fencePoint.m_Value);
 	}
 
 	RHITextureHandle DX12Device::CreateTexture(const RHITextureDesc& desc) noexcept
@@ -233,23 +271,30 @@ namespace gglab
 			return true;
 		}
 
-		for (const auto& commandQueue : m_CommandQueues)
+		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
 		{
-			if (!commandQueue)
-			{
-				continue;
-			}
-
-			const DX12Fence* fence = commandQueue->GetFence();
-			if (fence && fence->GetRHIHandle() == fencePoint.m_Fence)
-			{
-				return fence->IsCompleted(fencePoint.m_Value);
-			}
+			return fence->IsCompleted(fencePoint.m_Value);
 		}
 
 		GGLAB_LOG_GRAPHICS_WARN(
 			"DX12Device::IsFencePointCompleted received an unknown RHI fence handle.");
 		return false;
+	}
+
+	const DX12Fence* DX12Device::ResolveFence(RHIFenceHandle fenceHandle) const noexcept
+	{
+		for (const auto& commandQueue : m_CommandQueues)
+		{
+			if (commandQueue)
+			{
+				const DX12Fence* fence = commandQueue->GetFence();
+				if (fence && fence->GetRHIHandle() == fenceHandle)
+				{
+					return fence;
+				}
+			}
+		}
+		return nullptr;
 	}
 
 	void DX12Device::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
