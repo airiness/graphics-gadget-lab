@@ -5,8 +5,8 @@
 
 namespace gglab
 {
-	struct RGPhysicalTextureAllocation;
-	struct RGPhysicalBufferAllocation;
+	struct TransientTextureAllocation;
+	struct TransientBufferAllocation;
 
 	enum RGResourceType : uint8_t
 	{
@@ -84,7 +84,7 @@ namespace gglab
 	{
 		using Access = RGTextureAccess;
 		using Handle = RHITextureHandle;
-		using PhysicalAllocation = RGPhysicalTextureAllocation;
+		using PhysicalAllocation = TransientTextureAllocation;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 	};
 
@@ -93,7 +93,7 @@ namespace gglab
 	{
 		using Access = RGBufferAccess;
 		using Handle = RHIBufferHandle;
-		using PhysicalAllocation = RGPhysicalBufferAllocation;
+		using PhysicalAllocation = TransientBufferAllocation;
 		static constexpr RGResourceType ResourceType = RGResourceType::RGBuffer;
 	};
 }

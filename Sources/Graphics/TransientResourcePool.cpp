@@ -1,34 +1,34 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 #include "Graphics/RHI/RHIDevice.h"
 
 namespace gglab
 {
-	RGTransientResourcePool::RGTransientResourcePool(RHIDevice* device) noexcept :
+	TransientResourcePool::TransientResourcePool(RHIDevice* device) noexcept :
 		m_Device(device)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice must not be null.");
 	}
 
-	RGTransientResourcePool::~RGTransientResourcePool() noexcept
+	TransientResourcePool::~TransientResourcePool() noexcept
 	{
 		for (uint32_t index = 0; index < m_Textures.size(); ++index)
 		{
-			DestroyTexture(RGTransientResourcePoolSlot(index));
+			DestroyTexture(TransientResourcePoolSlot(index));
 		}
 		for (uint32_t index = 0; index < m_Buffers.size(); ++index)
 		{
-			DestroyBuffer(RGTransientResourcePoolSlot(index));
+			DestroyBuffer(TransientResourcePoolSlot(index));
 		}
 	}
 
-	void RGTransientResourcePool::RetireTexture(
-		RGPhysicalTextureAllocation&& allocation,
+	void TransientResourcePool::RetireTexture(
+		TransientTextureAllocation&& allocation,
 		const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Textures.size())
 		{
-			GGLAB_LOG_WARN("RGTransientResourcePool::RetireTexture received an invalid allocation.");
+			GGLAB_LOG_WARN("TransientResourcePool::RetireTexture received an invalid allocation.");
 			return;
 		}
 
@@ -45,13 +45,13 @@ namespace gglab
 		allocation.Reset();
 	}
 
-	void RGTransientResourcePool::RetireBuffer(
-		RGPhysicalBufferAllocation&& allocation,
+	void TransientResourcePool::RetireBuffer(
+		TransientBufferAllocation&& allocation,
 		const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Buffers.size())
 		{
-			GGLAB_LOG_WARN("RGTransientResourcePool::RetireBuffer received an invalid allocation.");
+			GGLAB_LOG_WARN("TransientResourcePool::RetireBuffer received an invalid allocation.");
 			return;
 		}
 
@@ -68,7 +68,7 @@ namespace gglab
 		allocation.Reset();
 	}
 
-	RGTransientTextureKey RGTransientResourcePool::MakeTextureKey(const RHITextureDesc& desc) noexcept
+	TransientTextureKey TransientResourcePool::MakeTextureKey(const RHITextureDesc& desc) noexcept
 	{
 		return
 		{
@@ -83,7 +83,7 @@ namespace gglab
 		};
 	}
 
-	RGTransientBufferKey RGTransientResourcePool::MakeBufferKey(const RHIBufferDesc& desc) noexcept
+	TransientBufferKey TransientResourcePool::MakeBufferKey(const RHIBufferDesc& desc) noexcept
 	{
 		return
 		{
@@ -94,7 +94,7 @@ namespace gglab
 		};
 	}
 
-	RGPhysicalTextureAllocation RGTransientResourcePool::AcquireTexture(const RHITextureDesc& desc) noexcept
+	TransientTextureAllocation TransientResourcePool::AcquireTexture(const RHITextureDesc& desc) noexcept
 	{
 		const auto key = MakeTextureKey(desc);
 		if (auto iter = m_FreeTextures.find(key);
@@ -109,7 +109,7 @@ namespace gglab
 		return CreateTexture(desc);
 	}
 
-	RGPhysicalBufferAllocation RGTransientResourcePool::AcquireBuffer(const RHIBufferDesc& desc) noexcept
+	TransientBufferAllocation TransientResourcePool::AcquireBuffer(const RHIBufferDesc& desc) noexcept
 	{
 		const auto key = MakeBufferKey(desc);
 		if (auto iter = m_FreeBuffers.find(key);
@@ -124,13 +124,13 @@ namespace gglab
 		return CreateBuffer(desc);
 	}
 
-	RGPhysicalTextureAllocation RGTransientResourcePool::CreateTexture(const RHITextureDesc& desc) noexcept
+	TransientTextureAllocation TransientResourcePool::CreateTexture(const RHITextureDesc& desc) noexcept
 	{
-		const RGTransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Textures.size()) };
+		const TransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Textures.size()) };
 		RHITextureDesc textureDesc = desc;
 		if (!textureDesc.m_DebugName)
 		{
-			textureDesc.m_DebugName = "RGTransientResourcePool.Texture";
+			textureDesc.m_DebugName = "TransientResourcePool.Texture";
 		}
 		if (!textureDesc.m_ClearValue)
 		{
@@ -138,7 +138,7 @@ namespace gglab
 		}
 
 		RHITextureHandle texture = m_Device->CreateTexture(textureDesc);
-		GGLAB_ASSERT_MSG(texture.IsValid(), "RGTransientResourcePool: CreateTexture failed.");
+		GGLAB_ASSERT_MSG(texture.IsValid(), "TransientResourcePool: CreateTexture failed.");
 		if (!texture.IsValid())
 		{
 			return {};
@@ -153,17 +153,17 @@ namespace gglab
 		return { texture, poolSlot, key };
 	}
 
-	RGPhysicalBufferAllocation RGTransientResourcePool::CreateBuffer(const RHIBufferDesc& desc) noexcept
+	TransientBufferAllocation TransientResourcePool::CreateBuffer(const RHIBufferDesc& desc) noexcept
 	{
-		const RGTransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Buffers.size()) };
+		const TransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Buffers.size()) };
 		RHIBufferDesc bufferDesc = desc;
 		if (!bufferDesc.m_DebugName)
 		{
-			bufferDesc.m_DebugName = "RGTransientResourcePool.Buffer";
+			bufferDesc.m_DebugName = "TransientResourcePool.Buffer";
 		}
 
 		RHIBufferHandle buffer = m_Device->CreateBuffer(bufferDesc);
-		GGLAB_ASSERT_MSG(buffer.IsValid(), "RGTransientResourcePool: CreateBuffer failed.");
+		GGLAB_ASSERT_MSG(buffer.IsValid(), "TransientResourcePool: CreateBuffer failed.");
 		if (!buffer.IsValid())
 		{
 			return {};
@@ -178,7 +178,7 @@ namespace gglab
 		return { buffer, poolSlot, key };
 	}
 
-	void RGTransientResourcePool::Tick() noexcept
+	void TransientResourcePool::Tick() noexcept
 	{
 		std::erase_if(m_PendingRetirements,
 			[this](const PendingRetirement& pending)
@@ -235,7 +235,7 @@ namespace gglab
 			});
 	}
 
-	void RGTransientResourcePool::TrimPerKey(uint32_t maxCachedPerKey) noexcept
+	void TransientResourcePool::TrimPerKey(uint32_t maxCachedPerKey) noexcept
 	{
 		m_MaxCachedPerKey = maxCachedPerKey;
 		if (maxCachedPerKey == 0)
@@ -274,8 +274,8 @@ namespace gglab
 		}
 	}
 
-	bool RGTransientResourcePool::IsCompatibleTexture(
-		const RGPhysicalTextureAllocation& allocation,
+	bool TransientResourcePool::IsCompatibleTexture(
+		const TransientTextureAllocation& allocation,
 		const RHITextureDesc& desc) const noexcept
 	{
 		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Textures.size())
@@ -294,7 +294,7 @@ namespace gglab
 			allocation.m_Key == MakeTextureKey(desc);
 	}
 
-	std::optional<RHIClearValue> RGTransientResourcePool::DefaultClearValue(const RHITextureDesc& desc) noexcept
+	std::optional<RHIClearValue> TransientResourcePool::DefaultClearValue(const RHITextureDesc& desc) noexcept
 	{
 		if (Test(desc.m_Usage, RHITextureUsage::RenderTarget))
 		{
@@ -323,7 +323,7 @@ namespace gglab
 		return std::nullopt;
 	}
 
-	void RGTransientResourcePool::DestroyTexture(RGTransientResourcePoolSlot poolSlot) noexcept
+	void TransientResourcePool::DestroyTexture(TransientResourcePoolSlot poolSlot) noexcept
 	{
 		if (!poolSlot.IsValid() || poolSlot.Value() >= m_Textures.size())
 		{
@@ -340,7 +340,7 @@ namespace gglab
 		texture.Reset();
 	}
 
-	void RGTransientResourcePool::DestroyBuffer(RGTransientResourcePoolSlot poolSlot) noexcept
+	void TransientResourcePool::DestroyBuffer(TransientResourcePoolSlot poolSlot) noexcept
 	{
 		if (!poolSlot.IsValid() || poolSlot.Value() >= m_Buffers.size())
 		{

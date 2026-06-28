@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderGraph/RGTransientResourcePoolSnapshot.h"
+#include "Graphics/TransientResourcePoolSnapshot.h"
 #include "Graphics/RHI/RHIDevice.h"
 
 namespace gglab
@@ -7,23 +7,23 @@ namespace gglab
 	namespace
 	{
 		void AccumulateState(
-			RGTransientPoolStateCounts& counts,
-			RGTransientPoolSlotState state) noexcept
+			TransientPoolStateCounts& counts,
+			TransientPoolSlotState state) noexcept
 		{
 			++counts.m_Total;
 			switch (state)
 			{
-			case RGTransientPoolSlotState::Leased: ++counts.m_Leased; break;
-			case RGTransientPoolSlotState::PendingRetirement: ++counts.m_PendingRetirement; break;
-			case RGTransientPoolSlotState::Available: ++counts.m_Available; break;
-			case RGTransientPoolSlotState::Destroyed: ++counts.m_Destroyed; break;
+			case TransientPoolSlotState::Leased: ++counts.m_Leased; break;
+			case TransientPoolSlotState::PendingRetirement: ++counts.m_PendingRetirement; break;
+			case TransientPoolSlotState::Available: ++counts.m_Available; break;
+			case TransientPoolSlotState::Destroyed: ++counts.m_Destroyed; break;
 			}
 		}
 	}
 
-	void BuildRGTransientResourcePoolSnapshot(
-		const RGTransientResourcePool& pool,
-		RGTransientResourcePoolSnapshot& outSnapshot) noexcept
+	void BuildTransientResourcePoolSnapshot(
+		const TransientResourcePool& pool,
+		TransientResourcePoolSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
 		outSnapshot.m_PendingRetirementCount = static_cast<uint32_t>(pool.m_PendingRetirements.size());
@@ -54,7 +54,7 @@ namespace gglab
 		std::unordered_map<uint32_t, RHIFencePoint> pendingBuffers;
 		for (const auto& pending : pool.m_PendingRetirements)
 		{
-			if (pending.m_Type == RGTransientResourcePool::ResourceType::Texture)
+			if (pending.m_Type == TransientResourcePool::ResourceType::Texture)
 			{
 				pendingTextures[pending.m_PoolSlot.Value()] = pending.m_FencePoint;
 			}
@@ -71,13 +71,13 @@ namespace gglab
 			const auto pending = pendingTextures.find(index);
 			const bool isPending = pending != pendingTextures.end();
 			const auto state = !record.m_Texture.IsValid() ?
-				RGTransientPoolSlotState::Destroyed :
-				isPending ? RGTransientPoolSlotState::PendingRetirement :
-				availableTextures.contains(index) ? RGTransientPoolSlotState::Available :
-				RGTransientPoolSlotState::Leased;
+				TransientPoolSlotState::Destroyed :
+				isPending ? TransientPoolSlotState::PendingRetirement :
+				availableTextures.contains(index) ? TransientPoolSlotState::Available :
+				TransientPoolSlotState::Leased;
 
-			RGTransientTextureSlotSnapshot snapshot{};
-			snapshot.m_PoolSlot = RGTransientResourcePoolSlot(index);
+			TransientTextureSlotSnapshot snapshot{};
+			snapshot.m_PoolSlot = TransientResourcePoolSlot(index);
 			snapshot.m_State = state;
 			snapshot.m_Texture = record.m_Texture;
 			snapshot.m_Key = record.m_Key;
@@ -98,13 +98,13 @@ namespace gglab
 			const auto pending = pendingBuffers.find(index);
 			const bool isPending = pending != pendingBuffers.end();
 			const auto state = !record.m_Buffer.IsValid() ?
-				RGTransientPoolSlotState::Destroyed :
-				isPending ? RGTransientPoolSlotState::PendingRetirement :
-				availableBuffers.contains(index) ? RGTransientPoolSlotState::Available :
-				RGTransientPoolSlotState::Leased;
+				TransientPoolSlotState::Destroyed :
+				isPending ? TransientPoolSlotState::PendingRetirement :
+				availableBuffers.contains(index) ? TransientPoolSlotState::Available :
+				TransientPoolSlotState::Leased;
 
-			RGTransientBufferSlotSnapshot snapshot{};
-			snapshot.m_PoolSlot = RGTransientResourcePoolSlot(index);
+			TransientBufferSlotSnapshot snapshot{};
+			snapshot.m_PoolSlot = TransientResourcePoolSlot(index);
 			snapshot.m_State = state;
 			snapshot.m_Buffer = record.m_Buffer;
 			snapshot.m_Key = record.m_Key;

@@ -2,7 +2,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/Camera.h"
@@ -65,7 +65,7 @@ namespace gglab
 
 		auto* device = &m_RHIContext->GetDevice();
 
-		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(device);
+		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -87,7 +87,7 @@ namespace gglab
 
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_Device = device;
-		renderResRegistryCreateInfo.m_TransientResourcePool = m_RGTransientResourcePool.get();
+		renderResRegistryCreateInfo.m_TransientResourcePool = m_TransientResourcePool.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
@@ -125,7 +125,7 @@ namespace gglab
 		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
-		m_RGTransientResourcePool.reset();
+		m_TransientResourcePool.reset();
 
 		m_SceneCB.reset();
 		m_ObjectTable.reset();
@@ -151,7 +151,7 @@ namespace gglab
 		m_SceneCB->Tick();
 		m_ViewSB->Tick();
 
-		m_RGTransientResourcePool->Tick();
+		m_TransientResourcePool->Tick();
 
 		m_HasActiveFrame = true;
 		return Frame(this, &rhiFrame);
@@ -323,7 +323,7 @@ namespace gglab
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
 		rgCreateInfo.m_Device = GetDevice();
-		rgCreateInfo.m_TransientResourcePool = m_RGTransientResourcePool.get();
+		rgCreateInfo.m_TransientResourcePool = m_TransientResourcePool.get();
 
 		return rgCreateInfo;
 	}

@@ -69,7 +69,7 @@ namespace gglab
 			return passIndex >= 0 ? std::format("{}", passIndex) : "-";
 		}
 
-		static std::string PoolSlotToString(RGTransientResourcePoolSlot poolSlot) noexcept
+		static std::string PoolSlotToString(TransientResourcePoolSlot poolSlot) noexcept
 		{
 			return poolSlot.IsValid() ? std::format("{}", poolSlot.Value()) : "-";
 		}

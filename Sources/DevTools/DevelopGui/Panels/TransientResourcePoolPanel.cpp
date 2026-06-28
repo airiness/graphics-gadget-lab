@@ -4,7 +4,7 @@
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraphSnapshot.h"
-#include "Graphics/RenderGraph/RGTransientResourcePoolSnapshot.h"
+#include "Graphics/TransientResourcePoolSnapshot.h"
 
 namespace gglab
 {
@@ -16,14 +16,14 @@ namespace gglab
 			char m_Filter[128] = {};
 		};
 
-		const char* SlotStateText(RGTransientPoolSlotState state) noexcept
+		const char* SlotStateText(TransientPoolSlotState state) noexcept
 		{
 			switch (state)
 			{
-			case RGTransientPoolSlotState::Leased: return "Leased";
-			case RGTransientPoolSlotState::PendingRetirement: return "PendingRetirement";
-			case RGTransientPoolSlotState::Available: return "Available";
-			case RGTransientPoolSlotState::Destroyed: return "Destroyed";
+			case TransientPoolSlotState::Leased: return "Leased";
+			case TransientPoolSlotState::PendingRetirement: return "PendingRetirement";
+			case TransientPoolSlotState::Available: return "Available";
+			case TransientPoolSlotState::Destroyed: return "Destroyed";
 			}
 			return "Unknown";
 		}
@@ -74,7 +74,7 @@ namespace gglab
 				completed ? "complete" : "pending");
 		}
 
-		void DrawCounts(const char* label, const RGTransientPoolStateCounts& counts) noexcept
+		void DrawCounts(const char* label, const TransientPoolStateCounts& counts) noexcept
 		{
 			ImGui::Text("%s: %u total | %u leased | %u pending | %u available | %u destroyed",
 				label, counts.m_Total, counts.m_Leased, counts.m_PendingRetirement,
@@ -82,7 +82,7 @@ namespace gglab
 		}
 
 		void DrawTextureTable(
-			const RGTransientResourcePoolSnapshot& snapshot,
+			const TransientResourcePoolSnapshot& snapshot,
 			const TransientResourcePoolPanelState& state) noexcept
 		{
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
@@ -106,7 +106,7 @@ namespace gglab
 
 			for (const auto& texture : snapshot.m_Textures)
 			{
-				if (state.m_HideDestroyed && texture.m_State == RGTransientPoolSlotState::Destroyed)
+				if (state.m_HideDestroyed && texture.m_State == TransientPoolSlotState::Destroyed)
 				{
 					continue;
 				}
@@ -145,7 +145,7 @@ namespace gglab
 		}
 
 		void DrawBufferTable(
-			const RGTransientResourcePoolSnapshot& snapshot,
+			const TransientResourcePoolSnapshot& snapshot,
 			const TransientResourcePoolPanelState& state) noexcept
 		{
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
@@ -165,7 +165,7 @@ namespace gglab
 
 			for (const auto& buffer : snapshot.m_Buffers)
 			{
-				if (state.m_HideDestroyed && buffer.m_State == RGTransientPoolSlotState::Destroyed)
+				if (state.m_HideDestroyed && buffer.m_State == TransientPoolSlotState::Destroyed)
 				{
 					continue;
 				}
@@ -248,8 +248,8 @@ namespace gglab
 			return;
 		}
 
-		RGTransientResourcePoolSnapshot snapshot;
-		BuildRGTransientResourcePoolSnapshot(
+		TransientResourcePoolSnapshot snapshot;
+		BuildTransientResourcePoolSnapshot(
 			*context.m_Renderer->GetTransientResourcePool(), snapshot);
 
 		DrawCounts("Textures", snapshot.m_TextureCounts);

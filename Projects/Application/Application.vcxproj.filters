@@ -246,8 +246,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\TransientResourcePool.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
@@ -471,8 +471,8 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePoolSnapshot.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\TransientResourcePoolSnapshot.cpp">
+      <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -722,8 +722,8 @@
     <ClInclude Include="..\..\Sources\Graphics\VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.h">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\TransientResourcePool.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h">
       <Filter>Core\Hash</Filter>
@@ -1043,8 +1043,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePoolSnapshot.h">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\TransientResourcePoolSnapshot.h">
+      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h">
       <Filter>Graphics</Filter>

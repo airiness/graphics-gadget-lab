@@ -24,7 +24,7 @@ namespace gglab
 			return passIndex.IsValid() ? static_cast<int32_t>(passIndex.Value()) : -1;
 		}
 
-		static RGTransientResourcePoolSlot GetVirtualResourcePoolSlot(
+		static TransientResourcePoolSlot GetVirtualResourcePoolSlot(
 			const RGVirtualResourceBase* virtualResource) noexcept
 		{
 			GGLAB_ASSERT_NOT_NULL(virtualResource);
