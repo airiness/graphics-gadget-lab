@@ -3,26 +3,6 @@
 
 namespace gglab
 {
-	GraphicsPSOKey GraphicsPipelineDesc::MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
-		ShaderHash128 dsHash, ShaderHash128 hsHash, ShaderHash128 gsHash) const noexcept
-	{
-		GraphicsPSOKey key{};
-		key.m_RootSignatureId = m_RootSignatureId;
-		key.m_InputLayoutId = m_InputLayoutId;
-		key.m_VertexShader = vsHash;
-		key.m_PixelShader = psHash;
-		key.m_DomainShader = dsHash;
-		key.m_HullShader = hsHash;
-		key.m_GeometryShader = gsHash;
-		key.m_Formats = m_Formats;
-		key.m_Topology = m_Topology;
-		key.m_SampleMask = m_SampleMask;
-		key.m_Rasterizer.PackRasterizerBits(m_RasterizerDesc);
-		key.m_Depth.PackDepthBits(m_DepthDesc);
-		key.m_Blend.PackBlendBits(m_BlendDesc, m_Formats.m_RtvFormats.NumRenderTargets);
-		return key;
-	}
-
 	bool GraphicsPipelineDesc::Validate() const noexcept
 	{
 		// RootSignature must be set

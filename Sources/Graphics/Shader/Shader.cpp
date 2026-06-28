@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/Shader.h"
+#include "Graphics/Shader/Shader.h"
 
 namespace gglab
 {

@@ -5,8 +5,8 @@
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
-#include "Graphics/PipelineCache.h"
-#include "Graphics/ShaderManager.h"
+#include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
 {
@@ -211,8 +211,6 @@ namespace gglab
 				static_cast<uint32_t>(system.m_PSOCache->m_RHIGraphicsPSOMap.size());
 			outSnapshot.m_Cache.m_BackendComputePSOs =
 				static_cast<uint32_t>(system.m_PSOCache->m_ComputePSOMap.size());
-			outSnapshot.m_Cache.m_BackendLegacyGraphicsPSOs =
-				static_cast<uint32_t>(system.m_PSOCache->m_GraphicsPSOMap.size());
 		}
 		if (system.m_RootSignatureCache)
 		{

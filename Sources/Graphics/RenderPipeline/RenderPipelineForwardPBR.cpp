@@ -4,7 +4,7 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RenderGraph/RGFrameTargets.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab
 {

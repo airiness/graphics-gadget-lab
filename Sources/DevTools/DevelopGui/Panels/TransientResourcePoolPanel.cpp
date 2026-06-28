@@ -4,7 +4,7 @@
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraphSnapshot.h"
-#include "Graphics/TransientResourcePoolSnapshot.h"
+#include "Graphics/Resource/TransientResourcePoolSnapshot.h"
 
 namespace gglab
 {

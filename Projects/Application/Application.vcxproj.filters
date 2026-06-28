@@ -55,6 +55,15 @@
     <Filter Include="Graphics\Buffer">
       <UniqueIdentifier>{c1fd30dc-7593-4891-a844-aaf576e5c8ad}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\Pipeline">
+      <UniqueIdentifier>{3F193C07-87CD-4BD1-9F38-04BD272AA216}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Shader">
+      <UniqueIdentifier>{A227E273-E01A-4EAE-B1B8-0191BFFBD799}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Resource">
+      <UniqueIdentifier>{BC7176CE-FE71-43DC-A059-774EE5E3FA72}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Hash">
       <UniqueIdentifier>{9c9a2b8f-4af1-4b73-8e6e-50c967e193ef}</UniqueIdentifier>
     </Filter>
@@ -246,8 +255,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\TransientResourcePool.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePool.cpp">
+      <Filter>Graphics\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
@@ -261,38 +270,32 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.cpp">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.cpp">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\ShaderManager.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderManager.cpp">
+      <Filter>Graphics\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\PipelineCache.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Pipeline\PipelineCache.cpp">
+      <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp">
+      <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\InputLayoutLibrary.cpp">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\HResult.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\ShaderCompiler.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderCompiler.cpp">
+      <Filter>Graphics\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\Shader.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Shader\Shader.cpp">
+      <Filter>Graphics\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp">
       <Filter>Core\Utility</Filter>
@@ -411,8 +414,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderResourceRegistry.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.cpp">
+      <Filter>Graphics\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -471,8 +474,8 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\TransientResourcePoolSnapshot.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.cpp">
+      <Filter>Graphics\Resource</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -644,9 +647,6 @@
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -666,9 +666,6 @@
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGDX12ResourceUtils.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTypes.h">
@@ -722,8 +719,8 @@
     <ClInclude Include="..\..\Sources\Graphics\VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\TransientResourcePool.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePool.h">
+      <Filter>Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h">
       <Filter>Core\Hash</Filter>
@@ -755,38 +752,32 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.h">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\ShaderManager.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderManager.h">
+      <Filter>Graphics\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelineCache.h">
+      <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\PipelinePresets.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelinePresets.h">
+      <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.h">
+      <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\InputLayoutLibrary.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelinePresets.h">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\HResult.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\ShaderCompiler.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderCompiler.h">
+      <Filter>Graphics\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Shader.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Shader\Shader.h">
+      <Filter>Graphics\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\ShaderTypes.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderTypes.h">
+      <Filter>Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h">
       <Filter>Core\Utility</Filter>
@@ -974,8 +965,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderResourceRegistry.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.h">
+      <Filter>Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -1007,12 +998,6 @@
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h">
-      <Filter>Graphics\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Utility\TextureViewDescUtils.h">
-      <Filter>Graphics\Utility</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1043,8 +1028,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\TransientResourcePoolSnapshot.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.h">
+      <Filter>Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h">
       <Filter>Graphics</Filter>

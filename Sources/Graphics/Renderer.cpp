@@ -1,16 +1,12 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
+#include "DevTools/DevelopGui/DevelopGuiBackend.h"
+#include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/TransientResourcePool.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/SamplerRegistry.h"
+#include "Graphics/TextureRegistry.h"
 #include "Graphics/TransferManager.h"
-#include "Graphics/Camera.h"
-#include "Graphics/RenderView.h"
-#include "Graphics/RenderScene.h"
-#include "Graphics/RenderPass/RenderPassForwardPBR.h"
-#include "Core/Utility/MathUtils.h"
-#include "Core/Utility/TypeUtils.h"
 
 namespace gglab
 {

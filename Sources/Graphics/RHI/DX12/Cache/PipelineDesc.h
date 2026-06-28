@@ -10,7 +10,6 @@ namespace gglab
 		ID3D12RootSignature* m_RootSignature = nullptr;
 
 		// InputLayout
-		InputLayoutID m_InputLayoutId{};
 		D3D12_INPUT_LAYOUT_DESC m_InputLayoutDesc{};
 
 		// Shaders
@@ -30,10 +29,6 @@ namespace gglab
 		CD3DX12_RASTERIZER_DESC m_RasterizerDesc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		CD3DX12_DEPTH_STENCIL_DESC1 m_DepthDesc = CD3DX12_DEPTH_STENCIL_DESC1(D3D12_DEFAULT);
 		CD3DX12_BLEND_DESC m_BlendDesc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-
-		// Generate PSO Key
-		[[nodiscard]] GraphicsPSOKey MakeKey(ShaderHash128 vsHash, ShaderHash128 psHash,
-			ShaderHash128 dsHash = {}, ShaderHash128 hsHash = {}, ShaderHash128 gsHash = {}) const noexcept;
 
 		[[nodiscard]] bool Validate() const noexcept;
 	};

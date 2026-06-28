@@ -1,8 +1,8 @@
 #include "Core/Precompiled.h"
-#include "Graphics/PipelineCache.h"
-#include "Graphics/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
-#include "Graphics/ShaderManager.h"
+#include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
 {

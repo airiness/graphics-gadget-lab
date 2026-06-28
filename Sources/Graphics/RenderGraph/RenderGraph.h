@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
-#include "Graphics/TransientResourcePool.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"

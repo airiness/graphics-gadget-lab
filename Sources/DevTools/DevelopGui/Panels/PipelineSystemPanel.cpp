@@ -2,7 +2,7 @@
 #include "DevTools/DevelopGui/Panels/PipelineSystemPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/PipelineCache.h"
+#include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystemSnapshot.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 
@@ -503,9 +503,8 @@ namespace gglab
 			ImGui::Text("Registered handles: %u graphics / %u compute",
 				cache.m_RegisteredGraphicsPipelines, cache.m_RegisteredComputePipelines);
 			ImGui::SeparatorText("DX12 Backend Cache");
-			ImGui::Text("PSOs: %u RHI graphics / %u compute / %u legacy graphics",
-				cache.m_BackendRHIGraphicsPSOs, cache.m_BackendComputePSOs,
-				cache.m_BackendLegacyGraphicsPSOs);
+			ImGui::Text("PSOs: %u graphics / %u compute",
+				cache.m_BackendRHIGraphicsPSOs, cache.m_BackendComputePSOs);
 			ImGui::Text("Root signatures: %u", cache.m_BackendRootSignatures);
 			ImGui::Spacing();
 			ImGui::TextWrapped("PipelineCache is currently a recipe resolver with caller-owned slots. "

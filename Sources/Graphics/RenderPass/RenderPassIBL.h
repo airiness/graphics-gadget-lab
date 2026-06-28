@@ -5,7 +5,7 @@
 #include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
 #include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab
 {

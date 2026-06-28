@@ -2,13 +2,14 @@
 #include "Core/Components.h"
 #include "Core/World.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
+#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
-#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RenderView.h"
 
 namespace gglab

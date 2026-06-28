@@ -5,6 +5,12 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHITexture.h"
 
+#include <deque>
+#include <optional>
+#include <tuple>
+#include <unordered_map>
+#include <vector>
+
 namespace gglab
 {
 	class RHIDevice;

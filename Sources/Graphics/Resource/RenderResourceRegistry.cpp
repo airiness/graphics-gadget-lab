@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderResourceRegistry.h"
-#include "Graphics/TransientResourcePool.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 

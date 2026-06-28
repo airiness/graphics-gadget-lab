@@ -213,7 +213,6 @@ namespace gglab
 		GraphicsPipelineDesc desc{};
 		desc.m_RootSignatureId = rootSignature.m_Id;
 		desc.m_RootSignature = rootSignature.m_RootSignature;
-		desc.m_InputLayoutId = InputLayoutID::None;
 		desc.m_InputLayoutDesc = inputLayout.m_Desc;
 		desc.m_VertexShader = shaderInputs.m_VertexShader;
 		desc.m_PixelShader = shaderInputs.m_PixelShader;

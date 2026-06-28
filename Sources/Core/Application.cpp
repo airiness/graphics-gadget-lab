@@ -3,7 +3,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Input/InputManager.h"
-#include "Graphics/ShaderManager.h"
+#include "Graphics/Shader/ShaderManager.h"
 #include "Core/Demo/DemoManager.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Core/Time.h"
@@ -13,6 +13,7 @@
 #include "Core/Demo/DemoPlayground.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);

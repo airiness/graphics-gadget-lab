@@ -3,6 +3,7 @@
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
+#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Renderer.h"
 

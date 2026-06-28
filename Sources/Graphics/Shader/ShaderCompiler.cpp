@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/ShaderCompiler.h"
+#include "Graphics/Shader/ShaderCompiler.h"
 #include "Core/HResult.h"
 #include "Core/StringId.h"
 #include "Core/Utility/StringUtils.h"

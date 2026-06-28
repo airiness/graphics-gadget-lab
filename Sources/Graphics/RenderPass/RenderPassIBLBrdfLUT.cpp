@@ -1,7 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/ShaderManager.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
 {

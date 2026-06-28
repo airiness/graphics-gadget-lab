@@ -1,9 +1,7 @@
 #pragma once
 #include "Core/Hash/FNV1a.h"
-#include "Core/TypedIndex.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/ShaderTypes.h"
-#include "Graphics/RHI/DX12/Cache/PipelinePresets.h"
+#include "Graphics/Shader/ShaderTypes.h"
 
 namespace gglab
 {
@@ -34,78 +32,6 @@ namespace gglab
 			return AsTuple() == rhs.AsTuple();
 		}
 	};
-
-	struct PackedRasterizer
-	{
-		uint32_t m_Bits = 0;
-
-		constexpr bool operator==(const PackedRasterizer&) const noexcept = default;
-
-		// Pack RasterizerDesc into 32 bits
-		void PackRasterizerBits(const D3D12_RASTERIZER_DESC& desc) noexcept;
-	};
-
-	struct PackedDepth
-	{
-		uint32_t m_Bits = 0;
-	
-		constexpr bool operator==(const PackedDepth&) const noexcept = default;
-
-		// Pack DepthStencilDesc into 32 bits
-		void PackDepthBits(const D3D12_DEPTH_STENCIL_DESC1& desc) noexcept;
-	};
-
-	struct PackedBlend
-	{
-		uint32_t m_Bits = 0;
-
-		constexpr bool operator==(const PackedBlend&) const noexcept = default;
-
-		// Pack BlendDesc into 32 bits
-		void PackBlendBits(const D3D12_BLEND_DESC& desc, uint32_t rtvCount) noexcept;
-	};
-
-	// GraphicsPSOKey
-	struct GraphicsPSOKey
-	{
-		RootSignatureID m_RootSignatureId{};
-		InputLayoutID m_InputLayoutId{};
-
-		ShaderHash128 m_VertexShader{};
-		ShaderHash128 m_PixelShader{};
-		ShaderHash128 m_DomainShader{};
-		ShaderHash128 m_HullShader{};
-		ShaderHash128 m_GeometryShader{};
-
-		PipelineFormats m_Formats{};
-
-		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-
-		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
-
-		PackedRasterizer m_Rasterizer{};
-		PackedDepth m_Depth{};
-		PackedBlend m_Blend{};
-
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_RootSignatureId.Value(),
-				m_InputLayoutId,
-				m_VertexShader.m_LowBits, m_VertexShader.m_HighBits,
-				m_PixelShader.m_LowBits, m_PixelShader.m_HighBits,
-				m_DomainShader.m_LowBits, m_DomainShader.m_HighBits,
-				m_HullShader.m_LowBits, m_HullShader.m_HighBits,
-				m_GeometryShader.m_LowBits, m_GeometryShader.m_HighBits,
-				m_Formats.AsTuple(),
-				m_Topology,
-				m_SampleMask,
-				m_Rasterizer.m_Bits,
-				m_Depth.m_Bits,
-				m_Blend.m_Bits);
-		}
-		constexpr bool operator==(const GraphicsPSOKey&) const noexcept = default;
-	};
-	using GraphicsPSOKeyHash = KeyHash<GraphicsPSOKey>;
 
 	// ComputePSOKey
 	struct ComputePSOKey

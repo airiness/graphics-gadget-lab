@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/ShaderManager.h"
+#include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGShadowResources.h"
