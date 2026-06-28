@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceUtils.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 
 namespace gglab
 {
@@ -52,7 +52,7 @@ namespace gglab
 		int32_t m_FirstUserPassIndex = -1;
 		int32_t m_LastUserPassIndex = -1;
 		uint64_t m_UsageBits = 0;
-		RGTransientResourcePoolSlot m_PoolSlot{};
+		TransientResourcePoolSlot m_PoolSlot{};
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		bool m_HasFinalBarrierState = false;
 		RHIResourceState m_FinalBarrierState = CommonRHIResourceState();

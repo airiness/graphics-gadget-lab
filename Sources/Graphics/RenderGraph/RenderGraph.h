@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
@@ -57,7 +57,7 @@ namespace gglab
 
 		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
-		virtual void Devirtualize(RGTransientResourcePool*) noexcept = 0;
+		virtual void Devirtualize(TransientResourcePool*) noexcept = 0;
 		virtual void Destroy(RenderGraph&) noexcept = 0;
 		virtual void ResetCompiledUsage() noexcept = 0;
 		virtual void AccumulateAccess(uint64_t accessValue) noexcept = 0;
@@ -91,7 +91,7 @@ namespace gglab
 		PhysicalAllocation m_PhysicalAllocation{};
 		Handle m_ImportedHandle{};
 
-		void Devirtualize(RGTransientResourcePool* pool) noexcept override;
+		void Devirtualize(TransientResourcePool* pool) noexcept override;
 		void Destroy(RenderGraph& rg) noexcept override;
 		void ResetCompiledUsage() noexcept override;
 		void AccumulateAccess(uint64_t accessValue) noexcept override;
@@ -163,7 +163,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
-			RGTransientResourcePool* m_TransientResourcePool = nullptr;
+			TransientResourcePool* m_TransientResourcePool = nullptr;
 		};
 
 		class RGBuilder
@@ -347,7 +347,7 @@ namespace gglab
 
 	private:
 		RHIDevice* m_Device = nullptr;
-		RGTransientResourcePool* m_TransientResourcePool = nullptr;
+		TransientResourcePool* m_TransientResourcePool = nullptr;
 
 		RGArenaAllocator m_ArenaAllocator;
 		RGBlackboard m_Blackboard;
@@ -360,8 +360,8 @@ namespace gglab
 
 		std::unordered_map<StringID, RGResourceHandle> m_NameHandleMap;
 
-		std::vector<RGPhysicalTextureAllocation> m_MarkedRetireTextures;
-		std::vector<RGPhysicalBufferAllocation> m_MarkedRetireBuffers;
+		std::vector<TransientTextureAllocation> m_MarkedRetireTextures;
+		std::vector<TransientBufferAllocation> m_MarkedRetireBuffers;
 
 		friend class RGBuilder;
 
@@ -695,7 +695,7 @@ namespace gglab
 
 	// RGVirtualResource functions
 	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::Devirtualize(RGTransientResourcePool* pool) noexcept
+	inline void RGVirtualResource<RESOURCE>::Devirtualize(TransientResourcePool* pool) noexcept
 	{
 		if (m_Devirtualized)
 		{

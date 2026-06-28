@@ -8,7 +8,7 @@
 #include "Graphics/TransferManager.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 #include "Graphics/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
@@ -85,7 +85,7 @@ namespace gglab
 		TransferManager* GetTransferManager() const noexcept { return m_RHIContext ? &m_RHIContext->GetTransferManager() : nullptr; }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
-		RGTransientResourcePool* GetTransientResourcePool() const noexcept { return m_RGTransientResourcePool.get(); }
+		TransientResourcePool* GetTransientResourcePool() const noexcept { return m_TransientResourcePool.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
 		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
@@ -127,7 +127,7 @@ namespace gglab
 
 	private:
 		std::unique_ptr<RHIContext> m_RHIContext;
-		std::unique_ptr<RGTransientResourcePool> m_RGTransientResourcePool;
+		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;

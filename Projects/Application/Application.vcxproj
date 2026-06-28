@@ -206,7 +206,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePoolSnapshot.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TransientResourcePoolSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\InputLayoutLibrary.cpp" />
@@ -230,7 +230,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderScene.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderWorldExtractor.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp" />
@@ -402,7 +402,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePool.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TransientResourcePool.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGShadowResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
@@ -425,7 +425,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTransientResourcePoolSnapshot.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TransientResourcePoolSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h" />

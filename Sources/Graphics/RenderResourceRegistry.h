@@ -1,6 +1,5 @@
 #pragma once
-#include "Graphics/RenderGraph/RGResource.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ShadowSettings.h"
@@ -22,7 +21,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
-			RGTransientResourcePool* m_TransientResourcePool = nullptr;
+			TransientResourcePool* m_TransientResourcePool = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 		};
 
@@ -73,7 +72,7 @@ namespace gglab
 		struct TextureEntry
 		{
 			RHITextureDesc m_TextureDesc{};
-			RGPhysicalTextureAllocation m_PhysicalAllocation{};
+			TransientTextureAllocation m_PhysicalAllocation{};
 			RHITextureViewHandle m_Srv{};
 			RHITextureViewDesc m_SrvDesc{};
 
@@ -125,7 +124,7 @@ namespace gglab
 
 	private:
 		RHIDevice* m_Device = nullptr;
-		RGTransientResourcePool* m_TransientResourcePool = nullptr;
+		TransientResourcePool* m_TransientResourcePool = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;

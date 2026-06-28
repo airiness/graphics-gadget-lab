@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderResourceRegistry.h"
-#include "Graphics/RenderGraph/RGTransientResourcePool.h"
+#include "Graphics/TransientResourcePool.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 
@@ -337,7 +337,7 @@ namespace gglab
 
 				const RHITextureHandle textureHandle = outEntry.m_PhysicalAllocation.m_Texture;
 				GGLAB_ASSERT_MSG(textureHandle.IsValid(),
-					"RenderResourceRegistry: failed to import RG texture as RHI texture.");
+					"RenderResourceRegistry: acquired transient texture handle is invalid.");
 
 				outEntry.m_Srv = m_Device->CreateTextureView(textureHandle, srvDesc);
 				GGLAB_ASSERT_MSG(outEntry.m_Srv.IsValid(),
@@ -358,7 +358,7 @@ namespace gglab
 				{
 					const RHITextureHandle textureHandle = entry.m_PhysicalAllocation.m_Texture;
 					GGLAB_ASSERT_MSG(textureHandle.IsValid(),
-						"RenderResourceRegistry: failed to import RG texture as RHI texture.");
+						"RenderResourceRegistry: acquired transient texture handle is invalid.");
 
 					entry.m_Srv = m_Device->CreateTextureView(textureHandle, srvDesc);
 					GGLAB_ASSERT_MSG(entry.m_Srv.IsValid(),
