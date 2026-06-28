@@ -125,6 +125,22 @@ namespace gglab
 		return bytecode;
 	}
 
+	RHIShaderBytecode ShaderManager::GetRHIShaderBytecode(ShaderID shaderId) const noexcept
+	{
+		if (!shaderId.IsValid())
+		{
+			return {};
+		}
+		const D3D12_SHADER_BYTECODE bytecode = GetBytecode(shaderId);
+		const ShaderHash128 hash = GetHash(shaderId);
+		return {
+			.m_Data = bytecode.pShaderBytecode,
+			.m_SizeInBytes = bytecode.BytecodeLength,
+			.m_HashLow = hash.m_LowBits,
+			.m_HashHigh = hash.m_HighBits,
+		};
+	}
+
 	ShaderBlob* ShaderManager::GetBlob(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);

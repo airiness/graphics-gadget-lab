@@ -4,6 +4,7 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
+#include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
@@ -138,9 +139,12 @@ namespace gglab
 		}
 	}
 
-	DX12GraphicsCommandContext::DX12GraphicsCommandContext(DX12Device* device,
+	DX12GraphicsCommandContext::DX12GraphicsCommandContext(
+		DX12Device* device,
+		DX12PipelineSystem* pipelineSystem,
 		DX12CommandList* commandList) noexcept :
-		m_Backend(device, commandList, RHIQueueType::Graphics)
+		m_Backend(device, commandList, RHIQueueType::Graphics),
+		m_PipelineSystem(pipelineSystem)
 	{}
 
 	void DX12GraphicsCommandContext::TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept
@@ -157,7 +161,8 @@ namespace gglab
 	{
 		DX12PipelineState* pipelineState = nullptr;
 		DX12RootSignature* rootSignature = nullptr;
-		if (!m_Backend.GetDevice()->ResolveGraphicsPipeline(pipeline, pipelineState, rootSignature))
+		if (!m_PipelineSystem ||
+			!m_PipelineSystem->ResolveGraphicsPipeline(pipeline, pipelineState, rootSignature))
 		{
 			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetPipeline received an invalid pipeline handle.");
 			return;
@@ -407,9 +412,12 @@ namespace gglab
 		m_Backend.GetCommandList()->SetGraphicsDescriptor(parameterIndex, descriptor);
 	}
 
-	DX12ComputeCommandContext::DX12ComputeCommandContext(DX12Device* device,
+	DX12ComputeCommandContext::DX12ComputeCommandContext(
+		DX12Device* device,
+		DX12PipelineSystem* pipelineSystem,
 		DX12CommandList* commandList) noexcept :
-		m_Backend(device, commandList, RHIQueueType::Compute)
+		m_Backend(device, commandList, RHIQueueType::Compute),
+		m_PipelineSystem(pipelineSystem)
 	{}
 
 	void DX12ComputeCommandContext::TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept
@@ -424,14 +432,35 @@ namespace gglab
 
 	void DX12ComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
-		GGLAB_ASSERT_MSG(!pipeline.IsValid(),
-			"DX12ComputeCommandContext::SetPipeline(RHIPipelineHandle) needs an RHI pipeline table before it can be used.");
+		DX12PipelineState* pipelineState = nullptr;
+		DX12RootSignature* rootSignature = nullptr;
+		if (!m_PipelineSystem ||
+			!m_PipelineSystem->ResolveComputePipeline(pipeline, pipelineState, rootSignature))
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ComputeCommandContext::SetPipeline received an invalid pipeline handle.");
+			return;
+		}
+		if (m_CurrentRootSignature != rootSignature)
+		{
+			m_Backend.Get()->SetComputeRootSignature(rootSignature->Get());
+			m_CurrentRootSignature = rootSignature;
+		}
+		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 	}
 
 	void DX12ComputeCommandContext::SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept
 	{
-		GGLAB_ASSERT_MSG(binding.m_TableIndex == 0 && binding.m_ParameterIndex == 0,
-			"DX12ComputeCommandContext::SetDescriptorTable needs an RHI descriptor table allocator before it can be used.");
+		const D3D12_GPU_DESCRIPTOR_HANDLE table = m_Backend.GetDevice()->ResolveShaderVisibleDescriptor(
+			binding.m_HeapType,
+			binding.m_TableIndex);
+		if (table.ptr == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ComputeCommandContext::SetDescriptorTable received an invalid descriptor table.");
+			return;
+		}
+		m_Backend.Get()->SetComputeRootDescriptorTable(binding.m_ParameterIndex, table);
 	}
 
 	void DX12ComputeCommandContext::Dispatch(uint32_t groupCountX,

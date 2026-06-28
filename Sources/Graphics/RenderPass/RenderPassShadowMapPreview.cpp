@@ -138,15 +138,16 @@ namespace gglab
 			shaderDesc.m_Entry = L"PSMain";
 			const auto psId = shaderManager->LoadShader(shaderDesc);
 
-			m_BaseRecipe.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_BaseRecipe.m_VSId = vsId;
 			m_BaseRecipe.m_PSId = psId;
 
-			m_BaseRecipe.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_BaseRecipe.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-			m_BaseRecipe.m_Formats.m_RtvFormats.NumRenderTargets = 1;
-			m_BaseRecipe.m_Formats.m_DsvFormat = DXGI_FORMAT_UNKNOWN;
+			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
+			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
 			m_BaseRecipe.m_Formats.m_SampleCount = 1;
 			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
 

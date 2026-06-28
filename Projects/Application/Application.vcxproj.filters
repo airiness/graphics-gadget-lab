@@ -147,6 +147,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -515,6 +518,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -743,6 +749,9 @@
     <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PipelinePresets.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -891,6 +900,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">

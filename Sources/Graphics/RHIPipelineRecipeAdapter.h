@@ -7,6 +7,5 @@ namespace gglab
 {
 	[[nodiscard]] RHIVertexInputLayoutDesc BuildRHIVertexInputLayoutDesc(InputLayoutID inputLayoutId) noexcept;
 	[[nodiscard]] RHIGraphicsPipelineDesc BuildRHIGraphicsPipelineDesc(
-		const GraphicsPipelineRecipe& recipe,
-		RHIBindingLayoutHandle bindingLayout = {}) noexcept;
+		const GraphicsPipelineRecipe& recipe) noexcept;
 }

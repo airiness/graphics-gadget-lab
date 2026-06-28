@@ -1,17 +1,27 @@
 #pragma once
-#include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
+#include "Graphics/GraphicsTypes.h"
+#include "Graphics/PipelinePresets.h"
+#include "Graphics/RHI/RHIPipeline.h"
 
 namespace gglab
 {
-	class DX12PipelineState;
-	class DX12Device;
-	class DX12PSOCache;
-	class DX12RootSignatureCache;
+	class RHIPipelineSystem;
 	class ShaderManager;
+
+	struct GraphicsPipelineFormats
+	{
+		std::array<RHIFormat, RHIGraphicsPipelineDesc::MaxRenderTargets> m_RenderTargetFormats{};
+		uint32_t m_RenderTargetCount = 0;
+		RHIFormat m_DepthStencilFormat = RHIFormat::Unknown;
+		uint32_t m_SampleCount = 1;
+		uint32_t m_SampleQuality = 0;
+
+		constexpr bool operator==(const GraphicsPipelineFormats&) const noexcept = default;
+	};
 
 	struct GraphicsPipelineRecipe
 	{
-		RootSignatureID m_RootSignatureId{};
+		RHIBindingLayoutHandle m_BindingLayout{};
 		InputLayoutID m_InputLayoutId{};
 
 		ShaderID m_VSId{};
@@ -20,54 +30,29 @@ namespace gglab
 		ShaderID m_HSId{};
 		ShaderID m_GSId{};
 
-		PipelineFormats m_Formats{};
+		GraphicsPipelineFormats m_Formats{};
 
-		D3D12_PRIMITIVE_TOPOLOGY_TYPE m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		RHIPrimitiveTopologyType m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+		RHIPrimitiveTopology m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 
 		RasterizerPreset m_RasterizerPreset = RasterizerPreset::Default;
 		DepthPreset m_DepthPreset = DepthPreset::Default;
 		BlendPreset m_BlendPreset = BlendPreset::Default;
 
-		int32_t m_DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-		float m_DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-		float m_SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+		int32_t m_DepthBias = 0;
+		float m_DepthBiasClamp = 0.0f;
+		float m_SlopeScaledDepthBias = 0.0f;
 
 		constexpr bool operator==(const GraphicsPipelineRecipe&) const noexcept = default;
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(
-				m_RootSignatureId.Value(),
-				m_InputLayoutId,
-				m_VSId.Value(),
-				m_PSId.Value(),
-				m_DSId.Value(),
-				m_HSId.Value(),
-				m_GSId.Value(),
-				m_Formats.AsTuple(),
-				m_Topology,
-				m_SampleMask,
-				m_RasterizerPreset,
-				m_DepthPreset,
-				m_BlendPreset,
-				m_DepthBias,
-				m_DepthBiasClamp,
-				m_SlopeScaledDepthBias);
-		}
 	};
 
 	struct ComputePipelineRecipe
 	{
-		RootSignatureID m_RootSignatureId{};
+		RHIBindingLayoutHandle m_BindingLayout{};
 		ShaderID m_CSId{};
 
 		constexpr bool operator==(const ComputePipelineRecipe&) const noexcept = default;
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(
-				m_RootSignatureId.Value(),
-				m_CSId.Value());
-		}
 	};
 
 	struct GraphicsPipelineSlot
@@ -80,9 +65,8 @@ namespace gglab
 
 		GraphicsPipelineRecipe m_Recipe{};
 		uint64_t m_ShaderRevision = 0;
-		DX12PipelineState* m_PipelineState = nullptr;
-		uint64_t m_PipelineCacheId = 0;
-		uint64_t m_PSOCacheRevision = 0;
+		RHIPipelineHandle m_Pipeline{};
+		uint64_t m_PipelineSystemRevision = 0;
 	};
 
 	struct ComputePipelineSlot
@@ -95,9 +79,8 @@ namespace gglab
 
 		ComputePipelineRecipe m_Recipe{};
 		uint64_t m_ShaderRevision = 0;
-		DX12PipelineState* m_PipelineState = nullptr;
-		uint64_t m_PipelineCacheId = 0;
-		uint64_t m_PSOCacheRevision = 0;
+		RHIPipelineHandle m_Pipeline{};
+		uint64_t m_PipelineSystemRevision = 0;
 	};
 
 	class PipelineCache
@@ -105,10 +88,8 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
-			DX12Device* m_Device = nullptr;
+			RHIPipelineSystem* m_PipelineSystem = nullptr;
 			ShaderManager* m_ShaderManager = nullptr;
-			DX12RootSignatureCache* m_RootSignatureCache = nullptr;
-			DX12PSOCache* m_PSOCache = nullptr;
 		};
 
 		explicit PipelineCache(const CreateInfo& createInfo) noexcept;
@@ -118,18 +99,12 @@ namespace gglab
 		RHIPipelineHandle Resolve(
 			GraphicsPipelineSlot& slot,
 			const GraphicsPipelineRecipe& recipe) noexcept;
-		DX12PipelineState* Resolve(
+		RHIPipelineHandle Resolve(
 			ComputePipelineSlot& slot,
 			const ComputePipelineRecipe& recipe) noexcept;
 
 	private:
-		ComputePipelineDesc BuildComputeDesc(
-			const ComputePipelineRecipe& recipe) const noexcept;
-
 		ShaderManager* m_ShaderManager = nullptr;
-		DX12Device* m_Device = nullptr;
-		DX12RootSignatureCache* m_RootSignatureCache = nullptr;
-		DX12PSOCache* m_PSOCache = nullptr;
-		uint64_t m_CacheId = 0;
+		RHIPipelineSystem* m_PipelineSystem = nullptr;
 	};
 }

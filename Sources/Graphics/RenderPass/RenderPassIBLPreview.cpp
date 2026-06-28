@@ -229,15 +229,16 @@ namespace gglab
 			shaderDesc.m_Entry = L"PSMain";
 			const auto psId = shaderManager->LoadShader(shaderDesc);
 
-			m_CubemapPreviewRecipe.m_RootSignatureId = renderer->GetCommonRootSignatureId();
+			m_CubemapPreviewRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 			m_CubemapPreviewRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_CubemapPreviewRecipe.m_VSId = vsId;
 			m_CubemapPreviewRecipe.m_PSId = psId;
 
-			m_CubemapPreviewRecipe.m_Topology = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-			m_CubemapPreviewRecipe.m_Formats.m_RtvFormats.RTFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-			m_CubemapPreviewRecipe.m_Formats.m_RtvFormats.NumRenderTargets = 1;
-			m_CubemapPreviewRecipe.m_Formats.m_DsvFormat = DXGI_FORMAT_UNKNOWN;
+			m_CubemapPreviewRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			m_CubemapPreviewRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			m_CubemapPreviewRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			m_CubemapPreviewRecipe.m_Formats.m_RenderTargetCount = 1;
+			m_CubemapPreviewRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
 			m_CubemapPreviewRecipe.m_Formats.m_SampleCount = 1;
 			m_CubemapPreviewRecipe.m_Formats.m_SampleQuality = 0;
 

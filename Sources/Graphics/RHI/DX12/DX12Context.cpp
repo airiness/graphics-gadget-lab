@@ -6,6 +6,7 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
+#include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/DX12TransferContext.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
@@ -46,9 +47,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
+		m_PipelineSystem = std::make_unique<DX12PipelineSystem>(m_Device.get());
 		DX12QueueSystem::CreateInfo queueSystemInfo{};
 		queueSystemInfo.m_Device = m_Device.get();
 		queueSystemInfo.m_FrameCount = desc.m_BufferCount;
+		queueSystemInfo.m_PipelineSystem = static_cast<DX12PipelineSystem*>(m_PipelineSystem.get());
 		m_QueueSystem = std::make_unique<DX12QueueSystem>(queueSystemInfo);
 		m_Device->SetQueueSystem(m_QueueSystem.get());
 
@@ -95,6 +98,7 @@ namespace gglab
 	RHISwapChain& DX12Context::GetSwapChain() noexcept { return *m_SwapChain; }
 	const RHISwapChain& DX12Context::GetSwapChain() const noexcept { return *m_SwapChain; }
 	TransferManager& DX12Context::GetTransferManager() noexcept { return *m_TransferManager; }
+	RHIPipelineSystem& DX12Context::GetPipelineSystem() noexcept { return *m_PipelineSystem; }
 	DX12Device& DX12Context::GetDX12Device() noexcept { return *m_Device; }
 	const DX12Device& DX12Context::GetDX12Device() const noexcept { return *m_Device; }
 	DX12DescriptorManager& DX12Context::GetDescriptorManager() noexcept { return *m_DescriptorManager; }
@@ -316,6 +320,7 @@ namespace gglab
 		m_Device->SetDescriptorManager(nullptr);
 		m_DescriptorManager->Tick();
 		m_DescriptorManager.reset();
+		m_PipelineSystem.reset();
 		m_Device->RetireCompletedWork();
 		m_Device->Finalize();
 		m_QueueSystem->Finalize();

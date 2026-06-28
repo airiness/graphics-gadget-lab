@@ -11,6 +11,7 @@ namespace gglab
 	class DX12CommandList;
 	class DX12Device;
 	class DX12PipelineState;
+	class DX12PipelineSystem;
 	class DX12RootSignature;
 
 	[[nodiscard]] RHICommandContextHandle AllocateDX12CommandContextHandle() noexcept;
@@ -57,6 +58,7 @@ namespace gglab
 	{
 	public:
 		DX12GraphicsCommandContext(DX12Device* device,
+			DX12PipelineSystem* pipelineSystem,
 			DX12CommandList* commandList) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12GraphicsCommandContext);
 		~DX12GraphicsCommandContext() override = default;
@@ -118,6 +120,7 @@ namespace gglab
 
 	private:
 		DX12CommandContext m_Backend;
+		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
 	};
 
@@ -125,6 +128,7 @@ namespace gglab
 	{
 	public:
 		DX12ComputeCommandContext(DX12Device* device,
+			DX12PipelineSystem* pipelineSystem,
 			DX12CommandList* commandList) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ComputeCommandContext);
 		~DX12ComputeCommandContext() override = default;
@@ -136,7 +140,11 @@ namespace gglab
 
 		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept { return m_Backend.GetUsedBuffers(); }
 		std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_Backend.GetUsedTextures(); }
-		void ClearTrackedResourceUses() noexcept { m_Backend.ClearTrackedResourceUses(); }
+		void ClearTrackedResourceUses() noexcept
+		{
+			m_Backend.ClearTrackedResourceUses();
+			m_CurrentRootSignature = nullptr;
+		}
 
 		void TrackTextureUse(RHITextureHandle texture) noexcept override { m_Backend.TrackTextureUse(texture); }
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend.TrackBufferUse(buffer); }
@@ -153,5 +161,7 @@ namespace gglab
 
 	private:
 		DX12CommandContext m_Backend;
+		DX12PipelineSystem* m_PipelineSystem = nullptr;
+		DX12RootSignature* m_CurrentRootSignature = nullptr;
 	};
 }

@@ -21,8 +21,6 @@
 
 namespace gglab
 {
-	class DX12PSOCache;
-	class DX12RootSignatureCache;
 	class ShaderManager;
 
 	class Renderer
@@ -96,7 +94,7 @@ namespace gglab
 		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept { return m_BackBufferClearColor; }
 
-		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
+		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept { return m_CommonBindingLayout; }
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
 
 		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept { return m_SceneCB.get(); }
@@ -122,7 +120,7 @@ namespace gglab
 		RHIFencePoint GetLastSubmittedFencePoint() const noexcept { return m_LastSubmittedFencePoint; }
 
 	private:
-		void CreateCommonRootSignature() noexcept;
+		void CreateCommonBindingLayout() noexcept;
 		void InitializeGpuBuffers() noexcept;
 		void AbortFrame(Frame& frame) noexcept;
 		void EndFrameLifetime(Frame& frame) noexcept;
@@ -133,15 +131,13 @@ namespace gglab
 	private:
 		std::unique_ptr<RHIContext> m_RHIContext;
 		std::unique_ptr<RGTransientResourcePool> m_RGTransientResourcePool;
-		std::unique_ptr<DX12PSOCache> m_PSOCache;
-		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<TextureRegistry> m_TextureRegistry;
 		std::unique_ptr<DevelopGuiBackend> m_DevelopGuiBackend;
 
-		RootSignatureID m_CommonRootSignatureId{};
+		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 
 		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;

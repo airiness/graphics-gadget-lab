@@ -20,8 +20,6 @@ namespace gglab
 	class DX12FencePoint;
 	class DX12Resource;
 	class DX12DescriptorCache;
-	class DX12PipelineState;
-	class DX12RootSignature;
 	struct DX12DescriptorView;
 	class DX12Device : public RHIDevice
 	{
@@ -95,14 +93,6 @@ namespace gglab
 			RHIDescriptorHeapType heapType,
 			uint32_t descriptorIndex) const noexcept;
 
-		RHIPipelineHandle RegisterGraphicsPipeline(
-			DX12PipelineState* pipelineState,
-			DX12RootSignature* rootSignature) noexcept;
-		bool ResolveGraphicsPipeline(
-			RHIPipelineHandle pipeline,
-			DX12PipelineState*& outPipelineState,
-			DX12RootSignature*& outRootSignature) const noexcept;
-
 		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;
 		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;
 		DX12Buffer* ResolveBuffer(RHIBufferHandle buffer) noexcept;
@@ -141,14 +131,6 @@ namespace gglab
 		DX12QueueSystem* m_QueueSystem = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 		std::unique_ptr<DX12DescriptorCache> m_DescriptorCache;
-
-		struct GraphicsPipelineBinding
-		{
-			DX12PipelineState* m_PipelineState = nullptr;
-			DX12RootSignature* m_RootSignature = nullptr;
-		};
-		std::vector<GraphicsPipelineBinding> m_GraphicsPipelineBindings;
-		mutable std::shared_mutex m_GraphicsPipelineMutex;
 
 		bool m_IsInitialized = false;
 	};
