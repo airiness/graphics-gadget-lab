@@ -4,24 +4,24 @@
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/RHI/RHIBindingLayout.h"
 #include "Graphics/RHI/RHIContext.h"
-#include "Graphics/PipelineCache.h"
-#include "Graphics/TransferManager.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/TransientResourcePool.h"
-#include "Graphics/RenderResourceRegistry.h"
-#include "Graphics/SamplerRegistry.h"
-#include "Graphics/TextureRegistry.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
 #include "Graphics/RenderParameters.h"
 #include "Graphics/RenderScene.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 #include <array>
 
 namespace gglab
 {
+	class DevelopGuiBackend;
+	class PipelineCache;
+	class RenderResourceRegistry;
+	class SamplerRegistry;
 	class ShaderManager;
+	class TextureRegistry;
+	class TransferManager;
 
 	class Renderer
 	{

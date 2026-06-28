@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/TransientResourcePool.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 
 namespace gglab
 {

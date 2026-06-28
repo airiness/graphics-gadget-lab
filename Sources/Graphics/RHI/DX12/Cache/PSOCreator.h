@@ -1,9 +1,15 @@
 #pragma once
 #include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
-#include "Graphics/RHI/DX12/DX12PipelineState.h"
+
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <type_traits>
+
 namespace gglab
 {
 	class DX12Device;
+	class DX12PipelineState;
 	class IPSOCreator
 	{
 	public:
@@ -73,13 +79,4 @@ namespace gglab
 		static D3D12_PIPELINE_STATE_STREAM_DESC BuildComputeStream(const ComputePipelineDesc& desc, StreamWriter& writer) noexcept;
 	};
 
-	class LibraryPSOCreator final : public IPSOCreator
-	{
-	public:
-		std::unique_ptr<DX12PipelineState> CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc) override;
-		std::unique_ptr<DX12PipelineState> CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc) override;
-
-	private:
-		ID3D12PipelineLibrary* m_PipelineLibrary = nullptr;
-	};
 }

@@ -1,6 +1,5 @@
 #pragma once
-#include "Graphics/TransientResourcePool.h"
-#include "Graphics/GraphicsTypes.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ShadowSettings.h"
 #include "Graphics/RHI/RHIDescriptor.h"

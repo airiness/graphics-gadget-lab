@@ -1,6 +1,6 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
-#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab::devtools
 {

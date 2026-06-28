@@ -1,12 +1,19 @@
 #pragma once
-#include "Core/TypedIndex.h"
 #include "Core/Hash/FNV1a.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/Shader.h"
-#include "Graphics/ShaderCompiler.h"
+#include "Graphics/Shader/Shader.h"
+
+#include <atomic>
+#include <memory>
+#include <shared_mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace gglab
 {
+	class ShaderCompiler;
+
 	struct ShaderKey
 	{
 		ShaderHash128 m_KeyHash;
@@ -20,7 +27,7 @@ namespace gglab
 	public:
 		ShaderManager() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
-		~ShaderManager() = default;
+		~ShaderManager();
 
 		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
 

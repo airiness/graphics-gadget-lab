@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/PSOCreator.h"
+#include "Graphics/RHI/DX12/DX12PipelineState.h"
 
 namespace gglab
 {
@@ -66,25 +67,4 @@ namespace gglab
 		return writer.GetDesc();		
 	}
 
-	std::unique_ptr<DX12PipelineState> LibraryPSOCreator::CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc)
-	{
-		if (!desc.Validate())
-		{
-			GGLAB_LOG_ERROR("Invalid GraphicsPipelineDesc");
-			return nullptr;
-		}
-		return nullptr;
-		// TODO : Management PSO by Library
-	}
-
-	std::unique_ptr<DX12PipelineState> LibraryPSOCreator::CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc)
-	{		
-		if (!desc.Validate())
-		{
-			GGLAB_LOG_ERROR("Invalid ComputePipelineDesc");
-			return nullptr;
-		}
-		return nullptr;
-		// TODO : Management PSO by Library
-	}
 }

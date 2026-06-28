@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/ShaderManager.h"
-#include "Graphics/ShaderCompiler.h"
+#include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderCompiler.h"
 #include "Core/Utility/StringUtils.h"
 
 namespace gglab
@@ -15,6 +15,8 @@ namespace gglab
 		defaultDesc.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(defaultDesc);
 	}
+
+	ShaderManager::~ShaderManager() = default;
 
 	void ShaderManager::SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept
 	{

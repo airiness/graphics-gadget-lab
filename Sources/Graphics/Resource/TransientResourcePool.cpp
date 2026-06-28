@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/TransientResourcePool.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RHI/RHIDevice.h"
 
 namespace gglab

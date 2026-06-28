@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/EnumFlags.h"
-#include "Graphics/ShaderTypes.h"
+#include "Graphics/Shader/ShaderTypes.h"
 
 namespace gglab
 {

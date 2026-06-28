@@ -1,8 +1,8 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
-#include "Graphics/PipelineCache.h"
+#include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab
 {

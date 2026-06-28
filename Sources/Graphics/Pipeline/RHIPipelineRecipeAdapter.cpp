@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 
 namespace gglab
 {

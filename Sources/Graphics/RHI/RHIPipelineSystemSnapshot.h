@@ -109,7 +109,6 @@ namespace gglab
 		uint32_t m_RegisteredComputePipelines = 0;
 		uint32_t m_BackendRHIGraphicsPSOs = 0;
 		uint32_t m_BackendComputePSOs = 0;
-		uint32_t m_BackendLegacyGraphicsPSOs = 0;
 		uint32_t m_BackendRootSignatures = 0;
 	};
 

@@ -1,7 +1,5 @@
 #pragma once
-#include "Graphics/PipelineCache.h"
-#include "Graphics/RHI/RHIBindingLayout.h"
-#include "Graphics/RHI/RHIPipeline.h"
+#include "Graphics/Pipeline/PipelineCache.h"
 
 namespace gglab
 {

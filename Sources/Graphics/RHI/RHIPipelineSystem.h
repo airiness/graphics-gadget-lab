@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RHI/RHIBindingLayout.h"
 #include "Graphics/RHI/RHIPipeline.h"
-#include "Graphics/ShaderTypes.h"
+#include "Graphics/Shader/ShaderTypes.h"
 
 #include <cstddef>
 

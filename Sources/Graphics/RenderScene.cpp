@@ -2,7 +2,7 @@
 #include "Graphics/RenderScene.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/AssetManager.h"
-#include "Graphics/RenderResourceRegistry.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Core/World.h"
 #include "Core/Components.h"
 #include "Core/Utility/MathUtils.h"

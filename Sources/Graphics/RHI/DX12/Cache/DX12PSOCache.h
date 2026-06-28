@@ -1,5 +1,4 @@
 #pragma once
-#include "Core/Hash/FNV1a.h"
 #include "Graphics/RHI/DX12/Cache/PSOKey.h"
 #include "Graphics/RHI/DX12/Cache/PSOCreator.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
@@ -18,7 +17,6 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PSOCache);
 		~DX12PSOCache();
 
-		DX12PipelineState* GetOrCreate(const GraphicsPSOKey& key, const GraphicsPipelineDesc& desc) noexcept;
 		DX12PipelineState* GetOrCreate(
 			const RHIGraphicsPipelineDesc& desc,
 			const RootSignatureHandle& rootSignature,
@@ -26,8 +24,6 @@ namespace gglab
 		DX12PipelineState* GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept;
 
 		void Clear() noexcept;
-		void ClearGraphicsPSOCache() noexcept;
-		void ClearComputePSOCache() noexcept;
 		uint64_t GetRevision() const noexcept
 		{
 			return m_Revision.load(std::memory_order_relaxed);
@@ -36,7 +32,6 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		std::unique_ptr<IPSOCreator> m_Creator;
-		std::unordered_map<GraphicsPSOKey, std::unique_ptr<DX12PipelineState>, GraphicsPSOKeyHash> m_GraphicsPSOMap;
 		std::unordered_map<DX12RHIGraphicsPSOKey, std::unique_ptr<DX12PipelineState>, DX12RHIGraphicsPSOKeyHash> m_RHIGraphicsPSOMap;
 		std::unordered_map<ComputePSOKey, std::unique_ptr<DX12PipelineState>, ComputePSOKeyHash> m_ComputePSOMap;
 
