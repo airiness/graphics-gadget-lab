@@ -29,7 +29,7 @@ namespace gglab
 	{
 		GGLAB_UNUSED(context);
 
-		rg.AddPass<PassData>("RenderPassDevelopGui",
+		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();

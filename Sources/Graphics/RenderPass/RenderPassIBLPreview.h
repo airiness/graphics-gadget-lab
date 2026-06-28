@@ -9,7 +9,14 @@ namespace gglab
 	class RenderPassIBLPreview : public RenderPassBase
 	{
 	public:
-		RenderPassIBLPreview() noexcept = default;
+		RenderPassIBLPreview() noexcept : RenderPassBase({
+			.m_TypeName = "Debug.IBLPreview",
+			.m_DisplayName = "IBL Preview",
+			.m_CategoryName = "Debug",
+			.m_Description = "Visualizes generated IBL cubemaps for inspection and learning.",
+			.m_Category = RenderPassCategory::Debug,
+			.m_Type = RenderPassType::Graphics,
+		}) {}
 		~RenderPassIBLPreview() override = default;
 
 		void AddPass(RenderGraph& rg,

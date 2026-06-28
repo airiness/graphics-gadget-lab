@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RHI/RHIPipelineSystem.h"
+#include "Graphics/RenderPass/RenderPassInfo.h"
 
 #include <cstdint>
 #include <string>
@@ -8,7 +9,7 @@
 namespace gglab
 {
 	class DX12PipelineSystem;
-	class ShaderManager;
+	class PipelineCache;
 
 	enum class RHIPipelineSnapshotType : uint8_t
 	{
@@ -74,7 +75,7 @@ namespace gglab
 		RHIPipelineSnapshotType m_Type = RHIPipelineSnapshotType::Graphics;
 		bool m_Alive = false;
 		RHIBindingLayoutHandle m_BindingLayout{};
-		std::string m_DebugName;
+		std::vector<RenderPassInfo> m_RenderPasses;
 
 		RHIShaderSnapshot m_VertexShader;
 		RHIShaderSnapshot m_PixelShader;
@@ -122,6 +123,6 @@ namespace gglab
 
 	void BuildDX12PipelineSystemSnapshot(
 		const DX12PipelineSystem& system,
-		const ShaderManager* shaderManager,
+		const PipelineCache* pipelineCache,
 		RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 }

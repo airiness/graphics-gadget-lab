@@ -15,7 +15,7 @@ namespace gglab
 	class DX12PSOCache;
 	class DX12RootSignature;
 	class DX12RootSignatureCache;
-	class ShaderManager;
+	class PipelineCache;
 	struct RHIPipelineSystemSnapshot;
 
 	class DX12PipelineSystem final : public RHIPipelineSystem
@@ -62,7 +62,6 @@ namespace gglab
 			PipelineType m_Type = PipelineType::Graphics;
 			RHIGraphicsPipelineDesc m_GraphicsDesc{};
 			RHIComputePipelineDesc m_ComputeDesc{};
-			std::string m_DebugName;
 			std::array<std::string, RHIVertexInputLayoutDesc::MaxAttributes> m_SemanticNames{};
 			ShaderHash128 m_VertexShaderHash{};
 			ShaderHash128 m_PixelShaderHash{};
@@ -108,7 +107,7 @@ namespace gglab
 
 		friend void BuildDX12PipelineSystemSnapshot(
 			const DX12PipelineSystem& system,
-			const ShaderManager* shaderManager,
+			const PipelineCache* pipelineCache,
 			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

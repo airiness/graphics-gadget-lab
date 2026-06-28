@@ -8,7 +8,7 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Lab/Architecture/Pipeline System";
+			return "Rendering/Pipeline System";
 		}
 		std::string_view GetTitle() const noexcept override { return "Pipeline System"; }
 		void Draw(DevelopGuiContext& context) noexcept override;

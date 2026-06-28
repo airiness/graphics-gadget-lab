@@ -9,7 +9,14 @@ namespace gglab
 	class RenderPassForwardPBR : public RenderPassBase
 	{
 	public:
-		RenderPassForwardPBR() noexcept = default;
+		RenderPassForwardPBR() noexcept : RenderPassBase({
+			.m_TypeName = "Geometry.ForwardPBR",
+			.m_DisplayName = "Forward PBR",
+			.m_CategoryName = "Geometry",
+			.m_Description = "Renders opaque, alpha-tested and transparent scene geometry with forward PBR shading.",
+			.m_Category = RenderPassCategory::Geometry,
+			.m_Type = RenderPassType::Graphics,
+		}) {}
 		~RenderPassForwardPBR() override = default;
 
 		void AddPass(RenderGraph& rg,

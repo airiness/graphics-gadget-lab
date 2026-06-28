@@ -2,6 +2,11 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/PipelinePresets.h"
 #include "Graphics/RHI/RHIPipeline.h"
+#include "Graphics/RenderPass/RenderPassInfo.h"
+
+#include <shared_mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace gglab
 {
@@ -98,14 +103,26 @@ namespace gglab
 
 		RHIPipelineHandle Resolve(
 			GraphicsPipelineSlot& slot,
-			const GraphicsPipelineRecipe& recipe) noexcept;
+			const GraphicsPipelineRecipe& recipe,
+			const RenderPassInfo& renderPassInfo) noexcept;
 		RHIPipelineHandle Resolve(
 			ComputePipelineSlot& slot,
-			const ComputePipelineRecipe& recipe) noexcept;
+			const ComputePipelineRecipe& recipe,
+			const RenderPassInfo& renderPassInfo) noexcept;
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager; }
+		void GetPipelineUsages(
+			RHIPipelineHandle pipeline,
+			std::vector<RenderPassInfo>& outUsages) const noexcept;
 
 	private:
+		void RecordPipelineUsage(
+			RHIPipelineHandle pipeline,
+			const RenderPassInfo& renderPassInfo) noexcept;
+
 		ShaderManager* m_ShaderManager = nullptr;
 		RHIPipelineSystem* m_PipelineSystem = nullptr;
+		mutable std::shared_mutex m_UsageMutex;
+		std::unordered_map<RHIPipelineHandle, std::vector<RenderPassInfo>> m_PipelineUsages;
+		uint64_t m_UsagePipelineSystemRevision = 0;
 	};
 }

@@ -5,6 +5,7 @@
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#include "Graphics/PipelineCache.h"
 #include "Graphics/ShaderManager.h"
 
 namespace gglab
@@ -55,12 +56,14 @@ namespace gglab
 
 	void BuildDX12PipelineSystemSnapshot(
 		const DX12PipelineSystem& system,
-		const ShaderManager* shaderManager,
+		const PipelineCache* pipelineCache,
 		RHIPipelineSystemSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
 		outSnapshot.m_BackendName = "Direct3D 12";
 		outSnapshot.m_Cache.m_PipelineSystemRevision = system.GetRevision();
+		const ShaderManager* shaderManager =
+			pipelineCache ? pipelineCache->GetShaderManager() : nullptr;
 
 		std::shared_lock systemLock(system.m_Mutex);
 		outSnapshot.m_BindingLayouts.reserve(system.m_BindingLayouts.size());
@@ -124,7 +127,10 @@ namespace gglab
 			pipeline.m_Handle = RHIPipelineHandle(index, system.m_PipelineGeneration);
 			pipeline.m_Alive = binding.m_PipelineState != nullptr &&
 				binding.m_PipelineState->Get() != nullptr;
-			pipeline.m_DebugName = binding.m_DebugName;
+			if (pipelineCache)
+			{
+				pipelineCache->GetPipelineUsages(pipeline.m_Handle, pipeline.m_RenderPasses);
+			}
 			pipeline.m_BackendPipelinePointer = reinterpret_cast<uint64_t>(
 				binding.m_PipelineState ? binding.m_PipelineState->Get() : nullptr);
 			pipeline.m_BackendRootSignatureId = binding.m_Type == DX12PipelineSystem::PipelineType::Graphics ?

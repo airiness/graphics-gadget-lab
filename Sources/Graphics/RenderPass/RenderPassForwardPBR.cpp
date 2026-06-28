@@ -63,7 +63,7 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<PassData>("RenderPassForwardPBR",
+		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -316,7 +316,7 @@ namespace gglab
 		const size_t slotIndex =
 			static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];
-		return pipelineCache->Resolve(slot, recipe);
+		return pipelineCache->Resolve(slot, recipe, GetInfo());
 	}
 
 	std::tuple<RasterizerPreset, DepthPreset, BlendPreset>

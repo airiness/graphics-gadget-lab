@@ -58,7 +58,7 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<PassData>("RenderPassIBL.BuildPrefilteredSpecularCubemap",
+		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -185,6 +185,6 @@ namespace gglab
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
-		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe);
+		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}
 }

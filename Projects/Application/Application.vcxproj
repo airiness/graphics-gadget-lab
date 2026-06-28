@@ -414,6 +414,7 @@
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputManager.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassInfo.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h" />
     <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
     <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />

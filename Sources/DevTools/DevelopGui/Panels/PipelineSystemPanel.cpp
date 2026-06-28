@@ -107,6 +107,33 @@ namespace gglab
 			}
 		}
 
+		const char* RenderPassCategoryText(RenderPassCategory category) noexcept
+		{
+			switch (category)
+			{
+			case RenderPassCategory::Geometry: return "Geometry";
+			case RenderPassCategory::Lighting: return "Lighting";
+			case RenderPassCategory::Shadow: return "Shadow";
+			case RenderPassCategory::IBL: return "IBL";
+			case RenderPassCategory::PostProcess: return "PostProcess";
+			case RenderPassCategory::Debug: return "Debug";
+			case RenderPassCategory::UI: return "UI";
+			case RenderPassCategory::Unknown: default: return "Unknown";
+			}
+		}
+
+		const char* RenderPassTypeText(RenderPassType type) noexcept
+		{
+			switch (type)
+			{
+			case RenderPassType::Graphics: return "Graphics";
+			case RenderPassType::Compute: return "Compute";
+			case RenderPassType::Transfer: return "Transfer";
+			case RenderPassType::Mixed: return "Mixed";
+			}
+			return "Unknown";
+		}
+
 		std::string HandleText(auto handle)
 		{
 			return handle.IsValid() ?
@@ -164,6 +191,19 @@ namespace gglab
 			{
 				if (index) result += ", ";
 				result += FormatText(pipeline.m_RenderTargetFormats[index]);
+			}
+			return result;
+		}
+
+		std::string PipelineUsagesText(const RHIPipelineSnapshot& pipeline)
+		{
+			if (pipeline.m_RenderPasses.empty()) return "Unregistered";
+			std::string result;
+			for (size_t index = 0; index < pipeline.m_RenderPasses.size(); ++index)
+			{
+				if (index) result += ", ";
+				const auto& pass = pipeline.m_RenderPasses[index];
+				result += pass.m_DisplayName.empty() ? pass.m_TypeName : pass.m_DisplayName;
 			}
 			return result;
 		}
@@ -312,6 +352,10 @@ namespace gglab
 
 			if (ImGui::TreeNode("Input Layout"))
 			{
+				if (pipeline.m_VertexAttributes.empty())
+				{
+					ImGui::TextDisabled("No vertex attributes (procedural geometry / SV_VertexID).");
+				}
 				if (ImGui::BeginTable("PipelineInputLayout", 5,
 					ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 				{
@@ -345,19 +389,58 @@ namespace gglab
 			}
 		}
 
+		void DrawRenderPassUsages(const RHIPipelineSnapshot& pipeline) noexcept
+		{
+			ImGui::SeparatorText("RenderPass Usages");
+			if (pipeline.m_RenderPasses.empty())
+			{
+				ImGui::TextDisabled("No RenderPass usage was registered for this pipeline.");
+				return;
+			}
+			if (ImGui::BeginTable("PipelineRenderPassUsages", 7,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				ImGui::TableSetupColumn("Stable Type");
+				ImGui::TableSetupColumn("Display Name");
+				ImGui::TableSetupColumn("Category");
+				ImGui::TableSetupColumn("Type");
+				ImGui::TableSetupColumn("DevelopGUI");
+				ImGui::TableSetupColumn("GPU Marker");
+				ImGui::TableSetupColumn("Profiling");
+				ImGui::TableHeadersRow();
+				for (const auto& pass : pipeline.m_RenderPasses)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(pass.m_TypeName.c_str());
+					if (!pass.m_Description.empty() && ImGui::IsItemHovered())
+					{
+						ImGui::SetTooltip("%s", pass.m_Description.c_str());
+					}
+					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(pass.m_DisplayName.c_str());
+					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(
+						pass.m_CategoryName.empty() ? RenderPassCategoryText(pass.m_Category) : pass.m_CategoryName.c_str());
+					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(RenderPassTypeText(pass.m_Type));
+					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(pass.m_ShowInDevelopGui ? "Yes" : "No");
+					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(pass.m_EnableGpuMarker ? "On" : "Off");
+					ImGui::TableSetColumnIndex(6); ImGui::TextUnformatted(pass.m_EnableProfiling ? "On" : "Off");
+				}
+				ImGui::EndTable();
+			}
+		}
+
 		void DrawPipelineDetail(const RHIPipelineSnapshot& pipeline) noexcept
 		{
 			ImGui::SeparatorText("Pipeline Detail");
-			ImGui::Text("Handle %s | %s | %s | Name: %s",
+			ImGui::Text("Handle %s | %s | %s",
 				HandleText(pipeline.m_Handle).c_str(),
 				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? "Graphics" : "Compute",
-				pipeline.m_Alive ? "Alive" : "Dead",
-				pipeline.m_DebugName.empty() ? "-" : pipeline.m_DebugName.c_str());
+				pipeline.m_Alive ? "Alive" : "Dead");
 			ImGui::Text("BindingLayout %s | Backend PSO 0x%llX | RootSignature ID %u / 0x%llX",
 				HandleText(pipeline.m_BindingLayout).c_str(),
 				static_cast<unsigned long long>(pipeline.m_BackendPipelinePointer),
 				pipeline.m_BackendRootSignatureId,
 				static_cast<unsigned long long>(pipeline.m_BackendRootSignaturePointer));
+			DrawRenderPassUsages(pipeline);
 			DrawShaderTable(pipeline);
 			if (pipeline.m_Type == RHIPipelineSnapshotType::Graphics) DrawGraphicsState(pipeline);
 		}
@@ -376,7 +459,7 @@ namespace gglab
 			if (ImGui::BeginTable("Pipelines", 9, flags, ImVec2(0.0f, 280.0f)))
 			{
 				ImGui::TableSetupColumn("Handle"); ImGui::TableSetupColumn("Type");
-				ImGui::TableSetupColumn("Alive"); ImGui::TableSetupColumn("Debug Name");
+				ImGui::TableSetupColumn("Alive"); ImGui::TableSetupColumn("Used By RenderPass");
 				ImGui::TableSetupColumn("Binding Layout"); ImGui::TableSetupColumn("VS/CS");
 				ImGui::TableSetupColumn("PS"); ImGui::TableSetupColumn("Formats");
 				ImGui::TableSetupColumn("Backend PSO"); ImGui::TableHeadersRow();
@@ -387,6 +470,7 @@ namespace gglab
 					const std::string primaryShader = ShaderSummary(
 						pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? pipeline.m_VertexShader : pipeline.m_ComputeShader);
 					const std::string pixelShader = ShaderSummary(pipeline.m_PixelShader);
+					const std::string usages = PipelineUsagesText(pipeline);
 					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
 						RenderTargetFormatsText(pipeline) : "-";
 					ImGui::TableNextRow();
@@ -395,7 +479,7 @@ namespace gglab
 						ImGuiSelectableFlags_SpanAllColumns)) state.m_SelectedPipeline = pipeline.m_Handle.Index();
 					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? "Graphics" : "Compute");
 					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(pipeline.m_Alive ? "Yes" : "No");
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(pipeline.m_DebugName.empty() ? "-" : pipeline.m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(usages.c_str());
 					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(layout.c_str());
 					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(primaryShader.c_str());
 					ImGui::TableSetColumnIndex(6); ImGui::TextUnformatted(pixelShader.c_str());
@@ -449,7 +533,7 @@ namespace gglab
 		RHIPipelineSystemSnapshot snapshot;
 		BuildDX12PipelineSystemSnapshot(
 			*dx12PipelineSystem,
-			pipelineCache ? pipelineCache->GetShaderManager() : nullptr,
+			pipelineCache,
 			snapshot);
 		auto& state = context.PanelState<PipelineSystemPanelState>();
 

@@ -16,7 +16,8 @@ namespace gglab
 
 	RHIPipelineHandle PipelineCache::Resolve(
 		GraphicsPipelineSlot& slot,
-		const GraphicsPipelineRecipe& recipe) noexcept
+		const GraphicsPipelineRecipe& recipe,
+		const RenderPassInfo& renderPassInfo) noexcept
 	{
 		const uint64_t shaderRevision = m_ShaderManager->GetRevision();
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
@@ -26,6 +27,7 @@ namespace gglab
 			slot.m_Recipe == recipe &&
 			slot.m_ShaderRevision == shaderRevision)
 		{
+			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 			return slot.m_Pipeline;
 		}
 
@@ -40,12 +42,14 @@ namespace gglab
 		slot.m_Recipe = recipe;
 		slot.m_ShaderRevision = shaderRevision;
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
+		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 		return slot.m_Pipeline;
 	}
 
 	RHIPipelineHandle PipelineCache::Resolve(
 		ComputePipelineSlot& slot,
-		const ComputePipelineRecipe& recipe) noexcept
+		const ComputePipelineRecipe& recipe,
+		const RenderPassInfo& renderPassInfo) noexcept
 	{
 		const uint64_t shaderRevision = m_ShaderManager->GetRevision();
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
@@ -55,6 +59,7 @@ namespace gglab
 			slot.m_Recipe == recipe &&
 			slot.m_ShaderRevision == shaderRevision)
 		{
+			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 			return slot.m_Pipeline;
 		}
 
@@ -67,6 +72,54 @@ namespace gglab
 		slot.m_Recipe = recipe;
 		slot.m_ShaderRevision = shaderRevision;
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
+		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 		return slot.m_Pipeline;
+	}
+
+	void PipelineCache::GetPipelineUsages(
+		RHIPipelineHandle pipeline,
+		std::vector<RenderPassInfo>& outUsages) const noexcept
+	{
+		outUsages.clear();
+		std::shared_lock lock(m_UsageMutex);
+		if (m_UsagePipelineSystemRevision != m_PipelineSystem->GetRevision())
+		{
+			return;
+		}
+		if (const auto iter = m_PipelineUsages.find(pipeline); iter != m_PipelineUsages.end())
+		{
+			outUsages = iter->second;
+		}
+	}
+
+	void PipelineCache::RecordPipelineUsage(
+		RHIPipelineHandle pipeline,
+		const RenderPassInfo& renderPassInfo) noexcept
+	{
+		if (!pipeline.IsValid() || renderPassInfo.m_TypeName.empty())
+		{
+			return;
+		}
+		const uint64_t revision = m_PipelineSystem->GetRevision();
+		std::unique_lock lock(m_UsageMutex);
+		if (m_UsagePipelineSystemRevision != revision)
+		{
+			m_PipelineUsages.clear();
+			m_UsagePipelineSystemRevision = revision;
+		}
+		auto& usages = m_PipelineUsages[pipeline];
+		const auto existing = std::ranges::find_if(usages,
+			[&renderPassInfo](const RenderPassInfo& usage)
+			{
+				return usage.m_TypeName == renderPassInfo.m_TypeName;
+			});
+		if (existing == usages.end())
+		{
+			usages.push_back(renderPassInfo);
+		}
+		else
+		{
+			*existing = renderPassInfo;
+		}
 	}
 }

@@ -9,7 +9,14 @@ namespace gglab
 	class RenderPassIBLBrdfLUT : public RenderPassBase
 	{
 	public:
-		RenderPassIBLBrdfLUT() noexcept = default;
+		RenderPassIBLBrdfLUT() noexcept : RenderPassBase({
+			.m_TypeName = "IBL.BrdfLUT",
+			.m_DisplayName = "IBL BRDF LUT",
+			.m_CategoryName = "IBL",
+			.m_Description = "Generates the split-sum BRDF integration lookup texture used by image-based lighting.",
+			.m_Category = RenderPassCategory::IBL,
+			.m_Type = RenderPassType::Graphics,
+		}) {}
 		~RenderPassIBLBrdfLUT() override = default;
 
 		void AddPass(RenderGraph& rg,
