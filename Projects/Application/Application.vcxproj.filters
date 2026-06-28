@@ -773,6 +773,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Shader.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\ShaderTypes.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>

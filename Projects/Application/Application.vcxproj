@@ -438,6 +438,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Shader.h" />
     <ClInclude Include="..\..\Sources\Graphics\ShaderCompiler.h" />
     <ClInclude Include="..\..\Sources\Graphics\ShaderManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\Core\StringId.h" />
     <ClInclude Include="..\..\Sources\Core\Time.h" />
     <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h" />

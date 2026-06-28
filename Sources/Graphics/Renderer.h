@@ -76,10 +76,7 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		[[nodiscard]] Frame BeginFrame(uint32_t backBufferIndex) noexcept;
-		void Render(
-			Frame& frame,
-			RenderGraph& rg,
-			const RenderFrameContext& renderContext) noexcept;
+		void Render(Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 		void EndFrame(Frame& frame) noexcept;
 
 		RHIContext* GetRHIContext() const noexcept { return m_RHIContext.get(); }

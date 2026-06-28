@@ -1,12 +1,9 @@
 #pragma once
-#include "Core/Platform/Win/ComTypes.h"
-#include "Graphics/RHI/DX12/Cache/PSOKey.h"
 #include "Core/EnumFlags.h"
+#include "Graphics/ShaderTypes.h"
 
 namespace gglab
 {
-	using ShaderBlob = IDxcBlobEncoding;
-
 	enum class ShaderStage : uint32_t
 	{
 		Vertex,
@@ -58,18 +55,20 @@ namespace gglab
 
 	struct ShaderCompileArtifact
 	{
-		std::filesystem::path m_DxilPath{};
+		std::filesystem::path m_BinaryPath{};
 		std::filesystem::path m_MetaPath{};
-		ComPtr<ShaderBlob> m_DxilBlob{};
+		ShaderBinary m_Binary{};
+		ShaderBinaryFormat m_Format = ShaderBinaryFormat::Unknown;
 		ShaderHash128 m_Hash{};
 		std::filesystem::file_time_type m_SourceTimeStamp{};
 		bool m_FromCache = false;
 
 		void Reset() noexcept
 		{
-			m_DxilPath.clear();
+			m_BinaryPath.clear();
 			m_MetaPath.clear();
-			m_DxilBlob.Reset();
+			m_Binary.Reset();
+			m_Format = ShaderBinaryFormat::Unknown;
 			m_Hash = {};
 			m_SourceTimeStamp = {};
 			m_FromCache = false;
@@ -84,11 +83,11 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(Shader);
 		~Shader() = default;
 
-		D3D12_SHADER_BYTECODE GetByteCode() const noexcept;
+		ShaderBytecode GetBytecode() const noexcept;
 		const ShaderDesc& GetDesc() const noexcept { return m_Desc; }
 		const ShaderCompileArtifact& GetCompileArtifact() const noexcept { return m_Artifact; }
 		uint64_t GetGeneration() const noexcept { return m_Generation; }
-		bool IsValid() const noexcept { return m_Artifact.m_DxilBlob != nullptr; }
+		bool IsValid() const noexcept { return m_Artifact.m_Binary.IsValid(); }
 
 	private:
 		void SetCompileArtifact(ShaderCompileArtifact artifact, bool changed) noexcept;

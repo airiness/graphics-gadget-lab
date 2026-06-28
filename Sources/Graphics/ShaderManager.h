@@ -1,11 +1,9 @@
 #pragma once
 #include "Core/TypedIndex.h"
-#include "Graphics/RHI/DX12/Cache/PSOKey.h"
 #include "Core/Hash/FNV1a.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Shader.h"
 #include "Graphics/ShaderCompiler.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
 
 namespace gglab
 {
@@ -31,9 +29,7 @@ namespace gglab
 		
 		int32_t RefreshChanged() noexcept;
 		bool RefreshShader(ShaderID shaderId) noexcept;
-		D3D12_SHADER_BYTECODE GetBytecode(ShaderID shaderId) const noexcept;
-		RHIShaderBytecode GetRHIShaderBytecode(ShaderID shaderId) const noexcept;
-		ShaderBlob* GetBlob(ShaderID shaderId) const noexcept;
+		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
 		uint64_t GetRevision() const noexcept

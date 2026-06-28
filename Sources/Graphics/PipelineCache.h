@@ -102,6 +102,7 @@ namespace gglab
 		RHIPipelineHandle Resolve(
 			ComputePipelineSlot& slot,
 			const ComputePipelineRecipe& recipe) noexcept;
+		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager; }
 
 	private:
 		ShaderManager* m_ShaderManager = nullptr;

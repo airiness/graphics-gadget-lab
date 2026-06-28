@@ -113,42 +113,15 @@ namespace gglab
 		return changed;
 	}
 
-	D3D12_SHADER_BYTECODE ShaderManager::GetBytecode(ShaderID shaderId) const noexcept
+	ShaderBytecode ShaderManager::GetBytecode(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		D3D12_SHADER_BYTECODE bytecode{};
 		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
 		{
-			return m_Shaders[shaderId.Value()]->GetByteCode();
+			return m_Shaders[shaderId.Value()]->GetBytecode();
 		}
 		GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Invalid shader ID {}", shaderId.Value());
-		return bytecode;
-	}
-
-	RHIShaderBytecode ShaderManager::GetRHIShaderBytecode(ShaderID shaderId) const noexcept
-	{
-		if (!shaderId.IsValid())
-		{
-			return {};
-		}
-		const D3D12_SHADER_BYTECODE bytecode = GetBytecode(shaderId);
-		const ShaderHash128 hash = GetHash(shaderId);
-		return {
-			.m_Data = bytecode.pShaderBytecode,
-			.m_SizeInBytes = bytecode.BytecodeLength,
-			.m_HashLow = hash.m_LowBits,
-			.m_HashHigh = hash.m_HighBits,
-		};
-	}
-
-	ShaderBlob* ShaderManager::GetBlob(ShaderID shaderId) const noexcept
-	{
-		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
-		{
-			return m_Shaders[shaderId.Value()]->GetCompileArtifact().m_DxilBlob.Get();
-		}
-		return nullptr;
+		return {};
 	}
 
 	ShaderHash128 ShaderManager::GetHash(ShaderID shaderId) const noexcept

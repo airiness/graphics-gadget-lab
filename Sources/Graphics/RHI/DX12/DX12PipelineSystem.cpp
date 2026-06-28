@@ -11,7 +11,7 @@ namespace gglab
 {
 	namespace
 	{
-		D3D12_SHADER_BYTECODE ToDX12Bytecode(const RHIShaderBytecode& bytecode) noexcept
+		D3D12_SHADER_BYTECODE ToDX12Bytecode(const ShaderBytecode& bytecode) noexcept
 		{
 			return {
 				.pShaderBytecode = bytecode.m_Data,
@@ -19,12 +19,14 @@ namespace gglab
 			};
 		}
 
-		ShaderHash128 ToDX12ShaderHash(const RHIShaderBytecode& bytecode) noexcept
+		ShaderHash128 ToDX12ShaderHash(const ShaderBytecode& bytecode) noexcept
 		{
-			return {
-				.m_LowBits = bytecode.m_HashLow,
-				.m_HighBits = bytecode.m_HashHigh,
-			};
+			return bytecode.m_Hash;
+		}
+
+		bool IsDX12ShaderBytecode(const ShaderBytecode& bytecode) noexcept
+		{
+			return !bytecode.IsValid() || bytecode.m_Format == ShaderBinaryFormat::Dxil;
 		}
 	}
 
@@ -55,7 +57,12 @@ namespace gglab
 		const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
 	{
 		DX12RootSignature* rootSignature = ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
-		if (!rootSignature || !createInfo.m_VertexShader.IsValid())
+		if (!rootSignature || !createInfo.m_VertexShader.IsValid() ||
+			!IsDX12ShaderBytecode(createInfo.m_VertexShader) ||
+			!IsDX12ShaderBytecode(createInfo.m_PixelShader) ||
+			!IsDX12ShaderBytecode(createInfo.m_DomainShader) ||
+			!IsDX12ShaderBytecode(createInfo.m_HullShader) ||
+			!IsDX12ShaderBytecode(createInfo.m_GeometryShader))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12PipelineSystem::CreateGraphicsPipeline received invalid inputs.");
@@ -89,7 +96,8 @@ namespace gglab
 		const RHIComputePipelineCreateInfo& createInfo) noexcept
 	{
 		DX12RootSignature* rootSignature = ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
-		if (!rootSignature || !createInfo.m_ComputeShader.IsValid())
+		if (!rootSignature || !createInfo.m_ComputeShader.IsValid() ||
+			!IsDX12ShaderBytecode(createInfo.m_ComputeShader))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12PipelineSystem::CreateComputePipeline received invalid inputs.");
