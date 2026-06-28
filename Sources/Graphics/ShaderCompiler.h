@@ -1,5 +1,4 @@
 #pragma once
-#include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/Shader.h"
 
 namespace gglab
@@ -9,7 +8,7 @@ namespace gglab
 	public:
 		ShaderCompiler() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderCompiler);
-		~ShaderCompiler() = default;
+		~ShaderCompiler();
 
 		void SetCacheRootDirectory(std::filesystem::path root) noexcept;
 		const std::filesystem::path& GetCacheRootDirectory() const noexcept { return m_CacheRootDir; }
@@ -24,8 +23,9 @@ namespace gglab
 		static ShaderHash128 ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept;
 
 	private:
-		std::filesystem::path MakeCacheDxilPath(const std::wstring& keyHex, ShaderStage stage) const noexcept;
-		ComPtr<IDxcBlob> CompileShader(const ShaderDesc& desc, std::vector<std::filesystem::path>& outDeps) const noexcept;
+		std::filesystem::path MakeCacheBinaryPath(const std::wstring& keyHex, ShaderStage stage) const noexcept;
+		ShaderBinary CompileShader(const ShaderDesc& desc,
+			std::vector<std::filesystem::path>& outDeps) const noexcept;
 		void WriteMeta(const std::filesystem::path& meta, const ShaderDesc& desc,
 			const std::vector<std::filesystem::path>& deps) const noexcept;
 		bool IsMetaUpToDate(const std::filesystem::path& meta) const noexcept;
@@ -35,14 +35,13 @@ namespace gglab
 		static std::wstring ToHex(ShaderHash128 hash) noexcept;
 		static std::wstring ToTarget(ShaderStage stage, ShaderModel model) noexcept;
 		static std::wstring BuildKeyString(const ShaderDesc& desc) noexcept;
-		static bool GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;
-		static ShaderHash128 ComputeHashFromBlob(IDxcBlob* blob) noexcept;
+		static bool GetContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept;
+		static ShaderHash128 ComputeHashFromBinary(const ShaderBinary& binary) noexcept;
 
 	private:
+		struct Impl;
+		std::unique_ptr<Impl> m_Impl;
 		std::filesystem::path m_CacheRootDir;
-		ComPtr<IDxcUtils> m_Utils;
-		ComPtr<IDxcCompiler3> m_Compiler;
-
 		ShaderDesc m_DefaultShaderConfig;
 	};
 }

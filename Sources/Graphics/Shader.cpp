@@ -8,15 +8,15 @@ namespace gglab
 	{
 	}
 
-	D3D12_SHADER_BYTECODE Shader::GetByteCode() const noexcept
+	ShaderBytecode Shader::GetBytecode() const noexcept
 	{
 		GGLAB_ASSERT_MSG(IsValid(), "Shader must be compiled.");
-
-		D3D12_SHADER_BYTECODE byteCode{};
-		byteCode.pShaderBytecode = m_Artifact.m_DxilBlob->GetBufferPointer();
-		byteCode.BytecodeLength = m_Artifact.m_DxilBlob->GetBufferSize();
-
-		return byteCode;
+		return {
+			.m_Data = m_Artifact.m_Binary.Data(),
+			.m_SizeInBytes = m_Artifact.m_Binary.SizeInBytes(),
+			.m_Format = m_Artifact.m_Format,
+			.m_Hash = m_Artifact.m_Hash,
+		};
 	}
 
 	void Shader::SetCompileArtifact(ShaderCompileArtifact artifact, bool changed) noexcept

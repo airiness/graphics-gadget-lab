@@ -31,11 +31,11 @@ namespace gglab
 
 		RHIGraphicsPipelineCreateInfo createInfo{};
 		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(recipe);
-		createInfo.m_VertexShader = m_ShaderManager->GetRHIShaderBytecode(recipe.m_VSId);
-		createInfo.m_PixelShader = m_ShaderManager->GetRHIShaderBytecode(recipe.m_PSId);
-		createInfo.m_DomainShader = m_ShaderManager->GetRHIShaderBytecode(recipe.m_DSId);
-		createInfo.m_HullShader = m_ShaderManager->GetRHIShaderBytecode(recipe.m_HSId);
-		createInfo.m_GeometryShader = m_ShaderManager->GetRHIShaderBytecode(recipe.m_GSId);
+		createInfo.m_VertexShader = m_ShaderManager->GetBytecode(recipe.m_VSId);
+		createInfo.m_PixelShader = recipe.m_PSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_PSId) : ShaderBytecode{};
+		createInfo.m_DomainShader = recipe.m_DSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_DSId) : ShaderBytecode{};
+		createInfo.m_HullShader = recipe.m_HSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_HSId) : ShaderBytecode{};
+		createInfo.m_GeometryShader = recipe.m_GSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_GSId) : ShaderBytecode{};
 		slot.m_Pipeline = m_PipelineSystem->CreateGraphicsPipeline(createInfo);
 		slot.m_Recipe = recipe;
 		slot.m_ShaderRevision = shaderRevision;
@@ -62,7 +62,7 @@ namespace gglab
 		createInfo.m_Desc.m_BindingLayout = recipe.m_BindingLayout;
 		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid() ?
 			RHIShaderHandle{ recipe.m_CSId.Value(), 1u } : RHIShaderHandle{};
-		createInfo.m_ComputeShader = m_ShaderManager->GetRHIShaderBytecode(recipe.m_CSId);
+		createInfo.m_ComputeShader = m_ShaderManager->GetBytecode(recipe.m_CSId);
 		slot.m_Pipeline = m_PipelineSystem->CreateComputePipeline(createInfo);
 		slot.m_Recipe = recipe;
 		slot.m_ShaderRevision = shaderRevision;

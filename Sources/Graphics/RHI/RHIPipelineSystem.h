@@ -1,38 +1,26 @@
 #pragma once
 #include "Graphics/RHI/RHIBindingLayout.h"
 #include "Graphics/RHI/RHIPipeline.h"
+#include "Graphics/ShaderTypes.h"
 
 #include <cstddef>
 
 namespace gglab
 {
-	struct RHIShaderBytecode
-	{
-		const void* m_Data = nullptr;
-		size_t m_SizeInBytes = 0;
-		uint64_t m_HashLow = 0;
-		uint64_t m_HashHigh = 0;
-
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_Data != nullptr && m_SizeInBytes > 0;
-		}
-	};
-
 	struct RHIGraphicsPipelineCreateInfo
 	{
 		RHIGraphicsPipelineDesc m_Desc{};
-		RHIShaderBytecode m_VertexShader{};
-		RHIShaderBytecode m_PixelShader{};
-		RHIShaderBytecode m_DomainShader{};
-		RHIShaderBytecode m_HullShader{};
-		RHIShaderBytecode m_GeometryShader{};
+		ShaderBytecode m_VertexShader{};
+		ShaderBytecode m_PixelShader{};
+		ShaderBytecode m_DomainShader{};
+		ShaderBytecode m_HullShader{};
+		ShaderBytecode m_GeometryShader{};
 	};
 
 	struct RHIComputePipelineCreateInfo
 	{
 		RHIComputePipelineDesc m_Desc{};
-		RHIShaderBytecode m_ComputeShader{};
+		ShaderBytecode m_ComputeShader{};
 	};
 
 	class RHIPipelineSystem

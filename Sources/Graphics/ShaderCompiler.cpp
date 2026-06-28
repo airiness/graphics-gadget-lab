@@ -8,6 +8,12 @@
 
 namespace gglab
 {
+	struct ShaderCompiler::Impl
+	{
+		ComPtr<IDxcUtils> m_Utils;
+		ComPtr<IDxcCompiler3> m_Compiler;
+	};
+
 	namespace
 	{
 		class ShaderIncludeHandler final :
@@ -60,16 +66,31 @@ namespace gglab
 			std::vector<std::filesystem::path> m_Includes;
 
 		};
+
+		ShaderBinary CopyShaderBinary(IDxcBlob* blob) noexcept
+		{
+			if (blob == nullptr || blob->GetBufferSize() == 0)
+			{
+				return {};
+			}
+
+			ShaderBinary binary(blob->GetBufferSize());
+			std::memcpy(binary.Data(), blob->GetBufferPointer(), blob->GetBufferSize());
+			return binary;
+		}
 	}
 
-	ShaderCompiler::ShaderCompiler() noexcept
+	ShaderCompiler::ShaderCompiler() noexcept :
+		m_Impl(std::make_unique<Impl>())
 	{
-		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Utils)));
-		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Compiler)));
+		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
+		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Impl->m_Compiler)));
 
 		const auto defaultRootDir = utils::GetExeOutDir() / L"ShaderCache";
 		SetCacheRootDirectory(defaultRootDir);
 	}
+
+	ShaderCompiler::~ShaderCompiler() = default;
 
 	void ShaderCompiler::SetCacheRootDirectory(std::filesystem::path root) noexcept
 	{
@@ -87,43 +108,42 @@ namespace gglab
 		ShaderCompileArtifact artifact{};
 		const auto recipeHash = ComputeRecipeHash(desc);
 		const auto keyHex = ToHex(recipeHash);
-		const auto dxil = MakeCacheDxilPath(keyHex, desc.m_Stage);
+		const auto binaryPath = MakeCacheBinaryPath(keyHex, desc.m_Stage);
 
-		auto meta = dxil;
+		auto meta = binaryPath;
 		meta.replace_extension(L"meta.txt");
 
-		artifact.m_DxilPath = dxil;
+		artifact.m_BinaryPath = binaryPath;
 		artifact.m_MetaPath = meta;
+		artifact.m_Format = ShaderBinaryFormat::Dxil;
 
 		// Exist
 		std::error_code errorCode;
-		if (std::filesystem::exists(dxil, errorCode) && std::filesystem::exists(meta, errorCode))
+		if (std::filesystem::exists(binaryPath, errorCode) && std::filesystem::exists(meta, errorCode))
 		{
 			if (IsMetaUpToDate(meta))
 			{
 				ComPtr<IDxcBlobEncoding> blobEncoding;
-				GGLAB_HR(m_Utils->LoadFile(dxil.c_str(), nullptr, &blobEncoding));
-				artifact.m_DxilBlob = blobEncoding;
+				GGLAB_HR(m_Impl->m_Utils->LoadFile(binaryPath.c_str(), nullptr, &blobEncoding));
+				artifact.m_Binary = CopyShaderBinary(blobEncoding.Get());
 				artifact.m_FromCache = true;
-				artifact.m_Hash = ComputeHashFromBlob(blobEncoding.Get());
+				artifact.m_Hash = ComputeHashFromBinary(artifact.m_Binary);
 				return artifact;
 			}
 		}
 
 		// Compile is not exist
 		std::vector<std::filesystem::path> deps;
-		auto dxilBlob = CompileShader(desc, deps);
+		auto binary = CompileShader(desc, deps);
 
 		// Save binary
-		utils::WriteFileBinary(dxil, dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
+		utils::WriteFileBinary(binaryPath, binary.Data(), binary.SizeInBytes());
 		WriteMeta(meta, desc, deps);
 
 		// result
-		ComPtr<IDxcBlobEncoding> blobEncoding;
-		GGLAB_HR(m_Utils->CreateBlob(dxilBlob->GetBufferPointer(), static_cast<UINT32>(dxilBlob->GetBufferSize()), 0, &blobEncoding));
-		artifact.m_DxilBlob = blobEncoding;
+		artifact.m_Binary = std::move(binary);
 		artifact.m_FromCache = false;
-		artifact.m_Hash = ComputeHashFromBlob(blobEncoding.Get());
+		artifact.m_Hash = ComputeHashFromBinary(artifact.m_Binary);
 		return artifact;
 	}
 
@@ -193,7 +213,7 @@ namespace gglab
 		return hash;
 	}
 
-	std::filesystem::path ShaderCompiler::MakeCacheDxilPath(const std::wstring& keyHex, ShaderStage stage) const noexcept
+	std::filesystem::path ShaderCompiler::MakeCacheBinaryPath(const std::wstring& keyHex, ShaderStage stage) const noexcept
 	{
 		std::wstring extension;
 		switch (stage)
@@ -229,10 +249,10 @@ namespace gglab
 		return path;
 	}
 
-	ComPtr<IDxcBlob> ShaderCompiler::CompileShader(const ShaderDesc& desc, std::vector<std::filesystem::path>& outDeps) const noexcept
+	ShaderBinary ShaderCompiler::CompileShader(const ShaderDesc& desc, std::vector<std::filesystem::path>& outDeps) const noexcept
 	{
 		ComPtr<IDxcBlobEncoding> src;
-		GGLAB_HR(m_Utils->LoadFile(utils::Canonical(desc.m_SourcePath).c_str(), nullptr, &src));
+		GGLAB_HR(m_Impl->m_Utils->LoadFile(utils::Canonical(desc.m_SourcePath).c_str(), nullptr, &src));
 
 		DxcBuffer buffer{};
 		buffer.Ptr = src->GetBufferPointer();
@@ -240,7 +260,7 @@ namespace gglab
 		buffer.Encoding = DXC_CP_UTF8;
 
 		ComPtr<ShaderIncludeHandler> includeHandler;
-		GGLAB_HR(MakeAndInitialize<ShaderIncludeHandler>(&includeHandler, m_Utils, desc.m_IncludeDirs));
+		GGLAB_HR(MakeAndInitialize<ShaderIncludeHandler>(&includeHandler, m_Impl->m_Utils, desc.m_IncludeDirs));
 
 		std::vector<const wchar_t*> args;
 		const std::wstring entry = desc.m_Entry.empty() ? L"Main" : desc.m_Entry;
@@ -308,7 +328,7 @@ namespace gglab
 
 		// Compile
 		ComPtr<IDxcResult> result;
-		GGLAB_HR(m_Compiler->Compile(&buffer, args.data(), (UINT32)args.size(), includeHandler.Get(), IID_PPV_ARGS(&result)));
+		GGLAB_HR(m_Impl->m_Compiler->Compile(&buffer, args.data(), (UINT32)args.size(), includeHandler.Get(), IID_PPV_ARGS(&result)));
 
 		HRESULT status = S_OK;
 		result->GetStatus(&status);
@@ -329,7 +349,7 @@ namespace gglab
 		ComPtr<IDxcBlob> dxilBlob;
 		GGLAB_HR(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxilBlob), nullptr));
 
-		return dxilBlob;
+		return CopyShaderBinary(dxilBlob.Get());
 	}
 
 	void ShaderCompiler::WriteMeta(const std::filesystem::path& meta, const ShaderDesc& desc,
@@ -556,7 +576,7 @@ namespace gglab
 		return str;
 	}
 
-	bool ShaderCompiler::GetDxilContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
+	bool ShaderCompiler::GetContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
 	{
 		constexpr size_t MinDxilSize = 20;
 		if (data == nullptr || size < MinDxilSize)
@@ -578,25 +598,25 @@ namespace gglab
 		return true;
 	}
 
-	ShaderHash128 ShaderCompiler::ComputeHashFromBlob(IDxcBlob* blob) noexcept
+	ShaderHash128 ShaderCompiler::ComputeHashFromBinary(const ShaderBinary& binary) noexcept
 	{
 		ShaderHash128 hash{};
-		if (!blob)
+		if (!binary.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBlob: blob is null.");
+			GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBinary: binary is empty.");
 			return hash;
 		}
 
-		const auto* ptr = static_cast<const uint8_t*>(blob->GetBufferPointer());
-		const auto size = blob->GetBufferSize();
+		const auto* ptr = static_cast<const uint8_t*>(binary.Data());
+		const auto size = binary.SizeInBytes();
 
-		if (GetDxilContainerHash(ptr, size, hash))
+		if (GetContainerHash(ptr, size, hash))
 		{
 			return hash;
 		}
 
 		// FNV-1a 64-bit hash
-		GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBlob: Failed to get DXIL validator hash, fallback to FNV-1a hash.");
+		GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBinary: Failed to get container hash, fallback to FNV-1a hash.");
 		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
 		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
 		return hash;

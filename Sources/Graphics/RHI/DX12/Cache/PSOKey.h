@@ -2,21 +2,11 @@
 #include "Core/Hash/FNV1a.h"
 #include "Core/TypedIndex.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/ShaderTypes.h"
 #include "Graphics/RHI/DX12/Cache/PipelinePresets.h"
 
 namespace gglab
 {
-	struct ShaderHash128
-	{
-		uint64_t m_LowBits = 0;
-		uint64_t m_HighBits = 0;
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_LowBits, m_HighBits);
-		}
-		constexpr bool operator==(const ShaderHash128&) const noexcept = default;
-	};
-
 	struct PipelineFormats
 	{
 		D3D12_RT_FORMAT_ARRAY m_RtvFormats = {};
