@@ -109,9 +109,9 @@ namespace gglab
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
 		const DX12Fence* ResolveFence(RHIFenceHandle fence) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
-		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
+		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
-		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept;
+		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept override;
 		void SetDescriptorManager(DX12DescriptorManager* descriptorManager) noexcept;
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;

@@ -2,7 +2,7 @@
 #include "Graphics/AssetManager.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/RHIDevice.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
 
@@ -108,12 +108,12 @@ namespace gglab
 	}
 
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
-		m_DX12Device(createInfo.m_DX12Device),
+		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_TextureRegistry(createInfo.m_TextureRegistry),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry)
 	{
-		GGLAB_ASSERT_MSG(m_DX12Device != nullptr, "DX12Device is null!");
+		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_TextureRegistry != nullptr, "TextureRegistry is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
@@ -333,25 +333,25 @@ namespace gglab
 		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest;
 		indexBufferDesc.m_DebugName = "AssetManager.Mesh.IndexBuffer";
 
-		const RHIBufferHandle vertexBuffer = m_DX12Device->CreateBuffer(vertexBufferDesc);
-		const RHIBufferHandle indexBuffer = m_DX12Device->CreateBuffer(indexBufferDesc);
+		const RHIBufferHandle vertexBuffer = m_Device->CreateBuffer(vertexBufferDesc);
+		const RHIBufferHandle indexBuffer = m_Device->CreateBuffer(indexBufferDesc);
 		if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
 		{
 			if (vertexBuffer.IsValid())
 			{
-				m_DX12Device->DestroyBuffer(vertexBuffer);
+				m_Device->DestroyBuffer(vertexBuffer);
 			}
 			if (indexBuffer.IsValid())
 			{
-				m_DX12Device->DestroyBuffer(indexBuffer);
+				m_Device->DestroyBuffer(indexBuffer);
 			}
 
 			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh failed to create RHI mesh buffers.");
 			return;
 		}
 
-		mesh->m_VertexBuffer = RHIBufferOwner(m_DX12Device, vertexBuffer);
-		mesh->m_IndexBuffer = RHIBufferOwner(m_DX12Device, indexBuffer);
+		mesh->m_VertexBuffer = RHIBufferOwner(m_Device, vertexBuffer);
+		mesh->m_IndexBuffer = RHIBufferOwner(m_Device, indexBuffer);
 
 		const bool vertexUploadSucceeded = transferBatch.UploadBuffer(
 			mesh->m_VertexBuffer.Get(), 0, verticesData.data(), vertexBufferSize);

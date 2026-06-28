@@ -1,6 +1,5 @@
 #include "Core/Precompiled.h"
 #include "Core/Application.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Input/InputManager.h"
@@ -241,7 +240,7 @@ namespace gglab
 		m_Renderer->Initialize(rendererCreateInfo);
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
-		assetManagerCreateInfo.m_DX12Device = m_Renderer->GetDevice();
+		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_TextureRegistry = m_Renderer->GetTextureRegistry();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
@@ -374,7 +373,7 @@ namespace gglab
 		}
 
 		// Must flush here for gpu resource safe release next
-		m_Renderer->GetDevice()->FlushGPU();
+		m_Renderer->GetRHIContext()->WaitIdle();
 
 		m_DemoManager.reset();
 		m_RenderFrameBuilder.reset();

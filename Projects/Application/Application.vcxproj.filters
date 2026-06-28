@@ -120,6 +120,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -366,6 +369,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp">
       <Filter>Graphics\RHI</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHIContext.cpp">
+      <Filter>Graphics\RHI</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
@@ -465,6 +471,9 @@
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h">
@@ -858,6 +867,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIContext.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h">

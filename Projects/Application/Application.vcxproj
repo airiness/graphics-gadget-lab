@@ -167,6 +167,7 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHIContext.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.cpp" />
@@ -180,6 +181,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
@@ -310,6 +312,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISwapChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h" />
@@ -332,6 +335,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h" />

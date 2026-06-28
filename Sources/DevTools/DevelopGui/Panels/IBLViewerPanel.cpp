@@ -4,7 +4,6 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -20,30 +19,12 @@ namespace gglab
 			bool m_FlipPreviewY = false;
 		};
 
-		static ImTextureID ToImGuiTextureID(D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
-		{
-			return static_cast<ImTextureID>(handle.ptr);
-		}
-
-		static D3D12_GPU_DESCRIPTOR_HANDLE ToGpuDescriptorHandle(
+		static ImTextureID ToImGuiTextureID(
 			Renderer* renderer,
 			RHIDescriptorHandle descriptor) noexcept
 		{
-			if (!renderer ||
-				!descriptor.IsValid() ||
-				descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
-			{
-				return {};
-			}
-
-			auto* descriptorManager = renderer->GetDescriptorManager();
-			if (!descriptorManager)
-			{
-				return {};
-			}
-
-			auto* heap = descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
-			return heap ? heap->GpuHandleAt(descriptor.m_Index) : D3D12_GPU_DESCRIPTOR_HANDLE{};
+			auto* backend = renderer ? renderer->GetDevelopGuiBackend() : nullptr;
+			return backend ? backend->ResolveTextureId(descriptor) : ImTextureID{};
 		}
 
 		static bool DrawPreviewLayoutCombo(const char* label, RenderResourceRegistry::IBLPreviewLayout& layout) noexcept
@@ -164,17 +145,16 @@ namespace gglab
 
 			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
 
-			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = ToGpuDescriptorHandle(
+			const ImTextureID textureId = ToImGuiTextureID(
 				renderer,
 				renderResRegistry->GetSrvDescriptor(BrdfLutIndex));
 
-			if (gpuHandle.ptr == 0)
+			if (!textureId)
 			{
 				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "BRDF LUT SRV GPU handle is invalid.");
 				return;
 			}
 
-			const ImTextureID textureId = ToImGuiTextureID(gpuHandle);
 			const float previewSize = std::clamp(state.m_BrdfLutPreviewSize, 16.0f, 2048.0f);
 			const ImVec2 imageSize(previewSize, previewSize);
 
@@ -278,18 +258,17 @@ namespace gglab
 				768.0f,
 				"%.0f");
 
-			D3D12_GPU_DESCRIPTOR_HANDLE environmentPreviewGpuHandle =
-				ToGpuDescriptorHandle(
+			const ImTextureID environmentPreviewTextureId =
+				ToImGuiTextureID(
 					renderer,
 					renderResRegistry->GetSrvDescriptor(EnvironmentPreviewIndex));
 
-			if (environmentPreviewGpuHandle.ptr == 0)
+			if (!environmentPreviewTextureId)
 			{
 				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Environment preview SRV GPU handle is invalid.");
 				return;
 			}
 
-			const ImTextureID environmentPreviewTextureId = ToImGuiTextureID(environmentPreviewGpuHandle);
 			const float environmentPreviewWidth = std::clamp(state.m_EnvironmentPreviewWidth, 16.0f, 2048.0f);
 
 			ImVec2 uv0(0.0f, 0.0f);
@@ -394,18 +373,17 @@ namespace gglab
 				768.0f,
 				"%.0f");
 
-			D3D12_GPU_DESCRIPTOR_HANDLE prefilteredSpecularPreviewGpuHandle =
-				ToGpuDescriptorHandle(
+			const ImTextureID prefilteredSpecularPreviewTextureId =
+				ToImGuiTextureID(
 					renderer,
 					renderResRegistry->GetSrvDescriptor(PrefilteredSpecularPreviewIndex));
 
-			if (prefilteredSpecularPreviewGpuHandle.ptr == 0)
+			if (!prefilteredSpecularPreviewTextureId)
 			{
 				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Prefiltered specular preview SRV GPU handle is invalid.");
 				return;
 			}
 
-			const ImTextureID prefilteredSpecularPreviewTextureId = ToImGuiTextureID(prefilteredSpecularPreviewGpuHandle);
 			const float prefilteredSpecularPreviewWidth =
 				std::clamp(state.m_PrefilteredSpecularPreviewWidth, 16.0f, 2048.0f);
 

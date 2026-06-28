@@ -5,7 +5,7 @@
 
 namespace gglab
 {
-	class DX12Device;
+	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
 
@@ -47,7 +47,7 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
-			DX12Device* m_DX12Device = nullptr;
+			RHIDevice* m_Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 		};
 
@@ -97,7 +97,7 @@ namespace gglab
 		void CreateTextureEntry(TextureID id, const char* texName) noexcept;
 
 	private:
-		DX12Device* m_DX12Device = nullptr;
+		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };

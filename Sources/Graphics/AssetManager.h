@@ -7,7 +7,7 @@
 
 namespace gglab
 {
-	class DX12Device;
+	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
 
@@ -16,7 +16,7 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
-			DX12Device* m_DX12Device = nullptr;
+			RHIDevice* m_Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			TextureRegistry* m_TextureRegistry = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
@@ -89,7 +89,7 @@ namespace gglab
 		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
 
 	private:
-		DX12Device* m_DX12Device = nullptr;
+		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		TextureRegistry* m_TextureRegistry = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
