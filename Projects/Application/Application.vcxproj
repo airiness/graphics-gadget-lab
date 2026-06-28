@@ -187,6 +187,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystemSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp" />
@@ -321,6 +322,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
@@ -350,8 +352,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.h" />
     <ClCompile Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h" />

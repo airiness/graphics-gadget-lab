@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/ShaderManager.h"
 #include "Graphics/ShaderCompiler.h"
+#include "Core/Utility/StringUtils.h"
 
 namespace gglab
 {
@@ -132,6 +133,21 @@ namespace gglab
 			return m_Shaders[shaderId.Value()]->GetCompileArtifact().m_Hash;
 		}
 		return {};
+	}
+
+	std::string ShaderManager::GetDebugName(ShaderID shaderId) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		if (!shaderId.IsValid() || shaderId.Value() >= m_Shaders.size() ||
+			!m_Shaders[shaderId.Value()])
+		{
+			return {};
+		}
+
+		const ShaderDesc& desc = m_Shaders[shaderId.Value()]->GetDesc();
+		const std::string source = desc.m_SourcePath.filename().string();
+		const std::string entry = utils::ToString(desc.m_Entry);
+		return entry.empty() ? source : std::format("{}::{}", source, entry);
 	}
 
 	uint64_t ShaderManager::GetGeneration(ShaderID shaderId) const noexcept

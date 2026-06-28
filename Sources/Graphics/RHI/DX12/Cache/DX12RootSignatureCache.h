@@ -5,6 +5,9 @@
 
 namespace gglab
 {
+	class DX12PipelineSystem;
+	class ShaderManager;
+	struct RHIPipelineSystemSnapshot;
 	struct RootSignatureKey
 	{
 		uint64_t m_LowBits = 0;
@@ -48,5 +51,10 @@ namespace gglab
 		std::unordered_map<RootSignatureKey, RootSignatureID, RootSignatureKeyHash> m_RootSignatureMap;
 		std::vector<std::unique_ptr<DX12RootSignature>> m_RootSignatures;
 		mutable std::shared_mutex m_Mutex;
+
+		friend void BuildDX12PipelineSystemSnapshot(
+			const DX12PipelineSystem& system,
+			const ShaderManager* shaderManager,
+			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

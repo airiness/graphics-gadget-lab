@@ -213,6 +213,9 @@ namespace gglab
 		desc.m_BindingLayout = recipe.m_BindingLayout;
 		desc.m_VertexShader = ToRHIShaderHandle(recipe.m_VSId);
 		desc.m_PixelShader = ToRHIShaderHandle(recipe.m_PSId);
+		desc.m_DomainShader = ToRHIShaderHandle(recipe.m_DSId);
+		desc.m_HullShader = ToRHIShaderHandle(recipe.m_HSId);
+		desc.m_GeometryShader = ToRHIShaderHandle(recipe.m_GSId);
 		desc.m_VertexInput = BuildRHIVertexInputLayoutDesc(recipe.m_InputLayoutId);
 		desc.m_TopologyType = recipe.m_TopologyType;
 		desc.m_PrimitiveTopology = recipe.m_PrimitiveTopology;

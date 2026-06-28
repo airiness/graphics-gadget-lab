@@ -31,6 +31,7 @@ namespace gglab
 		bool RefreshShader(ShaderID shaderId) noexcept;
 		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
+		std::string GetDebugName(ShaderID shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
 		uint64_t GetRevision() const noexcept
 		{
