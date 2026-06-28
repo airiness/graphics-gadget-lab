@@ -2,6 +2,7 @@
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
@@ -429,13 +430,17 @@ namespace gglab
 		ImGui::TextUnformatted("RHI Resource Management Lab");
 		ImGui::Separator();
 
-		if (!context.m_Renderer || !context.m_Renderer->GetDevice())
+		auto* dx12Context = context.m_Renderer ?
+			dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext()) :
+			nullptr;
+		if (!dx12Context)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "DX12Device is unavailable.");
+			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
+				"This diagnostic panel requires the DX12 backend.");
 			return;
 		}
 
-		auto& device = *context.m_Renderer->GetDevice();
+		auto& device = dx12Context->GetDX12Device();
 		auto& manager = *device.GetResourceManager();
 
 		if (ImGui::Button("Add Texture"))
@@ -497,7 +502,7 @@ namespace gglab
 		ImGui::SameLine();
 		if (ImGui::Button("Flush + Collect"))
 		{
-			device.FlushGPU();
+			dx12Context->WaitIdle();
 			manager.RetireCompletedResources();
 		}
 

@@ -4,7 +4,6 @@
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -31,30 +30,12 @@ namespace gglab
 			Vector3 m_Direction = -Vector3::UnitY;
 		};
 
-		static ImTextureID ToImGuiTextureID(D3D12_GPU_DESCRIPTOR_HANDLE handle) noexcept
-		{
-			return static_cast<ImTextureID>(handle.ptr);
-		}
-
-		static D3D12_GPU_DESCRIPTOR_HANDLE ToGpuDescriptorHandle(
+		static ImTextureID ToImGuiTextureID(
 			Renderer* renderer,
 			RHIDescriptorHandle descriptor) noexcept
 		{
-			if (!renderer ||
-				!descriptor.IsValid() ||
-				descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
-			{
-				return {};
-			}
-
-			auto* descriptorManager = renderer->GetDescriptorManager();
-			if (!descriptorManager)
-			{
-				return {};
-			}
-
-			auto* heap = descriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
-			return heap ? heap->GpuHandleAt(descriptor.m_Index) : D3D12_GPU_DESCRIPTOR_HANDLE{};
+			auto* backend = renderer ? renderer->GetDevelopGuiBackend() : nullptr;
+			return backend ? backend->ResolveTextureId(descriptor) : ImTextureID{};
 		}
 
 		static void DrawMatrix4x4(const char* label, const Matrix& mat) noexcept
@@ -317,8 +298,8 @@ namespace gglab
 			}
 
 			const uint32_t previewSrvIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
-			const D3D12_GPU_DESCRIPTOR_HANDLE previewSrvGpuHandle =
-				ToGpuDescriptorHandle(
+			const ImTextureID previewTextureId =
+				ToImGuiTextureID(
 					context.m_Renderer,
 					renderResourceRegistry->GetSrvDescriptor(ShadowMapPreviewIndex));
 
@@ -329,7 +310,7 @@ namespace gglab
 			ImGui::Text("Preview Format: %s", devtools::EnumText(ToDXGIFormat(previewDesc->m_Format)).data());
 			ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 
-			if (previewSrvGpuHandle.ptr == 0)
+			if (!previewTextureId)
 			{
 				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "ShadowMap preview SRV GPU handle is invalid.");
 				return;
@@ -342,7 +323,7 @@ namespace gglab
 			const float previewSize = std::clamp(state.m_PreviewSize, 16.0f, 2048.0f);
 			const ImVec2 uv0 = state.m_FlipPreviewY ? ImVec2(0.0f, 1.0f) : ImVec2(0.0f, 0.0f);
 			const ImVec2 uv1 = state.m_FlipPreviewY ? ImVec2(1.0f, 0.0f) : ImVec2(1.0f, 1.0f);
-			ImGui::Image(ToImGuiTextureID(previewSrvGpuHandle), ImVec2(previewSize, previewSize), uv0, uv1);
+			ImGui::Image(previewTextureId, ImVec2(previewSize, previewSize), uv0, uv1);
 		}
 	}
 

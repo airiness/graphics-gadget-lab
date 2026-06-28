@@ -1,13 +1,9 @@
 #pragma once
-#include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
-#include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
-#include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RHI/RHIBindingLayout.h"
-#include "Graphics/RHI/RHISwapChain.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/RHIContext.h"
 #include "Graphics/PipelineCache.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/GPUStructures.h"
@@ -25,8 +21,8 @@
 
 namespace gglab
 {
-	class DX12Device;
-	class DX12CommandAllocator;
+	class DX12PSOCache;
+	class DX12RootSignatureCache;
 	class ShaderManager;
 
 	class Renderer
@@ -46,9 +42,10 @@ namespace gglab
 				Ended,
 			};
 
-			Frame(Renderer* renderer, uint32_t backBufferIndex) noexcept :
+			Frame(Renderer* renderer, RHIFrameContext* rhiFrame) noexcept :
 				m_Renderer(renderer),
-				m_BackBufferIndex(backBufferIndex)
+				m_RHIFrame(rhiFrame),
+				m_BackBufferIndex(rhiFrame ? rhiFrame->GetBackBufferIndex() : 0)
 			{
 			}
 
@@ -57,7 +54,7 @@ namespace gglab
 			Renderer* m_Renderer = nullptr;
 			State m_State = State::Begun;
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
-			DX12CommandAllocator* m_CommandAllocator = nullptr;
+			RHIFrameContext* m_RHIFrame = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
 			RHIFencePoint m_UploadFencePoint = {};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
@@ -72,7 +69,7 @@ namespace gglab
 		};
 
 	public:
-		Renderer() noexcept = default;
+		Renderer() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
 		~Renderer();
 
@@ -87,10 +84,10 @@ namespace gglab
 			const RenderFrameContext& renderContext) noexcept;
 		void EndFrame(Frame& frame) noexcept;
 
-		DX12Device* GetDevice() const noexcept { return m_Device.get(); }
-		RHISwapChain* GetSwapChain() const noexcept { return m_SwapChain.get(); }
-		DX12DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager.get(); }
-		TransferManager* GetTransferManager() const noexcept { return m_TransferManager.get(); }
+		RHIContext* GetRHIContext() const noexcept { return m_RHIContext.get(); }
+		RHIDevice* GetDevice() const noexcept { return m_RHIContext ? &m_RHIContext->GetDevice() : nullptr; }
+		RHISwapChain* GetSwapChain() const noexcept { return m_RHIContext ? &m_RHIContext->GetSwapChain() : nullptr; }
+		TransferManager* GetTransferManager() const noexcept { return m_RHIContext ? &m_RHIContext->GetTransferManager() : nullptr; }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		RGTransientResourcePool* GetTransientResourcePool() const noexcept { return m_RGTransientResourcePool.get(); }
@@ -99,7 +96,6 @@ namespace gglab
 		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept { return m_BackBufferClearColor; }
 
-		DX12RootSignature* GetCommonRootSignature() const noexcept;
 		RootSignatureID GetCommonRootSignatureId() const noexcept { return m_CommonRootSignatureId; }
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
 
@@ -123,7 +119,7 @@ namespace gglab
 		void OnResume() noexcept;
 		bool IsSuspended() const noexcept;
 
-		DX12FencePoint GetLastSubmittedFencePoint() const noexcept { return m_LastSubmittedFencePoint; }
+		RHIFencePoint GetLastSubmittedFencePoint() const noexcept { return m_LastSubmittedFencePoint; }
 
 	private:
 		void CreateCommonRootSignature() noexcept;
@@ -132,13 +128,10 @@ namespace gglab
 		void EndFrameLifetime(Frame& frame) noexcept;
 		void RetireSceneGpuAllocations(
 			RenderSceneGpuAllocations* allocations,
-			const DX12FencePoint& fencePoint) noexcept;
+			const RHIFencePoint& fencePoint) noexcept;
 
 	private:
-		std::unique_ptr<DX12Device> m_Device;
-		std::unique_ptr<RHISwapChain> m_SwapChain;
-		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
-		std::unique_ptr<TransferManager> m_TransferManager;
+		std::unique_ptr<RHIContext> m_RHIContext;
 		std::unique_ptr<RGTransientResourcePool> m_RGTransientResourcePool;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
@@ -162,7 +155,7 @@ namespace gglab
 		std::atomic_bool m_IsInitialized = false;
 		std::atomic_bool m_IsSuspended = false;
 
-		DX12FencePoint m_LastSubmittedFencePoint = {};
+		RHIFencePoint m_LastSubmittedFencePoint = {};
 		bool m_HasActiveFrame = false;
 	};
 }

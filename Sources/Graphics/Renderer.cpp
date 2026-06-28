@@ -1,12 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12CommandContext.h"
+#include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/DX12CommandQueue.h"
-#include "Graphics/RHI/DX12/DX12CommandAllocator.h"
-#include "Graphics/RHI/DX12/DX12Fence.h"
+#include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
+#include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/AssetManager.h"
@@ -20,6 +17,8 @@
 
 namespace gglab
 {
+	Renderer::Renderer() noexcept = default;
+
 	namespace
 	{
 		void AddBindingSlot(
@@ -60,37 +59,27 @@ namespace gglab
 
 	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
-		m_Device = std::make_unique<DX12Device>();
-		m_Device->Initialize();
+		RHIContextDesc contextDesc{};
+		contextDesc.m_WindowHandle = createInfo.m_Hwnd;
+		contextDesc.m_Width = createInfo.m_Width;
+		contextDesc.m_Height = createInfo.m_Height;
+		m_RHIContext = CreateRHIContext(contextDesc);
+		GGLAB_ASSERT_MSG(m_RHIContext != nullptr, "Renderer failed to create an RHI context.");
 
-		RHISwapChainDesc swapChainCreateInfo{};
-		swapChainCreateInfo.m_WindowHandle = createInfo.m_Hwnd;
-		swapChainCreateInfo.m_Width = createInfo.m_Width;
-		swapChainCreateInfo.m_Height = createInfo.m_Height;
-		m_SwapChain = m_Device->CreateSwapChain(swapChainCreateInfo);
-		GGLAB_ASSERT_MSG(m_SwapChain && m_SwapChain->IsValid(),
-			"Renderer failed to create an RHI swapchain.");
+		auto* dx12Context = dynamic_cast<DX12Context*>(m_RHIContext.get());
+		GGLAB_ASSERT_MSG(dx12Context != nullptr,
+			"Legacy pipeline caches currently require the DX12 backend.");
+		auto* dx12Device = &dx12Context->GetDX12Device();
+		auto* device = &m_RHIContext->GetDevice();
 
-		DX12DescriptorManager::CreateInfo descriptorManagerCreateInfo{};
-		descriptorManagerCreateInfo.m_DX12Device = m_Device.get();
-		descriptorManagerCreateInfo.m_CbvSrvUavCount = 65536;
-		descriptorManagerCreateInfo.m_RtvCount = 4096;
-		descriptorManagerCreateInfo.m_DsvCount = 1024;
-		descriptorManagerCreateInfo.m_SamplerCount = 2048;
-		m_DescriptorManager = std::make_unique<DX12DescriptorManager>(descriptorManagerCreateInfo);
+		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(device);
 
-		m_TransferManager = std::make_unique<TransferManager>(m_Device.get());
+		m_PSOCache = std::make_unique<DX12PSOCache>(dx12Device, std::make_unique<StreamPSOCreator>());
 
-		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(m_Device.get());
-
-		m_Device->SetDescriptorManager(m_DescriptorManager.get());
-
-		m_PSOCache = std::make_unique<DX12PSOCache>(m_Device.get(), std::make_unique<StreamPSOCreator>());
-
-		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(m_Device.get());
+		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(dx12Device);
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
-			.m_Device = m_Device.get(),
+			.m_Device = dx12Device,
 			.m_ShaderManager = createInfo.m_ShaderManager,
 			.m_RootSignatureCache = m_RootSignatureCache.get(),
 			.m_PSOCache = m_PSOCache.get(),
@@ -99,18 +88,18 @@ namespace gglab
 			std::make_unique<PipelineCache>(pipelineCacheCreateInfo);
 
 		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
-		samplerRegistryCreateInfo.m_Device = m_Device.get();
+		samplerRegistryCreateInfo.m_Device = device;
 		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
 		m_SamplerRegistry->InitializePresetSamplers();
 
 		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
-		textureRegistryCreateInfo.m_DX12Device = m_Device.get();
-		textureRegistryCreateInfo.m_TransferManager = m_TransferManager.get();
+		textureRegistryCreateInfo.m_Device = device;
+		textureRegistryCreateInfo.m_TransferManager = GetTransferManager();
 		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
 		m_TextureRegistry->InitializeReservedTextures();
 
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
-		renderResRegistryCreateInfo.m_Device = m_Device.get();
+		renderResRegistryCreateInfo.m_Device = device;
 		renderResRegistryCreateInfo.m_TransientResourcePool = m_RGTransientResourcePool.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
@@ -118,10 +107,7 @@ namespace gglab
 		m_DevelopGuiBackend = std::make_unique<DevelopGuiBackend>();
 		DevelopGuiBackend::CreateInfo developGuiBackendCreateInfo{};
 		developGuiBackendCreateInfo.m_Hwnd = createInfo.m_Hwnd;
-		developGuiBackendCreateInfo.m_DX12Device = m_Device.get();
-		developGuiBackendCreateInfo.m_BackBufferFormat = m_SwapChain->GetFormat();
-		developGuiBackendCreateInfo.m_BufferCount = m_SwapChain->GetBufferCount();
-		developGuiBackendCreateInfo.m_DescriptorManager = m_DescriptorManager.get();
+		developGuiBackendCreateInfo.m_RHIContext = m_RHIContext.get();
 		m_DevelopGuiBackend->Initialize(developGuiBackendCreateInfo);
 
 		CreateCommonRootSignature();
@@ -142,24 +128,19 @@ namespace gglab
 
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
-		if (m_SwapChain)
-		{
-			m_SwapChain->Finalize();
-			m_SwapChain.reset();
-		}
+		m_RHIContext->WaitIdle();
 
 		m_DevelopGuiBackend->Finalize();
 		m_DevelopGuiBackend.reset();
 
 		m_RenderResRegistry.reset();
-		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint.ToRHI());
+		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
 		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
 		m_RootSignatureCache.reset();
 		m_PSOCache.reset();
 		m_RGTransientResourcePool.reset();
-		m_Device->SetDescriptorManager(nullptr);
 
 		m_SceneCB.reset();
 		m_ObjectTable.reset();
@@ -168,15 +149,7 @@ namespace gglab
 		m_MaterialSB.reset();
 		m_ViewSB.reset();
 
-		m_DescriptorManager->Tick();
-		m_DescriptorManager.reset();
-		m_TransferManager.reset();
-
-		if (m_Device)
-		{
-			m_Device->Finalize();
-			m_Device.reset();
-		}
+		m_RHIContext.reset();
 
 		m_IsInitialized = false;
 	}
@@ -186,20 +159,17 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::BeginFrame called before initialization.");
 		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
 			"Renderer::BeginFrame called without ending the previous frame.");
-		GGLAB_ASSERT_NOT_NULL(m_SwapChain.get());
-		GGLAB_ASSERT(m_SwapChain->GetCurrentBackBufferIndex() == backBufferIndex);
-
-		m_SwapChain->WaitFrameCompletion();
+		GGLAB_ASSERT_NOT_NULL(m_RHIContext.get());
+		RHIFrameContext& rhiFrame = m_RHIContext->BeginFrame();
+		GGLAB_ASSERT(rhiFrame.GetBackBufferIndex() == backBufferIndex);
 
 		m_SceneCB->Tick();
 		m_ViewSB->Tick();
 
 		m_RGTransientResourcePool->Tick();
-		m_DescriptorManager->Tick();
-		m_Device->RetireCompletedWork();
 
 		m_HasActiveFrame = true;
-		return Frame(this, backBufferIndex);
+		return Frame(this, &rhiFrame);
 	}
 
 	void Renderer::Render(
@@ -228,43 +198,30 @@ namespace gglab
 			return;
 		}
 
-		if (!m_SwapChain || !m_SwapChain->IsValid())
+		if (!GetSwapChain() || !GetSwapChain()->IsValid())
 		{
 			return;
 		}
 
-		auto swapChain = m_SwapChain.get();
+		auto* swapChain = GetSwapChain();
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
-
-		auto backBufferIndex = frame.m_BackBufferIndex;
-		auto commandAllocatorPool = m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
-		auto commandList = m_Device->GetGraphicsCommandList(backBufferIndex);
-		auto graphicsCommandContext = m_Device->GetGraphicsCommandContext(backBufferIndex);
-		auto commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
 
 		// Wait Structured Buffer upload
 		if (renderContext.m_UploadFencePoint.IsValid())
 		{
-			m_Device->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
+			GetDevice()->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
 		}
-
-		frame.m_CommandAllocator = commandAllocatorPool->RequestCommandAllocator();
-		commandList->Begin(frame.m_CommandAllocator);
-		graphicsCommandContext->ClearTrackedResourceUses();
-		const DX12DescriptorHeap* descriptorHeaps[] = {
-			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler),
-		};
-		commandList->SetDescriptorHeaps(descriptorHeaps);
 
 		RGExecuteContext executeContext{
 			RGBackendExecuteContext{
-				.m_GraphicsCommandContext = graphicsCommandContext,
+				.m_GraphicsCommandContext = &frame.m_RHIFrame->GetGraphicsContext(),
+				// Compute is acquired lazily through RHIFrameContext when a pass is
+				// scheduled for the compute queue.
+				.m_ComputeCommandContext = nullptr,
 			}
 		};
 		rg.Execute(executeContext);
 
-		commandList->End();
 		frame.m_State = Frame::State::Recorded;
 	}
 
@@ -282,44 +239,16 @@ namespace gglab
 			return;
 		}
 
-		GGLAB_ASSERT_NOT_NULL(m_SwapChain.get());
-		GGLAB_ASSERT_NOT_NULL(frame.m_CommandAllocator);
+		GGLAB_ASSERT_NOT_NULL(frame.m_RHIFrame);
 		GGLAB_ASSERT_NOT_NULL(frame.m_RenderGraph);
 
-		auto* swapChain = m_SwapChain.get();
-		auto* commandAllocatorPool =
-			m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
-		auto* commandList = m_Device->GetGraphicsCommandList(frame.m_BackBufferIndex);
-		auto* graphicsCommandContext = m_Device->GetGraphicsCommandContext(frame.m_BackBufferIndex);
-		auto* commandQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
-
-		const DX12CommandList* commandLists[] = { commandList };
-		m_LastSubmittedFencePoint = commandQueue->Execute(commandLists);
-
-		for (const RHIBufferHandle buffer : graphicsCommandContext->GetUsedBuffers())
-		{
-			m_Device->RecordBufferUse(buffer, m_LastSubmittedFencePoint);
-		}
-		for (const RHITextureHandle texture : graphicsCommandContext->GetUsedTextures())
-		{
-			m_Device->RecordTextureUse(texture, m_LastSubmittedFencePoint);
-		}
-		graphicsCommandContext->ClearTrackedResourceUses();
+		m_LastSubmittedFencePoint = m_RHIContext->EndFrame(*frame.m_RHIFrame);
 
 		RetireSceneGpuAllocations(
 			&frame.m_SceneGpuAllocations,
 			m_LastSubmittedFencePoint);
 
-		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint.ToRHI());
-
-		commandAllocatorPool->RecycleCommandAllocator(
-			frame.m_CommandAllocator,
-			m_LastSubmittedFencePoint);
-
-		m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
-
-		swapChain->SetFrameCompletionFence(m_LastSubmittedFencePoint.ToRHI());
-		swapChain->Present();
+		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
 		EndFrameLifetime(frame);
 	}
 
@@ -333,44 +262,23 @@ namespace gglab
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
 			"Renderer::AbortFrame received a frame created by another Renderer.");
 
-		auto* graphicsQueue = m_Device ?
-			m_Device->GetCommandQueue(CommandQueueType::Graphics) :
-			nullptr;
-		if (m_Device && frame.m_UploadFencePoint.IsValid())
+		if (m_RHIContext && frame.m_UploadFencePoint.IsValid())
 		{
-			m_Device->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
+			GetDevice()->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
 		}
 
-		if (m_Device)
+		if (m_RHIContext && frame.m_RHIFrame)
 		{
-			m_Device->GetGraphicsCommandContext(frame.m_BackBufferIndex)->ClearTrackedResourceUses();
-		}
-
-		if (graphicsQueue)
-		{
-			// No draw commands consume this frame's resources, but uploads may
-			// still be in flight. Signal after the queue wait so every frame-owned
-			// allocation can retire on the graphics timeline.
-			m_LastSubmittedFencePoint = graphicsQueue->Signal();
+			m_RHIContext->AbortFrame(*frame.m_RHIFrame);
+			m_LastSubmittedFencePoint = frame.m_RHIFrame->GetSubmittedFence();
 			RetireSceneGpuAllocations(
 				&frame.m_SceneGpuAllocations,
 				m_LastSubmittedFencePoint);
 
 			if (frame.m_RenderGraph)
 			{
-				frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint.ToRHI());
+				frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
 			}
-
-			if (frame.m_CommandAllocator)
-			{
-				auto* commandAllocatorPool =
-					m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics);
-				commandAllocatorPool->RecycleCommandAllocator(
-					frame.m_CommandAllocator,
-					m_LastSubmittedFencePoint);
-			}
-
-			m_DescriptorManager->EndFrame(m_LastSubmittedFencePoint);
 		}
 
 		EndFrameLifetime(frame);
@@ -379,7 +287,7 @@ namespace gglab
 	void Renderer::EndFrameLifetime(Frame& frame) noexcept
 	{
 		frame.m_State = Frame::State::Ended;
-		frame.m_CommandAllocator = nullptr;
+		frame.m_RHIFrame = nullptr;
 		frame.m_RenderGraph = nullptr;
 		frame.m_UploadFencePoint = {};
 		frame.m_SceneGpuAllocations = {};
@@ -389,7 +297,7 @@ namespace gglab
 
 	void Renderer::RetireSceneGpuAllocations(
 		RenderSceneGpuAllocations* allocations,
-		const DX12FencePoint& fencePoint) noexcept
+		const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!allocations || allocations->IsEmpty())
 		{
@@ -401,18 +309,13 @@ namespace gglab
 
 		if (allocations->m_Views.IsValid())
 		{
-			m_ViewSB->Retire(&allocations->m_Views, fencePoint.ToRHI());
+			m_ViewSB->Retire(&allocations->m_Views, fencePoint);
 		}
 		if (allocations->m_SceneConstants.IsValid())
 		{
-			m_SceneCB->Retire(&allocations->m_SceneConstants, fencePoint.ToRHI());
+			m_SceneCB->Retire(&allocations->m_SceneConstants, fencePoint);
 		}
 		*allocations = {};
-	}
-
-	DX12RootSignature* Renderer::GetCommonRootSignature() const noexcept
-	{
-		return m_RootSignatureCache->GetDX12RootSignature(m_CommonRootSignatureId);
 	}
 
 	RHIBindingLayoutDesc Renderer::BuildCommonRHIBindingLayoutDesc() noexcept
@@ -434,7 +337,7 @@ namespace gglab
 	RenderGraph::CreateInfo Renderer::CreateRenderGraphCreateInfo() const noexcept
 	{
 		RenderGraph::CreateInfo rgCreateInfo{};
-		rgCreateInfo.m_Device = m_Device.get();
+		rgCreateInfo.m_Device = GetDevice();
 		rgCreateInfo.m_TransientResourcePool = m_RGTransientResourcePool.get();
 
 		return rgCreateInfo;
@@ -454,7 +357,7 @@ namespace gglab
 			return;
 		}
 
-		if (!m_SwapChain || !m_SwapChain->IsValid())
+		if (!GetSwapChain() || !GetSwapChain()->IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. SwapChain is invalid.");
 			return;
@@ -466,9 +369,7 @@ namespace gglab
 			return;
 		}
 
-		m_Device->FlushGPU();
-
-		m_SwapChain->Resize(width, height);
+		m_RHIContext->Resize(width, height);
 	}
 
 	void Renderer::OnSuspend() noexcept
@@ -498,9 +399,9 @@ namespace gglab
 		// Small, per-frame CPU-visible constant allocations.
 		{
 			DynamicConstantBufferAllocator::CreateInfo createInfo{};
-			createInfo.m_Device = m_Device.get();
+			createInfo.m_Device = GetDevice();
 			createInfo.m_CapacityInBytes =
-				static_cast<uint32_t>(sizeof(SceneGPU)) * m_SwapChain->GetBufferCount() * 4;
+				static_cast<uint32_t>(sizeof(SceneGPU)) * GetSwapChain()->GetBufferCount() * 4;
 			createInfo.m_DebugName = "Renderer.DynamicConstants";
 			m_SceneCB = std::make_unique<DynamicConstantBufferAllocator>(createInfo);
 		}
@@ -509,28 +410,28 @@ namespace gglab
 		// updates the safe physical version selected by its backbuffer index.
 		{
 			PersistentStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
-			objectSBCreateInfo.m_Device = m_Device.get();
+			objectSBCreateInfo.m_Device = GetDevice();
 			objectSBCreateInfo.m_ElementCapacity = MaxObjectCapacity;
-			objectSBCreateInfo.m_BufferCount = m_SwapChain->GetBufferCount();
+			objectSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
 			objectSBCreateInfo.m_DebugName = "Renderer.PersistentObjects";
 			m_ObjectSB = std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 			m_ObjectTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, ObjectGPU>>(
-				MaxObjectCapacity, m_SwapChain->GetBufferCount());
+				MaxObjectCapacity, GetSwapChain()->GetBufferCount());
 
 			PersistentStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
-			materialSBCreateInfo.m_Device = m_Device.get();
+			materialSBCreateInfo.m_Device = GetDevice();
 			materialSBCreateInfo.m_ElementCapacity = MaxMaterialCapacity;
-			materialSBCreateInfo.m_BufferCount = m_SwapChain->GetBufferCount();
+			materialSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
 			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
 			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<MaterialID, MaterialGPU>>(
-				MaxMaterialCapacity, m_SwapChain->GetBufferCount());
+				MaxMaterialCapacity, GetSwapChain()->GetBufferCount());
 
 			// View data remains a small per-frame dynamic upload allocation.
 			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};
-			viewSBCreateInfo.m_Device = m_Device.get();
+			viewSBCreateInfo.m_Device = GetDevice();
 			viewSBCreateInfo.m_ElementCapacity =
-				MaxViewCapacity * m_SwapChain->GetBufferCount();
+				MaxViewCapacity * GetSwapChain()->GetBufferCount();
 			viewSBCreateInfo.m_DebugName = "Renderer.DynamicViews";
 			m_ViewSB = std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
 		}

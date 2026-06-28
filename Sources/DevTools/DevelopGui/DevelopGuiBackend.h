@@ -1,8 +1,10 @@
 #pragma once
+#include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHITexture.h"
 
 namespace gglab
 {
+	class RHIContext;
 	class DX12Device;
 	class DX12DescriptorManager;
 	class RHIGraphicsCommandContext;
@@ -13,10 +15,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			HWND m_Hwnd = nullptr;
-			DX12Device* m_DX12Device = nullptr;
-			RHIFormat m_BackBufferFormat = RHIFormat::R8G8B8A8Unorm;
-			uint32_t m_BufferCount = 2;
-			DX12DescriptorManager* m_DescriptorManager = nullptr;
+			RHIContext* m_RHIContext = nullptr;
 		};
 
 	public:
@@ -32,6 +31,8 @@ namespace gglab
 			RHIGraphicsCommandContext* commandContext,
 			RHITextureViewHandle renderTarget) noexcept;
 		void EndFrame() noexcept;
+		[[nodiscard]] ImTextureID ResolveTextureId(
+			RHIDescriptorHandle descriptor) const noexcept;
 
 	private:
 		static void DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,

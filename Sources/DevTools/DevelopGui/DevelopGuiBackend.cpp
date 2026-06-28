@@ -1,5 +1,7 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
+#include "Graphics/RHI/RHIContext.h"
+#include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
@@ -14,12 +16,14 @@ namespace gglab
 {
 	void DevelopGuiBackend::Initialize(const CreateInfo& createInfo) noexcept
 	{
-		GGLAB_ASSERT(createInfo.m_DX12Device);
-		GGLAB_ASSERT(createInfo.m_DescriptorManager);
-		GGLAB_ASSERT(createInfo.m_BufferCount >= 2);
+		GGLAB_ASSERT(createInfo.m_RHIContext);
+		auto* dx12Context = dynamic_cast<DX12Context*>(createInfo.m_RHIContext);
+		GGLAB_ASSERT_MSG(dx12Context != nullptr,
+			"DevelopGuiBackend currently requires the DX12 RHI backend.");
 
-		m_DX12Device = createInfo.m_DX12Device;
-		m_DescriptorManager = createInfo.m_DescriptorManager;
+		m_DX12Device = &dx12Context->GetDX12Device();
+		m_DescriptorManager = &dx12Context->GetDescriptorManager();
+		auto& swapChain = dx12Context->GetSwapChain();
 
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
@@ -35,8 +39,8 @@ namespace gglab
 		ImGui_ImplDX12_InitInfo initInfo{};
 		initInfo.Device = m_DX12Device->Get();
 		initInfo.CommandQueue = m_DX12Device->GetCommandQueue(CommandQueueType::Graphics)->Get();
-		initInfo.NumFramesInFlight = createInfo.m_BufferCount;
-		initInfo.RTVFormat = ToDXGIFormat(createInfo.m_BackBufferFormat);
+		initInfo.NumFramesInFlight = swapChain.GetBufferCount();
+		initInfo.RTVFormat = ToDXGIFormat(swapChain.GetFormat());
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		initInfo.SrvDescriptorHeap =
 			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap()->Get();
@@ -97,6 +101,21 @@ namespace gglab
 
 		ImGui::EndFrame();
 		m_FrameOpen = false;
+	}
+
+	ImTextureID DevelopGuiBackend::ResolveTextureId(
+		RHIDescriptorHandle descriptor) const noexcept
+	{
+		if (!m_DescriptorManager ||
+			!descriptor.IsValid() ||
+			descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
+		{
+			return {};
+		}
+
+		auto* heap = m_DescriptorManager->GetHeap(
+			DX12DescriptorManager::HeapType::CbvSrvUav);
+		return heap ? static_cast<ImTextureID>(heap->GpuHandleAt(descriptor.m_Index).ptr) : ImTextureID{};
 	}
 
 	void DevelopGuiBackend::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
