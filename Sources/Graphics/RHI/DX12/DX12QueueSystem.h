@@ -26,6 +26,7 @@ namespace gglab
 	class DX12Device;
 	class DX12Fence;
 	class DX12GraphicsCommandContext;
+	class DX12PipelineSystem;
 
 	class DX12QueueSystem final
 	{
@@ -33,6 +34,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			DX12Device* m_Device = nullptr;
+			DX12PipelineSystem* m_PipelineSystem = nullptr;
 			uint32_t m_FrameCount = 2;
 		};
 
@@ -69,6 +71,7 @@ namespace gglab
 		void InitializeFrameContexts() noexcept;
 
 		DX12Device* m_Device = nullptr;
+		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		uint32_t m_FrameCount = 0;
 		std::array<std::unique_ptr<DX12CommandQueue>, utils::EnumCount<DX12QueueType>()> m_Queues;
 		std::array<std::unique_ptr<DX12CommandAllocatorPool>, utils::EnumCount<DX12QueueType>()> m_AllocatorPools;

@@ -186,6 +186,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp" />
@@ -319,6 +320,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
@@ -341,6 +343,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h" />
@@ -381,6 +384,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\Graphics\PipelineCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\PipelinePresets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHIPipelineRecipeAdapter.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.h" />

@@ -1,9 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
-#include "Graphics/RHI/DX12/DX12RootSignature.h"
-#include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
-#include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGTransientResourcePool.h"
 #include "Graphics/AssetManager.h"
@@ -66,23 +63,13 @@ namespace gglab
 		m_RHIContext = CreateRHIContext(contextDesc);
 		GGLAB_ASSERT_MSG(m_RHIContext != nullptr, "Renderer failed to create an RHI context.");
 
-		auto* dx12Context = dynamic_cast<DX12Context*>(m_RHIContext.get());
-		GGLAB_ASSERT_MSG(dx12Context != nullptr,
-			"Legacy pipeline caches currently require the DX12 backend.");
-		auto* dx12Device = &dx12Context->GetDX12Device();
 		auto* device = &m_RHIContext->GetDevice();
 
 		m_RGTransientResourcePool = std::make_unique<RGTransientResourcePool>(device);
 
-		m_PSOCache = std::make_unique<DX12PSOCache>(dx12Device, std::make_unique<StreamPSOCreator>());
-
-		m_RootSignatureCache = std::make_unique<DX12RootSignatureCache>(dx12Device);
-
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
-			.m_Device = dx12Device,
+			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
 			.m_ShaderManager = createInfo.m_ShaderManager,
-			.m_RootSignatureCache = m_RootSignatureCache.get(),
-			.m_PSOCache = m_PSOCache.get(),
 		};
 		m_PipelineCache =
 			std::make_unique<PipelineCache>(pipelineCacheCreateInfo);
@@ -110,7 +97,7 @@ namespace gglab
 		developGuiBackendCreateInfo.m_RHIContext = m_RHIContext.get();
 		m_DevelopGuiBackend->Initialize(developGuiBackendCreateInfo);
 
-		CreateCommonRootSignature();
+		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
 
 		m_IsInitialized = true;
@@ -138,8 +125,6 @@ namespace gglab
 		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
-		m_RootSignatureCache.reset();
-		m_PSOCache.reset();
 		m_RGTransientResourcePool.reset();
 
 		m_SceneCB.reset();
@@ -387,11 +372,13 @@ namespace gglab
 		return m_IsSuspended.load(std::memory_order_relaxed);
 	}
 
-	void Renderer::CreateCommonRootSignature() noexcept
+	void Renderer::CreateCommonBindingLayout() noexcept
 	{
 		const RHIBindingLayoutDesc commonBindingLayout = BuildCommonRHIBindingLayoutDesc();
-		auto [id, rootSig] = m_RootSignatureCache->GetOrCreate(commonBindingLayout);
-		m_CommonRootSignatureId = id;
+		m_CommonBindingLayout =
+			m_RHIContext->GetPipelineSystem().CreateBindingLayout(commonBindingLayout);
+		GGLAB_ASSERT_MSG(m_CommonBindingLayout.IsValid(),
+			"Renderer failed to create the common RHI binding layout.");
 	}
 
 	void Renderer::InitializeGpuBuffers() noexcept

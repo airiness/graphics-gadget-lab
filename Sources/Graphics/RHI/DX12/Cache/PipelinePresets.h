@@ -1,15 +1,9 @@
 #pragma once
+#include "Graphics/PipelinePresets.h"
 #include <d3dx12.h>
 
 namespace gglab
 {
-	enum class RasterizerPreset : uint8_t
-	{
-		Default,
-		Wireframe,
-		TwoSided,
-		CullFront,
-	};
 	constexpr inline CD3DX12_RASTERIZER_DESC ApplyRasterizerPreset(RasterizerPreset preset) noexcept
 	{
 		CD3DX12_RASTERIZER_DESC desc(D3D12_DEFAULT);
@@ -34,14 +28,6 @@ namespace gglab
 		return desc;
 	}
 
-	enum class BlendPreset : uint8_t
-	{
-		Default,
-		AlphaBlend,
-		Additive,
-		PremultipliedAlpha,
-		ColorWriteDisable,
-	};
 	constexpr inline CD3DX12_BLEND_DESC ApplyBlendPreset(BlendPreset preset) noexcept
 	{
 		CD3DX12_BLEND_DESC desc(D3D12_DEFAULT);
@@ -89,14 +75,6 @@ namespace gglab
 		return desc;
 	}
 
-	enum class DepthPreset : uint8_t
-	{
-		Default,
-		DepthReadOnly,
-		DepthDisabled,
-		ReverseZ,
-		ReverseZReadOnly,
-	};
 	constexpr inline CD3DX12_DEPTH_STENCIL_DESC1 ApplyDepthPreset(DepthPreset preset) noexcept
 	{
 		CD3DX12_DEPTH_STENCIL_DESC1 desc(D3D12_DEFAULT);

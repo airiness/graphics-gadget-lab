@@ -1,8 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHIPipelineRecipeAdapter.h"
 
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
-
 namespace gglab
 {
 	namespace
@@ -46,40 +44,6 @@ namespace gglab
 			vertexBuffer.m_StrideInBytes = strideInBytes;
 			vertexBuffer.m_InputRate = RHIVertexInputRate::PerVertex;
 			vertexBuffer.m_InstanceStepRate = 0;
-		}
-
-		[[nodiscard]] RHIPrimitiveTopologyType ToRHITopologyType(
-			D3D12_PRIMITIVE_TOPOLOGY_TYPE topology) noexcept
-		{
-			switch (topology)
-			{
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT:
-				return RHIPrimitiveTopologyType::Point;
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE:
-				return RHIPrimitiveTopologyType::Line;
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE:
-				return RHIPrimitiveTopologyType::Triangle;
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH:
-				return RHIPrimitiveTopologyType::Patch;
-			default:
-				return RHIPrimitiveTopologyType::Unknown;
-			}
-		}
-
-		[[nodiscard]] RHIPrimitiveTopology ToRHIPrimitiveTopology(
-			D3D12_PRIMITIVE_TOPOLOGY_TYPE topology) noexcept
-		{
-			switch (topology)
-			{
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT:
-				return RHIPrimitiveTopology::PointList;
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE:
-				return RHIPrimitiveTopology::LineList;
-			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE:
-				return RHIPrimitiveTopology::TriangleList;
-			default:
-				return RHIPrimitiveTopology::Unknown;
-			}
 		}
 
 		[[nodiscard]] RHIRasterizerDesc ToRHIRasterizerDesc(
@@ -243,25 +207,24 @@ namespace gglab
 	}
 
 	RHIGraphicsPipelineDesc BuildRHIGraphicsPipelineDesc(
-		const GraphicsPipelineRecipe& recipe,
-		RHIBindingLayoutHandle bindingLayout) noexcept
+		const GraphicsPipelineRecipe& recipe) noexcept
 	{
 		RHIGraphicsPipelineDesc desc{};
-		desc.m_BindingLayout = bindingLayout;
+		desc.m_BindingLayout = recipe.m_BindingLayout;
 		desc.m_VertexShader = ToRHIShaderHandle(recipe.m_VSId);
 		desc.m_PixelShader = ToRHIShaderHandle(recipe.m_PSId);
 		desc.m_VertexInput = BuildRHIVertexInputLayoutDesc(recipe.m_InputLayoutId);
-		desc.m_TopologyType = ToRHITopologyType(recipe.m_Topology);
-		desc.m_PrimitiveTopology = ToRHIPrimitiveTopology(recipe.m_Topology);
+		desc.m_TopologyType = recipe.m_TopologyType;
+		desc.m_PrimitiveTopology = recipe.m_PrimitiveTopology;
 		desc.m_Rasterizer = ToRHIRasterizerDesc(recipe);
 		desc.m_DepthStencil = ToRHIDepthStencilDesc(recipe.m_DepthPreset);
 		desc.m_Blend = ToRHIBlendDesc(recipe.m_BlendPreset);
-		desc.m_RenderTargetCount = recipe.m_Formats.m_RtvFormats.NumRenderTargets;
+		desc.m_RenderTargetCount = recipe.m_Formats.m_RenderTargetCount;
 		for (uint32_t i = 0; i < desc.m_RenderTargetCount && i < RHIGraphicsPipelineDesc::MaxRenderTargets; ++i)
 		{
-			desc.m_RenderTargetFormats[i] = ToRHIFormat(recipe.m_Formats.m_RtvFormats.RTFormats[i]);
+			desc.m_RenderTargetFormats[i] = recipe.m_Formats.m_RenderTargetFormats[i];
 		}
-		desc.m_DepthStencilFormat = ToRHIFormat(recipe.m_Formats.m_DsvFormat);
+		desc.m_DepthStencilFormat = recipe.m_Formats.m_DepthStencilFormat;
 		desc.m_SampleCount = recipe.m_Formats.m_SampleCount;
 		desc.m_SampleQuality = recipe.m_Formats.m_SampleQuality;
 		desc.m_SampleMask = recipe.m_SampleMask;

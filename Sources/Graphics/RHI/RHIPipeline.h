@@ -171,4 +171,11 @@ namespace gglab
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 		const char* m_DebugName = nullptr;
 	};
+
+	struct RHIComputePipelineDesc
+	{
+		RHIBindingLayoutHandle m_BindingLayout{};
+		RHIShaderHandle m_ComputeShader{};
+		const char* m_DebugName = nullptr;
+	};
 }

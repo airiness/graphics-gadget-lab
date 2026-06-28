@@ -51,6 +51,7 @@ namespace gglab
 		RHISwapChain& GetSwapChain() noexcept override;
 		const RHISwapChain& GetSwapChain() const noexcept override;
 		TransferManager& GetTransferManager() noexcept override;
+		RHIPipelineSystem& GetPipelineSystem() noexcept override;
 
 		RHIFrameContext& BeginFrame() noexcept override;
 		RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept override;
@@ -80,6 +81,7 @@ namespace gglab
 
 		std::unique_ptr<DX12Device> m_Device;
 		std::unique_ptr<DX12QueueSystem> m_QueueSystem;
+		std::unique_ptr<RHIPipelineSystem> m_PipelineSystem;
 		std::unique_ptr<RHISwapChain> m_SwapChain;
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;

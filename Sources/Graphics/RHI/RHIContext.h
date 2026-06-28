@@ -7,6 +7,7 @@
 namespace gglab
 {
 	class TransferManager;
+	class RHIPipelineSystem;
 
 	struct RHIContextDesc
 	{
@@ -42,6 +43,7 @@ namespace gglab
 		[[nodiscard]] virtual RHISwapChain& GetSwapChain() noexcept = 0;
 		[[nodiscard]] virtual const RHISwapChain& GetSwapChain() const noexcept = 0;
 		[[nodiscard]] virtual TransferManager& GetTransferManager() noexcept = 0;
+		[[nodiscard]] virtual RHIPipelineSystem& GetPipelineSystem() noexcept = 0;
 
 		[[nodiscard]] virtual RHIFrameContext& BeginFrame() noexcept = 0;
 		[[nodiscard]] virtual RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept = 0;

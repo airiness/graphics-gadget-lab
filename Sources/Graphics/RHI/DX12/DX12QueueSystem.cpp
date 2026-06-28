@@ -11,9 +11,11 @@ namespace gglab
 {
 	DX12QueueSystem::DX12QueueSystem(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
+		m_PipelineSystem(createInfo.m_PipelineSystem),
 		m_FrameCount(createInfo.m_FrameCount)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
+		GGLAB_ASSERT_NOT_NULL(m_PipelineSystem);
 		GGLAB_ASSERT_MSG(m_FrameCount > 0, "DX12QueueSystem requires at least one frame slot.");
 		InitializeQueues();
 		InitializeAllocatorPools();
@@ -41,6 +43,7 @@ namespace gglab
 		m_Queues = {};
 		m_FrameCount = 0;
 		m_Device = nullptr;
+		m_PipelineSystem = nullptr;
 	}
 
 	DX12CommandQueue& DX12QueueSystem::GetQueue(DX12QueueType type) noexcept
@@ -246,12 +249,14 @@ namespace gglab
 		{
 			auto graphicsList = CreateCommandList(DX12QueueType::Graphics);
 			m_GraphicsContexts.push_back(
-				std::make_unique<DX12GraphicsCommandContext>(m_Device, graphicsList.get()));
+				std::make_unique<DX12GraphicsCommandContext>(
+					m_Device, m_PipelineSystem, graphicsList.get()));
 			m_GraphicsCommandLists.push_back(std::move(graphicsList));
 
 			auto computeList = CreateCommandList(DX12QueueType::Compute);
 			m_ComputeContexts.push_back(
-				std::make_unique<DX12ComputeCommandContext>(m_Device, computeList.get()));
+				std::make_unique<DX12ComputeCommandContext>(
+					m_Device, m_PipelineSystem, computeList.get()));
 			m_ComputeCommandLists.push_back(std::move(computeList));
 		}
 	}

@@ -57,10 +57,6 @@ namespace gglab
 		}
 
 		RetireCompletedRHIResources();
-		{
-			std::unique_lock lock(m_GraphicsPipelineMutex);
-			m_GraphicsPipelineBindings.clear();
-		}
 		SetDescriptorManager(nullptr);
 		m_ResourceManager.Finalize();
 
@@ -323,54 +319,6 @@ namespace gglab
 			return {};
 		}
 		return heap->GpuHandleAt(descriptorIndex);
-	}
-
-	RHIPipelineHandle DX12Device::RegisterGraphicsPipeline(
-		DX12PipelineState* pipelineState,
-		DX12RootSignature* rootSignature) noexcept
-	{
-		if (!pipelineState || !rootSignature)
-		{
-			return {};
-		}
-
-		std::unique_lock lock(m_GraphicsPipelineMutex);
-		for (uint32_t index = 0; index < m_GraphicsPipelineBindings.size(); ++index)
-		{
-			const auto& binding = m_GraphicsPipelineBindings[index];
-			if (binding.m_PipelineState == pipelineState && binding.m_RootSignature == rootSignature)
-			{
-				return RHIPipelineHandle(index, 1u);
-			}
-		}
-
-		const auto index = static_cast<RHIPipelineHandle::IndexType>(m_GraphicsPipelineBindings.size());
-		m_GraphicsPipelineBindings.push_back({ pipelineState, rootSignature });
-		return RHIPipelineHandle(index, 1u);
-	}
-
-	bool DX12Device::ResolveGraphicsPipeline(
-		RHIPipelineHandle pipeline,
-		DX12PipelineState*& outPipelineState,
-		DX12RootSignature*& outRootSignature) const noexcept
-	{
-		outPipelineState = nullptr;
-		outRootSignature = nullptr;
-		if (!pipeline.IsValid() || pipeline.Generation() != 1u)
-		{
-			return false;
-		}
-
-		std::shared_lock lock(m_GraphicsPipelineMutex);
-		if (pipeline.Index() >= m_GraphicsPipelineBindings.size())
-		{
-			return false;
-		}
-
-		const auto& binding = m_GraphicsPipelineBindings[pipeline.Index()];
-		outPipelineState = binding.m_PipelineState;
-		outRootSignature = binding.m_RootSignature;
-		return outPipelineState != nullptr && outRootSignature != nullptr;
 	}
 
 	DX12Texture* DX12Device::ResolveTexture(RHITextureHandle texture) noexcept
