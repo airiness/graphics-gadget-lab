@@ -15,11 +15,12 @@ namespace gglab
 	class DX12CommandAllocator;
 	class DX12CommandAllocatorPool;
 	class DX12CommandList;
+	class DX12QueueSystem;
 
 	class DX12TransferContext final : public RHITransferContext
 	{
 	public:
-		explicit DX12TransferContext(DX12Device* device) noexcept;
+		DX12TransferContext(DX12Device* device, DX12QueueSystem* queueSystem) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12TransferContext);
 		~DX12TransferContext() override;
 

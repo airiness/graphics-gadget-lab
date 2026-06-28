@@ -1,12 +1,11 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TransferManager.h"
-#include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITransferContext.h"
 
 namespace gglab
 {
-	TransferManager::TransferManager(RHIDevice* device) noexcept :
-		m_TransferContext(device ? device->CreateTransferContext() : nullptr)
+	TransferManager::TransferManager(std::unique_ptr<RHITransferContext> transferContext) noexcept :
+		m_TransferContext(std::move(transferContext))
 	{
 		GGLAB_ASSERT_MSG(m_TransferContext != nullptr,
 			"TransferManager failed to create an RHI transfer context.");

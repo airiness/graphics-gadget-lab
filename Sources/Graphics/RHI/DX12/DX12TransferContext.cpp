@@ -6,29 +6,29 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
-#include "Graphics/RHI/DX12/Utility/DX12QueueUtils.h"
 
 #include <cstring>
 
 namespace gglab
 {
-	DX12TransferContext::DX12TransferContext(DX12Device* dx12Device) noexcept :
+	DX12TransferContext::DX12TransferContext(
+		DX12Device* dx12Device,
+		DX12QueueSystem* queueSystem) noexcept :
 		m_Handle(AllocateDX12CommandContextHandle()),
 		m_Device(dx12Device)
 	{
 		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device pointer can not be null.");
+		GGLAB_ASSERT_MSG(queueSystem != nullptr, "DX12QueueSystem pointer can not be null.");
 
-		m_CommandQueue = dx12Device->GetCommandQueue(CommandQueueType::Transfer);
-		m_CommandAllocatorPool = dx12Device->GetCommandAllocatorPool(CommandQueueType::Transfer);
+		m_CommandQueue = &queueSystem->GetQueue(DX12QueueType::Transfer);
+		m_CommandAllocatorPool = &queueSystem->GetAllocatorPool(DX12QueueType::Transfer);
 		GGLAB_ASSERT_MSG(m_CommandQueue != nullptr && m_CommandAllocatorPool != nullptr,
 			"Transfer command queue or command allocator pool is null.");
 
-		DX12CommandList::CreateInfo createInfo{};
-		createInfo.m_DX12Device = m_Device;
-		createInfo.m_Type = ToD3D12CommandListType(GetQueueType());
-		m_CommandList = std::make_unique<DX12CommandList>(createInfo);
+		m_CommandList = queueSystem->CreateCommandList(DX12QueueType::Transfer);
 	}
 
 	DX12TransferContext::~DX12TransferContext()

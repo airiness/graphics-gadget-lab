@@ -1,37 +1,16 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12CommandContext.h"
-#include "Graphics/RHI/DX12/DX12CommandQueue.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/DX12CommandAllocator.h"
-#include "Graphics/RHI/DX12/DX12Fence.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Graphics/RHI/DX12/DX12TransferContext.h"
-#include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Core/HResult.h"
 
 namespace gglab
 {
-	namespace
-	{
-		CommandQueueType ToCommandQueueType(RHIQueueType queueType) noexcept
-		{
-			switch (queueType)
-			{
-			case RHIQueueType::Graphics: return CommandQueueType::Graphics;
-			case RHIQueueType::Compute: return CommandQueueType::Compute;
-			case RHIQueueType::Copy: return CommandQueueType::Copy;
-			case RHIQueueType::Transfer: return CommandQueueType::Transfer;
-			}
-			GGLAB_UNREACHABLE("Unhandled RHIQueueType.");
-		}
-	}
 	DX12Device::DX12Device() noexcept = default;
 
 	DX12Device::~DX12Device()
@@ -64,11 +43,8 @@ namespace gglab
 		InitializeD3D12Device();
 		InitializeInfoQueue();
 		CheckFeatureSupport();
-		InitializeCommandQueues();
 		InitializeMemAllocator();
 		m_ResourceManager.Initialize(this);
-		InitializeCommandLists();
-		InitializeCommandAllocatorPools();
 
 		m_IsInitialized = true;
 	}
@@ -80,8 +56,6 @@ namespace gglab
 			return;
 		}
 
-		FlushGPU();
-
 		RetireCompletedRHIResources();
 		{
 			std::unique_lock lock(m_GraphicsPipelineMutex);
@@ -90,20 +64,6 @@ namespace gglab
 		SetDescriptorManager(nullptr);
 		m_ResourceManager.Finalize();
 
-		for (const auto queueType : utils::EnumRange<CommandQueueType>())
-		{
-			auto& commandAllocatorPool = m_CommandAllocatorPools[utils::ToIndex(queueType)];
-			commandAllocatorPool.reset();
-
-			auto& commandQueue = m_CommandQueues[utils::ToIndex(queueType)];
-			commandQueue.reset();
-		}
-
-		m_GraphicsCommandContexts = {};
-		m_ComputeCommandContexts = {};
-		m_GraphicsCommandLists = {};
-		m_ComputeCommandLists = {};
-
 		m_MemAllocator.Reset();
 
 		m_D3D12Device.Reset();
@@ -111,73 +71,6 @@ namespace gglab
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
-	}
-
-	void DX12Device::FlushGPU() noexcept
-	{
-		for (const auto queueType : utils::EnumRange<CommandQueueType>())
-		{
-			auto& commandQueue = m_CommandQueues[utils::ToIndex(queueType)];
-			commandQueue->FlushCommandQueue();
-		}
-	}
-
-	std::unique_ptr<RHITransferContext> DX12Device::CreateTransferContext() noexcept
-	{
-		return std::make_unique<DX12TransferContext>(this);
-	}
-
-	std::unique_ptr<RHISwapChain> DX12Device::CreateSwapChain(const RHISwapChainDesc& desc) noexcept
-	{
-		DX12SwapChain::CreateInfo createInfo{};
-		createInfo.m_DX12Device = this;
-		createInfo.m_PresentQueue = GetCommandQueue(CommandQueueType::Graphics);
-		createInfo.m_Hwnd = static_cast<HWND>(desc.m_WindowHandle);
-		createInfo.m_Width = desc.m_Width;
-		createInfo.m_Height = desc.m_Height;
-		createInfo.m_Format = ToDXGIFormat(desc.m_Format);
-		createInfo.m_BufferCount = desc.m_BufferCount;
-		createInfo.m_AllowTearing = desc.m_AllowTearing && SupportTearing();
-		createInfo.m_Vsync = desc.m_Vsync;
-
-		auto swapChain = std::make_unique<DX12SwapChain>();
-		if (!swapChain->Initialize(createInfo))
-		{
-			return {};
-		}
-		return swapChain;
-	}
-
-	void DX12Device::WaitForFence(
-		RHIQueueType waitingQueue,
-		const RHIFencePoint& fencePoint) noexcept
-	{
-		if (!fencePoint.IsValid())
-		{
-			return;
-		}
-		const DX12Fence* fence = ResolveFence(fencePoint.m_Fence);
-		DX12CommandQueue* queue = GetCommandQueue(ToCommandQueueType(waitingQueue));
-		if (!fence || !queue)
-		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::WaitForFence received an unknown fence or queue.");
-			return;
-		}
-		queue->Wait(*fence, fencePoint.m_Value);
-	}
-
-	void DX12Device::WaitForFenceCompletion(const RHIFencePoint& fencePoint) noexcept
-	{
-		if (!fencePoint.IsValid())
-		{
-			return;
-		}
-		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
-		{
-			fence->WaitCompletion(fencePoint.m_Value);
-			return;
-		}
-		GGLAB_LOG_GRAPHICS_WARN("DX12Device::WaitForFenceCompletion received an unknown fence.");
 	}
 
 	RHITextureHandle DX12Device::CreateTexture(const RHITextureDesc& desc) noexcept
@@ -303,35 +196,7 @@ namespace gglab
 
 	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
-		if (!fencePoint.IsValid())
-		{
-			return true;
-		}
-
-		if (const DX12Fence* fence = ResolveFence(fencePoint.m_Fence))
-		{
-			return fence->IsCompleted(fencePoint.m_Value);
-		}
-
-		GGLAB_LOG_GRAPHICS_WARN(
-			"DX12Device::IsFencePointCompleted received an unknown RHI fence handle.");
-		return false;
-	}
-
-	const DX12Fence* DX12Device::ResolveFence(RHIFenceHandle fenceHandle) const noexcept
-	{
-		for (const auto& commandQueue : m_CommandQueues)
-		{
-			if (commandQueue)
-			{
-				const DX12Fence* fence = commandQueue->GetFence();
-				if (fence && fence->GetRHIHandle() == fenceHandle)
-				{
-					return fence;
-				}
-			}
-		}
-		return nullptr;
+		return m_QueueSystem ? m_QueueSystem->IsFencePointCompleted(fencePoint) : !fencePoint.IsValid();
 	}
 
 	void DX12Device::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
@@ -684,63 +549,6 @@ namespace gglab
 			GGLAB_HR(infoQueue->PushStorageFilter(&filter));
 		}
 #endif
-	}
-
-	void DX12Device::InitializeCommandQueues() noexcept
-	{
-		DX12CommandQueue::CreateInfo createInfo{};
-		createInfo.m_DX12Device = this;
-
-		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		m_CommandQueues[utils::ToIndex(CommandQueueType::Graphics)] = std::make_unique<DX12CommandQueue>(createInfo);
-		m_CommandQueues[utils::ToIndex(CommandQueueType::Transfer)] = std::make_unique<DX12CommandQueue>(createInfo);	//d3dx12 upload resource uses direct type
-
-		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-		m_CommandQueues[utils::ToIndex(CommandQueueType::Compute)] = std::make_unique<DX12CommandQueue>(createInfo);
-
-		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
-		m_CommandQueues[utils::ToIndex(CommandQueueType::Copy)] = std::make_unique<DX12CommandQueue>(createInfo);
-	}
-
-	void DX12Device::InitializeCommandLists() noexcept
-	{
-		DX12CommandList::CreateInfo createInfo{};
-		createInfo.m_DX12Device = this;
-
-		for (int32_t i = 0; i < BufferCount; i++)
-		{
-			createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-			m_GraphicsCommandLists[i] =
-				std::make_unique<DX12CommandList>(createInfo);
-			m_GraphicsCommandContexts[i] =
-				std::make_unique<DX12GraphicsCommandContext>(
-					this,
-					m_GraphicsCommandLists[i].get());
-
-			createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-			m_ComputeCommandLists[i] =
-				std::make_unique<DX12CommandList>(createInfo);
-			m_ComputeCommandContexts[i] =
-				std::make_unique<DX12ComputeCommandContext>(
-					this,
-					m_ComputeCommandLists[i].get());
-		}
-	}
-
-	void DX12Device::InitializeCommandAllocatorPools() noexcept
-	{
-		DX12CommandAllocator::CreateInfo createInfo{};
-		createInfo.m_DX12Device = this;
-		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Graphics)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
-		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Transfer)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
-
-		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Compute)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
-
-		createInfo.m_Type = D3D12_COMMAND_LIST_TYPE_COPY;
-		m_CommandAllocatorPools[utils::ToIndex(CommandQueueType::Copy)] = std::make_unique<DX12CommandAllocatorPool>(createInfo);
 	}
 
 	void DX12Device::InitializeMemAllocator() noexcept

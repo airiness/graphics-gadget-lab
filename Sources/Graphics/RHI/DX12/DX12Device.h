@@ -5,7 +5,6 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 
-#include <array>
 #include <memory>
 
 namespace D3D12MA
@@ -15,25 +14,10 @@ namespace D3D12MA
 
 namespace gglab
 {
-	enum class CommandQueueType : uint32_t
-	{
-		Graphics,
-		Compute,
-		Copy,
-		Transfer,
-
-		Count
-	};
-
-	class DX12CommandQueue;
-	class DX12CommandList;
-	class DX12GraphicsCommandContext;
-	class DX12ComputeCommandContext;
+	class DX12QueueSystem;
 	class DX12DescriptorManager;
 	class DX12DescriptorFreeListAllocator;
-	class DX12CommandAllocatorPool;
 	class DX12FencePoint;
-	class DX12Fence;
 	class DX12Resource;
 	class DX12DescriptorCache;
 	class DX12PipelineState;
@@ -69,26 +53,12 @@ namespace gglab
 
 		D3D12MA::Allocator* GetMemAllocator() const noexcept { return m_MemAllocator.Get(); }
 
-		DX12CommandQueue* GetCommandQueue(CommandQueueType type) const noexcept { return m_CommandQueues[utils::ToIndexChecked(type)].get(); }
-		DX12CommandAllocatorPool* GetCommandAllocatorPool(CommandQueueType type) const noexcept { return m_CommandAllocatorPools[utils::ToIndexChecked(type)].get(); }
-
-		DX12CommandList* GetGraphicsCommandList(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandLists.at(bufferIndex).get(); }
-		DX12CommandList* GetComputeCommandList(uint32_t bufferIndex) const noexcept { return m_ComputeCommandLists.at(bufferIndex).get(); }
-		DX12GraphicsCommandContext* GetGraphicsCommandContext(uint32_t bufferIndex) const noexcept { return m_GraphicsCommandContexts.at(bufferIndex).get(); }
-		DX12ComputeCommandContext* GetComputeCommandContext(uint32_t bufferIndex) const noexcept { return m_ComputeCommandContexts.at(bufferIndex).get(); }
-
 		bool SupportRayTracing() const noexcept { return m_FeatureSupport.m_RayTracingSupported; }
 		bool SupportMeshShader() const noexcept { return m_FeatureSupport.m_MeshShaderSupported; }
 		bool SupportTearing() const noexcept { return m_FeatureSupport.m_TearingSupported; }
 		bool SupportEnhancedBarrier() const noexcept { return m_FeatureSupport.m_EnhancedBarriers; }
 
-		void FlushGPU() noexcept;
-
 		RHIBackendType GetBackendType() const noexcept override { return RHIBackendType::DX12; }
-		std::unique_ptr<RHITransferContext> CreateTransferContext() noexcept override;
-		std::unique_ptr<RHISwapChain> CreateSwapChain(const RHISwapChainDesc& desc) noexcept override;
-		void WaitForFence(RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
-		void WaitForFenceCompletion(const RHIFencePoint& fencePoint) noexcept override;
 
 		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept override;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept override;
@@ -107,12 +77,12 @@ namespace gglab
 		void UnmapBuffer(RHIBufferHandle buffer) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
-		const DX12Fence* ResolveFence(RHIFenceHandle fence) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept override;
 		void SetDescriptorManager(DX12DescriptorManager* descriptorManager) noexcept;
+		void SetQueueSystem(DX12QueueSystem* queueSystem) noexcept { m_QueueSystem = queueSystem; }
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
@@ -144,9 +114,6 @@ namespace gglab
 		DX12ResourceManager* GetResourceManager() noexcept { return &m_ResourceManager; }
 		const DX12ResourceManager* GetResourceManager() const noexcept { return &m_ResourceManager; }
 
-	public:
-		static uint32_t GetBufferCount() noexcept { return BufferCount; }
-
 	private:
 		void InitializeWinPIX() noexcept;
 		void InitializeDXGIFactory() noexcept;
@@ -154,17 +121,11 @@ namespace gglab
 		void InitializeDebugLayer() noexcept;
 		void InitializeD3D12Device() noexcept;
 		void InitializeInfoQueue() noexcept;
-		void InitializeCommandQueues() noexcept;
-		void InitializeCommandLists() noexcept;
-		void InitializeCommandAllocatorPools() noexcept;
 		void InitializeMemAllocator() noexcept;
 		void CheckFeatureSupport() noexcept;
 
 	private:
 		static std::wstring GetLatestWinPixGpuCapturerPath() noexcept;
-
-	private:
-		static constexpr uint32_t BufferCount = 2;
 
 	private:
 		ComPtr<IDXGIFactory7> m_DxgiFactory;
@@ -173,21 +134,11 @@ namespace gglab
 
 		ComPtr<D3D12MA::Allocator> m_MemAllocator;
 
-		// Command Queues
-		std::array<std::unique_ptr<DX12CommandQueue>, utils::EnumCount<CommandQueueType>()> m_CommandQueues;
-
-		// Command Allocator Pools
-		std::array<std::unique_ptr<DX12CommandAllocatorPool>, utils::EnumCount<CommandQueueType>()> m_CommandAllocatorPools;
-
-		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_GraphicsCommandLists;
-		std::array<std::unique_ptr<DX12CommandList>, BufferCount> m_ComputeCommandLists;
-		std::array<std::unique_ptr<DX12GraphicsCommandContext>, BufferCount> m_GraphicsCommandContexts;
-		std::array<std::unique_ptr<DX12ComputeCommandContext>, BufferCount> m_ComputeCommandContexts;
-
 		// supported features
 		FeatureSupport m_FeatureSupport;
 
 		DX12ResourceManager m_ResourceManager;
+		DX12QueueSystem* m_QueueSystem = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 		std::unique_ptr<DX12DescriptorCache> m_DescriptorCache;
 

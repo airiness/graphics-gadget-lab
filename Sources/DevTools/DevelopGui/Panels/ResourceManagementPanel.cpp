@@ -5,6 +5,7 @@
 #include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Graphics/RHI/DX12/DX12ResourceManagerSnapshot.h"
 
@@ -136,15 +137,13 @@ namespace gglab
 			entry.m_DestroyRequested = true;
 		}
 
-		void RecordTestResourcesUse(DX12Device& device, ResourceManagementPanelState& state) noexcept
+		void RecordTestResourcesUse(
+			DX12Device& device,
+			DX12QueueSystem& queueSystem,
+			ResourceManagementPanelState& state) noexcept
 		{
-			auto* graphicsQueue = device.GetCommandQueue(CommandQueueType::Graphics);
-			if (!graphicsQueue)
-			{
-				return;
-			}
-
-			const DX12FencePoint fencePoint = graphicsQueue->Signal();
+			const DX12FencePoint fencePoint =
+				queueSystem.GetQueue(DX12QueueType::Graphics).Signal();
 			for (const auto& entry : state.m_Resources)
 			{
 				if (entry.m_DestroyRequested)
@@ -375,6 +374,7 @@ namespace gglab
 
 		void RunLifecycleTest(
 			DX12Device& device,
+			DX12QueueSystem& queueSystem,
 			DX12ResourceManager& manager,
 			ResourceManagementPanelState& state) noexcept
 		{
@@ -383,7 +383,7 @@ namespace gglab
 			device.DestroyTexture(first);
 			const bool invalidatedImmediately = !device.IsAlive(first);
 
-			device.FlushGPU();
+			queueSystem.WaitIdle();
 			manager.RetireCompletedResources();
 
 			const RHITextureHandle replacement = CreateTestTexture(device, ++state.m_TextureSerial);
@@ -393,7 +393,7 @@ namespace gglab
 
 			device.DestroyTexture(first);
 			device.DestroyTexture(replacement);
-			device.FlushGPU();
+			queueSystem.WaitIdle();
 			manager.RetireCompletedResources();
 
 			auto wrappedGeneration =
@@ -441,6 +441,7 @@ namespace gglab
 		}
 
 		auto& device = dx12Context->GetDX12Device();
+		auto& queueSystem = dx12Context->GetQueueSystem();
 		auto& manager = *device.GetResourceManager();
 
 		if (ImGui::Button("Add Texture"))
@@ -463,7 +464,7 @@ namespace gglab
 		ImGui::SameLine();
 		if (ImGui::Button("Signal + Record Use"))
 		{
-			RecordTestResourcesUse(device, state);
+			RecordTestResourcesUse(device, queueSystem, state);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Clear Destroyed Rows"))
@@ -508,7 +509,7 @@ namespace gglab
 
 		if (ImGui::Button("Run Lifecycle Test"))
 		{
-			RunLifecycleTest(device, manager, state);
+			RunLifecycleTest(device, queueSystem, manager, state);
 		}
 		ImGui::SameLine();
 		ImGui::TextUnformatted(state.m_LastTestResult.c_str());

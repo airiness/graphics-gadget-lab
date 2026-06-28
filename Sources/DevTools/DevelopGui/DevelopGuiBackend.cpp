@@ -2,6 +2,7 @@
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
@@ -38,7 +39,7 @@ namespace gglab
 
 		ImGui_ImplDX12_InitInfo initInfo{};
 		initInfo.Device = m_DX12Device->Get();
-		initInfo.CommandQueue = m_DX12Device->GetCommandQueue(CommandQueueType::Graphics)->Get();
+		initInfo.CommandQueue = dx12Context->GetQueueSystem().GetQueue(DX12QueueType::Graphics).Get();
 		initInfo.NumFramesInFlight = swapChain.GetBufferCount();
 		initInfo.RTVFormat = ToDXGIFormat(swapChain.GetFormat());
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
