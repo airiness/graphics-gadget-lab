@@ -209,7 +209,7 @@ namespace gglab
 		// Wait Structured Buffer upload
 		if (renderContext.m_UploadFencePoint.IsValid())
 		{
-			GetDevice()->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
+			m_RHIContext->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
 		}
 
 		RGExecuteContext executeContext{
@@ -264,7 +264,7 @@ namespace gglab
 
 		if (m_RHIContext && frame.m_UploadFencePoint.IsValid())
 		{
-			GetDevice()->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
+			m_RHIContext->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
 		}
 
 		if (m_RHIContext && frame.m_RHIFrame)

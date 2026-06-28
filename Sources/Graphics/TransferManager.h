@@ -5,13 +5,12 @@
 
 namespace gglab
 {
-	class RHIDevice;
 	class RHITransferContext;
 
 	class TransferManager
 	{
 	public:
-		explicit TransferManager(RHIDevice* device) noexcept;
+		explicit TransferManager(std::unique_ptr<RHITransferContext> transferContext) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(TransferManager);
 		~TransferManager() = default;
 

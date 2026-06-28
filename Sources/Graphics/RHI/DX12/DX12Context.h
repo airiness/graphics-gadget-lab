@@ -11,6 +11,7 @@ namespace gglab
 	class DX12DescriptorManager;
 	class DX12Device;
 	class DX12GraphicsCommandContext;
+	class DX12QueueSystem;
 
 	class DX12Context;
 
@@ -54,6 +55,8 @@ namespace gglab
 		RHIFrameContext& BeginFrame() noexcept override;
 		RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept override;
 		void AbortFrame(RHIFrameContext& frame) noexcept override;
+		void WaitForFence(RHIQueueType waitingQueue,
+			const RHIFencePoint& fencePoint) noexcept override;
 
 		void Resize(uint32_t width, uint32_t height) noexcept override;
 		void WaitIdle() noexcept override;
@@ -63,6 +66,8 @@ namespace gglab
 		[[nodiscard]] DX12Device& GetDX12Device() noexcept;
 		[[nodiscard]] const DX12Device& GetDX12Device() const noexcept;
 		[[nodiscard]] DX12DescriptorManager& GetDescriptorManager() noexcept;
+		[[nodiscard]] DX12QueueSystem& GetQueueSystem() noexcept;
+		[[nodiscard]] const DX12QueueSystem& GetQueueSystem() const noexcept;
 
 	private:
 		friend class DX12FrameContext;
@@ -74,6 +79,7 @@ namespace gglab
 		void Finalize() noexcept;
 
 		std::unique_ptr<DX12Device> m_Device;
+		std::unique_ptr<DX12QueueSystem> m_QueueSystem;
 		std::unique_ptr<RHISwapChain> m_SwapChain;
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;

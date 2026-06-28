@@ -5,8 +5,12 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
+#include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Graphics/RHI/DX12/DX12TransferContext.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/TransferManager.h"
 
 namespace gglab
@@ -27,7 +31,7 @@ namespace gglab
 	RHIGraphicsCommandContext& DX12FrameContext::GetGraphicsContext() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Active, "DX12FrameContext::GetGraphicsContext requires an active frame.");
-		return *m_Context->GetDX12Device().GetGraphicsCommandContext(m_FrameIndex);
+		return m_Context->GetQueueSystem().GetGraphicsContext(m_FrameIndex);
 	}
 
 	RHIComputeCommandContext* DX12FrameContext::GetComputeContext() noexcept
@@ -40,30 +44,39 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(desc.m_WindowHandle != nullptr, "DX12Context requires a window handle.");
 		GGLAB_ASSERT_MSG(desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
-		GGLAB_ASSERT_MSG(desc.m_BufferCount == DX12Device::GetBufferCount(),
-			"DX12Context buffer count must currently match DX12Device frame resources.");
-
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
+		DX12QueueSystem::CreateInfo queueSystemInfo{};
+		queueSystemInfo.m_Device = m_Device.get();
+		queueSystemInfo.m_FrameCount = desc.m_BufferCount;
+		m_QueueSystem = std::make_unique<DX12QueueSystem>(queueSystemInfo);
+		m_Device->SetQueueSystem(m_QueueSystem.get());
 
 		DX12DescriptorManager::CreateInfo descriptorInfo{};
 		descriptorInfo.m_DX12Device = m_Device.get();
 		m_DescriptorManager = std::make_unique<DX12DescriptorManager>(descriptorInfo);
 		m_Device->SetDescriptorManager(m_DescriptorManager.get());
 
-		RHISwapChainDesc swapChainDesc{};
-		swapChainDesc.m_WindowHandle = desc.m_WindowHandle;
-		swapChainDesc.m_Width = desc.m_Width;
-		swapChainDesc.m_Height = desc.m_Height;
-		swapChainDesc.m_Format = desc.m_BackBufferFormat;
-		swapChainDesc.m_BufferCount = desc.m_BufferCount;
-		swapChainDesc.m_AllowTearing = desc.m_AllowTearing;
-		swapChainDesc.m_Vsync = desc.m_Vsync;
-		m_SwapChain = m_Device->CreateSwapChain(swapChainDesc);
+		DX12SwapChain::CreateInfo swapChainInfo{};
+		swapChainInfo.m_DX12Device = m_Device.get();
+		swapChainInfo.m_QueueSystem = m_QueueSystem.get();
+		swapChainInfo.m_PresentQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
+		swapChainInfo.m_Hwnd = static_cast<HWND>(desc.m_WindowHandle);
+		swapChainInfo.m_Width = desc.m_Width;
+		swapChainInfo.m_Height = desc.m_Height;
+		swapChainInfo.m_Format = ToDXGIFormat(desc.m_BackBufferFormat);
+		swapChainInfo.m_BufferCount = desc.m_BufferCount;
+		swapChainInfo.m_AllowTearing = desc.m_AllowTearing && m_Device->SupportTearing();
+		swapChainInfo.m_Vsync = desc.m_Vsync;
+		auto swapChain = std::make_unique<DX12SwapChain>();
+		GGLAB_ASSERT_MSG(swapChain->Initialize(swapChainInfo),
+			"DX12Context failed to initialize the swapchain.");
+		m_SwapChain = std::move(swapChain);
 		GGLAB_ASSERT_MSG(m_SwapChain && m_SwapChain->IsValid(),
 			"DX12Context failed to create the swapchain.");
 
-		m_TransferManager = std::make_unique<TransferManager>(m_Device.get());
+		m_TransferManager = std::make_unique<TransferManager>(
+			std::make_unique<DX12TransferContext>(m_Device.get(), m_QueueSystem.get()));
 		m_Frames.reserve(desc.m_BufferCount);
 		for (uint32_t i = 0; i < desc.m_BufferCount; ++i)
 		{
@@ -85,6 +98,8 @@ namespace gglab
 	DX12Device& DX12Context::GetDX12Device() noexcept { return *m_Device; }
 	const DX12Device& DX12Context::GetDX12Device() const noexcept { return *m_Device; }
 	DX12DescriptorManager& DX12Context::GetDescriptorManager() noexcept { return *m_DescriptorManager; }
+	DX12QueueSystem& DX12Context::GetQueueSystem() noexcept { return *m_QueueSystem; }
+	const DX12QueueSystem& DX12Context::GetQueueSystem() const noexcept { return *m_QueueSystem; }
 
 	RHIFrameContext& DX12Context::BeginFrame() noexcept
 	{
@@ -120,9 +135,9 @@ namespace gglab
 		DX12FencePoint computeFence{};
 		if (frame->m_ComputeAllocator)
 		{
-			auto* computeList = m_Device->GetComputeCommandList(frame->m_FrameIndex);
-			auto* computeContext = m_Device->GetComputeCommandContext(frame->m_FrameIndex);
-			auto* computeQueue = m_Device->GetCommandQueue(CommandQueueType::Compute);
+			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameIndex);
+			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameIndex);
+			auto* computeQueue = &m_QueueSystem->GetQueue(DX12QueueType::Compute);
 			computeList->End();
 			const DX12CommandList* lists[] = { computeList };
 			computeFence = computeQueue->Execute(lists);
@@ -135,14 +150,14 @@ namespace gglab
 				m_Device->RecordTextureUse(texture, computeFence);
 			}
 			computeContext->ClearTrackedResourceUses();
-			m_Device->GetCommandAllocatorPool(CommandQueueType::Compute)->RecycleCommandAllocator(
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute).RecycleCommandAllocator(
 				frame->m_ComputeAllocator, computeFence);
-			m_Device->WaitForFence(RHIQueueType::Graphics, computeFence.ToRHI());
+			m_QueueSystem->WaitForFence(RHIQueueType::Graphics, computeFence.ToRHI());
 		}
 
-		auto* graphicsList = m_Device->GetGraphicsCommandList(frame->m_FrameIndex);
-		auto* graphicsContext = m_Device->GetGraphicsCommandContext(frame->m_FrameIndex);
-		auto* graphicsQueue = m_Device->GetCommandQueue(CommandQueueType::Graphics);
+		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
+		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameIndex);
+		auto* graphicsQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
 		graphicsList->End();
 		const DX12CommandList* lists[] = { graphicsList };
 		const DX12FencePoint graphicsFence = graphicsQueue->Execute(lists);
@@ -155,7 +170,7 @@ namespace gglab
 			m_Device->RecordTextureUse(texture, graphicsFence);
 		}
 		graphicsContext->ClearTrackedResourceUses();
-		m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics)->RecycleCommandAllocator(
+		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics).RecycleCommandAllocator(
 			frame->m_GraphicsAllocator, graphicsFence);
 
 		m_DescriptorManager->EndFrame(graphicsFence);
@@ -177,24 +192,31 @@ namespace gglab
 
 		if (frame->m_ComputeAllocator)
 		{
-			auto* computeList = m_Device->GetComputeCommandList(frame->m_FrameIndex);
-			auto* computeContext = m_Device->GetComputeCommandContext(frame->m_FrameIndex);
+			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameIndex);
+			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameIndex);
 			computeList->End();
 			computeContext->ClearTrackedResourceUses();
-			const DX12FencePoint fence = m_Device->GetCommandQueue(CommandQueueType::Compute)->Signal();
-			m_Device->GetCommandAllocatorPool(CommandQueueType::Compute)->RecycleCommandAllocator(
+			const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Compute).Signal();
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute).RecycleCommandAllocator(
 				frame->m_ComputeAllocator, fence);
 		}
 
-		auto* graphicsList = m_Device->GetGraphicsCommandList(frame->m_FrameIndex);
-		auto* graphicsContext = m_Device->GetGraphicsCommandContext(frame->m_FrameIndex);
+		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
+		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameIndex);
 		graphicsList->End();
 		graphicsContext->ClearTrackedResourceUses();
-		const DX12FencePoint fence = m_Device->GetCommandQueue(CommandQueueType::Graphics)->Signal();
-		m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics)->RecycleCommandAllocator(
+		const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Graphics).Signal();
+		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics).RecycleCommandAllocator(
 			frame->m_GraphicsAllocator, fence);
 		m_DescriptorManager->EndFrame(fence);
 		FinishFrame(*frame, fence.ToRHI());
+	}
+
+	void DX12Context::WaitForFence(
+		RHIQueueType waitingQueue,
+		const RHIFencePoint& fencePoint) noexcept
+	{
+		m_QueueSystem->WaitForFence(waitingQueue, fencePoint);
 	}
 
 	void DX12Context::Resize(uint32_t width, uint32_t height) noexcept
@@ -210,9 +232,9 @@ namespace gglab
 
 	void DX12Context::WaitIdle() noexcept
 	{
-		if (m_Device)
+		if (m_QueueSystem)
 		{
-			m_Device->FlushGPU();
+			m_QueueSystem->WaitIdle();
 		}
 	}
 
@@ -232,12 +254,12 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(&frame == m_ActiveFrame && frame.m_Active,
 			"Compute context can only be acquired from the active frame.");
-		auto* context = m_Device->GetComputeCommandContext(frame.m_FrameIndex);
+		auto* context = &m_QueueSystem->GetComputeContext(frame.m_FrameIndex);
 		if (!frame.m_ComputeAllocator)
 		{
 			frame.m_ComputeAllocator =
-				m_Device->GetCommandAllocatorPool(CommandQueueType::Compute)->RequestCommandAllocator();
-			auto* commandList = m_Device->GetComputeCommandList(frame.m_FrameIndex);
+				m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute).RequestCommandAllocator();
+			auto* commandList = &m_QueueSystem->GetComputeCommandList(frame.m_FrameIndex);
 			commandList->Begin(frame.m_ComputeAllocator);
 			context->ClearTrackedResourceUses();
 			BindGlobalDescriptorHeaps(*commandList);
@@ -248,10 +270,10 @@ namespace gglab
 	void DX12Context::BeginGraphicsRecording(DX12FrameContext& frame) noexcept
 	{
 		frame.m_GraphicsAllocator =
-			m_Device->GetCommandAllocatorPool(CommandQueueType::Graphics)->RequestCommandAllocator();
-		auto* commandList = m_Device->GetGraphicsCommandList(frame.m_FrameIndex);
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics).RequestCommandAllocator();
+		auto* commandList = &m_QueueSystem->GetGraphicsCommandList(frame.m_FrameIndex);
 		commandList->Begin(frame.m_GraphicsAllocator);
-		m_Device->GetGraphicsCommandContext(frame.m_FrameIndex)->ClearTrackedResourceUses();
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameIndex).ClearTrackedResourceUses();
 		BindGlobalDescriptorHeaps(*commandList);
 	}
 
@@ -294,7 +316,11 @@ namespace gglab
 		m_Device->SetDescriptorManager(nullptr);
 		m_DescriptorManager->Tick();
 		m_DescriptorManager.reset();
+		m_Device->RetireCompletedWork();
 		m_Device->Finalize();
+		m_QueueSystem->Finalize();
+		m_Device->SetQueueSystem(nullptr);
+		m_QueueSystem.reset();
 		m_Device.reset();
 		m_Initialized = false;
 	}

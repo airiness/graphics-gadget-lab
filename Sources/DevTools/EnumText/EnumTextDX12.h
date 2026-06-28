@@ -1,18 +1,18 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include <d3d12.h>
 
 namespace gglab::devtools
 {
 	template<>
-	struct EnumTextTraits<CommandQueueType>
+	struct EnumTextTraits<DX12QueueType>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ CommandQueueType::Graphics, "Graphics" },
-			EnumTextEntry{ CommandQueueType::Compute, "Compute" },
-			EnumTextEntry{ CommandQueueType::Copy, "Copy" },
-			EnumTextEntry{ CommandQueueType::Transfer, "Transfer" },
+			EnumTextEntry{ DX12QueueType::Graphics, "Graphics" },
+			EnumTextEntry{ DX12QueueType::Compute, "Compute" },
+			EnumTextEntry{ DX12QueueType::Copy, "Copy" },
+			EnumTextEntry{ DX12QueueType::Transfer, "Transfer" },
 		};
 	};
 

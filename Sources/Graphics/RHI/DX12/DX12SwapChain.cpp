@@ -2,6 +2,7 @@
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Core/HResult.h"
@@ -21,12 +22,14 @@ namespace gglab
 		}
 
 		GGLAB_ASSERT_MSG(createInfo.m_DX12Device != nullptr, "DX12SwapChain::Initialize: device is null.");
+		GGLAB_ASSERT_MSG(createInfo.m_QueueSystem != nullptr, "DX12SwapChain::Initialize: queue system is null.");
 		GGLAB_ASSERT_MSG(createInfo.m_PresentQueue != nullptr, "DX12SwapChain::Initialize: present queue is null.");
 		GGLAB_ASSERT_MSG(createInfo.m_Hwnd != nullptr, "DX12SwapChain::Initialize: hwnd is null.");
 		GGLAB_ASSERT_MSG(createInfo.m_Width > 0 && createInfo.m_Height > 0, "DX12SwapChain::Initialize: invalid size.");
 		GGLAB_ASSERT_MSG(createInfo.m_BufferCount >= 2, "DX12SwapChain::Initialize: bufferCount must be >= 2.");
 
 		m_DX12Device = createInfo.m_DX12Device;
+		m_QueueSystem = createInfo.m_QueueSystem;
 		m_PresentQueue = createInfo.m_PresentQueue;
 		m_Hwnd = createInfo.m_Hwnd;
 		m_Width = createInfo.m_Width;
@@ -103,7 +106,7 @@ namespace gglab
 		auto& fencePoint = m_SyncObjects[m_BackBufferIndex];
 		if (fencePoint.IsValid())
 		{
-			m_DX12Device->WaitForFenceCompletion(fencePoint);
+			m_QueueSystem->WaitForFenceCompletion(fencePoint);
 		}
 	}
 
@@ -275,7 +278,7 @@ namespace gglab
 		{
 			if (fencePoint.IsValid())
 			{
-				m_DX12Device->WaitForFenceCompletion(fencePoint);
+				m_QueueSystem->WaitForFenceCompletion(fencePoint);
 			}
 		}
 	}
@@ -287,6 +290,7 @@ namespace gglab
 		m_DxgiSwapChain.Reset();
 
 		m_DX12Device = nullptr;
+		m_QueueSystem = nullptr;
 		m_PresentQueue = nullptr;
 		m_Hwnd = nullptr;
 		m_Width = 0;
