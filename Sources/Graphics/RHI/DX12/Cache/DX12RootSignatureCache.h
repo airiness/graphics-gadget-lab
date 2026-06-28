@@ -6,7 +6,7 @@
 namespace gglab
 {
 	class DX12PipelineSystem;
-	class ShaderManager;
+	class PipelineCache;
 	struct RHIPipelineSystemSnapshot;
 	struct RootSignatureKey
 	{
@@ -54,7 +54,7 @@ namespace gglab
 
 		friend void BuildDX12PipelineSystemSnapshot(
 			const DX12PipelineSystem& system,
-			const ShaderManager* shaderManager,
+			const PipelineCache* pipelineCache,
 			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

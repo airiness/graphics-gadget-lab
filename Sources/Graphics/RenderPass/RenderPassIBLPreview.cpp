@@ -66,7 +66,9 @@ namespace gglab
 		EnsureInitialized(services);
 
 		auto* contextPtr = &context;
-		rg.AddPass<EnvironmentPreviewPassData>("RenderPassIBLPreview.EnvironmentCubemap",
+		const std::string environmentPassName =
+			MakeRenderGraphPassName("EnvironmentCubemap");
+		rg.AddPass<EnvironmentPreviewPassData>(environmentPassName.c_str(),
 			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, EnvironmentPreviewPassData& data)
 			{
 				builder.SideEffect();
@@ -133,7 +135,9 @@ namespace gglab
 
 			});
 
-		rg.AddPass<PrefilteredSpecularPreviewPassData>("RenderPassIBLPreview.PrefilteredSpecularCubemap",
+		const std::string prefilteredSpecularPassName =
+			MakeRenderGraphPassName("PrefilteredSpecularCubemap");
+		rg.AddPass<PrefilteredSpecularPreviewPassData>(prefilteredSpecularPassName.c_str(),
 			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PrefilteredSpecularPreviewPassData& data)
 			{
 				builder.SideEffect();
@@ -258,6 +262,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(
 			m_CubemapPreviewPipelineSlot,
-			m_CubemapPreviewRecipe);
+			m_CubemapPreviewRecipe,
+			GetInfo());
 	}
 }

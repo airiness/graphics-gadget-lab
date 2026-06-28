@@ -9,7 +9,14 @@ namespace gglab
 	class RenderPassTonemap final : public RenderPassBase
 	{
 	public:
-		RenderPassTonemap() noexcept = default;
+		RenderPassTonemap() noexcept : RenderPassBase({
+			.m_TypeName = "PostProcess.Tonemap",
+			.m_DisplayName = "Tonemap",
+			.m_CategoryName = "PostProcess",
+			.m_Description = "Maps HDR scene color to the display back buffer.",
+			.m_Category = RenderPassCategory::PostProcess,
+			.m_Type = RenderPassType::Graphics,
+		}) {}
 		~RenderPassTonemap() override = default;
 
 		void AddPass(RenderGraph& rg,

@@ -12,7 +12,14 @@ namespace gglab
 	class RenderPassDirectionalShadowMap final : public RenderPassBase
 	{
 	public:
-		RenderPassDirectionalShadowMap() noexcept = default;
+		RenderPassDirectionalShadowMap() noexcept : RenderPassBase({
+			.m_TypeName = "Shadow.Directional",
+			.m_DisplayName = "Directional Shadow Map",
+			.m_CategoryName = "Shadow",
+			.m_Description = "Renders the directional light shadow depth map for the main scene.",
+			.m_Category = RenderPassCategory::Shadow,
+			.m_Type = RenderPassType::Graphics,
+		}) {}
 		~RenderPassDirectionalShadowMap() override = default;
 
 		void AddPass(RenderGraph& rg,

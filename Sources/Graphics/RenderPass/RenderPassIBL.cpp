@@ -22,7 +22,7 @@ namespace gglab
 
 		renderResRegistry->EnsureIblResources();
 
-		rg.AddPass<PassData>("RenderPassIBL.SetupResources", [renderResRegistry](RenderGraph::RGBuilder& builder, PassData&)
+		rg.AddPass<PassData>(GetRenderGraphPassName(), [renderResRegistry](RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();
 

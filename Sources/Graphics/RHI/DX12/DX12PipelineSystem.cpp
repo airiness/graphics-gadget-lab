@@ -203,9 +203,6 @@ namespace gglab
 	{
 		PipelineBinding registered = binding;
 		registered.m_GraphicsDesc = createInfo.m_Desc;
-		registered.m_DebugName = createInfo.m_Desc.m_DebugName ?
-			createInfo.m_Desc.m_DebugName : "";
-		registered.m_GraphicsDesc.m_DebugName = nullptr;
 		const uint32_t attributeCount = std::min(
 			createInfo.m_Desc.m_VertexInput.m_AttributeCount,
 			RHIVertexInputLayoutDesc::MaxAttributes);
@@ -230,9 +227,6 @@ namespace gglab
 	{
 		PipelineBinding registered = binding;
 		registered.m_ComputeDesc = createInfo.m_Desc;
-		registered.m_DebugName = createInfo.m_Desc.m_DebugName ?
-			createInfo.m_Desc.m_DebugName : "";
-		registered.m_ComputeDesc.m_DebugName = nullptr;
 		registered.m_ComputeShaderHash = createInfo.m_ComputeShader.m_Hash;
 		return RegisterPipeline(std::move(registered));
 	}

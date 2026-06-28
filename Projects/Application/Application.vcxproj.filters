@@ -650,6 +650,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassInfo.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>

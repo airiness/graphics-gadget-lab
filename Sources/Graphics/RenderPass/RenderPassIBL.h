@@ -9,12 +9,23 @@
 
 namespace gglab
 {
-	class RenderPassIBL
+	class RenderPassIBL : public RenderPassBase
 	{
 	public:
+		RenderPassIBL() noexcept : RenderPassBase({
+			.m_TypeName = "IBL.SetupResources",
+			.m_DisplayName = "IBL Resource Setup",
+			.m_CategoryName = "IBL",
+			.m_Description = "Imports and publishes the persistent runtime textures used by the IBL passes.",
+			.m_Category = RenderPassCategory::IBL,
+			.m_Type = RenderPassType::Mixed,
+			.m_EnableGpuMarker = false,
+			.m_EnableProfiling = false,
+		}) {}
+
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
-			const RenderServices& services) noexcept;
+			const RenderServices& services) noexcept override;
 
 	private:
 		static RGTextureId ImportRuntimeTexture(RenderGraph::RGBuilder& builder,

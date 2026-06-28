@@ -9,7 +9,14 @@ namespace gglab
 	class RenderPassShadowMapPreview final : public RenderPassBase
 	{
 	public:
-		RenderPassShadowMapPreview() noexcept = default;
+		RenderPassShadowMapPreview() noexcept : RenderPassBase({
+			.m_TypeName = "Debug.ShadowMapPreview",
+			.m_DisplayName = "Shadow Map Preview",
+			.m_CategoryName = "Debug",
+			.m_Description = "Copies and visualizes the directional shadow map for inspection.",
+			.m_Category = RenderPassCategory::Debug,
+			.m_Type = RenderPassType::Graphics,
+		}) {}
 		~RenderPassShadowMapPreview() override = default;
 
 		void AddPass(RenderGraph& rg,

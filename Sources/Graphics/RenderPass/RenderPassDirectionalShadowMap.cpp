@@ -40,7 +40,7 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<PassData>("RenderPassDirectionalShadowMap",
+		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
@@ -243,7 +243,7 @@ namespace gglab
 		const size_t slotIndex =
 			static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];
-		return pipelineCache->Resolve(slot, recipe);
+		return pipelineCache->Resolve(slot, recipe, GetInfo());
 	}
 
 	RasterizerPreset RenderPassDirectionalShadowMap::GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept
