@@ -150,6 +150,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystemSnapshot.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -680,6 +683,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClInclude Include="..\..\Sources\Graphics\Buffer\Buffer.h">
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
@@ -702,6 +708,9 @@
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h">
@@ -906,6 +915,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystemSnapshot.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">

@@ -155,6 +155,9 @@ namespace gglab
 		RHIBindingLayoutHandle m_BindingLayout{};
 		RHIShaderHandle m_VertexShader{};
 		RHIShaderHandle m_PixelShader{};
+		RHIShaderHandle m_DomainShader{};
+		RHIShaderHandle m_HullShader{};
+		RHIShaderHandle m_GeometryShader{};
 
 		RHIVertexInputLayoutDesc m_VertexInput{};
 		RHIPrimitiveTopologyType m_TopologyType = RHIPrimitiveTopologyType::Triangle;

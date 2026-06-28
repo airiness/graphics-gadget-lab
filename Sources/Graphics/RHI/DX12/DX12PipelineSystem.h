@@ -1,9 +1,11 @@
 #pragma once
 #include "Graphics/RHI/RHIPipelineSystem.h"
 
+#include <array>
 #include <atomic>
 #include <memory>
 #include <shared_mutex>
+#include <string>
 #include <vector>
 
 namespace gglab
@@ -13,6 +15,8 @@ namespace gglab
 	class DX12PSOCache;
 	class DX12RootSignature;
 	class DX12RootSignatureCache;
+	class ShaderManager;
+	struct RHIPipelineSystemSnapshot;
 
 	class DX12PipelineSystem final : public RHIPipelineSystem
 	{
@@ -56,10 +60,37 @@ namespace gglab
 			DX12PipelineState* m_PipelineState = nullptr;
 			DX12RootSignature* m_RootSignature = nullptr;
 			PipelineType m_Type = PipelineType::Graphics;
+			RHIGraphicsPipelineDesc m_GraphicsDesc{};
+			RHIComputePipelineDesc m_ComputeDesc{};
+			std::string m_DebugName;
+			std::array<std::string, RHIVertexInputLayoutDesc::MaxAttributes> m_SemanticNames{};
+			ShaderHash128 m_VertexShaderHash{};
+			ShaderHash128 m_PixelShaderHash{};
+			ShaderHash128 m_DomainShaderHash{};
+			ShaderHash128 m_HullShaderHash{};
+			ShaderHash128 m_GeometryShaderHash{};
+			ShaderHash128 m_ComputeShaderHash{};
+		};
+
+		struct BindingLayoutBinding
+		{
+			RHIBindingLayoutHandle m_Handle{};
+			DX12RootSignature* m_RootSignature = nullptr;
+			std::string m_DebugName;
+			std::array<RHIBindingSlotDesc, RHIBindingLayoutDesc::MaxSlots> m_Slots{};
+			std::array<std::string, RHIBindingLayoutDesc::MaxSlots> m_SlotDebugNames{};
+			uint32_t m_SlotCount = 0;
+			bool m_Registered = false;
 		};
 
 		DX12RootSignature* ResolveBindingLayout(RHIBindingLayoutHandle layout) const noexcept;
-		RHIPipelineHandle RegisterPipeline(const PipelineBinding& binding) noexcept;
+		RHIPipelineHandle RegisterGraphicsPipeline(
+			const PipelineBinding& binding,
+			const RHIGraphicsPipelineCreateInfo& createInfo) noexcept;
+		RHIPipelineHandle RegisterComputePipeline(
+			const PipelineBinding& binding,
+			const RHIComputePipelineCreateInfo& createInfo) noexcept;
+		RHIPipelineHandle RegisterPipeline(PipelineBinding binding) noexcept;
 		bool ResolvePipeline(RHIPipelineHandle pipeline,
 			PipelineType expectedType,
 			DX12PipelineState*& outPipelineState,
@@ -68,10 +99,16 @@ namespace gglab
 		DX12Device* m_Device = nullptr;
 		std::unique_ptr<DX12RootSignatureCache> m_RootSignatureCache;
 		std::unique_ptr<DX12PSOCache> m_PSOCache;
+		std::vector<BindingLayoutBinding> m_BindingLayouts;
 		std::vector<PipelineBinding> m_Pipelines;
 		mutable std::shared_mutex m_Mutex;
 		std::atomic_uint64_t m_Revision = 1;
 		RHIBindingLayoutHandle::GenerationType m_BindingLayoutGeneration = 1;
 		RHIPipelineHandle::GenerationType m_PipelineGeneration = 1;
+
+		friend void BuildDX12PipelineSystemSnapshot(
+			const DX12PipelineSystem& system,
+			const ShaderManager* shaderManager,
+			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

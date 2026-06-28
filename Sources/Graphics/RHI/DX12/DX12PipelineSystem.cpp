@@ -48,9 +48,33 @@ namespace gglab
 		{
 			return {};
 		}
-		return RHIBindingLayoutHandle(
+		const RHIBindingLayoutHandle handle(
 			static_cast<RHIBindingLayoutHandle::IndexType>(rootSignature.m_Id.Value()),
 			m_BindingLayoutGeneration);
+		DX12RootSignature* nativeRootSignature =
+			m_RootSignatureCache->GetDX12RootSignature(rootSignature.m_Id);
+		{
+			std::unique_lock lock(m_Mutex);
+			if (m_BindingLayouts.size() <= handle.Index())
+			{
+				m_BindingLayouts.resize(static_cast<size_t>(handle.Index()) + 1);
+			}
+			auto& binding = m_BindingLayouts[handle.Index()];
+			binding = {};
+			binding.m_Handle = handle;
+			binding.m_RootSignature = nativeRootSignature;
+			binding.m_DebugName = desc.m_DebugName ? desc.m_DebugName : "";
+			binding.m_SlotCount = std::min(desc.m_SlotCount, RHIBindingLayoutDesc::MaxSlots);
+			binding.m_Registered = true;
+			for (uint32_t slotIndex = 0; slotIndex < binding.m_SlotCount; ++slotIndex)
+			{
+				binding.m_Slots[slotIndex] = desc.m_Slots[slotIndex];
+				binding.m_Slots[slotIndex].m_DebugName = nullptr;
+				binding.m_SlotDebugNames[slotIndex] =
+					desc.m_Slots[slotIndex].m_DebugName ? desc.m_Slots[slotIndex].m_DebugName : "";
+			}
+		}
+		return handle;
 	}
 
 	RHIPipelineHandle DX12PipelineSystem::CreateGraphicsPipeline(
@@ -89,7 +113,8 @@ namespace gglab
 			createInfo.m_Desc,
 			nativeRoot,
 			shaders);
-		return RegisterPipeline({ pipelineState, rootSignature, PipelineType::Graphics });
+		return RegisterGraphicsPipeline(
+			{ pipelineState, rootSignature, PipelineType::Graphics }, createInfo);
 	}
 
 	RHIPipelineHandle DX12PipelineSystem::CreateComputePipeline(
@@ -110,7 +135,8 @@ namespace gglab
 		desc.m_ComputeShader = ToDX12Bytecode(createInfo.m_ComputeShader);
 		const ComputePSOKey key = desc.MakeKey(ToDX12ShaderHash(createInfo.m_ComputeShader));
 		DX12PipelineState* pipelineState = m_PSOCache->GetOrCreate(key, desc);
-		return RegisterPipeline({ pipelineState, rootSignature, PipelineType::Compute });
+		return RegisterComputePipeline(
+			{ pipelineState, rootSignature, PipelineType::Compute }, createInfo);
 	}
 
 	bool DX12PipelineSystem::IsAlive(RHIBindingLayoutHandle layout) const noexcept
@@ -171,8 +197,48 @@ namespace gglab
 			RootSignatureID{ layout.Index() });
 	}
 
+	RHIPipelineHandle DX12PipelineSystem::RegisterGraphicsPipeline(
+		const PipelineBinding& binding,
+		const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
+	{
+		PipelineBinding registered = binding;
+		registered.m_GraphicsDesc = createInfo.m_Desc;
+		registered.m_DebugName = createInfo.m_Desc.m_DebugName ?
+			createInfo.m_Desc.m_DebugName : "";
+		registered.m_GraphicsDesc.m_DebugName = nullptr;
+		const uint32_t attributeCount = std::min(
+			createInfo.m_Desc.m_VertexInput.m_AttributeCount,
+			RHIVertexInputLayoutDesc::MaxAttributes);
+		for (uint32_t index = 0; index < attributeCount; ++index)
+		{
+			const char* semanticName =
+				createInfo.m_Desc.m_VertexInput.m_Attributes[index].m_SemanticName;
+			registered.m_SemanticNames[index] = semanticName ? semanticName : "";
+			registered.m_GraphicsDesc.m_VertexInput.m_Attributes[index].m_SemanticName = nullptr;
+		}
+		registered.m_VertexShaderHash = createInfo.m_VertexShader.m_Hash;
+		registered.m_PixelShaderHash = createInfo.m_PixelShader.m_Hash;
+		registered.m_DomainShaderHash = createInfo.m_DomainShader.m_Hash;
+		registered.m_HullShaderHash = createInfo.m_HullShader.m_Hash;
+		registered.m_GeometryShaderHash = createInfo.m_GeometryShader.m_Hash;
+		return RegisterPipeline(std::move(registered));
+	}
+
+	RHIPipelineHandle DX12PipelineSystem::RegisterComputePipeline(
+		const PipelineBinding& binding,
+		const RHIComputePipelineCreateInfo& createInfo) noexcept
+	{
+		PipelineBinding registered = binding;
+		registered.m_ComputeDesc = createInfo.m_Desc;
+		registered.m_DebugName = createInfo.m_Desc.m_DebugName ?
+			createInfo.m_Desc.m_DebugName : "";
+		registered.m_ComputeDesc.m_DebugName = nullptr;
+		registered.m_ComputeShaderHash = createInfo.m_ComputeShader.m_Hash;
+		return RegisterPipeline(std::move(registered));
+	}
+
 	RHIPipelineHandle DX12PipelineSystem::RegisterPipeline(
-		const PipelineBinding& binding) noexcept
+		PipelineBinding binding) noexcept
 	{
 		if (!binding.m_PipelineState || !binding.m_RootSignature)
 		{
@@ -190,7 +256,7 @@ namespace gglab
 			}
 		}
 		const auto index = static_cast<RHIPipelineHandle::IndexType>(m_Pipelines.size());
-		m_Pipelines.push_back(binding);
+		m_Pipelines.push_back(std::move(binding));
 		return RHIPipelineHandle(index, m_PipelineGeneration);
 	}
 

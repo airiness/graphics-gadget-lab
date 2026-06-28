@@ -6,6 +6,9 @@
 
 namespace gglab
 {
+	class DX12PipelineSystem;
+	class ShaderManager;
+	struct RHIPipelineSystemSnapshot;
 	class DX12Device;
 	class DX12PipelineState;
 	class DX12PSOCache
@@ -39,5 +42,10 @@ namespace gglab
 
 		mutable std::shared_mutex m_Mutex;
 		std::atomic_uint64_t m_Revision = 1;
+
+		friend void BuildDX12PipelineSystemSnapshot(
+			const DX12PipelineSystem& system,
+			const ShaderManager* shaderManager,
+			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }
