@@ -75,8 +75,10 @@ namespace gglab
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 
-				data.m_SceneColor = builder.Write(mainTargets.m_SceneColor, RGTextureAccess::RenderTarget);
-				data.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureAccess::DepthStencilWrite);
+				mainTargets.m_SceneColor = builder.Write(mainTargets.m_SceneColor, RGTextureAccess::RenderTarget);
+				mainTargets.m_Depth = builder.Write(mainTargets.m_Depth, RGTextureAccess::DepthStencilWrite);
+				data.m_SceneColor = mainTargets.m_SceneColor;
+				data.m_Depth = mainTargets.m_Depth;
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureAccess::Sample);
 				data.m_PrefilteredSpecularCubemap = builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);

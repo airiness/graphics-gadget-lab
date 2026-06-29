@@ -62,7 +62,7 @@ namespace gglab
 	{
 		None = 0,
 		DrawIndirect = 1ull << 0,
-		VertexInput = 1ull << 1,
+		IndexInput = 1ull << 1,
 		VertexShader = 1ull << 2,
 		PixelShader = 1ull << 3,
 		ComputeShader = 1ull << 4,
@@ -71,7 +71,7 @@ namespace gglab
 		Copy = 1ull << 7,
 		Resolve = 1ull << 8,
 		Present = 1ull << 9,
-		AllGraphics = DrawIndirect | VertexInput | VertexShader | PixelShader | RenderTarget | DepthStencil,
+		AllGraphics = DrawIndirect | IndexInput | VertexShader | PixelShader | RenderTarget | DepthStencil,
 		AllShaders = VertexShader | PixelShader | ComputeShader,
 		All = AllGraphics | ComputeShader | Copy | Resolve | Present,
 	};

@@ -92,7 +92,7 @@ namespace gglab::devtools
 	{
 		static constexpr std::array Entries = {
 			EnumTextEntry{ RHIStage::DrawIndirect, "DrawIndirect" },
-			EnumTextEntry{ RHIStage::VertexInput, "VertexInput" },
+			EnumTextEntry{ RHIStage::IndexInput, "IndexInput" },
 			EnumTextEntry{ RHIStage::VertexShader, "VertexShader" },
 			EnumTextEntry{ RHIStage::PixelShader, "PixelShader" },
 			EnumTextEntry{ RHIStage::ComputeShader, "ComputeShader" },

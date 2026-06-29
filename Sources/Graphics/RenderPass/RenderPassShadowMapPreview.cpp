@@ -56,9 +56,10 @@ namespace gglab
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
-				data.m_ShadowMapPreview = builder.Write(
+				shadowRes.m_DirectionalShadowMapPreview = builder.Write(
 					shadowRes.m_DirectionalShadowMapPreview,
 					RGTextureAccess::RenderTarget);
+				data.m_ShadowMapPreview = shadowRes.m_DirectionalShadowMapPreview;
 
 				const auto shadowMapSrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1);
 				data.m_ShadowMapSrv =

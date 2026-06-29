@@ -340,7 +340,12 @@ namespace gglab
 		// Build RenderGraph
 		auto& renderPipeline = demo->GetRenderPipeline();
 		renderPipeline.BuildRenderGraph(rg, renderContext, services);
-		rg.Compile();
+		const bool renderGraphCompiled = rg.Compile();
+		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
+		if (!renderGraphCompiled)
+		{
+			return false;
+		}
 
 		// Draw menus before Renderer::Render()
 		if (m_DevToolsRuntime)

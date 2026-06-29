@@ -67,9 +67,10 @@ namespace gglab
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
 				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
-				data.m_PrefilteredSpecularCubemap = builder.Write(
+				iblRes.m_PrefilteredSpecularCubemap = builder.Write(
 					iblRes.m_PrefilteredSpecularCubemap,
 					RGTextureAccess::RenderTarget);
+				data.m_PrefilteredSpecularCubemap = iblRes.m_PrefilteredSpecularCubemap;
 
 				const auto* textureDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
