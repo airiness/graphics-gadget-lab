@@ -19,6 +19,12 @@ namespace gglab
 				static_cast<UINT>(mipLevels);
 		}
 
+		uint32_t ResolvePlaneSlice(RHITextureAspect aspects) noexcept
+		{
+			return Test(aspects, RHITextureAspect::Stencil) &&
+				!Test(aspects, RHITextureAspect::Depth) ? 1u : 0u;
+		}
+
 		uint32_t ResolveRemainingCount(uint32_t base, uint32_t count, uint32_t total) noexcept
 		{
 			if (base >= total)
@@ -103,7 +109,7 @@ namespace gglab
 			if (nativeDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2D)
 			{
 				nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
-				nativeDesc.Texture2D.PlaneSlice = desc.m_Subresources.m_BasePlane;
+				nativeDesc.Texture2D.PlaneSlice = ResolvePlaneSlice(desc.m_Subresources.m_Aspects);
 			}
 			break;
 		case RHITextureViewDimension::Texture2DArray:
@@ -117,7 +123,7 @@ namespace gglab
 				nativeDesc.Texture2DArray.MipSlice = desc.m_Subresources.m_BaseMip;
 				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
 				nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
-				nativeDesc.Texture2DArray.PlaneSlice = desc.m_Subresources.m_BasePlane;
+				nativeDesc.Texture2DArray.PlaneSlice = ResolvePlaneSlice(desc.m_Subresources.m_Aspects);
 			}
 			else
 			{
@@ -216,7 +222,7 @@ namespace gglab
 			{
 				nativeDesc.Texture2D.MostDetailedMip = desc.m_Subresources.m_BaseMip;
 				nativeDesc.Texture2D.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
-				nativeDesc.Texture2D.PlaneSlice = desc.m_Subresources.m_BasePlane;
+				nativeDesc.Texture2D.PlaneSlice = ResolvePlaneSlice(desc.m_Subresources.m_Aspects);
 				nativeDesc.Texture2D.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			}
 			break;
@@ -230,7 +236,7 @@ namespace gglab
 				nativeDesc.Texture2DArray.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
 				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
 				nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
-				nativeDesc.Texture2DArray.PlaneSlice = desc.m_Subresources.m_BasePlane;
+				nativeDesc.Texture2DArray.PlaneSlice = ResolvePlaneSlice(desc.m_Subresources.m_Aspects);
 				nativeDesc.Texture2DArray.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			}
 			else
@@ -292,7 +298,7 @@ namespace gglab
 		case RHITextureViewDimension::Texture2D:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 			nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
-			nativeDesc.Texture2D.PlaneSlice = desc.m_Subresources.m_BasePlane;
+			nativeDesc.Texture2D.PlaneSlice = ResolvePlaneSlice(desc.m_Subresources.m_Aspects);
 			break;
 		case RHITextureViewDimension::Texture2DArray:
 		case RHITextureViewDimension::TextureCube:
@@ -301,7 +307,7 @@ namespace gglab
 			nativeDesc.Texture2DArray.MipSlice = desc.m_Subresources.m_BaseMip;
 			nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
 			nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
-			nativeDesc.Texture2DArray.PlaneSlice = desc.m_Subresources.m_BasePlane;
+			nativeDesc.Texture2DArray.PlaneSlice = ResolvePlaneSlice(desc.m_Subresources.m_Aspects);
 			break;
 		case RHITextureViewDimension::Texture3D:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;

@@ -106,6 +106,17 @@ namespace gglab::devtools
 	};
 
 	template<>
+	struct EnumTextTraits<RHITextureAspect>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RHITextureAspect::Color, "Color" },
+			EnumTextEntry{ RHITextureAspect::Depth, "Depth" },
+			EnumTextEntry{ RHITextureAspect::Stencil, "Stencil" },
+		};
+		static constexpr std::string_view NoneText = "None";
+	};
+
+	template<>
 	struct EnumTextTraits<RHIAccess>
 	{
 		static constexpr std::array Entries = {
@@ -149,5 +160,27 @@ namespace gglab::devtools
 			EnumFlagsTextWithBits(state.m_Stages),
 			EnumFlagsTextWithBits(state.m_Access),
 			EnumValueTextWithBits(state.m_Layout));
+	}
+
+	[[nodiscard]] inline std::string SubresourceRangeText(
+		const std::optional<RHISubresourceRange>& range)
+	{
+		if (!range)
+		{
+			return "All";
+		}
+
+		auto countText = [](uint32_t count)
+			{
+				return count == RHISubresourceRange::Remaining ?
+					std::string("Remaining") :
+					std::to_string(count);
+			};
+		return std::format("mip {}+{}, array {}+{}, aspects {}",
+			range->m_BaseMip,
+			countText(range->m_MipCount),
+			range->m_BaseArraySlice,
+			countText(range->m_ArraySliceCount),
+			EnumFlagsTextWithBits(range->m_Aspects));
 	}
 }

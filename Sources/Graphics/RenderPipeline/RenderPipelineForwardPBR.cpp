@@ -179,7 +179,7 @@ namespace gglab
 					{
 						.m_MipCount = 1,
 						.m_ArraySliceCount = 1,
-						.m_PlaneCount = 1,
+						.m_Aspects = RHITextureAspect::Color,
 					});
 			});
 	}

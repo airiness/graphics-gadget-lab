@@ -12,7 +12,7 @@ namespace gglab
 		uint32_t mip,
 		uint32_t firstSlice,
 		uint32_t arraySize,
-		uint32_t planeSlice = 0) noexcept
+		RHITextureAspect aspect = RHITextureAspect::Color) noexcept
 	{
 		return RHITextureViewDesc{
 			.m_Type = RHITextureViewType::ShaderResource,
@@ -24,8 +24,7 @@ namespace gglab
 				.m_MipCount = 1,
 				.m_BaseArraySlice = firstSlice,
 				.m_ArraySliceCount = arraySize,
-				.m_BasePlane = planeSlice,
-				.m_PlaneCount = 1,
+				.m_Aspects = aspect,
 			},
 		};
 	}
@@ -34,7 +33,7 @@ namespace gglab
 		RHIFormat format,
 		uint32_t mip = 0,
 		uint32_t mipLevels = 1,
-		uint32_t planeSlice = 0) noexcept
+		RHITextureAspect aspect = RHITextureAspect::Color) noexcept
 	{
 		return RHITextureViewDesc{
 			.m_Type = RHITextureViewType::ShaderResource,
@@ -44,8 +43,7 @@ namespace gglab
 			{
 				.m_BaseMip = mip,
 				.m_MipCount = mipLevels,
-				.m_BasePlane = planeSlice,
-				.m_PlaneCount = 1,
+				.m_Aspects = aspect,
 			},
 		};
 	}

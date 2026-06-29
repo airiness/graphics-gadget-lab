@@ -50,7 +50,11 @@ namespace gglab
 				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 
-				const auto dsvDesc = MakeRHITexture2DViewDesc(RHIFormat::D32Float);
+				const auto dsvDesc = MakeRHITexture2DViewDesc(
+					RHIFormat::D32Float,
+					0,
+					1,
+					RHITextureAspect::Depth);
 				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
 			},
 			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)

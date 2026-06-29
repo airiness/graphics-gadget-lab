@@ -729,7 +729,7 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (!ImGui::BeginTable(label, 4, flags))
+			if (!ImGui::BeginTable(label, 5, flags))
 			{
 				return;
 			}
@@ -738,12 +738,14 @@ namespace gglab
 			ImGui::TableSetupColumn("Type");
 			ImGui::TableSetupColumn("Before");
 			ImGui::TableSetupColumn("After");
+			ImGui::TableSetupColumn("Range");
 			ImGui::TableHeadersRow();
 
 			for (const auto& barrier : barriers)
 			{
 				const std::string before = devtools::BarrierStateText(barrier.m_Before);
 				const std::string after = devtools::BarrierStateText(barrier.m_After);
+				const std::string range = devtools::SubresourceRangeText(barrier.m_Subresources);
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -754,6 +756,8 @@ namespace gglab
 				ImGui::TextUnformatted(before.c_str());
 				ImGui::TableSetColumnIndex(3);
 				ImGui::TextUnformatted(after.c_str());
+				ImGui::TableSetColumnIndex(4);
+				ImGui::TextUnformatted(range.c_str());
 			}
 
 			ImGui::EndTable();
@@ -787,13 +791,14 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (ImGui::BeginTable("SelectedPassAccesses", 7, flags))
+			if (ImGui::BeginTable("SelectedPassAccesses", 8, flags))
 			{
 				ImGui::TableSetupColumn("Resource");
 				ImGui::TableSetupColumn("Type");
 				ImGui::TableSetupColumn("Dependency");
 				ImGui::TableSetupColumn("Access");
 				ImGui::TableSetupColumn("Stages");
+				ImGui::TableSetupColumn("Range");
 				ImGui::TableSetupColumn("Node");
 				ImGui::TableSetupColumn("Version");
 				ImGui::TableHeadersRow();
@@ -815,8 +820,11 @@ namespace gglab
 					const std::string stagesText = devtools::EnumFlagsTextWithBits(access.m_Stages);
 					ImGui::TextUnformatted(stagesText.c_str());
 					ImGui::TableSetColumnIndex(5);
-					ImGui::Text("%u", access.m_ResourceNodeIndex);
+					const std::string rangeText = devtools::SubresourceRangeText(access.m_Subresources);
+					ImGui::TextUnformatted(rangeText.c_str());
 					ImGui::TableSetColumnIndex(6);
+					ImGui::Text("%u", access.m_ResourceNodeIndex);
+					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%u", access.m_ResourceVersion);
 				}
 

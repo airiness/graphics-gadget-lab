@@ -47,14 +47,16 @@ namespace gglab
 		TextureCubeArray,
 	};
 
-	[[nodiscard]] constexpr inline uint32_t GetRHIFormatPlaneCount(RHIFormat format) noexcept
+	[[nodiscard]] constexpr inline RHITextureAspect GetRHIFormatAspects(RHIFormat format) noexcept
 	{
 		switch (format)
 		{
 		case RHIFormat::D24UnormS8Uint:
-			return 2;
+			return RHITextureAspect::DepthStencil;
+		case RHIFormat::D32Float:
+			return RHITextureAspect::Depth;
 		default:
-			return 1;
+			return RHITextureAspect::Color;
 		}
 	}
 
@@ -70,6 +72,15 @@ namespace gglab
 		const char* m_DebugName = nullptr;
 		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
 	};
+
+	[[nodiscard]] constexpr inline RHITextureAspect GetRHITextureAspects(const RHITextureDesc& desc) noexcept
+	{
+		if (desc.m_Format == RHIFormat::R32Typeless && Test(desc.m_Usage, RHITextureUsage::DepthStencil))
+		{
+			return RHITextureAspect::Depth;
+		}
+		return GetRHIFormatAspects(desc.m_Format);
+	}
 
 	struct RHIImportedTextureDesc
 	{
@@ -118,8 +129,7 @@ namespace gglab
 				m_Subresources.m_MipCount,
 				m_Subresources.m_BaseArraySlice,
 				m_Subresources.m_ArraySliceCount,
-				m_Subresources.m_BasePlane,
-				m_Subresources.m_PlaneCount,
+				m_Subresources.m_Aspects,
 				m_ResourceMinLODClamp);
 		}
 	};

@@ -27,6 +27,17 @@ namespace gglab
 		Buffer,
 	};
 
+	enum class RHITextureAspect : uint8_t
+	{
+		None = 0,
+		Color = 1u << 0,
+		Depth = 1u << 1,
+		Stencil = 1u << 2,
+		DepthStencil = Depth | Stencil,
+		All = Color | Depth | Stencil,
+	};
+	GGLAB_ENUM_FLAGS(RHITextureAspect);
+
 	enum class RHIFormat : uint16_t
 	{
 		Unknown,

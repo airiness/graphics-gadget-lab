@@ -47,8 +47,7 @@ namespace gglab
 		uint32_t m_MipCount = Remaining;
 		uint32_t m_BaseArraySlice = 0;
 		uint32_t m_ArraySliceCount = Remaining;
-		uint32_t m_BasePlane = 0;
-		uint32_t m_PlaneCount = 1;
+		RHITextureAspect m_Aspects = RHITextureAspect::All;
 
 		bool operator==(const RHISubresourceRange&) const noexcept = default;
 
@@ -59,8 +58,7 @@ namespace gglab
 				m_MipCount,
 				m_BaseArraySlice,
 				m_ArraySliceCount,
-				m_BasePlane,
-				m_PlaneCount);
+				m_Aspects);
 		}
 	};
 
