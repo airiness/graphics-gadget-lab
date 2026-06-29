@@ -292,19 +292,37 @@ namespace gglab
 		auto normalizeTextureRange = [](const RHITextureDesc& desc,
 			const std::optional<RHISubresourceRange>& requested) noexcept
 			{
+				auto resolveCount = [](uint32_t base, uint32_t count, uint32_t total) noexcept
+					{
+						if (base >= total)
+						{
+							return 0u;
+						}
+
+						const uint32_t remaining = total - base;
+						return count == RHISubresourceRange::Remaining ?
+							remaining :
+							std::min(count, remaining);
+					};
+
 				RHISubresourceRange range = requested.value_or(
 					RHISubresourceRange
 					{
-						.m_BaseMip = 0,
-						.m_MipCount = desc.m_MipLevels,
-						.m_BaseArraySlice = 0,
-						.m_ArraySliceCount = desc.m_ArraySize,
-						.m_BasePlane = 0,
-						.m_PlaneCount = 1,
+						.m_PlaneCount = RHISubresourceRange::Remaining,
 					});
-				range.m_MipCount = std::max(1u, range.m_MipCount);
-				range.m_ArraySliceCount = std::max(1u, range.m_ArraySliceCount);
-				range.m_PlaneCount = std::max(1u, range.m_PlaneCount);
+
+				const uint32_t mipLevels = std::max<uint32_t>(1, desc.m_MipLevels);
+				const uint32_t arraySize = desc.m_Dimension == RHITextureDimension::Texture3D ?
+					1u :
+					std::max<uint32_t>(1, desc.m_ArraySize);
+				const uint32_t planeCount = GetRHIFormatPlaneCount(desc.m_Format);
+
+				range.m_MipCount = resolveCount(range.m_BaseMip, range.m_MipCount, mipLevels);
+				range.m_ArraySliceCount = resolveCount(
+					range.m_BaseArraySlice,
+					range.m_ArraySliceCount,
+					arraySize);
+				range.m_PlaneCount = resolveCount(range.m_BasePlane, range.m_PlaneCount, planeCount);
 				return range;
 			};
 

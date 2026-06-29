@@ -8,7 +8,7 @@ namespace gglab
 	{
 		return
 		{
-			.m_Stages = RHIStage::None,
+			.m_Stages = RHIStage::All,
 			.m_Access = RHIAccess::Common,
 			.m_Layout = RHILayout::Common,
 		};

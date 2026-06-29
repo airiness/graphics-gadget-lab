@@ -49,7 +49,7 @@ namespace gglab
 		}
 		if (Test(stages, RHIStage::Present))
 		{
-			sync |= D3D12_BARRIER_SYNC_ALL;
+			return D3D12_BARRIER_SYNC_ALL;
 		}
 		return sync;
 	}
