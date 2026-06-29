@@ -18,6 +18,24 @@ namespace gglab
 {
 	namespace
 	{
+		CD3DX12_BARRIER_SUBRESOURCE_RANGE ToD3D12BarrierSubresourceRange(
+			const std::optional<RHISubresourceRange>& subresources) noexcept
+		{
+			if (!subresources)
+			{
+				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+			}
+
+			const RHISubresourceRange& range = *subresources;
+			return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
+				range.m_BaseMip,
+				range.m_MipCount,
+				range.m_BaseArraySlice,
+				range.m_ArraySliceCount,
+				range.m_BasePlane,
+				range.m_PlaneCount);
+		}
+
 		D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(RHIPrimitiveTopology topology) noexcept
 		{
 			switch (topology)
@@ -87,7 +105,7 @@ namespace gglab
 					ToD3D12BarrierLayout(barrier.m_Before.m_Layout),
 					ToD3D12BarrierLayout(barrier.m_After.m_Layout),
 					texture->Get(),
-					CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)));
+					ToD3D12BarrierSubresourceRange(barrier.m_Subresources)));
 			TrackTextureUse(barrier.m_Texture);
 		}
 

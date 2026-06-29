@@ -72,8 +72,9 @@ namespace gglab
 		swapChainInfo.m_AllowTearing = desc.m_AllowTearing && m_Device->SupportTearing();
 		swapChainInfo.m_Vsync = desc.m_Vsync;
 		auto swapChain = std::make_unique<DX12SwapChain>();
-		GGLAB_ASSERT_MSG(swapChain->Initialize(swapChainInfo),
-			"DX12Context failed to initialize the swapchain.");
+		const auto swapChainInitResult = swapChain->Initialize(swapChainInfo);
+		GGLAB_ASSERT_MSG(swapChainInitResult, "DX12Context failed to initialize the swapchain.");
+		GGLAB_UNUSED(swapChainInitResult);
 		m_SwapChain = std::move(swapChain);
 		GGLAB_ASSERT_MSG(m_SwapChain && m_SwapChain->IsValid(),
 			"DX12Context failed to create the swapchain.");

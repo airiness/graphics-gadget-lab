@@ -34,10 +34,93 @@ namespace gglab
 
 	void RenderGraph::Compile() noexcept
 	{
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		{
+			auto& passNode = m_PassNodes[passNodeIndex];
+			passNode.m_Culled = false;
+			passNode.m_ExecutionOrder = -1;
+			passNode.m_PreBarriers.clear();
+			passNode.m_PostBarriers.clear();
+			passNode.m_DevirtualizeVirtualResources.clear();
+			passNode.m_DestroyVirtualResources.clear();
+		}
+
+		BuildDependencyGraph();
+		CullPasses();
+		TopologicalSortPasses();
+		BuildResourceLifetimes();
+		BuildResourceBarriers();
+	}
+
+	void RenderGraph::BuildDependencyGraph() noexcept
+	{
+		m_DependencyEdges.clear();
+		for (auto& passNode : m_PassNodes)
+		{
+			passNode.m_Dependencies.clear();
+			passNode.m_Dependents.clear();
+		}
+
+		auto addEdge = [this](RGPassNodeIndex from,
+			RGPassNodeIndex to,
+			RGResourceNode::Index resourceNodeIndex) noexcept
+			{
+				if (!from.IsValid() || !to.IsValid() || from == to)
+				{
+					return;
+				}
+
+				auto edgeIter = std::ranges::find_if(m_DependencyEdges,
+					[&](const RGPassDependencyEdge& edge)
+					{
+						return edge.m_From == from &&
+							edge.m_To == to &&
+							edge.m_ResourceNodeIndex == resourceNodeIndex;
+					});
+				if (edgeIter != m_DependencyEdges.end())
+				{
+					return;
+				}
+
+				m_DependencyEdges.push_back(
+					{
+						.m_From = from,
+						.m_To = to,
+						.m_ResourceNodeIndex = resourceNodeIndex,
+					});
+				m_PassNodes[from.Value()].m_Dependents.push_back(to);
+				m_PassNodes[to.Value()].m_Dependencies.push_back(from);
+			};
+
+		for (uint32_t resourceNodeIndex = 0; resourceNodeIndex < m_ResourceNodes.size(); ++resourceNodeIndex)
+		{
+			const RGResourceNode& resourceNode = m_ResourceNodes[resourceNodeIndex];
+			const RGResourceNode::Index stableResourceNodeIndex{ resourceNodeIndex };
+
+			for (const auto readerPassIndex : resourceNode.m_Readers)
+			{
+				addEdge(resourceNode.m_Writer, readerPassIndex, stableResourceNodeIndex);
+			}
+
+			if (!resourceNode.m_Previous.IsValid() || !resourceNode.m_Writer.IsValid())
+			{
+				continue;
+			}
+
+			const RGResourceNode& previousNode = m_ResourceNodes[resourceNode.m_Previous.Value()];
+			addEdge(previousNode.m_Writer, resourceNode.m_Writer, resourceNode.m_Previous);
+			for (const auto previousReader : previousNode.m_Readers)
+			{
+				addEdge(previousReader, resourceNode.m_Writer, resourceNode.m_Previous);
+			}
+		}
+	}
+
+	void RenderGraph::CullPasses() noexcept
+	{
 		std::vector<RGPassNodeIndex> stack;
 		std::unordered_set<RGPassNodeIndex> reachable;
 
-		// Add pass to reachable and stack
 		auto addPass = [&stack, &reachable](RGPassNodeIndex passNodeIndex)
 			{
 				if (!passNodeIndex.IsValid())
@@ -50,49 +133,113 @@ namespace gglab
 				}
 			};
 
-		// Traverse passes and add it if it's a side effect pass
 		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
 		{
-			auto& passNode = m_PassNodes[passNodeIndex];
-			if (passNode.m_SideEffect)
+			if (m_PassNodes[passNodeIndex].m_SideEffect)
 			{
 				addPass(RGPassNodeIndex{ passNodeIndex });
 			}
 		}
 
-		// Traverse all passes in stack, find their reader resources, add their writer passes to stack and reachable
 		while (!stack.empty())
 		{
 			const RGPassNodeIndex passNodeIndex = stack.back();
 			stack.pop_back();
 
-			RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
-			for (const auto& access : passNode.m_Accesses)
+			for (const auto dependency : m_PassNodes[passNodeIndex.Value()].m_Dependencies)
 			{
-				if (access.m_DependencyAccess != RGDependencyAccess::Write)
+				addPass(dependency);
+			}
+		}
+
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		{
+			m_PassNodes[passNodeIndex].m_Culled =
+				(reachable.find(RGPassNodeIndex{ passNodeIndex }) == reachable.end());
+		}
+	}
+
+	void RenderGraph::TopologicalSortPasses() noexcept
+	{
+		m_ExecutionOrder.clear();
+		std::vector<uint32_t> indegrees(m_PassNodes.size(), 0);
+		std::vector<RGPassNodeIndex> ready;
+
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		{
+			const auto& passNode = m_PassNodes[passNodeIndex];
+			if (passNode.m_Culled)
+			{
+				continue;
+			}
+
+			for (const auto dependency : passNode.m_Dependencies)
+			{
+				if (!m_PassNodes[dependency.Value()].m_Culled)
 				{
-					RGResourceNode& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
-					if (resourceNode.m_Writer.IsValid())
-					{
-						addPass(resourceNode.m_Writer);
-					}
+					++indegrees[passNodeIndex];
+				}
+			}
+
+			if (indegrees[passNodeIndex] == 0)
+			{
+				ready.push_back(RGPassNodeIndex{ passNodeIndex });
+			}
+		}
+
+		while (!ready.empty())
+		{
+			std::ranges::sort(ready);
+			const RGPassNodeIndex passNodeIndex = ready.front();
+			ready.erase(ready.begin());
+
+			m_PassNodes[passNodeIndex.Value()].m_ExecutionOrder =
+				static_cast<int32_t>(m_ExecutionOrder.size());
+			m_ExecutionOrder.push_back(passNodeIndex);
+
+			for (const auto dependent : m_PassNodes[passNodeIndex.Value()].m_Dependents)
+			{
+				if (m_PassNodes[dependent.Value()].m_Culled)
+				{
+					continue;
+				}
+
+				GGLAB_ASSERT_MSG(indegrees[dependent.Value()] > 0, "RenderGraph topological sort indegree underflow.");
+				--indegrees[dependent.Value()];
+				if (indegrees[dependent.Value()] == 0)
+				{
+					ready.push_back(dependent);
 				}
 			}
 		}
 
-		// Set and initialize pass infos for next steps
-		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		uint32_t reachablePassCount = 0;
+		for (const auto& passNode : m_PassNodes)
 		{
-			auto& passNode = m_PassNodes[passNodeIndex];
-			passNode.m_Culled = (reachable.find(RGPassNodeIndex{ passNodeIndex }) == reachable.end());
-
-			passNode.m_PreBarriers.clear();
-			passNode.m_PostBarriers.clear();
-			passNode.m_DevirtualizeVirtualResources.clear();
-			passNode.m_DestroyVirtualResources.clear();
+			reachablePassCount += passNode.m_Culled ? 0u : 1u;
 		}
 
-		// Set and initialize virtual resource infos for next steps
+		GGLAB_ASSERT_MSG(m_ExecutionOrder.size() == reachablePassCount,
+			"RenderGraph dependency graph contains a cycle.");
+		if (m_ExecutionOrder.size() == reachablePassCount)
+		{
+			return;
+		}
+
+		m_ExecutionOrder.clear();
+		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		{
+			if (!m_PassNodes[passNodeIndex].m_Culled)
+			{
+				m_PassNodes[passNodeIndex].m_ExecutionOrder =
+					static_cast<int32_t>(m_ExecutionOrder.size());
+				m_ExecutionOrder.push_back(RGPassNodeIndex{ passNodeIndex });
+			}
+		}
+	}
+
+	void RenderGraph::BuildResourceLifetimes() noexcept
+	{
 		for (auto& virtualResource : m_VirtualResources)
 		{
 			virtualResource->m_RefCount = 0;
@@ -101,35 +248,27 @@ namespace gglab
 			virtualResource->ResetCompiledUsage();
 		}
 
-		// Traverse all reachable passes, count reference for virtual resources and find first and last user pass for each virtual resource
-		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		for (const auto passNodeIndex : m_ExecutionOrder)
 		{
-			auto& passNode = m_PassNodes[passNodeIndex];
-			if (passNode.m_Culled)
-			{
-				continue;
-			}
-
-			const RGPassNodeIndex rgPassNodeIndex{ passNodeIndex };
+			auto& passNode = m_PassNodes[passNodeIndex.Value()];
 			for (const auto& access : passNode.m_Accesses)
 			{
-				RGResourceNode& resourceNode = m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
-				auto* virtualResource = resourceNode.m_VirtualResource;
+				auto* virtualResource = m_ResourceNodes[access.m_ResourceNodeIndex.Value()].m_VirtualResource;
 				if (!virtualResource)
 				{
 					continue;
 				}
+
 				++virtualResource->m_RefCount;
 				virtualResource->AccumulateAccess(access.m_AccessValue);
 				if (!virtualResource->m_FirstUser.IsValid())
 				{
-					virtualResource->m_FirstUser = rgPassNodeIndex;
+					virtualResource->m_FirstUser = passNodeIndex;
 				}
-				virtualResource->m_LastUser = rgPassNodeIndex;
+				virtualResource->m_LastUser = passNodeIndex;
 			}
 		}
 
-		// Traverse all virtual resources, add devirtualize intent to first user pass and destroy intent to last user pass
 		for (auto* virtualResource : m_VirtualResources)
 		{
 			if (virtualResource->m_RefCount == 0)
@@ -140,67 +279,134 @@ namespace gglab
 			m_PassNodes[virtualResource->m_FirstUser.Value()].m_DevirtualizeVirtualResources.push_back(virtualResource);
 			m_PassNodes[virtualResource->m_LastUser.Value()].m_DestroyVirtualResources.push_back(virtualResource);
 		}
+	}
 
-		// Track resource barrier states while scanning passes in execution order.
-		std::unordered_map<RGVirtualResourceBase*, RHIResourceState> currentStates;
-		for (auto* virtualResource : m_VirtualResources)
+	void RenderGraph::BuildResourceBarriers() noexcept
+	{
+		struct TextureStateTracker
 		{
-			currentStates.emplace(virtualResource, virtualResource->m_InitialBarrierState);
-		}
-
-		struct MergedAccess
-		{
-			RGVirtualResourceBase* m_VirtualResource = nullptr;
-			uint64_t m_AccessValue = 0;
-			RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
+			RHIResourceState m_InitialState = CommonRHIResourceState();
+			std::unordered_map<uint32_t, RHIResourceState> m_SubresourceStates;
 		};
 
-		for (auto& passNode : m_PassNodes)
-		{
-			if (passNode.m_Culled)
+		auto normalizeTextureRange = [](const RHITextureDesc& desc,
+			const std::optional<RHISubresourceRange>& requested) noexcept
 			{
-				continue;
-			}
+				RHISubresourceRange range = requested.value_or(
+					RHISubresourceRange
+					{
+						.m_BaseMip = 0,
+						.m_MipCount = desc.m_MipLevels,
+						.m_BaseArraySlice = 0,
+						.m_ArraySliceCount = desc.m_ArraySize,
+						.m_BasePlane = 0,
+						.m_PlaneCount = 1,
+					});
+				range.m_MipCount = std::max(1u, range.m_MipCount);
+				range.m_ArraySliceCount = std::max(1u, range.m_ArraySliceCount);
+				range.m_PlaneCount = std::max(1u, range.m_PlaneCount);
+				return range;
+			};
 
-			std::vector<MergedAccess> mergedAccesses;
+		auto subresourceIndex = [](const RHITextureDesc& desc,
+			uint32_t mip,
+			uint32_t arraySlice,
+			uint32_t plane) noexcept
+			{
+				const uint32_t mipLevels = std::max<uint32_t>(1, desc.m_MipLevels);
+				const uint32_t arraySize = std::max<uint32_t>(1, desc.m_ArraySize);
+				return mip + mipLevels * (arraySlice + arraySize * plane);
+			};
+
+		auto singleSubresourceRange = [](uint32_t mip, uint32_t arraySlice, uint32_t plane) noexcept
+			{
+				return RHISubresourceRange
+				{
+					.m_BaseMip = mip,
+					.m_MipCount = 1,
+					.m_BaseArraySlice = arraySlice,
+					.m_ArraySliceCount = 1,
+					.m_BasePlane = plane,
+					.m_PlaneCount = 1,
+				};
+			};
+
+		std::unordered_map<RGVirtualResourceBase*, TextureStateTracker> textureStates;
+		std::unordered_map<RGVirtualResourceBase*, RHIResourceState> bufferStates;
+		for (auto* virtualResource : m_VirtualResources)
+		{
+			if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
+			{
+				textureStates.emplace(virtualResource,
+					TextureStateTracker{ .m_InitialState = virtualResource->m_InitialBarrierState });
+			}
+			else
+			{
+				bufferStates.emplace(virtualResource, virtualResource->m_InitialBarrierState);
+			}
+		}
+
+		for (const auto passNodeIndex : m_ExecutionOrder)
+		{
+			auto& passNode = m_PassNodes[passNodeIndex.Value()];
 			for (const auto& access : passNode.m_Accesses)
 			{
+				const RHIResourceState requiredState = ToRHIResourceState(
+					access.m_AccessValue,
+					access.m_ResourceType);
+
 				auto* virtualResource = m_ResourceNodes[access.m_ResourceNodeIndex.Value()].m_VirtualResource;
 				if (!virtualResource)
 				{
 					continue;
 				}
 
-				auto iter = std::ranges::find(mergedAccesses, virtualResource, &MergedAccess::m_VirtualResource);
-				if (iter == mergedAccesses.end())
+				if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
 				{
-					mergedAccesses.push_back(
+					const auto* textureResource =
+						static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource);
+					const RHISubresourceRange range = normalizeTextureRange(
+						textureResource->m_Desc,
+						access.m_Subresources);
+					auto& stateTracker = textureStates.at(virtualResource);
+
+					for (uint32_t plane = range.m_BasePlane; plane < range.m_BasePlane + range.m_PlaneCount; ++plane)
+					{
+						for (uint32_t arraySlice = range.m_BaseArraySlice;
+							arraySlice < range.m_BaseArraySlice + range.m_ArraySliceCount;
+							++arraySlice)
 						{
-							.m_VirtualResource = virtualResource,
-							.m_AccessValue = access.m_AccessValue,
-							.m_DependencyAccess = access.m_DependencyAccess,
-						});
+							for (uint32_t mip = range.m_BaseMip; mip < range.m_BaseMip + range.m_MipCount; ++mip)
+							{
+								const uint32_t index = subresourceIndex(textureResource->m_Desc, mip, arraySlice, plane);
+								auto [stateIter, inserted] = stateTracker.m_SubresourceStates.emplace(
+									index,
+									stateTracker.m_InitialState);
+								auto& currentState = stateIter->second;
+
+								if (NeedsRHIResourceBarrier(currentState, requiredState))
+								{
+									passNode.m_PreBarriers.push_back(
+										{
+											.m_VirtualResource = virtualResource,
+											.m_Before = currentState,
+											.m_After = requiredState,
+											.m_Subresources = singleSubresourceRange(mip, arraySlice, plane),
+										});
+								}
+								currentState = requiredState;
+							}
+						}
+					}
 					continue;
 				}
 
-				GGLAB_ASSERT_MSG(iter->m_DependencyAccess == access.m_DependencyAccess,
-					"A pass may not read and write the same whole resource.");
-				GGLAB_ASSERT_MSG(iter->m_AccessValue == access.m_AccessValue,
-					"A pass must declare a single access mode for each whole resource.");
-			}
-
-			for (const auto& access : mergedAccesses)
-			{
-				const RHIResourceState requiredState = ToRHIResourceState(
-					access.m_AccessValue,
-					access.m_VirtualResource->m_ResourceType);
-				auto& currentState = currentStates.at(access.m_VirtualResource);
-
+				auto& currentState = bufferStates.at(virtualResource);
 				if (NeedsRHIResourceBarrier(currentState, requiredState))
 				{
 					passNode.m_PreBarriers.push_back(
 						{
-							.m_VirtualResource = access.m_VirtualResource,
+							.m_VirtualResource = virtualResource,
 							.m_Before = currentState,
 							.m_After = requiredState,
 						});
@@ -219,12 +425,42 @@ namespace gglab
 			const RHIResourceState requiredFinalState = virtualResource->m_Imported ?
 				virtualResource->m_FinalBarrierState.value_or(virtualResource->m_InitialBarrierState) :
 				CommonRHIResourceState();
-			auto& currentState = currentStates.at(virtualResource);
+
+			if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
+			{
+				auto& stateTracker = textureStates.at(virtualResource);
+				for (auto& [subresourceIndex, currentState] : stateTracker.m_SubresourceStates)
+				{
+					if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
+					{
+						continue;
+					}
+
+					const auto* textureResource =
+						static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource);
+					const uint32_t mipLevels = std::max<uint32_t>(1, textureResource->m_Desc.m_MipLevels);
+					const uint32_t arraySize = std::max<uint32_t>(1, textureResource->m_Desc.m_ArraySize);
+					const uint32_t mip = subresourceIndex % mipLevels;
+					const uint32_t arraySlice = (subresourceIndex / mipLevels) % arraySize;
+					const uint32_t plane = subresourceIndex / (mipLevels * arraySize);
+
+					m_PassNodes[virtualResource->m_LastUser.Value()].m_PostBarriers.push_back(
+						{
+							.m_VirtualResource = virtualResource,
+							.m_Before = currentState,
+							.m_After = requiredFinalState,
+							.m_Subresources = singleSubresourceRange(mip, arraySlice, plane),
+						});
+					currentState = requiredFinalState;
+				}
+				continue;
+			}
+
+			auto& currentState = bufferStates.at(virtualResource);
 			if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
 			{
 				continue;
 			}
-
 			m_PassNodes[virtualResource->m_LastUser.Value()].m_PostBarriers.push_back(
 				{
 					.m_VirtualResource = virtualResource,
@@ -240,12 +476,9 @@ namespace gglab
 		auto* previousRenderGraph = executeContext.m_RenderGraph;
 		executeContext.m_RenderGraph = this;
 
-		for (auto& passNode : m_PassNodes)
+		for (const auto passNodeIndex : m_ExecutionOrder)
 		{
-			if (passNode.m_Culled)
-			{
-				continue;
-			}
+			auto& passNode = m_PassNodes[passNodeIndex.Value()];
 
 			// Devirtualize Gpu resources
 			for (auto* virtualResource : passNode.m_DevirtualizeVirtualResources)
@@ -478,7 +711,13 @@ namespace gglab
 				GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture barrier requires a live RHI handle.");
 				if (handle.IsValid())
 				{
-					textureBarriers.push_back({ handle, intent.m_Before, intent.m_After });
+					textureBarriers.push_back(
+						{
+							.m_Texture = handle,
+							.m_Before = intent.m_Before,
+							.m_After = intent.m_After,
+							.m_Subresources = intent.m_Subresources,
+						});
 				}
 				break;
 			}

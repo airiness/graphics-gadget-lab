@@ -3,6 +3,8 @@
 #include "Graphics/RenderGraph/RGTypes.h"
 #include "Graphics/RHI/RHIBuffer.h"
 
+#include <variant>
+
 namespace gglab
 {
 	struct TransientTextureAllocation;

@@ -16,6 +16,7 @@ namespace gglab
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 		RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
 		uint64_t m_AccessValue = 0;
+		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 	};
 
 	struct RGSnapshotBarrierInfo
@@ -25,6 +26,7 @@ namespace gglab
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 		RHIResourceState m_Before = CommonRHIResourceState();
 		RHIResourceState m_After = CommonRHIResourceState();
+		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 	};
 
 	struct RGSnapshotPassInfo
@@ -67,6 +69,7 @@ namespace gglab
 		std::string m_ResourceName;
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 		int32_t m_WriterPassIndex = -1;
+		int32_t m_PreviousResourceNodeIndex = -1;
 		std::vector<int32_t> m_ReaderPassIndices;
 	};
 

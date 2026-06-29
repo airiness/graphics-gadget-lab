@@ -105,6 +105,7 @@ namespace gglab
 		RGResourceHandle m_ResourceHandle;
 		RGVirtualResourceBase* m_VirtualResource = nullptr;
 
+		Index m_Previous = InvalidIndex;
 		RGPassNodeIndex m_Writer = InvalidRGPassNodeIndex;
 		std::vector<RGPassNodeIndex> m_Readers;
 
@@ -122,6 +123,7 @@ namespace gglab
 			uint64_t m_AccessValue = 0;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
 			RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
+			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
 
 		struct BarrierIntent
@@ -129,6 +131,7 @@ namespace gglab
 			RGVirtualResourceBase* m_VirtualResource = nullptr;
 			RHIResourceState m_Before = CommonRHIResourceState();
 			RHIResourceState m_After = CommonRHIResourceState();
+			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
 
 		GGLAB_DEFINE_NESTED_TYPED_INDEX(Index, uint32_t);
@@ -136,7 +139,10 @@ namespace gglab
 		StringID m_NameId;
 		bool m_SideEffect = false;
 		bool m_Culled = false;
+		int32_t m_ExecutionOrder = -1;
 		std::vector<Access> m_Accesses;
+		std::vector<RGPassNodeIndex> m_Dependencies;
+		std::vector<RGPassNodeIndex> m_Dependents;
 
 		std::vector<BarrierIntent> m_PreBarriers;
 		std::vector<BarrierIntent> m_PostBarriers;
@@ -145,6 +151,13 @@ namespace gglab
 		std::vector<RGVirtualResourceBase*> m_DestroyVirtualResources;
 
 		RGPassBase* m_Pass = nullptr;
+	};
+
+	struct RGPassDependencyEdge
+	{
+		RGPassNodeIndex m_From = InvalidRGPassNodeIndex;
+		RGPassNodeIndex m_To = InvalidRGPassNodeIndex;
+		RGResourceNode::Index m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
 	};
 
 	struct RGResourceSlot
@@ -226,23 +239,26 @@ namespace gglab
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access access = RESOURCE::DefaultReadAccess) noexcept
+				typename RESOURCE::Access access = RESOURCE::DefaultReadAccess,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access);
+				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, subresources);
 			}
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess) noexcept
+				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access);
+				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, subresources);
 			}
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access access) noexcept
+				typename RESOURCE::Access access,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access);
+				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, subresources);
 			}
 
 			template<typename RESOURCE>
@@ -313,15 +329,21 @@ namespace gglab
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex,
-			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access) noexcept;
+			RGResourceId<RESOURCE> resourceId,
+			RESOURCE::Access access,
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex,
-			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access) noexcept;
+			RGResourceId<RESOURCE> resourceId,
+			RESOURCE::Access access,
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNode::Index passNodeIndex,
-			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access) noexcept;
+			RGResourceId<RESOURCE> resourceId,
+			RESOURCE::Access access,
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
 		void ExportInternal(RGResourceId<RESOURCE> resourceId, RESOURCE::Access finalAccess) noexcept;
@@ -341,6 +363,12 @@ namespace gglab
 
 		RGPassNode& GetPassNode(RGPassNode::Index index) noexcept;
 
+		void BuildDependencyGraph() noexcept;
+		void CullPasses() noexcept;
+		void TopologicalSortPasses() noexcept;
+		void BuildResourceLifetimes() noexcept;
+		void BuildResourceBarriers() noexcept;
+
 		void TrackPassResourceUses(RHICommandContext* commandContext, const RGPassNode& passNode) noexcept;
 		void EmitBarriers(RHICommandContext* commandContext,
 			const std::vector<RGPassNode::BarrierIntent>& barriers) noexcept;
@@ -354,6 +382,8 @@ namespace gglab
 
 		std::vector<RGResourceNode> m_ResourceNodes;
 		std::vector<RGPassNode> m_PassNodes;
+		std::vector<RGPassDependencyEdge> m_DependencyEdges;
+		std::vector<RGPassNodeIndex> m_ExecutionOrder;
 		std::vector<RGVirtualResourceBase*> m_VirtualResources;
 		std::vector<RGResourceSlot> m_ResourceSlots;
 		std::vector<TextureViewRecord> m_TextureViews;
@@ -549,7 +579,8 @@ namespace gglab
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access resourceAccess) noexcept
+		typename RESOURCE::Access resourceAccess,
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
 
@@ -569,6 +600,10 @@ namespace gglab
 		access.m_AccessValue = static_cast<uint64_t>(resourceAccess);
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Read;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			access.m_Subresources = subresources;
+		}
 		passNode.m_Accesses.push_back(access);
 
 		return resourceId;
@@ -590,11 +625,13 @@ namespace gglab
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access resourceAccess) noexcept
+		typename RESOURCE::Access resourceAccess,
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
 
 		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
+		const RGResourceNode::Index previousNodeIndex = slot.m_ResourceNodeIndex;
 		RGResourceNode* curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
@@ -608,6 +645,7 @@ namespace gglab
 			RGResourceNode nextResourceNode = {};
 			nextResourceNode.m_ResourceHandle = resourceId;
 			nextResourceNode.m_VirtualResource = curResourceNode->m_VirtualResource;
+			nextResourceNode.m_Previous = previousNodeIndex;
 			slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
 			m_ResourceNodes.push_back(nextResourceNode);
 
@@ -626,6 +664,10 @@ namespace gglab
 		access.m_AccessValue = static_cast<uint64_t>(resourceAccess);
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Write;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			access.m_Subresources = subresources;
+		}
 		passNode.m_Accesses.push_back(access);
 
 		return resourceId;
@@ -634,7 +676,8 @@ namespace gglab
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ReadWriteInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access resourceAccess) noexcept
+		typename RESOURCE::Access resourceAccess,
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read-write valid resource.");
 
@@ -659,6 +702,7 @@ namespace gglab
 		RGResourceNode nextResourceNode = {};
 		nextResourceNode.m_ResourceHandle = resourceId;
 		nextResourceNode.m_VirtualResource = virtualResource;
+		nextResourceNode.m_Previous = previousNodeIndex;
 		nextResourceNode.m_Writer = stablePassNodeIndex;
 		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
 		m_ResourceNodes.push_back(nextResourceNode);
@@ -674,6 +718,17 @@ namespace gglab
 				.m_AccessValue = static_cast<uint64_t>(resourceAccess),
 				.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,
 				.m_DependencyAccess = RGDependencyAccess::ReadWrite,
+				.m_Subresources = [&]() -> std::optional<RHISubresourceRange>
+				{
+					if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+					{
+						return subresources;
+					}
+					else
+					{
+						return std::nullopt;
+					}
+				}(),
 			});
 		return resourceId;
 	}

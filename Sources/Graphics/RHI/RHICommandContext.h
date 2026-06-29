@@ -21,6 +21,7 @@ namespace gglab
 		RHITextureHandle m_Texture{};
 		RHIResourceState m_Before{};
 		RHIResourceState m_After{};
+		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 	};
 
 	struct RHIBufferBarrier
