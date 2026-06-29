@@ -345,15 +345,9 @@ namespace gglab
 					1u :
 					std::max<uint32_t>(1, desc.m_ArraySize);
 			};
-		auto aspectCountOf = [&](const RHITextureDesc& desc) noexcept
+		auto planeCountOf = [](const RHITextureDesc& desc) noexcept
 			{
-				uint32_t count = 0;
-				const RHITextureAspect aspects = GetRHITextureAspects(desc);
-				for (const auto aspect : aspectOrder)
-				{
-					count += Test(aspects, aspect) ? 1u : 0u;
-				}
-				return count;
+				return GetRHITexturePlaneCount(desc);
 			};
 		auto aspectIndexOf = [&](const RHITextureDesc& desc, RHITextureAspect target) noexcept
 			{
@@ -495,7 +489,7 @@ namespace gglab
 				}
 
 				const uint32_t fullSubresourceCount =
-					mipLevelsOf(desc) * arraySizeOf(desc) * aspectCountOf(desc);
+					mipLevelsOf(desc) * arraySizeOf(desc) * planeCountOf(desc);
 				for (auto& group : groups)
 				{
 					std::unordered_set<uint32_t> uniqueSubresources;

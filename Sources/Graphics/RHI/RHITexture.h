@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
@@ -49,15 +50,7 @@ namespace gglab
 
 	[[nodiscard]] constexpr inline RHITextureAspect GetRHIFormatAspects(RHIFormat format) noexcept
 	{
-		switch (format)
-		{
-		case RHIFormat::D24UnormS8Uint:
-			return RHITextureAspect::DepthStencil;
-		case RHIFormat::D32Float:
-			return RHITextureAspect::Depth;
-		default:
-			return RHITextureAspect::Color;
-		}
+		return GetRHIFormatInfo(format).m_Aspects;
 	}
 
 	struct RHITextureDesc
@@ -75,11 +68,18 @@ namespace gglab
 
 	[[nodiscard]] constexpr inline RHITextureAspect GetRHITextureAspects(const RHITextureDesc& desc) noexcept
 	{
-		if (desc.m_Format == RHIFormat::R32Typeless && Test(desc.m_Usage, RHITextureUsage::DepthStencil))
+		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(desc.m_Format);
+		if (Test(desc.m_Usage, RHITextureUsage::DepthStencil) &&
+			formatInfo.m_DepthStencilAspects != RHITextureAspect::None)
 		{
-			return RHITextureAspect::Depth;
+			return formatInfo.m_DepthStencilAspects;
 		}
-		return GetRHIFormatAspects(desc.m_Format);
+		return formatInfo.m_Aspects;
+	}
+
+	[[nodiscard]] constexpr inline uint32_t GetRHITexturePlaneCount(const RHITextureDesc& desc) noexcept
+	{
+		return GetRHIFormatInfo(desc.m_Format).m_PlaneCount;
 	}
 
 	struct RHIImportedTextureDesc

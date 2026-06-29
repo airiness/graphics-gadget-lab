@@ -323,6 +323,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />

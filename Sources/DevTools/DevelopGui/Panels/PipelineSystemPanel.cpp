@@ -4,6 +4,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystemSnapshot.h"
+#include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 
 namespace gglab
@@ -45,23 +46,7 @@ namespace gglab
 
 		const char* FormatText(RHIFormat format) noexcept
 		{
-			switch (format)
-			{
-			case RHIFormat::R8G8B8A8Typeless: return "R8G8B8A8Typeless";
-			case RHIFormat::R8G8B8A8Unorm: return "R8G8B8A8Unorm";
-			case RHIFormat::R8G8B8A8UnormSrgb: return "R8G8B8A8UnormSrgb";
-			case RHIFormat::R16G16Float: return "R16G16Float";
-			case RHIFormat::R16G16B16A16Float: return "R16G16B16A16Float";
-			case RHIFormat::R32G32Float: return "R32G32Float";
-			case RHIFormat::R32G32B32Float: return "R32G32B32Float";
-			case RHIFormat::R32G32B32A32Float: return "R32G32B32A32Float";
-			case RHIFormat::R32Typeless: return "R32Typeless";
-			case RHIFormat::R32Float: return "R32Float";
-			case RHIFormat::R32Uint: return "R32Uint";
-			case RHIFormat::D24UnormS8Uint: return "D24UnormS8Uint";
-			case RHIFormat::D32Float: return "D32Float";
-			case RHIFormat::Unknown: default: return "Unknown";
-			}
+			return GetRHIFormatInfo(format).m_Name;
 		}
 
 		const char* TopologyText(RHIPrimitiveTopology topology) noexcept

@@ -56,6 +56,8 @@ namespace gglab
 		R32Uint,
 		D24UnormS8Uint,
 		D32Float,
+
+		Count,
 	};
 
 	enum class RHIShaderStage : uint32_t

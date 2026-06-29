@@ -69,8 +69,7 @@ namespace gglab
 				return desc.m_StrideInBytes;
 			}
 
-			// Precise typed element sizes should eventually come from RHI format metadata.
-			return 1;
+			return std::max<uint32_t>(1, GetRHIFormatInfo(desc.m_Format).m_BytesPerBlock);
 		}
 
 		uint64_t AlignUp(uint64_t value, uint64_t alignment) noexcept

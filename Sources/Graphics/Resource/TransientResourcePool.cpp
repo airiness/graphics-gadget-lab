@@ -311,9 +311,7 @@ namespace gglab
 		if (Test(desc.m_Usage, RHITextureUsage::DepthStencil))
 		{
 			RHIClearValue clearValue{};
-			clearValue.m_Format = desc.m_Format == RHIFormat::R32Typeless ?
-				RHIFormat::D32Float :
-				desc.m_Format;
+			clearValue.m_Format = GetRHIFormatInfo(desc.m_Format).m_DepthStencilViewFormat;
 			clearValue.m_Depth = 1.0f;
 			clearValue.m_Stencil = 0;
 			clearValue.m_IsDepthStencil = true;
