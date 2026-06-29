@@ -87,7 +87,11 @@ namespace gglab
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
 				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth);
 
-				const auto shadowSrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1);
+				const auto shadowSrvDesc = MakeRHITexture2DViewDesc(
+					RHIFormat::R32Float,
+					0,
+					1,
+					RHITextureAspect::Depth);
 				data.m_ShadowSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_ShadowMap, shadowSrvDesc);
 

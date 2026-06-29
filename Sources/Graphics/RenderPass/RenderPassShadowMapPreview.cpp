@@ -61,7 +61,11 @@ namespace gglab
 					RGTextureAccess::RenderTarget);
 				data.m_ShadowMapPreview = shadowRes.m_DirectionalShadowMapPreview;
 
-				const auto shadowMapSrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1);
+				const auto shadowMapSrvDesc = MakeRHITexture2DViewDesc(
+					RHIFormat::R32Float,
+					0,
+					1,
+					RHITextureAspect::Depth);
 				data.m_ShadowMapSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_ShadowMap, shadowMapSrvDesc);
 				data.m_PreviewRtv =

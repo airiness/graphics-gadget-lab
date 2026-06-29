@@ -18,6 +18,25 @@ namespace gglab
 {
 	namespace
 	{
+		struct DX12PlaneRange
+		{
+			uint32_t m_BasePlane = 0;
+			uint32_t m_PlaneCount = 1;
+		};
+
+		DX12PlaneRange ToD3D12PlaneRange(RHITextureAspect aspects) noexcept
+		{
+			if (Test(aspects, RHITextureAspect::Depth) && Test(aspects, RHITextureAspect::Stencil))
+			{
+				return { 0, 2 };
+			}
+			if (Test(aspects, RHITextureAspect::Stencil))
+			{
+				return { 1, 1 };
+			}
+			return { 0, 1 };
+		}
+
 		CD3DX12_BARRIER_SUBRESOURCE_RANGE ToD3D12BarrierSubresourceRange(
 			const std::optional<RHISubresourceRange>& subresources) noexcept
 		{
@@ -27,13 +46,14 @@ namespace gglab
 			}
 
 			const RHISubresourceRange& range = *subresources;
+			const DX12PlaneRange planeRange = ToD3D12PlaneRange(range.m_Aspects);
 			return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
 				range.m_BaseMip,
 				range.m_MipCount,
 				range.m_BaseArraySlice,
 				range.m_ArraySliceCount,
-				range.m_BasePlane,
-				range.m_PlaneCount);
+				planeRange.m_BasePlane,
+				planeRange.m_PlaneCount);
 		}
 
 		D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(RHIPrimitiveTopology topology) noexcept
