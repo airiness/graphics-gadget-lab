@@ -64,7 +64,10 @@ namespace gglab
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
 				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
-				data.m_IrradianceCubemap = builder.Write(iblRes.m_IrradianceCubemap, RGTextureAccess::RenderTarget);
+				iblRes.m_IrradianceCubemap = builder.Write(
+					iblRes.m_IrradianceCubemap,
+					RGTextureAccess::RenderTarget);
+				data.m_IrradianceCubemap = iblRes.m_IrradianceCubemap;
 
 				const auto* textureDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap);

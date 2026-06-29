@@ -787,12 +787,13 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (ImGui::BeginTable("SelectedPassAccesses", 6, flags))
+			if (ImGui::BeginTable("SelectedPassAccesses", 7, flags))
 			{
 				ImGui::TableSetupColumn("Resource");
 				ImGui::TableSetupColumn("Type");
 				ImGui::TableSetupColumn("Dependency");
 				ImGui::TableSetupColumn("Access");
+				ImGui::TableSetupColumn("Stages");
 				ImGui::TableSetupColumn("Node");
 				ImGui::TableSetupColumn("Version");
 				ImGui::TableHeadersRow();
@@ -811,8 +812,11 @@ namespace gglab
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(accessText.c_str());
 					ImGui::TableSetColumnIndex(4);
-					ImGui::Text("%u", access.m_ResourceNodeIndex);
+					const std::string stagesText = devtools::EnumFlagsTextWithBits(access.m_Stages);
+					ImGui::TextUnformatted(stagesText.c_str());
 					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("%u", access.m_ResourceNodeIndex);
+					ImGui::TableSetColumnIndex(6);
 					ImGui::Text("%u", access.m_ResourceVersion);
 				}
 

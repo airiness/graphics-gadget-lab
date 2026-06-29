@@ -58,7 +58,10 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(textureDesc);
 	
-				data.m_EnvironmentCubemap = builder.Write(iblRes.m_EnvironmentCubemap, RGTextureAccess::RenderTarget);
+				iblRes.m_EnvironmentCubemap = builder.Write(
+					iblRes.m_EnvironmentCubemap,
+					RGTextureAccess::RenderTarget);
+				data.m_EnvironmentCubemap = iblRes.m_EnvironmentCubemap;
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{

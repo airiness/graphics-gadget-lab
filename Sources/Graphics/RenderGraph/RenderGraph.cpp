@@ -32,8 +32,9 @@ namespace gglab
 
 	RenderGraph::~RenderGraph() noexcept = default;
 
-	void RenderGraph::Compile() noexcept
+	bool RenderGraph::Compile() noexcept
 	{
+		m_Compiled = false;
 		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
 		{
 			auto& passNode = m_PassNodes[passNodeIndex];
@@ -44,12 +45,22 @@ namespace gglab
 			passNode.m_DevirtualizeVirtualResources.clear();
 			passNode.m_DestroyVirtualResources.clear();
 		}
+		if (!m_BuildValid)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("RenderGraph compilation rejected invalid resource declarations.");
+			return false;
+		}
 
 		BuildDependencyGraph();
 		CullPasses();
-		TopologicalSortPasses();
+		if (!TopologicalSortPasses())
+		{
+			return false;
+		}
 		BuildResourceLifetimes();
 		BuildResourceBarriers();
+		m_Compiled = true;
+		return true;
 	}
 
 	void RenderGraph::BuildDependencyGraph() noexcept
@@ -114,6 +125,25 @@ namespace gglab
 				addEdge(previousReader, resourceNode.m_Writer, resourceNode.m_Previous);
 			}
 		}
+
+		for (const auto* virtualResource : m_VirtualResources)
+		{
+			if (!virtualResource->m_ExportPass.IsValid())
+			{
+				continue;
+			}
+
+			GGLAB_ASSERT_MSG(
+				virtualResource->m_ExportResourceNodeIndex < m_ResourceNodes.size(),
+				"RenderGraph export references an invalid resource node.");
+			const RGResourceNode::Index resourceNodeIndex{ virtualResource->m_ExportResourceNodeIndex };
+			const auto& resourceNode = m_ResourceNodes[resourceNodeIndex.Value()];
+			addEdge(resourceNode.m_Writer, virtualResource->m_ExportPass, resourceNodeIndex);
+			for (const auto readerPassIndex : resourceNode.m_Readers)
+			{
+				addEdge(readerPassIndex, virtualResource->m_ExportPass, resourceNodeIndex);
+			}
+		}
 	}
 
 	void RenderGraph::CullPasses() noexcept
@@ -159,7 +189,7 @@ namespace gglab
 		}
 	}
 
-	void RenderGraph::TopologicalSortPasses() noexcept
+	bool RenderGraph::TopologicalSortPasses() noexcept
 	{
 		m_ExecutionOrder.clear();
 		std::vector<uint32_t> indegrees(m_PassNodes.size(), 0);
@@ -223,19 +253,16 @@ namespace gglab
 			"RenderGraph dependency graph contains a cycle.");
 		if (m_ExecutionOrder.size() == reachablePassCount)
 		{
-			return;
+			return true;
 		}
 
+		GGLAB_LOG_GRAPHICS_ERROR("RenderGraph dependency graph contains a cycle; execution is disabled.");
 		m_ExecutionOrder.clear();
-		for (uint32_t passNodeIndex = 0; passNodeIndex < m_PassNodes.size(); ++passNodeIndex)
+		for (auto& passNode : m_PassNodes)
 		{
-			if (!m_PassNodes[passNodeIndex].m_Culled)
-			{
-				m_PassNodes[passNodeIndex].m_ExecutionOrder =
-					static_cast<int32_t>(m_ExecutionOrder.size());
-				m_ExecutionOrder.push_back(RGPassNodeIndex{ passNodeIndex });
-			}
+			passNode.m_ExecutionOrder = -1;
 		}
+		return false;
 	}
 
 	void RenderGraph::BuildResourceLifetimes() noexcept
@@ -371,7 +398,8 @@ namespace gglab
 			{
 				const RHIResourceState requiredState = ToRHIResourceState(
 					access.m_AccessValue,
-					access.m_ResourceType);
+					access.m_ResourceType,
+					access.m_Stages);
 
 				auto* virtualResource = m_ResourceNodes[access.m_ResourceNodeIndex.Value()].m_VirtualResource;
 				if (!virtualResource)
@@ -435,34 +463,76 @@ namespace gglab
 
 		for (auto* virtualResource : m_VirtualResources)
 		{
-			if (virtualResource->m_RefCount == 0)
+			if (virtualResource->m_RefCount == 0 && !virtualResource->m_ExportPass.IsValid())
 			{
 				continue;
 			}
-
-			const RHIResourceState requiredFinalState = virtualResource->m_Imported ?
-				virtualResource->m_FinalBarrierState.value_or(virtualResource->m_InitialBarrierState) :
-				CommonRHIResourceState();
+			const RGPassNodeIndex finalBarrierPass = virtualResource->m_ExportPass.IsValid() ?
+				virtualResource->m_ExportPass :
+				virtualResource->m_LastUser;
+			GGLAB_ASSERT_MSG(finalBarrierPass.IsValid(), "RenderGraph final barrier requires an owning pass.");
 
 			if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
 			{
+				const auto* textureResource =
+					static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource);
 				auto& stateTracker = textureStates.at(virtualResource);
+				std::optional<RHISubresourceRange> normalizedFinalRange;
+				if (virtualResource->m_Imported && virtualResource->m_FinalBarrierState)
+				{
+					normalizedFinalRange = normalizeTextureRange(
+						textureResource->m_Desc,
+						virtualResource->m_FinalBarrierSubresources);
+					const auto& range = *normalizedFinalRange;
+					for (uint32_t plane = range.m_BasePlane; plane < range.m_BasePlane + range.m_PlaneCount; ++plane)
+					{
+						for (uint32_t arraySlice = range.m_BaseArraySlice;
+							arraySlice < range.m_BaseArraySlice + range.m_ArraySliceCount;
+							++arraySlice)
+						{
+							for (uint32_t mip = range.m_BaseMip; mip < range.m_BaseMip + range.m_MipCount; ++mip)
+							{
+								stateTracker.m_SubresourceStates.try_emplace(
+									subresourceIndex(textureResource->m_Desc, mip, arraySlice, plane),
+									stateTracker.m_InitialState);
+							}
+						}
+					}
+				}
+
 				for (auto& [subresourceIndex, currentState] : stateTracker.m_SubresourceStates)
 				{
+					const uint32_t mipLevels = std::max<uint32_t>(1, textureResource->m_Desc.m_MipLevels);
+					const uint32_t arraySize = textureResource->m_Desc.m_Dimension == RHITextureDimension::Texture3D ?
+						1u :
+						std::max<uint32_t>(1, textureResource->m_Desc.m_ArraySize);
+					const uint32_t mip = subresourceIndex % mipLevels;
+					const uint32_t arraySlice = (subresourceIndex / mipLevels) % arraySize;
+					const uint32_t plane = subresourceIndex / (mipLevels * arraySize);
+					RHIResourceState requiredFinalState = virtualResource->m_Imported ?
+						virtualResource->m_InitialBarrierState :
+						CommonRHIResourceState();
+
+					if (normalizedFinalRange)
+					{
+						const auto& range = *normalizedFinalRange;
+						const bool inFinalRange =
+							mip >= range.m_BaseMip && mip < range.m_BaseMip + range.m_MipCount &&
+							arraySlice >= range.m_BaseArraySlice &&
+							arraySlice < range.m_BaseArraySlice + range.m_ArraySliceCount &&
+							plane >= range.m_BasePlane && plane < range.m_BasePlane + range.m_PlaneCount;
+						if (inFinalRange)
+						{
+							requiredFinalState = *virtualResource->m_FinalBarrierState;
+						}
+					}
+
 					if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
 					{
 						continue;
 					}
 
-					const auto* textureResource =
-						static_cast<const RGVirtualResource<RGTextureResource>*>(virtualResource);
-					const uint32_t mipLevels = std::max<uint32_t>(1, textureResource->m_Desc.m_MipLevels);
-					const uint32_t arraySize = std::max<uint32_t>(1, textureResource->m_Desc.m_ArraySize);
-					const uint32_t mip = subresourceIndex % mipLevels;
-					const uint32_t arraySlice = (subresourceIndex / mipLevels) % arraySize;
-					const uint32_t plane = subresourceIndex / (mipLevels * arraySize);
-
-					m_PassNodes[virtualResource->m_LastUser.Value()].m_PostBarriers.push_back(
+					m_PassNodes[finalBarrierPass.Value()].m_PostBarriers.push_back(
 						{
 							.m_VirtualResource = virtualResource,
 							.m_Before = currentState,
@@ -474,12 +544,15 @@ namespace gglab
 				continue;
 			}
 
+			const RHIResourceState requiredFinalState = virtualResource->m_Imported ?
+				virtualResource->m_FinalBarrierState.value_or(virtualResource->m_InitialBarrierState) :
+				CommonRHIResourceState();
 			auto& currentState = bufferStates.at(virtualResource);
 			if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
 			{
 				continue;
 			}
-			m_PassNodes[virtualResource->m_LastUser.Value()].m_PostBarriers.push_back(
+			m_PassNodes[finalBarrierPass.Value()].m_PostBarriers.push_back(
 				{
 					.m_VirtualResource = virtualResource,
 					.m_Before = currentState,
@@ -491,6 +564,13 @@ namespace gglab
 
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_Compiled, "RenderGraph::Execute requires a successful Compile().");
+		if (!m_Compiled)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("RenderGraph execution skipped because compilation failed.");
+			return;
+		}
+
 		auto* previousRenderGraph = executeContext.m_RenderGraph;
 		executeContext.m_RenderGraph = this;
 

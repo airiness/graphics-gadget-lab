@@ -73,6 +73,9 @@ namespace gglab
 
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		std::optional<RHIResourceState> m_FinalBarrierState;
+		std::optional<RHISubresourceRange> m_FinalBarrierSubresources;
+		RGPassNodeIndex m_ExportPass = InvalidRGPassNodeIndex;
+		uint32_t m_ExportResourceNodeIndex = std::numeric_limits<uint32_t>::max();
 
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 	};
@@ -121,6 +124,7 @@ namespace gglab
 		{
 			RGResourceNode::Index m_ResourceNodeIndex{};
 			uint64_t m_AccessValue = 0;
+			RHIStage m_Stages = RHIStage::None;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
 			RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
 			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
@@ -242,7 +246,21 @@ namespace gglab
 				typename RESOURCE::Access access = RESOURCE::DefaultReadAccess,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, subresources);
+				return m_RG.ReadInternal<RESOURCE>(
+					m_PassNodeIndex,
+					resourceId,
+					access,
+					ToRHIStages(access),
+					subresources);
+			}
+
+			template<typename RESOURCE>
+			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Access access,
+				RHIStage stages,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
 			}
 
 			template<typename RESOURCE>
@@ -250,7 +268,21 @@ namespace gglab
 				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, subresources);
+				return m_RG.WriteInternal<RESOURCE>(
+					m_PassNodeIndex,
+					resourceId,
+					access,
+					ToRHIStages(access),
+					subresources);
+			}
+
+			template<typename RESOURCE>
+			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Access access,
+				RHIStage stages,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
 			}
 
 			template<typename RESOURCE>
@@ -258,13 +290,43 @@ namespace gglab
 				typename RESOURCE::Access access,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, subresources);
+				return m_RG.ReadWriteInternal<RESOURCE>(
+					m_PassNodeIndex,
+					resourceId,
+					access,
+					ToRHIStages(access),
+					subresources);
 			}
 
 			template<typename RESOURCE>
-			void Export(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access finalAccess) noexcept
+			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Access access,
+				RHIStage stages,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
-				m_RG.ExportInternal<RESOURCE>(resourceId, finalAccess);
+				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
+			}
+
+			template<typename RESOURCE>
+			void Export(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Access finalAccess,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				m_RG.ExportInternal<RESOURCE>(
+					m_PassNodeIndex,
+					resourceId,
+					finalAccess,
+					ToRHIStages(finalAccess),
+					subresources);
+			}
+
+			template<typename RESOURCE>
+			void Export(RGResourceId<RESOURCE> resourceId,
+				typename RESOURCE::Access finalAccess,
+				RHIStage stages,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				m_RG.ExportInternal<RESOURCE>(m_PassNodeIndex, resourceId, finalAccess, stages, subresources);
 			}
 
 			void SideEffect() noexcept
@@ -297,7 +359,7 @@ namespace gglab
 		template<typename ExecuteFunc>
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
 
-		void Compile() noexcept;
+		[[nodiscard]] bool Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
@@ -331,22 +393,29 @@ namespace gglab
 		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
+			RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
+			RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNode::Index passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
+			RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
-		void ExportInternal(RGResourceId<RESOURCE> resourceId, RESOURCE::Access finalAccess) noexcept;
+		void ExportInternal(RGPassNode::Index passNodeIndex,
+			RGResourceId<RESOURCE> resourceId,
+			RESOURCE::Access finalAccess,
+			RHIStage stages,
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<RHITextureViewType T>
 		RGTextureViewId CreateTextureView(
@@ -365,7 +434,7 @@ namespace gglab
 
 		void BuildDependencyGraph() noexcept;
 		void CullPasses() noexcept;
-		void TopologicalSortPasses() noexcept;
+		[[nodiscard]] bool TopologicalSortPasses() noexcept;
 		void BuildResourceLifetimes() noexcept;
 		void BuildResourceBarriers() noexcept;
 
@@ -392,6 +461,8 @@ namespace gglab
 
 		std::vector<TransientTextureAllocation> m_MarkedRetireTextures;
 		std::vector<TransientBufferAllocation> m_MarkedRetireBuffers;
+		bool m_BuildValid = true;
+		bool m_Compiled = false;
 
 		friend class RGBuilder;
 
@@ -580,14 +651,33 @@ namespace gglab
 	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
+		RHIStage stages,
 		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
+		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Read requires a non-empty pipeline stage.");
+		if (!resourceId.IsValid() || stages == RHIStage::None)
+		{
+			m_BuildValid = false;
+			return {};
+		}
 
 		const auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
 		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Read with stale handle.Version");
+		if (slot.m_Version != resourceId.GetVersion())
+		{
+			m_BuildValid = false;
+			return {};
+		}
 
 		RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
+		GGLAB_ASSERT_MSG(!resourceNode.m_VirtualResource->m_ExportPass.IsValid(),
+			"A RenderGraph resource may not be read after Export.");
+		if (resourceNode.m_VirtualResource->m_ExportPass.IsValid())
+		{
+			m_BuildValid = false;
+			return {};
+		}
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
 
@@ -598,6 +688,7 @@ namespace gglab
 		RGPassNode::Access access = {};
 		access.m_ResourceNodeIndex = slot.m_ResourceNodeIndex;
 		access.m_AccessValue = static_cast<uint64_t>(resourceAccess);
+		access.m_Stages = stages;
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Read;
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
@@ -610,29 +701,89 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline void RenderGraph::ExportInternal(RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access finalAccess) noexcept
+	inline void RenderGraph::ExportInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> resourceId,
+		typename RESOURCE::Access finalAccess,
+		RHIStage stages,
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must export valid resource.");
+		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Export requires a non-empty pipeline stage.");
+		if (!resourceId.IsValid() || stages == RHIStage::None)
+		{
+			m_BuildValid = false;
+			return;
+		}
+
+		const auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
+		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Export with stale handle.Version");
+		if (slot.m_Version != resourceId.GetVersion())
+		{
+			m_BuildValid = false;
+			return;
+		}
 
 		auto* virtualResource = GetVirtualResource(resourceId);
 		GGLAB_ASSERT_MSG(virtualResource != nullptr, "Export resource must exist.");
 		GGLAB_ASSERT_MSG(virtualResource->m_Imported, "Only imported resources may declare an exported state.");
+		if (!virtualResource || !virtualResource->m_Imported)
+		{
+			m_BuildValid = false;
+			return;
+		}
+		GGLAB_ASSERT_MSG(!virtualResource->m_ExportPass.IsValid(),
+			"A RenderGraph resource may only be exported once.");
+		if (virtualResource->m_ExportPass.IsValid())
+		{
+			m_BuildValid = false;
+			return;
+		}
 
-		virtualResource->m_FinalBarrierState = ToRHIResourceState(finalAccess);
+		virtualResource->m_FinalBarrierState = ToRHIResourceState(finalAccess, stages);
+		virtualResource->m_ExportPass = RGPassNodeIndex{ passNodeIndex.Value() };
+		virtualResource->m_ExportResourceNodeIndex = slot.m_ResourceNodeIndex.Value();
+		m_PassNodes[passNodeIndex.Value()].m_SideEffect = true;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			virtualResource->m_FinalBarrierSubresources = subresources;
+		}
+		else
+		{
+			virtualResource->m_FinalBarrierSubresources = std::nullopt;
+		}
 	}
 
 	template<typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
+		RHIStage stages,
 		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
+		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Write requires a non-empty pipeline stage.");
+		if (!resourceId.IsValid() || stages == RHIStage::None)
+		{
+			m_BuildValid = false;
+			return {};
+		}
 
 		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
+		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Write with stale handle.Version");
+		if (slot.m_Version != resourceId.GetVersion())
+		{
+			m_BuildValid = false;
+			return {};
+		}
 		const RGResourceNode::Index previousNodeIndex = slot.m_ResourceNodeIndex;
 		RGResourceNode* curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
+		GGLAB_ASSERT_MSG(!curResourceNode->m_VirtualResource->m_ExportPass.IsValid(),
+			"A RenderGraph resource may not be written after Export.");
+		if (curResourceNode->m_VirtualResource->m_ExportPass.IsValid())
+		{
+			m_BuildValid = false;
+			return {};
+		}
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
 
@@ -662,6 +813,7 @@ namespace gglab
 		RGPassNode::Access access = {};
 		access.m_ResourceNodeIndex = slot.m_ResourceNodeIndex;
 		access.m_AccessValue = static_cast<uint64_t>(resourceAccess);
+		access.m_Stages = stages;
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Write;
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
@@ -677,15 +829,34 @@ namespace gglab
 	inline RGResourceId<RESOURCE> RenderGraph::ReadWriteInternal(RGPassNode::Index passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
+		RHIStage stages,
 		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read-write valid resource.");
+		GGLAB_ASSERT_MSG(stages != RHIStage::None, "ReadWrite requires a non-empty pipeline stage.");
+		if (!resourceId.IsValid() || stages == RHIStage::None)
+		{
+			m_BuildValid = false;
+			return {};
+		}
 
 		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
 		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "ReadWrite with stale handle.Version");
+		if (slot.m_Version != resourceId.GetVersion())
+		{
+			m_BuildValid = false;
+			return {};
+		}
 
 		const RGResourceNode::Index previousNodeIndex = slot.m_ResourceNodeIndex;
 		RGResourceNode& previousNode = m_ResourceNodes[previousNodeIndex.Value()];
+		GGLAB_ASSERT_MSG(!previousNode.m_VirtualResource->m_ExportPass.IsValid(),
+			"A RenderGraph resource may not be read-written after Export.");
+		if (previousNode.m_VirtualResource->m_ExportPass.IsValid())
+		{
+			m_BuildValid = false;
+			return {};
+		}
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
 
@@ -716,6 +887,7 @@ namespace gglab
 			{
 				.m_ResourceNodeIndex = previousNodeIndex,
 				.m_AccessValue = static_cast<uint64_t>(resourceAccess),
+				.m_Stages = stages,
 				.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,
 				.m_DependencyAccess = RGDependencyAccess::ReadWrite,
 				.m_Subresources = [&]() -> std::optional<RHISubresourceRange>

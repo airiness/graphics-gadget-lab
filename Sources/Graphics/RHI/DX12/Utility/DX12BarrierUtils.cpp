@@ -15,7 +15,7 @@ namespace gglab
 		{
 			sync |= D3D12_BARRIER_SYNC_EXECUTE_INDIRECT;
 		}
-		if (Test(stages, RHIStage::VertexInput))
+		if (Test(stages, RHIStage::IndexInput))
 		{
 			sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
 		}

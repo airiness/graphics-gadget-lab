@@ -16,6 +16,7 @@ namespace gglab
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 		RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
 		uint64_t m_AccessValue = 0;
+		RHIStage m_Stages = RHIStage::None;
 		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 	};
 
@@ -58,6 +59,7 @@ namespace gglab
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		bool m_HasFinalBarrierState = false;
 		RHIResourceState m_FinalBarrierState = CommonRHIResourceState();
+		std::optional<RHISubresourceRange> m_FinalBarrierSubresources = std::nullopt;
 	};
 
 	struct RGSnapshotResourceNodeInfo

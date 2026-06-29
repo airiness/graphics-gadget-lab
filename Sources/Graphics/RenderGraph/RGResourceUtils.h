@@ -24,6 +24,40 @@ namespace gglab
 		return before != after || (HasUavAccess(before) && HasUavAccess(after));
 	}
 
+	constexpr inline RHIStage ToRHIStages(RGTextureAccess access) noexcept
+	{
+		switch (access)
+		{
+		case RGTextureAccess::None: return RHIStage::All;
+		case RGTextureAccess::Sample: return RHIStage::AllShaders;
+		case RGTextureAccess::RenderTarget: return RHIStage::RenderTarget;
+		case RGTextureAccess::DepthStencilWrite:
+		case RGTextureAccess::DepthStencilRead: return RHIStage::DepthStencil;
+		case RGTextureAccess::UnorderedAccess: return RHIStage::AllShaders;
+		case RGTextureAccess::CopySource:
+		case RGTextureAccess::CopyDest: return RHIStage::Copy;
+		case RGTextureAccess::Present: return RHIStage::Present;
+		}
+		GGLAB_UNREACHABLE("Unhandled RGTextureAccess.");
+	}
+
+	constexpr inline RHIStage ToRHIStages(RGBufferAccess access) noexcept
+	{
+		switch (access)
+		{
+		case RGBufferAccess::None: return RHIStage::All;
+		case RGBufferAccess::Vertex: return RHIStage::VertexShader;
+		case RGBufferAccess::Index: return RHIStage::IndexInput;
+		case RGBufferAccess::Constant:
+		case RGBufferAccess::StructuredRead:
+		case RGBufferAccess::UnorderedAccess: return RHIStage::AllShaders;
+		case RGBufferAccess::CopySource:
+		case RGBufferAccess::CopyDest: return RHIStage::Copy;
+		case RGBufferAccess::IndirectArgument: return RHIStage::DrawIndirect;
+		}
+		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");
+	}
+
 	constexpr inline RHITextureUsage ToRHIUsage(RGTextureAccess access) noexcept
 	{
 		switch (access)
@@ -67,56 +101,56 @@ namespace gglab
 		case RGTextureAccess::Sample:
 			return
 			{
-				.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::ShaderResource,
 				.m_Layout = RHILayout::ShaderResource,
 			};
 		case RGTextureAccess::RenderTarget:
 			return
 			{
-				.m_Stages = RHIStage::RenderTarget,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::RenderTarget,
 				.m_Layout = RHILayout::RenderTarget,
 			};
 		case RGTextureAccess::DepthStencilWrite:
 			return
 			{
-				.m_Stages = RHIStage::DepthStencil,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::DepthStencilWrite,
 				.m_Layout = RHILayout::DepthStencilWrite,
 			};
 		case RGTextureAccess::DepthStencilRead:
 			return
 			{
-				.m_Stages = RHIStage::DepthStencil,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::DepthStencilRead,
 				.m_Layout = RHILayout::DepthStencilRead,
 			};
 		case RGTextureAccess::UnorderedAccess:
 			return
 			{
-				.m_Stages = RHIStage::ComputeShader,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::UnorderedAccess,
 			};
 		case RGTextureAccess::CopySource:
 			return
 			{
-				.m_Stages = RHIStage::Copy,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::CopySource,
 				.m_Layout = RHILayout::CopySource,
 			};
 		case RGTextureAccess::CopyDest:
 			return
 			{
-				.m_Stages = RHIStage::Copy,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::CopyDest,
 			};
 		case RGTextureAccess::Present:
 			return
 			{
-				.m_Stages = RHIStage::Present,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::Present,
 				.m_Layout = RHILayout::Present,
 			};
@@ -132,39 +166,53 @@ namespace gglab
 		case RGBufferAccess::None:
 			return CommonRHIResourceState();
 		case RGBufferAccess::Vertex:
-			return { .m_Stages = RHIStage::VertexInput, .m_Access = RHIAccess::VertexBuffer, .m_Layout = RHILayout::Common };
+			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::VertexBuffer, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::Index:
-			return { .m_Stages = RHIStage::VertexInput, .m_Access = RHIAccess::IndexBuffer, .m_Layout = RHILayout::Common };
+			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::IndexBuffer, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::Constant:
-			return { .m_Stages = RHIStage::VertexShader | RHIStage::PixelShader | RHIStage::ComputeShader, .m_Access = RHIAccess::ConstantBuffer, .m_Layout = RHILayout::Common };
+			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::ConstantBuffer, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::StructuredRead:
-			return { .m_Stages = RHIStage::VertexShader | RHIStage::PixelShader | RHIStage::ComputeShader, .m_Access = RHIAccess::ShaderResource, .m_Layout = RHILayout::Common };
+			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::ShaderResource, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::UnorderedAccess:
 			return
 			{
-				.m_Stages = RHIStage::ComputeShader,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::Common,
 			};
 		case RGBufferAccess::CopySource:
 			return
 			{
-				.m_Stages = RHIStage::Copy,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::CopySource,
 				.m_Layout = RHILayout::Common,
 			};
 		case RGBufferAccess::CopyDest:
 			return
 			{
-				.m_Stages = RHIStage::Copy,
+				.m_Stages = ToRHIStages(access),
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::Common,
 			};
 		case RGBufferAccess::IndirectArgument:
-			return { .m_Stages = RHIStage::DrawIndirect, .m_Access = RHIAccess::IndirectArgument, .m_Layout = RHILayout::Common };
+			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::IndirectArgument, .m_Layout = RHILayout::Common };
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");
+	}
+
+	constexpr inline RHIResourceState ToRHIResourceState(RGTextureAccess access, RHIStage stages) noexcept
+	{
+		auto state = ToRHIResourceState(access);
+		state.m_Stages = stages;
+		return state;
+	}
+
+	constexpr inline RHIResourceState ToRHIResourceState(RGBufferAccess access, RHIStage stages) noexcept
+	{
+		auto state = ToRHIResourceState(access);
+		state.m_Stages = stages;
+		return state;
 	}
 
 	constexpr inline RHIResourceState ToRHIResourceState(uint64_t accessValue, RGResourceType resourceType) noexcept
@@ -178,6 +226,16 @@ namespace gglab
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGResourceType.");
+	}
+
+	constexpr inline RHIResourceState ToRHIResourceState(
+		uint64_t accessValue,
+		RGResourceType resourceType,
+		RHIStage stages) noexcept
+	{
+		auto state = ToRHIResourceState(accessValue, resourceType);
+		state.m_Stages = stages;
+		return state;
 	}
 
 }

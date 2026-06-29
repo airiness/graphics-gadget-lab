@@ -159,6 +159,7 @@ namespace gglab
 					resourceInfo.m_InitialBarrierState = virtualResource->m_InitialBarrierState;
 					resourceInfo.m_HasFinalBarrierState = virtualResource->m_FinalBarrierState.has_value();
 					resourceInfo.m_FinalBarrierState = virtualResource->m_FinalBarrierState.value_or(CommonRHIResourceState());
+					resourceInfo.m_FinalBarrierSubresources = virtualResource->m_FinalBarrierSubresources;
 					m_OutSnapshot.m_Resources.push_back(std::move(resourceInfo));
 				}
 			}
@@ -211,6 +212,7 @@ namespace gglab
 				accessInfo.m_ResourceType = access.m_ResourceType;
 				accessInfo.m_DependencyAccess = access.m_DependencyAccess;
 				accessInfo.m_AccessValue = access.m_AccessValue;
+				accessInfo.m_Stages = access.m_Stages;
 				accessInfo.m_Subresources = access.m_Subresources;
 				return accessInfo;
 			}

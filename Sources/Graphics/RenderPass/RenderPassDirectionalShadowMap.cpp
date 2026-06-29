@@ -44,7 +44,10 @@ namespace gglab
 			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
-				data.m_ShadowMap = builder.Write(shadowRes.m_DirectionalShadowMap, RGTextureAccess::DepthStencilWrite);
+				shadowRes.m_DirectionalShadowMap = builder.Write(
+					shadowRes.m_DirectionalShadowMap,
+					RGTextureAccess::DepthStencilWrite);
+				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 
 				const auto dsvDesc = MakeRHITexture2DViewDesc(RHIFormat::D32Float);
