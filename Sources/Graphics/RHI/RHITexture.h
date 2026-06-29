@@ -47,6 +47,17 @@ namespace gglab
 		TextureCubeArray,
 	};
 
+	[[nodiscard]] constexpr inline uint32_t GetRHIFormatPlaneCount(RHIFormat format) noexcept
+	{
+		switch (format)
+		{
+		case RHIFormat::D24UnormS8Uint:
+			return 2;
+		default:
+			return 1;
+		}
+	}
+
 	struct RHITextureDesc
 	{
 		RHITextureDimension m_Dimension = RHITextureDimension::Texture2D;

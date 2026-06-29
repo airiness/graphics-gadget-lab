@@ -112,7 +112,7 @@ namespace gglab
 
 	struct RHIResourceState
 	{
-		RHIStage m_Stages = RHIStage::None;
+		RHIStage m_Stages = RHIStage::All;
 		RHIAccess m_Access = RHIAccess::Common;
 		RHILayout m_Layout = RHILayout::Common;
 
