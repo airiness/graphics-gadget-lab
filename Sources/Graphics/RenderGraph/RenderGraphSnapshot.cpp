@@ -58,10 +58,12 @@ namespace gglab
 			RGSnapshotBuilder(
 				const std::vector<RGResourceNode>& resourceNodes,
 				const std::vector<RGPassNode>& passNodes,
+				const std::vector<RGPassDependencyEdge>& dependencyEdges,
 				const std::vector<RGVirtualResourceBase*>& virtualResources,
 				RGSnapshot& outSnapshot) noexcept :
 				m_ResourceNodes(resourceNodes),
 				m_PassNodes(passNodes),
+				m_DependencyEdges(dependencyEdges),
 				m_VirtualResources(virtualResources),
 				m_OutSnapshot(outSnapshot)
 			{}
@@ -91,14 +93,13 @@ namespace gglab
 
 			void BuildPasses() noexcept
 			{
-				int32_t executionOrder = 0;
 				for (uint32_t passIndex = 0; passIndex < m_PassNodes.size(); ++passIndex)
 				{
 					const auto& passNode = m_PassNodes[passIndex];
 
 					RGSnapshotPassInfo passInfo = {};
 					passInfo.m_Index = passIndex;
-					passInfo.m_ExecutionOrder = passNode.m_Culled ? -1 : executionOrder++;
+					passInfo.m_ExecutionOrder = passNode.m_ExecutionOrder;
 					passInfo.m_Name = ToSnapshotName(passNode.m_NameId);
 					passInfo.m_SideEffect = passNode.m_SideEffect;
 					passInfo.m_Culled = passNode.m_Culled;
@@ -178,6 +179,9 @@ namespace gglab
 						resourceNode.m_VirtualResource->m_ResourceType :
 						RGResourceType::RGTexture;
 					resourceNodeInfo.m_WriterPassIndex = ToSnapshotPassIndex(resourceNode.m_Writer);
+					resourceNodeInfo.m_PreviousResourceNodeIndex = resourceNode.m_Previous.IsValid() ?
+						static_cast<int32_t>(resourceNode.m_Previous.Value()) :
+						-1;
 					resourceNodeInfo.m_ReaderPassIndices.reserve(resourceNode.m_Readers.size());
 					for (const auto readerPassIndex : resourceNode.m_Readers)
 					{
@@ -185,10 +189,12 @@ namespace gglab
 					}
 					m_OutSnapshot.m_ResourceNodes.push_back(std::move(resourceNodeInfo));
 
-					for (const auto readerPassIndex : resourceNode.m_Readers)
-					{
-						m_OutSnapshot.m_DependencyEdges.push_back(BuildDependencyEdge(resourceNode, resourceNodeIndex, readerPassIndex));
-					}
+				}
+
+				m_OutSnapshot.m_DependencyEdges.reserve(m_DependencyEdges.size());
+				for (const auto& edge : m_DependencyEdges)
+				{
+					m_OutSnapshot.m_DependencyEdges.push_back(BuildDependencyEdge(edge));
 				}
 			}
 
@@ -205,6 +211,7 @@ namespace gglab
 				accessInfo.m_ResourceType = access.m_ResourceType;
 				accessInfo.m_DependencyAccess = access.m_DependencyAccess;
 				accessInfo.m_AccessValue = access.m_AccessValue;
+				accessInfo.m_Subresources = access.m_Subresources;
 				return accessInfo;
 			}
 
@@ -218,18 +225,17 @@ namespace gglab
 				info.m_ResourceType = intent.m_VirtualResource->m_ResourceType;
 				info.m_Before = intent.m_Before;
 				info.m_After = intent.m_After;
+				info.m_Subresources = intent.m_Subresources;
 				return info;
 			}
 
-			RGSnapshotDependencyEdge BuildDependencyEdge(
-				const RGResourceNode& resourceNode,
-				uint32_t resourceNodeIndex,
-				RGPassNodeIndex readerPassIndex) const noexcept
+			RGSnapshotDependencyEdge BuildDependencyEdge(const RGPassDependencyEdge& dependencyEdge) const noexcept
 			{
+				const RGResourceNode& resourceNode = m_ResourceNodes[dependencyEdge.m_ResourceNodeIndex.Value()];
 				RGSnapshotDependencyEdge edge = {};
-				edge.m_FromPassIndex = ToSnapshotPassIndex(resourceNode.m_Writer);
-				edge.m_ToPassIndex = ToSnapshotPassIndex(readerPassIndex);
-				edge.m_ResourceNodeIndex = resourceNodeIndex;
+				edge.m_FromPassIndex = ToSnapshotPassIndex(dependencyEdge.m_From);
+				edge.m_ToPassIndex = ToSnapshotPassIndex(dependencyEdge.m_To);
+				edge.m_ResourceNodeIndex = dependencyEdge.m_ResourceNodeIndex.Value();
 				edge.m_FromPassName = GetPassSnapshotName(m_PassNodes, edge.m_FromPassIndex);
 				edge.m_ToPassName = GetPassSnapshotName(m_PassNodes, edge.m_ToPassIndex);
 				edge.m_ResourceName = ToSnapshotName(resourceNode.NameId());
@@ -250,6 +256,7 @@ namespace gglab
 		private:
 			const std::vector<RGResourceNode>& m_ResourceNodes;
 			const std::vector<RGPassNode>& m_PassNodes;
+			const std::vector<RGPassDependencyEdge>& m_DependencyEdges;
 			const std::vector<RGVirtualResourceBase*>& m_VirtualResources;
 			RGSnapshot& m_OutSnapshot;
 			std::unordered_map<const RGVirtualResourceBase*, uint32_t> m_VirtualResourceIndices;
@@ -261,6 +268,7 @@ namespace gglab
 		RGSnapshotBuilder(
 			rg.m_ResourceNodes,
 			rg.m_PassNodes,
+			rg.m_DependencyEdges,
 			rg.m_VirtualResources,
 			outSnapshot).Build();
 	}
