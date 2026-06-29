@@ -920,6 +920,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
