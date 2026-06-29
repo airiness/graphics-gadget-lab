@@ -3,46 +3,53 @@
 
 namespace gglab
 {
-	D3D12_BARRIER_SYNC ToD3D12BarrierSync(RHIAccess access) noexcept
+	D3D12_BARRIER_SYNC ToD3D12BarrierSync(RHIStage stages) noexcept
 	{
-		if (access == RHIAccess::None)
+		if (stages == RHIStage::None)
 		{
 			return D3D12_BARRIER_SYNC_NONE;
 		}
 
 		D3D12_BARRIER_SYNC sync = D3D12_BARRIER_SYNC_NONE;
-		if (Test(access, RHIAccess::ShaderResource | RHIAccess::ConstantBuffer | RHIAccess::UnorderedAccess))
-		{
-			sync |= D3D12_BARRIER_SYNC_ALL_SHADING;
-		}
-		if (Test(access, RHIAccess::VertexBuffer))
-		{
-			sync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
-		}
-		if (Test(access, RHIAccess::IndexBuffer))
-		{
-			sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
-		}
-		if (Test(access, RHIAccess::RenderTarget))
-		{
-			sync |= D3D12_BARRIER_SYNC_RENDER_TARGET;
-		}
-		if (Test(access, RHIAccess::DepthStencilRead | RHIAccess::DepthStencilWrite))
-		{
-			sync |= D3D12_BARRIER_SYNC_DEPTH_STENCIL;
-		}
-		if (Test(access, RHIAccess::CopySource | RHIAccess::CopyDest))
-		{
-			sync |= D3D12_BARRIER_SYNC_COPY;
-		}
-		if (Test(access, RHIAccess::IndirectArgument))
+		if (Test(stages, RHIStage::DrawIndirect))
 		{
 			sync |= D3D12_BARRIER_SYNC_EXECUTE_INDIRECT;
 		}
-		if (sync == D3D12_BARRIER_SYNC_NONE &&
-			Test(access, RHIAccess::Common | RHIAccess::Present))
+		if (Test(stages, RHIStage::VertexInput))
 		{
-			sync = D3D12_BARRIER_SYNC_ALL;
+			sync |= D3D12_BARRIER_SYNC_INDEX_INPUT;
+		}
+		if (Test(stages, RHIStage::VertexShader))
+		{
+			sync |= D3D12_BARRIER_SYNC_VERTEX_SHADING;
+		}
+		if (Test(stages, RHIStage::PixelShader))
+		{
+			sync |= D3D12_BARRIER_SYNC_PIXEL_SHADING;
+		}
+		if (Test(stages, RHIStage::ComputeShader))
+		{
+			sync |= D3D12_BARRIER_SYNC_COMPUTE_SHADING;
+		}
+		if (Test(stages, RHIStage::RenderTarget))
+		{
+			sync |= D3D12_BARRIER_SYNC_RENDER_TARGET;
+		}
+		if (Test(stages, RHIStage::DepthStencil))
+		{
+			sync |= D3D12_BARRIER_SYNC_DEPTH_STENCIL;
+		}
+		if (Test(stages, RHIStage::Copy))
+		{
+			sync |= D3D12_BARRIER_SYNC_COPY;
+		}
+		if (Test(stages, RHIStage::Resolve))
+		{
+			sync |= D3D12_BARRIER_SYNC_RESOLVE;
+		}
+		if (Test(stages, RHIStage::Present))
+		{
+			sync |= D3D12_BARRIER_SYNC_ALL;
 		}
 		return sync;
 	}

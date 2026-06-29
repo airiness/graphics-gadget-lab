@@ -58,6 +58,25 @@ namespace gglab
 	};
 	GGLAB_ENUM_FLAGS(RHIShaderStage);
 
+	enum class RHIStage : uint64_t
+	{
+		None = 0,
+		DrawIndirect = 1ull << 0,
+		VertexInput = 1ull << 1,
+		VertexShader = 1ull << 2,
+		PixelShader = 1ull << 3,
+		ComputeShader = 1ull << 4,
+		RenderTarget = 1ull << 5,
+		DepthStencil = 1ull << 6,
+		Copy = 1ull << 7,
+		Resolve = 1ull << 8,
+		Present = 1ull << 9,
+		AllGraphics = DrawIndirect | VertexInput | VertexShader | PixelShader | RenderTarget | DepthStencil,
+		AllShaders = VertexShader | PixelShader | ComputeShader,
+		All = AllGraphics | ComputeShader | Copy | Resolve | Present,
+	};
+	GGLAB_ENUM_FLAGS(RHIStage);
+
 	enum class RHIAccess : uint64_t
 	{
 		None = 0,
@@ -93,6 +112,7 @@ namespace gglab
 
 	struct RHIResourceState
 	{
+		RHIStage m_Stages = RHIStage::None;
 		RHIAccess m_Access = RHIAccess::Common;
 		RHILayout m_Layout = RHILayout::Common;
 

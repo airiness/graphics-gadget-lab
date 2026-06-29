@@ -227,6 +227,7 @@ namespace gglab
 			importDesc.m_RHI.m_Desc.m_DebugName = debugName.c_str();
 			importDesc.m_RHI.m_External.m_InitialState =
 			{
+				.m_Stages = RHIStage::Present,
 				.m_Access = RHIAccess::Present,
 				.m_Layout = RHILayout::Present,
 			};

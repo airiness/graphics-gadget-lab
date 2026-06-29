@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/GraphicsTypes.h"
 
 namespace gglab
 {
@@ -13,9 +14,35 @@ namespace gglab
 
 		UINT ResolveMipLevels(uint32_t mipLevels) noexcept
 		{
-			return mipLevels == RHITextureViewDesc::AllMipLevels ?
+			return mipLevels == RHISubresourceRange::Remaining ?
 				static_cast<UINT>(-1) :
 				static_cast<UINT>(mipLevels);
+		}
+
+		uint32_t ResolveRemainingCount(uint32_t base, uint32_t count, uint32_t total) noexcept
+		{
+			if (base >= total)
+			{
+				return 0;
+			}
+
+			const uint32_t remaining = total - base;
+			return count == RHISubresourceRange::Remaining ?
+				remaining :
+				std::min(count, remaining);
+		}
+
+		uint32_t ResolveArraySliceCount(const RHITextureViewDesc& desc, const D3D12_RESOURCE_DESC& resourceDesc) noexcept
+		{
+			return ResolveRemainingCount(
+				desc.m_Subresources.m_BaseArraySlice,
+				desc.m_Subresources.m_ArraySliceCount,
+				static_cast<uint32_t>(resourceDesc.DepthOrArraySize));
+		}
+
+		uint32_t ResolveCubeCount(const RHITextureViewDesc& desc, const D3D12_RESOURCE_DESC& resourceDesc) noexcept
+		{
+			return ResolveArraySliceCount(desc, resourceDesc) / CubemapFaceCount;
 		}
 
 		uint64_t ResolveBufferViewSize(uint64_t offsetInBytes, uint64_t sizeInBytes, uint64_t bufferSizeInBytes) noexcept
@@ -61,13 +88,13 @@ namespace gglab
 		{
 		case RHITextureViewDimension::Texture1D:
 			nativeDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE1D;
-			nativeDesc.Texture1D.MipSlice = desc.m_MipSlice;
+			nativeDesc.Texture1D.MipSlice = desc.m_Subresources.m_BaseMip;
 			break;
 		case RHITextureViewDimension::Texture1DArray:
 			nativeDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE1DARRAY;
-			nativeDesc.Texture1DArray.MipSlice = desc.m_MipSlice;
-			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_FirstArraySlice;
-			nativeDesc.Texture1DArray.ArraySize = desc.m_ArraySize;
+			nativeDesc.Texture1DArray.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture1DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			break;
 		case RHITextureViewDimension::Texture2D:
 			nativeDesc.ViewDimension = resourceDesc.SampleDesc.Count > 1 ?
@@ -75,8 +102,8 @@ namespace gglab
 				D3D12_RTV_DIMENSION_TEXTURE2D;
 			if (nativeDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2D)
 			{
-				nativeDesc.Texture2D.MipSlice = desc.m_MipSlice;
-				nativeDesc.Texture2D.PlaneSlice = desc.m_PlaneSlice;
+				nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
+				nativeDesc.Texture2D.PlaneSlice = desc.m_Subresources.m_BasePlane;
 			}
 			break;
 		case RHITextureViewDimension::Texture2DArray:
@@ -87,22 +114,22 @@ namespace gglab
 				D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
 			if (nativeDesc.ViewDimension == D3D12_RTV_DIMENSION_TEXTURE2DARRAY)
 			{
-				nativeDesc.Texture2DArray.MipSlice = desc.m_MipSlice;
-				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_FirstArraySlice;
-				nativeDesc.Texture2DArray.ArraySize = desc.m_ArraySize;
-				nativeDesc.Texture2DArray.PlaneSlice = desc.m_PlaneSlice;
+				nativeDesc.Texture2DArray.MipSlice = desc.m_Subresources.m_BaseMip;
+				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+				nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
+				nativeDesc.Texture2DArray.PlaneSlice = desc.m_Subresources.m_BasePlane;
 			}
 			else
 			{
-				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_FirstArraySlice;
-				nativeDesc.Texture2DMSArray.ArraySize = desc.m_ArraySize;
+				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+				nativeDesc.Texture2DMSArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			}
 			break;
 		case RHITextureViewDimension::Texture3D:
 			nativeDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
-			nativeDesc.Texture3D.MipSlice = desc.m_MipSlice;
-			nativeDesc.Texture3D.FirstWSlice = desc.m_FirstArraySlice;
-			nativeDesc.Texture3D.WSize = desc.m_ArraySize;
+			nativeDesc.Texture3D.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture3D.FirstWSlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture3D.WSize = ResolveArraySliceCount(desc, resourceDesc);
 			break;
 		case RHITextureViewDimension::Unknown:
 			GGLAB_UNREACHABLE("Unexpected unknown RHI texture view dimension.");
@@ -129,14 +156,14 @@ namespace gglab
 				D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
 			if (nativeDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2DARRAY)
 			{
-				nativeDesc.Texture2DArray.MipSlice = desc.m_MipSlice;
-				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_FirstArraySlice;
-				nativeDesc.Texture2DArray.ArraySize = desc.m_ArraySize;
+				nativeDesc.Texture2DArray.MipSlice = desc.m_Subresources.m_BaseMip;
+				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+				nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			}
 			else
 			{
-				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_FirstArraySlice;
-				nativeDesc.Texture2DMSArray.ArraySize = desc.m_ArraySize;
+				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+				nativeDesc.Texture2DMSArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			}
 		}
 		else
@@ -146,7 +173,7 @@ namespace gglab
 				D3D12_DSV_DIMENSION_TEXTURE2D;
 			if (nativeDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2D)
 			{
-				nativeDesc.Texture2D.MipSlice = desc.m_MipSlice;
+				nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
 			}
 		}
 
@@ -169,16 +196,16 @@ namespace gglab
 		{
 		case RHITextureViewDimension::Texture1D:
 			nativeDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
-			nativeDesc.Texture1D.MostDetailedMip = desc.m_MostDetailedMip;
-			nativeDesc.Texture1D.MipLevels = ResolveMipLevels(desc.m_MipLevels);
+			nativeDesc.Texture1D.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture1D.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
 			nativeDesc.Texture1D.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			break;
 		case RHITextureViewDimension::Texture1DArray:
 			nativeDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
-			nativeDesc.Texture1DArray.MostDetailedMip = desc.m_MostDetailedMip;
-			nativeDesc.Texture1DArray.MipLevels = ResolveMipLevels(desc.m_MipLevels);
-			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_FirstArraySlice;
-			nativeDesc.Texture1DArray.ArraySize = desc.m_ArraySize;
+			nativeDesc.Texture1DArray.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture1DArray.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
+			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture1DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			nativeDesc.Texture1DArray.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			break;
 		case RHITextureViewDimension::Texture2D:
@@ -187,9 +214,9 @@ namespace gglab
 				D3D12_SRV_DIMENSION_TEXTURE2D;
 			if (nativeDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
 			{
-				nativeDesc.Texture2D.MostDetailedMip = desc.m_MostDetailedMip;
-				nativeDesc.Texture2D.MipLevels = ResolveMipLevels(desc.m_MipLevels);
-				nativeDesc.Texture2D.PlaneSlice = desc.m_PlaneSlice;
+				nativeDesc.Texture2D.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+				nativeDesc.Texture2D.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
+				nativeDesc.Texture2D.PlaneSlice = desc.m_Subresources.m_BasePlane;
 				nativeDesc.Texture2D.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			}
 			break;
@@ -199,37 +226,37 @@ namespace gglab
 				D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 			if (nativeDesc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
 			{
-				nativeDesc.Texture2DArray.MostDetailedMip = desc.m_MostDetailedMip;
-				nativeDesc.Texture2DArray.MipLevels = ResolveMipLevels(desc.m_MipLevels);
-				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_FirstArraySlice;
-				nativeDesc.Texture2DArray.ArraySize = desc.m_ArraySize;
-				nativeDesc.Texture2DArray.PlaneSlice = desc.m_PlaneSlice;
+				nativeDesc.Texture2DArray.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+				nativeDesc.Texture2DArray.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
+				nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+				nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
+				nativeDesc.Texture2DArray.PlaneSlice = desc.m_Subresources.m_BasePlane;
 				nativeDesc.Texture2DArray.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			}
 			else
 			{
-				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_FirstArraySlice;
-				nativeDesc.Texture2DMSArray.ArraySize = desc.m_ArraySize;
+				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+				nativeDesc.Texture2DMSArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			}
 			break;
 		case RHITextureViewDimension::Texture3D:
 			nativeDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-			nativeDesc.Texture3D.MostDetailedMip = desc.m_MostDetailedMip;
-			nativeDesc.Texture3D.MipLevels = ResolveMipLevels(desc.m_MipLevels);
+			nativeDesc.Texture3D.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture3D.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
 			nativeDesc.Texture3D.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			break;
 		case RHITextureViewDimension::TextureCube:
 			nativeDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-			nativeDesc.TextureCube.MostDetailedMip = desc.m_MostDetailedMip;
-			nativeDesc.TextureCube.MipLevels = ResolveMipLevels(desc.m_MipLevels);
+			nativeDesc.TextureCube.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+			nativeDesc.TextureCube.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
 			nativeDesc.TextureCube.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			break;
 		case RHITextureViewDimension::TextureCubeArray:
 			nativeDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
-			nativeDesc.TextureCubeArray.MostDetailedMip = desc.m_MostDetailedMip;
-			nativeDesc.TextureCubeArray.MipLevels = ResolveMipLevels(desc.m_MipLevels);
-			nativeDesc.TextureCubeArray.First2DArrayFace = desc.m_First2DArrayFace;
-			nativeDesc.TextureCubeArray.NumCubes = desc.m_NumCubes;
+			nativeDesc.TextureCubeArray.MostDetailedMip = desc.m_Subresources.m_BaseMip;
+			nativeDesc.TextureCubeArray.MipLevels = ResolveMipLevels(desc.m_Subresources.m_MipCount);
+			nativeDesc.TextureCubeArray.First2DArrayFace = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.TextureCubeArray.NumCubes = ResolveCubeCount(desc, resourceDesc);
 			nativeDesc.TextureCubeArray.ResourceMinLODClamp = desc.m_ResourceMinLODClamp;
 			break;
 		case RHITextureViewDimension::Unknown:
@@ -254,33 +281,33 @@ namespace gglab
 		{
 		case RHITextureViewDimension::Texture1D:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
-			nativeDesc.Texture1D.MipSlice = desc.m_MipSlice;
+			nativeDesc.Texture1D.MipSlice = desc.m_Subresources.m_BaseMip;
 			break;
 		case RHITextureViewDimension::Texture1DArray:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
-			nativeDesc.Texture1DArray.MipSlice = desc.m_MipSlice;
-			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_FirstArraySlice;
-			nativeDesc.Texture1DArray.ArraySize = desc.m_ArraySize;
+			nativeDesc.Texture1DArray.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture1DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			break;
 		case RHITextureViewDimension::Texture2D:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			nativeDesc.Texture2D.MipSlice = desc.m_MipSlice;
-			nativeDesc.Texture2D.PlaneSlice = desc.m_PlaneSlice;
+			nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture2D.PlaneSlice = desc.m_Subresources.m_BasePlane;
 			break;
 		case RHITextureViewDimension::Texture2DArray:
 		case RHITextureViewDimension::TextureCube:
 		case RHITextureViewDimension::TextureCubeArray:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-			nativeDesc.Texture2DArray.MipSlice = desc.m_MipSlice;
-			nativeDesc.Texture2DArray.FirstArraySlice = desc.m_FirstArraySlice;
-			nativeDesc.Texture2DArray.ArraySize = desc.m_ArraySize;
-			nativeDesc.Texture2DArray.PlaneSlice = desc.m_PlaneSlice;
+			nativeDesc.Texture2DArray.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture2DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture2DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
+			nativeDesc.Texture2DArray.PlaneSlice = desc.m_Subresources.m_BasePlane;
 			break;
 		case RHITextureViewDimension::Texture3D:
 			nativeDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-			nativeDesc.Texture3D.MipSlice = desc.m_MipSlice;
-			nativeDesc.Texture3D.FirstWSlice = desc.m_FirstArraySlice;
-			nativeDesc.Texture3D.WSize = desc.m_ArraySize;
+			nativeDesc.Texture3D.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture3D.FirstWSlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture3D.WSize = ResolveArraySliceCount(desc, resourceDesc);
 			break;
 		case RHITextureViewDimension::Unknown:
 			GGLAB_UNREACHABLE("Unexpected unknown RHI texture view dimension.");

@@ -98,8 +98,8 @@ namespace gglab
 
 			m_CommandList->AddTextureBarrier(
 				CD3DX12_TEXTURE_BARRIER(
-					ToD3D12BarrierSync(barrier.m_Before.m_Access),
-					ToD3D12BarrierSync(barrier.m_After.m_Access),
+					ToD3D12BarrierSync(barrier.m_Before.m_Stages),
+					ToD3D12BarrierSync(barrier.m_After.m_Stages),
 					ToD3D12BarrierAccess(barrier.m_Before.m_Access),
 					ToD3D12BarrierAccess(barrier.m_After.m_Access),
 					ToD3D12BarrierLayout(barrier.m_Before.m_Layout),
@@ -130,8 +130,8 @@ namespace gglab
 
 			m_CommandList->AddBufferBarrier(
 				CD3DX12_BUFFER_BARRIER(
-					ToD3D12BarrierSync(barrier.m_Before.m_Access),
-					ToD3D12BarrierSync(barrier.m_After.m_Access),
+					ToD3D12BarrierSync(barrier.m_Before.m_Stages),
+					ToD3D12BarrierSync(barrier.m_After.m_Stages),
 					ToD3D12BarrierAccess(barrier.m_Before.m_Access),
 					ToD3D12BarrierAccess(barrier.m_After.m_Access),
 					buffer->Get()));

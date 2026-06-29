@@ -18,10 +18,15 @@ namespace gglab
 			.m_Type = RHITextureViewType::ShaderResource,
 			.m_Dimension = RHITextureViewDimension::Texture2DArray,
 			.m_Format = format,
-			.m_MipSlice = mip,
-			.m_FirstArraySlice = firstSlice,
-			.m_ArraySize = arraySize,
-			.m_PlaneSlice = planeSlice,
+			.m_Subresources =
+			{
+				.m_BaseMip = mip,
+				.m_MipCount = 1,
+				.m_BaseArraySlice = firstSlice,
+				.m_ArraySliceCount = arraySize,
+				.m_BasePlane = planeSlice,
+				.m_PlaneCount = 1,
+			},
 		};
 	}
 
@@ -35,10 +40,13 @@ namespace gglab
 			.m_Type = RHITextureViewType::ShaderResource,
 			.m_Dimension = RHITextureViewDimension::Texture2D,
 			.m_Format = format,
-			.m_MostDetailedMip = mip,
-			.m_MipLevels = mipLevels,
-			.m_MipSlice = mip,
-			.m_PlaneSlice = planeSlice,
+			.m_Subresources =
+			{
+				.m_BaseMip = mip,
+				.m_MipCount = mipLevels,
+				.m_BasePlane = planeSlice,
+				.m_PlaneCount = 1,
+			},
 		};
 	}
 }

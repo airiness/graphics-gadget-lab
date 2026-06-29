@@ -376,11 +376,13 @@ namespace gglab
 			.m_Texture = texture->m_Texture,
 			.m_Before =
 			{
+				.m_Stages = RHIStage::Copy,
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::CopyDest,
 			},
 			.m_After =
 			{
+				.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
 				.m_Access = RHIAccess::ShaderResource,
 				.m_Layout = RHILayout::ShaderResource,
 			},
@@ -393,10 +395,10 @@ namespace gglab
 			RHITextureViewDimension::Texture2DArray :
 			RHITextureViewDimension::Texture2D;
 		srvDesc.m_Format = textureData.m_ViewFormat;
-		srvDesc.m_MostDetailedMip = 0;
-		srvDesc.m_MipLevels = textureData.m_MipLevels;
-		srvDesc.m_FirstArraySlice = 0;
-		srvDesc.m_ArraySize = textureData.m_ArraySize;
+		srvDesc.m_Subresources.m_BaseMip = 0;
+		srvDesc.m_Subresources.m_MipCount = textureData.m_MipLevels;
+		srvDesc.m_Subresources.m_BaseArraySlice = 0;
+		srvDesc.m_Subresources.m_ArraySliceCount = textureData.m_ArraySize;
 
 		texture->m_Srv = m_Device->CreateTextureView(texture->m_Texture, srvDesc);
 		GGLAB_ASSERT_MSG(texture->m_Srv.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture SRV.");

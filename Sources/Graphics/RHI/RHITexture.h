@@ -2,7 +2,6 @@
 #include "Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
-#include <limits>
 #include <tuple>
 #include <vector>
 
@@ -89,20 +88,11 @@ namespace gglab
 
 	struct RHITextureViewDesc
 	{
-		static constexpr uint32_t AllMipLevels = std::numeric_limits<uint32_t>::max();
-
 		RHITextureViewType m_Type = RHITextureViewType::ShaderResource;
 		RHITextureViewDimension m_Dimension = RHITextureViewDimension::Unknown;
 		RHIFormat m_Format = RHIFormat::Unknown;
 
-		uint32_t m_MostDetailedMip = 0;
-		uint32_t m_MipLevels = AllMipLevels;
-		uint32_t m_MipSlice = 0;
-		uint32_t m_FirstArraySlice = 0;
-		uint32_t m_ArraySize = 1;
-		uint32_t m_First2DArrayFace = 0;
-		uint32_t m_NumCubes = 1;
-		uint32_t m_PlaneSlice = 0;
+		RHISubresourceRange m_Subresources{};
 		float m_ResourceMinLODClamp = 0.0f;
 
 		bool operator==(const RHITextureViewDesc&) const noexcept = default;
@@ -113,14 +103,12 @@ namespace gglab
 				m_Type,
 				m_Dimension,
 				m_Format,
-				m_MostDetailedMip,
-				m_MipLevels,
-				m_MipSlice,
-				m_FirstArraySlice,
-				m_ArraySize,
-				m_First2DArrayFace,
-				m_NumCubes,
-				m_PlaneSlice,
+				m_Subresources.m_BaseMip,
+				m_Subresources.m_MipCount,
+				m_Subresources.m_BaseArraySlice,
+				m_Subresources.m_ArraySliceCount,
+				m_Subresources.m_BasePlane,
+				m_Subresources.m_PlaneCount,
 				m_ResourceMinLODClamp);
 		}
 	};
