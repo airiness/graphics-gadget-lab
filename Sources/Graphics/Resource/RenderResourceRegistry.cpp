@@ -34,8 +34,8 @@ namespace gglab
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::TextureCube;
 			srvDesc.m_Format = desc.m_Format;
-			srvDesc.m_MipLevels = desc.m_MipLevels;
-			srvDesc.m_NumCubes = 1;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
+			srvDesc.m_Subresources.m_ArraySliceCount = CubemapFaceCount;
 
 			EnsureTexture(TextureIndex::IBL_EnvironmentCubemap, desc, srvDesc, retireFenceOpt);
 		}
@@ -54,8 +54,8 @@ namespace gglab
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::TextureCube;
 			srvDesc.m_Format = desc.m_Format;
-			srvDesc.m_MipLevels = desc.m_MipLevels;
-			srvDesc.m_NumCubes = 1;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
+			srvDesc.m_Subresources.m_ArraySliceCount = CubemapFaceCount;
 
 			EnsureTexture(TextureIndex::IBL_IrradianceCubemap, desc, srvDesc, retireFenceOpt);
 		}
@@ -90,8 +90,8 @@ namespace gglab
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::TextureCube;
 			srvDesc.m_Format = desc.m_Format;
-			srvDesc.m_MipLevels = desc.m_MipLevels;
-			srvDesc.m_NumCubes = 1;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
+			srvDesc.m_Subresources.m_ArraySliceCount = CubemapFaceCount;
 
 			EnsureTexture(TextureIndex::IBL_PrefilteredSpecularCubemap, desc, srvDesc, retireFenceOpt);
 		}
@@ -110,7 +110,7 @@ namespace gglab
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
 			srvDesc.m_Format = desc.m_Format;
-			srvDesc.m_MipLevels = desc.m_MipLevels;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
 			EnsureTexture(TextureIndex::IBL_BrdfLut, desc, srvDesc, retireFenceOpt);
 		}
@@ -132,7 +132,7 @@ namespace gglab
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
 			srvDesc.m_Format = desc.m_Format;
-			srvDesc.m_MipLevels = desc.m_MipLevels;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
 			EnsureTexture(TextureIndex::Preview_IBL_EnvironmentCubemap, desc, srvDesc, retireFenceOpt);
 		}
@@ -154,7 +154,7 @@ namespace gglab
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
 			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
 			srvDesc.m_Format = desc.m_Format;
-			srvDesc.m_MipLevels = desc.m_MipLevels;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
 			EnsureTexture(TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, desc, srvDesc, retireFenceOpt);
 		}
@@ -176,7 +176,7 @@ namespace gglab
 		srvDesc.m_Type = RHITextureViewType::ShaderResource;
 		srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
 		srvDesc.m_Format = desc.m_Format;
-		srvDesc.m_MipLevels = desc.m_MipLevels;
+		srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
 		EnsureTexture(TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
 	}

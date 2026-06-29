@@ -88,6 +88,24 @@ namespace gglab::devtools
 	};
 
 	template<>
+	struct EnumTextTraits<RHIStage>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RHIStage::DrawIndirect, "DrawIndirect" },
+			EnumTextEntry{ RHIStage::VertexInput, "VertexInput" },
+			EnumTextEntry{ RHIStage::VertexShader, "VertexShader" },
+			EnumTextEntry{ RHIStage::PixelShader, "PixelShader" },
+			EnumTextEntry{ RHIStage::ComputeShader, "ComputeShader" },
+			EnumTextEntry{ RHIStage::RenderTarget, "RenderTarget" },
+			EnumTextEntry{ RHIStage::DepthStencil, "DepthStencil" },
+			EnumTextEntry{ RHIStage::Copy, "Copy" },
+			EnumTextEntry{ RHIStage::Resolve, "Resolve" },
+			EnumTextEntry{ RHIStage::Present, "Present" },
+		};
+		static constexpr std::string_view NoneText = "None";
+	};
+
+	template<>
 	struct EnumTextTraits<RHIAccess>
 	{
 		static constexpr std::array Entries = {
@@ -127,7 +145,8 @@ namespace gglab::devtools
 
 	[[nodiscard]] inline std::string BarrierStateText(const RHIResourceState& state)
 	{
-		return std::format("access={}, layout={}",
+		return std::format("stage={}, access={}, layout={}",
+			EnumFlagsTextWithBits(state.m_Stages),
 			EnumFlagsTextWithBits(state.m_Access),
 			EnumValueTextWithBits(state.m_Layout));
 	}

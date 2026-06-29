@@ -8,6 +8,7 @@ namespace gglab
 	{
 		return
 		{
+			.m_Stages = RHIStage::None,
 			.m_Access = RHIAccess::Common,
 			.m_Layout = RHILayout::Common,
 		};
@@ -66,48 +67,56 @@ namespace gglab
 		case RGTextureAccess::Sample:
 			return
 			{
+				.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
 				.m_Access = RHIAccess::ShaderResource,
 				.m_Layout = RHILayout::ShaderResource,
 			};
 		case RGTextureAccess::RenderTarget:
 			return
 			{
+				.m_Stages = RHIStage::RenderTarget,
 				.m_Access = RHIAccess::RenderTarget,
 				.m_Layout = RHILayout::RenderTarget,
 			};
 		case RGTextureAccess::DepthStencilWrite:
 			return
 			{
+				.m_Stages = RHIStage::DepthStencil,
 				.m_Access = RHIAccess::DepthStencilWrite,
 				.m_Layout = RHILayout::DepthStencilWrite,
 			};
 		case RGTextureAccess::DepthStencilRead:
 			return
 			{
+				.m_Stages = RHIStage::DepthStencil,
 				.m_Access = RHIAccess::DepthStencilRead,
 				.m_Layout = RHILayout::DepthStencilRead,
 			};
 		case RGTextureAccess::UnorderedAccess:
 			return
 			{
+				.m_Stages = RHIStage::ComputeShader,
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::UnorderedAccess,
 			};
 		case RGTextureAccess::CopySource:
 			return
 			{
+				.m_Stages = RHIStage::Copy,
 				.m_Access = RHIAccess::CopySource,
 				.m_Layout = RHILayout::CopySource,
 			};
 		case RGTextureAccess::CopyDest:
 			return
 			{
+				.m_Stages = RHIStage::Copy,
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::CopyDest,
 			};
 		case RGTextureAccess::Present:
 			return
 			{
+				.m_Stages = RHIStage::Present,
 				.m_Access = RHIAccess::Present,
 				.m_Layout = RHILayout::Present,
 			};
@@ -123,33 +132,36 @@ namespace gglab
 		case RGBufferAccess::None:
 			return CommonRHIResourceState();
 		case RGBufferAccess::Vertex:
-			return { .m_Access = RHIAccess::VertexBuffer, .m_Layout = RHILayout::Common };
+			return { .m_Stages = RHIStage::VertexInput, .m_Access = RHIAccess::VertexBuffer, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::Index:
-			return { .m_Access = RHIAccess::IndexBuffer, .m_Layout = RHILayout::Common };
+			return { .m_Stages = RHIStage::VertexInput, .m_Access = RHIAccess::IndexBuffer, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::Constant:
-			return { .m_Access = RHIAccess::ConstantBuffer, .m_Layout = RHILayout::Common };
+			return { .m_Stages = RHIStage::VertexShader | RHIStage::PixelShader | RHIStage::ComputeShader, .m_Access = RHIAccess::ConstantBuffer, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::StructuredRead:
-			return { .m_Access = RHIAccess::ShaderResource, .m_Layout = RHILayout::Common };
+			return { .m_Stages = RHIStage::VertexShader | RHIStage::PixelShader | RHIStage::ComputeShader, .m_Access = RHIAccess::ShaderResource, .m_Layout = RHILayout::Common };
 		case RGBufferAccess::UnorderedAccess:
 			return
 			{
+				.m_Stages = RHIStage::ComputeShader,
 				.m_Access = RHIAccess::UnorderedAccess,
 				.m_Layout = RHILayout::Common,
 			};
 		case RGBufferAccess::CopySource:
 			return
 			{
+				.m_Stages = RHIStage::Copy,
 				.m_Access = RHIAccess::CopySource,
 				.m_Layout = RHILayout::Common,
 			};
 		case RGBufferAccess::CopyDest:
 			return
 			{
+				.m_Stages = RHIStage::Copy,
 				.m_Access = RHIAccess::CopyDest,
 				.m_Layout = RHILayout::Common,
 			};
 		case RGBufferAccess::IndirectArgument:
-			return { .m_Access = RHIAccess::IndirectArgument, .m_Layout = RHILayout::Common };
+			return { .m_Stages = RHIStage::DrawIndirect, .m_Access = RHIAccess::IndirectArgument, .m_Layout = RHILayout::Common };
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");

@@ -4,7 +4,9 @@
 #include "Graphics/RHI/RHITypes.h"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
+#include <tuple>
 
 namespace gglab
 {
@@ -39,12 +41,27 @@ namespace gglab
 
 	struct RHISubresourceRange
 	{
+		static constexpr uint32_t Remaining = std::numeric_limits<uint32_t>::max();
+
 		uint32_t m_BaseMip = 0;
-		uint32_t m_MipCount = 1;
+		uint32_t m_MipCount = Remaining;
 		uint32_t m_BaseArraySlice = 0;
-		uint32_t m_ArraySliceCount = 1;
+		uint32_t m_ArraySliceCount = Remaining;
 		uint32_t m_BasePlane = 0;
 		uint32_t m_PlaneCount = 1;
+
+		bool operator==(const RHISubresourceRange&) const noexcept = default;
+
+		auto AsTuple() const noexcept
+		{
+			return std::make_tuple(
+				m_BaseMip,
+				m_MipCount,
+				m_BaseArraySlice,
+				m_ArraySliceCount,
+				m_BasePlane,
+				m_PlaneCount);
+		}
 	};
 
 	class RHITextureOwner
