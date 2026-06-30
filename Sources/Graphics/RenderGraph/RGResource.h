@@ -29,12 +29,24 @@ namespace gglab
 
 	enum class RGDependencyReason : uint8_t
 	{
+		// Liveness dependency: the consumer needs contents produced by the writer.
 		WriterToReader,
+
+		// Execution hazards: order passes only when both sides remain live.
 		PreviousWriterToWriter,
 		PreviousReaderToWriter,
+
+		// Exporting preserves the final writer's contents. Prior readers are only
+		// ordered before the export transition when they remain live independently.
 		ExportWriterToExport,
 		ExportReaderToExport,
 	};
+
+	[[nodiscard]] constexpr inline bool IsRGLivenessDependency(RGDependencyReason reason) noexcept
+	{
+		return reason == RGDependencyReason::WriterToReader ||
+			reason == RGDependencyReason::ExportWriterToExport;
+	}
 
 	// Describes how a texture is accessed by a pass.
 	// This is a single-use semantic, not a bitmask.

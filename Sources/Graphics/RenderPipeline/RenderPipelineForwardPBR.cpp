@@ -19,10 +19,7 @@ namespace gglab
 			RGTextureViewId m_Rtv{};
 		};
 
-		struct FinishBackBufferPassData
-		{
-			RGTextureId m_BackBuffer{};
-		};
+		struct FinishBackBufferPassData {};
 	}
 
 	void RenderPipelineForwardPBR::BuildRenderGraph(RenderGraph& rg,
@@ -162,18 +159,15 @@ namespace gglab
 
 		// Finish backbuffer
 		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",
-			[](RenderGraph::RGBuilder& builder, FinishBackBufferPassData& data)
+			[](RenderGraph::RGBuilder& builder, FinishBackBufferPassData&)
 			{
 				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
 				builder.SideEffect();
 
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
-				builder.WriteInPlace(targets.m_BackBuffer,
-					RGTextureAccess::RenderTarget);
-				data.m_BackBuffer = targets.m_BackBuffer;
 				builder.Export(
-					data.m_BackBuffer,
+					targets.m_BackBuffer,
 					RGTextureAccess::Present,
 					RHISubresourceRange
 					{

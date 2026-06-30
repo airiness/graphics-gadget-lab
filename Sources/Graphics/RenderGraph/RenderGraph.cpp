@@ -92,6 +92,13 @@ namespace gglab
 					});
 				if (edgeIter != m_DependencyEdges.end())
 				{
+					// A pair may first be discovered as a hazard and later as a true
+					// data dependency. Preserve the stronger liveness semantics.
+					if (!IsRGLivenessDependency(edgeIter->m_Reason) &&
+						IsRGLivenessDependency(reason))
+					{
+						edgeIter->m_Reason = reason;
+					}
 					return;
 				}
 
@@ -173,6 +180,16 @@ namespace gglab
 	{
 		std::vector<RGPassNodeIndex> stack;
 		std::unordered_set<RGPassNodeIndex> reachable;
+		// Hazard edges remain in RGPassNode's full adjacency for topological sorting,
+		// but cannot make an otherwise dead producer reachable.
+		std::vector<std::vector<RGPassNodeIndex>> livenessDependencies(m_PassNodes.size());
+		for (const auto& edge : m_DependencyEdges)
+		{
+			if (IsRGLivenessDependency(edge.m_Reason))
+			{
+				livenessDependencies[edge.m_To.Value()].push_back(edge.m_From);
+			}
+		}
 
 		auto addPass = [&stack, &reachable](RGPassNodeIndex passNodeIndex)
 			{
@@ -199,7 +216,7 @@ namespace gglab
 			const RGPassNodeIndex passNodeIndex = stack.back();
 			stack.pop_back();
 
-			for (const auto dependency : m_PassNodes[passNodeIndex.Value()].m_Dependencies)
+			for (const auto dependency : livenessDependencies[passNodeIndex.Value()])
 			{
 				addPass(dependency);
 			}
