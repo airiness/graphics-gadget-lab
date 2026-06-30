@@ -54,7 +54,7 @@ namespace gglab
 				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
 
 				data.m_SceneColor = builder.Read(mainTargets.m_SceneColor, RGTextureAccess::Sample);
-				mainTargets.m_BackBuffer = builder.Write(mainTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
+				builder.WriteInPlace(mainTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = mainTargets.m_BackBuffer;
 				data.m_SceneColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);

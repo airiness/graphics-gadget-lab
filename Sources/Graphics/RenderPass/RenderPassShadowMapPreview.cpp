@@ -56,7 +56,7 @@ namespace gglab
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
-				shadowRes.m_DirectionalShadowMapPreview = builder.Write(
+				builder.WriteInPlace(
 					shadowRes.m_DirectionalShadowMapPreview,
 					RGTextureAccess::RenderTarget);
 				data.m_ShadowMapPreview = shadowRes.m_DirectionalShadowMapPreview;

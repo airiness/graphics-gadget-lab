@@ -162,6 +162,7 @@ namespace gglab
 		RGPassNodeIndex m_From = InvalidRGPassNodeIndex;
 		RGPassNodeIndex m_To = InvalidRGPassNodeIndex;
 		RGResourceNode::Index m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
+		RGDependencyReason m_Reason = RGDependencyReason::WriterToReader;
 	};
 
 	struct RGResourceSlot
@@ -264,6 +265,7 @@ namespace gglab
 			}
 
 			template<typename RESOURCE>
+			[[nodiscard("Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
@@ -277,6 +279,7 @@ namespace gglab
 			}
 
 			template<typename RESOURCE>
+			[[nodiscard("Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
@@ -286,6 +289,24 @@ namespace gglab
 			}
 
 			template<typename RESOURCE>
+			void WriteInPlace(RGResourceId<RESOURCE>& resourceId,
+				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				resourceId = Write(resourceId, access, subresources);
+			}
+
+			template<typename RESOURCE>
+			void WriteInPlace(RGResourceId<RESOURCE>& resourceId,
+				typename RESOURCE::Access access,
+				RHIStage stages,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				resourceId = Write(resourceId, access, stages, subresources);
+			}
+
+			template<typename RESOURCE>
+			[[nodiscard("ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
@@ -299,12 +320,30 @@ namespace gglab
 			}
 
 			template<typename RESOURCE>
+			[[nodiscard("ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
 			{
 				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
+			}
+
+			template<typename RESOURCE>
+			void ReadWriteInPlace(RGResourceId<RESOURCE>& resourceId,
+				typename RESOURCE::Access access,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				resourceId = ReadWrite(resourceId, access, subresources);
+			}
+
+			template<typename RESOURCE>
+			void ReadWriteInPlace(RGResourceId<RESOURCE>& resourceId,
+				typename RESOURCE::Access access,
+				RHIStage stages,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			{
+				resourceId = ReadWrite(resourceId, access, stages, subresources);
 			}
 
 			template<typename RESOURCE>

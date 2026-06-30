@@ -91,7 +91,7 @@ namespace gglab
 					*previewDesc,
 					RGTextureAccess::None);
 
-				previewRes.m_EnvironmentCubemapPreview = builder.Write(
+				builder.WriteInPlace(
 					previewRes.m_EnvironmentCubemapPreview,
 					RGTextureAccess::RenderTarget);
 				data.m_EnvironmentCubemapPreview = previewRes.m_EnvironmentCubemapPreview;
@@ -163,7 +163,7 @@ namespace gglab
 					*previewDesc,
 					RGTextureAccess::None);
 
-				previewRes.m_PrefilteredSpecularCubemapPreview = builder.Write(
+				builder.WriteInPlace(
 					previewRes.m_PrefilteredSpecularCubemapPreview,
 					RGTextureAccess::RenderTarget);
 				data.m_PrefilteredSpecularCubemapPreview = previewRes.m_PrefilteredSpecularCubemapPreview;

@@ -44,7 +44,7 @@ namespace gglab
 			[](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
-				shadowRes.m_DirectionalShadowMap = builder.Write(
+				builder.WriteInPlace(
 					shadowRes.m_DirectionalShadowMap,
 					RGTextureAccess::DepthStencilWrite);
 				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;

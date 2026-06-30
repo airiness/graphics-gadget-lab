@@ -24,11 +24,18 @@ namespace gglab
 			uint32_t m_PlaneCount = 1;
 		};
 
-		DX12PlaneRange ToD3D12PlaneRange(RHITextureAspect aspects) noexcept
+		DX12PlaneRange ToD3D12PlaneRange(RHITextureAspect aspects, uint32_t planeCount) noexcept
 		{
+			if (planeCount <= 1)
+			{
+				GGLAB_ASSERT_MSG(aspects != RHITextureAspect::Stencil,
+					"Stencil subresource barrier requires a stencil plane.");
+				return { 0, 1 };
+			}
+
 			if (Test(aspects, RHITextureAspect::Depth) && Test(aspects, RHITextureAspect::Stencil))
 			{
-				return { 0, 2 };
+				return { 0, std::min<uint32_t>(2, planeCount) };
 			}
 			if (Test(aspects, RHITextureAspect::Stencil))
 			{
@@ -37,16 +44,77 @@ namespace gglab
 			return { 0, 1 };
 		}
 
+		uint32_t ResolveRemainingCount(uint32_t base, uint32_t count, uint32_t total) noexcept
+		{
+			if (base >= total)
+			{
+				return 0;
+			}
+
+			const uint32_t remaining = total - base;
+			return count == RHISubresourceRange::Remaining ?
+				remaining :
+				std::min(count, remaining);
+		}
+
+		uint32_t GetD3D12TextureArraySize(const D3D12_RESOURCE_DESC& desc) noexcept
+		{
+			if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+			{
+				return 1;
+			}
+			return std::max<uint32_t>(1, desc.DepthOrArraySize);
+		}
+
+		uint32_t GetD3D12TexturePlaneCount(const D3D12_RESOURCE_DESC& desc) noexcept
+		{
+			const RHIFormat format = ToRHIFormat(desc.Format);
+			const uint32_t planeCount = GetRHIFormatInfo(format).m_PlaneCount;
+			return std::max<uint32_t>(1, planeCount);
+		}
+
 		CD3DX12_BARRIER_SUBRESOURCE_RANGE ToD3D12BarrierSubresourceRange(
-			const std::optional<RHISubresourceRange>& subresources) noexcept
+			const std::optional<RHISubresourceRange>& subresources,
+			const D3D12_RESOURCE_DESC& resourceDesc) noexcept
 		{
 			if (!subresources)
 			{
 				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 			}
 
-			const RHISubresourceRange& range = *subresources;
-			const DX12PlaneRange planeRange = ToD3D12PlaneRange(range.m_Aspects);
+			RHISubresourceRange range = *subresources;
+			const uint32_t mipLevels = std::max<uint32_t>(1, resourceDesc.MipLevels);
+			const uint32_t arraySize = GetD3D12TextureArraySize(resourceDesc);
+			const uint32_t planeCount = GetD3D12TexturePlaneCount(resourceDesc);
+			range.m_MipCount = ResolveRemainingCount(range.m_BaseMip, range.m_MipCount, mipLevels);
+			range.m_ArraySliceCount = ResolveRemainingCount(
+				range.m_BaseArraySlice,
+				range.m_ArraySliceCount,
+				arraySize);
+
+			const DX12PlaneRange planeRange = ToD3D12PlaneRange(range.m_Aspects, planeCount);
+			GGLAB_ASSERT_MSG(range.m_MipCount > 0 && range.m_ArraySliceCount > 0,
+				"DX12 texture barrier received an empty subresource range.");
+			GGLAB_ASSERT_MSG(
+				planeRange.m_BasePlane + planeRange.m_PlaneCount <= planeCount,
+				"DX12 texture barrier received an out-of-range plane selection.");
+			if (range.m_MipCount == 0 ||
+				range.m_ArraySliceCount == 0 ||
+				planeRange.m_BasePlane + planeRange.m_PlaneCount > planeCount)
+			{
+				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+			}
+
+			if (range.m_BaseMip == 0 &&
+				range.m_MipCount == mipLevels &&
+				range.m_BaseArraySlice == 0 &&
+				range.m_ArraySliceCount == arraySize &&
+				planeRange.m_BasePlane == 0 &&
+				planeRange.m_PlaneCount == planeCount)
+			{
+				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+			}
+
 			return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
 				range.m_BaseMip,
 				range.m_MipCount,
@@ -125,7 +193,7 @@ namespace gglab
 					ToD3D12BarrierLayout(barrier.m_Before.m_Layout),
 					ToD3D12BarrierLayout(barrier.m_After.m_Layout),
 					texture->Get(),
-					ToD3D12BarrierSubresourceRange(barrier.m_Subresources)));
+					ToD3D12BarrierSubresourceRange(barrier.m_Subresources, texture->GetDesc())));
 			TrackTextureUse(barrier.m_Texture);
 		}
 

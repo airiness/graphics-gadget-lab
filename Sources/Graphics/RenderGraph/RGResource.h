@@ -27,6 +27,15 @@ namespace gglab
 		ReadWrite,
 	};
 
+	enum class RGDependencyReason : uint8_t
+	{
+		WriterToReader,
+		PreviousWriterToWriter,
+		PreviousReaderToWriter,
+		ExportWriterToExport,
+		ExportReaderToExport,
+	};
+
 	// Describes how a texture is accessed by a pass.
 	// This is a single-use semantic, not a bitmask.
 	// Resource creation capabilities are inferred by accumulating all pass usages.
