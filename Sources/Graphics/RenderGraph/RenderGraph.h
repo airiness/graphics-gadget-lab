@@ -20,6 +20,8 @@ namespace gglab
 	struct RGResourceNode;
 
 	GGLAB_DEFINE_TYPED_INDEX(RGPassNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGResourceNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGVirtualResourceIndex, uint32_t);
 	GGLAB_DEFINE_TYPED_INDEX(RGTextureViewId, uint32_t);
 
 	class RenderGraph;
@@ -53,8 +55,6 @@ namespace gglab
 
 	struct RGVirtualResourceBase
 	{
-		GGLAB_DEFINE_NESTED_TYPED_INDEX(Index, uint32_t);
-
 		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
 		virtual void Devirtualize(TransientResourcePool*) noexcept = 0;
@@ -75,7 +75,7 @@ namespace gglab
 		std::optional<RHIResourceState> m_FinalBarrierState;
 		std::optional<RHISubresourceRange> m_FinalBarrierSubresources;
 		RGPassNodeIndex m_ExportPass = InvalidRGPassNodeIndex;
-		uint32_t m_ExportResourceNodeIndex = std::numeric_limits<uint32_t>::max();
+		RGResourceNodeIndex m_ExportResourceNodeIndex = InvalidRGResourceNodeIndex;
 
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 	};
@@ -103,12 +103,10 @@ namespace gglab
 
 	struct RGResourceNode
 	{
-		GGLAB_DEFINE_NESTED_TYPED_INDEX(Index, uint32_t);
-
 		RGResourceHandle m_ResourceHandle;
 		RGVirtualResourceBase* m_VirtualResource = nullptr;
 
-		Index m_Previous = InvalidIndex;
+		RGResourceNodeIndex m_Previous = InvalidRGResourceNodeIndex;
 		RGPassNodeIndex m_Writer = InvalidRGPassNodeIndex;
 		std::vector<RGPassNodeIndex> m_Readers;
 
@@ -122,7 +120,7 @@ namespace gglab
 	{
 		struct Access
 		{
-			RGResourceNode::Index m_ResourceNodeIndex{};
+			RGResourceNodeIndex m_ResourceNodeIndex{};
 			uint64_t m_AccessValue = 0;
 			RHIStage m_Stages = RHIStage::None;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
@@ -137,8 +135,6 @@ namespace gglab
 			RHIResourceState m_After = CommonRHIResourceState();
 			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
-
-		GGLAB_DEFINE_NESTED_TYPED_INDEX(Index, uint32_t);
 
 		StringID m_NameId;
 		bool m_SideEffect = false;
@@ -161,14 +157,14 @@ namespace gglab
 	{
 		RGPassNodeIndex m_From = InvalidRGPassNodeIndex;
 		RGPassNodeIndex m_To = InvalidRGPassNodeIndex;
-		RGResourceNode::Index m_ResourceNodeIndex = RGResourceNode::InvalidIndex;
+		RGResourceNodeIndex m_ResourceNodeIndex = InvalidRGResourceNodeIndex;
 		RGDependencyReason m_Reason = RGDependencyReason::WriterToReader;
 	};
 
 	struct RGResourceSlot
 	{
-		RGVirtualResourceBase::Index m_VirtualResourceIndex;
-		RGResourceNode::Index m_ResourceNodeIndex;
+		RGVirtualResourceIndex m_VirtualResourceIndex;
+		RGResourceNodeIndex m_ResourceNodeIndex;
 		RGResourceHandle::Version m_Version = RGResourceHandle::UnintializedVersion;
 	};
 
@@ -187,7 +183,7 @@ namespace gglab
 		class RGBuilder
 		{
 		public:
-			RGBuilder(RenderGraph& rg, RGPassNode::Index passNodeIndex) :
+			RGBuilder(RenderGraph& rg, RGPassNodeIndex passNodeIndex) :
 				m_RG(rg),
 				m_PassNodeIndex(passNodeIndex)
 			{}
@@ -380,7 +376,7 @@ namespace gglab
 
 		private:
 			RenderGraph& m_RG;
-			RGPassNode::Index m_PassNodeIndex = RGPassNode::InvalidIndex;
+			RGPassNodeIndex m_PassNodeIndex = InvalidRGPassNodeIndex;
 		};
 
 	public:
@@ -429,28 +425,28 @@ namespace gglab
 			typename RESOURCE::Access initialAccess) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> ReadInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> ReadInternal(RGPassNodeIndex passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
 			RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> WriteInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> WriteInternal(RGPassNodeIndex passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
 			RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
-		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNode::Index passNodeIndex,
+		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNodeIndex passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
 			RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
 		template<typename RESOURCE>
-		void ExportInternal(RGPassNode::Index passNodeIndex,
+		void ExportInternal(RGPassNodeIndex passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access finalAccess,
 			RHIStage stages,
@@ -469,7 +465,7 @@ namespace gglab
 
 		RGResourceNode& GetActiveResourceNode(RGResourceHandle handle) noexcept;
 
-		RGPassNode& GetPassNode(RGPassNode::Index index) noexcept;
+		RGPassNode& GetPassNode(RGPassNodeIndex index) noexcept;
 
 		void BuildDependencyGraph() noexcept;
 		void CullPasses() noexcept;
@@ -526,7 +522,7 @@ namespace gglab
 		passNode.m_NameId = StringID(passName);
 		passNode.m_Pass = pass;
 
-		RGPassNode::Index passIndex{ static_cast<uint32_t>(m_PassNodes.size()) };
+		RGPassNodeIndex passIndex{ static_cast<uint32_t>(m_PassNodes.size()) };
 		m_PassNodes.push_back(passNode);
 
 		RGBuilder builder(*this, passIndex);
@@ -614,8 +610,8 @@ namespace gglab
 		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
 		RGResourceSlot slot;
-		slot.m_VirtualResourceIndex = static_cast<uint32_t>(m_VirtualResources.size());
-		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
+		slot.m_VirtualResourceIndex = RGVirtualResourceIndex{ static_cast<uint32_t>(m_VirtualResources.size()) };
+		slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		slot.m_Version = 1;
 
 		m_ResourceSlots.push_back(slot);
@@ -655,8 +651,8 @@ namespace gglab
 		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
 		RGResourceSlot slot;
-		slot.m_VirtualResourceIndex = static_cast<uint32_t>(m_VirtualResources.size());
-		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
+		slot.m_VirtualResourceIndex = RGVirtualResourceIndex{ static_cast<uint32_t>(m_VirtualResources.size()) };
+		slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		slot.m_Version = 1;
 
 		m_ResourceSlots.push_back(slot);
@@ -687,7 +683,7 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNode::Index passNodeIndex,
+	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNodeIndex passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
 		RHIStage stages,
@@ -718,7 +714,7 @@ namespace gglab
 			return {};
 		}
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
-		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
+		const RGPassNodeIndex stablePassNodeIndex = passNodeIndex;
 
 		GGLAB_ASSERT_MSG(resourceNode.m_Writer != stablePassNodeIndex, "Pass can not read this resource and write same resource.");
 
@@ -740,7 +736,7 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline void RenderGraph::ExportInternal(RGPassNode::Index passNodeIndex,
+	inline void RenderGraph::ExportInternal(RGPassNodeIndex passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access finalAccess,
 		RHIStage stages,
@@ -779,8 +775,8 @@ namespace gglab
 		}
 
 		virtualResource->m_FinalBarrierState = ToRHIResourceState(finalAccess, stages);
-		virtualResource->m_ExportPass = RGPassNodeIndex{ passNodeIndex.Value() };
-		virtualResource->m_ExportResourceNodeIndex = slot.m_ResourceNodeIndex.Value();
+		virtualResource->m_ExportPass = passNodeIndex;
+		virtualResource->m_ExportResourceNodeIndex = slot.m_ResourceNodeIndex;
 		m_PassNodes[passNodeIndex.Value()].m_SideEffect = true;
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 		{
@@ -793,7 +789,7 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNode::Index passNodeIndex,
+	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNodeIndex passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
 		RHIStage stages,
@@ -814,7 +810,7 @@ namespace gglab
 			m_BuildValid = false;
 			return {};
 		}
-		const RGResourceNode::Index previousNodeIndex = slot.m_ResourceNodeIndex;
+		const RGResourceNodeIndex previousNodeIndex = slot.m_ResourceNodeIndex;
 		RGResourceNode* curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		GGLAB_ASSERT_MSG(!curResourceNode->m_VirtualResource->m_ExportPass.IsValid(),
 			"A RenderGraph resource may not be written after Export.");
@@ -824,7 +820,7 @@ namespace gglab
 			return {};
 		}
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
-		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
+		const RGPassNodeIndex stablePassNodeIndex = passNodeIndex;
 
 		// version update
 		if ((curResourceNode->m_Writer.IsValid()) || (!curResourceNode->m_Readers.empty()))
@@ -836,7 +832,7 @@ namespace gglab
 			nextResourceNode.m_ResourceHandle = resourceId;
 			nextResourceNode.m_VirtualResource = curResourceNode->m_VirtualResource;
 			nextResourceNode.m_Previous = previousNodeIndex;
-			slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
+			slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 			m_ResourceNodes.push_back(nextResourceNode);
 
 			curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
@@ -865,7 +861,7 @@ namespace gglab
 	}
 
 	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::ReadWriteInternal(RGPassNode::Index passNodeIndex,
+	inline RGResourceId<RESOURCE> RenderGraph::ReadWriteInternal(RGPassNodeIndex passNodeIndex,
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
 		RHIStage stages,
@@ -887,7 +883,7 @@ namespace gglab
 			return {};
 		}
 
-		const RGResourceNode::Index previousNodeIndex = slot.m_ResourceNodeIndex;
+		const RGResourceNodeIndex previousNodeIndex = slot.m_ResourceNodeIndex;
 		RGResourceNode& previousNode = m_ResourceNodes[previousNodeIndex.Value()];
 		GGLAB_ASSERT_MSG(!previousNode.m_VirtualResource->m_ExportPass.IsValid(),
 			"A RenderGraph resource may not be read-written after Export.");
@@ -897,7 +893,7 @@ namespace gglab
 			return {};
 		}
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
-		const RGPassNodeIndex stablePassNodeIndex{ passNodeIndex.Value() };
+		const RGPassNodeIndex stablePassNodeIndex = passNodeIndex;
 
 		GGLAB_ASSERT_MSG(previousNode.m_Writer != stablePassNodeIndex,
 			"Pass can not read-write a resource it already writes.");
@@ -914,7 +910,7 @@ namespace gglab
 		nextResourceNode.m_VirtualResource = virtualResource;
 		nextResourceNode.m_Previous = previousNodeIndex;
 		nextResourceNode.m_Writer = stablePassNodeIndex;
-		slot.m_ResourceNodeIndex = static_cast<uint32_t>(m_ResourceNodes.size());
+		slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		m_ResourceNodes.push_back(nextResourceNode);
 
 		if (virtualResource && virtualResource->m_Imported)

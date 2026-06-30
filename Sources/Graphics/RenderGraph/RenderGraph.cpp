@@ -75,7 +75,7 @@ namespace gglab
 
 		auto addEdge = [this](RGPassNodeIndex from,
 			RGPassNodeIndex to,
-			RGResourceNode::Index resourceNodeIndex,
+			RGResourceNodeIndex resourceNodeIndex,
 			RGDependencyReason reason) noexcept
 			{
 				if (!from.IsValid() || !to.IsValid() || from == to)
@@ -116,7 +116,7 @@ namespace gglab
 		for (uint32_t resourceNodeIndex = 0; resourceNodeIndex < m_ResourceNodes.size(); ++resourceNodeIndex)
 		{
 			const RGResourceNode& resourceNode = m_ResourceNodes[resourceNodeIndex];
-			const RGResourceNode::Index stableResourceNodeIndex{ resourceNodeIndex };
+			const RGResourceNodeIndex stableResourceNodeIndex{ resourceNodeIndex };
 
 			for (const auto readerPassIndex : resourceNode.m_Readers)
 			{
@@ -156,9 +156,10 @@ namespace gglab
 			}
 
 			GGLAB_ASSERT_MSG(
-				virtualResource->m_ExportResourceNodeIndex < m_ResourceNodes.size(),
+				virtualResource->m_ExportResourceNodeIndex.IsValid() &&
+					virtualResource->m_ExportResourceNodeIndex.Value() < m_ResourceNodes.size(),
 				"RenderGraph export references an invalid resource node.");
-			const RGResourceNode::Index resourceNodeIndex{ virtualResource->m_ExportResourceNodeIndex };
+			const RGResourceNodeIndex resourceNodeIndex = virtualResource->m_ExportResourceNodeIndex;
 			const auto& resourceNode = m_ResourceNodes[resourceNodeIndex.Value()];
 			addEdge(
 				resourceNode.m_Writer,
@@ -515,7 +516,7 @@ namespace gglab
 		return m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 	}
 
-	RGPassNode& RenderGraph::GetPassNode(RGPassNode::Index index) noexcept
+	RGPassNode& RenderGraph::GetPassNode(RGPassNodeIndex index) noexcept
 	{
 		return m_PassNodes[index.Value()];
 	}
