@@ -8,7 +8,7 @@
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RenderView.h"
 

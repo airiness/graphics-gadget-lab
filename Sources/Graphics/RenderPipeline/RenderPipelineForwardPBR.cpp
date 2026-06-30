@@ -2,8 +2,8 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RenderGraph/RGFrameTargets.h"
-#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab

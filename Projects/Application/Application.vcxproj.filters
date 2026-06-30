@@ -839,8 +839,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGFrameTargets.h">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBlackboard.h">
+      <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h">
       <Filter>Externals\ImGui</Filter>
@@ -989,8 +989,8 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLResources.h">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\IBLGraphResources.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h">
       <Filter>Graphics</Filter>
@@ -1025,11 +1025,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGIBLPreviewResources.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGShadowResources.h">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ShadowGraphResources.h">
+      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
