@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RenderGraphSnapshot.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderGraph/RGExecutionPlan.h"
 
 namespace gglab
 {
@@ -58,13 +59,13 @@ namespace gglab
 			RGSnapshotBuilder(
 				const std::vector<RGResourceNode>& resourceNodes,
 				const std::vector<RGPassNode>& passNodes,
-				const std::vector<RGPassDependencyEdge>& dependencyEdges,
 				const std::vector<RGVirtualResourceBase*>& virtualResources,
+				const RGExecutionPlan* executionPlan,
 				RGSnapshot& outSnapshot) noexcept :
 				m_ResourceNodes(resourceNodes),
 				m_PassNodes(passNodes),
-				m_DependencyEdges(dependencyEdges),
 				m_VirtualResources(virtualResources),
+				m_ExecutionPlan(executionPlan),
 				m_OutSnapshot(outSnapshot)
 			{}
 
@@ -95,55 +96,54 @@ namespace gglab
 			{
 				for (uint32_t passIndex = 0; passIndex < m_PassNodes.size(); ++passIndex)
 				{
-					const auto& passNode = m_PassNodes[passIndex];
+					const auto& declaration = m_PassNodes[passIndex];
+					const RGCompiledPass* compiledPass = m_ExecutionPlan &&
+						passIndex < m_ExecutionPlan->GetPasses().size() ?
+						&m_ExecutionPlan->GetPasses()[passIndex] : nullptr;
 
 					RGSnapshotPassInfo passInfo = {};
 					passInfo.m_Index = passIndex;
-					passInfo.m_ExecutionOrder = passNode.m_ExecutionOrder;
-					passInfo.m_Name = ToSnapshotName(passNode.m_NameId);
-					passInfo.m_SideEffect = passNode.m_SideEffect;
-					passInfo.m_Culled = passNode.m_Culled;
-					passInfo.m_DependencyPassIndices.reserve(passNode.m_Dependencies.size());
-					passInfo.m_DependentPassIndices.reserve(passNode.m_Dependents.size());
-					passInfo.m_Accesses.reserve(passNode.m_Accesses.size());
-					passInfo.m_PreBarriers.reserve(passNode.m_PreBarriers.size());
-					passInfo.m_PostBarriers.reserve(passNode.m_PostBarriers.size());
-					passInfo.m_DevirtualizeResources.reserve(passNode.m_DevirtualizeVirtualResources.size());
-					passInfo.m_DestroyResources.reserve(passNode.m_DestroyVirtualResources.size());
+					passInfo.m_ExecutionOrder = compiledPass ? compiledPass->m_ExecutionOrder : -1;
+					passInfo.m_Name = ToSnapshotName(declaration.m_NameId);
+					passInfo.m_SideEffect = declaration.m_SideEffect;
+					passInfo.m_Culled = compiledPass ? compiledPass->m_Culled : false;
+					passInfo.m_Accesses.reserve(declaration.m_Accesses.size());
 
-					for (const auto dependency : passNode.m_Dependencies)
-					{
-						passInfo.m_DependencyPassIndices.push_back(ToSnapshotPassIndex(dependency));
-					}
-
-					for (const auto dependent : passNode.m_Dependents)
-					{
-						passInfo.m_DependentPassIndices.push_back(ToSnapshotPassIndex(dependent));
-					}
-
-					for (const auto& access : passNode.m_Accesses)
+					for (const auto& access : declaration.m_Accesses)
 					{
 						passInfo.m_Accesses.push_back(BuildAccessInfo(access));
 					}
 
-					for (const auto& barrier : passNode.m_PreBarriers)
+					if (compiledPass)
 					{
-						passInfo.m_PreBarriers.push_back(BuildBarrierInfo(barrier));
-					}
-
-					for (const auto& barrier : passNode.m_PostBarriers)
-					{
-						passInfo.m_PostBarriers.push_back(BuildBarrierInfo(barrier));
-					}
-
-					for (const auto* virtualResource : passNode.m_DevirtualizeVirtualResources)
-					{
-						passInfo.m_DevirtualizeResources.push_back(LookupVirtualResourceIndex(virtualResource));
-					}
-
-					for (const auto* virtualResource : passNode.m_DestroyVirtualResources)
-					{
-						passInfo.m_DestroyResources.push_back(LookupVirtualResourceIndex(virtualResource));
+						passInfo.m_DependencyPassIndices.reserve(compiledPass->m_Dependencies.size());
+						passInfo.m_DependentPassIndices.reserve(compiledPass->m_Dependents.size());
+						passInfo.m_PreBarriers.reserve(compiledPass->m_PreBarriers.size());
+						passInfo.m_PostBarriers.reserve(compiledPass->m_PostBarriers.size());
+						for (const auto dependency : compiledPass->m_Dependencies)
+						{
+							passInfo.m_DependencyPassIndices.push_back(ToSnapshotPassIndex(dependency));
+						}
+						for (const auto dependent : compiledPass->m_Dependents)
+						{
+							passInfo.m_DependentPassIndices.push_back(ToSnapshotPassIndex(dependent));
+						}
+						for (const auto& barrier : compiledPass->m_PreBarriers)
+						{
+							passInfo.m_PreBarriers.push_back(BuildBarrierInfo(barrier));
+						}
+						for (const auto& barrier : compiledPass->m_PostBarriers)
+						{
+							passInfo.m_PostBarriers.push_back(BuildBarrierInfo(barrier));
+						}
+						for (const auto resource : compiledPass->m_AcquireResources)
+						{
+							passInfo.m_DevirtualizeResources.push_back(resource.Value());
+						}
+						for (const auto resource : compiledPass->m_ReleaseResources)
+						{
+							passInfo.m_DestroyResources.push_back(resource.Value());
+						}
 					}
 
 					m_OutSnapshot.m_Passes.push_back(std::move(passInfo));
@@ -155,6 +155,9 @@ namespace gglab
 				for (uint32_t resourceIndex = 0; resourceIndex < m_VirtualResources.size(); ++resourceIndex)
 				{
 					const auto* virtualResource = m_VirtualResources[resourceIndex];
+					const RGCompiledResource* compiledResource = m_ExecutionPlan &&
+						resourceIndex < m_ExecutionPlan->GetResources().size() ?
+						&m_ExecutionPlan->GetResources()[resourceIndex] : nullptr;
 					GGLAB_ASSERT_NOT_NULL(virtualResource);
 
 					RGSnapshotResourceInfo resourceInfo = {};
@@ -163,15 +166,22 @@ namespace gglab
 					resourceInfo.m_ResourceType = virtualResource->m_ResourceType;
 					resourceInfo.m_Imported = virtualResource->m_Imported;
 					resourceInfo.m_Devirtualized = virtualResource->m_Devirtualized;
-					resourceInfo.m_RefCount = virtualResource->m_RefCount;
-					resourceInfo.m_FirstUserPassIndex = ToSnapshotPassIndex(virtualResource->m_FirstUser);
-					resourceInfo.m_LastUserPassIndex = ToSnapshotPassIndex(virtualResource->m_LastUser);
-					resourceInfo.m_UsageBits = virtualResource->GetCompiledUsageBits();
+					resourceInfo.m_RefCount = compiledResource ? compiledResource->m_RefCount : 0;
+					resourceInfo.m_FirstUserPassIndex = compiledResource ?
+						ToSnapshotPassIndex(compiledResource->m_FirstUser) : -1;
+					resourceInfo.m_LastUserPassIndex = compiledResource ?
+						ToSnapshotPassIndex(compiledResource->m_LastUser) : -1;
+					resourceInfo.m_UsageBits = compiledResource ? compiledResource->m_UsageBits : 0;
 					resourceInfo.m_PoolSlot = GetVirtualResourcePoolSlot(virtualResource);
-					resourceInfo.m_InitialBarrierState = virtualResource->m_InitialBarrierState;
-					resourceInfo.m_HasFinalBarrierState = virtualResource->m_FinalBarrierState.has_value();
-					resourceInfo.m_FinalBarrierState = virtualResource->m_FinalBarrierState.value_or(CommonRHIResourceState());
-					resourceInfo.m_FinalBarrierSubresources = virtualResource->m_FinalBarrierSubresources;
+					resourceInfo.m_InitialBarrierState = compiledResource ?
+						compiledResource->m_InitialState : virtualResource->m_InitialBarrierState;
+					resourceInfo.m_HasFinalBarrierState = compiledResource ?
+						compiledResource->m_FinalState.has_value() : virtualResource->m_FinalBarrierState.has_value();
+					resourceInfo.m_FinalBarrierState = compiledResource ?
+						compiledResource->m_FinalState.value_or(CommonRHIResourceState()) :
+						virtualResource->m_FinalBarrierState.value_or(CommonRHIResourceState());
+					resourceInfo.m_FinalBarrierSubresources = compiledResource ?
+						compiledResource->m_FinalSubresources : virtualResource->m_FinalBarrierSubresources;
 					m_OutSnapshot.m_Resources.push_back(std::move(resourceInfo));
 				}
 			}
@@ -204,8 +214,12 @@ namespace gglab
 
 				}
 
-				m_OutSnapshot.m_DependencyEdges.reserve(m_DependencyEdges.size());
-				for (const auto& edge : m_DependencyEdges)
+				if (!m_ExecutionPlan)
+				{
+					return;
+				}
+				m_OutSnapshot.m_DependencyEdges.reserve(m_ExecutionPlan->GetDependencyEdges().size());
+				for (const auto& edge : m_ExecutionPlan->GetDependencyEdges())
 				{
 					m_OutSnapshot.m_DependencyEdges.push_back(BuildDependencyEdge(edge));
 				}
@@ -229,14 +243,17 @@ namespace gglab
 				return accessInfo;
 			}
 
-			RGSnapshotBarrierInfo BuildBarrierInfo(const RGPassNode::BarrierIntent& intent) const noexcept
+			RGSnapshotBarrierInfo BuildBarrierInfo(const RGBarrierIntent& intent) const noexcept
 			{
-				GGLAB_ASSERT_NOT_NULL(intent.m_VirtualResource);
+				GGLAB_ASSERT_MSG(m_ExecutionPlan && intent.m_Resource.IsValid() &&
+					intent.m_Resource.Value() < m_ExecutionPlan->GetResources().size(),
+					"RenderGraph snapshot barrier references an invalid resource.");
+				const auto& resource = m_ExecutionPlan->GetResources()[intent.m_Resource.Value()];
 
 				RGSnapshotBarrierInfo info = {};
-				info.m_VirtualResourceIndex = LookupVirtualResourceIndex(intent.m_VirtualResource);
-				info.m_ResourceName = ToSnapshotName(intent.m_VirtualResource->m_NameId);
-				info.m_ResourceType = intent.m_VirtualResource->m_ResourceType;
+				info.m_VirtualResourceIndex = intent.m_Resource.Value();
+				info.m_ResourceName = ToSnapshotName(resource.m_NameId);
+				info.m_ResourceType = resource.m_ResourceType;
 				info.m_Before = intent.m_Before;
 				info.m_After = intent.m_After;
 				info.m_Subresources = intent.m_Subresources;
@@ -271,8 +288,8 @@ namespace gglab
 		private:
 			const std::vector<RGResourceNode>& m_ResourceNodes;
 			const std::vector<RGPassNode>& m_PassNodes;
-			const std::vector<RGPassDependencyEdge>& m_DependencyEdges;
 			const std::vector<RGVirtualResourceBase*>& m_VirtualResources;
+			const RGExecutionPlan* m_ExecutionPlan = nullptr;
 			RGSnapshot& m_OutSnapshot;
 			std::unordered_map<const RGVirtualResourceBase*, uint32_t> m_VirtualResourceIndices;
 		};
@@ -283,8 +300,8 @@ namespace gglab
 		RGSnapshotBuilder(
 			rg.m_ResourceNodes,
 			rg.m_PassNodes,
-			rg.m_DependencyEdges,
 			rg.m_VirtualResources,
+			rg.m_ExecutionPlan.get(),
 			outSnapshot).Build();
 	}
 }

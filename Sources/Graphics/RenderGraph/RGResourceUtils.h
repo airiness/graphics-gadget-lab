@@ -166,13 +166,33 @@ namespace gglab
 		case RGBufferAccess::None:
 			return CommonRHIResourceState();
 		case RGBufferAccess::Vertex:
-			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::VertexBuffer, .m_Layout = RHILayout::Common };
+			return
+			{
+				.m_Stages = ToRHIStages(access),
+				.m_Access = RHIAccess::VertexBuffer,
+				.m_Layout = RHILayout::Common
+			};
 		case RGBufferAccess::Index:
-			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::IndexBuffer, .m_Layout = RHILayout::Common };
+			return
+			{
+				.m_Stages = ToRHIStages(access),
+				.m_Access = RHIAccess::IndexBuffer,
+				.m_Layout = RHILayout::Common
+			};
 		case RGBufferAccess::Constant:
-			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::ConstantBuffer, .m_Layout = RHILayout::Common };
+			return
+			{
+				.m_Stages = ToRHIStages(access),
+				.m_Access = RHIAccess::ConstantBuffer,
+				.m_Layout = RHILayout::Common
+			};
 		case RGBufferAccess::StructuredRead:
-			return { .m_Stages = ToRHIStages(access), .m_Access = RHIAccess::ShaderResource, .m_Layout = RHILayout::Common };
+			return
+			{
+				.m_Stages = ToRHIStages(access),
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::Common
+			};
 		case RGBufferAccess::UnorderedAccess:
 			return
 			{
