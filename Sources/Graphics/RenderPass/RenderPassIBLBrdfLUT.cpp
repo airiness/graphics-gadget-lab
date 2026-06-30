@@ -52,7 +52,7 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::IBL_BrdfLut);
 				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
-				iblRes.m_BrdfLut = builder.Write(iblRes.m_BrdfLut, RGTextureAccess::RenderTarget);
+				builder.WriteInPlace(iblRes.m_BrdfLut, RGTextureAccess::RenderTarget);
 				data.m_BrdfLut = iblRes.m_BrdfLut;
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BrdfLut);
 

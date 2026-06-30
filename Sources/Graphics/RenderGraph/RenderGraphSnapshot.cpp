@@ -103,11 +103,23 @@ namespace gglab
 					passInfo.m_Name = ToSnapshotName(passNode.m_NameId);
 					passInfo.m_SideEffect = passNode.m_SideEffect;
 					passInfo.m_Culled = passNode.m_Culled;
+					passInfo.m_DependencyPassIndices.reserve(passNode.m_Dependencies.size());
+					passInfo.m_DependentPassIndices.reserve(passNode.m_Dependents.size());
 					passInfo.m_Accesses.reserve(passNode.m_Accesses.size());
 					passInfo.m_PreBarriers.reserve(passNode.m_PreBarriers.size());
 					passInfo.m_PostBarriers.reserve(passNode.m_PostBarriers.size());
 					passInfo.m_DevirtualizeResources.reserve(passNode.m_DevirtualizeVirtualResources.size());
 					passInfo.m_DestroyResources.reserve(passNode.m_DestroyVirtualResources.size());
+
+					for (const auto dependency : passNode.m_Dependencies)
+					{
+						passInfo.m_DependencyPassIndices.push_back(ToSnapshotPassIndex(dependency));
+					}
+
+					for (const auto dependent : passNode.m_Dependents)
+					{
+						passInfo.m_DependentPassIndices.push_back(ToSnapshotPassIndex(dependent));
+					}
 
 					for (const auto& access : passNode.m_Accesses)
 					{
@@ -241,6 +253,7 @@ namespace gglab
 				edge.m_FromPassName = GetPassSnapshotName(m_PassNodes, edge.m_FromPassIndex);
 				edge.m_ToPassName = GetPassSnapshotName(m_PassNodes, edge.m_ToPassIndex);
 				edge.m_ResourceName = ToSnapshotName(resourceNode.NameId());
+				edge.m_Reason = dependencyEdge.m_Reason;
 				return edge;
 			}
 

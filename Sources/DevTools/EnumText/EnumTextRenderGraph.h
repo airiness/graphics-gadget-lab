@@ -25,6 +25,18 @@ namespace gglab::devtools
 	};
 
 	template<>
+	struct EnumTextTraits<RGDependencyReason>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGDependencyReason::WriterToReader, "Writer -> Reader" },
+			EnumTextEntry{ RGDependencyReason::PreviousWriterToWriter, "Previous Writer -> Writer" },
+			EnumTextEntry{ RGDependencyReason::PreviousReaderToWriter, "Previous Reader -> Writer" },
+			EnumTextEntry{ RGDependencyReason::ExportWriterToExport, "Export Writer -> Export" },
+			EnumTextEntry{ RGDependencyReason::ExportReaderToExport, "Export Reader -> Export" },
+		};
+	};
+
+	template<>
 	struct EnumTextTraits<RGTextureAccess>
 	{
 		static constexpr std::array Entries = {

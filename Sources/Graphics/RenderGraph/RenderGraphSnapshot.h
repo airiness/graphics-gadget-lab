@@ -37,6 +37,8 @@ namespace gglab
 		std::string m_Name;
 		bool m_SideEffect = false;
 		bool m_Culled = false;
+		std::vector<int32_t> m_DependencyPassIndices;
+		std::vector<int32_t> m_DependentPassIndices;
 		std::vector<RGSnapshotAccessInfo> m_Accesses;
 		std::vector<RGSnapshotBarrierInfo> m_PreBarriers;
 		std::vector<RGSnapshotBarrierInfo> m_PostBarriers;
@@ -83,6 +85,7 @@ namespace gglab
 		std::string m_FromPassName;
 		std::string m_ToPassName;
 		std::string m_ResourceName;
+		RGDependencyReason m_Reason = RGDependencyReason::WriterToReader;
 	};
 
 	struct RGSnapshot

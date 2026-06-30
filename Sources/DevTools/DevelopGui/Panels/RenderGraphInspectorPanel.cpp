@@ -779,6 +779,10 @@ namespace gglab
 			ImGui::Text("Pass #%u: %s", pass.m_Index, pass.m_Name.c_str());
 			ImGui::Text("Execution Order: %s", PassIndexToString(pass.m_ExecutionOrder).c_str());
 			ImGui::Text("Culled: %s, SideEffect: %s", utils::BoolToString(pass.m_Culled), utils::BoolToString(pass.m_SideEffect));
+			const std::string dependencies = PassListToString(pass.m_DependencyPassIndices);
+			const std::string dependents = PassListToString(pass.m_DependentPassIndices);
+			ImGui::TextWrapped("Depends On: %s", dependencies.c_str());
+			ImGui::TextWrapped("Dependents: %s", dependents.c_str());
 
 			const std::string devirtualizeResources = ResourceListToString(snapshot, pass.m_DevirtualizeResources);
 			const std::string destroyResources = ResourceListToString(snapshot, pass.m_DestroyResources);
@@ -871,6 +875,10 @@ namespace gglab
 			ImGui::TextWrapped("Accumulated Usage: %s", usage.c_str());
 			ImGui::TextWrapped("Initial State: %s", initialState.c_str());
 			ImGui::TextWrapped("Exported Final State: %s", finalState.c_str());
+			const std::string finalRange = resource.m_HasFinalBarrierState ?
+				devtools::SubresourceRangeText(resource.m_FinalBarrierSubresources) :
+				"-";
+			ImGui::TextWrapped("Exported Final Range: %s", finalRange.c_str());
 		}
 
 		static void DrawPassesTab(
@@ -884,13 +892,15 @@ namespace gglab
 				ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (ImGui::BeginTable("RenderGraphPasses", 8, flags, ImVec2(0.0f, 280.0f)))
+			if (ImGui::BeginTable("RenderGraphPasses", 10, flags, ImVec2(0.0f, 280.0f)))
 			{
 				ImGui::TableSetupColumn("Order");
 				ImGui::TableSetupColumn("Index");
 				ImGui::TableSetupColumn("Name");
 				ImGui::TableSetupColumn("Culled");
 				ImGui::TableSetupColumn("SideEffect");
+				ImGui::TableSetupColumn("Deps");
+				ImGui::TableSetupColumn("Out");
 				ImGui::TableSetupColumn("Accesses");
 				ImGui::TableSetupColumn("Pre");
 				ImGui::TableSetupColumn("Post");
@@ -925,10 +935,14 @@ namespace gglab
 					ImGui::TableSetColumnIndex(4);
 					ImGui::TextUnformatted(utils::BoolToString(pass.m_SideEffect));
 					ImGui::TableSetColumnIndex(5);
-					ImGui::Text("%u", static_cast<uint32_t>(pass.m_Accesses.size()));
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependencyPassIndices.size()));
 					ImGui::TableSetColumnIndex(6);
-					ImGui::Text("%u", static_cast<uint32_t>(pass.m_PreBarriers.size()));
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependentPassIndices.size()));
 					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_Accesses.size()));
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_PreBarriers.size()));
+					ImGui::TableSetColumnIndex(9);
 					ImGui::Text("%u", static_cast<uint32_t>(pass.m_PostBarriers.size()));
 				}
 
@@ -1090,7 +1104,7 @@ namespace gglab
 				ImGui::TableSetColumnIndex(3);
 				ImGui::Text("%u", edge.m_ResourceNodeIndex);
 				ImGui::TableSetColumnIndex(4);
-				ImGui::TextUnformatted("Writer -> Reader");
+				ImGui::TextUnformatted(devtools::EnumText(edge.m_Reason).data());
 			}
 
 			ImGui::EndTable();

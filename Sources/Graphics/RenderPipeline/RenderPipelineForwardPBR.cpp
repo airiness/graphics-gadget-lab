@@ -124,7 +124,7 @@ namespace gglab
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
 
-				targets.m_BackBuffer = builder.Write(targets.m_BackBuffer,
+				builder.WriteInPlace(targets.m_BackBuffer,
 					RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = targets.m_BackBuffer;
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
@@ -169,7 +169,7 @@ namespace gglab
 
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
-				targets.m_BackBuffer = builder.Write(targets.m_BackBuffer,
+				builder.WriteInPlace(targets.m_BackBuffer,
 					RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = targets.m_BackBuffer;
 				builder.Export(
