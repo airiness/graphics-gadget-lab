@@ -2,10 +2,9 @@
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGFrameTargets.h"
-#include "Graphics/RenderGraph/RGIBLResources.h"
-#include "Graphics/RenderGraph/RGIBLPreviewResources.h"
-#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPass/IBLGraphResources.h"
+#include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 
 namespace gglab

@@ -4,7 +4,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGShadowResources.h"
+#include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
 
 namespace gglab

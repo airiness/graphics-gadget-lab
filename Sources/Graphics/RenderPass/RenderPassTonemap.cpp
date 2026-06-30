@@ -4,7 +4,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderGraph/RGFrameTargets.h"
+#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 
 namespace gglab
 {
