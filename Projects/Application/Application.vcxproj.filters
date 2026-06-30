@@ -252,7 +252,13 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierCompiler.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.cpp">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp">
@@ -1031,7 +1037,19 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierCompiler.h">
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGCompileDiagnostic.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutionPlan.h">
+      <Filter>Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.h">

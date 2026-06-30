@@ -4,25 +4,26 @@
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
+#include "Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Core/StringId.h"
+
+#include <memory>
 
 namespace gglab
 {
 	class RHIGraphicsCommandContext;
 	class RHIComputeCommandContext;
 	class RGPassBase;
+	class RGExecutionPlan;
+	class RGExecutor;
+	class RGCompiler;
 	template<typename PassData> class RGPass;
 	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
 
 	struct RGPassNode;
 	struct RGResourceNode;
-
-	GGLAB_DEFINE_TYPED_INDEX(RGPassNodeIndex, uint32_t);
-	GGLAB_DEFINE_TYPED_INDEX(RGResourceNodeIndex, uint32_t);
-	GGLAB_DEFINE_TYPED_INDEX(RGVirtualResourceIndex, uint32_t);
-	GGLAB_DEFINE_TYPED_INDEX(RGTextureViewId, uint32_t);
 
 	class RenderGraph;
 
@@ -48,28 +49,24 @@ namespace gglab
 
 	private:
 		RGBackendExecuteContext m_Backend{};
-		RenderGraph* m_RenderGraph = nullptr;
+		const RGExecutionPlan* m_ExecutionPlan = nullptr;
+		RHIDevice* m_Device = nullptr;
 
-		friend class RenderGraph;
+		friend class RGExecutor;
 	};
 
 	struct RGVirtualResourceBase
 	{
 		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
-		virtual void Devirtualize(TransientResourcePool*) noexcept = 0;
-		virtual void Destroy(RenderGraph&) noexcept = 0;
-		virtual void ResetCompiledUsage() noexcept = 0;
-		virtual void AccumulateAccess(uint64_t accessValue) noexcept = 0;
-		virtual uint64_t GetCompiledUsageBits() const noexcept = 0;
+		virtual void Devirtualize(TransientResourcePool*, uint64_t usageBits) noexcept = 0;
+		virtual void Release(
+			std::vector<TransientTextureAllocation>& retireTextures,
+			std::vector<TransientBufferAllocation>& retireBuffers) noexcept = 0;
 
 		StringID m_NameId;
 		bool m_Imported = false;
 		bool m_Devirtualized = false;
-		int32_t m_RefCount = 0;
-
-		RGPassNodeIndex m_FirstUser = InvalidRGPassNodeIndex;
-		RGPassNodeIndex m_LastUser = InvalidRGPassNodeIndex;
 
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		std::optional<RHIResourceState> m_FinalBarrierState;
@@ -94,11 +91,10 @@ namespace gglab
 		PhysicalAllocation m_PhysicalAllocation{};
 		Handle m_ImportedHandle{};
 
-		void Devirtualize(TransientResourcePool* pool) noexcept override;
-		void Destroy(RenderGraph& rg) noexcept override;
-		void ResetCompiledUsage() noexcept override;
-		void AccumulateAccess(uint64_t accessValue) noexcept override;
-		uint64_t GetCompiledUsageBits() const noexcept override;
+		void Devirtualize(TransientResourcePool* pool, uint64_t usageBits) noexcept override;
+		void Release(
+			std::vector<TransientTextureAllocation>& retireTextures,
+			std::vector<TransientBufferAllocation>& retireBuffers) noexcept override;
 	};
 
 	struct RGResourceNode
@@ -128,37 +124,11 @@ namespace gglab
 			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
 
-		struct BarrierIntent
-		{
-			RGVirtualResourceBase* m_VirtualResource = nullptr;
-			RHIResourceState m_Before = CommonRHIResourceState();
-			RHIResourceState m_After = CommonRHIResourceState();
-			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
-		};
-
 		StringID m_NameId;
 		bool m_SideEffect = false;
-		bool m_Culled = false;
-		int32_t m_ExecutionOrder = -1;
 		std::vector<Access> m_Accesses;
-		std::vector<RGPassNodeIndex> m_Dependencies;
-		std::vector<RGPassNodeIndex> m_Dependents;
-
-		std::vector<BarrierIntent> m_PreBarriers;
-		std::vector<BarrierIntent> m_PostBarriers;
-
-		std::vector<RGVirtualResourceBase*> m_DevirtualizeVirtualResources;
-		std::vector<RGVirtualResourceBase*> m_DestroyVirtualResources;
 
 		RGPassBase* m_Pass = nullptr;
-	};
-
-	struct RGPassDependencyEdge
-	{
-		RGPassNodeIndex m_From = InvalidRGPassNodeIndex;
-		RGPassNodeIndex m_To = InvalidRGPassNodeIndex;
-		RGResourceNodeIndex m_ResourceNodeIndex = InvalidRGResourceNodeIndex;
-		RGDependencyReason m_Reason = RGDependencyReason::WriterToReader;
 	};
 
 	struct RGResourceSlot
@@ -398,10 +368,11 @@ namespace gglab
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
-		RHITextureHandle GetTextureHandle(RGTextureId texId) noexcept;
-		RHIBufferHandle GetBufferHandle(RGBufferId bufId) noexcept;
-		RHITextureViewHandle GetTextureViewHandle(RGTextureViewId viewId) noexcept;
-		RHIDescriptorHandle GetTextureViewDescriptor(RGTextureViewId viewId) noexcept;
+		[[nodiscard]] const RGExecutionPlan* GetExecutionPlan() const noexcept { return m_ExecutionPlan.get(); }
+		[[nodiscard]] const std::vector<RGCompileDiagnostic>& GetCompileDiagnostics() const noexcept
+		{
+			return m_CompileDiagnostics;
+		}
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
@@ -457,25 +428,7 @@ namespace gglab
 			RGTextureId textureId,
 			std::optional<RHITextureViewDesc> desc) noexcept;
 
-		template<typename RESOURCE>
-		void MarkRetirePhysicalAllocation(
-			typename RGResourceTraits<RESOURCE>::PhysicalAllocation&& allocation) noexcept;
-
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
-
-		RGResourceNode& GetActiveResourceNode(RGResourceHandle handle) noexcept;
-
-		RGPassNode& GetPassNode(RGPassNodeIndex index) noexcept;
-
-		void BuildDependencyGraph() noexcept;
-		void CullPasses() noexcept;
-		[[nodiscard]] bool TopologicalSortPasses() noexcept;
-		void BuildResourceLifetimes() noexcept;
-		void BuildResourceBarriers() noexcept;
-
-		void TrackPassResourceUses(RHICommandContext* commandContext, const RGPassNode& passNode) noexcept;
-		void EmitBarriers(RHICommandContext* commandContext,
-			const std::vector<RGPassNode::BarrierIntent>& barriers) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -486,8 +439,6 @@ namespace gglab
 
 		std::vector<RGResourceNode> m_ResourceNodes;
 		std::vector<RGPassNode> m_PassNodes;
-		std::vector<RGPassDependencyEdge> m_DependencyEdges;
-		std::vector<RGPassNodeIndex> m_ExecutionOrder;
 		std::vector<RGVirtualResourceBase*> m_VirtualResources;
 		std::vector<RGResourceSlot> m_ResourceSlots;
 		std::vector<TextureViewRecord> m_TextureViews;
@@ -496,13 +447,12 @@ namespace gglab
 
 		std::vector<TransientTextureAllocation> m_MarkedRetireTextures;
 		std::vector<TransientBufferAllocation> m_MarkedRetireBuffers;
+		std::unique_ptr<RGExecutionPlan> m_ExecutionPlan;
+		std::vector<RGCompileDiagnostic> m_CompileDiagnostics;
 		bool m_BuildValid = true;
-		bool m_Compiled = false;
 
 		friend class RGBuilder;
-
-		template<typename RESOURCE>
-		friend struct RGVirtualResource;
+		friend class RGCompiler;
 
 		friend void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
 	};
@@ -621,7 +571,6 @@ namespace gglab
 		virtualResource->m_Devirtualized = false;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
-		virtualResource->ResetCompiledUsage();
 		m_VirtualResources.push_back(virtualResource);
 
 		RGResourceNode resourceNode
@@ -664,7 +613,6 @@ namespace gglab
 		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialAccess);
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
-		virtualResource->ResetCompiledUsage();
 		virtualResource->m_ImportedHandle = importedHandle;
 		m_VirtualResources.push_back(virtualResource);
 
@@ -940,24 +888,11 @@ namespace gglab
 		return resourceId;
 	}
 
-	template<typename RESOURCE>
-	inline void RenderGraph::MarkRetirePhysicalAllocation(
-		typename RGResourceTraits<RESOURCE>::PhysicalAllocation&& allocation) noexcept
-	{
-		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
-		{
-			m_MarkedRetireTextures.push_back(std::move(allocation));
-		}
-		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
-		{
-			m_MarkedRetireBuffers.push_back(std::move(allocation));
-		}
-		allocation.Reset();
-	}
-
 	// RGVirtualResource functions
 	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::Devirtualize(TransientResourcePool* pool) noexcept
+	inline void RGVirtualResource<RESOURCE>::Devirtualize(
+		TransientResourcePool* pool,
+		uint64_t usageBits) noexcept
 	{
 		if (m_Devirtualized)
 		{
@@ -973,18 +908,24 @@ namespace gglab
 
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 		{
-			m_PhysicalAllocation = pool->AcquireTexture(m_Desc);
+			auto compiledDesc = m_Desc;
+			compiledDesc.m_Usage = static_cast<RHITextureUsage>(usageBits);
+			m_PhysicalAllocation = pool->AcquireTexture(compiledDesc);
 		}
 		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
 		{
-			m_PhysicalAllocation = pool->AcquireBuffer(m_Desc);
+			auto compiledDesc = m_Desc;
+			compiledDesc.m_Usage = static_cast<RHIBufferUsage>(usageBits);
+			m_PhysicalAllocation = pool->AcquireBuffer(compiledDesc);
 		}
 		m_Devirtualized = m_PhysicalAllocation.IsValid();
 		GGLAB_ASSERT_MSG(m_Devirtualized, "Failed to acquire a transient physical resource.");
 	}
 
 	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::Destroy(RenderGraph& rg) noexcept
+	inline void RGVirtualResource<RESOURCE>::Release(
+		std::vector<TransientTextureAllocation>& retireTextures,
+		std::vector<TransientBufferAllocation>& retireBuffers) noexcept
 	{
 		if (!m_Devirtualized)
 		{
@@ -996,25 +937,15 @@ namespace gglab
 			return;
 		}
 
-		rg.MarkRetirePhysicalAllocation<RESOURCE>(std::move(m_PhysicalAllocation));
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			retireTextures.push_back(std::move(m_PhysicalAllocation));
+		}
+		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
+		{
+			retireBuffers.push_back(std::move(m_PhysicalAllocation));
+		}
+		m_PhysicalAllocation.Reset();
 		m_Devirtualized = false;
-	}
-
-	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::ResetCompiledUsage() noexcept
-	{
-		m_Desc.m_Usage = {};
-	}
-
-	template<typename RESOURCE>
-	inline void RGVirtualResource<RESOURCE>::AccumulateAccess(uint64_t accessValue) noexcept
-	{
-		m_Desc.m_Usage |= ToRHIUsage(static_cast<Access>(accessValue));
-	}
-
-	template<typename RESOURCE>
-	inline uint64_t RGVirtualResource<RESOURCE>::GetCompiledUsageBits() const noexcept
-	{
-		return static_cast<uint64_t>(m_Desc.m_Usage);
 	}
 }

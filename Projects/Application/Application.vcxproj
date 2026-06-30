@@ -206,7 +206,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierCompiler.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
@@ -421,7 +423,11 @@
     <ClInclude Include="..\..\Sources\Core\Precompiled.h" />
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierCompiler.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGCompileDiagnostic.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutionPlan.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h" />

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/EnumFlags.h"
+#include "Core/TypedIndex.h"
 #include "Graphics/RHI/RHITexture.h"
 #include "Graphics/RHI/RHITypes.h"
 
@@ -7,6 +8,11 @@
 
 namespace gglab
 {
+	GGLAB_DEFINE_TYPED_INDEX(RGPassNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGResourceNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGVirtualResourceIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGTextureViewId, uint32_t);
+
 	[[nodiscard]] constexpr inline RHITextureViewDesc MakeRHITexture2DArrayViewDesc(
 		RHIFormat format,
 		uint32_t mip,
