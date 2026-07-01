@@ -450,6 +450,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -978,6 +981,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiStateStore.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiProjectionUtils.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h">

@@ -5,6 +5,7 @@
 #include "Core/Utility/StringUtils.h"
 #include "Core/World.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/AssetSnapshot.h"
 
@@ -28,6 +29,15 @@ namespace gglab
 			entt::entity m_SelectedEntity = entt::null;
 			int32_t m_ComponentFilter = static_cast<int32_t>(EntityComponentFilter::All);
 			bool m_SelectCreatedEntity = true;
+			bool m_ShowWorldLinks = true;
+		};
+
+		struct EntityListItemAnchor
+		{
+			entt::entity m_Entity = entt::null;
+			ImVec2 m_Position = ImVec2(0.0f, 0.0f);
+			bool m_Selected = false;
+			bool m_Hovered = false;
 		};
 
 		[[nodiscard]] const char* LightTypeName(LightType type) noexcept
@@ -212,6 +222,8 @@ namespace gglab
 			}
 			ImGui::SameLine();
 			ImGui::Checkbox("Select Created", &state.m_SelectCreatedEntity);
+			ImGui::SameLine();
+			ImGui::Checkbox("World Links", &state.m_ShowWorldLinks);
 
 			const char* filterItems[] = { "All", "Transform", "Model", "Light" };
 			ImGui::Combo("Component Filter", &state.m_ComponentFilter, filterItems, IM_ARRAYSIZE(filterItems));
@@ -221,7 +233,8 @@ namespace gglab
 		void DrawEntityList(
 			const entt::registry& registry,
 			std::span<const entt::entity> entities,
-			EntityPanelState& state) noexcept
+			EntityPanelState& state,
+			std::vector<EntityListItemAnchor>& anchors) noexcept
 		{
 			ImGui::PushID("EntityList");
 			ImGui::SeparatorText("Entities");
@@ -236,17 +249,102 @@ namespace gglab
 			for (const entt::entity entity : entities)
 			{
 				const std::string label = BuildEntityLabel(registry, entity);
-				const bool selected = entity == state.m_SelectedEntity;
 				ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
-				if (ImGui::Selectable(label.c_str(), selected))
+				if (ImGui::Selectable(label.c_str(), entity == state.m_SelectedEntity))
 				{
 					state.m_SelectedEntity = entity;
+				}
+				if (ImGui::IsItemVisible())
+				{
+					const ImVec2 rectMin = ImGui::GetItemRectMin();
+					const ImVec2 rectMax = ImGui::GetItemRectMax();
+
+					EntityListItemAnchor anchor{};
+					anchor.m_Entity = entity;
+					anchor.m_Position = ImVec2(rectMax.x, (rectMin.y + rectMax.y) * 0.5f);
+					anchor.m_Selected = entity == state.m_SelectedEntity;
+					anchor.m_Hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+					anchors.emplace_back(anchor);
 				}
 				ImGui::PopID();
 			}
 
 			ImGui::EndChild();
 			ImGui::PopID();
+		}
+
+		void DrawEntityWorldLinks(
+			const entt::registry& registry,
+			const EntityPanelState& state,
+			std::span<const EntityListItemAnchor> anchors,
+			const RenderView* mainRenderView) noexcept
+		{
+			if (!state.m_ShowWorldLinks || mainRenderView == nullptr)
+			{
+				return;
+			}
+
+			ImDrawList* drawList = ImGui::GetForegroundDrawList();
+			if (drawList == nullptr)
+			{
+				return;
+			}
+
+			const ImU32 selectedColor = IM_COL32(255, 214, 96, 230);
+			const ImU32 hoveredColor = IM_COL32(96, 180, 255, 210);
+			const ImU32 shadowColor = IM_COL32(0, 0, 0, 120);
+			for (const EntityListItemAnchor& anchor : anchors)
+			{
+				const bool selected = anchor.m_Selected || anchor.m_Entity == state.m_SelectedEntity;
+				const bool shouldDraw = selected || anchor.m_Hovered;
+				if (!shouldDraw || !registry.valid(anchor.m_Entity))
+				{
+					continue;
+				}
+
+				const auto* transform = registry.try_get<components::TransformComponent>(anchor.m_Entity);
+				if (transform == nullptr)
+				{
+					continue;
+				}
+
+				ImVec2 worldScreenPosition;
+				bool screenClamped = false;
+				if (!devtools::ProjectWorldPositionToScreenClamped(
+					*mainRenderView,
+					transform->m_Position,
+					worldScreenPosition,
+					screenClamped))
+				{
+					continue;
+				}
+
+				const ImU32 color = selected ? selectedColor : hoveredColor;
+				const float thickness = selected ? 2.5f : 1.75f;
+				const float radius = selected ? 5.0f : 4.0f;
+
+				drawList->AddLine(
+					ImVec2(anchor.m_Position.x + 1.0f, anchor.m_Position.y + 1.0f),
+					ImVec2(worldScreenPosition.x + 1.0f, worldScreenPosition.y + 1.0f),
+					shadowColor,
+					thickness + 1.0f);
+				drawList->AddLine(anchor.m_Position, worldScreenPosition, color, thickness);
+				if (screenClamped)
+				{
+					drawList->AddCircle(worldScreenPosition, radius + 1.5f, shadowColor, 16, 3.0f);
+					drawList->AddCircle(worldScreenPosition, radius, color, 16, 2.0f);
+				}
+				else
+				{
+					drawList->AddCircleFilled(worldScreenPosition, radius + 1.0f, shadowColor, 16);
+					drawList->AddCircleFilled(worldScreenPosition, radius, color, 16);
+				}
+
+				const std::string label = std::format("Entity {}", entt::to_integral(anchor.m_Entity));
+				const ImVec2 labelPosition(worldScreenPosition.x + radius + 5.0f, worldScreenPosition.y - radius - 2.0f);
+				drawList->AddText(ImVec2(labelPosition.x + 1.0f, labelPosition.y + 1.0f), shadowColor, label.c_str());
+				drawList->AddText(labelPosition, color, label.c_str());
+			}
 		}
 
 		void DrawTransformComponent(components::TransformComponent& transform) noexcept
@@ -541,11 +639,7 @@ namespace gglab
 
 		auto& state = context.PanelState<EntityPanelState>();
 		auto& registry = context.m_World->GetRegistry();
-		const auto filter = static_cast<EntityComponentFilter>(std::clamp(
-			state.m_ComponentFilter,
-			static_cast<int32_t>(EntityComponentFilter::All),
-			static_cast<int32_t>(EntityComponentFilter::Light)));
-		const std::vector<entt::entity> entities = CollectEntities(registry, filter);
+		std::vector<EntityListItemAnchor> entityAnchors;
 		if (state.m_SelectedEntity != entt::null &&
 			!registry.valid(state.m_SelectedEntity))
 		{
@@ -563,12 +657,25 @@ namespace gglab
 
 			ImGui::TableSetColumnIndex(0);
 			DrawEntityListToolbar(registry, state);
-			DrawEntityList(registry, std::span<const entt::entity>(entities), state);
+
+			const auto updatedFilter = static_cast<EntityComponentFilter>(std::clamp(
+				state.m_ComponentFilter,
+				static_cast<int32_t>(EntityComponentFilter::All),
+				static_cast<int32_t>(EntityComponentFilter::Light)));
+			const std::vector<entt::entity> entities = CollectEntities(registry, updatedFilter);
+			entityAnchors.reserve(entities.size());
+			DrawEntityList(registry, std::span<const entt::entity>(entities), state, entityAnchors);
 
 			ImGui::TableSetColumnIndex(1);
 			DrawSelectedEntity(registry, state, context.m_AssetManager);
 
 			ImGui::EndTable();
 		}
+
+		DrawEntityWorldLinks(
+			registry,
+			state,
+			std::span<const EntityListItemAnchor>(entityAnchors),
+			context.m_MainRenderView);
 	}
 }
