@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RenderGraph/RGTypes.h"
+#include "Graphics/RenderGraph/RGResourceHandle.h"
 
 #include <cstdint>
 #include <string>

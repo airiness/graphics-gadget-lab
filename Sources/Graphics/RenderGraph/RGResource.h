@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceHandle.h"
-#include "Graphics/RenderGraph/RGTypes.h"
 #include "Graphics/RHI/RHIBuffer.h"
+#include "Graphics/RHI/RHITexture.h"
 
 #include <variant>
 
