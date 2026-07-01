@@ -163,6 +163,12 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBufferHandle());
 
+				// Light structured buffer
+				const auto& lightSB = renderer->GetLightStructuredBuffer();
+				graphicsContext->SetReadOnlyBuffer(
+					static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
+					lightSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
+
 				const ForwardPBRPassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
 					.ShadowMapTextureIndex = shadowSrv.m_Index,

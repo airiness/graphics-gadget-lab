@@ -137,6 +137,11 @@ namespace gglab
 				DrawTable(snapshot.m_Materials, state.m_HideFreeSlots);
 				ImGui::EndTabItem();
 			}
+			if (ImGui::BeginTabItem("Lights"))
+			{
+				DrawTable(snapshot.m_Lights, state.m_HideFreeSlots);
+				ImGui::EndTabItem();
+			}
 			ImGui::EndTabBar();
 		}
 	}

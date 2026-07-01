@@ -126,8 +126,10 @@ namespace gglab
 		m_SceneCB.reset();
 		m_ObjectTable.reset();
 		m_MaterialTable.reset();
+		m_LightTable.reset();
 		m_ObjectSB.reset();
 		m_MaterialSB.reset();
+		m_LightSB.reset();
 		m_ViewSB.reset();
 
 		m_RHIContext.reset();
@@ -310,6 +312,7 @@ namespace gglab
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 1, 0, 1, 0, "ObjectSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 2, 0, 1, 0, "MaterialSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 3, 0, 1, 0, "ViewSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 4, 0, 1, 0, "LightSB");
 		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::AllGraphics, 0, 0, 0, 0, "BindlessTextures");
 		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::AllGraphics, 0, 0, 0, 0, "BindlessSamplers");
 		return desc;
@@ -409,6 +412,15 @@ namespace gglab
 			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<MaterialID, MaterialGPU>>(
 				MaxMaterialCapacity, GetSwapChain()->GetBufferCount());
+
+			PersistentStructuredBuffer<LightGPU>::CreateInfo lightSBCreateInfo{};
+			lightSBCreateInfo.m_Device = GetDevice();
+			lightSBCreateInfo.m_ElementCapacity = MaxLightCapacity;
+			lightSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
+			lightSBCreateInfo.m_DebugName = "Renderer.PersistentLights";
+			m_LightSB = std::make_unique<PersistentStructuredBuffer<LightGPU>>(lightSBCreateInfo);
+			m_LightTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, LightGPU>>(
+				MaxLightCapacity, GetSwapChain()->GetBufferCount());
 
 			// View data remains a small per-frame dynamic upload allocation.
 			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};

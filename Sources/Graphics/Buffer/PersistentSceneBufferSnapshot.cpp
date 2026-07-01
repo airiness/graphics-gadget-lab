@@ -15,6 +15,7 @@ namespace gglab
 			const PersistentStructuredBuffer<T>& buffer,
 			const PersistentStructuredBufferTable<Key, T>& table,
 			KeyFormatter&& keyFormatter,
+			bool includeFreeDirtySlots,
 			PersistentBufferTableSnapshot& outSnapshot)
 		{
 			outSnapshot = {};
@@ -29,7 +30,9 @@ namespace gglab
 			outSnapshot.m_BufferVersions.reserve(table.GetBufferCount());
 			for (uint32_t bufferIndex = 0; bufferIndex < table.GetBufferCount(); ++bufferIndex)
 			{
-				const auto dirtyRanges = table.BuildDirtyRanges(bufferIndex);
+				const auto dirtyRanges = includeFreeDirtySlots ?
+					table.BuildDirtyRangesIncludingFreeSlots(bufferIndex) :
+					table.BuildDirtyRanges(bufferIndex);
 				uint32_t pendingSlots = 0;
 				for (const auto& range : dirtyRanges)
 				{
@@ -77,9 +80,12 @@ namespace gglab
 		outSnapshot = {};
 		const auto* objectBuffer = renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = renderer.GetMaterialStructuredBuffer();
+		const auto* lightBuffer = renderer.GetLightStructuredBuffer();
 		const auto* objectTable = renderer.GetObjectStructuredBufferTable();
 		const auto* materialTable = renderer.GetMaterialStructuredBufferTable();
-		if (!objectBuffer || !materialBuffer || !objectTable || !materialTable)
+		const auto* lightTable = renderer.GetLightStructuredBufferTable();
+		if (!objectBuffer || !materialBuffer || !lightBuffer ||
+			!objectTable || !materialTable || !lightTable)
 		{
 			return;
 		}
@@ -90,6 +96,7 @@ namespace gglab
 			{
 				return std::format("entity={} submesh={}", key >> 32, key & 0xffffffffull);
 			},
+			false,
 			outSnapshot.m_Objects);
 		BuildTableSnapshot(
 			"Materials", *materialBuffer, *materialTable,
@@ -97,6 +104,17 @@ namespace gglab
 			{
 				return std::format("MaterialID {}", key.Value());
 			},
+			false,
 			outSnapshot.m_Materials);
+		BuildTableSnapshot(
+			"Lights", *lightBuffer, *lightTable,
+			[](uint64_t key)
+			{
+				return key == std::numeric_limits<uint64_t>::max() ?
+					std::string("DefaultDirectionalLight") :
+					std::format("entity={}", key);
+			},
+			true,
+			outSnapshot.m_Lights);
 	}
 }

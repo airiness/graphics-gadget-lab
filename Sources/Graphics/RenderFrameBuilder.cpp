@@ -62,8 +62,10 @@ namespace gglab
 			.m_SceneCB = *info.m_Renderer.GetSceneConstantBuffer(),
 			.m_ObjectsSB = *info.m_Renderer.GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *info.m_Renderer.GetMaterialStructuredBuffer(),
+			.m_LightsSB = *info.m_Renderer.GetLightStructuredBuffer(),
 			.m_ObjectTable = *info.m_Renderer.GetObjectStructuredBufferTable(),
 			.m_MaterialTable = *info.m_Renderer.GetMaterialStructuredBufferTable(),
+			.m_LightTable = *info.m_Renderer.GetLightStructuredBufferTable(),
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_CurrentBackBufferIndex = info.m_BackBufferIndex,
 		};

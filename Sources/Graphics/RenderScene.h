@@ -34,9 +34,11 @@ namespace gglab
 
 		uint32_t m_ViewBaseIndex = 0;
 		uint32_t m_ViewCount = 0;
-		uint64_t m_SceneConstantBufferOffset = 0;
 
-		LightGPU m_MainLight{};
+		uint32_t m_LightBaseIndex = 0;
+		uint32_t m_LightCount = 0;
+
+		uint64_t m_SceneConstantBufferOffset = 0;
 
 		std::vector<RenderInstance> m_RenderInstances;
 	};
@@ -74,8 +76,10 @@ namespace gglab
 			DynamicConstantBufferAllocator& m_SceneCB;
 			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
 			PersistentStructuredBuffer<MaterialGPU>& m_MaterialsSB;
+			PersistentStructuredBuffer<LightGPU>& m_LightsSB;
 			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
 			PersistentStructuredBufferTable<MaterialID, MaterialGPU>& m_MaterialTable;
+			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_CurrentBackBufferIndex = 0;
 		};

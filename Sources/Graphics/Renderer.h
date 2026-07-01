@@ -100,10 +100,14 @@ namespace gglab
 		PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept { return m_ObjectSB.get(); }
 		const PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept { return m_MaterialSB.get(); }
 		PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept { return m_MaterialSB.get(); }
+		const PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() const noexcept { return m_LightSB.get(); }
+		PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() noexcept { return m_LightSB.get(); }
 		const PersistentStructuredBufferTable<uint64_t, ObjectGPU>* GetObjectStructuredBufferTable() const noexcept { return m_ObjectTable.get(); }
 		PersistentStructuredBufferTable<uint64_t, ObjectGPU>* GetObjectStructuredBufferTable() noexcept { return m_ObjectTable.get(); }
 		const PersistentStructuredBufferTable<MaterialID, MaterialGPU>* GetMaterialStructuredBufferTable() const noexcept { return m_MaterialTable.get(); }
 		PersistentStructuredBufferTable<MaterialID, MaterialGPU>* GetMaterialStructuredBufferTable() noexcept { return m_MaterialTable.get(); }
+		const PersistentStructuredBufferTable<uint64_t, LightGPU>* GetLightStructuredBufferTable() const noexcept { return m_LightTable.get(); }
+		PersistentStructuredBufferTable<uint64_t, LightGPU>* GetLightStructuredBufferTable() noexcept { return m_LightTable.get(); }
 		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() const noexcept { return m_ViewSB.get(); }
 		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept { return m_ViewSB.get(); }
 
@@ -141,8 +145,10 @@ namespace gglab
 
 		std::unique_ptr<PersistentStructuredBuffer<ObjectGPU>> m_ObjectSB;
 		std::unique_ptr<PersistentStructuredBuffer<MaterialGPU>> m_MaterialSB;
+		std::unique_ptr<PersistentStructuredBuffer<LightGPU>> m_LightSB;
 		std::unique_ptr<PersistentStructuredBufferTable<uint64_t, ObjectGPU>> m_ObjectTable;
 		std::unique_ptr<PersistentStructuredBufferTable<MaterialID, MaterialGPU>> m_MaterialTable;
+		std::unique_ptr<PersistentStructuredBufferTable<uint64_t, LightGPU>> m_LightTable;
 		std::unique_ptr<DynamicStructuredBufferAllocator<ViewGPU>> m_ViewSB;
 
 		std::atomic_bool m_IsInitialized = false;

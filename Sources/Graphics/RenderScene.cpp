@@ -10,6 +10,11 @@
 
 namespace gglab
 {
+	namespace
+	{
+		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
+	}
+
 	RenderSceneBuilder::BuildResult RenderSceneBuilder::Build(const BuildInfo& info) noexcept
 	{
 		BuildResult result{};
@@ -29,10 +34,13 @@ namespace gglab
 
 		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
 		using MaterialTable = PersistentStructuredBufferTable<MaterialID, MaterialGPU>;
+		using LightTable = PersistentStructuredBufferTable<uint64_t, LightGPU>;
 		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_ObjectsSB.GetBufferCount());
 		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_MaterialsSB.GetBufferCount());
+		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_LightsSB.GetBufferCount());
 		info.m_ObjectTable.BeginUpdate();
 		info.m_MaterialTable.BeginUpdate();
+		info.m_LightTable.BeginUpdate();
 
 		std::vector<ViewGPU> viewData;
 		viewData.reserve(renderViews.size());
@@ -156,8 +164,49 @@ namespace gglab
 				}
 			});
 
+		// Light data
+		{
+			bool foundLight = false;
+			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
+			for (auto&& [entity, transComp, lightComp] : lightView.each())
+			{
+				LightGPU lightGpu{};
+				lightGpu.Position = utils::ToVector4(transComp.m_Position, 1.0f);
+
+				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
+				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
+				forward.Normalize();
+				lightGpu.Direction = utils::ToVector4(forward, 0.0f);
+
+				lightGpu.Color = lightComp.m_Color;
+				lightGpu.Intensity = lightComp.m_Intensity;
+				lightGpu.Range = lightComp.m_Range;
+				lightGpu.SpotAngle = lightComp.m_SpotAngle;
+				lightGpu.LightType = static_cast<uint32_t>(lightComp.m_Type);
+
+				const uint64_t lightKey = static_cast<uint64_t>(entt::to_integral(entity));
+				const uint32_t lightSlot = info.m_LightTable.Upsert(lightKey, lightGpu);
+				foundLight = foundLight || lightSlot != LightTable::InvalidSlot;
+			}
+
+			// Preserve the previous fallback lighting for scenes with no explicit light.
+			if (!foundLight)
+			{
+				LightGPU lightGpu{};
+				lightGpu.Direction = -Vector4::UnitY;
+				lightGpu.Color = color::White;
+				lightGpu.Intensity = 1.0f;
+				lightGpu.Range = 1000.0f;
+				lightGpu.SpotAngle = 60.0f;
+				lightGpu.LightType = static_cast<uint32_t>(LightType::Directional);
+				const uint32_t lightSlot = info.m_LightTable.Upsert(DefaultLightKey, lightGpu);
+				GGLAB_ASSERT(lightSlot != LightTable::InvalidSlot);
+			}
+		}
+
 		info.m_ObjectTable.EndUpdate();
 		info.m_MaterialTable.EndUpdate();
+		info.m_LightTable.EndUpdate();
 
 		// View data
 		for (const RenderView& renderView : renderViews)
@@ -190,12 +239,15 @@ namespace gglab
 			info.m_ObjectTable.BuildDirtyRanges(info.m_CurrentBackBufferIndex);
 		const auto materialDirtyRanges =
 			info.m_MaterialTable.BuildDirtyRanges(info.m_CurrentBackBufferIndex);
+		const auto lightDirtyRanges =
+			info.m_LightTable.BuildDirtyRangesIncludingFreeSlots(info.m_CurrentBackBufferIndex);
 		bool objectsUploadSucceeded = true;
 		bool materialsUploadSucceeded = true;
+		bool lightsUploadSucceeded = true;
 
 		// Only upload changed contiguous ranges into the physical buffer version
 		// associated with the current backbuffer.
-		if (!objectDirtyRanges.empty() || !materialDirtyRanges.empty())
+		if (!objectDirtyRanges.empty() || !materialDirtyRanges.empty() || !lightDirtyRanges.empty())
 		{
 			auto batch = transferManager.BeginBatch();
 
@@ -223,6 +275,18 @@ namespace gglab
 					data.size_bytes());
 			}
 
+			const RHIBufferHandle lightBuffer =
+				info.m_LightsSB.GetBufferHandle(info.m_CurrentBackBufferIndex);
+			for (const auto& range : lightDirtyRanges)
+			{
+				const std::span<const LightGPU> data = info.m_LightTable.GetData(range);
+				lightsUploadSucceeded &= batch.UploadBuffer(
+					lightBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(LightGPU),
+					data.data(),
+					data.size_bytes());
+			}
+
 			uploadFencePoint = batch.Submit(false);
 			if (objectsUploadSucceeded)
 			{
@@ -232,11 +296,16 @@ namespace gglab
 			{
 				info.m_MaterialTable.Commit(info.m_CurrentBackBufferIndex, materialDirtyRanges);
 			}
+			if (lightsUploadSucceeded)
+			{
+				info.m_LightTable.Commit(info.m_CurrentBackBufferIndex, lightDirtyRanges);
+			}
 		}
 		else
 		{
 			info.m_ObjectTable.Commit(info.m_CurrentBackBufferIndex, {});
 			info.m_MaterialTable.Commit(info.m_CurrentBackBufferIndex, {});
+			info.m_LightTable.Commit(info.m_CurrentBackBufferIndex, {});
 		}
 
 		result.m_UploadFencePoint = uploadFencePoint;
@@ -247,6 +316,7 @@ namespace gglab
 
 		if (objectsUploadSucceeded &&
 			materialsUploadSucceeded &&
+			lightsUploadSucceeded &&
 			viewsUploadSucceeded)
 		{
 			result.m_Status = RenderSceneBuildStatus::Ready;
@@ -257,52 +327,18 @@ namespace gglab
 			result.m_RenderScene.m_MaterialCount = info.m_MaterialTable.GetLiveCount();
 			result.m_RenderScene.m_ViewBaseIndex = viewsBufferResult.m_FirstElementIndex;
 			result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
+			result.m_RenderScene.m_LightBaseIndex = 0;
+			result.m_RenderScene.m_LightCount = info.m_LightTable.GetCapacity();
 		}
 		else
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"RenderSceneBuilder: GPU scene upload failed "
-				"(objects={}, materials={}, views={}). Rendering is disabled for this frame.",
+				"(objects={}, materials={}, lights={}, views={}). Rendering is disabled for this frame.",
 				objectsUploadSucceeded,
 				materialsUploadSucceeded,
+				lightsUploadSucceeded,
 				viewsUploadSucceeded);
-		}
-
-		// MainLight data
-		{
-			LightGPU lightGpu{};
-			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
-
-			bool found = false;
-			for (auto [entity, transComp, lightComp] : lightView.each())
-			{
-				lightGpu.Position = utils::ToVector4(transComp.m_Position, 1.0f);
-
-				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
-				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
-				forward.Normalize();
-				lightGpu.Direction = utils::ToVector4(forward, 1.0f);
-
-				lightGpu.Color = lightComp.m_Color;
-				lightGpu.Intensity = lightComp.m_Intensity;
-				lightGpu.Range = lightComp.m_Range;
-				lightGpu.SpotAngle = lightComp.m_SpotAngle;
-				lightGpu.LightType = static_cast<uint32_t>(lightComp.m_Type);
-
-				found = true;
-				break;
-			}
-
-			// Dummy main light
-			if (!found)
-			{
-				lightGpu.Direction = -Vector4::UnitY;
-				lightGpu.Color = color::White;
-				lightGpu.Intensity = 1.0f;
-				lightGpu.LightType = static_cast<uint32_t>(LightType::Directional);
-			}
-
-			result.m_RenderScene.m_MainLight = lightGpu;
 		}
 
 		SceneGPU sceneCB{};
@@ -312,11 +348,12 @@ namespace gglab
 		sceneCB.MaterialCount = result.m_RenderScene.m_MaterialCount;
 		sceneCB.ViewBaseIndex = result.m_RenderScene.m_ViewBaseIndex;
 		sceneCB.ViewCount = result.m_RenderScene.m_ViewCount;
+		sceneCB.LightBaseIndex = result.m_RenderScene.m_LightBaseIndex;
+		sceneCB.LightCount = result.m_RenderScene.m_LightCount;
 
 		info.m_RenderResourceRegistry.EnsureIblResources();
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
 
-		sceneCB.MainLight = result.m_RenderScene.m_MainLight;
 		result.m_GpuAllocations.m_SceneConstants = info.m_SceneCB.Upload(sceneCB);
 		if (!result.m_GpuAllocations.m_SceneConstants.IsValid())
 		{
