@@ -9,6 +9,7 @@
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "Graphics/RHI/DX12/DX12TransferContext.h"
+#include "Graphics/RHI/DX12/DX12GpuProfiler.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
@@ -54,6 +55,14 @@ namespace gglab
 		queueSystemInfo.m_PipelineSystem = static_cast<DX12PipelineSystem*>(m_PipelineSystem.get());
 		m_QueueSystem = std::make_unique<DX12QueueSystem>(queueSystemInfo);
 		m_Device->SetQueueSystem(m_QueueSystem.get());
+		m_GpuProfiler = std::make_unique<DX12GpuProfiler>(
+			m_Device.get(),
+			&m_QueueSystem->GetQueue(DX12QueueType::Graphics),
+			desc.m_BufferCount);
+		for (uint32_t frameIndex = 0; frameIndex < desc.m_BufferCount; ++frameIndex)
+		{
+			m_QueueSystem->GetGraphicsContext(frameIndex).SetGpuProfiler(m_GpuProfiler.get());
+		}
 
 		DX12DescriptorManager::CreateInfo descriptorInfo{};
 		descriptorInfo.m_DX12Device = m_Device.get();
@@ -100,6 +109,7 @@ namespace gglab
 	const RHISwapChain& DX12Context::GetSwapChain() const noexcept { return *m_SwapChain; }
 	TransferManager& DX12Context::GetTransferManager() noexcept { return *m_TransferManager; }
 	RHIPipelineSystem& DX12Context::GetPipelineSystem() noexcept { return *m_PipelineSystem; }
+	GpuProfiler* DX12Context::GetGpuProfiler() noexcept { return m_GpuProfiler.get(); }
 	DX12Device& DX12Context::GetDX12Device() noexcept { return *m_Device; }
 	const DX12Device& DX12Context::GetDX12Device() const noexcept { return *m_Device; }
 	DX12DescriptorManager& DX12Context::GetDescriptorManager() noexcept { return *m_DescriptorManager; }
@@ -124,6 +134,9 @@ namespace gglab
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
 		BeginGraphicsRecording(frame);
+		m_GpuProfiler->BeginFrame(
+			frameIndex,
+			m_QueueSystem->GetGraphicsCommandList(frameIndex));
 		return frame;
 	}
 
@@ -163,6 +176,7 @@ namespace gglab
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
 		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameIndex);
 		auto* graphicsQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
+		m_GpuProfiler->EndFrame(frame->m_FrameIndex, *graphicsList);
 		graphicsList->End();
 		const DX12CommandList* lists[] = { graphicsList };
 		const DX12FencePoint graphicsFence = graphicsQueue->Execute(lists);
@@ -208,6 +222,7 @@ namespace gglab
 
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
 		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameIndex);
+		m_GpuProfiler->AbortFrame(frame->m_FrameIndex);
 		graphicsList->End();
 		graphicsContext->ClearTrackedResourceUses();
 		const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Graphics).Signal();
@@ -313,6 +328,7 @@ namespace gglab
 		WaitIdle();
 		m_Frames.clear();
 		m_TransferManager.reset();
+		m_GpuProfiler.reset();
 		if (m_SwapChain)
 		{
 			m_SwapChain->Finalize();

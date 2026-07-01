@@ -7,6 +7,9 @@
 
 #define GGLAB_UNUSED(variable) (void)(variable)
 
+#define GGLAB_PROFILE_CONCAT_IMPL(left, right) left##right
+#define GGLAB_PROFILE_CONCAT(left, right) GGLAB_PROFILE_CONCAT_IMPL(left, right)
+
 // Define unreachable and abort application
 #define GGLAB_UNREACHABLE(message) \
 	do { \

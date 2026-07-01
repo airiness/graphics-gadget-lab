@@ -7,6 +7,7 @@
 #include "Core/Demo/DemoManager.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Core/Time.h"
+#include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
@@ -275,6 +276,8 @@ namespace gglab
 			return true;
 		}
 
+		GGLAB_CPU_PROFILE_FRAME(m_Time->GetFrameCount() + 1);
+
 		m_Time->Update();
 		m_InputManager->Update();
 
@@ -328,7 +331,11 @@ namespace gglab
 			.m_WindowHeight = m_WindowHeight,
 			.m_BackBufferIndex = backBufferIndex,
 		};
-		auto frame = m_RenderFrameBuilder->Build(frameBuildInfo);
+		RenderFrameBuilder::BuildResult frame;
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
+			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
+		}
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
 		const RenderServices services{
@@ -339,8 +346,15 @@ namespace gglab
 
 		// Build RenderGraph
 		auto& renderPipeline = demo->GetRenderPipeline();
-		renderPipeline.BuildRenderGraph(rg, renderContext, services);
-		const bool renderGraphCompiled = rg.Compile();
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Build");
+			renderPipeline.BuildRenderGraph(rg, renderContext, services);
+		}
+		bool renderGraphCompiled = false;
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Compile");
+			renderGraphCompiled = rg.Compile();
+		}
 		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
 		if (!renderGraphCompiled)
 		{
@@ -350,6 +364,7 @@ namespace gglab
 		// Draw menus before Renderer::Render()
 		if (m_DevToolsRuntime)
 		{
+			GGLAB_CPU_PROFILE_SCOPE("DevelopGUI");
 			DevelopGuiContext guiContext{};
 			guiContext.m_Camera = &camera;
 			guiContext.m_CameraController = &demo->GetCameraController();
@@ -365,8 +380,14 @@ namespace gglab
 		}
 
 		// Render
-		m_Renderer->Render(rendererFrame, rg, renderContext);
-		m_Renderer->EndFrame(rendererFrame);
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
+			m_Renderer->Render(rendererFrame, rg, renderContext);
+		}
+		{
+			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
+			m_Renderer->EndFrame(rendererFrame);
+		}
 
 		return true;
 	}

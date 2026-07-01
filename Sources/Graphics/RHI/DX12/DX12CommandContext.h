@@ -13,6 +13,7 @@ namespace gglab
 	class DX12PipelineState;
 	class DX12PipelineSystem;
 	class DX12RootSignature;
+	class DX12GpuProfiler;
 
 	[[nodiscard]] RHICommandContextHandle AllocateDX12CommandContextHandle() noexcept;
 
@@ -113,6 +114,9 @@ namespace gglab
 			uint32_t instanceCount = 1,
 			uint32_t startVertexLocation = 0,
 			uint32_t startInstanceLocation = 0) noexcept override;
+		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void EndGpuProfileScope() noexcept override;
+		void SetGpuProfiler(DX12GpuProfiler* profiler) noexcept { m_GpuProfiler = profiler; }
 
 		void SetRootSignature(const DX12RootSignature& rootSignature) noexcept;
 		void SetPipelineState(const DX12PipelineState& pipelineState) noexcept;
@@ -122,6 +126,7 @@ namespace gglab
 		DX12CommandContext m_Backend;
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
+		DX12GpuProfiler* m_GpuProfiler = nullptr;
 	};
 
 	class DX12ComputeCommandContext final : public RHIComputeCommandContext

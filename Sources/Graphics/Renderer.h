@@ -22,6 +22,7 @@ namespace gglab
 	class ShaderManager;
 	class TextureRegistry;
 	class TransferManager;
+	class GpuProfiler;
 
 	class Renderer
 	{
@@ -89,6 +90,10 @@ namespace gglab
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
 		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
+		GpuProfiler* GetGpuProfiler() const noexcept
+		{
+			return m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
+		}
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept { return m_BackBufferClearColor; }
 
 		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept { return m_CommonBindingLayout; }
