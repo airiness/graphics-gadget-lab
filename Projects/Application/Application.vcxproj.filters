@@ -135,6 +135,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -231,6 +234,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </ClCompile>
@@ -247,6 +253,9 @@
       <Filter>Core\Input</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Time.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp">
@@ -512,6 +521,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -629,6 +641,9 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Color.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -654,6 +669,9 @@
       <Filter>Core\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Time.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Camera.h">
@@ -963,6 +981,9 @@
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderFrameBuilder.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Profiling\GpuProfiler.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h">

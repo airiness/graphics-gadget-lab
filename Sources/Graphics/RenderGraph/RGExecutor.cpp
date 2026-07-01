@@ -161,6 +161,12 @@ namespace gglab
 		for (const auto passIndex : plan.GetExecutionOrder())
 		{
 			const auto& pass = plan.GetPasses()[passIndex.Value()];
+			RHICommandContext* profileContext = executeContext.GetGraphicsCommandContext();
+			const std::string_view passName = pass.m_NameId.Name();
+			if (profileContext)
+			{
+				profileContext->BeginGpuProfileScope(passName);
+			}
 			for (const auto resourceIndex : pass.m_AcquireResources)
 			{
 				const auto& resource = plan.GetResources()[resourceIndex.Value()];
@@ -174,6 +180,10 @@ namespace gglab
 				pass.m_Executor->Execute(executeContext);
 			}
 			EmitBarriers(executeContext.GetGraphicsCommandContext(), plan, pass.m_PostBarriers);
+			if (profileContext)
+			{
+				profileContext->EndGpuProfileScope();
+			}
 
 			for (const auto resourceIndex : pass.m_ReleaseResources)
 			{

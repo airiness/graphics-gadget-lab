@@ -146,6 +146,7 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
@@ -187,6 +188,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
@@ -263,6 +265,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderManager.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Time.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
@@ -282,6 +285,7 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\AssetSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
@@ -353,6 +357,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h" />
@@ -404,6 +409,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderFrameBuilder.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Profiling\GpuProfiler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderView.h" />
@@ -455,6 +461,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\Core\StringId.h" />
     <ClInclude Include="..\..\Sources\Core\Time.h" />
+    <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h" />
     <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h" />
     <ClInclude Include="..\..\Sources\Graphics\TransferManager.h" />
     <ClInclude Include="..\..\Sources\Core\TypedIndex.h" />

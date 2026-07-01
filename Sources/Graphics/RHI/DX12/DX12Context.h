@@ -11,6 +11,7 @@ namespace gglab
 	class DX12DescriptorManager;
 	class DX12Device;
 	class DX12GraphicsCommandContext;
+	class DX12GpuProfiler;
 	class DX12QueueSystem;
 
 	class DX12Context;
@@ -52,6 +53,7 @@ namespace gglab
 		const RHISwapChain& GetSwapChain() const noexcept override;
 		TransferManager& GetTransferManager() noexcept override;
 		RHIPipelineSystem& GetPipelineSystem() noexcept override;
+		GpuProfiler* GetGpuProfiler() noexcept override;
 
 		RHIFrameContext& BeginFrame() noexcept override;
 		RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept override;
@@ -85,6 +87,7 @@ namespace gglab
 		std::unique_ptr<RHISwapChain> m_SwapChain;
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
+		std::unique_ptr<DX12GpuProfiler> m_GpuProfiler;
 		std::vector<std::unique_ptr<DX12FrameContext>> m_Frames;
 		DX12FrameContext* m_ActiveFrame = nullptr;
 		bool m_Initialized = false;

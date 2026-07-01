@@ -3,6 +3,7 @@
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Renderer.h"
+#include "Core/Profiling/CpuProfiler.h"
 
 namespace gglab
 {
@@ -71,7 +72,11 @@ namespace gglab
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_CurrentBackBufferIndex = info.m_BackBufferIndex,
 		};
-		auto sceneBuildResult = m_SceneBuilder.Build(sceneBuildInfo);
+		RenderSceneBuilder::BuildResult sceneBuildResult;
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderSceneBuilder");
+			sceneBuildResult = m_SceneBuilder.Build(sceneBuildInfo);
+		}
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);
 		result.m_SceneGpuAllocations = sceneBuildResult.m_GpuAllocations;
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;

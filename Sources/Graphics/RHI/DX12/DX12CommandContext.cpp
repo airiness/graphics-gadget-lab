@@ -6,6 +6,7 @@
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
+#include "Graphics/RHI/DX12/DX12GpuProfiler.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
@@ -500,6 +501,22 @@ namespace gglab
 			instanceCount,
 			startVertexLocation,
 			startInstanceLocation);
+	}
+
+	void DX12GraphicsCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	{
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->BeginScope(*m_Backend.GetCommandList(), name);
+		}
+	}
+
+	void DX12GraphicsCommandContext::EndGpuProfileScope() noexcept
+	{
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->EndScope(*m_Backend.GetCommandList());
+		}
 	}
 
 	void DX12GraphicsCommandContext::SetRootSignature(const DX12RootSignature& rootSignature) noexcept
