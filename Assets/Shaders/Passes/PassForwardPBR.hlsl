@@ -240,7 +240,6 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 
 	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor
 	float3 directLighting = 0.0.xxx;
-	bool shadowedDirectionalLightUsed = false;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
@@ -273,10 +272,9 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 		float3 diffuse = kd * Fd_Lambert(baseColor);
 
 		float shadowVisibility = 1.0;
-		if (light.LightType == 0u && !shadowedDirectionalLightUsed)
+		if (light.LightType == 0u && lightIndex == g_Scene.DirectionalShadowLightIndex)
 		{
 			shadowVisibility = SampleDirectionalShadow(IN.PositionWS, NoL);
-			shadowedDirectionalLightUsed = true;
 		}
 
 		directLighting += (diffuse + specular) *

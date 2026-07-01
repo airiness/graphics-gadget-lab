@@ -48,9 +48,12 @@ namespace gglab
 		uint32_t ViewCount;
 		uint32_t LightBaseIndex;
 		uint32_t LightCount;
+		uint32_t DirectionalShadowLightIndex;
+		uint32_t Padding[3];
 
 		IBLResourceGPU IBLResource;
 	};
+	static_assert(sizeof(SceneGPU) == 96);
 
 	struct ObjectGPU
 	{

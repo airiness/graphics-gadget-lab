@@ -37,6 +37,7 @@ namespace gglab
 
 		uint32_t m_LightBaseIndex = 0;
 		uint32_t m_LightCount = 0;
+		uint32_t m_DirectionalShadowLightIndex = std::numeric_limits<uint32_t>::max();
 
 		uint64_t m_SceneConstantBufferOffset = 0;
 
@@ -80,6 +81,7 @@ namespace gglab
 			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
 			PersistentStructuredBufferTable<MaterialID, MaterialGPU>& m_MaterialTable;
 			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
+			std::optional<uint64_t> m_DirectionalShadowLightKey;
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_CurrentBackBufferIndex = 0;
 		};

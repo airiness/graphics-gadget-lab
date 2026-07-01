@@ -190,11 +190,13 @@ namespace gglab
 		if (!uploads.empty())
 		{
 			auto batch = m_TransferManager->BeginBatch();
+			bool uploadsSucceeded = true;
 			for (const auto& data : uploads)
 			{
-				UploadTexture(data, batch);
+				uploadsSucceeded &= UploadTexture(data, batch);
 			}
 			GGLAB_UNUSED(batch.Submit(true));
+			GGLAB_ASSERT_MSG(uploadsSucceeded, "TextureRegistry failed to initialize reserved textures.");
 		}
 	}
 
@@ -242,16 +244,36 @@ namespace gglab
 						utils::ToUnderlying(tex->m_Semantic),
 						utils::ToUnderlying(semantic));
 				}
+				return textureId;
 			}
-			return textureId;
+
+			// Do not let a stale, incomplete dynamic entry poison future retries.
+			if (IsReservedTextureId(textureId) || !RemoveTexture(textureId))
+			{
+				return InvalidTextureID;
+			}
+		}
+
+		auto texUploadData = MakeTextureUploadData(InvalidTextureID, canonicalPath, semantic);
+		if (!texUploadData.m_TextureData.IsValid())
+		{
+			return InvalidTextureID;
 		}
 
 		textureId = CreateTexture(canonicalPath);
-
-		auto texUploadData = MakeTextureUploadData(textureId, canonicalPath, semantic);
+		if (!textureId.IsValid())
+		{
+			return InvalidTextureID;
+		}
+		texUploadData.m_TextureId = textureId;
 		auto batch = m_TransferManager->BeginBatch();
-		UploadTexture(texUploadData, batch);
+		const bool uploadSucceeded = UploadTexture(texUploadData, batch);
 		GGLAB_UNUSED(batch.Submit(true));
+		if (!uploadSucceeded)
+		{
+			RemoveTexture(textureId);
+			return InvalidTextureID;
+		}
 
 		return textureId;
 	}
@@ -301,13 +323,55 @@ namespace gglab
 	TextureID TextureRegistry::CreateTexture(const std::filesystem::path& canonicalPath) noexcept
 	{
 		const auto textureId = m_TextureIdCounter.Acquire();
+		if (!textureId.IsValid())
+		{
+			return InvalidTextureID;
+		}
 		auto pathIdPair = m_TextureContainer.m_PathIDMap.emplace(canonicalPath, textureId);
-		GGLAB_ASSERT_MSG(pathIdPair.second == true, "TextureRegistry: emplace path and TextureID pair failed.");
+		GGLAB_ASSERT_MSG(pathIdPair.second, "TextureRegistry: emplace path and TextureID pair failed.");
+		if (!pathIdPair.second)
+		{
+			return InvalidTextureID;
+		}
 
 		auto idTexPair = m_TextureContainer.m_TextureIDMap.emplace(textureId, std::make_unique<Texture>());
-		GGLAB_ASSERT_MSG(idTexPair.second == true, "TextureRegistry: emplace TextureID and Texture pair failed.");
+		GGLAB_ASSERT_MSG(idTexPair.second, "TextureRegistry: emplace TextureID and Texture pair failed.");
+		if (!idTexPair.second)
+		{
+			m_TextureContainer.m_PathIDMap.erase(pathIdPair.first);
+			return InvalidTextureID;
+		}
+
+		idTexPair.first->second->m_Id = textureId;
+		idTexPair.first->second->m_Name = StringID(canonicalPath.generic_string());
 
 		return textureId;
+	}
+
+	bool TextureRegistry::RemoveTexture(TextureID textureId) noexcept
+	{
+		if (!textureId.IsValid() || IsReservedTextureId(textureId))
+		{
+			return false;
+		}
+
+		auto textureIter = m_TextureContainer.m_TextureIDMap.find(textureId);
+		bool removed = false;
+		if (textureIter != m_TextureContainer.m_TextureIDMap.end())
+		{
+			if (textureIter->second && textureIter->second->m_Texture.IsValid())
+			{
+				m_Device->DestroyTexture(textureIter->second->m_Texture);
+			}
+			m_TextureContainer.m_TextureIDMap.erase(textureIter);
+			removed = true;
+		}
+		const size_t removedPaths = std::erase_if(m_TextureContainer.m_PathIDMap,
+			[textureId](const auto& entry) noexcept
+			{
+				return entry.second == textureId;
+			});
+		return removed || removedPaths > 0;
 	}
 
 	TextureID TextureRegistry::FindTexture(const std::filesystem::path& canonicalPath) const noexcept
@@ -343,24 +407,29 @@ namespace gglab
 		return uploadData;
 	}
 
-	void TextureRegistry::UploadTexture(const TextureUploadData& uploadData, TransferBatch& transferBatch) noexcept
+	bool TextureRegistry::UploadTexture(
+		const TextureUploadData& uploadData,
+		TransferBatch& transferBatch) noexcept
 	{
 		auto* texture = GetTexture(uploadData.m_TextureId);
 		GGLAB_ASSERT_MSG(texture != nullptr, "TextureRegistry::UploadTexture: invalid TextureID.");
+		if (!texture)
+		{
+			return false;
+		}
 
 		const TextureAssetData& textureData = uploadData.m_TextureData;
 		if (!textureData.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture received invalid texture asset data.");
-			return;
+			return false;
 		}
-
-		if (texture->m_Texture.IsValid())
+		if (texture->m_Texture.IsValid() || texture->m_IsUploaded)
 		{
-			m_Device->DestroyTexture(texture->m_Texture);
-			texture->m_Texture.Reset();
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureRegistry::UploadTexture only supports initial upload of a texture entry.");
+			return false;
 		}
-		texture->m_Srv.Reset();
 
 		const std::string debugName = "TextureRegistry.Texture." + std::to_string(uploadData.m_TextureId.Value());
 		RHITextureDesc textureDesc{};
@@ -375,14 +444,16 @@ namespace gglab
 
 		texture->m_Texture = m_Device->CreateTexture(textureDesc);
 		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture.");
+		if (!texture->m_Texture.IsValid())
+		{
+			return false;
+		}
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		if (!transferBatch.UploadTexture(texture->m_Texture, textureUploadData))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture failed to record the texture upload.");
-			m_Device->DestroyTexture(texture->m_Texture);
-			texture->m_Texture.Reset();
-			return;
+			return false;
 		}
 
 		const RHITextureBarrier barrier
@@ -416,8 +487,13 @@ namespace gglab
 
 		texture->m_Srv = m_Device->CreateTextureView(texture->m_Texture, srvDesc);
 		GGLAB_ASSERT_MSG(texture->m_Srv.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture SRV.");
+		if (!texture->m_Srv.IsValid())
+		{
+			return false;
+		}
 		texture->m_Semantic = uploadData.m_Semantic;
 		texture->m_IsUploaded = true;
+		return true;
 	}
 
 	void TextureRegistry::CreateTextureEntry(TextureID id, const char* texName) noexcept

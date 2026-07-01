@@ -164,6 +164,8 @@ namespace gglab
 				}
 			});
 
+		uint32_t directionalShadowLightSlot = LightTable::InvalidSlot;
+
 		// Light data
 		{
 			bool foundLight = false;
@@ -187,6 +189,12 @@ namespace gglab
 				const uint64_t lightKey = static_cast<uint64_t>(entt::to_integral(entity));
 				const uint32_t lightSlot = info.m_LightTable.Upsert(lightKey, lightGpu);
 				foundLight = foundLight || lightSlot != LightTable::InvalidSlot;
+				if (lightSlot != LightTable::InvalidSlot &&
+					info.m_DirectionalShadowLightKey == lightKey &&
+					lightComp.m_Type == LightType::Directional)
+				{
+					directionalShadowLightSlot = lightSlot;
+				}
 			}
 
 			// Preserve the previous fallback lighting for scenes with no explicit light.
@@ -329,6 +337,11 @@ namespace gglab
 			result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
 			result.m_RenderScene.m_LightBaseIndex = 0;
 			result.m_RenderScene.m_LightCount = info.m_LightTable.GetCapacity();
+			if (directionalShadowLightSlot != LightTable::InvalidSlot)
+			{
+				result.m_RenderScene.m_DirectionalShadowLightIndex =
+					result.m_RenderScene.m_LightBaseIndex + directionalShadowLightSlot;
+			}
 		}
 		else
 		{
@@ -350,6 +363,7 @@ namespace gglab
 		sceneCB.ViewCount = result.m_RenderScene.m_ViewCount;
 		sceneCB.LightBaseIndex = result.m_RenderScene.m_LightBaseIndex;
 		sceneCB.LightCount = result.m_RenderScene.m_LightCount;
+		sceneCB.DirectionalShadowLightIndex = result.m_RenderScene.m_DirectionalShadowLightIndex;
 
 		info.m_RenderResourceRegistry.EnsureIblResources();
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);

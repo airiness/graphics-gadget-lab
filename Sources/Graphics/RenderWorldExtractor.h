@@ -14,6 +14,7 @@ namespace gglab
 
 	struct RenderDirectionalLight
 	{
+		std::optional<uint64_t> m_EntityKey;
 		components::TransformComponent* m_Transform = nullptr;
 		components::LightComponent* m_Light = nullptr;
 		DirectionalShadowSettings* m_ShadowSettings = nullptr;

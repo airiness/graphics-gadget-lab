@@ -26,6 +26,7 @@ namespace gglab
 			}
 
 			RenderDirectionalLight directionalLight{};
+			directionalLight.m_EntityKey = static_cast<uint64_t>(entt::to_integral(entity));
 			directionalLight.m_Transform = &transform;
 			directionalLight.m_Light = &light;
 			directionalLight.m_Direction = ResolveLightDirection(transform);
