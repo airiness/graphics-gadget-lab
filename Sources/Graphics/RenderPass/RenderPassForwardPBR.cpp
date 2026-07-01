@@ -8,6 +8,7 @@
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 

@@ -3,6 +3,11 @@
 
 namespace gglab
 {
+	GGLAB_DEFINE_TYPED_INDEX(RGPassNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGResourceNodeIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGVirtualResourceIndex, uint32_t);
+	GGLAB_DEFINE_TYPED_INDEX(RGTextureViewId, uint32_t);
+
 	class RGResourceHandle
 	{
 	public:

@@ -328,6 +328,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
@@ -435,7 +436,6 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceHandle.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h" />
