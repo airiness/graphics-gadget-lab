@@ -95,12 +95,16 @@ namespace gglab
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			TextureAssetData&& textureData, TextureSemantic semantic) noexcept;
 
-		void UploadTexture(const TextureUploadData& uploadData, TransferBatch& transferBatch) noexcept;
+		[[nodiscard]] bool UploadTexture(
+			const TextureUploadData& uploadData,
+			TransferBatch& transferBatch) noexcept;
 
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
+		friend class AssetManager;
 
 		void CreateTextureEntry(TextureID id, const char* texName) noexcept;
+		bool RemoveTexture(TextureID textureId) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;

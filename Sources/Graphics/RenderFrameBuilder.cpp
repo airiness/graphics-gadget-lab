@@ -66,6 +66,8 @@ namespace gglab
 			.m_ObjectTable = *info.m_Renderer.GetObjectStructuredBufferTable(),
 			.m_MaterialTable = *info.m_Renderer.GetMaterialStructuredBufferTable(),
 			.m_LightTable = *info.m_Renderer.GetLightStructuredBufferTable(),
+			.m_DirectionalShadowLightKey = shadowSettings.m_Enable ?
+				result.m_WorldData.m_MainDirectionalLight.m_EntityKey : std::nullopt,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_CurrentBackBufferIndex = info.m_BackBufferIndex,
 		};

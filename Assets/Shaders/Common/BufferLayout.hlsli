@@ -41,6 +41,8 @@ struct SceneData
 	uint ViewCount;
 	uint LightBaseIndex;
 	uint LightCount;
+	uint DirectionalShadowLightIndex;
+	uint3 Padding;
 	
 	IBLResourceData IBLResource;
 };

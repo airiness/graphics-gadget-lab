@@ -501,8 +501,19 @@ namespace gglab
 				auto texId = m_TextureRegistry->FindTexture(canonicalTexPath);
 				if (!texId.IsValid())
 				{
-					texId = m_TextureRegistry->CreateTexture(canonicalTexPath);
-					texUploadDatas.emplace_back(m_TextureRegistry->MakeTextureUploadData(texId, canonicalTexPath, semantic));
+					auto uploadData = m_TextureRegistry->MakeTextureUploadData(
+						InvalidTextureID,
+						canonicalTexPath,
+						semantic);
+					if (uploadData.m_TextureData.IsValid())
+					{
+						texId = m_TextureRegistry->CreateTexture(canonicalTexPath);
+						if (texId.IsValid())
+						{
+							uploadData.m_TextureId = texId;
+							texUploadDatas.emplace_back(std::move(uploadData));
+						}
+					}
 				}
 
 				const auto samplerKey = MakeSamplerKeyFromAssimpTextureParams(mapMode);
@@ -716,9 +727,13 @@ namespace gglab
 		// Upload to GPU
 		auto batch = m_TransferManager->BeginBatch();
 		// Upload textures
+		std::vector<TextureID> failedTextureIds;
 		for (const auto& texUploadData : texUploadDatas)
 		{
-			m_TextureRegistry->UploadTexture(texUploadData, batch);
+			if (!m_TextureRegistry->UploadTexture(texUploadData, batch))
+			{
+				failedTextureIds.push_back(texUploadData.m_TextureId);
+			}
 		}
 		// Upload meshes
 		for (const auto& meshUploadData : meshUploadDatas)
@@ -726,6 +741,10 @@ namespace gglab
 			UploadMesh(meshUploadData, batch);
 		}
 		GGLAB_UNUSED(batch.Submit(true));
+		for (const TextureID textureId : failedTextureIds)
+		{
+			m_TextureRegistry->RemoveTexture(textureId);
+		}
 
 		return modelId;
 	}
