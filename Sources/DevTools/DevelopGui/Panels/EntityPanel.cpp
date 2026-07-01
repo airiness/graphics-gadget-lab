@@ -2,8 +2,11 @@
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
 #include "Core/Components.h"
 #include "Core/Utility/MathUtils.h"
+#include "Core/Utility/StringUtils.h"
 #include "Core/World.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "Graphics/AssetManager.h"
+#include "Graphics/AssetSnapshot.h"
 
 #include <algorithm>
 #include <vector>
@@ -157,6 +160,41 @@ namespace gglab
 			light.m_Range = 15.0f;
 			light.m_SpotAngle = 45.0f;
 			registry.emplace<components::LightComponent>(entity, light);
+		}
+
+		void AddModelComponent(entt::registry& registry, entt::entity entity, ModelID modelId) noexcept
+		{
+			if (!registry.valid(entity) ||
+				!modelId.IsValid() ||
+				registry.all_of<components::ModelComponent>(entity))
+			{
+				return;
+			}
+
+			if (!registry.all_of<components::TransformComponent>(entity))
+			{
+				registry.emplace<components::TransformComponent>(entity);
+			}
+
+			components::ModelComponent model{};
+			model.m_ModelId = modelId;
+			registry.emplace<components::ModelComponent>(entity, model);
+		}
+
+		[[nodiscard]] std::string ModelAssetDisplayName(const AssetSnapshot::Model& model)
+		{
+			if (!model.m_SourcePath.empty())
+			{
+				return model.m_SourcePath.filename().generic_string();
+			}
+
+			const std::string name = utils::StringIdToString(model.m_Name);
+			if (!name.empty())
+			{
+				return name;
+			}
+
+			return std::format("Model {}", model.m_Id.Value());
 		}
 
 		void DrawEntityListToolbar(
@@ -331,12 +369,30 @@ namespace gglab
 			ImGui::PopID();
 		}
 
-		void DrawModelComponent(const components::ModelComponent& model) noexcept
+		void DrawModelComponent(
+			const components::ModelComponent& model,
+			const AssetManager* assetManager) noexcept
 		{
 			ImGui::PushID("Component.Model");
 			if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				ImGui::Text("ModelID: %u", model.m_ModelId.Value());
+				if (assetManager)
+				{
+					if (const auto* asset = assetManager->GetModel(model.m_ModelId))
+					{
+						ImGui::Text("Mesh Instances: %u", static_cast<uint32_t>(asset->m_MeshInstance.size()));
+						const std::string name = utils::StringIdToString(asset->m_Name);
+						if (!name.empty())
+						{
+							ImGui::Text("Name: %s", name.c_str());
+						}
+					}
+					else
+					{
+						ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "Model asset is not loaded.");
+					}
+				}
 				ImGui::TextDisabled("Model assignment is read-only in this panel for now.");
 			}
 			ImGui::PopID();
@@ -344,7 +400,8 @@ namespace gglab
 
 		void DrawAddComponentButton(
 			entt::registry& registry,
-			entt::entity entity) noexcept
+			entt::entity entity,
+			AssetManager* assetManager) noexcept
 		{
 			ImGui::PushID("AddComponent");
 			if (ImGui::Button("+"))
@@ -365,13 +422,42 @@ namespace gglab
 				{
 					AddDefaultLightComponent(registry, entity);
 				}
-				ImGui::MenuItem(hasModel ? "Model" : "Model (not implemented)", nullptr, false, false);
+				if (hasModel)
+				{
+					ImGui::MenuItem("Model", nullptr, false, false);
+				}
+				else if (!assetManager)
+				{
+					ImGui::MenuItem("Model", "No AssetManager", false, false);
+				}
+				else if (ImGui::BeginMenu("Model"))
+				{
+					const AssetSnapshot assetSnapshot = BuildAssetSnapshot(*assetManager);
+					if (assetSnapshot.m_Models.empty())
+					{
+						ImGui::MenuItem("No loaded models", nullptr, false, false);
+					}
+					for (const auto& model : assetSnapshot.m_Models)
+					{
+						const std::string label = std::format("{}##{}",
+							ModelAssetDisplayName(model),
+							model.m_Id.Value());
+						if (ImGui::MenuItem(label.c_str()))
+						{
+							AddModelComponent(registry, entity, model.m_Id);
+						}
+					}
+					ImGui::EndMenu();
+				}
 				ImGui::EndPopup();
 			}
 			ImGui::PopID();
 		}
 
-		void DrawSelectedEntity(entt::registry& registry, EntityPanelState& state) noexcept
+		void DrawSelectedEntity(
+			entt::registry& registry,
+			EntityPanelState& state,
+			AssetManager* assetManager) noexcept
 		{
 			if (state.m_SelectedEntity == entt::null ||
 				!registry.valid(state.m_SelectedEntity))
@@ -385,7 +471,7 @@ namespace gglab
 			ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
 			ImGui::Text("Entity %u", entt::to_integral(entity));
 			ImGui::SameLine();
-			DrawAddComponentButton(registry, entity);
+			DrawAddComponentButton(registry, entity, assetManager);
 			ImGui::SameLine();
 			if (ImGui::Button("Delete Entity"))
 			{
@@ -438,7 +524,7 @@ namespace gglab
 
 			if (const auto* model = registry.try_get<components::ModelComponent>(entity))
 			{
-				DrawModelComponent(*model);
+				DrawModelComponent(*model, assetManager);
 			}
 
 			ImGui::PopID();
@@ -480,7 +566,7 @@ namespace gglab
 			DrawEntityList(registry, std::span<const entt::entity>(entities), state);
 
 			ImGui::TableSetColumnIndex(1);
-			DrawSelectedEntity(registry, state);
+			DrawSelectedEntity(registry, state, context.m_AssetManager);
 
 			ImGui::EndTable();
 		}

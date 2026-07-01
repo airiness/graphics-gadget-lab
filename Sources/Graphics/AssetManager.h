@@ -10,6 +10,10 @@ namespace gglab
 	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
+	struct AssetSnapshot;
+
+	class AssetManager;
+	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 
 	class AssetManager
 	{
@@ -52,6 +56,8 @@ namespace gglab
 		~AssetManager();
 
 		ModelID LoadModel(const std::filesystem::path& path) noexcept;
+		TextureID LoadTexture(const std::filesystem::path& path,
+			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
 
 		Mesh* GetMesh(MeshID meshId) noexcept;
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -86,6 +92,8 @@ namespace gglab
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
 
 	private:
+		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
+
 		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
 
 	private:

@@ -5,9 +5,13 @@
 
 namespace gglab
 {
+	class AssetManager;
 	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
+	struct AssetSnapshot;
+
+	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 
 	enum class ReservedTextureIDIndex : uint32_t
 	{
@@ -94,6 +98,8 @@ namespace gglab
 		void UploadTexture(const TextureUploadData& uploadData, TransferBatch& transferBatch) noexcept;
 
 	private:
+		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
+
 		void CreateTextureEntry(TextureID id, const char* texName) noexcept;
 
 	private:

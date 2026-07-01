@@ -214,7 +214,21 @@ namespace gglab
 
 	TextureID TextureRegistry::LoadTexture(const std::filesystem::path& path, TextureSemantic semantic) noexcept
 	{
+		if (path.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("TextureRegistry::LoadTexture received an empty path.");
+			return InvalidTextureID;
+		}
+
 		const auto canonicalPath = utils::Canonical(path);
+		std::error_code errorCode;
+		if (!std::filesystem::exists(canonicalPath, errorCode) ||
+			!std::filesystem::is_regular_file(canonicalPath, errorCode))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("TextureRegistry::LoadTexture received a missing texture file: '{}'.",
+				canonicalPath.string());
+			return InvalidTextureID;
+		}
 
 		auto textureId = FindTexture(canonicalPath);
 		if (textureId.IsValid())
