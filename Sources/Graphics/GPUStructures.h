@@ -46,11 +46,10 @@ namespace gglab
 		uint32_t MaterialCount;
 		uint32_t ViewBaseIndex;
 		uint32_t ViewCount;
-		uint32_t Padding[2];
+		uint32_t LightBaseIndex;
+		uint32_t LightCount;
 
 		IBLResourceGPU IBLResource;
-
-		LightGPU MainLight; // TODO: move to structured buffer lights
 	};
 
 	struct ObjectGPU
@@ -93,6 +92,7 @@ namespace gglab
 		uint32_t Padding;
 	};
 	static constexpr uint32_t MaxMaterialCapacity = 128;
+	static constexpr uint32_t MaxLightCapacity = 64;
 
 	struct ViewGPU
 	{

@@ -120,6 +120,56 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 	return SampleShadowPCF3x3(shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
 }
 
+bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out float attenuation)
+{
+	static const uint LightTypeDirectional = 0u;
+	static const uint LightTypeSpot = 1u;
+	static const uint LightTypePoint = 2u;
+
+	attenuation = 1.0;
+	if (light.Intensity <= 0.0)
+	{
+		L = 0.0.xxx;
+		return false;
+	}
+
+	if (light.LightType == LightTypeDirectional)
+	{
+		L = normalize(-light.Direction.xyz);
+		return true;
+	}
+
+	const float3 toLight = light.Position.xyz - positionWS;
+	const float distanceToLight = length(toLight);
+	const float range = max(light.Range, 0.0001);
+	if (distanceToLight <= 0.0001 || distanceToLight >= range)
+	{
+		L = 0.0.xxx;
+		return false;
+	}
+
+	L = toLight / distanceToLight;
+	const float normalizedDistance = saturate(distanceToLight / range);
+	attenuation = saturate(1.0 - normalizedDistance * normalizedDistance);
+	attenuation *= attenuation;
+
+	if (light.LightType == LightTypeSpot)
+	{
+		const float3 spotDirection = normalize(light.Direction.xyz);
+		const float cosTheta = dot(normalize(-L), spotDirection);
+		const float outerCos = cos(radians(max(light.SpotAngle, 0.001) * 0.5));
+		const float innerCos = cos(radians(max(light.SpotAngle * 0.8, 0.001) * 0.5));
+		const float spotAttenuation = saturate((cosTheta - outerCos) / max(innerCos - outerCos, 0.001));
+		attenuation *= spotAttenuation * spotAttenuation;
+	}
+	else if (light.LightType != LightTypePoint)
+	{
+		return false;
+	}
+
+	return attenuation > 0.0;
+}
+
 VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 {
 	VSOutput OUT;
@@ -183,32 +233,58 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 
 	// Shading
 	float3 V = normalize(viewData.CameraPos.xyz - IN.PositionWS); // View direction
-	float3 L = normalize(-g_Scene.MainLight.Direction.xyz); // DirWS is light to surface, so L = -DirWS
-
-	float NoL = saturate(dot(N, L));
 	float NoV = saturate(dot(N, V));
-	float3 H = normalize(L + V); // Half vector
-	float NoH = saturate(dot(N, H));
-	float VoH = saturate(dot(V, H));
 
 	// convert artistic roughness to physical roughness
 	float a = PerceptualRoughnessToAlpha(perceptualRoughness);
 
 	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor
-	float D = D_GGX(NoH, a);
-	float Vis = V_SmithGGXCorrelated(NoV, NoL, a);
-	float3 F = F_Schlick(F0, 1.0.xxx, VoH); // use F90 = 1.0, TODO: use Fresnel reflectance at grazing angle
+	float3 directLighting = 0.0.xxx;
+	bool shadowedDirectionalLightUsed = false;
+	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
+	{
+		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
+		const LightData light = g_Lights[lightIndex];
 
-	float3 specular = D * Vis * F;
+		float3 L = 0.0.xxx;
+		float attenuation = 1.0;
+		if (!ResolveLightVector(light, IN.PositionWS, L, attenuation))
+		{
+			continue;
+		}
 
-	float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
-	float3 diffuse = kd * Fd_Lambert(baseColor);
+		float NoL = saturate(dot(N, L));
+		if (NoL <= 0.0)
+		{
+			continue;
+		}
 
-	float shadowVisibility = SampleDirectionalShadow(IN.PositionWS, NoL);
+		float3 H = normalize(L + V); // Half vector
+		float NoH = saturate(dot(N, H));
+		float VoH = saturate(dot(V, H));
 
-	float3 Lo = (diffuse + specular) *
-		g_Scene.MainLight.Color.rgb *
-		g_Scene.MainLight.Intensity * NoL * shadowVisibility;
+		float D = D_GGX(NoH, a);
+		float Vis = V_SmithGGXCorrelated(NoV, NoL, a);
+		float3 F = F_Schlick(F0, 1.0.xxx, VoH); // use F90 = 1.0, TODO: use Fresnel reflectance at grazing angle
+
+		float3 specular = D * Vis * F;
+
+		float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
+		float3 diffuse = kd * Fd_Lambert(baseColor);
+
+		float shadowVisibility = 1.0;
+		if (light.LightType == 0u && !shadowedDirectionalLightUsed)
+		{
+			shadowVisibility = SampleDirectionalShadow(IN.PositionWS, NoL);
+			shadowedDirectionalLightUsed = true;
+		}
+
+		directLighting += (diffuse + specular) *
+			light.Color.rgb *
+			light.Intensity * NoL * attenuation * shadowVisibility;
+	}
+
+	float3 Lo = directLighting;
 
 	// Emissive texture(sRGB)
 	float2 emissiveUV = SelectUV(matData.EmissiveBinding, IN.UV0, IN.UV1);

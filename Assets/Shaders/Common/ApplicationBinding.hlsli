@@ -12,3 +12,4 @@ ConstantBuffer<DrawParameters> g_Draw : register(b1);
 StructuredBuffer<ObjectData> g_Objects : register(t1);
 StructuredBuffer<MaterialData> g_Materials : register(t2);
 StructuredBuffer<ViewData> g_Views : register(t3);
+StructuredBuffer<LightData> g_Lights : register(t4);

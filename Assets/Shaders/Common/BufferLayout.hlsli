@@ -9,7 +9,7 @@ struct LightData
 	float Intensity;
 	float Range;
 	float SpotAngle;
-	uint LightType; // 0: Directional, 1: Point, 2: Spot
+	uint LightType; // 0: Directional, 1: Spot, 2: Point
 };
 
 struct TextureSamplerBindingData
@@ -39,11 +39,10 @@ struct SceneData
 	uint MaterialCount;
 	uint ViewBaseIndex;
 	uint ViewCount;
-	uint2 Padding;
+	uint LightBaseIndex;
+	uint LightCount;
 	
 	IBLResourceData IBLResource;
-	
-	LightData MainLight;
 };
 
 struct ObjectData

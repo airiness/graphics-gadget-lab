@@ -23,6 +23,7 @@ namespace gglab
 		ObjectSB,		// g_Objects, t1
 		MaterialSB,		// g_Materials, t2
 		ViewSB,			// g_Views, t3
+		LightSB,		// g_Lights, t4
 
 		Count
 	};

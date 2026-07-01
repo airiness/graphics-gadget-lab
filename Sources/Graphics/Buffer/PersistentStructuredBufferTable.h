@@ -35,10 +35,11 @@ namespace gglab
 			uint32_t capacity,
 			uint32_t bufferCount) :
 			m_Data(capacity),
-			m_Revisions(capacity, 0),
+			m_Revisions(capacity, 1),
 			m_KeysBySlot(capacity),
 			m_UploadedRevisions(bufferCount, std::vector<uint64_t>(capacity, 0)),
-			m_BufferVersionStats(bufferCount)
+			m_BufferVersionStats(bufferCount),
+			m_NextRevision(1)
 		{
 			m_FreeSlots.reserve(capacity);
 			for (uint32_t slot = capacity; slot > 0; --slot)
@@ -103,6 +104,8 @@ namespace gglab
 				}
 
 				const uint32_t slot = iter->second.m_Slot;
+				m_Data[slot] = {};
+				m_Revisions[slot] = NextRevision();
 				m_KeysBySlot[slot].reset();
 				m_FreeSlots.push_back(slot);
 				iter = m_Records.erase(iter);
@@ -110,6 +113,19 @@ namespace gglab
 		}
 
 		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRanges(uint32_t bufferIndex) const
+		{
+			return BuildDirtyRangesInternal(bufferIndex, false);
+		}
+
+		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRangesIncludingFreeSlots(uint32_t bufferIndex) const
+		{
+			return BuildDirtyRangesInternal(bufferIndex, true);
+		}
+
+	private:
+		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRangesInternal(
+			uint32_t bufferIndex,
+			bool includeFreeSlots) const
 		{
 			GGLAB_ASSERT(bufferIndex < m_UploadedRevisions.size());
 			std::vector<DirtyRange> ranges;
@@ -121,7 +137,8 @@ namespace gglab
 			const auto& uploaded = m_UploadedRevisions[bufferIndex];
 			for (uint32_t slot = 0; slot < m_Data.size(); ++slot)
 			{
-				if (!m_KeysBySlot[slot].has_value() || uploaded[slot] == m_Revisions[slot])
+				if ((!includeFreeSlots && !m_KeysBySlot[slot].has_value()) ||
+					uploaded[slot] == m_Revisions[slot])
 				{
 					continue;
 				}
@@ -138,7 +155,7 @@ namespace gglab
 			}
 			return ranges;
 		}
-
+	public:
 		[[nodiscard]] std::span<const T> GetData(const DirtyRange& range) const noexcept
 		{
 			GGLAB_ASSERT(range.m_FirstElement <= m_Data.size() &&

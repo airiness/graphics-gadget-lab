@@ -47,6 +47,7 @@ namespace gglab
 	{
 		PersistentBufferTableSnapshot m_Objects;
 		PersistentBufferTableSnapshot m_Materials;
+		PersistentBufferTableSnapshot m_Lights;
 	};
 
 	void BuildPersistentSceneBufferSnapshot(
