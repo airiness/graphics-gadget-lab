@@ -144,6 +144,8 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Application.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\AssetSnapshot.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
@@ -278,6 +280,8 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
+    <ClInclude Include="..\..\Sources\Graphics\AssetSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />

@@ -116,20 +116,28 @@ namespace gglab
 		const std::filesystem::path& texPath,
 		TextureColorSpace colorSpace) noexcept
 	{
-		GGLAB_ASSERT_MSG(std::filesystem::exists(texPath), "Invalid texture file path.");
+		std::error_code errorCode;
+		if (!std::filesystem::exists(texPath, errorCode) ||
+			!std::filesystem::is_regular_file(texPath, errorCode))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader received an invalid texture file path: '{}'.",
+				texPath.string());
+			return {};
+		}
 
 		const std::string extension = texPath.extension().string();
 
 		DirectX::TexMetadata metadata;
 		DirectX::ScratchImage scratchImage;
+		HRESULT hr = S_OK;
 
 		if (extension == ".dds")
 		{
-			GGLAB_HR(DirectX::LoadFromDDSFile(
+			hr = DirectX::LoadFromDDSFile(
 				texPath.c_str(),
 				DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB,
 				&metadata,
-				scratchImage));
+				scratchImage);
 		}
 		else
 		{
@@ -143,11 +151,19 @@ namespace gglab
 				wicFlags |= DirectX::WIC_FLAGS::WIC_FLAGS_IGNORE_SRGB;
 			}
 
-			GGLAB_HR(DirectX::LoadFromWICFile(
+			hr = DirectX::LoadFromWICFile(
 				texPath.c_str(),
 				wicFlags,
 				&metadata,
-				scratchImage));
+				scratchImage);
+		}
+
+		if (FAILED(hr))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to decode texture '{}': {}",
+				texPath.string(),
+				FormatHResult(hr));
+			return {};
 		}
 
 		return ConvertScratchImage(scratchImage, colorSpace);

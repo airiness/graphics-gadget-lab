@@ -225,6 +225,12 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\AssetSnapshot.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
       <Filter>Externals\DirectXSimpleMath</Filter>
     </ClCompile>
@@ -613,6 +619,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\AssetSnapshot.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Color.h">
       <Filter>Graphics</Filter>

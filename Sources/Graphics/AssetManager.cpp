@@ -10,6 +10,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
+#include <algorithm>
+#include <cctype>
 #include <limits>
 
 namespace gglab
@@ -123,7 +125,21 @@ namespace gglab
 
 	ModelID AssetManager::LoadModel(const std::filesystem::path& path) noexcept
 	{
+		if (path.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadModel received an empty path.");
+			return InvalidModelID;
+		}
+
 		const auto canonicalPath = utils::Canonical(path);
+		std::error_code errorCode;
+		if (!std::filesystem::exists(canonicalPath, errorCode) ||
+			!std::filesystem::is_regular_file(canonicalPath, errorCode))
+		{
+			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadModel received a missing model file: '{}'.",
+				canonicalPath.string());
+			return InvalidModelID;
+		}
 
 		// Check if model is already loaded
 		if (auto existing = FindModel(canonicalPath); existing.IsValid())
@@ -132,8 +148,13 @@ namespace gglab
 		}
 
 		// Check extension, load glTF file
-		const auto getModelFileType = [](const std::string& extension) -> ModelType
+		const auto getModelFileType = [](std::string extension) -> ModelType
 			{
+				std::ranges::transform(extension, extension.begin(),
+					[](unsigned char c)
+					{
+						return static_cast<char>(std::tolower(c));
+					});
 				if (extension == ".gltf") { return ModelType::GlTF; }
 				return ModelType::Invalid;
 			};
@@ -149,6 +170,11 @@ namespace gglab
 		default:
 			GGLAB_UNREACHABLE("Unknown model file type.");
 		}
+	}
+
+	TextureID AssetManager::LoadTexture(const std::filesystem::path& path, TextureSemantic semantic) noexcept
+	{
+		return m_TextureRegistry->LoadTexture(path, semantic);
 	}
 
 	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
@@ -408,8 +434,18 @@ namespace gglab
 			aiProcess_OptimizeGraph;
 
 		const auto* aiScene = importer.ReadFile(path.string(), importFlags);
-		GGLAB_ASSERT_MSG(aiScene != nullptr, "Assimp load file failed.");
-		GGLAB_ASSERT_MSG(aiScene->HasMeshes(), "Model file do not has mesh data.");
+		if (aiScene == nullptr)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Assimp failed to load model '{}': {}",
+				path.string(),
+				importer.GetErrorString());
+			return InvalidModelID;
+		}
+		if (!aiScene->HasMeshes())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Model file '{}' does not contain mesh data.", path.string());
+			return InvalidModelID;
+		}
 
 		// Parse material datas
 		const auto aiMaterialCount = aiScene->mNumMaterials;
