@@ -1,11 +1,10 @@
 #pragma once
+#include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 
 namespace gglab
 {
-	class RenderGraph;
-
 	struct RGSnapshotAccessInfo
 	{
 		uint32_t m_ResourceNodeIndex = 0;
@@ -96,5 +95,9 @@ namespace gglab
 		std::vector<RGSnapshotDependencyEdge> m_DependencyEdges;
 	};
 
-	void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
+	template<>
+	struct SnapshotTraits<RGSnapshot>
+	{
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.RenderGraphSnapshot");
+	};
 }

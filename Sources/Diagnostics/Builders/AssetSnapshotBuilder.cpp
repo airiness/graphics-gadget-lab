@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/AssetSnapshot.h"
+#include "Diagnostics/Builders/AssetSnapshotBuilder.h"
+#include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/TextureRegistry.h"
 

@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/Buffer/PersistentSceneBufferSnapshot.h"
+#include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
+#include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/GPUStructures.h"

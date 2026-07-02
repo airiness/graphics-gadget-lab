@@ -11,6 +11,7 @@ namespace gglab
 	class Renderer;
 	class AssetManager;
 	class RenderGraph;
+	class DiagnosticsRuntime;
 
 	class DevelopGuiStateStore;
 
@@ -24,6 +25,7 @@ namespace gglab
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
+		DiagnosticsRuntime* m_Diagnostics = nullptr;
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 

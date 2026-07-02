@@ -21,6 +21,15 @@
     <Filter Include="Core">
       <UniqueIdentifier>{bb74519f-06d0-430b-9631-02634c26ac92}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Diagnostics">
+      <UniqueIdentifier>{90518E80-C2D2-41C8-A04A-8A80F18F3862}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Diagnostics\Builders">
+      <UniqueIdentifier>{1819CA43-BE74-4125-87DC-049279F46D9B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Diagnostics\Snapshots">
+      <UniqueIdentifier>{056E4A80-A4D4-41F7-BE98-97C90AEF8702}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
@@ -165,8 +174,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystemSnapshot.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
@@ -180,8 +189,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
@@ -228,8 +237,8 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\AssetSnapshot.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -498,8 +507,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -507,8 +516,14 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.cpp">
-      <Filter>Graphics\Resource</Filter>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.cpp">
+      <Filter>Diagnostics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -593,8 +608,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManagerSnapshot.h">
-      <Filter>Graphics\RHI\DX12</Filter>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
@@ -641,8 +656,8 @@
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\AssetSnapshot.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -725,8 +740,8 @@
     <ClInclude Include="..\..\Sources\Core\StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClCompile Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.cpp">
-      <Filter>Graphics\Buffer</Filter>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -752,8 +767,8 @@
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentSceneBufferSnapshot.h">
-      <Filter>Graphics\Buffer</Filter>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -959,8 +974,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystemSnapshot.h">
-      <Filter>Graphics\RHI</Filter>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">
       <Filter>Graphics\RHI</Filter>
@@ -1085,8 +1100,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ShadowGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraphSnapshot.h">
-      <Filter>Graphics\RenderGraph</Filter>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RenderGraphSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h">
       <Filter>Graphics\RenderGraph</Filter>
@@ -1103,14 +1118,50 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePoolSnapshot.h">
-      <Filter>Graphics\Resource</Filter>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotCommon.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotContext.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotProvider.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotStore.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

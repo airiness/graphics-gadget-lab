@@ -7,7 +7,8 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
-#include "Graphics/RHI/DX12/DX12ResourceManagerSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 
 namespace gglab
 {
@@ -477,9 +478,14 @@ namespace gglab
 				});
 		}
 
-		DX12ResourceManagerSnapshot snapshot;
-		BuildDX12ResourceManagerSnapshot(manager, snapshot);
-		DrawTestResourcesTable(device, snapshot, state);
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>() : nullptr;
+		if (!snapshot)
+		{
+			ImGui::TextDisabled("DX12 resource snapshot provider is not available.");
+			return;
+		}
+		DrawTestResourcesTable(device, *snapshot, state);
 
 		ImGui::SeparatorText("Validation");
 		if (ImGui::Button("Invalid Destroy Probe"))
@@ -514,7 +520,7 @@ namespace gglab
 		ImGui::SameLine();
 		ImGui::TextUnformatted(state.m_LastTestResult.c_str());
 
-		const auto& diagnostics = snapshot.m_Diagnostics;
+		const auto& diagnostics = snapshot->m_Diagnostics;
 
 		ImGui::SeparatorText("Diagnostics");
 		ImGui::Text(
@@ -538,12 +544,12 @@ namespace gglab
 		{
 			if (ImGui::BeginTabItem("Textures"))
 			{
-				DrawSlotsTable("RHITextureSlots", snapshot.m_Textures);
+				DrawSlotsTable("RHITextureSlots", snapshot->m_Textures);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Buffers"))
 			{
-				DrawSlotsTable("RHIBufferSlots", snapshot.m_Buffers);
+				DrawSlotsTable("RHIBufferSlots", snapshot->m_Buffers);
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();
