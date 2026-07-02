@@ -3,8 +3,9 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraphSnapshot.h"
-#include "Graphics/Resource/TransientResourcePoolSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 
 namespace gglab
 {
@@ -194,15 +195,14 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawRenderGraphResources(RenderGraph* renderGraph) noexcept
+		void DrawRenderGraphResources(DiagnosticsRuntime* diagnostics) noexcept
 		{
-			if (!renderGraph)
+			const auto* snapshot = diagnostics ? diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
+			if (!snapshot)
 			{
-				ImGui::TextDisabled("RenderGraph is not available.");
+				ImGui::TextDisabled("RenderGraph snapshot is not available.");
 				return;
 			}
-			RGSnapshot snapshot;
-			BuildRenderGraphSnapshot(*renderGraph, snapshot);
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
 			if (!ImGui::BeginTable("TransientPoolRenderGraphResources", 8, flags))
@@ -218,7 +218,7 @@ namespace gglab
 			ImGui::TableSetupColumn("First Pass");
 			ImGui::TableSetupColumn("Last Pass");
 			ImGui::TableHeadersRow();
-			for (const auto& resource : snapshot.m_Resources)
+			for (const auto& resource : snapshot->m_Resources)
 			{
 				const std::string usage = resource.m_ResourceType == RGResourceType::RGTexture ?
 					devtools::EnumFlagsText<RHITextureUsage>(static_cast<uint32_t>(resource.m_UsageBits)) :
@@ -248,15 +248,19 @@ namespace gglab
 			return;
 		}
 
-		TransientResourcePoolSnapshot snapshot;
-		BuildTransientResourcePoolSnapshot(
-			*context.m_Renderer->GetTransientResourcePool(), snapshot);
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<TransientResourcePoolSnapshot>() : nullptr;
+		if (!snapshot)
+		{
+			ImGui::TextDisabled("Transient pool snapshot provider is not available.");
+			return;
+		}
 
-		DrawCounts("Textures", snapshot.m_TextureCounts);
-		DrawCounts("Buffers", snapshot.m_BufferCounts);
+		DrawCounts("Textures", snapshot->m_TextureCounts);
+		DrawCounts("Buffers", snapshot->m_BufferCounts);
 		ImGui::Text("Pending retirements: %u | Free key buckets: %u texture / %u buffer | Max cached per key: %u",
-			snapshot.m_PendingRetirementCount, snapshot.m_FreeTextureKeyCount,
-			snapshot.m_FreeBufferKeyCount, snapshot.m_MaxCachedPerKey);
+			snapshot->m_PendingRetirementCount, snapshot->m_FreeTextureKeyCount,
+			snapshot->m_FreeBufferKeyCount, snapshot->m_MaxCachedPerKey);
 		ImGui::InputText("Filter", state.m_Filter, IM_ARRAYSIZE(state.m_Filter));
 		ImGui::SameLine();
 		ImGui::Checkbox("Hide Destroyed", &state.m_HideDestroyed);
@@ -265,17 +269,17 @@ namespace gglab
 		{
 			if (ImGui::BeginTabItem("Textures"))
 			{
-				DrawTextureTable(snapshot, state);
+				DrawTextureTable(*snapshot, state);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Buffers"))
 			{
-				DrawBufferTable(snapshot, state);
+				DrawBufferTable(*snapshot, state);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("RenderGraph Resources"))
 			{
-				DrawRenderGraphResources(context.m_RenderGraph);
+				DrawRenderGraphResources(context.m_Diagnostics);
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();

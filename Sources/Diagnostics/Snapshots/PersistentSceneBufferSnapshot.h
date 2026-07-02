@@ -1,4 +1,5 @@
 #pragma once
+#include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/RHIResource.h"
 
@@ -7,8 +8,6 @@
 
 namespace gglab
 {
-	class Renderer;
-
 	struct PersistentBufferVersionSnapshot
 	{
 		uint32_t m_BufferIndex = 0;
@@ -50,7 +49,9 @@ namespace gglab
 		PersistentBufferTableSnapshot m_Lights;
 	};
 
-	void BuildPersistentSceneBufferSnapshot(
-		const Renderer& renderer,
-		PersistentSceneBufferSnapshot& outSnapshot) noexcept;
+	template<>
+	struct SnapshotTraits<PersistentSceneBufferSnapshot>
+	{
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.PersistentSceneBufferSnapshot");
+	};
 }

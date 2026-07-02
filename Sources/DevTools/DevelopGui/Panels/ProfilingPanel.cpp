@@ -4,6 +4,7 @@
 #include "Core/Profiling/CpuProfiler.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
 
 namespace gglab
 {
@@ -101,6 +102,47 @@ namespace gglab
 
 			ImGui::EndTable();
 		}
+
+		void DrawSnapshotProfiles(DiagnosticsRuntime* diagnostics) noexcept
+		{
+			if (!diagnostics || !ImGui::CollapsingHeader("Snapshot Capture"))
+			{
+				return;
+			}
+			const auto profiles = diagnostics->GetProfiles();
+			if (!ImGui::BeginTable("SnapshotProfiles", 7,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				return;
+			}
+			ImGui::TableSetupColumn("Snapshot");
+			ImGui::TableSetupColumn("Policy");
+			ImGui::TableSetupColumn("Last (ms)");
+			ImGui::TableSetupColumn("Average (ms)");
+			ImGui::TableSetupColumn("Max (ms)");
+			ImGui::TableSetupColumn("Captures / Hits");
+			ImGui::TableSetupColumn("Refresh");
+			ImGui::TableHeadersRow();
+			for (const auto& profile : profiles)
+			{
+				const char* policy = profile.m_Policy == SnapshotUpdatePolicy::EveryFrame ? "Every Frame" :
+					profile.m_Policy == SnapshotUpdatePolicy::OnDemand ? "On Demand" : "Manual";
+				ImGui::PushID(static_cast<int>(profile.m_Id));
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(profile.m_Name.data(), profile.m_Name.data() + profile.m_Name.size());
+				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(policy);
+				ImGui::TableSetColumnIndex(2); ImGui::Text("%.3f", profile.m_LastCaptureMilliseconds);
+				ImGui::TableSetColumnIndex(3); ImGui::Text("%.3f", profile.m_AverageCaptureMilliseconds);
+				ImGui::TableSetColumnIndex(4); ImGui::Text("%.3f", profile.m_MaxCaptureMilliseconds);
+				ImGui::TableSetColumnIndex(5); ImGui::Text("%llu / %llu",
+					static_cast<unsigned long long>(profile.m_CaptureCount),
+					static_cast<unsigned long long>(profile.m_CacheHitCount));
+				ImGui::TableSetColumnIndex(6);
+				if (ImGui::SmallButton("Refresh")) diagnostics->RequestRefresh(profile.m_Id);
+				ImGui::PopID();
+			}
+			ImGui::EndTable();
+		}
 	}
 
 	void ProfilingPanel::Draw(DevelopGuiContext& context) noexcept
@@ -132,6 +174,7 @@ namespace gglab
 		}
 		ImGui::SameLine();
 		ImGui::Checkbox("Pause display", &state.m_Paused);
+		DrawSnapshotProfiles(context.m_Diagnostics);
 
 		if (!state.m_Paused)
 		{

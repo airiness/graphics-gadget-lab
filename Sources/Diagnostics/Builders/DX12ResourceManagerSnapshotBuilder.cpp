@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RHI/DX12/DX12ResourceManagerSnapshot.h"
+#include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
+#include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"

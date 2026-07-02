@@ -7,7 +7,8 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "Graphics/AssetManager.h"
-#include "Graphics/AssetSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/AssetSnapshot.h"
 
 #include <algorithm>
 #include <vector>
@@ -499,7 +500,8 @@ namespace gglab
 		void DrawAddComponentButton(
 			entt::registry& registry,
 			entt::entity entity,
-			AssetManager* assetManager) noexcept
+			AssetManager* assetManager,
+			const AssetSnapshot* assetSnapshot) noexcept
 		{
 			ImGui::PushID("AddComponent");
 			if (ImGui::Button("+"))
@@ -524,18 +526,17 @@ namespace gglab
 				{
 					ImGui::MenuItem("Model", nullptr, false, false);
 				}
-				else if (!assetManager)
+				else if (!assetManager || !assetSnapshot)
 				{
 					ImGui::MenuItem("Model", "No AssetManager", false, false);
 				}
 				else if (ImGui::BeginMenu("Model"))
 				{
-					const AssetSnapshot assetSnapshot = BuildAssetSnapshot(*assetManager);
-					if (assetSnapshot.m_Models.empty())
+					if (assetSnapshot->m_Models.empty())
 					{
 						ImGui::MenuItem("No loaded models", nullptr, false, false);
 					}
-					for (const auto& model : assetSnapshot.m_Models)
+					for (const auto& model : assetSnapshot->m_Models)
 					{
 						const std::string label = std::format("{}##{}",
 							ModelAssetDisplayName(model),
@@ -555,7 +556,8 @@ namespace gglab
 		void DrawSelectedEntity(
 			entt::registry& registry,
 			EntityPanelState& state,
-			AssetManager* assetManager) noexcept
+			AssetManager* assetManager,
+			const AssetSnapshot* assetSnapshot) noexcept
 		{
 			if (state.m_SelectedEntity == entt::null ||
 				!registry.valid(state.m_SelectedEntity))
@@ -569,7 +571,7 @@ namespace gglab
 			ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
 			ImGui::Text("Entity %u", entt::to_integral(entity));
 			ImGui::SameLine();
-			DrawAddComponentButton(registry, entity, assetManager);
+			DrawAddComponentButton(registry, entity, assetManager, assetSnapshot);
 			ImGui::SameLine();
 			if (ImGui::Button("Delete Entity"))
 			{
@@ -667,7 +669,9 @@ namespace gglab
 			DrawEntityList(registry, std::span<const entt::entity>(entities), state, entityAnchors);
 
 			ImGui::TableSetColumnIndex(1);
-			DrawSelectedEntity(registry, state, context.m_AssetManager);
+			const auto* assetSnapshot = context.m_Diagnostics ?
+				context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
+			DrawSelectedEntity(registry, state, context.m_AssetManager, assetSnapshot);
 
 			ImGui::EndTable();
 		}
