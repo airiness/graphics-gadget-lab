@@ -18,13 +18,29 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(m_Allocator, "Allocator can not be null.");
 
-		GGLAB_HR(m_Allocator->CreateResource(
-			&createInfo.m_AllocDesc,
-			&m_ResourceDesc,
-			createInfo.m_InitStates,
-			m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
-			&m_Allocation,
-			IID_PPV_ARGS(&m_Resource)));
+		if (createInfo.m_EnhancedInitialLayout)
+		{
+			const CD3DX12_RESOURCE_DESC1 resourceDesc1(m_ResourceDesc);
+			GGLAB_HR(m_Allocator->CreateResource3(
+				&createInfo.m_AllocDesc,
+				&resourceDesc1,
+				*createInfo.m_EnhancedInitialLayout,
+				m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
+				0,
+				nullptr,
+				&m_Allocation,
+				IID_PPV_ARGS(&m_Resource)));
+		}
+		else
+		{
+			GGLAB_HR(m_Allocator->CreateResource(
+				&createInfo.m_AllocDesc,
+				&m_ResourceDesc,
+				createInfo.m_InitStates,
+				m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
+				&m_Allocation,
+				IID_PPV_ARGS(&m_Resource)));
+		}
 
 	}
 
