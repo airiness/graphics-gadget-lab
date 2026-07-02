@@ -3,14 +3,11 @@
 #include "Core/Utility/TypeUtils.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHIFence.h"
+#include "Graphics/RHI/DX12/DX12HResult.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 
+#include <D3D12MemAlloc.h>
 #include <memory>
-
-namespace D3D12MA
-{
-	class Allocator;
-}
 
 namespace gglab
 {

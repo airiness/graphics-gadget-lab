@@ -11,7 +11,7 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 
 namespace gglab
 {

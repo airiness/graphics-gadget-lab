@@ -18,9 +18,6 @@
 // Shader Compiler
 #include <dxcapi.h>
 
-// D3D12MA
-#include <D3D12MemAlloc.h>
-
 // C++
 #include <cstdint>
 #include <string>

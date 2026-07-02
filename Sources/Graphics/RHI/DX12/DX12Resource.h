@@ -1,6 +1,8 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
 
+#include <D3D12MemAlloc.h>
+
 namespace gglab
 {
 	class DX12Device;

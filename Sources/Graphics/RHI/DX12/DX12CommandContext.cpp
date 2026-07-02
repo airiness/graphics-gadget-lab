@@ -10,7 +10,7 @@
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <algorithm>
 #include <atomic>

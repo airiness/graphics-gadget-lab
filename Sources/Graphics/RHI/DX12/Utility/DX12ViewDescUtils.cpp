@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/GraphicsTypes.h"
 
 namespace gglab
