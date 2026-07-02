@@ -3,7 +3,8 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Graphics/RHI/RHIPipelineSystemSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 
@@ -513,12 +514,14 @@ namespace gglab
 			return;
 		}
 
-		const PipelineCache* pipelineCache = context.m_Renderer->GetPipelineCache();
-		RHIPipelineSystemSnapshot snapshot;
-		BuildDX12PipelineSystemSnapshot(
-			*dx12PipelineSystem,
-			pipelineCache,
-			snapshot);
+		const auto* snapshotPtr = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>() : nullptr;
+		if (!snapshotPtr)
+		{
+			ImGui::TextDisabled("Pipeline snapshot provider is not available.");
+			return;
+		}
+		const RHIPipelineSystemSnapshot& snapshot = *snapshotPtr;
 		auto& state = context.PanelState<PipelineSystemPanelState>();
 
 		ImGui::Text("Backend: %s | Binding layouts: %u | Pipelines: %u",

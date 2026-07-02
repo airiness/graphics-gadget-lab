@@ -1,4 +1,5 @@
 #pragma once
+#include "Diagnostics/SnapshotCommon.h"
 
 #include <cstdint>
 #include <string>
@@ -6,8 +7,6 @@
 
 namespace gglab
 {
-	class DX12ResourceManager;
-
 	enum class DX12ResourceSnapshotOwnership : uint8_t
 	{
 		Owned,
@@ -58,7 +57,9 @@ namespace gglab
 		std::vector<DX12ResourceSlotSnapshot> m_Buffers;
 	};
 
-	void BuildDX12ResourceManagerSnapshot(
-		const DX12ResourceManager& manager,
-		DX12ResourceManagerSnapshot& outSnapshot) noexcept;
+	template<>
+	struct SnapshotTraits<DX12ResourceManagerSnapshot>
+	{
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.DX12ResourceManagerSnapshot");
+	};
 }

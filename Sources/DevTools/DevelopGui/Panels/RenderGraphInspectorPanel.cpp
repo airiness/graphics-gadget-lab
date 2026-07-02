@@ -3,7 +3,8 @@
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Graphics/RenderGraph/RenderGraphSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include <algorithm>
 #include <cmath>
 
@@ -1124,8 +1125,14 @@ namespace gglab
 			return;
 		}
 
-		RGSnapshot snapshot;
-		BuildRenderGraphSnapshot(*context.m_RenderGraph, snapshot);
+		const auto* snapshotPtr = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
+		if (!snapshotPtr)
+		{
+			ImGui::TextDisabled("RenderGraph snapshot provider is not available.");
+			return;
+		}
+		const RGSnapshot& snapshot = *snapshotPtr;
 
 		uint32_t culledPassCount = 0;
 		uint32_t preBarrierCount = 0;

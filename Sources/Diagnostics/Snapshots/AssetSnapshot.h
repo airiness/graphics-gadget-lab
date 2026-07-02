@@ -1,10 +1,9 @@
 #pragma once
+#include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/GraphicsTypes.h"
 
 namespace gglab
 {
-	class AssetManager;
-
 	struct AssetSnapshot
 	{
 		struct Model
@@ -30,5 +29,9 @@ namespace gglab
 		std::vector<Texture> m_Textures;
 	};
 
-	[[nodiscard]] AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
+	template<>
+	struct SnapshotTraits<AssetSnapshot>
+	{
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.AssetSnapshot");
+	};
 }

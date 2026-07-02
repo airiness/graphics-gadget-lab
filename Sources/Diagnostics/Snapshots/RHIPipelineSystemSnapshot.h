@@ -1,4 +1,5 @@
 #pragma once
+#include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RenderPass/RenderPassInfo.h"
 
@@ -8,9 +9,6 @@
 
 namespace gglab
 {
-	class DX12PipelineSystem;
-	class PipelineCache;
-
 	enum class RHIPipelineSnapshotType : uint8_t
 	{
 		Graphics,
@@ -120,8 +118,9 @@ namespace gglab
 		std::vector<RHIPipelineSnapshot> m_Pipelines;
 	};
 
-	void BuildDX12PipelineSystemSnapshot(
-		const DX12PipelineSystem& system,
-		const PipelineCache* pipelineCache,
-		RHIPipelineSystemSnapshot& outSnapshot) noexcept;
+	template<>
+	struct SnapshotTraits<RHIPipelineSystemSnapshot>
+	{
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.RHIPipelineSystemSnapshot");
+	};
 }

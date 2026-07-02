@@ -1,7 +1,8 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Graphics/Buffer/PersistentSceneBufferSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -121,25 +122,30 @@ namespace gglab
 		}
 
 		auto& state = context.PanelState<PersistentSceneBuffersPanelState>();
-		PersistentSceneBufferSnapshot snapshot;
-		BuildPersistentSceneBufferSnapshot(*context.m_Renderer, snapshot);
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<PersistentSceneBufferSnapshot>() : nullptr;
+		if (!snapshot)
+		{
+			ImGui::TextDisabled("Persistent buffer snapshot provider is not available.");
+			return;
+		}
 		ImGui::Checkbox("Hide Free Slots", &state.m_HideFreeSlots);
 
 		if (ImGui::BeginTabBar("PersistentSceneBufferTabs"))
 		{
 			if (ImGui::BeginTabItem("Objects"))
 			{
-				DrawTable(snapshot.m_Objects, state.m_HideFreeSlots);
+				DrawTable(snapshot->m_Objects, state.m_HideFreeSlots);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Materials"))
 			{
-				DrawTable(snapshot.m_Materials, state.m_HideFreeSlots);
+				DrawTable(snapshot->m_Materials, state.m_HideFreeSlots);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Lights"))
 			{
-				DrawTable(snapshot.m_Lights, state.m_HideFreeSlots);
+				DrawTable(snapshot->m_Lights, state.m_HideFreeSlots);
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();

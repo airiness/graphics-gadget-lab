@@ -1,4 +1,5 @@
 #pragma once
+#include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 
 namespace gglab
@@ -52,7 +53,9 @@ namespace gglab
 		std::vector<TransientBufferSlotSnapshot> m_Buffers;
 	};
 
-	void BuildTransientResourcePoolSnapshot(
-		const TransientResourcePool& pool,
-		TransientResourcePoolSnapshot& outSnapshot) noexcept;
+	template<>
+	struct SnapshotTraits<TransientResourcePoolSnapshot>
+	{
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.TransientResourcePoolSnapshot");
+	};
 }

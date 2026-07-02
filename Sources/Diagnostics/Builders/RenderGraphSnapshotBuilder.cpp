@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderGraph/RenderGraphSnapshot.h"
+#include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
+#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 

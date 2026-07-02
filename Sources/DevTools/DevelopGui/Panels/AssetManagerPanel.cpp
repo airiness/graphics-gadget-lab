@@ -3,7 +3,8 @@
 #include "Core/Utility/StringUtils.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/AssetManager.h"
-#include "Graphics/AssetSnapshot.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/AssetSnapshot.h"
 
 #include <algorithm>
 
@@ -101,7 +102,8 @@ namespace gglab
 			return std::format("Texture {}", texture.m_Id.Value());
 		}
 
-		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state) noexcept
+		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state,
+			const AssetSnapshot& assetSnapshot) noexcept
 		{
 			ImGui::PushID("Models");
 			ImGui::SeparatorText("Load Model");
@@ -125,7 +127,6 @@ namespace gglab
 				ImGui::EndDisabled();
 			}
 
-			const AssetSnapshot assetSnapshot = BuildAssetSnapshot(assetManager);
 			const auto& models = assetSnapshot.m_Models;
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
@@ -164,7 +165,8 @@ namespace gglab
 			ImGui::PopID();
 		}
 
-		void DrawTextureAssets(AssetManager& assetManager, AssetManagerPanelState& state) noexcept
+		void DrawTextureAssets(AssetManager& assetManager, AssetManagerPanelState& state,
+			const AssetSnapshot& assetSnapshot) noexcept
 		{
 			ImGui::PushID("Textures");
 			ImGui::SeparatorText("Load Texture");
@@ -206,7 +208,6 @@ namespace gglab
 				ImGui::EndDisabled();
 			}
 
-			const AssetSnapshot assetSnapshot = BuildAssetSnapshot(assetManager);
 			const auto& textures = assetSnapshot.m_Textures;
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
@@ -258,6 +259,13 @@ namespace gglab
 		}
 
 		auto& state = context.PanelState<AssetManagerPanelState>();
+		const auto* snapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
+		if (!snapshot)
+		{
+			ImGui::TextDisabled("Asset snapshot provider is not available.");
+			return;
+		}
 		state.m_TextureSemanticIndex = std::clamp<int32_t>(
 			state.m_TextureSemanticIndex,
 			0,
@@ -276,12 +284,12 @@ namespace gglab
 		{
 			if (ImGui::BeginTabItem("Models"))
 			{
-				DrawModelAssets(*context.m_AssetManager, state);
+				DrawModelAssets(*context.m_AssetManager, state, *snapshot);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Textures"))
 			{
-				DrawTextureAssets(*context.m_AssetManager, state);
+				DrawTextureAssets(*context.m_AssetManager, state, *snapshot);
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();
