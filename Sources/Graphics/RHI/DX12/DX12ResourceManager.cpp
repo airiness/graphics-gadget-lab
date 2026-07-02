@@ -110,7 +110,11 @@ namespace gglab
 		case RHIMemoryUsage::GpuToCpu:
 			createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;
 			createInfo.m_ResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-			createInfo.m_InitStates = D3D12_RESOURCE_STATE_COPY_DEST;
+			// This backend records Enhanced Barriers. Buffers are created in COMMON;
+			// use D3D12MA's layout-based creation path instead of passing the legacy
+			// COPY_DEST state, which raises CREATERESOURCE_STATE_IGNORED (#1328).
+			createInfo.m_InitStates = D3D12_RESOURCE_STATE_COMMON;
+			createInfo.m_EnhancedInitialLayout = D3D12_BARRIER_LAYOUT_UNDEFINED;
 			break;
 		}
 		buffer->Create(createInfo);
