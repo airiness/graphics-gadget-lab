@@ -188,6 +188,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12HResult.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp" />
@@ -204,7 +205,6 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp" />
@@ -220,6 +220,7 @@
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
@@ -355,6 +356,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12HResult.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.h" />
@@ -378,7 +380,6 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
@@ -386,6 +387,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.h" />
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
     <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />

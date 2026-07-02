@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"

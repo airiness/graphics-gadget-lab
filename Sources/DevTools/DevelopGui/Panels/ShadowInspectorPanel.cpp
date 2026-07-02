@@ -5,7 +5,7 @@
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
