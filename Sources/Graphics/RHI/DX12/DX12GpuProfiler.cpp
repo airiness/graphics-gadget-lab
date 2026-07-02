@@ -2,6 +2,7 @@
 #include "Graphics/RHI/DX12/DX12GpuProfiler.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Core/HResult.h"
 
@@ -9,7 +10,8 @@ namespace gglab
 {
 	DX12GpuProfiler::DX12GpuProfiler(DX12Device* device,
 		DX12CommandQueue* graphicsQueue,
-		uint32_t frameCount) noexcept
+		uint32_t frameCount) noexcept :
+		m_Device(device)
 	{
 		GGLAB_ASSERT_NOT_NULL(device);
 		GGLAB_ASSERT_NOT_NULL(graphicsQueue);
@@ -22,6 +24,23 @@ namespace gglab
 
 		GGLAB_HR_DX(graphicsQueue->Get()->GetTimestampFrequency(&m_TimestampFrequency), device->Get());
 		InitializeFrameResources(*device, frameCount);
+	}
+
+	DX12GpuProfiler::~DX12GpuProfiler()
+	{
+		if (!m_Device)
+		{
+			return;
+		}
+
+		for (auto& frame : m_Frames)
+		{
+			if (frame.m_ReadbackBuffer && frame.m_MappedTimestamps)
+			{
+				m_Device->UnmapBuffer(frame.m_ReadbackBuffer.Get());
+				frame.m_MappedTimestamps = nullptr;
+			}
+		}
 	}
 
 	void DX12GpuProfiler::SetEnabled(bool enabled) noexcept
@@ -91,12 +110,20 @@ namespace gglab
 		frame.m_FrameEndQuery = WriteTimestamp(frame, commandList);
 		if (frame.m_TimestampCount > 0)
 		{
+			DX12Buffer* readbackBuffer = m_Device->ResolveBuffer(frame.m_ReadbackBuffer.Get());
+			GGLAB_ASSERT_NOT_NULL(readbackBuffer);
+			if (!readbackBuffer)
+			{
+				frame.m_Recording = false;
+				m_ActiveFrame = nullptr;
+				return;
+			}
 			commandList.Get()->ResolveQueryData(
 				frame.m_QueryHeap.Get(),
 				D3D12_QUERY_TYPE_TIMESTAMP,
 				0,
 				frame.m_TimestampCount,
-				frame.m_ReadbackBuffer.Get(),
+				readbackBuffer->Get(),
 				0);
 			frame.m_PendingResults = true;
 		}
@@ -172,8 +199,9 @@ namespace gglab
 	void DX12GpuProfiler::InitializeFrameResources(DX12Device& device, uint32_t frameCount) noexcept
 	{
 		m_Frames.resize(frameCount);
-		for (auto& frame : m_Frames)
+		for (uint32_t frameIndex = 0; frameIndex < frameCount; ++frameIndex)
 		{
+			auto& frame = m_Frames[frameIndex];
 			D3D12_QUERY_HEAP_DESC queryHeapDesc{};
 			queryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
 			queryHeapDesc.Count = MaxTimestampCount;
@@ -181,19 +209,32 @@ namespace gglab
 				&queryHeapDesc,
 				IID_PPV_ARGS(&frame.m_QueryHeap)), device.Get());
 
-			const auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
-			const auto bufferDesc = CD3DX12_RESOURCE_DESC1::Buffer(
-				static_cast<uint64_t>(MaxTimestampCount) * sizeof(uint64_t));
-			GGLAB_HR_DX(device.Get()->CreateCommittedResource3(
-				&heapProperties,
-				D3D12_HEAP_FLAG_NONE,
-				&bufferDesc,
-				D3D12_BARRIER_LAYOUT_UNDEFINED,
-				nullptr,
-				nullptr,
-				0,
-				nullptr,
-				IID_PPV_ARGS(&frame.m_ReadbackBuffer)), device.Get());
+			const std::string debugName = std::format(
+				"GpuProfiler.TimestampReadback[{}]",
+				frameIndex);
+			RHIBufferDesc readbackDesc{};
+			readbackDesc.m_SizeInBytes =
+				static_cast<uint64_t>(MaxTimestampCount) * sizeof(uint64_t);
+			readbackDesc.m_Usage = RHIBufferUsage::CopyDest;
+			readbackDesc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
+			readbackDesc.m_DebugName = debugName.c_str();
+			const RHIBufferHandle readbackBuffer = device.CreateBuffer(readbackDesc);
+			GGLAB_ASSERT_MSG(readbackBuffer.IsValid(),
+				"DX12GpuProfiler failed to create a timestamp readback buffer.");
+			if (!readbackBuffer.IsValid())
+			{
+				m_Enabled.store(false, std::memory_order_relaxed);
+				continue;
+			}
+			frame.m_ReadbackBuffer = RHIBufferOwner(&device, readbackBuffer);
+			frame.m_MappedTimestamps =
+				static_cast<const uint64_t*>(device.MapBuffer(readbackBuffer));
+			GGLAB_ASSERT_MSG(frame.m_MappedTimestamps != nullptr,
+				"DX12GpuProfiler failed to map a timestamp readback buffer.");
+			if (!frame.m_MappedTimestamps)
+			{
+				m_Enabled.store(false, std::memory_order_relaxed);
+			}
 
 			frame.m_Scopes.reserve(MaxScopeCount);
 			frame.m_ScopeStack.reserve(MaxScopeCount);
@@ -207,16 +248,13 @@ namespace gglab
 			return;
 		}
 
-		void* mappedData = nullptr;
-		const D3D12_RANGE readRange{
-			0,
-			static_cast<SIZE_T>(frame.m_TimestampCount) * sizeof(uint64_t)
-		};
-		GGLAB_HR(frame.m_ReadbackBuffer->Map(
-			0,
-			&readRange,
-			&mappedData));
-		const auto* timestamps = static_cast<const uint64_t*>(mappedData);
+		const uint64_t* timestamps = frame.m_MappedTimestamps;
+		GGLAB_ASSERT_NOT_NULL(timestamps);
+		if (!timestamps)
+		{
+			frame.m_PendingResults = false;
+			return;
+		}
 
 		GpuProfileFrameSnapshot snapshot{};
 		snapshot.m_FrameIndex = frame.m_FrameIndex;
@@ -263,8 +301,6 @@ namespace gglab
 			++sampleIter->m_CallCount;
 		}
 
-		const D3D12_RANGE writtenRange{ 0, 0 };
-		frame.m_ReadbackBuffer->Unmap(0, &writtenRange);
 		frame.m_PendingResults = false;
 
 		std::scoped_lock lock(m_SnapshotMutex);

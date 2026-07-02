@@ -2,6 +2,7 @@
 #include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/Profiling/GpuProfiler.h"
+#include "Graphics/RHI/RHIResource.h"
 
 #include <atomic>
 #include <limits>
@@ -20,7 +21,7 @@ namespace gglab
 			DX12CommandQueue* graphicsQueue,
 			uint32_t frameCount) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12GpuProfiler);
-		~DX12GpuProfiler() override = default;
+		~DX12GpuProfiler() override;
 
 		void SetEnabled(bool enabled) noexcept override;
 		[[nodiscard]] bool IsEnabled() const noexcept override;
@@ -47,7 +48,8 @@ namespace gglab
 		struct FrameResource
 		{
 			ComPtr<ID3D12QueryHeap> m_QueryHeap;
-			ComPtr<ID3D12Resource> m_ReadbackBuffer;
+			RHIBufferOwner m_ReadbackBuffer;
+			const uint64_t* m_MappedTimestamps = nullptr;
 			uint64_t m_FrameIndex = 0;
 			uint32_t m_TimestampCount = 0;
 			uint32_t m_FrameBeginQuery = InvalidQueryIndex;
@@ -63,6 +65,7 @@ namespace gglab
 		uint32_t WriteTimestamp(FrameResource& frame, DX12CommandList& commandList) noexcept;
 
 	private:
+		DX12Device* m_Device = nullptr;
 		mutable std::mutex m_SnapshotMutex;
 		std::atomic_bool m_Enabled = true;
 		std::vector<FrameResource> m_Frames;

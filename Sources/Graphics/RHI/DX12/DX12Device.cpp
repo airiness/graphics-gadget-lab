@@ -486,14 +486,15 @@ namespace gglab
 				D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                       // This warning occurs when mapping a buffer with NULL range (which is valid).
 				D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                     // This warning occurs when unmapping a buffer with NULL range (which is valid).
 				D3D12_MESSAGE_ID_EXECUTECOMMANDLISTS_WRONGSWAPCHAINBUFFERREFERENCE, // This warning occurs when a command list that was recorded with one swapchain is executed with another swapchain (which is valid).
+				D3D12_MESSAGE_ID_CREATERESOURCE_STATE_IGNORED,                 // Enhanced Barriers create buffers in COMMON regardless of the legacy initial state.
 			};
 			D3D12_INFO_QUEUE_FILTER filter = {};
 			//filter.DenyList.NumCategories = _countof(categories);
 			//filter.DenyList.pCategoryList = categories;
 			filter.DenyList.NumSeverities = _countof(severities);
 			filter.DenyList.pSeverityList = severities;
-			//filter.DenyList.NumIDs = _countof(denyIds);
-			//filter.DenyList.pIDList = denyIds;
+			filter.DenyList.NumIDs = _countof(denyIds);
+			filter.DenyList.pIDList = denyIds;
 			GGLAB_HR(infoQueue->PushStorageFilter(&filter));
 		}
 #endif

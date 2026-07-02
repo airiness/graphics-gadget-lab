@@ -15,6 +15,7 @@ namespace gglab
 			D3D12MA::ALLOCATION_DESC m_AllocDesc = {};
 			CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
 			D3D12_RESOURCE_STATES m_InitStates = D3D12_RESOURCE_STATE_COMMON;
+			std::optional<D3D12_BARRIER_LAYOUT> m_EnhancedInitialLayout = std::nullopt;
 			std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
 		};
 
