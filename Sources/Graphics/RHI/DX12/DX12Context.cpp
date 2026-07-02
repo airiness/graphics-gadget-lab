@@ -12,7 +12,7 @@
 #include "Graphics/RHI/DX12/DX12GpuProfiler.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/TransferManager.h"
 
 namespace gglab

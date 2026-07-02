@@ -1,19 +1,11 @@
 #include "Core/Precompiled.h"
-#include "Core/HResult.h"
+#include "Graphics/RHI/DX12/DX12HResult.h"
 #include "Core/Utility/StringUtils.h"
 
 namespace gglab
 {
 	namespace
 	{
-		std::string HexHr(HRESULT hr)
-		{
-			std::ostringstream os;
-			os << "0x" << std::uppercase << std::hex
-				<< std::setw(8) << std::setfill('0') << static_cast<unsigned>(hr);
-			return os.str();
-		}
-
 		std::string NowTimeLocal()
 		{
 			using namespace std::chrono;
@@ -37,36 +29,47 @@ namespace gglab
 			std::fflush(stderr);
 		}
 
-	}
-
-	std::string FormatHResult(HRESULT hr)
-	{
-		_com_error e(hr);
-		std::string msg = utils::ToString(e.ErrorMessage());
-		if (msg.empty())
+		void AppendAdapterInfo(std::ostringstream& os, ID3D12Device* device)
 		{
-			return HexHr(hr);
+			if (!device)
+			{
+				return;
+			}
+
+			IDXGIDevice* dxgiDevice = nullptr;
+			if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dxgiDevice))) || !dxgiDevice)
+			{
+				return;
+			}
+
+			IDXGIAdapter* adapter = nullptr;
+			if (SUCCEEDED(dxgiDevice->GetAdapter(&adapter)) && adapter)
+			{
+				DXGI_ADAPTER_DESC desc{};
+				if (SUCCEEDED(adapter->GetDesc(&desc)))
+				{
+					os << "Adapter: VendorId=" << desc.VendorId
+						<< " DeviceId=" << desc.DeviceId
+						<< " SubSysId=" << desc.SubSysId
+						<< " Revision=" << desc.Revision
+						<< " | Luid=(" << desc.AdapterLuid.HighPart << "," << desc.AdapterLuid.LowPart << ")\n"
+						<< "         Desc=\"" << utils::ToString(desc.Description) << "\"\n";
+				}
+				adapter->Release();
+			}
+			dxgiDevice->Release();
 		}
-		std::ostringstream os;
-		os << HexHr(hr) << " (" << msg << ")";
-		return os.str();
 	}
 
-	bool IsDeviceRemovedHResult(HRESULT hr) noexcept
-	{
-		return hr == DXGI_ERROR_DEVICE_REMOVED
-			|| hr == DXGI_ERROR_DEVICE_HUNG
-			|| hr == DXGI_ERROR_DEVICE_RESET;
-	}
-
-	void ReportAndAbort(
+	void ReportAndAbortDX12(
 		HRESULT hr,
+		ID3D12Device* device,
 		std::string_view context,
 		std::source_location loc) noexcept
 	{
 		std::ostringstream os;
 
-		os << "=== FATAL: HRESULT Failure ===\n";
+		os << "=== FATAL: DirectX 12 Failure ===\n";
 		os << "Time   : " << NowTimeLocal() << "\n";
 		os << "Thread : " << ::GetCurrentThreadId() << "\n";
 		os << "Where  : " << loc.file_name() << ":" << loc.line()
@@ -77,6 +80,13 @@ namespace gglab
 		}
 
 		os << "Result : " << FormatHResult(hr) << "\n";
+
+		if (device && IsDeviceRemovedHResult(hr))
+		{
+			const HRESULT deviceRemovedReason = device->GetDeviceRemovedReason();
+			os << "DXGI   : DeviceRemovedReason = " << FormatHResult(deviceRemovedReason) << "\n";
+			AppendAdapterInfo(os, device);
+		}
 
 		os << "Action : Abort immediately.\n"
 			"==============================";

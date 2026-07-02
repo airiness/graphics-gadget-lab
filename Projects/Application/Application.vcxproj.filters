@@ -135,6 +135,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12HResult.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -184,9 +187,6 @@
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp">
@@ -335,6 +335,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
       <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp">
+      <Filter>Graphics\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
       <Filter>Graphics</Filter>
@@ -515,6 +518,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12HResult.h">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -572,6 +578,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h">
       <Filter>Graphics\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.h">
+      <Filter>Graphics\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Precompiled.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -591,9 +600,6 @@
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12FormatUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h">

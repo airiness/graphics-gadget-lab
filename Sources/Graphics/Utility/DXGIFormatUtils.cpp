@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RHI/DX12/Utility/DX12FormatUtils.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <array>
 
