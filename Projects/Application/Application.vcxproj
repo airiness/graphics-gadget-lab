@@ -283,7 +283,6 @@
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Core\Application.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h" />
-    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDX12.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
@@ -403,7 +402,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.h" />
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
-    <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h" />
+    <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />

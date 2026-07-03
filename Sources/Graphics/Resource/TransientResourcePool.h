@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Hash/FNV1a.h"
+#include "Core/Hash/KeyHash.h"
 #include "Core/TypedIndex.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"

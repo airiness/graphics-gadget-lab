@@ -563,9 +563,6 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h">
       <Filter>DevTools\EnumText</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDX12.h">
-      <Filter>DevTools\EnumText</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h">
       <Filter>DevTools\EnumText</Filter>
     </ClInclude>
@@ -785,7 +782,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePool.h">
       <Filter>Graphics\Resource</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Hash\FNV1a.h">
+    <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h">
       <Filter>Core\Hash</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h">

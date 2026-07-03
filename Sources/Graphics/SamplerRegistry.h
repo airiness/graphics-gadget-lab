@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHISampler.h"
-#include "Core/Hash/FNV1a.h"
+#include "Core/Hash/KeyHash.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace gglab
