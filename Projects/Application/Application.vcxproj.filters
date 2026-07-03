@@ -103,6 +103,12 @@
     <Filter Include="Scene">
       <UniqueIdentifier>{36644b82-8a6c-4027-a4e5-44a3a8e8d6a6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends">
+      <UniqueIdentifier>{fe2c8c44-3ab8-49da-a598-3786abfcf60f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends\DX12">
+      <UniqueIdentifier>{e4f4cccb-464f-4ec8-a66d-7b8bc9a03daf}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\RenderPipeline">
       <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
     </Filter>
@@ -399,8 +405,8 @@
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
       <Filter>Externals\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.cpp">
-      <Filter>DevTools\DevelopGui</Filter>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12Backend.cpp">
+      <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
@@ -442,6 +448,9 @@
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp">
@@ -919,6 +928,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h">
       <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12Backend.h">
+      <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>

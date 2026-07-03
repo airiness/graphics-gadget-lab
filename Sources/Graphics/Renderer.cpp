@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
+#include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -87,11 +87,11 @@ namespace gglab
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
-		m_DevelopGuiBackend = std::make_unique<DevelopGuiBackend>();
 		DevelopGuiBackend::CreateInfo developGuiBackendCreateInfo{};
-		developGuiBackendCreateInfo.m_Hwnd = createInfo.m_Hwnd;
+		developGuiBackendCreateInfo.m_NativeWindowHandle = createInfo.m_Hwnd;
 		developGuiBackendCreateInfo.m_RHIContext = m_RHIContext.get();
-		m_DevelopGuiBackend->Initialize(developGuiBackendCreateInfo);
+		m_DevelopGuiBackend = CreateDevelopGuiBackend(developGuiBackendCreateInfo);
+		GGLAB_ASSERT_MSG(m_DevelopGuiBackend != nullptr, "Renderer failed to create a DevelopGui backend.");
 
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
