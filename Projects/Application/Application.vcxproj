@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -142,7 +142,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Application.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
@@ -165,7 +165,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
@@ -223,7 +223,7 @@
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Demo\DemoPlayground.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
@@ -249,7 +249,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Main.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Main.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Mouse.cpp" />
     <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -281,7 +281,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
-    <ClInclude Include="..\..\Sources\Core\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\Application.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h" />
@@ -325,8 +325,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.h" />
     <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
-    <ClInclude Include="..\..\Sources\Core\Demo\DemoBase.h" />
-    <ClInclude Include="..\..\Sources\Core\Demo\DemoManager.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoBase.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanel.h" />
@@ -407,7 +407,7 @@
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
-    <ClInclude Include="..\..\Sources\Core\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />

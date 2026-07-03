@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Application.h"
+#include "Application/Application.h"
 
 int main(int argc, char* argv[])
 {

@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Demo/DemoManager.h"
+#include "Application/Demo/DemoManager.h"
 
 namespace gglab
 {

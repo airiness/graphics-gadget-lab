@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -94,7 +94,10 @@
     <Filter Include="Core\Platform\Win">
       <UniqueIdentifier>{76a2277b-ae88-40f8-bd21-c49f804feae6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Demo">
+    <Filter Include="Application">
+      <UniqueIdentifier>{b85c2716-206f-4557-9d78-ea8ea3ab77c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Demo">
       <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\RenderPipeline">
@@ -162,11 +165,11 @@
     <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Main.cpp">
-      <Filter>Core</Filter>
+    <ClCompile Include="..\..\Sources\Application\Main.cpp">
+      <Filter>Application</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Application.cpp">
-      <Filter>Core</Filter>
+    <ClCompile Include="..\..\Sources\Application\Application.cpp">
+      <Filter>Application</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
@@ -357,11 +360,11 @@
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Demo\DemoManager.cpp">
-      <Filter>Core\Demo</Filter>
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp">
+      <Filter>Application\Demo</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Demo\DemoPlayground.cpp">
-      <Filter>Core\Demo</Filter>
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
+      <Filter>Application\Demo</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
@@ -557,8 +560,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Application.h">
-      <Filter>Core</Filter>
+    <ClInclude Include="..\..\Sources\Application\Application.h">
+      <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h">
       <Filter>DevTools\EnumText</Filter>
@@ -875,14 +878,14 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderScene.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Demo\DemoManager.h">
-      <Filter>Core\Demo</Filter>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoManager.h">
+      <Filter>Application\Demo</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Demo\DemoBase.h">
-      <Filter>Core\Demo</Filter>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoBase.h">
+      <Filter>Application\Demo</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Demo\DemoPlayground.h">
-      <Filter>Core\Demo</Filter>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h">
+      <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h">
       <Filter>Graphics\RenderPipeline</Filter>

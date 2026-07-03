@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Demo/DemoBase.h"
+#include "Application/Demo/DemoBase.h"
 
 namespace gglab
 {
