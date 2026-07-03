@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
-#include "Core/Components.h"
+#include "Scene/Components.h"
 #include "Core/Utility/MathUtils.h"
 #include "Core/Utility/StringUtils.h"
 #include "Core/World.h"

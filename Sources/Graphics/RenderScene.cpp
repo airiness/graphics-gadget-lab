@@ -4,7 +4,7 @@
 #include "Graphics/AssetManager.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Core/World.h"
-#include "Core/Components.h"
+#include "Scene/Components.h"
 #include "Core/Utility/MathUtils.h"
 #include "Graphics/RenderView.h"
 
