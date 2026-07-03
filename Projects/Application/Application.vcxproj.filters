@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -99,6 +99,9 @@
     </Filter>
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{36644b82-8a6c-4027-a4e5-44a3a8e8d6a6}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\RenderPipeline">
       <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
@@ -650,8 +653,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Components.h">
-      <Filter>Core</Filter>
+    <ClInclude Include="..\..\Sources\Scene\Components.h">
+      <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
       <Filter>Graphics</Filter>

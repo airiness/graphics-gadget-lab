@@ -8,7 +8,7 @@
 #include "Core/Input/Mouse.h"
 #include "Core/Input/Keyboard.h"
 #include "Graphics/AssetManager.h"
-#include "Core/Components.h"
+#include "Scene/Components.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab

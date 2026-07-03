@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderWorldExtractor.h"
-#include "Core/Components.h"
+#include "Scene/Components.h"
 #include "Core/World.h"
 #include "Graphics/GraphicsTypes.h"
 

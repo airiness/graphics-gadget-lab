@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Components.h"
+#include "Scene/Components.h"
 #include "Core/World.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/DevelopGui/DevelopGuiBackend.h"

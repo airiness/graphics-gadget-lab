@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -321,7 +321,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
     <ClInclude Include="..\..\Sources\Graphics\CameraController.h" />
-    <ClInclude Include="..\..\Sources\Core\Components.h" />
+    <ClInclude Include="..\..\Sources\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.h" />
     <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
