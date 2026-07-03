@@ -5,7 +5,7 @@
 #include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Core/Hash/FNV1a.h"
+#include "Core/Hash/KeyHash.h"
 
 #include <span>
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Hash/FNV1a.h"
+#include "Core/Hash/KeyHash.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Shader/ShaderTypes.h"
 

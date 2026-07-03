@@ -4,7 +4,7 @@
 #include "Core/StringId.h"
 #include "Core/Utility/StringUtils.h"
 #include "Core/Utility/PathUtils.h"
-#include "Core/Hash/FNV1a.h"
+#include "Core/Hash/KeyHash.h"
 
 namespace gglab
 {
