@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
+#include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12Backend.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
@@ -15,12 +15,12 @@
 
 namespace gglab
 {
-	void DevelopGuiBackend::Initialize(const CreateInfo& createInfo) noexcept
+	void DevelopGuiDX12Backend::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		GGLAB_ASSERT(createInfo.m_RHIContext);
 		auto* dx12Context = dynamic_cast<DX12Context*>(createInfo.m_RHIContext);
 		GGLAB_ASSERT_MSG(dx12Context != nullptr,
-			"DevelopGuiBackend currently requires the DX12 RHI backend.");
+			"DevelopGuiDX12Backend requires the DX12 RHI backend.");
 
 		m_DX12Device = &dx12Context->GetDX12Device();
 		m_DescriptorManager = &dx12Context->GetDescriptorManager();
@@ -35,7 +35,7 @@ namespace gglab
 
 		ImGui::StyleColorsDark();
 
-		ImGui_ImplWin32_Init(createInfo.m_Hwnd);
+		ImGui_ImplWin32_Init(static_cast<HWND>(createInfo.m_NativeWindowHandle));
 
 		ImGui_ImplDX12_InitInfo initInfo{};
 		initInfo.Device = m_DX12Device->Get();
@@ -52,7 +52,7 @@ namespace gglab
 		ImGui_ImplDX12_Init(&initInfo);
 	}
 
-	void DevelopGuiBackend::Finalize() noexcept
+	void DevelopGuiDX12Backend::Finalize() noexcept
 	{
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
@@ -60,21 +60,21 @@ namespace gglab
 		ImGui::DestroyContext();
 	}
 
-	void DevelopGuiBackend::NewFrame() noexcept
+	void DevelopGuiDX12Backend::NewFrame() noexcept
 	{
 		GGLAB_ASSERT_MSG(!m_FrameOpen,
-			"DevelopGuiBackend::NewFrame called twice without ending previous frame.");
+			"DevelopGuiDX12Backend::NewFrame called twice without ending previous frame.");
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 		m_FrameOpen = true;
 	}
 
-	void DevelopGuiBackend::RenderDrawData(
+	void DevelopGuiDX12Backend::RenderDrawData(
 		RHIGraphicsCommandContext* commandContext,
 		RHITextureViewHandle renderTarget) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_FrameOpen, "DevelopGuiBackend::RenderDrawData called without NewFrame.");
+		GGLAB_ASSERT_MSG(m_FrameOpen, "DevelopGuiDX12Backend::RenderDrawData called without NewFrame.");
 		auto* dx12Context = dynamic_cast<DX12GraphicsCommandContext*>(commandContext);
 		GGLAB_ASSERT_NOT_NULL(dx12Context);
 		if (!dx12Context)
@@ -93,7 +93,7 @@ namespace gglab
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx12Context->Get());
 	}
 
-	void DevelopGuiBackend::EndFrame() noexcept
+	void DevelopGuiDX12Backend::EndFrame() noexcept
 	{
 		if (!m_FrameOpen)
 		{
@@ -104,7 +104,7 @@ namespace gglab
 		m_FrameOpen = false;
 	}
 
-	ImTextureID DevelopGuiBackend::ResolveTextureId(
+	ImTextureID DevelopGuiDX12Backend::ResolveTextureId(
 		RHIDescriptorHandle descriptor) const noexcept
 	{
 		if (!m_DescriptorManager ||
@@ -119,21 +119,22 @@ namespace gglab
 		return heap ? static_cast<ImTextureID>(heap->GpuHandleAt(descriptor.m_Index).ptr) : ImTextureID{};
 	}
 
-	void DevelopGuiBackend::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
+	void DevelopGuiDX12Backend::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
 		D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
-		auto* backend = static_cast<DevelopGuiBackend*>(info->UserData);
+		auto* backend = static_cast<DevelopGuiDX12Backend*>(info->UserData);
 		auto descriptorView = backend->m_DescriptorManager->AllocateDevelopGuiSrvView();
 		*outCpuHandle = descriptorView.m_CpuHandle;
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
 
-	void DevelopGuiBackend::DescriptorFree(ImGui_ImplDX12_InitInfo* info,
+	void DevelopGuiDX12Backend::DescriptorFree(ImGui_ImplDX12_InitInfo* info,
 		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
 	{
-		auto* backend = static_cast<DevelopGuiBackend*>(info->UserData);
+		GGLAB_UNUSED(cpuHandle);
+		auto* backend = static_cast<DevelopGuiDX12Backend*>(info->UserData);
 		backend->m_DescriptorManager->DeferFreeDevelopGuiSrvInFrame(gpuHandle);
 	}
 }
