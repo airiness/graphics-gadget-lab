@@ -28,6 +28,13 @@ namespace gglab
 	{
 		m_Context = context;
 		++m_FrameIndex;
+		for (auto& runtime : m_Providers)
+		{
+			if (runtime.m_Profile.m_RefreshPending)
+			{
+				Capture(runtime);
+			}
+		}
 	}
 
 	void DiagnosticsRuntime::Reset() noexcept
