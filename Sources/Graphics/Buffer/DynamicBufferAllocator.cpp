@@ -31,7 +31,11 @@ namespace gglab
 
 		if (m_Buffer)
 		{
-			m_MappedData = static_cast<std::byte*>(m_Device->MapBuffer(m_Buffer.Get()));
+			const RHIMappedBufferRange readRange =
+				m_MemoryUsage == RHIMemoryUsage::GpuToCpu ?
+				RHIMappedBufferRange{ 0, m_CapacityInBytes } : RHIMappedBufferRange{};
+			m_MappedData = static_cast<std::byte*>(
+				m_Device->MapBuffer(m_Buffer.Get(), readRange));
 		}
 		GGLAB_ASSERT_MSG(m_MappedData != nullptr, "DynamicBufferAllocator failed to map its RHI buffer.");
 	}
@@ -43,7 +47,10 @@ namespace gglab
 			"DynamicBufferAllocator destroyed with GPU allocations still pending retirement.");
 		if (m_MappedData && m_Buffer)
 		{
-			m_Device->UnmapBuffer(m_Buffer.Get());
+			const RHIMappedBufferRange writtenRange =
+				m_MemoryUsage == RHIMemoryUsage::CpuToGpu ?
+				RHIMappedBufferRange{ 0, m_CapacityInBytes } : RHIMappedBufferRange{};
+			m_Device->UnmapBuffer(m_Buffer.Get(), writtenRange);
 			m_MappedData = nullptr;
 		}
 	}

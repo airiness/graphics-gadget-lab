@@ -37,7 +37,7 @@ namespace gglab
 		{
 			if (frame.m_ReadbackBuffer && frame.m_MappedTimestamps)
 			{
-				m_Device->UnmapBuffer(frame.m_ReadbackBuffer.Get());
+				m_Device->UnmapBuffer(frame.m_ReadbackBuffer.Get(), {});
 				frame.m_MappedTimestamps = nullptr;
 			}
 		}
@@ -227,8 +227,9 @@ namespace gglab
 				continue;
 			}
 			frame.m_ReadbackBuffer = RHIBufferOwner(&device, readbackBuffer);
-			frame.m_MappedTimestamps =
-				static_cast<const uint64_t*>(device.MapBuffer(readbackBuffer));
+			frame.m_MappedTimestamps = static_cast<const uint64_t*>(device.MapBuffer(
+				readbackBuffer,
+				{ 0, readbackDesc.m_SizeInBytes }));
 			GGLAB_ASSERT_MSG(frame.m_MappedTimestamps != nullptr,
 				"DX12GpuProfiler failed to map a timestamp readback buffer.");
 			if (!frame.m_MappedTimestamps)
