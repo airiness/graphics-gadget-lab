@@ -362,7 +362,7 @@ namespace gglab
 		}
 
 		// Draw menus before Renderer::Render()
-		if (m_DevToolsRuntime)
+		if (developGuiBackend && m_DevToolsRuntime)
 		{
 			GGLAB_CPU_PROFILE_SCOPE("DevelopGUI");
 			DevelopGuiContext guiContext{};
