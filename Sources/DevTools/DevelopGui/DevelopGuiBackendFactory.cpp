@@ -9,6 +9,11 @@ namespace gglab
 		const DevelopGuiBackend::CreateInfo& createInfo) noexcept
 	{
 		GGLAB_ASSERT(createInfo.m_RHIContext);
+		if (!createInfo.m_RHIContext)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Cannot create a DevelopGui backend without an RHI context.");
+			return nullptr;
+		}
 
 		if (dynamic_cast<DX12Context*>(createInfo.m_RHIContext))
 		{
@@ -17,7 +22,7 @@ namespace gglab
 			return backend;
 		}
 
-		GGLAB_ASSERT_MSG(false, "No DevelopGui backend is registered for the current RHI backend.");
+		GGLAB_LOG_GRAPHICS_WARN("No DevelopGui backend is registered for the current RHI backend.");
 		return nullptr;
 	}
 }

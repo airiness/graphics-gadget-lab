@@ -91,7 +91,10 @@ namespace gglab
 		developGuiBackendCreateInfo.m_NativeWindowHandle = createInfo.m_Hwnd;
 		developGuiBackendCreateInfo.m_RHIContext = m_RHIContext.get();
 		m_DevelopGuiBackend = CreateDevelopGuiBackend(developGuiBackendCreateInfo);
-		GGLAB_ASSERT_MSG(m_DevelopGuiBackend != nullptr, "Renderer failed to create a DevelopGui backend.");
+		if (!m_DevelopGuiBackend)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("Renderer will continue without a DevelopGui backend.");
+		}
 
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
@@ -113,8 +116,11 @@ namespace gglab
 
 		m_RHIContext->WaitIdle();
 
-		m_DevelopGuiBackend->Finalize();
-		m_DevelopGuiBackend.reset();
+		if (m_DevelopGuiBackend)
+		{
+			m_DevelopGuiBackend->Finalize();
+			m_DevelopGuiBackend.reset();
+		}
 
 		m_RenderResRegistry.reset();
 		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);

@@ -27,6 +27,10 @@ namespace gglab
 		const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
+		if (!services.m_Renderer || !services.m_Renderer->GetDevelopGuiBackend())
+		{
+			return;
+		}
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
 			[](RenderGraph::RGBuilder& builder, PassData& data)
