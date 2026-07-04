@@ -19,7 +19,7 @@ namespace gglab
 		RHIFormat m_BackBufferFormat = RHIFormat::R8G8B8A8Unorm;
 		uint32_t m_BufferCount = 2;
 		bool m_AllowTearing = true;
-		bool m_Vsync = true;
+		bool m_Vsync = false;
 	};
 
 	class RHIFrameContext
