@@ -68,8 +68,10 @@ namespace gglab
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
-		void* MapBuffer(RHIBufferHandle buffer) noexcept override;
-		void UnmapBuffer(RHIBufferHandle buffer) noexcept override;
+		void* MapBuffer(RHIBufferHandle buffer,
+			RHIMappedBufferRange readRange) noexcept override;
+		void UnmapBuffer(RHIBufferHandle buffer,
+			RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;

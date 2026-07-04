@@ -29,8 +29,10 @@ namespace gglab
 		virtual void DestroyTextureView(RHITextureViewHandle view) noexcept = 0;
 		virtual void DestroyBufferView(RHIBufferViewHandle view) noexcept = 0;
 		virtual void DestroySampler(RHISamplerHandle sampler) noexcept = 0;
-		virtual void* MapBuffer(RHIBufferHandle buffer) noexcept = 0;
-		virtual void UnmapBuffer(RHIBufferHandle buffer) noexcept = 0;
+		virtual void* MapBuffer(RHIBufferHandle buffer,
+			RHIMappedBufferRange readRange) noexcept = 0;
+		virtual void UnmapBuffer(RHIBufferHandle buffer,
+			RHIMappedBufferRange writtenRange) noexcept = 0;
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;

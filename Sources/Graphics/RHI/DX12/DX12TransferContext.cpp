@@ -253,7 +253,7 @@ namespace gglab
 			return false;
 		}
 
-		void* mappedData = m_Device->MapBuffer(uploadBuffer.Get());
+		void* mappedData = m_Device->MapBuffer(uploadBuffer.Get(), {});
 		if (!mappedData)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("DX12TransferContext::UploadBuffer failed to map the intermediate upload buffer.");
@@ -261,7 +261,7 @@ namespace gglab
 		}
 
 		std::memcpy(mappedData, data, static_cast<size_t>(sizeInBytes));
-		m_Device->UnmapBuffer(uploadBuffer.Get());
+		m_Device->UnmapBuffer(uploadBuffer.Get(), { 0, sizeInBytes });
 
 		DX12Buffer* nativeUploadBuffer = m_Device->ResolveBuffer(uploadBuffer.Get());
 		GGLAB_ASSERT_NOT_NULL(nativeUploadBuffer);

@@ -57,7 +57,7 @@ namespace gglab
 		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 		createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 		createInfo.m_ResourceDesc = ToD3D12ResourceDesc(desc);
-		createInfo.m_InitStates = D3D12_RESOURCE_STATE_COMMON;
+		createInfo.m_EnhancedInitialLayout = D3D12_BARRIER_LAYOUT_COMMON;
 		createInfo.m_ClearValue = ToD3D12ClearValue(desc.m_ClearValue);
 		texture->Create(createInfo);
 		if (!texture->IsValid())
@@ -96,25 +96,22 @@ namespace gglab
 		createInfo.m_Allocator = m_Device->GetMemAllocator();
 		createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 		createInfo.m_ResourceDesc = ToD3D12ResourceDesc(desc);
+		// This backend records enhanced barriers. Buffers do not have a texture
+		// layout and must be created with D3D12_BARRIER_LAYOUT_UNDEFINED instead
+		// of a legacy initial resource state.
+		createInfo.m_EnhancedInitialLayout = D3D12_BARRIER_LAYOUT_UNDEFINED;
 		switch (desc.m_MemoryUsage)
 		{
 		case RHIMemoryUsage::GpuOnly:
 			createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-			createInfo.m_InitStates = D3D12_RESOURCE_STATE_COMMON;
 			break;
 		case RHIMemoryUsage::CpuToGpu:
 			createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
 			createInfo.m_ResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-			createInfo.m_InitStates = D3D12_RESOURCE_STATE_GENERIC_READ;
 			break;
 		case RHIMemoryUsage::GpuToCpu:
 			createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_READBACK;
 			createInfo.m_ResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-			// This backend records Enhanced Barriers. Buffers are created in COMMON;
-			// use D3D12MA's layout-based creation path instead of passing the legacy
-			// COPY_DEST state, which raises CREATERESOURCE_STATE_IGNORED (#1328).
-			createInfo.m_InitStates = D3D12_RESOURCE_STATE_COMMON;
-			createInfo.m_EnhancedInitialLayout = D3D12_BARRIER_LAYOUT_UNDEFINED;
 			break;
 		}
 		buffer->Create(createInfo);

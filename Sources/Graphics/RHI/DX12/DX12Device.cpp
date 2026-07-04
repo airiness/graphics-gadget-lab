@@ -165,7 +165,8 @@ namespace gglab
 		m_DescriptorCache->DestroySampler(sampler);
 	}
 
-	void* DX12Device::MapBuffer(RHIBufferHandle buffer) noexcept
+	void* DX12Device::MapBuffer(RHIBufferHandle buffer,
+		RHIMappedBufferRange readRange) noexcept
 	{
 		auto* nativeBuffer = ResolveBuffer(buffer);
 		if (!nativeBuffer)
@@ -173,14 +174,27 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN("DX12Device::MapBuffer received a non-live buffer handle.");
 			return nullptr;
 		}
-		return nativeBuffer->Map();
+		GGLAB_ASSERT(readRange.m_Begin <= readRange.m_End);
+		GGLAB_ASSERT(readRange.m_End <= nativeBuffer->SizeInBytes());
+		const D3D12_RANGE dx12ReadRange{
+			static_cast<SIZE_T>(readRange.m_Begin),
+			static_cast<SIZE_T>(readRange.m_End),
+		};
+		return nativeBuffer->Map(0, &dx12ReadRange);
 	}
 
-	void DX12Device::UnmapBuffer(RHIBufferHandle buffer) noexcept
+	void DX12Device::UnmapBuffer(RHIBufferHandle buffer,
+		RHIMappedBufferRange writtenRange) noexcept
 	{
 		if (auto* nativeBuffer = ResolveBuffer(buffer))
 		{
-			nativeBuffer->Unmap();
+			GGLAB_ASSERT(writtenRange.m_Begin <= writtenRange.m_End);
+			GGLAB_ASSERT(writtenRange.m_End <= nativeBuffer->SizeInBytes());
+			const D3D12_RANGE dx12WrittenRange{
+				static_cast<SIZE_T>(writtenRange.m_Begin),
+				static_cast<SIZE_T>(writtenRange.m_End),
+			};
+			nativeBuffer->Unmap(0, &dx12WrittenRange);
 		}
 	}
 
@@ -479,14 +493,12 @@ namespace gglab
 			{
 				D3D12_MESSAGE_SEVERITY_INFO
 			};
-			// Suppress individual messages by their ID
+			// ImGui's vendored DX12 backend creates its internal upload buffers through
+			// legacy CreateCommittedResource. On an enhanced-barrier device the initial
+			// state is intentionally ignored. Project-owned resources use CreateResource3.
 			D3D12_MESSAGE_ID denyIds[] =
 			{
-				D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE, // I'm really not sure why this is an error.  I often clear with different color than the resource was created with.
-				D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,                       // This warning occurs when mapping a buffer with NULL range (which is valid).
-				D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE,                     // This warning occurs when unmapping a buffer with NULL range (which is valid).
-				D3D12_MESSAGE_ID_EXECUTECOMMANDLISTS_WRONGSWAPCHAINBUFFERREFERENCE, // This warning occurs when a command list that was recorded with one swapchain is executed with another swapchain (which is valid).
-				D3D12_MESSAGE_ID_CREATERESOURCE_STATE_IGNORED,                 // Enhanced Barriers create buffers in COMMON regardless of the legacy initial state.
+				D3D12_MESSAGE_ID_CREATERESOURCE_STATE_IGNORED,
 			};
 			D3D12_INFO_QUEUE_FILTER filter = {};
 			//filter.DenyList.NumCategories = _countof(categories);

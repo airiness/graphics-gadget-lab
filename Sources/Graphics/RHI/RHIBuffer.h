@@ -29,6 +29,12 @@ namespace gglab
 		const char* m_DebugName = nullptr;
 	};
 
+	struct RHIMappedBufferRange
+	{
+		uint64_t m_Begin = 0;
+		uint64_t m_End = 0;
+	};
+
 	struct RHIImportedBufferDesc
 	{
 		RHIBufferDesc m_Desc;
