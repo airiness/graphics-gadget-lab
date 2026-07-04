@@ -1,23 +1,21 @@
 #include "Core/Precompiled.h"
 #include "Application/Application.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/AssetManager.h"
-#include "Core/Input/InputManager.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "Application/Platform/PlatformHost.h"
+#include "Application/Platform/PlatformWindow.h"
 #include "Application/Demo/DemoManager.h"
-#include "Graphics/RenderFrameBuilder.h"
+#include "Application/Demo/DemoPlayground.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
+#include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
+#include "Graphics/Renderer.h"
+#include "Graphics/AssetManager.h"
+#include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
-#include "Application/Demo/DemoPlayground.h"
-#include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
-#include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
-
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
+#include "DevTools/DevelopGui/DevelopGuiSystem.h"
 
 namespace gglab
 {
@@ -43,11 +41,11 @@ namespace gglab
 		return nullptr;
 	}
 
-	void Application::CreateApplicationInstance(const CreateInfo& createInfo) noexcept
+	void Application::CreateApplicationInstance(CreateInfo createInfo) noexcept
 	{
 		if (s_Application == nullptr)
 		{
-			s_Application = std::make_unique<Application>(createInfo);
+			s_Application = std::make_unique<Application>(std::move(createInfo));
 			s_Application->Initialize();
 		}
 	}
@@ -68,148 +66,37 @@ namespace gglab
 		}
 	}
 
-	Application::Application(const CreateInfo& createInfo) noexcept :
+	Application::Application(CreateInfo createInfo) noexcept :
 		m_WindowName(createInfo.m_WindowName),
 		m_WindowWidth(createInfo.m_WindowWidth),
 		m_WindowHeight(createInfo.m_WindowHeight),
-		m_HInstance(createInfo.m_HInstance)
+		m_PlatformHost(std::move(createInfo.m_PlatformHost))
 	{}
+
+	Application::~Application() = default;
 
 	void Application::Run() noexcept
 	{
-		MSG msg = {};
-		while (msg.message != WM_QUIT)
+		if (!m_IsInitialized || !m_PlatformHost)
 		{
-			if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-			{
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			}
-			else
-			{
-				if (!Tick())
-				{
-					return;
-				}
-			}
-		}
-	}
-
-	LRESULT Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-	{
-		Application* app = reinterpret_cast<Application*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-
-		auto* developGuiBackend = app && app->m_Renderer ?
-			app->m_Renderer->GetDevelopGuiBackend() : nullptr;
-		if (app && app->m_IsInitialized &&
-			developGuiBackend && developGuiBackend->IsActive() &&
-			ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
-		{
-			return 1;
+			return;
 		}
 
-		switch (message)
+		while (!m_PlatformHost->IsQuitRequested())
 		{
-		case WM_CREATE:
-		{
-			LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-			SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
-			return 0;
-		}
-		case WM_DESTROY:
-		{
-			PostQuitMessage(0);
-			return 0;
-		}
-		case WM_PAINT:
-		{
-			PAINTSTRUCT ps{};
-			BeginPaint(hWnd, &ps);
-			EndPaint(hWnd, &ps);
-			return 0;
-		}
-		case WM_ACTIVATEAPP:
-		{
-			if (!app)
+			m_PlatformHost->PumpEvents();
+
+			PlatformEvent event{};
+			while (m_PlatformHost->PollEvent(event))
 			{
-				break;
-			}
-			if (wParam)
-			{
-				app->OnActive();
-			}
-			else
-			{
-				app->OnInactive();
-			}
-			return 0;
-		}
-		case WM_ENTERSIZEMOVE:
-		{
-			if (!app)
-			{
-				break;
+				HandlePlatformEvent(event);
 			}
 
-			app->m_InSizeMove = true;
-			app->OnSuspend();
-			return 0;
-		}
-		case WM_EXITSIZEMOVE:
-		{
-			if (!app)
+			if (m_PlatformHost->IsQuitRequested() || !Tick())
 			{
-				break;
+				return;
 			}
-
-			app->m_InSizeMove = false;
-			app->OnResume();
-
-			RECT rc{};
-			GetClientRect(hWnd, &rc);
-			const auto width = static_cast<uint32_t>(rc.right - rc.left);
-			const auto height = static_cast<uint32_t>(rc.bottom - rc.top);
-			app->OnResize(width, height);
-
-			return 0;
 		}
-		case WM_SIZE:
-		{
-			if (!app)
-			{
-				break;
-			}
-
-			const uint32_t width = LOWORD(lParam);
-			const uint32_t height = HIWORD(lParam);
-
-			if (wParam == SIZE_MINIMIZED)
-			{
-				app->m_IsMinimized = true;
-				app->OnSuspend();
-				return 0;
-			}
-
-			const bool wasMinimized = app->m_IsMinimized;
-			app->m_IsMinimized = false;
-
-			if (wasMinimized)
-			{
-				app->OnResume();
-			}
-
-			if (!app->m_InSizeMove)
-			{
-				app->OnResize(width, height);
-			}
-			return 0;
-		}
-		default:
-		{
-		}
-		break;
-		}
-		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 
 	void Application::Initialize() noexcept
@@ -222,8 +109,26 @@ namespace gglab
 		// Logger
 		Logger::Initialize();
 
-		// Windows
-		InitializeWindow();
+		if (!m_PlatformHost)
+		{
+			GGLAB_LOG_ERROR("Application requires a platform host.");
+			return;
+		}
+
+		const PlatformWindowCreateInfo windowCreateInfo{
+			.m_Title = m_WindowName,
+			.m_Width = m_WindowWidth,
+			.m_Height = m_WindowHeight,
+		};
+		if (!m_PlatformHost->Initialize(windowCreateInfo))
+		{
+			GGLAB_LOG_ERROR("Failed to initialize the platform host.");
+			return;
+		}
+
+		auto& mainWindow = m_PlatformHost->GetMainWindow();
+		m_WindowWidth = mainWindow.GetWidth();
+		m_WindowHeight = mainWindow.GetHeight();
 
 		// Time
 		m_Time = std::make_unique<Time>();
@@ -231,7 +136,7 @@ namespace gglab
 
 		// InputManager
 		m_InputManager = std::make_unique<InputManager>();
-		m_InputManager->Initialize(m_Hwnd);
+		m_InputManager->Initialize(mainWindow.GetNativeHandle());
 
 		// ShaderManager
 		m_ShaderManager = std::make_unique<ShaderManager>();
@@ -240,7 +145,7 @@ namespace gglab
 		m_Renderer = std::make_unique<Renderer>();
 		Renderer::CreateInfo rendererCreateInfo{};
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
-		rendererCreateInfo.m_Hwnd = m_Hwnd;
+		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
 		m_Renderer->Initialize(rendererCreateInfo);
@@ -255,8 +160,16 @@ namespace gglab
 		m_DemoManager = std::make_unique<DemoManager>();
 
 		InitializeAssets();
-		m_DevToolsRuntime = std::make_unique<DevToolsRuntime>();
-		InitializeDevToolsPanels();
+
+		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
+		const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
+			.m_Window = &mainWindow,
+			.m_RHIContext = m_Renderer->GetRHIContext(),
+		};
+		if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
+		{
+			GGLAB_LOG_WARN("Application will continue without DevelopGui.");
+		}
 
 		// InitializeDemos
 		const auto demoIndex = m_DemoManager->CreateDemo<DemoPlayground>();
@@ -274,9 +187,9 @@ namespace gglab
 			return true;
 		}
 
-		if (m_IsMinimized || m_IsSuspended)
+		if (m_IsSuspended)
 		{
-			WaitMessage();
+			m_PlatformHost->WaitForEvents();
 			return true;
 		}
 
@@ -307,8 +220,8 @@ namespace gglab
 		}
 
 		// DevelopGui new frame
-		auto* developGuiBackend = m_Renderer->GetDevelopGuiBackend();
-		const bool developGuiFrameOpen = developGuiBackend && developGuiBackend->NewFrame();
+		const bool developGuiFrameOpen =
+			m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
@@ -322,12 +235,14 @@ namespace gglab
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
 
+		auto& shadowVisualizationSettings =
+			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_Camera = camera,
 			.m_Renderer = *m_Renderer,
 			.m_AssetManager = *m_AssetManager,
-			.m_ShadowVisualizationSettings = m_DevToolsRuntime->GetRenderVisualizationSettings().m_Shadow,
+			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 			.m_BackBufferIndex = backBufferIndex,
@@ -342,7 +257,8 @@ namespace gglab
 		const RenderServices services{
 			.m_Renderer = m_Renderer.get(),
 			.m_AssetManager = m_AssetManager.get(),
-			.m_ShaderManager = m_ShaderManager.get()
+			.m_ShaderManager = m_ShaderManager.get(),
+			.m_DevelopGuiSystem = m_DevelopGuiSystem.get(),
 		};
 
 		// Build RenderGraph
@@ -359,15 +275,15 @@ namespace gglab
 		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
 		if (!renderGraphCompiled)
 		{
-			if (developGuiBackend && developGuiBackend->IsFrameOpen())
+			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
 			{
-				developGuiBackend->EndFrame();
+				m_DevelopGuiSystem->EndFrame();
 			}
 			return false;
 		}
 
 		// Draw menus before Renderer::Render()
-		if (developGuiFrameOpen && developGuiBackend->IsFrameOpen() && m_DevToolsRuntime)
+		if (developGuiFrameOpen && m_DevelopGuiSystem->IsFrameOpen())
 		{
 			GGLAB_CPU_PROFILE_SCOPE("DevelopGUI");
 			DevelopGuiContext guiContext{};
@@ -381,7 +297,7 @@ namespace gglab
 			guiContext.m_RenderGraph = &rg;
 			guiContext.m_DirectionalShadowSettings = frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
 
-			m_DevToolsRuntime->Draw(guiContext);
+			m_DevelopGuiSystem->Draw(guiContext);
 		}
 
 		// Render
@@ -395,9 +311,9 @@ namespace gglab
 		}
 
 		// Pipelines without a DevelopGui render pass must still close the ImGui frame.
-		if (developGuiBackend && developGuiBackend->IsFrameOpen())
+		if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
 		{
-			developGuiBackend->EndFrame();
+			m_DevelopGuiSystem->EndFrame();
 		}
 
 		return true;
@@ -415,10 +331,10 @@ namespace gglab
 
 		m_DemoManager.reset();
 		m_RenderFrameBuilder.reset();
-		if (m_DevToolsRuntime)
+		if (m_DevelopGuiSystem)
 		{
-			m_DevToolsRuntime->Reset();
-			m_DevToolsRuntime.reset();
+			m_DevelopGuiSystem->Finalize();
+			m_DevelopGuiSystem.reset();
 		}
 		m_AssetManager.reset();
 
@@ -429,52 +345,9 @@ namespace gglab
 		m_InputManager.reset();
 		m_Time.reset();
 
+		m_PlatformHost->Finalize();
+
 		m_IsInitialized = false;
-	}
-
-	void Application::InitializeWindow() noexcept
-	{
-		// Set the working directory to the path of the executable.
-		WCHAR path[MAX_PATH];
-		HMODULE hModule = ::GetModuleHandleW(NULL);
-		if (::GetModuleFileNameW(hModule, path, MAX_PATH) > 0)
-		{
-			::PathRemoveFileSpecW(path);
-			::SetCurrentDirectoryW(path);
-		}
-
-		WNDCLASSEX wcex = {};
-		wcex.cbSize = sizeof(WNDCLASSEX);
-		wcex.style = CS_HREDRAW | CS_VREDRAW;
-		wcex.lpfnWndProc = WindowProc;
-		wcex.cbClsExtra = 0;
-		wcex.cbWndExtra = 0;
-		wcex.hInstance = m_HInstance;
-		wcex.hIcon = LoadIcon(m_HInstance, IDI_APPLICATION);
-		wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-		wcex.lpszMenuName = nullptr;
-		wcex.lpszClassName = m_WindowName.c_str();
-		wcex.hIconSm = LoadIcon(m_HInstance, IDI_APPLICATION);
-		RegisterClassEx(&wcex);
-
-		RECT rc = { 0 , 0, static_cast<LONG>(m_WindowWidth), static_cast<LONG>(m_WindowHeight) };
-		AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-
-		m_Hwnd = CreateWindow(
-			m_WindowName.c_str(),
-			m_WindowName.c_str(),
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			rc.right - rc.left,
-			rc.bottom - rc.top,
-			nullptr,
-			nullptr,
-			m_HInstance,
-			this);
-
-		ShowWindow(m_Hwnd, SW_SHOWDEFAULT);
 	}
 
 	void Application::InitializeAssets() noexcept
@@ -516,9 +389,26 @@ namespace gglab
 		}
 	}
 
-	void Application::InitializeDevToolsPanels() noexcept
+	void Application::HandlePlatformEvent(const PlatformEvent& event) noexcept
 	{
-		devtools::RegisterDefaultDevelopGuiPanels(m_DevToolsRuntime->GetRegistry());
+		switch (event.m_Type)
+		{
+		case PlatformEventType::Activated:
+			OnActive();
+			break;
+		case PlatformEventType::Deactivated:
+			OnInactive();
+			break;
+		case PlatformEventType::Suspended:
+			OnSuspend();
+			break;
+		case PlatformEventType::Resumed:
+			OnResume();
+			break;
+		case PlatformEventType::Resized:
+			OnResize(event.m_Width, event.m_Height);
+			break;
+		}
 	}
 
 	void Application::OnActive() noexcept

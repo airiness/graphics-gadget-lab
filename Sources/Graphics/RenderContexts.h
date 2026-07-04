@@ -15,6 +15,7 @@ namespace gglab
 	class Renderer;
 	class AssetManager;
 	class ShaderManager;
+	class DevelopGuiSystem;
 
 	struct RenderFrameContext
 	{
@@ -65,6 +66,7 @@ namespace gglab
 		Renderer* m_Renderer = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
+		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 
 		bool IsValid() const noexcept
 		{

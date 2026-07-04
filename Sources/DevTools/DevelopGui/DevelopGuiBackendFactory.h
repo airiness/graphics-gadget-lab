@@ -1,10 +1,15 @@
 #pragma once
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
-
 #include <memory>
 
 namespace gglab
 {
-	[[nodiscard]] std::unique_ptr<DevelopGuiBackend> CreateDevelopGuiBackend(
-		const DevelopGuiBackend::CreateInfo& createInfo) noexcept;
+	class DevelopGuiPlatformBackend;
+	class DevelopGuiRenderBackend;
+	class PlatformWindow;
+	class RHIContext;
+
+	[[nodiscard]] std::unique_ptr<DevelopGuiPlatformBackend> CreateDevelopGuiPlatformBackend(
+		PlatformWindow& window) noexcept;
+	[[nodiscard]] std::unique_ptr<DevelopGuiRenderBackend> CreateDevelopGuiRenderBackend(
+		RHIContext& context) noexcept;
 }

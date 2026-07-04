@@ -9,11 +9,13 @@ namespace gglab
 	class ShaderManager;
 	class DemoManager;
 	class RenderFrameBuilder;
-	class DevToolsRuntime;
+	class DevelopGuiSystem;
+	class PlatformHost;
 	class Time;
 	class Keyboard;
 	class Mouse;
 	class World;
+	struct PlatformEvent;
 	class Application
 	{
 	public:
@@ -22,20 +24,18 @@ namespace gglab
 			std::wstring_view m_WindowName;
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;
-			HINSTANCE m_HInstance = nullptr;
+			std::unique_ptr<PlatformHost> m_PlatformHost;
 		};
 
 	public:
-		explicit Application(const CreateInfo& createInfo) noexcept;
+		explicit Application(CreateInfo createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Application);
-		~Application() = default;
+		~Application();
 
 		void Run() noexcept;
 
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
 		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
-
-		HWND GetHwnd() const noexcept { return m_Hwnd; };
 
 		Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
 		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
@@ -46,23 +46,19 @@ namespace gglab
 		Mouse* GetMouse() const noexcept;
 		Time* GetTime() const noexcept { return m_Time.get(); }
 
-		static void CreateApplicationInstance(const CreateInfo& createInfo) noexcept;
+		static void CreateApplicationInstance(CreateInfo createInfo) noexcept;
 		static Application* GetInstance() noexcept;
 		static void DestroyApplicationInstance() noexcept;
-
-	private:
-		static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	private:
 		void Initialize() noexcept;
 		bool Tick() noexcept;
 		void Finalize() noexcept;
 
-		void InitializeWindow() noexcept;
 		void InitializeAssets() noexcept;
-		void InitializeDevToolsPanels() noexcept;
+		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
-		// Functions called by the WindowProc
+		// Platform lifecycle handlers
 		void OnActive() noexcept;
 		void OnInactive() noexcept;
 		void OnSuspend() noexcept;
@@ -77,11 +73,7 @@ namespace gglab
 		uint32_t m_WindowHeight = 0;
 
 		std::wstring m_WindowName;
-
-		HWND m_Hwnd = nullptr;
-		HINSTANCE m_HInstance = nullptr;
-
-		// Renderer
+		std::unique_ptr<PlatformHost> m_PlatformHost;
 		std::unique_ptr<Renderer> m_Renderer;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<AssetManager> m_AssetManager;
@@ -89,11 +81,9 @@ namespace gglab
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
-		std::unique_ptr<DevToolsRuntime> m_DevToolsRuntime;
+		std::unique_ptr<DevelopGuiSystem> m_DevelopGuiSystem;
 
 		bool m_IsInitialized = false;
-		bool m_IsMinimized = false;
-		bool m_InSizeMove = false;
 		bool m_IsSuspended = false;
 	};
 }

@@ -3,8 +3,8 @@
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -21,11 +21,11 @@ namespace gglab
 		};
 
 		static ImTextureID ToImGuiTextureID(
-			Renderer* renderer,
+			DevelopGuiSystem* developGuiSystem,
 			RHIDescriptorHandle descriptor) noexcept
 		{
-			auto* backend = renderer ? renderer->GetDevelopGuiBackend() : nullptr;
-			return backend ? backend->ResolveTextureId(descriptor) : ImTextureID{};
+			return developGuiSystem ?
+				developGuiSystem->ResolveTextureId(descriptor) : ImTextureID{};
 		}
 
 		static bool DrawPreviewLayoutCombo(const char* label, RenderResourceRegistry::IBLPreviewLayout& layout) noexcept
@@ -147,7 +147,7 @@ namespace gglab
 			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
 
 			const ImTextureID textureId = ToImGuiTextureID(
-				renderer,
+				context.m_DevelopGuiSystem,
 				renderResRegistry->GetSrvDescriptor(BrdfLutIndex));
 
 			if (!textureId)
@@ -261,7 +261,7 @@ namespace gglab
 
 			const ImTextureID environmentPreviewTextureId =
 				ToImGuiTextureID(
-					renderer,
+					context.m_DevelopGuiSystem,
 					renderResRegistry->GetSrvDescriptor(EnvironmentPreviewIndex));
 
 			if (!environmentPreviewTextureId)
@@ -376,7 +376,7 @@ namespace gglab
 
 			const ImTextureID prefilteredSpecularPreviewTextureId =
 				ToImGuiTextureID(
-					renderer,
+					context.m_DevelopGuiSystem,
 					renderResRegistry->GetSrvDescriptor(PrefilteredSpecularPreviewIndex));
 
 			if (!prefilteredSpecularPreviewTextureId)

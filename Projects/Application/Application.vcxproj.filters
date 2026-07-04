@@ -100,6 +100,12 @@
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Platform">
+      <UniqueIdentifier>{2c293ebc-b50d-4fe3-a812-f847923969f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Platform\Windows">
+      <UniqueIdentifier>{69b17727-bdeb-461b-824d-dbb203295cce}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Scene">
       <UniqueIdentifier>{36644b82-8a6c-4027-a4e5-44a3a8e8d6a6}</UniqueIdentifier>
     </Filter>
@@ -108,6 +114,9 @@
     </Filter>
     <Filter Include="DevTools\DevelopGui\Backends\DX12">
       <UniqueIdentifier>{e4f4cccb-464f-4ec8-a66d-7b8bc9a03daf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends\Windows">
+      <UniqueIdentifier>{ad673b8d-6f17-41cb-a231-8e5b8fe96d8d}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\RenderPipeline">
       <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
@@ -179,6 +188,12 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp">
       <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp">
+      <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
@@ -405,8 +420,11 @@
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
       <Filter>Externals\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12Backend.cpp">
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
+      <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
@@ -451,6 +469,9 @@
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp">
@@ -574,6 +595,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application.h">
       <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h">
+      <Filter>Application\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Platform\PlatformWindow.h">
+      <Filter>Application\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32MessageHandler.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32Window.h">
+      <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h">
       <Filter>DevTools\EnumText</Filter>
@@ -926,14 +962,23 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h">
       <Filter>Externals\ImGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h">
-      <Filter>DevTools\DevelopGui</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12Backend.h">
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPlatformBackend.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRenderBackend.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h">
       <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h">
+      <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>

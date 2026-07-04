@@ -12,6 +12,7 @@ namespace gglab
 	class AssetManager;
 	class RenderGraph;
 	class DiagnosticsRuntime;
+	class DevelopGuiSystem;
 
 	class DevelopGuiStateStore;
 
@@ -28,6 +29,7 @@ namespace gglab
 		DiagnosticsRuntime* m_Diagnostics = nullptr;
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
+		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 
 		DevelopGuiStateStore* m_StateStore = nullptr;
 		uint64_t m_CurrentPanelKey = 0;

@@ -5,7 +5,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
+#include "DevTools/DevelopGui/DevelopGuiSystem.h"
 
 namespace gglab
 {
@@ -27,13 +27,8 @@ namespace gglab
 		const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
-		if (!services.m_Renderer)
-		{
-			return;
-		}
-
-		auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
-		if (!developGuiBackend || !developGuiBackend->IsFrameOpen())
+		auto* developGuiSystem = services.m_DevelopGuiSystem;
+		if (!developGuiSystem || !developGuiSystem->IsFrameOpen())
 		{
 			return;
 		}
@@ -67,20 +62,19 @@ namespace gglab
 					shadowRes.m_DirectionalShadowMapPreview,
 					RGTextureAccess::Sample);
 			},
-			[&services](RGExecuteContext& executeContext, PassData& data)
+			[developGuiSystem](RGExecuteContext& executeContext, PassData& data)
 			{
 				GGLAB_UNUSED(data.m_BrdfLut);
 				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
 				GGLAB_UNUSED(data.m_PrefilteredSpecularCubemapPreview);
 				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
 
-				auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
-				if (!developGuiBackend || !developGuiBackend->IsFrameOpen())
+				if (!developGuiSystem->IsFrameOpen())
 				{
 					return;
 				}
 
-				developGuiBackend->RenderDrawData(
+				developGuiSystem->RenderDrawData(
 					executeContext.GetGraphicsCommandContext(),
 					executeContext.GetViewHandle(data.m_Rtv));
 			});

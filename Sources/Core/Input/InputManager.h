@@ -11,7 +11,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(InputManager);
 		~InputManager() noexcept = default;
 
-		void Initialize(HWND windowHandle) noexcept;
+		void Initialize(void* nativeWindowHandle) noexcept;
 		void Update() noexcept;
 		void Finalize() noexcept;
 

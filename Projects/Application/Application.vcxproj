@@ -143,6 +143,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
@@ -172,13 +174,15 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\RHIContext.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
-    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12Backend.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.cpp" />
@@ -283,6 +287,11 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Platform\PlatformWindow.h" />
+    <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32MessageHandler.h" />
+    <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32Window.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h" />
@@ -359,9 +368,12 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
-    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackend.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
-    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12Backend.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPlatformBackend.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRenderBackend.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.h" />

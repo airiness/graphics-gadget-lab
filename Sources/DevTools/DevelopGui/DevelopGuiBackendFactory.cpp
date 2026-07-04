@@ -1,32 +1,35 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
-#include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12Backend.h"
+#include "Application/Platform/Windows/Win32Window.h"
+#include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12RenderBackend.h"
+#include "DevTools/DevelopGui/Backends/Windows/DevelopGuiWin32PlatformBackend.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 
 namespace gglab
 {
-	std::unique_ptr<DevelopGuiBackend> CreateDevelopGuiBackend(
-		const DevelopGuiBackend::CreateInfo& createInfo) noexcept
+	std::unique_ptr<DevelopGuiPlatformBackend> CreateDevelopGuiPlatformBackend(
+		PlatformWindow& window) noexcept
 	{
-		GGLAB_ASSERT(createInfo.m_RHIContext);
-		if (!createInfo.m_RHIContext)
+		if (dynamic_cast<Win32Window*>(&window))
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Cannot create a DevelopGui backend without an RHI context.");
-			return nullptr;
+			return std::make_unique<DevelopGuiWin32PlatformBackend>();
 		}
 
-		if (dynamic_cast<DX12Context*>(createInfo.m_RHIContext))
+		GGLAB_LOG_GRAPHICS_WARN(
+			"No DevelopGui platform backend is registered for the current platform window.");
+		return nullptr;
+	}
+
+	std::unique_ptr<DevelopGuiRenderBackend> CreateDevelopGuiRenderBackend(
+		RHIContext& context) noexcept
+	{
+		if (dynamic_cast<DX12Context*>(&context))
 		{
-			auto backend = std::make_unique<DevelopGuiDX12Backend>();
-			if (!backend->Initialize(createInfo))
-			{
-				GGLAB_LOG_GRAPHICS_WARN("Failed to initialize the DevelopGui DX12 backend.");
-				return nullptr;
-			}
-			return backend;
+			return std::make_unique<DevelopGuiDX12RenderBackend>();
 		}
 
-		GGLAB_LOG_GRAPHICS_WARN("No DevelopGui backend is registered for the current RHI backend.");
+		GGLAB_LOG_GRAPHICS_WARN(
+			"No DevelopGui render backend is registered for the current RHI backend.");
 		return nullptr;
 	}
 }
