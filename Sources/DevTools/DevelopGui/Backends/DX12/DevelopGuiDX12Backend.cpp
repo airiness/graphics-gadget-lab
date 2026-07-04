@@ -15,19 +15,43 @@
 
 namespace gglab
 {
-	void DevelopGuiDX12Backend::Initialize(const CreateInfo& createInfo) noexcept
+	bool DevelopGuiDX12Backend::Initialize(const CreateInfo& createInfo) noexcept
 	{
-		GGLAB_ASSERT(createInfo.m_RHIContext);
+		GGLAB_ASSERT_MSG(m_State == State::Inactive,
+			"DevelopGuiDX12Backend is already initialized.");
+		if (m_State != State::Inactive)
+		{
+			return false;
+		}
+
+		if (!createInfo.m_RHIContext || !createInfo.m_NativeWindowHandle)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DevelopGuiDX12Backend requires an RHI context and a native window handle.");
+			return false;
+		}
+
 		auto* dx12Context = dynamic_cast<DX12Context*>(createInfo.m_RHIContext);
-		GGLAB_ASSERT_MSG(dx12Context != nullptr,
-			"DevelopGuiDX12Backend requires the DX12 RHI backend.");
+		if (!dx12Context)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DevelopGuiDX12Backend requires the DX12 RHI backend.");
+			return false;
+		}
 
 		m_DX12Device = &dx12Context->GetDX12Device();
 		m_DescriptorManager = &dx12Context->GetDescriptorManager();
 		auto& swapChain = dx12Context->GetSwapChain();
 
 		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
+		if (!ImGui::CreateContext())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Failed to create the ImGui context.");
+			m_DX12Device = nullptr;
+			m_DescriptorManager = nullptr;
+			return false;
+		}
+
 		ImGuiIO& io = ImGui::GetIO();
 
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -35,7 +59,14 @@ namespace gglab
 
 		ImGui::StyleColorsDark();
 
-		ImGui_ImplWin32_Init(static_cast<HWND>(createInfo.m_NativeWindowHandle));
+		if (!ImGui_ImplWin32_Init(static_cast<HWND>(createInfo.m_NativeWindowHandle)))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Failed to initialize the ImGui Win32 backend.");
+			ImGui::DestroyContext();
+			m_DX12Device = nullptr;
+			m_DescriptorManager = nullptr;
+			return false;
+		}
 
 		ImGui_ImplDX12_InitInfo initInfo{};
 		initInfo.Device = m_DX12Device->Get();
@@ -49,32 +80,68 @@ namespace gglab
 		initInfo.SrvDescriptorFreeFn = DescriptorFree;
 		initInfo.UserData = this;
 
-		ImGui_ImplDX12_Init(&initInfo);
+		if (!ImGui_ImplDX12_Init(&initInfo))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Failed to initialize the ImGui DX12 backend.");
+			if (ImGui::GetIO().BackendRendererUserData)
+			{
+				ImGui_ImplDX12_Shutdown();
+			}
+			ImGui_ImplWin32_Shutdown();
+			ImGui::DestroyContext();
+			m_DX12Device = nullptr;
+			m_DescriptorManager = nullptr;
+			return false;
+		}
+
+		m_State = State::Active;
+		return true;
 	}
 
 	void DevelopGuiDX12Backend::Finalize() noexcept
 	{
+		if (m_State == State::Inactive)
+		{
+			return;
+		}
+
+		EndFrame();
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 
 		ImGui::DestroyContext();
+		m_DX12Device = nullptr;
+		m_DescriptorManager = nullptr;
+		m_State = State::Inactive;
 	}
 
-	void DevelopGuiDX12Backend::NewFrame() noexcept
+	bool DevelopGuiDX12Backend::NewFrame() noexcept
 	{
-		GGLAB_ASSERT_MSG(!m_FrameOpen,
+		GGLAB_ASSERT_MSG(m_State != State::FrameOpen,
 			"DevelopGuiDX12Backend::NewFrame called twice without ending previous frame.");
+		if (m_State != State::Active)
+		{
+			return false;
+		}
+
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
-		m_FrameOpen = true;
+		m_State = State::FrameOpen;
+		return true;
 	}
 
 	void DevelopGuiDX12Backend::RenderDrawData(
 		RHIGraphicsCommandContext* commandContext,
 		RHITextureViewHandle renderTarget) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_FrameOpen, "DevelopGuiDX12Backend::RenderDrawData called without NewFrame.");
+		GGLAB_ASSERT_MSG(m_State == State::FrameOpen,
+			"DevelopGuiDX12Backend::RenderDrawData called without NewFrame.");
+		if (m_State != State::FrameOpen)
+		{
+			return;
+		}
+
 		auto* dx12Context = dynamic_cast<DX12GraphicsCommandContext*>(commandContext);
 		GGLAB_ASSERT_NOT_NULL(dx12Context);
 		if (!dx12Context)
@@ -83,7 +150,7 @@ namespace gglab
 		}
 
 		ImGui::Render();
-		m_FrameOpen = false;
+		m_State = State::Active;
 
 		commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&renderTarget, 1));
 
@@ -95,19 +162,20 @@ namespace gglab
 
 	void DevelopGuiDX12Backend::EndFrame() noexcept
 	{
-		if (!m_FrameOpen)
+		if (m_State != State::FrameOpen)
 		{
 			return;
 		}
 
 		ImGui::EndFrame();
-		m_FrameOpen = false;
+		m_State = State::Active;
 	}
 
 	ImTextureID DevelopGuiDX12Backend::ResolveTextureId(
 		RHIDescriptorHandle descriptor) const noexcept
 	{
-		if (!m_DescriptorManager ||
+		if (!IsActive() ||
+			!m_DescriptorManager ||
 			!descriptor.IsValid() ||
 			descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
 		{

@@ -27,7 +27,13 @@ namespace gglab
 		const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
-		if (!services.m_Renderer || !services.m_Renderer->GetDevelopGuiBackend())
+		if (!services.m_Renderer)
+		{
+			return;
+		}
+
+		auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
+		if (!developGuiBackend || !developGuiBackend->IsFrameOpen())
 		{
 			return;
 		}
@@ -69,6 +75,11 @@ namespace gglab
 				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
 
 				auto* developGuiBackend = services.m_Renderer->GetDevelopGuiBackend();
+				if (!developGuiBackend || !developGuiBackend->IsFrameOpen())
+				{
+					return;
+				}
+
 				developGuiBackend->RenderDrawData(
 					executeContext.GetGraphicsCommandContext(),
 					executeContext.GetViewHandle(data.m_Rtv));

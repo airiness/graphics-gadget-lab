@@ -18,7 +18,11 @@ namespace gglab
 		if (dynamic_cast<DX12Context*>(createInfo.m_RHIContext))
 		{
 			auto backend = std::make_unique<DevelopGuiDX12Backend>();
-			backend->Initialize(createInfo);
+			if (!backend->Initialize(createInfo))
+			{
+				GGLAB_LOG_GRAPHICS_WARN("Failed to initialize the DevelopGui DX12 backend.");
+				return nullptr;
+			}
 			return backend;
 		}
 

@@ -16,14 +16,15 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DevelopGuiDX12Backend);
 		~DevelopGuiDX12Backend() override = default;
 
-		void Initialize(const CreateInfo& createInfo) noexcept override;
+		[[nodiscard]] bool Initialize(const CreateInfo& createInfo) noexcept override;
 		void Finalize() noexcept override;
 
-		void NewFrame() noexcept override;
+		[[nodiscard]] bool NewFrame() noexcept override;
 		void RenderDrawData(
 			RHIGraphicsCommandContext* commandContext,
 			RHITextureViewHandle renderTarget) noexcept override;
 		void EndFrame() noexcept override;
+		[[nodiscard]] State GetState() const noexcept override { return m_State; }
 		[[nodiscard]] ImTextureID ResolveTextureId(
 			RHIDescriptorHandle descriptor) const noexcept override;
 
@@ -39,6 +40,6 @@ namespace gglab
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
-		bool m_FrameOpen = false;
+		State m_State = State::Inactive;
 	};
 }

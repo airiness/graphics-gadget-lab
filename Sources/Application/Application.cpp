@@ -99,7 +99,11 @@ namespace gglab
 	{
 		Application* app = reinterpret_cast<Application*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
-		if (app && app->m_IsInitialized && ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+		auto* developGuiBackend = app && app->m_Renderer ?
+			app->m_Renderer->GetDevelopGuiBackend() : nullptr;
+		if (app && app->m_IsInitialized &&
+			developGuiBackend && developGuiBackend->IsActive() &&
+			ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
 		{
 			return 1;
 		}
@@ -304,10 +308,7 @@ namespace gglab
 
 		// DevelopGui new frame
 		auto* developGuiBackend = m_Renderer->GetDevelopGuiBackend();
-		if (developGuiBackend)
-		{
-			developGuiBackend->NewFrame();
-		}
+		const bool developGuiFrameOpen = developGuiBackend && developGuiBackend->NewFrame();
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
@@ -358,11 +359,15 @@ namespace gglab
 		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
 		if (!renderGraphCompiled)
 		{
+			if (developGuiBackend && developGuiBackend->IsFrameOpen())
+			{
+				developGuiBackend->EndFrame();
+			}
 			return false;
 		}
 
 		// Draw menus before Renderer::Render()
-		if (developGuiBackend && m_DevToolsRuntime)
+		if (developGuiFrameOpen && developGuiBackend->IsFrameOpen() && m_DevToolsRuntime)
 		{
 			GGLAB_CPU_PROFILE_SCOPE("DevelopGUI");
 			DevelopGuiContext guiContext{};
@@ -387,6 +392,12 @@ namespace gglab
 		{
 			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
 			m_Renderer->EndFrame(rendererFrame);
+		}
+
+		// Pipelines without a DevelopGui render pass must still close the ImGui frame.
+		if (developGuiBackend && developGuiBackend->IsFrameOpen())
+		{
+			developGuiBackend->EndFrame();
 		}
 
 		return true;
