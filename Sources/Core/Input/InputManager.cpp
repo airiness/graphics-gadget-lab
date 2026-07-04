@@ -5,11 +5,11 @@
 
 namespace gglab
 {
-	void InputManager::Initialize(HWND windowHandle) noexcept
+	void InputManager::Initialize(void* nativeWindowHandle) noexcept
 	{
 		m_Keyboard = std::make_unique<Keyboard>();
 		m_Mouse = std::make_unique<Mouse>();
-		m_Mouse->SetWindowHandle(windowHandle);
+		m_Mouse->SetWindowHandle(static_cast<HWND>(nativeWindowHandle));
 	}
 
 	void InputManager::Update() noexcept

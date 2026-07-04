@@ -2,8 +2,8 @@
 #include "Scene/Components.h"
 #include "Core/World.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
-#include "DevTools/DevelopGui/DevelopGuiBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Renderer.h"
@@ -32,11 +32,11 @@ namespace gglab
 		};
 
 		static ImTextureID ToImGuiTextureID(
-			Renderer* renderer,
+			DevelopGuiSystem* developGuiSystem,
 			RHIDescriptorHandle descriptor) noexcept
 		{
-			auto* backend = renderer ? renderer->GetDevelopGuiBackend() : nullptr;
-			return backend ? backend->ResolveTextureId(descriptor) : ImTextureID{};
+			return developGuiSystem ?
+				developGuiSystem->ResolveTextureId(descriptor) : ImTextureID{};
 		}
 
 		static void DrawMatrix4x4(const char* label, const Matrix& mat) noexcept
@@ -301,7 +301,7 @@ namespace gglab
 			const uint32_t previewSrvIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
 			const ImTextureID previewTextureId =
 				ToImGuiTextureID(
-					context.m_Renderer,
+					context.m_DevelopGuiSystem,
 					renderResourceRegistry->GetSrvDescriptor(ShadowMapPreviewIndex));
 
 			ImGui::Text("Preview RG Size: %u", shadowRes->m_ShadowMapPreviewSize);

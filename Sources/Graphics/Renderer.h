@@ -15,7 +15,6 @@
 
 namespace gglab
 {
-	class DevelopGuiBackend;
 	class PipelineCache;
 	class RenderResourceRegistry;
 	class SamplerRegistry;
@@ -62,7 +61,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			ShaderManager* m_ShaderManager = nullptr;
-			HWND m_Hwnd = nullptr;
+			void* m_NativeWindowHandle = nullptr;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 		};
@@ -89,7 +88,6 @@ namespace gglab
 		TransientResourcePool* GetTransientResourcePool() const noexcept { return m_TransientResourcePool.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
-		DevelopGuiBackend* GetDevelopGuiBackend() const noexcept { return m_DevelopGuiBackend.get(); }
 		GpuProfiler* GetGpuProfiler() const noexcept
 		{
 			return m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
@@ -141,8 +139,6 @@ namespace gglab
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<TextureRegistry> m_TextureRegistry;
-		std::unique_ptr<DevelopGuiBackend> m_DevelopGuiBackend;
-
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 

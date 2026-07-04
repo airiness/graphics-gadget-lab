@@ -1,6 +1,5 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
-#include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -53,7 +52,7 @@ namespace gglab
 	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		RHIContextDesc contextDesc{};
-		contextDesc.m_WindowHandle = createInfo.m_Hwnd;
+		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;
 		m_RHIContext = CreateRHIContext(contextDesc);
@@ -67,8 +66,7 @@ namespace gglab
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
 			.m_ShaderManager = createInfo.m_ShaderManager,
 		};
-		m_PipelineCache =
-			std::make_unique<PipelineCache>(pipelineCacheCreateInfo);
+		m_PipelineCache = std::make_unique<PipelineCache>(pipelineCacheCreateInfo);
 
 		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
 		samplerRegistryCreateInfo.m_Device = device;
@@ -86,15 +84,6 @@ namespace gglab
 		renderResRegistryCreateInfo.m_TransientResourcePool = m_TransientResourcePool.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
-
-		DevelopGuiBackend::CreateInfo developGuiBackendCreateInfo{};
-		developGuiBackendCreateInfo.m_NativeWindowHandle = createInfo.m_Hwnd;
-		developGuiBackendCreateInfo.m_RHIContext = m_RHIContext.get();
-		m_DevelopGuiBackend = CreateDevelopGuiBackend(developGuiBackendCreateInfo);
-		if (!m_DevelopGuiBackend)
-		{
-			GGLAB_LOG_GRAPHICS_WARN("Renderer will continue without a DevelopGui backend.");
-		}
 
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
@@ -115,12 +104,6 @@ namespace gglab
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
 		m_RHIContext->WaitIdle();
-
-		if (m_DevelopGuiBackend)
-		{
-			m_DevelopGuiBackend->Finalize();
-			m_DevelopGuiBackend.reset();
-		}
 
 		m_RenderResRegistry.reset();
 		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
