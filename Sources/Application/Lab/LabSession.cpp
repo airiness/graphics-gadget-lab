@@ -1,6 +1,5 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/LabSession.h"
-#include "Core/Time.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
@@ -15,6 +14,7 @@ namespace gglab
 		const LabSessionCreateInfo& createInfo,
 		std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept :
 		m_Services(createInfo.m_Services),
+		m_RunConfig(createInfo.m_RunConfig),
 		m_Descriptor(std::move(descriptor)),
 		m_RenderPipeline(std::move(renderPipeline))
 	{
@@ -86,12 +86,10 @@ namespace gglab
 		}
 	}
 
-	void LabSession::UpdateCamera() noexcept
+	void LabSession::UpdateCamera(float deltaTime) noexcept
 	{
 		auto* inputManager = m_Services.m_InputManager;
-		auto* time = m_Services.m_Time;
 		GGLAB_ASSERT_NOT_NULL(inputManager);
-		GGLAB_ASSERT_NOT_NULL(time);
 
 		auto* mouse = inputManager->GetMouse();
 		auto* keyboard = inputManager->GetKeyboard();
@@ -108,7 +106,7 @@ namespace gglab
 		input.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
 		input.m_MouseDelta = mouseCoord;
 
-		m_CameraController->Update(*m_Camera, input, static_cast<float>(time->GetDeltaTime()));
+		m_CameraController->Update(*m_Camera, input, deltaTime);
 		m_Camera->Update();
 	}
 

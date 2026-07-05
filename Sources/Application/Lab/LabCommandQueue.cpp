@@ -55,6 +55,11 @@ namespace gglab
 		m_Pending.m_RebuildSceneRequested = true;
 	}
 
+	void LabCommandQueue::RequestRunConfig(const LabRunConfig& config) noexcept
+	{
+		m_Pending.m_RunConfig = config;
+	}
+
 	LabCommandBatch LabCommandQueue::Consume() noexcept
 	{
 		LabCommandBatch result = std::move(m_Pending);
@@ -65,6 +70,7 @@ namespace gglab
 	bool LabCommandQueue::IsEmpty() const noexcept
 	{
 		return !m_Pending.m_SwitchTarget.has_value() &&
+			!m_Pending.m_RunConfig.has_value() &&
 			m_Pending.m_ParameterChanges.empty() &&
 			!m_Pending.m_RestartRequested &&
 			!m_Pending.m_ResetParametersRequested &&

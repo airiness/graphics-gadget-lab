@@ -1,6 +1,7 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/LabParameter.h"
+#include "Application/Lab/LabRunConfig.h"
 #include "Application/Lab/LabTypes.h"
 #include "Core/World.h"
 
@@ -15,6 +16,7 @@ namespace gglab
 		DemoServices m_Services{};
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
+		LabRunConfig m_RunConfig{};
 
 		bool IsValid() const noexcept
 		{
@@ -40,7 +42,7 @@ namespace gglab
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnExit() noexcept {}
-		virtual void Update() noexcept = 0;
+		virtual void Update(float deltaTime) noexcept = 0;
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);
@@ -59,8 +61,9 @@ namespace gglab
 			const LabSessionCreateInfo& createInfo,
 			std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept;
 
-		void UpdateCamera() noexcept;
+		void UpdateCamera(float deltaTime) noexcept;
 		LabParameterSet& GetMutableParameters() noexcept { return m_Parameters; }
+		const LabRunConfig& GetRunConfig() const noexcept { return m_RunConfig; }
 
 		virtual void ApplyImmediateParameters() noexcept {}
 		virtual void RebuildScene() noexcept {}
@@ -69,6 +72,7 @@ namespace gglab
 		void SetRenderPipeline(std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept;
 
 		DemoServices m_Services{};
+		LabRunConfig m_RunConfig{};
 		World m_World;
 
 	private:

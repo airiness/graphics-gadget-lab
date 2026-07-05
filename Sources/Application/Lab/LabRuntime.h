@@ -33,11 +33,15 @@ namespace gglab
 		void RequestResetParameters() noexcept override { m_CommandQueue.RequestResetParameters(); }
 		void RequestRebuildScene() noexcept override { m_CommandQueue.RequestRebuildScene(); }
 		void RequestRestartSession() noexcept override { m_CommandQueue.RequestRestart(); }
+		void RequestRunConfig(const LabRunConfig& config) noexcept override
+		{
+			m_CommandQueue.RequestRunConfig(config);
+		}
 		void ProcessPendingCommands() noexcept;
 		LabSnapshot GetLabSnapshot() const noexcept override;
 
-		LabRuntimeState GetState() const noexcept { return m_State; }
-		bool IsReady() const noexcept { return m_State == LabRuntimeState::Ready && m_ActiveSession; }
+		LabRunState GetState() const noexcept { return m_State; }
+		bool IsReady() const noexcept { return m_State == LabRunState::Ready && m_ActiveSession; }
 		std::string_view GetLastError() const noexcept { return m_LastError; }
 		const LabCatalog& GetCatalog() const noexcept { return m_Catalog; }
 		const LabSession* GetActiveSession() const noexcept { return m_ActiveSession.get(); }
@@ -60,8 +64,12 @@ namespace gglab
 		LabCommandQueue m_CommandQueue;
 		std::unique_ptr<LabSession> m_ActiveSession;
 		std::string m_LastError;
-		LabRuntimeState m_State = LabRuntimeState::Uninitialized;
+		LabRunState m_State = LabRunState::Uninitialized;
 		uint64_t m_FrameInSession = 0;
+		uint32_t m_WarmupFramesRemaining = 0;
+		float m_EffectiveDeltaTime = 0.0f;
+		DemoFrameFeedback m_LastFrameFeedback{};
+		bool m_HasFrameFeedback = false;
 		bool m_IsEntered = false;
 	};
 }

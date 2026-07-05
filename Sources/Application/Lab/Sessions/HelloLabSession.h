@@ -9,7 +9,7 @@ namespace gglab
 		explicit HelloLabSession(const LabSessionCreateInfo& createInfo) noexcept;
 		~HelloLabSession() override = default;
 
-		void Update() noexcept override;
+		void Update(float deltaTime) noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
