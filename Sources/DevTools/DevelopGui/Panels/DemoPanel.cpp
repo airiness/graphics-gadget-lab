@@ -28,8 +28,9 @@ namespace gglab
 		const std::string preview = selectedDemo ?
 			std::string(selectedDemo->GetName()) : std::string("None");
 
+		ImGui::TextUnformatted("Active Demo");
 		ImGui::SetNextItemWidth(-FLT_MIN);
-		if (ImGui::BeginCombo("Active Demo", preview.c_str()))
+		if (ImGui::BeginCombo("##ActiveDemo", preview.c_str()))
 		{
 			for (uint32_t index = 0; index < m_DemoManager->GetDemoCount(); ++index)
 			{
