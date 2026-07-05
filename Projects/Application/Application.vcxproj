@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -229,7 +229,13 @@
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\LabCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\LabCommandQueue.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
@@ -425,7 +431,14 @@
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabCatalog.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
