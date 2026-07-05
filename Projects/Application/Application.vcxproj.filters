@@ -195,6 +195,9 @@
     <ClCompile Include="..\..\Sources\Application\Application.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
@@ -633,6 +636,9 @@
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h">
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h">

@@ -7,7 +7,7 @@ namespace gglab
 	class DemoLabHost final : public DemoBase
 	{
 	public:
-		explicit DemoLabHost(const DemoCreateInfo& createInfo) noexcept;
+		DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab) noexcept;
 		~DemoLabHost() override = default;
 
 		std::string_view GetName() const noexcept override { return "Demo.LabHost"; }
@@ -31,6 +31,7 @@ namespace gglab
 
 		LabRuntime& GetLabRuntime() noexcept { return m_Runtime; }
 		const LabRuntime& GetLabRuntime() const noexcept { return m_Runtime; }
+		bool IsValid() const noexcept { return m_Runtime.IsInitialized(); }
 
 	private:
 		LabRuntime m_Runtime;

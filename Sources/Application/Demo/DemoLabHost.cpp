@@ -5,7 +5,9 @@
 
 namespace gglab
 {
-	DemoLabHost::DemoLabHost(const DemoCreateInfo& createInfo) noexcept :
+	DemoLabHost::DemoLabHost(
+		const DemoCreateInfo& createInfo,
+		const LabId& startupLab) noexcept :
 		m_Runtime({
 			.m_Services = createInfo.m_Services,
 			.m_WindowWidth = createInfo.m_WindowWidth,
@@ -22,8 +24,7 @@ namespace gglab
 			&MiniPBRGridLabSession::Create);
 		GGLAB_ASSERT_MSG(miniPbrRegistered, "Failed to register the Mini PBR Grid Lab session.");
 
-		const bool initialized = m_Runtime.Initialize(HelloLabSession::GetId());
-		GGLAB_ASSERT_MSG(initialized, "Failed to initialize the Lab runtime.");
+		GGLAB_UNUSED(m_Runtime.Initialize(startupLab));
 	}
 
 	void DemoLabHost::OnEnter() noexcept

@@ -6,6 +6,7 @@
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/DemoTypes.h"
+#include "Application/Lab/Sessions/HelloLabSession.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
@@ -73,10 +74,11 @@ namespace gglab
 	}
 
 	Application::Application(CreateInfo createInfo) noexcept :
-		m_WindowName(createInfo.m_WindowName),
 		m_WindowWidth(createInfo.m_WindowWidth),
 		m_WindowHeight(createInfo.m_WindowHeight),
-		m_PlatformHost(std::move(createInfo.m_PlatformHost))
+		m_WindowName(createInfo.m_WindowName),
+		m_PlatformHost(std::move(createInfo.m_PlatformHost)),
+		m_LaunchOptions(std::move(createInfo.m_LaunchOptions))
 	{}
 
 	Application::~Application() = default;
@@ -143,6 +145,10 @@ namespace gglab
 		// InputManager
 		m_InputManager = std::make_unique<InputManager>();
 		m_InputManager->Initialize(mainWindow.GetNativeHandle());
+		if (m_LaunchOptions.m_StartWithAbsoluteMouse)
+		{
+			m_InputManager->GetMouse()->SetMouseMode(Mouse::MouseMode::Absolute);
+		}
 
 		// ShaderManager
 		m_ShaderManager = std::make_unique<ShaderManager>();
@@ -180,8 +186,30 @@ namespace gglab
 			.m_WindowHeight = m_WindowHeight,
 		};
 		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoPlayground>(demoCreateInfo));
-		const uint32_t labHostIndex = m_DemoManager->CreateDemo<DemoLabHost>(demoCreateInfo);
+		const LabId startupLab = m_LaunchOptions.m_StartupLabId ?
+			LabId(*m_LaunchOptions.m_StartupLabId) : HelloLabSession::GetId();
+		const uint32_t labHostIndex = m_DemoManager->CreateDemo<DemoLabHost>(
+			demoCreateInfo,
+			startupLab);
 		auto* labHost = static_cast<DemoLabHost*>(m_DemoManager->GetDemo(labHostIndex));
+		if (!labHost->IsValid())
+		{
+			GGLAB_LOG_ERROR("Failed to initialize the requested startup Lab.");
+			m_IsInitialized = true;
+			Finalize();
+			return;
+		}
+		if (m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost)
+		{
+			m_DemoManager->RequestActiveDemo(labHostIndex);
+			m_DemoManager->ApplyPendingActiveDemo();
+		}
+		GGLAB_LOG_INFO(
+			"Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
+			m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost ?
+				"Demo.LabHost" : "Demo.Playground",
+			startupLab.GetName(),
+			m_LaunchOptions.m_StartWithAbsoluteMouse ? "absolute" : "relative");
 
 		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
 		const DevelopGuiSystem::CreateInfo developGuiCreateInfo{

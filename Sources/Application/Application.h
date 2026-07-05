@@ -1,4 +1,5 @@
 #pragma once
+#include "Application/ApplicationLaunchOptions.h"
 
 namespace gglab
 {
@@ -25,6 +26,7 @@ namespace gglab
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;
 			std::unique_ptr<PlatformHost> m_PlatformHost;
+			ApplicationLaunchOptions m_LaunchOptions{};
 		};
 
 	public:
@@ -33,6 +35,7 @@ namespace gglab
 		~Application();
 
 		void Run() noexcept;
+		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
 		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
@@ -74,6 +77,7 @@ namespace gglab
 
 		std::wstring m_WindowName;
 		std::unique_ptr<PlatformHost> m_PlatformHost;
+		ApplicationLaunchOptions m_LaunchOptions{};
 		std::unique_ptr<Renderer> m_Renderer;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<AssetManager> m_AssetManager;
