@@ -3,7 +3,7 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
-#include "Core/HResult.h"
+#include "Graphics/RHI/DX12/DX12HResult.h"
 
 namespace gglab
 {

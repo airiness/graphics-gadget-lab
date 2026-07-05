@@ -4,7 +4,7 @@
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Core/HResult.h"
+#include "Graphics/RHI/DX12/DX12HResult.h"
 
 namespace gglab
 {
