@@ -107,6 +107,54 @@ namespace gglab
 
 			return Vector4(tangent.x, tangent.y, tangent.z, 1.0f);
 		}
+
+		Matrix ToMatrix(const aiMatrix4x4& matrix) noexcept
+		{
+			// Assimp uses column vectors; SimpleMath uses row vectors.
+			return Matrix(
+				matrix.a1, matrix.b1, matrix.c1, matrix.d1,
+				matrix.a2, matrix.b2, matrix.c2, matrix.d2,
+				matrix.a3, matrix.b3, matrix.c3, matrix.d3,
+				matrix.a4, matrix.b4, matrix.c4, matrix.d4);
+		}
+
+		void CollectModelMeshInstances(
+			const aiNode& node,
+			const aiMatrix4x4& parentTransform,
+			const std::vector<MeshID>& meshIds,
+			const std::vector<MaterialID>& meshMaterialIds,
+			std::vector<ModelMesh>& result) noexcept
+		{
+			const aiMatrix4x4 localToModel = parentTransform * node.mTransformation;
+			for (uint32_t nodeMeshIndex = 0; nodeMeshIndex < node.mNumMeshes; ++nodeMeshIndex)
+			{
+				const uint32_t meshIndex = node.mMeshes[nodeMeshIndex];
+				if (meshIndex >= meshIds.size())
+				{
+					GGLAB_LOG_GRAPHICS_WARN(
+						"Model node '{}' references invalid mesh index {}.",
+						node.mName.C_Str(),
+						meshIndex);
+					continue;
+				}
+
+				result.push_back({
+					.m_MeshId = meshIds[meshIndex],
+					.m_MaterialId = meshMaterialIds[meshIndex],
+					.m_LocalTransform = ToMatrix(localToModel),
+				});
+			}
+
+			for (uint32_t childIndex = 0; childIndex < node.mNumChildren; ++childIndex)
+			{
+				CollectModelMeshInstances(
+					*node.mChildren[childIndex],
+					localToModel,
+					meshIds,
+					meshMaterialIds,
+					result);
+			}
+		}
 	}
 
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
@@ -446,6 +494,11 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR("Model file '{}' does not contain mesh data.", path.string());
 			return InvalidModelID;
 		}
+		if (!aiScene->mRootNode)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Model file '{}' does not contain a scene hierarchy.", path.string());
+			return InvalidModelID;
+		}
 
 		// Parse material datas
 		const auto aiMaterialCount = aiScene->mNumMaterials;
@@ -609,7 +662,9 @@ namespace gglab
 		GGLAB_ASSERT(model);
 		model->m_Id = modelId;
 		model->m_Type = ModelType::GlTF;
-		model->m_MeshInstance.resize(aiMeshCount);
+
+		std::vector<MeshID> meshIds(aiMeshCount);
+		std::vector<MaterialID> meshMaterialIds(aiMeshCount);
 
 		// Prepare meshes upload data
 		std::vector<MeshUploadData> meshUploadDatas;
@@ -622,16 +677,13 @@ namespace gglab
 
 			const MeshID meshId = CreateMesh();
 			uploadData.m_MeshId = meshId;
+			meshIds[aiMeshIndex] = meshId;
+			meshMaterialIds[aiMeshIndex] = materialIds[aiMesh->mMaterialIndex];
 
 			auto* mesh = GetMesh(meshId);
 			GGLAB_ASSERT(mesh);
 			mesh->m_Id = meshId;
 			mesh->m_Name = StringID(aiMesh->mName.C_Str());
-
-			ModelMesh modelMesh{};
-			modelMesh.m_MeshId = meshId;
-			modelMesh.m_MaterialId = materialIds[aiMesh->mMaterialIndex];
-			model->m_MeshInstance[aiMeshIndex] = modelMesh;
 
 			// Vertex data
 			const auto aiVertexCount = aiMesh->mNumVertices;
@@ -722,6 +774,27 @@ namespace gglab
 
 			// Compute Bounding infos
 			ComputeMeshBounds(*mesh, verticesData);
+		}
+
+		model->m_MeshInstance.reserve(aiMeshCount);
+		CollectModelMeshInstances(
+			*aiScene->mRootNode,
+			aiMatrix4x4(),
+			meshIds,
+			meshMaterialIds,
+			model->m_MeshInstance);
+		if (model->m_MeshInstance.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"Model '{}' has no mesh instances in its node hierarchy; using identity transforms.",
+				path.string());
+			for (uint32_t meshIndex = 0; meshIndex < aiMeshCount; ++meshIndex)
+			{
+				model->m_MeshInstance.push_back({
+					.m_MeshId = meshIds[meshIndex],
+					.m_MaterialId = meshMaterialIds[meshIndex],
+				});
+			}
 		}
 
 		// Upload to GPU

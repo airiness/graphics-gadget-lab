@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
+#include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
@@ -13,7 +14,20 @@ namespace gglab
 		constexpr uint32_t GridSize = 9;
 		constexpr float GridSpacing = 2.4f;
 		constexpr float GridDepth = 5.0f;
+		constexpr float TargetAssetModelExtent = 18.0f;
+		constexpr std::string_view MetalRoughSpheresPath =
+			"Assets/Models/MetalRoughSpheres/MetalRoughSpheres.gltf";
+		constexpr std::string_view MetalRoughSpheresNoTexturesPath =
+			"Assets/Models/MetalRoughSpheresNoTextures/MetalRoughSpheresNoTextures.gltf";
 
+		enum class SceneSource : int32_t
+		{
+			ProceduralGrid,
+			MetalRoughSpheres,
+			MetalRoughSpheresNoTextures,
+		};
+
+		const LabParameterId SceneSourceId("mini_pbr.scene.source");
 		const LabParameterId EnableCameraInputId("mini_pbr.camera.enable_input");
 		const LabParameterId CameraFovId("mini_pbr.camera.fov");
 		const LabParameterId BaseColorId("mini_pbr.material.base_color");
@@ -34,6 +48,38 @@ namespace gglab
 		{
 			return static_cast<float>(index) / static_cast<float>(GridSize - 1);
 		}
+
+		bool ComputeModelBounds(
+			const Model& model,
+			const AssetManager& assetManager,
+			DirectX::BoundingBox& result) noexcept
+		{
+			bool hasBounds = false;
+			for (const ModelMesh& modelMesh : model.m_MeshInstance)
+			{
+				const Mesh* mesh = assetManager.GetMesh(modelMesh.m_MeshId);
+				if (!mesh || !mesh->m_HasBounds)
+				{
+					continue;
+				}
+
+				DirectX::BoundingBox transformedBounds{};
+				mesh->m_BoundingBox.Transform(transformedBounds, modelMesh.m_LocalTransform);
+				if (!hasBounds)
+				{
+					result = transformedBounds;
+					hasBounds = true;
+				}
+				else
+				{
+					DirectX::BoundingBox::CreateMerged(
+						result,
+						result,
+						transformedBounds);
+				}
+			}
+			return hasBounds;
+		}
 	}
 
 	MiniPBRGridLabSession::MiniPBRGridLabSession(
@@ -44,6 +90,19 @@ namespace gglab
 			std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = SceneSourceId,
+			.m_Name = "Scene Source",
+			.m_Group = "Scene",
+			.m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::RebuildScene,
+			.m_DefaultValue = int32_t(SceneSource::ProceduralGrid),
+			.m_EnumItems = {
+				{ .m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid" },
+				{ .m_Value = int32_t(SceneSource::MetalRoughSpheres), .m_Name = "MetalRoughSpheres" },
+				{ .m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures), .m_Name = "MetalRoughSpheresNoTextures" },
+			},
+		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,
 			.m_Name = "Enable Camera Input",
@@ -65,7 +124,7 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BaseColorId,
 			.m_Name = "Base Color",
-			.m_Group = "Material Grid",
+			.m_Group = "Procedural Material",
 			.m_Type = LabParameterType::Color,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = Color(0.82f, 0.18f, 0.08f, 1.0f),
@@ -73,7 +132,7 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = MetallicMinId,
 			.m_Name = "Metallic Min",
-			.m_Group = "Material Grid",
+			.m_Group = "Procedural Material",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 0.0f,
@@ -83,7 +142,7 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = MetallicMaxId,
 			.m_Name = "Metallic Max",
-			.m_Group = "Material Grid",
+			.m_Group = "Procedural Material",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 1.0f,
@@ -93,7 +152,7 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = RoughnessMinId,
 			.m_Name = "Roughness Min",
-			.m_Group = "Material Grid",
+			.m_Group = "Procedural Material",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 0.05f,
@@ -103,7 +162,7 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = RoughnessMaxId,
 			.m_Name = "Roughness Max",
-			.m_Group = "Material Grid",
+			.m_Group = "Procedural Material",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 0.9f,
@@ -113,7 +172,7 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = DebugViewId,
 			.m_Name = "Debug View",
-			.m_Group = "Material Grid",
+			.m_Group = "Procedural Material",
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(MaterialDebugView::Lit),
@@ -136,8 +195,6 @@ namespace gglab
 			.m_MaxValue = LabValue(20.0f),
 		}));
 
-		GetCamera().LookAt(Vector3(0.0f, 0.0f, -9.0f), Vector3(0.0f, 0.0f, GridDepth));
-		GetCamera().SetPosition(Vector3(8.0f, -7.0f, -20.0f));
 		ApplyImmediateParameters();
 		RebuildScene();
 	}
@@ -209,15 +266,41 @@ namespace gglab
 	{
 		auto& registry = m_World.GetRegistry();
 		registry.clear();
+		ApplyCameraPreset();
 
+		const auto sceneSource = static_cast<SceneSource>(GetParameters().Get(
+			SceneSourceId,
+			int32_t(SceneSource::ProceduralGrid)));
+		switch (sceneSource)
+		{
+		case SceneSource::MetalRoughSpheres:
+			GGLAB_UNUSED(BuildAssetModel(MetalRoughSpheresPath));
+			break;
+		case SceneSource::MetalRoughSpheresNoTextures:
+			GGLAB_UNUSED(BuildAssetModel(MetalRoughSpheresNoTexturesPath));
+			break;
+		case SceneSource::ProceduralGrid:
+		default:
+			BuildProceduralGrid();
+			break;
+		}
+
+		BuildLighting();
+		ApplyImmediateParameters();
+	}
+
+	void MiniPBRGridLabSession::BuildProceduralGrid() noexcept
+	{
+		auto& registry = m_World.GetRegistry();
+		const float halfGridSize = static_cast<float>(GridSize - 1) * 0.5f;
 		for (uint32_t row = 0; row < GridSize; ++row)
 		{
 			for (uint32_t column = 0; column < GridSize; ++column)
 			{
 				components::TransformComponent transform{};
 				transform.m_Position = Vector3(
-					(static_cast<float>(column) - 1.0f) * GridSpacing,
-					(1.0f - static_cast<float>(row)) * GridSpacing,
+					(static_cast<float>(column) - halfGridSize) * GridSpacing,
+					(halfGridSize - static_cast<float>(row)) * GridSpacing,
 					GridDepth);
 				transform.m_Scale = Vector3::One * 0.95f;
 
@@ -241,7 +324,56 @@ namespace gglab
 				});
 			}
 		}
+	}
 
+	bool MiniPBRGridLabSession::BuildAssetModel(std::string_view path) noexcept
+	{
+		auto& assetManager = *m_Services.m_AssetManager;
+		const ModelID modelId = assetManager.LoadModel(std::filesystem::path(path));
+		const Model* model = assetManager.GetModel(modelId);
+		if (!model)
+		{
+			GGLAB_LOG_ERROR("Mini PBR Grid failed to load model '{}'.", path);
+			return false;
+		}
+		GGLAB_LOG_INFO(
+			"Mini PBR Grid loaded '{}' with {} mesh instances.",
+			path,
+			model->m_MeshInstance.size());
+
+		DirectX::BoundingBox bounds{};
+		if (!ComputeModelBounds(*model, assetManager, bounds))
+		{
+			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has no valid bounds.", path);
+			return false;
+		}
+
+		const Vector3 fullExtent = Vector3(bounds.Extents) * 2.0f;
+		const float maxExtent = std::max({ fullExtent.x, fullExtent.y, fullExtent.z });
+		if (maxExtent <= 0.0f)
+		{
+			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has degenerate bounds.", path);
+			return false;
+		}
+
+		components::TransformComponent transform{};
+		const float scale = TargetAssetModelExtent / maxExtent;
+		transform.m_Scale = Vector3::One * scale;
+		transform.m_Position = Vector3(0.0f, 0.0f, GridDepth) -
+			Vector3(bounds.Center) * scale;
+
+		auto& registry = m_World.GetRegistry();
+		const entt::entity entity = registry.create();
+		registry.emplace<components::TransformComponent>(entity, transform);
+		registry.emplace<components::ModelComponent>(entity, components::ModelComponent{
+			.m_ModelId = modelId,
+		});
+		return true;
+	}
+
+	void MiniPBRGridLabSession::BuildLighting() noexcept
+	{
+		auto& registry = m_World.GetRegistry();
 		const entt::entity lightEntity = registry.create();
 		components::TransformComponent lightTransform{};
 		Vector3 lightDirection(-0.45f, -0.75f, 0.48f);
@@ -257,7 +389,14 @@ namespace gglab
 		light.m_Color = color::White;
 		light.m_Range = 1000.0f;
 		registry.emplace<components::LightComponent>(lightEntity, light);
-		ApplyImmediateParameters();
+	}
+
+	void MiniPBRGridLabSession::ApplyCameraPreset() noexcept
+	{
+		GetCamera().LookAt(
+			Vector3(0.0f, 1.8f, -20.0f),
+			Vector3(0.0f, 0.0f, GridDepth));
+		GetCamera().Update();
 	}
 
 	LabId MiniPBRGridLabSession::GetId() noexcept
@@ -271,7 +410,7 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Mini PBR Grid",
 			.m_Category = "Materials",
-			.m_Description = "A procedural sphere grid for comparing metallic and roughness values.",
+			.m_Description = "Compares runtime, textured and factor-only metallic-roughness sphere grids.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

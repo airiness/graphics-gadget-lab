@@ -19,7 +19,8 @@ namespace gglab
 
 		// Camera
 		Camera::CreateInfo camCreateInfo{};
-		camCreateInfo.m_Position = Vector3(60.0f, 36.0f, 1.0f);
+		camCreateInfo.m_Forward = -Vector3::UnitX;
+		camCreateInfo.m_Position = Vector3(8.0f, 2.0f, 0.0f);
 		camCreateInfo.m_Width = createInfo.m_WindowWidth;
 		camCreateInfo.m_Height = createInfo.m_WindowHeight;
 		camCreateInfo.m_Near = 0.1f;
@@ -115,19 +116,19 @@ namespace gglab
 			"Assets/Models/Sponza/Sponza.gltf",
 			Vector3::Zero,
 			Vector3::Zero,
-			Vector3::One * 0.1f);
+			Vector3::One);
 
 		// Flight helmet
 		createEntityWithModel(
 			"Assets/Models/FlightHelmet/FlightHelmet.gltf",
-			Vector3(10.0f, 20.0f, 0.0f),
+			Vector3(0.0f, 0.0f, 0.0f),
 			Vector3::Zero,
 			Vector3::One);
 
 		// Alpha Blend Model Test
 		createEntityWithModel(
 			"Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf",
-			Vector3(-10.0f, 20.0f, 0.0f),
+			Vector3(-5.0f, 0.0f, 0.0f),
 			Vector3::Zero,
 			Vector3::One);
 
