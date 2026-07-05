@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/LabRuntime.h"
+#include "Core/Time.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIContext.h"
 
@@ -9,6 +10,7 @@ namespace gglab
 		m_CreateInfo(createInfo)
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "LabRuntime requires valid create info.");
+		m_CreateInfo.m_RunConfig.Sanitize();
 	}
 
 	LabRuntime::~LabRuntime()
@@ -18,7 +20,7 @@ namespace gglab
 
 	bool LabRuntime::RegisterLab(LabDescriptor descriptor, LabSessionFactory factory) noexcept
 	{
-		if (m_State != LabRuntimeState::Uninitialized)
+		if (m_State != LabRunState::Uninitialized)
 		{
 			GGLAB_LOG_ERROR("Labs must be registered before LabRuntime initialization.");
 			return false;
@@ -28,7 +30,7 @@ namespace gglab
 
 	bool LabRuntime::Initialize(const LabId& startupLab) noexcept
 	{
-		if (m_State != LabRuntimeState::Uninitialized)
+		if (m_State != LabRunState::Uninitialized)
 		{
 			return IsReady();
 		}
@@ -50,8 +52,12 @@ namespace gglab
 		}
 		m_IsEntered = false;
 		m_ActiveSession.reset();
-		m_State = LabRuntimeState::Uninitialized;
+		m_State = LabRunState::Uninitialized;
 		m_FrameInSession = 0;
+		m_WarmupFramesRemaining = 0;
+		m_EffectiveDeltaTime = 0.0f;
+		m_LastFrameFeedback = {};
+		m_HasFrameFeedback = false;
 	}
 
 	void LabRuntime::OnEnter() noexcept
@@ -89,19 +95,39 @@ namespace gglab
 
 	void LabRuntime::Update() noexcept
 	{
-		GGLAB_ASSERT_MSG(IsReady(), "LabRuntime requires an active session before update.");
+		GGLAB_ASSERT_MSG(m_ActiveSession, "LabRuntime requires an active session before update.");
 		if (m_ActiveSession)
 		{
-			m_ActiveSession->Update();
-			++m_FrameInSession;
+			const LabRunConfig& config = m_CreateInfo.m_RunConfig;
+			m_EffectiveDeltaTime = config.m_UseFixedDeltaTime ?
+				config.m_FixedDeltaTime :
+				static_cast<float>(m_CreateInfo.m_Services.m_Time->GetDeltaTime());
+			m_ActiveSession->Update(m_EffectiveDeltaTime);
 		}
 	}
 
 	void LabRuntime::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
+		m_LastFrameFeedback = feedback;
+		m_HasFrameFeedback = true;
 		if (m_ActiveSession)
 		{
 			m_ActiveSession->OnFrameSubmitted(feedback);
+			++m_FrameInSession;
+		}
+
+		if (m_State == LabRunState::WarmingUp &&
+			feedback.m_RenderSceneStatus == RenderSceneBuildStatus::Ready &&
+			feedback.m_SubmittedFence.IsValid())
+		{
+			if (m_WarmupFramesRemaining > 0)
+			{
+				--m_WarmupFramesRemaining;
+			}
+			if (m_WarmupFramesRemaining == 0)
+			{
+				m_State = LabRunState::Ready;
+			}
 		}
 	}
 
@@ -111,6 +137,16 @@ namespace gglab
 		if (commands.m_SwitchTarget)
 		{
 			GGLAB_UNUSED(ReplaceActiveSession(*commands.m_SwitchTarget, true));
+			return;
+		}
+
+		if (commands.m_RunConfig && m_ActiveSession)
+		{
+			m_CreateInfo.m_RunConfig = *commands.m_RunConfig;
+			m_CreateInfo.m_RunConfig.Sanitize();
+			const std::vector<LabParameterValue> values =
+				m_ActiveSession->GetParameters().CaptureValues();
+			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
 			return;
 		}
 
@@ -180,6 +216,16 @@ namespace gglab
 		LabSnapshot snapshot{};
 		snapshot.m_State = m_State;
 		snapshot.m_FrameInSession = m_FrameInSession;
+		snapshot.m_RunConfig = m_CreateInfo.m_RunConfig;
+		snapshot.m_WarmupFramesRemaining = m_WarmupFramesRemaining;
+		snapshot.m_EffectiveDeltaTime = m_EffectiveDeltaTime;
+		snapshot.m_LastFrame = {
+			.m_RenderSceneStatus = m_LastFrameFeedback.m_RenderSceneStatus,
+			.m_SubmittedFenceValue = m_LastFrameFeedback.m_SubmittedFence.m_Value,
+			.m_ApplicationFrameIndex = m_LastFrameFeedback.m_FrameIndex,
+			.m_BackBufferIndex = m_LastFrameFeedback.m_BackBufferIndex,
+			.m_HasFeedback = m_HasFrameFeedback,
+		};
 		snapshot.m_LastError = m_LastError;
 		snapshot.m_HasPendingCommands = !m_CommandQueue.IsEmpty();
 		snapshot.m_IsHostActive = m_IsEntered;
@@ -243,8 +289,11 @@ namespace gglab
 
 	bool LabRuntime::ReplaceActiveSession(const LabId& id, bool waitForGpu) noexcept
 	{
+		const LabRunState previousState = m_State;
+		m_State = LabRunState::Loading;
 		if (!m_Catalog.Find(id))
 		{
+			m_State = previousState;
 			SetError(std::format("Lab '{}' is not registered.", id.GetName()));
 			return false;
 		}
@@ -252,6 +301,7 @@ namespace gglab
 		auto nextSession = m_Catalog.Create(id, m_CreateInfo);
 		if (!nextSession || !nextSession->IsValid())
 		{
+			m_State = previousState;
 			SetError(std::format("Failed to create lab '{}'.", id.GetName()));
 			return false;
 		}
@@ -274,8 +324,13 @@ namespace gglab
 		}
 
 		m_LastError.clear();
-		m_State = LabRuntimeState::Ready;
+		m_WarmupFramesRemaining = m_CreateInfo.m_RunConfig.m_WarmupFrames;
+		m_State = m_WarmupFramesRemaining > 0 ?
+			LabRunState::WarmingUp : LabRunState::Ready;
 		m_FrameInSession = 0;
+		m_EffectiveDeltaTime = 0.0f;
+		m_LastFrameFeedback = {};
+		m_HasFrameFeedback = false;
 		GGLAB_LOG_INFO("Activated lab '{}'.", id.GetName());
 		return true;
 	}
@@ -320,7 +375,7 @@ namespace gglab
 		m_LastError = std::move(message);
 		if (!m_ActiveSession)
 		{
-			m_State = LabRuntimeState::Failed;
+			m_State = LabRunState::Failed;
 		}
 		GGLAB_LOG_ERROR("{}", m_LastError);
 	}

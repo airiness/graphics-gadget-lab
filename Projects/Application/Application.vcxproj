@@ -220,6 +220,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.cpp" />
@@ -439,11 +440,15 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabInterfaces.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabParameter.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabPresetSchema.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabRunConfig.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h" />
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />

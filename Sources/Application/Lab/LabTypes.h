@@ -33,10 +33,14 @@ namespace gglab
 		Pipeline,
 	};
 
-	enum class LabRuntimeState : uint8_t
+	enum class LabRunState : uint8_t
 	{
 		Uninitialized,
+		Loading,
+		WarmingUp,
 		Ready,
+		Capturing,
+		Completed,
 		Failed,
 	};
 

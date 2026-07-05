@@ -16,6 +16,8 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "Diagnostics/Builders/LabSnapshotProvider.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
@@ -192,6 +194,9 @@ namespace gglab
 		}
 		else
 		{
+			m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
+				std::make_unique<LabSnapshotProvider>(&labHost->GetLabRuntime()),
+				SnapshotUpdatePolicy::EveryFrame);
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
 				std::make_unique<DemoPanel>(m_DemoManager.get()));
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(

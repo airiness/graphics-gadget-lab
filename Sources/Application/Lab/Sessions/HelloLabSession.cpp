@@ -99,11 +99,11 @@ namespace gglab
 		RebuildScene();
 	}
 
-	void HelloLabSession::Update() noexcept
+	void HelloLabSession::Update(float deltaTime) noexcept
 	{
 		if (m_EnableCameraInput)
 		{
-			UpdateCamera();
+			UpdateCamera(deltaTime);
 		}
 		else
 		{

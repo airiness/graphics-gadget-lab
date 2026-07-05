@@ -1,21 +1,30 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 #include "Application/Lab/LabInterfaces.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 
 namespace gglab
 {
 	namespace
 	{
-		const char* ToText(LabRuntimeState state) noexcept
+		const char* ToText(LabRunState state) noexcept
 		{
 			switch (state)
 			{
-			case LabRuntimeState::Uninitialized:
+			case LabRunState::Uninitialized:
 				return "Uninitialized";
-			case LabRuntimeState::Ready:
+			case LabRunState::Loading:
+				return "Loading";
+			case LabRunState::WarmingUp:
+				return "Warming Up";
+			case LabRunState::Ready:
 				return "Ready";
-			case LabRuntimeState::Failed:
+			case LabRunState::Capturing:
+				return "Capturing";
+			case LabRunState::Completed:
+				return "Completed";
+			case LabRunState::Failed:
 				return "Failed";
 			}
 			return "Unknown";
@@ -37,7 +46,15 @@ namespace gglab
 			return;
 		}
 
-		const LabSnapshot snapshot = m_SnapshotSource->GetLabSnapshot();
+		LabSnapshot sourceSnapshot{};
+		const LabSnapshot* snapshotPtr = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<LabSnapshot>() : nullptr;
+		if (!snapshotPtr)
+		{
+			sourceSnapshot = m_SnapshotSource->GetLabSnapshot();
+			snapshotPtr = &sourceSnapshot;
+		}
+		const LabSnapshot& snapshot = *snapshotPtr;
 		bool commandQueued = false;
 
 		ImGui::TextUnformatted("Active Lab");
@@ -66,6 +83,19 @@ namespace gglab
 
 		ImGui::Text("State: %s", ToText(snapshot.m_State));
 		ImGui::Text("Session frame: %llu", snapshot.m_FrameInSession);
+		if (snapshot.m_State == LabRunState::WarmingUp)
+		{
+			ImGui::Text("Warm-up remaining: %u", snapshot.m_WarmupFramesRemaining);
+		}
+		ImGui::Text("Effective delta: %.6f s", snapshot.m_EffectiveDeltaTime);
+		if (snapshot.m_LastFrame.m_HasFeedback)
+		{
+			ImGui::Text(
+				"Last submitted frame: %llu (back buffer %u, fence %llu)",
+				snapshot.m_LastFrame.m_ApplicationFrameIndex,
+				snapshot.m_LastFrame.m_BackBufferIndex,
+				snapshot.m_LastFrame.m_SubmittedFenceValue);
+		}
 		if (!snapshot.m_IsHostActive)
 		{
 			ImGui::TextDisabled("Demo.LabHost is inactive; commands will apply when it becomes active.");
@@ -91,6 +121,41 @@ namespace gglab
 		{
 			m_Control->RequestRestartSession();
 			commandQueued = true;
+		}
+
+		if (!m_RunConfigDraft || m_RunConfigLabId != snapshot.m_ActiveLabId)
+		{
+			m_RunConfigDraft = snapshot.m_RunConfig;
+			m_RunConfigLabId = snapshot.m_ActiveLabId;
+		}
+		if (m_RunConfigDraft && ImGui::CollapsingHeader("Run Configuration"))
+		{
+			LabRunConfig& config = *m_RunConfigDraft;
+			ImGui::InputScalar(
+				"Random Seed",
+				ImGuiDataType_U64,
+				&config.m_RandomSeed);
+			ImGui::DragScalar(
+				"Warm-up Frames",
+				ImGuiDataType_U32,
+				&config.m_WarmupFrames,
+				1.0f);
+			ImGui::Checkbox("Use Fixed Delta Time", &config.m_UseFixedDeltaTime);
+			ImGui::BeginDisabled(!config.m_UseFixedDeltaTime);
+			ImGui::DragFloat(
+				"Fixed Delta Time",
+				&config.m_FixedDeltaTime,
+				0.0001f,
+				1.0f / 1000.0f,
+				1.0f,
+				"%.6f s");
+			ImGui::EndDisabled();
+			if (ImGui::Button("Restart with Run Config"))
+			{
+				config.Sanitize();
+				m_Control->RequestRunConfig(config);
+				commandQueued = true;
+			}
 		}
 
 		std::string_view currentGroup;

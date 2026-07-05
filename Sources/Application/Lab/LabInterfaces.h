@@ -1,5 +1,6 @@
 #pragma once
-#include "Application/Lab/LabSnapshot.h"
+#include "Application/Lab/LabRunConfig.h"
+#include "Diagnostics/Snapshots/LabSnapshot.h"
 
 namespace gglab
 {
@@ -15,6 +16,7 @@ namespace gglab
 		virtual void RequestResetParameters() noexcept = 0;
 		virtual void RequestRebuildScene() noexcept = 0;
 		virtual void RequestRestartSession() noexcept = 0;
+		virtual void RequestRunConfig(const LabRunConfig& config) noexcept = 0;
 	};
 
 	class ILabSnapshotSource

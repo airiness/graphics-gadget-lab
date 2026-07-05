@@ -1,5 +1,9 @@
 #pragma once
+#include "Application/Lab/LabRunConfig.h"
+#include "Application/Lab/LabTypes.h"
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
+
+#include <optional>
 
 namespace gglab
 {
@@ -26,5 +30,7 @@ namespace gglab
 
 		ILabControl* m_Control = nullptr;
 		ILabSnapshotSource* m_SnapshotSource = nullptr;
+		std::optional<LabRunConfig> m_RunConfigDraft;
+		LabId m_RunConfigLabId;
 	};
 }
