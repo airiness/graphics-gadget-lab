@@ -12,7 +12,7 @@ namespace gglab
 	class DemoPlayground : public DemoBase
 	{
 	public:
-		DemoPlayground() noexcept;
+		explicit DemoPlayground(const DemoCreateInfo& createInfo) noexcept;
 		~DemoPlayground() override = default;
 
 		std::string_view GetName() const noexcept override { return "Demo.Playground"; }
@@ -32,6 +32,7 @@ namespace gglab
 		void InitializeScene() noexcept;
 
 	private:
+		DemoServices m_Services{};
 		World m_World;
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;

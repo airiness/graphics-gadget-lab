@@ -1,5 +1,4 @@
 #include "Core/Precompiled.h"
-#include "Application/Application.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Core/Time.h"
 #include "Core/Input/InputManager.h"
@@ -13,15 +12,16 @@
 
 namespace gglab
 {
-	DemoPlayground::DemoPlayground() noexcept
+	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo) noexcept :
+		m_Services(createInfo.m_Services)
 	{
-		auto* app = Application::GetInstance();
+		GGLAB_ASSERT_MSG(createInfo.IsValid(), "DemoPlayground requires valid create info.");
 
 		// Camera
 		Camera::CreateInfo camCreateInfo{};
 		camCreateInfo.m_Position = Vector3(60.0f, 36.0f, 1.0f);
-		camCreateInfo.m_Width = app->GetWindowWidth();
-		camCreateInfo.m_Height = app->GetWindowHeight();
+		camCreateInfo.m_Width = createInfo.m_WindowWidth;
+		camCreateInfo.m_Height = createInfo.m_WindowHeight;
 		camCreateInfo.m_Near = 0.1f;
 		camCreateInfo.m_Far = 1000.0f;
 		camCreateInfo.m_Fov = 60.0f;
@@ -57,9 +57,10 @@ namespace gglab
 
 	void DemoPlayground::Update() noexcept
 	{
-		auto* app = Application::GetInstance();
-		auto* inputManager = app->GetInputManager();
-		auto* time = app->GetTime();
+		auto* inputManager = m_Services.m_InputManager;
+		auto* time = m_Services.m_Time;
+		GGLAB_ASSERT_NOT_NULL(inputManager);
+		GGLAB_ASSERT_NOT_NULL(time);
 		auto* mouse = inputManager->GetMouse();
 		auto* keyboard = inputManager->GetKeyboard();
 		const auto mouseCoord = mouse->GetMouseCoord();
@@ -83,7 +84,8 @@ namespace gglab
 
 	void DemoPlayground::InitializeScene() noexcept
 	{
-		auto* assetManager = Application::GetInstance()->GetAssetManager();
+		auto* assetManager = m_Services.m_AssetManager;
+		GGLAB_ASSERT_NOT_NULL(assetManager);
 		auto& registry = m_World.GetRegistry();
 
 		auto createEntityWithModel = [&](

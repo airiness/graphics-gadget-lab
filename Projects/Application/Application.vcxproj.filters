@@ -390,6 +390,9 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
@@ -935,6 +938,9 @@
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
@@ -1092,6 +1098,9 @@
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanel.h">
