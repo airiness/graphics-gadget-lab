@@ -143,6 +143,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
+    <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
@@ -298,6 +299,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32MessageHandler.h" />

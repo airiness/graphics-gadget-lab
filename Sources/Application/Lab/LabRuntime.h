@@ -41,6 +41,12 @@ namespace gglab
 		LabSnapshot GetLabSnapshot() const noexcept override;
 
 		LabRunState GetState() const noexcept { return m_State; }
+		bool IsInitialized() const noexcept
+		{
+			return m_ActiveSession &&
+				m_State != LabRunState::Uninitialized &&
+				m_State != LabRunState::Failed;
+		}
 		bool IsReady() const noexcept { return m_State == LabRunState::Ready && m_ActiveSession; }
 		std::string_view GetLastError() const noexcept { return m_LastError; }
 		const LabCatalog& GetCatalog() const noexcept { return m_Catalog; }
