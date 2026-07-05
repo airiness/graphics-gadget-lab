@@ -64,10 +64,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <TargetName>$(SolutionName)App</TargetName>
+    <TargetName>GraphicsGadgetLab</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <TargetName>$(SolutionName)App</TargetName>
+    <TargetName>GraphicsGadgetLab</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -238,6 +238,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
@@ -444,9 +445,11 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabRunConfig.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />

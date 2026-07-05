@@ -268,6 +268,7 @@ namespace gglab
 
 		uint64_t lastVariantBits = std::numeric_limits<uint64_t>::max();
 		MeshID lastMeshId{};
+		bool hasBoundMesh = false;
 
 		for (uint32_t index = 0; index < range.m_Count; ++index)
 		{
@@ -280,7 +281,6 @@ namespace gglab
 					GetOrCreatePSOForVariant(*services.m_Renderer, drawItem.m_VariantBits));
 
 				lastVariantBits = drawItem.m_VariantBits;
-				lastMeshId = {}; // Because PSO changed
 			}
 
 			// Set Mesh
@@ -291,13 +291,14 @@ namespace gglab
 				continue;
 			}
 
-			if (drawItem.m_MeshId != lastMeshId)
+			if (!hasBoundMesh || drawItem.m_MeshId != lastMeshId)
 			{
 				graphicsContext->SetVertexBuffers(
 					0,
 					std::span<const RHIVertexBufferBinding>(&mesh->m_VertexBufferBinding, 1));
 				graphicsContext->SetIndexBuffer(mesh->m_IndexBufferBinding);
 				lastMeshId = drawItem.m_MeshId;
+				hasBoundMesh = true;
 			}
 
 			// Per draw item bindings

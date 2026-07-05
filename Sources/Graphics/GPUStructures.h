@@ -91,9 +91,9 @@ namespace gglab
 		int32_t AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND
 		float AlphaCutoff;
 		uint32_t Flags; // bit 0: doubleSided
-
-		uint32_t Padding;
+		uint32_t DebugView;
 	};
+	static_assert(sizeof(MaterialGPU) == 144);
 	static constexpr uint32_t MaxMaterialCapacity = 128;
 	static constexpr uint32_t MaxLightCapacity = 64;
 

@@ -97,6 +97,15 @@ namespace gglab
 	};
 	GGLAB_ENUM_FLAGS(MaterialFlags);
 
+	enum class MaterialDebugView : uint32_t
+	{
+		Lit,
+		BaseColor,
+		Metallic,
+		Roughness,
+		Normal,
+	};
+
 	enum class MaterialTextureSlot : uint32_t
 	{
 		BaseColor,
@@ -177,16 +186,70 @@ namespace gglab
 	// MeshID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshID, uint32_t);
 	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
+	inline constexpr MeshID ProceduralSphereMeshID{ 1u };
 	inline constexpr MeshID::ValueType ReservedMeshCount = 8u;
 
 	// MaterialID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialID, uint32_t);
-	inline constexpr MaterialID ProceduralCubeMaterialID{ 0u };
+	inline constexpr MaterialID ProceduralPrimitiveMaterialID{ 0u };
+	inline constexpr MaterialID ProceduralCubeMaterialID = ProceduralPrimitiveMaterialID;
 	inline constexpr MaterialID::ValueType ReservedMaterialCount = 8u;
+
+	class RuntimeMaterialKey
+	{
+	public:
+		RuntimeMaterialKey() noexcept = default;
+		explicit RuntimeMaterialKey(std::string_view name) noexcept : m_Id(name) {}
+		explicit constexpr RuntimeMaterialKey(uint64_t value) noexcept : m_Id(value) {}
+
+		[[nodiscard]] bool IsValid() const noexcept { return m_Id.Value() != 0; }
+		[[nodiscard]] uint64_t Value() const noexcept { return m_Id.Value(); }
+		friend constexpr auto operator<=>(const RuntimeMaterialKey&, const RuntimeMaterialKey&) = default;
+
+	private:
+		StringID m_Id{};
+	};
+
+	enum class RenderMaterialDomain : uint8_t
+	{
+		Asset,
+		Runtime,
+	};
+
+	struct RenderMaterialKey
+	{
+		static RenderMaterialKey FromAsset(MaterialID id) noexcept
+		{
+			return {
+				.m_Value = static_cast<uint64_t>(id.Value()),
+				.m_Domain = RenderMaterialDomain::Asset,
+			};
+		}
+
+		static RenderMaterialKey FromRuntime(RuntimeMaterialKey key) noexcept
+		{
+			return {
+				.m_Value = key.Value(),
+				.m_Domain = RenderMaterialDomain::Runtime,
+			};
+		}
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Domain == RenderMaterialDomain::Asset ?
+				m_Value != MaterialID::InvalidValue : m_Value != 0;
+		}
+
+		friend constexpr auto operator<=>(const RenderMaterialKey&, const RenderMaterialKey&) = default;
+
+		uint64_t m_Value = MaterialID::InvalidValue;
+		RenderMaterialDomain m_Domain = RenderMaterialDomain::Asset;
+	};
 
 	// ModelID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelID, uint32_t);
 	inline constexpr ModelID ProceduralCubeModelID{ 0u };
+	inline constexpr ModelID ProceduralSphereModelID{ 1u };
 	inline constexpr ModelID::ValueType ReservedModelCount = 8u;
 
 	struct Texture
@@ -212,10 +275,8 @@ namespace gglab
 		uint32_t m_TexCoordIndex = 0;
 	};
 
-	struct Material
+	struct MaterialProperties
 	{
-		MaterialID m_Id{};
-
 		MaterialTextureBinding m_BaseColorBinding{};
 		MaterialTextureBinding m_EmissiveBinding{};
 		MaterialTextureBinding m_MetallicRoughnessBinding{};
@@ -232,8 +293,13 @@ namespace gglab
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;
 		AlphaCutoffMode m_AlphaCutoffMode = AlphaCutoffMode::Disabled;
-
 		float m_AlphaCutoff = 0.5f;
+		MaterialDebugView m_DebugView = MaterialDebugView::Lit;
+	};
+
+	struct Material : MaterialProperties
+	{
+		MaterialID m_Id{};
 
 		StringID m_Name{};
 	};
@@ -272,5 +338,28 @@ namespace gglab
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		std::vector<ModelMesh> m_MeshInstance;
+	};
+}
+
+namespace std
+{
+	template<>
+	struct hash<gglab::RuntimeMaterialKey>
+	{
+		size_t operator()(gglab::RuntimeMaterialKey key) const noexcept
+		{
+			return std::hash<uint64_t>{}(key.Value());
+		}
+	};
+
+	template<>
+	struct hash<gglab::RenderMaterialKey>
+	{
+		size_t operator()(const gglab::RenderMaterialKey& key) const noexcept
+		{
+			const size_t valueHash = std::hash<uint64_t>{}(key.m_Value);
+			const size_t domainHash = std::hash<uint8_t>{}(static_cast<uint8_t>(key.m_Domain));
+			return valueHash ^ (domainHash + 0x9e3779b9u + (valueHash << 6) + (valueHash >> 2));
+		}
 	};
 }

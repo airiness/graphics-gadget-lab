@@ -13,6 +13,54 @@ namespace gglab
 	namespace
 	{
 		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
+
+		MaterialGPU BuildMaterialGpu(
+			const MaterialProperties& material,
+			const AssetManager& assetManager) noexcept
+		{
+			MaterialGPU gpu{};
+			gpu.BaseColorFactor = material.m_BaseColor;
+			gpu.MetallicFactor = material.m_MetallicFactor;
+			gpu.RoughnessFactor = material.m_RoughnessFactor;
+			gpu.NormalScale = material.m_NormalScale;
+			gpu.OcclusionStrength = material.m_OcclusionStrength;
+			gpu.EmissiveColorFactor = material.m_EmissiveColor;
+
+			gpu.BaseColorBinding = assetManager.ResolveTextureBinding(
+				material.m_BaseColorBinding,
+				ReservedTextureIDIndex::BaseColorWhite,
+				SamplerPreset::LinearWrap);
+			gpu.EmissiveBinding = assetManager.ResolveTextureBinding(
+				material.m_EmissiveBinding,
+				ReservedTextureIDIndex::EmissiveBlack,
+				SamplerPreset::LinearWrap);
+			gpu.MetallicRoughnessBinding = assetManager.ResolveTextureBinding(
+				material.m_MetallicRoughnessBinding,
+				ReservedTextureIDIndex::DefaultMetallicRoughness,
+				SamplerPreset::LinearWrap);
+			gpu.NormalBinding = assetManager.ResolveTextureBinding(
+				material.m_NormalBinding,
+				ReservedTextureIDIndex::NormalFlat,
+				SamplerPreset::LinearWrap);
+			gpu.OcclusionBinding = assetManager.ResolveTextureBinding(
+				material.m_OcclusionBinding,
+				ReservedTextureIDIndex::OcclusionWhite,
+				SamplerPreset::LinearWrap);
+
+			gpu.AlphaMode = static_cast<int32_t>(material.m_AlphaMode);
+			gpu.AlphaCutoff = material.m_AlphaCutoff;
+			gpu.Flags = static_cast<uint32_t>(material.m_Flags);
+			gpu.DebugView = static_cast<uint32_t>(material.m_DebugView);
+			return gpu;
+		}
+
+		struct MaterialUploadRecord
+		{
+			MaterialGPU m_Gpu{};
+			uint32_t m_Index = 0;
+			MaterialFlags m_Flags = MaterialFlags::None;
+			AlphaMode m_AlphaMode = AlphaMode::Opaque;
+		};
 	}
 
 	RenderSceneBuilder::BuildResult RenderSceneBuilder::Build(const BuildInfo& info) noexcept
@@ -33,7 +81,7 @@ namespace gglab
 		result.m_RenderScene.m_RenderInstances.clear();
 
 		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
-		using MaterialTable = PersistentStructuredBufferTable<MaterialID, MaterialGPU>;
+		using MaterialTable = PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>;
 		using LightTable = PersistentStructuredBufferTable<uint64_t, LightGPU>;
 		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_ObjectsSB.GetBufferCount());
 		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_MaterialsSB.GetBufferCount());
@@ -45,10 +93,10 @@ namespace gglab
 		std::vector<ViewGPU> viewData;
 		viewData.reserve(renderViews.size());
 
-		std::unordered_map<MaterialID, uint32_t> materialIndexMap;
+		std::unordered_map<RenderMaterialKey, MaterialUploadRecord> materialRecords;
 
 		registry.view<components::TransformComponent, components::ModelComponent>().each(
-			[&result, &assetManager, &info, &materialIndexMap](auto entity,
+			[&result, &assetManager, &info, &registry, &materialRecords](auto entity,
 				const components::TransformComponent& transformComp,
 				const components::ModelComponent& modelComp)
 			{
@@ -79,65 +127,58 @@ namespace gglab
 						continue;
 					}
 
-					uint32_t materialIndex = 0;
-					auto iter = materialIndexMap.find(modelMesh.m_MaterialId);
-					if (iter == materialIndexMap.end())
+					const MaterialProperties* material = nullptr;
+					RenderMaterialKey materialKey{};
+					const auto* materialInstance =
+						registry.try_get<components::MaterialInstanceComponent>(entity);
+					if (materialInstance && materialInstance->m_Key.IsValid())
 					{
-						const Material* material = assetManager.GetMaterial(modelMesh.m_MaterialId);
-						if (!material)
-						{
-							GGLAB_LOG_GRAPHICS_WARN("Mesh has invalid MaterialID.");
-							continue;
-						}
+						material = &materialInstance->m_Properties;
+						materialKey = RenderMaterialKey::FromRuntime(materialInstance->m_Key);
+					}
+					else
+					{
+						material = assetManager.GetMaterial(modelMesh.m_MaterialId);
+						materialKey = RenderMaterialKey::FromAsset(modelMesh.m_MaterialId);
+					}
 
-						MaterialGPU materialGpu{};
-						materialGpu.BaseColorFactor = material->m_BaseColor;
-						materialGpu.MetallicFactor = material->m_MetallicFactor;
-						materialGpu.RoughnessFactor = material->m_RoughnessFactor;
-						materialGpu.NormalScale = material->m_NormalScale;
-						materialGpu.OcclusionStrength = material->m_OcclusionStrength;
-						materialGpu.EmissiveColorFactor = material->m_EmissiveColor;
+					if (!material)
+					{
+						GGLAB_LOG_GRAPHICS_WARN("Mesh has no valid material.");
+						continue;
+					}
 
-						materialGpu.BaseColorBinding = assetManager.ResolveTextureBinding(material->m_BaseColorBinding,
-							ReservedTextureIDIndex::BaseColorWhite,
-							SamplerPreset::LinearWrap);
-
-						materialGpu.EmissiveBinding = assetManager.ResolveTextureBinding(material->m_EmissiveBinding,
-							ReservedTextureIDIndex::EmissiveBlack,
-							SamplerPreset::LinearWrap);
-
-						materialGpu.MetallicRoughnessBinding = assetManager.ResolveTextureBinding(material->m_MetallicRoughnessBinding,
-							ReservedTextureIDIndex::DefaultMetallicRoughness,
-							SamplerPreset::LinearWrap);
-
-						materialGpu.NormalBinding = assetManager.ResolveTextureBinding(material->m_NormalBinding,
-							ReservedTextureIDIndex::NormalFlat,
-							SamplerPreset::LinearWrap);
-
-						materialGpu.OcclusionBinding = assetManager.ResolveTextureBinding(material->m_OcclusionBinding,
-							ReservedTextureIDIndex::OcclusionWhite,
-							SamplerPreset::LinearWrap);
-
-						materialGpu.AlphaMode = static_cast<int32_t>(material->m_AlphaMode);
-						materialGpu.AlphaCutoff = material->m_AlphaCutoff;
-						materialGpu.Flags = static_cast<uint32_t>(material->m_Flags);
-
-						materialIndex = info.m_MaterialTable.Upsert(modelMesh.m_MaterialId, materialGpu);
+					const MaterialGPU materialGpu = BuildMaterialGpu(*material, assetManager);
+					auto iter = materialRecords.find(materialKey);
+					if (iter == materialRecords.end())
+					{
+						const uint32_t materialIndex =
+							info.m_MaterialTable.Upsert(materialKey, materialGpu);
 						if (materialIndex == MaterialTable::InvalidSlot)
 						{
 							continue;
 						}
-						materialIndexMap.emplace(modelMesh.m_MaterialId, materialIndex);
+						iter = materialRecords.emplace(materialKey, MaterialUploadRecord{
+							.m_Gpu = materialGpu,
+							.m_Index = materialIndex,
+							.m_Flags = material->m_Flags,
+							.m_AlphaMode = material->m_AlphaMode,
+						}).first;
 					}
-					else
+					else if (std::memcmp(&iter->second.m_Gpu, &materialGpu, sizeof(MaterialGPU)) != 0 ||
+						iter->second.m_Flags != material->m_Flags ||
+						iter->second.m_AlphaMode != material->m_AlphaMode)
 					{
-						materialIndex = iter->second;
+						GGLAB_LOG_GRAPHICS_WARN(
+							"Render material key collision for domain={} value=0x{:016X}.",
+							static_cast<uint32_t>(materialKey.m_Domain),
+							materialKey.m_Value);
 					}
 
 					ObjectGPU objectGpu{};
 					objectGpu.ModelMat = world;
 					objectGpu.NormalMat = normalMat;
-					objectGpu.MaterialIndex = materialIndex;
+					objectGpu.MaterialIndex = iter->second.m_Index;
 
 					const uint64_t objectKey =
 						(static_cast<uint64_t>(entt::to_integral(entity)) << 32) |
@@ -157,7 +198,9 @@ namespace gglab
 
 					RenderInstance renderInstance{};
 					renderInstance.m_MeshId = modelMesh.m_MeshId;
-					renderInstance.m_MaterialId = modelMesh.m_MaterialId;
+					renderInstance.m_MaterialKey = materialKey;
+					renderInstance.m_MaterialFlags = iter->second.m_Flags;
+					renderInstance.m_AlphaMode = iter->second.m_AlphaMode;
 					renderInstance.m_ObjectOffset = objectOffset;
 					renderInstance.m_WorldCenterPos = worldCenter;
 					result.m_RenderScene.m_RenderInstances.push_back(renderInstance);

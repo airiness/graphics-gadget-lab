@@ -417,6 +417,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -1001,6 +1004,9 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
@@ -1008,6 +1014,9 @@
       <Filter>Application\Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h">

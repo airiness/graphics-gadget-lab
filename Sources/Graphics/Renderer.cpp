@@ -399,7 +399,7 @@ namespace gglab
 			materialSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
 			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
 			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
-			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<MaterialID, MaterialGPU>>(
+			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>>(
 				MaxMaterialCapacity, GetSwapChain()->GetBufferCount());
 
 			PersistentStructuredBuffer<LightGPU>::CreateInfo lightSBCreateInfo{};

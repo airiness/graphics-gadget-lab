@@ -9,60 +9,79 @@ namespace gglab
 {
 	namespace primitive
 	{
-		entt::entity Cube::Create(const CreateInfo& info) noexcept
+		entt::entity PrimitiveBase::CreatePrimitive(
+			const CreateInfo& info,
+			ModelID modelId,
+			MeshID meshId,
+			std::string_view name,
+			VertexBuilder buildVertices,
+			IndexBuilder buildIndices) noexcept
 		{
-			auto* assetManager = info.m_AssetManager;
-			auto* samplerRegistry = info.m_SamplerRegistry;
-			auto& registry = info.m_World->GetRegistry();
+			GGLAB_ASSERT_NOT_NULL(info.m_AssetManager);
+			GGLAB_ASSERT_NOT_NULL(info.m_SamplerRegistry);
+			GGLAB_ASSERT_NOT_NULL(info.m_World);
 
-			if (assetManager->GetModel(ProceduralCubeModelID) == nullptr)
+			auto& assetManager = *info.m_AssetManager;
+			if (assetManager.GetMaterial(ProceduralPrimitiveMaterialID) == nullptr)
 			{
-				std::unique_ptr<Model> cubeModel = std::make_unique<Model>();
-				cubeModel->m_Id = ProceduralCubeModelID;
-				cubeModel->m_Type = ModelType::Procedural;
-				cubeModel->m_Name = StringID("ProceduralCube");
-
-				if (assetManager->GetMesh(ProceduralCubeMeshID) == nullptr)
-				{
-					std::unique_ptr<Mesh> cubeMesh = std::make_unique<Mesh>();
-					cubeMesh->m_Id = ProceduralCubeMeshID;
-
-					AssetManager::MeshUploadData meshUploadData;
-					meshUploadData.m_MeshId = ProceduralCubeMeshID;
-					meshUploadData.m_VerticesData = GetVerticesData();
-					meshUploadData.m_IndicesData = GetIndicesData();
-
-					if (assetManager->GetMaterial(ProceduralCubeMaterialID) == nullptr)
-					{
-						std::unique_ptr<Material> cubeMaterial = std::make_unique<Material>();
-						cubeMaterial->m_Id = ProceduralCubeMaterialID;
-						cubeMaterial->m_BaseColorBinding.m_TextureId = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
-						cubeMaterial->m_BaseColorBinding.m_SamplerId = samplerRegistry->GetPresetSamplerId(SamplerPreset::AnisotropicClamp);
-						assetManager->AddMaterial(std::move(cubeMaterial));
-					};
-
-					assetManager->AddMesh(std::move(cubeMesh), meshUploadData);
-				}
-
-				ModelMesh modelMesh{};
-				modelMesh.m_MeshId = ProceduralCubeMeshID;
-				modelMesh.m_MaterialId = ProceduralCubeMaterialID;
-
-				cubeModel->m_MeshInstance.push_back(modelMesh);
-
-				assetManager->AddModel(std::move(cubeModel));
+				auto material = std::make_unique<Material>();
+				material->m_Id = ProceduralPrimitiveMaterialID;
+				material->m_Name = StringID("ProceduralPrimitiveMaterial");
+				material->m_BaseColorBinding.m_TextureId =
+					ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
+				material->m_BaseColorBinding.m_SamplerId =
+					info.m_SamplerRegistry->GetPresetSamplerId(SamplerPreset::AnisotropicClamp);
+				assetManager.AddMaterial(std::move(material));
 			}
 
-			entt::entity cubeEntity = registry.create();
+			if (assetManager.GetMesh(meshId) == nullptr)
+			{
+				auto mesh = std::make_unique<Mesh>();
+				mesh->m_Id = meshId;
+				mesh->m_Name = StringID(name);
+				AssetManager::MeshUploadData uploadData{};
+				uploadData.m_VerticesData = buildVertices();
+				uploadData.m_IndicesData = buildIndices();
+				assetManager.AddMesh(std::move(mesh), uploadData);
+			}
 
-			components::TransformComponent transComp{};
-			registry.emplace<components::TransformComponent>(cubeEntity, transComp);
+			if (assetManager.GetModel(modelId) == nullptr)
+			{
+				auto model = std::make_unique<Model>();
+				model->m_Id = modelId;
+				model->m_Type = ModelType::Procedural;
+				model->m_Name = StringID(name);
+				model->m_MeshInstance.push_back({
+					.m_MeshId = meshId,
+					.m_MaterialId = ProceduralPrimitiveMaterialID,
+				});
+				assetManager.AddModel(std::move(model));
+			}
 
-			components::ModelComponent modelComp{};
-			modelComp.m_ModelId = ProceduralCubeModelID;
-			registry.emplace<components::ModelComponent>(cubeEntity, modelComp);
+			auto& registry = info.m_World->GetRegistry();
+			const entt::entity entity = registry.create();
+			registry.emplace<components::TransformComponent>(entity, info.m_Transform);
+			registry.emplace<components::ModelComponent>(entity, modelId);
+			if (info.m_MaterialInstance)
+			{
+				GGLAB_ASSERT_MSG(info.m_MaterialInstance->m_Key.IsValid(),
+					"A procedural primitive material instance requires a stable key.");
+				registry.emplace<components::MaterialInstanceComponent>(
+					entity,
+					*info.m_MaterialInstance);
+			}
+			return entity;
+		}
 
-			return cubeEntity;
+		entt::entity Cube::Create(const CreateInfo& info) noexcept
+		{
+			return CreatePrimitive(
+				info,
+				ProceduralCubeModelID,
+				ProceduralCubeMeshID,
+				"ProceduralCube",
+				&GetVerticesData,
+				&GetIndicesData);
 		}
 
 		std::vector<Vertex> Cube::GetVerticesData() noexcept
@@ -146,6 +165,67 @@ namespace gglab
 				indices.push_back(base + 3);
 			}
 
+			return indices;
+		}
+
+		entt::entity Sphere::Create(const CreateInfo& info) noexcept
+		{
+			return CreatePrimitive(
+				info,
+				ProceduralSphereModelID,
+				ProceduralSphereMeshID,
+				"ProceduralSphere",
+				&GetVerticesData,
+				&GetIndicesData);
+		}
+
+		std::vector<Vertex> Sphere::GetVerticesData() noexcept
+		{
+			std::vector<Vertex> vertices;
+			vertices.reserve((StackCount + 1) * (SliceCount + 1));
+			for (uint32_t stack = 0; stack <= StackCount; ++stack)
+			{
+				const float v = static_cast<float>(stack) / static_cast<float>(StackCount);
+				const float theta = v * DirectX::XM_PI;
+				const float sinTheta = std::sin(theta);
+				const float cosTheta = std::cos(theta);
+				for (uint32_t slice = 0; slice <= SliceCount; ++slice)
+				{
+					const float u = static_cast<float>(slice) / static_cast<float>(SliceCount);
+					const float phi = u * DirectX::XM_2PI;
+					const Vector3 normal(
+						sinTheta * std::cos(phi),
+						cosTheta,
+						sinTheta * std::sin(phi));
+					vertices.push_back({
+						normal,
+						normal,
+						Vector2(u, v),
+						Vector2(u, v),
+						Vector4(-std::sin(phi), 0.0f, std::cos(phi), 1.0f),
+					});
+				}
+			}
+			return vertices;
+		}
+
+		std::vector<uint32_t> Sphere::GetIndicesData() noexcept
+		{
+			std::vector<uint32_t> indices;
+			indices.reserve(StackCount * SliceCount * 6);
+			const uint32_t rowStride = SliceCount + 1;
+			for (uint32_t stack = 0; stack < StackCount; ++stack)
+			{
+				for (uint32_t slice = 0; slice < SliceCount; ++slice)
+				{
+					const uint32_t topLeft = stack * rowStride + slice;
+					const uint32_t bottomLeft = topLeft + rowStride;
+					indices.insert(indices.end(), {
+						topLeft, topLeft + 1, bottomLeft,
+						topLeft + 1, bottomLeft + 1, bottomLeft,
+					});
+				}
+			}
 			return indices;
 		}
 	}

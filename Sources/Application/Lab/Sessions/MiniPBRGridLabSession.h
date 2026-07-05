@@ -3,11 +3,11 @@
 
 namespace gglab
 {
-	class HelloLabSession final : public LabSessionBase
+	class MiniPBRGridLabSession final : public LabSessionBase
 	{
 	public:
-		explicit HelloLabSession(const LabSessionCreateInfo& createInfo) noexcept;
-		~HelloLabSession() override = default;
+		explicit MiniPBRGridLabSession(const LabSessionCreateInfo& createInfo) noexcept;
+		~MiniPBRGridLabSession() override = default;
 
 		void Update(float deltaTime) noexcept override;
 
@@ -16,11 +16,10 @@ namespace gglab
 		static std::unique_ptr<LabSessionBase> Create(
 			const LabSessionCreateInfo& createInfo) noexcept;
 
-	protected:
+	private:
 		void ApplyImmediateParameters() noexcept override;
 		void RebuildScene() noexcept override;
 
-	private:
 		bool m_EnableCameraInput = true;
 	};
 }

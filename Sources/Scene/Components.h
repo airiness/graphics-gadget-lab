@@ -19,6 +19,12 @@ namespace gglab::components
 		ModelID m_ModelId{};
 	};
 
+	struct MaterialInstanceComponent
+	{
+		RuntimeMaterialKey m_Key{};
+		MaterialProperties m_Properties{};
+	};
+
 	struct LightComponent
 	{
 		LightType m_Type = LightType::Directional;

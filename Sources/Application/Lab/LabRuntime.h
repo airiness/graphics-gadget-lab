@@ -2,7 +2,7 @@
 #include "Application/Lab/LabCatalog.h"
 #include "Application/Lab/LabCommandQueue.h"
 #include "Application/Lab/LabInterfaces.h"
-#include "Application/Lab/LabSession.h"
+#include "Application/Lab/LabSessionBase.h"
 
 namespace gglab
 {
@@ -44,7 +44,7 @@ namespace gglab
 		bool IsReady() const noexcept { return m_State == LabRunState::Ready && m_ActiveSession; }
 		std::string_view GetLastError() const noexcept { return m_LastError; }
 		const LabCatalog& GetCatalog() const noexcept { return m_Catalog; }
-		const LabSession* GetActiveSession() const noexcept { return m_ActiveSession.get(); }
+		const LabSessionBase* GetActiveSession() const noexcept { return m_ActiveSession.get(); }
 
 		World& GetWorld() noexcept;
 		Camera& GetCamera() noexcept;
@@ -62,7 +62,7 @@ namespace gglab
 		LabSessionCreateInfo m_CreateInfo{};
 		LabCatalog m_Catalog;
 		LabCommandQueue m_CommandQueue;
-		std::unique_ptr<LabSession> m_ActiveSession;
+		std::unique_ptr<LabSessionBase> m_ActiveSession;
 		std::string m_LastError;
 		LabRunState m_State = LabRunState::Uninitialized;
 		uint64_t m_FrameInSession = 0;

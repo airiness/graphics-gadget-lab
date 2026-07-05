@@ -3,6 +3,8 @@
 #include "Scene/Components.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
+#include "Graphics/Geometry.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab
@@ -13,13 +15,16 @@ namespace gglab
 		const LabParameterId CameraFovId("hello.camera.fov");
 		const LabParameterId ModelPositionId("hello.model.position");
 		const LabParameterId ModelScaleId("hello.model.scale");
+		const LabParameterId MaterialBaseColorId("hello.material.base_color");
+		const LabParameterId MaterialMetallicId("hello.material.metallic");
+		const LabParameterId MaterialRoughnessId("hello.material.roughness");
 		const LabParameterId LightColorId("hello.light.color");
 		const LabParameterId LightIntensityId("hello.light.intensity");
 		const LabParameterId LightDirectionId("hello.light.direction");
 	}
 
 	HelloLabSession::HelloLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSession(
+		LabSessionBase(
 			GetDescriptor(),
 			createInfo,
 			std::make_unique<RenderPipelineForwardPBR>())
@@ -59,9 +64,37 @@ namespace gglab
 			.m_Group = "Model",
 			.m_Type = LabParameterType::Float,
 			.m_Impact = LabChangeImpact::RebuildScene,
-			.m_DefaultValue = 5.0f,
+			.m_DefaultValue = 1.0f,
 			.m_MinValue = LabValue(0.1f),
-			.m_MaxValue = LabValue(20.0f),
+			.m_MaxValue = LabValue(10.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = MaterialBaseColorId,
+			.m_Name = "Base Color",
+			.m_Group = "Material",
+			.m_Type = LabParameterType::Color,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = Color(0.8f, 0.15f, 0.05f, 1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = MaterialMetallicId,
+			.m_Name = "Metallic",
+			.m_Group = "Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.2f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = MaterialRoughnessId,
+			.m_Name = "Roughness",
+			.m_Group = "Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.35f,
+			.m_MinValue = LabValue(0.04f),
+			.m_MaxValue = LabValue(1.0f),
 		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightColorId,
@@ -119,6 +152,20 @@ namespace gglab
 
 		const Color lightColor = parameters.Get(LightColorId, color::White);
 		const float lightIntensity = parameters.Get(LightIntensityId, 3.0f);
+		const Color baseColor = parameters.Get(
+			MaterialBaseColorId,
+			Color(0.8f, 0.15f, 0.05f, 1.0f));
+		const float metallic = parameters.Get(MaterialMetallicId, 0.2f);
+		const float roughness = parameters.Get(MaterialRoughnessId, 0.35f);
+		auto materialView = m_World.GetRegistry().view<components::MaterialInstanceComponent>();
+		for (const entt::entity entity : materialView)
+		{
+			auto& material = materialView.get<components::MaterialInstanceComponent>(entity);
+			material.m_Properties.m_BaseColor = baseColor;
+			material.m_Properties.m_MetallicFactor = metallic;
+			material.m_Properties.m_RoughnessFactor = roughness;
+		}
+
 		auto view = m_World.GetRegistry().view<components::LightComponent>();
 		for (const entt::entity entity : view)
 		{
@@ -137,18 +184,20 @@ namespace gglab
 		const Vector3 modelPosition = parameters.Get(
 			ModelPositionId,
 			Vector3(0.0f, 0.0f, 5.0f));
-		const float modelScale = parameters.Get(ModelScaleId, 5.0f);
+		const float modelScale = parameters.Get(ModelScaleId, 1.0f);
 
-		const entt::entity modelEntity = registry.create();
-		components::TransformComponent transform{};
-		transform.m_Position = modelPosition;
-		transform.m_Scale = Vector3::One * modelScale;
-		registry.emplace<components::TransformComponent>(modelEntity, transform);
-
-		components::ModelComponent model{};
-		model.m_ModelId = m_Services.m_AssetManager->LoadModel(
-			"Assets/Models/FlightHelmet/FlightHelmet.gltf");
-		registry.emplace<components::ModelComponent>(modelEntity, model);
+		components::TransformComponent modelTransform{};
+		modelTransform.m_Position = modelPosition;
+		modelTransform.m_Scale = Vector3::One * modelScale;
+		components::MaterialInstanceComponent materialInstance{};
+		materialInstance.m_Key = RuntimeMaterialKey("gglab.lab.hello.material.cube");
+		GGLAB_UNUSED(primitive::Cube::Create({
+			.m_AssetManager = m_Services.m_AssetManager,
+			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_World = &m_World,
+			.m_Transform = modelTransform,
+			.m_MaterialInstance = materialInstance,
+		}));
 
 		const entt::entity lightEntity = registry.create();
 		components::TransformComponent lightTransform{};
@@ -162,7 +211,7 @@ namespace gglab
 			direction = Vector3(0.0f, -1.0f, 0.0f);
 			break;
 		default:
-			direction = Vector3(-0.406f, -0.906f, -0.123f);
+			direction = Vector3(-0.406f, -0.906f, 0.123f);
 			break;
 		}
 		direction.Normalize();
@@ -194,7 +243,7 @@ namespace gglab
 		};
 	}
 
-	std::unique_ptr<LabSession> HelloLabSession::Create(
+	std::unique_ptr<LabSessionBase> HelloLabSession::Create(
 		const LabSessionCreateInfo& createInfo) noexcept
 	{
 		return std::make_unique<HelloLabSession>(createInfo);

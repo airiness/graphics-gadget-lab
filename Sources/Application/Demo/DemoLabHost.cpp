@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Lab/Sessions/HelloLabSession.h"
+#include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 
 namespace gglab
 {
@@ -15,6 +16,11 @@ namespace gglab
 			HelloLabSession::GetDescriptor(),
 			&HelloLabSession::Create);
 		GGLAB_ASSERT_MSG(registered, "Failed to register the Hello Lab session.");
+
+		const bool miniPbrRegistered = m_Runtime.RegisterLab(
+			MiniPBRGridLabSession::GetDescriptor(),
+			&MiniPBRGridLabSession::Create);
+		GGLAB_ASSERT_MSG(miniPbrRegistered, "Failed to register the Mini PBR Grid Lab session.");
 
 		const bool initialized = m_Runtime.Initialize(HelloLabSession::GetId());
 		GGLAB_ASSERT_MSG(initialized, "Failed to initialize the Lab runtime.");
