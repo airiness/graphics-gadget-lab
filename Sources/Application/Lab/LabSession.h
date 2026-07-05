@@ -1,5 +1,6 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
+#include "Application/Lab/LabParameter.h"
 #include "Application/Lab/LabTypes.h"
 #include "Core/World.h"
 
@@ -28,7 +29,14 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(LabSession);
 
 		const LabDescriptor& GetDescriptor() const noexcept { return m_Descriptor; }
+		const LabParameterSet& GetParameters() const noexcept { return m_Parameters; }
 		bool IsValid() const noexcept;
+		bool SetParameter(
+			const LabParameterId& id,
+			const LabValue& value,
+			LabChangeImpact* impact = nullptr) noexcept;
+		LabChangeImpact ResetParameters() noexcept;
+		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnExit() noexcept {}
@@ -52,12 +60,20 @@ namespace gglab
 			std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept;
 
 		void UpdateCamera() noexcept;
+		LabParameterSet& GetMutableParameters() noexcept { return m_Parameters; }
+
+		virtual void ApplyImmediateParameters() noexcept {}
+		virtual void RebuildScene() noexcept {}
+		virtual void RecreatePipeline() noexcept {}
+
+		void SetRenderPipeline(std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept;
 
 		DemoServices m_Services{};
 		World m_World;
 
 	private:
 		LabDescriptor m_Descriptor;
+		LabParameterSet m_Parameters;
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;

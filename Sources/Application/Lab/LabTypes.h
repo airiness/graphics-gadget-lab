@@ -33,6 +33,13 @@ namespace gglab
 		Pipeline,
 	};
 
+	enum class LabRuntimeState : uint8_t
+	{
+		Uninitialized,
+		Ready,
+		Failed,
+	};
+
 	struct LabDescriptor
 	{
 		LabId m_Id;

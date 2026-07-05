@@ -19,6 +19,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
+#include "DevTools/DevelopGui/Panels/LabPanel.h"
 
 namespace gglab
 {
@@ -177,7 +178,8 @@ namespace gglab
 			.m_WindowHeight = m_WindowHeight,
 		};
 		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoPlayground>(demoCreateInfo));
-		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoLabHost>(demoCreateInfo));
+		const uint32_t labHostIndex = m_DemoManager->CreateDemo<DemoLabHost>(demoCreateInfo);
+		auto* labHost = static_cast<DemoLabHost*>(m_DemoManager->GetDemo(labHostIndex));
 
 		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
 		const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
@@ -192,6 +194,10 @@ namespace gglab
 		{
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
 				std::make_unique<DemoPanel>(m_DemoManager.get()));
+			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
+				std::make_unique<LabPanel>(
+					&labHost->GetLabRuntime(),
+					&labHost->GetLabRuntime()));
 		}
 
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
