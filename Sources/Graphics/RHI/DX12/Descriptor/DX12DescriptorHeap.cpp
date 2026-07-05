@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Core/HResult.h"
+#include "Graphics/RHI/DX12/DX12HResult.h"
 
 namespace gglab
 {

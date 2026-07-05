@@ -7,7 +7,7 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12Resource.h"
-#include "Core/HResult.h"
+#include "Graphics/RHI/DX12/DX12HResult.h"
 
 namespace gglab
 {
