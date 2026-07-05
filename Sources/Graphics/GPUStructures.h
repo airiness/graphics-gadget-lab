@@ -94,7 +94,7 @@ namespace gglab
 		uint32_t DebugView;
 	};
 	static_assert(sizeof(MaterialGPU) == 144);
-	static constexpr uint32_t MaxMaterialCapacity = 128;
+	static constexpr uint32_t MaxMaterialCapacity = 256;
 	static constexpr uint32_t MaxLightCapacity = 64;
 
 	struct ViewGPU

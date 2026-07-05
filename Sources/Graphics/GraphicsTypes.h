@@ -330,6 +330,7 @@ namespace gglab
 	{
 		MeshID m_MeshId{};
 		MaterialID m_MaterialId{};
+		Matrix m_LocalTransform = Matrix::Identity;
 	};
 
 	struct Model

@@ -107,14 +107,10 @@ namespace gglab
 					return;
 				}
 
-				Matrix world =
+				const Matrix entityWorld =
 					Matrix::CreateScale(transformComp.m_Scale) *
 					Matrix::CreateFromQuaternion(transformComp.m_Rotation) *
 					Matrix::CreateTranslation(transformComp.m_Position);
-
-				Matrix normalMat = world;
-				normalMat.Translation(Vector3::Zero);
-				normalMat = normalMat.Invert().Transpose();
 
 				for (uint32_t modelMeshIndex = 0;
 					modelMeshIndex < model->m_MeshInstance.size();
@@ -126,6 +122,11 @@ namespace gglab
 					{
 						continue;
 					}
+
+					const Matrix world = modelMesh.m_LocalTransform * entityWorld;
+					Matrix normalMat = world;
+					normalMat.Translation(Vector3::Zero);
+					normalMat = normalMat.Invert().Transpose();
 
 					const MaterialProperties* material = nullptr;
 					RenderMaterialKey materialKey{};

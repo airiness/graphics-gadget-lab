@@ -398,13 +398,13 @@ namespace gglab
 		// Must flush here for gpu resource safe release next
 		m_Renderer->GetRHIContext()->WaitIdle();
 
-		m_DemoManager.reset();
 		m_RenderFrameBuilder.reset();
 		if (m_DevelopGuiSystem)
 		{
 			m_DevelopGuiSystem->Finalize();
 			m_DevelopGuiSystem.reset();
 		}
+		m_DemoManager.reset();
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();

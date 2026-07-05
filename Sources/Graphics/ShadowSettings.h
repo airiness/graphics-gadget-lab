@@ -5,13 +5,13 @@ namespace gglab
 {
 	inline constexpr uint32_t DefaultDirectionalShadowMapSize = 2048;
 	inline constexpr uint32_t DefaultDirectionalShadowMapPreviewSize = 512;
-	inline constexpr float DefaultDirectionalShadowMaxDistance = 200.0f;
-	inline constexpr float DefaultDirectionalShadowCasterExtrusionDistance = 600.0f;
-	inline constexpr float DefaultDirectionalShadowOrthoPadding = 2.0f;
-	inline constexpr float DefaultDirectionalShadowDepthPadding = 60.0f;
-	inline constexpr float DefaultDirectionalShadowReceiverDepthBias = 0.0015f;
-	inline constexpr int32_t DefaultDirectionalShadowRasterizerDepthBias = 1000;
-	inline constexpr float DefaultDirectionalShadowRasterizerSlopeScaledDepthBias = 1.5f;
+	inline constexpr float DefaultDirectionalShadowMaxDistance = 30.0f;
+	inline constexpr float DefaultDirectionalShadowCasterExtrusionDistance = 300.0f;
+	inline constexpr float DefaultDirectionalShadowOrthoPadding = 1.0f;
+	inline constexpr float DefaultDirectionalShadowDepthPadding = 200.0f;
+	inline constexpr float DefaultDirectionalShadowReceiverDepthBias = 0.0f;
+	inline constexpr int32_t DefaultDirectionalShadowRasterizerDepthBias = 360;
+	inline constexpr float DefaultDirectionalShadowRasterizerSlopeScaledDepthBias = 0.6f;
 
 	struct DirectionalShadowSettings
 	{
