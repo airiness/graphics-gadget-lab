@@ -15,5 +15,12 @@ namespace gglab
 		static LabDescriptor GetDescriptor() noexcept;
 		static std::unique_ptr<LabSession> Create(
 			const LabSessionCreateInfo& createInfo) noexcept;
+
+	protected:
+		void ApplyImmediateParameters() noexcept override;
+		void RebuildScene() noexcept override;
+
+	private:
+		bool m_EnableCameraInput = true;
 	};
 }

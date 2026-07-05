@@ -51,6 +51,7 @@ namespace gglab
 		m_IsEntered = false;
 		m_ActiveSession.reset();
 		m_State = LabRuntimeState::Uninitialized;
+		m_FrameInSession = 0;
 	}
 
 	void LabRuntime::OnEnter() noexcept
@@ -92,6 +93,7 @@ namespace gglab
 		if (m_ActiveSession)
 		{
 			m_ActiveSession->Update();
+			++m_FrameInSession;
 		}
 	}
 
@@ -116,7 +118,103 @@ namespace gglab
 		{
 			const LabId activeId = m_ActiveSession->GetDescriptor().m_Id;
 			GGLAB_UNUSED(ReplaceActiveSession(activeId, true));
+			return;
 		}
+
+		if (!m_ActiveSession)
+		{
+			return;
+		}
+
+		LabChangeImpact impact = LabChangeImpact::Immediate;
+		bool parametersChanged = false;
+		if (commands.m_ResetParametersRequested)
+		{
+			impact = m_ActiveSession->ResetParameters();
+			parametersChanged = true;
+		}
+
+		for (const LabParameterValue& change : commands.m_ParameterChanges)
+		{
+			LabChangeImpact changeImpact = LabChangeImpact::Immediate;
+			if (m_ActiveSession->SetParameter(change.m_Id, change.m_Value, &changeImpact))
+			{
+				impact = MaxImpact(impact, changeImpact);
+				parametersChanged = true;
+			}
+			else
+			{
+				GGLAB_LOG_WARN("Lab parameter '{}' was rejected.", change.m_Id.GetName());
+			}
+		}
+
+		if (commands.m_RebuildSceneRequested)
+		{
+			impact = MaxImpact(impact, LabChangeImpact::RebuildScene);
+			parametersChanged = true;
+		}
+
+		if (!parametersChanged)
+		{
+			return;
+		}
+
+		if (impact == LabChangeImpact::RestartSession)
+		{
+			const std::vector<LabParameterValue> values =
+				m_ActiveSession->GetParameters().CaptureValues();
+			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
+		}
+		else
+		{
+			if (impact == LabChangeImpact::RecreatePipeline)
+			{
+				WaitForGpuIdle();
+			}
+			m_ActiveSession->ApplyParameterChanges(impact);
+		}
+	}
+
+	LabSnapshot LabRuntime::GetLabSnapshot() const noexcept
+	{
+		LabSnapshot snapshot{};
+		snapshot.m_State = m_State;
+		snapshot.m_FrameInSession = m_FrameInSession;
+		snapshot.m_LastError = m_LastError;
+		snapshot.m_HasPendingCommands = !m_CommandQueue.IsEmpty();
+		snapshot.m_IsHostActive = m_IsEntered;
+
+		snapshot.m_AvailableLabs.reserve(m_Catalog.GetCount());
+		for (uint32_t index = 0; index < m_Catalog.GetCount(); ++index)
+		{
+			if (const LabDescriptor* descriptor = m_Catalog.GetDescriptor(index))
+			{
+				snapshot.m_AvailableLabs.push_back(*descriptor);
+			}
+		}
+
+		if (!m_ActiveSession)
+		{
+			return snapshot;
+		}
+
+		const LabDescriptor& descriptor = m_ActiveSession->GetDescriptor();
+		snapshot.m_ActiveLabId = descriptor.m_Id;
+		snapshot.m_ActiveLabName = descriptor.m_DisplayName;
+		snapshot.m_Category = descriptor.m_Category;
+		snapshot.m_Description = descriptor.m_Description;
+		snapshot.m_SchemaVersion = descriptor.m_SchemaVersion;
+
+		const auto parameters = m_ActiveSession->GetParameters().GetParameters();
+		snapshot.m_Parameters.reserve(parameters.size());
+		for (const LabParameter& parameter : parameters)
+		{
+			snapshot.m_Parameters.push_back({
+				.m_Desc = parameter.m_Desc,
+				.m_Value = parameter.m_Value,
+			});
+		}
+		return snapshot;
 	}
 
 	World& LabRuntime::GetWorld() noexcept
@@ -160,10 +258,7 @@ namespace gglab
 
 		if (waitForGpu && m_ActiveSession)
 		{
-			auto* renderer = m_CreateInfo.m_Services.m_Renderer;
-			GGLAB_ASSERT_NOT_NULL(renderer);
-			GGLAB_ASSERT_NOT_NULL(renderer->GetRHIContext());
-			renderer->GetRHIContext()->WaitIdle();
+			WaitForGpuIdle();
 		}
 
 		if (m_IsEntered && m_ActiveSession)
@@ -180,8 +275,44 @@ namespace gglab
 
 		m_LastError.clear();
 		m_State = LabRuntimeState::Ready;
+		m_FrameInSession = 0;
 		GGLAB_LOG_INFO("Activated lab '{}'.", id.GetName());
 		return true;
+	}
+
+	bool LabRuntime::RestartActiveSessionWithValues(
+		std::span<const LabParameterValue> values) noexcept
+	{
+		if (!m_ActiveSession)
+		{
+			return false;
+		}
+
+		const LabId activeId = m_ActiveSession->GetDescriptor().m_Id;
+		if (!ReplaceActiveSession(activeId, true))
+		{
+			return false;
+		}
+
+		LabChangeImpact impact = LabChangeImpact::Immediate;
+		for (const LabParameterValue& value : values)
+		{
+			LabChangeImpact valueImpact = LabChangeImpact::Immediate;
+			if (m_ActiveSession->SetParameter(value.m_Id, value.m_Value, &valueImpact))
+			{
+				impact = MaxImpact(impact, valueImpact);
+			}
+		}
+		m_ActiveSession->ApplyParameterChanges(impact);
+		return true;
+	}
+
+	void LabRuntime::WaitForGpuIdle() noexcept
+	{
+		auto* renderer = m_CreateInfo.m_Services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+		GGLAB_ASSERT_NOT_NULL(renderer->GetRHIContext());
+		renderer->GetRHIContext()->WaitIdle();
 	}
 
 	void LabRuntime::SetError(std::string message) noexcept
@@ -192,5 +323,14 @@ namespace gglab
 			m_State = LabRuntimeState::Failed;
 		}
 		GGLAB_LOG_ERROR("{}", m_LastError);
+	}
+
+	LabChangeImpact LabRuntime::MaxImpact(
+		LabChangeImpact lhs,
+		LabChangeImpact rhs) noexcept
+	{
+		return static_cast<LabChangeImpact>(std::max(
+			static_cast<uint8_t>(lhs),
+			static_cast<uint8_t>(rhs)));
 	}
 }

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -405,6 +405,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabCommandQueue.cpp">
       <Filter>Application\Lab</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\LabParameter.cpp">
+      <Filter>Application\Lab</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp">
       <Filter>Application\Lab</Filter>
     </ClCompile>
@@ -413,6 +416,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -974,10 +980,19 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabInterfaces.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabParameter.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h">
@@ -985,6 +1000,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h">
       <Filter>Graphics\RenderPipeline</Filter>

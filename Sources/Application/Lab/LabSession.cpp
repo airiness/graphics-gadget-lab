@@ -45,6 +45,39 @@ namespace gglab
 			m_Camera && m_CameraController && m_RenderPipeline;
 	}
 
+	bool LabSession::SetParameter(
+		const LabParameterId& id,
+		const LabValue& value,
+		LabChangeImpact* impact) noexcept
+	{
+		return m_Parameters.Set(id, value, impact);
+	}
+
+	LabChangeImpact LabSession::ResetParameters() noexcept
+	{
+		return m_Parameters.ResetAll();
+	}
+
+	void LabSession::ApplyParameterChanges(LabChangeImpact impact) noexcept
+	{
+		ApplyImmediateParameters();
+		switch (impact)
+		{
+		case LabChangeImpact::Immediate:
+			break;
+		case LabChangeImpact::RebuildScene:
+			RebuildScene();
+			break;
+		case LabChangeImpact::RecreatePipeline:
+			RecreatePipeline();
+			break;
+		case LabChangeImpact::RestartSession:
+			RecreatePipeline();
+			RebuildScene();
+			break;
+		}
+	}
+
 	void LabSession::OnResize(uint32_t width, uint32_t height) noexcept
 	{
 		if (width > 0 && height > 0)
@@ -77,5 +110,12 @@ namespace gglab
 
 		m_CameraController->Update(*m_Camera, input, static_cast<float>(time->GetDeltaTime()));
 		m_Camera->Update();
+	}
+
+	void LabSession::SetRenderPipeline(
+		std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(renderPipeline.get());
+		m_RenderPipeline = std::move(renderPipeline);
 	}
 }
