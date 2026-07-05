@@ -17,7 +17,9 @@ namespace gglab
 	struct RenderInstance
 	{
 		MeshID m_MeshId{};
-		MaterialID m_MaterialId{};
+		RenderMaterialKey m_MaterialKey{};
+		MaterialFlags m_MaterialFlags = MaterialFlags::None;
+		AlphaMode m_AlphaMode = AlphaMode::Opaque;
 
 		uint32_t m_ObjectOffset = 0;
 
@@ -79,7 +81,7 @@ namespace gglab
 			PersistentStructuredBuffer<MaterialGPU>& m_MaterialsSB;
 			PersistentStructuredBuffer<LightGPU>& m_LightsSB;
 			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
-			PersistentStructuredBufferTable<MaterialID, MaterialGPU>& m_MaterialTable;
+			PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>& m_MaterialTable;
 			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
 			std::optional<uint64_t> m_DirectionalShadowLightKey;
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;

@@ -113,8 +113,9 @@ namespace gglab
 			1,
 			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
 			{
-				// glTF: G=Roughness(1), B=Metallic(0). R unused.
-				return { 0, 255, 0, 255 };
+				// The shader multiplies sampled values by material factors, so an
+				// absent metallic-roughness texture must use the multiplicative identity.
+				return { 0, 255, 255, 255 };
 			}));
 
 		uploads.emplace_back(makeGeneratedUploadData(

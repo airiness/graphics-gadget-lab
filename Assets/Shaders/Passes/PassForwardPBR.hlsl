@@ -231,6 +231,23 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
 	float3 N = SampleNormalWS(matData, normalWS, tangentWS, IN.PositionWS, normalUV);
 
+	if (matData.DebugView == 1u)
+	{
+		return float4(baseColor, alpha);
+	}
+	if (matData.DebugView == 2u)
+	{
+		return float4(metallic.xxx, alpha);
+	}
+	if (matData.DebugView == 3u)
+	{
+		return float4(perceptualRoughness.xxx, alpha);
+	}
+	if (matData.DebugView == 4u)
+	{
+		return float4(N * 0.5 + 0.5, alpha);
+	}
+
 	// Shading
 	float3 V = normalize(viewData.CameraPos.xyz - IN.PositionWS); // View direction
 	float NoV = saturate(dot(N, V));

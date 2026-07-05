@@ -20,23 +20,24 @@ namespace gglab
 				continue;
 			}
 
-			const Material* material = info.m_AssetManager.GetMaterial(instance.m_MaterialId);
-
-			RenderBucket bucket = DecideRenderBucket(material);
-			bool doubleSided = IsDoubleSided(material);
+			RenderBucket bucket = DecideRenderBucket(instance.m_AlphaMode);
+			bool doubleSided = IsDoubleSided(instance.m_MaterialFlags);
 
 			uint64_t variantBits = 0;
 			variantBits |= EncodeVariantBits(bucket, doubleSided);
 
 			const uint8_t bucketOrder = BucketSortOrder(bucket);
 			const uint8_t variantBits8 = static_cast<uint8_t>(variantBits & VariantMask);
-			const uint32_t materialKey = static_cast<uint32_t>(instance.m_MaterialId.IsValid() ? instance.m_MaterialId.Value() : 0);
+			const uint64_t materialValue = instance.m_MaterialKey.m_Value ^
+				(static_cast<uint64_t>(instance.m_MaterialKey.m_Domain) << 63);
+			const uint32_t materialKey = static_cast<uint32_t>(
+				materialValue ^ (materialValue >> 32));
 			const uint32_t meshKey = static_cast<uint32_t>(instance.m_MeshId.IsValid() ? instance.m_MeshId.Value() : 0);
 			uint64_t sortKey = PackSortKey(bucketOrder, variantBits8, materialKey, meshKey);
 
 			DrawItem drawItem{};
 			drawItem.m_MeshId = instance.m_MeshId;
-			drawItem.m_MaterialId = instance.m_MaterialId;
+			drawItem.m_MaterialKey = instance.m_MaterialKey;
 			drawItem.m_ObjectOffset = instance.m_ObjectOffset;
 			drawItem.m_Bucket = bucket;
 			drawItem.m_VariantBits = variantBits;
@@ -123,14 +124,9 @@ namespace gglab
 		return bucketPart | variantPart | materialPart | meshPart;
 	}
 
-	RenderBucket RenderQueueBuilder::DecideRenderBucket(const Material* material) noexcept
+	RenderBucket RenderQueueBuilder::DecideRenderBucket(AlphaMode alphaMode) noexcept
 	{
-		if (!material)
-		{
-			return RenderBucket::Opaque;
-		}
-
-		switch (material->m_AlphaMode)
+		switch (alphaMode)
 		{
 		case AlphaMode::Mask:
 			return RenderBucket::AlphaTest;
@@ -142,13 +138,9 @@ namespace gglab
 		}
 	}
 
-	bool RenderQueueBuilder::IsDoubleSided(const Material* material) noexcept
+	bool RenderQueueBuilder::IsDoubleSided(MaterialFlags flags) noexcept
 	{
-		if (!material)
-		{
-			return false;
-		}
-		return (material->m_Flags & MaterialFlags::DoubleSided) != MaterialFlags::None;
+		return (flags & MaterialFlags::DoubleSided) != MaterialFlags::None;
 	}
 
 	uint32_t RenderQueueBuilder::MakeDepthKey(const RenderView& renderView, const Vector3& worldCenterPos) noexcept

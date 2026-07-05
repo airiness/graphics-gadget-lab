@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/LabCatalog.h"
-#include "Application/Lab/LabSession.h"
+#include "Application/Lab/LabSessionBase.h"
 
 namespace gglab
 {
@@ -48,7 +48,7 @@ namespace gglab
 		return entry ? &entry->m_Descriptor : nullptr;
 	}
 
-	std::unique_ptr<LabSession> LabCatalog::Create(
+	std::unique_ptr<LabSessionBase> LabCatalog::Create(
 		const LabId& id,
 		const LabSessionCreateInfo& createInfo) const noexcept
 	{

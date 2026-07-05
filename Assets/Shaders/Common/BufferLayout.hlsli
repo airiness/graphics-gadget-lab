@@ -82,8 +82,7 @@ struct MaterialData
 	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND. Defined in MaterialUtils.hlsli
 	float AlphaCutoff;
 	uint Flags; // bit 0: doubleSided
-	
-	uint Padding;
+	uint DebugView; // 0: lit, 1: base color, 2: metallic, 3: roughness, 4: normal
 };
 
 struct ViewData

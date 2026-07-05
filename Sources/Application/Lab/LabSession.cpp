@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Application/Lab/LabSession.h"
+#include "Application/Lab/LabSessionBase.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
@@ -9,7 +9,7 @@
 
 namespace gglab
 {
-	LabSession::LabSession(
+	LabSessionBase::LabSessionBase(
 		LabDescriptor descriptor,
 		const LabSessionCreateInfo& createInfo,
 		std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept :
@@ -18,7 +18,7 @@ namespace gglab
 		m_Descriptor(std::move(descriptor)),
 		m_RenderPipeline(std::move(renderPipeline))
 	{
-		GGLAB_ASSERT_MSG(createInfo.IsValid(), "LabSession requires valid create info.");
+		GGLAB_ASSERT_MSG(createInfo.IsValid(), "LabSessionBase requires valid create info.");
 
 		Camera::CreateInfo cameraCreateInfo{};
 		cameraCreateInfo.m_Position = Vector3(0.0f, 1.0f, -5.0f);
@@ -37,15 +37,15 @@ namespace gglab
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
 	}
 
-	LabSession::~LabSession() = default;
+	LabSessionBase::~LabSessionBase() = default;
 
-	bool LabSession::IsValid() const noexcept
+	bool LabSessionBase::IsValid() const noexcept
 	{
 		return m_Descriptor.m_Id.IsValid() && m_Services.IsValid() &&
 			m_Camera && m_CameraController && m_RenderPipeline;
 	}
 
-	bool LabSession::SetParameter(
+	bool LabSessionBase::SetParameter(
 		const LabParameterId& id,
 		const LabValue& value,
 		LabChangeImpact* impact) noexcept
@@ -53,12 +53,12 @@ namespace gglab
 		return m_Parameters.Set(id, value, impact);
 	}
 
-	LabChangeImpact LabSession::ResetParameters() noexcept
+	LabChangeImpact LabSessionBase::ResetParameters() noexcept
 	{
 		return m_Parameters.ResetAll();
 	}
 
-	void LabSession::ApplyParameterChanges(LabChangeImpact impact) noexcept
+	void LabSessionBase::ApplyParameterChanges(LabChangeImpact impact) noexcept
 	{
 		ApplyImmediateParameters();
 		switch (impact)
@@ -78,7 +78,7 @@ namespace gglab
 		}
 	}
 
-	void LabSession::OnResize(uint32_t width, uint32_t height) noexcept
+	void LabSessionBase::OnResize(uint32_t width, uint32_t height) noexcept
 	{
 		if (width > 0 && height > 0)
 		{
@@ -86,7 +86,7 @@ namespace gglab
 		}
 	}
 
-	void LabSession::UpdateCamera(float deltaTime) noexcept
+	void LabSessionBase::UpdateCamera(float deltaTime) noexcept
 	{
 		auto* inputManager = m_Services.m_InputManager;
 		GGLAB_ASSERT_NOT_NULL(inputManager);
@@ -110,7 +110,7 @@ namespace gglab
 		m_Camera->Update();
 	}
 
-	void LabSession::SetRenderPipeline(
+	void LabSessionBase::SetRenderPipeline(
 		std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(renderPipeline.get());

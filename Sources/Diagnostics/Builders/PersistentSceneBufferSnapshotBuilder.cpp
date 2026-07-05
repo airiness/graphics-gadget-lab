@@ -101,9 +101,17 @@ namespace gglab
 			outSnapshot.m_Objects);
 		BuildTableSnapshot(
 			"Materials", *materialBuffer, *materialTable,
-			[](MaterialID key)
+			[](RenderMaterialKey key)
 			{
-				return std::format("MaterialID {}", key.Value());
+				if (key.m_Domain == RenderMaterialDomain::Asset)
+				{
+					return std::format("Asset MaterialID {}", key.m_Value);
+				}
+
+				const std::string_view name = StringID::LookupName(key.m_Value);
+				return name.empty() ?
+					std::format("Runtime MaterialKey 0x{:016X}", key.m_Value) :
+					std::format("Runtime MaterialKey {}", name);
 			},
 			false,
 			outSnapshot.m_Materials);

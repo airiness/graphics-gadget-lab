@@ -428,7 +428,7 @@ namespace gglab
 	{
 		auto& state = context.PanelState<ResourceManagementPanelState>();
 
-		ImGui::TextUnformatted("RHI Resource Management Lab");
+		ImGui::TextUnformatted("RHI Resource Management");
 		ImGui::Separator();
 
 		auto* dx12Context = context.m_Renderer ?

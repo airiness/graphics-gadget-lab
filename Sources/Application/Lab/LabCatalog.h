@@ -6,11 +6,11 @@
 
 namespace gglab
 {
-	class LabSession;
+	class LabSessionBase;
 	struct LabSessionCreateInfo;
 
 	using LabSessionFactory =
-		std::unique_ptr<LabSession>(*)(const LabSessionCreateInfo& createInfo) noexcept;
+		std::unique_ptr<LabSessionBase>(*)(const LabSessionCreateInfo& createInfo) noexcept;
 
 	class LabCatalog
 	{
@@ -20,7 +20,7 @@ namespace gglab
 		uint32_t GetCount() const noexcept { return static_cast<uint32_t>(m_Entries.size()); }
 		const LabDescriptor* GetDescriptor(uint32_t index) const noexcept;
 		const LabDescriptor* Find(const LabId& id) const noexcept;
-		std::unique_ptr<LabSession> Create(
+		std::unique_ptr<LabSessionBase> Create(
 			const LabId& id,
 			const LabSessionCreateInfo& createInfo) const noexcept;
 

@@ -7,7 +7,7 @@ namespace gglab
 	struct DrawItem
 	{
 		MeshID m_MeshId{};
-		MaterialID m_MaterialId{};
+		RenderMaterialKey m_MaterialKey{};
 		uint32_t m_ObjectOffset = 0;
 
 		RenderBucket m_Bucket = RenderBucket::Opaque;
@@ -72,8 +72,8 @@ namespace gglab
 			uint8_t variantBits,
 			uint32_t materialKey,
 			uint32_t meshKey) noexcept;
-		static RenderBucket DecideRenderBucket(const Material* material) noexcept;
-		static bool IsDoubleSided(const Material* material) noexcept;
+		static RenderBucket DecideRenderBucket(AlphaMode alphaMode) noexcept;
+		static bool IsDoubleSided(MaterialFlags flags) noexcept;
 		static uint32_t MakeDepthKey(const RenderView& renderView, const Vector3& worldCenterPos) noexcept;
 	};
 }
