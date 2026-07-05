@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -99,6 +99,12 @@
     </Filter>
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{9bd5b171-a413-4f4e-926d-2a8a50679791}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Lab">
+      <UniqueIdentifier>{34A27B34-9CA4-44BA-B51C-041607A5D962}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Lab\Sessions">
+      <UniqueIdentifier>{5A6E10E0-25EE-4589-B9B4-B3BD7320055D}</UniqueIdentifier>
     </Filter>
     <Filter Include="Application\Platform">
       <UniqueIdentifier>{2c293ebc-b50d-4fe3-a812-f847923969f8}</UniqueIdentifier>
@@ -387,8 +393,26 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLabHost.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
       <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\LabCatalog.cpp">
+      <Filter>Application\Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\LabCommandQueue.cpp">
+      <Filter>Application\Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp">
+      <Filter>Application\Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp">
+      <Filter>Application\Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -935,11 +959,32 @@
     <ClInclude Include="..\..\Sources\Application\Demo\DemoBase.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h">
       <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabCatalog.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h">
       <Filter>Graphics\RenderPipeline</Filter>

@@ -2,6 +2,7 @@
 #include "Application/Application.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
+#include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/DemoTypes.h"
@@ -176,6 +177,7 @@ namespace gglab
 			.m_WindowHeight = m_WindowHeight,
 		};
 		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoPlayground>(demoCreateInfo));
+		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoLabHost>(demoCreateInfo));
 
 		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
 		const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
