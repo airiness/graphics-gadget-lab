@@ -4,6 +4,7 @@
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
+#include "Application/Demo/DemoTypes.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
@@ -16,6 +17,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
+#include "DevTools/DevelopGui/Panels/DemoPanel.h"
 
 namespace gglab
 {
@@ -158,8 +160,22 @@ namespace gglab
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 
 		m_DemoManager = std::make_unique<DemoManager>();
+		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 
 		InitializeAssets();
+
+		const DemoCreateInfo demoCreateInfo{
+			.m_Services = {
+				.m_Renderer = m_Renderer.get(),
+				.m_AssetManager = m_AssetManager.get(),
+				.m_ShaderManager = m_ShaderManager.get(),
+				.m_InputManager = m_InputManager.get(),
+				.m_Time = m_Time.get(),
+			},
+			.m_WindowWidth = m_WindowWidth,
+			.m_WindowHeight = m_WindowHeight,
+		};
+		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoPlayground>(demoCreateInfo));
 
 		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
 		const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
@@ -170,10 +186,11 @@ namespace gglab
 		{
 			GGLAB_LOG_WARN("Application will continue without DevelopGui.");
 		}
-
-		// InitializeDemos
-		const auto demoIndex = m_DemoManager->CreateDemo<DemoPlayground>();
-		m_DemoManager->SetActiveDemo(demoIndex);
+		else
+		{
+			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
+				std::make_unique<DemoPanel>(m_DemoManager.get()));
+		}
 
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
 
@@ -218,6 +235,9 @@ namespace gglab
 				return false;
 			}
 		}
+
+		// Apply UI-driven demo changes before the demo updates or frame data is built.
+		m_DemoManager->ApplyPendingActiveDemo();
 
 		// DevelopGui new frame
 		const bool developGuiFrameOpen =
@@ -309,6 +329,14 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
 			m_Renderer->EndFrame(rendererFrame);
 		}
+
+		const DemoFrameFeedback demoFeedback{
+			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
+			.m_SubmittedFence = m_Renderer->GetLastSubmittedFencePoint(),
+			.m_FrameIndex = m_Time->GetFrameCount(),
+			.m_BackBufferIndex = backBufferIndex,
+		};
+		demo->OnFrameSubmitted(demoFeedback);
 
 		// Pipelines without a DevelopGui render pass must still close the ImGui frame.
 		if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())

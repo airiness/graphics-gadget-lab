@@ -170,6 +170,7 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
@@ -337,7 +338,9 @@
     <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoBase.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoManager.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.h" />
