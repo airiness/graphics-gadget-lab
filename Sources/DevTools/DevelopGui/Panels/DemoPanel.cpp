@@ -24,9 +24,8 @@ namespace gglab
 		const uint32_t activeIndex = m_DemoManager->GetActiveIndex();
 		const uint32_t selectedIndex = m_DemoManager->HasPendingActiveDemo() ?
 			m_DemoManager->GetPendingActiveIndex() : activeIndex;
-		const DemoBase* selectedDemo = m_DemoManager->GetDemo(selectedIndex);
-		const std::string preview = selectedDemo ?
-			std::string(selectedDemo->GetName()) : std::string("None");
+		const std::string preview = selectedIndex < m_DemoManager->GetDemoCount() ?
+			std::string(m_DemoManager->GetDemoName(selectedIndex)) : std::string("None");
 
 		ImGui::TextUnformatted("Active Demo");
 		ImGui::SetNextItemWidth(-FLT_MIN);
@@ -34,13 +33,7 @@ namespace gglab
 		{
 			for (uint32_t index = 0; index < m_DemoManager->GetDemoCount(); ++index)
 			{
-				const DemoBase* demo = m_DemoManager->GetDemo(index);
-				if (!demo)
-				{
-					continue;
-				}
-
-				const std::string name(demo->GetName());
+				const std::string name(m_DemoManager->GetDemoName(index));
 				const bool selected = index == selectedIndex;
 				ImGui::PushID(static_cast<int>(index));
 				if (ImGui::Selectable(name.c_str(), selected))

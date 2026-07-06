@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -397,6 +397,9 @@
       <Filter>Application\Demo</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabHost.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
@@ -978,6 +981,9 @@
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h">

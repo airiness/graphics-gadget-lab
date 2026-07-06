@@ -3,6 +3,7 @@
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Demo/DemoLabHost.h"
+#include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/DemoTypes.h"
@@ -185,25 +186,48 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
-		GGLAB_UNUSED(m_DemoManager->CreateDemo<DemoPlayground>(demoCreateInfo));
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId ?
 			LabId(*m_LaunchOptions.m_StartupLabId) : HelloLabSession::GetId();
-		const uint32_t labHostIndex = m_DemoManager->CreateDemo<DemoLabHost>(
-			demoCreateInfo,
-			startupLab);
-		auto* labHost = static_cast<DemoLabHost*>(m_DemoManager->GetDemo(labHostIndex));
-		if (!labHost->IsValid())
+		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo(
+			"Demo.Playground",
+			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
+			{
+				return std::make_unique<DemoPlayground>(demoCreateInfo);
+			});
+		const uint32_t labHostIndex = m_DemoManager->RegisterDemo(
+			"Demo.LabHost",
+			[demoCreateInfo, startupLab]() noexcept -> std::unique_ptr<DemoBase>
+			{
+				auto labHost = std::make_unique<DemoLabHost>(demoCreateInfo, startupLab);
+				if (!labHost->IsValid())
+				{
+					GGLAB_LOG_ERROR("Failed to initialize the requested startup Lab.");
+					return nullptr;
+				}
+				return labHost;
+			});
+		if (playgroundIndex >= m_DemoManager->GetDemoCount() ||
+			labHostIndex >= m_DemoManager->GetDemoCount())
 		{
-			GGLAB_LOG_ERROR("Failed to initialize the requested startup Lab.");
+			GGLAB_LOG_ERROR("Failed to register startup demos.");
 			m_IsInitialized = true;
 			Finalize();
 			return;
 		}
-		if (m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost)
+		const uint32_t startupDemoIndex =
+			m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost ?
+			labHostIndex : playgroundIndex;
+		m_DemoManager->RequestActiveDemo(startupDemoIndex);
+		if (!m_DemoManager->ApplyPendingActiveDemo())
 		{
-			m_DemoManager->RequestActiveDemo(labHostIndex);
-			m_DemoManager->ApplyPendingActiveDemo();
+			GGLAB_LOG_ERROR("Failed to initialize the requested startup demo.");
+			m_IsInitialized = true;
+			Finalize();
+			return;
 		}
+		m_LabRuntimeLocator = std::make_unique<DemoLabRuntimeLocator>(
+			m_DemoManager.get(),
+			labHostIndex);
 		GGLAB_LOG_INFO(
 			"Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost ?
@@ -223,14 +247,12 @@ namespace gglab
 		else
 		{
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
-				std::make_unique<LabSnapshotProvider>(&labHost->GetLabRuntime()),
+				std::make_unique<LabSnapshotProvider>(m_LabRuntimeLocator.get()),
 				SnapshotUpdatePolicy::EveryFrame);
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
 				std::make_unique<DemoPanel>(m_DemoManager.get()));
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
-				std::make_unique<LabPanel>(
-					&labHost->GetLabRuntime(),
-					&labHost->GetLabRuntime()));
+				std::make_unique<LabPanel>(m_LabRuntimeLocator.get()));
 		}
 
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
@@ -404,6 +426,7 @@ namespace gglab
 			m_DevelopGuiSystem->Finalize();
 			m_DevelopGuiSystem.reset();
 		}
+		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
 		m_AssetManager.reset();
 

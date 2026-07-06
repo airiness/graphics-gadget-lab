@@ -4,6 +4,8 @@
 
 namespace gglab
 {
+	class LabRuntime;
+
 	class ILabControl
 	{
 	public:
@@ -24,5 +26,13 @@ namespace gglab
 	public:
 		virtual ~ILabSnapshotSource() = default;
 		virtual LabSnapshot GetLabSnapshot() const noexcept = 0;
+	};
+
+	class LabRuntimeLocatorBase
+	{
+	public:
+		virtual ~LabRuntimeLocatorBase() = default;
+		virtual LabRuntime* GetLabRuntimeIfCreated() noexcept = 0;
+		virtual const LabRuntime* GetLabRuntimeIfCreated() const noexcept = 0;
 	};
 }

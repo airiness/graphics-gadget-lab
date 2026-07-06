@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 #include "Application/Lab/LabInterfaces.h"
+#include "Application/Lab/LabRuntime.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 
@@ -39,10 +40,15 @@ namespace gglab
 
 	void LabPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		GGLAB_UNUSED(context);
-		if (!m_Control || !m_SnapshotSource)
+		if (!m_RuntimeLocator)
 		{
 			ImGui::TextDisabled("Lab runtime is not available.");
+			return;
+		}
+		LabRuntime* runtime = m_RuntimeLocator->GetLabRuntimeIfCreated();
+		if (!runtime)
+		{
+			ImGui::TextDisabled("Demo.LabHost has not been created yet.");
 			return;
 		}
 
@@ -51,7 +57,7 @@ namespace gglab
 			context.m_Diagnostics->GetSnapshot<LabSnapshot>() : nullptr;
 		if (!snapshotPtr)
 		{
-			sourceSnapshot = m_SnapshotSource->GetLabSnapshot();
+			sourceSnapshot = runtime->GetLabSnapshot();
 			snapshotPtr = &sourceSnapshot;
 		}
 		const LabSnapshot& snapshot = *snapshotPtr;
@@ -69,7 +75,7 @@ namespace gglab
 				ImGui::PushID(descriptor.m_Id.m_Name.c_str());
 				if (ImGui::Selectable(descriptor.m_DisplayName.c_str(), selected))
 				{
-					m_Control->RequestSwitchLab(descriptor.m_Id);
+					runtime->RequestSwitchLab(descriptor.m_Id);
 					commandQueued = true;
 				}
 				if (selected)
@@ -107,19 +113,19 @@ namespace gglab
 
 		if (ImGui::Button("Reset Parameters"))
 		{
-			m_Control->RequestResetParameters();
+			runtime->RequestResetParameters();
 			commandQueued = true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Rebuild Scene"))
 		{
-			m_Control->RequestRebuildScene();
+			runtime->RequestRebuildScene();
 			commandQueued = true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Restart Session"))
 		{
-			m_Control->RequestRestartSession();
+			runtime->RequestRestartSession();
 			commandQueued = true;
 		}
 
@@ -153,7 +159,7 @@ namespace gglab
 			if (ImGui::Button("Restart with Run Config"))
 			{
 				config.Sanitize();
-				m_Control->RequestRunConfig(config);
+				runtime->RequestRunConfig(config);
 				commandQueued = true;
 			}
 		}
@@ -296,7 +302,10 @@ namespace gglab
 
 		if (changed)
 		{
-			m_Control->RequestSetParameter(desc.m_Id, value);
+			if (LabRuntime* runtime = m_RuntimeLocator ? m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr)
+			{
+				runtime->RequestSetParameter(desc.m_Id, value);
+			}
 		}
 		return changed;
 	}

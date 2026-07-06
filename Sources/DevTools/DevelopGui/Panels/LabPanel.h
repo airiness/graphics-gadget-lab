@@ -7,16 +7,14 @@
 
 namespace gglab
 {
-	class ILabControl;
-	class ILabSnapshotSource;
+	class LabRuntimeLocatorBase;
 	struct LabParameterSnapshot;
 
 	class LabPanel final : public DevelopGuiPanelBase
 	{
 	public:
-		LabPanel(ILabControl* control, ILabSnapshotSource* snapshotSource) noexcept :
-			m_Control(control),
-			m_SnapshotSource(snapshotSource)
+		explicit LabPanel(LabRuntimeLocatorBase* runtimeLocator) noexcept :
+			m_RuntimeLocator(runtimeLocator)
 		{}
 
 		std::string_view GetPath() const noexcept override { return "Application/Lab"; }
@@ -28,8 +26,7 @@ namespace gglab
 	private:
 		bool DrawParameter(const LabParameterSnapshot& parameter) noexcept;
 
-		ILabControl* m_Control = nullptr;
-		ILabSnapshotSource* m_SnapshotSource = nullptr;
+		LabRuntimeLocatorBase* m_RuntimeLocator = nullptr;
 		std::optional<LabRunConfig> m_RunConfigDraft;
 		LabId m_RunConfigLabId;
 	};
