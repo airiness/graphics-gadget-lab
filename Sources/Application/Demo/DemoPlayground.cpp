@@ -125,13 +125,6 @@ namespace gglab
 			Vector3::Zero,
 			Vector3::One);
 
-		// Alpha Blend Model Test
-		createEntityWithModel(
-			"Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf",
-			Vector3(-5.0f, 0.0f, 0.0f),
-			Vector3::Zero,
-			Vector3::One);
-
 		// Main Light
 		{
 			auto mainLightEntity = registry.create();
