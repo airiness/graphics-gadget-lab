@@ -17,9 +17,9 @@ namespace gglab
 		view.m_View = camera.GetViewMatrix();
 		view.m_Proj = camera.GetProjMatrix();
 		view.m_ViewProj = view.m_View * view.m_Proj;
-		view.m_InvView = view.m_View.Invert();
-		view.m_InvProj = view.m_Proj.Invert();
-		view.m_InvViewProj = view.m_ViewProj.Invert();
+		view.m_InvView = math::Inverse(view.m_View);
+		view.m_InvProj = math::Inverse(view.m_Proj);
+		view.m_InvViewProj = math::Inverse(view.m_ViewProj);
 
 		view.m_CameraPosition = camera.GetPosition();
 		view.m_Near = camera.GetNear();
@@ -44,12 +44,12 @@ namespace gglab
 		}
 		lightDir.Normalize();
 
-		Vector3 cameraForward = Vector3::TransformNormal(Vector3::UnitZ, info.m_MainView.m_InvView);
-		Vector3 cameraRight = Vector3::TransformNormal(Vector3::UnitX, info.m_MainView.m_InvView);
-		Vector3 cameraUp = Vector3::TransformNormal(Vector3::UnitY, info.m_MainView.m_InvView);
+		Vector3 cameraForward = math::TransformDirection(Vector3::Forward, info.m_MainView.m_InvView);
+		Vector3 cameraRight = math::TransformDirection(Vector3::Right, info.m_MainView.m_InvView);
+		Vector3 cameraUp = math::TransformDirection(Vector3::Up, info.m_MainView.m_InvView);
 		if (cameraForward.LengthSquared() <= 1.0e-8f)
 		{
-			cameraForward = Vector3::UnitZ;
+			cameraForward = Vector3::Forward;
 		}
 		if (cameraRight.LengthSquared() <= 1.0e-8f)
 		{
@@ -99,7 +99,7 @@ namespace gglab
 		}
 
 		const Vector3 lightEyeForBounds = frustumCenter - lightDir;
-		const Matrix lightViewForBounds = Matrix::CreateLookAt(
+		const Matrix lightViewForBounds = math::CreateLookAtLH(
 			lightEyeForBounds,
 			frustumCenter,
 			lightUp);
@@ -110,9 +110,9 @@ namespace gglab
 		const auto includeLightSpacePoint =
 			[&minLS, &maxLS, &lightViewForBounds](const Vector3& pointWS) noexcept
 			{
-				const Vector3 pointLS = Vector3::Transform(pointWS, lightViewForBounds);
-				minLS = Vector3::Min(minLS, pointLS);
-				maxLS = Vector3::Max(maxLS, pointLS);
+				const Vector3 pointLS = math::TransformPoint(pointWS, lightViewForBounds);
+				minLS = math::Min(minLS, pointLS);
+				maxLS = math::Max(maxLS, pointLS);
 			};
 
 		const float casterExtrusionDistance = std::max(info.m_CasterExtrusionDistance, 0.0f);
@@ -134,20 +134,22 @@ namespace gglab
 
 		constexpr float ShadowNear = 0.1f;
 		const float shadowFar = std::max((maxLS.m_Z - minLS.m_Z) + ShadowNear, ShadowNear + 1.0f);
-		// CreateLookAt is right-handed here, so upstream casters sit on the high-z bound.
-		const float lightEyeOffset = -ShadowNear - maxLS.m_Z;
+		// In the LH light view, points in front of the light have increasing z.
+		// Place the eye before the minimum required near plane while preserving the fitted depth range.
+		const float lightEyeOffset = minLS.m_Z - ShadowNear;
 		const Vector3 lightEye = lightEyeForBounds + lightDir * lightEyeOffset;
 		const Vector3 lightTarget = lightEye + lightDir;
 
 		RenderView view{};
 		view.m_Name = info.m_Name;
 		view.m_ViewId = RenderViewID::DirectionalShadow;
-		view.m_View = Matrix::CreateLookAt(lightEye, lightTarget, lightUp);
-		view.m_Proj = Matrix::CreateOrthographicOffCenter(minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);
+		view.m_View = math::CreateLookAtLH(lightEye, lightTarget, lightUp);
+		view.m_Proj = math::CreateOrthographicOffCenterLH(
+			minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);
 		view.m_ViewProj = view.m_View * view.m_Proj;
-		view.m_InvView = view.m_View.Invert();
-		view.m_InvProj = view.m_Proj.Invert();
-		view.m_InvViewProj = view.m_ViewProj.Invert();
+		view.m_InvView = math::Inverse(view.m_View);
+		view.m_InvProj = math::Inverse(view.m_Proj);
+		view.m_InvViewProj = math::Inverse(view.m_ViewProj);
 		view.m_CameraPosition = lightEye;
 		view.m_Near = ShadowNear;
 		view.m_Far = shadowFar;

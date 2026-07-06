@@ -88,6 +88,9 @@
     <Filter Include="Core\Math\Backends">
       <UniqueIdentifier>{f5644881-9215-43f8-935c-7f1d6d51d8f8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Math\Interop">
+      <UniqueIdentifier>{a37e09a3-ff82-43df-87aa-d29c52b2c4f8}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Platform">
       <UniqueIdentifier>{578d0cc7-e7d1-47fd-93bf-d24a02f93c5e}</UniqueIdentifier>
     </Filter>
@@ -378,16 +381,25 @@
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXCollisionBackend.cpp">
+    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp">
       <Filter>Core\Math\Backends</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp">
       <Filter>Core\Math\Backends</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Color.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.cpp">
+      <Filter>Core\Math\Interop</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp">
       <Filter>Core\Math</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp">
       <Filter>Core\Math</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp">
@@ -776,9 +788,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Color.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Input\InputManager.h">
       <Filter>Core\Input</Filter>
     </ClInclude>
@@ -800,10 +809,13 @@
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\MathTypes.h">
-      <Filter>Core\Math</Filter>
+    <ClInclude Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.h">
+      <Filter>Core\Math\Interop</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Transform.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h">

@@ -1,4 +1,6 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/BoundingVolumes.h"
+#include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
@@ -52,7 +54,7 @@ namespace gglab
 		bool ComputeModelBounds(
 			const Model& model,
 			const AssetManager& assetManager,
-			math::BoundingBox& result) noexcept
+			math::Aabb& result) noexcept
 		{
 			bool hasBounds = false;
 			for (const ModelMesh& modelMesh : model.m_MeshInstance)
@@ -63,9 +65,8 @@ namespace gglab
 					continue;
 				}
 
-				math::BoundingBox transformedBounds{};
-				mesh->m_BoundingBox.Transform(
-					transformedBounds,
+				const math::Aabb transformedBounds = math::Transform(
+					mesh->m_Aabb,
 					modelMesh.m_LocalTransform);
 				if (!hasBounds)
 				{
@@ -74,10 +75,7 @@ namespace gglab
 				}
 				else
 				{
-					math::BoundingBox::CreateMerged(
-						result,
-						result,
-						transformedBounds);
+					result = math::Merge(result, transformedBounds);
 				}
 			}
 			return hasBounds;
@@ -343,7 +341,7 @@ namespace gglab
 			path,
 			model->m_MeshInstance.size());
 
-		math::BoundingBox bounds{};
+		math::Aabb bounds{};
 		if (!ComputeModelBounds(*model, assetManager, bounds))
 		{
 			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has no valid bounds.", path);
@@ -382,15 +380,12 @@ namespace gglab
 		components::TransformComponent lightTransform{};
 		Vector3 lightDirection(-0.45f, -0.75f, 0.48f);
 		lightDirection.Normalize();
-		Quaternion::FromToRotation(
-			-Vector3::UnitZ,
-			lightDirection,
-			lightTransform.m_Rotation);
+		lightTransform.m_Rotation = math::RotationFromTo(Vector3::Forward, lightDirection);
 		registry.emplace<components::TransformComponent>(lightEntity, lightTransform);
 
 		components::LightComponent light{};
 		light.m_Type = LightType::Directional;
-		light.m_Color = color::White;
+		light.m_Color = Color::White;
 		light.m_Range = 1000.0f;
 		registry.emplace<components::LightComponent>(lightEntity, light);
 	}

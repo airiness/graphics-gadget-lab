@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/Input/InputBase.h"
-#include "Core/Math/MathTypes.h"
+#include "Core/Math/Vector.h"
 
 namespace gglab
 {

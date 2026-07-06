@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
@@ -126,12 +127,12 @@ namespace gglab
 		components::TransformComponent lightTransform{};
 		Vector3 direction(-0.35f, -0.82f, -0.45f);
 		direction.Normalize();
-		Quaternion::FromToRotation(-Vector3::UnitZ, direction, lightTransform.m_Rotation);
+		lightTransform.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 		registry.emplace<components::TransformComponent>(lightEntity, lightTransform);
 
 		components::LightComponent light{};
 		light.m_Type = LightType::Directional;
-		light.m_Color = color::White;
+		light.m_Color = Color::White;
 		light.m_Range = 1000.0f;
 		light.m_DirectionalShadowSettings.emplace();
 		registry.emplace<components::LightComponent>(lightEntity, light);

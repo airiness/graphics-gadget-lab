@@ -1,5 +1,7 @@
 #pragma once
-#include "Core/Math/MathTypes.h"
+#include "Core/Math/Color.h"
+#include "Core/Math/Matrix.h"
+#include "Core/Math/Vector.h"
 #include "Core/TypedIndex.h"
 #include "Graphics/GraphicsTypes.h"
 // struct member name without m_ for GPU using

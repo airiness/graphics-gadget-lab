@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"

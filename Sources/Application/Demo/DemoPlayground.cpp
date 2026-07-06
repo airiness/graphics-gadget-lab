@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Quaternion.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Core/Time.h"
 #include "Core/Input/InputManager.h"
@@ -99,7 +100,7 @@ namespace gglab
 				auto entity = registry.create();
 				components::TransformComponent transformComp{};
 				transformComp.m_Position = position;
-				transformComp.m_Rotation = Quaternion::CreateFromYawPitchRoll(
+				transformComp.m_Rotation = math::CreateFromYawPitchRoll(
 					math::ToRadians(rotation.m_Y),
 					math::ToRadians(rotation.m_X),
 					math::ToRadians(rotation.m_Z));
@@ -132,12 +133,12 @@ namespace gglab
 			components::TransformComponent transComp{};
 			Vector3 direction = Vector3(-0.406f, -0.906f, -0.123f);
 			direction.Normalize();
-			Quaternion::FromToRotation(-Vector3::UnitZ, direction, transComp.m_Rotation);
+			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
 
 			components::LightComponent lightComp{};
 			lightComp.m_Intensity = 3.0f;
-			lightComp.m_Color = color::White;
+			lightComp.m_Color = Color::White;
 			lightComp.m_Type = LightType::Directional;
 			lightComp.m_Range = 1000.0f;
 			lightComp.m_DirectionalShadowSettings.emplace();

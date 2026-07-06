@@ -1,6 +1,8 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/Color.h"
+#include "Core/Math/Color.h"
+#include "Core/Math/Quaternion.h"
+#include "Core/Math/Vector.h"
 #include "Graphics/ShadowSettings.h"
 
 #include <optional>
@@ -28,7 +30,7 @@ namespace gglab::components
 	struct LightComponent
 	{
 		LightType m_Type = LightType::Directional;
-		Color m_Color = color::White;
+		Color m_Color = Color::White;
 		float m_Intensity = 1.0f;
 		float m_Range = 1000.0f;
 		float m_SpotAngle = 60.0f;

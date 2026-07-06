@@ -14,11 +14,6 @@ namespace gglab::math
 		void Normalize() noexcept;
 		void Normalize(Quaternion& result) const noexcept;
 
-		static Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll) noexcept;
-		static Quaternion CreateFromYawPitchRoll(const Vector3& angles) noexcept;
-		static void FromToRotation(const Vector3& fromDir, const Vector3& toDir, Quaternion& result) noexcept;
-		static Quaternion FromToRotation(const Vector3& fromDir, const Vector3& toDir) noexcept;
-
 		static const Quaternion Identity;
 
 		float m_X = 0.0f;
@@ -28,4 +23,12 @@ namespace gglab::math
 	};
 
 	Quaternion operator*(const Quaternion& lhs, const Quaternion& rhs) noexcept;
+	Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll) noexcept;
+	Quaternion CreateFromYawPitchRoll(const Vector3& angles) noexcept;
+	Quaternion RotationFromTo(const Vector3& fromDirection, const Vector3& toDirection) noexcept;
+}
+
+namespace gglab
+{
+	using math::Quaternion;
 }

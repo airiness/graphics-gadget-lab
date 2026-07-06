@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/HelloLabSession.h"
 #include "Scene/Components.h"
 #include "Graphics/AssetManager.h"
@@ -102,7 +103,7 @@ namespace gglab
 			.m_Group = "Lighting",
 			.m_Type = LabParameterType::Color,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = color::White,
+			.m_DefaultValue = Color::White,
 		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
@@ -150,7 +151,7 @@ namespace gglab
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, true);
 		GetCamera().SetFov(parameters.Get(CameraFovId, 60.0f));
 
-		const Color lightColor = parameters.Get(LightColorId, color::White);
+		const Color lightColor = parameters.Get(LightColorId, Color::White);
 		const float lightIntensity = parameters.Get(LightIntensityId, 3.0f);
 		const Color baseColor = parameters.Get(
 			MaterialBaseColorId,
@@ -215,7 +216,7 @@ namespace gglab
 			break;
 		}
 		direction.Normalize();
-		Quaternion::FromToRotation(-Vector3::UnitZ, direction, lightTransform.m_Rotation);
+		lightTransform.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 		registry.emplace<components::TransformComponent>(lightEntity, lightTransform);
 
 		components::LightComponent light{};

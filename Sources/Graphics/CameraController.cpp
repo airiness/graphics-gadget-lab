@@ -32,7 +32,7 @@ namespace gglab
 		const Vector3 worldUp = Vector3::UnitY;
 
 		Vector3 forwardXZ(camera.GetForward().m_X, 0.0f, camera.GetForward().m_Z);
-		forwardXZ = math::SafeNormalize(forwardXZ, Vector3::UnitZ);
+		forwardXZ = math::SafeNormalize(forwardXZ, Vector3::Forward);
 
 		const Vector3 right = camera.GetRight();
 
@@ -65,7 +65,7 @@ namespace gglab
 			// Convert per-frame interpolation factor to frame-rate independent alpha.
 			float alpha = 1.0f - std::pow(1.0f - std::clamp(t, 0.0f, 1.0f), deltaTime * 60.0f);
 			alpha = std::clamp(alpha, 0.0f, 1.0f);
-			m_Velocity = Vector3::Lerp(m_Velocity, desiredVelocity, alpha);
+			m_Velocity = math::Lerp(m_Velocity, desiredVelocity, alpha);
 		}
 
 		// Integrate position

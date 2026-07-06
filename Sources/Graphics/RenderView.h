@@ -1,4 +1,6 @@
 #pragma once
+#include "Core/Math/Matrix.h"
+#include "Core/Math/Vector.h"
 #include "Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/ShadowSettings.h"

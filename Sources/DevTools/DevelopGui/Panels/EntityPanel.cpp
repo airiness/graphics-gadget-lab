@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Quaternion.h"
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
 #include "Scene/Components.h"
 #include "Core/Math/MathFunctions.h"
@@ -166,7 +167,7 @@ namespace gglab
 
 			components::LightComponent light{};
 			light.m_Type = LightType::Point;
-			light.m_Color = color::White;
+			light.m_Color = Color::White;
 			light.m_Intensity = 3.0f;
 			light.m_Range = 15.0f;
 			light.m_SpotAngle = 45.0f;
@@ -363,7 +364,7 @@ namespace gglab
 				};
 				if (ImGui::DragFloat3("Rotate (deg)", rotationDegrees, 0.25f))
 				{
-					transform.m_Rotation = Quaternion::CreateFromYawPitchRoll(
+					transform.m_Rotation = math::CreateFromYawPitchRoll(
 						math::ToRadians(rotationDegrees[1]),
 						math::ToRadians(rotationDegrees[0]),
 						math::ToRadians(rotationDegrees[2]));
