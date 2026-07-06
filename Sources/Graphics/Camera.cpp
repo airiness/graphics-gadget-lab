@@ -134,14 +134,14 @@ namespace gglab
 
 	void Camera::UpdateProjMatrix() noexcept
 	{
-		m_ProjMatrix = DirectX::XMMatrixPerspectiveFovLH(
+		m_ProjMatrix = Matrix::CreatePerspectiveFieldOfView(
 			utils::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
 	}
 
 	void Camera::UpdateViewMatrix() noexcept
 	{
 		// normalize yaw to [-PI, PI]
-		m_Yaw = std::remainder(m_Yaw, DirectX::XM_2PI);
+		m_Yaw = std::remainder(m_Yaw, math::TwoPi);
 		m_Pitch = std::clamp(m_Pitch, -PitchLimitRadians, +PitchLimitRadians);
 
 		// forward = (cos(pitch)*sin(yaw), sin(pitch), cos(pitch)*cos(yaw))
@@ -154,7 +154,7 @@ namespace gglab
 		m_Up = m_Forward.Cross(m_Right);
 		m_Up = utils::SafeNormalize(m_Up, Vector3::UnitY);
 
-		m_ViewMatrix = DirectX::XMMatrixLookAtLH(m_Position, m_Position + m_Forward, m_Up);
+		m_ViewMatrix = Matrix::CreateLookAt(m_Position, m_Position + m_Forward, m_Up);
 	}
 
 	void Camera::ComputeYawPitchFromForward(const Vector3& forward) noexcept

@@ -11,8 +11,6 @@
 #include <cstdint>
 #include <limits>
 
-#include <SimpleMath.h>
-
 namespace gglab
 {
 	enum class CommonRSRootParamIndex : uint32_t
@@ -322,8 +320,8 @@ namespace gglab
 		uint32_t m_VertexCount = 0;
 		uint32_t m_IndexCount = 0;
 
-		DirectX::BoundingSphere m_BoundingSphere{};
-		DirectX::BoundingBox m_BoundingBox{};
+		math::BoundingSphere m_BoundingSphere{};
+		math::BoundingBox m_BoundingBox{};
 	};
 
 	struct ModelMesh

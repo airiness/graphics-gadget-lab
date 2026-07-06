@@ -52,7 +52,7 @@ namespace gglab
 		bool ComputeModelBounds(
 			const Model& model,
 			const AssetManager& assetManager,
-			DirectX::BoundingBox& result) noexcept
+			math::BoundingBox& result) noexcept
 		{
 			bool hasBounds = false;
 			for (const ModelMesh& modelMesh : model.m_MeshInstance)
@@ -63,8 +63,10 @@ namespace gglab
 					continue;
 				}
 
-				DirectX::BoundingBox transformedBounds{};
-				mesh->m_BoundingBox.Transform(transformedBounds, modelMesh.m_LocalTransform);
+				math::BoundingBox transformedBounds{};
+				mesh->m_BoundingBox.Transform(
+					transformedBounds,
+					modelMesh.m_LocalTransform);
 				if (!hasBounds)
 				{
 					result = transformedBounds;
@@ -72,7 +74,7 @@ namespace gglab
 				}
 				else
 				{
-					DirectX::BoundingBox::CreateMerged(
+					math::BoundingBox::CreateMerged(
 						result,
 						result,
 						transformedBounds);
@@ -341,14 +343,16 @@ namespace gglab
 			path,
 			model->m_MeshInstance.size());
 
-		DirectX::BoundingBox bounds{};
+		math::BoundingBox bounds{};
 		if (!ComputeModelBounds(*model, assetManager, bounds))
 		{
 			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has no valid bounds.", path);
 			return false;
 		}
 
-		const Vector3 fullExtent = Vector3(bounds.Extents) * 2.0f;
+		const Vector3 boundsExtents = bounds.Extents;
+		const Vector3 boundsCenter = bounds.Center;
+		const Vector3 fullExtent = boundsExtents * 2.0f;
 		const float maxExtent = std::max({ fullExtent.x, fullExtent.y, fullExtent.z });
 		if (maxExtent <= 0.0f)
 		{
@@ -360,7 +364,7 @@ namespace gglab
 		const float scale = TargetAssetModelExtent / maxExtent;
 		transform.m_Scale = Vector3::One * scale;
 		transform.m_Position = Vector3(0.0f, 0.0f, GridDepth) -
-			Vector3(bounds.Center) * scale;
+			boundsCenter * scale;
 
 		auto& registry = m_World.GetRegistry();
 		const entt::entity entity = registry.create();

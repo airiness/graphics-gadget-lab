@@ -7,12 +7,12 @@ namespace gglab::utils
 	Vector4 ToVector4(const Vector3& vec3, float a) noexcept;
 	constexpr float ToRadians(float degrees) noexcept
 	{
-		return DirectX::XMConvertToRadians(degrees);
+		return degrees * (math::Pi / 180.0f);
 	}
 
 	constexpr float ToDegrees(float radians) noexcept
 	{
-		return DirectX::XMConvertToDegrees(radians);
+		return radians * (180.0f / math::Pi);
 	}
 
 	template<typename T>

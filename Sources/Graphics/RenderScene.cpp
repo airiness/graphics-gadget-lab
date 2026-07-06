@@ -193,8 +193,7 @@ namespace gglab
 					Vector3 worldCenter = transformComp.m_Position;
 					if (mesh->m_HasBounds)
 					{
-						const Vector3 localCenter = mesh->m_BoundingBox.Center;
-						worldCenter = Vector3::Transform(localCenter, world);
+						worldCenter = Vector3::Transform(mesh->m_BoundingBox.Center, world);
 					}
 
 					RenderInstance renderInstance{};
