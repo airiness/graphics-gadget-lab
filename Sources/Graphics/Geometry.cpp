@@ -186,13 +186,13 @@ namespace gglab
 			for (uint32_t stack = 0; stack <= StackCount; ++stack)
 			{
 				const float v = static_cast<float>(stack) / static_cast<float>(StackCount);
-				const float theta = v * DirectX::XM_PI;
+				const float theta = v * math::Pi;
 				const float sinTheta = std::sin(theta);
 				const float cosTheta = std::cos(theta);
 				for (uint32_t slice = 0; slice <= SliceCount; ++slice)
 				{
 					const float u = static_cast<float>(slice) / static_cast<float>(SliceCount);
-					const float phi = u * DirectX::XM_2PI;
+					const float phi = u * math::TwoPi;
 					const Vector3 normal(
 						sinTheta * std::cos(phi),
 						cosTheta,

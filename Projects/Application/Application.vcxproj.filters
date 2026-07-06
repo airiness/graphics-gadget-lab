@@ -46,9 +46,6 @@
     <Filter Include="Externals\D3D12MemAlloc">
       <UniqueIdentifier>{7847d186-1580-4b5a-b232-ed9305fc091c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Externals\DirectXSimpleMath">
-      <UniqueIdentifier>{53450643-fb3f-4f95-8824-f673ebb33beb}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Input">
       <UniqueIdentifier>{b2b02cd2-6196-43e9-8f44-f9314263c7b5}</UniqueIdentifier>
     </Filter>
@@ -282,9 +279,6 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
-      <Filter>Externals\DirectXSimpleMath</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp">
       <Filter>Core\Input</Filter>
     </ClCompile>
@@ -380,6 +374,12 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
       <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\MathDirectXBridge.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\MathTypes.cpp">
+      <Filter>Core\Math</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Graphics\Utility</Filter>
@@ -767,14 +767,14 @@
     <ClInclude Include="..\..\Sources\Graphics\Color.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.h">
-      <Filter>Externals\DirectXSimpleMath</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Input\InputManager.h">
       <Filter>Core\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h">
       <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\MathDirectXBridge.h">
+      <Filter>Core\Math</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\MathTypes.h">
       <Filter>Core\Math</Filter>
@@ -1343,9 +1343,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl">
-      <Filter>Externals\DirectXSimpleMath</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli">

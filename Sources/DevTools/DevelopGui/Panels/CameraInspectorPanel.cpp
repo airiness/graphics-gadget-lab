@@ -85,13 +85,10 @@ namespace gglab
 				return;
 			}
 
-			Matrix fmat{};
-			DirectX::XMStoreFloat4x4(&fmat, mat);
-
-			ImGui::Text("% .4f % .4f % .4f % .4f", fmat._11, fmat._12, fmat._13, fmat._14);
-			ImGui::Text("% .4f % .4f % .4f % .4f", fmat._21, fmat._22, fmat._23, fmat._24);
-			ImGui::Text("% .4f % .4f % .4f % .4f", fmat._31, fmat._32, fmat._33, fmat._34);
-			ImGui::Text("% .4f % .4f % .4f % .4f", fmat._41, fmat._42, fmat._43, fmat._44);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat._11, mat._12, mat._13, mat._14);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat._21, mat._22, mat._23, mat._24);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat._31, mat._32, mat._33, mat._34);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat._41, mat._42, mat._43, mat._44);
 
 			ImGui::TreePop();
 		}

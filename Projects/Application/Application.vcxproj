@@ -44,7 +44,6 @@
     <Import Project="..\..\PropertySheets\DirectXTexImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
-    <Import Project="..\..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
@@ -57,7 +56,6 @@
     <Import Project="..\..\PropertySheets\DirectXTexImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
-    <Import Project="..\..\PropertySheets\DirectXSimpleMathImport.props" />
     <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
@@ -107,10 +105,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -228,6 +222,8 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\MathDirectXBridge.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\MathTypes.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp" />
@@ -294,7 +290,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
-    <ClInclude Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
@@ -498,6 +493,7 @@
     <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h" />
     <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
     <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\MathDirectXBridge.h" />
     <ClInclude Include="..\..\Sources\Core\Math\MathTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
@@ -538,7 +534,6 @@
     <ClInclude Include="..\..\Sources\Core\World.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\Externals\Vender\DirectXSimpleMath\SimpleMath.inl" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

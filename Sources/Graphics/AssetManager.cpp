@@ -110,7 +110,7 @@ namespace gglab
 
 		Matrix ToMatrix(const aiMatrix4x4& matrix) noexcept
 		{
-			// Assimp uses column vectors; SimpleMath uses row vectors.
+			// Assimp uses column vectors; gglab matrices use row vectors.
 			return Matrix(
 				matrix.a1, matrix.b1, matrix.c1, matrix.d1,
 				matrix.a2, matrix.b2, matrix.c2, matrix.d2,
@@ -864,25 +864,20 @@ namespace gglab
 
 	void AssetManager::ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept
 	{
-		static_assert(std::is_base_of_v<DirectX::XMFLOAT3, decltype(Vertex::m_Position)>,
-			"Vertex position must be XMFLOAT3 or derived type.");
-
 		if (vertices.empty())
 		{
-			mesh.m_BoundingBox = DirectX::BoundingBox{};
-			mesh.m_BoundingSphere = DirectX::BoundingSphere{};
+			mesh.m_BoundingBox = math::BoundingBox{};
+			mesh.m_BoundingSphere = math::BoundingSphere{};
 			mesh.m_HasBounds = false;
 			return;
 		}
 
 		const auto* firstPos = std::addressof(vertices[0].m_Position);
-		const auto* firstPoint = static_cast<const DirectX::XMFLOAT3*>(firstPos);
-
 		constexpr size_t stride = sizeof(Vertex);
 
-		DirectX::BoundingBox::CreateFromPoints(mesh.m_BoundingBox, vertices.size(), firstPoint, stride);
-		DirectX::BoundingSphere::CreateFromBoundingBox(mesh.m_BoundingSphere, mesh.m_BoundingBox);
-		//DirectX::BoundingSphere::CreateFromPoints(mesh.m_BoundingSphere, vertices.size(), firstPoint, stride);
+		math::BoundingBox::CreateFromPoints(mesh.m_BoundingBox, vertices.size(), firstPos, stride);
+		math::BoundingSphere::CreateFromBoundingBox(mesh.m_BoundingSphere, mesh.m_BoundingBox);
+		//math::BoundingSphere::CreateFromPoints(mesh.m_BoundingSphere, vertices.size(), firstPos, stride);
 
 		mesh.m_HasBounds = true;
 	}
