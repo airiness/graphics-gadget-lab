@@ -3,13 +3,13 @@
 
 namespace gglab
 {
-	class ILabSnapshotSource;
+	class LabRuntimeLocatorBase;
 
 	class LabSnapshotProvider final : public SnapshotProviderBase
 	{
 	public:
-		explicit LabSnapshotProvider(const ILabSnapshotSource* source) noexcept :
-			m_Source(source)
+		explicit LabSnapshotProvider(const LabRuntimeLocatorBase* runtimeLocator) noexcept :
+			m_RuntimeLocator(runtimeLocator)
 		{}
 
 		[[nodiscard]] SnapshotId GetId() const noexcept override;
@@ -17,6 +17,6 @@ namespace gglab
 		void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override;
 
 	private:
-		const ILabSnapshotSource* m_Source = nullptr;
+		const LabRuntimeLocatorBase* m_RuntimeLocator = nullptr;
 	};
 }

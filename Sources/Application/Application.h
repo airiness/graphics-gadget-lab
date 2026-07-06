@@ -16,6 +16,7 @@ namespace gglab
 	class Keyboard;
 	class Mouse;
 	class World;
+	class LabRuntimeLocatorBase;
 	struct PlatformEvent;
 	class Application
 	{
@@ -84,6 +85,7 @@ namespace gglab
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
+		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
 		std::unique_ptr<DevelopGuiSystem> m_DevelopGuiSystem;
 
