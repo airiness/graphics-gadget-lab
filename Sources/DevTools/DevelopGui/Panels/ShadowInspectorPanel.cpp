@@ -46,10 +46,10 @@ namespace gglab
 				return;
 			}
 
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._11, mat._12, mat._13, mat._14);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._21, mat._22, mat._23, mat._24);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._31, mat._32, mat._33, mat._34);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._41, mat._42, mat._43, mat._44);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_11, mat.m_12, mat.m_13, mat.m_14);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_21, mat.m_22, mat.m_23, mat.m_24);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_31, mat.m_32, mat.m_33, mat.m_34);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_41, mat.m_42, mat.m_43, mat.m_44);
 
 			ImGui::TreePop();
 		}
@@ -118,9 +118,9 @@ namespace gglab
 			}
 
 			float direction[3] = {
-				lightBinding.m_Direction.x,
-				lightBinding.m_Direction.y,
-				lightBinding.m_Direction.z,
+				lightBinding.m_Direction.m_X,
+				lightBinding.m_Direction.m_Y,
+				lightBinding.m_Direction.m_Z,
 			};
 
 			if (ImGui::DragFloat3("Direction", direction, 0.01f, -1.0f, 1.0f, "%.3f"))
@@ -134,15 +134,15 @@ namespace gglab
 			}
 
 			float color[3] = {
-				lightBinding.m_Light->m_Color.x,
-				lightBinding.m_Light->m_Color.y,
-				lightBinding.m_Light->m_Color.z,
+				lightBinding.m_Light->m_Color.m_R,
+				lightBinding.m_Light->m_Color.m_G,
+				lightBinding.m_Light->m_Color.m_B,
 			};
 			if (ImGui::ColorEdit3("Color", color))
 			{
-				lightBinding.m_Light->m_Color.x = color[0];
-				lightBinding.m_Light->m_Color.y = color[1];
-				lightBinding.m_Light->m_Color.z = color[2];
+				lightBinding.m_Light->m_Color.m_R = color[0];
+				lightBinding.m_Light->m_Color.m_G = color[1];
+				lightBinding.m_Light->m_Color.m_B = color[2];
 			}
 
 			ImGui::DragFloat("Intensity", &lightBinding.m_Light->m_Intensity, 0.01f, 0.0f, 100.0f, "%.3f");
@@ -233,9 +233,9 @@ namespace gglab
 			}
 
 			ImGui::Text("Position: %.3f, %.3f, %.3f",
-				shadowView->m_CameraPosition.x,
-				shadowView->m_CameraPosition.y,
-				shadowView->m_CameraPosition.z);
+				shadowView->m_CameraPosition.m_X,
+				shadowView->m_CameraPosition.m_Y,
+				shadowView->m_CameraPosition.m_Z);
 			ImGui::Text("Near/Far: %.3f / %.3f", shadowView->m_Near, shadowView->m_Far);
 			ImGui::Text("Viewport: %u x %u", shadowView->m_Width, shadowView->m_Height);
 			ImGui::Checkbox("Show Matrices", &state.m_ShowMatrices);

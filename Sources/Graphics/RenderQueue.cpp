@@ -158,7 +158,7 @@ namespace gglab
 		}
 
 		// Clamp Z to the valid [near, far] range from the view.
-		float z = centerViewPos.z;
+		float z = centerViewPos.m_Z;
 		z = std::clamp(z, nearZ, farZ);
 
 		float t = (z - nearZ) / denom;

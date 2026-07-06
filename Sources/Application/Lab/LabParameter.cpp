@@ -154,18 +154,18 @@ namespace gglab
 					{
 						if (const auto* minValue = std::get_if<Vector3>(&*desc.m_MinValue))
 						{
-							result.x = std::max(result.x, minValue->x);
-							result.y = std::max(result.y, minValue->y);
-							result.z = std::max(result.z, minValue->z);
+							result.m_X = std::max(result.m_X, minValue->m_X);
+							result.m_Y = std::max(result.m_Y, minValue->m_Y);
+							result.m_Z = std::max(result.m_Z, minValue->m_Z);
 						}
 					}
 					if (desc.m_MaxValue)
 					{
 						if (const auto* maxValue = std::get_if<Vector3>(&*desc.m_MaxValue))
 						{
-							result.x = std::min(result.x, maxValue->x);
-							result.y = std::min(result.y, maxValue->y);
-							result.z = std::min(result.z, maxValue->z);
+							result.m_X = std::min(result.m_X, maxValue->m_X);
+							result.m_Y = std::min(result.m_Y, maxValue->m_Y);
+							result.m_Z = std::min(result.m_Z, maxValue->m_Z);
 						}
 					}
 					return result;
@@ -173,10 +173,10 @@ namespace gglab
 				else if constexpr (std::is_same_v<T, Color>)
 				{
 					return Color(
-						std::clamp(candidate.x, 0.0f, 1.0f),
-						std::clamp(candidate.y, 0.0f, 1.0f),
-						std::clamp(candidate.z, 0.0f, 1.0f),
-						std::clamp(candidate.w, 0.0f, 1.0f));
+						std::clamp(candidate.m_R, 0.0f, 1.0f),
+						std::clamp(candidate.m_G, 0.0f, 1.0f),
+						std::clamp(candidate.m_B, 0.0f, 1.0f),
+						std::clamp(candidate.m_A, 0.0f, 1.0f));
 				}
 				else
 				{

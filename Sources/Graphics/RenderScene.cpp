@@ -5,7 +5,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Core/World.h"
 #include "Scene/Components.h"
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 #include "Graphics/RenderView.h"
 
 namespace gglab
@@ -193,7 +193,7 @@ namespace gglab
 					Vector3 worldCenter = transformComp.m_Position;
 					if (mesh->m_HasBounds)
 					{
-						worldCenter = Vector3::Transform(mesh->m_BoundingBox.Center, world);
+						worldCenter = Vector3::Transform(mesh->m_BoundingBox.m_Center, world);
 					}
 
 					RenderInstance renderInstance{};
@@ -216,12 +216,12 @@ namespace gglab
 			for (auto&& [entity, transComp, lightComp] : lightView.each())
 			{
 				LightGPU lightGpu{};
-				lightGpu.Position = utils::ToVector4(transComp.m_Position, 1.0f);
+				lightGpu.Position = math::ToVector4(transComp.m_Position, 1.0f);
 
 				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
 				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
 				forward.Normalize();
-				lightGpu.Direction = utils::ToVector4(forward, 0.0f);
+				lightGpu.Direction = math::ToVector4(forward, 0.0f);
 
 				lightGpu.Color = lightComp.m_Color;
 				lightGpu.Intensity = lightComp.m_Intensity;
@@ -267,7 +267,7 @@ namespace gglab
 			viewGpu.ProjMat = renderView.m_Proj;
 			viewGpu.InvViewMat = renderView.m_InvView;
 			viewGpu.InvProjMat = renderView.m_InvProj;
-			viewGpu.CameraPos = utils::ToVector4(renderView.m_CameraPosition, 1.0f);
+			viewGpu.CameraPos = math::ToVector4(renderView.m_CameraPosition, 1.0f);
 			viewGpu.Near = renderView.m_Near;
 			viewGpu.Far = renderView.m_Far;
 			viewGpu.FovRadians = renderView.m_FovRadians;

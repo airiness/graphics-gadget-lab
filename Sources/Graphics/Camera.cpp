@@ -51,8 +51,8 @@ namespace gglab
 
 	void Camera::SetYawPitch(float yawRadians, float pitchRadians) noexcept
 	{
-		if (!utils::IsFinite(yawRadians) ||
-			!utils::IsFinite(pitchRadians))
+		if (!math::IsFinite(yawRadians) ||
+			!math::IsFinite(pitchRadians))
 		{
 			return;
 		}
@@ -65,8 +65,8 @@ namespace gglab
 
 	void Camera::SetNearFar(float nearZ, float farZ) noexcept
 	{
-		if (!utils::IsFinite(nearZ) ||
-			!utils::IsFinite(farZ))
+		if (!math::IsFinite(nearZ) ||
+			!math::IsFinite(farZ))
 		{
 			return;
 		}
@@ -79,7 +79,7 @@ namespace gglab
 
 	void Camera::SetFov(float fovDegrees) noexcept
 	{
-		if (!utils::IsFinite(fovDegrees))
+		if (!math::IsFinite(fovDegrees))
 		{
 			return;
 		}
@@ -90,7 +90,7 @@ namespace gglab
 
 	void Camera::SetAspect(float aspect) noexcept
 	{
-		if (!utils::IsFinite(aspect) || aspect <= 0.0f)
+		if (!math::IsFinite(aspect) || aspect <= 0.0f)
 		{
 			return;
 		}
@@ -111,7 +111,7 @@ namespace gglab
 	{
 		m_Position = eye;
 
-		Vector3 forward = utils::SafeNormalize(target - eye, Vector3::UnitZ);
+		Vector3 forward = math::SafeNormalize(target - eye, Vector3::UnitZ);
 		ComputeYawPitchFromForward(forward);
 
 		MarkViewDirty();
@@ -135,7 +135,7 @@ namespace gglab
 	void Camera::UpdateProjMatrix() noexcept
 	{
 		m_ProjMatrix = Matrix::CreatePerspectiveFieldOfView(
-			utils::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
+			math::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
 	}
 
 	void Camera::UpdateViewMatrix() noexcept
@@ -149,10 +149,10 @@ namespace gglab
 		m_Forward = Vector3(cosP * std::sin(m_Yaw), std::sin(m_Pitch), cosP * std::cos(m_Yaw));
 
 		m_Right = Vector3::UnitY.Cross(m_Forward);
-		m_Right = utils::SafeNormalize(m_Right, Vector3::UnitX);
+		m_Right = math::SafeNormalize(m_Right, Vector3::UnitX);
 
 		m_Up = m_Forward.Cross(m_Right);
-		m_Up = utils::SafeNormalize(m_Up, Vector3::UnitY);
+		m_Up = math::SafeNormalize(m_Up, Vector3::UnitY);
 
 		m_ViewMatrix = Matrix::CreateLookAt(m_Position, m_Position + m_Forward, m_Up);
 	}
@@ -162,9 +162,9 @@ namespace gglab
 		// forward is expected normalized
 		// pitch = asin(y)
 		// yaw = atan2(x, z)
-		const Vector3 normForward = utils::SafeNormalize(forward, Vector3::UnitZ);
-		auto pitch = std::asin(std::clamp(normForward.y, -1.0f, 1.0f));
-		m_Yaw = std::atan2(normForward.x, normForward.z);
+		const Vector3 normForward = math::SafeNormalize(forward, Vector3::UnitZ);
+		auto pitch = std::asin(std::clamp(normForward.m_Y, -1.0f, 1.0f));
+		m_Yaw = std::atan2(normForward.m_X, normForward.m_Z);
 
 		m_Pitch = std::clamp(pitch, -PitchLimitRadians, +PitchLimitRadians);
 	}

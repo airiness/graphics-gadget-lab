@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 
 #include <algorithm>
 
@@ -20,23 +20,23 @@ namespace gglab::devtools
 
 			Vector4 clipPosition;
 			Vector3::Transform(worldPosition, view.m_ViewProj, clipPosition);
-			if (!utils::IsFinite(clipPosition.x) ||
-				!utils::IsFinite(clipPosition.y) ||
-				!utils::IsFinite(clipPosition.z) ||
-				!utils::IsFinite(clipPosition.w) ||
-				clipPosition.w <= 1.0e-5f)
+			if (!math::IsFinite(clipPosition.m_X) ||
+				!math::IsFinite(clipPosition.m_Y) ||
+				!math::IsFinite(clipPosition.m_Z) ||
+				!math::IsFinite(clipPosition.m_W) ||
+				clipPosition.m_W <= 1.0e-5f)
 			{
 				return false;
 			}
 
-			const float invW = 1.0f / clipPosition.w;
-			outNdc.x = clipPosition.x * invW;
-			outNdc.y = clipPosition.y * invW;
-			outNdc.z = clipPosition.z * invW;
+			const float invW = 1.0f / clipPosition.m_W;
+			outNdc.m_X = clipPosition.m_X * invW;
+			outNdc.m_Y = clipPosition.m_Y * invW;
+			outNdc.m_Z = clipPosition.m_Z * invW;
 			return
-				utils::IsFinite(outNdc.x) &&
-				utils::IsFinite(outNdc.y) &&
-				utils::IsFinite(outNdc.z);
+				math::IsFinite(outNdc.m_X) &&
+				math::IsFinite(outNdc.m_Y) &&
+				math::IsFinite(outNdc.m_Z);
 		}
 
 		[[nodiscard]] ImVec2 NdcToScreen(
@@ -44,8 +44,8 @@ namespace gglab::devtools
 			const ImGuiViewport& viewport) noexcept
 		{
 			return ImVec2(
-				viewport.Pos.x + (ndc.x * 0.5f + 0.5f) * viewport.Size.x,
-				viewport.Pos.y + (0.5f - ndc.y * 0.5f) * viewport.Size.y);
+				viewport.Pos.x + (ndc.m_X * 0.5f + 0.5f) * viewport.Size.x,
+				viewport.Pos.y + (0.5f - ndc.m_Y * 0.5f) * viewport.Size.y);
 		}
 	}
 
@@ -57,9 +57,9 @@ namespace gglab::devtools
 	{
 		Vector3 ndc;
 		if (!ProjectWorldPositionToNdc(view, worldPosition, ndc) ||
-			ndc.x < -1.0f || ndc.x > 1.0f ||
-			ndc.y < -1.0f || ndc.y > 1.0f ||
-			ndc.z < 0.0f || ndc.z > 1.0f)
+			ndc.m_X < -1.0f || ndc.m_X > 1.0f ||
+			ndc.m_Y < -1.0f || ndc.m_Y > 1.0f ||
+			ndc.m_Z < 0.0f || ndc.m_Z > 1.0f)
 		{
 			return false;
 		}
@@ -93,18 +93,18 @@ namespace gglab::devtools
 
 		Vector3 ndc;
 		if (!ProjectWorldPositionToNdc(view, worldPosition, ndc) ||
-			ndc.z < 0.0f || ndc.z > 1.0f)
+			ndc.m_Z < 0.0f || ndc.m_Z > 1.0f)
 		{
 			return false;
 		}
 
 		const Vector3 clampedNdc(
-			std::clamp(ndc.x, -1.0f, 1.0f),
-			std::clamp(ndc.y, -1.0f, 1.0f),
-			ndc.z);
+			std::clamp(ndc.m_X, -1.0f, 1.0f),
+			std::clamp(ndc.m_Y, -1.0f, 1.0f),
+			ndc.m_Z);
 		outClamped =
-			clampedNdc.x != ndc.x ||
-			clampedNdc.y != ndc.y;
+			clampedNdc.m_X != ndc.m_X ||
+			clampedNdc.m_Y != ndc.m_Y;
 
 		outScreenPosition = NdcToScreen(clampedNdc, viewport);
 		return true;

@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
 #include "Scene/Components.h"
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 #include "Core/Utility/StringUtils.h"
 #include "Core/World.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -353,27 +353,27 @@ namespace gglab
 			ImGui::PushID("Component.Transform");
 			if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				ImGui::DragFloat3("Translate", &transform.m_Position.x, 0.05f);
+				ImGui::DragFloat3("Translate", &transform.m_Position.m_X, 0.05f);
 
 				Vector3 euler = transform.m_Rotation.ToEuler();
 				float rotationDegrees[3] = {
-					utils::ToDegrees(euler.x),
-					utils::ToDegrees(euler.y),
-					utils::ToDegrees(euler.z),
+					math::ToDegrees(euler.m_X),
+					math::ToDegrees(euler.m_Y),
+					math::ToDegrees(euler.m_Z),
 				};
 				if (ImGui::DragFloat3("Rotate (deg)", rotationDegrees, 0.25f))
 				{
 					transform.m_Rotation = Quaternion::CreateFromYawPitchRoll(
-						utils::ToRadians(rotationDegrees[1]),
-						utils::ToRadians(rotationDegrees[0]),
-						utils::ToRadians(rotationDegrees[2]));
+						math::ToRadians(rotationDegrees[1]),
+						math::ToRadians(rotationDegrees[0]),
+						math::ToRadians(rotationDegrees[2]));
 				}
 
-				if (ImGui::DragFloat3("Scale", &transform.m_Scale.x, 0.01f, 0.001f, 1000.0f))
+				if (ImGui::DragFloat3("Scale", &transform.m_Scale.m_X, 0.01f, 0.001f, 1000.0f))
 				{
-					transform.m_Scale.x = std::max(transform.m_Scale.x, 0.001f);
-					transform.m_Scale.y = std::max(transform.m_Scale.y, 0.001f);
-					transform.m_Scale.z = std::max(transform.m_Scale.z, 0.001f);
+					transform.m_Scale.m_X = std::max(transform.m_Scale.m_X, 0.001f);
+					transform.m_Scale.m_Y = std::max(transform.m_Scale.m_Y, 0.001f);
+					transform.m_Scale.m_Z = std::max(transform.m_Scale.m_Z, 0.001f);
 				}
 			}
 			ImGui::PopID();
@@ -421,15 +421,15 @@ namespace gglab
 				}
 
 				float color[3] = {
-					light.m_Color.x,
-					light.m_Color.y,
-					light.m_Color.z,
+					light.m_Color.m_R,
+					light.m_Color.m_G,
+					light.m_Color.m_B,
 				};
 				if (ImGui::ColorEdit3("Color", color))
 				{
-					light.m_Color.x = color[0];
-					light.m_Color.y = color[1];
-					light.m_Color.z = color[2];
+					light.m_Color.m_R = color[0];
+					light.m_Color.m_G = color[1];
+					light.m_Color.m_B = color[2];
 				}
 
 				ImGui::DragFloat("Intensity", &light.m_Intensity, 0.05f, 0.0f, 1000.0f, "%.3f");
