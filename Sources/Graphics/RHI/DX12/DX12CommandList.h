@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Math/Color.h"
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 

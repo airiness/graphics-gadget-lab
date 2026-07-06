@@ -111,7 +111,7 @@ namespace gglab
 	{
 		m_Position = eye;
 
-		Vector3 forward = math::SafeNormalize(target - eye, Vector3::UnitZ);
+		Vector3 forward = math::SafeNormalize(target - eye, Vector3::Forward);
 		ComputeYawPitchFromForward(forward);
 
 		MarkViewDirty();
@@ -134,7 +134,7 @@ namespace gglab
 
 	void Camera::UpdateProjMatrix() noexcept
 	{
-		m_ProjMatrix = Matrix::CreatePerspectiveFieldOfView(
+		m_ProjMatrix = math::CreatePerspectiveFieldOfViewLH(
 			math::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
 	}
 
@@ -154,7 +154,7 @@ namespace gglab
 		m_Up = m_Forward.Cross(m_Right);
 		m_Up = math::SafeNormalize(m_Up, Vector3::UnitY);
 
-		m_ViewMatrix = Matrix::CreateLookAt(m_Position, m_Position + m_Forward, m_Up);
+		m_ViewMatrix = math::CreateLookAtLH(m_Position, m_Position + m_Forward, m_Up);
 	}
 
 	void Camera::ComputeYawPitchFromForward(const Vector3& forward) noexcept
@@ -162,7 +162,7 @@ namespace gglab
 		// forward is expected normalized
 		// pitch = asin(y)
 		// yaw = atan2(x, z)
-		const Vector3 normForward = math::SafeNormalize(forward, Vector3::UnitZ);
+		const Vector3 normForward = math::SafeNormalize(forward, Vector3::Forward);
 		auto pitch = std::asin(std::clamp(normForward.m_Y, -1.0f, 1.0f));
 		m_Yaw = std::atan2(normForward.m_X, normForward.m_Z);
 

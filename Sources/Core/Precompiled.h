@@ -48,7 +48,6 @@
 // Project definitions
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Math/MathTypes.h"
 #include "Core/Platform/Win/ComTypes.h"
 
 // GameInput

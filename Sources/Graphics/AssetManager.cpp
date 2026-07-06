@@ -5,6 +5,7 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
+#include "Core/Math/Interop/AssimpMathInterop.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -108,16 +109,6 @@ namespace gglab
 			return Vector4(tangent.m_X, tangent.m_Y, tangent.m_Z, 1.0f);
 		}
 
-		Matrix ToMatrix(const aiMatrix4x4& matrix) noexcept
-		{
-			// Assimp uses column vectors; gglab matrices use row vectors.
-			return Matrix(
-				matrix.a1, matrix.b1, matrix.c1, matrix.d1,
-				matrix.a2, matrix.b2, matrix.c2, matrix.d2,
-				matrix.a3, matrix.b3, matrix.c3, matrix.d3,
-				matrix.a4, matrix.b4, matrix.c4, matrix.d4);
-		}
-
 		void CollectModelMeshInstances(
 			const aiNode& node,
 			const aiMatrix4x4& parentTransform,
@@ -141,7 +132,7 @@ namespace gglab
 				result.push_back({
 					.m_MeshId = meshIds[meshIndex],
 					.m_MaterialId = meshMaterialIds[meshIndex],
-					.m_LocalTransform = ToMatrix(localToModel),
+					.m_LocalTransform = math::interop::FromAssimp(localToModel),
 				});
 			}
 
@@ -866,8 +857,8 @@ namespace gglab
 	{
 		if (vertices.empty())
 		{
-			mesh.m_BoundingBox = math::BoundingBox{};
-			mesh.m_BoundingSphere = math::BoundingSphere{};
+			mesh.m_Aabb = math::Aabb{};
+			mesh.m_Sphere = math::Sphere{};
 			mesh.m_HasBounds = false;
 			return;
 		}
@@ -875,9 +866,9 @@ namespace gglab
 		const auto* firstPos = std::addressof(vertices[0].m_Position);
 		constexpr size_t stride = sizeof(Vertex);
 
-		math::BoundingBox::CreateFromPoints(mesh.m_BoundingBox, vertices.size(), firstPos, stride);
-		math::BoundingSphere::CreateFromBoundingBox(mesh.m_BoundingSphere, mesh.m_BoundingBox);
-		//math::BoundingSphere::CreateFromPoints(mesh.m_BoundingSphere, vertices.size(), firstPos, stride);
+		mesh.m_Aabb = math::CreateAabbFromPoints(vertices.size(), firstPos, stride);
+		mesh.m_Sphere = math::CreateSphere(mesh.m_Aabb);
+		//mesh.m_Sphere = math::CreateSphereFromPoints(vertices.size(), firstPos, stride);
 
 		mesh.m_HasBounds = true;
 	}

@@ -145,7 +145,7 @@ namespace gglab
 
 	uint32_t RenderQueueBuilder::MakeDepthKey(const RenderView& renderView, const Vector3& worldCenterPos) noexcept
 	{
-		const Vector3 centerViewPos = Vector3::Transform(worldCenterPos, renderView.m_View);
+		const Vector3 centerViewPos = math::TransformPoint(worldCenterPos, renderView.m_View);
 
 		const float nearZ = renderView.m_Near;
 		const float farZ = renderView.m_Far;

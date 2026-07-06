@@ -222,10 +222,13 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXCollisionBackend.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
@@ -488,7 +491,6 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Color.h" />
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputManager.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h" />
@@ -501,8 +503,9 @@
     <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h" />
     <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\MathTypes.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Math/MathFunctions.h"
+#include "Core/Math/Matrix.h"
 
 namespace gglab
 {
@@ -8,7 +9,7 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
-			Vector3 m_Forward = Vector3::UnitZ;
+			Vector3 m_Forward = Vector3::Forward;
 			Vector3 m_Position = Vector3::Zero;
 
 			float m_Near = 0.01f;
@@ -72,7 +73,7 @@ namespace gglab
 		Matrix m_ViewMatrix = Matrix::Identity;
 		Matrix m_ProjMatrix = Matrix::Identity;
 
-		Vector3 m_Forward = Vector3::UnitZ;
+		Vector3 m_Forward = Vector3::Forward;
 		Vector3 m_Up = Vector3::UnitY;
 		Vector3 m_Right = Vector3::UnitX;
 		Vector3 m_Position = Vector3::Zero;

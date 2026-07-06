@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Math/MathTypes.h"
+#include "Core/Math/Vector.h"
 
 namespace gglab
 {

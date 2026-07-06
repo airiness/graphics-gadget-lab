@@ -1,5 +1,7 @@
 #pragma once
-#include "Graphics/Color.h"
+#include "Core/Math/BoundingVolumes.h"
+#include "Core/Math/Color.h"
+#include "Core/Math/Matrix.h"
 #include "Core/StringId.h"
 #include "Core/TypedIndex.h"
 #include "Core/EnumFlags.h"
@@ -281,8 +283,8 @@ namespace gglab
 		MaterialTextureBinding m_NormalBinding{};
 		MaterialTextureBinding m_OcclusionBinding{};
 
-		Color m_BaseColor = color::White;
-		Color m_EmissiveColor = color::Black;
+		Color m_BaseColor = Color::White;
+		Color m_EmissiveColor = Color::Black;
 		float m_MetallicFactor = 0.0f;
 		float m_RoughnessFactor = 1.0f;
 		float m_NormalScale = 1.0f;
@@ -320,8 +322,8 @@ namespace gglab
 		uint32_t m_VertexCount = 0;
 		uint32_t m_IndexCount = 0;
 
-		math::BoundingSphere m_BoundingSphere{};
-		math::BoundingBox m_BoundingBox{};
+		math::Sphere m_Sphere{};
+		math::Aabb m_Aabb{};
 	};
 
 	struct ModelMesh

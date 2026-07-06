@@ -22,20 +22,8 @@ namespace gglab::math
 
 		Matrix& operator*=(const Matrix& rhs) noexcept;
 
-		Matrix Invert() const noexcept;
-		void Invert(Matrix& result) const noexcept;
-		Matrix Transpose() const noexcept;
-		void Transpose(Matrix& result) const noexcept;
 		Vector3 Translation() const noexcept;
 		void Translation(const Vector3& value) noexcept;
-
-		static Matrix CreateScale(const Vector3& scale) noexcept;
-		static Matrix CreateScale(float scale) noexcept;
-		static Matrix CreateTranslation(const Vector3& translation) noexcept;
-		static Matrix CreateFromQuaternion(const Quaternion& rotation) noexcept;
-		static Matrix CreateLookAt(const Vector3& eye, const Vector3& target, const Vector3& up) noexcept;
-		static Matrix CreatePerspectiveFieldOfView(float fovRadians, float aspect, float nearZ, float farZ) noexcept;
-		static Matrix CreateOrthographicOffCenter(float left, float right, float bottom, float top, float nearZ, float farZ) noexcept;
 
 		static const Matrix Identity;
 
@@ -53,4 +41,19 @@ namespace gglab::math
 	};
 
 	Matrix operator*(const Matrix& lhs, const Matrix& rhs) noexcept;
+	Matrix Inverse(const Matrix& matrix) noexcept;
+	Matrix Transpose(const Matrix& matrix) noexcept;
+	Matrix CreateScale(const Vector3& scale) noexcept;
+	Matrix CreateScale(float scale) noexcept;
+	Matrix CreateTranslation(const Vector3& translation) noexcept;
+	Matrix CreateFromQuaternion(const Quaternion& rotation) noexcept;
+	Matrix CreateLookAtLH(const Vector3& eye, const Vector3& target, const Vector3& up) noexcept;
+	Matrix CreatePerspectiveFieldOfViewLH(float fovRadians, float aspect, float nearZ, float farZ) noexcept;
+	Matrix CreateOrthographicOffCenterLH(
+		float left, float right, float bottom, float top, float nearZ, float farZ) noexcept;
+}
+
+namespace gglab
+{
+	using math::Matrix;
 }

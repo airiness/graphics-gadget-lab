@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Matrix.h"
 #include "Graphics/RenderWorldExtractor.h"
 #include "Scene/Components.h"
 #include "Core/World.h"
@@ -42,8 +43,8 @@ namespace gglab
 
 	Vector3 RenderWorldExtractor::ResolveLightDirection(const components::TransformComponent& transform) noexcept
 	{
-		Matrix rotation = Matrix::CreateFromQuaternion(transform.m_Rotation);
-		Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
+		const Matrix rotation = math::CreateFromQuaternion(transform.m_Rotation);
+		Vector3 forward = math::TransformDirection(Vector3::Forward, rotation);
 		if (forward.LengthSquared() <= 1.0e-8f)
 		{
 			return -Vector3::UnitY;

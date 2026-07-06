@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Math/MathTypes.h"
+#include "Core/Math/BoundingVolumes.h"
 
 #include <DirectXCollision.h>
 #include <DirectXMath.h>
@@ -30,52 +30,50 @@ namespace gglab::math
 				value.m_41, value.m_42, value.m_43, value.m_44);
 		}
 
-		DirectX::BoundingBox ToDXBoundingBox(const BoundingBox& value) noexcept
+		DirectX::BoundingBox ToDXBoundingBox(const Aabb& value) noexcept
 		{
 			return DirectX::BoundingBox(
 				ToDXFloat3(value.m_Center),
 				ToDXFloat3(value.m_Extents));
 		}
 
-		DirectX::BoundingSphere ToDXBoundingSphere(const BoundingSphere& value) noexcept
+		DirectX::BoundingSphere ToDXBoundingSphere(const Sphere& value) noexcept
 		{
 			return DirectX::BoundingSphere(
 				ToDXFloat3(value.m_Center),
 				value.m_Radius);
 		}
 
-		BoundingBox StoreBoundingBox(const DirectX::BoundingBox& value) noexcept
+		Aabb StoreAabb(const DirectX::BoundingBox& value) noexcept
 		{
-			return BoundingBox(
+			return Aabb(
 				Vector3(value.Center.x, value.Center.y, value.Center.z),
 				Vector3(value.Extents.x, value.Extents.y, value.Extents.z));
 		}
 
-		BoundingSphere StoreBoundingSphere(const DirectX::BoundingSphere& value) noexcept
+		Sphere StoreSphere(const DirectX::BoundingSphere& value) noexcept
 		{
-			return BoundingSphere(
+			return Sphere(
 				Vector3(value.Center.x, value.Center.y, value.Center.z),
 				value.Radius);
 		}
 	}
 
-	void BoundingBox::Transform(BoundingBox& result, const Matrix& matrix) const noexcept
+	Aabb Transform(const Aabb& aabb, const Matrix& matrix) noexcept
 	{
 		DirectX::BoundingBox dxResult;
-		ToDXBoundingBox(*this).Transform(dxResult, LoadMatrix(matrix));
-		result = StoreBoundingBox(dxResult);
+		ToDXBoundingBox(aabb).Transform(dxResult, LoadMatrix(matrix));
+		return StoreAabb(dxResult);
 	}
 
-	void BoundingBox::CreateFromPoints(
-		BoundingBox& result,
+	Aabb CreateAabbFromPoints(
 		size_t count,
 		const Vector3* points,
 		size_t stride) noexcept
 	{
 		if (points == nullptr || count == 0)
 		{
-			result = BoundingBox{};
-			return;
+			return {};
 		}
 
 		DirectX::BoundingBox dxResult;
@@ -84,39 +82,35 @@ namespace gglab::math
 			count,
 			reinterpret_cast<const DirectX::XMFLOAT3*>(points),
 			stride);
-		result = StoreBoundingBox(dxResult);
+		return StoreAabb(dxResult);
 	}
 
-	void BoundingBox::CreateMerged(
-		BoundingBox& result,
-		const BoundingBox& lhs,
-		const BoundingBox& rhs) noexcept
+	Aabb Merge(const Aabb& lhs,
+		const Aabb& rhs) noexcept
 	{
 		DirectX::BoundingBox dxResult;
 		DirectX::BoundingBox::CreateMerged(
 			dxResult,
 			ToDXBoundingBox(lhs),
 			ToDXBoundingBox(rhs));
-		result = StoreBoundingBox(dxResult);
+		return StoreAabb(dxResult);
 	}
 
-	void BoundingSphere::Transform(BoundingSphere& result, const Matrix& matrix) const noexcept
+	Sphere Transform(const Sphere& sphere, const Matrix& matrix) noexcept
 	{
 		DirectX::BoundingSphere dxResult;
-		ToDXBoundingSphere(*this).Transform(dxResult, LoadMatrix(matrix));
-		result = StoreBoundingSphere(dxResult);
+		ToDXBoundingSphere(sphere).Transform(dxResult, LoadMatrix(matrix));
+		return StoreSphere(dxResult);
 	}
 
-	void BoundingSphere::CreateFromPoints(
-		BoundingSphere& result,
+	Sphere CreateSphereFromPoints(
 		size_t count,
 		const Vector3* points,
 		size_t stride) noexcept
 	{
 		if (points == nullptr || count == 0)
 		{
-			result = BoundingSphere{};
-			return;
+			return {};
 		}
 
 		DirectX::BoundingSphere dxResult;
@@ -125,13 +119,13 @@ namespace gglab::math
 			count,
 			reinterpret_cast<const DirectX::XMFLOAT3*>(points),
 			stride);
-		result = StoreBoundingSphere(dxResult);
+		return StoreSphere(dxResult);
 	}
 
-	void BoundingSphere::CreateFromBoundingBox(BoundingSphere& result, const BoundingBox& box) noexcept
+	Sphere CreateSphere(const Aabb& aabb) noexcept
 	{
 		DirectX::BoundingSphere dxResult;
-		DirectX::BoundingSphere::CreateFromBoundingBox(dxResult, ToDXBoundingBox(box));
-		result = StoreBoundingSphere(dxResult);
+		DirectX::BoundingSphere::CreateFromBoundingBox(dxResult, ToDXBoundingBox(aabb));
+		return StoreSphere(dxResult);
 	}
 }

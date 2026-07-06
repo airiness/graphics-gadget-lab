@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/StringId.h"
-#include "Core/Math/MathTypes.h"
+#include "Core/Math/Color.h"
+#include "Core/Math/Vector.h"
 
 #include <optional>
 #include <span>

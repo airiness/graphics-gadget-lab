@@ -1,4 +1,6 @@
 #pragma once
+#include "Core/CoreMacros.h"
+
 #include <cstddef>
 
 namespace gglab::math
@@ -12,8 +14,8 @@ namespace gglab::math
 		constexpr explicit Vector2(float value) noexcept : m_X(value), m_Y(value) {}
 		constexpr Vector2(float x, float y) noexcept : m_X(x), m_Y(y) {}
 
-		float& operator[](size_t index) noexcept { return (&m_X)[index]; }
-		const float& operator[](size_t index) const noexcept { return (&m_X)[index]; }
+		float& operator[](size_t index) noexcept { GGLAB_ASSERT(index < 2); return (&m_X)[index]; }
+		const float& operator[](size_t index) const noexcept { GGLAB_ASSERT(index < 2); return (&m_X)[index]; }
 
 		Vector2& operator+=(const Vector2& rhs) noexcept;
 		Vector2& operator-=(const Vector2& rhs) noexcept;
@@ -30,10 +32,6 @@ namespace gglab::math
 		void Normalize() noexcept;
 		void Normalize(Vector2& result) const noexcept;
 
-		static Vector2 Min(const Vector2& lhs, const Vector2& rhs) noexcept;
-		static Vector2 Max(const Vector2& lhs, const Vector2& rhs) noexcept;
-		static Vector2 Lerp(const Vector2& lhs, const Vector2& rhs, float t) noexcept;
-
 		static const Vector2 Zero;
 		static const Vector2 One;
 		static const Vector2 UnitX;
@@ -49,8 +47,8 @@ namespace gglab::math
 		constexpr explicit Vector3(float value) noexcept : m_X(value), m_Y(value), m_Z(value) {}
 		constexpr Vector3(float x, float y, float z) noexcept : m_X(x), m_Y(y), m_Z(z) {}
 
-		float& operator[](size_t index) noexcept { return (&m_X)[index]; }
-		const float& operator[](size_t index) const noexcept { return (&m_X)[index]; }
+		float& operator[](size_t index) noexcept { GGLAB_ASSERT(index < 3); return (&m_X)[index]; }
+		const float& operator[](size_t index) const noexcept { GGLAB_ASSERT(index < 3); return (&m_X)[index]; }
 
 		Vector3& operator+=(const Vector3& rhs) noexcept;
 		Vector3& operator-=(const Vector3& rhs) noexcept;
@@ -68,13 +66,6 @@ namespace gglab::math
 		void Normalize() noexcept;
 		void Normalize(Vector3& result) const noexcept;
 		Vector3 Normalized() const noexcept;
-
-		static Vector3 Min(const Vector3& lhs, const Vector3& rhs) noexcept;
-		static Vector3 Max(const Vector3& lhs, const Vector3& rhs) noexcept;
-		static Vector3 Lerp(const Vector3& lhs, const Vector3& rhs, float t) noexcept;
-		static Vector3 Transform(const Vector3& value, const Matrix& matrix) noexcept;
-		static void Transform(const Vector3& value, const Matrix& matrix, Vector4& result) noexcept;
-		static Vector3 TransformNormal(const Vector3& value, const Matrix& matrix) noexcept;
 
 		static const Vector3 Zero;
 		static const Vector3 One;
@@ -100,8 +91,8 @@ namespace gglab::math
 		constexpr Vector4(float x, float y, float z, float w) noexcept : m_X(x), m_Y(y), m_Z(z), m_W(w) {}
 		constexpr Vector4(const Vector3& value, float w) noexcept : m_X(value.m_X), m_Y(value.m_Y), m_Z(value.m_Z), m_W(w) {}
 
-		float& operator[](size_t index) noexcept { return (&m_X)[index]; }
-		const float& operator[](size_t index) const noexcept { return (&m_X)[index]; }
+		float& operator[](size_t index) noexcept { GGLAB_ASSERT(index < 4); return (&m_X)[index]; }
+		const float& operator[](size_t index) const noexcept { GGLAB_ASSERT(index < 4); return (&m_X)[index]; }
 
 		Vector4& operator+=(const Vector4& rhs) noexcept;
 		Vector4& operator-=(const Vector4& rhs) noexcept;
@@ -117,11 +108,6 @@ namespace gglab::math
 		float Dot(const Vector4& rhs) const noexcept;
 		void Normalize() noexcept;
 		void Normalize(Vector4& result) const noexcept;
-
-		static Vector4 Min(const Vector4& lhs, const Vector4& rhs) noexcept;
-		static Vector4 Max(const Vector4& lhs, const Vector4& rhs) noexcept;
-		static Vector4 Lerp(const Vector4& lhs, const Vector4& rhs, float t) noexcept;
-		static Vector4 Transform(const Vector4& value, const Matrix& matrix) noexcept;
 
 		static const Vector4 Zero;
 		static const Vector4 One;
@@ -142,6 +128,9 @@ namespace gglab::math
 	Vector2 operator*(const Vector2& lhs, float scalar) noexcept;
 	Vector2 operator*(float scalar, const Vector2& rhs) noexcept;
 	Vector2 operator/(const Vector2& lhs, float scalar) noexcept;
+	Vector2 Min(const Vector2& lhs, const Vector2& rhs) noexcept;
+	Vector2 Max(const Vector2& lhs, const Vector2& rhs) noexcept;
+	Vector2 Lerp(const Vector2& lhs, const Vector2& rhs, float t) noexcept;
 
 	Vector3 operator+(const Vector3& lhs, const Vector3& rhs) noexcept;
 	Vector3 operator-(const Vector3& lhs, const Vector3& rhs) noexcept;
@@ -149,6 +138,12 @@ namespace gglab::math
 	Vector3 operator*(const Vector3& lhs, float scalar) noexcept;
 	Vector3 operator*(float scalar, const Vector3& rhs) noexcept;
 	Vector3 operator/(const Vector3& lhs, float scalar) noexcept;
+	Vector3 Min(const Vector3& lhs, const Vector3& rhs) noexcept;
+	Vector3 Max(const Vector3& lhs, const Vector3& rhs) noexcept;
+	Vector3 Lerp(const Vector3& lhs, const Vector3& rhs, float t) noexcept;
+	Vector3 TransformPoint(const Vector3& value, const Matrix& matrix) noexcept;
+	Vector4 TransformPointHomogeneous(const Vector3& value, const Matrix& matrix) noexcept;
+	Vector3 TransformDirection(const Vector3& value, const Matrix& matrix) noexcept;
 
 	Vector4 operator+(const Vector4& lhs, const Vector4& rhs) noexcept;
 	Vector4 operator-(const Vector4& lhs, const Vector4& rhs) noexcept;
@@ -156,4 +151,15 @@ namespace gglab::math
 	Vector4 operator*(const Vector4& lhs, float scalar) noexcept;
 	Vector4 operator*(float scalar, const Vector4& rhs) noexcept;
 	Vector4 operator/(const Vector4& lhs, float scalar) noexcept;
+	Vector4 Min(const Vector4& lhs, const Vector4& rhs) noexcept;
+	Vector4 Max(const Vector4& lhs, const Vector4& rhs) noexcept;
+	Vector4 Lerp(const Vector4& lhs, const Vector4& rhs, float t) noexcept;
+	Vector4 Transform(const Vector4& value, const Matrix& matrix) noexcept;
+}
+
+namespace gglab
+{
+	using math::Vector2;
+	using math::Vector3;
+	using math::Vector4;
 }

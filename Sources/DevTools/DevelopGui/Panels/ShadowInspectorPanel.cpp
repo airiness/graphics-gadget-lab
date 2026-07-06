@@ -1,4 +1,6 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Matrix.h"
+#include "Core/Math/Quaternion.h"
 #include "Scene/Components.h"
 #include "Core/World.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
@@ -56,7 +58,9 @@ namespace gglab
 
 		static Vector3 DirectionFromTransform(const components::TransformComponent& transform) noexcept
 		{
-			Vector3 direction = Vector3::Transform(-Vector3::UnitZ, Matrix::CreateFromQuaternion(transform.m_Rotation));
+			Vector3 direction = math::TransformDirection(
+				Vector3::Forward,
+				math::CreateFromQuaternion(transform.m_Rotation));
 			if (direction.LengthSquared() <= 1.0e-8f)
 			{
 				return -Vector3::UnitY;
@@ -129,7 +133,8 @@ namespace gglab
 				if (newDirection.LengthSquared() > 1.0e-8f)
 				{
 					newDirection.Normalize();
-					Quaternion::FromToRotation(-Vector3::UnitZ, newDirection, lightBinding.m_Transform->m_Rotation);
+					lightBinding.m_Transform->m_Rotation =
+						math::RotationFromTo(Vector3::Forward, newDirection);
 				}
 			}
 

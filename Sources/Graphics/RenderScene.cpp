@@ -6,6 +6,7 @@
 #include "Core/World.h"
 #include "Scene/Components.h"
 #include "Core/Math/MathFunctions.h"
+#include "Core/Math/Transform.h"
 #include "Graphics/RenderView.h"
 
 namespace gglab
@@ -107,10 +108,10 @@ namespace gglab
 					return;
 				}
 
-				const Matrix entityWorld =
-					Matrix::CreateScale(transformComp.m_Scale) *
-					Matrix::CreateFromQuaternion(transformComp.m_Rotation) *
-					Matrix::CreateTranslation(transformComp.m_Position);
+				const Matrix entityWorld = math::CreateTransformMatrix(
+					transformComp.m_Scale,
+					transformComp.m_Rotation,
+					transformComp.m_Position);
 
 				for (uint32_t modelMeshIndex = 0;
 					modelMeshIndex < model->m_MeshInstance.size();
@@ -124,9 +125,7 @@ namespace gglab
 					}
 
 					const Matrix world = modelMesh.m_LocalTransform * entityWorld;
-					Matrix normalMat = world;
-					normalMat.Translation(Vector3::Zero);
-					normalMat = normalMat.Invert().Transpose();
+					const Matrix normalMat = math::CreateNormalMatrix(world);
 
 					const MaterialProperties* material = nullptr;
 					RenderMaterialKey materialKey{};
@@ -193,7 +192,7 @@ namespace gglab
 					Vector3 worldCenter = transformComp.m_Position;
 					if (mesh->m_HasBounds)
 					{
-						worldCenter = Vector3::Transform(mesh->m_BoundingBox.m_Center, world);
+						worldCenter = math::TransformPoint(mesh->m_Aabb.m_Center, world);
 					}
 
 					RenderInstance renderInstance{};
@@ -218,8 +217,8 @@ namespace gglab
 				LightGPU lightGpu{};
 				lightGpu.Position = math::ToVector4(transComp.m_Position, 1.0f);
 
-				Matrix rotation = Matrix::CreateFromQuaternion(transComp.m_Rotation);
-				Vector3 forward = Vector3::Transform(-Vector3::UnitZ, rotation);
+				const Matrix rotation = math::CreateFromQuaternion(transComp.m_Rotation);
+				Vector3 forward = math::TransformDirection(Vector3::Forward, rotation);
 				forward.Normalize();
 				lightGpu.Direction = math::ToVector4(forward, 0.0f);
 
@@ -245,7 +244,7 @@ namespace gglab
 			{
 				LightGPU lightGpu{};
 				lightGpu.Direction = -Vector4::UnitY;
-				lightGpu.Color = color::White;
+				lightGpu.Color = Color::White;
 				lightGpu.Intensity = 1.0f;
 				lightGpu.Range = 1000.0f;
 				lightGpu.SpotAngle = 60.0f;

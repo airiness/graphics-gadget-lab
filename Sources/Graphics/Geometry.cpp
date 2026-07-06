@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Geometry.h"
+#include "Core/Math/MathConstants.h"
 #include "Scene/Components.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
