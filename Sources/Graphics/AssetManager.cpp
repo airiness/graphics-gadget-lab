@@ -94,7 +94,7 @@ namespace gglab
 				n.Normalize();
 			}
 
-			const Vector3 up = (std::abs(n.y) < 0.999f) ? Vector3::UnitY : Vector3::UnitZ;
+			const Vector3 up = (std::abs(n.m_Y) < 0.999f) ? Vector3::UnitY : Vector3::UnitZ;
 			Vector3 tangent = up.Cross(n);
 			if (tangent.LengthSquared() <= TangentLengthSqEpsilon)
 			{
@@ -105,7 +105,7 @@ namespace gglab
 				tangent.Normalize();
 			}
 
-			return Vector4(tangent.x, tangent.y, tangent.z, 1.0f);
+			return Vector4(tangent.m_X, tangent.m_Y, tangent.m_Z, 1.0f);
 		}
 
 		Matrix ToMatrix(const aiMatrix4x4& matrix) noexcept
@@ -747,7 +747,7 @@ namespace gglab
 							handedness = (tangent.Cross(bitangent).Dot(normal) < 0.0f) ? -1.0f : 1.0f;
 						}
 
-						vertex.m_Tangent = Vector4(tangent.x, tangent.y, tangent.z, handedness);
+						vertex.m_Tangent = Vector4(tangent.m_X, tangent.m_Y, tangent.m_Z, handedness);
 					}
 				}
 				else

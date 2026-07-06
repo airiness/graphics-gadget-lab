@@ -350,10 +350,10 @@ namespace gglab
 			return false;
 		}
 
-		const Vector3 boundsExtents = bounds.Extents;
-		const Vector3 boundsCenter = bounds.Center;
+		const Vector3 boundsExtents = bounds.m_Extents;
+		const Vector3 boundsCenter = bounds.m_Center;
 		const Vector3 fullExtent = boundsExtents * 2.0f;
-		const float maxExtent = std::max({ fullExtent.x, fullExtent.y, fullExtent.z });
+		const float maxExtent = std::max({ fullExtent.m_X, fullExtent.m_Y, fullExtent.m_Z });
 		if (maxExtent <= 0.0f)
 		{
 			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has degenerate bounds.", path);

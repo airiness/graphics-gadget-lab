@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Math/MathTypes.h"
+#include "Core/Math/Vector.h"
 
 namespace gglab::math
 {
@@ -27,146 +27,124 @@ namespace gglab::math
 	const Vector4 Vector4::UnitZ = { 0.0f, 0.0f, 1.0f, 0.0f };
 	const Vector4 Vector4::UnitW = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-	const Matrix Matrix::Identity =
-	{
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f,
-	};
-
-	const Quaternion Quaternion::Identity = { 0.0f, 0.0f, 0.0f, 1.0f };
-
 	Vector2& Vector2::operator+=(const Vector2& rhs) noexcept
 	{
-		x += rhs.x;
-		y += rhs.y;
+		m_X += rhs.m_X;
+		m_Y += rhs.m_Y;
 		return *this;
 	}
 
 	Vector2& Vector2::operator-=(const Vector2& rhs) noexcept
 	{
-		x -= rhs.x;
-		y -= rhs.y;
+		m_X -= rhs.m_X;
+		m_Y -= rhs.m_Y;
 		return *this;
 	}
 
 	Vector2& Vector2::operator*=(const Vector2& rhs) noexcept
 	{
-		x *= rhs.x;
-		y *= rhs.y;
+		m_X *= rhs.m_X;
+		m_Y *= rhs.m_Y;
 		return *this;
 	}
 
 	Vector2& Vector2::operator*=(float scalar) noexcept
 	{
-		x *= scalar;
-		y *= scalar;
+		m_X *= scalar;
+		m_Y *= scalar;
 		return *this;
 	}
 
 	Vector2& Vector2::operator/=(float scalar) noexcept
 	{
-		x /= scalar;
-		y /= scalar;
+		m_X /= scalar;
+		m_Y /= scalar;
 		return *this;
 	}
 
 	Vector3& Vector3::operator+=(const Vector3& rhs) noexcept
 	{
-		x += rhs.x;
-		y += rhs.y;
-		z += rhs.z;
+		m_X += rhs.m_X;
+		m_Y += rhs.m_Y;
+		m_Z += rhs.m_Z;
 		return *this;
 	}
 
 	Vector3& Vector3::operator-=(const Vector3& rhs) noexcept
 	{
-		x -= rhs.x;
-		y -= rhs.y;
-		z -= rhs.z;
+		m_X -= rhs.m_X;
+		m_Y -= rhs.m_Y;
+		m_Z -= rhs.m_Z;
 		return *this;
 	}
 
 	Vector3& Vector3::operator*=(const Vector3& rhs) noexcept
 	{
-		x *= rhs.x;
-		y *= rhs.y;
-		z *= rhs.z;
+		m_X *= rhs.m_X;
+		m_Y *= rhs.m_Y;
+		m_Z *= rhs.m_Z;
 		return *this;
 	}
 
 	Vector3& Vector3::operator*=(float scalar) noexcept
 	{
-		x *= scalar;
-		y *= scalar;
-		z *= scalar;
+		m_X *= scalar;
+		m_Y *= scalar;
+		m_Z *= scalar;
 		return *this;
 	}
 
 	Vector3& Vector3::operator/=(float scalar) noexcept
 	{
-		x /= scalar;
-		y /= scalar;
-		z /= scalar;
+		m_X /= scalar;
+		m_Y /= scalar;
+		m_Z /= scalar;
 		return *this;
 	}
 
 	Vector4& Vector4::operator+=(const Vector4& rhs) noexcept
 	{
-		x += rhs.x;
-		y += rhs.y;
-		z += rhs.z;
-		w += rhs.w;
+		m_X += rhs.m_X;
+		m_Y += rhs.m_Y;
+		m_Z += rhs.m_Z;
+		m_W += rhs.m_W;
 		return *this;
 	}
 
 	Vector4& Vector4::operator-=(const Vector4& rhs) noexcept
 	{
-		x -= rhs.x;
-		y -= rhs.y;
-		z -= rhs.z;
-		w -= rhs.w;
+		m_X -= rhs.m_X;
+		m_Y -= rhs.m_Y;
+		m_Z -= rhs.m_Z;
+		m_W -= rhs.m_W;
 		return *this;
 	}
 
 	Vector4& Vector4::operator*=(const Vector4& rhs) noexcept
 	{
-		x *= rhs.x;
-		y *= rhs.y;
-		z *= rhs.z;
-		w *= rhs.w;
+		m_X *= rhs.m_X;
+		m_Y *= rhs.m_Y;
+		m_Z *= rhs.m_Z;
+		m_W *= rhs.m_W;
 		return *this;
 	}
 
 	Vector4& Vector4::operator*=(float scalar) noexcept
 	{
-		x *= scalar;
-		y *= scalar;
-		z *= scalar;
-		w *= scalar;
+		m_X *= scalar;
+		m_Y *= scalar;
+		m_Z *= scalar;
+		m_W *= scalar;
 		return *this;
 	}
 
 	Vector4& Vector4::operator/=(float scalar) noexcept
 	{
-		x /= scalar;
-		y /= scalar;
-		z /= scalar;
-		w /= scalar;
+		m_X /= scalar;
+		m_Y /= scalar;
+		m_Z /= scalar;
+		m_W /= scalar;
 		return *this;
-	}
-
-	Vector3 Matrix::Translation() const noexcept
-	{
-		return Vector3(_41, _42, _43);
-	}
-
-	void Matrix::Translation(const Vector3& value) noexcept
-	{
-		_41 = value.x;
-		_42 = value.y;
-		_43 = value.z;
 	}
 
 	Vector2 operator+(const Vector2& lhs, const Vector2& rhs) noexcept
@@ -288,5 +266,4 @@ namespace gglab::math
 		result /= scalar;
 		return result;
 	}
-
 }

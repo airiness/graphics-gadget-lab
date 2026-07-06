@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/Camera.h"
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 
 namespace gglab
 {
@@ -24,7 +24,7 @@ namespace gglab
 		view.m_CameraPosition = camera.GetPosition();
 		view.m_Near = camera.GetNear();
 		view.m_Far = camera.GetFar();
-		view.m_FovRadians = utils::ToRadians(camera.GetFov());
+		view.m_FovRadians = math::ToRadians(camera.GetFov());
 		view.m_Aspect = camera.GetAspect();
 		view.m_Exposure = 1.0f; //camera.GetExposure();
 
@@ -123,19 +123,19 @@ namespace gglab
 		}
 
 		const float orthoPadding = std::max(info.m_OrthoPadding, 0.0f);
-		minLS.x -= orthoPadding;
-		minLS.y -= orthoPadding;
-		maxLS.x += orthoPadding;
-		maxLS.y += orthoPadding;
+		minLS.m_X -= orthoPadding;
+		minLS.m_Y -= orthoPadding;
+		maxLS.m_X += orthoPadding;
+		maxLS.m_Y += orthoPadding;
 
 		const float depthPadding = std::max(info.m_DepthPadding, 0.0f);
-		minLS.z -= depthPadding;
-		maxLS.z += depthPadding;
+		minLS.m_Z -= depthPadding;
+		maxLS.m_Z += depthPadding;
 
 		constexpr float ShadowNear = 0.1f;
-		const float shadowFar = std::max((maxLS.z - minLS.z) + ShadowNear, ShadowNear + 1.0f);
+		const float shadowFar = std::max((maxLS.m_Z - minLS.m_Z) + ShadowNear, ShadowNear + 1.0f);
 		// CreateLookAt is right-handed here, so upstream casters sit on the high-z bound.
-		const float lightEyeOffset = -ShadowNear - maxLS.z;
+		const float lightEyeOffset = -ShadowNear - maxLS.m_Z;
 		const Vector3 lightEye = lightEyeForBounds + lightDir * lightEyeOffset;
 		const Vector3 lightTarget = lightEye + lightDir;
 
@@ -143,7 +143,7 @@ namespace gglab
 		view.m_Name = info.m_Name;
 		view.m_ViewId = RenderViewID::DirectionalShadow;
 		view.m_View = Matrix::CreateLookAt(lightEye, lightTarget, lightUp);
-		view.m_Proj = Matrix::CreateOrthographicOffCenter(minLS.x, maxLS.x, minLS.y, maxLS.y, ShadowNear, shadowFar);
+		view.m_Proj = Matrix::CreateOrthographicOffCenter(minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);
 		view.m_ViewProj = view.m_View * view.m_Proj;
 		view.m_InvView = view.m_View.Invert();
 		view.m_InvProj = view.m_Proj.Invert();

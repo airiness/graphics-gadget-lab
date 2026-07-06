@@ -100,9 +100,9 @@ namespace gglab
 				components::TransformComponent transformComp{};
 				transformComp.m_Position = position;
 				transformComp.m_Rotation = Quaternion::CreateFromYawPitchRoll(
-					utils::ToRadians(rotation.y),
-					utils::ToRadians(rotation.x),
-					utils::ToRadians(rotation.z));
+					math::ToRadians(rotation.m_Y),
+					math::ToRadians(rotation.m_X),
+					math::ToRadians(rotation.m_Z));
 				transformComp.m_Scale = scale;
 				registry.emplace<components::TransformComponent>(entity, transformComp);
 

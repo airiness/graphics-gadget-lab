@@ -284,17 +284,17 @@ namespace gglab
 			const Vector3* maxValue = GetOptionalValue<Vector3>(desc.m_MaxValue);
 			changed = ImGui::DragFloat3(
 				desc.m_Name.c_str(),
-				&current.x,
+				&current.m_X,
 				0.05f,
-				minValue ? minValue->x : 0.0f,
-				maxValue ? maxValue->x : 0.0f);
+				minValue ? minValue->m_X : 0.0f,
+				maxValue ? maxValue->m_X : 0.0f);
 			value = current;
 			break;
 		}
 		case LabParameterType::Color:
 		{
 			Color current = std::get<Color>(value);
-			changed = ImGui::ColorEdit4(desc.m_Name.c_str(), &current.x);
+			changed = ImGui::ColorEdit4(desc.m_Name.c_str(), &current.m_R);
 			value = current;
 			break;
 		}

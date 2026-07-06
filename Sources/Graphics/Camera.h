@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 
 namespace gglab
 {
@@ -66,7 +66,7 @@ namespace gglab
 		void ComputeYawPitchFromForward(const Vector3& forward) noexcept;
 
 	private:
-		static constexpr float PitchLimitRadians = utils::ToRadians(85.0f);
+		static constexpr float PitchLimitRadians = math::ToRadians(85.0f);
 
 	private:
 		Matrix m_ViewMatrix = Matrix::Identity;

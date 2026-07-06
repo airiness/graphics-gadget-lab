@@ -3,7 +3,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 
 namespace gglab
 {
@@ -37,10 +37,10 @@ namespace gglab
 		static void PullFromCamera(CameraPanelState& state, const Camera& camera) noexcept
 		{
 			const Vector3 p = camera.GetPosition();
-			state.m_Pos[0] = p.x; state.m_Pos[1] = p.y; state.m_Pos[2] = p.z;
+			state.m_Pos[0] = p.m_X; state.m_Pos[1] = p.m_Y; state.m_Pos[2] = p.m_Z;
 
-			state.m_YawDegree = utils::ToDegrees(camera.GetYaw());
-			state.m_PitchDegree = utils::ToDegrees(camera.GetPitch());
+			state.m_YawDegree = math::ToDegrees(camera.GetYaw());
+			state.m_PitchDegree = math::ToDegrees(camera.GetPitch());
 
 			state.m_FovDegree = camera.GetFov();
 			state.m_NearZ = camera.GetNear();
@@ -60,7 +60,7 @@ namespace gglab
 			state.m_FarZ = Camera::ClampFar(state.m_NearZ, state.m_FarZ);
 
 			camera.SetPosition(Vector3{ state.m_Pos[0], state.m_Pos[1], state.m_Pos[2] });
-			camera.SetYawPitch(utils::ToRadians(state.m_YawDegree), utils::ToRadians(state.m_PitchDegree));
+			camera.SetYawPitch(math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree));
 			camera.SetFov(state.m_FovDegree);
 			camera.SetNearFar(state.m_NearZ, state.m_FarZ);
 
@@ -75,7 +75,7 @@ namespace gglab
 
 		static void DrawVec3(const char* label, const Vector3& vec) noexcept
 		{
-			ImGui::Text("%s: (%.3f, %.3f, %.3f)", label, vec.x, vec.y, vec.z);
+			ImGui::Text("%s: (%.3f, %.3f, %.3f)", label, vec.m_X, vec.m_Y, vec.m_Z);
 		}
 
 		static void DrawMatrix4x4(const char* label, const Matrix& mat) noexcept
@@ -85,10 +85,10 @@ namespace gglab
 				return;
 			}
 
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._11, mat._12, mat._13, mat._14);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._21, mat._22, mat._23, mat._24);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._31, mat._32, mat._33, mat._34);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat._41, mat._42, mat._43, mat._44);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_11, mat.m_12, mat.m_13, mat.m_14);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_21, mat.m_22, mat.m_23, mat.m_24);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_31, mat.m_32, mat.m_33, mat.m_34);
+			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_41, mat.m_42, mat.m_43, mat.m_44);
 
 			ImGui::TreePop();
 		}

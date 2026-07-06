@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/Camera.h"
-#include "Core/Utility/MathUtils.h"
+#include "Core/Math/MathFunctions.h"
 
 namespace gglab
 {
@@ -19,8 +19,8 @@ namespace gglab
 		// Mouse relative mode, process yaw and pitch
 		if (input.m_IsMouseRelative)
 		{
-			const float yawDelta = input.m_MouseDelta.x * m_Params.m_MouseSensitivityRadPerCount;
-			const float pitchDelta = (-input.m_MouseDelta.y) * m_Params.m_MouseSensitivityRadPerCount;
+			const float yawDelta = input.m_MouseDelta.m_X * m_Params.m_MouseSensitivityRadPerCount;
+			const float pitchDelta = (-input.m_MouseDelta.m_Y) * m_Params.m_MouseSensitivityRadPerCount;
 
 			camera.SetYawPitch(camera.GetYaw() + yawDelta, camera.GetPitch() + pitchDelta);
 		}
@@ -31,19 +31,19 @@ namespace gglab
 		// Build world-space movement axes:
 		const Vector3 worldUp = Vector3::UnitY;
 
-		Vector3 forwardXZ(camera.GetForward().x, 0.0f, camera.GetForward().z);
-		forwardXZ = utils::SafeNormalize(forwardXZ, Vector3::UnitZ);
+		Vector3 forwardXZ(camera.GetForward().m_X, 0.0f, camera.GetForward().m_Z);
+		forwardXZ = math::SafeNormalize(forwardXZ, Vector3::UnitZ);
 
 		const Vector3 right = camera.GetRight();
 
 		// Desired direction
 		Vector3 desiredDir =
-			right * moveIntent.x +
-			worldUp * moveIntent.y +
-			forwardXZ * moveIntent.z;
+			right * moveIntent.m_X +
+			worldUp * moveIntent.m_Y +
+			forwardXZ * moveIntent.m_Z;
 
 		// Normalize desiredDir
-		desiredDir = utils::SafeNormalize(desiredDir, Vector3::Zero);
+		desiredDir = math::SafeNormalize(desiredDir, Vector3::Zero);
 
 		float speed = m_Params.m_MovementSpeed;
 		if (input.m_Accelerate)
