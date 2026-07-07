@@ -10,14 +10,14 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_Context(this),
 		m_FrameSlotCount(createInfo.m_FrameSlotCount),
-		m_MaxLineCountPerFrame(createInfo.m_MaxLineCountPerFrame)
+		m_MaxVertexCountPerFrame(createInfo.m_MaxVertexCountPerFrame)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		GGLAB_ASSERT(m_FrameSlotCount > 0);
-		GGLAB_ASSERT(m_MaxLineCountPerFrame > 0);
+		GGLAB_ASSERT(m_MaxVertexCountPerFrame > 0);
 
 		m_FrameSlotSizeInBytes = static_cast<uint64_t>(sizeof(DebugDrawVertex)) *
-			m_MaxLineCountPerFrame * 2u;
+			m_MaxVertexCountPerFrame;
 		m_TotalBufferSizeInBytes = m_FrameSlotSizeInBytes * m_FrameSlotCount;
 
 		RHIBufferDesc desc{};
@@ -36,9 +36,10 @@ namespace gglab
 		}
 		GGLAB_ASSERT_MSG(m_MappedVertices, "DebugDraw failed to map its vertex buffer.");
 
-		m_PendingLines.reserve(m_MaxLineCountPerFrame);
-		m_SealedLines.reserve(m_MaxLineCountPerFrame);
-		m_StagingVertices.reserve(static_cast<size_t>(m_MaxLineCountPerFrame) * 2u);
+		m_PendingCommands.reserve(1024);
+		m_SealedCommands.reserve(1024);
+		m_PersistentCommands.reserve(256);
+		m_StagingVertices.reserve(m_MaxVertexCountPerFrame);
 	}
 
 	DebugDrawSystem::~DebugDrawSystem() noexcept
@@ -50,7 +51,7 @@ namespace gglab
 		}
 	}
 
-	const DebugDrawFrameView& DebugDrawSystem::SealFrame(uint32_t frameSlot) noexcept
+	const DebugDrawFrameView& DebugDrawSystem::SealFrame(uint32_t frameSlot, float deltaTime) noexcept
 	{
 		GGLAB_ASSERT(frameSlot < m_FrameSlotCount);
 		m_FrameView = {};
@@ -59,46 +60,109 @@ namespace gglab
 			return m_FrameView;
 		}
 
+		std::unordered_set<StringID> disabledChannels;
 		{
 			std::scoped_lock lock(m_Mutex);
-			m_SealedLines.clear();
-			m_SealedLines.swap(m_PendingLines);
+			m_SealedCommands.clear();
+			for (Command& command : m_PersistentCommands)
+			{
+				m_SealedCommands.push_back(command);
+				command.m_RemainingSeconds -= std::max(deltaTime, 0.0f);
+			}
+			std::erase_if(m_PersistentCommands, [](const Command& command) noexcept
+				{
+					return command.m_RemainingSeconds <= 0.0f;
+				});
+			m_PersistentVertexCount = 0;
+			for (const Command& command : m_PersistentCommands)
+			{
+				m_PersistentVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
+			}
+
+			for (Command& command : m_PendingCommands)
+			{
+				m_SealedCommands.push_back(command);
+				if (command.m_Style.m_DurationSeconds > 0.0f)
+				{
+					const uint32_t vertexCount = static_cast<uint32_t>(command.m_Vertices->size());
+					if (m_PersistentVertexCount + vertexCount <= m_MaxVertexCountPerFrame)
+					{
+						command.m_RemainingSeconds = command.m_Style.m_DurationSeconds;
+						m_PersistentCommands.push_back(command);
+						m_PersistentVertexCount += vertexCount;
+					}
+					else
+					{
+						++m_PendingStatistics.m_DroppedCommandCount;
+					}
+				}
+			}
+			m_PendingCommands.clear();
+			m_PendingVertexCount = 0;
+			m_FrameView.m_Statistics = m_PendingStatistics;
+			m_FrameView.m_Statistics.m_PersistentCommandCount =
+				static_cast<uint32_t>(m_PersistentCommands.size());
+			m_PendingStatistics = {};
 			m_BudgetWarningEmitted = false;
+			disabledChannels = m_DisabledChannels;
 		}
 
 		m_StagingVertices.clear();
-		auto appendRange = [this](auto predicate) noexcept
+		auto appendRange = [this, &disabledChannels](auto predicate, PrimitiveTopology topology) noexcept
 			{
 				DebugDrawVertexRange range{};
 				range.m_FirstVertex = static_cast<uint32_t>(m_StagingVertices.size());
-				for (const LineCommand& line : m_SealedLines)
+				for (const Command& command : m_SealedCommands)
 				{
-					if (!predicate(line.m_Style))
+					if (command.m_Topology != topology || !command.m_Vertices ||
+						!predicate(command.m_Style))
 					{
 						continue;
 					}
-					m_StagingVertices.push_back({ line.m_Start, line.m_Style.m_Color });
-					m_StagingVertices.push_back({ line.m_End, line.m_Style.m_Color });
+					if (disabledChannels.contains(command.m_Style.m_Channel))
+					{
+						continue;
+					}
+					if (m_StagingVertices.size() + command.m_Vertices->size() > m_MaxVertexCountPerFrame)
+					{
+						++m_FrameView.m_Statistics.m_DroppedCommandCount;
+						continue;
+					}
+					m_StagingVertices.insert(
+						m_StagingVertices.end(), command.m_Vertices->begin(), command.m_Vertices->end());
 				}
 				range.m_VertexCount =
 					static_cast<uint32_t>(m_StagingVertices.size()) - range.m_FirstVertex;
 				return range;
 			};
 
-		m_FrameView.m_Scene = appendRange([](const DebugDrawStyle& style) noexcept
+		auto fillBatch = [&appendRange](DebugDrawBatchRanges& batch, auto predicate) noexcept
+			{
+				batch.m_Lines = appendRange(predicate, PrimitiveTopology::Lines);
+				batch.m_Triangles = appendRange(predicate, PrimitiveTopology::Triangles);
+			};
+		fillBatch(m_FrameView.m_Scene, [](const DebugDrawStyle& style) noexcept
 			{
 				return style.m_Space == DebugDrawSpace::World &&
 					style.m_DepthMode == DebugDrawDepthMode::Tested;
 			});
-		m_FrameView.m_OverlayWorld = appendRange([](const DebugDrawStyle& style) noexcept
+		fillBatch(m_FrameView.m_OverlayWorld, [](const DebugDrawStyle& style) noexcept
 			{
 				return style.m_Space == DebugDrawSpace::World &&
 					style.m_DepthMode == DebugDrawDepthMode::Always;
 			});
-		m_FrameView.m_OverlayScreen = appendRange([](const DebugDrawStyle& style) noexcept
+		fillBatch(m_FrameView.m_OverlayScreen, [](const DebugDrawStyle& style) noexcept
 			{
 				return style.m_Space == DebugDrawSpace::Screen;
 			});
+		m_FrameView.m_Statistics.m_LineVertexCount =
+			m_FrameView.m_Scene.m_Lines.m_VertexCount +
+			m_FrameView.m_OverlayWorld.m_Lines.m_VertexCount +
+			m_FrameView.m_OverlayScreen.m_Lines.m_VertexCount;
+		m_FrameView.m_Statistics.m_TriangleVertexCount =
+			m_FrameView.m_Scene.m_Triangles.m_VertexCount +
+			m_FrameView.m_OverlayWorld.m_Triangles.m_VertexCount +
+			m_FrameView.m_OverlayScreen.m_Triangles.m_VertexCount;
 
 		m_FrameView.m_VertexBuffer = m_VertexBuffer.Get();
 		m_FrameView.m_VertexBufferOffset = m_FrameSlotSizeInBytes * frameSlot;
@@ -118,45 +182,100 @@ namespace gglab
 	void DebugDrawSystem::Clear() noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
-		m_PendingLines.clear();
+		m_PendingCommands.clear();
+		m_PersistentCommands.clear();
+		m_PendingVertexCount = 0;
+		m_PersistentVertexCount = 0;
+		m_PendingStatistics = {};
 	}
 
-	void DebugDrawSystem::Submit(std::span<const LineCommand> lines) noexcept
+	void DebugDrawSystem::ClearChannel(StringID channel) noexcept
 	{
-		if (lines.empty())
+		std::scoped_lock lock(m_Mutex);
+		auto matches = [channel](const Command& command) noexcept
 		{
+			return command.m_Style.m_Channel == channel;
+		};
+		std::erase_if(m_PendingCommands, matches);
+		std::erase_if(m_PersistentCommands, matches);
+		m_PendingVertexCount = 0;
+		m_PersistentVertexCount = 0;
+		for (const Command& command : m_PendingCommands)
+		{
+			m_PendingVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
+		}
+		for (const Command& command : m_PersistentCommands)
+		{
+			m_PersistentVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
+		}
+	}
+
+	void DebugDrawSystem::SetChannelEnabled(StringID channel, bool enabled) noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+		if (enabled)
+		{
+			m_DisabledChannels.erase(channel);
+		}
+		else
+		{
+			m_DisabledChannels.insert(channel);
+		}
+	}
+
+	bool DebugDrawSystem::IsChannelEnabled(StringID channel) const noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+		return IsEnabledUnlocked(channel);
+	}
+
+	bool DebugDrawSystem::IsEnabledUnlocked(StringID channel) const noexcept
+	{
+		return !m_DisabledChannels.contains(channel);
+	}
+
+	void DebugDrawSystem::Submit(PrimitiveTopology topology,
+		std::span<const Vector3> positions, const DebugDrawStyle& style) noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+		++m_PendingStatistics.m_SubmittedCommandCount;
+		const bool topologyValid = topology == PrimitiveTopology::Lines ?
+			positions.size() % 2 == 0 : positions.size() % 3 == 0;
+		if (positions.empty() || !topologyValid || !math::IsFinite(style.m_Color) ||
+			!std::isfinite(style.m_DurationSeconds) || style.m_DurationSeconds < 0.0f ||
+			std::ranges::any_of(positions, [](const Vector3& value) noexcept { return !math::IsFinite(value); }))
+		{
+			++m_PendingStatistics.m_InvalidCommandCount;
+			return;
+		}
+		if (positions.size() > m_MaxVertexCountPerFrame ||
+			m_PendingVertexCount + positions.size() > m_MaxVertexCountPerFrame)
+		{
+			++m_PendingStatistics.m_DroppedCommandCount;
+			if (!m_BudgetWarningEmitted)
+			{
+				m_BudgetWarningEmitted = true;
+				GGLAB_LOG_GRAPHICS_WARN("DebugDraw vertex budget exceeded; commands were dropped.");
+			}
 			return;
 		}
 
-		std::scoped_lock lock(m_Mutex);
-		size_t droppedCount = 0;
-		for (const LineCommand& line : lines)
+		auto vertices = std::make_shared<std::vector<DebugDrawVertex>>();
+		vertices->reserve(positions.size());
+		for (const Vector3& position : positions)
 		{
-			if (!IsValid(line))
-			{
-				continue;
-			}
-			if (m_PendingLines.size() >= m_MaxLineCountPerFrame)
-			{
-				++droppedCount;
-				continue;
-			}
-			m_PendingLines.push_back(line);
+			vertices->push_back({ position, style.m_Color });
 		}
-		if (droppedCount > 0 && !m_BudgetWarningEmitted)
-		{
-			m_BudgetWarningEmitted = true;
-			GGLAB_LOG_GRAPHICS_WARN(
-				"DebugDraw line budget exceeded; dropped {} lines.",
-				droppedCount);
-		}
+		m_PendingCommands.push_back({ topology, style, std::move(vertices), 0.0f });
+		m_PendingVertexCount += static_cast<uint32_t>(positions.size());
+		++m_PendingStatistics.m_AcceptedCommandCount;
 	}
 
-	bool DebugDrawSystem::IsValid(const LineCommand& line) const noexcept
+	void DebugDrawSystem::RejectInvalid() noexcept
 	{
-		return math::IsFinite(line.m_Start) &&
-			math::IsFinite(line.m_End) &&
-			math::IsFinite(line.m_Style.m_Color);
+		std::scoped_lock lock(m_Mutex);
+		++m_PendingStatistics.m_SubmittedCommandCount;
+		++m_PendingStatistics.m_InvalidCommandCount;
 	}
 
 	void DebugDrawContext::Line(const Vector3& start, const Vector3& end,
@@ -164,8 +283,8 @@ namespace gglab
 	{
 		if (m_System)
 		{
-			const DebugDrawSystem::LineCommand line{ start, end, style };
-			m_System->Submit(std::span<const DebugDrawSystem::LineCommand>(&line, 1));
+			const std::array positions{ start, end };
+			m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
 		}
 	}
 
@@ -176,17 +295,19 @@ namespace gglab
 		{
 			return;
 		}
-		std::vector<DebugDrawSystem::LineCommand> lines;
-		lines.reserve(points.size() - 1 + (closed ? 1 : 0));
+		std::vector<Vector3> positions;
+		positions.reserve((points.size() - 1 + (closed ? 1 : 0)) * 2);
 		for (size_t index = 1; index < points.size(); ++index)
 		{
-			lines.push_back({ points[index - 1], points[index], style });
+			positions.push_back(points[index - 1]);
+			positions.push_back(points[index]);
 		}
 		if (closed)
 		{
-			lines.push_back({ points.back(), points.front(), style });
+			positions.push_back(points.back());
+			positions.push_back(points.front());
 		}
-		m_System->Submit(lines);
+		m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
 	}
 
 	void DebugDrawContext::Point(const Vector3& position, float size,
@@ -194,94 +315,67 @@ namespace gglab
 	{
 		if (!m_System || !std::isfinite(size) || size <= 0.0f)
 		{
+			if (m_System) m_System->RejectInvalid();
 			return;
 		}
 		const Vector3 x(size, 0.0f, 0.0f);
 		const Vector3 y(0.0f, size, 0.0f);
 		const Vector3 z(0.0f, 0.0f, size);
-		const std::array<DebugDrawSystem::LineCommand, 3> lines = {
-			DebugDrawSystem::LineCommand{ position - x, position + x, style },
-			DebugDrawSystem::LineCommand{ position - y, position + y, style },
-			DebugDrawSystem::LineCommand{ position - z, position + z, style },
+		const std::array positions = {
+			position - x, position + x,
+			position - y, position + y,
+			position - z, position + z,
 		};
-		m_System->Submit(lines);
+		m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
 	}
 
 	void DebugDrawContext::Arrow(const Vector3& start, const Vector3& end,
-		float headLength, const DebugDrawStyle& style) noexcept
+		float headLength, const DebugDrawStyle& style, uint32_t segments) noexcept
 	{
 		if (!m_System || !std::isfinite(headLength) || headLength <= 0.0f)
 		{
+			if (m_System) m_System->RejectInvalid();
 			return;
 		}
 		Vector3 direction = end - start;
 		const float length = direction.Length();
 		if (!std::isfinite(length) || length <= 1.0e-6f)
 		{
+			m_System->RejectInvalid();
 			return;
 		}
 		direction /= length;
 		headLength = std::min(headLength, length);
-		const Vector3 reference = std::abs(direction.Dot(Vector3::UnitY)) < 0.95f ?
-			Vector3::UnitY : Vector3::UnitX;
-		Vector3 side = direction.Cross(reference).Normalized();
-		Vector3 up = side.Cross(direction).Normalized();
-		const Vector3 headCenter = end - direction * headLength;
-		const float radius = headLength * 0.45f;
-		const std::array<DebugDrawSystem::LineCommand, 5> lines = {
-			DebugDrawSystem::LineCommand{ start, end, style },
-			DebugDrawSystem::LineCommand{ end, headCenter + side * radius, style },
-			DebugDrawSystem::LineCommand{ end, headCenter - side * radius, style },
-			DebugDrawSystem::LineCommand{ end, headCenter + up * radius, style },
-			DebugDrawSystem::LineCommand{ end, headCenter - up * radius, style },
-		};
-		m_System->Submit(lines);
+		const Vector3 baseCenter = end - direction * headLength;
+		Line(start, baseCenter, style);
+		Cone(end, -direction, headLength, headLength * 0.45f, style, segments);
 	}
 
 	void DebugDrawContext::Axes(const Matrix& transform, float length,
-		DebugDrawDepthMode depthMode) noexcept
+		float headLength, const DebugDrawStyle& style) noexcept
 	{
-		if (!m_System || !std::isfinite(length) || length <= 0.0f)
+		if (!m_System || !std::isfinite(length) || !std::isfinite(headLength) ||
+			length <= 0.0f || headLength <= 0.0f)
 		{
+			if (m_System) m_System->RejectInvalid();
 			return;
 		}
 		const Vector3 origin = math::TransformPoint(Vector3::Zero, transform);
-		const std::array<DebugDrawSystem::LineCommand, 3> lines = {
-			DebugDrawSystem::LineCommand{ origin, math::TransformPoint(Vector3::UnitX * length, transform),
-				{.m_Color = Color::Red, .m_DepthMode = depthMode } },
-			DebugDrawSystem::LineCommand{ origin, math::TransformPoint(Vector3::UnitY * length, transform),
-				{.m_Color = Color::Green, .m_DepthMode = depthMode } },
-			DebugDrawSystem::LineCommand{ origin, math::TransformPoint(Vector3::UnitZ * length, transform),
-				{.m_Color = Color::Blue, .m_DepthMode = depthMode } },
-		};
-		m_System->Submit(lines);
+		DebugDrawStyle axisStyle = style;
+		axisStyle.m_Color = Color::Red;
+		Arrow(origin, math::TransformPoint(Vector3::UnitX * length, transform), headLength,
+			axisStyle);
+		axisStyle.m_Color = Color::Green;
+		Arrow(origin, math::TransformPoint(Vector3::UnitY * length, transform), headLength,
+			axisStyle);
+		axisStyle.m_Color = Color::Blue;
+		Arrow(origin, math::TransformPoint(Vector3::UnitZ * length, transform), headLength,
+			axisStyle);
 	}
 
 	void DebugDrawContext::Aabb(const math::Aabb& bounds,
 		const DebugDrawStyle& style) noexcept
 	{
-		if (!m_System)
-		{
-			return;
-		}
-		const Vector3 min = bounds.m_Center - bounds.m_Extents;
-		const Vector3 max = bounds.m_Center + bounds.m_Extents;
-		const std::array<Vector3, 8> corners = {
-			Vector3(min.m_X, min.m_Y, min.m_Z), Vector3(max.m_X, min.m_Y, min.m_Z),
-			Vector3(max.m_X, max.m_Y, min.m_Z), Vector3(min.m_X, max.m_Y, min.m_Z),
-			Vector3(min.m_X, min.m_Y, max.m_Z), Vector3(max.m_X, min.m_Y, max.m_Z),
-			Vector3(max.m_X, max.m_Y, max.m_Z), Vector3(min.m_X, max.m_Y, max.m_Z),
-		};
-		constexpr std::array<std::array<uint8_t, 2>, 12> edges = { {
-			{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 },
-			{ 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 },
-			{ 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 },
-		} };
-		std::array<DebugDrawSystem::LineCommand, edges.size()> lines{};
-		for (size_t index = 0; index < edges.size(); ++index)
-		{
-			lines[index] = { corners[edges[index][0]], corners[edges[index][1]], style };
-		}
-		m_System->Submit(lines);
+		Box(bounds.m_Center, bounds.m_Extents, style);
 	}
 }

@@ -324,7 +324,9 @@ namespace gglab
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
-		m_DebugDrawSystem->SealFrame(backBufferIndex);
+		const DebugDrawFrameView debugDrawFrame = m_DebugDrawSystem->SealFrame(
+			backBufferIndex,
+			static_cast<float>(m_Time->GetDeltaTime()));
 
 		auto& shadowVisualizationSettings =
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
@@ -343,6 +345,7 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
+		frame.m_DebugDrawFrame = debugDrawFrame;
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
 		const RenderServices services{
@@ -350,7 +353,6 @@ namespace gglab
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get(),
 			.m_DevelopGuiSystem = m_DevelopGuiSystem.get(),
-			.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 		};
 
 		// Build RenderGraph

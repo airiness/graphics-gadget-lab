@@ -3,6 +3,8 @@
 #include "Graphics/RHI/RHIResource.h"
 
 #include <mutex>
+#include <memory>
+#include <unordered_set>
 #include <vector>
 
 namespace gglab
@@ -12,13 +14,13 @@ namespace gglab
 	class DebugDrawSystem
 	{
 	public:
-		static constexpr uint32_t DefaultMaxLineCount = 65'536;
+		static constexpr uint32_t DefaultMaxVertexCount = 131'072;
 
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
 			uint32_t m_FrameSlotCount = 0;
-			uint32_t m_MaxLineCountPerFrame = DefaultMaxLineCount;
+			uint32_t m_MaxVertexCountPerFrame = DefaultMaxVertexCount;
 		};
 
 		explicit DebugDrawSystem(const CreateInfo& createInfo) noexcept;
@@ -26,38 +28,55 @@ namespace gglab
 		~DebugDrawSystem() noexcept;
 
 		DebugDrawContext& GetContext() noexcept { return m_Context; }
-		const DebugDrawFrameView& SealFrame(uint32_t frameSlot) noexcept;
-		const DebugDrawFrameView& GetFrameView() const noexcept { return m_FrameView; }
+		const DebugDrawFrameView& SealFrame(uint32_t frameSlot, float deltaTime) noexcept;
 		void Clear() noexcept;
+		void ClearChannel(StringID channel) noexcept;
+		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
+		[[nodiscard]] bool IsChannelEnabled(StringID channel) const noexcept;
 
 	private:
 		friend class DebugDrawContext;
 
-		struct LineCommand
+		enum class PrimitiveTopology : uint8_t
 		{
-			Vector3 m_Start{};
-			Vector3 m_End{};
-			DebugDrawStyle m_Style{};
+			Lines,
+			Triangles,
 		};
 
-		void Submit(std::span<const LineCommand> lines) noexcept;
-		[[nodiscard]] bool IsValid(const LineCommand& line) const noexcept;
+		struct Command
+		{
+			PrimitiveTopology m_Topology = PrimitiveTopology::Lines;
+			DebugDrawStyle m_Style{};
+			std::shared_ptr<const std::vector<DebugDrawVertex>> m_Vertices;
+			float m_RemainingSeconds = 0.0f;
+		};
+
+		void Submit(PrimitiveTopology topology,
+			std::span<const Vector3> positions,
+			const DebugDrawStyle& style) noexcept;
+		void RejectInvalid() noexcept;
+		[[nodiscard]] bool IsEnabledUnlocked(StringID channel) const noexcept;
 
 		RHIDevice* m_Device = nullptr;
 		RHIBufferOwner m_VertexBuffer{};
 		std::byte* m_MappedVertices = nullptr;
 		DebugDrawContext m_Context;
 
-		std::mutex m_Mutex;
-		std::vector<LineCommand> m_PendingLines;
-		std::vector<LineCommand> m_SealedLines;
+		mutable std::mutex m_Mutex;
+		std::vector<Command> m_PendingCommands;
+		std::vector<Command> m_SealedCommands;
+		std::vector<Command> m_PersistentCommands;
+		std::unordered_set<StringID> m_DisabledChannels;
 		std::vector<DebugDrawVertex> m_StagingVertices;
 		DebugDrawFrameView m_FrameView{};
+		DebugDrawStatistics m_PendingStatistics{};
 
 		uint64_t m_FrameSlotSizeInBytes = 0;
 		uint64_t m_TotalBufferSizeInBytes = 0;
 		uint32_t m_FrameSlotCount = 0;
-		uint32_t m_MaxLineCountPerFrame = 0;
+		uint32_t m_MaxVertexCountPerFrame = 0;
+		uint32_t m_PendingVertexCount = 0;
+		uint32_t m_PersistentVertexCount = 0;
 		bool m_BudgetWarningEmitted = false;
 	};
 }

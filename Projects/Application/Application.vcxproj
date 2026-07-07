@@ -246,9 +246,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawOverlay.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawScene.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawShapes.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
@@ -465,8 +465,7 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawOverlay.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawScene.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
