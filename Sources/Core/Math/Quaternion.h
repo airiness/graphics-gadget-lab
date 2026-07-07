@@ -26,6 +26,7 @@ namespace gglab::math
 	Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll) noexcept;
 	Quaternion CreateFromYawPitchRoll(const Vector3& angles) noexcept;
 	Quaternion RotationFromTo(const Vector3& fromDirection, const Vector3& toDirection) noexcept;
+	Quaternion Slerp(const Quaternion& lhs, const Quaternion& rhs, float t) noexcept;
 }
 
 namespace gglab

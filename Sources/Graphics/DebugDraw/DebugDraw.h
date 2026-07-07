@@ -127,6 +127,9 @@ namespace gglab
 			const DebugDrawStyle& style = {}, uint32_t segments = 24) noexcept;
 		void Frustum(std::span<const Vector3, 8> corners,
 			const DebugDrawStyle& style = {}) noexcept;
+		void Grid(const Vector3& center, const Vector3& normal, const Vector3& tangent,
+			float halfExtent, uint32_t divisions,
+			const DebugDrawStyle& style = {}) noexcept;
 
 		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
 		[[nodiscard]] bool IsChannelEnabled(StringID channel) const noexcept;

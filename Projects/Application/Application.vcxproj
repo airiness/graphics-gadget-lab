@@ -243,6 +243,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
@@ -458,6 +459,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />

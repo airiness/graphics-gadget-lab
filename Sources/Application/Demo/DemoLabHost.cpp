@@ -2,6 +2,7 @@
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/HelloLabSession.h"
+#include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 
 namespace gglab
@@ -29,6 +30,12 @@ namespace gglab
 			AlphaTestLabSession::GetDescriptor(),
 			&AlphaTestLabSession::Create);
 		GGLAB_ASSERT_MSG(alphaTestRegistered, "Failed to register the Alpha Test Lab session.");
+
+		const bool mathFoundationRegistered = m_Runtime.RegisterLab(
+			MathFoundationLabSession::GetDescriptor(),
+			&MathFoundationLabSession::Create);
+		GGLAB_ASSERT_MSG(mathFoundationRegistered,
+			"Failed to register the Math Foundation Lab session.");
 
 		GGLAB_UNUSED(m_Runtime.Initialize(startupLab));
 	}
