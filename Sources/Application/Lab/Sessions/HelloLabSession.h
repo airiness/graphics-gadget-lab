@@ -10,6 +10,8 @@ namespace gglab
 		~HelloLabSession() override = default;
 
 		void Update(float deltaTime) noexcept override;
+		void OnEnter() noexcept override;
+		void OnExit() noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;

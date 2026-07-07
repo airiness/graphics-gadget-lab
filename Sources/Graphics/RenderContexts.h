@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RHI/RHIFence.h"
+#include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
@@ -16,13 +17,13 @@ namespace gglab
 	class AssetManager;
 	class ShaderManager;
 	class DevelopGuiSystem;
-	class DebugDrawSystem;
 
 	struct RenderFrameContext
 	{
 		std::span<RenderView> m_RenderViews;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
+		DebugDrawFrameView m_DebugDrawFrame{};
 
 		DirectionalShadowSettings m_DirectionalShadowSettings = DisabledDirectionalShadowSettings();
 		const ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
@@ -68,11 +69,10 @@ namespace gglab
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
-		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 
 		bool IsValid() const noexcept
 		{
-			return m_Renderer && m_AssetManager && m_ShaderManager && m_DebugDrawSystem;
+			return m_Renderer && m_AssetManager && m_ShaderManager;
 		}
 	};
 }

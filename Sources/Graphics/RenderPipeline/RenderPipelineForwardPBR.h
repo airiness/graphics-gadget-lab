@@ -1,8 +1,7 @@
 #pragma once
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
-#include "Graphics/RenderPass/RenderPassDebugDrawOverlay.h"
-#include "Graphics/RenderPass/RenderPassDebugDrawScene.h"
+#include "Graphics/RenderPass/RenderPassDebugDraw.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
@@ -28,11 +27,11 @@ namespace gglab
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassForwardPBR m_ForwardPBRPass;
-		RenderPassDebugDrawScene m_DebugDrawScenePass;
+		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		RenderPassTonemap m_TonemapPass;
 		RenderPassIBL m_IBLPass;
 		RenderPassIBLPreview m_IBLPreviewPass;
-		RenderPassDebugDrawOverlay m_DebugDrawOverlayPass;
+		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
 		RenderPassDevelopGui m_DevelopGuiPass;
 	};
 }

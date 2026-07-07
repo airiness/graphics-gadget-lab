@@ -501,13 +501,13 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawOverlay.cpp">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawScene.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.cpp">
+      <Filter>Graphics\DebugDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawShapes.cpp">
       <Filter>Graphics\DebugDraw</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
@@ -1148,10 +1148,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawOverlay.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawScene.h">
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h">

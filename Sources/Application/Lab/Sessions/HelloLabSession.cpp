@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Core/Math/Quaternion.h"
+#include "Core/Math/Transform.h"
 #include "Application/Lab/Sessions/HelloLabSession.h"
 #include "Scene/Components.h"
 #include "Graphics/AssetManager.h"
@@ -23,6 +24,55 @@ namespace gglab
 		const LabParameterId LightColorId("hello.light.color");
 		const LabParameterId LightIntensityId("hello.light.intensity");
 		const LabParameterId LightDirectionId("hello.light.direction");
+		const StringID DebugDrawShapeChannel("DebugDraw.ShapeLibrary");
+	}
+
+	void HelloLabSession::OnEnter() noexcept
+	{
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->SetChannelEnabled(DebugDrawShapeChannel, true);
+		const DebugDrawStyle wireStyle{
+			.m_Color = Color::Cyan,
+			.m_Channel = DebugDrawShapeChannel,
+			.m_DurationSeconds = 3600.0f,
+		};
+		DebugDrawStyle solidStyle = wireStyle;
+		solidStyle.m_Color = Color(1.0f, 0.35f, 0.05f, 0.35f);
+		solidStyle.m_FillMode = DebugDrawFillMode::Solid;
+
+		debugDraw->Circle(Vector3(0.0f, -1.25f, 8.0f), Vector3::UnitY, 4.0f,
+			{ .m_Color = Color::DarkGray, .m_Channel = DebugDrawShapeChannel,
+				.m_DurationSeconds = 3600.0f });
+		debugDraw->Sphere(Vector3(-3.0f, 0.0f, 8.0f), 1.0f, wireStyle);
+		debugDraw->Sphere(Vector3(-1.0f, 0.0f, 8.0f), 1.0f, solidStyle);
+		debugDraw->Cone(Vector3(1.0f, 1.0f, 8.0f), Vector3::Down, 2.0f, 0.8f, wireStyle);
+		debugDraw->Cylinder(Vector3(3.0f, 0.0f, 8.0f), Vector3::UnitY, 2.0f, 0.8f, solidStyle);
+		debugDraw->Capsule(Vector3(-2.0f, 0.0f, 11.0f), Vector3::UnitY, 1.0f, 0.65f, wireStyle);
+		debugDraw->Box(Vector3(0.0f, 0.0f, 11.0f), Vector3(0.8f), solidStyle);
+		debugDraw->Obb(
+			math::CreateTransformMatrix(
+				Vector3::One,
+				math::CreateFromYawPitchRoll(0.45f, 0.25f, 0.15f),
+				Vector3(2.0f, 0.0f, 11.0f)),
+			Vector3(0.9f, 0.6f, 0.75f),
+			wireStyle);
+
+		const std::array<Vector3, 8> frustumCorners = {
+			Vector3(-0.4f, 0.4f, 12.5f), Vector3(0.4f, 0.4f, 12.5f),
+			Vector3(0.4f, -0.4f, 12.5f), Vector3(-0.4f, -0.4f, 12.5f),
+			Vector3(-1.4f, 1.2f, 14.0f), Vector3(1.4f, 1.2f, 14.0f),
+			Vector3(1.4f, -1.2f, 14.0f), Vector3(-1.4f, -1.2f, 14.0f),
+		};
+		debugDraw->Frustum(frustumCorners, wireStyle);
+	}
+
+	void HelloLabSession::OnExit() noexcept
+	{
+		if (auto* debugDraw = m_Services.m_DebugDraw)
+		{
+			debugDraw->ClearChannel(DebugDrawShapeChannel);
+		}
 	}
 
 	HelloLabSession::HelloLabSession(const LabSessionCreateInfo& createInfo) noexcept :
@@ -150,9 +200,12 @@ namespace gglab
 		const Vector3 modelPosition = GetParameters().Get(
 			ModelPositionId, Vector3(0.0f, 0.0f, 5.0f));
 		const float modelScale = GetParameters().Get(ModelScaleId, 1.0f);
-		debugDraw->Axes(math::CreateTranslation(modelPosition), modelScale * 1.5f);
+		debugDraw->Axes(math::CreateTranslation(modelPosition), modelScale * 1.5f,
+			modelScale * 0.25f,
+			{ .m_FillMode = DebugDrawFillMode::Solid, .m_Channel = DebugDrawShapeChannel });
 		debugDraw->Aabb(math::Aabb(modelPosition, Vector3::One * modelScale), {
 			.m_Color = Color::Yellow,
+			.m_Channel = DebugDrawShapeChannel,
 		});
 		debugDraw->Arrow(
 			modelPosition,
@@ -161,12 +214,24 @@ namespace gglab
 			{
 				.m_Color = Color::Cyan,
 				.m_DepthMode = DebugDrawDepthMode::Always,
+				.m_FillMode = DebugDrawFillMode::Solid,
+				.m_Channel = DebugDrawShapeChannel,
 			});
 		debugDraw->Point(Vector3(24.0f, 24.0f, 0.0f), 8.0f, {
 			.m_Color = Color::Magenta,
 			.m_Space = DebugDrawSpace::Screen,
 			.m_DepthMode = DebugDrawDepthMode::Always,
+			.m_Channel = DebugDrawShapeChannel,
 		});
+		debugDraw->Circle(
+			Vector3(56.0f, 24.0f, 0.0f), Vector3::UnitZ, 8.0f,
+			{
+				.m_Color = Color(0.2f, 0.8f, 1.0f, 0.65f),
+				.m_Space = DebugDrawSpace::Screen,
+				.m_DepthMode = DebugDrawDepthMode::Always,
+				.m_FillMode = DebugDrawFillMode::Solid,
+				.m_Channel = DebugDrawShapeChannel,
+			});
 	}
 
 	void HelloLabSession::ApplyImmediateParameters() noexcept
