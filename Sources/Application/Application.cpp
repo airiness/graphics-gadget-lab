@@ -18,6 +18,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -163,6 +164,11 @@ namespace gglab
 		rendererCreateInfo.m_Height = m_WindowHeight;
 		m_Renderer->Initialize(rendererCreateInfo);
 
+		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
+			.m_Device = m_Renderer->GetDevice(),
+			.m_FrameSlotCount = m_Renderer->GetSwapChain()->GetBufferCount(),
+		});
+
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
@@ -182,6 +188,7 @@ namespace gglab
 				.m_ShaderManager = m_ShaderManager.get(),
 				.m_InputManager = m_InputManager.get(),
 				.m_Time = m_Time.get(),
+				.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
 			},
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
@@ -317,6 +324,7 @@ namespace gglab
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
+		m_DebugDrawSystem->SealFrame(backBufferIndex);
 
 		auto& shadowVisualizationSettings =
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
@@ -342,6 +350,7 @@ namespace gglab
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get(),
 			.m_DevelopGuiSystem = m_DevelopGuiSystem.get(),
+			.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 		};
 
 		// Build RenderGraph
@@ -421,6 +430,7 @@ namespace gglab
 		m_Renderer->GetRHIContext()->WaitIdle();
 
 		m_RenderFrameBuilder.reset();
+		m_DebugDrawSystem.reset();
 		if (m_DevelopGuiSystem)
 		{
 			m_DevelopGuiSystem->Finalize();
@@ -475,6 +485,15 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Vertex;
 			shaderDescs.push_back(desc);
 			desc.m_Stage = ShaderStage::Pixel;
+			shaderDescs.push_back(desc);
+
+			// Debug Draw
+			desc.m_SourcePath = L"Assets/Shaders/Passes/PassDebugDraw.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			shaderDescs.push_back(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
 			shaderDescs.push_back(desc);
 
 			m_ShaderManager->Preload(shaderDescs);

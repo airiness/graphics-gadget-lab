@@ -11,6 +11,7 @@ namespace gglab
 	class DemoManager;
 	class RenderFrameBuilder;
 	class DevelopGuiSystem;
+	class DebugDrawSystem;
 	class PlatformHost;
 	class Time;
 	class Keyboard;
@@ -88,6 +89,7 @@ namespace gglab
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
 		std::unique_ptr<DevelopGuiSystem> m_DevelopGuiSystem;
+		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
 
 		bool m_IsInitialized = false;
 		bool m_IsSuspended = false;

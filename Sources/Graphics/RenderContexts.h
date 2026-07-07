@@ -16,6 +16,7 @@ namespace gglab
 	class AssetManager;
 	class ShaderManager;
 	class DevelopGuiSystem;
+	class DebugDrawSystem;
 
 	struct RenderFrameContext
 	{
@@ -67,10 +68,11 @@ namespace gglab
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
+		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 
 		bool IsValid() const noexcept
 		{
-			return m_Renderer && m_AssetManager && m_ShaderManager;
+			return m_Renderer && m_AssetManager && m_ShaderManager && m_DebugDrawSystem;
 		}
 	};
 }

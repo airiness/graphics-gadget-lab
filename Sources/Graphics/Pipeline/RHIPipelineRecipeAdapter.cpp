@@ -199,6 +199,13 @@ namespace gglab
 			offset += Float4Size;
 			SetVertexBufferLayout(desc, offset);
 			break;
+		case InputLayoutID::P3C4:
+			AddVertexAttribute(desc, "POSITION", 0, RHIFormat::R32G32B32Float, offset);
+			offset += Float3Size;
+			AddVertexAttribute(desc, "COLOR", 0, RHIFormat::R32G32B32A32Float, offset);
+			offset += Float4Size;
+			SetVertexBufferLayout(desc, offset);
+			break;
 		case InputLayoutID::None:
 		default:
 			break;

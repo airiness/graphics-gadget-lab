@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Math/MathConstants.h"
 #include "Core/Math/Vector.h"
+#include "Core/Math/Color.h"
 
 #include <cmath>
 #include <concepts>
@@ -56,8 +57,23 @@ namespace gglab::math
 		return fallback;
 	}
 
-	inline bool IsFinite(float value) noexcept
+	[[nodiscard]] inline bool IsFinite(float value) noexcept
 	{
 		return std::isfinite(value);
+	}
+
+	[[nodiscard]] inline bool IsFinite(const Vector3& value) noexcept
+	{
+		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z);
+	}
+
+	[[nodiscard]] inline bool IsFinite(const Vector4& value) noexcept
+	{
+		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z) && IsFinite(value.m_W);
+	}
+
+	[[nodiscard]] inline bool IsFinite(const Color& value) noexcept
+	{
+		return IsFinite(value.m_R) && IsFinite(value.m_G) && IsFinite(value.m_B) && IsFinite(value.m_A);
 	}
 }

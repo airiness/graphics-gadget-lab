@@ -144,6 +144,9 @@ namespace gglab
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);
 
+		// Depth-tested world-space debug geometry is part of HDR scene color.
+		m_DebugDrawScenePass.AddPass(rg, context, services);
+
 		if (context.IsRenderSceneReady())
 		{
 			// Tonemap requires View StructuredBuffer data.
@@ -152,6 +155,9 @@ namespace gglab
 
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);
+
+		// Always-visible debug geometry is composed after all back-buffer previews.
+		m_DebugDrawOverlayPass.AddPass(rg, context, services);
 
 		// DevelopGui	
 		m_DevelopGuiPass.AddPass(rg, context, services);

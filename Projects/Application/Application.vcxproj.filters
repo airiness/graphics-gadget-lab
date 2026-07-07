@@ -61,6 +61,9 @@
     <Filter Include="Graphics\Buffer">
       <UniqueIdentifier>{c1fd30dc-7593-4891-a844-aaf576e5c8ad}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\DebugDraw">
+      <UniqueIdentifier>{86C651B9-B0DC-4F56-8494-850AF5FB1287}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\Pipeline">
       <UniqueIdentifier>{3F193C07-87CD-4BD1-9F38-04BD272AA216}</UniqueIdentifier>
     </Filter>
@@ -497,6 +500,15 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
       <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawOverlay.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawScene.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.cpp">
+      <Filter>Graphics\DebugDraw</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
@@ -1136,6 +1148,18 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawOverlay.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDrawScene.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h">
+      <Filter>Graphics\DebugDraw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h">
+      <Filter>Graphics\DebugDraw</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
@@ -1431,6 +1455,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDebugDraw.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassDirectionalShadowMap.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
