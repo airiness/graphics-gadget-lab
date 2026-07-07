@@ -143,6 +143,7 @@ namespace gglab
 		P3N3,			// Position(3), Normal(3)
 		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
 		P3N3T2T2Tan4,	// Position(3), Normal(3), TexCoord0(2), TexCoord1(2), Tangent(4)
+		P3C4,			// Position(3), Color(4)
 
 		None,
 		Count = None

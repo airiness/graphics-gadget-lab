@@ -149,6 +149,14 @@ namespace gglab
 	{
 		D3D12_DEPTH_STENCIL_VIEW_DESC nativeDesc{};
 		nativeDesc.Format = ResolveViewFormat(desc.m_Format, resourceDesc);
+		if (desc.m_ReadOnlyDepth)
+		{
+			nativeDesc.Flags |= D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+		}
+		if (desc.m_ReadOnlyStencil)
+		{
+			nativeDesc.Flags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+		}
 
 		const auto dimension = desc.m_Dimension == RHITextureViewDimension::Unknown ?
 			(resourceDesc.DepthOrArraySize > 1 ? RHITextureViewDimension::Texture2DArray : RHITextureViewDimension::Texture2D) :

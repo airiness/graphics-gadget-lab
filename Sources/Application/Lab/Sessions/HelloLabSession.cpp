@@ -5,6 +5,7 @@
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
+#include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
@@ -143,6 +144,29 @@ namespace gglab
 		{
 			GetCamera().Update();
 		}
+
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		const Vector3 modelPosition = GetParameters().Get(
+			ModelPositionId, Vector3(0.0f, 0.0f, 5.0f));
+		const float modelScale = GetParameters().Get(ModelScaleId, 1.0f);
+		debugDraw->Axes(math::CreateTranslation(modelPosition), modelScale * 1.5f);
+		debugDraw->Aabb(math::Aabb(modelPosition, Vector3::One * modelScale), {
+			.m_Color = Color::Yellow,
+		});
+		debugDraw->Arrow(
+			modelPosition,
+			modelPosition + Vector3::UnitY * modelScale * 2.5f,
+			modelScale * 0.4f,
+			{
+				.m_Color = Color::Cyan,
+				.m_DepthMode = DebugDrawDepthMode::Always,
+			});
+		debugDraw->Point(Vector3(24.0f, 24.0f, 0.0f), 8.0f, {
+			.m_Color = Color::Magenta,
+			.m_Space = DebugDrawSpace::Screen,
+			.m_DepthMode = DebugDrawDepthMode::Always,
+		});
 	}
 
 	void HelloLabSession::ApplyImmediateParameters() noexcept

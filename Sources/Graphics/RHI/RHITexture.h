@@ -116,6 +116,8 @@ namespace gglab
 
 		RHISubresourceRange m_Subresources{};
 		float m_ResourceMinLODClamp = 0.0f;
+		uint8_t m_ReadOnlyDepth = 0;
+		uint8_t m_ReadOnlyStencil = 0;
 
 		bool operator==(const RHITextureViewDesc&) const noexcept = default;
 
@@ -130,7 +132,9 @@ namespace gglab
 				m_Subresources.m_BaseArraySlice,
 				m_Subresources.m_ArraySliceCount,
 				m_Subresources.m_Aspects,
-				m_ResourceMinLODClamp);
+				m_ResourceMinLODClamp,
+				m_ReadOnlyDepth,
+				m_ReadOnlyStencil);
 		}
 	};
 }
