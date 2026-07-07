@@ -425,6 +425,38 @@ namespace gglab
 			positions, style);
 	}
 
+	void DebugDrawContext::Grid(const Vector3& center, const Vector3& normal,
+		const Vector3& tangent, float halfExtent, uint32_t divisions,
+		const DebugDrawStyle& style) noexcept
+	{
+		Basis basis{};
+		if (!m_System || !BuildBasis(normal, basis) || !math::IsFinite(tangent) ||
+			!std::isfinite(halfExtent) || halfExtent <= 0.0f || divisions == 0)
+		{
+			if (m_System) m_System->RejectInvalid();
+			return;
+		}
+
+		Vector3 axisX = tangent - basis.m_Axis * tangent.Dot(basis.m_Axis);
+		axisX = math::SafeNormalize(axisX, basis.m_U);
+		const Vector3 axisY = basis.m_Axis.Cross(axisX).Normalized();
+		divisions = std::min(divisions, 256u);
+		const float step = halfExtent * 2.0f / static_cast<float>(divisions);
+		std::vector<Vector3> positions;
+		positions.reserve(static_cast<size_t>(divisions + 1) * 4u);
+		for (uint32_t index = 0; index <= divisions; ++index)
+		{
+			const float offset = -halfExtent + step * index;
+			AppendLine(positions,
+				center + axisX * offset - axisY * halfExtent,
+				center + axisX * offset + axisY * halfExtent);
+			AppendLine(positions,
+				center + axisY * offset - axisX * halfExtent,
+				center + axisY * offset + axisX * halfExtent);
+		}
+		m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
+	}
+
 	void DebugDrawContext::SetChannelEnabled(StringID channel, bool enabled) noexcept
 	{
 		if (m_System) m_System->SetChannelEnabled(channel, enabled);

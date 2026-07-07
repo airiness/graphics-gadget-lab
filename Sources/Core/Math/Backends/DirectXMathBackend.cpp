@@ -384,6 +384,14 @@ namespace gglab::math
 		return StoreMatrix(DirectX::XMMatrixMultiply(LoadMatrix(lhs), LoadMatrix(rhs)));
 	}
 
+	Quaternion Slerp(const Quaternion& lhs, const Quaternion& rhs, float t) noexcept
+	{
+		return StoreQuaternion(DirectX::XMQuaternionSlerp(
+			LoadQuaternion(lhs),
+			LoadQuaternion(rhs),
+			t));
+	}
+
 	Quaternion operator*(const Quaternion& lhs, const Quaternion& rhs) noexcept
 	{
 		return StoreQuaternion(DirectX::XMQuaternionMultiply(

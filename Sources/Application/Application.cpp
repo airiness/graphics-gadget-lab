@@ -432,7 +432,6 @@ namespace gglab
 		m_Renderer->GetRHIContext()->WaitIdle();
 
 		m_RenderFrameBuilder.reset();
-		m_DebugDrawSystem.reset();
 		if (m_DevelopGuiSystem)
 		{
 			m_DevelopGuiSystem->Finalize();
@@ -440,6 +439,7 @@ namespace gglab
 		}
 		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
+		m_DebugDrawSystem.reset();
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();
