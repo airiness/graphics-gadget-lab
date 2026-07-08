@@ -55,6 +55,7 @@ namespace gglab
 		World& GetWorld() noexcept;
 		Camera& GetCamera() noexcept;
 		CameraController& GetCameraController() noexcept;
+		CameraRig& GetCameraRig() noexcept;
 		RenderPipelineBase& GetRenderPipeline() noexcept;
 
 	private:

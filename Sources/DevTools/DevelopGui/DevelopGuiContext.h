@@ -8,6 +8,7 @@ namespace gglab
 	class World;
 	class Camera;
 	class CameraController;
+	class CameraRig;
 	class Renderer;
 	class AssetManager;
 	class RenderGraph;
@@ -20,6 +21,7 @@ namespace gglab
 	{
 		Camera* m_Camera = nullptr;
 		CameraController* m_CameraController = nullptr;
+		CameraRig* m_CameraRig = nullptr;
 		Renderer* m_Renderer = nullptr;
 		World* m_World = nullptr;
 		std::span<RenderView> m_RenderViews;

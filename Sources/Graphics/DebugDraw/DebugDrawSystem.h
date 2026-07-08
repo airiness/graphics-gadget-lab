@@ -28,7 +28,10 @@ namespace gglab
 		~DebugDrawSystem() noexcept;
 
 		DebugDrawContext& GetContext() noexcept { return m_Context; }
-		const DebugDrawFrameView& SealFrame(uint32_t frameSlot, float deltaTime) noexcept;
+		const DebugDrawFrameView& SealFrame(
+			uint32_t frameSlot,
+			float deltaTime,
+			const DebugDrawCullContext& cullContext) noexcept;
 		void Clear() noexcept;
 		void ClearChannel(StringID channel) noexcept;
 		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
@@ -45,9 +48,17 @@ namespace gglab
 
 		struct Command
 		{
+			struct Bounds
+			{
+				math::Aabb m_Aabb{};
+				math::Sphere m_Sphere{};
+				bool m_Valid = false;
+			};
+
 			PrimitiveTopology m_Topology = PrimitiveTopology::Lines;
 			DebugDrawStyle m_Style{};
 			std::shared_ptr<const std::vector<DebugDrawVertex>> m_Vertices;
+			Bounds m_Bounds{};
 			float m_RemainingSeconds = 0.0f;
 		};
 
@@ -56,6 +67,11 @@ namespace gglab
 			const DebugDrawStyle& style) noexcept;
 		void RejectInvalid() noexcept;
 		[[nodiscard]] bool IsEnabledUnlocked(StringID channel) const noexcept;
+		[[nodiscard]] static Command::Bounds BuildBounds(
+			std::span<const Vector3> positions) noexcept;
+		[[nodiscard]] static bool ShouldCull(
+			const Command& command,
+			const DebugDrawCullContext& cullContext) noexcept;
 
 		RHIDevice* m_Device = nullptr;
 		RHIBufferOwner m_VertexBuffer{};

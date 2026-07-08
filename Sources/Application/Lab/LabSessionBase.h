@@ -4,6 +4,7 @@
 #include "Application/Lab/LabRunConfig.h"
 #include "Application/Lab/LabTypes.h"
 #include "Core/World.h"
+#include "Graphics/CameraRig.h"
 
 namespace gglab
 {
@@ -53,6 +54,7 @@ namespace gglab
 		World& GetWorld() noexcept { return m_World; }
 		Camera& GetCamera() noexcept { return *m_Camera; }
 		CameraController& GetCameraController() noexcept { return *m_CameraController; }
+		CameraRig& GetCameraRig() noexcept { return m_CameraRig; }
 		RenderPipelineBase& GetRenderPipeline() noexcept { return *m_RenderPipeline; }
 
 	protected:
@@ -80,6 +82,7 @@ namespace gglab
 		LabParameterSet m_Parameters;
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;
+		CameraRig m_CameraRig;
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 	};
 }

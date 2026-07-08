@@ -63,23 +63,24 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		EnsureInitialized(services);
+		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
+			[contextPtr, servicesPtr, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
 
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& displayTargets = targetsTable.GetViewTargets(displayViewId);
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 
-				builder.WriteInPlace(mainTargets.m_SceneColor, RGTextureAccess::RenderTarget);
-				builder.WriteInPlace(mainTargets.m_Depth, RGTextureAccess::DepthStencilWrite);
-				data.m_SceneColor = mainTargets.m_SceneColor;
-				data.m_Depth = mainTargets.m_Depth;
+				builder.WriteInPlace(displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
+				builder.WriteInPlace(displayTargets.m_Depth, RGTextureAccess::DepthStencilWrite);
+				data.m_SceneColor = displayTargets.m_SceneColor;
+				data.m_Depth = displayTargets.m_Depth;
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureAccess::Sample);
 				data.m_PrefilteredSpecularCubemap = builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
@@ -96,8 +97,8 @@ namespace gglab
 				data.m_ShadowSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_ShadowMap, shadowSrvDesc);
 
-				data.m_Width = mainTargets.m_Width;
-				data.m_Height = mainTargets.m_Height;
+				data.m_Width = displayTargets.m_Width;
+				data.m_Height = displayTargets.m_Height;
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 
 				auto* renderer = servicesPtr->m_Renderer;
@@ -111,7 +112,7 @@ namespace gglab
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
-			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr, displayViewId](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
@@ -127,7 +128,7 @@ namespace gglab
 					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
 
 				auto* renderer = servicesPtr->m_Renderer;
-				const auto& renderQueue = contextPtr->GetRenderQueue(RenderViewID::Main);
+				const auto& renderQueue = contextPtr->GetRenderQueue(displayViewId);
 				if (renderQueue.m_DrawItems.empty())
 				{
 					return;
@@ -170,7 +171,7 @@ namespace gglab
 					lightSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
 
 				const ForwardPBRPassParameters passParameters{
-					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
+					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
 					.ShadowMapTextureIndex = shadowSrv.m_Index,
 					.ShadowMapSamplerIndex = data.m_ShadowSamplerIndex,
 					.ShadowMapSize = data.m_ShadowMapSize,
@@ -182,7 +183,7 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr);
+				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId);
 			});
 	}
 
@@ -230,10 +231,11 @@ namespace gglab
 
 	void RenderPassForwardPBR::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+		const RenderServices& services,
+		RenderViewID viewId) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
-		const auto& renderQueue = context.GetRenderQueue(RenderViewID::Main);
+		const auto& renderQueue = context.GetRenderQueue(viewId);
 		if (renderQueue.m_DrawItems.empty())
 		{
 			return;

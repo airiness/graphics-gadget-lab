@@ -5,33 +5,61 @@
 
 namespace gglab
 {
+	namespace
+	{
+		RenderView BuildPerspectiveCameraView(
+			RenderViewID viewId,
+			const Camera& camera,
+			uint32_t width,
+			uint32_t height,
+			StringID name) noexcept
+		{
+			RenderView view{};
+			view.m_Name = name;
+			view.m_ViewId = viewId;
+			view.m_IsValid = true;
+
+			view.m_View = camera.GetViewMatrix();
+			view.m_Proj = camera.GetProjMatrix();
+			view.m_ViewProj = view.m_View * view.m_Proj;
+			view.m_InvView = math::Inverse(view.m_View);
+			view.m_InvProj = math::Inverse(view.m_Proj);
+			view.m_InvViewProj = math::Inverse(view.m_ViewProj);
+
+			view.m_CameraPosition = camera.GetPosition();
+			view.m_Near = camera.GetNear();
+			view.m_Far = camera.GetFar();
+			view.m_FovRadians = math::ToRadians(camera.GetFov());
+			view.m_Aspect = camera.GetAspect();
+			view.m_Exposure = 1.0f; //camera.GetExposure();
+
+			view.m_Width = width;
+			view.m_Height = height;
+
+			return view;
+		}
+	}
+
+	RenderView RenderViewBuilder::BuildDebugCameraView(
+		RenderViewID viewId,
+		const Camera& camera,
+		uint32_t width,
+		uint32_t height,
+		StringID name) const noexcept
+	{
+		GGLAB_ASSERT(IsDebugCameraRenderViewID(viewId));
+		return BuildPerspectiveCameraView(viewId, camera, width, height, name);
+	}
+
 	RenderView RenderViewBuildTraits<RenderViewID::Main>::Build(
 		const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept
 	{
-		RenderView view{};
-		view.m_Name = info.m_Name;
-		view.m_ViewId = RenderViewID::Main;
-
-		auto& camera = info.m_Camera;
-
-		view.m_View = camera.GetViewMatrix();
-		view.m_Proj = camera.GetProjMatrix();
-		view.m_ViewProj = view.m_View * view.m_Proj;
-		view.m_InvView = math::Inverse(view.m_View);
-		view.m_InvProj = math::Inverse(view.m_Proj);
-		view.m_InvViewProj = math::Inverse(view.m_ViewProj);
-
-		view.m_CameraPosition = camera.GetPosition();
-		view.m_Near = camera.GetNear();
-		view.m_Far = camera.GetFar();
-		view.m_FovRadians = math::ToRadians(camera.GetFov());
-		view.m_Aspect = camera.GetAspect();
-		view.m_Exposure = 1.0f; //camera.GetExposure();
-
-		view.m_Width = info.m_Width;
-		view.m_Height = info.m_Height;
-
-		return view;
+		return BuildPerspectiveCameraView(
+			RenderViewID::Main,
+			info.m_Camera,
+			info.m_Width,
+			info.m_Height,
+			info.m_Name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::DirectionalShadow>::Build(
@@ -143,6 +171,7 @@ namespace gglab
 		RenderView view{};
 		view.m_Name = info.m_Name;
 		view.m_ViewId = RenderViewID::DirectionalShadow;
+		view.m_IsValid = true;
 		view.m_View = math::CreateLookAtLH(lightEye, lightTarget, lightUp);
 		view.m_Proj = math::CreateOrthographicOffCenterLH(
 			minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);

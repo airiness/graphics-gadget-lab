@@ -51,7 +51,10 @@ namespace gglab
 		}
 	}
 
-	const DebugDrawFrameView& DebugDrawSystem::SealFrame(uint32_t frameSlot, float deltaTime) noexcept
+	const DebugDrawFrameView& DebugDrawSystem::SealFrame(
+		uint32_t frameSlot,
+		float deltaTime,
+		const DebugDrawCullContext& cullContext) noexcept
 	{
 		GGLAB_ASSERT(frameSlot < m_FrameSlotCount);
 		m_FrameView = {};
@@ -63,6 +66,7 @@ namespace gglab
 		std::unordered_set<StringID> disabledChannels;
 		{
 			std::scoped_lock lock(m_Mutex);
+			disabledChannels = m_DisabledChannels;
 			m_SealedCommands.clear();
 			for (Command& command : m_PersistentCommands)
 			{
@@ -76,13 +80,17 @@ namespace gglab
 			m_PersistentVertexCount = 0;
 			for (const Command& command : m_PersistentCommands)
 			{
-				m_PersistentVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
+				if (!disabledChannels.contains(command.m_Style.m_Channel))
+				{
+					m_PersistentVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
+				}
 			}
 
 			for (Command& command : m_PendingCommands)
 			{
 				m_SealedCommands.push_back(command);
-				if (command.m_Style.m_DurationSeconds > 0.0f)
+				if (command.m_Style.m_DurationSeconds > 0.0f &&
+					!disabledChannels.contains(command.m_Style.m_Channel))
 				{
 					const uint32_t vertexCount = static_cast<uint32_t>(command.m_Vertices->size());
 					if (m_PersistentVertexCount + vertexCount <= m_MaxVertexCountPerFrame)
@@ -104,11 +112,12 @@ namespace gglab
 				static_cast<uint32_t>(m_PersistentCommands.size());
 			m_PendingStatistics = {};
 			m_BudgetWarningEmitted = false;
-			disabledChannels = m_DisabledChannels;
 		}
 
 		m_StagingVertices.clear();
-		auto appendRange = [this, &disabledChannels](auto predicate, PrimitiveTopology topology) noexcept
+		auto appendRange = [this, &disabledChannels, &cullContext](
+			auto predicate,
+			PrimitiveTopology topology) noexcept
 			{
 				DebugDrawVertexRange range{};
 				range.m_FirstVertex = static_cast<uint32_t>(m_StagingVertices.size());
@@ -121,6 +130,12 @@ namespace gglab
 					}
 					if (disabledChannels.contains(command.m_Style.m_Channel))
 					{
+						++m_FrameView.m_Statistics.m_ChannelFilteredCommandCount;
+						continue;
+					}
+					if (ShouldCull(command, cullContext))
+					{
+						++m_FrameView.m_Statistics.m_CulledCommandCount;
 						continue;
 					}
 					if (m_StagingVertices.size() + command.m_Vertices->size() > m_MaxVertexCountPerFrame)
@@ -234,11 +249,70 @@ namespace gglab
 		return !m_DisabledChannels.contains(channel);
 	}
 
+	DebugDrawSystem::Command::Bounds DebugDrawSystem::BuildBounds(
+		std::span<const Vector3> positions) noexcept
+	{
+		Command::Bounds bounds{};
+		if (positions.empty())
+		{
+			return bounds;
+		}
+		bounds.m_Aabb = math::CreateAabbFromPoints(
+			positions.size(),
+			positions.data(),
+			sizeof(Vector3));
+		bounds.m_Sphere = math::CreateSphereFromPoints(
+			positions.size(),
+			positions.data(),
+			sizeof(Vector3));
+		bounds.m_Valid = true;
+		return bounds;
+	}
+
+	bool DebugDrawSystem::ShouldCull(
+		const Command& command,
+		const DebugDrawCullContext& cullContext) noexcept
+	{
+		if (!command.m_Bounds.m_Valid || command.m_Style.m_Space == DebugDrawSpace::Screen)
+		{
+			return false;
+		}
+		if (command.m_Style.m_CullingMode == DebugDrawCullingMode::None)
+		{
+			return false;
+		}
+		if (command.m_Style.m_CullingMode == DebugDrawCullingMode::Auto)
+		{
+			for (uint32_t index = 0; index < cullContext.m_DefaultFrustumCount; ++index)
+			{
+				if (!math::Intersects(cullContext.m_DefaultFrustums[index], command.m_Bounds.m_Aabb))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+		if (!cullContext.m_HasMainViewFrustum)
+		{
+			return false;
+		}
+		if (command.m_Style.m_CullingMode != DebugDrawCullingMode::MainViewFrustum)
+		{
+			return false;
+		}
+		return !math::Intersects(cullContext.m_MainViewFrustum, command.m_Bounds.m_Aabb);
+	}
+
 	void DebugDrawSystem::Submit(PrimitiveTopology topology,
 		std::span<const Vector3> positions, const DebugDrawStyle& style) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 		++m_PendingStatistics.m_SubmittedCommandCount;
+		if (!IsEnabledUnlocked(style.m_Channel))
+		{
+			++m_PendingStatistics.m_ChannelFilteredCommandCount;
+			return;
+		}
 		const bool topologyValid = topology == PrimitiveTopology::Lines ?
 			positions.size() % 2 == 0 : positions.size() % 3 == 0;
 		if (positions.empty() || !topologyValid || !math::IsFinite(style.m_Color) ||
@@ -266,7 +340,12 @@ namespace gglab
 		{
 			vertices->push_back({ position, style.m_Color });
 		}
-		m_PendingCommands.push_back({ topology, style, std::move(vertices), 0.0f });
+		m_PendingCommands.push_back({
+			topology,
+			style,
+			std::move(vertices),
+			BuildBounds(positions),
+			0.0f });
 		m_PendingVertexCount += static_cast<uint32_t>(positions.size());
 		++m_PendingStatistics.m_AcceptedCommandCount;
 	}

@@ -15,6 +15,7 @@
 #include "Core/Input/Mouse.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
@@ -324,15 +325,12 @@ namespace gglab
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
-		const DebugDrawFrameView debugDrawFrame = m_DebugDrawSystem->SealFrame(
-			backBufferIndex,
-			static_cast<float>(m_Time->GetDeltaTime()));
 
 		auto& shadowVisualizationSettings =
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
-			.m_Camera = camera,
+			.m_CameraRig = demo->GetCameraRig(),
 			.m_Renderer = *m_Renderer,
 			.m_AssetManager = *m_AssetManager,
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
@@ -345,7 +343,11 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
-		frame.m_DebugDrawFrame = debugDrawFrame;
+		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
+		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(
+			backBufferIndex,
+			static_cast<float>(m_Time->GetDeltaTime()),
+			frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
 		const RenderServices services{
@@ -383,6 +385,7 @@ namespace gglab
 			DevelopGuiContext guiContext{};
 			guiContext.m_Camera = &camera;
 			guiContext.m_CameraController = &demo->GetCameraController();
+			guiContext.m_CameraRig = &demo->GetCameraRig();
 			guiContext.m_Renderer = m_Renderer.get();
 			guiContext.m_World = &world;
 			guiContext.m_RenderViews = std::span<RenderView>(frame.m_RenderViews);

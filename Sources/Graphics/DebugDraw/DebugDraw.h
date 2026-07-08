@@ -1,10 +1,11 @@
 #pragma once
-#include "Core/Math/BoundingVolumes.h"
+#include "Core/Math/Culling.h"
 #include "Core/Math/Color.h"
 #include "Core/Math/Matrix.h"
 #include "Core/StringId.h"
 #include "Graphics/RHI/RHIHandles.h"
 
+#include <array>
 #include <cstdint>
 #include <span>
 
@@ -30,12 +31,20 @@ namespace gglab
 		Solid,
 	};
 
+	enum class DebugDrawCullingMode : uint8_t
+	{
+		Auto,
+		None,
+		MainViewFrustum,
+	};
+
 	struct DebugDrawStyle
 	{
 		Color m_Color = Color::White;
 		DebugDrawSpace m_Space = DebugDrawSpace::World;
 		DebugDrawDepthMode m_DepthMode = DebugDrawDepthMode::Tested;
 		DebugDrawFillMode m_FillMode = DebugDrawFillMode::Wireframe;
+		DebugDrawCullingMode m_CullingMode = DebugDrawCullingMode::Auto;
 		StringID m_Channel{};
 		float m_DurationSeconds = 0.0f;
 	};
@@ -72,9 +81,19 @@ namespace gglab
 		uint32_t m_AcceptedCommandCount = 0;
 		uint32_t m_DroppedCommandCount = 0;
 		uint32_t m_InvalidCommandCount = 0;
+		uint32_t m_ChannelFilteredCommandCount = 0;
+		uint32_t m_CulledCommandCount = 0;
 		uint32_t m_LineVertexCount = 0;
 		uint32_t m_TriangleVertexCount = 0;
 		uint32_t m_PersistentCommandCount = 0;
+	};
+
+	struct DebugDrawCullContext
+	{
+		math::Frustum m_MainViewFrustum{};
+		std::array<math::Frustum, 2> m_DefaultFrustums{};
+		uint32_t m_DefaultFrustumCount = 0;
+		bool m_HasMainViewFrustum = false;
 	};
 
 	struct DebugDrawFrameView

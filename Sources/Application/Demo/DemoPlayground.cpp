@@ -36,6 +36,7 @@ namespace gglab
 		camCtrlCreateInfo.m_Params.m_AccelerateMultiplier = 3.0f;
 		camCtrlCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(camCtrlCreateInfo);
+		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
 
 		// RenderPipeline
 		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
@@ -50,7 +51,7 @@ namespace gglab
 
 	void DemoPlayground::OnResize(uint32_t width, uint32_t height) noexcept
 	{
-		m_Camera->OnResize(width, height);
+		m_CameraRig.OnResize(width, height);
 	}
 
 	void DemoPlayground::OnExit() noexcept
@@ -79,9 +80,10 @@ namespace gglab
 		camInput.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
 		camInput.m_MouseDelta = mouseCoord;
 
-		m_CameraController->Update(*m_Camera, camInput, deltaTime);
-
-		m_Camera->Update();
+		Camera& camera = m_CameraRig.GetActiveCamera();
+		CameraController& controller = m_CameraRig.GetActiveCameraController();
+		controller.Update(camera, camInput, deltaTime);
+		camera.Update();
 	}
 
 	void DemoPlayground::InitializeScene() noexcept

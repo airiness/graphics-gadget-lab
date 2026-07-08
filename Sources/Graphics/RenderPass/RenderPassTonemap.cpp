@@ -44,30 +44,31 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		EnsureInitialized(services);
+		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
+			[servicesPtr, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& mainTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& displayTargets = targetsTable.GetViewTargets(displayViewId);
 
-				data.m_SceneColor = builder.Read(mainTargets.m_SceneColor, RGTextureAccess::Sample);
-				builder.WriteInPlace(mainTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
-				data.m_BackBuffer = mainTargets.m_BackBuffer;
+				data.m_SceneColor = builder.Read(displayTargets.m_SceneColor, RGTextureAccess::Sample);
+				builder.WriteInPlace(displayTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
+				data.m_BackBuffer = displayTargets.m_BackBuffer;
 				data.m_SceneColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);
 				data.m_BackBufferRtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
-				data.m_Width = mainTargets.m_Width;
-				data.m_Height = mainTargets.m_Height;
+				data.m_Width = displayTargets.m_Width;
+				data.m_Height = displayTargets.m_Height;
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
 				data.m_SamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
 			},
-			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr, displayViewId](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto sceneColorSrv = executeContext.GetViewDescriptor(data.m_SceneColorSrv);
@@ -99,7 +100,7 @@ namespace gglab
 				const TonemapPassParameters passParameters{
 					.SceneColorTextureIndex = sceneColorSrv.m_Index,
 					.SceneColorSamplerIndex = data.m_SamplerIndex,
-					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
+					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
 				};
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

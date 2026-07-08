@@ -9,7 +9,7 @@ namespace gglab
 {
 	namespace
 	{
-		struct MainViewSetupPassData {};
+		struct DisplayViewSetupPassData {};
 		struct ShadowSetupPassData {};
 
 		struct PrepareBackBufferPassData
@@ -33,16 +33,17 @@ namespace gglab
 
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
 
-		// MainView Setup
-		rg.AddPass<MainViewSetupPassData>("MainView.Setup",
-			[swapChain, frameBackBufferIndex](RenderGraph::RGBuilder& builder, MainViewSetupPassData&)
+		const RenderViewID displayViewId = context.GetDisplayViewId();
+
+		// DisplayView Setup
+		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
+			[swapChain, frameBackBufferIndex, displayViewId](RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
-				//GGLAB_LOG_GRAPHICS_INFO("MainView.Setup(Setup)");
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& targets = targetsTable.GetViewTargets(displayViewId);
 
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
@@ -57,14 +58,14 @@ namespace gglab
 				RHITextureDesc sceneColorDesc{};
 				sceneColorDesc.m_Extent = { width, height, 1u };
 				sceneColorDesc.m_Format = RHIFormat::R16G16B16A16Float;
-				targets.m_SceneColor = builder.CreateTexture("MainView.SceneColor", sceneColorDesc);
+				targets.m_SceneColor = builder.CreateTexture("DisplayView.SceneColor", sceneColorDesc);
 
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
 				backBufferDesc.m_Extent = { width, height, 1u };
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
-				targets.m_BackBuffer = builder.ImportTexture("MainView.BackBuffer",
+				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer",
 					backTexture,
 					backBufferDesc,
 					RGTextureAccess::Present);
@@ -74,7 +75,7 @@ namespace gglab
 				depthBufferDesc.m_Extent = { width, height, 1u };
 				depthBufferDesc.m_Format = RHIFormat::D24UnormS8Uint;
 
-				targets.m_Depth = builder.CreateTexture("MainView.DepthBuffer", depthBufferDesc);
+				targets.m_Depth = builder.CreateTexture("DisplayView.DepthBuffer", depthBufferDesc);
 
 			});
 
@@ -112,13 +113,12 @@ namespace gglab
 
 		// SwapChain prepare backbuffer
 		rg.AddPass<PrepareBackBufferPassData>("SwapChain.PrepareBackBuffer",
-			[](RenderGraph::RGBuilder& builder, PrepareBackBufferPassData& data)
+			[displayViewId](RenderGraph::RGBuilder& builder, PrepareBackBufferPassData& data)
 			{
-				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.PrepareBackBuffer(Setup)");
 				builder.SideEffect();
 
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& targets = targetsTable.GetViewTargets(displayViewId);
 
 				builder.WriteInPlace(targets.m_BackBuffer,
 					RGTextureAccess::RenderTarget);
@@ -164,13 +164,12 @@ namespace gglab
 
 		// Finish backbuffer
 		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",
-			[](RenderGraph::RGBuilder& builder, FinishBackBufferPassData&)
+			[displayViewId](RenderGraph::RGBuilder& builder, FinishBackBufferPassData&)
 			{
-				//GGLAB_LOG_GRAPHICS_INFO("SwapChain.FinishBackBuffer(Setup)");
 				builder.SideEffect();
 
 				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& targets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& targets = targetsTable.GetViewTargets(displayViewId);
 				builder.Export(
 					targets.m_BackBuffer,
 					RGTextureAccess::Present,
