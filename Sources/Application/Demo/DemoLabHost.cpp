@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
-#include "Application/Lab/Sessions/HelloLabSession.h"
+#include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 
@@ -17,9 +17,9 @@ namespace gglab
 		})
 	{
 		const bool registered = m_Runtime.RegisterLab(
-			HelloLabSession::GetDescriptor(),
-			&HelloLabSession::Create);
-		GGLAB_ASSERT_MSG(registered, "Failed to register the Hello Lab session.");
+			CullingLabSession::GetDescriptor(),
+			&CullingLabSession::Create);
+		GGLAB_ASSERT_MSG(registered, "Failed to register the Culling Lab session.");
 
 		const bool miniPbrRegistered = m_Runtime.RegisterLab(
 			MiniPBRGridLabSession::GetDescriptor(),

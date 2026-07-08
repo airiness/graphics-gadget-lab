@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Core/Math/Quaternion.h"
 #include "Core/Math/Transform.h"
-#include "Application/Lab/Sessions/HelloLabSession.h"
+#include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Scene/Components.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
@@ -14,20 +14,20 @@ namespace gglab
 {
 	namespace
 	{
-		const LabParameterId EnableCameraInputId("hello.camera.enable_input");
-		const LabParameterId CameraFovId("hello.camera.fov");
-		const LabParameterId ModelPositionId("hello.model.position");
-		const LabParameterId ModelScaleId("hello.model.scale");
-		const LabParameterId MaterialBaseColorId("hello.material.base_color");
-		const LabParameterId MaterialMetallicId("hello.material.metallic");
-		const LabParameterId MaterialRoughnessId("hello.material.roughness");
-		const LabParameterId LightColorId("hello.light.color");
-		const LabParameterId LightIntensityId("hello.light.intensity");
-		const LabParameterId LightDirectionId("hello.light.direction");
+		const LabParameterId EnableCameraInputId("culling.camera.enable_input");
+		const LabParameterId CameraFovId("culling.camera.fov");
+		const LabParameterId ModelPositionId("culling.model.position");
+		const LabParameterId ModelScaleId("culling.model.scale");
+		const LabParameterId MaterialBaseColorId("culling.material.base_color");
+		const LabParameterId MaterialMetallicId("culling.material.metallic");
+		const LabParameterId MaterialRoughnessId("culling.material.roughness");
+		const LabParameterId LightColorId("culling.light.color");
+		const LabParameterId LightIntensityId("culling.light.intensity");
+		const LabParameterId LightDirectionId("culling.light.direction");
 		const StringID DebugDrawShapeChannel("DebugDraw.ShapeLibrary");
 	}
 
-	void HelloLabSession::OnEnter() noexcept
+	void CullingLabSession::OnEnter() noexcept
 	{
 		auto* debugDraw = m_Services.m_DebugDraw;
 		GGLAB_ASSERT_NOT_NULL(debugDraw);
@@ -95,7 +95,7 @@ namespace gglab
 		debugDraw->Frustum(frustumCorners, wireStyle);
 	}
 
-	void HelloLabSession::OnExit() noexcept
+	void CullingLabSession::OnExit() noexcept
 	{
 		if (auto* debugDraw = m_Services.m_DebugDraw)
 		{
@@ -103,7 +103,7 @@ namespace gglab
 		}
 	}
 
-	HelloLabSession::HelloLabSession(const LabSessionCreateInfo& createInfo) noexcept :
+	CullingLabSession::CullingLabSession(const LabSessionCreateInfo& createInfo) noexcept :
 		LabSessionBase(
 			GetDescriptor(),
 			createInfo,
@@ -212,7 +212,7 @@ namespace gglab
 		RebuildScene();
 	}
 
-	void HelloLabSession::Update(float deltaTime) noexcept
+	void CullingLabSession::Update(float deltaTime) noexcept
 	{
 		if (m_EnableCameraInput)
 		{
@@ -262,7 +262,7 @@ namespace gglab
 			});
 	}
 
-	void HelloLabSession::ApplyImmediateParameters() noexcept
+	void CullingLabSession::ApplyImmediateParameters() noexcept
 	{
 		const auto& parameters = GetParameters();
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, true);
@@ -293,7 +293,7 @@ namespace gglab
 		}
 	}
 
-	void HelloLabSession::RebuildScene() noexcept
+	void CullingLabSession::RebuildScene() noexcept
 	{
 		auto& registry = m_World.GetRegistry();
 		registry.clear();
@@ -308,7 +308,7 @@ namespace gglab
 		modelTransform.m_Position = modelPosition;
 		modelTransform.m_Scale = Vector3::One * modelScale;
 		components::MaterialInstanceComponent materialInstance{};
-		materialInstance.m_Key = RuntimeMaterialKey("gglab.lab.hello.material.cube");
+		materialInstance.m_Key = RuntimeMaterialKey("gglab.lab.culling.material.cube");
 		GGLAB_UNUSED(primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
 			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
@@ -382,26 +382,26 @@ namespace gglab
 		ApplyImmediateParameters();
 	}
 
-	LabId HelloLabSession::GetId() noexcept
+	LabId CullingLabSession::GetId() noexcept
 	{
-		return LabId("gglab.lab.hello");
+		return LabId("gglab.lab.culling");
 	}
 
-	LabDescriptor HelloLabSession::GetDescriptor() noexcept
+	LabDescriptor CullingLabSession::GetDescriptor() noexcept
 	{
 		return {
 			.m_Id = GetId(),
-			.m_DisplayName = "Hello Lab",
-			.m_Category = "Foundation",
-			.m_Description = "A compact scene for validating Lab parameters and lifecycle commands.",
+			.m_DisplayName = "Culling Lab",
+			.m_Category = "Debug",
+			.m_Description = "A compact scene for validating RenderView, object culling, and DebugDraw culling behavior.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};
 	}
 
-	std::unique_ptr<LabSessionBase> HelloLabSession::Create(
+	std::unique_ptr<LabSessionBase> CullingLabSession::Create(
 		const LabSessionCreateInfo& createInfo) noexcept
 	{
-		return std::make_unique<HelloLabSession>(createInfo);
+		return std::make_unique<CullingLabSession>(createInfo);
 	}
 }

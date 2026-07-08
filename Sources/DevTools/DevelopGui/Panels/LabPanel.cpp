@@ -9,6 +9,8 @@ namespace gglab
 {
 	namespace
 	{
+		const LabId CullingLabId("gglab.lab.culling");
+
 		const char* ToText(LabRunState state) noexcept
 		{
 			switch (state)
@@ -35,6 +37,83 @@ namespace gglab
 		const T* GetOptionalValue(const std::optional<LabValue>& value) noexcept
 		{
 			return value ? std::get_if<T>(&*value) : nullptr;
+		}
+
+		const char* RenderViewLabel(RenderViewID viewId) noexcept
+		{
+			switch (viewId)
+			{
+			case RenderViewID::Main:
+				return "MainView";
+			case RenderViewID::DirectionalShadow:
+				return "DirectionalShadowView";
+			case RenderViewID::DebugCamera0:
+				return "DebugCamera0";
+			case RenderViewID::DebugCamera1:
+				return "DebugCamera1";
+			case RenderViewID::DebugCamera2:
+				return "DebugCamera2";
+			default:
+				return "Unknown";
+			}
+		}
+
+		void DrawCullingLabStatistics(const DevelopGuiContext& context) noexcept
+		{
+			if (context.m_RenderQueues.empty())
+			{
+				ImGui::TextDisabled("Render queue statistics are not available yet.");
+				return;
+			}
+
+			constexpr ImGuiTableFlags tableFlags =
+				ImGuiTableFlags_Borders |
+				ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_SizingStretchProp;
+			if (!ImGui::BeginTable("CullingLabRenderQueues", 6, tableFlags))
+			{
+				return;
+			}
+			ImGui::TableSetupColumn("RenderView", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Total", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+			ImGui::TableSetupColumn("Visible", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+			ImGui::TableSetupColumn("Culled", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+			ImGui::TableSetupColumn("Invalid", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+			ImGui::TableSetupColumn("Draw Items", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+			ImGui::TableHeadersRow();
+
+			for (const RenderQueue& queue : context.m_RenderQueues)
+			{
+				if (queue.m_ViewId == RenderViewID::Unknown)
+				{
+					continue;
+				}
+				const RenderQueueStatistics& stats = queue.m_Statistics;
+				if (stats.m_TotalInstanceCount == 0 &&
+					stats.m_VisibleInstanceCount == 0 &&
+					stats.m_CulledInstanceCount == 0 &&
+					stats.m_InvalidInstanceCount == 0)
+				{
+					continue;
+				}
+
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				ImGui::TextUnformatted(RenderViewLabel(queue.m_ViewId));
+				ImGui::TableSetColumnIndex(1);
+				ImGui::Text("%u", stats.m_TotalInstanceCount);
+				ImGui::TableSetColumnIndex(2);
+				ImGui::Text("%u", stats.m_VisibleInstanceCount);
+				ImGui::TableSetColumnIndex(3);
+				ImGui::Text("%u", stats.m_CulledInstanceCount);
+				ImGui::TableSetColumnIndex(4);
+				ImGui::Text("%u", stats.m_InvalidInstanceCount);
+				ImGui::TableSetColumnIndex(5);
+				ImGui::Text("%u", stats.m_DrawItemCount);
+			}
+
+			ImGui::EndTable();
 		}
 	}
 
@@ -109,6 +188,12 @@ namespace gglab
 		if (!snapshot.m_Description.empty())
 		{
 			ImGui::TextWrapped("%s", snapshot.m_Description.c_str());
+		}
+
+		if (snapshot.m_ActiveLabId == CullingLabId)
+		{
+			ImGui::SeparatorText("Culling Statistics");
+			DrawCullingLabStatistics(context);
 		}
 
 		if (ImGui::Button("Reset Parameters"))

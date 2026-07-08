@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <span>
+#include <vector>
 
 namespace gglab
 {
@@ -112,6 +113,14 @@ namespace gglab
 		}
 	};
 
+	struct DebugDrawChannelState
+	{
+		StringID m_Channel{};
+		bool m_Enabled = true;
+		uint32_t m_PendingCommandCount = 0;
+		uint32_t m_PersistentCommandCount = 0;
+	};
+
 	class DebugDrawContext
 	{
 	public:
@@ -152,6 +161,7 @@ namespace gglab
 
 		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
 		[[nodiscard]] bool IsChannelEnabled(StringID channel) const noexcept;
+		[[nodiscard]] std::vector<DebugDrawChannelState> GetChannelStates() const noexcept;
 		void ClearChannel(StringID channel) noexcept;
 
 	private:

@@ -280,6 +280,11 @@ namespace gglab
 			return meshId;
 		}
 
+		if (!mesh->m_HasBounds)
+		{
+			ComputeMeshBounds(*mesh, meshUploadData.m_VerticesData);
+		}
+
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
 

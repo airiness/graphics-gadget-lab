@@ -7,7 +7,7 @@
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/DemoTypes.h"
-#include "Application/Lab/Sessions/HelloLabSession.h"
+#include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
@@ -195,7 +195,7 @@ namespace gglab
 			.m_WindowHeight = m_WindowHeight,
 		};
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId ?
-			LabId(*m_LaunchOptions.m_StartupLabId) : HelloLabSession::GetId();
+			LabId(*m_LaunchOptions.m_StartupLabId) : CullingLabSession::GetId();
 		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo(
 			"Demo.Playground",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
@@ -389,10 +389,13 @@ namespace gglab
 			guiContext.m_Renderer = m_Renderer.get();
 			guiContext.m_World = &world;
 			guiContext.m_RenderViews = std::span<RenderView>(frame.m_RenderViews);
+			guiContext.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues);
 			guiContext.m_MainRenderView = &frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)];
 			guiContext.m_AssetManager = m_AssetManager.get();
 			guiContext.m_RenderGraph = &rg;
 			guiContext.m_DirectionalShadowSettings = frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
+			guiContext.m_DebugDrawSystem = m_DebugDrawSystem.get();
+			guiContext.m_DebugDrawFrame = frame.m_DebugDrawFrame;
 
 			m_DevelopGuiSystem->Draw(guiContext);
 		}

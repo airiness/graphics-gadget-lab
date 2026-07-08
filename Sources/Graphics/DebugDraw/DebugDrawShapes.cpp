@@ -467,6 +467,11 @@ namespace gglab
 		return m_System && m_System->IsChannelEnabled(channel);
 	}
 
+	std::vector<DebugDrawChannelState> DebugDrawContext::GetChannelStates() const noexcept
+	{
+		return m_System ? m_System->GetChannelStates() : std::vector<DebugDrawChannelState>{};
+	}
+
 	void DebugDrawContext::ClearChannel(StringID channel) noexcept
 	{
 		if (m_System) m_System->ClearChannel(channel);

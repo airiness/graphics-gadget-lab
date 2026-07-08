@@ -3,11 +3,11 @@
 
 namespace gglab
 {
-	class HelloLabSession final : public LabSessionBase
+	class CullingLabSession final : public LabSessionBase
 	{
 	public:
-		explicit HelloLabSession(const LabSessionCreateInfo& createInfo) noexcept;
-		~HelloLabSession() override = default;
+		explicit CullingLabSession(const LabSessionCreateInfo& createInfo) noexcept;
+		~CullingLabSession() override = default;
 
 		void Update(float deltaTime) noexcept override;
 		void OnEnter() noexcept override;
