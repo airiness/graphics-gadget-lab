@@ -17,6 +17,6 @@ namespace gglab::math
 	{
 		Matrix linearTransform = transform;
 		linearTransform.Translation(Vector3::Zero);
-		return Transpose(Inverse(linearTransform));
+		return Transpose(SafeInverse(linearTransform));
 	}
 }

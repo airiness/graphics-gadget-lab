@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Core/Math/MathConstants.h"
+#include "Core/Math/MathFunctions.h"
 #include "Core/Math/Matrix.h"
 #include "Core/Math/Quaternion.h"
 
@@ -126,6 +127,24 @@ namespace gglab::math
 		return StoreVector2(DirectX::XMVectorLerp(LoadVector2(lhs), LoadVector2(rhs), t));
 	}
 
+	bool TryNormalize(const Vector2& value, Vector2& result, float tolerance) noexcept
+	{
+		result = Vector2::Zero;
+		if (!IsFinite(value) || !std::isfinite(tolerance) || tolerance < 0.0f ||
+			value.LengthSquared() <= tolerance * tolerance)
+		{
+			return false;
+		}
+		value.Normalize(result);
+		return IsFinite(result);
+	}
+
+	Vector2 NormalizeOr(const Vector2& value, const Vector2& fallback, float tolerance) noexcept
+	{
+		Vector2 result{};
+		return TryNormalize(value, result, tolerance) ? result : fallback;
+	}
+
 	float Vector3::Length() const noexcept
 	{
 		return DirectX::XMVectorGetX(DirectX::XMVector3Length(LoadVector3(*this)));
@@ -197,6 +216,24 @@ namespace gglab::math
 			LoadMatrix(matrix)));
 	}
 
+	bool TryNormalize(const Vector3& value, Vector3& result, float tolerance) noexcept
+	{
+		result = Vector3::Zero;
+		if (!IsFinite(value) || !std::isfinite(tolerance) || tolerance < 0.0f ||
+			value.LengthSquared() <= tolerance * tolerance)
+		{
+			return false;
+		}
+		result = value.Normalized();
+		return IsFinite(result);
+	}
+
+	Vector3 NormalizeOr(const Vector3& value, const Vector3& fallback, float tolerance) noexcept
+	{
+		Vector3 result{};
+		return TryNormalize(value, result, tolerance) ? result : fallback;
+	}
+
 	float Vector4::Length() const noexcept
 	{
 		return DirectX::XMVectorGetX(DirectX::XMVector4Length(LoadVector4(*this)));
@@ -244,6 +281,24 @@ namespace gglab::math
 			LoadMatrix(matrix)));
 	}
 
+	bool TryNormalize(const Vector4& value, Vector4& result, float tolerance) noexcept
+	{
+		result = Vector4::Zero;
+		if (!IsFinite(value) || !std::isfinite(tolerance) || tolerance < 0.0f ||
+			value.LengthSquared() <= tolerance * tolerance)
+		{
+			return false;
+		}
+		value.Normalize(result);
+		return IsFinite(result);
+	}
+
+	Vector4 NormalizeOr(const Vector4& value, const Vector4& fallback, float tolerance) noexcept
+	{
+		Vector4 result{};
+		return TryNormalize(value, result, tolerance) ? result : fallback;
+	}
+
 	Matrix& Matrix::operator*=(const Matrix& rhs) noexcept
 	{
 		*this = *this * rhs;
@@ -254,6 +309,40 @@ namespace gglab::math
 	{
 		DirectX::XMVECTOR determinant;
 		return StoreMatrix(DirectX::XMMatrixInverse(&determinant, LoadMatrix(matrix)));
+	}
+
+	bool TryInverse(const Matrix& matrix, Matrix& result, float determinantTolerance) noexcept
+	{
+		result = Matrix::Identity;
+		if (!IsFinite(matrix) || !std::isfinite(determinantTolerance) || determinantTolerance < 0.0f)
+		{
+			return false;
+		}
+
+		DirectX::XMVECTOR determinant;
+		const DirectX::XMMATRIX inverse = DirectX::XMMatrixInverse(&determinant, LoadMatrix(matrix));
+		const float determinantValue = DirectX::XMVectorGetX(determinant);
+		if (!std::isfinite(determinantValue) || std::abs(determinantValue) <= determinantTolerance)
+		{
+			return false;
+		}
+
+		result = StoreMatrix(inverse);
+		return IsFinite(result);
+	}
+
+	Matrix SafeInverse(
+		const Matrix& matrix,
+		const Matrix& fallback,
+		float determinantTolerance) noexcept
+	{
+		Matrix result{};
+		return TryInverse(matrix, result, determinantTolerance) ? result : fallback;
+	}
+
+	Matrix SafeInverse(const Matrix& matrix, float determinantTolerance) noexcept
+	{
+		return SafeInverse(matrix, Matrix::Identity, determinantTolerance);
 	}
 
 	Matrix Transpose(const Matrix& matrix) noexcept
@@ -349,6 +438,34 @@ namespace gglab::math
 		return StoreQuaternion(DirectX::XMQuaternionRotationRollPitchYawFromVector(LoadVector3(angles)));
 	}
 
+	bool TryNormalize(const Quaternion& value, Quaternion& result, float tolerance) noexcept
+	{
+		result = Quaternion::Identity;
+		if (!IsFinite(value) || !std::isfinite(tolerance) || tolerance < 0.0f)
+		{
+			return false;
+		}
+
+		const float lengthSquared =
+			value.m_X * value.m_X +
+			value.m_Y * value.m_Y +
+			value.m_Z * value.m_Z +
+			value.m_W * value.m_W;
+		if (lengthSquared <= tolerance * tolerance)
+		{
+			return false;
+		}
+
+		result = StoreQuaternion(DirectX::XMQuaternionNormalize(LoadQuaternion(value)));
+		return IsFinite(result);
+	}
+
+	Quaternion NormalizeOr(const Quaternion& value, const Quaternion& fallback, float tolerance) noexcept
+	{
+		Quaternion result{};
+		return TryNormalize(value, result, tolerance) ? result : fallback;
+	}
+
 	Quaternion RotationFromTo(const Vector3& fromDir, const Vector3& toDir) noexcept
 	{
 		const DirectX::XMVECTOR from = DirectX::XMVector3Normalize(LoadVector3(fromDir));
@@ -377,6 +494,24 @@ namespace gglab::math
 		result.m_Z /= scale;
 		result.m_W = scale * 0.5f;
 		return result;
+	}
+
+	bool TryRotationFromTo(
+		const Vector3& fromDir,
+		const Vector3& toDir,
+		Quaternion& result,
+		float tolerance) noexcept
+	{
+		result = Quaternion::Identity;
+		Vector3 normalizedFrom{};
+		Vector3 normalizedTo{};
+		if (!TryNormalize(fromDir, normalizedFrom, tolerance) ||
+			!TryNormalize(toDir, normalizedTo, tolerance))
+		{
+			return false;
+		}
+		result = RotationFromTo(normalizedFrom, normalizedTo);
+		return IsFinite(result);
 	}
 
 	Matrix operator*(const Matrix& lhs, const Matrix& rhs) noexcept

@@ -25,9 +25,11 @@ namespace gglab
 		void ApplyCameraPreset() noexcept;
 		void DrawVectorValidation(DebugDrawContext& debugDraw) noexcept;
 		void DrawMatrixValidation(DebugDrawContext& debugDraw) noexcept;
+		void DrawNormalMatrixValidation(DebugDrawContext& debugDraw) noexcept;
 		void DrawQuaternionValidation(DebugDrawContext& debugDraw, float interpolationT) noexcept;
 		void DrawBoundsValidation(DebugDrawContext& debugDraw) noexcept;
 		void DrawProjectionValidation(DebugDrawContext& debugDraw) noexcept;
+		void DrawFrustumCullingValidation(DebugDrawContext& debugDraw) noexcept;
 		void DrawDegenerateValidation(DebugDrawContext& debugDraw) noexcept;
 
 		float m_ElapsedTime = 0.0f;

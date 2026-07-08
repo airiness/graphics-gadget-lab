@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Core/Math/BoundingVolumes.h"
+#include "Core/Math/Culling.h"
 #include "Core/Math/MathFunctions.h"
 #include "Core/Math/Quaternion.h"
 #include "Core/Math/Transform.h"
@@ -16,9 +17,11 @@ namespace gglab
 		{
 			Vector,
 			MatrixTransform,
+			NormalMatrix,
 			Quaternion,
 			Bounds,
 			ProjectionFrustum,
+			FrustumCulling,
 			Degenerate,
 		};
 
@@ -50,25 +53,22 @@ namespace gglab
 			return Vector3(value.m_X, value.m_Y, value.m_Z) / value.m_W;
 		}
 
-		bool IsFinite(const Quaternion& value) noexcept
+		std::array<Vector3, 8> BuildFrustumCorners(const Matrix& inverseViewProjection) noexcept
 		{
-			return math::IsFinite(value.m_X) && math::IsFinite(value.m_Y) &&
-				math::IsFinite(value.m_Z) && math::IsFinite(value.m_W);
-		}
+			constexpr std::array<Vector4, 8> clipCorners = {
+				Vector4(-1.0f, 1.0f, 0.0f, 1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+				Vector4(1.0f, -1.0f, 0.0f, 1.0f), Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
+				Vector4(-1.0f, 1.0f, 1.0f, 1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+				Vector4(1.0f, -1.0f, 1.0f, 1.0f), Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
+			};
 
-		bool IsFinite(const Matrix& value) noexcept
-		{
-			for (const auto& row : value.m_M)
+			std::array<Vector3, 8> worldCorners{};
+			for (size_t index = 0; index < clipCorners.size(); ++index)
 			{
-				for (float component : row)
-				{
-					if (!math::IsFinite(component))
-					{
-						return false;
-					}
-				}
+				worldCorners[index] = HomogeneousToPoint(
+					math::Transform(clipCorners[index], inverseViewProjection));
 			}
-			return true;
+			return worldCorners;
 		}
 	}
 
@@ -90,9 +90,11 @@ namespace gglab
 			.m_EnumItems = {
 				{ .m_Value = int32_t(MathTopic::Vector), .m_Name = "Vector Operations" },
 				{ .m_Value = int32_t(MathTopic::MatrixTransform), .m_Name = "Matrix / Transform" },
+				{ .m_Value = int32_t(MathTopic::NormalMatrix), .m_Name = "Normal Matrix" },
 				{ .m_Value = int32_t(MathTopic::Quaternion), .m_Name = "Quaternion" },
 				{ .m_Value = int32_t(MathTopic::Bounds), .m_Name = "Bounds" },
 				{ .m_Value = int32_t(MathTopic::ProjectionFrustum), .m_Name = "Projection / Frustum" },
+				{ .m_Value = int32_t(MathTopic::FrustumCulling), .m_Name = "Frustum Culling" },
 				{ .m_Value = int32_t(MathTopic::Degenerate), .m_Name = "Degenerate Inputs" },
 			},
 		}));
@@ -164,6 +166,9 @@ namespace gglab
 		case MathTopic::MatrixTransform:
 			DrawMatrixValidation(debugDraw);
 			break;
+		case MathTopic::NormalMatrix:
+			DrawNormalMatrixValidation(debugDraw);
+			break;
 		case MathTopic::Quaternion:
 		{
 			const bool animate = GetParameters().Get(AnimateId, true);
@@ -178,6 +183,9 @@ namespace gglab
 			break;
 		case MathTopic::ProjectionFrustum:
 			DrawProjectionValidation(debugDraw);
+			break;
+		case MathTopic::FrustumCulling:
+			DrawFrustumCullingValidation(debugDraw);
 			break;
 		case MathTopic::Degenerate:
 			DrawDegenerateValidation(debugDraw);
@@ -242,6 +250,33 @@ namespace gglab
 		debugDraw.Line(localPoint, transformedPoint, MakeStyle(Color::Gold));
 	}
 
+	void MathFoundationLabSession::DrawNormalMatrixValidation(DebugDrawContext& debugDraw) noexcept
+	{
+		const Matrix transform = math::CreateTransformMatrix(
+			Vector3(2.0f, 0.35f, 1.1f),
+			math::CreateFromYawPitchRoll(0.75f, 0.35f, 0.45f),
+			Vector3(0.0f, 0.6f, 6.0f));
+		const Matrix normalMatrix = math::CreateNormalMatrix(transform);
+		const Vector3 localNormal = math::NormalizeOr(Vector3(0.8f, 1.0f, 0.25f), Vector3::UnitY);
+		const Vector3 localPoint = localNormal;
+		const Vector3 anchor = math::TransformPoint(localPoint, transform);
+		const Vector3 transformedNormal = math::NormalizeOr(
+			math::TransformDirection(localNormal, transform),
+			Vector3::UnitY);
+		const Vector3 correctedNormal = math::NormalizeOr(
+			math::TransformDirection(localNormal, normalMatrix),
+			Vector3::UnitY);
+
+		debugDraw.Obb(transform, Vector3::One, MakeStyle(Color::Silver));
+		debugDraw.Point(anchor, 0.18f, MakeStyle(Color::Gold));
+		debugDraw.Arrow(anchor, anchor + transformedNormal * 1.6f, 0.25f,
+			MakeStyle(Color::Red, DebugDrawFillMode::Solid));
+		debugDraw.Arrow(anchor, anchor + correctedNormal * 1.6f, 0.25f,
+			MakeStyle(Color::Green, DebugDrawFillMode::Solid));
+		debugDraw.Axes(transform, 1.4f, 0.18f,
+			MakeStyle(Color::White, DebugDrawFillMode::Solid));
+	}
+
 	void MathFoundationLabSession::DrawQuaternionValidation(
 		DebugDrawContext& debugDraw, float interpolationT) noexcept
 	{
@@ -292,21 +327,54 @@ namespace gglab
 		const Matrix projection = math::CreatePerspectiveFieldOfViewLH(
 			math::ToRadians(50.0f), 1.6f, 0.5f, 7.0f);
 		const Matrix inverseViewProjection = math::Inverse(view * projection);
-		constexpr std::array<Vector4, 8> clipCorners = {
-			Vector4(-1.0f, 1.0f, 0.0f, 1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-			Vector4(1.0f, -1.0f, 0.0f, 1.0f), Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
-			Vector4(-1.0f, 1.0f, 1.0f, 1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-			Vector4(1.0f, -1.0f, 1.0f, 1.0f), Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
-		};
-		std::array<Vector3, 8> worldCorners{};
-		for (size_t index = 0; index < clipCorners.size(); ++index)
-		{
-			worldCorners[index] = HomogeneousToPoint(
-				math::Transform(clipCorners[index], inverseViewProjection));
-		}
+		const std::array<Vector3, 8> worldCorners = BuildFrustumCorners(inverseViewProjection);
 		debugDraw.Frustum(worldCorners, MakeStyle(Color::Gold));
 		debugDraw.Point(eye, 0.2f, MakeStyle(Color::Cyan));
 		debugDraw.Arrow(eye, target, 0.35f, MakeStyle(Color::Green, DebugDrawFillMode::Solid));
+	}
+
+	void MathFoundationLabSession::DrawFrustumCullingValidation(DebugDrawContext& debugDraw) noexcept
+	{
+		const Vector3 eye(-2.0f, 1.6f, 1.0f);
+		const Vector3 target(0.0f, 0.6f, 6.0f);
+		const Matrix view = math::CreateLookAtLH(eye, target, Vector3::UnitY);
+		const Matrix projection = math::CreatePerspectiveFieldOfViewLH(
+			math::ToRadians(45.0f), 1.35f, 0.5f, 6.0f);
+		const Matrix viewProjection = view * projection;
+		const Matrix inverseViewProjection = math::SafeInverse(viewProjection);
+		const math::Frustum frustum = math::CreateFrustumFromViewProjection(viewProjection);
+		const std::array<Vector3, 8> worldCorners = BuildFrustumCorners(inverseViewProjection);
+
+		debugDraw.Frustum(worldCorners, MakeStyle(Color::Gold));
+		debugDraw.Point(eye, 0.2f, MakeStyle(Color::Cyan));
+		debugDraw.Arrow(eye, target, 0.35f, MakeStyle(Color::Green, DebugDrawFillMode::Solid));
+
+		const auto clipToWorld = [inverseViewProjection](const Vector4& clip) noexcept
+			{
+				return HomogeneousToPoint(math::Transform(clip, inverseViewProjection));
+			};
+		const std::array spheres = {
+			math::Sphere(clipToWorld(Vector4(0.0f, 0.0f, 0.45f, 1.0f)), 0.28f),
+			math::Sphere(clipToWorld(Vector4(0.92f, 0.55f, 0.55f, 1.0f)), 0.35f),
+			math::Sphere(clipToWorld(Vector4(1.55f, 0.0f, 0.5f, 1.0f)), 0.28f),
+			math::Sphere(clipToWorld(Vector4(0.0f, 0.0f, 1.25f, 1.0f)), 0.32f),
+		};
+		for (const math::Sphere& sphere : spheres)
+		{
+			const bool visible = math::Intersects(frustum, sphere);
+			debugDraw.Sphere(sphere.m_Center, sphere.m_Radius,
+				MakeStyle(visible ? Color::Green : Color::Red));
+		}
+
+		const std::array boxes = {
+			math::Aabb(clipToWorld(Vector4(-0.45f, -0.45f, 0.35f, 1.0f)), Vector3(0.25f, 0.25f, 0.25f)),
+			math::Aabb(clipToWorld(Vector4(-1.45f, 0.0f, 0.6f, 1.0f)), Vector3(0.35f, 0.35f, 0.35f)),
+		};
+		for (const math::Aabb& aabb : boxes)
+		{
+			const bool visible = math::Intersects(frustum, aabb);
+			debugDraw.Aabb(aabb, MakeStyle(visible ? Color::Cyan : Color::Red));
+		}
 	}
 
 	void MathFoundationLabSession::DrawDegenerateValidation(DebugDrawContext& debugDraw) noexcept
@@ -317,13 +385,19 @@ namespace gglab
 		const bool rawNormalizeRejected = !math::IsFinite(rawZero);
 		const Vector3 safeZero = math::SafeNormalize(Vector3::Zero, Vector3::UnitX);
 		const Vector3 safeNearZero = math::SafeNormalize(Vector3(1.0e-10f), Vector3::UnitY);
-		const Quaternion opposite = math::RotationFromTo(Vector3::Forward, Vector3::Backward);
+		Vector3 tryNormalizedZero{};
+		const bool tryNormalizeRejected = !math::TryNormalize(Vector3::Zero, tryNormalizedZero);
+		Quaternion opposite = Quaternion::Identity;
+		GGLAB_UNUSED(math::TryRotationFromTo(Vector3::Forward, Vector3::Backward, opposite));
 		const Vector3 oppositeResult = math::TransformDirection(
 			Vector3::Forward, math::CreateFromQuaternion(opposite));
-		const Quaternion zeroDirectionRotation =
-			math::RotationFromTo(Vector3::Zero, Vector3::Forward);
-		const Matrix singularInverse = math::Inverse(
-			math::CreateScale(Vector3(1.0f, 0.0f, 1.0f)));
+		Quaternion zeroDirectionRotation{};
+		const bool zeroDirectionRejected =
+			!math::TryRotationFromTo(Vector3::Zero, Vector3::Forward, zeroDirectionRotation);
+		Matrix singularInverse{};
+		const bool singularInverseRejected = !math::TryInverse(
+			math::CreateScale(Vector3(1.0f, 0.0f, 1.0f)),
+			singularInverse);
 
 		debugDraw.Arrow(origin, origin + safeZero * 2.0f, 0.3f,
 			MakeStyle(Color::Green, DebugDrawFillMode::Solid));
@@ -336,9 +410,9 @@ namespace gglab
 		debugDraw.Point(origin + Vector3(-1.0f, 0.0f, 0.0f), 0.25f,
 			MakeStyle(rawNormalizeRejected ? Color::Red : Color::Green));
 		debugDraw.Point(origin + Vector3(-1.0f, 0.8f, 0.0f), 0.25f,
-			MakeStyle(IsFinite(zeroDirectionRotation) ? Color::Green : Color::Red));
+			MakeStyle(tryNormalizeRejected ? Color::Green : Color::Red));
 		debugDraw.Point(origin + Vector3(-1.0f, 1.6f, 0.0f), 0.25f,
-			MakeStyle(IsFinite(singularInverse) ? Color::Green : Color::Red));
+			MakeStyle(zeroDirectionRejected && singularInverseRejected ? Color::Green : Color::Red));
 
 		const float nan = std::numeric_limits<float>::quiet_NaN();
 		debugDraw.Line(Vector3(nan, 0.0f, 0.0f), Vector3::Zero, MakeStyle(Color::Red));
