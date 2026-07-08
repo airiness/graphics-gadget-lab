@@ -453,7 +453,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.cpp">
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp">
@@ -571,6 +571,9 @@
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.cpp">
@@ -1097,7 +1100,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\HelloLabSession.h">
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.h">
@@ -1269,6 +1272,9 @@
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\DebugDrawPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.h">

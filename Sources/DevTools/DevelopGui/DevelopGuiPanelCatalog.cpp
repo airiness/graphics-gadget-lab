@@ -3,6 +3,7 @@
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
+#include "DevTools/DevelopGui/Panels/DebugDrawPanel.h"
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/Panels/ImGuiToolsPanel.h"
@@ -20,6 +21,7 @@ namespace gglab::devtools
 	{
 		registry.RegisterPanel(std::make_unique<AssetManagerPanel>());
 		registry.RegisterPanel(std::make_unique<CameraInspectorPanel>());
+		registry.RegisterPanel(std::make_unique<DebugDrawPanel>());
 		registry.RegisterPanel(std::make_unique<EntityPanel>());
 		registry.RegisterPanel(std::make_unique<ImGuiToolsPanel>());
 		registry.RegisterPanel(std::make_unique<IBLViewerPanel>());

@@ -36,6 +36,7 @@ namespace gglab
 		void ClearChannel(StringID channel) noexcept;
 		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
 		[[nodiscard]] bool IsChannelEnabled(StringID channel) const noexcept;
+		[[nodiscard]] std::vector<DebugDrawChannelState> GetChannelStates() const noexcept;
 
 	private:
 		friend class DebugDrawContext;
@@ -82,6 +83,7 @@ namespace gglab
 		std::vector<Command> m_PendingCommands;
 		std::vector<Command> m_SealedCommands;
 		std::vector<Command> m_PersistentCommands;
+		std::unordered_set<StringID> m_KnownChannels;
 		std::unordered_set<StringID> m_DisabledChannels;
 		std::vector<DebugDrawVertex> m_StagingVertices;
 		DebugDrawFrameView m_FrameView{};

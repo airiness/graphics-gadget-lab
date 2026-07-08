@@ -1,5 +1,7 @@
 #pragma once
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
+#include "Graphics/DebugDraw/DebugDraw.h"
+#include "Graphics/RenderQueue.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ShadowSettings.h"
 
@@ -14,6 +16,7 @@ namespace gglab
 	class RenderGraph;
 	class DiagnosticsRuntime;
 	class DevelopGuiSystem;
+	class DebugDrawSystem;
 
 	class DevelopGuiStateStore;
 
@@ -25,10 +28,13 @@ namespace gglab
 		Renderer* m_Renderer = nullptr;
 		World* m_World = nullptr;
 		std::span<RenderView> m_RenderViews;
+		std::span<const RenderQueue> m_RenderQueues;
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
 		DiagnosticsRuntime* m_Diagnostics = nullptr;
+		DebugDrawSystem* m_DebugDrawSystem = nullptr;
+		DebugDrawFrameView m_DebugDrawFrame{};
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;

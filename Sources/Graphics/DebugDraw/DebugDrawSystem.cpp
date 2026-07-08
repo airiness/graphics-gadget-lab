@@ -80,17 +80,13 @@ namespace gglab
 			m_PersistentVertexCount = 0;
 			for (const Command& command : m_PersistentCommands)
 			{
-				if (!disabledChannels.contains(command.m_Style.m_Channel))
-				{
-					m_PersistentVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
-				}
+				m_PersistentVertexCount += static_cast<uint32_t>(command.m_Vertices->size());
 			}
 
 			for (Command& command : m_PendingCommands)
 			{
 				m_SealedCommands.push_back(command);
-				if (command.m_Style.m_DurationSeconds > 0.0f &&
-					!disabledChannels.contains(command.m_Style.m_Channel))
+				if (command.m_Style.m_DurationSeconds > 0.0f)
 				{
 					const uint32_t vertexCount = static_cast<uint32_t>(command.m_Vertices->size());
 					if (m_PersistentVertexCount + vertexCount <= m_MaxVertexCountPerFrame)
@@ -228,6 +224,7 @@ namespace gglab
 	void DebugDrawSystem::SetChannelEnabled(StringID channel, bool enabled) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
+		m_KnownChannels.insert(channel);
 		if (enabled)
 		{
 			m_DisabledChannels.erase(channel);
@@ -242,6 +239,40 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_Mutex);
 		return IsEnabledUnlocked(channel);
+	}
+
+	std::vector<DebugDrawChannelState> DebugDrawSystem::GetChannelStates() const noexcept
+	{
+		std::scoped_lock lock(m_Mutex);
+		std::vector<DebugDrawChannelState> states;
+		states.reserve(m_KnownChannels.size());
+		for (const StringID channel : m_KnownChannels)
+		{
+			DebugDrawChannelState state{
+				.m_Channel = channel,
+				.m_Enabled = IsEnabledUnlocked(channel),
+			};
+			for (const Command& command : m_PendingCommands)
+			{
+				if (command.m_Style.m_Channel == channel)
+				{
+					++state.m_PendingCommandCount;
+				}
+			}
+			for (const Command& command : m_PersistentCommands)
+			{
+				if (command.m_Style.m_Channel == channel)
+				{
+					++state.m_PersistentCommandCount;
+				}
+			}
+			states.push_back(state);
+		}
+		std::ranges::sort(states, [](const DebugDrawChannelState& lhs, const DebugDrawChannelState& rhs)
+			{
+				return lhs.m_Channel.Value() < rhs.m_Channel.Value();
+			});
+		return states;
 	}
 
 	bool DebugDrawSystem::IsEnabledUnlocked(StringID channel) const noexcept
@@ -308,11 +339,7 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_Mutex);
 		++m_PendingStatistics.m_SubmittedCommandCount;
-		if (!IsEnabledUnlocked(style.m_Channel))
-		{
-			++m_PendingStatistics.m_ChannelFilteredCommandCount;
-			return;
-		}
+		m_KnownChannels.insert(style.m_Channel);
 		const bool topologyValid = topology == PrimitiveTopology::Lines ?
 			positions.size() % 2 == 0 : positions.size() % 3 == 0;
 		if (positions.empty() || !topologyValid || !math::IsFinite(style.m_Color) ||
@@ -399,6 +426,16 @@ namespace gglab
 		}
 		const Vector3 x(size, 0.0f, 0.0f);
 		const Vector3 y(0.0f, size, 0.0f);
+		if (style.m_Space == DebugDrawSpace::Screen)
+		{
+			const std::array positions = {
+				position - x, position + x,
+				position - y, position + y,
+			};
+			m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
+			return;
+		}
+
 		const Vector3 z(0.0f, 0.0f, size);
 		const std::array positions = {
 			position - x, position + x,

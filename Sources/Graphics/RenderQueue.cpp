@@ -10,6 +10,7 @@ namespace gglab
 		renderQueue.m_ViewId = info.m_RenderView.m_ViewId;
 
 		const auto& instances = info.m_RenderScene.m_RenderInstances;
+		renderQueue.m_Statistics.m_TotalInstanceCount = static_cast<uint32_t>(instances.size());
 		renderQueue.m_DrawItems.reserve(instances.size());
 
 		for (const auto& instance : instances)
@@ -27,6 +28,7 @@ namespace gglab
 				}
 				if (!visible)
 				{
+					++renderQueue.m_Statistics.m_CulledInstanceCount;
 					continue;
 				}
 			}
@@ -34,6 +36,7 @@ namespace gglab
 			const auto* mesh = info.m_AssetManager.GetMesh(instance.m_MeshId);
 			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
 			{
+				++renderQueue.m_Statistics.m_InvalidInstanceCount;
 				continue;
 			}
 
@@ -62,7 +65,9 @@ namespace gglab
 			drawItem.mDepthKey = MakeDepthKey(info.m_RenderView, instance.m_WorldCenterPos);
 
 			renderQueue.m_DrawItems.push_back(drawItem);
+			++renderQueue.m_Statistics.m_VisibleInstanceCount;
 		}
+		renderQueue.m_Statistics.m_DrawItemCount = static_cast<uint32_t>(renderQueue.m_DrawItems.size());
 
 		// Sort draw items by sort key
 		std::stable_sort(renderQueue.m_DrawItems.begin(), renderQueue.m_DrawItems.end(),

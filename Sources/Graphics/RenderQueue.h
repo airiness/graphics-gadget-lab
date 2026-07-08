@@ -26,6 +26,15 @@ namespace gglab
 		uint32_t m_Count = 0;
 	};
 
+	struct RenderQueueStatistics
+	{
+		uint32_t m_TotalInstanceCount = 0;
+		uint32_t m_VisibleInstanceCount = 0;
+		uint32_t m_CulledInstanceCount = 0;
+		uint32_t m_InvalidInstanceCount = 0;
+		uint32_t m_DrawItemCount = 0;
+	};
+
 	struct RenderQueue
 	{
 		std::vector<DrawItem> m_DrawItems;
@@ -33,6 +42,7 @@ namespace gglab
 		std::array<DrawItemsRange, utils::ToIndex(RenderBucket::Count)> m_BucketDrawRanges{};
 
 		RenderViewID m_ViewId = RenderViewID::Unknown;
+		RenderQueueStatistics m_Statistics{};
 	};
 
 	class RenderQueueBuilder
