@@ -225,6 +225,7 @@
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp" />
@@ -508,6 +509,7 @@
     <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
     <ClInclude Include="..\..\Sources\Core\Math\BoundingVolumes.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Color.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Culling.h" />
     <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h" />
     <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />

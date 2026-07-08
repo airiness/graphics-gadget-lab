@@ -393,6 +393,9 @@
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp">
       <Filter>Core\Math</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.cpp">
       <Filter>Core\Math\Interop</Filter>
     </ClCompile>
@@ -813,6 +816,9 @@
       <Filter>Core\Math</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\Color.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Culling.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h">

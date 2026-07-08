@@ -1,6 +1,8 @@
 #pragma once
 #include "Core/Math/MathConstants.h"
 #include "Core/Math/Vector.h"
+#include "Core/Math/Matrix.h"
+#include "Core/Math/Quaternion.h"
 #include "Core/Math/Color.h"
 
 #include <cmath>
@@ -62,6 +64,11 @@ namespace gglab::math
 		return std::isfinite(value);
 	}
 
+	[[nodiscard]] inline bool IsFinite(const Vector2& value) noexcept
+	{
+		return IsFinite(value.m_X) && IsFinite(value.m_Y);
+	}
+
 	[[nodiscard]] inline bool IsFinite(const Vector3& value) noexcept
 	{
 		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z);
@@ -75,5 +82,26 @@ namespace gglab::math
 	[[nodiscard]] inline bool IsFinite(const Color& value) noexcept
 	{
 		return IsFinite(value.m_R) && IsFinite(value.m_G) && IsFinite(value.m_B) && IsFinite(value.m_A);
+	}
+
+	[[nodiscard]] inline bool IsFinite(const Quaternion& value) noexcept
+	{
+		return IsFinite(value.m_X) && IsFinite(value.m_Y) &&
+			IsFinite(value.m_Z) && IsFinite(value.m_W);
+	}
+
+	[[nodiscard]] inline bool IsFinite(const Matrix& value) noexcept
+	{
+		for (const auto& row : value.m_M)
+		{
+			for (float component : row)
+			{
+				if (!IsFinite(component))
+				{
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 }

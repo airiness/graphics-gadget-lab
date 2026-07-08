@@ -8,6 +8,8 @@ namespace gglab::math
 	struct Matrix;
 	struct Vector4;
 
+	// gglab math types are plain, scalar storage types for CPU/GPU and asset interop.
+	// Use TryNormalize or SafeNormalize when zero, near-zero or non-finite input is possible.
 	struct Vector2
 	{
 		constexpr Vector2() noexcept = default;
@@ -131,6 +133,14 @@ namespace gglab::math
 	Vector2 Min(const Vector2& lhs, const Vector2& rhs) noexcept;
 	Vector2 Max(const Vector2& lhs, const Vector2& rhs) noexcept;
 	Vector2 Lerp(const Vector2& lhs, const Vector2& rhs, float t) noexcept;
+	[[nodiscard]] bool TryNormalize(
+		const Vector2& value,
+		Vector2& result,
+		float tolerance = 1.0e-6f) noexcept;
+	Vector2 NormalizeOr(
+		const Vector2& value,
+		const Vector2& fallback,
+		float tolerance = 1.0e-6f) noexcept;
 
 	Vector3 operator+(const Vector3& lhs, const Vector3& rhs) noexcept;
 	Vector3 operator-(const Vector3& lhs, const Vector3& rhs) noexcept;
@@ -144,6 +154,14 @@ namespace gglab::math
 	Vector3 TransformPoint(const Vector3& value, const Matrix& matrix) noexcept;
 	Vector4 TransformPointHomogeneous(const Vector3& value, const Matrix& matrix) noexcept;
 	Vector3 TransformDirection(const Vector3& value, const Matrix& matrix) noexcept;
+	[[nodiscard]] bool TryNormalize(
+		const Vector3& value,
+		Vector3& result,
+		float tolerance = 1.0e-6f) noexcept;
+	Vector3 NormalizeOr(
+		const Vector3& value,
+		const Vector3& fallback,
+		float tolerance = 1.0e-6f) noexcept;
 
 	Vector4 operator+(const Vector4& lhs, const Vector4& rhs) noexcept;
 	Vector4 operator-(const Vector4& lhs, const Vector4& rhs) noexcept;
@@ -155,6 +173,14 @@ namespace gglab::math
 	Vector4 Max(const Vector4& lhs, const Vector4& rhs) noexcept;
 	Vector4 Lerp(const Vector4& lhs, const Vector4& rhs, float t) noexcept;
 	Vector4 Transform(const Vector4& value, const Matrix& matrix) noexcept;
+	[[nodiscard]] bool TryNormalize(
+		const Vector4& value,
+		Vector4& result,
+		float tolerance = 1.0e-6f) noexcept;
+	Vector4 NormalizeOr(
+		const Vector4& value,
+		const Vector4& fallback,
+		float tolerance = 1.0e-6f) noexcept;
 }
 
 namespace gglab

@@ -5,6 +5,11 @@ namespace gglab::math
 {
 	struct Quaternion;
 
+	// Math convention:
+	// - gglab uses a left-handed world: +X right, +Y up, +Z forward.
+	// - Matrices are stored in row-major field order and composed for row-vector use.
+	// - Points and directions are transformed as v * M; compose local-to-world as S * R * T.
+	// - Camera projection uses the D3D clip-space depth range [0, 1].
 	struct Matrix
 	{
 		constexpr Matrix() noexcept = default;
@@ -42,6 +47,17 @@ namespace gglab::math
 
 	Matrix operator*(const Matrix& lhs, const Matrix& rhs) noexcept;
 	Matrix Inverse(const Matrix& matrix) noexcept;
+	[[nodiscard]] bool TryInverse(
+		const Matrix& matrix,
+		Matrix& result,
+		float determinantTolerance = 1.0e-8f) noexcept;
+	Matrix SafeInverse(
+		const Matrix& matrix,
+		const Matrix& fallback,
+		float determinantTolerance = 1.0e-8f) noexcept;
+	Matrix SafeInverse(
+		const Matrix& matrix,
+		float determinantTolerance = 1.0e-8f) noexcept;
 	Matrix Transpose(const Matrix& matrix) noexcept;
 	Matrix CreateScale(const Vector3& scale) noexcept;
 	Matrix CreateScale(float scale) noexcept;
