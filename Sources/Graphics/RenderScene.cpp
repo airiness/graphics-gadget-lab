@@ -190,9 +190,13 @@ namespace gglab
 					}
 
 					Vector3 worldCenter = transformComp.m_Position;
+					math::Sphere worldBounds(worldCenter, 0.0f);
+					bool hasWorldBounds = false;
 					if (mesh->m_HasBounds)
 					{
 						worldCenter = math::TransformPoint(mesh->m_Aabb.m_Center, world);
+						worldBounds = math::Transform(mesh->m_Sphere, world);
+						hasWorldBounds = true;
 					}
 
 					RenderInstance renderInstance{};
@@ -202,6 +206,8 @@ namespace gglab
 					renderInstance.m_AlphaMode = iter->second.m_AlphaMode;
 					renderInstance.m_ObjectOffset = objectOffset;
 					renderInstance.m_WorldCenterPos = worldCenter;
+					renderInstance.m_WorldBounds = worldBounds;
+					renderInstance.m_HasWorldBounds = hasWorldBounds;
 					result.m_RenderScene.m_RenderInstances.push_back(renderInstance);
 				}
 			});

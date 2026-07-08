@@ -272,13 +272,19 @@ namespace gglab
 	Camera& LabRuntime::GetCamera() noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ActiveSession.get());
-		return m_ActiveSession->GetCamera();
+		return m_ActiveSession->GetCameraRig().GetActiveCamera();
 	}
 
 	CameraController& LabRuntime::GetCameraController() noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ActiveSession.get());
-		return m_ActiveSession->GetCameraController();
+		return m_ActiveSession->GetCameraRig().GetActiveCameraController();
+	}
+
+	CameraRig& LabRuntime::GetCameraRig() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ActiveSession.get());
+		return m_ActiveSession->GetCameraRig();
 	}
 
 	RenderPipelineBase& LabRuntime::GetRenderPipeline() noexcept

@@ -28,7 +28,8 @@ namespace gglab
 
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,
-			const RenderServices& services) noexcept;
+			const RenderServices& services,
+			RenderViewID viewId) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,

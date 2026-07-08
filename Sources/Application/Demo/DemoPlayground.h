@@ -1,6 +1,7 @@
 #pragma once
 #include "Application/Demo/DemoBase.h"
 #include "Core/World.h"
+#include "Graphics/CameraRig.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab
@@ -24,8 +25,12 @@ namespace gglab
 		void Update() noexcept override;
 
 		World& GetWorld() noexcept override { return m_World; }
-		Camera& GetCamera() noexcept override { return *m_Camera; }
-		CameraController& GetCameraController() noexcept override { return *m_CameraController; }
+		Camera& GetCamera() noexcept override { return m_CameraRig.GetActiveCamera(); }
+		CameraController& GetCameraController() noexcept override
+		{
+			return m_CameraRig.GetActiveCameraController();
+		}
+		CameraRig& GetCameraRig() noexcept override { return m_CameraRig; }
 		RenderPipelineBase& GetRenderPipeline() noexcept override { return *m_RenderPipeline; }
 
 	private:
@@ -36,6 +41,7 @@ namespace gglab
 		World m_World;
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;
+		CameraRig m_CameraRig;
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 	};
 }

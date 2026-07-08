@@ -3,7 +3,10 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
+#include "Graphics/CameraRig.h"
 #include "Core/Math/MathFunctions.h"
+
+#include <array>
 
 namespace gglab
 {
@@ -17,6 +20,8 @@ namespace gglab
 			bool m_SyncFromController = true;
 			bool m_ShowBasis = true;
 			bool m_ShowMatrices = false;
+			size_t m_SelectedCameraIndex = 0;
+			const Camera* m_LastCamera = nullptr;
 
 			// cached edit values
 			float m_Pos[3] = { 0.0f, 0.0f, 0.0f };
@@ -32,6 +37,14 @@ namespace gglab
 
 			// first time initialize
 			bool m_Initialized = false;
+		};
+
+		struct CameraBinding
+		{
+			Camera* m_Camera = nullptr;
+			CameraController* m_Controller = nullptr;
+			CameraRig::CameraSlot* m_Slot = nullptr;
+			size_t m_Index = 0;
 		};
 
 		static void PullFromCamera(CameraPanelState& state, const Camera& camera) noexcept
@@ -92,12 +105,190 @@ namespace gglab
 
 			ImGui::TreePop();
 		}
+
+		static const char* RenderViewIdLabel(RenderViewID viewId) noexcept
+		{
+			switch (viewId)
+			{
+			case RenderViewID::Main:
+				return "Main";
+			case RenderViewID::DebugCamera0:
+				return "DebugCamera0";
+			case RenderViewID::DebugCamera1:
+				return "DebugCamera1";
+			case RenderViewID::DebugCamera2:
+				return "DebugCamera2";
+			default:
+				return "None";
+			}
+		}
+
+		static const char* VisibilityModeLabel(RenderViewVisibilityMode mode) noexcept
+		{
+			switch (mode)
+			{
+			case RenderViewVisibilityMode::Self:
+				return "Self";
+			case RenderViewVisibilityMode::MainCamera:
+				return "Main Camera";
+			case RenderViewVisibilityMode::IntersectionWithMainCamera:
+				return "Intersection With Main";
+			case RenderViewVisibilityMode::None:
+				return "None";
+			default:
+				return "Unknown";
+			}
+		}
+
+		static CameraBinding ResolveCameraBinding(
+			CameraPanelState& state,
+			DevelopGuiContext& context) noexcept
+		{
+			if (auto* rig = context.m_CameraRig)
+			{
+				if (rig->GetCameraCount() == 0)
+				{
+					return {};
+				}
+				state.m_SelectedCameraIndex = std::min(
+					state.m_SelectedCameraIndex,
+					rig->GetCameraCount() - 1);
+				if (!state.m_Initialized)
+				{
+					state.m_SelectedCameraIndex = rig->GetActiveCameraIndex();
+				}
+				auto* slot = rig->GetCameraSlot(state.m_SelectedCameraIndex);
+				return {
+					.m_Camera = slot ? slot->m_Camera : nullptr,
+					.m_Controller = slot ? slot->m_Controller : nullptr,
+					.m_Slot = slot,
+					.m_Index = state.m_SelectedCameraIndex,
+				};
+			}
+
+			return {
+				.m_Camera = context.m_Camera,
+				.m_Controller = context.m_CameraController,
+				.m_Slot = nullptr,
+				.m_Index = 0,
+			};
+		}
+
+		static void DrawCameraRigControls(
+			CameraPanelState& state,
+			CameraRig& rig) noexcept
+		{
+			if (rig.GetCameraCount() == 0)
+			{
+				ImGui::TextUnformatted("No cameras registered.");
+				return;
+			}
+
+			const RenderViewID displayViewId = rig.GetDisplayViewId();
+			const CameraRig::CameraSlot* displaySlot = rig.FindRenderViewSlot(displayViewId);
+			const char* displayPreview = displayViewId == RenderViewID::Main ?
+				"Main Camera" :
+				(displaySlot ? displaySlot->m_Name.c_str() : RenderViewIdLabel(displayViewId));
+			if (ImGui::BeginCombo("Display View", displayPreview))
+			{
+				const bool mainSelected = displayViewId == RenderViewID::Main;
+				if (ImGui::Selectable("Main Camera", mainSelected))
+				{
+					GGLAB_UNUSED(rig.SetDisplayViewId(RenderViewID::Main));
+				}
+				if (mainSelected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+
+				for (size_t index = 0; index < rig.GetCameraCount(); ++index)
+				{
+					const auto* slot = rig.GetCameraSlot(index);
+					if (!slot || !slot->m_IsDebug || !slot->m_EnableRenderView ||
+						!IsDebugCameraRenderViewID(slot->m_RenderViewId))
+					{
+						continue;
+					}
+
+					const bool selected = displayViewId == slot->m_RenderViewId;
+					if (ImGui::Selectable(slot->m_Name.c_str(), selected))
+					{
+						GGLAB_UNUSED(rig.SetDisplayViewId(slot->m_RenderViewId));
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			state.m_SelectedCameraIndex = std::min(
+				state.m_SelectedCameraIndex,
+				rig.GetCameraCount() - 1);
+
+			const auto* selectedSlot = rig.GetCameraSlot(state.m_SelectedCameraIndex);
+			const char* preview = selectedSlot ? selectedSlot->m_Name.c_str() : "Camera";
+			if (ImGui::BeginCombo("Edit Camera", preview))
+			{
+				for (size_t index = 0; index < rig.GetCameraCount(); ++index)
+				{
+					const auto* slot = rig.GetCameraSlot(index);
+					if (!slot)
+					{
+						continue;
+					}
+					const bool selected = index == state.m_SelectedCameraIndex;
+					if (ImGui::Selectable(slot->m_Name.c_str(), selected))
+					{
+						state.m_SelectedCameraIndex = index;
+						rig.SetActiveCameraIndex(index);
+						state.m_Initialized = false;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			if (ImGui::Button("Add Debug Camera"))
+			{
+				state.m_SelectedCameraIndex = rig.AddDebugCameraFromActive();
+				state.m_Initialized = false;
+			}
+			ImGui::SameLine();
+			const bool canRemove = state.m_SelectedCameraIndex > 0;
+			if (!canRemove)
+			{
+				ImGui::BeginDisabled();
+			}
+			if (ImGui::Button("Remove Camera"))
+			{
+				GGLAB_UNUSED(rig.RemoveCamera(state.m_SelectedCameraIndex));
+				state.m_SelectedCameraIndex = rig.GetActiveCameraIndex();
+				state.m_Initialized = false;
+			}
+			if (!canRemove)
+			{
+				ImGui::EndDisabled();
+			}
+		}
 	}
 
 	void CameraInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		Camera* camera = context.m_Camera;
-		CameraController* cameraCtrl = context.m_CameraController;
+		auto& state = context.PanelState<CameraPanelState>();
+		if (context.m_CameraRig)
+		{
+			DrawCameraRigControls(state, *context.m_CameraRig);
+			ImGui::Spacing();
+		}
+
+		CameraBinding binding = ResolveCameraBinding(state, context);
+		Camera* camera = binding.m_Camera;
+		CameraController* cameraCtrl = binding.m_Controller;
 
 		if (!camera)
 		{
@@ -105,16 +296,15 @@ namespace gglab
 			return;
 		}
 
-		auto& state = context.PanelState<CameraPanelState>();
-
 		// Get camera params when first time
-		if (!state.m_Initialized)
+		if (!state.m_Initialized || state.m_LastCamera != camera)
 		{
 			PullFromCamera(state, *camera);
 			if (cameraCtrl)
 			{
 				PullFromController(state, *cameraCtrl);
 			}
+			state.m_LastCamera = camera;
 			state.m_Initialized = true;
 		}
 
@@ -130,7 +320,7 @@ namespace gglab
 			PullFromController(state, *cameraCtrl);
 		}
 
-		ImGui::TextUnformatted("Camera");
+		ImGui::TextUnformatted(binding.m_Slot ? binding.m_Slot->m_Name.c_str() : "Camera");
 		ImGui::Separator();
 
 		ImGui::Checkbox("Auto Apply", &state.m_AutoApply);
@@ -142,6 +332,59 @@ namespace gglab
 		ImGui::Checkbox("Show Basis", &state.m_ShowBasis);
 		ImGui::SameLine();
 		ImGui::Checkbox("Show Matrices", &state.m_ShowMatrices);
+
+		if (binding.m_Slot)
+		{
+			ImGui::SameLine();
+			ImGui::Checkbox("Draw Frustum", &binding.m_Slot->m_ShowFrustum);
+			if (binding.m_Slot->m_ShowFrustum)
+			{
+				ImGui::ColorEdit4("Frustum Color", &binding.m_Slot->m_FrustumColor.m_R);
+			}
+			if (binding.m_Slot->m_IsDebug && context.m_CameraRig)
+			{
+				bool enableRenderView = binding.m_Slot->m_EnableRenderView;
+				if (ImGui::Checkbox("Build RenderView", &enableRenderView))
+				{
+					GGLAB_UNUSED(context.m_CameraRig->SetDebugRenderViewEnabled(
+						binding.m_Index,
+						enableRenderView));
+				}
+				if (binding.m_Slot->m_EnableRenderView &&
+					IsDebugCameraRenderViewID(binding.m_Slot->m_RenderViewId))
+				{
+					ImGui::Text("RenderView: %s", RenderViewIdLabel(binding.m_Slot->m_RenderViewId));
+					RenderViewVisibilityMode visibilityMode = binding.m_Slot->m_VisibilityMode;
+					if (ImGui::BeginCombo("Visibility Mode", VisibilityModeLabel(visibilityMode)))
+					{
+						constexpr std::array modes = {
+							RenderViewVisibilityMode::Self,
+							RenderViewVisibilityMode::MainCamera,
+							RenderViewVisibilityMode::IntersectionWithMainCamera,
+							RenderViewVisibilityMode::None,
+						};
+						for (const RenderViewVisibilityMode mode : modes)
+						{
+							const bool selected = visibilityMode == mode;
+							if (ImGui::Selectable(VisibilityModeLabel(mode), selected))
+							{
+								binding.m_Slot->m_VisibilityMode = mode;
+								visibilityMode = mode;
+							}
+							if (selected)
+							{
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+				}
+				else
+				{
+					ImGui::TextDisabled("RenderView: None");
+				}
+			}
+		}
 
 		ImGui::Spacing();
 

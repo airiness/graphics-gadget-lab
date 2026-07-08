@@ -36,11 +36,19 @@ namespace gglab
 
 		RenderViewID m_ViewId = RenderViewID::Unknown;
 		StringID m_Name{};
+		bool m_IsValid = false;
 	};
 
 	class RenderViewBuilder
 	{
 	public:
+		RenderView BuildDebugCameraView(
+			RenderViewID viewId,
+			const Camera& camera,
+			uint32_t width,
+			uint32_t height,
+			StringID name) const noexcept;
+
 		template<RenderViewID ViewId>
 		RenderView Build(const RenderViewBuildInfo<ViewId>& info) const noexcept
 		{

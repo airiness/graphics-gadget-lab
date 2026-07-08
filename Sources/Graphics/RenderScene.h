@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
@@ -25,6 +26,8 @@ namespace gglab
 		uint32_t m_ObjectOffset = 0;
 
 		Vector3 m_WorldCenterPos = Vector3::Zero;
+		math::Sphere m_WorldBounds{};
+		bool m_HasWorldBounds = false;
 	};
 
 	struct RenderScene

@@ -8,7 +8,7 @@
 namespace gglab
 {
 	class AssetManager;
-	class Camera;
+	class CameraRig;
 	class Renderer;
 	class World;
 
@@ -18,7 +18,7 @@ namespace gglab
 		struct BuildInfo
 		{
 			World& m_World;
-			Camera& m_Camera;
+			CameraRig& m_CameraRig;
 			Renderer& m_Renderer;
 			AssetManager& m_AssetManager;
 			ShadowVisualizationSettings& m_ShadowVisualizationSettings;
@@ -35,8 +35,10 @@ namespace gglab
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
 			DebugDrawFrameView m_DebugDrawFrame{};
+			DebugDrawCullContext m_DebugDrawCullContext{};
 			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
+			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint32_t m_BackBufferIndex = 0;
 			ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 

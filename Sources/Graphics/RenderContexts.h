@@ -21,6 +21,7 @@ namespace gglab
 	struct RenderFrameContext
 	{
 		std::span<RenderView> m_RenderViews;
+		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
 		DebugDrawFrameView m_DebugDrawFrame{};
@@ -44,6 +45,18 @@ namespace gglab
 			const auto index = utils::ToIndex(viewId);
 			GGLAB_ASSERT(index < m_RenderQueues.size());
 			return m_RenderQueues[index];
+		}
+
+		RenderViewID GetDisplayViewId() const noexcept
+		{
+			return m_DisplayViewId;
+		}
+
+		const RenderView& GetDisplayRenderView() const noexcept
+		{
+			const auto index = utils::ToIndex(m_DisplayViewId);
+			GGLAB_ASSERT(index < m_RenderViews.size());
+			return m_RenderViews[index];
 		}
 
 		const DirectionalShadowSettings& GetDirectionalShadowSettings() const noexcept

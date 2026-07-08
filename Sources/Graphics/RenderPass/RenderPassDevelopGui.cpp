@@ -26,22 +26,22 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		GGLAB_UNUSED(context);
 		auto* developGuiSystem = services.m_DevelopGuiSystem;
 		if (!developGuiSystem || !developGuiSystem->IsFrameOpen())
 		{
 			return;
 		}
+		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[](RenderGraph::RGBuilder& builder, PassData& data)
+			[displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
 
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& viewTargets = targetsTable.GetViewTargets(RenderViewID::Main);
+				auto& viewTargets = targetsTable.GetViewTargets(displayViewId);
 				builder.WriteInPlace(viewTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = viewTargets.m_BackBuffer;
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);

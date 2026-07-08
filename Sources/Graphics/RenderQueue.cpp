@@ -14,6 +14,23 @@ namespace gglab
 
 		for (const auto& instance : instances)
 		{
+			if (instance.m_HasWorldBounds)
+			{
+				bool visible = true;
+				for (const math::Frustum& frustum : info.m_CullingFrustums)
+				{
+					if (!math::Intersects(frustum, instance.m_WorldBounds))
+					{
+						visible = false;
+						break;
+					}
+				}
+				if (!visible)
+				{
+					continue;
+				}
+			}
+
 			const auto* mesh = info.m_AssetManager.GetMesh(instance.m_MeshId);
 			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
 			{

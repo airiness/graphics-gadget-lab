@@ -77,12 +77,13 @@ namespace gglab
 
 		EnsureInitialized(services);
 		const auto* contextPtr = &context;
+		const RenderViewID displayViewId = context.GetDisplayViewId();
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[frame, scene](RenderGraph::RGBuilder& builder, PassData& data)
+			[frame, scene, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& targets = builder.GetBlackboard()
 					.Get<RGViewTargetsTable>(ViewTargetsTableName)
-					.GetViewTargets(RenderViewID::Main);
+					.GetViewTargets(displayViewId);
 				if (scene)
 				{
 					builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
@@ -113,7 +114,7 @@ namespace gglab
 				data.m_Width = targets.m_Width;
 				data.m_Height = targets.m_Height;
 			},
-			[this, contextPtr, &services, scene](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, &services, scene, displayViewId](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				auto* renderer = services.m_Renderer;
@@ -144,7 +145,7 @@ namespace gglab
 				};
 				commandContext->SetVertexBuffers(0, std::span<const RHIVertexBufferBinding>(&binding, 1));
 
-				auto draw = [this, commandContext, renderer](
+				auto draw = [this, commandContext, renderer, displayViewId](
 					const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
 					{
 						if (range.IsEmpty())
@@ -155,7 +156,7 @@ namespace gglab
 						commandContext->SetPrimitiveTopology(triangles ?
 							RHIPrimitiveTopology::TriangleList : RHIPrimitiveTopology::LineList);
 						const DebugDrawPassParameters parameters{
-							.ViewIndex = static_cast<uint32_t>(utils::ToIndex(RenderViewID::Main)),
+							.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
 							.Flags = flags,
 						};
 						commandContext->SetPushConstants(

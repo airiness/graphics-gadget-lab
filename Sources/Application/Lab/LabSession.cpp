@@ -35,6 +35,7 @@ namespace gglab
 		controllerCreateInfo.m_Params.m_AccelerateMultiplier = 3.0f;
 		controllerCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
+		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
 	}
 
 	LabSessionBase::~LabSessionBase() = default;
@@ -82,7 +83,7 @@ namespace gglab
 	{
 		if (width > 0 && height > 0)
 		{
-			m_Camera->OnResize(width, height);
+			m_CameraRig.OnResize(width, height);
 		}
 	}
 
@@ -106,8 +107,10 @@ namespace gglab
 		input.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
 		input.m_MouseDelta = mouseCoord;
 
-		m_CameraController->Update(*m_Camera, input, deltaTime);
-		m_Camera->Update();
+		Camera& camera = m_CameraRig.GetActiveCamera();
+		CameraController& controller = m_CameraRig.GetActiveCameraController();
+		controller.Update(camera, input, deltaTime);
+		camera.Update();
 	}
 
 	void LabSessionBase::SetRenderPipeline(

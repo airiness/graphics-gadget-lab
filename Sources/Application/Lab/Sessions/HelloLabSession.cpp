@@ -40,6 +40,12 @@ namespace gglab
 		DebugDrawStyle solidStyle = wireStyle;
 		solidStyle.m_Color = Color(1.0f, 0.35f, 0.05f, 0.35f);
 		solidStyle.m_FillMode = DebugDrawFillMode::Solid;
+		DebugDrawStyle cullingWireStyle = wireStyle;
+		cullingWireStyle.m_Color = Color::LightGray;
+		cullingWireStyle.m_CullingMode = DebugDrawCullingMode::MainViewFrustum;
+		DebugDrawStyle cullingSolidStyle = solidStyle;
+		cullingSolidStyle.m_Color = Color(0.15f, 0.85f, 0.55f, 0.45f);
+		cullingSolidStyle.m_CullingMode = DebugDrawCullingMode::MainViewFrustum;
 
 		debugDraw->Circle(Vector3(0.0f, -1.25f, 8.0f), Vector3::UnitY, 4.0f,
 			{ .m_Color = Color::DarkGray, .m_Channel = DebugDrawShapeChannel,
@@ -57,6 +63,28 @@ namespace gglab
 				Vector3(2.0f, 0.0f, 11.0f)),
 			Vector3(0.9f, 0.6f, 0.75f),
 			wireStyle);
+
+		constexpr std::array<Vector3, 7> cullingProbePositions = {
+			Vector3(-14.0f, 0.0f, 18.0f),
+			Vector3(-7.0f, 0.0f, 18.0f),
+			Vector3(0.0f, 0.0f, 18.0f),
+			Vector3(7.0f, 0.0f, 18.0f),
+			Vector3(14.0f, 0.0f, 18.0f),
+			Vector3(0.0f, 8.0f, 20.0f),
+			Vector3(0.0f, 0.0f, -8.0f),
+		};
+		for (size_t index = 0; index < cullingProbePositions.size(); ++index)
+		{
+			const Vector3& position = cullingProbePositions[index];
+			if ((index % 2) == 0)
+			{
+				debugDraw->Sphere(position, 0.85f, cullingWireStyle);
+			}
+			else
+			{
+				debugDraw->Box(position, Vector3(0.85f), cullingSolidStyle);
+			}
+		}
 
 		const std::array<Vector3, 8> frustumCorners = {
 			Vector3(-0.4f, 0.4f, 12.5f), Vector3(0.4f, 0.4f, 12.5f),
@@ -288,6 +316,44 @@ namespace gglab
 			.m_Transform = modelTransform,
 			.m_MaterialInstance = materialInstance,
 		}));
+
+		constexpr std::array<Vector3, 9> cullingCandidatePositions = {
+			Vector3(-18.0f, 0.0f, 22.0f),
+			Vector3(-9.0f, 0.0f, 22.0f),
+			Vector3(0.0f, 0.0f, 22.0f),
+			Vector3(9.0f, 0.0f, 22.0f),
+			Vector3(18.0f, 0.0f, 22.0f),
+			Vector3(0.0f, 9.0f, 24.0f),
+			Vector3(0.0f, -5.0f, 24.0f),
+			Vector3(0.0f, 0.0f, -12.0f),
+			Vector3(0.0f, 0.0f, 80.0f),
+		};
+		for (size_t index = 0; index < cullingCandidatePositions.size(); ++index)
+		{
+			components::TransformComponent candidateTransform{};
+			candidateTransform.m_Position = cullingCandidatePositions[index];
+			candidateTransform.m_Scale = Vector3::One * 0.8f;
+			if ((index % 2) == 0)
+			{
+				GGLAB_UNUSED(primitive::Cube::Create({
+					.m_AssetManager = m_Services.m_AssetManager,
+					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_World = &m_World,
+					.m_Transform = candidateTransform,
+					.m_MaterialInstance = materialInstance,
+				}));
+			}
+			else
+			{
+				GGLAB_UNUSED(primitive::Sphere::Create({
+					.m_AssetManager = m_Services.m_AssetManager,
+					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_World = &m_World,
+					.m_Transform = candidateTransform,
+					.m_MaterialInstance = materialInstance,
+				}));
+			}
+		}
 
 		const entt::entity lightEntity = registry.create();
 		components::TransformComponent lightTransform{};

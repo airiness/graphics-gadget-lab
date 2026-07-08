@@ -24,6 +24,7 @@ namespace gglab
 		{
 			return m_Runtime.GetCameraController();
 		}
+		CameraRig& GetCameraRig() noexcept override { return m_Runtime.GetCameraRig(); }
 		RenderPipelineBase& GetRenderPipeline() noexcept override
 		{
 			return m_Runtime.GetRenderPipeline();

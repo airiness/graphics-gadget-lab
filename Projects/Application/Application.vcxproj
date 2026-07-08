@@ -161,6 +161,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\CameraRig.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
@@ -352,6 +353,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
     <ClInclude Include="..\..\Sources\Graphics\CameraController.h" />
+    <ClInclude Include="..\..\Sources\Graphics\CameraRig.h" />
     <ClInclude Include="..\..\Sources\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.h" />

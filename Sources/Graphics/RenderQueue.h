@@ -1,7 +1,10 @@
 #pragma once
+#include "Core/Math/Culling.h"
 #include "Core/Math/Vector.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RenderScene.h"
+
+#include <span>
 
 namespace gglab
 {
@@ -40,6 +43,7 @@ namespace gglab
 			AssetManager& m_AssetManager;
 			const RenderScene& m_RenderScene;
 			const RenderView& m_RenderView;
+			std::span<const math::Frustum> m_CullingFrustums;
 		};
 
 		enum VariantBit : uint64_t
