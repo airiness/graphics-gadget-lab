@@ -19,6 +19,13 @@ struct ForwardPBRPassParameters
 
 ConstantBuffer<ForwardPBRPassParameters> g_Pass : register(b2);
 
+// Keep these values synchronized with MaterialDebugView in GraphicsTypes.h.
+static const uint MaterialDebugViewLit = 0u;
+static const uint MaterialDebugViewBaseColor = 1u;
+static const uint MaterialDebugViewMetallic = 2u;
+static const uint MaterialDebugViewRoughness = 3u;
+static const uint MaterialDebugViewNormal = 4u;
+
 bool IsShadowEnabled()
 {
 	return (g_Pass.ShadowFlags & 1u) != 0u;
@@ -231,19 +238,19 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
 	float3 N = SampleNormalWS(matData, normalWS, tangentWS, IN.PositionWS, normalUV);
 
-	if (matData.DebugView == 1u)
+	if (matData.DebugView == MaterialDebugViewBaseColor)
 	{
 		return float4(baseColor, alpha);
 	}
-	if (matData.DebugView == 2u)
+	if (matData.DebugView == MaterialDebugViewMetallic)
 	{
 		return float4(metallic.xxx, alpha);
 	}
-	if (matData.DebugView == 3u)
+	if (matData.DebugView == MaterialDebugViewRoughness)
 	{
 		return float4(perceptualRoughness.xxx, alpha);
 	}
-	if (matData.DebugView == 4u)
+	if (matData.DebugView == MaterialDebugViewNormal)
 	{
 		return float4(N * 0.5 + 0.5, alpha);
 	}
