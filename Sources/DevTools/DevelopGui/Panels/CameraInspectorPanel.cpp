@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
+#include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
@@ -106,40 +107,6 @@ namespace gglab
 			ImGui::TreePop();
 		}
 
-		static const char* RenderViewIdLabel(RenderViewID viewId) noexcept
-		{
-			switch (viewId)
-			{
-			case RenderViewID::Main:
-				return "Main";
-			case RenderViewID::DebugCamera0:
-				return "DebugCamera0";
-			case RenderViewID::DebugCamera1:
-				return "DebugCamera1";
-			case RenderViewID::DebugCamera2:
-				return "DebugCamera2";
-			default:
-				return "None";
-			}
-		}
-
-		static const char* VisibilityModeLabel(RenderViewVisibilityMode mode) noexcept
-		{
-			switch (mode)
-			{
-			case RenderViewVisibilityMode::Self:
-				return "Self";
-			case RenderViewVisibilityMode::MainCamera:
-				return "Main Camera";
-			case RenderViewVisibilityMode::IntersectionWithMainCamera:
-				return "Intersection With Main";
-			case RenderViewVisibilityMode::None:
-				return "None";
-			default:
-				return "Unknown";
-			}
-		}
-
 		static CameraBinding ResolveCameraBinding(
 			CameraPanelState& state,
 			DevelopGuiContext& context) noexcept
@@ -186,9 +153,10 @@ namespace gglab
 
 			const RenderViewID displayViewId = rig.GetDisplayViewId();
 			const CameraRig::CameraSlot* displaySlot = rig.FindRenderViewSlot(displayViewId);
+			const std::string displayViewIdText = devtools::EnumText(displayViewId);
 			const char* displayPreview = displayViewId == RenderViewID::Main ?
 				"Main Camera" :
-				(displaySlot ? displaySlot->m_Name.c_str() : RenderViewIdLabel(displayViewId));
+				(displaySlot ? displaySlot->m_Name.c_str() : displayViewIdText.c_str());
 			if (ImGui::BeginCombo("Display View", displayPreview))
 			{
 				const bool mainSelected = displayViewId == RenderViewID::Main;
@@ -353,9 +321,10 @@ namespace gglab
 				if (binding.m_Slot->m_EnableRenderView &&
 					IsDebugCameraRenderViewID(binding.m_Slot->m_RenderViewId))
 				{
-					ImGui::Text("RenderView: %s", RenderViewIdLabel(binding.m_Slot->m_RenderViewId));
+					ImGui::Text("RenderView: %s", devtools::EnumText(binding.m_Slot->m_RenderViewId).c_str());
 					RenderViewVisibilityMode visibilityMode = binding.m_Slot->m_VisibilityMode;
-					if (ImGui::BeginCombo("Visibility Mode", VisibilityModeLabel(visibilityMode)))
+					const std::string visibilityModeText = devtools::EnumText(visibilityMode);
+					if (ImGui::BeginCombo("Visibility Mode", visibilityModeText.c_str()))
 					{
 						constexpr std::array modes = {
 							RenderViewVisibilityMode::Self,
@@ -366,7 +335,7 @@ namespace gglab
 						for (const RenderViewVisibilityMode mode : modes)
 						{
 							const bool selected = visibilityMode == mode;
-							if (ImGui::Selectable(VisibilityModeLabel(mode), selected))
+							if (ImGui::Selectable(devtools::EnumText(mode).c_str(), selected))
 							{
 								binding.m_Slot->m_VisibilityMode = mode;
 								visibilityMode = mode;

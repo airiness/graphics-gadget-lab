@@ -32,6 +32,10 @@ namespace gglab
 					continue;
 				}
 			}
+			else
+			{
+				++renderQueue.m_Statistics.m_UnboundedInstanceCount;
+			}
 
 			const auto* mesh = info.m_AssetManager.GetMesh(instance.m_MeshId);
 			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
