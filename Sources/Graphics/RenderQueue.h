@@ -32,6 +32,7 @@ namespace gglab
 		uint32_t m_VisibleInstanceCount = 0;
 		uint32_t m_CulledInstanceCount = 0;
 		uint32_t m_InvalidInstanceCount = 0;
+		uint32_t m_UnboundedInstanceCount = 0;
 		uint32_t m_DrawItemCount = 0;
 	};
 

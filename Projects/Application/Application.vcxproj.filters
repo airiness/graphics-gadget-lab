@@ -468,6 +468,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DemoPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderViewPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
@@ -1278,6 +1281,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\EntityPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderViewPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiStateStore.h">

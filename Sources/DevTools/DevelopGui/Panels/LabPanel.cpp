@@ -3,6 +3,7 @@
 #include "Application/Lab/LabInterfaces.h"
 #include "Application/Lab/LabRuntime.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
+#include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 
 namespace gglab
@@ -37,25 +38,6 @@ namespace gglab
 		const T* GetOptionalValue(const std::optional<LabValue>& value) noexcept
 		{
 			return value ? std::get_if<T>(&*value) : nullptr;
-		}
-
-		const char* RenderViewLabel(RenderViewID viewId) noexcept
-		{
-			switch (viewId)
-			{
-			case RenderViewID::Main:
-				return "MainView";
-			case RenderViewID::DirectionalShadow:
-				return "DirectionalShadowView";
-			case RenderViewID::DebugCamera0:
-				return "DebugCamera0";
-			case RenderViewID::DebugCamera1:
-				return "DebugCamera1";
-			case RenderViewID::DebugCamera2:
-				return "DebugCamera2";
-			default:
-				return "Unknown";
-			}
 		}
 
 		void DrawCullingLabStatistics(const DevelopGuiContext& context) noexcept
@@ -100,7 +82,7 @@ namespace gglab
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(RenderViewLabel(queue.m_ViewId));
+				ImGui::TextUnformatted(devtools::EnumText(queue.m_ViewId).c_str());
 				ImGui::TableSetColumnIndex(1);
 				ImGui::Text("%u", stats.m_TotalInstanceCount);
 				ImGui::TableSetColumnIndex(2);
