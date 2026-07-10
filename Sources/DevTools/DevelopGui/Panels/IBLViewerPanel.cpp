@@ -61,6 +61,48 @@ namespace gglab
 
 			return changed;
 		}
+
+		static bool DrawPrefilterSampleCountCombo(uint32_t& sampleCount) noexcept
+		{
+			struct SampleCountOption
+			{
+				uint32_t m_Value;
+				const char* m_Label;
+			};
+
+			constexpr SampleCountOption Options[] = {
+				{ 64, "64" },
+				{ 128, "128" },
+				{ 256, "256" },
+				{ 512, "512" },
+				{ 1024, "1024" },
+				{ 2048, "2048" },
+				{ 4096, "4096" },
+			};
+
+			const auto selected = std::ranges::find(Options, sampleCount, &SampleCountOption::m_Value);
+			const char* previewLabel = selected != std::ranges::end(Options) ? selected->m_Label : "Custom";
+			bool changed = false;
+			if (ImGui::BeginCombo("Prefilter Sample Count", previewLabel))
+			{
+				for (const auto& option : Options)
+				{
+					const bool isSelected = sampleCount == option.m_Value;
+					if (ImGui::Selectable(option.m_Label, isSelected))
+					{
+						sampleCount = option.m_Value;
+						changed = true;
+					}
+					if (isSelected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			return changed;
+		}
 	}
 
 	void IBLViewerPanel::Draw(DevelopGuiContext& context) noexcept
@@ -107,7 +149,14 @@ namespace gglab
 				environmentSystem->SetRotationRadians(math::ToRadians(rotationDegrees));
 			}
 
+			uint32_t sampleCount = settings.m_PrefilteredSpecularSampleCount;
+			if (DrawPrefilterSampleCountCombo(sampleCount))
+			{
+				environmentSystem->SetPrefilteredSpecularSampleCount(sampleCount);
+			}
+
 			ImGui::TextDisabled("Skybox, diffuse IBL, specular IBL, and previews share these settings.");
+			ImGui::TextDisabled("Changing the prefilter sample count schedules a specular rebuild.");
 		}
 
 		ImGui::Spacing();
@@ -263,6 +312,36 @@ namespace gglab
 				renderResRegistry->SetIBLEnvironmentPreviewLayout(previewLayout);
 			}
 
+			const uint32_t environmentMipLevels = environmentDesc->m_MipLevels;
+			const uint32_t maxEnvironmentMip = environmentMipLevels > 0 ? environmentMipLevels - 1u : 0u;
+			uint32_t selectedEnvironmentMip = std::min(
+				renderResRegistry->GetIBLEnvironmentPreviewMip(),
+				maxEnvironmentMip);
+			if (selectedEnvironmentMip != renderResRegistry->GetIBLEnvironmentPreviewMip())
+			{
+				renderResRegistry->SetIBLEnvironmentPreviewMip(selectedEnvironmentMip);
+			}
+
+			int selectedEnvironmentMipInt = static_cast<int>(selectedEnvironmentMip);
+			if (ImGui::SliderInt("Source Mip", &selectedEnvironmentMipInt, 0, static_cast<int>(maxEnvironmentMip)))
+			{
+				selectedEnvironmentMip = static_cast<uint32_t>(
+					std::clamp(selectedEnvironmentMipInt, 0, static_cast<int>(maxEnvironmentMip)));
+				renderResRegistry->SetIBLEnvironmentPreviewMip(selectedEnvironmentMip);
+			}
+
+			const uint64_t selectedEnvironmentWidth = std::max<uint64_t>(
+				1u,
+				environmentDesc->m_Extent.m_Width >> selectedEnvironmentMip);
+			const uint32_t selectedEnvironmentHeight = std::max(
+				1u,
+				environmentDesc->m_Extent.m_Height >> selectedEnvironmentMip);
+			ImGui::Text("Selected Source Mip: %u / %u (%llu x %u)",
+				selectedEnvironmentMip,
+				maxEnvironmentMip,
+				static_cast<unsigned long long>(selectedEnvironmentWidth),
+				selectedEnvironmentHeight);
+
 			if (state.m_ShowMetadata)
 			{
 				const uint32_t environmentSrvIndex = renderResRegistry->GetShaderVisibleSrvIndex(EnvironmentIndex);
@@ -273,6 +352,7 @@ namespace gglab
 					environmentDesc->m_Extent.m_Height,
 					environmentDesc->m_ArraySize);
 				ImGui::Text("Environment Format: %s", devtools::EnumText(ToDXGIFormat(environmentDesc->m_Format)).data());
+				ImGui::Text("Environment MipLevels: %u", environmentMipLevels);
 				ImGui::Text("Environment Shader Visible SRV Index: %u", environmentSrvIndex);
 
 				ImGui::Text("Preview Canvas Size: %llu x %u",
@@ -359,14 +439,17 @@ namespace gglab
 			}
 
 			int selectedMipInt = static_cast<int>(selectedMip);
-			if (ImGui::SliderInt("Preview Mip", &selectedMipInt, 0, static_cast<int>(maxMip)))
+			if (ImGui::SliderInt("Output Mip", &selectedMipInt, 0, static_cast<int>(maxMip)))
 			{
 				selectedMip = static_cast<uint32_t>(std::clamp(selectedMipInt, 0, static_cast<int>(maxMip)));
 				renderResRegistry->SetIBLPrefilteredSpecularPreviewMip(selectedMip);
 			}
 
 			const float roughness = maxMip > 0 ? static_cast<float>(selectedMip) / static_cast<float>(maxMip) : 0.0f;
-			ImGui::Text("Approx Roughness: %.3f", roughness);
+			const float alpha = roughness * roughness;
+			ImGui::Text("Selected Output Mip: %u / %u", selectedMip, maxMip);
+			ImGui::Text("Perceptual Roughness: %.3f", roughness);
+			ImGui::Text("GGX Alpha: %.3f", alpha);
 
 			using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
 			PreviewLayout previewLayout = renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout();

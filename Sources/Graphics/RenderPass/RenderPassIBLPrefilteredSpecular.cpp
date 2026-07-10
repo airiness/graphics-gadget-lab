@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -18,7 +19,9 @@ namespace gglab
 			uint32_t MipLevels = 0;
 			uint32_t EnvironmentTextureIndex = 0;
 			uint32_t EnvironmentSamplerIndex = 0;
-			uint32_t Padding[3]{};
+			uint32_t EnvironmentResolution = 0;
+			uint32_t EnvironmentMipLevels = 0;
+			uint32_t SampleCount = 0;
 		};
 		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
 		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 32);
@@ -34,6 +37,9 @@ namespace gglab
 			uint32_t m_MipLevels = 0;
 			uint32_t m_EnvironmentTextureIndex = 0;
 			uint32_t m_EnvironmentSamplerIndex = 0;
+			uint32_t m_EnvironmentResolution = 0;
+			uint32_t m_EnvironmentMipLevels = 0;
+			uint32_t m_SampleCount = 0;
 		};
 	}
 
@@ -48,6 +54,8 @@ namespace gglab
 
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
+		auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
+		GGLAB_ASSERT_NOT_NULL(environmentSystem);
 
 		const auto shouldBuild = renderResRegistry->IsDirty(
 			RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
@@ -59,8 +67,9 @@ namespace gglab
 
 		EnsureInitialized(services);
 
+		const uint32_t sampleCount = environmentSystem->GetSettings().m_PrefilteredSpecularSampleCount;
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
+			[renderer, renderResRegistry, sampleCount](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -99,6 +108,13 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
+
+				const auto* environmentDesc = renderResRegistry->GetTextureDesc(
+					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				GGLAB_ASSERT_NOT_NULL(environmentDesc);
+				data.m_EnvironmentResolution = static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
+				data.m_EnvironmentMipLevels = environmentDesc->m_MipLevels;
+				data.m_SampleCount = sampleCount;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -127,6 +143,9 @@ namespace gglab
 							.MipLevels = data.m_MipLevels,
 							.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
 							.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
+							.EnvironmentResolution = data.m_EnvironmentResolution,
+							.EnvironmentMipLevels = data.m_EnvironmentMipLevels,
+							.SampleCount = data.m_SampleCount,
 						};
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

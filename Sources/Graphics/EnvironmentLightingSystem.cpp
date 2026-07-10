@@ -168,4 +168,19 @@ namespace gglab
 			m_Settings.m_RotationRadians = std::remainder(rotationRadians, FullRotation);
 		}
 	}
+
+	void EnvironmentLightingSystem::SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept
+	{
+		constexpr uint32_t MinSampleCount = 1;
+		constexpr uint32_t MaxSampleCount = 4096;
+		const uint32_t clampedSampleCount = std::clamp(sampleCount, MinSampleCount, MaxSampleCount);
+		if (m_Settings.m_PrefilteredSpecularSampleCount == clampedSampleCount)
+		{
+			return;
+		}
+
+		m_Settings.m_PrefilteredSpecularSampleCount = clampedSampleCount;
+		m_RenderResourceRegistry->MarkDirty(
+			RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
+	}
 }

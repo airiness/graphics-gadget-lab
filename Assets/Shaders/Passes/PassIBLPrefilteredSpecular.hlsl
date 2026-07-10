@@ -13,7 +13,9 @@ struct IBLPrefilteredSpecularPassParameters
 	uint MipLevels;
 	uint EnvironmentTextureIndex;
 	uint EnvironmentSamplerIndex;
-	uint3 Padding;
+	uint EnvironmentResolution;
+	uint EnvironmentMipLevels;
+	uint SampleCount;
 };
 
 ConstantBuffer<IBLPrefilteredSpecularPassParameters> g_Pass : register(b2);
@@ -36,16 +38,26 @@ float3 IntegratePrefilteredSpecular(
 	float3 normalWS,
 	float perceptualRoughness)
 {
-	const uint SAMPLE_COUNT = 1024;
+	// GGX degenerates to a delta distribution at zero roughness. Preserve the
+	// original environment texel instead of integrating an ill-conditioned PDF.
+	if (g_Pass.MipLevel == 0u || perceptualRoughness <= 0.0)
+	{
+		return SampleTextureCubeLevel(environmentBinding, normalWS, 0.0).rgb;
+	}
 
+	const uint sampleCount = max(g_Pass.SampleCount, 1u);
+	const float environmentResolution = max((float) g_Pass.EnvironmentResolution, 1.0);
+	const float environmentTexelSolidAngle =
+		4.0 * PI / (6.0 * environmentResolution * environmentResolution);
+	const float maxEnvironmentMip = (float) (max(g_Pass.EnvironmentMipLevels, 1u) - 1u);
 	float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
 	float3 viewWS = normalWS;
 	float3 prefilteredColor = 0.0.xxx;
 	float totalWeight = 0.0;
 
-	for (uint i = 0; i < SAMPLE_COUNT; ++i)
+	for (uint i = 0; i < sampleCount; ++i)
 	{
-		float2 Xi = Hammersley(i, SAMPLE_COUNT);
+		float2 Xi = Hammersley(i, sampleCount);
 		float3 halfTS = ImportanceSampleGGX(Xi, alpha);
 		float3 halfWS = TangentToWorld(halfTS, normalWS);
 		float3 lightWS = normalize(2.0 * dot(viewWS, halfWS) * halfWS - viewWS);
@@ -53,9 +65,18 @@ float3 IntegratePrefilteredSpecular(
 		float NoL = saturate(dot(normalWS, lightWS));
 		if (NoL > 0.0)
 		{
-			// Environment source mips are not generated yet. Sample mip 0 until
-			// PDF-based source LOD selection is added with an environment mip chain.
-			prefilteredColor += SampleTextureCubeLevel(environmentBinding, lightWS, 0.0).rgb * NoL;
+			float NoH = saturate(dot(normalWS, halfWS));
+			float HoV = saturate(dot(halfWS, viewWS));
+			float pdf = D_GGX(NoH, alpha) * NoH / max(4.0 * HoV, 1.0e-6);
+
+			// Match the solid angle represented by one importance sample to the
+			// cubemap texel footprint, reducing high-frequency noise without biasing
+			// every roughness level toward environment mip 0.
+			float sampleSolidAngle = 1.0 / max((float) sampleCount * pdf, 1.0e-6);
+			float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
+			sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
+
+			prefilteredColor += SampleTextureCubeLevel(environmentBinding, lightWS, sourceMip).rgb * NoL;
 			totalWeight += NoL;
 		}
 	}

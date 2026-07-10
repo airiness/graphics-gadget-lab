@@ -258,6 +258,11 @@ namespace gglab
 		m_IBLEnvironmentPreviewLayout = layout;
 	}
 
+	void RenderResourceRegistry::SetIBLEnvironmentPreviewMip(uint32_t mip) noexcept
+	{
+		m_IBLEnvironmentPreviewMip = mip;
+	}
+
 	void RenderResourceRegistry::SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept
 	{
 		if (layout >= IBLPreviewLayout::Count)

@@ -104,7 +104,14 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
-				data.m_SampleMip = 0;
+
+				const auto* environmentDesc = renderResRegistry->GetTextureDesc(
+					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				GGLAB_ASSERT_NOT_NULL(environmentDesc);
+				const uint32_t mipLevels = environmentDesc->m_MipLevels;
+				data.m_SampleMip = mipLevels > 0 ?
+					std::min(renderResRegistry->GetIBLEnvironmentPreviewMip(), mipLevels - 1u) :
+					0u;
 			},
 			[this, renderer, contextPtr](RGExecuteContext& executeContext, EnvironmentPreviewPassData& data)
 			{
