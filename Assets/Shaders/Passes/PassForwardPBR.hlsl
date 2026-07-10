@@ -1,6 +1,7 @@
 #include <Common/Common.hlsli>
 #include <Common/MaterialSampling.hlsli>
 #include <Common/MaterialUtils.hlsli>
+#include <Common/EnvironmentSampling.hlsli>
 #include <Common/VertexTransform.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
 #include <PBR/BRDF.hlsli>
@@ -87,7 +88,10 @@ float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
 float3 SampleIBLIrradiance(float3 normalWS)
 {
 	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.IrradianceBinding);
-	return SampleTextureCube(binding, normalize(normalWS)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+	float3 direction = WorldToEnvironmentDirection(
+		normalize(normalWS),
+		g_Scene.IBLResource.EnvironmentRotationRadians);
+	return SampleTextureCube(binding, direction).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
@@ -96,7 +100,10 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 	const uint mipLevels = max(g_Scene.IBLResource.PrefilteredSpecularMipLevels, 1u);
 	const float maxMipLevel = (float) (mipLevels - 1u);
 	const float lod = saturate(perceptualRoughness) * maxMipLevel;
-	return SampleTextureCubeLevel(binding, normalize(reflectWS), lod).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+	float3 direction = WorldToEnvironmentDirection(
+		normalize(reflectWS),
+		g_Scene.IBLResource.EnvironmentRotationRadians);
+	return SampleTextureCubeLevel(binding, direction, lod).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 float SampleDirectionalShadow(float3 positionWS, float NoL)

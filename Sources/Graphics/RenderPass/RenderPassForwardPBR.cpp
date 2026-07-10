@@ -77,8 +77,8 @@ namespace gglab
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 
-				builder.WriteInPlace(displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
-				builder.WriteInPlace(displayTargets.m_Depth, RGTextureAccess::DepthStencilWrite);
+				builder.ReadWriteInPlace(displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
+				builder.ReadWriteInPlace(displayTargets.m_Depth, RGTextureAccess::DepthStencilWrite);
 				data.m_SceneColor = displayTargets.m_SceneColor;
 				data.m_Depth = displayTargets.m_Depth;
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureAccess::Sample);
@@ -119,8 +119,6 @@ namespace gglab
 
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-				graphicsContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
-				graphicsContext->ClearDepthStencil(dsv, 1.0f, 0);
 				graphicsContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
 
 				const auto shadowSrv = executeContext.GetViewDescriptor(data.m_ShadowSrv);

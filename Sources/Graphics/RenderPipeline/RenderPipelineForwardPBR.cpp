@@ -141,6 +141,12 @@ namespace gglab
 		// ShadowMap Preview
 		m_ShadowMapPreviewPass.AddPass(rg, context, services);
 
+		// Clear HDR color and depth before background and scene geometry.
+		m_ClearViewTargetsPass.AddPass(rg, context, services);
+
+		// Render the environment first so transparent geometry blends over it.
+		m_SkyboxPass.AddPass(rg, context, services);
+
 		// RenderPass ForwardPBR
 		m_ForwardPBRPass.AddPass(rg, context, services);
 

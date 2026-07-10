@@ -28,7 +28,8 @@ struct IBLResourceData
 
 	uint PrefilteredSpecularMipLevels;
 	float EnvironmentIntensity;
-	uint2 Padding;
+	float EnvironmentRotationRadians;
+	uint Padding;
 };
 
 struct SceneData

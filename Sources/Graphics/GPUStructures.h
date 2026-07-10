@@ -37,7 +37,8 @@ namespace gglab
 
 		uint32_t PrefilteredSpecularMipLevels;
 		float EnvironmentIntensity;
-		uint32_t Padding[2];
+		float EnvironmentRotationRadians;
+		uint32_t Padding;
 	};
 
 	struct SceneGPU

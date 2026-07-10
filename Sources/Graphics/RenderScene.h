@@ -11,6 +11,7 @@
 
 namespace gglab
 {
+	class EnvironmentLightingSystem;
 	class World;
 	class AssetManager;
 	class TransferManager;
@@ -77,6 +78,7 @@ namespace gglab
 			AssetManager& m_AssetManager;
 			TransferManager& m_TransferManager;
 			RenderResourceRegistry& m_RenderResourceRegistry;
+			EnvironmentLightingSystem& m_EnvironmentLightingSystem;
 
 			std::span<RenderView> m_RenderViews;
 
