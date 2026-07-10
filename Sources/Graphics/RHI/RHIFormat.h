@@ -42,6 +42,7 @@ namespace gglab
 			RHIFormatInfo{ RHIFormat::R8G8B8A8Unorm, "R8G8B8A8Unorm", RHIFormatFamily::R8G8B8A8, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 4, false },
 			RHIFormatInfo{ RHIFormat::R8G8B8A8UnormSrgb, "R8G8B8A8UnormSrgb", RHIFormatFamily::R8G8B8A8, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 4, false },
 			RHIFormatInfo{ RHIFormat::R16G16Float, "R16G16Float", RHIFormatFamily::R16G16, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 4, false },
+			RHIFormatInfo{ RHIFormat::R16G16B16A16Typeless, "R16G16B16A16Typeless", RHIFormatFamily::R16G16B16A16, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 8, true },
 			RHIFormatInfo{ RHIFormat::R16G16B16A16Float, "R16G16B16A16Float", RHIFormatFamily::R16G16B16A16, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 8, false },
 			RHIFormatInfo{ RHIFormat::R32G32Float, "R32G32Float", RHIFormatFamily::R32G32, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 8, false },
 			RHIFormatInfo{ RHIFormat::R32G32B32Float, "R32G32B32Float", RHIFormatFamily::R32G32B32, RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 12, false },

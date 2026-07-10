@@ -153,11 +153,13 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
@@ -350,10 +352,12 @@
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
@@ -582,6 +586,7 @@
     <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\Common.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli" />
+    <None Include="..\..\Assets\Shaders\Common\EnvironmentSampling.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli" />
     <None Include="..\..\Assets\Shaders\Common\MaterialUtils.hlsli" />
@@ -603,6 +608,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

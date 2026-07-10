@@ -86,7 +86,7 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				if (scene)
 				{
-					builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 					data.m_Color = targets.m_SceneColor;
 					data.m_Depth = builder.Read(targets.m_Depth, RGTextureAccess::DepthStencilRead);
 					RHITextureViewDesc dsvDesc{};
@@ -103,7 +103,7 @@ namespace gglab
 				}
 				else
 				{
-					builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
+					builder.ReadWriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 					data.m_Color = targets.m_BackBuffer;
 					data.m_World = frame.m_OverlayWorld;
 					data.m_Screen = frame.m_OverlayScreen;

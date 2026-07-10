@@ -624,6 +624,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
@@ -634,6 +637,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp">
@@ -1358,6 +1364,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1368,6 +1377,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h">
@@ -1465,6 +1477,9 @@
     <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Assets\Shaders\Common\EnvironmentSampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -1522,6 +1537,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassSkybox.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl">

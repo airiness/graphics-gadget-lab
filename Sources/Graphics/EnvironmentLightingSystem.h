@@ -20,6 +20,13 @@ namespace gglab
 		bool m_LoadAttempted = false;
 	};
 
+	struct EnvironmentLightingSettings
+	{
+		float m_Intensity = 1.0f;
+		float m_RotationRadians = 0.0f;
+		bool m_EnableSkybox = true;
+	};
+
 	class EnvironmentLightingSystem
 	{
 	public:
@@ -44,6 +51,11 @@ namespace gglab
 		[[nodiscard]] const EnvironmentMapEntry* GetActiveEnvironment() const noexcept;
 		[[nodiscard]] TextureID GetActiveTextureId() const noexcept;
 
+		[[nodiscard]] const EnvironmentLightingSettings& GetSettings() const noexcept { return m_Settings; }
+		void SetIntensity(float intensity) noexcept;
+		void SetRotationRadians(float rotationRadians) noexcept;
+		void SetSkyboxEnabled(bool enabled) noexcept { m_Settings.m_EnableSkybox = enabled; }
+
 	private:
 		static constexpr size_t InvalidEntryIndex = std::numeric_limits<size_t>::max();
 
@@ -51,5 +63,6 @@ namespace gglab
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		std::vector<EnvironmentMapEntry> m_Entries;
 		size_t m_ActiveEntryIndex = InvalidEntryIndex;
+		EnvironmentLightingSettings m_Settings{};
 	};
 }

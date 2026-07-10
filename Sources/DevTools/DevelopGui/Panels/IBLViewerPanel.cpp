@@ -5,6 +5,8 @@
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
+#include "Core/Math/MathFunctions.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -81,6 +83,34 @@ namespace gglab
 			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "RenderResourceRegistry is null.");
 			return;
 		}
+
+		auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
+		if (environmentSystem && ImGui::CollapsingHeader("Environment Settings", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const auto settings = environmentSystem->GetSettings();
+
+			bool skyboxEnabled = settings.m_EnableSkybox;
+			if (ImGui::Checkbox("Enable Skybox", &skyboxEnabled))
+			{
+				environmentSystem->SetSkyboxEnabled(skyboxEnabled);
+			}
+
+			float intensity = settings.m_Intensity;
+			if (ImGui::DragFloat("Environment Intensity", &intensity, 0.01f, 0.0f, 100.0f, "%.3f"))
+			{
+				environmentSystem->SetIntensity(intensity);
+			}
+
+			float rotationDegrees = math::ToDegrees(settings.m_RotationRadians);
+			if (ImGui::SliderFloat("Environment Yaw", &rotationDegrees, -180.0f, 180.0f, "%.1f deg"))
+			{
+				environmentSystem->SetRotationRadians(math::ToRadians(rotationDegrees));
+			}
+
+			ImGui::TextDisabled("Skybox, diffuse IBL, specular IBL, and previews share these settings.");
+		}
+
+		ImGui::Spacing();
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		constexpr TextureIndex EnvironmentIndex = TextureIndex::IBL_EnvironmentCubemap;

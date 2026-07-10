@@ -45,7 +45,9 @@ namespace gglab
 		R8G8B8A8Typeless,
 		R8G8B8A8Unorm,
 		R8G8B8A8UnormSrgb,
+
 		R16G16Float,
+		R16G16B16A16Typeless,
 		R16G16B16A16Float,
 
 		R32G32Float,
@@ -54,6 +56,7 @@ namespace gglab
 		R32Typeless,
 		R32Float,
 		R32Uint,
+
 		D24UnormS8Uint,
 		D32Float,
 

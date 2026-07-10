@@ -4,6 +4,7 @@
 #include "Graphics/TextureRegistry.h"
 
 #include <cctype>
+#include <numbers>
 
 namespace gglab
 {
@@ -149,5 +150,22 @@ namespace gglab
 	{
 		const auto* activeEnvironment = GetActiveEnvironment();
 		return activeEnvironment ? activeEnvironment->m_TextureId : InvalidTextureID;
+	}
+
+	void EnvironmentLightingSystem::SetIntensity(float intensity) noexcept
+	{
+		if (std::isfinite(intensity))
+		{
+			m_Settings.m_Intensity = std::max(intensity, 0.0f);
+		}
+	}
+
+	void EnvironmentLightingSystem::SetRotationRadians(float rotationRadians) noexcept
+	{
+		if (std::isfinite(rotationRadians))
+		{
+			constexpr float FullRotation = 2.0f * std::numbers::pi_v<float>;
+			m_Settings.m_RotationRadians = std::remainder(rotationRadians, FullRotation);
+		}
 	}
 }

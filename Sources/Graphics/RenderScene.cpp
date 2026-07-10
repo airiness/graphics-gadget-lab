@@ -2,6 +2,7 @@
 #include "Graphics/RenderScene.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Core/World.h"
 #include "Scene/Components.h"
@@ -415,6 +416,9 @@ namespace gglab
 
 		info.m_RenderResourceRegistry.EnsureIblResources();
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
+		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetSettings();
+		sceneCB.IBLResource.EnvironmentIntensity = environmentSettings.m_Intensity;
+		sceneCB.IBLResource.EnvironmentRotationRadians = environmentSettings.m_RotationRadians;
 
 		result.m_GpuAllocations.m_SceneConstants = info.m_SceneCB.Upload(sceneCB);
 		if (!result.m_GpuAllocations.m_SceneConstants.IsValid())
