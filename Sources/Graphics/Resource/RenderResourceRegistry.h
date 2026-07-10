@@ -100,6 +100,8 @@ namespace gglab
 
 		void SetIBLEnvironmentPreviewLayout(IBLPreviewLayout layout) noexcept;
 		IBLPreviewLayout GetIBLEnvironmentPreviewLayout() const noexcept { return m_IBLEnvironmentPreviewLayout; }
+		void SetIBLEnvironmentPreviewMip(uint32_t mip) noexcept;
+		uint32_t GetIBLEnvironmentPreviewMip() const noexcept { return m_IBLEnvironmentPreviewMip; }
 
 		void SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept;
 		IBLPreviewLayout GetIBLPrefilteredSpecularPreviewLayout() const noexcept { return m_IBLPrefilteredSpecularPreviewLayout; }
@@ -128,6 +130,7 @@ namespace gglab
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
 		IBLPreviewLayout m_IBLEnvironmentPreviewLayout = IBLPreviewLayout::Cross;
+		uint32_t m_IBLEnvironmentPreviewMip = 0;
 		IBLPreviewLayout m_IBLPrefilteredSpecularPreviewLayout = IBLPreviewLayout::Cross;
 		uint32_t m_IBLPrefilteredSpecularPreviewMip = 0;
 	};

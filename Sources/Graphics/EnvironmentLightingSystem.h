@@ -24,6 +24,7 @@ namespace gglab
 	{
 		float m_Intensity = 1.0f;
 		float m_RotationRadians = 0.0f;
+		uint32_t m_PrefilteredSpecularSampleCount = 1024;
 		bool m_EnableSkybox = true;
 	};
 
@@ -54,6 +55,7 @@ namespace gglab
 		[[nodiscard]] const EnvironmentLightingSettings& GetSettings() const noexcept { return m_Settings; }
 		void SetIntensity(float intensity) noexcept;
 		void SetRotationRadians(float rotationRadians) noexcept;
+		void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept;
 		void SetSkyboxEnabled(bool enabled) noexcept { m_Settings.m_EnableSkybox = enabled; }
 
 	private:
