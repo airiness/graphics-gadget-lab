@@ -4,6 +4,7 @@ static const float PI = 3.14159265359f;
 static const float TWO_PI = 6.28318530718f;
 static const float INV_PI = 0.31830988618f;
 static const float HALF_PI = 1.57079632679f;
+static const float MAX_FP16_FINITE = 65504.0f;
 
 float Pow5(float x)
 {
@@ -11,15 +12,31 @@ float Pow5(float x)
 	return xx * xx * x;
 }
 
+float SanitizeHDRChannel(float value)
+{
+	return isfinite(value) ? clamp(value, 0.0, MAX_FP16_FINITE) : 0.0;
+}
+
+float3 SanitizeHDRColor(float3 color)
+{
+	return float3(
+		SanitizeHDRChannel(color.r),
+		SanitizeHDRChannel(color.g),
+		SanitizeHDRChannel(color.b));
+}
+
 float3 ACESFitted(float3 x)
 {
     // Narkowicz 2015
+	x = SanitizeHDRColor(x);
 	const float a = 2.51;
 	const float b = 0.03;
 	const float c = 2.43;
 	const float d = 0.59;
 	const float e = 0.14;
-	return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
+	float3 numerator = x * (a * x + b);
+	float3 denominator = x * (c * x + d) + e;
+	return saturate(numerator / max(denominator, 1.0e-6.xxx));
 }
 
 // Linear to sRGB Conversion

@@ -193,4 +193,24 @@ namespace gglab
 		m_RenderResourceRegistry->MarkDirty(
 			RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
 	}
+
+	void EnvironmentLightingSystem::SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept
+	{
+		if (!std::isfinite(maxSampleLuminance))
+		{
+			return;
+		}
+
+		constexpr float MinLuminance = 1.0f;
+		constexpr float MaxLuminance = 65000.0f;
+		const float clampedLuminance = std::clamp(maxSampleLuminance, MinLuminance, MaxLuminance);
+		if (m_Settings.m_PrefilteredSpecularMaxSampleLuminance == clampedLuminance)
+		{
+			return;
+		}
+
+		m_Settings.m_PrefilteredSpecularMaxSampleLuminance = clampedLuminance;
+		m_RenderResourceRegistry->MarkDirty(
+			RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
+	}
 }

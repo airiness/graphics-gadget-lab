@@ -16,10 +16,12 @@ namespace gglab
 			uint32_t CubemapFaceIndex = 0;
 			uint32_t EnvironmentTextureIndex = 0;
 			uint32_t EnvironmentSamplerIndex = 0;
-			uint32_t Padding = 0;
+			uint32_t EnvironmentResolution = 0;
+			uint32_t EnvironmentMipLevels = 0;
+			uint32_t Padding[3]{};
 		};
 		static_assert(IsPassRootConstantStruct<IBLIrradiancePassParameters>);
-		static_assert(sizeof(IBLIrradiancePassParameters) == 16);
+		static_assert(sizeof(IBLIrradiancePassParameters) == 32);
 
 		struct PassData
 		{
@@ -31,6 +33,8 @@ namespace gglab
 			uint32_t m_Height = 0;
 			uint32_t m_EnvironmentTextureIndex = 0;
 			uint32_t m_EnvironmentSamplerIndex = 0;
+			uint32_t m_EnvironmentResolution = 0;
+			uint32_t m_EnvironmentMipLevels = 0;
 		};
 	}
 
@@ -87,6 +91,12 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 					SamplerPreset::LinearClamp);
+
+				const auto* environmentDesc = renderResRegistry->GetTextureDesc(
+					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				GGLAB_ASSERT_NOT_NULL(environmentDesc);
+				data.m_EnvironmentResolution = static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
+				data.m_EnvironmentMipLevels = environmentDesc->m_MipLevels;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -106,6 +116,8 @@ namespace gglab
 						.CubemapFaceIndex = face,
 						.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
 						.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
+						.EnvironmentResolution = data.m_EnvironmentResolution,
+						.EnvironmentMipLevels = data.m_EnvironmentMipLevels,
 					};
 					commandContext->SetPushConstants(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

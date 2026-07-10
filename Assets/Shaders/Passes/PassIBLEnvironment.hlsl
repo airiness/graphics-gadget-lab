@@ -63,5 +63,5 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float3 dir = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
-	return float4(SampleEnvironmentSource(dir), 1.0);
+	return float4(SanitizeHDRColor(SampleEnvironmentSource(dir)), 1.0);
 }

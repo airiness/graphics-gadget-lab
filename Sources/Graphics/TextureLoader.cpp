@@ -6,11 +6,68 @@
 #include <DirectXTex.h>
 
 #include <cctype>
+#include <cmath>
 
 namespace gglab
 {
 	namespace
 	{
+		constexpr float MaxHalfFloatRadiance = 65000.0f;
+
+		struct HdrSanitizationStats
+		{
+			float m_MaxFiniteChannel = 0.0f;
+			uint64_t m_NonFiniteChannelCount = 0;
+			uint64_t m_NegativeChannelCount = 0;
+			uint64_t m_ClampedChannelCount = 0;
+		};
+
+		[[nodiscard]] HdrSanitizationStats SanitizeHdrForHalfFloat(
+			DirectX::ScratchImage& scratchImage) noexcept
+		{
+			HdrSanitizationStats stats{};
+			const DirectX::Image* images = scratchImage.GetImages();
+			for (size_t imageIndex = 0; imageIndex < scratchImage.GetImageCount(); ++imageIndex)
+			{
+				const DirectX::Image& image = images[imageIndex];
+				GGLAB_ASSERT(image.format == DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+				for (size_t y = 0; y < image.height; ++y)
+				{
+					auto* row = reinterpret_cast<float*>(image.pixels + y * image.rowPitch);
+					for (size_t x = 0; x < image.width; ++x)
+					{
+						float* pixel = row + x * 4;
+						for (size_t channel = 0; channel < 3; ++channel)
+						{
+							float& value = pixel[channel];
+							if (!std::isfinite(value))
+							{
+								value = 0.0f;
+								++stats.m_NonFiniteChannelCount;
+								continue;
+							}
+
+							stats.m_MaxFiniteChannel = std::max(stats.m_MaxFiniteChannel, value);
+							if (value < 0.0f)
+							{
+								value = 0.0f;
+								++stats.m_NegativeChannelCount;
+							}
+							else if (value > MaxHalfFloatRadiance)
+							{
+								value = MaxHalfFloatRadiance;
+								++stats.m_ClampedChannelCount;
+							}
+						}
+
+						pixel[3] = std::isfinite(pixel[3]) ? std::clamp(pixel[3], 0.0f, 1.0f) : 1.0f;
+					}
+				}
+			}
+			return stats;
+		}
+
 		[[nodiscard]] RHIFormat ToTextureResourceFormat(DXGI_FORMAT format) noexcept
 		{
 			DXGI_FORMAT resourceFormat = DirectX::MakeTypeless(format);
@@ -180,13 +237,50 @@ namespace gglab
 			return {};
 		}
 
-		if (extension == ".hdr" && metadata.format != DXGI_FORMAT_R16G16B16A16_FLOAT)
+		if (extension == ".hdr")
 		{
+			DirectX::ScratchImage floatImage;
+			DirectX::ScratchImage* hdrImage = &scratchImage;
+			if (metadata.format != DXGI_FORMAT_R32G32B32A32_FLOAT)
+			{
+				hr = DirectX::Convert(
+					scratchImage.GetImages(),
+					scratchImage.GetImageCount(),
+					metadata,
+					DXGI_FORMAT_R32G32B32A32_FLOAT,
+					DirectX::TEX_FILTER_DEFAULT,
+					DirectX::TEX_THRESHOLD_DEFAULT,
+					floatImage);
+				if (FAILED(hr))
+				{
+					GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to normalize HDR texture '{}': {}",
+						texPath.string(),
+						FormatHResult(hr));
+					return {};
+				}
+				hdrImage = &floatImage;
+			}
+
+			const HdrSanitizationStats stats = SanitizeHdrForHalfFloat(*hdrImage);
+			if (stats.m_NonFiniteChannelCount > 0 ||
+				stats.m_NegativeChannelCount > 0 ||
+				stats.m_ClampedChannelCount > 0)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"TextureLoader sanitized HDR '{}' for FP16 storage: maxFiniteChannel={}, nonFiniteChannels={}, negativeChannels={}, clampedChannels={}, clamp={}.",
+					texPath.string(),
+					stats.m_MaxFiniteChannel,
+					stats.m_NonFiniteChannelCount,
+					stats.m_NegativeChannelCount,
+					stats.m_ClampedChannelCount,
+					MaxHalfFloatRadiance);
+			}
+
 			DirectX::ScratchImage convertedImage;
 			hr = DirectX::Convert(
-				scratchImage.GetImages(),
-				scratchImage.GetImageCount(),
-				metadata,
+				hdrImage->GetImages(),
+				hdrImage->GetImageCount(),
+				hdrImage->GetMetadata(),
 				DXGI_FORMAT_R16G16B16A16_FLOAT,
 				DirectX::TEX_FILTER_DEFAULT,
 				DirectX::TEX_THRESHOLD_DEFAULT,

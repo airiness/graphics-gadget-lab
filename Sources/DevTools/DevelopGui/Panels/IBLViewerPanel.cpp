@@ -253,8 +253,26 @@ namespace gglab
 				environmentSystem->SetPrefilteredSpecularSampleCount(sampleCount);
 			}
 
+			float maxSampleLuminance = settings.m_PrefilteredSpecularMaxSampleLuminance;
+			if (ImGui::DragFloat(
+				"Prefilter Firefly Clamp",
+				&maxSampleLuminance,
+				10.0f,
+				1.0f,
+				65000.0f,
+				"%.0f"))
+			{
+				environmentSystem->SetPrefilteredSpecularMaxSampleLuminance(maxSampleLuminance);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip(
+					"Limits individual HDR samples while baking rough specular mips.\n"
+					"Mip 0 remains an exact copy of the environment.");
+			}
+
 			ImGui::TextDisabled("Skybox, diffuse IBL, specular IBL, and previews share these settings.");
-			ImGui::TextDisabled("Changing the prefilter sample count schedules a specular rebuild.");
+			ImGui::TextDisabled("Changing prefilter quality settings schedules a specular rebuild.");
 		}
 
 		ImGui::Spacing();

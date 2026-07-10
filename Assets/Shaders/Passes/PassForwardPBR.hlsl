@@ -68,11 +68,27 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float4 tangentWS, f
 	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
 
 	// Build TBN matrix
-	float3x3 TBN = BuildTBNFromTangent(normalize(normalWS), tangentWS, positionWS, uv);
+	float3x3 TBN = BuildTBNFromTangent(
+		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)),
+		tangentWS,
+		positionWS,
+		uv);
 
 	// Transform normal from tangent space to world space
-	float3 perturbedNormalWS = normalize(mul(normalSampled.xyz, TBN));
+	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled.xyz, TBN), TBN[2]);
 	return perturbedNormalWS;
+}
+
+float FilterPerceptualRoughness(float perceptualRoughness, float3 normalWS)
+{
+	// Normal-map frequencies above the pixel footprint otherwise turn a small,
+	// intense environment light into unstable sub-pixel specular highlights.
+	float3 normalDx = ddx(normalWS);
+	float3 normalDy = ddy(normalWS);
+	float normalVariance = dot(normalDx, normalDx) + dot(normalDy, normalDy);
+	float kernelAlpha = min(2.0 * normalVariance, 0.18);
+	float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
+	return sqrt(saturate(alpha + kernelAlpha));
 }
 
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
@@ -89,7 +105,7 @@ float3 SampleIBLIrradiance(float3 normalWS)
 {
 	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.IrradianceBinding);
 	float3 direction = WorldToEnvironmentDirection(
-		normalize(normalWS),
+		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)),
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCube(binding, direction).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
@@ -101,7 +117,7 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 	const float maxMipLevel = (float) (mipLevels - 1u);
 	const float lod = saturate(perceptualRoughness) * maxMipLevel;
 	float3 direction = WorldToEnvironmentDirection(
-		normalize(reflectWS),
+		SafeNormalize(reflectWS, float3(0.0, 1.0, 0.0)),
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCubeLevel(binding, direction, lod).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
@@ -236,7 +252,7 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	perceptualRoughness = ClampPerceptualRoughnessForBRDF(perceptualRoughness);
 
 	// Normal (linear)
-	float3 normalWS = normalize(IN.NormalWS);
+	float3 normalWS = SafeNormalize(IN.NormalWS, float3(0.0, 1.0, 0.0));
 	float4 tangentWS = IN.TangentWS;
 	if ((matData.Flags & 1u) != 0u && !isFrontFace)
 	{
@@ -261,9 +277,10 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	{
 		return float4(N * 0.5 + 0.5, alpha);
 	}
+	perceptualRoughness = FilterPerceptualRoughness(perceptualRoughness, N);
 
 	// Shading
-	float3 V = normalize(viewData.CameraPos.xyz - IN.PositionWS); // View direction
+	float3 V = SafeNormalize(viewData.CameraPos.xyz - IN.PositionWS, N); // View direction
 	float NoV = saturate(dot(N, V));
 
 	// convert artistic roughness to physical roughness
@@ -289,7 +306,7 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 			continue;
 		}
 
-		float3 H = normalize(L + V); // Half vector
+		float3 H = SafeNormalize(L + V, N); // Half vector
 		float NoH = saturate(dot(N, H));
 		float VoH = saturate(dot(V, H));
 
@@ -344,5 +361,5 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 
 	Lo += (diffuseIBL + specularIBL) * ao;
 
-	return float4(Lo, alpha);
+	return float4(SanitizeHDRColor(Lo), alpha);
 }

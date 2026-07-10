@@ -57,6 +57,7 @@ namespace gglab
 		float m_Intensity = 1.0f;
 		float m_RotationRadians = 0.0f;
 		uint32_t m_PrefilteredSpecularSampleCount = 0;
+		float m_PrefilteredSpecularMaxSampleLuminance = 0.0f;
 		bool m_SkyboxEnabled = true;
 
 		IBLTextureDiagnostics m_Environment;
