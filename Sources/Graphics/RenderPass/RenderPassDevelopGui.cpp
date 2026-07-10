@@ -16,6 +16,7 @@ namespace gglab
 			RGTextureId m_BackBuffer{};
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_EnvironmentCubemapPreview{};
+			RGTextureId m_IrradianceCubemapPreview{};
 			RGTextureId m_PrefilteredSpecularCubemapPreview{};
 			RGTextureId m_DirectionalShadowMapPreview{};
 			RGTextureViewId m_Rtv{};
@@ -53,6 +54,9 @@ namespace gglab
 				data.m_EnvironmentCubemapPreview = builder.Read(
 					iblPreviewRes.m_EnvironmentCubemapPreview,
 					RGTextureAccess::Sample);
+				data.m_IrradianceCubemapPreview = builder.Read(
+					iblPreviewRes.m_IrradianceCubemapPreview,
+					RGTextureAccess::Sample);
 				data.m_PrefilteredSpecularCubemapPreview = builder.Read(
 					iblPreviewRes.m_PrefilteredSpecularCubemapPreview,
 					RGTextureAccess::Sample);
@@ -66,6 +70,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(data.m_BrdfLut);
 				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
+				GGLAB_UNUSED(data.m_IrradianceCubemapPreview);
 				GGLAB_UNUSED(data.m_PrefilteredSpecularCubemapPreview);
 				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
 

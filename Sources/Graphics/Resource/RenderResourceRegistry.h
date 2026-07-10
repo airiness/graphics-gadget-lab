@@ -42,6 +42,9 @@ namespace gglab
 			uint32_t m_PreviewIBLEnvironmentCubemapFaceSize = 256;
 			RHIFormat m_PreviewIBLEnvironmentCubemapFormat = RHIFormat::R8G8B8A8Unorm;
 
+			uint32_t m_PreviewIBLIrradianceCubemapFaceSize = 256;
+			RHIFormat m_PreviewIBLIrradianceCubemapFormat = RHIFormat::R8G8B8A8Unorm;
+
 			uint32_t m_PreviewIBLPrefilteredSpecularCubemapFaceSize = 256;
 			RHIFormat m_PreviewIBLPrefilteredSpecularCubemapFormat = RHIFormat::R8G8B8A8Unorm;
 		};
@@ -53,8 +56,18 @@ namespace gglab
 			IBL_PrefilteredSpecularCubemap,
 			IBL_BrdfLut,
 			Preview_IBL_EnvironmentCubemap,
+			Preview_IBL_IrradianceCubemap,
 			Preview_IBL_PrefilteredSpecularCubemap,
 			Preview_Shadow_DirectionalShadowMap,
+
+			Count
+		};
+
+		enum class IBLPreviewType : uint8_t
+		{
+			Environment,
+			Irradiance,
+			PrefilteredSpecular,
 
 			Count
 		};
@@ -103,11 +116,23 @@ namespace gglab
 		void SetIBLEnvironmentPreviewMip(uint32_t mip) noexcept;
 		uint32_t GetIBLEnvironmentPreviewMip() const noexcept { return m_IBLEnvironmentPreviewMip; }
 
+		void SetIBLIrradiancePreviewLayout(IBLPreviewLayout layout) noexcept;
+		IBLPreviewLayout GetIBLIrradiancePreviewLayout() const noexcept { return m_IBLIrradiancePreviewLayout; }
+
 		void SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept;
 		IBLPreviewLayout GetIBLPrefilteredSpecularPreviewLayout() const noexcept { return m_IBLPrefilteredSpecularPreviewLayout; }
 
 		void SetIBLPrefilteredSpecularPreviewMip(uint32_t mip) noexcept;
 		uint32_t GetIBLPrefilteredSpecularPreviewMip() const noexcept { return m_IBLPrefilteredSpecularPreviewMip; }
+
+		void RequestIBLPreview(IBLPreviewType type) noexcept;
+		[[nodiscard]] bool ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept;
+		void MarkIBLPreviewDirty(IBLPreviewType type) noexcept;
+		void MarkAllIBLPreviewsDirty() noexcept;
+		void ClearIBLPreviewDirty(IBLPreviewType type) noexcept;
+		[[nodiscard]] bool IsIBLPreviewDirty(IBLPreviewType type) const noexcept;
+		[[nodiscard]] bool IsIBLPreviewRequested(IBLPreviewType type) const noexcept;
+		[[nodiscard]] uint64_t GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept;
 
 		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
@@ -120,6 +145,8 @@ namespace gglab
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void InvalidateDependents(TextureIndex index) noexcept;
+		void InvalidatePreviewForSource(TextureIndex index) noexcept;
+		[[nodiscard]] static TextureIndex GetPreviewTextureIndex(IBLPreviewType type) noexcept;
 
 		void DestroyTexture(TextureIndex index, const RHIFencePoint& fencePoint) noexcept;
 
@@ -129,8 +156,16 @@ namespace gglab
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()> m_TextureEntries;
+		struct IBLPreviewState
+		{
+			bool m_Requested = false;
+			bool m_Dirty = true;
+			uint64_t m_UpdateCount = 0;
+		};
+		std::array<IBLPreviewState, utils::EnumCount<IBLPreviewType>()> m_IBLPreviewStates;
 		IBLPreviewLayout m_IBLEnvironmentPreviewLayout = IBLPreviewLayout::Cross;
 		uint32_t m_IBLEnvironmentPreviewMip = 0;
+		IBLPreviewLayout m_IBLIrradiancePreviewLayout = IBLPreviewLayout::Cross;
 		IBLPreviewLayout m_IBLPrefilteredSpecularPreviewLayout = IBLPreviewLayout::Cross;
 		uint32_t m_IBLPrefilteredSpecularPreviewMip = 0;
 	};

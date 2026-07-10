@@ -16,6 +16,7 @@ namespace gglab
 	struct RGIBLPreviewResources
 	{
 		RGTextureId m_EnvironmentCubemapPreview{};
+		RGTextureId m_IrradianceCubemapPreview{};
 		RGTextureId m_PrefilteredSpecularCubemapPreview{};
 	};
 

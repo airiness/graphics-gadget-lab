@@ -156,7 +156,12 @@ namespace gglab
 	{
 		if (std::isfinite(intensity))
 		{
-			m_Settings.m_Intensity = std::max(intensity, 0.0f);
+			const float clampedIntensity = std::max(intensity, 0.0f);
+			if (m_Settings.m_Intensity != clampedIntensity)
+			{
+				m_Settings.m_Intensity = clampedIntensity;
+				m_RenderResourceRegistry->MarkAllIBLPreviewsDirty();
+			}
 		}
 	}
 
@@ -165,7 +170,12 @@ namespace gglab
 		if (std::isfinite(rotationRadians))
 		{
 			constexpr float FullRotation = 2.0f * std::numbers::pi_v<float>;
-			m_Settings.m_RotationRadians = std::remainder(rotationRadians, FullRotation);
+			const float wrappedRotation = std::remainder(rotationRadians, FullRotation);
+			if (m_Settings.m_RotationRadians != wrappedRotation)
+			{
+				m_Settings.m_RotationRadians = wrappedRotation;
+				m_RenderResourceRegistry->MarkAllIBLPreviewsDirty();
+			}
 		}
 	}
 
