@@ -16,6 +16,8 @@ struct IBLPrefilteredSpecularPassParameters
 	uint EnvironmentResolution;
 	uint EnvironmentMipLevels;
 	uint SampleCount;
+	float MaxSampleLuminance;
+	uint3 Padding;
 };
 
 ConstantBuffer<IBLPrefilteredSpecularPassParameters> g_Pass : register(b2);
@@ -33,6 +35,16 @@ float GetPerceptualRoughness()
 		: 0.0;
 }
 
+float3 ClampSampleLuminance(float3 radiance)
+{
+	radiance = SanitizeHDRColor(radiance);
+	const float luminance = dot(radiance, float3(0.2126, 0.7152, 0.0722));
+	const float maxLuminance = max(g_Pass.MaxSampleLuminance, 1.0);
+	return luminance > maxLuminance
+		? radiance * (maxLuminance / luminance)
+		: radiance;
+}
+
 float3 IntegratePrefilteredSpecular(
 	TextureSamplerBindingData environmentBinding,
 	float3 normalWS,
@@ -42,7 +54,7 @@ float3 IntegratePrefilteredSpecular(
 	// original environment texel instead of integrating an ill-conditioned PDF.
 	if (g_Pass.MipLevel == 0u || perceptualRoughness <= 0.0)
 	{
-		return SampleTextureCubeLevel(environmentBinding, normalWS, 0.0).rgb;
+		return SanitizeHDRColor(SampleTextureCubeLevel(environmentBinding, normalWS, 0.0).rgb);
 	}
 
 	const uint sampleCount = max(g_Pass.SampleCount, 1u);
@@ -76,12 +88,13 @@ float3 IntegratePrefilteredSpecular(
 			float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
 			sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
 
-			prefilteredColor += SampleTextureCubeLevel(environmentBinding, lightWS, sourceMip).rgb * NoL;
+			float3 sampleRadiance = SampleTextureCubeLevel(environmentBinding, lightWS, sourceMip).rgb;
+			prefilteredColor += ClampSampleLuminance(sampleRadiance) * NoL;
 			totalWeight += NoL;
 		}
 	}
 
-	return prefilteredColor / max(totalWeight, 1e-5);
+	return SanitizeHDRColor(prefilteredColor / max(totalWeight, 1e-5));
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

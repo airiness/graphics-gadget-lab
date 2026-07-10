@@ -23,10 +23,10 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 
-	const float3 hdrColor = SampleTexture2D(
+	const float3 hdrColor = SanitizeHDRColor(SampleTexture2D(
 		g_Pass.SceneColorTextureIndex,
 		g_Pass.SceneColorSamplerIndex,
-		IN.UV).rgb;
+		IN.UV).rgb);
 
 	float3 color = ACESFitted(hdrColor * viewData.Exposure);
 	color = LinearToSRGB(color);

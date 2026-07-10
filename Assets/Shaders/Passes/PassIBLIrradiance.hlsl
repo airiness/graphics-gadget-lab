@@ -10,7 +10,9 @@ struct IBLIrradiancePassParameters
 	uint CubemapFaceIndex;
 	uint EnvironmentTextureIndex;
 	uint EnvironmentSamplerIndex;
-	uint Padding;
+	uint EnvironmentResolution;
+	uint EnvironmentMipLevels;
+	uint3 Padding;
 };
 
 ConstantBuffer<IBLIrradiancePassParameters> g_Pass : register(b2);
@@ -23,6 +25,10 @@ TextureSamplerBindingData GetEnvironmentBinding()
 float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 normalWS)
 {
 	const uint SAMPLE_COUNT = 1024;
+	const float environmentResolution = max((float) g_Pass.EnvironmentResolution, 1.0);
+	const float environmentTexelSolidAngle =
+		4.0 * PI / (6.0 * environmentResolution * environmentResolution);
+	const float maxEnvironmentMip = (float) (max(g_Pass.EnvironmentMipLevels, 1u) - 1u);
 	float3 irradiance = 0.0.xxx;
 
 	for (uint i = 0; i < SAMPLE_COUNT; ++i)
@@ -34,11 +40,17 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 		// by the PDF denominator, leaving only PI * average(radiance).
 		float3 directionTS = CosineSampleHemisphere(Xi);
 		float3 directionWS = TangentToWorld(directionTS, normalWS);
+		float NoL = saturate(directionTS.z);
+		float pdf = NoL * INV_PI;
+		float sampleSolidAngle = 1.0 / max((float) SAMPLE_COUNT * pdf, 1.0e-6);
+		float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
+		sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
 
-		irradiance += SampleTextureCubeLevel(environmentBinding, directionWS, 0.0).rgb;
+		irradiance += SanitizeHDRColor(
+			SampleTextureCubeLevel(environmentBinding, directionWS, sourceMip).rgb);
 	}
 
-	return PI * irradiance / SAMPLE_COUNT;
+	return SanitizeHDRColor(PI * irradiance / SAMPLE_COUNT);
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

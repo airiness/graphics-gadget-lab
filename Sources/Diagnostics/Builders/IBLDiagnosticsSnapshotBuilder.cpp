@@ -63,6 +63,8 @@ namespace gglab
 		snapshot.m_Intensity = settings.m_Intensity;
 		snapshot.m_RotationRadians = settings.m_RotationRadians;
 		snapshot.m_PrefilteredSpecularSampleCount = settings.m_PrefilteredSpecularSampleCount;
+		snapshot.m_PrefilteredSpecularMaxSampleLuminance =
+			settings.m_PrefilteredSpecularMaxSampleLuminance;
 		snapshot.m_SkyboxEnabled = settings.m_EnableSkybox;
 
 		const auto environments = environmentSystem->GetEntries();

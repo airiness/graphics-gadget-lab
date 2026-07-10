@@ -22,9 +22,11 @@ namespace gglab
 			uint32_t EnvironmentResolution = 0;
 			uint32_t EnvironmentMipLevels = 0;
 			uint32_t SampleCount = 0;
+			float MaxSampleLuminance = 0.0f;
+			uint32_t Padding[3]{};
 		};
 		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
-		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 32);
+		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 48);
 
 		struct PassData
 		{
@@ -40,6 +42,7 @@ namespace gglab
 			uint32_t m_EnvironmentResolution = 0;
 			uint32_t m_EnvironmentMipLevels = 0;
 			uint32_t m_SampleCount = 0;
+			float m_MaxSampleLuminance = 0.0f;
 		};
 	}
 
@@ -67,9 +70,11 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		const uint32_t sampleCount = environmentSystem->GetSettings().m_PrefilteredSpecularSampleCount;
+		const auto& settings = environmentSystem->GetSettings();
+		const uint32_t sampleCount = settings.m_PrefilteredSpecularSampleCount;
+		const float maxSampleLuminance = settings.m_PrefilteredSpecularMaxSampleLuminance;
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[renderer, renderResRegistry, sampleCount](RenderGraph::RGBuilder& builder, PassData& data)
+			[renderer, renderResRegistry, sampleCount, maxSampleLuminance](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
@@ -115,6 +120,7 @@ namespace gglab
 				data.m_EnvironmentResolution = static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
 				data.m_EnvironmentMipLevels = environmentDesc->m_MipLevels;
 				data.m_SampleCount = sampleCount;
+				data.m_MaxSampleLuminance = maxSampleLuminance;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -146,6 +152,7 @@ namespace gglab
 							.EnvironmentResolution = data.m_EnvironmentResolution,
 							.EnvironmentMipLevels = data.m_EnvironmentMipLevels,
 							.SampleCount = data.m_SampleCount,
+							.MaxSampleLuminance = data.m_MaxSampleLuminance,
 						};
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
