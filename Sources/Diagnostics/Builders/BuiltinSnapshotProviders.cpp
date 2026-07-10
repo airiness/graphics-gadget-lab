@@ -2,6 +2,7 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
+#include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
@@ -9,6 +10,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
+#include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
@@ -51,6 +53,17 @@ namespace gglab
 				auto& snapshot = store.GetOrCreate<PersistentSceneBufferSnapshot>();
 				if (context.m_Renderer) BuildPersistentSceneBufferSnapshot(*context.m_Renderer, snapshot);
 				else snapshot = {};
+			}
+		};
+
+		class IBLDiagnosticsSnapshotProvider final : public SnapshotProvider<IBLDiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override { return "IBL Diagnostics"; }
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
+				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(*context.m_Renderer) : IBLDiagnosticsSnapshot{};
 			}
 		};
 
@@ -112,6 +125,7 @@ namespace gglab
 	void RegisterBuiltinSnapshotProviders(DiagnosticsRuntime& runtime) noexcept
 	{
 		runtime.RegisterProvider(std::make_unique<AssetSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<IBLDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<PersistentSceneBufferSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);

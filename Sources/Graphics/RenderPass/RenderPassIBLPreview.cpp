@@ -23,31 +23,21 @@ namespace gglab
 		static_assert(IsPassRootConstantStruct<IBLCubemapPreviewPassParameters>);
 		static_assert(sizeof(IBLCubemapPreviewPassParameters) == 16);
 
-		struct EnvironmentPreviewPassData
+		struct PreviewResourcesPassData
 		{
-			RGTextureId m_EnvironmentCubemap{};
-			RGTextureId m_EnvironmentCubemapPreview{};
-			RGTextureViewId m_Rtv{};
-
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			uint32_t m_DisplayLayout = 0;
-			uint32_t m_EnvironmentTextureIndex = 0;
-			uint32_t m_EnvironmentSamplerIndex = 0;
-			uint32_t m_SampleMip = 0;
 		};
 
-		struct PrefilteredSpecularPreviewPassData
+		struct CubemapPreviewPassData
 		{
-			RGTextureId m_PrefilteredSpecularCubemap{};
-			RGTextureId m_PrefilteredSpecularCubemapPreview{};
+			RGTextureId m_SourceCubemap{};
+			RGTextureId m_PreviewTexture{};
 			RGTextureViewId m_Rtv{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			uint32_t m_DisplayLayout = 0;
-			uint32_t m_PrefilteredSpecularTextureIndex = 0;
-			uint32_t m_PrefilteredSpecularSamplerIndex = 0;
+			uint32_t m_CubemapTextureIndex = 0;
+			uint32_t m_CubemapSamplerIndex = 0;
 			uint32_t m_SampleMip = 0;
 		};
 	}
@@ -65,161 +55,171 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		auto* contextPtr = &context;
-		const std::string environmentPassName =
-			MakeRenderGraphPassName("EnvironmentCubemap");
-		rg.AddPass<EnvironmentPreviewPassData>(environmentPassName.c_str(),
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, EnvironmentPreviewPassData& data)
+		const std::string resourcesPassName = MakeRenderGraphPassName("Resources");
+		rg.AddPass<PreviewResourcesPassData>(resourcesPassName.c_str(),
+			[renderResRegistry](RenderGraph::RGBuilder& builder, PreviewResourcesPassData&)
 			{
-				builder.SideEffect();
+				auto& previewResources = builder.GetBlackboard()
+					.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
 
-				auto& blackboard = builder.GetBlackboard();
-				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
-				auto& previewRes = blackboard.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
+				auto importPreview = [&builder, renderResRegistry](
+					RenderResourceRegistry::TextureIndex index,
+					const char* name) noexcept
+					{
+						const auto* desc = renderResRegistry->GetTextureDesc(index);
+						GGLAB_ASSERT_NOT_NULL(desc);
+						return builder.ImportTexture(
+							name,
+							renderResRegistry->GetTextureHandle(index),
+							*desc,
+							RGTextureAccess::None);
+					};
 
-				data.m_EnvironmentCubemap = builder.Read(iblRes.m_EnvironmentCubemap, RGTextureAccess::Sample);
-
-				const auto* previewDesc = renderResRegistry->GetTextureDesc(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(previewDesc);
-
-				previewRes.m_EnvironmentCubemapPreview = builder.ImportTexture(
-					"Preview.IBL.EnvironmentCubemap",
-					renderResRegistry->GetTextureHandle(
-						RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap),
-					*previewDesc,
-					RGTextureAccess::None);
-
-				builder.WriteInPlace(
-					previewRes.m_EnvironmentCubemapPreview,
-					RGTextureAccess::RenderTarget);
-				data.m_EnvironmentCubemapPreview = previewRes.m_EnvironmentCubemapPreview;
-
-				data.m_Rtv =
-					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemapPreview);
-				data.m_Width = previewDesc->m_Extent.m_Width;
-				data.m_Height = previewDesc->m_Extent.m_Height;
-				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLEnvironmentPreviewLayout());
-				data.m_EnvironmentTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
-				data.m_EnvironmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-					SamplerPreset::LinearClamp);
-
-				const auto* environmentDesc = renderResRegistry->GetTextureDesc(
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(environmentDesc);
-				const uint32_t mipLevels = environmentDesc->m_MipLevels;
-				data.m_SampleMip = mipLevels > 0 ?
-					std::min(renderResRegistry->GetIBLEnvironmentPreviewMip(), mipLevels - 1u) :
-					0u;
-			},
-			[this, renderer, contextPtr](RGExecuteContext& executeContext, EnvironmentPreviewPassData& data)
-			{
-				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
-				commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(*renderer));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
-				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
-				commandContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
-
-				const IBLCubemapPreviewPassParameters passParameters{
-					.DisplayLayout = data.m_DisplayLayout,
-					.CubemapTextureIndex = data.m_EnvironmentTextureIndex,
-					.CubemapSamplerIndex = data.m_EnvironmentSamplerIndex,
-					.SampleMip = data.m_SampleMip,
-				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					passParameters);
-
-				commandContext->Draw(3);
-
+				previewResources.m_EnvironmentCubemapPreview = importPreview(
+					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap,
+					"Preview.IBL.EnvironmentCubemap");
+				previewResources.m_IrradianceCubemapPreview = importPreview(
+					RenderResourceRegistry::TextureIndex::Preview_IBL_IrradianceCubemap,
+					"Preview.IBL.IrradianceCubemap");
+				previewResources.m_PrefilteredSpecularCubemapPreview = importPreview(
+					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
+					"Preview.IBL.PrefilteredSpecularCubemap");
 			});
 
-		const std::string prefilteredSpecularPassName =
-			MakeRenderGraphPassName("PrefilteredSpecularCubemap");
-		rg.AddPass<PrefilteredSpecularPreviewPassData>(prefilteredSpecularPassName.c_str(),
-			[renderer, renderResRegistry](RenderGraph::RGBuilder& builder, PrefilteredSpecularPreviewPassData& data)
+		using TextureIndex = RenderResourceRegistry::TextureIndex;
+		using PreviewType = RenderResourceRegistry::IBLPreviewType;
+		using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
+		const auto* contextPtr = &context;
+
+		auto addPreviewPass = [this, &rg, renderer, renderResRegistry, contextPtr](
+			const char* suffix,
+			PreviewType previewType,
+			TextureIndex sourceIndex,
+			TextureIndex previewIndex,
+			PreviewLayout layout,
+			uint32_t sampleMip) noexcept
 			{
-				builder.SideEffect();
+				const std::string passName = MakeRenderGraphPassName(suffix);
+				rg.AddPass<CubemapPreviewPassData>(passName.c_str(),
+					[renderer, renderResRegistry, previewType, sourceIndex, previewIndex, layout, sampleMip](
+						RenderGraph::RGBuilder& builder,
+						CubemapPreviewPassData& data)
+					{
+						builder.SideEffect();
+						auto& blackboard = builder.GetBlackboard();
+						auto& iblResources = blackboard.Get<RGIBLResources>(IBLResourcesName);
+						auto& previewResources = blackboard.Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
 
-				auto& blackboard = builder.GetBlackboard();
-				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
-				auto& previewRes = blackboard.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
+						RGTextureId source{};
+						RGTextureId* preview = nullptr;
+						switch (previewType)
+						{
+						case PreviewType::Environment:
+							source = iblResources.m_EnvironmentCubemap;
+							preview = &previewResources.m_EnvironmentCubemapPreview;
+							break;
+						case PreviewType::Irradiance:
+							source = iblResources.m_IrradianceCubemap;
+							preview = &previewResources.m_IrradianceCubemapPreview;
+							break;
+						case PreviewType::PrefilteredSpecular:
+							source = iblResources.m_PrefilteredSpecularCubemap;
+							preview = &previewResources.m_PrefilteredSpecularCubemapPreview;
+							break;
+						default:
+							GGLAB_ASSERT_MSG(false, "Unknown IBL preview type.");
+							return;
+						}
 
-				data.m_PrefilteredSpecularCubemap = builder.Read(
-					iblRes.m_PrefilteredSpecularCubemap,
-					RGTextureAccess::Sample);
+						data.m_SourceCubemap = builder.Read(source, RGTextureAccess::Sample);
+						builder.WriteInPlace(*preview, RGTextureAccess::RenderTarget);
+						data.m_PreviewTexture = *preview;
 
-				const auto* previewDesc = renderResRegistry->GetTextureDesc(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(previewDesc);
+						const auto* previewDesc = renderResRegistry->GetTextureDesc(previewIndex);
+						GGLAB_ASSERT_NOT_NULL(previewDesc);
+						data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_PreviewTexture);
+						data.m_Width = static_cast<uint32_t>(previewDesc->m_Extent.m_Width);
+						data.m_Height = previewDesc->m_Extent.m_Height;
+						data.m_DisplayLayout = static_cast<uint32_t>(layout);
+						data.m_CubemapTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(sourceIndex);
+						data.m_CubemapSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+							SamplerPreset::LinearClamp);
+						data.m_SampleMip = sampleMip;
+					},
+					[this, renderer, renderResRegistry, contextPtr, previewType](
+						RGExecuteContext& executeContext,
+						CubemapPreviewPassData& data)
+					{
+						auto* commandContext = executeContext.GetGraphicsCommandContext();
+						const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+						commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+						commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(*renderer));
+						commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+						commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
+						commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+						commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+						const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+						commandContext->SetConstantBuffer(
+							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+							sceneBuffer->GetBufferHandle(),
+							contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
-				previewRes.m_PrefilteredSpecularCubemapPreview = builder.ImportTexture(
-					"Preview.IBL.PrefilteredSpecularCubemap",
-					renderResRegistry->GetTextureHandle(
-						RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap),
-					*previewDesc,
-					RGTextureAccess::None);
+						const IBLCubemapPreviewPassParameters passParameters{
+							.DisplayLayout = data.m_DisplayLayout,
+							.CubemapTextureIndex = data.m_CubemapTextureIndex,
+							.CubemapSamplerIndex = data.m_CubemapSamplerIndex,
+							.SampleMip = data.m_SampleMip,
+						};
+						commandContext->SetPushConstants(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+							passParameters);
 
-				builder.WriteInPlace(
-					previewRes.m_PrefilteredSpecularCubemapPreview,
-					RGTextureAccess::RenderTarget);
-				data.m_PrefilteredSpecularCubemapPreview = previewRes.m_PrefilteredSpecularCubemapPreview;
+						commandContext->Draw(3);
+						renderResRegistry->ClearIBLPreviewDirty(previewType);
+					});
+			};
 
-				data.m_Rtv =
-					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_PrefilteredSpecularCubemapPreview);
-				data.m_Width = previewDesc->m_Extent.m_Width;
-				data.m_Height = previewDesc->m_Extent.m_Height;
-				data.m_DisplayLayout = static_cast<uint32_t>(renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout());
-				data.m_PrefilteredSpecularTextureIndex = renderResRegistry->GetShaderVisibleSrvIndex(
-					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
-				data.m_PrefilteredSpecularSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-					SamplerPreset::LinearClamp);
+		if (renderResRegistry->ConsumeIBLPreviewRequest(PreviewType::Environment))
+		{
+			const auto* environmentDesc = renderResRegistry->GetTextureDesc(TextureIndex::IBL_EnvironmentCubemap);
+			const uint32_t mipLevels = environmentDesc ? environmentDesc->m_MipLevels : 0;
+			const uint32_t sampleMip = mipLevels > 0 ?
+				std::min(renderResRegistry->GetIBLEnvironmentPreviewMip(), mipLevels - 1u) : 0u;
+			addPreviewPass(
+				"EnvironmentCubemap",
+				PreviewType::Environment,
+				TextureIndex::IBL_EnvironmentCubemap,
+				TextureIndex::Preview_IBL_EnvironmentCubemap,
+				renderResRegistry->GetIBLEnvironmentPreviewLayout(),
+				sampleMip);
+		}
 
-				const auto* prefilteredSpecularDesc = renderResRegistry->GetTextureDesc(
-					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
-				GGLAB_ASSERT_NOT_NULL(prefilteredSpecularDesc);
-				const uint32_t mipLevels = prefilteredSpecularDesc->m_MipLevels;
-				data.m_SampleMip = mipLevels > 0 ?
-					std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(), mipLevels - 1u) :
-					0u;
-			},
-			[this, renderer, contextPtr](RGExecuteContext& executeContext, PrefilteredSpecularPreviewPassData& data)
-			{
-				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
-				commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(*renderer));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
-				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
-				commandContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+		if (renderResRegistry->ConsumeIBLPreviewRequest(PreviewType::Irradiance))
+		{
+			addPreviewPass(
+				"IrradianceCubemap",
+				PreviewType::Irradiance,
+				TextureIndex::IBL_IrradianceCubemap,
+				TextureIndex::Preview_IBL_IrradianceCubemap,
+				renderResRegistry->GetIBLIrradiancePreviewLayout(),
+				0);
+		}
 
-				const IBLCubemapPreviewPassParameters passParameters{
-					.DisplayLayout = data.m_DisplayLayout,
-					.CubemapTextureIndex = data.m_PrefilteredSpecularTextureIndex,
-					.CubemapSamplerIndex = data.m_PrefilteredSpecularSamplerIndex,
-					.SampleMip = data.m_SampleMip,
-				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					passParameters);
-
-				commandContext->Draw(3);
-			});
+		if (renderResRegistry->ConsumeIBLPreviewRequest(PreviewType::PrefilteredSpecular))
+		{
+			const auto* prefilteredDesc = renderResRegistry->GetTextureDesc(
+				TextureIndex::IBL_PrefilteredSpecularCubemap);
+			const uint32_t mipLevels = prefilteredDesc ? prefilteredDesc->m_MipLevels : 0;
+			const uint32_t sampleMip = mipLevels > 0 ?
+				std::min(renderResRegistry->GetIBLPrefilteredSpecularPreviewMip(), mipLevels - 1u) : 0u;
+			addPreviewPass(
+				"PrefilteredSpecularCubemap",
+				PreviewType::PrefilteredSpecular,
+				TextureIndex::IBL_PrefilteredSpecularCubemap,
+				TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
+				renderResRegistry->GetIBLPrefilteredSpecularPreviewLayout(),
+				sampleMip);
+		}
 	}
 
 	void RenderPassIBLPreview::EnsureInitialized(const RenderServices& services) noexcept

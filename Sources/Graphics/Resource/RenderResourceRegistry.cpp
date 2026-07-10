@@ -148,6 +148,28 @@ namespace gglab
 			EnsureTexture(TextureIndex::Preview_IBL_EnvironmentCubemap, desc, srvDesc, retireFenceOpt);
 		}
 
+		// Preview_IBL_IrradianceCubemap
+		{
+			RHITextureDesc desc{};
+			desc.m_Extent = {
+				createInfo.m_PreviewIBLIrradianceCubemapFaceSize * 4u,
+				createInfo.m_PreviewIBLIrradianceCubemapFaceSize * 3u,
+				1u };
+			desc.m_ArraySize = 1;
+			desc.m_MipLevels = 1;
+			desc.m_SampleCount = 1;
+			desc.m_Format = createInfo.m_PreviewIBLIrradianceCubemapFormat;
+			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
+
+			RHITextureViewDesc srvDesc{};
+			srvDesc.m_Type = RHITextureViewType::ShaderResource;
+			srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
+			srvDesc.m_Format = desc.m_Format;
+			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
+
+			EnsureTexture(TextureIndex::Preview_IBL_IrradianceCubemap, desc, srvDesc, retireFenceOpt);
+		}
+
 		// Preview_IBL_PrefilteredSpecularCubemap
 		{
 			RHITextureDesc desc{};
@@ -195,7 +217,29 @@ namespace gglab
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
 	{
 		m_TextureEntries[utils::ToIndex(index)].m_Dirty = true;
+		InvalidatePreviewForSource(index);
 		InvalidateDependents(index);
+	}
+
+	void RenderResourceRegistry::InvalidatePreviewForSource(TextureIndex index) noexcept
+	{
+		switch (index)
+		{
+		case TextureIndex::IBL_EnvironmentCubemap:
+		case TextureIndex::Preview_IBL_EnvironmentCubemap:
+			MarkIBLPreviewDirty(IBLPreviewType::Environment);
+			break;
+		case TextureIndex::IBL_IrradianceCubemap:
+		case TextureIndex::Preview_IBL_IrradianceCubemap:
+			MarkIBLPreviewDirty(IBLPreviewType::Irradiance);
+			break;
+		case TextureIndex::IBL_PrefilteredSpecularCubemap:
+		case TextureIndex::Preview_IBL_PrefilteredSpecularCubemap:
+			MarkIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+			break;
+		default:
+			break;
+		}
 	}
 
 	void RenderResourceRegistry::InvalidateDependents(TextureIndex index) noexcept
@@ -256,11 +300,27 @@ namespace gglab
 		}
 
 		m_IBLEnvironmentPreviewLayout = layout;
+		MarkIBLPreviewDirty(IBLPreviewType::Environment);
 	}
 
 	void RenderResourceRegistry::SetIBLEnvironmentPreviewMip(uint32_t mip) noexcept
 	{
-		m_IBLEnvironmentPreviewMip = mip;
+		if (m_IBLEnvironmentPreviewMip != mip)
+		{
+			m_IBLEnvironmentPreviewMip = mip;
+			MarkIBLPreviewDirty(IBLPreviewType::Environment);
+		}
+	}
+
+	void RenderResourceRegistry::SetIBLIrradiancePreviewLayout(IBLPreviewLayout layout) noexcept
+	{
+		if (layout >= IBLPreviewLayout::Count || m_IBLIrradiancePreviewLayout == layout)
+		{
+			return;
+		}
+
+		m_IBLIrradiancePreviewLayout = layout;
+		MarkIBLPreviewDirty(IBLPreviewType::Irradiance);
 	}
 
 	void RenderResourceRegistry::SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept
@@ -270,12 +330,86 @@ namespace gglab
 			return;
 		}
 
-		m_IBLPrefilteredSpecularPreviewLayout = layout;
+		if (m_IBLPrefilteredSpecularPreviewLayout != layout)
+		{
+			m_IBLPrefilteredSpecularPreviewLayout = layout;
+			MarkIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+		}
 	}
 
 	void RenderResourceRegistry::SetIBLPrefilteredSpecularPreviewMip(uint32_t mip) noexcept
 	{
-		m_IBLPrefilteredSpecularPreviewMip = mip;
+		if (m_IBLPrefilteredSpecularPreviewMip != mip)
+		{
+			m_IBLPrefilteredSpecularPreviewMip = mip;
+			MarkIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+		}
+	}
+
+	void RenderResourceRegistry::RequestIBLPreview(IBLPreviewType type) noexcept
+	{
+		m_IBLPreviewStates[utils::ToIndex(type)].m_Requested = true;
+	}
+
+	bool RenderResourceRegistry::ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept
+	{
+		auto& state = m_IBLPreviewStates[utils::ToIndex(type)];
+		const bool shouldUpdate = state.m_Requested && state.m_Dirty;
+		state.m_Requested = false;
+		return shouldUpdate;
+	}
+
+	void RenderResourceRegistry::MarkIBLPreviewDirty(IBLPreviewType type) noexcept
+	{
+		m_IBLPreviewStates[utils::ToIndex(type)].m_Dirty = true;
+		m_TextureEntries[utils::ToIndex(GetPreviewTextureIndex(type))].m_Dirty = true;
+	}
+
+	void RenderResourceRegistry::MarkAllIBLPreviewsDirty() noexcept
+	{
+		MarkIBLPreviewDirty(IBLPreviewType::Environment);
+		MarkIBLPreviewDirty(IBLPreviewType::Irradiance);
+		MarkIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+	}
+
+	void RenderResourceRegistry::ClearIBLPreviewDirty(IBLPreviewType type) noexcept
+	{
+		auto& state = m_IBLPreviewStates[utils::ToIndex(type)];
+		state.m_Dirty = false;
+		++state.m_UpdateCount;
+		m_TextureEntries[utils::ToIndex(GetPreviewTextureIndex(type))].m_Dirty = false;
+	}
+
+	bool RenderResourceRegistry::IsIBLPreviewDirty(IBLPreviewType type) const noexcept
+	{
+		return m_IBLPreviewStates[utils::ToIndex(type)].m_Dirty;
+	}
+
+	bool RenderResourceRegistry::IsIBLPreviewRequested(IBLPreviewType type) const noexcept
+	{
+		return m_IBLPreviewStates[utils::ToIndex(type)].m_Requested;
+	}
+
+	uint64_t RenderResourceRegistry::GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept
+	{
+		return m_IBLPreviewStates[utils::ToIndex(type)].m_UpdateCount;
+	}
+
+	RenderResourceRegistry::TextureIndex RenderResourceRegistry::GetPreviewTextureIndex(
+		IBLPreviewType type) noexcept
+	{
+		switch (type)
+		{
+		case IBLPreviewType::Environment:
+			return TextureIndex::Preview_IBL_EnvironmentCubemap;
+		case IBLPreviewType::Irradiance:
+			return TextureIndex::Preview_IBL_IrradianceCubemap;
+		case IBLPreviewType::PrefilteredSpecular:
+			return TextureIndex::Preview_IBL_PrefilteredSpecularCubemap;
+		default:
+			GGLAB_ASSERT_MSG(false, "Unknown IBL preview type.");
+			return TextureIndex::Preview_IBL_EnvironmentCubemap;
+		}
 	}
 
 	void RenderResourceRegistry::FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept
@@ -326,6 +460,7 @@ namespace gglab
 				DestroyTexture(static_cast<TextureIndex>(index), fencePoint);
 			}
 		}
+		MarkAllIBLPreviewsDirty();
 	}
 
 	void RenderResourceRegistry::EnsureTexture(TextureIndex index,

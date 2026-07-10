@@ -5,6 +5,8 @@
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Core/Math/MathFunctions.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Renderer.h"
@@ -17,7 +19,9 @@ namespace gglab
 		{
 			float m_BrdfLutPreviewSize = 256.0f;
 			float m_EnvironmentPreviewWidth = 512.0f;
+			float m_IrradiancePreviewWidth = 512.0f;
 			float m_PrefilteredSpecularPreviewWidth = 512.0f;
+			std::string m_EnvironmentSelectionStatus;
 			bool m_ShowMetadata = true;
 			bool m_FlipPreviewY = false;
 		};
@@ -103,6 +107,47 @@ namespace gglab
 
 			return changed;
 		}
+
+		static void DrawBakeState(IBLBakeState state) noexcept
+		{
+			switch (state)
+			{
+			case IBLBakeState::Ready:
+				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
+				break;
+			case IBLBakeState::Dirty:
+				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Bake Pending");
+				break;
+			default:
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Unavailable");
+				break;
+			}
+		}
+
+		static void DrawBakePipelineStatus(const IBLDiagnosticsSnapshot& snapshot) noexcept
+		{
+			if (!ImGui::BeginTable("IBLBakePipelineStatus", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+			{
+				return;
+			}
+
+			ImGui::TableSetupColumn("Stage");
+			ImGui::TableSetupColumn("Status");
+			ImGui::TableHeadersRow();
+			const auto drawRow = [](const char* name, const IBLTextureDiagnostics& texture) noexcept
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(name);
+					ImGui::TableSetColumnIndex(1);
+					DrawBakeState(texture.m_BakeState);
+				};
+			drawRow("Environment", snapshot.m_Environment);
+			drawRow("Irradiance", snapshot.m_Irradiance);
+			drawRow("Prefiltered Specular", snapshot.m_PrefilteredSpecular);
+			drawRow("BRDF LUT", snapshot.m_BrdfLut);
+			ImGui::EndTable();
+		}
 	}
 
 	void IBLViewerPanel::Draw(DevelopGuiContext& context) noexcept
@@ -127,6 +172,59 @@ namespace gglab
 		}
 
 		auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
+		renderResRegistry->EnsureIblResources();
+		const auto* diagnosticsSnapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>() : nullptr;
+
+		if (diagnosticsSnapshot && ImGui::CollapsingHeader("Environment Source", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const auto activeIndex = diagnosticsSnapshot->m_ActiveEnvironmentIndex;
+			const char* activeLabel = "<Procedural Fallback>";
+			if (activeIndex < diagnosticsSnapshot->m_Environments.size())
+			{
+				activeLabel = diagnosticsSnapshot->m_Environments[activeIndex].m_DisplayName.c_str();
+			}
+
+			if (ImGui::BeginCombo("HDR Environment", activeLabel))
+			{
+				for (const auto& entry : diagnosticsSnapshot->m_Environments)
+				{
+					const bool selected = entry.m_Active;
+					if (ImGui::Selectable(entry.m_DisplayName.c_str(), selected) && environmentSystem)
+					{
+						if (environmentSystem->SelectEnvironment(entry.m_Index))
+						{
+							state.m_EnvironmentSelectionStatus = "Selected " + entry.m_DisplayName + "; IBL rebake scheduled.";
+						}
+						else
+						{
+							state.m_EnvironmentSelectionStatus = "Failed to load " + entry.m_DisplayName + ".";
+						}
+						context.m_Diagnostics->Invalidate<IBLDiagnosticsSnapshot>();
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			if (activeIndex < diagnosticsSnapshot->m_Environments.size())
+			{
+				ImGui::TextWrapped("%s", diagnosticsSnapshot->m_Environments[activeIndex].m_Path.string().c_str());
+			}
+			if (!state.m_EnvironmentSelectionStatus.empty())
+			{
+				ImGui::TextDisabled("%s", state.m_EnvironmentSelectionStatus.c_str());
+			}
+		}
+
+		if (diagnosticsSnapshot && ImGui::CollapsingHeader("Bake Pipeline", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			DrawBakePipelineStatus(*diagnosticsSnapshot);
+		}
+
 		if (environmentSystem && ImGui::CollapsingHeader("Environment Settings", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			const auto settings = environmentSystem->GetSettings();
@@ -164,6 +262,8 @@ namespace gglab
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		constexpr TextureIndex EnvironmentIndex = TextureIndex::IBL_EnvironmentCubemap;
 		constexpr TextureIndex EnvironmentPreviewIndex = TextureIndex::Preview_IBL_EnvironmentCubemap;
+		constexpr TextureIndex IrradianceIndex = TextureIndex::IBL_IrradianceCubemap;
+		constexpr TextureIndex IrradiancePreviewIndex = TextureIndex::Preview_IBL_IrradianceCubemap;
 		constexpr TextureIndex PrefilteredSpecularIndex = TextureIndex::IBL_PrefilteredSpecularCubemap;
 		constexpr TextureIndex PrefilteredSpecularPreviewIndex = TextureIndex::Preview_IBL_PrefilteredSpecularCubemap;
 		constexpr TextureIndex BrdfLutIndex = TextureIndex::IBL_BrdfLut;
@@ -171,8 +271,6 @@ namespace gglab
 		// Make sure the persistent BRDF LUT resource exists.
 		// This only creates the texture and descriptor if missing.
 		// Actual content is generated by RenderPassIBLBrdfLUT.
-		renderResRegistry->EnsureIblResources();
-
 		const auto* brdfLutDesc = renderResRegistry->GetTextureDesc(BrdfLutIndex);
 		if (!brdfLutDesc)
 		{
@@ -189,15 +287,9 @@ namespace gglab
 
 			ImGui::SameLine();
 
-			const bool isDirty = renderResRegistry->IsDirty(BrdfLutIndex);
-			if (isDirty)
-			{
-				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
-			}
-			else
-			{
-				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
-			}
+			DrawBakeState(diagnosticsSnapshot ?
+				diagnosticsSnapshot->m_BrdfLut.m_BakeState :
+				(renderResRegistry->IsDirty(BrdfLutIndex) ? IBLBakeState::Dirty : IBLBakeState::Ready));
 
 			ImGui::Checkbox("Show Metadata", &state.m_ShowMetadata);
 
@@ -283,6 +375,7 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("IBL Environment"))
 		{
+			renderResRegistry->RequestIBLPreview(RenderResourceRegistry::IBLPreviewType::Environment);
 			if (ImGui::Button("Rebuild Environment"))
 			{
 				renderResRegistry->MarkDirty(EnvironmentIndex);
@@ -290,14 +383,9 @@ namespace gglab
 
 			ImGui::SameLine();
 
-			if (renderResRegistry->IsDirty(EnvironmentIndex))
-			{
-				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
-			}
-			else
-			{
-				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
-			}
+			DrawBakeState(diagnosticsSnapshot ?
+				diagnosticsSnapshot->m_Environment.m_BakeState :
+				(renderResRegistry->IsDirty(EnvironmentIndex) ? IBLBakeState::Dirty : IBLBakeState::Ready));
 
 			if (!environmentDesc || !environmentPreviewDesc)
 			{
@@ -397,7 +485,102 @@ namespace gglab
 			const ImVec2 environmentImageSize(environmentPreviewWidth, environmentPreviewWidth * aspect);
 
 			ImGui::TextUnformatted(layoutHint);
-			ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
+			if (!diagnosticsSnapshot || diagnosticsSnapshot->m_EnvironmentPreview.m_UpdateCount > 0)
+			{
+				ImGui::Image(environmentPreviewTextureId, environmentImageSize, uv0, uv1);
+			}
+			else
+			{
+				ImGui::TextDisabled("Preview requested; it will be available next frame.");
+			}
+			if (diagnosticsSnapshot)
+			{
+				const auto& preview = diagnosticsSnapshot->m_EnvironmentPreview;
+				ImGui::TextDisabled("Preview updates: %llu%s",
+					static_cast<unsigned long long>(preview.m_UpdateCount),
+					preview.m_Dirty ? " (refresh pending)" : "");
+			}
+		}
+
+		ImGui::Spacing();
+
+		const auto* irradianceDesc = renderResRegistry->GetTextureDesc(IrradianceIndex);
+		const auto* irradiancePreviewDesc = renderResRegistry->GetTextureDesc(IrradiancePreviewIndex);
+		if (ImGui::CollapsingHeader("IBL Irradiance"))
+		{
+			renderResRegistry->RequestIBLPreview(RenderResourceRegistry::IBLPreviewType::Irradiance);
+			if (ImGui::Button("Rebuild Irradiance"))
+			{
+				renderResRegistry->MarkDirty(IrradianceIndex);
+			}
+			ImGui::SameLine();
+			DrawBakeState(diagnosticsSnapshot ? diagnosticsSnapshot->m_Irradiance.m_BakeState : IBLBakeState::Unavailable);
+
+			if (!irradianceDesc || !irradiancePreviewDesc)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Irradiance preview texture is not allocated.");
+				return;
+			}
+
+			using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
+			PreviewLayout previewLayout = renderResRegistry->GetIBLIrradiancePreviewLayout();
+			if (DrawPreviewLayoutCombo("Display Mode##IrradiancePreviewLayout", previewLayout))
+			{
+				renderResRegistry->SetIBLIrradiancePreviewLayout(previewLayout);
+			}
+
+			if (state.m_ShowMetadata)
+			{
+				ImGui::Text("Cubemap Size: %llu x %u x %u",
+					static_cast<unsigned long long>(irradianceDesc->m_Extent.m_Width),
+					irradianceDesc->m_Extent.m_Height,
+					irradianceDesc->m_ArraySize);
+				ImGui::Text("Cubemap Format: %s", devtools::EnumText(ToDXGIFormat(irradianceDesc->m_Format)).data());
+				ImGui::Text("Cubemap Shader Visible SRV Index: %u",
+					renderResRegistry->GetShaderVisibleSrvIndex(IrradianceIndex));
+			}
+
+			ImGui::SliderFloat(
+				"Irradiance Preview Width",
+				&state.m_IrradiancePreviewWidth,
+				192.0f,
+				768.0f,
+				"%.0f");
+			const ImTextureID previewTextureId = ToImGuiTextureID(
+				context.m_DevelopGuiSystem,
+				renderResRegistry->GetSrvDescriptor(IrradiancePreviewIndex));
+			if (!previewTextureId)
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Irradiance preview SRV is invalid.");
+				return;
+			}
+
+			const float previewWidth = std::clamp(state.m_IrradiancePreviewWidth, 16.0f, 2048.0f);
+			ImVec2 uv1(1.0f, 1.0f);
+			float aspect = 3.0f / 4.0f;
+			const char* layoutHint = "Cross Layout: +Y / -X +Z +X -Z / -Y";
+			if (previewLayout == PreviewLayout::Grid2x3)
+			{
+				uv1 = ImVec2(3.0f / 4.0f, 2.0f / 3.0f);
+				aspect = 2.0f / 3.0f;
+				layoutHint = "2x3 Layout: +X -X +Y / -Y +Z -Z";
+			}
+			ImGui::TextUnformatted(layoutHint);
+			if (!diagnosticsSnapshot || diagnosticsSnapshot->m_IrradiancePreview.m_UpdateCount > 0)
+			{
+				ImGui::Image(previewTextureId, ImVec2(previewWidth, previewWidth * aspect), ImVec2(0.0f, 0.0f), uv1);
+			}
+			else
+			{
+				ImGui::TextDisabled("Preview requested; it will be available next frame.");
+			}
+			if (diagnosticsSnapshot)
+			{
+				const auto& preview = diagnosticsSnapshot->m_IrradiancePreview;
+				ImGui::TextDisabled("Preview updates: %llu%s",
+					static_cast<unsigned long long>(preview.m_UpdateCount),
+					preview.m_Dirty ? " (refresh pending)" : "");
+			}
 		}
 
 		ImGui::Spacing();
@@ -407,6 +590,7 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("IBL Prefiltered Specular"))
 		{
+			renderResRegistry->RequestIBLPreview(RenderResourceRegistry::IBLPreviewType::PrefilteredSpecular);
 			if (ImGui::Button("Rebuild Prefiltered Specular"))
 			{
 				renderResRegistry->MarkDirty(PrefilteredSpecularIndex);
@@ -414,14 +598,9 @@ namespace gglab
 
 			ImGui::SameLine();
 
-			if (renderResRegistry->IsDirty(PrefilteredSpecularIndex))
-			{
-				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Dirty");
-			}
-			else
-			{
-				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
-			}
+			DrawBakeState(diagnosticsSnapshot ?
+				diagnosticsSnapshot->m_PrefilteredSpecular.m_BakeState :
+				(renderResRegistry->IsDirty(PrefilteredSpecularIndex) ? IBLBakeState::Dirty : IBLBakeState::Ready));
 
 			if (!prefilteredSpecularDesc || !prefilteredSpecularPreviewDesc)
 			{
@@ -518,7 +697,21 @@ namespace gglab
 				prefilteredSpecularPreviewWidth * aspect);
 
 			ImGui::TextUnformatted(layoutHint);
-			ImGui::Image(prefilteredSpecularPreviewTextureId, prefilteredSpecularImageSize, uv0, uv1);
+			if (!diagnosticsSnapshot || diagnosticsSnapshot->m_PrefilteredSpecularPreview.m_UpdateCount > 0)
+			{
+				ImGui::Image(prefilteredSpecularPreviewTextureId, prefilteredSpecularImageSize, uv0, uv1);
+			}
+			else
+			{
+				ImGui::TextDisabled("Preview requested; it will be available next frame.");
+			}
+			if (diagnosticsSnapshot)
+			{
+				const auto& preview = diagnosticsSnapshot->m_PrefilteredSpecularPreview;
+				ImGui::TextDisabled("Preview updates: %llu%s",
+					static_cast<unsigned long long>(preview.m_UpdateCount),
+					preview.m_Dirty ? " (refresh pending)" : "");
+			}
 		}
 	}
 }
