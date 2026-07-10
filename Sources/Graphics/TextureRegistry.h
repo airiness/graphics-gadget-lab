@@ -83,6 +83,9 @@ namespace gglab
 
 		Texture* GetTexture(TextureID textureId) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
+		const RHITextureDesc* GetTextureDesc(TextureID textureId) const noexcept;
+		RHIDescriptorHandle GetSrvDescriptor(TextureID textureId) const noexcept;
+		uint32_t GetShaderVisibleSrvIndex(TextureID textureId) const noexcept;
 
 		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
 

@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -85,6 +86,12 @@ namespace gglab
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
 
+		EnvironmentLightingSystem::CreateInfo environmentLightingCreateInfo{};
+		environmentLightingCreateInfo.m_TextureRegistry = m_TextureRegistry.get();
+		environmentLightingCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
+		m_EnvironmentLightingSystem = std::make_unique<EnvironmentLightingSystem>(environmentLightingCreateInfo);
+		m_EnvironmentLightingSystem->Initialize("Assets/Textures/Skybox");
+
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
 
@@ -105,6 +112,7 @@ namespace gglab
 
 		m_RHIContext->WaitIdle();
 
+		m_EnvironmentLightingSystem.reset();
 		m_RenderResRegistry.reset();
 		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
 		m_TextureRegistry.reset();

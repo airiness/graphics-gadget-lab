@@ -22,10 +22,21 @@ namespace gglab
 	{
 		// IBL_EnvironmentCubemap
 		{
+			auto maxMipLevels = [](uint32_t size) noexcept -> uint32_t
+				{
+					uint32_t levels = 1;
+					while (size > 1)
+					{
+						size >>= 1;
+						++levels;
+					}
+					return levels;
+				};
+
 			RHITextureDesc desc{};
 			desc.m_Extent = { createInfo.m_EnvironmentCubemapSize, createInfo.m_EnvironmentCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
-			desc.m_MipLevels = 1;
+			desc.m_MipLevels = static_cast<uint16_t>(maxMipLevels(createInfo.m_EnvironmentCubemapSize));
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
 			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
