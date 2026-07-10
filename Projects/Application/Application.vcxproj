@@ -155,6 +155,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.cpp" />
@@ -289,6 +290,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureLoader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp" />
@@ -349,6 +351,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h" />
     <ClInclude Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.h" />
@@ -542,6 +545,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureLoader.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h" />
@@ -595,6 +599,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentMip.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl" />

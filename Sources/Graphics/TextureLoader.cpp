@@ -5,6 +5,8 @@
 
 #include <DirectXTex.h>
 
+#include <cctype>
+
 namespace gglab
 {
 	namespace
@@ -125,7 +127,12 @@ namespace gglab
 			return {};
 		}
 
-		const std::string extension = texPath.extension().string();
+		std::string extension = texPath.extension().string();
+		std::ranges::transform(extension, extension.begin(),
+			[](unsigned char value) noexcept
+			{
+				return static_cast<char>(std::tolower(value));
+			});
 
 		DirectX::TexMetadata metadata;
 		DirectX::ScratchImage scratchImage;
@@ -136,6 +143,13 @@ namespace gglab
 			hr = DirectX::LoadFromDDSFile(
 				texPath.c_str(),
 				DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB,
+				&metadata,
+				scratchImage);
+		}
+		else if (extension == ".hdr")
+		{
+			hr = DirectX::LoadFromHDRFile(
+				texPath.c_str(),
 				&metadata,
 				scratchImage);
 		}
@@ -164,6 +178,28 @@ namespace gglab
 				texPath.string(),
 				FormatHResult(hr));
 			return {};
+		}
+
+		if (extension == ".hdr" && metadata.format != DXGI_FORMAT_R16G16B16A16_FLOAT)
+		{
+			DirectX::ScratchImage convertedImage;
+			hr = DirectX::Convert(
+				scratchImage.GetImages(),
+				scratchImage.GetImageCount(),
+				metadata,
+				DXGI_FORMAT_R16G16B16A16_FLOAT,
+				DirectX::TEX_FILTER_DEFAULT,
+				DirectX::TEX_THRESHOLD_DEFAULT,
+				convertedImage);
+			if (FAILED(hr))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to convert HDR texture '{}': {}",
+					texPath.string(),
+					FormatHResult(hr));
+				return {};
+			}
+
+			return ConvertScratchImage(convertedImage, TextureColorSpace::Linear);
 		}
 
 		return ConvertScratchImage(scratchImage, colorSpace);

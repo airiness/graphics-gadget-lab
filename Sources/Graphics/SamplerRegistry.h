@@ -15,6 +15,7 @@ namespace gglab
 
 		LinearClamp,
 		LinearWrap,
+		LinearWrapUClampV,
 
 		AnisotropicClamp,
 		AnisotropicWrap,

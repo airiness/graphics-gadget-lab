@@ -1,6 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/SamplerRegistry.h"
+#include "Graphics/TextureRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
@@ -13,18 +16,25 @@ namespace gglab
 		struct IBLEnvironmentPassParameters
 		{
 			uint32_t CubemapFaceIndex = 0;
-			uint32_t Padding[3]{};
+			uint32_t SourceTextureIndex = 0;
+			uint32_t SourceSamplerIndex = 0;
+			uint32_t SourceMode = 0;
 		};
 		static_assert(IsPassRootConstantStruct<IBLEnvironmentPassParameters>);
 		static_assert(sizeof(IBLEnvironmentPassParameters) == 16);
 
 		struct PassData
 		{
+			RGTextureId m_SourceEquirectangular{};
 			RGTextureId m_EnvironmentCubemap{};
 			std::array<RGTextureViewId, CubemapFaceCount> m_Rtvs{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			uint32_t m_SourceTextureIndex = 0;
+			uint32_t m_SourceSamplerIndex = 0;
+			uint32_t m_SourceMode = 0;
+			bool m_HasMipChain = false;
 		};
 	}
 
@@ -37,6 +47,29 @@ namespace gglab
 
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
+		auto* textureRegistry = renderer->GetTextureRegistry();
+		GGLAB_ASSERT_NOT_NULL(textureRegistry);
+
+		RHITextureHandle sourceTextureHandle{};
+		RHITextureDesc sourceTextureDesc{};
+		uint32_t sourceTextureIndex = 0;
+		uint32_t sourceSamplerIndex = 0;
+		bool hasHdrSource = false;
+		if (const auto* environmentSystem = renderer->GetEnvironmentLightingSystem())
+		{
+			const TextureID sourceTextureId = environmentSystem->GetActiveTextureId();
+			const auto* sourceTexture = textureRegistry->GetTexture(sourceTextureId);
+			const auto* sourceDesc = textureRegistry->GetTextureDesc(sourceTextureId);
+			if (sourceTexture && sourceDesc && sourceTexture->m_Texture.IsValid())
+			{
+				sourceTextureHandle = sourceTexture->m_Texture;
+				sourceTextureDesc = *sourceDesc;
+				sourceTextureIndex = textureRegistry->GetShaderVisibleSrvIndex(sourceTextureId);
+				sourceSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+					SamplerPreset::LinearWrapUClampV);
+				hasHdrSource = true;
+			}
+		}
 
 		const auto shouldBuild = renderResRegistry->IsDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 
@@ -48,9 +81,25 @@ namespace gglab
 		EnsureInitialized(services);
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
+			[renderResRegistry,
+				sourceTextureHandle,
+				sourceTextureDesc,
+				sourceTextureIndex,
+				sourceSamplerIndex,
+				hasHdrSource](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
+				if (hasHdrSource)
+				{
+					data.m_SourceEquirectangular = builder.ImportTexture(
+						"IBL.SourceEquirectangular",
+						sourceTextureHandle,
+						sourceTextureDesc,
+						RGTextureAccess::Sample);
+					data.m_SourceEquirectangular = builder.Read(
+						data.m_SourceEquirectangular,
+						RGTextureAccess::Sample);
+				}
 
 				auto& blackboard = builder.GetBlackboard();
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
@@ -58,10 +107,18 @@ namespace gglab
 				const auto* textureDesc = renderResRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(textureDesc);
-	
+
+				const RHISubresourceRange mipZeroRange{
+					.m_BaseMip = 0,
+					.m_MipCount = 1,
+					.m_BaseArraySlice = 0,
+					.m_ArraySliceCount = CubemapFaceCount,
+					.m_Aspects = RHITextureAspect::Color,
+				};
 				builder.WriteInPlace(
 					iblRes.m_EnvironmentCubemap,
-					RGTextureAccess::RenderTarget);
+					RGTextureAccess::RenderTarget,
+					mipZeroRange);
 				data.m_EnvironmentCubemap = iblRes.m_EnvironmentCubemap;
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
@@ -73,6 +130,10 @@ namespace gglab
 
 				data.m_Width = textureDesc->m_Extent.m_Width;
 				data.m_Height = textureDesc->m_Extent.m_Height;
+				data.m_SourceTextureIndex = sourceTextureIndex;
+				data.m_SourceSamplerIndex = sourceSamplerIndex;
+				data.m_SourceMode = hasHdrSource ? 1u : 0u;
+				data.m_HasMipChain = textureDesc->m_MipLevels > 1;
 			},
 			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -90,6 +151,9 @@ namespace gglab
 
 					const IBLEnvironmentPassParameters passParameters{
 						.CubemapFaceIndex = face,
+						.SourceTextureIndex = data.m_SourceTextureIndex,
+						.SourceSamplerIndex = data.m_SourceSamplerIndex,
+						.SourceMode = data.m_SourceMode,
 					};
 					commandContext->SetPushConstants(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
@@ -98,7 +162,10 @@ namespace gglab
 					commandContext->Draw(3);
 				}
 
-				renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				if (!data.m_HasMipChain)
+				{
+					renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				}
 			});
 
 	}

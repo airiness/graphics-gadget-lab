@@ -8,6 +8,7 @@
 #include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIResource.h"
+#include "Graphics/RHI/RHITexture.h"
 #include "Core/Utility/TypeUtils.h"
 
 #include <cstdint>
@@ -70,6 +71,7 @@ namespace gglab
 		MetallicRoughness,
 		Occlusion,
 		UVTest,
+		Environment,
 		GenericColor,
 		GenericData,
 		Unknown
@@ -278,6 +280,7 @@ namespace gglab
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
 		RHITextureHandle m_Texture;
+		RHITextureDesc m_Desc{};
 		bool m_IsUploaded = false;
 	};
 

@@ -210,6 +210,14 @@ namespace gglab
 			key.m_AddressW = RHITextureAddressMode::Wrap;
 			break;
 		}
+		case SamplerPreset::LinearWrapUClampV:
+		{
+			key.m_Filter = RHISamplerFilter::MinMagMipLinear;
+			key.m_AddressU = RHITextureAddressMode::Wrap;
+			key.m_AddressV = RHITextureAddressMode::Clamp;
+			key.m_AddressW = RHITextureAddressMode::Clamp;
+			break;
+		}
 		case SamplerPreset::AnisotropicClamp:
 		{
 			key.m_Filter = RHISamplerFilter::Anisotropic;

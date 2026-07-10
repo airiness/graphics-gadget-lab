@@ -609,6 +609,9 @@
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -622,6 +625,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp">
@@ -1337,6 +1343,9 @@
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1350,6 +1359,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h">
@@ -1498,6 +1510,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl">

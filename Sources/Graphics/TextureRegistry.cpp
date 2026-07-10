@@ -294,6 +294,32 @@ namespace gglab
 		return nullptr;
 	}
 
+	const RHITextureDesc* TextureRegistry::GetTextureDesc(TextureID textureId) const noexcept
+	{
+		const auto* texture = GetTexture(textureId);
+		return texture && texture->m_IsUploaded ? &texture->m_Desc : nullptr;
+	}
+
+	RHIDescriptorHandle TextureRegistry::GetSrvDescriptor(TextureID textureId) const noexcept
+	{
+		const auto* texture = GetTexture(textureId);
+		if (!texture || !texture->m_IsUploaded || !texture->m_Srv.IsValid())
+		{
+			return {};
+		}
+
+		return m_Device->GetTextureViewDescriptor(texture->m_Srv);
+	}
+
+	uint32_t TextureRegistry::GetShaderVisibleSrvIndex(TextureID textureId) const noexcept
+	{
+		const RHIDescriptorHandle descriptor = GetSrvDescriptor(textureId);
+		GGLAB_ASSERT_MSG(
+			descriptor.IsValid() && descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
+			"TextureRegistry::GetShaderVisibleSrvIndex: texture SRV descriptor is invalid.");
+		return descriptor.m_Index;
+	}
+
 	uint32_t TextureRegistry::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
 	{
 		const auto resolveSrvIndex = [this](RHITextureViewHandle srv) noexcept -> uint32_t
@@ -449,6 +475,8 @@ namespace gglab
 		{
 			return false;
 		}
+		texture->m_Desc = textureDesc;
+		texture->m_Desc.m_DebugName = nullptr;
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		if (!transferBatch.UploadTexture(texture->m_Texture, textureUploadData))
@@ -510,6 +538,7 @@ namespace gglab
 				texture->m_IsUploaded = false;
 				texture->m_Srv.Reset();
 				texture->m_Texture.Reset();
+				texture->m_Desc = {};
 			}
 		}
 	}
