@@ -97,7 +97,7 @@ struct ViewData
 	float Far;
 	float FovRadians;
 	float Aspect;
-	float Exposure;
+	float ExposureMultiplier;
 	uint Width;
 	uint Height;
 	uint Padding;

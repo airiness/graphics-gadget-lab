@@ -8,12 +8,14 @@ namespace gglab
 		m_Position(info.m_Position),
 		m_Near(info.m_Near),
 		m_Far(info.m_Far),
-		m_Fov(info.m_Fov)
+		m_Fov(info.m_Fov),
+		m_ExposureCompensationEV(info.m_ExposureCompensationEV)
 	{
 		// sanitize
 		m_Near = ClampNear(m_Near);
 		m_Far = ClampFar(m_Near, m_Far);
 		m_Fov = ClampFov(m_Fov);
+		m_ExposureCompensationEV = ClampExposureCompensationEV(m_ExposureCompensationEV);
 
 		auto width = std::max(1u, info.m_Width);
 		auto height = std::max(1u, info.m_Height);
@@ -99,6 +101,21 @@ namespace gglab
 		MarkProjDirty();
 	}
 
+	float Camera::GetExposureMultiplier() const noexcept
+	{
+		return std::exp2(m_ExposureCompensationEV);
+	}
+
+	void Camera::SetExposureCompensationEV(float ev) noexcept
+	{
+		if (!math::IsFinite(ev))
+		{
+			return;
+		}
+
+		m_ExposureCompensationEV = ClampExposureCompensationEV(ev);
+	}
+
 	void Camera::OnResize(uint32_t width, uint32_t height) noexcept
 	{
 		width = std::max(1u, width);
@@ -130,6 +147,11 @@ namespace gglab
 	float Camera::ClampFov(float fov) noexcept
 	{
 		return std::clamp(fov, 1.0f, 179.0f);
+	}
+
+	float Camera::ClampExposureCompensationEV(float ev) noexcept
+	{
+		return std::clamp(ev, -10.0f, 10.0f);
 	}
 
 	void Camera::UpdateProjMatrix() noexcept

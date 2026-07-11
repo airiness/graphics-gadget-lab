@@ -15,6 +15,7 @@ namespace gglab
 			float m_Near = 0.01f;
 			float m_Far = 1000.0f;
 			float m_Fov = 60.0f;
+			float m_ExposureCompensationEV = 0.0f;
 
 			uint32_t m_Width = 1280;
 			uint32_t m_Height = 720;
@@ -38,6 +39,8 @@ namespace gglab
 		float GetFar() const noexcept { return m_Far; }
 		float GetFov() const noexcept { return m_Fov; }
 		float GetAspect() const noexcept { return m_Aspect; }
+		float GetExposureCompensationEV() const noexcept { return m_ExposureCompensationEV; }
+		float GetExposureMultiplier() const noexcept;
 
 		float GetYaw() const noexcept { return m_Yaw; }
 		float GetPitch() const noexcept { return m_Pitch; }
@@ -47,6 +50,7 @@ namespace gglab
 		void SetNearFar(float nearZ, float farZ) noexcept;
 		void SetFov(float fovDegrees) noexcept;
 		void SetAspect(float aspect) noexcept;
+		void SetExposureCompensationEV(float ev) noexcept;
 
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 
@@ -56,6 +60,7 @@ namespace gglab
 		static float ClampNear(float nearZ) noexcept;
 		static float ClampFar(float nearZ, float farZ) noexcept;
 		static float ClampFov(float fov) noexcept;
+		static float ClampExposureCompensationEV(float ev) noexcept;
 
 	private:
 		void MarkViewDirty() noexcept { m_ViewDirty = true; }
@@ -82,6 +87,7 @@ namespace gglab
 		float m_Far = 1000.0f;
 		float m_Aspect = 1.0f;
 		float m_Fov = 60.0f;	// degrees
+		float m_ExposureCompensationEV = 0.0f;
 
 		float m_Pitch = 0.0f;	// radians
 		float m_Yaw = 0.0f;		// radians

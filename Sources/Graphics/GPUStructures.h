@@ -111,11 +111,12 @@ namespace gglab
 		float Far;
 		float FovRadians;
 		float Aspect;
-		float Exposure;
+		float ExposureMultiplier;
 		uint32_t Width;
 		uint32_t Height;
 		uint32_t Padding;
 	};
+	static_assert(sizeof(ViewGPU) == 304);
 	static constexpr uint32_t MaxViewCapacity = 
 		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
 }

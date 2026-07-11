@@ -28,7 +28,7 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 		g_Pass.SceneColorSamplerIndex,
 		IN.UV).rgb);
 
-	float3 color = ACESFitted(hdrColor * viewData.Exposure);
+	float3 color = ACESFitted(hdrColor * viewData.ExposureMultiplier);
 	color = LinearToSRGB(color);
 
 	return float4(color, 1.0);

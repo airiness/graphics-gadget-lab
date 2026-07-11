@@ -32,6 +32,7 @@ namespace gglab
 			float m_FovDegree = 60.0f;
 			float m_NearZ = 0.01f;
 			float m_FarZ = 1000.0f;
+			float m_ExposureCompensationEV = 0.0f;
 
 			// controller params
 			CameraController::Params m_CtrlParams{};
@@ -59,6 +60,7 @@ namespace gglab
 			state.m_FovDegree = camera.GetFov();
 			state.m_NearZ = camera.GetNear();
 			state.m_FarZ = camera.GetFar();
+			state.m_ExposureCompensationEV = camera.GetExposureCompensationEV();
 		}
 
 		static void PullFromController(CameraPanelState& state, const CameraController& camCtrl) noexcept
@@ -72,11 +74,14 @@ namespace gglab
 			state.m_FovDegree = Camera::ClampFov(state.m_FovDegree);
 			state.m_NearZ = Camera::ClampNear(state.m_NearZ);
 			state.m_FarZ = Camera::ClampFar(state.m_NearZ, state.m_FarZ);
+			state.m_ExposureCompensationEV =
+				Camera::ClampExposureCompensationEV(state.m_ExposureCompensationEV);
 
 			camera.SetPosition(Vector3{ state.m_Pos[0], state.m_Pos[1], state.m_Pos[2] });
 			camera.SetYawPitch(math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree));
 			camera.SetFov(state.m_FovDegree);
 			camera.SetNearFar(state.m_NearZ, state.m_FarZ);
+			camera.SetExposureCompensationEV(state.m_ExposureCompensationEV);
 
 			// Update camera
 			camera.Update();
@@ -370,6 +375,27 @@ namespace gglab
 		camChanged |= ImGui::DragFloat("FOV (degree)", &state.m_FovDegree, 0.1f, 1.0f, 179.0f);
 		camChanged |= ImGui::DragFloat("Near", &state.m_NearZ, 0.001f, 0.0001f, 100.0f);
 		camChanged |= ImGui::DragFloat("Far", &state.m_FarZ, 1.0f, 0.1f, 100000.0f);
+
+		ImGui::SeparatorText("Exposure");
+		camChanged |= ImGui::SliderFloat(
+			"Exposure Compensation",
+			&state.m_ExposureCompensationEV,
+			-10.0f,
+			10.0f,
+			"%+.2f EV",
+			ImGuiSliderFlags_AlwaysClamp);
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+		{
+			ImGui::SetTooltip(
+				"Adjusts image brightness in photographic stops.\n"
+				"+1 EV doubles exposure; -1 EV halves it.");
+		}
+		ImGui::Text("Exposure Multiplier: %.4fx", std::exp2(state.m_ExposureCompensationEV));
+		if (ImGui::Button("Reset Exposure"))
+		{
+			state.m_ExposureCompensationEV = 0.0f;
+			camChanged = true;
+		}
 
 		// Controller params
 		ImGui::SeparatorText("Controller");
