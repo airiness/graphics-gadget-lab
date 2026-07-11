@@ -36,16 +36,22 @@ namespace gglab
 
 		void Tick(const RHIFencePoint& lastSubmittedFence) noexcept;
 		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept;
+		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept;
 		void OnFrameSubmitted(const RHIFencePoint& fencePoint) noexcept;
 		void OnFrameAborted() noexcept;
 
 		[[nodiscard]] IBLBakeStage GetStageForRecording() const noexcept;
+		[[nodiscard]] bool ShouldInitializeBakeResources() const noexcept
+		{
+			return m_BakeResourcesNeedInitialization;
+		}
 		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept { return m_Status.m_BakingGeneration; }
 		[[nodiscard]] const IBLBakeConfig& GetBakingConfig() const noexcept { return m_BakingConfig; }
 		[[nodiscard]] const IBLBakeStatus& GetStatus() const noexcept { return m_Status; }
 
 	private:
 		void StartRequestedBake(const RHIFencePoint& retireFence) noexcept;
+		void ContinueRequestedBakeAfterInitialization() noexcept;
 		void AdvanceCompletedStage() noexcept;
 		bool UploadCachePayload(const IBLBakeCachePayload& payload) noexcept;
 		bool StartCacheReadback() noexcept;
@@ -68,6 +74,9 @@ namespace gglab
 		RHIFencePoint m_InFlightFence{};
 		IBLBakeStage m_CompletedStage = IBLBakeStage::Idle;
 		IBLBakeStage m_ExecutedStage = IBLBakeStage::Idle;
+		bool m_BakeResourcesNeedInitialization = false;
+		bool m_BakeResourceInitializationExecuted = false;
+		bool m_BakeResourceInitializationInFlight = false;
 		bool m_CacheUploadInFlight = false;
 		bool m_CacheReadbackInFlight = false;
 

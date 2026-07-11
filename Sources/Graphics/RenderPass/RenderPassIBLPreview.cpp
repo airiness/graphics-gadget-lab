@@ -23,10 +23,6 @@ namespace gglab
 		static_assert(IsPassRootConstantStruct<IBLCubemapPreviewPassParameters>);
 		static_assert(sizeof(IBLCubemapPreviewPassParameters) == 16);
 
-		struct PreviewResourcesPassData
-		{
-		};
-
 		struct CubemapPreviewPassData
 		{
 			RGTextureId m_SourceCubemap{};
@@ -52,38 +48,6 @@ namespace gglab
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 		EnsureInitialized(services);
-
-		const std::string resourcesPassName = MakeRenderGraphPassName("Resources");
-		rg.AddPass<PreviewResourcesPassData>(resourcesPassName.c_str(),
-			[renderResRegistry](RenderGraph::RGBuilder& builder, PreviewResourcesPassData&)
-			{
-				auto& previewResources = builder.GetBlackboard()
-					.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
-
-				auto importPreview = [&builder, renderResRegistry](
-					RenderResourceRegistry::TextureIndex index,
-					const char* name) noexcept
-					{
-						const auto* desc = renderResRegistry->GetTextureDesc(index);
-						GGLAB_ASSERT_NOT_NULL(desc);
-						return builder.ImportTexture(
-							name,
-							renderResRegistry->GetTextureHandle(index),
-							*desc,
-							RGTextureAccess::None);
-					};
-
-				previewResources.m_EnvironmentCubemapPreview = importPreview(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap,
-					"Preview.IBL.EnvironmentCubemap");
-				previewResources.m_IrradianceCubemapPreview = importPreview(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_IrradianceCubemap,
-					"Preview.IBL.IrradianceCubemap");
-				previewResources.m_PrefilteredSpecularCubemapPreview = importPreview(
-					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
-					"Preview.IBL.PrefilteredSpecularCubemap");
-
-			});
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		using PreviewType = RenderResourceRegistry::IBLPreviewType;

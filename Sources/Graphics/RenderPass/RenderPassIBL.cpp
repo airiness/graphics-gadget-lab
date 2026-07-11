@@ -71,9 +71,34 @@ namespace gglab
 					"IBL.Bake.BrdfLut",
 					true);
 
+				auto& previewResources = builder.GetBlackboard()
+					.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
+				auto importPreview = [&builder, renderResRegistry](
+					RenderResourceRegistry::TextureIndex index,
+					const char* name) noexcept
+					{
+						const auto* desc = renderResRegistry->GetTextureDesc(index);
+						GGLAB_ASSERT_NOT_NULL(desc);
+						return builder.ImportTexture(
+							name,
+							renderResRegistry->GetTextureHandle(index),
+							*desc,
+							RGTextureAccess::None);
+					};
+				previewResources.m_EnvironmentCubemapPreview = importPreview(
+					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap,
+					"Preview.IBL.EnvironmentCubemap");
+				previewResources.m_IrradianceCubemapPreview = importPreview(
+					RenderResourceRegistry::TextureIndex::Preview_IBL_IrradianceCubemap,
+					"Preview.IBL.IrradianceCubemap");
+				previewResources.m_PrefilteredSpecularCubemapPreview = importPreview(
+					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
+					"Preview.IBL.PrefilteredSpecularCubemap");
+
 			});
 
 		m_IBLClearPass.AddPass(rg, context, services);
+		m_IBLClearPass.AddBakePass(rg, context, services);
 
 		switch (bakeScheduler->GetStageForRecording())
 		{

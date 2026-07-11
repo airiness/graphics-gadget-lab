@@ -47,7 +47,13 @@ namespace gglab
 			}
 
 			m_InFlightFence = {};
-			if (m_CacheReadbackInFlight)
+			if (m_BakeResourceInitializationInFlight)
+			{
+				m_BakeResourceInitializationInFlight = false;
+				ContinueRequestedBakeAfterInitialization();
+				return;
+			}
+			else if (m_CacheReadbackInFlight)
 			{
 				m_CacheReadbackInFlight = false;
 				StartCacheWrite();
@@ -96,11 +102,27 @@ namespace gglab
 		m_RenderResourceRegistry->EnsureIBLBakeResources(m_BakingConfig, retireFencePtr);
 		if (!m_RenderResourceRegistry->HasIBLBakeResources())
 		{
+			m_BakeResourcesNeedInitialization = false;
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
+		// Bake targets are allocated as render-target textures from heaps created
+		// with CREATE_NOT_ZEROED. They remain live across multiple bake stages, so
+		// initialize every subresource before PIX or another tool attempts to
+		// preserve their contents with a copy operation.
+		m_BakeResourcesNeedInitialization = true;
+		m_BakeResourceInitializationExecuted = false;
 
 		SetStage(IBLBakeStage::LoadingCache, 0.0f);
+	}
+
+	void IBLBakeScheduler::ContinueRequestedBakeAfterInitialization() noexcept
+	{
+		if (m_Status.m_BakingGeneration != m_Status.m_RequestedGeneration)
+		{
+			return;
+		}
+
 		IBLBakeCachePayload payload{};
 		if (!m_EnvironmentLightingSystem->ShouldIgnoreCache(m_Status.m_BakingGeneration) &&
 			m_Cache.TryLoad(m_Status.m_CacheKey, m_BakingConfig, payload) &&
@@ -175,8 +197,26 @@ namespace gglab
 		m_ExecutedStage = stage;
 	}
 
+	void IBLBakeScheduler::NotifyBakeResourcesInitialized(uint64_t generation) noexcept
+	{
+		if (!m_BakeResourcesNeedInitialization || generation != m_Status.m_BakingGeneration)
+		{
+			return;
+		}
+		m_BakeResourceInitializationExecuted = true;
+	}
+
 	void IBLBakeScheduler::OnFrameSubmitted(const RHIFencePoint& fencePoint) noexcept
 	{
+		if (m_BakeResourceInitializationExecuted)
+		{
+			m_BakeResourcesNeedInitialization = false;
+			m_BakeResourceInitializationExecuted = false;
+			m_BakeResourceInitializationInFlight = true;
+			GGLAB_ASSERT_MSG(fencePoint.IsValid(),
+				"Submitted IBL bake resource initialization requires a valid frame fence.");
+			m_InFlightFence = fencePoint;
+		}
 		if (m_ExecutedStage == IBLBakeStage::Idle)
 		{
 			return;
@@ -191,6 +231,7 @@ namespace gglab
 	void IBLBakeScheduler::OnFrameAborted() noexcept
 	{
 		m_ExecutedStage = IBLBakeStage::Idle;
+		m_BakeResourceInitializationExecuted = false;
 	}
 
 	IBLBakeStage IBLBakeScheduler::GetStageForRecording() const noexcept

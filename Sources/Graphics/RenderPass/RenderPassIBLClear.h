@@ -18,5 +18,8 @@ namespace gglab
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
+		void AddBakePass(RenderGraph& rg,
+			const RenderFrameContext& context,
+			const RenderServices& services) noexcept;
 	};
 }
