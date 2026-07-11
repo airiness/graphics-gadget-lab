@@ -33,6 +33,7 @@ namespace gglab
 
 		void Begin() noexcept override;
 		RHIFencePoint Submit(bool wait = false) noexcept override;
+		void Abort() noexcept override;
 		void ReclaimCompleted() noexcept override;
 		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset,
 			RHIBufferHandle src, uint64_t srcOffset,
