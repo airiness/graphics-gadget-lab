@@ -31,7 +31,8 @@ namespace gglab
 			view.m_Far = camera.GetFar();
 			view.m_FovRadians = math::ToRadians(camera.GetFov());
 			view.m_Aspect = camera.GetAspect();
-			view.m_Exposure = 1.0f; //camera.GetExposure();
+			view.m_ExposureCompensationEV = camera.GetExposureCompensationEV();
+			view.m_ExposureMultiplier = camera.GetExposureMultiplier();
 
 			view.m_Width = width;
 			view.m_Height = height;
@@ -184,7 +185,8 @@ namespace gglab
 		view.m_Far = shadowFar;
 		view.m_FovRadians = 0.0f;
 		view.m_Aspect = 1.0f;
-		view.m_Exposure = 1.0f;
+		view.m_ExposureCompensationEV = 0.0f;
+		view.m_ExposureMultiplier = 1.0f;
 		view.m_Width = info.m_ShadowMapSize;
 		view.m_Height = info.m_ShadowMapSize;
 

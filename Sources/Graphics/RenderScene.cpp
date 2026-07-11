@@ -278,7 +278,7 @@ namespace gglab
 			viewGpu.Far = renderView.m_Far;
 			viewGpu.FovRadians = renderView.m_FovRadians;
 			viewGpu.Aspect = renderView.m_Aspect;
-			viewGpu.Exposure = renderView.m_Exposure;
+			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
 			viewData.push_back(viewGpu);
