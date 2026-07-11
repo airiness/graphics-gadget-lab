@@ -8,8 +8,10 @@ namespace gglab
 	{
 	public:
 		explicit TransferBatch(RHITransferContext& transferContext) noexcept;
-		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(TransferBatch);
-		~TransferBatch() = default;
+		GGLAB_DELETE_COPYABLE(TransferBatch);
+		TransferBatch(TransferBatch&& other) noexcept;
+		TransferBatch& operator=(TransferBatch&& other) noexcept;
+		~TransferBatch();
 
 		bool UploadBuffer(RHIBufferHandle dstBuffer, uint64_t dstOffset,
 			const void* src, uint64_t numBytes) noexcept;
@@ -28,6 +30,8 @@ namespace gglab
 		[[nodiscard]] RHIFencePoint Submit(bool wait = false) noexcept;
 
 	private:
-		RHITransferContext& m_TransferContext;
+		void AbortIfActive() noexcept;
+
+		RHITransferContext* m_TransferContext = nullptr;
 	};
 }

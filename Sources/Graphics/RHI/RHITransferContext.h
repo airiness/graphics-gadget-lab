@@ -13,6 +13,7 @@ namespace gglab
 
 		virtual void Begin() noexcept = 0;
 		[[nodiscard]] virtual RHIFencePoint Submit(bool wait = false) noexcept = 0;
+		virtual void Abort() noexcept = 0;
 		virtual void ReclaimCompleted() noexcept = 0;
 
 		virtual void CopyBuffer(

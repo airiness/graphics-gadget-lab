@@ -164,6 +164,25 @@ namespace gglab
 		return End(wait).ToRHI();
 	}
 
+	void DX12TransferContext::Abort() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_ExecutingInfo,
+			"DX12TransferContext::Abort() called without an active transfer operation.");
+		if (!m_ExecutingInfo)
+		{
+			return;
+		}
+
+		// Close but do not execute the discarded command list. Signaling the
+		// queue gives the allocator pool a normal retirement point without
+		// exposing DX12 allocator lifetime rules through the RHI interface.
+		m_CommandList->End();
+		m_ExecutingInfo.reset();
+		const DX12FencePoint fencePoint = m_CommandQueue->Signal();
+		m_CommandAllocatorPool->RecycleCommandAllocator(m_CurrentCommandAllocator, fencePoint);
+		m_CurrentCommandAllocator = nullptr;
+	}
+
 	void DX12TransferContext::ReclaimCompleted() noexcept
 	{
 		auto iter = std::remove_if(m_InFlightInfos.begin(), m_InFlightInfos.end(),
