@@ -2,6 +2,7 @@
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHITypes.h"
+#include "Graphics/IBLBakeTypes.h"
 
 #include <filesystem>
 #include <limits>
@@ -56,9 +57,12 @@ namespace gglab
 
 		float m_Intensity = 1.0f;
 		float m_RotationRadians = 0.0f;
+		IBLQualityPreset m_QualityPreset = IBLQualityPreset::Medium;
+		IBLBakeConfig m_BakeConfig{};
 		uint32_t m_PrefilteredSpecularSampleCount = 0;
 		float m_PrefilteredSpecularMaxSampleLuminance = 0.0f;
 		bool m_SkyboxEnabled = true;
+		IBLBakeStatus m_BakeStatus{};
 
 		IBLTextureDiagnostics m_Environment;
 		IBLTextureDiagnostics m_Irradiance;

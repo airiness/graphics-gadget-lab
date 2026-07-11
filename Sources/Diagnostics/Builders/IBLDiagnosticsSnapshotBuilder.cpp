@@ -2,6 +2,7 @@
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
@@ -54,7 +55,8 @@ namespace gglab
 		IBLDiagnosticsSnapshot snapshot{};
 		const auto* environmentSystem = renderer.GetEnvironmentLightingSystem();
 		const auto* registry = renderer.GetRenderResourceRegistry();
-		if (!environmentSystem || !registry)
+		const auto* bakeScheduler = renderer.GetIBLBakeScheduler();
+		if (!environmentSystem || !registry || !bakeScheduler)
 		{
 			return snapshot;
 		}
@@ -62,10 +64,13 @@ namespace gglab
 		const auto& settings = environmentSystem->GetSettings();
 		snapshot.m_Intensity = settings.m_Intensity;
 		snapshot.m_RotationRadians = settings.m_RotationRadians;
-		snapshot.m_PrefilteredSpecularSampleCount = settings.m_PrefilteredSpecularSampleCount;
+		snapshot.m_QualityPreset = settings.m_QualityPreset;
+		snapshot.m_BakeConfig = settings.m_BakeConfig;
+		snapshot.m_PrefilteredSpecularSampleCount = settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
 		snapshot.m_PrefilteredSpecularMaxSampleLuminance =
-			settings.m_PrefilteredSpecularMaxSampleLuminance;
+			settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
 		snapshot.m_SkyboxEnabled = settings.m_EnableSkybox;
+		snapshot.m_BakeStatus = bakeScheduler->GetStatus();
 
 		const auto environments = environmentSystem->GetEntries();
 		const auto* activeEnvironment = environmentSystem->GetActiveEnvironment();

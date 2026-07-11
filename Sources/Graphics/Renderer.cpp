@@ -1,12 +1,14 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 #include "Graphics/TransferManager.h"
+#include "Core/Utility/PathUtils.h"
 
 namespace gglab
 {
@@ -85,12 +87,22 @@ namespace gglab
 		renderResRegistryCreateInfo.m_TransientResourcePool = m_TransientResourcePool.get();
 		renderResRegistryCreateInfo.m_SamplerRegistry = m_SamplerRegistry.get();
 		m_RenderResRegistry = std::make_unique<RenderResourceRegistry>(renderResRegistryCreateInfo);
+		m_RenderResRegistry->EnsureIblResources();
 
 		EnvironmentLightingSystem::CreateInfo environmentLightingCreateInfo{};
 		environmentLightingCreateInfo.m_TextureRegistry = m_TextureRegistry.get();
 		environmentLightingCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
 		m_EnvironmentLightingSystem = std::make_unique<EnvironmentLightingSystem>(environmentLightingCreateInfo);
 		m_EnvironmentLightingSystem->Initialize("Assets/Textures/Skybox");
+
+		IBLBakeScheduler::CreateInfo iblBakeSchedulerCreateInfo{};
+		iblBakeSchedulerCreateInfo.m_Device = device;
+		iblBakeSchedulerCreateInfo.m_EnvironmentLightingSystem = m_EnvironmentLightingSystem.get();
+		iblBakeSchedulerCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
+		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();
+		iblBakeSchedulerCreateInfo.m_GpuProfiler = GetGpuProfiler();
+		iblBakeSchedulerCreateInfo.m_CacheDirectory = utils::GetExeOutDir() / "IBLCache";
+		m_IBLBakeScheduler = std::make_unique<IBLBakeScheduler>(iblBakeSchedulerCreateInfo);
 
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
@@ -112,6 +124,7 @@ namespace gglab
 
 		m_RHIContext->WaitIdle();
 
+		m_IBLBakeScheduler.reset();
 		m_EnvironmentLightingSystem.reset();
 		m_RenderResRegistry.reset();
 		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
@@ -147,6 +160,7 @@ namespace gglab
 		m_ViewSB->Tick();
 
 		m_TransientResourcePool->Tick();
+		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
 		m_HasActiveFrame = true;
 		return Frame(this, &rhiFrame);
@@ -223,6 +237,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(frame.m_RenderGraph);
 
 		m_LastSubmittedFencePoint = m_RHIContext->EndFrame(*frame.m_RHIFrame);
+		m_IBLBakeScheduler->OnFrameSubmitted(m_LastSubmittedFencePoint);
 
 		RetireSceneGpuAllocations(
 			&frame.m_SceneGpuAllocations,
@@ -237,6 +252,10 @@ namespace gglab
 		if (frame.m_State == Frame::State::Ended)
 		{
 			return;
+		}
+		if (m_IBLBakeScheduler)
+		{
+			m_IBLBakeScheduler->OnFrameAborted();
 		}
 
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,

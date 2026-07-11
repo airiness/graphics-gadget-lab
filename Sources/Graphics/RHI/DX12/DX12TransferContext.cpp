@@ -226,6 +226,16 @@ namespace gglab
 		return RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
 	}
 
+	RHIBufferOwner DX12TransferContext::CreateReadbackBuffer(uint64_t sizeInBytes) noexcept
+	{
+		RHIBufferDesc desc{};
+		desc.m_SizeInBytes = sizeInBytes;
+		desc.m_Usage = RHIBufferUsage::CopyDest;
+		desc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
+		desc.m_DebugName = "DX12TransferContext.TextureReadbackBuffer";
+		return RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
+	}
+
 	bool DX12TransferContext::UploadBuffer(const void* data, uint64_t sizeInBytes,
 		RHIBufferHandle dst, uint64_t dstOffset) noexcept
 	{
@@ -314,6 +324,97 @@ namespace gglab
 		}
 		RecordTextureUse(dst);
 		return true;
+	}
+
+	RHITextureReadbackRequest DX12TransferContext::ReadbackTexture(
+		RHITextureHandle src,
+		const RHITextureDesc& desc) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_ExecutingInfo, "ReadbackTexture must be called between Begin() and End().");
+
+		DX12Texture* srcTexture = m_Device->ResolveTexture(src);
+		if (!srcTexture || !srcTexture->IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12TransferContext::ReadbackTexture received a non-live texture handle.");
+			return {};
+		}
+
+		const uint32_t subresourceCount = static_cast<uint32_t>(desc.m_MipLevels) *
+			static_cast<uint32_t>(desc.m_ArraySize) * GetRHITexturePlaneCount(desc);
+		if (subresourceCount == 0)
+		{
+			return {};
+		}
+
+		const D3D12_RESOURCE_DESC nativeDesc = srcTexture->Get()->GetDesc();
+		std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
+		std::vector<UINT> rowCounts(subresourceCount);
+		std::vector<UINT64> rowSizes(subresourceCount);
+		UINT64 totalBytes = 0;
+		m_Device->Get()->GetCopyableFootprints(
+			&nativeDesc,
+			0,
+			subresourceCount,
+			0,
+			footprints.data(),
+			rowCounts.data(),
+			rowSizes.data(),
+			&totalBytes);
+
+		RHITextureReadbackRequest request{};
+		request.m_Buffer = CreateReadbackBuffer(totalBytes);
+		request.m_BufferSizeInBytes = totalBytes;
+		request.m_TextureDesc = desc;
+		request.m_TextureDesc.m_DebugName = nullptr;
+		if (!request.m_Buffer)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12TransferContext::ReadbackTexture failed to create a readback buffer.");
+			return {};
+		}
+
+		DX12Buffer* readbackBuffer = m_Device->ResolveBuffer(request.m_Buffer.Get());
+		GGLAB_ASSERT_NOT_NULL(readbackBuffer);
+		request.m_Subresources.reserve(subresourceCount);
+		for (uint32_t subresourceIndex = 0; subresourceIndex < subresourceCount; ++subresourceIndex)
+		{
+			D3D12_TEXTURE_COPY_LOCATION dstLocation{};
+			dstLocation.pResource = readbackBuffer->Get();
+			dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+			dstLocation.PlacedFootprint = footprints[subresourceIndex];
+
+			D3D12_TEXTURE_COPY_LOCATION srcLocation{};
+			srcLocation.pResource = srcTexture->Get();
+			srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+			srcLocation.SubresourceIndex = subresourceIndex;
+			m_CommandList->Get()->CopyTextureRegion(
+				&dstLocation,
+				0,
+				0,
+				0,
+				&srcLocation,
+				nullptr);
+
+			const uint32_t mipLevel = subresourceIndex % desc.m_MipLevels;
+			const uint32_t arraySlice = (subresourceIndex / desc.m_MipLevels) % desc.m_ArraySize;
+			const auto& footprint = footprints[subresourceIndex];
+			request.m_Subresources.push_back(
+				{
+					.m_BufferOffset = footprint.Offset,
+					.m_RowPitch = footprint.Footprint.RowPitch,
+					.m_RowSizeInBytes = rowSizes[subresourceIndex],
+					.m_SlicePitch = static_cast<uint64_t>(footprint.Footprint.RowPitch) * rowCounts[subresourceIndex],
+					.m_RowCount = rowCounts[subresourceIndex],
+					.m_Width = footprint.Footprint.Width,
+					.m_Height = footprint.Footprint.Height,
+					.m_Depth = footprint.Footprint.Depth,
+					.m_MipLevel = mipLevel,
+					.m_ArraySlice = arraySlice,
+				});
+		}
+
+		RecordTextureUse(src);
+		RecordBufferUse(request.m_Buffer.Get());
+		return request;
 	}
 
 	bool DX12TransferContext::UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResources,

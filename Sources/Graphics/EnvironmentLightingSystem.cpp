@@ -99,45 +99,12 @@ namespace gglab
 			return true;
 		}
 
-		auto& entry = m_Entries[entryIndex];
-		if (!entry.m_TextureId.IsValid())
-		{
-			entry.m_LoadAttempted = true;
-			entry.m_TextureId = m_TextureRegistry->LoadTexture(
-				entry.m_Path,
-				TextureSemantic::Environment);
-		}
-		if (!entry.m_TextureId.IsValid())
-		{
-			return false;
-		}
-
-		const auto* textureDesc = m_TextureRegistry->GetTextureDesc(entry.m_TextureId);
-		if (!textureDesc ||
-			textureDesc->m_Dimension != RHITextureDimension::Texture2D ||
-			textureDesc->m_ArraySize != 1 ||
-			textureDesc->m_Extent.m_Depth != 1 ||
-			static_cast<uint64_t>(textureDesc->m_Extent.m_Height) * 2u != textureDesc->m_Extent.m_Width)
-		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"EnvironmentLightingSystem: HDR environment '{}' must be a 2:1 2D texture (actual: {}x{}, array={}, depth={}).",
-				entry.m_Path.string(),
-				textureDesc ? textureDesc->m_Extent.m_Width : 0u,
-				textureDesc ? textureDesc->m_Extent.m_Height : 0u,
-				textureDesc ? textureDesc->m_ArraySize : 0u,
-				textureDesc ? textureDesc->m_Extent.m_Depth : 0u);
-			return false;
-		}
-
 		m_ActiveEntryIndex = entryIndex;
-		m_RenderResourceRegistry->MarkDirty(
-			RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+		RequestRebake();
 
 		GGLAB_LOG_GRAPHICS_INFO(
-			"EnvironmentLightingSystem: selected HDR environment '{}' ({}x{}).",
-			entry.m_Path.string(),
-			textureDesc->m_Extent.m_Width,
-			textureDesc->m_Extent.m_Height);
+			"EnvironmentLightingSystem: selected HDR environment '{}'.",
+			m_Entries[entryIndex].m_Path.string());
 		return true;
 	}
 
@@ -150,6 +117,40 @@ namespace gglab
 	{
 		const auto* activeEnvironment = GetActiveEnvironment();
 		return activeEnvironment ? activeEnvironment->m_TextureId : InvalidTextureID;
+	}
+
+	bool EnvironmentLightingSystem::EnsureActiveEnvironmentTextureLoaded() noexcept
+	{
+		if (m_ActiveEntryIndex >= m_Entries.size())
+		{
+			return true;
+		}
+
+		auto& entry = m_Entries[m_ActiveEntryIndex];
+		if (!entry.m_TextureId.IsValid() && !entry.m_LoadAttempted)
+		{
+			entry.m_LoadAttempted = true;
+			entry.m_TextureId = m_TextureRegistry->LoadTexture(entry.m_Path, TextureSemantic::Environment);
+		}
+		if (!entry.m_TextureId.IsValid())
+		{
+			return false;
+		}
+
+		const auto* textureDesc = m_TextureRegistry->GetTextureDesc(entry.m_TextureId);
+		if (!textureDesc || textureDesc->m_Dimension != RHITextureDimension::Texture2D ||
+			textureDesc->m_ArraySize != 1 || textureDesc->m_Extent.m_Depth != 1 ||
+			static_cast<uint64_t>(textureDesc->m_Extent.m_Height) * 2u != textureDesc->m_Extent.m_Width)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"EnvironmentLightingSystem: HDR environment '{}' must be a 2:1 2D texture (actual: {}x{}, array={}, depth={}).",
+				entry.m_Path.string(), textureDesc ? textureDesc->m_Extent.m_Width : 0u,
+				textureDesc ? textureDesc->m_Extent.m_Height : 0u,
+				textureDesc ? textureDesc->m_ArraySize : 0u,
+				textureDesc ? textureDesc->m_Extent.m_Depth : 0u);
+			return false;
+		}
+		return true;
 	}
 
 	void EnvironmentLightingSystem::SetIntensity(float intensity) noexcept
@@ -184,14 +185,14 @@ namespace gglab
 		constexpr uint32_t MinSampleCount = 1;
 		constexpr uint32_t MaxSampleCount = 4096;
 		const uint32_t clampedSampleCount = std::clamp(sampleCount, MinSampleCount, MaxSampleCount);
-		if (m_Settings.m_PrefilteredSpecularSampleCount == clampedSampleCount)
+		if (m_Settings.m_BakeConfig.m_PrefilteredSpecularSampleCount == clampedSampleCount)
 		{
 			return;
 		}
 
-		m_Settings.m_PrefilteredSpecularSampleCount = clampedSampleCount;
-		m_RenderResourceRegistry->MarkDirty(
-			RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
+		m_Settings.m_BakeConfig.m_PrefilteredSpecularSampleCount = clampedSampleCount;
+		m_Settings.m_QualityPreset = IBLQualityPreset::Custom;
+		RequestRebake();
 	}
 
 	void EnvironmentLightingSystem::SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept
@@ -204,13 +205,34 @@ namespace gglab
 		constexpr float MinLuminance = 1.0f;
 		constexpr float MaxLuminance = 65000.0f;
 		const float clampedLuminance = std::clamp(maxSampleLuminance, MinLuminance, MaxLuminance);
-		if (m_Settings.m_PrefilteredSpecularMaxSampleLuminance == clampedLuminance)
+		if (m_Settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance == clampedLuminance)
 		{
 			return;
 		}
 
-		m_Settings.m_PrefilteredSpecularMaxSampleLuminance = clampedLuminance;
-		m_RenderResourceRegistry->MarkDirty(
-			RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
+		m_Settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance = clampedLuminance;
+		m_Settings.m_QualityPreset = IBLQualityPreset::Custom;
+		RequestRebake();
+	}
+
+	void EnvironmentLightingSystem::SetQualityPreset(IBLQualityPreset preset) noexcept
+	{
+		if (preset >= IBLQualityPreset::Custom || m_Settings.m_QualityPreset == preset)
+		{
+			return;
+		}
+
+		m_Settings.m_QualityPreset = preset;
+		m_Settings.m_BakeConfig = GetIBLBakeConfig(preset);
+		RequestRebake();
+	}
+
+	void EnvironmentLightingSystem::RequestRebake(bool ignoreCache) noexcept
+	{
+		++m_BakeRequestGeneration;
+		if (ignoreCache)
+		{
+			m_IgnoreCacheGeneration = m_BakeRequestGeneration;
+		}
 	}
 }

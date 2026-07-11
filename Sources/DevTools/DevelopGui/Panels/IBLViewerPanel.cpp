@@ -108,6 +108,35 @@ namespace gglab
 			return changed;
 		}
 
+		static bool DrawQualityPresetCombo(IBLQualityPreset& preset) noexcept
+		{
+			bool changed = false;
+			if (ImGui::BeginCombo("Bake Quality", GetIBLQualityPresetName(preset).data()))
+			{
+				constexpr IBLQualityPreset Presets[] = {
+					IBLQualityPreset::Low,
+					IBLQualityPreset::Medium,
+					IBLQualityPreset::High,
+					IBLQualityPreset::Offline,
+				};
+				for (const IBLQualityPreset candidate : Presets)
+				{
+					const bool selected = preset == candidate;
+					if (ImGui::Selectable(GetIBLQualityPresetName(candidate).data(), selected))
+					{
+						preset = candidate;
+						changed = true;
+					}
+					if (selected)
+					{
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			return changed;
+		}
+
 		static void DrawBakeState(IBLBakeState state) noexcept
 		{
 			switch (state)
@@ -126,6 +155,25 @@ namespace gglab
 
 		static void DrawBakePipelineStatus(const IBLDiagnosticsSnapshot& snapshot) noexcept
 		{
+			const auto& bake = snapshot.m_BakeStatus;
+			ImGui::Text("Stage: %s", GetIBLBakeStageName(bake.m_Stage).data());
+			ImGui::ProgressBar(bake.m_Progress, ImVec2(-1.0f, 0.0f));
+			ImGui::Text("Generation: requested %llu | baking %llu | active %llu",
+				static_cast<unsigned long long>(bake.m_RequestedGeneration),
+				static_cast<unsigned long long>(bake.m_BakingGeneration),
+				static_cast<unsigned long long>(bake.m_ActiveGeneration));
+			ImGui::Text("Cache: %s | key %016llx",
+				bake.m_CacheHit ? "hit" : "miss",
+				static_cast<unsigned long long>(bake.m_CacheKey));
+			if (bake.m_GpuTimingAvailable)
+			{
+				ImGui::Text("Bake GPU: %.3f ms", bake.m_GpuMilliseconds);
+			}
+			else
+			{
+				ImGui::TextDisabled("Bake GPU: unavailable (enable GPU profiling before rebuilding)");
+			}
+
 			if (!ImGui::BeginTable("IBLBakePipelineStatus", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 			{
 				return;
@@ -172,7 +220,6 @@ namespace gglab
 		}
 
 		auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
-		renderResRegistry->EnsureIblResources();
 		const auto* diagnosticsSnapshot = context.m_Diagnostics ?
 			context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>() : nullptr;
 
@@ -247,13 +294,27 @@ namespace gglab
 				environmentSystem->SetRotationRadians(math::ToRadians(rotationDegrees));
 			}
 
-			uint32_t sampleCount = settings.m_PrefilteredSpecularSampleCount;
+			IBLQualityPreset qualityPreset = settings.m_QualityPreset;
+			if (DrawQualityPresetCombo(qualityPreset))
+			{
+				environmentSystem->SetQualityPreset(qualityPreset);
+			}
+			const auto& bakeConfig = settings.m_BakeConfig;
+			ImGui::TextDisabled(
+				"Environment %u | Irradiance %u (%u samples) | Specular %u (%u mips)",
+				bakeConfig.m_EnvironmentCubemapSize,
+				bakeConfig.m_IrradianceCubemapSize,
+				bakeConfig.m_IrradianceSampleCount,
+				bakeConfig.m_PrefilteredSpecularCubemapSize,
+				bakeConfig.m_PrefilteredSpecularMipLevels);
+
+			uint32_t sampleCount = settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
 			if (DrawPrefilterSampleCountCombo(sampleCount))
 			{
 				environmentSystem->SetPrefilteredSpecularSampleCount(sampleCount);
 			}
 
-			float maxSampleLuminance = settings.m_PrefilteredSpecularMaxSampleLuminance;
+			float maxSampleLuminance = settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
 			if (ImGui::DragFloat(
 				"Prefilter Firefly Clamp",
 				&maxSampleLuminance,
@@ -272,7 +333,11 @@ namespace gglab
 			}
 
 			ImGui::TextDisabled("Skybox, diffuse IBL, specular IBL, and previews share these settings.");
-			ImGui::TextDisabled("Changing prefilter quality settings schedules a specular rebuild.");
+			if (ImGui::Button("Rebuild IBL"))
+			{
+				environmentSystem->RequestRebake(true);
+			}
+			ImGui::TextDisabled("Bake changes are generated in staging resources and published atomically.");
 		}
 
 		ImGui::Spacing();
@@ -298,13 +363,6 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("IBL BRDF LUT"))
 		{
-			if (ImGui::Button("Rebuild BRDF LUT"))
-			{
-				renderResRegistry->MarkDirty(BrdfLutIndex);
-			}
-
-			ImGui::SameLine();
-
 			DrawBakeState(diagnosticsSnapshot ?
 				diagnosticsSnapshot->m_BrdfLut.m_BakeState :
 				(renderResRegistry->IsDirty(BrdfLutIndex) ? IBLBakeState::Dirty : IBLBakeState::Ready));
@@ -394,13 +452,6 @@ namespace gglab
 		if (ImGui::CollapsingHeader("IBL Environment"))
 		{
 			renderResRegistry->RequestIBLPreview(RenderResourceRegistry::IBLPreviewType::Environment);
-			if (ImGui::Button("Rebuild Environment"))
-			{
-				renderResRegistry->MarkDirty(EnvironmentIndex);
-			}
-
-			ImGui::SameLine();
-
 			DrawBakeState(diagnosticsSnapshot ?
 				diagnosticsSnapshot->m_Environment.m_BakeState :
 				(renderResRegistry->IsDirty(EnvironmentIndex) ? IBLBakeState::Dirty : IBLBakeState::Ready));
@@ -527,11 +578,6 @@ namespace gglab
 		if (ImGui::CollapsingHeader("IBL Irradiance"))
 		{
 			renderResRegistry->RequestIBLPreview(RenderResourceRegistry::IBLPreviewType::Irradiance);
-			if (ImGui::Button("Rebuild Irradiance"))
-			{
-				renderResRegistry->MarkDirty(IrradianceIndex);
-			}
-			ImGui::SameLine();
 			DrawBakeState(diagnosticsSnapshot ? diagnosticsSnapshot->m_Irradiance.m_BakeState : IBLBakeState::Unavailable);
 
 			if (!irradianceDesc || !irradiancePreviewDesc)
@@ -609,13 +655,6 @@ namespace gglab
 		if (ImGui::CollapsingHeader("IBL Prefiltered Specular"))
 		{
 			renderResRegistry->RequestIBLPreview(RenderResourceRegistry::IBLPreviewType::PrefilteredSpecular);
-			if (ImGui::Button("Rebuild Prefiltered Specular"))
-			{
-				renderResRegistry->MarkDirty(PrefilteredSpecularIndex);
-			}
-
-			ImGui::SameLine();
-
 			DrawBakeState(diagnosticsSnapshot ?
 				diagnosticsSnapshot->m_PrefilteredSpecular.m_BakeState :
 				(renderResRegistry->IsDirty(PrefilteredSpecularIndex) ? IBLBakeState::Dirty : IBLBakeState::Ready));

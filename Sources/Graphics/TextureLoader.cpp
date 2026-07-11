@@ -2,6 +2,7 @@
 #include "Graphics/TextureLoader.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Core/HResult.h"
+#include "Core/Utility/PathUtils.h"
 
 #include <DirectXTex.h>
 
@@ -70,10 +71,17 @@ namespace gglab
 
 		[[nodiscard]] RHIFormat ToTextureResourceFormat(DXGI_FORMAT format) noexcept
 		{
-			DXGI_FORMAT resourceFormat = DirectX::MakeTypeless(format);
-			if (resourceFormat == DXGI_FORMAT_UNKNOWN)
+			const DXGI_FORMAT typelessFormat = DirectX::MakeTypeless(format);
+			DXGI_FORMAT resourceFormat = format;
+			switch (typelessFormat)
 			{
-				resourceFormat = format;
+			case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+			case DXGI_FORMAT_R16G16B16A16_TYPELESS:
+			case DXGI_FORMAT_R32_TYPELESS:
+				resourceFormat = typelessFormat;
+				break;
+			default:
+				break;
 			}
 
 			return ToRHIFormat(resourceFormat);
@@ -345,5 +353,72 @@ namespace gglab
 			});
 
 		return result;
+	}
+
+	bool TextureLoader::SaveTextureDataToDDS(
+		const TextureAssetData& textureData,
+		const std::filesystem::path& path) noexcept
+	{
+		if (!textureData.IsValid() || !utils::CreateParentDirectoryIfNotExist(path))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader cannot save invalid texture data to '{}'.", path.string());
+			return false;
+		}
+
+		const DXGI_FORMAT format = ToDXGIFormat(textureData.m_ViewFormat);
+		if (format == DXGI_FORMAT_UNKNOWN)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader cannot save unsupported DDS format to '{}'.", path.string());
+			return false;
+		}
+
+		std::vector<DirectX::Image> images;
+		images.reserve(textureData.m_Subresources.size());
+		for (const auto& subresource : textureData.m_Subresources)
+		{
+			if (subresource.m_DataOffset + subresource.m_DataSize > textureData.m_Pixels.size())
+			{
+				return false;
+			}
+			images.push_back(
+				{
+					.width = subresource.m_Width,
+					.height = subresource.m_Height,
+					.format = format,
+					.rowPitch = static_cast<size_t>(subresource.m_RowPitch),
+					.slicePitch = static_cast<size_t>(subresource.m_SlicePitch),
+					.pixels = reinterpret_cast<uint8_t*>(const_cast<std::byte*>(
+						textureData.m_Pixels.data() + subresource.m_DataOffset)),
+				});
+		}
+
+		DirectX::TexMetadata metadata{};
+		metadata.width = textureData.m_Extent.m_Width;
+		metadata.height = textureData.m_Extent.m_Height;
+		metadata.depth = std::max<uint32_t>(textureData.m_Extent.m_Depth, 1u);
+		metadata.arraySize = textureData.m_ArraySize;
+		metadata.mipLevels = textureData.m_MipLevels;
+		metadata.format = format;
+		metadata.dimension = DirectX::TEX_DIMENSION_TEXTURE2D;
+		if (textureData.m_ArraySize == CubemapFaceCount)
+		{
+			metadata.miscFlags = DirectX::TEX_MISC_TEXTURECUBE;
+		}
+
+		const HRESULT result = DirectX::SaveToDDSFile(
+			images.data(),
+			images.size(),
+			metadata,
+			DirectX::DDS_FLAGS_FORCE_DX10_EXT,
+			path.c_str());
+		if (FAILED(result))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureLoader failed to save DDS '{}': {}",
+				path.string(),
+				FormatHResult(result));
+			return false;
+		}
+		return true;
 	}
 }

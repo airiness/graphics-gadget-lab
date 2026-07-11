@@ -16,6 +16,9 @@ namespace gglab
 		bool UploadTexture(
 			RHITextureHandle dstTexture,
 			const RHITextureUploadData& uploadData) noexcept;
+		[[nodiscard]] RHITextureReadbackRequest ReadbackTexture(
+			RHITextureHandle srcTexture,
+			const RHITextureDesc& desc) noexcept;
 		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset,
 			RHIBufferHandle src, uint64_t srcOffset,
 			uint64_t numBytes) noexcept;
