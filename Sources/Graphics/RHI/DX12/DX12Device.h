@@ -55,8 +55,12 @@ namespace gglab
 
 		RHIBackendType GetBackendType() const noexcept override { return RHIBackendType::DX12; }
 
-		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept override;
-		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept override;
+		RHITextureHandle CreateTexture(
+			const RHITextureDesc& desc,
+			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept override;
+		RHIBufferHandle CreateBuffer(
+			const RHIBufferDesc& desc,
+			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept override;
 		RHITextureHandle ImportTexture(const DX12ResourceManager::ImportedTextureDesc& desc) noexcept;
 		RHIBufferHandle ImportBuffer(const DX12ResourceManager::ImportedBufferDesc& desc) noexcept;
 		RHITextureViewHandle CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept override;
@@ -68,6 +72,14 @@ namespace gglab
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
+		void SetTextureDebugBinding(
+			RHITextureHandle texture,
+			const RHIResourceDebugBindingDesc& binding) noexcept override;
+		void SetBufferDebugBinding(
+			RHIBufferHandle buffer,
+			const RHIResourceDebugBindingDesc& binding) noexcept override;
+		std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept override;
+		std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept override;
 		void* MapBuffer(RHIBufferHandle buffer,
 			RHIMappedBufferRange readRange) noexcept override;
 		void UnmapBuffer(RHIBufferHandle buffer,

@@ -235,24 +235,40 @@ namespace gglab
 			RecordBufferUse(src);
 	}
 
-	RHIBufferOwner DX12TransferContext::CreateUploadBuffer(uint64_t sizeInBytes) noexcept
+	RHIBufferOwner DX12TransferContext::CreateUploadBuffer(
+		uint64_t sizeInBytes,
+		std::string_view owner) noexcept
 	{
 		RHIBufferDesc desc{};
 		desc.m_SizeInBytes = sizeInBytes;
 		desc.m_Usage = RHIBufferUsage::CopySource;
 		desc.m_MemoryUsage = RHIMemoryUsage::CpuToGpu;
-		desc.m_DebugName = "DX12TransferContext.UploadIntermediateBuffer";
-		return RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
+		const RHIResourceDebugIdentityDesc debugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Transfer,
+			.m_Category = "UploadBuffer",
+			.m_Label = owner,
+			.m_StableId = m_NextDebugOperationSerial++,
+		};
+		return RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 	}
 
-	RHIBufferOwner DX12TransferContext::CreateReadbackBuffer(uint64_t sizeInBytes) noexcept
+	RHIBufferOwner DX12TransferContext::CreateReadbackBuffer(
+		uint64_t sizeInBytes,
+		std::string_view owner) noexcept
 	{
 		RHIBufferDesc desc{};
 		desc.m_SizeInBytes = sizeInBytes;
 		desc.m_Usage = RHIBufferUsage::CopyDest;
 		desc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
-		desc.m_DebugName = "DX12TransferContext.TextureReadbackBuffer";
-		return RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
+		const RHIResourceDebugIdentityDesc debugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Transfer,
+			.m_Category = "TextureReadbackBuffer",
+			.m_Label = owner,
+			.m_StableId = m_NextDebugOperationSerial++,
+		};
+		return RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 	}
 
 	bool DX12TransferContext::UploadBuffer(const void* data, uint64_t sizeInBytes,
@@ -275,7 +291,9 @@ namespace gglab
 			return false;
 		}
 
-		RHIBufferOwner uploadBuffer = CreateUploadBuffer(sizeInBytes);
+		const std::string uploadOwner = std::format(
+			"BufferUpload->RHI={}:{}", dst.Index(), dst.Generation());
+		RHIBufferOwner uploadBuffer = CreateUploadBuffer(sizeInBytes, uploadOwner);
 		if (!uploadBuffer)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("DX12TransferContext::UploadBuffer failed to create an intermediate upload buffer.");
@@ -337,7 +355,9 @@ namespace gglab
 			return false;
 		}
 
-		if (!UploadResource(nativeSubresources, dstTexture))
+		const std::string uploadOwner = std::format(
+			"TextureUpload->RHI={}:{}", dst.Index(), dst.Generation());
+		if (!UploadResource(nativeSubresources, dstTexture, uploadOwner))
 		{
 			return false;
 		}
@@ -381,7 +401,9 @@ namespace gglab
 			&totalBytes);
 
 		RHITextureReadbackRequest request{};
-		request.m_Buffer = CreateReadbackBuffer(totalBytes);
+		const std::string readbackOwner = std::format(
+			"TextureReadback<-RHI={}:{}", src.Index(), src.Generation());
+		request.m_Buffer = CreateReadbackBuffer(totalBytes, readbackOwner);
 		request.m_BufferSizeInBytes = totalBytes;
 		request.m_TextureDesc = desc;
 		request.m_TextureDesc.m_DebugName = nullptr;
@@ -437,7 +459,8 @@ namespace gglab
 	}
 
 	bool DX12TransferContext::UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResources,
-		const DX12Resource* dstResource) noexcept
+		const DX12Resource* dstResource,
+		std::string_view owner) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_ExecutingInfo, "UploadResource must be called between Begin() and End().");
 		if (!m_ExecutingInfo || !dstResource || !dstResource->IsValid() || subResources.empty())
@@ -448,7 +471,8 @@ namespace gglab
 		auto subResourceCount = static_cast<UINT>(subResources.size());
 		auto uploadSize = GetRequiredIntermediateSize(dstResource->Get(), 0, subResourceCount);
 
-		RHIBufferOwner uploadBuffer = CreateUploadBuffer(static_cast<uint64_t>(uploadSize));
+		RHIBufferOwner uploadBuffer = CreateUploadBuffer(
+			static_cast<uint64_t>(uploadSize), owner);
 		if (!uploadBuffer)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("DX12TransferContext failed to create a texture upload buffer.");

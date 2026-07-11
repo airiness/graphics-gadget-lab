@@ -40,8 +40,15 @@ namespace gglab
 				desc.m_StrideInBytes = static_cast<uint32_t>(sizeof(T));
 				desc.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest;
 				desc.m_MemoryUsage = RHIMemoryUsage::GpuOnly;
-				desc.m_DebugName = debugName.c_str();
-				buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
+				const RHIResourceDebugIdentityDesc debugIdentity
+				{
+					.m_Domain = RHIResourceDebugDomain::Renderer,
+					.m_Category = "PersistentStructuredBuffer",
+					.m_Label = debugName,
+					.m_StableId = bufferIndex,
+				};
+				buffer = RHIBufferOwner(
+					m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 				GGLAB_ASSERT_MSG(buffer, "PersistentStructuredBuffer failed to create an RHI buffer.");
 			}
 		}

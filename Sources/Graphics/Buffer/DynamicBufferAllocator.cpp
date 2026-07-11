@@ -25,8 +25,15 @@ namespace gglab
 		desc.m_StrideInBytes = createInfo.m_StrideInBytes;
 		desc.m_Usage = createInfo.m_Usage;
 		desc.m_MemoryUsage = m_MemoryUsage;
-		desc.m_DebugName = createInfo.m_DebugName;
-		m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
+		const RHIResourceDebugIdentityDesc debugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Renderer,
+			.m_Category = "DynamicBuffer",
+			.m_Label = createInfo.m_DebugName ?
+				std::string_view(createInfo.m_DebugName) : std::string_view("Unspecified"),
+		};
+		m_Buffer = RHIBufferOwner(
+			m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 		GGLAB_ASSERT_MSG(m_Buffer, "DynamicBufferAllocator failed to create its RHI buffer.");
 
 		if (m_Buffer)

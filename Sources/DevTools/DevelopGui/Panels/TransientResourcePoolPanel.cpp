@@ -88,12 +88,15 @@ namespace gglab
 		{
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
-			if (!ImGui::BeginTable("TransientTexturePool", 11, flags))
+			if (!ImGui::BeginTable("TransientTexturePool", 14, flags))
 			{
 				return;
 			}
 			ImGui::TableSetupColumn("Slot");
 			ImGui::TableSetupColumn("State");
+			ImGui::TableSetupColumn("Logical Owner");
+			ImGui::TableSetupColumn("Acquire #");
+			ImGui::TableSetupColumn("Native Debug Name");
 			ImGui::TableSetupColumn("Handle");
 			ImGui::TableSetupColumn("Extent");
 			ImGui::TableSetupColumn("Array");
@@ -111,8 +114,9 @@ namespace gglab
 				{
 					continue;
 				}
-				const std::string searchable = std::format("{} {} {}x{}x{}",
+				const std::string searchable = std::format("{} {} {} {} {}x{}x{}",
 					texture.m_PoolSlot.Value(), SlotStateText(texture.m_State),
+					texture.m_LogicalName, texture.m_DebugName,
 					texture.m_Key.m_Extent.m_Width, texture.m_Key.m_Extent.m_Height,
 					texture.m_Key.m_Extent.m_Depth);
 				if (!MatchesFilter(searchable, state.m_Filter))
@@ -129,18 +133,21 @@ namespace gglab
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0); ImGui::Text("%u", texture.m_PoolSlot.Value());
 				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(SlotStateText(texture.m_State));
-				ImGui::TableSetColumnIndex(2);
+				ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(texture.m_LogicalName.c_str());
+				ImGui::TableSetColumnIndex(3); ImGui::Text("%llu", static_cast<unsigned long long>(texture.m_AcquireSerial));
+				ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(texture.m_DebugName.c_str());
+				ImGui::TableSetColumnIndex(5);
 				if (texture.m_Texture.IsValid()) ImGui::Text("%u:%u", texture.m_Texture.Index(), texture.m_Texture.Generation());
 				else ImGui::TextUnformatted("-");
-				ImGui::TableSetColumnIndex(3); ImGui::Text("%ux%ux%u", texture.m_Key.m_Extent.m_Width,
+				ImGui::TableSetColumnIndex(6); ImGui::Text("%ux%ux%u", texture.m_Key.m_Extent.m_Width,
 					texture.m_Key.m_Extent.m_Height, texture.m_Key.m_Extent.m_Depth);
-				ImGui::TableSetColumnIndex(4); ImGui::Text("%u", texture.m_Key.m_ArraySize);
-				ImGui::TableSetColumnIndex(5); ImGui::Text("%u", texture.m_Key.m_MipLevels);
-				ImGui::TableSetColumnIndex(6); ImGui::Text("%u", texture.m_Key.m_SampleCount);
-				ImGui::TableSetColumnIndex(7); ImGui::Text("%u", static_cast<uint32_t>(texture.m_Key.m_Format));
-				ImGui::TableSetColumnIndex(8); ImGui::TextUnformatted(usage.c_str());
-				ImGui::TableSetColumnIndex(9); ImGui::TextUnformatted(clearValue.c_str());
-				ImGui::TableSetColumnIndex(10); ImGui::TextUnformatted(fence.c_str());
+				ImGui::TableSetColumnIndex(7); ImGui::Text("%u", texture.m_Key.m_ArraySize);
+				ImGui::TableSetColumnIndex(8); ImGui::Text("%u", texture.m_Key.m_MipLevels);
+				ImGui::TableSetColumnIndex(9); ImGui::Text("%u", texture.m_Key.m_SampleCount);
+				ImGui::TableSetColumnIndex(10); ImGui::Text("%u", static_cast<uint32_t>(texture.m_Key.m_Format));
+				ImGui::TableSetColumnIndex(11); ImGui::TextUnformatted(usage.c_str());
+				ImGui::TableSetColumnIndex(12); ImGui::TextUnformatted(clearValue.c_str());
+				ImGui::TableSetColumnIndex(13); ImGui::TextUnformatted(fence.c_str());
 			}
 			ImGui::EndTable();
 		}
@@ -151,12 +158,15 @@ namespace gglab
 		{
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
-			if (!ImGui::BeginTable("TransientBufferPool", 7, flags))
+			if (!ImGui::BeginTable("TransientBufferPool", 10, flags))
 			{
 				return;
 			}
 			ImGui::TableSetupColumn("Slot");
 			ImGui::TableSetupColumn("State");
+			ImGui::TableSetupColumn("Logical Owner");
+			ImGui::TableSetupColumn("Acquire #");
+			ImGui::TableSetupColumn("Native Debug Name");
 			ImGui::TableSetupColumn("Handle");
 			ImGui::TableSetupColumn("Size");
 			ImGui::TableSetupColumn("Stride");
@@ -170,8 +180,9 @@ namespace gglab
 				{
 					continue;
 				}
-				const std::string searchable = std::format("{} {} {}",
-					buffer.m_PoolSlot.Value(), SlotStateText(buffer.m_State), buffer.m_Key.m_SizeInBytes);
+				const std::string searchable = std::format("{} {} {} {} {}",
+					buffer.m_PoolSlot.Value(), SlotStateText(buffer.m_State),
+					buffer.m_LogicalName, buffer.m_DebugName, buffer.m_Key.m_SizeInBytes);
 				if (!MatchesFilter(searchable, state.m_Filter))
 				{
 					continue;
@@ -184,13 +195,16 @@ namespace gglab
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0); ImGui::Text("%u", buffer.m_PoolSlot.Value());
 				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(SlotStateText(buffer.m_State));
-				ImGui::TableSetColumnIndex(2);
+				ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(buffer.m_LogicalName.c_str());
+				ImGui::TableSetColumnIndex(3); ImGui::Text("%llu", static_cast<unsigned long long>(buffer.m_AcquireSerial));
+				ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(buffer.m_DebugName.c_str());
+				ImGui::TableSetColumnIndex(5);
 				if (buffer.m_Buffer.IsValid()) ImGui::Text("%u:%u", buffer.m_Buffer.Index(), buffer.m_Buffer.Generation());
 				else ImGui::TextUnformatted("-");
-				ImGui::TableSetColumnIndex(3); ImGui::Text("%llu", static_cast<unsigned long long>(buffer.m_Key.m_SizeInBytes));
-				ImGui::TableSetColumnIndex(4); ImGui::Text("%u", buffer.m_Key.m_StrideInBytes);
-				ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(usage.c_str());
-				ImGui::TableSetColumnIndex(6); ImGui::TextUnformatted(fence.c_str());
+				ImGui::TableSetColumnIndex(6); ImGui::Text("%llu", static_cast<unsigned long long>(buffer.m_Key.m_SizeInBytes));
+				ImGui::TableSetColumnIndex(7); ImGui::Text("%u", buffer.m_Key.m_StrideInBytes);
+				ImGui::TableSetColumnIndex(8); ImGui::TextUnformatted(usage.c_str());
+				ImGui::TableSetColumnIndex(9); ImGui::TextUnformatted(fence.c_str());
 			}
 			ImGui::EndTable();
 		}

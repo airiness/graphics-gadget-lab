@@ -106,7 +106,10 @@ namespace gglab
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 		friend class AssetManager;
 
-		void CreateTextureEntry(TextureID id, const char* texName) noexcept;
+		void CreateTextureEntry(
+			TextureID id,
+			std::string_view textureName,
+			const std::filesystem::path& sourcePath = {}) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 
 	private:

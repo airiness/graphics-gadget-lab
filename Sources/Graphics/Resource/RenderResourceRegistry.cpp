@@ -8,6 +8,46 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct TextureLogicalNameEntry
+		{
+			std::string_view m_Scope;
+			std::string_view m_Leaf;
+			bool m_SupportsBakeRole = false;
+		};
+
+		constexpr std::array TextureLogicalNameEntries = {
+			TextureLogicalNameEntry{ "IBL.Active", "EnvironmentCubemap", true },
+			TextureLogicalNameEntry{ "IBL.Active", "IrradianceCubemap", true },
+			TextureLogicalNameEntry{ "IBL.Active", "PrefilteredSpecularCubemap", true },
+			TextureLogicalNameEntry{ "IBL.Active", "BrdfLut", true },
+			TextureLogicalNameEntry{ "Preview.IBL", "EnvironmentCubemap" },
+			TextureLogicalNameEntry{ "Preview.IBL", "IrradianceCubemap" },
+			TextureLogicalNameEntry{ "Preview.IBL", "PrefilteredSpecularCubemap" },
+			TextureLogicalNameEntry{ "Preview.Shadow", "DirectionalShadowMap" },
+		};
+		static_assert(TextureLogicalNameEntries.size() ==
+			utils::EnumCount<RenderResourceRegistry::TextureIndex>());
+
+		std::string TextureLogicalName(
+			RenderResourceRegistry::TextureIndex index,
+			bool bakeResource) noexcept
+		{
+			const size_t entryIndex = utils::ToIndex(index);
+			if (entryIndex >= TextureLogicalNameEntries.size())
+			{
+				return "Registry.Texture.Unknown";
+			}
+
+			const auto& entry = TextureLogicalNameEntries[entryIndex];
+			GGLAB_ASSERT_MSG(!bakeResource || entry.m_SupportsBakeRole,
+				"Only IBL registry textures support the bake role.");
+			const std::string_view scope = bakeResource ? "IBL.Bake" : entry.m_Scope;
+			return std::format("Registry.{}.{}", scope, entry.m_Leaf);
+		}
+	}
+
 	RenderResourceRegistry::RenderResourceRegistry(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_TransientResourcePool(createInfo.m_TransientResourcePool),
@@ -302,6 +342,16 @@ namespace gglab
 		{
 			std::swap(m_TextureEntries[index], m_IBLBakeTextureEntries[index]);
 			m_TextureEntries[index].m_Dirty = false;
+			const auto textureIndex = static_cast<TextureIndex>(index);
+			m_TransientResourcePool->SetTextureLogicalName(
+				m_TextureEntries[index].m_PhysicalAllocation,
+				TextureLogicalName(textureIndex, false));
+			if (m_IBLBakeTextureEntries[index].m_PhysicalAllocation.IsValid())
+			{
+				m_TransientResourcePool->SetTextureLogicalName(
+					m_IBLBakeTextureEntries[index].m_PhysicalAllocation,
+					TextureLogicalName(textureIndex, true));
+			}
 		}
 		m_HasInitializedActiveIBL = true;
 		MarkAllIBLPreviewsDirty();
@@ -628,7 +678,11 @@ namespace gglab
 		// Acquire a physical texture allocation from the reusable pool.
 		auto createTexture = [this, index, &srvDesc, &entries](TextureEntry& outEntry, const RHITextureDesc& desc) noexcept
 			{
-				auto allocation = m_TransientResourcePool->AcquireTexture(desc);
+				const bool bakeResource = &entries == &m_IBLBakeTextureEntries;
+				auto allocation = m_TransientResourcePool->AcquireTexture(
+					desc,
+					TextureLogicalName(index, bakeResource),
+					RHIResourceDebugBindingMode::Aliased);
 				GGLAB_ASSERT_MSG(allocation.IsValid(),
 					"RenderResourceRegistry: Acquire texture failed.");
 				if (!allocation.IsValid())

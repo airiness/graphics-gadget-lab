@@ -27,6 +27,9 @@ namespace gglab
 		TransientPoolSlotState m_State = TransientPoolSlotState::Destroyed;
 		RHITextureHandle m_Texture{};
 		TransientTextureKey m_Key{};
+		std::string m_LogicalName;
+		std::string m_DebugName;
+		uint64_t m_AcquireSerial = 0;
 		RHIFencePoint m_RetirementFence{};
 		bool m_RetirementFenceCompleted = false;
 	};
@@ -37,6 +40,9 @@ namespace gglab
 		TransientPoolSlotState m_State = TransientPoolSlotState::Destroyed;
 		RHIBufferHandle m_Buffer{};
 		TransientBufferKey m_Key{};
+		std::string m_LogicalName;
+		std::string m_DebugName;
+		uint64_t m_AcquireSerial = 0;
 		RHIFencePoint m_RetirementFence{};
 		bool m_RetirementFenceCompleted = false;
 	};

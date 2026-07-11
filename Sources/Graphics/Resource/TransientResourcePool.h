@@ -3,10 +3,13 @@
 #include "Core/TypedIndex.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"
+#include "Graphics/RHI/RHIResourceDebug.h"
 #include "Graphics/RHI/RHITexture.h"
 
 #include <deque>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -216,12 +219,16 @@ namespace gglab
 		{
 			RHITextureHandle m_Texture;
 			TransientTextureKey m_Key{};
+			std::string m_LogicalName;
+			uint64_t m_AcquireSerial = 0;
 		};
 
 		struct BufferRecord
 		{
 			RHIBufferHandle m_Buffer;
 			TransientBufferKey m_Key{};
+			std::string m_LogicalName;
+			uint64_t m_AcquireSerial = 0;
 		};
 
 		struct PendingRetirement
@@ -236,8 +243,19 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(TransientResourcePool);
 		~TransientResourcePool() noexcept;
 
-		[[nodiscard]] TransientTextureAllocation AcquireTexture(const RHITextureDesc& desc) noexcept;
-		[[nodiscard]] TransientBufferAllocation AcquireBuffer(const RHIBufferDesc& desc) noexcept;
+		[[nodiscard]] TransientTextureAllocation AcquireTexture(
+			const RHITextureDesc& desc,
+			std::string_view logicalName = {},
+			RHIResourceDebugBindingMode bindingMode =
+				RHIResourceDebugBindingMode::Exclusive) noexcept;
+		[[nodiscard]] TransientBufferAllocation AcquireBuffer(
+			const RHIBufferDesc& desc,
+			std::string_view logicalName = {},
+			RHIResourceDebugBindingMode bindingMode =
+				RHIResourceDebugBindingMode::Exclusive) noexcept;
+		void SetTextureLogicalName(
+			const TransientTextureAllocation& allocation,
+			std::string_view logicalName) noexcept;
 
 		void RetireTexture(TransientTextureAllocation&& allocation, const RHIFencePoint& fencePoint) noexcept;
 		void RetireBuffer(TransientBufferAllocation&& allocation, const RHIFencePoint& fencePoint) noexcept;
@@ -260,6 +278,16 @@ namespace gglab
 
 		[[nodiscard]] TransientTextureAllocation CreateTexture(const RHITextureDesc& textureDesc) noexcept;
 		[[nodiscard]] TransientBufferAllocation CreateBuffer(const RHIBufferDesc& bufferDesc) noexcept;
+		void UpdateTextureDebugIdentity(
+			TransientResourcePoolSlot poolSlot,
+			std::string_view logicalName,
+			bool recordAcquire,
+			RHIResourceDebugBindingMode bindingMode) noexcept;
+		void UpdateBufferDebugIdentity(
+			TransientResourcePoolSlot poolSlot,
+			std::string_view logicalName,
+			bool recordAcquire,
+			RHIResourceDebugBindingMode bindingMode) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -273,5 +301,6 @@ namespace gglab
 		std::deque<PendingRetirement> m_PendingRetirements;
 
 		uint32_t m_MaxCachedPerKey = 8;
+		uint64_t m_NextAcquireSerial = 1;
 	};
 }

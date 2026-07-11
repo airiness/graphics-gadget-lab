@@ -4,6 +4,7 @@
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 
 #include <memory>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -56,13 +57,18 @@ namespace gglab
 		};
 
 		DX12FencePoint End(bool wait) noexcept;
-		RHIBufferOwner CreateUploadBuffer(uint64_t sizeInBytes) noexcept;
-		RHIBufferOwner CreateReadbackBuffer(uint64_t sizeInBytes) noexcept;
+		RHIBufferOwner CreateUploadBuffer(
+			uint64_t sizeInBytes,
+			std::string_view owner) noexcept;
+		RHIBufferOwner CreateReadbackBuffer(
+			uint64_t sizeInBytes,
+			std::string_view owner) noexcept;
 		void CopyBuffer(DX12Buffer* dst, uint64_t dstOffset,
 			DX12Buffer* src, uint64_t srcOffset,
 			uint64_t numBytes) noexcept;
 		bool UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResources,
-			const DX12Resource* dstResource) noexcept;
+			const DX12Resource* dstResource,
+			std::string_view owner) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer) noexcept;
 		void RecordTextureUse(RHITextureHandle texture) noexcept;
 
@@ -74,5 +80,6 @@ namespace gglab
 		std::unique_ptr<DX12CommandList> m_CommandList;
 		std::unique_ptr<InFlightInfo> m_ExecutingInfo;
 		std::vector<std::unique_ptr<InFlightInfo>> m_InFlightInfos;
+		uint64_t m_NextDebugOperationSerial = 1;
 	};
 }

@@ -5,8 +5,10 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RHI/RHIResourceDebug.h"
 
 #include <memory>
+#include <string_view>
 
 namespace gglab
 {
@@ -16,8 +18,12 @@ namespace gglab
 		virtual ~RHIDevice() = default;
 
 		virtual RHIBackendType GetBackendType() const noexcept = 0;
-		virtual RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept = 0;
-		virtual RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept = 0;
+		virtual RHITextureHandle CreateTexture(
+			const RHITextureDesc& desc,
+			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;
+		virtual RHIBufferHandle CreateBuffer(
+			const RHIBufferDesc& desc,
+			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;
 		virtual RHITextureViewHandle CreateTextureView(RHITextureHandle texture,
 			const RHITextureViewDesc& desc) noexcept = 0;
 		virtual RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer,
@@ -29,6 +35,14 @@ namespace gglab
 		virtual void DestroyTextureView(RHITextureViewHandle view) noexcept = 0;
 		virtual void DestroyBufferView(RHIBufferViewHandle view) noexcept = 0;
 		virtual void DestroySampler(RHISamplerHandle sampler) noexcept = 0;
+		virtual void SetTextureDebugBinding(
+			RHITextureHandle texture,
+			const RHIResourceDebugBindingDesc& binding) noexcept = 0;
+		virtual void SetBufferDebugBinding(
+			RHIBufferHandle buffer,
+			const RHIResourceDebugBindingDesc& binding) noexcept = 0;
+		virtual std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept = 0;
+		virtual std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept = 0;
 		virtual void* MapBuffer(RHIBufferHandle buffer,
 			RHIMappedBufferRange readRange) noexcept = 0;
 		virtual void UnmapBuffer(RHIBufferHandle buffer,

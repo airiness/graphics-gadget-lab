@@ -94,8 +94,12 @@ namespace gglab
 		};
 	}
 
-	TransientTextureAllocation TransientResourcePool::AcquireTexture(const RHITextureDesc& desc) noexcept
+	TransientTextureAllocation TransientResourcePool::AcquireTexture(
+		const RHITextureDesc& desc,
+		std::string_view logicalName,
+		RHIResourceDebugBindingMode bindingMode) noexcept
 	{
+		TransientTextureAllocation allocation;
 		const auto key = MakeTextureKey(desc);
 		if (auto iter = m_FreeTextures.find(key);
 			iter != m_FreeTextures.end() && !iter->second.empty())
@@ -103,14 +107,29 @@ namespace gglab
 			const auto poolSlot = iter->second.back();
 			iter->second.pop_back();
 			const auto& record = m_Textures[poolSlot.Value()];
-			return { record.m_Texture, poolSlot, record.m_Key };
+			allocation = { record.m_Texture, poolSlot, record.m_Key };
+		}
+		else
+		{
+			allocation = CreateTexture(desc);
 		}
 
-		return CreateTexture(desc);
+		if (allocation.IsValid())
+		{
+			const std::string_view resolvedName = !logicalName.empty() ? logicalName :
+				(desc.m_DebugName ? std::string_view(desc.m_DebugName) : std::string_view{});
+			UpdateTextureDebugIdentity(
+				allocation.m_PoolSlot, resolvedName, true, bindingMode);
+		}
+		return allocation;
 	}
 
-	TransientBufferAllocation TransientResourcePool::AcquireBuffer(const RHIBufferDesc& desc) noexcept
+	TransientBufferAllocation TransientResourcePool::AcquireBuffer(
+		const RHIBufferDesc& desc,
+		std::string_view logicalName,
+		RHIResourceDebugBindingMode bindingMode) noexcept
 	{
+		TransientBufferAllocation allocation;
 		const auto key = MakeBufferKey(desc);
 		if (auto iter = m_FreeBuffers.find(key);
 			iter != m_FreeBuffers.end() && !iter->second.empty())
@@ -118,26 +137,60 @@ namespace gglab
 			const auto poolSlot = iter->second.back();
 			iter->second.pop_back();
 			const auto& record = m_Buffers[poolSlot.Value()];
-			return { record.m_Buffer, poolSlot, record.m_Key };
+			allocation = { record.m_Buffer, poolSlot, record.m_Key };
+		}
+		else
+		{
+			allocation = CreateBuffer(desc);
 		}
 
-		return CreateBuffer(desc);
+		if (allocation.IsValid())
+		{
+			const std::string_view resolvedName = !logicalName.empty() ? logicalName :
+				(desc.m_DebugName ? std::string_view(desc.m_DebugName) : std::string_view{});
+			UpdateBufferDebugIdentity(
+				allocation.m_PoolSlot, resolvedName, true, bindingMode);
+		}
+		return allocation;
+	}
+
+	void TransientResourcePool::SetTextureLogicalName(
+		const TransientTextureAllocation& allocation,
+		std::string_view logicalName) noexcept
+	{
+		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Textures.size())
+		{
+			GGLAB_LOG_WARN("TransientResourcePool::SetTextureLogicalName received an invalid allocation.");
+			return;
+		}
+
+		const auto& record = m_Textures[allocation.m_PoolSlot.Value()];
+		GGLAB_ASSERT_MSG(record.m_Texture == allocation.m_Texture && record.m_Key == allocation.m_Key,
+			"Texture allocation does not match its transient pool slot.");
+		UpdateTextureDebugIdentity(
+			allocation.m_PoolSlot,
+			logicalName,
+			false,
+			RHIResourceDebugBindingMode::Aliased);
 	}
 
 	TransientTextureAllocation TransientResourcePool::CreateTexture(const RHITextureDesc& desc) noexcept
 	{
 		const TransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Textures.size()) };
 		RHITextureDesc textureDesc = desc;
-		if (!textureDesc.m_DebugName)
-		{
-			textureDesc.m_DebugName = "TransientResourcePool.Texture";
-		}
 		if (!textureDesc.m_ClearValue)
 		{
 			textureDesc.m_ClearValue = DefaultClearValue(textureDesc);
 		}
 
-		RHITextureHandle texture = m_Device->CreateTexture(textureDesc);
+		const RHIResourceDebugIdentityDesc debugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Transient,
+			.m_Category = "Texture",
+			.m_Label = "PoolSlot",
+			.m_StableId = poolSlot.Value(),
+		};
+		RHITextureHandle texture = m_Device->CreateTexture(textureDesc, debugIdentity);
 		GGLAB_ASSERT_MSG(texture.IsValid(), "TransientResourcePool: CreateTexture failed.");
 		if (!texture.IsValid())
 		{
@@ -157,12 +210,14 @@ namespace gglab
 	{
 		const TransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Buffers.size()) };
 		RHIBufferDesc bufferDesc = desc;
-		if (!bufferDesc.m_DebugName)
+		const RHIResourceDebugIdentityDesc debugIdentity
 		{
-			bufferDesc.m_DebugName = "TransientResourcePool.Buffer";
-		}
-
-		RHIBufferHandle buffer = m_Device->CreateBuffer(bufferDesc);
+			.m_Domain = RHIResourceDebugDomain::Transient,
+			.m_Category = "Buffer",
+			.m_Label = "PoolSlot",
+			.m_StableId = poolSlot.Value(),
+		};
+		RHIBufferHandle buffer = m_Device->CreateBuffer(bufferDesc, debugIdentity);
 		GGLAB_ASSERT_MSG(buffer.IsValid(), "TransientResourcePool: CreateBuffer failed.");
 		if (!buffer.IsValid())
 		{
@@ -176,6 +231,48 @@ namespace gglab
 			});
 
 		return { buffer, poolSlot, key };
+	}
+
+	void TransientResourcePool::UpdateTextureDebugIdentity(
+		TransientResourcePoolSlot poolSlot,
+		std::string_view logicalName,
+		bool recordAcquire,
+		RHIResourceDebugBindingMode bindingMode) noexcept
+	{
+		GGLAB_ASSERT(poolSlot.IsValid() && poolSlot.Value() < m_Textures.size());
+		auto& record = m_Textures[poolSlot.Value()];
+		record.m_LogicalName = logicalName.empty() ? "Unnamed" : logicalName;
+		if (recordAcquire)
+		{
+			record.m_AcquireSerial = m_NextAcquireSerial++;
+		}
+		m_Device->SetTextureDebugBinding(record.m_Texture,
+			{
+				.m_Owner = record.m_LogicalName,
+				.m_Serial = record.m_AcquireSerial,
+				.m_Mode = bindingMode,
+			});
+	}
+
+	void TransientResourcePool::UpdateBufferDebugIdentity(
+		TransientResourcePoolSlot poolSlot,
+		std::string_view logicalName,
+		bool recordAcquire,
+		RHIResourceDebugBindingMode bindingMode) noexcept
+	{
+		GGLAB_ASSERT(poolSlot.IsValid() && poolSlot.Value() < m_Buffers.size());
+		auto& record = m_Buffers[poolSlot.Value()];
+		record.m_LogicalName = logicalName.empty() ? "Unnamed" : logicalName;
+		if (recordAcquire)
+		{
+			record.m_AcquireSerial = m_NextAcquireSerial++;
+		}
+		m_Device->SetBufferDebugBinding(record.m_Buffer,
+			{
+				.m_Owner = record.m_LogicalName,
+				.m_Serial = record.m_AcquireSerial,
+				.m_Mode = bindingMode,
+			});
 	}
 
 	void TransientResourcePool::Tick() noexcept

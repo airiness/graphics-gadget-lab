@@ -2,6 +2,7 @@
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TextureRegistry.h"
 
 #include <algorithm>
@@ -45,26 +46,18 @@ namespace gglab
 		const TextureRegistry* textureRegistry = assetManager.m_TextureRegistry;
 		if (textureRegistry)
 		{
-			const auto findTextureSourcePath = [textureRegistry](TextureID textureId) -> std::filesystem::path
-				{
-					for (const auto& [path, pathTextureId] : textureRegistry->m_TextureContainer.m_PathIDMap)
-					{
-						if (pathTextureId == textureId)
-						{
-							return path;
-						}
-					}
-					return {};
-				};
-
 			snapshot.m_Textures.reserve(textureRegistry->m_TextureContainer.m_TextureIDMap.size());
 			for (const auto& [textureId, texture] : textureRegistry->m_TextureContainer.m_TextureIDMap)
 			{
 				AssetSnapshot::Texture textureSnapshot{};
 				textureSnapshot.m_Id = textureId;
-				textureSnapshot.m_SourcePath = findTextureSourcePath(textureId);
+				textureSnapshot.m_SourcePath = texture->m_SourcePath;
 				textureSnapshot.m_Semantic = texture->m_Semantic;
 				textureSnapshot.m_Name = texture->m_Name;
+				textureSnapshot.m_Texture = texture->m_Texture;
+				textureSnapshot.m_DebugName = textureRegistry->m_Device ?
+					std::string(textureRegistry->m_Device->GetTextureDebugName(texture->m_Texture)) :
+					std::string{};
 				textureSnapshot.m_IsUploaded = texture->m_IsUploaded;
 				textureSnapshot.m_IsReserved = IsReservedTextureId(textureId);
 				snapshot.m_Textures.emplace_back(std::move(textureSnapshot));

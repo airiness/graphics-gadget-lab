@@ -12,7 +12,9 @@
 #include "Core/Utility/TypeUtils.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <limits>
+#include <string>
 
 namespace gglab
 {
@@ -279,6 +281,8 @@ namespace gglab
 		RHITextureViewHandle m_Srv{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
+		std::filesystem::path m_SourcePath;
+		std::string m_DebugLabel;
 		RHITextureHandle m_Texture;
 		RHITextureDesc m_Desc{};
 		bool m_IsUploaded = false;

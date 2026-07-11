@@ -5,7 +5,6 @@
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
-#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
 
@@ -31,6 +30,7 @@ namespace gglab
 			.m_InvalidDestroyCount = manager.m_Diagnostics.m_InvalidDestroyCount,
 			.m_StaleDestroyCount = manager.m_Diagnostics.m_StaleDestroyCount,
 			.m_DoubleDestroyCount = manager.m_Diagnostics.m_DoubleDestroyCount,
+			.m_UnnamedResourceCreateCount = manager.m_Diagnostics.m_UnnamedResourceCreateCount,
 		};
 
 		const auto toSnapshotState = [](RHIHandleSlotState state) noexcept
@@ -66,7 +66,28 @@ namespace gglab
 				result.m_Generation = slot.m_Generation;
 				result.m_State = toSnapshotState(slot.m_State);
 				result.m_Ownership = toSnapshotOwnership(slot.m_Ownership);
-				result.m_DebugName = utils::StringIdToString(slot.m_DebugNameId);
+				result.m_DebugDomain = slot.m_DebugIdentity.m_Domain;
+				result.m_DebugCategory = slot.m_DebugIdentity.m_Category;
+				result.m_DebugLabel = slot.m_DebugIdentity.m_Label;
+				result.m_DebugSource = slot.m_DebugIdentity.m_Source;
+				result.m_HasDebugStableId = slot.m_DebugIdentity.m_StableId.has_value();
+				result.m_DebugStableId = slot.m_DebugIdentity.m_StableId.value_or(0);
+				result.m_DebugOwner = slot.m_DebugBinding.m_Owner;
+				result.m_HasDebugBindingSerial = slot.m_DebugBinding.m_Serial.has_value();
+				result.m_DebugBindingSerial = slot.m_DebugBinding.m_Serial.value_or(0);
+				result.m_DebugBindingMode = slot.m_DebugBinding.m_Mode;
+				result.m_DebugBindingHistory.reserve(slot.m_DebugBindingHistory.size());
+				for (const auto& binding : slot.m_DebugBindingHistory)
+				{
+					result.m_DebugBindingHistory.push_back(
+						{
+							.m_Owner = binding.m_Owner,
+							.m_Serial = binding.m_Serial.value_or(0),
+							.m_HasSerial = binding.m_Serial.has_value(),
+							.m_Mode = binding.m_Mode,
+						});
+				}
+				result.m_DebugName = slot.m_DebugName;
 				result.m_LastUseFenceCount = static_cast<uint32_t>(slot.m_LastUsePoints.size());
 				result.m_CompletedLastUseFenceCount = static_cast<uint32_t>(std::ranges::count_if(
 					slot.m_LastUsePoints,
