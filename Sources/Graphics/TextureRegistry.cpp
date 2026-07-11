@@ -9,6 +9,49 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] constexpr std::string_view TextureSemanticDebugText(
+			TextureSemantic semantic) noexcept
+		{
+			switch (semantic)
+			{
+			case TextureSemantic::Unknown: return "Unknown";
+			case TextureSemantic::BaseColor: return "BaseColor";
+			case TextureSemantic::MetallicRoughness: return "MetallicRoughness";
+			case TextureSemantic::Normal: return "Normal";
+			case TextureSemantic::Occlusion: return "Occlusion";
+			case TextureSemantic::Emissive: return "Emissive";
+			case TextureSemantic::Environment: return "Environment";
+			case TextureSemantic::UVTest: return "UVTest";
+			case TextureSemantic::GenericColor: return "GenericColor";
+			case TextureSemantic::GenericData: return "GenericData";
+			}
+			return "Unknown";
+		}
+
+		[[nodiscard]] std::string TextureDebugSourcePath(
+			const std::filesystem::path& sourcePath)
+		{
+			if (sourcePath.empty())
+			{
+				return {};
+			}
+
+			const std::string normalized = sourcePath.generic_string();
+			const size_t assetsOffset = normalized.find("Assets/");
+			if (assetsOffset != std::string::npos)
+			{
+				return normalized.substr(assetsOffset);
+			}
+
+			return std::format(
+				"External/{}#{:08X}",
+				sourcePath.filename().generic_string(),
+				static_cast<uint32_t>(Crc64(normalized)));
+		}
+	}
+
 	TextureRegistry::TextureRegistry(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager)
@@ -175,7 +218,7 @@ namespace gglab
 		{
 			auto texPath = utils::Canonical(std::filesystem::path("Assets/Textures/UVTest1K.png"));
 			const auto id = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
-			CreateTextureEntry(id, "UVTestTexture1K");
+			CreateTextureEntry(id, "UVTestTexture1K", texPath);
 			uploads.emplace_back(MakeTextureUploadData(id, texPath, TextureSemantic::UVTest));
 			m_TextureContainer.m_PathIDMap[texPath] = id;
 		}
@@ -183,7 +226,7 @@ namespace gglab
 		{
 			auto texPath = utils::Canonical(std::filesystem::path("Assets/Textures/UVTest4K.png"));
 			const auto id = ToTextureId(ReservedTextureIDIndex::UVTestTexture4K);
-			CreateTextureEntry(id, "UVTestTexture4K");
+			CreateTextureEntry(id, "UVTestTexture4K", texPath);
 			uploads.emplace_back(MakeTextureUploadData(id, texPath, TextureSemantic::UVTest));
 			m_TextureContainer.m_PathIDMap[texPath] = id;
 		}
@@ -371,6 +414,8 @@ namespace gglab
 
 		idTexPair.first->second->m_Id = textureId;
 		idTexPair.first->second->m_Name = StringID(canonicalPath.generic_string());
+		idTexPair.first->second->m_SourcePath = canonicalPath;
+		idTexPair.first->second->m_DebugLabel = canonicalPath.filename().generic_string();
 
 		return textureId;
 	}
@@ -458,7 +503,6 @@ namespace gglab
 			return false;
 		}
 
-		const std::string debugName = "TextureRegistry.Texture." + std::to_string(uploadData.m_TextureId.Value());
 		RHITextureDesc textureDesc{};
 		textureDesc.m_Dimension = RHITextureDimension::Texture2D;
 		textureDesc.m_Format = textureData.m_ResourceFormat;
@@ -467,9 +511,19 @@ namespace gglab
 		textureDesc.m_ArraySize = textureData.m_ArraySize;
 		textureDesc.m_MipLevels = textureData.m_MipLevels;
 		textureDesc.m_SampleCount = 1;
-		textureDesc.m_DebugName = debugName.c_str();
+		const std::string category = std::format(
+			"Texture.{}", TextureSemanticDebugText(uploadData.m_Semantic));
+		const std::string source = TextureDebugSourcePath(texture->m_SourcePath);
+		const RHIResourceDebugIdentityDesc debugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Asset,
+			.m_Category = category,
+			.m_Label = texture->m_DebugLabel,
+			.m_Source = source,
+			.m_StableId = uploadData.m_TextureId.Value(),
+		};
 
-		texture->m_Texture = m_Device->CreateTexture(textureDesc);
+		texture->m_Texture = m_Device->CreateTexture(textureDesc, debugIdentity);
 		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture.");
 		if (!texture->m_Texture.IsValid())
 		{
@@ -525,7 +579,10 @@ namespace gglab
 		return true;
 	}
 
-	void TextureRegistry::CreateTextureEntry(TextureID id, const char* texName) noexcept
+	void TextureRegistry::CreateTextureEntry(
+		TextureID id,
+		std::string_view textureName,
+		const std::filesystem::path& sourcePath) noexcept
 	{
 		if (GetTexture(id) == nullptr)
 		{
@@ -534,7 +591,9 @@ namespace gglab
 			{
 				auto& texture = iterator->second;
 				texture->m_Id = id;
-				texture->m_Name = StringID(texName);
+				texture->m_Name = StringID(textureName);
+				texture->m_SourcePath = sourcePath;
+				texture->m_DebugLabel = textureName;
 				texture->m_IsUploaded = false;
 				texture->m_Srv.Reset();
 				texture->m_Texture.Reset();

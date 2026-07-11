@@ -395,16 +395,32 @@ namespace gglab
 		vertexBufferDesc.m_SizeInBytes = vertexBufferSize;
 		vertexBufferDesc.m_StrideInBytes = sizeof(Vertex);
 		vertexBufferDesc.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest;
-		vertexBufferDesc.m_DebugName = "AssetManager.Mesh.VertexBuffer";
 
 		RHIBufferDesc indexBufferDesc{};
 		indexBufferDesc.m_SizeInBytes = indexBufferSize;
 		indexBufferDesc.m_StrideInBytes = sizeof(uint32_t);
 		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest;
-		indexBufferDesc.m_DebugName = "AssetManager.Mesh.IndexBuffer";
 
-		const RHIBufferHandle vertexBuffer = m_Device->CreateBuffer(vertexBufferDesc);
-		const RHIBufferHandle indexBuffer = m_Device->CreateBuffer(indexBufferDesc);
+		const std::string_view meshName = mesh->m_Name.Name().empty() ?
+			std::string_view("UnnamedMesh") : mesh->m_Name.Name();
+		const RHIResourceDebugIdentityDesc vertexDebugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Asset,
+			.m_Category = "Mesh.VertexBuffer",
+			.m_Label = meshName,
+			.m_StableId = uploadData.m_MeshId.Value(),
+		};
+		const RHIResourceDebugIdentityDesc indexDebugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Asset,
+			.m_Category = "Mesh.IndexBuffer",
+			.m_Label = meshName,
+			.m_StableId = uploadData.m_MeshId.Value(),
+		};
+		const RHIBufferHandle vertexBuffer =
+			m_Device->CreateBuffer(vertexBufferDesc, vertexDebugIdentity);
+		const RHIBufferHandle indexBuffer =
+			m_Device->CreateBuffer(indexBufferDesc, indexDebugIdentity);
 		if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
 		{
 			if (vertexBuffer.IsValid())

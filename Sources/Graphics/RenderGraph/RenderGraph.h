@@ -910,13 +910,13 @@ namespace gglab
 		{
 			auto compiledDesc = m_Desc;
 			compiledDesc.m_Usage = static_cast<RHITextureUsage>(usageBits);
-			m_PhysicalAllocation = pool->AcquireTexture(compiledDesc);
+			m_PhysicalAllocation = pool->AcquireTexture(compiledDesc, m_NameId.Name());
 		}
 		else if constexpr (std::is_same_v<RESOURCE, RGBufferResource>)
 		{
 			auto compiledDesc = m_Desc;
 			compiledDesc.m_Usage = static_cast<RHIBufferUsage>(usageBits);
-			m_PhysicalAllocation = pool->AcquireBuffer(compiledDesc);
+			m_PhysicalAllocation = pool->AcquireBuffer(compiledDesc, m_NameId.Name());
 		}
 		m_Devirtualized = m_PhysicalAllocation.IsValid();
 		GGLAB_ASSERT_MSG(m_Devirtualized, "Failed to acquire a transient physical resource.");

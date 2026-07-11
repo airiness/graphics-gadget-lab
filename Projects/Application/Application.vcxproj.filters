@@ -1265,6 +1265,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResourceDebug.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>

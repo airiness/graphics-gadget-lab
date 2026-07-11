@@ -69,14 +69,18 @@ namespace gglab
 		m_IsInitialized = false;
 	}
 
-	RHITextureHandle DX12Device::CreateTexture(const RHITextureDesc& desc) noexcept
+	RHITextureHandle DX12Device::CreateTexture(
+		const RHITextureDesc& desc,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
-		return m_ResourceManager.CreateTexture(desc);
+		return m_ResourceManager.CreateTexture(desc, debugIdentity);
 	}
 
-	RHIBufferHandle DX12Device::CreateBuffer(const RHIBufferDesc& desc) noexcept
+	RHIBufferHandle DX12Device::CreateBuffer(
+		const RHIBufferDesc& desc,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
-		return m_ResourceManager.CreateBuffer(desc);
+		return m_ResourceManager.CreateBuffer(desc, debugIdentity);
 	}
 
 	RHITextureHandle DX12Device::ImportTexture(const DX12ResourceManager::ImportedTextureDesc& desc) noexcept
@@ -163,6 +167,30 @@ namespace gglab
 		}
 
 		m_DescriptorCache->DestroySampler(sampler);
+	}
+
+	void DX12Device::SetTextureDebugBinding(
+		RHITextureHandle texture,
+		const RHIResourceDebugBindingDesc& binding) noexcept
+	{
+		m_ResourceManager.SetTextureDebugBinding(texture, binding);
+	}
+
+	void DX12Device::SetBufferDebugBinding(
+		RHIBufferHandle buffer,
+		const RHIResourceDebugBindingDesc& binding) noexcept
+	{
+		m_ResourceManager.SetBufferDebugBinding(buffer, binding);
+	}
+
+	std::string_view DX12Device::GetTextureDebugName(RHITextureHandle texture) const noexcept
+	{
+		return m_ResourceManager.GetTextureDebugName(texture);
+	}
+
+	std::string_view DX12Device::GetBufferDebugName(RHIBufferHandle buffer) const noexcept
+	{
+		return m_ResourceManager.GetBufferDebugName(buffer);
 	}
 
 	void* DX12Device::MapBuffer(RHIBufferHandle buffer,

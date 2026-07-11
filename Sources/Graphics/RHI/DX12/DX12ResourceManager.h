@@ -1,13 +1,14 @@
 #pragma once
 #include "Core/CoreMacros.h"
-#include "Core/StringId.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
+#include "Graphics/RHI/RHIResourceDebug.h"
 #include "Graphics/RHI/RHITexture.h"
 #include "Core/Platform/Win/ComTypes.h"
 
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -30,12 +31,14 @@ namespace gglab
 		{
 			RHIImportedTextureDesc m_RHI;
 			ComPtr<ID3D12Resource> m_Resource;
+			RHIResourceDebugIdentityDesc m_DebugIdentity;
 		};
 
 		struct ImportedBufferDesc
 		{
 			RHIImportedBufferDesc m_RHI;
 			ComPtr<ID3D12Resource> m_Resource;
+			RHIResourceDebugIdentityDesc m_DebugIdentity;
 		};
 
 	private:
@@ -53,6 +56,7 @@ namespace gglab
 			uint64_t m_InvalidDestroyCount = 0;
 			uint64_t m_StaleDestroyCount = 0;
 			uint64_t m_DoubleDestroyCount = 0;
+			uint64_t m_UnnamedResourceCreateCount = 0;
 		};
 
 	public:
@@ -64,13 +68,25 @@ namespace gglab
 		void Finalize() noexcept;
 		void SetDescriptorCache(DX12DescriptorCache* descriptorCache) noexcept { m_DescriptorCache = descriptorCache; }
 
-		RHITextureHandle CreateTexture(const RHITextureDesc& desc) noexcept;
-		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc) noexcept;
+		RHITextureHandle CreateTexture(
+			const RHITextureDesc& desc,
+			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
+		RHIBufferHandle CreateBuffer(
+			const RHIBufferDesc& desc,
+			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
 		RHITextureHandle ImportTexture(const ImportedTextureDesc& desc) noexcept;
 		RHIBufferHandle ImportBuffer(const ImportedBufferDesc& desc) noexcept;
 
 		void DestroyTexture(RHITextureHandle texture) noexcept;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept;
+		void SetTextureDebugBinding(
+			RHITextureHandle texture,
+			const RHIResourceDebugBindingDesc& binding) noexcept;
+		void SetBufferDebugBinding(
+			RHIBufferHandle buffer,
+			const RHIResourceDebugBindingDesc& binding) noexcept;
+		std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept;
+		std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept;
 
@@ -91,7 +107,10 @@ namespace gglab
 			typename HandleT::GenerationType m_Generation = 1;
 			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
-			StringID m_DebugNameId;
+			RHIResourceDebugIdentity m_DebugIdentity;
+			RHIResourceDebugBinding m_DebugBinding;
+			std::vector<RHIResourceDebugBinding> m_DebugBindingHistory;
+			std::string m_DebugName;
 			std::vector<RHIFencePoint> m_LastUsePoints;
 			std::vector<RHIFencePoint> m_RetirementPoints;
 			std::unique_ptr<ResourceT> m_Resource;
@@ -104,20 +123,32 @@ namespace gglab
 		RHITextureHandle AllocateTextureSlot(
 			std::unique_ptr<DX12Texture> texture,
 			RHIResourceOwnership ownership,
-			std::string_view debugName) noexcept;
+			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
 		RHIBufferHandle AllocateBufferSlot(
 			std::unique_ptr<DX12Buffer> buffer,
 			RHIResourceOwnership ownership,
-			std::string_view debugName) noexcept;
+			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
 		static void RecordLastUsePoint(
 			std::vector<RHIFencePoint>& points,
 			const RHIFencePoint& fencePoint) noexcept;
+		template<typename HandleT, typename SlotT>
+		void SetResourceDebugBinding(
+			RHIHandleTable<HandleT, SlotT>& table,
+			HandleT handle,
+			RHIResourceType resourceType,
+			const RHIResourceDebugBindingDesc& binding,
+			const char* functionName) noexcept;
 		template<typename HandleT, typename SlotT, typename ResourceT>
 		static HandleT AllocateResourceSlot(
 			RHIHandleTable<HandleT, SlotT>& table,
 			std::unique_ptr<ResourceT> resource,
 			RHIResourceOwnership ownership,
-			std::string_view debugName) noexcept;
+			RHIResourceType resourceType,
+			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
+		template<typename HandleT, typename SlotT>
+		static std::string_view GetResourceDebugName(
+			const RHIHandleTable<HandleT, SlotT>& table,
+			HandleT handle) noexcept;
 		template<typename HandleT, typename SlotT, typename OnValidT>
 		void DestroyResource(
 			RHIHandleTable<HandleT, SlotT>& table,

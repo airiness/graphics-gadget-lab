@@ -21,6 +21,8 @@ namespace gglab
 			std::filesystem::path m_SourcePath;
 			TextureSemantic m_Semantic = TextureSemantic::Unknown;
 			StringID m_Name{};
+			RHITextureHandle m_Texture{};
+			std::string m_DebugName;
 			bool m_IsUploaded = false;
 			bool m_IsReserved = false;
 		};

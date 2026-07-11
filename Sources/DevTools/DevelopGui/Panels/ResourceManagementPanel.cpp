@@ -60,6 +60,64 @@ namespace gglab
 			return "Unknown";
 		}
 
+		std::string DebugIdentityText(const DX12ResourceSlotSnapshot& slot)
+		{
+			std::string result = std::format("{}.{}",
+				RHIResourceDebugDomainText(slot.m_DebugDomain), slot.m_DebugCategory);
+			if (slot.m_HasDebugStableId)
+			{
+				result.append(std::format(" ID={}", slot.m_DebugStableId));
+			}
+			if (!slot.m_DebugLabel.empty())
+			{
+				result.append(" Name=");
+				result.append(slot.m_DebugLabel);
+			}
+			if (!slot.m_DebugSource.empty())
+			{
+				result.append(" Source=");
+				result.append(slot.m_DebugSource);
+			}
+			return result;
+		}
+
+		std::string DebugBindingText(const DX12ResourceSlotSnapshot& slot)
+		{
+			if (slot.m_DebugOwner.empty() && !slot.m_HasDebugBindingSerial)
+			{
+				return "-";
+			}
+			return std::format("{}{}{} | {} | history={}",
+				slot.m_DebugOwner,
+				slot.m_HasDebugBindingSerial ? " #" : "",
+				slot.m_HasDebugBindingSerial ? std::to_string(slot.m_DebugBindingSerial) : "",
+				slot.m_DebugBindingMode == RHIResourceDebugBindingMode::Exclusive ?
+					"exclusive" : "aliased",
+				slot.m_DebugBindingHistory.size());
+		}
+
+		void DrawDebugBindingHistoryTooltip(const DX12ResourceSlotSnapshot& slot) noexcept
+		{
+			if (slot.m_DebugBindingHistory.empty() || !ImGui::IsItemHovered())
+			{
+				return;
+			}
+			if (ImGui::BeginTooltip())
+			{
+				ImGui::TextUnformatted("Previous bindings");
+				for (const auto& binding : slot.m_DebugBindingHistory)
+				{
+					ImGui::BulletText("%s%s%s | %s",
+						binding.m_Owner.c_str(),
+						binding.m_HasSerial ? " #" : "",
+						binding.m_HasSerial ? std::to_string(binding.m_Serial).c_str() : "",
+						binding.m_Mode == RHIResourceDebugBindingMode::Exclusive ?
+							"exclusive" : "aliased");
+				}
+				ImGui::EndTooltip();
+			}
+		}
+
 		RHITextureHandle CreateTestTexture(
 			DX12Device& device,
 			uint32_t serial,
@@ -74,8 +132,14 @@ namespace gglab
 			desc.m_Format = RHIFormat::R8G8B8A8Unorm;
 			desc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest;
 			desc.m_Extent = { 16, 16, 1 };
-			desc.m_DebugName = name.c_str();
-			return device.CreateTexture(desc);
+			const RHIResourceDebugIdentityDesc debugIdentity
+			{
+				.m_Domain = RHIResourceDebugDomain::DevTools,
+				.m_Category = "TestTexture",
+				.m_Label = name,
+				.m_StableId = serial,
+			};
+			return device.CreateTexture(desc, debugIdentity);
 		}
 
 		RHIBufferHandle CreateTestBuffer(
@@ -92,8 +156,14 @@ namespace gglab
 			desc.m_SizeInBytes = 4096;
 			desc.m_StrideInBytes = 16;
 			desc.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest;
-			desc.m_DebugName = name.c_str();
-			return device.CreateBuffer(desc);
+			const RHIResourceDebugIdentityDesc debugIdentity
+			{
+				.m_Domain = RHIResourceDebugDomain::DevTools,
+				.m_Category = "TestBuffer",
+				.m_Label = name,
+				.m_StableId = serial,
+			};
+			return device.CreateBuffer(desc, debugIdentity);
 		}
 
 		void AddTestTexture(DX12Device& device, ResourceManagementPanelState& state) noexcept
@@ -328,7 +398,7 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (!ImGui::BeginTable(tableId, 10, flags))
+			if (!ImGui::BeginTable(tableId, 12, flags | ImGuiTableFlags_ScrollX))
 			{
 				return;
 			}
@@ -337,6 +407,8 @@ namespace gglab
 			ImGui::TableSetupColumn("Generation");
 			ImGui::TableSetupColumn("State");
 			ImGui::TableSetupColumn("Ownership");
+			ImGui::TableSetupColumn("Identity");
+			ImGui::TableSetupColumn("Binding");
 			ImGui::TableSetupColumn("Debug Name");
 			ImGui::TableSetupColumn("Native");
 			ImGui::TableSetupColumn("Last Use");
@@ -357,16 +429,23 @@ namespace gglab
 				ImGui::TableSetColumnIndex(3);
 				ImGui::TextUnformatted(OwnershipText(slot.m_Ownership));
 				ImGui::TableSetColumnIndex(4);
-				ImGui::TextUnformatted(slot.m_DebugName.empty() ? "-" : slot.m_DebugName.c_str());
+				const std::string identity = DebugIdentityText(slot);
+				ImGui::TextUnformatted(identity.c_str());
 				ImGui::TableSetColumnIndex(5);
-				ImGui::TextUnformatted(slot.m_NativeResourceValid ? "yes" : "no");
+				const std::string binding = DebugBindingText(slot);
+				ImGui::TextUnformatted(binding.c_str());
+				DrawDebugBindingHistoryTooltip(slot);
 				ImGui::TableSetColumnIndex(6);
-				ImGui::Text("%u", slot.m_LastUseFenceCount);
+				ImGui::TextUnformatted(slot.m_DebugName.empty() ? "-" : slot.m_DebugName.c_str());
 				ImGui::TableSetColumnIndex(7);
-				ImGui::Text("%u", slot.m_CompletedLastUseFenceCount);
+				ImGui::TextUnformatted(slot.m_NativeResourceValid ? "yes" : "no");
 				ImGui::TableSetColumnIndex(8);
-				ImGui::Text("%u", slot.m_PendingFenceCount);
+				ImGui::Text("%u", slot.m_LastUseFenceCount);
 				ImGui::TableSetColumnIndex(9);
+				ImGui::Text("%u", slot.m_CompletedLastUseFenceCount);
+				ImGui::TableSetColumnIndex(10);
+				ImGui::Text("%u", slot.m_PendingFenceCount);
+				ImGui::TableSetColumnIndex(11);
 				ImGui::Text("%u", slot.m_CompletedFenceCount);
 			}
 
@@ -539,6 +618,8 @@ namespace gglab
 			static_cast<unsigned long long>(diagnostics.m_InvalidDestroyCount),
 			static_cast<unsigned long long>(diagnostics.m_StaleDestroyCount),
 			static_cast<unsigned long long>(diagnostics.m_DoubleDestroyCount));
+		ImGui::Text("Naming: unspecified resource creates=%llu",
+			static_cast<unsigned long long>(diagnostics.m_UnnamedResourceCreateCount));
 
 		if (ImGui::BeginTabBar("ResourceManagementSlots"))
 		{

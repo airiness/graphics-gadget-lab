@@ -25,8 +25,14 @@ namespace gglab
 		desc.m_StrideInBytes = sizeof(DebugDrawVertex);
 		desc.m_Usage = RHIBufferUsage::Vertex;
 		desc.m_MemoryUsage = RHIMemoryUsage::CpuToGpu;
-		desc.m_DebugName = "DebugDraw.VertexBuffer";
-		m_VertexBuffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc));
+		const RHIResourceDebugIdentityDesc debugIdentity
+		{
+			.m_Domain = RHIResourceDebugDomain::Renderer,
+			.m_Category = "DebugDraw.VertexBuffer",
+			.m_Label = "FrameVertices",
+		};
+		m_VertexBuffer = RHIBufferOwner(
+			m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 		GGLAB_ASSERT_MSG(m_VertexBuffer, "DebugDraw failed to create its vertex buffer.");
 
 		if (m_VertexBuffer)

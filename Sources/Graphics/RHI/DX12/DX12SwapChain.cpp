@@ -209,8 +209,6 @@ namespace gglab
 			GGLAB_HR(m_DxgiSwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
 
 			const D3D12_RESOURCE_DESC nativeDesc = backBuffer->GetDesc();
-			const std::string debugName = "SwapChain.BackBuffer." + std::to_string(i);
-
 			DX12ResourceManager::ImportedTextureDesc importDesc{};
 			importDesc.m_RHI.m_Desc.m_Dimension = RHITextureDimension::Texture2D;
 			importDesc.m_RHI.m_Desc.m_Format = ToRHIFormat(nativeDesc.Format);
@@ -224,14 +222,19 @@ namespace gglab
 			importDesc.m_RHI.m_Desc.m_ArraySize = nativeDesc.DepthOrArraySize;
 			importDesc.m_RHI.m_Desc.m_MipLevels = nativeDesc.MipLevels;
 			importDesc.m_RHI.m_Desc.m_SampleCount = nativeDesc.SampleDesc.Count;
-			importDesc.m_RHI.m_Desc.m_DebugName = debugName.c_str();
 			importDesc.m_RHI.m_External.m_InitialState =
 			{
 				.m_Stages = RHIStage::Present,
 				.m_Access = RHIAccess::Present,
 				.m_Layout = RHILayout::Present,
 			};
-			importDesc.m_RHI.m_External.m_DebugName = debugName.c_str();
+			importDesc.m_DebugIdentity =
+			{
+				.m_Domain = RHIResourceDebugDomain::SwapChain,
+				.m_Category = "BackBuffer",
+				.m_Label = "PresentationSurface",
+				.m_StableId = i,
+			};
 			importDesc.m_Resource = std::move(backBuffer);
 
 			m_BackBuffers[i] = m_DX12Device->ImportTexture(importDesc);

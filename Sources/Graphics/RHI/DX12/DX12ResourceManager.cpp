@@ -12,6 +12,34 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] bool HasDebugIdentity(
+			const RHIResourceDebugIdentityDesc& identity) noexcept
+		{
+			return identity.m_Domain != RHIResourceDebugDomain::Unknown ||
+				!identity.m_Category.empty() || !identity.m_Label.empty() ||
+				!identity.m_Source.empty() || identity.m_StableId.has_value();
+		}
+
+		[[nodiscard]] RHIResourceDebugIdentityDesc ResolveDebugIdentity(
+			const RHIResourceDebugIdentityDesc& identity,
+			std::string_view legacyName,
+			RHIResourceType resourceType) noexcept
+		{
+			if (HasDebugIdentity(identity))
+			{
+				return identity;
+			}
+			return
+			{
+				.m_Domain = RHIResourceDebugDomain::Unknown,
+				.m_Category = RHIResourceTypeDebugText(resourceType),
+				.m_Label = legacyName.empty() ? std::string_view("Unspecified") : legacyName,
+			};
+		}
+	}
+
 	DX12ResourceManager::~DX12ResourceManager() noexcept = default;
 
 	void DX12ResourceManager::Initialize(DX12Device* device) noexcept
@@ -33,7 +61,9 @@ namespace gglab
 		m_DescriptorCache = nullptr;
 	}
 
-	RHITextureHandle DX12ResourceManager::CreateTexture(const RHITextureDesc& desc) noexcept
+	RHITextureHandle DX12ResourceManager::CreateTexture(
+		const RHITextureDesc& desc,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "DX12ResourceManager must be initialized before creating textures.");
 		GGLAB_ASSERT_MSG(m_Device->GetMemAllocator() != nullptr, "DX12 memory allocator is not initialized.");
@@ -67,18 +97,19 @@ namespace gglab
 			return {};
 		}
 
-		const std::string_view debugName = desc.m_DebugName ? desc.m_DebugName : "";
-		if (!debugName.empty())
-		{
-			const std::wstring wideName = utils::ToWideString(debugName);
-			texture->SetDebugName(wideName.c_str());
-		}
-
+		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
+		const auto resolvedIdentity = ResolveDebugIdentity(
+			debugIdentity, legacyName, RHIResourceType::Texture);
+		m_Diagnostics.m_UnnamedResourceCreateCount +=
+			!HasDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_TextureCreateCount;
-		return AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Owned, debugName);
+		return AllocateTextureSlot(
+			std::move(texture), RHIResourceOwnership::Owned, resolvedIdentity);
 	}
 
-	RHIBufferHandle DX12ResourceManager::CreateBuffer(const RHIBufferDesc& desc) noexcept
+	RHIBufferHandle DX12ResourceManager::CreateBuffer(
+		const RHIBufferDesc& desc,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "DX12ResourceManager must be initialized before creating buffers.");
 		GGLAB_ASSERT_MSG(m_Device->GetMemAllocator() != nullptr, "DX12 memory allocator is not initialized.");
@@ -122,15 +153,14 @@ namespace gglab
 			return {};
 		}
 
-		const std::string_view debugName = desc.m_DebugName ? desc.m_DebugName : "";
-		if (!debugName.empty())
-		{
-			const std::wstring wideName = utils::ToWideString(debugName);
-			buffer->SetDebugName(wideName.c_str());
-		}
-
+		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
+		const auto resolvedIdentity = ResolveDebugIdentity(
+			debugIdentity, legacyName, RHIResourceType::Buffer);
+		m_Diagnostics.m_UnnamedResourceCreateCount +=
+			!HasDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferCreateCount;
-		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, debugName);
+		return AllocateBufferSlot(
+			std::move(buffer), RHIResourceOwnership::Owned, resolvedIdentity);
 	}
 
 	RHITextureHandle DX12ResourceManager::ImportTexture(const ImportedTextureDesc& desc) noexcept
@@ -156,15 +186,14 @@ namespace gglab
 		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
 			desc.m_RHI.m_External.m_DebugName :
 			desc.m_RHI.m_Desc.m_DebugName;
-		const std::string_view debugName = debugNameText ? debugNameText : "";
-		if (!debugName.empty())
-		{
-			const std::wstring wideName = utils::ToWideString(debugName);
-			texture->SetDebugName(wideName.c_str());
-		}
-
+		const std::string_view legacyName = debugNameText ? debugNameText : "";
+		const auto resolvedIdentity = ResolveDebugIdentity(
+			desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
+		m_Diagnostics.m_UnnamedResourceCreateCount +=
+			!HasDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_TextureImportCount;
-		return AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Borrowed, debugName);
+		return AllocateTextureSlot(
+			std::move(texture), RHIResourceOwnership::Borrowed, resolvedIdentity);
 	}
 
 	RHIBufferHandle DX12ResourceManager::ImportBuffer(const ImportedBufferDesc& desc) noexcept
@@ -190,15 +219,14 @@ namespace gglab
 		const char* debugNameText = desc.m_RHI.m_External.m_DebugName ?
 			desc.m_RHI.m_External.m_DebugName :
 			desc.m_RHI.m_Desc.m_DebugName;
-		const std::string_view debugName = debugNameText ? debugNameText : "";
-		if (!debugName.empty())
-		{
-			const std::wstring wideName = utils::ToWideString(debugName);
-			buffer->SetDebugName(wideName.c_str());
-		}
-
+		const std::string_view legacyName = debugNameText ? debugNameText : "";
+		const auto resolvedIdentity = ResolveDebugIdentity(
+			desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
+		m_Diagnostics.m_UnnamedResourceCreateCount +=
+			!HasDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferImportCount;
-		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Borrowed, debugName);
+		return AllocateBufferSlot(
+			std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);
 	}
 
 	void DX12ResourceManager::DestroyTexture(RHITextureHandle texture) noexcept
@@ -229,6 +257,36 @@ namespace gglab
 					m_DescriptorCache->RetireBufferViews(buffer, slot.m_RetirementPoints);
 				}
 			});
+	}
+
+	void DX12ResourceManager::SetTextureDebugBinding(
+		RHITextureHandle texture,
+		const RHIResourceDebugBindingDesc& binding) noexcept
+	{
+		SetResourceDebugBinding(
+			m_Textures, texture, RHIResourceType::Texture, binding,
+			"DX12ResourceManager::SetTextureDebugBinding");
+	}
+
+	void DX12ResourceManager::SetBufferDebugBinding(
+		RHIBufferHandle buffer,
+		const RHIResourceDebugBindingDesc& binding) noexcept
+	{
+		SetResourceDebugBinding(
+			m_Buffers, buffer, RHIResourceType::Buffer, binding,
+			"DX12ResourceManager::SetBufferDebugBinding");
+	}
+
+	std::string_view DX12ResourceManager::GetTextureDebugName(
+		RHITextureHandle texture) const noexcept
+	{
+		return GetResourceDebugName(m_Textures, texture);
+	}
+
+	std::string_view DX12ResourceManager::GetBufferDebugName(
+		RHIBufferHandle buffer) const noexcept
+	{
+		return GetResourceDebugName(m_Buffers, buffer);
 	}
 
 	void DX12ResourceManager::RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
@@ -304,19 +362,23 @@ namespace gglab
 	RHITextureHandle DX12ResourceManager::AllocateTextureSlot(
 		std::unique_ptr<DX12Texture> texture,
 		RHIResourceOwnership ownership,
-		std::string_view debugName) noexcept
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		GGLAB_ASSERT_MSG(texture != nullptr, "DX12ResourceManager requires a texture wrapper.");
-		return AllocateResourceSlot(m_Textures, std::move(texture), ownership, debugName);
+		return AllocateResourceSlot(
+			m_Textures, std::move(texture), ownership,
+			RHIResourceType::Texture, debugIdentity);
 	}
 
 	RHIBufferHandle DX12ResourceManager::AllocateBufferSlot(
 		std::unique_ptr<DX12Buffer> buffer,
 		RHIResourceOwnership ownership,
-		std::string_view debugName) noexcept
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		GGLAB_ASSERT_MSG(buffer != nullptr, "DX12ResourceManager requires a buffer wrapper.");
-		return AllocateResourceSlot(m_Buffers, std::move(buffer), ownership, debugName);
+		return AllocateResourceSlot(
+			m_Buffers, std::move(buffer), ownership,
+			RHIResourceType::Buffer, debugIdentity);
 	}
 
 	template<typename HandleT, typename SlotT, typename ResourceT>
@@ -324,16 +386,68 @@ namespace gglab
 		RHIHandleTable<HandleT, SlotT>& table,
 		std::unique_ptr<ResourceT> resource,
 		RHIResourceOwnership ownership,
-		std::string_view debugName) noexcept
+		RHIResourceType resourceType,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		const HandleT handle = table.Allocate();
 		SlotT& slot = table.SlotAt(handle.Index());
 		slot.m_Ownership = ownership;
-		slot.m_DebugNameId = debugName.empty() ? StringID{} : StringID(debugName);
+		slot.m_DebugIdentity.Assign(debugIdentity);
+		slot.m_DebugBinding = {};
+		slot.m_DebugBindingHistory.clear();
 		slot.m_LastUsePoints.clear();
 		slot.m_RetirementPoints.clear();
 		slot.m_Resource = std::move(resource);
+		slot.m_DebugName = FormatRHIResourceDebugName(
+			resourceType, handle.Index(), handle.Generation(), slot.m_DebugIdentity);
+		const std::wstring wideName = utils::ToWideString(slot.m_DebugName);
+		slot.m_Resource->SetDebugName(wideName.c_str());
 		return handle;
+	}
+
+	template<typename HandleT, typename SlotT>
+	void DX12ResourceManager::SetResourceDebugBinding(
+		RHIHandleTable<HandleT, SlotT>& table,
+		HandleT handle,
+		RHIResourceType resourceType,
+		const RHIResourceDebugBindingDesc& binding,
+		const char* functionName) noexcept
+	{
+		SlotT* slot = table.Resolve(handle);
+		if (!slot || !slot->m_Resource)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("{} received a non-live resource handle.", functionName);
+			return;
+		}
+
+		if (!slot->m_DebugBinding.IsEmpty())
+		{
+			slot->m_DebugBindingHistory.push_back(slot->m_DebugBinding);
+			constexpr size_t MaxBindingHistory = 8;
+			if (slot->m_DebugBindingHistory.size() > MaxBindingHistory)
+			{
+				slot->m_DebugBindingHistory.erase(slot->m_DebugBindingHistory.begin());
+			}
+		}
+		slot->m_DebugBinding.Assign(binding);
+
+		if (binding.m_Mode == RHIResourceDebugBindingMode::Exclusive)
+		{
+			slot->m_DebugName = FormatRHIResourceDebugName(
+				resourceType, handle.Index(), handle.Generation(),
+				slot->m_DebugIdentity, &slot->m_DebugBinding);
+			const std::wstring wideName = utils::ToWideString(slot->m_DebugName);
+			slot->m_Resource->SetDebugName(wideName.c_str());
+		}
+	}
+
+	template<typename HandleT, typename SlotT>
+	std::string_view DX12ResourceManager::GetResourceDebugName(
+		const RHIHandleTable<HandleT, SlotT>& table,
+		HandleT handle) noexcept
+	{
+		const SlotT* slot = table.Resolve(handle);
+		return slot && slot->m_Resource ? std::string_view(slot->m_DebugName) : std::string_view{};
 	}
 
 	template<typename HandleT, typename SlotT, typename OnValidT>
@@ -425,7 +539,10 @@ namespace gglab
 			slot.m_Resource.reset();
 			slot.m_LastUsePoints.clear();
 			slot.m_RetirementPoints.clear();
-			slot.m_DebugNameId = {};
+			slot.m_DebugIdentity = {};
+			slot.m_DebugBinding = {};
+			slot.m_DebugBindingHistory.clear();
+			slot.m_DebugName.clear();
 			slot.m_Ownership = RHIResourceOwnership::Owned;
 			table.Retire(index);
 			++retireCount;
@@ -466,7 +583,7 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_WARN(
 					"DX12ResourceManager finalizing texture slot {} ('{}') in state {}.",
 					index,
-					utils::StringIdToString(slot.m_DebugNameId),
+					slot.m_DebugName,
 					static_cast<uint32_t>(slot.m_State));
 			}
 		}
@@ -478,7 +595,7 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_WARN(
 					"DX12ResourceManager finalizing buffer slot {} ('{}') in state {}.",
 					index,
-					utils::StringIdToString(slot.m_DebugNameId),
+					slot.m_DebugName,
 					static_cast<uint32_t>(slot.m_State));
 			}
 		}

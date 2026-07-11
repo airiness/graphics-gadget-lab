@@ -82,6 +82,10 @@ namespace gglab
 			snapshot.m_State = state;
 			snapshot.m_Texture = record.m_Texture;
 			snapshot.m_Key = record.m_Key;
+			snapshot.m_LogicalName = record.m_LogicalName;
+			snapshot.m_DebugName = pool.m_Device ?
+				std::string(pool.m_Device->GetTextureDebugName(record.m_Texture)) : std::string{};
+			snapshot.m_AcquireSerial = record.m_AcquireSerial;
 			if (isPending)
 			{
 				snapshot.m_RetirementFence = pending->second;
@@ -109,6 +113,10 @@ namespace gglab
 			snapshot.m_State = state;
 			snapshot.m_Buffer = record.m_Buffer;
 			snapshot.m_Key = record.m_Key;
+			snapshot.m_LogicalName = record.m_LogicalName;
+			snapshot.m_DebugName = pool.m_Device ?
+				std::string(pool.m_Device->GetBufferDebugName(record.m_Buffer)) : std::string{};
+			snapshot.m_AcquireSerial = record.m_AcquireSerial;
 			if (isPending)
 			{
 				snapshot.m_RetirementFence = pending->second;

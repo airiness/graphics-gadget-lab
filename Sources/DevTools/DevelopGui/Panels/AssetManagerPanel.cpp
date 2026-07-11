@@ -212,13 +212,17 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
-			if (ImGui::BeginTable("TextureAssetsTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			if (ImGui::BeginTable("TextureAssetsTable", 8,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
 				ImGui::TableSetupColumn("Semantic", ImGuiTableColumnFlags_WidthFixed, 140.0f);
 				ImGui::TableSetupColumn("Uploaded", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Reserved", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("RHI Handle", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Native Debug Name", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableHeadersRow();
 
@@ -240,6 +244,17 @@ namespace gglab
 					ImGui::TableSetColumnIndex(4);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
 					ImGui::TableSetColumnIndex(5);
+					if (texture.m_Texture.IsValid())
+					{
+						ImGui::Text("%u:%u", texture.m_Texture.Index(), texture.m_Texture.Generation());
+					}
+					else
+					{
+						ImGui::TextUnformatted("-");
+					}
+					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(7);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}

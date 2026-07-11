@@ -1,5 +1,6 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
+#include "Graphics/RHI/RHIResourceDebug.h"
 
 #include <cstdint>
 #include <string>
@@ -20,6 +21,14 @@ namespace gglab
 		PendingRetirement,
 	};
 
+	struct DX12ResourceDebugBindingSnapshot
+	{
+		std::string m_Owner;
+		uint64_t m_Serial = 0;
+		bool m_HasSerial = false;
+		RHIResourceDebugBindingMode m_Mode = RHIResourceDebugBindingMode::Exclusive;
+	};
+
 	struct DX12ResourceManagerDiagnosticsSnapshot
 	{
 		uint64_t m_TextureCreateCount = 0;
@@ -34,6 +43,7 @@ namespace gglab
 		uint64_t m_InvalidDestroyCount = 0;
 		uint64_t m_StaleDestroyCount = 0;
 		uint64_t m_DoubleDestroyCount = 0;
+		uint64_t m_UnnamedResourceCreateCount = 0;
 	};
 
 	struct DX12ResourceSlotSnapshot
@@ -42,6 +52,18 @@ namespace gglab
 		uint32_t m_Generation = 0;
 		DX12ResourceSnapshotState m_State = DX12ResourceSnapshotState::Free;
 		DX12ResourceSnapshotOwnership m_Ownership = DX12ResourceSnapshotOwnership::Owned;
+		RHIResourceDebugDomain m_DebugDomain = RHIResourceDebugDomain::Unknown;
+		std::string m_DebugCategory;
+		std::string m_DebugLabel;
+		std::string m_DebugSource;
+		uint64_t m_DebugStableId = 0;
+		bool m_HasDebugStableId = false;
+		std::string m_DebugOwner;
+		uint64_t m_DebugBindingSerial = 0;
+		bool m_HasDebugBindingSerial = false;
+		RHIResourceDebugBindingMode m_DebugBindingMode =
+			RHIResourceDebugBindingMode::Exclusive;
+		std::vector<DX12ResourceDebugBindingSnapshot> m_DebugBindingHistory;
 		std::string m_DebugName;
 		uint32_t m_LastUseFenceCount = 0;
 		uint32_t m_CompletedLastUseFenceCount = 0;

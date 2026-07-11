@@ -404,6 +404,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResourceDebug.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />

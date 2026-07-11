@@ -209,16 +209,20 @@ namespace gglab
 				&queryHeapDesc,
 				IID_PPV_ARGS(&frame.m_QueryHeap)), device.Get());
 
-			const std::string debugName = std::format(
-				"GpuProfiler.TimestampReadback[{}]",
-				frameIndex);
 			RHIBufferDesc readbackDesc{};
 			readbackDesc.m_SizeInBytes =
 				static_cast<uint64_t>(MaxTimestampCount) * sizeof(uint64_t);
 			readbackDesc.m_Usage = RHIBufferUsage::CopyDest;
 			readbackDesc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
-			readbackDesc.m_DebugName = debugName.c_str();
-			const RHIBufferHandle readbackBuffer = device.CreateBuffer(readbackDesc);
+			const RHIResourceDebugIdentityDesc debugIdentity
+			{
+				.m_Domain = RHIResourceDebugDomain::Diagnostics,
+				.m_Category = "GpuProfiler.TimestampReadback",
+				.m_Label = "FrameResource",
+				.m_StableId = frameIndex,
+			};
+			const RHIBufferHandle readbackBuffer =
+				device.CreateBuffer(readbackDesc, debugIdentity);
 			GGLAB_ASSERT_MSG(readbackBuffer.IsValid(),
 				"DX12GpuProfiler failed to create a timestamp readback buffer.");
 			if (!readbackBuffer.IsValid())
