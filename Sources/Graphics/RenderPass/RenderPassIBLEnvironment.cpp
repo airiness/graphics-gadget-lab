@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
@@ -34,7 +35,7 @@ namespace gglab
 			uint32_t m_SourceTextureIndex = 0;
 			uint32_t m_SourceSamplerIndex = 0;
 			uint32_t m_SourceMode = 0;
-			bool m_HasMipChain = false;
+			RHIFormat m_RenderTargetFormat = RHIFormat::Unknown;
 		};
 	}
 
@@ -71,12 +72,9 @@ namespace gglab
 			}
 		}
 
-		const auto shouldBuild = renderResRegistry->IsDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
-
-		if (!shouldBuild)
-		{
-			return;
-		}
+		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
+		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
+		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
 
 		EnsureInitialized(services);
 
@@ -104,7 +102,7 @@ namespace gglab
 				auto& blackboard = builder.GetBlackboard();
 				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
 
-				const auto* textureDesc = renderResRegistry->GetTextureDesc(
+				const auto* textureDesc = renderResRegistry->GetIBLBakeTextureDesc(
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
@@ -116,10 +114,10 @@ namespace gglab
 					.m_Aspects = RHITextureAspect::Color,
 				};
 				builder.WriteInPlace(
-					iblRes.m_EnvironmentCubemap,
+					iblRes.m_BakeEnvironmentCubemap,
 					RGTextureAccess::RenderTarget,
 					mipZeroRange);
-				data.m_EnvironmentCubemap = iblRes.m_EnvironmentCubemap;
+				data.m_EnvironmentCubemap = iblRes.m_BakeEnvironmentCubemap;
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
@@ -133,12 +131,12 @@ namespace gglab
 				data.m_SourceTextureIndex = sourceTextureIndex;
 				data.m_SourceSamplerIndex = sourceSamplerIndex;
 				data.m_SourceMode = hasHdrSource ? 1u : 0u;
-				data.m_HasMipChain = textureDesc->m_MipLevels > 1;
+				data.m_RenderTargetFormat = textureDesc->m_Format;
 			},
-			[this, renderer, renderResRegistry](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, bakeScheduler, bakeGeneration](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
 				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
@@ -162,10 +160,7 @@ namespace gglab
 					commandContext->Draw(3);
 				}
 
-				if (!data.m_HasMipChain)
-				{
-					renderResRegistry->ClearDirty(RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
-				}
+				bakeScheduler->NotifyStageExecuted(IBLBakeStage::Environment, bakeGeneration);
 			});
 
 	}
@@ -213,10 +208,14 @@ namespace gglab
 
 	}
 
-	RHIPipelineHandle RenderPassIBLEnvironment::GetOrCreatePSO(const Renderer & renderer) noexcept
+	RHIPipelineHandle RenderPassIBLEnvironment::GetOrCreatePSO(
+		const Renderer& renderer,
+		RHIFormat renderTargetFormat) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
-		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
+		GraphicsPipelineRecipe recipe = m_BaseRecipe;
+		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;
+		return pipelineCache->Resolve(m_PipelineSlot, recipe, GetInfo());
 	}
 }

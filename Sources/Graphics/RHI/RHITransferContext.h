@@ -29,5 +29,8 @@ namespace gglab
 		[[nodiscard]] virtual bool UploadTexture(
 			const RHITextureUploadData& uploadData,
 			RHITextureHandle dst) noexcept = 0;
+		[[nodiscard]] virtual RHITextureReadbackRequest ReadbackTexture(
+			RHITextureHandle src,
+			const RHITextureDesc& desc) noexcept = 0;
 	};
 }

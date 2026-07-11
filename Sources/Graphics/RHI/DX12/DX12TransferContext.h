@@ -41,6 +41,9 @@ namespace gglab
 			RHIBufferHandle dst, uint64_t dstOffset = 0) noexcept override;
 		bool UploadTexture(const RHITextureUploadData& uploadData,
 			RHITextureHandle dst) noexcept override;
+		RHITextureReadbackRequest ReadbackTexture(
+			RHITextureHandle src,
+			const RHITextureDesc& desc) noexcept override;
 
 	private:
 		struct InFlightInfo
@@ -53,6 +56,7 @@ namespace gglab
 
 		DX12FencePoint End(bool wait) noexcept;
 		RHIBufferOwner CreateUploadBuffer(uint64_t sizeInBytes) noexcept;
+		RHIBufferOwner CreateReadbackBuffer(uint64_t sizeInBytes) noexcept;
 		void CopyBuffer(DX12Buffer* dst, uint64_t dstOffset,
 			DX12Buffer* src, uint64_t srcOffset,
 			uint64_t numBytes) noexcept;

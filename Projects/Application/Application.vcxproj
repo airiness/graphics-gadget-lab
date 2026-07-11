@@ -156,6 +156,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
@@ -294,6 +295,8 @@
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\IBLBakeCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureLoader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp" />
@@ -355,6 +358,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h" />
@@ -553,6 +557,9 @@
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\IBLBakeCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h" />
+    <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureLoader.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h" />

@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
+#include "Graphics/RenderPass/RenderPassIBLClear.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironmentMipChain.h"
 #include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
@@ -27,12 +28,14 @@ namespace gglab
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
+		void AddFinishPass(RenderGraph& rg) noexcept;
 
 	private:
 		static RGTextureId ImportRuntimeTexture(RenderGraph::RGBuilder& builder,
 			RenderResourceRegistry& registry,
 			RenderResourceRegistry::TextureIndex texIndex,
-			const char* name) noexcept;
+			const char* name,
+			bool bakeTarget = false) noexcept;
 
 	private:
 		RenderPassIBLEnvironment m_IBLEnvironmentPass;
@@ -40,5 +43,6 @@ namespace gglab
 		RenderPassIBLIrradiance m_IBLIrradiancePass;
 		RenderPassIBLPrefilteredSpecular m_IBLPrefilteredSpecularPass;
 		RenderPassIBLBrdfLUT m_IBLBrdfLUTPass;
+		RenderPassIBLClear m_IBLClearPass;
 	};
 }

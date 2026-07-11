@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/IBLBakeTypes.h"
 
 #include <filesystem>
 #include <limits>
@@ -24,8 +25,8 @@ namespace gglab
 	{
 		float m_Intensity = 1.0f;
 		float m_RotationRadians = 0.0f;
-		uint32_t m_PrefilteredSpecularSampleCount = 1024;
-		float m_PrefilteredSpecularMaxSampleLuminance = 1000.0f;
+		IBLQualityPreset m_QualityPreset = IBLQualityPreset::Medium;
+		IBLBakeConfig m_BakeConfig = GetIBLBakeConfig(IBLQualityPreset::Medium);
 		bool m_EnableSkybox = true;
 	};
 
@@ -52,12 +53,21 @@ namespace gglab
 
 		[[nodiscard]] const EnvironmentMapEntry* GetActiveEnvironment() const noexcept;
 		[[nodiscard]] TextureID GetActiveTextureId() const noexcept;
+		[[nodiscard]] bool EnsureActiveEnvironmentTextureLoaded() noexcept;
 
 		[[nodiscard]] const EnvironmentLightingSettings& GetSettings() const noexcept { return m_Settings; }
+		[[nodiscard]] const IBLBakeConfig& GetBakeConfig() const noexcept { return m_Settings.m_BakeConfig; }
+		[[nodiscard]] uint64_t GetBakeRequestGeneration() const noexcept { return m_BakeRequestGeneration; }
+		[[nodiscard]] bool ShouldIgnoreCache(uint64_t generation) const noexcept
+		{
+			return generation == m_IgnoreCacheGeneration;
+		}
 		void SetIntensity(float intensity) noexcept;
 		void SetRotationRadians(float rotationRadians) noexcept;
+		void SetQualityPreset(IBLQualityPreset preset) noexcept;
 		void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept;
 		void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept;
+		void RequestRebake(bool ignoreCache = false) noexcept;
 		void SetSkyboxEnabled(bool enabled) noexcept { m_Settings.m_EnableSkybox = enabled; }
 
 	private:
@@ -68,5 +78,7 @@ namespace gglab
 		std::vector<EnvironmentMapEntry> m_Entries;
 		size_t m_ActiveEntryIndex = InvalidEntryIndex;
 		EnvironmentLightingSettings m_Settings{};
+		uint64_t m_BakeRequestGeneration = 1;
+		uint64_t m_IgnoreCacheGeneration = 0;
 	};
 }

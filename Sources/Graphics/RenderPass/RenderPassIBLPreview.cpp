@@ -51,8 +51,6 @@ namespace gglab
 
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
-		renderResRegistry->EnsureIblResources();
-
 		EnsureInitialized(services);
 
 		const std::string resourcesPassName = MakeRenderGraphPassName("Resources");
@@ -84,6 +82,7 @@ namespace gglab
 				previewResources.m_PrefilteredSpecularCubemapPreview = importPreview(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
 					"Preview.IBL.PrefilteredSpecularCubemap");
+
 			});
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;

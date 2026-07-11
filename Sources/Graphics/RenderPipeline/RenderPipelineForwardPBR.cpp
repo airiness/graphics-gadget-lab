@@ -168,6 +168,10 @@ namespace gglab
 		// DevelopGui	
 		m_DevelopGuiPass.AddPass(rg, context, services);
 
+		// Return persistent IBL resources to Common only after every consumer and
+		// preview pass has declared its final access for this frame.
+		m_IBLPass.AddFinishPass(rg);
+
 		// Finish backbuffer
 		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",
 			[displayViewId](RenderGraph::RGBuilder& builder, FinishBackBufferPassData&)

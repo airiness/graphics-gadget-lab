@@ -108,6 +108,35 @@ namespace gglab
 		}
 	};
 
+	struct RHITextureReadbackSubresource
+	{
+		uint64_t m_BufferOffset = 0;
+		uint64_t m_RowPitch = 0;
+		uint64_t m_RowSizeInBytes = 0;
+		uint64_t m_SlicePitch = 0;
+		uint32_t m_RowCount = 0;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		uint32_t m_Depth = 1;
+		uint32_t m_MipLevel = 0;
+		uint32_t m_ArraySlice = 0;
+	};
+
+	struct RHITextureReadbackRequest
+	{
+		RHIBufferOwner m_Buffer;
+		uint64_t m_BufferSizeInBytes = 0;
+		RHITextureDesc m_TextureDesc{};
+		std::vector<RHITextureReadbackSubresource> m_Subresources;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return static_cast<bool>(m_Buffer) &&
+				m_BufferSizeInBytes > 0 &&
+				!m_Subresources.empty();
+		}
+	};
+
 	struct RHITextureViewDesc
 	{
 		RHITextureViewType m_Type = RHITextureViewType::ShaderResource;

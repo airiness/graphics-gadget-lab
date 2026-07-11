@@ -12,7 +12,8 @@ struct IBLIrradiancePassParameters
 	uint EnvironmentSamplerIndex;
 	uint EnvironmentResolution;
 	uint EnvironmentMipLevels;
-	uint3 Padding;
+	uint SampleCount;
+	uint2 Padding;
 };
 
 ConstantBuffer<IBLIrradiancePassParameters> g_Pass : register(b2);
@@ -24,7 +25,7 @@ TextureSamplerBindingData GetEnvironmentBinding()
 
 float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 normalWS)
 {
-	const uint SAMPLE_COUNT = 1024;
+	const uint SAMPLE_COUNT = max(g_Pass.SampleCount, 1u);
 	const float environmentResolution = max((float) g_Pass.EnvironmentResolution, 1.0);
 	const float environmentTexelSolidAngle =
 		4.0 * PI / (6.0 * environmentResolution * environmentResolution);

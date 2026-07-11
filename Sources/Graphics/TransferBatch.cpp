@@ -30,6 +30,13 @@ namespace gglab
 		return m_TransferContext.UploadTexture(uploadData, dstTexture);
 	}
 
+	RHITextureReadbackRequest TransferBatch::ReadbackTexture(
+		RHITextureHandle srcTexture,
+		const RHITextureDesc& desc) noexcept
+	{
+		return m_TransferContext.ReadbackTexture(srcTexture, desc);
+	}
+
 	void TransferBatch::CopyBuffer(
 		RHIBufferHandle dst,
 		uint64_t dstOffset,

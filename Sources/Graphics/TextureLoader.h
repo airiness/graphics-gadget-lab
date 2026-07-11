@@ -19,5 +19,9 @@ namespace gglab
 			uint32_t height,
 			std::span<const uint8_t> pixels,
 			TextureColorSpace colorSpace) noexcept;
+
+		[[nodiscard]] static bool SaveTextureDataToDDS(
+			const TextureAssetData& textureData,
+			const std::filesystem::path& path) noexcept;
 	};
 }

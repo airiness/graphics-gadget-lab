@@ -9,6 +9,11 @@ namespace gglab
 		RGTextureId m_IrradianceCubemap{};
 		RGTextureId m_PrefilteredSpecularCubemap{};
 		RGTextureId m_BrdfLut{};
+
+		RGTextureId m_BakeEnvironmentCubemap{};
+		RGTextureId m_BakeIrradianceCubemap{};
+		RGTextureId m_BakePrefilteredSpecularCubemap{};
+		RGTextureId m_BakeBrdfLut{};
 	};
 
 	inline constexpr const char* IBLResourcesName = "RGIBLResources";

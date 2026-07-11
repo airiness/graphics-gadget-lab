@@ -17,6 +17,7 @@ namespace gglab
 {
 	class PipelineCache;
 	class EnvironmentLightingSystem;
+	class IBLBakeScheduler;
 	class RenderResourceRegistry;
 	class SamplerRegistry;
 	class ShaderManager;
@@ -86,6 +87,7 @@ namespace gglab
 		TransferManager* GetTransferManager() const noexcept { return m_RHIContext ? &m_RHIContext->GetTransferManager() : nullptr; }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		EnvironmentLightingSystem* GetEnvironmentLightingSystem() const noexcept { return m_EnvironmentLightingSystem.get(); }
+		IBLBakeScheduler* GetIBLBakeScheduler() const noexcept { return m_IBLBakeScheduler.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		TransientResourcePool* GetTransientResourcePool() const noexcept { return m_TransientResourcePool.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
@@ -139,6 +141,7 @@ namespace gglab
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
+		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		std::unique_ptr<TextureRegistry> m_TextureRegistry;

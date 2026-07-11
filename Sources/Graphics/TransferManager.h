@@ -1,10 +1,12 @@
 #pragma once
 #include "Graphics/TransferBatch.h"
+#include "Graphics/TextureAsset.h"
 
 #include <memory>
 
 namespace gglab
 {
+	class RHIDevice;
 	class RHITransferContext;
 
 	class TransferManager
@@ -17,6 +19,12 @@ namespace gglab
 		void Reclaim() noexcept;
 
 		TransferBatch BeginBatch() noexcept;
+		[[nodiscard]] const std::byte* MapTextureReadback(
+			RHIDevice& device, const RHITextureReadbackRequest& request) noexcept;
+		[[nodiscard]] static TextureAssetData ResolveMappedTextureReadback(
+			const RHITextureReadbackRequest& request, const std::byte* mapped) noexcept;
+		static void UnmapTextureReadback(
+			RHIDevice& device, const RHITextureReadbackRequest& request) noexcept;
 
 	private:
 		std::unique_ptr<RHITransferContext> m_TransferContext;

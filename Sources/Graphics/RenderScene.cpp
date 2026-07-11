@@ -414,7 +414,6 @@ namespace gglab
 		sceneCB.LightCount = result.m_RenderScene.m_LightCount;
 		sceneCB.DirectionalShadowLightIndex = result.m_RenderScene.m_DirectionalShadowLightIndex;
 
-		info.m_RenderResourceRegistry.EnsureIblResources();
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
 		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetSettings();
 		sceneCB.IBLResource.EnvironmentIntensity = environmentSettings.m_Intensity;
