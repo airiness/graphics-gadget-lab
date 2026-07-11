@@ -1,5 +1,6 @@
 name: Sync repository labels
 
+# The repository label taxonomy is declared in .github/labels.json.
 on:
   workflow_dispatch:
   push:
