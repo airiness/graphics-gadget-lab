@@ -1,0 +1,143 @@
+name: Sync repository labels
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/labels.json
+      - .github/workflows/sync-labels.yml
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create, update, rename, and delete labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('.github/labels.json', 'utf8'));
+            const { owner, repo } = context.repo;
+
+            const normalize = value => value.toLowerCase();
+            const desiredByName = new Map(
+              config.labels.map(label => [normalize(label.name), label]));
+
+            const loadLabels = async () => {
+              const labels = await github.paginate(
+                github.rest.issues.listLabelsForRepo,
+                { owner, repo, per_page: 100 });
+              return new Map(labels.map(label => [normalize(label.name), label]));
+            };
+
+            let existing = await loadLabels();
+            let created = 0;
+            let updated = 0;
+            let renamed = 0;
+            let deleted = 0;
+
+            for (const rename of config.renames ?? []) {
+              const sourceKey = normalize(rename.from);
+              const targetKey = normalize(rename.to);
+              const source = existing.get(sourceKey);
+              if (!source || sourceKey === targetKey) {
+                continue;
+              }
+
+              const desired = desiredByName.get(targetKey);
+              const target = existing.get(targetKey);
+              if (!target) {
+                await github.rest.issues.updateLabel({
+                  owner,
+                  repo,
+                  name: source.name,
+                  new_name: rename.to,
+                  color: desired?.color ?? source.color,
+                  description: desired?.description ?? source.description ?? ''
+                });
+                core.info(`Renamed ${rename.from} -> ${rename.to}`);
+                renamed++;
+              } else {
+                const linkedItems = await github.paginate(
+                  github.rest.issues.listForRepo,
+                  { owner, repo, state: 'all', labels: rename.from, per_page: 100 });
+                for (const item of linkedItems) {
+                  await github.rest.issues.addLabels({
+                    owner,
+                    repo,
+                    issue_number: item.number,
+                    labels: [rename.to]
+                  });
+                }
+                await github.rest.issues.deleteLabel({ owner, repo, name: source.name });
+                core.info(`Merged ${rename.from} into existing ${rename.to}`);
+                renamed++;
+              }
+
+              existing = await loadLabels();
+            }
+
+            for (const desired of config.labels) {
+              const key = normalize(desired.name);
+              const current = existing.get(key);
+              if (!current) {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: desired.name,
+                  color: desired.color,
+                  description: desired.description
+                });
+                core.info(`Created ${desired.name}`);
+                created++;
+                continue;
+              }
+
+              const currentDescription = current.description ?? '';
+              if (current.color.toLowerCase() !== desired.color.toLowerCase() ||
+                  currentDescription !== desired.description ||
+                  current.name !== desired.name) {
+                await github.rest.issues.updateLabel({
+                  owner,
+                  repo,
+                  name: current.name,
+                  new_name: desired.name,
+                  color: desired.color,
+                  description: desired.description
+                });
+                core.info(`Updated ${desired.name}`);
+                updated++;
+              }
+            }
+
+            existing = await loadLabels();
+            for (const labelName of config.delete ?? []) {
+              const current = existing.get(normalize(labelName));
+              if (!current) {
+                continue;
+              }
+              await github.rest.issues.deleteLabel({ owner, repo, name: current.name });
+              core.info(`Deleted ${current.name}`);
+              deleted++;
+            }
+
+            core.summary
+              .addHeading('Label taxonomy sync')
+              .addTable([
+                [{ data: 'Operation', header: true }, { data: 'Count', header: true }],
+                ['Created', String(created)],
+                ['Updated', String(updated)],
+                ['Renamed', String(renamed)],
+                ['Deleted', String(deleted)]
+              ])
+              .addRaw(`Taxonomy version: ${config.version ?? 'unknown'}`)
+              .write();
