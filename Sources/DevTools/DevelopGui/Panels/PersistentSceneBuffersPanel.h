@@ -8,7 +8,7 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Rendering/Buffers/Persistent Scene Buffers";
+			return "Rendering/Resources/Persistent Scene Buffers";
 		}
 		std::string_view GetTitle() const noexcept override { return "Persistent Scene Buffers"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
