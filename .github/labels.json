@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "renames": [
+    {
+      "from": "area:developgui",
+      "to": "area:devtools"
+    },
+    {
+      "from": "area:pbr",
+      "to": "topic:pbr"
+    },
+    {
+      "from": "area:dx12",
+      "to": "backend:dx12"
+    }
+  ],
+  "delete": [
+    "area:foundation",
+    "area:renderpass"
+  ],
+  "labels": [
+    {
+      "name": "type:epic",
+      "color": "3E4B9E",
+      "description": "Large outcome that should be split into smaller issues"
+    },
+    {
+      "name": "type:feature",
+      "color": "0E8A16",
+      "description": "Deliverable feature or capability"
+    },
+    {
+      "name": "type:bug",
+      "color": "D73A4A",
+      "description": "Incorrect behavior, regression, or rendering defect"
+    },
+    {
+      "name": "type:refactor",
+      "color": "5319E7",
+      "description": "Internal structure improvement without intended behavior changes"
+    },
+    {
+      "name": "type:research",
+      "color": "1D76DB",
+      "description": "Investigation that should produce a conclusion and next steps"
+    },
+    {
+      "name": "type:experiment",
+      "color": "FBCA04",
+      "description": "Prototype or high-risk technical trial"
+    },
+    {
+      "name": "type:chore",
+      "color": "C2E0C6",
+      "description": "Repository maintenance with no product-facing behavior change"
+    },
+    {
+      "name": "type:docs",
+      "color": "0075CA",
+      "description": "Documentation, comments, guides, or notices"
+    },
+    {
+      "name": "type:test",
+      "color": "BFDADC",
+      "description": "Automated or manual validation coverage"
+    },
+
+    {
+      "name": "area:application",
+      "color": "1D76DB",
+      "description": "Application, demo, window, input, and frame loop"
+    },
+    {
+      "name": "area:core",
+      "color": "1D76DB",
+      "description": "Core utilities, containers, IDs, hashing, and shared infrastructure"
+    },
+    {
+      "name": "area:math",
+      "color": "1D76DB",
+      "description": "Vectors, matrices, quaternions, bounds, and geometry math"
+    },
+    {
+      "name": "area:scene",
+      "color": "1D76DB",
+      "description": "World, entities, cameras, RenderViews, RenderQueues, and lights"
+    },
+    {
+      "name": "area:renderer",
+      "color": "1D76DB",
+      "description": "Renderer, frame building, render pipelines, and render-pass orchestration"
+    },
+    {
+      "name": "area:rendergraph",
+      "color": "1D76DB",
+      "description": "RenderGraph scheduling, dependencies, compilation, and barriers"
+    },
+    {
+      "name": "area:rhi",
+      "color": "1D76DB",
+      "description": "Rendering Hardware Interface abstractions and contracts"
+    },
+    {
+      "name": "area:resource",
+      "color": "1D76DB",
+      "description": "GPU resources, descriptors, allocators, transfer, and retirement"
+    },
+    {
+      "name": "area:pipeline",
+      "color": "1D76DB",
+      "description": "PSOs, binding layouts, pipeline cache, and shader variants"
+    },
+    {
+      "name": "area:shader",
+      "color": "1D76DB",
+      "description": "HLSL, DXC, reflection, shader management, and shader utilities"
+    },
+    {
+      "name": "area:asset",
+      "color": "1D76DB",
+      "description": "Model and texture loading, importers, and asset registration"
+    },
+    {
+      "name": "area:material",
+      "color": "1D76DB",
+      "description": "Materials, texture bindings, samplers, and material instances"
+    },
+    {
+      "name": "area:devtools",
+      "color": "1D76DB",
+      "description": "DevelopGUI, DebugDraw, inspectors, previews, and visualizers"
+    },
+    {
+      "name": "area:diagnostics",
+      "color": "1D76DB",
+      "description": "Snapshots, profiling, statistics, telemetry, and validation output"
+    },
+    {
+      "name": "area:lab",
+      "color": "1D76DB",
+      "description": "Lab runtime, lab sessions, and focused rendering experiments"
+    },
+    {
+      "name": "area:tooling",
+      "color": "1D76DB",
+      "description": "CI, scripts, project files, build integration, and developer tooling"
+    },
+
+    {
+      "name": "topic:pbr",
+      "color": "A371F7",
+      "description": "Physically based shading models and material response"
+    },
+    {
+      "name": "topic:lighting",
+      "color": "A371F7",
+      "description": "Direct lighting, light representation, and light evaluation"
+    },
+    {
+      "name": "topic:ibl",
+      "color": "A371F7",
+      "description": "Image-based lighting, environment convolution, and BRDF integration"
+    },
+    {
+      "name": "topic:skybox",
+      "color": "A371F7",
+      "description": "Sky and environment background rendering"
+    },
+    {
+      "name": "topic:shadow",
+      "color": "A371F7",
+      "description": "Shadow maps, shadow sampling, biasing, and shadow views"
+    },
+    {
+      "name": "topic:postprocess",
+      "color": "A371F7",
+      "description": "Tonemapping, exposure, anti-aliasing, and post-processing"
+    },
+    {
+      "name": "topic:transparency",
+      "color": "A371F7",
+      "description": "Alpha modes, blending, sorting, and transparent rendering"
+    },
+    {
+      "name": "topic:culling",
+      "color": "A371F7",
+      "description": "Visibility tests, frustum culling, and submission filtering"
+    },
+    {
+      "name": "topic:render-view",
+      "color": "A371F7",
+      "description": "RenderView, multi-view rendering, camera views, and view targets"
+    },
+    {
+      "name": "topic:debug-draw",
+      "color": "A371F7",
+      "description": "Transient debug geometry, channels, and visualization"
+    },
+    {
+      "name": "topic:profiling",
+      "color": "A371F7",
+      "description": "CPU/GPU timing, counters, and performance inspection"
+    },
+    {
+      "name": "topic:bindless",
+      "color": "A371F7",
+      "description": "Bindless resource and sampler access"
+    },
+    {
+      "name": "topic:gpu-driven",
+      "color": "A371F7",
+      "description": "GPU-driven visibility, indirect submission, batching, and mesh processing"
+    },
+    {
+      "name": "topic:raytracing",
+      "color": "A371F7",
+      "description": "DXR, acceleration structures, ray queries, and path tracing"
+    },
+    {
+      "name": "topic:input",
+      "color": "A371F7",
+      "description": "Keyboard, mouse, gamepad, and camera input behavior"
+    },
+    {
+      "name": "topic:cache",
+      "color": "A371F7",
+      "description": "Persistent or runtime caches for shaders, pipelines, and generated data"
+    },
+
+    {
+      "name": "concern:correctness",
+      "color": "FBCA04",
+      "description": "Correctness, determinism, validation, or regression prevention"
+    },
+    {
+      "name": "concern:performance",
+      "color": "FBCA04",
+      "description": "CPU, GPU, submission, or bandwidth performance"
+    },
+    {
+      "name": "concern:lifetime",
+      "color": "FBCA04",
+      "description": "Ownership, destruction, retirement, and fence-aware lifetime"
+    },
+    {
+      "name": "concern:synchronization",
+      "color": "FBCA04",
+      "description": "Barriers, queues, fences, hazards, and GPU synchronization"
+    },
+    {
+      "name": "concern:threading",
+      "color": "FBCA04",
+      "description": "Concurrency, jobs, thread safety, and asynchronous handoff"
+    },
+    {
+      "name": "concern:memory",
+      "color": "FBCA04",
+      "description": "Memory usage, allocation behavior, pooling, and residency"
+    },
+    {
+      "name": "concern:visual-quality",
+      "color": "FBCA04",
+      "description": "Image quality, stability, artifacts, and perceptual output"
+    },
+    {
+      "name": "concern:api-design",
+      "color": "FBCA04",
+      "description": "Public interfaces, semantics, ownership contracts, and usability"
+    },
+    {
+      "name": "concern:build-time",
+      "color": "FBCA04",
+      "description": "Compilation, shader iteration, project generation, and build latency"
+    },
+
+    {
+      "name": "backend:dx12",
+      "color": "6E7781",
+      "description": "Direct3D 12 backend-specific implementation"
+    }
+  ]
+}
