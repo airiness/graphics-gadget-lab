@@ -10,6 +10,12 @@ namespace gglab
 	enum class RHISamplerFilter : uint8_t
 	{
 		MinMagMipPoint,
+		MinMagPointMipLinear,
+		MinPointMagLinearMipPoint,
+		MinPointMagMipLinear,
+		MinLinearMagMipPoint,
+		MinLinearMagPointMipLinear,
+		MinMagLinearMipPoint,
 		MinMagMipLinear,
 		Anisotropic,
 		ComparisonMinMagLinearMipPoint,

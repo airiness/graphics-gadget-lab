@@ -18,12 +18,19 @@ namespace gglab
 	class AssetManager
 	{
 	public:
+		struct MaterialTextureSamplingSettings
+		{
+			bool m_EnableAnisotropicFiltering = true;
+			uint32_t m_MaxAnisotropy = 8;
+		};
+
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			TextureRegistry* m_TextureRegistry = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
+			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 		};
 
 		struct MeshUploadData
@@ -101,6 +108,7 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		TextureRegistry* m_TextureRegistry = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
+		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
 		MeshIDCounter m_MeshIdCounter{ ReservedMeshCount };
 		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialCount };

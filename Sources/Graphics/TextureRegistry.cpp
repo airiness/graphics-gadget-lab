@@ -220,7 +220,8 @@ namespace gglab
 			const auto id = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
 			CreateTextureEntry(id, "UVTestTexture1K", texPath);
 			uploads.emplace_back(MakeTextureUploadData(id, texPath, TextureSemantic::UVTest));
-			m_TextureContainer.m_PathIDMap[texPath] = id;
+			m_TextureContainer.m_CacheKeyIDMap[
+				{ texPath, MakeTextureImportSettings(TextureSemantic::UVTest) }] = id;
 		}
 
 		{
@@ -228,7 +229,8 @@ namespace gglab
 			const auto id = ToTextureId(ReservedTextureIDIndex::UVTestTexture4K);
 			CreateTextureEntry(id, "UVTestTexture4K", texPath);
 			uploads.emplace_back(MakeTextureUploadData(id, texPath, TextureSemantic::UVTest));
-			m_TextureContainer.m_PathIDMap[texPath] = id;
+			m_TextureContainer.m_CacheKeyIDMap[
+				{ texPath, MakeTextureImportSettings(TextureSemantic::UVTest) }] = id;
 		}
 
 		if (!uploads.empty())
@@ -276,7 +278,8 @@ namespace gglab
 			return InvalidTextureID;
 		}
 
-		auto textureId = FindTexture(canonicalPath);
+		const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
+		auto textureId = FindTexture(canonicalPath, importSettings);
 		if (textureId.IsValid())
 		{
 			if (const auto* tex = GetTexture(textureId); tex && tex->m_IsUploaded)
@@ -304,7 +307,7 @@ namespace gglab
 			return InvalidTextureID;
 		}
 
-		textureId = CreateTexture(canonicalPath);
+		textureId = CreateTexture(canonicalPath, importSettings);
 		if (!textureId.IsValid())
 		{
 			return InvalidTextureID;
@@ -390,14 +393,16 @@ namespace gglab
 		return resolveSrvIndex(fallbackTexture->m_Srv);
 	}
 
-	TextureID TextureRegistry::CreateTexture(const std::filesystem::path& canonicalPath) noexcept
+	TextureID TextureRegistry::CreateTexture(const std::filesystem::path& canonicalPath,
+		const TextureImportSettings& importSettings) noexcept
 	{
 		const auto textureId = m_TextureIdCounter.Acquire();
 		if (!textureId.IsValid())
 		{
 			return InvalidTextureID;
 		}
-		auto pathIdPair = m_TextureContainer.m_PathIDMap.emplace(canonicalPath, textureId);
+		auto pathIdPair = m_TextureContainer.m_CacheKeyIDMap.emplace(
+			TextureCacheKey{ canonicalPath, importSettings }, textureId);
 		GGLAB_ASSERT_MSG(pathIdPair.second, "TextureRegistry: emplace path and TextureID pair failed.");
 		if (!pathIdPair.second)
 		{
@@ -408,7 +413,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(idTexPair.second, "TextureRegistry: emplace TextureID and Texture pair failed.");
 		if (!idTexPair.second)
 		{
-			m_TextureContainer.m_PathIDMap.erase(pathIdPair.first);
+			m_TextureContainer.m_CacheKeyIDMap.erase(pathIdPair.first);
 			return InvalidTextureID;
 		}
 
@@ -438,7 +443,7 @@ namespace gglab
 			m_TextureContainer.m_TextureIDMap.erase(textureIter);
 			removed = true;
 		}
-		const size_t removedPaths = std::erase_if(m_TextureContainer.m_PathIDMap,
+		const size_t removedPaths = std::erase_if(m_TextureContainer.m_CacheKeyIDMap,
 			[textureId](const auto& entry) noexcept
 			{
 				return entry.second == textureId;
@@ -446,11 +451,12 @@ namespace gglab
 		return removed || removedPaths > 0;
 	}
 
-	TextureID TextureRegistry::FindTexture(const std::filesystem::path& canonicalPath) const noexcept
+	TextureID TextureRegistry::FindTexture(const std::filesystem::path& canonicalPath,
+		const TextureImportSettings& importSettings) const noexcept
 	{
-		auto& texNameIdsMap = m_TextureContainer.m_PathIDMap;
-		auto iterator = texNameIdsMap.find(canonicalPath);
-		if (iterator != texNameIdsMap.end())
+		const auto& cacheKeyIds = m_TextureContainer.m_CacheKeyIDMap;
+		auto iterator = cacheKeyIds.find(TextureCacheKey{ canonicalPath, importSettings });
+		if (iterator != cacheKeyIds.end())
 		{
 			return iterator->second;
 		}
@@ -464,7 +470,9 @@ namespace gglab
 		uploadData.m_TextureId = textureId;
 		uploadData.m_Semantic = semantic;
 		uploadData.m_ColorSpace = GetTextureColorSpaceFromSemantic(semantic);
-		uploadData.m_TextureData = TextureLoader::LoadTextureData(canonicalPath, uploadData.m_ColorSpace);
+		uploadData.m_TextureData = TextureLoader::LoadTextureData(
+			canonicalPath,
+			MakeTextureImportSettings(semantic));
 		return uploadData;
 	}
 

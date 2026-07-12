@@ -2,6 +2,7 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
+#include "Graphics/TextureLoader.h"
 
 namespace gglab
 {
@@ -48,6 +49,27 @@ namespace gglab
 
 	class TextureRegistry
 	{
+		struct TextureCacheKey
+		{
+			std::filesystem::path m_CanonicalPath;
+			TextureImportSettings m_ImportSettings{};
+
+			bool operator==(const TextureCacheKey&) const noexcept = default;
+		};
+
+		struct TextureCacheKeyHash
+		{
+			size_t operator()(const TextureCacheKey& key) const noexcept
+			{
+				size_t hash = std::filesystem::hash_value(key.m_CanonicalPath);
+				hash ^= static_cast<size_t>(key.m_ImportSettings.m_Semantic) +
+					0x9e3779b9u + (hash << 6) + (hash >> 2);
+				hash ^= static_cast<size_t>(key.m_ImportSettings.m_MipPolicy) +
+					0x9e3779b9u + (hash << 6) + (hash >> 2);
+				return hash;
+			}
+		};
+
 	public:
 		struct CreateInfo
 		{
@@ -66,7 +88,7 @@ namespace gglab
 	private:
 		struct TextureContainer
 		{
-			std::unordered_map<std::filesystem::path, TextureID> m_PathIDMap;
+			std::unordered_map<TextureCacheKey, TextureID, TextureCacheKeyHash> m_CacheKeyIDMap;
 			std::unordered_map<TextureID, std::unique_ptr<Texture>> m_TextureIDMap;
 		};
 
@@ -89,8 +111,10 @@ namespace gglab
 
 		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
 
-		TextureID CreateTexture(const std::filesystem::path& canonicalPath) noexcept;
-		TextureID FindTexture(const std::filesystem::path& canonicalPath) const noexcept;
+		TextureID CreateTexture(const std::filesystem::path& canonicalPath,
+			const TextureImportSettings& importSettings) noexcept;
+		TextureID FindTexture(const std::filesystem::path& canonicalPath,
+			const TextureImportSettings& importSettings) const noexcept;
 
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			const std::filesystem::path& canonicalPath, TextureSemantic semantic) noexcept;
