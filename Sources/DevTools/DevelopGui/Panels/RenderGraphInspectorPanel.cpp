@@ -431,7 +431,7 @@ namespace gglab
 
 			if (!ImGui::BeginChild(
 				"RenderGraphGraphCanvas",
-				ImVec2(0.0f, 460.0f),
+				ImVec2(0.0f, 800.0f),
 				true,
 				ImGuiWindowFlags_HorizontalScrollbar))
 			{
