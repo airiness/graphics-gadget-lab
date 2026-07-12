@@ -9,6 +9,18 @@ namespace gglab
 		{
 		case RHISamplerFilter::MinMagMipPoint:
 			return D3D12_FILTER_MIN_MAG_MIP_POINT;
+		case RHISamplerFilter::MinMagPointMipLinear:
+			return D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+		case RHISamplerFilter::MinPointMagLinearMipPoint:
+			return D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;
+		case RHISamplerFilter::MinPointMagMipLinear:
+			return D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
+		case RHISamplerFilter::MinLinearMagMipPoint:
+			return D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
+		case RHISamplerFilter::MinLinearMagPointMipLinear:
+			return D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
+		case RHISamplerFilter::MinMagLinearMipPoint:
+			return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 		case RHISamplerFilter::MinMagMipLinear:
 			return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 		case RHISamplerFilter::Anisotropic:

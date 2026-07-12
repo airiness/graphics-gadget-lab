@@ -59,18 +59,81 @@ namespace gglab
 			}
 		}
 
-		static SamplerKey MakeSamplerKeyFromAssimpTextureParams(const aiTextureMapMode mapMode[3]) noexcept
+		constexpr int GltfNearest = 9728;
+		constexpr int GltfLinear = 9729;
+		constexpr int GltfNearestMipmapNearest = 9984;
+		constexpr int GltfLinearMipmapNearest = 9985;
+		constexpr int GltfNearestMipmapLinear = 9986;
+		constexpr int GltfLinearMipmapLinear = 9987;
+
+		[[nodiscard]] bool GltfMinFilterUsesMipmaps(int minFilter) noexcept
+		{
+			return minFilter >= GltfNearestMipmapNearest && minFilter <= GltfLinearMipmapLinear;
+		}
+
+		[[nodiscard]] bool GltfMinFilterIsLinear(int minFilter) noexcept
+		{
+			return minFilter == GltfLinear ||
+				minFilter == GltfLinearMipmapNearest ||
+				minFilter == GltfLinearMipmapLinear;
+		}
+
+		[[nodiscard]] bool GltfMipFilterIsLinear(int minFilter) noexcept
+		{
+			return minFilter == GltfNearestMipmapLinear ||
+				minFilter == GltfLinearMipmapLinear;
+		}
+
+		[[nodiscard]] RHISamplerFilter MakeRhiSamplerFilter(
+			bool minLinear,
+			bool magLinear,
+			bool mipLinear) noexcept
+		{
+			const uint32_t index =
+				(minLinear ? 4u : 0u) |
+				(magLinear ? 2u : 0u) |
+				(mipLinear ? 1u : 0u);
+			constexpr RHISamplerFilter filters[] =
+			{
+				RHISamplerFilter::MinMagMipPoint,
+				RHISamplerFilter::MinMagPointMipLinear,
+				RHISamplerFilter::MinPointMagLinearMipPoint,
+				RHISamplerFilter::MinPointMagMipLinear,
+				RHISamplerFilter::MinLinearMagMipPoint,
+				RHISamplerFilter::MinLinearMagPointMipLinear,
+				RHISamplerFilter::MinMagLinearMipPoint,
+				RHISamplerFilter::MinMagMipLinear,
+			};
+			return filters[index];
+		}
+
+		static SamplerKey MakeSamplerKeyFromAssimpTextureParams(
+			const aiTextureMapMode mapMode[3],
+			int magFilter,
+			int minFilter,
+			const AssetManager::MaterialTextureSamplingSettings& settings) noexcept
 		{
 			SamplerKey key{};
 
-			key.m_Filter = RHISamplerFilter::MinMagMipLinear;
+			const bool usesMipmaps = GltfMinFilterUsesMipmaps(minFilter);
+			const bool minLinear = GltfMinFilterIsLinear(minFilter);
+			const bool magLinear = magFilter != GltfNearest;
+			const bool mipLinear = GltfMipFilterIsLinear(minFilter);
+			const bool promoteToAnisotropic =
+				settings.m_EnableAnisotropicFiltering &&
+				minFilter == GltfLinearMipmapLinear &&
+				magLinear;
+			key.m_Filter = promoteToAnisotropic ?
+				RHISamplerFilter::Anisotropic :
+				MakeRhiSamplerFilter(minLinear, magLinear, mipLinear);
 
 			key.m_AddressU = ToRHITextureAddressMode(mapMode[0]);
 			key.m_AddressV = ToRHITextureAddressMode(mapMode[1]);
 			key.m_AddressW = ToRHITextureAddressMode(mapMode[2]);
 
 			key.m_MipLODBias = 0.0f;
-			key.m_MaxAnisotropy = 1;
+			key.m_MaxAnisotropy = promoteToAnisotropic ?
+				std::clamp(settings.m_MaxAnisotropy, 1u, 16u) : 1u;
 			key.m_CompareOp = RHICompareOp::Never;
 
 			key.m_BorderColor[0] = 0.0f;
@@ -79,6 +142,7 @@ namespace gglab
 			key.m_BorderColor[3] = 0.0f;
 
 			key.m_MinLOD = 0.0f;
+			key.m_MaxLOD = usesMipmaps ? std::numeric_limits<float>::max() : 0.0f;
 
 			return key;
 		}
@@ -152,7 +216,8 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_TextureRegistry(createInfo.m_TextureRegistry),
-		m_SamplerRegistry(createInfo.m_SamplerRegistry)
+		m_SamplerRegistry(createInfo.m_SamplerRegistry),
+		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
@@ -547,6 +612,8 @@ namespace gglab
 					aiTextureMapMode_Wrap,
 					aiTextureMapMode_Wrap
 				};
+				int magFilter = GltfLinear;
+				int minFilter = GltfLinearMipmapLinear;
 
 				if (aiMaterial->GetTexture(aiTexType,
 					0,
@@ -559,11 +626,18 @@ namespace gglab
 				{
 					continue;
 				}
+				GGLAB_UNUSED(aiMaterial->Get(
+					AI_MATKEY_GLTF_MAPPINGFILTER_MAG(aiTexType, 0),
+					magFilter));
+				GGLAB_UNUSED(aiMaterial->Get(
+					AI_MATKEY_GLTF_MAPPINGFILTER_MIN(aiTexType, 0),
+					minFilter));
 
 				const auto texPath = directory / aiTexPath.C_Str();
 				const auto canonicalTexPath = utils::Canonical(texPath);
 
-				auto texId = m_TextureRegistry->FindTexture(canonicalTexPath);
+				const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
+				auto texId = m_TextureRegistry->FindTexture(canonicalTexPath, importSettings);
 				if (!texId.IsValid())
 				{
 					auto uploadData = m_TextureRegistry->MakeTextureUploadData(
@@ -572,7 +646,7 @@ namespace gglab
 						semantic);
 					if (uploadData.m_TextureData.IsValid())
 					{
-						texId = m_TextureRegistry->CreateTexture(canonicalTexPath);
+						texId = m_TextureRegistry->CreateTexture(canonicalTexPath, importSettings);
 						if (texId.IsValid())
 						{
 							uploadData.m_TextureId = texId;
@@ -581,7 +655,11 @@ namespace gglab
 					}
 				}
 
-				const auto samplerKey = MakeSamplerKeyFromAssimpTextureParams(mapMode);
+				const auto samplerKey = MakeSamplerKeyFromAssimpTextureParams(
+					mapMode,
+					magFilter,
+					minFilter,
+					m_MaterialTextureSampling);
 				const auto samplerId = m_SamplerRegistry->GetOrCreateSampler(samplerKey);
 
 				MaterialTextureBinding binding{};

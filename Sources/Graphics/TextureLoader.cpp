@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TextureLoader.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+#include "Graphics/Utility/TextureUtils.h"
 #include "Core/HResult.h"
 #include "Core/Utility/PathUtils.h"
 
@@ -177,12 +178,109 @@ namespace gglab
 
 			return result;
 		}
+
+		[[nodiscard]] DirectX::TEX_FILTER_FLAGS GetMipFilterFlags(
+			TextureSemantic semantic) noexcept
+		{
+			DirectX::TEX_FILTER_FLAGS flags = DirectX::TEX_FILTER_FANT;
+			if (GetTextureColorSpaceFromSemantic(semantic) == TextureColorSpace::SRGB)
+			{
+				flags |= DirectX::TEX_FILTER_SRGB;
+			}
+			return flags;
+		}
+
+		[[nodiscard]] bool RenormalizeNormalMipChain(
+			DirectX::ScratchImage& mipChain,
+			const std::filesystem::path& texPath) noexcept
+		{
+			DirectX::ScratchImage normalized;
+			const HRESULT hr = DirectX::TransformImage(
+				mipChain.GetImages(),
+				mipChain.GetImageCount(),
+				mipChain.GetMetadata(),
+				[](DirectX::XMVECTOR* outPixels,
+					const DirectX::XMVECTOR* inPixels,
+					size_t width,
+					size_t) noexcept
+				{
+					const DirectX::XMVECTOR scale = DirectX::XMVectorReplicate(2.0f);
+					const DirectX::XMVECTOR bias = DirectX::XMVectorReplicate(-1.0f);
+					const DirectX::XMVECTOR encodeScale = DirectX::XMVectorReplicate(0.5f);
+					for (size_t x = 0; x < width; ++x)
+					{
+						DirectX::XMVECTOR normal = DirectX::XMVectorMultiplyAdd(inPixels[x], scale, bias);
+						const float lengthSquared = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(normal));
+						normal = lengthSquared > 1.0e-8f ?
+							DirectX::XMVector3Normalize(normal) :
+							DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+						DirectX::XMVECTOR encoded = DirectX::XMVectorMultiplyAdd(
+							normal,
+							encodeScale,
+							encodeScale);
+						outPixels[x] = DirectX::XMVectorSetW(encoded, DirectX::XMVectorGetW(inPixels[x]));
+					}
+				},
+				normalized);
+			if (FAILED(hr))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"TextureLoader failed to renormalize normal-map mip chain '{}': {}",
+					texPath.string(),
+					FormatHResult(hr));
+				return false;
+			}
+
+			mipChain = std::move(normalized);
+			return true;
+		}
+
+		[[nodiscard]] bool GenerateMipChainIfNeeded(
+			DirectX::ScratchImage& scratchImage,
+			const std::filesystem::path& texPath,
+			const TextureImportSettings& settings) noexcept
+		{
+			const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
+			if (settings.m_MipPolicy != TextureMipPolicy::GenerateIfMissing ||
+				metadata.mipLevels > 1 ||
+				(metadata.width == 1 && metadata.height == 1))
+			{
+				return true;
+			}
+
+			DirectX::ScratchImage mipChain;
+			const HRESULT hr = DirectX::GenerateMipMaps(
+				scratchImage.GetImages(),
+				scratchImage.GetImageCount(),
+				metadata,
+				GetMipFilterFlags(settings.m_Semantic),
+				0,
+				mipChain);
+			if (FAILED(hr))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"TextureLoader failed to generate mip chain '{}': {}",
+					texPath.string(),
+					FormatHResult(hr));
+				return false;
+			}
+
+			if (settings.m_Semantic == TextureSemantic::Normal &&
+				!RenormalizeNormalMipChain(mipChain, texPath))
+			{
+				return false;
+			}
+
+			scratchImage = std::move(mipChain);
+			return true;
+		}
 	}
 
 	TextureAssetData TextureLoader::LoadTextureData(
 		const std::filesystem::path& texPath,
-		TextureColorSpace colorSpace) noexcept
+		const TextureImportSettings& settings) noexcept
 	{
+		const TextureColorSpace colorSpace = GetTextureColorSpaceFromSemantic(settings.m_Semantic);
 		std::error_code errorCode;
 		if (!std::filesystem::exists(texPath, errorCode) ||
 			!std::filesystem::is_regular_file(texPath, errorCode))
@@ -301,10 +399,32 @@ namespace gglab
 				return {};
 			}
 
+			if (!GenerateMipChainIfNeeded(convertedImage, texPath, settings))
+			{
+				return {};
+			}
 			return ConvertScratchImage(convertedImage, TextureColorSpace::Linear);
 		}
 
+		if (!GenerateMipChainIfNeeded(scratchImage, texPath, settings))
+		{
+			return {};
+		}
 		return ConvertScratchImage(scratchImage, colorSpace);
+	}
+
+	TextureAssetData TextureLoader::LoadTextureData(
+		const std::filesystem::path& texPath,
+		TextureColorSpace colorSpace) noexcept
+	{
+		return LoadTextureData(
+			texPath,
+			TextureImportSettings
+			{
+				.m_Semantic = colorSpace == TextureColorSpace::SRGB ?
+					TextureSemantic::GenericColor : TextureSemantic::GenericData,
+				.m_MipPolicy = TextureMipPolicy::Preserve,
+			});
 	}
 
 	TextureAssetData TextureLoader::MakeTexture2DRgba8(
