@@ -104,7 +104,8 @@ namespace gglab
 
 		auto* assetManager = m_Services.m_AssetManager;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		const ModelID modelId = assetManager->LoadModel(std::filesystem::path(AlphaBlendModeTestPath));
+		const ModelID modelId = assetManager->LoadModelAsync(
+			std::filesystem::path(AlphaBlendModeTestPath)).m_ModelId;
 
 		const entt::entity modelEntity = registry.create();
 		components::TransformComponent modelTransform{};

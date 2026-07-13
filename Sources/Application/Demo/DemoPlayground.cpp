@@ -98,7 +98,8 @@ namespace gglab
 			const Vector3& rotation,
 			const Vector3& scale)
 			{
-				auto modelId = assetManager->LoadModel(modelPath);
+				const auto request = assetManager->LoadModelAsync(modelPath);
+				const ModelID modelId = request.m_ModelId;
 				auto entity = registry.create();
 				components::TransformComponent transformComp{};
 				transformComp.m_Position = position;
