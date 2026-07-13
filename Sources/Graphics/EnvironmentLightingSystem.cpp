@@ -136,6 +136,11 @@ namespace gglab
 		{
 			return false;
 		}
+		const Texture* texture = m_TextureRegistry->GetTexture(entry.m_TextureId);
+		if (!texture || texture->m_State != AssetState::Ready)
+		{
+			return false;
+		}
 
 		const auto* textureDesc = m_TextureRegistry->GetTextureDesc(entry.m_TextureId);
 		if (!textureDesc || textureDesc->m_Dimension != RHITextureDimension::Texture2D ||
@@ -151,6 +156,18 @@ namespace gglab
 			return false;
 		}
 		return true;
+	}
+
+	AssetState EnvironmentLightingSystem::GetActiveEnvironmentTextureState() const noexcept
+	{
+		if (m_ActiveEntryIndex >= m_Entries.size())
+		{
+			return AssetState::Ready;
+		}
+
+		const TextureID textureId = m_Entries[m_ActiveEntryIndex].m_TextureId;
+		const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+		return texture ? texture->m_State : AssetState::Failed;
 	}
 
 	void EnvironmentLightingSystem::SetIntensity(float intensity) noexcept

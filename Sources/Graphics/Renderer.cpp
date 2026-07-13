@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
@@ -62,6 +63,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_RHIContext != nullptr, "Renderer failed to create an RHI context.");
 
 		auto* device = &m_RHIContext->GetDevice();
+		m_AssetUploadScheduler = std::make_unique<AssetUploadScheduler>(
+			AssetUploadScheduler::CreateInfo{
+				.m_Device = device,
+				.m_TransferManager = GetTransferManager(),
+			});
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 
@@ -79,6 +85,7 @@ namespace gglab
 		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
 		textureRegistryCreateInfo.m_Device = device;
 		textureRegistryCreateInfo.m_TransferManager = GetTransferManager();
+		textureRegistryCreateInfo.m_AssetUploadScheduler = m_AssetUploadScheduler.get();
 		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
 		m_TextureRegistry->InitializeReservedTextures();
 
@@ -123,6 +130,7 @@ namespace gglab
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
 		m_RHIContext->WaitIdle();
+		m_AssetUploadScheduler->Finalize();
 
 		m_IBLBakeScheduler.reset();
 		m_EnvironmentLightingSystem.reset();
@@ -132,6 +140,7 @@ namespace gglab
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
 		m_TransientResourcePool.reset();
+		m_AssetUploadScheduler.reset();
 
 		m_SceneCB.reset();
 		m_ObjectTable.reset();
@@ -160,6 +169,7 @@ namespace gglab
 		m_ViewSB->Tick();
 
 		m_TransientResourcePool->Tick();
+		m_AssetUploadScheduler->Tick();
 		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
 		m_HasActiveFrame = true;

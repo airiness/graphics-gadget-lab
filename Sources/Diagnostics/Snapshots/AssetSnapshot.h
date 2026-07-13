@@ -1,5 +1,6 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
+#include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/GraphicsTypes.h"
 
 namespace gglab
@@ -39,9 +40,25 @@ namespace gglab
 			bool m_IsReserved = false;
 		};
 
+		struct Upload
+		{
+			AssetUploadHandle m_Handle{};
+			std::string m_Name;
+			AssetUploadStatus m_Status = AssetUploadStatus::Pending;
+			RHIFencePoint m_FencePoint{};
+			double m_ElapsedMilliseconds = 0.0;
+		};
+
 		std::vector<Model> m_Models;
 		std::vector<Mesh> m_Meshes;
 		std::vector<Texture> m_Textures;
+		uint32_t m_PendingUploadCount = 0;
+		uint64_t m_SubmittedUploadCount = 0;
+		uint64_t m_SucceededUploadCount = 0;
+		uint64_t m_FailedUploadCount = 0;
+		uint64_t m_UploadCompletionCallbackFailureCount = 0;
+		std::vector<Upload> m_PendingUploads;
+		std::vector<Upload> m_RecentUploads;
 	};
 
 	template<>

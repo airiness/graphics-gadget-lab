@@ -7,6 +7,7 @@
 namespace gglab
 {
 	class AssetManager;
+	class AssetUploadScheduler;
 	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
@@ -75,6 +76,7 @@ namespace gglab
 		{
 			RHIDevice* m_Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
+			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		};
 
 		struct TextureUploadData
@@ -140,6 +142,7 @@ namespace gglab
 	private:
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
+		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureContainer m_TextureContainer;

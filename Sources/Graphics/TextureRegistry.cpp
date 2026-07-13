@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TextureRegistry.h"
+#include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TextureLoader.h"
@@ -54,10 +55,12 @@ namespace gglab
 
 	TextureRegistry::TextureRegistry(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
-		m_TransferManager(createInfo.m_TransferManager)
+		m_TransferManager(createInfo.m_TransferManager),
+		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 	}
 
 	void TextureRegistry::InitializeReservedTextures() noexcept
@@ -235,6 +238,8 @@ namespace gglab
 
 		if (!uploads.empty())
 		{
+			// Fallback descriptors must exist before the first frame can resolve any
+			// material binding, so this bootstrap upload intentionally remains synchronous.
 			auto batch = m_TransferManager->BeginBatch();
 			bool uploadsSucceeded = true;
 			std::vector<TextureID> uploadedTextureIds;
@@ -334,14 +339,22 @@ namespace gglab
 		texUploadData.m_TextureId = textureId;
 		auto batch = m_TransferManager->BeginBatch();
 		const bool uploadSucceeded = UploadTexture(texUploadData, batch);
-		const RHIFencePoint uploadFence = batch.Submit(true);
-		if (!uploadSucceeded)
-		{
-			RemoveTexture(textureId);
-			return InvalidTextureID;
-		}
-		CompleteTextureUpload(textureId, uploadFence.IsValid());
-		if (!uploadFence.IsValid())
+		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
+			{
+				.m_Name = std::format(
+					"Texture {}: {}",
+					textureId.Value(),
+					canonicalPath.filename().generic_string()),
+			},
+			std::move(batch),
+			uploadSucceeded,
+			[this, textureId](const AssetUploadCompletionInfo& completion) noexcept
+			{
+				CompleteTextureUpload(
+					textureId,
+					completion.m_Status == AssetUploadStatus::Succeeded);
+			});
+		if (!uploadHandle.IsValid())
 		{
 			RemoveTexture(textureId);
 			return InvalidTextureID;
@@ -628,6 +641,16 @@ namespace gglab
 		}
 		texture->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
 		texture->m_IsUploaded = succeeded;
+		if (!succeeded)
+		{
+			texture->m_Srv.Reset();
+			if (texture->m_Texture.IsValid())
+			{
+				m_Device->DestroyTexture(texture->m_Texture);
+				texture->m_Texture.Reset();
+			}
+			texture->m_Desc = {};
+		}
 	}
 
 	void TextureRegistry::CreateTextureEntry(
