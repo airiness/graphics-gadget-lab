@@ -11,6 +11,7 @@ namespace gglab
 	class Camera;
 	class CameraController;
 	class RenderPipelineBase;
+	struct LabDiagnosticsSnapshot;
 
 	struct LabSessionCreateInfo
 	{
@@ -47,6 +48,10 @@ namespace gglab
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);
+		}
+		virtual void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
+		{
+			GGLAB_UNUSED(diagnostics);
 		}
 
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept;

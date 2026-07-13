@@ -4,6 +4,7 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
+#include "Application/Lab/Sessions/TaskSystemLabSession.h"
 
 namespace gglab
 {
@@ -36,6 +37,12 @@ namespace gglab
 			&MathFoundationLabSession::Create);
 		GGLAB_ASSERT_MSG(mathFoundationRegistered,
 			"Failed to register the Math Foundation Lab session.");
+
+		const bool taskSystemRegistered = m_Runtime.RegisterLab(
+			TaskSystemLabSession::GetDescriptor(),
+			&TaskSystemLabSession::Create);
+		GGLAB_ASSERT_MSG(taskSystemRegistered,
+			"Failed to register the Task System Lab session.");
 
 		GGLAB_UNUSED(m_Runtime.Initialize(startupLab));
 	}

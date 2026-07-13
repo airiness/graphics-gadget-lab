@@ -189,6 +189,7 @@ namespace gglab
 				.m_Renderer = m_Renderer.get(),
 				.m_AssetManager = m_AssetManager.get(),
 				.m_ShaderManager = m_ShaderManager.get(),
+				.m_TaskSystem = m_TaskSystem.get(),
 				.m_InputManager = m_InputManager.get(),
 				.m_Time = m_Time.get(),
 				.m_DebugDraw = &m_DebugDrawSystem->GetContext(),

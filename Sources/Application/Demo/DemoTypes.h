@@ -10,6 +10,7 @@ namespace gglab
 	class InputManager;
 	class Renderer;
 	class ShaderManager;
+	class TaskSystem;
 	class Time;
 
 	struct DemoServices
@@ -17,13 +18,14 @@ namespace gglab
 		Renderer* m_Renderer = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
+		TaskSystem* m_TaskSystem = nullptr;
 		InputManager* m_InputManager = nullptr;
 		Time* m_Time = nullptr;
 		DebugDrawContext* m_DebugDraw = nullptr;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Renderer && m_AssetManager && m_ShaderManager && m_InputManager &&
+			return m_Renderer && m_AssetManager && m_ShaderManager && m_TaskSystem && m_InputManager &&
 				m_Time && m_DebugDraw;
 		}
 	};
