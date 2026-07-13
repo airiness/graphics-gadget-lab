@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -225,6 +225,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp" />
@@ -239,6 +240,7 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
@@ -438,6 +440,7 @@
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResourceDebug.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISubresourceUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
@@ -485,6 +488,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
@@ -498,6 +502,8 @@
     <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />

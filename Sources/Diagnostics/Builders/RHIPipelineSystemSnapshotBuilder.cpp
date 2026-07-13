@@ -13,12 +13,6 @@ namespace gglab
 {
 	namespace
 	{
-		bool IsBindless(RHIBindingType type) noexcept
-		{
-			return type == RHIBindingType::BindlessSampledTextureTable ||
-				type == RHIBindingType::BindlessSamplerTable;
-		}
-
 		const char* BackendBindingType(const RHIBindingSlotDesc& slot) noexcept
 		{
 			if (slot.m_Type == RHIBindingType::PushConstants)
@@ -99,7 +93,7 @@ namespace gglab
 				slot.m_SizeInBytes = source.m_SizeInBytes;
 				slot.m_DebugName = binding.m_SlotDebugNames[slotIndex];
 
-				if (IsBindless(source.m_Type))
+				if (IsBindlessBindingType(source.m_Type))
 				{
 					slot.m_BackendMapping = RHIBindingBackendMapping::DirectlyIndexed;
 					slot.m_BackendBindingType = "DIRECTLY_INDEXED";

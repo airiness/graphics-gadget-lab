@@ -1,5 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
+#include "Core/Utility/MathUtils.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/GraphicsTypes.h"
 
@@ -25,22 +27,9 @@ namespace gglab
 				!Test(aspects, RHITextureAspect::Depth) ? 1u : 0u;
 		}
 
-		uint32_t ResolveRemainingCount(uint32_t base, uint32_t count, uint32_t total) noexcept
-		{
-			if (base >= total)
-			{
-				return 0;
-			}
-
-			const uint32_t remaining = total - base;
-			return count == RHISubresourceRange::Remaining ?
-				remaining :
-				std::min(count, remaining);
-		}
-
 		uint32_t ResolveArraySliceCount(const RHITextureViewDesc& desc, const D3D12_RESOURCE_DESC& resourceDesc) noexcept
 		{
-			return ResolveRemainingCount(
+			return ResolveSubresourceCount(
 				desc.m_Subresources.m_BaseArraySlice,
 				desc.m_Subresources.m_ArraySliceCount,
 				static_cast<uint32_t>(resourceDesc.DepthOrArraySize));
@@ -72,10 +61,6 @@ namespace gglab
 			return std::max<uint32_t>(1, GetRHIFormatInfo(desc.m_Format).m_BytesPerBlock);
 		}
 
-		uint64_t AlignUp(uint64_t value, uint64_t alignment) noexcept
-		{
-			return (value + alignment - 1) / alignment * alignment;
-		}
 	}
 
 	D3D12_RENDER_TARGET_VIEW_DESC BuildD3D12RenderTargetViewDesc(
@@ -338,7 +323,9 @@ namespace gglab
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC nativeDesc{};
 		nativeDesc.BufferLocation = baseGpuAddress + desc.m_OffsetInBytes;
-		nativeDesc.SizeInBytes = static_cast<UINT>(AlignUp(sizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+		nativeDesc.SizeInBytes = static_cast<UINT>(utils::AlignUp(
+			sizeInBytes,
+			static_cast<uint64_t>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)));
 		return nativeDesc;
 	}
 

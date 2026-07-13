@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12EnumUtils.h"
 
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
@@ -57,30 +58,6 @@ namespace gglab
 			case RHICullMode::Back:
 			default:
 				return D3D12_CULL_MODE_BACK;
-			}
-		}
-
-		[[nodiscard]] D3D12_COMPARISON_FUNC ToDX12ComparisonFunc(RHICompareOp compareOp) noexcept
-		{
-			switch (compareOp)
-			{
-			case RHICompareOp::Never:
-				return D3D12_COMPARISON_FUNC_NEVER;
-			case RHICompareOp::Less:
-				return D3D12_COMPARISON_FUNC_LESS;
-			case RHICompareOp::Equal:
-				return D3D12_COMPARISON_FUNC_EQUAL;
-			case RHICompareOp::LessEqual:
-				return D3D12_COMPARISON_FUNC_LESS_EQUAL;
-			case RHICompareOp::Greater:
-				return D3D12_COMPARISON_FUNC_GREATER;
-			case RHICompareOp::NotEqual:
-				return D3D12_COMPARISON_FUNC_NOT_EQUAL;
-			case RHICompareOp::GreaterEqual:
-				return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-			case RHICompareOp::Always:
-			default:
-				return D3D12_COMPARISON_FUNC_ALWAYS;
 			}
 		}
 
@@ -175,7 +152,7 @@ namespace gglab
 			desc.DepthWriteMask = rhiDesc.m_DepthWriteEnable ?
 				D3D12_DEPTH_WRITE_MASK_ALL :
 				D3D12_DEPTH_WRITE_MASK_ZERO;
-			desc.DepthFunc = ToDX12ComparisonFunc(rhiDesc.m_DepthCompareOp);
+			desc.DepthFunc = ToD3D12ComparisonFunc(rhiDesc.m_DepthCompareOp);
 			desc.StencilEnable = rhiDesc.m_StencilEnable;
 			return desc;
 		}

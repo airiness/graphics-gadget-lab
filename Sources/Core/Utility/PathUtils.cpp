@@ -1,8 +1,16 @@
 #include "Core/Precompiled.h"
 #include "Core/Utility/PathUtils.h"
+#include "Core/Utility/StringUtils.h"
 
 namespace gglab::utils
 {
+	bool ExtensionEqualsIgnoreCase(
+		const std::filesystem::path& path,
+		std::string_view extension) noexcept
+	{
+		return EqualsIgnoreCase(path.extension().string(), extension);
+	}
+
 	std::filesystem::path Canonical(const std::filesystem::path& path) noexcept
 	{
 		std::error_code errorCode;

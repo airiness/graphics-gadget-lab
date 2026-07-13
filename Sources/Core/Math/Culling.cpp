@@ -39,6 +39,48 @@ namespace gglab::math
 		return plane.m_Normal.Dot(point) + plane.m_Distance;
 	}
 
+	bool TryHomogeneousDivide(
+		const Vector4& value,
+		Vector3& result,
+		float tolerance) noexcept
+	{
+		result = Vector3::Zero;
+		if (!IsFinite(value) || !std::isfinite(tolerance) ||
+			tolerance < 0.0f || std::abs(value.m_W) <= tolerance)
+		{
+			return false;
+		}
+
+		const Vector3 divided = Vector3(value.m_X, value.m_Y, value.m_Z) / value.m_W;
+		if (!IsFinite(divided))
+		{
+			return false;
+		}
+
+		result = divided;
+		return true;
+	}
+
+	std::array<Vector3, 8> BuildFrustumCornersFromInverseViewProjection(
+		const Matrix& inverseViewProjection) noexcept
+	{
+		constexpr std::array<Vector4, 8> clipCorners = {
+			Vector4(-1.0f, 1.0f, 0.0f, 1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+			Vector4(1.0f, -1.0f, 0.0f, 1.0f), Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
+			Vector4(-1.0f, 1.0f, 1.0f, 1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+			Vector4(1.0f, -1.0f, 1.0f, 1.0f), Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
+		};
+
+		std::array<Vector3, 8> corners{};
+		for (size_t index = 0; index < clipCorners.size(); ++index)
+		{
+			GGLAB_UNUSED(TryHomogeneousDivide(
+				Transform(clipCorners[index], inverseViewProjection),
+				corners[index]));
+		}
+		return corners;
+	}
+
 	Frustum CreateFrustumFromViewProjection(const Matrix& viewProjection) noexcept
 	{
 		Frustum frustum{};

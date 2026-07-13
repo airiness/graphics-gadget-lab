@@ -8,7 +8,6 @@
 #include <DirectXTex.h>
 #include <DirectXPackedVector.h>
 
-#include <cctype>
 #include <cmath>
 
 namespace gglab
@@ -340,19 +339,15 @@ namespace gglab
 			return {};
 		}
 
-		std::string extension = texPath.extension().string();
-		std::ranges::transform(extension, extension.begin(),
-			[](unsigned char value) noexcept
-			{
-				return static_cast<char>(std::tolower(value));
-			});
+		const bool isDds = utils::ExtensionEqualsIgnoreCase(texPath, ".dds");
+		const bool isHdr = utils::ExtensionEqualsIgnoreCase(texPath, ".hdr");
 
 		DirectX::TexMetadata metadata;
 		DirectX::ScratchImage scratchImage;
 		HRESULT hr = S_OK;
 		progress.Report(0.08f, "Decoding texture", filename);
 
-		if (extension == ".dds")
+		if (isDds)
 		{
 			hr = DirectX::LoadFromDDSFile(
 				texPath.c_str(),
@@ -360,7 +355,7 @@ namespace gglab
 				&metadata,
 				scratchImage);
 		}
-		else if (extension == ".hdr")
+		else if (isHdr)
 		{
 			hr = DirectX::LoadFromHDRFile(
 				texPath.c_str(),
@@ -398,7 +393,7 @@ namespace gglab
 			"Texture decoded",
 			std::format("{}x{}", metadata.width, metadata.height));
 
-		if (extension == ".hdr")
+		if (isHdr)
 		{
 			progress.Report(0.40f, "Normalizing HDR pixels", filename);
 			DirectX::ScratchImage floatImage;

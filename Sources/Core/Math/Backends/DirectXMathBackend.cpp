@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Backends/DirectXMathInterop.h"
 #include "Core/Math/MathConstants.h"
 #include "Core/Math/MathFunctions.h"
 #include "Core/Math/Matrix.h"
@@ -11,81 +12,16 @@
 
 namespace gglab::math
 {
-	namespace
-	{
-		DirectX::XMVECTOR LoadVector2(const Vector2& value) noexcept
-		{
-			return DirectX::XMVectorSet(value.m_X, value.m_Y, 0.0f, 0.0f);
-		}
-
-		DirectX::XMVECTOR LoadVector3(const Vector3& value) noexcept
-		{
-			return DirectX::XMVectorSet(value.m_X, value.m_Y, value.m_Z, 0.0f);
-		}
-
-		DirectX::XMVECTOR LoadVector4(const Vector4& value) noexcept
-		{
-			return DirectX::XMVectorSet(value.m_X, value.m_Y, value.m_Z, value.m_W);
-		}
-
-		DirectX::XMVECTOR LoadQuaternion(const Quaternion& value) noexcept
-		{
-			return DirectX::XMVectorSet(value.m_X, value.m_Y, value.m_Z, value.m_W);
-		}
-
-		DirectX::XMMATRIX LoadMatrix(const Matrix& value) noexcept
-		{
-			return DirectX::XMMatrixSet(
-				value.m_11, value.m_12, value.m_13, value.m_14,
-				value.m_21, value.m_22, value.m_23, value.m_24,
-				value.m_31, value.m_32, value.m_33, value.m_34,
-				value.m_41, value.m_42, value.m_43, value.m_44);
-		}
-
-		Vector2 StoreVector2(DirectX::FXMVECTOR value) noexcept
-		{
-			return Vector2(
-				DirectX::XMVectorGetX(value),
-				DirectX::XMVectorGetY(value));
-		}
-
-		Vector3 StoreVector3(DirectX::FXMVECTOR value) noexcept
-		{
-			return Vector3(
-				DirectX::XMVectorGetX(value),
-				DirectX::XMVectorGetY(value),
-				DirectX::XMVectorGetZ(value));
-		}
-
-		Vector4 StoreVector4(DirectX::FXMVECTOR value) noexcept
-		{
-			return Vector4(
-				DirectX::XMVectorGetX(value),
-				DirectX::XMVectorGetY(value),
-				DirectX::XMVectorGetZ(value),
-				DirectX::XMVectorGetW(value));
-		}
-
-		Quaternion StoreQuaternion(DirectX::FXMVECTOR value) noexcept
-		{
-			return Quaternion(
-				DirectX::XMVectorGetX(value),
-				DirectX::XMVectorGetY(value),
-				DirectX::XMVectorGetZ(value),
-				DirectX::XMVectorGetW(value));
-		}
-
-		Matrix StoreMatrix(DirectX::FXMMATRIX value) noexcept
-		{
-			DirectX::XMFLOAT4X4 stored;
-			DirectX::XMStoreFloat4x4(&stored, value);
-			return Matrix(
-				stored._11, stored._12, stored._13, stored._14,
-				stored._21, stored._22, stored._23, stored._24,
-				stored._31, stored._32, stored._33, stored._34,
-				stored._41, stored._42, stored._43, stored._44);
-		}
-	}
+	using directx::LoadMatrix;
+	using directx::LoadQuaternion;
+	using directx::LoadVector2;
+	using directx::LoadVector3;
+	using directx::LoadVector4;
+	using directx::StoreMatrix;
+	using directx::StoreQuaternion;
+	using directx::StoreVector2;
+	using directx::StoreVector3;
+	using directx::StoreVector4;
 
 	float Vector2::Length() const noexcept
 	{

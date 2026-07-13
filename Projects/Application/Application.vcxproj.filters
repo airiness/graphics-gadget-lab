@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -261,6 +261,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.cpp">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
@@ -398,6 +401,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\HResult.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp">
+      <Filter>Core\Platform\Win</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderCompiler.cpp">
       <Filter>Graphics\Shader</Filter>
@@ -890,6 +896,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
@@ -1141,6 +1150,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\HResult.h">
       <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h">
+      <Filter>Core\Math\Backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h">
+      <Filter>Core\Platform\Win</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderCompiler.h">
       <Filter>Graphics\Shader</Filter>
@@ -1410,6 +1425,9 @@
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureViewDescUtils.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISubresourceUtils.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h">

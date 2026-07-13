@@ -44,32 +44,6 @@ namespace gglab
 			};
 		}
 
-		Vector3 HomogeneousToPoint(const Vector4& value) noexcept
-		{
-			if (!math::IsFinite(value) || std::abs(value.m_W) <= 1.0e-6f)
-			{
-				return Vector3::Zero;
-			}
-			return Vector3(value.m_X, value.m_Y, value.m_Z) / value.m_W;
-		}
-
-		std::array<Vector3, 8> BuildFrustumCorners(const Matrix& inverseViewProjection) noexcept
-		{
-			constexpr std::array<Vector4, 8> clipCorners = {
-				Vector4(-1.0f, 1.0f, 0.0f, 1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-				Vector4(1.0f, -1.0f, 0.0f, 1.0f), Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
-				Vector4(-1.0f, 1.0f, 1.0f, 1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-				Vector4(1.0f, -1.0f, 1.0f, 1.0f), Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
-			};
-
-			std::array<Vector3, 8> worldCorners{};
-			for (size_t index = 0; index < clipCorners.size(); ++index)
-			{
-				worldCorners[index] = HomogeneousToPoint(
-					math::Transform(clipCorners[index], inverseViewProjection));
-			}
-			return worldCorners;
-		}
 	}
 
 	MathFoundationLabSession::MathFoundationLabSession(
@@ -327,7 +301,8 @@ namespace gglab
 		const Matrix projection = math::CreatePerspectiveFieldOfViewLH(
 			math::ToRadians(50.0f), 1.6f, 0.5f, 7.0f);
 		const Matrix inverseViewProjection = math::Inverse(view * projection);
-		const std::array<Vector3, 8> worldCorners = BuildFrustumCorners(inverseViewProjection);
+		const std::array<Vector3, 8> worldCorners =
+			math::BuildFrustumCornersFromInverseViewProjection(inverseViewProjection);
 		debugDraw.Frustum(worldCorners, MakeStyle(Color::Gold));
 		debugDraw.Point(eye, 0.2f, MakeStyle(Color::Cyan));
 		debugDraw.Arrow(eye, target, 0.35f, MakeStyle(Color::Green, DebugDrawFillMode::Solid));
@@ -343,7 +318,8 @@ namespace gglab
 		const Matrix viewProjection = view * projection;
 		const Matrix inverseViewProjection = math::SafeInverse(viewProjection);
 		const math::Frustum frustum = math::CreateFrustumFromViewProjection(viewProjection);
-		const std::array<Vector3, 8> worldCorners = BuildFrustumCorners(inverseViewProjection);
+		const std::array<Vector3, 8> worldCorners =
+			math::BuildFrustumCornersFromInverseViewProjection(inverseViewProjection);
 
 		debugDraw.Frustum(worldCorners, MakeStyle(Color::Gold));
 		debugDraw.Point(eye, 0.2f, MakeStyle(Color::Cyan));
@@ -351,7 +327,11 @@ namespace gglab
 
 		const auto clipToWorld = [inverseViewProjection](const Vector4& clip) noexcept
 			{
-				return HomogeneousToPoint(math::Transform(clip, inverseViewProjection));
+				Vector3 point = Vector3::Zero;
+				GGLAB_UNUSED(math::TryHomogeneousDivide(
+					math::Transform(clip, inverseViewProjection),
+					point));
+				return point;
 			};
 		const std::array spheres = {
 			math::Sphere(clipToWorld(Vector4(0.0f, 0.0f, 0.45f, 1.0f)), 0.28f),

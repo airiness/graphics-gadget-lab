@@ -1,7 +1,12 @@
 #pragma once
 
+#include <string_view>
+
 namespace gglab::utils
 {
+	[[nodiscard]] bool ExtensionEqualsIgnoreCase(
+		const std::filesystem::path& path,
+		std::string_view extension) noexcept;
 	std::filesystem::path Canonical(const std::filesystem::path& path) noexcept;
 	bool CreateDirectoryIfNotExist(const std::filesystem::path& dir) noexcept;
 	bool CreateParentDirectoryIfNotExist(const std::filesystem::path& file) noexcept;
