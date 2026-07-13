@@ -3,6 +3,7 @@
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include <algorithm>
@@ -22,28 +23,6 @@ namespace gglab
 			int32_t m_GraphPopupResourceIndex = -1;
 			char m_Filter[128] = {};
 		};
-
-		static bool TextMatchesFilter(const std::string& text, const char* filter) noexcept
-		{
-			if (!filter || !*filter)
-			{
-				return true;
-			}
-
-			const std::string_view filterView(filter);
-			const auto match = std::search(
-				text.begin(),
-				text.end(),
-				filterView.begin(),
-				filterView.end(),
-				[](char lhs, char rhs)
-				{
-					return std::tolower(static_cast<unsigned char>(lhs)) ==
-						std::tolower(static_cast<unsigned char>(rhs));
-				});
-
-			return match != text.end();
-		}
 
 		static std::string UsageBitsText(uint64_t bits, RGResourceType resourceType) noexcept
 		{
@@ -125,14 +104,14 @@ namespace gglab
 
 		static bool PassMatchesFilter(const RGSnapshotPassInfo& pass, const char* filter) noexcept
 		{
-			if (TextMatchesFilter(pass.m_Name, filter))
+			if (utils::ContainsIgnoreCase(pass.m_Name, filter ? filter : ""))
 			{
 				return true;
 			}
 
 			for (const auto& access : pass.m_Accesses)
 			{
-				if (TextMatchesFilter(access.m_ResourceName, filter))
+				if (utils::ContainsIgnoreCase(access.m_ResourceName, filter ? filter : ""))
 				{
 					return true;
 				}
@@ -143,7 +122,7 @@ namespace gglab
 
 		static bool ResourceMatchesFilter(const RGSnapshotResourceInfo& resource, const char* filter) noexcept
 		{
-			return TextMatchesFilter(resource.m_Name, filter);
+			return utils::ContainsIgnoreCase(resource.m_Name, filter ? filter : "");
 		}
 
 		static bool PassAccessesResource(const RGSnapshotPassInfo& pass, uint32_t resourceIndex) noexcept
@@ -157,26 +136,6 @@ namespace gglab
 			}
 
 			return false;
-		}
-
-		static ImVec2 Add(const ImVec2& lhs, const ImVec2& rhs) noexcept
-		{
-			return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y);
-		}
-
-		static ImVec2 Subtract(const ImVec2& lhs, const ImVec2& rhs) noexcept
-		{
-			return ImVec2(lhs.x - rhs.x, lhs.y - rhs.y);
-		}
-
-		static ImVec2 Multiply(const ImVec2& value, float scale) noexcept
-		{
-			return ImVec2(value.x * scale, value.y * scale);
-		}
-
-		static ImVec2 RectCenter(const ImVec2& min, const ImVec2& max) noexcept
-		{
-			return ImVec2((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
 		}
 
 		static void DrawClippedText(
@@ -198,7 +157,7 @@ namespace gglab
 			ImU32 color,
 			float thickness) noexcept
 		{
-			const ImVec2 delta = Subtract(end, start);
+			const ImVec2 delta = end - start;
 			const float length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
 			if (length <= 1.0f)
 			{
@@ -208,13 +167,13 @@ namespace gglab
 			const ImVec2 direction(delta.x / length, delta.y / length);
 			const ImVec2 normal(-direction.y, direction.x);
 			const float arrowSize = 7.0f;
-			const ImVec2 headBase = Subtract(end, Multiply(direction, arrowSize));
+			const ImVec2 headBase = end - direction * arrowSize;
 
 			drawList->AddLine(start, end, color, thickness);
 			drawList->AddTriangleFilled(
 				end,
-				Add(headBase, Multiply(normal, arrowSize * 0.55f)),
-				Subtract(headBase, Multiply(normal, arrowSize * 0.55f)),
+				headBase + normal * (arrowSize * 0.55f),
+				headBase - normal * (arrowSize * 0.55f),
 				color);
 		}
 
@@ -442,7 +401,7 @@ namespace gglab
 			ImDrawList* drawList = ImGui::GetWindowDrawList();
 			const ImVec2 origin = ImGui::GetCursorScreenPos();
 			const ImVec2 childMin = ImGui::GetWindowPos();
-			const ImVec2 childMax = Add(childMin, ImGui::GetWindowSize());
+			const ImVec2 childMax = childMin + ImGui::GetWindowSize();
 			const bool graphInputActive =
 				ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
 				ImGui::IsMouseHoveringRect(childMin, childMax, true);
@@ -460,14 +419,14 @@ namespace gglab
 			{
 				const float x = leftMargin + static_cast<float>(ordinal) * columnStride;
 				drawList->AddLine(
-					Add(origin, ImVec2(x + passWidth * 0.5f, 8.0f)),
-					Add(origin, ImVec2(x + passWidth * 0.5f, canvasHeight - 8.0f)),
+					origin + ImVec2(x + passWidth * 0.5f, 8.0f),
+					origin + ImVec2(x + passWidth * 0.5f, canvasHeight - 8.0f),
 					gridColor,
 					1.0f);
 
 				const size_t passPosition = visiblePassPositions[ordinal];
-				passMins[passPosition] = Add(origin, ImVec2(x, topMargin));
-				passMaxs[passPosition] = Add(origin, ImVec2(x + passWidth, topMargin + passHeight));
+				passMins[passPosition] = origin + ImVec2(x, topMargin);
+				passMaxs[passPosition] = origin + ImVec2(x + passWidth, topMargin + passHeight);
 				hasPassRect[passPosition] = true;
 			}
 
@@ -524,8 +483,8 @@ namespace gglab
 					xMin + resourceMinWidth,
 					leftMargin + static_cast<float>(lastColumn) * columnStride + passWidth);
 				const float y = resourceTop + static_cast<float>(row) * resourceRowStride;
-				resourceMins[resourcePosition] = Add(origin, ImVec2(xMin, y));
-				resourceMaxs[resourcePosition] = Add(origin, ImVec2(xMax, y + resourceHeight));
+				resourceMins[resourcePosition] = origin + ImVec2(xMin, y);
+				resourceMaxs[resourcePosition] = origin + ImVec2(xMax, y + resourceHeight);
 				hasResourceRect[resourcePosition] = true;
 			}
 
@@ -616,11 +575,11 @@ namespace gglab
 				drawList->AddRect(min, max, border, 5.0f, 0, borderThickness);
 				if (resource.m_Imported)
 				{
-					drawList->AddCircleFilled(Add(min, ImVec2(8.0f, 8.0f)), 3.0f, selectedBorder);
+					drawList->AddCircleFilled(min + ImVec2(8.0f, 8.0f), 3.0f, selectedBorder);
 				}
 
 				const std::string label = std::format("#{} {}", resource.m_Index, resource.m_Name);
-				DrawClippedText(drawList, Add(min, ImVec2(8.0f, 6.0f)), Subtract(max, ImVec2(8.0f, 4.0f)), label.c_str(), textColor);
+				DrawClippedText(drawList, min + ImVec2(8.0f, 6.0f), max - ImVec2(8.0f, 4.0f), label.c_str(), textColor);
 
 				if (hovered)
 				{
@@ -660,8 +619,8 @@ namespace gglab
 
 				const std::string label = std::format("#{} {}", pass.m_Index, pass.m_Name);
 				const std::string order = std::format("order {}", PassIndexToString(pass.m_ExecutionOrder));
-				DrawClippedText(drawList, Add(min, ImVec2(8.0f, 7.0f)), Subtract(max, ImVec2(8.0f, 22.0f)), label.c_str(), textColor);
-				DrawClippedText(drawList, Add(min, ImVec2(8.0f, 25.0f)), Subtract(max, ImVec2(8.0f, 5.0f)), order.c_str(), textColor);
+				DrawClippedText(drawList, min + ImVec2(8.0f, 7.0f), max - ImVec2(8.0f, 22.0f), label.c_str(), textColor);
+				DrawClippedText(drawList, min + ImVec2(8.0f, 25.0f), max - ImVec2(8.0f, 5.0f), order.c_str(), textColor);
 
 				if (hovered)
 				{
@@ -1121,7 +1080,7 @@ namespace gglab
 
 		if (!context.m_RenderGraph)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "RenderGraph is null.");
+			ImGui::TextColored(devtools::style::ErrorTextColor, "RenderGraph is null.");
 			return;
 		}
 

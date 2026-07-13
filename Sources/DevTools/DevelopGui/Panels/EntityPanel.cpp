@@ -5,8 +5,11 @@
 #include "Core/Math/MathFunctions.h"
 #include "Core/Utility/StringUtils.h"
 #include "Core/World.h"
+#include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
+#include "DevTools/DevelopGui/DevelopGuiStyle.h"
+#include "DevTools/EnumText/EnumTextGraphics.h"
 #include "Graphics/AssetManager.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
@@ -41,21 +44,6 @@ namespace gglab
 			bool m_Selected = false;
 			bool m_Hovered = false;
 		};
-
-		[[nodiscard]] const char* LightTypeName(LightType type) noexcept
-		{
-			switch (type)
-			{
-			case LightType::Directional:
-				return "Directional";
-			case LightType::Spot:
-				return "Spot";
-			case LightType::Point:
-				return "Point";
-			default:
-				return "Unknown";
-			}
-		}
 
 		[[nodiscard]] bool PassesFilter(
 			const entt::registry& registry,
@@ -191,22 +179,6 @@ namespace gglab
 			components::ModelComponent model{};
 			model.m_ModelId = modelId;
 			registry.emplace<components::ModelComponent>(entity, model);
-		}
-
-		[[nodiscard]] std::string ModelAssetDisplayName(const AssetSnapshot::Model& model)
-		{
-			if (!model.m_SourcePath.empty())
-			{
-				return model.m_SourcePath.filename().generic_string();
-			}
-
-			const std::string name = utils::StringIdToString(model.m_Name);
-			if (!name.empty())
-			{
-				return name;
-			}
-
-			return std::format("Model {}", model.m_Id.Value());
 		}
 
 		void DrawEntityListToolbar(
@@ -464,7 +436,8 @@ namespace gglab
 					}
 				}
 
-				ImGui::Text("Resolved Type: %s", LightTypeName(light.m_Type));
+				const std::string lightType = devtools::EnumText(light.m_Type);
+				ImGui::Text("Resolved Type: %s", lightType.c_str());
 			}
 			ImGui::PopID();
 		}
@@ -490,7 +463,7 @@ namespace gglab
 					}
 					else
 					{
-						ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f), "Model asset is not loaded.");
+						ImGui::TextColored(devtools::style::NoticeTextColor, "Model asset is not loaded.");
 					}
 				}
 				ImGui::TextDisabled("Model assignment is read-only in this panel for now.");
@@ -540,7 +513,7 @@ namespace gglab
 					for (const auto& model : assetSnapshot->m_Models)
 					{
 						const std::string label = std::format("{}##{}",
-							ModelAssetDisplayName(model),
+							devtools::ModelDisplayName(model),
 							model.m_Id.Value());
 						if (ImGui::MenuItem(label.c_str()))
 						{
@@ -610,7 +583,7 @@ namespace gglab
 			}
 			else
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.25f, 1.0f),
+				ImGui::TextColored(devtools::style::NoticeTextColor,
 					"Transform is missing. New entities always include it.");
 				if (ImGui::Button("Repair Transform"))
 				{

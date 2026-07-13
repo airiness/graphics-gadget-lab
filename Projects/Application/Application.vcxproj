@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -145,6 +145,7 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\ModelImporter.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
@@ -182,7 +183,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
@@ -240,7 +243,7 @@
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp" />
@@ -345,7 +348,12 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextDXGI.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h" />
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextLab.h" />
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRHI.h" />
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderPass.h" />
+    <ClInclude Include="..\..\Sources\DevTools\AssetSnapshotText.h" />
+    <ClInclude Include="..\..\Sources\DevTools\RHIText.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
@@ -409,6 +417,10 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiContext.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiStyle.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Interop\ImGuiMathInterop.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
@@ -566,7 +578,7 @@
     <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h" />
     <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />

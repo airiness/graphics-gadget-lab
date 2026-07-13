@@ -1,6 +1,8 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiStyle.h"
+#include "DevTools/RHIText.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Renderer.h"
@@ -35,7 +37,8 @@ namespace gglab
 			{
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0); ImGui::Text("%u", version.m_BufferIndex);
-				ImGui::TableSetColumnIndex(1); ImGui::Text("%u:%u", version.m_Buffer.Index(), version.m_Buffer.Generation());
+				const std::string bufferHandle = devtools::RHIHandleText(version.m_Buffer);
+				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(bufferHandle.c_str());
 				ImGui::TableSetColumnIndex(2); ImGui::Text("%u", version.m_PendingSlotCount);
 				ImGui::TableSetColumnIndex(3); ImGui::Text("%u", version.m_PendingRangeCount);
 				ImGui::TableSetColumnIndex(4); ImGui::Text("%llu", static_cast<unsigned long long>(version.m_PendingUploadBytes));
@@ -85,7 +88,7 @@ namespace gglab
 					ImGui::TableSetColumnIndex(4 + static_cast<int>(index));
 					if (slot.m_Occupied && uploaded != slot.m_Revision)
 					{
-						ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "%llu pending",
+						ImGui::TextColored(devtools::style::WarningTextColor, "%llu pending",
 							static_cast<unsigned long long>(uploaded));
 					}
 					else

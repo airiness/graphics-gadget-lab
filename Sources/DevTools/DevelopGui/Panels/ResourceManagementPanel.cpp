@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
@@ -515,7 +516,7 @@ namespace gglab
 			nullptr;
 		if (!dx12Context)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
+			ImGui::TextColored(devtools::style::ErrorTextColor,
 				"This diagnostic panel requires the DX12 backend.");
 			return;
 		}

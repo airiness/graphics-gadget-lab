@@ -1,37 +1,26 @@
 #include "Core/Precompiled.h"
 #include "Application/ApplicationLaunchOptions.h"
-
-#include <cctype>
+#include "Core/Utility/StringUtils.h"
 
 namespace gglab
 {
 	namespace
 	{
-		bool EqualsIgnoreCase(std::string_view lhs, std::string_view rhs) noexcept
-		{
-			return lhs.size() == rhs.size() &&
-				std::ranges::equal(lhs, rhs, [](char left, char right)
-					{
-						return std::tolower(static_cast<unsigned char>(left)) ==
-							std::tolower(static_cast<unsigned char>(right));
-					});
-		}
-
 		std::optional<ApplicationStartupDemo> ParseDemo(std::string_view value) noexcept
 		{
-			if (EqualsIgnoreCase(value, "start") ||
-				EqualsIgnoreCase(value, "demo.start"))
+			if (utils::EqualsIgnoreCase(value, "start") ||
+				utils::EqualsIgnoreCase(value, "demo.start"))
 			{
 				return ApplicationStartupDemo::Start;
 			}
-			if (EqualsIgnoreCase(value, "playground") ||
-				EqualsIgnoreCase(value, "demo.playground"))
+			if (utils::EqualsIgnoreCase(value, "playground") ||
+				utils::EqualsIgnoreCase(value, "demo.playground"))
 			{
 				return ApplicationStartupDemo::Playground;
 			}
-			if (EqualsIgnoreCase(value, "lab") ||
-				EqualsIgnoreCase(value, "labhost") ||
-				EqualsIgnoreCase(value, "demo.labhost"))
+			if (utils::EqualsIgnoreCase(value, "lab") ||
+				utils::EqualsIgnoreCase(value, "labhost") ||
+				utils::EqualsIgnoreCase(value, "demo.labhost"))
 			{
 				return ApplicationStartupDemo::LabHost;
 			}

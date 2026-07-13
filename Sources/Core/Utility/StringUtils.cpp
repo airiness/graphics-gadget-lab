@@ -1,6 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Core/Utility/StringUtils.h"
 
+#include <cctype>
+
 namespace gglab::utils
 {
 	std::wstring ToWideString(std::string_view str) noexcept
@@ -46,6 +48,35 @@ namespace gglab::utils
 		}
 
 		return std::format("0x{:016X}", id.Value());
+	}
+
+	bool EqualsIgnoreCase(std::string_view lhs, std::string_view rhs) noexcept
+	{
+		return lhs.size() == rhs.size() &&
+			std::ranges::equal(lhs, rhs, [](char left, char right)
+				{
+					return std::tolower(static_cast<unsigned char>(left)) ==
+						std::tolower(static_cast<unsigned char>(right));
+				});
+	}
+
+	bool ContainsIgnoreCase(std::string_view text, std::string_view substring) noexcept
+	{
+		if (substring.empty())
+		{
+			return true;
+		}
+
+		return std::search(
+			text.begin(),
+			text.end(),
+			substring.begin(),
+			substring.end(),
+			[](char left, char right)
+			{
+				return std::tolower(static_cast<unsigned char>(left)) ==
+					std::tolower(static_cast<unsigned char>(right));
+			}) != text.end();
 	}
 
 	std::string_view FindLeaf(std::string_view path) noexcept

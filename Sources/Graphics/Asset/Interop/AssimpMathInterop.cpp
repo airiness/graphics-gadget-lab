@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Math/Interop/AssimpMathInterop.h"
+#include "Graphics/Asset/Interop/AssimpMathInterop.h"
 
 namespace gglab::math::interop
 {

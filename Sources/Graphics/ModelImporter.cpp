@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/ModelImporter.h"
-#include "Core/Math/Interop/AssimpMathInterop.h"
+#include "Graphics/Asset/Interop/AssimpMathInterop.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
 
