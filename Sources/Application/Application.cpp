@@ -9,6 +9,7 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Core/Time.h"
+#include "Core/Task/TaskSystem.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
@@ -119,6 +120,7 @@ namespace gglab
 
 		// Logger
 		Logger::Initialize();
+		m_TaskSystem = std::make_unique<TaskSystem>();
 
 		if (!m_PlatformHost)
 		{
@@ -254,6 +256,7 @@ namespace gglab
 		}
 		else
 		{
+			m_DevelopGuiSystem->GetDevToolsRuntime().SetTaskSystem(m_TaskSystem.get());
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
 				std::make_unique<LabSnapshotProvider>(m_LabRuntimeLocator.get()),
 				SnapshotUpdatePolicy::EveryFrame);
@@ -285,6 +288,10 @@ namespace gglab
 
 		m_Time->Update();
 		m_InputManager->Update();
+		m_TaskSystem->PumpCompletions({
+			.m_MaxCallbacks = 64,
+			.m_MaxMilliseconds = 1.0,
+		});
 
 		// Toggle Mouse Input Mode
 		if (const auto keyboard = GetKeyboard())
@@ -434,6 +441,14 @@ namespace gglab
 			return;
 		}
 
+		// Stop workers and deliver terminal completion notifications while task
+		// consumers are still alive.
+		if (m_TaskSystem)
+		{
+			m_TaskSystem->Shutdown();
+			m_TaskSystem->PumpCompletions();
+		}
+
 		// Must flush here for gpu resource safe release next
 		m_Renderer->GetRHIContext()->WaitIdle();
 
@@ -454,6 +469,7 @@ namespace gglab
 		m_ShaderManager.reset();
 		m_InputManager.reset();
 		m_Time.reset();
+		m_TaskSystem.reset();
 
 		m_PlatformHost->Finalize();
 

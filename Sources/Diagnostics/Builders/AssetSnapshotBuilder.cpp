@@ -30,6 +30,7 @@ namespace gglab
 		{
 			AssetSnapshot::Model modelSnapshot{};
 			modelSnapshot.m_Id = modelId;
+			modelSnapshot.m_State = model->m_State;
 			modelSnapshot.m_SourcePath = findModelSourcePath(modelId);
 			modelSnapshot.m_Type = model->m_Type;
 			modelSnapshot.m_Name = model->m_Name;
@@ -43,6 +44,24 @@ namespace gglab
 				return lhs.m_Id.Value() < rhs.m_Id.Value();
 			});
 
+		snapshot.m_Meshes.reserve(assetManager.m_MeshContainer.m_MeshIDMap.size());
+		for (const auto& [meshId, mesh] : assetManager.m_MeshContainer.m_MeshIDMap)
+		{
+			snapshot.m_Meshes.push_back({
+				.m_Id = meshId,
+				.m_State = mesh->m_State,
+				.m_Name = mesh->m_Name,
+				.m_VertexCount = mesh->m_VertexCount,
+				.m_IndexCount = mesh->m_IndexCount,
+				.m_IsUploaded = mesh->m_IsUploaded,
+			});
+		}
+		std::sort(snapshot.m_Meshes.begin(), snapshot.m_Meshes.end(),
+			[](const AssetSnapshot::Mesh& lhs, const AssetSnapshot::Mesh& rhs)
+			{
+				return lhs.m_Id.Value() < rhs.m_Id.Value();
+			});
+
 		const TextureRegistry* textureRegistry = assetManager.m_TextureRegistry;
 		if (textureRegistry)
 		{
@@ -51,6 +70,7 @@ namespace gglab
 			{
 				AssetSnapshot::Texture textureSnapshot{};
 				textureSnapshot.m_Id = textureId;
+				textureSnapshot.m_State = texture->m_State;
 				textureSnapshot.m_SourcePath = texture->m_SourcePath;
 				textureSnapshot.m_Semantic = texture->m_Semantic;
 				textureSnapshot.m_Name = texture->m_Name;

@@ -86,6 +86,7 @@ namespace gglab
 
 	private:
 		void UploadMesh(const MeshUploadData& uploadData, TransferBatch& transferBatch) noexcept;
+		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
 
 		ModelID LoadModelGltf(const std::filesystem::path& path) noexcept;
 
