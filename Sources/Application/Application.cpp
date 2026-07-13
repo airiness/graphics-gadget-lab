@@ -174,6 +174,7 @@ namespace gglab
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
+		assetManagerCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_TextureRegistry = m_Renderer->GetTextureRegistry();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();

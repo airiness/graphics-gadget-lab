@@ -142,6 +142,7 @@
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\ModelImporter.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
@@ -532,6 +533,7 @@
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\ModelImporter.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputManager.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassInfo.h" />

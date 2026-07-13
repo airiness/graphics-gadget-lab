@@ -305,6 +305,13 @@ namespace gglab
 				}
 				return textureId;
 			}
+			if (const auto* tex = GetTexture(textureId);
+				tex && tex->m_State != AssetState::Failed && tex->m_State != AssetState::Cancelled)
+			{
+				// An asynchronous request owns this stable cache entry. Returning it
+				// avoids invalidating the worker's eventual main-thread publication.
+				return textureId;
+			}
 
 			// Do not let a stale, incomplete dynamic entry poison future retries.
 			if (IsReservedTextureId(textureId) || !RemoveTexture(textureId))

@@ -1,13 +1,16 @@
 #pragma once
+#include "Core/Task/TaskTypes.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
+#include "Graphics/ModelImporter.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 
 namespace gglab
 {
 	class RHIDevice;
+	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
 	struct AssetSnapshot;
@@ -18,15 +21,28 @@ namespace gglab
 	class AssetManager
 	{
 	public:
-		struct MaterialTextureSamplingSettings
+		using MaterialTextureSamplingSettings = ModelImportSettings;
+
+		struct ModelLoadRequest
 		{
-			bool m_EnableAnisotropicFiltering = true;
-			uint32_t m_MaxAnisotropy = 8;
+			ModelID m_ModelId{};
+			TaskHandle m_Task{};
+
+			[[nodiscard]] bool IsValid() const noexcept { return m_ModelId.IsValid(); }
+		};
+
+		struct TextureLoadRequest
+		{
+			TextureID m_TextureId{};
+			TaskHandle m_Task{};
+
+			[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
 		};
 
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
+			TaskSystem* m_TaskSystem = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			TextureRegistry* m_TextureRegistry = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
@@ -65,6 +81,13 @@ namespace gglab
 		ModelID LoadModel(const std::filesystem::path& path) noexcept;
 		TextureID LoadTexture(const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
+		[[nodiscard]] ModelLoadRequest LoadModelAsync(
+			const std::filesystem::path& path,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
+		[[nodiscard]] TextureLoadRequest LoadTextureAsync(
+			const std::filesystem::path& path,
+			TextureSemantic semantic = TextureSemantic::GenericColor,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
 
 		Mesh* GetMesh(MeshID meshId) noexcept;
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -87,12 +110,28 @@ namespace gglab
 	private:
 		void UploadMesh(const MeshUploadData& uploadData, TransferBatch& transferBatch) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
+		bool PublishImportedModel(ModelID modelId, ImportedModel&& importedModel) noexcept;
+		bool PublishImportedTexture(
+			TextureID textureId,
+			TextureSemantic semantic,
+			TextureAssetData&& textureData) noexcept;
+		void CompleteModelLoad(
+			ModelID modelId,
+			const TaskCompletionInfo& completion,
+			ImportedModel&& importedModel) noexcept;
+		void CompleteTextureLoad(
+			TextureID textureId,
+			TextureSemantic semantic,
+			const TaskCompletionInfo& completion,
+			TextureAssetData&& textureData) noexcept;
 
 		ModelID LoadModelGltf(const std::filesystem::path& path) noexcept;
 
 		MeshID CreateMesh() noexcept;
 		MaterialID CreateMaterial() noexcept;
-		ModelID CreateModel(const std::filesystem::path& canonicalPath) noexcept;
+		ModelID CreateModel(
+			const std::filesystem::path& canonicalPath,
+			AssetState initialState = AssetState::LoadingCpu) noexcept;
 
 		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 
@@ -106,6 +145,7 @@ namespace gglab
 
 	private:
 		RHIDevice* m_Device = nullptr;
+		TaskSystem* m_TaskSystem = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		TextureRegistry* m_TextureRegistry = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
@@ -118,5 +158,7 @@ namespace gglab
 		MeshContainer m_MeshContainer;
 		MaterialContainer m_MaterialContainer;
 		ModelContainer m_ModelContainer;
+		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
+		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
 	};
 }

@@ -288,6 +288,9 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\ModelImporter.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -855,6 +858,9 @@
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\ModelImporter.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h">

@@ -134,9 +134,11 @@ namespace gglab
 			if (ImGui::Button("Load Model"))
 			{
 				const std::filesystem::path path(state.m_ModelPath.data());
-				const ModelID modelId = assetManager.LoadModel(path);
-				state.m_Status = modelId.IsValid() ?
-					std::format("Loaded model {}.", modelId.Value()) :
+				const auto request = assetManager.LoadModelAsync(path);
+				state.m_Status = request.IsValid() ?
+					std::format("Queued model {} (task {}).",
+						request.m_ModelId.Value(),
+						request.m_Task.m_Value) :
 					"Failed to load model. Only .gltf is currently supported.";
 			}
 			if (!hasPath)
@@ -218,9 +220,11 @@ namespace gglab
 			{
 				const std::filesystem::path path(state.m_TexturePath.data());
 				const TextureSemantic semantic = TextureSemanticItems[static_cast<size_t>(state.m_TextureSemanticIndex)].m_Value;
-				const TextureID textureId = assetManager.LoadTexture(path, semantic);
-				state.m_Status = textureId.IsValid() ?
-					std::format("Loaded texture {}.", textureId.Value()) :
+				const auto request = assetManager.LoadTextureAsync(path, semantic);
+				state.m_Status = request.IsValid() ?
+					std::format("Queued texture {} (task {}).",
+						request.m_TextureId.Value(),
+						request.m_Task.m_Value) :
 					"Failed to load texture.";
 			}
 			if (!hasPath)

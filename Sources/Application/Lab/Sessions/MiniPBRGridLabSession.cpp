@@ -201,6 +201,8 @@ namespace gglab
 
 	void MiniPBRGridLabSession::Update(float deltaTime) noexcept
 	{
+		TryFinalizeAssetModel();
+
 		if (m_EnableCameraInput)
 		{
 			UpdateCamera(deltaTime);
@@ -266,6 +268,8 @@ namespace gglab
 	{
 		auto& registry = m_World.GetRegistry();
 		registry.clear();
+		m_PendingModelId.Reset();
+		m_PendingModelPath.clear();
 		ApplyCameraPreset();
 
 		const auto sceneSource = static_cast<SceneSource>(GetParameters().Get(
@@ -329,23 +333,64 @@ namespace gglab
 	bool MiniPBRGridLabSession::BuildAssetModel(std::string_view path) noexcept
 	{
 		auto& assetManager = *m_Services.m_AssetManager;
-		const ModelID modelId = assetManager.LoadModel(std::filesystem::path(path));
-		const Model* model = assetManager.GetModel(modelId);
-		if (!model)
+		const auto request = assetManager.LoadModelAsync(std::filesystem::path(path));
+		if (!request.IsValid())
 		{
-			GGLAB_LOG_ERROR("Mini PBR Grid failed to load model '{}'.", path);
+			GGLAB_LOG_ERROR("Mini PBR Grid failed to request model '{}'.", path);
 			return false;
 		}
+
+		m_PendingModelId = request.m_ModelId;
+		m_PendingModelPath = path;
+		return true;
+	}
+
+	void MiniPBRGridLabSession::TryFinalizeAssetModel() noexcept
+	{
+		if (!m_PendingModelId.IsValid())
+		{
+			return;
+		}
+
+		auto& assetManager = *m_Services.m_AssetManager;
+		const Model* model = assetManager.GetModel(m_PendingModelId);
+		if (!model)
+		{
+			GGLAB_LOG_ERROR(
+				"Mini PBR Grid lost pending model '{}'.",
+				m_PendingModelPath);
+			m_PendingModelId.Reset();
+			m_PendingModelPath.clear();
+			return;
+		}
+		if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
+		{
+			GGLAB_LOG_ERROR(
+				"Mini PBR Grid failed to load model '{}'.",
+				m_PendingModelPath);
+			m_PendingModelId.Reset();
+			m_PendingModelPath.clear();
+			return;
+		}
+		if (model->m_State != AssetState::Ready)
+		{
+			return;
+		}
+
 		GGLAB_LOG_INFO(
 			"Mini PBR Grid loaded '{}' with {} mesh instances.",
-			path,
+			m_PendingModelPath,
 			model->m_MeshInstance.size());
 
 		math::Aabb bounds{};
 		if (!ComputeModelBounds(*model, assetManager, bounds))
 		{
-			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has no valid bounds.", path);
-			return false;
+			GGLAB_LOG_ERROR(
+				"Mini PBR Grid model '{}' has no valid bounds.",
+				m_PendingModelPath);
+			m_PendingModelId.Reset();
+			m_PendingModelPath.clear();
+			return;
 		}
 
 		const Vector3 boundsExtents = bounds.m_Extents;
@@ -354,8 +399,12 @@ namespace gglab
 		const float maxExtent = std::max({ fullExtent.m_X, fullExtent.m_Y, fullExtent.m_Z });
 		if (maxExtent <= 0.0f)
 		{
-			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has degenerate bounds.", path);
-			return false;
+			GGLAB_LOG_ERROR(
+				"Mini PBR Grid model '{}' has degenerate bounds.",
+				m_PendingModelPath);
+			m_PendingModelId.Reset();
+			m_PendingModelPath.clear();
+			return;
 		}
 
 		components::TransformComponent transform{};
@@ -368,9 +417,10 @@ namespace gglab
 		const entt::entity entity = registry.create();
 		registry.emplace<components::TransformComponent>(entity, transform);
 		registry.emplace<components::ModelComponent>(entity, components::ModelComponent{
-			.m_ModelId = modelId,
+			.m_ModelId = m_PendingModelId,
 		});
-		return true;
+		m_PendingModelId.Reset();
+		m_PendingModelPath.clear();
 	}
 
 	void MiniPBRGridLabSession::BuildLighting() noexcept

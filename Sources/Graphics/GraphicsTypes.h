@@ -38,9 +38,8 @@ namespace gglab
 		Procedural,
 	};
 
-	// Asset execution is synchronous today, but every entry still follows this
-	// lifecycle so the execution mechanism can become asynchronous without
-	// changing asset consumers.
+	// Asset entries use the same lifecycle for synchronous and asynchronous
+	// requests. Consumers must only dereference GPU resources in Ready state.
 	enum class AssetState : uint8_t
 	{
 		Unloaded,

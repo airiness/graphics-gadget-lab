@@ -1,16 +1,12 @@
 #include "Core/Precompiled.h"
 #include "Graphics/AssetManager.h"
+#include "Core/Task/TaskSystem.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
-#include "Core/Math/Interop/AssimpMathInterop.h"
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <assimp/GltfMaterial.h>
 #include <algorithm>
 #include <cctype>
 #include <limits>
@@ -19,207 +15,26 @@ namespace gglab
 {
 	namespace
 	{
-		constexpr float TangentLengthEpsilon = 1.0e-4f;
-		constexpr float TangentLengthSqEpsilon = TangentLengthEpsilon * TangentLengthEpsilon;
-
-		// MaterialTextureSlot to assimp Texture type mapping
-		aiTextureType ToAssimpTextureType(MaterialTextureSlot slot) noexcept
+		struct ModelLoadJob
 		{
-			switch (slot)
-			{
-			case MaterialTextureSlot::BaseColor:
-				return aiTextureType_BASE_COLOR;
-			case MaterialTextureSlot::MetallicRoughness:
-				return aiTextureType_GLTF_METALLIC_ROUGHNESS;
-			case MaterialTextureSlot::Normal:
-				return aiTextureType_NORMALS;
-			case MaterialTextureSlot::Occlusion:
-				return aiTextureType_AMBIENT_OCCLUSION;
-			case MaterialTextureSlot::Emissive:
-				return aiTextureType_EMISSIVE;
-			default:
-				return aiTextureType_NONE;
-			}
-		}
+			ImportedModel m_Model;
+		};
 
-		RHITextureAddressMode ToRHITextureAddressMode(aiTextureMapMode mode) noexcept
+		struct TextureLoadJob
 		{
-			switch (mode)
-			{
-			case aiTextureMapMode_Wrap:
-				return RHITextureAddressMode::Wrap;
-			case aiTextureMapMode_Clamp:
-				return RHITextureAddressMode::Clamp;
-			case aiTextureMapMode_Mirror:
-				return RHITextureAddressMode::Mirror;
-			case aiTextureMapMode_Decal:
-				return RHITextureAddressMode::Clamp;
-			default:
-				return RHITextureAddressMode::Wrap;
-			}
-		}
-
-		constexpr int GltfNearest = 9728;
-		constexpr int GltfLinear = 9729;
-		constexpr int GltfNearestMipmapNearest = 9984;
-		constexpr int GltfLinearMipmapNearest = 9985;
-		constexpr int GltfNearestMipmapLinear = 9986;
-		constexpr int GltfLinearMipmapLinear = 9987;
-
-		[[nodiscard]] bool GltfMinFilterUsesMipmaps(int minFilter) noexcept
-		{
-			return minFilter >= GltfNearestMipmapNearest && minFilter <= GltfLinearMipmapLinear;
-		}
-
-		[[nodiscard]] bool GltfMinFilterIsLinear(int minFilter) noexcept
-		{
-			return minFilter == GltfLinear ||
-				minFilter == GltfLinearMipmapNearest ||
-				minFilter == GltfLinearMipmapLinear;
-		}
-
-		[[nodiscard]] bool GltfMipFilterIsLinear(int minFilter) noexcept
-		{
-			return minFilter == GltfNearestMipmapLinear ||
-				minFilter == GltfLinearMipmapLinear;
-		}
-
-		[[nodiscard]] RHISamplerFilter MakeRhiSamplerFilter(
-			bool minLinear,
-			bool magLinear,
-			bool mipLinear) noexcept
-		{
-			const uint32_t index =
-				(minLinear ? 4u : 0u) |
-				(magLinear ? 2u : 0u) |
-				(mipLinear ? 1u : 0u);
-			constexpr RHISamplerFilter filters[] =
-			{
-				RHISamplerFilter::MinMagMipPoint,
-				RHISamplerFilter::MinMagPointMipLinear,
-				RHISamplerFilter::MinPointMagLinearMipPoint,
-				RHISamplerFilter::MinPointMagMipLinear,
-				RHISamplerFilter::MinLinearMagMipPoint,
-				RHISamplerFilter::MinLinearMagPointMipLinear,
-				RHISamplerFilter::MinMagLinearMipPoint,
-				RHISamplerFilter::MinMagMipLinear,
-			};
-			return filters[index];
-		}
-
-		static SamplerKey MakeSamplerKeyFromAssimpTextureParams(
-			const aiTextureMapMode mapMode[3],
-			int magFilter,
-			int minFilter,
-			const AssetManager::MaterialTextureSamplingSettings& settings) noexcept
-		{
-			SamplerKey key{};
-
-			const bool usesMipmaps = GltfMinFilterUsesMipmaps(minFilter);
-			const bool minLinear = GltfMinFilterIsLinear(minFilter);
-			const bool magLinear = magFilter != GltfNearest;
-			const bool mipLinear = GltfMipFilterIsLinear(minFilter);
-			const bool promoteToAnisotropic =
-				settings.m_EnableAnisotropicFiltering &&
-				minFilter == GltfLinearMipmapLinear &&
-				magLinear;
-			key.m_Filter = promoteToAnisotropic ?
-				RHISamplerFilter::Anisotropic :
-				MakeRhiSamplerFilter(minLinear, magLinear, mipLinear);
-
-			key.m_AddressU = ToRHITextureAddressMode(mapMode[0]);
-			key.m_AddressV = ToRHITextureAddressMode(mapMode[1]);
-			key.m_AddressW = ToRHITextureAddressMode(mapMode[2]);
-
-			key.m_MipLODBias = 0.0f;
-			key.m_MaxAnisotropy = promoteToAnisotropic ?
-				std::clamp(settings.m_MaxAnisotropy, 1u, 16u) : 1u;
-			key.m_CompareOp = RHICompareOp::Never;
-
-			key.m_BorderColor[0] = 0.0f;
-			key.m_BorderColor[1] = 0.0f;
-			key.m_BorderColor[2] = 0.0f;
-			key.m_BorderColor[3] = 0.0f;
-
-			key.m_MinLOD = 0.0f;
-			key.m_MaxLOD = usesMipmaps ? std::numeric_limits<float>::max() : 0.0f;
-
-			return key;
-		}
-
-		Vector4 MakeFallbackTangent(const Vector3& normal) noexcept
-		{
-			Vector3 n = normal;
-			if (n.LengthSquared() <= TangentLengthSqEpsilon)
-			{
-				n = Vector3::UnitY;
-			}
-			else
-			{
-				n.Normalize();
-			}
-
-			const Vector3 up = (std::abs(n.m_Y) < 0.999f) ? Vector3::UnitY : Vector3::UnitZ;
-			Vector3 tangent = up.Cross(n);
-			if (tangent.LengthSquared() <= TangentLengthSqEpsilon)
-			{
-				tangent = Vector3::UnitX;
-			}
-			else
-			{
-				tangent.Normalize();
-			}
-
-			return Vector4(tangent.m_X, tangent.m_Y, tangent.m_Z, 1.0f);
-		}
-
-		void CollectModelMeshInstances(
-			const aiNode& node,
-			const aiMatrix4x4& parentTransform,
-			const std::vector<MeshID>& meshIds,
-			const std::vector<MaterialID>& meshMaterialIds,
-			std::vector<ModelMesh>& result) noexcept
-		{
-			const aiMatrix4x4 localToModel = parentTransform * node.mTransformation;
-			for (uint32_t nodeMeshIndex = 0; nodeMeshIndex < node.mNumMeshes; ++nodeMeshIndex)
-			{
-				const uint32_t meshIndex = node.mMeshes[nodeMeshIndex];
-				if (meshIndex >= meshIds.size())
-				{
-					GGLAB_LOG_GRAPHICS_WARN(
-						"Model node '{}' references invalid mesh index {}.",
-						node.mName.C_Str(),
-						meshIndex);
-					continue;
-				}
-
-				result.push_back({
-					.m_MeshId = meshIds[meshIndex],
-					.m_MaterialId = meshMaterialIds[meshIndex],
-					.m_LocalTransform = math::interop::FromAssimp(localToModel),
-				});
-			}
-
-			for (uint32_t childIndex = 0; childIndex < node.mNumChildren; ++childIndex)
-			{
-				CollectModelMeshInstances(
-					*node.mChildren[childIndex],
-					localToModel,
-					meshIds,
-					meshMaterialIds,
-					result);
-			}
-		}
+			TextureAssetData m_TextureData;
+		};
 	}
-
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
+		m_TaskSystem(createInfo.m_TaskSystem),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_TextureRegistry(createInfo.m_TextureRegistry),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
+		GGLAB_ASSERT_MSG(m_TaskSystem != nullptr, "TaskSystem is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_TextureRegistry != nullptr, "TextureRegistry is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
@@ -279,6 +94,168 @@ namespace gglab
 	TextureID AssetManager::LoadTexture(const std::filesystem::path& path, TextureSemantic semantic) noexcept
 	{
 		return m_TextureRegistry->LoadTexture(path, semantic);
+	}
+
+	AssetManager::ModelLoadRequest AssetManager::LoadModelAsync(
+		const std::filesystem::path& path,
+		TaskPriority priority) noexcept
+	{
+		if (path.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadModelAsync received an empty path.");
+			return {};
+		}
+
+		const auto canonicalPath = utils::Canonical(path);
+		std::error_code errorCode;
+		if (!std::filesystem::exists(canonicalPath, errorCode) ||
+			!std::filesystem::is_regular_file(canonicalPath, errorCode))
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"AssetManager::LoadModelAsync received a missing model file: '{}'.",
+				canonicalPath.string());
+			return {};
+		}
+
+		if (const ModelID existing = FindModel(canonicalPath); existing.IsValid())
+		{
+			const auto task = m_ModelLoadTasks.find(existing);
+			return {
+				.m_ModelId = existing,
+				.m_Task = task != m_ModelLoadTasks.end() ? task->second : TaskHandle{},
+			};
+		}
+
+		const ModelID modelId = CreateModel(canonicalPath, AssetState::Queued);
+		Model* model = GetModel(modelId);
+		GGLAB_ASSERT_NOT_NULL(model);
+		model->m_Name = StringID(canonicalPath.filename().generic_string());
+		model->m_Type = ModelType::GlTF;
+
+		auto job = std::make_shared<ModelLoadJob>();
+		const ModelImportSettings importSettings = m_MaterialTextureSampling;
+		const TaskHandle task = m_TaskSystem->Submit(
+			{
+				.m_Name = std::format("Asset.ModelImport: {}", canonicalPath.filename().generic_string()),
+				.m_Priority = priority,
+			},
+			[canonicalPath, importSettings, job](std::stop_token stopToken) noexcept
+			{
+				ModelImportResult result = ModelImporter::Import(
+					canonicalPath,
+					importSettings,
+					stopToken);
+				if (!result.Succeeded())
+				{
+					return TaskResult::Failure(std::move(result.m_Error));
+				}
+				job->m_Model = std::move(result.m_Model);
+				return TaskResult::Success();
+			},
+			[this, modelId, job](const TaskCompletionInfo& completion) noexcept
+			{
+				CompleteModelLoad(modelId, completion, std::move(job->m_Model));
+			});
+		if (!task.IsValid())
+		{
+			model->m_State = AssetState::Failed;
+			return { .m_ModelId = modelId };
+		}
+
+		m_ModelLoadTasks.emplace(modelId, task);
+		return {
+			.m_ModelId = modelId,
+			.m_Task = task,
+		};
+	}
+
+	AssetManager::TextureLoadRequest AssetManager::LoadTextureAsync(
+		const std::filesystem::path& path,
+		TextureSemantic semantic,
+		TaskPriority priority) noexcept
+	{
+		if (path.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadTextureAsync received an empty path.");
+			return {};
+		}
+
+		const auto canonicalPath = utils::Canonical(path);
+		std::error_code errorCode;
+		if (!std::filesystem::exists(canonicalPath, errorCode) ||
+			!std::filesystem::is_regular_file(canonicalPath, errorCode))
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"AssetManager::LoadTextureAsync received a missing texture file: '{}'.",
+				canonicalPath.string());
+			return {};
+		}
+
+		const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
+		if (const TextureID existing = m_TextureRegistry->FindTexture(
+			canonicalPath, importSettings); existing.IsValid())
+		{
+			const auto task = m_TextureLoadTasks.find(existing);
+			return {
+				.m_TextureId = existing,
+				.m_Task = task != m_TextureLoadTasks.end() ? task->second : TaskHandle{},
+			};
+		}
+
+		const TextureID textureId = m_TextureRegistry->CreateTexture(
+			canonicalPath,
+			importSettings);
+		if (!textureId.IsValid())
+		{
+			return {};
+		}
+		Texture* texture = m_TextureRegistry->GetTexture(textureId);
+		GGLAB_ASSERT_NOT_NULL(texture);
+		texture->m_State = AssetState::Queued;
+		texture->m_Semantic = semantic;
+
+		auto job = std::make_shared<TextureLoadJob>();
+		const TaskHandle task = m_TaskSystem->Submit(
+			{
+				.m_Name = std::format("Asset.TextureDecode: {}", canonicalPath.filename().generic_string()),
+				.m_Priority = priority,
+			},
+			[canonicalPath, importSettings, job](std::stop_token stopToken) noexcept
+			{
+				if (stopToken.stop_requested())
+				{
+					return TaskResult::Success();
+				}
+				job->m_TextureData = TextureLoader::LoadTextureData(
+					canonicalPath,
+					importSettings);
+				if (!job->m_TextureData.IsValid())
+				{
+					return TaskResult::Failure(std::format(
+						"Failed to decode texture '{}'.",
+						canonicalPath.string()));
+				}
+				return TaskResult::Success();
+			},
+			[this, textureId, semantic, job](const TaskCompletionInfo& completion) noexcept
+			{
+				CompleteTextureLoad(
+					textureId,
+					semantic,
+					completion,
+					std::move(job->m_TextureData));
+			});
+		if (!task.IsValid())
+		{
+			texture->m_State = AssetState::Failed;
+			return { .m_TextureId = textureId };
+		}
+
+		m_TextureLoadTasks.emplace(textureId, task);
+		return {
+			.m_TextureId = textureId,
+			.m_Task = task,
+		};
 	}
 
 	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
@@ -560,402 +537,288 @@ namespace gglab
 		mesh->m_IsUploaded = succeeded;
 	}
 
-	ModelID AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
+	bool AssetManager::PublishImportedTexture(
+		TextureID textureId,
+		TextureSemantic semantic,
+		TextureAssetData&& textureData) noexcept
 	{
-		const auto canonicalPath = utils::Canonical(path);
-		const auto directory = canonicalPath.parent_path();
-
-		// Load model file
-		Assimp::Importer importer;
-		constexpr uint32_t importFlags =
-			aiProcess_ConvertToLeftHanded |
-			aiProcess_Triangulate |			// Index count per face must be 3
-			aiProcess_GenSmoothNormals |
-			aiProcess_CalcTangentSpace |
-			aiProcess_JoinIdenticalVertices |
-			aiProcess_ImproveCacheLocality |
-			aiProcess_RemoveRedundantMaterials |
-			aiProcess_SortByPType |
-			aiProcess_OptimizeMeshes |
-			aiProcess_OptimizeGraph;
-
-		const auto* aiScene = importer.ReadFile(path.string(), importFlags);
-		if (aiScene == nullptr)
+		Texture* texture = m_TextureRegistry->GetTexture(textureId);
+		if (!texture)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Assimp failed to load model '{}': {}",
-				path.string(),
-				importer.GetErrorString());
-			return InvalidModelID;
+			return false;
 		}
-		if (!aiScene->HasMeshes())
+		texture->m_State = AssetState::CpuReady;
+
+		auto uploadData = m_TextureRegistry->MakeTextureUploadData(
+			textureId,
+			std::move(textureData),
+			semantic);
+		auto batch = m_TransferManager->BeginBatch();
+		const bool recorded = m_TextureRegistry->UploadTexture(uploadData, batch);
+		const RHIFencePoint uploadFence = batch.Submit(true);
+		const bool succeeded = recorded && uploadFence.IsValid();
+		m_TextureRegistry->CompleteTextureUpload(textureId, succeeded);
+		return succeeded;
+	}
+
+	bool AssetManager::PublishImportedModel(
+		ModelID modelId,
+		ImportedModel&& importedModel) noexcept
+	{
+		Model* model = GetModel(modelId);
+		if (!model || importedModel.m_Meshes.empty())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Model file '{}' does not contain mesh data.", path.string());
-			return InvalidModelID;
-		}
-		if (!aiScene->mRootNode)
-		{
-			GGLAB_LOG_GRAPHICS_ERROR("Model file '{}' does not contain a scene hierarchy.", path.string());
-			return InvalidModelID;
+			return false;
 		}
 
-		// Parse material datas
-		const auto aiMaterialCount = aiScene->mNumMaterials;
-		std::vector<MaterialID> materialIds(aiMaterialCount);
-		std::vector<TextureRegistry::TextureUploadData> texUploadDatas;
+		model->m_Name = StringID(importedModel.m_Name);
+		model->m_Type = importedModel.m_Type;
+		model->m_State = AssetState::CpuReady;
 
-		for (uint32_t materialIndex = 0; materialIndex < aiMaterialCount; ++materialIndex)
+		std::vector<TextureID> textureIds(importedModel.m_Textures.size());
+		std::vector<TextureRegistry::TextureUploadData> textureUploads;
+		for (size_t textureIndex = 0; textureIndex < importedModel.m_Textures.size(); ++textureIndex)
 		{
-			const auto materialId = CreateMaterial();
-			materialIds[materialIndex] = materialId;
-
-			auto* material = GetMaterial(materialId);
-			material->m_Id = materialId;
-
-			const auto& aiMaterial = aiScene->mMaterials[materialIndex];
-			for (uint32_t slotIndex = 0; slotIndex < utils::ToIndex(MaterialTextureSlot::Count); ++slotIndex)
+			ImportedTexture& importedTexture = importedModel.m_Textures[textureIndex];
+			TextureID textureId = m_TextureRegistry->FindTexture(
+				importedTexture.m_CanonicalPath,
+				importedTexture.m_ImportSettings);
+			if (!textureId.IsValid() && importedTexture.m_Data.IsValid())
 			{
-				const auto slot = static_cast<MaterialTextureSlot>(slotIndex);
-				const auto semantic = GetMaterialTextureSlotSemantic(slot);
-				const auto aiTexType = ToAssimpTextureType(slot);
-				if (aiTexType == aiTextureType_NONE)
+				textureId = m_TextureRegistry->CreateTexture(
+					importedTexture.m_CanonicalPath,
+					importedTexture.m_ImportSettings);
+				if (textureId.IsValid())
+				{
+					textureUploads.emplace_back(m_TextureRegistry->MakeTextureUploadData(
+						textureId,
+						std::move(importedTexture.m_Data),
+						importedTexture.m_Semantic));
+				}
+			}
+			textureIds[textureIndex] = textureId;
+		}
+
+		std::vector<MaterialID> materialIds;
+		materialIds.reserve(std::max<size_t>(importedModel.m_Materials.size(), 1));
+		for (ImportedMaterial& importedMaterial : importedModel.m_Materials)
+		{
+			auto material = std::make_unique<Material>();
+			static_cast<MaterialProperties&>(*material) = importedMaterial.m_Properties;
+			material->m_Name = StringID(importedMaterial.m_Name);
+			for (uint32_t slotIndex = 0;
+				slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
+				++slotIndex)
+			{
+				const ImportedMaterialTextureBinding& importedBinding =
+					importedMaterial.m_TextureBindings[slotIndex];
+				if (importedBinding.m_TextureIndex ==
+					ImportedMaterialTextureBinding::InvalidTextureIndex)
 				{
 					continue;
 				}
-
-				aiString aiTexPath{};
-				aiTextureMapping mapping = aiTextureMapping_UV;
-				unsigned int uvIndex = 0;
-				ai_real blend = 1.0f;
-				aiTextureOp op = aiTextureOp_Multiply;
-				aiTextureMapMode mapMode[3] =
-				{
-					aiTextureMapMode_Wrap,
-					aiTextureMapMode_Wrap,
-					aiTextureMapMode_Wrap
-				};
-				int magFilter = GltfLinear;
-				int minFilter = GltfLinearMipmapLinear;
-
-				if (aiMaterial->GetTexture(aiTexType,
-					0,
-					&aiTexPath,
-					&mapping,
-					&uvIndex,
-					&blend,
-					&op,
-					mapMode) != aiReturn_SUCCESS)
-				{
-					continue;
-				}
-				GGLAB_UNUSED(aiMaterial->Get(
-					AI_MATKEY_GLTF_MAPPINGFILTER_MAG(aiTexType, 0),
-					magFilter));
-				GGLAB_UNUSED(aiMaterial->Get(
-					AI_MATKEY_GLTF_MAPPINGFILTER_MIN(aiTexType, 0),
-					minFilter));
-
-				const auto texPath = directory / aiTexPath.C_Str();
-				const auto canonicalTexPath = utils::Canonical(texPath);
-
-				const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
-				auto texId = m_TextureRegistry->FindTexture(canonicalTexPath, importSettings);
-				if (!texId.IsValid())
-				{
-					auto uploadData = m_TextureRegistry->MakeTextureUploadData(
-						InvalidTextureID,
-						canonicalTexPath,
-						semantic);
-					if (uploadData.m_TextureData.IsValid())
-					{
-						texId = m_TextureRegistry->CreateTexture(canonicalTexPath, importSettings);
-						if (texId.IsValid())
-						{
-							uploadData.m_TextureId = texId;
-							texUploadDatas.emplace_back(std::move(uploadData));
-						}
-					}
-				}
-
-				const auto samplerKey = MakeSamplerKeyFromAssimpTextureParams(
-					mapMode,
-					magFilter,
-					minFilter,
-					m_MaterialTextureSampling);
-				const auto samplerId = m_SamplerRegistry->GetOrCreateSampler(samplerKey);
 
 				MaterialTextureBinding binding{};
-				binding.m_TextureId = texId;
-				binding.m_SamplerId = samplerId;
-				if (uvIndex > 1)
+				if (importedBinding.m_TextureIndex < textureIds.size())
 				{
-					GGLAB_LOG_GRAPHICS_WARN("Texture '{}' requests TEXCOORD{}, but only TEXCOORD0/1 are supported. Falling back to TEXCOORD0.",
-						canonicalTexPath.string(),
-						uvIndex);
-					uvIndex = 0;
+					binding.m_TextureId = textureIds[importedBinding.m_TextureIndex];
 				}
-				binding.m_TexCoordIndex = uvIndex;
-
-				SetMaterialTexture(*material, slot, binding);
+				binding.m_SamplerId = m_SamplerRegistry->GetOrCreateSampler(
+					importedBinding.m_SamplerKey);
+				binding.m_TexCoordIndex = importedBinding.m_TexCoordIndex;
+				SetMaterialTexture(
+					*material,
+					static_cast<MaterialTextureSlot>(slotIndex),
+					binding);
 			}
-
-			// Get factors
-			aiColor4D baseColor;
-			if (aiMaterial->Get(AI_MATKEY_BASE_COLOR, baseColor) == aiReturn_SUCCESS)
-			{
-				material->m_BaseColor = Color(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
-			}
-
-			float metallicFactor = 0.0f;
-			if (aiMaterial->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) == aiReturn_SUCCESS)
-			{
-				material->m_MetallicFactor = metallicFactor;
-			}
-
-			float roughnessFactor = 1.0f;
-			if (aiMaterial->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == aiReturn_SUCCESS)
-			{
-				material->m_RoughnessFactor = roughnessFactor;
-			}
-
-			aiColor3D emissiveColor;
-			if (aiMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor) == aiReturn_SUCCESS)
-			{
-				material->m_EmissiveColor = Color(emissiveColor.r, emissiveColor.g, emissiveColor.b, 1.0f);
-			}
-
-			// AlphaMode
-			aiString alphaModeStr;
-			if (aiMaterial->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaModeStr) == aiReturn_SUCCESS)
-			{
-				std::string_view modeStr = alphaModeStr.C_Str();
-				if (modeStr == "MASK")
-				{
-					material->m_AlphaMode = AlphaMode::Mask;
-					material->m_AlphaCutoffMode = AlphaCutoffMode::AlphaCutoff;
-
-					float alphaCutoff = 0.5f;
-					aiMaterial->Get(AI_MATKEY_GLTF_ALPHACUTOFF, alphaCutoff);
-					material->m_AlphaCutoff = alphaCutoff;
-				}
-				else if (modeStr == "BLEND")
-				{
-					material->m_AlphaMode = AlphaMode::Blend;
-				}
-				else
-				{
-					material->m_AlphaMode = AlphaMode::Opaque;
-				}
-			}
-			else
-			{
-				material->m_AlphaMode = AlphaMode::Opaque;
-				material->m_AlphaCutoffMode = AlphaCutoffMode::Disabled;
-			}
-
-			// Material flags
-			int32_t doubleSided = 0;
-			if (aiMaterial->Get(AI_MATKEY_TWOSIDED, doubleSided) == aiReturn_SUCCESS)
-			{
-				if (doubleSided != 0)
-				{
-					material->m_Flags |= MaterialFlags::DoubleSided;
-				}
-			}
-
-			material->m_Name = StringID(aiMaterial->GetName().C_Str());
+			materialIds.push_back(AddMaterial(std::move(material)));
 		}
-
-		// Create Model and Meshes.
-		const auto aiMeshCount = aiScene->mNumMeshes;
-
-		const ModelID modelId = CreateModel(canonicalPath);
-		auto* model = GetModel(modelId);
-		GGLAB_ASSERT(model);
-		model->m_Id = modelId;
-		model->m_Type = ModelType::GlTF;
-		model->m_State = AssetState::LoadingCpu;
-
-		std::vector<MeshID> meshIds(aiMeshCount);
-		std::vector<MaterialID> meshMaterialIds(aiMeshCount);
-
-		// Prepare meshes upload data
-		std::vector<MeshUploadData> meshUploadDatas;
-		meshUploadDatas.resize(aiMeshCount);
-
-		for (uint32_t aiMeshIndex = 0; aiMeshIndex < aiMeshCount; ++aiMeshIndex)
+		if (materialIds.empty())
 		{
-			auto& uploadData = meshUploadDatas[aiMeshIndex];
-			const auto* aiMesh = aiScene->mMeshes[aiMeshIndex];
-
-			const MeshID meshId = CreateMesh();
-			uploadData.m_MeshId = meshId;
-			meshIds[aiMeshIndex] = meshId;
-			meshMaterialIds[aiMeshIndex] = materialIds[aiMesh->mMaterialIndex];
-
-			auto* mesh = GetMesh(meshId);
-			GGLAB_ASSERT(mesh);
-			mesh->m_Id = meshId;
-			mesh->m_Name = StringID(aiMesh->mName.C_Str());
-
-			// Vertex data
-			const auto aiVertexCount = aiMesh->mNumVertices;
-			auto& verticesData = uploadData.m_VerticesData;
-			verticesData.resize(aiVertexCount);
-
-			for (uint32_t aiVertexIndex = 0; aiVertexIndex < aiVertexCount; ++aiVertexIndex)
-			{
-				auto& vertex = verticesData[aiVertexIndex];
-
-				const auto& aiPosition = aiMesh->mVertices[aiVertexIndex];
-				vertex.m_Position = Vector3(aiPosition.x, aiPosition.y, aiPosition.z);
-
-				if (aiMesh->HasNormals())
-				{
-					const auto& aiNormal = aiMesh->mNormals[aiVertexIndex];
-					vertex.m_Normal = Vector3(aiNormal.x, aiNormal.y, aiNormal.z);
-				}
-
-				if (aiMesh->HasTextureCoords(0))
-				{
-					const auto& aiTexCoord = aiMesh->mTextureCoords[0][aiVertexIndex];
-					vertex.m_TexCoord0 = Vector2(aiTexCoord.x, aiTexCoord.y);
-					vertex.m_TexCoord1 = vertex.m_TexCoord0;
-				}
-
-				if (aiMesh->HasTextureCoords(1))
-				{
-					const auto& aiTexCoord = aiMesh->mTextureCoords[1][aiVertexIndex];
-					vertex.m_TexCoord1 = Vector2(aiTexCoord.x, aiTexCoord.y);
-				}
-
-				if (aiMesh->HasTangentsAndBitangents())
-				{
-					Vector3 normal = vertex.m_Normal;
-					if (normal.LengthSquared() <= TangentLengthSqEpsilon)
-					{
-						normal = Vector3::UnitY;
-					}
-					else
-					{
-						normal.Normalize();
-					}
-
-					const auto& aiTangent = aiMesh->mTangents[aiVertexIndex];
-					Vector3 tangent(aiTangent.x, aiTangent.y, aiTangent.z);
-					if (tangent.LengthSquared() <= TangentLengthSqEpsilon)
-					{
-						vertex.m_Tangent = MakeFallbackTangent(normal);
-					}
-					else
-					{
-						tangent.Normalize();
-
-						const auto& aiBitangent = aiMesh->mBitangents[aiVertexIndex];
-						Vector3 bitangent(aiBitangent.x, aiBitangent.y, aiBitangent.z);
-						float handedness = 1.0f;
-						if (bitangent.LengthSquared() > TangentLengthSqEpsilon)
-						{
-							bitangent.Normalize();
-							handedness = (tangent.Cross(bitangent).Dot(normal) < 0.0f) ? -1.0f : 1.0f;
-						}
-
-						vertex.m_Tangent = Vector4(tangent.m_X, tangent.m_Y, tangent.m_Z, handedness);
-					}
-				}
-				else
-				{
-					vertex.m_Tangent = MakeFallbackTangent(vertex.m_Normal);
-				}
-			}
-
-			// Indices data
-			const auto aiFaceCount = aiMesh->mNumFaces;
-			auto& indicesData = uploadData.m_IndicesData;
-
-			constexpr auto IndicesCountPerFace = 3;
-			indicesData.reserve(static_cast<size_t>(aiFaceCount * IndicesCountPerFace));
-
-			for (uint32_t aiFaceIndex = 0; aiFaceIndex < aiFaceCount; ++aiFaceIndex)
-			{
-				const auto& aiFace = aiMesh->mFaces[aiFaceIndex];
-				for (uint32_t aiIndIndex = 0; aiIndIndex < aiFace.mNumIndices; ++aiIndIndex)
-				{
-					indicesData.push_back(static_cast<uint32_t>(aiFace.mIndices[aiIndIndex]));
-				}
-			}
-
-			// Compute Bounding infos
-			ComputeMeshBounds(*mesh, verticesData);
+			materialIds.push_back(AddMaterial(std::make_unique<Material>()));
 		}
 
-		model->m_MeshInstance.reserve(aiMeshCount);
-		CollectModelMeshInstances(
-			*aiScene->mRootNode,
-			aiMatrix4x4(),
-			meshIds,
-			meshMaterialIds,
-			model->m_MeshInstance);
+		std::vector<MeshID> meshIds(importedModel.m_Meshes.size());
+		std::vector<MeshUploadData> meshUploads(importedModel.m_Meshes.size());
+		for (size_t meshIndex = 0; meshIndex < importedModel.m_Meshes.size(); ++meshIndex)
+		{
+			ImportedMesh& importedMesh = importedModel.m_Meshes[meshIndex];
+			const MeshID meshId = CreateMesh();
+			meshIds[meshIndex] = meshId;
+			Mesh* mesh = GetMesh(meshId);
+			GGLAB_ASSERT_NOT_NULL(mesh);
+			mesh->m_Name = StringID(importedMesh.m_Name);
+			mesh->m_Sphere = importedMesh.m_Sphere;
+			mesh->m_Aabb = importedMesh.m_Aabb;
+			mesh->m_HasBounds = importedMesh.m_HasBounds;
+			mesh->m_State = AssetState::CpuReady;
+
+			MeshUploadData& upload = meshUploads[meshIndex];
+			upload.m_MeshId = meshId;
+			upload.m_VerticesData = std::move(importedMesh.m_Vertices);
+			upload.m_IndicesData = std::move(importedMesh.m_Indices);
+		}
+
+		model->m_MeshInstance.clear();
+		model->m_MeshInstance.reserve(importedModel.m_MeshInstances.size());
+		for (const ImportedModelMesh& importedInstance : importedModel.m_MeshInstances)
+		{
+			if (importedInstance.m_MeshIndex >= meshIds.size())
+			{
+				continue;
+			}
+			const uint32_t materialIndex =
+				importedInstance.m_MaterialIndex < materialIds.size() ?
+				importedInstance.m_MaterialIndex : 0;
+			model->m_MeshInstance.push_back({
+				.m_MeshId = meshIds[importedInstance.m_MeshIndex],
+				.m_MaterialId = materialIds[materialIndex],
+				.m_LocalTransform = importedInstance.m_LocalTransform,
+			});
+		}
 		if (model->m_MeshInstance.empty())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"Model '{}' has no mesh instances in its node hierarchy; using identity transforms.",
-				path.string());
-			for (uint32_t meshIndex = 0; meshIndex < aiMeshCount; ++meshIndex)
+			for (size_t meshIndex = 0; meshIndex < meshIds.size(); ++meshIndex)
 			{
+				const uint32_t materialIndex =
+					importedModel.m_Meshes[meshIndex].m_MaterialIndex < materialIds.size() ?
+					importedModel.m_Meshes[meshIndex].m_MaterialIndex : 0;
 				model->m_MeshInstance.push_back({
 					.m_MeshId = meshIds[meshIndex],
-					.m_MaterialId = meshMaterialIds[meshIndex],
+					.m_MaterialId = materialIds[materialIndex],
 				});
 			}
 		}
 
-		// Upload to GPU
 		model->m_State = AssetState::UploadQueued;
 		auto batch = m_TransferManager->BeginBatch();
-		// Upload textures
-		std::vector<TextureID> failedTextureIds;
 		std::vector<TextureID> uploadedTextureIds;
-		uploadedTextureIds.reserve(texUploadDatas.size());
-		for (const auto& texUploadData : texUploadDatas)
+		for (const auto& textureUpload : textureUploads)
 		{
-			if (!m_TextureRegistry->UploadTexture(texUploadData, batch))
+			if (m_TextureRegistry->UploadTexture(textureUpload, batch))
 			{
-				failedTextureIds.push_back(texUploadData.m_TextureId);
-			}
-			else
-			{
-				uploadedTextureIds.push_back(texUploadData.m_TextureId);
+				uploadedTextureIds.push_back(textureUpload.m_TextureId);
 			}
 		}
-		// Upload meshes
-		for (const auto& meshUploadData : meshUploadDatas)
+		for (const MeshUploadData& meshUpload : meshUploads)
 		{
-			UploadMesh(meshUploadData, batch);
+			UploadMesh(meshUpload, batch);
 		}
+
 		const RHIFencePoint uploadFence = batch.Submit(true);
-		for (const TextureID textureId : uploadedTextureIds)
+		for (TextureID textureId : uploadedTextureIds)
 		{
 			m_TextureRegistry->CompleteTextureUpload(textureId, uploadFence.IsValid());
 		}
-		for (const TextureID textureId : failedTextureIds)
-		{
-			m_TextureRegistry->RemoveTexture(textureId);
-		}
 
-		bool meshesReady = true;
-		for (const auto& meshUploadData : meshUploadDatas)
+		bool meshesReady = uploadFence.IsValid();
+		for (const MeshUploadData& meshUpload : meshUploads)
 		{
-			const auto* mesh = GetMesh(meshUploadData.m_MeshId);
+			const Mesh* mesh = GetMesh(meshUpload.m_MeshId);
 			const bool succeeded = uploadFence.IsValid() &&
 				mesh && mesh->m_State == AssetState::GpuProcessing;
-			CompleteMeshUpload(meshUploadData.m_MeshId, succeeded);
+			CompleteMeshUpload(meshUpload.m_MeshId, succeeded);
 			meshesReady &= succeeded;
 		}
 		model->m_State = meshesReady ? AssetState::Ready : AssetState::Failed;
-
-		return modelId;
+		return meshesReady;
 	}
 
+	void AssetManager::CompleteModelLoad(
+		ModelID modelId,
+		const TaskCompletionInfo& completion,
+		ImportedModel&& importedModel) noexcept
+	{
+		m_ModelLoadTasks.erase(modelId);
+		Model* model = GetModel(modelId);
+		if (!model)
+		{
+			return;
+		}
+
+		if (completion.m_Status == TaskStatus::Cancelled)
+		{
+			model->m_State = AssetState::Cancelled;
+			return;
+		}
+		if (completion.m_Status != TaskStatus::Succeeded)
+		{
+			model->m_State = AssetState::Failed;
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Async model import '{}' failed: {}",
+				completion.m_Name,
+				completion.m_Error);
+			return;
+		}
+
+		const uint32_t meshInstanceCount = static_cast<uint32_t>(
+			importedModel.m_MeshInstances.size());
+		if (!PublishImportedModel(modelId, std::move(importedModel)))
+		{
+			model->m_State = AssetState::Failed;
+			return;
+		}
+		GGLAB_LOG_GRAPHICS_INFO(
+			"Async model {} published (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
+			modelId.Value(),
+			meshInstanceCount,
+			completion.m_QueueMilliseconds,
+			completion.m_ExecutionMilliseconds);
+	}
+
+	void AssetManager::CompleteTextureLoad(
+		TextureID textureId,
+		TextureSemantic semantic,
+		const TaskCompletionInfo& completion,
+		TextureAssetData&& textureData) noexcept
+	{
+		m_TextureLoadTasks.erase(textureId);
+		Texture* texture = m_TextureRegistry->GetTexture(textureId);
+		if (!texture)
+		{
+			return;
+		}
+
+		if (completion.m_Status == TaskStatus::Cancelled)
+		{
+			texture->m_State = AssetState::Cancelled;
+			return;
+		}
+		if (completion.m_Status != TaskStatus::Succeeded)
+		{
+			texture->m_State = AssetState::Failed;
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Async texture decode '{}' failed: {}",
+				completion.m_Name,
+				completion.m_Error);
+			return;
+		}
+
+		if (!PublishImportedTexture(textureId, semantic, std::move(textureData)))
+		{
+			texture->m_State = AssetState::Failed;
+			return;
+		}
+		GGLAB_LOG_GRAPHICS_INFO(
+			"Async texture {} published (queueMs={:.2f}, cpuMs={:.2f}).",
+			textureId.Value(),
+			completion.m_QueueMilliseconds,
+			completion.m_ExecutionMilliseconds);
+	}
+
+	ModelID AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
+	{
+		ModelImportResult result = ModelImporter::Import(path, m_MaterialTextureSampling);
+		if (!result.Succeeded())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("{}", result.m_Error);
+			return InvalidModelID;
+		}
+
+		const ModelID modelId = CreateModel(result.m_Model.m_CanonicalPath);
+		PublishImportedModel(modelId, std::move(result.m_Model));
+		return modelId;
+	}
 	MeshID AssetManager::CreateMesh() noexcept
 	{
 		const auto meshId = m_MeshIdCounter.Acquire();
@@ -975,7 +838,9 @@ namespace gglab
 		return materialId;
 	}
 
-	ModelID AssetManager::CreateModel(const std::filesystem::path& canonicalPath) noexcept
+	ModelID AssetManager::CreateModel(
+		const std::filesystem::path& canonicalPath,
+		AssetState initialState) noexcept
 	{
 		const auto modelId = m_ModelIdCounter.Acquire();
 		auto pathIdPair = m_ModelContainer.m_PathIDMap.emplace(canonicalPath, modelId);
@@ -983,7 +848,7 @@ namespace gglab
 
 		auto idModelPair = m_ModelContainer.m_ModelIDMap.emplace(modelId, std::make_unique<Model>());
 		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelID & ModelPtr pair failed.");
-		idModelPair.first->second->m_State = AssetState::LoadingCpu;
+		idModelPair.first->second->m_State = initialState;
 		return modelId;
 	}
 
