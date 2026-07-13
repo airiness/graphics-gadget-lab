@@ -134,6 +134,7 @@ namespace gglab
 			TextureID id,
 			std::string_view textureName,
 			const std::filesystem::path& sourcePath = {}) noexcept;
+		void CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 
 	private:

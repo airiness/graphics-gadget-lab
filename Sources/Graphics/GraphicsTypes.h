@@ -38,6 +38,22 @@ namespace gglab
 		Procedural,
 	};
 
+	// Asset execution is synchronous today, but every entry still follows this
+	// lifecycle so the execution mechanism can become asynchronous without
+	// changing asset consumers.
+	enum class AssetState : uint8_t
+	{
+		Unloaded,
+		Queued,
+		LoadingCpu,
+		CpuReady,
+		UploadQueued,
+		GpuProcessing,
+		Ready,
+		Failed,
+		Cancelled,
+	};
+
 	enum class AlphaMode : uint32_t
 	{
 		Opaque,
@@ -278,6 +294,7 @@ namespace gglab
 	struct Texture
 	{
 		TextureID m_Id{};
+		AssetState m_State = AssetState::Unloaded;
 		RHITextureViewHandle m_Srv{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
@@ -334,6 +351,7 @@ namespace gglab
 	{
 		MeshID m_Id{};
 
+		AssetState m_State = AssetState::Unloaded;
 		bool m_IsUploaded = false;
 		bool m_HasBounds = false;
 
@@ -362,6 +380,7 @@ namespace gglab
 	struct Model
 	{
 		ModelID m_Id{};
+		AssetState m_State = AssetState::Unloaded;
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		std::vector<ModelMesh> m_MeshInstance;

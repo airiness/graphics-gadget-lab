@@ -9,15 +9,27 @@ namespace gglab
 		struct Model
 		{
 			ModelID m_Id{};
+			AssetState m_State = AssetState::Unloaded;
 			std::filesystem::path m_SourcePath;
 			ModelType m_Type = ModelType::Invalid;
 			StringID m_Name{};
 			uint32_t m_MeshInstanceCount = 0;
 		};
 
+		struct Mesh
+		{
+			MeshID m_Id{};
+			AssetState m_State = AssetState::Unloaded;
+			StringID m_Name{};
+			uint32_t m_VertexCount = 0;
+			uint32_t m_IndexCount = 0;
+			bool m_IsUploaded = false;
+		};
+
 		struct Texture
 		{
 			TextureID m_Id{};
+			AssetState m_State = AssetState::Unloaded;
 			std::filesystem::path m_SourcePath;
 			TextureSemantic m_Semantic = TextureSemantic::Unknown;
 			StringID m_Name{};
@@ -28,6 +40,7 @@ namespace gglab
 		};
 
 		std::vector<Model> m_Models;
+		std::vector<Mesh> m_Meshes;
 		std::vector<Texture> m_Textures;
 	};
 

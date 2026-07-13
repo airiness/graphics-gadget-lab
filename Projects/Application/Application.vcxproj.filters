@@ -79,6 +79,9 @@
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Task">
+      <UniqueIdentifier>{D28903E6-793E-489B-9C0A-B435C0E01152}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\RHI\DX12\Cache">
       <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
     </Filter>
@@ -159,6 +162,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp">
+      <Filter>Core\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -686,6 +695,18 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h">
+      <Filter>Core\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h">
+      <Filter>Core\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TaskSystemSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>

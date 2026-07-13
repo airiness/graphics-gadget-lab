@@ -237,11 +237,23 @@ namespace gglab
 		{
 			auto batch = m_TransferManager->BeginBatch();
 			bool uploadsSucceeded = true;
+			std::vector<TextureID> uploadedTextureIds;
+			uploadedTextureIds.reserve(uploads.size());
 			for (const auto& data : uploads)
 			{
-				uploadsSucceeded &= UploadTexture(data, batch);
+				const bool uploaded = UploadTexture(data, batch);
+				uploadsSucceeded &= uploaded;
+				if (uploaded)
+				{
+					uploadedTextureIds.push_back(data.m_TextureId);
+				}
 			}
-			GGLAB_UNUSED(batch.Submit(true));
+			const RHIFencePoint uploadFence = batch.Submit(true);
+			uploadsSucceeded &= uploadFence.IsValid();
+			for (const TextureID textureId : uploadedTextureIds)
+			{
+				CompleteTextureUpload(textureId, uploadFence.IsValid());
+			}
 			GGLAB_ASSERT_MSG(uploadsSucceeded, "TextureRegistry failed to initialize reserved textures.");
 		}
 	}
@@ -315,8 +327,14 @@ namespace gglab
 		texUploadData.m_TextureId = textureId;
 		auto batch = m_TransferManager->BeginBatch();
 		const bool uploadSucceeded = UploadTexture(texUploadData, batch);
-		GGLAB_UNUSED(batch.Submit(true));
+		const RHIFencePoint uploadFence = batch.Submit(true);
 		if (!uploadSucceeded)
+		{
+			RemoveTexture(textureId);
+			return InvalidTextureID;
+		}
+		CompleteTextureUpload(textureId, uploadFence.IsValid());
+		if (!uploadFence.IsValid())
 		{
 			RemoveTexture(textureId);
 			return InvalidTextureID;
@@ -418,6 +436,7 @@ namespace gglab
 		}
 
 		idTexPair.first->second->m_Id = textureId;
+		idTexPair.first->second->m_State = AssetState::CpuReady;
 		idTexPair.first->second->m_Name = StringID(canonicalPath.generic_string());
 		idTexPair.first->second->m_SourcePath = canonicalPath;
 		idTexPair.first->second->m_DebugLabel = canonicalPath.filename().generic_string();
@@ -497,15 +516,18 @@ namespace gglab
 		{
 			return false;
 		}
+		texture->m_State = AssetState::UploadQueued;
 
 		const TextureAssetData& textureData = uploadData.m_TextureData;
 		if (!textureData.IsValid())
 		{
+			texture->m_State = AssetState::Failed;
 			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture received invalid texture asset data.");
 			return false;
 		}
 		if (texture->m_Texture.IsValid() || texture->m_IsUploaded)
 		{
+			texture->m_State = AssetState::Failed;
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"TextureRegistry::UploadTexture only supports initial upload of a texture entry.");
 			return false;
@@ -535,6 +557,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture.");
 		if (!texture->m_Texture.IsValid())
 		{
+			texture->m_State = AssetState::Failed;
 			return false;
 		}
 		texture->m_Desc = textureDesc;
@@ -543,6 +566,7 @@ namespace gglab
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		if (!transferBatch.UploadTexture(texture->m_Texture, textureUploadData))
 		{
+			texture->m_State = AssetState::Failed;
 			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture failed to record the texture upload.");
 			return false;
 		}
@@ -580,11 +604,23 @@ namespace gglab
 		GGLAB_ASSERT_MSG(texture->m_Srv.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture SRV.");
 		if (!texture->m_Srv.IsValid())
 		{
+			texture->m_State = AssetState::Failed;
 			return false;
 		}
 		texture->m_Semantic = uploadData.m_Semantic;
-		texture->m_IsUploaded = true;
+		texture->m_State = AssetState::GpuProcessing;
 		return true;
+	}
+
+	void TextureRegistry::CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept
+	{
+		auto* texture = GetTexture(textureId);
+		if (!texture)
+		{
+			return;
+		}
+		texture->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+		texture->m_IsUploaded = succeeded;
 	}
 
 	void TextureRegistry::CreateTextureEntry(
@@ -599,6 +635,7 @@ namespace gglab
 			{
 				auto& texture = iterator->second;
 				texture->m_Id = id;
+				texture->m_State = AssetState::CpuReady;
 				texture->m_Name = StringID(textureName);
 				texture->m_SourcePath = sourcePath;
 				texture->m_DebugLabel = textureName;

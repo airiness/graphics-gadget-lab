@@ -6,6 +6,7 @@
 namespace gglab
 {
 	struct DevelopGuiContext;
+	class TaskSystem;
 
 	struct RenderVisualizationSettings
 	{
@@ -21,6 +22,7 @@ namespace gglab
 
 		void Reset() noexcept;
 		void Draw(DevelopGuiContext& context) noexcept;
+		void SetTaskSystem(const TaskSystem* taskSystem) noexcept { m_TaskSystem = taskSystem; }
 
 		DevelopGuiRegistry& GetRegistry() noexcept { return m_Registry; }
 		DiagnosticsRuntime& GetDiagnostics() noexcept { return m_Diagnostics; }
@@ -30,5 +32,6 @@ namespace gglab
 		DevelopGuiRegistry m_Registry;
 		DiagnosticsRuntime m_Diagnostics;
 		RenderVisualizationSettings m_RenderVisualizationSettings{};
+		const TaskSystem* m_TaskSystem = nullptr;
 	};
 }

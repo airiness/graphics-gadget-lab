@@ -23,6 +23,7 @@ namespace gglab
 		m_Diagnostics.BeginFrame({
 			.m_Renderer = context.m_Renderer,
 			.m_AssetManager = context.m_AssetManager,
+			.m_TaskSystem = m_TaskSystem,
 			.m_World = context.m_World,
 			.m_RenderGraph = context.m_RenderGraph,
 			.m_RenderViews = context.m_RenderViews,

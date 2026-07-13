@@ -53,6 +53,23 @@ namespace gglab
 			}
 		}
 
+		[[nodiscard]] const char* AssetStateText(AssetState state) noexcept
+		{
+			switch (state)
+			{
+			case AssetState::Unloaded: return "Unloaded";
+			case AssetState::Queued: return "Queued";
+			case AssetState::LoadingCpu: return "Loading CPU";
+			case AssetState::CpuReady: return "CPU Ready";
+			case AssetState::UploadQueued: return "Upload Queued";
+			case AssetState::GpuProcessing: return "GPU Processing";
+			case AssetState::Ready: return "Ready";
+			case AssetState::Failed: return "Failed";
+			case AssetState::Cancelled: return "Cancelled";
+			}
+			return "Unknown";
+		}
+
 		[[nodiscard]] const char* TextureSemanticText(TextureSemantic semantic) noexcept
 		{
 			for (const TextureSemanticItem& item : TextureSemanticItems)
@@ -131,10 +148,11 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
-			if (ImGui::BeginTable("ModelAssetsTable", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			if (ImGui::BeginTable("ModelAssetsTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
 				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Meshes", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch);
@@ -152,10 +170,12 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(ModelTypeText(model.m_Type));
+					ImGui::TextUnformatted(AssetStateText(model.m_State));
 					ImGui::TableSetColumnIndex(3);
-					ImGui::Text("%u", model.m_MeshInstanceCount);
+					ImGui::TextUnformatted(ModelTypeText(model.m_Type));
 					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%u", model.m_MeshInstanceCount);
+					ImGui::TableSetColumnIndex(5);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -212,12 +232,13 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
-			if (ImGui::BeginTable("TextureAssetsTable", 8,
+			if (ImGui::BeginTable("TextureAssetsTable", 9,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
 				ImGui::TableSetupColumn("Semantic", ImGuiTableColumnFlags_WidthFixed, 140.0f);
 				ImGui::TableSetupColumn("Uploaded", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Reserved", ImGuiTableColumnFlags_WidthFixed, 80.0f);
@@ -238,12 +259,14 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(TextureSemanticText(texture.m_Semantic));
+					ImGui::TextUnformatted(AssetStateText(texture.m_State));
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
+					ImGui::TextUnformatted(TextureSemanticText(texture.m_Semantic));
 					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
 					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					ImGui::TableSetColumnIndex(6);
 					if (texture.m_Texture.IsValid())
 					{
 						ImGui::Text("%u:%u", texture.m_Texture.Index(), texture.m_Texture.Generation());
@@ -252,9 +275,9 @@ namespace gglab
 					{
 						ImGui::TextUnformatted("-");
 					}
-					ImGui::TableSetColumnIndex(6);
-					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
 					ImGui::TableSetColumnIndex(7);
+					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(8);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -262,6 +285,46 @@ namespace gglab
 				ImGui::EndTable();
 			}
 			ImGui::PopID();
+		}
+
+		void DrawMeshAssets(const AssetSnapshot& assetSnapshot) noexcept
+		{
+			const auto& meshes = assetSnapshot.m_Meshes;
+			ImGui::Text("%u meshes", static_cast<uint32_t>(meshes.size()));
+
+			if (ImGui::BeginTable("MeshAssetsTable", 6,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
+				ImGui::TableSetupColumn("Vertices", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Indices", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Uploaded", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableHeadersRow();
+
+				for (const auto& mesh : meshes)
+				{
+					const std::string name = utils::StringIdToString(mesh.m_Name);
+					ImGui::PushID(static_cast<int>(mesh.m_Id.Value()));
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%u", mesh.m_Id.Value());
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(name.empty() ? "<unnamed>" : name.c_str());
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(AssetStateText(mesh.m_State));
+					ImGui::TableSetColumnIndex(3);
+					ImGui::Text("%u", mesh.m_VertexCount);
+					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%u", mesh.m_IndexCount);
+					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(utils::BoolToString(mesh.m_IsUploaded));
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
 		}
 	}
 
@@ -305,6 +368,11 @@ namespace gglab
 			if (ImGui::BeginTabItem("Textures"))
 			{
 				DrawTextureAssets(*context.m_AssetManager, state, *snapshot);
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("Meshes"))
+			{
+				DrawMeshAssets(*snapshot);
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();

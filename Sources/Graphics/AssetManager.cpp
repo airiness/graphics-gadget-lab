@@ -352,11 +352,15 @@ namespace gglab
 
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
+		GetMesh(meshId)->m_State = AssetState::CpuReady;
 
 		// Upload Mesh to GPU
 		auto batch = m_TransferManager->BeginBatch();
 		UploadMesh(meshUploadData, batch);
-		GGLAB_UNUSED(batch.Submit(true));
+		const RHIFencePoint uploadFence = batch.Submit(true);
+		CompleteMeshUpload(
+			meshId,
+			uploadFence.IsValid() && GetMesh(meshId)->m_State == AssetState::GpuProcessing);
 
 		return meshId;
 	}
@@ -405,6 +409,7 @@ namespace gglab
 		{
 			model->m_Type = ModelType::Procedural;
 		}
+		model->m_State = AssetState::Ready;
 
 		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
 
@@ -437,6 +442,7 @@ namespace gglab
 			GGLAB_ASSERT_MSG(false, "UploadMesh: Invalid MeshID, check it!");
 			return;
 		}
+		mesh->m_State = AssetState::UploadQueued;
 
 		const auto& verticesData = uploadData.m_VerticesData;
 		const auto& indicesData = uploadData.m_IndicesData;
@@ -452,6 +458,7 @@ namespace gglab
 
 		if (vertexBufferSize == 0 || indexBufferSize == 0)
 		{
+			mesh->m_State = AssetState::Failed;
 			GGLAB_LOG_GRAPHICS_WARN("AssetManager::UploadMesh received an empty mesh.");
 			return;
 		}
@@ -488,6 +495,7 @@ namespace gglab
 			m_Device->CreateBuffer(indexBufferDesc, indexDebugIdentity);
 		if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
 		{
+			mesh->m_State = AssetState::Failed;
 			if (vertexBuffer.IsValid())
 			{
 				m_Device->DestroyBuffer(vertexBuffer);
@@ -512,6 +520,7 @@ namespace gglab
 			"AssetManager failed to record mesh buffer uploads.");
 		if (!vertexUploadSucceeded || !indexUploadSucceeded)
 		{
+			mesh->m_State = AssetState::Failed;
 			mesh->m_VertexBuffer.Reset();
 			mesh->m_IndexBuffer.Reset();
 			return;
@@ -520,6 +529,7 @@ namespace gglab
 		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
 			indexBufferSize > std::numeric_limits<uint32_t>::max())
 		{
+			mesh->m_State = AssetState::Failed;
 			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh mesh buffers exceed RHI binding size limits.");
 			mesh->m_VertexBuffer.Reset();
 			mesh->m_IndexBuffer.Reset();
@@ -536,7 +546,18 @@ namespace gglab
 		mesh->m_IndexBufferBinding.m_SizeInBytes = static_cast<uint32_t>(indexBufferSize);
 		mesh->m_IndexBufferBinding.m_Format = RHIFormat::R32Uint;
 
-		mesh->m_IsUploaded = true;
+		mesh->m_State = AssetState::GpuProcessing;
+	}
+
+	void AssetManager::CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept
+	{
+		auto* mesh = GetMesh(meshId);
+		if (!mesh)
+		{
+			return;
+		}
+		mesh->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+		mesh->m_IsUploaded = succeeded;
 	}
 
 	ModelID AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
@@ -752,6 +773,7 @@ namespace gglab
 		GGLAB_ASSERT(model);
 		model->m_Id = modelId;
 		model->m_Type = ModelType::GlTF;
+		model->m_State = AssetState::LoadingCpu;
 
 		std::vector<MeshID> meshIds(aiMeshCount);
 		std::vector<MaterialID> meshMaterialIds(aiMeshCount);
@@ -888,14 +910,21 @@ namespace gglab
 		}
 
 		// Upload to GPU
+		model->m_State = AssetState::UploadQueued;
 		auto batch = m_TransferManager->BeginBatch();
 		// Upload textures
 		std::vector<TextureID> failedTextureIds;
+		std::vector<TextureID> uploadedTextureIds;
+		uploadedTextureIds.reserve(texUploadDatas.size());
 		for (const auto& texUploadData : texUploadDatas)
 		{
 			if (!m_TextureRegistry->UploadTexture(texUploadData, batch))
 			{
 				failedTextureIds.push_back(texUploadData.m_TextureId);
+			}
+			else
+			{
+				uploadedTextureIds.push_back(texUploadData.m_TextureId);
 			}
 		}
 		// Upload meshes
@@ -903,11 +932,26 @@ namespace gglab
 		{
 			UploadMesh(meshUploadData, batch);
 		}
-		GGLAB_UNUSED(batch.Submit(true));
+		const RHIFencePoint uploadFence = batch.Submit(true);
+		for (const TextureID textureId : uploadedTextureIds)
+		{
+			m_TextureRegistry->CompleteTextureUpload(textureId, uploadFence.IsValid());
+		}
 		for (const TextureID textureId : failedTextureIds)
 		{
 			m_TextureRegistry->RemoveTexture(textureId);
 		}
+
+		bool meshesReady = true;
+		for (const auto& meshUploadData : meshUploadDatas)
+		{
+			const auto* mesh = GetMesh(meshUploadData.m_MeshId);
+			const bool succeeded = uploadFence.IsValid() &&
+				mesh && mesh->m_State == AssetState::GpuProcessing;
+			CompleteMeshUpload(meshUploadData.m_MeshId, succeeded);
+			meshesReady &= succeeded;
+		}
+		model->m_State = meshesReady ? AssetState::Ready : AssetState::Failed;
 
 		return modelId;
 	}
@@ -917,6 +961,7 @@ namespace gglab
 		const auto meshId = m_MeshIdCounter.Acquire();
 		auto idMeshPair = m_MeshContainer.m_MeshIDMap.emplace(meshId, std::make_unique<Mesh>());
 		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace MeshID & meshPtr pair failed.");
+		idMeshPair.first->second->m_State = AssetState::LoadingCpu;
 
 		return meshId;
 	}
@@ -938,6 +983,7 @@ namespace gglab
 
 		auto idModelPair = m_ModelContainer.m_ModelIDMap.emplace(modelId, std::make_unique<Model>());
 		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelID & ModelPtr pair failed.");
+		idModelPair.first->second->m_State = AssetState::LoadingCpu;
 		return modelId;
 	}
 
