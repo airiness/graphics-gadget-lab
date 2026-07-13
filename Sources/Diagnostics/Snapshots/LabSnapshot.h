@@ -7,6 +7,33 @@
 
 namespace gglab
 {
+	enum class LabDiagnosticCheckStatus : uint8_t
+	{
+		Pending,
+		Passed,
+		Failed,
+	};
+
+	struct LabDiagnosticMetric
+	{
+		std::string m_Name;
+		std::string m_Value;
+	};
+
+	struct LabDiagnosticCheck
+	{
+		std::string m_Name;
+		LabDiagnosticCheckStatus m_Status = LabDiagnosticCheckStatus::Pending;
+		std::string m_Detail;
+	};
+
+	struct LabDiagnosticsSnapshot
+	{
+		std::string m_Title;
+		std::vector<LabDiagnosticMetric> m_Metrics;
+		std::vector<LabDiagnosticCheck> m_Checks;
+	};
+
 	struct LabParameterSnapshot
 	{
 		LabParameterDesc m_Desc;
@@ -37,6 +64,7 @@ namespace gglab
 		uint32_t m_WarmupFramesRemaining = 0;
 		float m_EffectiveDeltaTime = 0.0f;
 		std::vector<LabParameterSnapshot> m_Parameters;
+		LabDiagnosticsSnapshot m_Diagnostics;
 		std::string m_LastError;
 		bool m_HasPendingCommands = false;
 		bool m_IsHostActive = false;

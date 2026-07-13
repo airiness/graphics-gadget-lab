@@ -97,6 +97,54 @@ namespace gglab
 
 			ImGui::EndTable();
 		}
+
+		void DrawLabDiagnostics(const LabDiagnosticsSnapshot& diagnostics) noexcept
+		{
+			if (diagnostics.m_Metrics.empty() && diagnostics.m_Checks.empty())
+			{
+				return;
+			}
+
+			ImGui::SeparatorText(diagnostics.m_Title.empty() ?
+				"Verification" : diagnostics.m_Title.c_str());
+			if (!diagnostics.m_Metrics.empty() && ImGui::BeginTable(
+				"LabDiagnosticMetrics", 2,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				ImGui::TableSetupColumn("Metric", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableHeadersRow();
+				for (const LabDiagnosticMetric& metric : diagnostics.m_Metrics)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(metric.m_Name.c_str());
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(metric.m_Value.c_str());
+				}
+				ImGui::EndTable();
+			}
+
+			for (const LabDiagnosticCheck& check : diagnostics.m_Checks)
+			{
+				const ImVec4 color = check.m_Status == LabDiagnosticCheckStatus::Passed ?
+					ImVec4(0.25f, 0.85f, 0.35f, 1.0f) :
+					check.m_Status == LabDiagnosticCheckStatus::Failed ?
+						ImVec4(1.0f, 0.3f, 0.25f, 1.0f) :
+						ImVec4(0.95f, 0.75f, 0.2f, 1.0f);
+				const char* status = check.m_Status == LabDiagnosticCheckStatus::Passed ? "PASS" :
+					check.m_Status == LabDiagnosticCheckStatus::Failed ? "FAIL" : "PENDING";
+				ImGui::TextColored(color, "[%s]", status);
+				ImGui::SameLine();
+				ImGui::TextUnformatted(check.m_Name.c_str());
+				if (!check.m_Detail.empty())
+				{
+					ImGui::Indent();
+					ImGui::TextWrapped("%s", check.m_Detail.c_str());
+					ImGui::Unindent();
+				}
+			}
+		}
 	}
 
 	void LabPanel::Draw(DevelopGuiContext& context) noexcept
@@ -177,6 +225,7 @@ namespace gglab
 			ImGui::SeparatorText("Culling Statistics");
 			DrawCullingLabStatistics(context);
 		}
+		DrawLabDiagnostics(snapshot.m_Diagnostics);
 
 		if (ImGui::Button("Reset Parameters"))
 		{

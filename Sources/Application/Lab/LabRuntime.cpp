@@ -260,6 +260,7 @@ namespace gglab
 				.m_Value = parameter.m_Value,
 			});
 		}
+		m_ActiveSession->BuildDiagnostics(snapshot.m_Diagnostics);
 		return snapshot;
 	}
 

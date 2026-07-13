@@ -149,6 +149,7 @@
     <ClCompile Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
@@ -256,6 +257,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
@@ -334,6 +336,7 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TaskSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.h" />
@@ -489,6 +492,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h" />

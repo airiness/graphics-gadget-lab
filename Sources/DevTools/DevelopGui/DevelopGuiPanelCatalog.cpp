@@ -15,6 +15,7 @@
 #include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 #include "DevTools/DevelopGui/Panels/PipelineSystemPanel.h"
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
+#include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
 
 namespace gglab::devtools
 {
@@ -34,5 +35,6 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<PersistentSceneBuffersPanel>());
 		registry.RegisterPanel(std::make_unique<PipelineSystemPanel>());
 		registry.RegisterPanel(std::make_unique<ProfilingPanel>());
+		registry.RegisterPanel(std::make_unique<TaskSystemPanel>());
 	}
 }
