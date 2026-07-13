@@ -15,6 +15,7 @@
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -176,6 +177,7 @@ namespace gglab
 		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
 		assetManagerCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
+		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
 		assetManagerCreateInfo.m_TextureRegistry = m_Renderer->GetTextureRegistry();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
@@ -453,6 +455,7 @@ namespace gglab
 
 		// Must flush here for gpu resource safe release next
 		m_Renderer->GetRHIContext()->WaitIdle();
+		m_Renderer->GetAssetUploadScheduler()->Finalize();
 
 		m_RenderFrameBuilder.reset();
 		if (m_DevelopGuiSystem)

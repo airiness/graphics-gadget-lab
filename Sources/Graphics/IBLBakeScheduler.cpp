@@ -77,6 +77,31 @@ namespace gglab
 			}
 		}
 
+		if (m_EnvironmentTextureUploadPending &&
+			m_Status.m_BakingGeneration == m_Status.m_RequestedGeneration)
+		{
+			if (m_EnvironmentLightingSystem->EnsureActiveEnvironmentTextureLoaded())
+			{
+				m_EnvironmentTextureUploadPending = false;
+				SetStage(IBLBakeStage::Environment, 0.0f);
+			}
+			else
+			{
+				const AssetState state =
+					m_EnvironmentLightingSystem->GetActiveEnvironmentTextureState();
+				if (state == AssetState::Failed || state == AssetState::Cancelled ||
+					state == AssetState::Ready)
+				{
+					m_EnvironmentTextureUploadPending = false;
+					SetStage(IBLBakeStage::Failed, 0.0f);
+				}
+				else
+				{
+					return;
+				}
+			}
+		}
+
 		if (m_Status.m_RequestedGeneration != m_Status.m_BakingGeneration &&
 			m_Status.m_RequestedGeneration != m_Status.m_ActiveGeneration)
 		{
@@ -89,6 +114,7 @@ namespace gglab
 		m_Status.m_BakingGeneration = m_Status.m_RequestedGeneration;
 		m_Status.m_CacheHit = false;
 		m_Status.m_CacheWritePending = false;
+		m_EnvironmentTextureUploadPending = false;
 		m_Status.m_GpuMilliseconds = 0.0;
 		m_Status.m_GpuTimingAvailable = false;
 		m_BakingConfig = m_EnvironmentLightingSystem->GetBakeConfig();
@@ -135,7 +161,18 @@ namespace gglab
 		}
 		if (!m_EnvironmentLightingSystem->EnsureActiveEnvironmentTextureLoaded())
 		{
-			SetStage(IBLBakeStage::Failed, 0.0f);
+			const AssetState state =
+				m_EnvironmentLightingSystem->GetActiveEnvironmentTextureState();
+			if (state == AssetState::Failed || state == AssetState::Cancelled ||
+				state == AssetState::Ready)
+			{
+				SetStage(IBLBakeStage::Failed, 0.0f);
+			}
+			else
+			{
+				m_EnvironmentTextureUploadPending = true;
+				SetStage(IBLBakeStage::WaitingForGpu, 0.05f);
+			}
 			return;
 		}
 

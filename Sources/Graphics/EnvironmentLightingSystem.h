@@ -54,6 +54,7 @@ namespace gglab
 		[[nodiscard]] const EnvironmentMapEntry* GetActiveEnvironment() const noexcept;
 		[[nodiscard]] TextureID GetActiveTextureId() const noexcept;
 		[[nodiscard]] bool EnsureActiveEnvironmentTextureLoaded() noexcept;
+		[[nodiscard]] AssetState GetActiveEnvironmentTextureState() const noexcept;
 
 		[[nodiscard]] const EnvironmentLightingSettings& GetSettings() const noexcept { return m_Settings; }
 		[[nodiscard]] const IBLBakeConfig& GetBakeConfig() const noexcept { return m_Settings.m_BakeConfig; }

@@ -79,6 +79,7 @@ namespace gglab
 		bool m_BakeResourceInitializationInFlight = false;
 		bool m_CacheUploadInFlight = false;
 		bool m_CacheReadbackInFlight = false;
+		bool m_EnvironmentTextureUploadPending = false;
 
 		struct CacheWriteWork
 		{

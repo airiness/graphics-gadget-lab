@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Task/TaskSystem.h"
+#include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDevice.h"
@@ -29,6 +30,7 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TaskSystem(createInfo.m_TaskSystem),
 		m_TransferManager(createInfo.m_TransferManager),
+		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
 		m_TextureRegistry(createInfo.m_TextureRegistry),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
@@ -36,6 +38,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_TaskSystem != nullptr, "TaskSystem is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
+		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_TextureRegistry != nullptr, "TextureRegistry is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
 	}
@@ -333,11 +336,17 @@ namespace gglab
 
 		// Upload Mesh to GPU
 		auto batch = m_TransferManager->BeginBatch();
-		UploadMesh(meshUploadData, batch);
-		const RHIFencePoint uploadFence = batch.Submit(true);
-		CompleteMeshUpload(
-			meshId,
-			uploadFence.IsValid() && GetMesh(meshId)->m_State == AssetState::GpuProcessing);
+		const bool recorded = UploadMesh(meshUploadData, batch);
+		(void)m_AssetUploadScheduler->Submit(
+			{ .m_Name = std::format("Mesh {}", meshId.Value()) },
+			std::move(batch),
+			recorded,
+			[this, meshId](const AssetUploadCompletionInfo& completion) noexcept
+			{
+				CompleteMeshUpload(
+					meshId,
+					completion.m_Status == AssetUploadStatus::Succeeded);
+			});
 
 		return meshId;
 	}
@@ -411,13 +420,15 @@ namespace gglab
 		return bindingGpu;
 	}
 
-	void AssetManager::UploadMesh(const MeshUploadData& uploadData, TransferBatch& transferBatch) noexcept
+	bool AssetManager::UploadMesh(
+		const MeshUploadData& uploadData,
+		TransferBatch& transferBatch) noexcept
 	{
 		auto* mesh = GetMesh(uploadData.m_MeshId);
 		if (mesh == nullptr)
 		{
 			GGLAB_ASSERT_MSG(false, "UploadMesh: Invalid MeshID, check it!");
-			return;
+			return false;
 		}
 		mesh->m_State = AssetState::UploadQueued;
 
@@ -437,7 +448,14 @@ namespace gglab
 		{
 			mesh->m_State = AssetState::Failed;
 			GGLAB_LOG_GRAPHICS_WARN("AssetManager::UploadMesh received an empty mesh.");
-			return;
+			return false;
+		}
+		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
+			indexBufferSize > std::numeric_limits<uint32_t>::max())
+		{
+			mesh->m_State = AssetState::Failed;
+			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh mesh buffers exceed RHI binding size limits.");
+			return false;
 		}
 
 		RHIBufferDesc vertexBufferDesc{};
@@ -483,7 +501,7 @@ namespace gglab
 			}
 
 			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh failed to create RHI mesh buffers.");
-			return;
+			return false;
 		}
 
 		mesh->m_VertexBuffer = RHIBufferOwner(m_Device, vertexBuffer);
@@ -498,19 +516,7 @@ namespace gglab
 		if (!vertexUploadSucceeded || !indexUploadSucceeded)
 		{
 			mesh->m_State = AssetState::Failed;
-			mesh->m_VertexBuffer.Reset();
-			mesh->m_IndexBuffer.Reset();
-			return;
-		}
-
-		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
-			indexBufferSize > std::numeric_limits<uint32_t>::max())
-		{
-			mesh->m_State = AssetState::Failed;
-			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh mesh buffers exceed RHI binding size limits.");
-			mesh->m_VertexBuffer.Reset();
-			mesh->m_IndexBuffer.Reset();
-			return;
+			return false;
 		}
 
 		mesh->m_VertexBufferBinding.m_Buffer = mesh->m_VertexBuffer.Get();
@@ -524,6 +530,7 @@ namespace gglab
 		mesh->m_IndexBufferBinding.m_Format = RHIFormat::R32Uint;
 
 		mesh->m_State = AssetState::GpuProcessing;
+		return true;
 	}
 
 	void AssetManager::CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept
@@ -535,6 +542,13 @@ namespace gglab
 		}
 		mesh->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
 		mesh->m_IsUploaded = succeeded;
+		if (!succeeded)
+		{
+			mesh->m_VertexBuffer.Reset();
+			mesh->m_IndexBuffer.Reset();
+			mesh->m_VertexBufferBinding = {};
+			mesh->m_IndexBufferBinding = {};
+		}
 	}
 
 	bool AssetManager::PublishImportedTexture(
@@ -555,10 +569,29 @@ namespace gglab
 			semantic);
 		auto batch = m_TransferManager->BeginBatch();
 		const bool recorded = m_TextureRegistry->UploadTexture(uploadData, batch);
-		const RHIFencePoint uploadFence = batch.Submit(true);
-		const bool succeeded = recorded && uploadFence.IsValid();
-		m_TextureRegistry->CompleteTextureUpload(textureId, succeeded);
-		return succeeded;
+		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
+			{ .m_Name = std::format("Texture {}", textureId.Value()) },
+			std::move(batch),
+			recorded,
+			[this, textureId](const AssetUploadCompletionInfo& completion) noexcept
+			{
+				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
+				m_TextureRegistry->CompleteTextureUpload(
+					textureId,
+					succeeded);
+				if (succeeded)
+				{
+					GGLAB_LOG_GRAPHICS_INFO(
+						"Texture {} GPU upload completed in {:.2f} ms.",
+						textureId.Value(),
+						completion.m_ElapsedMilliseconds);
+				}
+				else
+				{
+					GGLAB_LOG_GRAPHICS_ERROR("Texture {} GPU upload failed.", textureId.Value());
+				}
+			});
+		return uploadHandle.IsValid();
 	}
 
 	bool AssetManager::PublishImportedModel(
@@ -692,36 +725,52 @@ namespace gglab
 
 		model->m_State = AssetState::UploadQueued;
 		auto batch = m_TransferManager->BeginBatch();
+		bool recorded = true;
 		std::vector<TextureID> uploadedTextureIds;
+		uploadedTextureIds.reserve(textureUploads.size());
 		for (const auto& textureUpload : textureUploads)
 		{
-			if (m_TextureRegistry->UploadTexture(textureUpload, batch))
+			uploadedTextureIds.push_back(textureUpload.m_TextureId);
+			recorded &= m_TextureRegistry->UploadTexture(textureUpload, batch);
+		}
+		for (const MeshUploadData& meshUpload : meshUploads)
+		{
+			recorded &= UploadMesh(meshUpload, batch);
+		}
+
+		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
+			{ .m_Name = std::format("Model {}", modelId.Value()) },
+			std::move(batch),
+			recorded,
+			[this, modelId, textureIds = std::move(uploadedTextureIds), meshIds = std::move(meshIds)](
+				const AssetUploadCompletionInfo& completion) noexcept
 			{
-				uploadedTextureIds.push_back(textureUpload.m_TextureId);
-			}
-		}
-		for (const MeshUploadData& meshUpload : meshUploads)
-		{
-			UploadMesh(meshUpload, batch);
-		}
-
-		const RHIFencePoint uploadFence = batch.Submit(true);
-		for (TextureID textureId : uploadedTextureIds)
-		{
-			m_TextureRegistry->CompleteTextureUpload(textureId, uploadFence.IsValid());
-		}
-
-		bool meshesReady = uploadFence.IsValid();
-		for (const MeshUploadData& meshUpload : meshUploads)
-		{
-			const Mesh* mesh = GetMesh(meshUpload.m_MeshId);
-			const bool succeeded = uploadFence.IsValid() &&
-				mesh && mesh->m_State == AssetState::GpuProcessing;
-			CompleteMeshUpload(meshUpload.m_MeshId, succeeded);
-			meshesReady &= succeeded;
-		}
-		model->m_State = meshesReady ? AssetState::Ready : AssetState::Failed;
-		return meshesReady;
+				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
+				for (TextureID textureId : textureIds)
+				{
+					m_TextureRegistry->CompleteTextureUpload(textureId, succeeded);
+				}
+				for (MeshID meshId : meshIds)
+				{
+					CompleteMeshUpload(meshId, succeeded);
+				}
+				if (Model* completedModel = GetModel(modelId))
+				{
+					completedModel->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+				}
+				if (succeeded)
+				{
+					GGLAB_LOG_GRAPHICS_INFO(
+						"Model {} GPU upload completed in {:.2f} ms.",
+						modelId.Value(),
+						completion.m_ElapsedMilliseconds);
+				}
+				else
+				{
+					GGLAB_LOG_GRAPHICS_ERROR("Model {} GPU upload failed.", modelId.Value());
+				}
+			});
+		return uploadHandle.IsValid();
 	}
 
 	void AssetManager::CompleteModelLoad(
@@ -759,7 +808,7 @@ namespace gglab
 			return;
 		}
 		GGLAB_LOG_GRAPHICS_INFO(
-			"Async model {} published (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
+			"Async model {} queued for GPU upload (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
 			modelId.Value(),
 			meshInstanceCount,
 			completion.m_QueueMilliseconds,
@@ -800,7 +849,7 @@ namespace gglab
 			return;
 		}
 		GGLAB_LOG_GRAPHICS_INFO(
-			"Async texture {} published (queueMs={:.2f}, cpuMs={:.2f}).",
+			"Async texture {} queued for GPU upload (queueMs={:.2f}, cpuMs={:.2f}).",
 			textureId.Value(),
 			completion.m_QueueMilliseconds,
 			completion.m_ExecutionMilliseconds);

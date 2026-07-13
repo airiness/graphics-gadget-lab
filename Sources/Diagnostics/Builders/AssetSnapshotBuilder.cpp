@@ -2,6 +2,7 @@
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TextureRegistry.h"
 
@@ -88,6 +89,37 @@ namespace gglab
 				{
 					return lhs.m_Id.Value() < rhs.m_Id.Value();
 				});
+		}
+
+		if (assetManager.m_AssetUploadScheduler)
+		{
+			const AssetUploadStatistics statistics =
+				assetManager.m_AssetUploadScheduler->GetStatistics();
+			snapshot.m_PendingUploadCount = statistics.m_PendingCount;
+			snapshot.m_SubmittedUploadCount = statistics.m_SubmittedCount;
+			snapshot.m_SucceededUploadCount = statistics.m_SucceededCount;
+			snapshot.m_FailedUploadCount = statistics.m_FailedCount;
+			snapshot.m_UploadCompletionCallbackFailureCount =
+				statistics.m_CompletionCallbackFailureCount;
+
+			const auto copyUploads = [](
+				const std::vector<AssetUploadActivity>& source,
+				std::vector<AssetSnapshot::Upload>& destination)
+			{
+				destination.reserve(source.size());
+				for (const AssetUploadActivity& upload : source)
+				{
+					destination.push_back({
+						.m_Handle = upload.m_Handle,
+						.m_Name = upload.m_Name,
+						.m_Status = upload.m_Status,
+						.m_FencePoint = upload.m_FencePoint,
+						.m_ElapsedMilliseconds = upload.m_ElapsedMilliseconds,
+					});
+				}
+			};
+			copyUploads(statistics.m_PendingUploads, snapshot.m_PendingUploads);
+			copyUploads(statistics.m_RecentUploads, snapshot.m_RecentUploads);
 		}
 
 		return snapshot;

@@ -16,6 +16,7 @@
 namespace gglab
 {
 	class PipelineCache;
+	class AssetUploadScheduler;
 	class EnvironmentLightingSystem;
 	class IBLBakeScheduler;
 	class RenderResourceRegistry;
@@ -85,6 +86,7 @@ namespace gglab
 		RHIDevice* GetDevice() const noexcept { return m_RHIContext ? &m_RHIContext->GetDevice() : nullptr; }
 		RHISwapChain* GetSwapChain() const noexcept { return m_RHIContext ? &m_RHIContext->GetSwapChain() : nullptr; }
 		TransferManager* GetTransferManager() const noexcept { return m_RHIContext ? &m_RHIContext->GetTransferManager() : nullptr; }
+		AssetUploadScheduler* GetAssetUploadScheduler() const noexcept { return m_AssetUploadScheduler.get(); }
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		EnvironmentLightingSystem* GetEnvironmentLightingSystem() const noexcept { return m_EnvironmentLightingSystem.get(); }
 		IBLBakeScheduler* GetIBLBakeScheduler() const noexcept { return m_IBLBakeScheduler.get(); }
@@ -138,6 +140,7 @@ namespace gglab
 
 	private:
 		std::unique_ptr<RHIContext> m_RHIContext;
+		std::unique_ptr<AssetUploadScheduler> m_AssetUploadScheduler;
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;

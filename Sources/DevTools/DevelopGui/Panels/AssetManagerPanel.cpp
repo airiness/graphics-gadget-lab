@@ -82,6 +82,17 @@ namespace gglab
 			return "Unknown";
 		}
 
+		[[nodiscard]] const char* AssetUploadStatusText(AssetUploadStatus status) noexcept
+		{
+			switch (status)
+			{
+			case AssetUploadStatus::Pending: return "Pending";
+			case AssetUploadStatus::Succeeded: return "Succeeded";
+			case AssetUploadStatus::Failed: return "Failed";
+			}
+			return "Unknown";
+		}
+
 		[[nodiscard]] std::string PathText(const std::filesystem::path& path)
 		{
 			return path.empty() ? std::string{} : path.generic_string();
@@ -330,6 +341,85 @@ namespace gglab
 				ImGui::EndTable();
 			}
 		}
+
+		void DrawUploadTable(
+			const char* tableId,
+			const std::vector<AssetSnapshot::Upload>& uploads) noexcept
+		{
+			if (ImGui::BeginTable(
+				tableId,
+				5,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Fence", ImGuiTableColumnFlags_WidthFixed, 144.0f);
+				ImGui::TableSetupColumn("Elapsed (ms)", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+				ImGui::TableHeadersRow();
+
+				for (const AssetSnapshot::Upload& upload : uploads)
+				{
+					ImGui::PushID(static_cast<int>(upload.m_Handle.m_Value));
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%llu", upload.m_Handle.m_Value);
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(upload.m_Name.c_str());
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(AssetUploadStatusText(upload.m_Status));
+					ImGui::TableSetColumnIndex(3);
+					if (upload.m_FencePoint.IsValid())
+					{
+						ImGui::Text(
+							"%u:%u / %llu",
+							upload.m_FencePoint.m_Fence.Index(),
+							upload.m_FencePoint.m_Fence.Generation(),
+							upload.m_FencePoint.m_Value);
+					}
+					else
+					{
+						ImGui::TextUnformatted("-");
+					}
+					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%.2f", upload.m_ElapsedMilliseconds);
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+		}
+
+		void DrawAssetUploads(const AssetSnapshot& assetSnapshot) noexcept
+		{
+			ImGui::Text(
+				"Pending: %u   Submitted: %llu   Succeeded: %llu   Failed: %llu   Callback failures: %llu",
+				assetSnapshot.m_PendingUploadCount,
+				assetSnapshot.m_SubmittedUploadCount,
+				assetSnapshot.m_SucceededUploadCount,
+				assetSnapshot.m_FailedUploadCount,
+				assetSnapshot.m_UploadCompletionCallbackFailureCount);
+
+			ImGui::SeparatorText("Pending GPU Uploads");
+			if (assetSnapshot.m_PendingUploads.empty())
+			{
+				ImGui::TextDisabled("No pending uploads.");
+			}
+			else
+			{
+				DrawUploadTable("PendingAssetUploads", assetSnapshot.m_PendingUploads);
+			}
+
+			ImGui::SeparatorText("Recent GPU Uploads");
+			if (assetSnapshot.m_RecentUploads.empty())
+			{
+				ImGui::TextDisabled("No completed uploads.");
+			}
+			else
+			{
+				DrawUploadTable("RecentAssetUploads", assetSnapshot.m_RecentUploads);
+			}
+		}
 	}
 
 	void AssetManagerPanel::Draw(DevelopGuiContext& context) noexcept
@@ -377,6 +467,11 @@ namespace gglab
 			if (ImGui::BeginTabItem("Meshes"))
 			{
 				DrawMeshAssets(*snapshot);
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("Uploads"))
+			{
+				DrawAssetUploads(*snapshot);
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();

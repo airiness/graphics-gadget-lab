@@ -10,6 +10,7 @@
 namespace gglab
 {
 	class RHIDevice;
+	class AssetUploadScheduler;
 	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
@@ -44,6 +45,7 @@ namespace gglab
 			RHIDevice* m_Device = nullptr;
 			TaskSystem* m_TaskSystem = nullptr;
 			TransferManager* m_TransferManager = nullptr;
+			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 			TextureRegistry* m_TextureRegistry = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
@@ -108,7 +110,9 @@ namespace gglab
 			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
-		void UploadMesh(const MeshUploadData& uploadData, TransferBatch& transferBatch) noexcept;
+		[[nodiscard]] bool UploadMesh(
+			const MeshUploadData& uploadData,
+			TransferBatch& transferBatch) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
 		bool PublishImportedModel(ModelID modelId, ImportedModel&& importedModel) noexcept;
 		bool PublishImportedTexture(
@@ -147,6 +151,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TaskSystem* m_TaskSystem = nullptr;
 		TransferManager* m_TransferManager = nullptr;
+		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		TextureRegistry* m_TextureRegistry = nullptr;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
