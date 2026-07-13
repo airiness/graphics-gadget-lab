@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/IBLBakeCache.h"
 #include "Graphics/TextureLoader.h"
+#include "Graphics/Utility/TextureUtils.h"
 #include "Core/Hash/KeyHash.h"
 #include "Core/Utility/PathUtils.h"
 
@@ -80,17 +81,6 @@ namespace gglab
 			std::string markerText;
 			std::getline(marker, markerText);
 			return markerText == CompleteMarker;
-		}
-
-		uint32_t MaxMipLevels(uint32_t size) noexcept
-		{
-			uint32_t levels = 1;
-			while (size > 1)
-			{
-				size >>= 1;
-				++levels;
-			}
-			return levels;
 		}
 
 		bool Matches(
@@ -210,11 +200,11 @@ namespace gglab
 		const uint16_t specularMips = static_cast<uint16_t>(std::clamp(
 			config.m_PrefilteredSpecularMipLevels,
 			1u,
-			MaxMipLevels(specularSize)));
+			CalculateMipLevelCount(specularSize)));
 		if (!Matches(payload.m_Environment,
 			environmentSize,
 			static_cast<uint16_t>(CubemapFaceCount),
-			static_cast<uint16_t>(MaxMipLevels(environmentSize)),
+			static_cast<uint16_t>(CalculateMipLevelCount(environmentSize)),
 			config.m_EnvironmentCubemapFormat) ||
 			!Matches(payload.m_Irradiance,
 				std::max(config.m_IrradianceCubemapSize, 1u),

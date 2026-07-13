@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Backends/DirectXMathInterop.h"
 #include "Core/Math/BoundingVolumes.h"
 
 #include <DirectXCollision.h>
@@ -10,25 +11,14 @@ namespace gglab::math
 {
 	namespace
 	{
+		using directx::LoadMatrix;
+		using directx::ToDXFloat3;
+
 		static_assert(std::is_standard_layout_v<Vector3>);
 		static_assert(sizeof(Vector3) == sizeof(DirectX::XMFLOAT3));
 		static_assert(offsetof(Vector3, m_X) == offsetof(DirectX::XMFLOAT3, x));
 		static_assert(offsetof(Vector3, m_Y) == offsetof(DirectX::XMFLOAT3, y));
 		static_assert(offsetof(Vector3, m_Z) == offsetof(DirectX::XMFLOAT3, z));
-
-		DirectX::XMFLOAT3 ToDXFloat3(const Vector3& value) noexcept
-		{
-			return DirectX::XMFLOAT3(value.m_X, value.m_Y, value.m_Z);
-		}
-
-		DirectX::XMMATRIX LoadMatrix(const Matrix& value) noexcept
-		{
-			return DirectX::XMMatrixSet(
-				value.m_11, value.m_12, value.m_13, value.m_14,
-				value.m_21, value.m_22, value.m_23, value.m_24,
-				value.m_31, value.m_32, value.m_33, value.m_34,
-				value.m_41, value.m_42, value.m_43, value.m_44);
-		}
 
 		DirectX::BoundingBox ToDXBoundingBox(const Aabb& value) noexcept
 		{

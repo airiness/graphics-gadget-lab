@@ -13,30 +13,6 @@ namespace gglab
 			RenderViewID::DebugCamera2,
 		};
 
-		[[nodiscard]] std::array<Vector3, 8> BuildCameraFrustumCorners(const Camera& camera) noexcept
-		{
-			const Matrix inverseViewProjection = math::SafeInverse(
-				camera.GetViewMatrix() * camera.GetProjMatrix());
-			constexpr std::array<Vector4, 8> clipCorners = {
-				Vector4(-1.0f, 1.0f, 0.0f, 1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-				Vector4(1.0f, -1.0f, 0.0f, 1.0f), Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
-				Vector4(-1.0f, 1.0f, 1.0f, 1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-				Vector4(1.0f, -1.0f, 1.0f, 1.0f), Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
-			};
-
-			std::array<Vector3, 8> corners{};
-			for (size_t index = 0; index < clipCorners.size(); ++index)
-			{
-				const Vector4 homogeneous = math::Transform(clipCorners[index], inverseViewProjection);
-				if (std::abs(homogeneous.m_W) > 1.0e-6f && math::IsFinite(homogeneous))
-				{
-					corners[index] =
-						Vector3(homogeneous.m_X, homogeneous.m_Y, homogeneous.m_Z) /
-						homogeneous.m_W;
-				}
-			}
-			return corners;
-		}
 	}
 
 	void CameraRig::AttachMainCamera(Camera& camera, CameraController& controller) noexcept
@@ -94,7 +70,10 @@ namespace gglab
 				.m_CullingMode = DebugDrawCullingMode::None,
 				.m_Channel = channel,
 			};
-			const std::array<Vector3, 8> corners = BuildCameraFrustumCorners(*slot.m_Camera);
+			const Matrix inverseViewProjection = math::SafeInverse(
+				slot.m_Camera->GetViewMatrix() * slot.m_Camera->GetProjMatrix());
+			const std::array<Vector3, 8> corners =
+				math::BuildFrustumCornersFromInverseViewProjection(inverseViewProjection);
 			debugDraw.Frustum(corners, style);
 			debugDraw.Point(slot.m_Camera->GetPosition(), 0.15f, style);
 		}

@@ -21,6 +21,12 @@ namespace gglab
 		BindlessSamplerTable,
 	};
 
+	[[nodiscard]] constexpr bool IsBindlessBindingType(RHIBindingType type) noexcept
+	{
+		return type == RHIBindingType::BindlessSampledTextureTable ||
+			type == RHIBindingType::BindlessSamplerTable;
+	}
+
 	struct RHIBindingSlotDesc
 	{
 		RHIBindingType m_Type = RHIBindingType::Unknown;

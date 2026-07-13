@@ -3,6 +3,7 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Graphics/Utility/TextureUtils.h"
 
 #include <algorithm>
 
@@ -62,21 +63,10 @@ namespace gglab
 	{
 		// IBL_EnvironmentCubemap
 		{
-			auto maxMipLevels = [](uint32_t size) noexcept -> uint32_t
-				{
-					uint32_t levels = 1;
-					while (size > 1)
-					{
-						size >>= 1;
-						++levels;
-					}
-					return levels;
-				};
-
 			RHITextureDesc desc{};
 			desc.m_Extent = { createInfo.m_EnvironmentCubemapSize, createInfo.m_EnvironmentCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
-			desc.m_MipLevels = static_cast<uint16_t>(maxMipLevels(createInfo.m_EnvironmentCubemapSize));
+			desc.m_MipLevels = static_cast<uint16_t>(CalculateMipLevelCount(createInfo.m_EnvironmentCubemapSize));
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
 			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
@@ -115,21 +105,10 @@ namespace gglab
 
 		// IBL_PrefilteredSpecularCubemap
 		{
-			auto maxMipLevels = [](uint32_t size) noexcept -> uint32_t
-				{
-					uint32_t levels = 1;
-					while (size > 1)
-					{
-						size >>= 1;
-						++levels;
-					}
-					return levels;
-				};
-
 			const uint32_t prefilteredMipLevels = std::clamp(
 				createInfo.m_PrefilteredSpecularMipLevels,
 				1u,
-				maxMipLevels(createInfo.m_PrefilteredSpecularCubemapSize));
+				CalculateMipLevelCount(createInfo.m_PrefilteredSpecularCubemapSize));
 
 			RHITextureDesc desc{};
 			desc.m_Extent = { createInfo.m_PrefilteredSpecularCubemapSize, createInfo.m_PrefilteredSpecularCubemapSize, 1u };
@@ -249,17 +228,6 @@ namespace gglab
 		const IBLBakeConfig& config,
 		const RHIFencePoint* retireFenceOpt) noexcept
 	{
-		auto maxMipLevels = [](uint32_t size) noexcept -> uint32_t
-			{
-				uint32_t levels = 1;
-				while (size > 1)
-				{
-					size >>= 1;
-					++levels;
-				}
-				return levels;
-			};
-
 		auto ensureCubemap = [this, &entries, retireFenceOpt](
 			TextureIndex index,
 			uint32_t size,
@@ -287,7 +255,7 @@ namespace gglab
 		ensureCubemap(
 			TextureIndex::IBL_EnvironmentCubemap,
 			environmentSize,
-			maxMipLevels(environmentSize),
+			CalculateMipLevelCount(environmentSize),
 			config.m_EnvironmentCubemapFormat);
 
 		const uint32_t irradianceSize = std::max(config.m_IrradianceCubemapSize, 1u);
@@ -301,7 +269,7 @@ namespace gglab
 		ensureCubemap(
 			TextureIndex::IBL_PrefilteredSpecularCubemap,
 			specularSize,
-			std::clamp(config.m_PrefilteredSpecularMipLevels, 1u, maxMipLevels(specularSize)),
+			std::clamp(config.m_PrefilteredSpecularMipLevels, 1u, CalculateMipLevelCount(specularSize)),
 			config.m_PrefilteredSpecularCubemapFormat);
 
 		RHITextureDesc brdfDesc{};

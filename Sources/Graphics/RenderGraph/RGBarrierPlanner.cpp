@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGBarrierPlanner.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
 
 namespace gglab
 {
@@ -32,18 +33,6 @@ namespace gglab
 			RHITextureAspect::Depth,
 			RHITextureAspect::Stencil,
 		};
-
-		uint32_t MipLevelsOf(const RHITextureDesc& desc) noexcept
-		{
-			return std::max<uint32_t>(1, desc.m_MipLevels);
-		}
-
-		uint32_t ArraySizeOf(const RHITextureDesc& desc) noexcept
-		{
-			return desc.m_Dimension == RHITextureDimension::Texture3D ?
-				1u :
-				std::max<uint32_t>(1, desc.m_ArraySize);
-		}
 
 		uint32_t PlaneCountOf(const RHITextureDesc& desc) noexcept
 		{
@@ -98,51 +87,20 @@ namespace gglab
 			GGLAB_UNREACHABLE("Texture aspect index is out of range.");
 		}
 
-		RHISubresourceRange NormalizeTextureRange(
-			const RHITextureDesc& desc,
-			const std::optional<RHISubresourceRange>& requested) noexcept
-		{
-			auto resolveCount = [](uint32_t base, uint32_t count, uint32_t total) noexcept
-				{
-					if (base >= total)
-					{
-						return 0u;
-					}
-
-					const uint32_t remaining = total - base;
-					return count == RHISubresourceRange::Remaining ?
-						remaining :
-						std::min(count, remaining);
-				};
-
-			RHISubresourceRange range = requested.value_or(RHISubresourceRange{});
-
-			const uint32_t mipLevels = MipLevelsOf(desc);
-			const uint32_t arraySize = ArraySizeOf(desc);
-
-			range.m_MipCount = resolveCount(range.m_BaseMip, range.m_MipCount, mipLevels);
-			range.m_ArraySliceCount = resolveCount(
-				range.m_BaseArraySlice,
-				range.m_ArraySliceCount,
-				arraySize);
-			range.m_Aspects &= GetRHITextureAspects(desc);
-			return range;
-		}
-
 		uint32_t SubresourceIndex(
 			const RHITextureDesc& desc,
 			uint32_t mip,
 			uint32_t arraySlice,
 			RHITextureAspect aspect) noexcept
 		{
-			return mip + MipLevelsOf(desc) *
-				(arraySlice + ArraySizeOf(desc) * AspectIndexOf(desc, aspect));
+			return mip + GetRHITextureMipLevelCount(desc) *
+				(arraySlice + GetRHITextureArraySize(desc) * AspectIndexOf(desc, aspect));
 		}
 
 		TextureSubresource DecodeSubresource(const RHITextureDesc& desc, uint32_t index) noexcept
 		{
-			const uint32_t mipLevels = MipLevelsOf(desc);
-			const uint32_t arraySize = ArraySizeOf(desc);
+			const uint32_t mipLevels = GetRHITextureMipLevelCount(desc);
+			const uint32_t arraySize = GetRHITextureArraySize(desc);
 			return TextureSubresource
 			{
 				.m_Mip = index % mipLevels,
@@ -206,7 +164,7 @@ namespace gglab
 			}
 
 			const uint32_t fullSubresourceCount =
-				MipLevelsOf(desc) * ArraySizeOf(desc) * PlaneCountOf(desc);
+				GetRHITextureMipLevelCount(desc) * GetRHITextureArraySize(desc) * PlaneCountOf(desc);
 			for (auto& group : groups)
 			{
 				std::unordered_set<uint32_t> uniqueSubresources;
@@ -390,7 +348,7 @@ namespace gglab
 				if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
 				{
 					const RHITextureDesc textureDesc = CompiledTextureDesc(compiledResource);
-					const RHISubresourceRange range = NormalizeTextureRange(
+					const RHISubresourceRange range = NormalizeTextureSubresourceRange(
 						textureDesc,
 						access.m_Subresources);
 					auto& stateTracker = textureStates.at(virtualResource);
@@ -454,7 +412,7 @@ namespace gglab
 				std::optional<RHISubresourceRange> normalizedFinalRange;
 				if (resource.m_Imported && resource.m_FinalState)
 				{
-					normalizedFinalRange = NormalizeTextureRange(
+					normalizedFinalRange = NormalizeTextureSubresourceRange(
 						textureDesc,
 						resource.m_FinalSubresources);
 					const auto& range = *normalizedFinalRange;

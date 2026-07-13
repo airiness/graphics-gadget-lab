@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Core/HResult.h"
+#include "Core/Platform/Win/Win32DiagnosticOutput.h"
 #include "Core/Utility/StringUtils.h"
 
 namespace gglab
@@ -12,29 +13,6 @@ namespace gglab
 			os << "0x" << std::uppercase << std::hex
 				<< std::setw(8) << std::setfill('0') << static_cast<unsigned>(hr);
 			return os.str();
-		}
-
-		std::string NowTimeLocal()
-		{
-			using namespace std::chrono;
-			const auto now = system_clock::now();
-			const std::time_t t = system_clock::to_time_t(now);
-			std::tm tm{};
-			::localtime_s(&tm, &t);
-			char buffer[64]{};
-			std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d",
-				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-				tm.tm_hour, tm.tm_min, tm.tm_sec);
-			return buffer;
-		}
-
-		void OutputBoth(const std::string& str) noexcept
-		{
-			::OutputDebugStringA(str.c_str());
-			::OutputDebugStringA("\n");
-			std::fputs(str.c_str(), stderr);
-			std::fputc('\n', stderr);
-			std::fflush(stderr);
 		}
 
 	}
@@ -67,7 +45,7 @@ namespace gglab
 		std::ostringstream os;
 
 		os << "=== FATAL: HRESULT Failure ===\n";
-		os << "Time   : " << NowTimeLocal() << "\n";
+		os << "Time   : " << win32::FormatLocalTime() << "\n";
 		os << "Thread : " << ::GetCurrentThreadId() << "\n";
 		os << "Where  : " << loc.file_name() << ":" << loc.line()
 			<< " (" << loc.function_name() << ")\n";
@@ -82,7 +60,7 @@ namespace gglab
 			"==============================";
 
 		const std::string text = os.str();
-		OutputBoth(text);
+		win32::WriteDiagnosticOutput(text);
 
 #if defined(BUILD_DEBUG)
 		__debugbreak();

@@ -40,12 +40,6 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] bool IsBindlessSlot(RHIBindingType type) noexcept
-		{
-			return type == RHIBindingType::BindlessSampledTextureTable ||
-				type == RHIBindingType::BindlessSamplerTable;
-		}
-
 		[[nodiscard]] bool CanUseRootDescriptor(const RHIBindingSlotDesc& slot) noexcept
 		{
 			return slot.m_Count == 1 &&
@@ -72,14 +66,11 @@ namespace gglab
 				continue;
 			}
 
-			if (slot.m_Type == RHIBindingType::BindlessSampledTextureTable)
+			if (IsBindlessBindingType(slot.m_Type))
 			{
-				flags |= D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
-				continue;
-			}
-			if (slot.m_Type == RHIBindingType::BindlessSamplerTable)
-			{
-				flags |= D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
+				flags |= slot.m_Type == RHIBindingType::BindlessSampledTextureTable ?
+					D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED :
+					D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
 				continue;
 			}
 

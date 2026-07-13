@@ -2,26 +2,12 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/TextureRegistry.h"
+#include "Core/Utility/PathUtils.h"
 
-#include <cctype>
 #include <numbers>
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] bool IsHdrFile(const std::filesystem::path& path) noexcept
-		{
-			std::string extension = path.extension().string();
-			std::ranges::transform(extension, extension.begin(),
-				[](unsigned char value) noexcept
-				{
-					return static_cast<char>(std::tolower(value));
-				});
-			return extension == ".hdr";
-		}
-	}
-
 	EnvironmentLightingSystem::EnvironmentLightingSystem(const CreateInfo& createInfo) noexcept :
 		m_TextureRegistry(createInfo.m_TextureRegistry),
 		m_RenderResourceRegistry(createInfo.m_RenderResourceRegistry)
@@ -50,7 +36,8 @@ namespace gglab
 				iterator.increment(errorCode))
 			{
 				const auto& entry = *iterator;
-				if (!entry.is_regular_file(errorCode) || errorCode || !IsHdrFile(entry.path()))
+				if (!entry.is_regular_file(errorCode) || errorCode ||
+					!utils::ExtensionEqualsIgnoreCase(entry.path(), ".hdr"))
 				{
 					continue;
 				}

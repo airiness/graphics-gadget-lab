@@ -50,6 +50,12 @@ namespace gglab::math
 
 	Plane Normalize(const Plane& plane, float tolerance = 1.0e-6f) noexcept;
 	float SignedDistance(const Plane& plane, const Vector3& point) noexcept;
+	[[nodiscard]] bool TryHomogeneousDivide(
+		const Vector4& value,
+		Vector3& result,
+		float tolerance = 1.0e-6f) noexcept;
+	[[nodiscard]] std::array<Vector3, 8> BuildFrustumCornersFromInverseViewProjection(
+		const Matrix& inverseViewProjection) noexcept;
 	Frustum CreateFrustumFromViewProjection(const Matrix& viewProjection) noexcept;
 	[[nodiscard]] bool Intersects(const Plane& plane, const Sphere& sphere) noexcept;
 	[[nodiscard]] bool Intersects(const Plane& plane, const Aabb& aabb) noexcept;

@@ -10,6 +10,7 @@
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <algorithm>
@@ -45,19 +46,6 @@ namespace gglab
 			return { 0, 1 };
 		}
 
-		uint32_t ResolveRemainingCount(uint32_t base, uint32_t count, uint32_t total) noexcept
-		{
-			if (base >= total)
-			{
-				return 0;
-			}
-
-			const uint32_t remaining = total - base;
-			return count == RHISubresourceRange::Remaining ?
-				remaining :
-				std::min(count, remaining);
-		}
-
 		uint32_t GetD3D12TextureArraySize(const D3D12_RESOURCE_DESC& desc) noexcept
 		{
 			if (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
@@ -87,8 +75,8 @@ namespace gglab
 			const uint32_t mipLevels = std::max<uint32_t>(1, resourceDesc.MipLevels);
 			const uint32_t arraySize = GetD3D12TextureArraySize(resourceDesc);
 			const uint32_t planeCount = GetD3D12TexturePlaneCount(resourceDesc);
-			range.m_MipCount = ResolveRemainingCount(range.m_BaseMip, range.m_MipCount, mipLevels);
-			range.m_ArraySliceCount = ResolveRemainingCount(
+			range.m_MipCount = ResolveSubresourceCount(range.m_BaseMip, range.m_MipCount, mipLevels);
+			range.m_ArraySliceCount = ResolveSubresourceCount(
 				range.m_BaseArraySlice,
 				range.m_ArraySliceCount,
 				arraySize);
