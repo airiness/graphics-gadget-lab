@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -97,8 +97,11 @@
     <Filter Include="Core\Math\Backends">
       <UniqueIdentifier>{f5644881-9215-43f8-935c-7f1d6d51d8f8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Math\Interop">
-      <UniqueIdentifier>{a37e09a3-ff82-43df-87aa-d29c52b2c4f8}</UniqueIdentifier>
+    <Filter Include="Graphics\Asset">
+      <UniqueIdentifier>{c43bda20-0a24-4dab-8185-f0eef9f49f10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Asset\Interop">
+      <UniqueIdentifier>{3bc92d47-ddbe-4ca0-a02a-da269cb11d8f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Core\Platform">
       <UniqueIdentifier>{578d0cc7-e7d1-47fd-93bf-d24a02f93c5e}</UniqueIdentifier>
@@ -159,6 +162,9 @@
     </Filter>
     <Filter Include="DevTools\DevelopGui\Panels">
       <UniqueIdentifier>{554b19f9-b68e-4b10-b1ef-61957f195b37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Interop">
+      <UniqueIdentifier>{c50d2581-3a57-4b58-9279-3a5d092e0398}</UniqueIdentifier>
     </Filter>
     <Filter Include="DevTools\EnumText">
       <UniqueIdentifier>{c0a6f692-b901-4083-b468-2b64d223c3e6}</UniqueIdentifier>
@@ -426,8 +432,8 @@
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp">
       <Filter>Core\Math</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.cpp">
-      <Filter>Core\Math\Interop</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp">
+      <Filter>Graphics\Asset\Interop</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp">
       <Filter>Core\Math</Filter>
@@ -621,6 +627,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp">
       <Filter>DevTools</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\AssetSnapshotText.cpp">
+      <Filter>DevTools</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -657,7 +666,13 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp">
@@ -812,8 +827,23 @@
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextGraphics.h">
       <Filter>DevTools\EnumText</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextLab.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRHI.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderGraph.h">
       <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\EnumText\EnumTextRenderPass.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\AssetSnapshotText.h">
+      <Filter>DevTools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\RHIText.h">
+      <Filter>DevTools</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h">
       <Filter>Graphics\RHI\DX12</Filter>
@@ -944,8 +974,8 @@
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Interop\AssimpMathInterop.h">
-      <Filter>Core\Math\Interop</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h">
+      <Filter>Graphics\Asset\Interop</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h">
       <Filter>Core\Math</Filter>
@@ -1405,6 +1435,18 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiContext.h">
       <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiMathWidgets.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiStyle.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiTextureUtils.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Interop\ImGuiMathInterop.h">
+      <Filter>DevTools\DevelopGui\Interop</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>

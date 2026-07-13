@@ -1,7 +1,10 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
 #include "Core/Utility/StringUtils.h"
+#include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/EnumText/EnumTextGraphics.h"
+#include "DevTools/RHIText.h"
 #include "Graphics/AssetManager.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
@@ -20,114 +23,22 @@ namespace gglab
 			std::string m_Status;
 		};
 
-		struct TextureSemanticItem
+		constexpr std::array TextureSemantics =
 		{
-			TextureSemantic m_Value = TextureSemantic::Unknown;
-			const char* m_Label = "Unknown";
+			TextureSemantic::BaseColor,
+			TextureSemantic::Emissive,
+			TextureSemantic::Normal,
+			TextureSemantic::MetallicRoughness,
+			TextureSemantic::Occlusion,
+			TextureSemantic::UVTest,
+			TextureSemantic::GenericColor,
+			TextureSemantic::GenericData,
+			TextureSemantic::Unknown,
 		};
-
-		constexpr std::array TextureSemanticItems =
-		{
-			TextureSemanticItem{ TextureSemantic::BaseColor, "Base Color" },
-			TextureSemanticItem{ TextureSemantic::Emissive, "Emissive" },
-			TextureSemanticItem{ TextureSemantic::Normal, "Normal" },
-			TextureSemanticItem{ TextureSemantic::MetallicRoughness, "Metallic Roughness" },
-			TextureSemanticItem{ TextureSemantic::Occlusion, "Occlusion" },
-			TextureSemanticItem{ TextureSemantic::UVTest, "UV Test" },
-			TextureSemanticItem{ TextureSemantic::GenericColor, "Generic Color" },
-			TextureSemanticItem{ TextureSemantic::GenericData, "Generic Data" },
-			TextureSemanticItem{ TextureSemantic::Unknown, "Unknown" },
-		};
-
-		[[nodiscard]] const char* ModelTypeText(ModelType type) noexcept
-		{
-			switch (type)
-			{
-			case ModelType::GlTF:
-				return "glTF";
-			case ModelType::Procedural:
-				return "Procedural";
-			case ModelType::Invalid:
-			default:
-				return "Invalid";
-			}
-		}
-
-		[[nodiscard]] const char* AssetStateText(AssetState state) noexcept
-		{
-			switch (state)
-			{
-			case AssetState::Unloaded: return "Unloaded";
-			case AssetState::Queued: return "Queued";
-			case AssetState::LoadingCpu: return "Loading CPU";
-			case AssetState::CpuReady: return "CPU Ready";
-			case AssetState::UploadQueued: return "Upload Queued";
-			case AssetState::GpuProcessing: return "GPU Processing";
-			case AssetState::Ready: return "Ready";
-			case AssetState::Failed: return "Failed";
-			case AssetState::Cancelled: return "Cancelled";
-			}
-			return "Unknown";
-		}
-
-		[[nodiscard]] const char* TextureSemanticText(TextureSemantic semantic) noexcept
-		{
-			for (const TextureSemanticItem& item : TextureSemanticItems)
-			{
-				if (item.m_Value == semantic)
-				{
-					return item.m_Label;
-				}
-			}
-			return "Unknown";
-		}
-
-		[[nodiscard]] const char* AssetUploadStatusText(AssetUploadStatus status) noexcept
-		{
-			switch (status)
-			{
-			case AssetUploadStatus::Pending: return "Pending";
-			case AssetUploadStatus::Succeeded: return "Succeeded";
-			case AssetUploadStatus::Failed: return "Failed";
-			}
-			return "Unknown";
-		}
 
 		[[nodiscard]] std::string PathText(const std::filesystem::path& path)
 		{
 			return path.empty() ? std::string{} : path.generic_string();
-		}
-
-		[[nodiscard]] std::string ModelDisplayName(const AssetSnapshot::Model& model)
-		{
-			if (!model.m_SourcePath.empty())
-			{
-				return model.m_SourcePath.filename().generic_string();
-			}
-
-			const std::string name = utils::StringIdToString(model.m_Name);
-			if (!name.empty())
-			{
-				return name;
-			}
-
-			return std::format("Model {}", model.m_Id.Value());
-		}
-
-		[[nodiscard]] std::string TextureDisplayName(const AssetSnapshot::Texture& texture)
-		{
-			if (!texture.m_SourcePath.empty())
-			{
-				return texture.m_SourcePath.filename().generic_string();
-			}
-
-			const std::string name = utils::StringIdToString(texture.m_Name);
-			if (!name.empty())
-			{
-				return name;
-			}
-
-			return std::format("Texture {}", texture.m_Id.Value());
 		}
 
 		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state,
@@ -173,7 +84,7 @@ namespace gglab
 
 				for (const auto& model : models)
 				{
-					const std::string name = ModelDisplayName(model);
+					const std::string name = devtools::ModelDisplayName(model);
 					const std::string path = PathText(model.m_SourcePath);
 
 					ImGui::PushID(static_cast<int>(model.m_Id.Value()));
@@ -183,9 +94,11 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(AssetStateText(model.m_State));
+					const std::string modelState = devtools::EnumText(model.m_State);
+					ImGui::TextUnformatted(modelState.c_str());
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(ModelTypeText(model.m_Type));
+					const std::string modelType = devtools::EnumText(model.m_Type);
+					ImGui::TextUnformatted(modelType.c_str());
 					ImGui::TableSetColumnIndex(4);
 					ImGui::Text("%u", model.m_MeshInstanceCount);
 					ImGui::TableSetColumnIndex(5);
@@ -204,13 +117,15 @@ namespace gglab
 			ImGui::PushID("Textures");
 			ImGui::SeparatorText("Load Texture");
 			ImGui::InputText("Texture Path", state.m_TexturePath.data(), state.m_TexturePath.size());
-			const char* semanticPreview = TextureSemanticItems[static_cast<size_t>(state.m_TextureSemanticIndex)].m_Label;
-			if (ImGui::BeginCombo("Semantic", semanticPreview))
+			const std::string semanticPreview = devtools::EnumText(
+				TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)]);
+			if (ImGui::BeginCombo("Semantic", semanticPreview.c_str()))
 			{
-				for (size_t i = 0; i < TextureSemanticItems.size(); ++i)
+				for (size_t i = 0; i < TextureSemantics.size(); ++i)
 				{
 					const bool selected = static_cast<size_t>(state.m_TextureSemanticIndex) == i;
-					if (ImGui::Selectable(TextureSemanticItems[i].m_Label, selected))
+					const std::string semanticText = devtools::EnumText(TextureSemantics[i]);
+					if (ImGui::Selectable(semanticText.c_str(), selected))
 					{
 						state.m_TextureSemanticIndex = static_cast<int32_t>(i);
 					}
@@ -230,7 +145,7 @@ namespace gglab
 			if (ImGui::Button("Load Texture"))
 			{
 				const std::filesystem::path path(state.m_TexturePath.data());
-				const TextureSemantic semantic = TextureSemanticItems[static_cast<size_t>(state.m_TextureSemanticIndex)].m_Value;
+				const TextureSemantic semantic = TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)];
 				const auto request = assetManager.LoadTextureAsync(path, semantic);
 				state.m_Status = request.IsValid() ?
 					std::format("Queued texture {} (task {}).",
@@ -264,7 +179,7 @@ namespace gglab
 
 				for (const auto& texture : textures)
 				{
-					const std::string name = TextureDisplayName(texture);
+					const std::string name = devtools::TextureDisplayName(texture);
 					const std::string path = PathText(texture.m_SourcePath);
 
 					ImGui::PushID(static_cast<int>(texture.m_Id.Value()));
@@ -274,22 +189,18 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(AssetStateText(texture.m_State));
+					const std::string textureState = devtools::EnumText(texture.m_State);
+					ImGui::TextUnformatted(textureState.c_str());
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(TextureSemanticText(texture.m_Semantic));
+					const std::string semantic = devtools::EnumText(texture.m_Semantic);
+					ImGui::TextUnformatted(semantic.c_str());
 					ImGui::TableSetColumnIndex(4);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
 					ImGui::TableSetColumnIndex(5);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
 					ImGui::TableSetColumnIndex(6);
-					if (texture.m_Texture.IsValid())
-					{
-						ImGui::Text("%u:%u", texture.m_Texture.Index(), texture.m_Texture.Generation());
-					}
-					else
-					{
-						ImGui::TextUnformatted("-");
-					}
+					const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
+					ImGui::TextUnformatted(textureHandle.c_str());
 					ImGui::TableSetColumnIndex(7);
 					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
 					ImGui::TableSetColumnIndex(8);
@@ -328,7 +239,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(name.empty() ? "<unnamed>" : name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(AssetStateText(mesh.m_State));
+					const std::string meshState = devtools::EnumText(mesh.m_State);
+					ImGui::TextUnformatted(meshState.c_str());
 					ImGui::TableSetColumnIndex(3);
 					ImGui::Text("%u", mesh.m_VertexCount);
 					ImGui::TableSetColumnIndex(4);
@@ -369,7 +281,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(upload.m_Name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::TextUnformatted(AssetUploadStatusText(upload.m_Status));
+					const std::string uploadStatus = devtools::EnumText(upload.m_Status);
+					ImGui::TextUnformatted(uploadStatus.c_str());
 					ImGui::TableSetColumnIndex(3);
 					if (upload.m_Progress.HasProgress())
 					{
@@ -459,7 +372,7 @@ namespace gglab
 		state.m_TextureSemanticIndex = std::clamp<int32_t>(
 			state.m_TextureSemanticIndex,
 			0,
-			static_cast<int32_t>(TextureSemanticItems.size() - 1));
+			static_cast<int32_t>(TextureSemantics.size() - 1));
 
 		ImGui::TextUnformatted("Asset Manager");
 		ImGui::Separator();

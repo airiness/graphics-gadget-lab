@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "Core/Math/MathFunctions.h"
+#include "DevTools/DevelopGui/Interop/ImGuiMathInterop.h"
 
 #include <algorithm>
 
@@ -43,9 +44,9 @@ namespace gglab::devtools
 			const Vector3& ndc,
 			const ImGuiViewport& viewport) noexcept
 		{
-			return ImVec2(
+			return interop::ToImGui(Vector2(
 				viewport.Pos.x + (ndc.m_X * 0.5f + 0.5f) * viewport.Size.x,
-				viewport.Pos.y + (0.5f - ndc.m_Y * 0.5f) * viewport.Size.y);
+				viewport.Pos.y + (0.5f - ndc.m_Y * 0.5f) * viewport.Size.y));
 		}
 	}
 

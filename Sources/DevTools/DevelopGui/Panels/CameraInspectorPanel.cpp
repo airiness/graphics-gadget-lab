@@ -2,6 +2,7 @@
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/CameraRig.h"
@@ -90,26 +91,6 @@ namespace gglab
 		static void PushToController(CameraPanelState& s, CameraController& ctrl) noexcept
 		{
 			ctrl.SetParams(s.m_CtrlParams);
-		}
-
-		static void DrawVec3(const char* label, const Vector3& vec) noexcept
-		{
-			ImGui::Text("%s: (%.3f, %.3f, %.3f)", label, vec.m_X, vec.m_Y, vec.m_Z);
-		}
-
-		static void DrawMatrix4x4(const char* label, const Matrix& mat) noexcept
-		{
-			if (!ImGui::TreeNode(label))
-			{
-				return;
-			}
-
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_11, mat.m_12, mat.m_13, mat.m_14);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_21, mat.m_22, mat.m_23, mat.m_24);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_31, mat.m_32, mat.m_33, mat.m_34);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_41, mat.m_42, mat.m_43, mat.m_44);
-
-			ImGui::TreePop();
 		}
 
 		static CameraBinding ResolveCameraBinding(
@@ -458,15 +439,15 @@ namespace gglab
 
 		if (state.m_ShowBasis)
 		{
-			DrawVec3("Forward", camera->GetForward());
-			DrawVec3("Right", camera->GetRight());
-			DrawVec3("Up", camera->GetUp());
+			devtools::DrawVector3Text("Forward", camera->GetForward());
+			devtools::DrawVector3Text("Right", camera->GetRight());
+			devtools::DrawVector3Text("Up", camera->GetUp());
 		}
 
 		if (state.m_ShowMatrices)
 		{
-			DrawMatrix4x4("View Matrix", camera->GetViewMatrix());
-			DrawMatrix4x4("Proj Matrix", camera->GetProjMatrix());
+			devtools::DrawMatrix4x4Tree("View Matrix", camera->GetViewMatrix());
+			devtools::DrawMatrix4x4Tree("Proj Matrix", camera->GetProjMatrix());
 		}
 	}
 }

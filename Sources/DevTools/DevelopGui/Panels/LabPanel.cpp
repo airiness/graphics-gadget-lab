@@ -3,6 +3,7 @@
 #include "Application/Lab/LabInterfaces.h"
 #include "Application/Lab/LabRuntime.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
+#include "DevTools/EnumText/EnumTextLab.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 
@@ -11,28 +12,6 @@ namespace gglab
 	namespace
 	{
 		const LabId CullingLabId("gglab.lab.culling");
-
-		const char* ToText(LabRunState state) noexcept
-		{
-			switch (state)
-			{
-			case LabRunState::Uninitialized:
-				return "Uninitialized";
-			case LabRunState::Loading:
-				return "Loading";
-			case LabRunState::WarmingUp:
-				return "Warming Up";
-			case LabRunState::Ready:
-				return "Ready";
-			case LabRunState::Capturing:
-				return "Capturing";
-			case LabRunState::Completed:
-				return "Completed";
-			case LabRunState::Failed:
-				return "Failed";
-			}
-			return "Unknown";
-		}
 
 		template<typename T>
 		const T* GetOptionalValue(const std::optional<LabValue>& value) noexcept
@@ -196,7 +175,8 @@ namespace gglab
 			ImGui::EndCombo();
 		}
 
-		ImGui::Text("State: %s", ToText(snapshot.m_State));
+		const std::string runState = devtools::EnumText(snapshot.m_State);
+		ImGui::Text("State: %s", runState.c_str());
 		if (snapshot.m_HasPendingSession)
 		{
 			ImGui::Text("Pending Lab: %s", snapshot.m_PendingLabName.c_str());

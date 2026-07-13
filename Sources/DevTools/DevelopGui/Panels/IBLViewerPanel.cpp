@@ -4,7 +4,8 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "DevTools/DevelopGui/DevelopGuiSystem.h"
+#include "DevTools/DevelopGui/DevelopGuiStyle.h"
+#include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Core/Math/MathFunctions.h"
@@ -25,14 +26,6 @@ namespace gglab
 			bool m_ShowMetadata = true;
 			bool m_FlipPreviewY = false;
 		};
-
-		static ImTextureID ToImGuiTextureID(
-			DevelopGuiSystem* developGuiSystem,
-			RHIDescriptorHandle descriptor) noexcept
-		{
-			return developGuiSystem ?
-				developGuiSystem->ResolveTextureId(descriptor) : ImTextureID{};
-		}
 
 		static bool DrawPreviewLayoutCombo(const char* label, RenderResourceRegistry::IBLPreviewLayout& layout) noexcept
 		{
@@ -142,13 +135,13 @@ namespace gglab
 			switch (state)
 			{
 			case IBLBakeState::Ready:
-				ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "Ready");
+				ImGui::TextColored(devtools::style::SuccessTextColor, "Ready");
 				break;
 			case IBLBakeState::Dirty:
-				ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Bake Pending");
+				ImGui::TextColored(devtools::style::WarningTextColor, "Bake Pending");
 				break;
 			default:
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Unavailable");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Unavailable");
 				break;
 			}
 		}
@@ -208,14 +201,14 @@ namespace gglab
 		auto* renderer = context.m_Renderer;
 		if (!renderer)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Renderer is null.");
+			ImGui::TextColored(devtools::style::ErrorTextColor, "Renderer is null.");
 			return;
 		}
 
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		if (!renderResRegistry)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "RenderResourceRegistry is null.");
+			ImGui::TextColored(devtools::style::ErrorTextColor, "RenderResourceRegistry is null.");
 			return;
 		}
 
@@ -357,7 +350,7 @@ namespace gglab
 		const auto* brdfLutDesc = renderResRegistry->GetTextureDesc(BrdfLutIndex);
 		if (!brdfLutDesc)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "BRDF LUT texture is not allocated.");
+			ImGui::TextColored(devtools::style::ErrorTextColor, "BRDF LUT texture is not allocated.");
 			return;
 		}
 
@@ -393,13 +386,13 @@ namespace gglab
 
 			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
 
-			const ImTextureID textureId = ToImGuiTextureID(
+			const ImTextureID textureId = devtools::ResolveImGuiTextureId(
 				context.m_DevelopGuiSystem,
 				renderResRegistry->GetSrvDescriptor(BrdfLutIndex));
 
 			if (!textureId)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "BRDF LUT SRV GPU handle is invalid.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "BRDF LUT SRV GPU handle is invalid.");
 				return;
 			}
 
@@ -458,7 +451,7 @@ namespace gglab
 
 			if (!environmentDesc || !environmentPreviewDesc)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Environment preview texture is not allocated.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Environment preview texture is not allocated.");
 				return;
 			}
 
@@ -527,13 +520,13 @@ namespace gglab
 				"%.0f");
 
 			const ImTextureID environmentPreviewTextureId =
-				ToImGuiTextureID(
+				devtools::ResolveImGuiTextureId(
 					context.m_DevelopGuiSystem,
 					renderResRegistry->GetSrvDescriptor(EnvironmentPreviewIndex));
 
 			if (!environmentPreviewTextureId)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Environment preview SRV GPU handle is invalid.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Environment preview SRV GPU handle is invalid.");
 				return;
 			}
 
@@ -582,7 +575,7 @@ namespace gglab
 
 			if (!irradianceDesc || !irradiancePreviewDesc)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Irradiance preview texture is not allocated.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Irradiance preview texture is not allocated.");
 				return;
 			}
 
@@ -610,12 +603,12 @@ namespace gglab
 				192.0f,
 				768.0f,
 				"%.0f");
-			const ImTextureID previewTextureId = ToImGuiTextureID(
+			const ImTextureID previewTextureId = devtools::ResolveImGuiTextureId(
 				context.m_DevelopGuiSystem,
 				renderResRegistry->GetSrvDescriptor(IrradiancePreviewIndex));
 			if (!previewTextureId)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Irradiance preview SRV is invalid.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Irradiance preview SRV is invalid.");
 				return;
 			}
 
@@ -661,7 +654,7 @@ namespace gglab
 
 			if (!prefilteredSpecularDesc || !prefilteredSpecularPreviewDesc)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Prefiltered specular preview texture is not allocated.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Prefiltered specular preview texture is not allocated.");
 				return;
 			}
 
@@ -724,13 +717,13 @@ namespace gglab
 				"%.0f");
 
 			const ImTextureID prefilteredSpecularPreviewTextureId =
-				ToImGuiTextureID(
+				devtools::ResolveImGuiTextureId(
 					context.m_DevelopGuiSystem,
 					renderResRegistry->GetSrvDescriptor(PrefilteredSpecularPreviewIndex));
 
 			if (!prefilteredSpecularPreviewTextureId)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Prefiltered specular preview SRV GPU handle is invalid.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Prefiltered specular preview SRV GPU handle is invalid.");
 				return;
 			}
 

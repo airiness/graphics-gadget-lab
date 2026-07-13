@@ -7,7 +7,6 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
-
 #include <algorithm>
 #include <limits>
 

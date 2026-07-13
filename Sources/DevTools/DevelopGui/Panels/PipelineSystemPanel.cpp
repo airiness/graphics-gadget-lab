@@ -1,6 +1,9 @@
 #include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/PipelineSystemPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/EnumText/EnumTextRHI.h"
+#include "DevTools/EnumText/EnumTextRenderPass.h"
+#include "DevTools/RHIText.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
@@ -18,112 +21,9 @@ namespace gglab
 			uint32_t m_SelectedPipeline = RHIPipelineHandle::InvalidIndex;
 		};
 
-		const char* BindingTypeText(RHIBindingType type) noexcept
-		{
-			switch (type)
-			{
-			case RHIBindingType::ConstantBuffer: return "ConstantBuffer";
-			case RHIBindingType::ReadOnlyStorageBuffer: return "ReadOnlyStorageBuffer";
-			case RHIBindingType::ReadWriteStorageBuffer: return "ReadWriteStorageBuffer";
-			case RHIBindingType::SampledTexture: return "SampledTexture";
-			case RHIBindingType::StorageTexture: return "StorageTexture";
-			case RHIBindingType::Sampler: return "Sampler";
-			case RHIBindingType::PushConstants: return "PushConstants";
-			case RHIBindingType::BindlessSampledTextureTable: return "BindlessTextureTable";
-			case RHIBindingType::BindlessSamplerTable: return "BindlessSamplerTable";
-			case RHIBindingType::Unknown: default: return "Unknown";
-			}
-		}
-
-		const char* ShaderVisibilityText(RHIShaderStage visibility) noexcept
-		{
-			if (visibility == RHIShaderStage::All) return "All";
-			if (visibility == RHIShaderStage::AllGraphics) return "AllGraphics";
-			if (visibility == RHIShaderStage::Vertex) return "Vertex";
-			if (visibility == RHIShaderStage::Pixel) return "Pixel";
-			if (visibility == RHIShaderStage::Compute) return "Compute";
-			return "None";
-		}
-
 		const char* FormatText(RHIFormat format) noexcept
 		{
 			return GetRHIFormatInfo(format).m_Name;
-		}
-
-		const char* TopologyText(RHIPrimitiveTopology topology) noexcept
-		{
-			switch (topology)
-			{
-			case RHIPrimitiveTopology::PointList: return "PointList";
-			case RHIPrimitiveTopology::LineList: return "LineList";
-			case RHIPrimitiveTopology::LineStrip: return "LineStrip";
-			case RHIPrimitiveTopology::TriangleList: return "TriangleList";
-			case RHIPrimitiveTopology::TriangleStrip: return "TriangleStrip";
-			case RHIPrimitiveTopology::Unknown: default: return "Unknown";
-			}
-		}
-
-		const char* FillModeText(RHIFillMode mode) noexcept
-		{
-			return mode == RHIFillMode::Wireframe ? "Wireframe" : "Solid";
-		}
-
-		const char* CullModeText(RHICullMode mode) noexcept
-		{
-			switch (mode)
-			{
-			case RHICullMode::None: return "None";
-			case RHICullMode::Front: return "Front";
-			case RHICullMode::Back: default: return "Back";
-			}
-		}
-
-		const char* CompareOpText(RHICompareOp op) noexcept
-		{
-			switch (op)
-			{
-			case RHICompareOp::Never: return "Never";
-			case RHICompareOp::Less: return "Less";
-			case RHICompareOp::Equal: return "Equal";
-			case RHICompareOp::LessEqual: return "LessEqual";
-			case RHICompareOp::Greater: return "Greater";
-			case RHICompareOp::NotEqual: return "NotEqual";
-			case RHICompareOp::GreaterEqual: return "GreaterEqual";
-			case RHICompareOp::Always: default: return "Always";
-			}
-		}
-
-		const char* RenderPassCategoryText(RenderPassCategory category) noexcept
-		{
-			switch (category)
-			{
-			case RenderPassCategory::Geometry: return "Geometry";
-			case RenderPassCategory::Lighting: return "Lighting";
-			case RenderPassCategory::Shadow: return "Shadow";
-			case RenderPassCategory::IBL: return "IBL";
-			case RenderPassCategory::PostProcess: return "PostProcess";
-			case RenderPassCategory::Debug: return "Debug";
-			case RenderPassCategory::UI: return "UI";
-			case RenderPassCategory::Unknown: default: return "Unknown";
-			}
-		}
-
-		const char* RenderPassTypeText(RenderPassType type) noexcept
-		{
-			switch (type)
-			{
-			case RenderPassType::Graphics: return "Graphics";
-			case RenderPassType::Compute: return "Compute";
-			case RenderPassType::Transfer: return "Transfer";
-			case RenderPassType::Mixed: return "Mixed";
-			}
-			return "Unknown";
-		}
-
-		std::string HandleText(auto handle)
-		{
-			return handle.IsValid() ?
-				std::format("{}:{}", handle.Index(), handle.Generation()) : "-";
 		}
 
 		std::string HashText(ShaderHash128 hash)
@@ -166,7 +66,7 @@ namespace gglab
 		std::string ShaderSummary(const RHIShaderSnapshot& shader)
 		{
 			if (!shader.m_Present) return "-";
-			return shader.m_DebugName.empty() ? HandleText(shader.m_Handle) : shader.m_DebugName;
+			return shader.m_DebugName.empty() ? devtools::RHIHandleText(shader.m_Handle) : shader.m_DebugName;
 		}
 
 		std::string RenderTargetFormatsText(const RHIPipelineSnapshot& pipeline)
@@ -198,7 +98,7 @@ namespace gglab
 		{
 			ImGui::SeparatorText("Binding Layout Detail");
 			ImGui::Text("Handle %s | %s | Root parameters %u | RootSignature ID %u | Native 0x%llX",
-				HandleText(layout.m_Handle).c_str(), layout.m_Alive ? "Alive" : "Dead",
+				devtools::RHIHandleText(layout.m_Handle).c_str(), layout.m_Alive ? "Alive" : "Dead",
 				layout.m_RootParameterCount, layout.m_BackendRootSignatureId,
 				static_cast<unsigned long long>(layout.m_BackendRootSignaturePointer));
 			ImGui::Text("Name: %s | Direct indexing: resources=%s samplers=%s",
@@ -226,8 +126,10 @@ namespace gglab
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0); ImGui::Text("%u", slot.m_Slot);
 					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(slot.m_DebugName.empty() ? "-" : slot.m_DebugName.c_str());
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(BindingTypeText(slot.m_Type));
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(ShaderVisibilityText(slot.m_Visibility));
+					const std::string bindingType = devtools::EnumText(slot.m_Type);
+					const std::string shaderVisibility = devtools::EnumText(slot.m_Visibility);
+					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(bindingType.c_str());
+					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(shaderVisibility.c_str());
 					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(registerText.c_str());
 					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(slot.m_Count == 0 ? "Unbounded" : std::to_string(slot.m_Count).c_str());
 					ImGui::TableSetColumnIndex(6); ImGui::Text("%u B", slot.m_SizeInBytes);
@@ -258,7 +160,7 @@ namespace gglab
 				ImGui::TableHeadersRow();
 				for (const auto& layout : snapshot.m_BindingLayouts)
 				{
-					const std::string handle = HandleText(layout.m_Handle);
+					const std::string handle = devtools::RHIHandleText(layout.m_Handle);
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
 					if (ImGui::Selectable(handle.c_str(), state.m_SelectedLayout == layout.m_Handle.Index(),
@@ -305,7 +207,7 @@ namespace gglab
 				for (const auto& stage : stages)
 				{
 					if (!stage.m_Shader->m_Present) continue;
-					const std::string handle = HandleText(stage.m_Shader->m_Handle);
+					const std::string handle = devtools::RHIHandleText(stage.m_Shader->m_Handle);
 					const std::string hash = HashText(stage.m_Shader->m_Hash);
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(stage.m_Stage);
@@ -320,19 +222,23 @@ namespace gglab
 		void DrawGraphicsState(const RHIPipelineSnapshot& pipeline) noexcept
 		{
 			const std::string rtFormats = RenderTargetFormatsText(pipeline);
+			const std::string topology = devtools::EnumText(pipeline.m_PrimitiveTopology);
+			const std::string fillMode = devtools::EnumText(pipeline.m_Rasterizer.m_FillMode);
+			const std::string cullMode = devtools::EnumText(pipeline.m_Rasterizer.m_CullMode);
+			const std::string depthCompare = devtools::EnumText(pipeline.m_DepthStencil.m_DepthCompareOp);
 			ImGui::Text("Topology: %s | RTV: %s | DSV: %s | Samples: %u quality %u",
-				TopologyText(pipeline.m_PrimitiveTopology), rtFormats.c_str(),
+				topology.c_str(), rtFormats.c_str(),
 				FormatText(pipeline.m_DepthStencilFormat), pipeline.m_SampleCount,
 				pipeline.m_SampleQuality);
 			ImGui::Text("Rasterizer: fill=%s cull=%s frontCCW=%s depthBias=%d slopeBias=%.3f depthClip=%s",
-				FillModeText(pipeline.m_Rasterizer.m_FillMode), CullModeText(pipeline.m_Rasterizer.m_CullMode),
+				fillMode.c_str(), cullMode.c_str(),
 				pipeline.m_Rasterizer.m_FrontCounterClockwise ? "yes" : "no",
 				pipeline.m_Rasterizer.m_DepthBias, pipeline.m_Rasterizer.m_SlopeScaledDepthBias,
 				pipeline.m_Rasterizer.m_DepthClipEnable ? "yes" : "no");
 			ImGui::Text("Depth: test=%s write=%s compare=%s | Stencil=%s | AlphaToCoverage=%s",
 				pipeline.m_DepthStencil.m_DepthTestEnable ? "on" : "off",
 				pipeline.m_DepthStencil.m_DepthWriteEnable ? "on" : "off",
-				CompareOpText(pipeline.m_DepthStencil.m_DepthCompareOp),
+				depthCompare.c_str(),
 				pipeline.m_DepthStencil.m_StencilEnable ? "on" : "off",
 				pipeline.m_Blend.m_AlphaToCoverageEnable ? "on" : "off");
 
@@ -396,6 +302,9 @@ namespace gglab
 				ImGui::TableHeadersRow();
 				for (const auto& pass : pipeline.m_RenderPasses)
 				{
+					const std::string category = pass.m_CategoryName.empty() ?
+						devtools::EnumText(pass.m_Category) : pass.m_CategoryName;
+					const std::string type = devtools::EnumText(pass.m_Type);
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(pass.m_TypeName.c_str());
 					if (!pass.m_Description.empty() && ImGui::IsItemHovered())
@@ -403,9 +312,8 @@ namespace gglab
 						ImGui::SetTooltip("%s", pass.m_Description.c_str());
 					}
 					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(pass.m_DisplayName.c_str());
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(
-						pass.m_CategoryName.empty() ? RenderPassCategoryText(pass.m_Category) : pass.m_CategoryName.c_str());
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(RenderPassTypeText(pass.m_Type));
+					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(category.c_str());
+					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(type.c_str());
 					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(pass.m_ShowInDevelopGui ? "Yes" : "No");
 					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(pass.m_EnableGpuMarker ? "On" : "Off");
 					ImGui::TableSetColumnIndex(6); ImGui::TextUnformatted(pass.m_EnableProfiling ? "On" : "Off");
@@ -418,11 +326,11 @@ namespace gglab
 		{
 			ImGui::SeparatorText("Pipeline Detail");
 			ImGui::Text("Handle %s | %s | %s",
-				HandleText(pipeline.m_Handle).c_str(),
+				devtools::RHIHandleText(pipeline.m_Handle).c_str(),
 				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? "Graphics" : "Compute",
 				pipeline.m_Alive ? "Alive" : "Dead");
 			ImGui::Text("BindingLayout %s | Backend PSO 0x%llX | RootSignature ID %u / 0x%llX",
-				HandleText(pipeline.m_BindingLayout).c_str(),
+				devtools::RHIHandleText(pipeline.m_BindingLayout).c_str(),
 				static_cast<unsigned long long>(pipeline.m_BackendPipelinePointer),
 				pipeline.m_BackendRootSignatureId,
 				static_cast<unsigned long long>(pipeline.m_BackendRootSignaturePointer));
@@ -451,8 +359,8 @@ namespace gglab
 				ImGui::TableSetupColumn("Backend PSO"); ImGui::TableHeadersRow();
 				for (const auto& pipeline : snapshot.m_Pipelines)
 				{
-					const std::string handle = HandleText(pipeline.m_Handle);
-					const std::string layout = HandleText(pipeline.m_BindingLayout);
+					const std::string handle = devtools::RHIHandleText(pipeline.m_Handle);
+					const std::string layout = devtools::RHIHandleText(pipeline.m_BindingLayout);
 					const std::string primaryShader = ShaderSummary(
 						pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? pipeline.m_VertexShader : pipeline.m_ComputeShader);
 					const std::string pixelShader = ShaderSummary(pipeline.m_PixelShader);

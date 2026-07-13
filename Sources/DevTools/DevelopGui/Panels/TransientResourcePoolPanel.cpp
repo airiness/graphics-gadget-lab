@@ -2,6 +2,8 @@
 #include "DevTools/DevelopGui/Panels/TransientResourcePoolPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
+#include "DevTools/RHIText.h"
+#include "Core/Utility/StringUtils.h"
 #include "Graphics/Renderer.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
@@ -29,22 +31,6 @@ namespace gglab
 			return "Unknown";
 		}
 
-		bool MatchesFilter(std::string_view text, const char* filter) noexcept
-		{
-			if (!filter || !*filter)
-			{
-				return true;
-			}
-			const std::string_view filterView(filter);
-			return std::search(
-				text.begin(), text.end(), filterView.begin(), filterView.end(),
-				[](char lhs, char rhs)
-				{
-					return std::tolower(static_cast<unsigned char>(lhs)) ==
-						std::tolower(static_cast<unsigned char>(rhs));
-				}) != text.end();
-		}
-
 		std::string ClearValueText(const std::optional<RHIClearValue>& clearValue)
 		{
 			if (!clearValue)
@@ -70,8 +56,8 @@ namespace gglab
 			{
 				return "-";
 			}
-			return std::format("{}:{} value={} ({})",
-				fence.m_Fence.Index(), fence.m_Fence.Generation(), fence.m_Value,
+			return std::format("{} value={} ({})",
+				devtools::RHIHandleText(fence.m_Fence), fence.m_Value,
 				completed ? "complete" : "pending");
 		}
 
@@ -119,7 +105,7 @@ namespace gglab
 					texture.m_LogicalName, texture.m_DebugName,
 					texture.m_Key.m_Extent.m_Width, texture.m_Key.m_Extent.m_Height,
 					texture.m_Key.m_Extent.m_Depth);
-				if (!MatchesFilter(searchable, state.m_Filter))
+				if (!utils::ContainsIgnoreCase(searchable, state.m_Filter))
 				{
 					continue;
 				}
@@ -137,8 +123,8 @@ namespace gglab
 				ImGui::TableSetColumnIndex(3); ImGui::Text("%llu", static_cast<unsigned long long>(texture.m_AcquireSerial));
 				ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(texture.m_DebugName.c_str());
 				ImGui::TableSetColumnIndex(5);
-				if (texture.m_Texture.IsValid()) ImGui::Text("%u:%u", texture.m_Texture.Index(), texture.m_Texture.Generation());
-				else ImGui::TextUnformatted("-");
+				const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
+				ImGui::TextUnformatted(textureHandle.c_str());
 				ImGui::TableSetColumnIndex(6); ImGui::Text("%ux%ux%u", texture.m_Key.m_Extent.m_Width,
 					texture.m_Key.m_Extent.m_Height, texture.m_Key.m_Extent.m_Depth);
 				ImGui::TableSetColumnIndex(7); ImGui::Text("%u", texture.m_Key.m_ArraySize);
@@ -183,7 +169,7 @@ namespace gglab
 				const std::string searchable = std::format("{} {} {} {} {}",
 					buffer.m_PoolSlot.Value(), SlotStateText(buffer.m_State),
 					buffer.m_LogicalName, buffer.m_DebugName, buffer.m_Key.m_SizeInBytes);
-				if (!MatchesFilter(searchable, state.m_Filter))
+				if (!utils::ContainsIgnoreCase(searchable, state.m_Filter))
 				{
 					continue;
 				}
@@ -199,8 +185,8 @@ namespace gglab
 				ImGui::TableSetColumnIndex(3); ImGui::Text("%llu", static_cast<unsigned long long>(buffer.m_AcquireSerial));
 				ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(buffer.m_DebugName.c_str());
 				ImGui::TableSetColumnIndex(5);
-				if (buffer.m_Buffer.IsValid()) ImGui::Text("%u:%u", buffer.m_Buffer.Index(), buffer.m_Buffer.Generation());
-				else ImGui::TextUnformatted("-");
+				const std::string bufferHandle = devtools::RHIHandleText(buffer.m_Buffer);
+				ImGui::TextUnformatted(bufferHandle.c_str());
 				ImGui::TableSetColumnIndex(6); ImGui::Text("%llu", static_cast<unsigned long long>(buffer.m_Key.m_SizeInBytes));
 				ImGui::TableSetColumnIndex(7); ImGui::Text("%u", buffer.m_Key.m_StrideInBytes);
 				ImGui::TableSetColumnIndex(8); ImGui::TextUnformatted(usage.c_str());

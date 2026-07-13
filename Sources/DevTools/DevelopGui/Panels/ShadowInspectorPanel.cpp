@@ -5,7 +5,9 @@
 #include "Core/World.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "DevTools/DevelopGui/DevelopGuiSystem.h"
+#include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
+#include "DevTools/DevelopGui/DevelopGuiStyle.h"
+#include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Renderer.h"
@@ -32,29 +34,6 @@ namespace gglab
 			DirectionalShadowSettings* m_ShadowSettings = nullptr;
 			Vector3 m_Direction = -Vector3::UnitY;
 		};
-
-		static ImTextureID ToImGuiTextureID(
-			DevelopGuiSystem* developGuiSystem,
-			RHIDescriptorHandle descriptor) noexcept
-		{
-			return developGuiSystem ?
-				developGuiSystem->ResolveTextureId(descriptor) : ImTextureID{};
-		}
-
-		static void DrawMatrix4x4(const char* label, const Matrix& mat) noexcept
-		{
-			if (!ImGui::TreeNode(label))
-			{
-				return;
-			}
-
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_11, mat.m_12, mat.m_13, mat.m_14);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_21, mat.m_22, mat.m_23, mat.m_24);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_31, mat.m_32, mat.m_33, mat.m_34);
-			ImGui::Text("% .4f % .4f % .4f % .4f", mat.m_41, mat.m_42, mat.m_43, mat.m_44);
-
-			ImGui::TreePop();
-		}
 
 		static Vector3 DirectionFromTransform(const components::TransformComponent& transform) noexcept
 		{
@@ -117,7 +96,7 @@ namespace gglab
 			DirectionalLightBinding lightBinding = FindDirectionalLight(context.m_World);
 			if (!lightBinding.m_Transform || !lightBinding.m_Light)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Directional light is not found.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Directional light is not found.");
 				return;
 			}
 
@@ -199,7 +178,7 @@ namespace gglab
 			DirectionalLightBinding lightBinding = FindDirectionalLight(context.m_World);
 			if (!lightBinding.m_Light)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Directional light is not found.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Directional light is not found.");
 				return;
 			}
 
@@ -233,7 +212,7 @@ namespace gglab
 			const RenderView* shadowView = FindRenderView(context.m_RenderViews, RenderViewID::DirectionalShadow);
 			if (!shadowView)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Directional shadow render view is not available.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "Directional shadow render view is not available.");
 				return;
 			}
 
@@ -247,9 +226,9 @@ namespace gglab
 
 			if (state.m_ShowMatrices)
 			{
-				DrawMatrix4x4("View", shadowView->m_View);
-				DrawMatrix4x4("Projection", shadowView->m_Proj);
-				DrawMatrix4x4("ViewProjection", shadowView->m_ViewProj);
+				devtools::DrawMatrix4x4Tree("View", shadowView->m_View);
+				devtools::DrawMatrix4x4Tree("Projection", shadowView->m_Proj);
+				devtools::DrawMatrix4x4Tree("ViewProjection", shadowView->m_ViewProj);
 			}
 		}
 
@@ -259,14 +238,14 @@ namespace gglab
 
 			if (!context.m_RenderGraph)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "RenderGraph is null.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "RenderGraph is null.");
 				return;
 			}
 
 			auto* shadowRes = context.m_RenderGraph->GetBlackboard().TryGet<RGShadowResources>(ShadowResourcesName);
 			if (!shadowRes || !shadowRes->m_DirectionalShadowMap.IsValid())
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "ShadowMap resource is not available.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap resource is not available.");
 				return;
 			}
 
@@ -278,14 +257,14 @@ namespace gglab
 
 			if (!shadowRes->m_DirectionalShadowMapPreview.IsValid())
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "ShadowMap preview resource is not available.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap preview resource is not available.");
 				return;
 			}
 
 			auto* renderResourceRegistry = context.m_Renderer ? context.m_Renderer->GetRenderResourceRegistry() : nullptr;
 			if (!renderResourceRegistry)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "RenderResourceRegistry is null.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "RenderResourceRegistry is null.");
 				return;
 			}
 
@@ -296,13 +275,13 @@ namespace gglab
 			const auto* previewDesc = renderResourceRegistry->GetTextureDesc(ShadowMapPreviewIndex);
 			if (!previewDesc)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "ShadowMap preview texture is not allocated.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap preview texture is not allocated.");
 				return;
 			}
 
 			const uint32_t previewSrvIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
 			const ImTextureID previewTextureId =
-				ToImGuiTextureID(
+				devtools::ResolveImGuiTextureId(
 					context.m_DevelopGuiSystem,
 					renderResourceRegistry->GetSrvDescriptor(ShadowMapPreviewIndex));
 
@@ -315,7 +294,7 @@ namespace gglab
 
 			if (!previewTextureId)
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "ShadowMap preview SRV GPU handle is invalid.");
+				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap preview SRV GPU handle is invalid.");
 				return;
 			}
 
@@ -339,7 +318,7 @@ namespace gglab
 
 		if (!context.m_Renderer)
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Renderer is null.");
+			ImGui::TextColored(devtools::style::ErrorTextColor, "Renderer is null.");
 			return;
 		}
 
@@ -350,7 +329,7 @@ namespace gglab
 		}
 		else
 		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Shadow visualization settings are not available.");
+			ImGui::TextColored(devtools::style::ErrorTextColor, "Shadow visualization settings are not available.");
 		}
 		DrawLightControl(context);
 		DrawShadowCamera(context, state);
