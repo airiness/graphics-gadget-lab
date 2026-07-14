@@ -9,7 +9,6 @@
 #include "Core/Utility/TypeUtils.h"
 
 #include <algorithm>
-#include <cctype>
 #include <limits>
 
 namespace gglab
@@ -56,65 +55,6 @@ namespace gglab
 	}
 
 	AssetManager::~AssetManager() = default;
-
-	ModelID AssetManager::LoadModel(const std::filesystem::path& path) noexcept
-	{
-		if (path.empty())
-		{
-			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadModel received an empty path.");
-			return InvalidModelID;
-		}
-
-		const auto canonicalPath = utils::Canonical(path);
-		std::error_code errorCode;
-		if (!std::filesystem::exists(canonicalPath, errorCode) ||
-			!std::filesystem::is_regular_file(canonicalPath, errorCode))
-		{
-			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadModel received a missing model file: '{}'.",
-				canonicalPath.string());
-			return InvalidModelID;
-		}
-
-		// Check if model is already loaded
-		if (const ModelID existing = FindModel(canonicalPath); existing.IsValid())
-		{
-			const Model* model = GetModel(existing);
-			if (model && !IsTerminalAssetState(model->m_State))
-			{
-				return existing;
-			}
-			GGLAB_UNUSED(DetachTerminalModelPath(canonicalPath, existing));
-		}
-
-		// Check extension, load glTF file
-		const auto getModelFileType = [](std::string extension) -> ModelType
-			{
-				std::ranges::transform(extension, extension.begin(),
-					[](unsigned char c)
-					{
-						return static_cast<char>(std::tolower(c));
-					});
-				if (extension == ".gltf") { return ModelType::GlTF; }
-				return ModelType::Invalid;
-			};
-
-		const auto extension = canonicalPath.extension().string();
-		switch (getModelFileType(extension))
-		{
-		case ModelType::GlTF:
-			return LoadModelGltf(canonicalPath);
-		case ModelType::Procedural:
-		case ModelType::Invalid:
-			return ModelID::Invalid();
-		default:
-			GGLAB_UNREACHABLE("Unknown model file type.");
-		}
-	}
-
-	TextureID AssetManager::LoadTexture(const std::filesystem::path& path, TextureSemantic semantic) noexcept
-	{
-		return m_TextureRegistry->LoadTexture(path, semantic);
-	}
 
 	AssetManager::ModelLoadRequest AssetManager::LoadModelAsync(
 		const std::filesystem::path& path,
@@ -817,19 +757,6 @@ namespace gglab
 			completion.m_ExecutionMilliseconds);
 	}
 
-	ModelID AssetManager::LoadModelGltf(const std::filesystem::path& path) noexcept
-	{
-		ModelImportResult result = ModelImporter::Import(path, m_MaterialTextureSampling);
-		if (!result.Succeeded())
-		{
-			GGLAB_LOG_GRAPHICS_ERROR("{}", result.m_Error);
-			return InvalidModelID;
-		}
-
-		const ModelID modelId = CreateModel(result.m_Model.m_CanonicalPath);
-		PublishImportedModel(modelId, std::move(result.m_Model));
-		return modelId;
-	}
 	MeshID AssetManager::CreateMesh() noexcept
 	{
 		const auto meshId = m_MeshIdCounter.Acquire();

@@ -114,8 +114,6 @@ namespace gglab
 		void InitializeReservedTextures() noexcept;
 		void Finalize(const RHIFencePoint& fencePoint) noexcept;
 
-		TextureID LoadTexture(const std::filesystem::path& path,
-			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
 		[[nodiscard]] TextureLoadRequest LoadTextureAsync(
 			const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
@@ -133,9 +131,6 @@ namespace gglab
 			const TextureImportSettings& importSettings) noexcept;
 		TextureID FindTexture(const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings) const noexcept;
-
-		TextureUploadData MakeTextureUploadData(TextureID textureId,
-			const std::filesystem::path& canonicalPath, TextureSemantic semantic) noexcept;
 
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			TextureAssetData&& textureData, TextureSemantic semantic) noexcept;

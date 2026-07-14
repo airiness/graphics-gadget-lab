@@ -74,9 +74,6 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
-		ModelID LoadModel(const std::filesystem::path& path) noexcept;
-		TextureID LoadTexture(const std::filesystem::path& path,
-			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
 		[[nodiscard]] ModelLoadRequest LoadModelAsync(
 			const std::filesystem::path& path,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
@@ -114,8 +111,6 @@ namespace gglab
 			ModelID modelId,
 			const TaskCompletionInfo& completion,
 			ImportedModel&& importedModel) noexcept;
-
-		ModelID LoadModelGltf(const std::filesystem::path& path) noexcept;
 
 		MeshID CreateMesh() noexcept;
 		MaterialID CreateMaterial() noexcept;
