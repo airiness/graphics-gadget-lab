@@ -438,6 +438,9 @@
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp">
       <Filter>Core\Math</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.cpp">
+      <Filter>Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp">
       <Filter>Graphics\Asset\Interop</Filter>
     </ClCompile>
@@ -983,8 +986,14 @@
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.h">
+      <Filter>Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h">
       <Filter>Graphics\Asset\Interop</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ReservedTexture.h">
+      <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h">
       <Filter>Core\Math</Filter>

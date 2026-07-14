@@ -245,6 +245,7 @@
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp" />
@@ -584,7 +585,9 @@
     <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h" />
     <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ReservedTexture.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />

@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Task/TaskTypes.h"
+#include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
@@ -16,40 +17,6 @@ namespace gglab
 	struct AssetSnapshot;
 
 	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
-
-	enum class ReservedTextureIDIndex : uint32_t
-	{
-		BaseColorWhite,
-		MissingTextureChecker,
-		NormalFlat,
-		DefaultMetallicRoughness,
-		OcclusionWhite,
-		EmissiveBlack,
-		ErrorRed,
-		UVTest,
-		UVTestTexture1K,
-		UVTestTexture4K,
-		FallbackEnvironmentCubemap,
-
-		Count,
-
-		ReservedCount = 64u
-	};
-	static_assert(utils::ToIndex(ReservedTextureIDIndex::Count) < utils::ToIndex(ReservedTextureIDIndex::ReservedCount),
-		"ReservedTextureID::Count must be less than ReservedTextureID::ReservedCount");
-
-	inline constexpr TextureID::ValueType ReservedTextureCount =
-		static_cast<TextureID::ValueType>(utils::ToIndex(ReservedTextureIDIndex::ReservedCount));
-
-	constexpr TextureID ToTextureId(ReservedTextureIDIndex index) noexcept
-	{
-		return TextureID{ static_cast<TextureID::ValueType>(utils::ToIndex(index)) };
-	}
-
-	constexpr bool IsReservedTextureId(TextureID id) noexcept
-	{
-		return id.IsValid() && id.Value() < ReservedTextureCount;
-	}
 
 	class TextureRegistry
 	{
