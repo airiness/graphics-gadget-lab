@@ -468,6 +468,9 @@
     <ClCompile Include="..\..\Sources\Application\Demo\StartDemo.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\AssetPreparationTracker.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\LoadingProgress.cpp">
       <Filter>Application</Filter>
     </ClCompile>
@@ -1165,6 +1168,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h">
       <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\AssetPreparationTracker.h">
+      <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\LoadingProgress.h">
       <Filter>Application</Filter>

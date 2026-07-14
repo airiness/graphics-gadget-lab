@@ -353,6 +353,7 @@ namespace gglab
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
+		m_AssetManager->Tick();
 
 		auto& shadowVisualizationSettings =
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;

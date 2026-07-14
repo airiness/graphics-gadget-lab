@@ -146,6 +146,7 @@ namespace gglab
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 		friend class AssetManager;
+		friend class EnvironmentLightingSystem;
 
 		void CreateTextureEntry(
 			TextureID id,

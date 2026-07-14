@@ -36,37 +36,39 @@ namespace gglab
 		m_ActiveEntryIndex = InvalidEntryIndex;
 
 		std::error_code errorCode;
-		if (!std::filesystem::is_directory(rootDirectory, errorCode))
+		const bool directoryAvailable = std::filesystem::is_directory(rootDirectory, errorCode);
+		if (!directoryAvailable)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"EnvironmentLightingSystem: environment directory '{}' is unavailable; using procedural fallback.",
 				rootDirectory.string());
-			return;
 		}
-
-		for (std::filesystem::directory_iterator iterator(rootDirectory, errorCode), end;
-			iterator != end && !errorCode;
-			iterator.increment(errorCode))
+		else
 		{
-			const auto& entry = *iterator;
-			if (!entry.is_regular_file(errorCode) || errorCode || !IsHdrFile(entry.path()))
+			for (std::filesystem::directory_iterator iterator(rootDirectory, errorCode), end;
+				iterator != end && !errorCode;
+				iterator.increment(errorCode))
 			{
-				continue;
+				const auto& entry = *iterator;
+				if (!entry.is_regular_file(errorCode) || errorCode || !IsHdrFile(entry.path()))
+				{
+					continue;
+				}
+
+				m_Entries.push_back(
+					{
+						.m_Path = entry.path(),
+						.m_DisplayName = entry.path().stem().string(),
+					});
 			}
 
-			m_Entries.push_back(
-				{
-					.m_Path = entry.path(),
-					.m_DisplayName = entry.path().stem().string(),
-				});
-		}
-
-		if (errorCode)
-		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"EnvironmentLightingSystem: failed while scanning '{}': {}.",
-				rootDirectory.string(),
-				errorCode.message());
+			if (errorCode)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"EnvironmentLightingSystem: failed while scanning '{}': {}.",
+					rootDirectory.string(),
+					errorCode.message());
+			}
 		}
 
 		std::ranges::sort(m_Entries,
@@ -75,11 +77,16 @@ namespace gglab
 				return lhs.m_Path.generic_string() < rhs.m_Path.generic_string();
 			});
 
-		if (m_Entries.empty())
+		if (directoryAvailable && m_Entries.empty())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"EnvironmentLightingSystem: no valid HDR environment was found in '{}'; using procedural fallback.",
 				rootDirectory.string());
+		}
+
+		if (!SelectDefaultEnvironment())
+		{
+			RequestRebake();
 		}
 	}
 
@@ -138,19 +145,23 @@ namespace gglab
 		}
 
 		auto& entry = m_Entries[m_ActiveEntryIndex];
-		if (!entry.m_TextureId.IsValid() && !entry.m_LoadAttempted)
+		const Texture* texture = m_TextureRegistry->GetTexture(entry.m_TextureId);
+		const bool terminal = texture &&
+			(texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled);
+		if ((!entry.m_TextureId.IsValid() || !texture || terminal) &&
+			entry.m_LastLoadAttemptGeneration != m_BakeRequestGeneration)
 		{
-			entry.m_LoadAttempted = true;
+			entry.m_LastLoadAttemptGeneration = m_BakeRequestGeneration;
 			entry.m_TextureId = m_TextureRegistry->LoadTextureAsync(
 				entry.m_Path,
 				TextureSemantic::Environment,
 				TaskPriority::High).m_TextureId;
+			texture = m_TextureRegistry->GetTexture(entry.m_TextureId);
 		}
 		if (!entry.m_TextureId.IsValid())
 		{
 			return false;
 		}
-		const Texture* texture = m_TextureRegistry->GetTexture(entry.m_TextureId);
 		if (!texture || texture->m_State != AssetState::Ready)
 		{
 			return false;
@@ -167,6 +178,9 @@ namespace gglab
 				textureDesc ? textureDesc->m_Extent.m_Height : 0u,
 				textureDesc ? textureDesc->m_ArraySize : 0u,
 				textureDesc ? textureDesc->m_Extent.m_Depth : 0u);
+			const TextureID invalidTextureId = entry.m_TextureId;
+			entry.m_TextureId.Reset();
+			GGLAB_UNUSED(m_TextureRegistry->RemoveTexture(invalidTextureId));
 			return false;
 		}
 		return true;

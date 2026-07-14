@@ -66,7 +66,40 @@ namespace gglab
 		}));
 
 		ApplyImmediateParameters();
+	}
+
+	void AlphaTestLabSession::BeginPrepare() noexcept
+	{
+		m_AssetPreparation.Reset();
 		RebuildScene();
+		m_LoadingProgress = m_AssetPreparation.BuildProgress(
+			*m_Services.m_AssetManager,
+			"Preparing Alpha Test");
+	}
+
+	void AlphaTestLabSession::TickPrepare() noexcept
+	{
+		if (!m_LoadingProgress.IsPreparing())
+		{
+			return;
+		}
+		m_LoadingProgress = m_AssetPreparation.BuildProgress(
+			*m_Services.m_AssetManager,
+			"Preparing Alpha Test");
+	}
+
+	void AlphaTestLabSession::CommitPrepare() noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			m_LoadingProgress.IsReady(),
+			"Alpha Test committed before its model was ready.");
+	}
+
+	void AlphaTestLabSession::CancelPrepare() noexcept
+	{
+		m_AssetPreparation.Reset();
+		m_World.GetRegistry().clear();
+		m_LoadingProgress = LoadingProgress::Ready();
 	}
 
 	void AlphaTestLabSession::Update(float deltaTime) noexcept
@@ -106,6 +139,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(assetManager);
 		const ModelID modelId = assetManager->LoadModelAsync(
 			std::filesystem::path(AlphaBlendModeTestPath)).m_ModelId;
+		m_AssetPreparation.TrackModel(modelId, AlphaBlendModeTestPath);
 
 		const entt::entity modelEntity = registry.create();
 		components::TransformComponent modelTransform{};
@@ -117,6 +151,13 @@ namespace gglab
 		});
 
 		BuildLighting();
+		ApplyImmediateParameters();
+	}
+
+	void AlphaTestLabSession::OnParametersRestoredForPrepare(
+		LabChangeImpact impact) noexcept
+	{
+		GGLAB_UNUSED(impact);
 		ApplyImmediateParameters();
 	}
 

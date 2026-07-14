@@ -18,7 +18,7 @@ namespace gglab
 		std::filesystem::path m_Path;
 		std::string m_DisplayName;
 		TextureID m_TextureId{};
-		bool m_LoadAttempted = false;
+		uint64_t m_LastLoadAttemptGeneration = 0;
 	};
 
 	struct EnvironmentLightingSettings

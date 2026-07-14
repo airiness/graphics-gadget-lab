@@ -8,7 +8,6 @@
 #include "Scene/Components.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
-#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/AssetLoadProgress.h"
@@ -47,10 +46,6 @@ namespace gglab
 
 	void DemoPlayground::BeginPrepare() noexcept
 	{
-		if (auto* environment = m_Services.m_Renderer->GetEnvironmentLightingSystem())
-		{
-			GGLAB_UNUSED(environment->SelectDefaultEnvironment());
-		}
 		m_World.GetRegistry().clear();
 		m_PendingModels = {
 			{
