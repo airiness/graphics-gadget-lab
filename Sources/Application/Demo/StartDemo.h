@@ -53,5 +53,7 @@ namespace gglab
 		entt::entity m_AnimatedCubeEntity = entt::null;
 		float m_AnimationTime = 0.0f;
 		LoadingProgress m_LoadingProgress{};
+		bool m_PreviousSkyboxEnabled = true;
+		bool m_HasSkyboxOverride = false;
 	};
 }

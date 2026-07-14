@@ -19,7 +19,7 @@ namespace gglab
 	{
 	public:
 		static constexpr uint64_t CacheFormatVersion = 1;
-		static constexpr uint64_t BakeAlgorithmVersion = 2;
+		static constexpr uint64_t BakeAlgorithmVersion = 3;
 
 		explicit IBLBakeCache(std::filesystem::path rootDirectory) noexcept;
 

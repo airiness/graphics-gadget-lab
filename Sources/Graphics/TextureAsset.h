@@ -25,6 +25,7 @@ namespace gglab
 	{
 		RHIFormat m_ResourceFormat = RHIFormat::Unknown;
 		RHIFormat m_ViewFormat = RHIFormat::Unknown;
+		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Texture2D;
 		RHIExtent3D m_Extent{};
 		uint16_t m_ArraySize = 1;
 		uint16_t m_MipLevels = 1;

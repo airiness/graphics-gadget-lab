@@ -150,7 +150,7 @@ namespace gglab
 		std::ifstream stream(environmentPath, std::ios::binary);
 		if (!stream)
 		{
-			FNV1a64::MixValue(hash, std::string_view("procedural-environment-v1"));
+			FNV1a64::MixValue(hash, std::string_view("procedural-environment-cubemap-v1"));
 			return hash;
 		}
 

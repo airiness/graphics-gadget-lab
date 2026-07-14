@@ -7,7 +7,9 @@
 struct SkyboxPassParameters
 {
 	uint ViewIndex;
-	uint3 Padding;
+	uint EnvironmentTextureIndex;
+	uint EnvironmentSamplerIndex;
+	uint Padding;
 };
 
 ConstantBuffer<SkyboxPassParameters> g_Pass : register(b2);
@@ -38,10 +40,9 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 		directionWS,
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 
-	TextureSamplerBindingData environmentBinding =
-		MakeTextureSamplerBinding(g_Scene.IBLResource.EnvironmentBinding);
 	float3 color = SampleTextureCubeLevel(
-		environmentBinding,
+		g_Pass.EnvironmentTextureIndex,
+		g_Pass.EnvironmentSamplerIndex,
 		environmentDirection,
 		0.0).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 	return float4(SanitizeHDRColor(color), 1.0);

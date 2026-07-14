@@ -14,23 +14,8 @@ struct IBLEnvironmentPassParameters
 
 ConstantBuffer<IBLEnvironmentPassParameters> g_Pass : register(b2);
 
-float3 ProceduralSkybox(float3 dir)
-{
-	float t = saturate(dir.y * 0.5 + 0.5);
-
-	float3 ground = float3(0.04, 0.035, 0.03);
-	float3 skyHorizon = float3(0.45, 0.55, 0.75);
-	float3 skyZenith = float3(0.08, 0.18, 0.45);
-
-	float3 sky = lerp(skyHorizon, skyZenith, pow(t, 1.5));
-	float3 color = lerp(ground, sky, t);
-
-	float3 sunDir = normalize(float3(0.2, 0.8, 0.3));
-	float sun = pow(saturate(dot(dir, sunDir)), 512.0);
-	color += sun * float3(8.0, 6.5, 4.0);
-
-	return color;
-}
+static const uint ENVIRONMENT_SOURCE_EQUIRECTANGULAR = 0;
+static const uint ENVIRONMENT_SOURCE_CUBEMAP = 1;
 
 float2 EquirectangularUvFromDirection(float3 dir)
 {
@@ -42,9 +27,13 @@ float2 EquirectangularUvFromDirection(float3 dir)
 
 float3 SampleEnvironmentSource(float3 dir)
 {
-	if (g_Pass.SourceMode == 0u)
+	if (g_Pass.SourceMode == ENVIRONMENT_SOURCE_CUBEMAP)
 	{
-		return ProceduralSkybox(dir);
+		return SampleTextureCubeLevel(
+			g_Pass.SourceTextureIndex,
+			g_Pass.SourceSamplerIndex,
+			dir,
+			0.0).rgb;
 	}
 
 	float2 uv = EquirectangularUvFromDirection(dir);

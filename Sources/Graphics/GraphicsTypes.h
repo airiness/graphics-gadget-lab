@@ -301,6 +301,7 @@ namespace gglab
 		std::string m_DebugLabel;
 		RHITextureHandle m_Texture;
 		RHITextureDesc m_Desc{};
+		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
 		bool m_IsUploaded = false;
 	};
 

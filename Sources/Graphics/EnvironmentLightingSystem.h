@@ -13,6 +13,20 @@ namespace gglab
 	class RenderResourceRegistry;
 	class TextureRegistry;
 
+	enum class EnvironmentTextureSourceType : uint8_t
+	{
+		Equirectangular,
+		Cubemap,
+	};
+
+	struct EnvironmentTextureSource
+	{
+		TextureID m_TextureId{};
+		EnvironmentTextureSourceType m_Type = EnvironmentTextureSourceType::Equirectangular;
+
+		[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
+	};
+
 	struct EnvironmentMapEntry
 	{
 		std::filesystem::path m_Path;
@@ -53,7 +67,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] const EnvironmentMapEntry* GetActiveEnvironment() const noexcept;
-		[[nodiscard]] TextureID GetActiveTextureId() const noexcept;
+		[[nodiscard]] EnvironmentTextureSource GetBakeSource() const noexcept;
 		[[nodiscard]] bool EnsureActiveEnvironmentTextureLoaded() noexcept;
 		[[nodiscard]] AssetState GetActiveEnvironmentTextureState() const noexcept;
 

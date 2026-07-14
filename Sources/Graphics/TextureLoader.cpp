@@ -6,6 +6,7 @@
 #include "Core/Utility/PathUtils.h"
 
 #include <DirectXTex.h>
+#include <DirectXPackedVector.h>
 
 #include <cctype>
 #include <cmath>
@@ -110,6 +111,13 @@ namespace gglab
 			const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
 			result.m_ResourceFormat = ToTextureResourceFormat(metadata.format);
 			result.m_ViewFormat = ToTextureViewFormat(metadata.format, colorSpace);
+			result.m_SrvDimension = metadata.IsCubemap() ?
+				(metadata.arraySize == CubemapFaceCount ?
+					RHITextureViewDimension::TextureCube :
+					RHITextureViewDimension::TextureCubeArray) :
+				(metadata.arraySize > 1 ?
+					RHITextureViewDimension::Texture2DArray :
+					RHITextureViewDimension::Texture2D);
 			result.m_Extent =
 			{
 				.m_Width = static_cast<uint32_t>(metadata.width),
@@ -475,6 +483,67 @@ namespace gglab
 		return result;
 	}
 
+	TextureAssetData TextureLoader::MakeTextureCubeRgba16Float(
+		uint32_t faceSize,
+		std::span<const float> rgbaPixels) noexcept
+	{
+		TextureAssetData result{};
+		constexpr size_t channelCount = 4;
+		constexpr size_t channelBytes = sizeof(uint16_t);
+		const size_t expectedChannelCount =
+			static_cast<size_t>(faceSize) * faceSize * CubemapFaceCount * channelCount;
+		if (faceSize == 0 || rgbaPixels.size() != expectedChannelCount)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureLoader::MakeTextureCubeRgba16Float received invalid texture data.");
+			return result;
+		}
+
+		std::vector<uint16_t> halfPixels(expectedChannelCount);
+		for (size_t channelIndex = 0; channelIndex < expectedChannelCount; ++channelIndex)
+		{
+			const float value = std::clamp(
+				std::isfinite(rgbaPixels[channelIndex]) ? rgbaPixels[channelIndex] : 0.0f,
+				0.0f,
+				MaxHalfFloatRadiance);
+			halfPixels[channelIndex] = DirectX::PackedVector::XMConvertFloatToHalf(value);
+		}
+
+		result.m_ResourceFormat = RHIFormat::R16G16B16A16Float;
+		result.m_ViewFormat = RHIFormat::R16G16B16A16Float;
+		result.m_SrvDimension = RHITextureViewDimension::TextureCube;
+		result.m_Extent =
+		{
+			.m_Width = faceSize,
+			.m_Height = faceSize,
+			.m_Depth = 1,
+		};
+		result.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
+		result.m_MipLevels = 1;
+		result.m_ColorSpace = TextureColorSpace::Linear;
+		result.m_Pixels.resize(halfPixels.size() * channelBytes);
+		std::memcpy(result.m_Pixels.data(), halfPixels.data(), result.m_Pixels.size());
+
+		const uint64_t rowPitch = static_cast<uint64_t>(faceSize) * channelCount * channelBytes;
+		const uint64_t slicePitch = rowPitch * faceSize;
+		for (uint32_t face = 0; face < CubemapFaceCount; ++face)
+		{
+			result.m_Subresources.push_back(
+				{
+					.m_DataOffset = slicePitch * face,
+					.m_DataSize = slicePitch,
+					.m_RowPitch = rowPitch,
+					.m_SlicePitch = slicePitch,
+					.m_Width = faceSize,
+					.m_Height = faceSize,
+					.m_Depth = 1,
+					.m_MipLevel = 0,
+					.m_ArraySlice = face,
+				});
+		}
+		return result;
+	}
+
 	bool TextureLoader::SaveTextureDataToDDS(
 		const TextureAssetData& textureData,
 		const std::filesystem::path& path) noexcept
@@ -520,7 +589,13 @@ namespace gglab
 		metadata.mipLevels = textureData.m_MipLevels;
 		metadata.format = format;
 		metadata.dimension = DirectX::TEX_DIMENSION_TEXTURE2D;
-		if (textureData.m_ArraySize == CubemapFaceCount)
+		// Generic GPU readback data currently carries only the resource description,
+		// not the source SRV dimension. Preserve the six-slice fallback for IBL cache
+		// payloads while preferring explicit asset metadata everywhere else.
+		if (textureData.m_SrvDimension == RHITextureViewDimension::TextureCube ||
+			textureData.m_SrvDimension == RHITextureViewDimension::TextureCubeArray ||
+			(textureData.m_SrvDimension == RHITextureViewDimension::Texture2D &&
+				textureData.m_ArraySize == CubemapFaceCount))
 		{
 			metadata.miscFlags = DirectX::TEX_MISC_TEXTURECUBE;
 		}
