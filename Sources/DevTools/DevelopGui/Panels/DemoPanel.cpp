@@ -51,7 +51,29 @@ namespace gglab
 
 		if (m_DemoManager->HasPendingActiveDemo())
 		{
-			ImGui::TextDisabled("The selection will be applied at the next frame boundary.");
+			ImGui::Text("Pending Demo: %s", preview.c_str());
+		}
+		if (const auto progress = m_DemoManager->GetLoadingProgress())
+		{
+			const float fraction = std::clamp(progress->m_Fraction, 0.0f, 1.0f);
+			const std::string percentage = std::format(
+				"{}%",
+				static_cast<int32_t>(std::round(fraction * 100.0f)));
+			ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0.0f), percentage.c_str());
+			if (!progress->m_Stage.empty())
+			{
+				ImGui::TextUnformatted(progress->m_Stage.c_str());
+			}
+			if (!progress->m_Detail.empty())
+			{
+				ImGui::TextWrapped("%s", progress->m_Detail.c_str());
+			}
+		}
+		if (m_DemoManager->GetRetiringDemoCount() > 0)
+		{
+			ImGui::TextDisabled(
+				"Retiring demos: %u (waiting for GPU fences)",
+				m_DemoManager->GetRetiringDemoCount());
 		}
 	}
 }

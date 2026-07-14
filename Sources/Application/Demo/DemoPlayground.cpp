@@ -13,6 +13,45 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] float AssetProgress(AssetState state) noexcept
+		{
+			switch (state)
+			{
+			case AssetState::Unloaded: return 0.0f;
+			case AssetState::Queued: return 0.05f;
+			case AssetState::LoadingCpu: return 0.25f;
+			case AssetState::CpuReady: return 0.55f;
+			case AssetState::UploadQueued: return 0.65f;
+			case AssetState::GpuProcessing: return 0.85f;
+			case AssetState::Ready: return 1.0f;
+			case AssetState::Failed:
+			case AssetState::Cancelled:
+				return 0.0f;
+			}
+			return 0.0f;
+		}
+
+		[[nodiscard]] const char* AssetStage(AssetState state) noexcept
+		{
+			switch (state)
+			{
+			case AssetState::Queued: return "Queued for CPU import";
+			case AssetState::LoadingCpu: return "Importing model and decoding textures";
+			case AssetState::CpuReady: return "Preparing GPU resources";
+			case AssetState::UploadQueued: return "Queued for GPU upload";
+			case AssetState::GpuProcessing: return "Uploading resources and generating mips";
+			case AssetState::Ready: return "Model ready";
+			case AssetState::Failed: return "Model load failed";
+			case AssetState::Cancelled: return "Model load cancelled";
+			case AssetState::Unloaded:
+			default:
+				return "Preparing model request";
+			}
+		}
+	}
+
 	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo) noexcept :
 		m_Services(createInfo.m_Services)
 	{
@@ -40,9 +79,113 @@ namespace gglab
 
 		// RenderPipeline
 		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
+	}
 
-		// Scene initialize
-		InitializeScene();
+	void DemoPlayground::BeginPrepare() noexcept
+	{
+		m_World.GetRegistry().clear();
+		m_PendingModels = {
+			{
+				.m_Path = "Assets/Models/Sponza/Sponza.gltf",
+				.m_Position = Vector3::Zero,
+				.m_Rotation = Vector3::Zero,
+				.m_Scale = Vector3::One,
+			},
+			{
+				.m_Path = "Assets/Models/FlightHelmet/FlightHelmet.gltf",
+				.m_Position = Vector3::Zero,
+				.m_Rotation = Vector3::Zero,
+				.m_Scale = Vector3::One,
+			},
+		};
+
+		auto* assetManager = m_Services.m_AssetManager;
+		GGLAB_ASSERT_NOT_NULL(assetManager);
+		for (PendingModel& pending : m_PendingModels)
+		{
+			pending.m_ModelId = assetManager->LoadModelAsync(pending.m_Path).m_ModelId;
+			if (!pending.m_ModelId.IsValid())
+			{
+				m_LoadingProgress = {
+					.m_Status = LoadingStatus::Failed,
+					.m_Fraction = 0.0f,
+					.m_Stage = "Model request failed",
+					.m_Detail = pending.m_Path.generic_string(),
+				};
+				return;
+			}
+		}
+
+		m_LoadingProgress = {
+			.m_Status = LoadingStatus::Preparing,
+			.m_Fraction = 0.05f,
+			.m_Stage = "Loading scene models",
+			.m_Detail = m_PendingModels.front().m_Path.generic_string(),
+		};
+	}
+
+	void DemoPlayground::TickPrepare() noexcept
+	{
+		if (!m_LoadingProgress.IsPreparing())
+		{
+			return;
+		}
+
+		float totalProgress = 0.0f;
+		const PendingModel* current = nullptr;
+		AssetState currentState = AssetState::Unloaded;
+		for (const PendingModel& pending : m_PendingModels)
+		{
+			const Model* model = m_Services.m_AssetManager->GetModel(pending.m_ModelId);
+			if (!model || model->m_State == AssetState::Failed ||
+				model->m_State == AssetState::Cancelled)
+			{
+				m_LoadingProgress = {
+					.m_Status = LoadingStatus::Failed,
+					.m_Fraction = m_LoadingProgress.m_Fraction,
+					.m_Stage = "Model load failed",
+					.m_Detail = pending.m_Path.generic_string(),
+				};
+				return;
+			}
+
+			totalProgress += AssetProgress(model->m_State);
+			if (!current && model->m_State != AssetState::Ready)
+			{
+				current = &pending;
+				currentState = model->m_State;
+			}
+		}
+
+		const float modelProgress = m_PendingModels.empty() ? 1.0f :
+			totalProgress / static_cast<float>(m_PendingModels.size());
+		m_LoadingProgress.m_Fraction = 0.05f + modelProgress * 0.9f;
+		if (current)
+		{
+			m_LoadingProgress.m_Stage = AssetStage(currentState);
+			m_LoadingProgress.m_Detail = current->m_Path.generic_string();
+			return;
+		}
+
+		m_LoadingProgress = {
+			.m_Status = LoadingStatus::Ready,
+			.m_Fraction = 1.0f,
+			.m_Stage = "Scene ready",
+			.m_Detail = "All models and GPU resources are ready.",
+		};
+	}
+
+	void DemoPlayground::CommitPrepare() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(), "DemoPlayground committed before preparation completed.");
+		CommitScene();
+		m_PendingModels.clear();
+	}
+
+	void DemoPlayground::CancelPrepare() noexcept
+	{
+		m_PendingModels.clear();
+		m_LoadingProgress = LoadingProgress::Ready();
 	}
 
 	void DemoPlayground::OnEnter() noexcept
@@ -86,48 +229,25 @@ namespace gglab
 		camera.Update();
 	}
 
-	void DemoPlayground::InitializeScene() noexcept
+	void DemoPlayground::CommitScene() noexcept
 	{
-		auto* assetManager = m_Services.m_AssetManager;
-		GGLAB_ASSERT_NOT_NULL(assetManager);
 		auto& registry = m_World.GetRegistry();
+		for (const PendingModel& pending : m_PendingModels)
+		{
+			auto entity = registry.create();
+			components::TransformComponent transformComp{};
+			transformComp.m_Position = pending.m_Position;
+			transformComp.m_Rotation = math::CreateFromYawPitchRoll(
+				math::ToRadians(pending.m_Rotation.m_Y),
+				math::ToRadians(pending.m_Rotation.m_X),
+				math::ToRadians(pending.m_Rotation.m_Z));
+			transformComp.m_Scale = pending.m_Scale;
+			registry.emplace<components::TransformComponent>(entity, transformComp);
 
-		auto createEntityWithModel = [&](
-			const std::filesystem::path& modelPath,
-			const Vector3& position,
-			const Vector3& rotation,
-			const Vector3& scale)
-			{
-				const auto request = assetManager->LoadModelAsync(modelPath);
-				const ModelID modelId = request.m_ModelId;
-				auto entity = registry.create();
-				components::TransformComponent transformComp{};
-				transformComp.m_Position = position;
-				transformComp.m_Rotation = math::CreateFromYawPitchRoll(
-					math::ToRadians(rotation.m_Y),
-					math::ToRadians(rotation.m_X),
-					math::ToRadians(rotation.m_Z));
-				transformComp.m_Scale = scale;
-				registry.emplace<components::TransformComponent>(entity, transformComp);
-
-				components::ModelComponent modelComp{};
-				modelComp.m_ModelId = modelId;
-				registry.emplace<components::ModelComponent>(entity, modelComp);
-			};
-
-		// Test Sponza
-		createEntityWithModel(
-			"Assets/Models/Sponza/Sponza.gltf",
-			Vector3::Zero,
-			Vector3::Zero,
-			Vector3::One);
-
-		// Flight helmet
-		createEntityWithModel(
-			"Assets/Models/FlightHelmet/FlightHelmet.gltf",
-			Vector3(0.0f, 0.0f, 0.0f),
-			Vector3::Zero,
-			Vector3::One);
+			components::ModelComponent modelComp{};
+			modelComp.m_ModelId = pending.m_ModelId;
+			registry.emplace<components::ModelComponent>(entity, modelComp);
+		}
 
 		// Main Light
 		{

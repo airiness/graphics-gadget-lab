@@ -249,6 +249,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShell.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabCatalog.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabCommandQueue.cpp" />
@@ -260,6 +261,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
@@ -478,7 +480,9 @@
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShell.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\Application\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabCatalog.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabInterfaces.h" />
@@ -498,6 +502,7 @@
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />

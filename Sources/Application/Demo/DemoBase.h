@@ -1,6 +1,8 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
+#include "Application/LoadingProgress.h"
 
+#include <optional>
 #include <string_view>
 
 namespace gglab
@@ -18,6 +20,19 @@ namespace gglab
 		virtual ~DemoBase() = default;
 
 		virtual std::string_view GetName() const noexcept = 0;
+
+		virtual void BeginPrepare() noexcept {}
+		virtual void TickPrepare() noexcept {}
+		virtual LoadingProgress GetPreparationProgress() const noexcept
+		{
+			return LoadingProgress::Ready();
+		}
+		virtual void CommitPrepare() noexcept {}
+		virtual void CancelPrepare() noexcept {}
+		virtual std::optional<LoadingProgress> GetActiveLoadingProgress() const noexcept
+		{
+			return std::nullopt;
+		}
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept {}

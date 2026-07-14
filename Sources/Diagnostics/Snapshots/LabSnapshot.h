@@ -54,6 +54,8 @@ namespace gglab
 		std::vector<LabDescriptor> m_AvailableLabs;
 		LabId m_ActiveLabId;
 		std::string m_ActiveLabName;
+		LabId m_PendingLabId;
+		std::string m_PendingLabName;
 		std::string m_Category;
 		std::string m_Description;
 		uint32_t m_SchemaVersion = 0;
@@ -65,8 +67,13 @@ namespace gglab
 		float m_EffectiveDeltaTime = 0.0f;
 		std::vector<LabParameterSnapshot> m_Parameters;
 		LabDiagnosticsSnapshot m_Diagnostics;
+		float m_LoadingFraction = 0.0f;
+		std::string m_LoadingStage;
+		std::string m_LoadingDetail;
 		std::string m_LastError;
+		uint32_t m_RetiringSessionCount = 0;
 		bool m_HasPendingCommands = false;
+		bool m_HasPendingSession = false;
 		bool m_IsHostActive = false;
 	};
 

@@ -38,7 +38,9 @@ namespace gglab
 			m_CommandQueue.RequestRunConfig(config);
 		}
 		void ProcessPendingCommands() noexcept;
+		void TickTransitions() noexcept;
 		LabSnapshot GetLabSnapshot() const noexcept override;
+		[[nodiscard]] std::optional<LoadingProgress> GetLoadingProgress() const noexcept;
 
 		LabRunState GetState() const noexcept { return m_State; }
 		bool IsInitialized() const noexcept
@@ -48,6 +50,11 @@ namespace gglab
 				m_State != LabRunState::Failed;
 		}
 		bool IsReady() const noexcept { return m_State == LabRunState::Ready && m_ActiveSession; }
+		bool HasPendingSession() const noexcept { return m_PendingSession != nullptr; }
+		uint32_t GetRetiringSessionCount() const noexcept
+		{
+			return static_cast<uint32_t>(m_RetiringSessions.size());
+		}
 		std::string_view GetLastError() const noexcept { return m_LastError; }
 		const LabCatalog& GetCatalog() const noexcept { return m_Catalog; }
 		const LabSessionBase* GetActiveSession() const noexcept { return m_ActiveSession.get(); }
@@ -59,10 +66,13 @@ namespace gglab
 		RenderPipelineBase& GetRenderPipeline() noexcept;
 
 	private:
-		bool ReplaceActiveSession(const LabId& id, bool waitForGpu) noexcept;
+		bool BeginSessionTransition(
+			const LabId& id,
+			std::span<const LabParameterValue> values = {}) noexcept;
+		bool CommitPendingSession() noexcept;
 		bool RestartActiveSessionWithValues(
 			std::span<const LabParameterValue> values) noexcept;
-		void WaitForGpuIdle() noexcept;
+		void PollRetiringSessions() noexcept;
 		void SetError(std::string message) noexcept;
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;
 
@@ -70,8 +80,16 @@ namespace gglab
 		LabCatalog m_Catalog;
 		LabCommandQueue m_CommandQueue;
 		std::unique_ptr<LabSessionBase> m_ActiveSession;
+		std::unique_ptr<LabSessionBase> m_PendingSession;
+		struct RetiringSession
+		{
+			std::unique_ptr<LabSessionBase> m_Instance;
+			RHIFencePoint m_RetireFence{};
+		};
+		std::vector<RetiringSession> m_RetiringSessions;
 		std::string m_LastError;
 		LabRunState m_State = LabRunState::Uninitialized;
+		LabRunState m_StateBeforeTransition = LabRunState::Uninitialized;
 		uint64_t m_FrameInSession = 0;
 		uint32_t m_WarmupFramesRemaining = 0;
 		float m_EffectiveDeltaTime = 0.0f;

@@ -37,6 +37,13 @@ namespace gglab
 		{
 			return nullptr;
 		}
+		const bool isActive = m_DemoManager->GetActiveIndex() == m_LabHostIndex;
+		const bool isPending = m_DemoManager->HasPendingActiveDemo() &&
+			m_DemoManager->GetPendingActiveIndex() == m_LabHostIndex;
+		if (!isActive && !isPending)
+		{
+			return nullptr;
+		}
 
 		DemoBase* demo = m_DemoManager->GetDemo(m_LabHostIndex);
 		return demo ? static_cast<DemoLabHost*>(demo) : nullptr;

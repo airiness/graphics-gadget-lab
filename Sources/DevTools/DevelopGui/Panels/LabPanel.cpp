@@ -157,7 +157,7 @@ namespace gglab
 		LabRuntime* runtime = m_RuntimeLocator->GetLabRuntimeIfCreated();
 		if (!runtime)
 		{
-			ImGui::TextDisabled("Demo.LabHost has not been created yet.");
+			ImGui::TextDisabled("Demo.LabHost is not active or preparing.");
 			return;
 		}
 
@@ -197,6 +197,29 @@ namespace gglab
 		}
 
 		ImGui::Text("State: %s", ToText(snapshot.m_State));
+		if (snapshot.m_HasPendingSession)
+		{
+			ImGui::Text("Pending Lab: %s", snapshot.m_PendingLabName.c_str());
+			const float fraction = std::clamp(snapshot.m_LoadingFraction, 0.0f, 1.0f);
+			const std::string percentage = std::format(
+				"{}%",
+				static_cast<int32_t>(std::round(fraction * 100.0f)));
+			ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0.0f), percentage.c_str());
+			if (!snapshot.m_LoadingStage.empty())
+			{
+				ImGui::TextUnformatted(snapshot.m_LoadingStage.c_str());
+			}
+			if (!snapshot.m_LoadingDetail.empty())
+			{
+				ImGui::TextWrapped("%s", snapshot.m_LoadingDetail.c_str());
+			}
+		}
+		if (snapshot.m_RetiringSessionCount > 0)
+		{
+			ImGui::TextDisabled(
+				"Retiring sessions: %u (waiting for GPU fences)",
+				snapshot.m_RetiringSessionCount);
+		}
 		ImGui::Text("Session frame: %llu", snapshot.m_FrameInSession);
 		if (snapshot.m_State == LabRunState::WarmingUp)
 		{

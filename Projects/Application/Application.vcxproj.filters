@@ -453,6 +453,9 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShell.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
@@ -485,6 +488,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
@@ -1127,6 +1133,9 @@
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShell.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
@@ -1135,6 +1144,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h">
       <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\LoadingProgress.h">
+      <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabCatalog.h">
       <Filter>Application\Lab</Filter>
@@ -1189,6 +1201,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>

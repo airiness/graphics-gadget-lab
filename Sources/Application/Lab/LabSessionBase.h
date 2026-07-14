@@ -1,5 +1,6 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
+#include "Application/LoadingProgress.h"
 #include "Application/Lab/LabParameter.h"
 #include "Application/Lab/LabRunConfig.h"
 #include "Application/Lab/LabTypes.h"
@@ -41,6 +42,16 @@ namespace gglab
 			LabChangeImpact* impact = nullptr) noexcept;
 		LabChangeImpact ResetParameters() noexcept;
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
+		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
+
+		virtual void BeginPrepare() noexcept {}
+		virtual void TickPrepare() noexcept {}
+		virtual LoadingProgress GetPreparationProgress() const noexcept
+		{
+			return LoadingProgress::Ready();
+		}
+		virtual void CommitPrepare() noexcept {}
+		virtual void CancelPrepare() noexcept {}
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnExit() noexcept {}
@@ -75,6 +86,7 @@ namespace gglab
 		virtual void ApplyImmediateParameters() noexcept {}
 		virtual void RebuildScene() noexcept {}
 		virtual void RecreatePipeline() noexcept {}
+		virtual void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept;
 
 		void SetRenderPipeline(std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept;
 
