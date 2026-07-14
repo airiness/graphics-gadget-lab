@@ -75,17 +75,28 @@ namespace gglab
 				return lhs.m_Path.generic_string() < rhs.m_Path.generic_string();
 			});
 
+		if (m_Entries.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"EnvironmentLightingSystem: no valid HDR environment was found in '{}'; using procedural fallback.",
+				rootDirectory.string());
+		}
+	}
+
+	bool EnvironmentLightingSystem::SelectDefaultEnvironment() noexcept
+	{
+		if (GetActiveEnvironment())
+		{
+			return true;
+		}
 		for (size_t entryIndex = 0; entryIndex < m_Entries.size(); ++entryIndex)
 		{
 			if (SelectEnvironment(entryIndex))
 			{
-				return;
+				return true;
 			}
 		}
-
-		GGLAB_LOG_GRAPHICS_WARN(
-			"EnvironmentLightingSystem: no valid HDR environment was found in '{}'; using procedural fallback.",
-			rootDirectory.string());
+		return false;
 	}
 
 	bool EnvironmentLightingSystem::SelectEnvironment(size_t entryIndex) noexcept

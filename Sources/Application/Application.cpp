@@ -7,6 +7,7 @@
 #include "Application/Demo/DemoLoadingShell.h"
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
+#include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Core/Time.h"
@@ -205,6 +206,12 @@ namespace gglab
 		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId ?
 			LabId(*m_LaunchOptions.m_StartupLabId) : CullingLabSession::GetId();
+		const uint32_t startIndex = m_DemoManager->RegisterDemo(
+			"Demo.Start",
+			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
+			{
+				return std::make_unique<StartDemo>(demoCreateInfo);
+			});
 		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo(
 			"Demo.Playground",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
@@ -217,7 +224,8 @@ namespace gglab
 			{
 				return std::make_unique<DemoLabHost>(demoCreateInfo, startupLab);
 			});
-		if (playgroundIndex >= m_DemoManager->GetDemoCount() ||
+		if (startIndex >= m_DemoManager->GetDemoCount() ||
+			playgroundIndex >= m_DemoManager->GetDemoCount() ||
 			labHostIndex >= m_DemoManager->GetDemoCount())
 		{
 			GGLAB_LOG_ERROR("Failed to register startup demos.");
@@ -225,17 +233,29 @@ namespace gglab
 			Finalize();
 			return;
 		}
-		const uint32_t startupDemoIndex =
-			m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost ?
-			labHostIndex : playgroundIndex;
+		uint32_t startupDemoIndex = startIndex;
+		std::string_view startupDemoName = "Demo.Start";
+		switch (m_LaunchOptions.m_StartupDemo)
+		{
+		case ApplicationStartupDemo::Playground:
+			startupDemoIndex = playgroundIndex;
+			startupDemoName = "Demo.Playground";
+			break;
+		case ApplicationStartupDemo::LabHost:
+			startupDemoIndex = labHostIndex;
+			startupDemoName = "Demo.LabHost";
+			break;
+		case ApplicationStartupDemo::Start:
+		default:
+			break;
+		}
 		m_DemoManager->RequestActiveDemo(startupDemoIndex);
 		m_LabRuntimeLocator = std::make_unique<DemoLabRuntimeLocator>(
 			m_DemoManager.get(),
 			labHostIndex);
 		GGLAB_LOG_INFO(
 			"Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
-			m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost ?
-				"Demo.LabHost" : "Demo.Playground",
+			startupDemoName,
 			startupLab.GetName(),
 			m_LaunchOptions.m_StartWithAbsoluteMouse ? "absolute" : "relative");
 

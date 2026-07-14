@@ -50,26 +50,29 @@ namespace gglab
 					RenderResourceRegistry::TextureIndex::IBL_BrdfLut,
 					"IBL.BrdfLut");
 
-				iblRes.m_BakeEnvironmentCubemap = ImportRuntimeTexture(builder,
-					*renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
-					"IBL.Bake.EnvironmentCubemap",
-					true);
-				iblRes.m_BakeIrradianceCubemap = ImportRuntimeTexture(builder,
-					*renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
-					"IBL.Bake.IrradianceCubemap",
-					true);
-				iblRes.m_BakePrefilteredSpecularCubemap = ImportRuntimeTexture(builder,
-					*renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
-					"IBL.Bake.PrefilteredSpecularCubemap",
-					true);
-				iblRes.m_BakeBrdfLut = ImportRuntimeTexture(builder,
-					*renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_BrdfLut,
-					"IBL.Bake.BrdfLut",
-					true);
+				if (renderResRegistry->HasIBLBakeResources())
+				{
+					iblRes.m_BakeEnvironmentCubemap = ImportRuntimeTexture(builder,
+						*renderResRegistry,
+						RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
+						"IBL.Bake.EnvironmentCubemap",
+						true);
+					iblRes.m_BakeIrradianceCubemap = ImportRuntimeTexture(builder,
+						*renderResRegistry,
+						RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
+						"IBL.Bake.IrradianceCubemap",
+						true);
+					iblRes.m_BakePrefilteredSpecularCubemap = ImportRuntimeTexture(builder,
+						*renderResRegistry,
+						RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
+						"IBL.Bake.PrefilteredSpecularCubemap",
+						true);
+					iblRes.m_BakeBrdfLut = ImportRuntimeTexture(builder,
+						*renderResRegistry,
+						RenderResourceRegistry::TextureIndex::IBL_BrdfLut,
+						"IBL.Bake.BrdfLut",
+						true);
+				}
 
 				auto& previewResources = builder.GetBlackboard()
 					.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
@@ -134,10 +137,13 @@ namespace gglab
 				builder.Export(ibl.m_IrradianceCubemap, RGTextureAccess::None);
 				builder.Export(ibl.m_PrefilteredSpecularCubemap, RGTextureAccess::None);
 				builder.Export(ibl.m_BrdfLut, RGTextureAccess::None);
-				builder.Export(ibl.m_BakeEnvironmentCubemap, RGTextureAccess::None);
-				builder.Export(ibl.m_BakeIrradianceCubemap, RGTextureAccess::None);
-				builder.Export(ibl.m_BakePrefilteredSpecularCubemap, RGTextureAccess::None);
-				builder.Export(ibl.m_BakeBrdfLut, RGTextureAccess::None);
+				if (ibl.m_BakeEnvironmentCubemap.IsValid())
+				{
+					builder.Export(ibl.m_BakeEnvironmentCubemap, RGTextureAccess::None);
+					builder.Export(ibl.m_BakeIrradianceCubemap, RGTextureAccess::None);
+					builder.Export(ibl.m_BakePrefilteredSpecularCubemap, RGTextureAccess::None);
+					builder.Export(ibl.m_BakeBrdfLut, RGTextureAccess::None);
+				}
 
 				auto& previews = builder.GetBlackboard().Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
 				builder.Export(previews.m_EnvironmentCubemapPreview, RGTextureAccess::None);

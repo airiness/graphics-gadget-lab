@@ -19,6 +19,11 @@ namespace gglab
 
 		std::optional<ApplicationStartupDemo> ParseDemo(std::string_view value) noexcept
 		{
+			if (EqualsIgnoreCase(value, "start") ||
+				EqualsIgnoreCase(value, "demo.start"))
+			{
+				return ApplicationStartupDemo::Start;
+			}
 			if (EqualsIgnoreCase(value, "playground") ||
 				EqualsIgnoreCase(value, "demo.playground"))
 			{
@@ -68,7 +73,7 @@ namespace gglab
 				if (!demo)
 				{
 					result.m_Error = std::format(
-						"Unknown demo '{}'. Expected 'playground' or 'lab'.",
+						"Unknown demo '{}'. Expected 'start', 'playground', or 'lab'.",
 						arguments[index]);
 					return result;
 				}
@@ -99,9 +104,10 @@ namespace gglab
 		if (result.m_Options.m_StartupLabId)
 		{
 			if (demoSpecified &&
-				result.m_Options.m_StartupDemo == ApplicationStartupDemo::Playground)
+				result.m_Options.m_StartupDemo != ApplicationStartupDemo::LabHost)
 			{
-				result.m_Error = "Option '--lab' cannot be combined with '--demo playground'.";
+				result.m_Error =
+					"Option '--lab' cannot be combined with a non-LabHost '--demo' value.";
 				return result;
 			}
 			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
@@ -115,7 +121,7 @@ namespace gglab
 			"Usage: GraphicsGadgetLab.exe [options]\n"
 			"\n"
 			"Options:\n"
-			"  --demo <playground|lab>  Select the startup demo.\n"
+			"  --demo <start|playground|lab>  Select the startup demo.\n"
 			"  --lab <stable-lab-id>    Start LabHost with the requested Lab.\n"
 			"  --absolute-mouse         Start with a visible, uncaptured cursor.\n"
 			"  --help, -h               Show this help text.\n";

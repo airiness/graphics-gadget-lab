@@ -5,12 +5,15 @@
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
+#include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/Renderer.h"
 
 namespace gglab
 {
 	DemoLabHost::DemoLabHost(
 		const DemoCreateInfo& createInfo,
 		const LabId& startupLab) noexcept :
+		m_Renderer(createInfo.m_Services.m_Renderer),
 		m_StartupLab(startupLab),
 		m_Runtime({
 			.m_Services = createInfo.m_Services,
@@ -48,6 +51,10 @@ namespace gglab
 
 	void DemoLabHost::BeginPrepare() noexcept
 	{
+		if (auto* environment = m_Renderer->GetEnvironmentLightingSystem())
+		{
+			GGLAB_UNUSED(environment->SelectDefaultEnvironment());
+		}
 		GGLAB_UNUSED(m_Runtime.Initialize(m_StartupLab));
 	}
 

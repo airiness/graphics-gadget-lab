@@ -2,6 +2,7 @@
 #include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
+#include "Graphics/AssetLoadProgress.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
@@ -49,36 +50,6 @@ namespace gglab
 		float GridFactor(uint32_t index) noexcept
 		{
 			return static_cast<float>(index) / static_cast<float>(GridSize - 1);
-		}
-
-		float GetAssetLoadingFraction(AssetState state) noexcept
-		{
-			switch (state)
-			{
-			case AssetState::Queued: return 0.05f;
-			case AssetState::LoadingCpu: return 0.25f;
-			case AssetState::CpuReady: return 0.55f;
-			case AssetState::UploadQueued: return 0.65f;
-			case AssetState::GpuProcessing: return 0.85f;
-			case AssetState::Ready: return 1.0f;
-			default: return 0.0f;
-			}
-		}
-
-		std::string_view GetAssetLoadingStage(AssetState state) noexcept
-		{
-			switch (state)
-			{
-			case AssetState::Queued: return "Queued for CPU import";
-			case AssetState::LoadingCpu: return "Parsing model and decoding textures";
-			case AssetState::CpuReady: return "CPU preparation complete";
-			case AssetState::UploadQueued: return "Queued for GPU upload";
-			case AssetState::GpuProcessing: return "Uploading resources and generating mips";
-			case AssetState::Ready: return "Model ready";
-			case AssetState::Failed: return "Model loading failed";
-			case AssetState::Cancelled: return "Model loading cancelled";
-			default: return "Preparing model request";
-			}
 		}
 
 		bool ComputeModelBounds(
@@ -283,36 +254,59 @@ namespace gglab
 			{
 				BuildProceduralGridRow(m_NextGridRow);
 				++m_NextGridRow;
-				m_LoadingProgress.m_Fraction = 0.05f +
-					0.85f * static_cast<float>(m_NextGridRow) / static_cast<float>(GridSize);
-				m_LoadingProgress.m_Detail = m_NextGridRow < GridSize ?
-					std::format("Preparing row {} of {}.", m_NextGridRow + 1, GridSize) :
-					"Finalizing lighting and material parameters.";
 			}
+
+			LoadingProgressBuilder progress;
+			const float gridFraction =
+				static_cast<float>(m_NextGridRow) / static_cast<float>(GridSize);
+			progress.AddStep(0.85f, {
+				.m_Status = m_NextGridRow == GridSize ?
+					LoadingStatus::Ready : LoadingStatus::Preparing,
+				.m_Fraction = gridFraction,
+				.m_Stage = "Building procedural material grid",
+				.m_Detail = m_NextGridRow < GridSize ?
+					std::format("Preparing row {} of {}.", m_NextGridRow + 1, GridSize) :
+					"Procedural grid complete.",
+			});
 			if (m_NextGridRow == GridSize)
 			{
 				const Mesh* sphereMesh = m_Services.m_AssetManager->GetMesh(
 					ProceduralSphereMeshID);
-				if (!sphereMesh || sphereMesh->m_State == AssetState::Failed ||
-					sphereMesh->m_State == AssetState::Cancelled)
+				if (!sphereMesh)
 				{
-					m_LoadingProgress.m_Status = LoadingStatus::Failed;
-					m_LoadingProgress.m_Stage = "Procedural mesh upload failed";
-					m_LoadingProgress.m_Detail = "ProceduralSphere";
+					progress.AddStep(0.15f, {
+						.m_Status = LoadingStatus::Failed,
+						.m_Fraction = 0.0f,
+						.m_Stage = "Procedural mesh unavailable",
+						.m_Detail = "ProceduralSphere",
+					});
+					m_LoadingProgress = progress.Build();
 					return;
 				}
-				if (sphereMesh->m_State != AssetState::Ready)
+
+				const AssetLoadProgress meshProgress = GetAssetLoadProgress(
+					sphereMesh->m_State,
+					AssetLoadKind::Mesh);
+				progress.AddAssetStep(0.15f, meshProgress, "ProceduralSphere");
+				m_LoadingProgress = progress.Build();
+				if (!meshProgress.IsReady())
 				{
-					m_LoadingProgress.m_Fraction = 0.9f +
-						0.09f * GetAssetLoadingFraction(sphereMesh->m_State);
-					m_LoadingProgress.m_Stage = "Uploading procedural sphere mesh to GPU";
-					m_LoadingProgress.m_Detail = GetAssetLoadingStage(sphereMesh->m_State);
 					return;
 				}
 				BuildLighting();
 				ApplyImmediateParameters();
 				m_PrepareMode = PrepareMode::None;
 				m_LoadingProgress = LoadingProgress::Ready();
+			}
+			else
+			{
+				progress.AddStep(0.15f, {
+					.m_Status = LoadingStatus::Preparing,
+					.m_Fraction = 0.0f,
+					.m_Stage = "Waiting for procedural mesh upload",
+					.m_Detail = "ProceduralSphere",
+				});
+				m_LoadingProgress = progress.Build();
 			}
 			return;
 		}
@@ -334,15 +328,20 @@ namespace gglab
 			return;
 		}
 
-		m_LoadingProgress.m_Fraction = 0.05f + 0.85f * GetAssetLoadingFraction(model->m_State);
-		m_LoadingProgress.m_Stage = GetAssetLoadingStage(model->m_State);
-		m_LoadingProgress.m_Detail = m_PendingModelPath;
-		if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
-		{
-			m_LoadingProgress.m_Status = LoadingStatus::Failed;
-			return;
-		}
-		if (model->m_State != AssetState::Ready)
+		const AssetLoadProgress modelProgress = GetAssetLoadProgress(
+			model->m_State,
+			AssetLoadKind::Model);
+		LoadingProgressBuilder progress;
+		progress.AddCompletedStep(0.05f);
+		progress.AddAssetStep(0.85f, modelProgress, m_PendingModelPath);
+		progress.AddStep(0.10f, {
+			.m_Status = LoadingStatus::Preparing,
+			.m_Fraction = 0.0f,
+			.m_Stage = "Creating scene instance",
+			.m_Detail = m_PendingModelPath,
+		});
+		m_LoadingProgress = progress.Build();
+		if (!modelProgress.IsReady())
 		{
 			return;
 		}
