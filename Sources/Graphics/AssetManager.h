@@ -32,13 +32,7 @@ namespace gglab
 			[[nodiscard]] bool IsValid() const noexcept { return m_ModelId.IsValid(); }
 		};
 
-		struct TextureLoadRequest
-		{
-			TextureID m_TextureId{};
-			TaskHandle m_Task{};
-
-			[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
-		};
+		using TextureLoadRequest = TextureRegistry::TextureLoadRequest;
 
 		struct CreateInfo
 		{
@@ -115,19 +109,10 @@ namespace gglab
 			TransferBatch& transferBatch) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
 		bool PublishImportedModel(ModelID modelId, ImportedModel&& importedModel) noexcept;
-		bool PublishImportedTexture(
-			TextureID textureId,
-			TextureSemantic semantic,
-			TextureAssetData&& textureData) noexcept;
 		void CompleteModelLoad(
 			ModelID modelId,
 			const TaskCompletionInfo& completion,
 			ImportedModel&& importedModel) noexcept;
-		void CompleteTextureLoad(
-			TextureID textureId,
-			TextureSemantic semantic,
-			const TaskCompletionInfo& completion,
-			TextureAssetData&& textureData) noexcept;
 
 		ModelID LoadModelGltf(const std::filesystem::path& path) noexcept;
 
@@ -164,6 +149,5 @@ namespace gglab
 		MaterialContainer m_MaterialContainer;
 		ModelContainer m_ModelContainer;
 		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
-		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
 	};
 }

@@ -84,6 +84,7 @@ namespace gglab
 
 		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
 		textureRegistryCreateInfo.m_Device = device;
+		textureRegistryCreateInfo.m_TaskSystem = createInfo.m_TaskSystem;
 		textureRegistryCreateInfo.m_TransferManager = GetTransferManager();
 		textureRegistryCreateInfo.m_AssetUploadScheduler = m_AssetUploadScheduler.get();
 		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
@@ -104,6 +105,7 @@ namespace gglab
 
 		IBLBakeScheduler::CreateInfo iblBakeSchedulerCreateInfo{};
 		iblBakeSchedulerCreateInfo.m_Device = device;
+		iblBakeSchedulerCreateInfo.m_TaskSystem = createInfo.m_TaskSystem;
 		iblBakeSchedulerCreateInfo.m_EnvironmentLightingSystem = m_EnvironmentLightingSystem.get();
 		iblBakeSchedulerCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
 		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();

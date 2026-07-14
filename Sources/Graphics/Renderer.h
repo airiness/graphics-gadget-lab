@@ -22,6 +22,7 @@ namespace gglab
 	class RenderResourceRegistry;
 	class SamplerRegistry;
 	class ShaderManager;
+	class TaskSystem;
 	class TextureRegistry;
 	class TransferManager;
 	class GpuProfiler;
@@ -64,6 +65,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			ShaderManager* m_ShaderManager = nullptr;
+			TaskSystem* m_TaskSystem = nullptr;
 			void* m_NativeWindowHandle = nullptr;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
