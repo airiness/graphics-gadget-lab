@@ -161,6 +161,12 @@ namespace gglab
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
 			TextureAssetData&& textureData) noexcept;
+		[[nodiscard]] TaskHandle QueueTextureLoad(
+			TextureID textureId,
+			const std::filesystem::path& canonicalPath,
+			const TextureImportSettings& importSettings,
+			TextureSemantic semantic,
+			TaskPriority priority) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 
 	private:

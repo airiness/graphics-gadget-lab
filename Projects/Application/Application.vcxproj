@@ -250,6 +250,7 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShell.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\StartDemo.cpp" />
     <ClCompile Include="..\..\Sources\Application\LoadingProgress.cpp" />
@@ -484,6 +485,7 @@
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShell.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\StartDemo.h" />
     <ClInclude Include="..\..\Sources\Application\LoadingProgress.h" />

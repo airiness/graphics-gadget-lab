@@ -459,6 +459,9 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShell.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
@@ -1146,6 +1149,9 @@
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShell.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h">
