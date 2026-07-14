@@ -44,6 +44,7 @@ namespace gglab
 		~EnvironmentLightingSystem() = default;
 
 		void Initialize(const std::filesystem::path& rootDirectory) noexcept;
+		bool SelectDefaultEnvironment() noexcept;
 		bool SelectEnvironment(size_t entryIndex) noexcept;
 
 		[[nodiscard]] std::span<const EnvironmentMapEntry> GetEntries() const noexcept
@@ -79,7 +80,7 @@ namespace gglab
 		std::vector<EnvironmentMapEntry> m_Entries;
 		size_t m_ActiveEntryIndex = InvalidEntryIndex;
 		EnvironmentLightingSettings m_Settings{};
-		uint64_t m_BakeRequestGeneration = 1;
+		uint64_t m_BakeRequestGeneration = 0;
 		uint64_t m_IgnoreCacheGeneration = 0;
 	};
 }

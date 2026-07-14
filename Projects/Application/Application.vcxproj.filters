@@ -279,6 +279,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\AssetLoadProgress.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -458,6 +461,12 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp">
       <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Demo\StartDemo.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\LoadingProgress.cpp">
+      <Filter>Application</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\LabCatalog.cpp">
       <Filter>Application\Lab</Filter>
@@ -947,6 +956,9 @@
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\AssetLoadProgress.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1140,6 +1152,9 @@
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Demo\StartDemo.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h">

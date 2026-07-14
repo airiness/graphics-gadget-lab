@@ -8,50 +8,14 @@
 #include "Scene/Components.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
+#include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/AssetLoadProgress.h"
 #include "Graphics/AssetManager.h"
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] float AssetProgress(AssetState state) noexcept
-		{
-			switch (state)
-			{
-			case AssetState::Unloaded: return 0.0f;
-			case AssetState::Queued: return 0.05f;
-			case AssetState::LoadingCpu: return 0.25f;
-			case AssetState::CpuReady: return 0.55f;
-			case AssetState::UploadQueued: return 0.65f;
-			case AssetState::GpuProcessing: return 0.85f;
-			case AssetState::Ready: return 1.0f;
-			case AssetState::Failed:
-			case AssetState::Cancelled:
-				return 0.0f;
-			}
-			return 0.0f;
-		}
-
-		[[nodiscard]] const char* AssetStage(AssetState state) noexcept
-		{
-			switch (state)
-			{
-			case AssetState::Queued: return "Queued for CPU import";
-			case AssetState::LoadingCpu: return "Importing model and decoding textures";
-			case AssetState::CpuReady: return "Preparing GPU resources";
-			case AssetState::UploadQueued: return "Queued for GPU upload";
-			case AssetState::GpuProcessing: return "Uploading resources and generating mips";
-			case AssetState::Ready: return "Model ready";
-			case AssetState::Failed: return "Model load failed";
-			case AssetState::Cancelled: return "Model load cancelled";
-			case AssetState::Unloaded:
-			default:
-				return "Preparing model request";
-			}
-		}
-	}
-
 	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo) noexcept :
 		m_Services(createInfo.m_Services)
 	{
@@ -83,6 +47,10 @@ namespace gglab
 
 	void DemoPlayground::BeginPrepare() noexcept
 	{
+		if (auto* environment = m_Services.m_Renderer->GetEnvironmentLightingSystem())
+		{
+			GGLAB_UNUSED(environment->SelectDefaultEnvironment());
+		}
 		m_World.GetRegistry().clear();
 		m_PendingModels = {
 			{
@@ -131,39 +99,33 @@ namespace gglab
 			return;
 		}
 
-		float totalProgress = 0.0f;
-		const PendingModel* current = nullptr;
-		AssetState currentState = AssetState::Unloaded;
+		LoadingProgressBuilder progress;
+		progress.AddCompletedStep(0.05f);
+		const float modelWeight = m_PendingModels.empty() ? 0.0f :
+			0.95f / static_cast<float>(m_PendingModels.size());
 		for (const PendingModel& pending : m_PendingModels)
 		{
 			const Model* model = m_Services.m_AssetManager->GetModel(pending.m_ModelId);
-			if (!model || model->m_State == AssetState::Failed ||
-				model->m_State == AssetState::Cancelled)
+			if (!model)
 			{
-				m_LoadingProgress = {
+				progress.AddStep(modelWeight, {
 					.m_Status = LoadingStatus::Failed,
-					.m_Fraction = m_LoadingProgress.m_Fraction,
-					.m_Stage = "Model load failed",
+					.m_Fraction = 0.0f,
+					.m_Stage = "Model request unavailable",
 					.m_Detail = pending.m_Path.generic_string(),
-				};
-				return;
+				});
+				continue;
 			}
 
-			totalProgress += AssetProgress(model->m_State);
-			if (!current && model->m_State != AssetState::Ready)
-			{
-				current = &pending;
-				currentState = model->m_State;
-			}
+			progress.AddAssetStep(
+				modelWeight,
+				GetAssetLoadProgress(model->m_State, AssetLoadKind::Model),
+				pending.m_Path.generic_string());
 		}
 
-		const float modelProgress = m_PendingModels.empty() ? 1.0f :
-			totalProgress / static_cast<float>(m_PendingModels.size());
-		m_LoadingProgress.m_Fraction = 0.05f + modelProgress * 0.9f;
-		if (current)
+		m_LoadingProgress = progress.Build();
+		if (!m_LoadingProgress.IsReady())
 		{
-			m_LoadingProgress.m_Stage = AssetStage(currentState);
-			m_LoadingProgress.m_Detail = current->m_Path.generic_string();
 			return;
 		}
 

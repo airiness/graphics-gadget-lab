@@ -10,13 +10,14 @@ namespace gglab
 {
 	enum class ApplicationStartupDemo : uint8_t
 	{
+		Start,
 		Playground,
 		LabHost,
 	};
 
 	struct ApplicationLaunchOptions
 	{
-		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Playground;
+		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
 		bool m_StartWithAbsoluteMouse = false;
 	};

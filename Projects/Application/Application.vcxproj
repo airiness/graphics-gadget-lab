@@ -251,6 +251,8 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShell.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Demo\StartDemo.cpp" />
+    <ClCompile Include="..\..\Sources\Application\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabCatalog.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabCommandQueue.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabParameter.cpp" />
@@ -285,6 +287,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Keyboard.cpp" />
     <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
@@ -482,6 +485,7 @@
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShell.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\Application\Demo\StartDemo.h" />
     <ClInclude Include="..\..\Sources\Application\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabCatalog.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h" />
@@ -535,6 +539,7 @@
     <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
+    <ClInclude Include="..\..\Sources\Graphics\AssetLoadProgress.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
