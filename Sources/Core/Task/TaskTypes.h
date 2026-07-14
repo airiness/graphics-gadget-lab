@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Async/ProgressChannel.h"
 
 #include <array>
 #include <compare>
@@ -48,6 +49,7 @@ namespace gglab
 	{
 		std::string m_Name;
 		TaskPriority m_Priority = TaskPriority::Normal;
+		ProgressChannelPtr m_Progress;
 	};
 
 	struct TaskResult
@@ -94,6 +96,7 @@ namespace gglab
 		uint32_t m_WorkerIndex = std::numeric_limits<uint32_t>::max();
 		double m_QueueMilliseconds = 0.0;
 		double m_ExecutionMilliseconds = 0.0;
+		ProgressSnapshot m_Progress;
 	};
 
 	struct TaskSystemStatistics

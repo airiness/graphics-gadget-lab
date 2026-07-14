@@ -39,21 +39,37 @@ namespace gglab
 		TaskResult RunDeterministicWork(
 			std::stop_token stopToken,
 			uint32_t workUnits,
-			std::atomic<uint64_t>& checksum) noexcept
+			std::atomic<uint64_t>& checksum,
+			const ProgressReporter& progress = {}) noexcept
 		{
 			uint64_t value = 0x9E3779B97F4A7C15ull;
-			const uint32_t iterationCount = std::max(workUnits, 1u) * 4096u;
-			for (uint32_t iteration = 0; iteration < iterationCount; ++iteration)
+			workUnits = std::max(workUnits, 1u);
+			for (uint32_t workUnit = 0; workUnit < workUnits; ++workUnit)
 			{
-				if ((iteration & 255u) == 0 && stopToken.stop_requested())
+				progress.Report(
+					static_cast<float>(workUnit) / static_cast<float>(workUnits),
+					"Executing deterministic work",
+					std::format("Unit {} of {}", workUnit + 1, workUnits),
+					workUnit,
+					workUnits);
+				for (uint32_t iteration = 0; iteration < 4096u; ++iteration)
 				{
-					return TaskResult::Success();
+					if ((iteration & 255u) == 0 && stopToken.stop_requested())
+					{
+						return TaskResult::Success();
+					}
+					value ^= value >> 12;
+					value ^= value << 25;
+					value ^= value >> 27;
+					value *= 0x2545F4914F6CDD1Dull;
 				}
-				value ^= value >> 12;
-				value ^= value << 25;
-				value ^= value >> 27;
-				value *= 0x2545F4914F6CDD1Dull;
 			}
+			progress.Report(
+				1.0f,
+				"Deterministic work complete",
+				std::format("{} units", workUnits),
+				workUnits,
+				workUnits);
 			checksum.fetch_xor(value, std::memory_order_relaxed);
 			return TaskResult::Success();
 		}
@@ -383,6 +399,7 @@ namespace gglab
 			TaskDesc desc{
 				.m_Name = std::format("TaskLab/{}/Target/{}", state->m_Generation, index),
 				.m_Priority = TaskPriority::Normal,
+				.m_Progress = std::make_shared<ProgressChannel>(),
 			};
 			if (m_Scenario == Scenario::ExplicitFailure)
 			{
@@ -422,12 +439,18 @@ namespace gglab
 			else
 			{
 				const uint32_t workUnits = m_Scenario == Scenario::CompletionBacklog ? 1u : m_WorkUnits;
-				SubmitTask(std::move(desc), [state, workUnits](std::stop_token stopToken) noexcept
+				const ProgressChannelPtr taskProgress = desc.m_Progress;
+				SubmitTask(std::move(desc), [state, workUnits, progress = taskProgress](
+					std::stop_token stopToken) noexcept
 					{
 						state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetStartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetExecutedCount.fetch_add(1, std::memory_order_relaxed);
-						return RunDeterministicWork(stopToken, workUnits, state->m_Checksum);
+						return RunDeterministicWork(
+							stopToken,
+							workUnits,
+							state->m_Checksum,
+							ProgressReporter(progress, 0.05f, 0.98f));
 					}, true);
 			}
 		}
@@ -462,6 +485,7 @@ namespace gglab
 		for (uint32_t index = 0; index < targetCount; ++index)
 		{
 			auto state = m_State;
+			auto progress = std::make_shared<ProgressChannel>();
 			const TaskPriority priority = m_Scenario == Scenario::PriorityOrdering ?
 				PrioritySubmissionOrder[index % PrioritySubmissionOrder.size()] : TaskPriority::Normal;
 			if (m_Scenario == Scenario::PriorityOrdering)
@@ -473,7 +497,8 @@ namespace gglab
 			const TaskHandle handle = SubmitTask({
 				.m_Name = std::format("TaskLab/{}/Target/{}", state->m_Generation, index),
 				.m_Priority = priority,
-			}, [state, priority, scenario = m_Scenario, workUnits = m_WorkUnits](
+				.m_Progress = progress,
+			}, [state, priority, scenario = m_Scenario, workUnits = m_WorkUnits, progress](
 				std::stop_token stopToken) noexcept
 				{
 					state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
@@ -494,7 +519,11 @@ namespace gglab
 						GGLAB_ASSERT(state->m_PriorityRemaining[priorityIndex] > 0);
 						--state->m_PriorityRemaining[priorityIndex];
 					}
-					return RunDeterministicWork(stopToken, workUnits, state->m_Checksum);
+					return RunDeterministicWork(
+						stopToken,
+						workUnits,
+						state->m_Checksum,
+						ProgressReporter(progress, 0.05f, 0.98f));
 				}, true);
 
 			if (m_Scenario == Scenario::CancelQueued && handle.IsValid())
@@ -580,10 +609,36 @@ namespace gglab
 		TaskWork work,
 		bool targetTask) noexcept
 	{
+		if (!desc.m_Progress)
+		{
+			desc.m_Progress = std::make_shared<ProgressChannel>();
+		}
+		const ProgressReporter progress(desc.m_Progress);
+		progress.Report(0.0f, "Verification task queued", desc.m_Name);
+		TaskWork instrumentedWork = [work = std::move(work), progress](
+			std::stop_token stopToken) mutable -> TaskResult
+			{
+				progress.Report(0.03f, "Verification task running");
+				try
+				{
+					TaskResult result = work(stopToken);
+					progress.Report(
+						0.99f,
+						result.m_Succeeded ?
+							"Verification task work complete" : "Verification task failed",
+						result.m_Error);
+					return result;
+				}
+				catch (const std::exception& exception)
+				{
+					progress.Report(0.99f, "Verification task threw", exception.what());
+					throw;
+				}
+			};
 		std::weak_ptr<ScenarioState> weakState = m_State;
 		const TaskHandle handle = m_Services.m_TaskSystem->Submit(
 			std::move(desc),
-			std::move(work),
+			std::move(instrumentedWork),
 			[weakState, targetTask](const TaskCompletionInfo& info)
 			{
 				const auto state = weakState.lock();

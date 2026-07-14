@@ -22,8 +22,8 @@ namespace gglab
 		{
 			switch (kind)
 			{
-			case AssetLoadKind::Model: return "Uploading model resources and generating mips";
-			case AssetLoadKind::Texture: return "Uploading texture and generating mips";
+			case AssetLoadKind::Model: return "Uploading model GPU resources";
+			case AssetLoadKind::Texture: return "Uploading texture GPU resources";
 			case AssetLoadKind::Mesh: return "Uploading mesh buffers";
 			case AssetLoadKind::Generic:
 			default:
@@ -34,29 +34,44 @@ namespace gglab
 
 	AssetLoadProgress GetAssetLoadProgress(
 		AssetState state,
-		AssetLoadKind kind) noexcept
+		AssetLoadKind kind,
+		const ProgressChannelPtr& progress) noexcept
 	{
+		if (progress)
+		{
+			const ProgressSnapshot snapshot = progress->GetSnapshot();
+			if (snapshot.HasProgress())
+			{
+				return {
+					.m_State = state,
+					.m_Fraction = state == AssetState::Ready ? 1.0f : snapshot.m_Fraction,
+					.m_Stage = snapshot.m_Stage,
+					.m_Detail = snapshot.m_Detail,
+				};
+			}
+		}
+
 		switch (state)
 		{
 		case AssetState::Unloaded:
-			return { state, 0.0f, "Waiting for asset request" };
+			return { state, 0.0f, "Waiting for asset request", {} };
 		case AssetState::Queued:
-			return { state, 0.05f, "Queued for CPU processing" };
+			return { state, 0.05f, "Queued for CPU processing", {} };
 		case AssetState::LoadingCpu:
-			return { state, 0.25f, GetCpuProcessingStage(kind) };
+			return { state, 0.25f, std::string(GetCpuProcessingStage(kind)), {} };
 		case AssetState::CpuReady:
-			return { state, 0.55f, "CPU processing complete" };
+			return { state, 0.55f, "CPU processing complete", {} };
 		case AssetState::UploadQueued:
-			return { state, 0.65f, "Queued for GPU upload" };
+			return { state, 0.65f, "Queued for GPU upload", {} };
 		case AssetState::GpuProcessing:
-			return { state, 0.85f, GetGpuProcessingStage(kind) };
+			return { state, 0.85f, std::string(GetGpuProcessingStage(kind)), {} };
 		case AssetState::Ready:
-			return { state, 1.0f, "Asset ready" };
+			return { state, 1.0f, "Asset ready", {} };
 		case AssetState::Failed:
-			return { state, 0.0f, "Asset loading failed" };
+			return { state, 0.0f, "Asset loading failed", {} };
 		case AssetState::Cancelled:
-			return { state, 0.0f, "Asset loading cancelled" };
+			return { state, 0.0f, "Asset loading cancelled", {} };
 		}
-		return { state, 0.0f, "Unknown asset state" };
+		return { state, 0.0f, "Unknown asset state", {} };
 	}
 }

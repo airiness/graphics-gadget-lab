@@ -4,8 +4,8 @@
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TextureLoader.h"
+#include "Graphics/Utility/CubemapUtils.h"
 #include "Graphics/Utility/TextureUtils.h"
-#include "Core/Math/Vector.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
@@ -61,30 +61,6 @@ namespace gglab
 				static_cast<uint32_t>(Crc64(normalized)));
 		}
 
-		[[nodiscard]] Vector3 GetCubemapFaceDirection(CubemapFace face) noexcept
-		{
-			switch (face)
-			{
-			case CubemapFace::PositiveX: return Vector3::UnitX;
-			case CubemapFace::NegativeX: return -Vector3::UnitX;
-			case CubemapFace::PositiveY: return Vector3::UnitY;
-			case CubemapFace::NegativeY: return -Vector3::UnitY;
-			case CubemapFace::PositiveZ: return Vector3::UnitZ;
-			case CubemapFace::NegativeZ: return -Vector3::UnitZ;
-			default: return Vector3::UnitZ;
-			}
-		}
-
-		[[nodiscard]] Vector3 GetCubemapFaceUp(CubemapFace face) noexcept
-		{
-			switch (face)
-			{
-			case CubemapFace::PositiveY: return -Vector3::UnitZ;
-			case CubemapFace::NegativeY: return Vector3::UnitZ;
-			default: return Vector3::UnitY;
-			}
-		}
-
 		[[nodiscard]] Vector3 EvaluateProceduralEnvironment(const Vector3& direction) noexcept
 		{
 			const float t = std::clamp(direction.m_Y * 0.5f + 0.5f, 0.0f, 1.0f);
@@ -109,17 +85,13 @@ namespace gglab
 			for (uint32_t faceIndex = 0; faceIndex < CubemapFaceCount; ++faceIndex)
 			{
 				const auto face = static_cast<CubemapFace>(faceIndex);
-				const Vector3 forward = GetCubemapFaceDirection(face);
-				const Vector3 up = GetCubemapFaceUp(face);
-				const Vector3 right = up.Cross(forward).Normalized();
 				for (uint32_t y = 0; y < faceSize; ++y)
 				{
 					for (uint32_t x = 0; x < faceSize; ++x)
 					{
 						const float u = (static_cast<float>(x) + 0.5f) / faceSize;
 						const float v = (static_cast<float>(y) + 0.5f) / faceSize;
-						const Vector3 direction =
-							(forward + (u * 2.0f - 1.0f) * right - (v * 2.0f - 1.0f) * up).Normalized();
+						const Vector3 direction = CubemapFaceUvToDirection(face, Vector2(u, v));
 						const Vector3 color = EvaluateProceduralEnvironment(direction);
 						pixels.insert(pixels.end(), { color.m_X, color.m_Y, color.m_Z, 1.0f });
 					}
@@ -446,6 +418,7 @@ namespace gglab
 					"Texture {}: {}",
 					textureId.Value(),
 					canonicalPath.filename().generic_string()),
+				.m_Progress = GetTexture(textureId)->m_LoadProgress,
 			},
 			std::move(batch),
 			uploadSucceeded,
@@ -548,6 +521,10 @@ namespace gglab
 
 		texture->m_State = AssetState::Queued;
 		texture->m_Semantic = semantic;
+		ProgressReporter(texture->m_LoadProgress).Report(
+			0.05f,
+			"Queued for texture decoding",
+			canonicalPath.filename().generic_string());
 		auto job = std::make_shared<TextureLoadJob>();
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
@@ -555,8 +532,10 @@ namespace gglab
 					"Asset.TextureDecode: {}",
 					canonicalPath.filename().generic_string()),
 				.m_Priority = priority,
+				.m_Progress = texture->m_LoadProgress,
 			},
-			[canonicalPath, importSettings, job](std::stop_token stopToken) noexcept
+			[canonicalPath, importSettings, job, progress = texture->m_LoadProgress](
+				std::stop_token stopToken) noexcept
 			{
 				if (stopToken.stop_requested())
 				{
@@ -564,7 +543,8 @@ namespace gglab
 				}
 				job->m_TextureData = TextureLoader::LoadTextureData(
 					canonicalPath,
-					importSettings);
+					importSettings,
+					ProgressReporter(progress, 0.05f, 0.62f));
 				if (!job->m_TextureData.IsValid())
 				{
 					return TaskResult::Failure(std::format(
@@ -584,6 +564,10 @@ namespace gglab
 		if (!task.IsValid())
 		{
 			texture->m_State = AssetState::Failed;
+			ProgressReporter(texture->m_LoadProgress).Report(
+				0.05f,
+				"Texture decode submission failed",
+				canonicalPath.filename().generic_string());
 			return {};
 		}
 
@@ -768,6 +752,15 @@ namespace gglab
 		texture->m_State = AssetState::UploadQueued;
 
 		const TextureAssetData& textureData = uploadData.m_TextureData;
+		ProgressReporter(texture->m_LoadProgress).Report(
+			0.68f,
+			"Recording texture upload",
+			std::format(
+				"{}x{}, {} mip levels, {} subresources",
+				textureData.m_Extent.m_Width,
+				textureData.m_Extent.m_Height,
+				textureData.m_MipLevels,
+				textureData.m_Subresources.size()));
 		if (!textureData.IsValid())
 		{
 			texture->m_State = AssetState::Failed;
@@ -868,6 +861,10 @@ namespace gglab
 			return;
 		}
 		texture->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+		ProgressReporter(texture->m_LoadProgress).Report(
+			succeeded ? 1.0f : 0.96f,
+			succeeded ? "Texture ready" : "Texture GPU upload failed",
+			texture->m_DebugLabel);
 		texture->m_IsUploaded = succeeded;
 		if (!succeeded)
 		{
@@ -901,7 +898,10 @@ namespace gglab
 		auto batch = m_TransferManager->BeginBatch();
 		const bool recorded = UploadTexture(uploadData, batch);
 		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
-			{ .m_Name = std::format("Texture {}", textureId.Value()) },
+			{
+				.m_Name = std::format("Texture {}", textureId.Value()),
+				.m_Progress = texture->m_LoadProgress,
+			},
 			std::move(batch),
 			recorded,
 			[this, textureId](const AssetUploadCompletionInfo& completion) noexcept
@@ -939,11 +939,19 @@ namespace gglab
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
 			texture->m_State = AssetState::Cancelled;
+			ProgressReporter(texture->m_LoadProgress).Report(
+				0.05f,
+				"Texture loading cancelled",
+				completion.m_Name);
 			return;
 		}
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
 			texture->m_State = AssetState::Failed;
+			ProgressReporter(texture->m_LoadProgress).Report(
+				0.05f,
+				"Texture decoding failed",
+				completion.m_Error);
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Async texture decode '{}' failed: {}",
 				completion.m_Name,
@@ -954,6 +962,9 @@ namespace gglab
 		if (!PublishImportedTexture(textureId, semantic, std::move(textureData)))
 		{
 			texture->m_State = AssetState::Failed;
+			ProgressReporter(texture->m_LoadProgress).Report(
+				0.62f,
+				"Texture publication failed");
 			return;
 		}
 		GGLAB_LOG_GRAPHICS_INFO(
@@ -979,6 +990,7 @@ namespace gglab
 				texture->m_Name = StringID(textureName);
 				texture->m_SourcePath = sourcePath;
 				texture->m_DebugLabel = textureName;
+				texture->m_LoadProgress = std::make_shared<ProgressChannel>();
 				texture->m_IsUploaded = false;
 				texture->m_Srv.Reset();
 				texture->m_Texture.Reset();

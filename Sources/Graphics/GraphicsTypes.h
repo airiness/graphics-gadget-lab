@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Async/ProgressChannel.h"
 #include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Color.h"
 #include "Core/Math/Matrix.h"
@@ -302,6 +303,7 @@ namespace gglab
 		RHITextureHandle m_Texture;
 		RHITextureDesc m_Desc{};
 		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
+		ProgressChannelPtr m_LoadProgress;
 		bool m_IsUploaded = false;
 	};
 
@@ -356,6 +358,7 @@ namespace gglab
 		bool m_HasBounds = false;
 
 		StringID m_Name{};
+		ProgressChannelPtr m_LoadProgress;
 
 		RHIBufferOwner m_VertexBuffer;
 		RHIBufferOwner m_IndexBuffer;
@@ -383,6 +386,7 @@ namespace gglab
 		AssetState m_State = AssetState::Unloaded;
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
+		ProgressChannelPtr m_LoadProgress;
 		std::vector<ModelMesh> m_MeshInstance;
 	};
 }

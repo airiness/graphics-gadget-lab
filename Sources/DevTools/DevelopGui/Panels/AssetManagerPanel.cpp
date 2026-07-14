@@ -348,12 +348,14 @@ namespace gglab
 		{
 			if (ImGui::BeginTable(
 				tableId,
-				5,
+				7,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthFixed, 76.0f);
+				ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Fence", ImGuiTableColumnFlags_WidthFixed, 144.0f);
 				ImGui::TableSetupColumn("Elapsed (ms)", ImGuiTableColumnFlags_WidthFixed, 100.0f);
 				ImGui::TableHeadersRow();
@@ -369,6 +371,22 @@ namespace gglab
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(AssetUploadStatusText(upload.m_Status));
 					ImGui::TableSetColumnIndex(3);
+					if (upload.m_Progress.HasProgress())
+					{
+						ImGui::Text("%.1f%%", upload.m_Progress.m_Fraction * 100.0f);
+					}
+					else
+					{
+						ImGui::TextUnformatted("-");
+					}
+					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(upload.m_Progress.m_Stage.empty() ?
+						"-" : upload.m_Progress.m_Stage.c_str());
+					if (!upload.m_Progress.m_Detail.empty() && ImGui::IsItemHovered())
+					{
+						ImGui::SetTooltip("%s", upload.m_Progress.m_Detail.c_str());
+					}
+					ImGui::TableSetColumnIndex(5);
 					if (upload.m_FencePoint.IsValid())
 					{
 						ImGui::Text(
@@ -381,7 +399,7 @@ namespace gglab
 					{
 						ImGui::TextUnformatted("-");
 					}
-					ImGui::TableSetColumnIndex(4);
+					ImGui::TableSetColumnIndex(6);
 					ImGui::Text("%.2f", upload.m_ElapsedMilliseconds);
 					ImGui::PopID();
 				}

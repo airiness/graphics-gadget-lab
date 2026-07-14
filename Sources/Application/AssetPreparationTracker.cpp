@@ -55,7 +55,10 @@ namespace gglab
 			}
 			progress.AddAssetStep(
 				dependency.m_Weight,
-				GetAssetLoadProgress(model->m_State, AssetLoadKind::Model),
+				GetAssetLoadProgress(
+					model->m_State,
+					AssetLoadKind::Model,
+					model->m_LoadProgress),
 				dependency.m_Label);
 		}
 
@@ -74,7 +77,10 @@ namespace gglab
 			}
 			progress.AddAssetStep(
 				dependency.m_Weight,
-				GetAssetLoadProgress(mesh->m_State, AssetLoadKind::Mesh),
+				GetAssetLoadProgress(
+					mesh->m_State,
+					AssetLoadKind::Mesh,
+					mesh->m_LoadProgress),
 				dependency.m_Label);
 		}
 		return progress.Build();

@@ -163,13 +163,16 @@ namespace gglab
 			{
 				.m_Name = std::format("Asset.ModelImport: {}", canonicalPath.filename().generic_string()),
 				.m_Priority = priority,
+				.m_Progress = model->m_LoadProgress,
 			},
-			[canonicalPath, importSettings, job](std::stop_token stopToken) noexcept
+			[canonicalPath, importSettings, job, progress = model->m_LoadProgress](
+				std::stop_token stopToken) noexcept
 			{
 				ModelImportResult result = ModelImporter::Import(
 					canonicalPath,
 					importSettings,
-					stopToken);
+					stopToken,
+					ProgressReporter(progress, 0.05f, 0.62f));
 				if (!result.Succeeded())
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
@@ -184,6 +187,10 @@ namespace gglab
 		if (!task.IsValid())
 		{
 			model->m_State = AssetState::Failed;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.05f,
+				"Model import submission failed",
+				canonicalPath.filename().generic_string());
 			return { .m_ModelId = modelId };
 		}
 
@@ -279,16 +286,31 @@ namespace gglab
 		{
 			ComputeMeshBounds(*mesh, meshUploadData.m_VerticesData);
 		}
+		if (!mesh->m_LoadProgress)
+		{
+			mesh->m_LoadProgress = std::make_shared<ProgressChannel>();
+		}
 
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
-		GetMesh(meshId)->m_State = AssetState::CpuReady;
+		Mesh* storedMesh = GetMesh(meshId);
+		storedMesh->m_State = AssetState::CpuReady;
+		ProgressReporter(storedMesh->m_LoadProgress).Report(
+			0.62f,
+			"Procedural mesh CPU data ready",
+			std::format(
+				"{} vertices, {} indices",
+				meshUploadData.m_VerticesData.size(),
+				meshUploadData.m_IndicesData.size()));
 
 		// Upload Mesh to GPU
 		auto batch = m_TransferManager->BeginBatch();
 		const bool recorded = UploadMesh(meshUploadData, batch);
 		(void)m_AssetUploadScheduler->Submit(
-			{ .m_Name = std::format("Mesh {}", meshId.Value()) },
+			{
+				.m_Name = std::format("Mesh {}", meshId.Value()),
+				.m_Progress = storedMesh->m_LoadProgress,
+			},
 			std::move(batch),
 			recorded,
 			[this, meshId](const AssetUploadCompletionInfo& completion) noexcept
@@ -345,6 +367,10 @@ namespace gglab
 		{
 			model->m_Type = ModelType::Procedural;
 		}
+		if (!model->m_LoadProgress)
+		{
+			model->m_LoadProgress = std::make_shared<ProgressChannel>();
+		}
 		model->m_State = AssetState::CpuReady;
 
 		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
@@ -392,6 +418,10 @@ namespace gglab
 
 		const auto vertexCount = static_cast<uint32_t>(verticesData.size());
 		const auto indexCount = static_cast<uint32_t>(indicesData.size());
+		ProgressReporter(mesh->m_LoadProgress).Report(
+			0.68f,
+			"Recording mesh buffer upload",
+			std::format("{} vertices, {} indices", vertexCount, indexCount));
 
 		mesh->m_VertexCount = vertexCount;
 		mesh->m_IndexCount = indexCount;
@@ -496,6 +526,10 @@ namespace gglab
 			return;
 		}
 		mesh->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+		ProgressReporter(mesh->m_LoadProgress).Report(
+			succeeded ? 1.0f : 0.96f,
+			succeeded ? "Mesh ready" : "Mesh GPU upload failed",
+			std::format("Mesh {}", meshId.Value()));
 		mesh->m_IsUploaded = succeeded;
 		if (!succeeded)
 		{
@@ -519,6 +553,14 @@ namespace gglab
 		model->m_Name = StringID(importedModel.m_Name);
 		model->m_Type = importedModel.m_Type;
 		model->m_State = AssetState::CpuReady;
+		ProgressReporter(model->m_LoadProgress).Report(
+			0.64f,
+			"Publishing imported model",
+			std::format(
+				"{} meshes, {} materials, {} textures",
+				importedModel.m_Meshes.size(),
+				importedModel.m_Materials.size(),
+				importedModel.m_Textures.size()));
 
 		std::vector<TextureID> textureIds(importedModel.m_Textures.size());
 		std::vector<TextureRegistry::TextureUploadData> textureUploads;
@@ -657,8 +699,28 @@ namespace gglab
 			recorded &= UploadMesh(meshUpload, batch);
 		}
 
+		std::vector<ProgressChannelPtr> dependencyProgress;
+		dependencyProgress.reserve(uploadedTextureIds.size() + meshIds.size());
+		for (TextureID textureId : uploadedTextureIds)
+		{
+			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
+			{
+				dependencyProgress.push_back(texture->m_LoadProgress);
+			}
+		}
+		for (MeshID meshId : meshIds)
+		{
+			if (const Mesh* mesh = GetMesh(meshId))
+			{
+				dependencyProgress.push_back(mesh->m_LoadProgress);
+			}
+		}
+
 		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
-			{ .m_Name = std::format("Model {}", modelId.Value()) },
+			{
+				.m_Name = std::format("Model {}", modelId.Value()),
+				.m_Progress = model->m_LoadProgress,
+			},
 			std::move(batch),
 			recorded,
 			[this, modelId, textureIds = std::move(uploadedTextureIds), meshIds = std::move(meshIds)](
@@ -689,6 +751,16 @@ namespace gglab
 					GGLAB_LOG_GRAPHICS_ERROR("Model {} GPU upload failed.", modelId.Value());
 				}
 			});
+		if (uploadHandle.IsValid())
+		{
+			for (const ProgressChannelPtr& progress : dependencyProgress)
+			{
+				ProgressReporter(progress).Report(
+					0.82f,
+					"Waiting for model batch GPU upload",
+					std::format("Model {}", modelId.Value()));
+			}
+		}
 		return uploadHandle.IsValid();
 	}
 
@@ -707,11 +779,19 @@ namespace gglab
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
 			model->m_State = AssetState::Cancelled;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.05f,
+				"Model import cancelled",
+				completion.m_Name);
 			return;
 		}
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
 			model->m_State = AssetState::Failed;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.05f,
+				"Model import failed",
+				completion.m_Error);
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Async model import '{}' failed: {}",
 				completion.m_Name,
@@ -724,6 +804,9 @@ namespace gglab
 		if (!PublishImportedModel(modelId, std::move(importedModel)))
 		{
 			model->m_State = AssetState::Failed;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.62f,
+				"Model publication failed");
 			return;
 		}
 		GGLAB_LOG_GRAPHICS_INFO(
@@ -753,6 +836,7 @@ namespace gglab
 		auto idMeshPair = m_MeshContainer.m_MeshIDMap.emplace(meshId, std::make_unique<Mesh>());
 		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace MeshID & meshPtr pair failed.");
 		idMeshPair.first->second->m_State = AssetState::LoadingCpu;
+		idMeshPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
 
 		return meshId;
 	}
@@ -777,6 +861,12 @@ namespace gglab
 		auto idModelPair = m_ModelContainer.m_ModelIDMap.emplace(modelId, std::make_unique<Model>());
 		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelID & ModelPtr pair failed.");
 		idModelPair.first->second->m_State = initialState;
+		idModelPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
+		ProgressReporter(idModelPair.first->second->m_LoadProgress).Report(
+			initialState == AssetState::Queued ? 0.05f : 0.0f,
+			initialState == AssetState::Queued ?
+				"Queued for model import" : "Model entry created",
+			canonicalPath.filename().generic_string());
 		return modelId;
 	}
 
@@ -830,6 +920,9 @@ namespace gglab
 		if (model->m_MeshInstance.empty())
 		{
 			model->m_State = AssetState::Failed;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.64f,
+				"Model has no renderable mesh instances");
 			return true;
 		}
 
@@ -842,6 +935,9 @@ namespace gglab
 			if (!mesh || !material || mesh->m_State == AssetState::Failed)
 			{
 				model->m_State = AssetState::Failed;
+				ProgressReporter(model->m_LoadProgress).Report(
+					0.96f,
+					"Model dependency failed");
 				return true;
 			}
 			if (mesh->m_State == AssetState::Cancelled)
@@ -863,6 +959,9 @@ namespace gglab
 				if (!texture || texture->m_State == AssetState::Failed)
 				{
 					model->m_State = AssetState::Failed;
+					ProgressReporter(model->m_LoadProgress).Report(
+						0.96f,
+						"Model texture dependency failed");
 					return true;
 				}
 				if (texture->m_State == AssetState::Cancelled)
@@ -879,15 +978,24 @@ namespace gglab
 		if (cancelled)
 		{
 			model->m_State = AssetState::Cancelled;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.96f,
+				"Model dependency cancelled");
 			return true;
 		}
 		if (pending)
 		{
 			model->m_State = AssetState::GpuProcessing;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.82f,
+				"Waiting for model GPU dependencies");
 			return false;
 		}
 
 		model->m_State = AssetState::Ready;
+		ProgressReporter(model->m_LoadProgress).Report(
+			1.0f,
+			"Model ready");
 		return true;
 	}
 

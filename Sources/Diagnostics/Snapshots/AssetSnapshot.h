@@ -47,6 +47,7 @@ namespace gglab
 			AssetUploadStatus m_Status = AssetUploadStatus::Pending;
 			RHIFencePoint m_FencePoint{};
 			double m_ElapsedMilliseconds = 0.0;
+			ProgressSnapshot m_Progress;
 		};
 
 		std::vector<Model> m_Models;

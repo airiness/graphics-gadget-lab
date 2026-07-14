@@ -114,7 +114,10 @@ namespace gglab
 
 			progress.AddAssetStep(
 				modelWeight,
-				GetAssetLoadProgress(model->m_State, AssetLoadKind::Model),
+				GetAssetLoadProgress(
+					model->m_State,
+					AssetLoadKind::Model,
+					model->m_LoadProgress),
 				pending.m_Path.generic_string());
 		}
 

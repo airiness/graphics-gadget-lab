@@ -104,7 +104,8 @@ namespace gglab
 
 		[[nodiscard]] TextureAssetData ConvertScratchImage(
 			const DirectX::ScratchImage& scratchImage,
-			TextureColorSpace colorSpace) noexcept
+			TextureColorSpace colorSpace,
+			const ProgressReporter& progress) noexcept
 		{
 			TextureAssetData result{};
 
@@ -182,6 +183,13 @@ namespace gglab
 						.m_MipLevel = mipLevel,
 						.m_ArraySlice = arraySlice,
 					});
+				progress.Report(
+					0.82f + 0.16f * static_cast<float>(imageIndex + 1) /
+						static_cast<float>(imageCount),
+					"Packing texture subresources",
+					std::format("{} of {}", imageIndex + 1, imageCount),
+					static_cast<uint32_t>(imageIndex + 1),
+					static_cast<uint32_t>(imageCount));
 			}
 
 			return result;
@@ -246,15 +254,34 @@ namespace gglab
 		[[nodiscard]] bool GenerateMipChainIfNeeded(
 			DirectX::ScratchImage& scratchImage,
 			const std::filesystem::path& texPath,
-			const TextureImportSettings& settings) noexcept
+			const TextureImportSettings& settings,
+			const ProgressReporter& progress) noexcept
 		{
 			const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
 			if (settings.m_MipPolicy != TextureMipPolicy::GenerateIfMissing ||
 				metadata.mipLevels > 1 ||
 				(metadata.width == 1 && metadata.height == 1))
 			{
+				progress.Report(
+					0.78f,
+					"Using source mip chain",
+					std::format("{} mip levels", metadata.mipLevels));
 				return true;
 			}
+
+			size_t largestDimension = std::max(metadata.width, metadata.height);
+			uint32_t targetMipLevels = 1;
+			while (largestDimension > 1)
+			{
+				largestDimension >>= 1;
+				++targetMipLevels;
+			}
+			progress.Report(
+				0.62f,
+				"Generating mipmaps",
+				std::format("{} target mip levels", targetMipLevels),
+				0,
+				targetMipLevels);
 
 			DirectX::ScratchImage mipChain;
 			const HRESULT hr = DirectX::GenerateMipMaps(
@@ -273,21 +300,36 @@ namespace gglab
 				return false;
 			}
 
-			if (settings.m_Semantic == TextureSemantic::Normal &&
-				!RenormalizeNormalMipChain(mipChain, texPath))
+			if (settings.m_Semantic == TextureSemantic::Normal)
 			{
-				return false;
+				progress.Report(
+					0.72f,
+					"Renormalizing normal-map mipmaps",
+					std::format("{} mip levels", mipChain.GetMetadata().mipLevels));
+				if (!RenormalizeNormalMipChain(mipChain, texPath))
+				{
+					return false;
+				}
 			}
 
 			scratchImage = std::move(mipChain);
+			progress.Report(
+				0.78f,
+				"Mip chain ready",
+				std::format("{} mip levels", scratchImage.GetMetadata().mipLevels),
+				static_cast<uint32_t>(scratchImage.GetMetadata().mipLevels),
+				static_cast<uint32_t>(scratchImage.GetMetadata().mipLevels));
 			return true;
 		}
 	}
 
 	TextureAssetData TextureLoader::LoadTextureData(
 		const std::filesystem::path& texPath,
-		const TextureImportSettings& settings) noexcept
+		const TextureImportSettings& settings,
+		const ProgressReporter& progress) noexcept
 	{
+		const std::string filename = texPath.filename().generic_string();
+		progress.Report(0.02f, "Validating texture source", filename);
 		const TextureColorSpace colorSpace = GetTextureColorSpaceFromSemantic(settings.m_Semantic);
 		std::error_code errorCode;
 		if (!std::filesystem::exists(texPath, errorCode) ||
@@ -308,6 +350,7 @@ namespace gglab
 		DirectX::TexMetadata metadata;
 		DirectX::ScratchImage scratchImage;
 		HRESULT hr = S_OK;
+		progress.Report(0.08f, "Decoding texture", filename);
 
 		if (extension == ".dds")
 		{
@@ -350,9 +393,14 @@ namespace gglab
 				FormatHResult(hr));
 			return {};
 		}
+		progress.Report(
+			0.35f,
+			"Texture decoded",
+			std::format("{}x{}", metadata.width, metadata.height));
 
 		if (extension == ".hdr")
 		{
+			progress.Report(0.40f, "Normalizing HDR pixels", filename);
 			DirectX::ScratchImage floatImage;
 			DirectX::ScratchImage* hdrImage = &scratchImage;
 			if (metadata.format != DXGI_FORMAT_R32G32B32A32_FLOAT)
@@ -375,6 +423,7 @@ namespace gglab
 				hdrImage = &floatImage;
 			}
 
+			progress.Report(0.48f, "Sanitizing HDR radiance", filename);
 			const HdrSanitizationStats stats = SanitizeHdrForHalfFloat(*hdrImage);
 			if (stats.m_NonFiniteChannelCount > 0 ||
 				stats.m_NegativeChannelCount > 0 ||
@@ -391,6 +440,7 @@ namespace gglab
 			}
 
 			DirectX::ScratchImage convertedImage;
+			progress.Report(0.55f, "Converting HDR texture to FP16", filename);
 			hr = DirectX::Convert(
 				hdrImage->GetImages(),
 				hdrImage->GetImageCount(),
@@ -407,23 +457,31 @@ namespace gglab
 				return {};
 			}
 
-			if (!GenerateMipChainIfNeeded(convertedImage, texPath, settings))
+			if (!GenerateMipChainIfNeeded(convertedImage, texPath, settings, progress))
 			{
 				return {};
 			}
-			return ConvertScratchImage(convertedImage, TextureColorSpace::Linear);
+			TextureAssetData result = ConvertScratchImage(
+				convertedImage,
+				TextureColorSpace::Linear,
+				progress);
+			progress.Report(1.0f, "Texture CPU preparation complete", filename);
+			return result;
 		}
 
-		if (!GenerateMipChainIfNeeded(scratchImage, texPath, settings))
+		if (!GenerateMipChainIfNeeded(scratchImage, texPath, settings, progress))
 		{
 			return {};
 		}
-		return ConvertScratchImage(scratchImage, colorSpace);
+		TextureAssetData result = ConvertScratchImage(scratchImage, colorSpace, progress);
+		progress.Report(1.0f, "Texture CPU preparation complete", filename);
+		return result;
 	}
 
 	TextureAssetData TextureLoader::LoadTextureData(
 		const std::filesystem::path& texPath,
-		TextureColorSpace colorSpace) noexcept
+		TextureColorSpace colorSpace,
+		const ProgressReporter& progress) noexcept
 	{
 		return LoadTextureData(
 			texPath,
@@ -432,7 +490,8 @@ namespace gglab
 				.m_Semantic = colorSpace == TextureColorSpace::SRGB ?
 					TextureSemantic::GenericColor : TextureSemantic::GenericData,
 				.m_MipPolicy = TextureMipPolicy::Preserve,
-			});
+			},
+			progress);
 	}
 
 	TextureAssetData TextureLoader::MakeTexture2DRgba8(

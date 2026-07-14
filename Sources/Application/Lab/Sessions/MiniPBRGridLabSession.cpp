@@ -286,7 +286,8 @@ namespace gglab
 
 				const AssetLoadProgress meshProgress = GetAssetLoadProgress(
 					sphereMesh->m_State,
-					AssetLoadKind::Mesh);
+					AssetLoadKind::Mesh,
+					sphereMesh->m_LoadProgress);
 				progress.AddAssetStep(0.15f, meshProgress, "ProceduralSphere");
 				m_LoadingProgress = progress.Build();
 				if (!meshProgress.IsReady())
@@ -330,7 +331,8 @@ namespace gglab
 
 		const AssetLoadProgress modelProgress = GetAssetLoadProgress(
 			model->m_State,
-			AssetLoadKind::Model);
+			AssetLoadKind::Model,
+			model->m_LoadProgress);
 		LoadingProgressBuilder progress;
 		progress.AddCompletedStep(0.05f);
 		progress.AddAssetStep(0.85f, modelProgress, m_PendingModelPath);

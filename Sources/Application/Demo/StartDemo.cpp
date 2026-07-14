@@ -109,7 +109,10 @@ namespace gglab
 
 			progress.AddAssetStep(
 				0.45f,
-				GetAssetLoadProgress(mesh->m_State, AssetLoadKind::Mesh),
+				GetAssetLoadProgress(
+					mesh->m_State,
+					AssetLoadKind::Mesh,
+					mesh->m_LoadProgress),
 				name);
 		}
 
