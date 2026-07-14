@@ -24,7 +24,8 @@ namespace gglab
 
 	namespace
 	{
-		[[nodiscard]] std::string ShaderStageLabel(ShaderStage stage) noexcept
+		[[nodiscard]] constexpr std::string_view ShaderStageAbbreviation(
+			ShaderStage stage) noexcept
 		{
 			switch (stage)
 			{
@@ -146,7 +147,7 @@ namespace gglab
 			job->m_Labels.push_back(std::format(
 				"{} [{}]",
 				desc.m_SourcePath.filename().generic_string(),
-				ShaderStageLabel(desc.m_Stage)));
+				ShaderStageAbbreviation(desc.m_Stage)));
 		}
 
 		m_PreloadJob = job;

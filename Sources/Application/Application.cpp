@@ -162,6 +162,7 @@ namespace gglab
 
 		// ShaderManager
 		m_ShaderManager = std::make_unique<ShaderManager>();
+		InitializeAssets();
 
 		// Renderer
 		m_Renderer = std::make_unique<Renderer>();
@@ -189,8 +190,6 @@ namespace gglab
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
-
-		InitializeAssets();
 
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services = {

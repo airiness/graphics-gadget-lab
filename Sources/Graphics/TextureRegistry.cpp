@@ -226,24 +226,6 @@ namespace gglab
 				return { r, g, b, 255 };
 			}));
 
-		{
-			auto texPath = utils::Canonical(std::filesystem::path("Assets/Textures/UVTest1K.png"));
-			const auto id = ToTextureId(ReservedTextureIDIndex::UVTestTexture1K);
-			CreateTextureEntry(id, "UVTestTexture1K", texPath);
-			uploads.emplace_back(MakeTextureUploadData(id, texPath, TextureSemantic::UVTest));
-			m_TextureContainer.m_CacheKeyIDMap[
-				{ texPath, MakeTextureImportSettings(TextureSemantic::UVTest) }] = id;
-		}
-
-		{
-			auto texPath = utils::Canonical(std::filesystem::path("Assets/Textures/UVTest4K.png"));
-			const auto id = ToTextureId(ReservedTextureIDIndex::UVTestTexture4K);
-			CreateTextureEntry(id, "UVTestTexture4K", texPath);
-			uploads.emplace_back(MakeTextureUploadData(id, texPath, TextureSemantic::UVTest));
-			m_TextureContainer.m_CacheKeyIDMap[
-				{ texPath, MakeTextureImportSettings(TextureSemantic::UVTest) }] = id;
-		}
-
 		if (!uploads.empty())
 		{
 			// Fallback descriptors must exist before the first frame can resolve any
@@ -269,6 +251,40 @@ namespace gglab
 			}
 			GGLAB_ASSERT_MSG(uploadsSucceeded, "TextureRegistry failed to initialize reserved textures.");
 		}
+
+		const auto queueOptionalTexture = [this](
+			ReservedTextureIDIndex idIndex,
+			std::string_view name,
+			const std::filesystem::path& path) noexcept
+			{
+				const auto canonicalPath = utils::Canonical(path);
+				const TextureID textureId = ToTextureId(idIndex);
+				const TextureImportSettings importSettings =
+					MakeTextureImportSettings(TextureSemantic::UVTest);
+				CreateTextureEntry(textureId, name, canonicalPath);
+				const auto [iterator, inserted] =
+					m_TextureContainer.m_CacheKeyIDMap.emplace(
+						TextureCacheKey{ canonicalPath, importSettings },
+						textureId);
+				GGLAB_UNUSED(iterator);
+				GGLAB_ASSERT_MSG(inserted,
+					"TextureRegistry failed to register an optional reserved texture.");
+				GGLAB_UNUSED(QueueTextureLoad(
+					textureId,
+					canonicalPath,
+					importSettings,
+					TextureSemantic::UVTest,
+					TaskPriority::Background));
+			};
+
+		queueOptionalTexture(
+			ReservedTextureIDIndex::UVTestTexture1K,
+			"UVTestTexture1K",
+			"Assets/Textures/UVTest1K.png");
+		queueOptionalTexture(
+			ReservedTextureIDIndex::UVTestTexture4K,
+			"UVTestTexture4K",
+			"Assets/Textures/UVTest4K.png");
 	}
 
 	void TextureRegistry::Finalize(const RHIFencePoint& fencePoint) noexcept
@@ -408,11 +424,39 @@ namespace gglab
 		{
 			return {};
 		}
+		const TaskHandle task = QueueTextureLoad(
+			textureId,
+			canonicalPath,
+			importSettings,
+			semantic,
+			priority);
+		return {
+			.m_TextureId = textureId,
+			.m_Task = task,
+		};
+	}
+
+	TaskHandle TextureRegistry::QueueTextureLoad(
+		TextureID textureId,
+		const std::filesystem::path& canonicalPath,
+		const TextureImportSettings& importSettings,
+		TextureSemantic semantic,
+		TaskPriority priority) noexcept
+	{
 		Texture* texture = GetTexture(textureId);
 		GGLAB_ASSERT_NOT_NULL(texture);
+		if (!texture)
+		{
+			return {};
+		}
+		if (const auto iterator = m_TextureLoadTasks.find(textureId);
+			iterator != m_TextureLoadTasks.end())
+		{
+			return iterator->second;
+		}
+
 		texture->m_State = AssetState::Queued;
 		texture->m_Semantic = semantic;
-
 		auto job = std::make_shared<TextureLoadJob>();
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
@@ -449,14 +493,11 @@ namespace gglab
 		if (!task.IsValid())
 		{
 			texture->m_State = AssetState::Failed;
-			return { .m_TextureId = textureId };
+			return {};
 		}
 
 		m_TextureLoadTasks.emplace(textureId, task);
-		return {
-			.m_TextureId = textureId,
-			.m_Task = task,
-		};
+		return task;
 	}
 
 	Texture* TextureRegistry::GetTexture(TextureID textureId) noexcept
