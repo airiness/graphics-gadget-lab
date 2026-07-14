@@ -5,9 +5,12 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TextureLoader.h"
 #include "Graphics/Utility/TextureUtils.h"
+#include "Core/Math/Vector.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
+
+#include <cmath>
 
 namespace gglab
 {
@@ -56,6 +59,74 @@ namespace gglab
 				"External/{}#{:08X}",
 				sourcePath.filename().generic_string(),
 				static_cast<uint32_t>(Crc64(normalized)));
+		}
+
+		[[nodiscard]] Vector3 GetCubemapFaceDirection(CubemapFace face) noexcept
+		{
+			switch (face)
+			{
+			case CubemapFace::PositiveX: return Vector3::UnitX;
+			case CubemapFace::NegativeX: return -Vector3::UnitX;
+			case CubemapFace::PositiveY: return Vector3::UnitY;
+			case CubemapFace::NegativeY: return -Vector3::UnitY;
+			case CubemapFace::PositiveZ: return Vector3::UnitZ;
+			case CubemapFace::NegativeZ: return -Vector3::UnitZ;
+			default: return Vector3::UnitZ;
+			}
+		}
+
+		[[nodiscard]] Vector3 GetCubemapFaceUp(CubemapFace face) noexcept
+		{
+			switch (face)
+			{
+			case CubemapFace::PositiveY: return -Vector3::UnitZ;
+			case CubemapFace::NegativeY: return Vector3::UnitZ;
+			default: return Vector3::UnitY;
+			}
+		}
+
+		[[nodiscard]] Vector3 EvaluateProceduralEnvironment(const Vector3& direction) noexcept
+		{
+			const float t = std::clamp(direction.m_Y * 0.5f + 0.5f, 0.0f, 1.0f);
+			const Vector3 ground(0.04f, 0.035f, 0.03f);
+			const Vector3 skyHorizon(0.45f, 0.55f, 0.75f);
+			const Vector3 skyZenith(0.08f, 0.18f, 0.45f);
+			const Vector3 sky = Lerp(skyHorizon, skyZenith, std::pow(t, 1.5f));
+			Vector3 color = Lerp(ground, sky, t);
+
+			const Vector3 sunDirection = Vector3(0.2f, 0.8f, 0.3f).Normalized();
+			const float sun = std::pow(std::max(direction.Dot(sunDirection), 0.0f), 512.0f);
+			color += sun * Vector3(8.0f, 6.5f, 4.0f);
+			return color;
+		}
+
+		[[nodiscard]] TextureAssetData MakeProceduralEnvironmentCubemap() noexcept
+		{
+			constexpr uint32_t faceSize = 16;
+			std::vector<float> pixels;
+			pixels.reserve(static_cast<size_t>(faceSize) * faceSize * CubemapFaceCount * 4);
+
+			for (uint32_t faceIndex = 0; faceIndex < CubemapFaceCount; ++faceIndex)
+			{
+				const auto face = static_cast<CubemapFace>(faceIndex);
+				const Vector3 forward = GetCubemapFaceDirection(face);
+				const Vector3 up = GetCubemapFaceUp(face);
+				const Vector3 right = up.Cross(forward).Normalized();
+				for (uint32_t y = 0; y < faceSize; ++y)
+				{
+					for (uint32_t x = 0; x < faceSize; ++x)
+					{
+						const float u = (static_cast<float>(x) + 0.5f) / faceSize;
+						const float v = (static_cast<float>(y) + 0.5f) / faceSize;
+						const Vector3 direction =
+							(forward + (u * 2.0f - 1.0f) * right - (v * 2.0f - 1.0f) * up).Normalized();
+						const Vector3 color = EvaluateProceduralEnvironment(direction);
+						pixels.insert(pixels.end(), { color.m_X, color.m_Y, color.m_Z, 1.0f });
+					}
+				}
+			}
+
+			return TextureLoader::MakeTextureCubeRgba16Float(faceSize, pixels);
 		}
 	}
 
@@ -225,6 +296,12 @@ namespace gglab
 
 				return { r, g, b, 255 };
 			}));
+
+		uploads.emplace_back(makeUploadData(
+			ReservedTextureIDIndex::FallbackEnvironmentCubemap,
+			"FallbackEnvironmentCubemap",
+			TextureSemantic::Environment,
+			MakeProceduralEnvironmentCubemap()));
 
 		if (!uploads.empty())
 		{
@@ -763,9 +840,7 @@ namespace gglab
 
 		RHITextureViewDesc srvDesc{};
 		srvDesc.m_Type = RHITextureViewType::ShaderResource;
-		srvDesc.m_Dimension = textureData.m_ArraySize > 1 ?
-			RHITextureViewDimension::Texture2DArray :
-			RHITextureViewDimension::Texture2D;
+		srvDesc.m_Dimension = textureData.m_SrvDimension;
 		srvDesc.m_Format = textureData.m_ViewFormat;
 		srvDesc.m_Subresources.m_BaseMip = 0;
 		srvDesc.m_Subresources.m_MipCount = textureData.m_MipLevels;
@@ -779,6 +854,7 @@ namespace gglab
 			texture->m_State = AssetState::Failed;
 			return false;
 		}
+		texture->m_SrvDimension = textureData.m_SrvDimension;
 		texture->m_Semantic = uploadData.m_Semantic;
 		texture->m_State = AssetState::GpuProcessing;
 		return true;
@@ -802,6 +878,7 @@ namespace gglab
 				texture->m_Texture.Reset();
 			}
 			texture->m_Desc = {};
+			texture->m_SrvDimension = RHITextureViewDimension::Unknown;
 		}
 	}
 

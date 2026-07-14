@@ -29,6 +29,7 @@ namespace gglab
 		UVTest,
 		UVTestTexture1K,
 		UVTestTexture4K,
+		FallbackEnvironmentCubemap,
 
 		Count,
 

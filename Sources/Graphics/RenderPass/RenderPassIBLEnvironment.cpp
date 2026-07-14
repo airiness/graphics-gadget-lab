@@ -14,6 +14,12 @@ namespace gglab
 {
 	namespace
 	{
+		enum class EnvironmentSourceMode : uint32_t
+		{
+			Equirectangular,
+			Cubemap,
+		};
+
 		struct IBLEnvironmentPassParameters
 		{
 			uint32_t CubemapFaceIndex = 0;
@@ -26,7 +32,7 @@ namespace gglab
 
 		struct PassData
 		{
-			RGTextureId m_SourceEquirectangular{};
+			RGTextureId m_SourceTexture{};
 			RGTextureId m_EnvironmentCubemap{};
 			std::array<RGTextureViewId, CubemapFaceCount> m_Rtvs{};
 
@@ -55,10 +61,12 @@ namespace gglab
 		RHITextureDesc sourceTextureDesc{};
 		uint32_t sourceTextureIndex = 0;
 		uint32_t sourceSamplerIndex = 0;
-		bool hasHdrSource = false;
+		bool hasSource = false;
+		EnvironmentSourceMode sourceMode = EnvironmentSourceMode::Equirectangular;
 		if (const auto* environmentSystem = renderer->GetEnvironmentLightingSystem())
 		{
-			const TextureID sourceTextureId = environmentSystem->GetActiveTextureId();
+			const EnvironmentTextureSource source = environmentSystem->GetBakeSource();
+			const TextureID sourceTextureId = source.m_TextureId;
 			const auto* sourceTexture = textureRegistry->GetTexture(sourceTextureId);
 			const auto* sourceDesc = textureRegistry->GetTextureDesc(sourceTextureId);
 			if (sourceTexture && sourceDesc && sourceTexture->m_Texture.IsValid())
@@ -66,11 +74,17 @@ namespace gglab
 				sourceTextureHandle = sourceTexture->m_Texture;
 				sourceTextureDesc = *sourceDesc;
 				sourceTextureIndex = textureRegistry->GetShaderVisibleSrvIndex(sourceTextureId);
+				sourceMode = source.m_Type == EnvironmentTextureSourceType::Cubemap ?
+					EnvironmentSourceMode::Cubemap :
+					EnvironmentSourceMode::Equirectangular;
 				sourceSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-					SamplerPreset::LinearWrapUClampV);
-				hasHdrSource = true;
+					sourceMode == EnvironmentSourceMode::Cubemap ?
+						SamplerPreset::LinearClamp :
+						SamplerPreset::LinearWrapUClampV);
+				hasSource = true;
 			}
 		}
+		GGLAB_ASSERT_MSG(hasSource, "IBL environment bake requires a ready source texture.");
 
 		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
@@ -84,18 +98,19 @@ namespace gglab
 				sourceTextureDesc,
 				sourceTextureIndex,
 				sourceSamplerIndex,
-				hasHdrSource](RenderGraph::RGBuilder& builder, PassData& data)
+				sourceMode,
+				hasSource](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
-				if (hasHdrSource)
+				if (hasSource)
 				{
-					data.m_SourceEquirectangular = builder.ImportTexture(
-						"IBL.SourceEquirectangular",
+					data.m_SourceTexture = builder.ImportTexture(
+						"IBL.SourceEnvironment",
 						sourceTextureHandle,
 						sourceTextureDesc,
 						RGTextureAccess::Sample);
-					data.m_SourceEquirectangular = builder.Read(
-						data.m_SourceEquirectangular,
+					data.m_SourceTexture = builder.Read(
+						data.m_SourceTexture,
 						RGTextureAccess::Sample);
 				}
 
@@ -130,7 +145,7 @@ namespace gglab
 				data.m_Height = textureDesc->m_Extent.m_Height;
 				data.m_SourceTextureIndex = sourceTextureIndex;
 				data.m_SourceSamplerIndex = sourceSamplerIndex;
-				data.m_SourceMode = hasHdrSource ? 1u : 0u;
+				data.m_SourceMode = static_cast<uint32_t>(sourceMode);
 				data.m_RenderTargetFormat = textureDesc->m_Format;
 			},
 			[this, renderer, bakeScheduler, bakeGeneration](RGExecuteContext& executeContext, PassData& data)

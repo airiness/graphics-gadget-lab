@@ -1,11 +1,15 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/TextureRegistry.h"
 
 namespace gglab
 {
@@ -14,7 +18,9 @@ namespace gglab
 		struct SkyboxPassParameters
 		{
 			uint32_t ViewIndex = 0;
-			uint32_t Padding[3]{};
+			uint32_t EnvironmentTextureIndex = 0;
+			uint32_t EnvironmentSamplerIndex = 0;
+			uint32_t Padding = 0;
 		};
 		static_assert(IsPassRootConstantStruct<SkyboxPassParameters>);
 		static_assert(sizeof(SkyboxPassParameters) == 16);
@@ -26,6 +32,8 @@ namespace gglab
 			RGTextureViewId m_Rtv{};
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
 		};
 	}
 
@@ -47,28 +55,82 @@ namespace gglab
 		}
 
 		EnsureInitialized(services);
+		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
+		auto* renderResourceRegistry = renderer->GetRenderResourceRegistry();
+		auto* textureRegistry = renderer->GetTextureRegistry();
+		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
+		GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
+		GGLAB_ASSERT_NOT_NULL(textureRegistry);
+
+		const bool useFallback = bakeScheduler->GetStatus().m_ActiveGeneration == 0;
+		RHITextureHandle fallbackTextureHandle{};
+		RHITextureDesc fallbackTextureDesc{};
+		uint32_t environmentTextureIndex = 0;
+		if (useFallback)
+		{
+			const TextureID fallbackId = ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
+			const Texture* fallbackTexture = textureRegistry->GetTexture(fallbackId);
+			const RHITextureDesc* fallbackDesc = textureRegistry->GetTextureDesc(fallbackId);
+			GGLAB_ASSERT_MSG(
+				fallbackTexture && fallbackDesc && fallbackTexture->m_State == AssetState::Ready,
+				"Skybox fallback cubemap must be ready before the first frame.");
+			if (!fallbackTexture || !fallbackDesc || fallbackTexture->m_State != AssetState::Ready)
+			{
+				return;
+			}
+			fallbackTextureHandle = fallbackTexture->m_Texture;
+			fallbackTextureDesc = *fallbackDesc;
+			environmentTextureIndex = textureRegistry->GetShaderVisibleSrvIndex(fallbackId);
+		}
+		else
+		{
+			environmentTextureIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(
+				RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+		}
+		const uint32_t environmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+			SamplerPreset::LinearClamp);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const auto* contextPtr = &context;
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
+			[displayViewId,
+				useFallback,
+				fallbackTextureHandle,
+				fallbackTextureDesc,
+				environmentTextureIndex,
+				environmentSamplerIndex](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
-				auto& iblResources = blackboard.Get<RGIBLResources>(IBLResourcesName);
+				if (useFallback)
+				{
+					data.m_EnvironmentCubemap = builder.ImportTexture(
+						"Skybox.FallbackEnvironmentCubemap",
+						fallbackTextureHandle,
+						fallbackTextureDesc,
+						RGTextureAccess::Sample);
+					data.m_EnvironmentCubemap = builder.Read(
+						data.m_EnvironmentCubemap,
+						RGTextureAccess::Sample);
+				}
+				else
+				{
+					auto& iblResources = blackboard.Get<RGIBLResources>(IBLResourcesName);
+					data.m_EnvironmentCubemap = builder.Read(
+						iblResources.m_EnvironmentCubemap,
+						RGTextureAccess::Sample);
+				}
 				auto& targets = blackboard
 					.Get<RGViewTargetsTable>(ViewTargetsTableName)
 					.GetViewTargets(displayViewId);
-
-				data.m_EnvironmentCubemap = builder.Read(
-					iblResources.m_EnvironmentCubemap,
-					RGTextureAccess::Sample);
 				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 				data.m_SceneColor = targets.m_SceneColor;
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
 				data.m_Width = targets.m_Width;
 				data.m_Height = targets.m_Height;
+				data.m_EnvironmentTextureIndex = environmentTextureIndex;
+				data.m_EnvironmentSamplerIndex = environmentSamplerIndex;
 			},
 			[this, renderer, contextPtr, displayViewId](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -94,6 +156,8 @@ namespace gglab
 
 				const SkyboxPassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+					.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
+					.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 				};
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

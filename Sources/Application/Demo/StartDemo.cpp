@@ -11,6 +11,7 @@
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
@@ -136,6 +137,13 @@ namespace gglab
 
 	void StartDemo::OnEnter() noexcept
 	{
+		if (auto* environmentSystem = m_Services.m_Renderer->GetEnvironmentLightingSystem())
+		{
+			m_PreviousSkyboxEnabled = environmentSystem->GetSettings().m_EnableSkybox;
+			m_HasSkyboxOverride = true;
+			environmentSystem->SetSkyboxEnabled(false);
+		}
+
 		auto* debugDraw = m_Services.m_DebugDraw;
 		GGLAB_ASSERT_NOT_NULL(debugDraw);
 		debugDraw->SetChannelEnabled(StartDemoDebugChannel, true);
@@ -177,6 +185,15 @@ namespace gglab
 
 	void StartDemo::OnExit() noexcept
 	{
+		if (m_HasSkyboxOverride)
+		{
+			if (auto* environmentSystem = m_Services.m_Renderer->GetEnvironmentLightingSystem())
+			{
+				environmentSystem->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
+			}
+			m_HasSkyboxOverride = false;
+		}
+
 		if (auto* debugDraw = m_Services.m_DebugDraw)
 		{
 			debugDraw->ClearChannel(StartDemoDebugChannel);

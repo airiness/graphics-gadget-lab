@@ -131,17 +131,31 @@ namespace gglab
 		return m_ActiveEntryIndex < m_Entries.size() ? &m_Entries[m_ActiveEntryIndex] : nullptr;
 	}
 
-	TextureID EnvironmentLightingSystem::GetActiveTextureId() const noexcept
+	EnvironmentTextureSource EnvironmentLightingSystem::GetBakeSource() const noexcept
 	{
 		const auto* activeEnvironment = GetActiveEnvironment();
-		return activeEnvironment ? activeEnvironment->m_TextureId : InvalidTextureID;
+		if (activeEnvironment)
+		{
+			return
+			{
+				.m_TextureId = activeEnvironment->m_TextureId,
+				.m_Type = EnvironmentTextureSourceType::Equirectangular,
+			};
+		}
+
+		return
+		{
+			.m_TextureId = ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap),
+			.m_Type = EnvironmentTextureSourceType::Cubemap,
+		};
 	}
 
 	bool EnvironmentLightingSystem::EnsureActiveEnvironmentTextureLoaded() noexcept
 	{
 		if (m_ActiveEntryIndex >= m_Entries.size())
 		{
-			return true;
+			const Texture* fallback = m_TextureRegistry->GetTexture(GetBakeSource().m_TextureId);
+			return fallback && fallback->m_State == AssetState::Ready;
 		}
 
 		auto& entry = m_Entries[m_ActiveEntryIndex];
@@ -190,7 +204,8 @@ namespace gglab
 	{
 		if (m_ActiveEntryIndex >= m_Entries.size())
 		{
-			return AssetState::Ready;
+			const Texture* fallback = m_TextureRegistry->GetTexture(GetBakeSource().m_TextureId);
+			return fallback ? fallback->m_State : AssetState::Failed;
 		}
 
 		const TextureID textureId = m_Entries[m_ActiveEntryIndex].m_TextureId;

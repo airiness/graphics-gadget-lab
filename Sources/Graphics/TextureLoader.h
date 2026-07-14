@@ -49,6 +49,9 @@ namespace gglab
 			uint32_t height,
 			std::span<const uint8_t> pixels,
 			TextureColorSpace colorSpace) noexcept;
+		[[nodiscard]] static TextureAssetData MakeTextureCubeRgba16Float(
+			uint32_t faceSize,
+			std::span<const float> rgbaPixels) noexcept;
 
 		[[nodiscard]] static bool SaveTextureDataToDDS(
 			const TextureAssetData& textureData,

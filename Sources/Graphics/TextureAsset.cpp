@@ -5,7 +5,15 @@ namespace gglab
 {
 	bool TextureAssetData::IsValid() const noexcept
 	{
-		return m_ResourceFormat != RHIFormat::Unknown &&
+		const bool validViewDimension =
+			m_SrvDimension == RHITextureViewDimension::Texture2D ||
+			(m_SrvDimension == RHITextureViewDimension::Texture2DArray && m_ArraySize > 1) ||
+			(m_SrvDimension == RHITextureViewDimension::TextureCube && m_ArraySize == CubemapFaceCount) ||
+			(m_SrvDimension == RHITextureViewDimension::TextureCubeArray &&
+				m_ArraySize >= CubemapFaceCount && (m_ArraySize % CubemapFaceCount) == 0);
+
+		return validViewDimension &&
+			m_ResourceFormat != RHIFormat::Unknown &&
 			m_ViewFormat != RHIFormat::Unknown &&
 			m_Extent.m_Width > 0 &&
 			m_Extent.m_Height > 0 &&
