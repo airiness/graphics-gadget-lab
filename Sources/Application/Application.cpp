@@ -10,6 +10,7 @@
 #include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/LoadingProgress.h"
 #include "Core/Time.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Profiling/CpuProfiler.h"
@@ -166,6 +167,7 @@ namespace gglab
 		m_Renderer = std::make_unique<Renderer>();
 		Renderer::CreateInfo rendererCreateInfo{};
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
+		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
@@ -328,8 +330,10 @@ namespace gglab
 			}
 		}
 
-		// Prepare pending demos without replacing the active renderable demo.
-		if (!m_DemoManager->TickTransitions())
+		const ShaderPreloadStatus shaderPreload = m_ShaderManager->GetPreloadStatus();
+		// The bootstrap demo remains active until every shader required by the
+		// regular render pipelines has been published on the main thread.
+		if (shaderPreload.IsReady() && !m_DemoManager->TickTransitions())
 		{
 			GGLAB_LOG_ERROR("No active demo is available for rendering.");
 			return false;
@@ -423,7 +427,11 @@ namespace gglab
 			guiContext.m_DebugDrawFrame = frame.m_DebugDrawFrame;
 
 			m_DevelopGuiSystem->Draw(guiContext);
-			if (const auto loadingProgress = m_DemoManager->GetLoadingProgress())
+			if (!shaderPreload.IsReady())
+			{
+				DrawLoadingOverlay(GetStartupLoadingProgress());
+			}
+			else if (const auto loadingProgress = m_DemoManager->GetLoadingProgress())
 			{
 				DrawLoadingOverlay(*loadingProgress);
 			}
@@ -504,47 +512,64 @@ namespace gglab
 		// Shader preload
 		{
 			std::vector<ShaderDesc> shaderDescs;
-			ShaderDesc desc{};
+			const auto addGraphicsShader = [&shaderDescs](const wchar_t* sourcePath)
+				{
+					ShaderDesc desc{};
+					desc.m_SourcePath = sourcePath;
+					desc.m_Stage = ShaderStage::Vertex;
+					desc.m_Entry = L"VSMain";
+					shaderDescs.push_back(desc);
+					desc.m_Stage = ShaderStage::Pixel;
+					desc.m_Entry = L"PSMain";
+					shaderDescs.push_back(std::move(desc));
+				};
 
-			// Forward PBR
-			desc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			shaderDescs.push_back(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			shaderDescs.push_back(desc);
+			addGraphicsShader(L"Assets/Shaders/Passes/PassForwardPBR.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassDirectionalShadowMap.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassTonemap.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassDebugDraw.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassSkybox.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLEnvironment.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLEnvironmentMip.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLIrradiance.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLPrefilteredSpecular.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLBrdfLUT.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLCubemapPreview.hlsl");
 
-			// Directional Shadow Map
-			desc.m_SourcePath = L"Assets/Shaders/Passes/PassDirectionalShadowMap.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			shaderDescs.push_back(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			shaderDescs.push_back(desc);
-
-			// Shadow Map Preview
-			desc.m_SourcePath = L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			shaderDescs.push_back(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			shaderDescs.push_back(desc);
-
-			// Tonemap
-			desc.m_SourcePath = L"Assets/Shaders/Passes/PassTonemap.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			shaderDescs.push_back(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			shaderDescs.push_back(desc);
-
-			// Debug Draw
-			desc.m_SourcePath = L"Assets/Shaders/Passes/PassDebugDraw.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			desc.m_Entry = L"VSMain";
-			shaderDescs.push_back(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			shaderDescs.push_back(desc);
-
-			m_ShaderManager->Preload(shaderDescs);
+			GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
+				*m_TaskSystem,
+				std::move(shaderDescs),
+				TaskPriority::Critical));
 		}
+	}
+
+	LoadingProgress Application::GetStartupLoadingProgress() const noexcept
+	{
+		const ShaderPreloadStatus status = m_ShaderManager->GetPreloadStatus();
+		const float fraction = status.m_TotalCount > 0 ?
+			static_cast<float>(status.m_CompletedCount) /
+				static_cast<float>(status.m_TotalCount) : 0.0f;
+		if (status.HasFailed())
+		{
+			return {
+				.m_Status = LoadingStatus::Failed,
+				.m_Fraction = fraction,
+				.m_Title = "Starting Graphics Gadget Lab",
+				.m_Stage = "Shader preload failed",
+				.m_Detail = status.m_Error.empty() ?
+					"The shader preload task was cancelled." : status.m_Error,
+			};
+		}
+
+		return {
+			.m_Status = status.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = status.IsReady() ? 1.0f : fraction,
+			.m_Title = "Starting Graphics Gadget Lab",
+			.m_Stage = status.IsReady() ? "Shaders ready" : "Preloading shaders",
+			.m_Detail = status.m_CurrentShader.empty() ?
+				"Waiting for a shader worker." : status.m_CurrentShader,
+		};
 	}
 
 	void Application::HandlePlatformEvent(const PlatformEvent& event) noexcept

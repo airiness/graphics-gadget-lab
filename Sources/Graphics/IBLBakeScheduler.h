@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Task/TaskTypes.h"
 #include "Graphics/IBLBakeCache.h"
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/RHI/RHIFence.h"
@@ -15,6 +16,7 @@ namespace gglab
 	class GpuProfiler;
 	class RHIDevice;
 	class RenderResourceRegistry;
+	class TaskSystem;
 	class TransferManager;
 
 	class IBLBakeScheduler
@@ -23,6 +25,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
+			TaskSystem* m_TaskSystem = nullptr;
 			EnvironmentLightingSystem* m_EnvironmentLightingSystem = nullptr;
 			RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 			TransferManager* m_TransferManager = nullptr;
@@ -50,7 +53,15 @@ namespace gglab
 		[[nodiscard]] const IBLBakeStatus& GetStatus() const noexcept { return m_Status; }
 
 	private:
+		struct CacheLoadWork;
+
 		void StartRequestedBake(const RHIFencePoint& retireFence) noexcept;
+		void CompleteCacheLookup(
+			const TaskCompletionInfo& completion,
+			const std::shared_ptr<CacheLoadWork>& work) noexcept;
+		void BeginBakeResourceInitialization(
+			const RHIFencePoint& retireFence,
+			const std::shared_ptr<CacheLoadWork>& work) noexcept;
 		void ContinueRequestedBakeAfterInitialization() noexcept;
 		void AdvanceCompletedStage() noexcept;
 		bool UploadCachePayload(const IBLBakeCachePayload& payload) noexcept;
@@ -63,6 +74,7 @@ namespace gglab
 		[[nodiscard]] bool IsGpuStage(IBLBakeStage stage) const noexcept;
 
 		RHIDevice* m_Device = nullptr;
+		TaskSystem* m_TaskSystem = nullptr;
 		EnvironmentLightingSystem* m_EnvironmentLightingSystem = nullptr;
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		TransferManager* m_TransferManager = nullptr;
@@ -80,6 +92,17 @@ namespace gglab
 		bool m_CacheUploadInFlight = false;
 		bool m_CacheReadbackInFlight = false;
 		bool m_EnvironmentTextureUploadPending = false;
+
+		struct CacheLoadWork
+		{
+			uint64_t m_Generation = 0;
+			uint64_t m_Key = 0;
+			bool m_CacheHit = false;
+			IBLBakeCachePayload m_Payload;
+		};
+		TaskHandle m_CacheLookupTask{};
+		std::shared_ptr<CacheLoadWork> m_CompletedCacheLookup;
+		std::shared_ptr<CacheLoadWork> m_CurrentCacheLoad;
 
 		struct CacheWriteWork
 		{

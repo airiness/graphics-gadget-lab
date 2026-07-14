@@ -141,7 +141,10 @@ namespace gglab
 		if (!entry.m_TextureId.IsValid() && !entry.m_LoadAttempted)
 		{
 			entry.m_LoadAttempted = true;
-			entry.m_TextureId = m_TextureRegistry->LoadTexture(entry.m_Path, TextureSemantic::Environment);
+			entry.m_TextureId = m_TextureRegistry->LoadTextureAsync(
+				entry.m_Path,
+				TextureSemantic::Environment,
+				TaskPriority::High).m_TextureId;
 		}
 		if (!entry.m_TextureId.IsValid())
 		{

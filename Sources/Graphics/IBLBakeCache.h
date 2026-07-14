@@ -3,6 +3,7 @@
 #include "Graphics/TextureAsset.h"
 
 #include <filesystem>
+#include <stop_token>
 
 namespace gglab
 {
@@ -24,11 +25,13 @@ namespace gglab
 
 		[[nodiscard]] uint64_t ComputeKey(
 			const std::filesystem::path& environmentPath,
-			const IBLBakeConfig& config) const noexcept;
+			const IBLBakeConfig& config,
+			std::stop_token stopToken = {}) const noexcept;
 		[[nodiscard]] bool TryLoad(
 			uint64_t key,
 			const IBLBakeConfig& config,
-			IBLBakeCachePayload& outPayload) const noexcept;
+			IBLBakeCachePayload& outPayload,
+			std::stop_token stopToken = {}) const noexcept;
 		[[nodiscard]] bool Store(uint64_t key, const IBLBakeCachePayload& payload) const noexcept;
 
 		[[nodiscard]] const std::filesystem::path& GetRootDirectory() const noexcept { return m_RootDirectory; }

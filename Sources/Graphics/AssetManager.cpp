@@ -21,10 +21,6 @@ namespace gglab
 			ImportedModel m_Model;
 		};
 
-		struct TextureLoadJob
-		{
-			TextureAssetData m_TextureData;
-		};
 	}
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
@@ -177,88 +173,7 @@ namespace gglab
 		TextureSemantic semantic,
 		TaskPriority priority) noexcept
 	{
-		if (path.empty())
-		{
-			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadTextureAsync received an empty path.");
-			return {};
-		}
-
-		const auto canonicalPath = utils::Canonical(path);
-		std::error_code errorCode;
-		if (!std::filesystem::exists(canonicalPath, errorCode) ||
-			!std::filesystem::is_regular_file(canonicalPath, errorCode))
-		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"AssetManager::LoadTextureAsync received a missing texture file: '{}'.",
-				canonicalPath.string());
-			return {};
-		}
-
-		const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
-		if (const TextureID existing = m_TextureRegistry->FindTexture(
-			canonicalPath, importSettings); existing.IsValid())
-		{
-			const auto task = m_TextureLoadTasks.find(existing);
-			return {
-				.m_TextureId = existing,
-				.m_Task = task != m_TextureLoadTasks.end() ? task->second : TaskHandle{},
-			};
-		}
-
-		const TextureID textureId = m_TextureRegistry->CreateTexture(
-			canonicalPath,
-			importSettings);
-		if (!textureId.IsValid())
-		{
-			return {};
-		}
-		Texture* texture = m_TextureRegistry->GetTexture(textureId);
-		GGLAB_ASSERT_NOT_NULL(texture);
-		texture->m_State = AssetState::Queued;
-		texture->m_Semantic = semantic;
-
-		auto job = std::make_shared<TextureLoadJob>();
-		const TaskHandle task = m_TaskSystem->Submit(
-			{
-				.m_Name = std::format("Asset.TextureDecode: {}", canonicalPath.filename().generic_string()),
-				.m_Priority = priority,
-			},
-			[canonicalPath, importSettings, job](std::stop_token stopToken) noexcept
-			{
-				if (stopToken.stop_requested())
-				{
-					return TaskResult::Success();
-				}
-				job->m_TextureData = TextureLoader::LoadTextureData(
-					canonicalPath,
-					importSettings);
-				if (!job->m_TextureData.IsValid())
-				{
-					return TaskResult::Failure(std::format(
-						"Failed to decode texture '{}'.",
-						canonicalPath.string()));
-				}
-				return TaskResult::Success();
-			},
-			[this, textureId, semantic, job](const TaskCompletionInfo& completion) noexcept
-			{
-				CompleteTextureLoad(
-					textureId,
-					semantic,
-					completion,
-					std::move(job->m_TextureData));
-			});
-		if (!task.IsValid())
-		{
-			texture->m_State = AssetState::Failed;
-			return { .m_TextureId = textureId };
-		}
-
-		m_TextureLoadTasks.emplace(textureId, task);
-		return {
-			.m_TextureId = textureId,
-			.m_Task = task,
-		};
+		return m_TextureRegistry->LoadTextureAsync(path, semantic, priority);
 	}
 
 	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
@@ -551,49 +466,6 @@ namespace gglab
 		}
 	}
 
-	bool AssetManager::PublishImportedTexture(
-		TextureID textureId,
-		TextureSemantic semantic,
-		TextureAssetData&& textureData) noexcept
-	{
-		Texture* texture = m_TextureRegistry->GetTexture(textureId);
-		if (!texture)
-		{
-			return false;
-		}
-		texture->m_State = AssetState::CpuReady;
-
-		auto uploadData = m_TextureRegistry->MakeTextureUploadData(
-			textureId,
-			std::move(textureData),
-			semantic);
-		auto batch = m_TransferManager->BeginBatch();
-		const bool recorded = m_TextureRegistry->UploadTexture(uploadData, batch);
-		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
-			{ .m_Name = std::format("Texture {}", textureId.Value()) },
-			std::move(batch),
-			recorded,
-			[this, textureId](const AssetUploadCompletionInfo& completion) noexcept
-			{
-				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
-				m_TextureRegistry->CompleteTextureUpload(
-					textureId,
-					succeeded);
-				if (succeeded)
-				{
-					GGLAB_LOG_GRAPHICS_INFO(
-						"Texture {} GPU upload completed in {:.2f} ms.",
-						textureId.Value(),
-						completion.m_ElapsedMilliseconds);
-				}
-				else
-				{
-					GGLAB_LOG_GRAPHICS_ERROR("Texture {} GPU upload failed.", textureId.Value());
-				}
-			});
-		return uploadHandle.IsValid();
-	}
-
 	bool AssetManager::PublishImportedModel(
 		ModelID modelId,
 		ImportedModel&& importedModel) noexcept
@@ -811,46 +683,6 @@ namespace gglab
 			"Async model {} queued for GPU upload (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
 			modelId.Value(),
 			meshInstanceCount,
-			completion.m_QueueMilliseconds,
-			completion.m_ExecutionMilliseconds);
-	}
-
-	void AssetManager::CompleteTextureLoad(
-		TextureID textureId,
-		TextureSemantic semantic,
-		const TaskCompletionInfo& completion,
-		TextureAssetData&& textureData) noexcept
-	{
-		m_TextureLoadTasks.erase(textureId);
-		Texture* texture = m_TextureRegistry->GetTexture(textureId);
-		if (!texture)
-		{
-			return;
-		}
-
-		if (completion.m_Status == TaskStatus::Cancelled)
-		{
-			texture->m_State = AssetState::Cancelled;
-			return;
-		}
-		if (completion.m_Status != TaskStatus::Succeeded)
-		{
-			texture->m_State = AssetState::Failed;
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Async texture decode '{}' failed: {}",
-				completion.m_Name,
-				completion.m_Error);
-			return;
-		}
-
-		if (!PublishImportedTexture(textureId, semantic, std::move(textureData)))
-		{
-			texture->m_State = AssetState::Failed;
-			return;
-		}
-		GGLAB_LOG_GRAPHICS_INFO(
-			"Async texture {} queued for GPU upload (queueMs={:.2f}, cpuMs={:.2f}).",
-			textureId.Value(),
 			completion.m_QueueMilliseconds,
 			completion.m_ExecutionMilliseconds);
 	}

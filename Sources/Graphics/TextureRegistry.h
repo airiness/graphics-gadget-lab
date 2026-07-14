@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
@@ -9,6 +10,7 @@ namespace gglab
 	class AssetManager;
 	class AssetUploadScheduler;
 	class RHIDevice;
+	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
 	struct AssetSnapshot;
@@ -75,8 +77,17 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
+			TaskSystem* m_TaskSystem = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		};
+
+		struct TextureLoadRequest
+		{
+			TextureID m_TextureId{};
+			TaskHandle m_Task{};
+
+			[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
 		};
 
 		struct TextureUploadData
@@ -104,6 +115,10 @@ namespace gglab
 
 		TextureID LoadTexture(const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor) noexcept;
+		[[nodiscard]] TextureLoadRequest LoadTextureAsync(
+			const std::filesystem::path& path,
+			TextureSemantic semantic = TextureSemantic::GenericColor,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
 
 		Texture* GetTexture(TextureID textureId) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
@@ -137,14 +152,25 @@ namespace gglab
 			std::string_view textureName,
 			const std::filesystem::path& sourcePath = {}) noexcept;
 		void CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept;
+		bool PublishImportedTexture(
+			TextureID textureId,
+			TextureSemantic semantic,
+			TextureAssetData&& textureData) noexcept;
+		void CompleteTextureLoad(
+			TextureID textureId,
+			TextureSemantic semantic,
+			const TaskCompletionInfo& completion,
+			TextureAssetData&& textureData) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
+		TaskSystem* m_TaskSystem = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureContainer m_TextureContainer;
+		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
 	};
 }

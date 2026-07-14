@@ -117,7 +117,8 @@ namespace gglab
 
 	uint64_t IBLBakeCache::ComputeKey(
 		const std::filesystem::path& environmentPath,
-		const IBLBakeConfig& config) const noexcept
+		const IBLBakeConfig& config,
+		std::stop_token stopToken) const noexcept
 	{
 		uint64_t hash = FNV1a64::OffsetBasis;
 		FNV1a64::MixValue(hash, CacheFormatVersion);
@@ -139,6 +140,10 @@ namespace gglab
 		std::set<std::filesystem::path> visited;
 		for (const auto shaderPath : BakeShaderPaths)
 		{
+			if (stopToken.stop_requested())
+			{
+				return hash;
+			}
 			HashShaderDependency(hash, shaderRoot, shaderRoot / shaderPath, visited);
 		}
 
@@ -152,6 +157,10 @@ namespace gglab
 		std::array<char, 64 * 1024> buffer{};
 		while (stream)
 		{
+			if (stopToken.stop_requested())
+			{
+				return hash;
+			}
 			stream.read(buffer.data(), buffer.size());
 			const std::streamsize count = stream.gcount();
 			if (count > 0)
@@ -165,7 +174,8 @@ namespace gglab
 	bool IBLBakeCache::TryLoad(
 		uint64_t key,
 		const IBLBakeConfig& config,
-		IBLBakeCachePayload& outPayload) const noexcept
+		IBLBakeCachePayload& outPayload,
+		std::stop_token stopToken) const noexcept
 	{
 		const auto directory = GetEntryDirectory(key);
 		if (!HasCompleteMarker(directory))
@@ -175,9 +185,25 @@ namespace gglab
 
 		IBLBakeCachePayload payload{};
 		payload.m_Environment = TextureLoader::LoadTextureData(directory / "environment.dds", TextureColorSpace::Linear);
+		if (stopToken.stop_requested())
+		{
+			return false;
+		}
 		payload.m_Irradiance = TextureLoader::LoadTextureData(directory / "irradiance.dds", TextureColorSpace::Linear);
+		if (stopToken.stop_requested())
+		{
+			return false;
+		}
 		payload.m_PrefilteredSpecular = TextureLoader::LoadTextureData(directory / "prefiltered_specular.dds", TextureColorSpace::Linear);
+		if (stopToken.stop_requested())
+		{
+			return false;
+		}
 		payload.m_BrdfLut = TextureLoader::LoadTextureData(directory / "brdf_lut.dds", TextureColorSpace::Linear);
+		if (stopToken.stop_requested())
+		{
+			return false;
+		}
 
 		const uint32_t environmentSize = std::max(config.m_EnvironmentCubemapSize, 1u);
 		const uint32_t specularSize = std::max(config.m_PrefilteredSpecularCubemapSize, 1u);

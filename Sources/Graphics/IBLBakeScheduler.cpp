@@ -5,11 +5,13 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
+#include "Core/Task/TaskSystem.h"
 
 namespace gglab
 {
 	IBLBakeScheduler::IBLBakeScheduler(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
+		m_TaskSystem(createInfo.m_TaskSystem),
 		m_EnvironmentLightingSystem(createInfo.m_EnvironmentLightingSystem),
 		m_RenderResourceRegistry(createInfo.m_RenderResourceRegistry),
 		m_TransferManager(createInfo.m_TransferManager),
@@ -17,6 +19,7 @@ namespace gglab
 		m_Cache(createInfo.m_CacheDirectory)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
+		GGLAB_ASSERT_NOT_NULL(m_TaskSystem);
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem);
 		GGLAB_ASSERT_NOT_NULL(m_RenderResourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(m_TransferManager);
@@ -38,6 +41,12 @@ namespace gglab
 	{
 		PollCacheWrites();
 		m_Status.m_RequestedGeneration = m_EnvironmentLightingSystem->GetBakeRequestGeneration();
+
+		if (m_CompletedCacheLookup)
+		{
+			auto work = std::move(m_CompletedCacheLookup);
+			BeginBakeResourceInitialization(lastSubmittedFence, work);
+		}
 
 		if (m_InFlightFence.IsValid())
 		{
@@ -111,6 +120,14 @@ namespace gglab
 
 	void IBLBakeScheduler::StartRequestedBake(const RHIFencePoint& retireFence) noexcept
 	{
+		GGLAB_UNUSED(retireFence);
+		if (m_CacheLookupTask.IsValid())
+		{
+			GGLAB_UNUSED(m_TaskSystem->Cancel(m_CacheLookupTask));
+		}
+		m_CacheLookupTask = {};
+		m_CompletedCacheLookup.reset();
+		m_CurrentCacheLoad.reset();
 		m_Status.m_BakingGeneration = m_Status.m_RequestedGeneration;
 		m_Status.m_CacheHit = false;
 		m_Status.m_CacheWritePending = false;
@@ -122,24 +139,102 @@ namespace gglab
 		const auto* activeEnvironment = m_EnvironmentLightingSystem->GetActiveEnvironment();
 		const std::filesystem::path environmentPath = activeEnvironment ?
 			activeEnvironment->m_Path : std::filesystem::path{};
-		m_Status.m_CacheKey = m_Cache.ComputeKey(environmentPath, m_BakingConfig);
+		const uint64_t generation = m_Status.m_BakingGeneration;
+		const bool ignoreCache = m_EnvironmentLightingSystem->ShouldIgnoreCache(generation);
+		auto work = std::make_shared<CacheLoadWork>();
+		work->m_Generation = generation;
+		SetStage(IBLBakeStage::LoadingCache, 0.0f);
+		m_CacheLookupTask = m_TaskSystem->Submit(
+			{
+				.m_Name = std::format("IBL.CacheRead: generation {}", generation),
+				.m_Priority = TaskPriority::High,
+			},
+			[this, environmentPath, config = m_BakingConfig, ignoreCache, work](
+				std::stop_token stopToken) noexcept
+			{
+				work->m_Key = m_Cache.ComputeKey(environmentPath, config, stopToken);
+				if (stopToken.stop_requested() || ignoreCache)
+				{
+					return TaskResult::Success();
+				}
+				work->m_CacheHit = m_Cache.TryLoad(
+					work->m_Key,
+					config,
+					work->m_Payload,
+					stopToken);
+				return TaskResult::Success();
+			},
+			[this, work](const TaskCompletionInfo& completion) noexcept
+			{
+				CompleteCacheLookup(completion, work);
+			});
+		if (!m_CacheLookupTask.IsValid())
+		{
+			SetStage(IBLBakeStage::Failed, 0.0f);
+		}
+	}
 
+	void IBLBakeScheduler::CompleteCacheLookup(
+		const TaskCompletionInfo& completion,
+		const std::shared_ptr<CacheLoadWork>& work) noexcept
+	{
+		if (completion.m_Handle == m_CacheLookupTask)
+		{
+			m_CacheLookupTask = {};
+		}
+		if (work->m_Generation != m_Status.m_BakingGeneration ||
+			work->m_Generation != m_Status.m_RequestedGeneration)
+		{
+			return;
+		}
+		if (completion.m_Status != TaskStatus::Succeeded)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"IBL cache lookup for generation {} failed: {}",
+				work->m_Generation,
+				completion.m_Error);
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
+		GGLAB_LOG_GRAPHICS_INFO(
+			"IBL cache lookup generation {} completed (cache={}, key={:016x}, queueMs={:.2f}, cpuMs={:.2f}).",
+			work->m_Generation,
+			work->m_CacheHit ? "hit" : "miss",
+			work->m_Key,
+			completion.m_QueueMilliseconds,
+			completion.m_ExecutionMilliseconds);
+		m_CompletedCacheLookup = work;
+	}
+
+	void IBLBakeScheduler::BeginBakeResourceInitialization(
+		const RHIFencePoint& retireFence,
+		const std::shared_ptr<CacheLoadWork>& work) noexcept
+	{
+		if (work->m_Generation != m_Status.m_BakingGeneration ||
+			work->m_Generation != m_Status.m_RequestedGeneration)
+		{
+			return;
+		}
+
+		m_Status.m_CacheKey = work->m_Key;
+		m_CurrentCacheLoad = work;
 		const RHIFencePoint* retireFencePtr = retireFence.IsValid() ? &retireFence : nullptr;
 		m_RenderResourceRegistry->EnsureIBLBakeResources(m_BakingConfig, retireFencePtr);
 		if (!m_RenderResourceRegistry->HasIBLBakeResources())
 		{
 			m_BakeResourcesNeedInitialization = false;
+			m_CurrentCacheLoad.reset();
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
+
 		// Bake targets are allocated as render-target textures from heaps created
 		// with CREATE_NOT_ZEROED. They remain live across multiple bake stages, so
 		// initialize every subresource before PIX or another tool attempts to
 		// preserve their contents with a copy operation.
 		m_BakeResourcesNeedInitialization = true;
 		m_BakeResourceInitializationExecuted = false;
-
-		SetStage(IBLBakeStage::LoadingCache, 0.0f);
+		SetStage(IBLBakeStage::LoadingCache, 0.05f);
 	}
 
 	void IBLBakeScheduler::ContinueRequestedBakeAfterInitialization() noexcept
@@ -149,10 +244,9 @@ namespace gglab
 			return;
 		}
 
-		IBLBakeCachePayload payload{};
-		if (!m_EnvironmentLightingSystem->ShouldIgnoreCache(m_Status.m_BakingGeneration) &&
-			m_Cache.TryLoad(m_Status.m_CacheKey, m_BakingConfig, payload) &&
-			UploadCachePayload(payload))
+		auto cacheLoad = std::move(m_CurrentCacheLoad);
+		if (cacheLoad && cacheLoad->m_CacheHit &&
+			UploadCachePayload(cacheLoad->m_Payload))
 		{
 			m_Status.m_CacheHit = true;
 			m_CacheUploadInFlight = true;

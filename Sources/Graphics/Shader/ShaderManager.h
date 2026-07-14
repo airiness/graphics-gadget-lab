@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Hash/KeyHash.h"
+#include "Core/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Shader/Shader.h"
 
@@ -13,6 +14,26 @@
 namespace gglab
 {
 	class ShaderCompiler;
+	class TaskSystem;
+
+	struct ShaderPreloadStatus
+	{
+		TaskStatus m_Status = TaskStatus::Invalid;
+		uint32_t m_CompletedCount = 0;
+		uint32_t m_TotalCount = 0;
+		std::string m_CurrentShader;
+		std::string m_Error;
+
+		[[nodiscard]] bool IsPreparing() const noexcept
+		{
+			return m_Status == TaskStatus::Queued || m_Status == TaskStatus::Running;
+		}
+		[[nodiscard]] bool IsReady() const noexcept { return m_Status == TaskStatus::Succeeded; }
+		[[nodiscard]] bool HasFailed() const noexcept
+		{
+			return m_Status == TaskStatus::Failed || m_Status == TaskStatus::Cancelled;
+		}
+	};
 
 	struct ShaderKey
 	{
@@ -33,6 +54,11 @@ namespace gglab
 
 		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
 		void Preload(const std::vector<ShaderDesc>& descList) noexcept;
+		[[nodiscard]] TaskHandle PreloadAsync(
+			TaskSystem& taskSystem,
+			std::vector<ShaderDesc> descList,
+			TaskPriority priority = TaskPriority::High) noexcept;
+		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
 		
 		int32_t RefreshChanged() noexcept;
 		bool RefreshShader(ShaderID shaderId) noexcept;
@@ -46,8 +72,11 @@ namespace gglab
 		}
 
 	private:
+		struct ShaderPreloadJob;
+
 		bool RefreshShaderInternal(Shader& shader) noexcept;
 		bool RefreshShaderInternal(Shader& shader, const ShaderDesc& normalizedDesc) noexcept;
+		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
@@ -55,6 +84,11 @@ namespace gglab
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
 
 		std::unique_ptr<ShaderCompiler> m_Compiler;
+		ShaderDesc m_DefaultShaderConfig{};
+		std::shared_ptr<ShaderPreloadJob> m_PreloadJob;
+		TaskHandle m_PreloadTask{};
+		TaskStatus m_PreloadStatus = TaskStatus::Invalid;
+		std::string m_PreloadError;
 		std::atomic_uint64_t m_Revision = 1;
 	};
 }

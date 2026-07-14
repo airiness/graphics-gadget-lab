@@ -20,6 +20,7 @@ namespace gglab
 	class World;
 	class LabRuntimeLocatorBase;
 	struct PlatformEvent;
+	struct LoadingProgress;
 	class Application
 	{
 	public:
@@ -63,6 +64,7 @@ namespace gglab
 		void Finalize() noexcept;
 
 		void InitializeAssets() noexcept;
+		[[nodiscard]] LoadingProgress GetStartupLoadingProgress() const noexcept;
 		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
 		// Platform lifecycle handlers
