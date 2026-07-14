@@ -350,93 +350,6 @@ namespace gglab
 		}
 	}
 
-	TextureID TextureRegistry::LoadTexture(const std::filesystem::path& path, TextureSemantic semantic) noexcept
-	{
-		if (path.empty())
-		{
-			GGLAB_LOG_GRAPHICS_WARN("TextureRegistry::LoadTexture received an empty path.");
-			return InvalidTextureID;
-		}
-
-		const auto canonicalPath = utils::Canonical(path);
-		std::error_code errorCode;
-		if (!std::filesystem::exists(canonicalPath, errorCode) ||
-			!std::filesystem::is_regular_file(canonicalPath, errorCode))
-		{
-			GGLAB_LOG_GRAPHICS_WARN("TextureRegistry::LoadTexture received a missing texture file: '{}'.",
-				canonicalPath.string());
-			return InvalidTextureID;
-		}
-
-		const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
-		auto textureId = FindTexture(canonicalPath, importSettings);
-		if (textureId.IsValid())
-		{
-			if (const auto* tex = GetTexture(textureId); tex && tex->m_IsUploaded)
-			{
-				if (tex->m_Semantic != TextureSemantic::Unknown && tex->m_Semantic != semantic)
-				{
-					GGLAB_LOG_GRAPHICS_WARN("Texture '{}' is already loaded with different semantic (existing: {}, requested: {}).",
-						canonicalPath.string(),
-						utils::ToUnderlying(tex->m_Semantic),
-						utils::ToUnderlying(semantic));
-				}
-				return textureId;
-			}
-			if (const auto* tex = GetTexture(textureId);
-				tex && tex->m_State != AssetState::Failed && tex->m_State != AssetState::Cancelled)
-			{
-				// An asynchronous request owns this stable cache entry. Returning it
-				// avoids invalidating the worker's eventual main-thread publication.
-				return textureId;
-			}
-
-			// Do not let a stale, incomplete dynamic entry poison future retries.
-			if (IsReservedTextureId(textureId) || !RemoveTexture(textureId))
-			{
-				return InvalidTextureID;
-			}
-		}
-
-		auto texUploadData = MakeTextureUploadData(InvalidTextureID, canonicalPath, semantic);
-		if (!texUploadData.m_TextureData.IsValid())
-		{
-			return InvalidTextureID;
-		}
-
-		textureId = CreateTexture(canonicalPath, importSettings);
-		if (!textureId.IsValid())
-		{
-			return InvalidTextureID;
-		}
-		texUploadData.m_TextureId = textureId;
-		auto batch = m_TransferManager->BeginBatch();
-		const bool uploadSucceeded = UploadTexture(texUploadData, batch);
-		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
-			{
-				.m_Name = std::format(
-					"Texture {}: {}",
-					textureId.Value(),
-					canonicalPath.filename().generic_string()),
-				.m_Progress = GetTexture(textureId)->m_LoadProgress,
-			},
-			std::move(batch),
-			uploadSucceeded,
-			[this, textureId](const AssetUploadCompletionInfo& completion) noexcept
-			{
-				CompleteTextureUpload(
-					textureId,
-					completion.m_Status == AssetUploadStatus::Succeeded);
-			});
-		if (!uploadHandle.IsValid())
-		{
-			RemoveTexture(textureId);
-			return InvalidTextureID;
-		}
-
-		return textureId;
-	}
-
 	TextureRegistry::TextureLoadRequest TextureRegistry::LoadTextureAsync(
 		const std::filesystem::path& path,
 		TextureSemantic semantic,
@@ -672,6 +585,7 @@ namespace gglab
 		idTexPair.first->second->m_Name = StringID(canonicalPath.generic_string());
 		idTexPair.first->second->m_SourcePath = canonicalPath;
 		idTexPair.first->second->m_DebugLabel = canonicalPath.filename().generic_string();
+		idTexPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
 
 		return textureId;
 	}
@@ -713,19 +627,6 @@ namespace gglab
 			return iterator->second;
 		}
 		return InvalidTextureID;
-	}
-
-	TextureRegistry::TextureUploadData TextureRegistry::MakeTextureUploadData(TextureID textureId,
-		const std::filesystem::path& canonicalPath, TextureSemantic semantic) noexcept
-	{
-		TextureUploadData uploadData{};
-		uploadData.m_TextureId = textureId;
-		uploadData.m_Semantic = semantic;
-		uploadData.m_ColorSpace = GetTextureColorSpaceFromSemantic(semantic);
-		uploadData.m_TextureData = TextureLoader::LoadTextureData(
-			canonicalPath,
-			MakeTextureImportSettings(semantic));
-		return uploadData;
 	}
 
 	TextureRegistry::TextureUploadData TextureRegistry::MakeTextureUploadData(TextureID textureId,

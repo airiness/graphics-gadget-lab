@@ -105,14 +105,6 @@ namespace gglab
 		}
 	}
 
-	void ShaderManager::Preload(const std::vector<ShaderDesc>& descList) noexcept
-	{
-		for (const auto& desc : descList)
-		{
-			LoadShader(desc);
-		}
-	}
-
 	TaskHandle ShaderManager::PreloadAsync(
 		TaskSystem& taskSystem,
 		std::vector<ShaderDesc> descList,

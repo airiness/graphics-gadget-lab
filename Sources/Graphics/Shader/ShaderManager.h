@@ -53,7 +53,6 @@ namespace gglab
 		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
 
 		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
-		void Preload(const std::vector<ShaderDesc>& descList) noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(
 			TaskSystem& taskSystem,
 			std::vector<ShaderDesc> descList,
