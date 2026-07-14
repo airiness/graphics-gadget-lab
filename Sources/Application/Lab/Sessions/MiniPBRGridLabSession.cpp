@@ -51,6 +51,36 @@ namespace gglab
 			return static_cast<float>(index) / static_cast<float>(GridSize - 1);
 		}
 
+		float GetAssetLoadingFraction(AssetState state) noexcept
+		{
+			switch (state)
+			{
+			case AssetState::Queued: return 0.05f;
+			case AssetState::LoadingCpu: return 0.25f;
+			case AssetState::CpuReady: return 0.55f;
+			case AssetState::UploadQueued: return 0.65f;
+			case AssetState::GpuProcessing: return 0.85f;
+			case AssetState::Ready: return 1.0f;
+			default: return 0.0f;
+			}
+		}
+
+		std::string_view GetAssetLoadingStage(AssetState state) noexcept
+		{
+			switch (state)
+			{
+			case AssetState::Queued: return "Queued for CPU import";
+			case AssetState::LoadingCpu: return "Parsing model and decoding textures";
+			case AssetState::CpuReady: return "CPU preparation complete";
+			case AssetState::UploadQueued: return "Queued for GPU upload";
+			case AssetState::GpuProcessing: return "Uploading resources and generating mips";
+			case AssetState::Ready: return "Model ready";
+			case AssetState::Failed: return "Model loading failed";
+			case AssetState::Cancelled: return "Model loading cancelled";
+			default: return "Preparing model request";
+			}
+		}
+
 		bool ComputeModelBounds(
 			const Model& model,
 			const AssetManager& assetManager,
@@ -196,13 +226,156 @@ namespace gglab
 		}));
 
 		ApplyImmediateParameters();
-		RebuildScene();
+	}
+
+	void MiniPBRGridLabSession::BeginPrepare() noexcept
+	{
+		m_World.GetRegistry().clear();
+		m_PrepareMode = PrepareMode::None;
+		m_NextGridRow = 0;
+		m_PendingModelId.Reset();
+		m_PendingModelPath.clear();
+		ApplyCameraPreset();
+
+		const auto sceneSource = static_cast<SceneSource>(GetParameters().Get(
+			SceneSourceId,
+			int32_t(SceneSource::ProceduralGrid)));
+		if (sceneSource == SceneSource::ProceduralGrid)
+		{
+			m_PrepareMode = PrepareMode::ProceduralGrid;
+			m_LoadingProgress = {
+				.m_Status = LoadingStatus::Preparing,
+				.m_Fraction = 0.05f,
+				.m_Stage = "Building procedural material grid",
+				.m_Detail = std::format("Preparing row 1 of {}.", GridSize),
+			};
+			return;
+		}
+
+		const std::string_view modelPath =
+			sceneSource == SceneSource::MetalRoughSpheres ?
+			MetalRoughSpheresPath : MetalRoughSpheresNoTexturesPath;
+		m_PrepareMode = PrepareMode::AssetModel;
+		m_LoadingProgress = {
+			.m_Status = LoadingStatus::Preparing,
+			.m_Fraction = 0.02f,
+			.m_Stage = "Requesting model",
+			.m_Detail = std::string(modelPath),
+		};
+		if (!BuildAssetModel(modelPath))
+		{
+			m_LoadingProgress.m_Status = LoadingStatus::Failed;
+			m_LoadingProgress.m_Stage = "Model request failed";
+			m_LoadingProgress.m_Detail = std::string(modelPath);
+		}
+	}
+
+	void MiniPBRGridLabSession::TickPrepare() noexcept
+	{
+		if (!m_LoadingProgress.IsPreparing())
+		{
+			return;
+		}
+
+		if (m_PrepareMode == PrepareMode::ProceduralGrid)
+		{
+			if (m_NextGridRow < GridSize)
+			{
+				BuildProceduralGridRow(m_NextGridRow);
+				++m_NextGridRow;
+				m_LoadingProgress.m_Fraction = 0.05f +
+					0.85f * static_cast<float>(m_NextGridRow) / static_cast<float>(GridSize);
+				m_LoadingProgress.m_Detail = m_NextGridRow < GridSize ?
+					std::format("Preparing row {} of {}.", m_NextGridRow + 1, GridSize) :
+					"Finalizing lighting and material parameters.";
+			}
+			if (m_NextGridRow == GridSize)
+			{
+				const Mesh* sphereMesh = m_Services.m_AssetManager->GetMesh(
+					ProceduralSphereMeshID);
+				if (!sphereMesh || sphereMesh->m_State == AssetState::Failed ||
+					sphereMesh->m_State == AssetState::Cancelled)
+				{
+					m_LoadingProgress.m_Status = LoadingStatus::Failed;
+					m_LoadingProgress.m_Stage = "Procedural mesh upload failed";
+					m_LoadingProgress.m_Detail = "ProceduralSphere";
+					return;
+				}
+				if (sphereMesh->m_State != AssetState::Ready)
+				{
+					m_LoadingProgress.m_Fraction = 0.9f +
+						0.09f * GetAssetLoadingFraction(sphereMesh->m_State);
+					m_LoadingProgress.m_Stage = "Uploading procedural sphere mesh to GPU";
+					m_LoadingProgress.m_Detail = GetAssetLoadingStage(sphereMesh->m_State);
+					return;
+				}
+				BuildLighting();
+				ApplyImmediateParameters();
+				m_PrepareMode = PrepareMode::None;
+				m_LoadingProgress = LoadingProgress::Ready();
+			}
+			return;
+		}
+
+		if (m_PrepareMode != PrepareMode::AssetModel || !m_PendingModelId.IsValid())
+		{
+			m_LoadingProgress.m_Status = LoadingStatus::Failed;
+			m_LoadingProgress.m_Stage = "Model request unavailable";
+			return;
+		}
+
+		auto& assetManager = *m_Services.m_AssetManager;
+		const Model* model = assetManager.GetModel(m_PendingModelId);
+		if (!model)
+		{
+			m_LoadingProgress.m_Status = LoadingStatus::Failed;
+			m_LoadingProgress.m_Stage = "Model request lost";
+			m_LoadingProgress.m_Detail = m_PendingModelPath;
+			return;
+		}
+
+		m_LoadingProgress.m_Fraction = 0.05f + 0.85f * GetAssetLoadingFraction(model->m_State);
+		m_LoadingProgress.m_Stage = GetAssetLoadingStage(model->m_State);
+		m_LoadingProgress.m_Detail = m_PendingModelPath;
+		if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
+		{
+			m_LoadingProgress.m_Status = LoadingStatus::Failed;
+			return;
+		}
+		if (model->m_State != AssetState::Ready)
+		{
+			return;
+		}
+
+		m_LoadingProgress.m_Fraction = 0.95f;
+		m_LoadingProgress.m_Stage = "Creating scene instance";
+		if (!FinalizeAssetModel())
+		{
+			m_LoadingProgress.m_Status = LoadingStatus::Failed;
+			m_LoadingProgress.m_Detail = "The model has no usable bounds.";
+			return;
+		}
+		BuildLighting();
+		ApplyImmediateParameters();
+		m_PrepareMode = PrepareMode::None;
+		m_LoadingProgress = LoadingProgress::Ready();
+	}
+
+	void MiniPBRGridLabSession::CommitPrepare() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(), "Mini PBR Grid must be ready before commit.");
+	}
+
+	void MiniPBRGridLabSession::CancelPrepare() noexcept
+	{
+		m_PrepareMode = PrepareMode::None;
+		m_PendingModelId.Reset();
+		m_PendingModelPath.clear();
+		m_World.GetRegistry().clear();
 	}
 
 	void MiniPBRGridLabSession::Update(float deltaTime) noexcept
 	{
-		TryFinalizeAssetModel();
-
 		if (m_EnableCameraInput)
 		{
 			UpdateCamera(deltaTime);
@@ -266,67 +439,48 @@ namespace gglab
 
 	void MiniPBRGridLabSession::RebuildScene() noexcept
 	{
-		auto& registry = m_World.GetRegistry();
-		registry.clear();
-		m_PendingModelId.Reset();
-		m_PendingModelPath.clear();
-		ApplyCameraPreset();
+		ApplyImmediateParameters();
+		BeginPrepare();
+	}
 
-		const auto sceneSource = static_cast<SceneSource>(GetParameters().Get(
-			SceneSourceId,
-			int32_t(SceneSource::ProceduralGrid)));
-		switch (sceneSource)
-		{
-		case SceneSource::MetalRoughSpheres:
-			GGLAB_UNUSED(BuildAssetModel(MetalRoughSpheresPath));
-			break;
-		case SceneSource::MetalRoughSpheresNoTextures:
-			GGLAB_UNUSED(BuildAssetModel(MetalRoughSpheresNoTexturesPath));
-			break;
-		case SceneSource::ProceduralGrid:
-		default:
-			BuildProceduralGrid();
-			break;
-		}
-
-		BuildLighting();
+	void MiniPBRGridLabSession::OnParametersRestoredForPrepare(
+		LabChangeImpact impact) noexcept
+	{
+		GGLAB_UNUSED(impact);
 		ApplyImmediateParameters();
 	}
 
-	void MiniPBRGridLabSession::BuildProceduralGrid() noexcept
+	void MiniPBRGridLabSession::BuildProceduralGridRow(uint32_t row) noexcept
 	{
 		auto& registry = m_World.GetRegistry();
 		const float halfGridSize = static_cast<float>(GridSize - 1) * 0.5f;
-		for (uint32_t row = 0; row < GridSize; ++row)
+		for (uint32_t column = 0; column < GridSize; ++column)
 		{
-			for (uint32_t column = 0; column < GridSize; ++column)
-			{
-				components::TransformComponent transform{};
-				transform.m_Position = Vector3(
-					(static_cast<float>(column) - halfGridSize) * GridSpacing,
-					(halfGridSize - static_cast<float>(row)) * GridSpacing,
-					GridDepth);
-				transform.m_Scale = Vector3::One * 0.95f;
+			components::TransformComponent transform{};
+			transform.m_Position = Vector3(
+				(static_cast<float>(column) - halfGridSize) * GridSpacing,
+				(halfGridSize - static_cast<float>(row)) * GridSpacing,
+				GridDepth);
+			transform.m_Scale = Vector3::One * 0.95f;
 
-				components::MaterialInstanceComponent material{};
-				const std::string key = std::format(
-					"gglab.lab.mini_pbr_grid.material.{}.{}",
-					row,
-					column);
-				material.m_Key = RuntimeMaterialKey(key);
+			components::MaterialInstanceComponent material{};
+			const std::string key = std::format(
+				"gglab.lab.mini_pbr_grid.material.{}.{}",
+				row,
+				column);
+			material.m_Key = RuntimeMaterialKey(key);
 
-				const entt::entity sphere = primitive::Sphere::Create({
-					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
-					.m_World = &m_World,
-					.m_Transform = transform,
-					.m_MaterialInstance = material,
-				});
-				registry.emplace<GridCellComponent>(sphere, GridCellComponent{
-					.m_Row = row,
-					.m_Column = column,
-				});
-			}
+			const entt::entity sphere = primitive::Sphere::Create({
+				.m_AssetManager = m_Services.m_AssetManager,
+				.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+				.m_World = &m_World,
+				.m_Transform = transform,
+				.m_MaterialInstance = material,
+			});
+			registry.emplace<GridCellComponent>(sphere, GridCellComponent{
+				.m_Row = row,
+				.m_Column = column,
+			});
 		}
 	}
 
@@ -345,11 +499,11 @@ namespace gglab
 		return true;
 	}
 
-	void MiniPBRGridLabSession::TryFinalizeAssetModel() noexcept
+	bool MiniPBRGridLabSession::FinalizeAssetModel() noexcept
 	{
 		if (!m_PendingModelId.IsValid())
 		{
-			return;
+			return false;
 		}
 
 		auto& assetManager = *m_Services.m_AssetManager;
@@ -361,7 +515,7 @@ namespace gglab
 				m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
-			return;
+			return false;
 		}
 		if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
 		{
@@ -370,11 +524,11 @@ namespace gglab
 				m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
-			return;
+			return false;
 		}
 		if (model->m_State != AssetState::Ready)
 		{
-			return;
+			return false;
 		}
 
 		GGLAB_LOG_INFO(
@@ -390,7 +544,7 @@ namespace gglab
 				m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
-			return;
+			return false;
 		}
 
 		const Vector3 boundsExtents = bounds.m_Extents;
@@ -404,7 +558,7 @@ namespace gglab
 				m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
-			return;
+			return false;
 		}
 
 		components::TransformComponent transform{};
@@ -421,6 +575,7 @@ namespace gglab
 		});
 		m_PendingModelId.Reset();
 		m_PendingModelPath.clear();
+		return true;
 	}
 
 	void MiniPBRGridLabSession::BuildLighting() noexcept

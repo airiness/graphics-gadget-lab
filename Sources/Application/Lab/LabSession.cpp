@@ -79,6 +79,16 @@ namespace gglab
 		}
 	}
 
+	void LabSessionBase::ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept
+	{
+		OnParametersRestoredForPrepare(impact);
+	}
+
+	void LabSessionBase::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
+	{
+		ApplyParameterChanges(impact);
+	}
+
 	void LabSessionBase::OnResize(uint32_t width, uint32_t height) noexcept
 	{
 		if (width > 0 && height > 0)

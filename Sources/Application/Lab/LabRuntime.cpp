@@ -2,7 +2,7 @@
 #include "Application/Lab/LabRuntime.h"
 #include "Core/Time.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RHI/RHIContext.h"
+#include "Graphics/RHI/RHIDevice.h"
 
 namespace gglab
 {
@@ -41,7 +41,7 @@ namespace gglab
 			return false;
 		}
 
-		return ReplaceActiveSession(startupLab, false);
+		return BeginSessionTransition(startupLab);
 	}
 
 	void LabRuntime::Shutdown() noexcept
@@ -51,7 +51,13 @@ namespace gglab
 			m_ActiveSession->OnExit();
 		}
 		m_IsEntered = false;
+		if (m_PendingSession)
+		{
+			m_PendingSession->CancelPrepare();
+		}
+		m_PendingSession.reset();
 		m_ActiveSession.reset();
+		m_RetiringSessions.clear();
 		m_State = LabRunState::Uninitialized;
 		m_FrameInSession = 0;
 		m_WarmupFramesRemaining = 0;
@@ -90,6 +96,10 @@ namespace gglab
 		if (m_ActiveSession)
 		{
 			m_ActiveSession->OnResize(width, height);
+		}
+		if (m_PendingSession)
+		{
+			m_PendingSession->OnResize(width, height);
 		}
 	}
 
@@ -136,7 +146,8 @@ namespace gglab
 		const LabCommandBatch commands = m_CommandQueue.Consume();
 		if (commands.m_SwitchTarget)
 		{
-			GGLAB_UNUSED(ReplaceActiveSession(*commands.m_SwitchTarget, true));
+			GGLAB_UNUSED(BeginSessionTransition(*commands.m_SwitchTarget));
+			TickTransitions();
 			return;
 		}
 
@@ -147,18 +158,22 @@ namespace gglab
 			const std::vector<LabParameterValue> values =
 				m_ActiveSession->GetParameters().CaptureValues();
 			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
+			TickTransitions();
 			return;
 		}
 
 		if (commands.m_RestartRequested && m_ActiveSession)
 		{
-			const LabId activeId = m_ActiveSession->GetDescriptor().m_Id;
-			GGLAB_UNUSED(ReplaceActiveSession(activeId, true));
+			const std::vector<LabParameterValue> values =
+				m_ActiveSession->GetParameters().CaptureValues();
+			GGLAB_UNUSED(RestartActiveSessionWithValues(values));
+			TickTransitions();
 			return;
 		}
 
 		if (!m_ActiveSession)
 		{
+			TickTransitions();
 			return;
 		}
 
@@ -192,10 +207,11 @@ namespace gglab
 
 		if (!parametersChanged)
 		{
+			TickTransitions();
 			return;
 		}
 
-		if (impact == LabChangeImpact::RestartSession)
+		if (impact != LabChangeImpact::Immediate)
 		{
 			const std::vector<LabParameterValue> values =
 				m_ActiveSession->GetParameters().CaptureValues();
@@ -203,11 +219,36 @@ namespace gglab
 		}
 		else
 		{
-			if (impact == LabChangeImpact::RecreatePipeline)
-			{
-				WaitForGpuIdle();
-			}
 			m_ActiveSession->ApplyParameterChanges(impact);
+		}
+		TickTransitions();
+	}
+
+	void LabRuntime::TickTransitions() noexcept
+	{
+		PollRetiringSessions();
+		if (!m_PendingSession)
+		{
+			return;
+		}
+
+		m_PendingSession->TickPrepare();
+		const LoadingProgress progress = m_PendingSession->GetPreparationProgress();
+		if (progress.HasFailed())
+		{
+			const std::string labName = m_PendingSession->GetDescriptor().m_DisplayName;
+			m_PendingSession->CancelPrepare();
+			m_PendingSession.reset();
+			m_State = m_ActiveSession ? m_StateBeforeTransition : LabRunState::Failed;
+			SetError(std::format(
+				"Failed to prepare lab '{}': {}",
+				labName,
+				progress.m_Detail));
+			return;
+		}
+		if (progress.IsReady())
+		{
+			GGLAB_UNUSED(CommitPendingSession());
 		}
 	}
 
@@ -228,7 +269,19 @@ namespace gglab
 		};
 		snapshot.m_LastError = m_LastError;
 		snapshot.m_HasPendingCommands = !m_CommandQueue.IsEmpty();
+		snapshot.m_HasPendingSession = m_PendingSession != nullptr;
+		snapshot.m_RetiringSessionCount = GetRetiringSessionCount();
 		snapshot.m_IsHostActive = m_IsEntered;
+		if (m_PendingSession)
+		{
+			const LabDescriptor& pendingDescriptor = m_PendingSession->GetDescriptor();
+			const LoadingProgress progress = m_PendingSession->GetPreparationProgress();
+			snapshot.m_PendingLabId = pendingDescriptor.m_Id;
+			snapshot.m_PendingLabName = pendingDescriptor.m_DisplayName;
+			snapshot.m_LoadingFraction = progress.m_Fraction;
+			snapshot.m_LoadingStage = progress.m_Stage;
+			snapshot.m_LoadingDetail = progress.m_Detail;
+		}
 
 		snapshot.m_AvailableLabs.reserve(m_Catalog.GetCount());
 		for (uint32_t index = 0; index < m_Catalog.GetCount(); ++index)
@@ -264,6 +317,20 @@ namespace gglab
 		return snapshot;
 	}
 
+	std::optional<LoadingProgress> LabRuntime::GetLoadingProgress() const noexcept
+	{
+		if (!m_PendingSession)
+		{
+			return std::nullopt;
+		}
+
+		LoadingProgress progress = m_PendingSession->GetPreparationProgress();
+		progress.m_Title = std::format(
+			"Loading Lab: {}",
+			m_PendingSession->GetDescriptor().m_DisplayName);
+		return progress;
+	}
+
 	World& LabRuntime::GetWorld() noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ActiveSession.get());
@@ -294,36 +361,70 @@ namespace gglab
 		return m_ActiveSession->GetRenderPipeline();
 	}
 
-	bool LabRuntime::ReplaceActiveSession(const LabId& id, bool waitForGpu) noexcept
+	bool LabRuntime::BeginSessionTransition(
+		const LabId& id,
+		std::span<const LabParameterValue> values) noexcept
 	{
-		const LabRunState previousState = m_State;
+		if (!m_PendingSession)
+		{
+			m_StateBeforeTransition = m_State;
+		}
+		else
+		{
+			m_PendingSession->CancelPrepare();
+			m_PendingSession.reset();
+		}
 		m_State = LabRunState::Loading;
 		if (!m_Catalog.Find(id))
 		{
-			m_State = previousState;
+			m_State = m_ActiveSession ? m_StateBeforeTransition : LabRunState::Failed;
 			SetError(std::format("Lab '{}' is not registered.", id.GetName()));
 			return false;
 		}
 
-		auto nextSession = m_Catalog.Create(id, m_CreateInfo);
-		if (!nextSession || !nextSession->IsValid())
+		m_PendingSession = m_Catalog.Create(id, m_CreateInfo);
+		if (!m_PendingSession || !m_PendingSession->IsValid())
 		{
-			m_State = previousState;
+			m_PendingSession.reset();
+			m_State = m_ActiveSession ? m_StateBeforeTransition : LabRunState::Failed;
 			SetError(std::format("Failed to create lab '{}'.", id.GetName()));
 			return false;
 		}
 
-		if (waitForGpu && m_ActiveSession)
+		LabChangeImpact restoredImpact = LabChangeImpact::Immediate;
+		for (const LabParameterValue& value : values)
 		{
-			WaitForGpuIdle();
+			LabChangeImpact valueImpact = LabChangeImpact::Immediate;
+			if (m_PendingSession->SetParameter(value.m_Id, value.m_Value, &valueImpact))
+			{
+				restoredImpact = MaxImpact(restoredImpact, valueImpact);
+			}
 		}
+		m_PendingSession->ApplyRestoredParametersForPrepare(restoredImpact);
+		m_PendingSession->OnResize(m_CreateInfo.m_WindowWidth, m_CreateInfo.m_WindowHeight);
+		m_PendingSession->BeginPrepare();
+		m_LastError.clear();
+		return true;
+	}
 
+	bool LabRuntime::CommitPendingSession() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_PendingSession.get());
+		m_PendingSession->CommitPrepare();
 		if (m_IsEntered && m_ActiveSession)
 		{
 			m_ActiveSession->OnExit();
 		}
+		if (m_ActiveSession)
+		{
+			m_RetiringSessions.push_back({
+				.m_Instance = std::move(m_ActiveSession),
+				.m_RetireFence = m_HasFrameFeedback ?
+					m_LastFrameFeedback.m_SubmittedFence : RHIFencePoint{},
+			});
+		}
 
-		m_ActiveSession = std::move(nextSession);
+		m_ActiveSession = std::move(m_PendingSession);
 		m_ActiveSession->OnResize(m_CreateInfo.m_WindowWidth, m_CreateInfo.m_WindowHeight);
 		if (m_IsEntered)
 		{
@@ -338,7 +439,9 @@ namespace gglab
 		m_EffectiveDeltaTime = 0.0f;
 		m_LastFrameFeedback = {};
 		m_HasFrameFeedback = false;
-		GGLAB_LOG_INFO("Activated lab '{}'.", id.GetName());
+		GGLAB_LOG_INFO(
+			"Activated lab '{}'.",
+			m_ActiveSession->GetDescriptor().m_Id.GetName());
 		return true;
 	}
 
@@ -351,30 +454,25 @@ namespace gglab
 		}
 
 		const LabId activeId = m_ActiveSession->GetDescriptor().m_Id;
-		if (!ReplaceActiveSession(activeId, true))
-		{
-			return false;
-		}
-
-		LabChangeImpact impact = LabChangeImpact::Immediate;
-		for (const LabParameterValue& value : values)
-		{
-			LabChangeImpact valueImpact = LabChangeImpact::Immediate;
-			if (m_ActiveSession->SetParameter(value.m_Id, value.m_Value, &valueImpact))
-			{
-				impact = MaxImpact(impact, valueImpact);
-			}
-		}
-		m_ActiveSession->ApplyParameterChanges(impact);
-		return true;
+		return BeginSessionTransition(activeId, values);
 	}
 
-	void LabRuntime::WaitForGpuIdle() noexcept
+	void LabRuntime::PollRetiringSessions() noexcept
 	{
 		auto* renderer = m_CreateInfo.m_Services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
-		GGLAB_ASSERT_NOT_NULL(renderer->GetRHIContext());
-		renderer->GetRHIContext()->WaitIdle();
+		RHIDevice* device = renderer ? renderer->GetDevice() : nullptr;
+		if (!device)
+		{
+			return;
+		}
+		std::erase_if(
+			m_RetiringSessions,
+			[device](const RetiringSession& retiring) noexcept
+			{
+				return !retiring.m_RetireFence.IsValid() ||
+					device->IsFencePointCompleted(retiring.m_RetireFence);
+			});
 	}
 
 	void LabRuntime::SetError(std::string message) noexcept

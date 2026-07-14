@@ -4,6 +4,7 @@
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
+#include "Application/Demo/DemoLoadingShell.h"
 #include "Application/Demo/DemoManager.h"
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/DemoTypes.h"
@@ -25,6 +26,7 @@
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/LoadingOverlay.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
@@ -182,7 +184,7 @@ namespace gglab
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 
-		m_DemoManager = std::make_unique<DemoManager>();
+		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 
 		InitializeAssets();
@@ -200,6 +202,7 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
+		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId ?
 			LabId(*m_LaunchOptions.m_StartupLabId) : CullingLabSession::GetId();
 		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo(
@@ -212,13 +215,7 @@ namespace gglab
 			"Demo.LabHost",
 			[demoCreateInfo, startupLab]() noexcept -> std::unique_ptr<DemoBase>
 			{
-				auto labHost = std::make_unique<DemoLabHost>(demoCreateInfo, startupLab);
-				if (!labHost->IsValid())
-				{
-					GGLAB_LOG_ERROR("Failed to initialize the requested startup Lab.");
-					return nullptr;
-				}
-				return labHost;
+				return std::make_unique<DemoLabHost>(demoCreateInfo, startupLab);
 			});
 		if (playgroundIndex >= m_DemoManager->GetDemoCount() ||
 			labHostIndex >= m_DemoManager->GetDemoCount())
@@ -232,13 +229,6 @@ namespace gglab
 			m_LaunchOptions.m_StartupDemo == ApplicationStartupDemo::LabHost ?
 			labHostIndex : playgroundIndex;
 		m_DemoManager->RequestActiveDemo(startupDemoIndex);
-		if (!m_DemoManager->ApplyPendingActiveDemo())
-		{
-			GGLAB_LOG_ERROR("Failed to initialize the requested startup demo.");
-			m_IsInitialized = true;
-			Finalize();
-			return;
-		}
 		m_LabRuntimeLocator = std::make_unique<DemoLabRuntimeLocator>(
 			m_DemoManager.get(),
 			labHostIndex);
@@ -318,8 +308,12 @@ namespace gglab
 			}
 		}
 
-		// Apply UI-driven demo changes before the demo updates or frame data is built.
-		m_DemoManager->ApplyPendingActiveDemo();
+		// Prepare pending demos without replacing the active renderable demo.
+		if (!m_DemoManager->TickTransitions())
+		{
+			GGLAB_LOG_ERROR("No active demo is available for rendering.");
+			return false;
+		}
 
 		// DevelopGui new frame
 		const bool developGuiFrameOpen =
@@ -409,6 +403,10 @@ namespace gglab
 			guiContext.m_DebugDrawFrame = frame.m_DebugDrawFrame;
 
 			m_DevelopGuiSystem->Draw(guiContext);
+			if (const auto loadingProgress = m_DemoManager->GetLoadingProgress())
+			{
+				DrawLoadingOverlay(*loadingProgress);
+			}
 		}
 
 		// Render
@@ -427,7 +425,7 @@ namespace gglab
 			.m_FrameIndex = m_Time->GetFrameCount(),
 			.m_BackBufferIndex = backBufferIndex,
 		};
-		demo->OnFrameSubmitted(demoFeedback);
+		m_DemoManager->OnFrameSubmitted(demoFeedback);
 
 		// Pipelines without a DevelopGui render pass must still close the ImGui frame.
 		if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())

@@ -11,6 +11,7 @@ namespace gglab
 	DemoLabHost::DemoLabHost(
 		const DemoCreateInfo& createInfo,
 		const LabId& startupLab) noexcept :
+		m_StartupLab(startupLab),
 		m_Runtime({
 			.m_Services = createInfo.m_Services,
 			.m_WindowWidth = createInfo.m_WindowWidth,
@@ -43,8 +44,58 @@ namespace gglab
 			&TaskSystemLabSession::Create);
 		GGLAB_ASSERT_MSG(taskSystemRegistered,
 			"Failed to register the Task System Lab session.");
+	}
 
-		GGLAB_UNUSED(m_Runtime.Initialize(startupLab));
+	void DemoLabHost::BeginPrepare() noexcept
+	{
+		GGLAB_UNUSED(m_Runtime.Initialize(m_StartupLab));
+	}
+
+	void DemoLabHost::TickPrepare() noexcept
+	{
+		m_Runtime.TickTransitions();
+	}
+
+	LoadingProgress DemoLabHost::GetPreparationProgress() const noexcept
+	{
+		if (const auto progress = m_Runtime.GetLoadingProgress())
+		{
+			return *progress;
+		}
+		if (m_Runtime.IsInitialized())
+		{
+			return LoadingProgress::Ready();
+		}
+		if (m_Runtime.GetState() == LabRunState::Failed)
+		{
+			return {
+				.m_Status = LoadingStatus::Failed,
+				.m_Fraction = 0.0f,
+				.m_Stage = "Lab initialization failed",
+				.m_Detail = std::string(m_Runtime.GetLastError()),
+			};
+		}
+		return {
+			.m_Status = LoadingStatus::Preparing,
+			.m_Fraction = 0.0f,
+			.m_Stage = "Initializing Lab runtime",
+			.m_Detail = std::string(m_StartupLab.GetName()),
+		};
+	}
+
+	void DemoLabHost::CommitPrepare() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_Runtime.IsInitialized(), "DemoLabHost requires a prepared Lab session.");
+	}
+
+	void DemoLabHost::CancelPrepare() noexcept
+	{
+		m_Runtime.Shutdown();
+	}
+
+	std::optional<LoadingProgress> DemoLabHost::GetActiveLoadingProgress() const noexcept
+	{
+		return m_Runtime.GetLoadingProgress();
 	}
 
 	void DemoLabHost::OnEnter() noexcept
