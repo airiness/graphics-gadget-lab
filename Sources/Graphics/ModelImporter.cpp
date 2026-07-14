@@ -193,7 +193,8 @@ namespace gglab
 		[[nodiscard]] uint32_t ImportTexture(
 			ImportedModel& model,
 			const std::filesystem::path& path,
-			TextureSemantic semantic) noexcept
+			TextureSemantic semantic,
+			const ProgressReporter& progress) noexcept
 		{
 			const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
 			const auto existing = std::ranges::find_if(model.m_Textures,
@@ -211,7 +212,7 @@ namespace gglab
 			texture.m_CanonicalPath = path;
 			texture.m_ImportSettings = importSettings;
 			texture.m_Semantic = semantic;
-			texture.m_Data = TextureLoader::LoadTextureData(path, importSettings);
+			texture.m_Data = TextureLoader::LoadTextureData(path, importSettings, progress);
 			model.m_Textures.emplace_back(std::move(texture));
 			return static_cast<uint32_t>(model.m_Textures.size() - 1);
 		}
@@ -220,9 +221,14 @@ namespace gglab
 	ModelImportResult ModelImporter::Import(
 		const std::filesystem::path& path,
 		const ModelImportSettings& settings,
-		std::stop_token stopToken) noexcept
+		std::stop_token stopToken,
+		const ProgressReporter& progress) noexcept
 	{
 		ModelImportResult result{};
+		progress.Report(
+			0.02f,
+			"Validating model source",
+			path.filename().generic_string());
 		if (stopToken.stop_requested())
 		{
 			result.m_Error = "Model import was cancelled.";
@@ -254,6 +260,10 @@ namespace gglab
 			aiProcess_SortByPType |
 			aiProcess_OptimizeMeshes |
 			aiProcess_OptimizeGraph;
+		progress.Report(
+			0.08f,
+			"Parsing model with Assimp",
+			canonicalPath.filename().generic_string());
 		const aiScene* scene = importer.ReadFile(canonicalPath.string(), importFlags);
 		if (!scene)
 		{
@@ -271,6 +281,13 @@ namespace gglab
 			result.m_Error = std::format("Model file '{}' does not contain a scene hierarchy.", canonicalPath.string());
 			return result;
 		}
+		progress.Report(
+			0.25f,
+			"Model structure parsed",
+			std::format(
+				"{} meshes, {} materials",
+				scene->mNumMeshes,
+				scene->mNumMaterials));
 
 		ImportedModel& model = result.m_Model;
 		model.m_CanonicalPath = canonicalPath;
@@ -281,6 +298,16 @@ namespace gglab
 
 		for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
 		{
+			const float materialBegin = 0.25f + 0.35f *
+				static_cast<float>(materialIndex) / std::max(scene->mNumMaterials, 1u);
+			const float materialEnd = 0.25f + 0.35f *
+				static_cast<float>(materialIndex + 1) / std::max(scene->mNumMaterials, 1u);
+			progress.Report(
+				materialBegin,
+				"Processing model materials",
+				std::format("{} of {}", materialIndex + 1, scene->mNumMaterials),
+				materialIndex,
+				scene->mNumMaterials);
 			if (stopToken.stop_requested())
 			{
 				result.m_Error = "Model import was cancelled.";
@@ -324,7 +351,17 @@ namespace gglab
 
 				const auto canonicalTexturePath = utils::Canonical(directory / texturePath.C_Str());
 				ImportedMaterialTextureBinding& binding = destination.m_TextureBindings[slotIndex];
-				binding.m_TextureIndex = ImportTexture(model, canonicalTexturePath, semantic);
+				const float slotBegin = static_cast<float>(slotIndex) /
+					static_cast<float>(utils::ToIndex(MaterialTextureSlot::Count));
+				const float slotEnd = static_cast<float>(slotIndex + 1) /
+					static_cast<float>(utils::ToIndex(MaterialTextureSlot::Count));
+				binding.m_TextureIndex = ImportTexture(
+					model,
+					canonicalTexturePath,
+					semantic,
+					progress.Subrange(
+						std::lerp(materialBegin, materialEnd, slotBegin),
+						std::lerp(materialBegin, materialEnd, slotEnd)));
 				binding.m_SamplerKey = MakeSamplerKey(mapMode, magFilter, minFilter, settings);
 				if (uvIndex > 1)
 				{
@@ -381,6 +418,13 @@ namespace gglab
 		model.m_Meshes.resize(scene->mNumMeshes);
 		for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
 		{
+			progress.Report(
+				0.60f + 0.33f * static_cast<float>(meshIndex) /
+					std::max(scene->mNumMeshes, 1u),
+				"Building model mesh data",
+				std::format("{} of {}", meshIndex + 1, scene->mNumMeshes),
+				meshIndex,
+				scene->mNumMeshes);
 			if (stopToken.stop_requested())
 			{
 				result.m_Error = "Model import was cancelled.";
@@ -474,6 +518,7 @@ namespace gglab
 			}
 		}
 
+		progress.Report(0.94f, "Collecting model scene hierarchy");
 		CollectModelMeshInstances(
 			*scene->mRootNode,
 			aiMatrix4x4(),
@@ -493,6 +538,14 @@ namespace gglab
 			}
 		}
 
+		progress.Report(
+			1.0f,
+			"Model CPU import complete",
+			std::format(
+				"{} meshes, {} instances, {} textures",
+				model.m_Meshes.size(),
+				model.m_MeshInstances.size(),
+				model.m_Textures.size()));
 		return result;
 	}
 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 
-#include <string_view>
+#include <string>
 
 namespace gglab
 {
@@ -17,7 +17,8 @@ namespace gglab
 	{
 		AssetState m_State = AssetState::Unloaded;
 		float m_Fraction = 0.0f;
-		std::string_view m_Stage;
+		std::string m_Stage;
+		std::string m_Detail;
 
 		[[nodiscard]] bool IsReady() const noexcept
 		{
@@ -32,5 +33,6 @@ namespace gglab
 
 	[[nodiscard]] AssetLoadProgress GetAssetLoadProgress(
 		AssetState state,
-		AssetLoadKind kind = AssetLoadKind::Generic) noexcept;
+		AssetLoadKind kind = AssetLoadKind::Generic,
+		const ProgressChannelPtr& progress = {}) noexcept;
 }

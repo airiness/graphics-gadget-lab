@@ -115,6 +115,7 @@ namespace gglab
 						.m_Status = upload.m_Status,
 						.m_FencePoint = upload.m_FencePoint,
 						.m_ElapsedMilliseconds = upload.m_ElapsedMilliseconds,
+						.m_Progress = upload.m_Progress,
 					});
 				}
 			};

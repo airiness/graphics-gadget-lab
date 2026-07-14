@@ -55,11 +55,19 @@ namespace gglab
 
 		if (!upload.m_FencePoint.IsValid())
 		{
+			ProgressReporter(upload.m_Desc.m_Progress).Report(
+				0.72f,
+				"GPU upload submission failed",
+				upload.m_Desc.m_Name);
 			FinishUpload(std::move(upload), AssetUploadStatus::Failed);
 			return {};
 		}
 
 		const AssetUploadHandle handle = upload.m_Handle;
+		ProgressReporter(upload.m_Desc.m_Progress).Report(
+			0.82f,
+			"Waiting for GPU upload",
+			std::format("{} | fence {}", upload.m_Desc.m_Name, upload.m_FencePoint.m_Value));
 		m_PendingUploads.emplace_back(std::move(upload));
 		return handle;
 	}
@@ -136,12 +144,15 @@ namespace gglab
 		statistics.m_PendingUploads.reserve(m_PendingUploads.size());
 		for (const PendingUpload& upload : m_PendingUploads)
 		{
+			const ProgressSnapshot progress = upload.m_Desc.m_Progress ?
+				upload.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{};
 			statistics.m_PendingUploads.push_back({
 				.m_Handle = upload.m_Handle,
 				.m_Name = upload.m_Desc.m_Name,
 				.m_Status = AssetUploadStatus::Pending,
 				.m_FencePoint = upload.m_FencePoint,
 				.m_ElapsedMilliseconds = Milliseconds(now - upload.m_SubmittedAt),
+				.m_Progress = progress,
 			});
 		}
 		return statistics;
@@ -156,6 +167,12 @@ namespace gglab
 		PendingUpload&& upload,
 		AssetUploadStatus status) noexcept
 	{
+		ProgressReporter(upload.m_Desc.m_Progress).Report(
+			status == AssetUploadStatus::Succeeded ? 0.96f : 0.82f,
+			status == AssetUploadStatus::Succeeded ?
+				"Publishing GPU resource" : "GPU upload failed",
+			upload.m_Desc.m_Name);
+
 		AssetUploadCompletionInfo info{};
 		info.m_Handle = upload.m_Handle;
 		info.m_Name = std::move(upload.m_Desc.m_Name);
@@ -198,12 +215,15 @@ namespace gglab
 
 		if (m_RecentUploadCapacity > 0)
 		{
+			const ProgressSnapshot progress = upload.m_Desc.m_Progress ?
+				upload.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{};
 			m_RecentUploads.push_front({
 				.m_Handle = info.m_Handle,
 				.m_Name = std::move(info.m_Name),
 				.m_Status = info.m_Status,
 				.m_FencePoint = info.m_FencePoint,
 				.m_ElapsedMilliseconds = info.m_ElapsedMilliseconds,
+				.m_Progress = progress,
 			});
 			while (m_RecentUploads.size() > m_RecentUploadCapacity)
 			{

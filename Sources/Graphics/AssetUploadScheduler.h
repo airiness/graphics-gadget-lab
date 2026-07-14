@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Async/ProgressChannel.h"
 #include "Graphics/RHI/RHIFence.h"
 
 #include <chrono>
@@ -34,6 +35,7 @@ namespace gglab
 	struct AssetUploadDesc
 	{
 		std::string m_Name;
+		ProgressChannelPtr m_Progress;
 	};
 
 	struct AssetUploadCompletionInfo
@@ -54,6 +56,7 @@ namespace gglab
 		AssetUploadStatus m_Status = AssetUploadStatus::Pending;
 		RHIFencePoint m_FencePoint{};
 		double m_ElapsedMilliseconds = 0.0;
+		ProgressSnapshot m_Progress;
 	};
 
 	struct AssetUploadStatistics

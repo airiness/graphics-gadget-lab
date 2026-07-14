@@ -190,7 +190,7 @@ namespace gglab
 			{
 				if (MatchesFilters(task, state)) tasks.push_back(&task);
 			}
-			if (!ImGui::BeginTable("ActiveTasks", 7,
+			if (!ImGui::BeginTable("ActiveTasks", 9,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable,
 				ImVec2(0.0f, 180.0f)))
@@ -201,6 +201,8 @@ namespace gglab
 			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
 			ImGui::TableSetupColumn("Priority", ImGuiTableColumnFlags_WidthFixed, 85.0f);
 			ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+			ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+			ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch);
 			ImGui::TableSetupColumn("Worker", ImGuiTableColumnFlags_WidthFixed, 55.0f);
 			ImGui::TableSetupColumn("Queue ms", ImGuiTableColumnFlags_WidthFixed, 75.0f);
 			ImGui::TableSetupColumn("Run ms", ImGuiTableColumnFlags_WidthFixed, 75.0f);
@@ -218,9 +220,11 @@ namespace gglab
 						case 1: comparison = lhs->m_Name.compare(rhs->m_Name); break;
 						case 2: comparison = static_cast<int>(lhs->m_Priority) - static_cast<int>(rhs->m_Priority); break;
 						case 3: comparison = static_cast<int>(lhs->m_Status) - static_cast<int>(rhs->m_Status); break;
-						case 4: comparison = lhs->m_WorkerIndex < rhs->m_WorkerIndex ? -1 : lhs->m_WorkerIndex > rhs->m_WorkerIndex ? 1 : 0; break;
-						case 5: comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1 : lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1 : 0; break;
-						case 6: comparison = lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1 : lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1 : 0; break;
+						case 4: comparison = lhs->m_Progress.m_Fraction < rhs->m_Progress.m_Fraction ? -1 : lhs->m_Progress.m_Fraction > rhs->m_Progress.m_Fraction ? 1 : 0; break;
+						case 5: comparison = lhs->m_Progress.m_Stage.compare(rhs->m_Progress.m_Stage); break;
+						case 6: comparison = lhs->m_WorkerIndex < rhs->m_WorkerIndex ? -1 : lhs->m_WorkerIndex > rhs->m_WorkerIndex ? 1 : 0; break;
+						case 7: comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1 : lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1 : 0; break;
+						case 8: comparison = lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1 : lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1 : 0; break;
 						default: break;
 						}
 						return spec.SortDirection == ImGuiSortDirection_Ascending ?
@@ -236,10 +240,26 @@ namespace gglab
 				ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(PriorityText(task->m_Priority));
 				ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(StatusText(task->m_Status));
 				ImGui::TableSetColumnIndex(4);
+				if (task->m_Progress.HasProgress())
+				{
+					ImGui::Text("%.1f%%", task->m_Progress.m_Fraction * 100.0f);
+				}
+				else
+				{
+					ImGui::TextUnformatted("-");
+				}
+				ImGui::TableSetColumnIndex(5);
+				ImGui::TextUnformatted(task->m_Progress.m_Stage.empty() ?
+					"-" : task->m_Progress.m_Stage.c_str());
+				if (!task->m_Progress.m_Detail.empty() && ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("%s", task->m_Progress.m_Detail.c_str());
+				}
+				ImGui::TableSetColumnIndex(6);
 				if (task->m_Status == TaskStatus::Running) ImGui::Text("%u", task->m_WorkerIndex);
 				else ImGui::TextUnformatted("-");
-				ImGui::TableSetColumnIndex(5); ImGui::Text("%.3f", task->m_QueueMilliseconds);
-				ImGui::TableSetColumnIndex(6); ImGui::Text("%.3f", task->m_ExecutionMilliseconds);
+				ImGui::TableSetColumnIndex(7); ImGui::Text("%.3f", task->m_QueueMilliseconds);
+				ImGui::TableSetColumnIndex(8); ImGui::Text("%.3f", task->m_ExecutionMilliseconds);
 			}
 			ImGui::EndTable();
 		}

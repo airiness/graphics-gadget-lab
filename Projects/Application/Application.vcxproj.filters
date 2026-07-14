@@ -82,6 +82,9 @@
     <Filter Include="Core\Task">
       <UniqueIdentifier>{D28903E6-793E-489B-9C0A-B435C0E01152}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Core\Async">
+      <UniqueIdentifier>{9F630D32-5B3B-49FD-A399-B6741975CDB5}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\RHI\DX12\Cache">
       <UniqueIdentifier>{ba9b50ba-8b00-4101-8def-7a35ae57c787}</UniqueIdentifier>
     </Filter>
@@ -164,6 +167,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp">
       <Filter>Core\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp">
+      <Filter>Core\Async</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
@@ -436,6 +442,9 @@
       <Filter>Core\Math</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp">
+      <Filter>Graphics\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Utility\CubemapUtils.cpp">
       <Filter>Graphics\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp">
@@ -734,6 +743,9 @@
     <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h">
       <Filter>Core\Task</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h">
+      <Filter>Core\Async</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -819,6 +831,9 @@
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h">
+      <Filter>Graphics\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h">
       <Filter>Graphics\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.h">

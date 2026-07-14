@@ -90,6 +90,7 @@ namespace gglab
 		[[nodiscard]] static ModelImportResult Import(
 			const std::filesystem::path& path,
 			const ModelImportSettings& settings,
-			std::stop_token stopToken = {}) noexcept;
+			std::stop_token stopToken = {},
+			const ProgressReporter& progress = {}) noexcept;
 	};
 }

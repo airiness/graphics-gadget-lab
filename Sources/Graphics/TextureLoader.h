@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Async/ProgressChannel.h"
 #include "Graphics/TextureAsset.h"
 
 #include <cstdint>
@@ -38,11 +39,13 @@ namespace gglab
 	public:
 		[[nodiscard]] static TextureAssetData LoadTextureData(
 			const std::filesystem::path& texPath,
-			const TextureImportSettings& settings) noexcept;
+			const TextureImportSettings& settings,
+			const ProgressReporter& progress = {}) noexcept;
 
 		[[nodiscard]] static TextureAssetData LoadTextureData(
 			const std::filesystem::path& texPath,
-			TextureColorSpace colorSpace) noexcept;
+			TextureColorSpace colorSpace,
+			const ProgressReporter& progress = {}) noexcept;
 
 		[[nodiscard]] static TextureAssetData MakeTexture2DRgba8(
 			uint32_t width,

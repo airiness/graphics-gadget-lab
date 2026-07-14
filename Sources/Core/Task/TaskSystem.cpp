@@ -259,6 +259,10 @@ namespace gglab
 			activity.m_Name = task->m_Desc.m_Name;
 			activity.m_Priority = task->m_Desc.m_Priority;
 			activity.m_Status = task->m_Status;
+			if (task->m_Desc.m_Progress)
+			{
+				activity.m_Progress = task->m_Desc.m_Progress->GetSnapshot();
+			}
 			activity.m_WorkerIndex = task->m_WorkerIndex;
 			activity.m_QueueMilliseconds = Milliseconds(
 				(task->m_Status == TaskStatus::Queued ? now : task->m_StartedAt) - task->m_QueuedAt);

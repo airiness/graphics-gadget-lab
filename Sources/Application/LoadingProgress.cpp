@@ -55,11 +55,18 @@ namespace gglab
 			status = LoadingStatus::Failed;
 		}
 
+		std::string combinedDetail(detail);
+		if (!progress.m_Detail.empty())
+		{
+			combinedDetail = combinedDetail.empty() ? progress.m_Detail :
+				std::format("{} | {}", combinedDetail, progress.m_Detail);
+		}
+
 		AddStep(weight, {
 			.m_Status = status,
 			.m_Fraction = progress.m_Fraction,
 			.m_Stage = progress.m_Stage,
-			.m_Detail = detail,
+			.m_Detail = combinedDetail,
 		});
 	}
 
