@@ -89,7 +89,7 @@ namespace gglab
 				.m_DisplayName = environment.m_DisplayName,
 				.m_Active = active,
 				.m_TextureReady = environment.m_TextureId.IsValid(),
-				.m_LoadAttempted = environment.m_LoadAttempted,
+				.m_LoadAttempted = environment.m_LastLoadAttemptGeneration != 0,
 			});
 		}
 

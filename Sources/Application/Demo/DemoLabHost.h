@@ -41,7 +41,6 @@ namespace gglab
 		bool IsValid() const noexcept { return m_StartupLab.IsValid(); }
 
 	private:
-		Renderer* m_Renderer = nullptr;
 		LabId m_StartupLab;
 		LabRuntime m_Runtime;
 	};

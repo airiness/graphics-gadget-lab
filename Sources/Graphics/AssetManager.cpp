@@ -21,6 +21,22 @@ namespace gglab
 			ImportedModel m_Model;
 		};
 
+		[[nodiscard]] bool IsTerminalAssetState(AssetState state) noexcept
+		{
+			return state == AssetState::Failed || state == AssetState::Cancelled;
+		}
+
+		[[nodiscard]] std::array<TextureID, 5> GetMaterialTextureIds(
+			const MaterialProperties& material) noexcept
+		{
+			return {
+				material.m_BaseColorBinding.m_TextureId,
+				material.m_EmissiveBinding.m_TextureId,
+				material.m_MetallicRoughnessBinding.m_TextureId,
+				material.m_NormalBinding.m_TextureId,
+				material.m_OcclusionBinding.m_TextureId,
+			};
+		}
 	}
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
@@ -60,9 +76,14 @@ namespace gglab
 		}
 
 		// Check if model is already loaded
-		if (auto existing = FindModel(canonicalPath); existing.IsValid())
+		if (const ModelID existing = FindModel(canonicalPath); existing.IsValid())
 		{
-			return existing;
+			const Model* model = GetModel(existing);
+			if (model && !IsTerminalAssetState(model->m_State))
+			{
+				return existing;
+			}
+			GGLAB_UNUSED(DetachTerminalModelPath(canonicalPath, existing));
 		}
 
 		// Check extension, load glTF file
@@ -118,11 +139,16 @@ namespace gglab
 
 		if (const ModelID existing = FindModel(canonicalPath); existing.IsValid())
 		{
-			const auto task = m_ModelLoadTasks.find(existing);
-			return {
-				.m_ModelId = existing,
-				.m_Task = task != m_ModelLoadTasks.end() ? task->second : TaskHandle{},
-			};
+			const Model* model = GetModel(existing);
+			if (model && !IsTerminalAssetState(model->m_State))
+			{
+				const auto task = m_ModelLoadTasks.find(existing);
+				return {
+					.m_ModelId = existing,
+					.m_Task = task != m_ModelLoadTasks.end() ? task->second : TaskHandle{},
+				};
+			}
+			GGLAB_UNUSED(DetachTerminalModelPath(canonicalPath, existing));
 		}
 
 		const ModelID modelId = CreateModel(canonicalPath, AssetState::Queued);
@@ -174,6 +200,15 @@ namespace gglab
 		TaskPriority priority) noexcept
 	{
 		return m_TextureRegistry->LoadTextureAsync(path, semantic, priority);
+	}
+
+	void AssetManager::Tick() noexcept
+	{
+		std::erase_if(m_PendingModels,
+			[this](ModelID modelId) noexcept
+			{
+				return RefreshModelState(modelId);
+			});
 	}
 
 	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
@@ -310,9 +345,14 @@ namespace gglab
 		{
 			model->m_Type = ModelType::Procedural;
 		}
-		model->m_State = AssetState::Ready;
+		model->m_State = AssetState::CpuReady;
 
 		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
+		m_PendingModels.insert(modelId);
+		if (RefreshModelState(modelId))
+		{
+			m_PendingModels.erase(modelId);
+		}
 
 		return modelId;
 	}
@@ -488,6 +528,12 @@ namespace gglab
 			TextureID textureId = m_TextureRegistry->FindTexture(
 				importedTexture.m_CanonicalPath,
 				importedTexture.m_ImportSettings);
+			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+				texture && IsTerminalAssetState(texture->m_State))
+			{
+				GGLAB_UNUSED(m_TextureRegistry->RemoveTexture(textureId));
+				textureId.Reset();
+			}
 			if (!textureId.IsValid() && importedTexture.m_Data.IsValid())
 			{
 				textureId = m_TextureRegistry->CreateTexture(
@@ -596,6 +642,7 @@ namespace gglab
 		}
 
 		model->m_State = AssetState::UploadQueued;
+		m_PendingModels.insert(modelId);
 		auto batch = m_TransferManager->BeginBatch();
 		bool recorded = true;
 		std::vector<TextureID> uploadedTextureIds;
@@ -626,9 +673,9 @@ namespace gglab
 				{
 					CompleteMeshUpload(meshId, succeeded);
 				}
-				if (Model* completedModel = GetModel(modelId))
+				if (RefreshModelState(modelId))
 				{
-					completedModel->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+					m_PendingModels.erase(modelId);
 				}
 				if (succeeded)
 				{
@@ -742,6 +789,106 @@ namespace gglab
 			return iterator->second;
 		}
 		return InvalidModelID;
+	}
+
+	bool AssetManager::DetachTerminalModelPath(
+		const std::filesystem::path& canonicalPath,
+		ModelID modelId) noexcept
+	{
+		auto iterator = m_ModelContainer.m_PathIDMap.find(canonicalPath);
+		if (iterator == m_ModelContainer.m_PathIDMap.end() || iterator->second != modelId)
+		{
+			return false;
+		}
+
+		m_ModelContainer.m_PathIDMap.erase(iterator);
+		m_ModelLoadTasks.erase(modelId);
+		m_PendingModels.erase(modelId);
+		GGLAB_LOG_GRAPHICS_INFO(
+			"Detached terminal model {} from cache path '{}' so a later request can retry.",
+			modelId.Value(),
+			canonicalPath.string());
+		return true;
+	}
+
+	bool AssetManager::RefreshModelState(ModelID modelId) noexcept
+	{
+		Model* model = GetModel(modelId);
+		if (!model)
+		{
+			return true;
+		}
+		if (model->m_State == AssetState::Ready || IsTerminalAssetState(model->m_State))
+		{
+			return true;
+		}
+		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
+		{
+			return false;
+		}
+
+		if (model->m_MeshInstance.empty())
+		{
+			model->m_State = AssetState::Failed;
+			return true;
+		}
+
+		bool pending = false;
+		bool cancelled = false;
+		for (const ModelMesh& instance : model->m_MeshInstance)
+		{
+			const Mesh* mesh = GetMesh(instance.m_MeshId);
+			const Material* material = GetMaterial(instance.m_MaterialId);
+			if (!mesh || !material || mesh->m_State == AssetState::Failed)
+			{
+				model->m_State = AssetState::Failed;
+				return true;
+			}
+			if (mesh->m_State == AssetState::Cancelled)
+			{
+				cancelled = true;
+			}
+			else if (mesh->m_State != AssetState::Ready)
+			{
+				pending = true;
+			}
+
+			for (TextureID textureId : GetMaterialTextureIds(*material))
+			{
+				if (!textureId.IsValid())
+				{
+					continue;
+				}
+				const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+				if (!texture || texture->m_State == AssetState::Failed)
+				{
+					model->m_State = AssetState::Failed;
+					return true;
+				}
+				if (texture->m_State == AssetState::Cancelled)
+				{
+					cancelled = true;
+				}
+				else if (texture->m_State != AssetState::Ready)
+				{
+					pending = true;
+				}
+			}
+		}
+
+		if (cancelled)
+		{
+			model->m_State = AssetState::Cancelled;
+			return true;
+		}
+		if (pending)
+		{
+			model->m_State = AssetState::GpuProcessing;
+			return false;
+		}
+
+		model->m_State = AssetState::Ready;
+		return true;
 	}
 
 	void AssetManager::ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept

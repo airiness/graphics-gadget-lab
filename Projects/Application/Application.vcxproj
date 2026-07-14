@@ -253,6 +253,7 @@
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\StartDemo.cpp" />
+    <ClCompile Include="..\..\Sources\Application\AssetPreparationTracker.cpp" />
     <ClCompile Include="..\..\Sources\Application\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabCatalog.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabCommandQueue.cpp" />
@@ -488,6 +489,7 @@
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\StartDemo.h" />
+    <ClInclude Include="..\..\Sources\Application\AssetPreparationTracker.h" />
     <ClInclude Include="..\..\Sources\Application\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabCatalog.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabCommandQueue.h" />

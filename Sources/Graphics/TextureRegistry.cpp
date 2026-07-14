@@ -412,11 +412,25 @@ namespace gglab
 		const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
 		if (const TextureID existing = FindTexture(canonicalPath, importSettings); existing.IsValid())
 		{
-			const auto task = m_TextureLoadTasks.find(existing);
-			return {
-				.m_TextureId = existing,
-				.m_Task = task != m_TextureLoadTasks.end() ? task->second : TaskHandle{},
-			};
+			const Texture* texture = GetTexture(existing);
+			if (texture && texture->m_State != AssetState::Failed &&
+				texture->m_State != AssetState::Cancelled)
+			{
+				const auto task = m_TextureLoadTasks.find(existing);
+				return {
+					.m_TextureId = existing,
+					.m_Task = task != m_TextureLoadTasks.end() ? task->second : TaskHandle{},
+				};
+			}
+
+			if (IsReservedTextureId(existing) || !RemoveTexture(existing))
+			{
+				return {};
+			}
+			GGLAB_LOG_GRAPHICS_INFO(
+				"Removed terminal texture {} from cache path '{}' so a later request can retry.",
+				existing.Value(),
+				canonicalPath.string());
 		}
 
 		const TextureID textureId = CreateTexture(canonicalPath, importSettings);
@@ -608,6 +622,7 @@ namespace gglab
 			return false;
 		}
 
+		m_TextureLoadTasks.erase(textureId);
 		auto textureIter = m_TextureContainer.m_TextureIDMap.find(textureId);
 		bool removed = false;
 		if (textureIter != m_TextureContainer.m_TextureIDMap.end())

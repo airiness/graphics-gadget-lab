@@ -84,6 +84,7 @@ namespace gglab
 			const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
+		void Tick() noexcept;
 
 		Mesh* GetMesh(MeshID meshId) noexcept;
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -123,6 +124,10 @@ namespace gglab
 			AssetState initialState = AssetState::LoadingCpu) noexcept;
 
 		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
+		bool DetachTerminalModelPath(
+			const std::filesystem::path& canonicalPath,
+			ModelID modelId) noexcept;
+		bool RefreshModelState(ModelID modelId) noexcept;
 
 	public:
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
@@ -149,5 +154,6 @@ namespace gglab
 		MaterialContainer m_MaterialContainer;
 		ModelContainer m_ModelContainer;
 		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
+		std::unordered_set<ModelID> m_PendingModels;
 	};
 }

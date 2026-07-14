@@ -209,7 +209,42 @@ namespace gglab
 		}));
 
 		ApplyImmediateParameters();
+	}
+
+	void CullingLabSession::BeginPrepare() noexcept
+	{
+		m_AssetPreparation.Reset();
 		RebuildScene();
+		m_AssetPreparation.TrackModel(ProceduralCubeModelID, "ProceduralCube", 0.5f);
+		m_AssetPreparation.TrackModel(ProceduralSphereModelID, "ProceduralSphere", 0.5f);
+		m_LoadingProgress = m_AssetPreparation.BuildProgress(
+			*m_Services.m_AssetManager,
+			"Preparing Culling Lab");
+	}
+
+	void CullingLabSession::TickPrepare() noexcept
+	{
+		if (!m_LoadingProgress.IsPreparing())
+		{
+			return;
+		}
+		m_LoadingProgress = m_AssetPreparation.BuildProgress(
+			*m_Services.m_AssetManager,
+			"Preparing Culling Lab");
+	}
+
+	void CullingLabSession::CommitPrepare() noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			m_LoadingProgress.IsReady(),
+			"Culling Lab committed before its procedural models were ready.");
+	}
+
+	void CullingLabSession::CancelPrepare() noexcept
+	{
+		m_AssetPreparation.Reset();
+		m_World.GetRegistry().clear();
+		m_LoadingProgress = LoadingProgress::Ready();
 	}
 
 	void CullingLabSession::Update(float deltaTime) noexcept
@@ -379,6 +414,13 @@ namespace gglab
 		light.m_Range = 1000.0f;
 		light.m_DirectionalShadowSettings.emplace();
 		registry.emplace<components::LightComponent>(lightEntity, light);
+		ApplyImmediateParameters();
+	}
+
+	void CullingLabSession::OnParametersRestoredForPrepare(
+		LabChangeImpact impact) noexcept
+	{
+		GGLAB_UNUSED(impact);
 		ApplyImmediateParameters();
 	}
 
