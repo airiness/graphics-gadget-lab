@@ -11,6 +11,7 @@ namespace gglab
 {
 	class Camera;
 	class CameraController;
+	class AssetOwnerScope;
 	class RenderPipelineBase;
 	struct LabDiagnosticsSnapshot;
 
@@ -82,6 +83,8 @@ namespace gglab
 		void UpdateCamera(float deltaTime) noexcept;
 		LabParameterSet& GetMutableParameters() noexcept { return m_Parameters; }
 		const LabRunConfig& GetRunConfig() const noexcept { return m_RunConfig; }
+		AssetOwnerScope& GetAssetOwnerScope() noexcept;
+		void ResetAssetInterests() noexcept;
 
 		virtual void ApplyImmediateParameters() noexcept {}
 		virtual void RebuildScene() noexcept {}
@@ -96,6 +99,7 @@ namespace gglab
 
 	private:
 		LabDescriptor m_Descriptor;
+		std::unique_ptr<AssetOwnerScope> m_AssetOwnerScope;
 		LabParameterSet m_Parameters;
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;

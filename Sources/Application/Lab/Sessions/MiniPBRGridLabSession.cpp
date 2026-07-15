@@ -201,6 +201,7 @@ namespace gglab
 
 	void MiniPBRGridLabSession::BeginPrepare() noexcept
 	{
+		ResetAssetInterests();
 		m_World.GetRegistry().clear();
 		m_PrepareMode = PrepareMode::None;
 		m_NextGridRow = 0;
@@ -369,6 +370,7 @@ namespace gglab
 
 	void MiniPBRGridLabSession::CancelPrepare() noexcept
 	{
+		ResetAssetInterests();
 		m_PrepareMode = PrepareMode::None;
 		m_PendingModelId.Reset();
 		m_PendingModelPath.clear();
@@ -487,8 +489,7 @@ namespace gglab
 
 	bool MiniPBRGridLabSession::BuildAssetModel(std::string_view path) noexcept
 	{
-		auto& assetManager = *m_Services.m_AssetManager;
-		const auto request = assetManager.LoadModelAsync(std::filesystem::path(path));
+		const auto request = GetAssetOwnerScope().LoadModelAsync(std::filesystem::path(path));
 		if (!request.IsValid())
 		{
 			GGLAB_LOG_ERROR("Mini PBR Grid failed to request model '{}'.", path);

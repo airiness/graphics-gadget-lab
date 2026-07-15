@@ -117,12 +117,21 @@ namespace gglab
 			std::string_view textureName,
 			const std::filesystem::path& sourcePath = {}) noexcept;
 		void CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept;
-		bool QueueTextureUpload(TextureUploadData&& uploadData) noexcept;
+		bool QueueTextureUpload(
+			TextureUploadData&& uploadData,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
 		bool PublishImportedTexture(
 			TextureID textureId,
 			uint64_t generation,
 			TextureSemantic semantic,
+			TaskPriority priority,
 			TextureAssetData&& textureData) noexcept;
+		void CancelTextureIfUnreferenced(TextureID textureId, uint64_t generation) noexcept;
+		void UpdateTextureLoadPriority(
+			TextureID textureId,
+			uint64_t generation,
+			TaskPriority priority) noexcept;
+		void ReviveTextureInterest(TextureID textureId, uint64_t generation) noexcept;
 		void CompleteTextureLoad(
 			TextureID textureId,
 			uint64_t generation,

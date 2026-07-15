@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Async/ProgressChannel.h"
+#include "Core/Task/TaskTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 
 #include <chrono>
@@ -46,6 +47,10 @@ namespace gglab
 		AssetStreamingWorkKind m_Kind = AssetStreamingWorkKind::Unknown;
 		uint64_t m_StableId = 0;
 		uint64_t m_Generation = 0;
+
+		friend constexpr bool operator==(
+			const AssetStreamingIdentity&,
+			const AssetStreamingIdentity&) = default;
 	};
 
 	struct AssetStreamingWorkEstimate
@@ -86,6 +91,7 @@ namespace gglab
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
 		AssetStreamingWorkEstimate m_Estimate{};
+		TaskPriority m_Priority = TaskPriority::Normal;
 		ProgressChannelPtr m_Progress;
 	};
 
@@ -96,6 +102,7 @@ namespace gglab
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
 		AssetStreamingWorkEstimate m_Estimate{};
+		TaskPriority m_Priority = TaskPriority::Normal;
 		double m_QueueMilliseconds = 0.0;
 		ProgressSnapshot m_Progress;
 	};
@@ -107,6 +114,7 @@ namespace gglab
 		uint64_t m_EnqueuedCount = 0;
 		uint64_t m_ProcessedCount = 0;
 		uint64_t m_CallbackFailureCount = 0;
+		uint64_t m_CancelledCount = 0;
 		uint64_t m_PendingSourceBytes = 0;
 		uint64_t m_PendingStagingBytes = 0;
 		uint64_t m_PendingOperationCount = 0;
@@ -122,6 +130,7 @@ namespace gglab
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
 		AssetStreamingWorkEstimate m_Estimate{};
+		TaskPriority m_Priority = TaskPriority::Normal;
 		ProgressChannelPtr m_Progress;
 	};
 
@@ -197,6 +206,10 @@ namespace gglab
 		void EnqueueUploadReady(
 			AssetStreamingWorkDesc desc,
 			AssetStreamingWork work) noexcept;
+		uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept;
+		uint32_t UpdateWorkPriority(
+			const AssetStreamingIdentity& identity,
+			TaskPriority priority) noexcept;
 
 		[[nodiscard]] AssetUploadHandle Submit(
 			AssetUploadDesc desc,
@@ -240,6 +253,7 @@ namespace gglab
 			uint64_t m_EnqueuedCount = 0;
 			uint64_t m_ProcessedCount = 0;
 			uint64_t m_CallbackFailureCount = 0;
+			uint64_t m_CancelledCount = 0;
 			double m_TotalQueueMilliseconds = 0.0;
 			double m_MaxQueueMilliseconds = 0.0;
 			double m_TotalExecutionMilliseconds = 0.0;
@@ -264,6 +278,15 @@ namespace gglab
 			AssetUploadStatus status) noexcept;
 		uint32_t DrainPublicationQueue(bool ignoreBudget) noexcept;
 		void RemoveReadyBacklog(const AssetStreamingWorkEstimate& estimate, bool uploadReady) noexcept;
+		uint32_t CancelQueuedWork(
+			std::deque<QueuedWork>& queue,
+			QueueTelemetry& telemetry,
+			const AssetStreamingIdentity& identity,
+			bool uploadReady) noexcept;
+		uint32_t UpdateQueuedWorkPriority(
+			std::deque<QueuedWork>& queue,
+			const AssetStreamingIdentity& identity,
+			TaskPriority priority) noexcept;
 		[[nodiscard]] AssetStreamingQueueStatistics BuildQueueStatistics(
 			const std::deque<QueuedWork>& queue,
 			const QueueTelemetry& telemetry) const;

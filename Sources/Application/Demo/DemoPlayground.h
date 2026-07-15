@@ -2,6 +2,7 @@
 #include "Application/Demo/DemoBase.h"
 #include "Core/World.h"
 #include "Graphics/CameraRig.h"
+#include "Graphics/AssetManager.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 
@@ -56,6 +57,7 @@ namespace gglab
 
 	private:
 		DemoServices m_Services{};
+		AssetOwnerScope m_AssetOwnerScope;
 		World m_World;
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;

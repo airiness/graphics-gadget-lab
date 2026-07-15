@@ -16,7 +16,8 @@
 namespace gglab
 {
 	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo) noexcept :
-		m_Services(createInfo.m_Services)
+		m_Services(createInfo.m_Services),
+		m_AssetOwnerScope(createInfo.m_Services.m_AssetManager->CreateOwnerScope("Demo.Playground"))
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "DemoPlayground requires valid create info.");
 
@@ -46,6 +47,7 @@ namespace gglab
 
 	void DemoPlayground::BeginPrepare() noexcept
 	{
+		m_AssetOwnerScope.Reset();
 		m_World.GetRegistry().clear();
 		m_PendingModels = {
 			{
@@ -66,7 +68,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(assetManager);
 		for (PendingModel& pending : m_PendingModels)
 		{
-			pending.m_ModelId = assetManager->LoadModelAsync(pending.m_Path).m_ModelId;
+			pending.m_ModelId = m_AssetOwnerScope.LoadModelAsync(pending.m_Path).m_ModelId;
 			if (!pending.m_ModelId.IsValid())
 			{
 				m_LoadingProgress = {
@@ -144,6 +146,7 @@ namespace gglab
 
 	void DemoPlayground::CancelPrepare() noexcept
 	{
+		m_AssetOwnerScope.Reset();
 		m_PendingModels.clear();
 		m_LoadingProgress = LoadingProgress::Ready();
 	}
@@ -159,6 +162,7 @@ namespace gglab
 
 	void DemoPlayground::OnExit() noexcept
 	{
+		m_AssetOwnerScope.Reset();
 	}
 
 	void DemoPlayground::Update() noexcept

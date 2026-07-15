@@ -4,6 +4,7 @@
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
 #include "Graphics/Camera.h"
+#include "Graphics/AssetManager.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 
@@ -36,6 +37,9 @@ namespace gglab
 		controllerCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
+		m_AssetOwnerScope = std::make_unique<AssetOwnerScope>(
+			m_Services.m_AssetManager->CreateOwnerScope(
+				std::format("Lab.{}", m_Descriptor.m_Id.GetName())));
 	}
 
 	LabSessionBase::~LabSessionBase() = default;
@@ -121,6 +125,20 @@ namespace gglab
 		CameraController& controller = m_CameraRig.GetActiveCameraController();
 		controller.Update(camera, input, deltaTime);
 		camera.Update();
+	}
+
+	AssetOwnerScope& LabSessionBase::GetAssetOwnerScope() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_AssetOwnerScope.get());
+		return *m_AssetOwnerScope;
+	}
+
+	void LabSessionBase::ResetAssetInterests() noexcept
+	{
+		if (m_AssetOwnerScope)
+		{
+			m_AssetOwnerScope->Reset();
+		}
 	}
 
 	void LabSessionBase::SetRenderPipeline(

@@ -306,6 +306,7 @@ namespace gglab
 		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
 		ProgressChannelPtr m_LoadProgress;
 		bool m_IsUploaded = false;
+		bool m_CancelRequested = false;
 	};
 
 	struct Sampler
@@ -358,6 +359,7 @@ namespace gglab
 		AssetState m_State = AssetState::Unloaded;
 		bool m_IsUploaded = false;
 		bool m_HasBounds = false;
+		bool m_CancelRequested = false;
 
 		StringID m_Name{};
 		ProgressChannelPtr m_LoadProgress;
@@ -390,6 +392,7 @@ namespace gglab
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		ProgressChannelPtr m_LoadProgress;
+		bool m_CancelRequested = false;
 		std::vector<ModelMesh> m_MeshInstance;
 	};
 }

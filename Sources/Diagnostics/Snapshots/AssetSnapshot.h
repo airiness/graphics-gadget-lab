@@ -55,6 +55,16 @@ namespace gglab
 			ProgressSnapshot m_Progress;
 		};
 
+		struct OwnershipInterest
+		{
+			AssetStreamingWorkKind m_Kind = AssetStreamingWorkKind::Model;
+			uint64_t m_StableId = 0;
+			uint64_t m_Generation = 0;
+			uint32_t m_LeaseCount = 0;
+			uint32_t m_OwnerCount = 0;
+			TaskPriority m_EffectivePriority = TaskPriority::Normal;
+		};
+
 		std::vector<Model> m_Models;
 		std::vector<Mesh> m_Meshes;
 		std::vector<Texture> m_Textures;
@@ -76,6 +86,15 @@ namespace gglab
 		uint64_t m_SucceededUploadCount = 0;
 		uint64_t m_FailedUploadCount = 0;
 		uint64_t m_UploadCompletionCallbackFailureCount = 0;
+		uint32_t m_AssetOwnerCount = 0;
+		uint32_t m_AssetLeaseCount = 0;
+		uint32_t m_ManagedAssetCount = 0;
+		uint64_t m_OwnershipPriorityUpdateCount = 0;
+		uint64_t m_OwnershipCpuCancellationCount = 0;
+		uint64_t m_OwnershipReadyCancellationCount = 0;
+		uint64_t m_OwnershipGpuDeferredCancellationCount = 0;
+		uint64_t m_OwnershipReadyRetentionCount = 0;
+		std::vector<OwnershipInterest> m_ActiveOwnershipInterests;
 		std::vector<Upload> m_PendingUploads;
 		std::vector<Upload> m_RecentUploads;
 	};
