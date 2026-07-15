@@ -142,6 +142,9 @@
     <Filter Include="Graphics\RenderPipeline">
       <UniqueIdentifier>{93631839-7669-4f0a-b13f-c978f904eb39}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\PostProcess">
+      <UniqueIdentifier>{b3d38f90-6fe4-4a16-96e7-39c9b9564b64}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Externals\ImGui">
       <UniqueIdentifier>{fcaf4650-56ee-4d51-9d13-291379cac5b5}</UniqueIdentifier>
     </Filter>
@@ -549,6 +552,12 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.cpp">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\PostProcess\ViewRenderSettings.cpp">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderFrameBuilder.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -738,7 +747,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp">
@@ -1322,6 +1331,21 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessColor.h">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessGraphResources.h">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessOutput.h">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\ViewRenderSettings.h">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -1598,7 +1622,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassTonemap.h">
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h">
@@ -1731,6 +1755,9 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassDirectionalShadowMap.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassFinalColor.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -1756,9 +1783,6 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassSkybox.hlsl">
-      <Filter>Shaders\Passes</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassTonemap.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>

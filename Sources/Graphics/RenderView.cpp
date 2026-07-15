@@ -10,6 +10,7 @@ namespace gglab
 		RenderView BuildPerspectiveCameraView(
 			RenderViewID viewId,
 			const Camera& camera,
+			const ResolvedViewRenderSettings& renderSettings,
 			uint32_t width,
 			uint32_t height,
 			StringID name) noexcept
@@ -31,8 +32,8 @@ namespace gglab
 			view.m_Far = camera.GetFar();
 			view.m_FovRadians = math::ToRadians(camera.GetFov());
 			view.m_Aspect = camera.GetAspect();
-			view.m_ExposureCompensationEV = camera.GetExposureCompensationEV();
-			view.m_ExposureMultiplier = camera.GetExposureMultiplier();
+			view.m_ExposureCompensationEV = renderSettings.m_Exposure.m_CompensationEV;
+			view.m_ExposureMultiplier = renderSettings.m_Exposure.m_ExposureScale;
 
 			view.m_Width = width;
 			view.m_Height = height;
@@ -44,12 +45,13 @@ namespace gglab
 	RenderView RenderViewBuilder::BuildDebugCameraView(
 		RenderViewID viewId,
 		const Camera& camera,
+		const ResolvedViewRenderSettings& renderSettings,
 		uint32_t width,
 		uint32_t height,
 		StringID name) const noexcept
 	{
 		GGLAB_ASSERT(IsDebugCameraRenderViewID(viewId));
-		return BuildPerspectiveCameraView(viewId, camera, width, height, name);
+		return BuildPerspectiveCameraView(viewId, camera, renderSettings, width, height, name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::Main>::Build(
@@ -58,6 +60,7 @@ namespace gglab
 		return BuildPerspectiveCameraView(
 			RenderViewID::Main,
 			info.m_Camera,
+			info.m_RenderSettings,
 			info.m_Width,
 			info.m_Height,
 			info.m_Name);

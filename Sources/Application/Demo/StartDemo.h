@@ -3,6 +3,7 @@
 #include "Core/World.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab
@@ -38,6 +39,10 @@ namespace gglab
 			return m_CameraRig.GetActiveCameraController();
 		}
 		CameraRig& GetCameraRig() noexcept override { return m_CameraRig; }
+		const ViewRenderProfile& GetViewRenderProfile() const noexcept override
+		{
+			return m_ViewRenderProfile;
+		}
 		RenderPipelineBase& GetRenderPipeline() noexcept override { return *m_RenderPipeline; }
 
 	private:
@@ -48,6 +53,7 @@ namespace gglab
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;
 		CameraRig m_CameraRig;
+		ViewRenderProfile m_ViewRenderProfile{};
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 		entt::entity m_AnimatedSphereEntity = entt::null;
 		entt::entity m_AnimatedCubeEntity = entt::null;

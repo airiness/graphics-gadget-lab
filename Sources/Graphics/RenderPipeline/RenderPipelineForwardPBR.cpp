@@ -155,8 +155,8 @@ namespace gglab
 
 		if (context.IsRenderSceneReady())
 		{
-			// Tonemap requires View StructuredBuffer data.
-			m_TonemapPass.AddPass(rg, context, services);
+			// Final color requires View StructuredBuffer data.
+			m_PostProcessPipeline.AddPasses(rg, context, services);
 		}
 
 		// IBL Preview

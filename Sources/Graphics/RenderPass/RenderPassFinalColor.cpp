@@ -1,31 +1,31 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderPass/RenderPassTonemap.h"
+#include "Graphics/RenderPass/RenderPassFinalColor.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 
 namespace gglab
 {
 	namespace
 	{
-		struct TonemapPassParameters
+		struct FinalColorPassParameters
 		{
 			uint32_t SceneColorTextureIndex = 0;
 			uint32_t SceneColorSamplerIndex = 0;
 			uint32_t ViewIndex = 0;
 			uint32_t Padding = 0;
 		};
-		static_assert(IsPassRootConstantStruct<TonemapPassParameters>);
-		static_assert(sizeof(TonemapPassParameters) == 16);
+		static_assert(IsPassRootConstantStruct<FinalColorPassParameters>);
+		static_assert(sizeof(FinalColorPassParameters) == 16);
 
 		struct PassData
 		{
 			RGTextureId m_SceneColor{};
-			RGTextureId m_BackBuffer{};
+			RGTextureId m_Output{};
 			RGTextureViewId m_SceneColorSrv{};
-			RGTextureViewId m_BackBufferRtv{};
+			RGTextureViewId m_OutputRtv{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
@@ -33,7 +33,7 @@ namespace gglab
 		};
 	}
 
-	void RenderPassTonemap::AddPass(RenderGraph& rg,
+	void RenderPassFinalColor::AddPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
@@ -47,22 +47,44 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[servicesPtr, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
+			[contextPtr, servicesPtr, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
-				auto& displayTargets = targetsTable.GetViewTargets(displayViewId);
+				auto& postProcess = builder.GetBlackboard()
+					.Get<RGPostProcessResources>(PostProcessResourcesName);
+				GGLAB_ASSERT_MSG(
+					postProcess.m_Inputs.m_SceneColor.m_State ==
+						PostProcessColorState::SceneLinearRec709,
+					"FinalColor requires scene-linear Rec.709 input.");
+				GGLAB_ASSERT_MSG(
+					postProcess.m_Inputs.m_SceneColor.m_PreExposure == 1.0f,
+					"FinalColor PR1 does not support pre-exposed scene color.");
+				GGLAB_ASSERT_MSG(
+					postProcess.m_Output.m_Transform.m_Mode == OutputColorMode::SdrSRGB,
+					"FinalColor PR1 supports only SDR sRGB output.");
 
-				data.m_SceneColor = builder.Read(displayTargets.m_SceneColor, RGTextureAccess::Sample);
-				builder.WriteInPlace(displayTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
-				data.m_BackBuffer = displayTargets.m_BackBuffer;
+				const auto& viewSettings = contextPtr->GetViewRenderSettings(displayViewId);
+				GGLAB_ASSERT_MSG(
+					viewSettings.m_PostProcess.m_ToneMapping.m_Operator ==
+						ToneMappingOperator::AcesFitted,
+					"FinalColor PR1 supports only ACES fitted tone mapping.");
+
+				data.m_SceneColor = builder.Read(
+					postProcess.m_Inputs.m_SceneColor.m_Texture,
+					RGTextureAccess::Sample);
+				builder.WriteInPlace(
+					postProcess.m_Output.m_Texture,
+					RGTextureAccess::RenderTarget);
+				data.m_Output = postProcess.m_Output.m_Texture;
 				data.m_SceneColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);
-				data.m_BackBufferRtv =
-					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
-				data.m_Width = displayTargets.m_Width;
-				data.m_Height = displayTargets.m_Height;
+				data.m_OutputRtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
+
+				const RenderView& displayView = contextPtr->GetDisplayRenderView();
+				data.m_Width = displayView.m_Width;
+				data.m_Height = displayView.m_Height;
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
@@ -73,15 +95,15 @@ namespace gglab
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto sceneColorSrv = executeContext.GetViewDescriptor(data.m_SceneColorSrv);
 				GGLAB_ASSERT_MSG(sceneColorSrv.IsValid(),
-					"Tonemap scene color SRV must expose a descriptor heap index.");
+					"FinalColor scene color SRV must expose a descriptor heap index.");
 
-				const auto backBufferRtv = executeContext.GetViewHandle(data.m_BackBufferRtv);
+				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
 
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&backBufferRtv, 1));
+				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&outputRtv, 1));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
 				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
@@ -97,7 +119,7 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBufferHandle());
 
-				const TonemapPassParameters passParameters{
+				const FinalColorPassParameters passParameters{
 					.SceneColorTextureIndex = sceneColorSrv.m_Index,
 					.SceneColorSamplerIndex = data.m_SamplerIndex,
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
@@ -110,7 +132,7 @@ namespace gglab
 			});
 	}
 
-	void RenderPassTonemap::EnsureInitialized(const RenderServices& services) noexcept
+	void RenderPassFinalColor::EnsureInitialized(const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
@@ -121,7 +143,7 @@ namespace gglab
 		if (!m_IsInitialized)
 		{
 			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassTonemap.hlsl";
+			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassFinalColor.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Vertex;
 			shaderDesc.m_Entry = L"VSMain";
 			const auto vsId = shaderManager->LoadShader(shaderDesc);
@@ -150,10 +172,9 @@ namespace gglab
 
 			m_IsInitialized = true;
 		}
-
 	}
 
-	RHIPipelineHandle RenderPassTonemap::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassFinalColor::GetOrCreatePSO(const Renderer& renderer) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

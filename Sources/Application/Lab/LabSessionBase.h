@@ -6,6 +6,7 @@
 #include "Application/Lab/LabTypes.h"
 #include "Core/World.h"
 #include "Graphics/CameraRig.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 
 namespace gglab
 {
@@ -72,6 +73,7 @@ namespace gglab
 		Camera& GetCamera() noexcept { return *m_Camera; }
 		CameraController& GetCameraController() noexcept { return *m_CameraController; }
 		CameraRig& GetCameraRig() noexcept { return m_CameraRig; }
+		const ViewRenderProfile& GetViewRenderProfile() const noexcept { return m_ViewRenderProfile; }
 		RenderPipelineBase& GetRenderPipeline() noexcept { return *m_RenderPipeline; }
 
 	protected:
@@ -82,6 +84,7 @@ namespace gglab
 
 		void UpdateCamera(float deltaTime) noexcept;
 		LabParameterSet& GetMutableParameters() noexcept { return m_Parameters; }
+		ViewRenderProfile& GetMutableViewRenderProfile() noexcept { return m_ViewRenderProfile; }
 		const LabRunConfig& GetRunConfig() const noexcept { return m_RunConfig; }
 		AssetOwnerScope& GetAssetOwnerScope() noexcept;
 		void ResetAssetInterests() noexcept;
@@ -104,6 +107,7 @@ namespace gglab
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<CameraController> m_CameraController;
 		CameraRig m_CameraRig;
+		ViewRenderProfile m_ViewRenderProfile{};
 		std::unique_ptr<RenderPipelineBase> m_RenderPipeline;
 	};
 }
