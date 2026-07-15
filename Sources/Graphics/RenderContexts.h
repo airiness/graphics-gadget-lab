@@ -4,6 +4,7 @@
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/ShadowSettings.h"
 
 #include <cstdint>
@@ -21,6 +22,7 @@ namespace gglab
 	struct RenderFrameContext
 	{
 		std::span<RenderView> m_RenderViews;
+		std::span<const ResolvedViewRenderSettings> m_ViewRenderSettings;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
@@ -59,6 +61,18 @@ namespace gglab
 			return m_RenderViews[index];
 		}
 
+		const ResolvedViewRenderSettings& GetViewRenderSettings(RenderViewID viewId) const noexcept
+		{
+			const auto index = utils::ToIndex(viewId);
+			GGLAB_ASSERT(index < m_ViewRenderSettings.size());
+			return m_ViewRenderSettings[index];
+		}
+
+		const ResolvedViewRenderSettings& GetDisplayViewRenderSettings() const noexcept
+		{
+			return GetViewRenderSettings(m_DisplayViewId);
+		}
+
 		const DirectionalShadowSettings& GetDirectionalShadowSettings() const noexcept
 		{
 			return m_DirectionalShadowSettings;
@@ -72,6 +86,7 @@ namespace gglab
 		bool IsValid() const noexcept
 		{
 			return (m_RenderViews.size() >= utils::ToIndex(RenderViewID::Count)) &&
+				(m_ViewRenderSettings.size() >= utils::ToIndex(RenderViewID::Count)) &&
 				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}
 	};

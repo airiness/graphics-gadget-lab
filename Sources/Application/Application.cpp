@@ -363,6 +363,7 @@ namespace gglab
 			.m_Renderer = *m_Renderer,
 			.m_AssetManager = *m_AssetManager,
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
+			.m_ViewRenderProfile = demo->GetViewRenderProfile(),
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 			.m_BackBufferIndex = backBufferIndex,
@@ -531,7 +532,7 @@ namespace gglab
 			addGraphicsShader(L"Assets/Shaders/Passes/PassForwardPBR.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassDirectionalShadowMap.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassTonemap.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassFinalColor.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassDebugDraw.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassSkybox.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLEnvironment.hlsl");

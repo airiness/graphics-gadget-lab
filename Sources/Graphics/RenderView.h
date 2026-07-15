@@ -3,6 +3,7 @@
 #include "Core/Math/Vector.h"
 #include "Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/ShadowSettings.h"
 
 namespace gglab
@@ -46,6 +47,7 @@ namespace gglab
 		RenderView BuildDebugCameraView(
 			RenderViewID viewId,
 			const Camera& camera,
+			const ResolvedViewRenderSettings& renderSettings,
 			uint32_t width,
 			uint32_t height,
 			StringID name) const noexcept;
@@ -61,6 +63,7 @@ namespace gglab
 	struct RenderViewBuildInfo<RenderViewID::Main>
 	{
 		const Camera& m_Camera;
+		const ResolvedViewRenderSettings& m_RenderSettings;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		StringID m_Name = StringID("MainView");

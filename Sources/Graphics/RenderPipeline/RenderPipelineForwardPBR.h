@@ -9,7 +9,7 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
-#include "Graphics/RenderPass/RenderPassTonemap.h"
+#include "Graphics/RenderPipeline/PostProcessPipeline.h"
 
 namespace gglab
 {
@@ -32,7 +32,7 @@ namespace gglab
 		RenderPassSkybox m_SkyboxPass;
 		RenderPassForwardPBR m_ForwardPBRPass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
-		RenderPassTonemap m_TonemapPass;
+		PostProcessPipeline m_PostProcessPipeline;
 		RenderPassIBL m_IBLPass;
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };

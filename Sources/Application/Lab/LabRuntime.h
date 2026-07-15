@@ -63,6 +63,7 @@ namespace gglab
 		Camera& GetCamera() noexcept;
 		CameraController& GetCameraController() noexcept;
 		CameraRig& GetCameraRig() noexcept;
+		const ViewRenderProfile& GetViewRenderProfile() const noexcept;
 		RenderPipelineBase& GetRenderPipeline() noexcept;
 
 	private:

@@ -355,6 +355,12 @@ namespace gglab
 		return m_ActiveSession->GetCameraRig();
 	}
 
+	const ViewRenderProfile& LabRuntime::GetViewRenderProfile() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ActiveSession.get());
+		return m_ActiveSession->GetViewRenderProfile();
+	}
+
 	RenderPipelineBase& LabRuntime::GetRenderPipeline() noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ActiveSession.get());

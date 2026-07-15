@@ -13,6 +13,7 @@ namespace gglab
 	class CameraController;
 	class CameraRig;
 	class RenderPipelineBase;
+	struct ViewRenderProfile;
 
 	class DemoBase
 	{
@@ -48,6 +49,7 @@ namespace gglab
 		virtual Camera& GetCamera() noexcept = 0;
 		virtual CameraController& GetCameraController() noexcept = 0;
 		virtual CameraRig& GetCameraRig() noexcept = 0;
+		virtual const ViewRenderProfile& GetViewRenderProfile() const noexcept = 0;
 
 		virtual RenderPipelineBase& GetRenderPipeline() noexcept = 0;
 	};

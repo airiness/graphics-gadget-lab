@@ -3,7 +3,7 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 
-struct TonemapPassParameters
+struct FinalColorPassParameters
 {
 	uint SceneColorTextureIndex;
 	uint SceneColorSamplerIndex;
@@ -11,7 +11,7 @@ struct TonemapPassParameters
 	uint Padding;
 };
 
-ConstantBuffer<TonemapPassParameters> g_Pass : register(b2);
+ConstantBuffer<FinalColorPassParameters> g_Pass : register(b2);
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {

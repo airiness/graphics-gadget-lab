@@ -6,18 +6,18 @@ namespace gglab
 {
 	class Renderer;
 
-	class RenderPassTonemap final : public RenderPassBase
+	class RenderPassFinalColor final : public RenderPassBase
 	{
 	public:
-		RenderPassTonemap() noexcept : RenderPassBase({
-			.m_TypeName = "PostProcess.Tonemap",
-			.m_DisplayName = "Tonemap",
+		RenderPassFinalColor() noexcept : RenderPassBase({
+			.m_TypeName = "PostProcess.FinalColor",
+			.m_DisplayName = "Final Color",
 			.m_CategoryName = "PostProcess",
-			.m_Description = "Maps HDR scene color to the display back buffer.",
+			.m_Description = "Applies the final color transform to the presentation target.",
 			.m_Category = RenderPassCategory::PostProcess,
 			.m_Type = RenderPassType::Graphics,
 		}) {}
-		~RenderPassTonemap() override = default;
+		~RenderPassFinalColor() override = default;
 
 		void AddPass(RenderGraph& rg,
 			const RenderFrameContext& context,
