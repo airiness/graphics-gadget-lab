@@ -33,6 +33,7 @@ namespace gglab
 			},
 		};
 
+		m_BloomPass.AddPass(rg, context, services);
 		m_FinalColorPass.AddPass(rg, context, services);
 		// Publish the version written by FinalColor to downstream presentation passes.
 		targets.m_BackBuffer = resources.m_Output.m_Texture;

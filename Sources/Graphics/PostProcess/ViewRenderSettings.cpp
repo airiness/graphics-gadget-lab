@@ -8,12 +8,20 @@ namespace gglab
 		const ViewRenderProfile& profile,
 		const Camera& camera) noexcept
 	{
+		BloomSettings bloom = profile.m_PostProcess.m_Bloom;
+		bloom.m_Threshold = std::max(bloom.m_Threshold, 0.0f);
+		bloom.m_SoftKnee = std::clamp(bloom.m_SoftKnee, 0.0f, 1.0f);
+		bloom.m_Intensity = std::max(bloom.m_Intensity, 0.0f);
+		bloom.m_Scatter = std::clamp(bloom.m_Scatter, 0.0f, 1.0f);
+		bloom.m_MaxLevels = std::clamp(bloom.m_MaxLevels, 1u, 8u);
+
 		return {
 			.m_Exposure = {
 				.m_CompensationEV = camera.GetExposureCompensationEV(),
 				.m_ExposureScale = camera.GetExposureMultiplier(),
 			},
 			.m_PostProcess = {
+				.m_Bloom = bloom,
 				.m_ToneMapping = profile.m_PostProcess.m_ToneMapping,
 			},
 		};

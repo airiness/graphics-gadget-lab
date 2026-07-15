@@ -534,6 +534,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -745,6 +748,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.cpp">
@@ -1310,6 +1316,9 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -1341,6 +1350,9 @@
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessOutput.h">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessResolution.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\ViewRenderSettings.h">
@@ -1622,6 +1634,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1749,6 +1764,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassBloom.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassDebugDraw.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

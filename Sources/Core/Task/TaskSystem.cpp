@@ -194,6 +194,7 @@ namespace gglab
 				}
 				catch (const std::exception& exception)
 				{
+					GGLAB_UNUSED(exception);
 					GGLAB_LOG_ERROR(
 						"TaskSystem completion '{}' threw an exception: {}",
 						completion.m_Info.m_Name,

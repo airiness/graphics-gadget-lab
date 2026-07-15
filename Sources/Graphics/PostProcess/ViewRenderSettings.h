@@ -16,8 +16,19 @@ namespace gglab
 		ToneMappingOperator m_Operator = ToneMappingOperator::AcesFitted;
 	};
 
+	struct BloomSettings
+	{
+		bool m_Enabled = true;
+		float m_Threshold = 1.0f;
+		float m_SoftKnee = 0.5f;
+		float m_Intensity = 0.08f;
+		float m_Scatter = 0.7f;
+		uint32_t m_MaxLevels = 6;
+	};
+
 	struct PostProcessProfile
 	{
+		BloomSettings m_Bloom{};
 		ToneMappingSettings m_ToneMapping{};
 	};
 
@@ -35,6 +46,7 @@ namespace gglab
 
 	struct ResolvedPostProcessSettings
 	{
+		BloomSettings m_Bloom{};
 		ToneMappingSettings m_ToneMapping{};
 	};
 

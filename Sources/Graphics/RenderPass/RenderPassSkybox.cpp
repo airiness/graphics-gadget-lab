@@ -141,7 +141,6 @@ namespace gglab
 				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
-				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
@@ -162,7 +161,7 @@ namespace gglab
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
-				commandContext->Draw(3);
+				commandContext->DrawFullscreenTriangle();
 			});
 	}
 

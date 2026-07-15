@@ -6,6 +6,7 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
+#include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 
 namespace gglab
@@ -29,6 +30,11 @@ namespace gglab
 			MiniPBRGridLabSession::GetDescriptor(),
 			&MiniPBRGridLabSession::Create);
 		GGLAB_ASSERT_MSG(miniPbrRegistered, "Failed to register the Mini PBR Grid Lab session.");
+
+		const bool postProcessRegistered = m_Runtime.RegisterLab(
+			PostProcessLabSession::GetDescriptor(),
+			&PostProcessLabSession::Create);
+		GGLAB_ASSERT_MSG(postProcessRegistered, "Failed to register the Post Process Lab session.");
 
 		const bool alphaTestRegistered = m_Runtime.RegisterLab(
 			AlphaTestLabSession::GetDescriptor(),
