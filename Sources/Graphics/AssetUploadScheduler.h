@@ -48,10 +48,44 @@ namespace gglab
 		uint64_t m_Generation = 0;
 	};
 
+	struct AssetStreamingWorkEstimate
+	{
+		uint64_t m_SourceBytes = 0;
+		uint64_t m_StagingBytes = 0;
+		uint32_t m_OperationCount = 0;
+	};
+
+	struct AssetStreamingFrameBudget
+	{
+		uint32_t m_MaxCpuReadyItems = 8;
+		double m_MaxCpuReadyMilliseconds = 0.5;
+		uint32_t m_MaxUploadReadyItems = 8;
+		uint64_t m_MaxUploadBytes = 32ull * 1024ull * 1024ull;
+		uint32_t m_MaxUploadOperations = 64;
+		double m_MaxUploadMilliseconds = 1.0;
+		uint32_t m_MaxPublicationItems = 16;
+		double m_MaxPublicationMilliseconds = 0.5;
+		uint64_t m_MaxInFlightBytes = 256ull * 1024ull * 1024ull;
+		uint64_t m_MaxReadyBacklogBytes = 512ull * 1024ull * 1024ull;
+	};
+
+	struct AssetStreamingFrameUsage
+	{
+		uint32_t m_CpuReadyItems = 0;
+		double m_CpuReadyMilliseconds = 0.0;
+		uint32_t m_UploadReadyItems = 0;
+		uint64_t m_UploadBytes = 0;
+		uint32_t m_UploadOperations = 0;
+		double m_UploadMilliseconds = 0.0;
+		uint32_t m_PublicationItems = 0;
+		double m_PublicationMilliseconds = 0.0;
+	};
+
 	struct AssetStreamingWorkDesc
 	{
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
+		AssetStreamingWorkEstimate m_Estimate{};
 		ProgressChannelPtr m_Progress;
 	};
 
@@ -61,6 +95,7 @@ namespace gglab
 	{
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
+		AssetStreamingWorkEstimate m_Estimate{};
 		double m_QueueMilliseconds = 0.0;
 		ProgressSnapshot m_Progress;
 	};
@@ -72,6 +107,9 @@ namespace gglab
 		uint64_t m_EnqueuedCount = 0;
 		uint64_t m_ProcessedCount = 0;
 		uint64_t m_CallbackFailureCount = 0;
+		uint64_t m_PendingSourceBytes = 0;
+		uint64_t m_PendingStagingBytes = 0;
+		uint64_t m_PendingOperationCount = 0;
 		double m_TotalQueueMilliseconds = 0.0;
 		double m_MaxQueueMilliseconds = 0.0;
 		double m_TotalExecutionMilliseconds = 0.0;
@@ -83,6 +121,7 @@ namespace gglab
 	{
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
+		AssetStreamingWorkEstimate m_Estimate{};
 		ProgressChannelPtr m_Progress;
 	};
 
@@ -103,6 +142,7 @@ namespace gglab
 		AssetUploadHandle m_Handle{};
 		std::string m_Name;
 		AssetStreamingIdentity m_Identity{};
+		AssetStreamingWorkEstimate m_Estimate{};
 		AssetUploadStatus m_Status = AssetUploadStatus::Pending;
 		RHIFencePoint m_FencePoint{};
 		double m_ElapsedMilliseconds = 0.0;
@@ -114,6 +154,16 @@ namespace gglab
 		AssetStreamingQueueStatistics m_CpuReadyQueue;
 		AssetStreamingQueueStatistics m_UploadReadyQueue;
 		AssetStreamingQueueStatistics m_PublicationReadyQueue;
+		AssetStreamingFrameBudget m_FrameBudget;
+		AssetStreamingFrameUsage m_LastFrameUsage;
+		uint64_t m_ReadyBacklogBytes = 0;
+		uint64_t m_ReadyBacklogHighWatermark = 0;
+		uint64_t m_InFlightBytes = 0;
+		uint64_t m_InFlightHighWatermark = 0;
+		uint64_t m_BacklogBudgetDeferralCount = 0;
+		uint64_t m_UploadBudgetDeferralCount = 0;
+		uint64_t m_InFlightBudgetDeferralCount = 0;
+		uint64_t m_OversizedAdmissionCount = 0;
 		uint32_t m_PendingCount = 0;
 		uint64_t m_SubmittedCount = 0;
 		uint64_t m_SucceededCount = 0;
@@ -134,6 +184,7 @@ namespace gglab
 			RHIDevice* m_Device = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			uint32_t m_RecentUploadCapacity = 64;
+			AssetStreamingFrameBudget m_FrameBudget{};
 		};
 
 		explicit AssetUploadScheduler(const CreateInfo& createInfo) noexcept;
@@ -153,6 +204,7 @@ namespace gglab
 			bool recordingSucceeded,
 			AssetUploadCompletion completion = {}) noexcept;
 		uint32_t Tick() noexcept;
+		void DrainReadyWork() noexcept;
 		void Finalize() noexcept;
 
 		[[nodiscard]] AssetUploadStatistics GetStatistics() const;
@@ -200,15 +252,18 @@ namespace gglab
 			QueueTelemetry& telemetry,
 			AssetStreamingWorkDesc desc,
 			AssetStreamingWork work) noexcept;
-		uint32_t DrainWorkQueue(
-			std::deque<QueuedWork>& queue,
+		[[nodiscard]] double ExecuteWork(
+			QueuedWork&& queued,
 			QueueTelemetry& telemetry,
 			std::string_view queueName) noexcept;
+		uint32_t DrainCpuReadyQueue(bool ignoreBudget) noexcept;
+		uint32_t DrainUploadReadyQueue(bool ignoreBudget) noexcept;
 		uint32_t PollCompletedUploads() noexcept;
 		void EnqueuePublication(
 			PendingUpload&& upload,
 			AssetUploadStatus status) noexcept;
-		uint32_t DrainPublicationQueue() noexcept;
+		uint32_t DrainPublicationQueue(bool ignoreBudget) noexcept;
+		void RemoveReadyBacklog(const AssetStreamingWorkEstimate& estimate, bool uploadReady) noexcept;
 		[[nodiscard]] AssetStreamingQueueStatistics BuildQueueStatistics(
 			const std::deque<QueuedWork>& queue,
 			const QueueTelemetry& telemetry) const;
@@ -220,7 +275,18 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		std::thread::id m_OwnerThreadId;
 		uint32_t m_RecentUploadCapacity = 0;
+		AssetStreamingFrameBudget m_FrameBudget{};
+		AssetStreamingFrameUsage m_LastFrameUsage{};
 		uint64_t m_NextHandle = 1;
+		uint64_t m_ReadyBacklogBytes = 0;
+		uint64_t m_UploadReadyBacklogBytes = 0;
+		uint64_t m_ReadyBacklogHighWatermark = 0;
+		uint64_t m_InFlightBytes = 0;
+		uint64_t m_InFlightHighWatermark = 0;
+		uint64_t m_BacklogBudgetDeferralCount = 0;
+		uint64_t m_UploadBudgetDeferralCount = 0;
+		uint64_t m_InFlightBudgetDeferralCount = 0;
+		uint64_t m_OversizedAdmissionCount = 0;
 		uint64_t m_SubmittedCount = 0;
 		uint64_t m_SucceededCount = 0;
 		uint64_t m_FailedCount = 0;

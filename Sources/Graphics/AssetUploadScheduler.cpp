@@ -19,7 +19,8 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_OwnerThreadId(std::this_thread::get_id()),
-		m_RecentUploadCapacity(createInfo.m_RecentUploadCapacity)
+		m_RecentUploadCapacity(createInfo.m_RecentUploadCapacity),
+		m_FrameBudget(createInfo.m_FrameBudget)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		GGLAB_ASSERT_NOT_NULL(m_TransferManager);
@@ -94,6 +95,8 @@ namespace gglab
 			"Waiting for GPU upload",
 			std::format("{} | fence {}", upload.m_Desc.m_Name, upload.m_FencePoint.m_Value));
 		m_PendingUploads.emplace_back(std::move(upload));
+		m_InFlightBytes += m_PendingUploads.back().m_Desc.m_Estimate.m_StagingBytes;
+		m_InFlightHighWatermark = std::max(m_InFlightHighWatermark, m_InFlightBytes);
 		return handle;
 	}
 
@@ -105,16 +108,30 @@ namespace gglab
 			return 0;
 		}
 
-		GGLAB_UNUSED(DrainWorkQueue(
-			m_CpuReadyQueue,
-			m_CpuReadyTelemetry,
-			"CPU-ready"));
-		GGLAB_UNUSED(DrainWorkQueue(
-			m_UploadReadyQueue,
-			m_UploadReadyTelemetry,
-			"upload-ready"));
 		GGLAB_UNUSED(PollCompletedUploads());
-		return DrainPublicationQueue();
+		m_LastFrameUsage = {};
+		GGLAB_UNUSED(DrainCpuReadyQueue(false));
+		GGLAB_UNUSED(DrainUploadReadyQueue(false));
+		GGLAB_UNUSED(PollCompletedUploads());
+		return DrainPublicationQueue(false);
+	}
+
+	void AssetUploadScheduler::DrainReadyWork() noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "AssetUploadScheduler::DrainReadyWork must run on the owner thread.");
+		if (!IsOwnerThread())
+		{
+			return;
+		}
+
+		m_LastFrameUsage = {};
+		while (!m_CpuReadyQueue.empty() || !m_UploadReadyQueue.empty())
+		{
+			GGLAB_UNUSED(DrainCpuReadyQueue(true));
+			GGLAB_UNUSED(DrainUploadReadyQueue(true));
+		}
+		GGLAB_UNUSED(PollCompletedUploads());
+		GGLAB_UNUSED(DrainPublicationQueue(true));
 	}
 
 	uint32_t AssetUploadScheduler::PollCompletedUploads() noexcept
@@ -138,6 +155,12 @@ namespace gglab
 		}
 		for (PendingUpload& upload : completed)
 		{
+			const uint64_t stagingBytes = upload.m_Desc.m_Estimate.m_StagingBytes;
+			GGLAB_ASSERT_MSG(
+				stagingBytes <= m_InFlightBytes,
+				"Asset upload in-flight byte accounting underflow.");
+			m_InFlightBytes = stagingBytes <= m_InFlightBytes ?
+				m_InFlightBytes - stagingBytes : 0;
 			const AssetUploadStatus status = upload.m_RecordingSucceeded ?
 				AssetUploadStatus::Succeeded : AssetUploadStatus::Failed;
 			EnqueuePublication(std::move(upload), status);
@@ -157,7 +180,7 @@ namespace gglab
 			m_CpuReadyQueue.empty() && m_UploadReadyQueue.empty(),
 			"AssetUploadScheduler::Finalize requires ready work to be drained before the RHI context becomes idle.");
 		GGLAB_UNUSED(PollCompletedUploads());
-		GGLAB_UNUSED(DrainPublicationQueue());
+		GGLAB_UNUSED(DrainPublicationQueue(true));
 		GGLAB_ASSERT_MSG(
 			m_PendingUploads.empty(),
 			"AssetUploadScheduler::Finalize requires the RHI context to be idle.");
@@ -167,7 +190,7 @@ namespace gglab
 			m_PendingUploads.pop_front();
 			EnqueuePublication(std::move(upload), AssetUploadStatus::Failed);
 		}
-		GGLAB_UNUSED(DrainPublicationQueue());
+		GGLAB_UNUSED(DrainPublicationQueue(true));
 		m_TransferManager->Reclaim();
 	}
 
@@ -182,6 +205,16 @@ namespace gglab
 			m_UploadReadyQueue,
 			m_UploadReadyTelemetry);
 		statistics.m_PublicationReadyQueue = BuildPublicationQueueStatistics();
+		statistics.m_FrameBudget = m_FrameBudget;
+		statistics.m_LastFrameUsage = m_LastFrameUsage;
+		statistics.m_ReadyBacklogBytes = m_ReadyBacklogBytes;
+		statistics.m_ReadyBacklogHighWatermark = m_ReadyBacklogHighWatermark;
+		statistics.m_InFlightBytes = m_InFlightBytes;
+		statistics.m_InFlightHighWatermark = m_InFlightHighWatermark;
+		statistics.m_BacklogBudgetDeferralCount = m_BacklogBudgetDeferralCount;
+		statistics.m_UploadBudgetDeferralCount = m_UploadBudgetDeferralCount;
+		statistics.m_InFlightBudgetDeferralCount = m_InFlightBudgetDeferralCount;
+		statistics.m_OversizedAdmissionCount = m_OversizedAdmissionCount;
 		statistics.m_PendingCount = static_cast<uint32_t>(m_PendingUploads.size());
 		statistics.m_SubmittedCount = m_SubmittedCount;
 		statistics.m_SucceededCount = m_SucceededCount;
@@ -199,6 +232,7 @@ namespace gglab
 				.m_Handle = upload.m_Handle,
 				.m_Name = upload.m_Desc.m_Name,
 				.m_Identity = upload.m_Desc.m_Identity,
+				.m_Estimate = upload.m_Desc.m_Estimate,
 				.m_Status = AssetUploadStatus::Pending,
 				.m_FencePoint = upload.m_FencePoint,
 				.m_ElapsedMilliseconds = Milliseconds(now - upload.m_SubmittedAt),
@@ -234,57 +268,137 @@ namespace gglab
 		telemetry.m_HighWatermark = std::max(
 			telemetry.m_HighWatermark,
 			static_cast<uint32_t>(queue.size()));
+		m_ReadyBacklogBytes += queue.back().m_Desc.m_Estimate.m_SourceBytes;
+		if (&queue == &m_UploadReadyQueue)
+		{
+			m_UploadReadyBacklogBytes += queue.back().m_Desc.m_Estimate.m_SourceBytes;
+		}
+		m_ReadyBacklogHighWatermark = std::max(
+			m_ReadyBacklogHighWatermark,
+			m_ReadyBacklogBytes);
 	}
 
-	uint32_t AssetUploadScheduler::DrainWorkQueue(
-		std::deque<QueuedWork>& queue,
+	double AssetUploadScheduler::ExecuteWork(
+		QueuedWork&& queued,
 		QueueTelemetry& telemetry,
 		std::string_view queueName) noexcept
 	{
-		const uint32_t initialCount = static_cast<uint32_t>(queue.size());
-		uint32_t processedCount = 0;
-		while (processedCount < initialCount && !queue.empty())
+		const double queueMilliseconds = Milliseconds(
+			std::chrono::steady_clock::now() - queued.m_QueuedAt);
+		telemetry.m_TotalQueueMilliseconds += queueMilliseconds;
+		telemetry.m_MaxQueueMilliseconds = std::max(
+			telemetry.m_MaxQueueMilliseconds,
+			queueMilliseconds);
+
+		const auto executionBegin = std::chrono::steady_clock::now();
+		try
 		{
-			QueuedWork queued = std::move(queue.front());
-			queue.pop_front();
-			const double queueMilliseconds = Milliseconds(
-				std::chrono::steady_clock::now() - queued.m_QueuedAt);
-			telemetry.m_TotalQueueMilliseconds += queueMilliseconds;
-			telemetry.m_MaxQueueMilliseconds = std::max(
-				telemetry.m_MaxQueueMilliseconds,
-				queueMilliseconds);
+			queued.m_Work();
+		}
+		catch (const std::exception& exception)
+		{
+			++telemetry.m_CallbackFailureCount;
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Asset {} work '{}' threw an exception: {}",
+				queueName,
+				queued.m_Desc.m_Name,
+				exception.what());
+		}
+		catch (...)
+		{
+			++telemetry.m_CallbackFailureCount;
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Asset {} work '{}' threw an unknown exception.",
+				queueName,
+				queued.m_Desc.m_Name);
+		}
+		const double executionMilliseconds = Milliseconds(
+			std::chrono::steady_clock::now() - executionBegin);
+		telemetry.m_TotalExecutionMilliseconds += executionMilliseconds;
+		telemetry.m_MaxExecutionMilliseconds = std::max(
+			telemetry.m_MaxExecutionMilliseconds,
+			executionMilliseconds);
+		++telemetry.m_ProcessedCount;
+		return executionMilliseconds;
+	}
 
-			const auto executionBegin = std::chrono::steady_clock::now();
-			try
+	uint32_t AssetUploadScheduler::DrainCpuReadyQueue(bool ignoreBudget) noexcept
+	{
+		const uint32_t initialCount = static_cast<uint32_t>(m_CpuReadyQueue.size());
+		uint32_t processedCount = 0;
+		while (processedCount < initialCount && !m_CpuReadyQueue.empty())
+		{
+			const QueuedWork& next = m_CpuReadyQueue.front();
+			if (!ignoreBudget && processedCount > 0 &&
+				(m_LastFrameUsage.m_CpuReadyItems >= m_FrameBudget.m_MaxCpuReadyItems ||
+				m_LastFrameUsage.m_CpuReadyMilliseconds >= m_FrameBudget.m_MaxCpuReadyMilliseconds))
 			{
-				queued.m_Work();
+				break;
 			}
-			catch (const std::exception& exception)
+			const uint64_t prospectiveUploadBacklog =
+				m_UploadReadyBacklogBytes + next.m_Desc.m_Estimate.m_SourceBytes;
+			if (!ignoreBudget && !m_UploadReadyQueue.empty() &&
+				prospectiveUploadBacklog > m_FrameBudget.m_MaxReadyBacklogBytes)
 			{
-				++telemetry.m_CallbackFailureCount;
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"Asset {} work '{}' threw an exception: {}",
-					queueName,
-					queued.m_Desc.m_Name,
-					exception.what());
+				++m_BacklogBudgetDeferralCount;
+				break;
 			}
-			catch (...)
-			{
-				++telemetry.m_CallbackFailureCount;
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"Asset {} work '{}' threw an unknown exception.",
-					queueName,
-					queued.m_Desc.m_Name);
-			}
-			const double executionMilliseconds = Milliseconds(
-				std::chrono::steady_clock::now() - executionBegin);
-			telemetry.m_TotalExecutionMilliseconds += executionMilliseconds;
-			telemetry.m_MaxExecutionMilliseconds = std::max(
-				telemetry.m_MaxExecutionMilliseconds,
-				executionMilliseconds);
 
+			QueuedWork queued = std::move(m_CpuReadyQueue.front());
+			m_CpuReadyQueue.pop_front();
+			RemoveReadyBacklog(queued.m_Desc.m_Estimate, false);
+			const double elapsed = ExecuteWork(
+				std::move(queued), m_CpuReadyTelemetry, "CPU-ready");
 			++processedCount;
-			++telemetry.m_ProcessedCount;
+			++m_LastFrameUsage.m_CpuReadyItems;
+			m_LastFrameUsage.m_CpuReadyMilliseconds += elapsed;
+		}
+		return processedCount;
+	}
+
+	uint32_t AssetUploadScheduler::DrainUploadReadyQueue(bool ignoreBudget) noexcept
+	{
+		const uint32_t initialCount = static_cast<uint32_t>(m_UploadReadyQueue.size());
+		uint32_t processedCount = 0;
+		while (processedCount < initialCount && !m_UploadReadyQueue.empty())
+		{
+			const AssetStreamingWorkEstimate& estimate =
+				m_UploadReadyQueue.front().m_Desc.m_Estimate;
+			const bool hasFrameAdmission = m_LastFrameUsage.m_UploadReadyItems > 0;
+			const bool exceedsFrameBudget =
+				m_LastFrameUsage.m_UploadReadyItems >= m_FrameBudget.m_MaxUploadReadyItems ||
+				m_LastFrameUsage.m_UploadBytes + estimate.m_StagingBytes > m_FrameBudget.m_MaxUploadBytes ||
+				m_LastFrameUsage.m_UploadOperations + estimate.m_OperationCount > m_FrameBudget.m_MaxUploadOperations ||
+				m_LastFrameUsage.m_UploadMilliseconds >= m_FrameBudget.m_MaxUploadMilliseconds;
+			if (!ignoreBudget && hasFrameAdmission && exceedsFrameBudget)
+			{
+				++m_UploadBudgetDeferralCount;
+				break;
+			}
+
+			const bool exceedsInFlightBudget =
+				m_InFlightBytes + estimate.m_StagingBytes > m_FrameBudget.m_MaxInFlightBytes;
+			if (!ignoreBudget && exceedsInFlightBudget && m_InFlightBytes > 0)
+			{
+				++m_InFlightBudgetDeferralCount;
+				break;
+			}
+			if (!ignoreBudget && !hasFrameAdmission && (exceedsFrameBudget || exceedsInFlightBudget))
+			{
+				++m_OversizedAdmissionCount;
+			}
+
+			QueuedWork queued = std::move(m_UploadReadyQueue.front());
+			m_UploadReadyQueue.pop_front();
+			RemoveReadyBacklog(queued.m_Desc.m_Estimate, true);
+			const AssetStreamingWorkEstimate admittedEstimate = queued.m_Desc.m_Estimate;
+			const double elapsed = ExecuteWork(
+				std::move(queued), m_UploadReadyTelemetry, "upload-ready");
+			++processedCount;
+			++m_LastFrameUsage.m_UploadReadyItems;
+			m_LastFrameUsage.m_UploadBytes += admittedEstimate.m_StagingBytes;
+			m_LastFrameUsage.m_UploadOperations += admittedEstimate.m_OperationCount;
+			m_LastFrameUsage.m_UploadMilliseconds += elapsed;
 		}
 		return processedCount;
 	}
@@ -304,12 +418,18 @@ namespace gglab
 			static_cast<uint32_t>(m_PublicationReadyQueue.size()));
 	}
 
-	uint32_t AssetUploadScheduler::DrainPublicationQueue() noexcept
+	uint32_t AssetUploadScheduler::DrainPublicationQueue(bool ignoreBudget) noexcept
 	{
 		const uint32_t initialCount = static_cast<uint32_t>(m_PublicationReadyQueue.size());
 		uint32_t processedCount = 0;
 		while (processedCount < initialCount && !m_PublicationReadyQueue.empty())
 		{
+			if (!ignoreBudget && processedCount > 0 &&
+				(m_LastFrameUsage.m_PublicationItems >= m_FrameBudget.m_MaxPublicationItems ||
+				m_LastFrameUsage.m_PublicationMilliseconds >= m_FrameBudget.m_MaxPublicationMilliseconds))
+			{
+				break;
+			}
 			PendingPublication publication = std::move(m_PublicationReadyQueue.front());
 			m_PublicationReadyQueue.pop_front();
 			const double queueMilliseconds = Milliseconds(
@@ -327,9 +447,30 @@ namespace gglab
 				m_PublicationReadyTelemetry.m_MaxExecutionMilliseconds,
 				executionMilliseconds);
 			++processedCount;
+			++m_LastFrameUsage.m_PublicationItems;
+			m_LastFrameUsage.m_PublicationMilliseconds += executionMilliseconds;
 			++m_PublicationReadyTelemetry.m_ProcessedCount;
 		}
 		return processedCount;
+	}
+
+	void AssetUploadScheduler::RemoveReadyBacklog(
+		const AssetStreamingWorkEstimate& estimate,
+		bool uploadReady) noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			estimate.m_SourceBytes <= m_ReadyBacklogBytes,
+			"Asset ready backlog byte accounting underflow.");
+		m_ReadyBacklogBytes = estimate.m_SourceBytes <= m_ReadyBacklogBytes ?
+			m_ReadyBacklogBytes - estimate.m_SourceBytes : 0;
+		if (uploadReady)
+		{
+			GGLAB_ASSERT_MSG(
+				estimate.m_SourceBytes <= m_UploadReadyBacklogBytes,
+				"Asset upload-ready backlog byte accounting underflow.");
+			m_UploadReadyBacklogBytes = estimate.m_SourceBytes <= m_UploadReadyBacklogBytes ?
+				m_UploadReadyBacklogBytes - estimate.m_SourceBytes : 0;
+		}
 	}
 
 	AssetStreamingQueueStatistics AssetUploadScheduler::BuildQueueStatistics(
@@ -350,9 +491,13 @@ namespace gglab
 		const auto now = std::chrono::steady_clock::now();
 		for (const QueuedWork& work : queue)
 		{
+			statistics.m_PendingSourceBytes += work.m_Desc.m_Estimate.m_SourceBytes;
+			statistics.m_PendingStagingBytes += work.m_Desc.m_Estimate.m_StagingBytes;
+			statistics.m_PendingOperationCount += work.m_Desc.m_Estimate.m_OperationCount;
 			statistics.m_PendingWork.push_back({
 				.m_Name = work.m_Desc.m_Name,
 				.m_Identity = work.m_Desc.m_Identity,
+				.m_Estimate = work.m_Desc.m_Estimate,
 				.m_QueueMilliseconds = Milliseconds(now - work.m_QueuedAt),
 				.m_Progress = work.m_Desc.m_Progress ?
 					work.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{},
@@ -377,9 +522,13 @@ namespace gglab
 		const auto now = std::chrono::steady_clock::now();
 		for (const PendingPublication& publication : m_PublicationReadyQueue)
 		{
+			statistics.m_PendingSourceBytes += publication.m_Upload.m_Desc.m_Estimate.m_SourceBytes;
+			statistics.m_PendingStagingBytes += publication.m_Upload.m_Desc.m_Estimate.m_StagingBytes;
+			statistics.m_PendingOperationCount += publication.m_Upload.m_Desc.m_Estimate.m_OperationCount;
 			statistics.m_PendingWork.push_back({
 				.m_Name = publication.m_Upload.m_Desc.m_Name,
 				.m_Identity = publication.m_Upload.m_Desc.m_Identity,
+				.m_Estimate = publication.m_Upload.m_Desc.m_Estimate,
 				.m_QueueMilliseconds = Milliseconds(now - publication.m_QueuedAt),
 				.m_Progress = publication.m_Upload.m_Desc.m_Progress ?
 					publication.m_Upload.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{},
@@ -447,6 +596,7 @@ namespace gglab
 				.m_Handle = info.m_Handle,
 				.m_Name = std::move(info.m_Name),
 				.m_Identity = upload.m_Desc.m_Identity,
+				.m_Estimate = upload.m_Desc.m_Estimate,
 				.m_Status = info.m_Status,
 				.m_FencePoint = info.m_FencePoint,
 				.m_ElapsedMilliseconds = info.m_ElapsedMilliseconds,

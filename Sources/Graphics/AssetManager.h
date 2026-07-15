@@ -106,6 +106,7 @@ namespace gglab
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
 			TransferBatch& transferBatch) noexcept;
+		bool QueueMeshUpload(MeshUploadData&& uploadData) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
 		bool PublishImportedModel(
 			ModelID modelId,

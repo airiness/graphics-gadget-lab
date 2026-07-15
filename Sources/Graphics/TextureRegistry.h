@@ -117,6 +117,7 @@ namespace gglab
 			std::string_view textureName,
 			const std::filesystem::path& sourcePath = {}) noexcept;
 		void CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept;
+		bool QueueTextureUpload(TextureUploadData&& uploadData) noexcept;
 		bool PublishImportedTexture(
 			TextureID textureId,
 			uint64_t generation,
