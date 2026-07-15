@@ -19,7 +19,7 @@ namespace gglab
 		PostProcessColorState m_State = PostProcessColorState::SceneLinearRec709;
 
 		// StoredColor = SceneLinearColor * PreExposure. Scene rendering is not
-		// pre-exposed yet, so PR1 requires this value to remain 1.
+		// pre-exposed yet, so the current path requires this value to remain 1.
 		float m_PreExposure = 1.0f;
 	};
 

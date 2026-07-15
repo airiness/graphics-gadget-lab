@@ -121,7 +121,6 @@ namespace gglab
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
-				commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 				for (uint32_t mip = 0; mip < data.m_MipLevels; ++mip)
 				{
@@ -153,7 +152,7 @@ namespace gglab
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							passParameters);
 
-						commandContext->Draw(3);
+						commandContext->DrawFullscreenTriangle();
 					}
 				}
 

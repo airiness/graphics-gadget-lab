@@ -153,6 +153,12 @@ namespace gglab
 			uint32_t instanceCount = 1,
 			uint32_t startVertexLocation = 0,
 			uint32_t startInstanceLocation = 0) noexcept = 0;
+
+		void DrawFullscreenTriangle() noexcept
+		{
+			SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+			Draw(3);
+		}
 	};
 
 	class RHIComputeCommandContext : public RHICommandContext

@@ -7,8 +7,12 @@ struct FinalColorPassParameters
 {
 	uint SceneColorTextureIndex;
 	uint SceneColorSamplerIndex;
+	uint BloomTextureIndex;
+	uint BloomSamplerIndex;
 	uint ViewIndex;
-	uint Padding;
+	uint BloomEnabled;
+	float BloomIntensity;
+	float ScenePreExposure;
 };
 
 ConstantBuffer<FinalColorPassParameters> g_Pass : register(b2);
@@ -23,12 +27,21 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 
-	const float3 hdrColor = SanitizeHDRColor(SampleTexture2D(
+	float3 storedColor = SanitizeHDRColor(SampleTexture2D(
 		g_Pass.SceneColorTextureIndex,
 		g_Pass.SceneColorSamplerIndex,
 		IN.UV).rgb);
+	if (g_Pass.BloomEnabled != 0)
+	{
+		storedColor += SanitizeHDRColor(SampleTexture2D(
+			g_Pass.BloomTextureIndex,
+			g_Pass.BloomSamplerIndex,
+			IN.UV).rgb) * g_Pass.BloomIntensity;
+	}
 
-	float3 color = ACESFitted(hdrColor * viewData.ExposureMultiplier);
+	const float exposureScaleOverPreExposure =
+		viewData.ExposureMultiplier / max(g_Pass.ScenePreExposure, 1e-6);
+	float3 color = ACESFitted(storedColor * exposureScaleOverPreExposure);
 	color = LinearToSRGB(color);
 
 	return float4(color, 1.0);

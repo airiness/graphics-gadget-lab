@@ -131,7 +131,6 @@ namespace gglab
 					commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
 					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
 					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
-					commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 					const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
 					GGLAB_ASSERT_MSG(sourceSrv.IsValid(), "Environment mip source SRV must be shader visible.");
@@ -149,7 +148,7 @@ namespace gglab
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							passParameters);
-						commandContext->Draw(3);
+						commandContext->DrawFullscreenTriangle();
 					}
 
 					if (data.m_IsLastMip)

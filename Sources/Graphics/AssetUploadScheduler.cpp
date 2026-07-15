@@ -1309,6 +1309,7 @@ namespace gglab
 			}
 			catch (const std::exception& exception)
 			{
+				GGLAB_UNUSED(exception);
 				++m_CompletionCallbackFailureCount;
 				GGLAB_LOG_GRAPHICS_ERROR(
 					"Asset upload completion '{}' threw an exception: {}",

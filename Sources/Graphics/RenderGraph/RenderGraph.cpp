@@ -95,4 +95,24 @@ namespace gglab
 
 		return m_VirtualResources[slot.m_VirtualResourceIndex.Value()];
 	}
+
+	const RHITextureDesc& RenderGraph::GetTextureDesc(RGTextureId textureId) const noexcept
+	{
+		static const RHITextureDesc InvalidTextureDesc{};
+		GGLAB_ASSERT_MSG(textureId.IsValid(),
+			"RenderGraph::GetTextureDesc requires a valid texture id.");
+		if (!textureId.IsValid())
+		{
+			return InvalidTextureDesc;
+		}
+		auto* resource = GetVirtualResource(textureId);
+		GGLAB_ASSERT_MSG(
+			resource && resource->m_ResourceType == RGResourceType::RGTexture,
+			"RenderGraph::GetTextureDesc requires a texture resource.");
+		if (!resource || resource->m_ResourceType != RGResourceType::RGTexture)
+		{
+			return InvalidTextureDesc;
+		}
+		return static_cast<RGVirtualResource<RGTextureResource>*>(resource)->m_Desc;
+	}
 }

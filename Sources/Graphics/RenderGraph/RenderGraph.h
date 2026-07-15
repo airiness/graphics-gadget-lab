@@ -170,6 +170,11 @@ namespace gglab
 				return Create<RGTextureResource>(name, desc);
 			}
 
+			const RHITextureDesc& GetTextureDesc(RGTextureId textureId) const noexcept
+			{
+				return m_RG.GetTextureDesc(textureId);
+			}
+
 			RGBufferId CreateBuffer(const char* name, const RHIBufferDesc& desc = {}) noexcept
 			{
 				return Create<RGBufferResource>(name, desc);
@@ -429,6 +434,7 @@ namespace gglab
 			std::optional<RHITextureViewDesc> desc) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
+		const RHITextureDesc& GetTextureDesc(RGTextureId textureId) const noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
