@@ -7,6 +7,7 @@
 #include <deque>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -32,9 +33,56 @@ namespace gglab
 		Failed,
 	};
 
+	enum class AssetStreamingWorkKind : uint8_t
+	{
+		Unknown,
+		Model,
+		Texture,
+		Mesh,
+	};
+
+	struct AssetStreamingIdentity
+	{
+		AssetStreamingWorkKind m_Kind = AssetStreamingWorkKind::Unknown;
+		uint64_t m_StableId = 0;
+		uint64_t m_Generation = 0;
+	};
+
+	struct AssetStreamingWorkDesc
+	{
+		std::string m_Name;
+		AssetStreamingIdentity m_Identity{};
+		ProgressChannelPtr m_Progress;
+	};
+
+	using AssetStreamingWork = std::function<void()>;
+
+	struct AssetStreamingWorkActivity
+	{
+		std::string m_Name;
+		AssetStreamingIdentity m_Identity{};
+		double m_QueueMilliseconds = 0.0;
+		ProgressSnapshot m_Progress;
+	};
+
+	struct AssetStreamingQueueStatistics
+	{
+		uint32_t m_PendingCount = 0;
+		uint32_t m_HighWatermark = 0;
+		uint64_t m_EnqueuedCount = 0;
+		uint64_t m_ProcessedCount = 0;
+		uint64_t m_CallbackFailureCount = 0;
+		double m_TotalQueueMilliseconds = 0.0;
+		double m_MaxQueueMilliseconds = 0.0;
+		double m_TotalExecutionMilliseconds = 0.0;
+		double m_MaxExecutionMilliseconds = 0.0;
+		std::vector<AssetStreamingWorkActivity> m_PendingWork;
+	};
+
 	struct AssetUploadDesc
 	{
 		std::string m_Name;
+		AssetStreamingIdentity m_Identity{};
 		ProgressChannelPtr m_Progress;
 	};
 
@@ -42,6 +90,7 @@ namespace gglab
 	{
 		AssetUploadHandle m_Handle{};
 		std::string m_Name;
+		AssetStreamingIdentity m_Identity{};
 		AssetUploadStatus m_Status = AssetUploadStatus::Failed;
 		RHIFencePoint m_FencePoint{};
 		double m_ElapsedMilliseconds = 0.0;
@@ -53,6 +102,7 @@ namespace gglab
 	{
 		AssetUploadHandle m_Handle{};
 		std::string m_Name;
+		AssetStreamingIdentity m_Identity{};
 		AssetUploadStatus m_Status = AssetUploadStatus::Pending;
 		RHIFencePoint m_FencePoint{};
 		double m_ElapsedMilliseconds = 0.0;
@@ -61,6 +111,9 @@ namespace gglab
 
 	struct AssetUploadStatistics
 	{
+		AssetStreamingQueueStatistics m_CpuReadyQueue;
+		AssetStreamingQueueStatistics m_UploadReadyQueue;
+		AssetStreamingQueueStatistics m_PublicationReadyQueue;
 		uint32_t m_PendingCount = 0;
 		uint64_t m_SubmittedCount = 0;
 		uint64_t m_SucceededCount = 0;
@@ -70,8 +123,9 @@ namespace gglab
 		std::vector<AssetUploadActivity> m_RecentUploads;
 	};
 
-	// Owns the main-thread publication boundary for transfer-queue work. Callers
-	// record a batch, submit without waiting, then publish assets from the fence callback.
+	// Owns the main-thread streaming boundaries around transfer-queue work. CPU
+	// completions only enqueue payload publication, upload-ready work records and
+	// submits transfer batches, and completed fences enqueue final publication.
 	class AssetUploadScheduler
 	{
 	public:
@@ -85,6 +139,13 @@ namespace gglab
 		explicit AssetUploadScheduler(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetUploadScheduler);
 		~AssetUploadScheduler();
+
+		void EnqueueCpuReady(
+			AssetStreamingWorkDesc desc,
+			AssetStreamingWork work) noexcept;
+		void EnqueueUploadReady(
+			AssetStreamingWorkDesc desc,
+			AssetStreamingWork work) noexcept;
 
 		[[nodiscard]] AssetUploadHandle Submit(
 			AssetUploadDesc desc,
@@ -107,7 +168,51 @@ namespace gglab
 			AssetUploadCompletion m_Completion;
 		};
 
+		struct QueuedWork
+		{
+			AssetStreamingWorkDesc m_Desc;
+			std::chrono::steady_clock::time_point m_QueuedAt{};
+			AssetStreamingWork m_Work;
+		};
+
+		struct PendingPublication
+		{
+			PendingUpload m_Upload;
+			AssetUploadStatus m_Status = AssetUploadStatus::Failed;
+			std::chrono::steady_clock::time_point m_QueuedAt{};
+		};
+
+		struct QueueTelemetry
+		{
+			uint32_t m_HighWatermark = 0;
+			uint64_t m_EnqueuedCount = 0;
+			uint64_t m_ProcessedCount = 0;
+			uint64_t m_CallbackFailureCount = 0;
+			double m_TotalQueueMilliseconds = 0.0;
+			double m_MaxQueueMilliseconds = 0.0;
+			double m_TotalExecutionMilliseconds = 0.0;
+			double m_MaxExecutionMilliseconds = 0.0;
+		};
+
 		[[nodiscard]] bool IsOwnerThread() const noexcept;
+		void EnqueueWork(
+			std::deque<QueuedWork>& queue,
+			QueueTelemetry& telemetry,
+			AssetStreamingWorkDesc desc,
+			AssetStreamingWork work) noexcept;
+		uint32_t DrainWorkQueue(
+			std::deque<QueuedWork>& queue,
+			QueueTelemetry& telemetry,
+			std::string_view queueName) noexcept;
+		uint32_t PollCompletedUploads() noexcept;
+		void EnqueuePublication(
+			PendingUpload&& upload,
+			AssetUploadStatus status) noexcept;
+		uint32_t DrainPublicationQueue() noexcept;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildQueueStatistics(
+			const std::deque<QueuedWork>& queue,
+			const QueueTelemetry& telemetry) const;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildPublicationQueueStatistics() const;
 		void FinishUpload(PendingUpload&& upload, AssetUploadStatus status) noexcept;
 
 	private:
@@ -120,7 +225,13 @@ namespace gglab
 		uint64_t m_SucceededCount = 0;
 		uint64_t m_FailedCount = 0;
 		uint64_t m_CompletionCallbackFailureCount = 0;
+		std::deque<QueuedWork> m_CpuReadyQueue;
+		std::deque<QueuedWork> m_UploadReadyQueue;
 		std::deque<PendingUpload> m_PendingUploads;
+		std::deque<PendingPublication> m_PublicationReadyQueue;
 		std::deque<AssetUploadActivity> m_RecentUploads;
+		QueueTelemetry m_CpuReadyTelemetry;
+		QueueTelemetry m_UploadReadyTelemetry;
+		QueueTelemetry m_PublicationReadyTelemetry;
 	};
 }

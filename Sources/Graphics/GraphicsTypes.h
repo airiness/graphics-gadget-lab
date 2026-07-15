@@ -294,6 +294,7 @@ namespace gglab
 	struct Texture
 	{
 		TextureID m_Id{};
+		uint64_t m_Generation = 0;
 		AssetState m_State = AssetState::Unloaded;
 		RHITextureViewHandle m_Srv{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
@@ -352,6 +353,7 @@ namespace gglab
 	struct Mesh
 	{
 		MeshID m_Id{};
+		uint64_t m_Generation = 0;
 
 		AssetState m_State = AssetState::Unloaded;
 		bool m_IsUploaded = false;
@@ -383,6 +385,7 @@ namespace gglab
 	struct Model
 	{
 		ModelID m_Id{};
+		uint64_t m_Generation = 0;
 		AssetState m_State = AssetState::Unloaded;
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;

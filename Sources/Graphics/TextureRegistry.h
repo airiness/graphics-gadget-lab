@@ -53,6 +53,7 @@ namespace gglab
 		struct TextureLoadRequest
 		{
 			TextureID m_TextureId{};
+			uint64_t m_Generation = 0;
 			TaskHandle m_Task{};
 
 			[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
@@ -118,10 +119,12 @@ namespace gglab
 		void CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept;
 		bool PublishImportedTexture(
 			TextureID textureId,
+			uint64_t generation,
 			TextureSemantic semantic,
 			TextureAssetData&& textureData) noexcept;
 		void CompleteTextureLoad(
 			TextureID textureId,
+			uint64_t generation,
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
 			TextureAssetData&& textureData) noexcept;

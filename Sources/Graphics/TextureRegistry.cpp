@@ -197,6 +197,7 @@ namespace gglab
 				const auto task = m_TextureLoadTasks.find(existing);
 				return {
 					.m_TextureId = existing,
+					.m_Generation = texture->m_Generation,
 					.m_Task = task != m_TextureLoadTasks.end() ? task->second : TaskHandle{},
 				};
 			}
@@ -224,6 +225,7 @@ namespace gglab
 			priority);
 		return {
 			.m_TextureId = textureId,
+			.m_Generation = GetTexture(textureId)->m_Generation,
 			.m_Task = task,
 		};
 	}
@@ -248,6 +250,7 @@ namespace gglab
 		}
 
 		texture->m_State = AssetState::Queued;
+		const uint64_t generation = texture->m_Generation;
 		texture->m_Semantic = semantic;
 		ProgressReporter(texture->m_LoadProgress).Report(
 			0.05f,
@@ -281,13 +284,28 @@ namespace gglab
 				}
 				return TaskResult::Success();
 			},
-			[this, textureId, semantic, job](const TaskCompletionInfo& completion) noexcept
+			[this, textureId, generation, semantic, job, progress = texture->m_LoadProgress](
+				const TaskCompletionInfo& completion) noexcept
 			{
-				CompleteTextureLoad(
-					textureId,
-					semantic,
-					completion,
-					std::move(job->m_TextureData));
+				m_AssetUploadScheduler->EnqueueCpuReady(
+					{
+						.m_Name = completion.m_Name,
+						.m_Identity = {
+							.m_Kind = AssetStreamingWorkKind::Texture,
+							.m_StableId = textureId.Value(),
+							.m_Generation = generation,
+						},
+						.m_Progress = progress,
+					},
+					[this, textureId, generation, semantic, completion, job]() mutable noexcept
+					{
+						CompleteTextureLoad(
+							textureId,
+							generation,
+							semantic,
+							completion,
+							std::move(job->m_TextureData));
+					});
 			});
 		if (!task.IsValid())
 		{
@@ -396,6 +414,7 @@ namespace gglab
 		}
 
 		idTexPair.first->second->m_Id = textureId;
+		idTexPair.first->second->m_Generation = 1;
 		idTexPair.first->second->m_State = AssetState::CpuReady;
 		idTexPair.first->second->m_Name = StringID(canonicalPath.generic_string());
 		idTexPair.first->second->m_SourcePath = canonicalPath;
@@ -597,11 +616,12 @@ namespace gglab
 
 	bool TextureRegistry::PublishImportedTexture(
 		TextureID textureId,
+		uint64_t generation,
 		TextureSemantic semantic,
 		TextureAssetData&& textureData) noexcept
 	{
 		Texture* texture = GetTexture(textureId);
-		if (!texture)
+		if (!texture || texture->m_Generation != generation)
 		{
 			return false;
 		}
@@ -616,12 +636,22 @@ namespace gglab
 		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
 			{
 				.m_Name = std::format("Texture {}", textureId.Value()),
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Texture,
+					.m_StableId = textureId.Value(),
+					.m_Generation = generation,
+				},
 				.m_Progress = texture->m_LoadProgress,
 			},
 			std::move(batch),
 			recorded,
-			[this, textureId](const AssetUploadCompletionInfo& completion) noexcept
+			[this, textureId, generation](const AssetUploadCompletionInfo& completion) noexcept
 			{
+				const Texture* texture = GetTexture(textureId);
+				if (!texture || texture->m_Generation != generation)
+				{
+					return;
+				}
 				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
 				CompleteTextureUpload(textureId, succeeded);
 				if (succeeded)
@@ -641,16 +671,17 @@ namespace gglab
 
 	void TextureRegistry::CompleteTextureLoad(
 		TextureID textureId,
+		uint64_t generation,
 		TextureSemantic semantic,
 		const TaskCompletionInfo& completion,
 		TextureAssetData&& textureData) noexcept
 	{
-		m_TextureLoadTasks.erase(textureId);
 		Texture* texture = GetTexture(textureId);
-		if (!texture)
+		if (!texture || texture->m_Generation != generation)
 		{
 			return;
 		}
+		m_TextureLoadTasks.erase(textureId);
 
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
@@ -675,19 +706,47 @@ namespace gglab
 			return;
 		}
 
-		if (!PublishImportedTexture(textureId, semantic, std::move(textureData)))
-		{
-			texture->m_State = AssetState::Failed;
-			ProgressReporter(texture->m_LoadProgress).Report(
-				0.62f,
-				"Texture publication failed");
-			return;
-		}
-		GGLAB_LOG_GRAPHICS_INFO(
-			"Async texture {} queued for GPU upload (queueMs={:.2f}, cpuMs={:.2f}).",
-			textureId.Value(),
-			completion.m_QueueMilliseconds,
-			completion.m_ExecutionMilliseconds);
+		texture->m_State = AssetState::CpuReady;
+		ProgressReporter(texture->m_LoadProgress).Report(
+			0.62f,
+			"Queued for texture upload publication",
+			completion.m_Name);
+		auto payload = std::make_shared<TextureAssetData>(std::move(textureData));
+		m_AssetUploadScheduler->EnqueueUploadReady(
+			{
+				.m_Name = std::format("Texture {}", textureId.Value()),
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Texture,
+					.m_StableId = textureId.Value(),
+					.m_Generation = generation,
+				},
+				.m_Progress = texture->m_LoadProgress,
+			},
+			[this, textureId, generation, semantic, completion, payload]() mutable noexcept
+			{
+				Texture* currentTexture = GetTexture(textureId);
+				if (!currentTexture || currentTexture->m_Generation != generation)
+				{
+					return;
+				}
+				if (!PublishImportedTexture(
+					textureId,
+					generation,
+					semantic,
+					std::move(*payload)))
+				{
+					currentTexture->m_State = AssetState::Failed;
+					ProgressReporter(currentTexture->m_LoadProgress).Report(
+						0.62f,
+						"Texture publication failed");
+					return;
+				}
+				GGLAB_LOG_GRAPHICS_INFO(
+					"Async texture {} queued for GPU upload (queueMs={:.2f}, cpuMs={:.2f}).",
+					textureId.Value(),
+					completion.m_QueueMilliseconds,
+					completion.m_ExecutionMilliseconds);
+			});
 	}
 
 	void TextureRegistry::CreateTextureEntry(
@@ -702,6 +761,7 @@ namespace gglab
 			{
 				auto& texture = iterator->second;
 				texture->m_Id = id;
+				texture->m_Generation = 1;
 				texture->m_State = AssetState::CpuReady;
 				texture->m_Name = StringID(textureName);
 				texture->m_SourcePath = sourcePath;
