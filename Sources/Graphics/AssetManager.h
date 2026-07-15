@@ -27,6 +27,7 @@ namespace gglab
 		struct ModelLoadRequest
 		{
 			ModelID m_ModelId{};
+			uint64_t m_Generation = 0;
 			TaskHandle m_Task{};
 
 			[[nodiscard]] bool IsValid() const noexcept { return m_ModelId.IsValid(); }
@@ -106,9 +107,13 @@ namespace gglab
 			const MeshUploadData& uploadData,
 			TransferBatch& transferBatch) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
-		bool PublishImportedModel(ModelID modelId, ImportedModel&& importedModel) noexcept;
+		bool PublishImportedModel(
+			ModelID modelId,
+			uint64_t generation,
+			ImportedModel&& importedModel) noexcept;
 		void CompleteModelLoad(
 			ModelID modelId,
+			uint64_t generation,
 			const TaskCompletionInfo& completion,
 			ImportedModel&& importedModel) noexcept;
 

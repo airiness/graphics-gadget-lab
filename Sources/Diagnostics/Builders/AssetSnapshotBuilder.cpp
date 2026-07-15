@@ -31,6 +31,7 @@ namespace gglab
 		{
 			AssetSnapshot::Model modelSnapshot{};
 			modelSnapshot.m_Id = modelId;
+			modelSnapshot.m_Generation = model->m_Generation;
 			modelSnapshot.m_State = model->m_State;
 			modelSnapshot.m_SourcePath = findModelSourcePath(modelId);
 			modelSnapshot.m_Type = model->m_Type;
@@ -50,6 +51,7 @@ namespace gglab
 		{
 			snapshot.m_Meshes.push_back({
 				.m_Id = meshId,
+				.m_Generation = mesh->m_Generation,
 				.m_State = mesh->m_State,
 				.m_Name = mesh->m_Name,
 				.m_VertexCount = mesh->m_VertexCount,
@@ -71,6 +73,7 @@ namespace gglab
 			{
 				AssetSnapshot::Texture textureSnapshot{};
 				textureSnapshot.m_Id = textureId;
+				textureSnapshot.m_Generation = texture->m_Generation;
 				textureSnapshot.m_State = texture->m_State;
 				textureSnapshot.m_SourcePath = texture->m_SourcePath;
 				textureSnapshot.m_Semantic = texture->m_Semantic;
@@ -95,6 +98,9 @@ namespace gglab
 		{
 			const AssetUploadStatistics statistics =
 				assetManager.m_AssetUploadScheduler->GetStatistics();
+			snapshot.m_CpuReadyQueue = statistics.m_CpuReadyQueue;
+			snapshot.m_UploadReadyQueue = statistics.m_UploadReadyQueue;
+			snapshot.m_PublicationReadyQueue = statistics.m_PublicationReadyQueue;
 			snapshot.m_PendingUploadCount = statistics.m_PendingCount;
 			snapshot.m_SubmittedUploadCount = statistics.m_SubmittedCount;
 			snapshot.m_SucceededUploadCount = statistics.m_SucceededCount;
@@ -112,6 +118,7 @@ namespace gglab
 					destination.push_back({
 						.m_Handle = upload.m_Handle,
 						.m_Name = upload.m_Name,
+						.m_Identity = upload.m_Identity,
 						.m_Status = upload.m_Status,
 						.m_FencePoint = upload.m_FencePoint,
 						.m_ElapsedMilliseconds = upload.m_ElapsedMilliseconds,

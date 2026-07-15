@@ -84,6 +84,7 @@ namespace gglab
 				const auto task = m_ModelLoadTasks.find(existing);
 				return {
 					.m_ModelId = existing,
+					.m_Generation = model->m_Generation,
 					.m_Task = task != m_ModelLoadTasks.end() ? task->second : TaskHandle{},
 				};
 			}
@@ -93,6 +94,7 @@ namespace gglab
 		const ModelID modelId = CreateModel(canonicalPath, AssetState::Queued);
 		Model* model = GetModel(modelId);
 		GGLAB_ASSERT_NOT_NULL(model);
+		const uint64_t generation = model->m_Generation;
 		model->m_Name = StringID(canonicalPath.filename().generic_string());
 		model->m_Type = ModelType::GlTF;
 
@@ -119,9 +121,27 @@ namespace gglab
 				job->m_Model = std::move(result.m_Model);
 				return TaskResult::Success();
 			},
-			[this, modelId, job](const TaskCompletionInfo& completion) noexcept
+			[this, modelId, generation, job, progress = model->m_LoadProgress](
+				const TaskCompletionInfo& completion) noexcept
 			{
-				CompleteModelLoad(modelId, completion, std::move(job->m_Model));
+				m_AssetUploadScheduler->EnqueueCpuReady(
+					{
+						.m_Name = completion.m_Name,
+						.m_Identity = {
+							.m_Kind = AssetStreamingWorkKind::Model,
+							.m_StableId = modelId.Value(),
+							.m_Generation = generation,
+						},
+						.m_Progress = progress,
+					},
+					[this, modelId, generation, completion, job]() mutable noexcept
+					{
+						CompleteModelLoad(
+							modelId,
+							generation,
+							completion,
+							std::move(job->m_Model));
+					});
 			});
 		if (!task.IsValid())
 		{
@@ -130,12 +150,16 @@ namespace gglab
 				0.05f,
 				"Model import submission failed",
 				canonicalPath.filename().generic_string());
-			return { .m_ModelId = modelId };
+			return {
+				.m_ModelId = modelId,
+				.m_Generation = generation,
+			};
 		}
 
 		m_ModelLoadTasks.emplace(modelId, task);
 		return {
 			.m_ModelId = modelId,
+			.m_Generation = generation,
 			.m_Task = task,
 		};
 	}
@@ -229,6 +253,10 @@ namespace gglab
 		{
 			mesh->m_LoadProgress = std::make_shared<ProgressChannel>();
 		}
+		if (mesh->m_Generation == 0)
+		{
+			mesh->m_Generation = 1;
+		}
 
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
@@ -248,6 +276,11 @@ namespace gglab
 		(void)m_AssetUploadScheduler->Submit(
 			{
 				.m_Name = std::format("Mesh {}", meshId.Value()),
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Mesh,
+					.m_StableId = meshId.Value(),
+					.m_Generation = storedMesh->m_Generation,
+				},
 				.m_Progress = storedMesh->m_LoadProgress,
 			},
 			std::move(batch),
@@ -309,6 +342,10 @@ namespace gglab
 		if (!model->m_LoadProgress)
 		{
 			model->m_LoadProgress = std::make_shared<ProgressChannel>();
+		}
+		if (model->m_Generation == 0)
+		{
+			model->m_Generation = 1;
 		}
 		model->m_State = AssetState::CpuReady;
 
@@ -481,10 +518,11 @@ namespace gglab
 
 	bool AssetManager::PublishImportedModel(
 		ModelID modelId,
+		uint64_t generation,
 		ImportedModel&& importedModel) noexcept
 	{
 		Model* model = GetModel(modelId);
-		if (!model || importedModel.m_Meshes.empty())
+		if (!model || model->m_Generation != generation || importedModel.m_Meshes.empty())
 		{
 			return false;
 		}
@@ -627,10 +665,14 @@ namespace gglab
 		auto batch = m_TransferManager->BeginBatch();
 		bool recorded = true;
 		std::vector<TextureID> uploadedTextureIds;
+		std::vector<uint64_t> uploadedTextureGenerations;
 		uploadedTextureIds.reserve(textureUploads.size());
+		uploadedTextureGenerations.reserve(textureUploads.size());
 		for (const auto& textureUpload : textureUploads)
 		{
 			uploadedTextureIds.push_back(textureUpload.m_TextureId);
+			const Texture* texture = m_TextureRegistry->GetTexture(textureUpload.m_TextureId);
+			uploadedTextureGenerations.push_back(texture ? texture->m_Generation : 0);
 			recorded &= m_TextureRegistry->UploadTexture(textureUpload, batch);
 		}
 		for (const MeshUploadData& meshUpload : meshUploads)
@@ -658,17 +700,36 @@ namespace gglab
 		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
 			{
 				.m_Name = std::format("Model {}", modelId.Value()),
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Model,
+					.m_StableId = modelId.Value(),
+					.m_Generation = generation,
+				},
 				.m_Progress = model->m_LoadProgress,
 			},
 			std::move(batch),
 			recorded,
-			[this, modelId, textureIds = std::move(uploadedTextureIds), meshIds = std::move(meshIds)](
+			[this,
+				modelId,
+				generation,
+				textureIds = std::move(uploadedTextureIds),
+				textureGenerations = std::move(uploadedTextureGenerations),
+				meshIds = std::move(meshIds)](
 				const AssetUploadCompletionInfo& completion) noexcept
 			{
-				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
-				for (TextureID textureId : textureIds)
+				Model* currentModel = GetModel(modelId);
+				if (!currentModel || currentModel->m_Generation != generation)
 				{
-					m_TextureRegistry->CompleteTextureUpload(textureId, succeeded);
+					return;
+				}
+				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
+				for (size_t textureIndex = 0; textureIndex < textureIds.size(); ++textureIndex)
+				{
+					const Texture* texture = m_TextureRegistry->GetTexture(textureIds[textureIndex]);
+					if (texture && texture->m_Generation == textureGenerations[textureIndex])
+					{
+						m_TextureRegistry->CompleteTextureUpload(textureIds[textureIndex], succeeded);
+					}
 				}
 				for (MeshID meshId : meshIds)
 				{
@@ -705,15 +766,16 @@ namespace gglab
 
 	void AssetManager::CompleteModelLoad(
 		ModelID modelId,
+		uint64_t generation,
 		const TaskCompletionInfo& completion,
 		ImportedModel&& importedModel) noexcept
 	{
-		m_ModelLoadTasks.erase(modelId);
 		Model* model = GetModel(modelId);
-		if (!model)
+		if (!model || model->m_Generation != generation)
 		{
 			return;
 		}
+		m_ModelLoadTasks.erase(modelId);
 
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
@@ -738,22 +800,46 @@ namespace gglab
 			return;
 		}
 
-		const uint32_t meshInstanceCount = static_cast<uint32_t>(
-			importedModel.m_MeshInstances.size());
-		if (!PublishImportedModel(modelId, std::move(importedModel)))
-		{
-			model->m_State = AssetState::Failed;
-			ProgressReporter(model->m_LoadProgress).Report(
-				0.62f,
-				"Model publication failed");
-			return;
-		}
-		GGLAB_LOG_GRAPHICS_INFO(
-			"Async model {} queued for GPU upload (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
-			modelId.Value(),
-			meshInstanceCount,
-			completion.m_QueueMilliseconds,
-			completion.m_ExecutionMilliseconds);
+		model->m_State = AssetState::CpuReady;
+		ProgressReporter(model->m_LoadProgress).Report(
+			0.62f,
+			"Queued for model upload publication",
+			completion.m_Name);
+		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		m_AssetUploadScheduler->EnqueueUploadReady(
+			{
+				.m_Name = std::format("Model {}", modelId.Value()),
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Model,
+					.m_StableId = modelId.Value(),
+					.m_Generation = generation,
+				},
+				.m_Progress = model->m_LoadProgress,
+			},
+			[this, modelId, generation, completion, payload]() mutable noexcept
+			{
+				Model* currentModel = GetModel(modelId);
+				if (!currentModel || currentModel->m_Generation != generation)
+				{
+					return;
+				}
+				const uint32_t meshInstanceCount = static_cast<uint32_t>(
+					payload->m_MeshInstances.size());
+				if (!PublishImportedModel(modelId, generation, std::move(*payload)))
+				{
+					currentModel->m_State = AssetState::Failed;
+					ProgressReporter(currentModel->m_LoadProgress).Report(
+						0.62f,
+						"Model publication failed");
+					return;
+				}
+				GGLAB_LOG_GRAPHICS_INFO(
+					"Async model {} queued for GPU upload (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
+					modelId.Value(),
+					meshInstanceCount,
+					completion.m_QueueMilliseconds,
+					completion.m_ExecutionMilliseconds);
+			});
 	}
 
 	MeshID AssetManager::CreateMesh() noexcept
@@ -762,6 +848,7 @@ namespace gglab
 		auto idMeshPair = m_MeshContainer.m_MeshIDMap.emplace(meshId, std::make_unique<Mesh>());
 		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace MeshID & meshPtr pair failed.");
 		idMeshPair.first->second->m_State = AssetState::LoadingCpu;
+		idMeshPair.first->second->m_Generation = 1;
 		idMeshPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
 
 		return meshId;
@@ -787,6 +874,7 @@ namespace gglab
 		auto idModelPair = m_ModelContainer.m_ModelIDMap.emplace(modelId, std::make_unique<Model>());
 		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelID & ModelPtr pair failed.");
 		idModelPair.first->second->m_State = initialState;
+		idModelPair.first->second->m_Generation = 1;
 		idModelPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
 		ProgressReporter(idModelPair.first->second->m_LoadProgress).Report(
 			initialState == AssetState::Queued ? 0.05f : 0.0f,

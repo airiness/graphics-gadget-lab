@@ -479,6 +479,10 @@ namespace gglab
 			m_TaskSystem->PumpCompletions();
 		}
 
+		// Task completions only enqueue CPU-ready streaming payloads. Drain CPU-ready
+		// and upload-ready work before waiting for the uploads submitted by that work.
+		m_Renderer->GetAssetUploadScheduler()->Tick();
+
 		// Must flush here for gpu resource safe release next
 		m_Renderer->GetRHIContext()->WaitIdle();
 		m_Renderer->GetAssetUploadScheduler()->Finalize();

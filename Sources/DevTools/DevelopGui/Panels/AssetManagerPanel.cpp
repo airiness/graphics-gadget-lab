@@ -41,6 +41,17 @@ namespace gglab
 			return path.empty() ? std::string{} : path.generic_string();
 		}
 
+		[[nodiscard]] const char* StreamingWorkKindText(AssetStreamingWorkKind kind) noexcept
+		{
+			switch (kind)
+			{
+			case AssetStreamingWorkKind::Model: return "Model";
+			case AssetStreamingWorkKind::Texture: return "Texture";
+			case AssetStreamingWorkKind::Mesh: return "Mesh";
+			default: return "Unknown";
+			}
+		}
+
 		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state,
 			const AssetSnapshot& assetSnapshot) noexcept
 		{
@@ -72,9 +83,10 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
-			if (ImGui::BeginTable("ModelAssetsTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			if (ImGui::BeginTable("ModelAssetsTable", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
 				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
 				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
@@ -92,16 +104,18 @@ namespace gglab
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", model.m_Id.Value());
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextUnformatted(name.c_str());
+					ImGui::Text("%llu", model.m_Generation);
 					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(name.c_str());
+					ImGui::TableSetColumnIndex(3);
 					const std::string modelState = devtools::EnumText(model.m_State);
 					ImGui::TextUnformatted(modelState.c_str());
-					ImGui::TableSetColumnIndex(3);
+					ImGui::TableSetColumnIndex(4);
 					const std::string modelType = devtools::EnumText(model.m_Type);
 					ImGui::TextUnformatted(modelType.c_str());
-					ImGui::TableSetColumnIndex(4);
-					ImGui::Text("%u", model.m_MeshInstanceCount);
 					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("%u", model.m_MeshInstanceCount);
+					ImGui::TableSetColumnIndex(6);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -162,11 +176,12 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
-			if (ImGui::BeginTable("TextureAssetsTable", 9,
+			if (ImGui::BeginTable("TextureAssetsTable", 10,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
 				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
 				ImGui::TableSetupColumn("Semantic", ImGuiTableColumnFlags_WidthFixed, 140.0f);
@@ -187,23 +202,25 @@ namespace gglab
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", texture.m_Id.Value());
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextUnformatted(name.c_str());
+					ImGui::Text("%llu", texture.m_Generation);
 					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(name.c_str());
+					ImGui::TableSetColumnIndex(3);
 					const std::string textureState = devtools::EnumText(texture.m_State);
 					ImGui::TextUnformatted(textureState.c_str());
-					ImGui::TableSetColumnIndex(3);
+					ImGui::TableSetColumnIndex(4);
 					const std::string semantic = devtools::EnumText(texture.m_Semantic);
 					ImGui::TextUnformatted(semantic.c_str());
-					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
 					ImGui::TableSetColumnIndex(5);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
 					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					ImGui::TableSetColumnIndex(7);
 					const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
 					ImGui::TextUnformatted(textureHandle.c_str());
-					ImGui::TableSetColumnIndex(7);
-					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
 					ImGui::TableSetColumnIndex(8);
+					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(9);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -218,10 +235,11 @@ namespace gglab
 			const auto& meshes = assetSnapshot.m_Meshes;
 			ImGui::Text("%u meshes", static_cast<uint32_t>(meshes.size()));
 
-			if (ImGui::BeginTable("MeshAssetsTable", 6,
+			if (ImGui::BeginTable("MeshAssetsTable", 7,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
 				ImGui::TableSetupColumn("Vertices", ImGuiTableColumnFlags_WidthFixed, 80.0f);
@@ -237,15 +255,17 @@ namespace gglab
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", mesh.m_Id.Value());
 					ImGui::TableSetColumnIndex(1);
-					ImGui::TextUnformatted(name.empty() ? "<unnamed>" : name.c_str());
+					ImGui::Text("%llu", mesh.m_Generation);
 					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(name.empty() ? "<unnamed>" : name.c_str());
+					ImGui::TableSetColumnIndex(3);
 					const std::string meshState = devtools::EnumText(mesh.m_State);
 					ImGui::TextUnformatted(meshState.c_str());
-					ImGui::TableSetColumnIndex(3);
-					ImGui::Text("%u", mesh.m_VertexCount);
 					ImGui::TableSetColumnIndex(4);
-					ImGui::Text("%u", mesh.m_IndexCount);
+					ImGui::Text("%u", mesh.m_VertexCount);
 					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("%u", mesh.m_IndexCount);
+					ImGui::TableSetColumnIndex(6);
 					ImGui::TextUnformatted(utils::BoolToString(mesh.m_IsUploaded));
 					ImGui::PopID();
 				}
@@ -260,11 +280,12 @@ namespace gglab
 		{
 			if (ImGui::BeginTable(
 				tableId,
-				7,
+				8,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthFixed, 76.0f);
 				ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch);
@@ -281,9 +302,11 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(upload.m_Name.c_str());
 					ImGui::TableSetColumnIndex(2);
+					ImGui::Text("%llu", upload.m_Identity.m_Generation);
+					ImGui::TableSetColumnIndex(3);
 					const std::string uploadStatus = devtools::EnumText(upload.m_Status);
 					ImGui::TextUnformatted(uploadStatus.c_str());
-					ImGui::TableSetColumnIndex(3);
+					ImGui::TableSetColumnIndex(4);
 					if (upload.m_Progress.HasProgress())
 					{
 						ImGui::Text("%.1f%%", upload.m_Progress.m_Fraction * 100.0f);
@@ -292,14 +315,14 @@ namespace gglab
 					{
 						ImGui::TextUnformatted("-");
 					}
-					ImGui::TableSetColumnIndex(4);
+					ImGui::TableSetColumnIndex(5);
 					ImGui::TextUnformatted(upload.m_Progress.m_Stage.empty() ?
 						"-" : upload.m_Progress.m_Stage.c_str());
 					if (!upload.m_Progress.m_Detail.empty() && ImGui::IsItemHovered())
 					{
 						ImGui::SetTooltip("%s", upload.m_Progress.m_Detail.c_str());
 					}
-					ImGui::TableSetColumnIndex(5);
+					ImGui::TableSetColumnIndex(6);
 					if (upload.m_FencePoint.IsValid())
 					{
 						ImGui::Text(
@@ -312,7 +335,7 @@ namespace gglab
 					{
 						ImGui::TextUnformatted("-");
 					}
-					ImGui::TableSetColumnIndex(6);
+					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%.2f", upload.m_ElapsedMilliseconds);
 					ImGui::PopID();
 				}
@@ -321,8 +344,72 @@ namespace gglab
 			}
 		}
 
+		void DrawStreamingQueue(
+			const char* label,
+			const char* tableId,
+			const AssetStreamingQueueStatistics& queue) noexcept
+		{
+			const double averageWait = queue.m_ProcessedCount > 0 ?
+				queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
+			const double averageExecution = queue.m_ProcessedCount > 0 ?
+				queue.m_TotalExecutionMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
+			ImGui::Text(
+				"%s: pending=%u high=%u enqueued=%llu processed=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/max)=%.3f/%.3f ms",
+				label,
+				queue.m_PendingCount,
+				queue.m_HighWatermark,
+				queue.m_EnqueuedCount,
+				queue.m_ProcessedCount,
+				queue.m_CallbackFailureCount,
+				averageWait,
+				queue.m_MaxQueueMilliseconds,
+				averageExecution,
+				queue.m_MaxExecutionMilliseconds);
+			if (queue.m_PendingWork.empty())
+			{
+				return;
+			}
+
+			if (ImGui::BeginTable(
+				tableId,
+				5,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+				ImGui::TableSetupColumn("Asset", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Queued (ms)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableHeadersRow();
+				for (const AssetStreamingWorkActivity& work : queue.m_PendingWork)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(work.m_Name.c_str());
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(StreamingWorkKindText(work.m_Identity.m_Kind));
+					ImGui::TableSetColumnIndex(2);
+					ImGui::Text("%llu", work.m_Identity.m_StableId);
+					ImGui::TableSetColumnIndex(3);
+					ImGui::Text("%llu", work.m_Identity.m_Generation);
+					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%.3f", work.m_QueueMilliseconds);
+				}
+				ImGui::EndTable();
+			}
+		}
+
 		void DrawAssetUploads(const AssetSnapshot& assetSnapshot) noexcept
 		{
+			ImGui::SeparatorText("Streaming Queues");
+			DrawStreamingQueue("CPU Ready", "CpuReadyQueue", assetSnapshot.m_CpuReadyQueue);
+			DrawStreamingQueue("Upload Ready", "UploadReadyQueue", assetSnapshot.m_UploadReadyQueue);
+			DrawStreamingQueue(
+				"Publication Ready",
+				"PublicationReadyQueue",
+				assetSnapshot.m_PublicationReadyQueue);
+
+			ImGui::SeparatorText("GPU Uploads");
 			ImGui::Text(
 				"Pending: %u   Submitted: %llu   Succeeded: %llu   Failed: %llu   Callback failures: %llu",
 				assetSnapshot.m_PendingUploadCount,
