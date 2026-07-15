@@ -52,6 +52,18 @@ namespace gglab
 			}
 		}
 
+		[[nodiscard]] const char* TaskPriorityText(TaskPriority priority) noexcept
+		{
+			switch (priority)
+			{
+			case TaskPriority::Critical: return "Critical";
+			case TaskPriority::High: return "High";
+			case TaskPriority::Normal: return "Normal";
+			case TaskPriority::Background: return "Background";
+			default: return "Unknown";
+			}
+		}
+
 		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state,
 			const AssetSnapshot& assetSnapshot) noexcept
 		{
@@ -360,7 +372,7 @@ namespace gglab
 			const double averageExecution = queue.m_ProcessedCount > 0 ?
 				queue.m_TotalExecutionMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
 			ImGui::Text(
-				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/max)=%.3f/%.3f ms",
+				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu cancelled=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/max)=%.3f/%.3f ms",
 				label,
 				queue.m_PendingCount,
 				queue.m_HighWatermark,
@@ -369,6 +381,7 @@ namespace gglab
 				queue.m_PendingOperationCount,
 				queue.m_EnqueuedCount,
 				queue.m_ProcessedCount,
+				queue.m_CancelledCount,
 				queue.m_CallbackFailureCount,
 				averageWait,
 				queue.m_MaxQueueMilliseconds,
@@ -381,7 +394,7 @@ namespace gglab
 
 			if (ImGui::BeginTable(
 				tableId,
-				8,
+				9,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
@@ -392,6 +405,7 @@ namespace gglab
 				ImGui::TableSetupColumn("Source (KiB)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Staging (KiB)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Ops", ImGuiTableColumnFlags_WidthFixed, 52.0f);
+				ImGui::TableSetupColumn("Priority", ImGuiTableColumnFlags_WidthFixed, 84.0f);
 				ImGui::TableHeadersRow();
 				for (const AssetStreamingWorkActivity& work : queue.m_PendingWork)
 				{
@@ -412,6 +426,8 @@ namespace gglab
 					ImGui::Text("%.1f", static_cast<double>(work.m_Estimate.m_StagingBytes) / 1024.0);
 					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%u", work.m_Estimate.m_OperationCount);
+					ImGui::TableSetColumnIndex(8);
+					ImGui::TextUnformatted(TaskPriorityText(work.m_Priority));
 				}
 				ImGui::EndTable();
 			}
@@ -419,6 +435,51 @@ namespace gglab
 
 		void DrawAssetUploads(const AssetSnapshot& assetSnapshot) noexcept
 		{
+			ImGui::SeparatorText("Ownership");
+			ImGui::Text(
+				"Owners: %u   Leases: %u   Managed assets: %u   Priority updates: %llu",
+				assetSnapshot.m_AssetOwnerCount,
+				assetSnapshot.m_AssetLeaseCount,
+				assetSnapshot.m_ManagedAssetCount,
+				assetSnapshot.m_OwnershipPriorityUpdateCount);
+			ImGui::Text(
+				"Last-interest policy: CPU cancelled=%llu ready-work cancelled=%llu GPU deferred=%llu Ready retained=%llu",
+				assetSnapshot.m_OwnershipCpuCancellationCount,
+				assetSnapshot.m_OwnershipReadyCancellationCount,
+				assetSnapshot.m_OwnershipGpuDeferredCancellationCount,
+				assetSnapshot.m_OwnershipReadyRetentionCount);
+			if (!assetSnapshot.m_ActiveOwnershipInterests.empty() && ImGui::BeginTable(
+				"AssetOwnershipInterests",
+				6,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			{
+				ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+				ImGui::TableSetupColumn("Asset", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Owners", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Leases", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Effective Priority", ImGuiTableColumnFlags_WidthStretch);
+				ImGui::TableHeadersRow();
+				for (const AssetSnapshot::OwnershipInterest& interest :
+					assetSnapshot.m_ActiveOwnershipInterests)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(StreamingWorkKindText(interest.m_Kind));
+					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%llu", interest.m_StableId);
+					ImGui::TableSetColumnIndex(2);
+					ImGui::Text("%llu", interest.m_Generation);
+					ImGui::TableSetColumnIndex(3);
+					ImGui::Text("%u", interest.m_OwnerCount);
+					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%u", interest.m_LeaseCount);
+					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(TaskPriorityText(interest.m_EffectivePriority));
+				}
+				ImGui::EndTable();
+			}
+
 			const AssetStreamingFrameBudget& budget = assetSnapshot.m_StreamingFrameBudget;
 			const AssetStreamingFrameUsage& usage = assetSnapshot.m_LastStreamingFrameUsage;
 			ImGui::SeparatorText("Frame Admission Budget");

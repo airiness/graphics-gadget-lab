@@ -33,6 +33,7 @@ namespace gglab
 			TaskWork work,
 			TaskCompletion completion = {}) noexcept;
 		bool Cancel(TaskHandle handle) noexcept;
+		bool UpdatePriority(TaskHandle handle, TaskPriority priority) noexcept;
 		uint32_t PumpCompletions(
 			const TaskCompletionPumpBudget& budget = {}) noexcept;
 

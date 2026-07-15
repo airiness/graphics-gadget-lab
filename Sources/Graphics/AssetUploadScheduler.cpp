@@ -13,6 +13,13 @@ namespace gglab
 		{
 			return std::chrono::duration<double, std::milli>(duration).count();
 		}
+
+		[[nodiscard]] bool HasHigherPriority(
+			TaskPriority lhs,
+			TaskPriority rhs) noexcept
+		{
+			return static_cast<uint8_t>(lhs) < static_cast<uint8_t>(rhs);
+		}
 	}
 
 	AssetUploadScheduler::AssetUploadScheduler(const CreateInfo& createInfo) noexcept :
@@ -56,6 +63,70 @@ namespace gglab
 			m_UploadReadyTelemetry,
 			std::move(desc),
 			std::move(work));
+	}
+
+	uint32_t AssetUploadScheduler::CancelReadyWork(
+		const AssetStreamingIdentity& identity) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset ready work cancellation must run on the owner thread.");
+		if (!IsOwnerThread())
+		{
+			return 0;
+		}
+
+		return CancelQueuedWork(
+			m_CpuReadyQueue,
+			m_CpuReadyTelemetry,
+			identity,
+			false) +
+			CancelQueuedWork(
+				m_UploadReadyQueue,
+				m_UploadReadyTelemetry,
+				identity,
+				true);
+	}
+
+	uint32_t AssetUploadScheduler::UpdateWorkPriority(
+		const AssetStreamingIdentity& identity,
+		TaskPriority priority) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset streaming work reprioritization must run on the owner thread.");
+		if (!IsOwnerThread() || priority == TaskPriority::Count)
+		{
+			return 0;
+		}
+
+		uint32_t updatedCount =
+			UpdateQueuedWorkPriority(m_CpuReadyQueue, identity, priority) +
+			UpdateQueuedWorkPriority(m_UploadReadyQueue, identity, priority);
+		for (PendingUpload& upload : m_PendingUploads)
+		{
+			if (upload.m_Desc.m_Identity == identity && upload.m_Desc.m_Priority != priority)
+			{
+				upload.m_Desc.m_Priority = priority;
+				++updatedCount;
+			}
+		}
+		for (PendingPublication& publication : m_PublicationReadyQueue)
+		{
+			if (publication.m_Upload.m_Desc.m_Identity == identity &&
+				publication.m_Upload.m_Desc.m_Priority != priority)
+			{
+				publication.m_Upload.m_Desc.m_Priority = priority;
+				++updatedCount;
+			}
+		}
+		if (updatedCount > 0)
+		{
+			std::ranges::stable_sort(m_PublicationReadyQueue,
+				[](const PendingPublication& lhs, const PendingPublication& rhs) noexcept
+				{
+					return HasHigherPriority(
+						lhs.m_Upload.m_Desc.m_Priority,
+						rhs.m_Upload.m_Desc.m_Priority);
+				});
+		}
+		return updatedCount;
 	}
 
 	AssetUploadHandle AssetUploadScheduler::Submit(
@@ -259,19 +330,26 @@ namespace gglab
 			return;
 		}
 
-		queue.push_back({
+		QueuedWork queued{
 			.m_Desc = std::move(desc),
 			.m_QueuedAt = std::chrono::steady_clock::now(),
 			.m_Work = std::move(work),
-		});
+		};
+		const uint64_t sourceBytes = queued.m_Desc.m_Estimate.m_SourceBytes;
+		const auto insertion = std::ranges::find_if(queue,
+			[priority = queued.m_Desc.m_Priority](const QueuedWork& existing) noexcept
+			{
+				return HasHigherPriority(priority, existing.m_Desc.m_Priority);
+			});
+		queue.insert(insertion, std::move(queued));
 		++telemetry.m_EnqueuedCount;
 		telemetry.m_HighWatermark = std::max(
 			telemetry.m_HighWatermark,
 			static_cast<uint32_t>(queue.size()));
-		m_ReadyBacklogBytes += queue.back().m_Desc.m_Estimate.m_SourceBytes;
+		m_ReadyBacklogBytes += sourceBytes;
 		if (&queue == &m_UploadReadyQueue)
 		{
-			m_UploadReadyBacklogBytes += queue.back().m_Desc.m_Estimate.m_SourceBytes;
+			m_UploadReadyBacklogBytes += sourceBytes;
 		}
 		m_ReadyBacklogHighWatermark = std::max(
 			m_ReadyBacklogHighWatermark,
@@ -407,11 +485,18 @@ namespace gglab
 		PendingUpload&& upload,
 		AssetUploadStatus status) noexcept
 	{
-		m_PublicationReadyQueue.push_back({
+		PendingPublication publication{
 			.m_Upload = std::move(upload),
 			.m_Status = status,
 			.m_QueuedAt = std::chrono::steady_clock::now(),
-		});
+		};
+		const auto insertion = std::ranges::find_if(m_PublicationReadyQueue,
+			[priority = publication.m_Upload.m_Desc.m_Priority](
+				const PendingPublication& existing) noexcept
+			{
+				return HasHigherPriority(priority, existing.m_Upload.m_Desc.m_Priority);
+			});
+		m_PublicationReadyQueue.insert(insertion, std::move(publication));
 		++m_PublicationReadyTelemetry.m_EnqueuedCount;
 		m_PublicationReadyTelemetry.m_HighWatermark = std::max(
 			m_PublicationReadyTelemetry.m_HighWatermark,
@@ -473,6 +558,56 @@ namespace gglab
 		}
 	}
 
+	uint32_t AssetUploadScheduler::CancelQueuedWork(
+		std::deque<QueuedWork>& queue,
+		QueueTelemetry& telemetry,
+		const AssetStreamingIdentity& identity,
+		bool uploadReady) noexcept
+	{
+		uint32_t cancelledCount = 0;
+		for (auto iterator = queue.begin(); iterator != queue.end();)
+		{
+			if (iterator->m_Desc.m_Identity != identity)
+			{
+				++iterator;
+				continue;
+			}
+
+			RemoveReadyBacklog(iterator->m_Desc.m_Estimate, uploadReady);
+			iterator = queue.erase(iterator);
+			++cancelledCount;
+			++telemetry.m_CancelledCount;
+		}
+		return cancelledCount;
+	}
+
+	uint32_t AssetUploadScheduler::UpdateQueuedWorkPriority(
+		std::deque<QueuedWork>& queue,
+		const AssetStreamingIdentity& identity,
+		TaskPriority priority) noexcept
+	{
+		uint32_t updatedCount = 0;
+		for (QueuedWork& work : queue)
+		{
+			if (work.m_Desc.m_Identity == identity && work.m_Desc.m_Priority != priority)
+			{
+				work.m_Desc.m_Priority = priority;
+				++updatedCount;
+			}
+		}
+		if (updatedCount > 0)
+		{
+			std::ranges::stable_sort(queue,
+				[](const QueuedWork& lhs, const QueuedWork& rhs) noexcept
+				{
+					return HasHigherPriority(
+						lhs.m_Desc.m_Priority,
+						rhs.m_Desc.m_Priority);
+				});
+		}
+		return updatedCount;
+	}
+
 	AssetStreamingQueueStatistics AssetUploadScheduler::BuildQueueStatistics(
 		const std::deque<QueuedWork>& queue,
 		const QueueTelemetry& telemetry) const
@@ -483,6 +618,7 @@ namespace gglab
 		statistics.m_EnqueuedCount = telemetry.m_EnqueuedCount;
 		statistics.m_ProcessedCount = telemetry.m_ProcessedCount;
 		statistics.m_CallbackFailureCount = telemetry.m_CallbackFailureCount;
+		statistics.m_CancelledCount = telemetry.m_CancelledCount;
 		statistics.m_TotalQueueMilliseconds = telemetry.m_TotalQueueMilliseconds;
 		statistics.m_MaxQueueMilliseconds = telemetry.m_MaxQueueMilliseconds;
 		statistics.m_TotalExecutionMilliseconds = telemetry.m_TotalExecutionMilliseconds;
@@ -498,6 +634,7 @@ namespace gglab
 				.m_Name = work.m_Desc.m_Name,
 				.m_Identity = work.m_Desc.m_Identity,
 				.m_Estimate = work.m_Desc.m_Estimate,
+				.m_Priority = work.m_Desc.m_Priority,
 				.m_QueueMilliseconds = Milliseconds(now - work.m_QueuedAt),
 				.m_Progress = work.m_Desc.m_Progress ?
 					work.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{},
@@ -514,6 +651,7 @@ namespace gglab
 		statistics.m_EnqueuedCount = m_PublicationReadyTelemetry.m_EnqueuedCount;
 		statistics.m_ProcessedCount = m_PublicationReadyTelemetry.m_ProcessedCount;
 		statistics.m_CallbackFailureCount = m_CompletionCallbackFailureCount;
+		statistics.m_CancelledCount = m_PublicationReadyTelemetry.m_CancelledCount;
 		statistics.m_TotalQueueMilliseconds = m_PublicationReadyTelemetry.m_TotalQueueMilliseconds;
 		statistics.m_MaxQueueMilliseconds = m_PublicationReadyTelemetry.m_MaxQueueMilliseconds;
 		statistics.m_TotalExecutionMilliseconds = m_PublicationReadyTelemetry.m_TotalExecutionMilliseconds;
@@ -529,6 +667,7 @@ namespace gglab
 				.m_Name = publication.m_Upload.m_Desc.m_Name,
 				.m_Identity = publication.m_Upload.m_Desc.m_Identity,
 				.m_Estimate = publication.m_Upload.m_Desc.m_Estimate,
+				.m_Priority = publication.m_Upload.m_Desc.m_Priority,
 				.m_QueueMilliseconds = Milliseconds(now - publication.m_QueuedAt),
 				.m_Progress = publication.m_Upload.m_Desc.m_Progress ?
 					publication.m_Upload.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{},

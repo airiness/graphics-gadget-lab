@@ -70,6 +70,7 @@ namespace gglab
 
 	void AlphaTestLabSession::BeginPrepare() noexcept
 	{
+		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		RebuildScene();
 		m_LoadingProgress = m_AssetPreparation.BuildProgress(
@@ -97,6 +98,7 @@ namespace gglab
 
 	void AlphaTestLabSession::CancelPrepare() noexcept
 	{
+		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		m_World.GetRegistry().clear();
 		m_LoadingProgress = LoadingProgress::Ready();
@@ -130,6 +132,7 @@ namespace gglab
 
 	void AlphaTestLabSession::RebuildScene() noexcept
 	{
+		ResetAssetInterests();
 		auto& registry = m_World.GetRegistry();
 		registry.clear();
 
@@ -137,7 +140,7 @@ namespace gglab
 
 		auto* assetManager = m_Services.m_AssetManager;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		const ModelID modelId = assetManager->LoadModelAsync(
+		const ModelID modelId = GetAssetOwnerScope().LoadModelAsync(
 			std::filesystem::path(AlphaBlendModeTestPath)).m_ModelId;
 		m_AssetPreparation.TrackModel(modelId, AlphaBlendModeTestPath);
 

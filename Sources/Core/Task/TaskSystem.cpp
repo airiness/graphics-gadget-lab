@@ -115,6 +115,49 @@ namespace gglab
 		return iterator->second->m_StopSource.request_stop();
 	}
 
+	bool TaskSystem::UpdatePriority(TaskHandle handle, TaskPriority priority) noexcept
+	{
+		if (!handle.IsValid() || priority == TaskPriority::Count)
+		{
+			return false;
+		}
+
+		std::scoped_lock lock(m_Mutex);
+		const auto iterator = m_Tasks.find(handle.m_Value);
+		if (iterator == m_Tasks.end())
+		{
+			return false;
+		}
+
+		const std::shared_ptr<TaskRecord>& task = iterator->second;
+		if (task->m_Status != TaskStatus::Queued && task->m_Status != TaskStatus::Running)
+		{
+			return false;
+		}
+		if (task->m_Desc.m_Priority == priority)
+		{
+			return true;
+		}
+
+		if (task->m_Status == TaskStatus::Queued)
+		{
+			auto& oldQueue = m_Queues[PriorityIndex(task->m_Desc.m_Priority)];
+			const auto queuedTask = std::ranges::find(oldQueue, task);
+			GGLAB_ASSERT_MSG(
+				queuedTask != oldQueue.end(),
+				"Queued TaskSystem record was not present in its priority queue.");
+			if (queuedTask == oldQueue.end())
+			{
+				return false;
+			}
+			oldQueue.erase(queuedTask);
+			m_Queues[PriorityIndex(priority)].push_back(task);
+		}
+		task->m_Desc.m_Priority = priority;
+		m_WorkAvailable.notify_one();
+		return true;
+	}
+
 	uint32_t TaskSystem::PumpCompletions(
 		const TaskCompletionPumpBudget& budget) noexcept
 	{
@@ -392,7 +435,6 @@ namespace gglab
 		TaskCompletionInfo info{};
 		info.m_Handle = task->m_Handle;
 		info.m_Name = task->m_Desc.m_Name;
-		info.m_Priority = task->m_Desc.m_Priority;
 		info.m_Status = status;
 		info.m_Error = std::move(error);
 		const bool wasRunning = task->m_Status == TaskStatus::Running;
@@ -403,6 +445,7 @@ namespace gglab
 
 		{
 			std::scoped_lock lock(m_Mutex);
+			info.m_Priority = task->m_Desc.m_Priority;
 			task->m_Status = status;
 			task->m_Work = {};
 			if (wasRunning)

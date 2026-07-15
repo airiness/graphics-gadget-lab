@@ -24,6 +24,13 @@ namespace gglab
 			return state == AssetState::Failed || state == AssetState::Cancelled;
 		}
 
+		[[nodiscard]] TaskPriority HigherPriority(
+			TaskPriority lhs,
+			TaskPriority rhs) noexcept
+		{
+			return static_cast<uint8_t>(lhs) < static_cast<uint8_t>(rhs) ? lhs : rhs;
+		}
+
 		[[nodiscard]] std::array<TextureID, 5> GetMaterialTextureIds(
 			const MaterialProperties& material) noexcept
 		{
@@ -85,7 +92,608 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
 	}
 
-	AssetManager::~AssetManager() = default;
+	AssetManager::~AssetManager()
+	{
+		GGLAB_ASSERT_MSG(
+			m_AssetLeases.empty() && m_AssetInterests.empty(),
+			"AssetManager destroyed while asset leases are still active.");
+		GGLAB_ASSERT_MSG(
+			m_ModelDependencyOwners.empty() && m_ModelDependencyLeaseTokens.empty(),
+			"AssetManager destroyed while model dependency ownership is still active.");
+		GGLAB_ASSERT_MSG(
+			m_AssetOwners.empty(),
+			"AssetManager destroyed while asset owner scopes are still registered.");
+	}
+
+	AssetLease::AssetLease(AssetLease&& other) noexcept :
+		m_Manager(std::exchange(other.m_Manager, nullptr)),
+		m_LeaseToken(std::exchange(other.m_LeaseToken, 0))
+	{}
+
+	AssetLease& AssetLease::operator=(AssetLease&& other) noexcept
+	{
+		if (this != &other)
+		{
+			Reset();
+			m_Manager = std::exchange(other.m_Manager, nullptr);
+			m_LeaseToken = std::exchange(other.m_LeaseToken, 0);
+		}
+		return *this;
+	}
+
+	AssetLease::~AssetLease()
+	{
+		Reset();
+	}
+
+	void AssetLease::Reset() noexcept
+	{
+		if (m_Manager && m_LeaseToken != 0)
+		{
+			m_Manager->ReleaseAssetLease(m_LeaseToken);
+		}
+		m_Manager = nullptr;
+		m_LeaseToken = 0;
+	}
+
+	AssetOwnerScope::AssetOwnerScope(AssetOwnerScope&& other) noexcept :
+		m_Manager(std::exchange(other.m_Manager, nullptr)),
+		m_Owner(std::exchange(other.m_Owner, {})),
+		m_Leases(std::move(other.m_Leases))
+	{}
+
+	AssetOwnerScope& AssetOwnerScope::operator=(AssetOwnerScope&& other) noexcept
+	{
+		if (this != &other)
+		{
+			Reset();
+			if (m_Manager && m_Owner.IsValid())
+			{
+				m_Manager->UnregisterAssetOwner(m_Owner);
+			}
+			m_Manager = std::exchange(other.m_Manager, nullptr);
+			m_Owner = std::exchange(other.m_Owner, {});
+			m_Leases = std::move(other.m_Leases);
+		}
+		return *this;
+	}
+
+	AssetOwnerScope::~AssetOwnerScope()
+	{
+		Reset();
+		if (m_Manager && m_Owner.IsValid())
+		{
+			m_Manager->UnregisterAssetOwner(m_Owner);
+		}
+	}
+
+	AssetManager::ModelLoadRequest AssetOwnerScope::LoadModelAsync(
+		const std::filesystem::path& path,
+		TaskPriority priority) noexcept
+	{
+		if (!m_Manager || !m_Owner.IsValid())
+		{
+			return {};
+		}
+		AssetManager::ModelLoadRequest request = m_Manager->LoadModelAsync(path, priority);
+		if (request.IsValid())
+		{
+			m_Leases.emplace_back(m_Manager->AcquireAssetLease(
+				m_Owner,
+				AssetInterestKind::Model,
+				request.m_ModelId.Value(),
+				request.m_Generation,
+				priority));
+		}
+		return request;
+	}
+
+	AssetManager::TextureLoadRequest AssetOwnerScope::LoadTextureAsync(
+		const std::filesystem::path& path,
+		TextureSemantic semantic,
+		TaskPriority priority) noexcept
+	{
+		if (!m_Manager || !m_Owner.IsValid())
+		{
+			return {};
+		}
+		AssetManager::TextureLoadRequest request =
+			m_Manager->LoadTextureAsync(path, semantic, priority);
+		if (request.IsValid())
+		{
+			m_Leases.emplace_back(m_Manager->AcquireAssetLease(
+				m_Owner,
+				AssetInterestKind::Texture,
+				request.m_TextureId.Value(),
+				request.m_Generation,
+				priority));
+		}
+		return request;
+	}
+
+	void AssetOwnerScope::Reset() noexcept
+	{
+		m_Leases.clear();
+	}
+
+	AssetOwnerScope AssetManager::CreateOwnerScope(std::string label) noexcept
+	{
+		return AssetOwnerScope(this, RegisterAssetOwner(std::move(label)));
+	}
+
+	AssetOwnershipStatistics AssetManager::GetOwnershipStatistics() const
+	{
+		AssetOwnershipStatistics statistics{};
+		statistics.m_OwnerCount = static_cast<uint32_t>(m_AssetOwners.size());
+		statistics.m_LeaseCount = static_cast<uint32_t>(m_AssetLeases.size());
+		statistics.m_ManagedAssetCount = static_cast<uint32_t>(m_AssetInterests.size());
+		statistics.m_PriorityUpdateCount = m_OwnershipPriorityUpdateCount;
+		statistics.m_CpuCancellationCount = m_CpuCancellationCount;
+		statistics.m_ReadyCancellationCount = m_ReadyCancellationCount;
+		statistics.m_GpuDeferredCancellationCount = m_GpuDeferredCancellationCount;
+		statistics.m_ReadyRetentionCount = m_ReadyRetentionCount;
+		statistics.m_ActiveInterests.reserve(m_AssetInterests.size());
+		for (const auto& [key, interest] : m_AssetInterests)
+		{
+			std::unordered_set<uint64_t> owners;
+			for (uint64_t token : interest.m_LeaseTokens)
+			{
+				if (const auto lease = m_AssetLeases.find(token); lease != m_AssetLeases.end())
+				{
+					owners.insert(lease->second.m_Owner.m_Value);
+				}
+			}
+			statistics.m_ActiveInterests.push_back({
+				.m_Kind = key.m_Kind,
+				.m_StableId = key.m_StableId,
+				.m_Generation = interest.m_Generation,
+				.m_LeaseCount = static_cast<uint32_t>(interest.m_LeaseTokens.size()),
+				.m_OwnerCount = static_cast<uint32_t>(owners.size()),
+				.m_EffectivePriority = interest.m_EffectivePriority,
+			});
+		}
+		std::ranges::sort(statistics.m_ActiveInterests,
+			[](const AssetInterestActivity& lhs, const AssetInterestActivity& rhs) noexcept
+			{
+				if (lhs.m_Kind != rhs.m_Kind)
+				{
+					return lhs.m_Kind < rhs.m_Kind;
+				}
+				return lhs.m_StableId < rhs.m_StableId;
+			});
+		return statistics;
+	}
+
+	AssetOwnerId AssetManager::RegisterAssetOwner(std::string label) noexcept
+	{
+		const AssetOwnerId owner{ m_NextAssetOwnerId++ };
+		m_AssetOwners.emplace(owner, std::move(label));
+		return owner;
+	}
+
+	void AssetManager::UnregisterAssetOwner(AssetOwnerId owner) noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			std::ranges::none_of(m_AssetLeases,
+				[owner](const auto& entry) noexcept
+				{
+					return entry.second.m_Owner == owner;
+				}),
+			"Asset owner unregistered while leases are still active.");
+		m_AssetOwners.erase(owner);
+	}
+
+	AssetLease AssetManager::AcquireAssetLease(
+		AssetOwnerId owner,
+		AssetInterestKind kind,
+		uint64_t stableId,
+		uint64_t generation,
+		TaskPriority priority,
+		bool internal) noexcept
+	{
+		if (!owner.IsValid() || priority == TaskPriority::Count)
+		{
+			return {};
+		}
+		const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
+		const uint64_t token = m_NextAssetLeaseToken++;
+		m_AssetLeases.emplace(token, LeaseRecord{
+			.m_Key = key,
+			.m_Owner = owner,
+			.m_Generation = generation,
+			.m_Priority = priority,
+			.m_IsInternal = internal,
+		});
+		auto [interest, inserted] = m_AssetInterests.try_emplace(key);
+		if (inserted)
+		{
+			interest->second.m_Generation = generation;
+			interest->second.m_EffectivePriority = priority;
+		}
+		interest->second.m_LeaseTokens.insert(token);
+		if (kind == AssetInterestKind::Texture)
+		{
+			m_TextureRegistry->ReviveTextureInterest(
+				TextureID{ static_cast<uint32_t>(stableId) },
+				generation);
+		}
+		if (inserted)
+		{
+			ApplyInterestPriority(key, generation, priority);
+		}
+		else
+		{
+			RecomputeInterestPriority(key);
+		}
+		if (kind == AssetInterestKind::Model)
+		{
+			RefreshModelDependencyInterests(ModelID{ static_cast<uint32_t>(stableId) }, generation);
+		}
+		return AssetLease(this, token);
+	}
+
+	void AssetManager::ReleaseAssetLease(uint64_t leaseToken) noexcept
+	{
+		const auto lease = m_AssetLeases.find(leaseToken);
+		if (lease == m_AssetLeases.end())
+		{
+			return;
+		}
+		const LeaseRecord record = lease->second;
+		m_AssetLeases.erase(lease);
+		const auto interest = m_AssetInterests.find(record.m_Key);
+		if (interest == m_AssetInterests.end())
+		{
+			return;
+		}
+		interest->second.m_LeaseTokens.erase(leaseToken);
+		if (!interest->second.m_LeaseTokens.empty())
+		{
+			RecomputeInterestPriority(record.m_Key);
+			return;
+		}
+
+		if (record.m_Key.m_Kind == AssetInterestKind::Model)
+		{
+			ReleaseModelDependencyInterests(ModelID{ static_cast<uint32_t>(record.m_Key.m_StableId) });
+		}
+		m_AssetInterests.erase(interest);
+		CancelAssetIfUnreferenced(record.m_Key, record.m_Generation);
+	}
+
+	void AssetManager::UpdateAssetLeasePriority(
+		uint64_t leaseToken,
+		TaskPriority priority) noexcept
+	{
+		const auto lease = m_AssetLeases.find(leaseToken);
+		if (lease == m_AssetLeases.end() || lease->second.m_Priority == priority)
+		{
+			return;
+		}
+		lease->second.m_Priority = priority;
+		RecomputeInterestPriority(lease->second.m_Key);
+	}
+
+	void AssetManager::RecomputeInterestPriority(const InterestKey& key) noexcept
+	{
+		const auto interest = m_AssetInterests.find(key);
+		if (interest == m_AssetInterests.end() || interest->second.m_LeaseTokens.empty())
+		{
+			return;
+		}
+		TaskPriority effective = TaskPriority::Background;
+		for (uint64_t token : interest->second.m_LeaseTokens)
+		{
+			if (const auto lease = m_AssetLeases.find(token); lease != m_AssetLeases.end())
+			{
+				effective = HigherPriority(effective, lease->second.m_Priority);
+			}
+		}
+		if (effective == interest->second.m_EffectivePriority)
+		{
+			return;
+		}
+		interest->second.m_EffectivePriority = effective;
+		++m_OwnershipPriorityUpdateCount;
+		ApplyInterestPriority(key, interest->second.m_Generation, effective);
+		if (key.m_Kind == AssetInterestKind::Model)
+		{
+			UpdateModelDependencyPriorities(
+				ModelID{ static_cast<uint32_t>(key.m_StableId) },
+				effective);
+		}
+	}
+
+	void AssetManager::ApplyInterestPriority(
+		const InterestKey& key,
+		uint64_t generation,
+		TaskPriority priority) noexcept
+	{
+		if (key.m_Kind == AssetInterestKind::Model)
+		{
+			const ModelID modelId{ static_cast<uint32_t>(key.m_StableId) };
+			if (const auto task = m_ModelLoadTasks.find(modelId); task != m_ModelLoadTasks.end())
+			{
+				GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
+			}
+			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority({
+				.m_Kind = AssetStreamingWorkKind::Model,
+				.m_StableId = key.m_StableId,
+				.m_Generation = generation,
+			}, priority));
+		}
+		else if (key.m_Kind == AssetInterestKind::Texture)
+		{
+			m_TextureRegistry->UpdateTextureLoadPriority(
+				TextureID{ static_cast<uint32_t>(key.m_StableId) },
+				generation,
+				priority);
+		}
+		else
+		{
+			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority({
+				.m_Kind = AssetStreamingWorkKind::Mesh,
+				.m_StableId = key.m_StableId,
+				.m_Generation = generation,
+			}, priority));
+		}
+	}
+
+	TaskPriority AssetManager::GetEffectivePriority(
+		const InterestKey& key,
+		TaskPriority fallback) const noexcept
+	{
+		const auto interest = m_AssetInterests.find(key);
+		return interest != m_AssetInterests.end() ?
+			interest->second.m_EffectivePriority : fallback;
+	}
+
+	bool AssetManager::HasActiveInterest(const InterestKey& key) const noexcept
+	{
+		const auto interest = m_AssetInterests.find(key);
+		return interest != m_AssetInterests.end() && !interest->second.m_LeaseTokens.empty();
+	}
+
+	void AssetManager::RefreshModelDependencyInterests(
+		ModelID modelId,
+		uint64_t generation) noexcept
+	{
+		const InterestKey modelKey{
+			.m_Kind = AssetInterestKind::Model,
+			.m_StableId = modelId.Value(),
+		};
+		if (!HasActiveInterest(modelKey) || m_ModelDependencyLeaseTokens.contains(modelId))
+		{
+			return;
+		}
+		const Model* model = GetModel(modelId);
+		if (!model || model->m_Generation != generation || model->m_MeshInstance.empty())
+		{
+			return;
+		}
+
+		const AssetOwnerId owner = RegisterAssetOwner(
+			std::format("Model {} dependencies", modelId.Value()));
+		m_ModelDependencyOwners.emplace(modelId, owner);
+		auto& tokens = m_ModelDependencyLeaseTokens[modelId];
+		const TaskPriority priority = GetEffectivePriority(modelKey);
+		std::unordered_set<MeshID> meshIds;
+		std::unordered_set<TextureID> textureIds;
+		for (const ModelMesh& instance : model->m_MeshInstance)
+		{
+			meshIds.insert(instance.m_MeshId);
+			if (const Material* material = GetMaterial(instance.m_MaterialId))
+			{
+				for (TextureID textureId : GetMaterialTextureIds(*material))
+				{
+					if (textureId.IsValid() && !IsReservedTextureId(textureId))
+					{
+						textureIds.insert(textureId);
+					}
+				}
+			}
+		}
+
+		const auto retainLeaseToken = [&tokens](AssetLease&& lease) noexcept
+		{
+			if (!lease.IsValid())
+			{
+				return;
+			}
+			tokens.push_back(lease.m_LeaseToken);
+			lease.m_Manager = nullptr;
+			lease.m_LeaseToken = 0;
+		};
+		for (MeshID meshId : meshIds)
+		{
+			if (const Mesh* mesh = GetMesh(meshId))
+			{
+				retainLeaseToken(AcquireAssetLease(
+					owner,
+					AssetInterestKind::Mesh,
+					meshId.Value(),
+					mesh->m_Generation,
+					priority,
+					true));
+			}
+		}
+		for (TextureID textureId : textureIds)
+		{
+			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
+			{
+				retainLeaseToken(AcquireAssetLease(
+					owner,
+					AssetInterestKind::Texture,
+					textureId.Value(),
+					texture->m_Generation,
+					priority,
+					true));
+			}
+		}
+	}
+
+	void AssetManager::ReleaseModelDependencyInterests(ModelID modelId) noexcept
+	{
+		if (auto leases = m_ModelDependencyLeaseTokens.find(modelId);
+			leases != m_ModelDependencyLeaseTokens.end())
+		{
+			std::vector<uint64_t> tokens = std::move(leases->second);
+			m_ModelDependencyLeaseTokens.erase(leases);
+			for (uint64_t token : tokens)
+			{
+				ReleaseAssetLease(token);
+			}
+		}
+		if (const auto owner = m_ModelDependencyOwners.find(modelId);
+			owner != m_ModelDependencyOwners.end())
+		{
+			UnregisterAssetOwner(owner->second);
+			m_ModelDependencyOwners.erase(owner);
+		}
+	}
+
+	void AssetManager::UpdateModelDependencyPriorities(
+		ModelID modelId,
+		TaskPriority priority) noexcept
+	{
+		const auto leases = m_ModelDependencyLeaseTokens.find(modelId);
+		if (leases == m_ModelDependencyLeaseTokens.end())
+		{
+			return;
+		}
+		for (uint64_t token : leases->second)
+		{
+			UpdateAssetLeasePriority(token, priority);
+		}
+	}
+
+	void AssetManager::CancelAssetIfUnreferenced(
+		const InterestKey& key,
+		uint64_t generation) noexcept
+	{
+		if (key.m_Kind == AssetInterestKind::Model)
+		{
+			CancelModelIfUnreferenced(
+				ModelID{ static_cast<uint32_t>(key.m_StableId) },
+				generation);
+		}
+		else if (key.m_Kind == AssetInterestKind::Texture)
+		{
+			const TextureID textureId{ static_cast<uint32_t>(key.m_StableId) };
+			const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+			if (!texture || texture->m_Generation != generation)
+			{
+				return;
+			}
+			if (texture->m_State == AssetState::Ready)
+			{
+				++m_ReadyRetentionCount;
+				return;
+			}
+			if (texture->m_State == AssetState::Queued ||
+				texture->m_State == AssetState::LoadingCpu)
+			{
+				++m_CpuCancellationCount;
+			}
+			else if (texture->m_Texture.IsValid())
+			{
+				++m_GpuDeferredCancellationCount;
+			}
+			else
+			{
+				++m_ReadyCancellationCount;
+			}
+			m_TextureRegistry->CancelTextureIfUnreferenced(textureId, generation);
+		}
+		else
+		{
+			CancelMeshIfUnreferenced(
+				MeshID{ static_cast<uint32_t>(key.m_StableId) },
+				generation);
+		}
+	}
+
+	void AssetManager::CancelModelIfUnreferenced(
+		ModelID modelId,
+		uint64_t generation) noexcept
+	{
+		Model* model = GetModel(modelId);
+		if (!model || model->m_Generation != generation || IsTerminalAssetState(model->m_State))
+		{
+			return;
+		}
+		if (model->m_State == AssetState::Ready)
+		{
+			++m_ReadyRetentionCount;
+			return;
+		}
+		model->m_CancelRequested = true;
+		if (const auto task = m_ModelLoadTasks.find(modelId); task != m_ModelLoadTasks.end())
+		{
+			GGLAB_UNUSED(m_TaskSystem->Cancel(task->second));
+		}
+		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork({
+			.m_Kind = AssetStreamingWorkKind::Model,
+			.m_StableId = modelId.Value(),
+			.m_Generation = generation,
+		});
+		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
+		{
+			++m_CpuCancellationCount;
+		}
+		else if (cancelledReadyWork > 0)
+		{
+			++m_ReadyCancellationCount;
+		}
+		else
+		{
+			++m_GpuDeferredCancellationCount;
+		}
+		model->m_State = AssetState::Cancelled;
+		m_PendingModels.erase(modelId);
+		ProgressReporter(model->m_LoadProgress).Report(
+			0.96f,
+			"Model loading cancelled",
+			std::format("Model {} has no active owners", modelId.Value()));
+	}
+
+	void AssetManager::CancelMeshIfUnreferenced(
+		MeshID meshId,
+		uint64_t generation) noexcept
+	{
+		Mesh* mesh = GetMesh(meshId);
+		if (!mesh || mesh->m_Generation != generation || IsTerminalAssetState(mesh->m_State))
+		{
+			return;
+		}
+		if (mesh->m_State == AssetState::Ready)
+		{
+			++m_ReadyRetentionCount;
+			return;
+		}
+		mesh->m_CancelRequested = true;
+		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork({
+			.m_Kind = AssetStreamingWorkKind::Mesh,
+			.m_StableId = meshId.Value(),
+			.m_Generation = generation,
+		});
+		if (mesh->m_VertexBuffer || mesh->m_IndexBuffer)
+		{
+			++m_GpuDeferredCancellationCount;
+		}
+		else
+		{
+			GGLAB_UNUSED(cancelledReadyWork);
+			++m_ReadyCancellationCount;
+		}
+		mesh->m_State = mesh->m_VertexBuffer || mesh->m_IndexBuffer ?
+			AssetState::GpuProcessing : AssetState::Cancelled;
+		ProgressReporter(mesh->m_LoadProgress).Report(
+			0.96f,
+			mesh->m_VertexBuffer ?
+				"Mesh cancellation pending GPU completion" : "Mesh upload cancelled",
+			std::format("Mesh {} has no active owners", meshId.Value()));
+	}
 
 	AssetManager::ModelLoadRequest AssetManager::LoadModelAsync(
 		const std::filesystem::path& path,
@@ -156,6 +764,13 @@ namespace gglab
 			[this, modelId, generation, job, progress = model->m_LoadProgress](
 				const TaskCompletionInfo& completion) noexcept
 			{
+				const Model* currentModel = GetModel(modelId);
+				if (!currentModel || currentModel->m_Generation != generation ||
+					currentModel->m_CancelRequested)
+				{
+					m_ModelLoadTasks.erase(modelId);
+					return;
+				}
 				m_AssetUploadScheduler->EnqueueCpuReady(
 					{
 						.m_Name = completion.m_Name,
@@ -165,6 +780,7 @@ namespace gglab
 							.m_Generation = generation,
 						},
 						.m_Estimate = EstimateImportedModel(job->m_Model),
+						.m_Priority = completion.m_Priority,
 						.m_Progress = progress,
 					},
 					[this, modelId, generation, completion, job]() mutable noexcept
@@ -303,7 +919,7 @@ namespace gglab
 				meshUploadData.m_VerticesData.size(),
 				meshUploadData.m_IndicesData.size()));
 
-		if (!QueueMeshUpload(std::move(meshUploadData)))
+		if (!QueueMeshUpload(std::move(meshUploadData), TaskPriority::Normal))
 		{
 			storedMesh->m_State = AssetState::Failed;
 		}
@@ -510,7 +1126,9 @@ namespace gglab
 		return true;
 	}
 
-	bool AssetManager::QueueMeshUpload(MeshUploadData&& uploadData) noexcept
+	bool AssetManager::QueueMeshUpload(
+		MeshUploadData&& uploadData,
+		TaskPriority priority) noexcept
 	{
 		Mesh* mesh = GetMesh(uploadData.m_MeshId);
 		if (!mesh || uploadData.m_VerticesData.empty() || uploadData.m_IndicesData.empty())
@@ -536,19 +1154,25 @@ namespace gglab
 					.m_Generation = generation,
 				},
 				.m_Estimate = estimate,
+				.m_Priority = priority,
 				.m_Progress = mesh->m_LoadProgress,
 			},
-			[this, meshId, generation, estimate, payload]() mutable noexcept
+			[this, meshId, generation, estimate, priority, payload]() mutable noexcept
 			{
 				Mesh* currentMesh = GetMesh(meshId);
 				if (!currentMesh || currentMesh->m_Generation != generation)
 				{
 					return;
 				}
+				if (currentMesh->m_CancelRequested)
+				{
+					currentMesh->m_State = AssetState::Cancelled;
+					return;
+				}
 
 				auto batch = m_TransferManager->BeginBatch();
 				const bool recorded = UploadMesh(*payload, batch);
-				(void)m_AssetUploadScheduler->Submit(
+				GGLAB_UNUSED(m_AssetUploadScheduler->Submit(
 					{
 						.m_Name = std::format("Mesh {}", meshId.Value()),
 						.m_Identity = {
@@ -557,6 +1181,7 @@ namespace gglab
 							.m_Generation = generation,
 						},
 						.m_Estimate = estimate,
+						.m_Priority = priority,
 						.m_Progress = currentMesh->m_LoadProgress,
 					},
 					std::move(batch),
@@ -571,7 +1196,7 @@ namespace gglab
 						CompleteMeshUpload(
 							meshId,
 							completion.m_Status == AssetUploadStatus::Succeeded);
-					});
+					}));
 			});
 		return true;
 	}
@@ -583,13 +1208,17 @@ namespace gglab
 		{
 			return;
 		}
-		mesh->m_State = succeeded ? AssetState::Ready : AssetState::Failed;
+		const bool cancelled = mesh->m_CancelRequested;
+		const bool publishSucceeded = succeeded && !cancelled;
+		mesh->m_State = cancelled ? AssetState::Cancelled :
+			(publishSucceeded ? AssetState::Ready : AssetState::Failed);
 		ProgressReporter(mesh->m_LoadProgress).Report(
-			succeeded ? 1.0f : 0.96f,
-			succeeded ? "Mesh ready" : "Mesh GPU upload failed",
+			publishSucceeded ? 1.0f : 0.96f,
+			publishSucceeded ? "Mesh ready" :
+				(cancelled ? "Mesh upload cancelled" : "Mesh GPU upload failed"),
 			std::format("Mesh {}", meshId.Value()));
-		mesh->m_IsUploaded = succeeded;
-		if (!succeeded)
+		mesh->m_IsUploaded = publishSucceeded;
+		if (!publishSucceeded)
 		{
 			mesh->m_VertexBuffer.Reset();
 			mesh->m_IndexBuffer.Reset();
@@ -744,14 +1373,20 @@ namespace gglab
 
 		model->m_State = AssetState::UploadQueued;
 		m_PendingModels.insert(modelId);
+		const InterestKey modelKey{
+			.m_Kind = AssetInterestKind::Model,
+			.m_StableId = modelId.Value(),
+		};
+		const TaskPriority priority = GetEffectivePriority(modelKey);
+		RefreshModelDependencyInterests(modelId, generation);
 		bool queued = true;
 		for (TextureRegistry::TextureUploadData& textureUpload : textureUploads)
 		{
-			queued &= m_TextureRegistry->QueueTextureUpload(std::move(textureUpload));
+			queued &= m_TextureRegistry->QueueTextureUpload(std::move(textureUpload), priority);
 		}
 		for (MeshUploadData& meshUpload : meshUploads)
 		{
-			queued &= QueueMeshUpload(std::move(meshUpload));
+			queued &= QueueMeshUpload(std::move(meshUpload), priority);
 		}
 		ProgressReporter(model->m_LoadProgress).Report(
 			0.66f,
@@ -779,6 +1414,15 @@ namespace gglab
 			return;
 		}
 		m_ModelLoadTasks.erase(modelId);
+		if (model->m_CancelRequested)
+		{
+			model->m_State = AssetState::Cancelled;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.05f,
+				"Model import cancelled",
+				completion.m_Name);
+			return;
+		}
 
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
@@ -809,6 +1453,10 @@ namespace gglab
 			"Queued for model upload publication",
 			completion.m_Name);
 		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		const TaskPriority priority = GetEffectivePriority({
+			.m_Kind = AssetInterestKind::Model,
+			.m_StableId = modelId.Value(),
+		}, completion.m_Priority);
 		m_AssetUploadScheduler->EnqueueUploadReady(
 			{
 				.m_Name = std::format("Model {}", modelId.Value()),
@@ -818,6 +1466,7 @@ namespace gglab
 					.m_Generation = generation,
 				},
 				.m_Estimate = EstimateImportedModel(*payload),
+				.m_Priority = priority,
 				.m_Progress = model->m_LoadProgress,
 			},
 			[this, modelId, generation, completion, payload]() mutable noexcept

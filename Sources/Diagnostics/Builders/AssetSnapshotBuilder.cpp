@@ -141,6 +141,36 @@ namespace gglab
 			copyUploads(statistics.m_RecentUploads, snapshot.m_RecentUploads);
 		}
 
+		const AssetOwnershipStatistics ownership = assetManager.GetOwnershipStatistics();
+		snapshot.m_AssetOwnerCount = ownership.m_OwnerCount;
+		snapshot.m_AssetLeaseCount = ownership.m_LeaseCount;
+		snapshot.m_ManagedAssetCount = ownership.m_ManagedAssetCount;
+		snapshot.m_OwnershipPriorityUpdateCount = ownership.m_PriorityUpdateCount;
+		snapshot.m_OwnershipCpuCancellationCount = ownership.m_CpuCancellationCount;
+		snapshot.m_OwnershipReadyCancellationCount = ownership.m_ReadyCancellationCount;
+		snapshot.m_OwnershipGpuDeferredCancellationCount =
+			ownership.m_GpuDeferredCancellationCount;
+		snapshot.m_OwnershipReadyRetentionCount = ownership.m_ReadyRetentionCount;
+		snapshot.m_ActiveOwnershipInterests.reserve(ownership.m_ActiveInterests.size());
+		for (const AssetInterestActivity& interest : ownership.m_ActiveInterests)
+		{
+			AssetStreamingWorkKind kind = AssetStreamingWorkKind::Unknown;
+			switch (interest.m_Kind)
+			{
+			case AssetInterestKind::Model: kind = AssetStreamingWorkKind::Model; break;
+			case AssetInterestKind::Texture: kind = AssetStreamingWorkKind::Texture; break;
+			case AssetInterestKind::Mesh: kind = AssetStreamingWorkKind::Mesh; break;
+			}
+			snapshot.m_ActiveOwnershipInterests.push_back({
+				.m_Kind = kind,
+				.m_StableId = interest.m_StableId,
+				.m_Generation = interest.m_Generation,
+				.m_LeaseCount = interest.m_LeaseCount,
+				.m_OwnerCount = interest.m_OwnerCount,
+				.m_EffectivePriority = interest.m_EffectivePriority,
+			});
+		}
+
 		return snapshot;
 	}
 }

@@ -9,8 +9,56 @@
 
 namespace gglab
 {
+	struct AssetOwnerId
+	{
+		uint64_t m_Value = 0;
+
+		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
+		friend constexpr auto operator<=>(const AssetOwnerId&, const AssetOwnerId&) = default;
+	};
+
+	struct AssetOwnerIdHash
+	{
+		size_t operator()(AssetOwnerId owner) const noexcept
+		{
+			return std::hash<uint64_t>{}(owner.m_Value);
+		}
+	};
+
+	enum class AssetInterestKind : uint8_t
+	{
+		Model,
+		Texture,
+		Mesh,
+	};
+
+	struct AssetInterestActivity
+	{
+		AssetInterestKind m_Kind = AssetInterestKind::Model;
+		uint64_t m_StableId = 0;
+		uint64_t m_Generation = 0;
+		uint32_t m_LeaseCount = 0;
+		uint32_t m_OwnerCount = 0;
+		TaskPriority m_EffectivePriority = TaskPriority::Normal;
+	};
+
+	struct AssetOwnershipStatistics
+	{
+		uint32_t m_OwnerCount = 0;
+		uint32_t m_LeaseCount = 0;
+		uint32_t m_ManagedAssetCount = 0;
+		uint64_t m_PriorityUpdateCount = 0;
+		uint64_t m_CpuCancellationCount = 0;
+		uint64_t m_ReadyCancellationCount = 0;
+		uint64_t m_GpuDeferredCancellationCount = 0;
+		uint64_t m_ReadyRetentionCount = 0;
+		std::vector<AssetInterestActivity> m_ActiveInterests;
+	};
+
 	class RHIDevice;
 	class AssetUploadScheduler;
+	class AssetLease;
+	class AssetOwnerScope;
 	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
@@ -82,6 +130,8 @@ namespace gglab
 			const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
+		[[nodiscard]] AssetOwnerScope CreateOwnerScope(std::string label) noexcept;
+		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void Tick() noexcept;
 
 		Mesh* GetMesh(MeshID meshId) noexcept;
@@ -106,7 +156,9 @@ namespace gglab
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
 			TransferBatch& transferBatch) noexcept;
-		bool QueueMeshUpload(MeshUploadData&& uploadData) noexcept;
+		bool QueueMeshUpload(
+			MeshUploadData&& uploadData,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
 		bool PublishImportedModel(
 			ModelID modelId,
@@ -129,12 +181,77 @@ namespace gglab
 			const std::filesystem::path& canonicalPath,
 			ModelID modelId) noexcept;
 		bool RefreshModelState(ModelID modelId) noexcept;
+		void CancelModelIfUnreferenced(ModelID modelId, uint64_t generation) noexcept;
+		void CancelMeshIfUnreferenced(MeshID meshId, uint64_t generation) noexcept;
+		void RefreshModelDependencyInterests(ModelID modelId, uint64_t generation) noexcept;
+		void ReleaseModelDependencyInterests(ModelID modelId) noexcept;
+		void UpdateModelDependencyPriorities(ModelID modelId, TaskPriority priority) noexcept;
+
+		struct InterestKey
+		{
+			AssetInterestKind m_Kind = AssetInterestKind::Model;
+			uint64_t m_StableId = 0;
+
+			friend bool operator==(const InterestKey&, const InterestKey&) = default;
+		};
+
+		struct InterestKeyHash
+		{
+			size_t operator()(const InterestKey& key) const noexcept
+			{
+				const size_t kindHash = std::hash<uint8_t>{}(static_cast<uint8_t>(key.m_Kind));
+				const size_t idHash = std::hash<uint64_t>{}(key.m_StableId);
+				return idHash ^ (kindHash + 0x9e3779b9u + (idHash << 6) + (idHash >> 2));
+			}
+		};
+
+		struct LeaseRecord
+		{
+			InterestKey m_Key{};
+			AssetOwnerId m_Owner{};
+			uint64_t m_Generation = 0;
+			TaskPriority m_Priority = TaskPriority::Normal;
+			bool m_IsInternal = false;
+		};
+
+		struct InterestRecord
+		{
+			uint64_t m_Generation = 0;
+			TaskPriority m_EffectivePriority = TaskPriority::Normal;
+			std::unordered_set<uint64_t> m_LeaseTokens;
+		};
+
+		AssetOwnerId RegisterAssetOwner(std::string label) noexcept;
+		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
+		AssetLease AcquireAssetLease(
+			AssetOwnerId owner,
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation,
+			TaskPriority priority,
+			bool internal = false) noexcept;
+		void ReleaseAssetLease(uint64_t leaseToken) noexcept;
+		void UpdateAssetLeasePriority(uint64_t leaseToken, TaskPriority priority) noexcept;
+		void RecomputeInterestPriority(const InterestKey& key) noexcept;
+		void ApplyInterestPriority(
+			const InterestKey& key,
+			uint64_t generation,
+			TaskPriority priority) noexcept;
+		void CancelAssetIfUnreferenced(
+			const InterestKey& key,
+			uint64_t generation) noexcept;
+		[[nodiscard]] TaskPriority GetEffectivePriority(
+			const InterestKey& key,
+			TaskPriority fallback = TaskPriority::Normal) const noexcept;
+		[[nodiscard]] bool HasActiveInterest(const InterestKey& key) const noexcept;
 
 	public:
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
 
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
+		friend class AssetLease;
+		friend class AssetOwnerScope;
 
 		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
 
@@ -156,5 +273,73 @@ namespace gglab
 		ModelContainer m_ModelContainer;
 		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
 		std::unordered_set<ModelID> m_PendingModels;
+		uint64_t m_NextAssetOwnerId = 1;
+		uint64_t m_NextAssetLeaseToken = 1;
+		std::unordered_map<AssetOwnerId, std::string, AssetOwnerIdHash> m_AssetOwners;
+		std::unordered_map<uint64_t, LeaseRecord> m_AssetLeases;
+		std::unordered_map<InterestKey, InterestRecord, InterestKeyHash> m_AssetInterests;
+		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
+		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
+		uint64_t m_OwnershipPriorityUpdateCount = 0;
+		uint64_t m_CpuCancellationCount = 0;
+		uint64_t m_ReadyCancellationCount = 0;
+		uint64_t m_GpuDeferredCancellationCount = 0;
+		uint64_t m_ReadyRetentionCount = 0;
+	};
+
+	class AssetLease
+	{
+	public:
+		AssetLease() noexcept = default;
+		AssetLease(const AssetLease&) = delete;
+		AssetLease& operator=(const AssetLease&) = delete;
+		AssetLease(AssetLease&& other) noexcept;
+		AssetLease& operator=(AssetLease&& other) noexcept;
+		~AssetLease();
+
+		[[nodiscard]] bool IsValid() const noexcept { return m_Manager && m_LeaseToken != 0; }
+		void Reset() noexcept;
+
+	private:
+		friend class AssetManager;
+		AssetLease(AssetManager* manager, uint64_t leaseToken) noexcept :
+			m_Manager(manager),
+			m_LeaseToken(leaseToken)
+		{}
+
+		AssetManager* m_Manager = nullptr;
+		uint64_t m_LeaseToken = 0;
+	};
+
+	class AssetOwnerScope
+	{
+	public:
+		AssetOwnerScope() noexcept = default;
+		AssetOwnerScope(const AssetOwnerScope&) = delete;
+		AssetOwnerScope& operator=(const AssetOwnerScope&) = delete;
+		AssetOwnerScope(AssetOwnerScope&& other) noexcept;
+		AssetOwnerScope& operator=(AssetOwnerScope&& other) noexcept;
+		~AssetOwnerScope();
+
+		[[nodiscard]] AssetManager::ModelLoadRequest LoadModelAsync(
+			const std::filesystem::path& path,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
+		[[nodiscard]] AssetManager::TextureLoadRequest LoadTextureAsync(
+			const std::filesystem::path& path,
+			TextureSemantic semantic = TextureSemantic::GenericColor,
+			TaskPriority priority = TaskPriority::Normal) noexcept;
+		void Reset() noexcept;
+		[[nodiscard]] AssetOwnerId GetOwnerId() const noexcept { return m_Owner; }
+
+	private:
+		friend class AssetManager;
+		AssetOwnerScope(AssetManager* manager, AssetOwnerId owner) noexcept :
+			m_Manager(manager),
+			m_Owner(owner)
+		{}
+
+		AssetManager* m_Manager = nullptr;
+		AssetOwnerId m_Owner{};
+		std::vector<AssetLease> m_Leases;
 	};
 }
