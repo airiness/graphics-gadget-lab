@@ -35,6 +35,38 @@ namespace gglab
 				material.m_OcclusionBinding.m_TextureId,
 			};
 		}
+
+		[[nodiscard]] AssetStreamingWorkEstimate EstimateMeshUpload(
+			const AssetManager::MeshUploadData& uploadData) noexcept
+		{
+			const uint64_t vertexBytes = static_cast<uint64_t>(
+				uploadData.m_VerticesData.size()) * sizeof(Vertex);
+			const uint64_t indexBytes = static_cast<uint64_t>(
+				uploadData.m_IndicesData.size()) * sizeof(uint32_t);
+			return {
+				.m_SourceBytes = vertexBytes + indexBytes,
+				.m_StagingBytes = vertexBytes + indexBytes,
+				.m_OperationCount = 2,
+			};
+		}
+
+		[[nodiscard]] AssetStreamingWorkEstimate EstimateImportedModel(
+			const ImportedModel& model) noexcept
+		{
+			AssetStreamingWorkEstimate estimate{};
+			for (const ImportedTexture& texture : model.m_Textures)
+			{
+				estimate.m_SourceBytes += texture.m_Data.m_Pixels.size();
+			}
+			for (const ImportedMesh& mesh : model.m_Meshes)
+			{
+				estimate.m_SourceBytes +=
+					static_cast<uint64_t>(mesh.m_Vertices.size()) * sizeof(Vertex);
+				estimate.m_SourceBytes +=
+					static_cast<uint64_t>(mesh.m_Indices.size()) * sizeof(uint32_t);
+			}
+			return estimate;
+		}
 	}
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
@@ -132,6 +164,7 @@ namespace gglab
 							.m_StableId = modelId.Value(),
 							.m_Generation = generation,
 						},
+						.m_Estimate = EstimateImportedModel(job->m_Model),
 						.m_Progress = progress,
 					},
 					[this, modelId, generation, completion, job]() mutable noexcept
@@ -270,27 +303,10 @@ namespace gglab
 				meshUploadData.m_VerticesData.size(),
 				meshUploadData.m_IndicesData.size()));
 
-		// Upload Mesh to GPU
-		auto batch = m_TransferManager->BeginBatch();
-		const bool recorded = UploadMesh(meshUploadData, batch);
-		(void)m_AssetUploadScheduler->Submit(
-			{
-				.m_Name = std::format("Mesh {}", meshId.Value()),
-				.m_Identity = {
-					.m_Kind = AssetStreamingWorkKind::Mesh,
-					.m_StableId = meshId.Value(),
-					.m_Generation = storedMesh->m_Generation,
-				},
-				.m_Progress = storedMesh->m_LoadProgress,
-			},
-			std::move(batch),
-			recorded,
-			[this, meshId](const AssetUploadCompletionInfo& completion) noexcept
-			{
-				CompleteMeshUpload(
-					meshId,
-					completion.m_Status == AssetUploadStatus::Succeeded);
-			});
+		if (!QueueMeshUpload(std::move(meshUploadData)))
+		{
+			storedMesh->m_State = AssetState::Failed;
+		}
 
 		return meshId;
 	}
@@ -494,6 +510,72 @@ namespace gglab
 		return true;
 	}
 
+	bool AssetManager::QueueMeshUpload(MeshUploadData&& uploadData) noexcept
+	{
+		Mesh* mesh = GetMesh(uploadData.m_MeshId);
+		if (!mesh || uploadData.m_VerticesData.empty() || uploadData.m_IndicesData.empty())
+		{
+			return false;
+		}
+
+		const MeshID meshId = uploadData.m_MeshId;
+		const uint64_t generation = mesh->m_Generation;
+		const AssetStreamingWorkEstimate estimate = EstimateMeshUpload(uploadData);
+		mesh->m_State = AssetState::CpuReady;
+		ProgressReporter(mesh->m_LoadProgress).Report(
+			0.62f,
+			"Waiting for mesh upload admission",
+			std::format("{} bytes", estimate.m_StagingBytes));
+		auto payload = std::make_shared<MeshUploadData>(std::move(uploadData));
+		m_AssetUploadScheduler->EnqueueUploadReady(
+			{
+				.m_Name = std::format("Mesh {}", meshId.Value()),
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Mesh,
+					.m_StableId = meshId.Value(),
+					.m_Generation = generation,
+				},
+				.m_Estimate = estimate,
+				.m_Progress = mesh->m_LoadProgress,
+			},
+			[this, meshId, generation, estimate, payload]() mutable noexcept
+			{
+				Mesh* currentMesh = GetMesh(meshId);
+				if (!currentMesh || currentMesh->m_Generation != generation)
+				{
+					return;
+				}
+
+				auto batch = m_TransferManager->BeginBatch();
+				const bool recorded = UploadMesh(*payload, batch);
+				(void)m_AssetUploadScheduler->Submit(
+					{
+						.m_Name = std::format("Mesh {}", meshId.Value()),
+						.m_Identity = {
+							.m_Kind = AssetStreamingWorkKind::Mesh,
+							.m_StableId = meshId.Value(),
+							.m_Generation = generation,
+						},
+						.m_Estimate = estimate,
+						.m_Progress = currentMesh->m_LoadProgress,
+					},
+					std::move(batch),
+					recorded,
+					[this, meshId, generation](const AssetUploadCompletionInfo& completion) noexcept
+					{
+						const Mesh* currentMesh = GetMesh(meshId);
+						if (!currentMesh || currentMesh->m_Generation != generation)
+						{
+							return;
+						}
+						CompleteMeshUpload(
+							meshId,
+							completion.m_Status == AssetUploadStatus::Succeeded);
+					});
+			});
+		return true;
+	}
+
 	void AssetManager::CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept
 	{
 		auto* mesh = GetMesh(meshId);
@@ -662,106 +744,27 @@ namespace gglab
 
 		model->m_State = AssetState::UploadQueued;
 		m_PendingModels.insert(modelId);
-		auto batch = m_TransferManager->BeginBatch();
-		bool recorded = true;
-		std::vector<TextureID> uploadedTextureIds;
-		std::vector<uint64_t> uploadedTextureGenerations;
-		uploadedTextureIds.reserve(textureUploads.size());
-		uploadedTextureGenerations.reserve(textureUploads.size());
-		for (const auto& textureUpload : textureUploads)
+		bool queued = true;
+		for (TextureRegistry::TextureUploadData& textureUpload : textureUploads)
 		{
-			uploadedTextureIds.push_back(textureUpload.m_TextureId);
-			const Texture* texture = m_TextureRegistry->GetTexture(textureUpload.m_TextureId);
-			uploadedTextureGenerations.push_back(texture ? texture->m_Generation : 0);
-			recorded &= m_TextureRegistry->UploadTexture(textureUpload, batch);
+			queued &= m_TextureRegistry->QueueTextureUpload(std::move(textureUpload));
 		}
-		for (const MeshUploadData& meshUpload : meshUploads)
+		for (MeshUploadData& meshUpload : meshUploads)
 		{
-			recorded &= UploadMesh(meshUpload, batch);
+			queued &= QueueMeshUpload(std::move(meshUpload));
 		}
-
-		std::vector<ProgressChannelPtr> dependencyProgress;
-		dependencyProgress.reserve(uploadedTextureIds.size() + meshIds.size());
-		for (TextureID textureId : uploadedTextureIds)
+		ProgressReporter(model->m_LoadProgress).Report(
+			0.66f,
+			"Waiting for model dependency uploads",
+			std::format(
+				"{} texture uploads, {} mesh uploads",
+				textureUploads.size(),
+				meshUploads.size()));
+		if (RefreshModelState(modelId))
 		{
-			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
-			{
-				dependencyProgress.push_back(texture->m_LoadProgress);
-			}
+			m_PendingModels.erase(modelId);
 		}
-		for (MeshID meshId : meshIds)
-		{
-			if (const Mesh* mesh = GetMesh(meshId))
-			{
-				dependencyProgress.push_back(mesh->m_LoadProgress);
-			}
-		}
-
-		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
-			{
-				.m_Name = std::format("Model {}", modelId.Value()),
-				.m_Identity = {
-					.m_Kind = AssetStreamingWorkKind::Model,
-					.m_StableId = modelId.Value(),
-					.m_Generation = generation,
-				},
-				.m_Progress = model->m_LoadProgress,
-			},
-			std::move(batch),
-			recorded,
-			[this,
-				modelId,
-				generation,
-				textureIds = std::move(uploadedTextureIds),
-				textureGenerations = std::move(uploadedTextureGenerations),
-				meshIds = std::move(meshIds)](
-				const AssetUploadCompletionInfo& completion) noexcept
-			{
-				Model* currentModel = GetModel(modelId);
-				if (!currentModel || currentModel->m_Generation != generation)
-				{
-					return;
-				}
-				const bool succeeded = completion.m_Status == AssetUploadStatus::Succeeded;
-				for (size_t textureIndex = 0; textureIndex < textureIds.size(); ++textureIndex)
-				{
-					const Texture* texture = m_TextureRegistry->GetTexture(textureIds[textureIndex]);
-					if (texture && texture->m_Generation == textureGenerations[textureIndex])
-					{
-						m_TextureRegistry->CompleteTextureUpload(textureIds[textureIndex], succeeded);
-					}
-				}
-				for (MeshID meshId : meshIds)
-				{
-					CompleteMeshUpload(meshId, succeeded);
-				}
-				if (RefreshModelState(modelId))
-				{
-					m_PendingModels.erase(modelId);
-				}
-				if (succeeded)
-				{
-					GGLAB_LOG_GRAPHICS_INFO(
-						"Model {} GPU upload completed in {:.2f} ms.",
-						modelId.Value(),
-						completion.m_ElapsedMilliseconds);
-				}
-				else
-				{
-					GGLAB_LOG_GRAPHICS_ERROR("Model {} GPU upload failed.", modelId.Value());
-				}
-			});
-		if (uploadHandle.IsValid())
-		{
-			for (const ProgressChannelPtr& progress : dependencyProgress)
-			{
-				ProgressReporter(progress).Report(
-					0.82f,
-					"Waiting for model batch GPU upload",
-					std::format("Model {}", modelId.Value()));
-			}
-		}
-		return uploadHandle.IsValid();
+		return queued;
 	}
 
 	void AssetManager::CompleteModelLoad(
@@ -814,6 +817,7 @@ namespace gglab
 					.m_StableId = modelId.Value(),
 					.m_Generation = generation,
 				},
+				.m_Estimate = EstimateImportedModel(*payload),
 				.m_Progress = model->m_LoadProgress,
 			},
 			[this, modelId, generation, completion, payload]() mutable noexcept
@@ -834,7 +838,7 @@ namespace gglab
 					return;
 				}
 				GGLAB_LOG_GRAPHICS_INFO(
-					"Async model {} queued for GPU upload (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
+					"Async model {} queued dependency uploads (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
 					modelId.Value(),
 					meshInstanceCount,
 					completion.m_QueueMilliseconds,

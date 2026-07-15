@@ -48,6 +48,7 @@ namespace gglab
 			AssetUploadHandle m_Handle{};
 			std::string m_Name;
 			AssetStreamingIdentity m_Identity{};
+			AssetStreamingWorkEstimate m_Estimate{};
 			AssetUploadStatus m_Status = AssetUploadStatus::Pending;
 			RHIFencePoint m_FencePoint{};
 			double m_ElapsedMilliseconds = 0.0;
@@ -60,6 +61,16 @@ namespace gglab
 		AssetStreamingQueueStatistics m_CpuReadyQueue;
 		AssetStreamingQueueStatistics m_UploadReadyQueue;
 		AssetStreamingQueueStatistics m_PublicationReadyQueue;
+		AssetStreamingFrameBudget m_StreamingFrameBudget;
+		AssetStreamingFrameUsage m_LastStreamingFrameUsage;
+		uint64_t m_ReadyBacklogBytes = 0;
+		uint64_t m_ReadyBacklogHighWatermark = 0;
+		uint64_t m_InFlightUploadBytes = 0;
+		uint64_t m_InFlightUploadHighWatermark = 0;
+		uint64_t m_BacklogBudgetDeferralCount = 0;
+		uint64_t m_UploadBudgetDeferralCount = 0;
+		uint64_t m_InFlightBudgetDeferralCount = 0;
+		uint64_t m_OversizedAdmissionCount = 0;
 		uint32_t m_PendingUploadCount = 0;
 		uint64_t m_SubmittedUploadCount = 0;
 		uint64_t m_SucceededUploadCount = 0;

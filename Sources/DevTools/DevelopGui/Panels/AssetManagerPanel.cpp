@@ -280,7 +280,7 @@ namespace gglab
 		{
 			if (ImGui::BeginTable(
 				tableId,
-				8,
+				10,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
@@ -291,6 +291,8 @@ namespace gglab
 				ImGui::TableSetupColumn("Stage", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableSetupColumn("Fence", ImGuiTableColumnFlags_WidthFixed, 144.0f);
 				ImGui::TableSetupColumn("Elapsed (ms)", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+				ImGui::TableSetupColumn("Staging (KiB)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Ops", ImGuiTableColumnFlags_WidthFixed, 52.0f);
 				ImGui::TableHeadersRow();
 
 				for (const AssetSnapshot::Upload& upload : uploads)
@@ -337,6 +339,10 @@ namespace gglab
 					}
 					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%.2f", upload.m_ElapsedMilliseconds);
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("%.1f", static_cast<double>(upload.m_Estimate.m_StagingBytes) / 1024.0);
+					ImGui::TableSetColumnIndex(9);
+					ImGui::Text("%u", upload.m_Estimate.m_OperationCount);
 					ImGui::PopID();
 				}
 
@@ -354,10 +360,13 @@ namespace gglab
 			const double averageExecution = queue.m_ProcessedCount > 0 ?
 				queue.m_TotalExecutionMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
 			ImGui::Text(
-				"%s: pending=%u high=%u enqueued=%llu processed=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/max)=%.3f/%.3f ms",
+				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/max)=%.3f/%.3f ms",
 				label,
 				queue.m_PendingCount,
 				queue.m_HighWatermark,
+				static_cast<double>(queue.m_PendingSourceBytes) / (1024.0 * 1024.0),
+				static_cast<double>(queue.m_PendingStagingBytes) / (1024.0 * 1024.0),
+				queue.m_PendingOperationCount,
 				queue.m_EnqueuedCount,
 				queue.m_ProcessedCount,
 				queue.m_CallbackFailureCount,
@@ -372,7 +381,7 @@ namespace gglab
 
 			if (ImGui::BeginTable(
 				tableId,
-				5,
+				8,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
@@ -380,6 +389,9 @@ namespace gglab
 				ImGui::TableSetupColumn("Asset", ImGuiTableColumnFlags_WidthFixed, 72.0f);
 				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Queued (ms)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Source (KiB)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Staging (KiB)", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Ops", ImGuiTableColumnFlags_WidthFixed, 52.0f);
 				ImGui::TableHeadersRow();
 				for (const AssetStreamingWorkActivity& work : queue.m_PendingWork)
 				{
@@ -394,6 +406,12 @@ namespace gglab
 					ImGui::Text("%llu", work.m_Identity.m_Generation);
 					ImGui::TableSetColumnIndex(4);
 					ImGui::Text("%.3f", work.m_QueueMilliseconds);
+					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("%.1f", static_cast<double>(work.m_Estimate.m_SourceBytes) / 1024.0);
+					ImGui::TableSetColumnIndex(6);
+					ImGui::Text("%.1f", static_cast<double>(work.m_Estimate.m_StagingBytes) / 1024.0);
+					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%u", work.m_Estimate.m_OperationCount);
 				}
 				ImGui::EndTable();
 			}
@@ -401,6 +419,42 @@ namespace gglab
 
 		void DrawAssetUploads(const AssetSnapshot& assetSnapshot) noexcept
 		{
+			const AssetStreamingFrameBudget& budget = assetSnapshot.m_StreamingFrameBudget;
+			const AssetStreamingFrameUsage& usage = assetSnapshot.m_LastStreamingFrameUsage;
+			ImGui::SeparatorText("Frame Admission Budget");
+			ImGui::Text(
+				"CPU: %u/%u items, %.3f/%.3f ms   Upload: %u/%u items, %.2f/%.2f MiB, %u/%u ops, %.3f/%.3f ms",
+				usage.m_CpuReadyItems,
+				budget.m_MaxCpuReadyItems,
+				usage.m_CpuReadyMilliseconds,
+				budget.m_MaxCpuReadyMilliseconds,
+				usage.m_UploadReadyItems,
+				budget.m_MaxUploadReadyItems,
+				static_cast<double>(usage.m_UploadBytes) / (1024.0 * 1024.0),
+				static_cast<double>(budget.m_MaxUploadBytes) / (1024.0 * 1024.0),
+				usage.m_UploadOperations,
+				budget.m_MaxUploadOperations,
+				usage.m_UploadMilliseconds,
+				budget.m_MaxUploadMilliseconds);
+			ImGui::Text(
+				"Publication: %u/%u items, %.3f/%.3f ms   Ready backlog: %.2f/%.2f MiB (high %.2f)   In-flight: %.2f/%.2f MiB (high %.2f)",
+				usage.m_PublicationItems,
+				budget.m_MaxPublicationItems,
+				usage.m_PublicationMilliseconds,
+				budget.m_MaxPublicationMilliseconds,
+				static_cast<double>(assetSnapshot.m_ReadyBacklogBytes) / (1024.0 * 1024.0),
+				static_cast<double>(budget.m_MaxReadyBacklogBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ReadyBacklogHighWatermark) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_InFlightUploadBytes) / (1024.0 * 1024.0),
+				static_cast<double>(budget.m_MaxInFlightBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_InFlightUploadHighWatermark) / (1024.0 * 1024.0));
+			ImGui::Text(
+				"Deferrals: backlog=%llu upload-budget=%llu in-flight=%llu   Oversized admissions=%llu",
+				assetSnapshot.m_BacklogBudgetDeferralCount,
+				assetSnapshot.m_UploadBudgetDeferralCount,
+				assetSnapshot.m_InFlightBudgetDeferralCount,
+				assetSnapshot.m_OversizedAdmissionCount);
+
 			ImGui::SeparatorText("Streaming Queues");
 			DrawStreamingQueue("CPU Ready", "CpuReadyQueue", assetSnapshot.m_CpuReadyQueue);
 			DrawStreamingQueue("Upload Ready", "UploadReadyQueue", assetSnapshot.m_UploadReadyQueue);
