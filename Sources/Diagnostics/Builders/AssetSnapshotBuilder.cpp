@@ -216,6 +216,9 @@ namespace gglab
 			snapshot.m_InFlightBudgetDeferralCount = statistics.m_InFlightBudgetDeferralCount;
 			snapshot.m_OversizedAdmissionCount = statistics.m_OversizedAdmissionCount;
 			snapshot.m_PendingUploadCount = statistics.m_PendingCount;
+			snapshot.m_UploadBatchSubmissionCount = statistics.m_BatchSubmissionCount;
+			snapshot.m_LastUploadBatchResourceCount = statistics.m_LastBatchUploadCount;
+			snapshot.m_MaxResourcesPerUploadBatch = statistics.m_MaxUploadsPerBatch;
 			snapshot.m_SubmittedUploadCount = statistics.m_SubmittedCount;
 			snapshot.m_SucceededUploadCount = statistics.m_SucceededCount;
 			snapshot.m_FailedUploadCount = statistics.m_FailedCount;

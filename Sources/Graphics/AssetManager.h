@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
@@ -223,18 +224,13 @@ namespace gglab
 			AssetInterestKind m_Kind = AssetInterestKind::Model;
 			uint64_t m_StableId = 0;
 
+			[[nodiscard]] constexpr auto AsTuple() const noexcept
+			{
+				return std::tie(m_Kind, m_StableId);
+			}
 			friend bool operator==(const InterestKey&, const InterestKey&) = default;
 		};
-
-		struct InterestKeyHash
-		{
-			size_t operator()(const InterestKey& key) const noexcept
-			{
-				const size_t kindHash = std::hash<uint8_t>{}(static_cast<uint8_t>(key.m_Kind));
-				const size_t idHash = std::hash<uint64_t>{}(key.m_StableId);
-				return idHash ^ (kindHash + 0x9e3779b9u + (idHash << 6) + (idHash >> 2));
-			}
-		};
+		using InterestKeyHash = KeyHash<InterestKey>;
 
 		enum class ModelDependencyOutcome : uint8_t
 		{
@@ -250,21 +246,13 @@ namespace gglab
 			uint64_t m_StableId = 0;
 			uint64_t m_ContentGeneration = 0;
 
+			[[nodiscard]] constexpr auto AsTuple() const noexcept
+			{
+				return std::tie(m_Kind, m_StableId, m_ContentGeneration);
+			}
 			friend bool operator==(const DependencyKey&, const DependencyKey&) = default;
 		};
-
-		struct DependencyKeyHash
-		{
-			size_t operator()(const DependencyKey& key) const noexcept
-			{
-				size_t hash = std::hash<uint64_t>{}(key.m_StableId);
-				hash ^= std::hash<uint64_t>{}(key.m_ContentGeneration) +
-					0x9e3779b9u + (hash << 6) + (hash >> 2);
-				hash ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.m_Kind)) +
-					0x9e3779b9u + (hash << 6) + (hash >> 2);
-				return hash;
-			}
-		};
+		using DependencyKeyHash = KeyHash<DependencyKey>;
 
 		struct DependentModel
 		{

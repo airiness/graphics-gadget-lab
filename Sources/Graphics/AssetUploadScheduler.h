@@ -188,6 +188,7 @@ namespace gglab
 	};
 
 	using AssetUploadCompletion = std::function<void(const AssetUploadCompletionInfo&)>;
+	using AssetUploadRecord = std::function<bool(TransferBatch&)>;
 
 	struct AssetUploadActivity
 	{
@@ -218,6 +219,9 @@ namespace gglab
 		uint64_t m_InFlightBudgetDeferralCount = 0;
 		uint64_t m_OversizedAdmissionCount = 0;
 		uint32_t m_PendingCount = 0;
+		uint64_t m_BatchSubmissionCount = 0;
+		uint32_t m_LastBatchUploadCount = 0;
+		uint32_t m_MaxUploadsPerBatch = 0;
 		uint64_t m_SubmittedCount = 0;
 		uint64_t m_SucceededCount = 0;
 		uint64_t m_FailedCount = 0;
@@ -344,10 +348,9 @@ namespace gglab
 			const AssetStreamingIdentity& identity,
 			TaskPriority priority) noexcept;
 
-		[[nodiscard]] AssetUploadHandle Submit(
+		[[nodiscard]] AssetUploadHandle RecordUpload(
 			AssetUploadDesc desc,
-			TransferBatch&& batch,
-			bool recordingSucceeded,
+			AssetUploadRecord record,
 			AssetUploadCompletion completion = {}) noexcept;
 		uint32_t Tick() noexcept;
 		void DrainReadyWork() noexcept;
@@ -447,6 +450,7 @@ namespace gglab
 			AssetResourcePublicationFaultTiming timing,
 			AssetResourcePublicationStepResult& result) noexcept;
 		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
+		void FlushRecordedUploads() noexcept;
 		uint32_t PollCompletedUploads() noexcept;
 		void EnqueueGpuFinalize(
 			PendingUpload&& upload,
@@ -490,11 +494,15 @@ namespace gglab
 		uint64_t m_UploadRecordingBacklogBytes = 0;
 		uint64_t m_ReadyPayloadHighWatermark = 0;
 		uint64_t m_InFlightBytes = 0;
+		uint64_t m_RecordedUploadBytes = 0;
 		uint64_t m_InFlightHighWatermark = 0;
 		uint64_t m_UploadPromotionBudgetDeferralCount = 0;
 		uint64_t m_UploadBudgetDeferralCount = 0;
 		uint64_t m_InFlightBudgetDeferralCount = 0;
 		uint64_t m_OversizedAdmissionCount = 0;
+		uint64_t m_BatchSubmissionCount = 0;
+		uint32_t m_LastBatchUploadCount = 0;
+		uint32_t m_MaxUploadsPerBatch = 0;
 		uint64_t m_SubmittedCount = 0;
 		uint64_t m_SucceededCount = 0;
 		uint64_t m_FailedCount = 0;
@@ -502,6 +510,8 @@ namespace gglab
 		std::deque<QueuedWork> m_CpuPayloadQueue;
 		std::deque<QueuedResourcePublication> m_ResourcePublicationQueue;
 		std::deque<QueuedWork> m_UploadRecordingQueue;
+		std::unique_ptr<TransferBatch> m_RecordingBatch;
+		std::vector<PendingUpload> m_RecordedUploads;
 		std::deque<PendingUpload> m_PendingUploads;
 		std::deque<PendingGpuFinalize> m_GpuFinalizeQueue;
 		std::deque<AssetUploadActivity> m_RecentUploads;
@@ -518,5 +528,6 @@ namespace gglab
 		uint64_t m_PublicationOverBudgetExecutionCount = 0;
 		uint64_t m_PublicationNoProgressContinueCount = 0;
 		uint64_t m_PublicationFaultInjectionCount = 0;
+		bool m_IsRecordingUploadBatch = false;
 	};
 }
