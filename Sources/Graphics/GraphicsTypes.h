@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Async/ProgressChannel.h"
+#include "Core/Hash/KeyHash.h"
 #include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Color.h"
 #include "Core/Math/Matrix.h"
@@ -401,6 +402,11 @@ namespace gglab
 				m_Value != MaterialID::InvalidValue : m_Value != 0;
 		}
 
+		[[nodiscard]] constexpr auto AsTuple() const noexcept
+		{
+			return std::tie(m_Domain, m_Value);
+		}
+
 		friend constexpr auto operator<=>(const RenderMaterialKey&, const RenderMaterialKey&) = default;
 
 		uint64_t m_Value = MaterialID::InvalidValue;
@@ -532,9 +538,7 @@ namespace std
 	{
 		size_t operator()(const gglab::RenderMaterialKey& key) const noexcept
 		{
-			const size_t valueHash = std::hash<uint64_t>{}(key.m_Value);
-			const size_t domainHash = std::hash<uint8_t>{}(static_cast<uint8_t>(key.m_Domain));
-			return valueHash ^ (domainHash + 0x9e3779b9u + (valueHash << 6) + (valueHash >> 2));
+			return gglab::KeyHash<gglab::RenderMaterialKey>{}(key);
 		}
 	};
 }

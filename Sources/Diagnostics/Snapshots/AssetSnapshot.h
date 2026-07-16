@@ -123,6 +123,9 @@ namespace gglab
 		uint64_t m_InFlightBudgetDeferralCount = 0;
 		uint64_t m_OversizedAdmissionCount = 0;
 		uint32_t m_PendingUploadCount = 0;
+		uint64_t m_UploadBatchSubmissionCount = 0;
+		uint32_t m_LastUploadBatchResourceCount = 0;
+		uint32_t m_MaxResourcesPerUploadBatch = 0;
 		uint64_t m_SubmittedUploadCount = 0;
 		uint64_t m_SucceededUploadCount = 0;
 		uint64_t m_FailedUploadCount = 0;

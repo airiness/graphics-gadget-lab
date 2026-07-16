@@ -752,9 +752,7 @@ namespace gglab
 			textureId,
 			std::move(textureData),
 			semantic);
-		auto batch = m_TransferManager->BeginBatch();
-		const bool recorded = UploadTexture(uploadData, batch);
-		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->Submit(
+		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->RecordUpload(
 			{
 				.m_Name = std::format("Texture {}", textureId.Value()),
 				.m_Identity = {
@@ -766,8 +764,10 @@ namespace gglab
 				.m_Priority = priority,
 				.m_Progress = texture->m_LoadProgress,
 			},
-			std::move(batch),
-			recorded,
+			[this, &uploadData](TransferBatch& batch) noexcept
+			{
+				return UploadTexture(uploadData, batch);
+			},
 			[this, textureId, generation](const AssetUploadCompletionInfo& completion) noexcept
 			{
 				const Texture* texture = GetTexture(textureId);

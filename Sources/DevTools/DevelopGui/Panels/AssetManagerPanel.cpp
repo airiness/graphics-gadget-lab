@@ -692,6 +692,16 @@ namespace gglab
 				assetSnapshot.m_SucceededUploadCount,
 				assetSnapshot.m_FailedUploadCount,
 				assetSnapshot.m_UploadCompletionCallbackFailureCount);
+			const double averageResourcesPerBatch =
+				assetSnapshot.m_UploadBatchSubmissionCount > 0 ?
+				static_cast<double>(assetSnapshot.m_SubmittedUploadCount) /
+					static_cast<double>(assetSnapshot.m_UploadBatchSubmissionCount) : 0.0;
+			ImGui::Text(
+				"Transfer batches: %llu   Resources/batch: last=%u average=%.2f max=%u",
+				assetSnapshot.m_UploadBatchSubmissionCount,
+				assetSnapshot.m_LastUploadBatchResourceCount,
+				averageResourcesPerBatch,
+				assetSnapshot.m_MaxResourcesPerUploadBatch);
 
 			ImGui::SeparatorText("Pending GPU Uploads");
 			if (assetSnapshot.m_PendingUploads.empty())

@@ -70,6 +70,8 @@ namespace gglab
 			m_CpuPayloadQueue.empty() &&
 			m_ResourcePublicationQueue.empty() &&
 			m_UploadRecordingQueue.empty() &&
+			!m_RecordingBatch &&
+			m_RecordedUploads.empty() &&
 			m_PendingUploads.empty() &&
 			m_GpuFinalizeQueue.empty(),
 			"AssetUploadScheduler destroyed with pending streaming work. Call Finalize after draining ready work and waiting for GPU idle.");
@@ -194,46 +196,97 @@ namespace gglab
 		return updatedCount;
 	}
 
-	AssetUploadHandle AssetUploadScheduler::Submit(
+	AssetUploadHandle AssetUploadScheduler::RecordUpload(
 		AssetUploadDesc desc,
-		TransferBatch&& batch,
-		bool recordingSucceeded,
+		AssetUploadRecord record,
 		AssetUploadCompletion completion) noexcept
 	{
-		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset uploads must be submitted on the scheduler owner thread.");
-		if (!IsOwnerThread())
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset uploads must be recorded on the scheduler owner thread.");
+		GGLAB_ASSERT_MSG(
+			m_IsRecordingUploadBatch,
+			"Asset uploads must be recorded while the upload-recording queue is being drained.");
+		if (!IsOwnerThread() || !m_IsRecordingUploadBatch || !record)
 		{
 			return {};
+		}
+		if (!m_RecordingBatch)
+		{
+			m_RecordingBatch = std::make_unique<TransferBatch>(
+				m_TransferManager->BeginBatch());
 		}
 
 		PendingUpload upload{};
 		upload.m_Handle = { m_NextHandle++ };
 		upload.m_Desc = std::move(desc);
-		upload.m_SubmittedAt = std::chrono::steady_clock::now();
-		upload.m_RecordingSucceeded = recordingSucceeded;
 		upload.m_Completion = std::move(completion);
-		upload.m_FencePoint = batch.Submit(false);
-		++m_SubmittedCount;
-
-		if (!upload.m_FencePoint.IsValid())
+		try
 		{
-			ProgressReporter(upload.m_Desc.m_Progress).Report(
-				0.72f,
-				"GPU upload submission failed",
+			upload.m_RecordingSucceeded = record(*m_RecordingBatch);
+		}
+		catch (const std::exception& exception)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Asset upload recording '{}' threw an exception: {}",
+				upload.m_Desc.m_Name,
+				exception.what());
+		}
+		catch (...)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Asset upload recording '{}' threw an unknown exception.",
 				upload.m_Desc.m_Name);
-			EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
-			return {};
 		}
 
 		const AssetUploadHandle handle = upload.m_Handle;
-		ProgressReporter(upload.m_Desc.m_Progress).Report(
-			0.82f,
-			"Waiting for GPU upload",
-			std::format("{} | fence {}", upload.m_Desc.m_Name, upload.m_FencePoint.m_Value));
-		m_PendingUploads.emplace_back(std::move(upload));
-		m_InFlightBytes += m_PendingUploads.back().m_Desc.m_Estimate.m_StagingBytes;
-		m_InFlightHighWatermark = std::max(m_InFlightHighWatermark, m_InFlightBytes);
+		m_RecordedUploadBytes += upload.m_Desc.m_Estimate.m_StagingBytes;
+		m_RecordedUploads.emplace_back(std::move(upload));
 		return handle;
+	}
+
+	void AssetUploadScheduler::FlushRecordedUploads() noexcept
+	{
+		if (m_RecordedUploads.empty())
+		{
+			GGLAB_ASSERT_MSG(
+				!m_RecordingBatch && m_RecordedUploadBytes == 0,
+				"An empty upload batch should not own transfer state.");
+			return;
+		}
+
+		GGLAB_ASSERT_NOT_NULL(m_RecordingBatch.get());
+		const uint32_t uploadCount = static_cast<uint32_t>(m_RecordedUploads.size());
+		const auto submittedAt = std::chrono::steady_clock::now();
+		const RHIFencePoint fencePoint = m_RecordingBatch->Submit(false);
+		m_RecordingBatch.reset();
+		++m_BatchSubmissionCount;
+		m_LastBatchUploadCount = uploadCount;
+		m_MaxUploadsPerBatch = std::max(m_MaxUploadsPerBatch, uploadCount);
+		m_SubmittedCount += uploadCount;
+
+		for (PendingUpload& recorded : m_RecordedUploads)
+		{
+			recorded.m_SubmittedAt = submittedAt;
+			recorded.m_FencePoint = fencePoint;
+			if (!fencePoint.IsValid())
+			{
+				ProgressReporter(recorded.m_Desc.m_Progress).Report(
+					0.72f,
+					"GPU upload submission failed",
+					recorded.m_Desc.m_Name);
+				EnqueueGpuFinalize(std::move(recorded), AssetUploadStatus::Failed);
+				continue;
+			}
+
+			ProgressReporter(recorded.m_Desc.m_Progress).Report(
+				0.82f,
+				"Waiting for GPU upload",
+				std::format("{} | fence {}", recorded.m_Desc.m_Name, fencePoint.m_Value));
+			m_InFlightBytes += recorded.m_Desc.m_Estimate.m_StagingBytes;
+			m_PendingUploads.emplace_back(std::move(recorded));
+		}
+		m_RecordedUploads.clear();
+		m_RecordedUploadBytes = 0;
+		m_InFlightHighWatermark = std::max(m_InFlightHighWatermark, m_InFlightBytes);
 	}
 
 	uint32_t AssetUploadScheduler::Tick() noexcept
@@ -422,6 +475,9 @@ namespace gglab
 		statistics.m_InFlightBudgetDeferralCount = m_InFlightBudgetDeferralCount;
 		statistics.m_OversizedAdmissionCount = m_OversizedAdmissionCount;
 		statistics.m_PendingCount = static_cast<uint32_t>(m_PendingUploads.size());
+		statistics.m_BatchSubmissionCount = m_BatchSubmissionCount;
+		statistics.m_LastBatchUploadCount = m_LastBatchUploadCount;
+		statistics.m_MaxUploadsPerBatch = m_MaxUploadsPerBatch;
 		statistics.m_SubmittedCount = m_SubmittedCount;
 		statistics.m_SucceededCount = m_SucceededCount;
 		statistics.m_FailedCount = m_FailedCount;
@@ -800,6 +856,11 @@ namespace gglab
 
 	uint32_t AssetUploadScheduler::DrainUploadRecordingQueue(bool ignoreBudget) noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			!m_IsRecordingUploadBatch && !m_RecordingBatch &&
+			m_RecordedUploads.empty() && m_RecordedUploadBytes == 0,
+			"Upload batch recording cannot be nested.");
+		m_IsRecordingUploadBatch = true;
 		const uint32_t initialCount = static_cast<uint32_t>(m_UploadRecordingQueue.size());
 		uint32_t processedCount = 0;
 		while (processedCount < initialCount && !m_UploadRecordingQueue.empty())
@@ -819,7 +880,8 @@ namespace gglab
 			}
 
 			const bool exceedsInFlightBudget =
-				m_InFlightBytes + estimate.m_StagingBytes > m_FrameBudget.m_MaxInFlightBytes;
+				m_InFlightBytes + m_RecordedUploadBytes + estimate.m_StagingBytes >
+					m_FrameBudget.m_MaxInFlightBytes;
 			if (!ignoreBudget && exceedsInFlightBudget && m_InFlightBytes > 0)
 			{
 				++m_InFlightBudgetDeferralCount;
@@ -842,6 +904,8 @@ namespace gglab
 			m_LastFrameUsage.m_UploadOperations += admittedEstimate.m_OperationCount;
 			m_LastFrameUsage.m_UploadRecordingMilliseconds += elapsed;
 		}
+		FlushRecordedUploads();
+		m_IsRecordingUploadBatch = false;
 		return processedCount;
 	}
 

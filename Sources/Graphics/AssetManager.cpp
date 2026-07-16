@@ -1952,9 +1952,7 @@ namespace gglab
 					return;
 				}
 
-				auto batch = m_TransferManager->BeginBatch();
-				const bool recorded = UploadMesh(*payload, batch);
-				GGLAB_UNUSED(m_AssetUploadScheduler->Submit(
+				GGLAB_UNUSED(m_AssetUploadScheduler->RecordUpload(
 					{
 						.m_Name = std::format("Mesh {}", meshId.Value()),
 						.m_Identity = {
@@ -1966,8 +1964,10 @@ namespace gglab
 						.m_Priority = priority,
 						.m_Progress = currentMesh->m_LoadProgress,
 					},
-					std::move(batch),
-					recorded,
+					[this, payload](TransferBatch& batch) noexcept
+					{
+						return UploadMesh(*payload, batch);
+					},
 					[this, meshId, generation](const AssetUploadCompletionInfo& completion) noexcept
 					{
 						const Mesh* currentMesh = GetMesh(meshId);
