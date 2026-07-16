@@ -153,6 +153,8 @@ namespace gglab
 			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
+		class ModelPublicationCompatibilityJob;
+
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
 			TransferBatch& transferBatch) noexcept;

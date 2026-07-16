@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -62,28 +63,34 @@ namespace gglab
 
 	struct AssetStreamingFrameBudget
 	{
-		uint32_t m_MaxCpuReadyItems = 8;
-		double m_MaxCpuReadyMilliseconds = 0.5;
-		uint32_t m_MaxUploadReadyItems = 8;
+		uint32_t m_MaxCpuPayloadItems = 8;
+		double m_MaxCpuPayloadMilliseconds = 0.5;
+		uint32_t m_MaxResourcePublicationSteps = 16;
+		uint32_t m_MaxResourcePublicationCreations = 8;
+		double m_MaxResourcePublicationMilliseconds = 0.5;
+		uint32_t m_MaxUploadRecordingItems = 8;
 		uint64_t m_MaxUploadBytes = 32ull * 1024ull * 1024ull;
 		uint32_t m_MaxUploadOperations = 64;
-		double m_MaxUploadMilliseconds = 1.0;
-		uint32_t m_MaxPublicationItems = 16;
-		double m_MaxPublicationMilliseconds = 0.5;
+		double m_MaxUploadRecordingMilliseconds = 1.0;
+		uint32_t m_MaxGpuFinalizeItems = 16;
+		double m_MaxGpuFinalizeMilliseconds = 0.5;
 		uint64_t m_MaxInFlightBytes = 256ull * 1024ull * 1024ull;
-		uint64_t m_MaxReadyBacklogBytes = 512ull * 1024ull * 1024ull;
+		uint64_t m_MaxUploadRecordingBacklogBytes = 512ull * 1024ull * 1024ull;
 	};
 
 	struct AssetStreamingFrameUsage
 	{
-		uint32_t m_CpuReadyItems = 0;
-		double m_CpuReadyMilliseconds = 0.0;
-		uint32_t m_UploadReadyItems = 0;
+		uint32_t m_CpuPayloadItems = 0;
+		double m_CpuPayloadMilliseconds = 0.0;
+		uint32_t m_ResourcePublicationSteps = 0;
+		uint32_t m_ResourcePublicationCreations = 0;
+		double m_ResourcePublicationMilliseconds = 0.0;
+		uint32_t m_UploadRecordingItems = 0;
 		uint64_t m_UploadBytes = 0;
 		uint32_t m_UploadOperations = 0;
-		double m_UploadMilliseconds = 0.0;
-		uint32_t m_PublicationItems = 0;
-		double m_PublicationMilliseconds = 0.0;
+		double m_UploadRecordingMilliseconds = 0.0;
+		uint32_t m_GpuFinalizeItems = 0;
+		double m_GpuFinalizeMilliseconds = 0.0;
 	};
 
 	struct AssetStreamingWorkDesc
@@ -113,8 +120,15 @@ namespace gglab
 		uint32_t m_HighWatermark = 0;
 		uint64_t m_EnqueuedCount = 0;
 		uint64_t m_ProcessedCount = 0;
+		uint64_t m_ContinueCount = 0;
+		uint64_t m_CompletedCount = 0;
+		uint64_t m_FailedCount = 0;
 		uint64_t m_CallbackFailureCount = 0;
 		uint64_t m_CancelledCount = 0;
+		uint64_t m_ResourceCreationCount = 0;
+		uint64_t m_PayloadBytesMovedToUpload = 0;
+		uint64_t m_PayloadBytesDestroyed = 0;
+		uint64_t m_QueueSampleCount = 0;
 		uint64_t m_PendingSourceBytes = 0;
 		uint64_t m_PendingStagingBytes = 0;
 		uint64_t m_PendingOperationCount = 0;
@@ -160,13 +174,14 @@ namespace gglab
 
 	struct AssetUploadStatistics
 	{
-		AssetStreamingQueueStatistics m_CpuReadyQueue;
-		AssetStreamingQueueStatistics m_UploadReadyQueue;
-		AssetStreamingQueueStatistics m_PublicationReadyQueue;
+		AssetStreamingQueueStatistics m_CpuPayloadQueue;
+		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
+		AssetStreamingQueueStatistics m_UploadRecordingQueue;
+		AssetStreamingQueueStatistics m_GpuFinalizeQueue;
 		AssetStreamingFrameBudget m_FrameBudget;
 		AssetStreamingFrameUsage m_LastFrameUsage;
-		uint64_t m_ReadyBacklogBytes = 0;
-		uint64_t m_ReadyBacklogHighWatermark = 0;
+		uint64_t m_ReadyPayloadBytes = 0;
+		uint64_t m_ReadyPayloadHighWatermark = 0;
 		uint64_t m_InFlightBytes = 0;
 		uint64_t m_InFlightHighWatermark = 0;
 		uint64_t m_BacklogBudgetDeferralCount = 0;
@@ -182,9 +197,58 @@ namespace gglab
 		std::vector<AssetUploadActivity> m_RecentUploads;
 	};
 
-	// Owns the main-thread streaming boundaries around transfer-queue work. CPU
-	// completions only enqueue payload publication, upload-ready work records and
-	// submits transfer batches, and completed fences enqueue final publication.
+	enum class AssetResourcePublicationStepStatus : uint8_t
+	{
+		Continue,
+		Completed,
+		Failed,
+		Cancelled,
+	};
+
+	enum class AssetResourcePublicationAbortReason : uint8_t
+	{
+		Cancelled,
+		Failed,
+		Shutdown,
+	};
+
+	struct AssetResourcePublicationStepUsage
+	{
+		uint32_t m_WorkItems = 1;
+		uint32_t m_ResourceCreations = 0;
+		uint64_t m_PayloadBytesMovedToUpload = 0;
+		uint64_t m_PayloadBytesDestroyed = 0;
+	};
+
+	struct AssetResourcePublicationStepResult
+	{
+		AssetResourcePublicationStepStatus m_Status =
+			AssetResourcePublicationStepStatus::Continue;
+		AssetResourcePublicationStepUsage m_Usage{};
+		std::string m_Error;
+	};
+
+	class AssetUploadScheduler;
+
+	struct AssetResourcePublicationContext
+	{
+		AssetUploadScheduler* m_Scheduler = nullptr;
+	};
+
+	class IResourcePublicationJob
+	{
+	public:
+		virtual ~IResourcePublicationJob() = default;
+
+		[[nodiscard]] virtual AssetResourcePublicationStepResult Step(
+			AssetResourcePublicationContext& context) noexcept = 0;
+		virtual void Abort(
+			AssetResourcePublicationContext& context,
+			AssetResourcePublicationAbortReason reason) noexcept = 0;
+	};
+
+	// Owns the main-thread streaming boundaries around resource publication and
+	// transfer-queue work. Jobs advance only at explicit publication step boundaries.
 	class AssetUploadScheduler
 	{
 	public:
@@ -200,10 +264,13 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetUploadScheduler);
 		~AssetUploadScheduler();
 
-		void EnqueueCpuReady(
+		void EnqueueCpuPayload(
 			AssetStreamingWorkDesc desc,
 			AssetStreamingWork work) noexcept;
-		void EnqueueUploadReady(
+		void EnqueueResourcePublication(
+			AssetStreamingWorkDesc desc,
+			std::unique_ptr<IResourcePublicationJob>&& job) noexcept;
+		void EnqueueUploadRecording(
 			AssetStreamingWorkDesc desc,
 			AssetStreamingWork work) noexcept;
 		uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept;
@@ -240,7 +307,16 @@ namespace gglab
 			AssetStreamingWork m_Work;
 		};
 
-		struct PendingPublication
+		struct QueuedResourcePublication
+		{
+			AssetStreamingWorkDesc m_Desc;
+			std::chrono::steady_clock::time_point m_QueuedAt{};
+			uint64_t m_RemainingSourceBytes = 0;
+			bool m_HasStarted = false;
+			std::unique_ptr<IResourcePublicationJob> m_Job;
+		};
+
+		struct PendingGpuFinalize
 		{
 			PendingUpload m_Upload;
 			AssetUploadStatus m_Status = AssetUploadStatus::Failed;
@@ -252,8 +328,15 @@ namespace gglab
 			uint32_t m_HighWatermark = 0;
 			uint64_t m_EnqueuedCount = 0;
 			uint64_t m_ProcessedCount = 0;
+			uint64_t m_ContinueCount = 0;
+			uint64_t m_CompletedCount = 0;
+			uint64_t m_FailedCount = 0;
 			uint64_t m_CallbackFailureCount = 0;
 			uint64_t m_CancelledCount = 0;
+			uint64_t m_ResourceCreationCount = 0;
+			uint64_t m_PayloadBytesMovedToUpload = 0;
+			uint64_t m_PayloadBytesDestroyed = 0;
+			uint64_t m_QueueSampleCount = 0;
 			double m_TotalQueueMilliseconds = 0.0;
 			double m_MaxQueueMilliseconds = 0.0;
 			double m_TotalExecutionMilliseconds = 0.0;
@@ -270,27 +353,39 @@ namespace gglab
 			QueuedWork&& queued,
 			QueueTelemetry& telemetry,
 			std::string_view queueName) noexcept;
-		uint32_t DrainCpuReadyQueue(bool ignoreBudget) noexcept;
-		uint32_t DrainUploadReadyQueue(bool ignoreBudget) noexcept;
+		void InsertResourcePublication(QueuedResourcePublication&& publication) noexcept;
+		uint32_t DrainCpuPayloadQueue(bool ignoreBudget) noexcept;
+		uint32_t DrainResourcePublicationQueue(bool ignoreBudget) noexcept;
+		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
 		uint32_t PollCompletedUploads() noexcept;
-		void EnqueuePublication(
+		void EnqueueGpuFinalize(
 			PendingUpload&& upload,
 			AssetUploadStatus status) noexcept;
-		uint32_t DrainPublicationQueue(bool ignoreBudget) noexcept;
-		void RemoveReadyBacklog(const AssetStreamingWorkEstimate& estimate, bool uploadReady) noexcept;
+		uint32_t DrainGpuFinalizeQueue(bool ignoreBudget) noexcept;
+		void RemoveReadyPayload(const AssetStreamingWorkEstimate& estimate, bool uploadRecording) noexcept;
+		void RetireResourcePublicationPayload(
+			QueuedResourcePublication& publication,
+			const AssetResourcePublicationStepUsage& usage) noexcept;
 		uint32_t CancelQueuedWork(
 			std::deque<QueuedWork>& queue,
 			QueueTelemetry& telemetry,
 			const AssetStreamingIdentity& identity,
-			bool uploadReady) noexcept;
+			bool uploadRecording) noexcept;
+		uint32_t CancelResourcePublication(
+			const AssetStreamingIdentity& identity,
+			AssetResourcePublicationAbortReason reason) noexcept;
 		uint32_t UpdateQueuedWorkPriority(
 			std::deque<QueuedWork>& queue,
+			const AssetStreamingIdentity& identity,
+			TaskPriority priority) noexcept;
+		uint32_t UpdateResourcePublicationPriority(
 			const AssetStreamingIdentity& identity,
 			TaskPriority priority) noexcept;
 		[[nodiscard]] AssetStreamingQueueStatistics BuildQueueStatistics(
 			const std::deque<QueuedWork>& queue,
 			const QueueTelemetry& telemetry) const;
-		[[nodiscard]] AssetStreamingQueueStatistics BuildPublicationQueueStatistics() const;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildResourcePublicationQueueStatistics() const;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildGpuFinalizeQueueStatistics() const;
 		void FinishUpload(PendingUpload&& upload, AssetUploadStatus status) noexcept;
 
 	private:
@@ -301,9 +396,9 @@ namespace gglab
 		AssetStreamingFrameBudget m_FrameBudget{};
 		AssetStreamingFrameUsage m_LastFrameUsage{};
 		uint64_t m_NextHandle = 1;
-		uint64_t m_ReadyBacklogBytes = 0;
-		uint64_t m_UploadReadyBacklogBytes = 0;
-		uint64_t m_ReadyBacklogHighWatermark = 0;
+		uint64_t m_ReadyPayloadBytes = 0;
+		uint64_t m_UploadRecordingBacklogBytes = 0;
+		uint64_t m_ReadyPayloadHighWatermark = 0;
 		uint64_t m_InFlightBytes = 0;
 		uint64_t m_InFlightHighWatermark = 0;
 		uint64_t m_BacklogBudgetDeferralCount = 0;
@@ -314,13 +409,15 @@ namespace gglab
 		uint64_t m_SucceededCount = 0;
 		uint64_t m_FailedCount = 0;
 		uint64_t m_CompletionCallbackFailureCount = 0;
-		std::deque<QueuedWork> m_CpuReadyQueue;
-		std::deque<QueuedWork> m_UploadReadyQueue;
+		std::deque<QueuedWork> m_CpuPayloadQueue;
+		std::deque<QueuedResourcePublication> m_ResourcePublicationQueue;
+		std::deque<QueuedWork> m_UploadRecordingQueue;
 		std::deque<PendingUpload> m_PendingUploads;
-		std::deque<PendingPublication> m_PublicationReadyQueue;
+		std::deque<PendingGpuFinalize> m_GpuFinalizeQueue;
 		std::deque<AssetUploadActivity> m_RecentUploads;
-		QueueTelemetry m_CpuReadyTelemetry;
-		QueueTelemetry m_UploadReadyTelemetry;
-		QueueTelemetry m_PublicationReadyTelemetry;
+		QueueTelemetry m_CpuPayloadTelemetry;
+		QueueTelemetry m_ResourcePublicationTelemetry;
+		QueueTelemetry m_UploadRecordingTelemetry;
+		QueueTelemetry m_GpuFinalizeTelemetry;
 	};
 }

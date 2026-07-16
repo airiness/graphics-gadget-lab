@@ -98,13 +98,14 @@ namespace gglab
 		{
 			const AssetUploadStatistics statistics =
 				assetManager.m_AssetUploadScheduler->GetStatistics();
-			snapshot.m_CpuReadyQueue = statistics.m_CpuReadyQueue;
-			snapshot.m_UploadReadyQueue = statistics.m_UploadReadyQueue;
-			snapshot.m_PublicationReadyQueue = statistics.m_PublicationReadyQueue;
+			snapshot.m_CpuPayloadQueue = statistics.m_CpuPayloadQueue;
+			snapshot.m_ResourcePublicationQueue = statistics.m_ResourcePublicationQueue;
+			snapshot.m_UploadRecordingQueue = statistics.m_UploadRecordingQueue;
+			snapshot.m_GpuFinalizeQueue = statistics.m_GpuFinalizeQueue;
 			snapshot.m_StreamingFrameBudget = statistics.m_FrameBudget;
 			snapshot.m_LastStreamingFrameUsage = statistics.m_LastFrameUsage;
-			snapshot.m_ReadyBacklogBytes = statistics.m_ReadyBacklogBytes;
-			snapshot.m_ReadyBacklogHighWatermark = statistics.m_ReadyBacklogHighWatermark;
+			snapshot.m_ReadyPayloadBytes = statistics.m_ReadyPayloadBytes;
+			snapshot.m_ReadyPayloadHighWatermark = statistics.m_ReadyPayloadHighWatermark;
 			snapshot.m_InFlightUploadBytes = statistics.m_InFlightBytes;
 			snapshot.m_InFlightUploadHighWatermark = statistics.m_InFlightHighWatermark;
 			snapshot.m_BacklogBudgetDeferralCount = statistics.m_BacklogBudgetDeferralCount;
