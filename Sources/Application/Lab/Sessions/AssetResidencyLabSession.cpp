@@ -42,12 +42,22 @@ namespace gglab
 			Loading,
 			MarkUsage,
 			ReleaseOwner,
+			WaitForRelease,
+			WaitForReload,
 			Completed,
 		};
 
 		AssetManager::ModelLoadRequest m_Request{};
+		AssetResidencyConfig m_OriginalResidencyConfig{};
 		MeshID m_MeshId{};
 		TextureID m_TextureId{};
+		uint64_t m_ModelGeneration = 0;
+		uint64_t m_MeshGeneration = 0;
+		uint64_t m_TextureGeneration = 0;
+		uint64_t m_MeshResidencyEpoch = 0;
+		uint64_t m_TextureResidencyEpoch = 0;
+		uint64_t m_EvictionCountBaseline = 0;
+		uint64_t m_ReloadRequestCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
@@ -68,6 +78,15 @@ namespace gglab
 	void AssetResidencyLabSession::OnEnter() noexcept
 	{
 		m_State = std::make_unique<State>();
+		AssetManager& assetManager = *m_Services.m_AssetManager;
+		m_State->m_OriginalResidencyConfig = assetManager.GetResidencyConfig();
+		assetManager.SetResidencyConfig({
+			.m_EnableAutomaticEviction = false,
+			.m_HighWatermarkBytes = 1,
+			.m_LowWatermarkBytes = 0,
+			.m_MinUnusedFrames = 0,
+			.m_MaxEvictionsPerFrame = 16,
+		});
 		m_State->m_Request = GetAssetOwnerScope().LoadModelAsync(
 			"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
 			TaskPriority::Normal);
@@ -79,6 +98,11 @@ namespace gglab
 
 	void AssetResidencyLabSession::OnExit() noexcept
 	{
+		if (m_State)
+		{
+			m_Services.m_AssetManager->SetResidencyConfig(
+				m_State->m_OriginalResidencyConfig);
+		}
 		ResetAssetInterests();
 		m_State.reset();
 	}
@@ -210,6 +234,15 @@ namespace gglab
 			m_State->m_ModelUseCount = model->m_UseCount;
 			m_State->m_MeshUseCount = mesh->m_UseCount;
 			m_State->m_TextureUseCount = texture->m_UseCount;
+			m_State->m_ModelGeneration = model->m_ContentGeneration;
+			m_State->m_MeshGeneration = mesh->m_ContentGeneration;
+			m_State->m_TextureGeneration = texture->m_ContentGeneration;
+			m_State->m_MeshResidencyEpoch = mesh->m_ResidencyEpoch;
+			m_State->m_TextureResidencyEpoch = texture->m_ResidencyEpoch;
+			const AssetResidencyStatistics residency =
+				assetManager.GetResidencyStatistics();
+			m_State->m_EvictionCountBaseline = residency.m_EvictionCount;
+			m_State->m_ReloadRequestCountBaseline = residency.m_ReloadRequestCount;
 			m_State->m_Phase = State::Phase::MarkUsage;
 			break;
 		}
@@ -265,6 +298,113 @@ namespace gglab
 				snapshot.m_DependencyValidationMismatchCount != 0)
 			{
 				Fail("Unowned cacheable resident assets were not classified as eviction candidates.");
+				return;
+			}
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = true;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForRelease;
+			break;
+		}
+
+		case State::Phase::WaitForRelease:
+		{
+			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
+			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!model || !mesh || !texture ||
+				model->m_ContentGeneration != m_State->m_ModelGeneration ||
+				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
+				texture->m_ContentGeneration != m_State->m_TextureGeneration)
+			{
+				Fail("Residency release replaced a stable asset entry.");
+				return;
+			}
+			if (mesh->m_ResidencyState == AssetResidencyState::Evicting ||
+				texture->m_ResidencyState == AssetResidencyState::Evicting)
+			{
+				break;
+			}
+			if (mesh->m_State != AssetState::CpuReady ||
+				texture->m_State != AssetState::CpuReady ||
+				mesh->m_ContentState != AssetContentState::Ready ||
+				texture->m_ContentState != AssetContentState::Ready ||
+				mesh->m_ResidencyState != AssetResidencyState::NonResident ||
+				texture->m_ResidencyState != AssetResidencyState::NonResident ||
+				mesh->m_IsUploaded || texture->m_IsUploaded ||
+				mesh->m_VertexBuffer || mesh->m_IndexBuffer ||
+				texture->m_Texture.IsValid() || texture->m_Srv.IsValid())
+			{
+				Fail("Released assets did not preserve content while dropping GPU residency.");
+				return;
+			}
+			const AssetResidencyStatistics released =
+				assetManager.GetResidencyStatistics();
+			if (released.m_EvictionCount < m_State->m_EvictionCountBaseline + 2)
+			{
+				Fail("The residency controller did not finalize mesh and texture releases.");
+				return;
+			}
+
+			const AssetManager::ModelLoadRequest reloaded =
+				GetAssetOwnerScope().LoadModelAsync(
+					"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
+					TaskPriority::Normal);
+			if (!reloaded.IsValid() ||
+				reloaded.m_ModelId != m_State->m_Request.m_ModelId ||
+				reloaded.m_Generation != m_State->m_ModelGeneration)
+			{
+				Fail("Reload did not preserve the model ID and content generation.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForReload;
+			break;
+		}
+
+		case State::Phase::WaitForReload:
+		{
+			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
+			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!model || !mesh || !texture)
+			{
+				Fail("A stable asset entry disappeared during residency reload.");
+				return;
+			}
+			if (model->m_State == AssetState::Failed ||
+				model->m_State == AssetState::Cancelled ||
+				mesh->m_State == AssetState::Failed ||
+				mesh->m_State == AssetState::Cancelled ||
+				texture->m_State == AssetState::Failed ||
+				texture->m_State == AssetState::Cancelled)
+			{
+				Fail("A source-backed residency reload failed.");
+				return;
+			}
+			if (model->m_State != AssetState::Ready ||
+				mesh->m_State != AssetState::Ready ||
+				texture->m_State != AssetState::Ready)
+			{
+				break;
+			}
+			const AssetResidencyStatistics reloaded =
+				assetManager.GetResidencyStatistics();
+			if (model->m_ContentGeneration != m_State->m_ModelGeneration ||
+				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
+				texture->m_ContentGeneration != m_State->m_TextureGeneration ||
+				mesh->m_ResidencyEpoch <= m_State->m_MeshResidencyEpoch ||
+				texture->m_ResidencyEpoch <= m_State->m_TextureResidencyEpoch ||
+				!mesh->m_IsUploaded || !texture->m_IsUploaded ||
+				reloaded.m_ReloadRequestCount <= m_State->m_ReloadRequestCountBaseline ||
+				reloaded.m_ReloadingAssetCount != 0)
+			{
+				Fail("Reload did not restore residency on the original asset identities.");
+				return;
+			}
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			if (snapshot.m_DependencyValidationMismatchCount != 0)
+			{
+				Fail("Dependency tracking diverged during residency reload.");
 				return;
 			}
 			Complete();
@@ -329,7 +469,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, and candidate invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, eviction, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
@@ -344,7 +484,7 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Asset Residency Lab",
 			.m_Category = "Systems",
-			.m_Description = "Validates asset content, logical residency, policy, usage, and eviction-candidate invariants.",
+			.m_Description = "Validates logical residency, fence-safe release, and stable-ID source reload invariants.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

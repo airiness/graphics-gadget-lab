@@ -763,8 +763,30 @@ namespace gglab
 			snapshot->m_PinnedAssetCount,
 			snapshot->m_CacheableAssetCount,
 			snapshot->m_EvictionCandidateCount);
-		ImGui::TextDisabled(
-			"Candidates are diagnostic only; automatic eviction is not enabled.");
+		ImGui::Text(
+			"Controller: %s | Resident: %.2f MiB | Pending release: %.2f MiB (%u)",
+			snapshot->m_AutomaticResidencyEvictionEnabled ? "Enabled" : "Disabled",
+			static_cast<double>(snapshot->m_LogicalResidentBytes) / (1024.0 * 1024.0),
+			static_cast<double>(snapshot->m_PendingEvictionBytes) / (1024.0 * 1024.0),
+			snapshot->m_PendingEvictionCount);
+		ImGui::Text(
+			"Watermarks: %.2f / %.2f MiB | Min unused: %llu frames | Max releases/frame: %u",
+			static_cast<double>(snapshot->m_ResidencyLowWatermarkBytes) / (1024.0 * 1024.0),
+			static_cast<double>(snapshot->m_ResidencyHighWatermarkBytes) / (1024.0 * 1024.0),
+			snapshot->m_ResidencyMinUnusedFrames,
+			snapshot->m_MaxResidencyEvictionsPerFrame);
+		ImGui::Text(
+			"Released: %llu assets / %.2f MiB | Rescinded: %llu | Reloading: %u",
+			snapshot->m_ResidencyEvictionCount,
+			static_cast<double>(snapshot->m_ResidencyEvictedBytes) / (1024.0 * 1024.0),
+			snapshot->m_ResidencyEvictionCancellationCount,
+			snapshot->m_ReloadingAssetCount);
+		ImGui::Text(
+			"Reload requests: %llu | Coalesced: %llu | Last frame: %u | Peak/frame: %u",
+			snapshot->m_ResidencyReloadRequestCount,
+			snapshot->m_ResidencyReloadCoalescedCount,
+			snapshot->m_LastFrameReloadRequestCount,
+			snapshot->m_ReloadRequestHighWatermark);
 		ImGui::Text(
 			"Dependency graph: %u models | %u resources | %u edges | Builds: %llu | Events: %llu",
 			snapshot->m_TrackedModelDependencyCount,

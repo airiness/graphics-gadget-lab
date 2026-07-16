@@ -267,7 +267,8 @@ namespace gglab
 		const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings,
 		TextureSemantic semantic,
-		TaskPriority priority) noexcept
+		TaskPriority priority,
+		bool residencyReload) noexcept
 	{
 		Texture* texture = GetTexture(textureId);
 		GGLAB_ASSERT_NOT_NULL(texture);
@@ -281,7 +282,10 @@ namespace gglab
 			return iterator->second;
 		}
 
-		SetTextureState(*texture, AssetState::Queued);
+		if (!residencyReload)
+		{
+			SetTextureState(*texture, AssetState::Queued);
+		}
 		const uint64_t generation = texture->m_ContentGeneration;
 		texture->m_Semantic = semantic;
 		ProgressReporter(texture->m_LoadProgress).Report(
@@ -316,7 +320,8 @@ namespace gglab
 				}
 				return TaskResult::Success();
 			},
-			[this, textureId, generation, semantic, job, progress = texture->m_LoadProgress](
+			[this, textureId, generation, semantic, residencyReload, job,
+				progress = texture->m_LoadProgress](
 				const TaskCompletionInfo& completion) noexcept
 			{
 				const Texture* currentTexture = GetTexture(textureId);
@@ -338,19 +343,24 @@ namespace gglab
 						.m_Priority = completion.m_Priority,
 						.m_Progress = progress,
 					},
-					[this, textureId, generation, semantic, completion, job]() mutable noexcept
+					[this, textureId, generation, semantic, completion, residencyReload,
+						job]() mutable noexcept
 					{
 						CompleteTextureLoad(
 							textureId,
 							generation,
 							semantic,
 							completion,
-							std::move(job->m_TextureData));
+							std::move(job->m_TextureData),
+							residencyReload);
 					});
 			});
 		if (!task.IsValid())
 		{
-			SetTextureState(*texture, AssetState::Failed);
+			SetTextureState(
+				*texture,
+				residencyReload ? AssetState::CpuReady : AssetState::Failed);
+			texture->m_IsReloading = false;
 			ProgressReporter(texture->m_LoadProgress).Report(
 				0.05f,
 				"Texture decode submission failed",
@@ -643,16 +653,24 @@ namespace gglab
 		const bool publicationOrphan = m_PublicationOrphanedTextures.contains(textureId);
 		const bool cancelled = texture->m_CancelRequested || publicationOrphan;
 		const bool publishSucceeded = succeeded && !cancelled;
+		const bool residencyReload = texture->m_IsReloading;
 		SetTextureState(
 			*texture,
-			cancelled ? AssetState::Cancelled :
-				(publishSucceeded ? AssetState::Ready : AssetState::Failed));
+			cancelled ?
+				(residencyReload ? AssetState::CpuReady : AssetState::Cancelled) :
+				(publishSucceeded ? AssetState::Ready :
+					(residencyReload ? AssetState::CpuReady : AssetState::Failed)));
 		ProgressReporter(texture->m_LoadProgress).Report(
 			publishSucceeded ? 1.0f : 0.96f,
 			publishSucceeded ? "Texture ready" :
 				(cancelled ? "Texture upload cancelled" : "Texture GPU upload failed"),
 			texture->m_DebugLabel);
 		texture->m_IsUploaded = publishSucceeded;
+		texture->m_IsReloading = false;
+		if (residencyReload)
+		{
+			texture->m_CancelRequested = false;
+		}
 		if (!publishSucceeded)
 		{
 			texture->m_Srv.Reset();
@@ -724,7 +742,11 @@ namespace gglab
 					priority,
 					std::move(payload->m_TextureData)))
 				{
-					SetTextureState(*currentTexture, AssetState::Failed);
+					const bool residencyReload = currentTexture->m_IsReloading;
+					SetTextureState(
+						*currentTexture,
+						residencyReload ? AssetState::CpuReady : AssetState::Failed);
+					currentTexture->m_IsReloading = false;
 					ProgressReporter(currentTexture->m_LoadProgress).Report(
 						0.68f,
 						"Texture upload recording failed");
@@ -805,7 +827,8 @@ namespace gglab
 		uint64_t generation,
 		TextureSemantic semantic,
 		const TaskCompletionInfo& completion,
-		TextureAssetData&& textureData) noexcept
+		TextureAssetData&& textureData,
+		bool residencyReload) noexcept
 	{
 		Texture* texture = GetTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation)
@@ -815,7 +838,10 @@ namespace gglab
 		m_TextureLoadTasks.erase(textureId);
 		if (texture->m_CancelRequested)
 		{
-			SetTextureState(*texture, AssetState::Cancelled);
+			SetTextureState(
+				*texture,
+				residencyReload ? AssetState::CpuReady : AssetState::Cancelled);
+			texture->m_IsReloading = false;
 			ProgressReporter(texture->m_LoadProgress).Report(
 				0.05f,
 				"Texture loading cancelled",
@@ -825,7 +851,10 @@ namespace gglab
 
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
-			SetTextureState(*texture, AssetState::Cancelled);
+			SetTextureState(
+				*texture,
+				residencyReload ? AssetState::CpuReady : AssetState::Cancelled);
+			texture->m_IsReloading = false;
 			ProgressReporter(texture->m_LoadProgress).Report(
 				0.05f,
 				"Texture loading cancelled",
@@ -834,7 +863,10 @@ namespace gglab
 		}
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
-			SetTextureState(*texture, AssetState::Failed);
+			SetTextureState(
+				*texture,
+				residencyReload ? AssetState::CpuReady : AssetState::Failed);
+			texture->m_IsReloading = false;
 			ProgressReporter(texture->m_LoadProgress).Report(
 				0.05f,
 				"Texture decoding failed",
@@ -857,7 +889,10 @@ namespace gglab
 			semantic);
 		if (!QueueTextureUpload(std::move(uploadData), completion.m_Priority))
 		{
-			SetTextureState(*texture, AssetState::Failed);
+			SetTextureState(
+				*texture,
+				residencyReload ? AssetState::CpuReady : AssetState::Failed);
+			texture->m_IsReloading = false;
 			ProgressReporter(texture->m_LoadProgress).Report(
 				0.62f,
 				"Texture upload queueing failed");
@@ -894,6 +929,16 @@ namespace gglab
 			.m_StableId = textureId.Value(),
 			.m_Generation = generation,
 		}));
+		if (texture->m_IsReloading && !texture->m_Texture.IsValid())
+		{
+			texture->m_IsReloading = false;
+			SetTextureState(*texture, AssetState::CpuReady);
+			ProgressReporter(texture->m_LoadProgress).Report(
+				1.0f,
+				"Texture residency reload cancelled",
+				texture->m_DebugLabel);
+			return;
+		}
 		SetTextureState(
 			*texture,
 			texture->m_Texture.IsValid() ?
@@ -973,6 +1018,73 @@ namespace gglab
 			0.82f,
 			"Texture cancellation rescinded",
 			"A new owner acquired the in-flight texture");
+	}
+
+	TaskHandle TextureRegistry::RequestTextureResidency(
+		TextureID textureId,
+		uint64_t generation,
+		TaskPriority priority) noexcept
+	{
+		Texture* texture = GetTexture(textureId);
+		if (!texture || texture->m_ContentGeneration != generation ||
+			IsReservedTextureId(textureId))
+		{
+			return {};
+		}
+		if (texture->m_State == AssetState::Evicting)
+		{
+			SetTextureState(*texture, AssetState::Ready);
+			return {};
+		}
+		if (texture->m_State != AssetState::CpuReady || texture->m_ResidencyEpoch == 0 ||
+			texture->m_IsReloading || texture->m_SourcePath.empty())
+		{
+			return {};
+		}
+
+		texture->m_CancelRequested = false;
+		texture->m_IsReloading = true;
+		const TextureImportSettings importSettings =
+			MakeTextureImportSettings(texture->m_Semantic);
+		const TaskHandle task = QueueTextureLoad(
+			textureId,
+			texture->m_SourcePath,
+			importSettings,
+			texture->m_Semantic,
+			priority,
+			true);
+		if (!task.IsValid())
+		{
+			texture->m_IsReloading = false;
+		}
+		return task;
+	}
+
+	bool TextureRegistry::FinalizeTextureEviction(
+		TextureID textureId,
+		uint64_t generation) noexcept
+	{
+		Texture* texture = GetTexture(textureId);
+		if (!texture || texture->m_ContentGeneration != generation ||
+			texture->m_State != AssetState::Evicting)
+		{
+			return false;
+		}
+
+		texture->m_Srv.Reset();
+		if (texture->m_Texture.IsValid())
+		{
+			m_Device->DestroyTexture(texture->m_Texture);
+			texture->m_Texture.Reset();
+		}
+		texture->m_IsUploaded = false;
+		texture->m_SrvDimension = RHITextureViewDimension::Unknown;
+		SetTextureState(*texture, AssetState::CpuReady);
+		ProgressReporter(texture->m_LoadProgress).Report(
+			1.0f,
+			"Texture GPU residency released",
+			texture->m_DebugLabel);
+		return true;
 	}
 
 	void TextureRegistry::CreateTextureEntry(
