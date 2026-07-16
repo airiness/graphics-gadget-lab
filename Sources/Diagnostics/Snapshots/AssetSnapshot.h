@@ -78,7 +78,7 @@ namespace gglab
 		uint64_t m_ReadyPayloadHighWatermark = 0;
 		uint64_t m_InFlightUploadBytes = 0;
 		uint64_t m_InFlightUploadHighWatermark = 0;
-		uint64_t m_BacklogBudgetDeferralCount = 0;
+		uint64_t m_UploadPromotionBudgetDeferralCount = 0;
 		uint64_t m_UploadBudgetDeferralCount = 0;
 		uint64_t m_InFlightBudgetDeferralCount = 0;
 		uint64_t m_OversizedAdmissionCount = 0;

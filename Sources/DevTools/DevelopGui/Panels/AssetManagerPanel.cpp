@@ -64,6 +64,22 @@ namespace gglab
 			}
 		}
 
+		[[nodiscard]] const char* PublicationStageText(
+			AssetResourcePublicationStage stage) noexcept
+		{
+			switch (stage)
+			{
+			case AssetResourcePublicationStage::Textures: return "Textures";
+			case AssetResourcePublicationStage::Materials: return "Materials";
+			case AssetResourcePublicationStage::Meshes: return "Meshes";
+			case AssetResourcePublicationStage::MeshInstances: return "Mesh Instances";
+			case AssetResourcePublicationStage::Dependencies: return "Dependencies";
+			case AssetResourcePublicationStage::Commit: return "Commit";
+			case AssetResourcePublicationStage::ReleaseRetains: return "Release Retains";
+			default: return "Unknown";
+			}
+		}
+
 		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state,
 			const AssetSnapshot& assetSnapshot) noexcept
 		{
@@ -372,7 +388,7 @@ namespace gglab
 			const double averageExecution = queue.m_ProcessedCount > 0 ?
 				queue.m_TotalExecutionMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
 			ImGui::Text(
-				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu cancelled=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/max)=%.3f/%.3f ms",
+				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu cancelled=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/p95/max)=%.3f/%.3f/%.3f ms",
 				label,
 				queue.m_PendingCount,
 				queue.m_HighWatermark,
@@ -386,6 +402,7 @@ namespace gglab
 				averageWait,
 				queue.m_MaxQueueMilliseconds,
 				averageExecution,
+				queue.m_ExecutionP95Milliseconds,
 				queue.m_MaxExecutionMilliseconds);
 			if (queue.m_ContinueCount > 0 ||
 				queue.m_CompletedCount > 0 ||
@@ -400,6 +417,47 @@ namespace gglab
 					queue.m_ResourceCreationCount,
 					static_cast<double>(queue.m_PayloadBytesMovedToUpload) / (1024.0 * 1024.0),
 					static_cast<double>(queue.m_PayloadBytesDestroyed) / (1024.0 * 1024.0));
+				ImGui::Text(
+					"Step diagnostics: over-budget=%llu no-progress=%llu injected-faults=%llu",
+					queue.m_OverBudgetExecutionCount,
+					queue.m_NoProgressContinueCount,
+					queue.m_FaultInjectionCount);
+				if (ImGui::BeginTable(
+					"PublicationStageTelemetry",
+					5,
+					ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+				{
+					ImGui::TableSetupColumn("Stage");
+					ImGui::TableSetupColumn("Steps");
+					ImGui::TableSetupColumn("Average (ms)");
+					ImGui::TableSetupColumn("P95 (ms)");
+					ImGui::TableSetupColumn("Max (ms)");
+					ImGui::TableHeadersRow();
+					for (size_t stageIndex = 1;
+						stageIndex < queue.m_PublicationStages.size();
+						++stageIndex)
+					{
+						const auto& stage = queue.m_PublicationStages[stageIndex];
+						if (stage.m_StepCount == 0)
+						{
+							continue;
+						}
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::TextUnformatted(PublicationStageText(
+							static_cast<AssetResourcePublicationStage>(stageIndex)));
+						ImGui::TableSetColumnIndex(1);
+						ImGui::Text("%llu", stage.m_StepCount);
+						ImGui::TableSetColumnIndex(2);
+						ImGui::Text("%.3f", stage.m_TotalMilliseconds /
+							static_cast<double>(stage.m_StepCount));
+						ImGui::TableSetColumnIndex(3);
+						ImGui::Text("%.3f", stage.m_P95Milliseconds);
+						ImGui::TableSetColumnIndex(4);
+						ImGui::Text("%.3f", stage.m_MaxMilliseconds);
+					}
+					ImGui::EndTable();
+				}
 			}
 			if (queue.m_PendingWork.empty())
 			{
@@ -528,7 +586,7 @@ namespace gglab
 				usage.m_GpuFinalizeMilliseconds,
 				budget.m_MaxGpuFinalizeMilliseconds);
 			ImGui::Text(
-				"Observed ready payload: %.2f MiB (high %.2f)   Upload promotion limit: %.2f MiB   In-flight: %.2f/%.2f MiB (high %.2f)",
+				"Observed queued payload: %.2f MiB (high %.2f)   Upload-recording promotion limit: %.2f MiB   In-flight staging: %.2f/%.2f MiB (high %.2f)",
 				static_cast<double>(assetSnapshot.m_ReadyPayloadBytes) / (1024.0 * 1024.0),
 				static_cast<double>(assetSnapshot.m_ReadyPayloadHighWatermark) / (1024.0 * 1024.0),
 				static_cast<double>(budget.m_MaxUploadRecordingBacklogBytes) / (1024.0 * 1024.0),
@@ -536,8 +594,8 @@ namespace gglab
 				static_cast<double>(budget.m_MaxInFlightBytes) / (1024.0 * 1024.0),
 				static_cast<double>(assetSnapshot.m_InFlightUploadHighWatermark) / (1024.0 * 1024.0));
 			ImGui::Text(
-				"Deferrals: backlog=%llu upload-budget=%llu in-flight=%llu   Oversized admissions=%llu",
-				assetSnapshot.m_BacklogBudgetDeferralCount,
+				"Deferrals: upload-promotion=%llu upload-budget=%llu in-flight=%llu   Oversized admissions=%llu",
+				assetSnapshot.m_UploadPromotionBudgetDeferralCount,
 				assetSnapshot.m_UploadBudgetDeferralCount,
 				assetSnapshot.m_InFlightBudgetDeferralCount,
 				assetSnapshot.m_OversizedAdmissionCount);
