@@ -58,6 +58,31 @@ namespace gglab
 		std::vector<AssetInterestActivity> m_ActiveInterests;
 	};
 
+	struct AssetResidencyConfig
+	{
+		bool m_EnableAutomaticEviction = false;
+		uint64_t m_HighWatermarkBytes = 512ull * 1024ull * 1024ull;
+		uint64_t m_LowWatermarkBytes = 384ull * 1024ull * 1024ull;
+		uint64_t m_MinUnusedFrames = 120;
+		uint32_t m_MaxEvictionsPerFrame = 8;
+	};
+
+	struct AssetResidencyStatistics
+	{
+		AssetResidencyConfig m_Config{};
+		uint64_t m_LogicalResidentBytes = 0;
+		uint64_t m_PendingEvictionBytes = 0;
+		uint32_t m_PendingEvictionCount = 0;
+		uint32_t m_ReloadingAssetCount = 0;
+		uint64_t m_EvictionCount = 0;
+		uint64_t m_EvictedBytes = 0;
+		uint64_t m_EvictionCancellationCount = 0;
+		uint64_t m_ReloadRequestCount = 0;
+		uint64_t m_ReloadCoalescedCount = 0;
+		uint32_t m_LastFrameReloadRequestCount = 0;
+		uint32_t m_ReloadRequestHighWatermark = 0;
+	};
+
 	class RHIDevice;
 	class AssetUploadScheduler;
 	class AssetLease;
@@ -138,6 +163,12 @@ namespace gglab
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 		[[nodiscard]] AssetOwnerScope CreateOwnerScope(std::string label) noexcept;
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
+		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
+		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
+		{
+			return m_ResidencyConfig;
+		}
+		[[nodiscard]] AssetResidencyStatistics GetResidencyStatistics() const noexcept;
 		void Tick() noexcept;
 		void MarkModelUsed(ModelID modelId) noexcept;
 		void MarkMeshUsed(MeshID meshId) noexcept;
@@ -274,6 +305,15 @@ namespace gglab
 			uint64_t m_EventUpdateCount = 0;
 		};
 
+		struct PendingResidencyEviction
+		{
+			AssetInterestKind m_Kind = AssetInterestKind::Texture;
+			uint64_t m_StableId = 0;
+			uint64_t m_Generation = 0;
+			uint64_t m_ResidentBytes = 0;
+			uint64_t m_QuiescedFrame = 0;
+		};
+
 		struct LeaseRecord
 		{
 			InterestKey m_Key{};
@@ -330,7 +370,26 @@ namespace gglab
 			const InterestKey& key,
 			TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] bool HasActiveInterest(const InterestKey& key) const noexcept;
+		[[nodiscard]] bool HasPinnedDependentModel(
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation) const noexcept;
 		void MarkAssetUsed(AssetLifecycle& lifecycle) noexcept;
+		void FinalizeResidencyEvictions() noexcept;
+		void SelectResidencyEvictions() noexcept;
+		void RequestModelResidency(ModelID modelId, uint64_t generation) noexcept;
+		[[nodiscard]] TaskHandle RequestTextureResidency(
+			TextureID textureId,
+			uint64_t generation,
+			TaskPriority priority) noexcept;
+		void RequestMeshResidency(
+			MeshID meshId,
+			uint64_t generation,
+			TaskPriority priority) noexcept;
+		void QueueMeshResidencyReload(
+			ModelID sourceModelId,
+			TaskPriority priority) noexcept;
+		[[nodiscard]] uint64_t ComputeLogicalResidentBytes() const noexcept;
 		[[nodiscard]] static bool SetResidencyPolicy(
 			AssetLifecycle& lifecycle,
 			AssetResidencyPolicy policy,
@@ -386,6 +445,7 @@ namespace gglab
 		MaterialContainer m_MaterialContainer;
 		ModelContainer m_ModelContainer;
 		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
+		std::unordered_map<ModelID, TaskHandle> m_MeshReloadTasks;
 		std::unordered_set<ModelID> m_PendingModels;
 		uint64_t m_NextAssetOwnerId = 1;
 		uint64_t m_NextAssetLeaseToken = 1;
@@ -408,6 +468,17 @@ namespace gglab
 		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		uint64_t m_AssetUsageFrame = 0;
+		AssetResidencyConfig m_ResidencyConfig{};
+		std::vector<PendingResidencyEviction> m_PendingResidencyEvictions;
+		uint64_t m_LogicalResidentBytes = 0;
+		uint64_t m_ResidencyEvictionCount = 0;
+		uint64_t m_ResidencyEvictedBytes = 0;
+		uint64_t m_ResidencyEvictionCancellationCount = 0;
+		uint64_t m_ResidencyReloadRequestCount = 0;
+		uint64_t m_ResidencyReloadCoalescedCount = 0;
+		uint32_t m_CurrentFrameReloadRequestCount = 0;
+		uint32_t m_LastFrameReloadRequestCount = 0;
+		uint32_t m_ReloadRequestHighWatermark = 0;
 		uint64_t m_DependencyGraphBuildCount = 0;
 		uint64_t m_DependencyEventUpdateCount = 0;
 		uint64_t m_DependencyValidationCount = 0;

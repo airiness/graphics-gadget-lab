@@ -69,6 +69,8 @@ namespace gglab
 			return { state, 0.85f, std::string(GetGpuProcessingStage(kind)), {} };
 		case AssetState::Ready:
 			return { state, 1.0f, "Asset ready", {} };
+		case AssetState::Evicting:
+			return { state, 1.0f, "Retiring GPU residency", {} };
 		case AssetState::Failed:
 			return { state, 0.0f, "Asset loading failed", {} };
 		case AssetState::Cancelled:

@@ -29,6 +29,32 @@ namespace gglab
 		snapshot.m_DependencyValidationCount = assetManager.m_DependencyValidationCount;
 		snapshot.m_DependencyValidationMismatchCount =
 			assetManager.m_DependencyValidationMismatchCount;
+		const AssetResidencyStatistics residency =
+			assetManager.GetResidencyStatistics();
+		snapshot.m_AutomaticResidencyEvictionEnabled =
+			residency.m_Config.m_EnableAutomaticEviction;
+		snapshot.m_ResidencyHighWatermarkBytes =
+			residency.m_Config.m_HighWatermarkBytes;
+		snapshot.m_ResidencyLowWatermarkBytes =
+			residency.m_Config.m_LowWatermarkBytes;
+		snapshot.m_ResidencyMinUnusedFrames =
+			residency.m_Config.m_MinUnusedFrames;
+		snapshot.m_MaxResidencyEvictionsPerFrame =
+			residency.m_Config.m_MaxEvictionsPerFrame;
+		snapshot.m_LogicalResidentBytes = residency.m_LogicalResidentBytes;
+		snapshot.m_PendingEvictionBytes = residency.m_PendingEvictionBytes;
+		snapshot.m_PendingEvictionCount = residency.m_PendingEvictionCount;
+		snapshot.m_ReloadingAssetCount = residency.m_ReloadingAssetCount;
+		snapshot.m_ResidencyEvictionCount = residency.m_EvictionCount;
+		snapshot.m_ResidencyEvictedBytes = residency.m_EvictedBytes;
+		snapshot.m_ResidencyEvictionCancellationCount =
+			residency.m_EvictionCancellationCount;
+		snapshot.m_ResidencyReloadRequestCount = residency.m_ReloadRequestCount;
+		snapshot.m_ResidencyReloadCoalescedCount = residency.m_ReloadCoalescedCount;
+		snapshot.m_LastFrameReloadRequestCount =
+			residency.m_LastFrameReloadRequestCount;
+		snapshot.m_ReloadRequestHighWatermark =
+			residency.m_ReloadRequestHighWatermark;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetInterestKind kind,
@@ -62,18 +88,6 @@ namespace gglab
 				snapshot.m_EvictionCandidateCount += evictionCandidate ? 1u : 0u;
 			};
 
-		const auto findModelSourcePath = [&assetManager](ModelID modelId) -> std::filesystem::path
-			{
-				for (const auto& [path, pathModelId] : assetManager.m_ModelContainer.m_PathIDMap)
-				{
-					if (pathModelId == modelId)
-					{
-						return path;
-					}
-				}
-				return {};
-			};
-
 		snapshot.m_Models.reserve(assetManager.m_ModelContainer.m_ModelIDMap.size());
 		for (const auto& [modelId, model] : assetManager.m_ModelContainer.m_ModelIDMap)
 		{
@@ -87,7 +101,7 @@ namespace gglab
 			modelSnapshot.m_ContentState = model->m_ContentState;
 			modelSnapshot.m_ResidencyState = model->m_ResidencyState;
 			modelSnapshot.m_ResidencyPolicy = model->m_ResidencyPolicy;
-			modelSnapshot.m_SourcePath = findModelSourcePath(modelId);
+			modelSnapshot.m_SourcePath = model->m_SourcePath;
 			modelSnapshot.m_Type = model->m_Type;
 			modelSnapshot.m_Name = model->m_Name;
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());

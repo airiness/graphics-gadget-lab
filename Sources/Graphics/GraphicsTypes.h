@@ -52,6 +52,7 @@ namespace gglab
 		UploadQueued,
 		GpuProcessing,
 		Ready,
+		Evicting,
 		Failed,
 		Cancelled,
 	};
@@ -107,6 +108,7 @@ namespace gglab
 		case AssetState::UploadQueued:
 		case AssetState::GpuProcessing:
 		case AssetState::Ready:
+		case AssetState::Evicting:
 			return AssetContentState::Ready;
 		case AssetState::Failed:
 			return AssetContentState::Failed;
@@ -127,6 +129,8 @@ namespace gglab
 			return AssetResidencyState::Uploading;
 		case AssetState::Ready:
 			return AssetResidencyState::Resident;
+		case AssetState::Evicting:
+			return AssetResidencyState::Evicting;
 		case AssetState::Unloaded:
 		case AssetState::Queued:
 		case AssetState::LoadingCpu:
@@ -437,6 +441,7 @@ namespace gglab
 		ProgressChannelPtr m_LoadProgress;
 		bool m_IsUploaded = false;
 		bool m_CancelRequested = false;
+		bool m_IsReloading = false;
 	};
 
 	struct Sampler
@@ -487,6 +492,9 @@ namespace gglab
 		bool m_IsUploaded = false;
 		bool m_HasBounds = false;
 		bool m_CancelRequested = false;
+		bool m_IsReloading = false;
+		ModelID m_SourceModelId{};
+		uint32_t m_SourceMeshIndex = std::numeric_limits<uint32_t>::max();
 
 		StringID m_Name{};
 		ProgressChannelPtr m_LoadProgress;
@@ -516,6 +524,7 @@ namespace gglab
 		ModelID m_Id{};
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
+		std::filesystem::path m_SourcePath;
 		ProgressChannelPtr m_LoadProgress;
 		bool m_CancelRequested = false;
 		std::vector<ModelMesh> m_MeshInstance;

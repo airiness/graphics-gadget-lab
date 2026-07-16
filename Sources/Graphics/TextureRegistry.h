@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/GraphicsTypes.h"
@@ -27,21 +28,17 @@ namespace gglab
 			std::filesystem::path m_CanonicalPath;
 			TextureImportSettings m_ImportSettings{};
 
+			[[nodiscard]] auto AsTuple() const noexcept
+			{
+				return std::tuple{
+					std::filesystem::hash_value(m_CanonicalPath),
+					m_ImportSettings.m_Semantic,
+					m_ImportSettings.m_MipPolicy,
+				};
+			}
 			bool operator==(const TextureCacheKey&) const noexcept = default;
 		};
-
-		struct TextureCacheKeyHash
-		{
-			size_t operator()(const TextureCacheKey& key) const noexcept
-			{
-				size_t hash = std::filesystem::hash_value(key.m_CanonicalPath);
-				hash ^= static_cast<size_t>(key.m_ImportSettings.m_Semantic) +
-					0x9e3779b9u + (hash << 6) + (hash >> 2);
-				hash ^= static_cast<size_t>(key.m_ImportSettings.m_MipPolicy) +
-					0x9e3779b9u + (hash << 6) + (hash >> 2);
-				return hash;
-			}
-		};
+		using TextureCacheKeyHash = KeyHash<TextureCacheKey>;
 
 	public:
 		struct CreateInfo
@@ -134,19 +131,28 @@ namespace gglab
 			uint64_t generation,
 			TaskPriority priority) noexcept;
 		void ReviveTextureInterest(TextureID textureId, uint64_t generation) noexcept;
+		[[nodiscard]] TaskHandle RequestTextureResidency(
+			TextureID textureId,
+			uint64_t generation,
+			TaskPriority priority) noexcept;
+		[[nodiscard]] bool FinalizeTextureEviction(
+			TextureID textureId,
+			uint64_t generation) noexcept;
 		void RollbackPublicationTexture(TextureID textureId, uint64_t generation) noexcept;
 		void CompleteTextureLoad(
 			TextureID textureId,
 			uint64_t generation,
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
-			TextureAssetData&& textureData) noexcept;
+			TextureAssetData&& textureData,
+			bool residencyReload) noexcept;
 		[[nodiscard]] TaskHandle QueueTextureLoad(
 			TextureID textureId,
 			const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings,
 			TextureSemantic semantic,
-			TaskPriority priority) noexcept;
+			TaskPriority priority,
+			bool residencyReload = false) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 		void SetStateChangeCallback(
 			std::function<void(TextureID, uint64_t, AssetState)> callback) noexcept;
