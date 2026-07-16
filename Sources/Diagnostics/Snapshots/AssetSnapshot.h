@@ -10,30 +10,50 @@ namespace gglab
 		struct Model
 		{
 			ModelID m_Id{};
-			uint64_t m_Generation = 0;
+			uint64_t m_ContentGeneration = 0;
+			uint64_t m_ResidencyEpoch = 0;
+			uint64_t m_LastUsedFrame = 0;
+			uint64_t m_UseCount = 0;
 			AssetState m_State = AssetState::Unloaded;
+			AssetContentState m_ContentState = AssetContentState::Unloaded;
+			AssetResidencyState m_ResidencyState = AssetResidencyState::NonResident;
+			AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
 			std::filesystem::path m_SourcePath;
 			ModelType m_Type = ModelType::Invalid;
 			StringID m_Name{};
 			uint32_t m_MeshInstanceCount = 0;
+			bool m_IsEvictionCandidate = false;
 		};
 
 		struct Mesh
 		{
 			MeshID m_Id{};
-			uint64_t m_Generation = 0;
+			uint64_t m_ContentGeneration = 0;
+			uint64_t m_ResidencyEpoch = 0;
+			uint64_t m_LastUsedFrame = 0;
+			uint64_t m_UseCount = 0;
 			AssetState m_State = AssetState::Unloaded;
+			AssetContentState m_ContentState = AssetContentState::Unloaded;
+			AssetResidencyState m_ResidencyState = AssetResidencyState::NonResident;
+			AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
 			StringID m_Name{};
 			uint32_t m_VertexCount = 0;
 			uint32_t m_IndexCount = 0;
 			bool m_IsUploaded = false;
+			bool m_IsEvictionCandidate = false;
 		};
 
 		struct Texture
 		{
 			TextureID m_Id{};
-			uint64_t m_Generation = 0;
+			uint64_t m_ContentGeneration = 0;
+			uint64_t m_ResidencyEpoch = 0;
+			uint64_t m_LastUsedFrame = 0;
+			uint64_t m_UseCount = 0;
 			AssetState m_State = AssetState::Unloaded;
+			AssetContentState m_ContentState = AssetContentState::Unloaded;
+			AssetResidencyState m_ResidencyState = AssetResidencyState::NonResident;
+			AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
 			std::filesystem::path m_SourcePath;
 			TextureSemantic m_Semantic = TextureSemantic::Unknown;
 			StringID m_Name{};
@@ -41,6 +61,7 @@ namespace gglab
 			std::string m_DebugName;
 			bool m_IsUploaded = false;
 			bool m_IsReserved = false;
+			bool m_IsEvictionCandidate = false;
 		};
 
 		struct Upload
@@ -68,6 +89,11 @@ namespace gglab
 		std::vector<Model> m_Models;
 		std::vector<Mesh> m_Meshes;
 		std::vector<Texture> m_Textures;
+		uint64_t m_AssetUsageFrame = 0;
+		uint32_t m_ResidentAssetCount = 0;
+		uint32_t m_PinnedAssetCount = 0;
+		uint32_t m_CacheableAssetCount = 0;
+		uint32_t m_EvictionCandidateCount = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;
 		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
 		AssetStreamingQueueStatistics m_UploadRecordingQueue;

@@ -516,6 +516,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -1275,6 +1278,9 @@
       <Filter>Application\Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h">

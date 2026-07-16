@@ -827,7 +827,7 @@ namespace gglab
 			return;
 		}
 		const Model* model = GetModel(modelId);
-		if (!model || model->m_Generation != generation || model->m_MeshInstance.empty())
+		if (!model || model->m_ContentGeneration != generation || model->m_MeshInstance.empty())
 		{
 			return;
 		}
@@ -872,7 +872,7 @@ namespace gglab
 					owner,
 					AssetInterestKind::Mesh,
 					meshId.Value(),
-					mesh->m_Generation,
+					mesh->m_ContentGeneration,
 					priority,
 					true));
 			}
@@ -885,7 +885,7 @@ namespace gglab
 					owner,
 					AssetInterestKind::Texture,
 					textureId.Value(),
-					texture->m_Generation,
+					texture->m_ContentGeneration,
 					priority,
 					true));
 			}
@@ -946,7 +946,7 @@ namespace gglab
 		{
 			const TextureID textureId{ static_cast<uint32_t>(key.m_StableId) };
 			const Texture* texture = m_TextureRegistry->GetTexture(textureId);
-			if (!texture || texture->m_Generation != generation)
+			if (!texture || texture->m_ContentGeneration != generation)
 			{
 				return;
 			}
@@ -983,7 +983,7 @@ namespace gglab
 		uint64_t generation) noexcept
 	{
 		Model* model = GetModel(modelId);
-		if (!model || model->m_Generation != generation || IsTerminalAssetState(model->m_State))
+		if (!model || model->m_ContentGeneration != generation || IsTerminalAssetState(model->m_State))
 		{
 			return;
 		}
@@ -1014,7 +1014,7 @@ namespace gglab
 		{
 			++m_GpuDeferredCancellationCount;
 		}
-		model->m_State = AssetState::Cancelled;
+		SetAssetState(*model, AssetState::Cancelled);
 		m_PendingModels.erase(modelId);
 		ProgressReporter(model->m_LoadProgress).Report(
 			0.96f,
@@ -1027,7 +1027,7 @@ namespace gglab
 		uint64_t generation) noexcept
 	{
 		Mesh* mesh = GetMesh(meshId);
-		if (!mesh || mesh->m_Generation != generation || IsTerminalAssetState(mesh->m_State))
+		if (!mesh || mesh->m_ContentGeneration != generation || IsTerminalAssetState(mesh->m_State))
 		{
 			return;
 		}
@@ -1051,8 +1051,10 @@ namespace gglab
 			GGLAB_UNUSED(cancelledReadyWork);
 			++m_ReadyCancellationCount;
 		}
-		mesh->m_State = mesh->m_VertexBuffer || mesh->m_IndexBuffer ?
-			AssetState::GpuProcessing : AssetState::Cancelled;
+		SetAssetState(
+			*mesh,
+			mesh->m_VertexBuffer || mesh->m_IndexBuffer ?
+				AssetState::GpuProcessing : AssetState::Cancelled);
 		ProgressReporter(mesh->m_LoadProgress).Report(
 			0.96f,
 			mesh->m_VertexBuffer ?
@@ -1089,7 +1091,7 @@ namespace gglab
 				const auto task = m_ModelLoadTasks.find(existing);
 				return {
 					.m_ModelId = existing,
-					.m_Generation = model->m_Generation,
+					.m_Generation = model->m_ContentGeneration,
 					.m_Task = task != m_ModelLoadTasks.end() ? task->second : TaskHandle{},
 				};
 			}
@@ -1099,7 +1101,7 @@ namespace gglab
 		const ModelID modelId = CreateModel(canonicalPath, AssetState::Queued);
 		Model* model = GetModel(modelId);
 		GGLAB_ASSERT_NOT_NULL(model);
-		const uint64_t generation = model->m_Generation;
+		const uint64_t generation = model->m_ContentGeneration;
 		model->m_Name = StringID(canonicalPath.filename().generic_string());
 		model->m_Type = ModelType::GlTF;
 
@@ -1130,7 +1132,7 @@ namespace gglab
 				const TaskCompletionInfo& completion) noexcept
 			{
 				const Model* currentModel = GetModel(modelId);
-				if (!currentModel || currentModel->m_Generation != generation ||
+				if (!currentModel || currentModel->m_ContentGeneration != generation ||
 					currentModel->m_CancelRequested)
 				{
 					m_ModelLoadTasks.erase(modelId);
@@ -1159,7 +1161,7 @@ namespace gglab
 			});
 		if (!task.IsValid())
 		{
-			model->m_State = AssetState::Failed;
+			SetAssetState(*model, AssetState::Failed);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.05f,
 				"Model import submission failed",
@@ -1188,11 +1190,100 @@ namespace gglab
 
 	void AssetManager::Tick() noexcept
 	{
+		++m_AssetUsageFrame;
 		std::erase_if(m_PendingModels,
 			[this](ModelID modelId) noexcept
 			{
 				return RefreshModelState(modelId);
 			});
+	}
+
+	void AssetManager::MarkAssetUsed(AssetLifecycle& lifecycle) noexcept
+	{
+		if (lifecycle.m_ResidencyState != AssetResidencyState::Resident ||
+			m_AssetUsageFrame == 0)
+		{
+			return;
+		}
+		if (lifecycle.m_LastUsedFrame != m_AssetUsageFrame)
+		{
+			lifecycle.m_LastUsedFrame = m_AssetUsageFrame;
+			++lifecycle.m_UseCount;
+		}
+	}
+
+	void AssetManager::MarkModelUsed(ModelID modelId) noexcept
+	{
+		if (Model* model = GetModel(modelId))
+		{
+			MarkAssetUsed(*model);
+		}
+	}
+
+	void AssetManager::MarkMeshUsed(MeshID meshId) noexcept
+	{
+		if (Mesh* mesh = GetMesh(meshId))
+		{
+			MarkAssetUsed(*mesh);
+		}
+	}
+
+	void AssetManager::MarkTextureUsed(TextureID textureId) noexcept
+	{
+		if (Texture* texture = m_TextureRegistry->GetTexture(textureId))
+		{
+			MarkAssetUsed(*texture);
+		}
+	}
+
+	bool AssetManager::SetResidencyPolicy(
+		AssetLifecycle& lifecycle,
+		AssetResidencyPolicy policy,
+		bool isReserved) noexcept
+	{
+		if (isReserved && policy != AssetResidencyPolicy::Pinned)
+		{
+			return false;
+		}
+		lifecycle.m_ResidencyPolicy = policy;
+		return true;
+	}
+
+	bool AssetManager::SetModelResidencyPolicy(
+		ModelID modelId,
+		AssetResidencyPolicy policy) noexcept
+	{
+		Model* model = GetModel(modelId);
+		return model && SetResidencyPolicy(*model, policy, IsReservedModelId(modelId));
+	}
+
+	bool AssetManager::SetMeshResidencyPolicy(
+		MeshID meshId,
+		AssetResidencyPolicy policy) noexcept
+	{
+		Mesh* mesh = GetMesh(meshId);
+		return mesh && SetResidencyPolicy(*mesh, policy, IsReservedMeshId(meshId));
+	}
+
+	bool AssetManager::SetTextureResidencyPolicy(
+		TextureID textureId,
+		AssetResidencyPolicy policy) noexcept
+	{
+		Texture* texture = m_TextureRegistry->GetTexture(textureId);
+		return texture && SetResidencyPolicy(
+			*texture,
+			policy,
+			IsReservedTextureId(textureId));
+	}
+
+	Texture* AssetManager::GetTexture(TextureID textureId) noexcept
+	{
+		return m_TextureRegistry->GetTexture(textureId);
+	}
+
+	const Texture* AssetManager::GetTexture(TextureID textureId) const noexcept
+	{
+		return m_TextureRegistry->GetTexture(textureId);
 	}
 
 	Mesh* AssetManager::GetMesh(MeshID meshId) noexcept
@@ -1256,7 +1347,7 @@ namespace gglab
 		uint64_t generation) noexcept
 	{
 		Mesh* mesh = GetMesh(meshId);
-		if (!mesh || mesh->m_Generation != generation)
+		if (!mesh || mesh->m_ContentGeneration != generation)
 		{
 			return;
 		}
@@ -1271,7 +1362,7 @@ namespace gglab
 			mesh->m_State != AssetState::Ready)
 		{
 			m_PublicationOrphanedMeshes.insert(meshId);
-			mesh->m_State = AssetState::GpuProcessing;
+			SetAssetState(*mesh, AssetState::GpuProcessing);
 			ProgressReporter(mesh->m_LoadProgress).Report(
 				0.96f,
 				"Mesh publication rollback pending GPU completion");
@@ -1308,15 +1399,20 @@ namespace gglab
 		{
 			mesh->m_LoadProgress = std::make_shared<ProgressChannel>();
 		}
-		if (mesh->m_Generation == 0)
+		if (mesh->m_ContentGeneration == 0)
 		{
-			mesh->m_Generation = 1;
+			BeginAssetContentGeneration(
+				*mesh,
+				1,
+				AssetState::CpuReady,
+				IsReservedMeshId(meshId) ?
+					AssetResidencyPolicy::Pinned : AssetResidencyPolicy::Cacheable);
 		}
 
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
 		Mesh* storedMesh = GetMesh(meshId);
-		storedMesh->m_State = AssetState::CpuReady;
+		SetAssetState(*storedMesh, AssetState::CpuReady);
 		ProgressReporter(storedMesh->m_LoadProgress).Report(
 			0.62f,
 			"Procedural mesh CPU data ready",
@@ -1327,7 +1423,7 @@ namespace gglab
 
 		if (!QueueMeshUpload(std::move(meshUploadData), TaskPriority::Normal))
 		{
-			storedMesh->m_State = AssetState::Failed;
+			SetAssetState(*storedMesh, AssetState::Failed);
 		}
 
 		return meshId;
@@ -1381,11 +1477,16 @@ namespace gglab
 		{
 			model->m_LoadProgress = std::make_shared<ProgressChannel>();
 		}
-		if (model->m_Generation == 0)
+		if (model->m_ContentGeneration == 0)
 		{
-			model->m_Generation = 1;
+			BeginAssetContentGeneration(
+				*model,
+				1,
+				AssetState::CpuReady,
+				IsReservedModelId(modelId) ?
+					AssetResidencyPolicy::Pinned : AssetResidencyPolicy::Cacheable);
 		}
-		model->m_State = AssetState::CpuReady;
+		SetAssetState(*model, AssetState::CpuReady);
 
 		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
 		m_PendingModels.insert(modelId);
@@ -1425,7 +1526,7 @@ namespace gglab
 			GGLAB_ASSERT_MSG(false, "UploadMesh: Invalid MeshID, check it!");
 			return false;
 		}
-		mesh->m_State = AssetState::UploadQueued;
+		SetAssetState(*mesh, AssetState::UploadQueued);
 
 		const auto& verticesData = uploadData.m_VerticesData;
 		const auto& indicesData = uploadData.m_IndicesData;
@@ -1445,14 +1546,14 @@ namespace gglab
 
 		if (vertexBufferSize == 0 || indexBufferSize == 0)
 		{
-			mesh->m_State = AssetState::Failed;
+			SetAssetState(*mesh, AssetState::Failed);
 			GGLAB_LOG_GRAPHICS_WARN("AssetManager::UploadMesh received an empty mesh.");
 			return false;
 		}
 		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
 			indexBufferSize > std::numeric_limits<uint32_t>::max())
 		{
-			mesh->m_State = AssetState::Failed;
+			SetAssetState(*mesh, AssetState::Failed);
 			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh mesh buffers exceed RHI binding size limits.");
 			return false;
 		}
@@ -1489,7 +1590,7 @@ namespace gglab
 			m_Device->CreateBuffer(indexBufferDesc, indexDebugIdentity);
 		if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
 		{
-			mesh->m_State = AssetState::Failed;
+			SetAssetState(*mesh, AssetState::Failed);
 			if (vertexBuffer.IsValid())
 			{
 				m_Device->DestroyBuffer(vertexBuffer);
@@ -1514,7 +1615,7 @@ namespace gglab
 			"AssetManager failed to record mesh buffer uploads.");
 		if (!vertexUploadSucceeded || !indexUploadSucceeded)
 		{
-			mesh->m_State = AssetState::Failed;
+			SetAssetState(*mesh, AssetState::Failed);
 			return false;
 		}
 
@@ -1528,7 +1629,7 @@ namespace gglab
 		mesh->m_IndexBufferBinding.m_SizeInBytes = static_cast<uint32_t>(indexBufferSize);
 		mesh->m_IndexBufferBinding.m_Format = RHIFormat::R32Uint;
 
-		mesh->m_State = AssetState::GpuProcessing;
+		SetAssetState(*mesh, AssetState::GpuProcessing);
 		return true;
 	}
 
@@ -1543,11 +1644,11 @@ namespace gglab
 		}
 
 		const MeshID meshId = uploadData.m_MeshId;
-		const uint64_t generation = mesh->m_Generation;
+		const uint64_t generation = mesh->m_ContentGeneration;
 		const AssetStreamingWorkEstimate estimate = EstimateMeshUpload(uploadData);
 		if (mesh->m_State != AssetState::Publishing)
 		{
-			mesh->m_State = AssetState::CpuReady;
+			SetAssetState(*mesh, AssetState::CpuReady);
 		}
 		ProgressReporter(mesh->m_LoadProgress).Report(
 			0.62f,
@@ -1569,13 +1670,13 @@ namespace gglab
 			[this, meshId, generation, estimate, priority, payload]() mutable noexcept
 			{
 				Mesh* currentMesh = GetMesh(meshId);
-				if (!currentMesh || currentMesh->m_Generation != generation)
+				if (!currentMesh || currentMesh->m_ContentGeneration != generation)
 				{
 					return;
 				}
 				if (currentMesh->m_CancelRequested)
 				{
-					currentMesh->m_State = AssetState::Cancelled;
+					SetAssetState(*currentMesh, AssetState::Cancelled);
 					return;
 				}
 
@@ -1598,7 +1699,7 @@ namespace gglab
 					[this, meshId, generation](const AssetUploadCompletionInfo& completion) noexcept
 					{
 						const Mesh* currentMesh = GetMesh(meshId);
-						if (!currentMesh || currentMesh->m_Generation != generation)
+						if (!currentMesh || currentMesh->m_ContentGeneration != generation)
 						{
 							return;
 						}
@@ -1620,8 +1721,10 @@ namespace gglab
 		const bool publicationOrphan = m_PublicationOrphanedMeshes.contains(meshId);
 		const bool cancelled = mesh->m_CancelRequested || publicationOrphan;
 		const bool publishSucceeded = succeeded && !cancelled;
-		mesh->m_State = cancelled ? AssetState::Cancelled :
-			(publishSucceeded ? AssetState::Ready : AssetState::Failed);
+		SetAssetState(
+			*mesh,
+			cancelled ? AssetState::Cancelled :
+				(publishSucceeded ? AssetState::Ready : AssetState::Failed));
 		ProgressReporter(mesh->m_LoadProgress).Report(
 			publishSucceeded ? 1.0f : 0.96f,
 			publishSucceeded ? "Mesh ready" :
@@ -1685,14 +1788,14 @@ namespace gglab
 			return { .m_Status = AssetResourcePublicationStepStatus::Cancelled };
 		}
 		Model* model = GetModel(transaction.m_ModelId);
-		if (!model || model->m_Generation != transaction.m_Generation ||
+		if (!model || model->m_ContentGeneration != transaction.m_Generation ||
 			model->m_CancelRequested)
 		{
 			return { .m_Status = AssetResourcePublicationStepStatus::Cancelled };
 		}
 		if (model->m_State == AssetState::CpuReady)
 		{
-			model->m_State = AssetState::Publishing;
+			SetAssetState(*model, AssetState::Publishing);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.64f,
 				"Publishing model resources incrementally");
@@ -1736,7 +1839,7 @@ namespace gglab
 						.m_StableId = textureId.Value(),
 					};
 					if (HasActiveInterest(textureKey) ||
-						HasPublicationRetain(textureKey, texture->m_Generation))
+						HasPublicationRetain(textureKey, texture->m_ContentGeneration))
 					{
 						return failed(
 							std::format("Terminal texture {} is still retained", textureId.Value()),
@@ -1768,11 +1871,11 @@ namespace gglab
 							{ .m_PayloadBytesDestroyed = sourceBytes });
 					}
 					created = true;
-					texture->m_State = AssetState::Publishing;
+					SetAssetState(*texture, AssetState::Publishing);
 				}
 
 				transaction.m_TextureIds[textureIndex] = textureId;
-				const uint64_t textureGeneration = texture->m_Generation;
+				const uint64_t textureGeneration = texture->m_ContentGeneration;
 				auto retain = AcquirePublicationRetain(
 					AssetInterestKind::Texture,
 					textureId.Value(),
@@ -1919,22 +2022,22 @@ namespace gglab
 				mesh->m_Sphere = importedMesh.m_Sphere;
 				mesh->m_Aabb = importedMesh.m_Aabb;
 				mesh->m_HasBounds = importedMesh.m_HasBounds;
-				mesh->m_State = AssetState::Publishing;
+				SetAssetState(*mesh, AssetState::Publishing);
 				auto retain = AcquirePublicationRetain(
 					AssetInterestKind::Mesh,
 					meshId.Value(),
-					mesh->m_Generation);
+					mesh->m_ContentGeneration);
 				transaction.m_Claims.push_back({
 					.m_Kind = AssetInterestKind::Mesh,
 					.m_StableId = meshId.Value(),
-					.m_Generation = mesh->m_Generation,
+					.m_Generation = mesh->m_ContentGeneration,
 					.m_Origin = ClaimOrigin::Created,
 					.m_Retain = std::move(retain),
 				});
 				addDependency(
 					AssetInterestKind::Mesh,
 					meshId.Value(),
-					mesh->m_Generation);
+					mesh->m_ContentGeneration);
 
 				MeshUploadData uploadData{};
 				uploadData.m_MeshId = meshId;
@@ -2066,7 +2169,7 @@ namespace gglab
 					transaction.m_ModelId,
 					std::move(transaction.m_DependencyLeaseTokens));
 				transaction.m_DependencyOwner = {};
-				model->m_State = AssetState::UploadQueued;
+				SetAssetState(*model, AssetState::UploadQueued);
 				m_PendingModels.insert(transaction.m_ModelId);
 				transaction.m_Committed = true;
 				transaction.m_Stage = Stage::ReleaseRetains;
@@ -2193,11 +2296,13 @@ namespace gglab
 		}
 
 		Model* model = GetModel(transaction.m_ModelId);
-		if (model && model->m_Generation == transaction.m_Generation)
+		if (model && model->m_ContentGeneration == transaction.m_Generation)
 		{
 			model->m_MeshInstance.clear();
-			model->m_State = reason == AssetResourcePublicationAbortReason::Failed ?
-				AssetState::Failed : AssetState::Cancelled;
+			SetAssetState(
+				*model,
+				reason == AssetResourcePublicationAbortReason::Failed ?
+					AssetState::Failed : AssetState::Cancelled);
 			m_PendingModels.erase(transaction.m_ModelId);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.62f,
@@ -2213,14 +2318,14 @@ namespace gglab
 		ImportedModel&& importedModel) noexcept
 	{
 		Model* model = GetModel(modelId);
-		if (!model || model->m_Generation != generation)
+		if (!model || model->m_ContentGeneration != generation)
 		{
 			return;
 		}
 		m_ModelLoadTasks.erase(modelId);
 		if (model->m_CancelRequested)
 		{
-			model->m_State = AssetState::Cancelled;
+			SetAssetState(*model, AssetState::Cancelled);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.05f,
 				"Model import cancelled",
@@ -2230,7 +2335,7 @@ namespace gglab
 
 		if (completion.m_Status == TaskStatus::Cancelled)
 		{
-			model->m_State = AssetState::Cancelled;
+			SetAssetState(*model, AssetState::Cancelled);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.05f,
 				"Model import cancelled",
@@ -2239,7 +2344,7 @@ namespace gglab
 		}
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
-			model->m_State = AssetState::Failed;
+			SetAssetState(*model, AssetState::Failed);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.05f,
 				"Model import failed",
@@ -2251,7 +2356,7 @@ namespace gglab
 			return;
 		}
 
-		model->m_State = AssetState::CpuReady;
+		SetAssetState(*model, AssetState::CpuReady);
 		ProgressReporter(model->m_LoadProgress).Report(
 			0.62f,
 			"Queued for resource publication",
@@ -2289,8 +2394,10 @@ namespace gglab
 		const auto meshId = m_MeshIdCounter.Acquire();
 		auto idMeshPair = m_MeshContainer.m_MeshIDMap.emplace(meshId, std::make_unique<Mesh>());
 		GGLAB_ASSERT_MSG(idMeshPair.second == true, "Emplace MeshID & meshPtr pair failed.");
-		idMeshPair.first->second->m_State = AssetState::LoadingCpu;
-		idMeshPair.first->second->m_Generation = 1;
+		BeginAssetContentGeneration(
+			*idMeshPair.first->second,
+			1,
+			AssetState::LoadingCpu);
 		idMeshPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
 
 		return meshId;
@@ -2315,8 +2422,10 @@ namespace gglab
 
 		auto idModelPair = m_ModelContainer.m_ModelIDMap.emplace(modelId, std::make_unique<Model>());
 		GGLAB_ASSERT_MSG(idModelPair.second == true, "Emplace ModelID & ModelPtr pair failed.");
-		idModelPair.first->second->m_State = initialState;
-		idModelPair.first->second->m_Generation = 1;
+		BeginAssetContentGeneration(
+			*idModelPair.first->second,
+			1,
+			initialState);
 		idModelPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
 		ProgressReporter(idModelPair.first->second->m_LoadProgress).Report(
 			initialState == AssetState::Queued ? 0.05f : 0.0f,
@@ -2375,7 +2484,7 @@ namespace gglab
 
 		if (model->m_MeshInstance.empty())
 		{
-			model->m_State = AssetState::Failed;
+			SetAssetState(*model, AssetState::Failed);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.64f,
 				"Model has no renderable mesh instances");
@@ -2390,7 +2499,7 @@ namespace gglab
 			const Material* material = GetMaterial(instance.m_MaterialId);
 			if (!mesh || !material || mesh->m_State == AssetState::Failed)
 			{
-				model->m_State = AssetState::Failed;
+				SetAssetState(*model, AssetState::Failed);
 				ProgressReporter(model->m_LoadProgress).Report(
 					0.96f,
 					"Model dependency failed");
@@ -2414,7 +2523,7 @@ namespace gglab
 				const Texture* texture = m_TextureRegistry->GetTexture(textureId);
 				if (!texture || texture->m_State == AssetState::Failed)
 				{
-					model->m_State = AssetState::Failed;
+					SetAssetState(*model, AssetState::Failed);
 					ProgressReporter(model->m_LoadProgress).Report(
 						0.96f,
 						"Model texture dependency failed");
@@ -2433,7 +2542,7 @@ namespace gglab
 
 		if (cancelled)
 		{
-			model->m_State = AssetState::Cancelled;
+			SetAssetState(*model, AssetState::Cancelled);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.96f,
 				"Model dependency cancelled");
@@ -2441,14 +2550,14 @@ namespace gglab
 		}
 		if (pending)
 		{
-			model->m_State = AssetState::GpuProcessing;
+			SetAssetState(*model, AssetState::GpuProcessing);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.82f,
 				"Waiting for model GPU dependencies");
 			return false;
 		}
 
-		model->m_State = AssetState::Ready;
+		SetAssetState(*model, AssetState::Ready);
 		ProgressReporter(model->m_LoadProgress).Report(
 			1.0f,
 			"Model ready");

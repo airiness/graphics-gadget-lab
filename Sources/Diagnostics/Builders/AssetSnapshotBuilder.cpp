@@ -13,6 +13,39 @@ namespace gglab
 	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept
 	{
 		AssetSnapshot snapshot{};
+		snapshot.m_AssetUsageFrame = assetManager.m_AssetUsageFrame;
+
+		const auto isEvictionCandidate = [&assetManager](
+			AssetInterestKind kind,
+			uint64_t stableId,
+			const AssetLifecycle& lifecycle) noexcept
+			{
+				const AssetManager::InterestKey key{
+					.m_Kind = kind,
+					.m_StableId = stableId,
+				};
+				return lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
+					lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
+					!assetManager.HasActiveInterest(key) &&
+					!assetManager.HasPublicationRetain(
+						key,
+						lifecycle.m_ContentGeneration);
+			};
+		const auto recordResidency = [&snapshot](
+			const AssetLifecycle& lifecycle,
+			bool evictionCandidate) noexcept
+			{
+				GGLAB_ASSERT_MSG(
+					IsAssetLifecycleSynchronized(lifecycle),
+					"Asset aggregate, content, and residency states diverged.");
+				snapshot.m_ResidentAssetCount +=
+					lifecycle.m_ResidencyState == AssetResidencyState::Resident ? 1u : 0u;
+				snapshot.m_PinnedAssetCount +=
+					lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Pinned ? 1u : 0u;
+				snapshot.m_CacheableAssetCount +=
+					lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable ? 1u : 0u;
+				snapshot.m_EvictionCandidateCount += evictionCandidate ? 1u : 0u;
+			};
 
 		const auto findModelSourcePath = [&assetManager](ModelID modelId) -> std::filesystem::path
 			{
@@ -31,12 +64,23 @@ namespace gglab
 		{
 			AssetSnapshot::Model modelSnapshot{};
 			modelSnapshot.m_Id = modelId;
-			modelSnapshot.m_Generation = model->m_Generation;
+			modelSnapshot.m_ContentGeneration = model->m_ContentGeneration;
+			modelSnapshot.m_ResidencyEpoch = model->m_ResidencyEpoch;
+			modelSnapshot.m_LastUsedFrame = model->m_LastUsedFrame;
+			modelSnapshot.m_UseCount = model->m_UseCount;
 			modelSnapshot.m_State = model->m_State;
+			modelSnapshot.m_ContentState = model->m_ContentState;
+			modelSnapshot.m_ResidencyState = model->m_ResidencyState;
+			modelSnapshot.m_ResidencyPolicy = model->m_ResidencyPolicy;
 			modelSnapshot.m_SourcePath = findModelSourcePath(modelId);
 			modelSnapshot.m_Type = model->m_Type;
 			modelSnapshot.m_Name = model->m_Name;
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());
+			modelSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
+				AssetInterestKind::Model,
+				modelId.Value(),
+				*model);
+			recordResidency(*model, modelSnapshot.m_IsEvictionCandidate);
 			snapshot.m_Models.emplace_back(std::move(modelSnapshot));
 		}
 
@@ -51,13 +95,24 @@ namespace gglab
 		{
 			snapshot.m_Meshes.push_back({
 				.m_Id = meshId,
-				.m_Generation = mesh->m_Generation,
+				.m_ContentGeneration = mesh->m_ContentGeneration,
+				.m_ResidencyEpoch = mesh->m_ResidencyEpoch,
+				.m_LastUsedFrame = mesh->m_LastUsedFrame,
+				.m_UseCount = mesh->m_UseCount,
 				.m_State = mesh->m_State,
+				.m_ContentState = mesh->m_ContentState,
+				.m_ResidencyState = mesh->m_ResidencyState,
+				.m_ResidencyPolicy = mesh->m_ResidencyPolicy,
 				.m_Name = mesh->m_Name,
 				.m_VertexCount = mesh->m_VertexCount,
 				.m_IndexCount = mesh->m_IndexCount,
 				.m_IsUploaded = mesh->m_IsUploaded,
+				.m_IsEvictionCandidate = isEvictionCandidate(
+					AssetInterestKind::Mesh,
+					meshId.Value(),
+					*mesh),
 			});
+			recordResidency(*mesh, snapshot.m_Meshes.back().m_IsEvictionCandidate);
 		}
 		std::sort(snapshot.m_Meshes.begin(), snapshot.m_Meshes.end(),
 			[](const AssetSnapshot::Mesh& lhs, const AssetSnapshot::Mesh& rhs)
@@ -73,8 +128,14 @@ namespace gglab
 			{
 				AssetSnapshot::Texture textureSnapshot{};
 				textureSnapshot.m_Id = textureId;
-				textureSnapshot.m_Generation = texture->m_Generation;
+				textureSnapshot.m_ContentGeneration = texture->m_ContentGeneration;
+				textureSnapshot.m_ResidencyEpoch = texture->m_ResidencyEpoch;
+				textureSnapshot.m_LastUsedFrame = texture->m_LastUsedFrame;
+				textureSnapshot.m_UseCount = texture->m_UseCount;
 				textureSnapshot.m_State = texture->m_State;
+				textureSnapshot.m_ContentState = texture->m_ContentState;
+				textureSnapshot.m_ResidencyState = texture->m_ResidencyState;
+				textureSnapshot.m_ResidencyPolicy = texture->m_ResidencyPolicy;
 				textureSnapshot.m_SourcePath = texture->m_SourcePath;
 				textureSnapshot.m_Semantic = texture->m_Semantic;
 				textureSnapshot.m_Name = texture->m_Name;
@@ -84,6 +145,11 @@ namespace gglab
 					std::string{};
 				textureSnapshot.m_IsUploaded = texture->m_IsUploaded;
 				textureSnapshot.m_IsReserved = IsReservedTextureId(textureId);
+				textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
+					AssetInterestKind::Texture,
+					textureId.Value(),
+					*texture);
+				recordResidency(*texture, textureSnapshot.m_IsEvictionCandidate);
 				snapshot.m_Textures.emplace_back(std::move(textureSnapshot));
 			}
 

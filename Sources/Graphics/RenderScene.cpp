@@ -18,8 +18,14 @@ namespace gglab
 
 		MaterialGPU BuildMaterialGpu(
 			const MaterialProperties& material,
-			const AssetManager& assetManager) noexcept
+			AssetManager& assetManager) noexcept
 		{
+			assetManager.MarkTextureUsed(material.m_BaseColorBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_EmissiveBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_MetallicRoughnessBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_NormalBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_OcclusionBinding.m_TextureId);
+
 			MaterialGPU gpu{};
 			gpu.BaseColorFactor = material.m_BaseColor;
 			gpu.MetallicFactor = material.m_MetallicFactor;
@@ -108,6 +114,12 @@ namespace gglab
 					GGLAB_LOG_GRAPHICS_WARN("Entity has no model.");
 					return;
 				}
+				if (model->m_ContentState != AssetContentState::Ready ||
+					model->m_ResidencyState != AssetResidencyState::Resident)
+				{
+					return;
+				}
+				assetManager.MarkModelUsed(modelComp.m_ModelId);
 
 				const Matrix entityWorld = math::CreateTransformMatrix(
 					transformComp.m_Scale,
@@ -120,10 +132,12 @@ namespace gglab
 				{
 					const ModelMesh& modelMesh = model->m_MeshInstance[modelMeshIndex];
 					const Mesh* mesh = assetManager.GetMesh(modelMesh.m_MeshId);
-					if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
+					if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded ||
+						mesh->m_ResidencyState != AssetResidencyState::Resident)
 					{
 						continue;
 					}
+					assetManager.MarkMeshUsed(modelMesh.m_MeshId);
 
 					const Matrix world = modelMesh.m_LocalTransform * entityWorld;
 					const Matrix normalMat = math::CreateNormalMatrix(world);

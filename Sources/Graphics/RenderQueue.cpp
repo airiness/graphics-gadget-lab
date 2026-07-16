@@ -38,7 +38,8 @@ namespace gglab
 			}
 
 			const auto* mesh = info.m_AssetManager.GetMesh(instance.m_MeshId);
-			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
+			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded ||
+				mesh->m_ResidencyState != AssetResidencyState::Resident)
 			{
 				++renderQueue.m_Statistics.m_InvalidInstanceCount;
 				continue;

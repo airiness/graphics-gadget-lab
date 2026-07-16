@@ -21,7 +21,7 @@ namespace gglab
 			switch (scenario)
 			{
 			case AssetPublicationLabSession::Scenario::AcceptanceSuite:
-				return "Phase 3.5 Acceptance Suite";
+				return "Asset Publication Acceptance Suite";
 			case AssetPublicationLabSession::Scenario::IncrementalSuccess:
 				return "Incremental Success";
 			case AssetPublicationLabSession::Scenario::CancelTextures:
@@ -337,7 +337,7 @@ namespace gglab
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(0),
 			.m_EnumItems = {
-				{ .m_Value = 0, .m_Name = "Phase 3.5 Acceptance Suite" },
+				{ .m_Value = 0, .m_Name = "Asset Publication Acceptance Suite" },
 				{ .m_Value = 1, .m_Name = "Incremental Success" },
 				{ .m_Value = 2, .m_Name = "Cancel During Textures" },
 				{ .m_Value = 3, .m_Name = "Cancel During Materials" },
@@ -408,7 +408,7 @@ namespace gglab
 
 		const Model* model = m_Services.m_AssetManager->GetModel(
 			m_State->m_Request.m_ModelId);
-		if (model && model->m_Generation == m_State->m_Request.m_Generation)
+		if (model && model->m_ContentGeneration == m_State->m_Request.m_Generation)
 		{
 			m_State->m_FinalModelState = model->m_State;
 			if (model->m_State == AssetState::Publishing &&
@@ -448,7 +448,7 @@ namespace gglab
 		if (m_Suite)
 		{
 			diagnostics.m_Metrics = {
-				{ .m_Name = "Scenario", .m_Value = "Phase 3.5 Acceptance Suite" },
+				{ .m_Name = "Scenario", .m_Value = "Asset Publication Acceptance Suite" },
 				{ .m_Name = "Completed cases",
 					.m_Value = std::format("{} / {}",
 						m_Suite->m_Results.size(),
@@ -462,8 +462,8 @@ namespace gglab
 					m_Suite->m_Passed ? LabDiagnosticCheckStatus::Passed :
 					LabDiagnosticCheckStatus::Failed,
 				.m_Detail = !m_Suite->m_Finished ? "Acceptance cases are running." :
-					m_Suite->m_Passed ? "All Phase 3.5 acceptance cases passed." :
-					"One or more Phase 3.5 acceptance cases failed.",
+					m_Suite->m_Passed ? "All asset publication acceptance cases passed." :
+						"One or more asset publication acceptance cases failed.",
 			});
 			for (const AcceptanceSuiteState::Result& result : m_Suite->m_Results)
 			{
@@ -1054,7 +1054,7 @@ namespace gglab
 		case AcceptanceSuiteState::Phase::WaitingSharedRollback:
 		{
 			const Model* model = assetManager->GetModel(m_Suite->m_ModelRequest.m_ModelId);
-			if (model && model->m_Generation == m_Suite->m_ModelRequest.m_Generation &&
+			if (model && model->m_ContentGeneration == m_Suite->m_ModelRequest.m_Generation &&
 				model->m_State == AssetState::Failed && IsStreamingIdle(statistics))
 			{
 				if (++m_Suite->m_SettleFrames < 4)
@@ -1067,7 +1067,7 @@ namespace gglab
 					snapshot,
 					m_Suite->m_TextureRequest.m_TextureId);
 				if (!texture ||
-					texture->m_Generation != m_Suite->m_TextureRequest.m_Generation ||
+					texture->m_ContentGeneration != m_Suite->m_TextureRequest.m_Generation ||
 					texture->m_State != AssetState::Ready ||
 					!texture->m_IsUploaded ||
 					!texture->m_Texture.IsValid())
@@ -1183,17 +1183,17 @@ namespace gglab
 		const bool passed = errors.empty();
 		if (passed)
 		{
-			GGLAB_LOG_INFO("Phase 3.5 acceptance case PASS: {}.", name);
+			GGLAB_LOG_INFO("Asset publication acceptance case PASS: {}.", name);
 		}
 		else
 		{
 			GGLAB_LOG_ERROR(
-				"Phase 3.5 acceptance case FAIL: {} ({} invariant errors).",
+				"Asset publication acceptance case FAIL: {} ({} invariant errors).",
 				name,
 				errors.size());
 			for (const std::string& error : errors)
 			{
-				GGLAB_LOG_ERROR("Phase 3.5 acceptance invariant: {}", error);
+				GGLAB_LOG_ERROR("Asset publication acceptance invariant: {}", error);
 			}
 		}
 		m_Suite->m_Results.push_back({
@@ -1282,7 +1282,7 @@ namespace gglab
 		if (m_Suite->m_Passed)
 		{
 			GGLAB_LOG_INFO(
-				"PHASE 3.5 ACCEPTANCE PASS: {}/{} cases completed in {:.2f} s.",
+				"ASSET PUBLICATION ACCEPTANCE PASS: {}/{} cases completed in {:.2f} s.",
 				m_Suite->m_Results.size(),
 				static_cast<size_t>(AcceptanceSuiteState::Case::Count),
 				m_Suite->m_TotalElapsedSeconds);
@@ -1290,7 +1290,7 @@ namespace gglab
 		else
 		{
 			GGLAB_LOG_ERROR(
-				"PHASE 3.5 ACCEPTANCE FAIL: {}/{} cases passed, {} suite invariant errors.",
+				"ASSET PUBLICATION ACCEPTANCE FAIL: {}/{} cases passed, {} suite invariant errors.",
 				std::ranges::count_if(
 					m_Suite->m_Results,
 					&AcceptanceSuiteState::Result::m_Passed),
@@ -1298,7 +1298,7 @@ namespace gglab
 				m_Suite->m_FinalErrors.size());
 			for (const std::string& error : m_Suite->m_FinalErrors)
 			{
-				GGLAB_LOG_ERROR("Phase 3.5 suite invariant: {}", error);
+				GGLAB_LOG_ERROR("Asset publication suite invariant: {}", error);
 			}
 		}
 	}

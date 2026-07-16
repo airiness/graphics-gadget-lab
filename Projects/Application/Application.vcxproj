@@ -269,6 +269,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
@@ -525,6 +526,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.h" />

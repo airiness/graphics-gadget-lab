@@ -138,6 +138,25 @@ namespace gglab
 		[[nodiscard]] AssetOwnerScope CreateOwnerScope(std::string label) noexcept;
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void Tick() noexcept;
+		void MarkModelUsed(ModelID modelId) noexcept;
+		void MarkMeshUsed(MeshID meshId) noexcept;
+		void MarkTextureUsed(TextureID textureId) noexcept;
+		[[nodiscard]] bool SetModelResidencyPolicy(
+			ModelID modelId,
+			AssetResidencyPolicy policy) noexcept;
+		[[nodiscard]] bool SetMeshResidencyPolicy(
+			MeshID meshId,
+			AssetResidencyPolicy policy) noexcept;
+		[[nodiscard]] bool SetTextureResidencyPolicy(
+			TextureID textureId,
+			AssetResidencyPolicy policy) noexcept;
+		[[nodiscard]] uint64_t GetAssetUsageFrame() const noexcept
+		{
+			return m_AssetUsageFrame;
+		}
+
+		Texture* GetTexture(TextureID textureId) noexcept;
+		const Texture* GetTexture(TextureID textureId) const noexcept;
 
 		Mesh* GetMesh(MeshID meshId) noexcept;
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -273,6 +292,11 @@ namespace gglab
 			const InterestKey& key,
 			TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] bool HasActiveInterest(const InterestKey& key) const noexcept;
+		void MarkAssetUsed(AssetLifecycle& lifecycle) noexcept;
+		[[nodiscard]] static bool SetResidencyPolicy(
+			AssetLifecycle& lifecycle,
+			AssetResidencyPolicy policy,
+			bool isReserved) noexcept;
 
 	public:
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
@@ -320,6 +344,7 @@ namespace gglab
 		uint64_t m_ReadyRetentionCount = 0;
 		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
+		uint64_t m_AssetUsageFrame = 0;
 	};
 
 	class AssetPublicationRetain
