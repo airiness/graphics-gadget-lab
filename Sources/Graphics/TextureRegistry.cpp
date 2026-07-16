@@ -166,6 +166,9 @@ namespace gglab
 
 	void TextureRegistry::Finalize(const RHIFencePoint& fencePoint) noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			m_PublicationOrphanedTextures.empty(),
+			"TextureRegistry finalized while publication rollback is pending GPU completion.");
 		for (const auto& texture : m_TextureContainer.m_TextureIDMap | std::views::values)
 		{
 			if (texture->m_Texture.IsValid())
@@ -454,6 +457,7 @@ namespace gglab
 		}
 
 		m_TextureLoadTasks.erase(textureId);
+		m_PublicationOrphanedTextures.erase(textureId);
 		auto textureIter = m_TextureContainer.m_TextureIDMap.find(textureId);
 		bool removed = false;
 		if (textureIter != m_TextureContainer.m_TextureIDMap.end())
@@ -617,7 +621,8 @@ namespace gglab
 		{
 			return;
 		}
-		const bool cancelled = texture->m_CancelRequested;
+		const bool publicationOrphan = m_PublicationOrphanedTextures.contains(textureId);
+		const bool cancelled = texture->m_CancelRequested || publicationOrphan;
 		const bool publishSucceeded = succeeded && !cancelled;
 		texture->m_State = cancelled ? AssetState::Cancelled :
 			(publishSucceeded ? AssetState::Ready : AssetState::Failed);
@@ -638,6 +643,10 @@ namespace gglab
 			texture->m_Desc = {};
 			texture->m_SrvDimension = RHITextureViewDimension::Unknown;
 		}
+		if (publicationOrphan)
+		{
+			GGLAB_UNUSED(RemoveTexture(textureId));
+		}
 	}
 
 	bool TextureRegistry::QueueTextureUpload(
@@ -654,7 +663,10 @@ namespace gglab
 		const uint64_t generation = texture->m_Generation;
 		const AssetStreamingWorkEstimate estimate =
 			EstimateTextureUpload(uploadData.m_TextureData);
-		texture->m_State = AssetState::CpuReady;
+		if (texture->m_State != AssetState::Publishing)
+		{
+			texture->m_State = AssetState::CpuReady;
+		}
 		ProgressReporter(texture->m_LoadProgress).Report(
 			0.62f,
 			"Waiting for texture upload admission",
@@ -868,6 +880,37 @@ namespace gglab
 			texture->m_Texture.IsValid() ?
 				"Texture cancellation pending GPU completion" : "Texture loading cancelled",
 			texture->m_DebugLabel);
+	}
+
+	void TextureRegistry::RollbackPublicationTexture(
+		TextureID textureId,
+		uint64_t generation) noexcept
+	{
+		Texture* texture = GetTexture(textureId);
+		if (!texture || texture->m_Generation != generation ||
+			IsReservedTextureId(textureId))
+		{
+			return;
+		}
+
+		texture->m_CancelRequested = true;
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork({
+			.m_Kind = AssetStreamingWorkKind::Texture,
+			.m_StableId = textureId.Value(),
+			.m_Generation = generation,
+		}));
+		if (texture->m_Texture.IsValid() && texture->m_State != AssetState::Ready)
+		{
+			m_PublicationOrphanedTextures.insert(textureId);
+			texture->m_State = AssetState::GpuProcessing;
+			ProgressReporter(texture->m_LoadProgress).Report(
+				0.96f,
+				"Texture publication rollback pending GPU completion",
+				texture->m_DebugLabel);
+			return;
+		}
+
+		GGLAB_UNUSED(RemoveTexture(textureId));
 	}
 
 	void TextureRegistry::UpdateTextureLoadPriority(

@@ -52,17 +52,22 @@ namespace gglab
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;
 		uint64_t m_ReadyRetentionCount = 0;
+		uint64_t m_PublicationRetainCount = 0;
+		uint64_t m_PublicationProtectedCancellationCount = 0;
 		std::vector<AssetInterestActivity> m_ActiveInterests;
 	};
 
 	class RHIDevice;
 	class AssetUploadScheduler;
 	class AssetLease;
+	class AssetPublicationRetain;
 	class AssetOwnerScope;
 	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
 	struct AssetSnapshot;
+	struct AssetResourcePublicationStepResult;
+	enum class AssetResourcePublicationAbortReason : uint8_t;
 
 	class AssetManager;
 	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
@@ -153,7 +158,7 @@ namespace gglab
 			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
-		class ModelPublicationCompatibilityJob;
+		class ModelPublicationTransaction;
 
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
@@ -162,10 +167,15 @@ namespace gglab
 			MeshUploadData&& uploadData,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
-		bool PublishImportedModel(
-			ModelID modelId,
-			uint64_t generation,
-			ImportedModel&& importedModel) noexcept;
+		bool RemoveMesh(MeshID meshId) noexcept;
+		bool RemoveMaterial(MaterialID materialId) noexcept;
+		void RollbackPublicationMesh(MeshID meshId, uint64_t generation) noexcept;
+		[[nodiscard]] AssetResourcePublicationStepResult StepModelPublication(
+			ModelPublicationTransaction& transaction,
+			TaskPriority priority) noexcept;
+		void AbortModelPublication(
+			ModelPublicationTransaction& transaction,
+			AssetResourcePublicationAbortReason reason) noexcept;
 		void CompleteModelLoad(
 			ModelID modelId,
 			uint64_t generation,
@@ -223,6 +233,12 @@ namespace gglab
 			std::unordered_set<uint64_t> m_LeaseTokens;
 		};
 
+		struct PublicationRetainRecord
+		{
+			uint64_t m_Generation = 0;
+			uint32_t m_Count = 0;
+		};
+
 		AssetOwnerId RegisterAssetOwner(std::string label) noexcept;
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
 		AssetLease AcquireAssetLease(
@@ -234,6 +250,17 @@ namespace gglab
 			bool internal = false) noexcept;
 		void ReleaseAssetLease(uint64_t leaseToken) noexcept;
 		void UpdateAssetLeasePriority(uint64_t leaseToken, TaskPriority priority) noexcept;
+		[[nodiscard]] AssetPublicationRetain AcquirePublicationRetain(
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation) noexcept;
+		void ReleasePublicationRetain(
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation) noexcept;
+		[[nodiscard]] bool HasPublicationRetain(
+			const InterestKey& key,
+			uint64_t generation) const noexcept;
 		void RecomputeInterestPriority(const InterestKey& key) noexcept;
 		void ApplyInterestPriority(
 			const InterestKey& key,
@@ -253,6 +280,7 @@ namespace gglab
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 		friend class AssetLease;
+		friend class AssetPublicationRetain;
 		friend class AssetOwnerScope;
 
 		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
@@ -280,13 +308,50 @@ namespace gglab
 		std::unordered_map<AssetOwnerId, std::string, AssetOwnerIdHash> m_AssetOwners;
 		std::unordered_map<uint64_t, LeaseRecord> m_AssetLeases;
 		std::unordered_map<InterestKey, InterestRecord, InterestKeyHash> m_AssetInterests;
+		std::unordered_map<InterestKey, PublicationRetainRecord, InterestKeyHash>
+			m_PublicationRetains;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
+		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_OwnershipPriorityUpdateCount = 0;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;
 		uint64_t m_ReadyRetentionCount = 0;
+		uint64_t m_PublicationRetainCount = 0;
+		uint64_t m_PublicationProtectedCancellationCount = 0;
+	};
+
+	class AssetPublicationRetain
+	{
+	public:
+		AssetPublicationRetain() noexcept = default;
+		AssetPublicationRetain(const AssetPublicationRetain&) = delete;
+		AssetPublicationRetain& operator=(const AssetPublicationRetain&) = delete;
+		AssetPublicationRetain(AssetPublicationRetain&& other) noexcept;
+		AssetPublicationRetain& operator=(AssetPublicationRetain&& other) noexcept;
+		~AssetPublicationRetain();
+
+		[[nodiscard]] bool IsValid() const noexcept { return m_Manager != nullptr; }
+		void Reset() noexcept;
+
+	private:
+		friend class AssetManager;
+		AssetPublicationRetain(
+			AssetManager* manager,
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation) noexcept :
+			m_Manager(manager),
+			m_Kind(kind),
+			m_StableId(stableId),
+			m_Generation(generation)
+		{}
+
+		AssetManager* m_Manager = nullptr;
+		AssetInterestKind m_Kind = AssetInterestKind::Model;
+		uint64_t m_StableId = 0;
+		uint64_t m_Generation = 0;
 	};
 
 	class AssetLease

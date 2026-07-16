@@ -537,6 +537,7 @@ namespace gglab
 			QueuedResourcePublication publication =
 				std::move(m_ResourcePublicationQueue.front());
 			m_ResourcePublicationQueue.pop_front();
+			context.m_Priority = publication.m_Desc.m_Priority;
 			if (!publication.m_HasStarted)
 			{
 				const double queueMilliseconds = Milliseconds(

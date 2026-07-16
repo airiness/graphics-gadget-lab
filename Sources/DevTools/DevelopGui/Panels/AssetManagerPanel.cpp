@@ -462,6 +462,10 @@ namespace gglab
 				assetSnapshot.m_OwnershipReadyCancellationCount,
 				assetSnapshot.m_OwnershipGpuDeferredCancellationCount,
 				assetSnapshot.m_OwnershipReadyRetentionCount);
+			ImGui::Text(
+				"Publication transaction: active retains=%llu protected cancellations=%llu",
+				assetSnapshot.m_PublicationRetainCount,
+				assetSnapshot.m_PublicationProtectedCancellationCount);
 			if (!assetSnapshot.m_ActiveOwnershipInterests.empty() && ImGui::BeginTable(
 				"AssetOwnershipInterests",
 				6,

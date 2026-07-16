@@ -95,6 +95,8 @@ namespace gglab
 		uint64_t m_OwnershipReadyCancellationCount = 0;
 		uint64_t m_OwnershipGpuDeferredCancellationCount = 0;
 		uint64_t m_OwnershipReadyRetentionCount = 0;
+		uint64_t m_PublicationRetainCount = 0;
+		uint64_t m_PublicationProtectedCancellationCount = 0;
 		std::vector<OwnershipInterest> m_ActiveOwnershipInterests;
 		std::vector<Upload> m_PendingUploads;
 		std::vector<Upload> m_RecentUploads;

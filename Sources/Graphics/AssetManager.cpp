@@ -76,11 +76,46 @@ namespace gglab
 		}
 	}
 
-	class AssetManager::ModelPublicationCompatibilityJob final :
+	class AssetManager::ModelPublicationTransaction final :
 		public IResourcePublicationJob
 	{
 	public:
-		ModelPublicationCompatibilityJob(
+		enum class Stage : uint8_t
+		{
+			Textures,
+			Materials,
+			Meshes,
+			MeshInstances,
+			FallbackMeshInstances,
+			Dependencies,
+			Commit,
+			ReleaseRetains,
+			Finished,
+		};
+
+		enum class ClaimOrigin : uint8_t
+		{
+			Reused,
+			Created,
+		};
+
+		struct ResourceClaim
+		{
+			AssetInterestKind m_Kind = AssetInterestKind::Texture;
+			uint64_t m_StableId = 0;
+			uint64_t m_Generation = 0;
+			ClaimOrigin m_Origin = ClaimOrigin::Reused;
+			AssetPublicationRetain m_Retain;
+		};
+
+		struct Dependency
+		{
+			AssetInterestKind m_Kind = AssetInterestKind::Texture;
+			uint64_t m_StableId = 0;
+			uint64_t m_Generation = 0;
+		};
+
+		ModelPublicationTransaction(
 			AssetManager* assetManager,
 			ModelID modelId,
 			uint64_t generation,
@@ -92,80 +127,32 @@ namespace gglab
 			m_Generation(generation),
 			m_ImportQueueMilliseconds(importQueueMilliseconds),
 			m_ImportExecutionMilliseconds(importExecutionMilliseconds),
-			m_Payload(std::move(payload))
+			m_Source(std::move(*payload)),
+			m_TextureIds(m_Source.m_Textures.size()),
+			m_MeshIds(m_Source.m_Meshes.size())
 		{
+			m_MaterialIds.reserve(std::max<size_t>(m_Source.m_Materials.size(), 1));
+			m_PendingInstances.reserve(std::max(
+				m_Source.m_MeshInstances.size(),
+				m_Source.m_Meshes.size()));
+			m_Claims.reserve(m_Source.m_Textures.size() + m_Source.m_Meshes.size());
+			m_CreatedMaterialIds.reserve(std::max<size_t>(m_Source.m_Materials.size(), 1));
+			m_Dependencies.reserve(m_Source.m_Textures.size() + m_Source.m_Meshes.size());
+			m_DependencyLeaseTokens.reserve(
+				m_Source.m_Textures.size() + m_Source.m_Meshes.size());
 		}
 
 		[[nodiscard]] AssetResourcePublicationStepResult Step(
 			AssetResourcePublicationContext& context) noexcept override
 		{
-			GGLAB_UNUSED(context);
-			if (!m_AssetManager || !m_Payload)
+			if (!m_AssetManager)
 			{
 				return {
 					.m_Status = AssetResourcePublicationStepStatus::Failed,
-					.m_Error = "Model publication compatibility job has no payload",
+					.m_Error = "Model publication transaction has no AssetManager",
 				};
 			}
-
-			Model* model = m_AssetManager->GetModel(m_ModelId);
-			if (!model || model->m_Generation != m_Generation || model->m_CancelRequested)
-			{
-				return {
-					.m_Status = AssetResourcePublicationStepStatus::Cancelled,
-				};
-			}
-
-			const uint32_t meshInstanceCount = static_cast<uint32_t>(
-				std::min<size_t>(m_Payload->m_MeshInstances.size(),
-					std::numeric_limits<uint32_t>::max()));
-			size_t resourceCreationCount = 0;
-			const auto addResourceCreations = [&resourceCreationCount](size_t count) noexcept
-			{
-				resourceCreationCount = count <=
-					std::numeric_limits<size_t>::max() - resourceCreationCount ?
-					resourceCreationCount + count : std::numeric_limits<size_t>::max();
-			};
-			addResourceCreations(m_Payload->m_Textures.size());
-			addResourceCreations(m_Payload->m_Materials.size());
-			addResourceCreations(m_Payload->m_Meshes.size());
-			addResourceCreations(m_Payload->m_MeshInstances.size());
-			const uint32_t clampedResourceCreationCount = static_cast<uint32_t>(
-				std::min<size_t>(
-					resourceCreationCount,
-					std::numeric_limits<uint32_t>::max()));
-			if (!m_AssetManager->PublishImportedModel(
-				m_ModelId,
-				m_Generation,
-				std::move(*m_Payload)))
-			{
-				m_Payload.reset();
-				model->m_State = AssetState::Failed;
-				ProgressReporter(model->m_LoadProgress).Report(
-					0.62f,
-					"Model publication failed");
-				return {
-					.m_Status = AssetResourcePublicationStepStatus::Failed,
-					.m_Usage = {
-						.m_ResourceCreations = clampedResourceCreationCount,
-					},
-					.m_Error = "PublishImportedModel returned false",
-				};
-			}
-
-			m_Payload.reset();
-			GGLAB_LOG_GRAPHICS_INFO(
-				"Async model {} queued dependency uploads (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
-				m_ModelId.Value(),
-				meshInstanceCount,
-				m_ImportQueueMilliseconds,
-				m_ImportExecutionMilliseconds);
-			return {
-				.m_Status = AssetResourcePublicationStepStatus::Completed,
-				.m_Usage = {
-					.m_ResourceCreations = clampedResourceCreationCount,
-				},
-			};
+			return m_AssetManager->StepModelPublication(*this, context.m_Priority);
 		}
 
 		void Abort(
@@ -175,27 +162,42 @@ namespace gglab
 			GGLAB_UNUSED(context);
 			if (m_AssetManager)
 			{
-				Model* model = m_AssetManager->GetModel(m_ModelId);
-				if (model && model->m_Generation == m_Generation)
-				{
-					model->m_State = reason == AssetResourcePublicationAbortReason::Failed ?
-						AssetState::Failed : AssetState::Cancelled;
-					ProgressReporter(model->m_LoadProgress).Report(
-						0.62f,
-						reason == AssetResourcePublicationAbortReason::Failed ?
-							"Model publication failed" : "Model publication cancelled");
-				}
+				m_AssetManager->AbortModelPublication(*this, reason);
 			}
-			m_Payload.reset();
 		}
 
 	private:
+		friend class AssetManager;
+
 		AssetManager* m_AssetManager = nullptr;
 		ModelID m_ModelId{};
 		uint64_t m_Generation = 0;
 		double m_ImportQueueMilliseconds = 0.0;
 		double m_ImportExecutionMilliseconds = 0.0;
-		std::unique_ptr<ImportedModel> m_Payload;
+		ImportedModel m_Source;
+		Stage m_Stage = Stage::Textures;
+		size_t m_TextureCursor = 0;
+		size_t m_MaterialCursor = 0;
+		size_t m_MeshCursor = 0;
+		size_t m_InstanceCursor = 0;
+		size_t m_FallbackInstanceCursor = 0;
+		size_t m_DependencyCursor = 0;
+		size_t m_ReleaseRetainCursor = 0;
+		std::vector<TextureID> m_TextureIds;
+		std::vector<MaterialID> m_MaterialIds;
+		std::vector<MeshID> m_MeshIds;
+		std::vector<ModelMesh> m_PendingInstances;
+		std::vector<ResourceClaim> m_Claims;
+		std::vector<MaterialID> m_CreatedMaterialIds;
+		std::vector<Dependency> m_Dependencies;
+		std::unordered_set<InterestKey, InterestKeyHash> m_DependencyKeys;
+		AssetOwnerId m_DependencyOwner{};
+		std::vector<uint64_t> m_DependencyLeaseTokens;
+		uint32_t m_QueuedTextureUploads = 0;
+		uint32_t m_QueuedMeshUploads = 0;
+		bool m_DefaultMaterialCreated = false;
+		bool m_Committed = false;
+		bool m_Aborted = false;
 	};
 
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
@@ -226,6 +228,54 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			m_AssetOwners.empty(),
 			"AssetManager destroyed while asset owner scopes are still registered.");
+		GGLAB_ASSERT_MSG(
+			m_PublicationRetains.empty(),
+			"AssetManager destroyed while publication retains are still active.");
+		GGLAB_ASSERT_MSG(
+			m_PublicationOrphanedMeshes.empty(),
+			"AssetManager destroyed while publication mesh rollback is pending GPU completion.");
+	}
+
+	AssetPublicationRetain::AssetPublicationRetain(
+		AssetPublicationRetain&& other) noexcept :
+		m_Manager(std::exchange(other.m_Manager, nullptr)),
+		m_Kind(std::exchange(other.m_Kind, AssetInterestKind::Model)),
+		m_StableId(std::exchange(other.m_StableId, 0)),
+		m_Generation(std::exchange(other.m_Generation, 0))
+	{}
+
+	AssetPublicationRetain& AssetPublicationRetain::operator=(
+		AssetPublicationRetain&& other) noexcept
+	{
+		if (this != &other)
+		{
+			Reset();
+			m_Manager = std::exchange(other.m_Manager, nullptr);
+			m_Kind = std::exchange(other.m_Kind, AssetInterestKind::Model);
+			m_StableId = std::exchange(other.m_StableId, 0);
+			m_Generation = std::exchange(other.m_Generation, 0);
+		}
+		return *this;
+	}
+
+	AssetPublicationRetain::~AssetPublicationRetain()
+	{
+		Reset();
+	}
+
+	void AssetPublicationRetain::Reset() noexcept
+	{
+		if (m_Manager)
+		{
+			m_Manager->ReleasePublicationRetain(
+				m_Kind,
+				m_StableId,
+				m_Generation);
+		}
+		m_Manager = nullptr;
+		m_Kind = AssetInterestKind::Model;
+		m_StableId = 0;
+		m_Generation = 0;
 	}
 
 	AssetLease::AssetLease(AssetLease&& other) noexcept :
@@ -355,6 +405,9 @@ namespace gglab
 		statistics.m_ReadyCancellationCount = m_ReadyCancellationCount;
 		statistics.m_GpuDeferredCancellationCount = m_GpuDeferredCancellationCount;
 		statistics.m_ReadyRetentionCount = m_ReadyRetentionCount;
+		statistics.m_PublicationRetainCount = m_PublicationRetainCount;
+		statistics.m_PublicationProtectedCancellationCount =
+			m_PublicationProtectedCancellationCount;
 		statistics.m_ActiveInterests.reserve(m_AssetInterests.size());
 		for (const auto& [key, interest] : m_AssetInterests)
 		{
@@ -453,6 +506,65 @@ namespace gglab
 			RefreshModelDependencyInterests(ModelID{ static_cast<uint32_t>(stableId) }, generation);
 		}
 		return AssetLease(this, token);
+	}
+
+	AssetPublicationRetain AssetManager::AcquirePublicationRetain(
+		AssetInterestKind kind,
+		uint64_t stableId,
+		uint64_t generation) noexcept
+	{
+		const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
+		auto [retain, inserted] = m_PublicationRetains.try_emplace(key);
+		if (inserted)
+		{
+			retain->second.m_Generation = generation;
+		}
+		else if (retain->second.m_Generation != generation)
+		{
+			GGLAB_ASSERT_MSG(false, "Publication retain generation mismatch.");
+			return {};
+		}
+		++retain->second.m_Count;
+		++m_PublicationRetainCount;
+		if (kind == AssetInterestKind::Texture)
+		{
+			m_TextureRegistry->ReviveTextureInterest(
+				TextureID{ static_cast<uint32_t>(stableId) },
+				generation);
+		}
+		return AssetPublicationRetain(this, kind, stableId, generation);
+	}
+
+	void AssetManager::ReleasePublicationRetain(
+		AssetInterestKind kind,
+		uint64_t stableId,
+		uint64_t generation) noexcept
+	{
+		const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
+		const auto retain = m_PublicationRetains.find(key);
+		if (retain == m_PublicationRetains.end() ||
+			retain->second.m_Generation != generation ||
+			retain->second.m_Count == 0)
+		{
+			GGLAB_ASSERT_MSG(false, "Released an unknown publication retain.");
+			return;
+		}
+		--retain->second.m_Count;
+		--m_PublicationRetainCount;
+		if (retain->second.m_Count == 0)
+		{
+			m_PublicationRetains.erase(retain);
+		}
+	}
+
+	bool AssetManager::HasPublicationRetain(
+		const InterestKey& key,
+		uint64_t generation) const noexcept
+	{
+		const auto retain = m_PublicationRetains.find(key);
+		return retain != m_PublicationRetains.end() &&
+			retain->second.m_Generation == generation &&
+			retain->second.m_Count > 0;
 	}
 
 	void AssetManager::ReleaseAssetLease(uint64_t leaseToken) noexcept
@@ -694,6 +806,11 @@ namespace gglab
 		const InterestKey& key,
 		uint64_t generation) noexcept
 	{
+		if (HasPublicationRetain(key, generation))
+		{
+			++m_PublicationProtectedCancellationCount;
+			return;
+		}
 		if (key.m_Kind == AssetInterestKind::Model)
 		{
 			CancelModelIfUnreferenced(
@@ -998,6 +1115,47 @@ namespace gglab
 		return nullptr;
 	}
 
+	bool AssetManager::RemoveMesh(MeshID meshId) noexcept
+	{
+		m_PublicationOrphanedMeshes.erase(meshId);
+		return m_MeshContainer.m_MeshIDMap.erase(meshId) > 0;
+	}
+
+	bool AssetManager::RemoveMaterial(MaterialID materialId) noexcept
+	{
+		return m_MaterialContainer.m_MaterialIDMap.erase(materialId) > 0;
+	}
+
+	void AssetManager::RollbackPublicationMesh(
+		MeshID meshId,
+		uint64_t generation) noexcept
+	{
+		Mesh* mesh = GetMesh(meshId);
+		if (!mesh || mesh->m_Generation != generation)
+		{
+			return;
+		}
+
+		mesh->m_CancelRequested = true;
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork({
+			.m_Kind = AssetStreamingWorkKind::Mesh,
+			.m_StableId = meshId.Value(),
+			.m_Generation = generation,
+		}));
+		if ((mesh->m_VertexBuffer || mesh->m_IndexBuffer) &&
+			mesh->m_State != AssetState::Ready)
+		{
+			m_PublicationOrphanedMeshes.insert(meshId);
+			mesh->m_State = AssetState::GpuProcessing;
+			ProgressReporter(mesh->m_LoadProgress).Report(
+				0.96f,
+				"Mesh publication rollback pending GPU completion");
+			return;
+		}
+
+		GGLAB_UNUSED(RemoveMesh(meshId));
+	}
+
 	MeshID AssetManager::AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
 		GGLAB_ASSERT(mesh);
@@ -1262,7 +1420,10 @@ namespace gglab
 		const MeshID meshId = uploadData.m_MeshId;
 		const uint64_t generation = mesh->m_Generation;
 		const AssetStreamingWorkEstimate estimate = EstimateMeshUpload(uploadData);
-		mesh->m_State = AssetState::CpuReady;
+		if (mesh->m_State != AssetState::Publishing)
+		{
+			mesh->m_State = AssetState::CpuReady;
+		}
 		ProgressReporter(mesh->m_LoadProgress).Report(
 			0.62f,
 			"Waiting for mesh upload admission",
@@ -1331,7 +1492,8 @@ namespace gglab
 		{
 			return;
 		}
-		const bool cancelled = mesh->m_CancelRequested;
+		const bool publicationOrphan = m_PublicationOrphanedMeshes.contains(meshId);
+		const bool cancelled = mesh->m_CancelRequested || publicationOrphan;
 		const bool publishSucceeded = succeeded && !cancelled;
 		mesh->m_State = cancelled ? AssetState::Cancelled :
 			(publishSucceeded ? AssetState::Ready : AssetState::Failed);
@@ -1348,181 +1510,574 @@ namespace gglab
 			mesh->m_VertexBufferBinding = {};
 			mesh->m_IndexBufferBinding = {};
 		}
+		if (publicationOrphan)
+		{
+			GGLAB_UNUSED(RemoveMesh(meshId));
+		}
 	}
 
-	bool AssetManager::PublishImportedModel(
-		ModelID modelId,
-		uint64_t generation,
-		ImportedModel&& importedModel) noexcept
+	AssetResourcePublicationStepResult AssetManager::StepModelPublication(
+		ModelPublicationTransaction& transaction,
+		TaskPriority priority) noexcept
 	{
-		Model* model = GetModel(modelId);
-		if (!model || model->m_Generation != generation || importedModel.m_Meshes.empty())
+		using Stage = ModelPublicationTransaction::Stage;
+		using ClaimOrigin = ModelPublicationTransaction::ClaimOrigin;
+
+		const auto failed = [](std::string error,
+			AssetResourcePublicationStepUsage usage = {}) noexcept
 		{
-			return false;
+			return AssetResourcePublicationStepResult{
+				.m_Status = AssetResourcePublicationStepStatus::Failed,
+				.m_Usage = usage,
+				.m_Error = std::move(error),
+			};
+		};
+		const auto continued = [](AssetResourcePublicationStepUsage usage = {}) noexcept
+		{
+			return AssetResourcePublicationStepResult{
+				.m_Status = AssetResourcePublicationStepStatus::Continue,
+				.m_Usage = usage,
+			};
+		};
+		const auto addDependency = [&transaction](
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation) noexcept
+		{
+			const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
+			if (transaction.m_DependencyKeys.insert(key).second)
+			{
+				transaction.m_Dependencies.push_back({
+					.m_Kind = kind,
+					.m_StableId = stableId,
+					.m_Generation = generation,
+				});
+			}
+		};
+
+		if (transaction.m_Aborted)
+		{
+			return { .m_Status = AssetResourcePublicationStepStatus::Cancelled };
+		}
+		Model* model = GetModel(transaction.m_ModelId);
+		if (!model || model->m_Generation != transaction.m_Generation ||
+			model->m_CancelRequested)
+		{
+			return { .m_Status = AssetResourcePublicationStepStatus::Cancelled };
+		}
+		if (model->m_State == AssetState::CpuReady)
+		{
+			model->m_State = AssetState::Publishing;
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.64f,
+				"Publishing model resources incrementally");
+		}
+		if (transaction.m_Source.m_Meshes.empty())
+		{
+			return failed("Imported model contains no meshes");
 		}
 
-		model->m_Name = StringID(importedModel.m_Name);
-		model->m_Type = importedModel.m_Type;
-		model->m_State = AssetState::CpuReady;
-		ProgressReporter(model->m_LoadProgress).Report(
-			0.64f,
-			"Publishing imported model",
-			std::format(
-				"{} meshes, {} materials, {} textures",
-				importedModel.m_Meshes.size(),
-				importedModel.m_Materials.size(),
-				importedModel.m_Textures.size()));
-
-		std::vector<TextureID> textureIds(importedModel.m_Textures.size());
-		std::vector<TextureRegistry::TextureUploadData> textureUploads;
-		for (size_t textureIndex = 0; textureIndex < importedModel.m_Textures.size(); ++textureIndex)
+		for (;;)
 		{
-			ImportedTexture& importedTexture = importedModel.m_Textures[textureIndex];
-			TextureID textureId = m_TextureRegistry->FindTexture(
-				importedTexture.m_CanonicalPath,
-				importedTexture.m_ImportSettings);
-			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId);
-				texture && IsTerminalAssetState(texture->m_State))
+			switch (transaction.m_Stage)
 			{
-				GGLAB_UNUSED(m_TextureRegistry->RemoveTexture(textureId));
-				textureId.Reset();
-			}
-			if (!textureId.IsValid() && importedTexture.m_Data.IsValid())
+			case Stage::Textures:
 			{
-				textureId = m_TextureRegistry->CreateTexture(
-					importedTexture.m_CanonicalPath,
-					importedTexture.m_ImportSettings);
-				if (textureId.IsValid())
+				if (transaction.m_TextureCursor >= transaction.m_Source.m_Textures.size())
 				{
-					textureUploads.emplace_back(m_TextureRegistry->MakeTextureUploadData(
-						textureId,
-						std::move(importedTexture.m_Data),
-						importedTexture.m_Semantic));
-				}
-			}
-			textureIds[textureIndex] = textureId;
-		}
-
-		std::vector<MaterialID> materialIds;
-		materialIds.reserve(std::max<size_t>(importedModel.m_Materials.size(), 1));
-		for (ImportedMaterial& importedMaterial : importedModel.m_Materials)
-		{
-			auto material = std::make_unique<Material>();
-			static_cast<MaterialProperties&>(*material) = importedMaterial.m_Properties;
-			material->m_Name = StringID(importedMaterial.m_Name);
-			for (uint32_t slotIndex = 0;
-				slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
-				++slotIndex)
-			{
-				const ImportedMaterialTextureBinding& importedBinding =
-					importedMaterial.m_TextureBindings[slotIndex];
-				if (importedBinding.m_TextureIndex ==
-					ImportedMaterialTextureBinding::InvalidTextureIndex)
-				{
+					transaction.m_Stage = Stage::Materials;
 					continue;
 				}
 
-				MaterialTextureBinding binding{};
-				if (importedBinding.m_TextureIndex < textureIds.size())
+				const size_t textureIndex = transaction.m_TextureCursor++;
+				ImportedTexture& importedTexture =
+					transaction.m_Source.m_Textures[textureIndex];
+				const uint64_t sourceBytes = static_cast<uint64_t>(
+					importedTexture.m_Data.m_Pixels.size());
+				TextureID textureId = m_TextureRegistry->FindTexture(
+					importedTexture.m_CanonicalPath,
+					importedTexture.m_ImportSettings);
+				Texture* texture = m_TextureRegistry->GetTexture(textureId);
+				if (textureId.IsValid() && !texture)
 				{
-					binding.m_TextureId = textureIds[importedBinding.m_TextureIndex];
+					GGLAB_UNUSED(m_TextureRegistry->RemoveTexture(textureId));
+					textureId.Reset();
 				}
-				binding.m_SamplerId = m_SamplerRegistry->GetOrCreateSampler(
-					importedBinding.m_SamplerKey);
-				binding.m_TexCoordIndex = importedBinding.m_TexCoordIndex;
-				SetMaterialTexture(
-					*material,
-					static_cast<MaterialTextureSlot>(slotIndex),
-					binding);
+				else if (texture && IsTerminalAssetState(texture->m_State))
+				{
+					const InterestKey textureKey{
+						.m_Kind = AssetInterestKind::Texture,
+						.m_StableId = textureId.Value(),
+					};
+					if (HasActiveInterest(textureKey) ||
+						HasPublicationRetain(textureKey, texture->m_Generation))
+					{
+						return failed(
+							std::format("Terminal texture {} is still retained", textureId.Value()),
+							{ .m_PayloadBytesDestroyed = sourceBytes });
+					}
+					GGLAB_UNUSED(m_TextureRegistry->RemoveTexture(textureId));
+					textureId.Reset();
+					texture = nullptr;
+				}
+
+				bool created = false;
+				if (!textureId.IsValid())
+				{
+					if (!importedTexture.m_Data.IsValid())
+					{
+						transaction.m_TextureIds[textureIndex].Reset();
+						importedTexture = {};
+						return continued({ .m_PayloadBytesDestroyed = sourceBytes });
+					}
+					textureId = m_TextureRegistry->CreateTexture(
+						importedTexture.m_CanonicalPath,
+						importedTexture.m_ImportSettings);
+					texture = m_TextureRegistry->GetTexture(textureId);
+					if (!textureId.IsValid() || !texture)
+					{
+						importedTexture = {};
+						return failed(
+							"Failed to create texture entry during model publication",
+							{ .m_PayloadBytesDestroyed = sourceBytes });
+					}
+					created = true;
+					texture->m_State = AssetState::Publishing;
+				}
+
+				transaction.m_TextureIds[textureIndex] = textureId;
+				const uint64_t textureGeneration = texture->m_Generation;
+				auto retain = AcquirePublicationRetain(
+					AssetInterestKind::Texture,
+					textureId.Value(),
+					textureGeneration);
+				transaction.m_Claims.push_back({
+					.m_Kind = AssetInterestKind::Texture,
+					.m_StableId = textureId.Value(),
+					.m_Generation = textureGeneration,
+					.m_Origin = created ? ClaimOrigin::Created : ClaimOrigin::Reused,
+					.m_Retain = std::move(retain),
+				});
+				if (!IsReservedTextureId(textureId))
+				{
+					addDependency(
+						AssetInterestKind::Texture,
+						textureId.Value(),
+						textureGeneration);
+				}
+
+				if (!created)
+				{
+					importedTexture = {};
+					return continued({ .m_PayloadBytesDestroyed = sourceBytes });
+				}
+
+				auto uploadData = m_TextureRegistry->MakeTextureUploadData(
+					textureId,
+					std::move(importedTexture.m_Data),
+					importedTexture.m_Semantic);
+				const bool queued = m_TextureRegistry->QueueTextureUpload(
+					std::move(uploadData),
+					priority);
+				importedTexture = {};
+				if (!queued)
+				{
+					return failed(
+						std::format("Failed to queue texture {} upload", textureId.Value()),
+						{
+							.m_ResourceCreations = 1,
+							.m_PayloadBytesDestroyed = sourceBytes,
+						});
+				}
+				++transaction.m_QueuedTextureUploads;
+				return continued({
+					.m_ResourceCreations = 1,
+					.m_PayloadBytesMovedToUpload = sourceBytes,
+				});
 			}
-			materialIds.push_back(AddMaterial(std::move(material)));
+
+			case Stage::Materials:
+			{
+				ImportedMaterial* importedMaterial = nullptr;
+				if (transaction.m_MaterialCursor < transaction.m_Source.m_Materials.size())
+				{
+					importedMaterial = &transaction.m_Source.m_Materials[
+						transaction.m_MaterialCursor++];
+				}
+				else if (transaction.m_MaterialIds.empty() &&
+					!transaction.m_DefaultMaterialCreated)
+				{
+					transaction.m_DefaultMaterialCreated = true;
+				}
+				else
+				{
+					transaction.m_Stage = Stage::Meshes;
+					continue;
+				}
+
+				auto material = std::make_unique<Material>();
+				if (importedMaterial)
+				{
+					static_cast<MaterialProperties&>(*material) =
+						importedMaterial->m_Properties;
+					material->m_Name = StringID(importedMaterial->m_Name);
+					for (uint32_t slotIndex = 0;
+						slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
+						++slotIndex)
+					{
+						const ImportedMaterialTextureBinding& importedBinding =
+							importedMaterial->m_TextureBindings[slotIndex];
+						if (importedBinding.m_TextureIndex ==
+							ImportedMaterialTextureBinding::InvalidTextureIndex)
+						{
+							continue;
+						}
+
+						MaterialTextureBinding binding{};
+						if (importedBinding.m_TextureIndex < transaction.m_TextureIds.size())
+						{
+							binding.m_TextureId = transaction.m_TextureIds[
+								importedBinding.m_TextureIndex];
+						}
+						binding.m_SamplerId = m_SamplerRegistry->GetOrCreateSampler(
+							importedBinding.m_SamplerKey);
+						binding.m_TexCoordIndex = importedBinding.m_TexCoordIndex;
+						SetMaterialTexture(
+							*material,
+							static_cast<MaterialTextureSlot>(slotIndex),
+							binding);
+					}
+				}
+
+				const MaterialID materialId = AddMaterial(std::move(material));
+				if (!materialId.IsValid())
+				{
+					return failed("Failed to create material during model publication");
+				}
+				transaction.m_MaterialIds.push_back(materialId);
+				transaction.m_CreatedMaterialIds.push_back(materialId);
+				if (importedMaterial)
+				{
+					*importedMaterial = {};
+				}
+				return continued({ .m_ResourceCreations = 1 });
+			}
+
+			case Stage::Meshes:
+			{
+				if (transaction.m_MeshCursor >= transaction.m_Source.m_Meshes.size())
+				{
+					transaction.m_Stage = Stage::MeshInstances;
+					continue;
+				}
+
+				const size_t meshIndex = transaction.m_MeshCursor++;
+				ImportedMesh& importedMesh = transaction.m_Source.m_Meshes[meshIndex];
+				const uint64_t vertexBytes = static_cast<uint64_t>(
+					importedMesh.m_Vertices.size()) * sizeof(Vertex);
+				const uint64_t indexBytes = static_cast<uint64_t>(
+					importedMesh.m_Indices.size()) * sizeof(uint32_t);
+				const uint64_t sourceBytes = vertexBytes + indexBytes;
+				const MeshID meshId = CreateMesh();
+				Mesh* mesh = GetMesh(meshId);
+				if (!meshId.IsValid() || !mesh)
+				{
+					return failed(
+						"Failed to create mesh entry during model publication",
+						{ .m_PayloadBytesDestroyed = sourceBytes });
+				}
+
+				transaction.m_MeshIds[meshIndex] = meshId;
+				mesh->m_Id = meshId;
+				mesh->m_Name = StringID(importedMesh.m_Name);
+				mesh->m_Sphere = importedMesh.m_Sphere;
+				mesh->m_Aabb = importedMesh.m_Aabb;
+				mesh->m_HasBounds = importedMesh.m_HasBounds;
+				mesh->m_State = AssetState::Publishing;
+				auto retain = AcquirePublicationRetain(
+					AssetInterestKind::Mesh,
+					meshId.Value(),
+					mesh->m_Generation);
+				transaction.m_Claims.push_back({
+					.m_Kind = AssetInterestKind::Mesh,
+					.m_StableId = meshId.Value(),
+					.m_Generation = mesh->m_Generation,
+					.m_Origin = ClaimOrigin::Created,
+					.m_Retain = std::move(retain),
+				});
+				addDependency(
+					AssetInterestKind::Mesh,
+					meshId.Value(),
+					mesh->m_Generation);
+
+				MeshUploadData uploadData{};
+				uploadData.m_MeshId = meshId;
+				uploadData.m_VerticesData = std::move(importedMesh.m_Vertices);
+				uploadData.m_IndicesData = std::move(importedMesh.m_Indices);
+				importedMesh.m_Name.clear();
+				const bool queued = QueueMeshUpload(std::move(uploadData), priority);
+				if (!queued)
+				{
+					return failed(
+						std::format("Failed to queue mesh {} upload", meshId.Value()),
+						{
+							.m_ResourceCreations = 1,
+							.m_PayloadBytesDestroyed = sourceBytes,
+						});
+				}
+				++transaction.m_QueuedMeshUploads;
+				return continued({
+					.m_ResourceCreations = 1,
+					.m_PayloadBytesMovedToUpload = sourceBytes,
+				});
+			}
+
+			case Stage::MeshInstances:
+			{
+				if (transaction.m_InstanceCursor >=
+					transaction.m_Source.m_MeshInstances.size())
+				{
+					transaction.m_Stage = transaction.m_PendingInstances.empty() ?
+						Stage::FallbackMeshInstances : Stage::Dependencies;
+					continue;
+				}
+
+				ImportedModelMesh& importedInstance =
+					transaction.m_Source.m_MeshInstances[transaction.m_InstanceCursor++];
+				if (importedInstance.m_MeshIndex >= transaction.m_MeshIds.size())
+				{
+					importedInstance = {};
+					return continued();
+				}
+				const uint32_t materialIndex =
+					importedInstance.m_MaterialIndex < transaction.m_MaterialIds.size() ?
+					importedInstance.m_MaterialIndex : 0;
+				transaction.m_PendingInstances.push_back({
+					.m_MeshId = transaction.m_MeshIds[importedInstance.m_MeshIndex],
+					.m_MaterialId = transaction.m_MaterialIds[materialIndex],
+					.m_LocalTransform = importedInstance.m_LocalTransform,
+				});
+				importedInstance = {};
+				return continued({ .m_ResourceCreations = 1 });
+			}
+
+			case Stage::FallbackMeshInstances:
+			{
+				if (transaction.m_FallbackInstanceCursor >= transaction.m_MeshIds.size())
+				{
+					transaction.m_Stage = Stage::Dependencies;
+					continue;
+				}
+				const size_t meshIndex = transaction.m_FallbackInstanceCursor++;
+				const uint32_t sourceMaterialIndex =
+					transaction.m_Source.m_Meshes[meshIndex].m_MaterialIndex;
+				const uint32_t materialIndex =
+					sourceMaterialIndex < transaction.m_MaterialIds.size() ?
+					sourceMaterialIndex : 0;
+				transaction.m_PendingInstances.push_back({
+					.m_MeshId = transaction.m_MeshIds[meshIndex],
+					.m_MaterialId = transaction.m_MaterialIds[materialIndex],
+				});
+				return continued({ .m_ResourceCreations = 1 });
+			}
+
+			case Stage::Dependencies:
+			{
+				if (transaction.m_DependencyCursor >= transaction.m_Dependencies.size())
+				{
+					transaction.m_Stage = Stage::Commit;
+					continue;
+				}
+				if (!transaction.m_DependencyOwner.IsValid())
+				{
+					transaction.m_DependencyOwner = RegisterAssetOwner(
+						std::format("Model {} dependencies", transaction.m_ModelId.Value()));
+				}
+
+				const ModelPublicationTransaction::Dependency& dependency =
+					transaction.m_Dependencies[transaction.m_DependencyCursor++];
+				AssetLease lease = AcquireAssetLease(
+					transaction.m_DependencyOwner,
+					dependency.m_Kind,
+					dependency.m_StableId,
+					dependency.m_Generation,
+					priority,
+					true);
+				if (!lease.IsValid())
+				{
+					return failed("Failed to acquire model dependency lease");
+				}
+				transaction.m_DependencyLeaseTokens.push_back(lease.m_LeaseToken);
+				lease.m_Manager = nullptr;
+				lease.m_LeaseToken = 0;
+				return continued();
+			}
+
+			case Stage::Commit:
+			{
+				if (transaction.m_PendingInstances.empty())
+				{
+					return failed("Model publication produced no renderable mesh instances");
+				}
+				if (!transaction.m_DependencyOwner.IsValid())
+				{
+					transaction.m_DependencyOwner = RegisterAssetOwner(
+						std::format("Model {} dependencies", transaction.m_ModelId.Value()));
+				}
+				if (m_ModelDependencyOwners.contains(transaction.m_ModelId) ||
+					m_ModelDependencyLeaseTokens.contains(transaction.m_ModelId))
+				{
+					return failed("Model already owns dependency interests before publication commit");
+				}
+
+				model->m_Name = StringID(transaction.m_Source.m_Name);
+				model->m_Type = transaction.m_Source.m_Type;
+				model->m_MeshInstance = std::move(transaction.m_PendingInstances);
+				m_ModelDependencyOwners.emplace(
+					transaction.m_ModelId,
+					transaction.m_DependencyOwner);
+				m_ModelDependencyLeaseTokens.emplace(
+					transaction.m_ModelId,
+					std::move(transaction.m_DependencyLeaseTokens));
+				transaction.m_DependencyOwner = {};
+				model->m_State = AssetState::UploadQueued;
+				m_PendingModels.insert(transaction.m_ModelId);
+				transaction.m_Committed = true;
+				transaction.m_Stage = Stage::ReleaseRetains;
+				ProgressReporter(model->m_LoadProgress).Report(
+					0.66f,
+					"Waiting for model dependency uploads",
+					std::format(
+						"{} texture uploads, {} mesh uploads",
+						transaction.m_QueuedTextureUploads,
+						transaction.m_QueuedMeshUploads));
+				if (RefreshModelState(transaction.m_ModelId))
+				{
+					m_PendingModels.erase(transaction.m_ModelId);
+				}
+				return continued();
+			}
+
+			case Stage::ReleaseRetains:
+			{
+				if (transaction.m_ReleaseRetainCursor < transaction.m_Claims.size())
+				{
+					transaction.m_Claims[transaction.m_ReleaseRetainCursor++].m_Retain.Reset();
+					if (transaction.m_ReleaseRetainCursor < transaction.m_Claims.size())
+					{
+						return continued();
+					}
+				}
+				transaction.m_Stage = Stage::Finished;
+				GGLAB_LOG_GRAPHICS_INFO(
+					"Async model {} published incrementally (instances={}, textureUploads={}, meshUploads={}, queueMs={:.2f}, cpuMs={:.2f}).",
+					transaction.m_ModelId.Value(),
+					model->m_MeshInstance.size(),
+					transaction.m_QueuedTextureUploads,
+					transaction.m_QueuedMeshUploads,
+					transaction.m_ImportQueueMilliseconds,
+					transaction.m_ImportExecutionMilliseconds);
+				return { .m_Status = AssetResourcePublicationStepStatus::Completed };
+			}
+
+			case Stage::Finished:
+				return { .m_Status = AssetResourcePublicationStepStatus::Completed };
+			}
 		}
-		if (materialIds.empty())
+	}
+
+	void AssetManager::AbortModelPublication(
+		ModelPublicationTransaction& transaction,
+		AssetResourcePublicationAbortReason reason) noexcept
+	{
+		if (transaction.m_Aborted)
 		{
-			materialIds.push_back(AddMaterial(std::make_unique<Material>()));
+			return;
+		}
+		transaction.m_Aborted = true;
+
+		if (transaction.m_Committed)
+		{
+			for (ModelPublicationTransaction::ResourceClaim& claim : transaction.m_Claims)
+			{
+				const InterestKey key{
+					.m_Kind = claim.m_Kind,
+					.m_StableId = claim.m_StableId,
+				};
+				claim.m_Retain.Reset();
+				if (!HasPublicationRetain(key, claim.m_Generation) &&
+					!HasActiveInterest(key))
+				{
+					CancelAssetIfUnreferenced(key, claim.m_Generation);
+				}
+			}
+			return;
 		}
 
-		std::vector<MeshID> meshIds(importedModel.m_Meshes.size());
-		std::vector<MeshUploadData> meshUploads(importedModel.m_Meshes.size());
-		for (size_t meshIndex = 0; meshIndex < importedModel.m_Meshes.size(); ++meshIndex)
+		std::vector<uint64_t> dependencyTokens =
+			std::move(transaction.m_DependencyLeaseTokens);
+		for (uint64_t token : dependencyTokens)
 		{
-			ImportedMesh& importedMesh = importedModel.m_Meshes[meshIndex];
-			const MeshID meshId = CreateMesh();
-			meshIds[meshIndex] = meshId;
-			Mesh* mesh = GetMesh(meshId);
-			GGLAB_ASSERT_NOT_NULL(mesh);
-			mesh->m_Name = StringID(importedMesh.m_Name);
-			mesh->m_Sphere = importedMesh.m_Sphere;
-			mesh->m_Aabb = importedMesh.m_Aabb;
-			mesh->m_HasBounds = importedMesh.m_HasBounds;
-			mesh->m_State = AssetState::CpuReady;
-
-			MeshUploadData& upload = meshUploads[meshIndex];
-			upload.m_MeshId = meshId;
-			upload.m_VerticesData = std::move(importedMesh.m_Vertices);
-			upload.m_IndicesData = std::move(importedMesh.m_Indices);
+			ReleaseAssetLease(token);
+		}
+		if (transaction.m_DependencyOwner.IsValid())
+		{
+			UnregisterAssetOwner(transaction.m_DependencyOwner);
+			transaction.m_DependencyOwner = {};
 		}
 
-		model->m_MeshInstance.clear();
-		model->m_MeshInstance.reserve(importedModel.m_MeshInstances.size());
-		for (const ImportedModelMesh& importedInstance : importedModel.m_MeshInstances)
+		for (auto claim = transaction.m_Claims.rbegin();
+			claim != transaction.m_Claims.rend();
+			++claim)
 		{
-			if (importedInstance.m_MeshIndex >= meshIds.size())
+			const InterestKey key{
+				.m_Kind = claim->m_Kind,
+				.m_StableId = claim->m_StableId,
+			};
+			claim->m_Retain.Reset();
+			if (HasPublicationRetain(key, claim->m_Generation) || HasActiveInterest(key))
 			{
 				continue;
 			}
-			const uint32_t materialIndex =
-				importedInstance.m_MaterialIndex < materialIds.size() ?
-				importedInstance.m_MaterialIndex : 0;
-			model->m_MeshInstance.push_back({
-				.m_MeshId = meshIds[importedInstance.m_MeshIndex],
-				.m_MaterialId = materialIds[materialIndex],
-				.m_LocalTransform = importedInstance.m_LocalTransform,
-			});
-		}
-		if (model->m_MeshInstance.empty())
-		{
-			for (size_t meshIndex = 0; meshIndex < meshIds.size(); ++meshIndex)
+
+			if (claim->m_Origin == ModelPublicationTransaction::ClaimOrigin::Created)
 			{
-				const uint32_t materialIndex =
-					importedModel.m_Meshes[meshIndex].m_MaterialIndex < materialIds.size() ?
-					importedModel.m_Meshes[meshIndex].m_MaterialIndex : 0;
-				model->m_MeshInstance.push_back({
-					.m_MeshId = meshIds[meshIndex],
-					.m_MaterialId = materialIds[materialIndex],
-				});
+				if (claim->m_Kind == AssetInterestKind::Texture)
+				{
+					m_TextureRegistry->RollbackPublicationTexture(
+						TextureID{ static_cast<uint32_t>(claim->m_StableId) },
+						claim->m_Generation);
+				}
+				else if (claim->m_Kind == AssetInterestKind::Mesh)
+				{
+					RollbackPublicationMesh(
+						MeshID{ static_cast<uint32_t>(claim->m_StableId) },
+						claim->m_Generation);
+				}
+			}
+			else
+			{
+				CancelAssetIfUnreferenced(key, claim->m_Generation);
 			}
 		}
 
-		model->m_State = AssetState::UploadQueued;
-		m_PendingModels.insert(modelId);
-		const InterestKey modelKey{
-			.m_Kind = AssetInterestKind::Model,
-			.m_StableId = modelId.Value(),
-		};
-		const TaskPriority priority = GetEffectivePriority(modelKey);
-		RefreshModelDependencyInterests(modelId, generation);
-		bool queued = true;
-		for (TextureRegistry::TextureUploadData& textureUpload : textureUploads)
+		for (MaterialID materialId : transaction.m_CreatedMaterialIds)
 		{
-			queued &= m_TextureRegistry->QueueTextureUpload(std::move(textureUpload), priority);
+			GGLAB_UNUSED(RemoveMaterial(materialId));
 		}
-		for (MeshUploadData& meshUpload : meshUploads)
+
+		Model* model = GetModel(transaction.m_ModelId);
+		if (model && model->m_Generation == transaction.m_Generation)
 		{
-			queued &= QueueMeshUpload(std::move(meshUpload), priority);
+			model->m_MeshInstance.clear();
+			model->m_State = reason == AssetResourcePublicationAbortReason::Failed ?
+				AssetState::Failed : AssetState::Cancelled;
+			m_PendingModels.erase(transaction.m_ModelId);
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.62f,
+				reason == AssetResourcePublicationAbortReason::Failed ?
+					"Model publication failed" : "Model publication cancelled");
 		}
-		ProgressReporter(model->m_LoadProgress).Report(
-			0.66f,
-			"Waiting for model dependency uploads",
-			std::format(
-				"{} texture uploads, {} mesh uploads",
-				textureUploads.size(),
-				meshUploads.size()));
-		if (RefreshModelState(modelId))
-		{
-			m_PendingModels.erase(modelId);
-		}
-		return queued;
 	}
 
 	void AssetManager::CompleteModelLoad(
@@ -1581,7 +2136,7 @@ namespace gglab
 			.m_Kind = AssetInterestKind::Model,
 			.m_StableId = modelId.Value(),
 		}, completion.m_Priority);
-		auto publicationJob = std::make_unique<ModelPublicationCompatibilityJob>(
+		auto publicationJob = std::make_unique<ModelPublicationTransaction>(
 			this,
 			modelId,
 			generation,

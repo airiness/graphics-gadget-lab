@@ -61,6 +61,8 @@ namespace gglab
 			return { state, 0.25f, std::string(GetCpuProcessingStage(kind)), {} };
 		case AssetState::CpuReady:
 			return { state, 0.55f, "CPU processing complete", {} };
+		case AssetState::Publishing:
+			return { state, 0.62f, "Publishing asset resources", {} };
 		case AssetState::UploadQueued:
 			return { state, 0.65f, "Queued for GPU upload", {} };
 		case AssetState::GpuProcessing:
