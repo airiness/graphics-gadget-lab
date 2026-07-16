@@ -34,6 +34,39 @@ namespace gglab::devtools
 	};
 
 	template<>
+	struct EnumTextTraits<AssetContentState>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ AssetContentState::Unloaded, "Unloaded" },
+			EnumTextEntry{ AssetContentState::Loading, "Loading" },
+			EnumTextEntry{ AssetContentState::Ready, "Ready" },
+			EnumTextEntry{ AssetContentState::Failed, "Failed" },
+			EnumTextEntry{ AssetContentState::Cancelled, "Cancelled" },
+		};
+	};
+
+	template<>
+	struct EnumTextTraits<AssetResidencyState>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ AssetResidencyState::NonResident, "Non-resident" },
+			EnumTextEntry{ AssetResidencyState::Queued, "Queued" },
+			EnumTextEntry{ AssetResidencyState::Uploading, "Uploading" },
+			EnumTextEntry{ AssetResidencyState::Resident, "Resident" },
+			EnumTextEntry{ AssetResidencyState::Evicting, "Evicting" },
+		};
+	};
+
+	template<>
+	struct EnumTextTraits<AssetResidencyPolicy>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ AssetResidencyPolicy::Cacheable, "Cacheable" },
+			EnumTextEntry{ AssetResidencyPolicy::Pinned, "Pinned" },
+		};
+	};
+
+	template<>
 	struct EnumTextTraits<AssetUploadStatus>
 	{
 		static constexpr std::array Entries = {

@@ -1,6 +1,7 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
 #include "Application/LoadingProgress.h"
+#include "Core/CoreMacros.h"
 
 #include <optional>
 #include <string_view>
@@ -40,7 +41,7 @@ namespace gglab
 		virtual void Update()  noexcept = 0;
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
-			(void)feedback;
+			GGLAB_UNUSED(feedback);
 		}
 
 		virtual World& GetWorld() noexcept = 0;

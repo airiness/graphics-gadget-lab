@@ -55,6 +55,123 @@ namespace gglab
 		Cancelled,
 	};
 
+	enum class AssetContentState : uint8_t
+	{
+		Unloaded,
+		Loading,
+		Ready,
+		Failed,
+		Cancelled,
+	};
+
+	enum class AssetResidencyState : uint8_t
+	{
+		NonResident,
+		Queued,
+		Uploading,
+		Resident,
+		Evicting,
+	};
+
+	enum class AssetResidencyPolicy : uint8_t
+	{
+		Cacheable,
+		Pinned,
+	};
+
+	struct AssetLifecycle
+	{
+		uint64_t m_ContentGeneration = 0;
+		uint64_t m_ResidencyEpoch = 0;
+		uint64_t m_LastUsedFrame = 0;
+		uint64_t m_UseCount = 0;
+		AssetState m_State = AssetState::Unloaded;
+		AssetContentState m_ContentState = AssetContentState::Unloaded;
+		AssetResidencyState m_ResidencyState = AssetResidencyState::NonResident;
+		AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
+	};
+
+	[[nodiscard]] constexpr AssetContentState ProjectAssetContentState(
+		AssetState state) noexcept
+	{
+		switch (state)
+		{
+		case AssetState::Unloaded:
+			return AssetContentState::Unloaded;
+		case AssetState::Queued:
+		case AssetState::LoadingCpu:
+			return AssetContentState::Loading;
+		case AssetState::CpuReady:
+		case AssetState::Publishing:
+		case AssetState::UploadQueued:
+		case AssetState::GpuProcessing:
+		case AssetState::Ready:
+			return AssetContentState::Ready;
+		case AssetState::Failed:
+			return AssetContentState::Failed;
+		case AssetState::Cancelled:
+			return AssetContentState::Cancelled;
+		}
+		return AssetContentState::Unloaded;
+	}
+
+	[[nodiscard]] constexpr AssetResidencyState ProjectAssetResidencyState(
+		AssetState state) noexcept
+	{
+		switch (state)
+		{
+		case AssetState::UploadQueued:
+			return AssetResidencyState::Queued;
+		case AssetState::GpuProcessing:
+			return AssetResidencyState::Uploading;
+		case AssetState::Ready:
+			return AssetResidencyState::Resident;
+		case AssetState::Unloaded:
+		case AssetState::Queued:
+		case AssetState::LoadingCpu:
+		case AssetState::CpuReady:
+		case AssetState::Publishing:
+		case AssetState::Failed:
+		case AssetState::Cancelled:
+			return AssetResidencyState::NonResident;
+		}
+		return AssetResidencyState::NonResident;
+	}
+
+	inline void SetAssetState(AssetLifecycle& lifecycle, AssetState state) noexcept
+	{
+		const AssetResidencyState residencyState = ProjectAssetResidencyState(state);
+		if (lifecycle.m_ResidencyState == AssetResidencyState::NonResident &&
+			residencyState != AssetResidencyState::NonResident)
+		{
+			++lifecycle.m_ResidencyEpoch;
+		}
+		lifecycle.m_State = state;
+		lifecycle.m_ContentState = ProjectAssetContentState(state);
+		lifecycle.m_ResidencyState = residencyState;
+	}
+
+	inline void BeginAssetContentGeneration(
+		AssetLifecycle& lifecycle,
+		uint64_t generation,
+		AssetState initialState,
+		AssetResidencyPolicy policy = AssetResidencyPolicy::Cacheable) noexcept
+	{
+		GGLAB_ASSERT(generation > 0);
+		lifecycle = {
+			.m_ContentGeneration = generation,
+			.m_ResidencyPolicy = policy,
+		};
+		SetAssetState(lifecycle, initialState);
+	}
+
+	[[nodiscard]] constexpr bool IsAssetLifecycleSynchronized(
+		const AssetLifecycle& lifecycle) noexcept
+	{
+		return lifecycle.m_ContentState == ProjectAssetContentState(lifecycle.m_State) &&
+			lifecycle.m_ResidencyState == ProjectAssetResidencyState(lifecycle.m_State);
+	}
+
 	enum class AlphaMode : uint32_t
 	{
 		Opaque,
@@ -228,6 +345,10 @@ namespace gglab
 	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
 	inline constexpr MeshID ProceduralSphereMeshID{ 1u };
 	inline constexpr MeshID::ValueType ReservedMeshCount = 8u;
+	[[nodiscard]] constexpr bool IsReservedMeshId(MeshID id) noexcept
+	{
+		return id.IsValid() && id.Value() < ReservedMeshCount;
+	}
 
 	// MaterialID
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MaterialID, uint32_t);
@@ -291,12 +412,14 @@ namespace gglab
 	inline constexpr ModelID ProceduralCubeModelID{ 0u };
 	inline constexpr ModelID ProceduralSphereModelID{ 1u };
 	inline constexpr ModelID::ValueType ReservedModelCount = 8u;
+	[[nodiscard]] constexpr bool IsReservedModelId(ModelID id) noexcept
+	{
+		return id.IsValid() && id.Value() < ReservedModelCount;
+	}
 
-	struct Texture
+	struct Texture : AssetLifecycle
 	{
 		TextureID m_Id{};
-		uint64_t m_Generation = 0;
-		AssetState m_State = AssetState::Unloaded;
 		RHITextureViewHandle m_Srv{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		StringID m_Name{};
@@ -352,12 +475,9 @@ namespace gglab
 		StringID m_Name{};
 	};
 
-	struct Mesh
+	struct Mesh : AssetLifecycle
 	{
 		MeshID m_Id{};
-		uint64_t m_Generation = 0;
-
-		AssetState m_State = AssetState::Unloaded;
 		bool m_IsUploaded = false;
 		bool m_HasBounds = false;
 		bool m_CancelRequested = false;
@@ -385,11 +505,9 @@ namespace gglab
 		Matrix m_LocalTransform = Matrix::Identity;
 	};
 
-	struct Model
+	struct Model : AssetLifecycle
 	{
 		ModelID m_Id{};
-		uint64_t m_Generation = 0;
-		AssetState m_State = AssetState::Unloaded;
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		ProgressChannelPtr m_LoadProgress;

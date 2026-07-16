@@ -111,12 +111,20 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
-			if (ImGui::BeginTable("ModelAssetsTable", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			if (ImGui::BeginTable("ModelAssetsTable", 13,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
-				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Content Gen", ImGuiTableColumnFlags_WidthFixed, 88.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
+				ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthFixed, 88.0f);
+				ImGui::TableSetupColumn("Residency", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Epoch", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Policy", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Last Use", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Uses", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Candidate", ImGuiTableColumnFlags_WidthFixed, 76.0f);
 				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Meshes", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch);
@@ -132,18 +140,29 @@ namespace gglab
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", model.m_Id.Value());
 					ImGui::TableSetColumnIndex(1);
-					ImGui::Text("%llu", model.m_Generation);
+					ImGui::Text("%llu", model.m_ContentGeneration);
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(name.c_str());
 					ImGui::TableSetColumnIndex(3);
-					const std::string modelState = devtools::EnumText(model.m_State);
-					ImGui::TextUnformatted(modelState.c_str());
+					ImGui::TextUnformatted(devtools::EnumText(model.m_ContentState).c_str());
 					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(devtools::EnumText(model.m_ResidencyState).c_str());
+					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("%llu", model.m_ResidencyEpoch);
+					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(devtools::EnumText(model.m_ResidencyPolicy).c_str());
+					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%llu", model.m_LastUsedFrame);
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("%llu", model.m_UseCount);
+					ImGui::TableSetColumnIndex(9);
+					ImGui::TextUnformatted(utils::BoolToString(model.m_IsEvictionCandidate));
+					ImGui::TableSetColumnIndex(10);
 					const std::string modelType = devtools::EnumText(model.m_Type);
 					ImGui::TextUnformatted(modelType.c_str());
-					ImGui::TableSetColumnIndex(5);
+					ImGui::TableSetColumnIndex(11);
 					ImGui::Text("%u", model.m_MeshInstanceCount);
-					ImGui::TableSetColumnIndex(6);
+					ImGui::TableSetColumnIndex(12);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -204,14 +223,20 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
-			if (ImGui::BeginTable("TextureAssetsTable", 10,
+			if (ImGui::BeginTable("TextureAssetsTable", 16,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
-				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Content Gen", ImGuiTableColumnFlags_WidthFixed, 88.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
+				ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthFixed, 88.0f);
+				ImGui::TableSetupColumn("Residency", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Epoch", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Policy", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Last Use", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Uses", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Candidate", ImGuiTableColumnFlags_WidthFixed, 76.0f);
 				ImGui::TableSetupColumn("Semantic", ImGuiTableColumnFlags_WidthFixed, 140.0f);
 				ImGui::TableSetupColumn("Uploaded", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Reserved", ImGuiTableColumnFlags_WidthFixed, 80.0f);
@@ -230,25 +255,36 @@ namespace gglab
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", texture.m_Id.Value());
 					ImGui::TableSetColumnIndex(1);
-					ImGui::Text("%llu", texture.m_Generation);
+					ImGui::Text("%llu", texture.m_ContentGeneration);
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(name.c_str());
 					ImGui::TableSetColumnIndex(3);
-					const std::string textureState = devtools::EnumText(texture.m_State);
-					ImGui::TextUnformatted(textureState.c_str());
+					ImGui::TextUnformatted(devtools::EnumText(texture.m_ContentState).c_str());
 					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(devtools::EnumText(texture.m_ResidencyState).c_str());
+					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("%llu", texture.m_ResidencyEpoch);
+					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(devtools::EnumText(texture.m_ResidencyPolicy).c_str());
+					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%llu", texture.m_LastUsedFrame);
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("%llu", texture.m_UseCount);
+					ImGui::TableSetColumnIndex(9);
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsEvictionCandidate));
+					ImGui::TableSetColumnIndex(10);
 					const std::string semantic = devtools::EnumText(texture.m_Semantic);
 					ImGui::TextUnformatted(semantic.c_str());
-					ImGui::TableSetColumnIndex(5);
+					ImGui::TableSetColumnIndex(11);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
-					ImGui::TableSetColumnIndex(6);
+					ImGui::TableSetColumnIndex(12);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
-					ImGui::TableSetColumnIndex(7);
+					ImGui::TableSetColumnIndex(13);
 					const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
 					ImGui::TextUnformatted(textureHandle.c_str());
-					ImGui::TableSetColumnIndex(8);
+					ImGui::TableSetColumnIndex(14);
 					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
-					ImGui::TableSetColumnIndex(9);
+					ImGui::TableSetColumnIndex(15);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -263,13 +299,20 @@ namespace gglab
 			const auto& meshes = assetSnapshot.m_Meshes;
 			ImGui::Text("%u meshes", static_cast<uint32_t>(meshes.size()));
 
-			if (ImGui::BeginTable("MeshAssetsTable", 7,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			if (ImGui::BeginTable("MeshAssetsTable", 13,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
-				ImGui::TableSetupColumn("Generation", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Content Gen", ImGuiTableColumnFlags_WidthFixed, 88.0f);
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
-				ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 112.0f);
+				ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthFixed, 88.0f);
+				ImGui::TableSetupColumn("Residency", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableSetupColumn("Epoch", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Policy", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Last Use", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Uses", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+				ImGui::TableSetupColumn("Candidate", ImGuiTableColumnFlags_WidthFixed, 76.0f);
 				ImGui::TableSetupColumn("Vertices", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Indices", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Uploaded", ImGuiTableColumnFlags_WidthFixed, 80.0f);
@@ -283,17 +326,28 @@ namespace gglab
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", mesh.m_Id.Value());
 					ImGui::TableSetColumnIndex(1);
-					ImGui::Text("%llu", mesh.m_Generation);
+					ImGui::Text("%llu", mesh.m_ContentGeneration);
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(name.empty() ? "<unnamed>" : name.c_str());
 					ImGui::TableSetColumnIndex(3);
-					const std::string meshState = devtools::EnumText(mesh.m_State);
-					ImGui::TextUnformatted(meshState.c_str());
+					ImGui::TextUnformatted(devtools::EnumText(mesh.m_ContentState).c_str());
 					ImGui::TableSetColumnIndex(4);
-					ImGui::Text("%u", mesh.m_VertexCount);
+					ImGui::TextUnformatted(devtools::EnumText(mesh.m_ResidencyState).c_str());
 					ImGui::TableSetColumnIndex(5);
-					ImGui::Text("%u", mesh.m_IndexCount);
+					ImGui::Text("%llu", mesh.m_ResidencyEpoch);
 					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(devtools::EnumText(mesh.m_ResidencyPolicy).c_str());
+					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%llu", mesh.m_LastUsedFrame);
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("%llu", mesh.m_UseCount);
+					ImGui::TableSetColumnIndex(9);
+					ImGui::TextUnformatted(utils::BoolToString(mesh.m_IsEvictionCandidate));
+					ImGui::TableSetColumnIndex(10);
+					ImGui::Text("%u", mesh.m_VertexCount);
+					ImGui::TableSetColumnIndex(11);
+					ImGui::Text("%u", mesh.m_IndexCount);
+					ImGui::TableSetColumnIndex(12);
 					ImGui::TextUnformatted(utils::BoolToString(mesh.m_IsUploaded));
 					ImGui::PopID();
 				}
@@ -672,6 +726,17 @@ namespace gglab
 			ImGui::TextWrapped("%s", state.m_Status.c_str());
 			ImGui::Separator();
 		}
+
+		ImGui::SeparatorText("Logical Residency");
+		ImGui::Text(
+			"Usage frame: %llu | Resident: %u | Pinned: %u | Cacheable: %u | Candidates: %u",
+			snapshot->m_AssetUsageFrame,
+			snapshot->m_ResidentAssetCount,
+			snapshot->m_PinnedAssetCount,
+			snapshot->m_CacheableAssetCount,
+			snapshot->m_EvictionCandidateCount);
+		ImGui::TextDisabled(
+			"Candidates are diagnostic only; automatic eviction is not enabled.");
 
 		if (ImGui::BeginTabBar("AssetManagerTabs"))
 		{

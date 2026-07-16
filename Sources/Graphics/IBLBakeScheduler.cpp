@@ -29,7 +29,7 @@ namespace gglab
 	{
 		for (auto& pending : m_PendingCacheWrites)
 		{
-			(void)pending.m_Result.get();
+			GGLAB_UNUSED(pending.m_Result.get());
 			for (const auto& request : pending.m_Work->m_Requests)
 			{
 				m_TransferManager->UnmapTextureReadback(*m_Device, request);
