@@ -179,6 +179,66 @@ namespace gglab
 			return m_ProgressToken;
 		}
 
+		[[nodiscard]] AssetResourcePublicationStage GetCurrentStage() const noexcept override
+		{
+			Stage stage = m_Stage;
+			for (;;)
+			{
+				switch (stage)
+				{
+				case Stage::Textures:
+					if (m_TextureCursor < m_Source.m_Textures.size())
+					{
+						return AssetResourcePublicationStage::Textures;
+					}
+					stage = Stage::Materials;
+					break;
+				case Stage::Materials:
+					if (m_MaterialCursor < m_Source.m_Materials.size() ||
+						(m_MaterialIds.empty() && !m_DefaultMaterialCreated))
+					{
+						return AssetResourcePublicationStage::Materials;
+					}
+					stage = Stage::Meshes;
+					break;
+				case Stage::Meshes:
+					if (m_MeshCursor < m_Source.m_Meshes.size())
+					{
+						return AssetResourcePublicationStage::Meshes;
+					}
+					stage = Stage::MeshInstances;
+					break;
+				case Stage::MeshInstances:
+					if (m_InstanceCursor < m_Source.m_MeshInstances.size())
+					{
+						return AssetResourcePublicationStage::MeshInstances;
+					}
+					stage = m_PendingInstances.empty() ?
+						Stage::FallbackMeshInstances : Stage::Dependencies;
+					break;
+				case Stage::FallbackMeshInstances:
+					if (m_FallbackInstanceCursor < m_MeshIds.size())
+					{
+						return AssetResourcePublicationStage::MeshInstances;
+					}
+					stage = Stage::Dependencies;
+					break;
+				case Stage::Dependencies:
+					if (m_DependencyCursor < m_Dependencies.size())
+					{
+						return AssetResourcePublicationStage::Dependencies;
+					}
+					return AssetResourcePublicationStage::Commit;
+				case Stage::Commit:
+					return AssetResourcePublicationStage::Commit;
+				case Stage::ReleaseRetains:
+					return AssetResourcePublicationStage::ReleaseRetains;
+				case Stage::Finished:
+					return AssetResourcePublicationStage::Unknown;
+				}
+			}
+		}
+
 	private:
 		friend class AssetManager;
 		struct ProgressState

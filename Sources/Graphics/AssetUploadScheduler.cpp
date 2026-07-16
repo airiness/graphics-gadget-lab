@@ -279,6 +279,11 @@ namespace gglab
 		std::vector<PendingUpload> completed;
 		for (auto iterator = m_PendingUploads.begin(); iterator != m_PendingUploads.end();)
 		{
+			if (iterator->m_Desc.m_Identity == m_GpuCompletionHold)
+			{
+				++iterator;
+				continue;
+			}
 			if (!m_Device->IsFencePointCompleted(iterator->m_FencePoint))
 			{
 				++iterator;
@@ -316,6 +321,7 @@ namespace gglab
 			return;
 		}
 
+		m_GpuCompletionHold = {};
 		GGLAB_ASSERT_MSG(
 			m_CpuPayloadQueue.empty() &&
 			m_ResourcePublicationQueue.empty() &&
@@ -366,6 +372,28 @@ namespace gglab
 		{
 			m_PublicationFault = {};
 			m_PublicationFaultObservedOccurrences = 0;
+		}
+	}
+
+	void AssetUploadScheduler::ArmGpuCompletionHold(
+		const AssetStreamingIdentity& identity) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "GPU completion hold must be configured on the owner thread.");
+		GGLAB_ASSERT_MSG(
+			identity.m_Kind != AssetStreamingWorkKind::Unknown,
+			"GPU completion hold requires a valid streaming identity.");
+		if (IsOwnerThread() && identity.m_Kind != AssetStreamingWorkKind::Unknown)
+		{
+			m_GpuCompletionHold = identity;
+		}
+	}
+
+	void AssetUploadScheduler::ClearGpuCompletionHold() noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "GPU completion hold must be cleared on the owner thread.");
+		if (IsOwnerThread())
+		{
+			m_GpuCompletionHold = {};
 		}
 	}
 
@@ -557,6 +585,45 @@ namespace gglab
 		return processedCount;
 	}
 
+	bool AssetUploadScheduler::TryApplyResourcePublicationFault(
+		const AssetStreamingIdentity& identity,
+		AssetResourcePublicationStage stage,
+		AssetResourcePublicationFaultTiming timing,
+		AssetResourcePublicationStepResult& result) noexcept
+	{
+		if (!m_PublicationFault.IsValid() ||
+			m_PublicationFault.m_Identity != identity ||
+			m_PublicationFault.m_Stage != stage ||
+			m_PublicationFault.m_Timing != timing)
+		{
+			return false;
+		}
+
+		++m_PublicationFaultObservedOccurrences;
+		if (m_PublicationFaultObservedOccurrences <
+			m_PublicationFault.m_TriggerOccurrence)
+		{
+			return false;
+		}
+
+		const AssetResourcePublicationFaultAction action =
+			m_PublicationFault.m_Action;
+		result.m_Status = action == AssetResourcePublicationFaultAction::Fail ?
+			AssetResourcePublicationStepStatus::Failed :
+			AssetResourcePublicationStepStatus::Cancelled;
+		result.m_Usage.m_Stage = stage;
+		result.m_Error = std::format(
+			"Injected publication {} {} stage {} occurrence {}",
+			action == AssetResourcePublicationFaultAction::Fail ? "failure" : "cancellation",
+			timing == AssetResourcePublicationFaultTiming::BeforeStep ? "before" : "after",
+			static_cast<size_t>(stage),
+			m_PublicationFaultObservedOccurrences);
+		++m_PublicationFaultInjectionCount;
+		m_PublicationFault = {};
+		m_PublicationFaultObservedOccurrences = 0;
+		return true;
+	}
+
 	uint32_t AssetUploadScheduler::DrainResourcePublicationQueue(bool ignoreBudget) noexcept
 	{
 		uint32_t processedCount = 0;
@@ -618,7 +685,16 @@ namespace gglab
 
 			const uint64_t progressBefore = publication.m_Job->GetProgressToken();
 			const auto executionBegin = std::chrono::steady_clock::now();
-			AssetResourcePublicationStepResult result = publication.m_Job->Step(context);
+			AssetResourcePublicationStepResult result{};
+			const bool injectedBeforeStep = TryApplyResourcePublicationFault(
+				publication.m_Desc.m_Identity,
+				publication.m_Job->GetCurrentStage(),
+				AssetResourcePublicationFaultTiming::BeforeStep,
+				result);
+			if (!injectedBeforeStep)
+			{
+				result = publication.m_Job->Step(context);
+			}
 			const double executionMilliseconds = Milliseconds(
 				std::chrono::steady_clock::now() - executionBegin);
 			const uint64_t progressAfter = publication.m_Job->GetProgressToken();
@@ -658,29 +734,13 @@ namespace gglab
 					stageTelemetry.m_RecentExecutionMilliseconds,
 					executionMilliseconds);
 			}
-			if (result.m_Status == AssetResourcePublicationStepStatus::Continue &&
-				m_PublicationFault.IsValid() &&
-				m_PublicationFault.m_Identity == publication.m_Desc.m_Identity &&
-				m_PublicationFault.m_Stage == result.m_Usage.m_Stage)
+			if (result.m_Status == AssetResourcePublicationStepStatus::Continue)
 			{
-				++m_PublicationFaultObservedOccurrences;
-				if (m_PublicationFaultObservedOccurrences >=
-					m_PublicationFault.m_TriggerOccurrence)
-				{
-					const AssetResourcePublicationFaultAction action =
-						m_PublicationFault.m_Action;
-					result.m_Status = action == AssetResourcePublicationFaultAction::Fail ?
-						AssetResourcePublicationStepStatus::Failed :
-						AssetResourcePublicationStepStatus::Cancelled;
-					result.m_Error = std::format(
-						"Injected publication {} at stage {} occurrence {}",
-						action == AssetResourcePublicationFaultAction::Fail ? "failure" : "cancellation",
-						stageIndex,
-						m_PublicationFaultObservedOccurrences);
-					++m_PublicationFaultInjectionCount;
-					m_PublicationFault = {};
-					m_PublicationFaultObservedOccurrences = 0;
-				}
+				GGLAB_UNUSED(TryApplyResourcePublicationFault(
+					publication.m_Desc.m_Identity,
+					result.m_Usage.m_Stage,
+					AssetResourcePublicationFaultTiming::AfterStep,
+					result));
 			}
 			m_ResourcePublicationTelemetry.m_ResourceCreationCount +=
 				result.m_Usage.m_ResourceCreations;
