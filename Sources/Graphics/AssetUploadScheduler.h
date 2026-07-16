@@ -3,6 +3,7 @@
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -52,6 +53,27 @@ namespace gglab
 		friend constexpr bool operator==(
 			const AssetStreamingIdentity&,
 			const AssetStreamingIdentity&) = default;
+	};
+
+	enum class AssetResourcePublicationStage : uint8_t
+	{
+		Unknown,
+		Textures,
+		Materials,
+		Meshes,
+		MeshInstances,
+		Dependencies,
+		Commit,
+		ReleaseRetains,
+		Count,
+	};
+
+	struct AssetResourcePublicationStageStatistics
+	{
+		uint64_t m_StepCount = 0;
+		double m_TotalMilliseconds = 0.0;
+		double m_MaxMilliseconds = 0.0;
+		double m_P95Milliseconds = 0.0;
 	};
 
 	struct AssetStreamingWorkEstimate
@@ -136,6 +158,13 @@ namespace gglab
 		double m_MaxQueueMilliseconds = 0.0;
 		double m_TotalExecutionMilliseconds = 0.0;
 		double m_MaxExecutionMilliseconds = 0.0;
+		double m_ExecutionP95Milliseconds = 0.0;
+		uint64_t m_OverBudgetExecutionCount = 0;
+		uint64_t m_NoProgressContinueCount = 0;
+		uint64_t m_FaultInjectionCount = 0;
+		std::array<AssetResourcePublicationStageStatistics,
+			static_cast<size_t>(AssetResourcePublicationStage::Count)>
+			m_PublicationStages;
 		std::vector<AssetStreamingWorkActivity> m_PendingWork;
 	};
 
@@ -184,7 +213,7 @@ namespace gglab
 		uint64_t m_ReadyPayloadHighWatermark = 0;
 		uint64_t m_InFlightBytes = 0;
 		uint64_t m_InFlightHighWatermark = 0;
-		uint64_t m_BacklogBudgetDeferralCount = 0;
+		uint64_t m_UploadPromotionBudgetDeferralCount = 0;
 		uint64_t m_UploadBudgetDeferralCount = 0;
 		uint64_t m_InFlightBudgetDeferralCount = 0;
 		uint64_t m_OversizedAdmissionCount = 0;
@@ -212,12 +241,38 @@ namespace gglab
 		Shutdown,
 	};
 
+	enum class AssetResourcePublicationFaultAction : uint8_t
+	{
+		None,
+		Fail,
+		Cancel,
+	};
+
+	struct AssetResourcePublicationFaultInjection
+	{
+		AssetStreamingIdentity m_Identity{};
+		AssetResourcePublicationStage m_Stage = AssetResourcePublicationStage::Unknown;
+		AssetResourcePublicationFaultAction m_Action =
+			AssetResourcePublicationFaultAction::None;
+		uint32_t m_TriggerOccurrence = 1;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Identity.m_Kind != AssetStreamingWorkKind::Unknown &&
+				m_Stage != AssetResourcePublicationStage::Unknown &&
+				m_Stage != AssetResourcePublicationStage::Count &&
+				m_Action != AssetResourcePublicationFaultAction::None &&
+				m_TriggerOccurrence > 0;
+		}
+	};
+
 	struct AssetResourcePublicationStepUsage
 	{
 		uint32_t m_WorkItems = 1;
 		uint32_t m_ResourceCreations = 0;
 		uint64_t m_PayloadBytesMovedToUpload = 0;
 		uint64_t m_PayloadBytesDestroyed = 0;
+		AssetResourcePublicationStage m_Stage = AssetResourcePublicationStage::Unknown;
 	};
 
 	struct AssetResourcePublicationStepResult
@@ -246,6 +301,7 @@ namespace gglab
 		virtual void Abort(
 			AssetResourcePublicationContext& context,
 			AssetResourcePublicationAbortReason reason) noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetProgressToken() const noexcept = 0;
 	};
 
 	// Owns the main-thread streaming boundaries around resource publication and
@@ -287,6 +343,14 @@ namespace gglab
 		uint32_t Tick() noexcept;
 		void DrainReadyWork() noexcept;
 		void Finalize() noexcept;
+		void SetFrameBudget(const AssetStreamingFrameBudget& budget) noexcept;
+		[[nodiscard]] const AssetStreamingFrameBudget& GetFrameBudget() const noexcept
+		{
+			return m_FrameBudget;
+		}
+		void ArmResourcePublicationFault(
+			const AssetResourcePublicationFaultInjection& fault) noexcept;
+		void ClearResourcePublicationFault() noexcept;
 
 		[[nodiscard]] AssetUploadStatistics GetStatistics() const;
 
@@ -342,6 +406,15 @@ namespace gglab
 			double m_MaxQueueMilliseconds = 0.0;
 			double m_TotalExecutionMilliseconds = 0.0;
 			double m_MaxExecutionMilliseconds = 0.0;
+			std::deque<double> m_RecentExecutionMilliseconds;
+		};
+
+		struct PublicationStageTelemetry
+		{
+			uint64_t m_StepCount = 0;
+			double m_TotalMilliseconds = 0.0;
+			double m_MaxMilliseconds = 0.0;
+			std::deque<double> m_RecentExecutionMilliseconds;
 		};
 
 		[[nodiscard]] bool IsOwnerThread() const noexcept;
@@ -402,7 +475,7 @@ namespace gglab
 		uint64_t m_ReadyPayloadHighWatermark = 0;
 		uint64_t m_InFlightBytes = 0;
 		uint64_t m_InFlightHighWatermark = 0;
-		uint64_t m_BacklogBudgetDeferralCount = 0;
+		uint64_t m_UploadPromotionBudgetDeferralCount = 0;
 		uint64_t m_UploadBudgetDeferralCount = 0;
 		uint64_t m_InFlightBudgetDeferralCount = 0;
 		uint64_t m_OversizedAdmissionCount = 0;
@@ -420,5 +493,13 @@ namespace gglab
 		QueueTelemetry m_ResourcePublicationTelemetry;
 		QueueTelemetry m_UploadRecordingTelemetry;
 		QueueTelemetry m_GpuFinalizeTelemetry;
+		std::array<PublicationStageTelemetry,
+			static_cast<size_t>(AssetResourcePublicationStage::Count)>
+			m_PublicationStageTelemetry;
+		AssetResourcePublicationFaultInjection m_PublicationFault{};
+		uint32_t m_PublicationFaultObservedOccurrences = 0;
+		uint64_t m_PublicationOverBudgetExecutionCount = 0;
+		uint64_t m_PublicationNoProgressContinueCount = 0;
+		uint64_t m_PublicationFaultInjectionCount = 0;
 	};
 }

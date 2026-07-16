@@ -152,7 +152,15 @@ namespace gglab
 					.m_Error = "Model publication transaction has no AssetManager",
 				};
 			}
-			return m_AssetManager->StepModelPublication(*this, context.m_Priority);
+			const ProgressState progressBefore = CaptureProgressState();
+			AssetResourcePublicationStepResult result =
+				m_AssetManager->StepModelPublication(*this, context.m_Priority);
+			result.m_Usage.m_Stage = PublicationStage(m_LastStepStage);
+			if (CaptureProgressState() != progressBefore)
+			{
+				++m_ProgressToken;
+			}
+			return result;
 		}
 
 		void Abort(
@@ -166,8 +174,63 @@ namespace gglab
 			}
 		}
 
+		[[nodiscard]] uint64_t GetProgressToken() const noexcept override
+		{
+			return m_ProgressToken;
+		}
+
 	private:
 		friend class AssetManager;
+		struct ProgressState
+		{
+			Stage m_Stage = Stage::Finished;
+			size_t m_TextureCursor = 0;
+			size_t m_MaterialCursor = 0;
+			size_t m_MeshCursor = 0;
+			size_t m_InstanceCursor = 0;
+			size_t m_FallbackInstanceCursor = 0;
+			size_t m_DependencyCursor = 0;
+			size_t m_ReleaseRetainCursor = 0;
+			bool m_DefaultMaterialCreated = false;
+			bool m_Committed = false;
+
+			bool operator==(const ProgressState&) const = default;
+		};
+
+		[[nodiscard]] ProgressState CaptureProgressState() const noexcept
+		{
+			return {
+				.m_Stage = m_Stage,
+				.m_TextureCursor = m_TextureCursor,
+				.m_MaterialCursor = m_MaterialCursor,
+				.m_MeshCursor = m_MeshCursor,
+				.m_InstanceCursor = m_InstanceCursor,
+				.m_FallbackInstanceCursor = m_FallbackInstanceCursor,
+				.m_DependencyCursor = m_DependencyCursor,
+				.m_ReleaseRetainCursor = m_ReleaseRetainCursor,
+				.m_DefaultMaterialCreated = m_DefaultMaterialCreated,
+				.m_Committed = m_Committed,
+			};
+		}
+
+		[[nodiscard]] static AssetResourcePublicationStage PublicationStage(
+			Stage stage) noexcept
+		{
+			switch (stage)
+			{
+			case Stage::Textures: return AssetResourcePublicationStage::Textures;
+			case Stage::Materials: return AssetResourcePublicationStage::Materials;
+			case Stage::Meshes: return AssetResourcePublicationStage::Meshes;
+			case Stage::MeshInstances:
+			case Stage::FallbackMeshInstances:
+				return AssetResourcePublicationStage::MeshInstances;
+			case Stage::Dependencies: return AssetResourcePublicationStage::Dependencies;
+			case Stage::Commit: return AssetResourcePublicationStage::Commit;
+			case Stage::ReleaseRetains: return AssetResourcePublicationStage::ReleaseRetains;
+			case Stage::Finished: return AssetResourcePublicationStage::Unknown;
+			}
+			return AssetResourcePublicationStage::Unknown;
+		}
 
 		AssetManager* m_AssetManager = nullptr;
 		ModelID m_ModelId{};
@@ -176,6 +239,8 @@ namespace gglab
 		double m_ImportExecutionMilliseconds = 0.0;
 		ImportedModel m_Source;
 		Stage m_Stage = Stage::Textures;
+		Stage m_LastStepStage = Stage::Finished;
+		uint64_t m_ProgressToken = 0;
 		size_t m_TextureCursor = 0;
 		size_t m_MaterialCursor = 0;
 		size_t m_MeshCursor = 0;
@@ -1579,6 +1644,7 @@ namespace gglab
 
 		for (;;)
 		{
+			transaction.m_LastStepStage = transaction.m_Stage;
 			switch (transaction.m_Stage)
 			{
 			case Stage::Textures:

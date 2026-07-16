@@ -108,7 +108,8 @@ namespace gglab
 			snapshot.m_ReadyPayloadHighWatermark = statistics.m_ReadyPayloadHighWatermark;
 			snapshot.m_InFlightUploadBytes = statistics.m_InFlightBytes;
 			snapshot.m_InFlightUploadHighWatermark = statistics.m_InFlightHighWatermark;
-			snapshot.m_BacklogBudgetDeferralCount = statistics.m_BacklogBudgetDeferralCount;
+			snapshot.m_UploadPromotionBudgetDeferralCount =
+				statistics.m_UploadPromotionBudgetDeferralCount;
 			snapshot.m_UploadBudgetDeferralCount = statistics.m_UploadBudgetDeferralCount;
 			snapshot.m_InFlightBudgetDeferralCount = statistics.m_InFlightBudgetDeferralCount;
 			snapshot.m_OversizedAdmissionCount = statistics.m_OversizedAdmissionCount;

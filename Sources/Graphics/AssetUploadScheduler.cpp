@@ -4,11 +4,14 @@
 #include "Graphics/TransferBatch.h"
 #include "Graphics/TransferManager.h"
 
+#include <cmath>
+
 namespace gglab
 {
 	namespace
 	{
 		constexpr uint32_t MaxResourcePublicationDrainSteps = 1'000'000;
+		constexpr size_t RecentExecutionSampleCapacity = 256;
 
 		template<typename Rep, typename Period>
 		[[nodiscard]] double Milliseconds(std::chrono::duration<Rep, Period> duration) noexcept
@@ -21,6 +24,32 @@ namespace gglab
 			TaskPriority rhs) noexcept
 		{
 			return static_cast<uint8_t>(lhs) < static_cast<uint8_t>(rhs);
+		}
+
+		void RecordExecutionSample(
+			std::deque<double>& samples,
+			double milliseconds) noexcept
+		{
+			samples.push_back(milliseconds);
+			while (samples.size() > RecentExecutionSampleCapacity)
+			{
+				samples.pop_front();
+			}
+		}
+
+		[[nodiscard]] double ExecutionP95(
+			const std::deque<double>& samples)
+		{
+			if (samples.empty())
+			{
+				return 0.0;
+			}
+			std::vector<double> sorted(samples.begin(), samples.end());
+			std::ranges::sort(sorted);
+			const size_t index = std::min(
+				static_cast<size_t>(std::ceil(static_cast<double>(sorted.size()) * 0.95)) - 1,
+				sorted.size() - 1);
+			return sorted[index];
 		}
 	}
 
@@ -307,6 +336,39 @@ namespace gglab
 		m_TransferManager->Reclaim();
 	}
 
+	void AssetUploadScheduler::SetFrameBudget(
+		const AssetStreamingFrameBudget& budget) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset streaming frame budget must be changed on the owner thread.");
+		if (IsOwnerThread())
+		{
+			m_FrameBudget = budget;
+		}
+	}
+
+	void AssetUploadScheduler::ArmResourcePublicationFault(
+		const AssetResourcePublicationFaultInjection& fault) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Resource publication fault injection must be configured on the owner thread.");
+		if (!IsOwnerThread())
+		{
+			return;
+		}
+		GGLAB_ASSERT_MSG(fault.IsValid(), "Invalid resource publication fault injection configuration.");
+		m_PublicationFault = fault.IsValid() ? fault : AssetResourcePublicationFaultInjection{};
+		m_PublicationFaultObservedOccurrences = 0;
+	}
+
+	void AssetUploadScheduler::ClearResourcePublicationFault() noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Resource publication fault injection must be cleared on the owner thread.");
+		if (IsOwnerThread())
+		{
+			m_PublicationFault = {};
+			m_PublicationFaultObservedOccurrences = 0;
+		}
+	}
+
 	AssetUploadStatistics AssetUploadScheduler::GetStatistics() const
 	{
 		GGLAB_ASSERT_MSG(IsOwnerThread(), "AssetUploadScheduler statistics must be read on the owner thread.");
@@ -326,7 +388,8 @@ namespace gglab
 		statistics.m_ReadyPayloadHighWatermark = m_ReadyPayloadHighWatermark;
 		statistics.m_InFlightBytes = m_InFlightBytes;
 		statistics.m_InFlightHighWatermark = m_InFlightHighWatermark;
-		statistics.m_BacklogBudgetDeferralCount = m_BacklogBudgetDeferralCount;
+		statistics.m_UploadPromotionBudgetDeferralCount =
+			m_UploadPromotionBudgetDeferralCount;
 		statistics.m_UploadBudgetDeferralCount = m_UploadBudgetDeferralCount;
 		statistics.m_InFlightBudgetDeferralCount = m_InFlightBudgetDeferralCount;
 		statistics.m_OversizedAdmissionCount = m_OversizedAdmissionCount;
@@ -441,6 +504,9 @@ namespace gglab
 		telemetry.m_MaxExecutionMilliseconds = std::max(
 			telemetry.m_MaxExecutionMilliseconds,
 			executionMilliseconds);
+		RecordExecutionSample(
+			telemetry.m_RecentExecutionMilliseconds,
+			executionMilliseconds);
 		++telemetry.m_ProcessedCount;
 		return executionMilliseconds;
 	}
@@ -475,7 +541,7 @@ namespace gglab
 			if (!ignoreBudget && !m_UploadRecordingQueue.empty() &&
 				prospectiveUploadBacklog > m_FrameBudget.m_MaxUploadRecordingBacklogBytes)
 			{
-				++m_BacklogBudgetDeferralCount;
+				++m_UploadPromotionBudgetDeferralCount;
 				break;
 			}
 
@@ -550,18 +616,72 @@ namespace gglab
 				publication.m_HasStarted = true;
 			}
 
+			const uint64_t progressBefore = publication.m_Job->GetProgressToken();
 			const auto executionBegin = std::chrono::steady_clock::now();
-			const AssetResourcePublicationStepResult result = publication.m_Job->Step(context);
+			AssetResourcePublicationStepResult result = publication.m_Job->Step(context);
 			const double executionMilliseconds = Milliseconds(
 				std::chrono::steady_clock::now() - executionBegin);
+			const uint64_t progressAfter = publication.m_Job->GetProgressToken();
 			m_ResourcePublicationTelemetry.m_TotalExecutionMilliseconds += executionMilliseconds;
 			m_ResourcePublicationTelemetry.m_MaxExecutionMilliseconds = std::max(
 				m_ResourcePublicationTelemetry.m_MaxExecutionMilliseconds,
 				executionMilliseconds);
+			RecordExecutionSample(
+				m_ResourcePublicationTelemetry.m_RecentExecutionMilliseconds,
+				executionMilliseconds);
+			if (executionMilliseconds > m_FrameBudget.m_MaxResourcePublicationMilliseconds)
+			{
+				++m_PublicationOverBudgetExecutionCount;
+			}
 			++m_ResourcePublicationTelemetry.m_ProcessedCount;
 			GGLAB_ASSERT_MSG(
 				result.m_Usage.m_WorkItems == 1,
 				"Each resource publication Step must report exactly one work item.");
+			if (result.m_Status == AssetResourcePublicationStepStatus::Continue &&
+				progressAfter == progressBefore)
+			{
+				++m_PublicationNoProgressContinueCount;
+				GGLAB_ASSERT_MSG(false,
+					"Resource publication returned Continue without advancing its progress token.");
+			}
+			const size_t stageIndex = static_cast<size_t>(result.m_Usage.m_Stage);
+			if (stageIndex < m_PublicationStageTelemetry.size())
+			{
+				PublicationStageTelemetry& stageTelemetry =
+					m_PublicationStageTelemetry[stageIndex];
+				++stageTelemetry.m_StepCount;
+				stageTelemetry.m_TotalMilliseconds += executionMilliseconds;
+				stageTelemetry.m_MaxMilliseconds = std::max(
+					stageTelemetry.m_MaxMilliseconds,
+					executionMilliseconds);
+				RecordExecutionSample(
+					stageTelemetry.m_RecentExecutionMilliseconds,
+					executionMilliseconds);
+			}
+			if (result.m_Status == AssetResourcePublicationStepStatus::Continue &&
+				m_PublicationFault.IsValid() &&
+				m_PublicationFault.m_Identity == publication.m_Desc.m_Identity &&
+				m_PublicationFault.m_Stage == result.m_Usage.m_Stage)
+			{
+				++m_PublicationFaultObservedOccurrences;
+				if (m_PublicationFaultObservedOccurrences >=
+					m_PublicationFault.m_TriggerOccurrence)
+				{
+					const AssetResourcePublicationFaultAction action =
+						m_PublicationFault.m_Action;
+					result.m_Status = action == AssetResourcePublicationFaultAction::Fail ?
+						AssetResourcePublicationStepStatus::Failed :
+						AssetResourcePublicationStepStatus::Cancelled;
+					result.m_Error = std::format(
+						"Injected publication {} at stage {} occurrence {}",
+						action == AssetResourcePublicationFaultAction::Fail ? "failure" : "cancellation",
+						stageIndex,
+						m_PublicationFaultObservedOccurrences);
+					++m_PublicationFaultInjectionCount;
+					m_PublicationFault = {};
+					m_PublicationFaultObservedOccurrences = 0;
+				}
+			}
 			m_ResourcePublicationTelemetry.m_ResourceCreationCount +=
 				result.m_Usage.m_ResourceCreations;
 			m_ResourcePublicationTelemetry.m_PayloadBytesMovedToUpload +=
@@ -900,6 +1020,8 @@ namespace gglab
 		statistics.m_MaxQueueMilliseconds = telemetry.m_MaxQueueMilliseconds;
 		statistics.m_TotalExecutionMilliseconds = telemetry.m_TotalExecutionMilliseconds;
 		statistics.m_MaxExecutionMilliseconds = telemetry.m_MaxExecutionMilliseconds;
+		statistics.m_ExecutionP95Milliseconds = ExecutionP95(
+			telemetry.m_RecentExecutionMilliseconds);
 		statistics.m_PendingWork.reserve(queue.size());
 		const auto now = std::chrono::steady_clock::now();
 		for (const QueuedWork& work : queue)
@@ -953,6 +1075,28 @@ namespace gglab
 			m_ResourcePublicationTelemetry.m_TotalExecutionMilliseconds;
 		statistics.m_MaxExecutionMilliseconds =
 			m_ResourcePublicationTelemetry.m_MaxExecutionMilliseconds;
+		statistics.m_ExecutionP95Milliseconds = ExecutionP95(
+			m_ResourcePublicationTelemetry.m_RecentExecutionMilliseconds);
+		statistics.m_OverBudgetExecutionCount =
+			m_PublicationOverBudgetExecutionCount;
+		statistics.m_NoProgressContinueCount =
+			m_PublicationNoProgressContinueCount;
+		statistics.m_FaultInjectionCount =
+			m_PublicationFaultInjectionCount;
+		for (size_t stageIndex = 0;
+			stageIndex < m_PublicationStageTelemetry.size();
+			++stageIndex)
+		{
+			const PublicationStageTelemetry& source =
+				m_PublicationStageTelemetry[stageIndex];
+			AssetResourcePublicationStageStatistics& destination =
+				statistics.m_PublicationStages[stageIndex];
+			destination.m_StepCount = source.m_StepCount;
+			destination.m_TotalMilliseconds = source.m_TotalMilliseconds;
+			destination.m_MaxMilliseconds = source.m_MaxMilliseconds;
+			destination.m_P95Milliseconds = ExecutionP95(
+				source.m_RecentExecutionMilliseconds);
+		}
 		statistics.m_PendingWork.reserve(m_ResourcePublicationQueue.size());
 		const auto now = std::chrono::steady_clock::now();
 		for (const QueuedResourcePublication& publication : m_ResourcePublicationQueue)

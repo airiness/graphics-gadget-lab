@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/Demo/DemoLabHost.h"
+#include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
@@ -44,6 +45,12 @@ namespace gglab
 			&TaskSystemLabSession::Create);
 		GGLAB_ASSERT_MSG(taskSystemRegistered,
 			"Failed to register the Task System Lab session.");
+
+		const bool assetPublicationRegistered = m_Runtime.RegisterLab(
+			AssetPublicationLabSession::GetDescriptor(),
+			&AssetPublicationLabSession::Create);
+		GGLAB_ASSERT_MSG(assetPublicationRegistered,
+			"Failed to register the Asset Publication Lab session.");
 	}
 
 	void DemoLabHost::BeginPrepare() noexcept
