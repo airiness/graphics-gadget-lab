@@ -22,6 +22,13 @@ namespace gglab
 			ModelType m_Type = ModelType::Invalid;
 			StringID m_Name{};
 			uint32_t m_MeshInstanceCount = 0;
+			uint32_t m_DependencyCount = 0;
+			uint32_t m_ReadyDependencyCount = 0;
+			uint32_t m_PendingDependencyCount = 0;
+			uint32_t m_FailedDependencyCount = 0;
+			uint32_t m_CancelledDependencyCount = 0;
+			uint64_t m_DependencyEventUpdateCount = 0;
+			bool m_HasDependencyState = false;
 			bool m_IsEvictionCandidate = false;
 		};
 
@@ -94,6 +101,13 @@ namespace gglab
 		uint32_t m_PinnedAssetCount = 0;
 		uint32_t m_CacheableAssetCount = 0;
 		uint32_t m_EvictionCandidateCount = 0;
+		uint32_t m_TrackedModelDependencyCount = 0;
+		uint32_t m_ReverseDependencyCount = 0;
+		uint32_t m_ReverseDependencyEdgeCount = 0;
+		uint64_t m_DependencyGraphBuildCount = 0;
+		uint64_t m_DependencyEventUpdateCount = 0;
+		uint64_t m_DependencyValidationCount = 0;
+		uint64_t m_DependencyValidationMismatchCount = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;
 		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
 		AssetStreamingQueueStatistics m_UploadRecordingQueue;

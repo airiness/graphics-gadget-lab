@@ -236,6 +236,56 @@ namespace gglab
 			}
 		};
 
+		enum class ModelDependencyOutcome : uint8_t
+		{
+			Pending,
+			Ready,
+			Failed,
+			Cancelled,
+		};
+
+		struct DependencyKey
+		{
+			AssetInterestKind m_Kind = AssetInterestKind::Mesh;
+			uint64_t m_StableId = 0;
+			uint64_t m_ContentGeneration = 0;
+
+			friend bool operator==(const DependencyKey&, const DependencyKey&) = default;
+		};
+
+		struct DependencyKeyHash
+		{
+			size_t operator()(const DependencyKey& key) const noexcept
+			{
+				size_t hash = std::hash<uint64_t>{}(key.m_StableId);
+				hash ^= std::hash<uint64_t>{}(key.m_ContentGeneration) +
+					0x9e3779b9u + (hash << 6) + (hash >> 2);
+				hash ^= std::hash<uint8_t>{}(static_cast<uint8_t>(key.m_Kind)) +
+					0x9e3779b9u + (hash << 6) + (hash >> 2);
+				return hash;
+			}
+		};
+
+		struct DependentModel
+		{
+			ModelID m_ModelId{};
+			uint64_t m_ContentGeneration = 0;
+
+			friend bool operator==(const DependentModel&, const DependentModel&) = default;
+		};
+
+		struct ModelDependencyState
+		{
+			uint64_t m_ContentGeneration = 0;
+			std::unordered_map<DependencyKey, AssetState, DependencyKeyHash> m_DependencyStates;
+			uint32_t m_StructuralFailureCount = 0;
+			uint32_t m_ReadyCount = 0;
+			uint32_t m_PendingCount = 0;
+			uint32_t m_FailedCount = 0;
+			uint32_t m_CancelledCount = 0;
+			uint64_t m_EventUpdateCount = 0;
+		};
+
 		struct LeaseRecord
 		{
 			InterestKey m_Key{};
@@ -297,6 +347,28 @@ namespace gglab
 			AssetLifecycle& lifecycle,
 			AssetResidencyPolicy policy,
 			bool isReserved) noexcept;
+		void SetMeshState(Mesh& mesh, AssetState state) noexcept;
+		void RegisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
+		void UnregisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
+		void OnDependencyStateChanged(
+			AssetInterestKind kind,
+			uint64_t stableId,
+			uint64_t generation,
+			AssetState state) noexcept;
+		[[nodiscard]] ModelDependencyOutcome EvaluateModelDependenciesByTraversal(
+			const Model& model) const noexcept;
+		[[nodiscard]] static ModelDependencyOutcome EvaluateModelDependencyCounters(
+			const ModelDependencyState& state) noexcept;
+		void VerifyModelDependencyState(
+			ModelID modelId,
+			uint64_t generation,
+			ModelDependencyOutcome traversalOutcome) noexcept;
+		static void IncrementDependencyCounter(
+			ModelDependencyState& state,
+			AssetState dependencyState) noexcept;
+		static void DecrementDependencyCounter(
+			ModelDependencyState& state,
+			AssetState dependencyState) noexcept;
 
 	public:
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
@@ -336,6 +408,9 @@ namespace gglab
 			m_PublicationRetains;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
+		std::unordered_map<ModelID, ModelDependencyState> m_ModelDependencyStates;
+		std::unordered_map<DependencyKey, std::vector<DependentModel>, DependencyKeyHash>
+			m_ReverseDependencyIndex;
 		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_OwnershipPriorityUpdateCount = 0;
 		uint64_t m_CpuCancellationCount = 0;
@@ -345,6 +420,10 @@ namespace gglab
 		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		uint64_t m_AssetUsageFrame = 0;
+		uint64_t m_DependencyGraphBuildCount = 0;
+		uint64_t m_DependencyEventUpdateCount = 0;
+		uint64_t m_DependencyValidationCount = 0;
+		uint64_t m_DependencyValidationMismatchCount = 0;
 	};
 
 	class AssetPublicationRetain

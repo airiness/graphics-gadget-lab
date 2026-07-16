@@ -340,10 +340,20 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_TextureRegistry != nullptr, "TextureRegistry is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
+		m_TextureRegistry->SetStateChangeCallback(
+			[this](TextureID textureId, uint64_t generation, AssetState state) noexcept
+			{
+				OnDependencyStateChanged(
+					AssetInterestKind::Texture,
+					textureId.Value(),
+					generation,
+					state);
+			});
 	}
 
 	AssetManager::~AssetManager()
 	{
+		m_TextureRegistry->SetStateChangeCallback({});
 		GGLAB_ASSERT_MSG(
 			m_AssetLeases.empty() && m_AssetInterests.empty(),
 			"AssetManager destroyed while asset leases are still active.");
@@ -1014,6 +1024,7 @@ namespace gglab
 		{
 			++m_GpuDeferredCancellationCount;
 		}
+		UnregisterModelDependencies(modelId, generation);
 		SetAssetState(*model, AssetState::Cancelled);
 		m_PendingModels.erase(modelId);
 		ProgressReporter(model->m_LoadProgress).Report(
@@ -1051,7 +1062,7 @@ namespace gglab
 			GGLAB_UNUSED(cancelledReadyWork);
 			++m_ReadyCancellationCount;
 		}
-		SetAssetState(
+		SetMeshState(
 			*mesh,
 			mesh->m_VertexBuffer || mesh->m_IndexBuffer ?
 				AssetState::GpuProcessing : AssetState::Cancelled);
@@ -1249,6 +1260,266 @@ namespace gglab
 		return true;
 	}
 
+	void AssetManager::SetMeshState(Mesh& mesh, AssetState state) noexcept
+	{
+		const AssetState previousState = mesh.m_State;
+		SetAssetState(mesh, state);
+		if (previousState != state)
+		{
+			OnDependencyStateChanged(
+				AssetInterestKind::Mesh,
+				mesh.m_Id.Value(),
+				mesh.m_ContentGeneration,
+				state);
+		}
+	}
+
+	void AssetManager::IncrementDependencyCounter(
+		ModelDependencyState& state,
+		AssetState dependencyState) noexcept
+	{
+		switch (dependencyState)
+		{
+		case AssetState::Ready:
+			++state.m_ReadyCount;
+			break;
+		case AssetState::Failed:
+			++state.m_FailedCount;
+			break;
+		case AssetState::Cancelled:
+			++state.m_CancelledCount;
+			break;
+		default:
+			++state.m_PendingCount;
+			break;
+		}
+	}
+
+	void AssetManager::DecrementDependencyCounter(
+		ModelDependencyState& state,
+		AssetState dependencyState) noexcept
+	{
+		switch (dependencyState)
+		{
+		case AssetState::Ready:
+			GGLAB_ASSERT(state.m_ReadyCount > 0);
+			--state.m_ReadyCount;
+			break;
+		case AssetState::Failed:
+			GGLAB_ASSERT(state.m_FailedCount > 0);
+			--state.m_FailedCount;
+			break;
+		case AssetState::Cancelled:
+			GGLAB_ASSERT(state.m_CancelledCount > 0);
+			--state.m_CancelledCount;
+			break;
+		default:
+			GGLAB_ASSERT(state.m_PendingCount > 0);
+			--state.m_PendingCount;
+			break;
+		}
+	}
+
+	AssetManager::ModelDependencyOutcome AssetManager::EvaluateModelDependencyCounters(
+		const ModelDependencyState& state) noexcept
+	{
+		if (state.m_StructuralFailureCount > 0 || state.m_FailedCount > 0)
+		{
+			return ModelDependencyOutcome::Failed;
+		}
+		if (state.m_CancelledCount > 0)
+		{
+			return ModelDependencyOutcome::Cancelled;
+		}
+		if (state.m_PendingCount > 0)
+		{
+			return ModelDependencyOutcome::Pending;
+		}
+		return state.m_ReadyCount > 0 ?
+			ModelDependencyOutcome::Ready : ModelDependencyOutcome::Failed;
+	}
+
+	void AssetManager::RegisterModelDependencies(
+		ModelID modelId,
+		uint64_t generation) noexcept
+	{
+		if (const auto existing = m_ModelDependencyStates.find(modelId);
+			existing != m_ModelDependencyStates.end())
+		{
+			UnregisterModelDependencies(modelId, existing->second.m_ContentGeneration);
+		}
+
+		const Model* model = GetModel(modelId);
+		if (!model || model->m_ContentGeneration != generation)
+		{
+			return;
+		}
+
+		ModelDependencyState dependencyState{
+			.m_ContentGeneration = generation,
+		};
+		const auto addDependency = [&dependencyState](
+			AssetInterestKind kind,
+			uint64_t stableId,
+			const AssetLifecycle& lifecycle) noexcept
+		{
+			const DependencyKey key{
+				.m_Kind = kind,
+				.m_StableId = stableId,
+				.m_ContentGeneration = lifecycle.m_ContentGeneration,
+			};
+			const auto [dependency, inserted] =
+				dependencyState.m_DependencyStates.emplace(key, lifecycle.m_State);
+			if (inserted)
+			{
+				IncrementDependencyCounter(dependencyState, dependency->second);
+			}
+		};
+
+		if (model->m_MeshInstance.empty())
+		{
+			++dependencyState.m_StructuralFailureCount;
+		}
+		for (const ModelMesh& instance : model->m_MeshInstance)
+		{
+			if (const Mesh* mesh = GetMesh(instance.m_MeshId))
+			{
+				addDependency(
+					AssetInterestKind::Mesh,
+					instance.m_MeshId.Value(),
+					*mesh);
+			}
+			else
+			{
+				++dependencyState.m_StructuralFailureCount;
+			}
+
+			const Material* material = GetMaterial(instance.m_MaterialId);
+			if (!material)
+			{
+				++dependencyState.m_StructuralFailureCount;
+				continue;
+			}
+			for (TextureID textureId : GetMaterialTextureIds(*material))
+			{
+				if (!textureId.IsValid())
+				{
+					continue;
+				}
+				if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
+				{
+					addDependency(
+						AssetInterestKind::Texture,
+						textureId.Value(),
+						*texture);
+				}
+				else
+				{
+					++dependencyState.m_StructuralFailureCount;
+				}
+			}
+		}
+
+		auto [storedState, inserted] =
+			m_ModelDependencyStates.emplace(modelId, std::move(dependencyState));
+		GGLAB_ASSERT(inserted);
+		const DependentModel dependentModel{
+			.m_ModelId = modelId,
+			.m_ContentGeneration = generation,
+		};
+		for (const auto& [dependency, state] : storedState->second.m_DependencyStates)
+		{
+			GGLAB_UNUSED(state);
+			auto& dependents = m_ReverseDependencyIndex[dependency];
+			GGLAB_ASSERT(std::ranges::find(dependents, dependentModel) == dependents.end());
+			dependents.push_back(dependentModel);
+		}
+		++m_DependencyGraphBuildCount;
+	}
+
+	void AssetManager::UnregisterModelDependencies(
+		ModelID modelId,
+		uint64_t generation) noexcept
+	{
+		const auto state = m_ModelDependencyStates.find(modelId);
+		if (state == m_ModelDependencyStates.end() ||
+			state->second.m_ContentGeneration != generation)
+		{
+			return;
+		}
+
+		const DependentModel dependentModel{
+			.m_ModelId = modelId,
+			.m_ContentGeneration = generation,
+		};
+		for (const auto& [dependency, dependencyState] : state->second.m_DependencyStates)
+		{
+			GGLAB_UNUSED(dependencyState);
+			const auto reverse = m_ReverseDependencyIndex.find(dependency);
+			GGLAB_ASSERT(reverse != m_ReverseDependencyIndex.end());
+			if (reverse == m_ReverseDependencyIndex.end())
+			{
+				continue;
+			}
+			std::erase(reverse->second, dependentModel);
+			if (reverse->second.empty())
+			{
+				m_ReverseDependencyIndex.erase(reverse);
+			}
+		}
+		m_ModelDependencyStates.erase(state);
+	}
+
+	void AssetManager::OnDependencyStateChanged(
+		AssetInterestKind kind,
+		uint64_t stableId,
+		uint64_t generation,
+		AssetState state) noexcept
+	{
+		const DependencyKey dependency{
+			.m_Kind = kind,
+			.m_StableId = stableId,
+			.m_ContentGeneration = generation,
+		};
+		const auto reverse = m_ReverseDependencyIndex.find(dependency);
+		if (reverse == m_ReverseDependencyIndex.end())
+		{
+			return;
+		}
+
+		for (const DependentModel& dependent : reverse->second)
+		{
+			const auto modelState = m_ModelDependencyStates.find(dependent.m_ModelId);
+			if (modelState == m_ModelDependencyStates.end() ||
+				modelState->second.m_ContentGeneration != dependent.m_ContentGeneration)
+			{
+				continue;
+			}
+			const auto dependencyState =
+				modelState->second.m_DependencyStates.find(dependency);
+			if (dependencyState == modelState->second.m_DependencyStates.end() ||
+				dependencyState->second == state)
+			{
+				continue;
+			}
+
+			DecrementDependencyCounter(modelState->second, dependencyState->second);
+			dependencyState->second = state;
+			IncrementDependencyCounter(modelState->second, state);
+			++modelState->second.m_EventUpdateCount;
+			++m_DependencyEventUpdateCount;
+
+			const Model* model = GetModel(dependent.m_ModelId);
+			if (model && model->m_ContentGeneration == dependent.m_ContentGeneration &&
+				model->m_State == AssetState::Ready &&
+				EvaluateModelDependencyCounters(modelState->second) !=
+					ModelDependencyOutcome::Ready)
+			{
+				m_PendingModels.insert(dependent.m_ModelId);
+			}
+		}
+	}
+
 	bool AssetManager::SetModelResidencyPolicy(
 		ModelID modelId,
 		AssetResidencyPolicy policy) noexcept
@@ -1362,7 +1633,7 @@ namespace gglab
 			mesh->m_State != AssetState::Ready)
 		{
 			m_PublicationOrphanedMeshes.insert(meshId);
-			SetAssetState(*mesh, AssetState::GpuProcessing);
+			SetMeshState(*mesh, AssetState::GpuProcessing);
 			ProgressReporter(mesh->m_LoadProgress).Report(
 				0.96f,
 				"Mesh publication rollback pending GPU completion");
@@ -1412,7 +1683,7 @@ namespace gglab
 		m_MeshContainer.m_MeshIDMap.emplace(meshId, std::move(mesh));
 		meshUploadData.m_MeshId = meshId;
 		Mesh* storedMesh = GetMesh(meshId);
-		SetAssetState(*storedMesh, AssetState::CpuReady);
+		SetMeshState(*storedMesh, AssetState::CpuReady);
 		ProgressReporter(storedMesh->m_LoadProgress).Report(
 			0.62f,
 			"Procedural mesh CPU data ready",
@@ -1423,7 +1694,7 @@ namespace gglab
 
 		if (!QueueMeshUpload(std::move(meshUploadData), TaskPriority::Normal))
 		{
-			SetAssetState(*storedMesh, AssetState::Failed);
+			SetMeshState(*storedMesh, AssetState::Failed);
 		}
 
 		return meshId;
@@ -1489,6 +1760,7 @@ namespace gglab
 		SetAssetState(*model, AssetState::CpuReady);
 
 		m_ModelContainer.m_ModelIDMap.emplace(modelId, std::move(model));
+		RegisterModelDependencies(modelId, GetModel(modelId)->m_ContentGeneration);
 		m_PendingModels.insert(modelId);
 		if (RefreshModelState(modelId))
 		{
@@ -1526,7 +1798,7 @@ namespace gglab
 			GGLAB_ASSERT_MSG(false, "UploadMesh: Invalid MeshID, check it!");
 			return false;
 		}
-		SetAssetState(*mesh, AssetState::UploadQueued);
+		SetMeshState(*mesh, AssetState::UploadQueued);
 
 		const auto& verticesData = uploadData.m_VerticesData;
 		const auto& indicesData = uploadData.m_IndicesData;
@@ -1546,14 +1818,14 @@ namespace gglab
 
 		if (vertexBufferSize == 0 || indexBufferSize == 0)
 		{
-			SetAssetState(*mesh, AssetState::Failed);
+			SetMeshState(*mesh, AssetState::Failed);
 			GGLAB_LOG_GRAPHICS_WARN("AssetManager::UploadMesh received an empty mesh.");
 			return false;
 		}
 		if (vertexBufferSize > std::numeric_limits<uint32_t>::max() ||
 			indexBufferSize > std::numeric_limits<uint32_t>::max())
 		{
-			SetAssetState(*mesh, AssetState::Failed);
+			SetMeshState(*mesh, AssetState::Failed);
 			GGLAB_LOG_GRAPHICS_ERROR("AssetManager::UploadMesh mesh buffers exceed RHI binding size limits.");
 			return false;
 		}
@@ -1590,7 +1862,7 @@ namespace gglab
 			m_Device->CreateBuffer(indexBufferDesc, indexDebugIdentity);
 		if (!vertexBuffer.IsValid() || !indexBuffer.IsValid())
 		{
-			SetAssetState(*mesh, AssetState::Failed);
+			SetMeshState(*mesh, AssetState::Failed);
 			if (vertexBuffer.IsValid())
 			{
 				m_Device->DestroyBuffer(vertexBuffer);
@@ -1615,7 +1887,7 @@ namespace gglab
 			"AssetManager failed to record mesh buffer uploads.");
 		if (!vertexUploadSucceeded || !indexUploadSucceeded)
 		{
-			SetAssetState(*mesh, AssetState::Failed);
+			SetMeshState(*mesh, AssetState::Failed);
 			return false;
 		}
 
@@ -1629,7 +1901,7 @@ namespace gglab
 		mesh->m_IndexBufferBinding.m_SizeInBytes = static_cast<uint32_t>(indexBufferSize);
 		mesh->m_IndexBufferBinding.m_Format = RHIFormat::R32Uint;
 
-		SetAssetState(*mesh, AssetState::GpuProcessing);
+		SetMeshState(*mesh, AssetState::GpuProcessing);
 		return true;
 	}
 
@@ -1648,7 +1920,7 @@ namespace gglab
 		const AssetStreamingWorkEstimate estimate = EstimateMeshUpload(uploadData);
 		if (mesh->m_State != AssetState::Publishing)
 		{
-			SetAssetState(*mesh, AssetState::CpuReady);
+			SetMeshState(*mesh, AssetState::CpuReady);
 		}
 		ProgressReporter(mesh->m_LoadProgress).Report(
 			0.62f,
@@ -1676,7 +1948,7 @@ namespace gglab
 				}
 				if (currentMesh->m_CancelRequested)
 				{
-					SetAssetState(*currentMesh, AssetState::Cancelled);
+					SetMeshState(*currentMesh, AssetState::Cancelled);
 					return;
 				}
 
@@ -1721,7 +1993,7 @@ namespace gglab
 		const bool publicationOrphan = m_PublicationOrphanedMeshes.contains(meshId);
 		const bool cancelled = mesh->m_CancelRequested || publicationOrphan;
 		const bool publishSucceeded = succeeded && !cancelled;
-		SetAssetState(
+		SetMeshState(
 			*mesh,
 			cancelled ? AssetState::Cancelled :
 				(publishSucceeded ? AssetState::Ready : AssetState::Failed));
@@ -1871,7 +2143,7 @@ namespace gglab
 							{ .m_PayloadBytesDestroyed = sourceBytes });
 					}
 					created = true;
-					SetAssetState(*texture, AssetState::Publishing);
+					m_TextureRegistry->SetTextureState(*texture, AssetState::Publishing);
 				}
 
 				transaction.m_TextureIds[textureIndex] = textureId;
@@ -2022,7 +2294,7 @@ namespace gglab
 				mesh->m_Sphere = importedMesh.m_Sphere;
 				mesh->m_Aabb = importedMesh.m_Aabb;
 				mesh->m_HasBounds = importedMesh.m_HasBounds;
-				SetAssetState(*mesh, AssetState::Publishing);
+				SetMeshState(*mesh, AssetState::Publishing);
 				auto retain = AcquirePublicationRetain(
 					AssetInterestKind::Mesh,
 					meshId.Value(),
@@ -2170,6 +2442,9 @@ namespace gglab
 					std::move(transaction.m_DependencyLeaseTokens));
 				transaction.m_DependencyOwner = {};
 				SetAssetState(*model, AssetState::UploadQueued);
+				RegisterModelDependencies(
+					transaction.m_ModelId,
+					transaction.m_Generation);
 				m_PendingModels.insert(transaction.m_ModelId);
 				transaction.m_Committed = true;
 				transaction.m_Stage = Stage::ReleaseRetains;
@@ -2298,6 +2573,9 @@ namespace gglab
 		Model* model = GetModel(transaction.m_ModelId);
 		if (model && model->m_ContentGeneration == transaction.m_Generation)
 		{
+			UnregisterModelDependencies(
+				transaction.m_ModelId,
+				transaction.m_Generation);
 			model->m_MeshInstance.clear();
 			SetAssetState(
 				*model,
@@ -2466,44 +2744,23 @@ namespace gglab
 		return true;
 	}
 
-	bool AssetManager::RefreshModelState(ModelID modelId) noexcept
+	AssetManager::ModelDependencyOutcome AssetManager::EvaluateModelDependenciesByTraversal(
+		const Model& model) const noexcept
 	{
-		Model* model = GetModel(modelId);
-		if (!model)
+		if (model.m_MeshInstance.empty())
 		{
-			return true;
-		}
-		if (model->m_State == AssetState::Ready || IsTerminalAssetState(model->m_State))
-		{
-			return true;
-		}
-		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
-		{
-			return false;
-		}
-
-		if (model->m_MeshInstance.empty())
-		{
-			SetAssetState(*model, AssetState::Failed);
-			ProgressReporter(model->m_LoadProgress).Report(
-				0.64f,
-				"Model has no renderable mesh instances");
-			return true;
+			return ModelDependencyOutcome::Failed;
 		}
 
 		bool pending = false;
 		bool cancelled = false;
-		for (const ModelMesh& instance : model->m_MeshInstance)
+		for (const ModelMesh& instance : model.m_MeshInstance)
 		{
 			const Mesh* mesh = GetMesh(instance.m_MeshId);
 			const Material* material = GetMaterial(instance.m_MaterialId);
 			if (!mesh || !material || mesh->m_State == AssetState::Failed)
 			{
-				SetAssetState(*model, AssetState::Failed);
-				ProgressReporter(model->m_LoadProgress).Report(
-					0.96f,
-					"Model dependency failed");
-				return true;
+				return ModelDependencyOutcome::Failed;
 			}
 			if (mesh->m_State == AssetState::Cancelled)
 			{
@@ -2523,11 +2780,7 @@ namespace gglab
 				const Texture* texture = m_TextureRegistry->GetTexture(textureId);
 				if (!texture || texture->m_State == AssetState::Failed)
 				{
-					SetAssetState(*model, AssetState::Failed);
-					ProgressReporter(model->m_LoadProgress).Report(
-						0.96f,
-						"Model texture dependency failed");
-					return true;
+					return ModelDependencyOutcome::Failed;
 				}
 				if (texture->m_State == AssetState::Cancelled)
 				{
@@ -2542,19 +2795,100 @@ namespace gglab
 
 		if (cancelled)
 		{
+			return ModelDependencyOutcome::Cancelled;
+		}
+		if (pending)
+		{
+			return ModelDependencyOutcome::Pending;
+		}
+		return ModelDependencyOutcome::Ready;
+	}
+
+	void AssetManager::VerifyModelDependencyState(
+		ModelID modelId,
+		uint64_t generation,
+		ModelDependencyOutcome traversalOutcome) noexcept
+	{
+		++m_DependencyValidationCount;
+		const auto dependencyState = m_ModelDependencyStates.find(modelId);
+		const bool hasMatchingState = dependencyState != m_ModelDependencyStates.end() &&
+			dependencyState->second.m_ContentGeneration == generation;
+		const ModelDependencyOutcome eventOutcome = hasMatchingState ?
+			EvaluateModelDependencyCounters(dependencyState->second) :
+			ModelDependencyOutcome::Failed;
+		if (hasMatchingState && eventOutcome == traversalOutcome)
+		{
+			return;
+		}
+
+		++m_DependencyValidationMismatchCount;
+		GGLAB_LOG_GRAPHICS_ERROR(
+			"Model {} dependency tracking mismatch (generation={}, graph={}, traversal={}, graphPresent={}).",
+			modelId.Value(),
+			generation,
+			static_cast<uint32_t>(eventOutcome),
+			static_cast<uint32_t>(traversalOutcome),
+			hasMatchingState);
+		GGLAB_ASSERT_MSG(false, "Event-driven model dependency state diverged from traversal.");
+	}
+
+	bool AssetManager::RefreshModelState(ModelID modelId) noexcept
+	{
+		Model* model = GetModel(modelId);
+		if (!model)
+		{
+			return true;
+		}
+		if (IsTerminalAssetState(model->m_State))
+		{
+			return true;
+		}
+		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
+		{
+			return false;
+		}
+		if (model->m_State == AssetState::Ready)
+		{
+			const auto dependencyState = m_ModelDependencyStates.find(modelId);
+			if (dependencyState == m_ModelDependencyStates.end() ||
+				dependencyState->second.m_ContentGeneration != model->m_ContentGeneration ||
+				EvaluateModelDependencyCounters(dependencyState->second) ==
+					ModelDependencyOutcome::Ready)
+			{
+				return true;
+			}
+		}
+
+		const ModelDependencyOutcome outcome =
+			EvaluateModelDependenciesByTraversal(*model);
+		VerifyModelDependencyState(modelId, model->m_ContentGeneration, outcome);
+		switch (outcome)
+		{
+		case ModelDependencyOutcome::Failed:
+			SetAssetState(*model, AssetState::Failed);
+			ProgressReporter(model->m_LoadProgress).Report(
+				0.96f,
+				"Model dependency failed");
+			UnregisterModelDependencies(modelId, model->m_ContentGeneration);
+			return true;
+
+		case ModelDependencyOutcome::Cancelled:
 			SetAssetState(*model, AssetState::Cancelled);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.96f,
 				"Model dependency cancelled");
+			UnregisterModelDependencies(modelId, model->m_ContentGeneration);
 			return true;
-		}
-		if (pending)
-		{
+
+		case ModelDependencyOutcome::Pending:
 			SetAssetState(*model, AssetState::GpuProcessing);
 			ProgressReporter(model->m_LoadProgress).Report(
 				0.82f,
 				"Waiting for model GPU dependencies");
 			return false;
+
+		case ModelDependencyOutcome::Ready:
+			break;
 		}
 
 		SetAssetState(*model, AssetState::Ready);

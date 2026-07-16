@@ -6,6 +6,8 @@
 #include "Graphics/TextureAsset.h"
 #include "Graphics/TextureLoader.h"
 
+#include <functional>
+
 namespace gglab
 {
 	class AssetManager;
@@ -146,6 +148,9 @@ namespace gglab
 			TextureSemantic semantic,
 			TaskPriority priority) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
+		void SetStateChangeCallback(
+			std::function<void(TextureID, uint64_t, AssetState)> callback) noexcept;
+		void SetTextureState(Texture& texture, AssetState state) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -157,5 +162,6 @@ namespace gglab
 		TextureContainer m_TextureContainer;
 		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
 		std::unordered_set<TextureID> m_PublicationOrphanedTextures;
+		std::function<void(TextureID, uint64_t, AssetState)> m_StateChangeCallback;
 	};
 }

@@ -153,6 +153,26 @@ namespace gglab
 				return;
 			}
 
+			const AssetSnapshot dependencySnapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Model* dependencyModel = FindModelSnapshot(
+				dependencySnapshot,
+				m_State->m_Request.m_ModelId);
+			if (!dependencyModel || !dependencyModel->m_HasDependencyState ||
+				dependencyModel->m_DependencyCount == 0 ||
+				dependencyModel->m_ReadyDependencyCount != dependencyModel->m_DependencyCount ||
+				dependencyModel->m_PendingDependencyCount != 0 ||
+				dependencyModel->m_FailedDependencyCount != 0 ||
+				dependencyModel->m_CancelledDependencyCount != 0 ||
+				dependencySnapshot.m_TrackedModelDependencyCount == 0 ||
+				dependencySnapshot.m_ReverseDependencyEdgeCount <
+					dependencyModel->m_DependencyCount ||
+				dependencySnapshot.m_DependencyValidationCount == 0 ||
+				dependencySnapshot.m_DependencyValidationMismatchCount != 0)
+			{
+				Fail("The model dependency graph did not converge with traversal-based readiness.");
+				return;
+			}
+
 			if (!assetManager.SetModelResidencyPolicy(
 				m_State->m_Request.m_ModelId,
 				AssetResidencyPolicy::Pinned) ||
@@ -240,7 +260,9 @@ namespace gglab
 			if (!model || !mesh || !texture ||
 				!model->m_IsEvictionCandidate ||
 				!mesh->m_IsEvictionCandidate ||
-				!texture->m_IsEvictionCandidate)
+				!texture->m_IsEvictionCandidate ||
+				!model->m_HasDependencyState ||
+				snapshot.m_DependencyValidationMismatchCount != 0)
 			{
 				Fail("Unowned cacheable resident assets were not classified as eviction candidates.");
 				return;
@@ -307,7 +329,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: content, residency, policy, usage, and candidate invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, and candidate invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

@@ -14,6 +14,21 @@ namespace gglab
 	{
 		AssetSnapshot snapshot{};
 		snapshot.m_AssetUsageFrame = assetManager.m_AssetUsageFrame;
+		snapshot.m_TrackedModelDependencyCount = static_cast<uint32_t>(
+			assetManager.m_ModelDependencyStates.size());
+		snapshot.m_ReverseDependencyCount = static_cast<uint32_t>(
+			assetManager.m_ReverseDependencyIndex.size());
+		for (const auto& [dependency, dependents] : assetManager.m_ReverseDependencyIndex)
+		{
+			GGLAB_UNUSED(dependency);
+			snapshot.m_ReverseDependencyEdgeCount +=
+				static_cast<uint32_t>(dependents.size());
+		}
+		snapshot.m_DependencyGraphBuildCount = assetManager.m_DependencyGraphBuildCount;
+		snapshot.m_DependencyEventUpdateCount = assetManager.m_DependencyEventUpdateCount;
+		snapshot.m_DependencyValidationCount = assetManager.m_DependencyValidationCount;
+		snapshot.m_DependencyValidationMismatchCount =
+			assetManager.m_DependencyValidationMismatchCount;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetInterestKind kind,
@@ -76,6 +91,27 @@ namespace gglab
 			modelSnapshot.m_Type = model->m_Type;
 			modelSnapshot.m_Name = model->m_Name;
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());
+			if (const auto dependencyState = assetManager.m_ModelDependencyStates.find(modelId);
+				dependencyState != assetManager.m_ModelDependencyStates.end() &&
+				dependencyState->second.m_ContentGeneration == model->m_ContentGeneration)
+			{
+				const auto& state = dependencyState->second;
+				modelSnapshot.m_DependencyCount = static_cast<uint32_t>(
+					state.m_DependencyStates.size()) + state.m_StructuralFailureCount;
+				modelSnapshot.m_ReadyDependencyCount = state.m_ReadyCount;
+				modelSnapshot.m_PendingDependencyCount = state.m_PendingCount;
+				modelSnapshot.m_FailedDependencyCount =
+					state.m_FailedCount + state.m_StructuralFailureCount;
+				modelSnapshot.m_CancelledDependencyCount = state.m_CancelledCount;
+				modelSnapshot.m_DependencyEventUpdateCount = state.m_EventUpdateCount;
+				modelSnapshot.m_HasDependencyState = true;
+				GGLAB_ASSERT(
+					modelSnapshot.m_DependencyCount ==
+					modelSnapshot.m_ReadyDependencyCount +
+					modelSnapshot.m_PendingDependencyCount +
+					modelSnapshot.m_FailedDependencyCount +
+					modelSnapshot.m_CancelledDependencyCount);
+			}
 			modelSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
 				AssetInterestKind::Model,
 				modelId.Value(),
