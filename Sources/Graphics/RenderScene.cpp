@@ -40,7 +40,7 @@ namespace gglab
 				SamplerPreset::LinearWrap);
 			gpu.EmissiveBinding = assetManager.ResolveTextureBinding(
 				material.m_EmissiveBinding,
-				ReservedTextureIDIndex::EmissiveBlack,
+				ReservedTextureIDIndex::EmissiveWhite,
 				SamplerPreset::LinearWrap);
 			gpu.MetallicRoughnessBinding = assetManager.ResolveTextureBinding(
 				material.m_MetallicRoughnessBinding,

@@ -166,14 +166,14 @@ namespace gglab
 			});
 
 		addGeneratedTexture(
-			ReservedTextureIDIndex::EmissiveBlack,
-			"EmissiveBlack",
+			ReservedTextureIDIndex::EmissiveWhite,
+			"EmissiveWhite",
 			TextureSemantic::Emissive,
 			1,
 			1,
 			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
 			{
-				return { 0, 0, 0, 255 };
+				return { 255, 255, 255, 255 };
 			});
 
 		addGeneratedTexture(

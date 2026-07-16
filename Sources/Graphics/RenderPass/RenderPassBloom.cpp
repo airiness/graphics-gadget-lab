@@ -70,6 +70,14 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		AddPass(rg, context, services, DebugTapCallback{});
+	}
+
+	void RenderPassBloom::AddPass(RenderGraph& rg,
+		const RenderFrameContext& context,
+		const RenderServices& services,
+		const DebugTapCallback& debugTapCallback) noexcept
+	{
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const auto settings = context.GetViewRenderSettings(displayViewId).m_PostProcess.m_Bloom;
 		auto& postProcess = rg.GetBlackboard().Get<RGPostProcessResources>(
@@ -177,6 +185,23 @@ namespace gglab
 					parameters);
 				commandContext->DrawFullscreenTriangle();
 			});
+		postProcess.m_Bloom.m_Prefilter = {
+			.m_Texture = postProcess.m_Bloom.m_Pyramid[0],
+			.m_State = PostProcessColorState::SceneLinearRec709,
+			.m_PreExposure = postProcess.m_Inputs.m_SceneColor.m_PreExposure,
+		};
+		postProcess.m_Bloom.m_DownsampledPyramid[0] = postProcess.m_Bloom.m_Prefilter;
+		if (debugTapCallback)
+		{
+			debugTapCallback(
+				postProcess.m_Bloom.m_Prefilter,
+				PostProcessDebugTap::BloomPrefilter,
+				0);
+			debugTapCallback(
+				postProcess.m_Bloom.m_DownsampledPyramid[0],
+				PostProcessDebugTap::BloomPyramid,
+				0);
+		}
 
 		const uint32_t levelCount = postProcess.m_Bloom.m_LevelCount;
 		for (uint32_t level = 1; level < levelCount; ++level)
@@ -227,6 +252,18 @@ namespace gglab
 						parameters);
 					commandContext->DrawFullscreenTriangle();
 				});
+			postProcess.m_Bloom.m_DownsampledPyramid[level] = {
+				.m_Texture = postProcess.m_Bloom.m_Pyramid[level],
+				.m_State = PostProcessColorState::SceneLinearRec709,
+				.m_PreExposure = postProcess.m_Inputs.m_SceneColor.m_PreExposure,
+			};
+			if (debugTapCallback)
+			{
+				debugTapCallback(
+					postProcess.m_Bloom.m_DownsampledPyramid[level],
+					PostProcessDebugTap::BloomPyramid,
+					level);
+			}
 		}
 
 		for (uint32_t sourceLevel = levelCount - 1; sourceLevel > 0; --sourceLevel)

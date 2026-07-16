@@ -149,6 +149,7 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
@@ -156,6 +157,7 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
@@ -286,6 +288,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\PipelineCache.cpp" />
@@ -372,8 +375,10 @@
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h" />
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h" />
@@ -384,6 +389,7 @@
     <ClInclude Include="..\..\Sources\Diagnostics\SnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\SnapshotStore.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
@@ -553,6 +559,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelineCache.h" />
@@ -565,6 +572,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessColor.h" />
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessDebug.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessGraphResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessOutput.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessResolution.h" />
@@ -689,6 +697,7 @@
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentMip.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassSkybox.hlsl" />
   </ItemGroup>

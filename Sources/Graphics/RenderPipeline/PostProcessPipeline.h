@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBloom.h"
 #include "Graphics/RenderPass/RenderPassFinalColor.h"
+#include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 
 namespace gglab
 {
@@ -13,6 +14,7 @@ namespace gglab
 
 	private:
 		RenderPassBloom m_BloomPass;
+		RenderPassPostProcessPreview m_PreviewPass;
 		RenderPassFinalColor m_FinalColorPass;
 	};
 }

@@ -27,6 +27,7 @@ namespace gglab
 			TextureLogicalNameEntry{ "Preview.IBL", "IrradianceCubemap" },
 			TextureLogicalNameEntry{ "Preview.IBL", "PrefilteredSpecularCubemap" },
 			TextureLogicalNameEntry{ "Preview.Shadow", "DirectionalShadowMap" },
+			TextureLogicalNameEntry{ "Preview.PostProcess", "SelectedTap" },
 		};
 		static_assert(TextureLogicalNameEntries.size() ==
 			utils::EnumCount<RenderResourceRegistry::TextureIndex>());
@@ -346,6 +347,50 @@ namespace gglab
 		EnsureTexture(TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
 	}
 
+	void RenderResourceRegistry::EnsurePostProcessPreviewResources(
+		uint32_t sourceWidth,
+		uint32_t sourceHeight,
+		const RHIFencePoint* retireFenceOpt) noexcept
+	{
+		constexpr uint32_t MaxPreviewDimension = 512;
+		const uint32_t safeWidth = std::max(sourceWidth, 1u);
+		const uint32_t safeHeight = std::max(sourceHeight, 1u);
+		const float scale = static_cast<float>(MaxPreviewDimension) /
+			static_cast<float>(std::max(safeWidth, safeHeight));
+		const uint32_t previewWidth = std::max(
+			static_cast<uint32_t>(std::round(static_cast<float>(safeWidth) * scale)),
+			1u);
+		const uint32_t previewHeight = std::max(
+			static_cast<uint32_t>(std::round(static_cast<float>(safeHeight) * scale)),
+			1u);
+
+		const auto index = TextureIndex::Preview_PostProcess;
+		const auto& previousEntry = m_TextureEntries[utils::ToIndex(index)];
+		const bool descriptorChanged = previousEntry.m_Allocated &&
+			(previousEntry.m_TextureDesc.m_Extent.m_Width != previewWidth ||
+				previousEntry.m_TextureDesc.m_Extent.m_Height != previewHeight);
+
+		RHITextureDesc desc{};
+		desc.m_Extent = { previewWidth, previewHeight, 1u };
+		desc.m_ArraySize = 1;
+		desc.m_MipLevels = 1;
+		desc.m_SampleCount = 1;
+		desc.m_Format = RHIFormat::R8G8B8A8Unorm;
+		desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled;
+
+		RHITextureViewDesc srvDesc{};
+		srvDesc.m_Type = RHITextureViewType::ShaderResource;
+		srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
+		srvDesc.m_Format = desc.m_Format;
+		srvDesc.m_Subresources.m_MipCount = 1;
+
+		EnsureTexture(index, desc, srvDesc, retireFenceOpt);
+		if (descriptorChanged)
+		{
+			m_PostProcessPreviewState.m_HasPublished = false;
+		}
+	}
+
 	void RenderResourceRegistry::MarkDirty(TextureIndex index) noexcept
 	{
 		m_TextureEntries[utils::ToIndex(index)].m_Dirty = true;
@@ -548,6 +593,45 @@ namespace gglab
 		return m_IBLPreviewStates[utils::ToIndex(type)].m_UpdateCount;
 	}
 
+	void RenderResourceRegistry::SetPostProcessPreviewSelection(
+		PostProcessDebugSelection selection) noexcept
+	{
+		if (selection.m_Tap >= PostProcessDebugTap::Count)
+		{
+			return;
+		}
+		selection.m_BloomPyramidLevel = std::min(
+			selection.m_BloomPyramidLevel,
+			MaxBloomPyramidLevels - 1u);
+		m_PostProcessPreviewState.m_Selection = selection;
+	}
+
+	void RenderResourceRegistry::SetPostProcessPreviewExposureEV(float exposureEV) noexcept
+	{
+		m_PostProcessPreviewState.m_ExposureEV = std::clamp(exposureEV, -8.0f, 8.0f);
+	}
+
+	void RenderResourceRegistry::RequestPostProcessPreview() noexcept
+	{
+		m_PostProcessPreviewState.m_Requested = true;
+	}
+
+	bool RenderResourceRegistry::ConsumePostProcessPreviewRequest() noexcept
+	{
+		const bool requested = m_PostProcessPreviewState.m_Requested;
+		m_PostProcessPreviewState.m_Requested = false;
+		return requested;
+	}
+
+	void RenderResourceRegistry::PublishPostProcessPreview(
+		PostProcessDebugSelection selection) noexcept
+	{
+		m_PostProcessPreviewState.m_PublishedSelection = selection;
+		m_PostProcessPreviewState.m_HasPublished = true;
+		++m_PostProcessPreviewState.m_UpdateCount;
+		m_TextureEntries[utils::ToIndex(TextureIndex::Preview_PostProcess)].m_Dirty = false;
+	}
+
 	RenderResourceRegistry::TextureIndex RenderResourceRegistry::GetPreviewTextureIndex(
 		IBLPreviewType type) noexcept
 	{
@@ -624,6 +708,8 @@ namespace gglab
 		}
 		m_HasInitializedActiveIBL = false;
 		MarkAllIBLPreviewsDirty();
+		m_PostProcessPreviewState.m_Requested = false;
+		m_PostProcessPreviewState.m_HasPublished = false;
 	}
 
 	void RenderResourceRegistry::EnsureTexture(TextureIndex index,

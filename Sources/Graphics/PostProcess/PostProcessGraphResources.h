@@ -1,17 +1,18 @@
 #pragma once
 #include "Graphics/PostProcess/PostProcessColor.h"
+#include "Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/PostProcess/PostProcessOutput.h"
 
 #include <array>
 
 namespace gglab
 {
-	inline constexpr uint32_t MaxBloomPyramidLevels = 8;
-
 	struct RGBloomResources
 	{
 		std::array<RGTextureId, MaxBloomPyramidLevels> m_Pyramid{};
+		std::array<RGPostProcessColor, MaxBloomPyramidLevels> m_DownsampledPyramid{};
 		uint32_t m_LevelCount = 0;
+		RGPostProcessColor m_Prefilter{};
 		RGPostProcessColor m_Result{};
 	};
 

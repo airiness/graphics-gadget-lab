@@ -321,6 +321,9 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -681,6 +684,9 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -751,6 +757,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.cpp">
@@ -972,6 +981,9 @@
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h">
@@ -1349,6 +1361,9 @@
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessGraphResources.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessDebug.h">
+      <Filter>Graphics\PostProcess</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessOutput.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
@@ -1568,6 +1583,9 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
@@ -1637,6 +1655,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1683,6 +1704,9 @@
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h">
@@ -1795,6 +1819,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Assets\Shaders\Passes\PassPostProcessPreview.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl">

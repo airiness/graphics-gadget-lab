@@ -14,6 +14,7 @@
 #include "DevTools/DevelopGui/Panels/TransientResourcePoolPanel.h"
 #include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 #include "DevTools/DevelopGui/Panels/PipelineSystemPanel.h"
+#include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
 
@@ -34,6 +35,7 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<TransientResourcePoolPanel>());
 		registry.RegisterPanel(std::make_unique<PersistentSceneBuffersPanel>());
 		registry.RegisterPanel(std::make_unique<PipelineSystemPanel>());
+		registry.RegisterPanel(std::make_unique<PostProcessInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<ProfilingPanel>());
 		registry.RegisterPanel(std::make_unique<TaskSystemPanel>());
 	}

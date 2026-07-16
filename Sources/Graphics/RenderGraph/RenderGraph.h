@@ -381,6 +381,7 @@ namespace gglab
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
+		[[nodiscard]] const RHITextureDesc& GetTextureDesc(RGTextureId textureId) const noexcept;
 
 	private:
 		struct TextureViewRecord
@@ -434,7 +435,6 @@ namespace gglab
 			std::optional<RHITextureViewDesc> desc) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
-		const RHITextureDesc& GetTextureDesc(RGTextureId textureId) const noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
