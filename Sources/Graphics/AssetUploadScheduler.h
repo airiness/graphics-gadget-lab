@@ -248,12 +248,20 @@ namespace gglab
 		Cancel,
 	};
 
+	enum class AssetResourcePublicationFaultTiming : uint8_t
+	{
+		AfterStep,
+		BeforeStep,
+	};
+
 	struct AssetResourcePublicationFaultInjection
 	{
 		AssetStreamingIdentity m_Identity{};
 		AssetResourcePublicationStage m_Stage = AssetResourcePublicationStage::Unknown;
 		AssetResourcePublicationFaultAction m_Action =
 			AssetResourcePublicationFaultAction::None;
+		AssetResourcePublicationFaultTiming m_Timing =
+			AssetResourcePublicationFaultTiming::AfterStep;
 		uint32_t m_TriggerOccurrence = 1;
 
 		[[nodiscard]] bool IsValid() const noexcept
@@ -302,6 +310,7 @@ namespace gglab
 			AssetResourcePublicationContext& context,
 			AssetResourcePublicationAbortReason reason) noexcept = 0;
 		[[nodiscard]] virtual uint64_t GetProgressToken() const noexcept = 0;
+		[[nodiscard]] virtual AssetResourcePublicationStage GetCurrentStage() const noexcept = 0;
 	};
 
 	// Owns the main-thread streaming boundaries around resource publication and
@@ -351,6 +360,8 @@ namespace gglab
 		void ArmResourcePublicationFault(
 			const AssetResourcePublicationFaultInjection& fault) noexcept;
 		void ClearResourcePublicationFault() noexcept;
+		void ArmGpuCompletionHold(const AssetStreamingIdentity& identity) noexcept;
+		void ClearGpuCompletionHold() noexcept;
 
 		[[nodiscard]] AssetUploadStatistics GetStatistics() const;
 
@@ -430,6 +441,11 @@ namespace gglab
 		void InsertResourcePublication(QueuedResourcePublication&& publication) noexcept;
 		uint32_t DrainCpuPayloadQueue(bool ignoreBudget) noexcept;
 		uint32_t DrainResourcePublicationQueue(bool ignoreBudget) noexcept;
+		[[nodiscard]] bool TryApplyResourcePublicationFault(
+			const AssetStreamingIdentity& identity,
+			AssetResourcePublicationStage stage,
+			AssetResourcePublicationFaultTiming timing,
+			AssetResourcePublicationStepResult& result) noexcept;
 		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
 		uint32_t PollCompletedUploads() noexcept;
 		void EnqueueGpuFinalize(
@@ -498,6 +514,7 @@ namespace gglab
 			m_PublicationStageTelemetry;
 		AssetResourcePublicationFaultInjection m_PublicationFault{};
 		uint32_t m_PublicationFaultObservedOccurrences = 0;
+		AssetStreamingIdentity m_GpuCompletionHold{};
 		uint64_t m_PublicationOverBudgetExecutionCount = 0;
 		uint64_t m_PublicationNoProgressContinueCount = 0;
 		uint64_t m_PublicationFaultInjectionCount = 0;
