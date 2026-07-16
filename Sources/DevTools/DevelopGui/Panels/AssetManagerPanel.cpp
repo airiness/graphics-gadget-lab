@@ -111,7 +111,7 @@ namespace gglab
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
-			if (ImGui::BeginTable("ModelAssetsTable", 13,
+			if (ImGui::BeginTable("ModelAssetsTable", 15,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
@@ -125,6 +125,8 @@ namespace gglab
 				ImGui::TableSetupColumn("Last Use", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Uses", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Candidate", ImGuiTableColumnFlags_WidthFixed, 76.0f);
+				ImGui::TableSetupColumn("Deps R/P/F/C", ImGuiTableColumnFlags_WidthFixed, 128.0f);
+				ImGui::TableSetupColumn("Dep Events", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Meshes", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch);
@@ -158,11 +160,27 @@ namespace gglab
 					ImGui::TableSetColumnIndex(9);
 					ImGui::TextUnformatted(utils::BoolToString(model.m_IsEvictionCandidate));
 					ImGui::TableSetColumnIndex(10);
+					if (model.m_HasDependencyState)
+					{
+						ImGui::Text(
+							"%u/%u/%u/%u",
+							model.m_ReadyDependencyCount,
+							model.m_PendingDependencyCount,
+							model.m_FailedDependencyCount,
+							model.m_CancelledDependencyCount);
+					}
+					else
+					{
+						ImGui::TextUnformatted("-");
+					}
+					ImGui::TableSetColumnIndex(11);
+					ImGui::Text("%llu", model.m_DependencyEventUpdateCount);
+					ImGui::TableSetColumnIndex(12);
 					const std::string modelType = devtools::EnumText(model.m_Type);
 					ImGui::TextUnformatted(modelType.c_str());
-					ImGui::TableSetColumnIndex(11);
+					ImGui::TableSetColumnIndex(13);
 					ImGui::Text("%u", model.m_MeshInstanceCount);
-					ImGui::TableSetColumnIndex(12);
+					ImGui::TableSetColumnIndex(14);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}
@@ -737,6 +755,17 @@ namespace gglab
 			snapshot->m_EvictionCandidateCount);
 		ImGui::TextDisabled(
 			"Candidates are diagnostic only; automatic eviction is not enabled.");
+		ImGui::Text(
+			"Dependency graph: %u models | %u resources | %u edges | Builds: %llu | Events: %llu",
+			snapshot->m_TrackedModelDependencyCount,
+			snapshot->m_ReverseDependencyCount,
+			snapshot->m_ReverseDependencyEdgeCount,
+			snapshot->m_DependencyGraphBuildCount,
+			snapshot->m_DependencyEventUpdateCount);
+		ImGui::Text(
+			"Dependency validation: %llu checks | %llu mismatches",
+			snapshot->m_DependencyValidationCount,
+			snapshot->m_DependencyValidationMismatchCount);
 
 		if (ImGui::BeginTabBar("AssetManagerTabs"))
 		{
