@@ -2,6 +2,7 @@
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/IBLBakeTypes.h"
+#include "Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/ShadowSettings.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHITexture.h"
@@ -60,6 +61,7 @@ namespace gglab
 			Preview_IBL_IrradianceCubemap,
 			Preview_IBL_PrefilteredSpecularCubemap,
 			Preview_Shadow_DirectionalShadowMap,
+			Preview_PostProcess,
 
 			Count
 		};
@@ -108,6 +110,9 @@ namespace gglab
 		void MarkActiveIBLInitialized() noexcept { m_HasInitializedActiveIBL = true; }
 		void EnsureShadowPreviewResources(uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
+		void EnsurePostProcessPreviewResources(uint32_t sourceWidth,
+			uint32_t sourceHeight,
+			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void MarkDirty(TextureIndex index) noexcept;
 		bool IsDirty(TextureIndex index) const noexcept;
@@ -143,6 +148,36 @@ namespace gglab
 		[[nodiscard]] bool IsIBLPreviewDirty(IBLPreviewType type) const noexcept;
 		[[nodiscard]] bool IsIBLPreviewRequested(IBLPreviewType type) const noexcept;
 		[[nodiscard]] uint64_t GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept;
+
+		void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept;
+		[[nodiscard]] PostProcessDebugSelection GetPostProcessPreviewSelection() const noexcept
+		{
+			return m_PostProcessPreviewState.m_Selection;
+		}
+		void SetPostProcessPreviewExposureEV(float exposureEV) noexcept;
+		[[nodiscard]] float GetPostProcessPreviewExposureEV() const noexcept
+		{
+			return m_PostProcessPreviewState.m_ExposureEV;
+		}
+		void RequestPostProcessPreview() noexcept;
+		[[nodiscard]] bool ConsumePostProcessPreviewRequest() noexcept;
+		void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept;
+		[[nodiscard]] bool IsPostProcessPreviewRequested() const noexcept
+		{
+			return m_PostProcessPreviewState.m_Requested;
+		}
+		[[nodiscard]] bool HasPublishedPostProcessPreview() const noexcept
+		{
+			return m_PostProcessPreviewState.m_HasPublished;
+		}
+		[[nodiscard]] PostProcessDebugSelection GetPublishedPostProcessPreviewSelection() const noexcept
+		{
+			return m_PostProcessPreviewState.m_PublishedSelection;
+		}
+		[[nodiscard]] uint64_t GetPostProcessPreviewUpdateCount() const noexcept
+		{
+			return m_PostProcessPreviewState.m_UpdateCount;
+		}
 
 		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
@@ -189,5 +224,15 @@ namespace gglab
 		IBLPreviewLayout m_IBLIrradiancePreviewLayout = IBLPreviewLayout::Cross;
 		IBLPreviewLayout m_IBLPrefilteredSpecularPreviewLayout = IBLPreviewLayout::Cross;
 		uint32_t m_IBLPrefilteredSpecularPreviewMip = 0;
+		struct PostProcessPreviewState
+		{
+			PostProcessDebugSelection m_Selection{};
+			PostProcessDebugSelection m_PublishedSelection{};
+			float m_ExposureEV = 0.0f;
+			uint64_t m_UpdateCount = 0;
+			bool m_Requested = false;
+			bool m_HasPublished = false;
+		};
+		PostProcessPreviewState m_PostProcessPreviewState{};
 	};
 }

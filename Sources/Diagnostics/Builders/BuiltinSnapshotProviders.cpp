@@ -4,6 +4,7 @@
 #include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
+#include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
@@ -13,6 +14,7 @@
 #include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
+#include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
@@ -93,6 +95,29 @@ namespace gglab
 			}
 		};
 
+		class PostProcessDiagnosticsSnapshotProvider final :
+			public SnapshotProvider<PostProcessDiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Post Process Diagnostics";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<PostProcessDiagnosticsSnapshot>();
+				if (context.m_Renderer && context.m_RenderGraph)
+				{
+					snapshot = BuildPostProcessDiagnosticsSnapshot(
+						*context.m_Renderer, *context.m_RenderGraph);
+				}
+				else
+				{
+					snapshot = {};
+				}
+			}
+		};
+
 		class TransientResourcePoolSnapshotProvider final : public SnapshotProvider<TransientResourcePoolSnapshot>
 		{
 		public:
@@ -143,6 +168,7 @@ namespace gglab
 		runtime.RegisterProvider(std::make_unique<IBLDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<PersistentSceneBufferSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);

@@ -3,6 +3,8 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/Renderer.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab
 {
@@ -33,7 +35,39 @@ namespace gglab
 			},
 		};
 
-		m_BloomPass.AddPass(rg, context, services);
+		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* registry = renderer->GetRenderResourceRegistry();
+		GGLAB_ASSERT_NOT_NULL(registry);
+		const auto previewSelection = registry->GetPostProcessPreviewSelection();
+		const bool wantsIntermediateBloomTap = registry->IsPostProcessPreviewRequested() &&
+			(previewSelection.m_Tap == PostProcessDebugTap::BloomPrefilter ||
+				previewSelection.m_Tap == PostProcessDebugTap::BloomPyramid);
+		if (wantsIntermediateBloomTap)
+		{
+			m_BloomPass.AddPass(
+				rg,
+				context,
+				services,
+				[this, &rg, &context, &services](
+					const RGPostProcessColor& source,
+					PostProcessDebugTap tap,
+					uint32_t bloomPyramidLevel)
+				{
+					m_PreviewPass.AddPassForTap(
+						rg,
+						context,
+						services,
+						source,
+						tap,
+						bloomPyramidLevel);
+				});
+		}
+		else
+		{
+			m_BloomPass.AddPass(rg, context, services);
+		}
+		m_PreviewPass.AddPass(rg, context, services);
 		m_FinalColorPass.AddPass(rg, context, services);
 		// Publish the version written by FinalColor to downstream presentation passes.
 		targets.m_BackBuffer = resources.m_Output.m_Texture;

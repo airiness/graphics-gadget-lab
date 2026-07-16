@@ -11,7 +11,7 @@ namespace gglab
 		NormalFlat,
 		DefaultMetallicRoughness,
 		OcclusionWhite,
-		EmissiveBlack,
+		EmissiveWhite,
 		ErrorRed,
 		UVTest,
 		UVTestTexture1K,

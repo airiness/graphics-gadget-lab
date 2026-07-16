@@ -124,6 +124,17 @@ namespace gglab
 		}
 
 		template<typename T>
+		const T* TryGet(StringID nameId) const noexcept
+		{
+			BlackboardKey key{};
+			key.m_TypeId = MakeRGTypeId<T>();
+			key.m_Name = nameId;
+
+			const auto iter = m_Container.find(key);
+			return iter == m_Container.end() ? nullptr : static_cast<const T*>(iter->second);
+		}
+
+		template<typename T>
 		T& Get(StringID nameId) noexcept
 		{
 			T* ptr = TryGet<T>(nameId);
