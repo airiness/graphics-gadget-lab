@@ -47,6 +47,7 @@ namespace gglab
 		Queued,
 		LoadingCpu,
 		CpuReady,
+		Publishing,
 		UploadQueued,
 		GpuProcessing,
 		Ready,

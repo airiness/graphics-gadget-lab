@@ -24,6 +24,7 @@ namespace gglab::devtools
 			EnumTextEntry{ AssetState::Queued, "Queued" },
 			EnumTextEntry{ AssetState::LoadingCpu, "Loading CPU" },
 			EnumTextEntry{ AssetState::CpuReady, "CPU Ready" },
+			EnumTextEntry{ AssetState::Publishing, "Publishing" },
 			EnumTextEntry{ AssetState::UploadQueued, "Upload Queued" },
 			EnumTextEntry{ AssetState::GpuProcessing, "GPU Processing" },
 			EnumTextEntry{ AssetState::Ready, "Ready" },

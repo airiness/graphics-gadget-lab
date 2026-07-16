@@ -132,6 +132,7 @@ namespace gglab
 			uint64_t generation,
 			TaskPriority priority) noexcept;
 		void ReviveTextureInterest(TextureID textureId, uint64_t generation) noexcept;
+		void RollbackPublicationTexture(TextureID textureId, uint64_t generation) noexcept;
 		void CompleteTextureLoad(
 			TextureID textureId,
 			uint64_t generation,
@@ -155,5 +156,6 @@ namespace gglab
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureContainer m_TextureContainer;
 		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
+		std::unordered_set<TextureID> m_PublicationOrphanedTextures;
 	};
 }

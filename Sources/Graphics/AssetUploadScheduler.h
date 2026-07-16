@@ -233,6 +233,7 @@ namespace gglab
 	struct AssetResourcePublicationContext
 	{
 		AssetUploadScheduler* m_Scheduler = nullptr;
+		TaskPriority m_Priority = TaskPriority::Normal;
 	};
 
 	class IResourcePublicationJob

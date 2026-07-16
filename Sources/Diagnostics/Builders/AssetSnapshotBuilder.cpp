@@ -152,6 +152,9 @@ namespace gglab
 		snapshot.m_OwnershipGpuDeferredCancellationCount =
 			ownership.m_GpuDeferredCancellationCount;
 		snapshot.m_OwnershipReadyRetentionCount = ownership.m_ReadyRetentionCount;
+		snapshot.m_PublicationRetainCount = ownership.m_PublicationRetainCount;
+		snapshot.m_PublicationProtectedCancellationCount =
+			ownership.m_PublicationProtectedCancellationCount;
 		snapshot.m_ActiveOwnershipInterests.reserve(ownership.m_ActiveInterests.size());
 		for (const AssetInterestActivity& interest : ownership.m_ActiveInterests)
 		{
