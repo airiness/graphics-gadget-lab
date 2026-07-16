@@ -367,8 +367,8 @@ namespace gglab
 			const char* tableId,
 			const AssetStreamingQueueStatistics& queue) noexcept
 		{
-			const double averageWait = queue.m_ProcessedCount > 0 ?
-				queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
+			const double averageWait = queue.m_QueueSampleCount > 0 ?
+				queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_QueueSampleCount) : 0.0;
 			const double averageExecution = queue.m_ProcessedCount > 0 ?
 				queue.m_TotalExecutionMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
 			ImGui::Text(
@@ -387,6 +387,20 @@ namespace gglab
 				queue.m_MaxQueueMilliseconds,
 				averageExecution,
 				queue.m_MaxExecutionMilliseconds);
+			if (queue.m_ContinueCount > 0 ||
+				queue.m_CompletedCount > 0 ||
+				queue.m_FailedCount > 0 ||
+				queue.m_ResourceCreationCount > 0)
+			{
+				ImGui::Text(
+					"Step jobs: continue=%llu completed=%llu failed=%llu creations=%llu payload moved/destroyed=%.2f/%.2f MiB",
+					queue.m_ContinueCount,
+					queue.m_CompletedCount,
+					queue.m_FailedCount,
+					queue.m_ResourceCreationCount,
+					static_cast<double>(queue.m_PayloadBytesMovedToUpload) / (1024.0 * 1024.0),
+					static_cast<double>(queue.m_PayloadBytesDestroyed) / (1024.0 * 1024.0));
+			}
 			if (queue.m_PendingWork.empty())
 			{
 				return;
@@ -484,28 +498,36 @@ namespace gglab
 			const AssetStreamingFrameUsage& usage = assetSnapshot.m_LastStreamingFrameUsage;
 			ImGui::SeparatorText("Frame Admission Budget");
 			ImGui::Text(
-				"CPU: %u/%u items, %.3f/%.3f ms   Upload: %u/%u items, %.2f/%.2f MiB, %u/%u ops, %.3f/%.3f ms",
-				usage.m_CpuReadyItems,
-				budget.m_MaxCpuReadyItems,
-				usage.m_CpuReadyMilliseconds,
-				budget.m_MaxCpuReadyMilliseconds,
-				usage.m_UploadReadyItems,
-				budget.m_MaxUploadReadyItems,
+				"CPU payload: %u/%u items, %.3f/%.3f ms   Resource publication: %u/%u steps, %u/%u creations, %.3f/%.3f ms",
+				usage.m_CpuPayloadItems,
+				budget.m_MaxCpuPayloadItems,
+				usage.m_CpuPayloadMilliseconds,
+				budget.m_MaxCpuPayloadMilliseconds,
+				usage.m_ResourcePublicationSteps,
+				budget.m_MaxResourcePublicationSteps,
+				usage.m_ResourcePublicationCreations,
+				budget.m_MaxResourcePublicationCreations,
+				usage.m_ResourcePublicationMilliseconds,
+				budget.m_MaxResourcePublicationMilliseconds);
+			ImGui::Text(
+				"Upload recording: %u/%u items, %.2f/%.2f MiB, %u/%u ops, %.3f/%.3f ms   GPU finalize: %u/%u items, %.3f/%.3f ms",
+				usage.m_UploadRecordingItems,
+				budget.m_MaxUploadRecordingItems,
 				static_cast<double>(usage.m_UploadBytes) / (1024.0 * 1024.0),
 				static_cast<double>(budget.m_MaxUploadBytes) / (1024.0 * 1024.0),
 				usage.m_UploadOperations,
 				budget.m_MaxUploadOperations,
-				usage.m_UploadMilliseconds,
-				budget.m_MaxUploadMilliseconds);
+				usage.m_UploadRecordingMilliseconds,
+				budget.m_MaxUploadRecordingMilliseconds,
+				usage.m_GpuFinalizeItems,
+				budget.m_MaxGpuFinalizeItems,
+				usage.m_GpuFinalizeMilliseconds,
+				budget.m_MaxGpuFinalizeMilliseconds);
 			ImGui::Text(
-				"Publication: %u/%u items, %.3f/%.3f ms   Ready backlog: %.2f/%.2f MiB (high %.2f)   In-flight: %.2f/%.2f MiB (high %.2f)",
-				usage.m_PublicationItems,
-				budget.m_MaxPublicationItems,
-				usage.m_PublicationMilliseconds,
-				budget.m_MaxPublicationMilliseconds,
-				static_cast<double>(assetSnapshot.m_ReadyBacklogBytes) / (1024.0 * 1024.0),
-				static_cast<double>(budget.m_MaxReadyBacklogBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_ReadyBacklogHighWatermark) / (1024.0 * 1024.0),
+				"Observed ready payload: %.2f MiB (high %.2f)   Upload promotion limit: %.2f MiB   In-flight: %.2f/%.2f MiB (high %.2f)",
+				static_cast<double>(assetSnapshot.m_ReadyPayloadBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ReadyPayloadHighWatermark) / (1024.0 * 1024.0),
+				static_cast<double>(budget.m_MaxUploadRecordingBacklogBytes) / (1024.0 * 1024.0),
 				static_cast<double>(assetSnapshot.m_InFlightUploadBytes) / (1024.0 * 1024.0),
 				static_cast<double>(budget.m_MaxInFlightBytes) / (1024.0 * 1024.0),
 				static_cast<double>(assetSnapshot.m_InFlightUploadHighWatermark) / (1024.0 * 1024.0));
@@ -517,12 +539,16 @@ namespace gglab
 				assetSnapshot.m_OversizedAdmissionCount);
 
 			ImGui::SeparatorText("Streaming Queues");
-			DrawStreamingQueue("CPU Ready", "CpuReadyQueue", assetSnapshot.m_CpuReadyQueue);
-			DrawStreamingQueue("Upload Ready", "UploadReadyQueue", assetSnapshot.m_UploadReadyQueue);
+			DrawStreamingQueue("CPU Payload", "CpuPayloadQueue", assetSnapshot.m_CpuPayloadQueue);
 			DrawStreamingQueue(
-				"Publication Ready",
-				"PublicationReadyQueue",
-				assetSnapshot.m_PublicationReadyQueue);
+				"Resource Publication",
+				"ResourcePublicationQueue",
+				assetSnapshot.m_ResourcePublicationQueue);
+			DrawStreamingQueue(
+				"Upload Recording",
+				"UploadRecordingQueue",
+				assetSnapshot.m_UploadRecordingQueue);
+			DrawStreamingQueue("GPU Finalize", "GpuFinalizeQueue", assetSnapshot.m_GpuFinalizeQueue);
 
 			ImGui::SeparatorText("GPU Uploads");
 			ImGui::Text(

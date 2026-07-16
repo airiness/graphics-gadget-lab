@@ -75,6 +75,129 @@ namespace gglab
 			return estimate;
 		}
 	}
+
+	class AssetManager::ModelPublicationCompatibilityJob final :
+		public IResourcePublicationJob
+	{
+	public:
+		ModelPublicationCompatibilityJob(
+			AssetManager* assetManager,
+			ModelID modelId,
+			uint64_t generation,
+			double importQueueMilliseconds,
+			double importExecutionMilliseconds,
+			std::unique_ptr<ImportedModel>&& payload) noexcept :
+			m_AssetManager(assetManager),
+			m_ModelId(modelId),
+			m_Generation(generation),
+			m_ImportQueueMilliseconds(importQueueMilliseconds),
+			m_ImportExecutionMilliseconds(importExecutionMilliseconds),
+			m_Payload(std::move(payload))
+		{
+		}
+
+		[[nodiscard]] AssetResourcePublicationStepResult Step(
+			AssetResourcePublicationContext& context) noexcept override
+		{
+			GGLAB_UNUSED(context);
+			if (!m_AssetManager || !m_Payload)
+			{
+				return {
+					.m_Status = AssetResourcePublicationStepStatus::Failed,
+					.m_Error = "Model publication compatibility job has no payload",
+				};
+			}
+
+			Model* model = m_AssetManager->GetModel(m_ModelId);
+			if (!model || model->m_Generation != m_Generation || model->m_CancelRequested)
+			{
+				return {
+					.m_Status = AssetResourcePublicationStepStatus::Cancelled,
+				};
+			}
+
+			const uint32_t meshInstanceCount = static_cast<uint32_t>(
+				std::min<size_t>(m_Payload->m_MeshInstances.size(),
+					std::numeric_limits<uint32_t>::max()));
+			size_t resourceCreationCount = 0;
+			const auto addResourceCreations = [&resourceCreationCount](size_t count) noexcept
+			{
+				resourceCreationCount = count <=
+					std::numeric_limits<size_t>::max() - resourceCreationCount ?
+					resourceCreationCount + count : std::numeric_limits<size_t>::max();
+			};
+			addResourceCreations(m_Payload->m_Textures.size());
+			addResourceCreations(m_Payload->m_Materials.size());
+			addResourceCreations(m_Payload->m_Meshes.size());
+			addResourceCreations(m_Payload->m_MeshInstances.size());
+			const uint32_t clampedResourceCreationCount = static_cast<uint32_t>(
+				std::min<size_t>(
+					resourceCreationCount,
+					std::numeric_limits<uint32_t>::max()));
+			if (!m_AssetManager->PublishImportedModel(
+				m_ModelId,
+				m_Generation,
+				std::move(*m_Payload)))
+			{
+				m_Payload.reset();
+				model->m_State = AssetState::Failed;
+				ProgressReporter(model->m_LoadProgress).Report(
+					0.62f,
+					"Model publication failed");
+				return {
+					.m_Status = AssetResourcePublicationStepStatus::Failed,
+					.m_Usage = {
+						.m_ResourceCreations = clampedResourceCreationCount,
+					},
+					.m_Error = "PublishImportedModel returned false",
+				};
+			}
+
+			m_Payload.reset();
+			GGLAB_LOG_GRAPHICS_INFO(
+				"Async model {} queued dependency uploads (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
+				m_ModelId.Value(),
+				meshInstanceCount,
+				m_ImportQueueMilliseconds,
+				m_ImportExecutionMilliseconds);
+			return {
+				.m_Status = AssetResourcePublicationStepStatus::Completed,
+				.m_Usage = {
+					.m_ResourceCreations = clampedResourceCreationCount,
+				},
+			};
+		}
+
+		void Abort(
+			AssetResourcePublicationContext& context,
+			AssetResourcePublicationAbortReason reason) noexcept override
+		{
+			GGLAB_UNUSED(context);
+			if (m_AssetManager)
+			{
+				Model* model = m_AssetManager->GetModel(m_ModelId);
+				if (model && model->m_Generation == m_Generation)
+				{
+					model->m_State = reason == AssetResourcePublicationAbortReason::Failed ?
+						AssetState::Failed : AssetState::Cancelled;
+					ProgressReporter(model->m_LoadProgress).Report(
+						0.62f,
+						reason == AssetResourcePublicationAbortReason::Failed ?
+							"Model publication failed" : "Model publication cancelled");
+				}
+			}
+			m_Payload.reset();
+		}
+
+	private:
+		AssetManager* m_AssetManager = nullptr;
+		ModelID m_ModelId{};
+		uint64_t m_Generation = 0;
+		double m_ImportQueueMilliseconds = 0.0;
+		double m_ImportExecutionMilliseconds = 0.0;
+		std::unique_ptr<ImportedModel> m_Payload;
+	};
+
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_TaskSystem(createInfo.m_TaskSystem),
@@ -771,7 +894,7 @@ namespace gglab
 					m_ModelLoadTasks.erase(modelId);
 					return;
 				}
-				m_AssetUploadScheduler->EnqueueCpuReady(
+				m_AssetUploadScheduler->EnqueueCpuPayload(
 					{
 						.m_Name = completion.m_Name,
 						.m_Identity = {
@@ -1145,7 +1268,7 @@ namespace gglab
 			"Waiting for mesh upload admission",
 			std::format("{} bytes", estimate.m_StagingBytes));
 		auto payload = std::make_shared<MeshUploadData>(std::move(uploadData));
-		m_AssetUploadScheduler->EnqueueUploadReady(
+		m_AssetUploadScheduler->EnqueueUploadRecording(
 			{
 				.m_Name = std::format("Mesh {}", meshId.Value()),
 				.m_Identity = {
@@ -1450,14 +1573,22 @@ namespace gglab
 		model->m_State = AssetState::CpuReady;
 		ProgressReporter(model->m_LoadProgress).Report(
 			0.62f,
-			"Queued for model upload publication",
+			"Queued for resource publication",
 			completion.m_Name);
-		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		auto payload = std::make_unique<ImportedModel>(std::move(importedModel));
+		const AssetStreamingWorkEstimate estimate = EstimateImportedModel(*payload);
 		const TaskPriority priority = GetEffectivePriority({
 			.m_Kind = AssetInterestKind::Model,
 			.m_StableId = modelId.Value(),
 		}, completion.m_Priority);
-		m_AssetUploadScheduler->EnqueueUploadReady(
+		auto publicationJob = std::make_unique<ModelPublicationCompatibilityJob>(
+			this,
+			modelId,
+			generation,
+			completion.m_QueueMilliseconds,
+			completion.m_ExecutionMilliseconds,
+			std::move(payload));
+		m_AssetUploadScheduler->EnqueueResourcePublication(
 			{
 				.m_Name = std::format("Model {}", modelId.Value()),
 				.m_Identity = {
@@ -1465,34 +1596,11 @@ namespace gglab
 					.m_StableId = modelId.Value(),
 					.m_Generation = generation,
 				},
-				.m_Estimate = EstimateImportedModel(*payload),
+				.m_Estimate = estimate,
 				.m_Priority = priority,
 				.m_Progress = model->m_LoadProgress,
 			},
-			[this, modelId, generation, completion, payload]() mutable noexcept
-			{
-				Model* currentModel = GetModel(modelId);
-				if (!currentModel || currentModel->m_Generation != generation)
-				{
-					return;
-				}
-				const uint32_t meshInstanceCount = static_cast<uint32_t>(
-					payload->m_MeshInstances.size());
-				if (!PublishImportedModel(modelId, generation, std::move(*payload)))
-				{
-					currentModel->m_State = AssetState::Failed;
-					ProgressReporter(currentModel->m_LoadProgress).Report(
-						0.62f,
-						"Model publication failed");
-					return;
-				}
-				GGLAB_LOG_GRAPHICS_INFO(
-					"Async model {} queued dependency uploads (instances={}, queueMs={:.2f}, cpuMs={:.2f}).",
-					modelId.Value(),
-					meshInstanceCount,
-					completion.m_QueueMilliseconds,
-					completion.m_ExecutionMilliseconds);
-			});
+			std::move(publicationJob));
 	}
 
 	MeshID AssetManager::CreateMesh() noexcept

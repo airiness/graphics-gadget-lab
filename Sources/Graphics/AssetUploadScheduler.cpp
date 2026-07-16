@@ -8,6 +8,8 @@ namespace gglab
 {
 	namespace
 	{
+		constexpr uint32_t MaxResourcePublicationDrainSteps = 1'000'000;
+
 		template<typename Rep, typename Period>
 		[[nodiscard]] double Milliseconds(std::chrono::duration<Rep, Period> duration) noexcept
 		{
@@ -36,31 +38,61 @@ namespace gglab
 	AssetUploadScheduler::~AssetUploadScheduler()
 	{
 		GGLAB_ASSERT_MSG(
-			m_CpuReadyQueue.empty() &&
-			m_UploadReadyQueue.empty() &&
+			m_CpuPayloadQueue.empty() &&
+			m_ResourcePublicationQueue.empty() &&
+			m_UploadRecordingQueue.empty() &&
 			m_PendingUploads.empty() &&
-			m_PublicationReadyQueue.empty(),
+			m_GpuFinalizeQueue.empty(),
 			"AssetUploadScheduler destroyed with pending streaming work. Call Finalize after draining ready work and waiting for GPU idle.");
 	}
 
-	void AssetUploadScheduler::EnqueueCpuReady(
+	void AssetUploadScheduler::EnqueueCpuPayload(
 		AssetStreamingWorkDesc desc,
 		AssetStreamingWork work) noexcept
 	{
 		EnqueueWork(
-			m_CpuReadyQueue,
-			m_CpuReadyTelemetry,
+			m_CpuPayloadQueue,
+			m_CpuPayloadTelemetry,
 			std::move(desc),
 			std::move(work));
 	}
 
-	void AssetUploadScheduler::EnqueueUploadReady(
+	void AssetUploadScheduler::EnqueueResourcePublication(
+		AssetStreamingWorkDesc desc,
+		std::unique_ptr<IResourcePublicationJob>&& job) noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset resource publication must be enqueued on the scheduler owner thread.");
+		if (!IsOwnerThread() || !job)
+		{
+			return;
+		}
+
+		QueuedResourcePublication publication{
+			.m_Desc = std::move(desc),
+			.m_QueuedAt = std::chrono::steady_clock::now(),
+			.m_RemainingSourceBytes = 0,
+			.m_HasStarted = false,
+			.m_Job = std::move(job),
+		};
+		publication.m_RemainingSourceBytes = publication.m_Desc.m_Estimate.m_SourceBytes;
+		m_ReadyPayloadBytes += publication.m_RemainingSourceBytes;
+		m_ReadyPayloadHighWatermark = std::max(
+			m_ReadyPayloadHighWatermark,
+			m_ReadyPayloadBytes);
+		InsertResourcePublication(std::move(publication));
+		++m_ResourcePublicationTelemetry.m_EnqueuedCount;
+		m_ResourcePublicationTelemetry.m_HighWatermark = std::max(
+			m_ResourcePublicationTelemetry.m_HighWatermark,
+			static_cast<uint32_t>(m_ResourcePublicationQueue.size()));
+	}
+
+	void AssetUploadScheduler::EnqueueUploadRecording(
 		AssetStreamingWorkDesc desc,
 		AssetStreamingWork work) noexcept
 	{
 		EnqueueWork(
-			m_UploadReadyQueue,
-			m_UploadReadyTelemetry,
+			m_UploadRecordingQueue,
+			m_UploadRecordingTelemetry,
 			std::move(desc),
 			std::move(work));
 	}
@@ -75,13 +107,16 @@ namespace gglab
 		}
 
 		return CancelQueuedWork(
-			m_CpuReadyQueue,
-			m_CpuReadyTelemetry,
+			m_CpuPayloadQueue,
+			m_CpuPayloadTelemetry,
 			identity,
 			false) +
+			CancelResourcePublication(
+				identity,
+				AssetResourcePublicationAbortReason::Cancelled) +
 			CancelQueuedWork(
-				m_UploadReadyQueue,
-				m_UploadReadyTelemetry,
+				m_UploadRecordingQueue,
+				m_UploadRecordingTelemetry,
 				identity,
 				true);
 	}
@@ -97,8 +132,9 @@ namespace gglab
 		}
 
 		uint32_t updatedCount =
-			UpdateQueuedWorkPriority(m_CpuReadyQueue, identity, priority) +
-			UpdateQueuedWorkPriority(m_UploadReadyQueue, identity, priority);
+			UpdateQueuedWorkPriority(m_CpuPayloadQueue, identity, priority) +
+			UpdateResourcePublicationPriority(identity, priority) +
+			UpdateQueuedWorkPriority(m_UploadRecordingQueue, identity, priority);
 		for (PendingUpload& upload : m_PendingUploads)
 		{
 			if (upload.m_Desc.m_Identity == identity && upload.m_Desc.m_Priority != priority)
@@ -107,7 +143,7 @@ namespace gglab
 				++updatedCount;
 			}
 		}
-		for (PendingPublication& publication : m_PublicationReadyQueue)
+		for (PendingGpuFinalize& publication : m_GpuFinalizeQueue)
 		{
 			if (publication.m_Upload.m_Desc.m_Identity == identity &&
 				publication.m_Upload.m_Desc.m_Priority != priority)
@@ -118,8 +154,8 @@ namespace gglab
 		}
 		if (updatedCount > 0)
 		{
-			std::ranges::stable_sort(m_PublicationReadyQueue,
-				[](const PendingPublication& lhs, const PendingPublication& rhs) noexcept
+			std::ranges::stable_sort(m_GpuFinalizeQueue,
+				[](const PendingGpuFinalize& lhs, const PendingGpuFinalize& rhs) noexcept
 				{
 					return HasHigherPriority(
 						lhs.m_Upload.m_Desc.m_Priority,
@@ -156,7 +192,7 @@ namespace gglab
 				0.72f,
 				"GPU upload submission failed",
 				upload.m_Desc.m_Name);
-			EnqueuePublication(std::move(upload), AssetUploadStatus::Failed);
+			EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
 			return {};
 		}
 
@@ -181,10 +217,11 @@ namespace gglab
 
 		GGLAB_UNUSED(PollCompletedUploads());
 		m_LastFrameUsage = {};
-		GGLAB_UNUSED(DrainCpuReadyQueue(false));
-		GGLAB_UNUSED(DrainUploadReadyQueue(false));
+		GGLAB_UNUSED(DrainCpuPayloadQueue(false));
+		GGLAB_UNUSED(DrainResourcePublicationQueue(false));
+		GGLAB_UNUSED(DrainUploadRecordingQueue(false));
 		GGLAB_UNUSED(PollCompletedUploads());
-		return DrainPublicationQueue(false);
+		return DrainGpuFinalizeQueue(false);
 	}
 
 	void AssetUploadScheduler::DrainReadyWork() noexcept
@@ -196,13 +233,16 @@ namespace gglab
 		}
 
 		m_LastFrameUsage = {};
-		while (!m_CpuReadyQueue.empty() || !m_UploadReadyQueue.empty())
+		while (!m_CpuPayloadQueue.empty() ||
+			!m_ResourcePublicationQueue.empty() ||
+			!m_UploadRecordingQueue.empty())
 		{
-			GGLAB_UNUSED(DrainCpuReadyQueue(true));
-			GGLAB_UNUSED(DrainUploadReadyQueue(true));
+			GGLAB_UNUSED(DrainCpuPayloadQueue(true));
+			GGLAB_UNUSED(DrainResourcePublicationQueue(true));
+			GGLAB_UNUSED(DrainUploadRecordingQueue(true));
 		}
 		GGLAB_UNUSED(PollCompletedUploads());
-		GGLAB_UNUSED(DrainPublicationQueue(true));
+		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
 	}
 
 	uint32_t AssetUploadScheduler::PollCompletedUploads() noexcept
@@ -234,7 +274,7 @@ namespace gglab
 				m_InFlightBytes - stagingBytes : 0;
 			const AssetUploadStatus status = upload.m_RecordingSucceeded ?
 				AssetUploadStatus::Succeeded : AssetUploadStatus::Failed;
-			EnqueuePublication(std::move(upload), status);
+			EnqueueGpuFinalize(std::move(upload), status);
 		}
 		return static_cast<uint32_t>(completed.size());
 	}
@@ -248,10 +288,12 @@ namespace gglab
 		}
 
 		GGLAB_ASSERT_MSG(
-			m_CpuReadyQueue.empty() && m_UploadReadyQueue.empty(),
+			m_CpuPayloadQueue.empty() &&
+			m_ResourcePublicationQueue.empty() &&
+			m_UploadRecordingQueue.empty(),
 			"AssetUploadScheduler::Finalize requires ready work to be drained before the RHI context becomes idle.");
 		GGLAB_UNUSED(PollCompletedUploads());
-		GGLAB_UNUSED(DrainPublicationQueue(true));
+		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
 		GGLAB_ASSERT_MSG(
 			m_PendingUploads.empty(),
 			"AssetUploadScheduler::Finalize requires the RHI context to be idle.");
@@ -259,9 +301,9 @@ namespace gglab
 		{
 			PendingUpload upload = std::move(m_PendingUploads.front());
 			m_PendingUploads.pop_front();
-			EnqueuePublication(std::move(upload), AssetUploadStatus::Failed);
+			EnqueueGpuFinalize(std::move(upload), AssetUploadStatus::Failed);
 		}
-		GGLAB_UNUSED(DrainPublicationQueue(true));
+		GGLAB_UNUSED(DrainGpuFinalizeQueue(true));
 		m_TransferManager->Reclaim();
 	}
 
@@ -269,17 +311,19 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(IsOwnerThread(), "AssetUploadScheduler statistics must be read on the owner thread.");
 		AssetUploadStatistics statistics{};
-		statistics.m_CpuReadyQueue = BuildQueueStatistics(
-			m_CpuReadyQueue,
-			m_CpuReadyTelemetry);
-		statistics.m_UploadReadyQueue = BuildQueueStatistics(
-			m_UploadReadyQueue,
-			m_UploadReadyTelemetry);
-		statistics.m_PublicationReadyQueue = BuildPublicationQueueStatistics();
+		statistics.m_CpuPayloadQueue = BuildQueueStatistics(
+			m_CpuPayloadQueue,
+			m_CpuPayloadTelemetry);
+		statistics.m_ResourcePublicationQueue =
+			BuildResourcePublicationQueueStatistics();
+		statistics.m_UploadRecordingQueue = BuildQueueStatistics(
+			m_UploadRecordingQueue,
+			m_UploadRecordingTelemetry);
+		statistics.m_GpuFinalizeQueue = BuildGpuFinalizeQueueStatistics();
 		statistics.m_FrameBudget = m_FrameBudget;
 		statistics.m_LastFrameUsage = m_LastFrameUsage;
-		statistics.m_ReadyBacklogBytes = m_ReadyBacklogBytes;
-		statistics.m_ReadyBacklogHighWatermark = m_ReadyBacklogHighWatermark;
+		statistics.m_ReadyPayloadBytes = m_ReadyPayloadBytes;
+		statistics.m_ReadyPayloadHighWatermark = m_ReadyPayloadHighWatermark;
 		statistics.m_InFlightBytes = m_InFlightBytes;
 		statistics.m_InFlightHighWatermark = m_InFlightHighWatermark;
 		statistics.m_BacklogBudgetDeferralCount = m_BacklogBudgetDeferralCount;
@@ -346,14 +390,14 @@ namespace gglab
 		telemetry.m_HighWatermark = std::max(
 			telemetry.m_HighWatermark,
 			static_cast<uint32_t>(queue.size()));
-		m_ReadyBacklogBytes += sourceBytes;
-		if (&queue == &m_UploadReadyQueue)
+		m_ReadyPayloadBytes += sourceBytes;
+		if (&queue == &m_UploadRecordingQueue)
 		{
-			m_UploadReadyBacklogBytes += sourceBytes;
+			m_UploadRecordingBacklogBytes += sourceBytes;
 		}
-		m_ReadyBacklogHighWatermark = std::max(
-			m_ReadyBacklogHighWatermark,
-			m_ReadyBacklogBytes);
+		m_ReadyPayloadHighWatermark = std::max(
+			m_ReadyPayloadHighWatermark,
+			m_ReadyPayloadBytes);
 	}
 
 	double AssetUploadScheduler::ExecuteWork(
@@ -364,6 +408,7 @@ namespace gglab
 		const double queueMilliseconds = Milliseconds(
 			std::chrono::steady_clock::now() - queued.m_QueuedAt);
 		telemetry.m_TotalQueueMilliseconds += queueMilliseconds;
+		++telemetry.m_QueueSampleCount;
 		telemetry.m_MaxQueueMilliseconds = std::max(
 			telemetry.m_MaxQueueMilliseconds,
 			queueMilliseconds);
@@ -400,54 +445,192 @@ namespace gglab
 		return executionMilliseconds;
 	}
 
-	uint32_t AssetUploadScheduler::DrainCpuReadyQueue(bool ignoreBudget) noexcept
+	void AssetUploadScheduler::InsertResourcePublication(
+		QueuedResourcePublication&& publication) noexcept
 	{
-		const uint32_t initialCount = static_cast<uint32_t>(m_CpuReadyQueue.size());
+		const auto insertion = std::ranges::find_if(m_ResourcePublicationQueue,
+			[priority = publication.m_Desc.m_Priority](
+				const QueuedResourcePublication& existing) noexcept
+			{
+				return HasHigherPriority(priority, existing.m_Desc.m_Priority);
+			});
+		m_ResourcePublicationQueue.insert(insertion, std::move(publication));
+	}
+
+	uint32_t AssetUploadScheduler::DrainCpuPayloadQueue(bool ignoreBudget) noexcept
+	{
+		const uint32_t initialCount = static_cast<uint32_t>(m_CpuPayloadQueue.size());
 		uint32_t processedCount = 0;
-		while (processedCount < initialCount && !m_CpuReadyQueue.empty())
+		while (processedCount < initialCount && !m_CpuPayloadQueue.empty())
 		{
-			const QueuedWork& next = m_CpuReadyQueue.front();
+			const QueuedWork& next = m_CpuPayloadQueue.front();
 			if (!ignoreBudget && processedCount > 0 &&
-				(m_LastFrameUsage.m_CpuReadyItems >= m_FrameBudget.m_MaxCpuReadyItems ||
-				m_LastFrameUsage.m_CpuReadyMilliseconds >= m_FrameBudget.m_MaxCpuReadyMilliseconds))
+				(m_LastFrameUsage.m_CpuPayloadItems >= m_FrameBudget.m_MaxCpuPayloadItems ||
+				m_LastFrameUsage.m_CpuPayloadMilliseconds >= m_FrameBudget.m_MaxCpuPayloadMilliseconds))
 			{
 				break;
 			}
 			const uint64_t prospectiveUploadBacklog =
-				m_UploadReadyBacklogBytes + next.m_Desc.m_Estimate.m_SourceBytes;
-			if (!ignoreBudget && !m_UploadReadyQueue.empty() &&
-				prospectiveUploadBacklog > m_FrameBudget.m_MaxReadyBacklogBytes)
+				m_UploadRecordingBacklogBytes + next.m_Desc.m_Estimate.m_SourceBytes;
+			if (!ignoreBudget && !m_UploadRecordingQueue.empty() &&
+				prospectiveUploadBacklog > m_FrameBudget.m_MaxUploadRecordingBacklogBytes)
 			{
 				++m_BacklogBudgetDeferralCount;
 				break;
 			}
 
-			QueuedWork queued = std::move(m_CpuReadyQueue.front());
-			m_CpuReadyQueue.pop_front();
-			RemoveReadyBacklog(queued.m_Desc.m_Estimate, false);
+			QueuedWork queued = std::move(m_CpuPayloadQueue.front());
+			m_CpuPayloadQueue.pop_front();
+			RemoveReadyPayload(queued.m_Desc.m_Estimate, false);
 			const double elapsed = ExecuteWork(
-				std::move(queued), m_CpuReadyTelemetry, "CPU-ready");
+				std::move(queued), m_CpuPayloadTelemetry, "CPU-payload");
 			++processedCount;
-			++m_LastFrameUsage.m_CpuReadyItems;
-			m_LastFrameUsage.m_CpuReadyMilliseconds += elapsed;
+			++m_LastFrameUsage.m_CpuPayloadItems;
+			m_LastFrameUsage.m_CpuPayloadMilliseconds += elapsed;
 		}
 		return processedCount;
 	}
 
-	uint32_t AssetUploadScheduler::DrainUploadReadyQueue(bool ignoreBudget) noexcept
+	uint32_t AssetUploadScheduler::DrainResourcePublicationQueue(bool ignoreBudget) noexcept
 	{
-		const uint32_t initialCount = static_cast<uint32_t>(m_UploadReadyQueue.size());
 		uint32_t processedCount = 0;
-		while (processedCount < initialCount && !m_UploadReadyQueue.empty())
+		AssetResourcePublicationContext context{
+			.m_Scheduler = this,
+		};
+		while (!m_ResourcePublicationQueue.empty())
+		{
+			const bool budgetExhausted =
+				m_LastFrameUsage.m_ResourcePublicationSteps >=
+					m_FrameBudget.m_MaxResourcePublicationSteps ||
+				m_LastFrameUsage.m_ResourcePublicationCreations >=
+					m_FrameBudget.m_MaxResourcePublicationCreations ||
+				m_LastFrameUsage.m_ResourcePublicationMilliseconds >=
+					m_FrameBudget.m_MaxResourcePublicationMilliseconds;
+			if (!ignoreBudget && processedCount > 0 && budgetExhausted)
+			{
+				break;
+			}
+			if (ignoreBudget && processedCount >= MaxResourcePublicationDrainSteps)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Resource publication drain exceeded {} steps; aborting {} remaining jobs.",
+					MaxResourcePublicationDrainSteps,
+					m_ResourcePublicationQueue.size());
+				while (!m_ResourcePublicationQueue.empty())
+				{
+					QueuedResourcePublication publication =
+						std::move(m_ResourcePublicationQueue.front());
+					m_ResourcePublicationQueue.pop_front();
+					publication.m_Job->Abort(
+						context,
+						AssetResourcePublicationAbortReason::Shutdown);
+					GGLAB_ASSERT_MSG(
+						publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes,
+						"Resource publication payload accounting underflow during drain abort.");
+					m_ReadyPayloadBytes = publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes ?
+						m_ReadyPayloadBytes - publication.m_RemainingSourceBytes : 0;
+					++m_ResourcePublicationTelemetry.m_CancelledCount;
+				}
+				break;
+			}
+
+			QueuedResourcePublication publication =
+				std::move(m_ResourcePublicationQueue.front());
+			m_ResourcePublicationQueue.pop_front();
+			if (!publication.m_HasStarted)
+			{
+				const double queueMilliseconds = Milliseconds(
+					std::chrono::steady_clock::now() - publication.m_QueuedAt);
+				m_ResourcePublicationTelemetry.m_TotalQueueMilliseconds += queueMilliseconds;
+				++m_ResourcePublicationTelemetry.m_QueueSampleCount;
+				m_ResourcePublicationTelemetry.m_MaxQueueMilliseconds = std::max(
+					m_ResourcePublicationTelemetry.m_MaxQueueMilliseconds,
+					queueMilliseconds);
+				publication.m_HasStarted = true;
+			}
+
+			const auto executionBegin = std::chrono::steady_clock::now();
+			const AssetResourcePublicationStepResult result = publication.m_Job->Step(context);
+			const double executionMilliseconds = Milliseconds(
+				std::chrono::steady_clock::now() - executionBegin);
+			m_ResourcePublicationTelemetry.m_TotalExecutionMilliseconds += executionMilliseconds;
+			m_ResourcePublicationTelemetry.m_MaxExecutionMilliseconds = std::max(
+				m_ResourcePublicationTelemetry.m_MaxExecutionMilliseconds,
+				executionMilliseconds);
+			++m_ResourcePublicationTelemetry.m_ProcessedCount;
+			GGLAB_ASSERT_MSG(
+				result.m_Usage.m_WorkItems == 1,
+				"Each resource publication Step must report exactly one work item.");
+			m_ResourcePublicationTelemetry.m_ResourceCreationCount +=
+				result.m_Usage.m_ResourceCreations;
+			m_ResourcePublicationTelemetry.m_PayloadBytesMovedToUpload +=
+				result.m_Usage.m_PayloadBytesMovedToUpload;
+			m_ResourcePublicationTelemetry.m_PayloadBytesDestroyed +=
+				result.m_Usage.m_PayloadBytesDestroyed;
+			RetireResourcePublicationPayload(publication, result.m_Usage);
+
+			++processedCount;
+			++m_LastFrameUsage.m_ResourcePublicationSteps;
+			m_LastFrameUsage.m_ResourcePublicationCreations = static_cast<uint32_t>(
+				std::min<uint64_t>(
+					static_cast<uint64_t>(m_LastFrameUsage.m_ResourcePublicationCreations) +
+						result.m_Usage.m_ResourceCreations,
+					std::numeric_limits<uint32_t>::max()));
+			m_LastFrameUsage.m_ResourcePublicationMilliseconds += executionMilliseconds;
+
+			switch (result.m_Status)
+			{
+			case AssetResourcePublicationStepStatus::Continue:
+				++m_ResourcePublicationTelemetry.m_ContinueCount;
+				InsertResourcePublication(std::move(publication));
+				break;
+			case AssetResourcePublicationStepStatus::Completed:
+				++m_ResourcePublicationTelemetry.m_CompletedCount;
+				break;
+			case AssetResourcePublicationStepStatus::Failed:
+				++m_ResourcePublicationTelemetry.m_FailedCount;
+				publication.m_Job->Abort(
+					context,
+					AssetResourcePublicationAbortReason::Failed);
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Resource publication '{}' failed: {}",
+					publication.m_Desc.m_Name,
+					result.m_Error.empty() ? "unspecified error" : result.m_Error);
+				break;
+			case AssetResourcePublicationStepStatus::Cancelled:
+				++m_ResourcePublicationTelemetry.m_CancelledCount;
+				publication.m_Job->Abort(
+					context,
+					AssetResourcePublicationAbortReason::Cancelled);
+				break;
+			}
+
+			if (result.m_Status != AssetResourcePublicationStepStatus::Continue)
+			{
+				GGLAB_ASSERT_MSG(
+					publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes,
+					"Resource publication payload accounting underflow at terminal state.");
+				m_ReadyPayloadBytes = publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes ?
+					m_ReadyPayloadBytes - publication.m_RemainingSourceBytes : 0;
+			}
+		}
+		return processedCount;
+	}
+
+	uint32_t AssetUploadScheduler::DrainUploadRecordingQueue(bool ignoreBudget) noexcept
+	{
+		const uint32_t initialCount = static_cast<uint32_t>(m_UploadRecordingQueue.size());
+		uint32_t processedCount = 0;
+		while (processedCount < initialCount && !m_UploadRecordingQueue.empty())
 		{
 			const AssetStreamingWorkEstimate& estimate =
-				m_UploadReadyQueue.front().m_Desc.m_Estimate;
-			const bool hasFrameAdmission = m_LastFrameUsage.m_UploadReadyItems > 0;
+				m_UploadRecordingQueue.front().m_Desc.m_Estimate;
+			const bool hasFrameAdmission = m_LastFrameUsage.m_UploadRecordingItems > 0;
 			const bool exceedsFrameBudget =
-				m_LastFrameUsage.m_UploadReadyItems >= m_FrameBudget.m_MaxUploadReadyItems ||
+				m_LastFrameUsage.m_UploadRecordingItems >= m_FrameBudget.m_MaxUploadRecordingItems ||
 				m_LastFrameUsage.m_UploadBytes + estimate.m_StagingBytes > m_FrameBudget.m_MaxUploadBytes ||
 				m_LastFrameUsage.m_UploadOperations + estimate.m_OperationCount > m_FrameBudget.m_MaxUploadOperations ||
-				m_LastFrameUsage.m_UploadMilliseconds >= m_FrameBudget.m_MaxUploadMilliseconds;
+				m_LastFrameUsage.m_UploadRecordingMilliseconds >= m_FrameBudget.m_MaxUploadRecordingMilliseconds;
 			if (!ignoreBudget && hasFrameAdmission && exceedsFrameBudget)
 			{
 				++m_UploadBudgetDeferralCount;
@@ -466,103 +649,131 @@ namespace gglab
 				++m_OversizedAdmissionCount;
 			}
 
-			QueuedWork queued = std::move(m_UploadReadyQueue.front());
-			m_UploadReadyQueue.pop_front();
-			RemoveReadyBacklog(queued.m_Desc.m_Estimate, true);
+			QueuedWork queued = std::move(m_UploadRecordingQueue.front());
+			m_UploadRecordingQueue.pop_front();
+			RemoveReadyPayload(queued.m_Desc.m_Estimate, true);
 			const AssetStreamingWorkEstimate admittedEstimate = queued.m_Desc.m_Estimate;
 			const double elapsed = ExecuteWork(
-				std::move(queued), m_UploadReadyTelemetry, "upload-ready");
+				std::move(queued), m_UploadRecordingTelemetry, "upload-recording");
 			++processedCount;
-			++m_LastFrameUsage.m_UploadReadyItems;
+			++m_LastFrameUsage.m_UploadRecordingItems;
 			m_LastFrameUsage.m_UploadBytes += admittedEstimate.m_StagingBytes;
 			m_LastFrameUsage.m_UploadOperations += admittedEstimate.m_OperationCount;
-			m_LastFrameUsage.m_UploadMilliseconds += elapsed;
+			m_LastFrameUsage.m_UploadRecordingMilliseconds += elapsed;
 		}
 		return processedCount;
 	}
 
-	void AssetUploadScheduler::EnqueuePublication(
+	void AssetUploadScheduler::EnqueueGpuFinalize(
 		PendingUpload&& upload,
 		AssetUploadStatus status) noexcept
 	{
-		PendingPublication publication{
+		PendingGpuFinalize publication{
 			.m_Upload = std::move(upload),
 			.m_Status = status,
 			.m_QueuedAt = std::chrono::steady_clock::now(),
 		};
-		const auto insertion = std::ranges::find_if(m_PublicationReadyQueue,
+		const auto insertion = std::ranges::find_if(m_GpuFinalizeQueue,
 			[priority = publication.m_Upload.m_Desc.m_Priority](
-				const PendingPublication& existing) noexcept
+				const PendingGpuFinalize& existing) noexcept
 			{
 				return HasHigherPriority(priority, existing.m_Upload.m_Desc.m_Priority);
 			});
-		m_PublicationReadyQueue.insert(insertion, std::move(publication));
-		++m_PublicationReadyTelemetry.m_EnqueuedCount;
-		m_PublicationReadyTelemetry.m_HighWatermark = std::max(
-			m_PublicationReadyTelemetry.m_HighWatermark,
-			static_cast<uint32_t>(m_PublicationReadyQueue.size()));
+		m_GpuFinalizeQueue.insert(insertion, std::move(publication));
+		++m_GpuFinalizeTelemetry.m_EnqueuedCount;
+		m_GpuFinalizeTelemetry.m_HighWatermark = std::max(
+			m_GpuFinalizeTelemetry.m_HighWatermark,
+			static_cast<uint32_t>(m_GpuFinalizeQueue.size()));
 	}
 
-	uint32_t AssetUploadScheduler::DrainPublicationQueue(bool ignoreBudget) noexcept
+	uint32_t AssetUploadScheduler::DrainGpuFinalizeQueue(bool ignoreBudget) noexcept
 	{
-		const uint32_t initialCount = static_cast<uint32_t>(m_PublicationReadyQueue.size());
+		const uint32_t initialCount = static_cast<uint32_t>(m_GpuFinalizeQueue.size());
 		uint32_t processedCount = 0;
-		while (processedCount < initialCount && !m_PublicationReadyQueue.empty())
+		while (processedCount < initialCount && !m_GpuFinalizeQueue.empty())
 		{
 			if (!ignoreBudget && processedCount > 0 &&
-				(m_LastFrameUsage.m_PublicationItems >= m_FrameBudget.m_MaxPublicationItems ||
-				m_LastFrameUsage.m_PublicationMilliseconds >= m_FrameBudget.m_MaxPublicationMilliseconds))
+				(m_LastFrameUsage.m_GpuFinalizeItems >= m_FrameBudget.m_MaxGpuFinalizeItems ||
+				m_LastFrameUsage.m_GpuFinalizeMilliseconds >= m_FrameBudget.m_MaxGpuFinalizeMilliseconds))
 			{
 				break;
 			}
-			PendingPublication publication = std::move(m_PublicationReadyQueue.front());
-			m_PublicationReadyQueue.pop_front();
+			PendingGpuFinalize publication = std::move(m_GpuFinalizeQueue.front());
+			m_GpuFinalizeQueue.pop_front();
 			const double queueMilliseconds = Milliseconds(
 				std::chrono::steady_clock::now() - publication.m_QueuedAt);
-			m_PublicationReadyTelemetry.m_TotalQueueMilliseconds += queueMilliseconds;
-			m_PublicationReadyTelemetry.m_MaxQueueMilliseconds = std::max(
-				m_PublicationReadyTelemetry.m_MaxQueueMilliseconds,
+			m_GpuFinalizeTelemetry.m_TotalQueueMilliseconds += queueMilliseconds;
+			++m_GpuFinalizeTelemetry.m_QueueSampleCount;
+			m_GpuFinalizeTelemetry.m_MaxQueueMilliseconds = std::max(
+				m_GpuFinalizeTelemetry.m_MaxQueueMilliseconds,
 				queueMilliseconds);
 			const auto executionBegin = std::chrono::steady_clock::now();
 			FinishUpload(std::move(publication.m_Upload), publication.m_Status);
 			const double executionMilliseconds = Milliseconds(
 				std::chrono::steady_clock::now() - executionBegin);
-			m_PublicationReadyTelemetry.m_TotalExecutionMilliseconds += executionMilliseconds;
-			m_PublicationReadyTelemetry.m_MaxExecutionMilliseconds = std::max(
-				m_PublicationReadyTelemetry.m_MaxExecutionMilliseconds,
+			m_GpuFinalizeTelemetry.m_TotalExecutionMilliseconds += executionMilliseconds;
+			m_GpuFinalizeTelemetry.m_MaxExecutionMilliseconds = std::max(
+				m_GpuFinalizeTelemetry.m_MaxExecutionMilliseconds,
 				executionMilliseconds);
 			++processedCount;
-			++m_LastFrameUsage.m_PublicationItems;
-			m_LastFrameUsage.m_PublicationMilliseconds += executionMilliseconds;
-			++m_PublicationReadyTelemetry.m_ProcessedCount;
+			++m_LastFrameUsage.m_GpuFinalizeItems;
+			m_LastFrameUsage.m_GpuFinalizeMilliseconds += executionMilliseconds;
+			++m_GpuFinalizeTelemetry.m_ProcessedCount;
 		}
 		return processedCount;
 	}
 
-	void AssetUploadScheduler::RemoveReadyBacklog(
+	void AssetUploadScheduler::RemoveReadyPayload(
 		const AssetStreamingWorkEstimate& estimate,
-		bool uploadReady) noexcept
+		bool uploadRecording) noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			estimate.m_SourceBytes <= m_ReadyBacklogBytes,
-			"Asset ready backlog byte accounting underflow.");
-		m_ReadyBacklogBytes = estimate.m_SourceBytes <= m_ReadyBacklogBytes ?
-			m_ReadyBacklogBytes - estimate.m_SourceBytes : 0;
-		if (uploadReady)
+			estimate.m_SourceBytes <= m_ReadyPayloadBytes,
+			"Asset ready payload byte accounting underflow.");
+		m_ReadyPayloadBytes = estimate.m_SourceBytes <= m_ReadyPayloadBytes ?
+			m_ReadyPayloadBytes - estimate.m_SourceBytes : 0;
+		if (uploadRecording)
 		{
 			GGLAB_ASSERT_MSG(
-				estimate.m_SourceBytes <= m_UploadReadyBacklogBytes,
-				"Asset upload-ready backlog byte accounting underflow.");
-			m_UploadReadyBacklogBytes = estimate.m_SourceBytes <= m_UploadReadyBacklogBytes ?
-				m_UploadReadyBacklogBytes - estimate.m_SourceBytes : 0;
+				estimate.m_SourceBytes <= m_UploadRecordingBacklogBytes,
+				"Asset upload-recording payload byte accounting underflow.");
+			m_UploadRecordingBacklogBytes = estimate.m_SourceBytes <= m_UploadRecordingBacklogBytes ?
+				m_UploadRecordingBacklogBytes - estimate.m_SourceBytes : 0;
 		}
+	}
+
+	void AssetUploadScheduler::RetireResourcePublicationPayload(
+		QueuedResourcePublication& publication,
+		const AssetResourcePublicationStepUsage& usage) noexcept
+	{
+		const uint64_t movedBytes = usage.m_PayloadBytesMovedToUpload;
+		const uint64_t destroyedBytes = usage.m_PayloadBytesDestroyed;
+		GGLAB_ASSERT_MSG(
+			movedBytes <= publication.m_RemainingSourceBytes &&
+			destroyedBytes <= publication.m_RemainingSourceBytes -
+				std::min(movedBytes, publication.m_RemainingSourceBytes),
+			"Resource publication step retired more payload than the job owns.");
+		const uint64_t clampedMovedBytes = std::min(
+			movedBytes,
+			publication.m_RemainingSourceBytes);
+		const uint64_t retiredBytes = clampedMovedBytes + std::min(
+			destroyedBytes,
+			publication.m_RemainingSourceBytes - clampedMovedBytes);
+		GGLAB_ASSERT_MSG(
+			retiredBytes <= m_ReadyPayloadBytes,
+			"Resource publication ready payload accounting underflow.");
+		publication.m_RemainingSourceBytes -= retiredBytes;
+		publication.m_Desc.m_Estimate.m_SourceBytes =
+			publication.m_RemainingSourceBytes;
+		m_ReadyPayloadBytes = retiredBytes <= m_ReadyPayloadBytes ?
+			m_ReadyPayloadBytes - retiredBytes : 0;
 	}
 
 	uint32_t AssetUploadScheduler::CancelQueuedWork(
 		std::deque<QueuedWork>& queue,
 		QueueTelemetry& telemetry,
 		const AssetStreamingIdentity& identity,
-		bool uploadReady) noexcept
+		bool uploadRecording) noexcept
 	{
 		uint32_t cancelledCount = 0;
 		for (auto iterator = queue.begin(); iterator != queue.end();)
@@ -573,10 +784,40 @@ namespace gglab
 				continue;
 			}
 
-			RemoveReadyBacklog(iterator->m_Desc.m_Estimate, uploadReady);
+			RemoveReadyPayload(iterator->m_Desc.m_Estimate, uploadRecording);
 			iterator = queue.erase(iterator);
 			++cancelledCount;
 			++telemetry.m_CancelledCount;
+		}
+		return cancelledCount;
+	}
+
+	uint32_t AssetUploadScheduler::CancelResourcePublication(
+		const AssetStreamingIdentity& identity,
+		AssetResourcePublicationAbortReason reason) noexcept
+	{
+		AssetResourcePublicationContext context{
+			.m_Scheduler = this,
+		};
+		uint32_t cancelledCount = 0;
+		for (auto iterator = m_ResourcePublicationQueue.begin();
+			iterator != m_ResourcePublicationQueue.end();)
+		{
+			if (iterator->m_Desc.m_Identity != identity)
+			{
+				++iterator;
+				continue;
+			}
+
+			iterator->m_Job->Abort(context, reason);
+			GGLAB_ASSERT_MSG(
+				iterator->m_RemainingSourceBytes <= m_ReadyPayloadBytes,
+				"Resource publication cancellation payload accounting underflow.");
+			m_ReadyPayloadBytes = iterator->m_RemainingSourceBytes <= m_ReadyPayloadBytes ?
+				m_ReadyPayloadBytes - iterator->m_RemainingSourceBytes : 0;
+			iterator = m_ResourcePublicationQueue.erase(iterator);
+			++cancelledCount;
+			++m_ResourcePublicationTelemetry.m_CancelledCount;
 		}
 		return cancelledCount;
 	}
@@ -608,6 +849,34 @@ namespace gglab
 		return updatedCount;
 	}
 
+	uint32_t AssetUploadScheduler::UpdateResourcePublicationPriority(
+		const AssetStreamingIdentity& identity,
+		TaskPriority priority) noexcept
+	{
+		uint32_t updatedCount = 0;
+		for (QueuedResourcePublication& publication : m_ResourcePublicationQueue)
+		{
+			if (publication.m_Desc.m_Identity == identity &&
+				publication.m_Desc.m_Priority != priority)
+			{
+				publication.m_Desc.m_Priority = priority;
+				++updatedCount;
+			}
+		}
+		if (updatedCount > 0)
+		{
+			std::ranges::stable_sort(m_ResourcePublicationQueue,
+				[](const QueuedResourcePublication& lhs,
+					const QueuedResourcePublication& rhs) noexcept
+				{
+					return HasHigherPriority(
+						lhs.m_Desc.m_Priority,
+						rhs.m_Desc.m_Priority);
+				});
+		}
+		return updatedCount;
+	}
+
 	AssetStreamingQueueStatistics AssetUploadScheduler::BuildQueueStatistics(
 		const std::deque<QueuedWork>& queue,
 		const QueueTelemetry& telemetry) const
@@ -617,8 +886,15 @@ namespace gglab
 		statistics.m_HighWatermark = telemetry.m_HighWatermark;
 		statistics.m_EnqueuedCount = telemetry.m_EnqueuedCount;
 		statistics.m_ProcessedCount = telemetry.m_ProcessedCount;
+		statistics.m_ContinueCount = telemetry.m_ContinueCount;
+		statistics.m_CompletedCount = telemetry.m_CompletedCount;
+		statistics.m_FailedCount = telemetry.m_FailedCount;
 		statistics.m_CallbackFailureCount = telemetry.m_CallbackFailureCount;
 		statistics.m_CancelledCount = telemetry.m_CancelledCount;
+		statistics.m_ResourceCreationCount = telemetry.m_ResourceCreationCount;
+		statistics.m_PayloadBytesMovedToUpload = telemetry.m_PayloadBytesMovedToUpload;
+		statistics.m_PayloadBytesDestroyed = telemetry.m_PayloadBytesDestroyed;
+		statistics.m_QueueSampleCount = telemetry.m_QueueSampleCount;
 		statistics.m_TotalQueueMilliseconds = telemetry.m_TotalQueueMilliseconds;
 		statistics.m_MaxQueueMilliseconds = telemetry.m_MaxQueueMilliseconds;
 		statistics.m_TotalExecutionMilliseconds = telemetry.m_TotalExecutionMilliseconds;
@@ -643,22 +919,74 @@ namespace gglab
 		return statistics;
 	}
 
-	AssetStreamingQueueStatistics AssetUploadScheduler::BuildPublicationQueueStatistics() const
+	AssetStreamingQueueStatistics AssetUploadScheduler::BuildResourcePublicationQueueStatistics() const
+	{
+		GGLAB_ASSERT_MSG(
+			m_ResourcePublicationTelemetry.m_EnqueuedCount ==
+				m_ResourcePublicationTelemetry.m_CompletedCount +
+				m_ResourcePublicationTelemetry.m_FailedCount +
+				m_ResourcePublicationTelemetry.m_CancelledCount +
+				m_ResourcePublicationQueue.size(),
+			"Resource publication terminal accounting invariant failed.");
+		AssetStreamingQueueStatistics statistics{};
+		statistics.m_PendingCount = static_cast<uint32_t>(m_ResourcePublicationQueue.size());
+		statistics.m_HighWatermark = m_ResourcePublicationTelemetry.m_HighWatermark;
+		statistics.m_EnqueuedCount = m_ResourcePublicationTelemetry.m_EnqueuedCount;
+		statistics.m_ProcessedCount = m_ResourcePublicationTelemetry.m_ProcessedCount;
+		statistics.m_ContinueCount = m_ResourcePublicationTelemetry.m_ContinueCount;
+		statistics.m_CompletedCount = m_ResourcePublicationTelemetry.m_CompletedCount;
+		statistics.m_FailedCount = m_ResourcePublicationTelemetry.m_FailedCount;
+		statistics.m_CallbackFailureCount = m_ResourcePublicationTelemetry.m_CallbackFailureCount;
+		statistics.m_CancelledCount = m_ResourcePublicationTelemetry.m_CancelledCount;
+		statistics.m_ResourceCreationCount = m_ResourcePublicationTelemetry.m_ResourceCreationCount;
+		statistics.m_PayloadBytesMovedToUpload =
+			m_ResourcePublicationTelemetry.m_PayloadBytesMovedToUpload;
+		statistics.m_PayloadBytesDestroyed =
+			m_ResourcePublicationTelemetry.m_PayloadBytesDestroyed;
+		statistics.m_QueueSampleCount = m_ResourcePublicationTelemetry.m_QueueSampleCount;
+		statistics.m_TotalQueueMilliseconds =
+			m_ResourcePublicationTelemetry.m_TotalQueueMilliseconds;
+		statistics.m_MaxQueueMilliseconds =
+			m_ResourcePublicationTelemetry.m_MaxQueueMilliseconds;
+		statistics.m_TotalExecutionMilliseconds =
+			m_ResourcePublicationTelemetry.m_TotalExecutionMilliseconds;
+		statistics.m_MaxExecutionMilliseconds =
+			m_ResourcePublicationTelemetry.m_MaxExecutionMilliseconds;
+		statistics.m_PendingWork.reserve(m_ResourcePublicationQueue.size());
+		const auto now = std::chrono::steady_clock::now();
+		for (const QueuedResourcePublication& publication : m_ResourcePublicationQueue)
+		{
+			statistics.m_PendingSourceBytes += publication.m_RemainingSourceBytes;
+			statistics.m_PendingWork.push_back({
+				.m_Name = publication.m_Desc.m_Name,
+				.m_Identity = publication.m_Desc.m_Identity,
+				.m_Estimate = publication.m_Desc.m_Estimate,
+				.m_Priority = publication.m_Desc.m_Priority,
+				.m_QueueMilliseconds = Milliseconds(now - publication.m_QueuedAt),
+				.m_Progress = publication.m_Desc.m_Progress ?
+					publication.m_Desc.m_Progress->GetSnapshot() : ProgressSnapshot{},
+			});
+		}
+		return statistics;
+	}
+
+	AssetStreamingQueueStatistics AssetUploadScheduler::BuildGpuFinalizeQueueStatistics() const
 	{
 		AssetStreamingQueueStatistics statistics{};
-		statistics.m_PendingCount = static_cast<uint32_t>(m_PublicationReadyQueue.size());
-		statistics.m_HighWatermark = m_PublicationReadyTelemetry.m_HighWatermark;
-		statistics.m_EnqueuedCount = m_PublicationReadyTelemetry.m_EnqueuedCount;
-		statistics.m_ProcessedCount = m_PublicationReadyTelemetry.m_ProcessedCount;
+		statistics.m_PendingCount = static_cast<uint32_t>(m_GpuFinalizeQueue.size());
+		statistics.m_HighWatermark = m_GpuFinalizeTelemetry.m_HighWatermark;
+		statistics.m_EnqueuedCount = m_GpuFinalizeTelemetry.m_EnqueuedCount;
+		statistics.m_ProcessedCount = m_GpuFinalizeTelemetry.m_ProcessedCount;
 		statistics.m_CallbackFailureCount = m_CompletionCallbackFailureCount;
-		statistics.m_CancelledCount = m_PublicationReadyTelemetry.m_CancelledCount;
-		statistics.m_TotalQueueMilliseconds = m_PublicationReadyTelemetry.m_TotalQueueMilliseconds;
-		statistics.m_MaxQueueMilliseconds = m_PublicationReadyTelemetry.m_MaxQueueMilliseconds;
-		statistics.m_TotalExecutionMilliseconds = m_PublicationReadyTelemetry.m_TotalExecutionMilliseconds;
-		statistics.m_MaxExecutionMilliseconds = m_PublicationReadyTelemetry.m_MaxExecutionMilliseconds;
-		statistics.m_PendingWork.reserve(m_PublicationReadyQueue.size());
+		statistics.m_CancelledCount = m_GpuFinalizeTelemetry.m_CancelledCount;
+		statistics.m_QueueSampleCount = m_GpuFinalizeTelemetry.m_QueueSampleCount;
+		statistics.m_TotalQueueMilliseconds = m_GpuFinalizeTelemetry.m_TotalQueueMilliseconds;
+		statistics.m_MaxQueueMilliseconds = m_GpuFinalizeTelemetry.m_MaxQueueMilliseconds;
+		statistics.m_TotalExecutionMilliseconds = m_GpuFinalizeTelemetry.m_TotalExecutionMilliseconds;
+		statistics.m_MaxExecutionMilliseconds = m_GpuFinalizeTelemetry.m_MaxExecutionMilliseconds;
+		statistics.m_PendingWork.reserve(m_GpuFinalizeQueue.size());
 		const auto now = std::chrono::steady_clock::now();
-		for (const PendingPublication& publication : m_PublicationReadyQueue)
+		for (const PendingGpuFinalize& publication : m_GpuFinalizeQueue)
 		{
 			statistics.m_PendingSourceBytes += publication.m_Upload.m_Desc.m_Estimate.m_SourceBytes;
 			statistics.m_PendingStagingBytes += publication.m_Upload.m_Desc.m_Estimate.m_StagingBytes;

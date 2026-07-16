@@ -307,7 +307,7 @@ namespace gglab
 					m_TextureLoadTasks.erase(textureId);
 					return;
 				}
-				m_AssetUploadScheduler->EnqueueCpuReady(
+				m_AssetUploadScheduler->EnqueueCpuPayload(
 					{
 						.m_Name = completion.m_Name,
 						.m_Identity = {
@@ -660,7 +660,7 @@ namespace gglab
 			"Waiting for texture upload admission",
 			std::format("{} bytes", estimate.m_StagingBytes));
 		auto payload = std::make_shared<TextureUploadData>(std::move(uploadData));
-		m_AssetUploadScheduler->EnqueueUploadReady(
+		m_AssetUploadScheduler->EnqueueUploadRecording(
 			{
 				.m_Name = std::format("Texture {}", textureId.Value()),
 				.m_Identity = {
