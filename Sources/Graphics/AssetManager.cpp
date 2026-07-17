@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/AssetManager.h"
 #include "Core/Task/TaskSystem.h"
+#include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
@@ -869,11 +870,9 @@ namespace gglab
 			{
 				GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
 			}
-			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority({
-				.m_Kind = AssetStreamingWorkKind::Model,
-				.m_StableId = key.m_StableId,
-				.m_Generation = generation,
-			}, priority));
+			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority(
+				MakeAssetContentVersion(modelId, generation),
+				priority));
 		}
 		else if (key.m_Kind == AssetInterestKind::Texture)
 		{
@@ -894,11 +893,9 @@ namespace gglab
 					GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
 				}
 			}
-			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority({
-				.m_Kind = AssetStreamingWorkKind::Mesh,
-				.m_StableId = key.m_StableId,
-				.m_Generation = generation,
-			}, priority));
+			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority(
+				MakeAssetContentVersion(meshId, generation),
+				priority));
 		}
 	}
 
@@ -1135,11 +1132,8 @@ namespace gglab
 		{
 			GGLAB_UNUSED(m_TaskSystem->Cancel(task->second));
 		}
-		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork({
-			.m_Kind = AssetStreamingWorkKind::Model,
-			.m_StableId = modelId.Value(),
-			.m_Generation = generation,
-		});
+		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork(
+			MakeAssetContentVersion(modelId, generation));
 		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
 		{
 			++m_CpuCancellationCount;
@@ -1178,22 +1172,16 @@ namespace gglab
 		if (mesh->m_IsReloading && !mesh->m_VertexBuffer && !mesh->m_IndexBuffer)
 		{
 			mesh->m_CancelRequested = true;
-			GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork({
-				.m_Kind = AssetStreamingWorkKind::Mesh,
-				.m_StableId = meshId.Value(),
-				.m_Generation = generation,
-			}));
+			GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
+				MakeAssetContentVersion(meshId, generation)));
 			mesh->m_IsReloading = false;
 			SetMeshState(*mesh, AssetState::CpuReady);
 			++m_ReadyCancellationCount;
 			return;
 		}
 		mesh->m_CancelRequested = true;
-		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork({
-			.m_Kind = AssetStreamingWorkKind::Mesh,
-			.m_StableId = meshId.Value(),
-			.m_Generation = generation,
-		});
+		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork(
+			MakeAssetContentVersion(meshId, generation));
 		if (mesh->m_VertexBuffer || mesh->m_IndexBuffer)
 		{
 			++m_GpuDeferredCancellationCount;
@@ -2283,11 +2271,8 @@ namespace gglab
 		}
 
 		mesh->m_CancelRequested = true;
-		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork({
-			.m_Kind = AssetStreamingWorkKind::Mesh,
-			.m_StableId = meshId.Value(),
-			.m_Generation = generation,
-		}));
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
+			MakeAssetContentVersion(meshId, generation)));
 		if ((mesh->m_VertexBuffer || mesh->m_IndexBuffer) &&
 			mesh->m_State != AssetState::Ready)
 		{
