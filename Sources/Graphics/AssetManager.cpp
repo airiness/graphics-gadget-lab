@@ -474,6 +474,9 @@ namespace gglab
 			.m_LastPlanFrame = m_LastResidencyPlanFrame,
 			.m_LastPlannedActionCount = m_LastPlannedResidencyActionCount,
 			.m_LastPlannedBytes = m_LastPlannedResidencyBytes,
+			.m_OperationCount = m_ResidencyOperationCount,
+			.m_RevalidationRejectionCount = m_ResidencyRevalidationRejectionCount,
+			.m_StaleCompletionCount = m_ResidencyStaleCompletionCount,
 		};
 		for (const PendingResidencyEviction& eviction : m_PendingResidencyEvictions)
 		{
@@ -955,6 +958,7 @@ namespace gglab
 			GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
 				MakeAssetContentVersion(meshId, generation)));
 			mesh->m_IsReloading = false;
+			AssetResidencyController::InvalidateResidencyOperation(*mesh);
 			SetMeshState(*mesh, AssetState::CpuReady);
 			++m_ReadyCancellationCount;
 			return;
@@ -1133,6 +1137,7 @@ namespace gglab
 						meshId,
 						mesh->m_ContentGeneration),
 					.m_ResidencyEpoch = mesh->m_ResidencyEpoch,
+					.m_ResidencyOperationSerial = mesh->m_ResidencyOperationSerial,
 					.m_LastUsedFrame = mesh->m_LastUsedFrame,
 					.m_State = mesh->m_State,
 					.m_ContentState = mesh->m_ContentState,
@@ -1169,6 +1174,7 @@ namespace gglab
 						textureId,
 						texture->m_ContentGeneration),
 					.m_ResidencyEpoch = texture->m_ResidencyEpoch,
+					.m_ResidencyOperationSerial = texture->m_ResidencyOperationSerial,
 					.m_LastUsedFrame = texture->m_LastUsedFrame,
 					.m_State = texture->m_State,
 					.m_ContentState = texture->m_ContentState,
@@ -1191,6 +1197,141 @@ namespace gglab
 		return snapshot;
 	}
 
+	bool AssetManager::BuildResidencyInventoryEntry(
+		AssetKey key,
+		AssetResidencyInventoryEntry& entry) const noexcept
+	{
+		if (key.m_Kind == AssetKind::Mesh)
+		{
+			const MeshID meshId{ static_cast<uint32_t>(key.m_StableId) };
+			const Mesh* mesh = GetMesh(meshId);
+			if (!mesh)
+			{
+				return false;
+			}
+			entry = {
+				.m_Stamp = {
+					.m_ContentVersion = MakeAssetContentVersion(
+						meshId,
+						mesh->m_ContentGeneration),
+					.m_ResidencyEpoch = mesh->m_ResidencyEpoch,
+					.m_ResidencyOperationSerial = mesh->m_ResidencyOperationSerial,
+					.m_LastUsedFrame = mesh->m_LastUsedFrame,
+					.m_State = mesh->m_State,
+					.m_ContentState = mesh->m_ContentState,
+					.m_ResidencyState = mesh->m_ResidencyState,
+					.m_ResidencyPolicy = mesh->m_ResidencyPolicy,
+				},
+				.m_EstimatedBytes = EstimateMeshResidentBytes(*mesh),
+				.m_IsReserved = IsReservedMeshId(meshId),
+				.m_HasReloadSource = mesh->m_SourceModelId.IsValid() &&
+					mesh->m_SourceMeshIndex != std::numeric_limits<uint32_t>::max(),
+				.m_HasActiveInterest = HasActiveInterest(key),
+				.m_HasPublicationRetain = HasPublicationRetain(
+					key,
+					mesh->m_ContentGeneration),
+				.m_HasPinnedDependentModel = HasPinnedDependentModel(
+					AssetInterestKind::Mesh,
+					meshId.Value(),
+					mesh->m_ContentGeneration),
+			};
+			return true;
+		}
+		if (key.m_Kind == AssetKind::Texture)
+		{
+			const TextureID textureId{ static_cast<uint32_t>(key.m_StableId) };
+			const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+			if (!texture)
+			{
+				return false;
+			}
+			entry = {
+				.m_Stamp = {
+					.m_ContentVersion = MakeAssetContentVersion(
+						textureId,
+						texture->m_ContentGeneration),
+					.m_ResidencyEpoch = texture->m_ResidencyEpoch,
+					.m_ResidencyOperationSerial = texture->m_ResidencyOperationSerial,
+					.m_LastUsedFrame = texture->m_LastUsedFrame,
+					.m_State = texture->m_State,
+					.m_ContentState = texture->m_ContentState,
+					.m_ResidencyState = texture->m_ResidencyState,
+					.m_ResidencyPolicy = texture->m_ResidencyPolicy,
+				},
+				.m_EstimatedBytes = EstimateTextureResidentBytes(*texture),
+				.m_IsReserved = IsReservedTextureId(textureId),
+				.m_HasReloadSource = !texture->m_SourcePath.empty(),
+				.m_HasActiveInterest = HasActiveInterest(key),
+				.m_HasPublicationRetain = HasPublicationRetain(
+					key,
+					texture->m_ContentGeneration),
+				.m_HasPinnedDependentModel = HasPinnedDependentModel(
+					AssetInterestKind::Texture,
+					textureId.Value(),
+					texture->m_ContentGeneration),
+			};
+			return true;
+		}
+		return false;
+	}
+
+	AssetLifecycle* AssetManager::FindResidencyLifecycle(AssetKey key) noexcept
+	{
+		return const_cast<AssetLifecycle*>(
+			std::as_const(*this).FindResidencyLifecycle(key));
+	}
+
+	const AssetLifecycle* AssetManager::FindResidencyLifecycle(AssetKey key) const noexcept
+	{
+		if (key.m_Kind == AssetKind::Mesh)
+		{
+			return GetMesh(MeshID{ static_cast<uint32_t>(key.m_StableId) });
+		}
+		if (key.m_Kind == AssetKind::Texture)
+		{
+			return m_TextureRegistry->GetTexture(
+				TextureID{ static_cast<uint32_t>(key.m_StableId) });
+		}
+		return nullptr;
+	}
+
+	bool AssetManager::MatchesCurrentState(const AssetStateStamp& stamp) const noexcept
+	{
+		const AssetLifecycle* lifecycle = FindResidencyLifecycle(
+			stamp.m_ContentVersion.m_Key);
+		return lifecycle && stamp.m_ContentVersion.IsValid() &&
+			lifecycle->m_ContentGeneration == stamp.m_ContentVersion.m_ContentGeneration &&
+			lifecycle->m_ResidencyEpoch == stamp.m_ResidencyEpoch &&
+			lifecycle->m_ResidencyOperationSerial == stamp.m_ResidencyOperationSerial &&
+			lifecycle->m_LastUsedFrame == stamp.m_LastUsedFrame &&
+			lifecycle->m_State == stamp.m_State &&
+			lifecycle->m_ContentState == stamp.m_ContentState &&
+			lifecycle->m_ResidencyState == stamp.m_ResidencyState &&
+			lifecycle->m_ResidencyPolicy == stamp.m_ResidencyPolicy;
+	}
+
+	bool AssetManager::StillEligible(
+		const AssetResidencyAction& action,
+		uint64_t projectedResidentBytes) const noexcept
+	{
+		if (action.m_Operation != AssetResidencyOperationKind::Evict ||
+			!m_ResidencyConfig.m_EnableAutomaticEviction ||
+			projectedResidentBytes <= m_ResidencyConfig.m_LowWatermarkBytes)
+		{
+			return false;
+		}
+		AssetResidencyInventoryEntry currentEntry;
+		return BuildResidencyInventoryEntry(
+			action.m_ExpectedStamp.m_ContentVersion.m_Key,
+			currentEntry) &&
+			currentEntry.m_Stamp == action.m_ExpectedStamp &&
+			currentEntry.m_EstimatedBytes == action.m_EstimatedBytes &&
+			AssetResidencyController::IsEvictionCandidate(
+				currentEntry,
+				m_AssetUsageFrame,
+				m_ResidencyConfig);
+	}
+
 	void AssetManager::FinalizeResidencyEvictions() noexcept
 	{
 		for (auto iterator = m_PendingResidencyEvictions.begin();
@@ -1203,30 +1344,41 @@ namespace gglab
 				continue;
 			}
 
-			const AssetKey key = MakeAssetKey(
-				ToAssetKind(eviction.m_Kind),
-				eviction.m_StableId);
+			const AssetResidencyOperation operation = eviction.m_Operation;
+			const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
+			const AssetKey key = contentVersion.m_Key;
 			const bool protectedByInterest = HasActiveInterest(key) ||
-				HasPublicationRetain(key, eviction.m_Generation);
+				HasPublicationRetain(key, contentVersion.m_ContentGeneration);
 			bool finalized = false;
 			bool cancelled = protectedByInterest;
-			if (eviction.m_Kind == AssetInterestKind::Texture)
+			AssetLifecycle* lifecycle = FindResidencyLifecycle(key);
+			if (!lifecycle ||
+				!AssetResidencyController::IsCurrentOperation(*lifecycle, operation))
+			{
+				++m_ResidencyStaleCompletionCount;
+				cancelled = true;
+				finalized = true;
+			}
+			else if (key.m_Kind == AssetKind::Texture)
 			{
 				Texture* texture = m_TextureRegistry->GetTexture(
-					TextureID{ static_cast<uint32_t>(eviction.m_StableId) });
-				if (!texture || texture->m_ContentGeneration != eviction.m_Generation)
+					TextureID{ static_cast<uint32_t>(key.m_StableId) });
+				if (!texture ||
+					texture->m_ContentGeneration != contentVersion.m_ContentGeneration)
 				{
 					finalized = true;
 				}
 				else if (texture->m_State != AssetState::Evicting)
 				{
 					cancelled = texture->m_State == AssetState::Ready;
+					AssetResidencyController::CompleteResidencyOperation(*texture, operation);
 					finalized = true;
 				}
 				else if (protectedByInterest ||
 					texture->m_ResidencyPolicy == AssetResidencyPolicy::Pinned)
 				{
 					m_TextureRegistry->SetTextureState(*texture, AssetState::Ready);
+					AssetResidencyController::CompleteResidencyOperation(*texture, operation);
 					cancelled = true;
 					finalized = true;
 				}
@@ -1234,25 +1386,28 @@ namespace gglab
 				{
 					finalized = m_TextureRegistry->FinalizeTextureEviction(
 						texture->m_Id,
-						eviction.m_Generation);
+						operation);
 				}
 			}
-			else if (eviction.m_Kind == AssetInterestKind::Mesh)
+			else if (key.m_Kind == AssetKind::Mesh)
 			{
-				Mesh* mesh = EditMesh(MeshID{ static_cast<uint32_t>(eviction.m_StableId) });
-				if (!mesh || mesh->m_ContentGeneration != eviction.m_Generation)
+				Mesh* mesh = EditMesh(MeshID{ static_cast<uint32_t>(key.m_StableId) });
+				if (!mesh ||
+					mesh->m_ContentGeneration != contentVersion.m_ContentGeneration)
 				{
 					finalized = true;
 				}
 				else if (mesh->m_State != AssetState::Evicting)
 				{
 					cancelled = mesh->m_State == AssetState::Ready;
+					AssetResidencyController::CompleteResidencyOperation(*mesh, operation);
 					finalized = true;
 				}
 				else if (protectedByInterest ||
 					mesh->m_ResidencyPolicy == AssetResidencyPolicy::Pinned)
 				{
 					SetMeshState(*mesh, AssetState::Ready);
+					AssetResidencyController::CompleteResidencyOperation(*mesh, operation);
 					cancelled = true;
 					finalized = true;
 				}
@@ -1264,6 +1419,7 @@ namespace gglab
 					mesh->m_IndexBufferBinding = {};
 					mesh->m_IsUploaded = false;
 					SetMeshState(*mesh, AssetState::CpuReady);
+					AssetResidencyController::CompleteResidencyOperation(*mesh, operation);
 					ProgressReporter(mesh->m_LoadProgress).Report(
 						1.0f,
 						"Mesh GPU residency released",
@@ -1290,6 +1446,64 @@ namespace gglab
 		}
 	}
 
+	bool AssetManager::ApplyResidencyAction(
+		const AssetResidencyAction& action,
+		uint64_t projectedResidentBytes) noexcept
+	{
+		if (!MatchesCurrentState(action.m_ExpectedStamp) ||
+			!StillEligible(action, projectedResidentBytes))
+		{
+			++m_ResidencyRevalidationRejectionCount;
+			return false;
+		}
+
+		const AssetContentVersion contentVersion = action.m_ExpectedStamp.m_ContentVersion;
+		AssetLifecycle* lifecycle = FindResidencyLifecycle(contentVersion.m_Key);
+		if (!lifecycle)
+		{
+			++m_ResidencyRevalidationRejectionCount;
+			return false;
+		}
+		const AssetResidencyOperation operation =
+			m_AssetResidencyController.BeginResidencyOperation(
+				*lifecycle,
+				contentVersion,
+				action.m_Operation);
+		if (!operation.IsValid())
+		{
+			++m_ResidencyRevalidationRejectionCount;
+			return false;
+		}
+		++m_ResidencyOperationCount;
+
+		if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
+		{
+			Texture* texture = m_TextureRegistry->GetTexture(
+				TextureID{ static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+			GGLAB_ASSERT_NOT_NULL(texture);
+			m_TextureRegistry->SetTextureState(*texture, AssetState::Evicting);
+		}
+		else if (contentVersion.m_Key.m_Kind == AssetKind::Mesh)
+		{
+			Mesh* mesh = EditMesh(MeshID{
+				static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+			GGLAB_ASSERT_NOT_NULL(mesh);
+			SetMeshState(*mesh, AssetState::Evicting);
+		}
+		else
+		{
+			AssetResidencyController::CompleteResidencyOperation(*lifecycle, operation);
+			return false;
+		}
+
+		m_PendingResidencyEvictions.push_back({
+			.m_Operation = operation,
+			.m_ResidentBytes = action.m_EstimatedBytes,
+			.m_QuiescedFrame = m_AssetUsageFrame,
+		});
+		return true;
+	}
+
 	void AssetManager::ApplyResidencyPlan(AssetResidencyPlan&& plan) noexcept
 	{
 		if (plan.m_Consumed || plan.m_SnapshotFrame != m_AssetUsageFrame)
@@ -1297,6 +1511,7 @@ namespace gglab
 			return;
 		}
 		plan.m_Consumed = true;
+		uint64_t projectedResidentBytes = plan.m_LogicalResidentBytes;
 		for (AssetResidencyAction& action : plan.m_Actions)
 		{
 			if (std::exchange(action.m_Attempted, true) ||
@@ -1304,42 +1519,12 @@ namespace gglab
 			{
 				continue;
 			}
-			const AssetContentVersion contentVersion = action.m_ExpectedStamp.m_ContentVersion;
-			if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
+			if (ApplyResidencyAction(action, projectedResidentBytes))
 			{
-				Texture* texture = m_TextureRegistry->GetTexture(
-					TextureID{ static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
-				if (!texture ||
-					texture->m_ContentGeneration != contentVersion.m_ContentGeneration ||
-					texture->m_State != AssetState::Ready)
-				{
-					continue;
-				}
-				m_TextureRegistry->SetTextureState(*texture, AssetState::Evicting);
+				projectedResidentBytes =
+					projectedResidentBytes > action.m_EstimatedBytes ?
+						projectedResidentBytes - action.m_EstimatedBytes : 0;
 			}
-			else if (contentVersion.m_Key.m_Kind == AssetKind::Mesh)
-			{
-				Mesh* mesh = EditMesh(MeshID{
-					static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
-				if (!mesh || mesh->m_ContentGeneration != contentVersion.m_ContentGeneration ||
-					mesh->m_State != AssetState::Ready)
-				{
-					continue;
-				}
-				SetMeshState(*mesh, AssetState::Evicting);
-			}
-			else
-			{
-				continue;
-			}
-			m_PendingResidencyEvictions.push_back({
-				.m_Kind = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
-					AssetInterestKind::Texture : AssetInterestKind::Mesh,
-				.m_StableId = contentVersion.m_Key.m_StableId,
-				.m_Generation = contentVersion.m_ContentGeneration,
-				.m_ResidentBytes = action.m_EstimatedBytes,
-				.m_QuiescedFrame = m_AssetUsageFrame,
-			});
 		}
 	}
 
@@ -1374,13 +1559,47 @@ namespace gglab
 		}
 		++m_ResidencyReloadRequestCount;
 		++m_CurrentFrameReloadRequestCount;
+		const AssetContentVersion contentVersion = MakeAssetContentVersion(
+			textureId,
+			generation);
+		if (texture->m_State == AssetState::Evicting)
+		{
+			const AssetResidencyOperation operation =
+				m_AssetResidencyController.BeginResidencyOperation(
+					*texture,
+					contentVersion,
+					AssetResidencyOperationKind::Reload);
+			++m_ResidencyOperationCount;
+			m_TextureRegistry->SetTextureState(*texture, AssetState::Ready);
+			AssetResidencyController::CompleteResidencyOperation(*texture, operation);
+			return {};
+		}
+		AssetResidencyOperation operation;
 		if (texture->m_IsReloading)
 		{
 			++m_ResidencyReloadCoalescedCount;
+			operation = {
+				.m_Token = MakeAssetOperationToken(
+					contentVersion,
+					texture->m_ResidencyOperationSerial),
+				.m_Kind = AssetResidencyOperationKind::Reload,
+			};
+		}
+		else
+		{
+			operation = m_AssetResidencyController.BeginResidencyOperation(
+				*texture,
+				contentVersion,
+				AssetResidencyOperationKind::Reload);
+			if (!operation.IsValid())
+			{
+				return {};
+			}
+			++m_ResidencyOperationCount;
 		}
 		return m_TextureRegistry->RequestTextureResidency(
 			textureId,
-			generation,
+			operation,
 			priority);
 	}
 
@@ -1398,7 +1617,14 @@ namespace gglab
 		{
 			++m_ResidencyReloadRequestCount;
 			++m_CurrentFrameReloadRequestCount;
+			const AssetResidencyOperation operation =
+				m_AssetResidencyController.BeginResidencyOperation(
+					*mesh,
+					MakeAssetContentVersion(meshId, generation),
+					AssetResidencyOperationKind::Reload);
+			++m_ResidencyOperationCount;
 			SetMeshState(*mesh, AssetState::Ready);
+			AssetResidencyController::CompleteResidencyOperation(*mesh, operation);
 			return;
 		}
 		if (mesh->m_State != AssetState::CpuReady || mesh->m_ResidencyEpoch == 0 ||
@@ -1422,6 +1648,17 @@ namespace gglab
 		}
 		mesh->m_CancelRequested = false;
 		mesh->m_IsReloading = true;
+		const AssetResidencyOperation operation =
+			m_AssetResidencyController.BeginResidencyOperation(
+				*mesh,
+				MakeAssetContentVersion(meshId, generation),
+				AssetResidencyOperationKind::Reload);
+		if (!operation.IsValid())
+		{
+			mesh->m_IsReloading = false;
+			return;
+		}
+		++m_ResidencyOperationCount;
 		if (m_AssetLoadCoordinator.HasMeshReload(MakeAssetContentVersion(
 			mesh->m_SourceModelId,
 			sourceModel->m_ContentGeneration)))
@@ -1453,11 +1690,18 @@ namespace gglab
 		});
 		if (!submission.IsValid())
 		{
-			for (const auto& mesh : m_MeshStore.Entries() | std::views::values)
+			for (const auto& [meshId, mesh] : m_MeshStore.Entries())
 			{
 				if (mesh->m_SourceModelId == sourceModelId)
 				{
+					const AssetResidencyOperation operation{
+						.m_Token = MakeAssetOperationToken(
+							MakeAssetContentVersion(meshId, mesh->m_ContentGeneration),
+							mesh->m_ResidencyOperationSerial),
+						.m_Kind = AssetResidencyOperationKind::Reload,
+					};
 					mesh->m_IsReloading = false;
+					AssetResidencyController::CompleteResidencyOperation(*mesh, operation);
 				}
 			}
 			return;
@@ -2032,11 +2276,19 @@ namespace gglab
 
 	bool AssetManager::QueueMeshUpload(
 		MeshUploadData&& uploadData,
-		TaskPriority priority) noexcept
+		TaskPriority priority,
+		AssetResidencyOperation residencyOperation) noexcept
 	{
 		Mesh* mesh = EditMesh(uploadData.m_MeshId);
 		if (!mesh || uploadData.m_VerticesData.empty() || uploadData.m_IndicesData.empty())
 		{
+			return false;
+		}
+		if (residencyOperation.IsValid() &&
+			(residencyOperation.m_Kind != AssetResidencyOperationKind::Reload ||
+				!AssetResidencyController::IsCurrentOperation(*mesh, residencyOperation)))
+		{
+			++m_ResidencyStaleCompletionCount;
 			return false;
 		}
 
@@ -2064,11 +2316,20 @@ namespace gglab
 				.m_Priority = priority,
 				.m_Progress = mesh->m_LoadProgress,
 			},
-			[this, meshId, generation, estimate, priority, payload]() mutable noexcept
+			[this, meshId, generation, estimate, priority, residencyOperation,
+				payload]() mutable noexcept
 			{
 				Mesh* currentMesh = EditMesh(meshId);
 				if (!currentMesh || currentMesh->m_ContentGeneration != generation)
 				{
+					return;
+				}
+				if (residencyOperation.IsValid() &&
+					!AssetResidencyController::IsCurrentOperation(
+						*currentMesh,
+						residencyOperation))
+				{
+					++m_ResidencyStaleCompletionCount;
 					return;
 				}
 				if (currentMesh->m_CancelRequested)
@@ -2093,7 +2354,8 @@ namespace gglab
 					{
 						return UploadMesh(*payload, batch);
 					},
-					[this, meshId, generation](const AssetUploadCompletionInfo& completion) noexcept
+					[this, meshId, generation, residencyOperation](
+						const AssetUploadCompletionInfo& completion) noexcept
 					{
 						const Mesh* currentMesh = GetMesh(meshId);
 						if (!currentMesh || currentMesh->m_ContentGeneration != generation)
@@ -2102,17 +2364,27 @@ namespace gglab
 						}
 						CompleteMeshUpload(
 							meshId,
-							completion.m_Status == AssetUploadStatus::Succeeded);
+							completion.m_Status == AssetUploadStatus::Succeeded,
+							residencyOperation);
 					}));
 			});
 		return true;
 	}
 
-	void AssetManager::CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept
+	void AssetManager::CompleteMeshUpload(
+		MeshID meshId,
+		bool succeeded,
+		AssetResidencyOperation residencyOperation) noexcept
 	{
 		auto* mesh = EditMesh(meshId);
 		if (!mesh)
 		{
+			return;
+		}
+		if (residencyOperation.IsValid() &&
+			!AssetResidencyController::IsCurrentOperation(*mesh, residencyOperation))
+		{
+			++m_ResidencyStaleCompletionCount;
 			return;
 		}
 		const bool residencyReload = mesh->m_IsReloading;
@@ -2135,6 +2407,9 @@ namespace gglab
 		if (residencyReload)
 		{
 			mesh->m_CancelRequested = false;
+			AssetResidencyController::CompleteResidencyOperation(
+				*mesh,
+				residencyOperation);
 		}
 		if (!publishSucceeded)
 		{
@@ -2343,11 +2618,27 @@ namespace gglab
 			{
 				continue;
 			}
+			const AssetResidencyOperation residencyOperation{
+				.m_Token = MakeAssetOperationToken(
+					MakeAssetContentVersion(meshId, mesh->m_ContentGeneration),
+					mesh->m_ResidencyOperationSerial),
+				.m_Kind = AssetResidencyOperationKind::Reload,
+			};
+			if (!AssetResidencyController::IsCurrentOperation(
+				*mesh,
+				residencyOperation))
+			{
+				++m_ResidencyStaleCompletionCount;
+				continue;
+			}
 			if (completion.m_Status != TaskStatus::Succeeded ||
 				mesh->m_SourceMeshIndex >= importedModel.m_Meshes.size())
 			{
 				mesh->m_IsReloading = false;
 				SetMeshState(*mesh, AssetState::CpuReady);
+				AssetResidencyController::CompleteResidencyOperation(
+					*mesh,
+					residencyOperation);
 				continue;
 			}
 			ImportedMesh& importedMesh = importedModel.m_Meshes[mesh->m_SourceMeshIndex];
@@ -2358,10 +2649,14 @@ namespace gglab
 			};
 			if (!QueueMeshUpload(
 				std::move(uploadData),
-				GetEffectivePriority(MakeAssetKey(meshId), completion.m_Priority)))
+				GetEffectivePriority(MakeAssetKey(meshId), completion.m_Priority),
+				residencyOperation))
 			{
 				mesh->m_IsReloading = false;
 				SetMeshState(*mesh, AssetState::CpuReady);
+				AssetResidencyController::CompleteResidencyOperation(
+					*mesh,
+					residencyOperation);
 			}
 		}
 	}

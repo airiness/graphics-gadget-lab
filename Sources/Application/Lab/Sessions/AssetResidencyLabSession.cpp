@@ -62,6 +62,8 @@ namespace gglab
 		uint64_t m_EvictionCountBaseline = 0;
 		uint64_t m_EvictionCancellationCountBaseline = 0;
 		uint64_t m_ReloadRequestCountBaseline = 0;
+		uint64_t m_OperationCountBaseline = 0;
+		uint64_t m_StaleCompletionCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
@@ -257,6 +259,8 @@ namespace gglab
 			m_State->m_EvictionCancellationCountBaseline =
 				residency.m_EvictionCancellationCount;
 			m_State->m_ReloadRequestCountBaseline = residency.m_ReloadRequestCount;
+			m_State->m_OperationCountBaseline = residency.m_OperationCount;
+			m_State->m_StaleCompletionCountBaseline = residency.m_StaleCompletionCount;
 			m_State->m_Phase = State::Phase::MarkUsage;
 			break;
 		}
@@ -432,6 +436,9 @@ namespace gglab
 			if (residency.m_EvictionCancellationCount <
 				m_State->m_EvictionCancellationCountBaseline + 2 ||
 				residency.m_EvictionCount != m_State->m_EvictionCountBaseline ||
+				residency.m_OperationCount < m_State->m_OperationCountBaseline + 4 ||
+				residency.m_StaleCompletionCount <
+					m_State->m_StaleCompletionCountBaseline + 2 ||
 				mesh->m_ResidencyState != AssetResidencyState::Resident ||
 				texture->m_ResidencyState != AssetResidencyState::Resident ||
 				!mesh->m_IsUploaded || !texture->m_IsUploaded)
@@ -537,6 +544,8 @@ namespace gglab
 				texture->m_ContentGeneration != m_State->m_TextureGeneration ||
 				mesh->m_ResidencyEpoch <= m_State->m_MeshResidencyEpoch ||
 				texture->m_ResidencyEpoch <= m_State->m_TextureResidencyEpoch ||
+				mesh->m_ResidencyOperationSerial != 0 ||
+				texture->m_ResidencyOperationSerial != 0 ||
 				!mesh->m_IsUploaded || !texture->m_IsUploaded ||
 				reloaded.m_ReloadRequestCount <= m_State->m_ReloadRequestCountBaseline ||
 				reloaded.m_ReloadingAssetCount != 0)

@@ -85,6 +85,7 @@ namespace gglab
 	{
 		uint64_t m_ContentGeneration = 0;
 		uint64_t m_ResidencyEpoch = 0;
+		uint64_t m_ResidencyOperationSerial = 0;
 		uint64_t m_LastUsedFrame = 0;
 		uint64_t m_UseCount = 0;
 		AssetState m_State = AssetState::Unloaded;

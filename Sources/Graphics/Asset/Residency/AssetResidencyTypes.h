@@ -31,6 +31,7 @@ namespace gglab
 	{
 		AssetContentVersion m_ContentVersion{};
 		uint64_t m_ResidencyEpoch = 0;
+		uint64_t m_ResidencyOperationSerial = 0;
 		uint64_t m_LastUsedFrame = 0;
 		AssetState m_State = AssetState::Unloaded;
 		AssetContentState m_ContentState = AssetContentState::Unloaded;
@@ -38,6 +39,21 @@ namespace gglab
 		AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
 
 		friend bool operator==(const AssetStateStamp&, const AssetStateStamp&) = default;
+	};
+
+	struct AssetResidencyOperation
+	{
+		AssetOperationToken m_Token{};
+		AssetResidencyOperationKind m_Kind = AssetResidencyOperationKind::Evict;
+
+		[[nodiscard]] constexpr bool IsValid() const noexcept
+		{
+			return m_Token.IsValid();
+		}
+
+		friend bool operator==(
+			const AssetResidencyOperation&,
+			const AssetResidencyOperation&) = default;
 	};
 
 	struct AssetResidencyInventoryEntry
@@ -106,5 +122,8 @@ namespace gglab
 		uint64_t m_LastPlanFrame = 0;
 		uint32_t m_LastPlannedActionCount = 0;
 		uint64_t m_LastPlannedBytes = 0;
+		uint64_t m_OperationCount = 0;
+		uint64_t m_RevalidationRejectionCount = 0;
+		uint64_t m_StaleCompletionCount = 0;
 	};
 }

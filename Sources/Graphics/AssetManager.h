@@ -167,8 +167,12 @@ namespace gglab
 			TransferBatch& transferBatch) noexcept;
 		bool QueueMeshUpload(
 			MeshUploadData&& uploadData,
-			TaskPriority priority = TaskPriority::Normal) noexcept;
-		void CompleteMeshUpload(MeshID meshId, bool succeeded) noexcept;
+			TaskPriority priority = TaskPriority::Normal,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
+		void CompleteMeshUpload(
+			MeshID meshId,
+			bool succeeded,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool RemoveMesh(MeshID meshId) noexcept;
 		bool RemoveMaterial(MaterialID materialId) noexcept;
 		void RollbackPublicationMesh(MeshID meshId, uint64_t generation) noexcept;
@@ -209,9 +213,7 @@ namespace gglab
 
 		struct PendingResidencyEviction
 		{
-			AssetInterestKind m_Kind = AssetInterestKind::Texture;
-			uint64_t m_StableId = 0;
-			uint64_t m_Generation = 0;
+			AssetResidencyOperation m_Operation{};
 			uint64_t m_ResidentBytes = 0;
 			uint64_t m_QuiescedFrame = 0;
 		};
@@ -258,6 +260,18 @@ namespace gglab
 		void FinalizeResidencyEvictions() noexcept;
 		[[nodiscard]] AssetResidencyInventorySnapshot
 			BuildResidencyInventorySnapshot() const noexcept;
+		[[nodiscard]] bool BuildResidencyInventoryEntry(
+			AssetKey key,
+			AssetResidencyInventoryEntry& entry) const noexcept;
+		[[nodiscard]] AssetLifecycle* FindResidencyLifecycle(AssetKey key) noexcept;
+		[[nodiscard]] const AssetLifecycle* FindResidencyLifecycle(AssetKey key) const noexcept;
+		[[nodiscard]] bool MatchesCurrentState(const AssetStateStamp& stamp) const noexcept;
+		[[nodiscard]] bool StillEligible(
+			const AssetResidencyAction& action,
+			uint64_t projectedResidentBytes) const noexcept;
+		[[nodiscard]] bool ApplyResidencyAction(
+			const AssetResidencyAction& action,
+			uint64_t projectedResidentBytes) noexcept;
 		void ApplyResidencyPlan(AssetResidencyPlan&& plan) noexcept;
 		void RequestModelResidency(ModelID modelId, uint64_t generation) noexcept;
 		[[nodiscard]] TaskHandle RequestTextureResidency(
@@ -342,6 +356,9 @@ namespace gglab
 		uint64_t m_LastResidencyPlanFrame = 0;
 		uint32_t m_LastPlannedResidencyActionCount = 0;
 		uint64_t m_LastPlannedResidencyBytes = 0;
+		uint64_t m_ResidencyOperationCount = 0;
+		uint64_t m_ResidencyRevalidationRejectionCount = 0;
+		uint64_t m_ResidencyStaleCompletionCount = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;
 	};

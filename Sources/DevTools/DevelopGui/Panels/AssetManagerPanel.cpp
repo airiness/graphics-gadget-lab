@@ -795,6 +795,11 @@ namespace gglab
 			static_cast<double>(snapshot->m_LastPlannedResidencyBytes) /
 				(1024.0 * 1024.0));
 		ImGui::Text(
+			"Operations: %llu | Revalidation rejects: %llu | Stale completions: %llu",
+			snapshot->m_ResidencyOperationCount,
+			snapshot->m_ResidencyRevalidationRejectionCount,
+			snapshot->m_ResidencyStaleCompletionCount);
+		ImGui::Text(
 			"Dependency graph: %u models | %u resources | %u edges | Builds: %llu | Events: %llu",
 			snapshot->m_TrackedModelDependencyCount,
 			snapshot->m_ReverseDependencyCount,
