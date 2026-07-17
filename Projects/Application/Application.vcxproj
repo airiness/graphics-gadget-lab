@@ -248,6 +248,8 @@
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp" />
@@ -616,6 +618,8 @@
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h" />
