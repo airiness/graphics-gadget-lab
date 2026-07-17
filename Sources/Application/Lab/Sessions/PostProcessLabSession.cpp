@@ -128,6 +128,7 @@ namespace gglab
 
 	void PostProcessLabSession::BeginPrepare() noexcept
 	{
+		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		BuildScene();
 		m_AssetPreparation.TrackModel(ProceduralCubeModelID, "ProceduralCube", 0.35f);
@@ -157,6 +158,7 @@ namespace gglab
 
 	void PostProcessLabSession::CancelPrepare() noexcept
 	{
+		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		m_World.GetRegistry().clear();
 		m_LoadingProgress = LoadingProgress::Ready();

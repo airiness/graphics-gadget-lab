@@ -225,6 +225,7 @@ namespace gglab
 		}
 		catch (const std::exception& exception)
 		{
+			GGLAB_UNUSED(exception);
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Asset upload recording '{}' threw an exception: {}",
 				upload.m_Desc.m_Name,
@@ -567,6 +568,7 @@ namespace gglab
 		}
 		catch (const std::exception& exception)
 		{
+			GGLAB_UNUSED(exception);
 			++telemetry.m_CallbackFailureCount;
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Asset {} work '{}' threw an exception: {}",

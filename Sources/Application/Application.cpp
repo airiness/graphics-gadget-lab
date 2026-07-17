@@ -534,6 +534,7 @@ namespace gglab
 			addGraphicsShader(L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassFinalColor.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassBloom.hlsl");
+			addGraphicsShader(L"Assets/Shaders/Passes/PassPostProcessPreview.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassDebugDraw.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassSkybox.hlsl");
 			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLEnvironment.hlsl");
