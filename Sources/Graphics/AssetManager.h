@@ -4,6 +4,9 @@
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Graphics/Asset/Store/MaterialStore.h"
+#include "Graphics/Asset/Store/MeshStore.h"
+#include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
@@ -119,23 +122,6 @@ namespace gglab
 			std::vector<uint32_t> m_IndicesData;
 		};
 
-	private:
-		struct MeshContainer
-		{
-			std::unordered_map<MeshID, std::unique_ptr<Mesh>> m_MeshIDMap;
-		};
-
-		struct MaterialContainer
-		{
-			std::unordered_map<MaterialID, std::unique_ptr<Material>> m_MaterialIDMap;
-		};
-
-		struct ModelContainer
-		{
-			std::unordered_map<std::filesystem::path, ModelID> m_PathIDMap;
-			std::unordered_map<ModelID, std::unique_ptr<Model>> m_ModelIDMap;
-		};
-
 	public:
 		explicit AssetManager(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
@@ -179,18 +165,17 @@ namespace gglab
 		Texture* GetTexture(TextureID textureId) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
 
-		Mesh* GetMesh(MeshID meshId) noexcept;
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
 
-		Material* GetMaterial(MaterialID materialId) noexcept;
 		const Material* GetMaterial(MaterialID materialId) const noexcept;
 
-		Model* GetModel(ModelID modelId) noexcept;
 		const Model* GetModel(ModelID modelId) const noexcept;
 
-		MeshID AddMesh(std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
-		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
-		ModelID AddModel(std::unique_ptr<Model>&& model) noexcept;
+		MeshID AddProceduralMesh(
+			std::unique_ptr<Mesh>&& mesh,
+			MeshUploadData& meshUploadData) noexcept;
+		MaterialID AddProceduralMaterial(std::unique_ptr<Material>&& material) noexcept;
+		ModelID AddProceduralModel(std::unique_ptr<Model>&& model) noexcept;
 
 		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
 		MaterialTextureBindingGPU ResolveTextureBinding(const MaterialTextureBinding& binding,
@@ -198,6 +183,9 @@ namespace gglab
 			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
+		[[nodiscard]] Mesh* EditMesh(MeshID meshId) noexcept;
+		[[nodiscard]] Model* EditModel(ModelID modelId) noexcept;
+		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
 			TransferBatch& transferBatch) noexcept;
@@ -228,7 +216,6 @@ namespace gglab
 			ImportedModel&& importedModel) noexcept;
 
 		MeshID CreateMesh() noexcept;
-		MaterialID CreateMaterial() noexcept;
 		ModelID CreateModel(
 			const std::filesystem::path& canonicalPath,
 			AssetState initialState = AssetState::LoadingCpu) noexcept;
@@ -345,13 +332,9 @@ namespace gglab
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
-		MeshIDCounter m_MeshIdCounter{ ReservedMeshCount };
-		MaterialIDCounter m_MaterialIdCounter{ ReservedMaterialCount };
-		ModelIDCounter m_ModelIdCounter{ ReservedModelCount };
-
-		MeshContainer m_MeshContainer;
-		MaterialContainer m_MaterialContainer;
-		ModelContainer m_ModelContainer;
+		MeshStore m_MeshStore;
+		MaterialStore m_MaterialStore;
+		ModelStore m_ModelStore;
 		std::unordered_set<ModelID> m_PendingModels;
 		AssetLoadCoordinator m_AssetLoadCoordinator;
 		AssetInterestTracker m_AssetInterestTracker;

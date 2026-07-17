@@ -89,8 +89,9 @@ namespace gglab
 				snapshot.m_EvictionCandidateCount += evictionCandidate ? 1u : 0u;
 			};
 
-		snapshot.m_Models.reserve(assetManager.m_ModelContainer.m_ModelIDMap.size());
-		for (const auto& [modelId, model] : assetManager.m_ModelContainer.m_ModelIDMap)
+		const ModelStore::EntryMap& models = assetManager.m_ModelStore.Entries();
+		snapshot.m_Models.reserve(models.size());
+		for (const auto& [modelId, model] : models)
 		{
 			AssetSnapshot::Model modelSnapshot{};
 			modelSnapshot.m_Id = modelId;
@@ -141,8 +142,9 @@ namespace gglab
 				return lhs.m_Id.Value() < rhs.m_Id.Value();
 			});
 
-		snapshot.m_Meshes.reserve(assetManager.m_MeshContainer.m_MeshIDMap.size());
-		for (const auto& [meshId, mesh] : assetManager.m_MeshContainer.m_MeshIDMap)
+		const MeshStore::EntryMap& meshes = assetManager.m_MeshStore.Entries();
+		snapshot.m_Meshes.reserve(meshes.size());
+		for (const auto& [meshId, mesh] : meshes)
 		{
 			snapshot.m_Meshes.push_back({
 				.m_Id = meshId,
