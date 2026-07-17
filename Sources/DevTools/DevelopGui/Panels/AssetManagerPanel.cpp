@@ -788,6 +788,13 @@ namespace gglab
 			snapshot->m_LastFrameReloadRequestCount,
 			snapshot->m_ReloadRequestHighWatermark);
 		ImGui::Text(
+			"Planning: %llu frames | Last plan: frame %llu, %u actions / %.2f MiB",
+			snapshot->m_ResidencyPlanningCount,
+			snapshot->m_LastResidencyPlanFrame,
+			snapshot->m_LastPlannedResidencyActionCount,
+			static_cast<double>(snapshot->m_LastPlannedResidencyBytes) /
+				(1024.0 * 1024.0));
+		ImGui::Text(
 			"Dependency graph: %u models | %u resources | %u edges | Builds: %llu | Events: %llu",
 			snapshot->m_TrackedModelDependencyCount,
 			snapshot->m_ReverseDependencyCount,

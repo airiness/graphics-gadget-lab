@@ -4,6 +4,7 @@
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -46,31 +47,6 @@ namespace gglab
 		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		std::vector<AssetInterestActivity> m_ActiveInterests;
-	};
-
-	struct AssetResidencyConfig
-	{
-		bool m_EnableAutomaticEviction = false;
-		uint64_t m_HighWatermarkBytes = 512ull * 1024ull * 1024ull;
-		uint64_t m_LowWatermarkBytes = 384ull * 1024ull * 1024ull;
-		uint64_t m_MinUnusedFrames = 120;
-		uint32_t m_MaxEvictionsPerFrame = 8;
-	};
-
-	struct AssetResidencyStatistics
-	{
-		AssetResidencyConfig m_Config{};
-		uint64_t m_LogicalResidentBytes = 0;
-		uint64_t m_PendingEvictionBytes = 0;
-		uint32_t m_PendingEvictionCount = 0;
-		uint32_t m_ReloadingAssetCount = 0;
-		uint64_t m_EvictionCount = 0;
-		uint64_t m_EvictedBytes = 0;
-		uint64_t m_EvictionCancellationCount = 0;
-		uint64_t m_ReloadRequestCount = 0;
-		uint64_t m_ReloadCoalescedCount = 0;
-		uint32_t m_LastFrameReloadRequestCount = 0;
-		uint32_t m_ReloadRequestHighWatermark = 0;
 	};
 
 	class RHIDevice;
@@ -280,7 +256,9 @@ namespace gglab
 			uint64_t generation) const noexcept;
 		void MarkAssetUsed(AssetLifecycle& lifecycle) noexcept;
 		void FinalizeResidencyEvictions() noexcept;
-		void SelectResidencyEvictions() noexcept;
+		[[nodiscard]] AssetResidencyInventorySnapshot
+			BuildResidencyInventorySnapshot() const noexcept;
+		void ApplyResidencyPlan(AssetResidencyPlan&& plan) noexcept;
 		void RequestModelResidency(ModelID modelId, uint64_t generation) noexcept;
 		[[nodiscard]] TaskHandle RequestTextureResidency(
 			TextureID textureId,
@@ -293,7 +271,6 @@ namespace gglab
 		void QueueMeshResidencyReload(
 			ModelID sourceModelId,
 			TaskPriority priority) noexcept;
-		[[nodiscard]] uint64_t ComputeLogicalResidentBytes() const noexcept;
 		[[nodiscard]] static bool SetResidencyPolicy(
 			AssetLifecycle& lifecycle,
 			AssetResidencyPolicy policy,
@@ -338,6 +315,7 @@ namespace gglab
 		std::unordered_set<ModelID> m_PendingModels;
 		AssetLoadCoordinator m_AssetLoadCoordinator;
 		AssetInterestTracker m_AssetInterestTracker;
+		AssetResidencyController m_AssetResidencyController;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
 		AssetDependencyGraph m_AssetDependencyGraph;
@@ -360,6 +338,10 @@ namespace gglab
 		uint32_t m_CurrentFrameReloadRequestCount = 0;
 		uint32_t m_LastFrameReloadRequestCount = 0;
 		uint32_t m_ReloadRequestHighWatermark = 0;
+		uint64_t m_ResidencyPlanningCount = 0;
+		uint64_t m_LastResidencyPlanFrame = 0;
+		uint32_t m_LastPlannedResidencyActionCount = 0;
+		uint64_t m_LastPlannedResidencyBytes = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;
 	};

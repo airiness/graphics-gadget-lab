@@ -115,6 +115,9 @@
 	<Filter Include="Graphics\Asset\Loading">
 	  <UniqueIdentifier>{9279a072-7987-4b95-9753-bf15ad95218c}</UniqueIdentifier>
 	</Filter>
+	<Filter Include="Graphics\Asset\Residency">
+	  <UniqueIdentifier>{ef61c6c1-1eaa-4e42-b68e-5c7701284279}</UniqueIdentifier>
+	</Filter>
 	<Filter Include="Graphics\Asset\Store">
 	  <UniqueIdentifier>{c392b54c-9a75-4c0b-a38a-6fc426eb7e46}</UniqueIdentifier>
 	</Filter>
@@ -473,6 +476,9 @@
 	</ClCompile>
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
 	  <Filter>Graphics\Asset\Loading</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.cpp">
+	  <Filter>Graphics\Asset\Residency</Filter>
 	</ClCompile>
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.cpp">
 	  <Filter>Graphics\Asset\Store</Filter>
@@ -1081,6 +1087,12 @@
 	</ClInclude>
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h">
 	  <Filter>Graphics\Asset\Loading</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.h">
+	  <Filter>Graphics\Asset\Residency</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyTypes.h">
+	  <Filter>Graphics\Asset\Residency</Filter>
 	</ClInclude>
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.h">
 	  <Filter>Graphics\Asset\Store</Filter>

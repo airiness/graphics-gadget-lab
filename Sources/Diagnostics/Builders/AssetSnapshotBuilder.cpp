@@ -56,6 +56,11 @@ namespace gglab
 			residency.m_LastFrameReloadRequestCount;
 		snapshot.m_ReloadRequestHighWatermark =
 			residency.m_ReloadRequestHighWatermark;
+		snapshot.m_ResidencyPlanningCount = residency.m_PlanningCount;
+		snapshot.m_LastResidencyPlanFrame = residency.m_LastPlanFrame;
+		snapshot.m_LastPlannedResidencyActionCount =
+			residency.m_LastPlannedActionCount;
+		snapshot.m_LastPlannedResidencyBytes = residency.m_LastPlannedBytes;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetInterestKind kind,
