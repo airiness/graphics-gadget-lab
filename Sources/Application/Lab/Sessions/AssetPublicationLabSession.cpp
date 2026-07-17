@@ -879,7 +879,7 @@ namespace gglab
 							ownership.m_ActiveInterests,
 							[id](const AssetInterestActivity& activity) noexcept
 							{
-								return activity.m_Kind == AssetInterestKind::Texture &&
+								return activity.m_Kind == AssetKind::Texture &&
 									activity.m_StableId == id.Value();
 							});
 						return interest != ownership.m_ActiveInterests.end() ?
@@ -1151,7 +1151,7 @@ namespace gglab
 					ownership.m_ActiveInterests,
 					[this](const AssetInterestActivity& interest) noexcept
 					{
-						return interest.m_Kind == AssetInterestKind::Texture &&
+						return interest.m_Kind == AssetKind::Texture &&
 							interest.m_StableId == m_Suite->m_TextureIdentity.m_StableId &&
 							interest.m_Generation == m_Suite->m_TextureIdentity.m_Generation &&
 							interest.m_OwnerCount >= 1;

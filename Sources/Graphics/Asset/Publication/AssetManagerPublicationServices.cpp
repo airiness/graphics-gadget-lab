@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/TextureRegistry.h"
 
 namespace gglab
 {
@@ -107,7 +108,7 @@ namespace gglab
 			result.m_TextureId = textureId;
 			const uint64_t textureGeneration = texture->m_ContentGeneration;
 			AssetPublicationRetain retain = m_AssetManager->AcquirePublicationRetain(
-				AssetInterestKind::Texture,
+				AssetKind::Texture,
 				textureId.Value(),
 				textureGeneration);
 			result.m_Claim = {
@@ -233,7 +234,7 @@ namespace gglab
 			mesh->m_SourceMeshIndex = sourceMeshIndex;
 			m_AssetManager->SetMeshState(*mesh, AssetState::Publishing);
 			AssetPublicationRetain retain = m_AssetManager->AcquirePublicationRetain(
-				AssetInterestKind::Mesh,
+				AssetKind::Mesh,
 				meshId.Value(),
 				mesh->m_ContentGeneration);
 			result.m_Claim = {
@@ -285,16 +286,15 @@ namespace gglab
 			const AssetContentVersion& dependency,
 			TaskPriority priority) noexcept override
 		{
-			const std::optional<AssetInterestKind> kind = ToInterestKind(
-				dependency.m_Key.m_Kind);
-			if (!ownerToken.IsValid() || !dependency.IsValid() || !kind)
+			const std::optional<AssetKey> interestKey = ToInterestKey(dependency.m_Key);
+			if (!ownerToken.IsValid() || !dependency.IsValid() || !interestKey)
 			{
 				return {};
 			}
 
 			AssetLease lease = m_AssetManager->AcquireAssetLease(
 				AssetOwnerId{ ownerToken.m_Value },
-				*kind,
+				interestKey->m_Kind,
 				dependency.m_Key.m_StableId,
 				dependency.m_ContentGeneration,
 				priority,
@@ -502,21 +502,6 @@ namespace gglab
 			const ModelPublicationRetainToken token{ m_NextRetainToken++ };
 			m_Retains.emplace(token.m_Value, std::move(retain));
 			return token;
-		}
-
-		[[nodiscard]] static std::optional<AssetInterestKind> ToInterestKind(
-			AssetKind kind) noexcept
-		{
-			switch (kind)
-			{
-			case AssetKind::Model: return AssetInterestKind::Model;
-			case AssetKind::Texture: return AssetInterestKind::Texture;
-			case AssetKind::Mesh: return AssetInterestKind::Mesh;
-			case AssetKind::Unknown:
-			case AssetKind::Material:
-				return std::nullopt;
-			}
-			return std::nullopt;
 		}
 
 		[[nodiscard]] static std::optional<AssetKey> ToInterestKey(
