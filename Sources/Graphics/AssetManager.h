@@ -1,6 +1,7 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
+#include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
+#include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/VertexData.h"
@@ -150,6 +151,7 @@ namespace gglab
 		[[nodiscard]] AssetOwnerScope CreateOwnerScope(std::string label) noexcept;
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void DrainLoadCompletions() noexcept;
+		void DrainStateEvents() noexcept;
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
 		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
 		{
@@ -242,48 +244,6 @@ namespace gglab
 		void ReleaseModelDependencyInterests(ModelID modelId) noexcept;
 		void UpdateModelDependencyPriorities(ModelID modelId, TaskPriority priority) noexcept;
 
-		enum class ModelDependencyOutcome : uint8_t
-		{
-			Pending,
-			Ready,
-			Failed,
-			Cancelled,
-		};
-
-		struct DependencyKey
-		{
-			AssetInterestKind m_Kind = AssetInterestKind::Mesh;
-			uint64_t m_StableId = 0;
-			uint64_t m_ContentGeneration = 0;
-
-			[[nodiscard]] constexpr auto AsTuple() const noexcept
-			{
-				return std::tie(m_Kind, m_StableId, m_ContentGeneration);
-			}
-			friend bool operator==(const DependencyKey&, const DependencyKey&) = default;
-		};
-		using DependencyKeyHash = KeyHash<DependencyKey>;
-
-		struct DependentModel
-		{
-			ModelID m_ModelId{};
-			uint64_t m_ContentGeneration = 0;
-
-			friend bool operator==(const DependentModel&, const DependentModel&) = default;
-		};
-
-		struct ModelDependencyState
-		{
-			uint64_t m_ContentGeneration = 0;
-			std::unordered_map<DependencyKey, AssetState, DependencyKeyHash> m_DependencyStates;
-			uint32_t m_StructuralFailureCount = 0;
-			uint32_t m_ReadyCount = 0;
-			uint32_t m_PendingCount = 0;
-			uint32_t m_FailedCount = 0;
-			uint32_t m_CancelledCount = 0;
-			uint64_t m_EventUpdateCount = 0;
-		};
-
 		struct PendingResidencyEviction
 		{
 			AssetInterestKind m_Kind = AssetInterestKind::Texture;
@@ -354,25 +314,16 @@ namespace gglab
 		void SetMeshState(Mesh& mesh, AssetState state) noexcept;
 		void RegisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
 		void UnregisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
-		void OnDependencyStateChanged(
-			AssetInterestKind kind,
-			uint64_t stableId,
-			uint64_t generation,
-			AssetState state) noexcept;
+		void QueueDependencyStateChange(
+			AssetContentVersion contentVersion,
+			AssetContentState contentState,
+			AssetResidencyState residencyState) noexcept;
 		[[nodiscard]] ModelDependencyOutcome EvaluateModelDependenciesByTraversal(
 			const Model& model) const noexcept;
-		[[nodiscard]] static ModelDependencyOutcome EvaluateModelDependencyCounters(
-			const ModelDependencyState& state) noexcept;
 		void VerifyModelDependencyState(
 			ModelID modelId,
 			uint64_t generation,
 			ModelDependencyOutcome traversalOutcome) noexcept;
-		static void IncrementDependencyCounter(
-			ModelDependencyState& state,
-			AssetState dependencyState) noexcept;
-		static void DecrementDependencyCounter(
-			ModelDependencyState& state,
-			AssetState dependencyState) noexcept;
 
 	public:
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
@@ -406,9 +357,8 @@ namespace gglab
 		AssetInterestTracker m_AssetInterestTracker;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
-		std::unordered_map<ModelID, ModelDependencyState> m_ModelDependencyStates;
-		std::unordered_map<DependencyKey, std::vector<DependentModel>, DependencyKeyHash>
-			m_ReverseDependencyIndex;
+		AssetDependencyGraph m_AssetDependencyGraph;
+		AssetStateEventQueue m_AssetStateEventQueue;
 		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
@@ -427,8 +377,6 @@ namespace gglab
 		uint32_t m_CurrentFrameReloadRequestCount = 0;
 		uint32_t m_LastFrameReloadRequestCount = 0;
 		uint32_t m_ReloadRequestHighWatermark = 0;
-		uint64_t m_DependencyGraphBuildCount = 0;
-		uint64_t m_DependencyEventUpdateCount = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;
 	};

@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/RHI/RHIDevice.h"
@@ -14,18 +15,18 @@ namespace gglab
 	{
 		AssetSnapshot snapshot{};
 		snapshot.m_AssetUsageFrame = assetManager.m_AssetUsageFrame;
-		snapshot.m_TrackedModelDependencyCount = static_cast<uint32_t>(
-			assetManager.m_ModelDependencyStates.size());
-		snapshot.m_ReverseDependencyCount = static_cast<uint32_t>(
-			assetManager.m_ReverseDependencyIndex.size());
-		for (const auto& [dependency, dependents] : assetManager.m_ReverseDependencyIndex)
-		{
-			GGLAB_UNUSED(dependency);
-			snapshot.m_ReverseDependencyEdgeCount +=
-				static_cast<uint32_t>(dependents.size());
-		}
-		snapshot.m_DependencyGraphBuildCount = assetManager.m_DependencyGraphBuildCount;
-		snapshot.m_DependencyEventUpdateCount = assetManager.m_DependencyEventUpdateCount;
+		const AssetDependencyGraphStatistics dependencyStatistics =
+			assetManager.m_AssetDependencyGraph.GetStatistics();
+		snapshot.m_TrackedModelDependencyCount =
+			dependencyStatistics.m_TrackedModelCount;
+		snapshot.m_ReverseDependencyCount =
+			dependencyStatistics.m_ReverseDependencyCount;
+		snapshot.m_ReverseDependencyEdgeCount =
+			dependencyStatistics.m_ReverseDependencyEdgeCount;
+		snapshot.m_DependencyGraphBuildCount =
+			dependencyStatistics.m_GraphBuildCount;
+		snapshot.m_DependencyEventUpdateCount =
+			dependencyStatistics.m_EventUpdateCount;
 		snapshot.m_DependencyValidationCount = assetManager.m_DependencyValidationCount;
 		snapshot.m_DependencyValidationMismatchCount =
 			assetManager.m_DependencyValidationMismatchCount;
@@ -105,11 +106,11 @@ namespace gglab
 			modelSnapshot.m_Type = model->m_Type;
 			modelSnapshot.m_Name = model->m_Name;
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());
-			if (const auto dependencyState = assetManager.m_ModelDependencyStates.find(modelId);
-				dependencyState != assetManager.m_ModelDependencyStates.end() &&
-				dependencyState->second.m_ContentGeneration == model->m_ContentGeneration)
+			if (const AssetDependencyModelState* dependencyState =
+				assetManager.m_AssetDependencyGraph.FindModel(
+					MakeAssetContentVersion(modelId, model->m_ContentGeneration)))
 			{
-				const auto& state = dependencyState->second;
+				const AssetDependencyModelState& state = *dependencyState;
 				modelSnapshot.m_DependencyCount = static_cast<uint32_t>(
 					state.m_DependencyStates.size()) + state.m_StructuralFailureCount;
 				modelSnapshot.m_ReadyDependencyCount = state.m_ReadyCount;

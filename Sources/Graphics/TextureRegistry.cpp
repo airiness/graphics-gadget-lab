@@ -88,7 +88,11 @@ namespace gglab
 	}
 
 	void TextureRegistry::SetStateChangeCallback(
-		std::function<void(TextureID, uint64_t, AssetState)> callback) noexcept
+		std::function<void(
+			TextureID,
+			uint64_t,
+			AssetContentState,
+			AssetResidencyState)> callback) noexcept
 	{
 		m_StateChangeCallback = std::move(callback);
 	}
@@ -99,7 +103,11 @@ namespace gglab
 		SetAssetState(texture, state);
 		if (previousState != state && m_StateChangeCallback)
 		{
-			m_StateChangeCallback(texture.m_Id, texture.m_ContentGeneration, state);
+			m_StateChangeCallback(
+				texture.m_Id,
+				texture.m_ContentGeneration,
+				texture.m_ContentState,
+				texture.m_ResidencyState);
 		}
 	}
 

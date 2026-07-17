@@ -157,7 +157,11 @@ namespace gglab
 			bool residencyReload = false) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 		void SetStateChangeCallback(
-			std::function<void(TextureID, uint64_t, AssetState)> callback) noexcept;
+			std::function<void(
+				TextureID,
+				uint64_t,
+				AssetContentState,
+				AssetResidencyState)> callback) noexcept;
 		void SetTextureState(Texture& texture, AssetState state) noexcept;
 
 	private:
@@ -170,6 +174,10 @@ namespace gglab
 		TextureContainer m_TextureContainer;
 		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
 		std::unordered_set<TextureID> m_PublicationOrphanedTextures;
-		std::function<void(TextureID, uint64_t, AssetState)> m_StateChangeCallback;
+		std::function<void(
+			TextureID,
+			uint64_t,
+			AssetContentState,
+			AssetResidencyState)> m_StateChangeCallback;
 	};
 }
