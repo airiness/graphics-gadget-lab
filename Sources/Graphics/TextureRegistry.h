@@ -12,6 +12,7 @@
 namespace gglab
 {
 	class AssetManager;
+	class AssetManagerPublicationServices;
 	class AssetUploadScheduler;
 	class RHIDevice;
 	class TaskSystem;
@@ -109,6 +110,7 @@ namespace gglab
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 		friend class AssetManager;
+		friend class AssetManagerPublicationServices;
 		friend class EnvironmentLightingSystem;
 
 		void CreateTextureEntry(

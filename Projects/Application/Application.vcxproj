@@ -247,6 +247,9 @@
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
@@ -611,6 +614,10 @@
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetResourcePublication.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\ReservedTexture.h" />
