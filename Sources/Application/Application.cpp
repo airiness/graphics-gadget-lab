@@ -307,6 +307,7 @@ namespace gglab
 			.m_MaxCallbacks = 64,
 			.m_MaxMilliseconds = 1.0,
 		});
+		m_AssetManager->DrainLoadCompletions();
 
 		// Toggle Mouse Input Mode
 		if (const auto keyboard = GetKeyboard())
@@ -478,6 +479,7 @@ namespace gglab
 		{
 			m_TaskSystem->Shutdown();
 			m_TaskSystem->PumpCompletions();
+			m_AssetManager->DrainLoadCompletions();
 		}
 
 		// Task completions only enqueue CPU-ready streaming payloads. Drain CPU-ready

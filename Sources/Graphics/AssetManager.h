@@ -2,6 +2,7 @@
 #include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
+#include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
@@ -148,6 +149,7 @@ namespace gglab
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 		[[nodiscard]] AssetOwnerScope CreateOwnerScope(std::string label) noexcept;
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
+		void DrainLoadCompletions() noexcept;
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
 		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
 		{
@@ -206,9 +208,20 @@ namespace gglab
 		void RollbackPublicationMesh(MeshID meshId, uint64_t generation) noexcept;
 		[[nodiscard]] std::unique_ptr<AssetPublicationServicesBase>
 			CreateModelPublicationServices() noexcept;
+		void RouteModelImportCompletion(
+			AssetOperationToken operation,
+			const TaskCompletionInfo& completion,
+			ImportedModel&& importedModel) noexcept;
+		void RouteMeshReloadCompletion(
+			AssetOperationToken operation,
+			const TaskCompletionInfo& completion,
+			ImportedModel&& importedModel) noexcept;
 		void CompleteModelLoad(
-			ModelID modelId,
-			uint64_t generation,
+			AssetOperationToken operation,
+			const TaskCompletionInfo& completion,
+			ImportedModel&& importedModel) noexcept;
+		void CompleteMeshReload(
+			AssetOperationToken operation,
 			const TaskCompletionInfo& completion,
 			ImportedModel&& importedModel) noexcept;
 
@@ -375,7 +388,6 @@ namespace gglab
 
 	private:
 		RHIDevice* m_Device = nullptr;
-		TaskSystem* m_TaskSystem = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		TextureRegistry* m_TextureRegistry = nullptr;
@@ -389,9 +401,8 @@ namespace gglab
 		MeshContainer m_MeshContainer;
 		MaterialContainer m_MaterialContainer;
 		ModelContainer m_ModelContainer;
-		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
-		std::unordered_map<ModelID, TaskHandle> m_MeshReloadTasks;
 		std::unordered_set<ModelID> m_PendingModels;
+		AssetLoadCoordinator m_AssetLoadCoordinator;
 		AssetInterestTracker m_AssetInterestTracker;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
