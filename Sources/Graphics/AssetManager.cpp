@@ -16,16 +16,6 @@ namespace gglab
 {
 	namespace
 	{
-		struct ModelLoadJob
-		{
-			ImportedModel m_Model;
-		};
-
-		struct MeshResidencyReloadJob
-		{
-			ImportedModel m_Model;
-		};
-
 		[[nodiscard]] bool IsTerminalAssetState(AssetState state) noexcept
 		{
 			return state == AssetState::Failed || state == AssetState::Cancelled;
@@ -129,15 +119,14 @@ namespace gglab
 
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
-		m_TaskSystem(createInfo.m_TaskSystem),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
 		m_TextureRegistry(createInfo.m_TextureRegistry),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
-		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
+		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling),
+		m_AssetLoadCoordinator({ .m_TaskSystem = createInfo.m_TaskSystem })
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
-		GGLAB_ASSERT_MSG(m_TaskSystem != nullptr, "TaskSystem is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_TextureRegistry != nullptr, "TextureRegistry is null!");
@@ -172,6 +161,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			m_PublicationOrphanedMeshes.empty(),
 			"AssetManager destroyed while publication mesh rollback is pending GPU completion.");
+		GGLAB_ASSERT_MSG(
+			!m_AssetLoadCoordinator.HasActiveOperations() &&
+				!m_AssetLoadCoordinator.HasPendingCompletions(),
+			"AssetManager destroyed before asset load operations were drained.");
 	}
 
 	AssetPublicationRetain::AssetPublicationRetain(
@@ -373,6 +366,49 @@ namespace gglab
 		return statistics;
 	}
 
+	void AssetManager::DrainLoadCompletions() noexcept
+	{
+		std::vector<AssetLoadCompletion> completions;
+		m_AssetLoadCoordinator.DrainCompletions(completions);
+		for (AssetLoadCompletion& completion : completions)
+		{
+			std::visit(
+				[this](auto& result) noexcept
+				{
+					using Result = std::remove_cvref_t<decltype(result)>;
+					if constexpr (std::same_as<Result, ModelImportSucceeded>)
+					{
+						RouteModelImportCompletion(
+							result.m_Operation,
+							result.m_Completion,
+							std::move(result.m_Model));
+					}
+					else if constexpr (std::same_as<Result, ModelImportFailed>)
+					{
+						RouteModelImportCompletion(
+							result.m_Operation,
+							result.m_Completion,
+							{});
+					}
+					else if constexpr (std::same_as<Result, MeshReloadSucceeded>)
+					{
+						RouteMeshReloadCompletion(
+							result.m_Operation,
+							result.m_Completion,
+							std::move(result.m_Model));
+					}
+					else
+					{
+						RouteMeshReloadCompletion(
+							result.m_Operation,
+							result.m_Completion,
+							{});
+					}
+				},
+				completion);
+		}
+	}
+
 	void AssetManager::SetResidencyConfig(const AssetResidencyConfig& config) noexcept
 	{
 		m_ResidencyConfig = config;
@@ -571,10 +607,9 @@ namespace gglab
 		if (key.m_Kind == AssetKind::Model)
 		{
 			const ModelID modelId{ static_cast<uint32_t>(key.m_StableId) };
-			if (const auto task = m_ModelLoadTasks.find(modelId); task != m_ModelLoadTasks.end())
-			{
-				GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
-			}
+			GGLAB_UNUSED(m_AssetLoadCoordinator.UpdateModelImportPriority(
+				MakeAssetContentVersion(key, generation),
+				priority));
 			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority(
 				MakeAssetContentVersion(modelId, generation),
 				priority));
@@ -592,10 +627,13 @@ namespace gglab
 			if (const Mesh* mesh = GetMesh(meshId);
 				mesh && mesh->m_SourceModelId.IsValid())
 			{
-				if (const auto task = m_MeshReloadTasks.find(mesh->m_SourceModelId);
-					task != m_MeshReloadTasks.end())
+				if (const Model* sourceModel = GetModel(mesh->m_SourceModelId))
 				{
-					GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
+					GGLAB_UNUSED(m_AssetLoadCoordinator.UpdateMeshReloadPriority(
+						MakeAssetContentVersion(
+							mesh->m_SourceModelId,
+							sourceModel->m_ContentGeneration),
+						priority));
 				}
 			}
 			GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority(
@@ -827,10 +865,9 @@ namespace gglab
 			return;
 		}
 		model->m_CancelRequested = true;
-		if (const auto task = m_ModelLoadTasks.find(modelId); task != m_ModelLoadTasks.end())
-		{
-			GGLAB_UNUSED(m_TaskSystem->Cancel(task->second));
-		}
+		GGLAB_UNUSED(m_AssetLoadCoordinator.CancelModelImport(
+			MakeAssetContentVersion(modelId, generation)));
+		m_AssetLoadCoordinator.DiscardModelImport(MakeAssetKey(modelId));
 		const uint32_t cancelledReadyWork = m_AssetUploadScheduler->CancelReadyWork(
 			MakeAssetContentVersion(modelId, generation));
 		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
@@ -927,11 +964,11 @@ namespace gglab
 			const Model* model = GetModel(existing);
 			if (model && !IsTerminalAssetState(model->m_State))
 			{
-				const auto task = m_ModelLoadTasks.find(existing);
 				return {
 					.m_ModelId = existing,
 					.m_Generation = model->m_ContentGeneration,
-					.m_Task = task != m_ModelLoadTasks.end() ? task->second : TaskHandle{},
+					.m_Task = m_AssetLoadCoordinator.GetModelImportTask(
+						MakeAssetContentVersion(existing, model->m_ContentGeneration)),
 				};
 			}
 			GGLAB_UNUSED(DetachTerminalModelPath(canonicalPath, existing));
@@ -944,61 +981,15 @@ namespace gglab
 		model->m_Name = StringID(canonicalPath.filename().generic_string());
 		model->m_Type = ModelType::GlTF;
 
-		auto job = std::make_shared<ModelLoadJob>();
-		const ModelImportSettings importSettings = m_MaterialTextureSampling;
-		const TaskHandle task = m_TaskSystem->Submit(
-			{
-				.m_Name = std::format("Asset.ModelImport: {}", canonicalPath.filename().generic_string()),
+		const AssetLoadSubmission submission =
+			m_AssetLoadCoordinator.SubmitModelImport({
+				.m_ContentVersion = MakeAssetContentVersion(modelId, generation),
+				.m_SourcePath = canonicalPath,
+				.m_ImportSettings = m_MaterialTextureSampling,
 				.m_Priority = priority,
 				.m_Progress = model->m_LoadProgress,
-			},
-			[canonicalPath, importSettings, job, progress = model->m_LoadProgress](
-				std::stop_token stopToken) noexcept
-			{
-				ModelImportResult result = ModelImporter::Import(
-					canonicalPath,
-					importSettings,
-					stopToken,
-					ProgressReporter(progress, 0.05f, 0.62f));
-				if (!result.Succeeded())
-				{
-					return TaskResult::Failure(std::move(result.m_Error));
-				}
-				job->m_Model = std::move(result.m_Model);
-				return TaskResult::Success();
-			},
-			[this, modelId, generation, job, progress = model->m_LoadProgress](
-				const TaskCompletionInfo& completion) noexcept
-			{
-				const Model* currentModel = GetModel(modelId);
-				if (!currentModel || currentModel->m_ContentGeneration != generation ||
-					currentModel->m_CancelRequested)
-				{
-					m_ModelLoadTasks.erase(modelId);
-					return;
-				}
-				m_AssetUploadScheduler->EnqueueCpuPayload(
-					{
-						.m_Name = completion.m_Name,
-						.m_Identity = {
-							.m_Kind = AssetStreamingWorkKind::Model,
-							.m_StableId = modelId.Value(),
-							.m_Generation = generation,
-						},
-						.m_Estimate = EstimateImportedModel(job->m_Model),
-						.m_Priority = completion.m_Priority,
-						.m_Progress = progress,
-					},
-					[this, modelId, generation, completion, job]() mutable noexcept
-					{
-						CompleteModelLoad(
-							modelId,
-							generation,
-							completion,
-							std::move(job->m_Model));
-					});
 			});
-		if (!task.IsValid())
+		if (!submission.IsValid())
 		{
 			SetAssetState(*model, AssetState::Failed);
 			ProgressReporter(model->m_LoadProgress).Report(
@@ -1011,11 +1002,10 @@ namespace gglab
 			};
 		}
 
-		m_ModelLoadTasks.emplace(modelId, task);
 		return {
 			.m_ModelId = modelId,
 			.m_Generation = generation,
-			.m_Task = task,
+			.m_Task = submission.m_Task,
 		};
 	}
 
@@ -1041,6 +1031,7 @@ namespace gglab
 
 	void AssetManager::Tick() noexcept
 	{
+		DrainLoadCompletions();
 		++m_AssetUsageFrame;
 		FinalizeResidencyEvictions();
 		std::erase_if(m_PendingModels,
@@ -1376,7 +1367,9 @@ namespace gglab
 		}
 		mesh->m_CancelRequested = false;
 		mesh->m_IsReloading = true;
-		if (m_MeshReloadTasks.contains(mesh->m_SourceModelId))
+		if (m_AssetLoadCoordinator.HasMeshReload(MakeAssetContentVersion(
+			mesh->m_SourceModelId,
+			sourceModel->m_ContentGeneration)))
 		{
 			++m_ResidencyReloadCoalescedCount;
 			return;
@@ -1395,82 +1388,15 @@ namespace gglab
 		}
 		const std::filesystem::path sourcePath = sourceModel->m_SourcePath;
 		const uint64_t sourceGeneration = sourceModel->m_ContentGeneration;
-		auto job = std::make_shared<MeshResidencyReloadJob>();
-		const ModelImportSettings importSettings = m_MaterialTextureSampling;
-		const TaskHandle task = m_TaskSystem->Submit(
-			{
-				.m_Name = std::format(
-					"Asset.ModelResidencyReload: {}",
-					sourcePath.filename().generic_string()),
-				.m_Priority = priority,
-			},
-			[sourcePath, importSettings, job](std::stop_token stopToken) noexcept
-			{
-				ModelImportResult result = ModelImporter::Import(
-					sourcePath,
-					importSettings,
-					stopToken);
-				if (!result.Succeeded())
-				{
-					return TaskResult::Failure(std::move(result.m_Error));
-				}
-				job->m_Model = std::move(result.m_Model);
-				job->m_Model.m_Textures.clear();
-				job->m_Model.m_Materials.clear();
-				job->m_Model.m_MeshInstances.clear();
-				return TaskResult::Success();
-			},
-			[this, sourceModelId, sourceGeneration, job](
-				const TaskCompletionInfo& completion) noexcept
-			{
-				m_AssetUploadScheduler->EnqueueCpuPayload(
-					{
-						.m_Name = completion.m_Name,
-						.m_Identity = {
-							.m_Kind = AssetStreamingWorkKind::Model,
-							.m_StableId = sourceModelId.Value(),
-							.m_Generation = sourceGeneration,
-						},
-						.m_Estimate = EstimateImportedModel(job->m_Model),
-						.m_Priority = completion.m_Priority,
-					},
-					[this, sourceModelId, completion, job]() mutable noexcept
-					{
-						m_MeshReloadTasks.erase(sourceModelId);
-						for (const auto& [meshId, meshOwner] : m_MeshContainer.m_MeshIDMap)
-						{
-							Mesh* mesh = meshOwner.get();
-							if (!mesh->m_IsReloading || mesh->m_SourceModelId != sourceModelId)
-							{
-								continue;
-							}
-							if (completion.m_Status != TaskStatus::Succeeded ||
-								mesh->m_SourceMeshIndex >= job->m_Model.m_Meshes.size())
-							{
-								mesh->m_IsReloading = false;
-								SetMeshState(*mesh, AssetState::CpuReady);
-								continue;
-							}
-							ImportedMesh& importedMesh =
-								job->m_Model.m_Meshes[mesh->m_SourceMeshIndex];
-							MeshUploadData uploadData{
-								.m_MeshId = meshId,
-								.m_VerticesData = std::move(importedMesh.m_Vertices),
-								.m_IndicesData = std::move(importedMesh.m_Indices),
-							};
-							if (!QueueMeshUpload(
-								std::move(uploadData),
-								GetEffectivePriority(
-									MakeAssetKey(meshId),
-									completion.m_Priority)))
-							{
-								mesh->m_IsReloading = false;
-								SetMeshState(*mesh, AssetState::CpuReady);
-							}
-						}
-					});
-			});
-		if (!task.IsValid())
+		const AssetLoadSubmission submission = m_AssetLoadCoordinator.SubmitMeshReload({
+			.m_SourceModelVersion = MakeAssetContentVersion(
+				sourceModelId,
+				sourceGeneration),
+			.m_SourcePath = sourcePath,
+			.m_ImportSettings = m_MaterialTextureSampling,
+			.m_Priority = priority,
+		});
+		if (!submission.IsValid())
 		{
 			for (const auto& mesh : m_MeshContainer.m_MeshIDMap | std::views::values)
 			{
@@ -1481,7 +1407,6 @@ namespace gglab
 			}
 			return;
 		}
-		m_MeshReloadTasks.emplace(sourceModelId, task);
 	}
 
 	void AssetManager::MarkAssetUsed(AssetLifecycle& lifecycle) noexcept
@@ -2365,18 +2290,109 @@ namespace gglab
 		}
 	}
 
-	void AssetManager::CompleteModelLoad(
-		ModelID modelId,
-		uint64_t generation,
+	void AssetManager::RouteModelImportCompletion(
+		AssetOperationToken operation,
 		const TaskCompletionInfo& completion,
 		ImportedModel&& importedModel) noexcept
 	{
+		if (!m_AssetLoadCoordinator.IsCurrentModelImport(operation) ||
+			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
+		{
+			return;
+		}
+		const ModelID modelId{ static_cast<uint32_t>(
+			operation.m_ContentVersion.m_Key.m_StableId) };
+		const Model* model = GetModel(modelId);
+		if (!model ||
+			model->m_ContentGeneration != operation.m_ContentVersion.m_ContentGeneration ||
+			model->m_CancelRequested)
+		{
+			m_AssetLoadCoordinator.CompleteModelImport(operation);
+			return;
+		}
+
+		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		m_AssetUploadScheduler->EnqueueCpuPayload(
+			{
+				.m_Name = completion.m_Name,
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Model,
+					.m_StableId = modelId.Value(),
+					.m_Generation = operation.m_ContentVersion.m_ContentGeneration,
+				},
+				.m_Estimate = EstimateImportedModel(*payload),
+				.m_Priority = completion.m_Priority,
+				.m_Progress = model->m_LoadProgress,
+			},
+			[this, operation, completion, payload]() mutable noexcept
+			{
+				CompleteModelLoad(
+					operation,
+					completion,
+					std::move(*payload));
+			});
+	}
+
+	void AssetManager::RouteMeshReloadCompletion(
+		AssetOperationToken operation,
+		const TaskCompletionInfo& completion,
+		ImportedModel&& importedModel) noexcept
+	{
+		if (!m_AssetLoadCoordinator.IsCurrentMeshReload(operation) ||
+			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
+		{
+			return;
+		}
+		const ModelID sourceModelId{ static_cast<uint32_t>(
+			operation.m_ContentVersion.m_Key.m_StableId) };
+		const Model* sourceModel = GetModel(sourceModelId);
+		if (!sourceModel || sourceModel->m_ContentGeneration !=
+			operation.m_ContentVersion.m_ContentGeneration)
+		{
+			m_AssetLoadCoordinator.CompleteMeshReload(operation);
+			return;
+		}
+
+		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		m_AssetUploadScheduler->EnqueueCpuPayload(
+			{
+				.m_Name = completion.m_Name,
+				.m_Identity = {
+					.m_Kind = AssetStreamingWorkKind::Model,
+					.m_StableId = sourceModelId.Value(),
+					.m_Generation = operation.m_ContentVersion.m_ContentGeneration,
+				},
+				.m_Estimate = EstimateImportedModel(*payload),
+				.m_Priority = completion.m_Priority,
+			},
+			[this, operation, completion, payload]() mutable noexcept
+			{
+				CompleteMeshReload(
+					operation,
+					completion,
+					std::move(*payload));
+			});
+	}
+
+	void AssetManager::CompleteModelLoad(
+		AssetOperationToken operation,
+		const TaskCompletionInfo& completion,
+		ImportedModel&& importedModel) noexcept
+	{
+		if (!m_AssetLoadCoordinator.IsCurrentModelImport(operation) ||
+			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
+		{
+			return;
+		}
+		m_AssetLoadCoordinator.CompleteModelImport(operation);
+		const ModelID modelId{ static_cast<uint32_t>(
+			operation.m_ContentVersion.m_Key.m_StableId) };
+		const uint64_t generation = operation.m_ContentVersion.m_ContentGeneration;
 		Model* model = GetModel(modelId);
 		if (!model || model->m_ContentGeneration != generation)
 		{
 			return;
 		}
-		m_ModelLoadTasks.erase(modelId);
 		if (model->m_CancelRequested)
 		{
 			SetAssetState(*model, AssetState::Cancelled);
@@ -2439,6 +2455,56 @@ namespace gglab
 				.m_Progress = model->m_LoadProgress,
 			},
 			std::move(publicationJob));
+	}
+
+	void AssetManager::CompleteMeshReload(
+		AssetOperationToken operation,
+		const TaskCompletionInfo& completion,
+		ImportedModel&& importedModel) noexcept
+	{
+		if (!m_AssetLoadCoordinator.IsCurrentMeshReload(operation) ||
+			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
+		{
+			return;
+		}
+		m_AssetLoadCoordinator.CompleteMeshReload(operation);
+		const ModelID sourceModelId{ static_cast<uint32_t>(
+			operation.m_ContentVersion.m_Key.m_StableId) };
+		const Model* sourceModel = GetModel(sourceModelId);
+		if (!sourceModel || sourceModel->m_ContentGeneration !=
+			operation.m_ContentVersion.m_ContentGeneration)
+		{
+			return;
+		}
+
+		for (const auto& [meshId, meshOwner] : m_MeshContainer.m_MeshIDMap)
+		{
+			Mesh* mesh = meshOwner.get();
+			if (!mesh->m_IsReloading || mesh->m_SourceModelId != sourceModelId)
+			{
+				continue;
+			}
+			if (completion.m_Status != TaskStatus::Succeeded ||
+				mesh->m_SourceMeshIndex >= importedModel.m_Meshes.size())
+			{
+				mesh->m_IsReloading = false;
+				SetMeshState(*mesh, AssetState::CpuReady);
+				continue;
+			}
+			ImportedMesh& importedMesh = importedModel.m_Meshes[mesh->m_SourceMeshIndex];
+			MeshUploadData uploadData{
+				.m_MeshId = meshId,
+				.m_VerticesData = std::move(importedMesh.m_Vertices),
+				.m_IndicesData = std::move(importedMesh.m_Indices),
+			};
+			if (!QueueMeshUpload(
+				std::move(uploadData),
+				GetEffectivePriority(MakeAssetKey(meshId), completion.m_Priority)))
+			{
+				mesh->m_IsReloading = false;
+				SetMeshState(*mesh, AssetState::CpuReady);
+			}
+		}
 	}
 
 	MeshID AssetManager::CreateMesh() noexcept
@@ -2510,7 +2576,7 @@ namespace gglab
 		}
 
 		m_ModelContainer.m_PathIDMap.erase(iterator);
-		m_ModelLoadTasks.erase(modelId);
+		m_AssetLoadCoordinator.DiscardModelImport(MakeAssetKey(modelId));
 		m_PendingModels.erase(modelId);
 		GGLAB_LOG_GRAPHICS_INFO(
 			"Detached terminal model {} from cache path '{}' so a later request can retry.",

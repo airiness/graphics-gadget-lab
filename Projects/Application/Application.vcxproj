@@ -249,6 +249,7 @@
     <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.cpp" />
@@ -616,6 +617,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetResourcePublication.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.h" />
