@@ -4,6 +4,7 @@
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
@@ -12,21 +13,12 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ModelImporter.h"
-#include "Graphics/SamplerRegistry.h"
-#include "Graphics/TextureRegistry.h"
 
 namespace gglab
 {
-	enum class AssetInterestKind : uint8_t
-	{
-		Model,
-		Texture,
-		Mesh,
-	};
-
 	struct AssetInterestActivity
 	{
-		AssetInterestKind m_Kind = AssetInterestKind::Model;
+		AssetKind m_Kind = AssetKind::Model;
 		uint64_t m_StableId = 0;
 		uint64_t m_Generation = 0;
 		uint32_t m_LeaseCount = 0;
@@ -56,9 +48,12 @@ namespace gglab
 	class AssetLease;
 	class AssetPublicationRetain;
 	class AssetOwnerScope;
+	class SamplerRegistry;
 	class TaskSystem;
+	class TextureRegistry;
 	class TransferBatch;
 	class TransferManager;
+	enum class SamplerPreset : uint8_t;
 	struct AssetSnapshot;
 
 	class AssetManager;
@@ -78,7 +73,14 @@ namespace gglab
 			[[nodiscard]] bool IsValid() const noexcept { return m_ModelId.IsValid(); }
 		};
 
-		using TextureLoadRequest = TextureRegistry::TextureLoadRequest;
+		struct TextureLoadRequest
+		{
+			TextureID m_TextureId{};
+			uint64_t m_Generation = 0;
+			TaskHandle m_Task{};
+
+			[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
+		};
 
 		struct CreateInfo
 		{
@@ -117,7 +119,7 @@ namespace gglab
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
 		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
 		{
-			return m_ResidencyConfig;
+			return m_AssetResidencyController.GetConfig();
 		}
 		[[nodiscard]] AssetResidencyStatistics GetResidencyStatistics() const noexcept;
 		void Tick() noexcept;
@@ -138,7 +140,6 @@ namespace gglab
 			return m_AssetUsageFrame;
 		}
 
-		Texture* GetTexture(TextureID textureId) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -222,7 +223,7 @@ namespace gglab
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
 		AssetLease AcquireAssetLease(
 			AssetOwnerId owner,
-			AssetInterestKind kind,
+			AssetKind kind,
 			uint64_t stableId,
 			uint64_t generation,
 			TaskPriority priority,
@@ -230,11 +231,11 @@ namespace gglab
 		void ReleaseAssetLease(uint64_t leaseToken) noexcept;
 		void UpdateAssetLeasePriority(uint64_t leaseToken, TaskPriority priority) noexcept;
 		[[nodiscard]] AssetPublicationRetain AcquirePublicationRetain(
-			AssetInterestKind kind,
+			AssetKind kind,
 			uint64_t stableId,
 			uint64_t generation) noexcept;
 		void ReleasePublicationRetain(
-			AssetInterestKind kind,
+			AssetKind kind,
 			uint64_t stableId,
 			uint64_t generation) noexcept;
 		[[nodiscard]] bool HasPublicationRetain(
@@ -253,11 +254,11 @@ namespace gglab
 			TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept;
 		[[nodiscard]] bool HasPinnedDependentModel(
-			AssetInterestKind kind,
+			AssetKind kind,
 			uint64_t stableId,
 			uint64_t generation) const noexcept;
-		void MarkAssetUsed(AssetLifecycle& lifecycle) noexcept;
 		void FinalizeResidencyEvictions() noexcept;
+		void TickResidencyPhase() noexcept;
 		[[nodiscard]] AssetResidencyInventorySnapshot
 			BuildResidencyInventorySnapshot() const noexcept;
 		[[nodiscard]] bool BuildResidencyInventoryEntry(
@@ -265,10 +266,6 @@ namespace gglab
 			AssetResidencyInventoryEntry& entry) const noexcept;
 		[[nodiscard]] AssetLifecycle* FindResidencyLifecycle(AssetKey key) noexcept;
 		[[nodiscard]] const AssetLifecycle* FindResidencyLifecycle(AssetKey key) const noexcept;
-		[[nodiscard]] bool MatchesCurrentState(const AssetStateStamp& stamp) const noexcept;
-		[[nodiscard]] bool StillEligible(
-			const AssetResidencyAction& action,
-			uint64_t projectedResidentBytes) const noexcept;
 		[[nodiscard]] bool ApplyResidencyAction(
 			const AssetResidencyAction& action,
 			uint64_t projectedResidentBytes) noexcept;
@@ -285,10 +282,6 @@ namespace gglab
 		void QueueMeshResidencyReload(
 			ModelID sourceModelId,
 			TaskPriority priority) noexcept;
-		[[nodiscard]] static bool SetResidencyPolicy(
-			AssetLifecycle& lifecycle,
-			AssetResidencyPolicy policy,
-			bool isReserved) noexcept;
 		void SetMeshState(Mesh& mesh, AssetState state) noexcept;
 		void RegisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
 		void UnregisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
@@ -341,24 +334,8 @@ namespace gglab
 		uint64_t m_ReadyRetentionCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		uint64_t m_AssetUsageFrame = 0;
-		AssetResidencyConfig m_ResidencyConfig{};
 		std::vector<PendingResidencyEviction> m_PendingResidencyEvictions;
 		uint64_t m_LogicalResidentBytes = 0;
-		uint64_t m_ResidencyEvictionCount = 0;
-		uint64_t m_ResidencyEvictedBytes = 0;
-		uint64_t m_ResidencyEvictionCancellationCount = 0;
-		uint64_t m_ResidencyReloadRequestCount = 0;
-		uint64_t m_ResidencyReloadCoalescedCount = 0;
-		uint32_t m_CurrentFrameReloadRequestCount = 0;
-		uint32_t m_LastFrameReloadRequestCount = 0;
-		uint32_t m_ReloadRequestHighWatermark = 0;
-		uint64_t m_ResidencyPlanningCount = 0;
-		uint64_t m_LastResidencyPlanFrame = 0;
-		uint32_t m_LastPlannedResidencyActionCount = 0;
-		uint64_t m_LastPlannedResidencyBytes = 0;
-		uint64_t m_ResidencyOperationCount = 0;
-		uint64_t m_ResidencyRevalidationRejectionCount = 0;
-		uint64_t m_ResidencyStaleCompletionCount = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;
 	};
@@ -380,7 +357,7 @@ namespace gglab
 		friend class AssetManager;
 		AssetPublicationRetain(
 			AssetManager* manager,
-			AssetInterestKind kind,
+			AssetKind kind,
 			uint64_t stableId,
 			uint64_t generation) noexcept :
 			m_Manager(manager),
@@ -390,7 +367,7 @@ namespace gglab
 		{}
 
 		AssetManager* m_Manager = nullptr;
-		AssetInterestKind m_Kind = AssetInterestKind::Model;
+		AssetKind m_Kind = AssetKind::Model;
 		uint64_t m_StableId = 0;
 		uint64_t m_Generation = 0;
 	};

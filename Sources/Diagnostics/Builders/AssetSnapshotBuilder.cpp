@@ -67,14 +67,11 @@ namespace gglab
 		snapshot.m_ResidencyStaleCompletionCount = residency.m_StaleCompletionCount;
 
 		const auto isEvictionCandidate = [&assetManager](
-			AssetInterestKind kind,
+			AssetKind kind,
 			uint64_t stableId,
 			const AssetLifecycle& lifecycle) noexcept
 			{
-				const AssetKind assetKind = kind == AssetInterestKind::Texture ?
-					AssetKind::Texture : kind == AssetInterestKind::Mesh ?
-					AssetKind::Mesh : AssetKind::Model;
-				const AssetKey key = MakeAssetKey(assetKind, stableId);
+				const AssetKey key = MakeAssetKey(kind, stableId);
 				return lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
 					lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
 					!assetManager.HasActiveInterest(key) &&
@@ -138,7 +135,7 @@ namespace gglab
 					modelSnapshot.m_CancelledDependencyCount);
 			}
 			modelSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
-				AssetInterestKind::Model,
+				AssetKind::Model,
 				modelId.Value(),
 				*model);
 			recordResidency(*model, modelSnapshot.m_IsEvictionCandidate);
@@ -170,7 +167,7 @@ namespace gglab
 				.m_IndexCount = mesh->m_IndexCount,
 				.m_IsUploaded = mesh->m_IsUploaded,
 				.m_IsEvictionCandidate = isEvictionCandidate(
-					AssetInterestKind::Mesh,
+					AssetKind::Mesh,
 					meshId.Value(),
 					*mesh),
 			});
@@ -208,7 +205,7 @@ namespace gglab
 				textureSnapshot.m_IsUploaded = texture->m_IsUploaded;
 				textureSnapshot.m_IsReserved = IsReservedTextureId(textureId);
 				textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
-					AssetInterestKind::Texture,
+					AssetKind::Texture,
 					textureId.Value(),
 					*texture);
 				recordResidency(*texture, textureSnapshot.m_IsEvictionCandidate);
@@ -293,9 +290,9 @@ namespace gglab
 			AssetStreamingWorkKind kind = AssetStreamingWorkKind::Unknown;
 			switch (interest.m_Kind)
 			{
-			case AssetInterestKind::Model: kind = AssetStreamingWorkKind::Model; break;
-			case AssetInterestKind::Texture: kind = AssetStreamingWorkKind::Texture; break;
-			case AssetInterestKind::Mesh: kind = AssetStreamingWorkKind::Mesh; break;
+			case AssetKind::Model: kind = AssetStreamingWorkKind::Model; break;
+			case AssetKind::Texture: kind = AssetStreamingWorkKind::Texture; break;
+			case AssetKind::Mesh: kind = AssetStreamingWorkKind::Mesh; break;
 			}
 			snapshot.m_ActiveOwnershipInterests.push_back({
 				.m_Kind = kind,
