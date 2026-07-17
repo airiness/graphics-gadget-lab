@@ -57,8 +57,8 @@ namespace gglab
 			}
 			else if (texture && IsTerminalPublicationAssetState(texture->m_State))
 			{
-				const AssetManager::InterestKey textureKey{
-					.m_Kind = AssetInterestKind::Texture,
+				const AssetKey textureKey{
+					.m_Kind = AssetKind::Texture,
 					.m_StableId = textureId.Value(),
 				};
 				if (m_AssetManager->HasActiveInterest(textureKey) ||
@@ -390,7 +390,7 @@ namespace gglab
 		void CancelClaimIfUnreferenced(
 			const ModelPublicationClaim& claim) noexcept override
 		{
-			const std::optional<AssetManager::InterestKey> key = ToInterestKey(
+			const std::optional<AssetKey> key = ToInterestKey(
 				claim.m_ContentVersion.m_Key);
 			if (!key ||
 				m_AssetManager->HasPublicationRetain(
@@ -408,7 +408,7 @@ namespace gglab
 		void RollbackClaimIfUnreferenced(
 			const ModelPublicationClaim& claim) noexcept override
 		{
-			const std::optional<AssetManager::InterestKey> key = ToInterestKey(
+			const std::optional<AssetKey> key = ToInterestKey(
 				claim.m_ContentVersion.m_Key);
 			if (!key ||
 				m_AssetManager->HasPublicationRetain(
@@ -519,18 +519,17 @@ namespace gglab
 			return std::nullopt;
 		}
 
-		[[nodiscard]] static std::optional<AssetManager::InterestKey> ToInterestKey(
+		[[nodiscard]] static std::optional<AssetKey> ToInterestKey(
 			const AssetKey& key) noexcept
 		{
-			const std::optional<AssetInterestKind> kind = ToInterestKind(key.m_Kind);
-			if (!key.IsValid() || !kind)
+			if (!key.IsValid() ||
+				(key.m_Kind != AssetKind::Model &&
+					key.m_Kind != AssetKind::Texture &&
+					key.m_Kind != AssetKind::Mesh))
 			{
 				return std::nullopt;
 			}
-			return AssetManager::InterestKey{
-				.m_Kind = *kind,
-				.m_StableId = key.m_StableId,
-			};
+			return key;
 		}
 
 		[[nodiscard]] static ModelID ToModelId(

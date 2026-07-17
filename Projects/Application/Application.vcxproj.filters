@@ -106,6 +106,9 @@
     <Filter Include="Graphics\Asset\Publication">
       <UniqueIdentifier>{79c2d0d9-8417-4fae-9136-b0274eb69756}</UniqueIdentifier>
     </Filter>
+	<Filter Include="Graphics\Asset\Interest">
+	  <UniqueIdentifier>{eec23838-4527-484d-a43c-b26346697285}</UniqueIdentifier>
+	</Filter>
     <Filter Include="Core\Platform">
       <UniqueIdentifier>{578d0cc7-e7d1-47fd-93bf-d24a02f93c5e}</UniqueIdentifier>
     </Filter>
@@ -450,6 +453,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp">
+	  <Filter>Graphics\Asset\Interest</Filter>
+	</ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClCompile>
@@ -1037,6 +1043,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h">
+	  <Filter>Graphics\Asset\Interest</Filter>
+	</ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClInclude>
