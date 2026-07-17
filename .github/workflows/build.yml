@@ -1,0 +1,106 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build / ${{ matrix.configuration }}
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration:
+          - Debug
+          - Release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v3
+        with:
+          nuget-version: 6.14.3
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: packages
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-6.14.3-${{ hashFiles('Projects/Application/packages.config') }}
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: |
+          $restoreArguments = @(
+            "restore"
+            "GraphicsGadgetLab.sln"
+            "-PackagesDirectory"
+            "packages"
+            "-NonInteractive"
+            "-Verbosity"
+            "normal"
+          )
+
+          nuget @restoreArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $buildArguments = @(
+            "GraphicsGadgetLab.sln"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-${{ matrix.configuration }}.binlog"
+          )
+
+          msbuild @buildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Upload MSBuild binlog
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: msbuild-binlog-${{ matrix.configuration }}
+          path: Build/Logs/gglab-${{ matrix.configuration }}.binlog
+          if-no-files-found: ignore
+          retention-days: 7
