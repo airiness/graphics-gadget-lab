@@ -124,6 +124,10 @@ namespace gglab
 		uint64_t m_ResidencyReloadCoalescedCount = 0;
 		uint32_t m_LastFrameReloadRequestCount = 0;
 		uint32_t m_ReloadRequestHighWatermark = 0;
+		uint64_t m_ResidencyPlanningCount = 0;
+		uint64_t m_LastResidencyPlanFrame = 0;
+		uint32_t m_LastPlannedResidencyActionCount = 0;
+		uint64_t m_LastPlannedResidencyBytes = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;
 		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
 		AssetStreamingQueueStatistics m_UploadRecordingQueue;

@@ -470,6 +470,10 @@ namespace gglab
 			.m_ReloadCoalescedCount = m_ResidencyReloadCoalescedCount,
 			.m_LastFrameReloadRequestCount = m_LastFrameReloadRequestCount,
 			.m_ReloadRequestHighWatermark = m_ReloadRequestHighWatermark,
+			.m_PlanningCount = m_ResidencyPlanningCount,
+			.m_LastPlanFrame = m_LastResidencyPlanFrame,
+			.m_LastPlannedActionCount = m_LastPlannedResidencyActionCount,
+			.m_LastPlannedBytes = m_LastPlannedResidencyBytes,
 		};
 		for (const PendingResidencyEviction& eviction : m_PendingResidencyEvictions)
 		{
@@ -1076,8 +1080,21 @@ namespace gglab
 		DrainStateEvents();
 		++m_AssetUsageFrame;
 		FinalizeResidencyEvictions();
-		m_LogicalResidentBytes = ComputeLogicalResidentBytes();
-		SelectResidencyEvictions();
+		const AssetResidencyInventorySnapshot inventory =
+			BuildResidencyInventorySnapshot();
+		m_LogicalResidentBytes = inventory.m_LogicalResidentBytes;
+		AssetResidencyPlan plan = m_AssetResidencyController.BuildPlan(
+			inventory,
+			m_ResidencyConfig);
+		++m_ResidencyPlanningCount;
+		m_LastResidencyPlanFrame = plan.m_SnapshotFrame;
+		m_LastPlannedResidencyActionCount = static_cast<uint32_t>(plan.m_Actions.size());
+		m_LastPlannedResidencyBytes = 0;
+		for (const AssetResidencyAction& action : plan.m_Actions)
+		{
+			m_LastPlannedResidencyBytes += action.m_EstimatedBytes;
+		}
+		ApplyResidencyPlan(std::move(plan));
 		// Batch B: process events emitted while residency work was applied. Events
 		// emitted while this batch is processed remain deferred until the next tick.
 		DrainStateEvents();
@@ -1093,27 +1110,85 @@ namespace gglab
 			m_LastFrameReloadRequestCount);
 	}
 
-	uint64_t AssetManager::ComputeLogicalResidentBytes() const noexcept
+	AssetResidencyInventorySnapshot AssetManager::BuildResidencyInventorySnapshot() const noexcept
 	{
-		uint64_t bytes = 0;
-		for (const auto& mesh : m_MeshStore.Entries() | std::views::values)
+		AssetResidencyInventorySnapshot snapshot{
+			.m_Frame = m_AssetUsageFrame,
+		};
+		snapshot.m_Entries.reserve(
+			m_MeshStore.Entries().size() +
+			m_TextureRegistry->m_TextureContainer.m_TextureIDMap.size());
+		for (const auto& [meshId, mesh] : m_MeshStore.Entries())
 		{
+			const uint64_t estimatedBytes = EstimateMeshResidentBytes(*mesh);
 			if (mesh->m_ResidencyState == AssetResidencyState::Resident ||
 				mesh->m_ResidencyState == AssetResidencyState::Evicting)
 			{
-				bytes += EstimateMeshResidentBytes(*mesh);
+				snapshot.m_LogicalResidentBytes += estimatedBytes;
 			}
+			const AssetKey key = MakeAssetKey(meshId);
+			snapshot.m_Entries.push_back({
+				.m_Stamp = {
+					.m_ContentVersion = MakeAssetContentVersion(
+						meshId,
+						mesh->m_ContentGeneration),
+					.m_ResidencyEpoch = mesh->m_ResidencyEpoch,
+					.m_LastUsedFrame = mesh->m_LastUsedFrame,
+					.m_State = mesh->m_State,
+					.m_ContentState = mesh->m_ContentState,
+					.m_ResidencyState = mesh->m_ResidencyState,
+					.m_ResidencyPolicy = mesh->m_ResidencyPolicy,
+				},
+				.m_EstimatedBytes = estimatedBytes,
+				.m_IsReserved = IsReservedMeshId(meshId),
+				.m_HasReloadSource = mesh->m_SourceModelId.IsValid() &&
+					mesh->m_SourceMeshIndex != std::numeric_limits<uint32_t>::max(),
+				.m_HasActiveInterest = HasActiveInterest(key),
+				.m_HasPublicationRetain = HasPublicationRetain(
+					key,
+					mesh->m_ContentGeneration),
+				.m_HasPinnedDependentModel = HasPinnedDependentModel(
+					AssetInterestKind::Mesh,
+					meshId.Value(),
+					mesh->m_ContentGeneration),
+			});
 		}
-		for (const auto& texture :
-			m_TextureRegistry->m_TextureContainer.m_TextureIDMap | std::views::values)
+		for (const auto& [textureId, texture] :
+			m_TextureRegistry->m_TextureContainer.m_TextureIDMap)
 		{
+			const uint64_t estimatedBytes = EstimateTextureResidentBytes(*texture);
 			if (texture->m_ResidencyState == AssetResidencyState::Resident ||
 				texture->m_ResidencyState == AssetResidencyState::Evicting)
 			{
-				bytes += EstimateTextureResidentBytes(*texture);
+				snapshot.m_LogicalResidentBytes += estimatedBytes;
 			}
+			const AssetKey key = MakeAssetKey(textureId);
+			snapshot.m_Entries.push_back({
+				.m_Stamp = {
+					.m_ContentVersion = MakeAssetContentVersion(
+						textureId,
+						texture->m_ContentGeneration),
+					.m_ResidencyEpoch = texture->m_ResidencyEpoch,
+					.m_LastUsedFrame = texture->m_LastUsedFrame,
+					.m_State = texture->m_State,
+					.m_ContentState = texture->m_ContentState,
+					.m_ResidencyState = texture->m_ResidencyState,
+					.m_ResidencyPolicy = texture->m_ResidencyPolicy,
+				},
+				.m_EstimatedBytes = estimatedBytes,
+				.m_IsReserved = IsReservedTextureId(textureId),
+				.m_HasReloadSource = !texture->m_SourcePath.empty(),
+				.m_HasActiveInterest = HasActiveInterest(key),
+				.m_HasPublicationRetain = HasPublicationRetain(
+					key,
+					texture->m_ContentGeneration),
+				.m_HasPinnedDependentModel = HasPinnedDependentModel(
+					AssetInterestKind::Texture,
+					textureId.Value(),
+					texture->m_ContentGeneration),
+			});
 		}
-		return bytes;
+		return snapshot;
 	}
 
 	void AssetManager::FinalizeResidencyEvictions() noexcept
@@ -1215,120 +1290,56 @@ namespace gglab
 		}
 	}
 
-	void AssetManager::SelectResidencyEvictions() noexcept
+	void AssetManager::ApplyResidencyPlan(AssetResidencyPlan&& plan) noexcept
 	{
-		if (!m_ResidencyConfig.m_EnableAutomaticEviction ||
-			m_ResidencyConfig.m_MaxEvictionsPerFrame == 0 ||
-			m_LogicalResidentBytes <= m_ResidencyConfig.m_HighWatermarkBytes)
+		if (plan.m_Consumed || plan.m_SnapshotFrame != m_AssetUsageFrame)
 		{
 			return;
 		}
-
-		struct Candidate
+		plan.m_Consumed = true;
+		for (AssetResidencyAction& action : plan.m_Actions)
 		{
-			AssetInterestKind m_Kind = AssetInterestKind::Texture;
-			uint64_t m_StableId = 0;
-			uint64_t m_Generation = 0;
-			uint64_t m_LastUsedFrame = 0;
-			uint64_t m_ResidentBytes = 0;
-		};
-		std::vector<Candidate> candidates;
-		const auto isEligible = [this](
-			AssetInterestKind kind,
-			uint64_t stableId,
-			const AssetLifecycle& lifecycle) noexcept
-			{
-				const uint64_t unusedFrames = lifecycle.m_LastUsedFrame == 0 ?
-					m_AssetUsageFrame : m_AssetUsageFrame - lifecycle.m_LastUsedFrame;
-				const AssetKey key = MakeAssetKey(ToAssetKind(kind), stableId);
-				return lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
-					lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
-					unusedFrames >= m_ResidencyConfig.m_MinUnusedFrames &&
-					!HasActiveInterest(key) &&
-					!HasPinnedDependentModel(
-						kind,
-						stableId,
-						lifecycle.m_ContentGeneration) &&
-					!HasPublicationRetain(key, lifecycle.m_ContentGeneration);
-			};
-
-		for (const auto& [meshId, mesh] : m_MeshStore.Entries())
-		{
-			if (!mesh->m_SourceModelId.IsValid() ||
-				mesh->m_SourceMeshIndex == std::numeric_limits<uint32_t>::max() ||
-				!isEligible(AssetInterestKind::Mesh, meshId.Value(), *mesh))
+			if (std::exchange(action.m_Attempted, true) ||
+				action.m_Operation != AssetResidencyOperationKind::Evict)
 			{
 				continue;
 			}
-			candidates.push_back({
-				.m_Kind = AssetInterestKind::Mesh,
-				.m_StableId = meshId.Value(),
-				.m_Generation = mesh->m_ContentGeneration,
-				.m_LastUsedFrame = mesh->m_LastUsedFrame,
-				.m_ResidentBytes = EstimateMeshResidentBytes(*mesh),
-			});
-		}
-		for (const auto& [textureId, texture] :
-			m_TextureRegistry->m_TextureContainer.m_TextureIDMap)
-		{
-			if (IsReservedTextureId(textureId) || texture->m_SourcePath.empty() ||
-				!isEligible(AssetInterestKind::Texture, textureId.Value(), *texture))
-			{
-				continue;
-			}
-			candidates.push_back({
-				.m_Kind = AssetInterestKind::Texture,
-				.m_StableId = textureId.Value(),
-				.m_Generation = texture->m_ContentGeneration,
-				.m_LastUsedFrame = texture->m_LastUsedFrame,
-				.m_ResidentBytes = EstimateTextureResidentBytes(*texture),
-			});
-		}
-		std::ranges::sort(candidates,
-			[](const Candidate& lhs, const Candidate& rhs) noexcept
-			{
-				return std::tie(lhs.m_LastUsedFrame, lhs.m_Kind, lhs.m_StableId) <
-					std::tie(rhs.m_LastUsedFrame, rhs.m_Kind, rhs.m_StableId);
-			});
-
-		uint64_t projectedBytes = m_LogicalResidentBytes;
-		uint32_t selectedCount = 0;
-		for (const Candidate& candidate : candidates)
-		{
-			if (projectedBytes <= m_ResidencyConfig.m_LowWatermarkBytes ||
-				selectedCount >= m_ResidencyConfig.m_MaxEvictionsPerFrame)
-			{
-				break;
-			}
-			if (candidate.m_Kind == AssetInterestKind::Texture)
+			const AssetContentVersion contentVersion = action.m_ExpectedStamp.m_ContentVersion;
+			if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
 			{
 				Texture* texture = m_TextureRegistry->GetTexture(
-					TextureID{ static_cast<uint32_t>(candidate.m_StableId) });
-				if (!texture || texture->m_State != AssetState::Ready)
+					TextureID{ static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+				if (!texture ||
+					texture->m_ContentGeneration != contentVersion.m_ContentGeneration ||
+					texture->m_State != AssetState::Ready)
 				{
 					continue;
 				}
 				m_TextureRegistry->SetTextureState(*texture, AssetState::Evicting);
 			}
-			else
+			else if (contentVersion.m_Key.m_Kind == AssetKind::Mesh)
 			{
-				Mesh* mesh = EditMesh(MeshID{ static_cast<uint32_t>(candidate.m_StableId) });
-				if (!mesh || mesh->m_State != AssetState::Ready)
+				Mesh* mesh = EditMesh(MeshID{
+					static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+				if (!mesh || mesh->m_ContentGeneration != contentVersion.m_ContentGeneration ||
+					mesh->m_State != AssetState::Ready)
 				{
 					continue;
 				}
 				SetMeshState(*mesh, AssetState::Evicting);
 			}
+			else
+			{
+				continue;
+			}
 			m_PendingResidencyEvictions.push_back({
-				.m_Kind = candidate.m_Kind,
-				.m_StableId = candidate.m_StableId,
-				.m_Generation = candidate.m_Generation,
-				.m_ResidentBytes = candidate.m_ResidentBytes,
+				.m_Kind = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+					AssetInterestKind::Texture : AssetInterestKind::Mesh,
+				.m_StableId = contentVersion.m_Key.m_StableId,
+				.m_Generation = contentVersion.m_ContentGeneration,
+				.m_ResidentBytes = action.m_EstimatedBytes,
 				.m_QuiescedFrame = m_AssetUsageFrame,
 			});
-			projectedBytes = projectedBytes > candidate.m_ResidentBytes ?
-				projectedBytes - candidate.m_ResidentBytes : 0;
-			++selectedCount;
 		}
 	}
 
