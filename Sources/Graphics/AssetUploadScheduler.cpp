@@ -129,6 +129,17 @@ namespace gglab
 	}
 
 	uint32_t AssetUploadScheduler::CancelReadyWork(
+		const AssetContentVersion& contentVersion) noexcept
+	{
+		const AssetStreamingIdentity identity = ToAssetStreamingIdentity(contentVersion);
+		if (!contentVersion.IsValid() || identity.m_Kind == AssetStreamingWorkKind::Unknown)
+		{
+			return 0;
+		}
+		return CancelReadyWork(identity);
+	}
+
+	uint32_t AssetUploadScheduler::CancelReadyWork(
 		const AssetStreamingIdentity& identity) noexcept
 	{
 		GGLAB_ASSERT_MSG(IsOwnerThread(), "Asset ready work cancellation must run on the owner thread.");
@@ -150,6 +161,18 @@ namespace gglab
 				m_UploadRecordingTelemetry,
 				identity,
 				true);
+	}
+
+	uint32_t AssetUploadScheduler::UpdateWorkPriority(
+		const AssetContentVersion& contentVersion,
+		TaskPriority priority) noexcept
+	{
+		const AssetStreamingIdentity identity = ToAssetStreamingIdentity(contentVersion);
+		if (!contentVersion.IsValid() || identity.m_Kind == AssetStreamingWorkKind::Unknown)
+		{
+			return 0;
+		}
+		return UpdateWorkPriority(identity, priority);
 	}
 
 	uint32_t AssetUploadScheduler::UpdateWorkPriority(

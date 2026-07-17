@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TextureRegistry.h"
+#include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/TransferManager.h"
@@ -924,11 +925,8 @@ namespace gglab
 		{
 			GGLAB_UNUSED(m_TaskSystem->Cancel(task->second));
 		}
-		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork({
-			.m_Kind = AssetStreamingWorkKind::Texture,
-			.m_StableId = textureId.Value(),
-			.m_Generation = generation,
-		}));
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
+			MakeAssetContentVersion(textureId, generation)));
 		if (texture->m_IsReloading && !texture->m_Texture.IsValid())
 		{
 			texture->m_IsReloading = false;
@@ -962,11 +960,8 @@ namespace gglab
 		}
 
 		texture->m_CancelRequested = true;
-		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork({
-			.m_Kind = AssetStreamingWorkKind::Texture,
-			.m_StableId = textureId.Value(),
-			.m_Generation = generation,
-		}));
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
+			MakeAssetContentVersion(textureId, generation)));
 		if (texture->m_Texture.IsValid() && texture->m_State != AssetState::Ready)
 		{
 			m_PublicationOrphanedTextures.insert(textureId);
@@ -996,11 +991,9 @@ namespace gglab
 		{
 			GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
 		}
-		GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority({
-			.m_Kind = AssetStreamingWorkKind::Texture,
-			.m_StableId = textureId.Value(),
-			.m_Generation = generation,
-		}, priority));
+		GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority(
+			MakeAssetContentVersion(textureId, generation),
+			priority));
 	}
 
 	void TextureRegistry::ReviveTextureInterest(

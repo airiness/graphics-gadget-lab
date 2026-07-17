@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Async/ProgressChannel.h"
 #include "Core/Task/TaskTypes.h"
+#include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/RHI/RHIFence.h"
 
 #include <array>
@@ -54,6 +55,60 @@ namespace gglab
 			const AssetStreamingIdentity&,
 			const AssetStreamingIdentity&) = default;
 	};
+
+	[[nodiscard]] constexpr AssetKind ToAssetKind(
+		AssetStreamingWorkKind kind) noexcept
+	{
+		switch (kind)
+		{
+		case AssetStreamingWorkKind::Model:
+			return AssetKind::Model;
+		case AssetStreamingWorkKind::Texture:
+			return AssetKind::Texture;
+		case AssetStreamingWorkKind::Mesh:
+			return AssetKind::Mesh;
+		case AssetStreamingWorkKind::Unknown:
+			return AssetKind::Unknown;
+		}
+		return AssetKind::Unknown;
+	}
+
+	[[nodiscard]] constexpr AssetStreamingWorkKind ToAssetStreamingWorkKind(
+		AssetKind kind) noexcept
+	{
+		switch (kind)
+		{
+		case AssetKind::Model:
+			return AssetStreamingWorkKind::Model;
+		case AssetKind::Texture:
+			return AssetStreamingWorkKind::Texture;
+		case AssetKind::Mesh:
+			return AssetStreamingWorkKind::Mesh;
+		case AssetKind::Unknown:
+		case AssetKind::Material:
+			return AssetStreamingWorkKind::Unknown;
+		}
+		return AssetStreamingWorkKind::Unknown;
+	}
+
+	[[nodiscard]] constexpr AssetContentVersion ToAssetContentVersion(
+		const AssetStreamingIdentity& identity) noexcept
+	{
+		return MakeAssetContentVersion(
+			ToAssetKind(identity.m_Kind),
+			identity.m_StableId,
+			identity.m_Generation);
+	}
+
+	[[nodiscard]] constexpr AssetStreamingIdentity ToAssetStreamingIdentity(
+		const AssetContentVersion& contentVersion) noexcept
+	{
+		return {
+			.m_Kind = ToAssetStreamingWorkKind(contentVersion.m_Key.m_Kind),
+			.m_StableId = contentVersion.m_Key.m_StableId,
+			.m_Generation = contentVersion.m_ContentGeneration,
+		};
+	}
 
 	enum class AssetResourcePublicationStage : uint8_t
 	{
@@ -343,7 +398,11 @@ namespace gglab
 		void EnqueueUploadRecording(
 			AssetStreamingWorkDesc desc,
 			AssetStreamingWork work) noexcept;
+		uint32_t CancelReadyWork(const AssetContentVersion& contentVersion) noexcept;
 		uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept;
+		uint32_t UpdateWorkPriority(
+			const AssetContentVersion& contentVersion,
+			TaskPriority priority) noexcept;
 		uint32_t UpdateWorkPriority(
 			const AssetStreamingIdentity& identity,
 			TaskPriority priority) noexcept;
