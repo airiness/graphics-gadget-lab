@@ -3,6 +3,59 @@
 
 namespace gglab
 {
+	AssetResidencyOperation AssetResidencyController::BeginResidencyOperation(
+		AssetLifecycle& lifecycle,
+		AssetContentVersion contentVersion,
+		AssetResidencyOperationKind kind) noexcept
+	{
+		GGLAB_ASSERT(contentVersion.IsValid());
+		GGLAB_ASSERT(lifecycle.m_ContentGeneration == contentVersion.m_ContentGeneration);
+		if (!contentVersion.IsValid() ||
+			lifecycle.m_ContentGeneration != contentVersion.m_ContentGeneration)
+		{
+			return {};
+		}
+
+		const uint64_t serial = m_NextOperationSerial++;
+		GGLAB_ASSERT(serial != 0);
+		if (serial == 0)
+		{
+			return {};
+		}
+		lifecycle.m_ResidencyOperationSerial = serial;
+		return {
+			.m_Token = MakeAssetOperationToken(contentVersion, serial),
+			.m_Kind = kind,
+		};
+	}
+
+	bool AssetResidencyController::IsCurrentOperation(
+		const AssetLifecycle& lifecycle,
+		const AssetResidencyOperation& operation) noexcept
+	{
+		return operation.IsValid() &&
+			lifecycle.m_ContentGeneration ==
+				operation.m_Token.m_ContentVersion.m_ContentGeneration &&
+			lifecycle.m_ResidencyOperationSerial ==
+				operation.m_Token.m_OperationSerial;
+	}
+
+	void AssetResidencyController::CompleteResidencyOperation(
+		AssetLifecycle& lifecycle,
+		const AssetResidencyOperation& operation) noexcept
+	{
+		if (IsCurrentOperation(lifecycle, operation))
+		{
+			lifecycle.m_ResidencyOperationSerial = 0;
+		}
+	}
+
+	void AssetResidencyController::InvalidateResidencyOperation(
+		AssetLifecycle& lifecycle) noexcept
+	{
+		lifecycle.m_ResidencyOperationSerial = 0;
+	}
+
 	AssetResidencyPlan AssetResidencyController::BuildPlan(
 		const AssetResidencyInventorySnapshot& snapshot,
 		const AssetResidencyConfig& config) const noexcept
@@ -70,6 +123,7 @@ namespace gglab
 		const uint64_t unusedFrames = lastUsedFrame == 0 ?
 			snapshotFrame : snapshotFrame > lastUsedFrame ? snapshotFrame - lastUsedFrame : 0;
 		return entry.m_Stamp.m_ContentVersion.IsValid() &&
+			entry.m_Stamp.m_ResidencyOperationSerial == 0 &&
 			(entry.m_Stamp.m_ContentVersion.m_Key.m_Kind == AssetKind::Mesh ||
 				entry.m_Stamp.m_ContentVersion.m_Key.m_Kind == AssetKind::Texture) &&
 			entry.m_Stamp.m_State == AssetState::Ready &&

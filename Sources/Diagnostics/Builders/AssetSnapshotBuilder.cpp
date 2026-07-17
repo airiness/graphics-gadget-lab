@@ -61,6 +61,10 @@ namespace gglab
 		snapshot.m_LastPlannedResidencyActionCount =
 			residency.m_LastPlannedActionCount;
 		snapshot.m_LastPlannedResidencyBytes = residency.m_LastPlannedBytes;
+		snapshot.m_ResidencyOperationCount = residency.m_OperationCount;
+		snapshot.m_ResidencyRevalidationRejectionCount =
+			residency.m_RevalidationRejectionCount;
+		snapshot.m_ResidencyStaleCompletionCount = residency.m_StaleCompletionCount;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetInterestKind kind,

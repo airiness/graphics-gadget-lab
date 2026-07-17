@@ -2,6 +2,7 @@
 #include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/ReservedTexture.h"
+#include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
@@ -117,16 +118,21 @@ namespace gglab
 			TextureID id,
 			std::string_view textureName,
 			const std::filesystem::path& sourcePath = {}) noexcept;
-		void CompleteTextureUpload(TextureID textureId, bool succeeded) noexcept;
+		void CompleteTextureUpload(
+			TextureID textureId,
+			bool succeeded,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool QueueTextureUpload(
 			TextureUploadData&& uploadData,
-			TaskPriority priority = TaskPriority::Normal) noexcept;
+			TaskPriority priority = TaskPriority::Normal,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool PublishImportedTexture(
 			TextureID textureId,
 			uint64_t generation,
 			TextureSemantic semantic,
 			TaskPriority priority,
-			TextureAssetData&& textureData) noexcept;
+			TextureAssetData&& textureData,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		void CancelTextureIfUnreferenced(TextureID textureId, uint64_t generation) noexcept;
 		void UpdateTextureLoadPriority(
 			TextureID textureId,
@@ -135,11 +141,11 @@ namespace gglab
 		void ReviveTextureInterest(TextureID textureId, uint64_t generation) noexcept;
 		[[nodiscard]] TaskHandle RequestTextureResidency(
 			TextureID textureId,
-			uint64_t generation,
+			AssetResidencyOperation operation,
 			TaskPriority priority) noexcept;
 		[[nodiscard]] bool FinalizeTextureEviction(
 			TextureID textureId,
-			uint64_t generation) noexcept;
+			AssetResidencyOperation operation) noexcept;
 		void RollbackPublicationTexture(TextureID textureId, uint64_t generation) noexcept;
 		void CompleteTextureLoad(
 			TextureID textureId,
@@ -147,14 +153,16 @@ namespace gglab
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
 			TextureAssetData&& textureData,
-			bool residencyReload) noexcept;
+			bool residencyReload,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		[[nodiscard]] TaskHandle QueueTextureLoad(
 			TextureID textureId,
 			const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings,
 			TextureSemantic semantic,
 			TaskPriority priority,
-			bool residencyReload = false) noexcept;
+			bool residencyReload = false,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 		void SetStateChangeCallback(
 			std::function<void(
