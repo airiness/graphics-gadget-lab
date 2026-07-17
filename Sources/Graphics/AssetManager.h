@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
+#include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
@@ -10,22 +11,6 @@
 
 namespace gglab
 {
-	struct AssetOwnerId
-	{
-		uint64_t m_Value = 0;
-
-		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
-		friend constexpr auto operator<=>(const AssetOwnerId&, const AssetOwnerId&) = default;
-	};
-
-	struct AssetOwnerIdHash
-	{
-		size_t operator()(AssetOwnerId owner) const noexcept
-		{
-			return std::hash<uint64_t>{}(owner.m_Value);
-		}
-	};
-
 	enum class AssetInterestKind : uint8_t
 	{
 		Model,
@@ -244,19 +229,6 @@ namespace gglab
 		void ReleaseModelDependencyInterests(ModelID modelId) noexcept;
 		void UpdateModelDependencyPriorities(ModelID modelId, TaskPriority priority) noexcept;
 
-		struct InterestKey
-		{
-			AssetInterestKind m_Kind = AssetInterestKind::Model;
-			uint64_t m_StableId = 0;
-
-			[[nodiscard]] constexpr auto AsTuple() const noexcept
-			{
-				return std::tie(m_Kind, m_StableId);
-			}
-			friend bool operator==(const InterestKey&, const InterestKey&) = default;
-		};
-		using InterestKeyHash = KeyHash<InterestKey>;
-
 		enum class ModelDependencyOutcome : uint8_t
 		{
 			Pending,
@@ -308,28 +280,6 @@ namespace gglab
 			uint64_t m_QuiescedFrame = 0;
 		};
 
-		struct LeaseRecord
-		{
-			InterestKey m_Key{};
-			AssetOwnerId m_Owner{};
-			uint64_t m_Generation = 0;
-			TaskPriority m_Priority = TaskPriority::Normal;
-			bool m_IsInternal = false;
-		};
-
-		struct InterestRecord
-		{
-			uint64_t m_Generation = 0;
-			TaskPriority m_EffectivePriority = TaskPriority::Normal;
-			std::unordered_set<uint64_t> m_LeaseTokens;
-		};
-
-		struct PublicationRetainRecord
-		{
-			uint64_t m_Generation = 0;
-			uint32_t m_Count = 0;
-		};
-
 		AssetOwnerId RegisterAssetOwner(std::string label) noexcept;
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
 		AssetLease AcquireAssetLease(
@@ -350,20 +300,20 @@ namespace gglab
 			uint64_t stableId,
 			uint64_t generation) noexcept;
 		[[nodiscard]] bool HasPublicationRetain(
-			const InterestKey& key,
+			AssetKey key,
 			uint64_t generation) const noexcept;
-		void RecomputeInterestPriority(const InterestKey& key) noexcept;
+		void HandleInterestChange(const AssetInterestChange& change) noexcept;
 		void ApplyInterestPriority(
-			const InterestKey& key,
+			AssetKey key,
 			uint64_t generation,
 			TaskPriority priority) noexcept;
 		void CancelAssetIfUnreferenced(
-			const InterestKey& key,
+			AssetKey key,
 			uint64_t generation) noexcept;
 		[[nodiscard]] TaskPriority GetEffectivePriority(
-			const InterestKey& key,
+			AssetKey key,
 			TaskPriority fallback = TaskPriority::Normal) const noexcept;
-		[[nodiscard]] bool HasActiveInterest(const InterestKey& key) const noexcept;
+		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept;
 		[[nodiscard]] bool HasPinnedDependentModel(
 			AssetInterestKind kind,
 			uint64_t stableId,
@@ -442,25 +392,17 @@ namespace gglab
 		std::unordered_map<ModelID, TaskHandle> m_ModelLoadTasks;
 		std::unordered_map<ModelID, TaskHandle> m_MeshReloadTasks;
 		std::unordered_set<ModelID> m_PendingModels;
-		uint64_t m_NextAssetOwnerId = 1;
-		uint64_t m_NextAssetLeaseToken = 1;
-		std::unordered_map<AssetOwnerId, std::string, AssetOwnerIdHash> m_AssetOwners;
-		std::unordered_map<uint64_t, LeaseRecord> m_AssetLeases;
-		std::unordered_map<InterestKey, InterestRecord, InterestKeyHash> m_AssetInterests;
-		std::unordered_map<InterestKey, PublicationRetainRecord, InterestKeyHash>
-			m_PublicationRetains;
+		AssetInterestTracker m_AssetInterestTracker;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
 		std::unordered_map<ModelID, ModelDependencyState> m_ModelDependencyStates;
 		std::unordered_map<DependencyKey, std::vector<DependentModel>, DependencyKeyHash>
 			m_ReverseDependencyIndex;
 		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
-		uint64_t m_OwnershipPriorityUpdateCount = 0;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;
 		uint64_t m_ReadyRetentionCount = 0;
-		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		uint64_t m_AssetUsageFrame = 0;
 		AssetResidencyConfig m_ResidencyConfig{};

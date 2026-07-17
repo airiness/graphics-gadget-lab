@@ -31,11 +31,29 @@ namespace gglab
 			return state == AssetState::Failed || state == AssetState::Cancelled;
 		}
 
-		[[nodiscard]] TaskPriority HigherPriority(
-			TaskPriority lhs,
-			TaskPriority rhs) noexcept
+		[[nodiscard]] AssetKind ToAssetKind(AssetInterestKind kind) noexcept
 		{
-			return static_cast<uint8_t>(lhs) < static_cast<uint8_t>(rhs) ? lhs : rhs;
+			switch (kind)
+			{
+			case AssetInterestKind::Model: return AssetKind::Model;
+			case AssetInterestKind::Texture: return AssetKind::Texture;
+			case AssetInterestKind::Mesh: return AssetKind::Mesh;
+			}
+			return AssetKind::Unknown;
+		}
+
+		[[nodiscard]] AssetInterestKind ToAssetInterestKind(AssetKind kind) noexcept
+		{
+			switch (kind)
+			{
+			case AssetKind::Texture: return AssetInterestKind::Texture;
+			case AssetKind::Mesh: return AssetInterestKind::Mesh;
+			case AssetKind::Unknown:
+			case AssetKind::Model:
+			case AssetKind::Material:
+				return AssetInterestKind::Model;
+			}
+			return AssetInterestKind::Model;
 		}
 
 		[[nodiscard]] std::array<TextureID, 5> GetMaterialTextureIds(
@@ -139,16 +157,17 @@ namespace gglab
 	{
 		m_TextureRegistry->SetStateChangeCallback({});
 		GGLAB_ASSERT_MSG(
-			m_AssetLeases.empty() && m_AssetInterests.empty(),
+			!m_AssetInterestTracker.HasLeases() &&
+				!m_AssetInterestTracker.HasInterests(),
 			"AssetManager destroyed while asset leases are still active.");
 		GGLAB_ASSERT_MSG(
 			m_ModelDependencyOwners.empty() && m_ModelDependencyLeaseTokens.empty(),
 			"AssetManager destroyed while model dependency ownership is still active.");
 		GGLAB_ASSERT_MSG(
-			m_AssetOwners.empty(),
+			!m_AssetInterestTracker.HasOwners(),
 			"AssetManager destroyed while asset owner scopes are still registered.");
 		GGLAB_ASSERT_MSG(
-			m_PublicationRetains.empty(),
+			!m_AssetInterestTracker.HasPublicationRetains(),
 			"AssetManager destroyed while publication retains are still active.");
 		GGLAB_ASSERT_MSG(
 			m_PublicationOrphanedMeshes.empty(),
@@ -315,35 +334,30 @@ namespace gglab
 
 	AssetOwnershipStatistics AssetManager::GetOwnershipStatistics() const
 	{
+		const AssetInterestTrackerStatistics trackerStatistics =
+			m_AssetInterestTracker.GetStatistics();
 		AssetOwnershipStatistics statistics{};
-		statistics.m_OwnerCount = static_cast<uint32_t>(m_AssetOwners.size());
-		statistics.m_LeaseCount = static_cast<uint32_t>(m_AssetLeases.size());
-		statistics.m_ManagedAssetCount = static_cast<uint32_t>(m_AssetInterests.size());
-		statistics.m_PriorityUpdateCount = m_OwnershipPriorityUpdateCount;
+		statistics.m_OwnerCount = trackerStatistics.m_OwnerCount;
+		statistics.m_LeaseCount = trackerStatistics.m_LeaseCount;
+		statistics.m_ManagedAssetCount = trackerStatistics.m_ManagedAssetCount;
+		statistics.m_PriorityUpdateCount = trackerStatistics.m_PriorityUpdateCount;
 		statistics.m_CpuCancellationCount = m_CpuCancellationCount;
 		statistics.m_ReadyCancellationCount = m_ReadyCancellationCount;
 		statistics.m_GpuDeferredCancellationCount = m_GpuDeferredCancellationCount;
 		statistics.m_ReadyRetentionCount = m_ReadyRetentionCount;
-		statistics.m_PublicationRetainCount = m_PublicationRetainCount;
+		statistics.m_PublicationRetainCount = trackerStatistics.m_PublicationRetainCount;
 		statistics.m_PublicationProtectedCancellationCount =
 			m_PublicationProtectedCancellationCount;
-		statistics.m_ActiveInterests.reserve(m_AssetInterests.size());
-		for (const auto& [key, interest] : m_AssetInterests)
+		statistics.m_ActiveInterests.reserve(trackerStatistics.m_ActiveInterests.size());
+		for (const TrackedAssetInterestActivity& interest :
+			trackerStatistics.m_ActiveInterests)
 		{
-			std::unordered_set<uint64_t> owners;
-			for (uint64_t token : interest.m_LeaseTokens)
-			{
-				if (const auto lease = m_AssetLeases.find(token); lease != m_AssetLeases.end())
-				{
-					owners.insert(lease->second.m_Owner.m_Value);
-				}
-			}
 			statistics.m_ActiveInterests.push_back({
-				.m_Kind = key.m_Kind,
-				.m_StableId = key.m_StableId,
-				.m_Generation = interest.m_Generation,
-				.m_LeaseCount = static_cast<uint32_t>(interest.m_LeaseTokens.size()),
-				.m_OwnerCount = static_cast<uint32_t>(owners.size()),
+				.m_Kind = ToAssetInterestKind(interest.m_ContentVersion.m_Key.m_Kind),
+				.m_StableId = interest.m_ContentVersion.m_Key.m_StableId,
+				.m_Generation = interest.m_ContentVersion.m_ContentGeneration,
+				.m_LeaseCount = interest.m_LeaseCount,
+				.m_OwnerCount = interest.m_OwnerCount,
 				.m_EffectivePriority = interest.m_EffectivePriority,
 			});
 		}
@@ -400,21 +414,12 @@ namespace gglab
 
 	AssetOwnerId AssetManager::RegisterAssetOwner(std::string label) noexcept
 	{
-		const AssetOwnerId owner{ m_NextAssetOwnerId++ };
-		m_AssetOwners.emplace(owner, std::move(label));
-		return owner;
+		return m_AssetInterestTracker.RegisterOwner(std::move(label));
 	}
 
 	void AssetManager::UnregisterAssetOwner(AssetOwnerId owner) noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			std::ranges::none_of(m_AssetLeases,
-				[owner](const auto& entry) noexcept
-				{
-					return entry.second.m_Owner == owner;
-				}),
-			"Asset owner unregistered while leases are still active.");
-		m_AssetOwners.erase(owner);
+		m_AssetInterestTracker.UnregisterOwner(owner);
 	}
 
 	AssetLease AssetManager::AcquireAssetLease(
@@ -429,22 +434,15 @@ namespace gglab
 		{
 			return {};
 		}
-		const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
-		const uint64_t token = m_NextAssetLeaseToken++;
-		m_AssetLeases.emplace(token, LeaseRecord{
-			.m_Key = key,
-			.m_Owner = owner,
-			.m_Generation = generation,
-			.m_Priority = priority,
-			.m_IsInternal = internal,
-		});
-		auto [interest, inserted] = m_AssetInterests.try_emplace(key);
-		if (inserted)
+		const AssetLeaseAcquireResult result = m_AssetInterestTracker.AcquireLease(
+			owner,
+			MakeAssetContentVersion(ToAssetKind(kind), stableId, generation),
+			priority,
+			internal);
+		if (!result.IsValid())
 		{
-			interest->second.m_Generation = generation;
-			interest->second.m_EffectivePriority = priority;
+			return {};
 		}
-		interest->second.m_LeaseTokens.insert(token);
 		if (kind == AssetInterestKind::Texture)
 		{
 			m_TextureRegistry->ReviveTextureInterest(
@@ -462,21 +460,14 @@ namespace gglab
 				generation,
 				priority);
 		}
-		if (inserted)
-		{
-			ApplyInterestPriority(key, generation, priority);
-		}
-		else
-		{
-			RecomputeInterestPriority(key);
-		}
+		HandleInterestChange(result.m_Change);
 		if (kind == AssetInterestKind::Model)
 		{
 			RequestModelResidency(
 				ModelID{ static_cast<uint32_t>(stableId) },
 				generation);
 		}
-		return AssetLease(this, token);
+		return AssetLease(this, result.m_LeaseToken);
 	}
 
 	AssetPublicationRetain AssetManager::AcquirePublicationRetain(
@@ -484,19 +475,11 @@ namespace gglab
 		uint64_t stableId,
 		uint64_t generation) noexcept
 	{
-		const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
-		auto [retain, inserted] = m_PublicationRetains.try_emplace(key);
-		if (inserted)
+		if (!m_AssetInterestTracker.AcquirePublicationRetain(
+			MakeAssetContentVersion(ToAssetKind(kind), stableId, generation)))
 		{
-			retain->second.m_Generation = generation;
-		}
-		else if (retain->second.m_Generation != generation)
-		{
-			GGLAB_ASSERT_MSG(false, "Publication retain generation mismatch.");
 			return {};
 		}
-		++retain->second.m_Count;
-		++m_PublicationRetainCount;
 		if (kind == AssetInterestKind::Texture)
 		{
 			m_TextureRegistry->ReviveTextureInterest(
@@ -511,111 +494,81 @@ namespace gglab
 		uint64_t stableId,
 		uint64_t generation) noexcept
 	{
-		const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
-		const auto retain = m_PublicationRetains.find(key);
-		if (retain == m_PublicationRetains.end() ||
-			retain->second.m_Generation != generation ||
-			retain->second.m_Count == 0)
-		{
-			GGLAB_ASSERT_MSG(false, "Released an unknown publication retain.");
-			return;
-		}
-		--retain->second.m_Count;
-		--m_PublicationRetainCount;
-		if (retain->second.m_Count == 0)
-		{
-			m_PublicationRetains.erase(retain);
-		}
+		m_AssetInterestTracker.ReleasePublicationRetain(
+			MakeAssetContentVersion(ToAssetKind(kind), stableId, generation));
 	}
 
 	bool AssetManager::HasPublicationRetain(
-		const InterestKey& key,
+		AssetKey key,
 		uint64_t generation) const noexcept
 	{
-		const auto retain = m_PublicationRetains.find(key);
-		return retain != m_PublicationRetains.end() &&
-			retain->second.m_Generation == generation &&
-			retain->second.m_Count > 0;
+		return m_AssetInterestTracker.HasPublicationRetain(
+			MakeAssetContentVersion(key, generation));
 	}
 
 	void AssetManager::ReleaseAssetLease(uint64_t leaseToken) noexcept
 	{
-		const auto lease = m_AssetLeases.find(leaseToken);
-		if (lease == m_AssetLeases.end())
+		const std::optional<AssetInterestChange> change =
+			m_AssetInterestTracker.ReleaseLease(leaseToken);
+		if (!change)
 		{
 			return;
 		}
-		const LeaseRecord record = lease->second;
-		m_AssetLeases.erase(lease);
-		const auto interest = m_AssetInterests.find(record.m_Key);
-		if (interest == m_AssetInterests.end())
+		if (change->m_IsActive)
 		{
-			return;
-		}
-		interest->second.m_LeaseTokens.erase(leaseToken);
-		if (!interest->second.m_LeaseTokens.empty())
-		{
-			RecomputeInterestPriority(record.m_Key);
+			HandleInterestChange(*change);
 			return;
 		}
 
-		if (record.m_Key.m_Kind == AssetInterestKind::Model)
+		if (change->m_ContentVersion.m_Key.m_Kind == AssetKind::Model)
 		{
-			ReleaseModelDependencyInterests(ModelID{ static_cast<uint32_t>(record.m_Key.m_StableId) });
+			ReleaseModelDependencyInterests(ModelID{ static_cast<uint32_t>(
+				change->m_ContentVersion.m_Key.m_StableId) });
 		}
-		m_AssetInterests.erase(interest);
-		CancelAssetIfUnreferenced(record.m_Key, record.m_Generation);
+		CancelAssetIfUnreferenced(
+			change->m_ContentVersion.m_Key,
+			change->m_ContentVersion.m_ContentGeneration);
 	}
 
 	void AssetManager::UpdateAssetLeasePriority(
 		uint64_t leaseToken,
 		TaskPriority priority) noexcept
 	{
-		const auto lease = m_AssetLeases.find(leaseToken);
-		if (lease == m_AssetLeases.end() || lease->second.m_Priority == priority)
+		const std::optional<AssetInterestChange> change =
+			m_AssetInterestTracker.UpdateLeasePriority(leaseToken, priority);
+		if (change)
 		{
-			return;
+			HandleInterestChange(*change);
 		}
-		lease->second.m_Priority = priority;
-		RecomputeInterestPriority(lease->second.m_Key);
 	}
 
-	void AssetManager::RecomputeInterestPriority(const InterestKey& key) noexcept
+	void AssetManager::HandleInterestChange(const AssetInterestChange& change) noexcept
 	{
-		const auto interest = m_AssetInterests.find(key);
-		if (interest == m_AssetInterests.end() || interest->second.m_LeaseTokens.empty())
+		if (!change.m_IsActive ||
+			(change.m_WasActive && !change.EffectivePriorityChanged()))
 		{
 			return;
 		}
-		TaskPriority effective = TaskPriority::Background;
-		for (uint64_t token : interest->second.m_LeaseTokens)
-		{
-			if (const auto lease = m_AssetLeases.find(token); lease != m_AssetLeases.end())
-			{
-				effective = HigherPriority(effective, lease->second.m_Priority);
-			}
-		}
-		if (effective == interest->second.m_EffectivePriority)
-		{
-			return;
-		}
-		interest->second.m_EffectivePriority = effective;
-		++m_OwnershipPriorityUpdateCount;
-		ApplyInterestPriority(key, interest->second.m_Generation, effective);
-		if (key.m_Kind == AssetInterestKind::Model)
+		ApplyInterestPriority(
+			change.m_ContentVersion.m_Key,
+			change.m_ContentVersion.m_ContentGeneration,
+			change.m_EffectivePriority);
+		if (change.EffectivePriorityChanged() &&
+			change.m_ContentVersion.m_Key.m_Kind == AssetKind::Model)
 		{
 			UpdateModelDependencyPriorities(
-				ModelID{ static_cast<uint32_t>(key.m_StableId) },
-				effective);
+				ModelID{ static_cast<uint32_t>(
+					change.m_ContentVersion.m_Key.m_StableId) },
+				change.m_EffectivePriority);
 		}
 	}
 
 	void AssetManager::ApplyInterestPriority(
-		const InterestKey& key,
+		AssetKey key,
 		uint64_t generation,
 		TaskPriority priority) noexcept
 	{
-		if (key.m_Kind == AssetInterestKind::Model)
+		if (key.m_Kind == AssetKind::Model)
 		{
 			const ModelID modelId{ static_cast<uint32_t>(key.m_StableId) };
 			if (const auto task = m_ModelLoadTasks.find(modelId); task != m_ModelLoadTasks.end())
@@ -626,7 +579,7 @@ namespace gglab
 				MakeAssetContentVersion(modelId, generation),
 				priority));
 		}
-		else if (key.m_Kind == AssetInterestKind::Texture)
+		else if (key.m_Kind == AssetKind::Texture)
 		{
 			m_TextureRegistry->UpdateTextureLoadPriority(
 				TextureID{ static_cast<uint32_t>(key.m_StableId) },
@@ -652,18 +605,15 @@ namespace gglab
 	}
 
 	TaskPriority AssetManager::GetEffectivePriority(
-		const InterestKey& key,
+		AssetKey key,
 		TaskPriority fallback) const noexcept
 	{
-		const auto interest = m_AssetInterests.find(key);
-		return interest != m_AssetInterests.end() ?
-			interest->second.m_EffectivePriority : fallback;
+		return m_AssetInterestTracker.GetEffectivePriority(key, fallback);
 	}
 
-	bool AssetManager::HasActiveInterest(const InterestKey& key) const noexcept
+	bool AssetManager::HasActiveInterest(AssetKey key) const noexcept
 	{
-		const auto interest = m_AssetInterests.find(key);
-		return interest != m_AssetInterests.end() && !interest->second.m_LeaseTokens.empty();
+		return m_AssetInterestTracker.HasActiveInterest(key);
 	}
 
 	bool AssetManager::HasPinnedDependentModel(
@@ -696,10 +646,7 @@ namespace gglab
 		ModelID modelId,
 		uint64_t generation) noexcept
 	{
-		const InterestKey modelKey{
-			.m_Kind = AssetInterestKind::Model,
-			.m_StableId = modelId.Value(),
-		};
+		const AssetKey modelKey = MakeAssetKey(modelId);
 		if (!HasActiveInterest(modelKey) || m_ModelDependencyLeaseTokens.contains(modelId))
 		{
 			return;
@@ -806,7 +753,7 @@ namespace gglab
 	}
 
 	void AssetManager::CancelAssetIfUnreferenced(
-		const InterestKey& key,
+		AssetKey key,
 		uint64_t generation) noexcept
 	{
 		if (HasPublicationRetain(key, generation))
@@ -814,13 +761,13 @@ namespace gglab
 			++m_PublicationProtectedCancellationCount;
 			return;
 		}
-		if (key.m_Kind == AssetInterestKind::Model)
+		if (key.m_Kind == AssetKind::Model)
 		{
 			CancelModelIfUnreferenced(
 				ModelID{ static_cast<uint32_t>(key.m_StableId) },
 				generation);
 		}
-		else if (key.m_Kind == AssetInterestKind::Texture)
+		else if (key.m_Kind == AssetKind::Texture)
 		{
 			const TextureID textureId{ static_cast<uint32_t>(key.m_StableId) };
 			const Texture* texture = m_TextureRegistry->GetTexture(textureId);
@@ -1145,10 +1092,9 @@ namespace gglab
 				continue;
 			}
 
-			const InterestKey key{
-				.m_Kind = eviction.m_Kind,
-				.m_StableId = eviction.m_StableId,
-			};
+			const AssetKey key = MakeAssetKey(
+				ToAssetKind(eviction.m_Kind),
+				eviction.m_StableId);
 			const bool protectedByInterest = HasActiveInterest(key) ||
 				HasPublicationRetain(key, eviction.m_Generation);
 			bool finalized = false;
@@ -1258,7 +1204,7 @@ namespace gglab
 			{
 				const uint64_t unusedFrames = lifecycle.m_LastUsedFrame == 0 ?
 					m_AssetUsageFrame : m_AssetUsageFrame - lifecycle.m_LastUsedFrame;
-				const InterestKey key{ .m_Kind = kind, .m_StableId = stableId };
+				const AssetKey key = MakeAssetKey(ToAssetKind(kind), stableId);
 				return lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
 					lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
 					unusedFrames >= m_ResidencyConfig.m_MinUnusedFrames &&
@@ -1514,10 +1460,9 @@ namespace gglab
 							};
 							if (!QueueMeshUpload(
 								std::move(uploadData),
-								GetEffectivePriority({
-									.m_Kind = AssetInterestKind::Mesh,
-									.m_StableId = meshId.Value(),
-								}, completion.m_Priority)))
+								GetEffectivePriority(
+									MakeAssetKey(meshId),
+									completion.m_Priority)))
 							{
 								mesh->m_IsReloading = false;
 								SetMeshState(*mesh, AssetState::CpuReady);
@@ -2472,10 +2417,9 @@ namespace gglab
 			completion.m_Name);
 		auto payload = std::make_unique<ImportedModel>(std::move(importedModel));
 		const AssetStreamingWorkEstimate estimate = EstimateImportedModel(*payload);
-		const TaskPriority priority = GetEffectivePriority({
-			.m_Kind = AssetInterestKind::Model,
-			.m_StableId = modelId.Value(),
-		}, completion.m_Priority);
+		const TaskPriority priority = GetEffectivePriority(
+			MakeAssetKey(modelId),
+			completion.m_Priority);
 		auto publicationJob = std::make_unique<ModelPublicationJob>(
 			CreateModelPublicationServices(),
 			MakeAssetContentVersion(modelId, generation),

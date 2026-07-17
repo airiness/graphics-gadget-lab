@@ -61,10 +61,10 @@ namespace gglab
 			uint64_t stableId,
 			const AssetLifecycle& lifecycle) noexcept
 			{
-				const AssetManager::InterestKey key{
-					.m_Kind = kind,
-					.m_StableId = stableId,
-				};
+				const AssetKind assetKind = kind == AssetInterestKind::Texture ?
+					AssetKind::Texture : kind == AssetInterestKind::Mesh ?
+					AssetKind::Mesh : AssetKind::Model;
+				const AssetKey key = MakeAssetKey(assetKind, stableId);
 				return lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
 					lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
 					!assetManager.HasActiveInterest(key) &&
