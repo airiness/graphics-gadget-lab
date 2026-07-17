@@ -215,7 +215,7 @@ namespace gglab
 				importedMesh.m_Indices.size()) * sizeof(uint32_t);
 			const uint64_t sourceBytes = vertexBytes + indexBytes;
 			const MeshID meshId = m_AssetManager->CreateMesh();
-			Mesh* mesh = m_AssetManager->GetMesh(meshId);
+			Mesh* mesh = m_AssetManager->EditMesh(meshId);
 			if (!meshId.IsValid() || !mesh)
 			{
 				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
@@ -548,7 +548,7 @@ namespace gglab
 			const AssetContentVersion& modelVersion) const noexcept
 		{
 			const ModelID modelId = ToModelId(modelVersion);
-			Model* model = m_AssetManager->GetModel(modelId);
+			Model* model = m_AssetManager->EditModel(modelId);
 			return model &&
 				model->m_ContentGeneration == modelVersion.m_ContentGeneration ?
 				model : nullptr;

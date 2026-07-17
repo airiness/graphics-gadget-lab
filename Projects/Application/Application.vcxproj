@@ -252,6 +252,9 @@
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\MeshStore.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\ModelStore.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.cpp" />
@@ -622,6 +625,9 @@
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\MeshStore.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\ModelStore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetResourcePublication.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.h" />

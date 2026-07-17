@@ -32,7 +32,7 @@ namespace gglab
 					ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
 				material->m_BaseColorBinding.m_SamplerId =
 					info.m_SamplerRegistry->GetPresetSamplerId(SamplerPreset::AnisotropicClamp);
-				assetManager.AddMaterial(std::move(material));
+				assetManager.AddProceduralMaterial(std::move(material));
 			}
 
 			if (assetManager.GetMesh(meshId) == nullptr)
@@ -43,7 +43,7 @@ namespace gglab
 				AssetManager::MeshUploadData uploadData{};
 				uploadData.m_VerticesData = buildVertices();
 				uploadData.m_IndicesData = buildIndices();
-				assetManager.AddMesh(std::move(mesh), uploadData);
+				assetManager.AddProceduralMesh(std::move(mesh), uploadData);
 			}
 
 			if (assetManager.GetModel(modelId) == nullptr)
@@ -56,7 +56,7 @@ namespace gglab
 					.m_MeshId = meshId,
 					.m_MaterialId = ProceduralPrimitiveMaterialID,
 				});
-				assetManager.AddModel(std::move(model));
+				assetManager.AddProceduralModel(std::move(model));
 			}
 
 			auto& registry = info.m_World->GetRegistry();
