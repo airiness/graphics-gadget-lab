@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -100,27 +100,27 @@
     <Filter Include="Graphics\Asset">
       <UniqueIdentifier>{c43bda20-0a24-4dab-8185-f0eef9f49f10}</UniqueIdentifier>
     </Filter>
-	<Filter Include="Graphics\Asset\Dependency">
-	  <UniqueIdentifier>{99dc118a-3c5a-496a-9a52-06a25cf5dca8}</UniqueIdentifier>
-	</Filter>
+    <Filter Include="Graphics\Asset\Dependency">
+      <UniqueIdentifier>{99dc118a-3c5a-496a-9a52-06a25cf5dca8}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\Asset\Interop">
       <UniqueIdentifier>{3bc92d47-ddbe-4ca0-a02a-da269cb11d8f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\Asset\Publication">
       <UniqueIdentifier>{79c2d0d9-8417-4fae-9136-b0274eb69756}</UniqueIdentifier>
     </Filter>
-	<Filter Include="Graphics\Asset\Interest">
-	  <UniqueIdentifier>{eec23838-4527-484d-a43c-b26346697285}</UniqueIdentifier>
-	</Filter>
-	<Filter Include="Graphics\Asset\Loading">
-	  <UniqueIdentifier>{9279a072-7987-4b95-9753-bf15ad95218c}</UniqueIdentifier>
-	</Filter>
-	<Filter Include="Graphics\Asset\Residency">
-	  <UniqueIdentifier>{ef61c6c1-1eaa-4e42-b68e-5c7701284279}</UniqueIdentifier>
-	</Filter>
-	<Filter Include="Graphics\Asset\Store">
-	  <UniqueIdentifier>{c392b54c-9a75-4c0b-a38a-6fc426eb7e46}</UniqueIdentifier>
-	</Filter>
+    <Filter Include="Graphics\Asset\Interest">
+      <UniqueIdentifier>{eec23838-4527-484d-a43c-b26346697285}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Asset\Loading">
+      <UniqueIdentifier>{9279a072-7987-4b95-9753-bf15ad95218c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Asset\Residency">
+      <UniqueIdentifier>{ef61c6c1-1eaa-4e42-b68e-5c7701284279}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Asset\Store">
+      <UniqueIdentifier>{c392b54c-9a75-4c0b-a38a-6fc426eb7e46}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Platform">
       <UniqueIdentifier>{578d0cc7-e7d1-47fd-93bf-d24a02f93c5e}</UniqueIdentifier>
     </Filter>
@@ -465,30 +465,30 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.cpp">
-	  <Filter>Graphics\Asset\Dependency</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.cpp">
-	  <Filter>Graphics\Asset\Dependency</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp">
-	  <Filter>Graphics\Asset\Interest</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
-	  <Filter>Graphics\Asset\Loading</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.cpp">
-	  <Filter>Graphics\Asset\Residency</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.cpp">
-	  <Filter>Graphics\Asset\Store</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\MeshStore.cpp">
-	  <Filter>Graphics\Asset\Store</Filter>
-	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\Store\ModelStore.cpp">
-	  <Filter>Graphics\Asset\Store</Filter>
-	</ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.cpp">
+      <Filter>Graphics\Asset\Dependency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.cpp">
+      <Filter>Graphics\Asset\Dependency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp">
+      <Filter>Graphics\Asset\Interest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
+      <Filter>Graphics\Asset\Loading</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.cpp">
+      <Filter>Graphics\Asset\Residency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.cpp">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MeshStore.cpp">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\ModelStore.cpp">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClCompile>
@@ -1076,33 +1076,33 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h">
-	  <Filter>Graphics\Asset\Dependency</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h">
-	  <Filter>Graphics\Asset\Dependency</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h">
-	  <Filter>Graphics\Asset\Interest</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h">
-	  <Filter>Graphics\Asset\Loading</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.h">
-	  <Filter>Graphics\Asset\Residency</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyTypes.h">
-	  <Filter>Graphics\Asset\Residency</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.h">
-	  <Filter>Graphics\Asset\Store</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\MeshStore.h">
-	  <Filter>Graphics\Asset\Store</Filter>
-	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\Store\ModelStore.h">
-	  <Filter>Graphics\Asset\Store</Filter>
-	</ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h">
+      <Filter>Graphics\Asset\Dependency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h">
+      <Filter>Graphics\Asset\Dependency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h">
+      <Filter>Graphics\Asset\Interest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h">
+      <Filter>Graphics\Asset\Loading</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.h">
+      <Filter>Graphics\Asset\Residency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyTypes.h">
+      <Filter>Graphics\Asset\Residency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.h">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MeshStore.h">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\ModelStore.h">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClInclude>
