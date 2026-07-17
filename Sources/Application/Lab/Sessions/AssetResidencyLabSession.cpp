@@ -41,7 +41,10 @@ namespace gglab
 		{
 			Loading,
 			MarkUsage,
+			WaitForPinnedProtection,
 			ReleaseOwner,
+			WaitForEvictionStart,
+			WaitForEvictionCancellation,
 			WaitForRelease,
 			WaitForReload,
 			Completed,
@@ -57,10 +60,12 @@ namespace gglab
 		uint64_t m_MeshResidencyEpoch = 0;
 		uint64_t m_TextureResidencyEpoch = 0;
 		uint64_t m_EvictionCountBaseline = 0;
+		uint64_t m_EvictionCancellationCountBaseline = 0;
 		uint64_t m_ReloadRequestCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
+		uint32_t m_PinnedProtectionFrames = 0;
 		float m_ElapsedSeconds = 0.0f;
 		Phase m_Phase = Phase::Loading;
 		bool m_Passed = false;
@@ -219,6 +224,13 @@ namespace gglab
 				Fail("A cacheable asset rejected a valid residency policy transition.");
 				return;
 			}
+			if (!assetManager.SetModelResidencyPolicy(
+				m_State->m_Request.m_ModelId,
+				AssetResidencyPolicy::Pinned))
+			{
+				Fail("The verification model could not be pinned for eviction protection.");
+				return;
+			}
 			const TextureID reservedTexture = ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
 			const Texture* pinnedTexture = assetManager.GetTexture(reservedTexture);
 			if (!pinnedTexture ||
@@ -242,6 +254,8 @@ namespace gglab
 			const AssetResidencyStatistics residency =
 				assetManager.GetResidencyStatistics();
 			m_State->m_EvictionCountBaseline = residency.m_EvictionCount;
+			m_State->m_EvictionCancellationCountBaseline =
+				residency.m_EvictionCancellationCount;
 			m_State->m_ReloadRequestCountBaseline = residency.m_ReloadRequestCount;
 			m_State->m_Phase = State::Phase::MarkUsage;
 			break;
@@ -276,6 +290,57 @@ namespace gglab
 				return;
 			}
 			ResetAssetInterests();
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = true;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForPinnedProtection;
+			break;
+		}
+
+		case State::Phase::WaitForPinnedProtection:
+		{
+			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
+			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!model || !mesh || !texture ||
+				model->m_ContentGeneration != m_State->m_ModelGeneration ||
+				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
+				texture->m_ContentGeneration != m_State->m_TextureGeneration)
+			{
+				Fail("Pinned residency protection replaced a stable asset entry.");
+				return;
+			}
+			if (model->m_ResidencyPolicy != AssetResidencyPolicy::Pinned ||
+				model->m_State != AssetState::Ready ||
+				mesh->m_State != AssetState::Ready ||
+				texture->m_State != AssetState::Ready ||
+				mesh->m_ResidencyState != AssetResidencyState::Resident ||
+				texture->m_ResidencyState != AssetResidencyState::Resident)
+			{
+				Fail("A pinned model did not protect its resident dependencies from eviction.");
+				return;
+			}
+			const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
+			if (residency.m_EvictionCount != m_State->m_EvictionCountBaseline ||
+				residency.m_PendingEvictionCount != 0)
+			{
+				Fail("Automatic eviction scheduled or finalized work for a pinned model.");
+				return;
+			}
+			if (++m_State->m_PinnedProtectionFrames < 8)
+			{
+				break;
+			}
+			if (!assetManager.SetModelResidencyPolicy(
+				m_State->m_Request.m_ModelId,
+				AssetResidencyPolicy::Cacheable))
+			{
+				Fail("The verification model could not return to cacheable residency.");
+				return;
+			}
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = false;
+			assetManager.SetResidencyConfig(config);
 			m_State->m_Phase = State::Phase::ReleaseOwner;
 			break;
 		}
@@ -303,6 +368,84 @@ namespace gglab
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
 			config.m_EnableAutomaticEviction = true;
 			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForEvictionStart;
+			break;
+		}
+
+		case State::Phase::WaitForEvictionStart:
+		{
+			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
+			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!model || !mesh || !texture ||
+				model->m_ContentGeneration != m_State->m_ModelGeneration ||
+				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
+				texture->m_ContentGeneration != m_State->m_TextureGeneration)
+			{
+				Fail("Eviction start replaced a stable asset entry.");
+				return;
+			}
+			if (mesh->m_ResidencyState != AssetResidencyState::Evicting ||
+				texture->m_ResidencyState != AssetResidencyState::Evicting)
+			{
+				break;
+			}
+			const AssetManager::ModelLoadRequest revived =
+				GetAssetOwnerScope().LoadModelAsync(
+					"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
+					TaskPriority::Critical);
+			if (!revived.IsValid() ||
+				revived.m_ModelId != m_State->m_Request.m_ModelId ||
+				revived.m_Generation != m_State->m_ModelGeneration)
+			{
+				Fail("Reacquiring an evicting model did not preserve its content version.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForEvictionCancellation;
+			break;
+		}
+
+		case State::Phase::WaitForEvictionCancellation:
+		{
+			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
+			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!model || !mesh || !texture)
+			{
+				Fail("Eviction cancellation removed a stable asset entry.");
+				return;
+			}
+			if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled ||
+				mesh->m_State == AssetState::Failed || mesh->m_State == AssetState::Cancelled ||
+				texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled)
+			{
+				Fail("Reacquiring an evicting model produced a terminal asset state.");
+				return;
+			}
+			if (model->m_State != AssetState::Ready ||
+				mesh->m_State != AssetState::Ready ||
+				texture->m_State != AssetState::Ready)
+			{
+				break;
+			}
+			const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
+			if (residency.m_EvictionCancellationCount <
+				m_State->m_EvictionCancellationCountBaseline + 2 ||
+				residency.m_EvictionCount != m_State->m_EvictionCountBaseline ||
+				mesh->m_ResidencyState != AssetResidencyState::Resident ||
+				texture->m_ResidencyState != AssetResidencyState::Resident ||
+				!mesh->m_IsUploaded || !texture->m_IsUploaded)
+			{
+				Fail("Reacquiring interest did not cancel pending eviction before resource release.");
+				return;
+			}
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			if (snapshot.m_DependencyValidationMismatchCount != 0)
+			{
+				Fail("Dependency tracking diverged while eviction was cancelled.");
+				return;
+			}
+			ResetAssetInterests();
 			m_State->m_Phase = State::Phase::WaitForRelease;
 			break;
 		}
@@ -469,7 +612,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, eviction, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

@@ -266,6 +266,7 @@ namespace gglab
 			FailMaterials,
 			StaleGeneration,
 			SharedTextureRollback,
+			OwnershipPriorityMerge,
 			GpuSubmittedCancellation,
 			ShutdownDrain,
 			Count,
@@ -844,6 +845,77 @@ namespace gglab
 			};
 			m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingSharedTexture;
 			break;
+		}
+		case AcceptanceSuiteState::Case::OwnershipPriorityMerge:
+		{
+			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope(
+				"Asset publication acceptance background owner");
+			m_Suite->m_SecondaryOwner = assetManager->CreateOwnerScope(
+				"Asset publication acceptance critical owner");
+			const AssetManager::TextureLoadRequest backgroundRequest =
+				m_Suite->m_PrimaryOwner.LoadTextureAsync(
+					"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
+					TextureSemantic::BaseColor,
+					TaskPriority::Background);
+			const AssetManager::TextureLoadRequest criticalRequest =
+				m_Suite->m_SecondaryOwner.LoadTextureAsync(
+					"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
+					TextureSemantic::BaseColor,
+					TaskPriority::Critical);
+			std::vector<std::string> errors;
+			if (!backgroundRequest.IsValid() || !criticalRequest.IsValid() ||
+				backgroundRequest.m_TextureId != criticalRequest.m_TextureId ||
+				backgroundRequest.m_Generation != criticalRequest.m_Generation)
+			{
+				errors.push_back("Two owners did not acquire the same texture content version.");
+			}
+			else
+			{
+				const auto findInterest = [id = backgroundRequest.m_TextureId](
+					const AssetOwnershipStatistics& ownership) noexcept
+					-> const AssetInterestActivity*
+					{
+						const auto interest = std::ranges::find_if(
+							ownership.m_ActiveInterests,
+							[id](const AssetInterestActivity& activity) noexcept
+							{
+								return activity.m_Kind == AssetInterestKind::Texture &&
+									activity.m_StableId == id.Value();
+							});
+						return interest != ownership.m_ActiveInterests.end() ?
+							&*interest : nullptr;
+					};
+
+				const AssetOwnershipStatistics merged = assetManager->GetOwnershipStatistics();
+				const AssetInterestActivity* mergedInterest = findInterest(merged);
+				if (!mergedInterest ||
+					mergedInterest->m_Generation != backgroundRequest.m_Generation ||
+					mergedInterest->m_LeaseCount != 2 ||
+					mergedInterest->m_OwnerCount != 2 ||
+					mergedInterest->m_EffectivePriority != TaskPriority::Critical)
+				{
+					errors.push_back("Multiple leases did not merge to the highest owner priority.");
+				}
+
+				m_Suite->m_SecondaryOwner.Reset();
+				const AssetOwnershipStatistics reduced = assetManager->GetOwnershipStatistics();
+				const AssetInterestActivity* reducedInterest = findInterest(reduced);
+				if (!reducedInterest ||
+					reducedInterest->m_Generation != backgroundRequest.m_Generation ||
+					reducedInterest->m_LeaseCount != 1 ||
+					reducedInterest->m_OwnerCount != 1 ||
+					reducedInterest->m_EffectivePriority != TaskPriority::Background)
+				{
+					errors.push_back("Releasing the critical lease did not restore background priority.");
+				}
+				if (reduced.m_PriorityUpdateCount <
+					m_Suite->m_CaseBaselineOwnership.m_PriorityUpdateCount + 2)
+				{
+					errors.push_back("Priority merge and release were not both recorded.");
+				}
+			}
+			CompleteAcceptanceCase("Ownership priority merge", std::move(errors));
+			return;
 		}
 		case AcceptanceSuiteState::Case::GpuSubmittedCancellation:
 		{
