@@ -84,6 +84,8 @@ namespace gglab
 	};
 
 	class RHIDevice;
+	class AssetPublicationServicesBase;
+	class AssetManagerPublicationServices;
 	class AssetUploadScheduler;
 	class AssetLease;
 	class AssetPublicationRetain;
@@ -92,8 +94,6 @@ namespace gglab
 	class TransferBatch;
 	class TransferManager;
 	struct AssetSnapshot;
-	struct AssetResourcePublicationStepResult;
-	enum class AssetResourcePublicationAbortReason : uint8_t;
 
 	class AssetManager;
 	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
@@ -209,8 +209,6 @@ namespace gglab
 			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
-		class ModelPublicationTransaction;
-
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
 			TransferBatch& transferBatch) noexcept;
@@ -221,12 +219,8 @@ namespace gglab
 		bool RemoveMesh(MeshID meshId) noexcept;
 		bool RemoveMaterial(MaterialID materialId) noexcept;
 		void RollbackPublicationMesh(MeshID meshId, uint64_t generation) noexcept;
-		[[nodiscard]] AssetResourcePublicationStepResult StepModelPublication(
-			ModelPublicationTransaction& transaction,
-			TaskPriority priority) noexcept;
-		void AbortModelPublication(
-			ModelPublicationTransaction& transaction,
-			AssetResourcePublicationAbortReason reason) noexcept;
+		[[nodiscard]] std::unique_ptr<AssetPublicationServicesBase>
+			CreateModelPublicationServices() noexcept;
 		void CompleteModelLoad(
 			ModelID modelId,
 			uint64_t generation,
@@ -422,6 +416,7 @@ namespace gglab
 
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
+		friend class AssetManagerPublicationServices;
 		friend class AssetLease;
 		friend class AssetPublicationRetain;
 		friend class AssetOwnerScope;
@@ -532,6 +527,7 @@ namespace gglab
 
 	private:
 		friend class AssetManager;
+		friend class AssetManagerPublicationServices;
 		AssetLease(AssetManager* manager, uint64_t leaseToken) noexcept :
 			m_Manager(manager),
 			m_LeaseToken(leaseToken)
