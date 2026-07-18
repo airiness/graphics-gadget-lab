@@ -580,6 +580,20 @@ namespace gglab
 			{
 				break;
 			}
+			const auto replacementCompletion = std::ranges::find(
+				tasks.m_RecentTasks,
+				m_State->m_ReplacementTextureReloadTask,
+				&TaskCompletionInfo::m_Handle);
+			if (replacementCompletion != tasks.m_RecentTasks.end())
+			{
+				if (replacementCompletion->m_Status != TaskStatus::Succeeded)
+				{
+					Fail("The replacement texture decode did not complete successfully.");
+					return;
+				}
+				m_State->m_Phase = State::Phase::WaitForTextureReloadCompletion;
+				break;
+			}
 
 			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
 			if (!texture)

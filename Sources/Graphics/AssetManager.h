@@ -116,6 +116,9 @@ namespace gglab
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void DrainLoadCompletions() noexcept;
 		void DrainStateEvents() noexcept;
+		// Terminal owner-thread transition. Requires task/upload producers to be
+		// stopped and the RHI context to be idle.
+		void PrepareForShutdown() noexcept;
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
 		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
 		{
@@ -347,6 +350,7 @@ namespace gglab
 		uint64_t m_LogicalResidentBytes = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;
+		bool m_IsPreparedForShutdown = false;
 	};
 
 	class AssetPublicationRetain
