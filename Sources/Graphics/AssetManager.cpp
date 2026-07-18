@@ -138,6 +138,9 @@ namespace gglab
 		// members are then destroyed in reverse declaration order.
 		m_TextureRegistry->SetStateChangeCallback({});
 		GGLAB_ASSERT_MSG(
+			m_IsPreparedForShutdown,
+			"AssetManager destroyed without explicit shutdown preparation.");
+		GGLAB_ASSERT_MSG(
 			!m_AssetInterestTracker.HasLeases() &&
 				!m_AssetInterestTracker.HasInterests(),
 			"AssetManager destroyed while asset leases are still active.");
@@ -471,6 +474,98 @@ namespace gglab
 					completesOperation);
 			}
 		}
+	}
+
+	void AssetManager::PrepareForShutdown() noexcept
+	{
+		if (m_IsPreparedForShutdown)
+		{
+			return;
+		}
+		m_IsPreparedForShutdown = true;
+
+		AssetResidencyConfig shutdownConfig = m_AssetResidencyController.GetConfig();
+		shutdownConfig.m_EnableAutomaticEviction = false;
+		m_AssetResidencyController.SetConfig(shutdownConfig);
+
+		// Scheduler finalization may have emitted terminal residency events. Apply
+		// them before classifying pending evictions as current or stale.
+		DrainStateEvents();
+
+		const size_t pendingEvictionCount = m_PendingResidencyEvictions.size();
+		uint32_t cancelledCurrentEvictionCount = 0;
+		for (const PendingResidencyEviction& eviction : m_PendingResidencyEvictions)
+		{
+			const AssetResidencyOperation operation = eviction.m_Operation;
+			const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
+			AssetLifecycle* lifecycle = FindResidencyLifecycle(contentVersion.m_Key);
+			if (!lifecycle ||
+				!AssetResidencyController::IsCurrentOperation(*lifecycle, operation))
+			{
+				m_AssetResidencyController.RecordStaleCompletion();
+				m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
+				continue;
+			}
+
+			bool queuedCompletion = false;
+			if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
+			{
+				Texture* texture = m_TextureRegistry->GetTexture(TextureID{
+					static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+				if (texture &&
+					texture->m_ContentGeneration == contentVersion.m_ContentGeneration)
+				{
+					m_TextureRegistry->SetTextureState(
+						*texture,
+						texture->m_State == AssetState::Evicting ?
+							AssetState::Ready : texture->m_State,
+						operation,
+						AssetStateEventOperationPhase::Completes);
+					queuedCompletion = true;
+				}
+			}
+			else if (contentVersion.m_Key.m_Kind == AssetKind::Mesh)
+			{
+				Mesh* mesh = EditMesh(MeshID{
+					static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+				if (mesh && mesh->m_ContentGeneration ==
+					contentVersion.m_ContentGeneration)
+				{
+					SetMeshState(
+						*mesh,
+						mesh->m_State == AssetState::Evicting ?
+							AssetState::Ready : mesh->m_State,
+						operation,
+						AssetStateEventOperationPhase::Completes);
+					queuedCompletion = true;
+				}
+			}
+
+			GGLAB_ASSERT_MSG(
+				queuedCompletion,
+				"Pending residency eviction could not queue its shutdown completion.");
+			if (!queuedCompletion)
+			{
+				AssetResidencyController::CompleteResidencyOperation(*lifecycle, operation);
+			}
+			++cancelledCurrentEvictionCount;
+			m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
+		}
+		m_PendingResidencyEvictions.clear();
+
+		// Completion events retire the operation serial only after their restored
+		// state has passed the same stale-token validation as normal frame events.
+		DrainStateEvents();
+
+		if (pendingEvictionCount != 0)
+		{
+			GGLAB_LOG_GRAPHICS_INFO(
+				"AssetManager shutdown resolved {} pending residency evictions ({} current, {} stale).",
+				pendingEvictionCount,
+				cancelledCurrentEvictionCount,
+				pendingEvictionCount - cancelledCurrentEvictionCount);
+		}
+		GGLAB_ASSERT(m_PendingResidencyEvictions.empty());
 	}
 
 	void AssetManager::SetResidencyConfig(const AssetResidencyConfig& config) noexcept
@@ -1095,6 +1190,14 @@ namespace gglab
 
 	void AssetManager::Tick() noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			!m_IsPreparedForShutdown,
+			"AssetManager::Tick called after shutdown preparation.");
+		if (m_IsPreparedForShutdown)
+		{
+			return;
+		}
+
 		// Owner-thread phase 1: route worker completions into publication/upload work.
 		DrainLoadCompletions();
 		// Owner-thread phase 2: apply dependency events from previous work.

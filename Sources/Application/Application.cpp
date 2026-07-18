@@ -499,7 +499,7 @@ namespace gglab
 		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();
-		m_AssetManager->DrainStateEvents();
+		m_AssetManager->PrepareForShutdown();
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();
