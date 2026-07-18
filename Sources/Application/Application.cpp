@@ -532,20 +532,20 @@ namespace gglab
 					shaderDescs.push_back(std::move(desc));
 				};
 
-			addGraphicsShader(L"Assets/Shaders/Passes/PassForwardPBR.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassDirectionalShadowMap.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassShadowMapPreview.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassFinalColor.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassBloom.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassPostProcessPreview.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassDebugDraw.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassSkybox.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLEnvironment.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLEnvironmentMip.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLIrradiance.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLPrefilteredSpecular.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLBrdfLUT.hlsl");
-			addGraphicsShader(L"Assets/Shaders/Passes/PassIBLCubemapPreview.hlsl");
+			addGraphicsShader(L"Passes/PassForwardPBR.hlsl");
+			addGraphicsShader(L"Passes/PassDirectionalShadowMap.hlsl");
+			addGraphicsShader(L"Passes/PassShadowMapPreview.hlsl");
+			addGraphicsShader(L"Passes/PassFinalColor.hlsl");
+			addGraphicsShader(L"Passes/PassBloom.hlsl");
+			addGraphicsShader(L"Passes/PassPostProcessPreview.hlsl");
+			addGraphicsShader(L"Passes/PassDebugDraw.hlsl");
+			addGraphicsShader(L"Passes/PassSkybox.hlsl");
+			addGraphicsShader(L"Passes/PassIBLEnvironment.hlsl");
+			addGraphicsShader(L"Passes/PassIBLEnvironmentMip.hlsl");
+			addGraphicsShader(L"Passes/PassIBLIrradiance.hlsl");
+			addGraphicsShader(L"Passes/PassIBLPrefilteredSpecular.hlsl");
+			addGraphicsShader(L"Passes/PassIBLBrdfLUT.hlsl");
+			addGraphicsShader(L"Passes/PassIBLCubemapPreview.hlsl");
 
 			GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
 				*m_TaskSystem,

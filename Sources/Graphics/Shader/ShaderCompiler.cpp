@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #include "Core/HResult.h"
 #include "Core/StringId.h"
 #include "Core/Utility/StringUtils.h"
@@ -86,11 +87,17 @@ namespace gglab
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Impl->m_Compiler)));
 
+		SetSourceRootDirectory(GetShaderSourceRoot());
 		const auto defaultRootDir = utils::GetExeOutDir() / L"ShaderCache";
 		SetCacheRootDirectory(defaultRootDir);
 	}
 
 	ShaderCompiler::~ShaderCompiler() = default;
+
+	void ShaderCompiler::SetSourceRootDirectory(std::filesystem::path root) noexcept
+	{
+		m_SourceRootDir = utils::Canonical(root);
+	}
 
 	void ShaderCompiler::SetCacheRootDirectory(std::filesystem::path root) noexcept
 	{
@@ -163,10 +170,18 @@ namespace gglab
 		if (desc.m_OptLevel.empty()) { desc.m_OptLevel = m_DefaultShaderConfig.m_OptLevel; }
 		if (desc.m_Flags == ShaderCompileFlags::None) { desc.m_Flags = m_DefaultShaderConfig.m_Flags; }
 
-		// includes: normalize path, exclude duplicate
+		// Source and include paths supplied by shader users are relative to the configured source root.
+		if (desc.m_SourcePath.is_relative())
+		{
+			desc.m_SourcePath = m_SourceRootDir / desc.m_SourcePath;
+		}
 		desc.m_SourcePath = utils::Canonical(desc.m_SourcePath);
 		for (auto& include : desc.m_IncludeDirs)
 		{
+			if (include.is_relative())
+			{
+				include = m_SourceRootDir / include;
+			}
 			include = utils::Canonical(include);
 		}
 		{

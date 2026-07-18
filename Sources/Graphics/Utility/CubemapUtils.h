@@ -11,7 +11,7 @@ namespace gglab
 		Vector3 m_Right;
 	};
 
-	// Uses the same face orientation as Assets/Shaders/Common/Cubemap.hlsli.
+	// Uses the same face orientation as the shader source Common/Cubemap.hlsli.
 	[[nodiscard]] CubemapFaceBasis GetCubemapFaceBasis(CubemapFace face) noexcept;
 	[[nodiscard]] Vector3 GetCubemapFaceDirection(CubemapFace face) noexcept;
 	[[nodiscard]] Vector3 GetCubemapFaceUp(CubemapFace face) noexcept;

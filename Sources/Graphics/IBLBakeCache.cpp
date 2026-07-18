@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/IBLBakeCache.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TextureLoader.h"
 #include "Graphics/Utility/TextureUtils.h"
 #include "Core/Hash/KeyHash.h"
@@ -126,7 +127,7 @@ namespace gglab
 		FNV1a64::MixValue(hash, config.m_BrdfLutSize);
 		FNV1a64::MixValue(hash, config.m_BrdfLutFormat);
 
-		const std::filesystem::path shaderRoot = "Assets/Shaders";
+		const std::filesystem::path shaderRoot = GetShaderSourceRoot();
 		std::set<std::filesystem::path> visited;
 		for (const auto shaderPath : BakeShaderPaths)
 		{
