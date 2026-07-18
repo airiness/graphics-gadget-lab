@@ -1843,93 +1843,93 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli">
+    <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\BindlessResources.hlsli">
+    <None Include="..\..\Shaders\Common\BindlessResources.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli">
+    <None Include="..\..\Shaders\Common\BufferLayout.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\Common.hlsli">
+    <None Include="..\..\Shaders\Common\Common.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli">
+    <None Include="..\..\Shaders\Common\Cubemap.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\EnvironmentSampling.hlsli">
+    <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli">
+    <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli">
+    <None Include="..\..\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\MaterialUtils.hlsli">
+    <None Include="..\..\Shaders\Common\MaterialUtils.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli">
+    <None Include="..\..\Shaders\Common\Sampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\VertexInput.hlsli">
+    <None Include="..\..\Shaders\Common\VertexInput.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Common\VertexTransform.hlsli">
+    <None Include="..\..\Shaders\Common\VertexTransform.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\Lighting\ShadowSampling.hlsli">
+    <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli">
+    <None Include="..\..\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
-    <None Include="..\..\Assets\Shaders\shadertoolsconfig.json">
+    <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassBloom.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDebugDraw.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDirectionalShadowMap.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassFinalColor.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLCubemapPreview.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassPostProcessPreview.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassSkybox.hlsl">
+    <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
   </ItemGroup>

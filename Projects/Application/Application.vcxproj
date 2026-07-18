@@ -46,6 +46,7 @@
     <Import Project="..\..\PropertySheets\EnttImport.props" />
     <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -58,6 +59,7 @@
     <Import Project="..\..\PropertySheets\EnttImport.props" />
     <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -697,41 +699,42 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\Assets\Shaders\Common\ApplicationBinding.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\BindlessResources.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\BufferLayout.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\Common.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\Cubemap.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\EnvironmentSampling.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\FullscreenTriangle.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\MaterialSampling.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\MaterialUtils.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\Sampling.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\VertexInput.hlsli" />
-    <None Include="..\..\Assets\Shaders\Common\VertexTransform.hlsli" />
-    <None Include="..\..\Assets\Shaders\Lighting\ShadowSampling.hlsli" />
-    <None Include="..\..\Assets\Shaders\PBR\BRDF.hlsli" />
-    <None Include="..\..\Assets\Shaders\shadertoolsconfig.json" />
+    <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli" />
+    <None Include="..\..\Shaders\Common\BindlessResources.hlsli" />
+    <None Include="..\..\Shaders\Common\BufferLayout.hlsli" />
+    <None Include="..\..\Shaders\Common\Common.hlsli" />
+    <None Include="..\..\Shaders\Common\Cubemap.hlsli" />
+    <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
+    <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
+    <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
+    <None Include="..\..\Shaders\Common\Sampling.hlsli" />
+    <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
+    <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
+    <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
+    <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassBloom.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDebugDraw.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassDirectionalShadowMap.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassFinalColor.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassForwardPBR.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironment.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLEnvironmentMip.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLIrradiance.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassPostProcessPreview.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassShadowMapPreview.hlsl" />
-    <FxCompile Include="..\..\Assets\Shaders\Passes\PassSkybox.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\PropertySheets\LinkAssetDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkAssetDirectory.targets')" />
+    <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
     <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.targets')" />
     <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
