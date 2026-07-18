@@ -75,6 +75,14 @@ namespace gglab
 			std::unordered_map<TextureID, std::unique_ptr<Texture>> m_TextureIDMap;
 		};
 
+		struct TextureLoadOperationRecord
+		{
+			TaskHandle m_Task{};
+			uint64_t m_Generation = 0;
+			uint64_t m_LoadSerial = 0;
+			AssetResidencyOperation m_ResidencyOperation{};
+		};
+
 	public:
 		explicit TextureRegistry(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(TextureRegistry);
@@ -150,6 +158,7 @@ namespace gglab
 		void CompleteTextureLoad(
 			TextureID textureId,
 			uint64_t generation,
+			uint64_t loadSerial,
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
 			TextureAssetData&& textureData,
@@ -163,6 +172,14 @@ namespace gglab
 			TaskPriority priority,
 			bool residencyReload = false,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
+		[[nodiscard]] bool IsCurrentTextureLoadOperation(
+			TextureID textureId,
+			uint64_t generation,
+			uint64_t loadSerial) const noexcept;
+		void CompleteTextureLoadOperation(
+			TextureID textureId,
+			uint64_t generation,
+			uint64_t loadSerial) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 		void SetStateChangeCallback(
 			std::function<void(
@@ -180,7 +197,8 @@ namespace gglab
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureContainer m_TextureContainer;
-		std::unordered_map<TextureID, TaskHandle> m_TextureLoadTasks;
+		uint64_t m_NextTextureLoadSerial = 1;
+		std::unordered_map<TextureID, TextureLoadOperationRecord> m_TextureLoadTasks;
 		std::unordered_set<TextureID> m_PublicationOrphanedTextures;
 		std::function<void(
 			TextureID,

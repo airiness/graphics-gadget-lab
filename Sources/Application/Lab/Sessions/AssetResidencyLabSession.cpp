@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
+#include "Core/Task/TaskSystem.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
@@ -46,6 +47,9 @@ namespace gglab
 			WaitForEvictionStart,
 			WaitForEvictionCancellation,
 			WaitForRelease,
+			WaitForTextureReloadRunning,
+			WaitForTextureReloadReplacement,
+			WaitForTextureReloadCompletion,
 			WaitForReload,
 			Completed,
 		};
@@ -68,6 +72,8 @@ namespace gglab
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
 		uint32_t m_PinnedProtectionFrames = 0;
+		TaskHandle m_StaleTextureReloadTask{};
+		TaskHandle m_ReplacementTextureReloadTask{};
 		float m_ElapsedSeconds = 0.0f;
 		Phase m_Phase = Phase::Loading;
 		bool m_Passed = false;
@@ -496,6 +502,114 @@ namespace gglab
 				return;
 			}
 
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = false;
+			assetManager.SetResidencyConfig(config);
+			const AssetManager::TextureLoadRequest staleReload =
+				GetAssetOwnerScope().LoadTextureAsync(
+					texture->m_SourcePath,
+					texture->m_Semantic,
+					TaskPriority::Background);
+			if (!staleReload.IsValid() || !staleReload.m_Task.IsValid() ||
+				staleReload.m_TextureId != m_State->m_TextureId ||
+				staleReload.m_Generation != m_State->m_TextureGeneration)
+			{
+				Fail("The texture reload replacement probe could not start its first task.");
+				return;
+			}
+			m_State->m_StaleTextureReloadTask = staleReload.m_Task;
+			m_State->m_Phase = State::Phase::WaitForTextureReloadRunning;
+			break;
+		}
+
+		case State::Phase::WaitForTextureReloadRunning:
+		{
+			const TaskSystemStatistics tasks = m_Services.m_TaskSystem->GetStatistics();
+			const auto activity = std::ranges::find(
+				tasks.m_ActiveTasks,
+				m_State->m_StaleTextureReloadTask,
+				&TaskActivity::m_Handle);
+			if (activity == tasks.m_ActiveTasks.end() ||
+				activity->m_Status != TaskStatus::Running ||
+				activity->m_ExecutionMilliseconds < 25.0)
+			{
+				break;
+			}
+
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!texture || texture->m_ContentGeneration != m_State->m_TextureGeneration)
+			{
+				Fail("The texture reload replacement probe lost its stable texture entry.");
+				return;
+			}
+			ResetAssetInterests();
+			const AssetManager::TextureLoadRequest replacementReload =
+				GetAssetOwnerScope().LoadTextureAsync(
+					texture->m_SourcePath,
+					texture->m_Semantic,
+					TaskPriority::Critical);
+			if (!replacementReload.IsValid() || !replacementReload.m_Task.IsValid() ||
+				replacementReload.m_TextureId != m_State->m_TextureId ||
+				replacementReload.m_Generation != m_State->m_TextureGeneration ||
+				replacementReload.m_Task == m_State->m_StaleTextureReloadTask)
+			{
+				Fail("Cancelling a running texture reload did not create a replacement task.");
+				return;
+			}
+			m_State->m_ReplacementTextureReloadTask = replacementReload.m_Task;
+			m_State->m_Phase = State::Phase::WaitForTextureReloadReplacement;
+			break;
+		}
+
+		case State::Phase::WaitForTextureReloadReplacement:
+		{
+			const TaskSystemStatistics tasks = m_Services.m_TaskSystem->GetStatistics();
+			const bool staleCompletionDelivered = std::ranges::any_of(
+				tasks.m_RecentTasks,
+				[this](const TaskCompletionInfo& completion) noexcept
+				{
+					return completion.m_Handle == m_State->m_StaleTextureReloadTask;
+				});
+			if (!staleCompletionDelivered)
+			{
+				break;
+			}
+
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!texture)
+			{
+				Fail("The texture reload replacement probe lost its texture entry.");
+				return;
+			}
+			const AssetManager::TextureLoadRequest trackedReplacement =
+				GetAssetOwnerScope().LoadTextureAsync(
+					texture->m_SourcePath,
+					texture->m_Semantic,
+					TaskPriority::Critical);
+			if (!trackedReplacement.m_Task.IsValid() ||
+				trackedReplacement.m_Task != m_State->m_ReplacementTextureReloadTask)
+			{
+				Fail("A stale texture completion removed the replacement task record.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForTextureReloadCompletion;
+			break;
+		}
+
+		case State::Phase::WaitForTextureReloadCompletion:
+		{
+			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			if (!texture || texture->m_State == AssetState::Failed ||
+				texture->m_State == AssetState::Cancelled)
+			{
+				Fail("The replacement texture residency reload failed.");
+				return;
+			}
+			if (texture->m_State != AssetState::Ready)
+			{
+				break;
+			}
+
 			const AssetManager::ModelLoadRequest reloaded =
 				GetAssetOwnerScope().LoadModelAsync(
 					"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
@@ -621,7 +735,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, texture reload replacement, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

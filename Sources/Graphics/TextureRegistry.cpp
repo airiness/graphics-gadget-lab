@@ -237,10 +237,17 @@ namespace gglab
 				texture->m_State != AssetState::Cancelled)
 			{
 				const auto task = m_TextureLoadTasks.find(existing);
+				const bool currentTask = task != m_TextureLoadTasks.end() &&
+					task->second.m_Generation == texture->m_ContentGeneration &&
+					(!task->second.m_ResidencyOperation.IsValid() ||
+						(texture->m_IsReloading &&
+							AssetResidencyController::IsCurrentOperation(
+								*texture,
+								task->second.m_ResidencyOperation)));
 				return {
 					.m_TextureId = existing,
 					.m_Generation = texture->m_ContentGeneration,
-					.m_Task = task != m_TextureLoadTasks.end() ? task->second : TaskHandle{},
+					.m_Task = currentTask ? task->second.m_Task : TaskHandle{},
 				};
 			}
 
@@ -295,10 +302,19 @@ namespace gglab
 		{
 			return {};
 		}
-		if (const auto iterator = m_TextureLoadTasks.find(textureId);
-			iterator != m_TextureLoadTasks.end())
+		if (const auto existing = m_TextureLoadTasks.find(textureId);
+			existing != m_TextureLoadTasks.end())
 		{
-			return iterator->second;
+			const bool matchingResidencyOperation = residencyReload ?
+				existing->second.m_ResidencyOperation == residencyOperation :
+				!existing->second.m_ResidencyOperation.IsValid();
+			if (existing->second.m_Generation == texture->m_ContentGeneration &&
+				matchingResidencyOperation)
+			{
+				return existing->second.m_Task;
+			}
+			GGLAB_UNUSED(m_TaskSystem->Cancel(existing->second.m_Task));
+			m_TextureLoadTasks.erase(existing);
 		}
 
 		if (!residencyReload)
@@ -311,6 +327,12 @@ namespace gglab
 			0.05f,
 			"Queued for texture decoding",
 			canonicalPath.filename().generic_string());
+		const uint64_t loadSerial = m_NextTextureLoadSerial++;
+		GGLAB_ASSERT_MSG(loadSerial != 0, "Texture load operation serial overflowed.");
+		if (loadSerial == 0)
+		{
+			return {};
+		}
 		auto job = std::make_shared<TextureLoadJob>();
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
@@ -339,10 +361,17 @@ namespace gglab
 				}
 				return TaskResult::Success();
 			},
-			[this, textureId, generation, semantic, residencyReload, residencyOperation, job,
-				progress = texture->m_LoadProgress](
+			[this, textureId, generation, loadSerial, semantic, residencyReload,
+				residencyOperation, job, progress = texture->m_LoadProgress](
 				const TaskCompletionInfo& completion) noexcept
 			{
+				if (!IsCurrentTextureLoadOperation(
+					textureId,
+					generation,
+					loadSerial))
+				{
+					return;
+				}
 				const Texture* currentTexture = GetTexture(textureId);
 				if (!currentTexture || currentTexture->m_ContentGeneration != generation ||
 					currentTexture->m_CancelRequested ||
@@ -351,7 +380,10 @@ namespace gglab
 							*currentTexture,
 							residencyOperation)))
 				{
-					m_TextureLoadTasks.erase(textureId);
+					CompleteTextureLoadOperation(
+						textureId,
+						generation,
+						loadSerial);
 					return;
 				}
 				m_AssetUploadScheduler->EnqueueCpuPayload(
@@ -366,12 +398,13 @@ namespace gglab
 						.m_Priority = completion.m_Priority,
 						.m_Progress = progress,
 					},
-					[this, textureId, generation, semantic, completion, residencyReload,
-						residencyOperation, job]() mutable noexcept
+					[this, textureId, generation, loadSerial, semantic, completion,
+						residencyReload, residencyOperation, job]() mutable noexcept
 					{
 						CompleteTextureLoad(
 							textureId,
 							generation,
+							loadSerial,
 							semantic,
 							completion,
 							std::move(job->m_TextureData),
@@ -395,8 +428,42 @@ namespace gglab
 			return {};
 		}
 
-		m_TextureLoadTasks.emplace(textureId, task);
+		const auto [operation, inserted] = m_TextureLoadTasks.emplace(
+			textureId,
+			TextureLoadOperationRecord{
+				.m_Task = task,
+				.m_Generation = generation,
+				.m_LoadSerial = loadSerial,
+				.m_ResidencyOperation = residencyOperation,
+			});
+		GGLAB_ASSERT(inserted);
+		GGLAB_UNUSED(operation);
 		return task;
+	}
+
+	bool TextureRegistry::IsCurrentTextureLoadOperation(
+		TextureID textureId,
+		uint64_t generation,
+		uint64_t loadSerial) const noexcept
+	{
+		const auto operation = m_TextureLoadTasks.find(textureId);
+		return operation != m_TextureLoadTasks.end() &&
+			operation->second.m_Generation == generation &&
+			operation->second.m_LoadSerial == loadSerial;
+	}
+
+	void TextureRegistry::CompleteTextureLoadOperation(
+		TextureID textureId,
+		uint64_t generation,
+		uint64_t loadSerial) noexcept
+	{
+		const auto operation = m_TextureLoadTasks.find(textureId);
+		if (operation != m_TextureLoadTasks.end() &&
+			operation->second.m_Generation == generation &&
+			operation->second.m_LoadSerial == loadSerial)
+		{
+			m_TextureLoadTasks.erase(operation);
+		}
 	}
 
 	Texture* TextureRegistry::GetTexture(TextureID textureId) noexcept
@@ -892,6 +959,7 @@ namespace gglab
 	void TextureRegistry::CompleteTextureLoad(
 		TextureID textureId,
 		uint64_t generation,
+		uint64_t loadSerial,
 		TextureSemantic semantic,
 		const TaskCompletionInfo& completion,
 		TextureAssetData&& textureData,
@@ -903,7 +971,11 @@ namespace gglab
 		{
 			return;
 		}
-		m_TextureLoadTasks.erase(textureId);
+		if (!IsCurrentTextureLoadOperation(textureId, generation, loadSerial))
+		{
+			return;
+		}
+		CompleteTextureLoadOperation(textureId, generation, loadSerial);
 		if (residencyReload &&
 			!AssetResidencyController::IsCurrentOperation(*texture, residencyOperation))
 		{
@@ -1008,9 +1080,10 @@ namespace gglab
 
 		texture->m_CancelRequested = true;
 		if (const auto task = m_TextureLoadTasks.find(textureId);
-			task != m_TextureLoadTasks.end())
+			task != m_TextureLoadTasks.end() &&
+			task->second.m_Generation == generation)
 		{
-			GGLAB_UNUSED(m_TaskSystem->Cancel(task->second));
+			GGLAB_UNUSED(m_TaskSystem->Cancel(task->second.m_Task));
 		}
 		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
 			MakeAssetContentVersion(textureId, generation)));
@@ -1075,9 +1148,10 @@ namespace gglab
 			return;
 		}
 		if (const auto task = m_TextureLoadTasks.find(textureId);
-			task != m_TextureLoadTasks.end())
+			task != m_TextureLoadTasks.end() &&
+			task->second.m_Generation == generation)
 		{
-			GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second, priority));
+			GGLAB_UNUSED(m_TaskSystem->UpdatePriority(task->second.m_Task, priority));
 		}
 		GGLAB_UNUSED(m_AssetUploadScheduler->UpdateWorkPriority(
 			MakeAssetContentVersion(textureId, generation),
@@ -1122,16 +1196,18 @@ namespace gglab
 		if (texture->m_IsReloading)
 		{
 			if (const auto task = m_TextureLoadTasks.find(textureId);
-				task != m_TextureLoadTasks.end())
+				task != m_TextureLoadTasks.end() &&
+				task->second.m_Generation == texture->m_ContentGeneration &&
+				task->second.m_ResidencyOperation == operation)
 			{
-				return task->second;
+				return task->second.m_Task;
 			}
 			return {};
 		}
 		if (const auto staleTask = m_TextureLoadTasks.find(textureId);
 			staleTask != m_TextureLoadTasks.end())
 		{
-			GGLAB_UNUSED(m_TaskSystem->Cancel(staleTask->second));
+			GGLAB_UNUSED(m_TaskSystem->Cancel(staleTask->second.m_Task));
 			m_TextureLoadTasks.erase(staleTask);
 		}
 
