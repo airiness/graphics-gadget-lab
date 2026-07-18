@@ -8,7 +8,7 @@ render graphs, shaders, diagnostics, and small self-contained graphics Labs.
 
 ## Start Demo
 
-[▶ Watch the Start Demo](Assets/Media/StartDemo.mp4)
+[![Start Demo](Assets/Media/StartDemo.gif)](Assets/Media/StartDemo.mp4)
 
 ## Highlights
 
