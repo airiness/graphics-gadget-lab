@@ -42,6 +42,7 @@ namespace gglab
 		m_Device(createInfo.m_Device)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
+		CreatePresetSamplers();
 	}
 
 	SamplerRegistry::~SamplerRegistry()
@@ -60,13 +61,8 @@ namespace gglab
 		}
 	}
 
-	void SamplerRegistry::InitializePresetSamplers() noexcept
+	void SamplerRegistry::CreatePresetSamplers() noexcept
 	{
-		if (m_PresetSamplersInitialized)
-		{
-			return;
-		}
-
 		for (uint32_t index = 0; index < utils::EnumCount<SamplerPreset>(); ++index)
 		{
 			static_assert(utils::EnumCount<SamplerPreset>() <= 32);
@@ -79,8 +75,6 @@ namespace gglab
 				entry->second.m_PresetMask |= 1u << index;
 			}
 		}
-
-		m_PresetSamplersInitialized = true;
 	}
 
 	SamplerID SamplerRegistry::GetOrCreateSampler(const SamplerKey& key) noexcept
@@ -136,8 +130,6 @@ namespace gglab
 
 	SamplerID SamplerRegistry::GetPresetSamplerId(SamplerPreset preset) const noexcept
 	{
-		GGLAB_ASSERT_MSG(m_PresetSamplersInitialized, "Preset samplers not initialized. Call InitializePresetSamplers() first.");
-
 		const auto index = utils::ToIndexChecked(preset);
 		GGLAB_ASSERT_MSG(index < m_PresetSamplers.size(), "Invalid preset sampler index.");
 
@@ -187,8 +179,7 @@ namespace gglab
 			.m_PresetSamplerCount = presetSamplerCount,
 			.m_CustomSamplerCount = static_cast<uint32_t>(m_SamplerEntries.size()) -
 				presetSamplerCount,
-			.m_PresetBindingCount = m_PresetSamplersInitialized ?
-				static_cast<uint32_t>(m_PresetSamplers.size()) : 0,
+			.m_PresetBindingCount = static_cast<uint32_t>(m_PresetSamplers.size()),
 			.m_CacheHitCount = m_CacheHitCount,
 			.m_CacheMissCount = m_CacheMissCount,
 		};
