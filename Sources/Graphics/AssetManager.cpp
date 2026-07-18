@@ -1992,6 +1992,12 @@ namespace gglab
 		return m_TextureRegistry->GetTextureContentRef(textureId);
 	}
 
+	std::optional<AssetState> AssetManager::GetTextureState(
+		TextureContentRef content) const noexcept
+	{
+		return m_TextureRegistry->GetTextureState(content);
+	}
+
 	std::optional<ResidentTextureResource> AssetManager::GetResidentTextureResource(
 		TextureContentRef content) const noexcept
 	{

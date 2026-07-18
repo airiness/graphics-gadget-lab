@@ -577,6 +577,18 @@ namespace gglab
 		} : TextureContentRef{};
 	}
 
+	std::optional<AssetState> TextureRegistry::GetTextureState(
+		TextureContentRef content) const noexcept
+	{
+		const Texture* texture = GetTexture(content.m_Id);
+		if (!content.IsValid() || !texture ||
+			texture->m_ContentGeneration != content.m_Generation)
+		{
+			return std::nullopt;
+		}
+		return texture->m_State;
+	}
+
 	std::optional<ResidentTextureResource> TextureRegistry::GetResidentTextureResource(
 		TextureContentRef content) const noexcept
 	{

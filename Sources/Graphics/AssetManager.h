@@ -141,6 +141,8 @@ namespace gglab
 			AssetResidencyPolicy policy) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] std::optional<AssetState> GetTextureState(
+			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
 			TextureContentRef content) const noexcept;
 

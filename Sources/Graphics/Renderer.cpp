@@ -98,10 +98,8 @@ namespace gglab
 		m_RenderResRegistry->EnsureIblResources();
 
 		EnvironmentLightingSystem::CreateInfo environmentLightingCreateInfo{};
-		environmentLightingCreateInfo.m_TextureRegistry = m_TextureRegistry.get();
 		environmentLightingCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
 		m_EnvironmentLightingSystem = std::make_unique<EnvironmentLightingSystem>(environmentLightingCreateInfo);
-		m_EnvironmentLightingSystem->Initialize("Assets/Textures/Skybox");
 
 		IBLBakeScheduler::CreateInfo iblBakeSchedulerCreateInfo{};
 		iblBakeSchedulerCreateInfo.m_Device = device;

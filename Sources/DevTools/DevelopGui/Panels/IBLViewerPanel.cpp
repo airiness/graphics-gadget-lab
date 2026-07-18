@@ -10,6 +10,7 @@
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Core/Math/MathFunctions.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -213,6 +214,7 @@ namespace gglab
 		}
 
 		auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
+		auto* environmentAssets = context.m_EnvironmentAssetController;
 		const auto* diagnosticsSnapshot = context.m_Diagnostics ?
 			context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>() : nullptr;
 
@@ -230,11 +232,11 @@ namespace gglab
 				for (const auto& entry : diagnosticsSnapshot->m_Environments)
 				{
 					const bool selected = entry.m_Active;
-					if (ImGui::Selectable(entry.m_DisplayName.c_str(), selected) && environmentSystem)
+					if (ImGui::Selectable(entry.m_DisplayName.c_str(), selected) && environmentAssets)
 					{
-						if (environmentSystem->SelectEnvironment(entry.m_Index))
+						if (environmentAssets->SelectEnvironment(entry.m_Index))
 						{
-							state.m_EnvironmentSelectionStatus = "Selected " + entry.m_DisplayName + "; IBL rebake scheduled.";
+							state.m_EnvironmentSelectionStatus = "Loading " + entry.m_DisplayName + "; current environment remains active.";
 						}
 						else
 						{
