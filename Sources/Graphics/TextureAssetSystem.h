@@ -1,8 +1,8 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
+#include "Graphics/Asset/Store/TextureStore.h"
 #include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
@@ -16,31 +16,15 @@ namespace gglab
 {
 	class AssetManager;
 	class AssetManagerPublicationServices;
+	class AssetResidencyController;
 	class AssetUploadScheduler;
 	class RHIDevice;
 	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
 
-	class TextureRegistry
+	class TextureAssetSystem
 	{
-		struct TextureCacheKey
-		{
-			std::filesystem::path m_CanonicalPath;
-			TextureImportSettings m_ImportSettings{};
-
-			[[nodiscard]] auto AsTuple() const noexcept
-			{
-				return std::tuple{
-					std::filesystem::hash_value(m_CanonicalPath),
-					m_ImportSettings.m_Semantic,
-					m_ImportSettings.m_MipPolicy,
-				};
-			}
-			bool operator==(const TextureCacheKey&) const noexcept = default;
-		};
-		using TextureCacheKeyHash = KeyHash<TextureCacheKey>;
-
 	public:
 		struct CreateInfo
 		{
@@ -67,13 +51,13 @@ namespace gglab
 			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
 		};
 
-	private:
-		struct TextureContainer
+		struct EvictionFinalizationResult
 		{
-			std::unordered_map<TextureCacheKey, TextureID, TextureCacheKeyHash> m_CacheKeyIDMap;
-			std::unordered_map<TextureID, std::unique_ptr<Texture>> m_TextureIDMap;
+			bool m_Finalized = false;
+			bool m_Cancelled = false;
 		};
 
+	private:
 		struct TextureLoadOperationRecord
 		{
 			TaskHandle m_Task{};
@@ -83,9 +67,9 @@ namespace gglab
 		};
 
 	public:
-		explicit TextureRegistry(const CreateInfo& createInfo) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(TextureRegistry);
-		~TextureRegistry() = default;
+		explicit TextureAssetSystem(const CreateInfo& createInfo) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(TextureAssetSystem);
+		~TextureAssetSystem() = default;
 
 		void InitializeReservedTextures() noexcept;
 		void Finalize(const RHIFencePoint& fencePoint) noexcept;
@@ -95,7 +79,6 @@ namespace gglab
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 
-		Texture* GetTexture(TextureID textureId) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
 		const RHITextureDesc* GetTextureDesc(TextureID textureId) const noexcept;
 		RHIDescriptorHandle GetSrvDescriptor(TextureID textureId) const noexcept;
@@ -126,6 +109,34 @@ namespace gglab
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;
+		[[nodiscard]] uint32_t GetReloadingTextureCount() const noexcept;
+		[[nodiscard]] size_t GetTextureCount() const noexcept { return m_Store.Size(); }
+		[[nodiscard]] std::vector<TextureID> GetTextureIds() const;
+		[[nodiscard]] bool IsCurrentResidencyOperation(
+			const AssetResidencyOperation& operation) const noexcept;
+		[[nodiscard]] bool IsCurrentResidencyOperation(
+			const AssetOperationToken& operation) const noexcept;
+		void CompleteResidencyOperation(const AssetResidencyOperation& operation) noexcept;
+		void CompleteResidencyOperation(const AssetOperationToken& operation) noexcept;
+		[[nodiscard]] bool RestoreEvictionForShutdown(
+			const AssetResidencyOperation& operation) noexcept;
+		[[nodiscard]] EvictionFinalizationResult FinalizeEviction(
+			const AssetResidencyOperation& operation,
+			bool protectedByInterest) noexcept;
+		[[nodiscard]] AssetResidencyOperation BeginResidencyOperation(
+			const AssetContentVersion& contentVersion,
+			AssetResidencyOperationKind kind,
+			AssetResidencyController& controller) noexcept;
+		[[nodiscard]] TaskHandle RequestResidency(
+			TextureID textureId,
+			uint64_t generation,
+			TaskPriority priority,
+			AssetResidencyController& controller) noexcept;
+		void MarkUsed(TextureID textureId, uint64_t frame) noexcept;
+		[[nodiscard]] bool SetResidencyPolicy(
+			TextureID textureId,
+			AssetResidencyPolicy policy) noexcept;
+		[[nodiscard]] bool BeginPublication(TextureID textureId) noexcept;
 
 		void CreateTextureEntry(
 			TextureID id,
@@ -200,6 +211,7 @@ namespace gglab
 			AssetResidencyOperation residencyOperation = {},
 			AssetStateEventOperationPhase operationPhase =
 				AssetStateEventOperationPhase::None) noexcept;
+		[[nodiscard]] Texture* EditTexture(TextureID textureId) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -208,7 +220,7 @@ namespace gglab
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
-		TextureContainer m_TextureContainer;
+		TextureStore m_Store;
 		uint64_t m_NextTextureLoadSerial = 1;
 		std::unordered_map<TextureID, TextureLoadOperationRecord> m_TextureLoadTasks;
 		std::unordered_set<TextureID> m_PublicationOrphanedTextures;

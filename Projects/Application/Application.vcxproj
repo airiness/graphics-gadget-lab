@@ -257,6 +257,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MeshStore.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\TextureStore.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Store\ModelStore.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.cpp" />
@@ -345,7 +346,7 @@
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureLoader.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\TextureAssetSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader\Shader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderCompiler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderManager.cpp" />
@@ -638,6 +639,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MeshStore.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\TextureStore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Store\ModelStore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetResourcePublication.h" />
@@ -676,7 +678,7 @@
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\Graphics\TextureLoader.h" />
-    <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\TextureAssetSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\Shader.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderCompiler.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderManager.h" />

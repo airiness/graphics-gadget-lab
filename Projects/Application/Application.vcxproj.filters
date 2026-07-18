@@ -492,6 +492,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MeshStore.cpp">
       <Filter>Graphics\Asset\Store</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\TextureStore.cpp">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Store\ModelStore.cpp">
       <Filter>Graphics\Asset\Store</Filter>
     </ClCompile>
@@ -789,7 +792,7 @@
     <ClCompile Include="..\..\Sources\Graphics\TextureLoader.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\TextureRegistry.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\TextureAssetSystem.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp">
@@ -1113,6 +1116,9 @@
       <Filter>Graphics\Asset\Store</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MeshStore.h">
+      <Filter>Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\TextureStore.h">
       <Filter>Graphics\Asset\Store</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Store\ModelStore.h">
@@ -1745,7 +1751,7 @@
     <ClInclude Include="..\..\Sources\Graphics\TextureLoader.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\TextureRegistry.h">
+    <ClInclude Include="..\..\Sources\Graphics\TextureAssetSystem.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h">

@@ -2,7 +2,7 @@
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/TextureRegistry.h"
+#include "Graphics/TextureAssetSystem.h"
 
 namespace gglab
 {
@@ -48,13 +48,13 @@ namespace gglab
 			ModelPublicationTextureResult result{};
 			const uint64_t sourceBytes = static_cast<uint64_t>(
 				importedTexture.m_Data.m_Pixels.size());
-			TextureID textureId = m_AssetManager->m_TextureRegistry->FindTexture(
+			TextureID textureId = m_AssetManager->m_TextureAssets->FindTexture(
 				importedTexture.m_CanonicalPath,
 				importedTexture.m_ImportSettings);
-			Texture* texture = m_AssetManager->m_TextureRegistry->GetTexture(textureId);
+			const Texture* texture = m_AssetManager->m_TextureAssets->GetTexture(textureId);
 			if (textureId.IsValid() && !texture)
 			{
-				GGLAB_UNUSED(m_AssetManager->m_TextureRegistry->RemoveTexture(textureId));
+				GGLAB_UNUSED(m_AssetManager->m_TextureAssets->RemoveTexture(textureId));
 				textureId.Reset();
 			}
 			else if (texture && IsTerminalPublicationAssetState(texture->m_State))
@@ -74,7 +74,7 @@ namespace gglab
 						textureId.Value());
 					return result;
 				}
-				GGLAB_UNUSED(m_AssetManager->m_TextureRegistry->RemoveTexture(textureId));
+				GGLAB_UNUSED(m_AssetManager->m_TextureAssets->RemoveTexture(textureId));
 				textureId.Reset();
 				texture = nullptr;
 			}
@@ -88,10 +88,10 @@ namespace gglab
 					result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 					return result;
 				}
-				textureId = m_AssetManager->m_TextureRegistry->CreateTexture(
+				textureId = m_AssetManager->m_TextureAssets->CreateTexture(
 					importedTexture.m_CanonicalPath,
 					importedTexture.m_ImportSettings);
-				texture = m_AssetManager->m_TextureRegistry->GetTexture(textureId);
+				texture = m_AssetManager->m_TextureAssets->GetTexture(textureId);
 				if (!textureId.IsValid() || !texture)
 				{
 					importedTexture = {};
@@ -101,9 +101,14 @@ namespace gglab
 					return result;
 				}
 				created = true;
-				m_AssetManager->m_TextureRegistry->SetTextureState(
-					*texture,
-					AssetState::Publishing);
+				if (!m_AssetManager->m_TextureAssets->BeginPublication(textureId))
+				{
+					GGLAB_UNUSED(m_AssetManager->m_TextureAssets->RemoveTexture(textureId));
+					importedTexture = {};
+					result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
+					result.m_Error = "Failed to begin texture publication";
+					return result;
+				}
 			}
 
 			result.m_TextureId = textureId;
@@ -134,11 +139,11 @@ namespace gglab
 				return result;
 			}
 
-			auto uploadData = m_AssetManager->m_TextureRegistry->MakeTextureUploadData(
+			auto uploadData = m_AssetManager->m_TextureAssets->MakeTextureUploadData(
 				textureId,
 				std::move(importedTexture.m_Data),
 				importedTexture.m_Semantic);
-			const bool queued = m_AssetManager->m_TextureRegistry->QueueTextureUpload(
+			const bool queued = m_AssetManager->m_TextureAssets->QueueTextureUpload(
 				std::move(uploadData),
 				priority);
 			importedTexture = {};
@@ -422,7 +427,7 @@ namespace gglab
 			{
 				if (claim.m_ContentVersion.m_Key.m_Kind == AssetKind::Texture)
 				{
-					m_AssetManager->m_TextureRegistry->RollbackPublicationTexture(
+					m_AssetManager->m_TextureAssets->RollbackPublicationTexture(
 						TextureID{ static_cast<uint32_t>(
 							claim.m_ContentVersion.m_Key.m_StableId) },
 						claim.m_ContentVersion.m_ContentGeneration);
