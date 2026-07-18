@@ -2,7 +2,7 @@
 #include "Application/Demo/DemoBase.h"
 #include "Core/World.h"
 #include "Graphics/CameraRig.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"

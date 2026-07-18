@@ -2,8 +2,8 @@
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
-#include "Graphics/AssetManager.h"
-#include "Graphics/AssetUploadScheduler.h"
+#include "Graphics/Asset/AssetManager.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 
 #include <algorithm>
 

@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
-#include "Graphics/TextureLoader.h"
+#include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Utility/CubemapUtils.h"
 #include "Graphics/Utility/TextureUtils.h"
 

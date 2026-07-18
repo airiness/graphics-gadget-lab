@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Core/Task/TaskSystem.h"
-#include "Graphics/TextureLoader.h"
+#include "Graphics/Asset/Loading/TextureLoader.h"
 
 namespace gglab
 {

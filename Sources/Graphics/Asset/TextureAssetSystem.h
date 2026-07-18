@@ -6,7 +6,7 @@
 #include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
-#include "Graphics/TextureAsset.h"
+#include "Graphics/Asset/TextureAsset.h"
 
 #include <optional>
 

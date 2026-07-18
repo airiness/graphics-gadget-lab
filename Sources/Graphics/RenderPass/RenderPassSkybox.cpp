@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"

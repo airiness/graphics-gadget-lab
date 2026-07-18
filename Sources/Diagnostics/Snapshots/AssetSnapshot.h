@@ -1,6 +1,6 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/AssetUploadScheduler.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/GraphicsTypes.h"
 
 namespace gglab

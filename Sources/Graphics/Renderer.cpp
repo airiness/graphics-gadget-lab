@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/AssetUploadScheduler.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"

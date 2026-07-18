@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/Async/ProgressChannel.h"
-#include "Graphics/TextureAsset.h"
+#include "Graphics/Asset/TextureAsset.h"
 
 #include <cstdint>
 #include <filesystem>

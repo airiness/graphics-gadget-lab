@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/IBLBakeCache.h"
 #include "Graphics/Shader/ShaderPaths.h"
-#include "Graphics/TextureLoader.h"
+#include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Utility/TextureUtils.h"
 #include "Core/Hash/KeyHash.h"
 #include "Core/Utility/PathUtils.h"

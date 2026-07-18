@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/ModelImporter.h"
+#include "Graphics/Asset/Loading/ModelImporter.h"
 #include "Graphics/Asset/Interop/AssimpMathInterop.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"

@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderQueue.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 
 namespace gglab
 {

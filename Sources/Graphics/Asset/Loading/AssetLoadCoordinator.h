@@ -3,8 +3,8 @@
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
-#include "Graphics/ModelImporter.h"
-#include "Graphics/TextureAsset.h"
+#include "Graphics/Asset/Loading/ModelImporter.h"
+#include "Graphics/Asset/TextureAsset.h"
 
 #include <filesystem>
 #include <unordered_map>

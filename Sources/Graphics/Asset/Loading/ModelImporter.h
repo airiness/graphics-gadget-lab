@@ -1,8 +1,8 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/SamplerTypes.h"
-#include "Graphics/TextureAsset.h"
-#include "Graphics/TextureLoader.h"
+#include "Graphics/Asset/TextureAsset.h"
+#include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/VertexData.h"
 
 #include <array>

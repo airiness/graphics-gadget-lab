@@ -4,7 +4,7 @@
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
 #include "Graphics/Camera.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 

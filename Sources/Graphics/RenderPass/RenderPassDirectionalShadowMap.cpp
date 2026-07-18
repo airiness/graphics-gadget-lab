@@ -2,7 +2,7 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"

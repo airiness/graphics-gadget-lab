@@ -10,7 +10,7 @@
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 
