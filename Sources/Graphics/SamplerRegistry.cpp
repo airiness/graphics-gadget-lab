@@ -69,9 +69,15 @@ namespace gglab
 
 		for (uint32_t index = 0; index < utils::EnumCount<SamplerPreset>(); ++index)
 		{
+			static_assert(utils::EnumCount<SamplerPreset>() <= 32);
 			const auto preset = static_cast<SamplerPreset>(index);
 			m_PresetSamplers[index] = GetOrCreateSampler(MakePresetSamplerKey(preset));
 			GGLAB_ASSERT_MSG(m_PresetSamplers[index].IsValid(), "SamplerRegistry: failed to create preset sampler.");
+			if (auto entry = m_SamplerEntries.find(m_PresetSamplers[index]);
+				entry != m_SamplerEntries.end())
+			{
+				entry->second.m_PresetMask |= 1u << index;
+			}
 		}
 
 		m_PresetSamplersInitialized = true;
@@ -82,14 +88,25 @@ namespace gglab
 		const SamplerKey normalizedKey = NormalizeSamplerKey(key);
 		if (auto iterator = m_SamplerMap.find(normalizedKey); iterator != m_SamplerMap.end())
 		{
+			++m_CacheHitCount;
 			return iterator->second;
 		}
+		++m_CacheMissCount;
 
 		const RHISamplerHandle sampler = m_Device->CreateSampler(normalizedKey);
 		GGLAB_ASSERT_MSG(sampler.IsValid(), "SamplerRegistry: failed to create sampler.");
+		if (!sampler.IsValid())
+		{
+			return {};
+		}
 
 		SamplerID samplerId = m_SamplerIdCounter.Acquire();
 		GGLAB_ASSERT_MSG(samplerId.IsValid(), "SamplerRegistry: Invalid sampler id.");
+		if (!samplerId.IsValid())
+		{
+			m_Device->DestroySampler(sampler);
+			return {};
+		}
 
 		SamplerEntry entry{};
 		entry.m_SamplerId = samplerId;
@@ -98,9 +115,21 @@ namespace gglab
 
 		const auto [entryIterator, inserted] = m_SamplerEntries.emplace(samplerId, entry);
 		GGLAB_ASSERT_MSG(inserted, "SamplerRegistry: failed to insert sampler entry.");
+		if (!inserted)
+		{
+			m_Device->DestroySampler(sampler);
+			return {};
+		}
 
 		const auto [mapIterator, mapInserted] = m_SamplerMap.emplace(normalizedKey, samplerId);
 		GGLAB_ASSERT_MSG(mapInserted, "SamplerRegistry: failed to insert sampler into map.");
+		if (!mapInserted)
+		{
+			m_SamplerEntries.erase(entryIterator);
+			// CreateSampler may return the cached RHI handle that is already owned by
+			// the existing registry entry. Do not destroy that shared handle here.
+			return mapIterator->second;
+		}
 
 		return samplerId;
 	}
@@ -132,13 +161,13 @@ namespace gglab
 		return descriptor.m_Index;
 	}
 
-	const SamplerKey& SamplerRegistry::GetSamplerKey(const SamplerID& samplerId) const noexcept
+	SamplerKey SamplerRegistry::GetSamplerKey(SamplerID samplerId) const noexcept
 	{
 		const auto& entry = GetEntry(samplerId);
 		return entry.m_Key;
 	}
 
-	uint32_t SamplerRegistry::ResolveSamplerIndex(const SamplerID& samplerId, SamplerPreset fallbackPreset) const noexcept
+	uint32_t SamplerRegistry::ResolveSamplerIndex(SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept
 	{
 		if (samplerId.IsValid())
 		{
@@ -148,7 +177,51 @@ namespace gglab
 		return GetSamplerIndex(fallbackPreset);
 	}
 
-	const SamplerRegistry::SamplerEntry& SamplerRegistry::GetEntry(const SamplerID& samplerId) const noexcept
+	SamplerRegistryStatistics SamplerRegistry::GetStatistics() const noexcept
+	{
+		const uint32_t presetSamplerCount = static_cast<uint32_t>(std::ranges::count_if(
+			m_SamplerEntries | std::views::values,
+			[](const SamplerEntry& entry) noexcept { return entry.m_PresetMask != 0; }));
+		return {
+			.m_UniqueSamplerCount = static_cast<uint32_t>(m_SamplerEntries.size()),
+			.m_PresetSamplerCount = presetSamplerCount,
+			.m_CustomSamplerCount = static_cast<uint32_t>(m_SamplerEntries.size()) -
+				presetSamplerCount,
+			.m_PresetBindingCount = m_PresetSamplersInitialized ?
+				static_cast<uint32_t>(m_PresetSamplers.size()) : 0,
+			.m_CacheHitCount = m_CacheHitCount,
+			.m_CacheMissCount = m_CacheMissCount,
+		};
+	}
+
+	std::vector<SamplerRegistryReadInfo> SamplerRegistry::GetReadInfos() const
+	{
+		std::vector<SamplerRegistryReadInfo> infos;
+		infos.reserve(m_SamplerEntries.size());
+		for (const SamplerEntry& entry : m_SamplerEntries | std::views::values)
+		{
+			const RHIDescriptorHandle descriptor =
+				m_Device->GetSamplerDescriptor(entry.m_Sampler);
+			GGLAB_ASSERT_MSG(
+				descriptor.IsValid() &&
+					descriptor.m_HeapType == RHIDescriptorHeapType::Sampler,
+				"SamplerRegistry diagnostics encountered an invalid sampler descriptor.");
+			infos.push_back({
+				.m_Id = entry.m_SamplerId,
+				.m_Key = entry.m_Key,
+				.m_Sampler = entry.m_Sampler,
+				.m_DescriptorIndex = descriptor.m_Index,
+				.m_PresetMask = entry.m_PresetMask,
+			});
+		}
+		std::ranges::sort(
+			infos,
+			{},
+			&SamplerRegistryReadInfo::m_Id);
+		return infos;
+	}
+
+	const SamplerRegistry::SamplerEntry& SamplerRegistry::GetEntry(SamplerID samplerId) const noexcept
 	{
 		GGLAB_ASSERT_MSG(samplerId.IsValid(), "SamplerRegistry: invalid sampler id.");
 
@@ -163,11 +236,6 @@ namespace gglab
 		GGLAB_ASSERT_MSG(entry.m_Sampler.IsValid(), "SamplerRegistry: invalid RHI sampler handle in sampler entry.");
 
 		return entry;
-	}
-
-	SamplerRegistry::SamplerEntry& SamplerRegistry::GetEntry(const SamplerID& samplerId) noexcept
-	{
-		return const_cast<SamplerEntry&>(std::as_const(*this).GetEntry(samplerId));
 	}
 
 	namespace

@@ -3,6 +3,7 @@
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/SamplerTypes.h"
 
 namespace gglab::devtools
 {
@@ -100,6 +101,21 @@ namespace gglab::devtools
 			EnumTextEntry{ TextureSemantic::GenericColor, "Generic Color" },
 			EnumTextEntry{ TextureSemantic::GenericData, "Generic Data" },
 			EnumTextEntry{ TextureSemantic::Unknown, "Unknown" },
+		};
+	};
+
+	template<>
+	struct EnumTextTraits<SamplerPreset>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ SamplerPreset::PointClamp, "Point Clamp" },
+			EnumTextEntry{ SamplerPreset::PointWrap, "Point Wrap" },
+			EnumTextEntry{ SamplerPreset::LinearClamp, "Linear Clamp" },
+			EnumTextEntry{ SamplerPreset::LinearWrap, "Linear Wrap" },
+			EnumTextEntry{ SamplerPreset::LinearWrapUClampV, "Linear Wrap U / Clamp V" },
+			EnumTextEntry{ SamplerPreset::AnisotropicClamp, "Anisotropic Clamp" },
+			EnumTextEntry{ SamplerPreset::AnisotropicWrap, "Anisotropic Wrap" },
+			EnumTextEntry{ SamplerPreset::ShadowCmpLinearClamp, "Shadow Compare Linear Clamp" },
 		};
 	};
 
