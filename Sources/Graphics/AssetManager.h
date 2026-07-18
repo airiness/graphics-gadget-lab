@@ -12,7 +12,6 @@
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/GPUStructures.h"
 #include "Graphics/ModelImporter.h"
 
 #include <optional>
@@ -56,7 +55,6 @@ namespace gglab
 	class TextureRegistry;
 	class TransferBatch;
 	class TransferManager;
-	enum class SamplerPreset : uint8_t;
 	struct AssetSnapshot;
 
 	class AssetManager;
@@ -159,9 +157,6 @@ namespace gglab
 		ModelID AddProceduralModel(std::unique_ptr<Model>&& model) noexcept;
 
 		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
-		MaterialTextureBindingGPU ResolveTextureBinding(const MaterialTextureBinding& binding,
-			ReservedTextureIDIndex fallback,
-			SamplerPreset fallbackSampler) const noexcept;
 
 	private:
 		[[nodiscard]] Mesh* EditMesh(MeshID meshId) noexcept;

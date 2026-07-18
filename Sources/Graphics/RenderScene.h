@@ -14,6 +14,7 @@ namespace gglab
 	class EnvironmentLightingSystem;
 	class World;
 	class AssetManager;
+	class SamplerRegistry;
 	class TransferManager;
 	class RenderResourceRegistry;
 
@@ -76,6 +77,7 @@ namespace gglab
 		{
 			const World& m_World;
 			AssetManager& m_AssetManager;
+			SamplerRegistry& m_SamplerRegistry;
 			TransferManager& m_TransferManager;
 			RenderResourceRegistry& m_RenderResourceRegistry;
 			EnvironmentLightingSystem& m_EnvironmentLightingSystem;

@@ -318,6 +318,9 @@
     <ClCompile Include="..\..\Sources\Graphics\AssetLoadProgress.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\MaterialGpuEncoder.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -1023,6 +1026,9 @@
       <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\MaterialGpuEncoder.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\AssetUploadScheduler.h">

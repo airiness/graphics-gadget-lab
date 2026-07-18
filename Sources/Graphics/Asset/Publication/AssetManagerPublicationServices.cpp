@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 
 namespace gglab
