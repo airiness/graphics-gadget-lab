@@ -17,7 +17,7 @@ namespace gglab
 {
 	namespace
 	{
-		constexpr std::string_view CompleteMarker = "gglab-ibl-cache-v1";
+		constexpr std::string_view CompleteMarker = "gglab-ibl-cache-v2";
 		constexpr std::array<std::string_view, 5> BakeShaderPaths = {
 			"Passes/PassIBLEnvironment.hlsl",
 			"Passes/PassIBLEnvironmentMip.hlsl",
@@ -107,13 +107,16 @@ namespace gglab
 	}
 
 	uint64_t IBLBakeCache::ComputeKey(
-		const std::filesystem::path& environmentPath,
+		const AssetContentFingerprint& contentFingerprint,
 		const IBLBakeConfig& config,
 		std::stop_token stopToken) const noexcept
 	{
 		uint64_t hash = FNV1a64::OffsetBasis;
 		FNV1a64::MixValue(hash, CacheFormatVersion);
 		FNV1a64::MixValue(hash, BakeAlgorithmVersion);
+		FNV1a64::MixValue(hash, contentFingerprint.m_SourceContentHash);
+		FNV1a64::MixValue(hash, contentFingerprint.m_ImportSettingsHash);
+		FNV1a64::MixValue(hash, contentFingerprint.m_DecoderVersion);
 		FNV1a64::MixValue(hash, config.m_EnvironmentCubemapSize);
 		FNV1a64::MixValue(hash, config.m_EnvironmentCubemapFormat);
 		FNV1a64::MixValue(hash, config.m_IrradianceCubemapSize);
@@ -138,27 +141,6 @@ namespace gglab
 			HashShaderDependency(hash, shaderRoot, shaderRoot / shaderPath, visited);
 		}
 
-		std::ifstream stream(environmentPath, std::ios::binary);
-		if (!stream)
-		{
-			FNV1a64::MixValue(hash, std::string_view("procedural-environment-cubemap-v1"));
-			return hash;
-		}
-
-		std::array<char, 64 * 1024> buffer{};
-		while (stream)
-		{
-			if (stopToken.stop_requested())
-			{
-				return hash;
-			}
-			stream.read(buffer.data(), buffer.size());
-			const std::streamsize count = stream.gcount();
-			if (count > 0)
-			{
-				FNV1a64::MixBytes(hash, buffer.data(), static_cast<size_t>(count));
-			}
-		}
 		return hash;
 	}
 

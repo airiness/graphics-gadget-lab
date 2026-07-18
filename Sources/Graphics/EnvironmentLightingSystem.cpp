@@ -19,7 +19,7 @@ namespace gglab
 			"EnvironmentLightingSystem requires a valid committed texture source.");
 		if (!source.IsValid() ||
 			(source.m_Content == m_Source.m_Content && source.m_Type == m_Source.m_Type &&
-				source.m_SourcePath == m_Source.m_SourcePath))
+				source.m_ContentFingerprint == m_Source.m_ContentFingerprint))
 		{
 			return;
 		}

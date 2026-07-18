@@ -1094,6 +1094,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetContentFingerprint.h">
+      <Filter>Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h">
       <Filter>Graphics\Asset\Dependency</Filter>
     </ClInclude>

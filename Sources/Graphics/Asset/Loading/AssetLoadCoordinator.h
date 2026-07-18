@@ -2,7 +2,9 @@
 #include "Core/CoreMacros.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/AssetIdentity.h"
+#include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/ModelImporter.h"
+#include "Graphics/TextureAsset.h"
 
 #include <filesystem>
 #include <unordered_map>
@@ -50,11 +52,33 @@ namespace gglab
 		TaskCompletionInfo m_Completion{};
 	};
 
+	struct TextureDecodeSucceeded
+	{
+		AssetOperationToken m_Operation{};
+		TaskCompletionInfo m_Completion{};
+		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
+		TextureAssetData m_TextureData;
+		AssetContentFingerprint m_ContentFingerprint{};
+		bool m_ResidencyReload = false;
+		AssetResidencyOperation m_ResidencyOperation{};
+	};
+
+	struct TextureDecodeFailed
+	{
+		AssetOperationToken m_Operation{};
+		TaskCompletionInfo m_Completion{};
+		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
+		bool m_ResidencyReload = false;
+		AssetResidencyOperation m_ResidencyOperation{};
+	};
+
 	using AssetLoadCompletion = std::variant<
 		ModelImportSucceeded,
 		ModelImportFailed,
 		MeshReloadSucceeded,
-		MeshReloadFailed>;
+		MeshReloadFailed,
+		TextureDecodeSucceeded,
+		TextureDecodeFailed>;
 
 	struct ModelImportRequest
 	{
@@ -73,6 +97,18 @@ namespace gglab
 		TaskPriority m_Priority = TaskPriority::Normal;
 	};
 
+	struct TextureDecodeRequest
+	{
+		AssetContentVersion m_ContentVersion{};
+		std::filesystem::path m_SourcePath;
+		TextureImportSettings m_ImportSettings{};
+		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
+		TaskPriority m_Priority = TaskPriority::Normal;
+		ProgressChannelPtr m_Progress;
+		bool m_ResidencyReload = false;
+		AssetResidencyOperation m_ResidencyOperation{};
+	};
+
 	class AssetLoadCoordinator final
 	{
 	public:
@@ -89,11 +125,15 @@ namespace gglab
 			ModelImportRequest request) noexcept;
 		[[nodiscard]] AssetLoadSubmission SubmitMeshReload(
 			MeshReloadRequest request) noexcept;
+		[[nodiscard]] AssetLoadSubmission SubmitTextureDecode(
+			TextureDecodeRequest request) noexcept;
 
 		[[nodiscard]] TaskHandle GetModelImportTask(
 			AssetContentVersion contentVersion) const noexcept;
 		[[nodiscard]] bool HasMeshReload(
 			AssetContentVersion sourceModelVersion) const noexcept;
+		[[nodiscard]] TaskHandle GetTextureDecodeTask(
+			AssetContentVersion contentVersion) const noexcept;
 		[[nodiscard]] bool CancelModelImport(
 			AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] bool UpdateModelImportPriority(
@@ -102,14 +142,23 @@ namespace gglab
 		[[nodiscard]] bool UpdateMeshReloadPriority(
 			AssetContentVersion sourceModelVersion,
 			TaskPriority priority) noexcept;
+		[[nodiscard]] bool CancelTextureDecode(
+			AssetContentVersion contentVersion) noexcept;
+		[[nodiscard]] bool UpdateTextureDecodePriority(
+			AssetContentVersion contentVersion,
+			TaskPriority priority) noexcept;
 
 		[[nodiscard]] bool IsCurrentModelImport(
 			AssetOperationToken operation) const noexcept;
 		[[nodiscard]] bool IsCurrentMeshReload(
 			AssetOperationToken operation) const noexcept;
+		[[nodiscard]] bool IsCurrentTextureDecode(
+			AssetOperationToken operation) const noexcept;
 		void CompleteModelImport(AssetOperationToken operation) noexcept;
 		void CompleteMeshReload(AssetOperationToken operation) noexcept;
+		void CompleteTextureDecode(AssetOperationToken operation) noexcept;
 		void DiscardModelImport(AssetKey model) noexcept;
+		void DiscardTextureDecode(AssetKey texture) noexcept;
 
 		void DrainCompletions(std::vector<AssetLoadCompletion>& output) noexcept;
 		[[nodiscard]] bool HasActiveOperations() const noexcept;
@@ -141,6 +190,7 @@ namespace gglab
 		uint64_t m_NextOperationSerial = 1;
 		OperationMap m_ModelImports;
 		OperationMap m_MeshReloads;
+		OperationMap m_TextureDecodes;
 		std::vector<AssetLoadCompletion> m_PendingCompletions;
 	};
 }

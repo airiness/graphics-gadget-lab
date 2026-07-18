@@ -234,16 +234,19 @@ namespace gglab
 		const TextureID fallbackId =
 			ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
 		const TextureContentRef content = m_AssetManager->GetTextureContentRef(fallbackId);
+		const auto contentFingerprint =
+			m_AssetManager->GetTextureContentFingerprint(content);
 		GGLAB_ASSERT_MSG(
 			m_AssetManager->GetResidentTextureResource(content).has_value(),
 			"Environment fallback cubemap must be resident before controller reset.");
-		if (!content.IsValid())
+		if (!content.IsValid() || !contentFingerprint)
 		{
 			return;
 		}
 		m_EnvironmentLighting->CommitEnvironmentSource({
 			.m_Content = content,
 			.m_Type = EnvironmentTextureSourceType::Cubemap,
+			.m_ContentFingerprint = *contentFingerprint,
 		});
 	}
 
@@ -252,6 +255,18 @@ namespace gglab
 		GGLAB_ASSERT(m_PendingSelection.IsValid());
 		const size_t entryIndex = m_PendingSelection.m_EntryIndex;
 		const TextureContentRef content = m_PendingSelection.m_Content;
+		const auto contentFingerprint =
+			m_AssetManager->GetTextureContentFingerprint(content);
+		GGLAB_ASSERT_MSG(
+			contentFingerprint.has_value(),
+			"A ready environment texture must have decoded-content provenance.");
+		if (!contentFingerprint)
+		{
+			RejectPending(
+				EnvironmentAssetEntryState::Failed,
+				"decoded-content fingerprint unavailable");
+			return;
+		}
 		AssetOwnerScope oldActive = std::move(m_ActiveOwner);
 
 		// The candidate lease becomes active before the visible source changes.
@@ -263,7 +278,7 @@ namespace gglab
 		m_EnvironmentLighting->CommitEnvironmentSource({
 			.m_Content = content,
 			.m_Type = EnvironmentTextureSourceType::Equirectangular,
-			.m_SourcePath = entry.m_Path,
+			.m_ContentFingerprint = *contentFingerprint,
 		});
 
 		// Release the previous source only after the new source and lease are committed.

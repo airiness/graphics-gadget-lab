@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/TextureAsset.h"
 
@@ -18,13 +19,13 @@ namespace gglab
 	class IBLBakeCache
 	{
 	public:
-		static constexpr uint64_t CacheFormatVersion = 1;
+		static constexpr uint64_t CacheFormatVersion = 2;
 		static constexpr uint64_t BakeAlgorithmVersion = 3;
 
 		explicit IBLBakeCache(std::filesystem::path rootDirectory) noexcept;
 
 		[[nodiscard]] uint64_t ComputeKey(
-			const std::filesystem::path& environmentPath,
+			const AssetContentFingerprint& contentFingerprint,
 			const IBLBakeConfig& config,
 			std::stop_token stopToken = {}) const noexcept;
 		[[nodiscard]] bool TryLoad(

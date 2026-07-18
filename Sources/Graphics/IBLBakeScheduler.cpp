@@ -116,7 +116,7 @@ namespace gglab
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
-		const std::filesystem::path environmentPath = source.m_SourcePath;
+		const AssetContentFingerprint contentFingerprint = source.m_ContentFingerprint;
 		const uint64_t generation = m_Status.m_BakingGeneration;
 		const bool ignoreCache = m_EnvironmentLightingSystem->ShouldIgnoreCache(generation);
 		auto work = std::make_shared<CacheLoadWork>();
@@ -127,10 +127,10 @@ namespace gglab
 				.m_Name = std::format("IBL.CacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, environmentPath, config = m_BakingConfig, ignoreCache, work](
+			[this, contentFingerprint, config = m_BakingConfig, ignoreCache, work](
 				std::stop_token stopToken) noexcept
 			{
-				work->m_Key = m_Cache.ComputeKey(environmentPath, config, stopToken);
+				work->m_Key = m_Cache.ComputeKey(contentFingerprint, config, stopToken);
 				if (stopToken.stop_requested() || ignoreCache)
 				{
 					return TaskResult::Success();
