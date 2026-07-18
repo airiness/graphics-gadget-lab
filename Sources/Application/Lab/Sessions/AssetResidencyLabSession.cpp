@@ -186,14 +186,16 @@ namespace gglab
 					break;
 				}
 			}
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot dependencySnapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				dependencySnapshot,
+				m_State->m_TextureId);
 			if (!texture || texture->m_ResidencyState != AssetResidencyState::Resident)
 			{
 				Fail("The verification model has no resident texture dependency.");
 				return;
 			}
 
-			const AssetSnapshot dependencySnapshot = BuildAssetSnapshot(assetManager);
 			const AssetSnapshot::Model* dependencyModel = FindModelSnapshot(
 				dependencySnapshot,
 				m_State->m_Request.m_ModelId);
@@ -243,11 +245,18 @@ namespace gglab
 				return;
 			}
 			const TextureID reservedTexture = ToTextureId(ReservedTextureIDIndex::BaseColorWhite);
-			const Texture* pinnedTexture = assetManager.GetTexture(reservedTexture);
-			if (!pinnedTexture ||
-				assetManager.SetTextureResidencyPolicy(
+			if (assetManager.SetTextureResidencyPolicy(
 				reservedTexture,
-				AssetResidencyPolicy::Cacheable) ||
+				AssetResidencyPolicy::Cacheable))
+			{
+				Fail("A reserved texture accepted a cacheable residency policy.");
+				return;
+			}
+			const AssetSnapshot reservedSnapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* pinnedTexture = FindTextureSnapshot(
+				reservedSnapshot,
+				reservedTexture);
+			if (!pinnedTexture ||
 				pinnedTexture->m_ResidencyPolicy != AssetResidencyPolicy::Pinned)
 			{
 				Fail("A reserved texture accepted a cacheable residency policy.");
@@ -260,7 +269,7 @@ namespace gglab
 			m_State->m_ModelGeneration = model->m_ContentGeneration;
 			m_State->m_MeshGeneration = mesh->m_ContentGeneration;
 			m_State->m_TextureGeneration = texture->m_ContentGeneration;
-			m_State->m_TextureImportSettings = texture->m_Source.m_ImportSettings;
+			m_State->m_TextureImportSettings = texture->m_ImportSettings;
 			m_State->m_MeshResidencyEpoch = mesh->m_ResidencyEpoch;
 			m_State->m_TextureResidencyEpoch = texture->m_ResidencyEpoch;
 			const AssetResidencyStatistics residency =
@@ -319,7 +328,10 @@ namespace gglab
 		{
 			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!model || !mesh || !texture ||
 				model->m_ContentGeneration != m_State->m_ModelGeneration ||
 				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
@@ -394,7 +406,10 @@ namespace gglab
 		{
 			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!model || !mesh || !texture ||
 				model->m_ContentGeneration != m_State->m_ModelGeneration ||
 				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
@@ -427,7 +442,10 @@ namespace gglab
 		{
 			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!model || !mesh || !texture)
 			{
 				Fail("Eviction cancellation removed a stable asset entry.");
@@ -455,12 +473,11 @@ namespace gglab
 					m_State->m_StaleCompletionCountBaseline + 2 ||
 				mesh->m_ResidencyState != AssetResidencyState::Resident ||
 				texture->m_ResidencyState != AssetResidencyState::Resident ||
-				!mesh->m_IsUploaded || !texture->m_Gpu.m_IsUploaded)
+				!mesh->m_IsUploaded || !texture->m_IsUploaded)
 			{
 				Fail("Reacquiring interest did not cancel pending eviction before resource release.");
 				return;
 			}
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
 			if (snapshot.m_DependencyValidationMismatchCount != 0)
 			{
 				Fail("Dependency tracking diverged while eviction was cancelled.");
@@ -475,7 +492,10 @@ namespace gglab
 		{
 			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!model || !mesh || !texture ||
 				model->m_ContentGeneration != m_State->m_ModelGeneration ||
 				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
@@ -495,9 +515,9 @@ namespace gglab
 				texture->m_ContentState != AssetContentState::Ready ||
 				mesh->m_ResidencyState != AssetResidencyState::NonResident ||
 				texture->m_ResidencyState != AssetResidencyState::NonResident ||
-				mesh->m_IsUploaded || texture->m_Gpu.m_IsUploaded ||
+				mesh->m_IsUploaded || texture->m_IsUploaded ||
 				mesh->m_VertexBuffer || mesh->m_IndexBuffer ||
-				texture->m_Gpu.m_Texture.IsValid() || texture->m_Gpu.m_Srv.IsValid())
+				texture->m_Texture.IsValid() || texture->m_HasSrv)
 			{
 				Fail("Released assets did not preserve content while dropping GPU residency.");
 				return;
@@ -515,8 +535,8 @@ namespace gglab
 			assetManager.SetResidencyConfig(config);
 			const AssetManager::TextureLoadRequest staleReload =
 				GetAssetOwnerScope().LoadTextureAsync(
-					texture->m_Source.m_CanonicalPath,
-					texture->m_Source.m_ImportSettings.m_Semantic,
+					texture->m_SourcePath,
+					texture->m_ImportSettings.m_Semantic,
 					TaskPriority::Background);
 			if (!staleReload.IsValid() || !staleReload.m_Task.IsValid() ||
 				staleReload.m_TextureId != m_State->m_TextureId ||
@@ -544,7 +564,10 @@ namespace gglab
 				break;
 			}
 
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!texture || texture->m_ContentGeneration != m_State->m_TextureGeneration)
 			{
 				Fail("The texture reload replacement probe lost its stable texture entry.");
@@ -553,8 +576,8 @@ namespace gglab
 			ResetAssetInterests();
 			const AssetManager::TextureLoadRequest replacementReload =
 				GetAssetOwnerScope().LoadTextureAsync(
-					texture->m_Source.m_CanonicalPath,
-					texture->m_Source.m_ImportSettings.m_Semantic,
+					texture->m_SourcePath,
+					texture->m_ImportSettings.m_Semantic,
 					TaskPriority::Critical);
 			if (!replacementReload.IsValid() || !replacementReload.m_Task.IsValid() ||
 				replacementReload.m_TextureId != m_State->m_TextureId ||
@@ -597,7 +620,10 @@ namespace gglab
 				break;
 			}
 
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!texture)
 			{
 				Fail("The texture reload replacement probe lost its texture entry.");
@@ -605,8 +631,8 @@ namespace gglab
 			}
 			const AssetManager::TextureLoadRequest trackedReplacement =
 				GetAssetOwnerScope().LoadTextureAsync(
-					texture->m_Source.m_CanonicalPath,
-					texture->m_Source.m_ImportSettings.m_Semantic,
+					texture->m_SourcePath,
+					texture->m_ImportSettings.m_Semantic,
 					TaskPriority::Critical);
 			if (!trackedReplacement.m_Task.IsValid() ||
 				trackedReplacement.m_Task != m_State->m_ReplacementTextureReloadTask)
@@ -620,7 +646,10 @@ namespace gglab
 
 		case State::Phase::WaitForTextureReloadCompletion:
 		{
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!texture || texture->m_State == AssetState::Failed ||
 				texture->m_State == AssetState::Cancelled)
 			{
@@ -651,7 +680,10 @@ namespace gglab
 		{
 			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
-			const Texture* texture = assetManager.GetTexture(m_State->m_TextureId);
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
 			if (!model || !mesh || !texture)
 			{
 				Fail("A stable asset entry disappeared during residency reload.");
@@ -694,12 +726,12 @@ namespace gglab
 			if (model->m_ContentGeneration != m_State->m_ModelGeneration ||
 				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
 				texture->m_ContentGeneration != m_State->m_TextureGeneration ||
-				texture->m_Source.m_ImportSettings != m_State->m_TextureImportSettings ||
+				texture->m_ImportSettings != m_State->m_TextureImportSettings ||
 				mesh->m_ResidencyEpoch <= m_State->m_MeshResidencyEpoch ||
 				texture->m_ResidencyEpoch <= m_State->m_TextureResidencyEpoch ||
 				mesh->m_ResidencyOperationSerial != 0 ||
 				texture->m_ResidencyOperationSerial != 0 ||
-				!mesh->m_IsUploaded || !texture->m_Gpu.m_IsUploaded ||
+				!mesh->m_IsUploaded || !texture->m_IsUploaded ||
 				reloaded.m_ReloadRequestCount <= m_State->m_ReloadRequestCountBaseline ||
 				reloaded.m_ReloadingAssetCount != 0 ||
 				reloaded.m_AcceptedStateEventCount <=
@@ -713,7 +745,6 @@ namespace gglab
 					"Reload did not restore residency through validated state-operation events.");
 				return;
 			}
-			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
 			if (snapshot.m_DependencyValidationMismatchCount != 0)
 			{
 				Fail("Dependency tracking diverged during residency reload.");

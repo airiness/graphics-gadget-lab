@@ -89,19 +89,22 @@ namespace gglab
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 
+	private:
+		friend class AssetManager;
+		friend class AssetManagerPublicationServices;
+
 		const Texture* GetTexture(TextureID textureId) const noexcept;
-		const RHITextureDesc* GetTextureDesc(TextureID textureId) const noexcept;
-		RHIDescriptorHandle GetSrvDescriptor(TextureID textureId) const noexcept;
-		uint32_t GetShaderVisibleSrvIndex(TextureID textureId) const noexcept;
-
-		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
-
-		TextureID CreateTexture(const std::filesystem::path& canonicalPath,
+		uint32_t ResolveSrvIndex(
+			TextureID textureId,
+			ReservedTextureIDIndex fallback) const noexcept;
+		TextureID CreateTexture(
+			const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings) noexcept;
-		TextureID FindTexture(const std::filesystem::path& canonicalPath,
+		TextureID FindTexture(
+			const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings) const noexcept;
-
-		TextureUploadData MakeTextureUploadData(TextureID textureId,
+		TextureUploadData MakeTextureUploadData(
+			TextureID textureId,
 			TextureAssetData&& textureData,
 			const TextureImportSettings& importSettings,
 			AssetContentFingerprint contentFingerprint = {}) noexcept;
@@ -109,15 +112,10 @@ namespace gglab
 			ImportedTexture& importedTexture,
 			TaskPriority priority,
 			TexturePublicationContextBase& context) noexcept;
-
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
 			TransferBatch& transferBatch,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
-
-	private:
-		friend class AssetManager;
-		friend class AssetManagerPublicationServices;
 
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
 		[[nodiscard]] std::optional<AssetContentFingerprint> GetTextureContentFingerprint(

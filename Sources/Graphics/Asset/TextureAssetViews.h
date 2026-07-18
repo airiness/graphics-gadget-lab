@@ -36,11 +36,13 @@ namespace gglab
 		TextureContentRef m_Content{};
 		AssetLifecycle m_Lifecycle{};
 		std::filesystem::path m_SourcePath;
+		TextureImportSettings m_ImportSettings{};
 		TextureSemantic m_Semantic = TextureSemantic::Unknown;
 		StringID m_Name{};
 		RHITextureHandle m_Texture{};
 		std::string m_DebugName;
 		bool m_IsUploaded = false;
+		bool m_HasSrv = false;
 		bool m_IsReserved = false;
 	};
 }

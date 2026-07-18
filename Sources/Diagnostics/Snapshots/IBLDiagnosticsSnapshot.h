@@ -40,14 +40,24 @@ namespace gglab
 		bool m_Requested = false;
 	};
 
+	enum class IBLEnvironmentEntryState : uint8_t
+	{
+		Unrequested,
+		Loading,
+		Ready,
+		Failed,
+		InvalidShape,
+	};
+
 	struct IBLEnvironmentEntryDiagnostics
 	{
 		size_t m_Index = 0;
 		std::filesystem::path m_Path;
 		std::string m_DisplayName;
+		uint64_t m_LastSelectionSerial = 0;
+		IBLEnvironmentEntryState m_State = IBLEnvironmentEntryState::Unrequested;
 		bool m_Active = false;
 		bool m_TextureReady = false;
-		bool m_LoadAttempted = false;
 	};
 
 	struct IBLDiagnosticsSnapshot

@@ -144,7 +144,6 @@ namespace gglab
 		[[nodiscard]] bool SetTextureResidencyPolicy(
 			TextureID textureId,
 			AssetResidencyPolicy policy) noexcept;
-		const Texture* GetTexture(TextureID textureId) const noexcept;
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
 		[[nodiscard]] std::optional<AssetContentFingerprint> GetTextureContentFingerprint(
 			TextureContentRef content) const noexcept;
@@ -273,7 +272,6 @@ namespace gglab
 			AssetKey key,
 			AssetResidencyInventoryEntry& entry) const noexcept;
 		[[nodiscard]] AssetLifecycle* FindResidencyLifecycle(AssetKey key) noexcept;
-		[[nodiscard]] const AssetLifecycle* FindResidencyLifecycle(AssetKey key) const noexcept;
 		[[nodiscard]] bool ApplyResidencyAction(
 			const AssetResidencyAction& action,
 			uint64_t projectedResidentBytes) noexcept;

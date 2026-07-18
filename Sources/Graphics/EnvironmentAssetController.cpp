@@ -23,7 +23,6 @@ namespace gglab
 	{
 		Reset();
 		m_Entries.clear();
-		m_RootDirectory = rootDirectory;
 
 		std::error_code errorCode;
 		const bool directoryAvailable = std::filesystem::is_directory(rootDirectory, errorCode);
@@ -178,15 +177,17 @@ namespace gglab
 		}
 		m_PendingSelection = {};
 		supersededOwner.Reset();
+		auto& entry = m_Entries[entryIndex];
+		entry.m_LastSelectionSerial = m_SelectionSerial;
 
 		AssetOwnerScope pendingOwner = m_AssetManager->CreateOwnerScope();
 		const AssetManager::TextureLoadRequest request = pendingOwner.LoadTextureAsync(
-			m_Entries[entryIndex].m_Path,
+			entry.m_Path,
 			TextureSemantic::Environment,
 			TaskPriority::High);
 		if (!request.IsValid())
 		{
-			m_Entries[entryIndex].m_State = EnvironmentAssetEntryState::Failed;
+			entry.m_State = EnvironmentAssetEntryState::Failed;
 			return false;
 		}
 
@@ -199,9 +200,7 @@ namespace gglab
 			},
 			.m_Serial = m_SelectionSerial,
 		};
-		auto& entry = m_Entries[entryIndex];
 		entry.m_Content = m_PendingSelection.m_Content;
-		entry.m_LastSelectionSerial = m_SelectionSerial;
 		entry.m_State = EnvironmentAssetEntryState::Loading;
 		GGLAB_LOG_GRAPHICS_INFO(
 			"EnvironmentAssetController: loading environment candidate '{}' (selection {}).",

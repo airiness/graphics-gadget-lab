@@ -193,6 +193,8 @@ namespace gglab
 			textureSnapshot.m_Id = texture.m_Content.m_Id;
 			textureSnapshot.m_ContentGeneration = texture.m_Content.m_Generation;
 			textureSnapshot.m_ResidencyEpoch = lifecycle.m_ResidencyEpoch;
+			textureSnapshot.m_ResidencyOperationSerial =
+				lifecycle.m_ResidencyOperationSerial;
 			textureSnapshot.m_LastUsedFrame = lifecycle.m_LastUsedFrame;
 			textureSnapshot.m_UseCount = lifecycle.m_UseCount;
 			textureSnapshot.m_State = lifecycle.m_State;
@@ -200,11 +202,13 @@ namespace gglab
 			textureSnapshot.m_ResidencyState = lifecycle.m_ResidencyState;
 			textureSnapshot.m_ResidencyPolicy = lifecycle.m_ResidencyPolicy;
 			textureSnapshot.m_SourcePath = texture.m_SourcePath;
+			textureSnapshot.m_ImportSettings = texture.m_ImportSettings;
 			textureSnapshot.m_Semantic = texture.m_Semantic;
 			textureSnapshot.m_Name = texture.m_Name;
 			textureSnapshot.m_Texture = texture.m_Texture;
 			textureSnapshot.m_DebugName = texture.m_DebugName;
 			textureSnapshot.m_IsUploaded = texture.m_IsUploaded;
+			textureSnapshot.m_HasSrv = texture.m_HasSrv;
 			textureSnapshot.m_IsReserved = texture.m_IsReserved;
 			textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
 				AssetKind::Texture,

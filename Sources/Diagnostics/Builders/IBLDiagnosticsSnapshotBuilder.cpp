@@ -11,6 +11,28 @@ namespace gglab
 {
 	namespace
 	{
+		[[nodiscard]] IBLEnvironmentEntryState ToDiagnosticState(
+			EnvironmentAssetEntryState state) noexcept
+		{
+			switch (state)
+			{
+			case EnvironmentAssetEntryState::Unrequested:
+				return IBLEnvironmentEntryState::Unrequested;
+			case EnvironmentAssetEntryState::Loading:
+				return IBLEnvironmentEntryState::Loading;
+			case EnvironmentAssetEntryState::Ready:
+				return IBLEnvironmentEntryState::Ready;
+			case EnvironmentAssetEntryState::Failed:
+				return IBLEnvironmentEntryState::Failed;
+			case EnvironmentAssetEntryState::InvalidShape:
+				return IBLEnvironmentEntryState::InvalidShape;
+			}
+			return IBLEnvironmentEntryState::Unrequested;
+		}
+	}
+
+	namespace
+	{
 		IBLTextureDiagnostics BuildTextureDiagnostics(
 			const RenderResourceRegistry& registry,
 			RenderResourceRegistry::TextureIndex index) noexcept
@@ -92,9 +114,10 @@ namespace gglab
 					.m_Index = index,
 					.m_Path = environment.m_Path,
 					.m_DisplayName = environment.m_DisplayName,
+					.m_LastSelectionSerial = environment.m_LastSelectionSerial,
+					.m_State = ToDiagnosticState(environment.m_State),
 					.m_Active = active,
 					.m_TextureReady = environmentAssets->IsEntryTextureReady(index),
-					.m_LoadAttempted = environment.m_LastSelectionSerial != 0,
 				});
 			}
 		}
