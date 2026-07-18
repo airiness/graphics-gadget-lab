@@ -38,8 +38,7 @@ namespace gglab
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
 		m_AssetOwnerScope = std::make_unique<AssetOwnerScope>(
-			m_Services.m_AssetManager->CreateOwnerScope(
-				std::format("Lab.{}", m_Descriptor.m_Id.GetName())));
+			m_Services.m_AssetManager->CreateOwnerScope());
 	}
 
 	LabSessionBase::~LabSessionBase() = default;

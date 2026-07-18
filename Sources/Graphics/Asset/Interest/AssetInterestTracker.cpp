@@ -15,10 +15,10 @@ namespace gglab
 		}
 	}
 
-	AssetOwnerId AssetInterestTracker::RegisterOwner(std::string label) noexcept
+	AssetOwnerId AssetInterestTracker::RegisterOwner() noexcept
 	{
 		const AssetOwnerId owner{ m_NextOwnerId++ };
-		m_Owners.emplace(owner, std::move(label));
+		m_Owners.emplace(owner);
 		return owner;
 	}
 
@@ -37,8 +37,7 @@ namespace gglab
 	AssetLeaseAcquireResult AssetInterestTracker::AcquireLease(
 		AssetOwnerId owner,
 		AssetContentVersion contentVersion,
-		TaskPriority priority,
-		bool internal) noexcept
+		TaskPriority priority) noexcept
 	{
 		if (!owner.IsValid() || !contentVersion.IsValid() ||
 			priority == TaskPriority::Count || !m_Owners.contains(owner))
@@ -68,7 +67,6 @@ namespace gglab
 			.m_ContentVersion = contentVersion,
 			.m_Owner = owner,
 			.m_Priority = priority,
-			.m_IsInternal = internal,
 		});
 		interest->second.m_LeaseTokens.insert(token);
 		return {

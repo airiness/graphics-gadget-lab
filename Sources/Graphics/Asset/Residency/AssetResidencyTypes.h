@@ -22,11 +22,6 @@ namespace gglab
 		Reload,
 	};
 
-	enum class AssetResidencyActionReason : uint8_t
-	{
-		BudgetPressure,
-	};
-
 	enum class AssetStateEventOperationPhase : uint8_t
 	{
 		None,
@@ -91,11 +86,8 @@ namespace gglab
 
 	struct AssetResidencyAction
 	{
-		AssetResidencyOperationKind m_Operation = AssetResidencyOperationKind::Evict;
 		AssetStateStamp m_ExpectedStamp{};
-		AssetResidencyActionReason m_Reason = AssetResidencyActionReason::BudgetPressure;
 		uint64_t m_EstimatedBytes = 0;
-		bool m_Attempted = false;
 
 		friend bool operator==(const AssetResidencyAction&, const AssetResidencyAction&) = default;
 	};
@@ -104,9 +96,7 @@ namespace gglab
 	{
 		uint64_t m_SnapshotFrame = 0;
 		uint64_t m_LogicalResidentBytes = 0;
-		uint64_t m_ProjectedResidentBytes = 0;
 		std::vector<AssetResidencyAction> m_Actions;
-		bool m_Consumed = false;
 
 		friend bool operator==(const AssetResidencyPlan&, const AssetResidencyPlan&) = default;
 	};

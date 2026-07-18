@@ -68,20 +68,10 @@ namespace gglab
 			return m_ContentVersion.IsValid() && m_OperationSerial != 0;
 		}
 
-		[[nodiscard]] constexpr auto AsTuple() const noexcept
-		{
-			return std::tie(
-				m_ContentVersion.m_Key.m_Kind,
-				m_ContentVersion.m_Key.m_StableId,
-				m_ContentVersion.m_ContentGeneration,
-				m_OperationSerial);
-		}
-
 		friend constexpr bool operator==(
 			const AssetOperationToken&,
 			const AssetOperationToken&) = default;
 	};
-	using AssetOperationTokenHash = KeyHash<AssetOperationToken>;
 
 	[[nodiscard]] constexpr AssetKey MakeAssetKey(
 		AssetKind kind,

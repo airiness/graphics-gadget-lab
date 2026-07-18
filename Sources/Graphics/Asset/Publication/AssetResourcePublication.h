@@ -36,7 +36,6 @@ namespace gglab
 
 	struct AssetResourcePublicationStepUsage
 	{
-		uint32_t m_WorkItems = 1;
 		uint32_t m_ResourceCreations = 0;
 		uint64_t m_PayloadBytesMovedToUpload = 0;
 		uint64_t m_PayloadBytesDestroyed = 0;

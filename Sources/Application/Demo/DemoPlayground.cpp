@@ -17,7 +17,7 @@ namespace gglab
 {
 	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo) noexcept :
 		m_Services(createInfo.m_Services),
-		m_AssetOwnerScope(createInfo.m_Services.m_AssetManager->CreateOwnerScope("Demo.Playground"))
+		m_AssetOwnerScope(createInfo.m_Services.m_AssetManager->CreateOwnerScope())
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "DemoPlayground requires valid create info.");
 

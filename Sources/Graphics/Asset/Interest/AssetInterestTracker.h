@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
-#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -79,14 +78,13 @@ namespace gglab
 	class AssetInterestTracker final
 	{
 	public:
-		[[nodiscard]] AssetOwnerId RegisterOwner(std::string label) noexcept;
+		[[nodiscard]] AssetOwnerId RegisterOwner() noexcept;
 		void UnregisterOwner(AssetOwnerId owner) noexcept;
 
 		[[nodiscard]] AssetLeaseAcquireResult AcquireLease(
 			AssetOwnerId owner,
 			AssetContentVersion contentVersion,
-			TaskPriority priority,
-			bool internal = false) noexcept;
+			TaskPriority priority) noexcept;
 		[[nodiscard]] std::optional<AssetInterestChange> ReleaseLease(
 			uint64_t leaseToken) noexcept;
 		[[nodiscard]] std::optional<AssetInterestChange> UpdateLeasePriority(
@@ -119,7 +117,6 @@ namespace gglab
 			AssetContentVersion m_ContentVersion{};
 			AssetOwnerId m_Owner{};
 			TaskPriority m_Priority = TaskPriority::Normal;
-			bool m_IsInternal = false;
 		};
 
 		struct InterestRecord
@@ -142,7 +139,7 @@ namespace gglab
 
 		uint64_t m_NextOwnerId = 1;
 		uint64_t m_NextLeaseToken = 1;
-		std::unordered_map<AssetOwnerId, std::string, AssetOwnerIdHash> m_Owners;
+		std::unordered_set<AssetOwnerId, AssetOwnerIdHash> m_Owners;
 		std::unordered_map<uint64_t, LeaseRecord> m_Leases;
 		std::unordered_map<AssetKey, InterestRecord, AssetKeyHash> m_Interests;
 		std::unordered_map<AssetKey, PublicationRetainRecord, AssetKeyHash>

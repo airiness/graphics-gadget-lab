@@ -112,7 +112,7 @@ namespace gglab
 			const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
-		[[nodiscard]] AssetOwnerScope CreateOwnerScope(std::string label) noexcept;
+		[[nodiscard]] AssetOwnerScope CreateOwnerScope() noexcept;
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void DrainLoadCompletions() noexcept;
 		void DrainStateEvents() noexcept;
@@ -138,11 +138,6 @@ namespace gglab
 		[[nodiscard]] bool SetTextureResidencyPolicy(
 			TextureID textureId,
 			AssetResidencyPolicy policy) noexcept;
-		[[nodiscard]] uint64_t GetAssetUsageFrame() const noexcept
-		{
-			return m_AssetUsageFrame;
-		}
-
 		const Texture* GetTexture(TextureID textureId) const noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -223,15 +218,14 @@ namespace gglab
 			uint64_t m_QuiescedFrame = 0;
 		};
 
-		AssetOwnerId RegisterAssetOwner(std::string label) noexcept;
+		AssetOwnerId RegisterAssetOwner() noexcept;
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
 		AssetLease AcquireAssetLease(
 			AssetOwnerId owner,
 			AssetKind kind,
 			uint64_t stableId,
 			uint64_t generation,
-			TaskPriority priority,
-			bool internal = false) noexcept;
+			TaskPriority priority) noexcept;
 		void ReleaseAssetLease(uint64_t leaseToken) noexcept;
 		void UpdateAssetLeasePriority(uint64_t leaseToken, TaskPriority priority) noexcept;
 		[[nodiscard]] AssetPublicationRetain AcquirePublicationRetain(
@@ -273,7 +267,7 @@ namespace gglab
 		[[nodiscard]] bool ApplyResidencyAction(
 			const AssetResidencyAction& action,
 			uint64_t projectedResidentBytes) noexcept;
-		void ApplyResidencyPlan(AssetResidencyPlan&& plan) noexcept;
+		void ApplyResidencyPlan(const AssetResidencyPlan& plan) noexcept;
 		void RequestModelResidency(ModelID modelId, uint64_t generation) noexcept;
 		[[nodiscard]] TaskHandle RequestTextureResidency(
 			TextureID textureId,
@@ -428,8 +422,6 @@ namespace gglab
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 		void Reset() noexcept;
-		[[nodiscard]] AssetOwnerId GetOwnerId() const noexcept { return m_Owner; }
-
 	private:
 		friend class AssetManager;
 		AssetOwnerScope(AssetManager* manager, AssetOwnerId owner) noexcept :

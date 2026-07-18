@@ -108,7 +108,6 @@ namespace gglab
 		AssetResidencyPlan plan{
 			.m_SnapshotFrame = snapshot.m_Frame,
 			.m_LogicalResidentBytes = snapshot.m_LogicalResidentBytes,
-			.m_ProjectedResidentBytes = snapshot.m_LogicalResidentBytes,
 		};
 		if (!config.m_EnableAutomaticEviction || config.m_MaxEvictionsPerFrame == 0 ||
 			snapshot.m_LogicalResidentBytes <= config.m_HighWatermarkBytes)
@@ -139,22 +138,21 @@ namespace gglab
 						rhs->m_Stamp.m_ContentVersion.m_Key.m_StableId);
 			});
 
+		uint64_t projectedResidentBytes = snapshot.m_LogicalResidentBytes;
 		for (const AssetResidencyInventoryEntry* candidate : candidates)
 		{
-			if (plan.m_ProjectedResidentBytes <= config.m_LowWatermarkBytes ||
+			if (projectedResidentBytes <= config.m_LowWatermarkBytes ||
 				plan.m_Actions.size() >= config.m_MaxEvictionsPerFrame)
 			{
 				break;
 			}
 			plan.m_Actions.push_back({
-				.m_Operation = AssetResidencyOperationKind::Evict,
 				.m_ExpectedStamp = candidate->m_Stamp,
-				.m_Reason = AssetResidencyActionReason::BudgetPressure,
 				.m_EstimatedBytes = candidate->m_EstimatedBytes,
 			});
-			plan.m_ProjectedResidentBytes =
-				plan.m_ProjectedResidentBytes > candidate->m_EstimatedBytes ?
-					plan.m_ProjectedResidentBytes - candidate->m_EstimatedBytes : 0;
+			projectedResidentBytes =
+				projectedResidentBytes > candidate->m_EstimatedBytes ?
+					projectedResidentBytes - candidate->m_EstimatedBytes : 0;
 		}
 		return plan;
 	}
@@ -165,27 +163,11 @@ namespace gglab
 		uint64_t currentFrame,
 		uint64_t projectedResidentBytes) const noexcept
 	{
-		return action.m_Operation == AssetResidencyOperationKind::Evict &&
-			m_Statistics.m_Config.m_EnableAutomaticEviction &&
+		return m_Statistics.m_Config.m_EnableAutomaticEviction &&
 			projectedResidentBytes > m_Statistics.m_Config.m_LowWatermarkBytes &&
 			currentEntry.m_Stamp == action.m_ExpectedStamp &&
 			currentEntry.m_EstimatedBytes == action.m_EstimatedBytes &&
 			IsEvictionCandidate(currentEntry, currentFrame, m_Statistics.m_Config);
-	}
-
-	bool AssetResidencyController::MatchesCurrentState(
-		const AssetStateStamp& stamp,
-		const AssetLifecycle& lifecycle) noexcept
-	{
-		return stamp.m_ContentVersion.IsValid() &&
-			lifecycle.m_ContentGeneration == stamp.m_ContentVersion.m_ContentGeneration &&
-			lifecycle.m_ResidencyEpoch == stamp.m_ResidencyEpoch &&
-			lifecycle.m_ResidencyOperationSerial == stamp.m_ResidencyOperationSerial &&
-			lifecycle.m_LastUsedFrame == stamp.m_LastUsedFrame &&
-			lifecycle.m_State == stamp.m_State &&
-			lifecycle.m_ContentState == stamp.m_ContentState &&
-			lifecycle.m_ResidencyState == stamp.m_ResidencyState &&
-			lifecycle.m_ResidencyPolicy == stamp.m_ResidencyPolicy;
 	}
 
 	void AssetResidencyController::MarkAssetUsed(
