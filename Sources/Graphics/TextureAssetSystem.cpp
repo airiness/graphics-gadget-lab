@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
-#include "Graphics/TextureRegistry.h"
+#include "Graphics/TextureAssetSystem.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/AssetUploadScheduler.h"
@@ -85,7 +85,7 @@ namespace gglab
 
 	}
 
-	TextureRegistry::TextureRegistry(const CreateInfo& createInfo) noexcept :
+	TextureAssetSystem::TextureAssetSystem(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_TaskSystem(createInfo.m_TaskSystem),
 		m_TransferManager(createInfo.m_TransferManager),
@@ -97,7 +97,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 	}
 
-	void TextureRegistry::SetStateChangeCallback(
+	void TextureAssetSystem::SetStateChangeCallback(
 		std::function<void(
 			TextureID,
 			uint64_t,
@@ -109,7 +109,7 @@ namespace gglab
 		m_StateChangeCallback = std::move(callback);
 	}
 
-	void TextureRegistry::SetTextureState(
+	void TextureAssetSystem::SetTextureState(
 		Texture& texture,
 		AssetState state,
 		AssetResidencyOperation residencyOperation,
@@ -137,7 +137,7 @@ namespace gglab
 		}
 	}
 
-	void TextureRegistry::InitializeReservedTextures() noexcept
+	void TextureAssetSystem::InitializeReservedTextures() noexcept
 	{
 		std::vector<BuiltinTextureAsset> builtinTextures =
 			BuiltinTextureFactory::BuildBootstrapTextures();
@@ -177,7 +177,7 @@ namespace gglab
 			{
 				CompleteTextureUpload(textureId, uploadFence.IsValid());
 			}
-			GGLAB_ASSERT_MSG(uploadsSucceeded, "TextureRegistry failed to initialize reserved textures.");
+			GGLAB_ASSERT_MSG(uploadsSucceeded, "TextureAssetSystem failed to initialize reserved textures.");
 		}
 
 		const auto queueOptionalTexture = [this](
@@ -190,13 +190,12 @@ namespace gglab
 				const TextureImportSettings importSettings =
 					MakeTextureImportSettings(TextureSemantic::UVTest);
 				CreateTextureEntry(textureId, name, canonicalPath);
-				const auto [iterator, inserted] =
-					m_TextureContainer.m_CacheKeyIDMap.emplace(
-						TextureCacheKey{ canonicalPath, importSettings },
-						textureId);
-				GGLAB_UNUSED(iterator);
+				const bool inserted = m_Store.BindCacheKey(
+					canonicalPath,
+					importSettings,
+					textureId);
 				GGLAB_ASSERT_MSG(inserted,
-					"TextureRegistry failed to register an optional reserved texture.");
+					"TextureAssetSystem failed to register an optional reserved texture.");
 				GGLAB_UNUSED(QueueTextureLoad(
 					textureId,
 					canonicalPath,
@@ -215,12 +214,12 @@ namespace gglab
 			"Assets/Textures/UVTest4K.png");
 	}
 
-	void TextureRegistry::Finalize(const RHIFencePoint& fencePoint) noexcept
+	void TextureAssetSystem::Finalize(const RHIFencePoint& fencePoint) noexcept
 	{
 		GGLAB_ASSERT_MSG(
 			m_PublicationOrphanedTextures.empty(),
-			"TextureRegistry finalized while publication rollback is pending GPU completion.");
-		for (const auto& texture : m_TextureContainer.m_TextureIDMap | std::views::values)
+			"TextureAssetSystem finalized while publication rollback is pending GPU completion.");
+		for (const auto& texture : m_Store.Entries() | std::views::values)
 		{
 			if (texture->m_Texture.IsValid())
 			{
@@ -232,14 +231,14 @@ namespace gglab
 		}
 	}
 
-	TextureRegistry::TextureLoadRequest TextureRegistry::LoadTextureAsync(
+	TextureAssetSystem::TextureLoadRequest TextureAssetSystem::LoadTextureAsync(
 		const std::filesystem::path& path,
 		TextureSemantic semantic,
 		TaskPriority priority) noexcept
 	{
 		if (path.empty())
 		{
-			GGLAB_LOG_GRAPHICS_WARN("TextureRegistry::LoadTextureAsync received an empty path.");
+			GGLAB_LOG_GRAPHICS_WARN("TextureAssetSystem::LoadTextureAsync received an empty path.");
 			return {};
 		}
 
@@ -249,7 +248,7 @@ namespace gglab
 			!std::filesystem::is_regular_file(canonicalPath, errorCode))
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
-				"TextureRegistry::LoadTextureAsync received a missing texture file: '{}'.",
+				"TextureAssetSystem::LoadTextureAsync received a missing texture file: '{}'.",
 				canonicalPath.string());
 			return {};
 		}
@@ -304,7 +303,7 @@ namespace gglab
 		};
 	}
 
-	TaskHandle TextureRegistry::QueueTextureLoad(
+	TaskHandle TextureAssetSystem::QueueTextureLoad(
 		TextureID textureId,
 		const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings,
@@ -313,7 +312,7 @@ namespace gglab
 		bool residencyReload,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		GGLAB_ASSERT_NOT_NULL(texture);
 		if (!texture)
 		{
@@ -406,7 +405,7 @@ namespace gglab
 				{
 					return;
 				}
-				const Texture* currentTexture = GetTexture(textureId);
+				const Texture* currentTexture = EditTexture(textureId);
 				if (!currentTexture || currentTexture->m_ContentGeneration != generation ||
 					currentTexture->m_CancelRequested ||
 					(residencyReload &&
@@ -474,7 +473,7 @@ namespace gglab
 		return task;
 	}
 
-	bool TextureRegistry::IsCurrentTextureLoadOperation(
+	bool TextureAssetSystem::IsCurrentTextureLoadOperation(
 		TextureID textureId,
 		uint64_t generation,
 		uint64_t loadSerial) const noexcept
@@ -485,7 +484,7 @@ namespace gglab
 			operation->second.m_LoadSerial == loadSerial;
 	}
 
-	void TextureRegistry::CompleteTextureLoadOperation(
+	void TextureAssetSystem::CompleteTextureLoadOperation(
 		TextureID textureId,
 		uint64_t generation,
 		uint64_t loadSerial) noexcept
@@ -499,28 +498,224 @@ namespace gglab
 		}
 	}
 
-	Texture* TextureRegistry::GetTexture(TextureID textureId) noexcept
+	Texture* TextureAssetSystem::EditTexture(TextureID textureId) noexcept
 	{
 		return const_cast<Texture*>(std::as_const(*this).GetTexture(textureId));
 	}
 
-	const Texture* TextureRegistry::GetTexture(TextureID textureId) const noexcept
+	const Texture* TextureAssetSystem::GetTexture(TextureID textureId) const noexcept
 	{
-		auto iterator = m_TextureContainer.m_TextureIDMap.find(textureId);
-		if (iterator != m_TextureContainer.m_TextureIDMap.end())
-		{
-			return iterator->second.get();
-		}
-		return nullptr;
+		return m_Store.Find(textureId);
 	}
 
-	const RHITextureDesc* TextureRegistry::GetTextureDesc(TextureID textureId) const noexcept
+	bool TextureAssetSystem::IsCurrentResidencyOperation(
+		const AssetResidencyOperation& operation) const noexcept
+	{
+		const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
+		const Texture* texture = GetTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		return contentVersion.m_Key.m_Kind == AssetKind::Texture && texture &&
+			texture->m_ContentGeneration == contentVersion.m_ContentGeneration &&
+			AssetResidencyController::IsCurrentOperation(*texture, operation);
+	}
+
+	bool TextureAssetSystem::IsCurrentResidencyOperation(
+		const AssetOperationToken& operation) const noexcept
+	{
+		const AssetContentVersion contentVersion = operation.m_ContentVersion;
+		const Texture* texture = GetTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		return contentVersion.m_Key.m_Kind == AssetKind::Texture && texture &&
+			texture->m_ContentGeneration == contentVersion.m_ContentGeneration &&
+			AssetResidencyController::IsCurrentOperation(*texture, operation);
+	}
+
+	void TextureAssetSystem::CompleteResidencyOperation(
+		const AssetResidencyOperation& operation) noexcept
+	{
+		const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
+		Texture* texture = EditTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		if (texture && texture->m_ContentGeneration == contentVersion.m_ContentGeneration)
+		{
+			AssetResidencyController::CompleteResidencyOperation(*texture, operation);
+		}
+	}
+
+	void TextureAssetSystem::CompleteResidencyOperation(
+		const AssetOperationToken& operation) noexcept
+	{
+		const AssetContentVersion contentVersion = operation.m_ContentVersion;
+		Texture* texture = EditTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		if (texture && texture->m_ContentGeneration == contentVersion.m_ContentGeneration)
+		{
+			AssetResidencyController::CompleteResidencyOperation(*texture, operation);
+		}
+	}
+
+	bool TextureAssetSystem::RestoreEvictionForShutdown(
+		const AssetResidencyOperation& operation) noexcept
+	{
+		const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
+		Texture* texture = EditTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		if (!texture || texture->m_ContentGeneration != contentVersion.m_ContentGeneration)
+		{
+			return false;
+		}
+		SetTextureState(
+			*texture,
+			texture->m_State == AssetState::Evicting ? AssetState::Ready : texture->m_State,
+			operation,
+			AssetStateEventOperationPhase::Completes);
+		return true;
+	}
+
+	TextureAssetSystem::EvictionFinalizationResult TextureAssetSystem::FinalizeEviction(
+		const AssetResidencyOperation& operation,
+		bool protectedByInterest) noexcept
+	{
+		const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
+		Texture* texture = EditTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		if (!texture || texture->m_ContentGeneration != contentVersion.m_ContentGeneration)
+		{
+			return { .m_Finalized = true };
+		}
+		if (texture->m_State != AssetState::Evicting)
+		{
+			const bool cancelled = texture->m_State == AssetState::Ready;
+			AssetResidencyController::CompleteResidencyOperation(*texture, operation);
+			return { .m_Finalized = true, .m_Cancelled = cancelled };
+		}
+		if (protectedByInterest || texture->m_ResidencyPolicy == AssetResidencyPolicy::Pinned)
+		{
+			SetTextureState(
+				*texture,
+				AssetState::Ready,
+				operation,
+				AssetStateEventOperationPhase::Completes);
+			return { .m_Finalized = true, .m_Cancelled = true };
+		}
+		return {
+			.m_Finalized = FinalizeTextureEviction(texture->m_Id, operation),
+		};
+	}
+
+	AssetResidencyOperation TextureAssetSystem::BeginResidencyOperation(
+		const AssetContentVersion& contentVersion,
+		AssetResidencyOperationKind kind,
+		AssetResidencyController& controller) noexcept
+	{
+		Texture* texture = EditTexture(TextureID{
+			static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
+		if (!texture || texture->m_ContentGeneration != contentVersion.m_ContentGeneration)
+		{
+			return {};
+		}
+		const AssetResidencyOperation operation = controller.BeginResidencyOperation(
+			*texture,
+			contentVersion,
+			kind);
+		if (operation.IsValid() && kind == AssetResidencyOperationKind::Evict)
+		{
+			SetTextureState(
+				*texture,
+				AssetState::Evicting,
+				operation,
+				AssetStateEventOperationPhase::InProgress);
+		}
+		return operation;
+	}
+
+	TaskHandle TextureAssetSystem::RequestResidency(
+		TextureID textureId,
+		uint64_t generation,
+		TaskPriority priority,
+		AssetResidencyController& controller) noexcept
+	{
+		Texture* texture = EditTexture(textureId);
+		if (!texture || texture->m_ContentGeneration != generation ||
+			(texture->m_State != AssetState::Evicting &&
+				(texture->m_State != AssetState::CpuReady || texture->m_ResidencyEpoch == 0)))
+		{
+			return {};
+		}
+		controller.RecordReloadRequest(texture->m_IsReloading);
+		const AssetContentVersion contentVersion = MakeAssetContentVersion(textureId, generation);
+		if (texture->m_State == AssetState::Evicting)
+		{
+			const AssetResidencyOperation operation = controller.BeginResidencyOperation(
+				*texture,
+				contentVersion,
+				AssetResidencyOperationKind::Reload);
+			SetTextureState(
+				*texture,
+				AssetState::Ready,
+				operation,
+				AssetStateEventOperationPhase::Completes);
+			return {};
+		}
+		AssetResidencyOperation operation;
+		if (texture->m_IsReloading)
+		{
+			operation = {
+				.m_Token = MakeAssetOperationToken(contentVersion, texture->m_ResidencyOperationSerial),
+				.m_Kind = AssetResidencyOperationKind::Reload,
+			};
+		}
+		else
+		{
+			operation = controller.BeginResidencyOperation(
+				*texture,
+				contentVersion,
+				AssetResidencyOperationKind::Reload);
+			if (!operation.IsValid())
+			{
+				return {};
+			}
+		}
+		return RequestTextureResidency(textureId, operation, priority);
+	}
+
+	void TextureAssetSystem::MarkUsed(TextureID textureId, uint64_t frame) noexcept
+	{
+		if (Texture* texture = EditTexture(textureId))
+		{
+			AssetResidencyController::MarkAssetUsed(*texture, frame);
+		}
+	}
+
+	bool TextureAssetSystem::SetResidencyPolicy(
+		TextureID textureId,
+		AssetResidencyPolicy policy) noexcept
+	{
+		Texture* texture = EditTexture(textureId);
+		return texture && AssetResidencyController::SetResidencyPolicy(
+			*texture,
+			policy,
+			IsReservedTextureId(textureId));
+	}
+
+	bool TextureAssetSystem::BeginPublication(TextureID textureId) noexcept
+	{
+		Texture* texture = EditTexture(textureId);
+		if (!texture)
+		{
+			return false;
+		}
+		SetTextureState(*texture, AssetState::Publishing);
+		return true;
+	}
+
+	const RHITextureDesc* TextureAssetSystem::GetTextureDesc(TextureID textureId) const noexcept
 	{
 		const auto* texture = GetTexture(textureId);
 		return texture && texture->m_IsUploaded ? &texture->m_Desc : nullptr;
 	}
 
-	RHIDescriptorHandle TextureRegistry::GetSrvDescriptor(TextureID textureId) const noexcept
+	RHIDescriptorHandle TextureAssetSystem::GetSrvDescriptor(TextureID textureId) const noexcept
 	{
 		const auto* texture = GetTexture(textureId);
 		if (!texture || !texture->m_IsUploaded || !texture->m_Srv.IsValid())
@@ -531,23 +726,23 @@ namespace gglab
 		return m_Device->GetTextureViewDescriptor(texture->m_Srv);
 	}
 
-	uint32_t TextureRegistry::GetShaderVisibleSrvIndex(TextureID textureId) const noexcept
+	uint32_t TextureAssetSystem::GetShaderVisibleSrvIndex(TextureID textureId) const noexcept
 	{
 		const RHIDescriptorHandle descriptor = GetSrvDescriptor(textureId);
 		GGLAB_ASSERT_MSG(
 			descriptor.IsValid() && descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
-			"TextureRegistry::GetShaderVisibleSrvIndex: texture SRV descriptor is invalid.");
+			"TextureAssetSystem::GetShaderVisibleSrvIndex: texture SRV descriptor is invalid.");
 		return descriptor.m_Index;
 	}
 
-	uint32_t TextureRegistry::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
+	uint32_t TextureAssetSystem::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
 	{
 		const auto resolveSrvIndex = [this](RHITextureViewHandle srv) noexcept -> uint32_t
 			{
 				const RHIDescriptorHandle descriptor = m_Device->GetTextureViewDescriptor(srv);
 				GGLAB_ASSERT_MSG(
 					descriptor.IsValid() && descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
-					"TextureRegistry::ResolveSrvIndex: texture SRV descriptor is invalid.");
+					"TextureAssetSystem::ResolveSrvIndex: texture SRV descriptor is invalid.");
 				return descriptor.m_Index;
 			};
 
@@ -568,7 +763,7 @@ namespace gglab
 		return resolveSrvIndex(fallbackTexture->m_Srv);
 	}
 
-	TextureContentRef TextureRegistry::GetTextureContentRef(TextureID textureId) const noexcept
+	TextureContentRef TextureAssetSystem::GetTextureContentRef(TextureID textureId) const noexcept
 	{
 		const Texture* texture = GetTexture(textureId);
 		return texture ? TextureContentRef{
@@ -577,7 +772,7 @@ namespace gglab
 		} : TextureContentRef{};
 	}
 
-	std::optional<AssetState> TextureRegistry::GetTextureState(
+	std::optional<AssetState> TextureAssetSystem::GetTextureState(
 		TextureContentRef content) const noexcept
 	{
 		const Texture* texture = GetTexture(content.m_Id);
@@ -589,7 +784,7 @@ namespace gglab
 		return texture->m_State;
 	}
 
-	std::optional<ResidentTextureResource> TextureRegistry::GetResidentTextureResource(
+	std::optional<ResidentTextureResource> TextureAssetSystem::GetResidentTextureResource(
 		TextureContentRef content) const noexcept
 	{
 		const Texture* texture = GetTexture(content.m_Id);
@@ -608,7 +803,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			descriptor.IsValid() &&
 				descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
-			"TextureRegistry::GetResidentTextureResource: texture SRV descriptor is invalid.");
+			"TextureAssetSystem::GetResidentTextureResource: texture SRV descriptor is invalid.");
 		if (!descriptor.IsValid() ||
 			descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
 		{
@@ -623,11 +818,11 @@ namespace gglab
 		};
 	}
 
-	std::vector<TextureAssetReadInfo> TextureRegistry::GetTextureAssetReadInfos() const
+	std::vector<TextureAssetReadInfo> TextureAssetSystem::GetTextureAssetReadInfos() const
 	{
 		std::vector<TextureAssetReadInfo> infos;
-		infos.reserve(m_TextureContainer.m_TextureIDMap.size());
-		for (const auto& [textureId, texture] : m_TextureContainer.m_TextureIDMap)
+		infos.reserve(m_Store.Size());
+		for (const auto& [textureId, texture] : m_Store.Entries())
 		{
 			infos.push_back({
 				.m_Content = {
@@ -649,7 +844,25 @@ namespace gglab
 		return infos;
 	}
 
-	TextureID TextureRegistry::CreateTexture(const std::filesystem::path& canonicalPath,
+	uint32_t TextureAssetSystem::GetReloadingTextureCount() const noexcept
+	{
+		return static_cast<uint32_t>(std::ranges::count_if(
+			m_Store.Entries() | std::views::values,
+			[](const auto& texture) noexcept { return texture->m_IsReloading; }));
+	}
+
+	std::vector<TextureID> TextureAssetSystem::GetTextureIds() const
+	{
+		std::vector<TextureID> ids;
+		ids.reserve(m_Store.Size());
+		for (TextureID textureId : m_Store.Entries() | std::views::keys)
+		{
+			ids.push_back(textureId);
+		}
+		return ids;
+	}
+
+	TextureID TextureAssetSystem::CreateTexture(const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings) noexcept
 	{
 		const auto textureId = m_TextureIdCounter.Acquire();
@@ -657,36 +870,40 @@ namespace gglab
 		{
 			return InvalidTextureID;
 		}
-		auto pathIdPair = m_TextureContainer.m_CacheKeyIDMap.emplace(
-			TextureCacheKey{ canonicalPath, importSettings }, textureId);
-		GGLAB_ASSERT_MSG(pathIdPair.second, "TextureRegistry: emplace path and TextureID pair failed.");
-		if (!pathIdPair.second)
+		const bool cacheKeyBound = m_Store.BindCacheKey(
+			canonicalPath,
+			importSettings,
+			textureId);
+		GGLAB_ASSERT_MSG(cacheKeyBound, "TextureAssetSystem: emplace path and TextureID pair failed.");
+		if (!cacheKeyBound)
 		{
 			return InvalidTextureID;
 		}
 
-		auto idTexPair = m_TextureContainer.m_TextureIDMap.emplace(textureId, std::make_unique<Texture>());
-		GGLAB_ASSERT_MSG(idTexPair.second, "TextureRegistry: emplace TextureID and Texture pair failed.");
-		if (!idTexPair.second)
+		auto texture = std::make_unique<Texture>();
+		Texture* insertedTexture = texture.get();
+		const bool inserted = m_Store.Insert(textureId, std::move(texture));
+		GGLAB_ASSERT_MSG(inserted, "TextureAssetSystem: emplace TextureID and Texture pair failed.");
+		if (!inserted)
 		{
-			m_TextureContainer.m_CacheKeyIDMap.erase(pathIdPair.first);
+			GGLAB_UNUSED(m_Store.Remove(textureId));
 			return InvalidTextureID;
 		}
 
-		idTexPair.first->second->m_Id = textureId;
+		insertedTexture->m_Id = textureId;
 		BeginAssetContentGeneration(
-			*idTexPair.first->second,
+			*insertedTexture,
 			1,
 			AssetState::CpuReady);
-		idTexPair.first->second->m_Name = StringID(canonicalPath.generic_string());
-		idTexPair.first->second->m_SourcePath = canonicalPath;
-		idTexPair.first->second->m_DebugLabel = canonicalPath.filename().generic_string();
-		idTexPair.first->second->m_LoadProgress = std::make_shared<ProgressChannel>();
+		insertedTexture->m_Name = StringID(canonicalPath.generic_string());
+		insertedTexture->m_SourcePath = canonicalPath;
+		insertedTexture->m_DebugLabel = canonicalPath.filename().generic_string();
+		insertedTexture->m_LoadProgress = std::make_shared<ProgressChannel>();
 
 		return textureId;
 	}
 
-	bool TextureRegistry::RemoveTexture(TextureID textureId) noexcept
+	bool TextureAssetSystem::RemoveTexture(TextureID textureId) noexcept
 	{
 		if (!textureId.IsValid() || IsReservedTextureId(textureId))
 		{
@@ -695,38 +912,23 @@ namespace gglab
 
 		m_TextureLoadTasks.erase(textureId);
 		m_PublicationOrphanedTextures.erase(textureId);
-		auto textureIter = m_TextureContainer.m_TextureIDMap.find(textureId);
-		bool removed = false;
-		if (textureIter != m_TextureContainer.m_TextureIDMap.end())
+		if (Texture* texture = m_Store.Edit(textureId))
 		{
-			if (textureIter->second && textureIter->second->m_Texture.IsValid())
+			if (texture->m_Texture.IsValid())
 			{
-				m_Device->DestroyTexture(textureIter->second->m_Texture);
+				m_Device->DestroyTexture(texture->m_Texture);
 			}
-			m_TextureContainer.m_TextureIDMap.erase(textureIter);
-			removed = true;
 		}
-		const size_t removedPaths = std::erase_if(m_TextureContainer.m_CacheKeyIDMap,
-			[textureId](const auto& entry) noexcept
-			{
-				return entry.second == textureId;
-			});
-		return removed || removedPaths > 0;
+		return m_Store.Remove(textureId);
 	}
 
-	TextureID TextureRegistry::FindTexture(const std::filesystem::path& canonicalPath,
+	TextureID TextureAssetSystem::FindTexture(const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings) const noexcept
 	{
-		const auto& cacheKeyIds = m_TextureContainer.m_CacheKeyIDMap;
-		auto iterator = cacheKeyIds.find(TextureCacheKey{ canonicalPath, importSettings });
-		if (iterator != cacheKeyIds.end())
-		{
-			return iterator->second;
-		}
-		return InvalidTextureID;
+		return m_Store.FindCached(canonicalPath, importSettings);
 	}
 
-	TextureRegistry::TextureUploadData TextureRegistry::MakeTextureUploadData(TextureID textureId,
+	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(TextureID textureId,
 		TextureAssetData&& textureData, TextureSemantic semantic) noexcept
 	{
 		TextureUploadData uploadData{};
@@ -737,13 +939,13 @@ namespace gglab
 		return uploadData;
 	}
 
-	bool TextureRegistry::UploadTexture(
+	bool TextureAssetSystem::UploadTexture(
 		const TextureUploadData& uploadData,
 		TransferBatch& transferBatch,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
-		auto* texture = GetTexture(uploadData.m_TextureId);
-		GGLAB_ASSERT_MSG(texture != nullptr, "TextureRegistry::UploadTexture: invalid TextureID.");
+		auto* texture = EditTexture(uploadData.m_TextureId);
+		GGLAB_ASSERT_MSG(texture != nullptr, "TextureAssetSystem::UploadTexture: invalid TextureID.");
 		if (!texture)
 		{
 			return false;
@@ -773,7 +975,7 @@ namespace gglab
 				AssetState::Failed,
 				residencyOperation,
 				operationPhase);
-			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture received invalid texture asset data.");
+			GGLAB_LOG_GRAPHICS_ERROR("TextureAssetSystem::UploadTexture received invalid texture asset data.");
 			return false;
 		}
 		if (texture->m_Texture.IsValid() || texture->m_IsUploaded)
@@ -784,7 +986,7 @@ namespace gglab
 				residencyOperation,
 				operationPhase);
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"TextureRegistry::UploadTexture only supports initial upload of a texture entry.");
+				"TextureAssetSystem::UploadTexture only supports initial upload of a texture entry.");
 			return false;
 		}
 
@@ -809,7 +1011,7 @@ namespace gglab
 		};
 
 		texture->m_Texture = m_Device->CreateTexture(textureDesc, debugIdentity);
-		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture.");
+		GGLAB_ASSERT_MSG(texture->m_Texture.IsValid(), "TextureAssetSystem::UploadTexture: failed to create RHI texture.");
 		if (!texture->m_Texture.IsValid())
 		{
 			SetTextureState(
@@ -830,7 +1032,7 @@ namespace gglab
 				AssetState::Failed,
 				residencyOperation,
 				operationPhase);
-			GGLAB_LOG_GRAPHICS_ERROR("TextureRegistry::UploadTexture failed to record the texture upload.");
+			GGLAB_LOG_GRAPHICS_ERROR("TextureAssetSystem::UploadTexture failed to record the texture upload.");
 			return false;
 		}
 
@@ -862,7 +1064,7 @@ namespace gglab
 		srvDesc.m_Subresources.m_ArraySliceCount = textureData.m_ArraySize;
 
 		texture->m_Srv = m_Device->CreateTextureView(texture->m_Texture, srvDesc);
-		GGLAB_ASSERT_MSG(texture->m_Srv.IsValid(), "TextureRegistry::UploadTexture: failed to create RHI texture SRV.");
+		GGLAB_ASSERT_MSG(texture->m_Srv.IsValid(), "TextureAssetSystem::UploadTexture: failed to create RHI texture SRV.");
 		if (!texture->m_Srv.IsValid())
 		{
 			SetTextureState(
@@ -882,12 +1084,12 @@ namespace gglab
 		return true;
 	}
 
-	void TextureRegistry::CompleteTextureUpload(
+	void TextureAssetSystem::CompleteTextureUpload(
 		TextureID textureId,
 		bool succeeded,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
-		auto* texture = GetTexture(textureId);
+		auto* texture = EditTexture(textureId);
 		if (!texture)
 		{
 			return;
@@ -937,12 +1139,12 @@ namespace gglab
 		}
 	}
 
-	bool TextureRegistry::QueueTextureUpload(
+	bool TextureAssetSystem::QueueTextureUpload(
 		TextureUploadData&& uploadData,
 		TaskPriority priority,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
-		Texture* texture = GetTexture(uploadData.m_TextureId);
+		Texture* texture = EditTexture(uploadData.m_TextureId);
 		if (!texture || !uploadData.m_TextureData.IsValid())
 		{
 			return false;
@@ -985,7 +1187,7 @@ namespace gglab
 			[this, textureId, generation, priority, residencyOperation,
 				payload]() mutable noexcept
 			{
-				Texture* currentTexture = GetTexture(textureId);
+				Texture* currentTexture = EditTexture(textureId);
 				if (!currentTexture || currentTexture->m_ContentGeneration != generation)
 				{
 					return;
@@ -1033,7 +1235,7 @@ namespace gglab
 		return true;
 	}
 
-	bool TextureRegistry::PublishImportedTexture(
+	bool TextureAssetSystem::PublishImportedTexture(
 		TextureID textureId,
 		uint64_t generation,
 		TextureSemantic semantic,
@@ -1041,7 +1243,7 @@ namespace gglab
 		TextureAssetData&& textureData,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation)
 		{
 			return false;
@@ -1115,7 +1317,7 @@ namespace gglab
 		return uploadHandle.IsValid();
 	}
 
-	void TextureRegistry::CompleteTextureLoad(
+	void TextureAssetSystem::CompleteTextureLoad(
 		TextureID textureId,
 		uint64_t generation,
 		uint64_t loadSerial,
@@ -1125,7 +1327,7 @@ namespace gglab
 		bool residencyReload,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation)
 		{
 			return;
@@ -1224,11 +1426,11 @@ namespace gglab
 			completion.m_ExecutionMilliseconds);
 	}
 
-	void TextureRegistry::CancelTextureIfUnreferenced(
+	void TextureAssetSystem::CancelTextureIfUnreferenced(
 		TextureID textureId,
 		uint64_t generation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation ||
 			texture->m_State == AssetState::Ready ||
 			texture->m_State == AssetState::Failed ||
@@ -1268,11 +1470,11 @@ namespace gglab
 			texture->m_DebugLabel);
 	}
 
-	void TextureRegistry::RollbackPublicationTexture(
+	void TextureAssetSystem::RollbackPublicationTexture(
 		TextureID textureId,
 		uint64_t generation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation ||
 			IsReservedTextureId(textureId))
 		{
@@ -1296,7 +1498,7 @@ namespace gglab
 		GGLAB_UNUSED(RemoveTexture(textureId));
 	}
 
-	void TextureRegistry::UpdateTextureLoadPriority(
+	void TextureAssetSystem::UpdateTextureLoadPriority(
 		TextureID textureId,
 		uint64_t generation,
 		TaskPriority priority) noexcept
@@ -1317,11 +1519,11 @@ namespace gglab
 			priority));
 	}
 
-	void TextureRegistry::ReviveTextureInterest(
+	void TextureAssetSystem::ReviveTextureInterest(
 		TextureID textureId,
 		uint64_t generation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation ||
 			!texture->m_CancelRequested || texture->m_State != AssetState::GpuProcessing)
 		{
@@ -1334,12 +1536,12 @@ namespace gglab
 			"A new owner acquired the in-flight texture");
 	}
 
-	TaskHandle TextureRegistry::RequestTextureResidency(
+	TaskHandle TextureAssetSystem::RequestTextureResidency(
 		TextureID textureId,
 		AssetResidencyOperation operation,
 		TaskPriority priority) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || operation.m_Kind != AssetResidencyOperationKind::Reload ||
 			operation.m_Token.m_ContentVersion.m_Key != MakeAssetKey(textureId) ||
 			!AssetResidencyController::IsCurrentOperation(*texture, operation) ||
@@ -1389,11 +1591,11 @@ namespace gglab
 		return task;
 	}
 
-	bool TextureRegistry::FinalizeTextureEviction(
+	bool TextureAssetSystem::FinalizeTextureEviction(
 		TextureID textureId,
 		AssetResidencyOperation operation) noexcept
 	{
-		Texture* texture = GetTexture(textureId);
+		Texture* texture = EditTexture(textureId);
 		if (!texture || operation.m_Kind != AssetResidencyOperationKind::Evict ||
 			operation.m_Token.m_ContentVersion.m_Key != MakeAssetKey(textureId) ||
 			!AssetResidencyController::IsCurrentOperation(*texture, operation) ||
@@ -1422,32 +1624,32 @@ namespace gglab
 		return true;
 	}
 
-	void TextureRegistry::CreateTextureEntry(
+	void TextureAssetSystem::CreateTextureEntry(
 		TextureID id,
 		std::string_view textureName,
 		const std::filesystem::path& sourcePath) noexcept
 	{
 		if (GetTexture(id) == nullptr)
 		{
-			auto [iterator, result] = m_TextureContainer.m_TextureIDMap.emplace(id, std::make_unique<Texture>());
-			if (result)
+			auto texture = std::make_unique<Texture>();
+			Texture* insertedTexture = texture.get();
+			if (m_Store.Insert(id, std::move(texture)))
 			{
-				auto& texture = iterator->second;
-				texture->m_Id = id;
+				insertedTexture->m_Id = id;
 				BeginAssetContentGeneration(
-					*texture,
+					*insertedTexture,
 					1,
 					AssetState::CpuReady,
 					IsReservedTextureId(id) ?
 						AssetResidencyPolicy::Pinned : AssetResidencyPolicy::Cacheable);
-				texture->m_Name = StringID(textureName);
-				texture->m_SourcePath = sourcePath;
-				texture->m_DebugLabel = textureName;
-				texture->m_LoadProgress = std::make_shared<ProgressChannel>();
-				texture->m_IsUploaded = false;
-				texture->m_Srv.Reset();
-				texture->m_Texture.Reset();
-				texture->m_Desc = {};
+				insertedTexture->m_Name = StringID(textureName);
+				insertedTexture->m_SourcePath = sourcePath;
+				insertedTexture->m_DebugLabel = textureName;
+				insertedTexture->m_LoadProgress = std::make_shared<ProgressChannel>();
+				insertedTexture->m_IsUploaded = false;
+				insertedTexture->m_Srv.Reset();
+				insertedTexture->m_Texture.Reset();
+				insertedTexture->m_Desc = {};
 			}
 		}
 	}

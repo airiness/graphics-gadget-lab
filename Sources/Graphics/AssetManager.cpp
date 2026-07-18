@@ -4,7 +4,7 @@
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/ModelPublicationJob.h"
 #include "Graphics/AssetUploadScheduler.h"
-#include "Graphics/TextureRegistry.h"
+#include "Graphics/TextureAssetSystem.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDevice.h"
@@ -103,7 +103,7 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
-		m_TextureRegistry(std::make_unique<TextureRegistry>(TextureRegistry::CreateInfo{
+		m_TextureAssets(std::make_unique<TextureAssetSystem>(TextureAssetSystem::CreateInfo{
 			.m_Device = createInfo.m_Device,
 			.m_TaskSystem = createInfo.m_TaskSystem,
 			.m_TransferManager = createInfo.m_TransferManager,
@@ -117,8 +117,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
-		m_TextureRegistry->InitializeReservedTextures();
-		m_TextureRegistry->SetStateChangeCallback(
+		m_TextureAssets->InitializeReservedTextures();
+		m_TextureAssets->SetStateChangeCallback(
 			[this](
 				TextureID textureId,
 				uint64_t generation,
@@ -140,7 +140,7 @@ namespace gglab
 	{
 		// Detach external callbacks before validating facade-owned state. Component
 		// members are then destroyed in reverse declaration order.
-		m_TextureRegistry->SetStateChangeCallback({});
+		m_TextureAssets->SetStateChangeCallback({});
 		GGLAB_ASSERT_MSG(
 			m_IsPreparedForShutdown,
 			"AssetManager destroyed without explicit shutdown preparation.");
@@ -428,16 +428,20 @@ namespace gglab
 		for (const AssetStateEvent& event : events)
 		{
 			AssetLifecycle* operationLifecycle = nullptr;
+			const bool textureOperation = event.m_Operation &&
+				event.m_Status.m_ContentVersion.m_Key.m_Kind == AssetKind::Texture;
 			if (event.m_Operation)
 			{
 				// Residency events are accepted against the operation that is current at
 				// drain time, not merely the operation that was current when queued.
-				operationLifecycle = FindResidencyLifecycle(
+				operationLifecycle = textureOperation ? nullptr : FindResidencyLifecycle(
 					event.m_Status.m_ContentVersion.m_Key);
-				if (!operationLifecycle ||
-					!AssetResidencyController::IsCurrentOperation(
+				const bool currentOperation = textureOperation ?
+					m_TextureAssets->IsCurrentResidencyOperation(*event.m_Operation) :
+					operationLifecycle && AssetResidencyController::IsCurrentOperation(
 						*operationLifecycle,
-						*event.m_Operation))
+						*event.m_Operation);
+				if (!currentOperation)
 				{
 					m_AssetResidencyController.RecordStaleStateEvent();
 					continue;
@@ -476,9 +480,16 @@ namespace gglab
 				{
 					// Keep the token current until its terminal state has been applied;
 					// clearing it in the producer would make this event appear stale.
-					AssetResidencyController::CompleteResidencyOperation(
-						*operationLifecycle,
-						*event.m_Operation);
+					if (textureOperation)
+					{
+						m_TextureAssets->CompleteResidencyOperation(*event.m_Operation);
+					}
+					else
+					{
+						AssetResidencyController::CompleteResidencyOperation(
+							*operationLifecycle,
+							*event.m_Operation);
+					}
 				}
 				m_AssetResidencyController.RecordAcceptedStateEvent(
 					completesOperation);
@@ -518,9 +529,12 @@ namespace gglab
 		{
 			const AssetResidencyOperation operation = eviction.m_Operation;
 			const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
-			AssetLifecycle* lifecycle = FindResidencyLifecycle(contentVersion.m_Key);
-			if (!lifecycle ||
-				!AssetResidencyController::IsCurrentOperation(*lifecycle, operation))
+			AssetLifecycle* lifecycle = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+				nullptr : FindResidencyLifecycle(contentVersion.m_Key);
+			const bool currentOperation = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+				m_TextureAssets->IsCurrentResidencyOperation(operation) :
+				lifecycle && AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
+			if (!currentOperation)
 			{
 				m_AssetResidencyController.RecordStaleCompletion();
 				m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
@@ -530,19 +544,7 @@ namespace gglab
 			bool queuedCompletion = false;
 			if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
 			{
-				Texture* texture = m_TextureRegistry->GetTexture(TextureID{
-					static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
-				if (texture &&
-					texture->m_ContentGeneration == contentVersion.m_ContentGeneration)
-				{
-					m_TextureRegistry->SetTextureState(
-						*texture,
-						texture->m_State == AssetState::Evicting ?
-							AssetState::Ready : texture->m_State,
-						operation,
-						AssetStateEventOperationPhase::Completes);
-					queuedCompletion = true;
-				}
+				queuedCompletion = m_TextureAssets->RestoreEvictionForShutdown(operation);
 			}
 			else if (contentVersion.m_Key.m_Kind == AssetKind::Mesh)
 			{
@@ -566,7 +568,14 @@ namespace gglab
 				"Pending residency eviction could not queue its shutdown completion.");
 			if (!queuedCompletion)
 			{
-				AssetResidencyController::CompleteResidencyOperation(*lifecycle, operation);
+				if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
+				{
+					m_TextureAssets->CompleteResidencyOperation(operation);
+				}
+				else if (lifecycle)
+				{
+					AssetResidencyController::CompleteResidencyOperation(*lifecycle, operation);
+				}
 			}
 			++cancelledCurrentEvictionCount;
 			m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
@@ -615,7 +624,7 @@ namespace gglab
 
 		// AssetManager owns texture records and performs their terminal, fence-aware
 		// GPU release while the device and descriptor allocator are still alive.
-		m_TextureRegistry->Finalize(lastSubmittedFence);
+		m_TextureAssets->Finalize(lastSubmittedFence);
 		m_IsPreparedForShutdown = true;
 		GGLAB_LOG_GRAPHICS_INFO(
 			"AssetManager terminal shutdown prepared; texture GPU resources released at fence {}.",
@@ -640,11 +649,7 @@ namespace gglab
 		{
 			reloadingAssetCount += mesh->m_IsReloading ? 1u : 0u;
 		}
-		for (const auto& texture :
-			m_TextureRegistry->m_TextureContainer.m_TextureIDMap | std::views::values)
-		{
-			reloadingAssetCount += texture->m_IsReloading ? 1u : 0u;
-		}
+		reloadingAssetCount += m_TextureAssets->GetReloadingTextureCount();
 		return m_AssetResidencyController.GetStatistics(
 			m_LogicalResidentBytes,
 			pendingEvictionBytes,
@@ -684,7 +689,7 @@ namespace gglab
 		}
 		if (kind == AssetKind::Texture)
 		{
-			m_TextureRegistry->ReviveTextureInterest(
+			m_TextureAssets->ReviveTextureInterest(
 				TextureID{ static_cast<uint32_t>(stableId) },
 				generation);
 			GGLAB_UNUSED(RequestTextureResidency(
@@ -722,7 +727,7 @@ namespace gglab
 		}
 		if (kind == AssetKind::Texture)
 		{
-			m_TextureRegistry->ReviveTextureInterest(
+			m_TextureAssets->ReviveTextureInterest(
 				TextureID{ static_cast<uint32_t>(stableId) },
 				generation);
 		}
@@ -820,7 +825,7 @@ namespace gglab
 		}
 		else if (key.m_Kind == AssetKind::Texture)
 		{
-			m_TextureRegistry->UpdateTextureLoadPriority(
+			m_TextureAssets->UpdateTextureLoadPriority(
 				TextureID{ static_cast<uint32_t>(key.m_StableId) },
 				generation,
 				priority);
@@ -944,7 +949,7 @@ namespace gglab
 		}
 		for (TextureID textureId : textureIds)
 		{
-			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
+			if (const Texture* texture = m_TextureAssets->GetTexture(textureId))
 			{
 				retainLeaseToken(AcquireAssetLease(
 					owner,
@@ -1009,7 +1014,7 @@ namespace gglab
 		else if (key.m_Kind == AssetKind::Texture)
 		{
 			const TextureID textureId{ static_cast<uint32_t>(key.m_StableId) };
-			const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+			const Texture* texture = m_TextureAssets->GetTexture(textureId);
 			if (!texture || texture->m_ContentGeneration != generation)
 			{
 				return;
@@ -1032,7 +1037,7 @@ namespace gglab
 			{
 				++m_ReadyCancellationCount;
 			}
-			m_TextureRegistry->CancelTextureIfUnreferenced(textureId, generation);
+			m_TextureAssets->CancelTextureIfUnreferenced(textureId, generation);
 		}
 		else
 		{
@@ -1229,12 +1234,12 @@ namespace gglab
 				"AssetManager rejected texture loading after shutdown began.");
 			return {};
 		}
-		const TextureRegistry::TextureLoadRequest registryRequest =
-			m_TextureRegistry->LoadTextureAsync(path, semantic, priority);
+		const TextureAssetSystem::TextureLoadRequest systemRequest =
+			m_TextureAssets->LoadTextureAsync(path, semantic, priority);
 		TextureLoadRequest request{
-			.m_TextureId = registryRequest.m_TextureId,
-			.m_Generation = registryRequest.m_Generation,
-			.m_Task = registryRequest.m_Task,
+			.m_TextureId = systemRequest.m_TextureId,
+			.m_Generation = systemRequest.m_Generation,
+			.m_Task = systemRequest.m_Task,
 		};
 		if (request.IsValid())
 		{
@@ -1296,7 +1301,7 @@ namespace gglab
 		};
 		snapshot.m_Entries.reserve(
 			m_MeshStore.Entries().size() +
-			m_TextureRegistry->m_TextureContainer.m_TextureIDMap.size());
+			m_TextureAssets->GetTextureCount());
 		const auto appendEntry = [this, &snapshot](AssetKey key) noexcept
 			{
 				AssetResidencyInventoryEntry entry;
@@ -1317,8 +1322,7 @@ namespace gglab
 		{
 			appendEntry(MakeAssetKey(meshId));
 		}
-		for (const TextureID textureId :
-			m_TextureRegistry->m_TextureContainer.m_TextureIDMap | std::views::keys)
+		for (const TextureID textureId : m_TextureAssets->GetTextureIds())
 		{
 			appendEntry(MakeAssetKey(textureId));
 		}
@@ -1368,7 +1372,7 @@ namespace gglab
 		if (key.m_Kind == AssetKind::Texture)
 		{
 			const TextureID textureId{ static_cast<uint32_t>(key.m_StableId) };
-			const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+			const Texture* texture = m_TextureAssets->GetTexture(textureId);
 			if (!texture)
 			{
 				return false;
@@ -1405,8 +1409,8 @@ namespace gglab
 
 	AssetLifecycle* AssetManager::FindResidencyLifecycle(AssetKey key) noexcept
 	{
-		return const_cast<AssetLifecycle*>(
-			std::as_const(*this).FindResidencyLifecycle(key));
+		return key.m_Kind == AssetKind::Mesh ?
+			EditMesh(MeshID{ static_cast<uint32_t>(key.m_StableId) }) : nullptr;
 	}
 
 	const AssetLifecycle* AssetManager::FindResidencyLifecycle(AssetKey key) const noexcept
@@ -1417,7 +1421,7 @@ namespace gglab
 		}
 		if (key.m_Kind == AssetKind::Texture)
 		{
-			return m_TextureRegistry->GetTexture(
+			return m_TextureAssets->GetTexture(
 				TextureID{ static_cast<uint32_t>(key.m_StableId) });
 		}
 		return nullptr;
@@ -1442,9 +1446,12 @@ namespace gglab
 				HasPublicationRetain(key, contentVersion.m_ContentGeneration);
 			bool finalized = false;
 			bool cancelled = protectedByInterest;
-			AssetLifecycle* lifecycle = FindResidencyLifecycle(key);
-			if (!lifecycle ||
-				!AssetResidencyController::IsCurrentOperation(*lifecycle, operation))
+			AssetLifecycle* lifecycle = key.m_Kind == AssetKind::Texture ?
+				nullptr : FindResidencyLifecycle(key);
+			const bool currentOperation = key.m_Kind == AssetKind::Texture ?
+				m_TextureAssets->IsCurrentResidencyOperation(operation) :
+				lifecycle && AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
+			if (!currentOperation)
 			{
 				m_AssetResidencyController.RecordStaleCompletion();
 				cancelled = true;
@@ -1452,36 +1459,10 @@ namespace gglab
 			}
 			else if (key.m_Kind == AssetKind::Texture)
 			{
-				Texture* texture = m_TextureRegistry->GetTexture(
-					TextureID{ static_cast<uint32_t>(key.m_StableId) });
-				if (!texture ||
-					texture->m_ContentGeneration != contentVersion.m_ContentGeneration)
-				{
-					finalized = true;
-				}
-				else if (texture->m_State != AssetState::Evicting)
-				{
-					cancelled = texture->m_State == AssetState::Ready;
-					AssetResidencyController::CompleteResidencyOperation(*texture, operation);
-					finalized = true;
-				}
-				else if (protectedByInterest ||
-					texture->m_ResidencyPolicy == AssetResidencyPolicy::Pinned)
-				{
-					m_TextureRegistry->SetTextureState(
-						*texture,
-						AssetState::Ready,
-						operation,
-						AssetStateEventOperationPhase::Completes);
-					cancelled = true;
-					finalized = true;
-				}
-				else
-				{
-					finalized = m_TextureRegistry->FinalizeTextureEviction(
-						texture->m_Id,
-						operation);
-				}
+				const TextureAssetSystem::EvictionFinalizationResult result =
+					m_TextureAssets->FinalizeEviction(operation, protectedByInterest);
+				finalized = result.m_Finalized;
+				cancelled = result.m_Cancelled;
 			}
 			else if (key.m_Kind == AssetKind::Mesh)
 			{
@@ -1545,9 +1526,14 @@ namespace gglab
 		uint64_t projectedResidentBytes) noexcept
 	{
 		const AssetContentVersion contentVersion = action.m_ExpectedStamp.m_ContentVersion;
-		AssetLifecycle* lifecycle = FindResidencyLifecycle(contentVersion.m_Key);
+		AssetLifecycle* lifecycle = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+			nullptr : FindResidencyLifecycle(contentVersion.m_Key);
+		const bool assetExists = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+			m_TextureAssets->GetTexture(TextureID{
+				static_cast<uint32_t>(contentVersion.m_Key.m_StableId) }) != nullptr :
+			lifecycle != nullptr;
 		AssetResidencyInventoryEntry currentEntry;
-		if (!lifecycle ||
+		if (!assetExists ||
 			!BuildResidencyInventoryEntry(contentVersion.m_Key, currentEntry) ||
 			!m_AssetResidencyController.StillEligible(
 				action,
@@ -1560,6 +1546,11 @@ namespace gglab
 		}
 
 		const AssetResidencyOperation operation =
+			contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+			m_TextureAssets->BeginResidencyOperation(
+				contentVersion,
+				AssetResidencyOperationKind::Evict,
+				m_AssetResidencyController) :
 			m_AssetResidencyController.BeginResidencyOperation(
 				*lifecycle,
 				contentVersion,
@@ -1572,14 +1563,7 @@ namespace gglab
 
 		if (contentVersion.m_Key.m_Kind == AssetKind::Texture)
 		{
-			Texture* texture = m_TextureRegistry->GetTexture(
-				TextureID{ static_cast<uint32_t>(contentVersion.m_Key.m_StableId) });
-			GGLAB_ASSERT_NOT_NULL(texture);
-			m_TextureRegistry->SetTextureState(
-				*texture,
-				AssetState::Evicting,
-				operation,
-				AssetStateEventOperationPhase::InProgress);
+			// TextureAssetSystem began the operation and applied Evicting atomically.
 		}
 		else if (contentVersion.m_Key.m_Kind == AssetKind::Mesh)
 		{
@@ -1645,57 +1629,11 @@ namespace gglab
 		uint64_t generation,
 		TaskPriority priority) noexcept
 	{
-		Texture* texture = m_TextureRegistry->GetTexture(textureId);
-		if (!texture || texture->m_ContentGeneration != generation ||
-			(texture->m_State != AssetState::Evicting &&
-				(texture->m_State != AssetState::CpuReady ||
-					texture->m_ResidencyEpoch == 0)))
-		{
-			return {};
-		}
-		m_AssetResidencyController.RecordReloadRequest(texture->m_IsReloading);
-		const AssetContentVersion contentVersion = MakeAssetContentVersion(
+		return m_TextureAssets->RequestResidency(
 			textureId,
-			generation);
-		if (texture->m_State == AssetState::Evicting)
-		{
-			const AssetResidencyOperation operation =
-				m_AssetResidencyController.BeginResidencyOperation(
-					*texture,
-					contentVersion,
-					AssetResidencyOperationKind::Reload);
-			m_TextureRegistry->SetTextureState(
-				*texture,
-				AssetState::Ready,
-				operation,
-				AssetStateEventOperationPhase::Completes);
-			return {};
-		}
-		AssetResidencyOperation operation;
-		if (texture->m_IsReloading)
-		{
-			operation = {
-				.m_Token = MakeAssetOperationToken(
-					contentVersion,
-					texture->m_ResidencyOperationSerial),
-				.m_Kind = AssetResidencyOperationKind::Reload,
-			};
-		}
-		else
-		{
-			operation = m_AssetResidencyController.BeginResidencyOperation(
-				*texture,
-				contentVersion,
-				AssetResidencyOperationKind::Reload);
-			if (!operation.IsValid())
-			{
-				return {};
-			}
-		}
-		return m_TextureRegistry->RequestTextureResidency(
-			textureId,
-			operation,
-			priority);
+			generation,
+			priority,
+			m_AssetResidencyController);
 	}
 
 	void AssetManager::RequestMeshResidency(
@@ -1823,10 +1761,7 @@ namespace gglab
 
 	void AssetManager::MarkTextureUsed(TextureID textureId) noexcept
 	{
-		if (Texture* texture = m_TextureRegistry->GetTexture(textureId))
-		{
-			AssetResidencyController::MarkAssetUsed(*texture, m_AssetUsageFrame);
-		}
+		m_TextureAssets->MarkUsed(textureId, m_AssetUsageFrame);
 	}
 
 	void AssetManager::SetMeshState(
@@ -1905,7 +1840,7 @@ namespace gglab
 				{
 					continue;
 				}
-				if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
+				if (const Texture* texture = m_TextureAssets->GetTexture(textureId))
 				{
 					addDependency(
 						MakeAssetContentVersion(
@@ -1993,7 +1928,7 @@ namespace gglab
 		}
 		for (TextureID textureId : textureIds)
 		{
-			if (const Texture* texture = m_TextureRegistry->GetTexture(textureId))
+			if (const Texture* texture = m_TextureAssets->GetTexture(textureId))
 			{
 				GGLAB_UNUSED(RequestTextureResidency(
 					textureId,
@@ -2031,11 +1966,7 @@ namespace gglab
 		TextureID textureId,
 		AssetResidencyPolicy policy) noexcept
 	{
-		Texture* texture = m_TextureRegistry->GetTexture(textureId);
-		if (!texture || !AssetResidencyController::SetResidencyPolicy(
-			*texture,
-			policy,
-			IsReservedTextureId(textureId)))
+		if (!m_TextureAssets->SetResidencyPolicy(textureId, policy))
 		{
 			return false;
 		}
@@ -2043,7 +1974,7 @@ namespace gglab
 		{
 			GGLAB_UNUSED(RequestTextureResidency(
 				textureId,
-				texture->m_ContentGeneration,
+				GetTextureContentRef(textureId).m_Generation,
 				TaskPriority::Normal));
 		}
 		return true;
@@ -2051,29 +1982,29 @@ namespace gglab
 
 	const Texture* AssetManager::GetTexture(TextureID textureId) const noexcept
 	{
-		return m_TextureRegistry->GetTexture(textureId);
+		return m_TextureAssets->GetTexture(textureId);
 	}
 
 	TextureContentRef AssetManager::GetTextureContentRef(TextureID textureId) const noexcept
 	{
-		return m_TextureRegistry->GetTextureContentRef(textureId);
+		return m_TextureAssets->GetTextureContentRef(textureId);
 	}
 
 	std::optional<AssetState> AssetManager::GetTextureState(
 		TextureContentRef content) const noexcept
 	{
-		return m_TextureRegistry->GetTextureState(content);
+		return m_TextureAssets->GetTextureState(content);
 	}
 
 	std::optional<ResidentTextureResource> AssetManager::GetResidentTextureResource(
 		TextureContentRef content) const noexcept
 	{
-		return m_TextureRegistry->GetResidentTextureResource(content);
+		return m_TextureAssets->GetResidentTextureResource(content);
 	}
 
 	std::vector<TextureAssetReadInfo> AssetManager::GetTextureAssetReadInfos() const
 	{
-		return m_TextureRegistry->GetTextureAssetReadInfos();
+		return m_TextureAssets->GetTextureAssetReadInfos();
 	}
 
 	Mesh* AssetManager::EditMesh(MeshID meshId) noexcept
@@ -2249,7 +2180,7 @@ namespace gglab
 
 	uint32_t AssetManager::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
 	{
-		return m_TextureRegistry->ResolveSrvIndex(textureId, fallback);
+		return m_TextureAssets->ResolveSrvIndex(textureId, fallback);
 	}
 
 	bool AssetManager::UploadMesh(
@@ -2881,7 +2812,7 @@ namespace gglab
 				{
 					continue;
 				}
-				const Texture* texture = m_TextureRegistry->GetTexture(textureId);
+				const Texture* texture = m_TextureAssets->GetTexture(textureId);
 				if (!texture || texture->m_State == AssetState::Failed)
 				{
 					return ModelDependencyOutcome::Failed;

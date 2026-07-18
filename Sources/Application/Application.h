@@ -7,7 +7,7 @@ namespace gglab
 	class AssetManager;
 	class EnvironmentAssetController;
 	class TaskSystem;
-	class TextureRegistry;
+	class TextureAssetSystem;
 	class InputManager;
 	class ShaderManager;
 	class DemoManager;

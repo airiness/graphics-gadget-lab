@@ -52,7 +52,7 @@ namespace gglab
 	class AssetOwnerScope;
 	class SamplerRegistry;
 	class TaskSystem;
-	class TextureRegistry;
+	class TextureAssetSystem;
 	class TransferBatch;
 	class TransferManager;
 	struct AssetSnapshot;
@@ -328,7 +328,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
-		std::unique_ptr<TextureRegistry> m_TextureRegistry;
+		std::unique_ptr<TextureAssetSystem> m_TextureAssets;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
