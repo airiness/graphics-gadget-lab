@@ -1,8 +1,59 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TextureAsset.h"
+#include "Core/Hash/KeyHash.h"
 
 namespace gglab
 {
+	AssetContentFingerprint ComputeTextureContentFingerprint(
+		const TextureAssetData& textureData,
+		const TextureImportSettings& importSettings) noexcept
+	{
+		if (!textureData.IsValid())
+		{
+			return {};
+		}
+
+		uint64_t contentHash = FNV1a64::OffsetBasis;
+		FNV1a64::MixValue(contentHash, textureData.m_ResourceFormat);
+		FNV1a64::MixValue(contentHash, textureData.m_ViewFormat);
+		FNV1a64::MixValue(contentHash, textureData.m_SrvDimension);
+		FNV1a64::MixValue(contentHash, textureData.m_Extent.m_Width);
+		FNV1a64::MixValue(contentHash, textureData.m_Extent.m_Height);
+		FNV1a64::MixValue(contentHash, textureData.m_Extent.m_Depth);
+		FNV1a64::MixValue(contentHash, textureData.m_ArraySize);
+		FNV1a64::MixValue(contentHash, textureData.m_MipLevels);
+		FNV1a64::MixValue(contentHash, textureData.m_ColorSpace);
+		FNV1a64::MixValue(
+			contentHash,
+			static_cast<uint64_t>(textureData.m_Subresources.size()));
+		for (const TextureAssetSubresource& subresource : textureData.m_Subresources)
+		{
+			FNV1a64::MixValue(contentHash, subresource.m_DataOffset);
+			FNV1a64::MixValue(contentHash, subresource.m_DataSize);
+			FNV1a64::MixValue(contentHash, subresource.m_RowPitch);
+			FNV1a64::MixValue(contentHash, subresource.m_SlicePitch);
+			FNV1a64::MixValue(contentHash, subresource.m_Width);
+			FNV1a64::MixValue(contentHash, subresource.m_Height);
+			FNV1a64::MixValue(contentHash, subresource.m_Depth);
+			FNV1a64::MixValue(contentHash, subresource.m_MipLevel);
+			FNV1a64::MixValue(contentHash, subresource.m_ArraySlice);
+		}
+		FNV1a64::MixBytes(
+			contentHash,
+			textureData.m_Pixels.data(),
+			textureData.m_Pixels.size());
+
+		uint64_t settingsHash = FNV1a64::OffsetBasis;
+		FNV1a64::MixValue(settingsHash, importSettings.m_Semantic);
+		FNV1a64::MixValue(settingsHash, importSettings.m_MipPolicy);
+
+		return {
+			.m_SourceContentHash = contentHash,
+			.m_ImportSettingsHash = settingsHash,
+			.m_DecoderVersion = TextureDecoderVersion,
+		};
+	}
+
 	bool TextureAssetData::IsValid() const noexcept
 	{
 		const bool validViewDimension =

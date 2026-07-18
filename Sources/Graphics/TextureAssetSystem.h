@@ -7,7 +7,6 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
-#include "Graphics/TextureLoader.h"
 
 #include <functional>
 #include <optional>
@@ -15,13 +14,15 @@
 namespace gglab
 {
 	class AssetManager;
+	class AssetLoadCoordinator;
 	class AssetManagerPublicationServices;
 	class AssetResidencyController;
 	class AssetUploadScheduler;
 	class RHIDevice;
-	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
+	struct TextureDecodeFailed;
+	struct TextureDecodeSucceeded;
 
 	class TextureAssetSystem
 	{
@@ -29,7 +30,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
-			TaskSystem* m_TaskSystem = nullptr;
+			AssetLoadCoordinator* m_LoadCoordinator = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		};
@@ -49,21 +50,13 @@ namespace gglab
 			TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 			TextureAssetData m_TextureData;
 			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
+			AssetContentFingerprint m_ContentFingerprint{};
 		};
 
 		struct EvictionFinalizationResult
 		{
 			bool m_Finalized = false;
 			bool m_Cancelled = false;
-		};
-
-	private:
-		struct TextureLoadOperationRecord
-		{
-			TaskHandle m_Task{};
-			uint64_t m_Generation = 0;
-			uint64_t m_LoadSerial = 0;
-			AssetResidencyOperation m_ResidencyOperation{};
 		};
 
 	public:
@@ -92,7 +85,9 @@ namespace gglab
 			const TextureImportSettings& importSettings) const noexcept;
 
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
-			TextureAssetData&& textureData, TextureSemantic semantic) noexcept;
+			TextureAssetData&& textureData,
+			TextureSemantic semantic,
+			AssetContentFingerprint contentFingerprint = {}) noexcept;
 
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
@@ -104,6 +99,8 @@ namespace gglab
 		friend class AssetManagerPublicationServices;
 
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] std::optional<AssetContentFingerprint> GetTextureContentFingerprint(
+			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<AssetState> GetTextureState(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
@@ -172,14 +169,15 @@ namespace gglab
 			AssetResidencyOperation operation) noexcept;
 		void RollbackPublicationTexture(TextureID textureId, uint64_t generation) noexcept;
 		void CompleteTextureLoad(
-			TextureID textureId,
-			uint64_t generation,
-			uint64_t loadSerial,
+			AssetOperationToken operation,
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
 			TextureAssetData&& textureData,
+			AssetContentFingerprint contentFingerprint,
 			bool residencyReload,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
+		void RouteTextureDecodeCompletion(TextureDecodeSucceeded&& completion) noexcept;
+		void RouteTextureDecodeCompletion(TextureDecodeFailed&& completion) noexcept;
 		[[nodiscard]] TaskHandle QueueTextureLoad(
 			TextureID textureId,
 			const std::filesystem::path& canonicalPath,
@@ -188,14 +186,6 @@ namespace gglab
 			TaskPriority priority,
 			bool residencyReload = false,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
-		[[nodiscard]] bool IsCurrentTextureLoadOperation(
-			TextureID textureId,
-			uint64_t generation,
-			uint64_t loadSerial) const noexcept;
-		void CompleteTextureLoadOperation(
-			TextureID textureId,
-			uint64_t generation,
-			uint64_t loadSerial) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
 		void SetStateChangeCallback(
 			std::function<void(
@@ -215,14 +205,12 @@ namespace gglab
 
 	private:
 		RHIDevice* m_Device = nullptr;
-		TaskSystem* m_TaskSystem = nullptr;
+		AssetLoadCoordinator* m_LoadCoordinator = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureStore m_Store;
-		uint64_t m_NextTextureLoadSerial = 1;
-		std::unordered_map<TextureID, TextureLoadOperationRecord> m_TextureLoadTasks;
 		std::unordered_set<TextureID> m_PublicationOrphanedTextures;
 		std::function<void(
 			TextureID,

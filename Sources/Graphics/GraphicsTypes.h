@@ -7,6 +7,7 @@
 #include "Core/StringId.h"
 #include "Core/TypedIndex.h"
 #include "Core/EnumFlags.h"
+#include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIResource.h"
@@ -433,6 +434,7 @@ namespace gglab
 		TextureID m_Id{};
 		RHITextureViewHandle m_Srv{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
+		AssetContentFingerprint m_ContentFingerprint{};
 		StringID m_Name{};
 		std::filesystem::path m_SourcePath;
 		std::string m_DebugLabel;

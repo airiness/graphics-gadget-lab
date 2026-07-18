@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/IBLBakeTypes.h"
 
@@ -18,10 +19,12 @@ namespace gglab
 	{
 		TextureContentRef m_Content{};
 		EnvironmentTextureSourceType m_Type = EnvironmentTextureSourceType::Equirectangular;
-		// Temporary cache provenance until PR6 supplies a decoded-content fingerprint.
-		std::filesystem::path m_SourcePath;
+		AssetContentFingerprint m_ContentFingerprint{};
 
-		[[nodiscard]] bool IsValid() const noexcept { return m_Content.IsValid(); }
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Content.IsValid() && m_ContentFingerprint.IsValid();
+		}
 	};
 
 	struct EnvironmentLightingSettings

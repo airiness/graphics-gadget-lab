@@ -103,15 +103,15 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
+		m_AssetLoadCoordinator({ .m_TaskSystem = createInfo.m_TaskSystem }),
 		m_TextureAssets(std::make_unique<TextureAssetSystem>(TextureAssetSystem::CreateInfo{
 			.m_Device = createInfo.m_Device,
-			.m_TaskSystem = createInfo.m_TaskSystem,
+			.m_LoadCoordinator = &m_AssetLoadCoordinator,
 			.m_TransferManager = createInfo.m_TransferManager,
 			.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
 		})),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
-		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling),
-		m_AssetLoadCoordinator({ .m_TaskSystem = createInfo.m_TaskSystem })
+		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
@@ -408,12 +408,20 @@ namespace gglab
 							result.m_Completion,
 							std::move(result.m_Model));
 					}
-					else
+					else if constexpr (std::same_as<Result, MeshReloadFailed>)
 					{
 						RouteMeshReloadCompletion(
 							result.m_Operation,
 							result.m_Completion,
 							{});
+					}
+					else if constexpr (std::same_as<Result, TextureDecodeSucceeded>)
+					{
+						m_TextureAssets->RouteTextureDecodeCompletion(std::move(result));
+					}
+					else
+					{
+						m_TextureAssets->RouteTextureDecodeCompletion(std::move(result));
 					}
 				},
 				completion);
@@ -1988,6 +1996,12 @@ namespace gglab
 	TextureContentRef AssetManager::GetTextureContentRef(TextureID textureId) const noexcept
 	{
 		return m_TextureAssets->GetTextureContentRef(textureId);
+	}
+
+	std::optional<AssetContentFingerprint> AssetManager::GetTextureContentFingerprint(
+		TextureContentRef content) const noexcept
+	{
+		return m_TextureAssets->GetTextureContentFingerprint(content);
 	}
 
 	std::optional<AssetState> AssetManager::GetTextureState(

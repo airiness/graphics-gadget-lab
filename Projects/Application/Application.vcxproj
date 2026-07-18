@@ -631,6 +631,7 @@
     <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetContentFingerprint.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />

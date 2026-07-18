@@ -146,6 +146,8 @@ namespace gglab
 			AssetResidencyPolicy policy) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] std::optional<AssetContentFingerprint> GetTextureContentFingerprint(
+			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<AssetState> GetTextureState(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
@@ -328,6 +330,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		AssetLoadCoordinator m_AssetLoadCoordinator;
 		std::unique_ptr<TextureAssetSystem> m_TextureAssets;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
@@ -336,7 +339,6 @@ namespace gglab
 		MaterialStore m_MaterialStore;
 		ModelStore m_ModelStore;
 		std::unordered_set<ModelID> m_PendingModels;
-		AssetLoadCoordinator m_AssetLoadCoordinator;
 		AssetInterestTracker m_AssetInterestTracker;
 		AssetResidencyController m_AssetResidencyController;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
