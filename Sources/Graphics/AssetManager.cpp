@@ -109,6 +109,7 @@ namespace gglab
 			.m_LoadCoordinator = &m_AssetLoadCoordinator,
 			.m_TransferManager = createInfo.m_TransferManager,
 			.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
+			.m_StateEvents = &m_AssetStateEventQueue,
 		})),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
@@ -118,29 +119,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
 		m_TextureAssets->InitializeReservedTextures();
-		m_TextureAssets->SetStateChangeCallback(
-			[this](
-				TextureID textureId,
-				uint64_t generation,
-				AssetContentState contentState,
-				AssetResidencyState residencyState,
-				std::optional<AssetOperationToken> operation,
-				AssetStateEventOperationPhase operationPhase) noexcept
-			{
-				QueueDependencyStateChange(
-					MakeAssetContentVersion(textureId, generation),
-					contentState,
-					residencyState,
-					operation,
-					operationPhase);
-			});
 	}
 
 	AssetManager::~AssetManager()
 	{
-		// Detach external callbacks before validating facade-owned state. Component
-		// members are then destroyed in reverse declaration order.
-		m_TextureAssets->SetStateChangeCallback({});
 		GGLAB_ASSERT_MSG(
 			m_IsPreparedForShutdown,
 			"AssetManager destroyed without explicit shutdown preparation.");
@@ -318,6 +300,30 @@ namespace gglab
 				priority));
 		}
 		return request;
+	}
+
+	bool AssetOwnerScope::RetainTexture(
+		TextureContentRef content,
+		TaskPriority priority) noexcept
+	{
+		if (!m_Manager || !m_Owner.IsValid() || !content.IsValid() ||
+			priority == TaskPriority::Count ||
+			!m_Manager->GetTextureState(content).has_value())
+		{
+			return false;
+		}
+		AssetLease lease = m_Manager->AcquireAssetLease(
+			m_Owner,
+			AssetKind::Texture,
+			content.m_Id.Value(),
+			content.m_Generation,
+			priority);
+		if (!lease.IsValid())
+		{
+			return false;
+		}
+		m_Leases.emplace_back(std::move(lease));
+		return true;
 	}
 
 	void AssetOwnerScope::Reset() noexcept
@@ -1400,7 +1406,7 @@ namespace gglab
 				},
 				.m_EstimatedBytes = EstimateTextureResidentBytes(*texture),
 				.m_IsReserved = IsReservedTextureId(textureId),
-				.m_HasReloadSource = !texture->m_SourcePath.empty(),
+				.m_HasReloadSource = !texture->m_Source.m_CanonicalPath.empty(),
 				.m_HasActiveInterest = HasActiveInterest(key),
 				.m_HasPublicationRetain = HasPublicationRetain(
 					key,

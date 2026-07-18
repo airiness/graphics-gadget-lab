@@ -220,6 +220,39 @@ namespace gglab
 		Unknown
 	};
 
+	enum class TextureMipPolicy : uint8_t
+	{
+		Preserve,
+		GenerateIfMissing,
+	};
+
+	struct TextureImportSettings
+	{
+		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
+		TextureMipPolicy m_MipPolicy = TextureMipPolicy::GenerateIfMissing;
+
+		constexpr bool operator==(const TextureImportSettings&) const noexcept = default;
+	};
+
+	[[nodiscard]] constexpr TextureImportSettings MakeTextureImportSettings(
+		TextureSemantic semantic) noexcept
+	{
+		return
+		{
+			.m_Semantic = semantic,
+			.m_MipPolicy = semantic == TextureSemantic::Environment ?
+				TextureMipPolicy::Preserve :
+				TextureMipPolicy::GenerateIfMissing,
+		};
+	}
+
+	struct TextureSourceInfo
+	{
+		std::filesystem::path m_CanonicalPath;
+		TextureImportSettings m_ImportSettings{};
+		AssetContentFingerprint m_ContentFingerprint{};
+	};
+
 	inline constexpr uint32_t CubemapFaceCount = 6u;
 	enum class CubemapFace : uint8_t
 	{
@@ -433,10 +466,8 @@ namespace gglab
 	{
 		TextureID m_Id{};
 		RHITextureViewHandle m_Srv{};
-		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
-		AssetContentFingerprint m_ContentFingerprint{};
+		TextureSourceInfo m_Source{};
 		StringID m_Name{};
-		std::filesystem::path m_SourcePath;
 		std::string m_DebugLabel;
 		RHITextureHandle m_Texture;
 		RHITextureDesc m_Desc{};

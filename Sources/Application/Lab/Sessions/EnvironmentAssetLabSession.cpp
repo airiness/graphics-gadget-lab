@@ -132,6 +132,30 @@ namespace gglab
 			}
 
 			const size_t target = (m_State->m_ExpectedActiveIndex + 1) % entries.size();
+			const uint64_t serialBeforeImmediateFailure = controller.GetSelectionSerial();
+			if (!controller.SelectEnvironment(target))
+			{
+				Fail("Immediate-failure setup candidate was rejected.");
+				return;
+			}
+			if (controller.SelectEnvironmentFile(
+				"Assets/Textures/Skybox/__gglab_missing_environment__.hdr",
+				"Immediate Failure Probe"))
+			{
+				Fail("Missing environment unexpectedly produced a valid load request.");
+				return;
+			}
+			const auto entriesAfterFailure = controller.GetEntries();
+			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex ||
+				controller.GetPendingEnvironmentIndex() !=
+					EnvironmentAssetController::InvalidEntryIndex ||
+				controller.GetSelectionSerial() <= serialBeforeImmediateFailure ||
+				entriesAfterFailure.empty() ||
+				entriesAfterFailure.back().m_State != EnvironmentAssetEntryState::Failed)
+			{
+				Fail("An immediate selection failure did not invalidate the older pending candidate.");
+				return;
+			}
 			if (!controller.SelectEnvironment(target) ||
 				controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex)
 			{
@@ -315,7 +339,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ENVIRONMENT ASSET ACCEPTANCE PASS: rapid selection, transactional replacement, failure isolation, shape validation, fallback reset, and reselection invariants passed in {:.2f} s.",
+			"ENVIRONMENT ASSET ACCEPTANCE PASS: rapid selection, immediate-failure invalidation, transactional replacement, failure isolation, shape validation, fallback reset, and reselection invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

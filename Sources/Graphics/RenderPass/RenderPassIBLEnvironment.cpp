@@ -56,6 +56,8 @@ namespace gglab
 
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
+		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
+		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 
 		RHITextureHandle sourceTextureHandle{};
 		RHITextureDesc sourceTextureDesc{};
@@ -63,9 +65,9 @@ namespace gglab
 		uint32_t sourceSamplerIndex = 0;
 		bool hasSource = false;
 		EnvironmentSourceMode sourceMode = EnvironmentSourceMode::Equirectangular;
-		if (const auto* environmentSystem = renderer->GetEnvironmentLightingSystem())
+		const EnvironmentTextureSource source = bakeScheduler->GetBakingSource();
+		if (source.IsValid())
 		{
-			const EnvironmentTextureSource source = environmentSystem->GetBakeSource();
 			const auto sourceResource =
 				assetManager->GetResidentTextureResource(source.m_Content);
 			if (sourceResource)
@@ -86,8 +88,6 @@ namespace gglab
 		}
 		GGLAB_ASSERT_MSG(hasSource, "IBL environment bake requires a ready source texture.");
 
-		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
-		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
 
 		EnsureInitialized(services);

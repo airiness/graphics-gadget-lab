@@ -3,7 +3,9 @@
 #include "Graphics/TextureAssetSystem.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
+#include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Graphics/Asset/Publication/AssetPublicationServices.h"
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIDevice.h"
@@ -77,30 +79,25 @@ namespace gglab
 					AssetStateEventOperationPhase::InProgress;
 		}
 
+		[[nodiscard]] constexpr bool IsTerminalPublicationState(AssetState state) noexcept
+		{
+			return state == AssetState::Failed || state == AssetState::Cancelled;
+		}
+
 	}
 
 	TextureAssetSystem::TextureAssetSystem(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_LoadCoordinator(createInfo.m_LoadCoordinator),
 		m_TransferManager(createInfo.m_TransferManager),
-		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler)
+		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
+		m_StateEvents(createInfo.m_StateEvents)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_LoadCoordinator != nullptr, "AssetLoadCoordinator is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
-	}
-
-	void TextureAssetSystem::SetStateChangeCallback(
-		std::function<void(
-			TextureID,
-			uint64_t,
-			AssetContentState,
-			AssetResidencyState,
-			std::optional<AssetOperationToken>,
-			AssetStateEventOperationPhase)> callback) noexcept
-	{
-		m_StateChangeCallback = std::move(callback);
+		GGLAB_ASSERT_MSG(m_StateEvents != nullptr, "AssetStateEventQueue is null!");
 	}
 
 	void TextureAssetSystem::SetTextureState(
@@ -117,14 +114,15 @@ namespace gglab
 		SetAssetState(texture, state);
 		// A same-state terminal transition still has to retire its operation.
 		if ((previousState != state ||
-			operationPhase == AssetStateEventOperationPhase::Completes) &&
-			m_StateChangeCallback)
+			operationPhase == AssetStateEventOperationPhase::Completes))
 		{
-			m_StateChangeCallback(
-				texture.m_Id,
-				texture.m_ContentGeneration,
-				texture.m_ContentState,
-				texture.m_ResidencyState,
+			m_StateEvents->Push({
+				.m_ContentVersion = MakeAssetContentVersion(
+					texture.m_Id,
+					texture.m_ContentGeneration),
+				.m_ContentState = texture.m_ContentState,
+				.m_ResidencyState = texture.m_ResidencyState,
+			},
 				hasOperation ?
 					std::optional{ residencyOperation.m_Token } : std::nullopt,
 				operationPhase);
@@ -141,11 +139,13 @@ namespace gglab
 		for (BuiltinTextureAsset& builtinTexture : builtinTextures)
 		{
 			const TextureID id = ToTextureId(builtinTexture.m_Id);
-			CreateTextureEntry(id, builtinTexture.m_Name);
+			const TextureImportSettings importSettings =
+				MakeTextureImportSettings(builtinTexture.m_Semantic);
+			CreateTextureEntry(id, builtinTexture.m_Name, importSettings);
 			uploads.emplace_back(MakeTextureUploadData(
 				id,
 				std::move(builtinTexture.m_Data),
-				builtinTexture.m_Semantic));
+				importSettings));
 		}
 
 		if (!uploads.empty())
@@ -183,7 +183,7 @@ namespace gglab
 				const TextureID textureId = ToTextureId(idIndex);
 				const TextureImportSettings importSettings =
 					MakeTextureImportSettings(TextureSemantic::UVTest);
-				CreateTextureEntry(textureId, name, canonicalPath);
+				CreateTextureEntry(textureId, name, importSettings, canonicalPath);
 				const bool inserted = m_Store.BindCacheKey(
 					canonicalPath,
 					importSettings,
@@ -194,7 +194,6 @@ namespace gglab
 					textureId,
 					canonicalPath,
 					importSettings,
-					TextureSemantic::UVTest,
 					TaskPriority::Background));
 			};
 
@@ -284,7 +283,6 @@ namespace gglab
 			textureId,
 			canonicalPath,
 			importSettings,
-			semantic,
 			priority);
 		return {
 			.m_TextureId = textureId,
@@ -297,7 +295,6 @@ namespace gglab
 		TextureID textureId,
 		const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings,
-		TextureSemantic semantic,
 		TaskPriority priority,
 		bool residencyReload,
 		AssetResidencyOperation residencyOperation) noexcept
@@ -320,7 +317,10 @@ namespace gglab
 		{
 			SetTextureState(*texture, AssetState::Queued);
 		}
-		texture->m_Semantic = semantic;
+		GGLAB_ASSERT_MSG(
+			texture->m_Source.m_CanonicalPath == canonicalPath &&
+				texture->m_Source.m_ImportSettings == importSettings,
+			"Texture decode request does not match the texture source identity.");
 		ProgressReporter(texture->m_LoadProgress).Report(
 			0.05f,
 			"Queued for texture decoding",
@@ -331,7 +331,7 @@ namespace gglab
 				texture->m_ContentGeneration),
 			.m_SourcePath = canonicalPath,
 			.m_ImportSettings = importSettings,
-			.m_Semantic = semantic,
+			.m_Semantic = importSettings.m_Semantic,
 			.m_Priority = priority,
 			.m_Progress = texture->m_LoadProgress,
 			.m_ResidencyReload = residencyReload,
@@ -634,11 +634,11 @@ namespace gglab
 		const Texture* texture = GetTexture(content.m_Id);
 		if (!content.IsValid() || !texture ||
 			texture->m_ContentGeneration != content.m_Generation ||
-			!texture->m_ContentFingerprint.IsValid())
+			!texture->m_Source.m_ContentFingerprint.IsValid())
 		{
 			return std::nullopt;
 		}
-		return texture->m_ContentFingerprint;
+		return texture->m_Source.m_ContentFingerprint;
 	}
 
 	std::optional<AssetState> TextureAssetSystem::GetTextureState(
@@ -699,8 +699,8 @@ namespace gglab
 					.m_Generation = texture->m_ContentGeneration,
 				},
 				.m_Lifecycle = static_cast<const AssetLifecycle&>(*texture),
-				.m_SourcePath = texture->m_SourcePath,
-				.m_Semantic = texture->m_Semantic,
+				.m_SourcePath = texture->m_Source.m_CanonicalPath,
+				.m_Semantic = texture->m_Source.m_ImportSettings.m_Semantic,
 				.m_Name = texture->m_Name,
 				.m_Texture = texture->m_Texture,
 				.m_DebugName = m_Device ?
@@ -765,7 +765,10 @@ namespace gglab
 			1,
 			AssetState::CpuReady);
 		insertedTexture->m_Name = StringID(canonicalPath.generic_string());
-		insertedTexture->m_SourcePath = canonicalPath;
+		insertedTexture->m_Source = {
+			.m_CanonicalPath = canonicalPath,
+			.m_ImportSettings = importSettings,
+		};
 		insertedTexture->m_DebugLabel = canonicalPath.filename().generic_string();
 		insertedTexture->m_LoadProgress = std::make_shared<ProgressChannel>();
 
@@ -800,22 +803,153 @@ namespace gglab
 	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(
 		TextureID textureId,
 		TextureAssetData&& textureData,
-		TextureSemantic semantic,
+		const TextureImportSettings& importSettings,
 		AssetContentFingerprint contentFingerprint) noexcept
 	{
 		if (!contentFingerprint.IsValid())
 		{
 			contentFingerprint = ComputeTextureContentFingerprint(
 				textureData,
-				MakeTextureImportSettings(semantic));
+				importSettings);
 		}
 		TextureUploadData uploadData{};
 		uploadData.m_TextureId = textureId;
-		uploadData.m_Semantic = semantic;
-		uploadData.m_ColorSpace = GetTextureColorSpaceFromSemantic(semantic);
+		uploadData.m_ImportSettings = importSettings;
+		uploadData.m_ColorSpace = GetTextureColorSpaceFromSemantic(
+			importSettings.m_Semantic);
 		uploadData.m_TextureData = std::move(textureData);
 		uploadData.m_ContentFingerprint = contentFingerprint;
 		return uploadData;
+	}
+
+	ModelPublicationTextureResult TextureAssetSystem::PublishImportedTexture(
+		ImportedTexture& importedTexture,
+		TaskPriority priority,
+		TexturePublicationContextBase& context) noexcept
+	{
+		ModelPublicationTextureResult result{};
+		if (importedTexture.m_ImportSettings.m_Semantic != importedTexture.m_Semantic)
+		{
+			result.m_Error =
+				"Imported texture semantic does not match its import settings";
+			return result;
+		}
+		const uint64_t sourceBytes = static_cast<uint64_t>(
+			importedTexture.m_Data.m_Pixels.size());
+		TextureID textureId = FindTexture(
+			importedTexture.m_CanonicalPath,
+			importedTexture.m_ImportSettings);
+		const Texture* texture = GetTexture(textureId);
+		if (textureId.IsValid() && !texture)
+		{
+			GGLAB_UNUSED(RemoveTexture(textureId));
+			textureId.Reset();
+		}
+		else if (texture && IsTerminalPublicationState(texture->m_State))
+		{
+			const AssetKey textureKey = MakeAssetKey(textureId);
+			if (context.HasActiveInterest(textureKey) ||
+				context.HasPublicationRetain(
+					textureKey,
+					texture->m_ContentGeneration))
+			{
+				result.m_Error = std::format(
+					"Terminal texture {} is still retained",
+					textureId.Value());
+				return result;
+			}
+			GGLAB_UNUSED(RemoveTexture(textureId));
+			textureId.Reset();
+			texture = nullptr;
+		}
+
+		bool created = false;
+		if (!textureId.IsValid())
+		{
+			if (!importedTexture.m_Data.IsValid())
+			{
+				result.m_Error = "Imported texture payload is invalid";
+				return result;
+			}
+			textureId = CreateTexture(
+				importedTexture.m_CanonicalPath,
+				importedTexture.m_ImportSettings);
+			texture = GetTexture(textureId);
+			if (!textureId.IsValid() || !texture)
+			{
+				result.m_Error =
+					"Failed to create texture entry during model publication";
+				return result;
+			}
+			created = true;
+		}
+
+		const uint64_t generation = texture->m_ContentGeneration;
+		const AssetContentVersion contentVersion = MakeAssetContentVersion(
+			textureId,
+			generation);
+		ModelPublicationRetainToken retain =
+			context.AcquireTextureRetain(contentVersion);
+		if (!retain.IsValid())
+		{
+			if (created)
+			{
+				GGLAB_UNUSED(RemoveTexture(textureId));
+			}
+			result.m_Error = "Failed to retain texture publication claim";
+			return result;
+		}
+		if (created && !BeginPublication(textureId))
+		{
+			context.ReleaseTextureRetain(retain);
+			GGLAB_UNUSED(RemoveTexture(textureId));
+			result.m_Error = "Failed to begin texture publication";
+			return result;
+		}
+
+		result.m_TextureId = textureId;
+		result.m_Claim = {
+			.m_ContentVersion = contentVersion,
+			.m_Origin = created ?
+				ModelPublicationClaimOrigin::Created :
+				ModelPublicationClaimOrigin::Reused,
+			.m_Retain = retain,
+		};
+		if (!IsReservedTextureId(textureId))
+		{
+			result.m_Dependency = contentVersion;
+		}
+
+		if (!created)
+		{
+			importedTexture = {};
+			result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
+			return result;
+		}
+
+		auto uploadData = MakeTextureUploadData(
+			textureId,
+			std::move(importedTexture.m_Data),
+			importedTexture.m_ImportSettings);
+		const bool queued = QueueTextureUpload(std::move(uploadData), priority);
+		importedTexture = {};
+		result.m_Usage.m_ResourceCreations = 1;
+		if (!queued)
+		{
+			context.ReleaseTextureRetain(retain);
+			result.m_Claim = {};
+			result.m_Dependency = {};
+			result.m_TextureId.Reset();
+			GGLAB_UNUSED(RemoveTexture(textureId));
+			result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
+			result.m_Error = std::format(
+				"Failed to queue texture {} upload",
+				textureId.Value());
+			return result;
+		}
+		result.m_Usage.m_PayloadBytesMovedToUpload = sourceBytes;
+		result.m_UploadQueued = true;
+		return result;
 	}
 
 	bool TextureAssetSystem::UploadTexture(
@@ -826,6 +960,13 @@ namespace gglab
 		auto* texture = EditTexture(uploadData.m_TextureId);
 		GGLAB_ASSERT_MSG(texture != nullptr, "TextureAssetSystem::UploadTexture: invalid TextureID.");
 		if (!texture)
+		{
+			return false;
+		}
+		GGLAB_ASSERT_MSG(
+			texture->m_Source.m_ImportSettings == uploadData.m_ImportSettings,
+			"Texture upload settings do not match the texture source identity.");
+		if (texture->m_Source.m_ImportSettings != uploadData.m_ImportSettings)
 		{
 			return false;
 		}
@@ -889,8 +1030,10 @@ namespace gglab
 		textureDesc.m_MipLevels = textureData.m_MipLevels;
 		textureDesc.m_SampleCount = 1;
 		const std::string category = std::format(
-			"Texture.{}", TextureSemanticDebugText(uploadData.m_Semantic));
-		const std::string source = TextureDebugSourcePath(texture->m_SourcePath);
+			"Texture.{}",
+			TextureSemanticDebugText(uploadData.m_ImportSettings.m_Semantic));
+		const std::string source = TextureDebugSourcePath(
+			texture->m_Source.m_CanonicalPath);
 		const RHIResourceDebugIdentityDesc debugIdentity
 		{
 			.m_Domain = RHIResourceDebugDomain::Asset,
@@ -913,7 +1056,7 @@ namespace gglab
 		}
 		texture->m_Desc = textureDesc;
 		texture->m_Desc.m_DebugName = nullptr;
-		texture->m_ContentFingerprint = uploadData.m_ContentFingerprint;
+		texture->m_Source.m_ContentFingerprint = uploadData.m_ContentFingerprint;
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		if (!transferBatch.UploadTexture(texture->m_Texture, textureUploadData))
@@ -966,7 +1109,9 @@ namespace gglab
 			return false;
 		}
 		texture->m_SrvDimension = textureData.m_SrvDimension;
-		texture->m_Semantic = uploadData.m_Semantic;
+		GGLAB_ASSERT_MSG(
+			texture->m_Source.m_ImportSettings == uploadData.m_ImportSettings,
+			"Uploaded texture settings do not match the texture source identity.");
 		SetTextureState(
 			*texture,
 			AssetState::GpuProcessing,
@@ -1103,10 +1248,10 @@ namespace gglab
 							residencyReload));
 					return;
 				}
-				if (!PublishImportedTexture(
+				if (!RecordTextureUpload(
 					textureId,
 					generation,
-					payload->m_Semantic,
+					payload->m_ImportSettings,
 					priority,
 					std::move(payload->m_TextureData),
 					residencyOperation))
@@ -1126,16 +1271,23 @@ namespace gglab
 		return true;
 	}
 
-	bool TextureAssetSystem::PublishImportedTexture(
+	bool TextureAssetSystem::RecordTextureUpload(
 		TextureID textureId,
 		uint64_t generation,
-		TextureSemantic semantic,
+		const TextureImportSettings& importSettings,
 		TaskPriority priority,
 		TextureAssetData&& textureData,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
 		Texture* texture = EditTexture(textureId);
 		if (!texture || texture->m_ContentGeneration != generation)
+		{
+			return false;
+		}
+		GGLAB_ASSERT_MSG(
+			texture->m_Source.m_ImportSettings == importSettings,
+			"Recorded texture upload settings do not match the source identity.");
+		if (texture->m_Source.m_ImportSettings != importSettings)
 		{
 			return false;
 		}
@@ -1154,7 +1306,7 @@ namespace gglab
 		auto uploadData = MakeTextureUploadData(
 			textureId,
 			std::move(textureData),
-			semantic);
+			importSettings);
 		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->RecordUpload(
 			{
 				.m_Name = std::format("Texture {}", textureId.Value()),
@@ -1302,6 +1454,19 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_MSG(
+			texture->m_Source.m_ImportSettings.m_Semantic == semantic,
+			"Decoded texture semantic does not match the texture source identity.");
+		if (texture->m_Source.m_ImportSettings.m_Semantic != semantic)
+		{
+			SetTextureState(
+				*texture,
+				residencyReload ? AssetState::CpuReady : AssetState::Failed,
+				residencyOperation,
+				ResidencyStateEventPhase(residencyOperation, residencyReload));
+			texture->m_IsReloading = false;
+			return;
+		}
 		if (residencyReload &&
 			!AssetResidencyController::IsCurrentOperation(*texture, residencyOperation))
 		{
@@ -1367,7 +1532,7 @@ namespace gglab
 		auto uploadData = MakeTextureUploadData(
 			textureId,
 			std::move(textureData),
-			semantic,
+			texture->m_Source.m_ImportSettings,
 			contentFingerprint);
 		if (!QueueTextureUpload(
 			std::move(uploadData),
@@ -1509,7 +1674,7 @@ namespace gglab
 			return {};
 		}
 		if (texture->m_State != AssetState::CpuReady || texture->m_ResidencyEpoch == 0 ||
-			texture->m_SourcePath.empty())
+			texture->m_Source.m_CanonicalPath.empty())
 		{
 			return {};
 		}
@@ -1526,13 +1691,10 @@ namespace gglab
 
 		texture->m_CancelRequested = false;
 		texture->m_IsReloading = true;
-		const TextureImportSettings importSettings =
-			MakeTextureImportSettings(texture->m_Semantic);
 		const TaskHandle task = QueueTextureLoad(
 			textureId,
-			texture->m_SourcePath,
-			importSettings,
-			texture->m_Semantic,
+			texture->m_Source.m_CanonicalPath,
+			texture->m_Source.m_ImportSettings,
 			priority,
 			true,
 			operation);
@@ -1579,6 +1741,7 @@ namespace gglab
 	void TextureAssetSystem::CreateTextureEntry(
 		TextureID id,
 		std::string_view textureName,
+		TextureImportSettings importSettings,
 		const std::filesystem::path& sourcePath) noexcept
 	{
 		if (GetTexture(id) == nullptr)
@@ -1595,7 +1758,10 @@ namespace gglab
 					IsReservedTextureId(id) ?
 						AssetResidencyPolicy::Pinned : AssetResidencyPolicy::Cacheable);
 				insertedTexture->m_Name = StringID(textureName);
-				insertedTexture->m_SourcePath = sourcePath;
+				insertedTexture->m_Source = {
+					.m_CanonicalPath = sourcePath,
+					.m_ImportSettings = importSettings,
+				};
 				insertedTexture->m_DebugLabel = textureName;
 				insertedTexture->m_LoadProgress = std::make_shared<ProgressChannel>();
 				insertedTexture->m_IsUploaded = false;

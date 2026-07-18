@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -27,6 +28,9 @@ namespace gglab
 
 	IBLBakeScheduler::~IBLBakeScheduler()
 	{
+		GGLAB_ASSERT_MSG(
+			m_AssetManager == nullptr && !m_BakingSourceOwner,
+			"IBLBakeScheduler destroyed before detaching AssetManager.");
 		for (auto& pending : m_PendingCacheWrites)
 		{
 			GGLAB_UNUSED(pending.m_Result.get());
@@ -35,6 +39,27 @@ namespace gglab
 				m_TransferManager->UnmapTextureReadback(*m_Device, request);
 			}
 		}
+	}
+
+	void IBLBakeScheduler::AttachAssetManager(AssetManager& assetManager) noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			m_AssetManager == nullptr && !m_BakingSourceOwner,
+			"IBLBakeScheduler already has an attached AssetManager.");
+		if (m_AssetManager || m_BakingSourceOwner)
+		{
+			return;
+		}
+		m_AssetManager = &assetManager;
+		m_BakingSourceOwner = std::make_unique<AssetOwnerScope>(
+			assetManager.CreateOwnerScope());
+	}
+
+	void IBLBakeScheduler::DetachAssetManager() noexcept
+	{
+		ReleaseBakingSourceLease();
+		m_BakingSourceOwner.reset();
+		m_AssetManager = nullptr;
 	}
 
 	void IBLBakeScheduler::Tick(const RHIFencePoint& lastSubmittedFence) noexcept
@@ -72,6 +97,7 @@ namespace gglab
 				m_CacheUploadInFlight = false;
 				if (m_Status.m_BakingGeneration == m_Status.m_RequestedGeneration)
 				{
+					ReleaseBakingSourceLease();
 					PublishBake(true);
 				}
 			}
@@ -96,6 +122,7 @@ namespace gglab
 	void IBLBakeScheduler::StartRequestedBake(const RHIFencePoint& retireFence) noexcept
 	{
 		GGLAB_UNUSED(retireFence);
+		ReleaseBakingSourceLease();
 		if (m_CacheLookupTask.IsValid())
 		{
 			GGLAB_UNUSED(m_TaskSystem->Cancel(m_CacheLookupTask));
@@ -108,17 +135,27 @@ namespace gglab
 		m_Status.m_CacheWritePending = false;
 		m_Status.m_GpuMilliseconds = 0.0;
 		m_Status.m_GpuTimingAvailable = false;
-		m_BakingConfig = m_EnvironmentLightingSystem->GetBakeConfig();
+		m_BakingRequest = {
+			.m_Generation = m_Status.m_BakingGeneration,
+			.m_Source = m_EnvironmentLightingSystem->GetBakeSource(),
+			.m_Config = m_EnvironmentLightingSystem->GetBakeConfig(),
+			.m_IgnoreCache = m_EnvironmentLightingSystem->ShouldIgnoreCache(
+				m_Status.m_BakingGeneration),
+		};
 
-		const EnvironmentTextureSource source = m_EnvironmentLightingSystem->GetBakeSource();
-		if (!source.IsValid())
+		if (!m_BakingRequest.IsValid() || !m_BakingSourceOwner ||
+			!m_BakingSourceOwner->RetainTexture(
+				m_BakingRequest.m_Source.m_Content,
+				TaskPriority::High))
 		{
+			ReleaseBakingSourceLease();
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
-		const AssetContentFingerprint contentFingerprint = source.m_ContentFingerprint;
+		const AssetContentFingerprint contentFingerprint =
+			m_BakingRequest.m_Source.m_ContentFingerprint;
 		const uint64_t generation = m_Status.m_BakingGeneration;
-		const bool ignoreCache = m_EnvironmentLightingSystem->ShouldIgnoreCache(generation);
+		const bool ignoreCache = m_BakingRequest.m_IgnoreCache;
 		auto work = std::make_shared<CacheLoadWork>();
 		work->m_Generation = generation;
 		SetStage(IBLBakeStage::LoadingCache, 0.0f);
@@ -127,7 +164,7 @@ namespace gglab
 				.m_Name = std::format("IBL.CacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, contentFingerprint, config = m_BakingConfig, ignoreCache, work](
+			[this, contentFingerprint, config = m_BakingRequest.m_Config, ignoreCache, work](
 				std::stop_token stopToken) noexcept
 			{
 				work->m_Key = m_Cache.ComputeKey(contentFingerprint, config, stopToken);
@@ -148,6 +185,7 @@ namespace gglab
 			});
 		if (!m_CacheLookupTask.IsValid())
 		{
+			ReleaseBakingSourceLease();
 			SetStage(IBLBakeStage::Failed, 0.0f);
 		}
 	}
@@ -167,6 +205,7 @@ namespace gglab
 		}
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
+			ReleaseBakingSourceLease();
 			if (completion.m_Status == TaskStatus::Cancelled)
 			{
 				GGLAB_LOG_GRAPHICS_INFO(
@@ -206,9 +245,12 @@ namespace gglab
 		m_Status.m_CacheKey = work->m_Key;
 		m_CurrentCacheLoad = work;
 		const RHIFencePoint* retireFencePtr = retireFence.IsValid() ? &retireFence : nullptr;
-		m_RenderResourceRegistry->EnsureIBLBakeResources(m_BakingConfig, retireFencePtr);
+		m_RenderResourceRegistry->EnsureIBLBakeResources(
+			m_BakingRequest.m_Config,
+			retireFencePtr);
 		if (!m_RenderResourceRegistry->HasIBLBakeResources())
 		{
+			ReleaseBakingSourceLease();
 			m_BakeResourcesNeedInitialization = false;
 			m_CurrentCacheLoad.reset();
 			SetStage(IBLBakeStage::Failed, 0.0f);
@@ -240,8 +282,9 @@ namespace gglab
 			SetStage(IBLBakeStage::WaitingForGpu, 0.95f);
 			return;
 		}
-		if (!m_EnvironmentLightingSystem->GetBakeSource().IsValid())
+		if (!m_BakingRequest.m_Source.IsValid())
 		{
+			ReleaseBakingSourceLease();
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
@@ -352,8 +395,9 @@ namespace gglab
 		switch (m_CompletedStage)
 		{
 		case IBLBakeStage::Environment:
+			ReleaseBakingSourceLease();
 			SetStage(
-				m_BakingConfig.m_EnvironmentCubemapSize > 1 ?
+				m_BakingRequest.m_Config.m_EnvironmentCubemapSize > 1 ?
 					IBLBakeStage::EnvironmentMipChain : IBLBakeStage::Irradiance,
 				0.2f);
 			break;
@@ -373,6 +417,14 @@ namespace gglab
 			break;
 		default:
 			break;
+		}
+	}
+
+	void IBLBakeScheduler::ReleaseBakingSourceLease() noexcept
+	{
+		if (m_BakingSourceOwner)
+		{
+			m_BakingSourceOwner->Reset();
 		}
 	}
 

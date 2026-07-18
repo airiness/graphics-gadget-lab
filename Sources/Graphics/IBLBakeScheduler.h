@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Task/TaskTypes.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeCache.h"
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/RHI/RHIFence.h"
@@ -12,6 +13,8 @@
 
 namespace gglab
 {
+	class AssetManager;
+	class AssetOwnerScope;
 	class EnvironmentLightingSystem;
 	class GpuProfiler;
 	class RHIDevice;
@@ -22,6 +25,19 @@ namespace gglab
 	class IBLBakeScheduler
 	{
 	public:
+		struct BakeRequestSnapshot
+		{
+			uint64_t m_Generation = 0;
+			EnvironmentTextureSource m_Source{};
+			IBLBakeConfig m_Config{};
+			bool m_IgnoreCache = false;
+
+			[[nodiscard]] bool IsValid() const noexcept
+			{
+				return m_Generation != 0 && m_Source.IsValid();
+			}
+		};
+
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
@@ -37,6 +53,8 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(IBLBakeScheduler);
 		~IBLBakeScheduler();
 
+		void AttachAssetManager(AssetManager& assetManager) noexcept;
+		void DetachAssetManager() noexcept;
 		void Tick(const RHIFencePoint& lastSubmittedFence) noexcept;
 		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept;
 		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept;
@@ -49,7 +67,14 @@ namespace gglab
 			return m_BakeResourcesNeedInitialization;
 		}
 		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept { return m_Status.m_BakingGeneration; }
-		[[nodiscard]] const IBLBakeConfig& GetBakingConfig() const noexcept { return m_BakingConfig; }
+		[[nodiscard]] const IBLBakeConfig& GetBakingConfig() const noexcept
+		{
+			return m_BakingRequest.m_Config;
+		}
+		[[nodiscard]] const EnvironmentTextureSource& GetBakingSource() const noexcept
+		{
+			return m_BakingRequest.m_Source;
+		}
 		[[nodiscard]] const IBLBakeStatus& GetStatus() const noexcept { return m_Status; }
 
 	private:
@@ -70,6 +95,7 @@ namespace gglab
 		void PollCacheWrites() noexcept;
 		void PublishBake(bool cacheHit) noexcept;
 		void CaptureGpuTime(IBLBakeStage stage) noexcept;
+		void ReleaseBakingSourceLease() noexcept;
 		void SetStage(IBLBakeStage stage, float progress) noexcept;
 		[[nodiscard]] bool IsGpuStage(IBLBakeStage stage) const noexcept;
 
@@ -81,7 +107,9 @@ namespace gglab
 		GpuProfiler* m_GpuProfiler = nullptr;
 		IBLBakeCache m_Cache;
 
-		IBLBakeConfig m_BakingConfig{};
+		AssetManager* m_AssetManager = nullptr;
+		std::unique_ptr<AssetOwnerScope> m_BakingSourceOwner;
+		BakeRequestSnapshot m_BakingRequest{};
 		IBLBakeStatus m_Status{};
 		RHIFencePoint m_InFlightFence{};
 		IBLBakeStage m_CompletedStage = IBLBakeStage::Idle;

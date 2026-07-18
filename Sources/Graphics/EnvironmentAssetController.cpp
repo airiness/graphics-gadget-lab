@@ -158,6 +158,27 @@ namespace gglab
 			return true;
 		}
 
+		++m_SelectionSerial;
+		GGLAB_ASSERT_MSG(m_SelectionSerial != 0, "Environment selection serial overflowed.");
+		if (m_SelectionSerial == 0)
+		{
+			return false;
+		}
+
+		// A new selection command supersedes the previous candidate even when the
+		// replacement fails before an asynchronous load can be submitted.
+		AssetOwnerScope supersededOwner = std::move(m_PendingOwner);
+		if (m_PendingSelection.m_EntryIndex < m_Entries.size())
+		{
+			auto& superseded = m_Entries[m_PendingSelection.m_EntryIndex];
+			if (superseded.m_State == EnvironmentAssetEntryState::Loading)
+			{
+				superseded.m_State = EnvironmentAssetEntryState::Unrequested;
+			}
+		}
+		m_PendingSelection = {};
+		supersededOwner.Reset();
+
 		AssetOwnerScope pendingOwner = m_AssetManager->CreateOwnerScope();
 		const AssetManager::TextureLoadRequest request = pendingOwner.LoadTextureAsync(
 			m_Entries[entryIndex].m_Path,
@@ -166,13 +187,6 @@ namespace gglab
 		if (!request.IsValid())
 		{
 			m_Entries[entryIndex].m_State = EnvironmentAssetEntryState::Failed;
-			return false;
-		}
-
-		++m_SelectionSerial;
-		GGLAB_ASSERT_MSG(m_SelectionSerial != 0, "Environment selection serial overflowed.");
-		if (m_SelectionSerial == 0)
-		{
 			return false;
 		}
 

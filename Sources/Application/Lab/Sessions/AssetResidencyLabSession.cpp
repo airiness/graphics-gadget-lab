@@ -61,6 +61,7 @@ namespace gglab
 		uint64_t m_ModelGeneration = 0;
 		uint64_t m_MeshGeneration = 0;
 		uint64_t m_TextureGeneration = 0;
+		TextureImportSettings m_TextureImportSettings{};
 		uint64_t m_MeshResidencyEpoch = 0;
 		uint64_t m_TextureResidencyEpoch = 0;
 		uint64_t m_EvictionCountBaseline = 0;
@@ -259,6 +260,7 @@ namespace gglab
 			m_State->m_ModelGeneration = model->m_ContentGeneration;
 			m_State->m_MeshGeneration = mesh->m_ContentGeneration;
 			m_State->m_TextureGeneration = texture->m_ContentGeneration;
+			m_State->m_TextureImportSettings = texture->m_Source.m_ImportSettings;
 			m_State->m_MeshResidencyEpoch = mesh->m_ResidencyEpoch;
 			m_State->m_TextureResidencyEpoch = texture->m_ResidencyEpoch;
 			const AssetResidencyStatistics residency =
@@ -513,8 +515,8 @@ namespace gglab
 			assetManager.SetResidencyConfig(config);
 			const AssetManager::TextureLoadRequest staleReload =
 				GetAssetOwnerScope().LoadTextureAsync(
-					texture->m_SourcePath,
-					texture->m_Semantic,
+					texture->m_Source.m_CanonicalPath,
+					texture->m_Source.m_ImportSettings.m_Semantic,
 					TaskPriority::Background);
 			if (!staleReload.IsValid() || !staleReload.m_Task.IsValid() ||
 				staleReload.m_TextureId != m_State->m_TextureId ||
@@ -551,8 +553,8 @@ namespace gglab
 			ResetAssetInterests();
 			const AssetManager::TextureLoadRequest replacementReload =
 				GetAssetOwnerScope().LoadTextureAsync(
-					texture->m_SourcePath,
-					texture->m_Semantic,
+					texture->m_Source.m_CanonicalPath,
+					texture->m_Source.m_ImportSettings.m_Semantic,
 					TaskPriority::Critical);
 			if (!replacementReload.IsValid() || !replacementReload.m_Task.IsValid() ||
 				replacementReload.m_TextureId != m_State->m_TextureId ||
@@ -603,8 +605,8 @@ namespace gglab
 			}
 			const AssetManager::TextureLoadRequest trackedReplacement =
 				GetAssetOwnerScope().LoadTextureAsync(
-					texture->m_SourcePath,
-					texture->m_Semantic,
+					texture->m_Source.m_CanonicalPath,
+					texture->m_Source.m_ImportSettings.m_Semantic,
 					TaskPriority::Critical);
 			if (!trackedReplacement.m_Task.IsValid() ||
 				trackedReplacement.m_Task != m_State->m_ReplacementTextureReloadTask)
@@ -692,6 +694,7 @@ namespace gglab
 			if (model->m_ContentGeneration != m_State->m_ModelGeneration ||
 				mesh->m_ContentGeneration != m_State->m_MeshGeneration ||
 				texture->m_ContentGeneration != m_State->m_TextureGeneration ||
+				texture->m_Source.m_ImportSettings != m_State->m_TextureImportSettings ||
 				mesh->m_ResidencyEpoch <= m_State->m_MeshResidencyEpoch ||
 				texture->m_ResidencyEpoch <= m_State->m_TextureResidencyEpoch ||
 				mesh->m_ResidencyOperationSerial != 0 ||
