@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
@@ -6,9 +7,16 @@
 
 namespace gglab
 {
-	class AssetManagerPublicationServices final :
-		public AssetPublicationServicesBase,
-		public TexturePublicationContextBase
+	namespace
+	{
+		[[nodiscard]] constexpr bool IsTerminalPublicationState(
+			AssetState state) noexcept
+		{
+			return state == AssetState::Failed || state == AssetState::Cancelled;
+		}
+	}
+
+	class AssetManagerPublicationServices final : public AssetPublicationServicesBase
 	{
 	public:
 		explicit AssetManagerPublicationServices(AssetManager* assetManager) noexcept :
@@ -39,36 +47,141 @@ namespace gglab
 			ImportedTexture& importedTexture,
 			TaskPriority priority) noexcept override
 		{
-			return m_AssetManager->m_TextureAssets->PublishImportedTexture(
-				importedTexture,
-				priority,
-				*this);
-		}
+			ModelPublicationTextureResult result{};
+			const uint64_t sourceBytes = static_cast<uint64_t>(
+				importedTexture.m_Data.m_Pixels.size());
+			const auto fail = [&importedTexture, sourceBytes](
+				ModelPublicationTextureResult& failedResult,
+				std::string error) noexcept -> ModelPublicationTextureResult
+				{
+					importedTexture = {};
+					failedResult.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
+					failedResult.m_Error = std::move(error);
+					return std::move(failedResult);
+				};
+			if (importedTexture.m_ImportSettings.m_Semantic != importedTexture.m_Semantic)
+			{
+				return fail(
+					result,
+					"Imported texture semantic does not match its import settings");
+			}
 
-		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept override
-		{
-			return m_AssetManager->HasActiveInterest(key);
-		}
+			TextureAssetSystem& textureAssets = *m_AssetManager->m_TextureAssets;
+			TextureID textureId = textureAssets.FindTexture(
+				importedTexture.m_CanonicalPath,
+				importedTexture.m_ImportSettings);
+			const Texture* texture = textureAssets.GetTexture(textureId);
+			if (textureId.IsValid() && !texture)
+			{
+				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
+				textureId.Reset();
+			}
+			else if (texture && IsTerminalPublicationState(texture->m_State))
+			{
+				const AssetKey textureKey = MakeAssetKey(textureId);
+				if (m_AssetManager->HasActiveInterest(textureKey) ||
+					m_AssetManager->HasPublicationRetain(
+						textureKey,
+						texture->m_ContentGeneration))
+				{
+					return fail(
+						result,
+						std::format(
+							"Terminal texture {} is still retained",
+							textureId.Value()));
+				}
+				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
+				textureId.Reset();
+				texture = nullptr;
+			}
 
-		[[nodiscard]] bool HasPublicationRetain(
-			AssetKey key,
-			uint64_t generation) const noexcept override
-		{
-			return m_AssetManager->HasPublicationRetain(key, generation);
-		}
+			bool created = false;
+			if (!textureId.IsValid())
+			{
+				if (!importedTexture.m_Data.IsValid())
+				{
+					return fail(result, "Imported texture payload is invalid");
+				}
+				textureId = textureAssets.CreateTexture(
+					importedTexture.m_CanonicalPath,
+					importedTexture.m_ImportSettings);
+				texture = textureAssets.GetTexture(textureId);
+				if (!textureId.IsValid() || !texture)
+				{
+					return fail(
+						result,
+						"Failed to create texture entry during model publication");
+				}
+				created = true;
+			}
 
-		[[nodiscard]] ModelPublicationRetainToken AcquireTextureRetain(
-			const AssetContentVersion& contentVersion) noexcept override
-		{
-			return StoreRetain(m_AssetManager->AcquirePublicationRetain(
-				contentVersion.m_Key.m_Kind,
-				contentVersion.m_Key.m_StableId,
-				contentVersion.m_ContentGeneration));
-		}
+			const AssetContentVersion contentVersion = MakeAssetContentVersion(
+				textureId,
+				texture->m_ContentGeneration);
+			ModelPublicationRetainToken retain = StoreRetain(
+				m_AssetManager->AcquirePublicationRetain(
+					AssetKind::Texture,
+					textureId.Value(),
+					texture->m_ContentGeneration));
+			if (!retain.IsValid())
+			{
+				if (created)
+				{
+					GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
+				}
+				return fail(result, "Failed to retain texture publication claim");
+			}
+			if (created && !textureAssets.BeginPublication(textureId))
+			{
+				ReleaseRetain(retain);
+				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
+				return fail(result, "Failed to begin texture publication");
+			}
 
-		void ReleaseTextureRetain(ModelPublicationRetainToken retain) noexcept override
-		{
-			ReleaseRetain(retain);
+			result.m_TextureId = textureId;
+			result.m_Claim = {
+				.m_ContentVersion = contentVersion,
+				.m_Origin = created ?
+					ModelPublicationClaimOrigin::Created :
+					ModelPublicationClaimOrigin::Reused,
+				.m_Retain = retain,
+			};
+			if (!IsReservedTextureId(textureId))
+			{
+				result.m_Dependency = contentVersion;
+			}
+			if (!created)
+			{
+				importedTexture = {};
+				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
+				return result;
+			}
+
+			auto uploadData = textureAssets.MakeTextureUploadData(
+				textureId,
+				std::move(importedTexture.m_Data),
+				importedTexture.m_ImportSettings);
+			const bool queued = textureAssets.QueueTextureUpload(
+				std::move(uploadData),
+				priority);
+			importedTexture = {};
+			result.m_Usage.m_ResourceCreations = 1;
+			if (!queued)
+			{
+				ReleaseRetain(retain);
+				result.m_Claim = {};
+				result.m_Dependency = {};
+				result.m_TextureId.Reset();
+				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
+				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
+				result.m_Error = std::format(
+					"Failed to queue texture {} upload",
+					textureId.Value());
+				return result;
+			}
+			result.m_Usage.m_PayloadBytesMovedToUpload = sourceBytes;
+			result.m_UploadQueued = true;
+			return result;
 		}
 
 		[[nodiscard]] ModelPublicationMaterialResult PublishMaterial(
