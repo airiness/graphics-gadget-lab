@@ -13,6 +13,7 @@ namespace gglab
 	class CameraRig;
 	class Renderer;
 	class AssetManager;
+	class EnvironmentAssetController;
 	class RenderGraph;
 	class DiagnosticsRuntime;
 	class DevelopGuiSystem;
@@ -31,6 +32,7 @@ namespace gglab
 		std::span<const RenderQueue> m_RenderQueues;
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
+		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
 		DiagnosticsRuntime* m_Diagnostics = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;

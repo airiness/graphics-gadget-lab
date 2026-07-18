@@ -86,31 +86,6 @@ namespace gglab
 			}
 		}
 
-		if (m_EnvironmentTextureUploadPending &&
-			m_Status.m_BakingGeneration == m_Status.m_RequestedGeneration)
-		{
-			if (m_EnvironmentLightingSystem->EnsureActiveEnvironmentTextureLoaded())
-			{
-				m_EnvironmentTextureUploadPending = false;
-				SetStage(IBLBakeStage::Environment, 0.0f);
-			}
-			else
-			{
-				const AssetState state =
-					m_EnvironmentLightingSystem->GetActiveEnvironmentTextureState();
-				if (state == AssetState::Failed || state == AssetState::Cancelled ||
-					state == AssetState::Ready)
-				{
-					m_EnvironmentTextureUploadPending = false;
-					SetStage(IBLBakeStage::Failed, 0.0f);
-				}
-				else
-				{
-					return;
-				}
-			}
-		}
-
 		if (m_Status.m_RequestedGeneration != m_Status.m_BakingGeneration &&
 			m_Status.m_RequestedGeneration != m_Status.m_ActiveGeneration)
 		{
@@ -131,14 +106,17 @@ namespace gglab
 		m_Status.m_BakingGeneration = m_Status.m_RequestedGeneration;
 		m_Status.m_CacheHit = false;
 		m_Status.m_CacheWritePending = false;
-		m_EnvironmentTextureUploadPending = false;
 		m_Status.m_GpuMilliseconds = 0.0;
 		m_Status.m_GpuTimingAvailable = false;
 		m_BakingConfig = m_EnvironmentLightingSystem->GetBakeConfig();
 
-		const auto* activeEnvironment = m_EnvironmentLightingSystem->GetActiveEnvironment();
-		const std::filesystem::path environmentPath = activeEnvironment ?
-			activeEnvironment->m_Path : std::filesystem::path{};
+		const EnvironmentTextureSource source = m_EnvironmentLightingSystem->GetBakeSource();
+		if (!source.IsValid())
+		{
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
+		const std::filesystem::path environmentPath = source.m_SourcePath;
 		const uint64_t generation = m_Status.m_BakingGeneration;
 		const bool ignoreCache = m_EnvironmentLightingSystem->ShouldIgnoreCache(generation);
 		auto work = std::make_shared<CacheLoadWork>();
@@ -253,20 +231,9 @@ namespace gglab
 			SetStage(IBLBakeStage::WaitingForGpu, 0.95f);
 			return;
 		}
-		if (!m_EnvironmentLightingSystem->EnsureActiveEnvironmentTextureLoaded())
+		if (!m_EnvironmentLightingSystem->GetBakeSource().IsValid())
 		{
-			const AssetState state =
-				m_EnvironmentLightingSystem->GetActiveEnvironmentTextureState();
-			if (state == AssetState::Failed || state == AssetState::Cancelled ||
-				state == AssetState::Ready)
-			{
-				SetStage(IBLBakeStage::Failed, 0.0f);
-			}
-			else
-			{
-				m_EnvironmentTextureUploadPending = true;
-				SetStage(IBLBakeStage::WaitingForGpu, 0.05f);
-			}
+			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
 

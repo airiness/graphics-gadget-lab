@@ -79,7 +79,9 @@ namespace gglab
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
-				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(*context.m_Renderer) : IBLDiagnosticsSnapshot{};
+				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(
+					*context.m_Renderer,
+					context.m_EnvironmentAssetController) : IBLDiagnosticsSnapshot{};
 			}
 		};
 

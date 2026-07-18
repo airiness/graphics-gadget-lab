@@ -20,6 +20,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -187,6 +188,12 @@ namespace gglab
 		assetManagerCreateInfo.m_TextureRegistry = m_Renderer->GetTextureRegistry();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
+		m_EnvironmentAssetController = std::make_unique<EnvironmentAssetController>(
+			EnvironmentAssetController::CreateInfo{
+				.m_AssetManager = m_AssetManager.get(),
+				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
+			});
+		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
@@ -200,6 +207,7 @@ namespace gglab
 				.m_InputManager = m_InputManager.get(),
 				.m_Time = m_Time.get(),
 				.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
+				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 			},
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
@@ -355,6 +363,7 @@ namespace gglab
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
 		m_AssetManager->Tick();
+		m_EnvironmentAssetController->Tick();
 
 		auto& shadowVisualizationSettings =
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
@@ -423,6 +432,7 @@ namespace gglab
 			guiContext.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues);
 			guiContext.m_MainRenderView = &frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)];
 			guiContext.m_AssetManager = m_AssetManager.get();
+			guiContext.m_EnvironmentAssetController = m_EnvironmentAssetController.get();
 			guiContext.m_RenderGraph = &rg;
 			guiContext.m_DirectionalShadowSettings = frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
 			guiContext.m_DebugDrawSystem = m_DebugDrawSystem.get();
@@ -472,6 +482,9 @@ namespace gglab
 		{
 			return;
 		}
+
+		// Commit the pinned fallback before releasing environment texture leases.
+		m_EnvironmentAssetController.reset();
 
 		// Stop workers and deliver terminal completion notifications while task
 		// consumers are still alive.

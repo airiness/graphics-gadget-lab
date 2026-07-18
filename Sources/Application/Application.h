@@ -5,6 +5,7 @@ namespace gglab
 {
 	class Renderer;
 	class AssetManager;
+	class EnvironmentAssetController;
 	class TaskSystem;
 	class TextureRegistry;
 	class InputManager;
@@ -46,6 +47,10 @@ namespace gglab
 
 		Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
 		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
+		EnvironmentAssetController* GetEnvironmentAssetController() const noexcept
+		{
+			return m_EnvironmentAssetController.get();
+		}
 		TaskSystem* GetTaskSystem() const noexcept { return m_TaskSystem.get(); }
 		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager.get(); }
@@ -88,6 +93,7 @@ namespace gglab
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;
 		std::unique_ptr<AssetManager> m_AssetManager;
+		std::unique_ptr<EnvironmentAssetController> m_EnvironmentAssetController;
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;

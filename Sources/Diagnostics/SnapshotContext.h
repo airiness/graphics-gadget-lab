@@ -6,6 +6,7 @@ namespace gglab
 {
 	class Renderer;
 	class AssetManager;
+	class EnvironmentAssetController;
 	class TaskSystem;
 	class World;
 	class RenderGraph;
@@ -14,6 +15,7 @@ namespace gglab
 	{
 		Renderer* m_Renderer = nullptr;
 		AssetManager* m_AssetManager = nullptr;
+		const EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		const TaskSystem* m_TaskSystem = nullptr;
 		World* m_World = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;

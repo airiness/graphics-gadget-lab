@@ -2,6 +2,7 @@
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
+#include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
@@ -64,6 +65,12 @@ namespace gglab
 			&AssetResidencyLabSession::Create);
 		GGLAB_ASSERT_MSG(assetResidencyRegistered,
 			"Failed to register the Asset Residency Lab session.");
+
+		const bool environmentAssetRegistered = m_Runtime.RegisterLab(
+			EnvironmentAssetLabSession::GetDescriptor(),
+			&EnvironmentAssetLabSession::Create);
+		GGLAB_ASSERT_MSG(environmentAssetRegistered,
+			"Failed to register the Environment Asset Lab session.");
 	}
 
 	void DemoLabHost::BeginPrepare() noexcept

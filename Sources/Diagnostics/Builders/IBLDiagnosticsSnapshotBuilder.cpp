@@ -2,6 +2,7 @@
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -50,7 +51,9 @@ namespace gglab
 		}
 	}
 
-	IBLDiagnosticsSnapshot BuildIBLDiagnosticsSnapshot(const Renderer& renderer) noexcept
+	IBLDiagnosticsSnapshot BuildIBLDiagnosticsSnapshot(
+		const Renderer& renderer,
+		const EnvironmentAssetController* environmentAssets) noexcept
 	{
 		IBLDiagnosticsSnapshot snapshot{};
 		const auto* environmentSystem = renderer.GetEnvironmentLightingSystem();
@@ -72,25 +75,28 @@ namespace gglab
 		snapshot.m_SkyboxEnabled = settings.m_EnableSkybox;
 		snapshot.m_BakeStatus = bakeScheduler->GetStatus();
 
-		const auto environments = environmentSystem->GetEntries();
-		const auto* activeEnvironment = environmentSystem->GetActiveEnvironment();
-		snapshot.m_Environments.reserve(environments.size());
-		for (size_t index = 0; index < environments.size(); ++index)
+		if (environmentAssets)
 		{
-			const auto& environment = environments[index];
-			const bool active = &environment == activeEnvironment;
-			if (active)
+			const auto environments = environmentAssets->GetEntries();
+			const auto* activeEnvironment = environmentAssets->GetActiveEnvironment();
+			snapshot.m_Environments.reserve(environments.size());
+			for (size_t index = 0; index < environments.size(); ++index)
 			{
-				snapshot.m_ActiveEnvironmentIndex = index;
+				const auto& environment = environments[index];
+				const bool active = &environment == activeEnvironment;
+				if (active)
+				{
+					snapshot.m_ActiveEnvironmentIndex = index;
+				}
+				snapshot.m_Environments.push_back({
+					.m_Index = index,
+					.m_Path = environment.m_Path,
+					.m_DisplayName = environment.m_DisplayName,
+					.m_Active = active,
+					.m_TextureReady = environmentAssets->IsEntryTextureReady(index),
+					.m_LoadAttempted = environment.m_LastSelectionSerial != 0,
+				});
 			}
-			snapshot.m_Environments.push_back({
-				.m_Index = index,
-				.m_Path = environment.m_Path,
-				.m_DisplayName = environment.m_DisplayName,
-				.m_Active = active,
-				.m_TextureReady = environment.m_Content.IsValid(),
-				.m_LoadAttempted = environment.m_LastLoadAttemptGeneration != 0,
-			});
 		}
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;

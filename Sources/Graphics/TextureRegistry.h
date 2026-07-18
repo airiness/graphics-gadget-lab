@@ -119,9 +119,10 @@ namespace gglab
 	private:
 		friend class AssetManager;
 		friend class AssetManagerPublicationServices;
-		friend class EnvironmentLightingSystem;
 
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] std::optional<AssetState> GetTextureState(
+			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;

@@ -285,6 +285,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\EnvironmentAssetLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
@@ -339,6 +340,7 @@
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\EnvironmentAssetController.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp" />
@@ -552,6 +554,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\EnvironmentAssetLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AlphaTestLabSession.h" />
@@ -667,6 +670,7 @@
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
