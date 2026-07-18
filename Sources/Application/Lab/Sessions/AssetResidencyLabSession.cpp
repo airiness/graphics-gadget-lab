@@ -455,7 +455,7 @@ namespace gglab
 					m_State->m_StaleCompletionCountBaseline + 2 ||
 				mesh->m_ResidencyState != AssetResidencyState::Resident ||
 				texture->m_ResidencyState != AssetResidencyState::Resident ||
-				!mesh->m_IsUploaded || !texture->m_IsUploaded)
+				!mesh->m_IsUploaded || !texture->m_Gpu.m_IsUploaded)
 			{
 				Fail("Reacquiring interest did not cancel pending eviction before resource release.");
 				return;
@@ -495,9 +495,9 @@ namespace gglab
 				texture->m_ContentState != AssetContentState::Ready ||
 				mesh->m_ResidencyState != AssetResidencyState::NonResident ||
 				texture->m_ResidencyState != AssetResidencyState::NonResident ||
-				mesh->m_IsUploaded || texture->m_IsUploaded ||
+				mesh->m_IsUploaded || texture->m_Gpu.m_IsUploaded ||
 				mesh->m_VertexBuffer || mesh->m_IndexBuffer ||
-				texture->m_Texture.IsValid() || texture->m_Srv.IsValid())
+				texture->m_Gpu.m_Texture.IsValid() || texture->m_Gpu.m_Srv.IsValid())
 			{
 				Fail("Released assets did not preserve content while dropping GPU residency.");
 				return;
@@ -699,7 +699,7 @@ namespace gglab
 				texture->m_ResidencyEpoch <= m_State->m_TextureResidencyEpoch ||
 				mesh->m_ResidencyOperationSerial != 0 ||
 				texture->m_ResidencyOperationSerial != 0 ||
-				!mesh->m_IsUploaded || !texture->m_IsUploaded ||
+				!mesh->m_IsUploaded || !texture->m_Gpu.m_IsUploaded ||
 				reloaded.m_ReloadRequestCount <= m_State->m_ReloadRequestCountBaseline ||
 				reloaded.m_ReloadingAssetCount != 0 ||
 				reloaded.m_AcceptedStateEventCount <=

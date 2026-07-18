@@ -253,6 +253,22 @@ namespace gglab
 		AssetContentFingerprint m_ContentFingerprint{};
 	};
 
+	struct TextureGpuState
+	{
+		RHITextureHandle m_Texture;
+		RHITextureViewHandle m_Srv{};
+		RHITextureDesc m_Desc{};
+		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
+		bool m_IsUploaded = false;
+	};
+
+	struct TextureLoadState
+	{
+		ProgressChannelPtr m_Progress;
+		bool m_CancelRequested = false;
+		bool m_IsReloading = false;
+	};
+
 	inline constexpr uint32_t CubemapFaceCount = 6u;
 	enum class CubemapFace : uint8_t
 	{
@@ -465,17 +481,11 @@ namespace gglab
 	struct Texture : AssetLifecycle
 	{
 		TextureID m_Id{};
-		RHITextureViewHandle m_Srv{};
 		TextureSourceInfo m_Source{};
 		StringID m_Name{};
 		std::string m_DebugLabel;
-		RHITextureHandle m_Texture;
-		RHITextureDesc m_Desc{};
-		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
-		ProgressChannelPtr m_LoadProgress;
-		bool m_IsUploaded = false;
-		bool m_CancelRequested = false;
-		bool m_IsReloading = false;
+		TextureGpuState m_Gpu{};
+		TextureLoadState m_Load{};
 	};
 
 	struct MaterialTextureBinding

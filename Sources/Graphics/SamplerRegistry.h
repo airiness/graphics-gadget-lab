@@ -54,8 +54,6 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(SamplerRegistry);
 		~SamplerRegistry();
 
-		void InitializePresetSamplers() noexcept;
-
 		SamplerID GetOrCreateSampler(const SamplerKey& key) noexcept;
 		SamplerID GetPresetSamplerId(SamplerPreset preset) const noexcept;
 
@@ -69,6 +67,7 @@ namespace gglab
 		[[nodiscard]] std::vector<SamplerRegistryReadInfo> GetReadInfos() const;
 
 	private:
+		void CreatePresetSamplers() noexcept;
 		const SamplerEntry& GetEntry(SamplerID samplerId) const noexcept;
 
 	private:
@@ -80,7 +79,6 @@ namespace gglab
 		std::unordered_map<SamplerID, SamplerEntry> m_SamplerEntries;
 
 		std::array<SamplerID, utils::EnumCount<SamplerPreset>()> m_PresetSamplers{};
-		bool m_PresetSamplersInitialized = false;
 		uint64_t m_CacheHitCount = 0;
 		uint64_t m_CacheMissCount = 0;
 	};

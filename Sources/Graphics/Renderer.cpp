@@ -79,7 +79,6 @@ namespace gglab
 		SamplerRegistry::CreateInfo samplerRegistryCreateInfo{};
 		samplerRegistryCreateInfo.m_Device = device;
 		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
-		m_SamplerRegistry->InitializePresetSamplers();
 
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_Device = device;

@@ -75,21 +75,22 @@ namespace gglab
 		[[nodiscard]] uint64_t EstimateTextureResidentBytes(
 			const Texture& texture) noexcept
 		{
-			if (!texture.m_Texture.IsValid())
+			if (!texture.m_Gpu.m_Texture.IsValid())
 			{
 				return 0;
 			}
 			const uint64_t bytesPerTexel =
-				GetRHIFormatInfo(texture.m_Desc.m_Format).m_BytesPerBlock;
+				GetRHIFormatInfo(texture.m_Gpu.m_Desc.m_Format).m_BytesPerBlock;
 			uint64_t bytes = 0;
-			for (uint32_t mip = 0; mip < texture.m_Desc.m_MipLevels; ++mip)
+			for (uint32_t mip = 0; mip < texture.m_Gpu.m_Desc.m_MipLevels; ++mip)
 			{
-				const uint64_t width = std::max<uint32_t>(1, texture.m_Desc.m_Extent.m_Width >> mip);
-				const uint64_t height = std::max<uint32_t>(1, texture.m_Desc.m_Extent.m_Height >> mip);
-				const uint64_t depth = std::max<uint32_t>(1, texture.m_Desc.m_Extent.m_Depth >> mip);
+				const uint64_t width = std::max<uint32_t>(1, texture.m_Gpu.m_Desc.m_Extent.m_Width >> mip);
+				const uint64_t height = std::max<uint32_t>(1, texture.m_Gpu.m_Desc.m_Extent.m_Height >> mip);
+				const uint64_t depth = std::max<uint32_t>(1, texture.m_Gpu.m_Desc.m_Extent.m_Depth >> mip);
 				bytes += width * height * depth * bytesPerTexel;
 			}
-			return bytes * texture.m_Desc.m_ArraySize * texture.m_Desc.m_SampleCount;
+			return bytes * texture.m_Gpu.m_Desc.m_ArraySize *
+				texture.m_Gpu.m_Desc.m_SampleCount;
 		}
 
 		[[nodiscard]] uint64_t EstimateMeshResidentBytes(const Mesh& mesh) noexcept
@@ -1043,7 +1044,7 @@ namespace gglab
 			{
 				++m_CpuCancellationCount;
 			}
-			else if (texture->m_Texture.IsValid())
+			else if (texture->m_Gpu.m_Texture.IsValid())
 			{
 				++m_GpuDeferredCancellationCount;
 			}
