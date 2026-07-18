@@ -568,6 +568,75 @@ namespace gglab
 		return resolveSrvIndex(fallbackTexture->m_Srv);
 	}
 
+	TextureContentRef TextureRegistry::GetTextureContentRef(TextureID textureId) const noexcept
+	{
+		const Texture* texture = GetTexture(textureId);
+		return texture ? TextureContentRef{
+			.m_Id = textureId,
+			.m_Generation = texture->m_ContentGeneration,
+		} : TextureContentRef{};
+	}
+
+	std::optional<ResidentTextureResource> TextureRegistry::GetResidentTextureResource(
+		TextureContentRef content) const noexcept
+	{
+		const Texture* texture = GetTexture(content.m_Id);
+		if (!content.IsValid() || !texture ||
+			texture->m_ContentGeneration != content.m_Generation ||
+			texture->m_State != AssetState::Ready ||
+			texture->m_ResidencyState != AssetResidencyState::Resident ||
+			!texture->m_IsUploaded || !texture->m_Texture.IsValid() ||
+			!texture->m_Srv.IsValid())
+		{
+			return std::nullopt;
+		}
+
+		const RHIDescriptorHandle descriptor =
+			m_Device->GetTextureViewDescriptor(texture->m_Srv);
+		GGLAB_ASSERT_MSG(
+			descriptor.IsValid() &&
+				descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
+			"TextureRegistry::GetResidentTextureResource: texture SRV descriptor is invalid.");
+		if (!descriptor.IsValid() ||
+			descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
+		{
+			return std::nullopt;
+		}
+
+		return ResidentTextureResource{
+			.m_Content = content,
+			.m_Texture = texture->m_Texture,
+			.m_Desc = texture->m_Desc,
+			.m_SrvIndex = descriptor.m_Index,
+		};
+	}
+
+	std::vector<TextureAssetReadInfo> TextureRegistry::GetTextureAssetReadInfos() const
+	{
+		std::vector<TextureAssetReadInfo> infos;
+		infos.reserve(m_TextureContainer.m_TextureIDMap.size());
+		for (const auto& [textureId, texture] : m_TextureContainer.m_TextureIDMap)
+		{
+			infos.push_back({
+				.m_Content = {
+					.m_Id = textureId,
+					.m_Generation = texture->m_ContentGeneration,
+				},
+				.m_Lifecycle = static_cast<const AssetLifecycle&>(*texture),
+				.m_SourcePath = texture->m_SourcePath,
+				.m_Semantic = texture->m_Semantic,
+				.m_Name = texture->m_Name,
+				.m_Texture = texture->m_Texture,
+				.m_DebugName = m_Device ?
+					std::string(m_Device->GetTextureDebugName(texture->m_Texture)) :
+					std::string{},
+				.m_IsUploaded = texture->m_IsUploaded,
+				.m_IsReserved = IsReservedTextureId(textureId),
+			});
+		}
+		return infos;
+	}
+
 	TextureID TextureRegistry::CreateTexture(const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings) noexcept
 	{

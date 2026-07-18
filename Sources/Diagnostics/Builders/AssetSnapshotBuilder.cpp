@@ -4,8 +4,6 @@
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/AssetUploadScheduler.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/TextureRegistry.h"
 
 #include <algorithm>
 
@@ -185,45 +183,42 @@ namespace gglab
 				return lhs.m_Id.Value() < rhs.m_Id.Value();
 			});
 
-		const TextureRegistry* textureRegistry = assetManager.m_TextureRegistry;
-		if (textureRegistry)
+		const std::vector<TextureAssetReadInfo> textureInfos =
+			assetManager.GetTextureAssetReadInfos();
+		snapshot.m_Textures.reserve(textureInfos.size());
+		for (const TextureAssetReadInfo& texture : textureInfos)
 		{
-			snapshot.m_Textures.reserve(textureRegistry->m_TextureContainer.m_TextureIDMap.size());
-			for (const auto& [textureId, texture] : textureRegistry->m_TextureContainer.m_TextureIDMap)
-			{
-				AssetSnapshot::Texture textureSnapshot{};
-				textureSnapshot.m_Id = textureId;
-				textureSnapshot.m_ContentGeneration = texture->m_ContentGeneration;
-				textureSnapshot.m_ResidencyEpoch = texture->m_ResidencyEpoch;
-				textureSnapshot.m_LastUsedFrame = texture->m_LastUsedFrame;
-				textureSnapshot.m_UseCount = texture->m_UseCount;
-				textureSnapshot.m_State = texture->m_State;
-				textureSnapshot.m_ContentState = texture->m_ContentState;
-				textureSnapshot.m_ResidencyState = texture->m_ResidencyState;
-				textureSnapshot.m_ResidencyPolicy = texture->m_ResidencyPolicy;
-				textureSnapshot.m_SourcePath = texture->m_SourcePath;
-				textureSnapshot.m_Semantic = texture->m_Semantic;
-				textureSnapshot.m_Name = texture->m_Name;
-				textureSnapshot.m_Texture = texture->m_Texture;
-				textureSnapshot.m_DebugName = textureRegistry->m_Device ?
-					std::string(textureRegistry->m_Device->GetTextureDebugName(texture->m_Texture)) :
-					std::string{};
-				textureSnapshot.m_IsUploaded = texture->m_IsUploaded;
-				textureSnapshot.m_IsReserved = IsReservedTextureId(textureId);
-				textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
-					AssetKind::Texture,
-					textureId.Value(),
-					*texture);
-				recordResidency(*texture, textureSnapshot.m_IsEvictionCandidate);
-				snapshot.m_Textures.emplace_back(std::move(textureSnapshot));
-			}
-
-			std::sort(snapshot.m_Textures.begin(), snapshot.m_Textures.end(),
-				[](const AssetSnapshot::Texture& lhs, const AssetSnapshot::Texture& rhs)
-				{
-					return lhs.m_Id.Value() < rhs.m_Id.Value();
-				});
+			const AssetLifecycle& lifecycle = texture.m_Lifecycle;
+			AssetSnapshot::Texture textureSnapshot{};
+			textureSnapshot.m_Id = texture.m_Content.m_Id;
+			textureSnapshot.m_ContentGeneration = texture.m_Content.m_Generation;
+			textureSnapshot.m_ResidencyEpoch = lifecycle.m_ResidencyEpoch;
+			textureSnapshot.m_LastUsedFrame = lifecycle.m_LastUsedFrame;
+			textureSnapshot.m_UseCount = lifecycle.m_UseCount;
+			textureSnapshot.m_State = lifecycle.m_State;
+			textureSnapshot.m_ContentState = lifecycle.m_ContentState;
+			textureSnapshot.m_ResidencyState = lifecycle.m_ResidencyState;
+			textureSnapshot.m_ResidencyPolicy = lifecycle.m_ResidencyPolicy;
+			textureSnapshot.m_SourcePath = texture.m_SourcePath;
+			textureSnapshot.m_Semantic = texture.m_Semantic;
+			textureSnapshot.m_Name = texture.m_Name;
+			textureSnapshot.m_Texture = texture.m_Texture;
+			textureSnapshot.m_DebugName = texture.m_DebugName;
+			textureSnapshot.m_IsUploaded = texture.m_IsUploaded;
+			textureSnapshot.m_IsReserved = texture.m_IsReserved;
+			textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
+				AssetKind::Texture,
+				texture.m_Content.m_Id.Value(),
+				lifecycle);
+			recordResidency(lifecycle, textureSnapshot.m_IsEvictionCandidate);
+			snapshot.m_Textures.emplace_back(std::move(textureSnapshot));
 		}
+
+		std::sort(snapshot.m_Textures.begin(), snapshot.m_Textures.end(),
+			[](const AssetSnapshot::Texture& lhs, const AssetSnapshot::Texture& rhs)
+			{
+				return lhs.m_Id.Value() < rhs.m_Id.Value();
+			});
 
 		if (assetManager.m_AssetUploadScheduler)
 		{

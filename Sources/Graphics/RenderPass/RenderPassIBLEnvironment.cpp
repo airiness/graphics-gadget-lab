@@ -1,10 +1,10 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "Graphics/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/TextureRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
@@ -51,11 +51,11 @@ namespace gglab
 
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* assetManager = services.m_AssetManager;
+		GGLAB_ASSERT_NOT_NULL(assetManager);
 
 		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
-		auto* textureRegistry = renderer->GetTextureRegistry();
-		GGLAB_ASSERT_NOT_NULL(textureRegistry);
 
 		RHITextureHandle sourceTextureHandle{};
 		RHITextureDesc sourceTextureDesc{};
@@ -66,14 +66,14 @@ namespace gglab
 		if (const auto* environmentSystem = renderer->GetEnvironmentLightingSystem())
 		{
 			const EnvironmentTextureSource source = environmentSystem->GetBakeSource();
-			const TextureID sourceTextureId = source.m_TextureId;
-			const auto* sourceTexture = textureRegistry->GetTexture(sourceTextureId);
-			const auto* sourceDesc = textureRegistry->GetTextureDesc(sourceTextureId);
-			if (sourceTexture && sourceDesc && sourceTexture->m_Texture.IsValid())
+			const auto sourceResource =
+				assetManager->GetResidentTextureResource(source.m_Content);
+			if (sourceResource)
 			{
-				sourceTextureHandle = sourceTexture->m_Texture;
-				sourceTextureDesc = *sourceDesc;
-				sourceTextureIndex = textureRegistry->GetShaderVisibleSrvIndex(sourceTextureId);
+				assetManager->MarkTextureUsed(source.m_Content.m_Id);
+				sourceTextureHandle = sourceResource->m_Texture;
+				sourceTextureDesc = sourceResource->m_Desc;
+				sourceTextureIndex = sourceResource->m_SrvIndex;
 				sourceMode = source.m_Type == EnvironmentTextureSourceType::Cubemap ?
 					EnvironmentSourceMode::Cubemap :
 					EnvironmentSourceMode::Equirectangular;

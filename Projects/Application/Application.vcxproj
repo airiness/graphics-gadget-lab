@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -641,6 +641,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\ReservedTexture.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetViews.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />

@@ -3,12 +3,14 @@
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
+#include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
 #include "Graphics/TextureLoader.h"
 
 #include <functional>
+#include <optional>
 
 namespace gglab
 {
@@ -19,9 +21,6 @@ namespace gglab
 	class TaskSystem;
 	class TransferBatch;
 	class TransferManager;
-	struct AssetSnapshot;
-
-	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 
 	class TextureRegistry
 	{
@@ -118,10 +117,14 @@ namespace gglab
 			AssetResidencyOperation residencyOperation = {}) noexcept;
 
 	private:
-		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 		friend class AssetManager;
 		friend class AssetManagerPublicationServices;
 		friend class EnvironmentLightingSystem;
+
+		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
+			TextureContentRef content) const noexcept;
+		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;
 
 		void CreateTextureEntry(
 			TextureID id,

@@ -125,14 +125,20 @@ namespace gglab
 		{
 			return
 			{
-				.m_TextureId = activeEnvironment->m_TextureId,
+				.m_Content = activeEnvironment->m_Content,
 				.m_Type = EnvironmentTextureSourceType::Equirectangular,
 			};
 		}
+		const TextureID fallbackId =
+			ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
+		const Texture* fallback = m_TextureRegistry->GetTexture(fallbackId);
 
 		return
 		{
-			.m_TextureId = ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap),
+			.m_Content = {
+				.m_Id = fallbackId,
+				.m_Generation = fallback ? fallback->m_ContentGeneration : 0,
+			},
 			.m_Type = EnvironmentTextureSourceType::Cubemap,
 		};
 	}
@@ -141,34 +147,43 @@ namespace gglab
 	{
 		if (m_ActiveEntryIndex >= m_Entries.size())
 		{
-			const Texture* fallback = m_TextureRegistry->GetTexture(GetBakeSource().m_TextureId);
-			return fallback && fallback->m_State == AssetState::Ready;
+			const TextureContentRef content = GetBakeSource().m_Content;
+			const Texture* fallback = m_TextureRegistry->GetTexture(content.m_Id);
+			return fallback && fallback->m_ContentGeneration == content.m_Generation &&
+				fallback->m_State == AssetState::Ready;
 		}
 
 		auto& entry = m_Entries[m_ActiveEntryIndex];
-		const Texture* texture = m_TextureRegistry->GetTexture(entry.m_TextureId);
-		const bool terminal = texture &&
+		const Texture* texture = m_TextureRegistry->GetTexture(entry.m_Content.m_Id);
+		const bool currentContent = texture &&
+			texture->m_ContentGeneration == entry.m_Content.m_Generation;
+		const bool terminal = currentContent &&
 			(texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled);
-		if ((!entry.m_TextureId.IsValid() || !texture || terminal) &&
+		if ((!entry.m_Content.IsValid() || !currentContent || terminal) &&
 			entry.m_LastLoadAttemptGeneration != m_BakeRequestGeneration)
 		{
 			entry.m_LastLoadAttemptGeneration = m_BakeRequestGeneration;
-			entry.m_TextureId = m_TextureRegistry->LoadTextureAsync(
+			const TextureRegistry::TextureLoadRequest request = m_TextureRegistry->LoadTextureAsync(
 				entry.m_Path,
 				TextureSemantic::Environment,
-				TaskPriority::High).m_TextureId;
-			texture = m_TextureRegistry->GetTexture(entry.m_TextureId);
+				TaskPriority::High);
+			entry.m_Content = {
+				.m_Id = request.m_TextureId,
+				.m_Generation = request.m_Generation,
+			};
+			texture = m_TextureRegistry->GetTexture(entry.m_Content.m_Id);
 		}
-		if (!entry.m_TextureId.IsValid())
+		if (!entry.m_Content.IsValid())
 		{
 			return false;
 		}
-		if (!texture || texture->m_State != AssetState::Ready)
+		if (!texture || texture->m_ContentGeneration != entry.m_Content.m_Generation ||
+			texture->m_State != AssetState::Ready)
 		{
 			return false;
 		}
 
-		const auto* textureDesc = m_TextureRegistry->GetTextureDesc(entry.m_TextureId);
+		const auto* textureDesc = m_TextureRegistry->GetTextureDesc(entry.m_Content.m_Id);
 		if (!textureDesc || textureDesc->m_Dimension != RHITextureDimension::Texture2D ||
 			textureDesc->m_ArraySize != 1 || textureDesc->m_Extent.m_Depth != 1 ||
 			static_cast<uint64_t>(textureDesc->m_Extent.m_Height) * 2u != textureDesc->m_Extent.m_Width)
@@ -179,8 +194,8 @@ namespace gglab
 				textureDesc ? textureDesc->m_Extent.m_Height : 0u,
 				textureDesc ? textureDesc->m_ArraySize : 0u,
 				textureDesc ? textureDesc->m_Extent.m_Depth : 0u);
-			const TextureID invalidTextureId = entry.m_TextureId;
-			entry.m_TextureId.Reset();
+			const TextureID invalidTextureId = entry.m_Content.m_Id;
+			entry.m_Content = {};
 			GGLAB_UNUSED(m_TextureRegistry->RemoveTexture(invalidTextureId));
 			return false;
 		}
@@ -191,13 +206,16 @@ namespace gglab
 	{
 		if (m_ActiveEntryIndex >= m_Entries.size())
 		{
-			const Texture* fallback = m_TextureRegistry->GetTexture(GetBakeSource().m_TextureId);
-			return fallback ? fallback->m_State : AssetState::Failed;
+			const TextureContentRef content = GetBakeSource().m_Content;
+			const Texture* fallback = m_TextureRegistry->GetTexture(content.m_Id);
+			return fallback && fallback->m_ContentGeneration == content.m_Generation ?
+				fallback->m_State : AssetState::Failed;
 		}
 
-		const TextureID textureId = m_Entries[m_ActiveEntryIndex].m_TextureId;
-		const Texture* texture = m_TextureRegistry->GetTexture(textureId);
-		return texture ? texture->m_State : AssetState::Failed;
+		const TextureContentRef content = m_Entries[m_ActiveEntryIndex].m_Content;
+		const Texture* texture = m_TextureRegistry->GetTexture(content.m_Id);
+		return texture && texture->m_ContentGeneration == content.m_Generation ?
+			texture->m_State : AssetState::Failed;
 	}
 
 	void EnvironmentLightingSystem::SetIntensity(float intensity) noexcept

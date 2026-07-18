@@ -1988,6 +1988,22 @@ namespace gglab
 		return m_TextureRegistry->GetTexture(textureId);
 	}
 
+	TextureContentRef AssetManager::GetTextureContentRef(TextureID textureId) const noexcept
+	{
+		return m_TextureRegistry->GetTextureContentRef(textureId);
+	}
+
+	std::optional<ResidentTextureResource> AssetManager::GetResidentTextureResource(
+		TextureContentRef content) const noexcept
+	{
+		return m_TextureRegistry->GetResidentTextureResource(content);
+	}
+
+	std::vector<TextureAssetReadInfo> AssetManager::GetTextureAssetReadInfos() const
+	{
+		return m_TextureRegistry->GetTextureAssetReadInfos();
+	}
+
 	Mesh* AssetManager::EditMesh(MeshID meshId) noexcept
 	{
 		return m_MeshStore.Edit(meshId);
