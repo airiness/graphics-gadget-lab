@@ -331,6 +331,9 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		AssetLoadCoordinator m_AssetLoadCoordinator;
+		// State events outlive TextureAssetSystem so the injected sink remains valid
+		// through texture-domain shutdown and destruction.
+		AssetStateEventQueue m_AssetStateEventQueue;
 		std::unique_ptr<TextureAssetSystem> m_TextureAssets;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
@@ -344,7 +347,6 @@ namespace gglab
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
 		AssetDependencyGraph m_AssetDependencyGraph;
-		AssetStateEventQueue m_AssetStateEventQueue;
 		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
@@ -434,6 +436,9 @@ namespace gglab
 			const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
+		[[nodiscard]] bool RetainTexture(
+			TextureContentRef content,
+			TaskPriority priority = TaskPriority::High) noexcept;
 		void Reset() noexcept;
 	private:
 		friend class AssetManager;

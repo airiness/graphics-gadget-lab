@@ -6,15 +6,9 @@
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] bool IsTerminalPublicationAssetState(AssetState state) noexcept
-		{
-			return state == AssetState::Failed || state == AssetState::Cancelled;
-		}
-	}
-
-	class AssetManagerPublicationServices final : public AssetPublicationServicesBase
+	class AssetManagerPublicationServices final :
+		public AssetPublicationServicesBase,
+		public TexturePublicationContextBase
 	{
 	public:
 		explicit AssetManagerPublicationServices(AssetManager* assetManager) noexcept :
@@ -45,120 +39,36 @@ namespace gglab
 			ImportedTexture& importedTexture,
 			TaskPriority priority) noexcept override
 		{
-			ModelPublicationTextureResult result{};
-			const uint64_t sourceBytes = static_cast<uint64_t>(
-				importedTexture.m_Data.m_Pixels.size());
-			TextureID textureId = m_AssetManager->m_TextureAssets->FindTexture(
-				importedTexture.m_CanonicalPath,
-				importedTexture.m_ImportSettings);
-			const Texture* texture = m_AssetManager->m_TextureAssets->GetTexture(textureId);
-			if (textureId.IsValid() && !texture)
-			{
-				GGLAB_UNUSED(m_AssetManager->m_TextureAssets->RemoveTexture(textureId));
-				textureId.Reset();
-			}
-			else if (texture && IsTerminalPublicationAssetState(texture->m_State))
-			{
-				const AssetKey textureKey{
-					.m_Kind = AssetKind::Texture,
-					.m_StableId = textureId.Value(),
-				};
-				if (m_AssetManager->HasActiveInterest(textureKey) ||
-					m_AssetManager->HasPublicationRetain(
-						textureKey,
-						texture->m_ContentGeneration))
-				{
-					result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
-					result.m_Error = std::format(
-						"Terminal texture {} is still retained",
-						textureId.Value());
-					return result;
-				}
-				GGLAB_UNUSED(m_AssetManager->m_TextureAssets->RemoveTexture(textureId));
-				textureId.Reset();
-				texture = nullptr;
-			}
+			return m_AssetManager->m_TextureAssets->PublishImportedTexture(
+				importedTexture,
+				priority,
+				*this);
+		}
 
-			bool created = false;
-			if (!textureId.IsValid())
-			{
-				if (!importedTexture.m_Data.IsValid())
-				{
-					importedTexture = {};
-					result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
-					return result;
-				}
-				textureId = m_AssetManager->m_TextureAssets->CreateTexture(
-					importedTexture.m_CanonicalPath,
-					importedTexture.m_ImportSettings);
-				texture = m_AssetManager->m_TextureAssets->GetTexture(textureId);
-				if (!textureId.IsValid() || !texture)
-				{
-					importedTexture = {};
-					result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
-					result.m_Error =
-						"Failed to create texture entry during model publication";
-					return result;
-				}
-				created = true;
-				if (!m_AssetManager->m_TextureAssets->BeginPublication(textureId))
-				{
-					GGLAB_UNUSED(m_AssetManager->m_TextureAssets->RemoveTexture(textureId));
-					importedTexture = {};
-					result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
-					result.m_Error = "Failed to begin texture publication";
-					return result;
-				}
-			}
+		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept override
+		{
+			return m_AssetManager->HasActiveInterest(key);
+		}
 
-			result.m_TextureId = textureId;
-			const uint64_t textureGeneration = texture->m_ContentGeneration;
-			AssetPublicationRetain retain = m_AssetManager->AcquirePublicationRetain(
-				AssetKind::Texture,
-				textureId.Value(),
-				textureGeneration);
-			result.m_Claim = {
-				.m_ContentVersion = MakeAssetContentVersion(
-					AssetKind::Texture,
-					textureId.Value(),
-					textureGeneration),
-				.m_Origin = created ?
-					ModelPublicationClaimOrigin::Created :
-					ModelPublicationClaimOrigin::Reused,
-				.m_Retain = StoreRetain(std::move(retain)),
-			};
-			if (!IsReservedTextureId(textureId))
-			{
-				result.m_Dependency = result.m_Claim.m_ContentVersion;
-			}
+		[[nodiscard]] bool HasPublicationRetain(
+			AssetKey key,
+			uint64_t generation) const noexcept override
+		{
+			return m_AssetManager->HasPublicationRetain(key, generation);
+		}
 
-			if (!created)
-			{
-				importedTexture = {};
-				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
-				return result;
-			}
+		[[nodiscard]] ModelPublicationRetainToken AcquireTextureRetain(
+			const AssetContentVersion& contentVersion) noexcept override
+		{
+			return StoreRetain(m_AssetManager->AcquirePublicationRetain(
+				contentVersion.m_Key.m_Kind,
+				contentVersion.m_Key.m_StableId,
+				contentVersion.m_ContentGeneration));
+		}
 
-			auto uploadData = m_AssetManager->m_TextureAssets->MakeTextureUploadData(
-				textureId,
-				std::move(importedTexture.m_Data),
-				importedTexture.m_Semantic);
-			const bool queued = m_AssetManager->m_TextureAssets->QueueTextureUpload(
-				std::move(uploadData),
-				priority);
-			importedTexture = {};
-			result.m_Usage.m_ResourceCreations = 1;
-			if (!queued)
-			{
-				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
-				result.m_Error = std::format(
-					"Failed to queue texture {} upload",
-					textureId.Value());
-				return result;
-			}
-			result.m_Usage.m_PayloadBytesMovedToUpload = sourceBytes;
-			result.m_UploadQueued = true;
-			return result;
+		void ReleaseTextureRetain(ModelPublicationRetainToken retain) noexcept override
+		{
+			ReleaseRetain(retain);
 		}
 
 		[[nodiscard]] ModelPublicationMaterialResult PublishMaterial(

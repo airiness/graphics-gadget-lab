@@ -8,7 +8,6 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/TextureAsset.h"
 
-#include <functional>
 #include <optional>
 
 namespace gglab
@@ -17,12 +16,29 @@ namespace gglab
 	class AssetLoadCoordinator;
 	class AssetManagerPublicationServices;
 	class AssetResidencyController;
+	class AssetStateEventQueue;
 	class AssetUploadScheduler;
 	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
 	struct TextureDecodeFailed;
 	struct TextureDecodeSucceeded;
+	struct ImportedTexture;
+	struct ModelPublicationRetainToken;
+	struct ModelPublicationTextureResult;
+
+	class TexturePublicationContextBase
+	{
+	public:
+		virtual ~TexturePublicationContextBase() = default;
+		[[nodiscard]] virtual bool HasActiveInterest(AssetKey key) const noexcept = 0;
+		[[nodiscard]] virtual bool HasPublicationRetain(
+			AssetKey key,
+			uint64_t generation) const noexcept = 0;
+		[[nodiscard]] virtual ModelPublicationRetainToken AcquireTextureRetain(
+			const AssetContentVersion& contentVersion) noexcept = 0;
+		virtual void ReleaseTextureRetain(ModelPublicationRetainToken retain) noexcept = 0;
+	};
 
 	class TextureAssetSystem
 	{
@@ -33,6 +49,7 @@ namespace gglab
 			AssetLoadCoordinator* m_LoadCoordinator = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+			AssetStateEventQueue* m_StateEvents = nullptr;
 		};
 
 		struct TextureLoadRequest
@@ -47,7 +64,7 @@ namespace gglab
 		struct TextureUploadData
 		{
 			TextureID m_TextureId{};
-			TextureSemantic m_Semantic = TextureSemantic::GenericColor;
+			TextureImportSettings m_ImportSettings{};
 			TextureAssetData m_TextureData;
 			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
 			AssetContentFingerprint m_ContentFingerprint{};
@@ -86,8 +103,12 @@ namespace gglab
 
 		TextureUploadData MakeTextureUploadData(TextureID textureId,
 			TextureAssetData&& textureData,
-			TextureSemantic semantic,
+			const TextureImportSettings& importSettings,
 			AssetContentFingerprint contentFingerprint = {}) noexcept;
+		[[nodiscard]] ModelPublicationTextureResult PublishImportedTexture(
+			ImportedTexture& importedTexture,
+			TaskPriority priority,
+			TexturePublicationContextBase& context) noexcept;
 
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
@@ -138,6 +159,7 @@ namespace gglab
 		void CreateTextureEntry(
 			TextureID id,
 			std::string_view textureName,
+			TextureImportSettings importSettings,
 			const std::filesystem::path& sourcePath = {}) noexcept;
 		void CompleteTextureUpload(
 			TextureID textureId,
@@ -147,10 +169,10 @@ namespace gglab
 			TextureUploadData&& uploadData,
 			TaskPriority priority = TaskPriority::Normal,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
-		bool PublishImportedTexture(
+		bool RecordTextureUpload(
 			TextureID textureId,
 			uint64_t generation,
-			TextureSemantic semantic,
+			const TextureImportSettings& importSettings,
 			TaskPriority priority,
 			TextureAssetData&& textureData,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
@@ -182,19 +204,10 @@ namespace gglab
 			TextureID textureId,
 			const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings,
-			TextureSemantic semantic,
 			TaskPriority priority,
 			bool residencyReload = false,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool RemoveTexture(TextureID textureId) noexcept;
-		void SetStateChangeCallback(
-			std::function<void(
-				TextureID,
-				uint64_t,
-				AssetContentState,
-				AssetResidencyState,
-				std::optional<AssetOperationToken>,
-				AssetStateEventOperationPhase)> callback) noexcept;
 		void SetTextureState(
 			Texture& texture,
 			AssetState state,
@@ -208,16 +221,10 @@ namespace gglab
 		AssetLoadCoordinator* m_LoadCoordinator = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		AssetStateEventQueue* m_StateEvents = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureStore m_Store;
 		std::unordered_set<TextureID> m_PublicationOrphanedTextures;
-		std::function<void(
-			TextureID,
-			uint64_t,
-			AssetContentState,
-			AssetResidencyState,
-			std::optional<AssetOperationToken>,
-			AssetStateEventOperationPhase)> m_StateChangeCallback;
 	};
 }

@@ -20,6 +20,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/AssetUploadScheduler.h"
 #include "Graphics/AssetManager.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -187,6 +188,7 @@ namespace gglab
 		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
+		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
 		m_EnvironmentAssetController = std::make_unique<EnvironmentAssetController>(
 			EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
@@ -518,6 +520,7 @@ namespace gglab
 		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();
+		m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
 		m_AssetManager->PrepareForShutdown(
 			m_Renderer->GetLastSubmittedFencePoint());
 		m_AssetManager.reset();
