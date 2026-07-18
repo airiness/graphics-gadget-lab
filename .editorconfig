@@ -10,5 +10,12 @@ indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+[*.{vcxproj,filters}]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = space
+indent_size = 2
+insert_final_newline = false
+
 [*.{sh,gltf}]
 end_of_line = lf

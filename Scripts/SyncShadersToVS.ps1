@@ -84,7 +84,26 @@ function Read-XmlDocument {
     return $document
 }
 
-function Save-XmlDocument {
+function Test-BytesEqual {
+    param(
+        [byte[]]$Left,
+        [byte[]]$Right
+    )
+
+    if ($Left.Length -ne $Right.Length) {
+        return $false
+    }
+
+    for ($i = 0; $i -lt $Left.Length; $i++) {
+        if ($Left[$i] -ne $Right[$i]) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Save-XmlDocumentIfChanged {
     param(
         [System.Xml.XmlDocument]$Document,
         [string]$Path
@@ -97,13 +116,29 @@ function Save-XmlDocument {
     $settings.NewLineHandling = [System.Xml.NewLineHandling]::Replace
     $settings.Encoding = New-Object System.Text.UTF8Encoding($true)
 
-    $writer = [System.Xml.XmlWriter]::Create($Path, $settings)
+    $stream = New-Object System.IO.MemoryStream
     try {
-        $Document.Save($writer)
+        $writer = [System.Xml.XmlWriter]::Create($stream, $settings)
+        try {
+            $Document.Save($writer)
+        }
+        finally {
+            $writer.Close()
+        }
+
+        $newBytes = $stream.ToArray()
     }
     finally {
-        $writer.Close()
+        $stream.Dispose()
     }
+
+    $oldBytes = [System.IO.File]::ReadAllBytes($Path)
+    if (Test-BytesEqual $oldBytes $newBytes) {
+        return $false
+    }
+
+    [System.IO.File]::WriteAllBytes($Path, $newBytes)
+    return $true
 }
 
 function Remove-WhitespaceTextNodes {
@@ -296,7 +331,7 @@ Remove-EmptyItemGroups $projectDoc $projectNs
 Add-ShaderItemsToProject $projectDoc $shaderFiles
 Remove-EmptyItemGroups $projectDoc $projectNs
 Remove-WhitespaceTextNodes $projectDoc
-Save-XmlDocument $projectDoc $projectPath
+$projectChanged = Save-XmlDocumentIfChanged $projectDoc $projectPath
 
 $filtersDoc = Read-XmlDocument $filtersPath
 $filtersNs = New-Object System.Xml.XmlNamespaceManager($filtersDoc.NameTable)
@@ -307,6 +342,8 @@ Remove-EmptyItemGroups $filtersDoc $filtersNs
 Add-ShaderItemsToFilters $filtersDoc $shaderFiles $shaderDir
 Remove-EmptyItemGroups $filtersDoc $filtersNs
 Remove-WhitespaceTextNodes $filtersDoc
-Save-XmlDocument $filtersDoc $filtersPath
+$filtersChanged = Save-XmlDocumentIfChanged $filtersDoc $filtersPath
 
 Write-Host "Synced $($shaderFiles.Count) shader files to Visual Studio project."
+Write-Host "Application.vcxproj: $(if ($projectChanged) { 'updated' } else { 'unchanged' })"
+Write-Host "Application.vcxproj.filters: $(if ($filtersChanged) { 'updated' } else { 'unchanged' })"
