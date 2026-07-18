@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/TextureAsset.h"
+#include "Graphics/Asset/TextureAsset.h"
 #include "Core/Hash/KeyHash.h"
 
 namespace gglab

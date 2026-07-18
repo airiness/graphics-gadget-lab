@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"

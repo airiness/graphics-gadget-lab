@@ -6,7 +6,7 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/RHIText.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"

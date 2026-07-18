@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 
 #include <limits>

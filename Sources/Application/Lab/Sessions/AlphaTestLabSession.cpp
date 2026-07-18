@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Scene/Components.h"

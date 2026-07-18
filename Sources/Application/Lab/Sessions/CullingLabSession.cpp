@@ -3,7 +3,7 @@
 #include "Core/Math/Transform.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Scene/Components.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/DebugDraw/DebugDraw.h"

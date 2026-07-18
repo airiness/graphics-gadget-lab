@@ -21,7 +21,7 @@
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RHI/DX12/DX12Context.h"

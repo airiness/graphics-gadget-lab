@@ -2,7 +2,7 @@
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Publication/AssetResourcePublication.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/ModelImporter.h"
+#include "Graphics/Asset/Loading/ModelImporter.h"
 
 #include <compare>
 #include <span>

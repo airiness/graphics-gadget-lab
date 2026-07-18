@@ -1,9 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/TextureAssetSystem.h"
+#include "Graphics/Asset/TextureAssetSystem.h"
 
 namespace gglab
 {

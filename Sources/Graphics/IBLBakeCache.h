@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/IBLBakeTypes.h"
-#include "Graphics/TextureAsset.h"
+#include "Graphics/Asset/TextureAsset.h"
 
 #include <filesystem>
 #include <stop_token>

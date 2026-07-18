@@ -1,7 +1,7 @@
 #pragma once
 #include "Core/CoreMacros.h"
 #include "Core/Hash/KeyHash.h"
-#include "Graphics/TextureAsset.h"
+#include "Graphics/Asset/TextureAsset.h"
 
 #include <memory>
 #include <unordered_map>

@@ -115,6 +115,9 @@
     <Filter Include="Graphics\Asset\Loading">
       <UniqueIdentifier>{9279a072-7987-4b95-9753-bf15ad95218c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\Asset\Streaming">
+      <UniqueIdentifier>{c3ba0286-9374-40f9-8877-fb2863a7ff7d}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\Asset\Residency">
       <UniqueIdentifier>{ef61c6c1-1eaa-4e42-b68e-5c7701284279}</UniqueIdentifier>
     </Filter>
@@ -315,8 +318,8 @@
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\AssetLoadProgress.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadProgress.cpp">
+      <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\MaterialGpuEncoder.cpp">
       <Filter>Graphics</Filter>
@@ -327,14 +330,14 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\AssetManager.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\AssetManager.cpp">
+      <Filter>Graphics\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\AssetUploadScheduler.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Streaming\AssetUploadScheduler.cpp">
+      <Filter>Graphics\Asset\Streaming</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\ModelImporter.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\ModelImporter.cpp">
+      <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
@@ -786,14 +789,14 @@
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\TextureAsset.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp">
+      <Filter>Graphics\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\TextureLoader.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.cpp">
+      <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\TextureAssetSystem.cpp">
-      <Filter>Graphics</Filter>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAssetSystem.cpp">
+      <Filter>Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp">
       <Filter>Graphics\RenderPass</Filter>
@@ -1037,17 +1040,17 @@
     <ClInclude Include="..\..\Sources\Scene\Components.h">
       <Filter>Scene</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\AssetManager.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetManager.h">
+      <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\MaterialGpuEncoder.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\AssetUploadScheduler.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Streaming\AssetUploadScheduler.h">
+      <Filter>Graphics\Asset\Streaming</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\ModelImporter.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\ModelImporter.h">
+      <Filter>Graphics\Asset\Loading</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
@@ -1184,8 +1187,8 @@
     <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\AssetLoadProgress.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadProgress.h">
+      <Filter>Graphics\Asset\Loading</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h">
       <Filter>Graphics</Filter>
@@ -1754,14 +1757,14 @@
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\TextureAsset.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h">
+      <Filter>Graphics\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\TextureLoader.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.h">
+      <Filter>Graphics\Asset\Loading</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\TextureAssetSystem.h">
-      <Filter>Graphics</Filter>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetSystem.h">
+      <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h">
       <Filter>Graphics\RenderPass</Filter>

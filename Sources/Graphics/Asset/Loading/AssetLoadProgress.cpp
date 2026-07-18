@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/AssetLoadProgress.h"
+#include "Graphics/Asset/Loading/AssetLoadProgress.h"
 
 namespace gglab
 {

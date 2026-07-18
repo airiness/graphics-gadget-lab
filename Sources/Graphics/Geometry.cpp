@@ -2,7 +2,7 @@
 #include "Graphics/Geometry.h"
 #include "Core/Math/MathConstants.h"
 #include "Scene/Components.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Core/World.h"
 

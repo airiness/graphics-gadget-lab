@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Graphics/AssetUploadScheduler.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferBatch.h"
 #include "Graphics/TransferManager.h"

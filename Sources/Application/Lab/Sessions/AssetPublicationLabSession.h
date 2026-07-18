@@ -1,6 +1,6 @@
 #pragma once
 #include "Application/Lab/LabSessionBase.h"
-#include "Graphics/AssetUploadScheduler.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 
 namespace gglab
 {

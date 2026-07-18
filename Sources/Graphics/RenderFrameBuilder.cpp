@@ -1,6 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderFrameBuilder.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"

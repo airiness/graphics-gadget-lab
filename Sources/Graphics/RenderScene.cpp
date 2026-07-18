@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/TransferManager.h"
-#include "Graphics/AssetManager.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"

@@ -12,7 +12,7 @@
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/VertexData.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/ModelImporter.h"
+#include "Graphics/Asset/Loading/ModelImporter.h"
 
 #include <optional>
 
