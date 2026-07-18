@@ -10,6 +10,8 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderCompiler);
 		~ShaderCompiler();
 
+		void SetSourceRootDirectory(std::filesystem::path root) noexcept;
+		const std::filesystem::path& GetSourceRootDirectory() const noexcept { return m_SourceRootDir; }
 		void SetCacheRootDirectory(std::filesystem::path root) noexcept;
 		const std::filesystem::path& GetCacheRootDirectory() const noexcept { return m_CacheRootDir; }
 		void SetDefaultShaderConfig(const ShaderDesc& defaultShaderConfig) noexcept { m_DefaultShaderConfig = defaultShaderConfig; }
@@ -41,6 +43,7 @@ namespace gglab
 	private:
 		struct Impl;
 		std::unique_ptr<Impl> m_Impl;
+		std::filesystem::path m_SourceRootDir;
 		std::filesystem::path m_CacheRootDir;
 		ShaderDesc m_DefaultShaderConfig;
 	};

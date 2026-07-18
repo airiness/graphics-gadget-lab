@@ -197,7 +197,7 @@ namespace gglab
 		{
 			// Shader
 			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassForwardPBR.hlsl";
+			shaderDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Vertex;
 			shaderDesc.m_Entry = L"VSMain";
 			const auto vsId = shaderManager->LoadShader(shaderDesc);

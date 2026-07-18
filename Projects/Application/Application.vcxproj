@@ -344,6 +344,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Shader\Shader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderCompiler.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderPaths.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp" />
@@ -670,6 +671,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Shader\Shader.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderCompiler.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderManager.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderPaths.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\Core\StringId.h" />
     <ClInclude Include="..\..\Sources\Core\Time.h" />

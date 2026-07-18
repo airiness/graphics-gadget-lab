@@ -341,7 +341,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassBloom.hlsl";
+		shaderDesc.m_SourcePath = L"Passes/PassBloom.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Vertex;
 		shaderDesc.m_Entry = L"VSMain";
 		m_BaseRecipe.m_VSId = shaderManager->LoadShader(shaderDesc);

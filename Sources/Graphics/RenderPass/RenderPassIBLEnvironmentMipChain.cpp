@@ -174,7 +174,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassIBLEnvironmentMip.hlsl";
+		shaderDesc.m_SourcePath = L"Passes/PassIBLEnvironmentMip.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Vertex;
 		shaderDesc.m_Entry = L"VSMain";
 		const auto vsId = shaderManager->LoadShader(shaderDesc);

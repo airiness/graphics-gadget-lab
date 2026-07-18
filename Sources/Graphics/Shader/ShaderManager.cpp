@@ -47,7 +47,7 @@ namespace gglab
 
 		m_DefaultShaderConfig.m_Flags |= IsDebuggerPresent() ?
 			ShaderCompileFlags::Debug : ShaderCompileFlags::None;
-		m_DefaultShaderConfig.m_IncludeDirs = { L"Assets/Shaders" };
+		m_DefaultShaderConfig.m_IncludeDirs = { m_Compiler->GetSourceRootDirectory() };
 		m_DefaultShaderConfig.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(m_DefaultShaderConfig);
 	}

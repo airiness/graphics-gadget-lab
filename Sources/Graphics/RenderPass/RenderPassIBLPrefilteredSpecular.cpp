@@ -171,7 +171,7 @@ namespace gglab
 		if (!m_IsInitialized)
 		{
 			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassIBLPrefilteredSpecular.hlsl";
+			shaderDesc.m_SourcePath = L"Passes/PassIBLPrefilteredSpecular.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Vertex;
 			shaderDesc.m_Entry = L"VSMain";
 			const auto vsId = shaderManager->LoadShader(shaderDesc);

@@ -178,7 +178,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Assets/Shaders/Passes/PassSkybox.hlsl";
+			shaderDesc.m_SourcePath = L"Passes/PassSkybox.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Vertex;
 		shaderDesc.m_Entry = L"VSMain";
 		const auto vsId = shaderManager->LoadShader(shaderDesc);
