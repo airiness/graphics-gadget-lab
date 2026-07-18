@@ -11,7 +11,6 @@ namespace gglab
 {
 	struct AssetStateEvent
 	{
-		uint64_t m_Sequence = 0;
 		DependencyStatus m_Status{};
 		std::optional<AssetOperationToken> m_Operation;
 		AssetStateEventOperationPhase m_OperationPhase =
@@ -24,7 +23,7 @@ namespace gglab
 		AssetStateEventQueue() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetStateEventQueue);
 
-		[[nodiscard]] uint64_t Push(
+		void Push(
 			DependencyStatus status,
 			std::optional<AssetOperationToken> operation = std::nullopt,
 			AssetStateEventOperationPhase operationPhase =
@@ -40,7 +39,6 @@ namespace gglab
 		void AssertOwnerThread() const noexcept;
 
 		std::thread::id m_OwnerThread;
-		uint64_t m_NextSequence = 1;
 		std::vector<AssetStateEvent> m_PendingEvents;
 	};
 }

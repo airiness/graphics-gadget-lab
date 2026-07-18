@@ -276,8 +276,7 @@ namespace gglab
 			{
 				return {};
 			}
-			const AssetOwnerId owner = m_AssetManager->RegisterAssetOwner(
-				std::format("Model {} dependencies", modelVersion.m_Key.m_StableId));
+			const AssetOwnerId owner = m_AssetManager->RegisterAssetOwner();
 			return { .m_Value = owner.m_Value };
 		}
 
@@ -297,8 +296,7 @@ namespace gglab
 				interestKey->m_Kind,
 				dependency.m_Key.m_StableId,
 				dependency.m_ContentGeneration,
-				priority,
-				true);
+				priority);
 			if (!lease.IsValid())
 			{
 				return {};

@@ -825,8 +825,7 @@ namespace gglab
 		}
 		case AcceptanceSuiteState::Case::SharedTextureRollback:
 		{
-			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope(
-				"Asset publication acceptance shared texture owner");
+			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope();
 			m_Suite->m_TextureRequest = m_Suite->m_PrimaryOwner.LoadTextureAsync(
 				"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
 				TextureSemantic::BaseColor,
@@ -848,10 +847,8 @@ namespace gglab
 		}
 		case AcceptanceSuiteState::Case::OwnershipPriorityMerge:
 		{
-			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope(
-				"Asset publication acceptance background owner");
-			m_Suite->m_SecondaryOwner = assetManager->CreateOwnerScope(
-				"Asset publication acceptance critical owner");
+			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope();
+			m_Suite->m_SecondaryOwner = assetManager->CreateOwnerScope();
 			const AssetManager::TextureLoadRequest backgroundRequest =
 				m_Suite->m_PrimaryOwner.LoadTextureAsync(
 					"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
@@ -919,8 +916,7 @@ namespace gglab
 		}
 		case AcceptanceSuiteState::Case::GpuSubmittedCancellation:
 		{
-			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope(
-				"Asset publication acceptance GPU cancellation owner");
+			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope();
 			m_Suite->m_TextureRequest = m_Suite->m_PrimaryOwner.LoadTextureAsync(
 				"Assets/Models/FlightHelmet/FlightHelmet_Materials_LensesMat_BaseColor.png",
 				TextureSemantic::BaseColor,
@@ -1088,8 +1084,7 @@ namespace gglab
 				m_Suite->m_TextureRequest.m_TextureId);
 			if (texture && texture->m_State == AssetState::Ready && texture->m_IsUploaded)
 			{
-				m_Suite->m_SecondaryOwner = assetManager->CreateOwnerScope(
-					"Asset publication acceptance rollback model owner");
+				m_Suite->m_SecondaryOwner = assetManager->CreateOwnerScope();
 				m_Suite->m_ModelRequest = m_Suite->m_SecondaryOwner.LoadModelAsync(
 					"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
 					TaskPriority::Normal);

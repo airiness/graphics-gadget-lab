@@ -78,7 +78,6 @@ namespace gglab
 	struct AssetDependencyChange
 	{
 		AssetContentVersion m_Model{};
-		ModelDependencyOutcome m_PreviousOutcome = ModelDependencyOutcome::Failed;
 		ModelDependencyOutcome m_CurrentOutcome = ModelDependencyOutcome::Failed;
 	};
 
@@ -104,7 +103,7 @@ namespace gglab
 			uint32_t structuralFailureCount) noexcept;
 		void UnregisterModel(AssetContentVersion model) noexcept;
 
-		[[nodiscard]] uint32_t ApplyStatus(
+		void ApplyStatus(
 			const DependencyStatus& status,
 			std::vector<AssetDependencyChange>& changes) noexcept;
 

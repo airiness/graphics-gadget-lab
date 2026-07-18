@@ -44,10 +44,6 @@ namespace gglab
 			uint64_t currentFrame,
 			uint64_t projectedResidentBytes) const noexcept;
 
-		[[nodiscard]] static bool MatchesCurrentState(
-			const AssetStateStamp& stamp,
-			const AssetLifecycle& lifecycle) noexcept;
-
 		static void MarkAssetUsed(
 			AssetLifecycle& lifecycle,
 			uint64_t currentFrame) noexcept;

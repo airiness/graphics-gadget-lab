@@ -22,12 +22,6 @@ namespace gglab
 			MakeAssetKey(AssetKind::Mesh, id.Value()) : AssetKey{};
 	}
 
-	[[nodiscard]] constexpr AssetKey MakeAssetKey(MaterialID id) noexcept
-	{
-		return id.IsValid() ?
-			MakeAssetKey(AssetKind::Material, id.Value()) : AssetKey{};
-	}
-
 	[[nodiscard]] constexpr AssetContentVersion MakeAssetContentVersion(
 		ModelID id,
 		uint64_t contentGeneration) noexcept
@@ -49,10 +43,4 @@ namespace gglab
 		return MakeAssetContentVersion(MakeAssetKey(id), contentGeneration);
 	}
 
-	[[nodiscard]] constexpr AssetContentVersion MakeAssetContentVersion(
-		MaterialID id,
-		uint64_t contentGeneration) noexcept
-	{
-		return MakeAssetContentVersion(MakeAssetKey(id), contentGeneration);
-	}
 }

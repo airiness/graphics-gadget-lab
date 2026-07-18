@@ -791,9 +791,6 @@ namespace gglab
 				++m_PublicationOverBudgetExecutionCount;
 			}
 			++m_ResourcePublicationTelemetry.m_ProcessedCount;
-			GGLAB_ASSERT_MSG(
-				result.m_Usage.m_WorkItems == 1,
-				"Each resource publication Step must report exactly one work item.");
 			if (result.m_Status == AssetResourcePublicationStepStatus::Continue &&
 				progressAfter == progressBefore)
 			{

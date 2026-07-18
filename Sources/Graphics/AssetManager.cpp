@@ -321,9 +321,9 @@ namespace gglab
 		m_Leases.clear();
 	}
 
-	AssetOwnerScope AssetManager::CreateOwnerScope(std::string label) noexcept
+	AssetOwnerScope AssetManager::CreateOwnerScope() noexcept
 	{
-		return AssetOwnerScope(this, RegisterAssetOwner(std::move(label)));
+		return AssetOwnerScope(this, RegisterAssetOwner());
 	}
 
 	AssetOwnershipStatistics AssetManager::GetOwnershipStatistics() const
@@ -434,7 +434,7 @@ namespace gglab
 				}
 			}
 
-			GGLAB_UNUSED(m_AssetDependencyGraph.ApplyStatus(event.m_Status, changes));
+			m_AssetDependencyGraph.ApplyStatus(event.m_Status, changes);
 			for (const AssetDependencyChange& change : changes)
 			{
 				if (change.m_Model.m_Key.m_Kind != AssetKind::Model)
@@ -598,9 +598,9 @@ namespace gglab
 			reloadingAssetCount);
 	}
 
-	AssetOwnerId AssetManager::RegisterAssetOwner(std::string label) noexcept
+	AssetOwnerId AssetManager::RegisterAssetOwner() noexcept
 	{
-		return m_AssetInterestTracker.RegisterOwner(std::move(label));
+		return m_AssetInterestTracker.RegisterOwner();
 	}
 
 	void AssetManager::UnregisterAssetOwner(AssetOwnerId owner) noexcept
@@ -613,8 +613,7 @@ namespace gglab
 		AssetKind kind,
 		uint64_t stableId,
 		uint64_t generation,
-		TaskPriority priority,
-		bool internal) noexcept
+		TaskPriority priority) noexcept
 	{
 		if (!owner.IsValid() || !IsInterestAssetKind(kind) ||
 			priority == TaskPriority::Count)
@@ -624,8 +623,7 @@ namespace gglab
 		const AssetLeaseAcquireResult result = m_AssetInterestTracker.AcquireLease(
 			owner,
 			MakeAssetContentVersion(kind, stableId, generation),
-			priority,
-			internal);
+			priority);
 		if (!result.IsValid())
 		{
 			return {};
@@ -847,8 +845,7 @@ namespace gglab
 			return;
 		}
 
-		const AssetOwnerId owner = RegisterAssetOwner(
-			std::format("Model {} dependencies", modelId.Value()));
+		const AssetOwnerId owner = RegisterAssetOwner();
 		m_ModelDependencyOwners.emplace(modelId, owner);
 		auto& tokens = m_ModelDependencyLeaseTokens[modelId];
 		const TaskPriority priority = GetEffectivePriority(modelKey);
@@ -888,8 +885,7 @@ namespace gglab
 					AssetKind::Mesh,
 					meshId.Value(),
 					mesh->m_ContentGeneration,
-					priority,
-					true));
+					priority));
 			}
 		}
 		for (TextureID textureId : textureIds)
@@ -901,8 +897,7 @@ namespace gglab
 					AssetKind::Texture,
 					textureId.Value(),
 					texture->m_ContentGeneration,
-					priority,
-					true));
+					priority));
 			}
 		}
 	}
@@ -1225,7 +1220,7 @@ namespace gglab
 		m_LogicalResidentBytes = inventory.m_LogicalResidentBytes;
 		AssetResidencyPlan plan = m_AssetResidencyController.BuildPlan(inventory);
 		m_AssetResidencyController.RecordPlan(plan);
-		ApplyResidencyPlan(std::move(plan));
+		ApplyResidencyPlan(plan);
 	}
 
 	AssetResidencyInventorySnapshot AssetManager::BuildResidencyInventorySnapshot() const noexcept
@@ -1487,9 +1482,6 @@ namespace gglab
 		AssetLifecycle* lifecycle = FindResidencyLifecycle(contentVersion.m_Key);
 		AssetResidencyInventoryEntry currentEntry;
 		if (!lifecycle ||
-			!AssetResidencyController::MatchesCurrentState(
-				action.m_ExpectedStamp,
-				*lifecycle) ||
 			!BuildResidencyInventoryEntry(contentVersion.m_Key, currentEntry) ||
 			!m_AssetResidencyController.StillEligible(
 				action,
@@ -1505,7 +1497,7 @@ namespace gglab
 			m_AssetResidencyController.BeginResidencyOperation(
 				*lifecycle,
 				contentVersion,
-				action.m_Operation);
+				AssetResidencyOperationKind::Evict);
 		if (!operation.IsValid())
 		{
 			m_AssetResidencyController.RecordRevalidationRejection();
@@ -1548,21 +1540,15 @@ namespace gglab
 		return true;
 	}
 
-	void AssetManager::ApplyResidencyPlan(AssetResidencyPlan&& plan) noexcept
+	void AssetManager::ApplyResidencyPlan(const AssetResidencyPlan& plan) noexcept
 	{
-		if (plan.m_Consumed || plan.m_SnapshotFrame != m_AssetUsageFrame)
+		if (plan.m_SnapshotFrame != m_AssetUsageFrame)
 		{
 			return;
 		}
-		plan.m_Consumed = true;
 		uint64_t projectedResidentBytes = plan.m_LogicalResidentBytes;
-		for (AssetResidencyAction& action : plan.m_Actions)
+		for (const AssetResidencyAction& action : plan.m_Actions)
 		{
-			if (std::exchange(action.m_Attempted, true) ||
-				action.m_Operation != AssetResidencyOperationKind::Evict)
-			{
-				continue;
-			}
 			if (ApplyResidencyAction(action, projectedResidentBytes))
 			{
 				projectedResidentBytes =
@@ -1889,11 +1875,11 @@ namespace gglab
 		std::optional<AssetOperationToken> operation,
 		AssetStateEventOperationPhase operationPhase) noexcept
 	{
-		GGLAB_UNUSED(m_AssetStateEventQueue.Push({
+		m_AssetStateEventQueue.Push({
 			.m_ContentVersion = contentVersion,
 			.m_ContentState = contentState,
 			.m_ResidencyState = residencyState,
-		}, operation, operationPhase));
+		}, operation, operationPhase);
 	}
 
 	bool AssetManager::SetModelResidencyPolicy(

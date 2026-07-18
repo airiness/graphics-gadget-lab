@@ -61,7 +61,7 @@ namespace gglab
 		UnregisterModel(model.m_Key);
 	}
 
-	uint32_t AssetDependencyGraph::ApplyStatus(
+	void AssetDependencyGraph::ApplyStatus(
 		const DependencyStatus& status,
 		std::vector<AssetDependencyChange>& changes) noexcept
 	{
@@ -69,13 +69,13 @@ namespace gglab
 		if (!status.IsValid())
 		{
 			++m_IgnoredEventCount;
-			return 0;
+			return;
 		}
 		const auto reverse = m_ReverseDependencies.find(status.m_ContentVersion);
 		if (reverse == m_ReverseDependencies.end())
 		{
 			++m_IgnoredEventCount;
-			return 0;
+			return;
 		}
 
 		for (const AssetContentVersion dependent : reverse->second)
@@ -101,13 +101,15 @@ namespace gglab
 			IncrementCounter(model->second, ProjectDependencyOutcome(status));
 			++model->second.m_EventUpdateCount;
 			++m_EventUpdateCount;
-			changes.push_back({
-				.m_Model = dependent,
-				.m_PreviousOutcome = previousOutcome,
-				.m_CurrentOutcome = EvaluateModel(model->second),
-			});
+			const ModelDependencyOutcome currentOutcome = EvaluateModel(model->second);
+			if (previousOutcome != currentOutcome)
+			{
+				changes.push_back({
+					.m_Model = dependent,
+					.m_CurrentOutcome = currentOutcome,
+				});
+			}
 		}
-		return static_cast<uint32_t>(changes.size());
 	}
 
 	const AssetDependencyModelState* AssetDependencyGraph::FindModel(
