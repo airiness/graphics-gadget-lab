@@ -13,6 +13,22 @@ namespace gglab
 
 	DemoManager::~DemoManager()
 	{
+		if (!m_IsPreparedForAssetShutdown && m_ActiveDemo)
+		{
+			m_ActiveDemo->OnExit();
+		}
+		if (!m_IsPreparedForAssetShutdown && m_PendingDemo)
+		{
+			m_PendingDemo->CancelPrepare();
+		}
+	}
+
+	void DemoManager::PrepareForAssetShutdown() noexcept
+	{
+		if (m_IsPreparedForAssetShutdown)
+		{
+			return;
+		}
 		if (m_ActiveDemo)
 		{
 			m_ActiveDemo->OnExit();
@@ -21,6 +37,7 @@ namespace gglab
 		{
 			m_PendingDemo->CancelPrepare();
 		}
+		m_IsPreparedForAssetShutdown = true;
 	}
 
 	DemoBase* DemoManager::GetDemo(uint32_t index) const noexcept

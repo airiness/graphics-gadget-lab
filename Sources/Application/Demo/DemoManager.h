@@ -36,6 +36,7 @@ namespace gglab
 			return static_cast<uint32_t>(m_RetiringDemos.size());
 		}
 		uint32_t GetDemoCount() const noexcept { return static_cast<uint32_t>(m_DemoSlots.size()); }
+		void PrepareForAssetShutdown() noexcept;
 
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 
@@ -71,6 +72,7 @@ namespace gglab
 		uint32_t m_RequestedDemoIndex = InvalidDemoIndex;
 		DemoFrameFeedback m_LastActiveFrame{};
 		bool m_HasLastActiveFrame = false;
+		bool m_IsPreparedForAssetShutdown = false;
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
 	};
