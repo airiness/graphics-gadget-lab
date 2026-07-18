@@ -800,6 +800,11 @@ namespace gglab
 			snapshot->m_ResidencyRevalidationRejectionCount,
 			snapshot->m_ResidencyStaleCompletionCount);
 		ImGui::Text(
+			"Operation events: %llu accepted / %llu completed | Stale: %llu",
+			snapshot->m_ResidencyAcceptedStateEventCount,
+			snapshot->m_ResidencyCompletedStateEventCount,
+			snapshot->m_ResidencyStaleStateEventCount);
+		ImGui::Text(
 			"Dependency graph: %u models | %u resources | %u edges | Builds: %llu | Events: %llu",
 			snapshot->m_TrackedModelDependencyCount,
 			snapshot->m_ReverseDependencyCount,

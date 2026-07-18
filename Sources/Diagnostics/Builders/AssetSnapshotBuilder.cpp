@@ -62,6 +62,12 @@ namespace gglab
 			residency.m_LastPlannedActionCount;
 		snapshot.m_LastPlannedResidencyBytes = residency.m_LastPlannedBytes;
 		snapshot.m_ResidencyOperationCount = residency.m_OperationCount;
+		snapshot.m_ResidencyAcceptedStateEventCount =
+			residency.m_AcceptedStateEventCount;
+		snapshot.m_ResidencyCompletedStateEventCount =
+			residency.m_CompletedStateEventCount;
+		snapshot.m_ResidencyStaleStateEventCount =
+			residency.m_StaleStateEventCount;
 		snapshot.m_ResidencyRevalidationRejectionCount =
 			residency.m_RevalidationRejectionCount;
 		snapshot.m_ResidencyStaleCompletionCount = residency.m_StaleCompletionCount;

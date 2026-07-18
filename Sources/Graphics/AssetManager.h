@@ -165,7 +165,8 @@ namespace gglab
 		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 		[[nodiscard]] bool UploadMesh(
 			const MeshUploadData& uploadData,
-			TransferBatch& transferBatch) noexcept;
+			TransferBatch& transferBatch,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool QueueMeshUpload(
 			MeshUploadData&& uploadData,
 			TaskPriority priority = TaskPriority::Normal,
@@ -282,13 +283,21 @@ namespace gglab
 		void QueueMeshResidencyReload(
 			ModelID sourceModelId,
 			TaskPriority priority) noexcept;
-		void SetMeshState(Mesh& mesh, AssetState state) noexcept;
+		void SetMeshState(
+			Mesh& mesh,
+			AssetState state,
+			AssetResidencyOperation residencyOperation = {},
+			AssetStateEventOperationPhase operationPhase =
+				AssetStateEventOperationPhase::None) noexcept;
 		void RegisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
 		void UnregisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
 		void QueueDependencyStateChange(
 			AssetContentVersion contentVersion,
 			AssetContentState contentState,
-			AssetResidencyState residencyState) noexcept;
+			AssetResidencyState residencyState,
+			std::optional<AssetOperationToken> operation = std::nullopt,
+			AssetStateEventOperationPhase operationPhase =
+				AssetStateEventOperationPhase::None) noexcept;
 		[[nodiscard]] ModelDependencyOutcome EvaluateModelDependenciesByTraversal(
 			const Model& model) const noexcept;
 		void VerifyModelDependencyState(

@@ -68,6 +68,8 @@ namespace gglab
 		uint64_t m_ReloadRequestCountBaseline = 0;
 		uint64_t m_OperationCountBaseline = 0;
 		uint64_t m_StaleCompletionCountBaseline = 0;
+		uint64_t m_AcceptedStateEventCountBaseline = 0;
+		uint64_t m_CompletedStateEventCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
@@ -267,6 +269,10 @@ namespace gglab
 			m_State->m_ReloadRequestCountBaseline = residency.m_ReloadRequestCount;
 			m_State->m_OperationCountBaseline = residency.m_OperationCount;
 			m_State->m_StaleCompletionCountBaseline = residency.m_StaleCompletionCount;
+			m_State->m_AcceptedStateEventCountBaseline =
+				residency.m_AcceptedStateEventCount;
+			m_State->m_CompletedStateEventCountBaseline =
+				residency.m_CompletedStateEventCount;
 			m_State->m_Phase = State::Phase::MarkUsage;
 			break;
 		}
@@ -662,9 +668,16 @@ namespace gglab
 				texture->m_ResidencyOperationSerial != 0 ||
 				!mesh->m_IsUploaded || !texture->m_IsUploaded ||
 				reloaded.m_ReloadRequestCount <= m_State->m_ReloadRequestCountBaseline ||
-				reloaded.m_ReloadingAssetCount != 0)
+				reloaded.m_ReloadingAssetCount != 0 ||
+				reloaded.m_AcceptedStateEventCount <=
+					m_State->m_AcceptedStateEventCountBaseline ||
+				reloaded.m_CompletedStateEventCount <
+					m_State->m_CompletedStateEventCountBaseline + 6 ||
+				reloaded.m_AcceptedStateEventCount <
+					reloaded.m_CompletedStateEventCount)
 			{
-				Fail("Reload did not restore residency on the original asset identities.");
+				Fail(
+					"Reload did not restore residency through validated state-operation events.");
 				return;
 			}
 			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
@@ -735,7 +748,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, texture reload replacement, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, validated state-operation events, texture reload replacement, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

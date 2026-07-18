@@ -114,7 +114,8 @@ namespace gglab
 
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
-			TransferBatch& transferBatch) noexcept;
+			TransferBatch& transferBatch,
+			AssetResidencyOperation residencyOperation = {}) noexcept;
 
 	private:
 		friend AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
@@ -186,8 +187,15 @@ namespace gglab
 				TextureID,
 				uint64_t,
 				AssetContentState,
-				AssetResidencyState)> callback) noexcept;
-		void SetTextureState(Texture& texture, AssetState state) noexcept;
+				AssetResidencyState,
+				std::optional<AssetOperationToken>,
+				AssetStateEventOperationPhase)> callback) noexcept;
+		void SetTextureState(
+			Texture& texture,
+			AssetState state,
+			AssetResidencyOperation residencyOperation = {},
+			AssetStateEventOperationPhase operationPhase =
+				AssetStateEventOperationPhase::None) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -204,6 +212,8 @@ namespace gglab
 			TextureID,
 			uint64_t,
 			AssetContentState,
-			AssetResidencyState)> m_StateChangeCallback;
+			AssetResidencyState,
+			std::optional<AssetOperationToken>,
+			AssetStateEventOperationPhase)> m_StateChangeCallback;
 	};
 }

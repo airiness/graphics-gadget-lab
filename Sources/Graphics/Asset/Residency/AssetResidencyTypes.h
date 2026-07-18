@@ -27,6 +27,13 @@ namespace gglab
 		BudgetPressure,
 	};
 
+	enum class AssetStateEventOperationPhase : uint8_t
+	{
+		None,
+		InProgress,
+		Completes,
+	};
+
 	struct AssetStateStamp
 	{
 		AssetContentVersion m_ContentVersion{};
@@ -123,6 +130,9 @@ namespace gglab
 		uint32_t m_LastPlannedActionCount = 0;
 		uint64_t m_LastPlannedBytes = 0;
 		uint64_t m_OperationCount = 0;
+		uint64_t m_AcceptedStateEventCount = 0;
+		uint64_t m_CompletedStateEventCount = 0;
+		uint64_t m_StaleStateEventCount = 0;
 		uint64_t m_RevalidationRejectionCount = 0;
 		uint64_t m_StaleCompletionCount = 0;
 	};

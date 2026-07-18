@@ -129,6 +129,9 @@ namespace gglab
 		uint32_t m_LastPlannedResidencyActionCount = 0;
 		uint64_t m_LastPlannedResidencyBytes = 0;
 		uint64_t m_ResidencyOperationCount = 0;
+		uint64_t m_ResidencyAcceptedStateEventCount = 0;
+		uint64_t m_ResidencyCompletedStateEventCount = 0;
+		uint64_t m_ResidencyStaleStateEventCount = 0;
 		uint64_t m_ResidencyRevalidationRejectionCount = 0;
 		uint64_t m_ResidencyStaleCompletionCount = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;

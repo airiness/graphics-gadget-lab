@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/CoreMacros.h"
 #include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
+#include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 
 #include <optional>
 #include <thread>
@@ -13,6 +14,8 @@ namespace gglab
 		uint64_t m_Sequence = 0;
 		DependencyStatus m_Status{};
 		std::optional<AssetOperationToken> m_Operation;
+		AssetStateEventOperationPhase m_OperationPhase =
+			AssetStateEventOperationPhase::None;
 	};
 
 	class AssetStateEventQueue final
@@ -23,7 +26,9 @@ namespace gglab
 
 		[[nodiscard]] uint64_t Push(
 			DependencyStatus status,
-			std::optional<AssetOperationToken> operation = std::nullopt) noexcept;
+			std::optional<AssetOperationToken> operation = std::nullopt,
+			AssetStateEventOperationPhase operationPhase =
+				AssetStateEventOperationPhase::None) noexcept;
 		void Drain(std::vector<AssetStateEvent>& output) noexcept;
 
 		[[nodiscard]] bool HasPendingEvents() const noexcept
