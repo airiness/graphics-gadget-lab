@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
+#include "Graphics/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
@@ -9,7 +10,6 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/TextureRegistry.h"
 
 namespace gglab
 {
@@ -48,6 +48,8 @@ namespace gglab
 
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* assetManager = services.m_AssetManager;
+		GGLAB_ASSERT_NOT_NULL(assetManager);
 		const auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
 		if (!environmentSystem || !environmentSystem->GetSettings().m_EnableSkybox)
 		{
@@ -57,10 +59,8 @@ namespace gglab
 		EnsureInitialized(services);
 		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
 		auto* renderResourceRegistry = renderer->GetRenderResourceRegistry();
-		auto* textureRegistry = renderer->GetTextureRegistry();
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
-		GGLAB_ASSERT_NOT_NULL(textureRegistry);
 
 		const bool useFallback = bakeScheduler->GetStatus().m_ActiveGeneration == 0;
 		RHITextureHandle fallbackTextureHandle{};
@@ -68,19 +68,23 @@ namespace gglab
 		uint32_t environmentTextureIndex = 0;
 		if (useFallback)
 		{
-			const TextureID fallbackId = ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
-			const Texture* fallbackTexture = textureRegistry->GetTexture(fallbackId);
-			const RHITextureDesc* fallbackDesc = textureRegistry->GetTextureDesc(fallbackId);
+			const TextureID fallbackId =
+				ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
+			const TextureContentRef fallbackContent =
+				assetManager->GetTextureContentRef(fallbackId);
+			const auto fallbackResource =
+				assetManager->GetResidentTextureResource(fallbackContent);
 			GGLAB_ASSERT_MSG(
-				fallbackTexture && fallbackDesc && fallbackTexture->m_State == AssetState::Ready,
+				fallbackResource.has_value(),
 				"Skybox fallback cubemap must be ready before the first frame.");
-			if (!fallbackTexture || !fallbackDesc || fallbackTexture->m_State != AssetState::Ready)
+			if (!fallbackResource)
 			{
 				return;
 			}
-			fallbackTextureHandle = fallbackTexture->m_Texture;
-			fallbackTextureDesc = *fallbackDesc;
-			environmentTextureIndex = textureRegistry->GetShaderVisibleSrvIndex(fallbackId);
+			assetManager->MarkTextureUsed(fallbackContent.m_Id);
+			fallbackTextureHandle = fallbackResource->m_Texture;
+			fallbackTextureDesc = fallbackResource->m_Desc;
+			environmentTextureIndex = fallbackResource->m_SrvIndex;
 		}
 		else
 		{

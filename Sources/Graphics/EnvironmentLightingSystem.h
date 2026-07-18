@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/GraphicsTypes.h"
+#include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/IBLBakeTypes.h"
 
 #include <filesystem>
@@ -21,17 +21,17 @@ namespace gglab
 
 	struct EnvironmentTextureSource
 	{
-		TextureID m_TextureId{};
+		TextureContentRef m_Content{};
 		EnvironmentTextureSourceType m_Type = EnvironmentTextureSourceType::Equirectangular;
 
-		[[nodiscard]] bool IsValid() const noexcept { return m_TextureId.IsValid(); }
+		[[nodiscard]] bool IsValid() const noexcept { return m_Content.IsValid(); }
 	};
 
 	struct EnvironmentMapEntry
 	{
 		std::filesystem::path m_Path;
 		std::string m_DisplayName;
-		TextureID m_TextureId{};
+		TextureContentRef m_Content{};
 		uint64_t m_LastLoadAttemptGeneration = 0;
 	};
 

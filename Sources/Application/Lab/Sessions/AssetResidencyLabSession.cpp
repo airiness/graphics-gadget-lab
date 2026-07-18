@@ -671,6 +671,22 @@ namespace gglab
 			{
 				break;
 			}
+			const TextureContentRef textureContent =
+				assetManager.GetTextureContentRef(m_State->m_TextureId);
+			if (!textureContent.IsValid() ||
+				textureContent.m_Generation != m_State->m_TextureGeneration ||
+				!assetManager.GetResidentTextureResource(textureContent))
+			{
+				Fail("The resident texture render view was unavailable for current content.");
+				return;
+			}
+			TextureContentRef staleTextureContent = textureContent;
+			++staleTextureContent.m_Generation;
+			if (assetManager.GetResidentTextureResource(staleTextureContent))
+			{
+				Fail("The resident texture render view accepted a stale content generation.");
+				return;
+			}
 			const AssetResidencyStatistics reloaded =
 				assetManager.GetResidencyStatistics();
 			if (model->m_ContentGeneration != m_State->m_ModelGeneration ||
@@ -762,7 +778,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, validated state-operation events, texture reload replacement, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

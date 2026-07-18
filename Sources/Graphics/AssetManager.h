@@ -6,6 +6,7 @@
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
+#include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -13,6 +14,8 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/ModelImporter.h"
+
+#include <optional>
 
 namespace gglab
 {
@@ -139,6 +142,9 @@ namespace gglab
 			TextureID textureId,
 			AssetResidencyPolicy policy) noexcept;
 		const Texture* GetTexture(TextureID textureId) const noexcept;
+		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
+			TextureContentRef content) const noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
 
@@ -311,6 +317,8 @@ namespace gglab
 		friend class AssetLease;
 		friend class AssetPublicationRetain;
 		friend class AssetOwnerScope;
+
+		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;
 
 		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
 
