@@ -23,22 +23,6 @@ namespace gglab
 	class TransferManager;
 	struct TextureDecodeFailed;
 	struct TextureDecodeSucceeded;
-	struct ImportedTexture;
-	struct ModelPublicationRetainToken;
-	struct ModelPublicationTextureResult;
-
-	class TexturePublicationContextBase
-	{
-	public:
-		virtual ~TexturePublicationContextBase() = default;
-		[[nodiscard]] virtual bool HasActiveInterest(AssetKey key) const noexcept = 0;
-		[[nodiscard]] virtual bool HasPublicationRetain(
-			AssetKey key,
-			uint64_t generation) const noexcept = 0;
-		[[nodiscard]] virtual ModelPublicationRetainToken AcquireTextureRetain(
-			const AssetContentVersion& contentVersion) noexcept = 0;
-		virtual void ReleaseTextureRetain(ModelPublicationRetainToken retain) noexcept = 0;
-	};
 
 	class TextureAssetSystem
 	{
@@ -108,10 +92,6 @@ namespace gglab
 			TextureAssetData&& textureData,
 			const TextureImportSettings& importSettings,
 			AssetContentFingerprint contentFingerprint = {}) noexcept;
-		[[nodiscard]] ModelPublicationTextureResult PublishImportedTexture(
-			ImportedTexture& importedTexture,
-			TaskPriority priority,
-			TexturePublicationContextBase& context) noexcept;
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
 			TransferBatch& transferBatch,
