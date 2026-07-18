@@ -61,16 +61,33 @@ namespace gglab
 		const AssetLifecycle& lifecycle,
 		const AssetResidencyOperation& operation) noexcept
 	{
+		return operation.IsValid() && IsCurrentOperation(lifecycle, operation.m_Token);
+	}
+
+	bool AssetResidencyController::IsCurrentOperation(
+		const AssetLifecycle& lifecycle,
+		const AssetOperationToken& operation) noexcept
+	{
 		return operation.IsValid() &&
 			lifecycle.m_ContentGeneration ==
-				operation.m_Token.m_ContentVersion.m_ContentGeneration &&
+				operation.m_ContentVersion.m_ContentGeneration &&
 			lifecycle.m_ResidencyOperationSerial ==
-				operation.m_Token.m_OperationSerial;
+				operation.m_OperationSerial;
 	}
 
 	void AssetResidencyController::CompleteResidencyOperation(
 		AssetLifecycle& lifecycle,
 		const AssetResidencyOperation& operation) noexcept
+	{
+		if (operation.IsValid())
+		{
+			CompleteResidencyOperation(lifecycle, operation.m_Token);
+		}
+	}
+
+	void AssetResidencyController::CompleteResidencyOperation(
+		AssetLifecycle& lifecycle,
+		const AssetOperationToken& operation) noexcept
 	{
 		if (IsCurrentOperation(lifecycle, operation))
 		{
@@ -241,6 +258,18 @@ namespace gglab
 	void AssetResidencyController::RecordStaleCompletion() noexcept
 	{
 		++m_Statistics.m_StaleCompletionCount;
+	}
+
+	void AssetResidencyController::RecordAcceptedStateEvent(
+		bool completedOperation) noexcept
+	{
+		++m_Statistics.m_AcceptedStateEventCount;
+		m_Statistics.m_CompletedStateEventCount += completedOperation ? 1 : 0;
+	}
+
+	void AssetResidencyController::RecordStaleStateEvent() noexcept
+	{
+		++m_Statistics.m_StaleStateEventCount;
 	}
 
 	void AssetResidencyController::EndFrame() noexcept

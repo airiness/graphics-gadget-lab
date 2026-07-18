@@ -22,10 +22,16 @@ namespace gglab
 		[[nodiscard]] static bool IsCurrentOperation(
 			const AssetLifecycle& lifecycle,
 			const AssetResidencyOperation& operation) noexcept;
+		[[nodiscard]] static bool IsCurrentOperation(
+			const AssetLifecycle& lifecycle,
+			const AssetOperationToken& operation) noexcept;
 
 		static void CompleteResidencyOperation(
 			AssetLifecycle& lifecycle,
 			const AssetResidencyOperation& operation) noexcept;
+		static void CompleteResidencyOperation(
+			AssetLifecycle& lifecycle,
+			const AssetOperationToken& operation) noexcept;
 
 		static void InvalidateResidencyOperation(AssetLifecycle& lifecycle) noexcept;
 
@@ -57,6 +63,8 @@ namespace gglab
 		void RecordReloadCoalesced() noexcept;
 		void RecordRevalidationRejection() noexcept;
 		void RecordStaleCompletion() noexcept;
+		void RecordAcceptedStateEvent(bool completedOperation) noexcept;
+		void RecordStaleStateEvent() noexcept;
 		void EndFrame() noexcept;
 
 		[[nodiscard]] static bool IsEvictionCandidate(

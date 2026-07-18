@@ -9,10 +9,15 @@ namespace gglab
 
 	uint64_t AssetStateEventQueue::Push(
 		DependencyStatus status,
-		std::optional<AssetOperationToken> operation) noexcept
+		std::optional<AssetOperationToken> operation,
+		AssetStateEventOperationPhase operationPhase) noexcept
 	{
 		AssertOwnerThread();
+		const bool hasOperation = operation.has_value();
+		const bool hasOperationPhase =
+			operationPhase != AssetStateEventOperationPhase::None;
 		if (!status.IsValid() ||
+			hasOperation != hasOperationPhase ||
 			(operation && (!operation->IsValid() ||
 				operation->m_ContentVersion != status.m_ContentVersion)))
 		{
@@ -25,6 +30,7 @@ namespace gglab
 			.m_Sequence = sequence,
 			.m_Status = status,
 			.m_Operation = operation,
+			.m_OperationPhase = operationPhase,
 		});
 		return sequence;
 	}
