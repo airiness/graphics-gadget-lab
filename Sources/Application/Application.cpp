@@ -185,7 +185,6 @@ namespace gglab
 		assetManagerCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
-		assetManagerCreateInfo.m_TextureRegistry = m_Renderer->GetTextureRegistry();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_EnvironmentAssetController = std::make_unique<EnvironmentAssetController>(
@@ -483,6 +482,13 @@ namespace gglab
 			return;
 		}
 
+		// Close public submission before client OnExit hooks release their interests.
+		m_AssetManager->BeginShutdown();
+
+		// Release active and pending demo/Lab asset interests while their services
+		// are still alive. GPU-facing session objects remain alive until WaitIdle.
+		m_DemoManager->PrepareForAssetShutdown();
+
 		// Commit the pinned fallback before releasing environment texture leases.
 		m_EnvironmentAssetController.reset();
 
@@ -512,7 +518,8 @@ namespace gglab
 		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();
-		m_AssetManager->PrepareForShutdown();
+		m_AssetManager->PrepareForShutdown(
+			m_Renderer->GetLastSubmittedFencePoint());
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();

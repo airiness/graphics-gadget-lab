@@ -167,10 +167,19 @@ namespace gglab
 		}
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"IBL cache lookup for generation {} failed: {}",
-				work->m_Generation,
-				completion.m_Error);
+			if (completion.m_Status == TaskStatus::Cancelled)
+			{
+				GGLAB_LOG_GRAPHICS_INFO(
+					"IBL cache lookup generation {} was cancelled.",
+					work->m_Generation);
+			}
+			else
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"IBL cache lookup for generation {} failed: {}",
+					work->m_Generation,
+					completion.m_Error);
+			}
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}

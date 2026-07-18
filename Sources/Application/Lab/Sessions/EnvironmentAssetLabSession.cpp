@@ -47,7 +47,14 @@ namespace gglab
 	{
 		if (m_Services.m_EnvironmentAssetController)
 		{
-			m_Services.m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+			if (m_Services.m_AssetManager->IsAcceptingCommands())
+			{
+				m_Services.m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+			}
+			else
+			{
+				m_Services.m_EnvironmentAssetController->Reset();
+			}
 		}
 		m_State.reset();
 	}

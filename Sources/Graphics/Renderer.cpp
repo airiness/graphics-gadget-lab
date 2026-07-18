@@ -7,7 +7,6 @@
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/TextureRegistry.h"
 #include "Graphics/TransferManager.h"
 #include "Core/Utility/PathUtils.h"
 
@@ -82,14 +81,6 @@ namespace gglab
 		m_SamplerRegistry = std::make_unique<SamplerRegistry>(samplerRegistryCreateInfo);
 		m_SamplerRegistry->InitializePresetSamplers();
 
-		TextureRegistry::CreateInfo textureRegistryCreateInfo{};
-		textureRegistryCreateInfo.m_Device = device;
-		textureRegistryCreateInfo.m_TaskSystem = createInfo.m_TaskSystem;
-		textureRegistryCreateInfo.m_TransferManager = GetTransferManager();
-		textureRegistryCreateInfo.m_AssetUploadScheduler = m_AssetUploadScheduler.get();
-		m_TextureRegistry = std::make_unique<TextureRegistry>(textureRegistryCreateInfo);
-		m_TextureRegistry->InitializeReservedTextures();
-
 		RenderResourceRegistry::CreateInfo renderResRegistryCreateInfo{};
 		renderResRegistryCreateInfo.m_Device = device;
 		renderResRegistryCreateInfo.m_TransientResourcePool = m_TransientResourcePool.get();
@@ -135,8 +126,6 @@ namespace gglab
 		m_IBLBakeScheduler.reset();
 		m_EnvironmentLightingSystem.reset();
 		m_RenderResRegistry.reset();
-		m_TextureRegistry->Finalize(m_LastSubmittedFencePoint);
-		m_TextureRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
 		m_TransientResourcePool.reset();

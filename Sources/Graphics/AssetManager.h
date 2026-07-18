@@ -89,7 +89,6 @@ namespace gglab
 			TaskSystem* m_TaskSystem = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
-			TextureRegistry* m_TextureRegistry = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 		};
@@ -117,9 +116,15 @@ namespace gglab
 		[[nodiscard]] AssetOwnershipStatistics GetOwnershipStatistics() const;
 		void DrainLoadCompletions() noexcept;
 		void DrainStateEvents() noexcept;
+		// Closes public submission/owner creation before clients release interests.
+		void BeginShutdown() noexcept;
 		// Terminal owner-thread transition. Requires task/upload producers to be
 		// stopped and the RHI context to be idle.
-		void PrepareForShutdown() noexcept;
+		void PrepareForShutdown(const RHIFencePoint& lastSubmittedFence) noexcept;
+		[[nodiscard]] bool IsAcceptingCommands() const noexcept
+		{
+			return m_AcceptingCommands;
+		}
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
 		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
 		{
@@ -323,7 +328,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
-		TextureRegistry* m_TextureRegistry = nullptr;
+		std::unique_ptr<TextureRegistry> m_TextureRegistry;
 		SamplerRegistry* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
@@ -349,6 +354,7 @@ namespace gglab
 		uint64_t m_LogicalResidentBytes = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;
+		bool m_AcceptingCommands = true;
 		bool m_IsPreparedForShutdown = false;
 	};
 

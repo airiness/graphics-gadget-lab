@@ -103,7 +103,12 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
-		m_TextureRegistry(createInfo.m_TextureRegistry),
+		m_TextureRegistry(std::make_unique<TextureRegistry>(TextureRegistry::CreateInfo{
+			.m_Device = createInfo.m_Device,
+			.m_TaskSystem = createInfo.m_TaskSystem,
+			.m_TransferManager = createInfo.m_TransferManager,
+			.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
+		})),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling),
 		m_AssetLoadCoordinator({ .m_TaskSystem = createInfo.m_TaskSystem })
@@ -111,8 +116,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
-		GGLAB_ASSERT_MSG(m_TextureRegistry != nullptr, "TextureRegistry is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
+		m_TextureRegistry->InitializeReservedTextures();
 		m_TextureRegistry->SetStateChangeCallback(
 			[this](
 				TextureID textureId,
@@ -322,6 +327,12 @@ namespace gglab
 
 	AssetOwnerScope AssetManager::CreateOwnerScope() noexcept
 	{
+		if (!m_AcceptingCommands)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"AssetManager rejected owner creation after shutdown began.");
+			return {};
+		}
 		return AssetOwnerScope(this, RegisterAssetOwner());
 	}
 
@@ -475,17 +486,27 @@ namespace gglab
 		}
 	}
 
-	void AssetManager::PrepareForShutdown() noexcept
+	void AssetManager::BeginShutdown() noexcept
+	{
+		if (!m_AcceptingCommands)
+		{
+			return;
+		}
+		m_AcceptingCommands = false;
+
+		AssetResidencyConfig shutdownConfig = m_AssetResidencyController.GetConfig();
+		shutdownConfig.m_EnableAutomaticEviction = false;
+		m_AssetResidencyController.SetConfig(shutdownConfig);
+	}
+
+	void AssetManager::PrepareForShutdown(
+		const RHIFencePoint& lastSubmittedFence) noexcept
 	{
 		if (m_IsPreparedForShutdown)
 		{
 			return;
 		}
-		m_IsPreparedForShutdown = true;
-
-		AssetResidencyConfig shutdownConfig = m_AssetResidencyController.GetConfig();
-		shutdownConfig.m_EnableAutomaticEviction = false;
-		m_AssetResidencyController.SetConfig(shutdownConfig);
+		BeginShutdown();
 
 		// Scheduler finalization may have emitted terminal residency events. Apply
 		// them before classifying pending evictions as current or stale.
@@ -565,6 +586,40 @@ namespace gglab
 				pendingEvictionCount - cancelledCurrentEvictionCount);
 		}
 		GGLAB_ASSERT(m_PendingResidencyEvictions.empty());
+		GGLAB_ASSERT_MSG(
+			!m_AssetInterestTracker.HasOwners() &&
+				!m_AssetInterestTracker.HasLeases() &&
+				!m_AssetInterestTracker.HasInterests() &&
+				!m_AssetInterestTracker.HasPublicationRetains(),
+			"AssetManager shutdown requires all external asset ownership to be released.");
+		GGLAB_ASSERT_MSG(
+			m_ModelDependencyOwners.empty() && m_ModelDependencyLeaseTokens.empty(),
+			"AssetManager shutdown requires model dependency ownership to be released.");
+		GGLAB_ASSERT_MSG(
+			!m_AssetLoadCoordinator.HasActiveOperations() &&
+				!m_AssetLoadCoordinator.HasPendingCompletions(),
+			"AssetManager shutdown requires asset load work to be drained.");
+		GGLAB_ASSERT_MSG(
+			!m_AssetStateEventQueue.HasPendingEvents(),
+			"AssetManager shutdown requires asset state events to be drained.");
+
+		const AssetUploadStatistics uploadStatistics =
+			m_AssetUploadScheduler->GetStatistics();
+		GGLAB_ASSERT_MSG(
+			uploadStatistics.m_CpuPayloadQueue.m_PendingCount == 0 &&
+				uploadStatistics.m_ResourcePublicationQueue.m_PendingCount == 0 &&
+				uploadStatistics.m_UploadRecordingQueue.m_PendingCount == 0 &&
+				uploadStatistics.m_GpuFinalizeQueue.m_PendingCount == 0 &&
+				uploadStatistics.m_PendingCount == 0,
+			"AssetManager shutdown requires the upload scheduler to be finalized.");
+
+		// AssetManager owns texture records and performs their terminal, fence-aware
+		// GPU release while the device and descriptor allocator are still alive.
+		m_TextureRegistry->Finalize(lastSubmittedFence);
+		m_IsPreparedForShutdown = true;
+		GGLAB_LOG_GRAPHICS_INFO(
+			"AssetManager terminal shutdown prepared; texture GPU resources released at fence {}.",
+			lastSubmittedFence.m_Value);
 	}
 
 	void AssetManager::SetResidencyConfig(const AssetResidencyConfig& config) noexcept
@@ -1090,6 +1145,12 @@ namespace gglab
 		const std::filesystem::path& path,
 		TaskPriority priority) noexcept
 	{
+		if (!m_AcceptingCommands)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"AssetManager rejected model loading after shutdown began.");
+			return {};
+		}
 		if (path.empty())
 		{
 			GGLAB_LOG_GRAPHICS_WARN("AssetManager::LoadModelAsync received an empty path.");
@@ -1162,6 +1223,12 @@ namespace gglab
 		TextureSemantic semantic,
 		TaskPriority priority) noexcept
 	{
+		if (!m_AcceptingCommands)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"AssetManager rejected texture loading after shutdown began.");
+			return {};
+		}
 		const TextureRegistry::TextureLoadRequest registryRequest =
 			m_TextureRegistry->LoadTextureAsync(path, semantic, priority);
 		TextureLoadRequest request{
@@ -1185,9 +1252,9 @@ namespace gglab
 	void AssetManager::Tick() noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			!m_IsPreparedForShutdown,
-			"AssetManager::Tick called after shutdown preparation.");
-		if (m_IsPreparedForShutdown)
+			m_AcceptingCommands,
+			"AssetManager::Tick called after shutdown began.");
+		if (!m_AcceptingCommands)
 		{
 			return;
 		}

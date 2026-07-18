@@ -23,7 +23,6 @@ namespace gglab
 	class SamplerRegistry;
 	class ShaderManager;
 	class TaskSystem;
-	class TextureRegistry;
 	class TransferManager;
 	class GpuProfiler;
 
@@ -95,7 +94,6 @@ namespace gglab
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept { return m_RenderResRegistry.get(); }
 		TransientResourcePool* GetTransientResourcePool() const noexcept { return m_TransientResourcePool.get(); }
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
-		TextureRegistry* GetTextureRegistry() const noexcept { return m_TextureRegistry.get(); }
 		GpuProfiler* GetGpuProfiler() const noexcept
 		{
 			return m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
@@ -149,7 +147,6 @@ namespace gglab
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
-		std::unique_ptr<TextureRegistry> m_TextureRegistry;
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 
