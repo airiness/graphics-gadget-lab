@@ -7,6 +7,7 @@
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
+#include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
@@ -17,6 +18,7 @@
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
 #include "Graphics/AssetManager.h"
@@ -161,6 +163,30 @@ namespace gglab
 				else snapshot = {};
 			}
 		};
+
+		class SamplerRegistrySnapshotProvider final :
+			public SnapshotProvider<SamplerRegistrySnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Sampler Registry";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<SamplerRegistrySnapshot>();
+				const SamplerRegistry* registry = context.m_Renderer ?
+					context.m_Renderer->GetSamplerRegistry() : nullptr;
+				if (registry)
+				{
+					BuildSamplerRegistrySnapshot(*registry, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
+			}
+		};
 	}
 
 	void RegisterBuiltinSnapshotProviders(DiagnosticsRuntime& runtime) noexcept
@@ -174,5 +200,6 @@ namespace gglab
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<SamplerRegistrySnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 	}
 }

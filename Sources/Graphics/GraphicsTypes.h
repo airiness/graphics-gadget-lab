@@ -447,12 +447,6 @@ namespace gglab
 		bool m_IsReloading = false;
 	};
 
-	struct Sampler
-	{
-		SamplerID m_Id{};
-		RHISamplerHandle m_Sampler{};
-	};
-
 	struct MaterialTextureBinding
 	{
 		TextureID m_TextureId{};

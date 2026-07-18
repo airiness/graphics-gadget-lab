@@ -1,32 +1,36 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHISampler.h"
+#include "Graphics/SamplerTypes.h"
 #include "Core/Hash/KeyHash.h"
 #include "Core/Utility/TypeUtils.h"
+
+#include <vector>
 
 namespace gglab
 {
 	class RHIDevice;
 
-	enum class SamplerPreset : uint8_t
+	using SamplerKeyHash = KeyHash<SamplerKey>;
+
+	struct SamplerRegistryReadInfo
 	{
-		PointClamp,
-		PointWrap,
-
-		LinearClamp,
-		LinearWrap,
-		LinearWrapUClampV,
-
-		AnisotropicClamp,
-		AnisotropicWrap,
-
-		ShadowCmpLinearClamp,
-
-		Count
+		SamplerID m_Id{};
+		SamplerKey m_Key{};
+		RHISamplerHandle m_Sampler{};
+		uint32_t m_DescriptorIndex = 0;
+		uint32_t m_PresetMask = 0;
 	};
 
-	using SamplerKey = RHISamplerDesc;
-	using SamplerKeyHash = KeyHash<SamplerKey>;
+	struct SamplerRegistryStatistics
+	{
+		uint32_t m_UniqueSamplerCount = 0;
+		uint32_t m_PresetSamplerCount = 0;
+		uint32_t m_CustomSamplerCount = 0;
+		uint32_t m_PresetBindingCount = 0;
+		uint64_t m_CacheHitCount = 0;
+		uint64_t m_CacheMissCount = 0;
+	};
 
 	class SamplerRegistry
 	{
@@ -42,6 +46,7 @@ namespace gglab
 			SamplerID m_SamplerId{};
 			SamplerKey m_Key{};
 			RHISamplerHandle m_Sampler{};
+			uint32_t m_PresetMask = 0;
 		};
 
 	public:
@@ -57,13 +62,14 @@ namespace gglab
 		uint32_t GetSamplerIndex(SamplerPreset preset) const noexcept;
 		uint32_t GetSamplerIndex(const SamplerID& samplerId) const noexcept;
 
-		const SamplerKey& GetSamplerKey(const SamplerID& samplerId) const noexcept;
+		SamplerKey GetSamplerKey(SamplerID samplerId) const noexcept;
 
-		uint32_t ResolveSamplerIndex(const SamplerID& samplerId, SamplerPreset fallbackPreset) const noexcept;
+		uint32_t ResolveSamplerIndex(SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept;
+		[[nodiscard]] SamplerRegistryStatistics GetStatistics() const noexcept;
+		[[nodiscard]] std::vector<SamplerRegistryReadInfo> GetReadInfos() const;
 
 	private:
-		const SamplerEntry& GetEntry(const SamplerID& samplerId) const noexcept;
-		SamplerEntry& GetEntry(const SamplerID& samplerId) noexcept;
+		const SamplerEntry& GetEntry(SamplerID samplerId) const noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -75,5 +81,7 @@ namespace gglab
 
 		std::array<SamplerID, utils::EnumCount<SamplerPreset>()> m_PresetSamplers{};
 		bool m_PresetSamplersInitialized = false;
+		uint64_t m_CacheHitCount = 0;
+		uint64_t m_CacheMissCount = 0;
 	};
 }

@@ -837,6 +837,9 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -1733,6 +1736,9 @@
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\SamplerTypes.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1802,6 +1808,9 @@
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RenderGraphSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\SamplerRegistrySnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -1845,6 +1854,9 @@
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h">

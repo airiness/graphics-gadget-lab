@@ -4,12 +4,15 @@
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
+#include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/RHIText.h"
 #include "Graphics/AssetManager.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace gglab
 {
@@ -370,6 +373,106 @@ namespace gglab
 					ImGui::PopID();
 				}
 
+				ImGui::EndTable();
+			}
+		}
+
+		std::string SamplerPresetMaskText(uint32_t presetMask)
+		{
+			std::string text;
+			for (uint32_t index = 0; index < utils::EnumCount<SamplerPreset>(); ++index)
+			{
+				if ((presetMask & (1u << index)) == 0)
+				{
+					continue;
+				}
+				if (!text.empty())
+				{
+					text.append(", ");
+				}
+				text.append(devtools::EnumText(static_cast<SamplerPreset>(index)));
+			}
+			return text.empty() ? "Custom" : text;
+		}
+
+		void DrawSamplerRegistry(const SamplerRegistrySnapshot& snapshot) noexcept
+		{
+			const uint64_t lookupCount = snapshot.m_CacheHitCount + snapshot.m_CacheMissCount;
+			const double hitRate = lookupCount == 0 ? 0.0 :
+				100.0 * static_cast<double>(snapshot.m_CacheHitCount) /
+				static_cast<double>(lookupCount);
+			ImGui::Text(
+				"Unique: %u | Preset-backed: %u | Custom: %u | Preset bindings: %u",
+				snapshot.m_UniqueSamplerCount,
+				snapshot.m_PresetSamplerCount,
+				snapshot.m_CustomSamplerCount,
+				snapshot.m_PresetBindingCount);
+			ImGui::Text(
+				"Cache lookups: %llu hits / %llu misses (%.1f%% hit rate)",
+				snapshot.m_CacheHitCount,
+				snapshot.m_CacheMissCount,
+				hitRate);
+
+			if (ImGui::BeginTable(
+				"SamplerRegistryTable",
+				12,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
+			{
+				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 52.0f);
+				ImGui::TableSetupColumn("Preset / Kind", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+				ImGui::TableSetupColumn("Filter", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+				ImGui::TableSetupColumn("Address U", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Address V", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Address W", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Compare", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Aniso", ImGuiTableColumnFlags_WidthFixed, 52.0f);
+				ImGui::TableSetupColumn("Mip Bias", ImGuiTableColumnFlags_WidthFixed, 68.0f);
+				ImGui::TableSetupColumn("LOD Range", ImGuiTableColumnFlags_WidthFixed, 128.0f);
+				ImGui::TableSetupColumn("Descriptor", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+				ImGui::TableSetupColumn("RHI Handle", ImGuiTableColumnFlags_WidthFixed, 96.0f);
+				ImGui::TableHeadersRow();
+
+				for (const SamplerRegistrySnapshot::Entry& entry : snapshot.m_Entries)
+				{
+					const SamplerKey& key = entry.m_Key;
+					const std::string presets = SamplerPresetMaskText(entry.m_PresetMask);
+					const std::string handle = devtools::RHIHandleText(entry.m_Sampler);
+					ImGui::PushID(static_cast<int>(entry.m_Id.Value()));
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%u", entry.m_Id.Value());
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(presets.c_str());
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(devtools::EnumText(key.m_Filter).c_str());
+					ImGui::TableSetColumnIndex(3);
+					ImGui::TextUnformatted(devtools::EnumText(key.m_AddressU).c_str());
+					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(devtools::EnumText(key.m_AddressV).c_str());
+					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(devtools::EnumText(key.m_AddressW).c_str());
+					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(devtools::EnumText(key.m_CompareOp).c_str());
+					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%u", key.m_MaxAnisotropy);
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("%.2f", key.m_MipLODBias);
+					ImGui::TableSetColumnIndex(9);
+					if (key.m_MaxLOD == std::numeric_limits<float>::max())
+					{
+						ImGui::Text("%.2f .. Max", key.m_MinLOD);
+					}
+					else
+					{
+						ImGui::Text("%.2f .. %.2f", key.m_MinLOD, key.m_MaxLOD);
+					}
+					ImGui::TableSetColumnIndex(10);
+					ImGui::Text("%u", entry.m_DescriptorIndex);
+					ImGui::TableSetColumnIndex(11);
+					ImGui::TextUnformatted(handle.c_str());
+					ImGui::PopID();
+				}
 				ImGui::EndTable();
 			}
 		}
@@ -736,6 +839,8 @@ namespace gglab
 		auto& state = context.PanelState<AssetManagerPanelState>();
 		const auto* snapshot = context.m_Diagnostics ?
 			context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
+		const auto* samplerSnapshot = context.m_Diagnostics ?
+			context.m_Diagnostics->GetSnapshot<SamplerRegistrySnapshot>() : nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Asset snapshot provider is not available.");
@@ -831,6 +936,18 @@ namespace gglab
 			if (ImGui::BeginTabItem("Meshes"))
 			{
 				DrawMeshAssets(*snapshot);
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("Samplers"))
+			{
+				if (samplerSnapshot)
+				{
+					DrawSamplerRegistry(*samplerSnapshot);
+				}
+				else
+				{
+					ImGui::TextDisabled("Sampler registry snapshot is not available.");
+				}
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Uploads"))

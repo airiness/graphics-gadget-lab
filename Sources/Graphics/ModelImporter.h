@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/SamplerRegistry.h"
+#include "Graphics/SamplerTypes.h"
 #include "Graphics/TextureAsset.h"
 #include "Graphics/TextureLoader.h"
 #include "Graphics/VertexData.h"

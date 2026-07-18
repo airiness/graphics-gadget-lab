@@ -237,6 +237,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.cpp" />
@@ -399,6 +400,7 @@
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.h" />
@@ -664,6 +666,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutionPlan.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGPass.h" />
@@ -672,6 +675,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\SamplerTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeCache.h" />
