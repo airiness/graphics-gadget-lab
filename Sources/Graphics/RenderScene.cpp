@@ -3,6 +3,7 @@
 #include "Graphics/TransferManager.h"
 #include "Graphics/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Core/World.h"
 #include "Scene/Components.h"
@@ -16,7 +17,7 @@ namespace gglab
 	{
 		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
 
-		MaterialGPU BuildMaterialGpu(
+		void MarkMaterialTexturesUsed(
 			const MaterialProperties& material,
 			AssetManager& assetManager) noexcept
 		{
@@ -25,41 +26,6 @@ namespace gglab
 			assetManager.MarkTextureUsed(material.m_MetallicRoughnessBinding.m_TextureId);
 			assetManager.MarkTextureUsed(material.m_NormalBinding.m_TextureId);
 			assetManager.MarkTextureUsed(material.m_OcclusionBinding.m_TextureId);
-
-			MaterialGPU gpu{};
-			gpu.BaseColorFactor = material.m_BaseColor;
-			gpu.MetallicFactor = material.m_MetallicFactor;
-			gpu.RoughnessFactor = material.m_RoughnessFactor;
-			gpu.NormalScale = material.m_NormalScale;
-			gpu.OcclusionStrength = material.m_OcclusionStrength;
-			gpu.EmissiveColorFactor = material.m_EmissiveColor;
-
-			gpu.BaseColorBinding = assetManager.ResolveTextureBinding(
-				material.m_BaseColorBinding,
-				ReservedTextureIDIndex::BaseColorWhite,
-				SamplerPreset::LinearWrap);
-			gpu.EmissiveBinding = assetManager.ResolveTextureBinding(
-				material.m_EmissiveBinding,
-				ReservedTextureIDIndex::EmissiveWhite,
-				SamplerPreset::LinearWrap);
-			gpu.MetallicRoughnessBinding = assetManager.ResolveTextureBinding(
-				material.m_MetallicRoughnessBinding,
-				ReservedTextureIDIndex::DefaultMetallicRoughness,
-				SamplerPreset::LinearWrap);
-			gpu.NormalBinding = assetManager.ResolveTextureBinding(
-				material.m_NormalBinding,
-				ReservedTextureIDIndex::NormalFlat,
-				SamplerPreset::LinearWrap);
-			gpu.OcclusionBinding = assetManager.ResolveTextureBinding(
-				material.m_OcclusionBinding,
-				ReservedTextureIDIndex::OcclusionWhite,
-				SamplerPreset::LinearWrap);
-
-			gpu.AlphaMode = static_cast<int32_t>(material.m_AlphaMode);
-			gpu.AlphaCutoff = material.m_AlphaCutoff;
-			gpu.Flags = static_cast<uint32_t>(material.m_Flags);
-			gpu.DebugView = static_cast<uint32_t>(material.m_DebugView);
-			return gpu;
 		}
 
 		struct MaterialUploadRecord
@@ -163,7 +129,11 @@ namespace gglab
 						continue;
 					}
 
-					const MaterialGPU materialGpu = BuildMaterialGpu(*material, assetManager);
+					MarkMaterialTexturesUsed(*material, assetManager);
+					const MaterialGPU materialGpu = MaterialGpuEncoder::Encode(
+						*material,
+						assetManager,
+						info.m_SamplerRegistry);
 					auto iter = materialRecords.find(materialKey);
 					if (iter == materialRecords.end())
 					{

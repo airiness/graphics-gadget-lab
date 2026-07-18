@@ -319,6 +319,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\MaterialGpuEncoder.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Keyboard.cpp" />
@@ -608,6 +609,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
+    <ClInclude Include="..\..\Sources\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\Graphics\AssetManager.h" />
     <ClInclude Include="..\..\Sources\Graphics\AssetUploadScheduler.h" />
     <ClInclude Include="..\..\Sources\Graphics\ModelImporter.h" />

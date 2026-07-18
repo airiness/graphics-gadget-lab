@@ -4,7 +4,6 @@
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/ModelPublicationJob.h"
 #include "Graphics/AssetUploadScheduler.h"
-#include "Graphics/SamplerRegistry.h"
 #include "Graphics/TextureRegistry.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
@@ -2178,19 +2177,6 @@ namespace gglab
 	uint32_t AssetManager::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
 	{
 		return m_TextureRegistry->ResolveSrvIndex(textureId, fallback);
-	}
-
-	MaterialTextureBindingGPU AssetManager::ResolveTextureBinding(const MaterialTextureBinding& binding, ReservedTextureIDIndex fallback, SamplerPreset fallbackSampler) const noexcept
-	{
-		MaterialTextureBindingGPU bindingGpu{};
-
-		bindingGpu.TextureSamplerBinding.TextureIndex = ResolveSrvIndex(binding.m_TextureId, fallback);
-		bindingGpu.TextureSamplerBinding.SamplerIndex = m_SamplerRegistry->ResolveSamplerIndex(binding.m_SamplerId, fallbackSampler);
-
-		bindingGpu.TexCoordIndex = binding.m_TexCoordIndex;
-		bindingGpu.Padding = 0;
-
-		return bindingGpu;
 	}
 
 	bool AssetManager::UploadMesh(

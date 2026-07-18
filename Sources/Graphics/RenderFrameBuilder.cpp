@@ -233,6 +233,7 @@ namespace gglab
 		const RenderSceneBuilder::BuildInfo sceneBuildInfo{
 			.m_World = info.m_World,
 			.m_AssetManager = info.m_AssetManager,
+			.m_SamplerRegistry = *info.m_Renderer.GetSamplerRegistry(),
 			.m_TransferManager = *info.m_Renderer.GetTransferManager(),
 			.m_RenderResourceRegistry = *info.m_Renderer.GetRenderResourceRegistry(),
 			.m_EnvironmentLightingSystem = *info.m_Renderer.GetEnvironmentLightingSystem(),
