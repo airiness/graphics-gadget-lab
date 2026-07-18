@@ -1428,20 +1428,6 @@ namespace gglab
 			EditMesh(MeshID{ static_cast<uint32_t>(key.m_StableId) }) : nullptr;
 	}
 
-	const AssetLifecycle* AssetManager::FindResidencyLifecycle(AssetKey key) const noexcept
-	{
-		if (key.m_Kind == AssetKind::Mesh)
-		{
-			return GetMesh(MeshID{ static_cast<uint32_t>(key.m_StableId) });
-		}
-		if (key.m_Kind == AssetKind::Texture)
-		{
-			return m_TextureAssets->GetTexture(
-				TextureID{ static_cast<uint32_t>(key.m_StableId) });
-		}
-		return nullptr;
-	}
-
 	void AssetManager::FinalizeResidencyEvictions() noexcept
 	{
 		for (auto iterator = m_PendingResidencyEvictions.begin();
@@ -1993,11 +1979,6 @@ namespace gglab
 				TaskPriority::Normal));
 		}
 		return true;
-	}
-
-	const Texture* AssetManager::GetTexture(TextureID textureId) const noexcept
-	{
-		return m_TextureAssets->GetTexture(textureId);
 	}
 
 	TextureContentRef AssetManager::GetTextureContentRef(TextureID textureId) const noexcept

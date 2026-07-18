@@ -565,32 +565,6 @@ namespace gglab
 		return true;
 	}
 
-	const RHITextureDesc* TextureAssetSystem::GetTextureDesc(TextureID textureId) const noexcept
-	{
-		const auto* texture = GetTexture(textureId);
-		return texture && texture->m_Gpu.m_IsUploaded ? &texture->m_Gpu.m_Desc : nullptr;
-	}
-
-	RHIDescriptorHandle TextureAssetSystem::GetSrvDescriptor(TextureID textureId) const noexcept
-	{
-		const auto* texture = GetTexture(textureId);
-		if (!texture || !texture->m_Gpu.m_IsUploaded || !texture->m_Gpu.m_Srv.IsValid())
-		{
-			return {};
-		}
-
-		return m_Device->GetTextureViewDescriptor(texture->m_Gpu.m_Srv);
-	}
-
-	uint32_t TextureAssetSystem::GetShaderVisibleSrvIndex(TextureID textureId) const noexcept
-	{
-		const RHIDescriptorHandle descriptor = GetSrvDescriptor(textureId);
-		GGLAB_ASSERT_MSG(
-			descriptor.IsValid() && descriptor.m_HeapType == RHIDescriptorHeapType::CbvSrvUav,
-			"TextureAssetSystem::GetShaderVisibleSrvIndex: texture SRV descriptor is invalid.");
-		return descriptor.m_Index;
-	}
-
 	uint32_t TextureAssetSystem::ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept
 	{
 		const auto resolveSrvIndex = [this](RHITextureViewHandle srv) noexcept -> uint32_t
@@ -700,6 +674,7 @@ namespace gglab
 				},
 				.m_Lifecycle = static_cast<const AssetLifecycle&>(*texture),
 				.m_SourcePath = texture->m_Source.m_CanonicalPath,
+				.m_ImportSettings = texture->m_Source.m_ImportSettings,
 				.m_Semantic = texture->m_Source.m_ImportSettings.m_Semantic,
 				.m_Name = texture->m_Name,
 				.m_Texture = texture->m_Gpu.m_Texture,
@@ -707,6 +682,7 @@ namespace gglab
 					std::string(m_Device->GetTextureDebugName(texture->m_Gpu.m_Texture)) :
 					std::string{},
 				.m_IsUploaded = texture->m_Gpu.m_IsUploaded,
+				.m_HasSrv = texture->m_Gpu.m_Srv.IsValid(),
 				.m_IsReserved = IsReservedTextureId(textureId),
 			});
 		}
@@ -828,14 +804,16 @@ namespace gglab
 		TexturePublicationContextBase& context) noexcept
 	{
 		ModelPublicationTextureResult result{};
+		const uint64_t sourceBytes = static_cast<uint64_t>(
+			importedTexture.m_Data.m_Pixels.size());
 		if (importedTexture.m_ImportSettings.m_Semantic != importedTexture.m_Semantic)
 		{
+			importedTexture = {};
+			result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 			result.m_Error =
 				"Imported texture semantic does not match its import settings";
 			return result;
 		}
-		const uint64_t sourceBytes = static_cast<uint64_t>(
-			importedTexture.m_Data.m_Pixels.size());
 		TextureID textureId = FindTexture(
 			importedTexture.m_CanonicalPath,
 			importedTexture.m_ImportSettings);
@@ -853,6 +831,8 @@ namespace gglab
 					textureKey,
 					texture->m_ContentGeneration))
 			{
+				importedTexture = {};
+				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				result.m_Error = std::format(
 					"Terminal texture {} is still retained",
 					textureId.Value());
@@ -868,6 +848,8 @@ namespace gglab
 		{
 			if (!importedTexture.m_Data.IsValid())
 			{
+				importedTexture = {};
+				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				result.m_Error = "Imported texture payload is invalid";
 				return result;
 			}
@@ -877,6 +859,8 @@ namespace gglab
 			texture = GetTexture(textureId);
 			if (!textureId.IsValid() || !texture)
 			{
+				importedTexture = {};
+				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				result.m_Error =
 					"Failed to create texture entry during model publication";
 				return result;
@@ -896,6 +880,8 @@ namespace gglab
 			{
 				GGLAB_UNUSED(RemoveTexture(textureId));
 			}
+			importedTexture = {};
+			result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 			result.m_Error = "Failed to retain texture publication claim";
 			return result;
 		}
@@ -903,6 +889,8 @@ namespace gglab
 		{
 			context.ReleaseTextureRetain(retain);
 			GGLAB_UNUSED(RemoveTexture(textureId));
+			importedTexture = {};
+			result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 			result.m_Error = "Failed to begin texture publication";
 			return result;
 		}

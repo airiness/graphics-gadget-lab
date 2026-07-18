@@ -55,6 +55,7 @@ namespace gglab
 			TextureID m_Id{};
 			uint64_t m_ContentGeneration = 0;
 			uint64_t m_ResidencyEpoch = 0;
+			uint64_t m_ResidencyOperationSerial = 0;
 			uint64_t m_LastUsedFrame = 0;
 			uint64_t m_UseCount = 0;
 			AssetState m_State = AssetState::Unloaded;
@@ -62,11 +63,13 @@ namespace gglab
 			AssetResidencyState m_ResidencyState = AssetResidencyState::NonResident;
 			AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
 			std::filesystem::path m_SourcePath;
+			TextureImportSettings m_ImportSettings{};
 			TextureSemantic m_Semantic = TextureSemantic::Unknown;
 			StringID m_Name{};
 			RHITextureHandle m_Texture{};
 			std::string m_DebugName;
 			bool m_IsUploaded = false;
+			bool m_HasSrv = false;
 			bool m_IsReserved = false;
 			bool m_IsEvictionCandidate = false;
 		};

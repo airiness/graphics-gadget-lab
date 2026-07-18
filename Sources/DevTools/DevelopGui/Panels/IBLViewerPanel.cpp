@@ -23,7 +23,6 @@ namespace gglab
 			float m_EnvironmentPreviewWidth = 512.0f;
 			float m_IrradiancePreviewWidth = 512.0f;
 			float m_PrefilteredSpecularPreviewWidth = 512.0f;
-			std::string m_EnvironmentSelectionStatus;
 			bool m_ShowMetadata = true;
 			bool m_FlipPreviewY = false;
 		};
@@ -234,14 +233,7 @@ namespace gglab
 					const bool selected = entry.m_Active;
 					if (ImGui::Selectable(entry.m_DisplayName.c_str(), selected) && environmentAssets)
 					{
-						if (environmentAssets->SelectEnvironment(entry.m_Index))
-						{
-							state.m_EnvironmentSelectionStatus = "Loading " + entry.m_DisplayName + "; current environment remains active.";
-						}
-						else
-						{
-							state.m_EnvironmentSelectionStatus = "Failed to load " + entry.m_DisplayName + ".";
-						}
+						GGLAB_UNUSED(environmentAssets->SelectEnvironment(entry.m_Index));
 						context.m_Diagnostics->Invalidate<IBLDiagnosticsSnapshot>();
 					}
 					if (selected)
@@ -256,9 +248,45 @@ namespace gglab
 			{
 				ImGui::TextWrapped("%s", diagnosticsSnapshot->m_Environments[activeIndex].m_Path.string().c_str());
 			}
-			if (!state.m_EnvironmentSelectionStatus.empty())
+			const IBLEnvironmentEntryDiagnostics* latestSelection = nullptr;
+			for (const auto& entry : diagnosticsSnapshot->m_Environments)
 			{
-				ImGui::TextDisabled("%s", state.m_EnvironmentSelectionStatus.c_str());
+				if (entry.m_LastSelectionSerial != 0 &&
+					(!latestSelection || entry.m_LastSelectionSerial >
+						latestSelection->m_LastSelectionSerial))
+				{
+					latestSelection = &entry;
+				}
+			}
+			if (latestSelection)
+			{
+				switch (latestSelection->m_State)
+				{
+				case IBLEnvironmentEntryState::Loading:
+					ImGui::TextDisabled(
+						"Loading %s; current environment remains active.",
+						latestSelection->m_DisplayName.c_str());
+					break;
+				case IBLEnvironmentEntryState::Ready:
+					ImGui::TextDisabled(
+						"Active: %s.",
+						latestSelection->m_DisplayName.c_str());
+					break;
+				case IBLEnvironmentEntryState::Failed:
+					ImGui::TextColored(
+						devtools::style::ErrorTextColor,
+						"Failed to load %s.",
+						latestSelection->m_DisplayName.c_str());
+					break;
+				case IBLEnvironmentEntryState::InvalidShape:
+					ImGui::TextColored(
+						devtools::style::ErrorTextColor,
+						"%s is not a 2:1 environment texture.",
+						latestSelection->m_DisplayName.c_str());
+					break;
+				case IBLEnvironmentEntryState::Unrequested:
+					break;
+				}
 			}
 		}
 
