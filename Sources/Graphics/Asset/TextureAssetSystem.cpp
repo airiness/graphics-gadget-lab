@@ -1411,10 +1411,14 @@ namespace gglab
 		}
 
 		texture->m_Load.m_CancelRequested = true;
-		GGLAB_UNUSED(m_LoadCoordinator->CancelTextureDecode(
-			MakeAssetContentVersion(textureId, generation)));
-		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(
-			MakeAssetContentVersion(textureId, generation)));
+		const AssetContentVersion contentVersion =
+			MakeAssetContentVersion(textureId, generation);
+		GGLAB_UNUSED(m_LoadCoordinator->CancelTextureDecode(contentVersion));
+		// A successful decode remains registered until its CPU payload runs.
+		// Cancelling that payload bypasses CompleteTextureLoad, so retire the
+		// coordinator operation explicitly before removing ready work.
+		m_LoadCoordinator->DiscardTextureDecode(contentVersion.m_Key);
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(contentVersion));
 		if (texture->m_Load.m_IsReloading && !texture->m_Gpu.m_Texture.IsValid())
 		{
 			texture->m_Load.m_IsReloading = false;
