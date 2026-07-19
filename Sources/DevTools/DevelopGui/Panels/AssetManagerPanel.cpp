@@ -291,6 +291,22 @@ namespace gglab
 				static_cast<double>(assetSnapshot.m_TextureDerivedDataWrittenBytes) / (1024.0 * 1024.0),
 				assetSnapshot.m_TextureDerivedDataWriteFailureCount,
 				assetSnapshot.m_TextureDerivedDataCorruptionCount);
+			ImGui::Text(
+				"Shared requests: %llu | Build claims: %llu | Waits: %llu | Immediate hits: %llu",
+				assetSnapshot.m_TextureDerivedDataRequestCount,
+				assetSnapshot.m_TextureDerivedDataBuildRequiredCount,
+				assetSnapshot.m_TextureDerivedDataWaitCount,
+				assetSnapshot.m_TextureDerivedDataImmediateHitCount);
+			ImGui::Text(
+				"Active builds: %u | Active participants: %u | Publishes: %llu | Fan-out: %llu",
+				assetSnapshot.m_TextureDerivedDataActiveBuildCount,
+				assetSnapshot.m_TextureDerivedDataActiveWaiterCount,
+				assetSnapshot.m_TextureDerivedDataPublishCount,
+				assetSnapshot.m_TextureDerivedDataFanoutDeliveryCount);
+			ImGui::Text(
+				"Shared failures: %llu | Cancelled participants: %llu",
+				assetSnapshot.m_TextureDerivedDataBuildFailureCount,
+				assetSnapshot.m_TextureDerivedDataCancelledWaiterCount);
 			if (ImGui::Button("Clear Texture Local DDC"))
 			{
 				assetManager.ClearTextureDerivedDataCache();

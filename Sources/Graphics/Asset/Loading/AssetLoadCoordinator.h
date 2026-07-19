@@ -4,7 +4,7 @@
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
-#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
+#include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
 #include "Graphics/Asset/TextureAsset.h"
 #include "Graphics/Asset/TextureArtifact.h"
 
@@ -59,7 +59,7 @@ namespace gglab
 		AssetOperationToken m_Operation{};
 		TaskCompletionInfo m_Completion{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
-		TextureArtifact m_Artifact;
+		TextureArtifactHandle m_Artifact;
 		AssetContentFingerprint m_ContentFingerprint{};
 		SourceDigest m_SourceDigest{};
 		DerivedDataKey m_DerivedDataKey{};
@@ -172,13 +172,18 @@ namespace gglab
 		[[nodiscard]] bool HasActiveOperations() const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept
 		{
-			return m_TextureDerivedDataStore.GetStatistics();
+			return m_TextureDerivedDataSystem.GetStoreStatistics();
+		}
+		[[nodiscard]] TextureDerivedDataCoordinatorStatistics
+		GetTextureDerivedDataCoordinatorStatistics() const noexcept
+		{
+			return m_TextureDerivedDataSystem.GetCoordinatorStatistics();
 		}
 		[[nodiscard]] bool IsTextureDerivedDataCached(const DerivedDataKey& key) const noexcept
 		{
-			return m_TextureDerivedDataStore.Contains(key);
+			return m_TextureDerivedDataSystem.Contains(key);
 		}
-		void ClearTextureDerivedDataCache() noexcept { m_TextureDerivedDataStore.Clear(); }
+		void ClearTextureDerivedDataCache() noexcept { m_TextureDerivedDataSystem.Clear(); }
 		[[nodiscard]] bool HasPendingCompletions() const noexcept
 		{
 			return !m_PendingCompletions.empty();
@@ -189,6 +194,8 @@ namespace gglab
 		{
 			AssetOperationToken m_Operation{};
 			TaskHandle m_Task{};
+			DerivedDataKey m_DerivedDataKey{};
+			TaskPriority m_Priority = TaskPriority::Normal;
 		};
 
 		using OperationMap =
@@ -204,7 +211,7 @@ namespace gglab
 			AssetOperationToken operation) noexcept;
 
 		TaskSystem* m_TaskSystem = nullptr;
-		LocalDerivedDataStore m_TextureDerivedDataStore;
+		TextureDerivedDataSystem m_TextureDerivedDataSystem;
 		uint64_t m_NextOperationSerial = 1;
 		OperationMap m_ModelImports;
 		OperationMap m_MeshReloads;

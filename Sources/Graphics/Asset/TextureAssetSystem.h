@@ -195,7 +195,7 @@ namespace gglab
 			AssetOperationToken operation,
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
-			TextureArtifact&& artifact,
+			TextureArtifactHandle artifact,
 			AssetContentFingerprint contentFingerprint,
 			SourceDigest sourceDigest,
 			DerivedDataKey derivedDataKey,

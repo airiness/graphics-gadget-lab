@@ -41,6 +41,8 @@ namespace gglab
 			ArtifactContentDigest contentDigest = {}) noexcept;
 		[[nodiscard]] TextureArtifactHandle CreateAndAdmit(
 			TextureArtifact&& artifact) noexcept;
+		[[nodiscard]] TextureArtifactHandle Admit(
+			TextureArtifactHandle artifact) noexcept;
 		[[nodiscard]] TextureArtifactHandle Find(
 			const ArtifactContentDigest& contentDigest) noexcept;
 		[[nodiscard]] bool Contains(

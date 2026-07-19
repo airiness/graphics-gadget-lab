@@ -164,6 +164,16 @@ namespace gglab
 		uint64_t m_TextureDerivedDataWriteCount = 0;
 		uint64_t m_TextureDerivedDataWriteFailureCount = 0;
 		uint64_t m_TextureDerivedDataWrittenBytes = 0;
+		uint32_t m_TextureDerivedDataActiveBuildCount = 0;
+		uint32_t m_TextureDerivedDataActiveWaiterCount = 0;
+		uint64_t m_TextureDerivedDataRequestCount = 0;
+		uint64_t m_TextureDerivedDataImmediateHitCount = 0;
+		uint64_t m_TextureDerivedDataWaitCount = 0;
+		uint64_t m_TextureDerivedDataBuildRequiredCount = 0;
+		uint64_t m_TextureDerivedDataPublishCount = 0;
+		uint64_t m_TextureDerivedDataBuildFailureCount = 0;
+		uint64_t m_TextureDerivedDataCancelledWaiterCount = 0;
+		uint64_t m_TextureDerivedDataFanoutDeliveryCount = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;
 		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
 		AssetStreamingQueueStatistics m_UploadRecordingQueue;

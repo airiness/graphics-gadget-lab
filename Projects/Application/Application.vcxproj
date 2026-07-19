@@ -351,6 +351,7 @@
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp" />
@@ -648,6 +649,7 @@
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />

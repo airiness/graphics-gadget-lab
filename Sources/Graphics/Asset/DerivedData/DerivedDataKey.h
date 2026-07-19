@@ -37,6 +37,11 @@ namespace gglab
 		friend constexpr bool operator==(const DerivedDataKey&, const DerivedDataKey&) noexcept = default;
 	};
 
+	struct DerivedDataKeyHash
+	{
+		[[nodiscard]] size_t operator()(const DerivedDataKey& key) const noexcept;
+	};
+
 	class DerivedDataKeyBuilder final
 	{
 	public:

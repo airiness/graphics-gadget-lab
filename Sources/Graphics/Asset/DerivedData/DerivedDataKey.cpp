@@ -4,6 +4,17 @@
 
 namespace gglab
 {
+	size_t DerivedDataKeyHash::operator()(const DerivedDataKey& key) const noexcept
+	{
+		uint64_t hash = 14695981039346656037ull;
+		for (const std::byte value : key.m_Value)
+		{
+			hash ^= static_cast<uint8_t>(value);
+			hash *= 1099511628211ull;
+		}
+		return static_cast<size_t>(hash);
+	}
+
 	namespace
 	{
 		template<class T>
