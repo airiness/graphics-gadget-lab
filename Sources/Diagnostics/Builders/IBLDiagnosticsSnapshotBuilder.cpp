@@ -117,7 +117,6 @@ namespace gglab
 					.m_LastSelectionSerial = environment.m_LastSelectionSerial,
 					.m_State = ToDiagnosticState(environment.m_State),
 					.m_Active = active,
-					.m_TextureReady = environmentAssets->IsEntryTextureReady(index),
 				});
 			}
 		}

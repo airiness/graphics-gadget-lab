@@ -63,7 +63,6 @@ namespace gglab
 		}
 		[[nodiscard]] size_t GetPendingEnvironmentIndex() const noexcept;
 		[[nodiscard]] uint64_t GetSelectionSerial() const noexcept { return m_SelectionSerial; }
-		[[nodiscard]] bool IsEntryTextureReady(size_t entryIndex) const noexcept;
 
 	private:
 		struct PendingSelection

@@ -57,7 +57,6 @@ namespace gglab
 		uint64_t m_LastSelectionSerial = 0;
 		IBLEnvironmentEntryState m_State = IBLEnvironmentEntryState::Unrequested;
 		bool m_Active = false;
-		bool m_TextureReady = false;
 	};
 
 	struct IBLDiagnosticsSnapshot

@@ -29,7 +29,7 @@ namespace gglab
 	IBLBakeScheduler::~IBLBakeScheduler()
 	{
 		GGLAB_ASSERT_MSG(
-			m_AssetManager == nullptr && !m_BakingSourceOwner,
+			!m_BakingSourceOwner,
 			"IBLBakeScheduler destroyed before detaching AssetManager.");
 		for (auto& pending : m_PendingCacheWrites)
 		{
@@ -44,13 +44,12 @@ namespace gglab
 	void IBLBakeScheduler::AttachAssetManager(AssetManager& assetManager) noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			m_AssetManager == nullptr && !m_BakingSourceOwner,
+			!m_BakingSourceOwner,
 			"IBLBakeScheduler already has an attached AssetManager.");
-		if (m_AssetManager || m_BakingSourceOwner)
+		if (m_BakingSourceOwner)
 		{
 			return;
 		}
-		m_AssetManager = &assetManager;
 		m_BakingSourceOwner = std::make_unique<AssetOwnerScope>(
 			assetManager.CreateOwnerScope());
 	}
@@ -59,7 +58,6 @@ namespace gglab
 	{
 		ReleaseBakingSourceLease();
 		m_BakingSourceOwner.reset();
-		m_AssetManager = nullptr;
 	}
 
 	void IBLBakeScheduler::Tick(const RHIFencePoint& lastSubmittedFence) noexcept
