@@ -343,11 +343,14 @@
     <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentAssetController.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\IBLBakeCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLBundleArtifact.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLBundleArtifactCache.cpp" />
 	<ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLBundleArtifactCodec.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
@@ -648,6 +651,8 @@
 	<ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h" />
 	<ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLBundleArtifactCodec.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
@@ -696,9 +701,10 @@
     <ClInclude Include="..\..\Sources\Graphics\SamplerTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h" />
-    <ClInclude Include="..\..\Sources\Graphics\IBLBakeCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLBundleArtifact.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLBundleArtifactCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifact.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.h" />

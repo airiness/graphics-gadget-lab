@@ -1,4 +1,6 @@
 #pragma once
+#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/RHI/RHIFormat.h"
 
 #include <cstdint>
@@ -62,8 +64,11 @@ namespace gglab
 		float m_Progress = 0.0f;
 		double m_GpuMilliseconds = 0.0;
 		bool m_GpuTimingAvailable = false;
-		uint64_t m_CacheKey = 0;
+		DerivedDataKey m_DerivedDataKey{};
+		ArtifactContentDigest m_ArtifactContentDigest{};
 		bool m_CacheHit = false;
+		bool m_CpuCacheHit = false;
+		bool m_DerivedDataCacheHit = false;
 		bool m_CacheWritePending = false;
 		bool m_HasActiveBake = false;
 	};

@@ -64,6 +64,7 @@ namespace gglab
 
 		m_D3D12Device.Reset();
 		m_DxgiAdapter.Reset();
+		m_AdapterCompatibilityIdentity.clear();
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
@@ -478,7 +479,22 @@ namespace gglab
 		}
 
 		GGLAB_ASSERT_MSG(m_DxgiAdapter != nullptr, "Create DxgiAdapter failed.");
-
+		if (m_DxgiAdapter)
+		{
+			DXGI_ADAPTER_DESC1 desc{};
+			LARGE_INTEGER driverVersion{};
+			GGLAB_HR(m_DxgiAdapter->GetDesc1(&desc));
+			GGLAB_UNUSED(m_DxgiAdapter->CheckInterfaceSupport(
+				__uuidof(IDXGIDevice),
+				&driverVersion));
+			m_AdapterCompatibilityIdentity = std::format(
+				"dx12:{:08x}:{:08x}:{:08x}:{:08x}:driver-{:016x}",
+				desc.VendorId,
+				desc.DeviceId,
+				desc.SubSysId,
+				desc.Revision,
+				static_cast<uint64_t>(driverVersion.QuadPart));
+		}
 	}
 
 	void DX12Device::InitializeD3D12Device() noexcept

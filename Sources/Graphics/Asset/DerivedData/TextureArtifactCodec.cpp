@@ -47,7 +47,13 @@ namespace gglab
 		const TextureArtifact& artifact) noexcept
 	{
 		if (!artifact.IsValid()) return {};
-		const TextureAssetData& texture = artifact.m_Data;
+		return SerializeTextureData(artifact.m_Data);
+	}
+
+	std::vector<std::byte> TextureArtifactCodec::SerializeTextureData(
+		const TextureAssetData& texture) noexcept
+	{
+		if (!texture.IsValid()) return {};
 		Writer writer;
 		writer.U32(TextureArtifactSchemaVersion);
 		writer.U32(static_cast<uint32_t>(texture.m_ResourceFormat));

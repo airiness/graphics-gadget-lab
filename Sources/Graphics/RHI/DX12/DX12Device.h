@@ -54,6 +54,10 @@ namespace gglab
 		bool SupportEnhancedBarrier() const noexcept { return m_FeatureSupport.m_EnhancedBarriers; }
 
 		RHIBackendType GetBackendType() const noexcept override { return RHIBackendType::DX12; }
+		std::string_view GetAdapterCompatibilityIdentity() const noexcept override
+		{
+			return m_AdapterCompatibilityIdentity;
+		}
 
 		RHITextureHandle CreateTexture(
 			const RHITextureDesc& desc,
@@ -137,6 +141,7 @@ namespace gglab
 
 		// supported features
 		FeatureSupport m_FeatureSupport;
+		std::string m_AdapterCompatibilityIdentity;
 
 		DX12ResourceManager m_ResourceManager;
 		DX12QueueSystem* m_QueueSystem = nullptr;

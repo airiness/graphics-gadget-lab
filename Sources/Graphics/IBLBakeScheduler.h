@@ -1,13 +1,12 @@
 #pragma once
 #include "Core/Task/TaskTypes.h"
+#include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/IBLBakeCache.h"
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 
 #include <filesystem>
 #include <array>
-#include <future>
 #include <memory>
 #include <vector>
 
@@ -47,7 +46,8 @@ namespace gglab
 			RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			GpuProfiler* m_GpuProfiler = nullptr;
-			std::filesystem::path m_CacheDirectory;
+			std::filesystem::path m_DerivedDataCacheDirectory;
+			IBLBundleArtifactCacheConfig m_ArtifactCache{};
 		};
 
 		explicit IBLBakeScheduler(const CreateInfo& createInfo) noexcept;
@@ -77,9 +77,20 @@ namespace gglab
 			return m_BakingRequest.m_Source;
 		}
 		[[nodiscard]] const IBLBakeStatus& GetStatus() const noexcept { return m_Status; }
+		[[nodiscard]] IBLBundleArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept
+		{
+			return m_DerivedDataSystem.GetArtifactCacheStatistics();
+		}
+		[[nodiscard]] LocalDerivedDataStoreStatistics GetDerivedDataStoreStatistics() const noexcept
+		{
+			return m_DerivedDataSystem.GetStoreStatistics();
+		}
+		void ClearArtifactCache() noexcept { m_DerivedDataSystem.ClearArtifactCache(); }
+		void ClearDerivedDataStore() noexcept { m_DerivedDataSystem.ClearStore(); }
 
 	private:
 		struct CacheLoadWork;
+		struct CacheWriteWork;
 
 		void StartRequestedBake(const RHIFencePoint& retireFence) noexcept;
 		void CompleteCacheLookup(
@@ -90,10 +101,12 @@ namespace gglab
 			const std::shared_ptr<CacheLoadWork>& work) noexcept;
 		void ContinueRequestedBakeAfterInitialization() noexcept;
 		void AdvanceCompletedStage() noexcept;
-		bool UploadCachePayload(const IBLBakeCachePayload& payload) noexcept;
+		bool UploadCacheArtifact(const IBLBundleArtifact& artifact) noexcept;
 		bool StartCacheReadback() noexcept;
 		void StartCacheWrite() noexcept;
-		void PollCacheWrites() noexcept;
+		void CompleteCacheWrite(
+			const TaskCompletionInfo& completion,
+			const std::shared_ptr<CacheWriteWork>& work) noexcept;
 		void PublishBake(bool cacheHit) noexcept;
 		void CaptureGpuTime(IBLBakeStage stage) noexcept;
 		void ReleaseBakingSourceLease() noexcept;
@@ -106,7 +119,7 @@ namespace gglab
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		GpuProfiler* m_GpuProfiler = nullptr;
-		IBLBakeCache m_Cache;
+		IBLDerivedDataSystem m_DerivedDataSystem;
 
 		std::unique_ptr<AssetOwnerScope> m_BakingSourceOwner;
 		BakeRequestSnapshot m_BakingRequest{};
@@ -123,9 +136,10 @@ namespace gglab
 		struct CacheLoadWork
 		{
 			uint64_t m_Generation = 0;
-			uint64_t m_Key = 0;
-			bool m_CacheHit = false;
-			IBLBakeCachePayload m_Payload;
+			DerivedDataKey m_Key{};
+			IBLDerivedDataSource m_Source = IBLDerivedDataSource::Miss;
+			IBLBundleArtifactHandle m_Artifact;
+			std::string m_Error;
 		};
 		TaskHandle m_CacheLookupTask{};
 		std::shared_ptr<CacheLoadWork> m_CompletedCacheLookup;
@@ -133,16 +147,12 @@ namespace gglab
 
 		struct CacheWriteWork
 		{
-			uint64_t m_Key = 0;
+			DerivedDataKey m_Key{};
 			std::array<RHITextureReadbackRequest, 4> m_Requests;
-			std::array<const std::byte*, 4> m_Mapped{};
-		};
-		struct PendingCacheWrite
-		{
-			std::shared_ptr<CacheWriteWork> m_Work;
-			std::future<bool> m_Result;
+			IBLBundleArtifactHandle m_Artifact;
+			TaskHandle m_Task{};
 		};
 		std::shared_ptr<CacheWriteWork> m_ReadbackWork;
-		std::vector<PendingCacheWrite> m_PendingCacheWrites;
+		std::vector<std::shared_ptr<CacheWriteWork>> m_PendingCacheWrites;
 	};
 }
