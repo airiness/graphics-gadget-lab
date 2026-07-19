@@ -1,6 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Core/Task/TaskSystem.h"
+#include "Graphics/Asset/DerivedData/SourceSnapshot.h"
+#include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Asset/TextureArtifact.h"
 
@@ -18,11 +20,15 @@ namespace gglab
 			TextureAssetData m_TextureData;
 			AssetContentFingerprint m_ContentFingerprint{};
 			ArtifactContentDigest m_ArtifactContentDigest{};
+			SourceDigest m_SourceDigest{};
+			DerivedDataKey m_DerivedDataKey{};
+			bool m_DerivedDataCacheHit = false;
 		};
 	}
 
 	AssetLoadCoordinator::AssetLoadCoordinator(const CreateInfo& createInfo) noexcept :
-		m_TaskSystem(createInfo.m_TaskSystem)
+		m_TaskSystem(createInfo.m_TaskSystem),
+		m_TextureDerivedDataStore(createInfo.m_TextureDerivedDataCacheDirectory)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_TaskSystem);
 	}
@@ -236,6 +242,8 @@ namespace gglab
 		const TextureImportSettings importSettings = request.m_ImportSettings;
 		const TextureSemantic semantic = request.m_Semantic;
 		const ProgressChannelPtr progress = std::move(request.m_Progress);
+		const SourceDigest expectedSourceDigest = request.m_ExpectedSourceDigest;
+		const DerivedDataKey expectedDerivedDataKey = request.m_ExpectedDerivedDataKey;
 		const bool residencyReload = request.m_ResidencyReload;
 		const AssetResidencyOperation residencyOperation = request.m_ResidencyOperation;
 		const TaskHandle task = m_TaskSystem->Submit(
@@ -246,16 +254,88 @@ namespace gglab
 				.m_Priority = request.m_Priority,
 				.m_Progress = progress,
 			},
-			[sourcePath, importSettings, job, progress](std::stop_token stopToken) noexcept
+			[this, sourcePath, importSettings, expectedSourceDigest,
+				expectedDerivedDataKey, job, progress](std::stop_token stopToken) noexcept
 			{
 				if (stopToken.stop_requested())
 				{
 					return TaskResult::Success();
 				}
+
+				const auto tryDerivedData = [this, &job, &importSettings, &progress](
+					const DerivedDataKey& key) noexcept
+				{
+					if (!key.IsValid()) return false;
+					ProgressReporter(progress).Report(
+						0.12f,
+						"Looking up texture derived data",
+						DerivedDataKeyText(key));
+					DerivedDataReadResult cached = m_TextureDerivedDataStore.Read(
+						key,
+						TextureArtifactType,
+						TextureArtifactSchemaVersion);
+					if (cached.m_Disposition != DerivedDataReadDisposition::Hit) return false;
+					TextureArtifactDecodeResult decoded = TextureArtifactCodec::Deserialize(
+						cached.m_Payload,
+						cached.m_ArtifactContentDigest);
+					if (!decoded.Succeeded())
+					{
+						m_TextureDerivedDataStore.DiscardCorrupt(key);
+						GGLAB_LOG_GRAPHICS_WARN(
+							"Texture DDC entry '{}' failed codec validation: {}",
+							DerivedDataKeyText(key),
+							decoded.m_Error);
+						return false;
+					}
+					job->m_TextureData = std::move(decoded.m_Artifact.m_Data);
+					job->m_ArtifactContentDigest = decoded.m_Artifact.m_ContentDigest;
+					job->m_ContentFingerprint = ComputeTextureContentFingerprint(
+						job->m_TextureData,
+						importSettings);
+					job->m_DerivedDataKey = key;
+					job->m_DerivedDataCacheHit = true;
+					ProgressReporter(progress).Report(
+						0.60f,
+						"Texture derived data cache hit",
+						DerivedDataKeyText(key));
+					return job->m_ContentFingerprint.IsValid();
+				};
+
+				job->m_SourceDigest = expectedSourceDigest;
+				if (expectedDerivedDataKey.IsValid() && tryDerivedData(expectedDerivedDataKey))
+				{
+					return TaskResult::Success();
+				}
+
+				SourceSnapshotResult snapshot = ReadSourceSnapshot(sourcePath);
+				if (!snapshot.Succeeded()) return TaskResult::Failure(std::move(snapshot.m_Error));
+				job->m_SourceDigest = snapshot.m_Snapshot.m_Digest;
+				job->m_DerivedDataKey = BuildTextureDerivedDataKey(
+					job->m_SourceDigest,
+					sourcePath,
+					importSettings);
+				if (!job->m_DerivedDataKey.IsValid())
+				{
+					return TaskResult::Failure("Failed to build the texture derived-data key.");
+				}
+				if (expectedDerivedDataKey.IsValid() &&
+					job->m_DerivedDataKey != expectedDerivedDataKey)
+				{
+					return TaskResult::Failure(std::format(
+						"Texture source changed for immutable generation (expected key {}, observed {}).",
+						DerivedDataKeyText(expectedDerivedDataKey),
+						DerivedDataKeyText(job->m_DerivedDataKey)));
+				}
+				if (!expectedDerivedDataKey.IsValid() && tryDerivedData(job->m_DerivedDataKey))
+				{
+					return TaskResult::Success();
+				}
+				if (stopToken.stop_requested()) return TaskResult::Success();
 				job->m_TextureData = TextureLoader::LoadTextureData(
 					sourcePath,
+					snapshot.m_Snapshot.m_Bytes,
 					importSettings,
-					ProgressReporter(progress, 0.05f, 0.62f));
+					ProgressReporter(progress, 0.18f, 0.62f));
 				if (!job->m_TextureData.IsValid())
 				{
 					return TaskResult::Failure(std::format(
@@ -273,6 +353,23 @@ namespace gglab
 					return TaskResult::Failure(std::format(
 						"Failed to fingerprint decoded texture '{}'.",
 						sourcePath.string()));
+				}
+				TextureArtifact artifact{
+					.m_Data = std::move(job->m_TextureData),
+					.m_ContentDigest = job->m_ArtifactContentDigest,
+				};
+				const std::vector<std::byte> payload = TextureArtifactCodec::Serialize(artifact);
+				job->m_TextureData = std::move(artifact.m_Data);
+				if (!payload.empty() && !m_TextureDerivedDataStore.Write(
+					job->m_DerivedDataKey,
+					TextureArtifactType,
+					TextureArtifactSchemaVersion,
+					job->m_ArtifactContentDigest,
+					payload))
+				{
+					GGLAB_LOG_GRAPHICS_WARN(
+						"Failed to publish texture DDC entry '{}'.",
+						DerivedDataKeyText(job->m_DerivedDataKey));
 				}
 				return TaskResult::Success();
 			},
@@ -294,6 +391,9 @@ namespace gglab
 							.m_ContentDigest = job->m_ArtifactContentDigest,
 						},
 						.m_ContentFingerprint = job->m_ContentFingerprint,
+						.m_SourceDigest = job->m_SourceDigest,
+						.m_DerivedDataKey = job->m_DerivedDataKey,
+						.m_DerivedDataCacheHit = job->m_DerivedDataCacheHit,
 						.m_ResidencyReload = residencyReload,
 						.m_ResidencyOperation = residencyOperation,
 					});

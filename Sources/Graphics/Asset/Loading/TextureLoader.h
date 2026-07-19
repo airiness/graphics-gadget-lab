@@ -15,6 +15,11 @@ namespace gglab
 			const std::filesystem::path& texPath,
 			const TextureImportSettings& settings,
 			const ProgressReporter& progress = {}) noexcept;
+		[[nodiscard]] static TextureAssetData LoadTextureData(
+			const std::filesystem::path& sourceIdentity,
+			std::span<const std::byte> sourceBytes,
+			const TextureImportSettings& settings,
+			const ProgressReporter& progress = {}) noexcept;
 
 		[[nodiscard]] static TextureAssetData LoadTextureData(
 			const std::filesystem::path& texPath,

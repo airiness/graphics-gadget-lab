@@ -271,10 +271,35 @@ namespace gglab
 				assetManager.ClearTextureArtifactCache();
 				state.m_Status = "Texture CPU artifact cache cleared.";
 			}
+			ImGui::SeparatorText("Texture Local DDC");
+			const uint64_t ddcLookupCount = assetSnapshot.m_TextureDerivedDataHitCount +
+				assetSnapshot.m_TextureDerivedDataMissCount;
+			const double ddcHitRate = ddcLookupCount == 0 ? 0.0 :
+				100.0 * static_cast<double>(assetSnapshot.m_TextureDerivedDataHitCount) /
+					static_cast<double>(ddcLookupCount);
+			ImGui::Text(
+				"Entries: %llu (%.2f MiB) | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
+				assetSnapshot.m_TextureDerivedDataStoredEntryCount,
+				static_cast<double>(assetSnapshot.m_TextureDerivedDataStoredBytes) / (1024.0 * 1024.0),
+				assetSnapshot.m_TextureDerivedDataHitCount,
+				assetSnapshot.m_TextureDerivedDataMissCount,
+				ddcHitRate);
+			ImGui::Text(
+				"Reads: %.2f MiB | Writes: %llu (%.2f MiB) | Failures: %llu | Corruptions: %llu",
+				static_cast<double>(assetSnapshot.m_TextureDerivedDataReadBytes) / (1024.0 * 1024.0),
+				assetSnapshot.m_TextureDerivedDataWriteCount,
+				static_cast<double>(assetSnapshot.m_TextureDerivedDataWrittenBytes) / (1024.0 * 1024.0),
+				assetSnapshot.m_TextureDerivedDataWriteFailureCount,
+				assetSnapshot.m_TextureDerivedDataCorruptionCount);
+			if (ImGui::Button("Clear Texture Local DDC"))
+			{
+				assetManager.ClearTextureDerivedDataCache();
+				state.m_Status = "Texture local DDC cleared.";
+			}
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
-			if (ImGui::BeginTable("TextureAssetsTable", 18,
+			if (ImGui::BeginTable("TextureAssetsTable", 21,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
@@ -291,6 +316,9 @@ namespace gglab
 				ImGui::TableSetupColumn("Semantic", ImGuiTableColumnFlags_WidthFixed, 140.0f);
 				ImGui::TableSetupColumn("CPU Cached", ImGuiTableColumnFlags_WidthFixed, 84.0f);
 				ImGui::TableSetupColumn("Artifact ID", ImGuiTableColumnFlags_WidthFixed, 136.0f);
+				ImGui::TableSetupColumn("DDC Cached", ImGuiTableColumnFlags_WidthFixed, 84.0f);
+				ImGui::TableSetupColumn("DDC Key", ImGuiTableColumnFlags_WidthFixed, 136.0f);
+				ImGui::TableSetupColumn("Source Digest", ImGuiTableColumnFlags_WidthFixed, 136.0f);
 				ImGui::TableSetupColumn("Uploaded", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Reserved", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("RHI Handle", ImGuiTableColumnFlags_WidthFixed, 96.0f);
@@ -335,15 +363,23 @@ namespace gglab
 						texture.m_ArtifactContentDigest);
 					ImGui::TextUnformatted(artifactId.empty() ? "-" : artifactId.c_str());
 					ImGui::TableSetColumnIndex(13);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsDerivedDataCached));
 					ImGui::TableSetColumnIndex(14);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					const std::string derivedDataKey = DerivedDataKeyText(texture.m_DerivedDataKey);
+					ImGui::TextUnformatted(derivedDataKey.empty() ? "-" : derivedDataKey.c_str());
 					ImGui::TableSetColumnIndex(15);
+					const std::string sourceDigest = SourceDigestText(texture.m_SourceDigest);
+					ImGui::TextUnformatted(sourceDigest.empty() ? "-" : sourceDigest.c_str());
+					ImGui::TableSetColumnIndex(16);
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
+					ImGui::TableSetColumnIndex(17);
+					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					ImGui::TableSetColumnIndex(18);
 					const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
 					ImGui::TextUnformatted(textureHandle.c_str());
-					ImGui::TableSetColumnIndex(16);
+					ImGui::TableSetColumnIndex(19);
 					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
-					ImGui::TableSetColumnIndex(17);
+					ImGui::TableSetColumnIndex(20);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}

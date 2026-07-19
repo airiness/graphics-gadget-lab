@@ -322,8 +322,10 @@ namespace gglab
 		}
 	}
 
-	TextureAssetData TextureLoader::LoadTextureData(
+	static TextureAssetData LoadTextureDataInternal(
 		const std::filesystem::path& texPath,
+		std::span<const std::byte> sourceBytes,
+		bool decodeFromMemory,
 		const TextureImportSettings& settings,
 		const ProgressReporter& progress) noexcept
 	{
@@ -331,8 +333,9 @@ namespace gglab
 		progress.Report(0.02f, "Validating texture source", filename);
 		const TextureColorSpace colorSpace = GetTextureColorSpaceFromSemantic(settings.m_Semantic);
 		std::error_code errorCode;
-		if (!std::filesystem::exists(texPath, errorCode) ||
+		if (!decodeFromMemory && (!std::filesystem::exists(texPath, errorCode) ||
 			!std::filesystem::is_regular_file(texPath, errorCode))
+			|| (decodeFromMemory && sourceBytes.empty()))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader received an invalid texture file path: '{}'.",
 				texPath.string());
@@ -349,18 +352,20 @@ namespace gglab
 
 		if (isDds)
 		{
-			hr = DirectX::LoadFromDDSFile(
-				texPath.c_str(),
-				DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB,
-				&metadata,
-				scratchImage);
+			hr = decodeFromMemory ?
+				DirectX::LoadFromDDSMemory(
+					sourceBytes.data(), sourceBytes.size(),
+					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage) :
+				DirectX::LoadFromDDSFile(
+					texPath.c_str(), DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB,
+					&metadata, scratchImage);
 		}
 		else if (isHdr)
 		{
-			hr = DirectX::LoadFromHDRFile(
-				texPath.c_str(),
-				&metadata,
-				scratchImage);
+			hr = decodeFromMemory ?
+				DirectX::LoadFromHDRMemory(
+					sourceBytes.data(), sourceBytes.size(), &metadata, scratchImage) :
+				DirectX::LoadFromHDRFile(texPath.c_str(), &metadata, scratchImage);
 		}
 		else
 		{
@@ -374,11 +379,10 @@ namespace gglab
 				wicFlags |= DirectX::WIC_FLAGS::WIC_FLAGS_IGNORE_SRGB;
 			}
 
-			hr = DirectX::LoadFromWICFile(
-				texPath.c_str(),
-				wicFlags,
-				&metadata,
-				scratchImage);
+			hr = decodeFromMemory ?
+				DirectX::LoadFromWICMemory(
+					sourceBytes.data(), sourceBytes.size(), wicFlags, &metadata, scratchImage) :
+				DirectX::LoadFromWICFile(texPath.c_str(), wicFlags, &metadata, scratchImage);
 		}
 
 		if (FAILED(hr))
@@ -471,6 +475,28 @@ namespace gglab
 		TextureAssetData result = ConvertScratchImage(scratchImage, colorSpace, progress);
 		progress.Report(1.0f, "Texture CPU preparation complete", filename);
 		return result;
+	}
+
+	TextureAssetData TextureLoader::LoadTextureData(
+		const std::filesystem::path& texPath,
+		const TextureImportSettings& settings,
+		const ProgressReporter& progress) noexcept
+	{
+		return LoadTextureDataInternal(texPath, {}, false, settings, progress);
+	}
+
+	TextureAssetData TextureLoader::LoadTextureData(
+		const std::filesystem::path& sourceIdentity,
+		std::span<const std::byte> sourceBytes,
+		const TextureImportSettings& settings,
+		const ProgressReporter& progress) noexcept
+	{
+		return LoadTextureDataInternal(
+			sourceIdentity,
+			sourceBytes,
+			true,
+			settings,
+			progress);
 	}
 
 	TextureAssetData TextureLoader::LoadTextureData(

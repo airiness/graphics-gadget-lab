@@ -84,6 +84,17 @@ namespace gglab
 			artifactCache.m_AdmissionRejectedCount;
 		snapshot.m_TextureArtifactEvictionCount = artifactCache.m_EvictionCount;
 		snapshot.m_TextureArtifactEvictedBytes = artifactCache.m_EvictedBytes;
+		const LocalDerivedDataStoreStatistics derivedData =
+			assetManager.GetTextureDerivedDataStatistics();
+		snapshot.m_TextureDerivedDataStoredBytes = derivedData.m_StoredBytes;
+		snapshot.m_TextureDerivedDataStoredEntryCount = derivedData.m_StoredEntryCount;
+		snapshot.m_TextureDerivedDataHitCount = derivedData.m_HitCount;
+		snapshot.m_TextureDerivedDataMissCount = derivedData.m_MissCount;
+		snapshot.m_TextureDerivedDataCorruptionCount = derivedData.m_CorruptionCount;
+		snapshot.m_TextureDerivedDataReadBytes = derivedData.m_ReadBytes;
+		snapshot.m_TextureDerivedDataWriteCount = derivedData.m_WriteCount;
+		snapshot.m_TextureDerivedDataWriteFailureCount = derivedData.m_WriteFailureCount;
+		snapshot.m_TextureDerivedDataWrittenBytes = derivedData.m_WrittenBytes;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetKind kind,
@@ -224,10 +235,13 @@ namespace gglab
 			textureSnapshot.m_DebugName = texture.m_DebugName;
 			textureSnapshot.m_ArtifactContentDigest =
 				texture.m_ArtifactContentDigest;
+			textureSnapshot.m_SourceDigest = texture.m_SourceDigest;
+			textureSnapshot.m_DerivedDataKey = texture.m_DerivedDataKey;
 			textureSnapshot.m_IsUploaded = texture.m_IsUploaded;
 			textureSnapshot.m_HasSrv = texture.m_HasSrv;
 			textureSnapshot.m_IsReserved = texture.m_IsReserved;
 			textureSnapshot.m_IsCpuArtifactCached = texture.m_IsCpuArtifactCached;
+			textureSnapshot.m_IsDerivedDataCached = texture.m_IsDerivedDataCached;
 			textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
 				AssetKind::Texture,
 				texture.m_Content.m_Id.Value(),
