@@ -813,6 +813,9 @@
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -1146,6 +1149,9 @@
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClInclude>
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h">

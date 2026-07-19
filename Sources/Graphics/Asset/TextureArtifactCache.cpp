@@ -38,7 +38,17 @@ namespace gglab
 		{
 			return {};
 		}
-		const ArtifactContentDigest contentDigest = artifact.m_ContentDigest;
+		return Admit(std::make_shared<const TextureArtifact>(std::move(artifact)));
+	}
+
+	TextureArtifactHandle TextureArtifactCache::Admit(
+		TextureArtifactHandle artifact) noexcept
+	{
+		if (!artifact || !artifact->IsValid())
+		{
+			return {};
+		}
+		const ArtifactContentDigest contentDigest = artifact->m_ContentDigest;
 
 		if (auto existing = m_Entries.find(contentDigest); existing != m_Entries.end())
 		{
@@ -46,15 +56,16 @@ namespace gglab
 			return existing->second.m_Artifact;
 		}
 
-		auto artifactAllocation = std::make_unique<TextureArtifact>(std::move(artifact));
-		const uint64_t bytes = artifactAllocation->GetAllocatedBytes();
+		const uint64_t bytes = artifact->GetAllocatedBytes();
+		const TextureArtifact* artifactValue = artifact.get();
 		const std::shared_ptr<LiveState> liveState = m_LiveState;
 		liveState->m_Bytes.fetch_add(bytes, std::memory_order_relaxed);
 		TextureArtifactHandle handle(
-			artifactAllocation.release(),
-			[liveState, bytes](const TextureArtifact* value) noexcept
+			artifactValue,
+			[liveState, bytes, artifact = std::move(artifact)](
+				const TextureArtifact* value) noexcept
 			{
-				delete value;
+				GGLAB_UNUSED(value);
 				liveState->m_Bytes.fetch_sub(bytes, std::memory_order_relaxed);
 			});
 

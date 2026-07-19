@@ -1301,7 +1301,7 @@ namespace gglab
 			return;
 		}
 
-		auto payload = std::make_shared<TextureArtifact>(std::move(result.m_Artifact));
+		TextureArtifactHandle payload = std::move(result.m_Artifact);
 		const AssetStreamingWorkEstimate estimate = EstimateTextureUpload(payload->m_Data);
 		const AssetOperationToken operation = result.m_Operation;
 		const TaskCompletionInfo completion = result.m_Completion;
@@ -1336,7 +1336,7 @@ namespace gglab
 					operation,
 					semantic,
 					completion,
-					std::move(*payload),
+					std::move(payload),
 					contentFingerprint,
 					sourceDigest,
 					derivedDataKey,
@@ -1364,7 +1364,7 @@ namespace gglab
 		AssetOperationToken operation,
 		TextureSemantic semantic,
 		const TaskCompletionInfo& completion,
-		TextureArtifact&& artifact,
+		TextureArtifactHandle artifact,
 		AssetContentFingerprint contentFingerprint,
 		SourceDigest sourceDigest,
 		DerivedDataKey derivedDataKey,
@@ -1460,9 +1460,11 @@ namespace gglab
 			0.62f,
 			"Queued for texture upload publication",
 			completion.m_Name);
+		TextureArtifactHandle admittedArtifact = m_ArtifactCache.Admit(
+			std::move(artifact));
 		auto uploadData = MakeTextureUploadData(
 			textureId,
-			std::move(artifact),
+			std::move(admittedArtifact),
 			texture->m_Source.m_ImportSettings,
 			contentFingerprint,
 			sourceDigest,

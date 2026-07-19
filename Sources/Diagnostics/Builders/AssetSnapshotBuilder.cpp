@@ -95,6 +95,27 @@ namespace gglab
 		snapshot.m_TextureDerivedDataWriteCount = derivedData.m_WriteCount;
 		snapshot.m_TextureDerivedDataWriteFailureCount = derivedData.m_WriteFailureCount;
 		snapshot.m_TextureDerivedDataWrittenBytes = derivedData.m_WrittenBytes;
+		const TextureDerivedDataCoordinatorStatistics derivedDataCoordinator =
+			assetManager.GetTextureDerivedDataCoordinatorStatistics();
+		snapshot.m_TextureDerivedDataActiveBuildCount =
+			derivedDataCoordinator.m_ActiveBuildCount;
+		snapshot.m_TextureDerivedDataActiveWaiterCount =
+			derivedDataCoordinator.m_ActiveWaiterCount;
+		snapshot.m_TextureDerivedDataRequestCount =
+			derivedDataCoordinator.m_RequestCount;
+		snapshot.m_TextureDerivedDataImmediateHitCount =
+			derivedDataCoordinator.m_ImmediateHitCount;
+		snapshot.m_TextureDerivedDataWaitCount = derivedDataCoordinator.m_WaitCount;
+		snapshot.m_TextureDerivedDataBuildRequiredCount =
+			derivedDataCoordinator.m_BuildRequiredCount;
+		snapshot.m_TextureDerivedDataPublishCount =
+			derivedDataCoordinator.m_PublishCount;
+		snapshot.m_TextureDerivedDataBuildFailureCount =
+			derivedDataCoordinator.m_BuildFailureCount;
+		snapshot.m_TextureDerivedDataCancelledWaiterCount =
+			derivedDataCoordinator.m_CancelledWaiterCount;
+		snapshot.m_TextureDerivedDataFanoutDeliveryCount =
+			derivedDataCoordinator.m_FanoutDeliveryCount;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetKind kind,

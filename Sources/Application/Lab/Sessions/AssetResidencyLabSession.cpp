@@ -5,6 +5,8 @@
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
+#include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
+#include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab
@@ -33,6 +35,88 @@ namespace gglab
 		{
 			const auto iterator = std::ranges::find(snapshot.m_Textures, id, &AssetSnapshot::Texture::m_Id);
 			return iterator != snapshot.m_Textures.end() ? &*iterator : nullptr;
+		}
+
+		[[nodiscard]] bool ValidateTextureDerivedDataCoordinatorContract(
+			std::string& error) noexcept
+		{
+			TextureDerivedDataSystem system(std::filesystem::path{});
+			SourceDigest sourceDigest{};
+			sourceDigest.m_Value.front() = std::byte{ 0x5a };
+			TextureImportSettings importSettings{};
+			importSettings.m_Semantic = TextureSemantic::GenericColor;
+			const DerivedDataKey key = BuildTextureDerivedDataKey(
+				sourceDigest,
+				"shared-request.png",
+				importSettings);
+			TextureDerivedDataRequestResult producer = system.Request(key);
+			TextureDerivedDataRequestResult waiting = system.Request(key);
+			if (producer.m_Disposition != ArtifactRequestDisposition::BuildRequired ||
+				!producer.m_BuildClaim.IsValid() || !producer.m_Waiter.IsValid() ||
+				waiting.m_Disposition != ArtifactRequestDisposition::Waiting ||
+				!waiting.m_Waiter.IsValid())
+			{
+				error = "Texture shared request did not create one build claim and one waiter.";
+				return false;
+			}
+			if (!producer.m_Waiter.Cancel() ||
+				producer.m_BuildClaim.GetStopToken().stop_requested())
+			{
+				error = "Cancelling one texture participant stopped a build required by another waiter.";
+				return false;
+			}
+
+			constexpr std::array<uint8_t, 4> pixels{ 64, 128, 192, 255 };
+			TextureAssetData textureData = TextureLoader::MakeTexture2DRgba8(
+				1,
+				1,
+				pixels,
+				TextureColorSpace::SRGB);
+			const ArtifactContentDigest contentDigest =
+				ComputeTextureArtifactContentDigest(textureData);
+			const AssetContentFingerprint contentFingerprint =
+				ComputeTextureContentFingerprint(textureData, importSettings);
+			TextureArtifactHandle artifact = std::make_shared<const TextureArtifact>(
+				TextureArtifact{
+					.m_Data = std::move(textureData),
+					.m_ContentDigest = contentDigest,
+				});
+			TextureDerivedDataArtifact published{
+				.m_Artifact = artifact,
+				.m_ContentFingerprint = contentFingerprint,
+			};
+			if (!published.IsValid() || !system.Publish(
+				std::move(producer.m_BuildClaim),
+				published))
+			{
+				error = "Texture shared request could not publish its artifact.";
+				return false;
+			}
+
+			TextureDerivedDataRequestResult immediate = system.Request(key);
+			TextureArtifactWaitResult waited = system.Wait(
+				std::move(waiting.m_Waiter),
+				{});
+			const TextureDerivedDataCoordinatorStatistics statistics =
+				system.GetCoordinatorStatistics();
+			if (immediate.m_Disposition != ArtifactRequestDisposition::Hit ||
+				immediate.m_Artifact.m_Artifact != artifact ||
+				waited.m_Disposition != ArtifactWaitDisposition::Succeeded ||
+				waited.m_Artifact.m_Artifact != artifact ||
+				statistics.m_RequestCount != 3 ||
+				statistics.m_BuildRequiredCount != 1 ||
+				statistics.m_WaitCount != 1 ||
+				statistics.m_ImmediateHitCount != 1 ||
+				statistics.m_PublishCount != 1 ||
+				statistics.m_CancelledWaiterCount != 1 ||
+				statistics.m_FanoutDeliveryCount != 1 ||
+				statistics.m_ActiveBuildCount != 0 ||
+				statistics.m_ActiveWaiterCount != 0)
+			{
+				error = "Texture shared request fan-out or diagnostics did not satisfy the contract.";
+				return false;
+			}
+			return true;
 		}
 	}
 
@@ -103,6 +187,12 @@ namespace gglab
 	void AssetResidencyLabSession::OnEnter() noexcept
 	{
 		m_State = std::make_unique<State>();
+		std::string coordinatorError;
+		if (!ValidateTextureDerivedDataCoordinatorContract(coordinatorError))
+		{
+			Fail(std::move(coordinatorError));
+			return;
+		}
 		AssetManager& assetManager = *m_Services.m_AssetManager;
 		m_State->m_OriginalResidencyConfig = assetManager.GetResidencyConfig();
 		assetManager.SetResidencyConfig({
@@ -1039,7 +1129,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, CPU artifact cache reload, local DDC build/hit/fallback, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

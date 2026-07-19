@@ -2024,6 +2024,12 @@ namespace gglab
 		return m_AssetLoadCoordinator.GetTextureDerivedDataStatistics();
 	}
 
+	TextureDerivedDataCoordinatorStatistics
+	AssetManager::GetTextureDerivedDataCoordinatorStatistics() const noexcept
+	{
+		return m_AssetLoadCoordinator.GetTextureDerivedDataCoordinatorStatistics();
+	}
+
 	void AssetManager::ClearTextureDerivedDataCache() noexcept
 	{
 		m_AssetLoadCoordinator.ClearTextureDerivedDataCache();
