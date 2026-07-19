@@ -47,6 +47,8 @@ namespace gglab
 			WaitForEvictionStart,
 			WaitForEvictionCancellation,
 			WaitForRelease,
+			WaitForTextureArtifactCacheReload,
+			WaitForTextureArtifactCacheRelease,
 			WaitForTextureReloadRunning,
 			WaitForTextureReloadReplacement,
 			WaitForTextureReloadCompletion,
@@ -71,6 +73,7 @@ namespace gglab
 		uint64_t m_StaleCompletionCountBaseline = 0;
 		uint64_t m_AcceptedStateEventCountBaseline = 0;
 		uint64_t m_CompletedStateEventCountBaseline = 0;
+		uint64_t m_TextureArtifactCacheHitCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
@@ -529,7 +532,107 @@ namespace gglab
 				Fail("The residency controller did not finalize mesh and texture releases.");
 				return;
 			}
+			const TextureArtifactCacheStatistics artifactCache =
+				assetManager.GetTextureArtifactCacheStatistics();
+			if (!texture->m_IsCpuArtifactCached ||
+				!texture->m_ArtifactContentDigest.IsValid() ||
+				artifactCache.m_CachedEntryCount == 0 ||
+				artifactCache.m_CachedBytes == 0)
+			{
+				Fail("The decoded texture was not retained by the CPU artifact cache.");
+				return;
+			}
 
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = false;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_TextureArtifactCacheHitCountBaseline = artifactCache.m_HitCount;
+			const AssetManager::TextureLoadRequest cacheReload =
+				GetAssetOwnerScope().LoadTextureAsync(
+					texture->m_SourcePath,
+					texture->m_ImportSettings.m_Semantic,
+					TaskPriority::Critical);
+			const TextureArtifactCacheStatistics cacheReloadStatistics =
+				assetManager.GetTextureArtifactCacheStatistics();
+			if (!cacheReload.IsValid() || cacheReload.m_Task.IsValid() ||
+				cacheReload.m_TextureId != m_State->m_TextureId ||
+				cacheReload.m_Generation != m_State->m_TextureGeneration ||
+				cacheReloadStatistics.m_HitCount !=
+					m_State->m_TextureArtifactCacheHitCountBaseline + 1)
+			{
+				Fail("The texture residency reload did not use its cached CPU artifact.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForTextureArtifactCacheReload;
+			break;
+		}
+
+		case State::Phase::WaitForTextureArtifactCacheReload:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
+			if (!texture || texture->m_State == AssetState::Failed ||
+				texture->m_State == AssetState::Cancelled)
+			{
+				Fail("The CPU artifact cache texture reload failed.");
+				return;
+			}
+			if (texture->m_State != AssetState::Ready)
+			{
+				break;
+			}
+			const TextureArtifactCacheStatistics artifactCache =
+				assetManager.GetTextureArtifactCacheStatistics();
+			if (texture->m_ResidencyState != AssetResidencyState::Resident ||
+				!texture->m_IsUploaded || !texture->m_Texture.IsValid() ||
+				!texture->m_HasSrv || !texture->m_IsCpuArtifactCached ||
+				artifactCache.m_HitCount !=
+					m_State->m_TextureArtifactCacheHitCountBaseline + 1)
+			{
+				Fail("The cached CPU artifact did not restore texture GPU residency.");
+				return;
+			}
+
+			ResetAssetInterests();
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = true;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForTextureArtifactCacheRelease;
+			break;
+		}
+
+		case State::Phase::WaitForTextureArtifactCacheRelease:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
+			if (!texture || texture->m_ContentGeneration != m_State->m_TextureGeneration)
+			{
+				Fail("The cache-hit reload replaced its stable texture entry.");
+				return;
+			}
+			if (texture->m_ResidencyState == AssetResidencyState::Evicting)
+			{
+				break;
+			}
+			if (texture->m_State != AssetState::CpuReady ||
+				texture->m_ResidencyState != AssetResidencyState::NonResident ||
+				texture->m_IsUploaded || texture->m_Texture.IsValid() ||
+				texture->m_HasSrv)
+			{
+				Fail("The cache-hit texture could not return to non-resident state.");
+				return;
+			}
+
+			assetManager.ClearTextureArtifactCache();
+			if (assetManager.GetTextureArtifactCacheStatistics().m_CachedEntryCount != 0)
+			{
+				Fail("Clearing the texture CPU artifact cache left cached entries behind.");
+				return;
+			}
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
 			config.m_EnableAutomaticEviction = false;
 			assetManager.SetResidencyConfig(config);
@@ -812,7 +915,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, CPU artifact cache reload, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
@@ -827,7 +930,7 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Asset Residency Lab",
 			.m_Category = "Systems",
-			.m_Description = "Validates logical residency, fence-safe release, and stable-ID source reload invariants.",
+			.m_Description = "Validates logical residency, fence-safe release, CPU artifact cache reload, and stable-ID source reload invariants.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

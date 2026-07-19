@@ -85,7 +85,8 @@ namespace gglab
 		m_LoadCoordinator(createInfo.m_LoadCoordinator),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
-		m_StateEvents(createInfo.m_StateEvents)
+		m_StateEvents(createInfo.m_StateEvents),
+		m_ArtifactCache(createInfo.m_ArtifactCache)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_LoadCoordinator != nullptr, "AssetLoadCoordinator is null!");
@@ -675,9 +676,12 @@ namespace gglab
 				.m_DebugName = m_Device ?
 					std::string(m_Device->GetTextureDebugName(texture->m_Gpu.m_Texture)) :
 					std::string{},
+				.m_ArtifactContentDigest = texture->m_Source.m_ArtifactContentDigest,
 				.m_IsUploaded = texture->m_Gpu.m_IsUploaded,
 				.m_HasSrv = texture->m_Gpu.m_Srv.IsValid(),
 				.m_IsReserved = IsReservedTextureId(textureId),
+				.m_IsCpuArtifactCached = m_ArtifactCache.Contains(
+					texture->m_Source.m_ArtifactContentDigest),
 			});
 		}
 		return infos;
@@ -774,7 +778,8 @@ namespace gglab
 		TextureID textureId,
 		TextureAssetData&& textureData,
 		const TextureImportSettings& importSettings,
-		AssetContentFingerprint contentFingerprint) noexcept
+		AssetContentFingerprint contentFingerprint,
+		ArtifactContentDigest artifactContentDigest) noexcept
 	{
 		if (!contentFingerprint.IsValid())
 		{
@@ -782,12 +787,51 @@ namespace gglab
 				textureData,
 				importSettings);
 		}
+		if (!artifactContentDigest.IsValid())
+		{
+			artifactContentDigest = ComputeTextureArtifactContentDigest(textureData);
+		}
+		return MakeTextureUploadData(
+			textureId,
+			TextureArtifact{
+				.m_Data = std::move(textureData),
+				.m_ContentDigest = artifactContentDigest,
+			},
+			importSettings,
+			contentFingerprint);
+	}
+
+	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(
+		TextureID textureId,
+		TextureArtifact&& artifact,
+		const TextureImportSettings& importSettings,
+		AssetContentFingerprint contentFingerprint) noexcept
+	{
+		TextureArtifactHandle artifactHandle = m_ArtifactCache.CreateAndAdmit(
+			std::move(artifact));
+		if (!artifactHandle)
+		{
+			return {};
+		}
+		return MakeTextureUploadData(
+			textureId,
+			std::move(artifactHandle),
+			importSettings,
+			contentFingerprint);
+	}
+
+	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(
+		TextureID textureId,
+		TextureArtifactHandle artifact,
+		const TextureImportSettings& importSettings,
+		AssetContentFingerprint contentFingerprint) noexcept
+	{
 		TextureUploadData uploadData{};
 		uploadData.m_TextureId = textureId;
 		uploadData.m_ImportSettings = importSettings;
 		uploadData.m_ColorSpace = GetTextureColorSpaceFromSemantic(
 			importSettings.m_Semantic);
-		uploadData.m_TextureData = std::move(textureData);
+		uploadData.m_Artifact = std::move(artifact);
 		uploadData.m_ContentFingerprint = contentFingerprint;
 		return uploadData;
 	}
@@ -818,7 +862,18 @@ namespace gglab
 			residencyOperation,
 			operationPhase);
 
-		const TextureAssetData& textureData = uploadData.m_TextureData;
+		if (!uploadData.m_Artifact || !uploadData.m_Artifact->IsValid())
+		{
+			SetTextureState(
+				*texture,
+				AssetState::Failed,
+				residencyOperation,
+				operationPhase);
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureAssetSystem::UploadTexture received an invalid texture artifact.");
+			return false;
+		}
+		const TextureAssetData& textureData = uploadData.m_Artifact->m_Data;
 		ProgressReporter(texture->m_Load.m_Progress).Report(
 			0.68f,
 			"Recording texture upload",
@@ -897,6 +952,8 @@ namespace gglab
 		texture->m_Gpu.m_Desc = textureDesc;
 		texture->m_Gpu.m_Desc.m_DebugName = nullptr;
 		texture->m_Source.m_ContentFingerprint = uploadData.m_ContentFingerprint;
+		texture->m_Source.m_ArtifactContentDigest =
+			uploadData.m_Artifact->m_ContentDigest;
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		if (!transferBatch.UploadTexture(texture->m_Gpu.m_Texture, textureUploadData))
@@ -1021,7 +1078,7 @@ namespace gglab
 		AssetResidencyOperation residencyOperation) noexcept
 	{
 		Texture* texture = EditTexture(uploadData.m_TextureId);
-		if (!texture || !uploadData.m_TextureData.IsValid())
+		if (!texture || !uploadData.m_Artifact || !uploadData.m_Artifact->IsValid())
 		{
 			return false;
 		}
@@ -1034,7 +1091,7 @@ namespace gglab
 		const TextureID textureId = uploadData.m_TextureId;
 		const uint64_t generation = texture->m_ContentGeneration;
 		const AssetStreamingWorkEstimate estimate =
-			EstimateTextureUpload(uploadData.m_TextureData);
+			EstimateTextureUpload(uploadData.m_Artifact->m_Data);
 		if (texture->m_State != AssetState::Publishing)
 		{
 			SetTextureState(
@@ -1091,9 +1148,8 @@ namespace gglab
 				if (!RecordTextureUpload(
 					textureId,
 					generation,
-					payload->m_ImportSettings,
 					priority,
-					std::move(payload->m_TextureData),
+					std::move(*payload),
 					residencyOperation))
 				{
 					const bool residencyReload = currentTexture->m_Load.m_IsReloading;
@@ -1114,9 +1170,8 @@ namespace gglab
 	bool TextureAssetSystem::RecordTextureUpload(
 		TextureID textureId,
 		uint64_t generation,
-		const TextureImportSettings& importSettings,
 		TaskPriority priority,
-		TextureAssetData&& textureData,
+		TextureUploadData uploadData,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
 		Texture* texture = EditTexture(textureId);
@@ -1125,9 +1180,10 @@ namespace gglab
 			return false;
 		}
 		GGLAB_ASSERT_MSG(
-			texture->m_Source.m_ImportSettings == importSettings,
+			texture->m_Source.m_ImportSettings == uploadData.m_ImportSettings,
 			"Recorded texture upload settings do not match the source identity.");
-		if (texture->m_Source.m_ImportSettings != importSettings)
+		if (texture->m_Source.m_ImportSettings != uploadData.m_ImportSettings ||
+			!uploadData.m_Artifact || !uploadData.m_Artifact->IsValid())
 		{
 			return false;
 		}
@@ -1142,11 +1198,8 @@ namespace gglab
 			residencyOperation,
 			ResidencyStateEventPhase(residencyOperation));
 
-		const AssetStreamingWorkEstimate estimate = EstimateTextureUpload(textureData);
-		auto uploadData = MakeTextureUploadData(
-			textureId,
-			std::move(textureData),
-			importSettings);
+		const AssetStreamingWorkEstimate estimate = EstimateTextureUpload(
+			uploadData.m_Artifact->m_Data);
 		const AssetUploadHandle uploadHandle = m_AssetUploadScheduler->RecordUpload(
 			{
 				.m_Name = std::format("Texture {}", textureId.Value()),
@@ -1224,8 +1277,8 @@ namespace gglab
 			return;
 		}
 
-		auto payload = std::make_shared<TextureAssetData>(std::move(result.m_TextureData));
-		const AssetStreamingWorkEstimate estimate = EstimateTextureUpload(*payload);
+		auto payload = std::make_shared<TextureArtifact>(std::move(result.m_Artifact));
+		const AssetStreamingWorkEstimate estimate = EstimateTextureUpload(payload->m_Data);
 		const AssetOperationToken operation = result.m_Operation;
 		const TaskCompletionInfo completion = result.m_Completion;
 		const TextureSemantic semantic = result.m_Semantic;
@@ -1275,7 +1328,7 @@ namespace gglab
 		AssetOperationToken operation,
 		TextureSemantic semantic,
 		const TaskCompletionInfo& completion,
-		TextureAssetData&& textureData,
+		TextureArtifact&& artifact,
 		AssetContentFingerprint contentFingerprint,
 		bool residencyReload,
 		AssetResidencyOperation residencyOperation) noexcept
@@ -1371,7 +1424,7 @@ namespace gglab
 			completion.m_Name);
 		auto uploadData = MakeTextureUploadData(
 			textureId,
-			std::move(textureData),
+			std::move(artifact),
 			texture->m_Source.m_ImportSettings,
 			contentFingerprint);
 		if (!QueueTextureUpload(
@@ -1517,8 +1570,7 @@ namespace gglab
 		{
 			return {};
 		}
-		if (texture->m_State != AssetState::CpuReady || texture->m_ResidencyEpoch == 0 ||
-			texture->m_Source.m_CanonicalPath.empty())
+		if (texture->m_State != AssetState::CpuReady || texture->m_ResidencyEpoch == 0)
 		{
 			return {};
 		}
@@ -1535,6 +1587,41 @@ namespace gglab
 
 		texture->m_Load.m_CancelRequested = false;
 		texture->m_Load.m_IsReloading = true;
+		if (TextureArtifactHandle artifact = m_ArtifactCache.Find(
+			texture->m_Source.m_ArtifactContentDigest))
+		{
+			ProgressReporter(texture->m_Load.m_Progress).Report(
+				0.62f,
+				"Texture CPU artifact cache hit",
+				ArtifactContentDigestText(artifact->m_ContentDigest));
+			TextureUploadData uploadData = MakeTextureUploadData(
+				textureId,
+				std::move(artifact),
+				texture->m_Source.m_ImportSettings,
+				texture->m_Source.m_ContentFingerprint);
+			if (QueueTextureUpload(
+				std::move(uploadData),
+				priority,
+				operation))
+			{
+				return {};
+			}
+		}
+
+		if (texture->m_Source.m_CanonicalPath.empty())
+		{
+			texture->m_Load.m_IsReloading = false;
+			SetTextureState(
+				*texture,
+				AssetState::CpuReady,
+				operation,
+				AssetStateEventOperationPhase::Completes);
+			ProgressReporter(texture->m_Load.m_Progress).Report(
+				0.05f,
+				"Texture residency reload unavailable",
+				"CPU artifact cache miss and no source path");
+			return {};
+		}
 		const TaskHandle task = QueueTextureLoad(
 			textureId,
 			texture->m_Source.m_CanonicalPath,

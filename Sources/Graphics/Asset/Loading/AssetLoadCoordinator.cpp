@@ -2,6 +2,7 @@
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Core/Task/TaskSystem.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
+#include "Graphics/Asset/TextureArtifact.h"
 
 namespace gglab
 {
@@ -16,6 +17,7 @@ namespace gglab
 		{
 			TextureAssetData m_TextureData;
 			AssetContentFingerprint m_ContentFingerprint{};
+			ArtifactContentDigest m_ArtifactContentDigest{};
 		};
 	}
 
@@ -260,10 +262,13 @@ namespace gglab
 						"Failed to decode texture '{}'.",
 						sourcePath.string()));
 				}
+				job->m_ArtifactContentDigest = ComputeTextureArtifactContentDigest(
+					job->m_TextureData);
 				job->m_ContentFingerprint = ComputeTextureContentFingerprint(
 					job->m_TextureData,
 					importSettings);
-				if (!job->m_ContentFingerprint.IsValid())
+				if (!job->m_ArtifactContentDigest.IsValid() ||
+					!job->m_ContentFingerprint.IsValid())
 				{
 					return TaskResult::Failure(std::format(
 						"Failed to fingerprint decoded texture '{}'.",
@@ -284,7 +289,10 @@ namespace gglab
 						.m_Operation = operation,
 						.m_Completion = completion,
 						.m_Semantic = semantic,
-						.m_TextureData = std::move(job->m_TextureData),
+						.m_Artifact = {
+							.m_Data = std::move(job->m_TextureData),
+							.m_ContentDigest = job->m_ArtifactContentDigest,
+						},
 						.m_ContentFingerprint = job->m_ContentFingerprint,
 						.m_ResidencyReload = residencyReload,
 						.m_ResidencyOperation = residencyOperation,

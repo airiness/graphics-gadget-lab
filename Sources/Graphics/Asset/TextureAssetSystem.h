@@ -4,6 +4,7 @@
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/Asset/Store/TextureStore.h"
 #include "Graphics/Asset/TextureAssetViews.h"
+#include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/Asset/TextureAsset.h"
@@ -34,6 +35,7 @@ namespace gglab
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 			AssetStateEventQueue* m_StateEvents = nullptr;
+			TextureArtifactCacheConfig m_ArtifactCache{};
 		};
 
 		struct TextureLoadRequest
@@ -49,7 +51,7 @@ namespace gglab
 		{
 			TextureID m_TextureId{};
 			TextureImportSettings m_ImportSettings{};
-			TextureAssetData m_TextureData;
+			TextureArtifactHandle m_Artifact;
 			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
 			AssetContentFingerprint m_ContentFingerprint{};
 		};
@@ -91,7 +93,18 @@ namespace gglab
 			TextureID textureId,
 			TextureAssetData&& textureData,
 			const TextureImportSettings& importSettings,
-			AssetContentFingerprint contentFingerprint = {}) noexcept;
+			AssetContentFingerprint contentFingerprint = {},
+			ArtifactContentDigest artifactContentDigest = {}) noexcept;
+		TextureUploadData MakeTextureUploadData(
+			TextureID textureId,
+			TextureArtifact&& artifact,
+			const TextureImportSettings& importSettings,
+			AssetContentFingerprint contentFingerprint) noexcept;
+		TextureUploadData MakeTextureUploadData(
+			TextureID textureId,
+			TextureArtifactHandle artifact,
+			const TextureImportSettings& importSettings,
+			AssetContentFingerprint contentFingerprint) noexcept;
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
 			TransferBatch& transferBatch,
@@ -105,6 +118,11 @@ namespace gglab
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;
+		[[nodiscard]] TextureArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept
+		{
+			return m_ArtifactCache.GetStatistics();
+		}
+		void ClearArtifactCache() noexcept { m_ArtifactCache.Clear(); }
 		[[nodiscard]] uint32_t GetReloadingTextureCount() const noexcept;
 		[[nodiscard]] size_t GetTextureCount() const noexcept { return m_Store.Size(); }
 		[[nodiscard]] std::vector<TextureID> GetTextureIds() const;
@@ -150,9 +168,8 @@ namespace gglab
 		bool RecordTextureUpload(
 			TextureID textureId,
 			uint64_t generation,
-			const TextureImportSettings& importSettings,
 			TaskPriority priority,
-			TextureAssetData&& textureData,
+			TextureUploadData uploadData,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
 		void CancelTextureIfUnreferenced(TextureID textureId, uint64_t generation) noexcept;
 		void UpdateTextureLoadPriority(
@@ -172,7 +189,7 @@ namespace gglab
 			AssetOperationToken operation,
 			TextureSemantic semantic,
 			const TaskCompletionInfo& completion,
-			TextureAssetData&& textureData,
+			TextureArtifact&& artifact,
 			AssetContentFingerprint contentFingerprint,
 			bool residencyReload,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
@@ -200,6 +217,7 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		AssetStateEventQueue* m_StateEvents = nullptr;
+		TextureArtifactCache m_ArtifactCache;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureStore m_Store;

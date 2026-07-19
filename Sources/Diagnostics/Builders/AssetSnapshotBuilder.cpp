@@ -69,6 +69,21 @@ namespace gglab
 		snapshot.m_ResidencyRevalidationRejectionCount =
 			residency.m_RevalidationRejectionCount;
 		snapshot.m_ResidencyStaleCompletionCount = residency.m_StaleCompletionCount;
+		const TextureArtifactCacheStatistics artifactCache =
+			assetManager.GetTextureArtifactCacheStatistics();
+		snapshot.m_TextureArtifactCacheBudgetBytes = artifactCache.m_BudgetBytes;
+		snapshot.m_TextureArtifactCachedBytes = artifactCache.m_CachedBytes;
+		snapshot.m_TextureArtifactExternallyRetainedBytes =
+			artifactCache.m_ExternallyRetainedBytes;
+		snapshot.m_TextureArtifactTotalLiveBytes = artifactCache.m_TotalLiveBytes;
+		snapshot.m_TextureArtifactCachedEntryCount = artifactCache.m_CachedEntryCount;
+		snapshot.m_TextureArtifactCacheHitCount = artifactCache.m_HitCount;
+		snapshot.m_TextureArtifactCacheMissCount = artifactCache.m_MissCount;
+		snapshot.m_TextureArtifactAdmissionCount = artifactCache.m_AdmissionCount;
+		snapshot.m_TextureArtifactAdmissionRejectedCount =
+			artifactCache.m_AdmissionRejectedCount;
+		snapshot.m_TextureArtifactEvictionCount = artifactCache.m_EvictionCount;
+		snapshot.m_TextureArtifactEvictedBytes = artifactCache.m_EvictedBytes;
 
 		const auto isEvictionCandidate = [&assetManager](
 			AssetKind kind,
@@ -207,9 +222,12 @@ namespace gglab
 			textureSnapshot.m_Name = texture.m_Name;
 			textureSnapshot.m_Texture = texture.m_Texture;
 			textureSnapshot.m_DebugName = texture.m_DebugName;
+			textureSnapshot.m_ArtifactContentDigest =
+				texture.m_ArtifactContentDigest;
 			textureSnapshot.m_IsUploaded = texture.m_IsUploaded;
 			textureSnapshot.m_HasSrv = texture.m_HasSrv;
 			textureSnapshot.m_IsReserved = texture.m_IsReserved;
+			textureSnapshot.m_IsCpuArtifactCached = texture.m_IsCpuArtifactCached;
 			textureSnapshot.m_IsEvictionCandidate = isEvictionCandidate(
 				AssetKind::Texture,
 				texture.m_Content.m_Id.Value(),
