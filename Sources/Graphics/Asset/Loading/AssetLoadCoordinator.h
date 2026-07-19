@@ -7,6 +7,7 @@
 #include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
 #include "Graphics/Asset/TextureAsset.h"
 #include "Graphics/Asset/TextureArtifact.h"
+#include "Graphics/Asset/ModelImportArtifact.h"
 
 #include <filesystem>
 #include <unordered_map>
@@ -16,6 +17,7 @@
 namespace gglab
 {
 	class TaskSystem;
+	class ModelImportArtifactCache;
 
 	struct AssetLoadSubmission
 	{
@@ -32,7 +34,7 @@ namespace gglab
 	{
 		AssetOperationToken m_Operation{};
 		TaskCompletionInfo m_Completion{};
-		ImportedModel m_Model;
+		ModelImportArtifactHandle m_Artifact;
 	};
 
 	struct ModelImportFailed
@@ -45,7 +47,7 @@ namespace gglab
 	{
 		AssetOperationToken m_Operation{};
 		TaskCompletionInfo m_Completion{};
-		ImportedModel m_Model;
+		ModelImportArtifactHandle m_Artifact;
 	};
 
 	struct MeshReloadFailed
@@ -100,6 +102,7 @@ namespace gglab
 		std::filesystem::path m_SourcePath;
 		ModelImportSettings m_ImportSettings{};
 		TaskPriority m_Priority = TaskPriority::Normal;
+		ArtifactContentDigest m_ExpectedArtifactContentDigest{};
 	};
 
 	struct TextureDecodeRequest
@@ -122,6 +125,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			TaskSystem* m_TaskSystem = nullptr;
+			ModelImportArtifactCache* m_ModelImportArtifactCache = nullptr;
 			std::filesystem::path m_TextureDerivedDataCacheDirectory;
 		};
 
@@ -211,6 +215,7 @@ namespace gglab
 			AssetOperationToken operation) noexcept;
 
 		TaskSystem* m_TaskSystem = nullptr;
+		ModelImportArtifactCache* m_ModelImportArtifactCache = nullptr;
 		TextureDerivedDataSystem m_TextureDerivedDataSystem;
 		uint64_t m_NextOperationSerial = 1;
 		OperationMap m_ModelImports;

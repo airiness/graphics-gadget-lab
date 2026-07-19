@@ -44,18 +44,16 @@ namespace gglab
 		}
 
 		[[nodiscard]] ModelPublicationTextureResult PublishTexture(
-			ImportedTexture& importedTexture,
+			const ImportedTexture& importedTexture,
 			TaskPriority priority) noexcept override
 		{
 			ModelPublicationTextureResult result{};
 			const uint64_t sourceBytes = static_cast<uint64_t>(
 				importedTexture.m_Data.m_Pixels.size());
-			const auto fail = [&importedTexture, sourceBytes](
+			const auto fail = [](
 				ModelPublicationTextureResult& failedResult,
 				std::string error) noexcept -> ModelPublicationTextureResult
 				{
-					importedTexture = {};
-					failedResult.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 					failedResult.m_Error = std::move(error);
 					return std::move(failedResult);
 				};
@@ -152,19 +150,17 @@ namespace gglab
 			}
 			if (!created)
 			{
-				importedTexture = {};
-				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				return result;
 			}
 
+			TextureAssetData textureData = importedTexture.m_Data;
 			auto uploadData = textureAssets.MakeTextureUploadData(
 				textureId,
-				std::move(importedTexture.m_Data),
+				std::move(textureData),
 				importedTexture.m_ImportSettings);
 			const bool queued = textureAssets.QueueTextureUpload(
 				std::move(uploadData),
 				priority);
-			importedTexture = {};
 			result.m_Usage.m_ResourceCreations = 1;
 			if (!queued)
 			{
@@ -173,7 +169,6 @@ namespace gglab
 				result.m_Dependency = {};
 				result.m_TextureId.Reset();
 				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
-				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				result.m_Error = std::format(
 					"Failed to queue texture {} upload",
 					textureId.Value());
@@ -235,7 +230,7 @@ namespace gglab
 		[[nodiscard]] ModelPublicationMeshResult PublishMesh(
 			const AssetContentVersion& modelVersion,
 			uint32_t sourceMeshIndex,
-			ImportedMesh& importedMesh,
+			const ImportedMesh& importedMesh,
 			TaskPriority priority) noexcept override
 		{
 			ModelPublicationMeshResult result{};
@@ -248,7 +243,6 @@ namespace gglab
 			Mesh* mesh = m_AssetManager->EditMesh(meshId);
 			if (!meshId.IsValid() || !mesh)
 			{
-				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				result.m_Error = "Failed to create mesh entry during model publication";
 				return result;
 			}
@@ -278,16 +272,14 @@ namespace gglab
 
 			AssetManager::MeshUploadData uploadData{};
 			uploadData.m_MeshId = meshId;
-			uploadData.m_VerticesData = std::move(importedMesh.m_Vertices);
-			uploadData.m_IndicesData = std::move(importedMesh.m_Indices);
-			importedMesh.m_Name.clear();
+			uploadData.m_VerticesData = importedMesh.m_Vertices;
+			uploadData.m_IndicesData = importedMesh.m_Indices;
 			const bool queued = m_AssetManager->QueueMeshUpload(
 				std::move(uploadData),
 				priority);
 			result.m_Usage.m_ResourceCreations = 1;
 			if (!queued)
 			{
-				result.m_Usage.m_PayloadBytesDestroyed = sourceBytes;
 				result.m_Error = std::format(
 					"Failed to queue mesh {} upload",
 					meshId.Value());

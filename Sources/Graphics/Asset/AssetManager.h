@@ -8,6 +8,7 @@
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
+#include "Graphics/Asset/ModelImportArtifactCache.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -93,6 +94,7 @@ namespace gglab
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 			TextureArtifactCacheConfig m_TextureArtifactCache{};
+			ModelImportArtifactCacheConfig m_ModelImportArtifactCache{};
 			std::filesystem::path m_TextureDerivedDataCacheDirectory;
 		};
 
@@ -156,6 +158,8 @@ namespace gglab
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] TextureArtifactCacheStatistics GetTextureArtifactCacheStatistics() const noexcept;
 		void ClearTextureArtifactCache() noexcept;
+		[[nodiscard]] ModelImportArtifactCacheStatistics GetModelImportArtifactCacheStatistics() const noexcept;
+		void ClearModelImportArtifactCache() noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept;
 		[[nodiscard]] TextureDerivedDataCoordinatorStatistics
 		GetTextureDerivedDataCoordinatorStatistics() const noexcept;
@@ -199,19 +203,19 @@ namespace gglab
 		void RouteModelImportCompletion(
 			AssetOperationToken operation,
 			const TaskCompletionInfo& completion,
-			ImportedModel&& importedModel) noexcept;
+			ModelImportArtifactHandle artifact) noexcept;
 		void RouteMeshReloadCompletion(
 			AssetOperationToken operation,
 			const TaskCompletionInfo& completion,
-			ImportedModel&& importedModel) noexcept;
+			ModelImportArtifactHandle artifact) noexcept;
 		void CompleteModelLoad(
 			AssetOperationToken operation,
 			const TaskCompletionInfo& completion,
-			ImportedModel&& importedModel) noexcept;
+			ModelImportArtifactHandle artifact) noexcept;
 		void CompleteMeshReload(
 			AssetOperationToken operation,
 			const TaskCompletionInfo& completion,
-			ImportedModel&& importedModel) noexcept;
+			ModelImportArtifactHandle artifact) noexcept;
 
 		MeshID CreateMesh() noexcept;
 		ModelID CreateModel(
@@ -337,6 +341,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		ModelImportArtifactCache m_ModelImportArtifactCache;
 		AssetLoadCoordinator m_AssetLoadCoordinator;
 		// State events outlive TextureAssetSystem so the injected sink remains valid
 		// through texture-domain shutdown and destruction.

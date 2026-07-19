@@ -23,6 +23,7 @@ namespace gglab
 			std::filesystem::path m_SourcePath;
 			ModelType m_Type = ModelType::Invalid;
 			StringID m_Name{};
+			ArtifactContentDigest m_ImportArtifactContentDigest{};
 			uint32_t m_MeshInstanceCount = 0;
 			uint32_t m_DependencyCount = 0;
 			uint32_t m_ReadyDependencyCount = 0;
@@ -31,6 +32,7 @@ namespace gglab
 			uint32_t m_CancelledDependencyCount = 0;
 			uint64_t m_DependencyEventUpdateCount = 0;
 			bool m_HasDependencyState = false;
+			bool m_IsImportArtifactCached = false;
 			bool m_IsEvictionCandidate = false;
 		};
 
@@ -144,6 +146,17 @@ namespace gglab
 		uint64_t m_ResidencyStaleStateEventCount = 0;
 		uint64_t m_ResidencyRevalidationRejectionCount = 0;
 		uint64_t m_ResidencyStaleCompletionCount = 0;
+		uint64_t m_ModelImportArtifactCacheBudgetBytes = 0;
+		uint64_t m_ModelImportArtifactCachedBytes = 0;
+		uint64_t m_ModelImportArtifactExternallyRetainedBytes = 0;
+		uint64_t m_ModelImportArtifactTotalLiveBytes = 0;
+		uint32_t m_ModelImportArtifactCachedEntryCount = 0;
+		uint64_t m_ModelImportArtifactCacheHitCount = 0;
+		uint64_t m_ModelImportArtifactCacheMissCount = 0;
+		uint64_t m_ModelImportArtifactAdmissionCount = 0;
+		uint64_t m_ModelImportArtifactAdmissionRejectedCount = 0;
+		uint64_t m_ModelImportArtifactEvictionCount = 0;
+		uint64_t m_ModelImportArtifactEvictedBytes = 0;
 		uint64_t m_TextureArtifactCacheBudgetBytes = 0;
 		uint64_t m_TextureArtifactCachedBytes = 0;
 		uint64_t m_TextureArtifactExternallyRetainedBytes = 0;

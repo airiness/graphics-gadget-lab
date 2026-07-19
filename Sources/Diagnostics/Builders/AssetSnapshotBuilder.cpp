@@ -69,6 +69,21 @@ namespace gglab
 		snapshot.m_ResidencyRevalidationRejectionCount =
 			residency.m_RevalidationRejectionCount;
 		snapshot.m_ResidencyStaleCompletionCount = residency.m_StaleCompletionCount;
+		const ModelImportArtifactCacheStatistics modelArtifactCache =
+			assetManager.GetModelImportArtifactCacheStatistics();
+		snapshot.m_ModelImportArtifactCacheBudgetBytes = modelArtifactCache.m_BudgetBytes;
+		snapshot.m_ModelImportArtifactCachedBytes = modelArtifactCache.m_CachedBytes;
+		snapshot.m_ModelImportArtifactExternallyRetainedBytes =
+			modelArtifactCache.m_ExternallyRetainedBytes;
+		snapshot.m_ModelImportArtifactTotalLiveBytes = modelArtifactCache.m_TotalLiveBytes;
+		snapshot.m_ModelImportArtifactCachedEntryCount = modelArtifactCache.m_CachedEntryCount;
+		snapshot.m_ModelImportArtifactCacheHitCount = modelArtifactCache.m_HitCount;
+		snapshot.m_ModelImportArtifactCacheMissCount = modelArtifactCache.m_MissCount;
+		snapshot.m_ModelImportArtifactAdmissionCount = modelArtifactCache.m_AdmissionCount;
+		snapshot.m_ModelImportArtifactAdmissionRejectedCount =
+			modelArtifactCache.m_AdmissionRejectedCount;
+		snapshot.m_ModelImportArtifactEvictionCount = modelArtifactCache.m_EvictionCount;
+		snapshot.m_ModelImportArtifactEvictedBytes = modelArtifactCache.m_EvictedBytes;
 		const TextureArtifactCacheStatistics artifactCache =
 			assetManager.GetTextureArtifactCacheStatistics();
 		snapshot.m_TextureArtifactCacheBudgetBytes = artifactCache.m_BudgetBytes;
@@ -163,6 +178,11 @@ namespace gglab
 			modelSnapshot.m_SourcePath = model->m_SourcePath;
 			modelSnapshot.m_Type = model->m_Type;
 			modelSnapshot.m_Name = model->m_Name;
+			modelSnapshot.m_ImportArtifactContentDigest =
+				model->m_ImportArtifactContentDigest;
+			modelSnapshot.m_IsImportArtifactCached =
+				assetManager.m_ModelImportArtifactCache.Contains(
+					model->m_ImportArtifactContentDigest);
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());
 			if (const AssetDependencyModelState* dependencyState =
 				assetManager.m_AssetDependencyGraph.FindModel(

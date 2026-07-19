@@ -11,6 +11,7 @@
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIResource.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Core/Utility/TypeUtils.h"
 
 #include <cstdint>
@@ -529,6 +530,7 @@ namespace gglab
 		StringID m_Name;
 		ModelType m_Type = ModelType::Invalid;
 		std::filesystem::path m_SourcePath;
+		ArtifactContentDigest m_ImportArtifactContentDigest{};
 		ProgressChannelPtr m_LoadProgress;
 		bool m_CancelRequested = false;
 		std::vector<ModelMesh> m_MeshInstance;
