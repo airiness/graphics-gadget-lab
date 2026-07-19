@@ -11,6 +11,7 @@
 #include "Core/Math/MathFunctions.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab
@@ -146,18 +147,63 @@ namespace gglab
 			}
 		}
 
-		static void DrawBakePipelineStatus(const IBLDiagnosticsSnapshot& snapshot) noexcept
+		static void DrawBakePipelineStatus(
+			const IBLDiagnosticsSnapshot& snapshot,
+			IBLBakeScheduler* scheduler) noexcept
 		{
 			const auto& bake = snapshot.m_BakeStatus;
+			const char* cacheSource = "miss";
+			if (bake.m_CpuCacheHit)
+			{
+				cacheSource = "CPU cache hit";
+			}
+			else if (bake.m_DerivedDataCacheHit)
+			{
+				cacheSource = "local DDC hit";
+			}
 			ImGui::Text("Stage: %s", GetIBLBakeStageName(bake.m_Stage).data());
 			ImGui::ProgressBar(bake.m_Progress, ImVec2(-1.0f, 0.0f));
 			ImGui::Text("Generation: requested %llu | baking %llu | active %llu",
 				static_cast<unsigned long long>(bake.m_RequestedGeneration),
 				static_cast<unsigned long long>(bake.m_BakingGeneration),
 				static_cast<unsigned long long>(bake.m_ActiveGeneration));
-			ImGui::Text("Cache: %s | key %016llx",
-				bake.m_CacheHit ? "hit" : "miss",
-				static_cast<unsigned long long>(bake.m_CacheKey));
+			ImGui::Text("Cache: %s%s",
+				cacheSource,
+				bake.m_CacheWritePending ? " | DDC write pending" : "");
+			ImGui::TextDisabled(
+				"Key: %s | artifact: %s",
+				DerivedDataKeyText(bake.m_DerivedDataKey).c_str(),
+				ArtifactContentDigestText(bake.m_ArtifactContentDigest).c_str());
+			const auto& cpuCache = snapshot.m_ArtifactCache;
+			ImGui::Text(
+				"CPU cache: %u entries | %.1f / %.1f MiB | hit %llu | miss %llu | evicted %llu",
+				cpuCache.m_CachedEntryCount,
+				static_cast<double>(cpuCache.m_CachedBytes) / (1024.0 * 1024.0),
+				static_cast<double>(cpuCache.m_BudgetBytes) / (1024.0 * 1024.0),
+				static_cast<unsigned long long>(cpuCache.m_HitCount),
+				static_cast<unsigned long long>(cpuCache.m_MissCount),
+				static_cast<unsigned long long>(cpuCache.m_EvictionCount));
+			const auto& ddc = snapshot.m_DerivedDataStore;
+			ImGui::Text(
+				"Local DDC: %llu entries | %.1f MiB | hit %llu | miss %llu | corrupt %llu | write failures %llu",
+				static_cast<unsigned long long>(ddc.m_StoredEntryCount),
+				static_cast<double>(ddc.m_StoredBytes) / (1024.0 * 1024.0),
+				static_cast<unsigned long long>(ddc.m_HitCount),
+				static_cast<unsigned long long>(ddc.m_MissCount),
+				static_cast<unsigned long long>(ddc.m_CorruptionCount),
+				static_cast<unsigned long long>(ddc.m_WriteFailureCount));
+			if (scheduler && ImGui::Button("Clear IBL CPU Cache"))
+			{
+				scheduler->ClearArtifactCache();
+			}
+			if (scheduler)
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("Clear IBL Local DDC"))
+				{
+					scheduler->ClearDerivedDataStore();
+				}
+			}
 			if (bake.m_GpuTimingAvailable)
 			{
 				ImGui::Text("Bake GPU: %.3f ms", bake.m_GpuMilliseconds);
@@ -292,7 +338,9 @@ namespace gglab
 
 		if (diagnosticsSnapshot && ImGui::CollapsingHeader("Bake Pipeline", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			DrawBakePipelineStatus(*diagnosticsSnapshot);
+			DrawBakePipelineStatus(
+				*diagnosticsSnapshot,
+				renderer->GetIBLBakeScheduler());
 		}
 
 		if (environmentSystem && ImGui::CollapsingHeader("Environment Settings", ImGuiTreeNodeFlags_DefaultOpen))

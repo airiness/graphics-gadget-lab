@@ -21,6 +21,8 @@ namespace gglab
 	public:
 		[[nodiscard]] static std::vector<std::byte> Serialize(
 			const TextureArtifact& artifact) noexcept;
+		[[nodiscard]] static std::vector<std::byte> SerializeTextureData(
+			const TextureAssetData& textureData) noexcept;
 		[[nodiscard]] static TextureArtifactDecodeResult Deserialize(
 			std::span<const std::byte> payload,
 			const ArtifactContentDigest& expectedContentDigest) noexcept;

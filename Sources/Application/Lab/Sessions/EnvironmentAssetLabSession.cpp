@@ -2,6 +2,7 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/EnvironmentAssetController.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
@@ -18,6 +19,9 @@ namespace gglab
 			WaitForInvalidShape,
 			ObserveFallback,
 			WaitForReselection,
+			WaitForInitialBundle,
+			WaitForCpuCacheHit,
+			WaitForDerivedDataCacheHit,
 			Completed,
 		};
 
@@ -25,6 +29,10 @@ namespace gglab
 		size_t m_ExpectedActiveIndex = EnvironmentAssetController::InvalidEntryIndex;
 		size_t m_ProbeEntryIndex = EnvironmentAssetController::InvalidEntryIndex;
 		float m_ElapsedSeconds = 0.0f;
+		uint64_t m_PreviousIBLGeneration = 0;
+		uint64_t m_DerivedDataHitCountBaseline = 0;
+		DerivedDataKey m_IBLKey{};
+		ArtifactContentDigest m_IBLArtifactDigest{};
 		Phase m_Phase = Phase::WaitForInitialEnvironment;
 		bool m_Passed = false;
 		std::vector<std::string> m_Errors;
@@ -279,6 +287,117 @@ namespace gglab
 				Fail("Environment reselection did not replace the fallback.");
 				return;
 			}
+			m_State->m_Phase = State::Phase::WaitForInitialBundle;
+			break;
+		}
+
+		case State::Phase::WaitForInitialBundle:
+		{
+			IBLBakeScheduler& scheduler =
+				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			const IBLBakeStatus& status = scheduler.GetStatus();
+			if (status.m_Stage == IBLBakeStage::Failed)
+			{
+				Fail("The final environment IBL bundle failed to bake or load.");
+				return;
+			}
+			if (status.m_Stage != IBLBakeStage::Ready ||
+				status.m_ActiveGeneration != status.m_RequestedGeneration ||
+				status.m_CacheWritePending)
+			{
+				break;
+			}
+			const auto cpuCache = scheduler.GetArtifactCacheStatistics();
+			const auto ddc = scheduler.GetDerivedDataStoreStatistics();
+			if (!status.m_DerivedDataKey.IsValid() ||
+				!status.m_ArtifactContentDigest.IsValid() ||
+				cpuCache.m_CachedEntryCount == 0 ||
+				ddc.m_StoredEntryCount == 0)
+			{
+				Fail("The ready IBL bundle was not published to both CPU cache and local DDC.");
+				return;
+			}
+			m_State->m_IBLKey = status.m_DerivedDataKey;
+			m_State->m_IBLArtifactDigest = status.m_ArtifactContentDigest;
+			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
+			m_Services.m_Renderer->GetEnvironmentLightingSystem()->RequestRebake(false);
+			m_State->m_Phase = State::Phase::WaitForCpuCacheHit;
+			break;
+		}
+
+		case State::Phase::WaitForCpuCacheHit:
+		{
+			IBLBakeScheduler& scheduler =
+				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			const IBLBakeStatus& status = scheduler.GetStatus();
+			if (status.m_Stage == IBLBakeStage::Failed)
+			{
+				Fail("The IBL CPU cache reload failed.");
+				return;
+			}
+			if (status.m_Stage != IBLBakeStage::Ready ||
+				status.m_ActiveGeneration == m_State->m_PreviousIBLGeneration)
+			{
+				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
+				{
+					Fail("The CPU cache reload replaced the active IBL bundle before publication.");
+				}
+				break;
+			}
+			if (status.m_ActiveGeneration != status.m_RequestedGeneration ||
+				!status.m_CacheHit || !status.m_CpuCacheHit ||
+				status.m_DerivedDataCacheHit ||
+				status.m_DerivedDataKey != m_State->m_IBLKey ||
+				status.m_ArtifactContentDigest != m_State->m_IBLArtifactDigest)
+			{
+				Fail("The repeated IBL request did not reuse the exact CPU bundle artifact.");
+				return;
+			}
+
+			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
+			scheduler.ClearArtifactCache();
+			if (scheduler.GetArtifactCacheStatistics().m_CachedEntryCount != 0)
+			{
+				Fail("Clearing the IBL CPU cache left cached bundle entries behind.");
+				return;
+			}
+			m_State->m_DerivedDataHitCountBaseline =
+				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
+			m_Services.m_Renderer->GetEnvironmentLightingSystem()->RequestRebake(false);
+			m_State->m_Phase = State::Phase::WaitForDerivedDataCacheHit;
+			break;
+		}
+
+		case State::Phase::WaitForDerivedDataCacheHit:
+		{
+			IBLBakeScheduler& scheduler =
+				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			const IBLBakeStatus& status = scheduler.GetStatus();
+			if (status.m_Stage == IBLBakeStage::Failed)
+			{
+				Fail("The IBL local DDC reload failed.");
+				return;
+			}
+			if (status.m_Stage != IBLBakeStage::Ready ||
+				status.m_ActiveGeneration == m_State->m_PreviousIBLGeneration)
+			{
+				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
+				{
+					Fail("The local DDC reload replaced the active IBL bundle before publication.");
+				}
+				break;
+			}
+			if (status.m_ActiveGeneration != status.m_RequestedGeneration ||
+				!status.m_CacheHit || status.m_CpuCacheHit ||
+				!status.m_DerivedDataCacheHit ||
+				status.m_DerivedDataKey != m_State->m_IBLKey ||
+				status.m_ArtifactContentDigest != m_State->m_IBLArtifactDigest ||
+				scheduler.GetDerivedDataStoreStatistics().m_HitCount <=
+					m_State->m_DerivedDataHitCountBaseline)
+			{
+				Fail("The IBL request did not restore the exact bundle artifact from local DDC.");
+				return;
+			}
 			Complete();
 			break;
 		}
@@ -308,7 +427,7 @@ namespace gglab
 					LabDiagnosticCheckStatus::Failed,
 			.m_Detail = m_State->m_Phase != State::Phase::Completed ?
 				"Verification is running." :
-				m_State->m_Passed ? "All environment asset invariants passed." :
+				m_State->m_Passed ? "Environment selection and IBL cache/DDC invariants passed." :
 					std::format("{} invariant errors.", m_State->m_Errors.size()),
 		});
 		for (const std::string& error : m_State->m_Errors)
@@ -339,7 +458,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ENVIRONMENT ASSET ACCEPTANCE PASS: rapid selection, immediate-failure invalidation, transactional replacement, failure isolation, shape validation, fallback reset, and reselection invariants passed in {:.2f} s.",
+			"ENVIRONMENT ASSET ACCEPTANCE PASS: transactional environment selection, atomic IBL publication, CPU bundle cache reuse, and local DDC restoration invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
@@ -354,9 +473,9 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Environment Asset Lab",
 			.m_Category = "Systems",
-			.m_Description = "Validates transactional HDR environment selection and fallback behavior.",
+			.m_Description = "Validates transactional HDR environment selection plus atomic IBL CPU cache and local DDC restoration.",
 			.m_Kind = LabKind::Pipeline,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 

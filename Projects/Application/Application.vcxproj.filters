@@ -786,9 +786,6 @@
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentAssetController.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\IBLBakeCache.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -798,10 +795,22 @@
 	<ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp">
 		<Filter>Graphics\Asset</Filter>
 	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLBundleArtifact.cpp">
+		<Filter>Graphics\Asset</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLBundleArtifactCache.cpp">
+		<Filter>Graphics\Asset</Filter>
+	</ClCompile>
 	<ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp">
 		<Filter>Core\Hash</Filter>
 	</ClCompile>
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLBundleArtifactCodec.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClCompile>
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
@@ -1146,6 +1155,12 @@
 		<Filter>Core\Hash</Filter>
 	</ClInclude>
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLBundleArtifactCodec.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClInclude>
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">
@@ -1805,15 +1820,18 @@
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\IBLBakeCache.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLBundleArtifact.h">
+		<Filter>Graphics\Asset</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLBundleArtifactCache.h">
+		<Filter>Graphics\Asset</Filter>
+	</ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>

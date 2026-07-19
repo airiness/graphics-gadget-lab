@@ -96,6 +96,32 @@ namespace gglab
 			settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
 		snapshot.m_SkyboxEnabled = settings.m_EnableSkybox;
 		snapshot.m_BakeStatus = bakeScheduler->GetStatus();
+		const auto artifactCache = bakeScheduler->GetArtifactCacheStatistics();
+		snapshot.m_ArtifactCache = {
+			.m_BudgetBytes = artifactCache.m_BudgetBytes,
+			.m_CachedBytes = artifactCache.m_CachedBytes,
+			.m_ExternallyRetainedBytes = artifactCache.m_ExternallyRetainedBytes,
+			.m_TotalLiveBytes = artifactCache.m_TotalLiveBytes,
+			.m_CachedEntryCount = artifactCache.m_CachedEntryCount,
+			.m_HitCount = artifactCache.m_HitCount,
+			.m_MissCount = artifactCache.m_MissCount,
+			.m_AdmissionCount = artifactCache.m_AdmissionCount,
+			.m_AdmissionRejectedCount = artifactCache.m_AdmissionRejectedCount,
+			.m_EvictionCount = artifactCache.m_EvictionCount,
+			.m_EvictedBytes = artifactCache.m_EvictedBytes,
+		};
+		const auto derivedDataStore = bakeScheduler->GetDerivedDataStoreStatistics();
+		snapshot.m_DerivedDataStore = {
+			.m_StoredBytes = derivedDataStore.m_StoredBytes,
+			.m_StoredEntryCount = derivedDataStore.m_StoredEntryCount,
+			.m_HitCount = derivedDataStore.m_HitCount,
+			.m_MissCount = derivedDataStore.m_MissCount,
+			.m_CorruptionCount = derivedDataStore.m_CorruptionCount,
+			.m_ReadBytes = derivedDataStore.m_ReadBytes,
+			.m_WriteCount = derivedDataStore.m_WriteCount,
+			.m_WriteFailureCount = derivedDataStore.m_WriteFailureCount,
+			.m_WrittenBytes = derivedDataStore.m_WrittenBytes,
+		};
 
 		if (environmentAssets)
 		{

@@ -18,6 +18,9 @@ namespace gglab
 		virtual ~RHIDevice() = default;
 
 		virtual RHIBackendType GetBackendType() const noexcept = 0;
+		// Stable across process launches and changes when the adapter or driver
+		// compatibility domain changes. It intentionally excludes transient LUIDs.
+		virtual std::string_view GetAdapterCompatibilityIdentity() const noexcept = 0;
 		virtual RHITextureHandle CreateTexture(
 			const RHITextureDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;

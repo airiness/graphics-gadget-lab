@@ -59,6 +59,34 @@ namespace gglab
 		bool m_Active = false;
 	};
 
+	struct IBLArtifactCacheDiagnostics
+	{
+		uint64_t m_BudgetBytes = 0;
+		uint64_t m_CachedBytes = 0;
+		uint64_t m_ExternallyRetainedBytes = 0;
+		uint64_t m_TotalLiveBytes = 0;
+		uint32_t m_CachedEntryCount = 0;
+		uint64_t m_HitCount = 0;
+		uint64_t m_MissCount = 0;
+		uint64_t m_AdmissionCount = 0;
+		uint64_t m_AdmissionRejectedCount = 0;
+		uint64_t m_EvictionCount = 0;
+		uint64_t m_EvictedBytes = 0;
+	};
+
+	struct IBLDerivedDataStoreDiagnostics
+	{
+		uint64_t m_StoredBytes = 0;
+		uint64_t m_StoredEntryCount = 0;
+		uint64_t m_HitCount = 0;
+		uint64_t m_MissCount = 0;
+		uint64_t m_CorruptionCount = 0;
+		uint64_t m_ReadBytes = 0;
+		uint64_t m_WriteCount = 0;
+		uint64_t m_WriteFailureCount = 0;
+		uint64_t m_WrittenBytes = 0;
+	};
+
 	struct IBLDiagnosticsSnapshot
 	{
 		std::vector<IBLEnvironmentEntryDiagnostics> m_Environments;
@@ -72,6 +100,8 @@ namespace gglab
 		float m_PrefilteredSpecularMaxSampleLuminance = 0.0f;
 		bool m_SkyboxEnabled = true;
 		IBLBakeStatus m_BakeStatus{};
+		IBLArtifactCacheDiagnostics m_ArtifactCache;
+		IBLDerivedDataStoreDiagnostics m_DerivedDataStore;
 
 		IBLTextureDiagnostics m_Environment;
 		IBLTextureDiagnostics m_Irradiance;

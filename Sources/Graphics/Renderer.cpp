@@ -98,7 +98,8 @@ namespace gglab
 		iblBakeSchedulerCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
 		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();
 		iblBakeSchedulerCreateInfo.m_GpuProfiler = GetGpuProfiler();
-		iblBakeSchedulerCreateInfo.m_CacheDirectory = utils::GetExeOutDir() / "IBLCache";
+		iblBakeSchedulerCreateInfo.m_DerivedDataCacheDirectory =
+			utils::GetExeOutDir() / "DerivedDataCache" / "IBL";
 		m_IBLBakeScheduler = std::make_unique<IBLBakeScheduler>(iblBakeSchedulerCreateInfo);
 
 		CreateCommonBindingLayout();
