@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Asset/AssetContentFingerprint.h"
+#include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITexture.h"
 
@@ -47,6 +48,7 @@ namespace gglab
 		std::filesystem::path m_CanonicalPath;
 		TextureImportSettings m_ImportSettings{};
 		AssetContentFingerprint m_ContentFingerprint{};
+		ArtifactContentDigest m_ArtifactContentDigest{};
 	};
 
 	struct TextureGpuState

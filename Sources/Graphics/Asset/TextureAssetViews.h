@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/GraphicsTypes.h"
 
 #include <cstdint>
@@ -41,8 +42,10 @@ namespace gglab
 		StringID m_Name{};
 		RHITextureHandle m_Texture{};
 		std::string m_DebugName;
+		ArtifactContentDigest m_ArtifactContentDigest{};
 		bool m_IsUploaded = false;
 		bool m_HasSrv = false;
 		bool m_IsReserved = false;
+		bool m_IsCpuArtifactCached = false;
 	};
 }

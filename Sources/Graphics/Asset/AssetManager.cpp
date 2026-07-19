@@ -111,6 +111,7 @@ namespace gglab
 			.m_TransferManager = createInfo.m_TransferManager,
 			.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
 			.m_StateEvents = &m_AssetStateEventQueue,
+			.m_ArtifactCache = createInfo.m_TextureArtifactCache,
 		})),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
@@ -2002,6 +2003,16 @@ namespace gglab
 		TextureContentRef content) const noexcept
 	{
 		return m_TextureAssets->GetResidentTextureResource(content);
+	}
+
+	TextureArtifactCacheStatistics AssetManager::GetTextureArtifactCacheStatistics() const noexcept
+	{
+		return m_TextureAssets->GetArtifactCacheStatistics();
+	}
+
+	void AssetManager::ClearTextureArtifactCache() noexcept
+	{
+		m_TextureAssets->ClearArtifactCache();
 	}
 
 	std::vector<TextureAssetReadInfo> AssetManager::GetTextureAssetReadInfos() const

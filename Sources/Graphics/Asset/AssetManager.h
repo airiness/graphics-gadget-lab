@@ -7,6 +7,7 @@
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/TextureAssetViews.h"
+#include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -91,6 +92,7 @@ namespace gglab
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
+			TextureArtifactCacheConfig m_TextureArtifactCache{};
 		};
 
 		struct MeshUploadData
@@ -151,6 +153,8 @@ namespace gglab
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
 			TextureContentRef content) const noexcept;
+		[[nodiscard]] TextureArtifactCacheStatistics GetTextureArtifactCacheStatistics() const noexcept;
+		void ClearTextureArtifactCache() noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
 

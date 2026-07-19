@@ -1,6 +1,7 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/GraphicsTypes.h"
 
 namespace gglab
@@ -68,9 +69,11 @@ namespace gglab
 			StringID m_Name{};
 			RHITextureHandle m_Texture{};
 			std::string m_DebugName;
+			ArtifactContentDigest m_ArtifactContentDigest{};
 			bool m_IsUploaded = false;
 			bool m_HasSrv = false;
 			bool m_IsReserved = false;
+			bool m_IsCpuArtifactCached = false;
 			bool m_IsEvictionCandidate = false;
 		};
 
@@ -137,6 +140,17 @@ namespace gglab
 		uint64_t m_ResidencyStaleStateEventCount = 0;
 		uint64_t m_ResidencyRevalidationRejectionCount = 0;
 		uint64_t m_ResidencyStaleCompletionCount = 0;
+		uint64_t m_TextureArtifactCacheBudgetBytes = 0;
+		uint64_t m_TextureArtifactCachedBytes = 0;
+		uint64_t m_TextureArtifactExternallyRetainedBytes = 0;
+		uint64_t m_TextureArtifactTotalLiveBytes = 0;
+		uint32_t m_TextureArtifactCachedEntryCount = 0;
+		uint64_t m_TextureArtifactCacheHitCount = 0;
+		uint64_t m_TextureArtifactCacheMissCount = 0;
+		uint64_t m_TextureArtifactAdmissionCount = 0;
+		uint64_t m_TextureArtifactAdmissionRejectedCount = 0;
+		uint64_t m_TextureArtifactEvictionCount = 0;
+		uint64_t m_TextureArtifactEvictedBytes = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;
 		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
 		AssetStreamingQueueStatistics m_UploadRecordingQueue;

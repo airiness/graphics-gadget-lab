@@ -5,6 +5,7 @@
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
 #include "Graphics/Asset/TextureAsset.h"
+#include "Graphics/Asset/TextureArtifact.h"
 
 #include <filesystem>
 #include <unordered_map>
@@ -57,7 +58,7 @@ namespace gglab
 		AssetOperationToken m_Operation{};
 		TaskCompletionInfo m_Completion{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
-		TextureAssetData m_TextureData;
+		TextureArtifact m_Artifact;
 		AssetContentFingerprint m_ContentFingerprint{};
 		bool m_ResidencyReload = false;
 		AssetResidencyOperation m_ResidencyOperation{};
