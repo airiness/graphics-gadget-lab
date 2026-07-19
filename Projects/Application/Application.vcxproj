@@ -345,7 +345,12 @@
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentAssetController.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp" />
+	<ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp" />
@@ -637,7 +642,12 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetContentFingerprint.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h" />
+	<ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />

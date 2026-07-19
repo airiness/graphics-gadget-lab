@@ -73,9 +73,12 @@
     <Filter Include="Graphics\Resource">
       <UniqueIdentifier>{BC7176CE-FE71-43DC-A059-774EE5E3FA72}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Hash">
+	<Filter Include="Core\Hash">
       <UniqueIdentifier>{9c9a2b8f-4af1-4b73-8e6e-50c967e193ef}</UniqueIdentifier>
-    </Filter>
+	</Filter>
+	<Filter Include="Graphics\Asset\DerivedData">
+		<UniqueIdentifier>{6c8e368e-b681-4dd7-8f0b-98d69c7c8ef1}</UniqueIdentifier>
+	</Filter>
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
     </Filter>
@@ -792,9 +795,24 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp">
+		<Filter>Graphics\Asset</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp">
+		<Filter>Core\Hash</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -1112,9 +1130,24 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetContentFingerprint.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h">
+		<Filter>Graphics\Asset</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Core\Hash\Sha256.h">
+		<Filter>Core\Hash</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h">
+		<Filter>Graphics\Asset\DerivedData</Filter>
+	</ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h">
       <Filter>Graphics\Asset\Dependency</Filter>
     </ClInclude>

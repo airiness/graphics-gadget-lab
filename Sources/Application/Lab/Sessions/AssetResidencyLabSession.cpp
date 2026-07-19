@@ -49,6 +49,10 @@ namespace gglab
 			WaitForRelease,
 			WaitForTextureArtifactCacheReload,
 			WaitForTextureArtifactCacheRelease,
+			WaitForTextureDdcBuild,
+			WaitForTextureDdcBuildRelease,
+			WaitForTextureDdcReload,
+			WaitForTextureDdcReloadRelease,
 			WaitForTextureReloadRunning,
 			WaitForTextureReloadReplacement,
 			WaitForTextureReloadCompletion,
@@ -74,6 +78,8 @@ namespace gglab
 		uint64_t m_AcceptedStateEventCountBaseline = 0;
 		uint64_t m_CompletedStateEventCountBaseline = 0;
 		uint64_t m_TextureArtifactCacheHitCountBaseline = 0;
+		uint64_t m_TextureDdcHitCountBaseline = 0;
+		uint64_t m_TextureDdcWriteCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
@@ -633,6 +639,124 @@ namespace gglab
 				Fail("Clearing the texture CPU artifact cache left cached entries behind.");
 				return;
 			}
+			assetManager.ClearTextureDerivedDataCache();
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = false;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_TextureDdcWriteCountBaseline =
+				assetManager.GetTextureDerivedDataStatistics().m_WriteCount;
+			const AssetManager::TextureLoadRequest sourceBuild =
+				GetAssetOwnerScope().LoadTextureAsync(
+					texture->m_SourcePath,
+					texture->m_ImportSettings.m_Semantic,
+					TaskPriority::Critical);
+			if (!sourceBuild.IsValid() || !sourceBuild.m_Task.IsValid() ||
+				sourceBuild.m_TextureId != m_State->m_TextureId ||
+				sourceBuild.m_Generation != m_State->m_TextureGeneration)
+			{
+				Fail("The texture DDC source build could not start.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForTextureDdcBuild;
+			break;
+		}
+
+		case State::Phase::WaitForTextureDdcBuild:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			if (!texture || texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled)
+			{
+				Fail("The texture DDC source build failed.");
+				return;
+			}
+			if (texture->m_State != AssetState::Ready) break;
+			const LocalDerivedDataStoreStatistics ddc = assetManager.GetTextureDerivedDataStatistics();
+			if (!texture->m_DerivedDataKey.IsValid() || !texture->m_SourceDigest.IsValid() ||
+				!texture->m_IsDerivedDataCached ||
+				ddc.m_WriteCount < m_State->m_TextureDdcWriteCountBaseline + 1)
+			{
+				Fail("The source-built texture was not published to the local DDC.");
+				return;
+			}
+			ResetAssetInterests();
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = true;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForTextureDdcBuildRelease;
+			break;
+		}
+
+		case State::Phase::WaitForTextureDdcBuildRelease:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			if (!texture) { Fail("The DDC source-built texture entry disappeared."); return; }
+			if (texture->m_ResidencyState == AssetResidencyState::Evicting) break;
+			if (texture->m_State != AssetState::CpuReady ||
+				texture->m_ResidencyState != AssetResidencyState::NonResident)
+			{
+				Fail("The DDC source-built texture did not become non-resident.");
+				return;
+			}
+			assetManager.ClearTextureArtifactCache();
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = false;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_TextureDdcHitCountBaseline =
+				assetManager.GetTextureDerivedDataStatistics().m_HitCount;
+			const AssetManager::TextureLoadRequest ddcReload =
+				GetAssetOwnerScope().LoadTextureAsync(
+					texture->m_SourcePath,
+					texture->m_ImportSettings.m_Semantic,
+					TaskPriority::Critical);
+			if (!ddcReload.IsValid() || !ddcReload.m_Task.IsValid())
+			{
+				Fail("The texture DDC reload could not start.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForTextureDdcReload;
+			break;
+		}
+
+		case State::Phase::WaitForTextureDdcReload:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			if (!texture || texture->m_State == AssetState::Failed || texture->m_State == AssetState::Cancelled)
+			{
+				Fail("The texture local DDC reload failed.");
+				return;
+			}
+			if (texture->m_State != AssetState::Ready) break;
+			if (assetManager.GetTextureDerivedDataStatistics().m_HitCount <
+				m_State->m_TextureDdcHitCountBaseline + 1)
+			{
+				Fail("The texture reload did not record a local DDC hit.");
+				return;
+			}
+			ResetAssetInterests();
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_EnableAutomaticEviction = true;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForTextureDdcReloadRelease;
+			break;
+		}
+
+		case State::Phase::WaitForTextureDdcReloadRelease:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			if (!texture) { Fail("The DDC-hit texture entry disappeared."); return; }
+			if (texture->m_ResidencyState == AssetResidencyState::Evicting) break;
+			if (texture->m_State != AssetState::CpuReady ||
+				texture->m_ResidencyState != AssetResidencyState::NonResident)
+			{
+				Fail("The DDC-hit texture did not become non-resident.");
+				return;
+			}
+			assetManager.ClearTextureArtifactCache();
+			assetManager.ClearTextureDerivedDataCache();
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
 			config.m_EnableAutomaticEviction = false;
 			assetManager.SetResidencyConfig(config);
@@ -915,7 +1039,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, CPU artifact cache reload, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, CPU artifact cache reload, local DDC build/hit/fallback, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
@@ -930,7 +1054,7 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Asset Residency Lab",
 			.m_Category = "Systems",
-			.m_Description = "Validates logical residency, fence-safe release, CPU artifact cache reload, and stable-ID source reload invariants.",
+			.m_Description = "Validates logical residency, CPU artifact/DDC reload, fence-safe release, and stable-ID source reload invariants.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

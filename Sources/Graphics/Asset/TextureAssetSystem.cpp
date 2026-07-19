@@ -329,6 +329,10 @@ namespace gglab
 			.m_Semantic = importSettings.m_Semantic,
 			.m_Priority = priority,
 			.m_Progress = texture->m_Load.m_Progress,
+			.m_ExpectedSourceDigest = residencyReload ?
+				texture->m_Source.m_SourceDigest : SourceDigest{},
+			.m_ExpectedDerivedDataKey = residencyReload ?
+				texture->m_Source.m_DerivedDataKey : DerivedDataKey{},
 			.m_ResidencyReload = residencyReload,
 			.m_ResidencyOperation = residencyOperation,
 		});
@@ -677,11 +681,15 @@ namespace gglab
 					std::string(m_Device->GetTextureDebugName(texture->m_Gpu.m_Texture)) :
 					std::string{},
 				.m_ArtifactContentDigest = texture->m_Source.m_ArtifactContentDigest,
+				.m_SourceDigest = texture->m_Source.m_SourceDigest,
+				.m_DerivedDataKey = texture->m_Source.m_DerivedDataKey,
 				.m_IsUploaded = texture->m_Gpu.m_IsUploaded,
 				.m_HasSrv = texture->m_Gpu.m_Srv.IsValid(),
 				.m_IsReserved = IsReservedTextureId(textureId),
 				.m_IsCpuArtifactCached = m_ArtifactCache.Contains(
 					texture->m_Source.m_ArtifactContentDigest),
+				.m_IsDerivedDataCached = m_LoadCoordinator->IsTextureDerivedDataCached(
+					texture->m_Source.m_DerivedDataKey),
 			});
 		}
 		return infos;
@@ -805,7 +813,9 @@ namespace gglab
 		TextureID textureId,
 		TextureArtifact&& artifact,
 		const TextureImportSettings& importSettings,
-		AssetContentFingerprint contentFingerprint) noexcept
+		AssetContentFingerprint contentFingerprint,
+		SourceDigest sourceDigest,
+		DerivedDataKey derivedDataKey) noexcept
 	{
 		TextureArtifactHandle artifactHandle = m_ArtifactCache.CreateAndAdmit(
 			std::move(artifact));
@@ -817,14 +827,18 @@ namespace gglab
 			textureId,
 			std::move(artifactHandle),
 			importSettings,
-			contentFingerprint);
+			contentFingerprint,
+			sourceDigest,
+			derivedDataKey);
 	}
 
 	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(
 		TextureID textureId,
 		TextureArtifactHandle artifact,
 		const TextureImportSettings& importSettings,
-		AssetContentFingerprint contentFingerprint) noexcept
+		AssetContentFingerprint contentFingerprint,
+		SourceDigest sourceDigest,
+		DerivedDataKey derivedDataKey) noexcept
 	{
 		TextureUploadData uploadData{};
 		uploadData.m_TextureId = textureId;
@@ -833,6 +847,8 @@ namespace gglab
 			importSettings.m_Semantic);
 		uploadData.m_Artifact = std::move(artifact);
 		uploadData.m_ContentFingerprint = contentFingerprint;
+		uploadData.m_SourceDigest = sourceDigest;
+		uploadData.m_DerivedDataKey = derivedDataKey;
 		return uploadData;
 	}
 
@@ -954,6 +970,14 @@ namespace gglab
 		texture->m_Source.m_ContentFingerprint = uploadData.m_ContentFingerprint;
 		texture->m_Source.m_ArtifactContentDigest =
 			uploadData.m_Artifact->m_ContentDigest;
+		if (uploadData.m_SourceDigest.IsValid())
+		{
+			texture->m_Source.m_SourceDigest = uploadData.m_SourceDigest;
+		}
+		if (uploadData.m_DerivedDataKey.IsValid())
+		{
+			texture->m_Source.m_DerivedDataKey = uploadData.m_DerivedDataKey;
+		}
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
 		if (!transferBatch.UploadTexture(texture->m_Gpu.m_Texture, textureUploadData))
@@ -1283,6 +1307,13 @@ namespace gglab
 		const TaskCompletionInfo completion = result.m_Completion;
 		const TextureSemantic semantic = result.m_Semantic;
 		const AssetContentFingerprint contentFingerprint = result.m_ContentFingerprint;
+		const SourceDigest sourceDigest = result.m_SourceDigest;
+		const DerivedDataKey derivedDataKey = result.m_DerivedDataKey;
+		GGLAB_LOG_GRAPHICS_INFO(
+			"Texture {} derived data resolved (cache={}, key={}).",
+			textureId.Value(),
+			result.m_DerivedDataCacheHit ? "hit" : "miss",
+			DerivedDataKeyText(derivedDataKey));
 		const bool residencyReload = result.m_ResidencyReload;
 		const AssetResidencyOperation residencyOperation = result.m_ResidencyOperation;
 		m_AssetUploadScheduler->EnqueueCpuPayload(
@@ -1298,6 +1329,7 @@ namespace gglab
 				.m_Progress = texture->m_Load.m_Progress,
 			},
 			[this, operation, semantic, completion, payload, contentFingerprint,
+				sourceDigest, derivedDataKey,
 				residencyReload, residencyOperation]() mutable noexcept
 			{
 				CompleteTextureLoad(
@@ -1306,6 +1338,8 @@ namespace gglab
 					completion,
 					std::move(*payload),
 					contentFingerprint,
+					sourceDigest,
+					derivedDataKey,
 					residencyReload,
 					residencyOperation);
 			});
@@ -1320,6 +1354,8 @@ namespace gglab
 			result.m_Completion,
 			{},
 			{},
+			{},
+			{},
 			result.m_ResidencyReload,
 			result.m_ResidencyOperation);
 	}
@@ -1330,6 +1366,8 @@ namespace gglab
 		const TaskCompletionInfo& completion,
 		TextureArtifact&& artifact,
 		AssetContentFingerprint contentFingerprint,
+		SourceDigest sourceDigest,
+		DerivedDataKey derivedDataKey,
 		bool residencyReload,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
@@ -1426,7 +1464,9 @@ namespace gglab
 			textureId,
 			std::move(artifact),
 			texture->m_Source.m_ImportSettings,
-			contentFingerprint);
+			contentFingerprint,
+			sourceDigest,
+			derivedDataKey);
 		if (!QueueTextureUpload(
 			std::move(uploadData),
 			completion.m_Priority,
@@ -1598,7 +1638,9 @@ namespace gglab
 				textureId,
 				std::move(artifact),
 				texture->m_Source.m_ImportSettings,
-				texture->m_Source.m_ContentFingerprint);
+				texture->m_Source.m_ContentFingerprint,
+				texture->m_Source.m_SourceDigest,
+				texture->m_Source.m_DerivedDataKey);
 			if (QueueTextureUpload(
 				std::move(uploadData),
 				priority,

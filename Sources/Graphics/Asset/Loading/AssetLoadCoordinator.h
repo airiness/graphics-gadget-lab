@@ -4,6 +4,7 @@
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/TextureAsset.h"
 #include "Graphics/Asset/TextureArtifact.h"
 
@@ -60,6 +61,9 @@ namespace gglab
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		TextureArtifact m_Artifact;
 		AssetContentFingerprint m_ContentFingerprint{};
+		SourceDigest m_SourceDigest{};
+		DerivedDataKey m_DerivedDataKey{};
+		bool m_DerivedDataCacheHit = false;
 		bool m_ResidencyReload = false;
 		AssetResidencyOperation m_ResidencyOperation{};
 	};
@@ -106,6 +110,8 @@ namespace gglab
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		TaskPriority m_Priority = TaskPriority::Normal;
 		ProgressChannelPtr m_Progress;
+		SourceDigest m_ExpectedSourceDigest{};
+		DerivedDataKey m_ExpectedDerivedDataKey{};
 		bool m_ResidencyReload = false;
 		AssetResidencyOperation m_ResidencyOperation{};
 	};
@@ -116,6 +122,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			TaskSystem* m_TaskSystem = nullptr;
+			std::filesystem::path m_TextureDerivedDataCacheDirectory;
 		};
 
 		explicit AssetLoadCoordinator(const CreateInfo& createInfo) noexcept;
@@ -163,6 +170,15 @@ namespace gglab
 
 		void DrainCompletions(std::vector<AssetLoadCompletion>& output) noexcept;
 		[[nodiscard]] bool HasActiveOperations() const noexcept;
+		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept
+		{
+			return m_TextureDerivedDataStore.GetStatistics();
+		}
+		[[nodiscard]] bool IsTextureDerivedDataCached(const DerivedDataKey& key) const noexcept
+		{
+			return m_TextureDerivedDataStore.Contains(key);
+		}
+		void ClearTextureDerivedDataCache() noexcept { m_TextureDerivedDataStore.Clear(); }
 		[[nodiscard]] bool HasPendingCompletions() const noexcept
 		{
 			return !m_PendingCompletions.empty();
@@ -188,6 +204,7 @@ namespace gglab
 			AssetOperationToken operation) noexcept;
 
 		TaskSystem* m_TaskSystem = nullptr;
+		LocalDerivedDataStore m_TextureDerivedDataStore;
 		uint64_t m_NextOperationSerial = 1;
 		OperationMap m_ModelImports;
 		OperationMap m_MeshReloads;

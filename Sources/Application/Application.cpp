@@ -13,6 +13,7 @@
 #include "Application/LoadingProgress.h"
 #include "Core/Time.h"
 #include "Core/Task/TaskSystem.h"
+#include "Core/Utility/PathUtils.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
@@ -187,6 +188,8 @@ namespace gglab
 		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
 		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
+		assetManagerCreateInfo.m_TextureDerivedDataCacheDirectory =
+			utils::GetExeOutDir() / "DerivedDataCache" / "Texture";
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
 		m_EnvironmentAssetController = std::make_unique<EnvironmentAssetController>(

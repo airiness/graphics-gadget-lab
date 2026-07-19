@@ -54,6 +54,8 @@ namespace gglab
 			TextureArtifactHandle m_Artifact;
 			TextureColorSpace m_ColorSpace = TextureColorSpace::Linear;
 			AssetContentFingerprint m_ContentFingerprint{};
+			SourceDigest m_SourceDigest{};
+			DerivedDataKey m_DerivedDataKey{};
 		};
 
 		struct EvictionFinalizationResult
@@ -99,12 +101,16 @@ namespace gglab
 			TextureID textureId,
 			TextureArtifact&& artifact,
 			const TextureImportSettings& importSettings,
-			AssetContentFingerprint contentFingerprint) noexcept;
+			AssetContentFingerprint contentFingerprint,
+			SourceDigest sourceDigest = {},
+			DerivedDataKey derivedDataKey = {}) noexcept;
 		TextureUploadData MakeTextureUploadData(
 			TextureID textureId,
 			TextureArtifactHandle artifact,
 			const TextureImportSettings& importSettings,
-			AssetContentFingerprint contentFingerprint) noexcept;
+			AssetContentFingerprint contentFingerprint,
+			SourceDigest sourceDigest = {},
+			DerivedDataKey derivedDataKey = {}) noexcept;
 		[[nodiscard]] bool UploadTexture(
 			const TextureUploadData& uploadData,
 			TransferBatch& transferBatch,
@@ -191,6 +197,8 @@ namespace gglab
 			const TaskCompletionInfo& completion,
 			TextureArtifact&& artifact,
 			AssetContentFingerprint contentFingerprint,
+			SourceDigest sourceDigest,
+			DerivedDataKey derivedDataKey,
 			bool residencyReload,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
 		void RouteTextureDecodeCompletion(TextureDecodeSucceeded&& completion) noexcept;

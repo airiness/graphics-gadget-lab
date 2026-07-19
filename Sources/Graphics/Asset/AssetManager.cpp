@@ -104,7 +104,11 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
-		m_AssetLoadCoordinator({ .m_TaskSystem = createInfo.m_TaskSystem }),
+		m_AssetLoadCoordinator({
+			.m_TaskSystem = createInfo.m_TaskSystem,
+			.m_TextureDerivedDataCacheDirectory =
+				createInfo.m_TextureDerivedDataCacheDirectory,
+		}),
 		m_TextureAssets(std::make_unique<TextureAssetSystem>(TextureAssetSystem::CreateInfo{
 			.m_Device = createInfo.m_Device,
 			.m_LoadCoordinator = &m_AssetLoadCoordinator,
@@ -2013,6 +2017,16 @@ namespace gglab
 	void AssetManager::ClearTextureArtifactCache() noexcept
 	{
 		m_TextureAssets->ClearArtifactCache();
+	}
+
+	LocalDerivedDataStoreStatistics AssetManager::GetTextureDerivedDataStatistics() const noexcept
+	{
+		return m_AssetLoadCoordinator.GetTextureDerivedDataStatistics();
+	}
+
+	void AssetManager::ClearTextureDerivedDataCache() noexcept
+	{
+		m_AssetLoadCoordinator.ClearTextureDerivedDataCache();
 	}
 
 	std::vector<TextureAssetReadInfo> AssetManager::GetTextureAssetReadInfos() const

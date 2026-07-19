@@ -2,6 +2,7 @@
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/ArtifactContentDigest.h"
+#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/GraphicsTypes.h"
 
 namespace gglab
@@ -70,10 +71,13 @@ namespace gglab
 			RHITextureHandle m_Texture{};
 			std::string m_DebugName;
 			ArtifactContentDigest m_ArtifactContentDigest{};
+			SourceDigest m_SourceDigest{};
+			DerivedDataKey m_DerivedDataKey{};
 			bool m_IsUploaded = false;
 			bool m_HasSrv = false;
 			bool m_IsReserved = false;
 			bool m_IsCpuArtifactCached = false;
+			bool m_IsDerivedDataCached = false;
 			bool m_IsEvictionCandidate = false;
 		};
 
@@ -151,6 +155,15 @@ namespace gglab
 		uint64_t m_TextureArtifactAdmissionRejectedCount = 0;
 		uint64_t m_TextureArtifactEvictionCount = 0;
 		uint64_t m_TextureArtifactEvictedBytes = 0;
+		uint64_t m_TextureDerivedDataStoredBytes = 0;
+		uint64_t m_TextureDerivedDataStoredEntryCount = 0;
+		uint64_t m_TextureDerivedDataHitCount = 0;
+		uint64_t m_TextureDerivedDataMissCount = 0;
+		uint64_t m_TextureDerivedDataCorruptionCount = 0;
+		uint64_t m_TextureDerivedDataReadBytes = 0;
+		uint64_t m_TextureDerivedDataWriteCount = 0;
+		uint64_t m_TextureDerivedDataWriteFailureCount = 0;
+		uint64_t m_TextureDerivedDataWrittenBytes = 0;
 		AssetStreamingQueueStatistics m_CpuPayloadQueue;
 		AssetStreamingQueueStatistics m_ResourcePublicationQueue;
 		AssetStreamingQueueStatistics m_UploadRecordingQueue;

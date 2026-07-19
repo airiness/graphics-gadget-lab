@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/Asset/ArtifactContentDigest.h"
+#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITexture.h"
 
@@ -49,6 +50,8 @@ namespace gglab
 		TextureImportSettings m_ImportSettings{};
 		AssetContentFingerprint m_ContentFingerprint{};
 		ArtifactContentDigest m_ArtifactContentDigest{};
+		SourceDigest m_SourceDigest{};
+		DerivedDataKey m_DerivedDataKey{};
 	};
 
 	struct TextureGpuState

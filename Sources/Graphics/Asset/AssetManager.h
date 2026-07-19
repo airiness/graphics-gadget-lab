@@ -93,6 +93,7 @@ namespace gglab
 			SamplerRegistry* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 			TextureArtifactCacheConfig m_TextureArtifactCache{};
+			std::filesystem::path m_TextureDerivedDataCacheDirectory;
 		};
 
 		struct MeshUploadData
@@ -155,6 +156,8 @@ namespace gglab
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] TextureArtifactCacheStatistics GetTextureArtifactCacheStatistics() const noexcept;
 		void ClearTextureArtifactCache() noexcept;
+		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept;
+		void ClearTextureDerivedDataCache() noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
 
