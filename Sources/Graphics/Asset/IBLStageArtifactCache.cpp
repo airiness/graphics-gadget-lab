@@ -1,16 +1,16 @@
 #include "Core/Precompiled.h"
-#include "Graphics/Asset/IBLBundleArtifactCache.h"
+#include "Graphics/Asset/IBLStageArtifactCache.h"
 
 namespace gglab
 {
-	IBLBundleArtifactCache::IBLBundleArtifactCache(
-		const IBLBundleArtifactCacheConfig& config) noexcept :
+	IBLStageArtifactCache::IBLStageArtifactCache(
+		const IBLStageArtifactCacheConfig& config) noexcept :
 		m_Config(config),
 		m_LiveState(std::make_shared<LiveState>())
 	{}
 
-	IBLBundleArtifactHandle IBLBundleArtifactCache::Admit(
-		IBLBundleArtifactHandle artifact) noexcept
+	IBLStageArtifactHandle IBLStageArtifactCache::Admit(
+		IBLStageArtifactHandle artifact) noexcept
 	{
 		if (!artifact || !artifact->IsValid())
 		{
@@ -24,13 +24,13 @@ namespace gglab
 		}
 
 		const uint64_t bytes = artifact->GetAllocatedBytes();
-		const IBLBundleArtifact* artifactValue = artifact.get();
+		const IBLStageArtifact* artifactValue = artifact.get();
 		const std::shared_ptr<LiveState> liveState = m_LiveState;
 		liveState->m_Bytes.fetch_add(bytes, std::memory_order_relaxed);
-		IBLBundleArtifactHandle handle(
+		IBLStageArtifactHandle handle(
 			artifactValue,
 			[liveState, bytes, artifact = std::move(artifact)](
-				const IBLBundleArtifact* value) noexcept
+				const IBLStageArtifact* value) noexcept
 			{
 				GGLAB_UNUSED(value);
 				liveState->m_Bytes.fetch_sub(bytes, std::memory_order_relaxed);
@@ -57,7 +57,7 @@ namespace gglab
 		return handle;
 	}
 
-	IBLBundleArtifactHandle IBLBundleArtifactCache::Find(
+	IBLStageArtifactHandle IBLStageArtifactCache::Find(
 		const ArtifactContentDigest& contentDigest) noexcept
 	{
 		const auto entry = m_Entries.find(contentDigest);
@@ -71,13 +71,13 @@ namespace gglab
 		return entry->second.m_Artifact;
 	}
 
-	bool IBLBundleArtifactCache::Contains(
+	bool IBLStageArtifactCache::Contains(
 		const ArtifactContentDigest& contentDigest) const noexcept
 	{
 		return m_Entries.contains(contentDigest);
 	}
 
-	void IBLBundleArtifactCache::Clear() noexcept
+	void IBLStageArtifactCache::Clear() noexcept
 	{
 		while (!m_Entries.empty())
 		{
@@ -85,7 +85,7 @@ namespace gglab
 		}
 	}
 
-	IBLBundleArtifactCacheStatistics IBLBundleArtifactCache::GetStatistics() const noexcept
+	IBLStageArtifactCacheStatistics IBLStageArtifactCache::GetStatistics() const noexcept
 	{
 		const uint64_t liveBytes = m_LiveState->m_Bytes.load(std::memory_order_relaxed);
 		return {
@@ -103,7 +103,7 @@ namespace gglab
 		};
 	}
 
-	void IBLBundleArtifactCache::EvictToFit(uint64_t incomingBytes) noexcept
+	void IBLStageArtifactCache::EvictToFit(uint64_t incomingBytes) noexcept
 	{
 		while (!m_Entries.empty() &&
 			m_CachedBytes + incomingBytes > m_Config.m_BudgetBytes)
@@ -112,7 +112,7 @@ namespace gglab
 		}
 	}
 
-	void IBLBundleArtifactCache::EvictOne() noexcept
+	void IBLStageArtifactCache::EvictOne() noexcept
 	{
 		if (m_Entries.empty())
 		{

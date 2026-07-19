@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/CoreMacros.h"
-#include "Graphics/Asset/IBLBundleArtifact.h"
+#include "Graphics/Asset/IBLStageArtifact.h"
 
 #include <atomic>
 #include <memory>
@@ -8,12 +8,12 @@
 
 namespace gglab
 {
-	struct IBLBundleArtifactCacheConfig
+	struct IBLStageArtifactCacheConfig
 	{
 		uint64_t m_BudgetBytes = 1024ull * 1024ull * 1024ull;
 	};
 
-	struct IBLBundleArtifactCacheStatistics
+	struct IBLStageArtifactCacheStatistics
 	{
 		uint64_t m_BudgetBytes = 0;
 		uint64_t m_CachedBytes = 0;
@@ -28,27 +28,27 @@ namespace gglab
 		uint64_t m_EvictedBytes = 0;
 	};
 
-	class IBLBundleArtifactCache final
+	class IBLStageArtifactCache final
 	{
 	public:
-		explicit IBLBundleArtifactCache(
-			const IBLBundleArtifactCacheConfig& config = {}) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(IBLBundleArtifactCache);
-		~IBLBundleArtifactCache() = default;
+		explicit IBLStageArtifactCache(
+			const IBLStageArtifactCacheConfig& config = {}) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(IBLStageArtifactCache);
+		~IBLStageArtifactCache() = default;
 
-		[[nodiscard]] IBLBundleArtifactHandle Admit(
-			IBLBundleArtifactHandle artifact) noexcept;
-		[[nodiscard]] IBLBundleArtifactHandle Find(
+		[[nodiscard]] IBLStageArtifactHandle Admit(
+			IBLStageArtifactHandle artifact) noexcept;
+		[[nodiscard]] IBLStageArtifactHandle Find(
 			const ArtifactContentDigest& contentDigest) noexcept;
 		[[nodiscard]] bool Contains(
 			const ArtifactContentDigest& contentDigest) const noexcept;
 		void Clear() noexcept;
-		[[nodiscard]] IBLBundleArtifactCacheStatistics GetStatistics() const noexcept;
+		[[nodiscard]] IBLStageArtifactCacheStatistics GetStatistics() const noexcept;
 
 	private:
 		struct Entry
 		{
-			IBLBundleArtifactHandle m_Artifact;
+			IBLStageArtifactHandle m_Artifact;
 			uint64_t m_Bytes = 0;
 			uint64_t m_LastAccessSerial = 0;
 		};
@@ -61,7 +61,7 @@ namespace gglab
 		void EvictToFit(uint64_t incomingBytes) noexcept;
 		void EvictOne() noexcept;
 
-		IBLBundleArtifactCacheConfig m_Config{};
+		IBLStageArtifactCacheConfig m_Config{};
 		std::shared_ptr<LiveState> m_LiveState;
 		std::unordered_map<ArtifactContentDigest, Entry, ArtifactContentDigestHash> m_Entries;
 		uint64_t m_AccessSerial = 0;

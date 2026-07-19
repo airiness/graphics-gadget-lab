@@ -19,9 +19,12 @@ namespace gglab
 			WaitForInvalidShape,
 			ObserveFallback,
 			WaitForReselection,
-			WaitForInitialBundle,
+			WaitForInitialStageSet,
 			WaitForCpuCacheHit,
 			WaitForDerivedDataCacheHit,
+			WaitForCpuPartialHit,
+			WaitForDerivedDataPartialHit,
+			WaitForRestore,
 			Completed,
 		};
 
@@ -31,8 +34,14 @@ namespace gglab
 		float m_ElapsedSeconds = 0.0f;
 		uint64_t m_PreviousIBLGeneration = 0;
 		uint64_t m_DerivedDataHitCountBaseline = 0;
-		DerivedDataKey m_IBLKey{};
-		ArtifactContentDigest m_IBLArtifactDigest{};
+		std::array<DerivedDataKey,
+			static_cast<size_t>(IBLArtifactStage::Count)> m_IBLKeys{};
+		std::array<ArtifactContentDigest,
+			static_cast<size_t>(IBLArtifactStage::Count)> m_IBLArtifactDigests{};
+		IBLQualityPreset m_OriginalQualityPreset = IBLQualityPreset::Medium;
+		uint32_t m_OriginalSpecularSampleCount = 0;
+		uint32_t m_CpuPartialSpecularSampleCount = 0;
+		uint32_t m_DdcPartialSpecularSampleCount = 0;
 		Phase m_Phase = Phase::WaitForInitialEnvironment;
 		bool m_Passed = false;
 		std::vector<std::string> m_Errors;
@@ -49,10 +58,41 @@ namespace gglab
 	void EnvironmentAssetLabSession::OnEnter() noexcept
 	{
 		m_State = std::make_unique<State>();
+		IBLBakeScheduler* scheduler = m_Services.m_Renderer->GetIBLBakeScheduler();
+		// The acceptance sequence needs deterministic stage misses even when a
+		// previous run populated the same sample-count variants. DDC entries are
+		// recoverable derived data, so start this cache-focused Lab from a clean set.
+		scheduler->ClearArtifactCache();
+		scheduler->ClearDerivedDataStore();
+		const auto& settings = m_Services.m_Renderer->
+			GetEnvironmentLightingSystem()->GetSettings();
+		m_State->m_OriginalQualityPreset = settings.m_QualityPreset;
+		m_State->m_OriginalSpecularSampleCount =
+			settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+		m_State->m_CpuPartialSpecularSampleCount =
+			m_State->m_OriginalSpecularSampleCount < 4096 ?
+				m_State->m_OriginalSpecularSampleCount + 1 : 4095;
+		m_State->m_DdcPartialSpecularSampleCount =
+			m_State->m_CpuPartialSpecularSampleCount < 4096 ?
+				m_State->m_CpuPartialSpecularSampleCount + 1 : 4094;
 	}
 
 	void EnvironmentAssetLabSession::OnExit() noexcept
 	{
+		if (m_State)
+		{
+			EnvironmentLightingSystem* environment = m_Services.m_Renderer->
+				GetEnvironmentLightingSystem();
+			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
+			{
+				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
+			}
+			else
+			{
+				environment->SetPrefilteredSpecularSampleCount(
+					m_State->m_OriginalSpecularSampleCount);
+			}
+		}
 		if (m_Services.m_EnvironmentAssetController)
 		{
 			if (m_Services.m_AssetManager->IsAcceptingCommands())
@@ -287,18 +327,18 @@ namespace gglab
 				Fail("Environment reselection did not replace the fallback.");
 				return;
 			}
-			m_State->m_Phase = State::Phase::WaitForInitialBundle;
+			m_State->m_Phase = State::Phase::WaitForInitialStageSet;
 			break;
 		}
 
-		case State::Phase::WaitForInitialBundle:
+		case State::Phase::WaitForInitialStageSet:
 		{
 			IBLBakeScheduler& scheduler =
 				*m_Services.m_Renderer->GetIBLBakeScheduler();
 			const IBLBakeStatus& status = scheduler.GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
-				Fail("The final environment IBL bundle failed to bake or load.");
+				Fail("The final environment IBL stage set failed to bake or load.");
 				return;
 			}
 			if (status.m_Stage != IBLBakeStage::Ready ||
@@ -309,16 +349,25 @@ namespace gglab
 			}
 			const auto cpuCache = scheduler.GetArtifactCacheStatistics();
 			const auto ddc = scheduler.GetDerivedDataStoreStatistics();
-			if (!status.m_DerivedDataKey.IsValid() ||
-				!status.m_ArtifactContentDigest.IsValid() ||
-				cpuCache.m_CachedEntryCount == 0 ||
-				ddc.m_StoredEntryCount == 0)
+			const bool validArtifacts = std::ranges::all_of(
+				status.m_Artifacts,
+				[](const IBLStageArtifactStatus& artifact) noexcept
+				{
+					return artifact.m_DerivedDataKey.IsValid() &&
+						artifact.m_ContentDigest.IsValid();
+				});
+			if (!validArtifacts ||
+				cpuCache.m_CachedEntryCount < static_cast<uint32_t>(IBLArtifactStage::Count) ||
+				ddc.m_StoredEntryCount < static_cast<uint32_t>(IBLArtifactStage::Count))
 			{
-				Fail("The ready IBL bundle was not published to both CPU cache and local DDC.");
+				Fail("The ready IBL stage set was not published to both CPU cache and local DDC.");
 				return;
 			}
-			m_State->m_IBLKey = status.m_DerivedDataKey;
-			m_State->m_IBLArtifactDigest = status.m_ArtifactContentDigest;
+			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
+			{
+				m_State->m_IBLKeys[index] = status.m_Artifacts[index].m_DerivedDataKey;
+				m_State->m_IBLArtifactDigests[index] = status.m_Artifacts[index].m_ContentDigest;
+			}
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
 			m_Services.m_Renderer->GetEnvironmentLightingSystem()->RequestRebake(false);
 			m_State->m_Phase = State::Phase::WaitForCpuCacheHit;
@@ -340,17 +389,26 @@ namespace gglab
 			{
 				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("The CPU cache reload replaced the active IBL bundle before publication.");
+					Fail("The CPU cache reload replaced the active IBL stage set before publication.");
 				}
 				break;
 			}
-			if (status.m_ActiveGeneration != status.m_RequestedGeneration ||
-				!status.m_CacheHit || !status.m_CpuCacheHit ||
-				status.m_DerivedDataCacheHit ||
-				status.m_DerivedDataKey != m_State->m_IBLKey ||
-				status.m_ArtifactContentDigest != m_State->m_IBLArtifactDigest)
+			bool exactCpuHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
+				status.m_CacheHit && !status.m_PartialCacheHit &&
+				status.m_CacheHitStageCount == static_cast<uint32_t>(IBLArtifactStage::Count) &&
+				status.m_GpuBuildStageCount == 0;
+			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
 			{
-				Fail("The repeated IBL request did not reuse the exact CPU bundle artifact.");
+				exactCpuHit &= status.m_Artifacts[index].m_Resolution ==
+					IBLArtifactResolution::CpuCache;
+				exactCpuHit &= status.m_Artifacts[index].m_DerivedDataKey ==
+					m_State->m_IBLKeys[index];
+				exactCpuHit &= status.m_Artifacts[index].m_ContentDigest ==
+					m_State->m_IBLArtifactDigests[index];
+			}
+			if (!exactCpuHit)
+			{
+				Fail("The repeated IBL request did not reuse the exact CPU stage artifacts.");
 				return;
 			}
 
@@ -358,7 +416,7 @@ namespace gglab
 			scheduler.ClearArtifactCache();
 			if (scheduler.GetArtifactCacheStatistics().m_CachedEntryCount != 0)
 			{
-				Fail("Clearing the IBL CPU cache left cached bundle entries behind.");
+				Fail("Clearing the IBL CPU cache left cached stage entries behind.");
 				return;
 			}
 			m_State->m_DerivedDataHitCountBaseline =
@@ -383,19 +441,201 @@ namespace gglab
 			{
 				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("The local DDC reload replaced the active IBL bundle before publication.");
+					Fail("The local DDC reload replaced the active IBL stage set before publication.");
 				}
 				break;
 			}
-			if (status.m_ActiveGeneration != status.m_RequestedGeneration ||
-				!status.m_CacheHit || status.m_CpuCacheHit ||
-				!status.m_DerivedDataCacheHit ||
-				status.m_DerivedDataKey != m_State->m_IBLKey ||
-				status.m_ArtifactContentDigest != m_State->m_IBLArtifactDigest ||
-				scheduler.GetDerivedDataStoreStatistics().m_HitCount <=
-					m_State->m_DerivedDataHitCountBaseline)
+			bool exactDdcHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
+				status.m_CacheHit && !status.m_PartialCacheHit &&
+				status.m_CacheHitStageCount == static_cast<uint32_t>(IBLArtifactStage::Count) &&
+				status.m_GpuBuildStageCount == 0;
+			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
 			{
-				Fail("The IBL request did not restore the exact bundle artifact from local DDC.");
+				exactDdcHit &= status.m_Artifacts[index].m_Resolution ==
+					IBLArtifactResolution::LocalDdc;
+				exactDdcHit &= status.m_Artifacts[index].m_DerivedDataKey ==
+					m_State->m_IBLKeys[index];
+				exactDdcHit &= status.m_Artifacts[index].m_ContentDigest ==
+					m_State->m_IBLArtifactDigests[index];
+			}
+			if (!exactDdcHit ||
+				scheduler.GetDerivedDataStoreStatistics().m_HitCount <
+					m_State->m_DerivedDataHitCountBaseline +
+					static_cast<uint32_t>(IBLArtifactStage::Count))
+			{
+				Fail("The IBL request did not restore the exact stage artifacts from local DDC.");
+				return;
+			}
+
+			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
+			m_Services.m_Renderer->GetEnvironmentLightingSystem()->
+				SetPrefilteredSpecularSampleCount(
+					m_State->m_CpuPartialSpecularSampleCount);
+			m_State->m_Phase = State::Phase::WaitForCpuPartialHit;
+			break;
+		}
+
+		case State::Phase::WaitForCpuPartialHit:
+		{
+			IBLBakeScheduler& scheduler =
+				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			const IBLBakeStatus& status = scheduler.GetStatus();
+			if (status.m_Stage == IBLBakeStage::Failed)
+			{
+				Fail("The IBL CPU partial-hit bake failed.");
+				return;
+			}
+			if (status.m_Stage != IBLBakeStage::Ready ||
+				status.m_ActiveGeneration == m_State->m_PreviousIBLGeneration)
+			{
+				if (status.m_Stage != IBLBakeStage::Ready &&
+					status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
+				{
+					Fail("A CPU partial hit replaced the active IBL before its complete stage set was ready.");
+				}
+				break;
+			}
+			if (status.m_CacheWritePending)
+			{
+				break;
+			}
+
+			const size_t specular = static_cast<size_t>(
+				IBLArtifactStage::PrefilteredSpecular);
+			bool partialHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
+				status.m_PartialCacheHit && !status.m_CacheHit &&
+				status.m_CacheHitStageCount == 3 && status.m_GpuBuildStageCount == 1;
+			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
+			{
+				const auto& artifact = status.m_Artifacts[index];
+				if (index == specular)
+				{
+					partialHit &= artifact.m_Resolution == IBLArtifactResolution::GpuBuild;
+					partialHit &= artifact.m_DerivedDataKey != m_State->m_IBLKeys[index];
+					partialHit &= artifact.m_ContentDigest.IsValid();
+				}
+				else
+				{
+					partialHit &= artifact.m_Resolution == IBLArtifactResolution::CpuCache;
+					partialHit &= artifact.m_DerivedDataKey == m_State->m_IBLKeys[index];
+					partialHit &= artifact.m_ContentDigest == m_State->m_IBLArtifactDigests[index];
+				}
+			}
+			if (!partialHit)
+			{
+				Fail("Changing only specular samples did not produce a 3-stage CPU hit plus 1-stage GPU build.");
+				return;
+			}
+
+			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
+			scheduler.ClearArtifactCache();
+			m_State->m_DerivedDataHitCountBaseline =
+				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
+			m_Services.m_Renderer->GetEnvironmentLightingSystem()->
+				SetPrefilteredSpecularSampleCount(
+					m_State->m_DdcPartialSpecularSampleCount);
+			m_State->m_Phase = State::Phase::WaitForDerivedDataPartialHit;
+			break;
+		}
+
+		case State::Phase::WaitForDerivedDataPartialHit:
+		{
+			IBLBakeScheduler& scheduler =
+				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			const IBLBakeStatus& status = scheduler.GetStatus();
+			if (status.m_Stage == IBLBakeStage::Failed)
+			{
+				Fail("The IBL local DDC partial-hit bake failed.");
+				return;
+			}
+			if (status.m_Stage != IBLBakeStage::Ready ||
+				status.m_ActiveGeneration == m_State->m_PreviousIBLGeneration)
+			{
+				if (status.m_Stage != IBLBakeStage::Ready &&
+					status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
+				{
+					Fail("A DDC partial hit replaced the active IBL before its complete stage set was ready.");
+				}
+				break;
+			}
+			if (status.m_CacheWritePending)
+			{
+				break;
+			}
+
+			const size_t specular = static_cast<size_t>(
+				IBLArtifactStage::PrefilteredSpecular);
+			bool partialHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
+				status.m_PartialCacheHit && !status.m_CacheHit &&
+				status.m_CacheHitStageCount == 3 && status.m_GpuBuildStageCount == 1;
+			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
+			{
+				const auto& artifact = status.m_Artifacts[index];
+				if (index == specular)
+				{
+					partialHit &= artifact.m_Resolution == IBLArtifactResolution::GpuBuild;
+					partialHit &= artifact.m_ContentDigest.IsValid();
+				}
+				else
+				{
+					partialHit &= artifact.m_Resolution == IBLArtifactResolution::LocalDdc;
+					partialHit &= artifact.m_DerivedDataKey == m_State->m_IBLKeys[index];
+					partialHit &= artifact.m_ContentDigest == m_State->m_IBLArtifactDigests[index];
+				}
+			}
+			partialHit &= scheduler.GetDerivedDataStoreStatistics().m_HitCount >=
+				m_State->m_DerivedDataHitCountBaseline + 3;
+			if (!partialHit)
+			{
+				Fail("Changing only specular samples did not produce a 3-stage DDC hit plus 1-stage GPU build.");
+				return;
+			}
+
+			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
+			EnvironmentLightingSystem* environment = m_Services.m_Renderer->
+				GetEnvironmentLightingSystem();
+			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
+			{
+				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
+			}
+			else
+			{
+				environment->SetPrefilteredSpecularSampleCount(
+					m_State->m_OriginalSpecularSampleCount);
+			}
+			m_State->m_Phase = State::Phase::WaitForRestore;
+			break;
+		}
+
+		case State::Phase::WaitForRestore:
+		{
+			const IBLBakeStatus& status = m_Services.m_Renderer->
+				GetIBLBakeScheduler()->GetStatus();
+			if (status.m_Stage == IBLBakeStage::Failed)
+			{
+				Fail("Restoring the original IBL configuration failed.");
+				return;
+			}
+			if (status.m_Stage != IBLBakeStage::Ready ||
+				status.m_ActiveGeneration == m_State->m_PreviousIBLGeneration)
+			{
+				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
+				{
+					Fail("Restoring the original IBL replaced the active set before atomic publication.");
+				}
+				break;
+			}
+			bool restored = status.m_CacheHit && status.m_GpuBuildStageCount == 0;
+			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
+			{
+				restored &= status.m_Artifacts[index].m_DerivedDataKey ==
+					m_State->m_IBLKeys[index];
+				restored &= status.m_Artifacts[index].m_ContentDigest ==
+					m_State->m_IBLArtifactDigests[index];
+			}
+			if (!restored)
+			{
+				Fail("The original IBL stage set was not restored exactly.");
 				return;
 			}
 			Complete();
@@ -458,7 +698,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ENVIRONMENT ASSET ACCEPTANCE PASS: transactional environment selection, atomic IBL publication, CPU bundle cache reuse, and local DDC restoration invariants passed in {:.2f} s.",
+			"ENVIRONMENT ASSET ACCEPTANCE PASS: transactional environment selection, atomic IBL stage publication, full and partial CPU cache reuse, and full and partial local DDC restoration invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
@@ -473,9 +713,9 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Environment Asset Lab",
 			.m_Category = "Systems",
-			.m_Description = "Validates transactional HDR environment selection plus atomic IBL CPU cache and local DDC restoration.",
+			.m_Description = "Validates transactional HDR selection plus atomic full/partial IBL CPU cache and local DDC restoration.",
 			.m_Kind = LabKind::Pipeline,
-			.m_SchemaVersion = 2,
+			.m_SchemaVersion = 3,
 		};
 	}
 
