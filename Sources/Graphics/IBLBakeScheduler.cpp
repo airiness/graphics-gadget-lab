@@ -1,15 +1,36 @@
 #include "Core/Precompiled.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "Core/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
-#include "Core/Task/TaskSystem.h"
 
 namespace gglab
 {
+	namespace
+	{
+		using TextureIndex = RenderResourceRegistry::TextureIndex;
+
+		constexpr std::array<IBLArtifactStage,
+			static_cast<size_t>(IBLArtifactStage::Count)> ArtifactStages = {
+			IBLArtifactStage::Environment,
+			IBLArtifactStage::Irradiance,
+			IBLArtifactStage::PrefilteredSpecular,
+			IBLArtifactStage::BrdfLut,
+		};
+
+		constexpr std::array<TextureIndex,
+			static_cast<size_t>(IBLArtifactStage::Count)> ArtifactTextureIndices = {
+			TextureIndex::IBL_EnvironmentCubemap,
+			TextureIndex::IBL_IrradianceCubemap,
+			TextureIndex::IBL_PrefilteredSpecularCubemap,
+			TextureIndex::IBL_BrdfLut,
+		};
+	}
+
 	IBLBakeScheduler::IBLBakeScheduler(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
 		m_TaskSystem(createInfo.m_TaskSystem),
@@ -65,7 +86,8 @@ namespace gglab
 
 	void IBLBakeScheduler::Tick(const RHIFencePoint& lastSubmittedFence) noexcept
 	{
-		m_Status.m_RequestedGeneration = m_EnvironmentLightingSystem->GetBakeRequestGeneration();
+		m_Status.m_RequestedGeneration =
+			m_EnvironmentLightingSystem->GetBakeRequestGeneration();
 
 		if (m_CompletedCacheLookup)
 		{
@@ -87,7 +109,7 @@ namespace gglab
 				ContinueRequestedBakeAfterInitialization();
 				return;
 			}
-			else if (m_CacheReadbackInFlight)
+			if (m_CacheReadbackInFlight)
 			{
 				m_CacheReadbackInFlight = false;
 				StartCacheWrite();
@@ -97,8 +119,13 @@ namespace gglab
 				m_CacheUploadInFlight = false;
 				if (m_Status.m_BakingGeneration == m_Status.m_RequestedGeneration)
 				{
-					ReleaseBakingSourceLease();
-					PublishBake(true);
+					if (m_Status.m_Artifacts[static_cast<size_t>(
+						IBLArtifactStage::Environment)].m_Resolution !=
+						IBLArtifactResolution::Miss)
+					{
+						ReleaseBakingSourceLease();
+					}
+					AdvanceToNextMissingStage();
 				}
 			}
 			else if (m_CompletedStage != IBLBakeStage::Idle)
@@ -131,11 +158,13 @@ namespace gglab
 		m_CompletedCacheLookup.reset();
 		m_CurrentCacheLoad.reset();
 		m_Status.m_BakingGeneration = m_Status.m_RequestedGeneration;
-		m_Status.m_DerivedDataKey = {};
-		m_Status.m_ArtifactContentDigest = {};
+		m_Status.m_Artifacts = {};
 		m_Status.m_CacheHit = false;
+		m_Status.m_PartialCacheHit = false;
 		m_Status.m_CpuCacheHit = false;
 		m_Status.m_DerivedDataCacheHit = false;
+		m_Status.m_CacheHitStageCount = 0;
+		m_Status.m_GpuBuildStageCount = 0;
 		m_Status.m_CacheWritePending =
 			m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
 		m_Status.m_GpuMilliseconds = 0.0;
@@ -157,8 +186,10 @@ namespace gglab
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
+
 		const AssetContentFingerprint contentFingerprint =
 			m_BakingRequest.m_Source.m_ContentFingerprint;
+		const EnvironmentTextureSourceType sourceType = m_BakingRequest.m_Source.m_Type;
 		const uint64_t generation = m_Status.m_BakingGeneration;
 		const bool ignoreCache = m_BakingRequest.m_IgnoreCache;
 		auto work = std::make_shared<CacheLoadWork>();
@@ -166,21 +197,18 @@ namespace gglab
 		SetStage(IBLBakeStage::LoadingCache, 0.0f);
 		m_CacheLookupTask = m_TaskSystem->Submit(
 			{
-				.m_Name = std::format("IBL.CacheRead: generation {}", generation),
+				.m_Name = std::format("IBL.StageCacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, contentFingerprint, config = m_BakingRequest.m_Config, ignoreCache, work](
-				std::stop_token stopToken) noexcept
+			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config,
+				ignoreCache, work](std::stop_token stopToken) noexcept
 			{
-				IBLDerivedDataLookupResult result = m_DerivedDataSystem.Lookup(
+				work->m_Result = m_DerivedDataSystem.Lookup(
 					contentFingerprint,
+					sourceType,
 					config,
 					ignoreCache,
 					stopToken);
-				work->m_Key = result.m_Key;
-				work->m_Source = result.m_Source;
-				work->m_Artifact = std::move(result.m_Artifact);
-				work->m_Error = std::move(result.m_Error);
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
@@ -213,40 +241,41 @@ namespace gglab
 			if (completion.m_Status == TaskStatus::Cancelled)
 			{
 				GGLAB_LOG_GRAPHICS_INFO(
-					"IBL cache lookup generation {} was cancelled.",
+					"IBL stage cache lookup generation {} was cancelled.",
 					work->m_Generation);
 			}
 			else
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
-					"IBL cache lookup for generation {} failed: {}",
+					"IBL stage cache lookup for generation {} failed: {}",
 					work->m_Generation,
 					completion.m_Error);
 			}
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
-		const char* source = "miss";
-		if (work->m_Source == IBLDerivedDataSource::CpuCache)
+
+		uint32_t cpuHits = 0;
+		uint32_t ddcHits = 0;
+		for (IBLArtifactStage stage : ArtifactStages)
 		{
-			source = "CPU cache";
-		}
-		else if (work->m_Source == IBLDerivedDataSource::LocalDdc)
-		{
-			source = "local DDC";
-		}
-		if (!work->m_Error.empty())
-		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"IBL derived-data lookup generation {} ignored an invalid entry: {}",
-				work->m_Generation,
-				work->m_Error);
+			const auto& stageResult = work->m_Result.Get(stage);
+			cpuHits += stageResult.m_Source == IBLDerivedDataSource::CpuCache ? 1u : 0u;
+			ddcHits += stageResult.m_Source == IBLDerivedDataSource::LocalDdc ? 1u : 0u;
+			if (!stageResult.m_Error.empty())
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"IBL {} cache entry was ignored: {}",
+					GetIBLArtifactStageName(stage),
+					stageResult.m_Error);
+			}
 		}
 		GGLAB_LOG_GRAPHICS_INFO(
-			"IBL derived-data lookup generation {} completed (source={}, key={}, queueMs={:.2f}, cpuMs={:.2f}).",
+			"IBL stage cache lookup generation {} completed (cpuHits={}, ddcHits={}, misses={}, queueMs={:.2f}, cpuMs={:.2f}).",
 			work->m_Generation,
-			source,
-			DerivedDataKeyText(work->m_Key),
+			cpuHits,
+			ddcHits,
+			static_cast<uint32_t>(IBLArtifactStage::Count) - cpuHits - ddcHits,
 			completion.m_QueueMilliseconds,
 			completion.m_ExecutionMilliseconds);
 		m_CompletedCacheLookup = work;
@@ -262,9 +291,35 @@ namespace gglab
 			return;
 		}
 
-		m_Status.m_DerivedDataKey = work->m_Key;
-		m_Status.m_ArtifactContentDigest = work->m_Artifact ?
-			work->m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+		for (IBLArtifactStage stage : ArtifactStages)
+		{
+			const auto& result = work->m_Result.Get(stage);
+			auto& status = m_Status.m_Artifacts[static_cast<size_t>(stage)];
+			status.m_DerivedDataKey = result.m_Key;
+			status.m_ContentDigest = result.m_Artifact ?
+				result.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+			switch (result.m_Source)
+			{
+			case IBLDerivedDataSource::CpuCache:
+				status.m_Resolution = IBLArtifactResolution::CpuCache;
+				m_Status.m_CpuCacheHit = true;
+				++m_Status.m_CacheHitStageCount;
+				break;
+			case IBLDerivedDataSource::LocalDdc:
+				status.m_Resolution = IBLArtifactResolution::LocalDdc;
+				m_Status.m_DerivedDataCacheHit = true;
+				++m_Status.m_CacheHitStageCount;
+				break;
+			case IBLDerivedDataSource::Miss:
+				status.m_Resolution = IBLArtifactResolution::Miss;
+				break;
+			}
+		}
+		m_Status.m_CacheHit = m_Status.m_CacheHitStageCount ==
+			static_cast<uint32_t>(IBLArtifactStage::Count);
+		m_Status.m_PartialCacheHit = m_Status.m_CacheHitStageCount > 0 &&
+			!m_Status.m_CacheHit;
+
 		m_CurrentCacheLoad = work;
 		const RHIFencePoint* retireFencePtr = retireFence.IsValid() ? &retireFence : nullptr;
 		m_RenderResourceRegistry->EnsureIBLBakeResources(
@@ -279,10 +334,9 @@ namespace gglab
 			return;
 		}
 
-		// Bake targets are allocated as render-target textures from heaps created
-		// with CREATE_NOT_ZEROED. They remain live across multiple bake stages, so
-		// initialize every subresource before PIX or another tool attempts to
-		// preserve their contents with a copy operation.
+		// Staging targets come from CREATE_NOT_ZEROED heaps and remain live across
+		// several passes. Initialize every subresource before uploading hits or
+		// recording any missing stage.
 		m_BakeResourcesNeedInitialization = true;
 		m_BakeResourceInitializationExecuted = false;
 		SetStage(IBLBakeStage::LoadingCache, 0.05f);
@@ -296,57 +350,42 @@ namespace gglab
 		}
 
 		auto cacheLoad = std::move(m_CurrentCacheLoad);
-		if (cacheLoad && cacheLoad->m_Artifact &&
-			UploadCacheArtifact(*cacheLoad->m_Artifact))
+		if (m_Status.m_CacheHitStageCount > 0)
 		{
-			m_Status.m_CacheHit = true;
-			m_Status.m_CpuCacheHit =
-				cacheLoad->m_Source == IBLDerivedDataSource::CpuCache;
-			m_Status.m_DerivedDataCacheHit =
-				cacheLoad->m_Source == IBLDerivedDataSource::LocalDdc;
+			if (!cacheLoad || !UploadCachedArtifacts(cacheLoad->m_Result))
+			{
+				ReleaseBakingSourceLease();
+				SetStage(IBLBakeStage::Failed, 0.0f);
+				return;
+			}
 			m_CacheUploadInFlight = true;
-			SetStage(IBLBakeStage::WaitingForGpu, 0.95f);
-			return;
-		}
-		if (!m_BakingRequest.m_Source.IsValid())
-		{
-			ReleaseBakingSourceLease();
-			SetStage(IBLBakeStage::Failed, 0.0f);
+			SetStage(IBLBakeStage::WaitingForGpu, 0.1f);
 			return;
 		}
 
-		SetStage(IBLBakeStage::Environment, 0.0f);
+		AdvanceToNextMissingStage();
 	}
 
-	bool IBLBakeScheduler::UploadCacheArtifact(const IBLBundleArtifact& artifact) noexcept
+	bool IBLBakeScheduler::UploadCachedArtifacts(
+		const IBLDerivedDataLookupResult& result) noexcept
 	{
-		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		TransferBatch batch = m_TransferManager->BeginBatch();
-		const bool uploaded =
-			batch.UploadTexture(
-				m_RenderResourceRegistry->GetIBLBakeTextureHandle(TextureIndex::IBL_EnvironmentCubemap),
-				artifact.m_Environment.MakeUploadData()) &&
-			batch.UploadTexture(
-				m_RenderResourceRegistry->GetIBLBakeTextureHandle(TextureIndex::IBL_IrradianceCubemap),
-				artifact.m_Irradiance.MakeUploadData()) &&
-			batch.UploadTexture(
-				m_RenderResourceRegistry->GetIBLBakeTextureHandle(TextureIndex::IBL_PrefilteredSpecularCubemap),
-				artifact.m_PrefilteredSpecular.MakeUploadData()) &&
-			batch.UploadTexture(
-				m_RenderResourceRegistry->GetIBLBakeTextureHandle(TextureIndex::IBL_BrdfLut),
-				artifact.m_BrdfLut.MakeUploadData());
-
-		std::array<RHITextureBarrier, 4> barriers{};
-		const TextureIndex indices[] = {
-			TextureIndex::IBL_EnvironmentCubemap,
-			TextureIndex::IBL_IrradianceCubemap,
-			TextureIndex::IBL_PrefilteredSpecularCubemap,
-			TextureIndex::IBL_BrdfLut,
-		};
-		for (size_t index = 0; index < barriers.size(); ++index)
+		std::vector<RHITextureBarrier> barriers;
+		barriers.reserve(static_cast<size_t>(IBLArtifactStage::Count));
+		bool uploaded = true;
+		for (IBLArtifactStage stage : ArtifactStages)
 		{
-			barriers[index] = {
-				.m_Texture = m_RenderResourceRegistry->GetIBLBakeTextureHandle(indices[index]),
+			const IBLStageArtifactHandle& artifact = result.Get(stage).m_Artifact;
+			if (!artifact)
+			{
+				continue;
+			}
+			const TextureIndex textureIndex = ArtifactTextureIndices[static_cast<size_t>(stage)];
+			const RHITextureHandle texture =
+				m_RenderResourceRegistry->GetIBLBakeTextureHandle(textureIndex);
+			uploaded &= batch.UploadTexture(texture, artifact->m_Texture.MakeUploadData());
+			barriers.push_back({
+				.m_Texture = texture,
 				.m_Before = {
 					.m_Stages = RHIStage::Copy,
 					.m_Access = RHIAccess::CopyDest,
@@ -357,16 +396,23 @@ namespace gglab
 					.m_Access = RHIAccess::Common,
 					.m_Layout = RHILayout::Common,
 				},
-			};
+			});
+		}
+		if (barriers.empty())
+		{
+			return false;
 		}
 		batch.TextureBarrier(barriers);
 		m_InFlightFence = batch.Submit(false);
 		return uploaded && m_InFlightFence.IsValid();
 	}
 
-	void IBLBakeScheduler::NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept
+	void IBLBakeScheduler::NotifyStageExecuted(
+		IBLBakeStage stage,
+		uint64_t generation) noexcept
 	{
-		if (!IsGpuStage(stage) || stage != m_Status.m_Stage || generation != m_Status.m_BakingGeneration)
+		if (!IsGpuStage(stage) || stage != m_Status.m_Stage ||
+			generation != m_Status.m_BakingGeneration)
 		{
 			return;
 		}
@@ -375,7 +421,8 @@ namespace gglab
 
 	void IBLBakeScheduler::NotifyBakeResourcesInitialized(uint64_t generation) noexcept
 	{
-		if (!m_BakeResourcesNeedInitialization || generation != m_Status.m_BakingGeneration)
+		if (!m_BakeResourcesNeedInitialization ||
+			generation != m_Status.m_BakingGeneration)
 		{
 			return;
 		}
@@ -389,7 +436,8 @@ namespace gglab
 			m_BakeResourcesNeedInitialization = false;
 			m_BakeResourceInitializationExecuted = false;
 			m_BakeResourceInitializationInFlight = true;
-			GGLAB_ASSERT_MSG(fencePoint.IsValid(),
+			GGLAB_ASSERT_MSG(
+				fencePoint.IsValid(),
 				"Submitted IBL bake resource initialization requires a valid frame fence.");
 			m_InFlightFence = fencePoint;
 		}
@@ -397,7 +445,9 @@ namespace gglab
 		{
 			return;
 		}
-		GGLAB_ASSERT_MSG(fencePoint.IsValid(), "A recorded IBL bake stage requires a valid frame fence.");
+		GGLAB_ASSERT_MSG(
+			fencePoint.IsValid(),
+			"A recorded IBL bake stage requires a valid frame fence.");
 		m_InFlightFence = fencePoint;
 		m_CompletedStage = m_ExecutedStage;
 		m_ExecutedStage = IBLBakeStage::Idle;
@@ -422,28 +472,86 @@ namespace gglab
 		{
 		case IBLBakeStage::Environment:
 			ReleaseBakingSourceLease();
-			SetStage(
-				m_BakingRequest.m_Config.m_EnvironmentCubemapSize > 1 ?
-					IBLBakeStage::EnvironmentMipChain : IBLBakeStage::Irradiance,
-				0.2f);
+			if (m_BakingRequest.m_Config.m_EnvironmentCubemapSize > 1)
+			{
+				SetStage(IBLBakeStage::EnvironmentMipChain, 0.2f);
+			}
+			else
+			{
+				MarkGpuStageBuilt(IBLArtifactStage::Environment);
+				AdvanceToNextMissingStage();
+			}
 			break;
 		case IBLBakeStage::EnvironmentMipChain:
-			SetStage(IBLBakeStage::Irradiance, 0.4f);
+			MarkGpuStageBuilt(IBLArtifactStage::Environment);
+			AdvanceToNextMissingStage();
 			break;
 		case IBLBakeStage::Irradiance:
-			SetStage(IBLBakeStage::PrefilteredSpecular, 0.6f);
+			MarkGpuStageBuilt(IBLArtifactStage::Irradiance);
+			AdvanceToNextMissingStage();
 			break;
 		case IBLBakeStage::PrefilteredSpecular:
-			SetStage(IBLBakeStage::BrdfLut, 0.8f);
+			MarkGpuStageBuilt(IBLArtifactStage::PrefilteredSpecular);
+			AdvanceToNextMissingStage();
 			break;
 		case IBLBakeStage::BrdfLut:
-			SetStage(IBLBakeStage::SavingCache, 0.95f);
-			StartCacheReadback();
-			PublishBake(false);
+			MarkGpuStageBuilt(IBLArtifactStage::BrdfLut);
+			AdvanceToNextMissingStage();
 			break;
 		default:
 			break;
 		}
+	}
+
+	void IBLBakeScheduler::AdvanceToNextMissingStage() noexcept
+	{
+		const auto isMissing = [this](IBLArtifactStage stage) noexcept
+		{
+			return m_Status.m_Artifacts[static_cast<size_t>(stage)].m_Resolution ==
+				IBLArtifactResolution::Miss;
+		};
+		if (isMissing(IBLArtifactStage::Environment))
+		{
+			if (!m_BakingRequest.m_Source.IsValid())
+			{
+				ReleaseBakingSourceLease();
+				SetStage(IBLBakeStage::Failed, 0.0f);
+				return;
+			}
+			SetStage(IBLBakeStage::Environment, 0.1f);
+			return;
+		}
+		if (isMissing(IBLArtifactStage::Irradiance))
+		{
+			SetStage(IBLBakeStage::Irradiance, 0.4f);
+			return;
+		}
+		if (isMissing(IBLArtifactStage::PrefilteredSpecular))
+		{
+			SetStage(IBLBakeStage::PrefilteredSpecular, 0.6f);
+			return;
+		}
+		if (isMissing(IBLArtifactStage::BrdfLut))
+		{
+			SetStage(IBLBakeStage::BrdfLut, 0.8f);
+			return;
+		}
+
+		ReleaseBakingSourceLease();
+		if (m_Status.m_GpuBuildStageCount > 0)
+		{
+			SetStage(IBLBakeStage::SavingCache, 0.95f);
+			GGLAB_UNUSED(StartCacheReadback());
+		}
+		PublishBake();
+	}
+
+	void IBLBakeScheduler::MarkGpuStageBuilt(IBLArtifactStage stage) noexcept
+	{
+		auto& status = m_Status.m_Artifacts[static_cast<size_t>(stage)];
+		GGLAB_ASSERT(status.m_Resolution == IBLArtifactResolution::Miss);
+		status.m_Resolution = IBLArtifactResolution::GpuBuild;
+		++m_Status.m_GpuBuildStageCount;
 	}
 
 	void IBLBakeScheduler::ReleaseBakingSourceLease() noexcept
@@ -456,38 +564,48 @@ namespace gglab
 
 	bool IBLBakeScheduler::StartCacheReadback() noexcept
 	{
-		using TextureIndex = RenderResourceRegistry::TextureIndex;
-		constexpr std::array indices = {
-			TextureIndex::IBL_EnvironmentCubemap, TextureIndex::IBL_IrradianceCubemap,
-			TextureIndex::IBL_PrefilteredSpecularCubemap, TextureIndex::IBL_BrdfLut };
 		auto work = std::make_shared<CacheWriteWork>();
-		work->m_Key = m_Status.m_DerivedDataKey;
-		if (!work->m_Key.IsValid())
-		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"IBL bake generation {} has no valid derived-data key; skipping cache readback.",
-				m_Status.m_BakingGeneration);
-			return false;
-		}
+		work->m_Generation = m_Status.m_BakingGeneration;
+		work->m_Config = m_BakingRequest.m_Config;
 		TransferBatch batch = m_TransferManager->BeginBatch();
-		for (size_t index = 0; index < indices.size(); ++index)
+		uint32_t readbackCount = 0;
+		for (IBLArtifactStage stage : ArtifactStages)
 		{
-			const auto* desc = m_RenderResourceRegistry->GetIBLBakeTextureDesc(indices[index]);
+			const size_t index = static_cast<size_t>(stage);
+			const auto& stageStatus = m_Status.m_Artifacts[index];
+			work->m_Keys[index] = stageStatus.m_DerivedDataKey;
+			work->m_BuiltStages[index] =
+				stageStatus.m_Resolution == IBLArtifactResolution::GpuBuild;
+			if (!work->m_BuiltStages[index] || !work->m_Keys[index].IsValid())
+			{
+				continue;
+			}
+
+			const TextureIndex textureIndex = ArtifactTextureIndices[index];
+			const auto* desc = m_RenderResourceRegistry->GetIBLBakeTextureDesc(textureIndex);
 			if (!desc)
 			{
 				return false;
 			}
 			work->m_Requests[index] = batch.ReadbackTexture(
-				m_RenderResourceRegistry->GetIBLBakeTextureHandle(indices[index]), *desc);
+				m_RenderResourceRegistry->GetIBLBakeTextureHandle(textureIndex),
+				*desc);
 			if (!work->m_Requests[index].IsValid())
 			{
 				return false;
 			}
+			++readbackCount;
 		}
+		if (readbackCount == 0)
+		{
+			return false;
+		}
+
 		m_InFlightFence = batch.Submit(false);
 		m_CacheReadbackInFlight = m_InFlightFence.IsValid();
 		m_ReadbackWork = m_CacheReadbackInFlight ? std::move(work) : nullptr;
-		m_Status.m_CacheWritePending = m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
+		m_Status.m_CacheWritePending =
+			m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
 		return m_CacheReadbackInFlight;
 	}
 
@@ -498,80 +616,91 @@ namespace gglab
 		{
 			return;
 		}
-		IBLBundleArtifact artifact{};
-		std::array<const std::byte*, 4> mapped{};
-		TextureAssetData* outputs[] = {
-			&artifact.m_Environment,
-			&artifact.m_Irradiance,
-			&artifact.m_PrefilteredSpecular,
-			&artifact.m_BrdfLut,
-		};
-		size_t mappedCount = 0;
-		for (size_t index = 0; index < work->m_Requests.size(); ++index)
+
+		uint32_t artifactCount = 0;
+		for (IBLArtifactStage stage : ArtifactStages)
 		{
-			mapped[index] = m_TransferManager->MapTextureReadback(
+			const size_t index = static_cast<size_t>(stage);
+			if (!work->m_BuiltStages[index] || !work->m_Requests[index].IsValid())
+			{
+				continue;
+			}
+			const std::byte* mapped = m_TransferManager->MapTextureReadback(
 				*m_Device,
 				work->m_Requests[index]);
-			if (!mapped[index])
+			if (!mapped)
 			{
-				break;
+				GGLAB_LOG_GRAPHICS_WARN(
+					"IBL {} readback could not be mapped for DDC publication.",
+					GetIBLArtifactStageName(stage));
+				continue;
 			}
-			++mappedCount;
-			*outputs[index] = TransferManager::ResolveMappedTextureReadback(
+			TextureAssetData texture = TransferManager::ResolveMappedTextureReadback(
 				work->m_Requests[index],
-				mapped[index]);
-		}
-		for (size_t index = 0; index < mappedCount; ++index)
-		{
+				mapped);
 			m_TransferManager->UnmapTextureReadback(*m_Device, work->m_Requests[index]);
+
+			IBLStageArtifactHandle artifact = CreateIBLStageArtifact(
+				stage,
+				std::move(texture));
+			if (!artifact || !artifact->MatchesConfig(work->m_Config))
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"IBL {} produced an invalid stage artifact; skipping DDC publication.",
+					GetIBLArtifactStageName(stage));
+				continue;
+			}
+			artifact = m_DerivedDataSystem.Admit(
+				work->m_Keys[index],
+				std::move(artifact));
+			if (!artifact)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"IBL {} could not admit its immutable stage artifact.",
+					GetIBLArtifactStageName(stage));
+				continue;
+			}
+			work->m_Artifacts.Set(stage, artifact);
+			if (work->m_Generation == m_Status.m_BakingGeneration &&
+				work->m_Keys[index] == m_Status.m_Artifacts[index].m_DerivedDataKey)
+			{
+				m_Status.m_Artifacts[index].m_ContentDigest = artifact->m_ContentDigest;
+			}
+			++artifactCount;
 		}
-		if (mappedCount != work->m_Requests.size())
+
+		if (artifactCount == 0)
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"IBL bake {} could not map all readbacks for derived-data publication.",
-				DerivedDataKeyText(work->m_Key));
-			m_Status.m_CacheWritePending = !m_PendingCacheWrites.empty();
-			return;
-		}
-		work->m_Artifact = CreateIBLBundleArtifact(std::move(artifact));
-		if (!work->m_Artifact ||
-			!work->m_Artifact->MatchesConfig(m_BakingRequest.m_Config))
-		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"IBL bake {} produced an invalid bundle artifact; skipping DDC publication.",
-				DerivedDataKeyText(work->m_Key));
 			m_Status.m_CacheWritePending = !m_PendingCacheWrites.empty();
 			return;
 		}
 
-		work->m_Artifact = m_DerivedDataSystem.Admit(
-			work->m_Key,
-			std::move(work->m_Artifact));
-		if (!work->m_Artifact)
-		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"IBL bake {} could not admit its immutable bundle artifact.",
-				DerivedDataKeyText(work->m_Key));
-			m_Status.m_CacheWritePending = !m_PendingCacheWrites.empty();
-			return;
-		}
-		m_Status.m_ArtifactContentDigest = work->m_Artifact->m_ContentDigest;
 		work->m_Task = m_TaskSystem->Submit(
 			{
 				.m_Name = std::format(
-					"IBL.DDCWrite: {}",
-					DerivedDataKeyText(work->m_Key)),
+					"IBL.StageDDCWrite: generation {} ({} stages)",
+					work->m_Generation,
+					artifactCount),
 				.m_Priority = TaskPriority::Background,
 			},
 			[this, work](std::stop_token stopToken) noexcept
 			{
-				if (stopToken.stop_requested())
+				for (IBLArtifactStage stage : ArtifactStages)
 				{
-					return TaskResult::Success();
+					if (stopToken.stop_requested())
+					{
+						return TaskResult::Success();
+					}
+					const size_t index = static_cast<size_t>(stage);
+					const IBLStageArtifactHandle& artifact = work->m_Artifacts.Get(stage);
+					if (artifact && !m_DerivedDataSystem.Store(work->m_Keys[index], artifact))
+					{
+						return TaskResult::Failure(std::format(
+							"Failed to write the {} IBL stage to the local DDC.",
+							GetIBLArtifactStageName(stage)));
+					}
 				}
-				return m_DerivedDataSystem.Store(work->m_Key, work->m_Artifact) ?
-					TaskResult::Success() :
-					TaskResult::Failure("Failed to write the IBL bundle to the local DDC.");
+				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
 			{
@@ -580,8 +709,8 @@ namespace gglab
 		if (!work->m_Task.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
-				"Failed to submit the IBL DDC writer for {}.",
-				DerivedDataKeyText(work->m_Key));
+				"Failed to submit the IBL stage DDC writer for generation {}.",
+				work->m_Generation);
 			m_Status.m_CacheWritePending = !m_PendingCacheWrites.empty();
 			return;
 		}
@@ -601,8 +730,8 @@ namespace gglab
 		if (completion.m_Status != TaskStatus::Succeeded)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
-				"IBL bundle {} was not persisted to the local DDC: {}",
-				DerivedDataKeyText(work->m_Key),
+				"IBL stage artifacts for generation {} were not fully persisted: {}",
+				work->m_Generation,
 				completion.m_Status == TaskStatus::Cancelled ?
 					"task cancelled" : completion.m_Error);
 		}
@@ -610,19 +739,25 @@ namespace gglab
 			m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
 	}
 
-	void IBLBakeScheduler::PublishBake(bool cacheHit) noexcept
+	void IBLBakeScheduler::PublishBake() noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			std::ranges::none_of(
+				m_Status.m_Artifacts,
+				[](const IBLStageArtifactStatus& artifact) noexcept
+				{
+					return artifact.m_Resolution == IBLArtifactResolution::Miss;
+				}),
+			"IBL staging resources must contain a complete generation before publication.");
 		m_RenderResourceRegistry->PublishIBLBakeResources();
 		m_Status.m_ActiveGeneration = m_Status.m_BakingGeneration;
-		m_Status.m_CacheHit = cacheHit;
 		m_Status.m_HasActiveBake = true;
 		SetStage(IBLBakeStage::Ready, 1.0f);
 		GGLAB_LOG_GRAPHICS_INFO(
-			"IBL bake generation {} published (cache={}, key={}, artifact={}, gpuMs={:.3f}).",
+			"IBL bake generation {} published atomically (cacheStages={}, gpuStages={}, gpuMs={:.3f}).",
 			m_Status.m_ActiveGeneration,
-			cacheHit ? "hit" : "miss",
-			DerivedDataKeyText(m_Status.m_DerivedDataKey),
-			ArtifactContentDigestText(m_Status.m_ArtifactContentDigest),
+			m_Status.m_CacheHitStageCount,
+			m_Status.m_GpuBuildStageCount,
 			m_Status.m_GpuMilliseconds);
 	}
 

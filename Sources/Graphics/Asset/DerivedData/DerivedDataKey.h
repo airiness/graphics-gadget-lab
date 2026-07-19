@@ -55,6 +55,10 @@ namespace gglab
 		{
 			return digest.IsValid() && m_Builder.AddBytes(digest.m_Value);
 		}
+		bool AddDerivedDataKey(const DerivedDataKey& key) noexcept
+		{
+			return key.IsValid() && m_Builder.AddBytes(key.m_Value);
+		}
 		[[nodiscard]] DerivedDataKey Finish() noexcept;
 
 	private:

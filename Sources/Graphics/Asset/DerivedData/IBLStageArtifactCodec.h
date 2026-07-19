@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/IBLBundleArtifact.h"
+#include "Graphics/Asset/IBLStageArtifact.h"
 
 #include <span>
 #include <string>
@@ -7,11 +7,9 @@
 
 namespace gglab
 {
-	inline constexpr std::string_view IBLBundleArtifactType = "gglab.ibl.bundle";
-
-	struct IBLBundleArtifactDecodeResult
+	struct IBLStageArtifactDecodeResult
 	{
-		IBLBundleArtifact m_Artifact;
+		IBLStageArtifact m_Artifact;
 		std::string m_Error;
 
 		[[nodiscard]] bool Succeeded() const noexcept
@@ -20,13 +18,14 @@ namespace gglab
 		}
 	};
 
-	class IBLBundleArtifactCodec final
+	class IBLStageArtifactCodec final
 	{
 	public:
 		[[nodiscard]] static std::vector<std::byte> Serialize(
-			const IBLBundleArtifact& artifact) noexcept;
-		[[nodiscard]] static IBLBundleArtifactDecodeResult Deserialize(
+			const IBLStageArtifact& artifact) noexcept;
+		[[nodiscard]] static IBLStageArtifactDecodeResult Deserialize(
 			std::span<const std::byte> payload,
+			IBLArtifactStage expectedStage,
 			const ArtifactContentDigest& expectedContentDigest) noexcept;
 	};
 }

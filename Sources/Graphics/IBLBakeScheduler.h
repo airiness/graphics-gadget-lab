@@ -5,8 +5,8 @@
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 
-#include <filesystem>
 #include <array>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -14,7 +14,6 @@ namespace gglab
 {
 	class AssetManager;
 	class AssetOwnerScope;
-	class EnvironmentLightingSystem;
 	class GpuProfiler;
 	class RHIDevice;
 	class RenderResourceRegistry;
@@ -47,7 +46,7 @@ namespace gglab
 			TransferManager* m_TransferManager = nullptr;
 			GpuProfiler* m_GpuProfiler = nullptr;
 			std::filesystem::path m_DerivedDataCacheDirectory;
-			IBLBundleArtifactCacheConfig m_ArtifactCache{};
+			IBLStageArtifactCacheConfig m_ArtifactCache{};
 		};
 
 		explicit IBLBakeScheduler(const CreateInfo& createInfo) noexcept;
@@ -67,7 +66,10 @@ namespace gglab
 		{
 			return m_BakeResourcesNeedInitialization;
 		}
-		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept { return m_Status.m_BakingGeneration; }
+		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept
+		{
+			return m_Status.m_BakingGeneration;
+		}
 		[[nodiscard]] const IBLBakeConfig& GetBakingConfig() const noexcept
 		{
 			return m_BakingRequest.m_Config;
@@ -77,7 +79,7 @@ namespace gglab
 			return m_BakingRequest.m_Source;
 		}
 		[[nodiscard]] const IBLBakeStatus& GetStatus() const noexcept { return m_Status; }
-		[[nodiscard]] IBLBundleArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept
+		[[nodiscard]] IBLStageArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept
 		{
 			return m_DerivedDataSystem.GetArtifactCacheStatistics();
 		}
@@ -101,13 +103,15 @@ namespace gglab
 			const std::shared_ptr<CacheLoadWork>& work) noexcept;
 		void ContinueRequestedBakeAfterInitialization() noexcept;
 		void AdvanceCompletedStage() noexcept;
-		bool UploadCacheArtifact(const IBLBundleArtifact& artifact) noexcept;
+		void AdvanceToNextMissingStage() noexcept;
+		void MarkGpuStageBuilt(IBLArtifactStage stage) noexcept;
+		bool UploadCachedArtifacts(const IBLDerivedDataLookupResult& result) noexcept;
 		bool StartCacheReadback() noexcept;
 		void StartCacheWrite() noexcept;
 		void CompleteCacheWrite(
 			const TaskCompletionInfo& completion,
 			const std::shared_ptr<CacheWriteWork>& work) noexcept;
-		void PublishBake(bool cacheHit) noexcept;
+		void PublishBake() noexcept;
 		void CaptureGpuTime(IBLBakeStage stage) noexcept;
 		void ReleaseBakingSourceLease() noexcept;
 		void SetStage(IBLBakeStage stage, float progress) noexcept;
@@ -136,10 +140,7 @@ namespace gglab
 		struct CacheLoadWork
 		{
 			uint64_t m_Generation = 0;
-			DerivedDataKey m_Key{};
-			IBLDerivedDataSource m_Source = IBLDerivedDataSource::Miss;
-			IBLBundleArtifactHandle m_Artifact;
-			std::string m_Error;
+			IBLDerivedDataLookupResult m_Result;
 		};
 		TaskHandle m_CacheLookupTask{};
 		std::shared_ptr<CacheLoadWork> m_CompletedCacheLookup;
@@ -147,9 +148,15 @@ namespace gglab
 
 		struct CacheWriteWork
 		{
-			DerivedDataKey m_Key{};
-			std::array<RHITextureReadbackRequest, 4> m_Requests;
-			IBLBundleArtifactHandle m_Artifact;
+			uint64_t m_Generation = 0;
+			IBLBakeConfig m_Config{};
+			std::array<DerivedDataKey,
+				static_cast<size_t>(IBLArtifactStage::Count)> m_Keys{};
+			std::array<bool,
+				static_cast<size_t>(IBLArtifactStage::Count)> m_BuiltStages{};
+			std::array<RHITextureReadbackRequest,
+				static_cast<size_t>(IBLArtifactStage::Count)> m_Requests{};
+			IBLStageArtifactSet m_Artifacts;
 			TaskHandle m_Task{};
 		};
 		std::shared_ptr<CacheWriteWork> m_ReadbackWork;

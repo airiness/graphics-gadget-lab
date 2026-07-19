@@ -152,28 +152,30 @@ namespace gglab
 			IBLBakeScheduler* scheduler) noexcept
 		{
 			const auto& bake = snapshot.m_BakeStatus;
-			const char* cacheSource = "miss";
-			if (bake.m_CpuCacheHit)
-			{
-				cacheSource = "CPU cache hit";
-			}
-			else if (bake.m_DerivedDataCacheHit)
-			{
-				cacheSource = "local DDC hit";
-			}
+			const char* cacheCoverage = bake.m_CacheHit ? "full hit" :
+				bake.m_PartialCacheHit ? "partial hit" : "miss";
 			ImGui::Text("Stage: %s", GetIBLBakeStageName(bake.m_Stage).data());
 			ImGui::ProgressBar(bake.m_Progress, ImVec2(-1.0f, 0.0f));
 			ImGui::Text("Generation: requested %llu | baking %llu | active %llu",
 				static_cast<unsigned long long>(bake.m_RequestedGeneration),
 				static_cast<unsigned long long>(bake.m_BakingGeneration),
 				static_cast<unsigned long long>(bake.m_ActiveGeneration));
-			ImGui::Text("Cache: %s%s",
-				cacheSource,
+			ImGui::Text("Cache: %s (%u cached, %u GPU-built)%s",
+				cacheCoverage,
+				bake.m_CacheHitStageCount,
+				bake.m_GpuBuildStageCount,
 				bake.m_CacheWritePending ? " | DDC write pending" : "");
-			ImGui::TextDisabled(
-				"Key: %s | artifact: %s",
-				DerivedDataKeyText(bake.m_DerivedDataKey).c_str(),
-				ArtifactContentDigestText(bake.m_ArtifactContentDigest).c_str());
+			for (size_t index = 0; index < bake.m_Artifacts.size(); ++index)
+			{
+				const IBLArtifactStage stage = static_cast<IBLArtifactStage>(index);
+				const auto& artifact = bake.m_Artifacts[index];
+				ImGui::TextDisabled(
+					"%s: %s | key %s | artifact %s",
+					GetIBLArtifactStageName(stage).data(),
+					GetIBLArtifactResolutionName(artifact.m_Resolution).data(),
+					DerivedDataKeyText(artifact.m_DerivedDataKey).c_str(),
+					ArtifactContentDigestText(artifact.m_ContentDigest).c_str());
+			}
 			const auto& cpuCache = snapshot.m_ArtifactCache;
 			ImGui::Text(
 				"CPU cache: %u entries | %.1f / %.1f MiB | hit %llu | miss %llu | evicted %llu",

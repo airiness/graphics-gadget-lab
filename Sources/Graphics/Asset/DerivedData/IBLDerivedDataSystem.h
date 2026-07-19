@@ -3,8 +3,10 @@
 #include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
-#include "Graphics/Asset/IBLBundleArtifactCache.h"
+#include "Graphics/Asset/IBLStageArtifactCache.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 
+#include <array>
 #include <filesystem>
 #include <mutex>
 #include <stop_token>
@@ -25,12 +27,28 @@ namespace gglab
 		LocalDdc,
 	};
 
-	struct IBLDerivedDataLookupResult
+	struct IBLStageDerivedDataLookupResult
 	{
 		DerivedDataKey m_Key{};
-		IBLBundleArtifactHandle m_Artifact;
+		IBLStageArtifactHandle m_Artifact;
 		IBLDerivedDataSource m_Source = IBLDerivedDataSource::Miss;
 		std::string m_Error;
+	};
+
+	struct IBLDerivedDataLookupResult
+	{
+		std::array<IBLStageDerivedDataLookupResult,
+			static_cast<size_t>(IBLArtifactStage::Count)> m_Stages{};
+
+		[[nodiscard]] IBLStageDerivedDataLookupResult& Get(IBLArtifactStage stage) noexcept
+		{
+			return m_Stages[static_cast<size_t>(stage)];
+		}
+		[[nodiscard]] const IBLStageDerivedDataLookupResult& Get(
+			IBLArtifactStage stage) const noexcept
+		{
+			return m_Stages[static_cast<size_t>(stage)];
+		}
 	};
 
 	class IBLDerivedDataSystem final
@@ -39,7 +57,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			std::filesystem::path m_CacheDirectory;
-			IBLBundleArtifactCacheConfig m_ArtifactCache{};
+			IBLStageArtifactCacheConfig m_ArtifactCache{};
 			IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 			std::string m_AdapterScopeIdentity;
 		};
@@ -50,35 +68,42 @@ namespace gglab
 
 		[[nodiscard]] IBLDerivedDataLookupResult Lookup(
 			const AssetContentFingerprint& contentFingerprint,
+			EnvironmentTextureSourceType sourceType,
 			const IBLBakeConfig& config,
 			bool ignoreCache,
 			std::stop_token stopToken = {}) noexcept;
-		[[nodiscard]] IBLBundleArtifactHandle Admit(
+		[[nodiscard]] IBLStageArtifactHandle Admit(
 			const DerivedDataKey& key,
-			IBLBundleArtifactHandle artifact) noexcept;
+			IBLStageArtifactHandle artifact) noexcept;
 		[[nodiscard]] bool Store(
 			const DerivedDataKey& key,
-			const IBLBundleArtifactHandle& artifact) noexcept;
+			const IBLStageArtifactHandle& artifact) noexcept;
 
-		[[nodiscard]] IBLBundleArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept;
+		[[nodiscard]] IBLStageArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept;
 		void ClearArtifactCache() noexcept;
 		void ClearStore() noexcept;
 
 	private:
-		[[nodiscard]] DerivedDataKey BuildKey(
-			const AssetContentFingerprint& contentFingerprint,
-			const IBLBakeConfig& config,
-			std::stop_token stopToken) const noexcept;
+		[[nodiscard]] std::array<DerivedDataKey,
+			static_cast<size_t>(IBLArtifactStage::Count)> BuildKeys(
+				const AssetContentFingerprint& contentFingerprint,
+				EnvironmentTextureSourceType sourceType,
+				const IBLBakeConfig& config,
+				std::stop_token stopToken) const noexcept;
 		[[nodiscard]] SourceDigest ComputeShaderDependencyDigest(
+			IBLArtifactStage stage,
 			std::stop_token stopToken) const noexcept;
 
 		IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 		std::string m_AdapterScopeIdentity;
 		mutable std::mutex m_ArtifactMutex;
-		IBLBundleArtifactCache m_ArtifactCache;
+		IBLStageArtifactCache m_ArtifactCache;
 		std::unordered_map<DerivedDataKey, ArtifactContentDigest, DerivedDataKeyHash>
 			m_KeyToContentDigest;
 		LocalDerivedDataStore m_Store;
 	};
+
+	[[nodiscard]] std::string_view GetIBLStageArtifactType(
+		IBLArtifactStage stage) noexcept;
 }

@@ -795,10 +795,10 @@
 	<ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp">
 		<Filter>Graphics\Asset</Filter>
 	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLBundleArtifact.cpp">
+	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.cpp">
 		<Filter>Graphics\Asset</Filter>
 	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLBundleArtifactCache.cpp">
+	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.cpp">
 		<Filter>Graphics\Asset</Filter>
 	</ClCompile>
 	<ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp">
@@ -807,7 +807,7 @@
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClCompile>
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLBundleArtifactCodec.cpp">
+	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClCompile>
 	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp">
@@ -1157,7 +1157,7 @@
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLBundleArtifactCodec.h">
+	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h">
 		<Filter>Graphics\Asset\DerivedData</Filter>
 	</ClInclude>
 	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h">
@@ -1826,10 +1826,10 @@
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLBundleArtifact.h">
+	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h">
 		<Filter>Graphics\Asset</Filter>
 	</ClInclude>
-	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLBundleArtifactCache.h">
+	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.h">
 		<Filter>Graphics\Asset</Filter>
 	</ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h">
