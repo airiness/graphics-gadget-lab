@@ -355,6 +355,8 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifactCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAssetSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Shader\Shader.cpp" />
@@ -700,6 +702,8 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifact.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifactCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\Shader\Shader.h" />

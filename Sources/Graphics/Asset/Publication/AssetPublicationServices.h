@@ -107,7 +107,7 @@ namespace gglab
 		[[nodiscard]] virtual bool PrepareModelForPublication(
 			const AssetContentVersion& model) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationTextureResult PublishTexture(
-			ImportedTexture& importedTexture,
+			const ImportedTexture& importedTexture,
 			TaskPriority priority) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationMaterialResult PublishMaterial(
 			const ImportedMaterial* importedMaterial,
@@ -115,7 +115,7 @@ namespace gglab
 		[[nodiscard]] virtual ModelPublicationMeshResult PublishMesh(
 			const AssetContentVersion& model,
 			uint32_t sourceMeshIndex,
-			ImportedMesh& importedMesh,
+			const ImportedMesh& importedMesh,
 			TaskPriority priority) noexcept = 0;
 
 		[[nodiscard]] virtual ModelPublicationOwnerToken CreateDependencyOwner(

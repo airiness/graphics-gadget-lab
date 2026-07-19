@@ -8,26 +8,28 @@ namespace gglab
 		AssetContentVersion model,
 		double importQueueMilliseconds,
 		double importExecutionMilliseconds,
-		ImportedModel&& source) noexcept :
+		ModelImportArtifactHandle artifact) noexcept :
 		m_Services(std::move(services)),
 		m_Model(model),
 		m_ImportQueueMilliseconds(importQueueMilliseconds),
 		m_ImportExecutionMilliseconds(importExecutionMilliseconds),
-		m_Source(std::move(source)),
-		m_TextureIds(m_Source.m_Textures.size()),
-		m_MeshIds(m_Source.m_Meshes.size())
+		m_Artifact(std::move(artifact)),
+		m_TextureIds(m_Artifact ? m_Artifact->m_Model.m_Textures.size() : 0),
+		m_MeshIds(m_Artifact ? m_Artifact->m_Model.m_Meshes.size() : 0)
 	{
 		GGLAB_ASSERT(m_Model.IsValid());
 		GGLAB_ASSERT(m_Model.m_Key.m_Kind == AssetKind::Model);
-		m_MaterialIds.reserve(std::max<size_t>(m_Source.m_Materials.size(), 1));
+		GGLAB_ASSERT(m_Artifact && m_Artifact->IsValid());
+		const ImportedModel& source = m_Artifact->m_Model;
+		m_MaterialIds.reserve(std::max<size_t>(source.m_Materials.size(), 1));
 		m_PendingInstances.reserve(std::max(
-			m_Source.m_MeshInstances.size(),
-			m_Source.m_Meshes.size()));
-		m_Dependencies.reserve(m_Source.m_Textures.size() + m_Source.m_Meshes.size());
+			source.m_MeshInstances.size(),
+			source.m_Meshes.size()));
+		m_Dependencies.reserve(source.m_Textures.size() + source.m_Meshes.size());
 		m_Journal.Reserve(
-			m_Source.m_Textures.size() + m_Source.m_Meshes.size(),
-			std::max<size_t>(m_Source.m_Materials.size(), 1),
-			m_Source.m_Textures.size() + m_Source.m_Meshes.size());
+			source.m_Textures.size() + source.m_Meshes.size(),
+			std::max<size_t>(source.m_Materials.size(), 1),
+			source.m_Textures.size() + source.m_Meshes.size());
 	}
 
 	AssetResourcePublicationStepResult ModelPublicationJob::Step(
@@ -52,7 +54,7 @@ namespace gglab
 				{ .m_Status = AssetResourcePublicationStepStatus::Cancelled },
 				progressBefore);
 		}
-		if (m_Source.m_Meshes.empty())
+		if (!m_Artifact || m_Artifact->m_Model.m_Meshes.empty())
 		{
 			return FinalizeStep(
 				Failed("Imported model contains no meshes"),
@@ -123,20 +125,25 @@ namespace gglab
 
 	AssetResourcePublicationStage ModelPublicationJob::GetCurrentStage() const noexcept
 	{
+		if (!m_Artifact)
+		{
+			return AssetResourcePublicationStage::Unknown;
+		}
+		const ImportedModel& source = m_Artifact->m_Model;
 		Stage stage = m_Stage;
 		for (;;)
 		{
 			switch (stage)
 			{
 			case Stage::Textures:
-				if (m_TextureCursor < m_Source.m_Textures.size())
+				if (m_TextureCursor < source.m_Textures.size())
 				{
 					return AssetResourcePublicationStage::Textures;
 				}
 				stage = Stage::Materials;
 				break;
 			case Stage::Materials:
-				if (m_MaterialCursor < m_Source.m_Materials.size() ||
+				if (m_MaterialCursor < source.m_Materials.size() ||
 					(m_MaterialIds.empty() && !m_DefaultMaterialCreated))
 				{
 					return AssetResourcePublicationStage::Materials;
@@ -144,14 +151,14 @@ namespace gglab
 				stage = Stage::Meshes;
 				break;
 			case Stage::Meshes:
-				if (m_MeshCursor < m_Source.m_Meshes.size())
+				if (m_MeshCursor < source.m_Meshes.size())
 				{
 					return AssetResourcePublicationStage::Meshes;
 				}
 				stage = Stage::MeshInstances;
 				break;
 			case Stage::MeshInstances:
-				if (m_InstanceCursor < m_Source.m_MeshInstances.size())
+				if (m_InstanceCursor < source.m_MeshInstances.size())
 				{
 					return AssetResourcePublicationStage::MeshInstances;
 				}
@@ -184,7 +191,8 @@ namespace gglab
 	ModelPublicationJob::OptionalStepResult ModelPublicationJob::StepTextures(
 		TaskPriority priority) noexcept
 	{
-		if (m_TextureCursor >= m_Source.m_Textures.size())
+		const ImportedModel& source = m_Artifact->m_Model;
+		if (m_TextureCursor >= source.m_Textures.size())
 		{
 			m_Stage = Stage::Materials;
 			return std::nullopt;
@@ -192,7 +200,7 @@ namespace gglab
 
 		const size_t textureIndex = m_TextureCursor++;
 		ModelPublicationTextureResult result = m_Services->PublishTexture(
-			m_Source.m_Textures[textureIndex],
+			source.m_Textures[textureIndex],
 			priority);
 		m_TextureIds[textureIndex] = result.m_TextureId;
 		if (result.m_Claim.m_ContentVersion.IsValid())
@@ -216,10 +224,11 @@ namespace gglab
 
 	ModelPublicationJob::OptionalStepResult ModelPublicationJob::StepMaterials() noexcept
 	{
-		ImportedMaterial* importedMaterial = nullptr;
-		if (m_MaterialCursor < m_Source.m_Materials.size())
+		const ImportedModel& source = m_Artifact->m_Model;
+		const ImportedMaterial* importedMaterial = nullptr;
+		if (m_MaterialCursor < source.m_Materials.size())
 		{
-			importedMaterial = &m_Source.m_Materials[m_MaterialCursor++];
+			importedMaterial = &source.m_Materials[m_MaterialCursor++];
 		}
 		else if (m_MaterialIds.empty() && !m_DefaultMaterialCreated)
 		{
@@ -240,17 +249,14 @@ namespace gglab
 		}
 		m_MaterialIds.push_back(result.m_MaterialId);
 		m_Journal.RecordCreatedMaterial(result.m_MaterialId);
-		if (importedMaterial)
-		{
-			*importedMaterial = {};
-		}
 		return Continued(result.m_Usage);
 	}
 
 	ModelPublicationJob::OptionalStepResult ModelPublicationJob::StepMeshes(
 		TaskPriority priority) noexcept
 	{
-		if (m_MeshCursor >= m_Source.m_Meshes.size())
+		const ImportedModel& source = m_Artifact->m_Model;
+		if (m_MeshCursor >= source.m_Meshes.size())
 		{
 			m_Stage = Stage::MeshInstances;
 			return std::nullopt;
@@ -260,7 +266,7 @@ namespace gglab
 		ModelPublicationMeshResult result = m_Services->PublishMesh(
 			m_Model,
 			static_cast<uint32_t>(meshIndex),
-			m_Source.m_Meshes[meshIndex],
+			source.m_Meshes[meshIndex],
 			priority);
 		m_MeshIds[meshIndex] = result.m_MeshId;
 		if (result.m_Claim.m_ContentVersion.IsValid())
@@ -284,18 +290,18 @@ namespace gglab
 
 	ModelPublicationJob::OptionalStepResult ModelPublicationJob::StepMeshInstances() noexcept
 	{
-		if (m_InstanceCursor >= m_Source.m_MeshInstances.size())
+		const ImportedModel& source = m_Artifact->m_Model;
+		if (m_InstanceCursor >= source.m_MeshInstances.size())
 		{
 			m_Stage = m_PendingInstances.empty() ?
 				Stage::FallbackMeshInstances : Stage::Dependencies;
 			return std::nullopt;
 		}
 
-		ImportedModelMesh& importedInstance =
-			m_Source.m_MeshInstances[m_InstanceCursor++];
+		const ImportedModelMesh& importedInstance =
+			source.m_MeshInstances[m_InstanceCursor++];
 		if (importedInstance.m_MeshIndex >= m_MeshIds.size())
 		{
-			importedInstance = {};
 			return Continued();
 		}
 		const uint32_t materialIndex =
@@ -306,7 +312,6 @@ namespace gglab
 			.m_MaterialId = m_MaterialIds[materialIndex],
 			.m_LocalTransform = importedInstance.m_LocalTransform,
 		});
-		importedInstance = {};
 		return Continued({ .m_ResourceCreations = 1 });
 	}
 
@@ -321,7 +326,7 @@ namespace gglab
 
 		const size_t meshIndex = m_FallbackInstanceCursor++;
 		const uint32_t sourceMaterialIndex =
-			m_Source.m_Meshes[meshIndex].m_MaterialIndex;
+			m_Artifact->m_Model.m_Meshes[meshIndex].m_MaterialIndex;
 		const uint32_t materialIndex =
 			sourceMaterialIndex < m_MaterialIds.size() ? sourceMaterialIndex : 0;
 		m_PendingInstances.push_back({
@@ -383,8 +388,8 @@ namespace gglab
 		m_CommittedInstanceCount = static_cast<uint32_t>(m_PendingInstances.size());
 		std::string error = m_Services->CommitModel({
 			.m_Model = m_Model,
-			.m_Name = m_Source.m_Name,
-			.m_Type = m_Source.m_Type,
+			.m_Name = m_Artifact->m_Model.m_Name,
+			.m_Type = m_Artifact->m_Model.m_Type,
 			.m_MeshInstances = std::move(m_PendingInstances),
 			.m_DependencyOwner = m_Journal.GetDependencyOwner(),
 			.m_DependencyLeases = m_Journal.GetDependencyLeases(),

@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Asset/Publication/ModelPublicationJournal.h"
+#include "Graphics/Asset/ModelImportArtifact.h"
 
 #include <memory>
 #include <optional>
@@ -16,7 +17,7 @@ namespace gglab
 			AssetContentVersion model,
 			double importQueueMilliseconds,
 			double importExecutionMilliseconds,
-			ImportedModel&& source) noexcept;
+			ModelImportArtifactHandle artifact) noexcept;
 
 		[[nodiscard]] AssetResourcePublicationStepResult Step(
 			AssetResourcePublicationContext& context) noexcept override;
@@ -87,7 +88,7 @@ namespace gglab
 		AssetContentVersion m_Model{};
 		double m_ImportQueueMilliseconds = 0.0;
 		double m_ImportExecutionMilliseconds = 0.0;
-		ImportedModel m_Source;
+		ModelImportArtifactHandle m_Artifact;
 		ModelPublicationJournal m_Journal;
 		Stage m_Stage = Stage::Textures;
 		Stage m_LastStepStage = Stage::Finished;

@@ -822,6 +822,12 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.cpp">
+      <Filter>Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifactCache.cpp">
+      <Filter>Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.cpp">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
@@ -1815,6 +1821,12 @@
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.h">
+      <Filter>Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.h">
+      <Filter>Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifactCache.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.h">

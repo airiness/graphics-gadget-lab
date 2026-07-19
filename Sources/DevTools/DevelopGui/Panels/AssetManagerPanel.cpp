@@ -111,10 +111,40 @@ namespace gglab
 			}
 
 			const auto& models = assetSnapshot.m_Models;
+			ImGui::SeparatorText("Model Import CPU Artifact Cache");
+			const uint64_t artifactLookupCount =
+				assetSnapshot.m_ModelImportArtifactCacheHitCount +
+				assetSnapshot.m_ModelImportArtifactCacheMissCount;
+			const double artifactHitRate = artifactLookupCount == 0 ? 0.0 :
+				100.0 * static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheHitCount) /
+					static_cast<double>(artifactLookupCount);
+			ImGui::Text(
+				"Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
+				assetSnapshot.m_ModelImportArtifactCachedEntryCount,
+				assetSnapshot.m_ModelImportArtifactCacheHitCount,
+				assetSnapshot.m_ModelImportArtifactCacheMissCount,
+				artifactHitRate);
+			ImGui::Text(
+				"Memory: cached %.2f MiB / %.2f MiB | externally retained %.2f MiB | total live %.2f MiB",
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactCachedBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheBudgetBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactExternallyRetainedBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactTotalLiveBytes) / (1024.0 * 1024.0));
+			ImGui::Text(
+				"Admissions: %llu | Rejected: %llu | Evictions: %llu (%.2f MiB)",
+				assetSnapshot.m_ModelImportArtifactAdmissionCount,
+				assetSnapshot.m_ModelImportArtifactAdmissionRejectedCount,
+				assetSnapshot.m_ModelImportArtifactEvictionCount,
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactEvictedBytes) / (1024.0 * 1024.0));
+			if (ImGui::Button("Clear Model Import CPU Cache"))
+			{
+				assetManager.ClearModelImportArtifactCache();
+				state.m_Status = "Model import CPU artifact cache cleared.";
+			}
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
-			if (ImGui::BeginTable("ModelAssetsTable", 15,
+			if (ImGui::BeginTable("ModelAssetsTable", 17,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
 			{
@@ -132,6 +162,8 @@ namespace gglab
 				ImGui::TableSetupColumn("Dep Events", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 96.0f);
 				ImGui::TableSetupColumn("Meshes", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("CPU Cache", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+				ImGui::TableSetupColumn("Artifact", ImGuiTableColumnFlags_WidthFixed, 140.0f);
 				ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch);
 				ImGui::TableHeadersRow();
 
@@ -184,6 +216,12 @@ namespace gglab
 					ImGui::TableSetColumnIndex(13);
 					ImGui::Text("%u", model.m_MeshInstanceCount);
 					ImGui::TableSetColumnIndex(14);
+					ImGui::TextUnformatted(utils::BoolToString(model.m_IsImportArtifactCached));
+					ImGui::TableSetColumnIndex(15);
+					const std::string artifactDigest = ArtifactContentDigestText(
+						model.m_ImportArtifactContentDigest);
+					ImGui::TextUnformatted(artifactDigest.empty() ? "-" : artifactDigest.c_str());
+					ImGui::TableSetColumnIndex(16);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
 				}

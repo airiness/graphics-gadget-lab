@@ -5,6 +5,7 @@
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Asset/TextureArtifact.h"
+#include "Graphics/Asset/ModelImportArtifactCache.h"
 
 namespace gglab
 {
@@ -12,7 +13,7 @@ namespace gglab
 	{
 		struct ImportJob
 		{
-			ImportedModel m_Model;
+			ModelImportArtifactHandle m_Artifact;
 		};
 
 		struct TextureDecodeJob
@@ -25,9 +26,11 @@ namespace gglab
 
 	AssetLoadCoordinator::AssetLoadCoordinator(const CreateInfo& createInfo) noexcept :
 		m_TaskSystem(createInfo.m_TaskSystem),
+		m_ModelImportArtifactCache(createInfo.m_ModelImportArtifactCache),
 		m_TextureDerivedDataSystem(createInfo.m_TextureDerivedDataCacheDirectory)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_TaskSystem);
+		GGLAB_ASSERT_NOT_NULL(m_ModelImportArtifactCache);
 	}
 
 	AssetLoadCoordinator::~AssetLoadCoordinator()
@@ -87,7 +90,11 @@ namespace gglab
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
-				job->m_Model = std::move(result.m_Model);
+				job->m_Artifact = CreateModelImportArtifact(std::move(result.m_Model));
+				if (!job->m_Artifact)
+				{
+					return TaskResult::Failure("Failed to create model import artifact");
+				}
 				return TaskResult::Success();
 			},
 			[this, operation, job](const TaskCompletionInfo& completion) mutable noexcept
@@ -101,7 +108,7 @@ namespace gglab
 					m_PendingCompletions.emplace_back(ModelImportSucceeded{
 						.m_Operation = operation,
 						.m_Completion = completion,
-						.m_Model = std::move(job->m_Model),
+						.m_Artifact = std::move(job->m_Artifact),
 					});
 				}
 				else
@@ -151,17 +158,32 @@ namespace gglab
 		const AssetOperationToken operation = AllocateOperation(
 			request.m_SourceModelVersion);
 		auto job = std::make_shared<ImportJob>();
+		if (request.m_ExpectedArtifactContentDigest.IsValid())
+		{
+			job->m_Artifact = m_ModelImportArtifactCache->Find(
+				request.m_ExpectedArtifactContentDigest);
+		}
 		const std::filesystem::path sourcePath = std::move(request.m_SourcePath);
 		const ModelImportSettings importSettings = request.m_ImportSettings;
+		const bool cacheHit = static_cast<bool>(job->m_Artifact);
+		const std::string taskName = cacheHit ?
+			std::format(
+				"Asset.ModelResidencyCacheHit: {}",
+				sourcePath.filename().generic_string()) :
+			std::format(
+				"Asset.ModelResidencyReload: {}",
+				sourcePath.filename().generic_string());
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
-				.m_Name = std::format(
-					"Asset.ModelResidencyReload: {}",
-					sourcePath.filename().generic_string()),
+				.m_Name = taskName,
 				.m_Priority = request.m_Priority,
 			},
-			[sourcePath, importSettings, job](std::stop_token stopToken) noexcept
+			[sourcePath, importSettings, job, cacheHit](std::stop_token stopToken) noexcept
 			{
+				if (cacheHit)
+				{
+					return TaskResult::Success();
+				}
 				ModelImportResult result = ModelImporter::Import(
 					sourcePath,
 					importSettings,
@@ -170,10 +192,11 @@ namespace gglab
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
-				job->m_Model = std::move(result.m_Model);
-				job->m_Model.m_Textures.clear();
-				job->m_Model.m_Materials.clear();
-				job->m_Model.m_MeshInstances.clear();
+				job->m_Artifact = CreateModelImportArtifact(std::move(result.m_Model));
+				if (!job->m_Artifact)
+				{
+					return TaskResult::Failure("Failed to create model import artifact");
+				}
 				return TaskResult::Success();
 			},
 			[this, operation, job](const TaskCompletionInfo& completion) mutable noexcept
@@ -187,7 +210,7 @@ namespace gglab
 					m_PendingCompletions.emplace_back(MeshReloadSucceeded{
 						.m_Operation = operation,
 						.m_Completion = completion,
-						.m_Model = std::move(job->m_Model),
+						.m_Artifact = std::move(job->m_Artifact),
 					});
 				}
 				else

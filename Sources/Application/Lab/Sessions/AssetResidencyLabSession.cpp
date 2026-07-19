@@ -161,6 +161,7 @@ namespace gglab
 		uint64_t m_StaleCompletionCountBaseline = 0;
 		uint64_t m_AcceptedStateEventCountBaseline = 0;
 		uint64_t m_CompletedStateEventCountBaseline = 0;
+		uint64_t m_ModelImportArtifactCacheHitCountBaseline = 0;
 		uint64_t m_TextureArtifactCacheHitCountBaseline = 0;
 		uint64_t m_TextureDdcHitCountBaseline = 0;
 		uint64_t m_TextureDdcWriteCountBaseline = 0;
@@ -313,6 +314,14 @@ namespace gglab
 				Fail("The model dependency graph did not converge with traversal-based readiness.");
 				return;
 			}
+			if (!dependencyModel->m_ImportArtifactContentDigest.IsValid() ||
+				!dependencyModel->m_IsImportArtifactCached ||
+				dependencySnapshot.m_ModelImportArtifactCachedEntryCount == 0 ||
+				dependencySnapshot.m_ModelImportArtifactAdmissionCount == 0)
+			{
+				Fail("The immutable model import artifact was not admitted to the CPU cache.");
+				return;
+			}
 
 			if (!assetManager.SetModelResidencyPolicy(
 				m_State->m_Request.m_ModelId,
@@ -383,6 +392,8 @@ namespace gglab
 				residency.m_AcceptedStateEventCount;
 			m_State->m_CompletedStateEventCountBaseline =
 				residency.m_CompletedStateEventCount;
+			m_State->m_ModelImportArtifactCacheHitCountBaseline =
+				dependencySnapshot.m_ModelImportArtifactCacheHitCount;
 			m_State->m_Phase = State::Phase::MarkUsage;
 			break;
 		}
@@ -1067,6 +1078,17 @@ namespace gglab
 				Fail("Dependency tracking diverged during residency reload.");
 				return;
 			}
+			const AssetSnapshot::Model* reloadedModel = FindModelSnapshot(
+				snapshot,
+				m_State->m_Request.m_ModelId);
+			if (!reloadedModel || !reloadedModel->m_IsImportArtifactCached ||
+				!reloadedModel->m_ImportArtifactContentDigest.IsValid() ||
+				snapshot.m_ModelImportArtifactCacheHitCount <=
+					m_State->m_ModelImportArtifactCacheHitCountBaseline)
+			{
+				Fail("Mesh residency reload did not reuse the immutable model import artifact.");
+				return;
+			}
 			Complete();
 			break;
 		}
@@ -1129,7 +1151,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

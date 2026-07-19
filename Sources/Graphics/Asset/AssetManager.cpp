@@ -104,8 +104,10 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
+		m_ModelImportArtifactCache(createInfo.m_ModelImportArtifactCache),
 		m_AssetLoadCoordinator({
 			.m_TaskSystem = createInfo.m_TaskSystem,
+			.m_ModelImportArtifactCache = &m_ModelImportArtifactCache,
 			.m_TextureDerivedDataCacheDirectory =
 				createInfo.m_TextureDerivedDataCacheDirectory,
 		}),
@@ -404,7 +406,7 @@ namespace gglab
 						RouteModelImportCompletion(
 							result.m_Operation,
 							result.m_Completion,
-							std::move(result.m_Model));
+							std::move(result.m_Artifact));
 					}
 					else if constexpr (std::same_as<Result, ModelImportFailed>)
 					{
@@ -418,7 +420,7 @@ namespace gglab
 						RouteMeshReloadCompletion(
 							result.m_Operation,
 							result.m_Completion,
-							std::move(result.m_Model));
+							std::move(result.m_Artifact));
 					}
 					else if constexpr (std::same_as<Result, MeshReloadFailed>)
 					{
@@ -1724,6 +1726,8 @@ namespace gglab
 			.m_SourcePath = sourcePath,
 			.m_ImportSettings = m_MaterialTextureSampling,
 			.m_Priority = priority,
+			.m_ExpectedArtifactContentDigest =
+				sourceModel->m_ImportArtifactContentDigest,
 		});
 		if (!submission.IsValid())
 		{
@@ -2017,6 +2021,17 @@ namespace gglab
 	void AssetManager::ClearTextureArtifactCache() noexcept
 	{
 		m_TextureAssets->ClearArtifactCache();
+	}
+
+	ModelImportArtifactCacheStatistics
+	AssetManager::GetModelImportArtifactCacheStatistics() const noexcept
+	{
+		return m_ModelImportArtifactCache.GetStatistics();
+	}
+
+	void AssetManager::ClearModelImportArtifactCache() noexcept
+	{
+		m_ModelImportArtifactCache.Clear();
 	}
 
 	LocalDerivedDataStoreStatistics AssetManager::GetTextureDerivedDataStatistics() const noexcept
@@ -2514,7 +2529,7 @@ namespace gglab
 	void AssetManager::RouteModelImportCompletion(
 		AssetOperationToken operation,
 		const TaskCompletionInfo& completion,
-		ImportedModel&& importedModel) noexcept
+		ModelImportArtifactHandle artifact) noexcept
 	{
 		if (!m_AssetLoadCoordinator.IsCurrentModelImport(operation) ||
 			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
@@ -2532,7 +2547,10 @@ namespace gglab
 			return;
 		}
 
-		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		if (artifact)
+		{
+			artifact = m_ModelImportArtifactCache.Admit(std::move(artifact));
+		}
 		m_AssetUploadScheduler->EnqueueCpuPayload(
 			{
 				.m_Name = completion.m_Name,
@@ -2541,23 +2559,24 @@ namespace gglab
 					.m_StableId = modelId.Value(),
 					.m_Generation = operation.m_ContentVersion.m_ContentGeneration,
 				},
-				.m_Estimate = EstimateImportedModel(*payload),
+				.m_Estimate = artifact ?
+					EstimateImportedModel(artifact->m_Model) : AssetStreamingWorkEstimate{},
 				.m_Priority = completion.m_Priority,
 				.m_Progress = model->m_LoadProgress,
 			},
-			[this, operation, completion, payload]() mutable noexcept
+			[this, operation, completion, artifact = std::move(artifact)]() mutable noexcept
 			{
 				CompleteModelLoad(
 					operation,
 					completion,
-					std::move(*payload));
+					std::move(artifact));
 			});
 	}
 
 	void AssetManager::RouteMeshReloadCompletion(
 		AssetOperationToken operation,
 		const TaskCompletionInfo& completion,
-		ImportedModel&& importedModel) noexcept
+		ModelImportArtifactHandle artifact) noexcept
 	{
 		if (!m_AssetLoadCoordinator.IsCurrentMeshReload(operation) ||
 			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
@@ -2574,7 +2593,10 @@ namespace gglab
 			return;
 		}
 
-		auto payload = std::make_shared<ImportedModel>(std::move(importedModel));
+		if (artifact)
+		{
+			artifact = m_ModelImportArtifactCache.Admit(std::move(artifact));
+		}
 		m_AssetUploadScheduler->EnqueueCpuPayload(
 			{
 				.m_Name = completion.m_Name,
@@ -2583,22 +2605,23 @@ namespace gglab
 					.m_StableId = sourceModelId.Value(),
 					.m_Generation = operation.m_ContentVersion.m_ContentGeneration,
 				},
-				.m_Estimate = EstimateImportedModel(*payload),
+				.m_Estimate = artifact ?
+					EstimateImportedModel(artifact->m_Model) : AssetStreamingWorkEstimate{},
 				.m_Priority = completion.m_Priority,
 			},
-			[this, operation, completion, payload]() mutable noexcept
+			[this, operation, completion, artifact = std::move(artifact)]() mutable noexcept
 			{
 				CompleteMeshReload(
 					operation,
 					completion,
-					std::move(*payload));
+					std::move(artifact));
 			});
 	}
 
 	void AssetManager::CompleteModelLoad(
 		AssetOperationToken operation,
 		const TaskCompletionInfo& completion,
-		ImportedModel&& importedModel) noexcept
+		ModelImportArtifactHandle artifact) noexcept
 	{
 		if (!m_AssetLoadCoordinator.IsCurrentModelImport(operation) ||
 			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
@@ -2633,7 +2656,7 @@ namespace gglab
 				completion.m_Name);
 			return;
 		}
-		if (completion.m_Status != TaskStatus::Succeeded)
+		if (completion.m_Status != TaskStatus::Succeeded || !artifact || !artifact->IsValid())
 		{
 			SetAssetState(*model, AssetState::Failed);
 			ProgressReporter(model->m_LoadProgress).Report(
@@ -2652,8 +2675,8 @@ namespace gglab
 			0.62f,
 			"Queued for resource publication",
 			completion.m_Name);
-		auto payload = std::make_unique<ImportedModel>(std::move(importedModel));
-		const AssetStreamingWorkEstimate estimate = EstimateImportedModel(*payload);
+		model->m_ImportArtifactContentDigest = artifact->m_ContentDigest;
+		const AssetStreamingWorkEstimate estimate = EstimateImportedModel(artifact->m_Model);
 		const TaskPriority priority = GetEffectivePriority(
 			MakeAssetKey(modelId),
 			completion.m_Priority);
@@ -2662,7 +2685,7 @@ namespace gglab
 			MakeAssetContentVersion(modelId, generation),
 			completion.m_QueueMilliseconds,
 			completion.m_ExecutionMilliseconds,
-			std::move(*payload));
+			std::move(artifact));
 		m_AssetUploadScheduler->EnqueueResourcePublication(
 			{
 				.m_Name = std::format("Model {}", modelId.Value()),
@@ -2681,7 +2704,7 @@ namespace gglab
 	void AssetManager::CompleteMeshReload(
 		AssetOperationToken operation,
 		const TaskCompletionInfo& completion,
-		ImportedModel&& importedModel) noexcept
+		ModelImportArtifactHandle artifact) noexcept
 	{
 		if (!m_AssetLoadCoordinator.IsCurrentMeshReload(operation) ||
 			operation.m_ContentVersion.m_Key.m_Kind != AssetKind::Model)
@@ -2691,12 +2714,17 @@ namespace gglab
 		m_AssetLoadCoordinator.CompleteMeshReload(operation);
 		const ModelID sourceModelId{ static_cast<uint32_t>(
 			operation.m_ContentVersion.m_Key.m_StableId) };
-		const Model* sourceModel = GetModel(sourceModelId);
+		Model* sourceModel = EditModel(sourceModelId);
 		if (!sourceModel || sourceModel->m_ContentGeneration !=
 			operation.m_ContentVersion.m_ContentGeneration)
 		{
 			return;
 		}
+		if (completion.m_Status == TaskStatus::Succeeded && artifact && artifact->IsValid())
+		{
+			sourceModel->m_ImportArtifactContentDigest = artifact->m_ContentDigest;
+		}
+		const ImportedModel* importedModel = artifact ? &artifact->m_Model : nullptr;
 
 		for (const auto& [meshId, meshOwner] : m_MeshStore.Entries())
 		{
@@ -2718,8 +2746,8 @@ namespace gglab
 				m_AssetResidencyController.RecordStaleCompletion();
 				continue;
 			}
-			if (completion.m_Status != TaskStatus::Succeeded ||
-				mesh->m_SourceMeshIndex >= importedModel.m_Meshes.size())
+			if (completion.m_Status != TaskStatus::Succeeded || !importedModel ||
+				mesh->m_SourceMeshIndex >= importedModel->m_Meshes.size())
 			{
 				mesh->m_IsReloading = false;
 				SetMeshState(
@@ -2729,11 +2757,12 @@ namespace gglab
 					AssetStateEventOperationPhase::Completes);
 				continue;
 			}
-			ImportedMesh& importedMesh = importedModel.m_Meshes[mesh->m_SourceMeshIndex];
+			const ImportedMesh& importedMesh =
+				importedModel->m_Meshes[mesh->m_SourceMeshIndex];
 			MeshUploadData uploadData{
 				.m_MeshId = meshId,
-				.m_VerticesData = std::move(importedMesh.m_Vertices),
-				.m_IndicesData = std::move(importedMesh.m_Indices),
+				.m_VerticesData = importedMesh.m_Vertices,
+				.m_IndicesData = importedMesh.m_Indices,
 			};
 			if (!QueueMeshUpload(
 				std::move(uploadData),
