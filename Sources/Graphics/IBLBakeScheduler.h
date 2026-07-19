@@ -24,7 +24,7 @@ namespace gglab
 
 	class IBLBakeScheduler
 	{
-	public:
+	private:
 		struct BakeRequestSnapshot
 		{
 			uint64_t m_Generation = 0;
@@ -38,6 +38,7 @@ namespace gglab
 			}
 		};
 
+	public:
 		struct CreateInfo
 		{
 			RHIDevice* m_Device = nullptr;
@@ -107,7 +108,6 @@ namespace gglab
 		GpuProfiler* m_GpuProfiler = nullptr;
 		IBLBakeCache m_Cache;
 
-		AssetManager* m_AssetManager = nullptr;
 		std::unique_ptr<AssetOwnerScope> m_BakingSourceOwner;
 		BakeRequestSnapshot m_BakingRequest{};
 		IBLBakeStatus m_Status{};

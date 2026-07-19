@@ -40,6 +40,41 @@ namespace gglab
 		[[nodiscard]] RHITextureUploadData MakeUploadData() const noexcept;
 	};
 
+	// Mutable texture storage stays inside the asset subsystem. External consumers
+	// receive generation-checked TextureContentRef/ResidentTextureResource views.
+	struct TextureSourceInfo
+	{
+		std::filesystem::path m_CanonicalPath;
+		TextureImportSettings m_ImportSettings{};
+		AssetContentFingerprint m_ContentFingerprint{};
+	};
+
+	struct TextureGpuState
+	{
+		RHITextureHandle m_Texture;
+		RHITextureViewHandle m_Srv{};
+		RHITextureDesc m_Desc{};
+		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
+		bool m_IsUploaded = false;
+	};
+
+	struct TextureLoadState
+	{
+		ProgressChannelPtr m_Progress;
+		bool m_CancelRequested = false;
+		bool m_IsReloading = false;
+	};
+
+	struct Texture : AssetLifecycle
+	{
+		TextureID m_Id{};
+		TextureSourceInfo m_Source{};
+		StringID m_Name{};
+		std::string m_DebugLabel;
+		TextureGpuState m_Gpu{};
+		TextureLoadState m_Load{};
+	};
+
 	[[nodiscard]] AssetContentFingerprint ComputeTextureContentFingerprint(
 		const TextureAssetData& textureData,
 		const TextureImportSettings& importSettings) noexcept;

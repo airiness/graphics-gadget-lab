@@ -236,12 +236,6 @@ namespace gglab
 			m_PendingSelection.m_EntryIndex : InvalidEntryIndex;
 	}
 
-	bool EnvironmentAssetController::IsEntryTextureReady(size_t entryIndex) const noexcept
-	{
-		return entryIndex < m_Entries.size() &&
-			m_AssetManager->GetResidentTextureResource(m_Entries[entryIndex].m_Content).has_value();
-	}
-
 	void EnvironmentAssetController::CommitFallback() noexcept
 	{
 		const TextureID fallbackId =

@@ -153,12 +153,6 @@ namespace gglab
 		return descriptor.m_Index;
 	}
 
-	SamplerKey SamplerRegistry::GetSamplerKey(SamplerID samplerId) const noexcept
-	{
-		const auto& entry = GetEntry(samplerId);
-		return entry.m_Key;
-	}
-
 	uint32_t SamplerRegistry::ResolveSamplerIndex(SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept
 	{
 		if (samplerId.IsValid())

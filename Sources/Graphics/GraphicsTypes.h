@@ -7,7 +7,6 @@
 #include "Core/StringId.h"
 #include "Core/TypedIndex.h"
 #include "Core/EnumFlags.h"
-#include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIResource.h"
@@ -246,29 +245,6 @@ namespace gglab
 		};
 	}
 
-	struct TextureSourceInfo
-	{
-		std::filesystem::path m_CanonicalPath;
-		TextureImportSettings m_ImportSettings{};
-		AssetContentFingerprint m_ContentFingerprint{};
-	};
-
-	struct TextureGpuState
-	{
-		RHITextureHandle m_Texture;
-		RHITextureViewHandle m_Srv{};
-		RHITextureDesc m_Desc{};
-		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
-		bool m_IsUploaded = false;
-	};
-
-	struct TextureLoadState
-	{
-		ProgressChannelPtr m_Progress;
-		bool m_CancelRequested = false;
-		bool m_IsReloading = false;
-	};
-
 	inline constexpr uint32_t CubemapFaceCount = 6u;
 	enum class CubemapFace : uint8_t
 	{
@@ -477,16 +453,6 @@ namespace gglab
 	{
 		return id.IsValid() && id.Value() < ReservedModelCount;
 	}
-
-	struct Texture : AssetLifecycle
-	{
-		TextureID m_Id{};
-		TextureSourceInfo m_Source{};
-		StringID m_Name{};
-		std::string m_DebugLabel;
-		TextureGpuState m_Gpu{};
-		TextureLoadState m_Load{};
-	};
 
 	struct MaterialTextureBinding
 	{
