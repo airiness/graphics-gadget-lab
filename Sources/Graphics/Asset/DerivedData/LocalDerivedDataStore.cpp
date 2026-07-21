@@ -63,49 +63,32 @@ namespace gglab
 			std::span<const std::byte> m_Bytes;
 			size_t m_Offset = 0;
 		};
-	}
 
-	LocalDerivedDataStore::LocalDerivedDataStore(
-		std::filesystem::path rootDirectory) noexcept :
-		m_RootDirectory(std::move(rootDirectory))
-	{
-		if (IsEnabled())
+		[[nodiscard]] DerivedDataReadResult ReadEntry(
+			const std::filesystem::path& path,
+			const DerivedDataKey& key,
+			std::string_view artifactType,
+			uint32_t schemaVersion) noexcept
 		{
-			GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_RootDirectory));
-			RefreshStoredStatistics();
-		}
-	}
+			DerivedDataReadResult result{};
+			std::ifstream stream(path, std::ios::binary | std::ios::ate);
+			if (!stream)
+			{
+				return result;
+			}
 
-	DerivedDataReadResult LocalDerivedDataStore::Read(
-		const DerivedDataKey& key,
-		std::string_view artifactType,
-		uint32_t schemaVersion) noexcept
-	{
-		DerivedDataReadResult result{};
-		if (!IsEnabled() || !key.IsValid())
-		{
-			m_MissCount.fetch_add(1, std::memory_order_relaxed);
-			return result;
-		}
-		std::scoped_lock lock(m_Mutex);
-		const std::filesystem::path path = EntryPath(key);
-		std::ifstream stream(path, std::ios::binary | std::ios::ate);
-		if (!stream)
-		{
-			m_EntryPaths.erase(path);
-			m_MissCount.fetch_add(1, std::memory_order_relaxed);
-			return result;
-		}
-		const std::streamoff end = stream.tellg();
-		if (end <= 0 || static_cast<uint64_t>(end) > std::numeric_limits<size_t>::max())
-		{
-			result.m_Disposition = DerivedDataReadDisposition::Corrupt;
-		}
-		else
-		{
+			const std::streamoff end = stream.tellg();
+			if (end <= 0 || static_cast<uint64_t>(end) > std::numeric_limits<size_t>::max())
+			{
+				result.m_Disposition = DerivedDataReadDisposition::Corrupt;
+				return result;
+			}
+
 			std::vector<std::byte> fileBytes(static_cast<size_t>(end));
 			stream.seekg(0, std::ios::beg);
-			stream.read(reinterpret_cast<char*>(fileBytes.data()), static_cast<std::streamsize>(fileBytes.size()));
+			stream.read(
+				reinterpret_cast<char*>(fileBytes.data()),
+				static_cast<std::streamsize>(fileBytes.size()));
 			BinaryReader reader(fileBytes);
 			std::array<std::byte, 8> magic{};
 			uint32_t containerVersion = 0;
@@ -131,8 +114,11 @@ namespace gglab
 				headerBytes + typeBytes + payloadBytes == fileBytes.size())
 			{
 				const auto storedType = std::span(fileBytes).subspan(reader.Offset(), typeBytes);
-				const auto expectedType = std::as_bytes(std::span{ artifactType.data(), artifactType.size() });
-				const auto payload = std::span(fileBytes).subspan(reader.Offset() + typeBytes, static_cast<size_t>(payloadBytes));
+				const auto expectedType = std::as_bytes(
+					std::span{ artifactType.data(), artifactType.size() });
+				const auto payload = std::span(fileBytes).subspan(
+					reader.Offset() + typeBytes,
+					static_cast<size_t>(payloadBytes));
 				if (std::ranges::equal(storedType, expectedType) &&
 					ComputeSha256(payload).m_Value == storedPayloadDigest.m_Value &&
 					storedArtifactDigest.IsValid())
@@ -146,8 +132,40 @@ namespace gglab
 			{
 				result.m_Disposition = DerivedDataReadDisposition::Corrupt;
 			}
+			return result;
 		}
-		stream.close();
+	}
+
+	LocalDerivedDataStore::LocalDerivedDataStore(
+		std::filesystem::path rootDirectory) noexcept :
+		m_RootDirectory(std::move(rootDirectory))
+	{
+		if (IsEnabled())
+		{
+			GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_RootDirectory));
+			RefreshStoredStatistics();
+		}
+	}
+
+	DerivedDataReadResult LocalDerivedDataStore::Read(
+		const DerivedDataKey& key,
+		std::string_view artifactType,
+		uint32_t schemaVersion) noexcept
+	{
+		if (!IsEnabled() || !key.IsValid())
+		{
+			m_MissCount.fetch_add(1, std::memory_order_relaxed);
+			return {};
+		}
+		std::scoped_lock lock(m_Mutex);
+		const std::filesystem::path path = EntryPath(key);
+		DerivedDataReadResult result = ReadEntry(path, key, artifactType, schemaVersion);
+		if (result.m_Disposition == DerivedDataReadDisposition::Miss)
+		{
+			m_EntryPaths.erase(path);
+			m_MissCount.fetch_add(1, std::memory_order_relaxed);
+			return result;
+		}
 
 		if (result.m_Disposition == DerivedDataReadDisposition::Hit)
 		{
@@ -194,7 +212,10 @@ namespace gglab
 			return false;
 		}
 		const std::filesystem::path temporary = path.string() + std::format(
-			".tmp.{}.{}", GetCurrentProcessId(), m_TemporarySerial.fetch_add(1));
+			".tmp.{}.{}.{}",
+			GetCurrentProcessId(),
+			reinterpret_cast<uintptr_t>(this),
+			m_TemporarySerial.fetch_add(1));
 		std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
 		if (stream)
 		{
@@ -206,23 +227,90 @@ namespace gglab
 		stream.close();
 		const uint64_t totalBytes = header.m_Bytes.size() + payload.size();
 		std::error_code errorCode;
-		const bool existed = std::filesystem::exists(path, errorCode);
-		const uint64_t previousBytes = existed ? std::filesystem::file_size(path, errorCode) : 0;
-		const bool published = wrote && MoveFileExW(
-			temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
-		if (!published)
+		if (!wrote)
 		{
 			std::filesystem::remove(temporary, errorCode);
 			m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
 			return false;
 		}
-		if (!existed) m_StoredEntryCount.fetch_add(1, std::memory_order_relaxed);
-		m_EntryPaths.insert(path);
-		if (previousBytes <= m_StoredBytes.load(std::memory_order_relaxed)) m_StoredBytes.fetch_sub(previousBytes, std::memory_order_relaxed);
-		m_StoredBytes.fetch_add(totalBytes, std::memory_order_relaxed);
-		m_WriteCount.fetch_add(1, std::memory_order_relaxed);
-		m_WrittenBytes.fetch_add(payload.size(), std::memory_order_relaxed);
-		return true;
+
+		constexpr uint32_t MaxPublishAttempts = 3;
+		for (uint32_t attempt = 0; attempt < MaxPublishAttempts; ++attempt)
+		{
+			if (MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH))
+			{
+				if (m_EntryPaths.insert(path).second)
+				{
+					m_StoredEntryCount.fetch_add(1, std::memory_order_relaxed);
+					m_StoredBytes.fetch_add(totalBytes, std::memory_order_relaxed);
+				}
+				m_WriteCount.fetch_add(1, std::memory_order_relaxed);
+				m_WrittenBytes.fetch_add(payload.size(), std::memory_order_relaxed);
+				return true;
+			}
+
+			DerivedDataReadResult existing = ReadEntry(
+				path,
+				key,
+				artifactType,
+				schemaVersion);
+			if (existing.m_Disposition == DerivedDataReadDisposition::Hit)
+			{
+				std::filesystem::remove(temporary, errorCode);
+				if (m_EntryPaths.insert(path).second)
+				{
+					errorCode.clear();
+					const uint64_t existingBytes = std::filesystem::file_size(path, errorCode);
+					m_StoredEntryCount.fetch_add(1, std::memory_order_relaxed);
+					if (!errorCode)
+					{
+						m_StoredBytes.fetch_add(existingBytes, std::memory_order_relaxed);
+					}
+				}
+				if (existing.m_ArtifactContentDigest == artifactContentDigest)
+				{
+					return true;
+				}
+
+				m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Rejected non-deterministic local DDC write for key '{}' (existing artifact {}, produced artifact {}).",
+					DerivedDataKeyText(key),
+					ArtifactContentDigestText(existing.m_ArtifactContentDigest),
+					ArtifactContentDigestText(artifactContentDigest));
+				return false;
+			}
+
+			if (existing.m_Disposition == DerivedDataReadDisposition::Corrupt)
+			{
+				errorCode.clear();
+				const uint64_t corruptBytes = std::filesystem::file_size(path, errorCode);
+				errorCode.clear();
+				if (std::filesystem::remove(path, errorCode))
+				{
+					m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
+					if (m_EntryPaths.erase(path) > 0)
+					{
+						m_StoredEntryCount.fetch_sub(1, std::memory_order_relaxed);
+						const uint64_t storedBytes =
+							m_StoredBytes.load(std::memory_order_relaxed);
+						if (corruptBytes <= storedBytes)
+						{
+							m_StoredBytes.fetch_sub(corruptBytes, std::memory_order_relaxed);
+						}
+					}
+					GGLAB_LOG_GRAPHICS_WARN(
+						"Discarded corrupt local DDC entry '{}' before immutable publication.",
+						path.string());
+					continue;
+				}
+			}
+			break;
+		}
+
+		std::filesystem::remove(temporary, errorCode);
+		m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
+		return false;
 	}
 
 	bool LocalDerivedDataStore::Contains(const DerivedDataKey& key) const noexcept

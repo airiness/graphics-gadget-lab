@@ -333,6 +333,8 @@ namespace gglab
 				texture->m_Source.m_SourceDigest : SourceDigest{},
 			.m_ExpectedDerivedDataKey = residencyReload ?
 				texture->m_Source.m_DerivedDataKey : DerivedDataKey{},
+			.m_ExpectedArtifactContentDigest = residencyReload ?
+				texture->m_Source.m_ArtifactContentDigest : ArtifactContentDigest{},
 			.m_ResidencyReload = residencyReload,
 			.m_ResidencyOperation = residencyOperation,
 		});
@@ -887,6 +889,17 @@ namespace gglab
 				operationPhase);
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"TextureAssetSystem::UploadTexture received an invalid texture artifact.");
+			return false;
+		}
+		if (residencyOperation.IsValid() &&
+			texture->m_Source.m_ArtifactContentDigest.IsValid() &&
+			uploadData.m_Artifact->m_ContentDigest !=
+				texture->m_Source.m_ArtifactContentDigest)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureAssetSystem::UploadTexture rejected immutable generation content (expected artifact {}, upload artifact {}).",
+				ArtifactContentDigestText(texture->m_Source.m_ArtifactContentDigest),
+				ArtifactContentDigestText(uploadData.m_Artifact->m_ContentDigest));
 			return false;
 		}
 		const TextureAssetData& textureData = uploadData.m_Artifact->m_Data;
@@ -1448,6 +1461,26 @@ namespace gglab
 				"Async texture decode '{}' failed: {}",
 				completion.m_Name,
 				completion.m_Error);
+			return;
+		}
+		if (residencyReload &&
+			texture->m_Source.m_ArtifactContentDigest.IsValid() &&
+			(!artifact || artifact->m_ContentDigest !=
+				texture->m_Source.m_ArtifactContentDigest))
+		{
+			const ArtifactContentDigest actualDigest = artifact ?
+				artifact->m_ContentDigest : ArtifactContentDigest{};
+			SetTextureState(
+				*texture,
+				AssetState::CpuReady,
+				residencyOperation,
+				AssetStateEventOperationPhase::Completes);
+			texture->m_Load.m_IsReloading = false;
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Rejected texture residency reload for immutable generation {} (expected artifact {}, resolved artifact {}).",
+				generation,
+				ArtifactContentDigestText(texture->m_Source.m_ArtifactContentDigest),
+				ArtifactContentDigestText(actualDigest));
 			return;
 		}
 

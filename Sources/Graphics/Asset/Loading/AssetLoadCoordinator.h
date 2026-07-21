@@ -115,6 +115,7 @@ namespace gglab
 		ProgressChannelPtr m_Progress;
 		SourceDigest m_ExpectedSourceDigest{};
 		DerivedDataKey m_ExpectedDerivedDataKey{};
+		ArtifactContentDigest m_ExpectedArtifactContentDigest{};
 		bool m_ResidencyReload = false;
 		AssetResidencyOperation m_ResidencyOperation{};
 	};

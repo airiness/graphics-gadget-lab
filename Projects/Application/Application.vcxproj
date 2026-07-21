@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.8.2505.32\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.615.1\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -344,17 +344,17 @@
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\EnvironmentAssetController.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.cpp" />
-	<ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
-	<ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp" />
@@ -648,15 +648,15 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetContentFingerprint.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h" />
-	<ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h" />
+    <ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />
@@ -703,8 +703,8 @@
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h" />
-	<ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifact.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.h" />

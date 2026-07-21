@@ -13,7 +13,6 @@ namespace gglab
 		DerivedDataKey m_Key{};
 		uint64_t m_BuildSerial = 0;
 		uint32_t m_ParticipantCount = 0;
-		std::stop_source m_BuildStopSource;
 		TextureDerivedDataArtifact m_Artifact;
 		std::string m_Error;
 		bool m_Complete = false;
@@ -145,7 +144,6 @@ namespace gglab
 		}
 		const auto core = std::move(m_Core);
 		const auto state = std::move(m_State);
-		bool requestBuildStop = false;
 		{
 			std::scoped_lock lock(core->m_Mutex);
 			GGLAB_ASSERT(state->m_ParticipantCount > 0);
@@ -159,20 +157,9 @@ namespace gglab
 			{
 				++core->m_Statistics.m_CancelledWaiterCount;
 			}
-			requestBuildStop = !state->m_Complete && state->m_ParticipantCount == 0;
-			if (requestBuildStop)
-			{
-				const auto request = core->m_Requests.find(state->m_Key);
-				if (request != core->m_Requests.end() && request->second == state)
-				{
-					core->m_Requests.erase(request);
-				}
-			}
+			// The active request remains discoverable until its BuildClaim finishes.
+			// Participant cancellation must not create a second producer for the same key.
 			EraseCompletedRequestLocked(*core, state);
-		}
-		if (requestBuildStop)
-		{
-			state->m_BuildStopSource.request_stop();
 		}
 	}
 
@@ -209,11 +196,6 @@ namespace gglab
 	bool TextureArtifactBuildClaim::IsValid() const noexcept
 	{
 		return m_Core && m_State && m_Serial != 0;
-	}
-
-	std::stop_token TextureArtifactBuildClaim::GetStopToken() const noexcept
-	{
-		return m_State ? m_State->m_BuildStopSource.get_token() : std::stop_token{};
 	}
 
 	void TextureArtifactBuildClaim::Abandon() noexcept
