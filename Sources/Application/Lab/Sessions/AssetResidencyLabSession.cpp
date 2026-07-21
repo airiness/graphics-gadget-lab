@@ -59,10 +59,9 @@ namespace gglab
 				error = "Texture shared request did not create one build claim and one waiter.";
 				return false;
 			}
-			if (!producer.m_Waiter.Cancel() ||
-				producer.m_BuildClaim.GetStopToken().stop_requested())
+			if (!producer.m_Waiter.Cancel())
 			{
-				error = "Cancelling one texture participant stopped a build required by another waiter.";
+				error = "Cancelling one texture participant failed.";
 				return false;
 			}
 
@@ -114,6 +113,35 @@ namespace gglab
 				statistics.m_ActiveWaiterCount != 0)
 			{
 				error = "Texture shared request fan-out or diagnostics did not satisfy the contract.";
+				return false;
+			}
+
+			sourceDigest.m_Value.back() = std::byte{ 0xa5 };
+			const DerivedDataKey cancellationKey = BuildTextureDerivedDataKey(
+				sourceDigest,
+				"cancelled-shared-request.png",
+				importSettings);
+			TextureDerivedDataRequestResult cancelledProducer = system.Request(cancellationKey);
+			if (cancelledProducer.m_Disposition != ArtifactRequestDisposition::BuildRequired ||
+				!cancelledProducer.m_Waiter.Cancel())
+			{
+				error = "Texture cancellation contract could not create and release its producer participant.";
+				return false;
+			}
+			TextureDerivedDataRequestResult replacement = system.Request(cancellationKey);
+			if (replacement.m_Disposition != ArtifactRequestDisposition::Waiting ||
+				replacement.m_BuildClaim.IsValid())
+			{
+				error = "Texture participant cancellation allowed a second producer for an active key.";
+				return false;
+			}
+			GGLAB_UNUSED(system.Fail(
+				std::move(cancelledProducer.m_BuildClaim),
+				"Expected cancellation-boundary validation failure."));
+			if (system.Wait(std::move(replacement.m_Waiter), {}).m_Disposition !=
+				ArtifactWaitDisposition::Failed)
+			{
+				error = "Texture cancellation-boundary waiter did not observe producer completion.";
 				return false;
 			}
 			return true;

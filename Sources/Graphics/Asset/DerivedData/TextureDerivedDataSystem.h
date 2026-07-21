@@ -65,7 +65,6 @@ namespace gglab
 		~TextureArtifactBuildClaim();
 
 		[[nodiscard]] bool IsValid() const noexcept;
-		[[nodiscard]] std::stop_token GetStopToken() const noexcept;
 
 	private:
 		friend class TextureDerivedDataSystem;

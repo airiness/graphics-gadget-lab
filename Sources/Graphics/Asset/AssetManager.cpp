@@ -2720,9 +2720,16 @@ namespace gglab
 		{
 			return;
 		}
-		if (completion.m_Status == TaskStatus::Succeeded && artifact && artifact->IsValid())
+		if (completion.m_Status == TaskStatus::Succeeded && artifact && artifact->IsValid() &&
+			sourceModel->m_ImportArtifactContentDigest.IsValid() &&
+			artifact->m_ContentDigest != sourceModel->m_ImportArtifactContentDigest)
 		{
-			sourceModel->m_ImportArtifactContentDigest = artifact->m_ContentDigest;
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Rejected mesh residency reload for immutable model generation {} (expected artifact {}, resolved artifact {}).",
+				operation.m_ContentVersion.m_ContentGeneration,
+				ArtifactContentDigestText(sourceModel->m_ImportArtifactContentDigest),
+				ArtifactContentDigestText(artifact->m_ContentDigest));
+			artifact.reset();
 		}
 		const ImportedModel* importedModel = artifact ? &artifact->m_Model : nullptr;
 

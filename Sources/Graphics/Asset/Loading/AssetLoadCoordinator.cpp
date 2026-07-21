@@ -136,7 +136,8 @@ namespace gglab
 		MeshReloadRequest request) noexcept
 	{
 		if (!request.m_SourceModelVersion.IsValid() || request.m_SourcePath.empty() ||
-			request.m_Priority == TaskPriority::Count)
+			request.m_Priority == TaskPriority::Count ||
+			!request.m_ExpectedArtifactContentDigest.IsValid())
 		{
 			return {};
 		}
@@ -165,6 +166,8 @@ namespace gglab
 		}
 		const std::filesystem::path sourcePath = std::move(request.m_SourcePath);
 		const ModelImportSettings importSettings = request.m_ImportSettings;
+		const ArtifactContentDigest expectedArtifactContentDigest =
+			request.m_ExpectedArtifactContentDigest;
 		const bool cacheHit = static_cast<bool>(job->m_Artifact);
 		const std::string taskName = cacheHit ?
 			std::format(
@@ -178,10 +181,16 @@ namespace gglab
 				.m_Name = taskName,
 				.m_Priority = request.m_Priority,
 			},
-			[sourcePath, importSettings, job, cacheHit](std::stop_token stopToken) noexcept
+			[sourcePath, importSettings, expectedArtifactContentDigest,
+				job, cacheHit](std::stop_token stopToken) noexcept
 			{
 				if (cacheHit)
 				{
+					if (job->m_Artifact->m_ContentDigest != expectedArtifactContentDigest)
+					{
+						return TaskResult::Failure(
+							"Model artifact cache returned content with an unexpected digest.");
+					}
 					return TaskResult::Success();
 				}
 				ModelImportResult result = ModelImporter::Import(
@@ -196,6 +205,14 @@ namespace gglab
 				if (!job->m_Artifact)
 				{
 					return TaskResult::Failure("Failed to create model import artifact");
+				}
+				if (expectedArtifactContentDigest.IsValid() &&
+					job->m_Artifact->m_ContentDigest != expectedArtifactContentDigest)
+				{
+					return TaskResult::Failure(std::format(
+						"Model source changed for immutable content generation (expected artifact {}, rebuilt artifact {}).",
+						ArtifactContentDigestText(expectedArtifactContentDigest),
+						ArtifactContentDigestText(job->m_Artifact->m_ContentDigest)));
 				}
 				return TaskResult::Success();
 			},
@@ -238,7 +255,10 @@ namespace gglab
 		TextureDecodeRequest request) noexcept
 	{
 		if (!request.m_ContentVersion.IsValid() || request.m_SourcePath.empty() ||
-			request.m_Priority == TaskPriority::Count)
+			request.m_Priority == TaskPriority::Count ||
+			(request.m_ResidencyReload &&
+				(!request.m_ExpectedArtifactContentDigest.IsValid() ||
+					!request.m_ResidencyOperation.IsValid())))
 		{
 			return {};
 		}
@@ -276,6 +296,8 @@ namespace gglab
 		const ProgressChannelPtr progress = std::move(request.m_Progress);
 		const SourceDigest expectedSourceDigest = request.m_ExpectedSourceDigest;
 		const DerivedDataKey expectedDerivedDataKey = request.m_ExpectedDerivedDataKey;
+		const ArtifactContentDigest expectedArtifactContentDigest =
+			request.m_ExpectedArtifactContentDigest;
 		const bool residencyReload = request.m_ResidencyReload;
 		const AssetResidencyOperation residencyOperation = request.m_ResidencyOperation;
 		const TaskHandle task = m_TaskSystem->Submit(
@@ -287,8 +309,26 @@ namespace gglab
 				.m_Progress = progress,
 			},
 			[this, sourcePath, importSettings, expectedSourceDigest,
-				expectedDerivedDataKey, job, progress](std::stop_token stopToken) noexcept
+				expectedDerivedDataKey, expectedArtifactContentDigest,
+				job, progress](std::stop_token stopToken) noexcept
 			{
+				const auto validateExpectedArtifact =
+					[expectedArtifactContentDigest](
+						const TextureDerivedDataArtifact& artifact) noexcept -> std::string
+					{
+						if (!expectedArtifactContentDigest.IsValid() ||
+							(artifact.m_Artifact &&
+								artifact.m_Artifact->m_ContentDigest == expectedArtifactContentDigest))
+						{
+							return {};
+						}
+						const ArtifactContentDigest actualDigest = artifact.m_Artifact ?
+							artifact.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+						return std::format(
+							"Texture artifact changed for immutable generation (expected {}, resolved {}).",
+							ArtifactContentDigestText(expectedArtifactContentDigest),
+							ArtifactContentDigestText(actualDigest));
+					};
 				if (stopToken.stop_requested())
 				{
 					return TaskResult::Success();
@@ -321,8 +361,16 @@ namespace gglab
 				if (requestResult.m_Disposition == ArtifactRequestDisposition::Hit)
 				{
 					job->m_Artifact = std::move(requestResult.m_Artifact);
-					return job->m_Artifact.IsValid() ? TaskResult::Success() :
-						TaskResult::Failure("Shared texture artifact hit was invalid.");
+					if (!job->m_Artifact.IsValid())
+					{
+						return TaskResult::Failure("Shared texture artifact hit was invalid.");
+					}
+					if (std::string error = validateExpectedArtifact(job->m_Artifact);
+						!error.empty())
+					{
+						return TaskResult::Failure(std::move(error));
+					}
+					return TaskResult::Success();
 				}
 				if (requestResult.m_Disposition == ArtifactRequestDisposition::Waiting)
 				{
@@ -343,6 +391,11 @@ namespace gglab
 						return TaskResult::Failure(std::move(waitResult.m_Error));
 					}
 					job->m_Artifact = std::move(waitResult.m_Artifact);
+					if (std::string error = validateExpectedArtifact(job->m_Artifact);
+						!error.empty())
+					{
+						return TaskResult::Failure(std::move(error));
+					}
 					ProgressReporter(progress).Report(
 						0.60f,
 						"Shared texture artifact resolved",
@@ -358,11 +411,6 @@ namespace gglab
 				std::stop_callback cancelParticipant(
 					stopToken,
 					[&participant]() noexcept { participant.Cancel(); });
-				const std::stop_token buildStopToken = buildClaim.GetStopToken();
-				if (buildStopToken.stop_requested())
-				{
-					return TaskResult::Success();
-				}
 
 				ProgressReporter(progress).Report(
 					0.12f,
@@ -373,6 +421,12 @@ namespace gglab
 					importSettings);
 				if (cached.IsValid())
 				{
+					if (std::string error = validateExpectedArtifact(cached); !error.empty())
+					{
+						GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
+							std::move(buildClaim), error));
+						return TaskResult::Failure(std::move(error));
+					}
 					job->m_Artifact = cached;
 					if (!m_TextureDerivedDataSystem.Publish(
 						std::move(buildClaim),
@@ -414,11 +468,6 @@ namespace gglab
 						return TaskResult::Failure(error);
 					}
 				}
-				if (buildStopToken.stop_requested())
-				{
-					return TaskResult::Success();
-				}
-
 				TextureAssetData textureData = TextureLoader::LoadTextureData(
 					sourcePath,
 					snapshot.m_Snapshot.m_Bytes,
@@ -442,6 +491,17 @@ namespace gglab
 					const std::string error = std::format(
 						"Failed to fingerprint decoded texture '{}'.",
 						sourcePath.string());
+					GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
+						std::move(buildClaim), error));
+					return TaskResult::Failure(error);
+				}
+				if (expectedArtifactContentDigest.IsValid() &&
+					artifactContentDigest != expectedArtifactContentDigest)
+				{
+					const std::string error = std::format(
+						"Texture source rebuild changed immutable generation content (expected artifact {}, rebuilt artifact {}).",
+						ArtifactContentDigestText(expectedArtifactContentDigest),
+						ArtifactContentDigestText(artifactContentDigest));
 					GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
 						std::move(buildClaim), error));
 					return TaskResult::Failure(error);
