@@ -482,19 +482,21 @@ namespace gglab
 						std::move(buildClaim), error));
 					return TaskResult::Failure(error);
 				}
-				const ArtifactContentDigest artifactContentDigest =
-					ComputeTextureArtifactContentDigest(textureData);
 				const AssetContentFingerprint contentFingerprint =
 					ComputeTextureContentFingerprint(textureData, importSettings);
-				if (!artifactContentDigest.IsValid() || !contentFingerprint.IsValid())
+				TextureArtifactBuildResult built = CreateTextureArtifact(
+					std::move(textureData));
+				if (!built.Succeeded() || !contentFingerprint.IsValid())
 				{
 					const std::string error = std::format(
-						"Failed to fingerprint decoded texture '{}'.",
+						"Failed to build decoded texture artifact '{}'.",
 						sourcePath.string());
 					GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
 						std::move(buildClaim), error));
 					return TaskResult::Failure(error);
 				}
+				const ArtifactContentDigest artifactContentDigest =
+					built.m_Artifact.m_ContentDigest;
 				if (expectedArtifactContentDigest.IsValid() &&
 					artifactContentDigest != expectedArtifactContentDigest)
 				{
@@ -507,10 +509,7 @@ namespace gglab
 					return TaskResult::Failure(error);
 				}
 				TextureArtifactHandle artifact = std::make_shared<const TextureArtifact>(
-					TextureArtifact{
-						.m_Data = std::move(textureData),
-						.m_ContentDigest = artifactContentDigest,
-					});
+					std::move(built.m_Artifact));
 				if (!m_TextureDerivedDataSystem.Write(
 					job->m_DerivedDataKey,
 					*artifact))

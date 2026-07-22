@@ -789,8 +789,7 @@ namespace gglab
 		TextureID textureId,
 		TextureAssetData&& textureData,
 		const TextureImportSettings& importSettings,
-		AssetContentFingerprint contentFingerprint,
-		ArtifactContentDigest artifactContentDigest) noexcept
+		AssetContentFingerprint contentFingerprint) noexcept
 	{
 		if (!contentFingerprint.IsValid())
 		{
@@ -798,30 +797,8 @@ namespace gglab
 				textureData,
 				importSettings);
 		}
-		if (!artifactContentDigest.IsValid())
-		{
-			artifactContentDigest = ComputeTextureArtifactContentDigest(textureData);
-		}
-		return MakeTextureUploadData(
-			textureId,
-			TextureArtifact{
-				.m_Data = std::move(textureData),
-				.m_ContentDigest = artifactContentDigest,
-			},
-			importSettings,
-			contentFingerprint);
-	}
-
-	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(
-		TextureID textureId,
-		TextureArtifact&& artifact,
-		const TextureImportSettings& importSettings,
-		AssetContentFingerprint contentFingerprint,
-		SourceDigest sourceDigest,
-		DerivedDataKey derivedDataKey) noexcept
-	{
 		TextureArtifactHandle artifactHandle = m_ArtifactCache.CreateAndAdmit(
-			std::move(artifact));
+			std::move(textureData));
 		if (!artifactHandle)
 		{
 			return {};
@@ -830,9 +807,7 @@ namespace gglab
 			textureId,
 			std::move(artifactHandle),
 			importSettings,
-			contentFingerprint,
-			sourceDigest,
-			derivedDataKey);
+			contentFingerprint);
 	}
 
 	TextureAssetSystem::TextureUploadData TextureAssetSystem::MakeTextureUploadData(

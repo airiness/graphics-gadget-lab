@@ -9,35 +9,15 @@ namespace gglab
 	{}
 
 	TextureArtifactHandle TextureArtifactCache::CreateAndAdmit(
-		TextureAssetData&& data,
-		ArtifactContentDigest contentDigest) noexcept
+		TextureAssetData&& data) noexcept
 	{
-		if (!data.IsValid())
+		TextureArtifactBuildResult built = CreateTextureArtifact(std::move(data));
+		if (!built.Succeeded())
 		{
 			return {};
 		}
-		if (!contentDigest.IsValid())
-		{
-			contentDigest = ComputeTextureArtifactContentDigest(data);
-		}
-		if (!contentDigest.IsValid())
-		{
-			return {};
-		}
-		return CreateAndAdmit(TextureArtifact{
-			.m_Data = std::move(data),
-			.m_ContentDigest = contentDigest,
-		});
-	}
-
-	TextureArtifactHandle TextureArtifactCache::CreateAndAdmit(
-		TextureArtifact&& artifact) noexcept
-	{
-		if (!artifact.IsValid())
-		{
-			return {};
-		}
-		return Admit(std::make_shared<const TextureArtifact>(std::move(artifact)));
+		return Admit(std::make_shared<const TextureArtifact>(
+			std::move(built.m_Artifact)));
 	}
 
 	TextureArtifactHandle TextureArtifactCache::Admit(

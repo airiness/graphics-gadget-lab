@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <filesystem>
+#include <limits>
 #include <mutex>
 #include <span>
 #include <string_view>
@@ -26,6 +27,15 @@ namespace gglab
 		ArtifactContentDigest m_ArtifactContentDigest{};
 		std::vector<std::byte> m_Payload;
 	};
+
+	struct LocalDerivedDataReadOptions
+	{
+		uint64_t m_MaxContainerBytes = std::numeric_limits<uint64_t>::max();
+	};
+
+	[[nodiscard]] uint64_t ComputeLocalDerivedDataContainerByteLimit(
+		std::string_view artifactType,
+		uint64_t maximumPayloadBytes) noexcept;
 
 	struct LocalDerivedDataStoreStatistics
 	{
@@ -50,7 +60,8 @@ namespace gglab
 		[[nodiscard]] DerivedDataReadResult Read(
 			const DerivedDataKey& key,
 			std::string_view artifactType,
-			uint32_t schemaVersion) noexcept;
+			uint32_t schemaVersion,
+			LocalDerivedDataReadOptions options = {}) noexcept;
 		[[nodiscard]] bool Write(
 			const DerivedDataKey& key,
 			std::string_view artifactType,

@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/Asset/ArtifactContentDigest.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 
 #include <memory>
 
@@ -27,6 +27,29 @@ namespace gglab
 
 	using TextureArtifactHandle = std::shared_ptr<const TextureArtifact>;
 
+	enum class TextureArtifactBuildError : uint8_t
+	{
+		None,
+		InvalidStructure,
+		DigestFailure,
+	};
+
+	struct TextureArtifactBuildResult
+	{
+		TextureArtifact m_Artifact;
+		TextureArtifactBuildError m_Error = TextureArtifactBuildError::None;
+		TextureStructureValidationError m_StructureError =
+			TextureStructureValidationError::None;
+
+		[[nodiscard]] bool Succeeded() const noexcept
+		{
+			return m_Error == TextureArtifactBuildError::None && m_Artifact.IsValid();
+		}
+	};
+
 	[[nodiscard]] ArtifactContentDigest ComputeTextureArtifactContentDigest(
 		const TextureAssetData& textureData) noexcept;
+	[[nodiscard]] TextureArtifactBuildResult CreateTextureArtifact(
+		TextureAssetData&& textureData,
+		TextureAssetValidationLimits limits = {}) noexcept;
 }
