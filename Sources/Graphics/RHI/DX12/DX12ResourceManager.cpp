@@ -6,6 +6,7 @@
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 #include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
@@ -68,15 +69,13 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "DX12ResourceManager must be initialized before creating textures.");
 		GGLAB_ASSERT_MSG(m_Device->GetMemAllocator() != nullptr, "DX12 memory allocator is not initialized.");
 
-		if (desc.m_Format == RHIFormat::Unknown ||
-			desc.m_Extent.m_Width == 0 ||
-			desc.m_Extent.m_Height == 0 ||
-			desc.m_ArraySize == 0 ||
-			desc.m_MipLevels == 0 ||
-			desc.m_SampleCount == 0)
+		const RHITextureValidationResult validation = ValidateRHITextureDesc(desc);
+		if (!validation.IsValid())
 		{
 			++m_Diagnostics.m_CreateFailureCount;
-			GGLAB_LOG_GRAPHICS_WARN("DX12ResourceManager::CreateTexture rejected an invalid texture description.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ResourceManager::CreateTexture rejected the texture description: {}.",
+				RHITextureValidationErrorText(validation.m_Error));
 			return {};
 		}
 

@@ -198,6 +198,7 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\RHITextureValidation.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\RHIContext.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
@@ -497,6 +498,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureValidation.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />

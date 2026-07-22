@@ -3,6 +3,7 @@
 #include "Core/Hash/Sha256.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 
 namespace gglab
 {
@@ -157,6 +158,96 @@ namespace gglab
 				!truncated.Succeeded() && !truncated.m_Error.empty(),
 				"Texture artifact codec rejects truncated payloads");
 		}
+
+		void RunRHITextureValidationTests(SelfTestContext& context) noexcept
+		{
+			RHITextureDesc textureDesc{};
+			textureDesc.m_Format = RHIFormat::R8G8B8A8Typeless;
+			textureDesc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest;
+			textureDesc.m_Extent = { 4, 2, 1 };
+			textureDesc.m_MipLevels = 2;
+
+			std::array<std::byte, 32> mip0{};
+			std::array<std::byte, 8> mip1{};
+			RHITextureUploadData uploadData{
+				.m_Subresources = {
+					{ .m_Data = mip0.data(), .m_RowPitch = 16, .m_SlicePitch = 32 },
+					{ .m_Data = mip1.data(), .m_RowPitch = 8, .m_SlicePitch = 8 },
+				},
+			};
+			context.Check(
+				ValidateRHITextureUploadData(textureDesc, uploadData).IsValid(),
+				"RHI texture upload validation accepts a complete mip chain");
+
+			RHITextureUploadData missingMip = uploadData;
+			missingMip.m_Subresources.pop_back();
+			context.Check(
+				ValidateRHITextureUploadData(textureDesc, missingMip).m_Error ==
+					RHITextureValidationError::InvalidUploadSubresourceCount,
+				"RHI texture upload validation rejects an incomplete mip chain");
+
+			RHITextureUploadData shortRow = uploadData;
+			shortRow.m_Subresources.front().m_RowPitch = 15;
+			context.Check(
+				ValidateRHITextureUploadData(textureDesc, shortRow).m_Error ==
+					RHITextureValidationError::InvalidUploadRowPitch,
+				"RHI texture upload validation rejects a short row pitch");
+
+			RHITextureUploadData shortSlice = uploadData;
+			shortSlice.m_Subresources.front().m_SlicePitch = 16;
+			context.Check(
+				ValidateRHITextureUploadData(textureDesc, shortSlice).m_Error ==
+					RHITextureValidationError::InvalidUploadSlicePitch,
+				"RHI texture upload validation rejects a short slice pitch");
+
+			const RHITextureViewDesc typedSrv{
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = RHIFormat::R8G8B8A8UnormSrgb,
+			};
+			context.Check(
+				ValidateRHITextureViewDesc(textureDesc, typedSrv).IsValid(),
+				"RHI texture view validation accepts a typed view of a typeless resource");
+
+			RHITextureViewDesc incompatibleView = typedSrv;
+			incompatibleView.m_Format = RHIFormat::R16G16Float;
+			context.Check(
+				ValidateRHITextureViewDesc(textureDesc, incompatibleView).m_Error ==
+					RHITextureValidationError::IncompatibleViewFormat,
+				"RHI texture view validation rejects an incompatible format family");
+
+			RHITextureDesc cubeDesc = textureDesc;
+			cubeDesc.m_Extent = { 4, 4, 1 };
+			cubeDesc.m_ArraySize = 6;
+			RHITextureViewDesc cubeView = typedSrv;
+			cubeView.m_Dimension = RHITextureViewDimension::TextureCube;
+			cubeView.m_Subresources.m_ArraySliceCount = 5;
+			context.Check(
+				ValidateRHITextureViewDesc(cubeDesc, cubeView).m_Error ==
+					RHITextureValidationError::InvalidSubresourceRange,
+				"RHI texture view validation rejects an incomplete cube range");
+
+			RHITextureDesc depthDesc{};
+			depthDesc.m_Format = RHIFormat::R32Typeless;
+			depthDesc.m_Usage = RHITextureUsage::DepthStencil | RHITextureUsage::Sampled;
+			RHITextureViewDesc depthSrv{
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = RHIFormat::R32Float,
+			};
+			depthSrv.m_Subresources.m_Aspects = RHITextureAspect::Depth;
+			context.Check(
+				ValidateRHITextureViewDesc(depthDesc, depthSrv).IsValid(),
+				"RHI texture view validation accepts a typed SRV of a typeless depth resource");
+
+			RHITextureDesc multiPlaneDesc{};
+			multiPlaneDesc.m_Format = RHIFormat::D24UnormS8Uint;
+			multiPlaneDesc.m_Usage = RHITextureUsage::DepthStencil | RHITextureUsage::CopyDest;
+			context.Check(
+				ValidateRHITextureUploadData(multiPlaneDesc, {}).m_Error ==
+					RHITextureValidationError::UnsupportedUploadFormat,
+				"RHI texture upload validation explicitly rejects unsupported multi-plane data");
+		}
 	}
 
 	void RunAssetDataSelfTests(SelfTestContext& context) noexcept
@@ -164,5 +255,6 @@ namespace gglab
 		RunSha256Tests(context);
 		RunDerivedDataKeyTests(context);
 		RunTextureCodecTests(context);
+		RunRHITextureValidationTests(context);
 	}
 }

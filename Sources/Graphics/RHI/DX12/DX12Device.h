@@ -58,6 +58,11 @@ namespace gglab
 		{
 			return m_AdapterCompatibilityIdentity;
 		}
+		RHITextureSupportResult QueryTextureSupport(
+			const RHITextureDesc& desc) const noexcept override;
+		RHITextureSupportResult QueryTextureViewSupport(
+			const RHITextureDesc& textureDesc,
+			const RHITextureViewDesc& viewDesc) const noexcept override;
 
 		RHITextureHandle CreateTexture(
 			const RHITextureDesc& desc,

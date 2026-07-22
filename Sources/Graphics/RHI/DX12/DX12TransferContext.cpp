@@ -9,11 +9,51 @@
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/RHITextureValidation.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <cstring>
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] RHITextureDesc MakeRHITextureDesc(
+			const D3D12_RESOURCE_DESC& nativeDesc) noexcept
+		{
+			RHITextureDesc desc{};
+			desc.m_Format = ToRHIFormat(nativeDesc.Format);
+			desc.m_Usage = RHITextureUsage::CopyDest;
+			desc.m_Extent.m_Width = static_cast<uint32_t>(nativeDesc.Width);
+			desc.m_Extent.m_Height = nativeDesc.Height;
+			desc.m_MipLevels = nativeDesc.MipLevels;
+			desc.m_SampleCount = static_cast<uint16_t>(nativeDesc.SampleDesc.Count);
+
+			switch (nativeDesc.Dimension)
+			{
+			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+				desc.m_Dimension = RHITextureDimension::Texture1D;
+				desc.m_Extent.m_Depth = 1;
+				desc.m_ArraySize = nativeDesc.DepthOrArraySize;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+				desc.m_Dimension = RHITextureDimension::Texture2D;
+				desc.m_Extent.m_Depth = 1;
+				desc.m_ArraySize = nativeDesc.DepthOrArraySize;
+				break;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+				desc.m_Dimension = RHITextureDimension::Texture3D;
+				desc.m_Extent.m_Depth = nativeDesc.DepthOrArraySize;
+				desc.m_ArraySize = 1;
+				break;
+			default:
+				desc.m_Dimension = static_cast<RHITextureDimension>(-1);
+				break;
+			}
+			return desc;
+		}
+	}
+
 	DX12TransferContext::DX12TransferContext(
 		DX12Device* dx12Device,
 		DX12QueueSystem* queueSystem) noexcept :
@@ -331,28 +371,27 @@ namespace gglab
 			return false;
 		}
 
+		const RHITextureDesc textureDesc = MakeRHITextureDesc(dstTexture->Get()->GetDesc());
+		const RHITextureValidationResult validation =
+			ValidateRHITextureUploadData(textureDesc, uploadData);
+		if (!validation.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DX12TransferContext::UploadTexture rejected the complete upload: {}.",
+				RHITextureValidationErrorText(validation.m_Error));
+			return false;
+		}
+
 		std::vector<D3D12_SUBRESOURCE_DATA> nativeSubresources;
 		nativeSubresources.reserve(uploadData.m_Subresources.size());
 		for (const RHITextureSubresourceData& subresource : uploadData.m_Subresources)
 		{
-			if (!subresource.m_Data || subresource.m_RowPitch == 0 || subresource.m_SlicePitch == 0)
-			{
-				GGLAB_LOG_GRAPHICS_WARN("DX12TransferContext::UploadTexture skipped an invalid texture subresource.");
-				continue;
-			}
-
 			nativeSubresources.push_back(
 				{
 					.pData = subresource.m_Data,
 					.RowPitch = static_cast<LONG_PTR>(subresource.m_RowPitch),
 					.SlicePitch = static_cast<LONG_PTR>(subresource.m_SlicePitch),
 				});
-		}
-
-		if (nativeSubresources.empty())
-		{
-			GGLAB_LOG_GRAPHICS_ERROR("DX12TransferContext::UploadTexture received no valid texture subresources.");
-			return false;
 		}
 
 		const std::string uploadOwner = std::format(
