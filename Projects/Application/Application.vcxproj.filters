@@ -255,6 +255,9 @@
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -976,6 +979,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h">
       <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h">
       <Filter>Application\SelfTest</Filter>
@@ -1855,6 +1861,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactCacheCore.h">
+      <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h">
       <Filter>Graphics\Asset</Filter>
