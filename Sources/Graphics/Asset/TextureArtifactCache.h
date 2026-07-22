@@ -21,10 +21,7 @@ namespace gglab
 		~TextureArtifactCache() = default;
 
 		[[nodiscard]] TextureArtifactHandle CreateAndAdmit(
-			TextureAssetData&& data,
-			ArtifactContentDigest contentDigest = {}) noexcept;
-		[[nodiscard]] TextureArtifactHandle CreateAndAdmit(
-			TextureArtifact&& artifact) noexcept;
+			TextureAssetData&& data) noexcept;
 		[[nodiscard]] TextureArtifactHandle Admit(
 			TextureArtifactHandle artifact) noexcept;
 		[[nodiscard]] TextureArtifactHandle Find(

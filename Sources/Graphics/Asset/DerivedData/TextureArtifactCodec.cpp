@@ -83,6 +83,22 @@ namespace gglab
 		return std::move(writer.m_Data);
 	}
 
+	uint64_t TextureArtifactCodec::GetMaximumSerializedBytes(
+		TextureAssetValidationLimits limits) noexcept
+	{
+		constexpr uint64_t HeaderBytes = 10 * sizeof(uint32_t) + 2 * sizeof(uint64_t);
+		constexpr uint64_t SubresourceRecordBytes = 52;
+		constexpr uint64_t MaxValue = std::numeric_limits<uint64_t>::max();
+		if (limits.m_MaxPixelBytes > MaxValue - HeaderBytes ||
+			limits.m_MaxSubresources >
+				(MaxValue - HeaderBytes - limits.m_MaxPixelBytes) / SubresourceRecordBytes)
+		{
+			return MaxValue;
+		}
+		return HeaderBytes + limits.m_MaxPixelBytes +
+			limits.m_MaxSubresources * SubresourceRecordBytes;
+	}
+
 	TextureArtifactDecodeResult TextureArtifactCodec::Deserialize(
 		std::span<const std::byte> payload,
 		const ArtifactContentDigest& expectedContentDigest,
@@ -95,7 +111,7 @@ namespace gglab
 			return result;
 		}
 		Reader reader(payload);
-		TextureAssetData& texture = result.m_Artifact.m_Data;
+		TextureAssetData texture{};
 		uint32_t schema = 0;
 		uint32_t resourceFormat = 0, viewFormat = 0, srvDimension = 0;
 		uint32_t arraySize = 0, mipLevels = 0, colorSpace = 0;
@@ -173,23 +189,27 @@ namespace gglab
 			result.m_Error = "Texture DDC pixel payload is truncated.";
 			return result;
 		}
-		const TextureStructureValidationResult structureValidation =
-			ValidateTextureAssetStructure(texture, limits);
-		if (!structureValidation.IsValid())
+		TextureArtifactBuildResult built = CreateTextureArtifact(
+			std::move(texture),
+			limits);
+		if (!built.Succeeded())
 		{
 			result = {};
-			result.m_StructureError = structureValidation.m_Error;
-			result.m_Error = std::format(
-				"Texture DDC artifact failed structural validation: {}.",
-				TextureStructureValidationErrorText(structureValidation.m_Error));
+			result.m_StructureError = built.m_StructureError;
+			result.m_Error = built.m_Error == TextureArtifactBuildError::InvalidStructure ?
+				std::format(
+					"Texture DDC artifact failed structural validation: {}.",
+					TextureStructureValidationErrorText(built.m_StructureError)) :
+				"Texture DDC artifact digest computation failed.";
 			return result;
 		}
-		result.m_Artifact.m_ContentDigest = ComputeTextureArtifactContentDigest(texture);
-		if (result.m_Artifact.m_ContentDigest != expectedContentDigest)
+		if (built.m_Artifact.m_ContentDigest != expectedContentDigest)
 		{
 			result = {};
 			result.m_Error = "Texture DDC artifact content digest mismatch.";
+			return result;
 		}
+		result.m_Artifact = std::move(built.m_Artifact);
 		return result;
 	}
 }

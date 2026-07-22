@@ -157,10 +157,16 @@ namespace gglab
 				stageResult.m_Artifact.reset();
 			}
 
+			const std::string_view artifactType = GetIBLStageArtifactType(stage);
 			DerivedDataReadResult read = m_Store.Read(
 				stageResult.m_Key,
-				GetIBLStageArtifactType(stage),
-				IBLStageArtifactSchemaVersion);
+				artifactType,
+				IBLStageArtifactSchemaVersion,
+				{
+					.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
+						artifactType,
+						IBLStageArtifactCodec::GetMaximumSerializedBytes()),
+				});
 			if (stopToken.stop_requested() ||
 				read.m_Disposition != DerivedDataReadDisposition::Hit)
 			{

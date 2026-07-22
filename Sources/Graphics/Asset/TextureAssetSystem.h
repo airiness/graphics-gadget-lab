@@ -95,15 +95,7 @@ namespace gglab
 			TextureID textureId,
 			TextureAssetData&& textureData,
 			const TextureImportSettings& importSettings,
-			AssetContentFingerprint contentFingerprint = {},
-			ArtifactContentDigest artifactContentDigest = {}) noexcept;
-		TextureUploadData MakeTextureUploadData(
-			TextureID textureId,
-			TextureArtifact&& artifact,
-			const TextureImportSettings& importSettings,
-			AssetContentFingerprint contentFingerprint,
-			SourceDigest sourceDigest = {},
-			DerivedDataKey derivedDataKey = {}) noexcept;
+			AssetContentFingerprint contentFingerprint = {}) noexcept;
 		TextureUploadData MakeTextureUploadData(
 			TextureID textureId,
 			TextureArtifactHandle artifact,

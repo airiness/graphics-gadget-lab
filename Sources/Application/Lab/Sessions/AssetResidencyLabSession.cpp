@@ -71,15 +71,13 @@ namespace gglab
 				1,
 				pixels,
 				TextureColorSpace::SRGB);
-			const ArtifactContentDigest contentDigest =
-				ComputeTextureArtifactContentDigest(textureData);
 			const AssetContentFingerprint contentFingerprint =
 				ComputeTextureContentFingerprint(textureData, importSettings);
-			TextureArtifactHandle artifact = std::make_shared<const TextureArtifact>(
-				TextureArtifact{
-					.m_Data = std::move(textureData),
-					.m_ContentDigest = contentDigest,
-				});
+			TextureArtifactBuildResult built = CreateTextureArtifact(
+				std::move(textureData));
+			TextureArtifactHandle artifact = built.Succeeded() ?
+				std::make_shared<const TextureArtifact>(std::move(built.m_Artifact)) :
+				TextureArtifactHandle{};
 			TextureDerivedDataArtifact published{
 				.m_Artifact = artifact,
 				.m_ContentFingerprint = contentFingerprint,

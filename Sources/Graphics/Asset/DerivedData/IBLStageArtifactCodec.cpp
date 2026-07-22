@@ -70,6 +70,19 @@ namespace gglab
 		return payload;
 	}
 
+	uint64_t IBLStageArtifactCodec::GetMaximumSerializedBytes(
+		TextureAssetValidationLimits limits) noexcept
+	{
+		constexpr uint64_t HeaderBytes =
+			2 * sizeof(uint32_t) + ArtifactContentDigest{}.m_Value.size() +
+			sizeof(uint64_t);
+		const uint64_t textureBytes =
+			TextureArtifactCodec::GetMaximumSerializedBytes(limits);
+		return textureBytes > std::numeric_limits<uint64_t>::max() - HeaderBytes ?
+			std::numeric_limits<uint64_t>::max() :
+			HeaderBytes + textureBytes;
+	}
+
 	IBLStageArtifactDecodeResult IBLStageArtifactCodec::Deserialize(
 		std::span<const std::byte> payload,
 		IBLArtifactStage expectedStage,

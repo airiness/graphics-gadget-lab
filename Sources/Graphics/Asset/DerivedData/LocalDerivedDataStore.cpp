@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Core/Hash/Sha256.h"
+#include "Core/Log/Logger.h"
 #include "Core/Utility/PathUtils.h"
 
 namespace gglab
@@ -12,6 +13,16 @@ namespace gglab
 			std::byte{ 'B' }, std::byte{ 'D' }, std::byte{ 'D' }, std::byte{ 'C' },
 		};
 		constexpr uint32_t ContainerVersion = 1;
+		constexpr uint64_t ContainerFixedBytes =
+			ContainerMagic.size() + 3 * sizeof(uint32_t) + sizeof(uint64_t) +
+			DerivedDataKey{}.m_Value.size() + ArtifactContentDigest{}.m_Value.size() +
+			Sha256Hash{}.m_Value.size();
+
+		[[nodiscard]] bool HasGraphicsLogger() noexcept
+		{
+			return static_cast<bool>(
+				Logger::GetLogger(Logger::LoggerType::Graphics));
+		}
 
 		class BinaryWriter
 		{
@@ -68,7 +79,8 @@ namespace gglab
 			const std::filesystem::path& path,
 			const DerivedDataKey& key,
 			std::string_view artifactType,
-			uint32_t schemaVersion) noexcept
+			uint32_t schemaVersion,
+			LocalDerivedDataReadOptions options) noexcept
 		{
 			DerivedDataReadResult result{};
 			std::ifstream stream(path, std::ios::binary | std::ios::ate);
@@ -78,7 +90,8 @@ namespace gglab
 			}
 
 			const std::streamoff end = stream.tellg();
-			if (end <= 0 || static_cast<uint64_t>(end) > std::numeric_limits<size_t>::max())
+			if (end <= 0 || static_cast<uint64_t>(end) > options.m_MaxContainerBytes ||
+				static_cast<uint64_t>(end) > std::numeric_limits<size_t>::max())
 			{
 				result.m_Disposition = DerivedDataReadDisposition::Corrupt;
 				return result;
@@ -136,6 +149,21 @@ namespace gglab
 		}
 	}
 
+	uint64_t ComputeLocalDerivedDataContainerByteLimit(
+		std::string_view artifactType,
+		uint64_t maximumPayloadBytes) noexcept
+	{
+		constexpr uint64_t MaxValue = std::numeric_limits<uint64_t>::max();
+		if (artifactType.size() > MaxValue - ContainerFixedBytes ||
+			maximumPayloadBytes >
+				MaxValue - ContainerFixedBytes - static_cast<uint64_t>(artifactType.size()))
+		{
+			return MaxValue;
+		}
+		return ContainerFixedBytes + static_cast<uint64_t>(artifactType.size()) +
+			maximumPayloadBytes;
+	}
+
 	LocalDerivedDataStore::LocalDerivedDataStore(
 		std::filesystem::path rootDirectory) noexcept :
 		m_RootDirectory(std::move(rootDirectory))
@@ -150,7 +178,8 @@ namespace gglab
 	DerivedDataReadResult LocalDerivedDataStore::Read(
 		const DerivedDataKey& key,
 		std::string_view artifactType,
-		uint32_t schemaVersion) noexcept
+		uint32_t schemaVersion,
+		LocalDerivedDataReadOptions options) noexcept
 	{
 		if (!IsEnabled() || !key.IsValid())
 		{
@@ -159,7 +188,12 @@ namespace gglab
 		}
 		std::scoped_lock lock(m_Mutex);
 		const std::filesystem::path path = EntryPath(key);
-		DerivedDataReadResult result = ReadEntry(path, key, artifactType, schemaVersion);
+		DerivedDataReadResult result = ReadEntry(
+			path,
+			key,
+			artifactType,
+			schemaVersion,
+			options);
 		if (result.m_Disposition == DerivedDataReadDisposition::Miss)
 		{
 			m_EntryPaths.erase(path);
@@ -180,7 +214,12 @@ namespace gglab
 			m_EntryPaths.erase(path);
 			RefreshStoredStatistics();
 		}
-		GGLAB_LOG_GRAPHICS_WARN("Discarded corrupt local DDC entry '{}'.", path.string());
+		if (HasGraphicsLogger())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"Discarded corrupt local DDC entry '{}'.",
+				path.string());
+		}
 		return result;
 	}
 
@@ -253,7 +292,8 @@ namespace gglab
 				path,
 				key,
 				artifactType,
-				schemaVersion);
+				schemaVersion,
+				{});
 			if (existing.m_Disposition == DerivedDataReadDisposition::Hit)
 			{
 				std::filesystem::remove(temporary, errorCode);
@@ -273,11 +313,14 @@ namespace gglab
 				}
 
 				m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"Rejected non-deterministic local DDC write for key '{}' (existing artifact {}, produced artifact {}).",
-					DerivedDataKeyText(key),
-					ArtifactContentDigestText(existing.m_ArtifactContentDigest),
-					ArtifactContentDigestText(artifactContentDigest));
+				if (HasGraphicsLogger())
+				{
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"Rejected non-deterministic local DDC write for key '{}' (existing artifact {}, produced artifact {}).",
+						DerivedDataKeyText(key),
+						ArtifactContentDigestText(existing.m_ArtifactContentDigest),
+						ArtifactContentDigestText(artifactContentDigest));
+				}
 				return false;
 			}
 
@@ -299,9 +342,12 @@ namespace gglab
 							m_StoredBytes.fetch_sub(corruptBytes, std::memory_order_relaxed);
 						}
 					}
-					GGLAB_LOG_GRAPHICS_WARN(
-						"Discarded corrupt local DDC entry '{}' before immutable publication.",
-						path.string());
+					if (HasGraphicsLogger())
+					{
+						GGLAB_LOG_GRAPHICS_WARN(
+							"Discarded corrupt local DDC entry '{}' before immutable publication.",
+							path.string());
+					}
 					continue;
 				}
 			}

@@ -26,6 +26,8 @@ namespace gglab
 			const TextureArtifact& artifact) noexcept;
 		[[nodiscard]] static std::vector<std::byte> SerializeTextureData(
 			const TextureAssetData& textureData) noexcept;
+		[[nodiscard]] static uint64_t GetMaximumSerializedBytes(
+			TextureAssetValidationLimits limits = {}) noexcept;
 		[[nodiscard]] static TextureArtifactDecodeResult Deserialize(
 			std::span<const std::byte> payload,
 			const ArtifactContentDigest& expectedContentDigest,

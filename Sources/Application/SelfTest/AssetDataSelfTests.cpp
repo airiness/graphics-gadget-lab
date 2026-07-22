@@ -2,6 +2,7 @@
 #include "Application/SelfTest/AssetDataSelfTests.h"
 #include "Core/Hash/Sha256.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHITextureValidation.h"
@@ -133,13 +134,23 @@ namespace gglab
 
 		void RunTextureCodecTests(SelfTestContext& context) noexcept
 		{
-			TextureArtifact artifact{};
-			artifact.m_Data = MakeTextureFixture();
-			artifact.m_ContentDigest = ComputeTextureArtifactContentDigest(artifact.m_Data);
+			TextureArtifactBuildResult built = CreateTextureArtifact(MakeTextureFixture());
+			const bool buildSucceeded = built.Succeeded();
+			TextureArtifact artifact = std::move(built.m_Artifact);
 			context.Check(
-				MatchesHex(artifact.m_ContentDigest.m_Value,
+				buildSucceeded && MatchesHex(artifact.m_ContentDigest.m_Value,
 					"9f01361721504e531dce2e8437dd2698515b96e47718b64cd372390e242720f1"),
-				"Texture artifact content digest matches the stable golden vector");
+				"Texture artifact factory validates data and matches the stable digest vector");
+
+			TextureAssetData invalidFixture = MakeTextureFixture();
+			invalidFixture.m_Subresources.front().m_DataOffset = 1;
+			const TextureArtifactBuildResult invalid = CreateTextureArtifact(
+				std::move(invalidFixture));
+			context.Check(
+				!invalid.Succeeded() &&
+					invalid.m_Error == TextureArtifactBuildError::InvalidStructure &&
+					invalid.m_StructureError == TextureStructureValidationError::OutOfBounds,
+				"Texture artifact factory rejects structurally invalid input before hashing");
 
 			std::vector<std::byte> payload = TextureArtifactCodec::Serialize(artifact);
 			const Sha256Hash payloadHash = ComputeSha256(payload);
@@ -233,6 +244,73 @@ namespace gglab
 				ValidateTextureAssetStructure(valid, limits).m_Error ==
 					TextureStructureValidationError::ExceedsConfiguredLimit,
 				"Texture structure validation applies configurable allocation limits");
+		}
+
+		void RunLocalDerivedDataStoreTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path root = std::filesystem::temp_directory_path(errorCode) /
+				std::format(
+					"gglab.asset-data-self-test.{}.{}",
+					GetCurrentProcessId(),
+					reinterpret_cast<uintptr_t>(&context));
+			if (errorCode)
+			{
+				context.Check(false, "Local DDC self-test resolves a temporary directory");
+				return;
+			}
+			std::filesystem::remove_all(root, errorCode);
+
+			constexpr std::string_view ArtifactType = "gglab.self-test";
+			constexpr uint32_t SchemaVersion = 1;
+			constexpr std::array<std::byte, 4> Payload{
+				std::byte{ 0x10 },
+				std::byte{ 0x20 },
+				std::byte{ 0x30 },
+				std::byte{ 0x40 },
+			};
+			DerivedDataKey key{};
+			key.m_Value = ComputeSha256(std::as_bytes(std::span{ ArtifactType })).m_Value;
+			ArtifactContentDigest artifactDigest{};
+			artifactDigest.m_Value = ComputeSha256(Payload).m_Value;
+
+			{
+				LocalDerivedDataStore store(root);
+				const bool wrote = store.Write(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					artifactDigest,
+					Payload);
+				const DerivedDataReadResult hit = store.Read(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					{
+						.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
+							ArtifactType,
+							Payload.size()),
+					});
+				context.Check(
+					wrote && hit.m_Disposition == DerivedDataReadDisposition::Hit &&
+						hit.m_ArtifactContentDigest == artifactDigest &&
+						std::ranges::equal(hit.m_Payload, Payload),
+					"Local DDC bounded read accepts a container within its payload limit");
+
+				const DerivedDataReadResult oversized = store.Read(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					{ .m_MaxContainerBytes = 1 });
+				context.Check(
+					oversized.m_Disposition == DerivedDataReadDisposition::Corrupt &&
+						oversized.m_Payload.empty() && !store.Contains(key) &&
+						store.GetStatistics().m_CorruptionCount == 1,
+					"Local DDC rejects and discards an oversized container before payload allocation");
+			}
+
+			errorCode.clear();
+			std::filesystem::remove_all(root, errorCode);
 		}
 
 		void RunRHITextureValidationTests(SelfTestContext& context) noexcept
@@ -332,6 +410,7 @@ namespace gglab
 		RunDerivedDataKeyTests(context);
 		RunTextureCodecTests(context);
 		RunTextureStructureValidationTests(context);
+		RunLocalDerivedDataStoreTests(context);
 		RunRHITextureValidationTests(context);
 	}
 }

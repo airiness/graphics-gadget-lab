@@ -320,7 +320,12 @@ namespace gglab
 		DerivedDataReadResult cached = m_Store.Read(
 			key,
 			TextureArtifactType,
-			TextureArtifactSchemaVersion);
+			TextureArtifactSchemaVersion,
+			{
+				.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
+					TextureArtifactType,
+					TextureArtifactCodec::GetMaximumSerializedBytes()),
+			});
 		if (cached.m_Disposition != DerivedDataReadDisposition::Hit)
 		{
 			return {};
