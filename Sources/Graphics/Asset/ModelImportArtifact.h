@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <span>
 
 namespace gglab
 {
@@ -45,6 +46,39 @@ namespace gglab
 	};
 
 	using ModelImportArtifactHandle = std::shared_ptr<const ModelImportArtifact>;
+
+	struct ModelMeshUploadSource
+	{
+		ModelImportArtifactHandle m_Owner;
+		uint32_t m_MeshIndex = 0;
+
+		[[nodiscard]] const ImportedMesh* GetMesh() const noexcept
+		{
+			return m_Owner && m_MeshIndex < m_Owner->m_Meshes.size() ?
+				&m_Owner->m_Meshes[m_MeshIndex] : nullptr;
+		}
+
+		[[nodiscard]] std::span<const Vertex> GetVertices() const noexcept
+		{
+			const ImportedMesh* mesh = GetMesh();
+			return mesh ? std::span<const Vertex>(mesh->m_Vertices) :
+				std::span<const Vertex>{};
+		}
+
+		[[nodiscard]] std::span<const uint32_t> GetIndices() const noexcept
+		{
+			const ImportedMesh* mesh = GetMesh();
+			return mesh ? std::span<const uint32_t>(mesh->m_Indices) :
+				std::span<const uint32_t>{};
+		}
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return GetMesh() != nullptr;
+		}
+
+		void Reset() noexcept { *this = {}; }
+	};
 
 	[[nodiscard]] ModelImportArtifactHandle CreateModelImportArtifact(
 		ImportedModel&& importedModel,

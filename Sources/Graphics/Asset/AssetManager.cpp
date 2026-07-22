@@ -44,9 +44,9 @@ namespace gglab
 			const AssetManager::MeshUploadData& uploadData) noexcept
 		{
 			const uint64_t vertexBytes = static_cast<uint64_t>(
-				uploadData.m_VerticesData.size()) * sizeof(Vertex);
+				uploadData.GetVertices().size()) * sizeof(Vertex);
 			const uint64_t indexBytes = static_cast<uint64_t>(
-				uploadData.m_IndicesData.size()) * sizeof(uint32_t);
+				uploadData.GetIndices().size()) * sizeof(uint32_t);
 			return {
 				.m_SourceBytes = vertexBytes + indexBytes,
 				.m_StagingBytes = vertexBytes + indexBytes,
@@ -2232,7 +2232,7 @@ namespace gglab
 	}
 
 	bool AssetManager::UploadMesh(
-		const MeshUploadData& uploadData,
+		MeshUploadData& uploadData,
 		TransferBatch& transferBatch,
 		AssetResidencyOperation residencyOperation) noexcept
 	{
@@ -2252,8 +2252,8 @@ namespace gglab
 			residencyOperation,
 			operationPhase);
 
-		const auto& verticesData = uploadData.m_VerticesData;
-		const auto& indicesData = uploadData.m_IndicesData;
+		const std::span<const Vertex> verticesData = uploadData.GetVertices();
+		const std::span<const uint32_t> indicesData = uploadData.GetIndices();
 
 		const auto vertexCount = static_cast<uint32_t>(verticesData.size());
 		const auto indexCount = static_cast<uint32_t>(indicesData.size());
@@ -2335,6 +2335,9 @@ namespace gglab
 			mesh->m_VertexBuffer.Get(), 0, verticesData.data(), vertexBufferSize);
 		const bool indexUploadSucceeded = transferBatch.UploadBuffer(
 			mesh->m_IndexBuffer.Get(), 0, indicesData.data(), indexBufferSize);
+		// TransferBatch copies the source into staging memory synchronously.
+		// The immutable model artifact is no longer needed after both copies return.
+		uploadData.ReleaseBorrowedSource();
 		GGLAB_ASSERT_MSG(vertexUploadSucceeded && indexUploadSucceeded,
 			"AssetManager failed to record mesh buffer uploads.");
 		if (!vertexUploadSucceeded || !indexUploadSucceeded)
@@ -2367,7 +2370,7 @@ namespace gglab
 		AssetResidencyOperation residencyOperation) noexcept
 	{
 		Mesh* mesh = EditMesh(uploadData.m_MeshId);
-		if (!mesh || uploadData.m_VerticesData.empty() || uploadData.m_IndicesData.empty())
+		if (!mesh || uploadData.GetVertices().empty() || uploadData.GetIndices().empty())
 		{
 			return false;
 		}
@@ -2764,12 +2767,12 @@ namespace gglab
 					AssetStateEventOperationPhase::Completes);
 				continue;
 			}
-			const ImportedMesh& importedMesh =
-				importedModel->m_Meshes[mesh->m_SourceMeshIndex];
 			MeshUploadData uploadData{
 				.m_MeshId = meshId,
-				.m_VerticesData = importedMesh.m_Vertices,
-				.m_IndicesData = importedMesh.m_Indices,
+				.m_ModelSource = {
+					.m_Owner = artifact,
+					.m_MeshIndex = mesh->m_SourceMeshIndex,
+				},
 			};
 			if (!QueueMeshUpload(
 				std::move(uploadData),

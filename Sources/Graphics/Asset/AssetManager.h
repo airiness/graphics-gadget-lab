@@ -103,6 +103,21 @@ namespace gglab
 			MeshID m_MeshId{};
 			std::vector<Vertex> m_VerticesData;
 			std::vector<uint32_t> m_IndicesData;
+			ModelMeshUploadSource m_ModelSource;
+
+			[[nodiscard]] std::span<const Vertex> GetVertices() const noexcept
+			{
+				return m_ModelSource.m_Owner ? m_ModelSource.GetVertices() :
+					std::span<const Vertex>(m_VerticesData);
+			}
+
+			[[nodiscard]] std::span<const uint32_t> GetIndices() const noexcept
+			{
+				return m_ModelSource.m_Owner ? m_ModelSource.GetIndices() :
+					std::span<const uint32_t>(m_IndicesData);
+			}
+
+			void ReleaseBorrowedSource() noexcept { m_ModelSource.Reset(); }
 		};
 
 	public:
@@ -184,7 +199,7 @@ namespace gglab
 		[[nodiscard]] Model* EditModel(ModelID modelId) noexcept;
 		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
 		[[nodiscard]] bool UploadMesh(
-			const MeshUploadData& uploadData,
+			MeshUploadData& uploadData,
 			TransferBatch& transferBatch,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool QueueMeshUpload(

@@ -226,16 +226,16 @@ namespace gglab
 
 		[[nodiscard]] ModelPublicationMeshResult PublishMesh(
 			const AssetContentVersion& modelVersion,
-			uint32_t sourceMeshIndex,
-			const ImportedMesh& importedMesh,
+			ModelMeshUploadSource source,
 			TaskPriority priority) noexcept override
 		{
 			ModelPublicationMeshResult result{};
-			const uint64_t vertexBytes = static_cast<uint64_t>(
-				importedMesh.m_Vertices.size()) * sizeof(Vertex);
-			const uint64_t indexBytes = static_cast<uint64_t>(
-				importedMesh.m_Indices.size()) * sizeof(uint32_t);
-			const uint64_t sourceBytes = vertexBytes + indexBytes;
+			const ImportedMesh* importedMesh = source.GetMesh();
+			if (!importedMesh)
+			{
+				result.m_Error = "Model mesh upload source is invalid";
+				return result;
+			}
 			const MeshID meshId = m_AssetManager->CreateMesh();
 			Mesh* mesh = m_AssetManager->EditMesh(meshId);
 			if (!meshId.IsValid() || !mesh)
@@ -246,12 +246,12 @@ namespace gglab
 
 			result.m_MeshId = meshId;
 			mesh->m_Id = meshId;
-			mesh->m_Name = StringID(importedMesh.m_Name);
-			mesh->m_Sphere = importedMesh.m_Sphere;
-			mesh->m_Aabb = importedMesh.m_Aabb;
-			mesh->m_HasBounds = importedMesh.m_HasBounds;
+			mesh->m_Name = StringID(importedMesh->m_Name);
+			mesh->m_Sphere = importedMesh->m_Sphere;
+			mesh->m_Aabb = importedMesh->m_Aabb;
+			mesh->m_HasBounds = importedMesh->m_HasBounds;
 			mesh->m_SourceModelId = ToModelId(modelVersion);
-			mesh->m_SourceMeshIndex = sourceMeshIndex;
+			mesh->m_SourceMeshIndex = source.m_MeshIndex;
 			m_AssetManager->SetMeshState(*mesh, AssetState::Publishing);
 			AssetPublicationRetain retain = m_AssetManager->AcquirePublicationRetain(
 				AssetKind::Mesh,
@@ -269,9 +269,7 @@ namespace gglab
 
 			AssetManager::MeshUploadData uploadData{};
 			uploadData.m_MeshId = meshId;
-			uploadData.m_VerticesData = importedMesh.m_Vertices;
-			uploadData.m_IndicesData = importedMesh.m_Indices;
-			result.m_Usage.m_SourceBytesCopiedToUpload = sourceBytes;
+			uploadData.m_ModelSource = std::move(source);
 			const bool queued = m_AssetManager->QueueMeshUpload(
 				std::move(uploadData),
 				priority);
