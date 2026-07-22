@@ -80,6 +80,43 @@ namespace gglab
 			return texture;
 		}
 
+		[[nodiscard]] TextureAssetData MakeTwoMipTextureFixture()
+		{
+			TextureAssetData texture = MakeTextureFixture();
+			texture.m_MipLevels = 2;
+			texture.m_Pixels.insert(
+				texture.m_Pixels.end(),
+				{
+					std::byte{ 0x20 }, std::byte{ 0x21 },
+					std::byte{ 0x22 }, std::byte{ 0x23 },
+				});
+			texture.m_Subresources.push_back({
+				.m_DataOffset = 8,
+				.m_DataSize = 4,
+				.m_RowPitch = 4,
+				.m_SlicePitch = 4,
+				.m_Width = 1,
+				.m_Height = 1,
+				.m_Depth = 1,
+				.m_MipLevel = 1,
+				.m_ArraySlice = 0,
+			});
+			return texture;
+		}
+
+		[[nodiscard]] TextureAssetData MakeNonCanonicalTextureFixture()
+		{
+			TextureAssetData texture = MakeTwoMipTextureFixture();
+			std::rotate(
+				texture.m_Pixels.begin(),
+				texture.m_Pixels.begin() + 8,
+				texture.m_Pixels.end());
+			std::swap(texture.m_Subresources[0], texture.m_Subresources[1]);
+			texture.m_Subresources[0].m_DataOffset = 0;
+			texture.m_Subresources[1].m_DataOffset = 4;
+			return texture;
+		}
+
 		[[nodiscard]] bool TextureDataMatchesFixture(const TextureAssetData& texture) noexcept
 		{
 			if (texture.m_ResourceFormat != RHIFormat::R8G8B8A8Typeless ||
@@ -178,6 +215,15 @@ namespace gglab
 					invalid.m_StructureError == TextureStructureValidationError::OutOfBounds,
 				"Texture artifact factory rejects structurally invalid input before hashing");
 
+			const TextureArtifactBuildResult nonCanonical = CreateTextureArtifact(
+				MakeNonCanonicalTextureFixture());
+			context.Check(
+				!nonCanonical.Succeeded() &&
+					nonCanonical.m_Error == TextureArtifactBuildError::InvalidStructure &&
+					nonCanonical.m_StructureError ==
+						TextureStructureValidationError::NonCanonicalSubresourceOrder,
+				"Texture artifact factory rejects non-canonical subresource order");
+
 			std::vector<std::byte> payload = TextureArtifactCodec::Serialize(artifact);
 			const Sha256Hash payloadHash = ComputeSha256(payload);
 			context.Check(
@@ -230,6 +276,13 @@ namespace gglab
 			context.Check(
 				ValidateTextureAssetStructure(valid).IsValid(),
 				"Texture structure validation accepts the canonical fixture");
+			context.Check(
+				ValidateTextureAssetStructure(MakeTwoMipTextureFixture()).IsValid(),
+				"Texture structure validation accepts canonical array-major mip order");
+			context.Check(
+				ValidateTextureAssetStructure(MakeNonCanonicalTextureFixture()).m_Error ==
+					TextureStructureValidationError::NonCanonicalSubresourceOrder,
+				"Texture structure validation rejects reordered mip data");
 
 			TextureAssetData outOfBounds = valid;
 			outOfBounds.m_Subresources.front().m_DataOffset = 1;
