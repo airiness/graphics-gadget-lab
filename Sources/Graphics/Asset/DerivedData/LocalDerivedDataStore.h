@@ -2,6 +2,7 @@
 #include "Core/CoreMacros.h"
 #include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
 
 #include <atomic>
 #include <filesystem>
@@ -9,7 +10,6 @@
 #include <mutex>
 #include <span>
 #include <string_view>
-#include <unordered_set>
 #include <vector>
 
 namespace gglab
@@ -19,6 +19,13 @@ namespace gglab
 		Miss,
 		Hit,
 		Corrupt,
+	};
+
+	enum class DerivedDataPresence : uint8_t
+	{
+		Missing,
+		Present,
+		Inaccessible,
 	};
 
 	struct DerivedDataReadResult
@@ -48,6 +55,10 @@ namespace gglab
 		uint64_t m_WriteCount = 0;
 		uint64_t m_WriteFailureCount = 0;
 		uint64_t m_WrittenBytes = 0;
+		uint64_t m_CatalogLastReconciledAtUnixMilliseconds = 0;
+		uint64_t m_CatalogReconciliationCount = 0;
+		uint64_t m_CatalogReconciliationFailureCount = 0;
+		bool m_IsCatalogApproximate = true;
 	};
 
 	class LocalDerivedDataStore final
@@ -68,22 +79,25 @@ namespace gglab
 			uint32_t schemaVersion,
 			const ArtifactContentDigest& artifactContentDigest,
 			std::span<const std::byte> payload) noexcept;
-		[[nodiscard]] bool Contains(const DerivedDataKey& key) const noexcept;
+		// Present means that the entry path exists; Read performs container validation.
+		[[nodiscard]] DerivedDataPresence Probe(const DerivedDataKey& key) const noexcept;
+		[[nodiscard]] bool Contains(const DerivedDataKey& key) const noexcept
+		{
+			return Probe(key) == DerivedDataPresence::Present;
+		}
 		void DiscardCorrupt(const DerivedDataKey& key) noexcept;
 		void Clear() noexcept;
+		[[nodiscard]] bool ReconcileCatalog() noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStatistics() const noexcept;
 		[[nodiscard]] bool IsEnabled() const noexcept { return !m_RootDirectory.empty(); }
 
 	private:
 		[[nodiscard]] std::filesystem::path EntryPath(const DerivedDataKey& key) const;
-		void RefreshStoredStatistics() noexcept;
 
 		std::filesystem::path m_RootDirectory;
+		LocalDerivedDataCatalog m_Catalog;
 		mutable std::mutex m_Mutex;
-		std::unordered_set<std::filesystem::path> m_EntryPaths;
 		std::atomic_uint64_t m_TemporarySerial = 1;
-		std::atomic_uint64_t m_StoredBytes = 0;
-		std::atomic_uint64_t m_StoredEntryCount = 0;
 		std::atomic_uint64_t m_HitCount = 0;
 		std::atomic_uint64_t m_MissCount = 0;
 		std::atomic_uint64_t m_CorruptionCount = 0;

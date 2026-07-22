@@ -121,6 +121,13 @@ namespace gglab
 			.m_WriteCount = derivedDataStore.m_WriteCount,
 			.m_WriteFailureCount = derivedDataStore.m_WriteFailureCount,
 			.m_WrittenBytes = derivedDataStore.m_WrittenBytes,
+			.m_CatalogLastReconciledAtUnixMilliseconds =
+				derivedDataStore.m_CatalogLastReconciledAtUnixMilliseconds,
+			.m_CatalogReconciliationCount =
+				derivedDataStore.m_CatalogReconciliationCount,
+			.m_CatalogReconciliationFailureCount =
+				derivedDataStore.m_CatalogReconciliationFailureCount,
+			.m_IsCatalogApproximate = derivedDataStore.m_IsCatalogApproximate,
 		};
 
 		if (environmentAssets)

@@ -14,6 +14,8 @@
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 
+#include <chrono>
+
 namespace gglab
 {
 	namespace
@@ -194,6 +196,25 @@ namespace gglab
 				static_cast<unsigned long long>(ddc.m_MissCount),
 				static_cast<unsigned long long>(ddc.m_CorruptionCount),
 				static_cast<unsigned long long>(ddc.m_WriteFailureCount));
+			if (ddc.m_CatalogLastReconciledAtUnixMilliseconds == 0)
+			{
+				ImGui::TextDisabled("DDC catalog: approximate | not reconciled");
+			}
+			else
+			{
+				const uint64_t catalogNowMilliseconds = static_cast<uint64_t>(
+					std::chrono::duration_cast<std::chrono::milliseconds>(
+						std::chrono::system_clock::now().time_since_epoch()).count());
+				const uint64_t catalogAgeMilliseconds =
+					catalogNowMilliseconds >= ddc.m_CatalogLastReconciledAtUnixMilliseconds ?
+					catalogNowMilliseconds - ddc.m_CatalogLastReconciledAtUnixMilliseconds : 0;
+				ImGui::TextDisabled(
+					"DDC catalog: %s | reconciled %.1f s ago | refreshes %llu | failures %llu",
+					ddc.m_IsCatalogApproximate ? "approximate" : "exact",
+					static_cast<double>(catalogAgeMilliseconds) / 1000.0,
+					static_cast<unsigned long long>(ddc.m_CatalogReconciliationCount),
+					static_cast<unsigned long long>(ddc.m_CatalogReconciliationFailureCount));
+			}
 			if (scheduler && ImGui::Button("Clear IBL CPU Cache"))
 			{
 				scheduler->ClearArtifactCache();

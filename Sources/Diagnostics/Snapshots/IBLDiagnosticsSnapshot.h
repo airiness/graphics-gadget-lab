@@ -85,6 +85,10 @@ namespace gglab
 		uint64_t m_WriteCount = 0;
 		uint64_t m_WriteFailureCount = 0;
 		uint64_t m_WrittenBytes = 0;
+		uint64_t m_CatalogLastReconciledAtUnixMilliseconds = 0;
+		uint64_t m_CatalogReconciliationCount = 0;
+		uint64_t m_CatalogReconciliationFailureCount = 0;
+		bool m_IsCatalogApproximate = true;
 	};
 
 	struct IBLDiagnosticsSnapshot

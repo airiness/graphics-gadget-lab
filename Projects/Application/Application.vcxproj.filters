@@ -837,6 +837,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp">
+      <Filter>Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
@@ -1200,6 +1203,9 @@
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h">
+      <Filter>Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">

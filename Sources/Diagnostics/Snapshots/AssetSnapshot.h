@@ -177,6 +177,10 @@ namespace gglab
 		uint64_t m_TextureDerivedDataWriteCount = 0;
 		uint64_t m_TextureDerivedDataWriteFailureCount = 0;
 		uint64_t m_TextureDerivedDataWrittenBytes = 0;
+		uint64_t m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds = 0;
+		uint64_t m_TextureDerivedDataCatalogReconciliationCount = 0;
+		uint64_t m_TextureDerivedDataCatalogReconciliationFailureCount = 0;
+		bool m_IsTextureDerivedDataCatalogApproximate = true;
 		uint32_t m_TextureDerivedDataActiveBuildCount = 0;
 		uint32_t m_TextureDerivedDataActiveWaiterCount = 0;
 		uint64_t m_TextureDerivedDataRequestCount = 0;
