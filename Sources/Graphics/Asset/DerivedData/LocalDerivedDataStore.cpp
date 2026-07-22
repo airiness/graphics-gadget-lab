@@ -134,12 +134,15 @@ namespace gglab
 				const auto payload = std::span(fileBytes).subspan(
 					reader.Offset() + typeBytes,
 					static_cast<size_t>(payloadBytes));
+				const Sha256Hash payloadDigest = ComputeSha256(payload);
 				if (std::ranges::equal(storedType, expectedType) &&
-					ComputeSha256(payload).m_Value == storedPayloadDigest.m_Value &&
+					payloadDigest.IsValid() &&
+					payloadDigest.m_Value == storedPayloadDigest.m_Value &&
 					storedArtifactDigest.IsValid())
 				{
 					result.m_Disposition = DerivedDataReadDisposition::Hit;
 					result.m_ArtifactContentDigest = storedArtifactDigest;
+					result.m_PayloadDigest = payloadDigest;
 					result.m_Payload.assign(payload.begin(), payload.end());
 				}
 			}
@@ -407,17 +410,41 @@ namespace gglab
 			DerivedDataPresence::Present : DerivedDataPresence::Missing;
 	}
 
-	void LocalDerivedDataStore::DiscardCorrupt(const DerivedDataKey& key) noexcept
+	void LocalDerivedDataStore::DiscardObservedCorrupt(
+		const DerivedDataKey& key,
+		std::string_view artifactType,
+		uint32_t schemaVersion,
+		const ArtifactContentDigest& observedArtifactContentDigest,
+		const Sha256Hash& observedPayloadDigest,
+		LocalDerivedDataReadOptions options) noexcept
 	{
-		if (!IsEnabled() || !key.IsValid()) return;
+		if (!IsEnabled() || !key.IsValid() || artifactType.empty() ||
+			!observedArtifactContentDigest.IsValid() || !observedPayloadDigest.IsValid())
+		{
+			return;
+		}
 		std::scoped_lock lock(m_Mutex);
 		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
 		if (!maintenance.IsAcquired()) return;
+		const std::filesystem::path path = EntryPath(key);
+		const DerivedDataReadResult current = ReadEntry(
+			path,
+			key,
+			artifactType,
+			schemaVersion,
+			options);
+		if (current.m_Disposition != DerivedDataReadDisposition::Hit ||
+			current.m_ArtifactContentDigest != observedArtifactContentDigest ||
+			current.m_PayloadDigest.m_Value != observedPayloadDigest.m_Value)
+		{
+			return;
+		}
+
 		std::error_code errorCode;
-		if (std::filesystem::remove(EntryPath(key), errorCode))
+		if (std::filesystem::remove(path, errorCode))
 		{
 			m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
-			m_Catalog.RemoveEntry(EntryPath(key));
+			m_Catalog.RemoveEntry(path);
 		}
 	}
 

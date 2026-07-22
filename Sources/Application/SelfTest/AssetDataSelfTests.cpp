@@ -525,6 +525,64 @@ namespace gglab
 			}
 
 			{
+				const std::filesystem::path raceRoot = root / "observed-corrupt";
+				LocalDerivedDataStore staleReader(raceRoot);
+				LocalDerivedDataStore replacementWriter(raceRoot);
+				const bool wroteObserved = staleReader.Write(
+					key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				const DerivedDataReadResult observed = staleReader.Read(
+					key, ArtifactType, SchemaVersion);
+
+				constexpr std::array<std::byte, 5> ReplacementPayload{
+					std::byte{ 0x61 },
+					std::byte{ 0x62 },
+					std::byte{ 0x63 },
+					std::byte{ 0x64 },
+					std::byte{ 0x65 },
+				};
+				ArtifactContentDigest replacementDigest{};
+				replacementDigest.m_Value = ComputeSha256(ReplacementPayload).m_Value;
+				const bool replaced = replacementWriter.Clear() && replacementWriter.Write(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					replacementDigest,
+					Payload);
+				staleReader.DiscardObservedCorrupt(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					observed.m_ArtifactContentDigest,
+					observed.m_PayloadDigest);
+				const DerivedDataReadResult preserved = staleReader.Read(
+					key, ArtifactType, SchemaVersion);
+				context.Check(
+					wroteObserved &&
+						observed.m_Disposition == DerivedDataReadDisposition::Hit &&
+						observed.m_PayloadDigest.IsValid() && replaced &&
+						preserved.m_Disposition == DerivedDataReadDisposition::Hit &&
+						preserved.m_ArtifactContentDigest != observed.m_ArtifactContentDigest &&
+						preserved.m_ArtifactContentDigest == replacementDigest &&
+						preserved.m_PayloadDigest.m_Value == observed.m_PayloadDigest.m_Value &&
+						std::ranges::equal(preserved.m_Payload, Payload) &&
+						staleReader.GetStatistics().m_CorruptionCount == 0,
+					"Local DDC stale corrupt disposal preserves a replacement entry");
+
+				const uint64_t corruptionCount =
+					staleReader.GetStatistics().m_CorruptionCount;
+				staleReader.DiscardObservedCorrupt(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					preserved.m_ArtifactContentDigest,
+					preserved.m_PayloadDigest);
+				context.Check(
+					staleReader.Probe(key) == DerivedDataPresence::Missing &&
+						staleReader.GetStatistics().m_CorruptionCount == corruptionCount + 1,
+					"Local DDC observed corrupt disposal removes the unchanged entry");
+			}
+
+			{
 				const std::filesystem::path readRoot = root / "lock-free-read";
 				LocalDerivedDataStore store(readRoot);
 				GGLAB_UNUSED(store.Write(key, ArtifactType, SchemaVersion, artifactDigest, Payload));
