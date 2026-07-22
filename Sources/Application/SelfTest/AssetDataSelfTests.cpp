@@ -4,8 +4,12 @@
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
+#include "Graphics/Asset/ModelImportArtifactCache.h"
+#include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHITextureValidation.h"
+
+#include <thread>
 
 namespace gglab
 {
@@ -94,6 +98,22 @@ namespace gglab
 				subresource.m_Depth == 1 && subresource.m_MipLevel == 0 &&
 				subresource.m_ArraySlice == 0 &&
 				std::ranges::equal(texture.m_Pixels, MakeTextureFixture().m_Pixels);
+		}
+
+		[[nodiscard]] ImportedModel MakeModelImportFixture()
+		{
+			ImportedModel model{};
+			model.m_CanonicalPath = "Assets/Models/SelfTest.gltf";
+			model.m_Name = "SelfTest";
+			model.m_Type = ModelType::GlTF;
+			model.m_Textures.push_back({
+				.m_CanonicalPath = "Assets/Textures/SelfTest.png",
+				.m_ImportSettings = MakeTextureImportSettings(TextureSemantic::BaseColor),
+				.m_Semantic = TextureSemantic::BaseColor,
+				.m_Data = MakeTextureFixture(),
+			});
+			model.m_Meshes.push_back({ .m_Name = "SelfTestMesh" });
+			return model;
 		}
 
 		void RunSha256Tests(SelfTestContext& context) noexcept
@@ -313,6 +333,95 @@ namespace gglab
 			std::filesystem::remove_all(root, errorCode);
 		}
 
+		void RunModelImportArtifactTests(SelfTestContext& context) noexcept
+		{
+			{
+				TextureArtifactCache concurrentCache({ .m_BudgetBytes = 1024 * 1024 });
+				std::array<TextureArtifactHandle, 4> handles;
+				std::array<std::jthread, 4> workers;
+				for (size_t index = 0; index < workers.size(); ++index)
+				{
+					workers[index] = std::jthread([&concurrentCache, &handles, index]() noexcept
+					{
+						handles[index] = concurrentCache.CreateAndAdmit(MakeTextureFixture());
+					});
+				}
+				for (std::jthread& worker : workers)
+				{
+					worker.join();
+				}
+				context.Check(
+					std::ranges::all_of(handles,
+						[&handles](const TextureArtifactHandle& handle) noexcept
+						{
+							return handle && handle == handles.front();
+						}) &&
+						concurrentCache.GetStatistics().m_AdmissionCount == 1,
+					"Texture artifact cache canonicalizes concurrent worker admissions");
+			}
+
+			TextureArtifactCache textureCache({ .m_BudgetBytes = 1024 * 1024 });
+			ImportedModel source = MakeModelImportFixture();
+			const std::byte* const sourcePixels =
+				source.m_Textures.front().m_Data.m_Pixels.data();
+			ModelImportArtifactHandle artifact = CreateModelImportArtifact(
+				std::move(source),
+				textureCache);
+			context.Check(
+				artifact && artifact->IsValid() && artifact->m_Textures.size() == 1 &&
+					artifact->m_Textures.front().m_Artifact->m_Data.m_Pixels.data() ==
+						sourcePixels,
+				"Model import artifacts move texture pixels into immutable texture artifacts");
+
+			ModelImportArtifactHandle duplicate = CreateModelImportArtifact(
+				MakeModelImportFixture(),
+				textureCache);
+			const bool sharesCanonicalTexture = artifact && duplicate &&
+				artifact->m_Textures.front().m_Artifact ==
+					duplicate->m_Textures.front().m_Artifact;
+			context.Check(
+				sharesCanonicalTexture &&
+					artifact->m_ContentDigest == duplicate->m_ContentDigest,
+				"Model import artifacts reference the canonical texture allocation and digest");
+
+			const uint64_t textureBytes = artifact ?
+				artifact->m_Textures.front().m_Artifact->GetAllocatedBytes() : 0;
+			const ArtifactCacheCoreStatistics textureStatistics = textureCache.GetStatistics();
+			context.Check(
+				textureBytes != 0 && textureStatistics.m_AdmissionCount == 1 &&
+					textureStatistics.m_CachedBytes == textureBytes &&
+					textureStatistics.m_TotalLiveBytes == textureBytes,
+				"Texture cache accounts a model texture allocation exactly once");
+
+			ModelImportArtifactCache modelCache({ .m_BudgetBytes = 1024 * 1024 });
+			artifact = modelCache.Admit(std::move(artifact));
+			context.Check(
+				artifact && modelCache.GetStatistics().m_CachedBytes ==
+					artifact->GetAllocatedBytes(),
+				"Model artifact cache excludes referenced texture allocation bytes");
+
+			textureCache.Clear();
+			const ArtifactCacheCoreStatistics retained = textureCache.GetStatistics();
+			context.Check(
+				retained.m_CachedBytes == 0 &&
+					retained.m_ExternallyRetainedBytes == textureBytes &&
+					retained.m_TotalLiveBytes == textureBytes,
+				"Model artifacts keep evicted texture cache allocations externally retained");
+
+			modelCache.Clear();
+			artifact.reset();
+			duplicate.reset();
+			context.Check(
+				textureCache.GetStatistics().m_TotalLiveBytes == 0,
+				"Texture allocation accounting reaches zero after model handles are released");
+
+			ImportedModel invalid = MakeModelImportFixture();
+			invalid.m_Textures.front().m_Data.m_Subresources.front().m_DataOffset = 1;
+			context.Check(
+				!CreateModelImportArtifact(std::move(invalid), textureCache),
+				"Model artifact construction rejects an invalid embedded texture");
+		}
+
 		void RunRHITextureValidationTests(SelfTestContext& context) noexcept
 		{
 			RHITextureDesc textureDesc{};
@@ -411,6 +520,7 @@ namespace gglab
 		RunTextureCodecTests(context);
 		RunTextureStructureValidationTests(context);
 		RunLocalDerivedDataStoreTests(context);
+		RunModelImportArtifactTests(context);
 		RunRHITextureValidationTests(context);
 	}
 }

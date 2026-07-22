@@ -55,13 +55,11 @@ namespace gglab
 		}
 
 		[[nodiscard]] AssetStreamingWorkEstimate EstimateImportedModel(
-			const ImportedModel& model) noexcept
+			const ModelImportArtifact& model) noexcept
 		{
 			AssetStreamingWorkEstimate estimate{};
-			for (const ImportedTexture& texture : model.m_Textures)
-			{
-				estimate.m_SourceBytes += texture.m_Data.m_Pixels.size();
-			}
+			// Referenced texture allocations are accounted by TextureArtifactCache.
+			// The model publication payload only owns its mesh source bytes directly.
 			for (const ImportedMesh& mesh : model.m_Meshes)
 			{
 				estimate.m_SourceBytes +=
@@ -104,10 +102,12 @@ namespace gglab
 		m_Device(createInfo.m_Device),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
+		m_TextureArtifactCache(createInfo.m_TextureArtifactCache),
 		m_ModelImportArtifactCache(createInfo.m_ModelImportArtifactCache),
 		m_AssetLoadCoordinator({
 			.m_TaskSystem = createInfo.m_TaskSystem,
 			.m_ModelImportArtifactCache = &m_ModelImportArtifactCache,
+			.m_TextureArtifactCache = &m_TextureArtifactCache,
 			.m_TextureDerivedDataCacheDirectory =
 				createInfo.m_TextureDerivedDataCacheDirectory,
 		}),
@@ -117,7 +117,7 @@ namespace gglab
 			.m_TransferManager = createInfo.m_TransferManager,
 			.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
 			.m_StateEvents = &m_AssetStateEventQueue,
-			.m_ArtifactCache = createInfo.m_TextureArtifactCache,
+			.m_ArtifactCache = &m_TextureArtifactCache,
 		})),
 		m_SamplerRegistry(createInfo.m_SamplerRegistry),
 		m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
@@ -2560,7 +2560,7 @@ namespace gglab
 					.m_Generation = operation.m_ContentVersion.m_ContentGeneration,
 				},
 				.m_Estimate = artifact ?
-					EstimateImportedModel(artifact->m_Model) : AssetStreamingWorkEstimate{},
+					EstimateImportedModel(*artifact) : AssetStreamingWorkEstimate{},
 				.m_Priority = completion.m_Priority,
 				.m_Progress = model->m_LoadProgress,
 			},
@@ -2606,7 +2606,7 @@ namespace gglab
 					.m_Generation = operation.m_ContentVersion.m_ContentGeneration,
 				},
 				.m_Estimate = artifact ?
-					EstimateImportedModel(artifact->m_Model) : AssetStreamingWorkEstimate{},
+					EstimateImportedModel(*artifact) : AssetStreamingWorkEstimate{},
 				.m_Priority = completion.m_Priority,
 			},
 			[this, operation, completion, artifact = std::move(artifact)]() mutable noexcept
@@ -2676,7 +2676,7 @@ namespace gglab
 			"Queued for resource publication",
 			completion.m_Name);
 		model->m_ImportArtifactContentDigest = artifact->m_ContentDigest;
-		const AssetStreamingWorkEstimate estimate = EstimateImportedModel(artifact->m_Model);
+		const AssetStreamingWorkEstimate estimate = EstimateImportedModel(*artifact);
 		const TaskPriority priority = GetEffectivePriority(
 			MakeAssetKey(modelId),
 			completion.m_Priority);
@@ -2731,7 +2731,7 @@ namespace gglab
 				ArtifactContentDigestText(artifact->m_ContentDigest));
 			artifact.reset();
 		}
-		const ImportedModel* importedModel = artifact ? &artifact->m_Model : nullptr;
+		const ModelImportArtifact* importedModel = artifact.get();
 
 		for (const auto& [meshId, meshOwner] : m_MeshStore.Entries())
 		{

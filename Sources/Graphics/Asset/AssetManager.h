@@ -341,6 +341,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		TextureArtifactCache m_TextureArtifactCache;
 		ModelImportArtifactCache m_ModelImportArtifactCache;
 		AssetLoadCoordinator m_AssetLoadCoordinator;
 		// State events outlive TextureAssetSystem so the injected sink remains valid

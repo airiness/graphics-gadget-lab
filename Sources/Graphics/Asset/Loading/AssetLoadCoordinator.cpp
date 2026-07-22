@@ -27,10 +27,12 @@ namespace gglab
 	AssetLoadCoordinator::AssetLoadCoordinator(const CreateInfo& createInfo) noexcept :
 		m_TaskSystem(createInfo.m_TaskSystem),
 		m_ModelImportArtifactCache(createInfo.m_ModelImportArtifactCache),
+		m_TextureArtifactCache(createInfo.m_TextureArtifactCache),
 		m_TextureDerivedDataSystem(createInfo.m_TextureDerivedDataCacheDirectory)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_TaskSystem);
 		GGLAB_ASSERT_NOT_NULL(m_ModelImportArtifactCache);
+		GGLAB_ASSERT_NOT_NULL(m_TextureArtifactCache);
 	}
 
 	AssetLoadCoordinator::~AssetLoadCoordinator()
@@ -70,6 +72,7 @@ namespace gglab
 		const std::filesystem::path sourcePath = std::move(request.m_SourcePath);
 		const ModelImportSettings importSettings = request.m_ImportSettings;
 		const ProgressChannelPtr progress = std::move(request.m_Progress);
+		TextureArtifactCache* const textureArtifactCache = m_TextureArtifactCache;
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
 				.m_Name = std::format(
@@ -78,7 +81,7 @@ namespace gglab
 				.m_Priority = request.m_Priority,
 				.m_Progress = progress,
 			},
-			[sourcePath, importSettings, job, progress](
+			[sourcePath, importSettings, job, progress, textureArtifactCache](
 				std::stop_token stopToken) noexcept
 			{
 				ModelImportResult result = ModelImporter::Import(
@@ -90,7 +93,9 @@ namespace gglab
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
-				job->m_Artifact = CreateModelImportArtifact(std::move(result.m_Model));
+				job->m_Artifact = CreateModelImportArtifact(
+					std::move(result.m_Model),
+					*textureArtifactCache);
 				if (!job->m_Artifact)
 				{
 					return TaskResult::Failure("Failed to create model import artifact");
@@ -168,6 +173,7 @@ namespace gglab
 		const ModelImportSettings importSettings = request.m_ImportSettings;
 		const ArtifactContentDigest expectedArtifactContentDigest =
 			request.m_ExpectedArtifactContentDigest;
+		TextureArtifactCache* const textureArtifactCache = m_TextureArtifactCache;
 		const bool cacheHit = static_cast<bool>(job->m_Artifact);
 		const std::string taskName = cacheHit ?
 			std::format(
@@ -182,7 +188,7 @@ namespace gglab
 				.m_Priority = request.m_Priority,
 			},
 			[sourcePath, importSettings, expectedArtifactContentDigest,
-				job, cacheHit](std::stop_token stopToken) noexcept
+				job, cacheHit, textureArtifactCache](std::stop_token stopToken) noexcept
 			{
 				if (cacheHit)
 				{
@@ -201,7 +207,9 @@ namespace gglab
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
-				job->m_Artifact = CreateModelImportArtifact(std::move(result.m_Model));
+				job->m_Artifact = CreateModelImportArtifact(
+					std::move(result.m_Model),
+					*textureArtifactCache);
 				if (!job->m_Artifact)
 				{
 					return TaskResult::Failure("Failed to create model import artifact");

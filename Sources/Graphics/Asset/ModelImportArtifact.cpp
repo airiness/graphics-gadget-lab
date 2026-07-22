@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 #include "Core/Hash/Sha256.h"
+#include "Graphics/Asset/TextureArtifactCache.h"
 
 #include <bit>
 
@@ -14,7 +15,6 @@ namespace gglab
 			ArtifactDigestWriter() noexcept : m_Succeeded(m_Builder.IsValid()) {}
 
 			void U8(uint8_t value) noexcept { m_Succeeded &= m_Builder.AddU8(value); }
-			void U16(uint16_t value) noexcept { m_Succeeded &= m_Builder.AddU16(value); }
 			void U32(uint32_t value) noexcept { m_Succeeded &= m_Builder.AddU32(value); }
 			void U64(uint64_t value) noexcept { m_Succeeded &= m_Builder.AddU64(value); }
 			void Bool(bool value) noexcept { U8(value ? 1u : 0u); }
@@ -122,60 +122,28 @@ namespace gglab
 			writer.Float(sampler.m_MinLOD);
 			writer.Float(sampler.m_MaxLOD);
 		}
-
-		void AddTextureData(
-			ArtifactDigestWriter& writer,
-			const TextureAssetData& textureData) noexcept
-		{
-			writer.U32(static_cast<uint32_t>(textureData.m_ResourceFormat));
-			writer.U32(static_cast<uint32_t>(textureData.m_ViewFormat));
-			writer.U32(static_cast<uint32_t>(textureData.m_SrvDimension));
-			writer.U32(textureData.m_Extent.m_Width);
-			writer.U32(textureData.m_Extent.m_Height);
-			writer.U32(textureData.m_Extent.m_Depth);
-			writer.U16(textureData.m_ArraySize);
-			writer.U16(textureData.m_MipLevels);
-			writer.U8(static_cast<uint8_t>(textureData.m_ColorSpace));
-			writer.U64(static_cast<uint64_t>(textureData.m_Subresources.size()));
-			for (const TextureAssetSubresource& subresource : textureData.m_Subresources)
-			{
-				writer.U64(subresource.m_DataOffset);
-				writer.U64(subresource.m_DataSize);
-				writer.U64(subresource.m_RowPitch);
-				writer.U64(subresource.m_SlicePitch);
-				writer.U32(subresource.m_Width);
-				writer.U32(subresource.m_Height);
-				writer.U32(subresource.m_Depth);
-				writer.U32(subresource.m_MipLevel);
-				writer.U32(subresource.m_ArraySlice);
-			}
-			writer.Bytes(textureData.m_Pixels);
-		}
 	}
 
 	uint64_t ModelImportArtifact::GetAllocatedBytes() const noexcept
 	{
 		uint64_t bytes = sizeof(ModelImportArtifact) +
-			static_cast<uint64_t>(m_Model.m_CanonicalPath.native().capacity()) *
+			static_cast<uint64_t>(m_CanonicalPath.native().capacity()) *
 				sizeof(std::filesystem::path::value_type) +
-			static_cast<uint64_t>(m_Model.m_Name.capacity()) +
-			static_cast<uint64_t>(m_Model.m_Textures.capacity()) * sizeof(ImportedTexture) +
-			static_cast<uint64_t>(m_Model.m_Materials.capacity()) * sizeof(ImportedMaterial) +
-			static_cast<uint64_t>(m_Model.m_Meshes.capacity()) * sizeof(ImportedMesh) +
-			static_cast<uint64_t>(m_Model.m_MeshInstances.capacity()) * sizeof(ImportedModelMesh);
-		for (const ImportedTexture& texture : m_Model.m_Textures)
+			static_cast<uint64_t>(m_Name.capacity()) +
+			static_cast<uint64_t>(m_Textures.capacity()) * sizeof(ModelImportTexture) +
+			static_cast<uint64_t>(m_Materials.capacity()) * sizeof(ImportedMaterial) +
+			static_cast<uint64_t>(m_Meshes.capacity()) * sizeof(ImportedMesh) +
+			static_cast<uint64_t>(m_MeshInstances.capacity()) * sizeof(ImportedModelMesh);
+		for (const ModelImportTexture& texture : m_Textures)
 		{
 			bytes += static_cast<uint64_t>(texture.m_CanonicalPath.native().capacity()) *
 				sizeof(std::filesystem::path::value_type);
-			bytes += static_cast<uint64_t>(texture.m_Data.m_Pixels.capacity()) * sizeof(std::byte);
-			bytes += static_cast<uint64_t>(texture.m_Data.m_Subresources.capacity()) *
-				sizeof(TextureAssetSubresource);
 		}
-		for (const ImportedMaterial& material : m_Model.m_Materials)
+		for (const ImportedMaterial& material : m_Materials)
 		{
 			bytes += static_cast<uint64_t>(material.m_Name.capacity());
 		}
-		for (const ImportedMesh& mesh : m_Model.m_Meshes)
+		for (const ImportedMesh& mesh : m_Meshes)
 		{
 			bytes += static_cast<uint64_t>(mesh.m_Name.capacity());
 			bytes += static_cast<uint64_t>(mesh.m_Vertices.capacity()) * sizeof(Vertex);
@@ -184,8 +152,8 @@ namespace gglab
 		return bytes;
 	}
 
-	ArtifactContentDigest ComputeModelImportArtifactContentDigest(
-		const ImportedModel& model) noexcept
+	static ArtifactContentDigest ComputeModelImportArtifactContentDigest(
+		const ModelImportArtifact& model) noexcept
 	{
 		if (model.m_Meshes.empty())
 		{
@@ -198,13 +166,13 @@ namespace gglab
 		writer.U32(static_cast<uint32_t>(model.m_Type));
 
 		writer.U64(static_cast<uint64_t>(model.m_Textures.size()));
-		for (const ImportedTexture& texture : model.m_Textures)
+		for (const ModelImportTexture& texture : model.m_Textures)
 		{
 			writer.String(texture.m_CanonicalPath.generic_string());
 			writer.U32(static_cast<uint32_t>(texture.m_ImportSettings.m_Semantic));
 			writer.U8(static_cast<uint8_t>(texture.m_ImportSettings.m_MipPolicy));
 			writer.U32(static_cast<uint32_t>(texture.m_Semantic));
-			AddTextureData(writer, texture.m_Data);
+			writer.Bytes(texture.m_Artifact->m_ContentDigest.m_Value);
 		}
 
 		writer.U64(static_cast<uint64_t>(model.m_Materials.size()));
@@ -268,16 +236,50 @@ namespace gglab
 		return digest;
 	}
 
-	ModelImportArtifactHandle CreateModelImportArtifact(ImportedModel&& model) noexcept
+	ModelImportArtifactHandle CreateModelImportArtifact(
+		ImportedModel&& importedModel,
+		TextureArtifactCache& textureArtifactCache) noexcept
 	{
-		ArtifactContentDigest digest = ComputeModelImportArtifactContentDigest(model);
+		if (importedModel.m_Meshes.empty())
+		{
+			return {};
+		}
+
+		ModelImportArtifact artifact{
+			.m_CanonicalPath = std::move(importedModel.m_CanonicalPath),
+			.m_Name = std::move(importedModel.m_Name),
+			.m_Type = importedModel.m_Type,
+			.m_Materials = std::move(importedModel.m_Materials),
+			.m_Meshes = std::move(importedModel.m_Meshes),
+			.m_MeshInstances = std::move(importedModel.m_MeshInstances),
+		};
+		artifact.m_Textures.reserve(importedModel.m_Textures.size());
+		for (ImportedTexture& importedTexture : importedModel.m_Textures)
+		{
+			if (importedTexture.m_ImportSettings.m_Semantic != importedTexture.m_Semantic)
+			{
+				return {};
+			}
+			TextureArtifactHandle textureArtifact =
+				textureArtifactCache.CreateAndAdmit(std::move(importedTexture.m_Data));
+			if (!textureArtifact)
+			{
+				return {};
+			}
+			artifact.m_Textures.push_back({
+				.m_CanonicalPath = std::move(importedTexture.m_CanonicalPath),
+				.m_ImportSettings = importedTexture.m_ImportSettings,
+				.m_Semantic = importedTexture.m_Semantic,
+				.m_Artifact = std::move(textureArtifact),
+			});
+		}
+
+		ArtifactContentDigest digest = ComputeModelImportArtifactContentDigest(artifact);
 		if (!digest.IsValid())
 		{
 			return {};
 		}
-		return std::make_shared<const ModelImportArtifact>(ModelImportArtifact{
-			.m_Model = std::move(model),
-			.m_ContentDigest = digest,
-		});
+		artifact.m_ContentDigest = digest;
+		return std::make_shared<const ModelImportArtifact>(std::move(artifact));
 	}
 }
