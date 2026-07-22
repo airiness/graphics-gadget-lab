@@ -9,6 +9,12 @@ namespace gglab
 		struct CacheTestArtifact
 		{
 			uint32_t m_Id = 0;
+			uint64_t m_AllocatedBytes = 0;
+
+			[[nodiscard]] uint64_t GetAllocatedBytes() const noexcept
+			{
+				return m_AllocatedBytes;
+			}
 		};
 
 		using CacheTestCore = ArtifactCacheCore<uint32_t, CacheTestArtifact>;
@@ -22,18 +28,17 @@ namespace gglab
 		{
 			return cache.Admit(
 				key,
-				{
-					.m_Artifact = std::make_shared<const CacheTestArtifact>(
-						CacheTestArtifact{ .m_Id = artifactId }),
-					.m_PhysicalBytes = physicalBytes,
-				});
+				std::make_shared<const CacheTestArtifact>(CacheTestArtifact{
+					.m_Id = artifactId,
+					.m_AllocatedBytes = physicalBytes,
+				}));
 		}
 
 		void RunDuplicateAdmissionTests(SelfTestContext& context) noexcept
 		{
 			CacheTestCore cache(8);
 			CacheTestHandle first = Admit(cache, 1, 10, 4);
-			CacheTestHandle duplicate = Admit(cache, 1, 20, 4);
+			CacheTestHandle duplicate = Admit(cache, 1, 20, 6);
 			const ArtifactCacheCoreStatistics statistics = cache.GetStatistics();
 			context.Check(
 				first && duplicate && first == duplicate && duplicate->m_Id == 10,
@@ -42,7 +47,7 @@ namespace gglab
 				statistics.m_AdmissionCount == 1 &&
 					statistics.m_CachedEntryCount == 1 &&
 					statistics.m_CachedBytes == 4 && statistics.m_TotalLiveBytes == 4,
-				"Artifact cache repeated admission preserves physical byte accounting");
+				"Artifact cache repeated keys preserve canonical physical byte accounting");
 
 			first.reset();
 			duplicate.reset();

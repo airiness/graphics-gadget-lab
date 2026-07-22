@@ -1,8 +1,11 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Task/TaskTypes.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
+#include <utility>
 
 namespace gglab
 {
@@ -37,9 +40,38 @@ namespace gglab
 	struct AssetResourcePublicationStepUsage
 	{
 		uint32_t m_ResourceCreations = 0;
-		uint64_t m_PayloadBytesMovedToUpload = 0;
-		uint64_t m_PayloadBytesDestroyed = 0;
+		// Source bytes are released only when the publication job no longer owns
+		// them. Copying data into an upload payload does not release its source.
+		uint64_t m_SourceBytesReleased = 0;
+		// Independent CPU payload bytes created by this step. Transfer staging
+		// allocations are accounted by the upload scheduler separately.
+		uint64_t m_SourceBytesCopiedToUpload = 0;
 		AssetResourcePublicationStage m_Stage = AssetResourcePublicationStage::Unknown;
+	};
+
+	// Tracks the source payload still owned by one publication job. Step usage
+	// may retire ownership early; every terminal path retires the remainder.
+	struct AssetResourcePublicationPayloadState
+	{
+		uint64_t m_RemainingSourceBytes = 0;
+
+		[[nodiscard]] uint64_t RetireStep(
+			const AssetResourcePublicationStepUsage& usage) noexcept
+		{
+			GGLAB_ASSERT_MSG(
+				usage.m_SourceBytesReleased <= m_RemainingSourceBytes,
+				"Resource publication step released more source bytes than the job owns.");
+			const uint64_t releasedBytes = std::min(
+				usage.m_SourceBytesReleased,
+				m_RemainingSourceBytes);
+			m_RemainingSourceBytes -= releasedBytes;
+			return releasedBytes;
+		}
+
+		[[nodiscard]] uint64_t RetireTerminal() noexcept
+		{
+			return std::exchange(m_RemainingSourceBytes, 0);
+		}
 	};
 
 	struct AssetResourcePublicationStepResult

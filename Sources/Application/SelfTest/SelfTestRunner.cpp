@@ -2,6 +2,7 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"
+#include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
 
 namespace gglab
@@ -16,6 +17,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "asset-data",
 				.m_Run = &RunAssetDataSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "publication-accounting",
+				.m_Run = &RunPublicationAccountingSelfTests,
 			},
 		};
 

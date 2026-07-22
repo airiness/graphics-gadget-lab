@@ -154,6 +154,7 @@ namespace gglab
 			}
 
 			TextureAssetData textureData = importedTexture.m_Data;
+			result.m_Usage.m_SourceBytesCopiedToUpload = sourceBytes;
 			auto uploadData = textureAssets.MakeTextureUploadData(
 				textureId,
 				std::move(textureData),
@@ -174,7 +175,6 @@ namespace gglab
 					textureId.Value());
 				return result;
 			}
-			result.m_Usage.m_PayloadBytesMovedToUpload = sourceBytes;
 			result.m_UploadQueued = true;
 			return result;
 		}
@@ -274,6 +274,7 @@ namespace gglab
 			uploadData.m_MeshId = meshId;
 			uploadData.m_VerticesData = importedMesh.m_Vertices;
 			uploadData.m_IndicesData = importedMesh.m_Indices;
+			result.m_Usage.m_SourceBytesCopiedToUpload = sourceBytes;
 			const bool queued = m_AssetManager->QueueMeshUpload(
 				std::move(uploadData),
 				priority);
@@ -285,7 +286,6 @@ namespace gglab
 					meshId.Value());
 				return result;
 			}
-			result.m_Usage.m_PayloadBytesMovedToUpload = sourceBytes;
 			result.m_UploadQueued = true;
 			return result;
 		}

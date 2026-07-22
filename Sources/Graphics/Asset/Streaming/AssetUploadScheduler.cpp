@@ -101,12 +101,13 @@ namespace gglab
 		QueuedResourcePublication publication{
 			.m_Desc = std::move(desc),
 			.m_QueuedAt = std::chrono::steady_clock::now(),
-			.m_RemainingSourceBytes = 0,
+			.m_Payload = {},
 			.m_HasStarted = false,
 			.m_Job = std::move(job),
 		};
-		publication.m_RemainingSourceBytes = publication.m_Desc.m_Estimate.m_SourceBytes;
-		m_ReadyPayloadBytes += publication.m_RemainingSourceBytes;
+		publication.m_Payload.m_RemainingSourceBytes =
+			publication.m_Desc.m_Estimate.m_SourceBytes;
+		m_ReadyPayloadBytes += publication.m_Payload.m_RemainingSourceBytes;
 		m_ReadyPayloadHighWatermark = std::max(
 			m_ReadyPayloadHighWatermark,
 			m_ReadyPayloadBytes);
@@ -738,11 +739,7 @@ namespace gglab
 					publication.m_Job->Abort(
 						context,
 						AssetResourcePublicationAbortReason::Shutdown);
-					GGLAB_ASSERT_MSG(
-						publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes,
-						"Resource publication payload accounting underflow during drain abort.");
-					m_ReadyPayloadBytes = publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes ?
-						m_ReadyPayloadBytes - publication.m_RemainingSourceBytes : 0;
+					RetireTerminalResourcePublicationPayload(publication);
 					++m_ResourcePublicationTelemetry.m_CancelledCount;
 				}
 				break;
@@ -822,11 +819,11 @@ namespace gglab
 			}
 			m_ResourcePublicationTelemetry.m_ResourceCreationCount +=
 				result.m_Usage.m_ResourceCreations;
-			m_ResourcePublicationTelemetry.m_PayloadBytesMovedToUpload +=
-				result.m_Usage.m_PayloadBytesMovedToUpload;
-			m_ResourcePublicationTelemetry.m_PayloadBytesDestroyed +=
-				result.m_Usage.m_PayloadBytesDestroyed;
-			RetireResourcePublicationPayload(publication, result.m_Usage);
+			const uint64_t sourceBytesReleased =
+				RetireResourcePublicationPayload(publication, result.m_Usage);
+			m_ResourcePublicationTelemetry.m_SourceBytesReleased += sourceBytesReleased;
+			m_ResourcePublicationTelemetry.m_SourceBytesCopiedToUpload +=
+				result.m_Usage.m_SourceBytesCopiedToUpload;
 
 			++processedCount;
 			++m_LastFrameUsage.m_ResourcePublicationSteps;
@@ -866,11 +863,7 @@ namespace gglab
 
 			if (result.m_Status != AssetResourcePublicationStepStatus::Continue)
 			{
-				GGLAB_ASSERT_MSG(
-					publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes,
-					"Resource publication payload accounting underflow at terminal state.");
-				m_ReadyPayloadBytes = publication.m_RemainingSourceBytes <= m_ReadyPayloadBytes ?
-					m_ReadyPayloadBytes - publication.m_RemainingSourceBytes : 0;
+				RetireTerminalResourcePublicationPayload(publication);
 			}
 		}
 		return processedCount;
@@ -1009,31 +1002,32 @@ namespace gglab
 		}
 	}
 
-	void AssetUploadScheduler::RetireResourcePublicationPayload(
+	uint64_t AssetUploadScheduler::RetireResourcePublicationPayload(
 		QueuedResourcePublication& publication,
 		const AssetResourcePublicationStepUsage& usage) noexcept
 	{
-		const uint64_t movedBytes = usage.m_PayloadBytesMovedToUpload;
-		const uint64_t destroyedBytes = usage.m_PayloadBytesDestroyed;
-		GGLAB_ASSERT_MSG(
-			movedBytes <= publication.m_RemainingSourceBytes &&
-			destroyedBytes <= publication.m_RemainingSourceBytes -
-				std::min(movedBytes, publication.m_RemainingSourceBytes),
-			"Resource publication step retired more payload than the job owns.");
-		const uint64_t clampedMovedBytes = std::min(
-			movedBytes,
-			publication.m_RemainingSourceBytes);
-		const uint64_t retiredBytes = clampedMovedBytes + std::min(
-			destroyedBytes,
-			publication.m_RemainingSourceBytes - clampedMovedBytes);
-		GGLAB_ASSERT_MSG(
-			retiredBytes <= m_ReadyPayloadBytes,
-			"Resource publication ready payload accounting underflow.");
-		publication.m_RemainingSourceBytes -= retiredBytes;
+		const uint64_t retiredBytes = publication.m_Payload.RetireStep(usage);
 		publication.m_Desc.m_Estimate.m_SourceBytes =
-			publication.m_RemainingSourceBytes;
-		m_ReadyPayloadBytes = retiredBytes <= m_ReadyPayloadBytes ?
-			m_ReadyPayloadBytes - retiredBytes : 0;
+			publication.m_Payload.m_RemainingSourceBytes;
+		RetireReadyPayloadBytes(retiredBytes);
+		return retiredBytes;
+	}
+
+	void AssetUploadScheduler::RetireTerminalResourcePublicationPayload(
+		QueuedResourcePublication& publication) noexcept
+	{
+		const uint64_t retiredBytes = publication.m_Payload.RetireTerminal();
+		publication.m_Desc.m_Estimate.m_SourceBytes = 0;
+		RetireReadyPayloadBytes(retiredBytes);
+	}
+
+	void AssetUploadScheduler::RetireReadyPayloadBytes(uint64_t bytes) noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			bytes <= m_ReadyPayloadBytes,
+			"Resource publication ready payload accounting underflow.");
+		m_ReadyPayloadBytes = bytes <= m_ReadyPayloadBytes ?
+			m_ReadyPayloadBytes - bytes : 0;
 	}
 
 	uint32_t AssetUploadScheduler::CancelQueuedWork(
@@ -1077,11 +1071,7 @@ namespace gglab
 			}
 
 			iterator->m_Job->Abort(context, reason);
-			GGLAB_ASSERT_MSG(
-				iterator->m_RemainingSourceBytes <= m_ReadyPayloadBytes,
-				"Resource publication cancellation payload accounting underflow.");
-			m_ReadyPayloadBytes = iterator->m_RemainingSourceBytes <= m_ReadyPayloadBytes ?
-				m_ReadyPayloadBytes - iterator->m_RemainingSourceBytes : 0;
+			RetireTerminalResourcePublicationPayload(*iterator);
 			iterator = m_ResourcePublicationQueue.erase(iterator);
 			++cancelledCount;
 			++m_ResourcePublicationTelemetry.m_CancelledCount;
@@ -1159,8 +1149,8 @@ namespace gglab
 		statistics.m_CallbackFailureCount = telemetry.m_CallbackFailureCount;
 		statistics.m_CancelledCount = telemetry.m_CancelledCount;
 		statistics.m_ResourceCreationCount = telemetry.m_ResourceCreationCount;
-		statistics.m_PayloadBytesMovedToUpload = telemetry.m_PayloadBytesMovedToUpload;
-		statistics.m_PayloadBytesDestroyed = telemetry.m_PayloadBytesDestroyed;
+		statistics.m_SourceBytesReleased = telemetry.m_SourceBytesReleased;
+		statistics.m_SourceBytesCopiedToUpload = telemetry.m_SourceBytesCopiedToUpload;
 		statistics.m_QueueSampleCount = telemetry.m_QueueSampleCount;
 		statistics.m_TotalQueueMilliseconds = telemetry.m_TotalQueueMilliseconds;
 		statistics.m_MaxQueueMilliseconds = telemetry.m_MaxQueueMilliseconds;
@@ -1208,10 +1198,10 @@ namespace gglab
 		statistics.m_CallbackFailureCount = m_ResourcePublicationTelemetry.m_CallbackFailureCount;
 		statistics.m_CancelledCount = m_ResourcePublicationTelemetry.m_CancelledCount;
 		statistics.m_ResourceCreationCount = m_ResourcePublicationTelemetry.m_ResourceCreationCount;
-		statistics.m_PayloadBytesMovedToUpload =
-			m_ResourcePublicationTelemetry.m_PayloadBytesMovedToUpload;
-		statistics.m_PayloadBytesDestroyed =
-			m_ResourcePublicationTelemetry.m_PayloadBytesDestroyed;
+		statistics.m_SourceBytesReleased =
+			m_ResourcePublicationTelemetry.m_SourceBytesReleased;
+		statistics.m_SourceBytesCopiedToUpload =
+			m_ResourcePublicationTelemetry.m_SourceBytesCopiedToUpload;
 		statistics.m_QueueSampleCount = m_ResourcePublicationTelemetry.m_QueueSampleCount;
 		statistics.m_TotalQueueMilliseconds =
 			m_ResourcePublicationTelemetry.m_TotalQueueMilliseconds;
@@ -1247,7 +1237,8 @@ namespace gglab
 		const auto now = std::chrono::steady_clock::now();
 		for (const QueuedResourcePublication& publication : m_ResourcePublicationQueue)
 		{
-			statistics.m_PendingSourceBytes += publication.m_RemainingSourceBytes;
+			statistics.m_PendingSourceBytes +=
+				publication.m_Payload.m_RemainingSourceBytes;
 			statistics.m_PendingWork.push_back({
 				.m_Name = publication.m_Desc.m_Name,
 				.m_Identity = publication.m_Desc.m_Identity,

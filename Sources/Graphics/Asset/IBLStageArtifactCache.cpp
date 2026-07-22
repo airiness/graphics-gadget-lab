@@ -16,13 +16,7 @@ namespace gglab
 		{
 			return {};
 		}
-		const uint64_t bytes = artifact->GetAllocatedBytes();
-		return m_Core.Admit(
-			key,
-			{
-				.m_Artifact = std::move(artifact),
-				.m_PhysicalBytes = bytes,
-			});
+		return m_Core.Admit(key, std::move(artifact));
 	}
 
 	IBLStageArtifactHandle IBLStageArtifactCache::Find(

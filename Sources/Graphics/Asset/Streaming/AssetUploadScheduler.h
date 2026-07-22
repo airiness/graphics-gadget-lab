@@ -191,8 +191,8 @@ namespace gglab
 		uint64_t m_CallbackFailureCount = 0;
 		uint64_t m_CancelledCount = 0;
 		uint64_t m_ResourceCreationCount = 0;
-		uint64_t m_PayloadBytesMovedToUpload = 0;
-		uint64_t m_PayloadBytesDestroyed = 0;
+		uint64_t m_SourceBytesReleased = 0;
+		uint64_t m_SourceBytesCopiedToUpload = 0;
 		uint64_t m_QueueSampleCount = 0;
 		uint64_t m_PendingSourceBytes = 0;
 		uint64_t m_PendingStagingBytes = 0;
@@ -383,7 +383,7 @@ namespace gglab
 		{
 			AssetStreamingWorkDesc m_Desc;
 			std::chrono::steady_clock::time_point m_QueuedAt{};
-			uint64_t m_RemainingSourceBytes = 0;
+			AssetResourcePublicationPayloadState m_Payload{};
 			bool m_HasStarted = false;
 			std::unique_ptr<IResourcePublicationJob> m_Job;
 		};
@@ -406,8 +406,8 @@ namespace gglab
 			uint64_t m_CallbackFailureCount = 0;
 			uint64_t m_CancelledCount = 0;
 			uint64_t m_ResourceCreationCount = 0;
-			uint64_t m_PayloadBytesMovedToUpload = 0;
-			uint64_t m_PayloadBytesDestroyed = 0;
+			uint64_t m_SourceBytesReleased = 0;
+			uint64_t m_SourceBytesCopiedToUpload = 0;
 			uint64_t m_QueueSampleCount = 0;
 			double m_TotalQueueMilliseconds = 0.0;
 			double m_MaxQueueMilliseconds = 0.0;
@@ -450,9 +450,12 @@ namespace gglab
 			AssetUploadStatus status) noexcept;
 		uint32_t DrainGpuFinalizeQueue(bool ignoreBudget) noexcept;
 		void RemoveReadyPayload(const AssetStreamingWorkEstimate& estimate, bool uploadRecording) noexcept;
-		void RetireResourcePublicationPayload(
+		[[nodiscard]] uint64_t RetireResourcePublicationPayload(
 			QueuedResourcePublication& publication,
 			const AssetResourcePublicationStepUsage& usage) noexcept;
+		void RetireTerminalResourcePublicationPayload(
+			QueuedResourcePublication& publication) noexcept;
+		void RetireReadyPayloadBytes(uint64_t bytes) noexcept;
 		uint32_t CancelQueuedWork(
 			std::deque<QueuedWork>& queue,
 			QueueTelemetry& telemetry,

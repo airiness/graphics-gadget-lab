@@ -144,7 +144,8 @@ namespace gglab
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
 			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
 			"  --self-test <suite-id>          Run a headless self-test suite.\n"
-			"                                  Available: asset-data.\n"
+			"                                  Available: artifact-cache, asset-data,\n"
+			"                                  publication-accounting.\n"
 			"  --help, -h                      Show this help text.\n";
 	}
 }
