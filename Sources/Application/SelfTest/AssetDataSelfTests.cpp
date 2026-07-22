@@ -7,6 +7,8 @@
 #include "Graphics/Asset/ModelImportArtifactCache.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
+#include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 
 #include <cwctype>
@@ -967,6 +969,70 @@ namespace gglab
 			context.Check(
 				ValidateRHITextureViewDesc(depthDesc, depthSrv).IsValid(),
 				"RHI texture view validation accepts a typed SRV of a typeless depth resource");
+
+			RHITextureDesc texture1DDesc{};
+			texture1DDesc.m_Dimension = RHITextureDimension::Texture1D;
+			texture1DDesc.m_Format = RHIFormat::R8G8B8A8Unorm;
+			texture1DDesc.m_Usage = RHITextureUsage::Sampled;
+			texture1DDesc.m_Extent = { 8, 1, 1 };
+			RHITextureViewDesc inferred1DSrv{};
+			inferred1DSrv.m_Type = RHITextureViewType::ShaderResource;
+			inferred1DSrv.m_Format = texture1DDesc.m_Format;
+			const D3D12_SHADER_RESOURCE_VIEW_DESC native1DSrv =
+				BuildD3D12ShaderResourceViewDesc(
+					inferred1DSrv,
+					ToD3D12ResourceDesc(texture1DDesc));
+			context.Check(
+				ValidateRHITextureViewDesc(texture1DDesc, inferred1DSrv).IsValid() &&
+					native1DSrv.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE1D,
+				"RHI and DX12 consistently infer an unknown 1D SRV dimension");
+
+			RHITextureDesc texture1DArrayDesc = texture1DDesc;
+			texture1DArrayDesc.m_Format = RHIFormat::D32Float;
+			texture1DArrayDesc.m_Usage = RHITextureUsage::DepthStencil;
+			texture1DArrayDesc.m_ArraySize = 2;
+			RHITextureViewDesc inferred1DArrayDsv{};
+			inferred1DArrayDsv.m_Type = RHITextureViewType::DepthStencil;
+			inferred1DArrayDsv.m_Format = texture1DArrayDesc.m_Format;
+			const D3D12_DEPTH_STENCIL_VIEW_DESC native1DArrayDsv =
+				BuildD3D12DepthStencilViewDesc(
+					inferred1DArrayDsv,
+					ToD3D12ResourceDesc(texture1DArrayDesc));
+			context.Check(
+				ValidateRHITextureViewDesc(
+					texture1DArrayDesc,
+					inferred1DArrayDsv).IsValid() &&
+					native1DArrayDsv.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE1DARRAY &&
+					native1DArrayDsv.Texture1DArray.ArraySize == 2,
+				"RHI and DX12 consistently infer an unknown 1D-array DSV dimension");
+
+			RHITextureDesc texture3DDesc{};
+			texture3DDesc.m_Dimension = RHITextureDimension::Texture3D;
+			texture3DDesc.m_Format = RHIFormat::R8G8B8A8Unorm;
+			texture3DDesc.m_Usage = RHITextureUsage::UnorderedAccess;
+			texture3DDesc.m_Extent = { 4, 4, 4 };
+			RHITextureViewDesc inferred3DUav{};
+			inferred3DUav.m_Type = RHITextureViewType::UnorderedAccess;
+			inferred3DUav.m_Format = texture3DDesc.m_Format;
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC native3DUav =
+				BuildD3D12UnorderedAccessViewDesc(
+					inferred3DUav,
+					ToD3D12ResourceDesc(texture3DDesc));
+			context.Check(
+				ValidateRHITextureViewDesc(texture3DDesc, inferred3DUav).IsValid() &&
+					native3DUav.ViewDimension == D3D12_UAV_DIMENSION_TEXTURE3D,
+				"RHI and DX12 consistently infer an unknown 3D UAV dimension");
+
+			RHITextureDesc texture3DDepthDesc = texture3DDesc;
+			texture3DDepthDesc.m_Format = RHIFormat::D32Float;
+			texture3DDepthDesc.m_Usage = RHITextureUsage::DepthStencil;
+			RHITextureViewDesc invalid3DDsv{};
+			invalid3DDsv.m_Type = RHITextureViewType::DepthStencil;
+			invalid3DDsv.m_Format = texture3DDepthDesc.m_Format;
+			context.Check(
+				ValidateRHITextureViewDesc(texture3DDepthDesc, invalid3DDsv).m_Error ==
+					RHITextureValidationError::IncompatibleViewDimension,
+				"RHI texture view validation rejects unsupported 3D depth-stencil views");
 
 			RHITextureDesc multiPlaneDesc{};
 			multiPlaneDesc.m_Format = RHIFormat::D24UnormS8Uint;
