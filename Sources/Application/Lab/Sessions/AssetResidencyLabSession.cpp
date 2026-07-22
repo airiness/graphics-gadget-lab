@@ -782,7 +782,11 @@ namespace gglab
 				Fail("Clearing the texture CPU artifact cache left cached entries behind.");
 				return;
 			}
-			assetManager.ClearTextureDerivedDataCache();
+			if (!assetManager.ClearTextureDerivedDataCache())
+			{
+				Fail("The texture local DDC could not be cleared.");
+				return;
+			}
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
 			config.m_EnableAutomaticEviction = false;
 			assetManager.SetResidencyConfig(config);
@@ -899,7 +903,11 @@ namespace gglab
 				return;
 			}
 			assetManager.ClearTextureArtifactCache();
-			assetManager.ClearTextureDerivedDataCache();
+			if (!assetManager.ClearTextureDerivedDataCache())
+			{
+				Fail("The texture local DDC could not be cleared before the stale reload test.");
+				return;
+			}
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
 			config.m_EnableAutomaticEviction = false;
 			assetManager.SetResidencyConfig(config);

@@ -456,6 +456,9 @@
     <ClCompile Include="..\..\Sources\Core\HResult.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp">
+      <Filter>Core\Platform\Win</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp">
       <Filter>Core\Platform\Win</Filter>
     </ClCompile>
@@ -840,6 +843,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.cpp">
+      <Filter>Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
@@ -1208,6 +1214,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.h">
+      <Filter>Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
@@ -1444,6 +1453,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h">
       <Filter>Core\Math\Backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h">
+      <Filter>Core\Platform\Win</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h">
       <Filter>Core\Platform\Win</Filter>

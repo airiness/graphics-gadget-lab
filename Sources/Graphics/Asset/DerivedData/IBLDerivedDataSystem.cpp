@@ -240,9 +240,9 @@ namespace gglab
 		m_ArtifactCache.Clear();
 	}
 
-	void IBLDerivedDataSystem::ClearStore() noexcept
+	bool IBLDerivedDataSystem::ClearStore() noexcept
 	{
-		m_Store.Clear();
+		return m_Store.Clear();
 	}
 
 	std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)>

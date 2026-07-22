@@ -2045,9 +2045,9 @@ namespace gglab
 		return m_AssetLoadCoordinator.GetTextureDerivedDataCoordinatorStatistics();
 	}
 
-	void AssetManager::ClearTextureDerivedDataCache() noexcept
+	bool AssetManager::ClearTextureDerivedDataCache() noexcept
 	{
-		m_AssetLoadCoordinator.ClearTextureDerivedDataCache();
+		return m_AssetLoadCoordinator.ClearTextureDerivedDataCache();
 	}
 
 	std::vector<TextureAssetReadInfo> AssetManager::GetTextureAssetReadInfos() const

@@ -4,6 +4,8 @@
 #include "Core/Log/Logger.h"
 #include "Core/Utility/PathUtils.h"
 
+#include <thread>
+
 namespace gglab
 {
 	namespace
@@ -166,12 +168,24 @@ namespace gglab
 
 	LocalDerivedDataStore::LocalDerivedDataStore(
 		std::filesystem::path rootDirectory) noexcept :
-		m_RootDirectory(std::move(rootDirectory)),
-		m_Catalog(m_RootDirectory)
+		m_RootIdentity(ResolveLocalDerivedDataRootIdentity(rootDirectory)),
+		m_RootDirectory(m_RootIdentity.m_CanonicalRoot),
+		m_Catalog(m_RootDirectory),
+		m_MaintenanceLock(m_RootIdentity)
 	{
 		if (IsEnabled())
 		{
-			GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_RootDirectory));
+			if (!utils::CreateDirectoryIfNotExist(m_RootDirectory)) return;
+			std::vector<std::filesystem::path> trashPaths;
+			{
+				win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+				if (maintenance.IsAcquired())
+				{
+					CleanupOrphanTemporaryFilesLocked();
+					trashPaths = CollectTrashPathsLocked();
+				}
+			}
+			ScheduleTrashCleanup(std::move(trashPaths));
 			GGLAB_UNUSED(m_Catalog.Reconcile());
 		}
 	}
@@ -187,7 +201,6 @@ namespace gglab
 			m_MissCount.fetch_add(1, std::memory_order_relaxed);
 			return {};
 		}
-		std::scoped_lock lock(m_Mutex);
 		const std::filesystem::path path = EntryPath(key);
 		DerivedDataReadResult result = ReadEntry(
 			path,
@@ -210,6 +223,32 @@ namespace gglab
 			{
 				m_Catalog.RecordEntry(path, bytes);
 			}
+			m_HitCount.fetch_add(1, std::memory_order_relaxed);
+			m_ReadBytes.fetch_add(result.m_Payload.size(), std::memory_order_relaxed);
+			return result;
+		}
+		std::scoped_lock lock(m_Mutex);
+		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+		if (!maintenance.IsAcquired())
+		{
+			m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
+			return result;
+		}
+		// Clear may replace the root while the lock-free read is in flight. Recheck
+		// before deleting so a transient miss or a newly published entry is not
+		// treated as corrupt.
+		result = ReadEntry(path, key, artifactType, schemaVersion, options);
+		if (result.m_Disposition == DerivedDataReadDisposition::Miss)
+		{
+			m_Catalog.RemoveEntry(path);
+			m_MissCount.fetch_add(1, std::memory_order_relaxed);
+			return result;
+		}
+		if (result.m_Disposition == DerivedDataReadDisposition::Hit)
+		{
+			std::error_code errorCode;
+			const uint64_t bytes = std::filesystem::file_size(path, errorCode);
+			if (!errorCode) m_Catalog.RecordEntry(path, bytes);
 			m_HitCount.fetch_add(1, std::memory_order_relaxed);
 			m_ReadBytes.fetch_add(result.m_Payload.size(), std::memory_order_relaxed);
 			return result;
@@ -250,6 +289,12 @@ namespace gglab
 		header.AddBytes(std::as_bytes(std::span{ artifactType.data(), artifactType.size() }));
 
 		std::scoped_lock lock(m_Mutex);
+		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+		if (!maintenance.IsAcquired())
+		{
+			m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
+			return false;
+		}
 		const std::filesystem::path path = EntryPath(key);
 		if (!utils::CreateParentDirectoryIfNotExist(path))
 		{
@@ -366,6 +411,8 @@ namespace gglab
 	{
 		if (!IsEnabled() || !key.IsValid()) return;
 		std::scoped_lock lock(m_Mutex);
+		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+		if (!maintenance.IsAcquired()) return;
 		std::error_code errorCode;
 		if (std::filesystem::remove(EntryPath(key), errorCode))
 		{
@@ -374,14 +421,62 @@ namespace gglab
 		}
 	}
 
-	void LocalDerivedDataStore::Clear() noexcept
+	bool LocalDerivedDataStore::Clear() noexcept
 	{
-		if (!IsEnabled()) return;
-		std::scoped_lock lock(m_Mutex);
-		std::error_code errorCode;
-		std::filesystem::remove_all(m_RootDirectory, errorCode);
-		GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_RootDirectory));
-		m_Catalog.Clear();
+		if (!IsEnabled()) return true;
+		std::vector<std::filesystem::path> trashPaths;
+		bool cleared = false;
+		{
+			std::scoped_lock lock(m_Mutex);
+			win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+			if (!maintenance.IsAcquired()) return false;
+			trashPaths = CollectTrashPathsLocked();
+
+			std::error_code errorCode;
+			const bool rootExists = std::filesystem::exists(m_RootDirectory, errorCode);
+			if (errorCode) return false;
+			if (!rootExists)
+			{
+				cleared = utils::CreateDirectoryIfNotExist(m_RootDirectory);
+				if (cleared) m_Catalog.Clear();
+			}
+			else
+			{
+				const std::filesystem::path trashPath = MakeTrashPath();
+				std::filesystem::rename(m_RootDirectory, trashPath, errorCode);
+				if (errorCode)
+				{
+					if (HasGraphicsLogger())
+					{
+						GGLAB_LOG_GRAPHICS_WARN(
+							"Local DDC clear could not rename '{}' to '{}': {}.",
+							m_RootDirectory.string(),
+							trashPath.string(),
+							errorCode.message());
+					}
+					return false;
+				}
+
+				if (!utils::CreateDirectoryIfNotExist(m_RootDirectory))
+				{
+					errorCode.clear();
+					std::filesystem::rename(trashPath, m_RootDirectory, errorCode);
+					if (HasGraphicsLogger())
+					{
+						GGLAB_LOG_GRAPHICS_ERROR(
+							"Local DDC clear could not create replacement root '{}'; rollback {}.",
+							m_RootDirectory.string(),
+							errorCode ? "failed" : "succeeded");
+					}
+					return false;
+				}
+				trashPaths.push_back(trashPath);
+				m_Catalog.Clear();
+				cleared = true;
+			}
+		}
+		ScheduleTrashCleanup(std::move(trashPaths));
+		return cleared;
 	}
 
 	bool LocalDerivedDataStore::ReconcileCatalog() noexcept
@@ -416,6 +511,83 @@ namespace gglab
 	{
 		const std::string text = DerivedDataKeyText(key, key.m_Value.size());
 		return m_RootDirectory / text.substr(0, 2) / (text + ".ddc");
+	}
+
+	win32::NamedMutexGuard LocalDerivedDataStore::AcquireMaintenanceLock() noexcept
+	{
+		win32::NamedMutexGuard maintenance = m_MaintenanceLock.Acquire();
+		if (!maintenance.WasAbandoned()) return maintenance;
+		if (HasGraphicsLogger())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"Recovered an abandoned local DDC maintenance lock for '{}'.",
+				m_RootDirectory.string());
+		}
+		GGLAB_UNUSED(m_Catalog.Reconcile());
+		CleanupOrphanTemporaryFilesLocked();
+		return maintenance;
+	}
+
+	void LocalDerivedDataStore::CleanupOrphanTemporaryFilesLocked() noexcept
+	{
+		std::error_code errorCode;
+		for (std::filesystem::recursive_directory_iterator iterator(
+			m_RootDirectory,
+			std::filesystem::directory_options::skip_permission_denied,
+			errorCode), end; !errorCode && iterator != end; iterator.increment(errorCode))
+		{
+			if (!iterator->is_regular_file(errorCode)) continue;
+			if (!iterator->path().filename().string().contains(".ddc.tmp.")) continue;
+			const std::filesystem::path temporaryPath = iterator->path();
+			errorCode.clear();
+			std::filesystem::remove(temporaryPath, errorCode);
+			errorCode.clear();
+		}
+	}
+
+	std::vector<std::filesystem::path>
+	LocalDerivedDataStore::CollectTrashPathsLocked() const noexcept
+	{
+		std::vector<std::filesystem::path> trashPaths;
+		const std::filesystem::path parent = m_RootDirectory.parent_path();
+		const std::wstring prefix = m_RootDirectory.filename().wstring() + L".trash.";
+		std::error_code errorCode;
+		for (std::filesystem::directory_iterator iterator(
+			parent,
+			std::filesystem::directory_options::skip_permission_denied,
+			errorCode), end; !errorCode && iterator != end; iterator.increment(errorCode))
+		{
+			if (iterator->path().filename().wstring().starts_with(prefix))
+			{
+				trashPaths.push_back(iterator->path());
+			}
+		}
+		return trashPaths;
+	}
+
+	std::filesystem::path LocalDerivedDataStore::MakeTrashPath() noexcept
+	{
+		return m_RootDirectory.parent_path() /
+			std::format(
+				L"{}.trash.{}.{}.{}",
+				m_RootDirectory.filename().wstring(),
+				::GetCurrentProcessId(),
+				::GetTickCount64(),
+				m_TrashSerial.fetch_add(1, std::memory_order_relaxed));
+	}
+
+	void LocalDerivedDataStore::ScheduleTrashCleanup(
+		std::vector<std::filesystem::path> trashPaths) noexcept
+	{
+		if (trashPaths.empty()) return;
+		std::thread([trashPaths = std::move(trashPaths)]() noexcept
+		{
+			for (const std::filesystem::path& trashPath : trashPaths)
+			{
+				std::error_code errorCode;
+				std::filesystem::remove_all(trashPath, errorCode);
+			}
+		}).detach();
 	}
 
 }

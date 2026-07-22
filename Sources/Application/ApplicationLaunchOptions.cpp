@@ -140,7 +140,7 @@ namespace gglab
 			"Usage: GraphicsGadgetLab.exe [options]\n"
 			"\n"
 			"Options:\n"
-			"  --demo <start|playground|lab>  Select the startup demo.\n"
+			"  --demo <start|playground|lab>   Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
 			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
 			"  --self-test <suite-id>          Run a headless self-test suite.\n"

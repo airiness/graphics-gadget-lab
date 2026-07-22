@@ -178,7 +178,7 @@ namespace gglab
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept;
 		[[nodiscard]] TextureDerivedDataCoordinatorStatistics
 		GetTextureDerivedDataCoordinatorStatistics() const noexcept;
-		void ClearTextureDerivedDataCache() noexcept;
+		[[nodiscard]] bool ClearTextureDerivedDataCache() noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
 

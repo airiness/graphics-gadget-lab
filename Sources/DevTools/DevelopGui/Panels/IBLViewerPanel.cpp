@@ -224,7 +224,7 @@ namespace gglab
 				ImGui::SameLine();
 				if (ImGui::Button("Clear IBL Local DDC"))
 				{
-					scheduler->ClearDerivedDataStore();
+					GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
 				}
 			}
 			if (bake.m_GpuTimingAvailable)

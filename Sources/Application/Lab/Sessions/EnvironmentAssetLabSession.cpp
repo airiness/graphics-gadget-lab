@@ -63,7 +63,7 @@ namespace gglab
 		// previous run populated the same sample-count variants. DDC entries are
 		// recoverable derived data, so start this cache-focused Lab from a clean set.
 		scheduler->ClearArtifactCache();
-		scheduler->ClearDerivedDataStore();
+		GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
 		const auto& settings = m_Services.m_Renderer->
 			GetEnvironmentLightingSystem()->GetSettings();
 		m_State->m_OriginalQualityPreset = settings.m_QualityPreset;
