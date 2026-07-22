@@ -357,6 +357,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
@@ -666,6 +667,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />

@@ -9,6 +9,7 @@
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 
+#include <fstream>
 #include <thread>
 
 namespace gglab
@@ -299,7 +300,78 @@ namespace gglab
 			artifactDigest.m_Value = ComputeSha256(Payload).m_Value;
 
 			{
-				LocalDerivedDataStore store(root);
+				const std::filesystem::path probeRoot = root / "probe";
+				LocalDerivedDataStore observer(probeRoot);
+				LocalDerivedDataStore externalWriter(probeRoot);
+				const std::string keyText = DerivedDataKeyText(key, key.m_Value.size());
+				const std::filesystem::path entryPath =
+					probeRoot / keyText.substr(0, 2) / (keyText + ".ddc");
+				context.Check(
+					observer.Probe(key) == DerivedDataPresence::Missing,
+					"Local DDC probe reports a missing filesystem entry");
+				const bool externallyWritten = externalWriter.Write(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					artifactDigest,
+					Payload);
+				context.Check(
+					externallyWritten && observer.Probe(key) == DerivedDataPresence::Present &&
+						observer.GetStatistics().m_StoredEntryCount == 0,
+					"Local DDC probe observes external creation without relying on the catalog");
+
+				const bool reconciledCreation = observer.ReconcileCatalog();
+				const LocalDerivedDataStoreStatistics createdStatistics = observer.GetStatistics();
+				context.Check(
+					reconciledCreation && createdStatistics.m_StoredEntryCount == 1 &&
+						createdStatistics.m_StoredBytes != 0 &&
+						createdStatistics.m_CatalogLastReconciledAtUnixMilliseconds != 0 &&
+						createdStatistics.m_CatalogReconciliationCount >= 2 &&
+						createdStatistics.m_IsCatalogApproximate,
+					"Local DDC catalog reconciliation refreshes approximate diagnostics");
+
+				errorCode.clear();
+				const bool externallyRemoved = std::filesystem::remove(entryPath, errorCode);
+				context.Check(
+					externallyRemoved && !errorCode &&
+						observer.Probe(key) == DerivedDataPresence::Missing &&
+						observer.GetStatistics().m_StoredEntryCount == 1,
+					"Local DDC probe observes external deletion before catalog reconciliation");
+				const bool reconciledDeletion = observer.ReconcileCatalog();
+				context.Check(
+					reconciledDeletion && observer.GetStatistics().m_StoredEntryCount == 0,
+					"Local DDC reconciliation removes externally deleted entries from diagnostics");
+
+				GGLAB_UNUSED(externalWriter.Write(
+					key,
+					ArtifactType,
+					SchemaVersion,
+					artifactDigest,
+					Payload));
+				{
+					std::ofstream corruptStream(entryPath, std::ios::binary | std::ios::trunc);
+					constexpr std::array CorruptBytes{ 'b', 'a', 'd' };
+					corruptStream.write(CorruptBytes.data(), CorruptBytes.size());
+				}
+				const uint64_t corruptionCount = observer.GetStatistics().m_CorruptionCount;
+				context.Check(
+					observer.Probe(key) == DerivedDataPresence::Present &&
+						std::filesystem::exists(entryPath) &&
+						observer.GetStatistics().m_CorruptionCount == corruptionCount,
+					"Local DDC probe does not validate or delete a corrupt entry");
+				const DerivedDataReadResult corrupt = observer.Read(
+					key,
+					ArtifactType,
+					SchemaVersion);
+				context.Check(
+					corrupt.m_Disposition == DerivedDataReadDisposition::Corrupt &&
+						!std::filesystem::exists(entryPath) &&
+						observer.GetStatistics().m_CorruptionCount == corruptionCount + 1,
+					"Local DDC read retains responsibility for corrupt entry disposal");
+			}
+
+			{
+				LocalDerivedDataStore store(root / "read");
 				const bool wrote = store.Write(
 					key,
 					ArtifactType,

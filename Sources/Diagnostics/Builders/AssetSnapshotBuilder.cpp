@@ -110,6 +110,14 @@ namespace gglab
 		snapshot.m_TextureDerivedDataWriteCount = derivedData.m_WriteCount;
 		snapshot.m_TextureDerivedDataWriteFailureCount = derivedData.m_WriteFailureCount;
 		snapshot.m_TextureDerivedDataWrittenBytes = derivedData.m_WrittenBytes;
+		snapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds =
+			derivedData.m_CatalogLastReconciledAtUnixMilliseconds;
+		snapshot.m_TextureDerivedDataCatalogReconciliationCount =
+			derivedData.m_CatalogReconciliationCount;
+		snapshot.m_TextureDerivedDataCatalogReconciliationFailureCount =
+			derivedData.m_CatalogReconciliationFailureCount;
+		snapshot.m_IsTextureDerivedDataCatalogApproximate =
+			derivedData.m_IsCatalogApproximate;
 		const TextureDerivedDataCoordinatorStatistics derivedDataCoordinator =
 			assetManager.GetTextureDerivedDataCoordinatorStatistics();
 		snapshot.m_TextureDerivedDataActiveBuildCount =

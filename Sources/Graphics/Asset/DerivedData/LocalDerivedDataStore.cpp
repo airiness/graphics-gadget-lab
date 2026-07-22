@@ -166,12 +166,13 @@ namespace gglab
 
 	LocalDerivedDataStore::LocalDerivedDataStore(
 		std::filesystem::path rootDirectory) noexcept :
-		m_RootDirectory(std::move(rootDirectory))
+		m_RootDirectory(std::move(rootDirectory)),
+		m_Catalog(m_RootDirectory)
 	{
 		if (IsEnabled())
 		{
 			GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_RootDirectory));
-			RefreshStoredStatistics();
+			GGLAB_UNUSED(m_Catalog.Reconcile());
 		}
 	}
 
@@ -196,13 +197,19 @@ namespace gglab
 			options);
 		if (result.m_Disposition == DerivedDataReadDisposition::Miss)
 		{
-			m_EntryPaths.erase(path);
+			m_Catalog.RemoveEntry(path);
 			m_MissCount.fetch_add(1, std::memory_order_relaxed);
 			return result;
 		}
 
 		if (result.m_Disposition == DerivedDataReadDisposition::Hit)
 		{
+			std::error_code errorCode;
+			const uint64_t bytes = std::filesystem::file_size(path, errorCode);
+			if (!errorCode)
+			{
+				m_Catalog.RecordEntry(path, bytes);
+			}
 			m_HitCount.fetch_add(1, std::memory_order_relaxed);
 			m_ReadBytes.fetch_add(result.m_Payload.size(), std::memory_order_relaxed);
 			return result;
@@ -211,8 +218,7 @@ namespace gglab
 		std::error_code errorCode;
 		if (std::filesystem::remove(path, errorCode))
 		{
-			m_EntryPaths.erase(path);
-			RefreshStoredStatistics();
+			m_Catalog.RemoveEntry(path);
 		}
 		if (HasGraphicsLogger())
 		{
@@ -278,11 +284,7 @@ namespace gglab
 		{
 			if (MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH))
 			{
-				if (m_EntryPaths.insert(path).second)
-				{
-					m_StoredEntryCount.fetch_add(1, std::memory_order_relaxed);
-					m_StoredBytes.fetch_add(totalBytes, std::memory_order_relaxed);
-				}
+				m_Catalog.RecordEntry(path, totalBytes);
 				m_WriteCount.fetch_add(1, std::memory_order_relaxed);
 				m_WrittenBytes.fetch_add(payload.size(), std::memory_order_relaxed);
 				return true;
@@ -297,15 +299,11 @@ namespace gglab
 			if (existing.m_Disposition == DerivedDataReadDisposition::Hit)
 			{
 				std::filesystem::remove(temporary, errorCode);
-				if (m_EntryPaths.insert(path).second)
+				errorCode.clear();
+				const uint64_t existingBytes = std::filesystem::file_size(path, errorCode);
+				if (!errorCode)
 				{
-					errorCode.clear();
-					const uint64_t existingBytes = std::filesystem::file_size(path, errorCode);
-					m_StoredEntryCount.fetch_add(1, std::memory_order_relaxed);
-					if (!errorCode)
-					{
-						m_StoredBytes.fetch_add(existingBytes, std::memory_order_relaxed);
-					}
+					m_Catalog.RecordEntry(path, existingBytes);
 				}
 				if (existing.m_ArtifactContentDigest == artifactContentDigest)
 				{
@@ -327,21 +325,10 @@ namespace gglab
 			if (existing.m_Disposition == DerivedDataReadDisposition::Corrupt)
 			{
 				errorCode.clear();
-				const uint64_t corruptBytes = std::filesystem::file_size(path, errorCode);
-				errorCode.clear();
 				if (std::filesystem::remove(path, errorCode))
 				{
 					m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
-					if (m_EntryPaths.erase(path) > 0)
-					{
-						m_StoredEntryCount.fetch_sub(1, std::memory_order_relaxed);
-						const uint64_t storedBytes =
-							m_StoredBytes.load(std::memory_order_relaxed);
-						if (corruptBytes <= storedBytes)
-						{
-							m_StoredBytes.fetch_sub(corruptBytes, std::memory_order_relaxed);
-						}
-					}
+					m_Catalog.RemoveEntry(path);
 					if (HasGraphicsLogger())
 					{
 						GGLAB_LOG_GRAPHICS_WARN(
@@ -359,11 +346,20 @@ namespace gglab
 		return false;
 	}
 
-	bool LocalDerivedDataStore::Contains(const DerivedDataKey& key) const noexcept
+	DerivedDataPresence LocalDerivedDataStore::Probe(const DerivedDataKey& key) const noexcept
 	{
-		if (!IsEnabled() || !key.IsValid()) return false;
-		std::scoped_lock lock(m_Mutex);
-		return m_EntryPaths.contains(EntryPath(key));
+		if (!IsEnabled() || !key.IsValid()) return DerivedDataPresence::Missing;
+		std::error_code errorCode;
+		const std::filesystem::file_status status =
+			std::filesystem::status(EntryPath(key), errorCode);
+		if (errorCode == std::errc::no_such_file_or_directory ||
+			errorCode == std::errc::not_a_directory)
+		{
+			return DerivedDataPresence::Missing;
+		}
+		if (errorCode) return DerivedDataPresence::Inaccessible;
+		return std::filesystem::exists(status) ?
+			DerivedDataPresence::Present : DerivedDataPresence::Missing;
 	}
 
 	void LocalDerivedDataStore::DiscardCorrupt(const DerivedDataKey& key) noexcept
@@ -374,8 +370,7 @@ namespace gglab
 		if (std::filesystem::remove(EntryPath(key), errorCode))
 		{
 			m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
-			m_EntryPaths.erase(EntryPath(key));
-			RefreshStoredStatistics();
+			m_Catalog.RemoveEntry(EntryPath(key));
 		}
 	}
 
@@ -386,16 +381,22 @@ namespace gglab
 		std::error_code errorCode;
 		std::filesystem::remove_all(m_RootDirectory, errorCode);
 		GGLAB_UNUSED(utils::CreateDirectoryIfNotExist(m_RootDirectory));
-		m_EntryPaths.clear();
-		m_StoredBytes.store(0, std::memory_order_relaxed);
-		m_StoredEntryCount.store(0, std::memory_order_relaxed);
+		m_Catalog.Clear();
+	}
+
+	bool LocalDerivedDataStore::ReconcileCatalog() noexcept
+	{
+		if (!IsEnabled()) return false;
+		std::scoped_lock lock(m_Mutex);
+		return m_Catalog.Reconcile();
 	}
 
 	LocalDerivedDataStoreStatistics LocalDerivedDataStore::GetStatistics() const noexcept
 	{
+		const LocalDerivedDataCatalogSnapshot catalog = m_Catalog.GetSnapshot();
 		return {
-			.m_StoredBytes = m_StoredBytes.load(std::memory_order_relaxed),
-			.m_StoredEntryCount = m_StoredEntryCount.load(std::memory_order_relaxed),
+			.m_StoredBytes = catalog.m_StoredBytes,
+			.m_StoredEntryCount = catalog.m_StoredEntryCount,
 			.m_HitCount = m_HitCount.load(std::memory_order_relaxed),
 			.m_MissCount = m_MissCount.load(std::memory_order_relaxed),
 			.m_CorruptionCount = m_CorruptionCount.load(std::memory_order_relaxed),
@@ -403,6 +404,11 @@ namespace gglab
 			.m_WriteCount = m_WriteCount.load(std::memory_order_relaxed),
 			.m_WriteFailureCount = m_WriteFailureCount.load(std::memory_order_relaxed),
 			.m_WrittenBytes = m_WrittenBytes.load(std::memory_order_relaxed),
+			.m_CatalogLastReconciledAtUnixMilliseconds =
+				catalog.m_LastReconciledAtUnixMilliseconds,
+			.m_CatalogReconciliationCount = catalog.m_ReconciliationCount,
+			.m_CatalogReconciliationFailureCount = catalog.m_ReconciliationFailureCount,
+			.m_IsCatalogApproximate = catalog.m_IsApproximate,
 		};
 	}
 
@@ -412,34 +418,4 @@ namespace gglab
 		return m_RootDirectory / text.substr(0, 2) / (text + ".ddc");
 	}
 
-	void LocalDerivedDataStore::RefreshStoredStatistics() noexcept
-	{
-		uint64_t entries = 0;
-		uint64_t bytes = 0;
-		m_EntryPaths.clear();
-		std::vector<std::filesystem::path> temporaryFiles;
-		std::error_code errorCode;
-		for (std::filesystem::recursive_directory_iterator iterator(m_RootDirectory, errorCode), end;
-			!errorCode && iterator != end; iterator.increment(errorCode))
-		{
-			if (!iterator->is_regular_file(errorCode)) continue;
-			if (iterator->path().extension() == ".ddc")
-			{
-				++entries;
-				bytes += iterator->file_size(errorCode);
-				m_EntryPaths.insert(iterator->path());
-			}
-			else if (iterator->path().filename().string().contains(".ddc.tmp."))
-			{
-				temporaryFiles.push_back(iterator->path());
-			}
-		}
-		for (const std::filesystem::path& temporary : temporaryFiles)
-		{
-			errorCode.clear();
-			std::filesystem::remove(temporary, errorCode);
-		}
-		m_StoredEntryCount.store(entries, std::memory_order_relaxed);
-		m_StoredBytes.store(bytes, std::memory_order_relaxed);
-	}
 }

@@ -12,6 +12,7 @@
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
 
 namespace gglab
@@ -329,6 +330,27 @@ namespace gglab
 				static_cast<double>(assetSnapshot.m_TextureDerivedDataWrittenBytes) / (1024.0 * 1024.0),
 				assetSnapshot.m_TextureDerivedDataWriteFailureCount,
 				assetSnapshot.m_TextureDerivedDataCorruptionCount);
+			if (assetSnapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds == 0)
+			{
+				ImGui::TextDisabled("Catalog: approximate | not reconciled");
+			}
+			else
+			{
+				const uint64_t catalogNowMilliseconds = static_cast<uint64_t>(
+					std::chrono::duration_cast<std::chrono::milliseconds>(
+						std::chrono::system_clock::now().time_since_epoch()).count());
+				const uint64_t catalogAgeMilliseconds =
+					catalogNowMilliseconds >=
+						assetSnapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds ?
+					catalogNowMilliseconds -
+						assetSnapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds : 0;
+				ImGui::TextDisabled(
+					"Catalog: %s | reconciled %.1f s ago | refreshes %llu | failures %llu",
+					assetSnapshot.m_IsTextureDerivedDataCatalogApproximate ? "approximate" : "exact",
+					static_cast<double>(catalogAgeMilliseconds) / 1000.0,
+					assetSnapshot.m_TextureDerivedDataCatalogReconciliationCount,
+					assetSnapshot.m_TextureDerivedDataCatalogReconciliationFailureCount);
+			}
 			ImGui::Text(
 				"Shared requests: %llu | Build claims: %llu | Waits: %llu | Immediate hits: %llu",
 				assetSnapshot.m_TextureDerivedDataRequestCount,
