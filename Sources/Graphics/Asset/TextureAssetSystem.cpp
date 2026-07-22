@@ -94,6 +94,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_StateEvents != nullptr, "AssetStateEventQueue is null!");
+		GGLAB_ASSERT_MSG(m_ArtifactCache != nullptr, "TextureArtifactCache is null!");
 	}
 
 	void TextureAssetSystem::SetTextureState(
@@ -689,7 +690,7 @@ namespace gglab
 				.m_IsUploaded = texture->m_Gpu.m_IsUploaded,
 				.m_HasSrv = texture->m_Gpu.m_Srv.IsValid(),
 				.m_IsReserved = IsReservedTextureId(textureId),
-				.m_IsCpuArtifactCached = m_ArtifactCache.Contains(
+				.m_IsCpuArtifactCached = m_ArtifactCache->Contains(
 					texture->m_Source.m_ArtifactContentDigest),
 				.m_IsDerivedDataCached = m_LoadCoordinator->IsTextureDerivedDataCached(
 					texture->m_Source.m_DerivedDataKey),
@@ -797,7 +798,7 @@ namespace gglab
 				textureData,
 				importSettings);
 		}
-		TextureArtifactHandle artifactHandle = m_ArtifactCache.CreateAndAdmit(
+		TextureArtifactHandle artifactHandle = m_ArtifactCache->CreateAndAdmit(
 			std::move(textureData));
 		if (!artifactHandle)
 		{
@@ -818,6 +819,22 @@ namespace gglab
 		SourceDigest sourceDigest,
 		DerivedDataKey derivedDataKey) noexcept
 	{
+		artifact = m_ArtifactCache->Admit(std::move(artifact));
+		if (!artifact)
+		{
+			return {};
+		}
+		if (!contentFingerprint.IsValid())
+		{
+			contentFingerprint = ComputeTextureContentFingerprint(
+				artifact->m_Data,
+				importSettings);
+		}
+		if (!contentFingerprint.IsValid())
+		{
+			return {};
+		}
+
 		TextureUploadData uploadData{};
 		uploadData.m_TextureId = textureId;
 		uploadData.m_ImportSettings = importSettings;
@@ -1461,11 +1478,9 @@ namespace gglab
 			0.62f,
 			"Queued for texture upload publication",
 			completion.m_Name);
-		TextureArtifactHandle admittedArtifact = m_ArtifactCache.Admit(
-			std::move(artifact));
 		auto uploadData = MakeTextureUploadData(
 			textureId,
-			std::move(admittedArtifact),
+			std::move(artifact),
 			texture->m_Source.m_ImportSettings,
 			contentFingerprint,
 			sourceDigest,
@@ -1630,7 +1645,7 @@ namespace gglab
 
 		texture->m_Load.m_CancelRequested = false;
 		texture->m_Load.m_IsReloading = true;
-		if (TextureArtifactHandle artifact = m_ArtifactCache.Find(
+		if (TextureArtifactHandle artifact = m_ArtifactCache->Find(
 			texture->m_Source.m_ArtifactContentDigest))
 		{
 			ProgressReporter(texture->m_Load.m_Progress).Report(

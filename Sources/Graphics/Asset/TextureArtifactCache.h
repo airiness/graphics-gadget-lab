@@ -3,6 +3,8 @@
 #include "Graphics/Asset/ArtifactCacheCore.h"
 #include "Graphics/Asset/TextureArtifact.h"
 
+#include <mutex>
+
 namespace gglab
 {
 	struct TextureArtifactCacheConfig
@@ -37,6 +39,7 @@ namespace gglab
 			TextureArtifact,
 			ArtifactContentDigestHash>;
 
+		mutable std::mutex m_Mutex;
 		Core m_Core;
 	};
 }

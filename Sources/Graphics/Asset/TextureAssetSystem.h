@@ -35,7 +35,7 @@ namespace gglab
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 			AssetStateEventQueue* m_StateEvents = nullptr;
-			TextureArtifactCacheConfig m_ArtifactCache{};
+			TextureArtifactCache* m_ArtifactCache = nullptr;
 		};
 
 		struct TextureLoadRequest
@@ -100,7 +100,7 @@ namespace gglab
 			TextureID textureId,
 			TextureArtifactHandle artifact,
 			const TextureImportSettings& importSettings,
-			AssetContentFingerprint contentFingerprint,
+			AssetContentFingerprint contentFingerprint = {},
 			SourceDigest sourceDigest = {},
 			DerivedDataKey derivedDataKey = {}) noexcept;
 		[[nodiscard]] bool UploadTexture(
@@ -118,9 +118,9 @@ namespace gglab
 		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;
 		[[nodiscard]] TextureArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept
 		{
-			return m_ArtifactCache.GetStatistics();
+			return m_ArtifactCache->GetStatistics();
 		}
-		void ClearArtifactCache() noexcept { m_ArtifactCache.Clear(); }
+		void ClearArtifactCache() noexcept { m_ArtifactCache->Clear(); }
 		[[nodiscard]] uint32_t GetReloadingTextureCount() const noexcept;
 		[[nodiscard]] size_t GetTextureCount() const noexcept { return m_Store.Size(); }
 		[[nodiscard]] std::vector<TextureID> GetTextureIds() const;
@@ -217,7 +217,7 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		AssetStateEventQueue* m_StateEvents = nullptr;
-		TextureArtifactCache m_ArtifactCache;
+		TextureArtifactCache* m_ArtifactCache = nullptr;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureStore m_Store;

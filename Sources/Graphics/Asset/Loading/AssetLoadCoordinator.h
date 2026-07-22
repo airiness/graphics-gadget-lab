@@ -18,6 +18,7 @@ namespace gglab
 {
 	class TaskSystem;
 	class ModelImportArtifactCache;
+	class TextureArtifactCache;
 
 	struct AssetLoadSubmission
 	{
@@ -127,6 +128,7 @@ namespace gglab
 		{
 			TaskSystem* m_TaskSystem = nullptr;
 			ModelImportArtifactCache* m_ModelImportArtifactCache = nullptr;
+			TextureArtifactCache* m_TextureArtifactCache = nullptr;
 			std::filesystem::path m_TextureDerivedDataCacheDirectory;
 		};
 
@@ -217,6 +219,7 @@ namespace gglab
 
 		TaskSystem* m_TaskSystem = nullptr;
 		ModelImportArtifactCache* m_ModelImportArtifactCache = nullptr;
+		TextureArtifactCache* m_TextureArtifactCache = nullptr;
 		TextureDerivedDataSystem m_TextureDerivedDataSystem;
 		uint64_t m_NextOperationSerial = 1;
 		OperationMap m_ModelImports;

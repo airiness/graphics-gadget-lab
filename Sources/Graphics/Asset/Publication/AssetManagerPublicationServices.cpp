@@ -44,12 +44,10 @@ namespace gglab
 		}
 
 		[[nodiscard]] ModelPublicationTextureResult PublishTexture(
-			const ImportedTexture& importedTexture,
+			const ModelImportTexture& importedTexture,
 			TaskPriority priority) noexcept override
 		{
 			ModelPublicationTextureResult result{};
-			const uint64_t sourceBytes = static_cast<uint64_t>(
-				importedTexture.m_Data.m_Pixels.size());
 			const auto fail = [](
 				ModelPublicationTextureResult& failedResult,
 				std::string error) noexcept -> ModelPublicationTextureResult
@@ -96,7 +94,8 @@ namespace gglab
 			bool created = false;
 			if (!textureId.IsValid())
 			{
-				if (!importedTexture.m_Data.IsValid())
+				if (!importedTexture.m_Artifact ||
+					!importedTexture.m_Artifact->IsValid())
 				{
 					return fail(result, "Imported texture payload is invalid");
 				}
@@ -153,11 +152,9 @@ namespace gglab
 				return result;
 			}
 
-			TextureAssetData textureData = importedTexture.m_Data;
-			result.m_Usage.m_SourceBytesCopiedToUpload = sourceBytes;
 			auto uploadData = textureAssets.MakeTextureUploadData(
 				textureId,
-				std::move(textureData),
+				importedTexture.m_Artifact,
 				importedTexture.m_ImportSettings);
 			const bool queued = textureAssets.QueueTextureUpload(
 				std::move(uploadData),

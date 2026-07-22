@@ -1,8 +1,8 @@
 #pragma once
 #include "Graphics/Asset/AssetIdentity.h"
+#include "Graphics/Asset/ModelImportArtifact.h"
 #include "Graphics/Asset/Publication/AssetResourcePublication.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/Asset/Loading/ModelImporter.h"
 
 #include <compare>
 #include <span>
@@ -107,7 +107,7 @@ namespace gglab
 		[[nodiscard]] virtual bool PrepareModelForPublication(
 			const AssetContentVersion& model) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationTextureResult PublishTexture(
-			const ImportedTexture& importedTexture,
+			const ModelImportTexture& importedTexture,
 			TaskPriority priority) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationMaterialResult PublishMaterial(
 			const ImportedMaterial* importedMaterial,
