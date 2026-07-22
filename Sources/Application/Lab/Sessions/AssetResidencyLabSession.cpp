@@ -322,11 +322,11 @@ namespace gglab
 			{
 				break;
 			}
-			if (publication.m_SourceBytesCopiedToUpload <=
+			if (publication.m_SourceBytesCopiedToUpload !=
 				m_State->m_PublicationCopiedBytesBaseline)
 			{
 				Fail(
-					"Model publication did not preserve source ownership through terminal cleanup or report copied upload payload bytes.");
+					"Model publication created an independent CPU upload payload instead of borrowing immutable artifact data.");
 				return;
 			}
 			const AssetSnapshot::Texture* texture = FindTextureSnapshot(

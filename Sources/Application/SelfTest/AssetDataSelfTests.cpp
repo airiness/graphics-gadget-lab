@@ -112,7 +112,11 @@ namespace gglab
 				.m_Semantic = TextureSemantic::BaseColor,
 				.m_Data = MakeTextureFixture(),
 			});
-			model.m_Meshes.push_back({ .m_Name = "SelfTestMesh" });
+			model.m_Meshes.push_back({
+				.m_Name = "SelfTestMesh",
+				.m_Vertices = { Vertex{} },
+				.m_Indices = { 0 },
+			});
 			return model;
 		}
 
@@ -395,10 +399,31 @@ namespace gglab
 
 			ModelImportArtifactCache modelCache({ .m_BudgetBytes = 1024 * 1024 });
 			artifact = modelCache.Admit(std::move(artifact));
+			const uint64_t modelBytes = artifact ? artifact->GetAllocatedBytes() : 0;
 			context.Check(
-				artifact && modelCache.GetStatistics().m_CachedBytes ==
-					artifact->GetAllocatedBytes(),
+				modelBytes != 0 &&
+					modelCache.GetStatistics().m_CachedBytes == modelBytes,
 				"Model artifact cache excludes referenced texture allocation bytes");
+
+			ModelMeshUploadSource meshSource{
+				.m_Owner = artifact,
+				.m_MeshIndex = 0,
+			};
+			const Vertex* const sourceVertices =
+				artifact->m_Meshes.front().m_Vertices.data();
+			const uint32_t* const sourceIndices =
+				artifact->m_Meshes.front().m_Indices.data();
+			context.Check(
+				meshSource.IsValid() &&
+					meshSource.GetVertices().data() == sourceVertices &&
+					meshSource.GetIndices().data() == sourceIndices,
+				"Model mesh upload sources resolve immutable payloads without copying");
+			context.Check(
+				!ModelMeshUploadSource{
+					.m_Owner = artifact,
+					.m_MeshIndex = 1,
+				}.IsValid(),
+				"Model mesh upload sources reject out-of-range mesh indices");
 
 			textureCache.Clear();
 			const ArtifactCacheCoreStatistics retained = textureCache.GetStatistics();
@@ -411,6 +436,16 @@ namespace gglab
 			modelCache.Clear();
 			artifact.reset();
 			duplicate.reset();
+			const ArtifactCacheCoreStatistics retainedModel = modelCache.GetStatistics();
+			context.Check(
+				meshSource.IsValid() && retainedModel.m_CachedBytes == 0 &&
+					retainedModel.m_ExternallyRetainedBytes == modelBytes &&
+					retainedModel.m_TotalLiveBytes == modelBytes,
+				"Queued model mesh sources retain artifacts after model cache eviction");
+			meshSource.Reset();
+			context.Check(
+				modelCache.GetStatistics().m_TotalLiveBytes == 0,
+				"Model mesh upload sources release artifact ownership after staging");
 			context.Check(
 				textureCache.GetStatistics().m_TotalLiveBytes == 0,
 				"Texture allocation accounting reaches zero after model handles are released");

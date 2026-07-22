@@ -114,8 +114,7 @@ namespace gglab
 			std::span<const TextureID> textureIds) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationMeshResult PublishMesh(
 			const AssetContentVersion& model,
-			uint32_t sourceMeshIndex,
-			const ImportedMesh& importedMesh,
+			ModelMeshUploadSource source,
 			TaskPriority priority) noexcept = 0;
 
 		[[nodiscard]] virtual ModelPublicationOwnerToken CreateDependencyOwner(

@@ -265,8 +265,10 @@ namespace gglab
 		const size_t meshIndex = m_MeshCursor++;
 		ModelPublicationMeshResult result = m_Services->PublishMesh(
 			m_Model,
-			static_cast<uint32_t>(meshIndex),
-			source.m_Meshes[meshIndex],
+			{
+				.m_Owner = m_Artifact,
+				.m_MeshIndex = static_cast<uint32_t>(meshIndex),
+			},
 			priority);
 		m_MeshIds[meshIndex] = result.m_MeshId;
 		if (result.m_Claim.m_ContentVersion.IsValid())
