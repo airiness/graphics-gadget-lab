@@ -2,6 +2,7 @@
 #include "Application/Application.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
+#include "Application/SelfTest/SelfTestRunner.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -27,6 +28,11 @@ int main(int argc, char* argv[])
 	{
 		std::fputs(gglab::GetApplicationLaunchUsage().data(), stdout);
 		return EXIT_SUCCESS;
+	}
+	if (launchResult.m_Options.m_SelfTestSuiteId)
+	{
+		return gglab::RunApplicationSelfTestSuite(
+			*launchResult.m_Options.m_SelfTestSuiteId) ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
