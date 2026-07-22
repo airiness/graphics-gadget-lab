@@ -7,10 +7,52 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Core/HResult.h"
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] D3D12_FORMAT_SUPPORT1 TextureDimensionSupport(
+			RHITextureDimension dimension) noexcept
+		{
+			switch (dimension)
+			{
+			case RHITextureDimension::Texture1D:
+				return D3D12_FORMAT_SUPPORT1_TEXTURE1D;
+			case RHITextureDimension::Texture2D:
+				return D3D12_FORMAT_SUPPORT1_TEXTURE2D;
+			case RHITextureDimension::Texture3D:
+				return D3D12_FORMAT_SUPPORT1_TEXTURE3D;
+			}
+			return D3D12_FORMAT_SUPPORT1_NONE;
+		}
+
+		[[nodiscard]] bool HasFormatSupport1(
+			D3D12_FORMAT_SUPPORT1 actual,
+			D3D12_FORMAT_SUPPORT1 required) noexcept
+		{
+			return (actual & required) == required;
+		}
+
+		[[nodiscard]] bool SupportsMultisampling(
+			ID3D12Device* device,
+			DXGI_FORMAT format,
+			uint16_t sampleCount) noexcept
+		{
+			D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS multisampleSupport{
+				.Format = format,
+				.SampleCount = sampleCount,
+				.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE,
+			};
+			return SUCCEEDED(device->CheckFeatureSupport(
+				D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+				&multisampleSupport,
+				sizeof(multisampleSupport))) && multisampleSupport.NumQualityLevels > 0;
+		}
+	}
+
 	DX12Device::DX12Device() noexcept = default;
 
 	DX12Device::~DX12Device()
@@ -68,6 +110,132 @@ namespace gglab
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
+	}
+
+	RHITextureSupportResult DX12Device::QueryTextureSupport(
+		const RHITextureDesc& desc) const noexcept
+	{
+		const RHITextureValidationResult validation = ValidateRHITextureDesc(desc);
+		if (!validation.IsValid())
+		{
+			return { .m_ValidationError = validation.m_Error };
+		}
+		if (!m_D3D12Device)
+		{
+			return {};
+		}
+
+		D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport{
+			.Format = ToDXGIFormat(desc.m_Format),
+		};
+		if (FAILED(m_D3D12Device->CheckFeatureSupport(
+			D3D12_FEATURE_FORMAT_SUPPORT,
+			&formatSupport,
+			sizeof(formatSupport))))
+		{
+			return {};
+		}
+
+		D3D12_FORMAT_SUPPORT1 requiredSupport = TextureDimensionSupport(desc.m_Dimension);
+		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(desc.m_Format);
+		if (!formatInfo.m_IsTypeless)
+		{
+			if (Test(desc.m_Usage, RHITextureUsage::RenderTarget))
+			{
+				requiredSupport |= D3D12_FORMAT_SUPPORT1_RENDER_TARGET;
+			}
+			if (Test(desc.m_Usage, RHITextureUsage::DepthStencil))
+			{
+				requiredSupport |= D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL;
+			}
+			if (Test(desc.m_Usage, RHITextureUsage::UnorderedAccess))
+			{
+				requiredSupport |= D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
+			}
+		}
+
+		if (!HasFormatSupport1(formatSupport.Support1, requiredSupport))
+		{
+			return {};
+		}
+
+		if (desc.m_SampleCount > 1 && !formatInfo.m_IsTypeless)
+		{
+			if (!SupportsMultisampling(
+				m_D3D12Device.Get(), ToDXGIFormat(desc.m_Format), desc.m_SampleCount))
+			{
+				return {};
+			}
+		}
+
+		return { .m_Supported = true };
+	}
+
+	RHITextureSupportResult DX12Device::QueryTextureViewSupport(
+		const RHITextureDesc& textureDesc,
+		const RHITextureViewDesc& viewDesc) const noexcept
+	{
+		const RHITextureValidationResult validation =
+			ValidateRHITextureViewDesc(textureDesc, viewDesc);
+		if (!validation.IsValid())
+		{
+			return { .m_ValidationError = validation.m_Error };
+		}
+		if (!QueryTextureSupport(textureDesc).IsSupported() || !m_D3D12Device)
+		{
+			return {};
+		}
+
+		const RHIFormat viewFormat = viewDesc.m_Format == RHIFormat::Unknown ?
+			textureDesc.m_Format : viewDesc.m_Format;
+		D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport{
+			.Format = ToDXGIFormat(viewFormat),
+		};
+		if (FAILED(m_D3D12Device->CheckFeatureSupport(
+			D3D12_FEATURE_FORMAT_SUPPORT,
+			&formatSupport,
+			sizeof(formatSupport))))
+		{
+			return {};
+		}
+
+		D3D12_FORMAT_SUPPORT1 requiredSupport = TextureDimensionSupport(textureDesc.m_Dimension);
+		switch (viewDesc.m_Type)
+		{
+		case RHITextureViewType::RenderTarget:
+			requiredSupport |= D3D12_FORMAT_SUPPORT1_RENDER_TARGET;
+			break;
+		case RHITextureViewType::DepthStencil:
+			requiredSupport |= D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL;
+			break;
+		case RHITextureViewType::ShaderResource:
+			if (!HasFormatSupport1(formatSupport.Support1, D3D12_FORMAT_SUPPORT1_SHADER_LOAD) &&
+				!HasFormatSupport1(formatSupport.Support1, D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE))
+			{
+				return {};
+			}
+			break;
+		case RHITextureViewType::UnorderedAccess:
+			requiredSupport |= D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
+			if ((formatSupport.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE) == 0)
+			{
+				return {};
+			}
+			break;
+		}
+
+		if (!HasFormatSupport1(formatSupport.Support1, requiredSupport))
+		{
+			return {};
+		}
+		if (textureDesc.m_SampleCount > 1 &&
+			!SupportsMultisampling(
+				m_D3D12Device.Get(), ToDXGIFormat(viewFormat), textureDesc.m_SampleCount))
+		{
+			return {};
+		}
+
+		return { .m_Supported = true };
 	}
 
 	RHITextureHandle DX12Device::CreateTexture(

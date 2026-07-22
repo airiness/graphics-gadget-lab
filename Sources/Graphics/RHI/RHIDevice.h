@@ -5,6 +5,7 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/RHIResourceDebug.h"
 
 #include <memory>
@@ -21,6 +22,11 @@ namespace gglab
 		// Stable across process launches and changes when the adapter or driver
 		// compatibility domain changes. It intentionally excludes transient LUIDs.
 		virtual std::string_view GetAdapterCompatibilityIdentity() const noexcept = 0;
+		virtual RHITextureSupportResult QueryTextureSupport(
+			const RHITextureDesc& desc) const noexcept = 0;
+		virtual RHITextureSupportResult QueryTextureViewSupport(
+			const RHITextureDesc& textureDesc,
+			const RHITextureViewDesc& viewDesc) const noexcept = 0;
 		virtual RHITextureHandle CreateTexture(
 			const RHITextureDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;
