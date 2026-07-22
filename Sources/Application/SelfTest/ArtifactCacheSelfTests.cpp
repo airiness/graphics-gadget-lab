@@ -102,6 +102,36 @@ namespace gglab
 				"Artifact cache live bytes reach zero after all external pins are released");
 		}
 
+		void RunReadmissionTests(SelfTestContext& context) noexcept
+		{
+			CacheTestCore cache(8);
+			CacheTestHandle retained = Admit(cache, 1, 10, 4);
+			cache.Clear();
+			ArtifactCacheCoreStatistics statistics = cache.GetStatistics();
+			context.Check(
+				retained && !cache.Contains(1) && statistics.m_CachedBytes == 0 &&
+					statistics.m_TotalLiveBytes == 4 &&
+					statistics.m_ExternallyRetainedBytes == 4,
+				"Artifact cache retains one allocation record after eviction");
+
+			CacheTestHandle readmitted = cache.Admit(1, retained);
+			statistics = cache.GetStatistics();
+			context.Check(
+				readmitted == retained && cache.Contains(1) &&
+					statistics.m_AdmissionCount == 2 &&
+					statistics.m_CachedBytes == 4 &&
+					statistics.m_TotalLiveBytes == 4 &&
+					statistics.m_ExternallyRetainedBytes == 0,
+				"Artifact cache re-admission reuses the retained allocation record");
+
+			retained.reset();
+			readmitted.reset();
+			cache.Clear();
+			context.Check(
+				cache.GetStatistics().m_TotalLiveBytes == 0,
+				"Artifact cache releases a re-admitted allocation record exactly once");
+		}
+
 		void RunRejectedAdmissionTests(SelfTestContext& context) noexcept
 		{
 			CacheTestCore cache(8);
@@ -141,6 +171,7 @@ namespace gglab
 	{
 		RunDuplicateAdmissionTests(context);
 		RunLruAndLifetimeTests(context);
+		RunReadmissionTests(context);
 		RunRejectedAdmissionTests(context);
 		RunCoreLifetimeTests(context);
 	}

@@ -795,6 +795,21 @@ namespace gglab
 					retained.m_TotalLiveBytes == textureBytes,
 				"Model artifacts keep evicted texture cache allocations externally retained");
 
+			TextureArtifactHandle readmittedTexture = artifact ?
+				textureCache.Admit(artifact->m_Textures.front().m_Artifact) : nullptr;
+			const ArtifactCacheCoreStatistics readmittedTextureStatistics =
+				textureCache.GetStatistics();
+			context.Check(
+				readmittedTexture &&
+					readmittedTexture == artifact->m_Textures.front().m_Artifact &&
+					readmittedTextureStatistics.m_AdmissionCount == 2 &&
+					readmittedTextureStatistics.m_CachedBytes == textureBytes &&
+					readmittedTextureStatistics.m_TotalLiveBytes == textureBytes &&
+					readmittedTextureStatistics.m_ExternallyRetainedBytes == 0,
+				"Texture cache re-admission reuses a model-retained allocation record");
+			textureCache.Clear();
+			readmittedTexture.reset();
+
 			modelCache.Clear();
 			artifact.reset();
 			duplicate.reset();

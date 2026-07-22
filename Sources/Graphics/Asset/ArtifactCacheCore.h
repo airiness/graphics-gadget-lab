@@ -28,8 +28,9 @@ namespace gglab
 
 	// Wrappers own artifact validation and key selection. The core derives the
 	// physical allocation size from the immutable artifact, then keeps cache
-	// entries and allocation tickets on the same lifetime model. Tickets may
-	// remain alive through external handles after eviction.
+	// entries and allocation records on the same lifetime model. Records remain
+	// discoverable through external handles so re-admission cannot count the same
+	// physical allocation twice after eviction.
 	template<typename Key, typename Artifact, typename KeyHash = std::hash<Key>>
 	class ArtifactCacheCore final
 	{
@@ -168,6 +169,40 @@ namespace gglab
 			std::atomic_uint64_t m_Bytes = 0;
 		};
 
+		struct AllocationRecord
+		{
+			AllocationRecord(
+				std::shared_ptr<LiveState> liveState,
+				Handle artifact,
+				uint64_t physicalBytes) noexcept :
+				m_LiveState(std::move(liveState)),
+				m_Artifact(std::move(artifact)),
+				m_PhysicalBytes(physicalBytes)
+			{
+				m_LiveState->m_Bytes.fetch_add(
+					m_PhysicalBytes,
+					std::memory_order_relaxed);
+			}
+
+			~AllocationRecord()
+			{
+				m_LiveState->m_Bytes.fetch_sub(
+					m_PhysicalBytes,
+					std::memory_order_relaxed);
+			}
+
+			std::shared_ptr<LiveState> m_LiveState;
+			Handle m_Artifact;
+			uint64_t m_PhysicalBytes = 0;
+		};
+
+		struct TrackedArtifactDeleter
+		{
+			void operator()(const Artifact*) const noexcept {}
+
+			std::shared_ptr<AllocationRecord> m_Allocation;
+		};
+
 		void AssertNoPointerAlias(const Artifact* artifact) const noexcept
 		{
 #ifndef NDEBUG
@@ -187,18 +222,30 @@ namespace gglab
 			Handle artifact,
 			uint64_t physicalBytes) noexcept
 		{
+			if (const TrackedArtifactDeleter* tracked =
+				std::get_deleter<TrackedArtifactDeleter>(artifact);
+				tracked && tracked->m_Allocation &&
+				tracked->m_Allocation->m_LiveState == m_LiveState)
+			{
+				GGLAB_ASSERT_MSG(
+					tracked->m_Allocation->m_Artifact.get() == artifact.get(),
+					"Tracked artifact allocation changed its physical address.");
+				GGLAB_ASSERT_MSG(
+					tracked->m_Allocation->m_PhysicalBytes == physicalBytes,
+					"Tracked artifact allocation changed its physical byte estimate.");
+				return artifact;
+			}
+
 			const Artifact* value = artifact.get();
-			const std::shared_ptr<LiveState> liveState = m_LiveState;
-			liveState->m_Bytes.fetch_add(physicalBytes, std::memory_order_relaxed);
+			std::shared_ptr<AllocationRecord> allocation =
+				std::make_shared<AllocationRecord>(
+					m_LiveState,
+					std::move(artifact),
+					physicalBytes);
 			return Handle(
 				value,
-				[liveState, physicalBytes, artifact = std::move(artifact)](
-					const Artifact* releasedValue) noexcept
-				{
-					GGLAB_UNUSED(releasedValue);
-					liveState->m_Bytes.fetch_sub(
-						physicalBytes,
-						std::memory_order_relaxed);
+				TrackedArtifactDeleter{
+					.m_Allocation = std::move(allocation),
 				});
 		}
 
