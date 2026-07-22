@@ -19,6 +19,7 @@ namespace gglab
 	{
 		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
+		std::optional<std::string> m_SelfTestSuiteId;
 		bool m_StartWithAbsoluteMouse = false;
 	};
 

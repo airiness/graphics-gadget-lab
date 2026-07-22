@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/ApplicationLaunchOptions.h"
+#include "Application/SelfTest/SelfTestRunner.h"
 #include "Core/Utility/StringUtils.h"
 
 namespace gglab
@@ -85,6 +86,28 @@ namespace gglab
 				result.m_Options.m_StartupLabId = std::string(arguments[index]);
 				continue;
 			}
+			if (argument == "--self-test")
+			{
+				if (result.m_Options.m_SelfTestSuiteId)
+				{
+					result.m_Error = "Option '--self-test' may only be specified once.";
+					return result;
+				}
+				if (++index >= arguments.size() || arguments[index].empty())
+				{
+					result.m_Error = "Option '--self-test' requires a non-empty suite ID.";
+					return result;
+				}
+				if (!IsApplicationSelfTestSuiteRegistered(arguments[index]))
+				{
+					result.m_Error = std::format(
+						"Unknown self-test suite '{}'.",
+						arguments[index]);
+					return result;
+				}
+				result.m_Options.m_SelfTestSuiteId = std::string(arguments[index]);
+				continue;
+			}
 
 			result.m_Error = std::format("Unknown option '{}'.", argument);
 			return result;
@@ -101,6 +124,13 @@ namespace gglab
 			}
 			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		}
+		if (result.m_Options.m_SelfTestSuiteId &&
+			(demoSpecified || result.m_Options.m_StartupLabId ||
+				result.m_Options.m_StartWithAbsoluteMouse))
+		{
+			result.m_Error =
+				"Option '--self-test' cannot be combined with interactive startup options.";
+		}
 		return result;
 	}
 
@@ -111,8 +141,10 @@ namespace gglab
 			"\n"
 			"Options:\n"
 			"  --demo <start|playground|lab>  Select the startup demo.\n"
-			"  --lab <stable-lab-id>    Start LabHost with the requested Lab.\n"
-			"  --absolute-mouse         Start with a visible, uncaptured cursor.\n"
-			"  --help, -h               Show this help text.\n";
+			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
+			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
+			"  --self-test <suite-id>          Run a headless self-test suite.\n"
+			"                                  Available: asset-data.\n"
+			"  --help, -h                      Show this help text.\n";
 	}
 }

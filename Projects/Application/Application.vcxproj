@@ -140,6 +140,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
@@ -385,6 +388,9 @@
     <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32MessageHandler.h" />

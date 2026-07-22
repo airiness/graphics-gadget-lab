@@ -79,6 +79,9 @@
     <Filter Include="Graphics\Asset\DerivedData">
       <UniqueIdentifier>{6c8e368e-b681-4dd7-8f0b-98d69c7c8ef1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\SelfTest">
+      <UniqueIdentifier>{bb18b507-1c05-46c5-ae59-161c4d734c61}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{419d8a17-8785-4ff0-8260-38d59e638815}</UniqueIdentifier>
     </Filter>
@@ -251,6 +254,15 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp">
       <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp">
+      <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
@@ -958,6 +970,15 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h">
       <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h">
+      <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h">
       <Filter>Application\Platform</Filter>
