@@ -807,6 +807,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAssetValidation.cpp">
+      <Filter>Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -1860,6 +1863,9 @@
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h">
+      <Filter>Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetValidation.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifact.h">

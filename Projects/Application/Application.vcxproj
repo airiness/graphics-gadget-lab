@@ -360,6 +360,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAssetValidation.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.cpp" />
@@ -714,6 +715,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetValidation.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifact.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.h" />

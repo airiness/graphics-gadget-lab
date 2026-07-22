@@ -3,6 +3,7 @@
 #include "Core/Hash/Sha256.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 
 namespace gglab
@@ -29,6 +30,19 @@ namespace gglab
 				}
 			}
 			return true;
+		}
+
+		void WriteU64LittleEndian(
+			std::span<std::byte> bytes,
+			size_t offset,
+			uint64_t value) noexcept
+		{
+			GGLAB_ASSERT(offset <= bytes.size() && bytes.size() - offset >= sizeof(value));
+			for (size_t byteIndex = 0; byteIndex < sizeof(value); ++byteIndex)
+			{
+				bytes[offset + byteIndex] = static_cast<std::byte>(value & 0xffu);
+				value >>= 8;
+			}
 		}
 
 		[[nodiscard]] TextureAssetData MakeTextureFixture()
@@ -113,7 +127,7 @@ namespace gglab
 				settings);
 			context.Check(
 				MatchesHex(key.m_Value,
-					"d23bc6a906672bcfb535fa4b25cff593186818da484f8d40e03f9f6b76d9c564"),
+					"5889e6c301b099379dab9713ef36830489dfba6fee4c20ed6e07e7e4203c7e88"),
 				"Texture derived-data key matches the stable golden vector");
 		}
 
@@ -131,7 +145,7 @@ namespace gglab
 			const Sha256Hash payloadHash = ComputeSha256(payload);
 			context.Check(
 				payload.size() == 116 && MatchesHex(payloadHash.m_Value,
-					"17755aeff6b484ac40f8a8e0f4ff1b7ee8c2a91f4e77ee58410b2623b1908e72"),
+					"d2a89c689bc4db351973d96ff9ff6745ac129ca3b2f8f56f210c316cb3bf6c8f"),
 				"Texture artifact codec matches the stable payload layout");
 
 			const TextureArtifactDecodeResult decoded = TextureArtifactCodec::Deserialize(
@@ -141,6 +155,20 @@ namespace gglab
 				decoded.Succeeded() && decoded.m_Artifact.m_ContentDigest == artifact.m_ContentDigest &&
 					TextureDataMatchesFixture(decoded.m_Artifact.m_Data),
 				"Texture artifact codec round-trips the fixture");
+
+			std::vector<std::byte> oversizedDeclaration = payload;
+			constexpr size_t SubresourceCountOffset = 10 * sizeof(uint32_t);
+			WriteU64LittleEndian(
+				oversizedDeclaration,
+				SubresourceCountOffset,
+				std::numeric_limits<uint64_t>::max());
+			const TextureArtifactDecodeResult oversized = TextureArtifactCodec::Deserialize(
+				oversizedDeclaration,
+				artifact.m_ContentDigest);
+			context.Check(
+				!oversized.Succeeded() && oversized.m_StructureError ==
+					TextureStructureValidationError::ExceedsConfiguredLimit,
+				"Texture artifact codec rejects oversized declarations before allocation");
 
 			payload.back() ^= std::byte{ 0xff };
 			const TextureArtifactDecodeResult corrupted = TextureArtifactCodec::Deserialize(
@@ -157,6 +185,54 @@ namespace gglab
 			context.Check(
 				!truncated.Succeeded() && !truncated.m_Error.empty(),
 				"Texture artifact codec rejects truncated payloads");
+		}
+
+		void RunTextureStructureValidationTests(SelfTestContext& context) noexcept
+		{
+			const TextureAssetData valid = MakeTextureFixture();
+			context.Check(
+				ValidateTextureAssetStructure(valid).IsValid(),
+				"Texture structure validation accepts the canonical fixture");
+
+			TextureAssetData outOfBounds = valid;
+			outOfBounds.m_Subresources.front().m_DataOffset = 1;
+			context.Check(
+				ValidateTextureAssetStructure(outOfBounds).m_Error ==
+					TextureStructureValidationError::OutOfBounds,
+				"Texture structure validation rejects out-of-bounds pixel data");
+
+			TextureAssetData shortRow = valid;
+			shortRow.m_Subresources.front().m_RowPitch = 7;
+			context.Check(
+				ValidateTextureAssetStructure(shortRow).m_Error ==
+					TextureStructureValidationError::InvalidRowPitch,
+				"Texture structure validation rejects a short row pitch");
+
+			TextureAssetData wrongExtent = valid;
+			wrongExtent.m_Subresources.front().m_Width = 1;
+			context.Check(
+				ValidateTextureAssetStructure(wrongExtent).m_Error ==
+					TextureStructureValidationError::InvalidSubresourceExtent,
+				"Texture structure validation rejects inconsistent mip extents");
+
+			TextureAssetData duplicate = valid;
+			duplicate.m_SrvDimension = RHITextureViewDimension::Texture2DArray;
+			duplicate.m_ArraySize = 2;
+			duplicate.m_Pixels.resize(16);
+			TextureAssetSubresource duplicateSubresource = duplicate.m_Subresources.front();
+			duplicateSubresource.m_DataOffset = 8;
+			duplicate.m_Subresources.push_back(duplicateSubresource);
+			context.Check(
+				ValidateTextureAssetStructure(duplicate).m_Error ==
+					TextureStructureValidationError::DuplicateSubresource,
+				"Texture structure validation rejects duplicate subresource coordinates");
+
+			TextureAssetValidationLimits limits{};
+			limits.m_MaxPixelBytes = 7;
+			context.Check(
+				ValidateTextureAssetStructure(valid, limits).m_Error ==
+					TextureStructureValidationError::ExceedsConfiguredLimit,
+				"Texture structure validation applies configurable allocation limits");
 		}
 
 		void RunRHITextureValidationTests(SelfTestContext& context) noexcept
@@ -255,6 +331,7 @@ namespace gglab
 		RunSha256Tests(context);
 		RunDerivedDataKeyTests(context);
 		RunTextureCodecTests(context);
+		RunTextureStructureValidationTests(context);
 		RunRHITextureValidationTests(context);
 	}
 }
