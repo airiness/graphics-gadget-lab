@@ -10,7 +10,6 @@
 #include <filesystem>
 #include <mutex>
 #include <stop_token>
-#include <unordered_map>
 
 namespace gglab
 {
@@ -99,8 +98,6 @@ namespace gglab
 		std::string m_AdapterScopeIdentity;
 		mutable std::mutex m_ArtifactMutex;
 		IBLStageArtifactCache m_ArtifactCache;
-		std::unordered_map<DerivedDataKey, ArtifactContentDigest, DerivedDataKeyHash>
-			m_KeyToContentDigest;
 		LocalDerivedDataStore m_Store;
 	};
 

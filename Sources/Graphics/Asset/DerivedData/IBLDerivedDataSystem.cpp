@@ -146,10 +146,7 @@ namespace gglab
 
 			{
 				std::scoped_lock lock(m_ArtifactMutex);
-				const auto mapped = m_KeyToContentDigest.find(stageResult.m_Key);
-				stageResult.m_Artifact = m_ArtifactCache.Find(
-					mapped != m_KeyToContentDigest.end() ?
-						mapped->second : ArtifactContentDigest{});
+				stageResult.m_Artifact = m_ArtifactCache.Find(stageResult.m_Key);
 				if (stageResult.m_Artifact &&
 					stageResult.m_Artifact->m_Stage == stage &&
 					stageResult.m_Artifact->MatchesConfig(config))
@@ -199,17 +196,7 @@ namespace gglab
 			return {};
 		}
 		std::scoped_lock lock(m_ArtifactMutex);
-		const ArtifactContentDigest contentDigest = artifact->m_ContentDigest;
-		artifact = m_ArtifactCache.Admit(std::move(artifact));
-		if (artifact && m_ArtifactCache.Contains(contentDigest))
-		{
-			m_KeyToContentDigest[key] = contentDigest;
-		}
-		else
-		{
-			m_KeyToContentDigest.erase(key);
-		}
-		return artifact;
+		return m_ArtifactCache.Admit(key, std::move(artifact));
 	}
 
 	bool IBLDerivedDataSystem::Store(
@@ -245,7 +232,6 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_ArtifactMutex);
 		m_ArtifactCache.Clear();
-		m_KeyToContentDigest.clear();
 	}
 
 	void IBLDerivedDataSystem::ClearStore() noexcept

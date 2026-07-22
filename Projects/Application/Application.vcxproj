@@ -140,6 +140,7 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp" />
@@ -390,6 +391,7 @@
     <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h" />
@@ -712,6 +714,7 @@
     <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactCacheCore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h" />

@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/SelfTestRunner.h"
+#include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
 
@@ -8,6 +9,10 @@ namespace gglab
 	namespace
 	{
 		constexpr std::array RegisteredSuites{
+			SelfTestSuiteDesc{
+				.m_Id = "artifact-cache",
+				.m_Run = &RunArtifactCacheSelfTests,
+			},
 			SelfTestSuiteDesc{
 				.m_Id = "asset-data",
 				.m_Run = &RunAssetDataSelfTests,
