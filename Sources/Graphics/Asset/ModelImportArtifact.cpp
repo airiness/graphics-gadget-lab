@@ -173,6 +173,7 @@ namespace gglab
 			writer.U8(static_cast<uint8_t>(texture.m_ImportSettings.m_MipPolicy));
 			writer.U32(static_cast<uint32_t>(texture.m_Semantic));
 			writer.Bytes(texture.m_Artifact->m_ContentDigest.m_Value);
+			writer.Bytes(texture.m_DerivedDataKey.m_Value);
 		}
 
 		writer.U64(static_cast<uint64_t>(model.m_Materials.size()));
@@ -238,9 +239,11 @@ namespace gglab
 
 	ModelImportArtifactHandle CreateModelImportArtifact(
 		ImportedModel&& importedModel,
+		std::vector<ResolvedModelImportTexture>&& resolvedTextures,
 		TextureArtifactCache& textureArtifactCache) noexcept
 	{
-		if (importedModel.m_Meshes.empty())
+		if (importedModel.m_Meshes.empty() ||
+			importedModel.m_TextureSources.size() != resolvedTextures.size())
 		{
 			return {};
 		}
@@ -253,24 +256,33 @@ namespace gglab
 			.m_Meshes = std::move(importedModel.m_Meshes),
 			.m_MeshInstances = std::move(importedModel.m_MeshInstances),
 		};
-		artifact.m_Textures.reserve(importedModel.m_Textures.size());
-		for (ImportedTexture& importedTexture : importedModel.m_Textures)
+		artifact.m_Textures.reserve(importedModel.m_TextureSources.size());
+		for (size_t textureIndex = 0;
+			textureIndex < importedModel.m_TextureSources.size();
+			++textureIndex)
 		{
-			if (importedTexture.m_ImportSettings.m_Semantic != importedTexture.m_Semantic)
+			ImportedTextureSource& textureSource =
+				importedModel.m_TextureSources[textureIndex];
+			ResolvedModelImportTexture& resolvedTexture = resolvedTextures[textureIndex];
+			if (textureSource.m_ImportSettings.m_Semantic != textureSource.m_Semantic ||
+				!resolvedTexture.IsValid())
 			{
 				return {};
 			}
-			TextureArtifactHandle textureArtifact =
-				textureArtifactCache.CreateAndAdmit(std::move(importedTexture.m_Data));
+			TextureArtifactHandle textureArtifact = textureArtifactCache.Admit(
+				std::move(resolvedTexture.m_Artifact));
 			if (!textureArtifact)
 			{
 				return {};
 			}
 			artifact.m_Textures.push_back({
-				.m_CanonicalPath = std::move(importedTexture.m_CanonicalPath),
-				.m_ImportSettings = importedTexture.m_ImportSettings,
-				.m_Semantic = importedTexture.m_Semantic,
+				.m_CanonicalPath = std::move(textureSource.m_CanonicalPath),
+				.m_ImportSettings = textureSource.m_ImportSettings,
+				.m_Semantic = textureSource.m_Semantic,
 				.m_Artifact = std::move(textureArtifact),
+				.m_ContentFingerprint = resolvedTexture.m_ContentFingerprint,
+				.m_SourceDigest = resolvedTexture.m_SourceDigest,
+				.m_DerivedDataKey = resolvedTexture.m_DerivedDataKey,
 			});
 		}
 

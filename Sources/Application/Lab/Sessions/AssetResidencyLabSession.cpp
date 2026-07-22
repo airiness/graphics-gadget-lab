@@ -337,6 +337,13 @@ namespace gglab
 				Fail("The verification model has no resident texture dependency.");
 				return;
 			}
+			if (!texture->m_SourceDigest.IsValid() ||
+				!texture->m_DerivedDataKey.IsValid() ||
+				!texture->m_IsDerivedDataCached)
+			{
+				Fail("The model texture did not use the shared texture derived-data path.");
+				return;
+			}
 
 			const AssetSnapshot::Model* dependencyModel = FindModelSnapshot(
 				dependencySnapshot,
@@ -1201,7 +1208,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, unified model texture DDC production, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

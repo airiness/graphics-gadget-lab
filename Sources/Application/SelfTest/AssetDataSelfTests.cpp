@@ -147,11 +147,10 @@ namespace gglab
 			model.m_CanonicalPath = "Assets/Models/SelfTest.gltf";
 			model.m_Name = "SelfTest";
 			model.m_Type = ModelType::GlTF;
-			model.m_Textures.push_back({
+			model.m_TextureSources.push_back({
 				.m_CanonicalPath = "Assets/Textures/SelfTest.png",
 				.m_ImportSettings = MakeTextureImportSettings(TextureSemantic::BaseColor),
 				.m_Semantic = TextureSemantic::BaseColor,
-				.m_Data = MakeTextureFixture(),
 			});
 			model.m_Meshes.push_back({
 				.m_Name = "SelfTestMesh",
@@ -159,6 +158,34 @@ namespace gglab
 				.m_Indices = { 0 },
 			});
 			return model;
+		}
+
+		[[nodiscard]] std::vector<ResolvedModelImportTexture>
+		MakeResolvedModelTextureFixture(
+			std::byte sourceMarker = std::byte{ 0x42 }) noexcept
+		{
+			const ImportedModel model = MakeModelImportFixture();
+			const ImportedTextureSource& source = model.m_TextureSources.front();
+			TextureAssetData textureData = MakeTextureFixture();
+			const AssetContentFingerprint contentFingerprint =
+				ComputeTextureContentFingerprint(textureData, source.m_ImportSettings);
+			TextureArtifactBuildResult built = CreateTextureArtifact(
+				std::move(textureData));
+			SourceDigest sourceDigest{};
+			sourceDigest.m_Value.front() = sourceMarker;
+			return {
+				{
+					.m_Artifact = built.Succeeded() ?
+						std::make_shared<const TextureArtifact>(std::move(built.m_Artifact)) :
+						TextureArtifactHandle{},
+					.m_ContentFingerprint = contentFingerprint,
+					.m_SourceDigest = sourceDigest,
+					.m_DerivedDataKey = BuildTextureDerivedDataKey(
+						sourceDigest,
+						source.m_CanonicalPath,
+						source.m_ImportSettings),
+				},
+			};
 		}
 
 		void RunSha256Tests(SelfTestContext& context) noexcept
@@ -783,19 +810,24 @@ namespace gglab
 
 			TextureArtifactCache textureCache({ .m_BudgetBytes = 1024 * 1024 });
 			ImportedModel source = MakeModelImportFixture();
+			std::vector<ResolvedModelImportTexture> resolvedTextures =
+				MakeResolvedModelTextureFixture();
 			const std::byte* const sourcePixels =
-				source.m_Textures.front().m_Data.m_Pixels.data();
+				resolvedTextures.front().m_Artifact->m_Data.m_Pixels.data();
 			ModelImportArtifactHandle artifact = CreateModelImportArtifact(
 				std::move(source),
+				std::move(resolvedTextures),
 				textureCache);
 			context.Check(
 				artifact && artifact->IsValid() && artifact->m_Textures.size() == 1 &&
 					artifact->m_Textures.front().m_Artifact->m_Data.m_Pixels.data() ==
-						sourcePixels,
-				"Model import artifacts move texture pixels into immutable texture artifacts");
+						sourcePixels && artifact->m_Textures.front().m_SourceDigest.IsValid() &&
+					artifact->m_Textures.front().m_DerivedDataKey.IsValid(),
+				"Model import artifacts retain resolved texture payloads and source identity");
 
 			ModelImportArtifactHandle duplicate = CreateModelImportArtifact(
 				MakeModelImportFixture(),
+				MakeResolvedModelTextureFixture(),
 				textureCache);
 			const bool sharesCanonicalTexture = artifact && duplicate &&
 				artifact->m_Textures.front().m_Artifact ==
@@ -804,6 +836,18 @@ namespace gglab
 				sharesCanonicalTexture &&
 					artifact->m_ContentDigest == duplicate->m_ContentDigest,
 				"Model import artifacts reference the canonical texture allocation and digest");
+
+			ModelImportArtifactHandle changedSource = CreateModelImportArtifact(
+				MakeModelImportFixture(),
+				MakeResolvedModelTextureFixture(std::byte{ 0x43 }),
+				textureCache);
+			context.Check(
+				changedSource && artifact &&
+					changedSource->m_Textures.front().m_Artifact ==
+						artifact->m_Textures.front().m_Artifact &&
+					changedSource->m_ContentDigest != artifact->m_ContentDigest,
+				"Model artifact identity includes the resolved texture derived-data key");
+			changedSource.reset();
 
 			const uint64_t textureBytes = artifact ?
 				artifact->m_Textures.front().m_Artifact->GetAllocatedBytes() : 0;
@@ -882,11 +926,12 @@ namespace gglab
 				textureCache.GetStatistics().m_TotalLiveBytes == 0,
 				"Texture allocation accounting reaches zero after model handles are released");
 
-			ImportedModel invalid = MakeModelImportFixture();
-			invalid.m_Textures.front().m_Data.m_Subresources.front().m_DataOffset = 1;
 			context.Check(
-				!CreateModelImportArtifact(std::move(invalid), textureCache),
-				"Model artifact construction rejects an invalid embedded texture");
+				!CreateModelImportArtifact(
+					MakeModelImportFixture(),
+					{},
+					textureCache),
+				"Model artifact construction rejects an unresolved texture source");
 		}
 
 		void RunRHITextureValidationTests(SelfTestContext& context) noexcept
