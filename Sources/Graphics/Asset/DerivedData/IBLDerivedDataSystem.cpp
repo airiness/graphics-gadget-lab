@@ -158,15 +158,16 @@ namespace gglab
 			}
 
 			const std::string_view artifactType = GetIBLStageArtifactType(stage);
+			const LocalDerivedDataReadOptions readOptions{
+				.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
+					artifactType,
+					IBLStageArtifactCodec::GetMaximumSerializedBytes()),
+			};
 			DerivedDataReadResult read = m_Store.Read(
 				stageResult.m_Key,
 				artifactType,
 				IBLStageArtifactSchemaVersion,
-				{
-					.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
-						artifactType,
-						IBLStageArtifactCodec::GetMaximumSerializedBytes()),
-				});
+				readOptions);
 			if (stopToken.stop_requested() ||
 				read.m_Disposition != DerivedDataReadDisposition::Hit)
 			{
@@ -178,7 +179,13 @@ namespace gglab
 				read.m_ArtifactContentDigest);
 			if (!decoded.Succeeded() || !decoded.m_Artifact.MatchesConfig(config))
 			{
-				m_Store.DiscardCorrupt(stageResult.m_Key);
+				m_Store.DiscardObservedCorrupt(
+					stageResult.m_Key,
+					artifactType,
+					IBLStageArtifactSchemaVersion,
+					read.m_ArtifactContentDigest,
+					read.m_PayloadDigest,
+					readOptions);
 				stageResult.m_Error = decoded.m_Error.empty() ?
 					"IBL stage DDC artifact does not match its bake configuration." :
 					std::move(decoded.m_Error);

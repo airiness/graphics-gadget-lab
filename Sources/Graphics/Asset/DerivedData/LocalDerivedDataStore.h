@@ -33,6 +33,7 @@ namespace gglab
 	{
 		DerivedDataReadDisposition m_Disposition = DerivedDataReadDisposition::Miss;
 		ArtifactContentDigest m_ArtifactContentDigest{};
+		Sha256Hash m_PayloadDigest{};
 		std::vector<std::byte> m_Payload;
 	};
 
@@ -86,7 +87,13 @@ namespace gglab
 		{
 			return Probe(key) == DerivedDataPresence::Present;
 		}
-		void DiscardCorrupt(const DerivedDataKey& key) noexcept;
+		void DiscardObservedCorrupt(
+			const DerivedDataKey& key,
+			std::string_view artifactType,
+			uint32_t schemaVersion,
+			const ArtifactContentDigest& observedArtifactContentDigest,
+			const Sha256Hash& observedPayloadDigest,
+			LocalDerivedDataReadOptions options = {}) noexcept;
 		[[nodiscard]] bool Clear() noexcept;
 		[[nodiscard]] bool ReconcileCatalog() noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStatistics() const noexcept;

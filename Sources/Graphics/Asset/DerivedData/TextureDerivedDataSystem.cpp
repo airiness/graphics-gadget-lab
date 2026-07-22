@@ -317,15 +317,16 @@ namespace gglab
 		const DerivedDataKey& key,
 		const TextureImportSettings& importSettings) noexcept
 	{
+		const LocalDerivedDataReadOptions readOptions{
+			.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
+				TextureArtifactType,
+				TextureArtifactCodec::GetMaximumSerializedBytes()),
+		};
 		DerivedDataReadResult cached = m_Store.Read(
 			key,
 			TextureArtifactType,
 			TextureArtifactSchemaVersion,
-			{
-				.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
-					TextureArtifactType,
-					TextureArtifactCodec::GetMaximumSerializedBytes()),
-			});
+			readOptions);
 		if (cached.m_Disposition != DerivedDataReadDisposition::Hit)
 		{
 			return {};
@@ -335,7 +336,13 @@ namespace gglab
 			cached.m_ArtifactContentDigest);
 		if (!decoded.Succeeded())
 		{
-			m_Store.DiscardCorrupt(key);
+			m_Store.DiscardObservedCorrupt(
+				key,
+				TextureArtifactType,
+				TextureArtifactSchemaVersion,
+				cached.m_ArtifactContentDigest,
+				cached.m_PayloadDigest,
+				readOptions);
 			GGLAB_LOG_GRAPHICS_WARN(
 				"Texture DDC entry '{}' failed codec validation: {}",
 				DerivedDataKeyText(key),
