@@ -220,6 +220,11 @@ namespace gglab
 		{
 			return Error(RHITextureValidationError::IncompatibleViewDimension);
 		}
+		if (viewDesc.m_Type == RHITextureViewType::DepthStencil &&
+			textureDesc.m_Dimension == RHITextureDimension::Texture3D)
+		{
+			return Error(RHITextureValidationError::IncompatibleViewDimension);
+		}
 
 		const RHISubresourceRange range = NormalizeTextureSubresourceRange(
 			textureDesc, viewDesc.m_Subresources);

@@ -40,6 +40,34 @@ namespace gglab
 			return ResolveArraySliceCount(desc, resourceDesc) / CubemapFaceCount;
 		}
 
+		RHITextureViewDimension ResolveTextureViewDimension(
+			RHITextureViewDimension dimension,
+			const D3D12_RESOURCE_DESC& resourceDesc) noexcept
+		{
+			if (dimension != RHITextureViewDimension::Unknown)
+			{
+				return dimension;
+			}
+
+			switch (resourceDesc.Dimension)
+			{
+			case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+				return resourceDesc.DepthOrArraySize > 1 ?
+					RHITextureViewDimension::Texture1DArray :
+					RHITextureViewDimension::Texture1D;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+				return resourceDesc.DepthOrArraySize > 1 ?
+					RHITextureViewDimension::Texture2DArray :
+					RHITextureViewDimension::Texture2D;
+			case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+				return RHITextureViewDimension::Texture3D;
+			case D3D12_RESOURCE_DIMENSION_UNKNOWN:
+			case D3D12_RESOURCE_DIMENSION_BUFFER:
+				GGLAB_UNREACHABLE("Cannot infer a texture view dimension from a non-texture resource.");
+			}
+			return RHITextureViewDimension::Unknown;
+		}
+
 		uint64_t ResolveBufferViewSize(uint64_t offsetInBytes, uint64_t sizeInBytes, uint64_t bufferSizeInBytes) noexcept
 		{
 			if (offsetInBytes >= bufferSizeInBytes)
@@ -70,9 +98,9 @@ namespace gglab
 		D3D12_RENDER_TARGET_VIEW_DESC nativeDesc{};
 		nativeDesc.Format = ResolveViewFormat(desc.m_Format, resourceDesc);
 
-		const auto dimension = desc.m_Dimension == RHITextureViewDimension::Unknown ?
-			(resourceDesc.DepthOrArraySize > 1 ? RHITextureViewDimension::Texture2DArray : RHITextureViewDimension::Texture2D) :
-			desc.m_Dimension;
+		const RHITextureViewDimension dimension = ResolveTextureViewDimension(
+			desc.m_Dimension,
+			resourceDesc);
 
 		switch (dimension)
 		{
@@ -143,12 +171,34 @@ namespace gglab
 			nativeDesc.Flags |= D3D12_DSV_FLAG_READ_ONLY_STENCIL;
 		}
 
-		const auto dimension = desc.m_Dimension == RHITextureViewDimension::Unknown ?
-			(resourceDesc.DepthOrArraySize > 1 ? RHITextureViewDimension::Texture2DArray : RHITextureViewDimension::Texture2D) :
-			desc.m_Dimension;
+		const RHITextureViewDimension dimension = ResolveTextureViewDimension(
+			desc.m_Dimension,
+			resourceDesc);
 
-		if (dimension == RHITextureViewDimension::Texture2DArray)
+		switch (dimension)
 		{
+		case RHITextureViewDimension::Texture1D:
+			nativeDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE1D;
+			nativeDesc.Texture1D.MipSlice = desc.m_Subresources.m_BaseMip;
+			break;
+		case RHITextureViewDimension::Texture1DArray:
+			nativeDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE1DARRAY;
+			nativeDesc.Texture1DArray.MipSlice = desc.m_Subresources.m_BaseMip;
+			nativeDesc.Texture1DArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
+			nativeDesc.Texture1DArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
+			break;
+		case RHITextureViewDimension::Texture2D:
+			nativeDesc.ViewDimension = resourceDesc.SampleDesc.Count > 1 ?
+				D3D12_DSV_DIMENSION_TEXTURE2DMS :
+				D3D12_DSV_DIMENSION_TEXTURE2D;
+			if (nativeDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2D)
+			{
+				nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
+			}
+			break;
+		case RHITextureViewDimension::Texture2DArray:
+		case RHITextureViewDimension::TextureCube:
+		case RHITextureViewDimension::TextureCubeArray:
 			nativeDesc.ViewDimension = resourceDesc.SampleDesc.Count > 1 ?
 				D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY :
 				D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
@@ -163,16 +213,13 @@ namespace gglab
 				nativeDesc.Texture2DMSArray.FirstArraySlice = desc.m_Subresources.m_BaseArraySlice;
 				nativeDesc.Texture2DMSArray.ArraySize = ResolveArraySliceCount(desc, resourceDesc);
 			}
-		}
-		else
-		{
-			nativeDesc.ViewDimension = resourceDesc.SampleDesc.Count > 1 ?
-				D3D12_DSV_DIMENSION_TEXTURE2DMS :
-				D3D12_DSV_DIMENSION_TEXTURE2D;
-			if (nativeDesc.ViewDimension == D3D12_DSV_DIMENSION_TEXTURE2D)
-			{
-				nativeDesc.Texture2D.MipSlice = desc.m_Subresources.m_BaseMip;
-			}
+			break;
+		case RHITextureViewDimension::Texture3D:
+			GGLAB_UNREACHABLE("D3D12 depth-stencil views do not support 3D textures.");
+			break;
+		case RHITextureViewDimension::Unknown:
+			GGLAB_UNREACHABLE("Unexpected unknown RHI texture view dimension.");
+			break;
 		}
 
 		return nativeDesc;
@@ -186,9 +233,9 @@ namespace gglab
 		nativeDesc.Format = ResolveViewFormat(desc.m_Format, resourceDesc);
 		nativeDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
-		const auto dimension = desc.m_Dimension == RHITextureViewDimension::Unknown ?
-			(resourceDesc.DepthOrArraySize > 1 ? RHITextureViewDimension::Texture2DArray : RHITextureViewDimension::Texture2D) :
-			desc.m_Dimension;
+		const RHITextureViewDimension dimension = ResolveTextureViewDimension(
+			desc.m_Dimension,
+			resourceDesc);
 
 		switch (dimension)
 		{
@@ -271,9 +318,9 @@ namespace gglab
 		D3D12_UNORDERED_ACCESS_VIEW_DESC nativeDesc{};
 		nativeDesc.Format = ResolveViewFormat(desc.m_Format, resourceDesc);
 
-		const auto dimension = desc.m_Dimension == RHITextureViewDimension::Unknown ?
-			RHITextureViewDimension::Texture2D :
-			desc.m_Dimension;
+		const RHITextureViewDimension dimension = ResolveTextureViewDimension(
+			desc.m_Dimension,
+			resourceDesc);
 
 		switch (dimension)
 		{
