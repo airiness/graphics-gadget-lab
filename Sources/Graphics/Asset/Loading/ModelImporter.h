@@ -1,8 +1,8 @@
 #pragma once
+#include "Core/Async/ProgressChannel.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/SamplerTypes.h"
 #include "Graphics/Asset/TextureAsset.h"
-#include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/VertexData.h"
 
 #include <array>
@@ -17,12 +17,11 @@ namespace gglab
 		uint32_t m_MaxAnisotropy = 8;
 	};
 
-	struct ImportedTexture
+	struct ImportedTextureSource
 	{
 		std::filesystem::path m_CanonicalPath;
 		TextureImportSettings m_ImportSettings{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
-		TextureAssetData m_Data;
 	};
 
 	struct ImportedMaterialTextureBinding
@@ -64,7 +63,7 @@ namespace gglab
 		std::filesystem::path m_CanonicalPath;
 		std::string m_Name;
 		ModelType m_Type = ModelType::Invalid;
-		std::vector<ImportedTexture> m_Textures;
+		std::vector<ImportedTextureSource> m_TextureSources;
 		std::vector<ImportedMaterial> m_Materials;
 		std::vector<ImportedMesh> m_Meshes;
 		std::vector<ImportedModelMesh> m_MeshInstances;

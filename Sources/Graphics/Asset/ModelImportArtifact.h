@@ -1,5 +1,7 @@
 #pragma once
 #include "Graphics/Asset/ArtifactContentDigest.h"
+#include "Graphics/Asset/AssetContentFingerprint.h"
+#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
 #include "Graphics/Asset/TextureArtifact.h"
 
@@ -17,11 +19,31 @@ namespace gglab
 		TextureImportSettings m_ImportSettings{};
 		TextureSemantic m_Semantic = TextureSemantic::GenericColor;
 		TextureArtifactHandle m_Artifact;
+		AssetContentFingerprint m_ContentFingerprint{};
+		SourceDigest m_SourceDigest{};
+		DerivedDataKey m_DerivedDataKey{};
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
 			return m_ImportSettings.m_Semantic == m_Semantic &&
-				m_Artifact && m_Artifact->IsValid();
+				m_Artifact && m_Artifact->IsValid() &&
+				m_ContentFingerprint.IsValid() && m_SourceDigest.IsValid() &&
+				m_DerivedDataKey.IsValid();
+		}
+	};
+
+	struct ResolvedModelImportTexture
+	{
+		TextureArtifactHandle m_Artifact;
+		AssetContentFingerprint m_ContentFingerprint{};
+		SourceDigest m_SourceDigest{};
+		DerivedDataKey m_DerivedDataKey{};
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Artifact && m_Artifact->IsValid() &&
+				m_ContentFingerprint.IsValid() && m_SourceDigest.IsValid() &&
+				m_DerivedDataKey.IsValid();
 		}
 	};
 
@@ -82,5 +104,6 @@ namespace gglab
 
 	[[nodiscard]] ModelImportArtifactHandle CreateModelImportArtifact(
 		ImportedModel&& importedModel,
+		std::vector<ResolvedModelImportTexture>&& resolvedTextures,
 		TextureArtifactCache& textureArtifactCache) noexcept;
 }

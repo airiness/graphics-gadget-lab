@@ -2,7 +2,6 @@
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Core/Task/TaskSystem.h"
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
-#include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
@@ -22,6 +21,315 @@ namespace gglab
 			SourceDigest m_SourceDigest{};
 			DerivedDataKey m_DerivedDataKey{};
 		};
+
+		[[nodiscard]] TaskResult ResolveTextureArtifact(
+			TextureDerivedDataSystem& derivedDataSystem,
+			const std::filesystem::path& sourcePath,
+			const TextureImportSettings& importSettings,
+			SourceDigest expectedSourceDigest,
+			DerivedDataKey expectedDerivedDataKey,
+			ArtifactContentDigest expectedArtifactContentDigest,
+			const ProgressReporter& progress,
+			std::stop_token stopToken,
+			TextureDecodeJob& job) noexcept
+		{
+			const auto validateExpectedArtifact =
+				[expectedArtifactContentDigest](
+					const TextureDerivedDataArtifact& artifact) noexcept -> std::string
+				{
+					if (!expectedArtifactContentDigest.IsValid() ||
+						(artifact.m_Artifact &&
+							artifact.m_Artifact->m_ContentDigest == expectedArtifactContentDigest))
+					{
+						return {};
+					}
+					const ArtifactContentDigest actualDigest = artifact.m_Artifact ?
+						artifact.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+					return std::format(
+						"Texture artifact changed for immutable generation (expected {}, resolved {}).",
+						ArtifactContentDigestText(expectedArtifactContentDigest),
+						ArtifactContentDigestText(actualDigest));
+				};
+
+			job = {};
+			if (stopToken.stop_requested())
+			{
+				return TaskResult::Success();
+			}
+			job.m_SourceDigest = expectedSourceDigest;
+			job.m_DerivedDataKey = expectedDerivedDataKey;
+			SourceSnapshotResult snapshot{};
+			bool hasSourceSnapshot = false;
+			if (!job.m_DerivedDataKey.IsValid())
+			{
+				snapshot = ReadSourceSnapshot(sourcePath);
+				if (!snapshot.Succeeded())
+				{
+					return TaskResult::Failure(std::move(snapshot.m_Error));
+				}
+				hasSourceSnapshot = true;
+				job.m_SourceDigest = snapshot.m_Snapshot.m_Digest;
+				job.m_DerivedDataKey = BuildTextureDerivedDataKey(
+					job.m_SourceDigest,
+					sourcePath,
+					importSettings);
+			}
+			if (!job.m_DerivedDataKey.IsValid())
+			{
+				return TaskResult::Failure("Failed to build the texture derived-data key.");
+			}
+
+			TextureDerivedDataRequestResult requestResult =
+				derivedDataSystem.Request(job.m_DerivedDataKey);
+			if (requestResult.m_Disposition == ArtifactRequestDisposition::Hit)
+			{
+				job.m_Artifact = std::move(requestResult.m_Artifact);
+				if (!job.m_Artifact.IsValid())
+				{
+					return TaskResult::Failure("Shared texture artifact hit was invalid.");
+				}
+				if (std::string error = validateExpectedArtifact(job.m_Artifact);
+					!error.empty())
+				{
+					return TaskResult::Failure(std::move(error));
+				}
+				return TaskResult::Success();
+			}
+			if (requestResult.m_Disposition == ArtifactRequestDisposition::Waiting)
+			{
+				progress.Report(
+					0.14f,
+					"Waiting for shared texture artifact",
+					DerivedDataKeyText(job.m_DerivedDataKey));
+				TextureArtifactWaitResult waitResult = derivedDataSystem.Wait(
+					std::move(requestResult.m_Waiter),
+					stopToken);
+				if (waitResult.m_Disposition == ArtifactWaitDisposition::Cancelled)
+				{
+					return TaskResult::Success();
+				}
+				if (waitResult.m_Disposition == ArtifactWaitDisposition::Failed)
+				{
+					return TaskResult::Failure(std::move(waitResult.m_Error));
+				}
+				job.m_Artifact = std::move(waitResult.m_Artifact);
+				if (std::string error = validateExpectedArtifact(job.m_Artifact);
+					!error.empty())
+				{
+					return TaskResult::Failure(std::move(error));
+				}
+				progress.Report(
+					0.60f,
+					"Shared texture artifact resolved",
+					DerivedDataKeyText(job.m_DerivedDataKey));
+				return job.m_Artifact.IsValid() ? TaskResult::Success() :
+					TaskResult::Failure("Shared texture artifact result was invalid.");
+			}
+
+			TextureArtifactWaiterHandle participant =
+				std::move(requestResult.m_Waiter);
+			TextureArtifactBuildClaim buildClaim =
+				std::move(requestResult.m_BuildClaim);
+			std::stop_callback cancelParticipant(
+				stopToken,
+				[&participant]() noexcept { participant.Cancel(); });
+
+			progress.Report(
+				0.12f,
+				"Looking up shared texture derived data",
+				DerivedDataKeyText(job.m_DerivedDataKey));
+			TextureDerivedDataArtifact cached = derivedDataSystem.Read(
+				job.m_DerivedDataKey,
+				importSettings);
+			if (cached.IsValid())
+			{
+				if (std::string error = validateExpectedArtifact(cached); !error.empty())
+				{
+					GGLAB_UNUSED(derivedDataSystem.Fail(
+						std::move(buildClaim), error));
+					return TaskResult::Failure(std::move(error));
+				}
+				job.m_Artifact = cached;
+				if (!derivedDataSystem.Publish(
+					std::move(buildClaim),
+					std::move(cached)))
+				{
+					return TaskResult::Failure("Failed to publish a shared texture DDC hit.");
+				}
+				progress.Report(
+					0.60f,
+					"Shared texture derived data cache hit",
+					DerivedDataKeyText(job.m_DerivedDataKey));
+				return TaskResult::Success();
+			}
+
+			if (!hasSourceSnapshot)
+			{
+				snapshot = ReadSourceSnapshot(sourcePath);
+				if (!snapshot.Succeeded())
+				{
+					const std::string error = snapshot.m_Error;
+					GGLAB_UNUSED(derivedDataSystem.Fail(
+						std::move(buildClaim), error));
+					return TaskResult::Failure(error);
+				}
+				job.m_SourceDigest = snapshot.m_Snapshot.m_Digest;
+				const DerivedDataKey observedKey = BuildTextureDerivedDataKey(
+					job.m_SourceDigest,
+					sourcePath,
+					importSettings);
+				if (observedKey != job.m_DerivedDataKey)
+				{
+					const std::string error = std::format(
+						"Texture source changed for immutable generation (expected key {}, observed {}).",
+						DerivedDataKeyText(job.m_DerivedDataKey),
+						DerivedDataKeyText(observedKey));
+					GGLAB_UNUSED(derivedDataSystem.Fail(
+						std::move(buildClaim), error));
+					return TaskResult::Failure(error);
+				}
+			}
+			TextureAssetData textureData = TextureLoader::LoadTextureData(
+				sourcePath,
+				snapshot.m_Snapshot.m_Bytes,
+				importSettings,
+				progress.Subrange(0.18f, 0.62f));
+			if (!textureData.IsValid())
+			{
+				const std::string error = std::format(
+					"Failed to decode texture '{}'.",
+					sourcePath.string());
+				GGLAB_UNUSED(derivedDataSystem.Fail(
+					std::move(buildClaim), error));
+				return TaskResult::Failure(error);
+			}
+			const AssetContentFingerprint contentFingerprint =
+				ComputeTextureContentFingerprint(textureData, importSettings);
+			TextureArtifactBuildResult built = CreateTextureArtifact(
+				std::move(textureData));
+			if (!built.Succeeded() || !contentFingerprint.IsValid())
+			{
+				const std::string error = std::format(
+					"Failed to build decoded texture artifact '{}'.",
+					sourcePath.string());
+				GGLAB_UNUSED(derivedDataSystem.Fail(
+					std::move(buildClaim), error));
+				return TaskResult::Failure(error);
+			}
+			const ArtifactContentDigest artifactContentDigest =
+				built.m_Artifact.m_ContentDigest;
+			if (expectedArtifactContentDigest.IsValid() &&
+				artifactContentDigest != expectedArtifactContentDigest)
+			{
+				const std::string error = std::format(
+					"Texture source rebuild changed immutable generation content (expected artifact {}, rebuilt artifact {}).",
+					ArtifactContentDigestText(expectedArtifactContentDigest),
+					ArtifactContentDigestText(artifactContentDigest));
+				GGLAB_UNUSED(derivedDataSystem.Fail(
+					std::move(buildClaim), error));
+				return TaskResult::Failure(error);
+			}
+			TextureArtifactHandle artifact = std::make_shared<const TextureArtifact>(
+				std::move(built.m_Artifact));
+			if (!derivedDataSystem.Write(job.m_DerivedDataKey, *artifact))
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"Failed to publish texture DDC entry '{}'.",
+					DerivedDataKeyText(job.m_DerivedDataKey));
+			}
+			job.m_Artifact = {
+				.m_Artifact = std::move(artifact),
+				.m_ContentFingerprint = contentFingerprint,
+				.m_DerivedDataCacheHit = false,
+			};
+			if (!derivedDataSystem.Publish(
+				std::move(buildClaim),
+				job.m_Artifact))
+			{
+				return TaskResult::Failure("Failed to publish a shared texture artifact.");
+			}
+			return TaskResult::Success();
+		}
+
+		[[nodiscard]] TaskResult ResolveModelTextureSources(
+			TextureDerivedDataSystem& derivedDataSystem,
+			const ImportedModel& model,
+			const ProgressReporter& progress,
+			std::stop_token stopToken,
+			std::vector<ResolvedModelImportTexture>& resolvedTextures) noexcept
+		{
+			resolvedTextures.clear();
+			resolvedTextures.reserve(model.m_TextureSources.size());
+			uint32_t derivedDataCacheHitCount = 0;
+			for (size_t textureIndex = 0;
+				textureIndex < model.m_TextureSources.size();
+				++textureIndex)
+			{
+				if (stopToken.stop_requested())
+				{
+					return TaskResult::Success();
+				}
+				const ImportedTextureSource& source = model.m_TextureSources[textureIndex];
+				const float begin = static_cast<float>(textureIndex) /
+					static_cast<float>(model.m_TextureSources.size());
+				const float end = static_cast<float>(textureIndex + 1) /
+					static_cast<float>(model.m_TextureSources.size());
+				progress.Report(
+					begin,
+					"Resolving model texture artifacts",
+					std::format("{} of {}: {}",
+						textureIndex + 1,
+						model.m_TextureSources.size(),
+						source.m_CanonicalPath.filename().generic_string()),
+					static_cast<uint32_t>(textureIndex),
+					static_cast<uint32_t>(model.m_TextureSources.size()));
+				TextureDecodeJob textureJob{};
+				TaskResult result = ResolveTextureArtifact(
+					derivedDataSystem,
+					source.m_CanonicalPath,
+					source.m_ImportSettings,
+					{},
+					{},
+					{},
+					progress.Subrange(begin, end),
+					stopToken,
+					textureJob);
+				if (!result.m_Succeeded || stopToken.stop_requested())
+				{
+					return result;
+				}
+				if (!textureJob.m_Artifact.IsValid() ||
+					!textureJob.m_SourceDigest.IsValid() ||
+					!textureJob.m_DerivedDataKey.IsValid())
+				{
+					return TaskResult::Failure(std::format(
+						"Failed to resolve model texture '{}'.",
+						source.m_CanonicalPath.string()));
+				}
+				derivedDataCacheHitCount +=
+					textureJob.m_Artifact.m_DerivedDataCacheHit ? 1u : 0u;
+				resolvedTextures.push_back({
+					.m_Artifact = std::move(textureJob.m_Artifact.m_Artifact),
+					.m_ContentFingerprint = textureJob.m_Artifact.m_ContentFingerprint,
+					.m_SourceDigest = textureJob.m_SourceDigest,
+					.m_DerivedDataKey = textureJob.m_DerivedDataKey,
+				});
+			}
+			progress.Report(
+				1.0f,
+				"Model texture artifacts resolved",
+				std::format("{} textures", resolvedTextures.size()),
+				static_cast<uint32_t>(resolvedTextures.size()),
+				static_cast<uint32_t>(resolvedTextures.size()));
+			if (!resolvedTextures.empty())
+			{
+				GGLAB_LOG_GRAPHICS_INFO(
+					"Model texture artifacts resolved (textures={}, ddcHits={}).",
+					resolvedTextures.size(),
+					derivedDataCacheHitCount);
+			}
+			return TaskResult::Success();
+		}
 	}
 
 	AssetLoadCoordinator::AssetLoadCoordinator(const CreateInfo& createInfo) noexcept :
@@ -81,20 +389,32 @@ namespace gglab
 				.m_Priority = request.m_Priority,
 				.m_Progress = progress,
 			},
-			[sourcePath, importSettings, job, progress, textureArtifactCache](
+			[this, sourcePath, importSettings, job, progress, textureArtifactCache](
 				std::stop_token stopToken) noexcept
 			{
 				ModelImportResult result = ModelImporter::Import(
 					sourcePath,
 					importSettings,
 					stopToken,
-					ProgressReporter(progress, 0.05f, 0.62f));
+					ProgressReporter(progress, 0.05f, 0.48f));
 				if (!result.Succeeded())
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
+				std::vector<ResolvedModelImportTexture> resolvedTextures;
+				TaskResult textureResult = ResolveModelTextureSources(
+					m_TextureDerivedDataSystem,
+					result.m_Model,
+					ProgressReporter(progress, 0.48f, 0.62f),
+					stopToken,
+					resolvedTextures);
+				if (!textureResult.m_Succeeded || stopToken.stop_requested())
+				{
+					return textureResult;
+				}
 				job->m_Artifact = CreateModelImportArtifact(
 					std::move(result.m_Model),
+					std::move(resolvedTextures),
 					*textureArtifactCache);
 				if (!job->m_Artifact)
 				{
@@ -187,7 +507,7 @@ namespace gglab
 				.m_Name = taskName,
 				.m_Priority = request.m_Priority,
 			},
-			[sourcePath, importSettings, expectedArtifactContentDigest,
+			[this, sourcePath, importSettings, expectedArtifactContentDigest,
 				job, cacheHit, textureArtifactCache](std::stop_token stopToken) noexcept
 			{
 				if (cacheHit)
@@ -207,8 +527,20 @@ namespace gglab
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
+				std::vector<ResolvedModelImportTexture> resolvedTextures;
+				TaskResult textureResult = ResolveModelTextureSources(
+					m_TextureDerivedDataSystem,
+					result.m_Model,
+					{},
+					stopToken,
+					resolvedTextures);
+				if (!textureResult.m_Succeeded || stopToken.stop_requested())
+				{
+					return textureResult;
+				}
 				job->m_Artifact = CreateModelImportArtifact(
 					std::move(result.m_Model),
+					std::move(resolvedTextures),
 					*textureArtifactCache);
 				if (!job->m_Artifact)
 				{
@@ -320,224 +652,16 @@ namespace gglab
 				expectedDerivedDataKey, expectedArtifactContentDigest,
 				job, progress](std::stop_token stopToken) noexcept
 			{
-				const auto validateExpectedArtifact =
-					[expectedArtifactContentDigest](
-						const TextureDerivedDataArtifact& artifact) noexcept -> std::string
-					{
-						if (!expectedArtifactContentDigest.IsValid() ||
-							(artifact.m_Artifact &&
-								artifact.m_Artifact->m_ContentDigest == expectedArtifactContentDigest))
-						{
-							return {};
-						}
-						const ArtifactContentDigest actualDigest = artifact.m_Artifact ?
-							artifact.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
-						return std::format(
-							"Texture artifact changed for immutable generation (expected {}, resolved {}).",
-							ArtifactContentDigestText(expectedArtifactContentDigest),
-							ArtifactContentDigestText(actualDigest));
-					};
-				if (stopToken.stop_requested())
-				{
-					return TaskResult::Success();
-				}
-				job->m_SourceDigest = expectedSourceDigest;
-				job->m_DerivedDataKey = expectedDerivedDataKey;
-				SourceSnapshotResult snapshot{};
-				bool hasSourceSnapshot = false;
-				if (!job->m_DerivedDataKey.IsValid())
-				{
-					snapshot = ReadSourceSnapshot(sourcePath);
-					if (!snapshot.Succeeded())
-					{
-						return TaskResult::Failure(std::move(snapshot.m_Error));
-					}
-					hasSourceSnapshot = true;
-					job->m_SourceDigest = snapshot.m_Snapshot.m_Digest;
-					job->m_DerivedDataKey = BuildTextureDerivedDataKey(
-						job->m_SourceDigest,
-						sourcePath,
-						importSettings);
-				}
-				if (!job->m_DerivedDataKey.IsValid())
-				{
-					return TaskResult::Failure("Failed to build the texture derived-data key.");
-				}
-
-				TextureDerivedDataRequestResult requestResult =
-					m_TextureDerivedDataSystem.Request(job->m_DerivedDataKey);
-				if (requestResult.m_Disposition == ArtifactRequestDisposition::Hit)
-				{
-					job->m_Artifact = std::move(requestResult.m_Artifact);
-					if (!job->m_Artifact.IsValid())
-					{
-						return TaskResult::Failure("Shared texture artifact hit was invalid.");
-					}
-					if (std::string error = validateExpectedArtifact(job->m_Artifact);
-						!error.empty())
-					{
-						return TaskResult::Failure(std::move(error));
-					}
-					return TaskResult::Success();
-				}
-				if (requestResult.m_Disposition == ArtifactRequestDisposition::Waiting)
-				{
-					ProgressReporter(progress).Report(
-						0.14f,
-						"Waiting for shared texture artifact",
-						DerivedDataKeyText(job->m_DerivedDataKey));
-					TextureArtifactWaitResult waitResult =
-						m_TextureDerivedDataSystem.Wait(
-							std::move(requestResult.m_Waiter),
-							stopToken);
-					if (waitResult.m_Disposition == ArtifactWaitDisposition::Cancelled)
-					{
-						return TaskResult::Success();
-					}
-					if (waitResult.m_Disposition == ArtifactWaitDisposition::Failed)
-					{
-						return TaskResult::Failure(std::move(waitResult.m_Error));
-					}
-					job->m_Artifact = std::move(waitResult.m_Artifact);
-					if (std::string error = validateExpectedArtifact(job->m_Artifact);
-						!error.empty())
-					{
-						return TaskResult::Failure(std::move(error));
-					}
-					ProgressReporter(progress).Report(
-						0.60f,
-						"Shared texture artifact resolved",
-						DerivedDataKeyText(job->m_DerivedDataKey));
-					return job->m_Artifact.IsValid() ? TaskResult::Success() :
-						TaskResult::Failure("Shared texture artifact result was invalid.");
-				}
-
-				TextureArtifactWaiterHandle participant =
-					std::move(requestResult.m_Waiter);
-				TextureArtifactBuildClaim buildClaim =
-					std::move(requestResult.m_BuildClaim);
-				std::stop_callback cancelParticipant(
-					stopToken,
-					[&participant]() noexcept { participant.Cancel(); });
-
-				ProgressReporter(progress).Report(
-					0.12f,
-					"Looking up shared texture derived data",
-					DerivedDataKeyText(job->m_DerivedDataKey));
-				TextureDerivedDataArtifact cached = m_TextureDerivedDataSystem.Read(
-					job->m_DerivedDataKey,
-					importSettings);
-				if (cached.IsValid())
-				{
-					if (std::string error = validateExpectedArtifact(cached); !error.empty())
-					{
-						GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
-							std::move(buildClaim), error));
-						return TaskResult::Failure(std::move(error));
-					}
-					job->m_Artifact = cached;
-					if (!m_TextureDerivedDataSystem.Publish(
-						std::move(buildClaim),
-						std::move(cached)))
-					{
-						return TaskResult::Failure("Failed to publish a shared texture DDC hit.");
-					}
-					ProgressReporter(progress).Report(
-						0.60f,
-						"Shared texture derived data cache hit",
-						DerivedDataKeyText(job->m_DerivedDataKey));
-					return TaskResult::Success();
-				}
-
-				if (!hasSourceSnapshot)
-				{
-					snapshot = ReadSourceSnapshot(sourcePath);
-					if (!snapshot.Succeeded())
-					{
-						const std::string error = snapshot.m_Error;
-						GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
-							std::move(buildClaim), error));
-						return TaskResult::Failure(error);
-					}
-					hasSourceSnapshot = true;
-					job->m_SourceDigest = snapshot.m_Snapshot.m_Digest;
-					const DerivedDataKey observedKey = BuildTextureDerivedDataKey(
-						job->m_SourceDigest,
-						sourcePath,
-						importSettings);
-					if (observedKey != job->m_DerivedDataKey)
-					{
-						const std::string error = std::format(
-							"Texture source changed for immutable generation (expected key {}, observed {}).",
-							DerivedDataKeyText(job->m_DerivedDataKey),
-							DerivedDataKeyText(observedKey));
-						GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
-							std::move(buildClaim), error));
-						return TaskResult::Failure(error);
-					}
-				}
-				TextureAssetData textureData = TextureLoader::LoadTextureData(
+				return ResolveTextureArtifact(
+					m_TextureDerivedDataSystem,
 					sourcePath,
-					snapshot.m_Snapshot.m_Bytes,
 					importSettings,
-					ProgressReporter(progress, 0.18f, 0.62f));
-				if (!textureData.IsValid())
-				{
-					const std::string error = std::format(
-						"Failed to decode texture '{}'.",
-						sourcePath.string());
-					GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
-						std::move(buildClaim), error));
-					return TaskResult::Failure(error);
-				}
-				const AssetContentFingerprint contentFingerprint =
-					ComputeTextureContentFingerprint(textureData, importSettings);
-				TextureArtifactBuildResult built = CreateTextureArtifact(
-					std::move(textureData));
-				if (!built.Succeeded() || !contentFingerprint.IsValid())
-				{
-					const std::string error = std::format(
-						"Failed to build decoded texture artifact '{}'.",
-						sourcePath.string());
-					GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
-						std::move(buildClaim), error));
-					return TaskResult::Failure(error);
-				}
-				const ArtifactContentDigest artifactContentDigest =
-					built.m_Artifact.m_ContentDigest;
-				if (expectedArtifactContentDigest.IsValid() &&
-					artifactContentDigest != expectedArtifactContentDigest)
-				{
-					const std::string error = std::format(
-						"Texture source rebuild changed immutable generation content (expected artifact {}, rebuilt artifact {}).",
-						ArtifactContentDigestText(expectedArtifactContentDigest),
-						ArtifactContentDigestText(artifactContentDigest));
-					GGLAB_UNUSED(m_TextureDerivedDataSystem.Fail(
-						std::move(buildClaim), error));
-					return TaskResult::Failure(error);
-				}
-				TextureArtifactHandle artifact = std::make_shared<const TextureArtifact>(
-					std::move(built.m_Artifact));
-				if (!m_TextureDerivedDataSystem.Write(
-					job->m_DerivedDataKey,
-					*artifact))
-				{
-					GGLAB_LOG_GRAPHICS_WARN(
-						"Failed to publish texture DDC entry '{}'.",
-						DerivedDataKeyText(job->m_DerivedDataKey));
-				}
-				job->m_Artifact = {
-					.m_Artifact = std::move(artifact),
-					.m_ContentFingerprint = contentFingerprint,
-					.m_DerivedDataCacheHit = false,
-				};
-				if (!m_TextureDerivedDataSystem.Publish(
-					std::move(buildClaim),
-					job->m_Artifact))
-				{
-					return TaskResult::Failure("Failed to publish a shared texture artifact.");
-				}
-				return TaskResult::Success();
+					expectedSourceDigest,
+					expectedDerivedDataKey,
+					expectedArtifactContentDigest,
+					ProgressReporter(progress),
+					stopToken,
+					*job);
 			},
 			[this, operation, semantic, residencyReload, residencyOperation, job](
 				const TaskCompletionInfo& completion) mutable noexcept

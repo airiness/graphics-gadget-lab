@@ -155,7 +155,10 @@ namespace gglab
 			auto uploadData = textureAssets.MakeTextureUploadData(
 				textureId,
 				importedTexture.m_Artifact,
-				importedTexture.m_ImportSettings);
+				importedTexture.m_ImportSettings,
+				importedTexture.m_ContentFingerprint,
+				importedTexture.m_SourceDigest,
+				importedTexture.m_DerivedDataKey);
 			const bool queued = textureAssets.QueueTextureUpload(
 				std::move(uploadData),
 				priority);

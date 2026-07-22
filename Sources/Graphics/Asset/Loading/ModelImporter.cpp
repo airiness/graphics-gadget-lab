@@ -190,31 +190,31 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] uint32_t ImportTexture(
+		[[nodiscard]] uint32_t RegisterTextureSource(
 			ImportedModel& model,
 			const std::filesystem::path& path,
-			TextureSemantic semantic,
-			const ProgressReporter& progress) noexcept
+			TextureSemantic semantic) noexcept
 		{
 			const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
-			const auto existing = std::ranges::find_if(model.m_Textures,
-				[&](const ImportedTexture& texture) noexcept
+			const auto existing = std::ranges::find_if(model.m_TextureSources,
+				[&](const ImportedTextureSource& texture) noexcept
 				{
 					return texture.m_CanonicalPath == path &&
 						texture.m_ImportSettings == importSettings;
 				});
-			if (existing != model.m_Textures.end())
+			if (existing != model.m_TextureSources.end())
 			{
-				return static_cast<uint32_t>(std::distance(model.m_Textures.begin(), existing));
+				return static_cast<uint32_t>(std::distance(
+					model.m_TextureSources.begin(),
+					existing));
 			}
 
-			ImportedTexture texture{};
+			ImportedTextureSource texture{};
 			texture.m_CanonicalPath = path;
 			texture.m_ImportSettings = importSettings;
 			texture.m_Semantic = semantic;
-			texture.m_Data = TextureLoader::LoadTextureData(path, importSettings, progress);
-			model.m_Textures.emplace_back(std::move(texture));
-			return static_cast<uint32_t>(model.m_Textures.size() - 1);
+			model.m_TextureSources.emplace_back(std::move(texture));
+			return static_cast<uint32_t>(model.m_TextureSources.size() - 1);
 		}
 	}
 
@@ -351,17 +351,10 @@ namespace gglab
 
 				const auto canonicalTexturePath = utils::Canonical(directory / texturePath.C_Str());
 				ImportedMaterialTextureBinding& binding = destination.m_TextureBindings[slotIndex];
-				const float slotBegin = static_cast<float>(slotIndex) /
-					static_cast<float>(utils::ToIndex(MaterialTextureSlot::Count));
-				const float slotEnd = static_cast<float>(slotIndex + 1) /
-					static_cast<float>(utils::ToIndex(MaterialTextureSlot::Count));
-				binding.m_TextureIndex = ImportTexture(
+				binding.m_TextureIndex = RegisterTextureSource(
 					model,
 					canonicalTexturePath,
-					semantic,
-					progress.Subrange(
-						std::lerp(materialBegin, materialEnd, slotBegin),
-						std::lerp(materialBegin, materialEnd, slotEnd)));
+					semantic);
 				binding.m_SamplerKey = MakeSamplerKey(mapMode, magFilter, minFilter, settings);
 				if (uvIndex > 1)
 				{
@@ -545,7 +538,7 @@ namespace gglab
 				"{} meshes, {} instances, {} textures",
 				model.m_Meshes.size(),
 				model.m_MeshInstances.size(),
-				model.m_Textures.size()));
+				model.m_TextureSources.size()));
 		return result;
 	}
 }
