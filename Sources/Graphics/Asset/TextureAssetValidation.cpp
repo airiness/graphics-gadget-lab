@@ -104,6 +104,7 @@ namespace gglab
 		case TextureStructureValidationError::InvalidSubresourceIndex: return "invalid texture subresource index";
 		case TextureStructureValidationError::DuplicateSubresource: return "duplicate texture subresource";
 		case TextureStructureValidationError::MissingSubresource: return "missing texture subresource";
+		case TextureStructureValidationError::NonCanonicalSubresourceOrder: return "non-canonical texture subresource order";
 		case TextureStructureValidationError::InvalidSubresourceExtent: return "invalid texture subresource extent";
 		case TextureStructureValidationError::OffsetOverflow: return "texture subresource offset overflow";
 		case TextureStructureValidationError::OutOfBounds: return "texture subresource is out of bounds";
@@ -250,8 +251,9 @@ namespace gglab
 		ranges.reserve(expectedSubresources);
 		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(data.m_ResourceFormat);
 
-		for (const TextureAssetSubresource& subresource : data.m_Subresources)
+		for (size_t ordinal = 0; ordinal < data.m_Subresources.size(); ++ordinal)
 		{
+			const TextureAssetSubresource& subresource = data.m_Subresources[ordinal];
 			if (subresource.m_MipLevel >= data.m_MipLevels ||
 				subresource.m_ArraySlice >= data.m_ArraySize)
 			{
@@ -262,6 +264,10 @@ namespace gglab
 			if (seen[subresourceIndex] != 0)
 			{
 				return Error(TextureStructureValidationError::DuplicateSubresource);
+			}
+			if (subresourceIndex != ordinal)
+			{
+				return Error(TextureStructureValidationError::NonCanonicalSubresourceOrder);
 			}
 			seen[subresourceIndex] = 1;
 

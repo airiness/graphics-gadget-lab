@@ -29,6 +29,7 @@ namespace gglab
 		InvalidSubresourceIndex,
 		DuplicateSubresource,
 		MissingSubresource,
+		NonCanonicalSubresourceOrder,
 		InvalidSubresourceExtent,
 		OffsetOverflow,
 		OutOfBounds,
