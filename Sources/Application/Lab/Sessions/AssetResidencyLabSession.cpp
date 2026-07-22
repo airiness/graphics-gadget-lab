@@ -193,6 +193,7 @@ namespace gglab
 		uint64_t m_TextureArtifactCacheHitCountBaseline = 0;
 		uint64_t m_TextureDdcHitCountBaseline = 0;
 		uint64_t m_TextureDdcWriteCountBaseline = 0;
+		uint64_t m_PublicationCopiedBytesBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
@@ -223,6 +224,8 @@ namespace gglab
 			return;
 		}
 		AssetManager& assetManager = *m_Services.m_AssetManager;
+		m_State->m_PublicationCopiedBytesBaseline = BuildAssetSnapshot(assetManager)
+			.m_ResourcePublicationQueue.m_SourceBytesCopiedToUpload;
 		m_State->m_OriginalResidencyConfig = assetManager.GetResidencyConfig();
 		assetManager.SetResidencyConfig({
 			.m_EnableAutomaticEviction = false,
@@ -315,6 +318,19 @@ namespace gglab
 				}
 			}
 			const AssetSnapshot dependencySnapshot = BuildAssetSnapshot(assetManager);
+			const AssetStreamingQueueStatistics& publication =
+				dependencySnapshot.m_ResourcePublicationQueue;
+			if (publication.m_PendingCount != 0 || publication.m_PendingSourceBytes != 0)
+			{
+				break;
+			}
+			if (publication.m_SourceBytesCopiedToUpload <=
+				m_State->m_PublicationCopiedBytesBaseline)
+			{
+				Fail(
+					"Model publication did not preserve source ownership through terminal cleanup or report copied upload payload bytes.");
+				return;
+			}
 			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
 				dependencySnapshot,
 				m_State->m_TextureId);
@@ -1179,7 +1195,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

@@ -48,13 +48,7 @@ namespace gglab
 			return {};
 		}
 		const ArtifactContentDigest contentDigest = artifact->m_ContentDigest;
-		const uint64_t bytes = artifact->GetAllocatedBytes();
-		return m_Core.Admit(
-			contentDigest,
-			{
-				.m_Artifact = std::move(artifact),
-				.m_PhysicalBytes = bytes,
-			});
+		return m_Core.Admit(contentDigest, std::move(artifact));
 	}
 
 	TextureArtifactHandle TextureArtifactCache::Find(

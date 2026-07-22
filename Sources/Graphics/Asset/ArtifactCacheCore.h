@@ -26,16 +26,10 @@ namespace gglab
 		uint64_t m_EvictedBytes = 0;
 	};
 
-	template<typename Artifact>
-	struct ArtifactCacheAdmission
-	{
-		std::shared_ptr<const Artifact> m_Artifact;
-		uint64_t m_PhysicalBytes = 0;
-	};
-
-	// Wrappers own artifact validation, key selection, and byte estimation. The
-	// core keeps cache entries and allocation tickets on the same lifetime model,
-	// while tickets may remain alive through external handles after eviction.
+	// Wrappers own artifact validation and key selection. The core derives the
+	// physical allocation size from the immutable artifact, then keeps cache
+	// entries and allocation tickets on the same lifetime model. Tickets may
+	// remain alive through external handles after eviction.
 	template<typename Key, typename Artifact, typename KeyHash = std::hash<Key>>
 	class ArtifactCacheCore final
 	{
@@ -51,25 +45,33 @@ namespace gglab
 
 		[[nodiscard]] Handle Admit(
 			const Key& key,
-			ArtifactCacheAdmission<Artifact>&& admission) noexcept
+			Handle artifact) noexcept
 		{
-			if (!admission.m_Artifact || admission.m_PhysicalBytes == 0)
+			if (!artifact)
 			{
 				return {};
 			}
 
 			if (auto existing = m_Entries.find(key); existing != m_Entries.end())
 			{
-				GGLAB_ASSERT_MSG(
-					existing->second.m_PhysicalBytes == admission.m_PhysicalBytes,
-					"Repeated artifact cache admission changed the physical byte estimate.");
+				if (existing->second.m_Artifact.get() == artifact.get())
+				{
+					GGLAB_ASSERT_MSG(
+						existing->second.m_PhysicalBytes == artifact->GetAllocatedBytes(),
+						"Repeated artifact handle admission changed the physical byte estimate.");
+				}
 				Touch(existing->second);
 				return existing->second.m_Artifact;
 			}
 
-			const uint64_t physicalBytes = admission.m_PhysicalBytes;
+			AssertNoPointerAlias(artifact.get());
+			const uint64_t physicalBytes = artifact->GetAllocatedBytes();
+			if (physicalBytes == 0)
+			{
+				return {};
+			}
 			Handle trackedArtifact = TrackAllocation(
-				std::move(admission.m_Artifact),
+				std::move(artifact),
 				physicalBytes);
 			if (physicalBytes > m_BudgetBytes)
 			{
@@ -165,6 +167,21 @@ namespace gglab
 		{
 			std::atomic_uint64_t m_Bytes = 0;
 		};
+
+		void AssertNoPointerAlias(const Artifact* artifact) const noexcept
+		{
+#ifndef NDEBUG
+			for (const auto& [existingKey, entry] : m_Entries)
+			{
+				GGLAB_UNUSED(existingKey);
+				GGLAB_ASSERT_MSG(
+					entry.m_Artifact.get() != artifact,
+					"One artifact allocation cannot be admitted under multiple cache keys.");
+			}
+#else
+			GGLAB_UNUSED(artifact);
+#endif
+		}
 
 		[[nodiscard]] Handle TrackAllocation(
 			Handle artifact,

@@ -713,13 +713,13 @@ namespace gglab
 				queue.m_ResourceCreationCount > 0)
 			{
 				ImGui::Text(
-					"Step jobs: continue=%llu completed=%llu failed=%llu creations=%llu payload moved/destroyed=%.2f/%.2f MiB",
+					"Step jobs: continue=%llu completed=%llu failed=%llu creations=%llu source released/copied=%.2f/%.2f MiB",
 					queue.m_ContinueCount,
 					queue.m_CompletedCount,
 					queue.m_FailedCount,
 					queue.m_ResourceCreationCount,
-					static_cast<double>(queue.m_PayloadBytesMovedToUpload) / (1024.0 * 1024.0),
-					static_cast<double>(queue.m_PayloadBytesDestroyed) / (1024.0 * 1024.0));
+					static_cast<double>(queue.m_SourceBytesReleased) / (1024.0 * 1024.0),
+					static_cast<double>(queue.m_SourceBytesCopiedToUpload) / (1024.0 * 1024.0));
 				ImGui::Text(
 					"Step diagnostics: over-budget=%llu no-progress=%llu injected-faults=%llu",
 					queue.m_OverBudgetExecutionCount,
