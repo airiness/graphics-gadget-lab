@@ -369,8 +369,9 @@ namespace gglab
 				assetSnapshot.m_TextureDerivedDataCancelledWaiterCount);
 			if (ImGui::Button("Clear Texture Local DDC"))
 			{
-				assetManager.ClearTextureDerivedDataCache();
-				state.m_Status = "Texture local DDC cleared.";
+				state.m_Status = assetManager.ClearTextureDerivedDataCache() ?
+					"Texture local DDC cleared." :
+					"Texture local DDC clear failed; existing data was preserved.";
 			}
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));

@@ -190,7 +190,10 @@ namespace gglab
 		{
 			return m_TextureDerivedDataSystem.Contains(key);
 		}
-		void ClearTextureDerivedDataCache() noexcept { m_TextureDerivedDataSystem.Clear(); }
+		[[nodiscard]] bool ClearTextureDerivedDataCache() noexcept
+		{
+			return m_TextureDerivedDataSystem.Clear();
+		}
 		[[nodiscard]] bool HasPendingCompletions() const noexcept
 		{
 			return !m_PendingCompletions.empty();

@@ -3,6 +3,7 @@
 #include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
 
 #include <atomic>
 #include <filesystem>
@@ -86,18 +87,27 @@ namespace gglab
 			return Probe(key) == DerivedDataPresence::Present;
 		}
 		void DiscardCorrupt(const DerivedDataKey& key) noexcept;
-		void Clear() noexcept;
+		[[nodiscard]] bool Clear() noexcept;
 		[[nodiscard]] bool ReconcileCatalog() noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStatistics() const noexcept;
 		[[nodiscard]] bool IsEnabled() const noexcept { return !m_RootDirectory.empty(); }
 
 	private:
 		[[nodiscard]] std::filesystem::path EntryPath(const DerivedDataKey& key) const;
+		[[nodiscard]] win32::NamedMutexGuard AcquireMaintenanceLock() noexcept;
+		void CleanupOrphanTemporaryFilesLocked() noexcept;
+		[[nodiscard]] std::vector<std::filesystem::path> CollectTrashPathsLocked() const noexcept;
+		[[nodiscard]] std::filesystem::path MakeTrashPath() noexcept;
+		static void ScheduleTrashCleanup(
+			std::vector<std::filesystem::path> trashPaths) noexcept;
 
+		LocalDerivedDataRootIdentity m_RootIdentity;
 		std::filesystem::path m_RootDirectory;
 		LocalDerivedDataCatalog m_Catalog;
+		LocalDerivedDataMaintenanceLock m_MaintenanceLock;
 		mutable std::mutex m_Mutex;
 		std::atomic_uint64_t m_TemporarySerial = 1;
+		std::atomic_uint64_t m_TrashSerial = 1;
 		std::atomic_uint64_t m_HitCount = 0;
 		std::atomic_uint64_t m_MissCount = 0;
 		std::atomic_uint64_t m_CorruptionCount = 0;

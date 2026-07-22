@@ -9,6 +9,7 @@
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 
+#include <cwctype>
 #include <fstream>
 #include <thread>
 
@@ -409,6 +410,237 @@ namespace gglab
 			std::filesystem::remove_all(root, errorCode);
 		}
 
+		void RunLocalDerivedDataMaintenanceTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path root = std::filesystem::temp_directory_path(errorCode) /
+				std::format(
+					"gglab.ddc-maintenance-self-test.{}.{}",
+					GetCurrentProcessId(),
+					reinterpret_cast<uintptr_t>(&context));
+			if (errorCode)
+			{
+				context.Check(false, "Local DDC maintenance self-test resolves a temporary directory");
+				return;
+			}
+			std::filesystem::remove_all(root, errorCode);
+
+			constexpr std::string_view ArtifactType = "gglab.maintenance-self-test";
+			constexpr uint32_t SchemaVersion = 1;
+			constexpr std::array<std::byte, 4> Payload{
+				std::byte{ 0x51 },
+				std::byte{ 0x52 },
+				std::byte{ 0x53 },
+				std::byte{ 0x54 },
+			};
+			DerivedDataKey key{};
+			key.m_Value = ComputeSha256(std::as_bytes(std::span{ ArtifactType })).m_Value;
+			ArtifactContentDigest artifactDigest{};
+			artifactDigest.m_Value = ComputeSha256(Payload).m_Value;
+			const auto entryPath = [&key](const std::filesystem::path& storeRoot)
+			{
+				const std::string keyText = DerivedDataKeyText(key, key.m_Value.size());
+				return storeRoot / keyText.substr(0, 2) / (keyText + ".ddc");
+			};
+
+			{
+				const std::filesystem::path identityRoot = root / "Identity";
+				std::wstring alternateText = identityRoot.wstring();
+				std::ranges::transform(alternateText, alternateText.begin(),
+					[](wchar_t value) noexcept { return static_cast<wchar_t>(std::towupper(value)); });
+				const LocalDerivedDataRootIdentity canonical =
+					ResolveLocalDerivedDataRootIdentity(identityRoot / ".");
+				const LocalDerivedDataRootIdentity alternate =
+					ResolveLocalDerivedDataRootIdentity(std::filesystem::path(alternateText));
+				context.Check(
+					canonical.IsValid() && alternate.IsValid() &&
+						canonical.m_CanonicalUtf8 == alternate.m_CanonicalUtf8 &&
+						canonical.m_MutexName == alternate.m_MutexName &&
+						canonical.m_MutexName.starts_with(L"Local\\gglab.ddc."),
+					"Local DDC root identity normalizes absolute path spelling and case");
+			}
+
+			{
+				const std::filesystem::path concurrentRoot = root / "concurrent-writers";
+				LocalDerivedDataStore first(concurrentRoot);
+				LocalDerivedDataStore second(concurrentRoot);
+				std::array<bool, 2> writes{};
+				std::jthread firstWriter([&]() noexcept
+				{
+					writes[0] = first.Write(
+						key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				});
+				std::jthread secondWriter([&]() noexcept
+				{
+					writes[1] = second.Write(
+						key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				});
+				firstWriter.join();
+				secondWriter.join();
+				const DerivedDataReadResult result = first.Read(
+					key, ArtifactType, SchemaVersion);
+				context.Check(
+					writes[0] && writes[1] &&
+						result.m_Disposition == DerivedDataReadDisposition::Hit &&
+						std::ranges::equal(result.m_Payload, Payload),
+					"Local DDC maintenance lock serializes immutable publication to one key");
+			}
+
+			{
+				const std::filesystem::path raceRoot = root / "clear-writer";
+				LocalDerivedDataStore writer(raceRoot);
+				LocalDerivedDataStore clearer(raceRoot);
+				std::atomic_bool writesSucceeded = true;
+				std::atomic_bool clearsSucceeded = true;
+				std::jthread writeThread([&]() noexcept
+				{
+					for (uint32_t iteration = 0; iteration < 32; ++iteration)
+					{
+						if (!writer.Write(key, ArtifactType, SchemaVersion, artifactDigest, Payload))
+						{
+							writesSucceeded.store(false, std::memory_order_relaxed);
+						}
+					}
+				});
+				std::jthread clearThread([&]() noexcept
+				{
+					for (uint32_t iteration = 0; iteration < 8; ++iteration)
+					{
+						if (!clearer.Clear())
+						{
+							clearsSucceeded.store(false, std::memory_order_relaxed);
+						}
+					}
+				});
+				writeThread.join();
+				clearThread.join();
+				const bool finalWrite = writer.Write(
+					key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				context.Check(
+					writesSucceeded.load(std::memory_order_relaxed) &&
+						clearsSucceeded.load(std::memory_order_relaxed) && finalWrite &&
+						clearer.Read(key, ArtifactType, SchemaVersion).m_Disposition ==
+							DerivedDataReadDisposition::Hit,
+					"Local DDC Clear and writers coordinate without losing the replacement root");
+			}
+
+			{
+				const std::filesystem::path readRoot = root / "lock-free-read";
+				LocalDerivedDataStore store(readRoot);
+				GGLAB_UNUSED(store.Write(key, ArtifactType, SchemaVersion, artifactDigest, Payload));
+				std::atomic_bool stopReader = false;
+				std::atomic_uint32_t corruptReads = 0;
+				std::jthread reader([&]() noexcept
+				{
+					while (!stopReader.load(std::memory_order_relaxed))
+					{
+						if (store.Read(key, ArtifactType, SchemaVersion).m_Disposition ==
+							DerivedDataReadDisposition::Corrupt)
+						{
+							corruptReads.fetch_add(1, std::memory_order_relaxed);
+						}
+					}
+				});
+				for (uint32_t iteration = 0; iteration < 8; ++iteration)
+				{
+					if (store.Clear())
+					{
+						GGLAB_UNUSED(store.Write(
+							key, ArtifactType, SchemaVersion, artifactDigest, Payload));
+					}
+				}
+				stopReader.store(true, std::memory_order_relaxed);
+				reader.join();
+				const bool finalMaintenance = store.Clear() && store.Write(
+					key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				context.Check(
+					finalMaintenance && corruptReads.load(std::memory_order_relaxed) == 0 &&
+						store.Read(key, ArtifactType, SchemaVersion).m_Disposition ==
+							DerivedDataReadDisposition::Hit,
+					"Local DDC lock-free Read treats concurrent Clear as a transient miss");
+			}
+
+			{
+				const std::filesystem::path abandonedRoot = root / "abandoned";
+				LocalDerivedDataStore store(abandonedRoot);
+				const LocalDerivedDataRootIdentity identity =
+					ResolveLocalDerivedDataRootIdentity(abandonedRoot);
+				const std::filesystem::path orphanTemporary =
+					abandonedRoot / "orphan.ddc.tmp.crashed";
+				GGLAB_UNUSED(std::filesystem::create_directories(abandonedRoot, errorCode));
+				{
+					std::ofstream orphanStream(orphanTemporary, std::ios::binary | std::ios::trunc);
+					orphanStream.put('x');
+				}
+				HANDLE rawMutex = ::CreateMutexW(nullptr, FALSE, identity.m_MutexName.c_str());
+				std::atomic_bool acquired = false;
+				std::jthread abandoningThread([&]() noexcept
+				{
+					if (::WaitForSingleObject(rawMutex, INFINITE) == WAIT_OBJECT_0)
+					{
+						acquired.store(true, std::memory_order_release);
+					}
+					// Exiting the owning thread without ReleaseMutex intentionally abandons it.
+				});
+				abandoningThread.join();
+				const bool recovered = store.Write(
+					key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				if (rawMutex) ::CloseHandle(rawMutex);
+				context.Check(
+					rawMutex && acquired.load(std::memory_order_acquire) && recovered &&
+						!std::filesystem::exists(orphanTemporary),
+					"Local DDC recovers an abandoned mutex and removes orphan temporary files");
+			}
+
+			{
+				const std::filesystem::path blockedRoot = root / "rename-failure";
+				LocalDerivedDataStore store(blockedRoot);
+				const bool wrote = store.Write(
+					key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				const std::filesystem::path path = entryPath(blockedRoot);
+				HANDLE reader = ::CreateFileW(
+					path.c_str(),
+					GENERIC_READ,
+					FILE_SHARE_READ | FILE_SHARE_WRITE,
+					nullptr,
+					OPEN_EXISTING,
+					FILE_ATTRIBUTE_NORMAL,
+					nullptr);
+				const bool clearRejected = reader != INVALID_HANDLE_VALUE && !store.Clear();
+				if (reader != INVALID_HANDLE_VALUE) ::CloseHandle(reader);
+				const DerivedDataReadResult preserved = store.Read(
+					key, ArtifactType, SchemaVersion);
+				context.Check(
+					wrote && clearRejected &&
+						preserved.m_Disposition == DerivedDataReadDisposition::Hit,
+					"Local DDC Clear preserves the active root when rename fails");
+			}
+
+			{
+				const std::filesystem::path retryRoot = root / "trash-retry";
+				const std::filesystem::path staleTrash =
+					retryRoot.parent_path() /
+					(retryRoot.filename().wstring() + L".trash.previous");
+				GGLAB_UNUSED(std::filesystem::create_directories(staleTrash, errorCode));
+				{
+					std::ofstream staleFile(staleTrash / "entry.ddc", std::ios::binary);
+					staleFile.put('x');
+				}
+				LocalDerivedDataStore store(retryRoot);
+				for (uint32_t attempt = 0;
+					attempt < 200 && std::filesystem::exists(staleTrash); ++attempt)
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				}
+				context.Check(
+					!std::filesystem::exists(staleTrash),
+					"Local DDC retries best-effort cleanup of trash left by an earlier process");
+			}
+
+			errorCode.clear();
+			std::filesystem::remove_all(root, errorCode);
+		}
+
 		void RunModelImportArtifactTests(SelfTestContext& context) noexcept
 		{
 			{
@@ -627,6 +859,7 @@ namespace gglab
 		RunTextureCodecTests(context);
 		RunTextureStructureValidationTests(context);
 		RunLocalDerivedDataStoreTests(context);
+		RunLocalDerivedDataMaintenanceTests(context);
 		RunModelImportArtifactTests(context);
 		RunRHITextureValidationTests(context);
 	}

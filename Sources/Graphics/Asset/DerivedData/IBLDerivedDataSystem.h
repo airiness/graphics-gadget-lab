@@ -81,7 +81,7 @@ namespace gglab
 		[[nodiscard]] IBLStageArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept;
 		void ClearArtifactCache() noexcept;
-		void ClearStore() noexcept;
+		[[nodiscard]] bool ClearStore() noexcept;
 
 	private:
 		[[nodiscard]] std::array<DerivedDataKey,

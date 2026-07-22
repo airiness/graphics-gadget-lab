@@ -252,6 +252,7 @@
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
@@ -358,6 +359,7 @@
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
@@ -565,6 +567,7 @@
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />
@@ -668,6 +671,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />

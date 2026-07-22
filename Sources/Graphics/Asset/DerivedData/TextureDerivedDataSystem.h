@@ -154,7 +154,7 @@ namespace gglab
 		{
 			return m_Store.Contains(key);
 		}
-		void Clear() noexcept { m_Store.Clear(); }
+		[[nodiscard]] bool Clear() noexcept { return m_Store.Clear(); }
 
 	private:
 		std::shared_ptr<TextureDerivedDataCoordinatorCore> m_Core;

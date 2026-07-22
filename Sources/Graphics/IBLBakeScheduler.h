@@ -88,7 +88,10 @@ namespace gglab
 			return m_DerivedDataSystem.GetStoreStatistics();
 		}
 		void ClearArtifactCache() noexcept { m_DerivedDataSystem.ClearArtifactCache(); }
-		void ClearDerivedDataStore() noexcept { m_DerivedDataSystem.ClearStore(); }
+		[[nodiscard]] bool ClearDerivedDataStore() noexcept
+		{
+			return m_DerivedDataSystem.ClearStore();
+		}
 
 	private:
 		struct CacheLoadWork;
