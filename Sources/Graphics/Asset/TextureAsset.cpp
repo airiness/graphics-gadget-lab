@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/TextureAsset.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 #include "Core/Hash/KeyHash.h"
 
 namespace gglab
@@ -56,44 +57,34 @@ namespace gglab
 
 	bool TextureAssetData::IsValid() const noexcept
 	{
-		const bool validViewDimension =
-			m_SrvDimension == RHITextureViewDimension::Texture2D ||
-			(m_SrvDimension == RHITextureViewDimension::Texture2DArray && m_ArraySize > 1) ||
-			(m_SrvDimension == RHITextureViewDimension::TextureCube && m_ArraySize == CubemapFaceCount) ||
-			(m_SrvDimension == RHITextureViewDimension::TextureCubeArray &&
-				m_ArraySize >= CubemapFaceCount && (m_ArraySize % CubemapFaceCount) == 0);
-
-		return validViewDimension &&
-			m_ResourceFormat != RHIFormat::Unknown &&
-			m_ViewFormat != RHIFormat::Unknown &&
-			m_Extent.m_Width > 0 &&
-			m_Extent.m_Height > 0 &&
-			m_Extent.m_Depth > 0 &&
-			m_ArraySize > 0 &&
-			m_MipLevels > 0 &&
-			!m_Pixels.empty() &&
-			!m_Subresources.empty();
+		return ValidateTextureAssetStructure(*this).IsValid();
 	}
 
 	RHITextureUploadData TextureAssetData::MakeUploadData() const noexcept
 	{
+		const TextureStructureValidationResult validation =
+			ValidateTextureAssetStructure(*this);
+		if (!validation.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureAssetData::MakeUploadData rejected invalid texture data: {}.",
+				TextureStructureValidationErrorText(validation.m_Error));
+			return {};
+		}
+
 		RHITextureUploadData uploadData{};
-		uploadData.m_Subresources.reserve(m_Subresources.size());
+		uploadData.m_Subresources.resize(m_Subresources.size());
 
 		for (const TextureAssetSubresource& subresource : m_Subresources)
 		{
-			if (subresource.m_DataOffset + subresource.m_DataSize > m_Pixels.size())
-			{
-				GGLAB_LOG_GRAPHICS_WARN("TextureAssetData::MakeUploadData skipped an out-of-range subresource.");
-				continue;
-			}
-
-			uploadData.m_Subresources.push_back(
+			const size_t index = static_cast<size_t>(subresource.m_ArraySlice) *
+				m_MipLevels + subresource.m_MipLevel;
+			uploadData.m_Subresources[index] =
 				{
 					.m_Data = m_Pixels.data() + subresource.m_DataOffset,
 					.m_RowPitch = subresource.m_RowPitch,
 					.m_SlicePitch = subresource.m_SlicePitch,
-				});
+				};
 		}
 
 		return uploadData;

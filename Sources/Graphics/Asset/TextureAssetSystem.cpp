@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
@@ -912,14 +913,20 @@ namespace gglab
 				textureData.m_Extent.m_Height,
 				textureData.m_MipLevels,
 				textureData.m_Subresources.size()));
-		if (!textureData.IsValid())
+		const TextureUploadValidationResult textureValidation =
+			ValidateTextureUploadForDevice(textureData, *m_Device);
+		if (!textureValidation.IsValid())
 		{
 			SetTextureState(
 				*texture,
 				AssetState::Failed,
 				residencyOperation,
 				operationPhase);
-			GGLAB_LOG_GRAPHICS_ERROR("TextureAssetSystem::UploadTexture received invalid texture asset data.");
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureAssetSystem::UploadTexture rejected {} texture data (structure={}, rhi={}).",
+				TextureUploadValidationDispositionText(textureValidation.m_Disposition),
+				TextureStructureValidationErrorText(textureValidation.m_StructureError),
+				RHITextureValidationErrorText(textureValidation.m_RHIError));
 			return false;
 		}
 		if (!uploadData.m_ContentFingerprint.IsValid())
@@ -945,14 +952,7 @@ namespace gglab
 			return false;
 		}
 
-		RHITextureDesc textureDesc{};
-		textureDesc.m_Dimension = RHITextureDimension::Texture2D;
-		textureDesc.m_Format = textureData.m_ResourceFormat;
-		textureDesc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest;
-		textureDesc.m_Extent = textureData.m_Extent;
-		textureDesc.m_ArraySize = textureData.m_ArraySize;
-		textureDesc.m_MipLevels = textureData.m_MipLevels;
-		textureDesc.m_SampleCount = 1;
+		const RHITextureDesc textureDesc = BuildTextureRHITextureDesc(textureData);
 		const std::string category = std::format(
 			"Texture.{}",
 			TextureSemanticDebugText(uploadData.m_ImportSettings.m_Semantic));
@@ -1022,14 +1022,7 @@ namespace gglab
 		};
 		transferBatch.TextureBarrier(std::span{ &barrier, 1 });
 
-		RHITextureViewDesc srvDesc{};
-		srvDesc.m_Type = RHITextureViewType::ShaderResource;
-		srvDesc.m_Dimension = textureData.m_SrvDimension;
-		srvDesc.m_Format = textureData.m_ViewFormat;
-		srvDesc.m_Subresources.m_BaseMip = 0;
-		srvDesc.m_Subresources.m_MipCount = textureData.m_MipLevels;
-		srvDesc.m_Subresources.m_BaseArraySlice = 0;
-		srvDesc.m_Subresources.m_ArraySliceCount = textureData.m_ArraySize;
+		const RHITextureViewDesc srvDesc = BuildTextureRHISRVDesc(textureData);
 
 		texture->m_Gpu.m_Srv = m_Device->CreateTextureView(texture->m_Gpu.m_Texture, srvDesc);
 		GGLAB_ASSERT_MSG(texture->m_Gpu.m_Srv.IsValid(), "TextureAssetSystem::UploadTexture: failed to create RHI texture SRV.");

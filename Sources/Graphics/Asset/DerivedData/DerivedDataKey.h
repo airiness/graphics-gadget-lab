@@ -65,7 +65,7 @@ namespace gglab
 		Sha256Builder m_Builder;
 	};
 
-	inline constexpr uint32_t TextureArtifactSchemaVersion = 1;
+	inline constexpr uint32_t TextureArtifactSchemaVersion = 2;
 	inline constexpr uint32_t TextureProducerCompatibilityVersion = 1;
 
 	[[nodiscard]] DerivedDataKey BuildTextureDerivedDataKey(

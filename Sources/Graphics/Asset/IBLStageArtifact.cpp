@@ -145,6 +145,19 @@ namespace gglab
 		IBLArtifactStage stage,
 		TextureAssetData&& texture) noexcept
 	{
+		if (stage == IBLArtifactStage::Environment ||
+			stage == IBLArtifactStage::Irradiance ||
+			stage == IBLArtifactStage::PrefilteredSpecular)
+		{
+			texture.m_SrvDimension = texture.m_ArraySize == CubemapFaceCount ?
+				RHITextureViewDimension::TextureCube :
+				RHITextureViewDimension::TextureCubeArray;
+		}
+		else if (stage == IBLArtifactStage::BrdfLut)
+		{
+			texture.m_SrvDimension = RHITextureViewDimension::Texture2D;
+		}
+
 		IBLStageArtifact artifact{
 			.m_Stage = stage,
 			.m_Texture = std::move(texture),

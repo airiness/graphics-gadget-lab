@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Asset/TextureArtifact.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 
 #include <span>
 #include <string>
@@ -13,6 +14,8 @@ namespace gglab
 	{
 		TextureArtifact m_Artifact;
 		std::string m_Error;
+		TextureStructureValidationError m_StructureError =
+			TextureStructureValidationError::None;
 		[[nodiscard]] bool Succeeded() const noexcept { return m_Artifact.IsValid(); }
 	};
 
@@ -25,6 +28,7 @@ namespace gglab
 			const TextureAssetData& textureData) noexcept;
 		[[nodiscard]] static TextureArtifactDecodeResult Deserialize(
 			std::span<const std::byte> payload,
-			const ArtifactContentDigest& expectedContentDigest) noexcept;
+			const ArtifactContentDigest& expectedContentDigest,
+			TextureAssetValidationLimits limits = {}) noexcept;
 	};
 }

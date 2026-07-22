@@ -66,6 +66,7 @@ namespace gglab
 		writer.U32(texture.m_MipLevels);
 		writer.U32(static_cast<uint32_t>(texture.m_ColorSpace));
 		writer.U64(texture.m_Subresources.size());
+		writer.U64(texture.m_Pixels.size());
 		for (const TextureAssetSubresource& subresource : texture.m_Subresources)
 		{
 			writer.U64(subresource.m_DataOffset);
@@ -78,14 +79,14 @@ namespace gglab
 			writer.U32(subresource.m_MipLevel);
 			writer.U32(subresource.m_ArraySlice);
 		}
-		writer.U64(texture.m_Pixels.size());
 		writer.Bytes(texture.m_Pixels);
 		return std::move(writer.m_Data);
 	}
 
 	TextureArtifactDecodeResult TextureArtifactCodec::Deserialize(
 		std::span<const std::byte> payload,
-		const ArtifactContentDigest& expectedContentDigest) noexcept
+		const ArtifactContentDigest& expectedContentDigest,
+		TextureAssetValidationLimits limits) noexcept
 	{
 		TextureArtifactDecodeResult result{};
 		if (payload.empty() || !expectedContentDigest.IsValid())
@@ -99,15 +100,16 @@ namespace gglab
 		uint32_t resourceFormat = 0, viewFormat = 0, srvDimension = 0;
 		uint32_t arraySize = 0, mipLevels = 0, colorSpace = 0;
 		uint64_t subresourceCount = 0;
+		uint64_t pixelBytes = 0;
 		if (!reader.U32(schema) || schema != TextureArtifactSchemaVersion ||
 			!reader.U32(resourceFormat) || !reader.U32(viewFormat) ||
 			!reader.U32(srvDimension) || !reader.U32(texture.m_Extent.m_Width) ||
 			!reader.U32(texture.m_Extent.m_Height) || !reader.U32(texture.m_Extent.m_Depth) ||
 			!reader.U32(arraySize) || !reader.U32(mipLevels) ||
 			!reader.U32(colorSpace) || !reader.U64(subresourceCount) ||
+			!reader.U64(pixelBytes) ||
 			arraySize > std::numeric_limits<uint16_t>::max() ||
-			mipLevels > std::numeric_limits<uint16_t>::max() ||
-			subresourceCount > reader.Remaining() / 52)
+			mipLevels > std::numeric_limits<uint16_t>::max())
 		{
 			result.m_Error = "Texture DDC payload header is invalid.";
 			return result;
@@ -118,6 +120,38 @@ namespace gglab
 		texture.m_ArraySize = static_cast<uint16_t>(arraySize);
 		texture.m_MipLevels = static_cast<uint16_t>(mipLevels);
 		texture.m_ColorSpace = static_cast<TextureColorSpace>(colorSpace);
+
+		const TextureStructureValidationResult metadataValidation =
+			ValidateTextureAssetMetadata(texture, subresourceCount, pixelBytes, limits);
+		if (!metadataValidation.IsValid())
+		{
+			result = {};
+			result.m_StructureError = metadataValidation.m_Error;
+			result.m_Error = std::format(
+				"Texture DDC metadata failed validation: {}.",
+				TextureStructureValidationErrorText(metadataValidation.m_Error));
+			return result;
+		}
+
+		constexpr uint64_t SubresourceRecordBytes = 52;
+		if (subresourceCount > std::numeric_limits<size_t>::max() ||
+			pixelBytes > std::numeric_limits<size_t>::max() ||
+			subresourceCount > std::numeric_limits<uint64_t>::max() / SubresourceRecordBytes)
+		{
+			result = {};
+			result.m_StructureError = TextureStructureValidationError::ExceedsConfiguredLimit;
+			result.m_Error = "Texture DDC allocation size exceeds the platform limit.";
+			return result;
+		}
+		const uint64_t subresourceTableBytes = subresourceCount * SubresourceRecordBytes;
+		if (subresourceTableBytes > reader.Remaining() ||
+			pixelBytes != reader.Remaining() - subresourceTableBytes)
+		{
+			result = {};
+			result.m_Error = "Texture DDC payload sizes are inconsistent.";
+			return result;
+		}
+
 		texture.m_Subresources.resize(static_cast<size_t>(subresourceCount));
 		for (TextureAssetSubresource& subresource : texture.m_Subresources)
 		{
@@ -132,19 +166,22 @@ namespace gglab
 				return result;
 			}
 		}
-		uint64_t pixelBytes = 0;
-		if (!reader.U64(pixelBytes) || pixelBytes != reader.Remaining() ||
-			pixelBytes > std::numeric_limits<size_t>::max())
+		texture.m_Pixels.resize(static_cast<size_t>(pixelBytes));
+		if (!reader.Bytes(texture.m_Pixels) || reader.Remaining() != 0)
 		{
 			result = {};
-			result.m_Error = "Texture DDC pixel payload size is invalid.";
+			result.m_Error = "Texture DDC pixel payload is truncated.";
 			return result;
 		}
-		texture.m_Pixels.resize(static_cast<size_t>(pixelBytes));
-		if (!reader.Bytes(texture.m_Pixels) || reader.Remaining() != 0 || !texture.IsValid())
+		const TextureStructureValidationResult structureValidation =
+			ValidateTextureAssetStructure(texture, limits);
+		if (!structureValidation.IsValid())
 		{
 			result = {};
-			result.m_Error = "Texture DDC artifact failed structural validation.";
+			result.m_StructureError = structureValidation.m_Error;
+			result.m_Error = std::format(
+				"Texture DDC artifact failed structural validation: {}.",
+				TextureStructureValidationErrorText(structureValidation.m_Error));
 			return result;
 		}
 		result.m_Artifact.m_ContentDigest = ComputeTextureArtifactContentDigest(texture);
