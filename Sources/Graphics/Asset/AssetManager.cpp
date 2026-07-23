@@ -1133,9 +1133,18 @@ namespace gglab
 		const ModelID modelId{ static_cast<uint32_t>(key.m_StableId) };
 		const Model* model = GetModel(modelId);
 		if (!model ||
-			model->m_ContentGeneration != contentVersion.m_ContentGeneration ||
-			m_ModelDependencyOwners.contains(modelId) ||
-			m_ModelDependencyLeaseTokens.contains(modelId))
+			model->m_ContentGeneration != contentVersion.m_ContentGeneration)
+		{
+			return false;
+		}
+
+		// Retirement owns the final teardown of a model's internal dependency
+		// interests. Cancel any not-yet-executed publication work first so it
+		// cannot publish resources after the Store entry has been removed.
+		GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(contentVersion));
+		model = GetModel(modelId);
+		if (!model ||
+			model->m_ContentGeneration != contentVersion.m_ContentGeneration)
 		{
 			return false;
 		}
@@ -1148,6 +1157,7 @@ namespace gglab
 				materials.insert(instance.m_MaterialId);
 			}
 		}
+		ReleaseModelDependencyInterests(modelId);
 		UnregisterModelDependencies(modelId, contentVersion.m_ContentGeneration);
 		m_AssetLoadCoordinator.DiscardModelImport(key);
 		m_PendingModels.erase(modelId);
@@ -1236,25 +1246,27 @@ namespace gglab
 		uint32_t retiredModelCount = 0;
 		uint32_t retiredMeshCount = 0;
 		uint32_t retiredTextureCount = 0;
-		for (auto iterator = m_PendingRuntimeRetirements.begin();
-			iterator != m_PendingRuntimeRetirements.end() &&
+		for (size_t pendingIndex = 0;
+			pendingIndex < m_PendingRuntimeRetirements.size() &&
 				retiredCount < config.m_MaxRuntimeRetirementsPerFrame;)
 		{
-			const PendingRuntimeRetirement pending = *iterator;
+			const PendingRuntimeRetirement pending =
+				m_PendingRuntimeRetirements[pendingIndex];
 			const AssetContentVersion contentVersion = pending.m_ContentVersion;
 			const AssetKey key = contentVersion.m_Key;
 			if (HasActiveInterest(key) ||
 				HasPublicationRetain(key, contentVersion.m_ContentGeneration))
 			{
 				++m_RuntimeRetirementCancellationCount;
-				iterator = m_PendingRuntimeRetirements.erase(iterator);
+				m_PendingRuntimeRetirements.erase(
+					m_PendingRuntimeRetirements.begin() + pendingIndex);
 				continue;
 			}
 			if (m_AssetUsageFrame < pending.m_QueuedFrame ||
 				m_AssetUsageFrame - pending.m_QueuedFrame <
 					config.m_RuntimeEntryRetentionFrames)
 			{
-				++iterator;
+				++pendingIndex;
 				continue;
 			}
 
@@ -1278,7 +1290,8 @@ namespace gglab
 				lifecycle->m_ContentGeneration !=
 					contentVersion.m_ContentGeneration)
 			{
-				iterator = m_PendingRuntimeRetirements.erase(iterator);
+				m_PendingRuntimeRetirements.erase(
+					m_PendingRuntimeRetirements.begin() + pendingIndex);
 				continue;
 			}
 			if (lifecycle->m_ResidencyPolicy == AssetResidencyPolicy::Pinned ||
@@ -1292,13 +1305,13 @@ namespace gglab
 					lifecycle->m_State != AssetState::CpuReady &&
 					!IsTerminalAssetState(lifecycle->m_State)))
 			{
-				++iterator;
+				++pendingIndex;
 				continue;
 			}
 
 			if (!RetireRuntimeEntry(contentVersion))
 			{
-				++iterator;
+				++pendingIndex;
 				continue;
 			}
 			++retiredCount;
@@ -1309,7 +1322,8 @@ namespace gglab
 			retiredTextureCount +=
 				key.m_Kind == AssetKind::Texture ? 1u : 0u;
 			++m_RuntimeRetirementCount;
-			iterator = m_PendingRuntimeRetirements.erase(iterator);
+			m_PendingRuntimeRetirements.erase(
+				m_PendingRuntimeRetirements.begin() + pendingIndex);
 		}
 		if (retiredCount != 0)
 		{

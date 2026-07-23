@@ -168,6 +168,8 @@ namespace gglab
 			WaitForTextureReloadCompletion,
 			WaitForReload,
 			WaitForRuntimeRetirement,
+			WaitForDirectLoadReady,
+			WaitForDirectRuntimeRetirement,
 			Completed,
 		};
 
@@ -1200,6 +1202,110 @@ namespace gglab
 				Fail("Retired runtime entries remained addressable or pending.");
 				return;
 			}
+
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_RuntimeEntryRetentionFrames = 1'000'000;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Request = assetManager.LoadModelAsync(
+				"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
+				TaskPriority::Normal);
+			if (!m_State->m_Request.IsValid())
+			{
+				Fail("AssetManager rejected the direct-load retirement probe.");
+				return;
+			}
+			m_State->m_Phase = State::Phase::WaitForDirectLoadReady;
+			break;
+		}
+
+		case State::Phase::WaitForDirectLoadReady:
+		{
+			const Model* model = assetManager.GetModel(m_State->m_Request.m_ModelId);
+			if (!model ||
+				model->m_ContentGeneration != m_State->m_Request.m_Generation)
+			{
+				break;
+			}
+			if (model->m_State == AssetState::Failed ||
+				model->m_State == AssetState::Cancelled)
+			{
+				Fail("The direct-load retirement probe did not become Ready.");
+				return;
+			}
+			if (model->m_State != AssetState::Ready)
+			{
+				break;
+			}
+			if (model->m_MeshInstance.empty())
+			{
+				Fail("The direct-load retirement probe has no mesh instances.");
+				return;
+			}
+
+			const ModelMesh& instance = model->m_MeshInstance.front();
+			m_State->m_ModelGeneration = model->m_ContentGeneration;
+			m_State->m_MeshId = instance.m_MeshId;
+			m_State->m_MaterialId = instance.m_MaterialId;
+			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
+			const Material* material = assetManager.GetMaterial(m_State->m_MaterialId);
+			if (!mesh || !material)
+			{
+				Fail("The direct-load retirement probe has missing dependencies.");
+				return;
+			}
+			m_State->m_MeshGeneration = mesh->m_ContentGeneration;
+			m_State->m_TextureId.Reset();
+			for (TextureID textureId : std::array{
+				material->m_BaseColorBinding.m_TextureId,
+				material->m_MetallicRoughnessBinding.m_TextureId,
+				material->m_NormalBinding.m_TextureId,
+				material->m_OcclusionBinding.m_TextureId,
+				material->m_EmissiveBinding.m_TextureId })
+			{
+				if (textureId.IsValid() && !IsReservedTextureId(textureId))
+				{
+					m_State->m_TextureId = textureId;
+					break;
+				}
+			}
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
+				snapshot,
+				m_State->m_TextureId);
+			if (!texture)
+			{
+				Fail("The direct-load retirement probe has no runtime texture dependency.");
+				return;
+			}
+			m_State->m_TextureGeneration = texture->m_ContentGeneration;
+			m_State->m_RuntimeRetirementCountBaseline =
+				assetManager.GetOwnershipStatistics().m_RuntimeRetirementCount;
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_RuntimeEntryRetentionFrames = 0;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_Phase = State::Phase::WaitForDirectRuntimeRetirement;
+			break;
+		}
+
+		case State::Phase::WaitForDirectRuntimeRetirement:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			if (assetManager.GetModel(m_State->m_Request.m_ModelId) ||
+				assetManager.GetMesh(m_State->m_MeshId) ||
+				assetManager.GetMaterial(m_State->m_MaterialId) ||
+				FindTextureSnapshot(snapshot, m_State->m_TextureId))
+			{
+				break;
+			}
+			const AssetOwnershipStatistics ownership =
+				assetManager.GetOwnershipStatistics();
+			if (ownership.m_RuntimeRetirementCount <
+				m_State->m_RuntimeRetirementCountBaseline + 3 ||
+				ownership.m_PendingRuntimeRetirementCount != 0)
+			{
+				Fail("Direct-loaded runtime entries remained pending after retirement.");
+				return;
+			}
 			Complete();
 			break;
 		}
@@ -1262,7 +1368,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, unified model texture DDC production, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, stable-ID reload, and runtime entry retirement invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, unified model texture DDC production, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, stable-ID reload, owner-scoped retirement, and direct-load runtime retirement invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 
