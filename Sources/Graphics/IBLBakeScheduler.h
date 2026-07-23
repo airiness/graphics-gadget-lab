@@ -12,6 +12,92 @@
 
 namespace gglab
 {
+	namespace detail
+	{
+		struct IBLBakeResourceInitializationState
+		{
+			[[nodiscard]] constexpr bool ResetForRequestedBake() noexcept
+			{
+				if (m_InFlight)
+				{
+					return false;
+				}
+				*this = {};
+				return true;
+			}
+
+			[[nodiscard]] constexpr bool Begin(uint64_t generation) noexcept
+			{
+				if (generation == 0 || m_NeedsRecording || m_Executed || m_InFlight)
+				{
+					return false;
+				}
+				m_Generation = generation;
+				m_NeedsRecording = true;
+				return true;
+			}
+
+			[[nodiscard]] constexpr bool ShouldRecord(uint64_t generation) const noexcept
+			{
+				return m_NeedsRecording && m_Generation == generation;
+			}
+
+			[[nodiscard]] constexpr bool NotifyExecuted(uint64_t generation) noexcept
+			{
+				if (!ShouldRecord(generation))
+				{
+					return false;
+				}
+				m_Executed = true;
+				return true;
+			}
+
+			[[nodiscard]] constexpr bool HasExecuted() const noexcept
+			{
+				return m_Executed;
+			}
+
+			[[nodiscard]] constexpr bool Submit() noexcept
+			{
+				if (!m_Executed)
+				{
+					return false;
+				}
+				m_NeedsRecording = false;
+				m_Executed = false;
+				m_InFlight = true;
+				return true;
+			}
+
+			constexpr void AbortFrame() noexcept
+			{
+				m_Executed = false;
+			}
+
+			[[nodiscard]] constexpr bool IsInFlight() const noexcept
+			{
+				return m_InFlight;
+			}
+
+			[[nodiscard]] constexpr uint64_t Complete() noexcept
+			{
+				if (!m_InFlight)
+				{
+					return 0;
+				}
+				const uint64_t generation = m_Generation;
+				*this = {};
+				return generation;
+			}
+
+		private:
+			uint64_t m_Generation = 0;
+			bool m_NeedsRecording = false;
+			bool m_Executed = false;
+			bool m_InFlight = false;
+		};
+	}
+
 	class AssetManager;
 	class AssetOwnerScope;
 	class GpuProfiler;
@@ -64,7 +150,8 @@ namespace gglab
 		[[nodiscard]] IBLBakeStage GetStageForRecording() const noexcept;
 		[[nodiscard]] bool ShouldInitializeBakeResources() const noexcept
 		{
-			return m_BakeResourcesNeedInitialization;
+			return m_BakeResourceInitialization.ShouldRecord(
+				m_Status.m_BakingGeneration);
 		}
 		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept
 		{
@@ -104,7 +191,7 @@ namespace gglab
 		void BeginBakeResourceInitialization(
 			const RHIFencePoint& retireFence,
 			const std::shared_ptr<CacheLoadWork>& work) noexcept;
-		void ContinueRequestedBakeAfterInitialization() noexcept;
+		void ContinueRequestedBakeAfterInitialization(uint64_t generation) noexcept;
 		void AdvanceCompletedStage() noexcept;
 		void AdvanceToNextMissingStage() noexcept;
 		void MarkGpuStageBuilt(IBLArtifactStage stage) noexcept;
@@ -134,9 +221,7 @@ namespace gglab
 		RHIFencePoint m_InFlightFence{};
 		IBLBakeStage m_CompletedStage = IBLBakeStage::Idle;
 		IBLBakeStage m_ExecutedStage = IBLBakeStage::Idle;
-		bool m_BakeResourcesNeedInitialization = false;
-		bool m_BakeResourceInitializationExecuted = false;
-		bool m_BakeResourceInitializationInFlight = false;
+		detail::IBLBakeResourceInitializationState m_BakeResourceInitialization;
 		bool m_CacheUploadInFlight = false;
 		bool m_CacheReadbackInFlight = false;
 
