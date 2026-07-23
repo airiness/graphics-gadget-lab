@@ -841,11 +841,16 @@ namespace gglab
 				assetSnapshot.m_ManagedAssetCount,
 				assetSnapshot.m_OwnershipPriorityUpdateCount);
 			ImGui::Text(
-				"Last-interest policy: CPU cancelled=%llu ready-work cancelled=%llu GPU deferred=%llu Ready retained=%llu",
+				"Last-interest policy: CPU cancelled=%llu ready-work cancelled=%llu GPU deferred=%llu",
 				assetSnapshot.m_OwnershipCpuCancellationCount,
 				assetSnapshot.m_OwnershipReadyCancellationCount,
-				assetSnapshot.m_OwnershipGpuDeferredCancellationCount,
-				assetSnapshot.m_OwnershipReadyRetentionCount);
+				assetSnapshot.m_OwnershipGpuDeferredCancellationCount);
+			ImGui::Text(
+				"Runtime retirement: requested=%llu revived=%llu retired=%llu pending=%u",
+				assetSnapshot.m_RuntimeRetirementRequestCount,
+				assetSnapshot.m_RuntimeRetirementCancellationCount,
+				assetSnapshot.m_RuntimeRetirementCount,
+				assetSnapshot.m_PendingRuntimeRetirementCount);
 			ImGui::Text(
 				"Publication transaction: active retains=%llu protected cancellations=%llu",
 				assetSnapshot.m_PublicationRetainCount,
@@ -1031,6 +1036,10 @@ namespace gglab
 			static_cast<double>(snapshot->m_ResidencyHighWatermarkBytes) / (1024.0 * 1024.0),
 			snapshot->m_ResidencyMinUnusedFrames,
 			snapshot->m_MaxResidencyEvictionsPerFrame);
+		ImGui::Text(
+			"Runtime cache: retain %llu frames | Max retirements/frame: %u",
+			snapshot->m_RuntimeEntryRetentionFrames,
+			snapshot->m_MaxRuntimeRetirementsPerFrame);
 		ImGui::Text(
 			"Released: %llu assets / %.2f MiB | Rescinded: %llu | Reloading: %u",
 			snapshot->m_ResidencyEvictionCount,

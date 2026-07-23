@@ -167,12 +167,14 @@ namespace gglab
 			WaitForTextureReloadReplacement,
 			WaitForTextureReloadCompletion,
 			WaitForReload,
+			WaitForRuntimeRetirement,
 			Completed,
 		};
 
 		AssetManager::ModelLoadRequest m_Request{};
 		AssetResidencyConfig m_OriginalResidencyConfig{};
 		MeshID m_MeshId{};
+		MaterialID m_MaterialId{};
 		TextureID m_TextureId{};
 		uint64_t m_ModelGeneration = 0;
 		uint64_t m_MeshGeneration = 0;
@@ -192,9 +194,12 @@ namespace gglab
 		uint64_t m_TextureDdcHitCountBaseline = 0;
 		uint64_t m_TextureDdcWriteCountBaseline = 0;
 		uint64_t m_PublicationCopiedBytesBaseline = 0;
+		uint64_t m_RuntimeRetirementCountBaseline = 0;
 		uint64_t m_ModelUseCount = 0;
 		uint64_t m_MeshUseCount = 0;
 		uint64_t m_TextureUseCount = 0;
+		uint64_t m_RuntimeEntryRetentionFramesBeforePinned = 0;
+		uint32_t m_MaxRuntimeRetirementsPerFrameBeforePinned = 0;
 		uint32_t m_PinnedProtectionFrames = 0;
 		TaskHandle m_StaleTextureReloadTask{};
 		TaskHandle m_ReplacementTextureReloadTask{};
@@ -294,9 +299,10 @@ namespace gglab
 			}
 
 			m_State->m_MeshId = model->m_MeshInstance.front().m_MeshId;
+			m_State->m_MaterialId = model->m_MeshInstance.front().m_MaterialId;
 			const Mesh* mesh = assetManager.GetMesh(m_State->m_MeshId);
 			const Material* material = assetManager.GetMaterial(
-				model->m_MeshInstance.front().m_MaterialId);
+				m_State->m_MaterialId);
 			if (!mesh || !material || mesh->m_ResidencyState != AssetResidencyState::Resident)
 			{
 				Fail("The verification model has no resident mesh dependency.");
@@ -477,7 +483,13 @@ namespace gglab
 			}
 			ResetAssetInterests();
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			m_State->m_RuntimeEntryRetentionFramesBeforePinned =
+				config.m_RuntimeEntryRetentionFrames;
+			m_State->m_MaxRuntimeRetirementsPerFrameBeforePinned =
+				config.m_MaxRuntimeRetirementsPerFrame;
 			config.m_EnableAutomaticEviction = true;
+			config.m_RuntimeEntryRetentionFrames = 0;
+			config.m_MaxRuntimeRetirementsPerFrame = 64;
 			assetManager.SetResidencyConfig(config);
 			m_State->m_Phase = State::Phase::WaitForPinnedProtection;
 			break;
@@ -520,6 +532,12 @@ namespace gglab
 			{
 				break;
 			}
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_RuntimeEntryRetentionFrames =
+				m_State->m_RuntimeEntryRetentionFramesBeforePinned;
+			config.m_MaxRuntimeRetirementsPerFrame =
+				m_State->m_MaxRuntimeRetirementsPerFrameBeforePinned;
+			assetManager.SetResidencyConfig(config);
 			if (!assetManager.SetModelResidencyPolicy(
 				m_State->m_Request.m_ModelId,
 				AssetResidencyPolicy::Cacheable))
@@ -527,7 +545,7 @@ namespace gglab
 				Fail("The verification model could not return to cacheable residency.");
 				return;
 			}
-			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config = assetManager.GetResidencyConfig();
 			config.m_EnableAutomaticEviction = false;
 			assetManager.SetResidencyConfig(config);
 			m_State->m_Phase = State::Phase::ReleaseOwner;
@@ -1146,6 +1164,42 @@ namespace gglab
 				Fail("Mesh residency reload did not reuse the immutable model import artifact.");
 				return;
 			}
+			AssetResidencyConfig config = assetManager.GetResidencyConfig();
+			config.m_RuntimeEntryRetentionFrames = 0;
+			config.m_MaxRuntimeRetirementsPerFrame = 64;
+			assetManager.SetResidencyConfig(config);
+			m_State->m_RuntimeRetirementCountBaseline =
+				assetManager.GetOwnershipStatistics().m_RuntimeRetirementCount;
+			ResetAssetInterests();
+			m_State->m_Phase = State::Phase::WaitForRuntimeRetirement;
+			break;
+		}
+
+		case State::Phase::WaitForRuntimeRetirement:
+		{
+			const AssetSnapshot snapshot = BuildAssetSnapshot(assetManager);
+			if (assetManager.GetModel(m_State->m_Request.m_ModelId) ||
+				assetManager.GetMesh(m_State->m_MeshId) ||
+				assetManager.GetMaterial(m_State->m_MaterialId) ||
+				FindTextureSnapshot(snapshot, m_State->m_TextureId))
+			{
+				break;
+			}
+			const TextureContentRef retiredTexture{
+				.m_Id = m_State->m_TextureId,
+				.m_Generation = m_State->m_TextureGeneration,
+			};
+			const AssetOwnershipStatistics ownership =
+				assetManager.GetOwnershipStatistics();
+			if (assetManager.GetTextureState(retiredTexture) ||
+				assetManager.GetResidentTextureResource(retiredTexture) ||
+				ownership.m_RuntimeRetirementCount <
+					m_State->m_RuntimeRetirementCountBaseline + 3 ||
+				ownership.m_PendingRuntimeRetirementCount != 0)
+			{
+				Fail("Retired runtime entries remained addressable or pending.");
+				return;
+			}
 			Complete();
 			break;
 		}
@@ -1208,7 +1262,7 @@ namespace gglab
 		m_State->m_Passed = true;
 		m_State->m_Phase = State::Phase::Completed;
 		GGLAB_LOG_INFO(
-			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, unified model texture DDC production, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, and stable-ID reload invariants passed in {:.2f} s.",
+			"ASSET RESIDENCY ACCEPTANCE PASS: lifecycle, dependency, policy, usage, publication source ownership accounting, pinned protection, eviction cancellation, release, immutable model import artifact cache hit, unified model texture DDC production, texture CPU artifact cache reload, local DDC build/hit/fallback, shared artifact build/wait/cancel fan-out, validated state-operation events, texture reload replacement, generation-safe render views, stable-ID reload, and runtime entry retirement invariants passed in {:.2f} s.",
 			m_State->m_ElapsedSeconds);
 	}
 

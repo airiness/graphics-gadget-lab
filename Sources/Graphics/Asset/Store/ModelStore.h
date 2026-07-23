@@ -31,6 +31,7 @@ namespace gglab
 		[[nodiscard]] bool DetachPath(
 			const std::filesystem::path& canonicalPath,
 			ModelID modelId) noexcept;
+		[[nodiscard]] bool Remove(ModelID modelId) noexcept;
 
 		[[nodiscard]] const EntryMap& Entries() const noexcept { return m_Entries; }
 
