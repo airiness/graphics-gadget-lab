@@ -125,6 +125,8 @@ namespace gglab
 		uint64_t m_ResidencyLowWatermarkBytes = 0;
 		uint64_t m_ResidencyMinUnusedFrames = 0;
 		uint32_t m_MaxResidencyEvictionsPerFrame = 0;
+		uint64_t m_RuntimeEntryRetentionFrames = 0;
+		uint32_t m_MaxRuntimeRetirementsPerFrame = 0;
 		uint64_t m_LogicalResidentBytes = 0;
 		uint64_t m_PendingEvictionBytes = 0;
 		uint32_t m_PendingEvictionCount = 0;
@@ -220,7 +222,10 @@ namespace gglab
 		uint64_t m_OwnershipCpuCancellationCount = 0;
 		uint64_t m_OwnershipReadyCancellationCount = 0;
 		uint64_t m_OwnershipGpuDeferredCancellationCount = 0;
-		uint64_t m_OwnershipReadyRetentionCount = 0;
+		uint64_t m_RuntimeRetirementRequestCount = 0;
+		uint64_t m_RuntimeRetirementCancellationCount = 0;
+		uint64_t m_RuntimeRetirementCount = 0;
+		uint32_t m_PendingRuntimeRetirementCount = 0;
 		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		std::vector<OwnershipInterest> m_ActiveOwnershipInterests;

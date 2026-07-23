@@ -5,6 +5,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
+#include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
@@ -783,6 +784,20 @@ namespace gglab
 
 		void RunModelImportArtifactTests(SelfTestContext& context) noexcept
 		{
+			{
+				ModelStore store;
+				const std::filesystem::path path =
+					"Assets/Models/RuntimeRetirement.gltf";
+				const ModelID retiredId = store.Create(path);
+				const bool removed = store.Remove(retiredId);
+				const ModelID replacementId = store.Create(path);
+				context.Check(
+					retiredId.IsValid() && removed && !store.Find(retiredId) &&
+						store.FindByPath(path) == replacementId &&
+						replacementId.IsValid() && replacementId != retiredId,
+					"Model store retirement clears path identity without reusing IDs");
+			}
+
 			{
 				TextureArtifactCache concurrentCache({ .m_BudgetBytes = 1024 * 1024 });
 				std::array<TextureArtifactHandle, 4> handles;

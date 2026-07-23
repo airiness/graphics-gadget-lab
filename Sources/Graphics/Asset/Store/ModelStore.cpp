@@ -90,4 +90,16 @@ namespace gglab
 		m_PathIndex.erase(iterator);
 		return true;
 	}
+
+	bool ModelStore::Remove(ModelID modelId) noexcept
+	{
+		const bool removed = m_Entries.erase(modelId) > 0;
+		const size_t removedPaths = std::erase_if(
+			m_PathIndex,
+			[modelId](const auto& entry) noexcept
+			{
+				return entry.second == modelId;
+			});
+		return removed || removedPaths > 0;
+	}
 }

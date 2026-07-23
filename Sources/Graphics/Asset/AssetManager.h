@@ -39,7 +39,10 @@ namespace gglab
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;
-		uint64_t m_ReadyRetentionCount = 0;
+		uint64_t m_RuntimeRetirementRequestCount = 0;
+		uint64_t m_RuntimeRetirementCancellationCount = 0;
+		uint64_t m_RuntimeRetirementCount = 0;
+		uint32_t m_PendingRuntimeRetirementCount = 0;
 		uint64_t m_PublicationRetainCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		std::vector<AssetInterestActivity> m_ActiveInterests;
@@ -255,6 +258,12 @@ namespace gglab
 			uint64_t m_QuiescedFrame = 0;
 		};
 
+		struct PendingRuntimeRetirement
+		{
+			AssetContentVersion m_ContentVersion{};
+			uint64_t m_QueuedFrame = 0;
+		};
+
 		AssetOwnerId RegisterAssetOwner() noexcept;
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
 		AssetLease AcquireAssetLease(
@@ -284,6 +293,11 @@ namespace gglab
 		void CancelAssetIfUnreferenced(
 			AssetKey key,
 			uint64_t generation) noexcept;
+		void QueueRuntimeRetirement(AssetContentVersion contentVersion) noexcept;
+		void CancelRuntimeRetirement(AssetContentVersion contentVersion) noexcept;
+		void FinalizeRuntimeRetirements() noexcept;
+		[[nodiscard]] bool RetireRuntimeEntry(
+			AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] TaskPriority GetEffectivePriority(
 			AssetKey key,
 			TaskPriority fallback = TaskPriority::Normal) const noexcept;
@@ -379,10 +393,13 @@ namespace gglab
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;
-		uint64_t m_ReadyRetentionCount = 0;
+		uint64_t m_RuntimeRetirementRequestCount = 0;
+		uint64_t m_RuntimeRetirementCancellationCount = 0;
+		uint64_t m_RuntimeRetirementCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
 		uint64_t m_AssetUsageFrame = 0;
 		std::vector<PendingResidencyEviction> m_PendingResidencyEvictions;
+		std::vector<PendingRuntimeRetirement> m_PendingRuntimeRetirements;
 		uint64_t m_LogicalResidentBytes = 0;
 		uint64_t m_DependencyValidationCount = 0;
 		uint64_t m_DependencyValidationMismatchCount = 0;

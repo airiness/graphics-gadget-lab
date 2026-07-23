@@ -40,6 +40,10 @@ namespace gglab
 			residency.m_Config.m_MinUnusedFrames;
 		snapshot.m_MaxResidencyEvictionsPerFrame =
 			residency.m_Config.m_MaxEvictionsPerFrame;
+		snapshot.m_RuntimeEntryRetentionFrames =
+			residency.m_Config.m_RuntimeEntryRetentionFrames;
+		snapshot.m_MaxRuntimeRetirementsPerFrame =
+			residency.m_Config.m_MaxRuntimeRetirementsPerFrame;
 		snapshot.m_LogicalResidentBytes = residency.m_LogicalResidentBytes;
 		snapshot.m_PendingEvictionBytes = residency.m_PendingEvictionBytes;
 		snapshot.m_PendingEvictionCount = residency.m_PendingEvictionCount;
@@ -366,7 +370,13 @@ namespace gglab
 		snapshot.m_OwnershipReadyCancellationCount = ownership.m_ReadyCancellationCount;
 		snapshot.m_OwnershipGpuDeferredCancellationCount =
 			ownership.m_GpuDeferredCancellationCount;
-		snapshot.m_OwnershipReadyRetentionCount = ownership.m_ReadyRetentionCount;
+		snapshot.m_RuntimeRetirementRequestCount =
+			ownership.m_RuntimeRetirementRequestCount;
+		snapshot.m_RuntimeRetirementCancellationCount =
+			ownership.m_RuntimeRetirementCancellationCount;
+		snapshot.m_RuntimeRetirementCount = ownership.m_RuntimeRetirementCount;
+		snapshot.m_PendingRuntimeRetirementCount =
+			ownership.m_PendingRuntimeRetirementCount;
 		snapshot.m_PublicationRetainCount = ownership.m_PublicationRetainCount;
 		snapshot.m_PublicationProtectedCancellationCount =
 			ownership.m_PublicationProtectedCancellationCount;

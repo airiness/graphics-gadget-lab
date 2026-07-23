@@ -14,6 +14,10 @@ namespace gglab
 		uint64_t m_LowWatermarkBytes = 384ull * 1024ull * 1024ull;
 		uint64_t m_MinUnusedFrames = 120;
 		uint32_t m_MaxEvictionsPerFrame = 8;
+		// Last-interest entries remain addressable as a runtime cache during this
+		// window. Retirement removes the Store/path entry without reusing its ID.
+		uint64_t m_RuntimeEntryRetentionFrames = 600;
+		uint32_t m_MaxRuntimeRetirementsPerFrame = 8;
 	};
 
 	enum class AssetResidencyOperationKind : uint8_t

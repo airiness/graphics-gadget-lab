@@ -151,6 +151,9 @@ namespace gglab
 			m_PublicationOrphanedMeshes.empty(),
 			"AssetManager destroyed while publication mesh rollback is pending GPU completion.");
 		GGLAB_ASSERT_MSG(
+			m_PendingRuntimeRetirements.empty(),
+			"AssetManager destroyed while runtime entry retirements are pending.");
+		GGLAB_ASSERT_MSG(
 			m_PendingResidencyEvictions.empty(),
 			"AssetManager destroyed while residency eviction commands are pending.");
 		GGLAB_ASSERT_MSG(
@@ -362,7 +365,13 @@ namespace gglab
 		statistics.m_CpuCancellationCount = m_CpuCancellationCount;
 		statistics.m_ReadyCancellationCount = m_ReadyCancellationCount;
 		statistics.m_GpuDeferredCancellationCount = m_GpuDeferredCancellationCount;
-		statistics.m_ReadyRetentionCount = m_ReadyRetentionCount;
+		statistics.m_RuntimeRetirementRequestCount =
+			m_RuntimeRetirementRequestCount;
+		statistics.m_RuntimeRetirementCancellationCount =
+			m_RuntimeRetirementCancellationCount;
+		statistics.m_RuntimeRetirementCount = m_RuntimeRetirementCount;
+		statistics.m_PendingRuntimeRetirementCount =
+			static_cast<uint32_t>(m_PendingRuntimeRetirements.size());
 		statistics.m_PublicationRetainCount = trackerStatistics.m_PublicationRetainCount;
 		statistics.m_PublicationProtectedCancellationCount =
 			m_PublicationProtectedCancellationCount;
@@ -603,6 +612,7 @@ namespace gglab
 			m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
 		}
 		m_PendingResidencyEvictions.clear();
+		m_PendingRuntimeRetirements.clear();
 
 		// Completion events retire the operation serial only after their restored
 		// state has passed the same stale-token validation as normal frame events.
@@ -709,6 +719,7 @@ namespace gglab
 		{
 			return {};
 		}
+		CancelRuntimeRetirement(result.m_Change.m_ContentVersion);
 		if (kind == AssetKind::Texture)
 		{
 			m_TextureAssets->ReviveTextureInterest(
@@ -743,10 +754,12 @@ namespace gglab
 	{
 		if (!IsInterestAssetKind(kind) ||
 			!m_AssetInterestTracker.AcquirePublicationRetain(
-			MakeAssetContentVersion(kind, stableId, generation)))
+				MakeAssetContentVersion(kind, stableId, generation)))
 		{
 			return {};
 		}
+		CancelRuntimeRetirement(
+			MakeAssetContentVersion(kind, stableId, generation));
 		if (kind == AssetKind::Texture)
 		{
 			m_TextureAssets->ReviveTextureInterest(
@@ -763,6 +776,14 @@ namespace gglab
 	{
 		m_AssetInterestTracker.ReleasePublicationRetain(
 			MakeAssetContentVersion(kind, stableId, generation));
+		const AssetKey key{
+			.m_Kind = kind,
+			.m_StableId = stableId,
+		};
+		if (!HasActiveInterest(key) && !HasPublicationRetain(key, generation))
+		{
+			CancelAssetIfUnreferenced(key, generation);
+		}
 	}
 
 	bool AssetManager::HasPublicationRetain(
@@ -789,6 +810,12 @@ namespace gglab
 
 		if (change->m_ContentVersion.m_Key.m_Kind == AssetKind::Model)
 		{
+			if (!HasPublicationRetain(
+				change->m_ContentVersion.m_Key,
+				change->m_ContentVersion.m_ContentGeneration))
+			{
+				QueueRuntimeRetirement(change->m_ContentVersion);
+			}
 			ReleaseModelDependencyInterests(ModelID{ static_cast<uint32_t>(
 				change->m_ContentVersion.m_Key.m_StableId) });
 		}
@@ -1018,6 +1045,283 @@ namespace gglab
 		}
 	}
 
+	void AssetManager::QueueRuntimeRetirement(
+		AssetContentVersion contentVersion) noexcept
+	{
+		if (!contentVersion.IsValid())
+		{
+			return;
+		}
+		const AssetKey key = contentVersion.m_Key;
+		const bool reserved =
+			(key.m_Kind == AssetKind::Model &&
+				IsReservedModelId(ModelID{
+					static_cast<uint32_t>(key.m_StableId) })) ||
+			(key.m_Kind == AssetKind::Mesh &&
+				IsReservedMeshId(MeshID{
+					static_cast<uint32_t>(key.m_StableId) })) ||
+			(key.m_Kind == AssetKind::Texture &&
+				IsReservedTextureId(TextureID{
+					static_cast<uint32_t>(key.m_StableId) }));
+		if (reserved)
+		{
+			return;
+		}
+
+		const auto pending = std::ranges::find(
+			m_PendingRuntimeRetirements,
+			contentVersion,
+			&PendingRuntimeRetirement::m_ContentVersion);
+		if (pending != m_PendingRuntimeRetirements.end())
+		{
+			return;
+		}
+		m_PendingRuntimeRetirements.push_back({
+			.m_ContentVersion = contentVersion,
+			.m_QueuedFrame = m_AssetUsageFrame,
+		});
+		++m_RuntimeRetirementRequestCount;
+	}
+
+	void AssetManager::CancelRuntimeRetirement(
+		AssetContentVersion contentVersion) noexcept
+	{
+		const size_t removed = std::erase_if(
+			m_PendingRuntimeRetirements,
+			[contentVersion](const PendingRuntimeRetirement& pending) noexcept
+			{
+				return pending.m_ContentVersion == contentVersion;
+			});
+		m_RuntimeRetirementCancellationCount += removed;
+	}
+
+	bool AssetManager::RetireRuntimeEntry(
+		AssetContentVersion contentVersion) noexcept
+	{
+		const AssetKey key = contentVersion.m_Key;
+		if (key.m_Kind == AssetKind::Texture)
+		{
+			const TextureID textureId{
+				static_cast<uint32_t>(key.m_StableId)
+			};
+			const Texture* texture = m_TextureAssets->GetTexture(textureId);
+			if (!texture ||
+				texture->m_ContentGeneration != contentVersion.m_ContentGeneration)
+			{
+				return false;
+			}
+			GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(contentVersion));
+			return m_TextureAssets->RemoveTexture(textureId);
+		}
+		if (key.m_Kind == AssetKind::Mesh)
+		{
+			const MeshID meshId{ static_cast<uint32_t>(key.m_StableId) };
+			const Mesh* mesh = GetMesh(meshId);
+			if (!mesh ||
+				mesh->m_ContentGeneration != contentVersion.m_ContentGeneration)
+			{
+				return false;
+			}
+			GGLAB_UNUSED(m_AssetUploadScheduler->CancelReadyWork(contentVersion));
+			return RemoveMesh(meshId);
+		}
+		if (key.m_Kind != AssetKind::Model)
+		{
+			return false;
+		}
+
+		const ModelID modelId{ static_cast<uint32_t>(key.m_StableId) };
+		const Model* model = GetModel(modelId);
+		if (!model ||
+			model->m_ContentGeneration != contentVersion.m_ContentGeneration ||
+			m_ModelDependencyOwners.contains(modelId) ||
+			m_ModelDependencyLeaseTokens.contains(modelId))
+		{
+			return false;
+		}
+
+		std::unordered_set<MaterialID> materials;
+		for (const ModelMesh& instance : model->m_MeshInstance)
+		{
+			if (instance.m_MaterialId.IsValid())
+			{
+				materials.insert(instance.m_MaterialId);
+			}
+		}
+		UnregisterModelDependencies(modelId, contentVersion.m_ContentGeneration);
+		m_AssetLoadCoordinator.DiscardModelImport(key);
+		m_PendingModels.erase(modelId);
+		if (!m_ModelStore.Remove(modelId))
+		{
+			return false;
+		}
+
+		for (MaterialID materialId : materials)
+		{
+			const bool referenced = std::ranges::any_of(
+				m_ModelStore.Entries() | std::views::values,
+				[materialId](const std::unique_ptr<Model>& candidate) noexcept
+				{
+					return std::ranges::any_of(
+						candidate->m_MeshInstance,
+						[materialId](const ModelMesh& instance) noexcept
+						{
+							return instance.m_MaterialId == materialId;
+						});
+				});
+			if (!referenced)
+			{
+				GGLAB_UNUSED(RemoveMaterial(materialId));
+			}
+		}
+		return true;
+	}
+
+	void AssetManager::FinalizeRuntimeRetirements() noexcept
+	{
+		const AssetResidencyConfig& config = m_AssetResidencyController.GetConfig();
+		if (config.m_MaxRuntimeRetirementsPerFrame == 0)
+		{
+			return;
+		}
+
+		const auto queueIfUnreferenced =
+			[this](AssetContentVersion contentVersion) noexcept
+			{
+				if (!HasActiveInterest(contentVersion.m_Key) &&
+					!HasPublicationRetain(
+						contentVersion.m_Key,
+						contentVersion.m_ContentGeneration))
+				{
+					QueueRuntimeRetirement(contentVersion);
+				}
+			};
+		for (const auto& [modelId, model] : m_ModelStore.Entries())
+		{
+			queueIfUnreferenced(MakeAssetContentVersion(
+				modelId,
+				model->m_ContentGeneration));
+		}
+		for (const auto& [meshId, mesh] : m_MeshStore.Entries())
+		{
+			queueIfUnreferenced(MakeAssetContentVersion(
+				meshId,
+				mesh->m_ContentGeneration));
+		}
+		for (TextureID textureId : m_TextureAssets->GetTextureIds())
+		{
+			if (const Texture* texture = m_TextureAssets->GetTexture(textureId))
+			{
+				queueIfUnreferenced(MakeAssetContentVersion(
+					textureId,
+					texture->m_ContentGeneration));
+			}
+		}
+
+		std::ranges::stable_sort(
+			m_PendingRuntimeRetirements,
+			[](const PendingRuntimeRetirement& lhs,
+				const PendingRuntimeRetirement& rhs) noexcept
+			{
+				const auto priority = [](AssetKind kind) noexcept
+				{
+					return kind == AssetKind::Model ? 0u :
+						kind == AssetKind::Mesh ? 1u : 2u;
+				};
+				return priority(lhs.m_ContentVersion.m_Key.m_Kind) <
+					priority(rhs.m_ContentVersion.m_Key.m_Kind);
+			});
+
+		uint32_t retiredCount = 0;
+		uint32_t retiredModelCount = 0;
+		uint32_t retiredMeshCount = 0;
+		uint32_t retiredTextureCount = 0;
+		for (auto iterator = m_PendingRuntimeRetirements.begin();
+			iterator != m_PendingRuntimeRetirements.end() &&
+				retiredCount < config.m_MaxRuntimeRetirementsPerFrame;)
+		{
+			const PendingRuntimeRetirement pending = *iterator;
+			const AssetContentVersion contentVersion = pending.m_ContentVersion;
+			const AssetKey key = contentVersion.m_Key;
+			if (HasActiveInterest(key) ||
+				HasPublicationRetain(key, contentVersion.m_ContentGeneration))
+			{
+				++m_RuntimeRetirementCancellationCount;
+				iterator = m_PendingRuntimeRetirements.erase(iterator);
+				continue;
+			}
+			if (m_AssetUsageFrame < pending.m_QueuedFrame ||
+				m_AssetUsageFrame - pending.m_QueuedFrame <
+					config.m_RuntimeEntryRetentionFrames)
+			{
+				++iterator;
+				continue;
+			}
+
+			const AssetLifecycle* lifecycle = nullptr;
+			if (key.m_Kind == AssetKind::Model)
+			{
+				lifecycle = GetModel(ModelID{
+					static_cast<uint32_t>(key.m_StableId) });
+			}
+			else if (key.m_Kind == AssetKind::Mesh)
+			{
+				lifecycle = GetMesh(MeshID{
+					static_cast<uint32_t>(key.m_StableId) });
+			}
+			else if (key.m_Kind == AssetKind::Texture)
+			{
+				lifecycle = m_TextureAssets->GetTexture(TextureID{
+					static_cast<uint32_t>(key.m_StableId) });
+			}
+			if (!lifecycle ||
+				lifecycle->m_ContentGeneration !=
+					contentVersion.m_ContentGeneration)
+			{
+				iterator = m_PendingRuntimeRetirements.erase(iterator);
+				continue;
+			}
+			if (lifecycle->m_ResidencyPolicy == AssetResidencyPolicy::Pinned ||
+				((key.m_Kind == AssetKind::Mesh ||
+					key.m_Kind == AssetKind::Texture) &&
+					HasPinnedDependentModel(
+						key.m_Kind,
+						key.m_StableId,
+						contentVersion.m_ContentGeneration)) ||
+				(lifecycle->m_State != AssetState::Ready &&
+					lifecycle->m_State != AssetState::CpuReady &&
+					!IsTerminalAssetState(lifecycle->m_State)))
+			{
+				++iterator;
+				continue;
+			}
+
+			if (!RetireRuntimeEntry(contentVersion))
+			{
+				++iterator;
+				continue;
+			}
+			++retiredCount;
+			retiredModelCount +=
+				key.m_Kind == AssetKind::Model ? 1u : 0u;
+			retiredMeshCount +=
+				key.m_Kind == AssetKind::Mesh ? 1u : 0u;
+			retiredTextureCount +=
+				key.m_Kind == AssetKind::Texture ? 1u : 0u;
+			++m_RuntimeRetirementCount;
+			iterator = m_PendingRuntimeRetirements.erase(iterator);
+		}
+		if (retiredCount != 0)
+		{
+			GGLAB_LOG_GRAPHICS_INFO(
+				"Retired unreferenced runtime entries (models={}, meshes={}, textures={}, pending={}).",
+				retiredModelCount,
+				retiredMeshCount,
+				retiredTextureCount,
+				m_PendingRuntimeRetirements.size());
+		}
+	}
+
 	void AssetManager::CancelAssetIfUnreferenced(
 		AssetKey key,
 		uint64_t generation) noexcept
@@ -1041,9 +1345,11 @@ namespace gglab
 			{
 				return;
 			}
-			if (texture->m_State == AssetState::Ready)
+			QueueRuntimeRetirement(
+				MakeAssetContentVersion(textureId, generation));
+			if (texture->m_State == AssetState::Ready ||
+				IsTerminalAssetState(texture->m_State))
 			{
-				++m_ReadyRetentionCount;
 				return;
 			}
 			if (texture->m_State == AssetState::Queued ||
@@ -1076,11 +1382,16 @@ namespace gglab
 		Model* model = EditModel(modelId);
 		if (!model || model->m_ContentGeneration != generation || IsTerminalAssetState(model->m_State))
 		{
+			if (model && model->m_ContentGeneration == generation)
+			{
+				QueueRuntimeRetirement(
+					MakeAssetContentVersion(modelId, generation));
+			}
 			return;
 		}
+		QueueRuntimeRetirement(MakeAssetContentVersion(modelId, generation));
 		if (model->m_State == AssetState::Ready)
 		{
-			++m_ReadyRetentionCount;
 			return;
 		}
 		if (model->m_ContentState == AssetContentState::Ready &&
@@ -1090,7 +1401,6 @@ namespace gglab
 		{
 			model->m_CancelRequested = false;
 			m_PendingModels.insert(modelId);
-			++m_ReadyRetentionCount;
 			return;
 		}
 		model->m_CancelRequested = true;
@@ -1127,11 +1437,16 @@ namespace gglab
 		Mesh* mesh = EditMesh(meshId);
 		if (!mesh || mesh->m_ContentGeneration != generation || IsTerminalAssetState(mesh->m_State))
 		{
+			if (mesh && mesh->m_ContentGeneration == generation)
+			{
+				QueueRuntimeRetirement(
+					MakeAssetContentVersion(meshId, generation));
+			}
 			return;
 		}
+		QueueRuntimeRetirement(MakeAssetContentVersion(meshId, generation));
 		if (mesh->m_State == AssetState::Ready)
 		{
-			++m_ReadyRetentionCount;
 			return;
 		}
 		if (mesh->m_IsReloading && !mesh->m_VertexBuffer && !mesh->m_IndexBuffer)
@@ -1308,6 +1623,7 @@ namespace gglab
 	void AssetManager::TickResidencyPhase() noexcept
 	{
 		FinalizeResidencyEvictions();
+		FinalizeRuntimeRetirements();
 		const AssetResidencyInventorySnapshot inventory =
 			BuildResidencyInventorySnapshot();
 		m_LogicalResidentBytes = inventory.m_LogicalResidentBytes;
