@@ -29,6 +29,36 @@ namespace gglab
 			TextureIndex::IBL_PrefilteredSpecularCubemap,
 			TextureIndex::IBL_BrdfLut,
 		};
+
+		[[nodiscard]] consteval bool ValidateResourceInitializationAbortSupersede() noexcept
+		{
+			detail::IBLBakeResourceInitializationState state;
+			if (!state.Begin(1) || !state.ShouldRecord(1) ||
+				state.ShouldRecord(2) || !state.NotifyExecuted(1))
+			{
+				return false;
+			}
+
+			state.AbortFrame();
+			if (!state.ShouldRecord(1) || !state.ResetForRequestedBake() ||
+				state.ShouldRecord(1) || state.NotifyExecuted(2))
+			{
+				return false;
+			}
+
+			if (!state.Begin(2) || !state.ShouldRecord(2) ||
+				!state.NotifyExecuted(2) || !state.Submit() ||
+				!state.IsInFlight() || state.ResetForRequestedBake())
+			{
+				return false;
+			}
+			return state.Complete() == 2 && !state.IsInFlight() &&
+				!state.ShouldRecord(2);
+		}
+
+		static_assert(
+			ValidateResourceInitializationAbortSupersede(),
+			"IBL resource initialization must not survive an abort and superseding generation.");
 	}
 
 	IBLBakeScheduler::IBLBakeScheduler(const CreateInfo& createInfo) noexcept :
@@ -103,10 +133,10 @@ namespace gglab
 			}
 
 			m_InFlightFence = {};
-			if (m_BakeResourceInitializationInFlight)
+			if (m_BakeResourceInitialization.IsInFlight())
 			{
-				m_BakeResourceInitializationInFlight = false;
-				ContinueRequestedBakeAfterInitialization();
+				const uint64_t generation = m_BakeResourceInitialization.Complete();
+				ContinueRequestedBakeAfterInitialization(generation);
 				return;
 			}
 			if (m_CacheReadbackInFlight)
@@ -149,6 +179,17 @@ namespace gglab
 	void IBLBakeScheduler::StartRequestedBake(const RHIFencePoint& retireFence) noexcept
 	{
 		GGLAB_UNUSED(retireFence);
+		// A frame abort keeps initialization recordable for the same generation.
+		// A superseding bake must discard that state before adopting new resources.
+		const bool resetInitialization =
+			m_BakeResourceInitialization.ResetForRequestedBake();
+		GGLAB_ASSERT_MSG(
+			resetInitialization,
+			"An in-flight IBL resource initialization must complete before superseding its bake.");
+		if (!resetInitialization)
+		{
+			return;
+		}
 		ReleaseBakingSourceLease();
 		if (m_CacheLookupTask.IsValid())
 		{
@@ -328,7 +369,6 @@ namespace gglab
 		if (!m_RenderResourceRegistry->HasIBLBakeResources())
 		{
 			ReleaseBakingSourceLease();
-			m_BakeResourcesNeedInitialization = false;
 			m_CurrentCacheLoad.reset();
 			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
@@ -337,22 +377,36 @@ namespace gglab
 		// Staging targets come from CREATE_NOT_ZEROED heaps and remain live across
 		// several passes. Initialize every subresource before uploading hits or
 		// recording any missing stage.
-		m_BakeResourcesNeedInitialization = true;
-		m_BakeResourceInitializationExecuted = false;
+		if (!m_BakeResourceInitialization.Begin(work->m_Generation))
+		{
+			ReleaseBakingSourceLease();
+			m_CurrentCacheLoad.reset();
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
 		SetStage(IBLBakeStage::LoadingCache, 0.05f);
 	}
 
-	void IBLBakeScheduler::ContinueRequestedBakeAfterInitialization() noexcept
+	void IBLBakeScheduler::ContinueRequestedBakeAfterInitialization(
+		uint64_t generation) noexcept
 	{
-		if (m_Status.m_BakingGeneration != m_Status.m_RequestedGeneration)
+		auto cacheLoad = std::move(m_CurrentCacheLoad);
+		if (generation == 0 ||
+			generation != m_Status.m_BakingGeneration ||
+			generation != m_Status.m_RequestedGeneration)
 		{
 			return;
 		}
 
-		auto cacheLoad = std::move(m_CurrentCacheLoad);
+		if (!cacheLoad || cacheLoad->m_Generation != generation)
+		{
+			ReleaseBakingSourceLease();
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
 		if (m_Status.m_CacheHitStageCount > 0)
 		{
-			if (!cacheLoad || !UploadCachedArtifacts(cacheLoad->m_Result))
+			if (!UploadCachedArtifacts(cacheLoad->m_Result))
 			{
 				ReleaseBakingSourceLease();
 				SetStage(IBLBakeStage::Failed, 0.0f);
@@ -421,25 +475,28 @@ namespace gglab
 
 	void IBLBakeScheduler::NotifyBakeResourcesInitialized(uint64_t generation) noexcept
 	{
-		if (!m_BakeResourcesNeedInitialization ||
-			generation != m_Status.m_BakingGeneration)
+		if (generation != m_Status.m_BakingGeneration)
 		{
 			return;
 		}
-		m_BakeResourceInitializationExecuted = true;
+		GGLAB_UNUSED(m_BakeResourceInitialization.NotifyExecuted(generation));
 	}
 
 	void IBLBakeScheduler::OnFrameSubmitted(const RHIFencePoint& fencePoint) noexcept
 	{
-		if (m_BakeResourceInitializationExecuted)
+		if (m_BakeResourceInitialization.HasExecuted())
 		{
-			m_BakeResourcesNeedInitialization = false;
-			m_BakeResourceInitializationExecuted = false;
-			m_BakeResourceInitializationInFlight = true;
 			GGLAB_ASSERT_MSG(
 				fencePoint.IsValid(),
 				"Submitted IBL bake resource initialization requires a valid frame fence.");
-			m_InFlightFence = fencePoint;
+			if (!fencePoint.IsValid())
+			{
+				m_BakeResourceInitialization.AbortFrame();
+			}
+			else if (m_BakeResourceInitialization.Submit())
+			{
+				m_InFlightFence = fencePoint;
+			}
 		}
 		if (m_ExecutedStage == IBLBakeStage::Idle)
 		{
@@ -457,7 +514,7 @@ namespace gglab
 	void IBLBakeScheduler::OnFrameAborted() noexcept
 	{
 		m_ExecutedStage = IBLBakeStage::Idle;
-		m_BakeResourceInitializationExecuted = false;
+		m_BakeResourceInitialization.AbortFrame();
 	}
 
 	IBLBakeStage IBLBakeScheduler::GetStageForRecording() const noexcept
