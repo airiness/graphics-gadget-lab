@@ -57,6 +57,36 @@ namespace gglab
 				"Artifact cache releases its allocation ticket after the last handle");
 		}
 
+		void RunCrossKeyAliasTests(SelfTestContext& context) noexcept
+		{
+			CacheTestCore cache(8);
+			CacheTestHandle artifact =
+				std::make_shared<const CacheTestArtifact>(CacheTestArtifact{
+					.m_Id = 10,
+					.m_AllocatedBytes = 4,
+				});
+			CacheTestHandle first = cache.Admit(1, artifact);
+			CacheTestHandle alias = cache.Admit(2, artifact);
+			const ArtifactCacheCoreStatistics statistics = cache.GetStatistics();
+			context.Check(
+				first && alias == first && cache.Contains(1) && !cache.Contains(2),
+				"Artifact cache rejects one allocation admitted under different keys");
+			context.Check(
+				statistics.m_AdmissionCount == 1 &&
+					statistics.m_AdmissionRejectedCount == 1 &&
+					statistics.m_CachedEntryCount == 1 &&
+					statistics.m_CachedBytes == 4 && statistics.m_TotalLiveBytes == 4,
+				"Artifact cache cross-key alias rejection preserves physical byte accounting");
+
+			artifact.reset();
+			first.reset();
+			alias.reset();
+			cache.Clear();
+			context.Check(
+				cache.GetStatistics().m_TotalLiveBytes == 0,
+				"Artifact cache releases a rejected cross-key alias exactly once");
+		}
+
 		void RunLruAndLifetimeTests(SelfTestContext& context) noexcept
 		{
 			CacheTestCore cache(8);
@@ -170,6 +200,7 @@ namespace gglab
 	void RunArtifactCacheSelfTests(SelfTestContext& context) noexcept
 	{
 		RunDuplicateAdmissionTests(context);
+		RunCrossKeyAliasTests(context);
 		RunLruAndLifetimeTests(context);
 		RunReadmissionTests(context);
 		RunRejectedAdmissionTests(context);

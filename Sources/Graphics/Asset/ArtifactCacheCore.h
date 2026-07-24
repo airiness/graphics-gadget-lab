@@ -65,7 +65,17 @@ namespace gglab
 				return existing->second.m_Artifact;
 			}
 
-			AssertNoPointerAlias(artifact.get());
+			for (auto& [existingKey, entry] : m_Entries)
+			{
+				GGLAB_UNUSED(existingKey);
+				if (entry.m_Artifact.get() == artifact.get())
+				{
+					Touch(entry);
+					++m_AdmissionRejectedCount;
+					return entry.m_Artifact;
+				}
+			}
+
 			const uint64_t physicalBytes = artifact->GetAllocatedBytes();
 			if (physicalBytes == 0)
 			{
@@ -202,21 +212,6 @@ namespace gglab
 
 			std::shared_ptr<AllocationRecord> m_Allocation;
 		};
-
-		void AssertNoPointerAlias(const Artifact* artifact) const noexcept
-		{
-#ifndef NDEBUG
-			for (const auto& [existingKey, entry] : m_Entries)
-			{
-				GGLAB_UNUSED(existingKey);
-				GGLAB_ASSERT_MSG(
-					entry.m_Artifact.get() != artifact,
-					"One artifact allocation cannot be admitted under multiple cache keys.");
-			}
-#else
-			GGLAB_UNUSED(artifact);
-#endif
-		}
 
 		[[nodiscard]] Handle TrackAllocation(
 			Handle artifact,
