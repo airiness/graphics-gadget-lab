@@ -314,6 +314,14 @@ namespace gglab
 					TextureStructureValidationError::NonCanonicalSubresourceOrder,
 				"Texture structure validation rejects reordered mip data");
 
+			TextureAssetData reversedPhysicalOrder = MakeTwoMipTextureFixture();
+			reversedPhysicalOrder.m_Subresources[0].m_DataOffset = 4;
+			reversedPhysicalOrder.m_Subresources[1].m_DataOffset = 0;
+			context.Check(
+				ValidateTextureAssetStructure(reversedPhysicalOrder).m_Error ==
+					TextureStructureValidationError::NonCanonicalSubresourceOrder,
+				"Texture structure validation rejects non-canonical physical mip order");
+
 			TextureAssetData outOfBounds = valid;
 			outOfBounds.m_Subresources.front().m_DataOffset = 1;
 			context.Check(

@@ -11,12 +11,6 @@ namespace gglab
 {
 	namespace
 	{
-		struct ByteRange
-		{
-			uint64_t m_Begin = 0;
-			uint64_t m_End = 0;
-		};
-
 		[[nodiscard]] constexpr TextureStructureValidationResult Error(
 			TextureStructureValidationError error) noexcept
 		{
@@ -247,9 +241,8 @@ namespace gglab
 
 		const size_t expectedSubresources = data.m_Subresources.size();
 		std::vector<uint8_t> seen(expectedSubresources, 0);
-		std::vector<ByteRange> ranges;
-		ranges.reserve(expectedSubresources);
 		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(data.m_ResourceFormat);
+		uint64_t expectedDataOffset = 0;
 
 		for (size_t ordinal = 0; ordinal < data.m_Subresources.size(); ++ordinal)
 		{
@@ -310,24 +303,18 @@ namespace gglab
 			{
 				return Error(TextureStructureValidationError::InvalidDataSize);
 			}
-			ranges.push_back({ subresource.m_DataOffset, dataEnd });
+			if (subresource.m_DataOffset != expectedDataOffset)
+			{
+				return Error(TextureStructureValidationError::NonCanonicalSubresourceOrder);
+			}
+			expectedDataOffset = dataEnd;
 		}
 
 		if (std::ranges::find(seen, uint8_t{ 0 }) != seen.end())
 		{
 			return Error(TextureStructureValidationError::MissingSubresource);
 		}
-		std::ranges::sort(ranges, {}, &ByteRange::m_Begin);
-		uint64_t coveredBytes = 0;
-		for (const ByteRange& range : ranges)
-		{
-			if (range.m_Begin != coveredBytes)
-			{
-				return Error(TextureStructureValidationError::InvalidDataSize);
-			}
-			coveredBytes = range.m_End;
-		}
-		if (coveredBytes != data.m_Pixels.size())
+		if (expectedDataOffset != data.m_Pixels.size())
 		{
 			return Error(TextureStructureValidationError::InvalidDataSize);
 		}
