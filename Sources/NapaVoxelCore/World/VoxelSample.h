@@ -39,17 +39,6 @@ namespace napa::voxel
 			material == VoxelMaterial::Stone;
 	}
 
-	[[nodiscard]] constexpr VoxelSample CanonicalizeVoxelSample(
-		VoxelSample sample) noexcept
-	{
-		if (sample.m_Density < IsoValue)
-		{
-			sample.m_Material = VoxelMaterial::Empty;
-			sample.m_Damage = 0;
-		}
-		return sample;
-	}
-
 	[[nodiscard]] constexpr ValidationResult ValidateVoxelSample(
 		VoxelSample sample) noexcept
 	{
@@ -58,13 +47,46 @@ namespace napa::voxel
 			return { ValidationError::InvalidVoxelMaterial };
 		}
 
-		const VoxelSample canonical = CanonicalizeVoxelSample(sample);
-		if (canonical != sample ||
-			(sample.m_Density >= IsoValue &&
-				sample.m_Material == VoxelMaterial::Empty))
+		if (sample.m_Density < IsoValue)
+		{
+			if (sample.m_Material != VoxelMaterial::Empty ||
+				sample.m_Damage != 0)
+			{
+				return { ValidationError::NonCanonicalVoxelSample };
+			}
+		}
+		else if (sample.m_Material == VoxelMaterial::Empty)
 		{
 			return { ValidationError::NonCanonicalVoxelSample };
 		}
+		return {};
+	}
+
+	[[nodiscard]] constexpr ValidationResult PrepareVoxelSampleForStorage(
+		VoxelSample input,
+		VoxelSample& output) noexcept
+	{
+		if (!IsKnownVoxelMaterial(input.m_Material))
+		{
+			return { ValidationError::InvalidVoxelMaterial };
+		}
+
+		if (input.m_Density < IsoValue)
+		{
+			output = {
+				.m_Density = input.m_Density,
+				.m_Material = VoxelMaterial::Empty,
+				.m_Damage = 0,
+			};
+			return {};
+		}
+
+		if (input.m_Material == VoxelMaterial::Empty)
+		{
+			return { ValidationError::NonCanonicalVoxelSample };
+		}
+
+		output = input;
 		return {};
 	}
 

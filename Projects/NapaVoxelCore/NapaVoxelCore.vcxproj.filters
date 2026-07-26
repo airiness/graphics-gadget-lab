@@ -24,7 +24,13 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h">
       <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h">
+      <Filter>NapaVoxelCore\World</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h">
+      <Filter>NapaVoxelCore\World</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.h">
       <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h">
@@ -36,6 +42,12 @@
       <Filter>NapaVoxelCore</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp">
+      <Filter>NapaVoxelCore\World</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.cpp">
+      <Filter>NapaVoxelCore\World</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.cpp">
       <Filter>NapaVoxelCore\World</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.cpp">

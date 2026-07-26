@@ -82,6 +82,8 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -89,7 +91,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

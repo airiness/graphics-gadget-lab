@@ -25,6 +25,7 @@ namespace napa::voxel
 		LogicalSampleCountOverflow = 16,
 		LogicalChunkCountOverflow = 17,
 		LogicalDomainSizeOverflow = 18,
+		SampleOutsideLogicalBounds = 19,
 	};
 
 	struct ValidationResult
