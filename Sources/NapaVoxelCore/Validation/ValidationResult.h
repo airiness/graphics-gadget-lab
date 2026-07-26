@@ -15,6 +15,10 @@ namespace napa::voxel
 		EmptyLogicalCellBounds = 6,
 		LogicalSampleBoundsOverflow = 7,
 		ArithmeticOverflow = 8,
+		InvalidLocalCoordinate = 9,
+		InvalidCellCornerOffset = 10,
+		FlatIndexOutOfRange = 11,
+		CoordinateOutOfRange = 12,
 	};
 
 	struct ValidationResult

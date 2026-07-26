@@ -2,8 +2,10 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
+#include "NapaVoxelCore/World/Coordinates.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -146,6 +148,452 @@ namespace gglab
 				"CheckedMul matches wide arithmetic across signed boundaries");
 		}
 
+		void RunFloorDivisionTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			struct DivisionCase
+			{
+				std::int32_t m_Value = 0;
+				std::int32_t m_ExpectedQuotient = 0;
+				std::uint32_t m_ExpectedRemainder = 0;
+				std::string_view m_Name;
+			};
+
+			constexpr std::array<DivisionCase, 9> Cases{
+				DivisionCase{ 17, 1, 1, "Floor division handles a value above a positive boundary" },
+				DivisionCase{ 16, 1, 0, "Floor division handles a positive boundary" },
+				DivisionCase{ 15, 0, 15, "Floor division handles a positive interior" },
+				DivisionCase{ 0, 0, 0, "Floor division handles zero" },
+				DivisionCase{ -1, -1, 15, "Floor division handles negative one" },
+				DivisionCase{ -15, -1, 1, "Floor division handles a negative interior" },
+				DivisionCase{ -16, -1, 0, "Floor division handles a negative boundary" },
+				DivisionCase{ -17, -2, 15, "Floor division handles a value below a negative boundary" },
+				DivisionCase{
+					std::numeric_limits<std::int32_t>::min(),
+					-134217728,
+					0,
+					"Floor division handles int32 minimum",
+				},
+			};
+
+			for (const DivisionCase& divisionCase : Cases)
+			{
+				const std::optional<std::int32_t> quotient =
+					FloorDiv(divisionCase.m_Value, 16);
+				const std::optional<std::uint32_t> remainder =
+					FloorMod(divisionCase.m_Value, 16);
+				context.Check(
+					quotient &&
+					remainder &&
+					*quotient == divisionCase.m_ExpectedQuotient &&
+					*remainder == divisionCase.m_ExpectedRemainder,
+					divisionCase.m_Name);
+			}
+			context.Check(
+				!FloorDiv(1, 0) && !FloorMod(1, 0),
+				"FloorDiv and FloorMod reject a zero divisor");
+
+			for (const std::uint32_t chunkCellCount : { 8u, 16u, 32u })
+			{
+				bool identityHolds = true;
+				const std::int32_t range =
+					static_cast<std::int32_t>(chunkCellCount * 2);
+				for (std::int32_t value = -range; value <= range; ++value)
+				{
+					const std::optional<std::int32_t> quotient =
+						FloorDiv(value, chunkCellCount);
+					const std::optional<std::uint32_t> remainder =
+						FloorMod(value, chunkCellCount);
+					identityHolds &=
+						quotient &&
+						remainder &&
+						*remainder < chunkCellCount &&
+						static_cast<std::int64_t>(*quotient) *
+							chunkCellCount +
+							*remainder == value;
+				}
+				context.Check(
+					identityHolds,
+					"Floor division reconstructs coordinates for a supported N");
+			}
+		}
+
+		void RunCoordinateOwnershipTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			struct OwnerCase
+			{
+				SampleCoord m_Global{};
+				OwnedSampleAddress m_Expected{};
+			};
+
+			constexpr std::array<OwnerCase, 8> Cases{
+				OwnerCase{ { 15, 0, 0 }, { { 0, 0, 0 }, { 15, 0, 0 } } },
+				OwnerCase{ { 16, 0, 0 }, { { 1, 0, 0 }, { 0, 0, 0 } } },
+				OwnerCase{ { 17, 0, 0 }, { { 1, 0, 0 }, { 1, 0, 0 } } },
+				OwnerCase{ { -1, 0, 0 }, { { -1, 0, 0 }, { 15, 0, 0 } } },
+				OwnerCase{ { -16, 0, 0 }, { { -1, 0, 0 }, { 0, 0, 0 } } },
+				OwnerCase{ { -17, 0, 0 }, { { -2, 0, 0 }, { 15, 0, 0 } } },
+				OwnerCase{
+					{ -1, 16, 32 },
+					{ { -1, 1, 2 }, { 15, 0, 0 } },
+				},
+				OwnerCase{
+					{ -17, -16, -15 },
+					{ { -2, -1, -1 }, { 15, 0, 1 } },
+				},
+			};
+
+			bool explicitCasesMatch = true;
+			for (const OwnerCase& ownerCase : Cases)
+			{
+				OwnedSampleAddress address{};
+				explicitCasesMatch &=
+					ResolveSampleOwner(
+						ownerCase.m_Global,
+						16,
+						address).Succeeded() &&
+					address == ownerCase.m_Expected;
+			}
+			context.Check(
+				explicitCasesMatch,
+				"Sample owner resolution handles faces, edges, corners, and negatives");
+
+			OwnedCellAddress cellAddress{};
+			context.Check(
+				ResolveCellOwner({ -1, 16, 32 }, 16, cellAddress).Succeeded() &&
+				cellAddress ==
+					OwnedCellAddress{ { -1, 1, 2 }, { 15, 0, 0 } },
+				"Cell owner resolution uses the same canonical ownership rule");
+
+			OwnedSampleAddress unchangedAddress{
+				.m_Owner = { 7, 8, 9 },
+				.m_Local = { 1, 2, 3 },
+			};
+			const OwnedSampleAddress expectedUnchangedAddress = unchangedAddress;
+			context.Check(
+				ResolveSampleOwner({ 0, 0, 0 }, 7, unchangedAddress).m_Error ==
+					ValidationError::InvalidChunkCellCount &&
+				unchangedAddress == expectedUnchangedAddress,
+				"Failed owner resolution leaves the output address unchanged");
+
+			for (const std::uint32_t chunkCellCount : { 8u, 16u, 32u })
+			{
+				bool roundTripMatches = true;
+				const std::int32_t n =
+					static_cast<std::int32_t>(chunkCellCount);
+				for (std::int32_t z = -n - 1; z <= n + 1; ++z)
+				{
+					for (std::int32_t y = -n - 1; y <= n + 1; ++y)
+					{
+						for (std::int32_t x = -n - 1; x <= n + 1; ++x)
+						{
+							const SampleCoord sample{ x, y, z };
+							const CellCoord cell{ x, y, z };
+							OwnedSampleAddress sampleAddress{};
+							OwnedCellAddress cellAddress{};
+							SampleCoord reconstructedSample{};
+							CellCoord reconstructedCell{};
+							roundTripMatches &=
+								ResolveSampleOwner(
+									sample,
+									chunkCellCount,
+									sampleAddress).Succeeded() &&
+								sampleAddress.m_Local.m_X < chunkCellCount &&
+								sampleAddress.m_Local.m_Y < chunkCellCount &&
+								sampleAddress.m_Local.m_Z < chunkCellCount &&
+								ChunkLocalToGlobalSample(
+									sampleAddress.m_Owner,
+									sampleAddress.m_Local,
+									chunkCellCount,
+									reconstructedSample).Succeeded() &&
+								reconstructedSample == sample &&
+								ResolveCellOwner(
+									cell,
+									chunkCellCount,
+									cellAddress).Succeeded() &&
+								cellAddress.m_Local.m_X < chunkCellCount &&
+								cellAddress.m_Local.m_Y < chunkCellCount &&
+								cellAddress.m_Local.m_Z < chunkCellCount &&
+								ChunkLocalToGlobalCell(
+									cellAddress.m_Owner,
+									cellAddress.m_Local,
+									chunkCellCount,
+									reconstructedCell).Succeeded() &&
+								reconstructedCell == cell;
+						}
+					}
+				}
+				context.Check(
+					roundTripMatches,
+					"Sample and cell ownership are unique and reversible for a supported N");
+			}
+		}
+
+		void RunCanonicalOrderingTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			std::array<ChunkCoord, 7> chunks{
+				ChunkCoord{ 1, 0, 0 },
+				ChunkCoord{ 0, 0, 1 },
+				ChunkCoord{ 0, 1, 0 },
+				ChunkCoord{ -1, 0, 0 },
+				ChunkCoord{ 0, -1, 0 },
+				ChunkCoord{ 0, 0, -1 },
+				ChunkCoord{ 0, 0, 0 },
+			};
+			std::ranges::sort(chunks, ChunkCoordZYXLess{});
+
+			constexpr std::array<ChunkCoord, 7> Expected{
+				ChunkCoord{ 0, 0, -1 },
+				ChunkCoord{ 0, -1, 0 },
+				ChunkCoord{ -1, 0, 0 },
+				ChunkCoord{ 0, 0, 0 },
+				ChunkCoord{ 1, 0, 0 },
+				ChunkCoord{ 0, 1, 0 },
+				ChunkCoord{ 0, 0, 1 },
+			};
+			context.Check(
+				chunks == Expected,
+				"ChunkCoordZYXLess orders chunks by Z, then Y, then X");
+		}
+
+		void RunFlattenTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			for (const std::uint32_t chunkCellCount : { 8u, 16u, 32u })
+			{
+				bool roundTripMatches = true;
+				for (std::uint32_t z = 0; z < chunkCellCount; ++z)
+				{
+					for (std::uint32_t y = 0; y < chunkCellCount; ++y)
+					{
+						for (std::uint32_t x = 0; x < chunkCellCount; ++x)
+						{
+							const LocalCoord expected{ x, y, z };
+							std::size_t flatIndex = 0;
+							LocalCoord actual{};
+							roundTripMatches &=
+								FlattenLocal(
+									expected,
+									chunkCellCount,
+									flatIndex).Succeeded() &&
+								flatIndex ==
+									x + chunkCellCount *
+										(y + chunkCellCount * z) &&
+								UnflattenLocal(
+									flatIndex,
+									chunkCellCount,
+									actual).Succeeded() &&
+								actual == expected;
+						}
+					}
+				}
+				context.Check(
+					roundTripMatches,
+					"FlattenLocal and UnflattenLocal round-trip a supported chunk");
+			}
+
+			std::size_t flatIndex = 123;
+			context.Check(
+				FlattenLocal({ 16, 0, 0 }, 16, flatIndex).m_Error ==
+					ValidationError::InvalidLocalCoordinate &&
+				flatIndex == 123,
+				"FlattenLocal rejects LocalCoord components equal to N");
+
+			LocalCoord local{ 1, 2, 3 };
+			context.Check(
+				UnflattenLocal(4096, 16, local).m_Error ==
+					ValidationError::FlatIndexOutOfRange &&
+				local == LocalCoord{ 1, 2, 3 },
+				"UnflattenLocal rejects the first index beyond chunk capacity");
+			context.Check(
+				ValidateLocalCoord({ 0, 0, 0 }, 7).m_Error ==
+					ValidationError::InvalidChunkCellCount &&
+				UnflattenLocal(0, 7, local).m_Error ==
+					ValidationError::InvalidChunkCellCount,
+				"Local coordinate operations reject unsupported chunk sizes");
+		}
+
+		void RunCellCornerAndHaloTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			bool cornersMatch = true;
+			for (std::uint32_t z = 0; z <= 1; ++z)
+			{
+				for (std::uint32_t y = 0; y <= 1; ++y)
+				{
+					for (std::uint32_t x = 0; x <= 1; ++x)
+					{
+						SampleCoord sample{};
+						cornersMatch &=
+							CellCornerToGlobalSample(
+								{ -5, 7, 11 },
+								{ x, y, z },
+								sample).Succeeded() &&
+							sample == SampleCoord{
+								-5 + static_cast<std::int32_t>(x),
+								7 + static_cast<std::int32_t>(y),
+								11 + static_cast<std::int32_t>(z),
+							};
+					}
+				}
+			}
+			context.Check(
+				cornersMatch,
+				"CellCornerToGlobalSample accepts all eight cell corners");
+
+			SampleCoord sample{ 1, 2, 3 };
+			context.Check(
+				CellCornerToGlobalSample(
+					{ 0, 0, 0 },
+					{ 2, 0, 0 },
+					sample).m_Error ==
+					ValidationError::InvalidCellCornerOffset &&
+				sample == SampleCoord{ 1, 2, 3 },
+				"CellCornerToGlobalSample rejects offsets outside zero and one");
+			context.Check(
+				CellCornerToGlobalSample(
+					{ std::numeric_limits<std::int32_t>::max(), 0, 0 },
+					{ 1, 0, 0 },
+					sample).m_Error ==
+					ValidationError::CoordinateOutOfRange,
+				"CellCornerToGlobalSample rejects coordinate overflow");
+
+			struct HaloCase
+			{
+				CellCoord m_Cell{};
+				CellCornerOffset m_Corner{};
+				OwnedSampleAddress m_Expected{};
+			};
+			constexpr std::array<HaloCase, 3> HaloCases{
+				HaloCase{
+					{ 15, 0, 0 },
+					{ 1, 0, 0 },
+					{ { 1, 0, 0 }, { 0, 0, 0 } },
+				},
+				HaloCase{
+					{ 15, 15, 0 },
+					{ 1, 1, 0 },
+					{ { 1, 1, 0 }, { 0, 0, 0 } },
+				},
+				HaloCase{
+					{ 15, 15, 15 },
+					{ 1, 1, 1 },
+					{ { 1, 1, 1 }, { 0, 0, 0 } },
+				},
+			};
+
+			bool haloCasesMatch = true;
+			for (const HaloCase& haloCase : HaloCases)
+			{
+				SampleCoord globalSample{};
+				OwnedSampleAddress address{};
+				haloCasesMatch &=
+					CellCornerToGlobalSample(
+						haloCase.m_Cell,
+						haloCase.m_Corner,
+						globalSample).Succeeded() &&
+					ResolveSampleOwner(
+						globalSample,
+						16,
+						address).Succeeded() &&
+					address == haloCase.m_Expected;
+			}
+			context.Check(
+				haloCasesMatch,
+				"Positive halo samples resolve through global sample ownership");
+		}
+
+		void RunCoordinateBoundsTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			SampleCoord maximumSample{};
+			context.Check(
+				ChunkLocalToGlobalSample(
+					{ 134217727, 0, 0 },
+					{ 15, 0, 0 },
+					16,
+					maximumSample).Succeeded() &&
+				maximumSample ==
+					SampleCoord{
+						std::numeric_limits<std::int32_t>::max(),
+						0,
+						0,
+					},
+				"ChunkLocalToGlobalSample accepts the maximum exact coordinate");
+
+			CellCoord minimumCell{};
+			context.Check(
+				ChunkLocalToGlobalCell(
+					{ -134217728, 0, 0 },
+					{ 0, 0, 0 },
+					16,
+					minimumCell).Succeeded() &&
+				minimumCell ==
+					CellCoord{
+						std::numeric_limits<std::int32_t>::min(),
+						0,
+						0,
+					},
+				"ChunkLocalToGlobalCell accepts the minimum exact coordinate");
+
+			SampleCoord unchangedSample{ 1, 2, 3 };
+			context.Check(
+				ChunkLocalToGlobalSample(
+					{ std::numeric_limits<std::int32_t>::max(), 0, 0 },
+					{ 0, 0, 0 },
+					32,
+					unchangedSample).m_Error ==
+					ValidationError::CoordinateOutOfRange &&
+				unchangedSample == SampleCoord{ 1, 2, 3 },
+				"ChunkLocalToGlobalSample rejects expansion beyond int32");
+
+			SampleAabb sampleBounds{};
+			const CellAabb logicalCellBounds{
+				.m_Min = { -16, -8, -4 },
+				.m_MaxExclusive = { 16, 8, 4 },
+			};
+			context.Check(
+				LogicalCellBoundsToSampleBounds(
+					logicalCellBounds,
+					sampleBounds).Succeeded() &&
+				sampleBounds == SampleAabb{
+					.m_Min = { -16, -8, -4 },
+					.m_MaxExclusive = { 17, 9, 5 },
+				},
+				"Logical cell bounds expand by one positive sample");
+
+			context.Check(
+				LogicalCellBoundsToSampleBounds(
+					{
+						.m_Min = { 0, 0, 0 },
+						.m_MaxExclusive = { 0, 1, 1 },
+					},
+					sampleBounds).m_Error ==
+					ValidationError::EmptyLogicalCellBounds,
+				"Logical sample bounds conversion rejects an empty cell axis");
+			context.Check(
+				LogicalCellBoundsToSampleBounds(
+					{
+						.m_Min = { 0, 0, 0 },
+						.m_MaxExclusive = {
+							std::numeric_limits<std::int32_t>::max(),
+							1,
+							1,
+						},
+					},
+					sampleBounds).m_Error ==
+					ValidationError::LogicalSampleBoundsOverflow,
+				"Logical sample bounds conversion rejects positive overflow");
+		}
+
 		void RunWorldConfigValidationTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -269,6 +717,12 @@ namespace gglab
 	void RunNapaVoxelCoordinateSelfTests(SelfTestContext& context) noexcept
 	{
 		RunCheckedArithmeticTests(context);
+		RunFloorDivisionTests(context);
+		RunCoordinateOwnershipTests(context);
+		RunCanonicalOrderingTests(context);
+		RunFlattenTests(context);
+		RunCellCornerAndHaloTests(context);
+		RunCoordinateBoundsTests(context);
 		RunWorldConfigValidationTests(context);
 	}
 }

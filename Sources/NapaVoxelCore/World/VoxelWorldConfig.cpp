@@ -10,15 +10,6 @@ namespace napa::voxel
 {
 	namespace
 	{
-		[[nodiscard]] constexpr bool IsSupportedChunkCellCount(
-			std::uint32_t chunkCellCount) noexcept
-		{
-			return
-				chunkCellCount == 8 ||
-				chunkCellCount == 16 ||
-				chunkCellCount == 32;
-		}
-
 		[[nodiscard]] constexpr bool CanExpandToLogicalSampleBounds(
 			const CellAabb& bounds) noexcept
 		{

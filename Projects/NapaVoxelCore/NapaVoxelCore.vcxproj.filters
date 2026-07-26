@@ -1,47 +1,42 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Header Files">
+    <Filter Include="NapaVoxelCore">
       <UniqueIdentifier>{D19CAA60-7BC0-4DE0-9FC9-E193B939D215}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{7AE6F925-A28B-4056-A4BA-E1D183704D6B}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files\Validation">
+    <Filter Include="NapaVoxelCore\Validation">
       <UniqueIdentifier>{48DC8EEC-0BAD-4E86-BEFB-C03171361819}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\World">
+    <Filter Include="NapaVoxelCore\World">
       <UniqueIdentifier>{D35A7A7D-4285-47FD-A4EB-76B2AE29DDE0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\World">
-      <UniqueIdentifier>{ECFA1B14-81EC-4856-8445-CBAA5932C10F}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h">
-      <Filter>Header Files</Filter>
+      <Filter>NapaVoxelCore</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
-      <Filter>Header Files\Validation</Filter>
+      <Filter>NapaVoxelCore\Validation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h">
-      <Filter>Header Files\Validation</Filter>
+      <Filter>NapaVoxelCore\Validation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h">
-      <Filter>Header Files\World</Filter>
+      <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h">
-      <Filter>Header Files\World</Filter>
+      <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>NapaVoxelCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp">
+      <Filter>NapaVoxelCore\World</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.cpp">
-      <Filter>Source Files\World</Filter>
+      <Filter>NapaVoxelCore\World</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
