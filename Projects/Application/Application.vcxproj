@@ -142,6 +142,7 @@
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp" />
@@ -416,6 +417,7 @@
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h" />

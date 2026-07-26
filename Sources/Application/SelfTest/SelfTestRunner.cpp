@@ -2,6 +2,7 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"
+#include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
@@ -18,6 +19,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "asset-data",
 				.m_Run = &RunAssetDataSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "napa-voxel",
+				.m_Run = &RunNapaVoxelCoreSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "publication-accounting",

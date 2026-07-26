@@ -5,11 +5,11 @@ namespace napa::voxel
 	namespace
 	{
 		constexpr BuildContract CurrentBuildContract{
-			.coreApiVersion = 1,
-			.voxelHashSchemaVersion = 1,
-			.meshHashSchemaVersion = 1,
-			.referenceMesherVersion = 1,
-			.p0IsoValue = 128,
+			.m_CoreApiVersion = 1,
+			.m_VoxelHashSchemaVersion = 1,
+			.m_MeshHashSchemaVersion = 1,
+			.m_ReferenceMesherVersion = 1,
+			.m_P0IsoValue = 128,
 		};
 	}
 

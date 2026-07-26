@@ -141,7 +141,8 @@ namespace gglab
 			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
 			"  --self-test <suite-id>          Run a headless self-test suite.\n"
 			"                                  Available: artifact-cache, asset-data,\n"
-			"                                  publication-accounting, rendering-contracts.\n"
+			"                                  publication-accounting, rendering-contracts,\n"
+			"                                  napa-voxel.\n"
 			"  --help, -h                      Show this help text.\n";
 	}
 }

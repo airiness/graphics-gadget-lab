@@ -6,11 +6,11 @@ namespace napa::voxel
 {
 	struct BuildContract
 	{
-		std::uint32_t coreApiVersion;
-		std::uint32_t voxelHashSchemaVersion;
-		std::uint32_t meshHashSchemaVersion;
-		std::uint32_t referenceMesherVersion;
-		std::uint8_t p0IsoValue;
+		std::uint32_t m_CoreApiVersion = 0;
+		std::uint32_t m_VoxelHashSchemaVersion = 0;
+		std::uint32_t m_MeshHashSchemaVersion = 0;
+		std::uint32_t m_ReferenceMesherVersion = 0;
+		std::uint8_t m_P0IsoValue = 0;
 	};
 
 	[[nodiscard]] const BuildContract& GetBuildContract() noexcept;
