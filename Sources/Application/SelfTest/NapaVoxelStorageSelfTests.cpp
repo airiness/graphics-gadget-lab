@@ -137,12 +137,25 @@ namespace gglab
 		{
 			using namespace napa::voxel;
 
-			VoxelChunk chunk{ 8 };
+			std::unique_ptr<VoxelChunk> chunk;
 			context.Check(
-				chunk.GetChunkCellCount() == 8 &&
-					chunk.GetSampleCount() == 512 &&
-					chunk.GetVoxelRevision() == 0,
+				VoxelChunk::Create(8, chunk).Succeeded() &&
+					chunk &&
+					chunk->GetChunkCellCount() == 8 &&
+					chunk->GetSampleCount() == 512 &&
+					chunk->GetVoxelRevision() == 0,
 				"A voxel chunk starts with the expected capacity and revision");
+			if (!chunk)
+			{
+				return;
+			}
+
+			VoxelChunk* const validChunk = chunk.get();
+			context.Check(
+				VoxelChunk::Create(7, chunk).m_Error ==
+					ValidationError::InvalidChunkCellCount &&
+					chunk.get() == validChunk,
+				"VoxelChunk creation rejects an unsupported permanent state");
 
 			const LocalCoord local{ 7, 3, 1 };
 			VoxelSample original{
@@ -152,8 +165,8 @@ namespace gglab
 			};
 			VoxelSample current = original;
 			context.Check(
-				chunk.ReadOriginalSample(local, original).Succeeded() &&
-					chunk.ReadCurrentSample(local, current).Succeeded() &&
+				chunk->ReadOriginalSample(local, original).Succeeded() &&
+					chunk->ReadCurrentSample(local, current).Succeeded() &&
 					original == DefaultVoxelSample &&
 					current == DefaultVoxelSample,
 				"A voxel chunk initializes original and current samples to empty");
@@ -165,39 +178,39 @@ namespace gglab
 			};
 			bool changed = false;
 			context.Check(
-				chunk.WriteOriginalAndCurrentSample(
+				chunk->WriteOriginalAndCurrentSample(
 					local,
 					solid,
 					changed).Succeeded() &&
 					changed &&
-					chunk.GetVoxelRevision() == 1 &&
-					chunk.ReadOriginalSample(local, original).Succeeded() &&
-					chunk.ReadCurrentSample(local, current).Succeeded() &&
+					chunk->GetVoxelRevision() == 1 &&
+					chunk->ReadOriginalSample(local, original).Succeeded() &&
+					chunk->ReadCurrentSample(local, current).Succeeded() &&
 					original == solid &&
 					current == solid,
 				"An initialization write updates both sample layers once");
 
 			changed = true;
 			context.Check(
-				chunk.WriteOriginalAndCurrentSample(
+				chunk->WriteOriginalAndCurrentSample(
 					local,
 					solid,
 					changed).Succeeded() &&
 					!changed &&
-					chunk.GetVoxelRevision() == 1,
+					chunk->GetVoxelRevision() == 1,
 				"An identical initialization write does not advance revision");
 
 			VoxelSample damaged = solid;
 			damaged.m_Damage = 99;
 			context.Check(
-				chunk.WriteCurrentSample(
+				chunk->WriteCurrentSample(
 					local,
 					damaged,
 					changed).Succeeded() &&
 					changed &&
-					chunk.GetVoxelRevision() == 2 &&
-					chunk.ReadOriginalSample(local, original).Succeeded() &&
-					chunk.ReadCurrentSample(local, current).Succeeded() &&
+					chunk->GetVoxelRevision() == 2 &&
+					chunk->ReadOriginalSample(local, original).Succeeded() &&
+					chunk->ReadCurrentSample(local, current).Succeeded() &&
 					original == solid &&
 					current == damaged,
 				"A current write does not alias the original sample layer");
@@ -209,20 +222,20 @@ namespace gglab
 			};
 			changed = true;
 			context.Check(
-				chunk.WriteCurrentSample(
+				chunk->WriteCurrentSample(
 					local,
 					unknown,
 					changed).m_Error ==
 					ValidationError::InvalidVoxelMaterial &&
 					changed &&
-					chunk.GetVoxelRevision() == 2 &&
-					chunk.ReadCurrentSample(local, current).Succeeded() &&
+					chunk->GetVoxelRevision() == 2 &&
+					chunk->ReadCurrentSample(local, current).Succeeded() &&
 					current == damaged,
 				"A rejected chunk write changes neither data nor outputs");
 
 			VoxelSample unchangedRead = damaged;
 			context.Check(
-				chunk.ReadCurrentSample(
+				chunk->ReadCurrentSample(
 					{ 8, 0, 0 },
 					unchangedRead).m_Error ==
 					ValidationError::InvalidLocalCoordinate &&
@@ -247,6 +260,16 @@ namespace gglab
 						} &&
 					world->GetLogicalDomainMetrics().m_TotalSampleCount ==
 						4913 &&
+					world->GetLogicalDomainMetrics().m_CellOwnerChunkBounds ==
+						ChunkAabb{
+							.m_Min = { -1, -1, -1 },
+							.m_MaxExclusive = { 1, 1, 1 },
+						} &&
+					world->GetLogicalDomainMetrics().m_SampleOwnerChunkBounds ==
+						ChunkAabb{
+							.m_Min = { -1, -1, -1 },
+							.m_MaxExclusive = { 2, 2, 2 },
+						} &&
 					world->GetResidentChunkCount() == 0 &&
 					world->GetWorldVoxelRevision() == 0,
 				"A voxel world captures validated logical-domain metadata");
@@ -398,17 +421,24 @@ namespace gglab
 
 			bool allocated = false;
 			context.Check(
-				world->EnsureChunkAllocated({ 4, 0, 0 }, allocated).Succeeded() &&
+				world->EnsureChunkAllocated({ 0, 0, 1 }, allocated).Succeeded() &&
 					allocated &&
 					world->GetResidentChunkCount() == 3 &&
 					world->GetWorldVoxelRevision() == 3,
-				"Guard storage can be allocated without changing voxel revision");
+				"A positive guard sample chunk can be allocated without changing revision");
 			allocated = true;
 			context.Check(
-				world->EnsureChunkAllocated({ 4, 0, 0 }, allocated).Succeeded() &&
+				world->EnsureChunkAllocated({ 0, 0, 1 }, allocated).Succeeded() &&
 					!allocated &&
 					world->GetResidentChunkCount() == 3,
 				"Guard allocation reports an already resident chunk");
+			allocated = true;
+			context.Check(
+				world->EnsureChunkAllocated({ 4, 0, 0 }, allocated).m_Error ==
+					ValidationError::ChunkOutsideLogicalSampleDomain &&
+					allocated &&
+					world->GetResidentChunkCount() == 3,
+				"Chunk allocation rejects owners unrelated to the logical sample domain");
 
 			const std::size_t residentBeforeRejectedWrite =
 				world->GetResidentChunkCount();
@@ -417,7 +447,7 @@ namespace gglab
 			changed = true;
 			context.Check(
 				world->WriteCurrentSample(
-					{ 32, 0, 0 },
+					{ 0, 0, 9 },
 					unknown,
 					changed).m_Error ==
 					ValidationError::SampleOutsideLogicalBounds &&
@@ -430,10 +460,34 @@ namespace gglab
 
 			read = damaged;
 			context.Check(
-				world->ReadCurrentSample({ 32, 0, 0 }, read).m_Error ==
+				world->ReadCurrentSample({ 0, 0, 9 }, read).m_Error ==
 					ValidationError::SampleOutsideLogicalBounds &&
 					read == damaged,
 				"Allocated guard chunks remain inaccessible as logical samples");
+
+			std::unique_ptr<VoxelWorld> currentFirstWorld;
+			bool currentFirstChanged = false;
+			VoxelSample currentFirstOriginal{};
+			VoxelSample currentFirstCurrent{};
+			context.Check(
+				VoxelWorld::Create(config, currentFirstWorld).Succeeded() &&
+					currentFirstWorld &&
+					currentFirstWorld->WriteCurrentSample(
+						negativeCoordinate,
+						solid,
+						currentFirstChanged).Succeeded() &&
+					currentFirstChanged &&
+					currentFirstWorld->GetResidentChunkCount() == 1 &&
+					currentFirstWorld->GetWorldVoxelRevision() == 1 &&
+					currentFirstWorld->ReadOriginalSample(
+						negativeCoordinate,
+						currentFirstOriginal).Succeeded() &&
+					currentFirstWorld->ReadCurrentSample(
+						negativeCoordinate,
+						currentFirstCurrent).Succeeded() &&
+					currentFirstOriginal == DefaultVoxelSample &&
+					currentFirstCurrent == solid,
+				"A current-first write allocates storage without changing original data");
 
 			VoxelWorld* const existingWorld = world.get();
 			VoxelWorldConfig invalidConfig = config;

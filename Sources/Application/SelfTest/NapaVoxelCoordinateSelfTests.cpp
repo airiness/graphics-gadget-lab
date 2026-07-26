@@ -567,8 +567,26 @@ namespace gglab
 				sampleBounds == SampleAabb{
 					.m_Min = { -16, -8, -4 },
 					.m_MaxExclusive = { 17, 9, 5 },
-				},
+				} &&
+				sampleBounds.Contains({ -16, -8, -4 }) &&
+				sampleBounds.Contains({ 16, 8, 4 }) &&
+				!sampleBounds.Contains({ 17, 8, 4 }),
 				"Logical cell bounds expand by one positive sample");
+
+			ChunkAabb sampleOwnerBounds{};
+			context.Check(
+				SampleBoundsToOwnerChunkBounds(
+					sampleBounds,
+					16,
+					sampleOwnerBounds).Succeeded() &&
+					sampleOwnerBounds ==
+						ChunkAabb{
+							.m_Min = { -1, -1, -1 },
+							.m_MaxExclusive = { 2, 1, 1 },
+						} &&
+					sampleOwnerBounds.Contains({ 1, 0, 0 }) &&
+					!sampleOwnerBounds.Contains({ 2, 0, 0 }),
+				"Sample bounds identify cell and positive guard owner chunks");
 
 			context.Check(
 				LogicalCellBoundsToSampleBounds(
@@ -616,6 +634,10 @@ namespace gglab
 							.m_Min = { -1, -1, -1 },
 							.m_MaxExclusive = { 1, 1, 1 },
 						},
+						.m_SampleOwnerChunkBounds = {
+							.m_Min = { -1, -1, -1 },
+							.m_MaxExclusive = { 2, 1, 1 },
+						},
 						.m_ChunkCount = 8,
 					},
 				"Logical domain metrics describe cells, samples, and owner chunks");
@@ -635,6 +657,11 @@ namespace gglab
 					ChunkAabb{
 						.m_Min = { -2, -1, -1 },
 						.m_MaxExclusive = { -1, 0, 0 },
+					} &&
+				metrics.m_SampleOwnerChunkBounds ==
+					ChunkAabb{
+						.m_Min = { -2, -1, -1 },
+						.m_MaxExclusive = { 0, 0, 0 },
 					} &&
 				metrics.m_ChunkCount == 1,
 				"Logical domain metrics preserve negative owner boundaries");

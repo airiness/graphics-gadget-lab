@@ -9,6 +9,7 @@
 namespace napa::voxel
 {
 	inline constexpr std::uint8_t IsoValue = 128;
+	inline constexpr std::uint32_t VoxelDataSchemaVersion = 1;
 
 	enum class VoxelMaterial : std::uint8_t
 	{

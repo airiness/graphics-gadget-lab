@@ -65,11 +65,18 @@ namespace napa::voxel
 			SampleCoord coordinate,
 			VoxelSample& sample,
 			bool original) const noexcept;
+		[[nodiscard]] ValidationResult FindOrCreateChunk(
+			ChunkCoord coordinate,
+			VoxelChunk*& chunk,
+			bool& allocated);
 
 		VoxelWorldConfig m_Config{};
 		LogicalDomainMetrics m_LogicalDomainMetrics{};
 		SampleAabb m_LogicalSampleBounds{};
-		std::map<ChunkCoord, VoxelChunk, ChunkCoordZYXLess> m_Chunks;
+		std::map<
+			ChunkCoord,
+			std::unique_ptr<VoxelChunk>,
+			ChunkCoordZYXLess> m_Chunks;
 		std::uint64_t m_WorldVoxelRevision = 0;
 	};
 }

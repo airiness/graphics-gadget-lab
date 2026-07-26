@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <utility>
 
 namespace napa::voxel
 {
@@ -19,6 +21,22 @@ namespace napa::voxel
 			const std::size_t count = chunkCellCount;
 			return count * count * count;
 		}
+	}
+
+	ValidationResult VoxelChunk::Create(
+		std::uint32_t chunkCellCount,
+		std::unique_ptr<VoxelChunk>& chunk)
+	{
+		if (!IsSupportedChunkCellCount(chunkCellCount))
+		{
+			return { ValidationError::InvalidChunkCellCount };
+		}
+
+		std::unique_ptr<VoxelChunk> created{
+			new VoxelChunk(chunkCellCount),
+		};
+		chunk = std::move(created);
+		return {};
 	}
 
 	VoxelChunk::VoxelChunk(std::uint32_t chunkCellCount)

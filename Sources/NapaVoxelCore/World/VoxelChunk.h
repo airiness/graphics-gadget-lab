@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 namespace napa::voxel
@@ -13,7 +14,14 @@ namespace napa::voxel
 	class VoxelChunk final
 	{
 	public:
-		explicit VoxelChunk(std::uint32_t chunkCellCount);
+		[[nodiscard]] static ValidationResult Create(
+			std::uint32_t chunkCellCount,
+			std::unique_ptr<VoxelChunk>& chunk);
+
+		VoxelChunk(const VoxelChunk&) = delete;
+		VoxelChunk& operator=(const VoxelChunk&) = delete;
+		VoxelChunk(VoxelChunk&&) = delete;
+		VoxelChunk& operator=(VoxelChunk&&) = delete;
 
 		[[nodiscard]] std::uint32_t GetChunkCellCount() const noexcept;
 		[[nodiscard]] std::size_t GetSampleCount() const noexcept;
@@ -36,6 +44,8 @@ namespace napa::voxel
 			bool& changed) noexcept;
 
 	private:
+		explicit VoxelChunk(std::uint32_t chunkCellCount);
+
 		[[nodiscard]] ValidationResult ResolveFlatIndex(
 			LocalCoord local,
 			std::size_t& flatIndex) const noexcept;

@@ -29,6 +29,7 @@ namespace napa::voxel
 		std::uint64_t m_TotalSampleCount = 0;
 
 		ChunkAabb m_CellOwnerChunkBounds{};
+		ChunkAabb m_SampleOwnerChunkBounds{};
 		std::uint64_t m_ChunkCount = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(

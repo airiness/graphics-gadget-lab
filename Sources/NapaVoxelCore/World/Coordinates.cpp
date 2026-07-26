@@ -356,4 +356,62 @@ namespace napa::voxel
 		};
 		return {};
 	}
+
+	ValidationResult SampleBoundsToOwnerChunkBounds(
+		const SampleAabb& sampleBounds,
+		std::uint32_t chunkCellCount,
+		ChunkAabb& chunkBounds) noexcept
+	{
+		if (sampleBounds.IsEmpty())
+		{
+			return { ValidationError::EmptySampleBounds };
+		}
+
+		const SampleCoord maximumInclusive{
+			sampleBounds.m_MaxExclusive.m_X - 1,
+			sampleBounds.m_MaxExclusive.m_Y - 1,
+			sampleBounds.m_MaxExclusive.m_Z - 1,
+		};
+		OwnedSampleAddress minimumAddress{};
+		OwnedSampleAddress maximumAddress{};
+		const ValidationResult minimumResult = ResolveSampleOwner(
+			sampleBounds.m_Min,
+			chunkCellCount,
+			minimumAddress);
+		if (minimumResult.Failed())
+		{
+			return minimumResult;
+		}
+		const ValidationResult maximumResult = ResolveSampleOwner(
+			maximumInclusive,
+			chunkCellCount,
+			maximumAddress);
+		if (maximumResult.Failed())
+		{
+			return maximumResult;
+		}
+
+		const std::optional<std::int32_t> maximumExclusiveX =
+			CheckedAdd(maximumAddress.m_Owner.m_X, std::int32_t{ 1 });
+		const std::optional<std::int32_t> maximumExclusiveY =
+			CheckedAdd(maximumAddress.m_Owner.m_Y, std::int32_t{ 1 });
+		const std::optional<std::int32_t> maximumExclusiveZ =
+			CheckedAdd(maximumAddress.m_Owner.m_Z, std::int32_t{ 1 });
+		if (!maximumExclusiveX ||
+			!maximumExclusiveY ||
+			!maximumExclusiveZ)
+		{
+			return { ValidationError::LogicalChunkCountOverflow };
+		}
+
+		chunkBounds = {
+			.m_Min = minimumAddress.m_Owner,
+			.m_MaxExclusive = {
+				*maximumExclusiveX,
+				*maximumExclusiveY,
+				*maximumExclusiveZ,
+			},
+		};
+		return {};
+	}
 }

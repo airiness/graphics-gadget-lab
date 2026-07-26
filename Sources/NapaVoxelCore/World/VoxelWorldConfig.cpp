@@ -120,6 +120,16 @@ namespace napa::voxel
 		}
 		computed.m_TotalSampleCount = *totalSampleCount;
 
+		const ValidationResult sampleOwnerBoundsResult =
+			SampleBoundsToOwnerChunkBounds(
+				sampleBounds,
+				config.m_ChunkCellCount,
+				computed.m_SampleOwnerChunkBounds);
+		if (sampleOwnerBoundsResult.Failed())
+		{
+			return sampleOwnerBoundsResult;
+		}
+
 		const std::optional<std::int32_t> maximumCellX = CheckedAdd(
 			config.m_LogicalCellBounds.m_MaxExclusive.m_X,
 			std::int32_t{ -1 });

@@ -76,6 +76,18 @@ namespace napa::voxel
 				m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
+		[[nodiscard]] constexpr bool Contains(
+			SampleCoord coordinate) const noexcept
+		{
+			return
+				coordinate.m_X >= m_Min.m_X &&
+				coordinate.m_Y >= m_Min.m_Y &&
+				coordinate.m_Z >= m_Min.m_Z &&
+				coordinate.m_X < m_MaxExclusive.m_X &&
+				coordinate.m_Y < m_MaxExclusive.m_Y &&
+				coordinate.m_Z < m_MaxExclusive.m_Z;
+		}
+
 		[[nodiscard]] friend constexpr bool operator==(
 			const SampleAabb&,
 			const SampleAabb&) noexcept = default;
@@ -94,6 +106,18 @@ namespace napa::voxel
 				m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
+		[[nodiscard]] constexpr bool Contains(
+			CellCoord coordinate) const noexcept
+		{
+			return
+				coordinate.m_X >= m_Min.m_X &&
+				coordinate.m_Y >= m_Min.m_Y &&
+				coordinate.m_Z >= m_Min.m_Z &&
+				coordinate.m_X < m_MaxExclusive.m_X &&
+				coordinate.m_Y < m_MaxExclusive.m_Y &&
+				coordinate.m_Z < m_MaxExclusive.m_Z;
+		}
+
 		[[nodiscard]] friend constexpr bool operator==(
 			const CellAabb&,
 			const CellAabb&) noexcept = default;
@@ -110,6 +134,18 @@ namespace napa::voxel
 				m_Min.m_X >= m_MaxExclusive.m_X ||
 				m_Min.m_Y >= m_MaxExclusive.m_Y ||
 				m_Min.m_Z >= m_MaxExclusive.m_Z;
+		}
+
+		[[nodiscard]] constexpr bool Contains(
+			ChunkCoord coordinate) const noexcept
+		{
+			return
+				coordinate.m_X >= m_Min.m_X &&
+				coordinate.m_Y >= m_Min.m_Y &&
+				coordinate.m_Z >= m_Min.m_Z &&
+				coordinate.m_X < m_MaxExclusive.m_X &&
+				coordinate.m_Y < m_MaxExclusive.m_Y &&
+				coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(
@@ -201,4 +237,8 @@ namespace napa::voxel
 	[[nodiscard]] ValidationResult LogicalCellBoundsToSampleBounds(
 		const CellAabb& cellBounds,
 		SampleAabb& sampleBounds) noexcept;
+	[[nodiscard]] ValidationResult SampleBoundsToOwnerChunkBounds(
+		const SampleAabb& sampleBounds,
+		std::uint32_t chunkCellCount,
+		ChunkAabb& chunkBounds) noexcept;
 }

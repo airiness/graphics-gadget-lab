@@ -8,22 +8,6 @@
 
 namespace napa::voxel
 {
-	namespace
-	{
-		[[nodiscard]] constexpr bool Contains(
-			const SampleAabb& bounds,
-			SampleCoord coordinate) noexcept
-		{
-			return
-				coordinate.m_X >= bounds.m_Min.m_X &&
-				coordinate.m_Y >= bounds.m_Min.m_Y &&
-				coordinate.m_Z >= bounds.m_Min.m_Z &&
-				coordinate.m_X < bounds.m_MaxExclusive.m_X &&
-				coordinate.m_Y < bounds.m_MaxExclusive.m_Y &&
-				coordinate.m_Z < bounds.m_MaxExclusive.m_Z;
-		}
-	}
-
 	ValidationResult VoxelWorld::Create(
 		const VoxelWorldConfig& config,
 		std::unique_ptr<VoxelWorld>& world)
@@ -99,7 +83,7 @@ namespace napa::voxel
 	{
 		const auto iterator = m_Chunks.find(chunk);
 		return iterator != m_Chunks.end()
-			? &iterator->second
+			? iterator->second.get()
 			: nullptr;
 	}
 
@@ -107,11 +91,15 @@ namespace napa::voxel
 		ChunkCoord chunk,
 		bool& allocated)
 	{
-		const auto [iterator, inserted] =
-			m_Chunks.try_emplace(chunk, m_Config.m_ChunkCellCount);
-		static_cast<void>(iterator);
-		allocated = inserted;
-		return {};
+		if (!m_LogicalDomainMetrics.m_SampleOwnerChunkBounds.Contains(chunk))
+		{
+			return {
+				ValidationError::ChunkOutsideLogicalSampleDomain,
+			};
+		}
+
+		VoxelChunk* result = nullptr;
+		return FindOrCreateChunk(chunk, result, allocated);
 	}
 
 	ValidationResult VoxelWorld::ReadOriginalSample(
@@ -162,11 +150,11 @@ namespace napa::voxel
 			VoxelSample original{};
 			VoxelSample current{};
 			const ValidationResult originalResult =
-				iterator->second.ReadOriginalSample(
+				iterator->second->ReadOriginalSample(
 					address.m_Local,
 					original);
 			const ValidationResult currentResult =
-				iterator->second.ReadCurrentSample(
+				iterator->second->ReadCurrentSample(
 					address.m_Local,
 					current);
 			if (originalResult.Failed())
@@ -190,16 +178,20 @@ namespace napa::voxel
 			return { ValidationError::ArithmeticOverflow };
 		}
 
-		if (iterator == m_Chunks.end())
+		VoxelChunk* chunk = nullptr;
+		bool allocated = false;
+		const ValidationResult allocationResult = FindOrCreateChunk(
+			address.m_Owner,
+			chunk,
+			allocated);
+		if (allocationResult.Failed())
 		{
-			iterator = m_Chunks.try_emplace(
-				address.m_Owner,
-				m_Config.m_ChunkCellCount).first;
+			return allocationResult;
 		}
-
+		static_cast<void>(allocated);
 		bool chunkChanged = false;
 		const ValidationResult writeResult =
-			iterator->second.WriteOriginalAndCurrentSample(
+			chunk->WriteOriginalAndCurrentSample(
 				address.m_Local,
 				prepared,
 				chunkChanged);
@@ -251,7 +243,7 @@ namespace napa::voxel
 		{
 			VoxelSample current{};
 			const ValidationResult readResult =
-				iterator->second.ReadCurrentSample(
+				iterator->second->ReadCurrentSample(
 					address.m_Local,
 					current);
 			if (readResult.Failed())
@@ -271,16 +263,20 @@ namespace napa::voxel
 			return { ValidationError::ArithmeticOverflow };
 		}
 
-		if (iterator == m_Chunks.end())
+		VoxelChunk* chunk = nullptr;
+		bool allocated = false;
+		const ValidationResult allocationResult = FindOrCreateChunk(
+			address.m_Owner,
+			chunk,
+			allocated);
+		if (allocationResult.Failed())
 		{
-			iterator = m_Chunks.try_emplace(
-				address.m_Owner,
-				m_Config.m_ChunkCellCount).first;
+			return allocationResult;
 		}
-
+		static_cast<void>(allocated);
 		bool chunkChanged = false;
 		const ValidationResult writeResult =
-			iterator->second.WriteCurrentSample(
+			chunk->WriteCurrentSample(
 				address.m_Local,
 				prepared,
 				chunkChanged);
@@ -303,7 +299,7 @@ namespace napa::voxel
 		SampleCoord coordinate,
 		OwnedSampleAddress& address) const noexcept
 	{
-		if (!Contains(m_LogicalSampleBounds, coordinate))
+		if (!m_LogicalSampleBounds.Contains(coordinate))
 		{
 			return { ValidationError::SampleOutsideLogicalBounds };
 		}
@@ -335,7 +331,37 @@ namespace napa::voxel
 		}
 
 		return original
-			? iterator->second.ReadOriginalSample(address.m_Local, sample)
-			: iterator->second.ReadCurrentSample(address.m_Local, sample);
+			? iterator->second->ReadOriginalSample(address.m_Local, sample)
+			: iterator->second->ReadCurrentSample(address.m_Local, sample);
+	}
+
+	ValidationResult VoxelWorld::FindOrCreateChunk(
+		ChunkCoord coordinate,
+		VoxelChunk*& chunk,
+		bool& allocated)
+	{
+		const auto existing = m_Chunks.find(coordinate);
+		if (existing != m_Chunks.end())
+		{
+			chunk = existing->second.get();
+			allocated = false;
+			return {};
+		}
+
+		std::unique_ptr<VoxelChunk> created;
+		const ValidationResult createResult = VoxelChunk::Create(
+			m_Config.m_ChunkCellCount,
+			created);
+		if (createResult.Failed())
+		{
+			return createResult;
+		}
+
+		const auto [iterator, inserted] = m_Chunks.try_emplace(
+			coordinate,
+			std::move(created));
+		chunk = iterator->second.get();
+		allocated = inserted;
+		return {};
 	}
 }
