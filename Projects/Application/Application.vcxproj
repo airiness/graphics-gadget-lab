@@ -802,6 +802,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
+      <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\Externals\Vender\DirectXMesh\DirectXMesh\DirectXMesh_Desktop_2022_Win10.vcxproj">
       <Project>{6857f086-f6fe-4150-9ed7-7446f1c1c220}</Project>
     </ProjectReference>
