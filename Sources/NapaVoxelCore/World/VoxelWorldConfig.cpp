@@ -209,11 +209,11 @@ namespace napa::voxel
 		{
 			return { ValidationError::LogicalChunkCountOverflow };
 		}
-		computed.m_ChunkCount = *chunkCount;
+		computed.m_CellOwnerChunkCount = *chunkCount;
 
 		if (!FitsSize(computed.m_TotalCellCount) ||
 			!FitsSize(computed.m_TotalSampleCount) ||
-			!FitsSize(computed.m_ChunkCount))
+			!FitsSize(computed.m_CellOwnerChunkCount))
 		{
 			return { ValidationError::LogicalDomainSizeOverflow };
 		}

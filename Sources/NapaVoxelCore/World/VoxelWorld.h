@@ -3,6 +3,7 @@
 #include "NapaVoxelCore/Validation/ValidationResult.h"
 #include "NapaVoxelCore/World/Coordinates.h"
 #include "NapaVoxelCore/World/VoxelChunk.h"
+#include "NapaVoxelCore/World/VoxelRestore.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"
 
@@ -15,10 +16,21 @@ namespace napa::voxel
 {
 	class VoxelWorld final
 	{
+	private:
+		struct ConstructionToken
+		{
+		};
+
 	public:
 		[[nodiscard]] static ValidationResult Create(
 			const VoxelWorldConfig& config,
 			std::unique_ptr<VoxelWorld>& world);
+
+		VoxelWorld(
+			ConstructionToken,
+			const VoxelWorldConfig& config,
+			const LogicalDomainMetrics& metrics,
+			SampleAabb logicalSampleBounds);
 
 		VoxelWorld(const VoxelWorld&) = delete;
 		VoxelWorld& operator=(const VoxelWorld&) = delete;
@@ -52,12 +64,16 @@ namespace napa::voxel
 			VoxelSample input,
 			bool& changed);
 
-	private:
-		VoxelWorld(
-			const VoxelWorldConfig& config,
-			const LogicalDomainMetrics& metrics,
-			SampleAabb logicalSampleBounds);
+		[[nodiscard]] ValidationResult RestoreAll(
+			RestoreResult& result);
+		[[nodiscard]] ValidationResult RestoreSampleOwnerChunk(
+			ChunkCoord chunk,
+			RestoreResult& result);
+		[[nodiscard]] ValidationResult RestoreRegion(
+			const SampleAabb& region,
+			RestoreResult& result);
 
+	private:
 		[[nodiscard]] ValidationResult ResolveLogicalSample(
 			SampleCoord coordinate,
 			OwnedSampleAddress& address) const noexcept;
@@ -69,6 +85,9 @@ namespace napa::voxel
 			ChunkCoord coordinate,
 			VoxelChunk*& chunk,
 			bool& allocated);
+		[[nodiscard]] ValidationResult RestoreRegionInternal(
+			const SampleAabb& region,
+			RestoreResult& result);
 
 		VoxelWorldConfig m_Config{};
 		LogicalDomainMetrics m_LogicalDomainMetrics{};

@@ -163,6 +163,30 @@ namespace gglab
 					goldenHash == 0x3447718e07eed74aull,
 				"The default logical voxel world matches its golden hash");
 
+			std::unique_ptr<VoxelWorld> nonEmptyGoldenWorld;
+			std::uint64_t nonEmptyGoldenHash = 0;
+			const VoxelSample goldenStone{
+				.m_Density = IsoValue,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 17,
+			};
+			bool goldenChanged = false;
+			context.Check(
+				VoxelWorld::Create(
+					MakeGoldenHashConfig(),
+					nonEmptyGoldenWorld).Succeeded() &&
+					nonEmptyGoldenWorld &&
+					nonEmptyGoldenWorld->WriteOriginalAndCurrentSample(
+						{ 0, 0, 0 },
+						goldenStone,
+						goldenChanged).Succeeded() &&
+					goldenChanged &&
+					ComputeLogicalVoxelWorldHash(
+						*nonEmptyGoldenWorld,
+						nonEmptyGoldenHash).Succeeded() &&
+					nonEmptyGoldenHash == 0x22acf3d1636e3855ull,
+				"A non-empty logical voxel world matches its golden hash");
+
 			const VoxelWorldConfig config = MakeAllocationHashConfig();
 			std::unique_ptr<VoxelWorld> implicitWorld;
 			std::unique_ptr<VoxelWorld> allocatedWorld;

@@ -638,7 +638,7 @@ namespace gglab
 							.m_Min = { -1, -1, -1 },
 							.m_MaxExclusive = { 2, 1, 1 },
 						},
-						.m_ChunkCount = 8,
+						.m_CellOwnerChunkCount = 8,
 					},
 				"Logical domain metrics describe cells, samples, and owner chunks");
 
@@ -663,14 +663,14 @@ namespace gglab
 						.m_Min = { -2, -1, -1 },
 						.m_MaxExclusive = { 0, 0, 0 },
 					} &&
-				metrics.m_ChunkCount == 1,
+				metrics.m_CellOwnerChunkCount == 1,
 				"Logical domain metrics preserve negative owner boundaries");
 
 			const LogicalDomainMetrics unchangedMetrics{
 				.m_CellCountX = 7,
 				.m_CellCountY = 8,
 				.m_CellCountZ = 9,
-				.m_ChunkCount = 10,
+				.m_CellOwnerChunkCount = 10,
 			};
 			metrics = unchangedMetrics;
 			VoxelWorldConfig invalidConfig = MakeValidConfig();

@@ -30,7 +30,7 @@ namespace napa::voxel
 
 		ChunkAabb m_CellOwnerChunkBounds{};
 		ChunkAabb m_SampleOwnerChunkBounds{};
-		std::uint64_t m_ChunkCount = 0;
+		std::uint64_t m_CellOwnerChunkCount = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
 			const LogicalDomainMetrics&,

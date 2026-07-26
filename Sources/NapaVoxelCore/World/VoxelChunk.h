@@ -7,16 +7,28 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace napa::voxel
 {
+	class VoxelWorld;
+
 	class VoxelChunk final
 	{
+	private:
+		struct ConstructionToken
+		{
+		};
+
 	public:
 		[[nodiscard]] static ValidationResult Create(
 			std::uint32_t chunkCellCount,
 			std::unique_ptr<VoxelChunk>& chunk);
+
+		explicit VoxelChunk(
+			ConstructionToken,
+			std::uint32_t chunkCellCount);
 
 		VoxelChunk(const VoxelChunk&) = delete;
 		VoxelChunk& operator=(const VoxelChunk&) = delete;
@@ -44,12 +56,15 @@ namespace napa::voxel
 			bool& changed) noexcept;
 
 	private:
-		explicit VoxelChunk(std::uint32_t chunkCellCount);
+		friend class VoxelWorld;
 
 		[[nodiscard]] ValidationResult ResolveFlatIndex(
 			LocalCoord local,
 			std::size_t& flatIndex) const noexcept;
 		[[nodiscard]] ValidationResult AdvanceRevision() noexcept;
+		[[nodiscard]] ValidationResult RestoreCurrentSamples(
+			std::span<const LocalCoord> coordinates,
+			bool& changed) noexcept;
 
 		std::uint32_t m_ChunkCellCount = 0;
 		std::vector<VoxelSample> m_OriginalSamples;

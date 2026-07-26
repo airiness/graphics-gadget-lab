@@ -96,6 +96,7 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelRestore.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h" />

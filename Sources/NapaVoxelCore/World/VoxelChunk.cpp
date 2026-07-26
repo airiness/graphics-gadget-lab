@@ -32,14 +32,17 @@ namespace napa::voxel
 			return { ValidationError::InvalidChunkCellCount };
 		}
 
-		std::unique_ptr<VoxelChunk> created{
-			new VoxelChunk(chunkCellCount),
-		};
+		std::unique_ptr<VoxelChunk> created =
+			std::make_unique<VoxelChunk>(
+				ConstructionToken{},
+				chunkCellCount);
 		chunk = std::move(created);
 		return {};
 	}
 
-	VoxelChunk::VoxelChunk(std::uint32_t chunkCellCount)
+	VoxelChunk::VoxelChunk(
+		ConstructionToken,
+		std::uint32_t chunkCellCount)
 		: m_ChunkCellCount(chunkCellCount)
 		, m_OriginalSamples(
 			ComputeSampleCount(chunkCellCount),
@@ -201,6 +204,54 @@ namespace napa::voxel
 		}
 
 		++m_VoxelRevision;
+		return {};
+	}
+
+	ValidationResult VoxelChunk::RestoreCurrentSamples(
+		std::span<const LocalCoord> coordinates,
+		bool& changed) noexcept
+	{
+		bool hasDifference = false;
+		for (const LocalCoord coordinate : coordinates)
+		{
+			std::size_t flatIndex = 0;
+			const ValidationResult indexResult =
+				ResolveFlatIndex(coordinate, flatIndex);
+			if (indexResult.Failed())
+			{
+				return indexResult;
+			}
+
+			hasDifference =
+				hasDifference ||
+				m_CurrentSamples[flatIndex] !=
+					m_OriginalSamples[flatIndex];
+		}
+
+		if (!hasDifference)
+		{
+			changed = false;
+			return {};
+		}
+
+		const ValidationResult revisionResult = AdvanceRevision();
+		if (revisionResult.Failed())
+		{
+			return revisionResult;
+		}
+
+		for (const LocalCoord coordinate : coordinates)
+		{
+			const std::size_t count = m_ChunkCellCount;
+			const std::size_t flatIndex =
+				(static_cast<std::size_t>(coordinate.m_Z) * count +
+					coordinate.m_Y) *
+					count +
+				coordinate.m_X;
+			m_CurrentSamples[flatIndex] = m_OriginalSamples[flatIndex];
+		}
+
+		changed = true;
 		return {};
 	}
 }

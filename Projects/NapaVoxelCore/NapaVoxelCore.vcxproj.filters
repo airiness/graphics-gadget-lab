@@ -36,6 +36,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h">
       <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelRestore.h">
+      <Filter>NapaVoxelCore\World</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h">
       <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
