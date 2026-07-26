@@ -3,6 +3,7 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
 #include "NapaVoxelCore/BuildContract.h"
+#include "NapaVoxelCore/World/VoxelSample.h"
 
 #include <cstdio>
 
@@ -15,14 +16,14 @@ namespace gglab
 
 		std::printf(
 			"NapaVoxelCore build contract: core-api=%u, voxel-hash-schema=%u, "
-			"mesh-hash-schema=%u, reference-mesher=%u, p0-iso=%u\n",
+			"mesh-hash-schema=%u, reference-mesher=%u, iso=%u\n",
 			static_cast<unsigned>(contract.m_CoreApiVersion),
 			static_cast<unsigned>(contract.m_VoxelHashSchemaVersion),
 			static_cast<unsigned>(contract.m_MeshHashSchemaVersion),
 			static_cast<unsigned>(contract.m_ReferenceMesherVersion),
-			static_cast<unsigned>(contract.m_P0IsoValue));
+			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 1, "Core API version is 1");
+		context.Check(contract.m_CoreApiVersion == 2, "Core API version is 2");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -32,8 +33,11 @@ namespace gglab
 		context.Check(
 			contract.m_ReferenceMesherVersion == 1,
 			"Reference mesher version is 1");
-		context.Check(contract.m_P0IsoValue == 128, "P0 iso value is 128");
+		context.Check(
+			contract.m_IsoValue == napa::voxel::IsoValue,
+			"Build contract reports the canonical iso value");
 
 		RunNapaVoxelCoordinateSelfTests(context);
+		RunNapaVoxelStorageSelfTests(context);
 	}
 }

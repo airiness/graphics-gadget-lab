@@ -99,6 +99,24 @@ namespace napa::voxel
 			const CellAabb&) noexcept = default;
 	};
 
+	struct ChunkAabb
+	{
+		ChunkCoord m_Min{};
+		ChunkCoord m_MaxExclusive{};
+
+		[[nodiscard]] constexpr bool IsEmpty() const noexcept
+		{
+			return
+				m_Min.m_X >= m_MaxExclusive.m_X ||
+				m_Min.m_Y >= m_MaxExclusive.m_Y ||
+				m_Min.m_Z >= m_MaxExclusive.m_Z;
+		}
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const ChunkAabb&,
+			const ChunkAabb&) noexcept = default;
+	};
+
 	struct OwnedSampleAddress
 	{
 		ChunkCoord m_Owner{};

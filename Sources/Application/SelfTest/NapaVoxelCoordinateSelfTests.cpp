@@ -594,6 +594,113 @@ namespace gglab
 				"Logical sample bounds conversion rejects positive overflow");
 		}
 
+		void RunLogicalDomainMetricsTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config = MakeValidConfig();
+			LogicalDomainMetrics metrics{};
+			context.Check(
+				ComputeLogicalDomainMetrics(config, metrics).Succeeded() &&
+				metrics ==
+					LogicalDomainMetrics{
+						.m_CellCountX = 32,
+						.m_CellCountY = 16,
+						.m_CellCountZ = 8,
+						.m_SampleCountX = 33,
+						.m_SampleCountY = 17,
+						.m_SampleCountZ = 9,
+						.m_TotalCellCount = 4096,
+						.m_TotalSampleCount = 5049,
+						.m_CellOwnerChunkBounds = {
+							.m_Min = { -1, -1, -1 },
+							.m_MaxExclusive = { 1, 1, 1 },
+						},
+						.m_ChunkCount = 8,
+					},
+				"Logical domain metrics describe cells, samples, and owner chunks");
+
+			VoxelWorldConfig singleCellConfig = MakeValidConfig();
+			singleCellConfig.m_LogicalCellBounds = {
+				.m_Min = { -17, -16, -15 },
+				.m_MaxExclusive = { -16, -15, -14 },
+			};
+			context.Check(
+				ComputeLogicalDomainMetrics(
+					singleCellConfig,
+					metrics).Succeeded() &&
+				metrics.m_TotalCellCount == 1 &&
+				metrics.m_TotalSampleCount == 8 &&
+				metrics.m_CellOwnerChunkBounds ==
+					ChunkAabb{
+						.m_Min = { -2, -1, -1 },
+						.m_MaxExclusive = { -1, 0, 0 },
+					} &&
+				metrics.m_ChunkCount == 1,
+				"Logical domain metrics preserve negative owner boundaries");
+
+			const LogicalDomainMetrics unchangedMetrics{
+				.m_CellCountX = 7,
+				.m_CellCountY = 8,
+				.m_CellCountZ = 9,
+				.m_ChunkCount = 10,
+			};
+			metrics = unchangedMetrics;
+			VoxelWorldConfig invalidConfig = MakeValidConfig();
+			invalidConfig.m_ChunkCellCount = 7;
+			context.Check(
+				ComputeLogicalDomainMetrics(
+					invalidConfig,
+					metrics).m_Error ==
+					ValidationError::InvalidChunkCellCount &&
+				metrics == unchangedMetrics,
+				"Failed logical domain computation leaves metrics unchanged");
+
+			VoxelWorldConfig cellOverflowConfig = MakeValidConfig();
+			cellOverflowConfig.m_LogicalCellBounds = {
+				.m_Min = {
+					std::numeric_limits<std::int32_t>::min(),
+					std::numeric_limits<std::int32_t>::min(),
+					std::numeric_limits<std::int32_t>::min(),
+				},
+				.m_MaxExclusive = {
+					std::numeric_limits<std::int32_t>::max() - 1,
+					std::numeric_limits<std::int32_t>::max() - 1,
+					std::numeric_limits<std::int32_t>::max() - 1,
+				},
+			};
+			context.Check(
+				ComputeLogicalDomainMetrics(
+					cellOverflowConfig,
+					metrics).m_Error ==
+					ValidationError::LogicalCellCountOverflow &&
+				ValidateConfig(cellOverflowConfig).m_Error ==
+					ValidationError::LogicalCellCountOverflow,
+				"Logical domain validation rejects uint64 cell count overflow");
+
+			VoxelWorldConfig sampleOverflowConfig = MakeValidConfig();
+			sampleOverflowConfig.m_LogicalCellBounds = {
+				.m_Min = {
+					std::numeric_limits<std::int32_t>::min(),
+					std::numeric_limits<std::int32_t>::min(),
+					0,
+				},
+				.m_MaxExclusive = {
+					std::numeric_limits<std::int32_t>::max() - 1,
+					std::numeric_limits<std::int32_t>::max() - 1,
+					1,
+				},
+			};
+			context.Check(
+				ComputeLogicalDomainMetrics(
+					sampleOverflowConfig,
+					metrics).m_Error ==
+					ValidationError::LogicalSampleCountOverflow &&
+				ValidateConfig(sampleOverflowConfig).m_Error ==
+					ValidationError::LogicalSampleCountOverflow,
+				"Logical domain validation rejects uint64 sample count overflow");
+		}
+
 		void RunWorldConfigValidationTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -707,10 +814,6 @@ namespace gglab
 				config,
 				ValidationError::LogicalSampleBoundsOverflow,
 				"ValidateConfig rejects overflowing logical sample bounds");
-
-			context.Check(
-				P0IsoValue == 128,
-				"The P0 iso value remains fixed at 128");
 		}
 	}
 
@@ -723,6 +826,7 @@ namespace gglab
 		RunFlattenTests(context);
 		RunCellCornerAndHaloTests(context);
 		RunCoordinateBoundsTests(context);
+		RunLogicalDomainMetricsTests(context);
 		RunWorldConfigValidationTests(context);
 	}
 }

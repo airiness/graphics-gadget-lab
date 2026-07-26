@@ -19,6 +19,12 @@ namespace napa::voxel
 		InvalidCellCornerOffset = 10,
 		FlatIndexOutOfRange = 11,
 		CoordinateOutOfRange = 12,
+		InvalidVoxelMaterial = 13,
+		NonCanonicalVoxelSample = 14,
+		LogicalCellCountOverflow = 15,
+		LogicalSampleCountOverflow = 16,
+		LogicalChunkCountOverflow = 17,
+		LogicalDomainSizeOverflow = 18,
 	};
 
 	struct ValidationResult

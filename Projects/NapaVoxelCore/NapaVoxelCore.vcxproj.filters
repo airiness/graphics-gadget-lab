@@ -24,6 +24,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h">
       <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h">
+      <Filter>NapaVoxelCore\World</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h">
       <Filter>NapaVoxelCore\World</Filter>
     </ClInclude>
