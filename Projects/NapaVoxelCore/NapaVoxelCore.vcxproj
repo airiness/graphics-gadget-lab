@@ -81,6 +81,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp" />
@@ -90,6 +91,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />

@@ -28,6 +28,14 @@ namespace napa::voxel
 		SampleOutsideLogicalBounds = 19,
 		EmptySampleBounds = 20,
 		ChunkOutsideLogicalSampleDomain = 21,
+		InvalidPrimitiveShape = 22,
+		EmptyPrimitiveMaterial = 23,
+		NonFinitePrimitivePosition = 24,
+		NonFinitePrimitiveSize = 25,
+		NonPositiveSphereRadius = 26,
+		NonPositivePrimitiveExtent = 27,
+		DuplicatePrimitiveStableId = 28,
+		NonFiniteSignedDistance = 29,
 	};
 
 	struct ValidationResult

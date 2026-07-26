@@ -286,6 +286,51 @@ namespace gglab
 					result.m_ChangedSampleCoordinates ==
 						std::vector<SampleCoord>{ guardCoordinate },
 				"An empty restore region is rejected without changing its result");
+
+			std::unique_ptr<VoxelWorld> currentFirstWorld;
+			bool currentFirstChanged = false;
+			RestoreResult currentFirstResult{};
+			VoxelSample currentFirstOriginal{};
+			VoxelSample currentFirstCurrent{};
+			const SampleCoord currentFirstCoordinate{ -1, 0, 0 };
+			context.Check(
+				VoxelWorld::Create(
+					MakeRestoreConfig(),
+					currentFirstWorld).Succeeded() &&
+					currentFirstWorld &&
+					currentFirstWorld->WriteCurrentSample(
+						currentFirstCoordinate,
+						stone,
+						currentFirstChanged).Succeeded() &&
+					currentFirstChanged,
+				"Current-first restore data starts without an original write");
+			if (currentFirstWorld)
+			{
+				const std::uint64_t currentFirstRevision =
+					currentFirstWorld->GetWorldVoxelRevision();
+				const std::size_t currentFirstResidentCount =
+					currentFirstWorld->GetResidentChunkCount();
+				context.Check(
+					currentFirstWorld->RestoreAll(
+						currentFirstResult).Succeeded() &&
+						currentFirstResult.m_ChangedSampleCoordinates ==
+							std::vector<SampleCoord>{
+								currentFirstCoordinate,
+							} &&
+						currentFirstWorld->GetWorldVoxelRevision() ==
+							currentFirstRevision + 1 &&
+						currentFirstWorld->GetResidentChunkCount() ==
+							currentFirstResidentCount &&
+						currentFirstWorld->ReadOriginalSample(
+							currentFirstCoordinate,
+							currentFirstOriginal).Succeeded() &&
+						currentFirstWorld->ReadCurrentSample(
+							currentFirstCoordinate,
+							currentFirstCurrent).Succeeded() &&
+						currentFirstOriginal == DefaultVoxelSample &&
+						currentFirstCurrent == DefaultVoxelSample,
+					"Current-first restore recovers the implicit original baseline");
+			}
 		}
 	}
 

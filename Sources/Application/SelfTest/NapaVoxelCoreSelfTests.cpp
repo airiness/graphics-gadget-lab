@@ -23,7 +23,7 @@ namespace gglab
 			static_cast<unsigned>(contract.m_ReferenceMesherVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 5, "Core API version is 5");
+		context.Check(contract.m_CoreApiVersion == 6, "Core API version is 6");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -41,5 +41,6 @@ namespace gglab
 		RunNapaVoxelStorageSelfTests(context);
 		RunNapaVoxelHashSelfTests(context);
 		RunNapaVoxelRestoreSelfTests(context);
+		RunNapaVoxelPrimitiveSelfTests(context);
 	}
 }

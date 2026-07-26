@@ -242,12 +242,13 @@ namespace napa::voxel
 
 		for (const LocalCoord coordinate : coordinates)
 		{
-			const std::size_t count = m_ChunkCellCount;
-			const std::size_t flatIndex =
-				(static_cast<std::size_t>(coordinate.m_Z) * count +
-					coordinate.m_Y) *
-					count +
-				coordinate.m_X;
+			std::size_t flatIndex = 0;
+			const ValidationResult indexResult =
+				ResolveFlatIndex(coordinate, flatIndex);
+			if (indexResult.Failed())
+			{
+				return indexResult;
+			}
 			m_CurrentSamples[flatIndex] = m_OriginalSamples[flatIndex];
 		}
 
