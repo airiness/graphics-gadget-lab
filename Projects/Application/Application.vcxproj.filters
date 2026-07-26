@@ -267,6 +267,9 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -1062,6 +1065,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTestCases.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.h">

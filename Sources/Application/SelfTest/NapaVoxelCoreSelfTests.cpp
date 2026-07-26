@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
+#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
 #include "NapaVoxelCore/BuildContract.h"
 
@@ -32,5 +33,7 @@ namespace gglab
 			contract.m_ReferenceMesherVersion == 1,
 			"Reference mesher version is 1");
 		context.Check(contract.m_P0IsoValue == 128, "P0 iso value is 128");
+
+		RunNapaVoxelCoordinateSelfTests(context);
 	}
 }
