@@ -65,6 +65,10 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult RestoreCurrentSamples(
 			std::span<const LocalCoord> coordinates,
 			bool& changed) noexcept;
+		[[nodiscard]] ValidationResult InitializePreparedSample(
+			LocalCoord local,
+			VoxelSample prepared) noexcept;
+		void CommitInitialState() noexcept;
 
 		std::uint32_t m_ChunkCellCount = 0;
 		std::vector<VoxelSample> m_OriginalSamples;

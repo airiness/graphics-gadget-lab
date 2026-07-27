@@ -255,4 +255,26 @@ namespace napa::voxel
 		changed = true;
 		return {};
 	}
+
+	ValidationResult VoxelChunk::InitializePreparedSample(
+		LocalCoord local,
+		VoxelSample prepared) noexcept
+	{
+		std::size_t flatIndex = 0;
+		const ValidationResult indexResult =
+			ResolveFlatIndex(local, flatIndex);
+		if (indexResult.Failed())
+		{
+			return indexResult;
+		}
+
+		m_OriginalSamples[flatIndex] = prepared;
+		m_CurrentSamples[flatIndex] = prepared;
+		return {};
+	}
+
+	void VoxelChunk::CommitInitialState() noexcept
+	{
+		m_VoxelRevision = 1;
+	}
 }

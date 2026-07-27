@@ -36,6 +36,10 @@ namespace napa::voxel
 		NonPositivePrimitiveExtent = 27,
 		DuplicatePrimitiveStableId = 28,
 		NonFiniteSignedDistance = 29,
+		NonFiniteQuantizationInput = 30,
+		EmptySafetyMarginViolation = 31,
+		OriginalStateSealed = 32,
+		UnpreparedDensityQuantizationContext = 33,
 	};
 
 	struct ValidationResult

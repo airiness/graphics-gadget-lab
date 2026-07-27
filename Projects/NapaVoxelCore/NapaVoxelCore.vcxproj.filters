@@ -21,6 +21,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h">
       <Filter>NapaVoxelCore</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h">
+      <Filter>NapaVoxelCore\Field</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h">
       <Filter>NapaVoxelCore\Field</Filter>
     </ClInclude>
@@ -58,6 +61,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp">
       <Filter>NapaVoxelCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp">
+      <Filter>NapaVoxelCore\Field</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp">
       <Filter>NapaVoxelCore\Field</Filter>

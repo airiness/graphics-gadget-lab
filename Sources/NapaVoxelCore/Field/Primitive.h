@@ -4,11 +4,15 @@
 #include "NapaVoxelCore/World/VoxelSample.h"
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <type_traits>
 
 namespace napa::voxel
 {
+	class VoxelWorld;
+	struct VoxelWorldConfig;
+
 	struct Double3
 	{
 		double m_X = 0.0;
@@ -79,6 +83,11 @@ namespace napa::voxel
 		PrimitiveParameters m_Parameters{};
 	};
 
+	struct PrimitiveWorldGenerationResult
+	{
+		std::uint64_t m_InitialVoxelHash = 0;
+	};
+
 	[[nodiscard]] ValidationResult ValidatePrimitive(
 		const PrimitiveDesc& primitive) noexcept;
 	[[nodiscard]] ValidationResult ValidatePrimitiveSet(
@@ -87,6 +96,13 @@ namespace napa::voxel
 		const PrimitiveDesc& primitive,
 		Double3 position,
 		double& signedDistance) noexcept;
+	[[nodiscard]] ValidationResult ValidateEmptyCellSafetyMargin(
+		const VoxelWorld& world) noexcept;
+	[[nodiscard]] ValidationResult GeneratePrimitiveVoxelWorld(
+		const VoxelWorldConfig& config,
+		std::span<const PrimitiveDesc> primitives,
+		std::unique_ptr<VoxelWorld>& world,
+		PrimitiveWorldGenerationResult& result);
 
 	static_assert(std::is_standard_layout_v<Double3>);
 	static_assert(std::is_trivially_copyable_v<Double3>);

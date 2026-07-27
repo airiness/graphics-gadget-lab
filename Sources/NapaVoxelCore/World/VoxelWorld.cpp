@@ -138,6 +138,16 @@ namespace napa::voxel
 		return m_WorldVoxelRevision;
 	}
 
+	bool VoxelWorld::IsOriginalStateSealed() const noexcept
+	{
+		return m_OriginalStateSealed;
+	}
+
+	void VoxelWorld::SealOriginalState() noexcept
+	{
+		m_OriginalStateSealed = true;
+	}
+
 	const VoxelChunk* VoxelWorld::FindChunk(ChunkCoord chunk) const noexcept
 	{
 		const auto iterator = m_Chunks.find(chunk);
@@ -180,6 +190,11 @@ namespace napa::voxel
 		VoxelSample input,
 		bool& changed)
 	{
+		if (m_OriginalStateSealed)
+		{
+			return { ValidationError::OriginalStateSealed };
+		}
+
 		OwnedSampleAddress address{};
 		const ValidationResult addressResult =
 			ResolveLogicalSample(coordinate, address);
@@ -583,5 +598,49 @@ namespace napa::voxel
 		++m_WorldVoxelRevision;
 		result = std::move(restored);
 		return {};
+	}
+
+	ValidationResult VoxelWorld::InitializePreparedSample(
+		SampleCoord coordinate,
+		VoxelSample prepared)
+	{
+		OwnedSampleAddress address{};
+		const ValidationResult addressResult =
+			ResolveLogicalSample(coordinate, address);
+		if (addressResult.Failed())
+		{
+			return addressResult;
+		}
+		if (prepared == DefaultVoxelSample)
+		{
+			return {};
+		}
+
+		VoxelChunk* chunk = nullptr;
+		bool allocated = false;
+		const ValidationResult allocationResult = FindOrCreateChunk(
+			address.m_Owner,
+			chunk,
+			allocated);
+		if (allocationResult.Failed())
+		{
+			return allocationResult;
+		}
+		static_cast<void>(allocated);
+		return chunk->InitializePreparedSample(
+			address.m_Local,
+			prepared);
+	}
+
+	void VoxelWorld::CommitGeneratedOriginalState() noexcept
+	{
+		for (auto& [coordinate, chunk] : m_Chunks)
+		{
+			static_cast<void>(coordinate);
+			chunk->CommitInitialState();
+		}
+
+		m_WorldVoxelRevision = 1;
+		m_OriginalStateSealed = true;
 	}
 }

@@ -81,6 +81,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp" />
@@ -91,6 +92,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h" />

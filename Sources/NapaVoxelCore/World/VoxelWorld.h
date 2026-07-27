@@ -11,9 +11,13 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <span>
 
 namespace napa::voxel
 {
+	struct PrimitiveDesc;
+	struct PrimitiveWorldGenerationResult;
+
 	class VoxelWorld final
 	{
 	private:
@@ -41,6 +45,8 @@ namespace napa::voxel
 		[[nodiscard]] SampleAabb GetLogicalSampleBounds() const noexcept;
 		[[nodiscard]] std::size_t GetResidentChunkCount() const noexcept;
 		[[nodiscard]] std::uint64_t GetWorldVoxelRevision() const noexcept;
+		[[nodiscard]] bool IsOriginalStateSealed() const noexcept;
+		void SealOriginalState() noexcept;
 
 		[[nodiscard]] const VoxelChunk* FindChunk(
 			ChunkCoord chunk) const noexcept;
@@ -74,6 +80,12 @@ namespace napa::voxel
 			RestoreResult& result);
 
 	private:
+		friend ValidationResult GeneratePrimitiveVoxelWorld(
+			const VoxelWorldConfig& config,
+			std::span<const PrimitiveDesc> primitives,
+			std::unique_ptr<VoxelWorld>& world,
+			PrimitiveWorldGenerationResult& result);
+
 		[[nodiscard]] ValidationResult ResolveLogicalSample(
 			SampleCoord coordinate,
 			OwnedSampleAddress& address) const noexcept;
@@ -88,6 +100,10 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult RestoreRegionInternal(
 			const SampleAabb& region,
 			RestoreResult& result);
+		[[nodiscard]] ValidationResult InitializePreparedSample(
+			SampleCoord coordinate,
+			VoxelSample prepared);
+		void CommitGeneratedOriginalState() noexcept;
 
 		VoxelWorldConfig m_Config{};
 		LogicalDomainMetrics m_LogicalDomainMetrics{};
@@ -97,5 +113,6 @@ namespace napa::voxel
 			std::unique_ptr<VoxelChunk>,
 			ChunkCoordZYXLess> m_Chunks;
 		std::uint64_t m_WorldVoxelRevision = 0;
+		bool m_OriginalStateSealed = false;
 	};
 }
