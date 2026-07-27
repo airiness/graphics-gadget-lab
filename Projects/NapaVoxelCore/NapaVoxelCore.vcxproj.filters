@@ -13,6 +13,9 @@
     <Filter Include="NapaVoxelCore\Hash">
       <UniqueIdentifier>{B5A5DA96-05E3-40C4-B504-3B4B2273F83B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="NapaVoxelCore\Meshing">
+      <UniqueIdentifier>{E7E65EC5-560F-4D08-A1AD-C751AD25BBF5}</UniqueIdentifier>
+    </Filter>
     <Filter Include="NapaVoxelCore\World">
       <UniqueIdentifier>{D35A7A7D-4285-47FD-A4EB-76B2AE29DDE0}</UniqueIdentifier>
     </Filter>
@@ -32,6 +35,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h">
       <Filter>NapaVoxelCore\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h">
+      <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h">
+      <Filter>NapaVoxelCore\Meshing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
       <Filter>NapaVoxelCore\Validation</Filter>
@@ -73,6 +82,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp">
       <Filter>NapaVoxelCore\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp">
+      <Filter>NapaVoxelCore\Meshing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp">
       <Filter>NapaVoxelCore\World</Filter>

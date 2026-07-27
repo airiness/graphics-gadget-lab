@@ -662,6 +662,50 @@ namespace gglab
 
 			const VoxelWorldConfig config =
 				MakePrimitiveWorldConfig();
+			std::unique_ptr<VoxelWorld> defaultWorld;
+			std::uint64_t defaultHash = 0;
+			std::unique_ptr<VoxelWorld> emptyPrimitiveWorld;
+			PrimitiveWorldGenerationResult emptyPrimitiveResult{};
+			VoxelSample emptyOriginal{
+				.m_Density = IsoValue,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 1,
+			};
+			VoxelSample emptyCurrent = emptyOriginal;
+			RestoreResult emptyRestore{};
+			context.Check(
+				VoxelWorld::Create(
+					config,
+					defaultWorld).Succeeded() &&
+					defaultWorld &&
+					ComputeLogicalVoxelWorldHash(
+						*defaultWorld,
+						defaultHash).Succeeded() &&
+					GeneratePrimitiveVoxelWorld(
+						config,
+						std::span<const PrimitiveDesc>{},
+						emptyPrimitiveWorld,
+						emptyPrimitiveResult).Succeeded() &&
+					emptyPrimitiveWorld &&
+					emptyPrimitiveWorld->IsOriginalStateSealed() &&
+					emptyPrimitiveWorld->GetWorldVoxelRevision() == 1 &&
+					emptyPrimitiveWorld->GetResidentChunkCount() == 0 &&
+					emptyPrimitiveResult.m_InitialVoxelHash ==
+						defaultHash &&
+					emptyPrimitiveWorld->ReadOriginalSample(
+						{ 4, 4, 4 },
+						emptyOriginal).Succeeded() &&
+					emptyPrimitiveWorld->ReadCurrentSample(
+						{ 4, 4, 4 },
+						emptyCurrent).Succeeded() &&
+					emptyOriginal == DefaultVoxelSample &&
+					emptyCurrent == DefaultVoxelSample &&
+					emptyPrimitiveWorld->RestoreAll(
+						emptyRestore).Succeeded() &&
+					!emptyRestore.Changed() &&
+					emptyPrimitiveWorld->GetWorldVoxelRevision() == 1,
+				"An empty primitive set generates a sealed sparse empty baseline");
+
 			std::unique_ptr<VoxelWorld> unchangedWorld;
 			context.Check(
 				VoxelWorld::Create(

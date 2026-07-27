@@ -40,6 +40,17 @@ namespace napa::voxel
 		EmptySafetyMarginViolation = 31,
 		OriginalStateSealed = 32,
 		UnpreparedDensityQuantizationContext = 33,
+		UnpreparedMeshQuantizationContext = 34,
+		NonFiniteMeshVertex = 35,
+		MeshPositionOutOfRange = 36,
+		InvalidMeshNormal = 37,
+		InvalidMeshBounds = 38,
+		InvalidMeshSection = 39,
+		InvalidMeshIndexCount = 40,
+		MeshIndexOutOfRange = 41,
+		DegenerateMeshTriangle = 42,
+		InvalidMeshWinding = 43,
+		ChunkOutsideLogicalCellDomain = 44,
 	};
 
 	struct ValidationResult

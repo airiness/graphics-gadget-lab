@@ -16,6 +16,11 @@ namespace napa::voxel
 		WriteByte(static_cast<std::uint8_t>(value >> 8));
 	}
 
+	void CanonicalHashWriter::WriteI16(std::int16_t value) noexcept
+	{
+		WriteU16(static_cast<std::uint16_t>(value));
+	}
+
 	void CanonicalHashWriter::WriteU32(std::uint32_t value) noexcept
 	{
 		WriteByte(static_cast<std::uint8_t>(value));

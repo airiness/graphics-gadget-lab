@@ -75,6 +75,14 @@ namespace gglab
 				u16.GetValue() == 0x07ee9e07b4b1c883ull,
 				"WriteU16 serializes little-endian bytes");
 
+			CanonicalHashWriter i16;
+			CanonicalHashWriter i16Bits;
+			i16.WriteI16(-32767);
+			i16Bits.WriteU16(0x8001);
+			context.Check(
+				i16.GetValue() == i16Bits.GetValue(),
+				"WriteI16 serializes two's-complement little-endian bits");
+
 			CanonicalHashWriter u32;
 			u32.WriteU32(0x12345678);
 			context.Check(

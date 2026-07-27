@@ -16,6 +16,7 @@ namespace napa::voxel
 
 		void WriteU8(std::uint8_t value) noexcept;
 		void WriteU16(std::uint16_t value) noexcept;
+		void WriteI16(std::int16_t value) noexcept;
 		void WriteU32(std::uint32_t value) noexcept;
 		void WriteU64(std::uint64_t value) noexcept;
 		void WriteI32(std::int32_t value) noexcept;
