@@ -23,7 +23,8 @@ namespace gglab
 		const RHIResourceState& before,
 		const RHIResourceState& after) noexcept
 	{
-		return before != after;
+		return before.m_Access != after.m_Access ||
+			before.m_Layout != after.m_Layout;
 	}
 
 	constexpr inline bool NeedsOrderedUavBarrier(

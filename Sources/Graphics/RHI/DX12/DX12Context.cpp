@@ -36,6 +36,14 @@ namespace gglab
 		return m_Context->GetQueueSystem().GetGraphicsContext(m_FrameIndex);
 	}
 
+	RHIComputeCommandContext& DX12FrameContext::GetDirectComputeContext() noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			m_Active,
+			"DX12FrameContext::GetDirectComputeContext requires an active frame.");
+		return m_Context->GetDirectComputeContext(*this);
+	}
+
 	RHIComputeCommandContext* DX12FrameContext::GetComputeContext() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Active, "DX12FrameContext::GetComputeContext requires an active frame.");
@@ -59,9 +67,21 @@ namespace gglab
 			m_Device.get(),
 			&m_QueueSystem->GetQueue(DX12QueueType::Graphics),
 			desc.m_BufferCount);
+		m_DirectComputeContexts.reserve(desc.m_BufferCount);
 		for (uint32_t frameIndex = 0; frameIndex < desc.m_BufferCount; ++frameIndex)
 		{
-			m_QueueSystem->GetGraphicsContext(frameIndex).SetGpuProfiler(m_GpuProfiler.get());
+			auto& graphicsContext = m_QueueSystem->GetGraphicsContext(frameIndex);
+			graphicsContext.SetGpuProfiler(m_GpuProfiler.get());
+			auto computeContext = std::make_unique<DX12ComputeCommandContext>(
+				graphicsContext,
+				static_cast<DX12PipelineSystem*>(m_PipelineSystem.get()));
+			computeContext->SetGpuProfiler(m_GpuProfiler.get());
+			GGLAB_ASSERT_MSG(
+				computeContext->GetHandle() == graphicsContext.GetHandle() &&
+					computeContext->GetQueueType() == RHIQueueType::Graphics &&
+					computeContext->GetCommandList() == graphicsContext.GetCommandList(),
+				"A direct compute encoder must share its graphics context handle, queue, and command list.");
+			m_DirectComputeContexts.push_back(std::move(computeContext));
 		}
 
 		DX12DescriptorManager::CreateInfo descriptorInfo{};
@@ -287,6 +307,16 @@ namespace gglab
 		return context;
 	}
 
+	DX12ComputeCommandContext& DX12Context::GetDirectComputeContext(
+		DX12FrameContext& frame) noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			&frame == m_ActiveFrame && frame.m_Active,
+			"A direct compute encoder can only be acquired from the active frame.");
+		GGLAB_ASSERT(frame.m_FrameIndex < m_DirectComputeContexts.size());
+		return *m_DirectComputeContexts[frame.m_FrameIndex];
+	}
+
 	void DX12Context::BeginGraphicsRecording(DX12FrameContext& frame) noexcept
 	{
 		frame.m_GraphicsAllocator =
@@ -294,6 +324,7 @@ namespace gglab
 		auto* commandList = &m_QueueSystem->GetGraphicsCommandList(frame.m_FrameIndex);
 		commandList->Begin(frame.m_GraphicsAllocator);
 		m_QueueSystem->GetGraphicsContext(frame.m_FrameIndex).ClearTrackedResourceUses();
+		m_DirectComputeContexts[frame.m_FrameIndex]->ResetEncoderState();
 		BindGlobalDescriptorHeaps(*commandList);
 	}
 
@@ -327,6 +358,7 @@ namespace gglab
 		}
 		WaitIdle();
 		m_Frames.clear();
+		m_DirectComputeContexts.clear();
 		m_TransferManager.reset();
 		m_GpuProfiler.reset();
 		if (m_SwapChain)

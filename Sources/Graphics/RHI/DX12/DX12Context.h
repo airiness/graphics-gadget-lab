@@ -25,6 +25,7 @@ namespace gglab
 		uint32_t GetBackBufferIndex() const noexcept override { return m_BackBufferIndex; }
 		RHITextureHandle GetBackBuffer() const noexcept override;
 		RHIGraphicsCommandContext& GetGraphicsContext() noexcept override;
+		RHIComputeCommandContext& GetDirectComputeContext() noexcept override;
 		RHIComputeCommandContext* GetComputeContext() noexcept override;
 		RHIFencePoint GetSubmittedFence() const noexcept override { return m_SubmittedFence; }
 
@@ -76,6 +77,7 @@ namespace gglab
 		friend class DX12FrameContext;
 
 		DX12ComputeCommandContext* AcquireComputeContext(DX12FrameContext& frame) noexcept;
+		DX12ComputeCommandContext& GetDirectComputeContext(DX12FrameContext& frame) noexcept;
 		void BeginGraphicsRecording(DX12FrameContext& frame) noexcept;
 		void BindGlobalDescriptorHeaps(class DX12CommandList& commandList) noexcept;
 		void FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept;
@@ -88,6 +90,7 @@ namespace gglab
 		std::unique_ptr<DX12DescriptorManager> m_DescriptorManager;
 		std::unique_ptr<TransferManager> m_TransferManager;
 		std::unique_ptr<DX12GpuProfiler> m_GpuProfiler;
+		std::vector<std::unique_ptr<DX12ComputeCommandContext>> m_DirectComputeContexts;
 		std::vector<std::unique_ptr<DX12FrameContext>> m_Frames;
 		DX12FrameContext* m_ActiveFrame = nullptr;
 		bool m_Initialized = false;

@@ -218,6 +218,56 @@ namespace gglab
 		m_CommandList->FlushBarriers();
 	}
 
+	void DX12CommandContext::TextureUavBarrier(
+		std::span<const RHITextureUavBarrier> barriers) noexcept
+	{
+		if (!m_Device || !m_CommandList || barriers.empty())
+		{
+			return;
+		}
+
+		std::vector<ID3D12Resource*> resources;
+		resources.reserve(barriers.size());
+		for (const RHITextureUavBarrier& barrier : barriers)
+		{
+			DX12Texture* texture = m_Device->ResolveTexture(barrier.m_Texture);
+			if (!texture)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12CommandContext::TextureUavBarrier received a non-live texture handle.");
+				continue;
+			}
+			resources.push_back(texture->Get());
+			TrackTextureUse(barrier.m_Texture);
+		}
+		m_CommandList->ResourceUavBarriers(resources);
+	}
+
+	void DX12CommandContext::BufferUavBarrier(
+		std::span<const RHIBufferUavBarrier> barriers) noexcept
+	{
+		if (!m_Device || !m_CommandList || barriers.empty())
+		{
+			return;
+		}
+
+		std::vector<ID3D12Resource*> resources;
+		resources.reserve(barriers.size());
+		for (const RHIBufferUavBarrier& barrier : barriers)
+		{
+			DX12Buffer* buffer = m_Device->ResolveBuffer(barrier.m_Buffer);
+			if (!buffer)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12CommandContext::BufferUavBarrier received a non-live buffer handle.");
+				continue;
+			}
+			resources.push_back(buffer->Get());
+			TrackBufferUse(barrier.m_Buffer);
+		}
+		m_CommandList->ResourceUavBarriers(resources);
+	}
+
 	void DX12CommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept
 	{
 		if (std::ranges::find(m_UsedBuffers, buffer) == m_UsedBuffers.end())
@@ -250,6 +300,18 @@ namespace gglab
 	void DX12GraphicsCommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
 	{
 		m_Backend.BufferBarrier(barriers);
+	}
+
+	void DX12GraphicsCommandContext::TextureUavBarrier(
+		std::span<const RHITextureUavBarrier> barriers) noexcept
+	{
+		m_Backend.TextureUavBarrier(barriers);
+	}
+
+	void DX12GraphicsCommandContext::BufferUavBarrier(
+		std::span<const RHIBufferUavBarrier> barriers) noexcept
+	{
+		m_Backend.BufferUavBarrier(barriers);
 	}
 
 	void DX12GraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
@@ -527,18 +589,47 @@ namespace gglab
 		DX12Device* device,
 		DX12PipelineSystem* pipelineSystem,
 		DX12CommandList* commandList) noexcept :
-		m_Backend(device, commandList, RHIQueueType::Compute),
 		m_PipelineSystem(pipelineSystem)
-	{}
+	{
+		m_OwnedBackend = std::make_unique<DX12CommandContext>(
+			device,
+			commandList,
+			RHIQueueType::Compute);
+		m_Backend = m_OwnedBackend.get();
+	}
+
+	DX12ComputeCommandContext::DX12ComputeCommandContext(
+		DX12GraphicsCommandContext& graphicsContext,
+		DX12PipelineSystem* pipelineSystem) noexcept :
+		m_Backend(&graphicsContext.m_Backend),
+		m_PipelineSystem(pipelineSystem)
+	{
+		GGLAB_ASSERT_NOT_NULL(m_Backend);
+		GGLAB_ASSERT_MSG(
+			m_Backend->GetQueueType() == RHIQueueType::Graphics,
+			"A direct compute encoder must wrap a graphics/direct command context.");
+	}
 
 	void DX12ComputeCommandContext::TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept
 	{
-		m_Backend.TextureBarrier(barriers);
+		m_Backend->TextureBarrier(barriers);
 	}
 
 	void DX12ComputeCommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
 	{
-		m_Backend.BufferBarrier(barriers);
+		m_Backend->BufferBarrier(barriers);
+	}
+
+	void DX12ComputeCommandContext::TextureUavBarrier(
+		std::span<const RHITextureUavBarrier> barriers) noexcept
+	{
+		m_Backend->TextureUavBarrier(barriers);
+	}
+
+	void DX12ComputeCommandContext::BufferUavBarrier(
+		std::span<const RHIBufferUavBarrier> barriers) noexcept
+	{
+		m_Backend->BufferUavBarrier(barriers);
 	}
 
 	void DX12ComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
@@ -554,15 +645,15 @@ namespace gglab
 		}
 		if (m_CurrentRootSignature != rootSignature)
 		{
-			m_Backend.Get()->SetComputeRootSignature(rootSignature->Get());
+			m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
 			m_CurrentRootSignature = rootSignature;
 		}
-		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
+		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 	}
 
 	void DX12ComputeCommandContext::SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept
 	{
-		const D3D12_GPU_DESCRIPTOR_HANDLE table = m_Backend.GetDevice()->ResolveShaderVisibleDescriptor(
+		const D3D12_GPU_DESCRIPTOR_HANDLE table = m_Backend->GetDevice()->ResolveShaderVisibleDescriptor(
 			binding.m_HeapType,
 			binding.m_TableIndex);
 		if (table.ptr == 0)
@@ -571,24 +662,105 @@ namespace gglab
 				"DX12ComputeCommandContext::SetDescriptorTable received an invalid descriptor table.");
 			return;
 		}
-		m_Backend.Get()->SetComputeRootDescriptorTable(binding.m_ParameterIndex, table);
+		m_Backend->GetCommandList()->SetComputeDescriptorTable(binding.m_ParameterIndex, table);
+	}
+
+	void DX12ComputeCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex,
+		RHIBufferHandle buffer,
+		uint64_t offset) noexcept
+	{
+		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
+		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ComputeCommandContext::SetConstantBuffer received an invalid buffer binding.");
+			return;
+		}
+		m_Backend->GetCommandList()->SetComputeConstantBuffer(
+			parameterIndex,
+			nativeBuffer->GPUVirtualAddress() + offset);
+		m_Backend->TrackBufferUse(buffer);
+	}
+
+	void DX12ComputeCommandContext::SetReadOnlyBuffer(
+		uint32_t parameterIndex,
+		RHIBufferHandle buffer,
+		uint64_t offset) noexcept
+	{
+		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
+		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ComputeCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			return;
+		}
+		m_Backend->GetCommandList()->SetComputeReadOnlyBuffer(
+			parameterIndex,
+			nativeBuffer->GPUVirtualAddress() + offset);
+		m_Backend->TrackBufferUse(buffer);
+	}
+
+	void DX12ComputeCommandContext::SetReadWriteBuffer(
+		uint32_t parameterIndex,
+		RHIBufferHandle buffer,
+		uint64_t offset) noexcept
+	{
+		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
+		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ComputeCommandContext::SetReadWriteBuffer received an invalid buffer binding.");
+			return;
+		}
+		m_Backend->GetCommandList()->SetComputeReadWriteBuffer(
+			parameterIndex,
+			nativeBuffer->GPUVirtualAddress() + offset);
+		m_Backend->TrackBufferUse(buffer);
+	}
+
+	void DX12ComputeCommandContext::SetPushConstants(
+		uint32_t parameterIndex,
+		std::span<const uint32_t> values,
+		uint32_t destOffset) noexcept
+	{
+		m_Backend->GetCommandList()->SetComputeRoot32BitConstants(
+			parameterIndex,
+			values,
+			destOffset);
 	}
 
 	void DX12ComputeCommandContext::Dispatch(uint32_t groupCountX,
 		uint32_t groupCountY,
 		uint32_t groupCountZ) noexcept
 	{
-		m_Backend.Get()->Dispatch(groupCountX, groupCountY, groupCountZ);
+		m_Backend->GetCommandList()->Dispatch(groupCountX, groupCountY, groupCountZ);
 	}
 
 	void DX12ComputeCommandContext::SetPipelineState(const DX12PipelineState& pipelineState) noexcept
 	{
-		m_Backend.GetCommandList()->SetPipelineState(pipelineState);
+		m_Backend->GetCommandList()->SetPipelineState(pipelineState);
 	}
 
 	void DX12ComputeCommandContext::SetDescriptor(uint32_t parameterIndex,
 		const DX12DescriptorView& descriptor) noexcept
 	{
-		m_Backend.Get()->SetComputeRootDescriptorTable(parameterIndex, descriptor.m_GpuHandle);
+		m_Backend->GetCommandList()->SetComputeDescriptorTable(parameterIndex, descriptor.m_GpuHandle);
+	}
+
+	void DX12ComputeCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	{
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->BeginScope(*m_Backend->GetCommandList(), name);
+		}
+	}
+
+	void DX12ComputeCommandContext::EndGpuProfileScope() noexcept
+	{
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->EndScope(*m_Backend->GetCommandList());
+		}
 	}
 }

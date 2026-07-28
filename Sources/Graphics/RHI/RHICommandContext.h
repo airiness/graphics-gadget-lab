@@ -33,6 +33,16 @@ namespace gglab
 		RHIResourceState m_After{};
 	};
 
+	struct RHITextureUavBarrier
+	{
+		RHITextureHandle m_Texture{};
+	};
+
+	struct RHIBufferUavBarrier
+	{
+		RHIBufferHandle m_Buffer{};
+	};
+
 	struct RHISubmitInfo
 	{
 		RHIQueueType m_QueueType = RHIQueueType::Graphics;
@@ -92,6 +102,8 @@ namespace gglab
 		virtual void TrackBufferUse(RHIBufferHandle buffer) noexcept = 0;
 		virtual void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept = 0;
 		virtual void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept = 0;
+		virtual void TextureUavBarrier(std::span<const RHITextureUavBarrier> barriers) noexcept = 0;
+		virtual void BufferUavBarrier(std::span<const RHIBufferUavBarrier> barriers) noexcept = 0;
 		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};
@@ -168,6 +180,35 @@ namespace gglab
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
+		virtual void SetConstantBuffer(
+			uint32_t parameterIndex,
+			RHIBufferHandle buffer,
+			uint64_t offset = 0) noexcept = 0;
+		virtual void SetReadOnlyBuffer(
+			uint32_t parameterIndex,
+			RHIBufferHandle buffer,
+			uint64_t offset = 0) noexcept = 0;
+		virtual void SetReadWriteBuffer(
+			uint32_t parameterIndex,
+			RHIBufferHandle buffer,
+			uint64_t offset = 0) noexcept = 0;
+		virtual void SetPushConstants(
+			uint32_t parameterIndex,
+			std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept = 0;
+
+		template<typename T>
+		void SetPushConstants(uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
+		{
+			static_assert(std::is_trivially_copyable_v<T>);
+			static_assert(std::is_standard_layout_v<T>);
+			static_assert(sizeof(T) % sizeof(uint32_t) == 0);
+
+			std::array<uint32_t, sizeof(T) / sizeof(uint32_t)> data{};
+			std::memcpy(data.data(), &values, sizeof(T));
+			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
+		}
+
 		virtual void Dispatch(uint32_t groupCountX,
 			uint32_t groupCountY,
 			uint32_t groupCountZ) noexcept = 0;

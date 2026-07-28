@@ -50,6 +50,11 @@ namespace gglab
 		m_D3D12GraphicsCommandList->SetGraphicsRootSignature(rootSignature.Get());
 	}
 
+	void DX12CommandList::SetComputeRootSignature(const DX12RootSignature& rootSignature) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetComputeRootSignature(rootSignature.Get());
+	}
+
 	void DX12CommandList::SetPipelineState(const DX12PipelineState& pipelineState) const noexcept
 	{
 		// TODO: for RayTracing change into ID3D12GraphicsCommandList::SetPipelineState1(...).
@@ -169,6 +174,46 @@ namespace gglab
 			destOffset);
 	}
 
+	void DX12CommandList::SetComputeConstantBuffer(
+		uint32_t parameterIndex,
+		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetComputeRootConstantBufferView(parameterIndex, gpuAddress);
+	}
+
+	void DX12CommandList::SetComputeReadOnlyBuffer(
+		uint32_t parameterIndex,
+		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetComputeRootShaderResourceView(parameterIndex, gpuAddress);
+	}
+
+	void DX12CommandList::SetComputeReadWriteBuffer(
+		uint32_t parameterIndex,
+		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetComputeRootUnorderedAccessView(parameterIndex, gpuAddress);
+	}
+
+	void DX12CommandList::SetComputeDescriptorTable(
+		uint32_t parameterIndex,
+		D3D12_GPU_DESCRIPTOR_HANDLE table) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetComputeRootDescriptorTable(parameterIndex, table);
+	}
+
+	void DX12CommandList::SetComputeRoot32BitConstants(
+		uint32_t parameterIndex,
+		std::span<const uint32_t> values,
+		uint32_t destOffset) const noexcept
+	{
+		m_D3D12GraphicsCommandList->SetComputeRoot32BitConstants(
+			parameterIndex,
+			static_cast<UINT>(values.size()),
+			values.data(),
+			destOffset);
+	}
+
 	void DX12CommandList::AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept
 	{
 		m_TextureBarriers.push_back(textureBarrier);
@@ -213,6 +258,33 @@ namespace gglab
 		m_TextureBarriers.clear();
 		m_BufferBarriers.clear();
 		m_GlobalBarriers.clear();
+	}
+
+	void DX12CommandList::ResourceUavBarriers(
+		std::span<ID3D12Resource* const> resources) noexcept
+	{
+		if (resources.empty())
+		{
+			return;
+		}
+
+		FlushBarriers();
+		std::vector<D3D12_RESOURCE_BARRIER> barriers;
+		barriers.reserve(resources.size());
+		for (ID3D12Resource* resource : resources)
+		{
+			GGLAB_ASSERT_NOT_NULL(resource);
+			if (resource)
+			{
+				barriers.push_back(CD3DX12_RESOURCE_BARRIER::UAV(resource));
+			}
+		}
+		if (!barriers.empty())
+		{
+			m_D3D12GraphicsCommandList->ResourceBarrier(
+				static_cast<UINT>(barriers.size()),
+				barriers.data());
+		}
 	}
 
 	void DX12CommandList::ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& color) const noexcept
@@ -279,5 +351,13 @@ namespace gglab
 	void DX12CommandList::DrawInstanced(uint32_t vertexCount) const noexcept
 	{
 		m_D3D12GraphicsCommandList->DrawInstanced(vertexCount, 1, 0, 0);
+	}
+
+	void DX12CommandList::Dispatch(
+		uint32_t groupCountX,
+		uint32_t groupCountY,
+		uint32_t groupCountZ) const noexcept
+	{
+		m_D3D12GraphicsCommandList->Dispatch(groupCountX, groupCountY, groupCountZ);
 	}
 }
