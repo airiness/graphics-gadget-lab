@@ -40,6 +40,7 @@ namespace gglab
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_D3D12GraphicsCommandList.Get(); }
 
 		void SetGraphicsRootSignature(const DX12RootSignature& rootSignature) const noexcept;
+		void SetComputeRootSignature(const DX12RootSignature& rootSignature) const noexcept;
 		void SetPipelineState(const DX12PipelineState& pipelineState) const noexcept;
 		void SetDescriptorHeap(const DX12DescriptorHeap& descriptorHeap) const noexcept;
 		void SetDescriptorHeaps(std::span<const DX12DescriptorHeap*> descriptorHeaps) const noexcept;
@@ -55,6 +56,14 @@ namespace gglab
 		void SetGraphicsDescriptor(uint32_t parameterIndex, const DX12DescriptorView& descriptor) const noexcept;
 		void SetGraphicsRoot32BitConstant(uint32_t parameterIndex, uint32_t value, uint32_t destOffset = 0) const noexcept;
 		void SetGraphicsRoot32BitConstants(uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset = 0) const noexcept;
+		void SetComputeConstantBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept;
+		void SetComputeReadOnlyBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept;
+		void SetComputeReadWriteBuffer(uint32_t parameterIndex, D3D12_GPU_VIRTUAL_ADDRESS gpuAddress) const noexcept;
+		void SetComputeDescriptorTable(uint32_t parameterIndex, D3D12_GPU_DESCRIPTOR_HANDLE table) const noexcept;
+		void SetComputeRoot32BitConstants(
+			uint32_t parameterIndex,
+			std::span<const uint32_t> values,
+			uint32_t destOffset = 0) const noexcept;
 		template<typename T>
 		void SetGraphicsRoot32BitConstants(uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) const noexcept
 		{
@@ -73,11 +82,13 @@ namespace gglab
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
 		void FlushBarriers() noexcept;
+		void ResourceUavBarriers(std::span<ID3D12Resource* const> resources) noexcept;
 		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& clearColor) const noexcept;
 		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const DX12Resource& resource) const noexcept;
 		void ClearDepthStencil(const DX12DescriptorView& dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) const noexcept;
 		void DrawIndexedInstanced(uint32_t indexCount) const noexcept;
 		void DrawInstanced(uint32_t vertexCount) const noexcept;
+		void Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) const noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

@@ -76,8 +76,12 @@ namespace gglab
 
 			std::vector<RHITextureBarrier> textureBarriers;
 			std::vector<RHIBufferBarrier> bufferBarriers;
+			std::vector<RHITextureUavBarrier> textureUavBarriers;
+			std::vector<RHIBufferUavBarrier> bufferUavBarriers;
 			textureBarriers.reserve(barriers.size());
 			bufferBarriers.reserve(barriers.size());
+			textureUavBarriers.reserve(barriers.size());
+			bufferUavBarriers.reserve(barriers.size());
 			for (const auto& intent : barriers)
 			{
 				GGLAB_ASSERT_MSG(intent.m_Resource.IsValid() &&
@@ -87,7 +91,7 @@ namespace gglab
 					intent.m_Kind != RGBarrierKind::Uav ||
 						(HasUavAccess(intent.m_Before) &&
 							HasUavAccess(intent.m_After) &&
-							intent.m_Before == intent.m_After &&
+							!NeedsRHIResourceTransition(intent.m_Before, intent.m_After) &&
 							!intent.m_Subresources),
 					"RenderGraph UAV barriers require one whole resource in a stable UAV state.");
 				const auto& resource = plan.GetResources()[intent.m_Resource.Value()];
@@ -100,13 +104,20 @@ namespace gglab
 						intent.m_HasResolvedPhysicalHandle = true;
 						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
 						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
-						textureBarriers.push_back(
-							{
-								.m_Texture = handle,
-								.m_Before = intent.m_Before,
-								.m_After = intent.m_After,
-								.m_Subresources = intent.m_Subresources,
-							});
+						if (intent.m_Kind == RGBarrierKind::Uav)
+						{
+							textureUavBarriers.push_back({ handle });
+						}
+						else
+						{
+							textureBarriers.push_back(
+								{
+									.m_Texture = handle,
+									.m_Before = intent.m_Before,
+									.m_After = intent.m_After,
+									.m_Subresources = intent.m_Subresources,
+								});
+						}
 					}
 				}
 				else
@@ -118,13 +129,22 @@ namespace gglab
 						intent.m_HasResolvedPhysicalHandle = true;
 						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
 						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
-						bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
+						if (intent.m_Kind == RGBarrierKind::Uav)
+						{
+							bufferUavBarriers.push_back({ handle });
+						}
+						else
+						{
+							bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
+						}
 					}
 				}
 			}
 
 			commandContext->TextureBarrier(textureBarriers);
 			commandContext->BufferBarrier(bufferBarriers);
+			commandContext->TextureUavBarrier(textureUavBarriers);
+			commandContext->BufferUavBarrier(bufferUavBarriers);
 		}
 	}
 

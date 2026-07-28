@@ -13,6 +13,23 @@ namespace gglab
 			std::optional<RGDependencyAccess> m_LastOrderedUavAccess = std::nullopt;
 		};
 
+		void RecordAccess(
+			TrackedResourceState& trackedState,
+			const RHIResourceState& requiredState,
+			bool synchronized) noexcept
+		{
+			if (synchronized)
+			{
+				trackedState.m_State = requiredState;
+				return;
+			}
+
+			GGLAB_ASSERT_MSG(
+				!NeedsRHIResourceTransition(trackedState.m_State, requiredState),
+				"Unsynchronized access must preserve the persistent resource state.");
+			trackedState.m_State.m_Stages |= requiredState.m_Stages;
+		}
+
 		struct TextureStateTracker
 		{
 			RHIResourceState m_InitialState = CommonRHIResourceState();
@@ -412,17 +429,32 @@ namespace gglab
 						passNode.m_PreBarriers);
 					if (needsUavBarrier)
 					{
+						RHIStage beforeStages = RHIStage::None;
+						for (const auto& [index, trackedState] : stateTracker.m_SubresourceStates)
+						{
+							GGLAB_UNUSED(index);
+							if (HasUavAccess(trackedState.m_State))
+							{
+								beforeStages |= trackedState.m_State.m_Stages;
+							}
+						}
+						RHIResourceState beforeState = requiredState;
+						beforeState.m_Stages = beforeStages;
 						passNode.m_PreBarriers.push_back(
 							{
 								.m_Resource = access.m_Resource,
 								.m_Kind = RGBarrierKind::Uav,
 								.m_Reason = RGBarrierReason::OrderedStorageHazard,
-								.m_Before = requiredState,
+								.m_Before = beforeState,
 								.m_After = requiredState,
 							});
 						for (auto& [index, trackedState] : stateTracker.m_SubresourceStates)
 						{
 							GGLAB_UNUSED(index);
+							if (HasUavAccess(trackedState.m_State))
+							{
+								trackedState.m_State.m_Stages = RHIStage::None;
+							}
 							trackedState.m_LastOrderedUavAccess.reset();
 						}
 					}
@@ -437,7 +469,10 @@ namespace gglab
 							auto& trackedState = stateTracker.m_SubresourceStates.at(index);
 							const bool transitioned =
 								NeedsRHIResourceTransition(trackedState.m_State, requiredState);
-							trackedState.m_State = requiredState;
+							RecordAccess(
+								trackedState,
+								requiredState,
+								transitioned || needsUavBarrier);
 							if (transitioned || !HasUavAccess(requiredState))
 							{
 								trackedState.m_LastOrderedUavAccess.reset();
@@ -454,6 +489,7 @@ namespace gglab
 				auto& trackedState = bufferStates.at(virtualResource);
 				const bool transitioned =
 					NeedsRHIResourceTransition(trackedState.m_State, requiredState);
+				bool synchronized = transitioned;
 				if (transitioned)
 				{
 					passNode.m_PreBarriers.push_back(
@@ -473,17 +509,19 @@ namespace gglab
 						access.m_DependencyAccess,
 						access.m_Ordering))
 				{
+					RHIResourceState beforeState = trackedState.m_State;
 					passNode.m_PreBarriers.push_back(
 						{
 							.m_Resource = access.m_Resource,
 							.m_Kind = RGBarrierKind::Uav,
 							.m_Reason = RGBarrierReason::OrderedStorageHazard,
-							.m_Before = requiredState,
+							.m_Before = beforeState,
 							.m_After = requiredState,
 						});
 					trackedState.m_LastOrderedUavAccess.reset();
+					synchronized = true;
 				}
-				trackedState.m_State = requiredState;
+				RecordAccess(trackedState, requiredState, synchronized);
 				if (transitioned || !HasUavAccess(requiredState))
 				{
 					trackedState.m_LastOrderedUavAccess.reset();

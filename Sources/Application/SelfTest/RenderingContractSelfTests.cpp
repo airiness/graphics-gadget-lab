@@ -32,6 +32,11 @@ namespace gglab
 			RGBufferId m_SecondBuffer;
 		};
 
+		struct TextureStorageAccessPassData
+		{
+			RGTextureId m_Texture;
+		};
+
 		[[nodiscard]] bool NearlyEqual(
 			float lhs,
 			float rhs,
@@ -417,6 +422,13 @@ namespace gglab
 			context.Check(
 				orderedUavMatrixMatches,
 				"Ordered UAV hazards cover the complete read, write, and read-write matrix");
+			const RHIResourceState pixelReadState =
+				ToRHIResourceState(RGBufferAccess::StructuredRead, RHIStage::PixelShader);
+			const RHIResourceState computeReadState =
+				ToRHIResourceState(RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+			context.Check(
+				!NeedsRHIResourceTransition(pixelReadState, computeReadState),
+				"Stage-only changes do not alter persistent resource state");
 
 			const RHIResourceState textureStorageState =
 				ToRHIResourceState(RGTextureAccess::StorageRead);
@@ -668,6 +680,182 @@ namespace gglab
 						barriers[1].m_Kind == RGBarrierKind::Uav &&
 						barriers[0].m_VirtualResourceIndex != barriers[1].m_VirtualResourceIndex,
 					"Each ordered UAV hazard retains its own resource identity for physical resolution");
+			}
+
+			RenderGraph multiSubresourceGraph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			RGTextureId mipTexture;
+			const RHITextureDesc mipTextureDesc =
+			{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { .m_Width = 4, .m_Height = 4, .m_Depth = 1 },
+				.m_MipLevels = 3,
+			};
+			const RHISubresourceRange firstMip =
+			{
+				.m_BaseMip = 0,
+				.m_MipCount = 1,
+				.m_BaseArraySlice = 0,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			const RHISubresourceRange firstTwoMips =
+			{
+				.m_BaseMip = 0,
+				.m_MipCount = 2,
+				.m_BaseArraySlice = 0,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			const RHISubresourceRange thirdMip =
+			{
+				.m_BaseMip = 2,
+				.m_MipCount = 1,
+				.m_BaseArraySlice = 0,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>(
+				"WriteFirstMip",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					mipTexture = builder.CreateTexture("MipTexture", mipTextureDesc);
+					builder.WriteInPlace(
+						mipTexture,
+						RGTextureAccess::StorageWrite,
+						firstMip);
+					data.m_Texture = mipTexture;
+				});
+			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>(
+				"SampleThirdMip",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					data.m_Texture = builder.Read(
+						mipTexture,
+						RGTextureAccess::Sample,
+						RHIStage::PixelShader,
+						thirdMip);
+					builder.SideEffect();
+				});
+			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>(
+				"ReadWriteFirstTwoMips",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					builder.ReadWriteInPlace(
+						mipTexture,
+						RGTextureAccess::StorageReadWrite,
+						firstTwoMips);
+					data.m_Texture = mipTexture;
+					builder.SideEffect();
+				});
+			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>(
+				"CopyToThirdMip",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					builder.WriteInPlace(
+						mipTexture,
+						RGTextureAccess::CopyDest,
+						thirdMip);
+					data.m_Texture = mipTexture;
+					builder.SideEffect();
+				});
+			const bool multiSubresourceCompiled = multiSubresourceGraph.Compile();
+			context.Check(
+				multiSubresourceCompiled,
+				"Multi-subresource texture UAV barrier fixture compiles");
+			if (multiSubresourceCompiled)
+			{
+				RGSnapshot multiSubresourceSnapshot;
+				BuildRenderGraphSnapshot(multiSubresourceGraph, multiSubresourceSnapshot);
+				const auto& barriers = multiSubresourceSnapshot.m_Passes[2].m_PreBarriers;
+				const auto transition = std::ranges::find(
+					barriers,
+					RGBarrierKind::Transition,
+					&RGSnapshotBarrierInfo::m_Kind);
+				const auto uav = std::ranges::find(
+					barriers,
+					RGBarrierKind::Uav,
+					&RGSnapshotBarrierInfo::m_Kind);
+				context.Check(
+					barriers.size() == 2 &&
+						transition != barriers.end() &&
+						transition->m_Subresources &&
+						transition->m_Subresources->m_BaseMip == 1 &&
+						transition->m_Subresources->m_MipCount == 1 &&
+						uav != barriers.end() &&
+						!uav->m_Subresources,
+					"Texture transitions remain subresource-scoped while UAV ordering targets the resource");
+				const auto& copyBarriers =
+					multiSubresourceSnapshot.m_Passes[3].m_PreBarriers;
+				context.Check(
+					copyBarriers.size() == 1 &&
+						copyBarriers[0].m_Kind == RGBarrierKind::Transition &&
+						copyBarriers[0].m_Subresources == thirdMip &&
+						Test(copyBarriers[0].m_Before.m_Stages, RHIStage::PixelShader),
+					"A texture UAV barrier preserves non-UAV synchronization scopes on untouched subresources");
+			}
+
+			RenderGraph stageScopeGraph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			RGBufferId stageScopeBuffer;
+			stageScopeGraph.AddPass<StorageAccessPassData>(
+				"InitializeStageScopeBuffer",
+				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					stageScopeBuffer = builder.CreateBuffer("StageScopeBuffer");
+					builder.WriteInPlace(stageScopeBuffer, RGBufferAccess::CopyDest);
+					data.m_Buffer = stageScopeBuffer;
+				});
+			stageScopeGraph.AddPass<StorageAccessPassData>(
+				"PixelRead",
+				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.Read(
+						stageScopeBuffer,
+						RGBufferAccess::StructuredRead,
+						RHIStage::PixelShader);
+					builder.SideEffect();
+				});
+			stageScopeGraph.AddPass<StorageAccessPassData>(
+				"ComputeRead",
+				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.Read(
+						stageScopeBuffer,
+						RGBufferAccess::StructuredRead,
+						RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			stageScopeGraph.AddPass<StorageAccessPassData>(
+				"CopyAfterReads",
+				[&](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					builder.WriteInPlace(stageScopeBuffer, RGBufferAccess::CopyDest);
+					data.m_Buffer = stageScopeBuffer;
+					builder.SideEffect();
+				});
+			const bool stageScopeCompiled = stageScopeGraph.Compile();
+			context.Check(stageScopeCompiled, "Barrier synchronization-scope fixture compiles");
+			if (stageScopeCompiled)
+			{
+				RGSnapshot stageScopeSnapshot;
+				BuildRenderGraphSnapshot(stageScopeGraph, stageScopeSnapshot);
+				const auto& computeRead = stageScopeSnapshot.m_Passes[2];
+				const auto& copyAfterReads = stageScopeSnapshot.m_Passes[3];
+				context.Check(
+					computeRead.m_PreBarriers.empty() &&
+						copyAfterReads.m_PreBarriers.size() == 1 &&
+						Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages, RHIStage::PixelShader) &&
+						Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages, RHIStage::ComputeShader),
+					"Read-only stage scopes accumulate until a persistent state transition");
 			}
 		}
 

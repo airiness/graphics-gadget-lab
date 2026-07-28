@@ -30,6 +30,7 @@ namespace gglab
 		[[nodiscard]] virtual uint32_t GetBackBufferIndex() const noexcept = 0;
 		[[nodiscard]] virtual RHITextureHandle GetBackBuffer() const noexcept = 0;
 		[[nodiscard]] virtual RHIGraphicsCommandContext& GetGraphicsContext() noexcept = 0;
+		[[nodiscard]] virtual RHIComputeCommandContext& GetDirectComputeContext() noexcept = 0;
 		[[nodiscard]] virtual RHIComputeCommandContext* GetComputeContext() noexcept = 0;
 		[[nodiscard]] virtual RHIFencePoint GetSubmittedFence() const noexcept = 0;
 	};
