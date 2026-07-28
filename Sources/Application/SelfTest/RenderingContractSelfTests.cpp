@@ -4,6 +4,7 @@
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
@@ -35,6 +36,75 @@ namespace gglab
 		struct TextureStorageAccessPassData
 		{
 			RGTextureId m_Texture;
+		};
+
+		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
+		{
+		public:
+			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
+			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
+			void SetPipeline(RHIPipelineHandle) noexcept override {}
+			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
+			void SetRenderTargets(
+				std::span<const RHITextureViewHandle>,
+				RHITextureViewHandle) noexcept override {}
+			void ClearColor(
+				RHITextureViewHandle,
+				const std::array<float, 4>&) noexcept override {}
+			void ClearDepthStencil(
+				RHITextureViewHandle,
+				float,
+				std::optional<uint8_t>) noexcept override {}
+			void SetViewport(const RHIViewport&) noexcept override {}
+			void SetScissorRect(const RHIScissorRect&) noexcept override {}
+			void SetPrimitiveTopology(RHIPrimitiveTopology) noexcept override {}
+			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetPushConstants(
+				uint32_t,
+				std::span<const uint32_t>,
+				uint32_t) noexcept override {}
+			void SetVertexBuffers(
+				uint32_t,
+				std::span<const RHIVertexBufferBinding>) noexcept override {}
+			void SetIndexBuffer(const RHIIndexBufferBinding&) noexcept override {}
+			void DrawIndexed(uint32_t, uint32_t, uint32_t, int32_t, uint32_t) noexcept override {}
+			void Draw(uint32_t, uint32_t, uint32_t, uint32_t) noexcept override {}
+
+			uint32_t m_BeginProfileCount = 0;
+			uint32_t m_EndProfileCount = 0;
+		};
+
+		class RecordingComputeCommandContext final : public RHIComputeCommandContext
+		{
+		public:
+			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
+			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
+			void SetPipeline(RHIPipelineHandle) noexcept override {}
+			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
+			void SetConstantBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+			void SetPushConstants(
+				uint32_t,
+				std::span<const uint32_t>,
+				uint32_t) noexcept override {}
+			void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override {}
+
+			uint32_t m_BeginProfileCount = 0;
+			uint32_t m_EndProfileCount = 0;
 		};
 
 		[[nodiscard]] bool NearlyEqual(
@@ -787,8 +857,10 @@ namespace gglab
 						transition->m_Subresources->m_BaseMip == 1 &&
 						transition->m_Subresources->m_MipCount == 1 &&
 						uav != barriers.end() &&
-						!uav->m_Subresources,
-					"Texture transitions remain subresource-scoped while UAV ordering targets the resource");
+						uav->m_Subresources == firstMip &&
+						uav->m_Before.m_Layout == RHILayout::UnorderedAccess &&
+						uav->m_After.m_Layout == RHILayout::UnorderedAccess,
+					"Texture transitions and Enhanced UAV ordering retain exact subresource state");
 				const auto& copyBarriers =
 					multiSubresourceSnapshot.m_Passes[3].m_PreBarriers;
 				context.Check(
@@ -856,6 +928,94 @@ namespace gglab
 						Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages, RHIStage::PixelShader) &&
 						Test(copyAfterReads.m_PreBarriers[0].m_Before.m_Stages, RHIStage::ComputeShader),
 					"Read-only stage scopes accumulate until a persistent state transition");
+			}
+
+			RecordingGraphicsCommandContext graphicsContext;
+			RecordingComputeCommandContext directComputeContext;
+			uint32_t graphicsExecutions = 0;
+			uint32_t computeExecutions = 0;
+			uint32_t copyExecutions = 0;
+			uint32_t culledComputeExecutions = 0;
+			bool graphicsContextSelected = false;
+			bool directComputeContextSelected = false;
+			bool asyncComputeRemainsUnavailable = false;
+			RenderGraph encoderGraph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			encoderGraph.AddTrivialSideEffectPass(
+				"GraphicsEncoder",
+				[&](RGExecuteContext& executeContext)
+				{
+					++graphicsExecutions;
+					graphicsContextSelected =
+						executeContext.GetGraphicsCommandContext() == &graphicsContext;
+				});
+			encoderGraph.AddTrivialSideEffectPass(
+				"ComputeEncoder",
+				RGPassEncoderType::Compute,
+				[&](RGExecuteContext& executeContext)
+				{
+					++computeExecutions;
+					directComputeContextSelected =
+						executeContext.GetDirectComputeCommandContext() == &directComputeContext;
+					asyncComputeRemainsUnavailable =
+						executeContext.GetAsyncComputeCommandContext() == nullptr;
+				});
+			encoderGraph.AddTrivialSideEffectPass(
+				"CopyEncoder",
+				RGPassEncoderType::Copy,
+				[&](RGExecuteContext&)
+				{
+					++copyExecutions;
+				});
+			encoderGraph.AddPass<StorageAccessPassData>(
+				"CulledComputeEncoder",
+				RGPassEncoderType::Compute,
+				[](RenderGraph::RGBuilder&, StorageAccessPassData&) {},
+				[&](RGExecuteContext&, StorageAccessPassData&)
+				{
+					++culledComputeExecutions;
+				});
+			const bool encoderGraphCompiled = encoderGraph.Compile();
+			context.Check(encoderGraphCompiled, "RenderGraph pass encoder fixture compiles");
+			if (encoderGraphCompiled)
+			{
+				RGSnapshot encoderSnapshot;
+				BuildRenderGraphSnapshot(encoderGraph, encoderSnapshot);
+				context.Check(
+					encoderSnapshot.m_Passes.size() == 4 &&
+						encoderSnapshot.m_Passes[0].m_EncoderType == RGPassEncoderType::Graphics &&
+						encoderSnapshot.m_Passes[1].m_EncoderType == RGPassEncoderType::Compute &&
+						encoderSnapshot.m_Passes[2].m_EncoderType == RGPassEncoderType::Copy &&
+						encoderSnapshot.m_Passes[3].m_EncoderType == RGPassEncoderType::Compute &&
+						encoderSnapshot.m_Passes[3].m_Culled,
+					"RenderGraph snapshots preserve encoder metadata for live and culled passes");
+
+				RGExecuteContext executeContext(
+					{
+						.m_GraphicsCommandContext = &graphicsContext,
+						.m_DirectComputeCommandContext = &directComputeContext,
+						.m_AsyncComputeCommandContext = nullptr,
+					});
+				encoderGraph.Execute(executeContext);
+				context.Check(
+					graphicsExecutions == 1 &&
+						computeExecutions == 1 &&
+						copyExecutions == 1 &&
+						culledComputeExecutions == 0 &&
+						graphicsContextSelected &&
+						directComputeContextSelected &&
+						asyncComputeRemainsUnavailable,
+					"RenderGraph executes each live pass with its declared direct-list encoder");
+				context.Check(
+					graphicsContext.m_BeginProfileCount == 2 &&
+						graphicsContext.m_EndProfileCount == 2 &&
+						directComputeContext.m_BeginProfileCount == 1 &&
+						directComputeContext.m_EndProfileCount == 1,
+					"RenderGraph profiles Graphics, Compute, and Copy on their selected command contexts");
 			}
 		}
 

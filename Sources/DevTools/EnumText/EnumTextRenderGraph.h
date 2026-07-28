@@ -1,10 +1,21 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
+#include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResource.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 
 namespace gglab::devtools
 {
+	template<>
+	struct EnumTextTraits<RGPassEncoderType>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGPassEncoderType::Graphics, "Graphics" },
+			EnumTextEntry{ RGPassEncoderType::Compute, "Compute" },
+			EnumTextEntry{ RGPassEncoderType::Copy, "Copy" },
+		};
+	};
+
 	template<>
 	struct EnumTextTraits<RGResourceType>
 	{

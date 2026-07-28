@@ -30,7 +30,8 @@ namespace gglab
 	struct RGBackendExecuteContext
 	{
 		RHIGraphicsCommandContext* m_GraphicsCommandContext = nullptr;
-		RHIComputeCommandContext* m_ComputeCommandContext = nullptr;
+		RHIComputeCommandContext* m_DirectComputeCommandContext = nullptr;
+		RHIComputeCommandContext* m_AsyncComputeCommandContext = nullptr;
 	};
 
 	struct RGExecuteContext
@@ -41,16 +42,15 @@ namespace gglab
 
 		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
 		RHIDescriptorHandle GetViewDescriptor(RGTextureViewId viewId) const noexcept;
-		RHIGraphicsCommandContext* GetGraphicsCommandContext() const noexcept { return m_Backend.m_GraphicsCommandContext; }
-		RHIComputeCommandContext* GetComputeCommandContext() const noexcept { return m_Backend.m_ComputeCommandContext; }
-
-		RGBackendExecuteContext& GetBackend() noexcept { return m_Backend; }
-		const RGBackendExecuteContext& GetBackend() const noexcept { return m_Backend; }
+		RHIGraphicsCommandContext* GetGraphicsCommandContext() const noexcept;
+		RHIComputeCommandContext* GetDirectComputeCommandContext() const noexcept;
+		RHIComputeCommandContext* GetAsyncComputeCommandContext() const noexcept;
 
 	private:
 		RGBackendExecuteContext m_Backend{};
 		const RGExecutionPlan* m_ExecutionPlan = nullptr;
 		RHIDevice* m_Device = nullptr;
+		std::optional<RGPassEncoderType> m_ActiveEncoderType = std::nullopt;
 
 		friend class RGExecutor;
 	};
@@ -126,6 +126,7 @@ namespace gglab
 		};
 
 		StringID m_NameId;
+		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;
 		std::vector<Access> m_Accesses;
 
@@ -379,12 +380,28 @@ namespace gglab
 		template<typename PassData, typename SetupFunc, typename ExecuteFunc>
 		auto* AddPass(const char* passName, SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept;
 
+		template<typename PassData, typename SetupFunc, typename ExecuteFunc>
+		auto* AddPass(const char* passName,
+			RGPassEncoderType encoderType,
+			SetupFunc setupFunc,
+			ExecuteFunc&& executeFunc) noexcept;
+
 		template<typename PassData, typename SetupFunc>
 		auto* AddPass(const char* passName, SetupFunc setupFunc) noexcept;
+
+		template<typename PassData, typename SetupFunc>
+		auto* AddPass(const char* passName,
+			RGPassEncoderType encoderType,
+			SetupFunc setupFunc) noexcept;
 
 		// Add an always - executed pass with no pass data or resource declarations.
 		template<typename ExecuteFunc>
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
+
+		template<typename ExecuteFunc>
+		auto* AddTrivialSideEffectPass(const char* passName,
+			RGPassEncoderType encoderType,
+			ExecuteFunc&& executeFunc) noexcept;
 
 		[[nodiscard]] bool Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
@@ -486,6 +503,20 @@ namespace gglab
 	template<typename PassData, typename SetupFunc, typename ExecuteFunc>
 	inline auto* RenderGraph::AddPass(const char* passName, SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept
 	{
+		return AddPass<PassData>(
+			passName,
+			RGPassEncoderType::Graphics,
+			std::move(setupFunc),
+			std::forward<ExecuteFunc>(executeFunc));
+	}
+
+	template<typename PassData, typename SetupFunc, typename ExecuteFunc>
+	inline auto* RenderGraph::AddPass(
+		const char* passName,
+		RGPassEncoderType encoderType,
+		SetupFunc setupFunc,
+		ExecuteFunc&& executeFunc) noexcept
+	{
 		using PassDataType = std::decay_t<PassData>;
 		using ExecuteFuncType = std::decay_t<ExecuteFunc>;
 		using PassType = RGPassConcrete<PassDataType, ExecuteFuncType>;
@@ -496,6 +527,7 @@ namespace gglab
 
 		RGPassNode passNode = {};
 		passNode.m_NameId = StringID(passName);
+		passNode.m_EncoderType = encoderType;
 		passNode.m_Pass = pass;
 
 		RGPassNodeIndex passIndex{ static_cast<uint32_t>(m_PassNodes.size()) };
@@ -563,11 +595,39 @@ namespace gglab
 			[](RGExecuteContext&, PassDataType&) noexcept {});
 	}
 
+	template<typename PassData, typename SetupFunc>
+	inline auto* RenderGraph::AddPass(
+		const char* passName,
+		RGPassEncoderType encoderType,
+		SetupFunc setupFunc) noexcept
+	{
+		using PassDataType = std::decay_t<PassData>;
+
+		return AddPass<PassDataType>(
+			passName,
+			encoderType,
+			std::move(setupFunc),
+			[](RGExecuteContext&, PassDataType&) noexcept {});
+	}
+
 	template<typename ExecuteFunc>
 	inline auto* RenderGraph::AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept
 	{
+		return AddTrivialSideEffectPass(
+			passName,
+			RGPassEncoderType::Graphics,
+			std::forward<ExecuteFunc>(executeFunc));
+	}
+
+	template<typename ExecuteFunc>
+	inline auto* RenderGraph::AddTrivialSideEffectPass(
+		const char* passName,
+		RGPassEncoderType encoderType,
+		ExecuteFunc&& executeFunc) noexcept
+	{
 		struct EmptyData {};
 		return AddPass<EmptyData>(passName,
+			encoderType,
 			[](RGBuilder& builder, EmptyData&) { builder.SideEffect(); },
 			[fn = std::forward<ExecuteFunc>(executeFunc)](RGExecuteContext& executeContext, EmptyData&)
 			{

@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/StringId.h"
 #include "Graphics/RenderGraph/RGCompileDiagnostic.h"
+#include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/RHITexture.h"
 
@@ -53,6 +54,7 @@ namespace gglab
 		RGPassNodeIndex m_Declaration = InvalidRGPassNodeIndex;
 		StringID m_NameId;
 		RGPassBase* m_Executor = nullptr;
+		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;
 		bool m_Culled = true;
 		int32_t m_ExecutionOrder = -1;

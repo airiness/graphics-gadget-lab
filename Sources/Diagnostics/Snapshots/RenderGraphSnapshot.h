@@ -1,5 +1,6 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
+#include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 
@@ -40,6 +41,7 @@ namespace gglab
 		uint32_t m_Index = 0;
 		int32_t m_ExecutionOrder = -1;
 		std::string m_Name;
+		RGPassEncoderType m_EncoderType = RGPassEncoderType::Graphics;
 		bool m_SideEffect = false;
 		bool m_Culled = false;
 		std::vector<int32_t> m_DependencyPassIndices;

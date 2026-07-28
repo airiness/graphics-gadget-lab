@@ -150,20 +150,6 @@ namespace gglab
 		}
 	}
 
-	void DX12TransferContext::TextureUavBarrier(
-		std::span<const RHITextureUavBarrier> barriers) noexcept
-	{
-		GGLAB_ASSERT_MSG(barriers.empty(),
-			"Transfer contexts do not support UAV texture barriers.");
-	}
-
-	void DX12TransferContext::BufferUavBarrier(
-		std::span<const RHIBufferUavBarrier> barriers) noexcept
-	{
-		GGLAB_ASSERT_MSG(barriers.empty(),
-			"Transfer contexts do not support UAV buffer barriers.");
-	}
-
 	void DX12TransferContext::Begin() noexcept
 	{
 		// Do this in TransferManager, not here.

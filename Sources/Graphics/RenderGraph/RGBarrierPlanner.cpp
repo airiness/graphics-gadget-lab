@@ -43,7 +43,7 @@ namespace gglab
 			RHITextureAspect m_Aspect = RHITextureAspect::Color;
 		};
 
-		struct TextureTransition
+		struct TextureBarrierRecord
 		{
 			TextureSubresource m_Subresource;
 			RHIResourceState m_Before;
@@ -156,34 +156,36 @@ namespace gglab
 			}
 		}
 
-		void AppendCoalescedBarriers(
+		void AppendCoalescedTextureBarriers(
 			RGVirtualResourceIndex resourceIndex,
 			const RHITextureDesc& desc,
-			std::vector<TextureTransition>& transitions,
-			std::vector<RGBarrierIntent>& output) noexcept
+			std::vector<TextureBarrierRecord>& barriers,
+			std::vector<RGBarrierIntent>& output,
+			RGBarrierKind kind = RGBarrierKind::Transition,
+			RGBarrierReason reason = RGBarrierReason::AccessTransition) noexcept
 		{
-			struct TransitionGroup
+			struct BarrierGroup
 			{
 				RHIResourceState m_Before;
 				RHIResourceState m_After;
 				std::vector<TextureSubresource> m_Subresources;
 			};
 
-			std::vector<TransitionGroup> groups;
-			for (const auto& transition : transitions)
+			std::vector<BarrierGroup> groups;
+			for (const auto& barrier : barriers)
 			{
 				auto group = std::ranges::find_if(groups,
-					[&](const TransitionGroup& candidate)
+					[&](const BarrierGroup& candidate)
 					{
-						return candidate.m_Before == transition.m_Before &&
-							candidate.m_After == transition.m_After;
+						return candidate.m_Before == barrier.m_Before &&
+							candidate.m_After == barrier.m_After;
 					});
 				if (group == groups.end())
 				{
-					groups.push_back({ transition.m_Before, transition.m_After, {} });
+					groups.push_back({ barrier.m_Before, barrier.m_After, {} });
 					group = std::prev(groups.end());
 				}
-				group->m_Subresources.push_back(transition.m_Subresource);
+				group->m_Subresources.push_back(barrier.m_Subresource);
 			}
 
 			const uint32_t fullSubresourceCount =
@@ -206,8 +208,8 @@ namespace gglab
 					output.push_back(
 						{
 							.m_Resource = resourceIndex,
-							.m_Kind = RGBarrierKind::Transition,
-							.m_Reason = RGBarrierReason::AccessTransition,
+							.m_Kind = kind,
+							.m_Reason = reason,
 							.m_Before = group.m_Before,
 							.m_After = group.m_After,
 							.m_Subresources = std::nullopt,
@@ -303,8 +305,8 @@ namespace gglab
 					output.push_back(
 						{
 							.m_Resource = resourceIndex,
-							.m_Kind = RGBarrierKind::Transition,
-							.m_Reason = RGBarrierReason::AccessTransition,
+							.m_Kind = kind,
+							.m_Reason = reason,
 							.m_Before = group.m_Before,
 							.m_After = group.m_After,
 							.m_Subresources = range,
@@ -387,8 +389,8 @@ namespace gglab
 						textureDesc,
 						access.m_Subresources);
 					auto& stateTracker = textureStates.at(virtualResource);
-					std::vector<TextureTransition> transitions;
-					bool needsUavBarrier = false;
+					std::vector<TextureBarrierRecord> transitions;
+					std::vector<TextureBarrierRecord> uavBarriers;
 					ForEachSubresource(textureDesc, range,
 						[&](const TextureSubresource& subresource)
 						{
@@ -419,45 +421,26 @@ namespace gglab
 									access.m_DependencyAccess,
 									access.m_Ordering))
 							{
-								needsUavBarrier = true;
+								uavBarriers.push_back(
+									{
+										.m_Subresource = subresource,
+										.m_Before = trackedState.m_State,
+										.m_After = requiredState,
+									});
 							}
 						});
-					AppendCoalescedBarriers(
+					AppendCoalescedTextureBarriers(
 						access.m_Resource,
 						textureDesc,
 						transitions,
 						passNode.m_PreBarriers);
-					if (needsUavBarrier)
-					{
-						RHIStage beforeStages = RHIStage::None;
-						for (const auto& [index, trackedState] : stateTracker.m_SubresourceStates)
-						{
-							GGLAB_UNUSED(index);
-							if (HasUavAccess(trackedState.m_State))
-							{
-								beforeStages |= trackedState.m_State.m_Stages;
-							}
-						}
-						RHIResourceState beforeState = requiredState;
-						beforeState.m_Stages = beforeStages;
-						passNode.m_PreBarriers.push_back(
-							{
-								.m_Resource = access.m_Resource,
-								.m_Kind = RGBarrierKind::Uav,
-								.m_Reason = RGBarrierReason::OrderedStorageHazard,
-								.m_Before = beforeState,
-								.m_After = requiredState,
-							});
-						for (auto& [index, trackedState] : stateTracker.m_SubresourceStates)
-						{
-							GGLAB_UNUSED(index);
-							if (HasUavAccess(trackedState.m_State))
-							{
-								trackedState.m_State.m_Stages = RHIStage::None;
-							}
-							trackedState.m_LastOrderedUavAccess.reset();
-						}
-					}
+					AppendCoalescedTextureBarriers(
+						access.m_Resource,
+						textureDesc,
+						uavBarriers,
+						passNode.m_PreBarriers,
+						RGBarrierKind::Uav,
+						RGBarrierReason::OrderedStorageHazard);
 					ForEachSubresource(textureDesc, range,
 						[&](const TextureSubresource& subresource)
 						{
@@ -469,10 +452,18 @@ namespace gglab
 							auto& trackedState = stateTracker.m_SubresourceStates.at(index);
 							const bool transitioned =
 								NeedsRHIResourceTransition(trackedState.m_State, requiredState);
+							const bool orderedUavHazard = !transitioned &&
+								HasUavAccess(requiredState) &&
+								trackedState.m_LastOrderedUavAccess &&
+								NeedsOrderedUavBarrier(
+									*trackedState.m_LastOrderedUavAccess,
+									RGOrderingRequirement::Ordered,
+									access.m_DependencyAccess,
+									access.m_Ordering);
 							RecordAccess(
 								trackedState,
 								requiredState,
-								transitioned || needsUavBarrier);
+								transitioned || orderedUavHazard);
 							if (transitioned || !HasUavAccess(requiredState))
 							{
 								trackedState.m_LastOrderedUavAccess.reset();
@@ -575,7 +566,7 @@ namespace gglab
 						});
 				}
 
-				std::vector<TextureTransition> transitions;
+				std::vector<TextureBarrierRecord> transitions;
 				for (auto& [subresourceIndex, trackedState] : stateTracker.m_SubresourceStates)
 				{
 					const TextureSubresource subresource = DecodeSubresource(
@@ -610,7 +601,7 @@ namespace gglab
 					trackedState.m_LastOrderedUavAccess.reset();
 				}
 				const size_t transitionStart = m_Passes[finalBarrierPass.Value()].m_PostBarriers.size();
-				AppendCoalescedBarriers(
+					AppendCoalescedTextureBarriers(
 					resource.m_Declaration,
 					textureDesc,
 					transitions,

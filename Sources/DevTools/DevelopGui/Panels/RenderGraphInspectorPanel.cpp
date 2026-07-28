@@ -203,6 +203,7 @@ namespace gglab
 			ImGui::TextWrapped("%s", pass.m_Name.c_str());
 			ImGui::Separator();
 			ImGui::Text("Execution Order: %s", PassIndexToString(pass.m_ExecutionOrder).c_str());
+			ImGui::Text("Encoder: %s", devtools::EnumText(pass.m_EncoderType).data());
 			ImGui::Text("Culled: %s", utils::BoolToString(pass.m_Culled));
 			ImGui::Text("SideEffect: %s", utils::BoolToString(pass.m_SideEffect));
 			ImGui::Text("Accesses: %u", static_cast<uint32_t>(pass.m_Accesses.size()));
@@ -750,6 +751,7 @@ namespace gglab
 			ImGui::SeparatorText("Selected Pass");
 			ImGui::Text("Pass #%u: %s", pass.m_Index, pass.m_Name.c_str());
 			ImGui::Text("Execution Order: %s", PassIndexToString(pass.m_ExecutionOrder).c_str());
+			ImGui::Text("Encoder: %s", devtools::EnumText(pass.m_EncoderType).data());
 			ImGui::Text("Culled: %s, SideEffect: %s", utils::BoolToString(pass.m_Culled), utils::BoolToString(pass.m_SideEffect));
 			const std::string dependencies = PassListToString(pass.m_DependencyPassIndices);
 			const std::string dependents = PassListToString(pass.m_DependentPassIndices);
@@ -867,11 +869,12 @@ namespace gglab
 				ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (ImGui::BeginTable("RenderGraphPasses", 10, flags, ImVec2(0.0f, 280.0f)))
+			if (ImGui::BeginTable("RenderGraphPasses", 11, flags, ImVec2(0.0f, 280.0f)))
 			{
 				ImGui::TableSetupColumn("Order");
 				ImGui::TableSetupColumn("Index");
 				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupColumn("Encoder");
 				ImGui::TableSetupColumn("Culled");
 				ImGui::TableSetupColumn("SideEffect");
 				ImGui::TableSetupColumn("Deps");
@@ -906,18 +909,20 @@ namespace gglab
 						state.m_SelectedPassIndex = static_cast<int32_t>(pass.m_Index);
 					}
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(utils::BoolToString(pass.m_Culled));
+					ImGui::TextUnformatted(devtools::EnumText(pass.m_EncoderType).data());
 					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(utils::BoolToString(pass.m_SideEffect));
+					ImGui::TextUnformatted(utils::BoolToString(pass.m_Culled));
 					ImGui::TableSetColumnIndex(5);
-					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependencyPassIndices.size()));
+					ImGui::TextUnformatted(utils::BoolToString(pass.m_SideEffect));
 					ImGui::TableSetColumnIndex(6);
-					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependentPassIndices.size()));
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependencyPassIndices.size()));
 					ImGui::TableSetColumnIndex(7);
-					ImGui::Text("%u", static_cast<uint32_t>(pass.m_Accesses.size()));
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependentPassIndices.size()));
 					ImGui::TableSetColumnIndex(8);
-					ImGui::Text("%u", static_cast<uint32_t>(pass.m_PreBarriers.size()));
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_Accesses.size()));
 					ImGui::TableSetColumnIndex(9);
+					ImGui::Text("%u", static_cast<uint32_t>(pass.m_PreBarriers.size()));
+					ImGui::TableSetColumnIndex(10);
 					ImGui::Text("%u", static_cast<uint32_t>(pass.m_PostBarriers.size()));
 				}
 
