@@ -113,6 +113,21 @@ namespace napa::voxel
 		return lhs.m_X < rhs.m_X;
 	}
 
+	bool SampleCoordZYXLess::operator()(
+		SampleCoord lhs,
+		SampleCoord rhs) const noexcept
+	{
+		if (lhs.m_Z != rhs.m_Z)
+		{
+			return lhs.m_Z < rhs.m_Z;
+		}
+		if (lhs.m_Y != rhs.m_Y)
+		{
+			return lhs.m_Y < rhs.m_Y;
+		}
+		return lhs.m_X < rhs.m_X;
+	}
+
 	std::optional<std::int32_t> FloorDiv(
 		std::int32_t value,
 		std::uint32_t positiveDivisor) noexcept

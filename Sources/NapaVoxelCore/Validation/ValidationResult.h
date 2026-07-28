@@ -51,6 +51,12 @@ namespace napa::voxel
 		DegenerateMeshTriangle = 42,
 		InvalidMeshWinding = 43,
 		ChunkOutsideLogicalCellDomain = 44,
+		MeshGeometryOutsideTargetChunk = 45,
+		InvalidReferenceEdge = 46,
+		NonCrossingReferenceEdge = 47,
+		EqualDensityReferenceEdge = 48,
+		NonFiniteDensityGradient = 49,
+		DegenerateDensityGradient = 50,
 	};
 
 	struct ValidationResult

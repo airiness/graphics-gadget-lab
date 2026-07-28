@@ -192,6 +192,13 @@ namespace napa::voxel
 			ChunkCoord rhs) const noexcept;
 	};
 
+	struct SampleCoordZYXLess
+	{
+		[[nodiscard]] bool operator()(
+			SampleCoord lhs,
+			SampleCoord rhs) const noexcept;
+	};
+
 	[[nodiscard]] constexpr bool IsSupportedChunkCellCount(
 		std::uint32_t chunkCellCount) noexcept
 	{

@@ -3,9 +3,13 @@
 
 #include "NapaVoxelCore/Meshing/MeshData.h"
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
+#include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <type_traits>
 
 namespace gglab
@@ -57,6 +61,55 @@ namespace gglab
 					.m_Max = { 2.0f, 2.0f, 1.0f },
 				},
 			};
+		}
+
+		[[nodiscard]] napa::voxel::MeshData
+			MakeSyntheticMultiMaterialMesh()
+		{
+			using namespace napa::voxel;
+
+			return {
+				.m_Vertices = {
+					{
+						.m_Position = { 1.0f, 1.0f, 1.0f },
+						.m_Normal = { 0.0f, 0.0f, 1.0f },
+					},
+					{
+						.m_Position = { 2.0f, 1.0f, 1.0f },
+						.m_Normal = { 0.0f, 0.0f, 1.0f },
+					},
+					{
+						.m_Position = { 2.0f, 2.0f, 1.0f },
+						.m_Normal = { 0.0f, 0.0f, 1.0f },
+					},
+					{
+						.m_Position = { 1.0f, 2.0f, 1.0f },
+						.m_Normal = { 0.0f, 0.0f, 1.0f },
+					},
+				},
+				.m_Sections = {
+					{
+						.m_Material = VoxelMaterial::Soil,
+						.m_Indices = { 0, 1, 2 },
+					},
+					{
+						.m_Material = VoxelMaterial::Stone,
+						.m_Indices = { 0, 2, 3 },
+					},
+				},
+				.m_Bounds = {
+					.m_Min = { 1.0f, 1.0f, 1.0f },
+					.m_Max = { 2.0f, 2.0f, 1.0f },
+				},
+			};
+		}
+
+		[[nodiscard]] bool NearlyEqual(
+			double lhs,
+			double rhs,
+			double tolerance = 1.0e-6) noexcept
+		{
+			return std::abs(lhs - rhs) <= tolerance;
 		}
 
 		void RunMeshDataLayoutTests(
@@ -274,6 +327,23 @@ namespace gglab
 						},
 				"A valid synthetic triangle produces canonical counts and bounds");
 
+			const MeshData multiMaterialMesh =
+				MakeSyntheticMultiMaterialMesh();
+			MeshValidationResult multiMaterialResult{};
+			context.Check(
+				ValidateAndHashChunkMesh(
+					multiMaterialMesh,
+					config,
+					{},
+					multiMaterialResult).Succeeded() &&
+					multiMaterialResult.m_ValidationHash ==
+						0x344ed3af7a4eeec1ull &&
+					multiMaterialResult.m_VertexCount == 4 &&
+					multiMaterialResult.m_SectionCount == 2 &&
+					multiMaterialResult.m_IndexCount == 6 &&
+					multiMaterialResult.m_TriangleCount == 2,
+				"A valid multi-material mesh matches its section-order golden");
+
 			VoxelWorldConfig multiChunkConfig = config;
 			multiChunkConfig.m_LogicalCellBounds.m_MaxExclusive =
 				{ 16, 8, 8 };
@@ -303,6 +373,61 @@ namespace gglab
 					otherConfigEmptyResult.m_ValidationHash !=
 						emptyResult.m_ValidationHash,
 				"Mesh validation hashes bind both chunk coordinate and config");
+
+			MeshValidationResult targetChunkResult{};
+			context.Check(
+				ValidateAndHashChunkMesh(
+					triangle,
+					multiChunkConfig,
+					{ 1, 0, 0 },
+					targetChunkResult).m_Error ==
+					ValidationError::MeshGeometryOutsideTargetChunk,
+				"Chunk mesh validation rejects geometry from another chunk");
+
+			MeshData positiveBoundaryMesh{
+				.m_Vertices = {
+					{
+						.m_Position = { 8.0f, 1.0f, 1.0f },
+						.m_Normal = { 1.0f, 0.0f, 0.0f },
+					},
+					{
+						.m_Position = { 8.0f, 2.0f, 1.0f },
+						.m_Normal = { 1.0f, 0.0f, 0.0f },
+					},
+					{
+						.m_Position = { 8.0f, 1.0f, 2.0f },
+						.m_Normal = { 1.0f, 0.0f, 0.0f },
+					},
+				},
+				.m_Sections = {
+					{
+						.m_Material = VoxelMaterial::Stone,
+						.m_Indices = { 0, 1, 2 },
+					},
+				},
+				.m_Bounds = {
+					.m_Min = { 8.0f, 1.0f, 1.0f },
+					.m_Max = { 8.0f, 2.0f, 2.0f },
+				},
+			};
+			context.Check(
+				ValidateAndHashChunkMesh(
+					positiveBoundaryMesh,
+					multiChunkConfig,
+					{},
+					targetChunkResult).Succeeded(),
+				"Chunk mesh validation includes the shared positive boundary");
+
+			MeshData oversizedBounds = triangle;
+			oversizedBounds.m_Bounds.m_Max.m_X = 9.0f;
+			context.Check(
+				ValidateAndHashChunkMesh(
+					oversizedBounds,
+					multiChunkConfig,
+					{},
+					targetChunkResult).m_Error ==
+					ValidationError::MeshGeometryOutsideTargetChunk,
+				"Chunk mesh bounds cannot extend outside the target chunk");
 
 			constexpr float SubQuantizationOffset =
 				1.0f / 262144.0f;
@@ -509,6 +634,339 @@ namespace gglab
 					ValidationError::InvalidMeshSection,
 				"Mesh sections use strict material enum order");
 		}
+
+		void RunReferenceTopologyContractTests(
+			SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			constexpr std::array<CellCornerOffset, 8>
+				ExpectedCorners{
+					CellCornerOffset{ 0, 0, 0 },
+					CellCornerOffset{ 1, 0, 0 },
+					CellCornerOffset{ 0, 1, 0 },
+					CellCornerOffset{ 1, 1, 0 },
+					CellCornerOffset{ 0, 0, 1 },
+					CellCornerOffset{ 1, 0, 1 },
+					CellCornerOffset{ 0, 1, 1 },
+					CellCornerOffset{ 1, 1, 1 },
+				};
+			constexpr std::array<
+				std::array<std::uint8_t, 4>,
+				6> ExpectedTetrahedra{
+					std::array<std::uint8_t, 4>{ 0, 1, 3, 7 },
+					std::array<std::uint8_t, 4>{ 0, 3, 2, 7 },
+					std::array<std::uint8_t, 4>{ 0, 2, 6, 7 },
+					std::array<std::uint8_t, 4>{ 0, 6, 4, 7 },
+					std::array<std::uint8_t, 4>{ 0, 4, 5, 7 },
+					std::array<std::uint8_t, 4>{ 0, 5, 1, 7 },
+				};
+			constexpr std::array<
+				std::array<std::uint8_t, 2>,
+				6> ExpectedEdges{
+					std::array<std::uint8_t, 2>{ 0, 1 },
+					std::array<std::uint8_t, 2>{ 0, 2 },
+					std::array<std::uint8_t, 2>{ 0, 3 },
+					std::array<std::uint8_t, 2>{ 1, 2 },
+					std::array<std::uint8_t, 2>{ 1, 3 },
+					std::array<std::uint8_t, 2>{ 2, 3 },
+				};
+
+			context.Check(
+				ReferenceCubeCornerOffsets == ExpectedCorners,
+				"Reference cube corner IDs use the fixed binary offsets");
+			context.Check(
+				ReferenceFreudenthalTetrahedra ==
+					ExpectedTetrahedra,
+				"Reference cells use the fixed six Freudenthal tetrahedra");
+			context.Check(
+				ReferenceTetrahedronEdges == ExpectedEdges,
+				"Reference tetrahedra use the fixed ab-ac-ad-bc-bd-cd edge order");
+
+			const SampleCoordZYXLess less;
+			context.Check(
+				less(
+					{ 100, 0, 0 },
+					{ -100, 1, 0 }) &&
+					less(
+						{ 100, 100, 0 },
+						{ -100, -100, 1 }) &&
+					less(
+						{ -1, 0, 0 },
+						{ 0, 0, 0 }),
+				"Global sample endpoint order is canonical z-y-x order");
+		}
+
+		void RunReferenceGradientTests(
+			SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			VoxelWorldConfig config = MakeMeshValidationConfig();
+			config.m_LogicalCellBounds = {
+				.m_Min = {},
+				.m_MaxExclusive = { 3, 3, 3 },
+			};
+			std::unique_ptr<VoxelWorld> world;
+			const ValidationResult createResult =
+				VoxelWorld::Create(config, world);
+			context.Check(
+				createResult.Succeeded() && world != nullptr,
+				"Reference gradient fixture creates a valid voxel world");
+			if (!world)
+			{
+				return;
+			}
+
+			bool initialized = true;
+			for (std::int32_t z = 0; z <= 3; ++z)
+			{
+				for (std::int32_t y = 0; y <= 3; ++y)
+				{
+					for (std::int32_t x = 0; x <= 3; ++x)
+					{
+						const std::uint8_t density =
+							static_cast<std::uint8_t>(
+								10 * x + 20 * y + 30 * z);
+						const VoxelSample sample{
+							.m_Density = density,
+							.m_Material =
+								density < IsoValue
+									? VoxelMaterial::Empty
+									: VoxelMaterial::Stone,
+							.m_Damage = 0,
+						};
+						bool changed = false;
+						if (world->WriteCurrentSample(
+							{ x, y, z },
+							sample,
+							changed).Failed())
+						{
+							initialized = false;
+						}
+					}
+				}
+			}
+			context.Check(
+				initialized,
+				"Reference gradient fixture initializes every logical sample");
+			if (!initialized)
+			{
+				return;
+			}
+
+			const ReferenceMesher mesher(*world);
+			DensityGradient centerGradient{};
+			context.Check(
+				mesher.ComputeSampleDensityGradient(
+					{ 1, 1, 1 },
+					centerGradient).Succeeded() &&
+					centerGradient ==
+						DensityGradient{ 20.0, 40.0, 60.0 },
+				"Interior sample gradients use central density differences");
+
+			DensityGradient minimumGradient{};
+			DensityGradient maximumGradient{};
+			context.Check(
+				mesher.ComputeSampleDensityGradient(
+					{ 0, 0, 0 },
+					minimumGradient).Succeeded() &&
+					mesher.ComputeSampleDensityGradient(
+						{ 3, 3, 3 },
+						maximumGradient).Succeeded() &&
+					minimumGradient ==
+						DensityGradient{ 10.0, 20.0, 30.0 } &&
+					maximumGradient ==
+						DensityGradient{ 10.0, 20.0, 30.0 },
+				"Logical world boundaries use fixed one-sided gradients");
+
+			DensityGradient unchanged{ 7.0, 8.0, 9.0 };
+			context.Check(
+				mesher.ComputeSampleDensityGradient(
+					{ 4, 0, 0 },
+					unchanged).m_Error ==
+					ValidationError::SampleOutsideLogicalBounds &&
+					unchanged == DensityGradient{ 7.0, 8.0, 9.0 },
+				"Out-of-bounds gradient sampling fails atomically");
+		}
+
+		void RunReferenceInterpolationTests(
+			SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			VoxelWorldConfig config = MakeMeshValidationConfig();
+			config.m_VoxelSize = 0.25f;
+			config.m_LogicalCellBounds = {
+				.m_Min = {},
+				.m_MaxExclusive = { 2, 2, 2 },
+			};
+			std::unique_ptr<VoxelWorld> world;
+			const ValidationResult createResult =
+				VoxelWorld::Create(config, world);
+			context.Check(
+				createResult.Succeeded() && world != nullptr,
+				"Reference interpolation fixture creates a valid voxel world");
+			if (!world)
+			{
+				return;
+			}
+
+			const ReferenceMesher mesher(*world);
+			const ReferenceEdgeEndpoint solid{
+				.m_Coordinate = { 0, 0, 0 },
+				.m_Sample = {
+					.m_Density = 192,
+					.m_Material = VoxelMaterial::Stone,
+					.m_Damage = 0,
+				},
+				.m_DensityGradient = { -2.0, 0.0, 0.0 },
+			};
+			const ReferenceEdgeEndpoint empty{
+				.m_Coordinate = { 1, 0, 0 },
+				.m_Sample = {
+					.m_Density = 64,
+					.m_Material = VoxelMaterial::Empty,
+					.m_Damage = 0,
+				},
+				.m_DensityGradient = { 0.0, -2.0, 0.0 },
+			};
+
+			ReferenceEdgeVertex forward{};
+			ReferenceEdgeVertex reverse{};
+			const bool forwardSucceeded =
+				mesher.InterpolateEdge(
+					solid,
+					empty,
+					forward).Succeeded();
+			const bool reverseSucceeded =
+				mesher.InterpolateEdge(
+					empty,
+					solid,
+					reverse).Succeeded();
+			context.Check(
+				forwardSucceeded &&
+					reverseSucceeded &&
+					forward == reverse &&
+					forward.m_EndpointA == SampleCoord{} &&
+					forward.m_EndpointB ==
+						SampleCoord{ 1, 0, 0 } &&
+					NearlyEqual(
+						forward.m_InterpolationT,
+						0.5) &&
+					NearlyEqual(
+						forward.m_Position.m_X,
+						0.125) &&
+					NearlyEqual(
+						forward.m_Position.m_Y,
+						0.0) &&
+					NearlyEqual(
+						forward.m_Position.m_Z,
+						0.0) &&
+					forward.m_DensityGradient ==
+						DensityGradient{ -1.0, -1.0, 0.0 } &&
+					NearlyEqual(
+						forward.m_Normal.m_X,
+						0.7071067811865475) &&
+					NearlyEqual(
+						forward.m_Normal.m_Y,
+						0.7071067811865475) &&
+					NearlyEqual(
+						forward.m_Normal.m_Z,
+						0.0),
+				"Edge interpolation is input-order independent and reuses one double t");
+
+			ReferenceEdgeEndpoint isoAtA = solid;
+			isoAtA.m_Sample.m_Density = IsoValue;
+			ReferenceEdgeVertex atA{};
+			ReferenceEdgeEndpoint emptyAtA = empty;
+			emptyAtA.m_Coordinate = { 0, 1, 0 };
+			ReferenceEdgeEndpoint isoAtB = isoAtA;
+			isoAtB.m_Coordinate = { 1, 1, 0 };
+			ReferenceEdgeVertex atB{};
+			context.Check(
+				mesher.InterpolateEdge(
+					isoAtA,
+					empty,
+					atA).Succeeded() &&
+					atA.m_InterpolationT == 0.0 &&
+					!std::signbit(atA.m_InterpolationT) &&
+					atA.m_Position ==
+						Float3{ 0.0f, 0.0f, 0.0f } &&
+					mesher.InterpolateEdge(
+						emptyAtA,
+						isoAtB,
+						atB).Succeeded() &&
+					atB.m_InterpolationT == 1.0 &&
+					atB.m_Position ==
+						Float3{ 0.25f, 0.25f, 0.0f },
+				"Exact-iso endpoints produce canonical t-zero and t-one vertices");
+
+			ReferenceEdgeEndpoint equalA = empty;
+			equalA.m_Coordinate = { 0, 0, 1 };
+			ReferenceEdgeEndpoint equalB = empty;
+			equalB.m_Coordinate = { 1, 0, 1 };
+			ReferenceEdgeVertex unchanged{
+				.m_Position = { 1.0f, 2.0f, 3.0f },
+				.m_Normal = { 0.0f, 1.0f, 0.0f },
+				.m_DensityGradient = { 4.0, 5.0, 6.0 },
+				.m_EndpointA = { 7, 8, 9 },
+				.m_EndpointB = { 10, 11, 12 },
+				.m_InterpolationT = 0.75,
+			};
+			const ReferenceEdgeVertex sentinel = unchanged;
+			context.Check(
+				mesher.InterpolateEdge(
+					equalA,
+					equalB,
+					unchanged).m_Error ==
+					ValidationError::EqualDensityReferenceEdge &&
+					unchanged == sentinel,
+				"Equal-density reference edges fail without publishing output");
+
+			ReferenceEdgeEndpoint nonCrossing = equalB;
+			nonCrossing.m_Sample.m_Density = 32;
+			context.Check(
+				mesher.InterpolateEdge(
+					equalA,
+					nonCrossing,
+					unchanged).m_Error ==
+					ValidationError::NonCrossingReferenceEdge,
+				"Reference interpolation rejects unequal non-crossing densities");
+
+			ReferenceEdgeEndpoint distant = empty;
+			distant.m_Coordinate = { 2, 0, 0 };
+			context.Check(
+				mesher.InterpolateEdge(
+					solid,
+					distant,
+					unchanged).m_Error ==
+					ValidationError::InvalidReferenceEdge,
+				"Reference interpolation rejects endpoints outside one cube");
+
+			ReferenceEdgeEndpoint nonFinite = empty;
+			nonFinite.m_DensityGradient.m_X =
+				std::numeric_limits<double>::infinity();
+			context.Check(
+				mesher.InterpolateEdge(
+					solid,
+					nonFinite,
+					unchanged).m_Error ==
+					ValidationError::NonFiniteDensityGradient,
+				"Reference interpolation rejects non-finite endpoint gradients");
+
+			ReferenceEdgeEndpoint cancellingA = solid;
+			ReferenceEdgeEndpoint cancellingB = empty;
+			cancellingA.m_DensityGradient = { -1.0, 0.0, 0.0 };
+			cancellingB.m_DensityGradient = { 1.0, 0.0, 0.0 };
+			context.Check(
+				mesher.InterpolateEdge(
+					cancellingA,
+					cancellingB,
+					unchanged).m_Error ==
+					ValidationError::DegenerateDensityGradient,
+				"Reference interpolation reports a zero interpolated gradient");
+		}
 	}
 
 	void RunNapaVoxelMesherSelfTests(
@@ -517,5 +975,8 @@ namespace gglab
 		RunMeshDataLayoutTests(context);
 		RunMeshQuantizationTests(context);
 		RunSyntheticMeshValidationTests(context);
+		RunReferenceTopologyContractTests(context);
+		RunReferenceGradientTests(context);
+		RunReferenceInterpolationTests(context);
 	}
 }

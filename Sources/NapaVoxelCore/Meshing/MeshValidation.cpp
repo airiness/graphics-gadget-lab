@@ -116,6 +116,24 @@ namespace napa::voxel
 					MeshNormalLengthTolerance;
 		}
 
+		[[nodiscard]] bool IsWithinTargetChunk(
+			QuantizedMeshPosition position,
+			std::uint32_t chunkCellCount) noexcept
+		{
+			const std::int32_t maximum =
+				static_cast<std::int32_t>(
+					chunkCellCount *
+					static_cast<std::uint32_t>(
+						MeshPositionQuantizationScale));
+			return
+				position.m_X >= 0 &&
+				position.m_Y >= 0 &&
+				position.m_Z >= 0 &&
+				position.m_X <= maximum &&
+				position.m_Y <= maximum &&
+				position.m_Z <= maximum;
+		}
+
 		[[nodiscard]] double ComputeTriangleDoubleAreaSquaredInVoxelUnits(
 			Float3 a,
 			Float3 b,
@@ -439,6 +457,14 @@ namespace napa::voxel
 			{
 				return positionResult;
 			}
+			if (!IsWithinTargetChunk(
+				quantizedVertex.m_Position,
+				config.m_ChunkCellCount))
+			{
+				return {
+					ValidationError::MeshGeometryOutsideTargetChunk,
+				};
+			}
 			const ValidationResult normalResult =
 				QuantizeMeshNormal(
 					vertex.m_Normal,
@@ -573,6 +599,17 @@ namespace napa::voxel
 			if (maximumResult.Failed())
 			{
 				return maximumResult;
+			}
+			if (!IsWithinTargetChunk(
+					quantizedBounds.m_Min,
+					config.m_ChunkCellCount) ||
+				!IsWithinTargetChunk(
+					quantizedBounds.m_Max,
+					config.m_ChunkCellCount))
+			{
+				return {
+					ValidationError::MeshGeometryOutsideTargetChunk,
+				};
 			}
 		}
 

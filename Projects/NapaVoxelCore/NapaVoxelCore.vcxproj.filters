@@ -42,6 +42,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h">
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h">
+      <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
       <Filter>NapaVoxelCore\Validation</Filter>
     </ClInclude>
@@ -84,6 +87,9 @@
       <Filter>NapaVoxelCore\Hash</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp">
+      <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.cpp">
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp">
