@@ -19,6 +19,9 @@ namespace gglab
 			view.m_Name = name;
 			view.m_ViewId = viewId;
 			view.m_IsValid = true;
+			// The field describes the active projection. Main-view Reversed-Z is
+			// enabled later as one atomic projection/resource/state migration.
+			view.m_DepthConvention = DepthConvention::Standard;
 
 			view.m_View = camera.GetViewMatrix();
 			view.m_Proj = camera.GetProjMatrix();
@@ -176,6 +179,7 @@ namespace gglab
 		view.m_Name = info.m_Name;
 		view.m_ViewId = RenderViewID::DirectionalShadow;
 		view.m_IsValid = true;
+		view.m_DepthConvention = DepthConvention::Standard;
 		view.m_View = math::CreateLookAtLH(lightEye, lightTarget, lightUp);
 		view.m_Proj = math::CreateOrthographicOffCenterLH(
 			minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);

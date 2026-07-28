@@ -143,6 +143,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
@@ -398,6 +399,7 @@
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h" />
@@ -635,6 +637,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h" />
+    <ClInclude Include="..\..\Sources\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBlackboard.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\IBLGraphResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePool.h" />
@@ -767,11 +770,13 @@
     <None Include="..\..\Shaders\Common\BufferLayout.hlsli" />
     <None Include="..\..\Shaders\Common\Common.hlsli" />
     <None Include="..\..\Shaders\Common\Cubemap.hlsli" />
+    <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli" />
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
     <None Include="..\..\Shaders\Common\Sampling.hlsli" />
+    <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
@@ -793,6 +798,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

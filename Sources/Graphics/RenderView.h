@@ -4,6 +4,7 @@
 #include "Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/ShadowSettings.h"
 
 namespace gglab
@@ -36,6 +37,7 @@ namespace gglab
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 
+		DepthConvention m_DepthConvention = DepthConvention::Standard;
 		RenderViewID m_ViewId = RenderViewID::Unknown;
 		StringID m_Name{};
 		bool m_IsValid = false;

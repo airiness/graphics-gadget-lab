@@ -16,6 +16,9 @@
     <Filter Include="Shaders\PBR">
       <UniqueIdentifier>{8D727DF1-1ACE-168D-EB4F-C640631BA613}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Tests">
+      <UniqueIdentifier>{3984EAF9-ACD0-A5D8-8DAF-939D9046E4E8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Core">
@@ -184,6 +187,9 @@
     <Filter Include="Graphics\Utility">
       <UniqueIdentifier>{d892a0d4-9889-4a83-a0fe-d9ee5889cd10}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\ScreenSpace">
+      <UniqueIdentifier>{9f09b8d6-7c37-42cb-9c06-81c4d18818f0}</UniqueIdentifier>
+    </Filter>
     <Filter Include="DevTools">
       <UniqueIdentifier>{7d8e678e-3509-4f8e-86ff-5cb9c6ac8c50}</UniqueIdentifier>
     </Filter>
@@ -262,6 +268,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp">
@@ -1001,6 +1010,9 @@
     <ClInclude Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
@@ -1498,6 +1510,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderView.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\ScreenSpace\ScreenSpaceTypes.h">
+      <Filter>Graphics\ScreenSpace</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\World.h">
       <Filter>Core</Filter>
@@ -2056,6 +2071,9 @@
     <None Include="..\..\Shaders\Common\Cubemap.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -2069,6 +2087,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\Sampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\ScreenSpace.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\VertexInput.hlsli">
@@ -2129,6 +2150,9 @@
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl">
       <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

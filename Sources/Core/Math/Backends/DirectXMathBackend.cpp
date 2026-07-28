@@ -319,6 +319,19 @@ namespace gglab::math
 		return StoreMatrix(DirectX::XMMatrixPerspectiveFovLH(fovRadians, aspect, nearZ, farZ));
 	}
 
+	Matrix CreatePerspectiveFieldOfViewLHReversedZ(
+		float fovRadians,
+		float aspect,
+		float nearZ,
+		float farZ) noexcept
+	{
+		return StoreMatrix(DirectX::XMMatrixPerspectiveFovLH(
+			fovRadians,
+			aspect,
+			farZ,
+			nearZ));
+	}
+
 	Matrix CreateOrthographicOffCenterLH(float left, float right, float bottom, float top, float nearZ, float farZ) noexcept
 	{
 		return StoreMatrix(DirectX::XMMatrixOrthographicOffCenterLH(left, right, bottom, top, nearZ, farZ));

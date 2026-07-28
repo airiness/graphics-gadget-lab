@@ -65,6 +65,11 @@ namespace gglab::math
 	Matrix CreateFromQuaternion(const Quaternion& rotation) noexcept;
 	Matrix CreateLookAtLH(const Vector3& eye, const Vector3& target, const Vector3& up) noexcept;
 	Matrix CreatePerspectiveFieldOfViewLH(float fovRadians, float aspect, float nearZ, float farZ) noexcept;
+	Matrix CreatePerspectiveFieldOfViewLHReversedZ(
+		float fovRadians,
+		float aspect,
+		float nearZ,
+		float farZ) noexcept;
 	Matrix CreateOrthographicOffCenterLH(
 		float left, float right, float bottom, float top, float nearZ, float farZ) noexcept;
 }
