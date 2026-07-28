@@ -24,6 +24,21 @@ namespace gglab
 			return buffer->m_Imported ? buffer->m_ImportedHandle : buffer->m_PhysicalAllocation.m_Buffer;
 		}
 
+		RHICommandContext* SelectPassCommandContext(
+			const RGBackendExecuteContext& backend,
+			RGPassEncoderType encoderType) noexcept
+		{
+			switch (encoderType)
+			{
+			case RGPassEncoderType::Graphics:
+			case RGPassEncoderType::Copy:
+				return backend.m_GraphicsCommandContext;
+			case RGPassEncoderType::Compute:
+				return backend.m_DirectComputeCommandContext;
+			}
+			GGLAB_UNREACHABLE("Unhandled RenderGraph pass encoder type.");
+		}
+
 		void TrackPassResourceUses(
 			RHICommandContext* commandContext,
 			const RGExecutionPlan& plan,
@@ -76,12 +91,8 @@ namespace gglab
 
 			std::vector<RHITextureBarrier> textureBarriers;
 			std::vector<RHIBufferBarrier> bufferBarriers;
-			std::vector<RHITextureUavBarrier> textureUavBarriers;
-			std::vector<RHIBufferUavBarrier> bufferUavBarriers;
 			textureBarriers.reserve(barriers.size());
 			bufferBarriers.reserve(barriers.size());
-			textureUavBarriers.reserve(barriers.size());
-			bufferUavBarriers.reserve(barriers.size());
 			for (const auto& intent : barriers)
 			{
 				GGLAB_ASSERT_MSG(intent.m_Resource.IsValid() &&
@@ -91,9 +102,8 @@ namespace gglab
 					intent.m_Kind != RGBarrierKind::Uav ||
 						(HasUavAccess(intent.m_Before) &&
 							HasUavAccess(intent.m_After) &&
-							!NeedsRHIResourceTransition(intent.m_Before, intent.m_After) &&
-							!intent.m_Subresources),
-					"RenderGraph UAV barriers require one whole resource in a stable UAV state.");
+							!NeedsRHIResourceTransition(intent.m_Before, intent.m_After)),
+					"RenderGraph UAV barriers require a stable UAV state.");
 				const auto& resource = plan.GetResources()[intent.m_Resource.Value()];
 				if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
@@ -104,20 +114,13 @@ namespace gglab
 						intent.m_HasResolvedPhysicalHandle = true;
 						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
 						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
-						if (intent.m_Kind == RGBarrierKind::Uav)
-						{
-							textureUavBarriers.push_back({ handle });
-						}
-						else
-						{
-							textureBarriers.push_back(
-								{
-									.m_Texture = handle,
-									.m_Before = intent.m_Before,
-									.m_After = intent.m_After,
-									.m_Subresources = intent.m_Subresources,
-								});
-						}
+						textureBarriers.push_back(
+							{
+								.m_Texture = handle,
+								.m_Before = intent.m_Before,
+								.m_After = intent.m_After,
+								.m_Subresources = intent.m_Subresources,
+							});
 					}
 				}
 				else
@@ -129,22 +132,13 @@ namespace gglab
 						intent.m_HasResolvedPhysicalHandle = true;
 						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
 						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
-						if (intent.m_Kind == RGBarrierKind::Uav)
-						{
-							bufferUavBarriers.push_back({ handle });
-						}
-						else
-						{
-							bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
-						}
+						bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
 					}
 				}
 			}
 
 			commandContext->TextureBarrier(textureBarriers);
 			commandContext->BufferBarrier(bufferBarriers);
-			commandContext->TextureUavBarrier(textureUavBarriers);
-			commandContext->BufferUavBarrier(bufferUavBarriers);
 		}
 	}
 
@@ -171,6 +165,36 @@ namespace gglab
 		return m_Device && view.IsValid() ? m_Device->GetTextureViewDescriptor(view) : RHIDescriptorHandle{};
 	}
 
+	RHIGraphicsCommandContext* RGExecuteContext::GetGraphicsCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Graphics;
+		GGLAB_ASSERT_MSG(
+			compatible,
+			"Graphics command context access requires a Graphics RenderGraph pass.");
+		return compatible ? m_Backend.m_GraphicsCommandContext : nullptr;
+	}
+
+	RHIComputeCommandContext* RGExecuteContext::GetDirectComputeCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Compute;
+		GGLAB_ASSERT_MSG(
+			compatible,
+			"Direct compute command context access requires a Compute RenderGraph pass.");
+		return compatible ? m_Backend.m_DirectComputeCommandContext : nullptr;
+	}
+
+	RHIComputeCommandContext* RGExecuteContext::GetAsyncComputeCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Compute;
+		GGLAB_ASSERT_MSG(
+			compatible,
+			"Async compute command context access requires a Compute RenderGraph pass.");
+		return compatible ? m_Backend.m_AsyncComputeCommandContext : nullptr;
+	}
+
 	void RGExecutor::Execute(
 		const RGExecutionPlan& plan,
 		const RGExecutorRuntime& runtime,
@@ -194,11 +218,17 @@ namespace gglab
 		for (const auto passIndex : plan.GetExecutionOrder())
 		{
 			const auto& pass = plan.GetPasses()[passIndex.Value()];
-			RHICommandContext* profileContext = executeContext.GetGraphicsCommandContext();
+			const auto previousEncoderType = executeContext.m_ActiveEncoderType;
+			executeContext.m_ActiveEncoderType = pass.m_EncoderType;
+			RHICommandContext* passCommandContext =
+				SelectPassCommandContext(executeContext.m_Backend, pass.m_EncoderType);
+			GGLAB_ASSERT_MSG(
+				passCommandContext,
+				"RenderGraph pass requires an available command context for its encoder type.");
 			const std::string_view passName = pass.m_NameId.Name();
-			if (profileContext)
+			if (passCommandContext)
 			{
-				profileContext->BeginGpuProfileScope(passName);
+				passCommandContext->BeginGpuProfileScope(passName);
 			}
 			for (const auto resourceIndex : pass.m_AcquireResources)
 			{
@@ -206,16 +236,16 @@ namespace gglab
 				resource.m_Resource->Devirtualize(runtime.m_TransientResourcePool, resource.m_UsageBits);
 			}
 
-			TrackPassResourceUses(executeContext.GetGraphicsCommandContext(), plan, pass);
-			EmitBarriers(executeContext.GetGraphicsCommandContext(), plan, pass.m_PreBarriers);
+			TrackPassResourceUses(passCommandContext, plan, pass);
+			EmitBarriers(passCommandContext, plan, pass.m_PreBarriers);
 			if (pass.m_Executor)
 			{
 				pass.m_Executor->Execute(executeContext);
 			}
-			EmitBarriers(executeContext.GetGraphicsCommandContext(), plan, pass.m_PostBarriers);
-			if (profileContext)
+			EmitBarriers(passCommandContext, plan, pass.m_PostBarriers);
+			if (passCommandContext)
 			{
-				profileContext->EndGpuProfileScope();
+				passCommandContext->EndGpuProfileScope();
 			}
 
 			for (const auto resourceIndex : pass.m_ReleaseResources)
@@ -224,6 +254,7 @@ namespace gglab
 					*runtime.m_RetireTextures,
 					*runtime.m_RetireBuffers);
 			}
+			executeContext.m_ActiveEncoderType = previousEncoderType;
 		}
 
 		executeContext.m_ExecutionPlan = previousPlan;

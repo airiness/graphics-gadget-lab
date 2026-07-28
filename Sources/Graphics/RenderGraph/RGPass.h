@@ -1,6 +1,15 @@
 #pragma once
+#include <cstdint>
+
 namespace gglab
 {
+	enum class RGPassEncoderType : uint8_t
+	{
+		Graphics,
+		Compute,
+		Copy,
+	};
+
 	struct RGExecuteContext;
 	class RGBuilder;
 	class RGPassBase

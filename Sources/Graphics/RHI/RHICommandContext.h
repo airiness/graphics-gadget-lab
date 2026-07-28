@@ -33,16 +33,6 @@ namespace gglab
 		RHIResourceState m_After{};
 	};
 
-	struct RHITextureUavBarrier
-	{
-		RHITextureHandle m_Texture{};
-	};
-
-	struct RHIBufferUavBarrier
-	{
-		RHIBufferHandle m_Buffer{};
-	};
-
 	struct RHISubmitInfo
 	{
 		RHIQueueType m_QueueType = RHIQueueType::Graphics;
@@ -102,8 +92,6 @@ namespace gglab
 		virtual void TrackBufferUse(RHIBufferHandle buffer) noexcept = 0;
 		virtual void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept = 0;
 		virtual void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept = 0;
-		virtual void TextureUavBarrier(std::span<const RHITextureUavBarrier> barriers) noexcept = 0;
-		virtual void BufferUavBarrier(std::span<const RHIBufferUavBarrier> barriers) noexcept = 0;
 		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};

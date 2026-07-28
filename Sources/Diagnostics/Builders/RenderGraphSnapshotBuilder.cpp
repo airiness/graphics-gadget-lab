@@ -133,6 +133,7 @@ namespace gglab
 					passInfo.m_Index = passIndex;
 					passInfo.m_ExecutionOrder = compiledPass ? compiledPass->m_ExecutionOrder : -1;
 					passInfo.m_Name = ToSnapshotName(declaration.m_NameId);
+					passInfo.m_EncoderType = declaration.m_EncoderType;
 					passInfo.m_SideEffect = declaration.m_SideEffect;
 					passInfo.m_Culled = compiledPass ? compiledPass->m_Culled : false;
 					passInfo.m_Accesses.reserve(declaration.m_Accesses.size());

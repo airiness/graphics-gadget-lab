@@ -208,9 +208,8 @@ namespace gglab
 		RGExecuteContext executeContext{
 			RGBackendExecuteContext{
 				.m_GraphicsCommandContext = &frame.m_RHIFrame->GetGraphicsContext(),
-				// Compute is acquired lazily through RHIFrameContext when a pass is
-				// scheduled for the compute queue.
-				.m_ComputeCommandContext = nullptr,
+				.m_DirectComputeCommandContext = &frame.m_RHIFrame->GetDirectComputeContext(),
+				.m_AsyncComputeCommandContext = nullptr,
 			}
 		};
 		rg.Execute(executeContext);

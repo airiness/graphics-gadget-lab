@@ -218,56 +218,6 @@ namespace gglab
 		m_CommandList->FlushBarriers();
 	}
 
-	void DX12CommandContext::TextureUavBarrier(
-		std::span<const RHITextureUavBarrier> barriers) noexcept
-	{
-		if (!m_Device || !m_CommandList || barriers.empty())
-		{
-			return;
-		}
-
-		std::vector<ID3D12Resource*> resources;
-		resources.reserve(barriers.size());
-		for (const RHITextureUavBarrier& barrier : barriers)
-		{
-			DX12Texture* texture = m_Device->ResolveTexture(barrier.m_Texture);
-			if (!texture)
-			{
-				GGLAB_LOG_GRAPHICS_WARN(
-					"DX12CommandContext::TextureUavBarrier received a non-live texture handle.");
-				continue;
-			}
-			resources.push_back(texture->Get());
-			TrackTextureUse(barrier.m_Texture);
-		}
-		m_CommandList->ResourceUavBarriers(resources);
-	}
-
-	void DX12CommandContext::BufferUavBarrier(
-		std::span<const RHIBufferUavBarrier> barriers) noexcept
-	{
-		if (!m_Device || !m_CommandList || barriers.empty())
-		{
-			return;
-		}
-
-		std::vector<ID3D12Resource*> resources;
-		resources.reserve(barriers.size());
-		for (const RHIBufferUavBarrier& barrier : barriers)
-		{
-			DX12Buffer* buffer = m_Device->ResolveBuffer(barrier.m_Buffer);
-			if (!buffer)
-			{
-				GGLAB_LOG_GRAPHICS_WARN(
-					"DX12CommandContext::BufferUavBarrier received a non-live buffer handle.");
-				continue;
-			}
-			resources.push_back(buffer->Get());
-			TrackBufferUse(barrier.m_Buffer);
-		}
-		m_CommandList->ResourceUavBarriers(resources);
-	}
-
 	void DX12CommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept
 	{
 		if (std::ranges::find(m_UsedBuffers, buffer) == m_UsedBuffers.end())
@@ -300,18 +250,6 @@ namespace gglab
 	void DX12GraphicsCommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
 	{
 		m_Backend.BufferBarrier(barriers);
-	}
-
-	void DX12GraphicsCommandContext::TextureUavBarrier(
-		std::span<const RHITextureUavBarrier> barriers) noexcept
-	{
-		m_Backend.TextureUavBarrier(barriers);
-	}
-
-	void DX12GraphicsCommandContext::BufferUavBarrier(
-		std::span<const RHIBufferUavBarrier> barriers) noexcept
-	{
-		m_Backend.BufferUavBarrier(barriers);
 	}
 
 	void DX12GraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
@@ -618,18 +556,6 @@ namespace gglab
 	void DX12ComputeCommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
 	{
 		m_Backend->BufferBarrier(barriers);
-	}
-
-	void DX12ComputeCommandContext::TextureUavBarrier(
-		std::span<const RHITextureUavBarrier> barriers) noexcept
-	{
-		m_Backend->TextureUavBarrier(barriers);
-	}
-
-	void DX12ComputeCommandContext::BufferUavBarrier(
-		std::span<const RHIBufferUavBarrier> barriers) noexcept
-	{
-		m_Backend->BufferUavBarrier(barriers);
 	}
 
 	void DX12ComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept

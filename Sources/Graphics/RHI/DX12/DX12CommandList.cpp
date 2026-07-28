@@ -260,33 +260,6 @@ namespace gglab
 		m_GlobalBarriers.clear();
 	}
 
-	void DX12CommandList::ResourceUavBarriers(
-		std::span<ID3D12Resource* const> resources) noexcept
-	{
-		if (resources.empty())
-		{
-			return;
-		}
-
-		FlushBarriers();
-		std::vector<D3D12_RESOURCE_BARRIER> barriers;
-		barriers.reserve(resources.size());
-		for (ID3D12Resource* resource : resources)
-		{
-			GGLAB_ASSERT_NOT_NULL(resource);
-			if (resource)
-			{
-				barriers.push_back(CD3DX12_RESOURCE_BARRIER::UAV(resource));
-			}
-		}
-		if (!barriers.empty())
-		{
-			m_D3D12GraphicsCommandList->ResourceBarrier(
-				static_cast<UINT>(barriers.size()),
-				barriers.data());
-		}
-	}
-
 	void DX12CommandList::ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& color) const noexcept
 	{
 		GGLAB_ASSERT(rtDescriptor.m_DebugType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV);

@@ -82,7 +82,6 @@ namespace gglab
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
 		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
 		void FlushBarriers() noexcept;
-		void ResourceUavBarriers(std::span<ID3D12Resource* const> resources) noexcept;
 		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const Color& clearColor) const noexcept;
 		void ClearRenderTarget(const DX12DescriptorView& rtDescriptor, const DX12Resource& resource) const noexcept;
 		void ClearDepthStencil(const DX12DescriptorView& dsDescriptor, float depthClearValue, std::optional<uint8_t> stencilClearValue = std::nullopt) const noexcept;
