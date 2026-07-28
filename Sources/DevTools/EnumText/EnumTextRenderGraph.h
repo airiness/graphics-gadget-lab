@@ -46,6 +46,25 @@ namespace gglab::devtools
 	};
 
 	template<>
+	struct EnumTextTraits<RGBarrierKind>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGBarrierKind::Transition, "Transition" },
+			EnumTextEntry{ RGBarrierKind::Uav, "UAV" },
+		};
+	};
+
+	template<>
+	struct EnumTextTraits<RGBarrierReason>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGBarrierReason::AccessTransition, "Access Transition" },
+			EnumTextEntry{ RGBarrierReason::OrderedStorageHazard, "Ordered Storage Hazard" },
+			EnumTextEntry{ RGBarrierReason::FinalStateTransition, "Final State Transition" },
+		};
+	};
+
+	template<>
 	struct EnumTextTraits<RGTextureAccess>
 	{
 		static constexpr std::array Entries = {

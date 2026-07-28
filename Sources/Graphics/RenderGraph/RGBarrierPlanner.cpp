@@ -7,10 +7,16 @@ namespace gglab
 {
 	namespace
 	{
+		struct TrackedResourceState
+		{
+			RHIResourceState m_State = CommonRHIResourceState();
+			std::optional<RGDependencyAccess> m_LastOrderedUavAccess = std::nullopt;
+		};
+
 		struct TextureStateTracker
 		{
 			RHIResourceState m_InitialState = CommonRHIResourceState();
-			std::unordered_map<uint32_t, RHIResourceState> m_SubresourceStates;
+			std::unordered_map<uint32_t, TrackedResourceState> m_SubresourceStates;
 		};
 
 		struct TextureSubresource
@@ -183,6 +189,8 @@ namespace gglab
 					output.push_back(
 						{
 							.m_Resource = resourceIndex,
+							.m_Kind = RGBarrierKind::Transition,
+							.m_Reason = RGBarrierReason::AccessTransition,
 							.m_Before = group.m_Before,
 							.m_After = group.m_After,
 							.m_Subresources = std::nullopt,
@@ -278,6 +286,8 @@ namespace gglab
 					output.push_back(
 						{
 							.m_Resource = resourceIndex,
+							.m_Kind = RGBarrierKind::Transition,
+							.m_Reason = RGBarrierReason::AccessTransition,
 							.m_Before = group.m_Before,
 							.m_After = group.m_After,
 							.m_Subresources = range,
@@ -313,7 +323,7 @@ namespace gglab
 	void RGBarrierPlanner::Build() noexcept
 	{
 		std::unordered_map<RGVirtualResourceBase*, TextureStateTracker> textureStates;
-		std::unordered_map<RGVirtualResourceBase*, RHIResourceState> bufferStates;
+		std::unordered_map<RGVirtualResourceBase*, TrackedResourceState> bufferStates;
 		for (const auto& resource : m_Resources)
 		{
 			auto* virtualResource = resource.m_Resource;
@@ -324,7 +334,15 @@ namespace gglab
 			}
 			else
 			{
-				bufferStates.emplace(virtualResource, resource.m_InitialState);
+				bufferStates.emplace(
+					virtualResource,
+					TrackedResourceState
+					{
+						.m_State = resource.m_InitialState,
+						.m_LastOrderedUavAccess = HasUavAccess(resource.m_InitialState) ?
+							std::optional{ RGDependencyAccess::ReadWrite } :
+							std::nullopt,
+					});
 			}
 		}
 
@@ -353,6 +371,7 @@ namespace gglab
 						access.m_Subresources);
 					auto& stateTracker = textureStates.at(virtualResource);
 					std::vector<TextureTransition> transitions;
+					bool needsUavBarrier = false;
 					ForEachSubresource(textureDesc, range,
 						[&](const TextureSubresource& subresource)
 						{
@@ -361,35 +380,119 @@ namespace gglab
 								subresource.m_Mip,
 								subresource.m_ArraySlice,
 								subresource.m_Aspect);
-							auto [stateIter, inserted] = stateTracker.m_SubresourceStates.emplace(
+							auto stateIter = stateTracker.m_SubresourceStates.emplace(
 								index,
-								stateTracker.m_InitialState);
-							auto& currentState = stateIter->second;
-							if (NeedsRHIResourceBarrier(currentState, requiredState))
+								TrackedResourceState
+								{
+									.m_State = stateTracker.m_InitialState,
+									.m_LastOrderedUavAccess = HasUavAccess(stateTracker.m_InitialState) ?
+										std::optional{ RGDependencyAccess::ReadWrite } :
+										std::nullopt,
+								}).first;
+							auto& trackedState = stateIter->second;
+							if (NeedsRHIResourceTransition(trackedState.m_State, requiredState))
 							{
-								transitions.push_back({ subresource, currentState, requiredState });
+								transitions.push_back({ subresource, trackedState.m_State, requiredState });
 							}
-							currentState = requiredState;
+							else if (HasUavAccess(requiredState) &&
+								trackedState.m_LastOrderedUavAccess &&
+								NeedsOrderedUavBarrier(
+									*trackedState.m_LastOrderedUavAccess,
+									RGOrderingRequirement::Ordered,
+									access.m_DependencyAccess,
+									access.m_Ordering))
+							{
+								needsUavBarrier = true;
+							}
 						});
 					AppendCoalescedBarriers(
 						access.m_Resource,
 						textureDesc,
 						transitions,
 						passNode.m_PreBarriers);
+					if (needsUavBarrier)
+					{
+						passNode.m_PreBarriers.push_back(
+							{
+								.m_Resource = access.m_Resource,
+								.m_Kind = RGBarrierKind::Uav,
+								.m_Reason = RGBarrierReason::OrderedStorageHazard,
+								.m_Before = requiredState,
+								.m_After = requiredState,
+							});
+						for (auto& [index, trackedState] : stateTracker.m_SubresourceStates)
+						{
+							GGLAB_UNUSED(index);
+							trackedState.m_LastOrderedUavAccess.reset();
+						}
+					}
+					ForEachSubresource(textureDesc, range,
+						[&](const TextureSubresource& subresource)
+						{
+							const uint32_t index = SubresourceIndex(
+								textureDesc,
+								subresource.m_Mip,
+								subresource.m_ArraySlice,
+								subresource.m_Aspect);
+							auto& trackedState = stateTracker.m_SubresourceStates.at(index);
+							const bool transitioned =
+								NeedsRHIResourceTransition(trackedState.m_State, requiredState);
+							trackedState.m_State = requiredState;
+							if (transitioned || !HasUavAccess(requiredState))
+							{
+								trackedState.m_LastOrderedUavAccess.reset();
+							}
+							if (HasUavAccess(requiredState) &&
+								access.m_Ordering == RGOrderingRequirement::Ordered)
+							{
+								trackedState.m_LastOrderedUavAccess = access.m_DependencyAccess;
+							}
+						});
 					continue;
 				}
 
-				auto& currentState = bufferStates.at(virtualResource);
-				if (NeedsRHIResourceBarrier(currentState, requiredState))
+				auto& trackedState = bufferStates.at(virtualResource);
+				const bool transitioned =
+					NeedsRHIResourceTransition(trackedState.m_State, requiredState);
+				if (transitioned)
 				{
 					passNode.m_PreBarriers.push_back(
 						{
 							.m_Resource = access.m_Resource,
-							.m_Before = currentState,
+							.m_Kind = RGBarrierKind::Transition,
+							.m_Reason = RGBarrierReason::AccessTransition,
+							.m_Before = trackedState.m_State,
 							.m_After = requiredState,
 						});
 				}
-				currentState = requiredState;
+				else if (HasUavAccess(requiredState) &&
+					trackedState.m_LastOrderedUavAccess &&
+					NeedsOrderedUavBarrier(
+						*trackedState.m_LastOrderedUavAccess,
+						RGOrderingRequirement::Ordered,
+						access.m_DependencyAccess,
+						access.m_Ordering))
+				{
+					passNode.m_PreBarriers.push_back(
+						{
+							.m_Resource = access.m_Resource,
+							.m_Kind = RGBarrierKind::Uav,
+							.m_Reason = RGBarrierReason::OrderedStorageHazard,
+							.m_Before = requiredState,
+							.m_After = requiredState,
+						});
+					trackedState.m_LastOrderedUavAccess.reset();
+				}
+				trackedState.m_State = requiredState;
+				if (transitioned || !HasUavAccess(requiredState))
+				{
+					trackedState.m_LastOrderedUavAccess.reset();
+				}
+				if (HasUavAccess(requiredState) &&
+					access.m_Ordering == RGOrderingRequirement::Ordered)
+				{
+					trackedState.m_LastOrderedUavAccess = access.m_DependencyAccess;
+				}
 			}
 		}
 
@@ -424,12 +527,18 @@ namespace gglab
 									subresource.m_Mip,
 									subresource.m_ArraySlice,
 									subresource.m_Aspect),
-								stateTracker.m_InitialState);
+								TrackedResourceState
+								{
+									.m_State = stateTracker.m_InitialState,
+									.m_LastOrderedUavAccess = HasUavAccess(stateTracker.m_InitialState) ?
+										std::optional{ RGDependencyAccess::ReadWrite } :
+										std::nullopt,
+								});
 						});
 				}
 
 				std::vector<TextureTransition> transitions;
-				for (auto& [subresourceIndex, currentState] : stateTracker.m_SubresourceStates)
+				for (auto& [subresourceIndex, trackedState] : stateTracker.m_SubresourceStates)
 				{
 					const TextureSubresource subresource = DecodeSubresource(
 						textureDesc,
@@ -453,37 +562,47 @@ namespace gglab
 						}
 					}
 
-					if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
+					if (!NeedsRHIResourceTransition(trackedState.m_State, requiredFinalState))
 					{
 						continue;
 					}
 
-					transitions.push_back({ subresource, currentState, requiredFinalState });
-					currentState = requiredFinalState;
+					transitions.push_back({ subresource, trackedState.m_State, requiredFinalState });
+					trackedState.m_State = requiredFinalState;
+					trackedState.m_LastOrderedUavAccess.reset();
 				}
+				const size_t transitionStart = m_Passes[finalBarrierPass.Value()].m_PostBarriers.size();
 				AppendCoalescedBarriers(
 					resource.m_Declaration,
 					textureDesc,
 					transitions,
 					m_Passes[finalBarrierPass.Value()].m_PostBarriers);
+				auto& postBarriers = m_Passes[finalBarrierPass.Value()].m_PostBarriers;
+				for (size_t barrierIndex = transitionStart; barrierIndex < postBarriers.size(); ++barrierIndex)
+				{
+					postBarriers[barrierIndex].m_Reason = RGBarrierReason::FinalStateTransition;
+				}
 				continue;
 			}
 
 			const RHIResourceState requiredFinalState = resource.m_Imported ?
 				resource.m_FinalState.value_or(resource.m_InitialState) :
 				CommonRHIResourceState();
-			auto& currentState = bufferStates.at(virtualResource);
-			if (!NeedsRHIResourceBarrier(currentState, requiredFinalState))
+			auto& trackedState = bufferStates.at(virtualResource);
+			if (!NeedsRHIResourceTransition(trackedState.m_State, requiredFinalState))
 			{
 				continue;
 			}
 			m_Passes[finalBarrierPass.Value()].m_PostBarriers.push_back(
 				{
 					.m_Resource = resource.m_Declaration,
-					.m_Before = currentState,
+					.m_Kind = RGBarrierKind::Transition,
+					.m_Reason = RGBarrierReason::FinalStateTransition,
+					.m_Before = trackedState.m_State,
 					.m_After = requiredFinalState,
 				});
-			currentState = requiredFinalState;
+			trackedState.m_State = requiredFinalState;
+			trackedState.m_LastOrderedUavAccess.reset();
 		}
 	}
 }

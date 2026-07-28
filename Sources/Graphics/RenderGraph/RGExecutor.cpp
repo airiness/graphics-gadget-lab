@@ -83,6 +83,13 @@ namespace gglab
 				GGLAB_ASSERT_MSG(intent.m_Resource.IsValid() &&
 					intent.m_Resource.Value() < plan.GetResources().size(),
 					"RenderGraph barrier references an invalid resource.");
+				GGLAB_ASSERT_MSG(
+					intent.m_Kind != RGBarrierKind::Uav ||
+						(HasUavAccess(intent.m_Before) &&
+							HasUavAccess(intent.m_After) &&
+							intent.m_Before == intent.m_After &&
+							!intent.m_Subresources),
+					"RenderGraph UAV barriers require one whole resource in a stable UAV state.");
 				const auto& resource = plan.GetResources()[intent.m_Resource.Value()];
 				if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
@@ -90,6 +97,9 @@ namespace gglab
 					GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture barrier requires a live RHI handle.");
 					if (handle.IsValid())
 					{
+						intent.m_HasResolvedPhysicalHandle = true;
+						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
+						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
 						textureBarriers.push_back(
 							{
 								.m_Texture = handle,
@@ -105,6 +115,9 @@ namespace gglab
 					GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer barrier requires a live RHI handle.");
 					if (handle.IsValid())
 					{
+						intent.m_HasResolvedPhysicalHandle = true;
+						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
+						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
 						bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
 					}
 				}

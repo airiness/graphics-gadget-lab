@@ -25,6 +25,11 @@ namespace gglab
 		uint32_t m_VirtualResourceIndex = 0;
 		std::string m_ResourceName;
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
+		RGBarrierKind m_Kind = RGBarrierKind::Transition;
+		RGBarrierReason m_Reason = RGBarrierReason::AccessTransition;
+		bool m_HasPhysicalHandle = false;
+		uint32_t m_PhysicalHandleIndex = 0;
+		uint32_t m_PhysicalHandleGeneration = 0;
 		RHIResourceState m_Before = CommonRHIResourceState();
 		RHIResourceState m_After = CommonRHIResourceState();
 		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;

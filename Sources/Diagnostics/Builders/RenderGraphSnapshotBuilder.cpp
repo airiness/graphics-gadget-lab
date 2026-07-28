@@ -44,6 +44,33 @@ namespace gglab
 			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
 		}
 
+		static void SetBarrierPhysicalHandle(
+			const RGCompiledResource& resource,
+			RGSnapshotBarrierInfo& info) noexcept
+		{
+			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			{
+				const auto* texture =
+					static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
+				const RHITextureHandle handle = texture->m_Imported ?
+					texture->m_ImportedHandle :
+					texture->m_PhysicalAllocation.m_Texture;
+				info.m_HasPhysicalHandle = handle.IsValid();
+				info.m_PhysicalHandleIndex = handle.Index();
+				info.m_PhysicalHandleGeneration = handle.Generation();
+				return;
+			}
+
+			const auto* buffer =
+				static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
+			const RHIBufferHandle handle = buffer->m_Imported ?
+				buffer->m_ImportedHandle :
+				buffer->m_PhysicalAllocation.m_Buffer;
+			info.m_HasPhysicalHandle = handle.IsValid();
+			info.m_PhysicalHandleIndex = handle.Index();
+			info.m_PhysicalHandleGeneration = handle.Generation();
+		}
+
 		static std::string GetPassSnapshotName(const std::vector<RGPassNode>& passNodes, int32_t passIndex) noexcept
 		{
 			if (passIndex < 0 || static_cast<size_t>(passIndex) >= passNodes.size())
@@ -256,6 +283,18 @@ namespace gglab
 				info.m_VirtualResourceIndex = intent.m_Resource.Value();
 				info.m_ResourceName = ToSnapshotName(resource.m_NameId);
 				info.m_ResourceType = resource.m_ResourceType;
+				info.m_Kind = intent.m_Kind;
+				info.m_Reason = intent.m_Reason;
+				if (intent.m_HasResolvedPhysicalHandle)
+				{
+					info.m_HasPhysicalHandle = true;
+					info.m_PhysicalHandleIndex = intent.m_ResolvedPhysicalHandleIndex;
+					info.m_PhysicalHandleGeneration = intent.m_ResolvedPhysicalHandleGeneration;
+				}
+				else
+				{
+					SetBarrierPhysicalHandle(resource, info);
+				}
 				info.m_Before = intent.m_Before;
 				info.m_After = intent.m_After;
 				info.m_Subresources = intent.m_Subresources;

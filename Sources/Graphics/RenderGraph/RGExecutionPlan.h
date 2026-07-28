@@ -26,9 +26,14 @@ namespace gglab
 	struct RGBarrierIntent
 	{
 		RGVirtualResourceIndex m_Resource = InvalidRGVirtualResourceIndex;
+		RGBarrierKind m_Kind = RGBarrierKind::Transition;
+		RGBarrierReason m_Reason = RGBarrierReason::AccessTransition;
 		RHIResourceState m_Before = CommonRHIResourceState();
 		RHIResourceState m_After = CommonRHIResourceState();
 		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
+		mutable bool m_HasResolvedPhysicalHandle = false;
+		mutable uint32_t m_ResolvedPhysicalHandleIndex = 0;
+		mutable uint32_t m_ResolvedPhysicalHandleGeneration = 0;
 	};
 
 	struct RGCompiledAccess
