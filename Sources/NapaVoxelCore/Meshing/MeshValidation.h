@@ -61,6 +61,10 @@ namespace napa::voxel
 	public:
 		MeshQuantizationContext() = default;
 
+		[[nodiscard]] bool IsPrepared() const noexcept;
+		[[nodiscard]] bool ContainsTargetCellDomain(
+			QuantizedMeshPosition position) const noexcept;
+
 	private:
 		friend ValidationResult PrepareMeshQuantizationContext(
 			const VoxelWorldConfig& config,
@@ -75,6 +79,8 @@ namespace napa::voxel
 		double m_ChunkOriginVoxelX = 0.0;
 		double m_ChunkOriginVoxelY = 0.0;
 		double m_ChunkOriginVoxelZ = 0.0;
+		QuantizedMeshPosition m_TargetCellDomainMin{};
+		QuantizedMeshPosition m_TargetCellDomainMax{};
 		bool m_IsPrepared = false;
 	};
 
@@ -89,6 +95,11 @@ namespace napa::voxel
 	[[nodiscard]] ValidationResult QuantizeMeshNormal(
 		Float3 normal,
 		QuantizedMeshNormal& quantized) noexcept;
+	[[nodiscard]] ValidationResult ValidateMeshTriangleArea(
+		Float3 a,
+		Float3 b,
+		Float3 c,
+		float voxelSize) noexcept;
 	[[nodiscard]] ValidationResult ValidateAndHashChunkMesh(
 		const MeshData& mesh,
 		const VoxelWorldConfig& config,

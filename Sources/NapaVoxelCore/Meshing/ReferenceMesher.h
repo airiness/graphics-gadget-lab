@@ -1,6 +1,7 @@
 #pragma once
 
 #include "NapaVoxelCore/Meshing/MeshData.h"
+#include "NapaVoxelCore/Meshing/MeshValidation.h"
 #include "NapaVoxelCore/Validation/ValidationResult.h"
 #include "NapaVoxelCore/World/Coordinates.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
@@ -81,6 +82,28 @@ namespace napa::voxel
 			const ReferenceEdgeVertex&) noexcept = default;
 	};
 
+	struct ReferenceTriangle
+	{
+		std::array<ReferenceEdgeVertex, 3> m_Vertices{};
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const ReferenceTriangle&,
+			const ReferenceTriangle&) noexcept = default;
+	};
+
+	struct ReferenceTetrahedronPolygonization
+	{
+		std::array<ReferenceTriangle, 2> m_Triangles{};
+		VoxelMaterial m_Material = VoxelMaterial::Empty;
+		std::uint8_t m_TriangleCount = 0;
+		std::uint8_t m_SkippedDegenerateTriangleCount = 0;
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const ReferenceTetrahedronPolygonization&,
+			const ReferenceTetrahedronPolygonization&) noexcept =
+			default;
+	};
+
 	class ReferenceMesher final
 	{
 	public:
@@ -93,6 +116,12 @@ namespace napa::voxel
 			ReferenceEdgeEndpoint first,
 			ReferenceEdgeEndpoint second,
 			ReferenceEdgeVertex& vertex) const noexcept;
+		[[nodiscard]] ValidationResult PolygonizeTetrahedron(
+			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
+			std::uint8_t tetrahedronIndex,
+			const MeshQuantizationContext& quantizationContext,
+			ReferenceTetrahedronPolygonization& polygonization)
+			const noexcept;
 
 	private:
 		const VoxelWorld& m_World;

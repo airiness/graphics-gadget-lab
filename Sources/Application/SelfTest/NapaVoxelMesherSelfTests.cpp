@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -110,6 +111,241 @@ namespace gglab
 			double tolerance = 1.0e-6) noexcept
 		{
 			return std::abs(lhs - rhs) <= tolerance;
+		}
+
+		[[nodiscard]] std::array<
+			napa::voxel::ReferenceEdgeEndpoint,
+			8> MakeReferenceCubeCorners(
+				std::uint8_t classification,
+				std::uint8_t solidDensity = 192,
+				std::uint8_t emptyDensity = 64) noexcept
+		{
+			using namespace napa::voxel;
+
+			std::array<ReferenceEdgeEndpoint, 8> corners{};
+			for (std::size_t cornerIndex = 0;
+				cornerIndex < corners.size();
+				++cornerIndex)
+			{
+				const CellCornerOffset offset =
+					ReferenceCubeCornerOffsets[cornerIndex];
+				corners[cornerIndex] = {
+					.m_Coordinate = {
+						static_cast<std::int32_t>(offset.m_X),
+						static_cast<std::int32_t>(offset.m_Y),
+						static_cast<std::int32_t>(offset.m_Z),
+					},
+					.m_Sample = {
+						.m_Density = emptyDensity,
+						.m_Material = VoxelMaterial::Empty,
+						.m_Damage = 0,
+					},
+					.m_DensityGradient = { 1.0, 0.0, 0.0 },
+				};
+			}
+
+			const std::array<std::uint8_t, 4>& tetrahedron =
+				ReferenceFreudenthalTetrahedra[0];
+			DensityGradient solidSum{};
+			DensityGradient emptySum{};
+			double solidCount = 0.0;
+			double emptyCount = 0.0;
+			for (std::size_t localIndex = 0;
+				localIndex < tetrahedron.size();
+				++localIndex)
+			{
+				const std::uint8_t cornerId =
+					tetrahedron[localIndex];
+				const bool solid =
+					(classification &
+						(static_cast<std::uint8_t>(1) <<
+							localIndex)) != 0;
+				ReferenceEdgeEndpoint& corner =
+					corners[cornerId];
+				corner.m_Sample = solid
+					? VoxelSample{
+						.m_Density = solidDensity,
+						.m_Material = VoxelMaterial::Stone,
+						.m_Damage = 0,
+					}
+					: VoxelSample{
+						.m_Density = emptyDensity,
+						.m_Material = VoxelMaterial::Empty,
+						.m_Damage = 0,
+					};
+
+				DensityGradient& sum =
+					solid ? solidSum : emptySum;
+				sum.m_X += corner.m_Coordinate.m_X;
+				sum.m_Y += corner.m_Coordinate.m_Y;
+				sum.m_Z += corner.m_Coordinate.m_Z;
+				if (solid)
+				{
+					solidCount += 1.0;
+				}
+				else
+				{
+					emptyCount += 1.0;
+				}
+			}
+
+			if (solidCount > 0.0 && emptyCount > 0.0)
+			{
+				const DensityGradient densityGradient{
+					solidSum.m_X / solidCount -
+						emptySum.m_X / emptyCount,
+					solidSum.m_Y / solidCount -
+						emptySum.m_Y / emptyCount,
+					solidSum.m_Z / solidCount -
+						emptySum.m_Z / emptyCount,
+				};
+				for (const std::uint8_t cornerId : tetrahedron)
+				{
+					corners[cornerId].m_DensityGradient =
+						densityGradient;
+				}
+			}
+			return corners;
+		}
+
+		[[nodiscard]] std::uint8_t CountTetrahedronSolidBits(
+			std::uint8_t classification) noexcept
+		{
+			std::uint8_t count = 0;
+			for (std::uint8_t bit = 0; bit < 4; ++bit)
+			{
+				count += static_cast<std::uint8_t>(
+					(classification >>
+						bit) &
+					static_cast<std::uint8_t>(1));
+			}
+			return count;
+		}
+
+		[[nodiscard]] bool HasOutwardNormalWinding(
+			const napa::voxel::ReferenceTriangle& triangle) noexcept
+		{
+			using namespace napa::voxel;
+
+			const Float3 a = triangle.m_Vertices[0].m_Position;
+			const Float3 b = triangle.m_Vertices[1].m_Position;
+			const Float3 c = triangle.m_Vertices[2].m_Position;
+			const double abX =
+				static_cast<double>(b.m_X) -
+				static_cast<double>(a.m_X);
+			const double abY =
+				static_cast<double>(b.m_Y) -
+				static_cast<double>(a.m_Y);
+			const double abZ =
+				static_cast<double>(b.m_Z) -
+				static_cast<double>(a.m_Z);
+			const double acX =
+				static_cast<double>(c.m_X) -
+				static_cast<double>(a.m_X);
+			const double acY =
+				static_cast<double>(c.m_Y) -
+				static_cast<double>(a.m_Y);
+			const double acZ =
+				static_cast<double>(c.m_Z) -
+				static_cast<double>(a.m_Z);
+			const double crossX = abY * acZ - abZ * acY;
+			const double crossY = abZ * acX - abX * acZ;
+			const double crossZ = abX * acY - abY * acX;
+			const double normalX =
+				triangle.m_Vertices[0].m_Normal.m_X +
+				triangle.m_Vertices[1].m_Normal.m_X +
+				triangle.m_Vertices[2].m_Normal.m_X;
+			const double normalY =
+				triangle.m_Vertices[0].m_Normal.m_Y +
+				triangle.m_Vertices[1].m_Normal.m_Y +
+				triangle.m_Vertices[2].m_Normal.m_Y;
+			const double normalZ =
+				triangle.m_Vertices[0].m_Normal.m_Z +
+				triangle.m_Vertices[1].m_Normal.m_Z +
+				triangle.m_Vertices[2].m_Normal.m_Z;
+			return
+				crossX * normalX +
+				crossY * normalY +
+				crossZ * normalZ > 0.0;
+		}
+
+		[[nodiscard]] bool HasDirectionWinding(
+			const napa::voxel::ReferenceTriangle& triangle,
+			napa::voxel::DensityGradient direction) noexcept
+		{
+			const napa::voxel::Float3 a =
+				triangle.m_Vertices[0].m_Position;
+			const napa::voxel::Float3 b =
+				triangle.m_Vertices[1].m_Position;
+			const napa::voxel::Float3 c =
+				triangle.m_Vertices[2].m_Position;
+			const double abX =
+				static_cast<double>(b.m_X) -
+				static_cast<double>(a.m_X);
+			const double abY =
+				static_cast<double>(b.m_Y) -
+				static_cast<double>(a.m_Y);
+			const double abZ =
+				static_cast<double>(b.m_Z) -
+				static_cast<double>(a.m_Z);
+			const double acX =
+				static_cast<double>(c.m_X) -
+				static_cast<double>(a.m_X);
+			const double acY =
+				static_cast<double>(c.m_Y) -
+				static_cast<double>(a.m_Y);
+			const double acZ =
+				static_cast<double>(c.m_Z) -
+				static_cast<double>(a.m_Z);
+			const double crossX = abY * acZ - abZ * acY;
+			const double crossY = abZ * acX - abX * acZ;
+			const double crossZ = abX * acY - abY * acX;
+			return
+				crossX * direction.m_X +
+				crossY * direction.m_Y +
+				crossZ * direction.m_Z > 0.0;
+		}
+
+		[[nodiscard]] bool IsVertexOnCubeEdge(
+			const napa::voxel::ReferenceEdgeVertex& vertex,
+			const std::array<
+				napa::voxel::ReferenceEdgeEndpoint,
+				8>& cubeCorners,
+			std::uint8_t firstCornerId,
+			std::uint8_t secondCornerId) noexcept
+		{
+			const napa::voxel::SampleCoord first =
+				cubeCorners[firstCornerId].m_Coordinate;
+			const napa::voxel::SampleCoord second =
+				cubeCorners[secondCornerId].m_Coordinate;
+			return
+				(vertex.m_EndpointA == first &&
+					vertex.m_EndpointB == second) ||
+				(vertex.m_EndpointA == second &&
+					vertex.m_EndpointB == first);
+		}
+
+		[[nodiscard]] bool TriangleContainsCubeEdge(
+			const napa::voxel::ReferenceTriangle& triangle,
+			const std::array<
+				napa::voxel::ReferenceEdgeEndpoint,
+				8>& cubeCorners,
+			std::uint8_t firstCornerId,
+			std::uint8_t secondCornerId) noexcept
+		{
+			for (const napa::voxel::ReferenceEdgeVertex& vertex :
+				triangle.m_Vertices)
+			{
+				if (IsVertexOnCubeEdge(
+					vertex,
+					cubeCorners,
+					firstCornerId,
+					secondCornerId))
+				{
+					return true;
+				}
+			}
+			return false;
 		}
 
 		void RunMeshDataLayoutTests(
@@ -381,7 +617,8 @@ namespace gglab
 					multiChunkConfig,
 					{ 1, 0, 0 },
 					targetChunkResult).m_Error ==
-					ValidationError::MeshGeometryOutsideTargetChunk,
+					ValidationError::
+						MeshGeometryOutsideTargetCellDomain,
 				"Chunk mesh validation rejects geometry from another chunk");
 
 			MeshData positiveBoundaryMesh{
@@ -426,8 +663,49 @@ namespace gglab
 					multiChunkConfig,
 					{},
 					targetChunkResult).m_Error ==
-					ValidationError::MeshGeometryOutsideTargetChunk,
+					ValidationError::
+						MeshGeometryOutsideTargetCellDomain,
 				"Chunk mesh bounds cannot extend outside the target chunk");
+
+			VoxelWorldConfig partialChunkConfig = config;
+			partialChunkConfig.m_LogicalCellBounds = {
+				.m_Min = { 4, 0, 0 },
+				.m_MaxExclusive = { 12, 8, 8 },
+			};
+			MeshData outsidePositivePartialChunk = triangle;
+			for (MeshVertex& vertex :
+				outsidePositivePartialChunk.m_Vertices)
+			{
+				vertex.m_Position.m_X += 12.0f;
+			}
+			outsidePositivePartialChunk.m_Bounds.m_Min.m_X += 12.0f;
+			outsidePositivePartialChunk.m_Bounds.m_Max.m_X += 12.0f;
+			context.Check(
+				ValidateAndHashChunkMesh(
+					triangle,
+					partialChunkConfig,
+					{},
+					targetChunkResult).m_Error ==
+					ValidationError::
+						MeshGeometryOutsideTargetCellDomain &&
+					ValidateAndHashChunkMesh(
+						positiveBoundaryMesh,
+						partialChunkConfig,
+						{},
+						targetChunkResult).Succeeded() &&
+					ValidateAndHashChunkMesh(
+						positiveBoundaryMesh,
+						partialChunkConfig,
+						{ 1, 0, 0 },
+						targetChunkResult).Succeeded() &&
+					ValidateAndHashChunkMesh(
+						outsidePositivePartialChunk,
+						partialChunkConfig,
+						{ 1, 0, 0 },
+						targetChunkResult).m_Error ==
+						ValidationError::
+							MeshGeometryOutsideTargetCellDomain,
+				"Partial chunks validate their logical cell intersection and shared boundary");
 
 			constexpr float SubQuantizationOffset =
 				1.0f / 262144.0f;
@@ -825,7 +1103,7 @@ namespace gglab
 			const ReferenceEdgeEndpoint empty{
 				.m_Coordinate = { 1, 0, 0 },
 				.m_Sample = {
-					.m_Density = 64,
+					.m_Density = 96,
 					.m_Material = VoxelMaterial::Empty,
 					.m_Damage = 0,
 				},
@@ -853,24 +1131,31 @@ namespace gglab
 						SampleCoord{ 1, 0, 0 } &&
 					NearlyEqual(
 						forward.m_InterpolationT,
-						0.5) &&
+						2.0 / 3.0) &&
 					NearlyEqual(
 						forward.m_Position.m_X,
-						0.125) &&
+						1.0 / 6.0) &&
 					NearlyEqual(
 						forward.m_Position.m_Y,
 						0.0) &&
 					NearlyEqual(
 						forward.m_Position.m_Z,
 						0.0) &&
-					forward.m_DensityGradient ==
-						DensityGradient{ -1.0, -1.0, 0.0 } &&
+					NearlyEqual(
+						forward.m_DensityGradient.m_X,
+						-2.0 / 3.0) &&
+					NearlyEqual(
+						forward.m_DensityGradient.m_Y,
+						-4.0 / 3.0) &&
+					NearlyEqual(
+						forward.m_DensityGradient.m_Z,
+						0.0) &&
 					NearlyEqual(
 						forward.m_Normal.m_X,
-						0.7071067811865475) &&
+						0.4472135954999579) &&
 					NearlyEqual(
 						forward.m_Normal.m_Y,
-						0.7071067811865475) &&
+						0.8944271909999159) &&
 					NearlyEqual(
 						forward.m_Normal.m_Z,
 						0.0),
@@ -957,6 +1242,7 @@ namespace gglab
 
 			ReferenceEdgeEndpoint cancellingA = solid;
 			ReferenceEdgeEndpoint cancellingB = empty;
+			cancellingB.m_Sample.m_Density = 64;
 			cancellingA.m_DensityGradient = { -1.0, 0.0, 0.0 };
 			cancellingB.m_DensityGradient = { 1.0, 0.0, 0.0 };
 			context.Check(
@@ -966,6 +1252,260 @@ namespace gglab
 					unchanged).m_Error ==
 					ValidationError::DegenerateDensityGradient,
 				"Reference interpolation reports a zero interpolated gradient");
+		}
+
+		void RunReferenceTetrahedronPolygonizationTests(
+			SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			VoxelWorldConfig config = MakeMeshValidationConfig();
+			config.m_VoxelSize = 1.0f;
+			config.m_LogicalCellBounds = {
+				.m_Min = {},
+				.m_MaxExclusive = { 2, 2, 2 },
+			};
+			std::unique_ptr<VoxelWorld> world;
+			const ValidationResult createResult =
+				VoxelWorld::Create(config, world);
+			context.Check(
+				createResult.Succeeded() && world != nullptr,
+				"Reference tetrahedron fixture creates a valid voxel world");
+			if (!world)
+			{
+				return;
+			}
+
+			MeshQuantizationContext quantizationContext;
+			const ValidationResult contextResult =
+				PrepareMeshQuantizationContext(
+					config,
+					{},
+					quantizationContext);
+			context.Check(
+				contextResult.Succeeded(),
+				"Reference tetrahedron fixture prepares mesh quantization");
+			if (contextResult.Failed())
+			{
+				return;
+			}
+
+			const ReferenceMesher mesher(*world);
+			bool classificationsValid = true;
+			for (std::uint8_t classification = 0;
+				classification < 16;
+				++classification)
+			{
+				const std::array<ReferenceEdgeEndpoint, 8>
+					corners =
+						MakeReferenceCubeCorners(classification);
+				ReferenceTetrahedronPolygonization polygonization;
+				const ValidationResult result =
+					mesher.PolygonizeTetrahedron(
+						corners,
+						0,
+						quantizationContext,
+						polygonization);
+				const std::uint8_t solidCount =
+					CountTetrahedronSolidBits(classification);
+				const std::uint8_t expectedTriangleCount =
+					solidCount == 0 || solidCount == 4
+						? 0
+						: solidCount == 2
+							? 2
+							: 1;
+				classificationsValid &=
+					result.Succeeded() &&
+					polygonization.m_TriangleCount ==
+						expectedTriangleCount &&
+					polygonization
+						.m_SkippedDegenerateTriangleCount == 0 &&
+					polygonization.m_Material ==
+						(expectedTriangleCount == 0
+							? VoxelMaterial::Empty
+							: VoxelMaterial::Stone);
+				for (std::uint8_t triangleIndex = 0;
+					triangleIndex <
+						polygonization.m_TriangleCount;
+					++triangleIndex)
+				{
+					classificationsValid &=
+						HasOutwardNormalWinding(
+							polygonization
+								.m_Triangles[triangleIndex]);
+				}
+			}
+			context.Check(
+				classificationsValid,
+				"All sixteen tetrahedron classifications produce fixed valid topology");
+
+			const std::array<ReferenceEdgeEndpoint, 8>
+				twoSolidCorners = MakeReferenceCubeCorners(0b1001);
+			ReferenceTetrahedronPolygonization twoSolid{};
+			const bool twoSolidSucceeded =
+				mesher.PolygonizeTetrahedron(
+					twoSolidCorners,
+					0,
+					quantizationContext,
+					twoSolid).Succeeded();
+			context.Check(
+				twoSolidSucceeded &&
+					twoSolid.m_TriangleCount == 2 &&
+					TriangleContainsCubeEdge(
+						twoSolid.m_Triangles[0],
+						twoSolidCorners,
+						0,
+						1) &&
+					TriangleContainsCubeEdge(
+						twoSolid.m_Triangles[0],
+						twoSolidCorners,
+						0,
+						3) &&
+					TriangleContainsCubeEdge(
+						twoSolid.m_Triangles[0],
+						twoSolidCorners,
+						7,
+						3) &&
+					TriangleContainsCubeEdge(
+						twoSolid.m_Triangles[1],
+						twoSolidCorners,
+						0,
+						1) &&
+					TriangleContainsCubeEdge(
+						twoSolid.m_Triangles[1],
+						twoSolidCorners,
+						7,
+						3) &&
+					TriangleContainsCubeEdge(
+						twoSolid.m_Triangles[1],
+						twoSolidCorners,
+						7,
+						1),
+				"Two-solid tetrahedra use the fixed perimeter and diagonal");
+
+			std::array<ReferenceEdgeEndpoint, 8>
+				materialCorners = MakeReferenceCubeCorners(0b1001);
+			materialCorners[0].m_Sample.m_Density = 200;
+			materialCorners[0].m_Sample.m_Material =
+				VoxelMaterial::Soil;
+			materialCorners[7].m_Sample.m_Density = 200;
+			ReferenceTetrahedronPolygonization tiedMaterial{};
+			const bool tiedMaterialSucceeded =
+				mesher.PolygonizeTetrahedron(
+					materialCorners,
+					0,
+					quantizationContext,
+					tiedMaterial).Succeeded();
+			materialCorners[7].m_Sample.m_Density = 201;
+			ReferenceTetrahedronPolygonization denserMaterial{};
+			const bool denserMaterialSucceeded =
+				mesher.PolygonizeTetrahedron(
+					materialCorners,
+					0,
+					quantizationContext,
+					denserMaterial).Succeeded();
+			context.Check(
+				tiedMaterialSucceeded &&
+					tiedMaterial.m_Material ==
+						VoxelMaterial::Soil &&
+					denserMaterialSucceeded &&
+					denserMaterial.m_Material ==
+						VoxelMaterial::Stone,
+				"Tetrahedron material selection uses density then cube-corner ID");
+
+			std::array<ReferenceEdgeEndpoint, 8>
+				oneIsoCorner = MakeReferenceCubeCorners(0b0001);
+			oneIsoCorner[0].m_Sample.m_Density = IsoValue;
+			ReferenceTetrahedronPolygonization oneIso{};
+			const bool oneIsoSucceeded =
+				mesher.PolygonizeTetrahedron(
+					oneIsoCorner,
+					0,
+					quantizationContext,
+					oneIso).Succeeded();
+			std::array<ReferenceEdgeEndpoint, 8>
+				twoIsoCorners = MakeReferenceCubeCorners(0b1001);
+			twoIsoCorners[0].m_Sample.m_Density = IsoValue;
+			twoIsoCorners[7].m_Sample.m_Density = IsoValue;
+			ReferenceTetrahedronPolygonization twoIso{};
+			const bool twoIsoSucceeded =
+				mesher.PolygonizeTetrahedron(
+					twoIsoCorners,
+					0,
+					quantizationContext,
+					twoIso).Succeeded();
+			context.Check(
+				oneIsoSucceeded &&
+					oneIso.m_TriangleCount == 0 &&
+					oneIso.m_SkippedDegenerateTriangleCount == 1 &&
+					twoIsoSucceeded &&
+					twoIso.m_TriangleCount == 0 &&
+					twoIso.m_SkippedDegenerateTriangleCount == 2,
+				"Exact-iso canonical degeneracies are skipped deterministically");
+
+			std::array<ReferenceEdgeEndpoint, 8>
+				fallbackCorners = MakeReferenceCubeCorners(0b0001);
+			fallbackCorners[0].m_DensityGradient =
+				{ 1.0, 0.0, 0.0 };
+			fallbackCorners[1].m_DensityGradient =
+				{ -1.0, 1.0, 0.0 };
+			fallbackCorners[3].m_DensityGradient =
+				{ -1.0, -1.0, 1.0 };
+			fallbackCorners[7].m_DensityGradient =
+				{ -1.0, 0.0, -1.0 };
+			ReferenceTetrahedronPolygonization fallback{};
+			const bool fallbackSucceeded =
+				mesher.PolygonizeTetrahedron(
+					fallbackCorners,
+					0,
+					quantizationContext,
+					fallback).Succeeded();
+			context.Check(
+				fallbackSucceeded &&
+					fallback.m_TriangleCount == 1 &&
+					HasDirectionWinding(
+						fallback.m_Triangles[0],
+						{ 1.0, 2.0 / 3.0, 1.0 / 3.0 }),
+				"Degenerate triangle gradients use the centroid winding fallback");
+
+			ReferenceTetrahedronPolygonization unchanged{
+				.m_Material = VoxelMaterial::Soil,
+				.m_TriangleCount = 2,
+				.m_SkippedDegenerateTriangleCount = 1,
+			};
+			const ReferenceTetrahedronPolygonization sentinel =
+				unchanged;
+			const std::array<ReferenceEdgeEndpoint, 8>
+				validCorners = MakeReferenceCubeCorners(0b0001);
+			MeshQuantizationContext unprepared;
+			std::array<ReferenceEdgeEndpoint, 8>
+				malformedCorners = validCorners;
+			malformedCorners[0].m_Coordinate.m_X = 1;
+			context.Check(
+				mesher.PolygonizeTetrahedron(
+					validCorners,
+					6,
+					quantizationContext,
+					unchanged).m_Error ==
+					ValidationError::InvalidReferenceTetrahedron &&
+					unchanged == sentinel &&
+					mesher.PolygonizeTetrahedron(
+						validCorners,
+						0,
+						unprepared,
+						unchanged).m_Error ==
+						ValidationError::
+							UnpreparedMeshQuantizationContext &&
+					unchanged == sentinel &&
+					mesher.PolygonizeTetrahedron(
+						malformedCorners,
+						0,
+						quantizationContext,
+						unchanged).m_Error ==
+						ValidationError::
+							InvalidReferenceTetrahedron &&
+					unchanged == sentinel,
+				"Invalid tetrahedron inputs fail without publishing output");
 		}
 	}
 
@@ -978,5 +1518,6 @@ namespace gglab
 		RunReferenceTopologyContractTests(context);
 		RunReferenceGradientTests(context);
 		RunReferenceInterpolationTests(context);
+		RunReferenceTetrahedronPolygonizationTests(context);
 	}
 }

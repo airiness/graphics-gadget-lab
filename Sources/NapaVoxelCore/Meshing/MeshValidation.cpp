@@ -116,24 +116,6 @@ namespace napa::voxel
 					MeshNormalLengthTolerance;
 		}
 
-		[[nodiscard]] bool IsWithinTargetChunk(
-			QuantizedMeshPosition position,
-			std::uint32_t chunkCellCount) noexcept
-		{
-			const std::int32_t maximum =
-				static_cast<std::int32_t>(
-					chunkCellCount *
-					static_cast<std::uint32_t>(
-						MeshPositionQuantizationScale));
-			return
-				position.m_X >= 0 &&
-				position.m_Y >= 0 &&
-				position.m_Z >= 0 &&
-				position.m_X <= maximum &&
-				position.m_Y <= maximum &&
-				position.m_Z <= maximum;
-		}
-
 		[[nodiscard]] double ComputeTriangleDoubleAreaSquaredInVoxelUnits(
 			Float3 a,
 			Float3 b,
@@ -282,21 +264,107 @@ namespace napa::voxel
 			};
 		}
 
+		const std::int64_t chunkCellCount =
+			config.m_ChunkCellCount;
+		const std::int64_t originX =
+			static_cast<std::int64_t>(chunk.m_X) *
+			chunkCellCount;
+		const std::int64_t originY =
+			static_cast<std::int64_t>(chunk.m_Y) *
+			chunkCellCount;
+		const std::int64_t originZ =
+			static_cast<std::int64_t>(chunk.m_Z) *
+			chunkCellCount;
+		const std::int64_t endX = originX + chunkCellCount;
+		const std::int64_t endY = originY + chunkCellCount;
+		const std::int64_t endZ = originZ + chunkCellCount;
+
+		const std::int64_t localMinimumX =
+			std::max(
+				originX,
+				static_cast<std::int64_t>(
+					config.m_LogicalCellBounds.m_Min.m_X)) -
+			originX;
+		const std::int64_t localMinimumY =
+			std::max(
+				originY,
+				static_cast<std::int64_t>(
+					config.m_LogicalCellBounds.m_Min.m_Y)) -
+			originY;
+		const std::int64_t localMinimumZ =
+			std::max(
+				originZ,
+				static_cast<std::int64_t>(
+					config.m_LogicalCellBounds.m_Min.m_Z)) -
+			originZ;
+		const std::int64_t localMaximumX =
+			std::min(
+				endX,
+				static_cast<std::int64_t>(
+					config.m_LogicalCellBounds.m_MaxExclusive.m_X)) -
+			originX;
+		const std::int64_t localMaximumY =
+			std::min(
+				endY,
+				static_cast<std::int64_t>(
+					config.m_LogicalCellBounds.m_MaxExclusive.m_Y)) -
+			originY;
+		const std::int64_t localMaximumZ =
+			std::min(
+				endZ,
+				static_cast<std::int64_t>(
+					config.m_LogicalCellBounds.m_MaxExclusive.m_Z)) -
+			originZ;
+
+		const std::int64_t quantizationScale =
+			static_cast<std::int64_t>(
+				MeshPositionQuantizationScale);
 		MeshQuantizationContext prepared;
 		prepared.m_InverseVoxelSize =
 			1.0 / static_cast<double>(config.m_VoxelSize);
 		prepared.m_ChunkOriginVoxelX =
-			static_cast<double>(chunk.m_X) *
-			static_cast<double>(config.m_ChunkCellCount);
+			static_cast<double>(originX);
 		prepared.m_ChunkOriginVoxelY =
-			static_cast<double>(chunk.m_Y) *
-			static_cast<double>(config.m_ChunkCellCount);
+			static_cast<double>(originY);
 		prepared.m_ChunkOriginVoxelZ =
-			static_cast<double>(chunk.m_Z) *
-			static_cast<double>(config.m_ChunkCellCount);
+			static_cast<double>(originZ);
+		prepared.m_TargetCellDomainMin = {
+			static_cast<std::int32_t>(
+				localMinimumX * quantizationScale),
+			static_cast<std::int32_t>(
+				localMinimumY * quantizationScale),
+			static_cast<std::int32_t>(
+				localMinimumZ * quantizationScale),
+		};
+		prepared.m_TargetCellDomainMax = {
+			static_cast<std::int32_t>(
+				localMaximumX * quantizationScale),
+			static_cast<std::int32_t>(
+				localMaximumY * quantizationScale),
+			static_cast<std::int32_t>(
+				localMaximumZ * quantizationScale),
+		};
 		prepared.m_IsPrepared = true;
 		context = prepared;
 		return {};
+	}
+
+	bool MeshQuantizationContext::IsPrepared() const noexcept
+	{
+		return m_IsPrepared;
+	}
+
+	bool MeshQuantizationContext::ContainsTargetCellDomain(
+		QuantizedMeshPosition position) const noexcept
+	{
+		return
+			m_IsPrepared &&
+			position.m_X >= m_TargetCellDomainMin.m_X &&
+			position.m_Y >= m_TargetCellDomainMin.m_Y &&
+			position.m_Z >= m_TargetCellDomainMin.m_Z &&
+			position.m_X <= m_TargetCellDomainMax.m_X &&
+			position.m_Y <= m_TargetCellDomainMax.m_Y &&
+			position.m_Z <= m_TargetCellDomainMax.m_Z;
 	}
 
 	ValidationResult QuantizeMeshPosition(
@@ -390,6 +458,40 @@ namespace napa::voxel
 		return {};
 	}
 
+	ValidationResult ValidateMeshTriangleArea(
+		Float3 a,
+		Float3 b,
+		Float3 c,
+		float voxelSize) noexcept
+	{
+		if (!IsFinite(a) || !IsFinite(b) || !IsFinite(c))
+		{
+			return { ValidationError::NonFiniteMeshVertex };
+		}
+		if (!std::isfinite(voxelSize))
+		{
+			return { ValidationError::NonFiniteVoxelSize };
+		}
+		if (voxelSize <= 0.0f)
+		{
+			return { ValidationError::NonPositiveVoxelSize };
+		}
+
+		const double doubleAreaSquared =
+			ComputeTriangleDoubleAreaSquaredInVoxelUnits(
+				a,
+				b,
+				c,
+				1.0 / static_cast<double>(voxelSize));
+		if (!std::isfinite(doubleAreaSquared) ||
+			doubleAreaSquared <=
+				MinimumMeshTriangleDoubleAreaSquared)
+		{
+			return { ValidationError::DegenerateMeshTriangle };
+		}
+		return {};
+	}
+
 	ValidationResult ValidateAndHashChunkMesh(
 		const MeshData& mesh,
 		const VoxelWorldConfig& config,
@@ -406,9 +508,6 @@ namespace napa::voxel
 		{
 			return contextResult;
 		}
-		const double inverseVoxelSize =
-			1.0 / static_cast<double>(config.m_VoxelSize);
-
 		if (!HasValidBoundsShape(mesh.m_Bounds))
 		{
 			return { ValidationError::InvalidMeshBounds };
@@ -457,12 +556,12 @@ namespace napa::voxel
 			{
 				return positionResult;
 			}
-			if (!IsWithinTargetChunk(
-				quantizedVertex.m_Position,
-				config.m_ChunkCellCount))
+			if (!quantizationContext.ContainsTargetCellDomain(
+				quantizedVertex.m_Position))
 			{
 				return {
-					ValidationError::MeshGeometryOutsideTargetChunk,
+					ValidationError::
+						MeshGeometryOutsideTargetCellDomain,
 				};
 			}
 			const ValidationResult normalResult =
@@ -553,17 +652,15 @@ namespace napa::voxel
 				const MeshVertex& vertexA = mesh.m_Vertices[indexA];
 				const MeshVertex& vertexB = mesh.m_Vertices[indexB];
 				const MeshVertex& vertexC = mesh.m_Vertices[indexC];
-				const double doubleAreaSquared =
-					ComputeTriangleDoubleAreaSquaredInVoxelUnits(
+				const ValidationResult areaResult =
+					ValidateMeshTriangleArea(
 						vertexA.m_Position,
 						vertexB.m_Position,
 						vertexC.m_Position,
-						inverseVoxelSize);
-				if (!std::isfinite(doubleAreaSquared) ||
-					doubleAreaSquared <=
-						MinimumMeshTriangleDoubleAreaSquared)
+						config.m_VoxelSize);
+				if (areaResult.Failed())
 				{
-					return { ValidationError::DegenerateMeshTriangle };
+					return areaResult;
 				}
 
 				if (!HasOutwardWinding(
@@ -600,15 +697,14 @@ namespace napa::voxel
 			{
 				return maximumResult;
 			}
-			if (!IsWithinTargetChunk(
-					quantizedBounds.m_Min,
-					config.m_ChunkCellCount) ||
-				!IsWithinTargetChunk(
-					quantizedBounds.m_Max,
-					config.m_ChunkCellCount))
+			if (!quantizationContext.ContainsTargetCellDomain(
+					quantizedBounds.m_Min) ||
+				!quantizationContext.ContainsTargetCellDomain(
+					quantizedBounds.m_Max))
 			{
 				return {
-					ValidationError::MeshGeometryOutsideTargetChunk,
+					ValidationError::
+						MeshGeometryOutsideTargetCellDomain,
 				};
 			}
 		}
