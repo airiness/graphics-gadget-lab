@@ -19,8 +19,6 @@ namespace gglab
 			view.m_Name = name;
 			view.m_ViewId = viewId;
 			view.m_IsValid = true;
-			// The field describes the active projection. Main-view Reversed-Z is
-			// enabled later as one atomic projection/resource/state migration.
 			view.m_DepthConvention = DepthConvention::Standard;
 
 			view.m_View = camera.GetViewMatrix();

@@ -27,6 +27,12 @@ namespace gglab
 		ReadWrite,
 	};
 
+	enum class RGOrderingRequirement : uint8_t
+	{
+		Ordered,
+		Unordered,
+	};
+
 	enum class RGDependencyReason : uint8_t
 	{
 		// Liveness dependency: the consumer needs contents produced by the writer.
@@ -58,7 +64,9 @@ namespace gglab
 		RenderTarget,
 		DepthStencilWrite,
 		DepthStencilRead,
-		UnorderedAccess,
+		StorageRead,
+		StorageWrite,
+		StorageReadWrite,
 		CopySource,
 		CopyDest,
 		Present,
@@ -71,11 +79,73 @@ namespace gglab
 		Index,
 		Constant,
 		StructuredRead,
-		UnorderedAccess,
+		StorageRead,
+		StorageWrite,
+		StorageReadWrite,
 		CopySource,
 		CopyDest,
 		IndirectArgument,
 	};
+
+	[[nodiscard]] constexpr inline bool IsStorageAccess(RGTextureAccess access) noexcept
+	{
+		return access == RGTextureAccess::StorageRead ||
+			access == RGTextureAccess::StorageWrite ||
+			access == RGTextureAccess::StorageReadWrite;
+	}
+
+	[[nodiscard]] constexpr inline bool IsStorageAccess(RGBufferAccess access) noexcept
+	{
+		return access == RGBufferAccess::StorageRead ||
+			access == RGBufferAccess::StorageWrite ||
+			access == RGBufferAccess::StorageReadWrite;
+	}
+
+	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(
+		RGTextureAccess access,
+		RGDependencyAccess dependencyAccess,
+		RGOrderingRequirement ordering) noexcept
+	{
+		if (ordering == RGOrderingRequirement::Unordered && !IsStorageAccess(access))
+		{
+			return false;
+		}
+
+		switch (access)
+		{
+		case RGTextureAccess::StorageRead:
+			return dependencyAccess == RGDependencyAccess::Read;
+		case RGTextureAccess::StorageWrite:
+			return dependencyAccess == RGDependencyAccess::Write;
+		case RGTextureAccess::StorageReadWrite:
+			return dependencyAccess == RGDependencyAccess::ReadWrite;
+		default:
+			return true;
+		}
+	}
+
+	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(
+		RGBufferAccess access,
+		RGDependencyAccess dependencyAccess,
+		RGOrderingRequirement ordering) noexcept
+	{
+		if (ordering == RGOrderingRequirement::Unordered && !IsStorageAccess(access))
+		{
+			return false;
+		}
+
+		switch (access)
+		{
+		case RGBufferAccess::StorageRead:
+			return dependencyAccess == RGDependencyAccess::Read;
+		case RGBufferAccess::StorageWrite:
+			return dependencyAccess == RGDependencyAccess::Write;
+		case RGBufferAccess::StorageReadWrite:
+			return dependencyAccess == RGDependencyAccess::ReadWrite;
+		default:
+			return true;
+		}
+	}
 
 	template<typename RESOURCE>
 	struct RGResourceTraits;
@@ -98,7 +168,7 @@ namespace gglab
 		using Access = RGBufferAccess;
 
 		static constexpr RGBufferAccess DefaultReadAccess = RGBufferAccess::Vertex;
-		static constexpr RGBufferAccess DefaultWriteAccess = RGBufferAccess::UnorderedAccess;
+		static constexpr RGBufferAccess DefaultWriteAccess = RGBufferAccess::StorageWrite;
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
 

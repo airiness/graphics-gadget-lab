@@ -14,6 +14,7 @@ namespace gglab
 		std::string m_ResourceName;
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 		RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
+		RGOrderingRequirement m_Ordering = RGOrderingRequirement::Ordered;
 		uint64_t m_AccessValue = 0;
 		RHIStage m_Stages = RHIStage::None;
 		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;

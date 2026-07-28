@@ -29,5 +29,11 @@ float3 ReconstructPositionFromRawDepth(
 	const float4 homogeneousPosition = mul(
 		float4(ndc, rawDepth, 1.0),
 		inverseTransform);
+	if (!all(isfinite(homogeneousPosition)) ||
+		abs(homogeneousPosition.w) <= 1.0e-8)
+	{
+		return 0.0.xxx;
+	}
+
 	return homogeneousPosition.xyz / homogeneousPosition.w;
 }

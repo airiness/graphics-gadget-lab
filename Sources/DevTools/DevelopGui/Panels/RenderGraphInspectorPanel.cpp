@@ -755,11 +755,12 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (ImGui::BeginTable("SelectedPassAccesses", 8, flags))
+			if (ImGui::BeginTable("SelectedPassAccesses", 9, flags))
 			{
 				ImGui::TableSetupColumn("Resource");
 				ImGui::TableSetupColumn("Type");
 				ImGui::TableSetupColumn("Dependency");
+				ImGui::TableSetupColumn("Ordering");
 				ImGui::TableSetupColumn("Access");
 				ImGui::TableSetupColumn("Stages");
 				ImGui::TableSetupColumn("Range");
@@ -779,16 +780,18 @@ namespace gglab
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(devtools::EnumText(access.m_DependencyAccess).data());
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(accessText.c_str());
+					ImGui::TextUnformatted(devtools::EnumText(access.m_Ordering).data());
 					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(accessText.c_str());
+					ImGui::TableSetColumnIndex(5);
 					const std::string stagesText = devtools::EnumFlagsTextWithBits(access.m_Stages);
 					ImGui::TextUnformatted(stagesText.c_str());
-					ImGui::TableSetColumnIndex(5);
+					ImGui::TableSetColumnIndex(6);
 					const std::string rangeText = devtools::SubresourceRangeText(access.m_Subresources);
 					ImGui::TextUnformatted(rangeText.c_str());
-					ImGui::TableSetColumnIndex(6);
-					ImGui::Text("%u", access.m_ResourceNodeIndex);
 					ImGui::TableSetColumnIndex(7);
+					ImGui::Text("%u", access.m_ResourceNodeIndex);
+					ImGui::TableSetColumnIndex(8);
 					ImGui::Text("%u", access.m_ResourceVersion);
 				}
 
