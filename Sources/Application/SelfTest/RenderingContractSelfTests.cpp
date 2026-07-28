@@ -26,6 +26,12 @@ namespace gglab
 			RGBufferId m_Buffer;
 		};
 
+		struct DualStorageAccessPassData
+		{
+			RGBufferId m_FirstBuffer;
+			RGBufferId m_SecondBuffer;
+		};
+
 		[[nodiscard]] bool NearlyEqual(
 			float lhs,
 			float rhs,
@@ -288,6 +294,130 @@ namespace gglab
 
 		void RunRenderGraphAccessAndBarrierContractTests(SelfTestContext& context) noexcept
 		{
+			struct TextureCompatibilityRow
+			{
+				RGTextureAccess m_Access;
+				std::array<bool, 3> m_DependencyAccesses;
+			};
+			constexpr std::array TextureCompatibility =
+			{
+				TextureCompatibilityRow{ RGTextureAccess::None, { false, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::Sample, { true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::RenderTarget, { false, true, true } },
+				TextureCompatibilityRow{ RGTextureAccess::DepthStencilWrite, { false, true, true } },
+				TextureCompatibilityRow{ RGTextureAccess::DepthStencilRead, { true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::StorageRead, { true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::StorageWrite, { false, true, false } },
+				TextureCompatibilityRow{ RGTextureAccess::StorageReadWrite, { false, false, true } },
+				TextureCompatibilityRow{ RGTextureAccess::CopySource, { true, false, false } },
+				TextureCompatibilityRow{ RGTextureAccess::CopyDest, { false, true, false } },
+				TextureCompatibilityRow{ RGTextureAccess::Present, { false, false, false } },
+			};
+			struct BufferCompatibilityRow
+			{
+				RGBufferAccess m_Access;
+				std::array<bool, 3> m_DependencyAccesses;
+			};
+			constexpr std::array BufferCompatibility =
+			{
+				BufferCompatibilityRow{ RGBufferAccess::None, { false, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::Vertex, { true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::Index, { true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::Constant, { true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StructuredRead, { true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StorageRead, { true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StorageWrite, { false, true, false } },
+				BufferCompatibilityRow{ RGBufferAccess::StorageReadWrite, { false, false, true } },
+				BufferCompatibilityRow{ RGBufferAccess::CopySource, { true, false, false } },
+				BufferCompatibilityRow{ RGBufferAccess::CopyDest, { false, true, false } },
+				BufferCompatibilityRow{ RGBufferAccess::IndirectArgument, { true, false, false } },
+			};
+			constexpr std::array DependencyAccesses =
+			{
+				RGDependencyAccess::Read,
+				RGDependencyAccess::Write,
+				RGDependencyAccess::ReadWrite,
+			};
+			static_assert(TextureCompatibility.size() ==
+				static_cast<size_t>(RGTextureAccess::Present) + 1);
+			static_assert(BufferCompatibility.size() ==
+				static_cast<size_t>(RGBufferAccess::IndirectArgument) + 1);
+
+			bool completeCompatibilityMatrixMatches = true;
+			for (const auto& row : TextureCompatibility)
+			{
+				for (size_t accessIndex = 0; accessIndex < DependencyAccesses.size(); ++accessIndex)
+				{
+					const auto dependencyAccess = DependencyAccesses[accessIndex];
+					completeCompatibilityMatrixMatches &=
+						IsRGAccessCompatible(
+							row.m_Access,
+							dependencyAccess,
+							RGOrderingRequirement::Ordered) ==
+							row.m_DependencyAccesses[accessIndex];
+					completeCompatibilityMatrixMatches &=
+						IsRGAccessCompatible(
+							row.m_Access,
+							dependencyAccess,
+							RGOrderingRequirement::Unordered) ==
+							(row.m_DependencyAccesses[accessIndex] && IsStorageAccess(row.m_Access));
+				}
+			}
+			for (const auto& row : BufferCompatibility)
+			{
+				for (size_t accessIndex = 0; accessIndex < DependencyAccesses.size(); ++accessIndex)
+				{
+					const auto dependencyAccess = DependencyAccesses[accessIndex];
+					completeCompatibilityMatrixMatches &=
+						IsRGAccessCompatible(
+							row.m_Access,
+							dependencyAccess,
+							RGOrderingRequirement::Ordered) ==
+							row.m_DependencyAccesses[accessIndex];
+					completeCompatibilityMatrixMatches &=
+						IsRGAccessCompatible(
+							row.m_Access,
+							dependencyAccess,
+							RGOrderingRequirement::Unordered) ==
+							(row.m_DependencyAccesses[accessIndex] && IsStorageAccess(row.m_Access));
+				}
+			}
+			context.Check(
+				completeCompatibilityMatrixMatches,
+				"RenderGraph validates the complete texture and buffer access compatibility matrix");
+
+			bool orderedUavMatrixMatches = true;
+			for (const auto beforeAccess : DependencyAccesses)
+			{
+				for (const auto afterAccess : DependencyAccesses)
+				{
+					const bool expected =
+						beforeAccess != RGDependencyAccess::Read ||
+						afterAccess != RGDependencyAccess::Read;
+					orderedUavMatrixMatches &=
+						NeedsOrderedUavBarrier(
+							beforeAccess,
+							RGOrderingRequirement::Ordered,
+							afterAccess,
+							RGOrderingRequirement::Ordered) == expected;
+					orderedUavMatrixMatches &=
+						!NeedsOrderedUavBarrier(
+							beforeAccess,
+							RGOrderingRequirement::Unordered,
+							afterAccess,
+							RGOrderingRequirement::Ordered);
+					orderedUavMatrixMatches &=
+						!NeedsOrderedUavBarrier(
+							beforeAccess,
+							RGOrderingRequirement::Ordered,
+							afterAccess,
+							RGOrderingRequirement::Unordered);
+				}
+			}
+			context.Check(
+				orderedUavMatrixMatches,
+				"Ordered UAV hazards cover the complete read, write, and read-write matrix");
+
 			const RHIResourceState textureStorageState =
 				ToRHIResourceState(RGTextureAccess::StorageRead);
 			const RHIResourceState bufferStorageState =
@@ -444,17 +574,101 @@ namespace gglab
 				"Read-write storage access participates in incoming and outgoing dependencies");
 			context.Check(
 				!initialWrite.m_PreBarriers.empty() &&
-					!storageRead.m_PreBarriers.empty() &&
-					!secondWrite.m_PreBarriers.empty() &&
-					!storageReadWrite.m_PreBarriers.empty() &&
-					!finalRead.m_PreBarriers.empty(),
-				"Storage access split preserves conservative UAV barrier coverage");
+					initialWrite.m_PreBarriers[0].m_Kind == RGBarrierKind::Transition &&
+					storageRead.m_PreBarriers.empty() &&
+					secondWrite.m_PreBarriers.size() == 1 &&
+					secondWrite.m_PreBarriers[0].m_Kind == RGBarrierKind::Uav &&
+					storageReadWrite.m_PreBarriers.size() == 1 &&
+					storageReadWrite.m_PreBarriers[0].m_Kind == RGBarrierKind::Uav &&
+					finalRead.m_PreBarriers.size() == 1 &&
+					finalRead.m_PreBarriers[0].m_Kind == RGBarrierKind::Uav,
+				"Storage barriers distinguish transitions, ordered hazards, and explicit unordered access");
 			context.Check(
 				unusedWrite.m_Culled &&
 					unusedWrite.m_ExecutionOrder < 0 &&
 					unusedWrite.m_PreBarriers.empty() &&
 					unusedWrite.m_PostBarriers.empty(),
 				"Culled storage writers leave no execution or barrier work");
+
+			RenderGraph transitionGraph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			RGBufferId transitionBuffer;
+			transitionGraph.AddPass<StorageAccessPassData>(
+				"TransitionStorageWrite",
+				[&transitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					transitionBuffer = builder.CreateBuffer("TransitionBuffer");
+					builder.WriteInPlace(transitionBuffer, RGBufferAccess::StorageWrite);
+					data.m_Buffer = transitionBuffer;
+				});
+			transitionGraph.AddPass<StorageAccessPassData>(
+				"TransitionStructuredRead",
+				[&transitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.Read(transitionBuffer, RGBufferAccess::StructuredRead);
+					builder.SideEffect();
+				});
+			const bool transitionCompiled = transitionGraph.Compile();
+			context.Check(transitionCompiled, "UAV-to-SRV transition fixture compiles");
+			if (transitionCompiled)
+			{
+				RGSnapshot transitionSnapshot;
+				BuildRenderGraphSnapshot(transitionGraph, transitionSnapshot);
+				const auto& barriers = transitionSnapshot.m_Passes[1].m_PreBarriers;
+				context.Check(
+					barriers.size() == 1 &&
+						barriers[0].m_Kind == RGBarrierKind::Transition &&
+						barriers[0].m_Reason == RGBarrierReason::AccessTransition,
+					"UAV-to-SRV edges emit one transition without a duplicate UAV barrier");
+			}
+
+			RenderGraph resourceSpecificGraph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			RGBufferId firstBuffer;
+			RGBufferId secondBuffer;
+			resourceSpecificGraph.AddPass<DualStorageAccessPassData>(
+				"WriteTwoStorageBuffers",
+				[&](RenderGraph::RGBuilder& builder, DualStorageAccessPassData& data)
+				{
+					firstBuffer = builder.CreateBuffer("FirstStorageBuffer");
+					secondBuffer = builder.CreateBuffer("SecondStorageBuffer");
+					builder.WriteInPlace(firstBuffer, RGBufferAccess::StorageWrite);
+					builder.WriteInPlace(secondBuffer, RGBufferAccess::StorageWrite);
+					data.m_FirstBuffer = firstBuffer;
+					data.m_SecondBuffer = secondBuffer;
+				});
+			resourceSpecificGraph.AddPass<DualStorageAccessPassData>(
+				"ReadWriteTwoStorageBuffers",
+				[&](RenderGraph::RGBuilder& builder, DualStorageAccessPassData& data)
+				{
+					builder.ReadWriteInPlace(firstBuffer, RGBufferAccess::StorageReadWrite);
+					builder.ReadWriteInPlace(secondBuffer, RGBufferAccess::StorageReadWrite);
+					data.m_FirstBuffer = firstBuffer;
+					data.m_SecondBuffer = secondBuffer;
+					builder.SideEffect();
+				});
+			const bool resourceSpecificCompiled = resourceSpecificGraph.Compile();
+			context.Check(resourceSpecificCompiled, "Resource-specific UAV barrier fixture compiles");
+			if (resourceSpecificCompiled)
+			{
+				RGSnapshot resourceSpecificSnapshot;
+				BuildRenderGraphSnapshot(resourceSpecificGraph, resourceSpecificSnapshot);
+				const auto& barriers = resourceSpecificSnapshot.m_Passes[1].m_PreBarriers;
+				context.Check(
+					barriers.size() == 2 &&
+						barriers[0].m_Kind == RGBarrierKind::Uav &&
+						barriers[1].m_Kind == RGBarrierKind::Uav &&
+						barriers[0].m_VirtualResourceIndex != barriers[1].m_VirtualResourceIndex,
+					"Each ordered UAV hazard retains its own resource identity for physical resolution");
+			}
 		}
 
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept

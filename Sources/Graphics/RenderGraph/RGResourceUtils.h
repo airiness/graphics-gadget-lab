@@ -19,9 +19,23 @@ namespace gglab
 		return Test(state.m_Access, RHIAccess::UnorderedAccess);
 	}
 
-	constexpr inline bool NeedsRHIResourceBarrier(const RHIResourceState& before, const RHIResourceState& after) noexcept
+	constexpr inline bool NeedsRHIResourceTransition(
+		const RHIResourceState& before,
+		const RHIResourceState& after) noexcept
 	{
-		return before != after || (HasUavAccess(before) && HasUavAccess(after));
+		return before != after;
+	}
+
+	constexpr inline bool NeedsOrderedUavBarrier(
+		RGDependencyAccess beforeAccess,
+		RGOrderingRequirement beforeOrdering,
+		RGDependencyAccess afterAccess,
+		RGOrderingRequirement afterOrdering) noexcept
+	{
+		return beforeOrdering == RGOrderingRequirement::Ordered &&
+			afterOrdering == RGOrderingRequirement::Ordered &&
+			(beforeAccess != RGDependencyAccess::Read ||
+				afterAccess != RGDependencyAccess::Read);
 	}
 
 	constexpr inline RHIStage ToRHIStages(RGTextureAccess access) noexcept

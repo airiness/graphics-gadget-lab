@@ -48,6 +48,19 @@ namespace gglab
 		ExportReaderToExport,
 	};
 
+	enum class RGBarrierKind : uint8_t
+	{
+		Transition,
+		Uav,
+	};
+
+	enum class RGBarrierReason : uint8_t
+	{
+		AccessTransition,
+		OrderedStorageHazard,
+		FinalStateTransition,
+	};
+
 	[[nodiscard]] constexpr inline bool IsRGLivenessDependency(RGDependencyReason reason) noexcept
 	{
 		return reason == RGDependencyReason::WriterToReader ||
@@ -113,15 +126,25 @@ namespace gglab
 
 		switch (access)
 		{
+		case RGTextureAccess::None:
+		case RGTextureAccess::Present:
+			return false;
+		case RGTextureAccess::Sample:
+		case RGTextureAccess::DepthStencilRead:
+		case RGTextureAccess::CopySource:
 		case RGTextureAccess::StorageRead:
 			return dependencyAccess == RGDependencyAccess::Read;
+		case RGTextureAccess::RenderTarget:
+		case RGTextureAccess::DepthStencilWrite:
+			return dependencyAccess == RGDependencyAccess::Write ||
+				dependencyAccess == RGDependencyAccess::ReadWrite;
+		case RGTextureAccess::CopyDest:
 		case RGTextureAccess::StorageWrite:
 			return dependencyAccess == RGDependencyAccess::Write;
 		case RGTextureAccess::StorageReadWrite:
 			return dependencyAccess == RGDependencyAccess::ReadWrite;
-		default:
-			return true;
 		}
+		GGLAB_UNREACHABLE("Unhandled RGTextureAccess.");
 	}
 
 	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(
@@ -136,15 +159,23 @@ namespace gglab
 
 		switch (access)
 		{
+		case RGBufferAccess::None:
+			return false;
+		case RGBufferAccess::Vertex:
+		case RGBufferAccess::Index:
+		case RGBufferAccess::Constant:
+		case RGBufferAccess::StructuredRead:
+		case RGBufferAccess::CopySource:
+		case RGBufferAccess::IndirectArgument:
 		case RGBufferAccess::StorageRead:
 			return dependencyAccess == RGDependencyAccess::Read;
+		case RGBufferAccess::CopyDest:
 		case RGBufferAccess::StorageWrite:
 			return dependencyAccess == RGDependencyAccess::Write;
 		case RGBufferAccess::StorageReadWrite:
 			return dependencyAccess == RGDependencyAccess::ReadWrite;
-		default:
-			return true;
 		}
+		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");
 	}
 
 	template<typename RESOURCE>

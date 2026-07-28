@@ -689,13 +689,16 @@ namespace gglab
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
-			if (!ImGui::BeginTable(label, 5, flags))
+			if (!ImGui::BeginTable(label, 8, flags))
 			{
 				return;
 			}
 
 			ImGui::TableSetupColumn("Resource");
 			ImGui::TableSetupColumn("Type");
+			ImGui::TableSetupColumn("Kind");
+			ImGui::TableSetupColumn("Physical");
+			ImGui::TableSetupColumn("Reason");
 			ImGui::TableSetupColumn("Before");
 			ImGui::TableSetupColumn("After");
 			ImGui::TableSetupColumn("Range");
@@ -706,6 +709,9 @@ namespace gglab
 				const std::string before = devtools::BarrierStateText(barrier.m_Before);
 				const std::string after = devtools::BarrierStateText(barrier.m_After);
 				const std::string range = devtools::SubresourceRangeText(barrier.m_Subresources);
+				const std::string physical = barrier.m_HasPhysicalHandle ?
+					std::format("{}:{}", barrier.m_PhysicalHandleIndex, barrier.m_PhysicalHandleGeneration) :
+					"Pending";
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -713,10 +719,16 @@ namespace gglab
 				ImGui::TableSetColumnIndex(1);
 				ImGui::TextUnformatted(devtools::EnumText(barrier.m_ResourceType).data());
 				ImGui::TableSetColumnIndex(2);
-				ImGui::TextUnformatted(before.c_str());
+				ImGui::TextUnformatted(devtools::EnumText(barrier.m_Kind).data());
 				ImGui::TableSetColumnIndex(3);
-				ImGui::TextUnformatted(after.c_str());
+				ImGui::TextUnformatted(physical.c_str());
 				ImGui::TableSetColumnIndex(4);
+				ImGui::TextUnformatted(devtools::EnumText(barrier.m_Reason).data());
+				ImGui::TableSetColumnIndex(5);
+				ImGui::TextUnformatted(before.c_str());
+				ImGui::TableSetColumnIndex(6);
+				ImGui::TextUnformatted(after.c_str());
+				ImGui::TableSetColumnIndex(7);
 				ImGui::TextUnformatted(range.c_str());
 			}
 
