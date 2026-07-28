@@ -15,6 +15,15 @@ namespace gglab::devtools
 	};
 
 	template<>
+	struct EnumTextTraits<RGOrderingRequirement>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGOrderingRequirement::Ordered, "Ordered" },
+			EnumTextEntry{ RGOrderingRequirement::Unordered, "Unordered" },
+		};
+	};
+
+	template<>
 	struct EnumTextTraits<RGDependencyAccess>
 	{
 		static constexpr std::array Entries = {
@@ -45,7 +54,9 @@ namespace gglab::devtools
 			EnumTextEntry{ RGTextureAccess::RenderTarget, "RTV" },
 			EnumTextEntry{ RGTextureAccess::DepthStencilWrite, "DSV Write" },
 			EnumTextEntry{ RGTextureAccess::DepthStencilRead, "DSV Read" },
-			EnumTextEntry{ RGTextureAccess::UnorderedAccess, "UAV" },
+			EnumTextEntry{ RGTextureAccess::StorageRead, "Storage Read" },
+			EnumTextEntry{ RGTextureAccess::StorageWrite, "Storage Write" },
+			EnumTextEntry{ RGTextureAccess::StorageReadWrite, "Storage ReadWrite" },
 			EnumTextEntry{ RGTextureAccess::CopySource, "CopySrc" },
 			EnumTextEntry{ RGTextureAccess::CopyDest, "CopyDst" },
 			EnumTextEntry{ RGTextureAccess::Present, "Present" },
@@ -61,7 +72,9 @@ namespace gglab::devtools
 			EnumTextEntry{ RGBufferAccess::Index, "Index" },
 			EnumTextEntry{ RGBufferAccess::Constant, "Constant" },
 			EnumTextEntry{ RGBufferAccess::StructuredRead, "StructuredRead" },
-			EnumTextEntry{ RGBufferAccess::UnorderedAccess, "UAV" },
+			EnumTextEntry{ RGBufferAccess::StorageRead, "Storage Read" },
+			EnumTextEntry{ RGBufferAccess::StorageWrite, "Storage Write" },
+			EnumTextEntry{ RGBufferAccess::StorageReadWrite, "Storage ReadWrite" },
 			EnumTextEntry{ RGBufferAccess::CopySource, "CopySrc" },
 			EnumTextEntry{ RGBufferAccess::CopyDest, "CopyDst" },
 			EnumTextEntry{ RGBufferAccess::IndirectArgument, "IndirectArgument" },

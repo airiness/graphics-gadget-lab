@@ -121,6 +121,7 @@ namespace gglab
 			RHIStage m_Stages = RHIStage::None;
 			RGResourceType m_ResourceType = RGResourceType::RGTexture;
 			RGDependencyAccess m_DependencyAccess = RGDependencyAccess::Read;
+			RGOrderingRequirement m_Ordering = RGOrderingRequirement::Ordered;
 			std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
 		};
 
@@ -216,37 +217,43 @@ namespace gglab
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultReadAccess,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
 				return m_RG.ReadInternal<RESOURCE>(
 					m_PassNodeIndex,
 					resourceId,
 					access,
 					ToRHIStages(access),
-					subresources);
+					subresources,
+					ordering);
 			}
 
 			template<typename RESOURCE>
 			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
+				return m_RG.ReadInternal<RESOURCE>(
+					m_PassNodeIndex, resourceId, access, stages, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
 			[[nodiscard("Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
 				return m_RG.WriteInternal<RESOURCE>(
 					m_PassNodeIndex,
 					resourceId,
 					access,
 					ToRHIStages(access),
-					subresources);
+					subresources,
+					ordering);
 			}
 
 			template<typename RESOURCE>
@@ -254,40 +261,46 @@ namespace gglab
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
+				return m_RG.WriteInternal<RESOURCE>(
+					m_PassNodeIndex, resourceId, access, stages, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
 			void WriteInPlace(RGResourceId<RESOURCE>& resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				resourceId = Write(resourceId, access, subresources);
+				resourceId = Write(resourceId, access, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
 			void WriteInPlace(RGResourceId<RESOURCE>& resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				resourceId = Write(resourceId, access, stages, subresources);
+				resourceId = Write(resourceId, access, stages, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
 			[[nodiscard("ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
 				return m_RG.ReadWriteInternal<RESOURCE>(
 					m_PassNodeIndex,
 					resourceId,
 					access,
 					ToRHIStages(access),
-					subresources);
+					subresources,
+					ordering);
 			}
 
 			template<typename RESOURCE>
@@ -295,26 +308,30 @@ namespace gglab
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access, stages, subresources);
+				return m_RG.ReadWriteInternal<RESOURCE>(
+					m_PassNodeIndex, resourceId, access, stages, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
 			void ReadWriteInPlace(RGResourceId<RESOURCE>& resourceId,
 				typename RESOURCE::Access access,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				resourceId = ReadWrite(resourceId, access, subresources);
+				resourceId = ReadWrite(resourceId, access, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
 			void ReadWriteInPlace(RGResourceId<RESOURCE>& resourceId,
 				typename RESOURCE::Access access,
 				RHIStage stages,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
+				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				resourceId = ReadWrite(resourceId, access, stages, subresources);
+				resourceId = ReadWrite(resourceId, access, stages, subresources, ordering);
 			}
 
 			template<typename RESOURCE>
@@ -406,21 +423,24 @@ namespace gglab
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
 			RHIStage stages,
-			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+			RGOrderingRequirement ordering) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> WriteInternal(RGPassNodeIndex passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
 			RHIStage stages,
-			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+			RGOrderingRequirement ordering) noexcept;
 
 		template<typename RESOURCE>
 		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNodeIndex passNodeIndex,
 			RGResourceId<RESOURCE> resourceId,
 			RESOURCE::Access access,
 			RHIStage stages,
-			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
+			std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+			RGOrderingRequirement ordering) noexcept;
 
 		template<typename RESOURCE>
 		void ExportInternal(RGPassNodeIndex passNodeIndex,
@@ -641,11 +661,17 @@ namespace gglab
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
 		RHIStage stages,
-		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+		RGOrderingRequirement ordering) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
 		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Read requires a non-empty pipeline stage.");
-		if (!resourceId.IsValid() || stages == RHIStage::None)
+		GGLAB_ASSERT_MSG(
+			IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Read, ordering),
+			"Read access is incompatible with its storage or ordering semantics.");
+		if (!resourceId.IsValid() ||
+			stages == RHIStage::None ||
+			!IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Read, ordering))
 		{
 			m_BuildValid = false;
 			return {};
@@ -680,6 +706,7 @@ namespace gglab
 		access.m_Stages = stages;
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Read;
+		access.m_Ordering = ordering;
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 		{
 			access.m_Subresources = subresources;
@@ -747,11 +774,17 @@ namespace gglab
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
 		RHIStage stages,
-		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+		RGOrderingRequirement ordering) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
 		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Write requires a non-empty pipeline stage.");
-		if (!resourceId.IsValid() || stages == RHIStage::None)
+		GGLAB_ASSERT_MSG(
+			IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Write, ordering),
+			"Write access is incompatible with its storage or ordering semantics.");
+		if (!resourceId.IsValid() ||
+			stages == RHIStage::None ||
+			!IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Write, ordering))
 		{
 			m_BuildValid = false;
 			return {};
@@ -805,6 +838,7 @@ namespace gglab
 		access.m_Stages = stages;
 		access.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		access.m_DependencyAccess = RGDependencyAccess::Write;
+		access.m_Ordering = ordering;
 		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 		{
 			access.m_Subresources = subresources;
@@ -819,11 +853,17 @@ namespace gglab
 		RGResourceId<RESOURCE> resourceId,
 		typename RESOURCE::Access resourceAccess,
 		RHIStage stages,
-		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
+		std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+		RGOrderingRequirement ordering) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read-write valid resource.");
 		GGLAB_ASSERT_MSG(stages != RHIStage::None, "ReadWrite requires a non-empty pipeline stage.");
-		if (!resourceId.IsValid() || stages == RHIStage::None)
+		GGLAB_ASSERT_MSG(
+			IsRGAccessCompatible(resourceAccess, RGDependencyAccess::ReadWrite, ordering),
+			"ReadWrite access is incompatible with its storage or ordering semantics.");
+		if (!resourceId.IsValid() ||
+			stages == RHIStage::None ||
+			!IsRGAccessCompatible(resourceAccess, RGDependencyAccess::ReadWrite, ordering))
 		{
 			m_BuildValid = false;
 			return {};
@@ -879,6 +919,7 @@ namespace gglab
 				.m_Stages = stages,
 				.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,
 				.m_DependencyAccess = RGDependencyAccess::ReadWrite,
+				.m_Ordering = ordering,
 				.m_Subresources = [&]() -> std::optional<RHISubresourceRange>
 				{
 					if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)

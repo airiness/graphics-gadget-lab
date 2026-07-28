@@ -238,6 +238,7 @@ namespace gglab
 				accessInfo.m_ResourceName = ToSnapshotName(resourceNode.NameId());
 				accessInfo.m_ResourceType = access.m_ResourceType;
 				accessInfo.m_DependencyAccess = access.m_DependencyAccess;
+				accessInfo.m_Ordering = access.m_Ordering;
 				accessInfo.m_AccessValue = access.m_AccessValue;
 				accessInfo.m_Stages = access.m_Stages;
 				accessInfo.m_Subresources = access.m_Subresources;

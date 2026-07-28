@@ -1,7 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
+#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
+#include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
@@ -17,6 +19,11 @@ namespace gglab
 		{
 			Vector2 m_UV = Vector2::Zero;
 			float m_RawDepth = 0.0f;
+		};
+
+		struct StorageAccessPassData
+		{
+			RGBufferId m_Buffer;
 		};
 
 		[[nodiscard]] bool NearlyEqual(
@@ -146,8 +153,18 @@ namespace gglab
 						reversedSample.m_UV,
 						reversedSample.m_RawDepth,
 						math::Inverse(reversedProjection)),
-					positionVS.m_Z),
+					positionVS.m_Z,
+					PositionTolerance),
 				"Raw depth reconstructs positive left-handed view Z");
+			context.Check(
+				NearlyEqual(
+					screen_space::RawDepthToPositiveViewZ(
+						standardSample.m_UV,
+						standardSample.m_RawDepth,
+						math::Inverse(standardProjection)),
+					positionVS.m_Z,
+					PositionTolerance),
+				"Standard-Z raw depth reconstructs positive left-handed view Z");
 
 			const Matrix view = math::CreateLookAtLH(
 				Vector3(3.0f, 2.0f, -4.0f),
@@ -162,7 +179,29 @@ namespace gglab
 				math::Inverse(viewProjection));
 			context.Check(
 				NearlyEqual(reconstructedWorld, positionWS),
-				"Raw depth and inverse view-projection reconstruct world position");
+				"Reversed-Z raw depth reconstructs world position");
+
+			const Matrix standardViewProjection = view * standardProjection;
+			const ProjectedPosition standardWorldSample =
+				ProjectPosition(positionWS, standardViewProjection);
+			const Vector3 reconstructedStandardWorld =
+				screen_space::ReconstructWorldPosition(
+					standardWorldSample.m_UV,
+					standardWorldSample.m_RawDepth,
+					math::Inverse(standardViewProjection));
+			context.Check(
+				NearlyEqual(reconstructedStandardWorld, positionWS),
+				"Standard-Z raw depth reconstructs world position");
+
+			const Matrix degenerateInverseTransform{};
+			context.Check(
+				NearlyEqual(
+					screen_space::ReconstructPositionFromRawDepth(
+						Vector2(0.5f, 0.5f),
+						0.5f,
+						degenerateInverseTransform),
+					Vector3::Zero),
+				"Position reconstruction returns zero when homogeneous W is degenerate");
 		}
 
 		void RunScreenCoordinateTests(SelfTestContext& context) noexcept
@@ -197,7 +236,7 @@ namespace gglab
 
 			context.Check(
 				mainView.m_DepthConvention == DepthConvention::Standard,
-				"Main view records its current Standard-Z contract before atomic migration");
+				"Main view records its Standard-Z contract");
 			context.Check(
 				shadowView.m_DepthConvention == DepthConvention::Standard,
 				"Directional shadow view records its Standard-Z contract");
@@ -231,9 +270,191 @@ namespace gglab
 			RunShaderCompileContractTests(context);
 		}
 
-		// Later roadmap commits add deterministic checks to these focused groups.
-		void RunRenderGraphAccessAndBarrierContractTests(SelfTestContext&) noexcept
+		[[nodiscard]] bool HasDependencyEdge(
+			const RGSnapshot& snapshot,
+			uint32_t fromPass,
+			uint32_t toPass,
+			RGDependencyReason reason) noexcept
 		{
+			return std::ranges::any_of(
+				snapshot.m_DependencyEdges,
+				[=](const RGSnapshotDependencyEdge& edge)
+				{
+					return edge.m_FromPassIndex == static_cast<int32_t>(fromPass) &&
+						edge.m_ToPassIndex == static_cast<int32_t>(toPass) &&
+						edge.m_Reason == reason;
+				});
+		}
+
+		void RunRenderGraphAccessAndBarrierContractTests(SelfTestContext& context) noexcept
+		{
+			const RHIResourceState textureStorageState =
+				ToRHIResourceState(RGTextureAccess::StorageRead);
+			const RHIResourceState bufferStorageState =
+				ToRHIResourceState(RGBufferAccess::StorageRead);
+			context.Check(
+				textureStorageState == ToRHIResourceState(RGTextureAccess::StorageWrite) &&
+					textureStorageState == ToRHIResourceState(RGTextureAccess::StorageReadWrite) &&
+					bufferStorageState == ToRHIResourceState(RGBufferAccess::StorageWrite) &&
+					bufferStorageState == ToRHIResourceState(RGBufferAccess::StorageReadWrite) &&
+					ToRHIUsage(RGTextureAccess::StorageRead) ==
+						RHITextureUsage::UnorderedAccess &&
+					ToRHIUsage(RGTextureAccess::StorageWrite) ==
+						RHITextureUsage::UnorderedAccess &&
+					ToRHIUsage(RGTextureAccess::StorageReadWrite) ==
+						RHITextureUsage::UnorderedAccess &&
+					ToRHIUsage(RGBufferAccess::StorageRead) ==
+						RHIBufferUsage::UnorderedAccess &&
+					ToRHIUsage(RGBufferAccess::StorageWrite) ==
+						RHIBufferUsage::UnorderedAccess &&
+					ToRHIUsage(RGBufferAccess::StorageReadWrite) ==
+						RHIBufferUsage::UnorderedAccess &&
+					HasUavAccess(textureStorageState) &&
+					HasUavAccess(bufferStorageState),
+				"Storage read, write, and read-write accesses map to UAV resource states");
+			context.Check(
+				IsRGAccessCompatible(
+					RGTextureAccess::StorageRead,
+					RGDependencyAccess::Read,
+					RGOrderingRequirement::Ordered) &&
+					IsRGAccessCompatible(
+						RGTextureAccess::StorageWrite,
+						RGDependencyAccess::Write,
+						RGOrderingRequirement::Ordered) &&
+					IsRGAccessCompatible(
+						RGBufferAccess::StorageReadWrite,
+						RGDependencyAccess::ReadWrite,
+						RGOrderingRequirement::Unordered) &&
+					!IsRGAccessCompatible(
+						RGTextureAccess::StorageRead,
+						RGDependencyAccess::Write,
+						RGOrderingRequirement::Ordered) &&
+					!IsRGAccessCompatible(
+						RGBufferAccess::StructuredRead,
+						RGDependencyAccess::Read,
+						RGOrderingRequirement::Unordered),
+				"Storage access and ordering declarations reject incompatible semantics");
+
+			RenderGraph graph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			RGBufferId storageBuffer;
+			graph.AddPass<StorageAccessPassData>(
+				"InitialStorageWrite",
+				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					storageBuffer = builder.CreateBuffer("StorageBuffer");
+					builder.WriteInPlace(storageBuffer, RGBufferAccess::StorageWrite);
+					data.m_Buffer = storageBuffer;
+				});
+			graph.AddPass<StorageAccessPassData>(
+				"StorageRead",
+				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.Read(
+						storageBuffer,
+						RGBufferAccess::StorageRead,
+						std::nullopt,
+						RGOrderingRequirement::Unordered);
+					builder.SideEffect();
+				});
+			graph.AddPass<StorageAccessPassData>(
+				"SecondStorageWrite",
+				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					builder.WriteInPlace(storageBuffer, RGBufferAccess::StorageWrite);
+					data.m_Buffer = storageBuffer;
+				});
+			graph.AddPass<StorageAccessPassData>(
+				"StorageReadWrite",
+				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					builder.ReadWriteInPlace(
+						storageBuffer,
+						RGBufferAccess::StorageReadWrite);
+					data.m_Buffer = storageBuffer;
+				});
+			graph.AddPass<StorageAccessPassData>(
+				"FinalStorageRead",
+				[&storageBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.Read(
+						storageBuffer,
+						RGBufferAccess::StorageRead);
+					builder.SideEffect();
+				});
+			graph.AddPass<StorageAccessPassData>(
+				"UnusedStorageWrite",
+				[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.CreateBuffer("UnusedStorageBuffer");
+					builder.WriteInPlace(data.m_Buffer, RGBufferAccess::StorageWrite);
+				});
+
+			const bool compiled = graph.Compile();
+			context.Check(compiled, "Storage access RenderGraph fixture compiles");
+			if (!compiled)
+			{
+				return;
+			}
+
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const auto& initialWrite = snapshot.m_Passes[0];
+			const auto& storageRead = snapshot.m_Passes[1];
+			const auto& secondWrite = snapshot.m_Passes[2];
+			const auto& storageReadWrite = snapshot.m_Passes[3];
+			const auto& finalRead = snapshot.m_Passes[4];
+			const auto& unusedWrite = snapshot.m_Passes[5];
+
+			context.Check(
+				initialWrite.m_Accesses[0].m_DependencyAccess == RGDependencyAccess::Write &&
+					initialWrite.m_Accesses[0].m_AccessValue ==
+						static_cast<uint64_t>(RGBufferAccess::StorageWrite) &&
+					storageRead.m_Accesses[0].m_DependencyAccess == RGDependencyAccess::Read &&
+					storageRead.m_Accesses[0].m_AccessValue ==
+						static_cast<uint64_t>(RGBufferAccess::StorageRead) &&
+					storageReadWrite.m_Accesses[0].m_DependencyAccess ==
+						RGDependencyAccess::ReadWrite &&
+					storageReadWrite.m_Accesses[0].m_AccessValue ==
+						static_cast<uint64_t>(RGBufferAccess::StorageReadWrite),
+				"Storage access semantics remain distinct in RenderGraph snapshots");
+			context.Check(
+				storageRead.m_Accesses[0].m_Ordering == RGOrderingRequirement::Unordered &&
+					initialWrite.m_Accesses[0].m_Ordering == RGOrderingRequirement::Ordered,
+				"RenderGraph snapshots preserve explicit and default ordering requirements");
+			context.Check(
+				HasDependencyEdge(
+					snapshot, 0, 1, RGDependencyReason::WriterToReader) &&
+					HasDependencyEdge(
+						snapshot, 1, 2, RGDependencyReason::PreviousReaderToWriter),
+				"RenderGraph creates writer-to-reader and reader-to-writer edges");
+			context.Check(
+				HasDependencyEdge(
+					snapshot, 0, 2, RGDependencyReason::PreviousWriterToWriter),
+				"RenderGraph creates writer-to-writer edges");
+			context.Check(
+				HasDependencyEdge(
+					snapshot, 2, 3, RGDependencyReason::WriterToReader) &&
+					HasDependencyEdge(
+						snapshot, 3, 4, RGDependencyReason::WriterToReader),
+				"Read-write storage access participates in incoming and outgoing dependencies");
+			context.Check(
+				!initialWrite.m_PreBarriers.empty() &&
+					!storageRead.m_PreBarriers.empty() &&
+					!secondWrite.m_PreBarriers.empty() &&
+					!storageReadWrite.m_PreBarriers.empty() &&
+					!finalRead.m_PreBarriers.empty(),
+				"Storage access split preserves conservative UAV barrier coverage");
+			context.Check(
+				unusedWrite.m_Culled &&
+					unusedWrite.m_ExecutionOrder < 0 &&
+					unusedWrite.m_PreBarriers.empty() &&
+					unusedWrite.m_PostBarriers.empty(),
+				"Culled storage writers leave no execution or barrier work");
 		}
 
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept

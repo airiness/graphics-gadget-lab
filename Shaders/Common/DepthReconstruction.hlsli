@@ -1,6 +1,7 @@
 #pragma once
 #include <Common/ScreenSpace.hlsli>
 
+// ABI: values must match gglab::DepthConvention.
 static const uint DEPTH_CONVENTION_REVERSED = 0;
 static const uint DEPTH_CONVENTION_STANDARD = 1;
 

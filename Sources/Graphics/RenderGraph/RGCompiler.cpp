@@ -106,6 +106,7 @@ namespace gglab
 						.m_Stages = access.m_Stages,
 						.m_ResourceType = access.m_ResourceType,
 						.m_DependencyAccess = access.m_DependencyAccess,
+						.m_Ordering = access.m_Ordering,
 						.m_Subresources = access.m_Subresources,
 					});
 			}

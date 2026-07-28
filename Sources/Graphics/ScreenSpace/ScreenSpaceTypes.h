@@ -4,14 +4,18 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 namespace gglab
 {
 	enum class DepthConvention : uint8_t
 	{
 		Reversed = 0,
-		Standard,
+		Standard = 1,
 	};
+
+	static_assert(std::to_underlying(DepthConvention::Reversed) == 0);
+	static_assert(std::to_underlying(DepthConvention::Standard) == 1);
 
 	namespace screen_space
 	{
@@ -94,7 +98,10 @@ namespace gglab
 			const Vector4 homogeneousPosition = math::Transform(
 				Vector4(ndc.m_X, ndc.m_Y, rawDepth, 1.0f),
 				inverseTransform);
-			if (!std::isfinite(homogeneousPosition.m_W) ||
+			if (!std::isfinite(homogeneousPosition.m_X) ||
+				!std::isfinite(homogeneousPosition.m_Y) ||
+				!std::isfinite(homogeneousPosition.m_Z) ||
+				!std::isfinite(homogeneousPosition.m_W) ||
 				std::abs(homogeneousPosition.m_W) <= 1.0e-8f)
 			{
 				return Vector3::Zero;
