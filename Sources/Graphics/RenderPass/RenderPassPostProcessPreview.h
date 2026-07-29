@@ -2,6 +2,8 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
+
+#include <optional>
 #include "Graphics/RenderPass/RenderPassBase.h"
 
 namespace gglab
@@ -37,7 +39,7 @@ namespace gglab
 			const RenderServices& services,
 			RGTextureId source,
 			float sourcePreExposure,
-			RHIFormat sourceViewFormat,
+			std::optional<RHITextureViewDesc> sourceViewDesc,
 			PostProcessDebugSelection selection) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer) noexcept;

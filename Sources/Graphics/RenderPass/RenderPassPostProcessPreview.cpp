@@ -1,9 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
+#include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 
@@ -78,15 +78,15 @@ namespace gglab
 			{
 				return;
 			}
-			const auto& resources = rg.GetBlackboard().Get<RGPostProcessResources>(
-				PostProcessResourcesName);
+			const auto& sceneDepth = rg.GetBlackboard().Get<RGSceneDepthResources>(
+				SceneDepthResourcesName);
 			AddResolvedPass(
 				rg,
 				context,
 				services,
-				resources.m_Inputs.m_SceneDepth,
+				sceneDepth.m_Texture,
 				1.0f,
-				resources.m_Inputs.m_SceneDepthSrvFormat,
+				sceneDepth.m_SrvDesc,
 				selection);
 			return;
 		}
@@ -144,7 +144,7 @@ namespace gglab
 			services,
 			source.m_Texture,
 			source.m_PreExposure,
-			RHIFormat::Unknown,
+			std::nullopt,
 			selection);
 	}
 
@@ -153,7 +153,7 @@ namespace gglab
 		const RenderServices& services,
 		RGTextureId source,
 		float sourcePreExposure,
-		RHIFormat sourceViewFormat,
+		std::optional<RHITextureViewDesc> sourceViewDesc,
 		PostProcessDebugSelection selection) noexcept
 	{
 		auto* renderer = services.m_Renderer;
@@ -189,7 +189,7 @@ namespace gglab
 		const auto* contextPtr = &context;
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[source, sourcePreExposure, sourceViewFormat, selection, outputDesc,
+			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc,
 				initialAccess, samplerIndex, previewExposureScale, registry](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
@@ -200,7 +200,7 @@ namespace gglab
 					*outputDesc,
 					initialAccess);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
-				if (sourceViewFormat == RHIFormat::Unknown)
+				if (!sourceViewDesc)
 				{
 					data.m_SourceSrv =
 						builder.CreateView<RHITextureViewType::ShaderResource>(
@@ -208,15 +208,10 @@ namespace gglab
 				}
 				else
 				{
-					const auto srvDesc = MakeRHITexture2DViewDesc(
-						sourceViewFormat,
-						0,
-						1,
-						RHITextureAspect::Depth);
 					data.m_SourceSrv =
 						builder.CreateView<RHITextureViewType::ShaderResource>(
 							data.m_Source,
-							srvDesc);
+							*sourceViewDesc);
 				}
 				data.m_OutputRtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 				builder.Export(data.m_Output, RGTextureAccess::Sample, RHIStage::PixelShader);

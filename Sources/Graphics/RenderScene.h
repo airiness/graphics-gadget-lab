@@ -26,6 +26,7 @@ namespace gglab
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;
 
 		uint32_t m_ObjectOffset = 0;
+		uint32_t m_MaterialOffset = 0;
 
 		Vector3 m_WorldCenterPos = Vector3::Zero;
 		math::Sphere m_WorldBounds{};

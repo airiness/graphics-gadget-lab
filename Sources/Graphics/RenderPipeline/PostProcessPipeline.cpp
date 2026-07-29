@@ -26,10 +26,6 @@ namespace gglab
 					.m_State = PostProcessColorState::SceneLinearRec709,
 					.m_PreExposure = 1.0f,
 				},
-				.m_SceneDepth = targets.m_Depth,
-				.m_SceneDepthDsvFormat = RHIFormat::D32Float,
-				.m_SceneDepthSrvFormat = RHIFormat::R32Float,
-				.m_DepthConvention = context.GetDisplayRenderView().m_DepthConvention,
 			},
 			.m_Output = {
 				.m_Texture = targets.m_BackBuffer,

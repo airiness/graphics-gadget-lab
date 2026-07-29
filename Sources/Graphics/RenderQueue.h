@@ -13,6 +13,7 @@ namespace gglab
 		MeshID m_MeshId{};
 		RenderMaterialKey m_MaterialKey{};
 		uint32_t m_ObjectOffset = 0;
+		uint32_t m_MaterialOffset = 0;
 
 		RenderBucket m_Bucket = RenderBucket::Opaque;
 		uint64_t m_VariantBits = 0;

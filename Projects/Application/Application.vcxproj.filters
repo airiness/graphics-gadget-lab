@@ -456,6 +456,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\PipelineCache.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.cpp">
+      <Filter>Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
@@ -1457,6 +1460,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelineCache.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.h">
+      <Filter>Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelinePresets.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
@@ -1494,6 +1500,9 @@
       <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\SceneDepthGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h">

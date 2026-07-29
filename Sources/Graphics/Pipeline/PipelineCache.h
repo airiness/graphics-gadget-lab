@@ -1,10 +1,12 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/Pipeline/DepthCoverage.h"
 #include "Graphics/Pipeline/PipelinePresets.h"
 #include "Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RenderPass/RenderPassInfo.h"
 
 #include <shared_mutex>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -48,6 +50,9 @@ namespace gglab
 		int32_t m_DepthBias = 0;
 		float m_DepthBiasClamp = 0.0f;
 		float m_SlopeScaledDepthBias = 0.0f;
+
+		std::optional<DepthCoverageSignature> m_DepthCoverageSignature =
+			std::nullopt;
 
 		constexpr bool operator==(const GraphicsPipelineRecipe&) const noexcept = default;
 	};

@@ -8,7 +8,6 @@ namespace gglab
 	{
 		RGTextureId m_SceneColor{};
 		RGTextureId m_BackBuffer{};
-		RGTextureId m_Depth{};
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

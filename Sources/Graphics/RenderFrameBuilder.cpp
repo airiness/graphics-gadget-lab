@@ -136,6 +136,7 @@ namespace gglab
 			.m_DirectionalShadowSettings = m_WorldData.GetMainDirectionalShadowSettings(),
 			.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
 			.m_BackBufferIndex = m_BackBufferIndex,
+			.m_FrameSerial = m_FrameSerial,
 			.m_UploadFencePoint = m_UploadFencePoint,
 			.m_SceneGpuAllocations = &m_SceneGpuAllocations,
 			.m_RenderSceneStatus = m_RenderSceneStatus,
@@ -146,6 +147,7 @@ namespace gglab
 	{
 		BuildResult result{};
 		result.m_BackBufferIndex = info.m_BackBufferIndex;
+		result.m_FrameSerial = info.m_FrameSerial;
 		result.m_ShadowVisualizationSettings = &info.m_ShadowVisualizationSettings;
 		result.m_WorldData = m_WorldExtractor.Extract(info.m_World);
 

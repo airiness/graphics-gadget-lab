@@ -34,6 +34,10 @@ namespace gglab
 		public:
 			GGLAB_DELETE_COPYABLE_MOVABLE(Frame);
 			~Frame() noexcept;
+			[[nodiscard]] uint64_t GetSerial() const noexcept
+			{
+				return m_FrameSerial;
+			}
 
 		private:
 			enum class State : uint8_t
@@ -43,9 +47,13 @@ namespace gglab
 				Ended,
 			};
 
-			Frame(Renderer* renderer, RHIFrameContext* rhiFrame) noexcept :
+			Frame(
+				Renderer* renderer,
+				RHIFrameContext* rhiFrame,
+				uint64_t frameSerial) noexcept :
 				m_Renderer(renderer),
 				m_RHIFrame(rhiFrame),
+				m_FrameSerial(frameSerial),
 				m_BackBufferIndex(rhiFrame ? rhiFrame->GetBackBufferIndex() : 0)
 			{
 			}
@@ -54,6 +62,7 @@ namespace gglab
 
 			Renderer* m_Renderer = nullptr;
 			State m_State = State::Begun;
+			uint64_t m_FrameSerial = 0;
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			RHIFrameContext* m_RHIFrame = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
@@ -164,6 +173,7 @@ namespace gglab
 		std::atomic_bool m_IsSuspended = false;
 
 		RHIFencePoint m_LastSubmittedFencePoint = {};
+		uint64_t m_NextFrameSerial = 1;
 		bool m_HasActiveFrame = false;
 	};
 }
