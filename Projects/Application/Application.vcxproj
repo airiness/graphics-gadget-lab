@@ -301,6 +301,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
@@ -598,6 +599,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
@@ -796,6 +798,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />

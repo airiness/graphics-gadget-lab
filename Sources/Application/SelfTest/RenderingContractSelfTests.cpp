@@ -38,6 +38,135 @@ namespace gglab
 			RGTextureId m_Texture;
 		};
 
+		struct BarrierBatchingPassData
+		{
+			RGTextureId m_Texture;
+			RGBufferId m_Buffer;
+		};
+
+		class RecordingDevice final : public RHIDevice
+		{
+		public:
+			RHIBackendType GetBackendType() const noexcept override { return {}; }
+			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
+			{
+				return "RenderingContract.RecordingDevice";
+			}
+			RHITextureSupportResult QueryTextureSupport(
+				const RHITextureDesc&) const noexcept override
+			{
+				return {};
+			}
+			RHITextureSupportResult QueryTextureViewSupport(
+				const RHITextureDesc&,
+				const RHITextureViewDesc&) const noexcept override
+			{
+				return {};
+			}
+			RHITextureHandle CreateTexture(
+				const RHITextureDesc&,
+				const RHIResourceDebugIdentityDesc&) noexcept override
+			{
+				return {};
+			}
+			RHIBufferHandle CreateBuffer(
+				const RHIBufferDesc&,
+				const RHIResourceDebugIdentityDesc&) noexcept override
+			{
+				return {};
+			}
+			RHITextureViewHandle CreateTextureView(
+				RHITextureHandle,
+				const RHITextureViewDesc&) noexcept override
+			{
+				return {};
+			}
+			RHIBufferViewHandle CreateBufferView(
+				RHIBufferHandle,
+				const RHIBufferViewDesc&) noexcept override
+			{
+				return {};
+			}
+			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override
+			{
+				return {};
+			}
+			void DestroyTexture(RHITextureHandle) noexcept override {}
+			void DestroyBuffer(RHIBufferHandle) noexcept override {}
+			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
+			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
+			void DestroySampler(RHISamplerHandle) noexcept override {}
+			void SetTextureDebugBinding(
+				RHITextureHandle,
+				const RHIResourceDebugBindingDesc&) noexcept override {}
+			void SetBufferDebugBinding(
+				RHIBufferHandle,
+				const RHIResourceDebugBindingDesc&) noexcept override {}
+			std::string_view GetTextureDebugName(
+				RHITextureHandle) const noexcept override
+			{
+				return {};
+			}
+			std::string_view GetBufferDebugName(
+				RHIBufferHandle) const noexcept override
+			{
+				return {};
+			}
+			void* MapBuffer(
+				RHIBufferHandle,
+				RHIMappedBufferRange) noexcept override
+			{
+				return nullptr;
+			}
+			void UnmapBuffer(
+				RHIBufferHandle,
+				RHIMappedBufferRange) noexcept override {}
+			uint32_t GetBufferViewAlignment(
+				RHIBufferViewType) const noexcept override
+			{
+				return 1;
+			}
+			bool IsAlive(RHITextureHandle texture) const noexcept override
+			{
+				return texture.IsValid();
+			}
+			bool IsAlive(RHIBufferHandle buffer) const noexcept override
+			{
+				return buffer.IsValid();
+			}
+			bool IsAlive(RHISamplerHandle sampler) const noexcept override
+			{
+				return sampler.IsValid();
+			}
+			bool IsFencePointCompleted(
+				const RHIFencePoint&) const noexcept override
+			{
+				return true;
+			}
+			void RecordTextureUse(
+				RHITextureHandle,
+				const RHIFencePoint&) noexcept override {}
+			void RecordBufferUse(
+				RHIBufferHandle,
+				const RHIFencePoint&) noexcept override {}
+			RHIDescriptorHandle GetTextureViewDescriptor(
+				RHITextureViewHandle) const noexcept override
+			{
+				return {};
+			}
+			RHIDescriptorHandle GetBufferViewDescriptor(
+				RHIBufferViewHandle) const noexcept override
+			{
+				return {};
+			}
+			RHIDescriptorHandle GetSamplerDescriptor(
+				RHISamplerHandle) const noexcept override
+			{
+				return {};
+			}
+			void RetireCompletedWork() noexcept override {}
+		};
+
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
 		public:
@@ -45,8 +174,15 @@ namespace gglab
 			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
 			void TrackTextureUse(RHITextureHandle) noexcept override {}
 			void TrackBufferUse(RHIBufferHandle) noexcept override {}
-			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
-			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
+			{
+				m_TextureBarrierCount += static_cast<uint32_t>(barriers.size());
+			}
+			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
+			{
+				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
+			}
+			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
@@ -79,6 +215,9 @@ namespace gglab
 
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
+			uint32_t m_FlushBarrierCount = 0;
+			uint32_t m_TextureBarrierCount = 0;
+			uint32_t m_BufferBarrierCount = 0;
 		};
 
 		class RecordingComputeCommandContext final : public RHIComputeCommandContext
@@ -88,8 +227,15 @@ namespace gglab
 			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
 			void TrackTextureUse(RHITextureHandle) noexcept override {}
 			void TrackBufferUse(RHIBufferHandle) noexcept override {}
-			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
-			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
+			{
+				m_TextureBarrierCount += static_cast<uint32_t>(barriers.size());
+			}
+			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
+			{
+				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
+			}
+			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
@@ -105,6 +251,9 @@ namespace gglab
 
 			uint32_t m_BeginProfileCount = 0;
 			uint32_t m_EndProfileCount = 0;
+			uint32_t m_FlushBarrierCount = 0;
+			uint32_t m_TextureBarrierCount = 0;
+			uint32_t m_BufferBarrierCount = 0;
 		};
 
 		[[nodiscard]] bool NearlyEqual(
@@ -1016,6 +1165,77 @@ namespace gglab
 						directComputeContext.m_BeginProfileCount == 1 &&
 						directComputeContext.m_EndProfileCount == 1,
 					"RenderGraph profiles Graphics, Compute, and Copy on their selected command contexts");
+			}
+
+			RecordingGraphicsCommandContext batchingGraphicsContext;
+			RecordingComputeCommandContext batchingComputeContext;
+			RecordingDevice batchingDevice;
+			RenderGraph barrierBatchingGraph(
+				{
+					.m_Device = &batchingDevice,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			barrierBatchingGraph.AddPass<BarrierBatchingPassData>(
+				"BatchTextureAndBufferBarriers",
+				RGPassEncoderType::Compute,
+				[](RenderGraph::RGBuilder& builder, BarrierBatchingPassData& data)
+				{
+					const RHITextureDesc textureDesc =
+					{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Extent = { .m_Width = 4, .m_Height = 4, .m_Depth = 1 },
+					};
+					const RHIBufferDesc bufferDesc =
+					{
+						.m_SizeInBytes = 64,
+						.m_StrideInBytes = 16,
+					};
+					data.m_Texture = builder.ImportTexture(
+						"BatchingTexture",
+						RHITextureHandle{ 1, 1 },
+						textureDesc,
+						RGTextureAccess::CopyDest);
+					data.m_Buffer = builder.ImportBuffer(
+						"BatchingBuffer",
+						RHIBufferHandle{ 1, 1 },
+						bufferDesc,
+						RGBufferAccess::CopyDest);
+					data.m_Texture = builder.Read(
+						data.m_Texture,
+						RGTextureAccess::Sample,
+						RHIStage::ComputeShader);
+					data.m_Buffer = builder.Read(
+						data.m_Buffer,
+						RGBufferAccess::StructuredRead,
+						RHIStage::ComputeShader);
+					builder.Export(
+						data.m_Texture,
+						RGTextureAccess::Sample,
+						RHIStage::ComputeShader);
+					builder.Export(
+						data.m_Buffer,
+						RGBufferAccess::StructuredRead,
+						RHIStage::ComputeShader);
+					builder.SideEffect();
+				},
+				[](RGExecuteContext&, BarrierBatchingPassData&) {});
+			const bool barrierBatchingCompiled = barrierBatchingGraph.Compile();
+			context.Check(barrierBatchingCompiled, "RenderGraph barrier batching fixture compiles");
+			if (barrierBatchingCompiled)
+			{
+				RGExecuteContext batchingExecuteContext(
+					{
+						.m_GraphicsCommandContext = &batchingGraphicsContext,
+						.m_DirectComputeCommandContext = &batchingComputeContext,
+						.m_AsyncComputeCommandContext = nullptr,
+					});
+				barrierBatchingGraph.Execute(batchingExecuteContext);
+				context.Check(
+					batchingComputeContext.m_TextureBarrierCount == 1 &&
+						batchingComputeContext.m_BufferBarrierCount == 1 &&
+						batchingComputeContext.m_FlushBarrierCount == 1,
+					"RenderGraph batches texture and buffer barriers into one explicit flush");
 			}
 		}
 

@@ -186,7 +186,6 @@ namespace gglab
 			TrackTextureUse(barrier.m_Texture);
 		}
 
-		m_CommandList->FlushBarriers();
 	}
 
 	void DX12CommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
@@ -215,7 +214,14 @@ namespace gglab
 			TrackBufferUse(barrier.m_Buffer);
 		}
 
-		m_CommandList->FlushBarriers();
+	}
+
+	void DX12CommandContext::FlushBarriers() noexcept
+	{
+		if (m_CommandList)
+		{
+			m_CommandList->FlushBarriers();
+		}
 	}
 
 	void DX12CommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept
