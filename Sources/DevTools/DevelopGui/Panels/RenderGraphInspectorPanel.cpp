@@ -6,6 +6,7 @@
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "Graphics/RHI/RHIFormat.h"
 #include <algorithm>
 #include <cmath>
 
@@ -226,6 +227,28 @@ namespace gglab
 			ImGui::Text("First User: %s", PassIndexToString(resource.m_FirstUserPassIndex).c_str());
 			ImGui::Text("Last User: %s", PassIndexToString(resource.m_LastUserPassIndex).c_str());
 			ImGui::TextWrapped("Usage: %s", usage.c_str());
+			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			{
+				ImGui::Text(
+					"Texture: %llu x %u x %u, %s",
+					static_cast<unsigned long long>(
+						resource.m_TextureExtent.m_Width),
+					resource.m_TextureExtent.m_Height,
+					resource.m_TextureExtent.m_Depth,
+					GetRHIFormatInfo(resource.m_TextureFormat).m_Name);
+				if (resource.m_TextureClearValue)
+				{
+					const auto& clearValue = *resource.m_TextureClearValue;
+					if (clearValue.m_IsDepthStencil)
+					{
+						ImGui::Text(
+							"Clear: depth %.3f, stencil %u, %s",
+							clearValue.m_Depth,
+							clearValue.m_Stencil,
+							GetRHIFormatInfo(clearValue.m_Format).m_Name);
+					}
+				}
+			}
 			ImGui::TextWrapped("Initial: %s", initialState.c_str());
 		}
 
@@ -850,6 +873,26 @@ namespace gglab
 				PassIndexToString(resource.m_LastUserPassIndex).c_str(),
 				poolSlot.c_str());
 			ImGui::TextWrapped("Accumulated Usage: %s", usage.c_str());
+			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			{
+				ImGui::Text(
+					"Texture: %llu x %u x %u, %s",
+					static_cast<unsigned long long>(
+						resource.m_TextureExtent.m_Width),
+					resource.m_TextureExtent.m_Height,
+					resource.m_TextureExtent.m_Depth,
+					GetRHIFormatInfo(resource.m_TextureFormat).m_Name);
+				if (resource.m_TextureClearValue &&
+					resource.m_TextureClearValue->m_IsDepthStencil)
+				{
+					const auto& clearValue = *resource.m_TextureClearValue;
+					ImGui::Text(
+						"Typed Clear: depth %.3f, stencil %u, %s",
+						clearValue.m_Depth,
+						clearValue.m_Stencil,
+						GetRHIFormatInfo(clearValue.m_Format).m_Name);
+				}
+			}
 			ImGui::TextWrapped("Initial State: %s", initialState.c_str());
 			ImGui::TextWrapped("Exported Final State: %s", finalState.c_str());
 			const std::string finalRange = resource.m_HasFinalBarrierState ?

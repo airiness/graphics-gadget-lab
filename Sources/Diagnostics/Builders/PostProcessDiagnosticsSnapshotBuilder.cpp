@@ -46,6 +46,24 @@ namespace gglab
 		{
 			snapshot.m_SceneColor = BuildTextureDiagnostics(
 				renderGraph, resources->m_Inputs.m_SceneColor);
+			const auto& depthInput = resources->m_Inputs;
+			if (depthInput.m_SceneDepth.IsValid())
+			{
+				const auto& desc = renderGraph.GetTextureDesc(
+					depthInput.m_SceneDepth);
+				snapshot.m_SceneDepth = {
+					.m_Width = static_cast<uint32_t>(desc.m_Extent.m_Width),
+					.m_Height = desc.m_Extent.m_Height,
+					.m_ResourceFormat = desc.m_Format,
+					.m_DsvFormat = depthInput.m_SceneDepthDsvFormat,
+					.m_SrvFormat = depthInput.m_SceneDepthSrvFormat,
+					.m_ClearDepth = desc.m_ClearValue ?
+						desc.m_ClearValue->m_Depth : 0.0f,
+					.m_Convention = depthInput.m_DepthConvention,
+					.m_HasTypedClear = desc.m_ClearValue.has_value(),
+					.m_Available = true,
+				};
+			}
 			snapshot.m_BloomPrefilter = BuildTextureDiagnostics(
 				renderGraph, resources->m_Bloom.m_Prefilter);
 			snapshot.m_BloomLevelCount = resources->m_Bloom.m_LevelCount;

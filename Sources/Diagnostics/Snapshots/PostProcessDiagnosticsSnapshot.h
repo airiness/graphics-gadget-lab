@@ -4,6 +4,7 @@
 #include "Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHITypes.h"
+#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <array>
 #include <string>
@@ -43,9 +44,23 @@ namespace gglab
 		bool m_HasPublished = false;
 	};
 
+	struct SceneDepthDiagnostics
+	{
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		RHIFormat m_ResourceFormat = RHIFormat::Unknown;
+		RHIFormat m_DsvFormat = RHIFormat::Unknown;
+		RHIFormat m_SrvFormat = RHIFormat::Unknown;
+		float m_ClearDepth = 0.0f;
+		DepthConvention m_Convention = DepthConvention::Standard;
+		bool m_HasTypedClear = false;
+		bool m_Available = false;
+	};
+
 	struct PostProcessDiagnosticsSnapshot
 	{
 		PostProcessTextureDiagnostics m_SceneColor{};
+		SceneDepthDiagnostics m_SceneDepth{};
 		PostProcessTextureDiagnostics m_BloomPrefilter{};
 		std::array<PostProcessTextureDiagnostics, MaxBloomPyramidLevels> m_BloomPyramid{};
 		uint32_t m_BloomLevelCount = 0;

@@ -18,6 +18,7 @@ namespace gglab
 		std::atomic<uint64_t> m_ReadWriteExecutions = 0;
 		std::atomic<uint64_t> m_PreviewExecutions = 0;
 		std::atomic<uint64_t> m_CulledExecutions = 0;
+		std::atomic<float> m_AnimationTimeSeconds = 0.0f;
 		std::atomic<float> m_AnimationSpeed = 1.0f;
 		std::atomic<float> m_PatternFrequency = 18.0f;
 		std::atomic<float> m_RingRadius = 0.46f;
@@ -169,8 +170,6 @@ namespace gglab
 				const uint32_t displayWidth = swapChain->GetBufferWidth();
 				const uint32_t displayHeight = swapChain->GetBufferHeight();
 				const RenderViewID displayViewId = context.GetDisplayViewId();
-				const float animationSpeed =
-					m_State->m_AnimationSpeed.load(std::memory_order_relaxed);
 				const float patternFrequency =
 					m_State->m_PatternFrequency.load(std::memory_order_relaxed);
 				const float ringRadius =
@@ -179,10 +178,9 @@ namespace gglab
 					m_State->m_RingIntensity.load(std::memory_order_relaxed);
 				const uint32_t checkerCellSize =
 					m_State->m_CheckerCellSize.load(std::memory_order_relaxed);
-				m_Phase = std::fmod(
-					m_Phase + 0.015f * animationSpeed,
+				const float phase = std::fmod(
+					m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
 					6.28318530718f);
-				const float phase = m_Phase;
 
 				rg.AddPass<SetupPassData>(
 					"Lab.RenderGraphCompute.Setup",
@@ -622,7 +620,6 @@ namespace gglab
 			ComputePipelineSlot m_ComputeWriteSlot{};
 			ComputePipelineSlot m_ComputeReadWriteSlot{};
 			GraphicsPipelineSlot m_PreviewSlot{};
-			float m_Phase = 0.0f;
 			bool m_IsInitialized = false;
 		};
 	}
@@ -694,7 +691,17 @@ namespace gglab
 
 	void RenderGraphComputeLabSession::Update(float deltaTime) noexcept
 	{
-		GGLAB_UNUSED(deltaTime);
+		const float animationSpeed =
+			m_State->m_AnimationSpeed.load(std::memory_order_relaxed);
+		if (std::isfinite(deltaTime) && deltaTime > 0.0f)
+		{
+			m_AnimationTimeSeconds = std::fmod(
+				m_AnimationTimeSeconds + deltaTime * animationSpeed,
+				6.28318530718f);
+			m_State->m_AnimationTimeSeconds.store(
+				m_AnimationTimeSeconds,
+				std::memory_order_relaxed);
+		}
 		GetCamera().Update();
 	}
 

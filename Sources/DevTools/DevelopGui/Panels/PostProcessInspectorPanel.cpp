@@ -21,6 +21,8 @@ namespace gglab
 			case PostProcessDebugTap::BloomPrefilter: return "Bloom Prefilter";
 			case PostProcessDebugTap::BloomPyramid: return "Bloom Pyramid";
 			case PostProcessDebugTap::BloomResult: return "Bloom Result";
+			case PostProcessDebugTap::SceneDepthRaw: return "Scene Depth / Raw";
+			case PostProcessDebugTap::SceneDepthLinearViewZ: return "Scene Depth / Linear View Z";
 			default: return "Unknown";
 			}
 		}
@@ -35,6 +37,8 @@ namespace gglab
 					PostProcessDebugTap::BloomPrefilter,
 					PostProcessDebugTap::BloomPyramid,
 					PostProcessDebugTap::BloomResult,
+					PostProcessDebugTap::SceneDepthRaw,
+					PostProcessDebugTap::SceneDepthLinearViewZ,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -158,7 +162,19 @@ namespace gglab
 
 		registry->RequestPostProcessPreview();
 		const auto* selectedTexture = ResolveSelectedTexture(*snapshot, selection);
-		if (!selectedTexture || !selectedTexture->m_Available)
+		const bool depthSelection =
+			selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
+			selection.m_Tap == PostProcessDebugTap::SceneDepthLinearViewZ;
+		if (depthSelection && snapshot->m_SceneDepth.m_Available)
+		{
+			ImGui::TextDisabled(
+				"Source: %u x %u, %s resource, %s SRV",
+				snapshot->m_SceneDepth.m_Width,
+				snapshot->m_SceneDepth.m_Height,
+				GetRHIFormatInfo(snapshot->m_SceneDepth.m_ResourceFormat).m_Name,
+				GetRHIFormatInfo(snapshot->m_SceneDepth.m_SrvFormat).m_Name);
+		}
+		else if (!selectedTexture || !selectedTexture->m_Available)
 		{
 			ImGui::TextDisabled("The selected tap is unavailable in the current pipeline configuration.");
 		}
@@ -196,6 +212,32 @@ namespace gglab
 		else
 		{
 			ImGui::TextDisabled("Preview will be published on the next rendered frame.");
+		}
+
+		if (ImGui::CollapsingHeader("Scene Depth", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const auto& depth = snapshot->m_SceneDepth;
+			if (!depth.m_Available)
+			{
+				ImGui::TextDisabled("Scene depth is unavailable.");
+			}
+			else
+			{
+				ImGui::Text("Extent: %u x %u", depth.m_Width, depth.m_Height);
+				ImGui::Text(
+					"Resource / DSV / SRV: %s / %s / %s",
+					GetRHIFormatInfo(depth.m_ResourceFormat).m_Name,
+					GetRHIFormatInfo(depth.m_DsvFormat).m_Name,
+					GetRHIFormatInfo(depth.m_SrvFormat).m_Name);
+				ImGui::Text(
+					"Clear: %.3f (%s) | Convention: %s",
+					depth.m_ClearDepth,
+					depth.m_HasTypedClear ? "typed" : "none",
+					depth.m_Convention == DepthConvention::Reversed ?
+						"Reversed-Z" : "Standard-Z");
+				ImGui::TextDisabled(
+					"Filter DisplayView.DepthBuffer in RenderGraph Inspector to inspect its access chain.");
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Bloom Resources", ImGuiTreeNodeFlags_DefaultOpen))

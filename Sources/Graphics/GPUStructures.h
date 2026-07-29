@@ -114,7 +114,7 @@ namespace gglab
 		float ExposureMultiplier;
 		uint32_t Width;
 		uint32_t Height;
-		uint32_t Padding;
+		uint32_t DepthConvention;
 	};
 	static_assert(sizeof(ViewGPU) == 304);
 	static constexpr uint32_t MaxViewCapacity = 

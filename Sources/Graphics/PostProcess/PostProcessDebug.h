@@ -8,12 +8,14 @@ namespace gglab
 
 	enum class PostProcessDebugTap : uint8_t
 	{
-		SceneColor,
-		BloomPrefilter,
-		BloomPyramid,
-		BloomResult,
+		SceneColor = 0,
+		BloomPrefilter = 1,
+		BloomPyramid = 2,
+		BloomResult = 3,
+		SceneDepthRaw = 4,
+		SceneDepthLinearViewZ = 5,
 
-		Count
+		Count = 6
 	};
 
 	struct PostProcessDebugSelection

@@ -551,6 +551,80 @@ namespace gglab
 					standardWrite.m_DepthWriteEnable &&
 					standardWrite.m_DepthCompareOp == RHICompareOp::Less,
 				"Depth presets encode explicit Reversed-Z and Standard-Z compare contracts");
+
+			struct SampleableDepthPassData
+			{
+				RGTextureViewId m_View{};
+			};
+			RenderGraph graph(
+				{
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			RGTextureId graphDepth;
+			RHITextureDesc graphDepthDesc = depthDesc;
+			graphDepthDesc.m_Usage = RHITextureUsage::None;
+			graph.AddPass<SampleableDepthPassData>(
+				"SampleableDepth.Write",
+				[&graphDepth, graphDepthDesc, dsvDesc](
+					RenderGraph::RGBuilder& builder,
+					SampleableDepthPassData& data)
+				{
+					graphDepth = builder.CreateTexture(
+						"DisplayView.DepthBuffer",
+						graphDepthDesc);
+					builder.WriteInPlace(
+						graphDepth,
+						RGTextureAccess::DepthStencilWrite);
+					data.m_View =
+						builder.CreateView<RHITextureViewType::DepthStencil>(
+							graphDepth,
+							dsvDesc);
+				});
+			graph.AddPass<SampleableDepthPassData>(
+				"SampleableDepth.Sample",
+				[&graphDepth, srvDesc](
+					RenderGraph::RGBuilder& builder,
+					SampleableDepthPassData& data)
+				{
+					graphDepth = builder.Read(
+						graphDepth,
+						RGTextureAccess::Sample,
+						RHIStage::PixelShader);
+					data.m_View =
+						builder.CreateView<RHITextureViewType::ShaderResource>(
+							graphDepth,
+							srvDesc);
+					builder.SideEffect();
+				});
+
+			const bool graphCompiled = graph.Compile();
+			context.Check(
+				graphCompiled,
+				"RenderGraph sampleable-depth DSV-to-SRV fixture compiles");
+			if (graphCompiled)
+			{
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				const auto expectedUsage =
+					RHITextureUsage::DepthStencil | RHITextureUsage::Sampled;
+				context.Check(
+					snapshot.m_Resources.size() == 1 &&
+						snapshot.m_Resources[0].m_UsageBits ==
+							static_cast<uint64_t>(expectedUsage) &&
+						snapshot.m_Resources[0].m_TextureFormat ==
+							RHIFormat::R32Typeless &&
+						snapshot.m_Passes[0].m_Accesses[0].m_AccessValue ==
+							static_cast<uint64_t>(
+								RGTextureAccess::DepthStencilWrite) &&
+						snapshot.m_Passes[1].m_Accesses[0].m_AccessValue ==
+							static_cast<uint64_t>(RGTextureAccess::Sample) &&
+						snapshot.m_Passes[1].m_PreBarriers.size() == 1 &&
+						snapshot.m_Passes[1].m_PreBarriers[0].m_Kind ==
+							RGBarrierKind::Transition,
+					"RenderGraph infers depth and sampled usage with a DSV-to-SRV transition");
+			}
 		}
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept

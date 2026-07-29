@@ -64,6 +64,9 @@ namespace gglab
 		int32_t m_FirstUserPassIndex = -1;
 		int32_t m_LastUserPassIndex = -1;
 		uint64_t m_UsageBits = 0;
+		RHIFormat m_TextureFormat = RHIFormat::Unknown;
+		RHIExtent3D m_TextureExtent{};
+		std::optional<RHIClearValue> m_TextureClearValue = std::nullopt;
 		TransientResourcePoolSlot m_PoolSlot{};
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		bool m_HasFinalBarrierState = false;

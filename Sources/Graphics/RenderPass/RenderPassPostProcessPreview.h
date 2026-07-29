@@ -35,7 +35,9 @@ namespace gglab
 		void AddResolvedPass(RenderGraph& rg,
 			const RenderFrameContext& context,
 			const RenderServices& services,
-			const RGPostProcessColor& source,
+			RGTextureId source,
+			float sourcePreExposure,
+			RHIFormat sourceViewFormat,
 			PostProcessDebugSelection selection) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer) noexcept;

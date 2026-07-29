@@ -100,5 +100,5 @@ struct ViewData
 	float ExposureMultiplier;
 	uint Width;
 	uint Height;
-	uint Padding;
+	uint DepthConvention;
 };

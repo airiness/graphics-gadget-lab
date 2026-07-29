@@ -302,6 +302,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
@@ -600,6 +601,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
