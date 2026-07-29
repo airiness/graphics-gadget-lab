@@ -67,6 +67,10 @@ namespace napa::voxel
 		std::uint64_t m_IndexCount = 0;
 		std::uint64_t m_TriangleCount = 0;
 		QuantizedMeshAabb m_QuantizedBounds{};
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const MeshValidationResult&,
+			const MeshValidationResult&) noexcept = default;
 	};
 
 	class MeshQuantizationContext final

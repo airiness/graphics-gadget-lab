@@ -2026,7 +2026,7 @@ namespace gglab
 
 			std::unique_ptr<VoxelWorld> emptyWorld;
 			PrimitiveWorldGenerationResult emptyGeneration{};
-			ReferenceChunkMeshingResult emptyMeshing{};
+			ChunkMeshRecord emptyMeshing{};
 			const bool emptyMeshed =
 				GeneratePrimitiveVoxelWorld(
 					config,
@@ -2053,7 +2053,7 @@ namespace gglab
 				"An empty primitive set produces the canonical empty chunk mesh");
 
 			std::unique_ptr<VoxelWorld> solidWorld;
-			ReferenceChunkMeshingResult solidMeshing{};
+			ChunkMeshRecord solidMeshing{};
 			const bool solidMeshed =
 				VoxelWorld::Create(config, solidWorld).Succeeded() &&
 				solidWorld &&
@@ -2083,7 +2083,7 @@ namespace gglab
 				"A uniform solid field contains no isosurface and hashes as the canonical empty mesh");
 
 			std::unique_ptr<VoxelWorld> planeWorld;
-			ReferenceChunkMeshingResult planeMeshing{};
+			ChunkMeshRecord planeMeshing{};
 			const bool planeMeshed =
 				VoxelWorld::Create(config, planeWorld).Succeeded() &&
 				planeWorld &&
@@ -2144,7 +2144,7 @@ namespace gglab
 				.m_MaxExclusive = { 1000008, 8, 8 },
 			};
 			std::unique_ptr<VoxelWorld> distantPlaneWorld;
-			ReferenceChunkMeshingResult distantPlaneMeshing{};
+			ChunkMeshRecord distantPlaneMeshing{};
 			const bool distantPlaneMeshed =
 				VoxelWorld::Create(
 					distantPlaneConfig,
@@ -2199,7 +2199,7 @@ namespace gglab
 				"Distant Chunk meshing preserves Chunk-local Float3 precision");
 
 			std::unique_ptr<VoxelWorld> latticeEdgePlaneWorld;
-			ReferenceChunkMeshingResult
+			ChunkMeshRecord
 				latticeEdgePlaneMeshing{};
 			const bool latticeEdgePlaneMeshed =
 				VoxelWorld::Create(
@@ -2233,7 +2233,7 @@ namespace gglab
 				"Exact-iso plane through lattice edges meshes deterministically");
 
 			std::unique_ptr<VoxelWorld> latticeVertexPlaneWorld;
-			ReferenceChunkMeshingResult
+			ChunkMeshRecord
 				latticeVertexPlaneMeshing{};
 			const bool latticeVertexPlaneMeshed =
 				VoxelWorld::Create(
@@ -2275,7 +2275,7 @@ namespace gglab
 			};
 			std::unique_ptr<VoxelWorld> sphereWorld;
 			PrimitiveWorldGenerationResult sphereGeneration{};
-			ReferenceChunkMeshingResult sphereMeshing{};
+			ChunkMeshRecord sphereMeshing{};
 			const bool sphereMeshed =
 				GeneratePrimitiveVoxelWorld(
 					config,
@@ -2343,7 +2343,7 @@ namespace gglab
 			std::unique_ptr<VoxelWorld> negativeSphereWorld;
 			PrimitiveWorldGenerationResult
 				negativeSphereGeneration{};
-			ReferenceChunkMeshingResult negativeSphereMeshing{};
+			ChunkMeshRecord negativeSphereMeshing{};
 			const bool negativeSphereMeshed =
 				GeneratePrimitiveVoxelWorld(
 					negativeSphereConfig,
@@ -2414,7 +2414,7 @@ namespace gglab
 				sampleAlignedSphereWorld;
 			PrimitiveWorldGenerationResult
 				sampleAlignedSphereGeneration{};
-			ReferenceChunkMeshingResult
+			ChunkMeshRecord
 				sampleAlignedSphereMeshing{};
 			const bool sampleAlignedSphereMeshed =
 				GeneratePrimitiveVoxelWorld(
@@ -2445,7 +2445,7 @@ namespace gglab
 			};
 			std::unique_ptr<VoxelWorld> boxWorld;
 			PrimitiveWorldGenerationResult boxGeneration{};
-			ReferenceChunkMeshingResult boxMeshing{};
+			ChunkMeshRecord boxMeshing{};
 			const bool boxMeshed =
 				GeneratePrimitiveVoxelWorld(
 					config,
@@ -2495,7 +2495,7 @@ namespace gglab
 			std::unique_ptr<VoxelWorld> sampleAlignedBoxWorld;
 			PrimitiveWorldGenerationResult
 				sampleAlignedBoxGeneration{};
-			ReferenceChunkMeshingResult
+			ChunkMeshRecord
 				sampleAlignedBoxMeshing{};
 			const bool sampleAlignedBoxMeshed =
 				GeneratePrimitiveVoxelWorld(
@@ -2530,7 +2530,7 @@ namespace gglab
 			std::unique_ptr<VoxelWorld> multiMaterialWorld;
 			PrimitiveWorldGenerationResult
 				multiMaterialGeneration{};
-			ReferenceChunkMeshingResult multiMaterialMeshing{};
+			ChunkMeshRecord multiMaterialMeshing{};
 			const bool multiMaterialMeshed =
 				GeneratePrimitiveVoxelWorld(
 					config,
@@ -2549,7 +2549,7 @@ namespace gglab
 				reversedMultiMaterialWorld;
 			PrimitiveWorldGenerationResult
 				reversedMultiMaterialGeneration{};
-			ReferenceChunkMeshingResult
+			ChunkMeshRecord
 				reversedMultiMaterialMeshing{};
 			const bool reversedMultiMaterialMeshed =
 				GeneratePrimitiveVoxelWorld(
@@ -2616,7 +2616,7 @@ namespace gglab
 				iteration < 10 && repeatedMeshMatches;
 				++iteration)
 			{
-				ReferenceChunkMeshingResult repeated{};
+				ChunkMeshRecord repeated{};
 				repeatedMeshMatches =
 					ReferenceMesher(*sphereWorld).MeshChunk(
 						{},
@@ -2646,8 +2646,8 @@ namespace gglab
 				.m_MaxExclusive = { 12, 8, 8 },
 			};
 			std::unique_ptr<VoxelWorld> partialWorld;
-			ReferenceChunkMeshingResult partialLeft{};
-			ReferenceChunkMeshingResult partialRight{};
+			ChunkMeshRecord partialLeft{};
+			ChunkMeshRecord partialRight{};
 			const bool partialMeshed =
 				VoxelWorld::Create(
 					partialConfig,
@@ -2693,7 +2693,9 @@ namespace gglab
 						.m_Max.m_X == 0,
 				"Partial chunks assign an exact shared-boundary surface to one cell owner");
 
-			ReferenceChunkMeshingResult unchanged{
+			ChunkMeshRecord unchanged{
+				.m_Chunk = { 7, 8, 9 },
+				.m_SourceWorldVoxelRevision = 16,
 				.m_Mesh = MakeSyntheticTriangleMesh(),
 				.m_WindingEvidence = {
 					{
@@ -2724,6 +2726,9 @@ namespace gglab
 					unchanged).m_Error ==
 					ValidationError::
 						ChunkOutsideLogicalCellDomain &&
+					unchanged.m_Chunk ==
+						ChunkCoord{ 7, 8, 9 } &&
+					unchanged.m_SourceWorldVoxelRevision == 16 &&
 					unchanged.m_Mesh.m_Vertices.size() == 3 &&
 					unchanged.m_Mesh.m_Sections.size() == 1 &&
 					unchanged.m_WindingEvidence ==

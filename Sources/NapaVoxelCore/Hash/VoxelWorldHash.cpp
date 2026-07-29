@@ -2,6 +2,7 @@
 
 #include "NapaVoxelCore/BuildContract.h"
 #include "NapaVoxelCore/Hash/CanonicalHash.h"
+#include "NapaVoxelCore/Hash/CanonicalVoxelSerialization.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
@@ -14,24 +15,12 @@ namespace napa::voxel
 		std::uint64_t& hash) noexcept
 	{
 		const VoxelWorldConfig& config = world.GetConfig();
-		const CellAabb& cellBounds = config.m_LogicalCellBounds;
 		const SampleAabb sampleBounds = world.GetLogicalSampleBounds();
 
 		CanonicalHashWriter writer;
 		writer.WriteU32(GetBuildContract().m_VoxelHashSchemaVersion);
 		writer.WriteU32(VoxelDataSchemaVersion);
-
-		writer.WriteI32(cellBounds.m_Min.m_X);
-		writer.WriteI32(cellBounds.m_Min.m_Y);
-		writer.WriteI32(cellBounds.m_Min.m_Z);
-		writer.WriteI32(cellBounds.m_MaxExclusive.m_X);
-		writer.WriteI32(cellBounds.m_MaxExclusive.m_Y);
-		writer.WriteI32(cellBounds.m_MaxExclusive.m_Z);
-
-		writer.WriteU32(config.m_ChunkCellCount);
-		writer.WriteFloat32(config.m_VoxelSize);
-		writer.WriteU8(IsoValue);
-		writer.WriteFloat32(config.m_SurfaceBandVoxels);
+		WriteCanonicalVoxelWorldConfig(writer, config);
 
 		for (std::int64_t z = sampleBounds.m_Min.m_Z;
 			z < sampleBounds.m_MaxExclusive.m_Z;

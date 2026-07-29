@@ -87,6 +87,7 @@
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.cpp" />
@@ -97,10 +98,13 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalVoxelSerialization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h" />

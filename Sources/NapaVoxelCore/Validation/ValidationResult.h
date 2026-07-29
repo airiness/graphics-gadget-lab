@@ -61,6 +61,8 @@ namespace napa::voxel
 		InvalidMeshWindingEvidence = 52,
 		MismatchedMeshQuantizationContext = 53,
 		UnrepresentableChunkLocalPosition = 54,
+		InvalidWorldMeshRecordSet = 55,
+		MismatchedChunkMeshValidation = 56,
 	};
 
 	struct ValidationResult

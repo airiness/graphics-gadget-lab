@@ -1,7 +1,9 @@
 #pragma once
 
+#include "NapaVoxelCore/Meshing/ChunkMeshRecord.h"
 #include "NapaVoxelCore/Meshing/MeshData.h"
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
+#include "NapaVoxelCore/Meshing/WorldMeshHash.h"
 #include "NapaVoxelCore/Validation/ValidationResult.h"
 #include "NapaVoxelCore/World/Coordinates.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
@@ -107,14 +109,11 @@ namespace napa::voxel
 			default;
 	};
 
-	struct ReferenceChunkMeshingResult
+	struct ReferenceWorldMeshingResult
 	{
-		MeshData m_Mesh;
-		// Matches material-section order, then triangle index order.
-		std::vector<MeshTriangleWindingEvidence>
-			m_WindingEvidence;
-		MeshValidationResult m_Validation{};
-		std::uint64_t m_SkippedDegenerateTriangleCount = 0;
+		// Complete Cell-owner Chunk Domain in canonical z/y/x order.
+		std::vector<ChunkMeshRecord> m_Chunks;
+		WorldMeshValidationResult m_Validation{};
 	};
 
 	class ReferenceMesher final
@@ -139,7 +138,9 @@ namespace napa::voxel
 			const noexcept;
 		[[nodiscard]] ValidationResult MeshChunk(
 			ChunkCoord chunk,
-			ReferenceChunkMeshingResult& result) const;
+			ChunkMeshRecord& record) const;
+		[[nodiscard]] ValidationResult MeshWorld(
+			ReferenceWorldMeshingResult& result) const;
 
 	private:
 		[[nodiscard]] ValidationResult

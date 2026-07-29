@@ -1731,7 +1731,7 @@ namespace napa::voxel
 
 	ValidationResult ReferenceMesher::MeshChunk(
 		ChunkCoord chunk,
-		ReferenceChunkMeshingResult& result) const
+		ChunkMeshRecord& record) const
 	{
 		const VoxelWorldConfig& config = m_World.GetConfig();
 		CellAabb cellBounds{};
@@ -1909,7 +1909,10 @@ namespace napa::voxel
 			return validationResult;
 		}
 
-		ReferenceChunkMeshingResult prepared{
+		ChunkMeshRecord prepared{
+			.m_Chunk = chunk,
+			.m_SourceWorldVoxelRevision =
+				m_World.GetWorldVoxelRevision(),
 			.m_Mesh = std::move(mesh),
 			.m_WindingEvidence =
 				std::move(windingEvidence),
@@ -1917,6 +1920,70 @@ namespace napa::voxel
 			.m_SkippedDegenerateTriangleCount =
 				skippedDegenerateTriangleCount,
 		};
+		record = std::move(prepared);
+		return {};
+	}
+
+	ValidationResult ReferenceMesher::MeshWorld(
+		ReferenceWorldMeshingResult& result) const
+	{
+		const LogicalDomainMetrics& metrics =
+			m_World.GetLogicalDomainMetrics();
+		const std::optional<std::size_t> chunkCount =
+			CheckedNarrow<std::size_t>(
+				metrics.m_CellOwnerChunkCount);
+		if (!chunkCount)
+		{
+			return {
+				ValidationError::LogicalDomainSizeOverflow,
+			};
+		}
+
+		ReferenceWorldMeshingResult prepared;
+		prepared.m_Chunks.reserve(*chunkCount);
+		const ChunkAabb& chunkBounds =
+			metrics.m_CellOwnerChunkBounds;
+		for (std::int64_t z = chunkBounds.m_Min.m_Z;
+			z < chunkBounds.m_MaxExclusive.m_Z;
+			++z)
+		{
+			for (std::int64_t y = chunkBounds.m_Min.m_Y;
+				y < chunkBounds.m_MaxExclusive.m_Y;
+				++y)
+			{
+				for (std::int64_t x = chunkBounds.m_Min.m_X;
+					x < chunkBounds.m_MaxExclusive.m_X;
+					++x)
+				{
+					ChunkMeshRecord record;
+					const ValidationResult meshResult =
+						MeshChunk(
+							{
+								static_cast<std::int32_t>(x),
+								static_cast<std::int32_t>(y),
+								static_cast<std::int32_t>(z),
+							},
+							record);
+					if (meshResult.Failed())
+					{
+						return meshResult;
+					}
+					prepared.m_Chunks.push_back(
+						std::move(record));
+				}
+			}
+		}
+
+		const ValidationResult validationResult =
+			ValidateAndHashWorldMeshRecords(
+				prepared.m_Chunks,
+				m_World.GetConfig(),
+				prepared.m_Validation);
+		if (validationResult.Failed())
+		{
+			return validationResult;
+		}
+
 		result = std::move(prepared);
 		return {};
 	}

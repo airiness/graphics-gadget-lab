@@ -3,6 +3,7 @@
 #include "NapaVoxelCore/BuildContract.h"
 #include "NapaVoxelCore/Field/DensityQuantization.h"
 #include "NapaVoxelCore/Hash/CanonicalHash.h"
+#include "NapaVoxelCore/Hash/CanonicalVoxelSerialization.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
 #include <algorithm>
@@ -192,23 +193,6 @@ namespace napa::voxel
 				crossZ *
 					static_cast<double>(outwardDirection.m_Z) >
 				0.0;
-		}
-
-		void WriteConfig(
-			CanonicalHashWriter& writer,
-			const VoxelWorldConfig& config) noexcept
-		{
-			const CellAabb& bounds = config.m_LogicalCellBounds;
-			writer.WriteI32(bounds.m_Min.m_X);
-			writer.WriteI32(bounds.m_Min.m_Y);
-			writer.WriteI32(bounds.m_Min.m_Z);
-			writer.WriteI32(bounds.m_MaxExclusive.m_X);
-			writer.WriteI32(bounds.m_MaxExclusive.m_Y);
-			writer.WriteI32(bounds.m_MaxExclusive.m_Z);
-			writer.WriteU32(config.m_ChunkCellCount);
-			writer.WriteFloat32(config.m_VoxelSize);
-			writer.WriteU8(IsoValue);
-			writer.WriteFloat32(config.m_SurfaceBandVoxels);
 		}
 
 		void WriteQuantizedPosition(
@@ -788,7 +772,7 @@ namespace napa::voxel
 		const BuildContract& contract = GetBuildContract();
 		writer.WriteU32(contract.m_MeshHashSchemaVersion);
 		writer.WriteU32(contract.m_ReferenceMesherVersion);
-		WriteConfig(writer, config);
+		WriteCanonicalVoxelWorldConfig(writer, config);
 		writer.WriteI32(chunk.m_X);
 		writer.WriteI32(chunk.m_Y);
 		writer.WriteI32(chunk.m_Z);
