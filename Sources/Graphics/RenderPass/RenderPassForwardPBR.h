@@ -23,6 +23,11 @@ namespace gglab
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
+		[[nodiscard]] static std::optional<DepthCoverageSignature>
+			BuildDepthCoverageSignatureForVariant(
+				const GraphicsPipelineRecipe& recipe,
+				uint64_t variantBits) noexcept;
+
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
@@ -40,6 +45,12 @@ namespace gglab
 		RHIPipelineHandle GetOrCreatePSOForVariant(
 			const Renderer& renderer,
 			uint64_t variantBits) noexcept;
+
+		[[nodiscard]] static DepthCoverageBinding BuildDepthCoverageBindingForDraw(
+			const Renderer& renderer,
+			const RenderFrameContext& context,
+			const DrawItem& drawItem,
+			RenderViewID viewId) noexcept;
 
 		std::tuple<RasterizerPreset, DepthPreset, BlendPreset>
 			GetPresetsFromVariantBits(uint64_t variantBits) const noexcept;

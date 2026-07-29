@@ -20,8 +20,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		GetDepthFarValue(DEPTH_CONVENTION_REVERSED) == 0.0 &&
 		GetDepthNearValue(DEPTH_CONVENTION_STANDARD) == 0.0 &&
 		GetDepthFarValue(DEPTH_CONVENTION_STANDARD) == 1.0 &&
-		IsDepthBackground(0.0, DEPTH_CONVENTION_REVERSED, 0.0) &&
-		IsDepthBackground(1.0, DEPTH_CONVENTION_STANDARD, 0.0) &&
+		IsDepthBackground(0.0, DEPTH_CONVENTION_REVERSED) &&
+		IsDepthBackground(1.0, DEPTH_CONVENTION_STANDARD) &&
 		IsDepthNearer(0.75, 0.25, DEPTH_CONVENTION_REVERSED) &&
 		IsDepthFarther(0.75, 0.25, DEPTH_CONVENTION_STANDARD);
 

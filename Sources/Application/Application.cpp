@@ -381,6 +381,7 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 			.m_BackBufferIndex = backBufferIndex,
+			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
 		RenderFrameBuilder::BuildResult frame;
 		{

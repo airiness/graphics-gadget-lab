@@ -20,12 +20,11 @@ float GetDepthFarValue(uint convention)
 	return GetDepthBackgroundValue(convention);
 }
 
-bool IsDepthBackground(float rawDepth, uint convention, float tolerance)
+bool IsDepthBackground(float rawDepth, uint convention)
 {
-	tolerance = max(tolerance, 0.0);
 	return convention == DEPTH_CONVENTION_REVERSED ?
-		rawDepth <= tolerance :
-		rawDepth >= 1.0 - tolerance;
+		rawDepth <= 0.0 :
+		rawDepth >= 1.0;
 }
 
 bool IsDepthNearer(float lhs, float rhs, uint convention)

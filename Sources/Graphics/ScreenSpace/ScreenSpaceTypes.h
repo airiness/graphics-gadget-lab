@@ -34,15 +34,13 @@ namespace gglab
 			return GetDepthBackgroundValue(convention);
 		}
 
-		inline bool IsDepthBackground(
+		inline constexpr bool IsDepthBackground(
 			float rawDepth,
-			DepthConvention convention,
-			float tolerance = 1.0e-6f) noexcept
+			DepthConvention convention) noexcept
 		{
-			tolerance = std::max(tolerance, 0.0f);
 			return convention == DepthConvention::Reversed ?
-				rawDepth <= tolerance :
-				rawDepth >= 1.0f - tolerance;
+				rawDepth <= 0.0f :
+				rawDepth >= 1.0f;
 		}
 
 		inline constexpr bool IsDepthNearer(

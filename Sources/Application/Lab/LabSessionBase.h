@@ -70,7 +70,9 @@ namespace gglab
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept;
 
 		World& GetWorld() noexcept { return m_World; }
+		const World& GetWorld() const noexcept { return m_World; }
 		Camera& GetCamera() noexcept { return *m_Camera; }
+		const Camera& GetCamera() const noexcept { return *m_Camera; }
 		CameraController& GetCameraController() noexcept { return *m_CameraController; }
 		CameraRig& GetCameraRig() noexcept { return m_CameraRig; }
 		const ViewRenderProfile& GetViewRenderProfile() const noexcept { return m_ViewRenderProfile; }

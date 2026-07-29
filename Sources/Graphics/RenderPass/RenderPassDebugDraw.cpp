@@ -3,8 +3,8 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
@@ -87,15 +87,14 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				if (scene)
 				{
+					auto& sceneDepth = builder.GetBlackboard()
+						.Get<RGSceneDepthResources>(SceneDepthResourcesName);
 					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 					data.m_Color = targets.m_SceneColor;
-					data.m_Depth = builder.Read(targets.m_Depth, RGTextureAccess::DepthStencilRead);
-					RHITextureViewDesc dsvDesc =
-						MakeRHITexture2DViewDesc(
-							RHIFormat::D32Float,
-							0,
-							1,
-							RHITextureAspect::Depth);
+					data.m_Depth = builder.Read(
+						sceneDepth.m_Texture,
+						RGTextureAccess::DepthStencilRead);
+					RHITextureViewDesc dsvDesc = sceneDepth.m_DsvDesc;
 					dsvDesc.m_ReadOnlyDepth = true;
 					data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, dsvDesc);
 					data.m_World = frame.m_Scene;

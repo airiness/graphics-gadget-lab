@@ -64,6 +64,7 @@ namespace gglab
 			drawItem.m_MeshId = instance.m_MeshId;
 			drawItem.m_MaterialKey = instance.m_MaterialKey;
 			drawItem.m_ObjectOffset = instance.m_ObjectOffset;
+			drawItem.m_MaterialOffset = instance.m_MaterialOffset;
 			drawItem.m_Bucket = bucket;
 			drawItem.m_VariantBits = variantBits;
 			drawItem.m_SortKey = sortKey;

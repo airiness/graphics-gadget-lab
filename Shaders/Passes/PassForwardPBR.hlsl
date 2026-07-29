@@ -207,14 +207,13 @@ VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
 	const ObjectData objData = LoadCurrentObjectData();
 	const ViewData viewData = LoadViewData(g_Pass.ViewIndex);
 
-	const float4 posWS = TransformPositionWS(IN.Position, objData);
-	const float4 posVS = TransformPositionVS(posWS, viewData);
-	const float4 posCS = TransformPositionCS(posVS, viewData);
+	const RigidCoveragePosition position =
+		ResolveRigidCoveragePosition(IN.Position, objData, viewData);
 	const float3 normalWS = TransformNormalWS(IN.Normal, objData);
 	const float4 tangentWS = TransformTangentWS(IN.Tangent, objData);
 
-	OUT.PositionCS = posCS;
-	OUT.PositionWS = posWS.xyz;
+	OUT.PositionCS = position.PositionCS;
+	OUT.PositionWS = position.PositionWS.xyz;
 	OUT.NormalWS = normalWS;
 	OUT.UV0 = IN.UV0;
 	OUT.UV1 = IN.UV1;
@@ -236,13 +235,13 @@ float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 	ViewData viewData = g_Views[IN.ViewIndex];
 
 	// BaseColor
-	const float2 baseColorUV = SelectUV(matData.BaseColorBinding, IN.UV0, IN.UV1);
-	float4 baseColorSampled = SampleTextureBinding(matData.BaseColorBinding.TextureSamplerBinding, baseColorUV);
-	float3 baseColor = baseColorSampled.rgb * matData.BaseColorFactor.rgb;
+	const float4 baseColorSampled =
+		SampleMaterialBaseColor(matData, IN.UV0, IN.UV1);
+	const float3 baseColor = baseColorSampled.rgb;
 
 	float alpha = ResolveMaterialAlpha(
 		matData,
-		baseColorSampled.a * matData.BaseColorFactor.a);
+		baseColorSampled.a);
 
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
 	float2 metallicRoughnessUV = SelectUV(matData.MetallicRoughnessBinding, IN.UV0, IN.UV1);

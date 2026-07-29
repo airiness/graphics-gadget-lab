@@ -10,14 +10,27 @@ float2 SelectUV(MaterialTextureBindingData bindingData, float2 uv0, float2 uv1)
 	return (bindingData.TexCoordIndex == 1u) ? uv1 : uv0;
 }
 
-float SampleMaterialBaseAlpha(MaterialData matData, float2 uv0, float2 uv1)
+float4 SampleMaterialBaseColor(MaterialData matData, float2 uv0, float2 uv1)
 {
 	const float2 baseColorUV = SelectUV(matData.BaseColorBinding, uv0, uv1);
-	const float sampledAlpha = SampleTextureBinding(
+	return SampleTextureBinding(
 		matData.BaseColorBinding.TextureSamplerBinding,
-		baseColorUV).a;
+		baseColorUV) * matData.BaseColorFactor;
+}
 
-	return sampledAlpha * matData.BaseColorFactor.a;
+float SampleMaterialBaseAlpha(MaterialData matData, float2 uv0, float2 uv1)
+{
+	return SampleMaterialBaseColor(matData, uv0, uv1).a;
+}
+
+void ApplyMaterialAlphaClipFromSample(
+	MaterialData matData,
+	float sampledAlpha)
+{
+	if (matData.AlphaMode == MaterialAlphaModeMask)
+	{
+		clip(sampledAlpha - matData.AlphaCutoff);
+	}
 }
 
 float ResolveMaterialAlpha(MaterialData matData, float sampledAlpha)
@@ -29,7 +42,7 @@ float ResolveMaterialAlpha(MaterialData matData, float sampledAlpha)
 
 	if (matData.AlphaMode == MaterialAlphaModeMask)
 	{
-		clip(sampledAlpha - matData.AlphaCutoff);
+		ApplyMaterialAlphaClipFromSample(matData, sampledAlpha);
 		return 1.0;
 	}
 
@@ -43,5 +56,7 @@ void ApplyMaterialAlphaClip(MaterialData matData, float2 uv0, float2 uv1)
 		return;
 	}
 
-	clip(SampleMaterialBaseAlpha(matData, uv0, uv1) - matData.AlphaCutoff);
+	ApplyMaterialAlphaClipFromSample(
+		matData,
+		SampleMaterialBaseAlpha(matData, uv0, uv1));
 }

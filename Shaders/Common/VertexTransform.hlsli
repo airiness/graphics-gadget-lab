@@ -33,6 +33,13 @@ ViewData LoadViewData(uint viewOffset)
 	return g_Views[GetViewDataIndex(viewOffset)];
 }
 
+struct RigidCoveragePosition
+{
+	float4 PositionWS;
+	float4 PositionVS;
+	float4 PositionCS;
+};
+
 float4 TransformPositionWS(float3 positionOS, ObjectData objData)
 {
 	return mul(float4(positionOS, 1.0), objData.ModelMat);
@@ -46,6 +53,18 @@ float4 TransformPositionVS(float4 positionWS, ViewData viewData)
 float4 TransformPositionCS(float4 positionVS, ViewData viewData)
 {
 	return mul(positionVS, viewData.ProjMat);
+}
+
+RigidCoveragePosition ResolveRigidCoveragePosition(
+	float3 positionOS,
+	ObjectData objData,
+	ViewData viewData)
+{
+	RigidCoveragePosition position;
+	position.PositionWS = TransformPositionWS(positionOS, objData);
+	position.PositionVS = TransformPositionVS(position.PositionWS, viewData);
+	position.PositionCS = TransformPositionCS(position.PositionVS, viewData);
+	return position;
 }
 
 float3 TransformNormalWS(float3 normalOS, ObjectData objData)

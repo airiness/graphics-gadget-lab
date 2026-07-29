@@ -27,6 +27,7 @@ namespace gglab
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;
 			uint32_t m_BackBufferIndex = 0;
+			uint64_t m_FrameSerial = 0;
 		};
 
 		struct BuildResult
@@ -44,6 +45,7 @@ namespace gglab
 			RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint32_t m_BackBufferIndex = 0;
+			uint64_t m_FrameSerial = 0;
 			ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 
 			RenderFrameContext MakeRenderFrameContext() noexcept;

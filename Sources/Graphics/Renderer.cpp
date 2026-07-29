@@ -162,7 +162,11 @@ namespace gglab
 		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
 		m_HasActiveFrame = true;
-		return Frame(this, &rhiFrame);
+		const uint64_t frameSerial = m_NextFrameSerial++;
+		GGLAB_ASSERT_MSG(
+			frameSerial != 0,
+			"Renderer frame serial overflowed its valid range.");
+		return Frame(this, &rhiFrame, frameSerial);
 	}
 
 	void Renderer::Render(
@@ -176,6 +180,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.m_State == Frame::State::Begun,
 			"Renderer::Render requires an active frame begun by Renderer::BeginFrame.");
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
+		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
 
 		frame.m_RenderGraph = &rg;
 		frame.m_UploadFencePoint = renderContext.m_UploadFencePoint;

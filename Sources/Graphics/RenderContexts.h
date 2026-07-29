@@ -32,6 +32,7 @@ namespace gglab
 		const ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 
 		uint32_t m_BackBufferIndex = 0;
+		uint64_t m_FrameSerial = 0;
 
 		RHIFencePoint m_UploadFencePoint{};	// TODO: multi fence points support
 		RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
@@ -85,7 +86,8 @@ namespace gglab
 
 		bool IsValid() const noexcept
 		{
-			return (m_RenderViews.size() >= utils::ToIndex(RenderViewID::Count)) &&
+			return m_FrameSerial != 0 &&
+				(m_RenderViews.size() >= utils::ToIndex(RenderViewID::Count)) &&
 				(m_ViewRenderSettings.size() >= utils::ToIndex(RenderViewID::Count)) &&
 				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}

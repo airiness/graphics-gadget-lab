@@ -4,8 +4,11 @@
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
@@ -179,6 +182,10 @@ namespace gglab
 			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
 			{
 				m_TextureBarrierCount += static_cast<uint32_t>(barriers.size());
+				m_TextureBarriers.insert(
+					m_TextureBarriers.end(),
+					barriers.begin(),
+					barriers.end());
 			}
 			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
 			{
@@ -220,6 +227,7 @@ namespace gglab
 			uint32_t m_FlushBarrierCount = 0;
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
+			std::vector<RHITextureBarrier> m_TextureBarriers;
 		};
 
 		class RecordingComputeCommandContext final : public RHIComputeCommandContext
@@ -342,6 +350,48 @@ namespace gglab
 					screen_space::IsDepthBackground(1.0f, DepthConvention::Standard) &&
 					screen_space::IsDepthBackground(0.0f, DepthConvention::Reversed),
 				"Depth background values are convention-aware");
+			context.Check(
+				!screen_space::IsDepthBackground(
+					1.0f - 5.0e-7f,
+					DepthConvention::Standard) &&
+				!screen_space::IsDepthBackground(
+					5.0e-7f,
+					DepthConvention::Reversed),
+				"Non-clear depth values near the far plane remain geometry");
+
+			constexpr float PrecisionNearZ = 0.05f;
+			constexpr float PrecisionFarZ = 5000.0f;
+			constexpr float FarGeometryZ = PrecisionFarZ * 0.95f;
+			const Matrix precisionStandardProjection =
+				math::CreatePerspectiveFieldOfViewLH(
+					FovRadians,
+					Aspect,
+					PrecisionNearZ,
+					PrecisionFarZ);
+			const Matrix precisionReversedProjection =
+				math::CreatePerspectiveFieldOfViewLHReversedZ(
+					FovRadians,
+					Aspect,
+					PrecisionNearZ,
+					PrecisionFarZ);
+			const float precisionStandardDepth = ProjectPosition(
+				Vector3(0.0f, 0.0f, FarGeometryZ),
+				precisionStandardProjection).m_RawDepth;
+			const float precisionReversedDepth = ProjectPosition(
+				Vector3(0.0f, 0.0f, FarGeometryZ),
+				precisionReversedProjection).m_RawDepth;
+			context.Check(
+				precisionStandardDepth < 1.0f &&
+					1.0f - precisionStandardDepth < 1.0e-6f &&
+					!screen_space::IsDepthBackground(
+						precisionStandardDepth,
+						DepthConvention::Standard) &&
+					precisionReversedDepth > 0.0f &&
+					precisionReversedDepth < 1.0e-6f &&
+					!screen_space::IsDepthBackground(
+						precisionReversedDepth,
+						DepthConvention::Reversed),
+				"Geometry at 95 percent of the far range is not classified as background");
 			context.Check(
 				screen_space::IsDepthNearer(0.25f, 0.75f, DepthConvention::Standard) &&
 					screen_space::IsDepthFarther(0.75f, 0.25f, DepthConvention::Standard) &&
@@ -556,24 +606,28 @@ namespace gglab
 			{
 				RGTextureViewId m_View{};
 			};
-			RenderGraph graph(
-				{
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
-					.m_TransientResourcePool =
-						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
-				});
+			RecordingDevice recordingDevice;
+			RecordingGraphicsCommandContext recordingGraphicsContext;
+			constexpr RHITextureHandle graphDepthHandle{ 41, 7 };
+			RenderGraph graph({
+				.m_Device = &recordingDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
 			RGTextureId graphDepth;
 			RHITextureDesc graphDepthDesc = depthDesc;
 			graphDepthDesc.m_Usage = RHITextureUsage::None;
 			graph.AddPass<SampleableDepthPassData>(
 				"SampleableDepth.Write",
-				[&graphDepth, graphDepthDesc, dsvDesc](
+				[&graphDepth, graphDepthDesc, graphDepthHandle, dsvDesc](
 					RenderGraph::RGBuilder& builder,
 					SampleableDepthPassData& data)
 				{
-					graphDepth = builder.CreateTexture(
+					graphDepth = builder.ImportTexture(
 						"DisplayView.DepthBuffer",
-						graphDepthDesc);
+						graphDepthHandle,
+						graphDepthDesc,
+						RGTextureAccess::None);
 					builder.WriteInPlace(
 						graphDepth,
 						RGTextureAccess::DepthStencilWrite);
@@ -605,6 +659,99 @@ namespace gglab
 				"RenderGraph sampleable-depth DSV-to-SRV fixture compiles");
 			if (graphCompiled)
 			{
+				const RHIResourceState commonState = CommonRHIResourceState();
+				const RHIResourceState depthWriteState =
+					ToRHIResourceState(RGTextureAccess::DepthStencilWrite);
+				const RHIResourceState pixelSampleState =
+					ToRHIResourceState(
+						RGTextureAccess::Sample,
+						RHIStage::PixelShader);
+				const auto* executionPlan = graph.GetExecutionPlan();
+				const bool hasExactPlannerContract =
+					executionPlan &&
+					executionPlan->GetResources().size() == 1 &&
+					executionPlan->GetPasses().size() == 2 &&
+					executionPlan->GetPasses()[0].m_PreBarriers.size() == 1 &&
+					executionPlan->GetPasses()[0].m_PostBarriers.empty() &&
+					executionPlan->GetPasses()[1].m_PreBarriers.size() == 1 &&
+					executionPlan->GetPasses()[1].m_PostBarriers.size() == 1;
+				bool plannerBarrierFieldsMatch = hasExactPlannerContract;
+				if (hasExactPlannerContract)
+				{
+					const auto& writeBarrier =
+						executionPlan->GetPasses()[0].m_PreBarriers[0];
+					const auto& sampleBarrier =
+						executionPlan->GetPasses()[1].m_PreBarriers[0];
+					const auto& finalBarrier =
+						executionPlan->GetPasses()[1].m_PostBarriers[0];
+					const auto isFullTextureTransition =
+						[](const RGBarrierIntent& barrier) noexcept
+						{
+							return barrier.m_Resource.Value() == 0 &&
+								barrier.m_Kind == RGBarrierKind::Transition &&
+								!barrier.m_Subresources.has_value();
+						};
+					plannerBarrierFieldsMatch =
+						isFullTextureTransition(writeBarrier) &&
+						writeBarrier.m_Reason ==
+							RGBarrierReason::AccessTransition &&
+						writeBarrier.m_Before == commonState &&
+						writeBarrier.m_After == depthWriteState &&
+						isFullTextureTransition(sampleBarrier) &&
+						sampleBarrier.m_Reason ==
+							RGBarrierReason::AccessTransition &&
+						sampleBarrier.m_Before == depthWriteState &&
+						sampleBarrier.m_After == pixelSampleState &&
+						isFullTextureTransition(finalBarrier) &&
+						finalBarrier.m_Reason ==
+							RGBarrierReason::FinalStateTransition &&
+						finalBarrier.m_Before == pixelSampleState &&
+						finalBarrier.m_After == commonState;
+				}
+				context.Check(
+					plannerBarrierFieldsMatch,
+					"RenderGraph plans the exact Common-to-DSW-to-pixel-SRV-to-Common depth contract");
+
+				const bool dependencyMatches = executionPlan &&
+					std::ranges::any_of(
+						executionPlan->GetDependencyEdges(),
+						[](const RGPassDependencyEdge& edge) noexcept
+						{
+							return edge.m_From.Value() == 0 &&
+								edge.m_To.Value() == 1 &&
+								edge.m_Reason ==
+									RGDependencyReason::WriterToReader;
+						});
+				context.Check(
+					dependencyMatches,
+					"Sampleable depth preserves its writer-to-reader dependency");
+
+				bool compiledViewsMatch = executionPlan &&
+					executionPlan->GetTextureViews().size() == 2;
+				if (compiledViewsMatch)
+				{
+					const auto& compiledDsv =
+						executionPlan->GetTextureViews()[0].m_Desc;
+					const auto& compiledSrv =
+						executionPlan->GetTextureViews()[1].m_Desc;
+					compiledViewsMatch =
+						compiledDsv.m_Type ==
+							RHITextureViewType::DepthStencil &&
+						compiledDsv.m_Dimension ==
+							RHITextureViewDimension::Texture2D &&
+						compiledDsv.m_Format == RHIFormat::D32Float &&
+						compiledDsv.m_Subresources == dsvDesc.m_Subresources &&
+						compiledSrv.m_Type ==
+							RHITextureViewType::ShaderResource &&
+						compiledSrv.m_Dimension ==
+							RHITextureViewDimension::Texture2D &&
+						compiledSrv.m_Format == RHIFormat::R32Float &&
+						compiledSrv.m_Subresources == srvDesc.m_Subresources;
+				}
+				context.Check(
+					compiledViewsMatch,
+					"Sampleable depth compiles canonical D32 DSV and R32 SRV views of one resource");
+
 				RGSnapshot snapshot;
 				BuildRenderGraphSnapshot(graph, snapshot);
 				const auto expectedUsage =
@@ -620,10 +767,91 @@ namespace gglab
 								RGTextureAccess::DepthStencilWrite) &&
 						snapshot.m_Passes[1].m_Accesses[0].m_AccessValue ==
 							static_cast<uint64_t>(RGTextureAccess::Sample) &&
+						snapshot.m_Passes[0].m_PreBarriers.size() == 1 &&
 						snapshot.m_Passes[1].m_PreBarriers.size() == 1 &&
-						snapshot.m_Passes[1].m_PreBarriers[0].m_Kind ==
-							RGBarrierKind::Transition,
-					"RenderGraph infers depth and sampled usage with a DSV-to-SRV transition");
+						snapshot.m_Passes[1].m_PostBarriers.size() == 1,
+					"RenderGraph snapshot publishes the inferred sampleable-depth contract");
+
+				RGExecuteContext executeContext({
+					.m_GraphicsCommandContext = &recordingGraphicsContext,
+				});
+				graph.Execute(executeContext);
+				const auto isFullResourceBarrier =
+					[](const RHITextureBarrier& barrier) noexcept
+					{
+						return !barrier.m_Subresources.has_value();
+					};
+				const bool loweredBarriersMatch =
+					recordingGraphicsContext.m_TextureBarriers.size() == 3 &&
+					recordingGraphicsContext.m_TextureBarriers[0].m_Texture ==
+						graphDepthHandle &&
+					isFullResourceBarrier(
+						recordingGraphicsContext.m_TextureBarriers[0]) &&
+					recordingGraphicsContext.m_TextureBarriers[0].m_Before ==
+						commonState &&
+					recordingGraphicsContext.m_TextureBarriers[0].m_After ==
+						depthWriteState &&
+					recordingGraphicsContext.m_TextureBarriers[1].m_Texture ==
+						graphDepthHandle &&
+					isFullResourceBarrier(
+						recordingGraphicsContext.m_TextureBarriers[1]) &&
+					recordingGraphicsContext.m_TextureBarriers[1].m_Before ==
+						depthWriteState &&
+					recordingGraphicsContext.m_TextureBarriers[1].m_After ==
+						pixelSampleState &&
+					recordingGraphicsContext.m_TextureBarriers[2].m_Texture ==
+						graphDepthHandle &&
+					isFullResourceBarrier(
+						recordingGraphicsContext.m_TextureBarriers[2]) &&
+					recordingGraphicsContext.m_TextureBarriers[2].m_Before ==
+						pixelSampleState &&
+					recordingGraphicsContext.m_TextureBarriers[2].m_After ==
+						commonState;
+				context.Check(
+					loweredBarriersMatch,
+					"RenderGraph executor lowers exactly three resource-specific depth barriers");
+
+				D3D12_RESOURCE_DESC nativeResourceDesc{};
+				nativeResourceDesc.Dimension =
+					D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+				nativeResourceDesc.Width = 1280;
+				nativeResourceDesc.Height = 720;
+				nativeResourceDesc.DepthOrArraySize = 1;
+				nativeResourceDesc.MipLevels = 1;
+				nativeResourceDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+				nativeResourceDesc.SampleDesc = { 1, 0 };
+				auto* nativeResource =
+					reinterpret_cast<ID3D12Resource*>(uintptr_t{ 0x1234 });
+				bool nativeBarrierMatches = false;
+				if (recordingGraphicsContext.m_TextureBarriers.size() == 3)
+				{
+					const D3D12_TEXTURE_BARRIER nativeBarrier =
+						BuildD3D12TextureBarrier(
+							recordingGraphicsContext.m_TextureBarriers[1],
+							nativeResource,
+							nativeResourceDesc);
+					nativeBarrierMatches =
+						nativeBarrier.SyncBefore ==
+							D3D12_BARRIER_SYNC_DEPTH_STENCIL &&
+						nativeBarrier.SyncAfter ==
+							D3D12_BARRIER_SYNC_PIXEL_SHADING &&
+						nativeBarrier.AccessBefore ==
+							D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE &&
+						nativeBarrier.AccessAfter ==
+							D3D12_BARRIER_ACCESS_SHADER_RESOURCE &&
+						nativeBarrier.LayoutBefore ==
+							D3D12_BARRIER_LAYOUT_DEPTH_STENCIL_WRITE &&
+						nativeBarrier.LayoutAfter ==
+							D3D12_BARRIER_LAYOUT_SHADER_RESOURCE &&
+						nativeBarrier.pResource == nativeResource &&
+						nativeBarrier.Subresources.IndexOrFirstMipLevel ==
+							D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES &&
+						nativeBarrier.Flags ==
+							D3D12_TEXTURE_BARRIER_FLAG_NONE;
+				}
+				context.Check(
+					nativeBarrierMatches,
+					"DX12 lowers the depth transition to the exact Enhanced Barrier contract");
 			}
 		}
 
@@ -646,6 +874,273 @@ namespace gglab
 				"Production DXC compiles screen-space and depth reconstruction helpers");
 		}
 
+		void RunDepthCoverageContractTests(SelfTestContext& context) noexcept
+		{
+			const auto makeVariantBits =
+				[](RenderBucket bucket, bool doubleSided) noexcept
+				{
+					uint64_t bits =
+						static_cast<uint64_t>(bucket) <<
+						RenderQueueBuilder::VariantBit::BucketShift;
+					if (doubleSided)
+					{
+						bits |=
+							RenderQueueBuilder::VariantBit::DoubleSided;
+					}
+					return bits;
+				};
+
+			GraphicsPipelineRecipe baseRecipe{};
+			baseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			baseRecipe.m_TopologyType =
+				RHIPrimitiveTopologyType::Triangle;
+			baseRecipe.m_PrimitiveTopology =
+				RHIPrimitiveTopology::TriangleList;
+			baseRecipe.m_Formats.m_SampleCount = 1;
+			baseRecipe.m_Formats.m_SampleQuality = 0;
+			baseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
+			baseRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
+			baseRecipe.m_BlendPreset = BlendPreset::Default;
+
+			const auto opaque =
+				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
+					baseRecipe,
+					makeVariantBits(RenderBucket::Opaque, false));
+			const auto opaqueRepeat =
+				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
+					baseRecipe,
+					makeVariantBits(RenderBucket::Opaque, false));
+			const auto alphaTest =
+				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
+					baseRecipe,
+					makeVariantBits(RenderBucket::AlphaTest, false));
+			const auto doubleSided =
+				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
+					baseRecipe,
+					makeVariantBits(RenderBucket::Opaque, true));
+			const auto transparent =
+				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
+					baseRecipe,
+					makeVariantBits(RenderBucket::Transparent, false));
+			context.Check(
+				opaque && opaqueRepeat && alphaTest && doubleSided &&
+					*opaque == *opaqueRepeat &&
+					!transparent,
+				"Forward variants generate stable depth coverage eligibility");
+			if (!opaque || !alphaTest || !doubleSided)
+			{
+				return;
+			}
+
+			DepthCoverageSignature alphaNormalized = *alphaTest;
+			alphaNormalized.m_AlphaVariant =
+				DepthCoverageAlphaVariant::Opaque;
+			DepthCoverageSignature doubleSidedNormalized = *doubleSided;
+			doubleSidedNormalized.m_CullMode = opaque->m_CullMode;
+			doubleSidedNormalized.m_DoubleSided = false;
+			context.Check(
+				alphaNormalized == *opaque &&
+					doubleSidedNormalized == *opaque,
+				"Alpha-test and double-sided variants differ only in their coverage fields");
+
+			const auto differsAfter =
+				[&opaque](auto mutate) noexcept
+				{
+					DepthCoverageSignature changed = *opaque;
+					mutate(changed);
+					return changed != *opaque;
+				};
+			const bool staticFieldsParticipate =
+				differsAfter([](auto& value)
+					{
+						value.m_VertexProgram =
+							DepthCoverageVertexProgram::SkinnedMeshV1;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_Deformation =
+							DepthCoverageDeformationVariant::Skinned;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_InputLayout = InputLayoutID::P3C4;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_PositionPrecision =
+							DepthCoveragePositionPrecision::Float16;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_PositionFormat =
+							RHIFormat::R32G32B32A32Float;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_CullMode = RHICullMode::Front;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_FrontCounterClockwise = true;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_DepthClipEnable = false;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_SampleCount = 4;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_AlphaVariant =
+							DepthCoverageAlphaVariant::BaseColorMaskV1;
+					});
+			context.Check(
+				staticFieldsParticipate,
+				"Coverage-relevant static fields participate in signature identity");
+
+			GraphicsPipelineRecipe nonCoverageRecipe = baseRecipe;
+			nonCoverageRecipe.m_DepthPreset =
+				DepthPreset::ReversedZReadOnly;
+			nonCoverageRecipe.m_BlendPreset = BlendPreset::AlphaBlend;
+			nonCoverageRecipe.m_Formats.m_RenderTargetFormats[0] =
+				RHIFormat::R8G8B8A8Unorm;
+			const auto nonCoverageSignature =
+				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
+					nonCoverageRecipe,
+					makeVariantBits(RenderBucket::Opaque, false));
+			context.Check(
+				nonCoverageSignature &&
+					*nonCoverageSignature == *opaque,
+				"Depth, blend, and render-target state do not change coverage identity");
+
+			GraphicsPipelineRecipe opaqueLogicalRecipe = baseRecipe;
+			opaqueLogicalRecipe.m_DepthCoverageSignature = *opaque;
+			GraphicsPipelineRecipe alphaLogicalRecipe = baseRecipe;
+			alphaLogicalRecipe.m_DepthCoverageSignature = *alphaTest;
+			context.Check(
+				opaqueLogicalRecipe != alphaLogicalRecipe,
+				"Depth coverage signature participates in logical pipeline recipe identity");
+
+			const DepthCoverageBinding binding{
+				.m_FrameSerial = 23,
+				.m_ViewBindingId = 1,
+				.m_CurrentModelSource = {
+					.m_Buffer = RHIBufferHandle{ 2, 3 },
+					.m_ElementIndex = 17,
+				},
+				.m_CurrentViewSource = {
+					.m_Buffer = RHIBufferHandle{ 4, 5 },
+					.m_ElementIndex = 29,
+				},
+				.m_CurrentJitteredProjectionSource = {
+					.m_Buffer = RHIBufferHandle{ 4, 5 },
+					.m_ElementIndex = 29,
+				},
+				.m_ProjectionSource =
+					DepthCoverageProjectionSource::ViewDataProjection,
+				.m_MaterialAlphaSource = {
+					.m_Buffer = RHIBufferHandle{ 6, 7 },
+					.m_ElementIndex = 31,
+				},
+			};
+			const auto bindingDiffersAfter =
+				[&binding](auto mutate) noexcept
+				{
+					DepthCoverageBinding changed = binding;
+					mutate(changed);
+					return changed != binding;
+				};
+			context.Check(
+				binding.IsValid() &&
+					binding == DepthCoverageBinding(binding) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							++value.m_FrameSerial;
+						}) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							++value.m_ViewBindingId;
+						}) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							++value.m_CurrentModelSource.m_ElementIndex;
+						}) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							value.m_CurrentViewSource.m_Buffer =
+								RHIBufferHandle{ 4, 6 };
+						}) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							++value.m_CurrentJitteredProjectionSource.m_ElementIndex;
+						}) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							value.m_ProjectionSource =
+								DepthCoverageProjectionSource::
+									DedicatedJitteredProjection;
+						}) &&
+					bindingDiffersAfter([](auto& value)
+						{
+							++value.m_MaterialAlphaSource.m_ElementIndex;
+						}),
+				"Dynamic depth coverage binding identifies every GPU data source");
+
+			DepthCoverageBinding changedBinding = binding;
+			++changedBinding.m_FrameSerial;
+			const DepthCoverageComparison comparison =
+				CompareDepthCoverageContracts(
+					*opaque,
+					binding,
+					*alphaTest,
+					changedBinding);
+			context.Check(
+				!comparison.IsCompatible() &&
+					comparison.m_Mismatch.find("AlphaVariant") !=
+						std::string::npos &&
+					comparison.m_Mismatch.find("FrameSerial") !=
+						std::string::npos &&
+					DescribeDepthCoverageSignature(*opaque).find(
+						"InputLayout") != std::string::npos &&
+					DescribeDepthCoverageBinding(binding).find(
+						"MaterialAlpha") != std::string::npos,
+				"Depth coverage diagnostics identify mismatched signature and binding fields");
+
+			const DepthCoverageComparison invalidBindingComparison =
+				CompareDepthCoverageContracts(
+					*opaque,
+					DepthCoverageBinding{},
+					*opaque,
+					DepthCoverageBinding{});
+			const DepthCoverageComparison invalidSignatureComparison =
+				CompareDepthCoverageContracts(
+					DepthCoverageSignature{},
+					binding,
+					DepthCoverageSignature{},
+					binding);
+			DepthCoverageBinding invalidRhsBinding = binding;
+			invalidRhsBinding.m_FrameSerial = 0;
+			const DepthCoverageComparison oneInvalidBindingComparison =
+				CompareDepthCoverageContracts(
+					*opaque,
+					binding,
+					*opaque,
+					invalidRhsBinding);
+			context.Check(
+				!invalidBindingComparison.IsCompatible() &&
+					invalidBindingComparison.m_Mismatch.find(
+						"Binding.LhsInvalid") != std::string::npos &&
+					!invalidSignatureComparison.IsCompatible() &&
+					invalidSignatureComparison.m_Mismatch.find(
+						"Signature.LhsInvalid") != std::string::npos &&
+					!oneInvalidBindingComparison.IsCompatible() &&
+					oneInvalidBindingComparison.m_Mismatch.find(
+						"Binding.RhsInvalid") != std::string::npos,
+				"Depth coverage comparison rejects missing signature and binding sources");
+		}
+
 		void RunScreenSpaceAndDepthContractTests(SelfTestContext& context) noexcept
 		{
 			RunProjectionConventionTests(context);
@@ -653,6 +1148,7 @@ namespace gglab
 			RunScreenCoordinateTests(context);
 			RunRenderViewConventionTests(context);
 			RunSampleableDepthFormatTests(context);
+			RunDepthCoverageContractTests(context);
 			RunShaderCompileContractTests(context);
 		}
 

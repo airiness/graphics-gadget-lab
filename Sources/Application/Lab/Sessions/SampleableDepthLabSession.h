@@ -46,7 +46,10 @@ namespace gglab
 		float m_FarPlane = 5000.0f;
 		uint32_t m_ViewportWidth = 0;
 		uint32_t m_ViewportHeight = 0;
+		float m_InitialFarMarkerViewDistance = 0.0f;
+		bool m_FixtureConfigured = false;
 		PostProcessDebugSelection m_PreviousPreviewSelection{};
+		uint64_t m_PreviewUpdateCountOnEnter = 0;
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};
 	};

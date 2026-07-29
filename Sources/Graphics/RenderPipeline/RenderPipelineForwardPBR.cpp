@@ -2,8 +2,10 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/RHI/RHITextureViewDescUtils.h"
 
 namespace gglab
 {
@@ -34,10 +36,14 @@ namespace gglab
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const DepthConvention displayDepthConvention =
+			context.GetDisplayRenderView().m_DepthConvention;
 
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
-			[swapChain, frameBackBufferIndex, displayViewId](RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
+			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention](
+				RenderGraph::RGBuilder& builder,
+				DisplayViewSetupPassData&)
 			{
 				builder.SideEffect();
 
@@ -76,11 +82,28 @@ namespace gglab
 				depthBufferDesc.m_Format = RHIFormat::R32Typeless;
 				depthBufferDesc.m_ClearValue = RHIClearValue{
 					.m_Format = RHIFormat::D32Float,
-					.m_Depth = 0.0f,
+					.m_Depth = screen_space::GetDepthBackgroundValue(
+						displayDepthConvention),
 					.m_IsDepthStencil = true,
 				};
 
-				targets.m_Depth = builder.CreateTexture("DisplayView.DepthBuffer", depthBufferDesc);
+				auto& sceneDepth = blackboard.GetOrCreate<RGSceneDepthResources>(
+					SceneDepthResourcesName);
+				sceneDepth.m_Texture = builder.CreateTexture(
+					"DisplayView.DepthBuffer",
+					depthBufferDesc);
+				sceneDepth.m_DsvDesc = MakeRHITexture2DViewDesc(
+					RHIFormat::D32Float,
+					0,
+					1,
+					RHITextureAspect::Depth);
+				sceneDepth.m_DsvDesc.m_Type = RHITextureViewType::DepthStencil;
+				sceneDepth.m_SrvDesc = MakeRHITexture2DViewDesc(
+					RHIFormat::R32Float,
+					0,
+					1,
+					RHITextureAspect::Depth);
+				sceneDepth.m_Convention = displayDepthConvention;
 
 			});
 

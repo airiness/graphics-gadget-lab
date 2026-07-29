@@ -190,6 +190,7 @@ namespace gglab
 					renderInstance.m_MaterialFlags = iter->second.m_Flags;
 					renderInstance.m_AlphaMode = iter->second.m_AlphaMode;
 					renderInstance.m_ObjectOffset = objectOffset;
+					renderInstance.m_MaterialOffset = iter->second.m_Index;
 					renderInstance.m_WorldCenterPos = worldCenter;
 					renderInstance.m_WorldBounds = worldBounds;
 					renderInstance.m_HasWorldBounds = hasWorldBounds;

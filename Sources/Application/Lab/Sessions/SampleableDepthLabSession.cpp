@@ -70,7 +70,7 @@ namespace gglab
 			.m_Name = "Far Plane",
 			.m_Group = "Depth Range",
 			.m_Type = LabParameterType::Float,
-			.m_Impact = LabChangeImpact::Immediate,
+			.m_Impact = LabChangeImpact::RebuildScene,
 			.m_DefaultValue = 5000.0f,
 			.m_MinValue = LabValue(100.0f),
 			.m_MaxValue = LabValue(10000.0f),
@@ -119,6 +119,8 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection =
 			registry->GetPostProcessPreviewSelection();
+		m_PreviewUpdateCountOnEnter =
+			registry->GetPostProcessPreviewUpdateCount();
 		registry->SetPostProcessPreviewSelection({
 			.m_Tap = PostProcessDebugTap::SceneDepthRaw,
 		});
@@ -132,6 +134,7 @@ namespace gglab
 		{
 			registry->SetPostProcessPreviewSelection(
 				m_PreviousPreviewSelection);
+			registry->RequestPostProcessPreview();
 		}
 	}
 
@@ -171,6 +174,7 @@ namespace gglab
 
 	void SampleableDepthLabSession::RebuildScene() noexcept
 	{
+		ApplyImmediateParameters();
 		BuildScene();
 	}
 
@@ -186,6 +190,7 @@ namespace gglab
 		ResetAssetInterests();
 		auto& registry = m_World.GetRegistry();
 		registry.clear();
+		m_FixtureConfigured = false;
 		ApplyCameraPreset();
 
 		const ModelID alphaModel = GetAssetOwnerScope().LoadModelAsync(
@@ -217,7 +222,7 @@ namespace gglab
 		components::TransformComponent floorTransform{};
 		floorTransform.m_Position = Vector3(0.0f, -1.4f, 8.0f);
 		floorTransform.m_Scale = Vector3(8.0f, 0.2f, 10.0f);
-		GGLAB_UNUSED(primitive::Cube::Create({
+		const entt::entity floorEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
 			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
 			.m_World = &m_World,
@@ -226,12 +231,12 @@ namespace gglab
 				"gglab.lab.sampleable_depth.floor",
 				Color(0.08f, 0.09f, 0.12f, 1.0f),
 				0.75f),
-		}));
+		});
 
 		components::TransformComponent cubeTransform{};
 		cubeTransform.m_Position = Vector3(0.3f, 0.0f, 5.2f);
 		cubeTransform.m_Scale = Vector3(1.8f, 1.8f, 1.8f);
-		GGLAB_UNUSED(primitive::Cube::Create({
+		const entt::entity cubeEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
 			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
 			.m_World = &m_World,
@@ -240,12 +245,12 @@ namespace gglab
 				"gglab.lab.sampleable_depth.intersection.cube",
 				Color(0.12f, 0.42f, 0.92f, 1.0f),
 				0.32f),
-		}));
+		});
 
 		components::TransformComponent sphereTransform{};
 		sphereTransform.m_Position = Vector3(1.35f, 0.35f, 5.7f);
 		sphereTransform.m_Scale = Vector3::One * 2.0f;
-		GGLAB_UNUSED(primitive::Sphere::Create({
+		const entt::entity sphereEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
 			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
 			.m_World = &m_World,
@@ -254,12 +259,17 @@ namespace gglab
 				"gglab.lab.sampleable_depth.intersection.sphere",
 				Color(0.95f, 0.24f, 0.08f, 1.0f),
 				0.2f),
-		}));
+		});
 
 		components::TransformComponent farTransform{};
-		farTransform.m_Position = Vector3(0.0f, 25.0f, 350.0f);
-		farTransform.m_Scale = Vector3::One * 18.0f;
-		GGLAB_UNUSED(primitive::Sphere::Create({
+		const Camera& camera = GetCamera();
+		m_InitialFarMarkerViewDistance = m_FarPlane * 0.98f;
+		farTransform.m_Position =
+			camera.GetPosition() +
+			camera.GetForward() * m_InitialFarMarkerViewDistance +
+			camera.GetUp() * (m_FarPlane * 0.04f);
+		farTransform.m_Scale = Vector3::One * (m_FarPlane * 0.008f);
+		const entt::entity farEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
 			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
 			.m_World = &m_World,
@@ -268,7 +278,27 @@ namespace gglab
 				"gglab.lab.sampleable_depth.far_marker",
 				Color(0.65f, 0.75f, 0.2f, 1.0f),
 				0.5f),
-		}));
+		});
+
+		const auto hasModelTransform = [&registry](entt::entity entity) noexcept
+		{
+			return registry.valid(entity) &&
+				registry.all_of<
+					components::TransformComponent,
+					components::ModelComponent>(entity);
+		};
+		const auto hasPrimitiveFixture = [&registry, &hasModelTransform](
+			entt::entity entity) noexcept
+		{
+			return hasModelTransform(entity) &&
+				registry.all_of<components::MaterialInstanceComponent>(entity);
+		};
+		m_FixtureConfigured =
+			hasModelTransform(alphaEntity) &&
+			hasPrimitiveFixture(floorEntity) &&
+			hasPrimitiveFixture(cubeEntity) &&
+			hasPrimitiveFixture(sphereEntity) &&
+			hasPrimitiveFixture(farEntity);
 
 		BuildLighting();
 		ApplyImmediateParameters();
@@ -310,40 +340,88 @@ namespace gglab
 		LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		const float ratio = m_FarPlane / std::max(m_NearPlane, 1.0e-6f);
+		const float farMarkerRatio = m_FarPlane > 0.0f ?
+			m_InitialFarMarkerViewDistance / m_FarPlane : 0.0f;
+		const Camera& camera = GetCamera();
+		const float expectedAspect = m_ViewportHeight > 0 ?
+			static_cast<float>(m_ViewportWidth) /
+				static_cast<float>(m_ViewportHeight) :
+			0.0f;
+		const bool cameraContractMatches =
+			std::abs(camera.GetNear() - m_NearPlane) <= 1.0e-6f &&
+			std::abs(camera.GetFar() - m_FarPlane) <= 1.0e-3f &&
+			m_ViewportWidth > 0 &&
+			m_ViewportHeight > 0 &&
+			std::abs(camera.GetAspect() - expectedAspect) <= 1.0e-6f;
+		const auto* registry =
+			m_Services.m_Renderer->GetRenderResourceRegistry();
+		const bool depthPreviewExecuted =
+			registry &&
+			registry->HasPublishedPostProcessPreview() &&
+			registry->GetPostProcessPreviewUpdateCount() >
+				m_PreviewUpdateCountOnEnter &&
+			(registry->GetPublishedPostProcessPreviewSelection().m_Tap ==
+					PostProcessDebugTap::SceneDepthRaw ||
+				registry->GetPublishedPostProcessPreviewSelection().m_Tap ==
+					PostProcessDebugTap::SceneDepthLinearViewZ);
+		LabDiagnosticCheckStatus fixtureStatus =
+			LabDiagnosticCheckStatus::Pending;
+		std::string fixtureDetail =
+			"Asset preparation is still in progress.";
+		if (m_LoadingProgress.HasFailed())
+		{
+			fixtureStatus = LabDiagnosticCheckStatus::Failed;
+			fixtureDetail = std::format(
+				"Asset preparation failed: {}",
+				m_LoadingProgress.m_Detail);
+		}
+		else if (m_LoadingProgress.IsReady())
+		{
+			fixtureStatus = m_FixtureConfigured ?
+				LabDiagnosticCheckStatus::Passed :
+				LabDiagnosticCheckStatus::Failed;
+			fixtureDetail = m_FixtureConfigured ?
+				"Required alpha, intersection, floor, and far-marker entities have the expected components; pixel correctness remains a visual check." :
+				"Scene preparation completed, but one or more required fixture components are missing.";
+		}
 		diagnostics.m_Title = "Sampleable Reversed-Z Depth";
 		diagnostics.m_Metrics = {
 			{ .m_Name = "Near plane", .m_Value = std::format("{:.4f}", m_NearPlane) },
 			{ .m_Name = "Far plane", .m_Value = std::format("{:.1f}", m_FarPlane) },
 			{ .m_Name = "Far / near", .m_Value = std::format("{:.0f}:1", ratio) },
+			{ .m_Name = "Initial far-marker view-Z", .m_Value = std::format(
+				"{:.1f} ({:.1f}% of far)",
+				m_InitialFarMarkerViewDistance,
+				farMarkerRatio * 100.0f) },
 			{ .m_Name = "Viewport", .m_Value = std::format(
 				"{} x {}", m_ViewportWidth, m_ViewportHeight) },
 		};
 		diagnostics.m_Checks = {
 			{
-				.m_Name = "Large near/far ratio",
+				.m_Name = "Configured near/far ratio",
 				.m_Status = ratio >= 10000.0f ?
 					LabDiagnosticCheckStatus::Passed :
 					LabDiagnosticCheckStatus::Failed,
-				.m_Detail = "The default range exercises Reversed-Z precision over at least 10,000:1.",
+				.m_Detail = "The configured camera range is at least 10,000:1.",
 			},
 			{
-				.m_Name = "Resize and aspect contract",
-				.m_Status = m_ViewportWidth > 0 && m_ViewportHeight > 0 ?
+				.m_Name = "Current camera contract",
+				.m_Status = cameraContractMatches ?
+					LabDiagnosticCheckStatus::Passed :
+					LabDiagnosticCheckStatus::Failed,
+				.m_Detail = "Camera near/far and aspect match the current Lab parameters and viewport.",
+			},
+			{
+				.m_Name = "Depth preview executed",
+				.m_Status = depthPreviewExecuted ?
 					LabDiagnosticCheckStatus::Passed :
 					LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "The active viewport remains valid across resize and restore.",
+				.m_Detail = "A depth preview was published after this Lab entered.",
 			},
 			{
-				.m_Name = "Main / shadow convention split",
-				.m_Status = LabDiagnosticCheckStatus::Passed,
-				.m_Detail = "Main depth is Reversed-Z; directional shadow depth remains Standard-Z.",
-			},
-			{
-				.m_Name = "Acceptance geometry",
-				.m_Status = m_LoadingProgress.IsReady() ?
-					LabDiagnosticCheckStatus::Passed :
-					LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Background, alpha-test silhouettes, intersecting solids, and a far marker are present.",
+				.m_Name = "Fixture construction",
+				.m_Status = fixtureStatus,
+				.m_Detail = fixtureDetail,
 			},
 		};
 	}

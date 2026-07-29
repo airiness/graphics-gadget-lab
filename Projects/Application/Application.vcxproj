@@ -317,6 +317,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\PipelineCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.cpp" />
@@ -620,6 +621,8 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\SceneDepthGraphResources.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelineCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelinePresets.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.h" />

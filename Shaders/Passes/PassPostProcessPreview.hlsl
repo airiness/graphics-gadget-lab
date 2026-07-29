@@ -46,7 +46,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 		{
 			return float4(rawDepth.xxx, 1.0);
 		}
-		if (IsDepthBackground(rawDepth, viewData.DepthConvention, 1.0e-6))
+		if (IsDepthBackground(rawDepth, viewData.DepthConvention))
 		{
 			return float4(0.0, 0.0, 0.0, 1.0);
 		}

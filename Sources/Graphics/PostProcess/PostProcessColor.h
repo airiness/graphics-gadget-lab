@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
 
@@ -27,9 +26,5 @@ namespace gglab
 	struct RGPostProcessInputs
 	{
 		RGPostProcessColor m_SceneColor{};
-		RGTextureId m_SceneDepth{};
-		RHIFormat m_SceneDepthDsvFormat = RHIFormat::Unknown;
-		RHIFormat m_SceneDepthSrvFormat = RHIFormat::Unknown;
-		DepthConvention m_DepthConvention = DepthConvention::Standard;
 	};
 }
