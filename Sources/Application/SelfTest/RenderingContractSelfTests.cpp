@@ -3,8 +3,10 @@
 #include "Core/Math/MathFunctions.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
+#include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
@@ -464,12 +466,91 @@ namespace gglab
 						.m_MainView = mainView,
 					});
 
+			const float mainNear = ProjectPosition(
+				Vector3(0.0f, 0.0f, mainView.m_Near),
+				mainView.m_Proj).m_RawDepth;
+			const float mainFar = ProjectPosition(
+				Vector3(0.0f, 0.0f, mainView.m_Far),
+				mainView.m_Proj).m_RawDepth;
 			context.Check(
-				mainView.m_DepthConvention == DepthConvention::Standard,
-				"Main view records its Standard-Z contract");
+				mainView.m_DepthConvention == DepthConvention::Reversed &&
+					NearlyEqual(mainNear, 1.0f) &&
+					NearlyEqual(mainFar, 0.0f),
+				"Main view records and projects with its Reversed-Z contract");
 			context.Check(
 				shadowView.m_DepthConvention == DepthConvention::Standard,
 				"Directional shadow view records its Standard-Z contract");
+		}
+
+		void RunSampleableDepthFormatTests(SelfTestContext& context) noexcept
+		{
+			const RHITextureDesc depthDesc{
+				.m_Format = RHIFormat::R32Typeless,
+				.m_Usage =
+					RHITextureUsage::Sampled |
+					RHITextureUsage::DepthStencil,
+				.m_Extent = { 1280, 720, 1 },
+				.m_ClearValue = RHIClearValue{
+					.m_Format = RHIFormat::D32Float,
+					.m_Depth = 0.0f,
+					.m_IsDepthStencil = true,
+				},
+			};
+			const RHITextureViewDesc dsvDesc{
+				.m_Type = RHITextureViewType::DepthStencil,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = RHIFormat::D32Float,
+				.m_Subresources = {
+					.m_MipCount = 1,
+					.m_ArraySliceCount = 1,
+					.m_Aspects = RHITextureAspect::Depth,
+				},
+			};
+			const RHITextureViewDesc srvDesc{
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = RHIFormat::R32Float,
+				.m_Subresources = {
+					.m_MipCount = 1,
+					.m_ArraySliceCount = 1,
+					.m_Aspects = RHITextureAspect::Depth,
+				},
+			};
+			context.Check(
+				ValidateRHITextureDesc(depthDesc).IsValid() &&
+					ValidateRHITextureViewDesc(depthDesc, dsvDesc).IsValid() &&
+					ValidateRHITextureViewDesc(depthDesc, srvDesc).IsValid(),
+				"R32 typeless main depth accepts typed D32 DSV and R32 SRV views");
+
+			RHITextureDesc typelessClearDesc = depthDesc;
+			typelessClearDesc.m_ClearValue->m_Format = RHIFormat::R32Typeless;
+			context.Check(
+				!ValidateRHITextureDesc(typelessClearDesc).IsValid(),
+				"Optimized clear values reject typeless formats");
+
+			GraphicsPipelineRecipe reversedWriteRecipe{};
+			reversedWriteRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
+			const auto reversedWrite =
+				BuildRHIGraphicsPipelineDesc(reversedWriteRecipe).m_DepthStencil;
+			GraphicsPipelineRecipe reversedReadRecipe{};
+			reversedReadRecipe.m_DepthPreset = DepthPreset::ReversedZReadOnly;
+			const auto reversedRead =
+				BuildRHIGraphicsPipelineDesc(reversedReadRecipe).m_DepthStencil;
+			GraphicsPipelineRecipe standardWriteRecipe{};
+			standardWriteRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
+			const auto standardWrite =
+				BuildRHIGraphicsPipelineDesc(standardWriteRecipe).m_DepthStencil;
+			context.Check(
+				reversedWrite.m_DepthTestEnable &&
+					reversedWrite.m_DepthWriteEnable &&
+					reversedWrite.m_DepthCompareOp == RHICompareOp::GreaterEqual &&
+					reversedRead.m_DepthTestEnable &&
+					!reversedRead.m_DepthWriteEnable &&
+					reversedRead.m_DepthCompareOp == RHICompareOp::GreaterEqual &&
+					standardWrite.m_DepthTestEnable &&
+					standardWrite.m_DepthWriteEnable &&
+					standardWrite.m_DepthCompareOp == RHICompareOp::Less,
+				"Depth presets encode explicit Reversed-Z and Standard-Z compare contracts");
 		}
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
@@ -497,6 +578,7 @@ namespace gglab
 			RunPositionReconstructionTests(context);
 			RunScreenCoordinateTests(context);
 			RunRenderViewConventionTests(context);
+			RunSampleableDepthFormatTests(context);
 			RunShaderCompileContractTests(context);
 		}
 

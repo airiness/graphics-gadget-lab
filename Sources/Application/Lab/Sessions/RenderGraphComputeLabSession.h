@@ -24,6 +24,8 @@ namespace gglab
 			const LabSessionCreateInfo& createInfo) noexcept;
 
 	private:
+		void ApplyImmediateParameters() noexcept override;
+
 		std::shared_ptr<RenderGraphComputeLabState> m_State;
 	};
 }

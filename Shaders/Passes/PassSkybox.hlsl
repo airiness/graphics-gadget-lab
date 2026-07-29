@@ -1,5 +1,6 @@
 #include <Common/Common.hlsli>
 #include <Common/ApplicationBinding.hlsli>
+#include <Common/DepthReconstruction.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/MaterialSampling.hlsli>
@@ -22,7 +23,12 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 float3 ReconstructWorldDirection(float2 uv, ViewData viewData)
 {
 	float2 positionNdc = uv * float2(2.0, -2.0) + float2(-1.0, 1.0);
-	float4 farPositionVS = mul(float4(positionNdc, 1.0, 1.0), viewData.InvProjMat);
+	float4 farPositionVS = mul(
+		float4(
+			positionNdc,
+			GetDepthFarValue(DEPTH_CONVENTION_REVERSED),
+			1.0),
+		viewData.InvProjMat);
 	float3 directionVS = SafeNormalize(
 		farPositionVS.xyz / max(farPositionVS.w, 1.0e-6),
 		float3(0.0, 0.0, 1.0));

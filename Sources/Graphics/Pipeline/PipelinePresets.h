@@ -22,10 +22,10 @@ namespace gglab
 
 	enum class DepthPreset : uint8_t
 	{
-		Default,
-		DepthReadOnly,
+		StandardZWrite,
+		StandardZReadOnly,
 		DepthDisabled,
-		ReverseZ,
-		ReverseZReadOnly,
+		ReversedZWrite,
+		ReversedZReadOnly,
 	};
 }

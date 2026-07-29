@@ -148,7 +148,7 @@ namespace gglab
 
 			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 			m_BaseRecipe.m_BlendPreset = BlendPreset::ColorWriteDisable;
-			m_BaseRecipe.m_DepthPreset = DepthPreset::Default;
+			m_BaseRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
 
 			m_IsInitialized = true;
 		}
