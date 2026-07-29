@@ -612,6 +612,86 @@ namespace gglab
 				"Logical sample bounds conversion rejects positive overflow");
 		}
 
+		void RunCellOwnerChunkIntersectionTests(
+			SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			const CellAabb positiveBounds{
+				.m_Min = { 4, 2, 1 },
+				.m_MaxExclusive = { 20, 14, 9 },
+			};
+			CellAabb intersection{};
+			const bool positivePartialChunksMatch =
+				IntersectCellOwnerChunk(
+					{ 0, 0, 0 },
+					8,
+					positiveBounds,
+					intersection).Succeeded() &&
+				intersection ==
+					CellAabb{
+						.m_Min = { 4, 2, 1 },
+						.m_MaxExclusive = { 8, 8, 8 },
+					} &&
+				IntersectCellOwnerChunk(
+					{ 2, 1, 1 },
+					8,
+					positiveBounds,
+					intersection).Succeeded() &&
+				intersection ==
+					CellAabb{
+						.m_Min = { 16, 8, 8 },
+						.m_MaxExclusive = { 20, 14, 9 },
+					};
+			context.Check(
+				positivePartialChunksMatch,
+				"Cell-owner chunk intersection clips positive partial chunks");
+
+			const CellAabb unchangedIntersection{
+				.m_Min = { 1, 2, 3 },
+				.m_MaxExclusive = { 4, 5, 6 },
+			};
+			intersection = unchangedIntersection;
+			context.Check(
+				IntersectCellOwnerChunk(
+					{ -1, 0, 0 },
+					8,
+					positiveBounds,
+					intersection).m_Error ==
+						ValidationError::ChunkOutsideLogicalCellDomain &&
+					intersection == unchangedIntersection,
+				"Outside cell-owner chunks leave the intersection unchanged");
+
+			const CellAabb negativeBounds{
+				.m_Min = { -20, -14, -9 },
+				.m_MaxExclusive = { -4, -2, -1 },
+			};
+			const bool negativePartialChunksMatch =
+				IntersectCellOwnerChunk(
+					{ -3, -2, -2 },
+					8,
+					negativeBounds,
+					intersection).Succeeded() &&
+				intersection ==
+					CellAabb{
+						.m_Min = { -20, -14, -9 },
+						.m_MaxExclusive = { -16, -8, -8 },
+					} &&
+				IntersectCellOwnerChunk(
+					{ -1, -1, -1 },
+					8,
+					negativeBounds,
+					intersection).Succeeded() &&
+				intersection ==
+					CellAabb{
+						.m_Min = { -8, -8, -8 },
+						.m_MaxExclusive = { -4, -2, -1 },
+					};
+			context.Check(
+				negativePartialChunksMatch,
+				"Cell-owner chunk intersection preserves negative partial chunks");
+		}
+
 		void RunLogicalDomainMetricsTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -841,6 +921,46 @@ namespace gglab
 				config,
 				ValidationError::LogicalSampleBoundsOverflow,
 				"ValidateConfig rejects overflowing logical sample bounds");
+
+			config = MakeValidConfig();
+			config.m_LogicalCellBounds = {
+				.m_Min = { 1000000, 0, 0 },
+				.m_MaxExclusive = { 1000008, 8, 8 },
+			};
+			CheckValidationError(
+				context,
+				config,
+				ValidationError::UnrepresentableWorldPosition,
+				"ValidateConfig rejects world positions below canonical mesh precision");
+
+			config = MakeValidConfig();
+			config.m_LogicalCellBounds = {
+				.m_Min = { 16777215, 0, 0 },
+				.m_MaxExclusive = { 16777218, 8, 8 },
+			};
+			CheckValidationError(
+				context,
+				config,
+				ValidationError::UnrepresentableWorldPosition,
+				"ValidateConfig covers precision loss inside a logical axis");
+
+			config = MakeValidConfig();
+			config.m_LogicalCellBounds = {
+				.m_Min = { -128, -128, -128 },
+				.m_MaxExclusive = { 127, 127, 127 },
+			};
+			context.Check(
+				ValidateConfig(config).Succeeded(),
+				"ValidateConfig accepts a domain at canonical mesh precision");
+
+			config = MakeValidConfig();
+			config.m_VoxelSize =
+				std::numeric_limits<float>::max();
+			CheckValidationError(
+				context,
+				config,
+				ValidationError::UnrepresentableWorldPosition,
+				"ValidateConfig rejects finite voxel sizes that overflow world positions");
 		}
 	}
 
@@ -853,6 +973,7 @@ namespace gglab
 		RunFlattenTests(context);
 		RunCellCornerAndHaloTests(context);
 		RunCoordinateBoundsTests(context);
+		RunCellOwnerChunkIntersectionTests(context);
 		RunLogicalDomainMetricsTests(context);
 		RunWorldConfigValidationTests(context);
 	}

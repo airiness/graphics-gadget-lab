@@ -1,10 +1,16 @@
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 
+#include "NapaVoxelCore/Validation/CheckedArithmetic.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <map>
+#include <optional>
 #include <utility>
+#include <vector>
 
 namespace napa::voxel
 {
@@ -85,12 +91,13 @@ namespace napa::voxel
 			return {};
 		}
 
+		template <typename DensityReader>
 		[[nodiscard]] ValidationResult ComputeAxisDensityGradient(
-			const VoxelWorld& world,
 			const SampleAabb& bounds,
 			SampleCoord coordinate,
 			CoordinateAxis axis,
 			std::uint8_t centerDensity,
+			DensityReader&& readDensity,
 			double& gradient) noexcept
 		{
 			const std::int32_t value = GetAxis(coordinate, axis);
@@ -104,7 +111,7 @@ namespace napa::voxel
 				SetAxis(positive, axis, value + 1);
 				std::uint8_t positiveDensity = 0;
 				const ValidationResult positiveResult =
-					ReadDensity(world, positive, positiveDensity);
+					readDensity(positive, positiveDensity);
 				if (positiveResult.Failed())
 				{
 					return positiveResult;
@@ -121,7 +128,7 @@ namespace napa::voxel
 				SetAxis(negative, axis, value - 1);
 				std::uint8_t negativeDensity = 0;
 				const ValidationResult negativeResult =
-					ReadDensity(world, negative, negativeDensity);
+					readDensity(negative, negativeDensity);
 				if (negativeResult.Failed())
 				{
 					return negativeResult;
@@ -139,13 +146,13 @@ namespace napa::voxel
 			std::uint8_t negativeDensity = 0;
 			std::uint8_t positiveDensity = 0;
 			const ValidationResult negativeResult =
-				ReadDensity(world, negative, negativeDensity);
+				readDensity(negative, negativeDensity);
 			if (negativeResult.Failed())
 			{
 				return negativeResult;
 			}
 			const ValidationResult positiveResult =
-				ReadDensity(world, positive, positiveDensity);
+				readDensity(positive, positiveDensity);
 			if (positiveResult.Failed())
 			{
 				return positiveResult;
@@ -267,10 +274,136 @@ namespace napa::voxel
 			return {};
 		}
 
+		[[nodiscard]] ValidationResult
+			InterpolatePreparedEdgeCandidate(
+				const VoxelWorldConfig& config,
+				ReferenceEdgeEndpoint first,
+				ReferenceEdgeEndpoint second,
+				ReferenceEdgeVertex& vertex) noexcept
+		{
+			if (SampleCoordZYXLess{}(
+				second.m_Coordinate,
+				first.m_Coordinate))
+			{
+				std::swap(first, second);
+			}
+
+			const std::int32_t densityA =
+				first.m_Sample.m_Density;
+			const std::int32_t densityB =
+				second.m_Sample.m_Density;
+			if (densityA == densityB)
+			{
+				return {
+					ValidationError::EqualDensityReferenceEdge,
+				};
+			}
+
+			const bool solidA = densityA >= IsoValue;
+			const bool solidB = densityB >= IsoValue;
+			if (solidA == solidB)
+			{
+				return {
+					ValidationError::NonCrossingReferenceEdge,
+				};
+			}
+
+			double interpolationT =
+				(static_cast<double>(IsoValue) -
+					static_cast<double>(densityA)) /
+				(static_cast<double>(densityB) -
+					static_cast<double>(densityA));
+			interpolationT =
+				std::clamp(interpolationT, 0.0, 1.0);
+			if (interpolationT == 0.0)
+			{
+				interpolationT = 0.0;
+			}
+
+			const Float3 position = InterpolatePosition(
+				first.m_Coordinate,
+				second.m_Coordinate,
+				interpolationT,
+				static_cast<double>(config.m_VoxelSize));
+			if (!IsFinite(position))
+			{
+				return { ValidationError::NonFiniteMeshVertex };
+			}
+
+			const DensityGradient densityGradient =
+				InterpolateDensityGradient(
+					first.m_DensityGradient,
+					second.m_DensityGradient,
+					interpolationT);
+			if (!IsFinite(densityGradient))
+			{
+				return {
+					ValidationError::NonFiniteDensityGradient,
+				};
+			}
+
+			vertex = {
+				.m_Position = position,
+				.m_DensityGradient = densityGradient,
+				.m_EndpointA = first.m_Coordinate,
+				.m_EndpointB = second.m_Coordinate,
+				.m_InterpolationT = interpolationT,
+			};
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult InterpolateEdgeCandidate(
+			const VoxelWorld& world,
+			ReferenceEdgeEndpoint first,
+			ReferenceEdgeEndpoint second,
+			ReferenceEdgeVertex& vertex) noexcept
+		{
+			const SampleAabb bounds = world.GetLogicalSampleBounds();
+			if (!bounds.Contains(first.m_Coordinate) ||
+				!bounds.Contains(second.m_Coordinate))
+			{
+				return {
+					ValidationError::SampleOutsideLogicalBounds,
+				};
+			}
+			if (!IsReferenceEdge(
+				first.m_Coordinate,
+				second.m_Coordinate))
+			{
+				return { ValidationError::InvalidReferenceEdge };
+			}
+
+			const ValidationResult firstSampleResult =
+				ValidateVoxelSample(first.m_Sample);
+			if (firstSampleResult.Failed())
+			{
+				return firstSampleResult;
+			}
+			const ValidationResult secondSampleResult =
+				ValidateVoxelSample(second.m_Sample);
+			if (secondSampleResult.Failed())
+			{
+				return secondSampleResult;
+			}
+			if (!IsFinite(first.m_DensityGradient) ||
+				!IsFinite(second.m_DensityGradient))
+			{
+				return {
+					ValidationError::NonFiniteDensityGradient,
+				};
+			}
+			return InterpolatePreparedEdgeCandidate(
+				world.GetConfig(),
+				first,
+				second,
+				vertex);
+		}
+
 		[[nodiscard]] ValidationResult ValidateTetrahedronCorners(
 			const VoxelWorld& world,
 			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
-			const std::array<std::uint8_t, 4>& tetrahedron) noexcept
+			const std::array<std::uint8_t, 4>& tetrahedron,
+			CellCoord& cell) noexcept
 		{
 			const std::uint8_t firstCornerId = tetrahedron[0];
 			const ReferenceEdgeEndpoint& first =
@@ -290,6 +423,20 @@ namespace napa::voxel
 					first.m_Coordinate.m_Z) -
 				static_cast<std::int64_t>(firstOffset.m_Z);
 			const SampleAabb bounds = world.GetLogicalSampleBounds();
+			const std::optional<std::int32_t> narrowedCellX =
+				CheckedNarrow<std::int32_t>(cellX);
+			const std::optional<std::int32_t> narrowedCellY =
+				CheckedNarrow<std::int32_t>(cellY);
+			const std::optional<std::int32_t> narrowedCellZ =
+				CheckedNarrow<std::int32_t>(cellZ);
+			if (!narrowedCellX ||
+				!narrowedCellY ||
+				!narrowedCellZ)
+			{
+				return {
+					ValidationError::InvalidReferenceTetrahedron,
+				};
+			}
 
 			for (const std::uint8_t cornerId : tetrahedron)
 			{
@@ -332,6 +479,11 @@ namespace napa::voxel
 					};
 				}
 			}
+			cell = {
+				*narrowedCellX,
+				*narrowedCellY,
+				*narrowedCellZ,
+			};
 			return {};
 		}
 
@@ -494,11 +646,34 @@ namespace napa::voxel
 			{
 				return { ValidationError::DegenerateDensityGradient };
 			}
+			const double inverseOutwardLength =
+				1.0 / std::sqrt(outwardLengthSquared);
+			const Float3 normalizedOutwardDirection{
+				static_cast<float>(
+					outwardDirection.m_X *
+						inverseOutwardLength),
+				static_cast<float>(
+					outwardDirection.m_Y *
+						inverseOutwardLength),
+				static_cast<float>(
+					outwardDirection.m_Z *
+						inverseOutwardLength),
+			};
+			if (!IsFinite(normalizedOutwardDirection))
+			{
+				return { ValidationError::NonFiniteDensityGradient };
+			}
 
 			const double alignment =
-				geometricNormal.m_X * outwardDirection.m_X +
-				geometricNormal.m_Y * outwardDirection.m_Y +
-				geometricNormal.m_Z * outwardDirection.m_Z;
+				geometricNormal.m_X *
+					static_cast<double>(
+						normalizedOutwardDirection.m_X) +
+				geometricNormal.m_Y *
+					static_cast<double>(
+						normalizedOutwardDirection.m_Y) +
+				geometricNormal.m_Z *
+					static_cast<double>(
+						normalizedOutwardDirection.m_Z);
 			if (!std::isfinite(alignment) || alignment == 0.0)
 			{
 				return { ValidationError::InvalidMeshWinding };
@@ -509,6 +684,10 @@ namespace napa::voxel
 					triangle.m_Vertices[1],
 					triangle.m_Vertices[2]);
 			}
+			triangle.m_WindingEvidence = {
+				.m_OutwardDirection =
+					normalizedOutwardDirection,
+			};
 			return {};
 		}
 
@@ -547,6 +726,572 @@ namespace napa::voxel
 				positions[1] == positions[2];
 			return {};
 		}
+
+		struct PreparedReferenceSampleGrid
+		{
+			std::size_t m_SampleCountX = 0;
+			std::size_t m_SampleCountY = 0;
+			std::size_t m_SampleCountZ = 0;
+			std::vector<ReferenceEdgeEndpoint> m_Samples;
+		};
+
+		struct PreparedVoxelSampleGrid
+		{
+			SampleAabb m_Bounds{};
+			std::size_t m_SampleCountX = 0;
+			std::size_t m_SampleCountY = 0;
+			std::size_t m_SampleCountZ = 0;
+			std::vector<VoxelSample> m_Samples;
+		};
+
+		struct PendingMaterialSection
+		{
+			std::vector<std::uint32_t> m_Indices;
+			std::vector<MeshTriangleWindingEvidence>
+				m_WindingEvidence;
+		};
+
+		[[nodiscard]] ValidationResult ValidateReferenceMeshCapacity(
+			const CellAabb& cellBounds) noexcept
+		{
+			const std::uint64_t cellCountX =
+				static_cast<std::uint64_t>(
+					static_cast<std::int64_t>(
+						cellBounds.m_MaxExclusive.m_X) -
+					static_cast<std::int64_t>(
+						cellBounds.m_Min.m_X));
+			const std::uint64_t cellCountY =
+				static_cast<std::uint64_t>(
+					static_cast<std::int64_t>(
+						cellBounds.m_MaxExclusive.m_Y) -
+					static_cast<std::int64_t>(
+						cellBounds.m_Min.m_Y));
+			const std::uint64_t cellCountZ =
+				static_cast<std::uint64_t>(
+					static_cast<std::int64_t>(
+						cellBounds.m_MaxExclusive.m_Z) -
+					static_cast<std::int64_t>(
+						cellBounds.m_Min.m_Z));
+			const std::optional<std::uint64_t> cellCountXY =
+				CheckedMul(cellCountX, cellCountY);
+			const std::optional<std::uint64_t> cellCount =
+				cellCountXY
+					? CheckedMul(*cellCountXY, cellCountZ)
+					: std::nullopt;
+			const std::optional<std::uint64_t> triangleCount =
+				cellCount
+					? CheckedMul(
+						*cellCount,
+						static_cast<std::uint64_t>(12))
+					: std::nullopt;
+			const std::optional<std::uint64_t> vertexCount =
+				triangleCount
+					? CheckedMul(
+						*triangleCount,
+						static_cast<std::uint64_t>(3))
+					: std::nullopt;
+			if (!cellCount || !triangleCount || !vertexCount)
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+			if (*vertexCount >
+				static_cast<std::uint64_t>(
+					std::numeric_limits<std::uint32_t>::max()))
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+
+			if (!CheckedNarrow<std::size_t>(*vertexCount) ||
+				!CheckedNarrow<std::size_t>(*triangleCount))
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult ComputeSampleGridShape(
+			const SampleAabb& bounds,
+			std::size_t& sizeX,
+			std::size_t& sizeY,
+			std::size_t& sizeZ,
+			std::size_t& capacity) noexcept
+		{
+			const std::uint64_t countX =
+				static_cast<std::uint64_t>(
+					static_cast<std::int64_t>(
+						bounds.m_MaxExclusive.m_X) -
+					static_cast<std::int64_t>(
+						bounds.m_Min.m_X));
+			const std::uint64_t countY =
+				static_cast<std::uint64_t>(
+					static_cast<std::int64_t>(
+						bounds.m_MaxExclusive.m_Y) -
+					static_cast<std::int64_t>(
+						bounds.m_Min.m_Y));
+			const std::uint64_t countZ =
+				static_cast<std::uint64_t>(
+					static_cast<std::int64_t>(
+						bounds.m_MaxExclusive.m_Z) -
+					static_cast<std::int64_t>(
+						bounds.m_Min.m_Z));
+			const std::optional<std::uint64_t> countXY =
+				CheckedMul(countX, countY);
+			const std::optional<std::uint64_t> count =
+				countXY
+					? CheckedMul(*countXY, countZ)
+					: std::nullopt;
+			const std::optional<std::size_t> preparedSizeX =
+				CheckedNarrow<std::size_t>(countX);
+			const std::optional<std::size_t> preparedSizeY =
+				CheckedNarrow<std::size_t>(countY);
+			const std::optional<std::size_t> preparedSizeZ =
+				CheckedNarrow<std::size_t>(countZ);
+			const std::optional<std::size_t> preparedCapacity =
+				count
+					? CheckedNarrow<std::size_t>(*count)
+					: std::nullopt;
+			if (!preparedSizeX ||
+				!preparedSizeY ||
+				!preparedSizeZ ||
+				!preparedCapacity)
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+
+			sizeX = *preparedSizeX;
+			sizeY = *preparedSizeY;
+			sizeZ = *preparedSizeZ;
+			capacity = *preparedCapacity;
+			return {};
+		}
+
+		[[nodiscard]] std::size_t FlattenPreparedSample(
+			SampleCoord coordinate,
+			const SampleAabb& bounds,
+			std::size_t sizeX,
+			std::size_t sizeY) noexcept
+		{
+			const std::size_t x = static_cast<std::size_t>(
+				static_cast<std::int64_t>(coordinate.m_X) -
+				static_cast<std::int64_t>(bounds.m_Min.m_X));
+			const std::size_t y = static_cast<std::size_t>(
+				static_cast<std::int64_t>(coordinate.m_Y) -
+				static_cast<std::int64_t>(bounds.m_Min.m_Y));
+			const std::size_t z = static_cast<std::size_t>(
+				static_cast<std::int64_t>(coordinate.m_Z) -
+				static_cast<std::int64_t>(bounds.m_Min.m_Z));
+			return x + sizeX * (y + sizeY * z);
+		}
+
+		[[nodiscard]] ValidationResult PrepareVoxelSampleGrid(
+			const VoxelWorld& world,
+			const SampleAabb& bounds,
+			PreparedVoxelSampleGrid& grid)
+		{
+			std::size_t sizeX = 0;
+			std::size_t sizeY = 0;
+			std::size_t sizeZ = 0;
+			std::size_t capacity = 0;
+			const ValidationResult shapeResult =
+				ComputeSampleGridShape(
+					bounds,
+					sizeX,
+					sizeY,
+					sizeZ,
+					capacity);
+			if (shapeResult.Failed())
+			{
+				return shapeResult;
+			}
+
+			PreparedVoxelSampleGrid prepared{
+				.m_Bounds = bounds,
+				.m_SampleCountX = sizeX,
+				.m_SampleCountY = sizeY,
+				.m_SampleCountZ = sizeZ,
+				.m_Samples = std::vector<VoxelSample>(capacity),
+			};
+			for (std::size_t z = 0; z < sizeZ; ++z)
+			{
+				for (std::size_t y = 0; y < sizeY; ++y)
+				{
+					for (std::size_t x = 0; x < sizeX; ++x)
+					{
+						const SampleCoord coordinate{
+							static_cast<std::int32_t>(
+								static_cast<std::int64_t>(
+									bounds.m_Min.m_X) +
+								static_cast<std::int64_t>(x)),
+							static_cast<std::int32_t>(
+								static_cast<std::int64_t>(
+									bounds.m_Min.m_Y) +
+								static_cast<std::int64_t>(y)),
+							static_cast<std::int32_t>(
+								static_cast<std::int64_t>(
+									bounds.m_Min.m_Z) +
+								static_cast<std::int64_t>(z)),
+						};
+						VoxelSample sample{};
+						const ValidationResult sampleResult =
+							world.ReadCurrentSample(
+								coordinate,
+								sample);
+						if (sampleResult.Failed())
+						{
+							return sampleResult;
+						}
+						const std::size_t index =
+							x + sizeX * (y + sizeY * z);
+						prepared.m_Samples[index] = sample;
+					}
+				}
+			}
+
+			grid = std::move(prepared);
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult ReadPreparedDensity(
+			const PreparedVoxelSampleGrid& grid,
+			SampleCoord coordinate,
+			std::uint8_t& density) noexcept
+		{
+			if (!grid.m_Bounds.Contains(coordinate))
+			{
+				return {
+					ValidationError::SampleOutsideLogicalBounds,
+				};
+			}
+			const std::size_t index = FlattenPreparedSample(
+				coordinate,
+				grid.m_Bounds,
+				grid.m_SampleCountX,
+				grid.m_SampleCountY);
+			density = grid.m_Samples[index].m_Density;
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult PrepareReferenceSampleGrid(
+			const VoxelWorld& world,
+			const CellAabb& cellBounds,
+			PreparedReferenceSampleGrid& grid)
+		{
+			const SampleAabb logicalBounds =
+				world.GetLogicalSampleBounds();
+			const std::optional<std::int32_t>
+				targetMaximumExclusiveX =
+					CheckedNarrow<std::int32_t>(
+						static_cast<std::int64_t>(
+							cellBounds
+								.m_MaxExclusive.m_X) +
+						1);
+			const std::optional<std::int32_t>
+				targetMaximumExclusiveY =
+					CheckedNarrow<std::int32_t>(
+						static_cast<std::int64_t>(
+							cellBounds
+								.m_MaxExclusive.m_Y) +
+						1);
+			const std::optional<std::int32_t>
+				targetMaximumExclusiveZ =
+					CheckedNarrow<std::int32_t>(
+						static_cast<std::int64_t>(
+							cellBounds
+								.m_MaxExclusive.m_Z) +
+						1);
+			if (!targetMaximumExclusiveX ||
+				!targetMaximumExclusiveY ||
+				!targetMaximumExclusiveZ)
+			{
+				return {
+					ValidationError::CoordinateOutOfRange,
+				};
+			}
+
+			const SampleAabb targetBounds{
+				.m_Min = {
+					cellBounds.m_Min.m_X,
+					cellBounds.m_Min.m_Y,
+					cellBounds.m_Min.m_Z,
+				},
+				.m_MaxExclusive = {
+					*targetMaximumExclusiveX,
+					*targetMaximumExclusiveY,
+					*targetMaximumExclusiveZ,
+				},
+			};
+			const SampleAabb expandedBounds{
+				.m_Min = {
+					static_cast<std::int32_t>(std::max(
+						static_cast<std::int64_t>(
+							logicalBounds.m_Min.m_X),
+						static_cast<std::int64_t>(
+							targetBounds.m_Min.m_X) -
+							1)),
+					static_cast<std::int32_t>(std::max(
+						static_cast<std::int64_t>(
+							logicalBounds.m_Min.m_Y),
+						static_cast<std::int64_t>(
+							targetBounds.m_Min.m_Y) -
+							1)),
+					static_cast<std::int32_t>(std::max(
+						static_cast<std::int64_t>(
+							logicalBounds.m_Min.m_Z),
+						static_cast<std::int64_t>(
+							targetBounds.m_Min.m_Z) -
+							1)),
+				},
+				.m_MaxExclusive = {
+					static_cast<std::int32_t>(std::min(
+						static_cast<std::int64_t>(
+							logicalBounds
+								.m_MaxExclusive.m_X),
+						static_cast<std::int64_t>(
+							targetBounds
+								.m_MaxExclusive.m_X) +
+							1)),
+					static_cast<std::int32_t>(std::min(
+						static_cast<std::int64_t>(
+							logicalBounds
+								.m_MaxExclusive.m_Y),
+						static_cast<std::int64_t>(
+							targetBounds
+								.m_MaxExclusive.m_Y) +
+							1)),
+					static_cast<std::int32_t>(std::min(
+						static_cast<std::int64_t>(
+							logicalBounds
+								.m_MaxExclusive.m_Z),
+						static_cast<std::int64_t>(
+							targetBounds
+								.m_MaxExclusive.m_Z) +
+							1)),
+				},
+			};
+			PreparedVoxelSampleGrid voxelSamples;
+			const ValidationResult voxelSampleResult =
+				PrepareVoxelSampleGrid(
+					world,
+					expandedBounds,
+					voxelSamples);
+			if (voxelSampleResult.Failed())
+			{
+				return voxelSampleResult;
+			}
+
+			std::size_t sizeX = 0;
+			std::size_t sizeY = 0;
+			std::size_t sizeZ = 0;
+			std::size_t capacity = 0;
+			const ValidationResult shapeResult =
+				ComputeSampleGridShape(
+					targetBounds,
+					sizeX,
+					sizeY,
+					sizeZ,
+					capacity);
+			if (shapeResult.Failed())
+			{
+				return shapeResult;
+			}
+			PreparedReferenceSampleGrid prepared{
+				.m_SampleCountX = sizeX,
+				.m_SampleCountY = sizeY,
+				.m_SampleCountZ = sizeZ,
+				.m_Samples =
+					std::vector<ReferenceEdgeEndpoint>(capacity),
+			};
+			const auto readDensity =
+				[&voxelSamples](
+					SampleCoord coordinate,
+					std::uint8_t& density) noexcept
+				{
+					return ReadPreparedDensity(
+						voxelSamples,
+						coordinate,
+						density);
+				};
+			for (std::size_t z = 0; z < sizeZ; ++z)
+			{
+				for (std::size_t y = 0; y < sizeY; ++y)
+				{
+					for (std::size_t x = 0; x < sizeX; ++x)
+					{
+						const SampleCoord coordinate{
+							static_cast<std::int32_t>(
+								static_cast<std::int64_t>(
+									targetBounds.m_Min.m_X) +
+								static_cast<std::int64_t>(x)),
+							static_cast<std::int32_t>(
+								static_cast<std::int64_t>(
+									targetBounds.m_Min.m_Y) +
+								static_cast<std::int64_t>(y)),
+							static_cast<std::int32_t>(
+								static_cast<std::int64_t>(
+									targetBounds.m_Min.m_Z) +
+								static_cast<std::int64_t>(z)),
+						};
+						const std::size_t voxelSampleIndex =
+							FlattenPreparedSample(
+								coordinate,
+								voxelSamples.m_Bounds,
+								voxelSamples
+									.m_SampleCountX,
+								voxelSamples
+									.m_SampleCountY);
+						const VoxelSample sample =
+							voxelSamples.m_Samples[
+								voxelSampleIndex];
+						DensityGradient gradient{};
+						const ValidationResult xResult =
+							ComputeAxisDensityGradient(
+								logicalBounds,
+								coordinate,
+								CoordinateAxis::X,
+								sample.m_Density,
+								readDensity,
+								gradient.m_X);
+						if (xResult.Failed())
+						{
+							return xResult;
+						}
+						const ValidationResult yResult =
+							ComputeAxisDensityGradient(
+								logicalBounds,
+								coordinate,
+								CoordinateAxis::Y,
+								sample.m_Density,
+								readDensity,
+								gradient.m_Y);
+						if (yResult.Failed())
+						{
+							return yResult;
+						}
+						const ValidationResult zResult =
+							ComputeAxisDensityGradient(
+								logicalBounds,
+								coordinate,
+								CoordinateAxis::Z,
+								sample.m_Density,
+								readDensity,
+								gradient.m_Z);
+						if (zResult.Failed())
+						{
+							return zResult;
+						}
+
+						const std::size_t index =
+							x + sizeX * (y + sizeY * z);
+						prepared.m_Samples[index] = {
+							.m_Coordinate = coordinate,
+							.m_Sample = sample,
+							.m_DensityGradient = gradient,
+						};
+					}
+				}
+			}
+
+			grid = std::move(prepared);
+			return {};
+		}
+
+		[[nodiscard]] const ReferenceEdgeEndpoint&
+			GetPreparedSample(
+				const PreparedReferenceSampleGrid& grid,
+				std::size_t cellX,
+				std::size_t cellY,
+				std::size_t cellZ,
+				CellCornerOffset corner) noexcept
+		{
+			const std::size_t x = cellX + corner.m_X;
+			const std::size_t y = cellY + corner.m_Y;
+			const std::size_t z = cellZ + corner.m_Z;
+			const std::size_t index =
+				x +
+				grid.m_SampleCountX *
+					(y + grid.m_SampleCountY * z);
+			return grid.m_Samples[index];
+		}
+
+		void IncludeBoundsPoint(
+			Float3 point,
+			bool& hasBounds,
+			FloatAabb& bounds) noexcept
+		{
+			if (!hasBounds)
+			{
+				bounds = {
+					.m_Min = point,
+					.m_Max = point,
+				};
+				hasBounds = true;
+				return;
+			}
+			bounds.m_Min.m_X =
+				std::min(bounds.m_Min.m_X, point.m_X);
+			bounds.m_Min.m_Y =
+				std::min(bounds.m_Min.m_Y, point.m_Y);
+			bounds.m_Min.m_Z =
+				std::min(bounds.m_Min.m_Z, point.m_Z);
+			bounds.m_Max.m_X =
+				std::max(bounds.m_Max.m_X, point.m_X);
+			bounds.m_Max.m_Y =
+				std::max(bounds.m_Max.m_Y, point.m_Y);
+			bounds.m_Max.m_Z =
+				std::max(bounds.m_Max.m_Z, point.m_Z);
+		}
+
+		[[nodiscard]] ValidationResult AppendReferenceTriangle(
+			const ReferenceTriangle& triangle,
+			VoxelMaterial material,
+			MeshData& mesh,
+			std::map<
+				VoxelMaterial,
+				PendingMaterialSection>& materialSections,
+			bool& hasBounds)
+		{
+			const std::optional<std::uint32_t> baseIndex =
+				CheckedNarrow<std::uint32_t>(
+					mesh.m_Vertices.size());
+			const std::optional<std::uint32_t> secondIndex =
+				baseIndex
+					? CheckedAdd(
+						*baseIndex,
+						static_cast<std::uint32_t>(1))
+					: std::nullopt;
+			const std::optional<std::uint32_t> thirdIndex =
+				baseIndex
+					? CheckedAdd(
+						*baseIndex,
+						static_cast<std::uint32_t>(2))
+					: std::nullopt;
+			if (!baseIndex || !secondIndex || !thirdIndex)
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+
+			for (const ReferenceEdgeVertex& vertex :
+				triangle.m_Vertices)
+			{
+				mesh.m_Vertices.push_back({
+					.m_Position = vertex.m_Position,
+					.m_Normal = vertex.m_Normal,
+				});
+				IncludeBoundsPoint(
+					vertex.m_Position,
+					hasBounds,
+					mesh.m_Bounds);
+			}
+
+			PendingMaterialSection& section =
+				materialSections[material];
+			section.m_Indices.push_back(*baseIndex);
+			section.m_Indices.push_back(*secondIndex);
+			section.m_Indices.push_back(*thirdIndex);
+			section.m_WindingEvidence.push_back(
+				triangle.m_WindingEvidence);
+			return {};
+		}
 	}
 
 	ReferenceMesher::ReferenceMesher(
@@ -574,13 +1319,19 @@ namespace napa::voxel
 		}
 
 		DensityGradient prepared{};
+		const auto readDensity =
+			[this](SampleCoord sample, std::uint8_t& density)
+				noexcept
+			{
+				return ReadDensity(m_World, sample, density);
+			};
 		const ValidationResult xResult =
 			ComputeAxisDensityGradient(
-				m_World,
 				bounds,
 				coordinate,
 				CoordinateAxis::X,
 				centerDensity,
+				readDensity,
 				prepared.m_X);
 		if (xResult.Failed())
 		{
@@ -588,11 +1339,11 @@ namespace napa::voxel
 		}
 		const ValidationResult yResult =
 			ComputeAxisDensityGradient(
-				m_World,
 				bounds,
 				coordinate,
 				CoordinateAxis::Y,
 				centerDensity,
+				readDensity,
 				prepared.m_Y);
 		if (yResult.Failed())
 		{
@@ -600,11 +1351,11 @@ namespace napa::voxel
 		}
 		const ValidationResult zResult =
 			ComputeAxisDensityGradient(
-				m_World,
 				bounds,
 				coordinate,
 				CoordinateAxis::Z,
 				centerDensity,
+				readDensity,
 				prepared.m_Z);
 		if (zResult.Failed())
 		{
@@ -620,101 +1371,29 @@ namespace napa::voxel
 		ReferenceEdgeEndpoint second,
 		ReferenceEdgeVertex& vertex) const noexcept
 	{
-		const SampleAabb bounds = m_World.GetLogicalSampleBounds();
-		if (!bounds.Contains(first.m_Coordinate) ||
-			!bounds.Contains(second.m_Coordinate))
+		ReferenceEdgeVertex prepared{};
+		const ValidationResult interpolationResult =
+			InterpolateEdgeCandidate(
+				m_World,
+				first,
+				second,
+				prepared);
+		if (interpolationResult.Failed())
 		{
-			return { ValidationError::SampleOutsideLogicalBounds };
-		}
-		if (!IsReferenceEdge(
-			first.m_Coordinate,
-			second.m_Coordinate))
-		{
-			return { ValidationError::InvalidReferenceEdge };
-		}
-
-		const ValidationResult firstSampleResult =
-			ValidateVoxelSample(first.m_Sample);
-		if (firstSampleResult.Failed())
-		{
-			return firstSampleResult;
-		}
-		const ValidationResult secondSampleResult =
-			ValidateVoxelSample(second.m_Sample);
-		if (secondSampleResult.Failed())
-		{
-			return secondSampleResult;
-		}
-		if (!IsFinite(first.m_DensityGradient) ||
-			!IsFinite(second.m_DensityGradient))
-		{
-			return { ValidationError::NonFiniteDensityGradient };
+			return interpolationResult;
 		}
 
-		if (SampleCoordZYXLess{}(
-			second.m_Coordinate,
-			first.m_Coordinate))
-		{
-			std::swap(first, second);
-		}
-
-		const std::int32_t densityA = first.m_Sample.m_Density;
-		const std::int32_t densityB = second.m_Sample.m_Density;
-		if (densityA == densityB)
-		{
-			return { ValidationError::EqualDensityReferenceEdge };
-		}
-
-		const bool solidA = densityA >= IsoValue;
-		const bool solidB = densityB >= IsoValue;
-		if (solidA == solidB)
-		{
-			return { ValidationError::NonCrossingReferenceEdge };
-		}
-
-		double interpolationT =
-			(static_cast<double>(IsoValue) -
-				static_cast<double>(densityA)) /
-			(static_cast<double>(densityB) -
-				static_cast<double>(densityA));
-		interpolationT = std::clamp(interpolationT, 0.0, 1.0);
-		if (interpolationT == 0.0)
-		{
-			interpolationT = 0.0;
-		}
-
-		const Float3 position = InterpolatePosition(
-			first.m_Coordinate,
-			second.m_Coordinate,
-			interpolationT,
-			static_cast<double>(
-				m_World.GetConfig().m_VoxelSize));
-		if (!IsFinite(position))
-		{
-			return { ValidationError::NonFiniteMeshVertex };
-		}
-
-		const DensityGradient densityGradient =
-			InterpolateDensityGradient(
-				first.m_DensityGradient,
-				second.m_DensityGradient,
-				interpolationT);
 		Float3 normal{};
 		const ValidationResult normalResult =
-			ComputeOutwardNormal(densityGradient, normal);
+			ComputeOutwardNormal(
+				prepared.m_DensityGradient,
+				normal);
 		if (normalResult.Failed())
 		{
 			return normalResult;
 		}
-
-		vertex = {
-			.m_Position = position,
-			.m_Normal = normal,
-			.m_DensityGradient = densityGradient,
-			.m_EndpointA = first.m_Coordinate,
-			.m_EndpointB = second.m_Coordinate,
-			.m_InterpolationT = interpolationT,
-		};
+		prepared.m_Normal = normal;
+		vertex = prepared;
 		return {};
 	}
 
@@ -739,16 +1418,53 @@ namespace napa::voxel
 
 		const std::array<std::uint8_t, 4>& tetrahedron =
 			ReferenceFreudenthalTetrahedra[tetrahedronIndex];
+		CellCoord cell{};
 		const ValidationResult cornerResult =
 			ValidateTetrahedronCorners(
 				m_World,
 				cubeCorners,
-				tetrahedron);
+				tetrahedron,
+				cell);
 		if (cornerResult.Failed())
 		{
 			return cornerResult;
 		}
+		OwnedCellAddress cellAddress{};
+		const ValidationResult ownerResult =
+			ResolveCellOwner(
+				cell,
+				m_World.GetConfig().m_ChunkCellCount,
+				cellAddress);
+		if (ownerResult.Failed())
+		{
+			return ownerResult;
+		}
+		if (!quantizationContext.IsCompatible(
+			m_World.GetConfig(),
+			cellAddress.m_Owner))
+		{
+			return {
+				ValidationError::
+					MismatchedMeshQuantizationContext,
+			};
+		}
+		return PolygonizePreparedTetrahedron(
+			cubeCorners,
+			tetrahedronIndex,
+			quantizationContext,
+			polygonization);
+	}
 
+	ValidationResult
+		ReferenceMesher::PolygonizePreparedTetrahedron(
+			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
+			std::uint8_t tetrahedronIndex,
+			const MeshQuantizationContext& quantizationContext,
+			ReferenceTetrahedronPolygonization& polygonization)
+			const noexcept
+	{
+		const std::array<std::uint8_t, 4>& tetrahedron =
+			ReferenceFreudenthalTetrahedra[tetrahedronIndex];
 		std::array<std::uint8_t, 4> solidCorners{};
 		std::array<std::uint8_t, 4> emptyCorners{};
 		std::uint8_t solidCount = 0;
@@ -809,7 +1525,8 @@ namespace napa::voxel
 				}
 
 				const ValidationResult interpolationResult =
-					InterpolateEdge(
+					InterpolatePreparedEdgeCandidate(
+						m_World.GetConfig(),
 						cubeCorners[firstCornerId],
 						cubeCorners[secondCornerId],
 						crossingVertices[crossingCount]);
@@ -860,7 +1577,8 @@ namespace napa::voxel
 				++edgeIndex)
 			{
 				const ValidationResult interpolationResult =
-					InterpolateEdge(
+					InterpolatePreparedEdgeCandidate(
+						m_World.GetConfig(),
 						cubeCorners[
 							perimeterEdges[edgeIndex][0]],
 						cubeCorners[
@@ -918,6 +1636,19 @@ namespace napa::voxel
 				return areaResult;
 			}
 
+			for (ReferenceEdgeVertex& vertex :
+				candidate.m_Vertices)
+			{
+				const ValidationResult normalResult =
+					ComputeOutwardNormal(
+						vertex.m_DensityGradient,
+						vertex.m_Normal);
+				if (normalResult.Failed())
+				{
+					return normalResult;
+				}
+			}
+
 			const ValidationResult windingResult =
 				OrientReferenceTriangle(
 					cubeCorners,
@@ -934,6 +1665,197 @@ namespace napa::voxel
 		}
 
 		polygonization = std::move(prepared);
+		return {};
+	}
+
+	ValidationResult ReferenceMesher::MeshChunk(
+		ChunkCoord chunk,
+		ReferenceChunkMeshingResult& result) const
+	{
+		const VoxelWorldConfig& config = m_World.GetConfig();
+		CellAabb cellBounds{};
+		const ValidationResult intersectionResult =
+			IntersectCellOwnerChunk(
+				chunk,
+				config.m_ChunkCellCount,
+				config.m_LogicalCellBounds,
+				cellBounds);
+		if (intersectionResult.Failed())
+		{
+			return intersectionResult;
+		}
+
+		MeshQuantizationContext quantizationContext;
+		const ValidationResult contextResult =
+			PrepareMeshQuantizationContext(
+				config,
+				chunk,
+				quantizationContext);
+		if (contextResult.Failed())
+		{
+			return contextResult;
+		}
+
+		const ValidationResult capacityResult =
+			ValidateReferenceMeshCapacity(cellBounds);
+		if (capacityResult.Failed())
+		{
+			return capacityResult;
+		}
+
+		PreparedReferenceSampleGrid sampleGrid;
+		const ValidationResult gridResult =
+			PrepareReferenceSampleGrid(
+				m_World,
+				cellBounds,
+				sampleGrid);
+		if (gridResult.Failed())
+		{
+			return gridResult;
+		}
+
+		MeshData mesh;
+		std::map<VoxelMaterial, PendingMaterialSection>
+			materialSections;
+		bool hasBounds = false;
+		std::uint64_t skippedDegenerateTriangleCount = 0;
+		const std::size_t cellCountX =
+			sampleGrid.m_SampleCountX - 1;
+		const std::size_t cellCountY =
+			sampleGrid.m_SampleCountY - 1;
+		const std::size_t cellCountZ =
+			sampleGrid.m_SampleCountZ - 1;
+		for (std::size_t cellZ = 0;
+			cellZ < cellCountZ;
+			++cellZ)
+		{
+			for (std::size_t cellY = 0;
+				cellY < cellCountY;
+				++cellY)
+			{
+				for (std::size_t cellX = 0;
+					cellX < cellCountX;
+					++cellX)
+				{
+					std::array<ReferenceEdgeEndpoint, 8>
+						cubeCorners{};
+					for (std::size_t cornerIndex = 0;
+						cornerIndex < cubeCorners.size();
+						++cornerIndex)
+					{
+						cubeCorners[cornerIndex] =
+							GetPreparedSample(
+								sampleGrid,
+								cellX,
+								cellY,
+								cellZ,
+								ReferenceCubeCornerOffsets[
+									cornerIndex]);
+					}
+
+					for (std::uint8_t tetrahedronIndex = 0;
+						static_cast<std::size_t>(
+							tetrahedronIndex) <
+							ReferenceFreudenthalTetrahedra
+								.size();
+						++tetrahedronIndex)
+					{
+						ReferenceTetrahedronPolygonization
+							polygonization{};
+						const ValidationResult
+							polygonizationResult =
+								PolygonizePreparedTetrahedron(
+									cubeCorners,
+									tetrahedronIndex,
+									quantizationContext,
+									polygonization);
+						if (polygonizationResult.Failed())
+						{
+							return polygonizationResult;
+						}
+
+						const std::optional<std::uint64_t>
+							nextSkippedCount = CheckedAdd(
+								skippedDegenerateTriangleCount,
+								static_cast<std::uint64_t>(
+									polygonization
+										.m_SkippedDegenerateTriangleCount));
+						if (!nextSkippedCount)
+						{
+							return {
+								ValidationError::ArithmeticOverflow,
+							};
+						}
+						skippedDegenerateTriangleCount =
+							*nextSkippedCount;
+
+						for (std::uint8_t triangleIndex = 0;
+							triangleIndex <
+								polygonization.m_TriangleCount;
+							++triangleIndex)
+						{
+							const ValidationResult appendResult =
+								AppendReferenceTriangle(
+									polygonization.m_Triangles[
+										triangleIndex],
+									polygonization.m_Material,
+									mesh,
+									materialSections,
+									hasBounds);
+							if (appendResult.Failed())
+							{
+								return appendResult;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		std::vector<MeshTriangleWindingEvidence>
+			windingEvidence;
+		mesh.m_Sections.reserve(materialSections.size());
+		for (auto& [material, pendingSection] :
+			materialSections)
+		{
+			if (pendingSection.m_Indices.empty())
+			{
+				continue;
+			}
+			mesh.m_Sections.push_back({
+				.m_Material = material,
+				.m_Indices =
+					std::move(pendingSection.m_Indices),
+			});
+			for (const MeshTriangleWindingEvidence evidence :
+				pendingSection.m_WindingEvidence)
+			{
+				windingEvidence.push_back(evidence);
+			}
+		}
+
+		MeshValidationResult validation{};
+		const ValidationResult validationResult =
+			ValidateAndHashChunkMesh(
+				mesh,
+				windingEvidence,
+				config,
+				chunk,
+				validation);
+		if (validationResult.Failed())
+		{
+			return validationResult;
+		}
+
+		ReferenceChunkMeshingResult prepared{
+			.m_Mesh = std::move(mesh),
+			.m_WindingEvidence =
+				std::move(windingEvidence),
+			.m_Validation = validation,
+			.m_SkippedDegenerateTriangleCount =
+				skippedDegenerateTriangleCount,
+		};
+		result = std::move(prepared);
 		return {};
 	}
 }

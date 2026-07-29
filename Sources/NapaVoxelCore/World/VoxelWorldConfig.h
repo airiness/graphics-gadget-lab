@@ -7,6 +7,9 @@
 
 namespace napa::voxel
 {
+	inline constexpr double CanonicalPositionQuantizationScale =
+		65536.0;
+
 	struct VoxelWorldConfig
 	{
 		std::uint32_t m_ChunkCellCount = 16;

@@ -160,9 +160,7 @@ namespace napa::voxel
 			Float3 a,
 			Float3 b,
 			Float3 c,
-			Float3 normalA,
-			Float3 normalB,
-			Float3 normalC) noexcept
+			Float3 outwardDirection) noexcept
 		{
 			const double abX =
 				static_cast<double>(b.m_X) -
@@ -186,22 +184,14 @@ namespace napa::voxel
 			const double crossX = abY * acZ - abZ * acY;
 			const double crossY = abZ * acX - abX * acZ;
 			const double crossZ = abX * acY - abY * acX;
-			const double normalX =
-				static_cast<double>(normalA.m_X) +
-				static_cast<double>(normalB.m_X) +
-				static_cast<double>(normalC.m_X);
-			const double normalY =
-				static_cast<double>(normalA.m_Y) +
-				static_cast<double>(normalB.m_Y) +
-				static_cast<double>(normalC.m_Y);
-			const double normalZ =
-				static_cast<double>(normalA.m_Z) +
-				static_cast<double>(normalB.m_Z) +
-				static_cast<double>(normalC.m_Z);
 			return
-				crossX * normalX +
-				crossY * normalY +
-				crossZ * normalZ > 0.0;
+				crossX *
+					static_cast<double>(outwardDirection.m_X) +
+				crossY *
+					static_cast<double>(outwardDirection.m_Y) +
+				crossZ *
+					static_cast<double>(outwardDirection.m_Z) >
+				0.0;
 		}
 
 		void WriteConfig(
@@ -264,8 +254,19 @@ namespace napa::voxel
 			};
 		}
 
-		const std::int64_t chunkCellCount =
-			config.m_ChunkCellCount;
+		CellAabb targetCellBounds{};
+		const ValidationResult intersectionResult =
+			IntersectCellOwnerChunk(
+				chunk,
+				config.m_ChunkCellCount,
+				config.m_LogicalCellBounds,
+				targetCellBounds);
+		if (intersectionResult.Failed())
+		{
+			return intersectionResult;
+		}
+
+		const std::int64_t chunkCellCount = config.m_ChunkCellCount;
 		const std::int64_t originX =
 			static_cast<std::int64_t>(chunk.m_X) *
 			chunkCellCount;
@@ -275,45 +276,29 @@ namespace napa::voxel
 		const std::int64_t originZ =
 			static_cast<std::int64_t>(chunk.m_Z) *
 			chunkCellCount;
-		const std::int64_t endX = originX + chunkCellCount;
-		const std::int64_t endY = originY + chunkCellCount;
-		const std::int64_t endZ = originZ + chunkCellCount;
-
 		const std::int64_t localMinimumX =
-			std::max(
-				originX,
-				static_cast<std::int64_t>(
-					config.m_LogicalCellBounds.m_Min.m_X)) -
+			static_cast<std::int64_t>(
+				targetCellBounds.m_Min.m_X) -
 			originX;
 		const std::int64_t localMinimumY =
-			std::max(
-				originY,
-				static_cast<std::int64_t>(
-					config.m_LogicalCellBounds.m_Min.m_Y)) -
+			static_cast<std::int64_t>(
+				targetCellBounds.m_Min.m_Y) -
 			originY;
 		const std::int64_t localMinimumZ =
-			std::max(
-				originZ,
-				static_cast<std::int64_t>(
-					config.m_LogicalCellBounds.m_Min.m_Z)) -
+			static_cast<std::int64_t>(
+				targetCellBounds.m_Min.m_Z) -
 			originZ;
 		const std::int64_t localMaximumX =
-			std::min(
-				endX,
-				static_cast<std::int64_t>(
-					config.m_LogicalCellBounds.m_MaxExclusive.m_X)) -
+			static_cast<std::int64_t>(
+				targetCellBounds.m_MaxExclusive.m_X) -
 			originX;
 		const std::int64_t localMaximumY =
-			std::min(
-				endY,
-				static_cast<std::int64_t>(
-					config.m_LogicalCellBounds.m_MaxExclusive.m_Y)) -
+			static_cast<std::int64_t>(
+				targetCellBounds.m_MaxExclusive.m_Y) -
 			originY;
 		const std::int64_t localMaximumZ =
-			std::min(
-				endZ,
-				static_cast<std::int64_t>(
-					config.m_LogicalCellBounds.m_MaxExclusive.m_Z)) -
+			static_cast<std::int64_t>(
+				targetCellBounds.m_MaxExclusive.m_Z) -
 			originZ;
 
 		const std::int64_t quantizationScale =
@@ -344,6 +329,8 @@ namespace napa::voxel
 			static_cast<std::int32_t>(
 				localMaximumZ * quantizationScale),
 		};
+		prepared.m_Config = config;
+		prepared.m_TargetChunk = chunk;
 		prepared.m_IsPrepared = true;
 		context = prepared;
 		return {};
@@ -352,6 +339,21 @@ namespace napa::voxel
 	bool MeshQuantizationContext::IsPrepared() const noexcept
 	{
 		return m_IsPrepared;
+	}
+
+	bool MeshQuantizationContext::IsCompatible(
+		const VoxelWorldConfig& config,
+		ChunkCoord chunk) const noexcept
+	{
+		return
+			m_IsPrepared &&
+			m_TargetChunk == chunk &&
+			m_Config.m_ChunkCellCount == config.m_ChunkCellCount &&
+			m_Config.m_VoxelSize == config.m_VoxelSize &&
+			m_Config.m_SurfaceBandVoxels ==
+				config.m_SurfaceBandVoxels &&
+			m_Config.m_LogicalCellBounds ==
+				config.m_LogicalCellBounds;
 	}
 
 	bool MeshQuantizationContext::ContainsTargetCellDomain(
@@ -494,6 +496,7 @@ namespace napa::voxel
 
 	ValidationResult ValidateAndHashChunkMesh(
 		const MeshData& mesh,
+		std::span<const MeshTriangleWindingEvidence> windingEvidence,
 		const VoxelWorldConfig& config,
 		ChunkCoord chunk,
 		MeshValidationResult& result)
@@ -530,6 +533,8 @@ namespace napa::voxel
 
 		std::vector<QuantizedMeshVertex> quantizedVertices;
 		quantizedVertices.reserve(mesh.m_Vertices.size());
+		QuantizedMeshAabb quantizedVertexBounds{};
+		bool hasQuantizedVertexBounds = false;
 		for (const MeshVertex& vertex : mesh.m_Vertices)
 		{
 			if (!IsFinite(vertex.m_Position) ||
@@ -572,11 +577,41 @@ namespace napa::voxel
 			{
 				return normalResult;
 			}
+			if (!hasQuantizedVertexBounds)
+			{
+				quantizedVertexBounds = {
+					.m_Min = quantizedVertex.m_Position,
+					.m_Max = quantizedVertex.m_Position,
+				};
+				hasQuantizedVertexBounds = true;
+			}
+			else
+			{
+				quantizedVertexBounds.m_Min.m_X = std::min(
+					quantizedVertexBounds.m_Min.m_X,
+					quantizedVertex.m_Position.m_X);
+				quantizedVertexBounds.m_Min.m_Y = std::min(
+					quantizedVertexBounds.m_Min.m_Y,
+					quantizedVertex.m_Position.m_Y);
+				quantizedVertexBounds.m_Min.m_Z = std::min(
+					quantizedVertexBounds.m_Min.m_Z,
+					quantizedVertex.m_Position.m_Z);
+				quantizedVertexBounds.m_Max.m_X = std::max(
+					quantizedVertexBounds.m_Max.m_X,
+					quantizedVertex.m_Position.m_X);
+				quantizedVertexBounds.m_Max.m_Y = std::max(
+					quantizedVertexBounds.m_Max.m_Y,
+					quantizedVertex.m_Position.m_Y);
+				quantizedVertexBounds.m_Max.m_Z = std::max(
+					quantizedVertexBounds.m_Max.m_Z,
+					quantizedVertex.m_Position.m_Z);
+			}
 			quantizedVertices.push_back(quantizedVertex);
 		}
 
 		std::uint64_t totalIndexCount = 0;
 		std::uint64_t triangleCount = 0;
+		std::size_t windingEvidenceIndex = 0;
 		std::uint8_t previousMaterial = 0;
 		bool hasPreviousMaterial = false;
 		for (const MeshSection& section : mesh.m_Sections)
@@ -663,17 +698,53 @@ namespace napa::voxel
 					return areaResult;
 				}
 
+				if (windingEvidenceIndex >= windingEvidence.size())
+				{
+					return {
+						ValidationError::InvalidMeshWindingEvidence,
+					};
+				}
+				const Float3 outwardDirection =
+					windingEvidence[
+						windingEvidenceIndex++]
+						.m_OutwardDirection;
+				if (!IsFinite(outwardDirection))
+				{
+					return {
+						ValidationError::InvalidMeshWindingEvidence,
+					};
+				}
+				const double directionX = outwardDirection.m_X;
+				const double directionY = outwardDirection.m_Y;
+				const double directionZ = outwardDirection.m_Z;
+				const double directionLengthSquared =
+					directionX * directionX +
+					directionY * directionY +
+					directionZ * directionZ;
+				if (!std::isfinite(directionLengthSquared) ||
+					directionLengthSquared <= 0.0 ||
+					!HasUnitLength(outwardDirection))
+				{
+					return {
+						ValidationError::InvalidMeshWindingEvidence,
+					};
+				}
+
 				if (!HasOutwardWinding(
 					vertexA.m_Position,
 					vertexB.m_Position,
 					vertexC.m_Position,
-					vertexA.m_Normal,
-					vertexB.m_Normal,
-					vertexC.m_Normal))
+					outwardDirection))
 				{
 					return { ValidationError::InvalidMeshWinding };
 				}
 			}
+		}
+		if (windingEvidenceIndex != windingEvidence.size())
+		{
+			return {
+				ValidationError::InvalidMeshWindingEvidence,
+			};
 		}
 
 		QuantizedMeshAabb quantizedBounds{};
@@ -696,6 +767,10 @@ namespace napa::voxel
 			if (maximumResult.Failed())
 			{
 				return maximumResult;
+			}
+			if (quantizedBounds != quantizedVertexBounds)
+			{
+				return { ValidationError::InvalidMeshBounds };
 			}
 			if (!quantizationContext.ContainsTargetCellDomain(
 					quantizedBounds.m_Min) ||

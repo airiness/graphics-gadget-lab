@@ -58,6 +58,9 @@ namespace napa::voxel
 		NonFiniteDensityGradient = 49,
 		DegenerateDensityGradient = 50,
 		InvalidReferenceTetrahedron = 51,
+		InvalidMeshWindingEvidence = 52,
+		MismatchedMeshQuantizationContext = 53,
+		UnrepresentableWorldPosition = 54,
 	};
 
 	struct ValidationResult

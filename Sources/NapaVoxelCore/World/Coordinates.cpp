@@ -2,6 +2,7 @@
 
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -425,6 +426,128 @@ namespace napa::voxel
 				*maximumExclusiveX,
 				*maximumExclusiveY,
 				*maximumExclusiveZ,
+			},
+		};
+		return {};
+	}
+
+	ValidationResult IntersectCellOwnerChunk(
+		ChunkCoord chunk,
+		std::uint32_t chunkCellCount,
+		const CellAabb& logicalCellBounds,
+		CellAabb& intersection) noexcept
+	{
+		if (!IsSupportedChunkCellCount(chunkCellCount))
+		{
+			return { ValidationError::InvalidChunkCellCount };
+		}
+		if (logicalCellBounds.IsEmpty())
+		{
+			return { ValidationError::EmptyLogicalCellBounds };
+		}
+
+		const std::int64_t chunkSize = chunkCellCount;
+		const std::optional<std::int64_t> minimumX =
+			CheckedMul(
+				static_cast<std::int64_t>(chunk.m_X),
+				chunkSize);
+		const std::optional<std::int64_t> minimumY =
+			CheckedMul(
+				static_cast<std::int64_t>(chunk.m_Y),
+				chunkSize);
+		const std::optional<std::int64_t> minimumZ =
+			CheckedMul(
+				static_cast<std::int64_t>(chunk.m_Z),
+				chunkSize);
+		const std::optional<std::int64_t> maximumX =
+			minimumX
+				? CheckedAdd(*minimumX, chunkSize)
+				: std::nullopt;
+		const std::optional<std::int64_t> maximumY =
+			minimumY
+				? CheckedAdd(*minimumY, chunkSize)
+				: std::nullopt;
+		const std::optional<std::int64_t> maximumZ =
+			minimumZ
+				? CheckedAdd(*minimumZ, chunkSize)
+				: std::nullopt;
+		if (!minimumX || !minimumY || !minimumZ ||
+			!maximumX || !maximumY || !maximumZ)
+		{
+			return { ValidationError::ArithmeticOverflow };
+		}
+
+		const std::int64_t intersectionMinimumX =
+			std::max(
+				*minimumX,
+				static_cast<std::int64_t>(
+					logicalCellBounds.m_Min.m_X));
+		const std::int64_t intersectionMinimumY =
+			std::max(
+				*minimumY,
+				static_cast<std::int64_t>(
+					logicalCellBounds.m_Min.m_Y));
+		const std::int64_t intersectionMinimumZ =
+			std::max(
+				*minimumZ,
+				static_cast<std::int64_t>(
+					logicalCellBounds.m_Min.m_Z));
+		const std::int64_t intersectionMaximumX =
+			std::min(
+				*maximumX,
+				static_cast<std::int64_t>(
+					logicalCellBounds.m_MaxExclusive.m_X));
+		const std::int64_t intersectionMaximumY =
+			std::min(
+				*maximumY,
+				static_cast<std::int64_t>(
+					logicalCellBounds.m_MaxExclusive.m_Y));
+		const std::int64_t intersectionMaximumZ =
+			std::min(
+				*maximumZ,
+				static_cast<std::int64_t>(
+					logicalCellBounds.m_MaxExclusive.m_Z));
+		if (intersectionMinimumX >= intersectionMaximumX ||
+			intersectionMinimumY >= intersectionMaximumY ||
+			intersectionMinimumZ >= intersectionMaximumZ)
+		{
+			return {
+				ValidationError::ChunkOutsideLogicalCellDomain,
+			};
+		}
+
+		const std::optional<std::int32_t> narrowedMinimumX =
+			CheckedNarrow<std::int32_t>(intersectionMinimumX);
+		const std::optional<std::int32_t> narrowedMinimumY =
+			CheckedNarrow<std::int32_t>(intersectionMinimumY);
+		const std::optional<std::int32_t> narrowedMinimumZ =
+			CheckedNarrow<std::int32_t>(intersectionMinimumZ);
+		const std::optional<std::int32_t> narrowedMaximumX =
+			CheckedNarrow<std::int32_t>(intersectionMaximumX);
+		const std::optional<std::int32_t> narrowedMaximumY =
+			CheckedNarrow<std::int32_t>(intersectionMaximumY);
+		const std::optional<std::int32_t> narrowedMaximumZ =
+			CheckedNarrow<std::int32_t>(intersectionMaximumZ);
+		if (!narrowedMinimumX ||
+			!narrowedMinimumY ||
+			!narrowedMinimumZ ||
+			!narrowedMaximumX ||
+			!narrowedMaximumY ||
+			!narrowedMaximumZ)
+		{
+			return { ValidationError::CoordinateOutOfRange };
+		}
+
+		intersection = {
+			.m_Min = {
+				*narrowedMinimumX,
+				*narrowedMinimumY,
+				*narrowedMinimumZ,
+			},
+			.m_MaxExclusive = {
+				*narrowedMaximumX,
+				*narrowedMaximumY,
+				*narrowedMaximumZ,
 			},
 		};
 		return {};

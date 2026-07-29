@@ -260,4 +260,9 @@ namespace napa::voxel
 		const SampleAabb& sampleBounds,
 		std::uint32_t chunkCellCount,
 		ChunkAabb& chunkBounds) noexcept;
+	[[nodiscard]] ValidationResult IntersectCellOwnerChunk(
+		ChunkCoord chunk,
+		std::uint32_t chunkCellCount,
+		const CellAabb& logicalCellBounds,
+		CellAabb& intersection) noexcept;
 }

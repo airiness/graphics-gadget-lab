@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace napa::voxel
 {
@@ -85,6 +86,7 @@ namespace napa::voxel
 	struct ReferenceTriangle
 	{
 		std::array<ReferenceEdgeVertex, 3> m_Vertices{};
+		MeshTriangleWindingEvidence m_WindingEvidence{};
 
 		[[nodiscard]] friend constexpr bool operator==(
 			const ReferenceTriangle&,
@@ -102,6 +104,16 @@ namespace napa::voxel
 			const ReferenceTetrahedronPolygonization&,
 			const ReferenceTetrahedronPolygonization&) noexcept =
 			default;
+	};
+
+	struct ReferenceChunkMeshingResult
+	{
+		MeshData m_Mesh;
+		// Matches material-section order, then triangle index order.
+		std::vector<MeshTriangleWindingEvidence>
+			m_WindingEvidence;
+		MeshValidationResult m_Validation{};
+		std::uint64_t m_SkippedDegenerateTriangleCount = 0;
 	};
 
 	class ReferenceMesher final
@@ -122,8 +134,22 @@ namespace napa::voxel
 			const MeshQuantizationContext& quantizationContext,
 			ReferenceTetrahedronPolygonization& polygonization)
 			const noexcept;
+		[[nodiscard]] ValidationResult MeshChunk(
+			ChunkCoord chunk,
+			ReferenceChunkMeshingResult& result) const;
 
 	private:
+		[[nodiscard]] ValidationResult
+			PolygonizePreparedTetrahedron(
+				const std::array<
+					ReferenceEdgeEndpoint,
+					8>& cubeCorners,
+				std::uint8_t tetrahedronIndex,
+				const MeshQuantizationContext&
+					quantizationContext,
+				ReferenceTetrahedronPolygonization&
+					polygonization) const noexcept;
+
 		const VoxelWorld& m_World;
 	};
 }

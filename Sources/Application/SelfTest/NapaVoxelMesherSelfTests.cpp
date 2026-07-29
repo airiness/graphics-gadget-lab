@@ -1,17 +1,21 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
+#include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/MeshData.h"
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <span>
 #include <type_traits>
+#include <vector>
 
 namespace gglab
 {
@@ -105,6 +109,172 @@ namespace gglab
 			};
 		}
 
+		[[nodiscard]] napa::voxel::MeshData
+			MakeReferenceTriangleMesh(
+				const napa::voxel::ReferenceTriangle& triangle,
+				napa::voxel::VoxelMaterial material)
+		{
+			using namespace napa::voxel;
+
+			MeshData mesh;
+			for (const ReferenceEdgeVertex& vertex :
+				triangle.m_Vertices)
+			{
+				mesh.m_Vertices.push_back({
+					.m_Position = vertex.m_Position,
+					.m_Normal = vertex.m_Normal,
+				});
+				if (mesh.m_Vertices.size() == 1)
+				{
+					mesh.m_Bounds = {
+						.m_Min = vertex.m_Position,
+						.m_Max = vertex.m_Position,
+					};
+				}
+				else
+				{
+					mesh.m_Bounds.m_Min.m_X = std::min(
+						mesh.m_Bounds.m_Min.m_X,
+						vertex.m_Position.m_X);
+					mesh.m_Bounds.m_Min.m_Y = std::min(
+						mesh.m_Bounds.m_Min.m_Y,
+						vertex.m_Position.m_Y);
+					mesh.m_Bounds.m_Min.m_Z = std::min(
+						mesh.m_Bounds.m_Min.m_Z,
+						vertex.m_Position.m_Z);
+					mesh.m_Bounds.m_Max.m_X = std::max(
+						mesh.m_Bounds.m_Max.m_X,
+						vertex.m_Position.m_X);
+					mesh.m_Bounds.m_Max.m_Y = std::max(
+						mesh.m_Bounds.m_Max.m_Y,
+						vertex.m_Position.m_Y);
+					mesh.m_Bounds.m_Max.m_Z = std::max(
+						mesh.m_Bounds.m_Max.m_Z,
+						vertex.m_Position.m_Z);
+				}
+			}
+			mesh.m_Sections.push_back({
+				.m_Material = material,
+				.m_Indices = { 0, 1, 2 },
+			});
+			return mesh;
+		}
+
+		template <typename SampleFactory>
+		[[nodiscard]] bool InitializeCurrentSamples(
+			napa::voxel::VoxelWorld& world,
+			SampleFactory&& sampleFactory)
+		{
+			using namespace napa::voxel;
+
+			const SampleAabb bounds = world.GetLogicalSampleBounds();
+			for (std::int64_t z = bounds.m_Min.m_Z;
+				z < bounds.m_MaxExclusive.m_Z;
+				++z)
+			{
+				for (std::int64_t y = bounds.m_Min.m_Y;
+					y < bounds.m_MaxExclusive.m_Y;
+					++y)
+				{
+					for (std::int64_t x = bounds.m_Min.m_X;
+						x < bounds.m_MaxExclusive.m_X;
+						++x)
+					{
+						const SampleCoord coordinate{
+							static_cast<std::int32_t>(x),
+							static_cast<std::int32_t>(y),
+							static_cast<std::int32_t>(z),
+						};
+						bool changed = false;
+						if (world.WriteCurrentSample(
+							coordinate,
+							sampleFactory(coordinate),
+							changed).Failed())
+						{
+							return false;
+						}
+					}
+				}
+			}
+			return true;
+		}
+
+		[[nodiscard]] napa::voxel::PrimitiveDesc
+			MakeMeshingSphere(
+				std::uint64_t stableId,
+				napa::voxel::Double3 center,
+				double radius,
+				napa::voxel::VoxelMaterial material) noexcept
+		{
+			using namespace napa::voxel;
+
+			return {
+				.m_StableId = { stableId },
+				.m_Material = material,
+				.m_Shape = PrimitiveShape::Sphere,
+				.m_Parameters = {
+					.m_Sphere = {
+						.m_Center = center,
+						.m_Radius = radius,
+					},
+				},
+			};
+		}
+
+		[[nodiscard]] napa::voxel::PrimitiveDesc
+			MakeMeshingBox(
+				std::uint64_t stableId,
+				napa::voxel::Double3 center,
+				napa::voxel::Double3 halfExtents,
+				napa::voxel::VoxelMaterial material) noexcept
+		{
+			using namespace napa::voxel;
+
+			return {
+				.m_StableId = { stableId },
+				.m_Material = material,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = center,
+						.m_HalfExtents = halfExtents,
+					},
+				},
+			};
+		}
+
+		[[nodiscard]] napa::voxel::VoxelSample
+			MakeLinearExactIsoSample(
+				napa::voxel::SampleCoord coordinate,
+				std::int32_t weightX,
+				std::int32_t weightY,
+				std::int32_t weightZ,
+				std::int32_t isoCoordinate) noexcept
+		{
+			using namespace napa::voxel;
+
+			const std::int32_t unboundedDensity =
+				static_cast<std::int32_t>(IsoValue) +
+				(isoCoordinate -
+					weightX * coordinate.m_X -
+					weightY * coordinate.m_Y -
+					weightZ * coordinate.m_Z) *
+					16;
+			const std::uint8_t density =
+				static_cast<std::uint8_t>(std::clamp(
+					unboundedDensity,
+					0,
+					255));
+			return {
+				.m_Density = density,
+				.m_Material =
+					density >= IsoValue
+						? VoxelMaterial::Stone
+						: VoxelMaterial::Empty,
+				.m_Damage = 0,
+			};
+		}
+
 		[[nodiscard]] bool NearlyEqual(
 			double lhs,
 			double rhs,
@@ -113,10 +283,42 @@ namespace gglab
 			return std::abs(lhs - rhs) <= tolerance;
 		}
 
+		[[nodiscard]] napa::voxel::ValidationResult
+			ValidatePositiveZWindingMesh(
+				const napa::voxel::MeshData& mesh,
+				const napa::voxel::VoxelWorldConfig& config,
+				napa::voxel::ChunkCoord chunk,
+				napa::voxel::MeshValidationResult& result,
+				napa::voxel::Float3 outwardDirection =
+					{ 0.0f, 0.0f, 1.0f })
+		{
+			using namespace napa::voxel;
+
+			std::size_t triangleCount = 0;
+			for (const MeshSection& section : mesh.m_Sections)
+			{
+				triangleCount += section.m_Indices.size() / 3;
+			}
+			const std::vector<MeshTriangleWindingEvidence>
+				windingEvidence(
+					triangleCount,
+					{
+						.m_OutwardDirection =
+							outwardDirection,
+					});
+			return ValidateAndHashChunkMesh(
+				mesh,
+				windingEvidence,
+				config,
+				chunk,
+				result);
+		}
+
 		[[nodiscard]] std::array<
 			napa::voxel::ReferenceEdgeEndpoint,
 			8> MakeReferenceCubeCorners(
 				std::uint8_t classification,
+				std::uint8_t tetrahedronIndex = 0,
 				std::uint8_t solidDensity = 192,
 				std::uint8_t emptyDensity = 64) noexcept
 		{
@@ -145,7 +347,8 @@ namespace gglab
 			}
 
 			const std::array<std::uint8_t, 4>& tetrahedron =
-				ReferenceFreudenthalTetrahedra[0];
+				ReferenceFreudenthalTetrahedra[
+					tetrahedronIndex];
 			DensityGradient solidSum{};
 			DensityGradient emptySum{};
 			double solidCount = 0.0;
@@ -525,13 +728,13 @@ namespace gglab
 				MakeMeshValidationConfig();
 			MeshValidationResult emptyResult{};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					{},
 					config,
 					{},
 					emptyResult).Succeeded() &&
 					emptyResult.m_ValidationHash ==
-						0x6068a2326a691748ull &&
+						0x66ee37df3fd08e65ull &&
 					emptyResult.m_VertexCount == 0 &&
 					emptyResult.m_SectionCount == 0 &&
 					emptyResult.m_IndexCount == 0 &&
@@ -543,7 +746,7 @@ namespace gglab
 			const MeshData triangle = MakeSyntheticTriangleMesh();
 			MeshValidationResult triangleResult{};
 			const bool triangleValid =
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					triangle,
 					config,
 					{},
@@ -551,7 +754,7 @@ namespace gglab
 			context.Check(
 				triangleValid &&
 					triangleResult.m_ValidationHash ==
-						0xc884871a1401007dull &&
+						0x074cb7e126cc04e6ull &&
 					triangleResult.m_VertexCount == 3 &&
 					triangleResult.m_SectionCount == 1 &&
 					triangleResult.m_IndexCount == 3 &&
@@ -567,18 +770,146 @@ namespace gglab
 				MakeSyntheticMultiMaterialMesh();
 			MeshValidationResult multiMaterialResult{};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					multiMaterialMesh,
 					config,
 					{},
 					multiMaterialResult).Succeeded() &&
 					multiMaterialResult.m_ValidationHash ==
-						0x344ed3af7a4eeec1ull &&
+						0xa789825fe4d67ca0ull &&
 					multiMaterialResult.m_VertexCount == 4 &&
 					multiMaterialResult.m_SectionCount == 2 &&
 					multiMaterialResult.m_IndexCount == 6 &&
 					multiMaterialResult.m_TriangleCount == 2,
 				"A valid multi-material mesh matches its section-order golden");
+
+			const std::array<MeshTriangleWindingEvidence, 1>
+				positiveZWinding{
+					MeshTriangleWindingEvidence{
+						.m_OutwardDirection =
+							{ 0.0f, 0.0f, 1.0f },
+					},
+				};
+			const std::array<MeshTriangleWindingEvidence, 1>
+				zeroWinding{
+					MeshTriangleWindingEvidence{
+						.m_OutwardDirection = {},
+					},
+				};
+			const std::array<MeshTriangleWindingEvidence, 1>
+				nonUnitWinding{
+					MeshTriangleWindingEvidence{
+						.m_OutwardDirection =
+							{ 0.0f, 0.0f, 2.0f },
+					},
+				};
+			const std::array<MeshTriangleWindingEvidence, 1>
+				nonFiniteWinding{
+					MeshTriangleWindingEvidence{
+						.m_OutwardDirection = {
+							std::numeric_limits<float>::infinity(),
+							0.0f,
+							1.0f,
+						},
+					},
+				};
+			MeshValidationResult evidenceResult =
+				triangleResult;
+			context.Check(
+				ValidateAndHashChunkMesh(
+					triangle,
+					std::span<
+						const MeshTriangleWindingEvidence>{},
+					config,
+					{},
+					evidenceResult).m_Error ==
+					ValidationError::InvalidMeshWindingEvidence &&
+					ValidateAndHashChunkMesh(
+						{},
+						positiveZWinding,
+						config,
+						{},
+						evidenceResult).m_Error ==
+						ValidationError::
+							InvalidMeshWindingEvidence &&
+					ValidateAndHashChunkMesh(
+						triangle,
+						zeroWinding,
+						config,
+						{},
+						evidenceResult).m_Error ==
+						ValidationError::
+							InvalidMeshWindingEvidence &&
+					ValidateAndHashChunkMesh(
+						triangle,
+						nonFiniteWinding,
+						config,
+						{},
+						evidenceResult).m_Error ==
+						ValidationError::
+							InvalidMeshWindingEvidence &&
+					ValidateAndHashChunkMesh(
+						triangle,
+						nonUnitWinding,
+						config,
+						{},
+						evidenceResult).m_Error ==
+						ValidationError::
+							InvalidMeshWindingEvidence,
+				"Mesh validation requires one canonical unit winding evidence item per triangle");
+
+			MeshData mixedWindingMesh = triangle;
+			mixedWindingMesh.m_Vertices.insert(
+				mixedWindingMesh.m_Vertices.end(),
+				{
+					{
+						.m_Position = { 3.0f, 1.0f, 1.0f },
+						.m_Normal = { 1.0f, 0.0f, 0.0f },
+					},
+					{
+						.m_Position = { 3.0f, 2.0f, 1.0f },
+						.m_Normal = { 1.0f, 0.0f, 0.0f },
+					},
+					{
+						.m_Position = { 3.0f, 1.0f, 2.0f },
+						.m_Normal = { 1.0f, 0.0f, 0.0f },
+					},
+				});
+			mixedWindingMesh.m_Sections.push_back({
+				.m_Material = VoxelMaterial::Stone,
+				.m_Indices = { 3, 4, 5 },
+			});
+			mixedWindingMesh.m_Bounds.m_Max =
+				{ 3.0f, 2.0f, 2.0f };
+			const std::array canonicalMixedWinding{
+				MeshTriangleWindingEvidence{
+					.m_OutwardDirection =
+						{ 0.0f, 0.0f, 1.0f },
+				},
+				MeshTriangleWindingEvidence{
+					.m_OutwardDirection =
+						{ 1.0f, 0.0f, 0.0f },
+				},
+			};
+			const std::array swappedMixedWinding{
+				canonicalMixedWinding[1],
+				canonicalMixedWinding[0],
+			};
+			context.Check(
+				ValidateAndHashChunkMesh(
+					mixedWindingMesh,
+					canonicalMixedWinding,
+					config,
+					{},
+					evidenceResult).Succeeded() &&
+					ValidateAndHashChunkMesh(
+						mixedWindingMesh,
+						swappedMixedWinding,
+						config,
+						{},
+						evidenceResult).m_Error ==
+						ValidationError::InvalidMeshWinding,
+				"Winding evidence follows section and triangle index order");
 
 			VoxelWorldConfig multiChunkConfig = config;
 			multiChunkConfig.m_LogicalCellBounds.m_MaxExclusive =
@@ -589,17 +920,17 @@ namespace gglab
 			otherConfig.m_SurfaceBandVoxels = 3.0f;
 			MeshValidationResult otherConfigEmptyResult{};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					{},
 					multiChunkConfig,
 					{},
 					firstChunkEmptyResult).Succeeded() &&
-					ValidateAndHashChunkMesh(
+					ValidatePositiveZWindingMesh(
 						{},
 						multiChunkConfig,
 						{ 1, 0, 0 },
 						otherChunkEmptyResult).Succeeded() &&
-					ValidateAndHashChunkMesh(
+					ValidatePositiveZWindingMesh(
 						{},
 						otherConfig,
 						{},
@@ -612,7 +943,7 @@ namespace gglab
 
 			MeshValidationResult targetChunkResult{};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					triangle,
 					multiChunkConfig,
 					{ 1, 0, 0 },
@@ -648,24 +979,24 @@ namespace gglab
 				},
 			};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					positiveBoundaryMesh,
 					multiChunkConfig,
 					{},
-					targetChunkResult).Succeeded(),
+					targetChunkResult,
+					{ 1.0f, 0.0f, 0.0f }).Succeeded(),
 				"Chunk mesh validation includes the shared positive boundary");
 
 			MeshData oversizedBounds = triangle;
 			oversizedBounds.m_Bounds.m_Max.m_X = 9.0f;
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					oversizedBounds,
 					multiChunkConfig,
 					{},
 					targetChunkResult).m_Error ==
-					ValidationError::
-						MeshGeometryOutsideTargetCellDomain,
-				"Chunk mesh bounds cannot extend outside the target chunk");
+					ValidationError::InvalidMeshBounds,
+				"Chunk mesh bounds must be canonical tight bounds");
 
 			VoxelWorldConfig partialChunkConfig = config;
 			partialChunkConfig.m_LogicalCellBounds = {
@@ -681,24 +1012,26 @@ namespace gglab
 			outsidePositivePartialChunk.m_Bounds.m_Min.m_X += 12.0f;
 			outsidePositivePartialChunk.m_Bounds.m_Max.m_X += 12.0f;
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					triangle,
 					partialChunkConfig,
 					{},
 					targetChunkResult).m_Error ==
 					ValidationError::
 						MeshGeometryOutsideTargetCellDomain &&
-					ValidateAndHashChunkMesh(
+					ValidatePositiveZWindingMesh(
 						positiveBoundaryMesh,
 						partialChunkConfig,
 						{},
-						targetChunkResult).Succeeded() &&
-					ValidateAndHashChunkMesh(
+						targetChunkResult,
+						{ 1.0f, 0.0f, 0.0f }).Succeeded() &&
+					ValidatePositiveZWindingMesh(
 						positiveBoundaryMesh,
 						partialChunkConfig,
 						{ 1, 0, 0 },
-						targetChunkResult).Succeeded() &&
-					ValidateAndHashChunkMesh(
+						targetChunkResult,
+						{ 1.0f, 0.0f, 0.0f }).Succeeded() &&
+					ValidatePositiveZWindingMesh(
 						outsidePositivePartialChunk,
 						partialChunkConfig,
 						{ 1, 0, 0 },
@@ -730,7 +1063,7 @@ namespace gglab
 			MeshValidationResult subQuantizationResult{};
 			context.Check(
 				triangleValid &&
-					ValidateAndHashChunkMesh(
+					ValidatePositiveZWindingMesh(
 						subQuantizationVariant,
 						config,
 						{},
@@ -744,7 +1077,7 @@ namespace gglab
 				VoxelMaterial::Stone;
 			MeshValidationResult stoneResult{};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					stoneTriangle,
 					config,
 					{},
@@ -756,7 +1089,7 @@ namespace gglab
 			MeshData invalidBounds = triangle;
 			invalidBounds.m_Bounds.m_Max.m_X = 1.5f;
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					invalidBounds,
 					config,
 					{},
@@ -768,7 +1101,7 @@ namespace gglab
 			invalidNormal.m_Vertices[0].m_Normal =
 				{ 0.0f, 0.0f, 0.5f };
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					invalidNormal,
 					config,
 					{},
@@ -780,7 +1113,7 @@ namespace gglab
 			nonFiniteNormal.m_Vertices[0].m_Normal.m_X =
 				std::numeric_limits<float>::infinity();
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					nonFiniteNormal,
 					config,
 					{},
@@ -791,7 +1124,7 @@ namespace gglab
 			MeshData invalidIndexCount = triangle;
 			invalidIndexCount.m_Sections[0].m_Indices.pop_back();
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					invalidIndexCount,
 					config,
 					{},
@@ -802,7 +1135,7 @@ namespace gglab
 			MeshData invalidIndex = triangle;
 			invalidIndex.m_Sections[0].m_Indices[2] = 3;
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					invalidIndex,
 					config,
 					{},
@@ -818,7 +1151,7 @@ namespace gglab
 					1.0f,
 				};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					canonicalDegenerate,
 					config,
 					{},
@@ -836,7 +1169,7 @@ namespace gglab
 			areaDegenerate.m_Bounds.m_Max =
 				{ 3.0f, 1.0f, 1.0f };
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					areaDegenerate,
 					config,
 					{},
@@ -860,7 +1193,7 @@ namespace gglab
 			};
 			const MeshValidationResult sentinel = unchanged;
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					reversedWinding,
 					config,
 					{},
@@ -884,7 +1217,7 @@ namespace gglab
 			invalidMaterial.m_Sections[0].m_Material =
 				VoxelMaterial::Empty;
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					invalidMaterial,
 					config,
 					{},
@@ -904,7 +1237,7 @@ namespace gglab
 				},
 			};
 			context.Check(
-				ValidateAndHashChunkMesh(
+				ValidatePositiveZWindingMesh(
 					unorderedSections,
 					config,
 					{},
@@ -1292,52 +1625,63 @@ namespace gglab
 
 			const ReferenceMesher mesher(*world);
 			bool classificationsValid = true;
-			for (std::uint8_t classification = 0;
-				classification < 16;
-				++classification)
+			for (std::uint8_t tetrahedronIndex = 0;
+				static_cast<std::size_t>(tetrahedronIndex) <
+					ReferenceFreudenthalTetrahedra.size();
+				++tetrahedronIndex)
 			{
-				const std::array<ReferenceEdgeEndpoint, 8>
-					corners =
-						MakeReferenceCubeCorners(classification);
-				ReferenceTetrahedronPolygonization polygonization;
-				const ValidationResult result =
-					mesher.PolygonizeTetrahedron(
-						corners,
-						0,
-						quantizationContext,
-						polygonization);
-				const std::uint8_t solidCount =
-					CountTetrahedronSolidBits(classification);
-				const std::uint8_t expectedTriangleCount =
-					solidCount == 0 || solidCount == 4
-						? 0
-						: solidCount == 2
-							? 2
-							: 1;
-				classificationsValid &=
-					result.Succeeded() &&
-					polygonization.m_TriangleCount ==
-						expectedTriangleCount &&
-					polygonization
-						.m_SkippedDegenerateTriangleCount == 0 &&
-					polygonization.m_Material ==
-						(expectedTriangleCount == 0
-							? VoxelMaterial::Empty
-							: VoxelMaterial::Stone);
-				for (std::uint8_t triangleIndex = 0;
-					triangleIndex <
-						polygonization.m_TriangleCount;
-					++triangleIndex)
+				for (std::uint8_t classification = 0;
+					classification < 16;
+					++classification)
 				{
+					const std::array<ReferenceEdgeEndpoint, 8>
+						corners = MakeReferenceCubeCorners(
+							classification,
+							tetrahedronIndex);
+					ReferenceTetrahedronPolygonization
+						polygonization;
+					const ValidationResult result =
+						mesher.PolygonizeTetrahedron(
+							corners,
+							tetrahedronIndex,
+							quantizationContext,
+							polygonization);
+					const std::uint8_t solidCount =
+						CountTetrahedronSolidBits(
+							classification);
+					const std::uint8_t expectedTriangleCount =
+						solidCount == 0 || solidCount == 4
+							? 0
+							: solidCount == 2
+								? 2
+								: 1;
 					classificationsValid &=
-						HasOutwardNormalWinding(
-							polygonization
-								.m_Triangles[triangleIndex]);
+						result.Succeeded() &&
+						polygonization.m_TriangleCount ==
+							expectedTriangleCount &&
+						polygonization
+							.m_SkippedDegenerateTriangleCount ==
+								0 &&
+						polygonization.m_Material ==
+							(expectedTriangleCount == 0
+								? VoxelMaterial::Empty
+								: VoxelMaterial::Stone);
+					for (std::uint8_t triangleIndex = 0;
+						triangleIndex <
+							polygonization.m_TriangleCount;
+						++triangleIndex)
+					{
+						classificationsValid &=
+							HasOutwardNormalWinding(
+								polygonization
+									.m_Triangles[
+										triangleIndex]);
+					}
 				}
 			}
 			context.Check(
 				classificationsValid,
-				"All sixteen tetrahedron classifications produce fixed valid topology");
+				"All six tetrahedra and sixteen classifications produce fixed valid topology");
 
 			const std::array<ReferenceEdgeEndpoint, 8>
 				twoSolidCorners = MakeReferenceCubeCorners(0b1001);
@@ -1416,6 +1760,7 @@ namespace gglab
 			std::array<ReferenceEdgeEndpoint, 8>
 				oneIsoCorner = MakeReferenceCubeCorners(0b0001);
 			oneIsoCorner[0].m_Sample.m_Density = IsoValue;
+			oneIsoCorner[0].m_DensityGradient = {};
 			ReferenceTetrahedronPolygonization oneIso{};
 			const bool oneIsoSucceeded =
 				mesher.PolygonizeTetrahedron(
@@ -1427,6 +1772,8 @@ namespace gglab
 				twoIsoCorners = MakeReferenceCubeCorners(0b1001);
 			twoIsoCorners[0].m_Sample.m_Density = IsoValue;
 			twoIsoCorners[7].m_Sample.m_Density = IsoValue;
+			twoIsoCorners[0].m_DensityGradient = {};
+			twoIsoCorners[7].m_DensityGradient = {};
 			ReferenceTetrahedronPolygonization twoIso{};
 			const bool twoIsoSucceeded =
 				mesher.PolygonizeTetrahedron(
@@ -1441,7 +1788,43 @@ namespace gglab
 					twoIsoSucceeded &&
 					twoIso.m_TriangleCount == 0 &&
 					twoIso.m_SkippedDegenerateTriangleCount == 2,
-				"Exact-iso canonical degeneracies are skipped deterministically");
+				"Exact-iso canonical degeneracies are skipped before zero gradients are normalized");
+
+			std::array<ReferenceEdgeEndpoint, 8>
+				oneOfTwoIsoCorners =
+					MakeReferenceCubeCorners(0b1001);
+			oneOfTwoIsoCorners[0].m_Sample.m_Density =
+				IsoValue;
+			ReferenceTetrahedronPolygonization oneOfTwoIso{};
+			context.Check(
+				mesher.PolygonizeTetrahedron(
+					oneOfTwoIsoCorners,
+					0,
+					quantizationContext,
+					oneOfTwoIso).Succeeded() &&
+					oneOfTwoIso.m_TriangleCount == 1 &&
+					oneOfTwoIso
+						.m_SkippedDegenerateTriangleCount == 1,
+				"A degenerate triangle does not suppress its surviving two-two companion");
+
+			std::array<ReferenceEdgeEndpoint, 8>
+				zeroGradientCorners =
+					MakeReferenceCubeCorners(0b0001);
+			for (ReferenceEdgeEndpoint& corner :
+				zeroGradientCorners)
+			{
+				corner.m_DensityGradient = {};
+			}
+			ReferenceTetrahedronPolygonization
+				zeroGradientPolygonization{};
+			context.Check(
+				mesher.PolygonizeTetrahedron(
+					zeroGradientCorners,
+					0,
+					quantizationContext,
+					zeroGradientPolygonization).m_Error ==
+					ValidationError::DegenerateDensityGradient,
+				"Surviving triangles still reject zero interpolated gradients");
 
 			std::array<ReferenceEdgeEndpoint, 8>
 				fallbackCorners = MakeReferenceCubeCorners(0b0001);
@@ -1467,6 +1850,49 @@ namespace gglab
 						fallback.m_Triangles[0],
 						{ 1.0, 2.0 / 3.0, 1.0 / 3.0 }),
 				"Degenerate triangle gradients use the centroid winding fallback");
+			if (fallbackSucceeded &&
+				fallback.m_TriangleCount == 1)
+			{
+				const MeshData fallbackMesh =
+					MakeReferenceTriangleMesh(
+						fallback.m_Triangles[0],
+						fallback.m_Material);
+				const std::array<MeshTriangleWindingEvidence, 1>
+					fallbackEvidence{
+						fallback.m_Triangles[0]
+							.m_WindingEvidence,
+					};
+				MeshValidationResult fallbackValidation{};
+				context.Check(
+					ValidateAndHashChunkMesh(
+						fallbackMesh,
+						fallbackEvidence,
+						config,
+						{},
+						fallbackValidation).Succeeded(),
+					"Final mesh validation reuses the polygonizer winding contract");
+			}
+
+			std::array<ReferenceEdgeEndpoint, 8>
+				roundedDirectionCorners =
+					MakeReferenceCubeCorners(0b0001);
+			for (const std::uint8_t cornerId :
+				ReferenceFreudenthalTetrahedra[0])
+			{
+				roundedDirectionCorners[cornerId]
+					.m_DensityGradient =
+						{ -1.0e-50, -1.0, 0.0 };
+			}
+			ReferenceTetrahedronPolygonization
+				roundedDirectionPolygonization{};
+			context.Check(
+				mesher.PolygonizeTetrahedron(
+					roundedDirectionCorners,
+					0,
+					quantizationContext,
+					roundedDirectionPolygonization).m_Error ==
+					ValidationError::InvalidMeshWinding,
+				"Polygonization orients with the same canonical float direction used by final validation");
 
 			ReferenceTetrahedronPolygonization unchanged{
 				.m_Material = VoxelMaterial::Soil,
@@ -1478,6 +1904,14 @@ namespace gglab
 			const std::array<ReferenceEdgeEndpoint, 8>
 				validCorners = MakeReferenceCubeCorners(0b0001);
 			MeshQuantizationContext unprepared;
+			VoxelWorldConfig mismatchedConfig = config;
+			mismatchedConfig.m_VoxelSize = 0.5f;
+			MeshQuantizationContext mismatchedContext;
+			const ValidationResult mismatchedContextResult =
+				PrepareMeshQuantizationContext(
+					mismatchedConfig,
+					{},
+					mismatchedContext);
 			std::array<ReferenceEdgeEndpoint, 8>
 				malformedCorners = validCorners;
 			malformedCorners[0].m_Coordinate.m_X = 1;
@@ -1497,6 +1931,15 @@ namespace gglab
 						ValidationError::
 							UnpreparedMeshQuantizationContext &&
 					unchanged == sentinel &&
+					mismatchedContextResult.Succeeded() &&
+					mesher.PolygonizeTetrahedron(
+						validCorners,
+						0,
+						mismatchedContext,
+						unchanged).m_Error ==
+						ValidationError::
+							MismatchedMeshQuantizationContext &&
+					unchanged == sentinel &&
 					mesher.PolygonizeTetrahedron(
 						malformedCorners,
 						0,
@@ -1505,7 +1948,600 @@ namespace gglab
 						ValidationError::
 							InvalidReferenceTetrahedron &&
 					unchanged == sentinel,
-				"Invalid tetrahedron inputs fail without publishing output");
+				"Invalid or mismatched tetrahedron inputs fail without publishing output");
+		}
+
+		void RunReferenceChunkMeshingTests(
+			SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config =
+				MakeMeshValidationConfig();
+
+			std::unique_ptr<VoxelWorld> emptyWorld;
+			PrimitiveWorldGenerationResult emptyGeneration{};
+			ReferenceChunkMeshingResult emptyMeshing{};
+			const bool emptyMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					std::span<const PrimitiveDesc>{},
+					emptyWorld,
+					emptyGeneration).Succeeded() &&
+				emptyWorld &&
+				ReferenceMesher(*emptyWorld).MeshChunk(
+					{},
+					emptyMeshing).Succeeded();
+			context.Check(
+				emptyMeshed &&
+					emptyMeshing.m_Mesh.m_Vertices.empty() &&
+					emptyMeshing.m_Mesh.m_Sections.empty() &&
+					emptyMeshing.m_Mesh.m_Bounds ==
+						FloatAabb{} &&
+					emptyMeshing.m_Validation.m_VertexCount == 0 &&
+					emptyMeshing.m_Validation.m_TriangleCount == 0 &&
+					emptyMeshing
+						.m_Validation.m_ValidationHash ==
+						0x66ee37df3fd08e65ull &&
+					emptyMeshing
+						.m_SkippedDegenerateTriangleCount == 0,
+				"An empty primitive set produces the canonical empty chunk mesh");
+
+			std::unique_ptr<VoxelWorld> solidWorld;
+			ReferenceChunkMeshingResult solidMeshing{};
+			const bool solidMeshed =
+				VoxelWorld::Create(config, solidWorld).Succeeded() &&
+				solidWorld &&
+				InitializeCurrentSamples(
+					*solidWorld,
+					[](SampleCoord)
+					{
+						return VoxelSample{
+							.m_Density = 192,
+							.m_Material =
+								VoxelMaterial::Stone,
+							.m_Damage = 0,
+						};
+					}) &&
+				ReferenceMesher(*solidWorld).MeshChunk(
+					{},
+					solidMeshing).Succeeded();
+			context.Check(
+				solidMeshed &&
+					solidMeshing.m_Mesh.m_Vertices.empty() &&
+					solidMeshing.m_Mesh.m_Sections.empty() &&
+					emptyMeshed &&
+					solidMeshing
+						.m_Validation.m_ValidationHash ==
+						emptyMeshing
+							.m_Validation.m_ValidationHash,
+				"A uniform solid field contains no isosurface and hashes as the canonical empty mesh");
+
+			std::unique_ptr<VoxelWorld> planeWorld;
+			ReferenceChunkMeshingResult planeMeshing{};
+			const bool planeMeshed =
+				VoxelWorld::Create(config, planeWorld).Succeeded() &&
+				planeWorld &&
+				InitializeCurrentSamples(
+					*planeWorld,
+					[](SampleCoord coordinate)
+					{
+						const std::int32_t unboundedDensity =
+							static_cast<std::int32_t>(
+								IsoValue) +
+							(4 - coordinate.m_X) * 32;
+						const std::uint8_t density =
+							static_cast<std::uint8_t>(
+								std::clamp(
+									unboundedDensity,
+									0,
+									255));
+						return VoxelSample{
+							.m_Density = density,
+							.m_Material =
+								density >= IsoValue
+									? VoxelMaterial::Stone
+									: VoxelMaterial::Empty,
+							.m_Damage = 0,
+						};
+					}) &&
+				ReferenceMesher(*planeWorld).MeshChunk(
+					{},
+					planeMeshing).Succeeded();
+			context.Check(
+				planeMeshed &&
+					planeMeshing
+						.m_Validation.m_ValidationHash ==
+						0xfc76f5e33d6ec3e1ull &&
+					planeMeshing.m_Validation.m_VertexCount == 384 &&
+					planeMeshing.m_Validation.m_SectionCount == 1 &&
+					planeMeshing.m_Validation.m_IndexCount == 384 &&
+					planeMeshing.m_Validation.m_TriangleCount == 128 &&
+					planeMeshing
+						.m_SkippedDegenerateTriangleCount == 384 &&
+					planeMeshing.m_Mesh.m_Sections.size() == 1 &&
+					planeMeshing.m_Mesh.m_Sections[0].m_Material ==
+						VoxelMaterial::Stone &&
+					planeMeshing.m_Validation.m_QuantizedBounds ==
+						QuantizedMeshAabb{
+							.m_Min = { 262144, 0, 0 },
+							.m_Max = {
+								262144,
+								524288,
+								524288,
+							},
+						},
+				"Exact-iso plane meshing produces one tight deterministic section");
+
+			std::unique_ptr<VoxelWorld> latticeEdgePlaneWorld;
+			ReferenceChunkMeshingResult
+				latticeEdgePlaneMeshing{};
+			const bool latticeEdgePlaneMeshed =
+				VoxelWorld::Create(
+					config,
+					latticeEdgePlaneWorld).Succeeded() &&
+				latticeEdgePlaneWorld &&
+				InitializeCurrentSamples(
+					*latticeEdgePlaneWorld,
+					[](SampleCoord coordinate)
+					{
+						return MakeLinearExactIsoSample(
+							coordinate,
+							1,
+							1,
+							0,
+							8);
+					}) &&
+				ReferenceMesher(*latticeEdgePlaneWorld).MeshChunk(
+					{},
+					latticeEdgePlaneMeshing).Succeeded();
+			context.Check(
+				latticeEdgePlaneMeshed &&
+					latticeEdgePlaneMeshing
+						.m_Validation.m_TriangleCount > 0 &&
+					latticeEdgePlaneMeshing
+						.m_SkippedDegenerateTriangleCount > 0 &&
+					latticeEdgePlaneMeshing
+						.m_WindingEvidence.size() ==
+						latticeEdgePlaneMeshing
+							.m_Validation.m_TriangleCount,
+				"Exact-iso plane through lattice edges meshes deterministically");
+
+			std::unique_ptr<VoxelWorld> latticeVertexPlaneWorld;
+			ReferenceChunkMeshingResult
+				latticeVertexPlaneMeshing{};
+			const bool latticeVertexPlaneMeshed =
+				VoxelWorld::Create(
+					config,
+					latticeVertexPlaneWorld).Succeeded() &&
+				latticeVertexPlaneWorld &&
+				InitializeCurrentSamples(
+					*latticeVertexPlaneWorld,
+					[](SampleCoord coordinate)
+					{
+						return MakeLinearExactIsoSample(
+							coordinate,
+							1,
+							1,
+							1,
+							12);
+					}) &&
+				ReferenceMesher(*latticeVertexPlaneWorld).MeshChunk(
+					{},
+					latticeVertexPlaneMeshing).Succeeded();
+			context.Check(
+				latticeVertexPlaneMeshed &&
+					latticeVertexPlaneMeshing
+						.m_Validation.m_TriangleCount > 0 &&
+					latticeVertexPlaneMeshing
+						.m_SkippedDegenerateTriangleCount > 0 &&
+					latticeVertexPlaneMeshing
+						.m_WindingEvidence.size() ==
+						latticeVertexPlaneMeshing
+							.m_Validation.m_TriangleCount,
+				"Exact-iso plane through lattice vertices meshes deterministically");
+
+			const std::array spherePrimitive{
+				MakeMeshingSphere(
+					1,
+					{ 4.0, 4.0, 4.0 },
+					1.5,
+					VoxelMaterial::Stone),
+			};
+			std::unique_ptr<VoxelWorld> sphereWorld;
+			PrimitiveWorldGenerationResult sphereGeneration{};
+			ReferenceChunkMeshingResult sphereMeshing{};
+			const bool sphereMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					spherePrimitive,
+					sphereWorld,
+					sphereGeneration).Succeeded() &&
+				sphereWorld &&
+				ReferenceMesher(*sphereWorld).MeshChunk(
+					{},
+					sphereMeshing).Succeeded();
+			MeshValidationResult sphereRevalidation{};
+			context.Check(
+				sphereMeshed &&
+					ValidateAndHashChunkMesh(
+						sphereMeshing.m_Mesh,
+						sphereMeshing.m_WindingEvidence,
+						config,
+						{},
+						sphereRevalidation).Succeeded() &&
+					sphereRevalidation.m_ValidationHash ==
+						sphereMeshing
+							.m_Validation.m_ValidationHash &&
+					sphereMeshing.m_WindingEvidence.size() ==
+						sphereMeshing
+							.m_Validation.m_TriangleCount &&
+					sphereMeshing
+						.m_Validation.m_ValidationHash ==
+						0x21430fa2a20a7e24ull &&
+					sphereMeshing.m_Validation.m_VertexCount == 864 &&
+					sphereMeshing.m_Validation.m_IndexCount == 864 &&
+					sphereMeshing.m_Validation.m_TriangleCount == 288 &&
+					sphereMeshing.m_Validation.m_SectionCount == 1 &&
+					sphereMeshing
+						.m_SkippedDegenerateTriangleCount == 0 &&
+					sphereMeshing.m_Validation.m_QuantizedBounds ==
+						QuantizedMeshAabb{
+							.m_Min = {
+								163840,
+								163840,
+								163840,
+							},
+							.m_Max = {
+								360448,
+								360448,
+								360448,
+							},
+						} &&
+					sphereMeshing.m_Mesh.m_Sections.size() == 1 &&
+					sphereMeshing.m_Mesh.m_Sections[0].m_Material ==
+						VoxelMaterial::Stone,
+				"Sphere chunk results retain enough evidence for identical revalidation");
+
+			const std::array sampleAlignedSpherePrimitive{
+				MakeMeshingSphere(
+					3,
+					{ 4.0, 4.0, 4.0 },
+					2.0,
+					VoxelMaterial::Stone),
+			};
+			std::unique_ptr<VoxelWorld>
+				sampleAlignedSphereWorld;
+			PrimitiveWorldGenerationResult
+				sampleAlignedSphereGeneration{};
+			ReferenceChunkMeshingResult
+				sampleAlignedSphereMeshing{};
+			const bool sampleAlignedSphereMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					sampleAlignedSpherePrimitive,
+					sampleAlignedSphereWorld,
+					sampleAlignedSphereGeneration).Succeeded() &&
+				sampleAlignedSphereWorld &&
+				ReferenceMesher(*sampleAlignedSphereWorld)
+					.MeshChunk(
+						{},
+						sampleAlignedSphereMeshing)
+					.Succeeded();
+			context.Check(
+				sampleAlignedSphereMeshed &&
+					sampleAlignedSphereMeshing
+						.m_Validation.m_TriangleCount > 0 &&
+					sampleAlignedSphereMeshing
+						.m_SkippedDegenerateTriangleCount > 0,
+				"Sphere surfaces through known samples handle exact-iso topology");
+
+			const std::array boxPrimitive{
+				MakeMeshingBox(
+					2,
+					{ 4.0, 4.0, 4.0 },
+					{ 1.5, 1.25, 1.75 },
+					VoxelMaterial::Soil),
+			};
+			std::unique_ptr<VoxelWorld> boxWorld;
+			PrimitiveWorldGenerationResult boxGeneration{};
+			ReferenceChunkMeshingResult boxMeshing{};
+			const bool boxMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					boxPrimitive,
+					boxWorld,
+					boxGeneration).Succeeded() &&
+				boxWorld &&
+				ReferenceMesher(*boxWorld).MeshChunk(
+					{},
+					boxMeshing).Succeeded();
+			context.Check(
+				boxMeshed &&
+					boxMeshing
+						.m_Validation.m_ValidationHash ==
+						0x721dd1cddc0cbcd6ull &&
+					boxMeshing.m_Validation.m_VertexCount == 1080 &&
+					boxMeshing.m_Validation.m_IndexCount == 1080 &&
+					boxMeshing.m_Validation.m_TriangleCount == 360 &&
+					boxMeshing.m_Validation.m_SectionCount == 1 &&
+					boxMeshing
+						.m_SkippedDegenerateTriangleCount == 0 &&
+					boxMeshing.m_Validation.m_QuantizedBounds ==
+						QuantizedMeshAabb{
+							.m_Min = {
+								163840,
+								180224,
+								147456,
+							},
+							.m_Max = {
+								360448,
+								344064,
+								376832,
+							},
+						} &&
+					boxMeshing.m_Mesh.m_Sections.size() == 1 &&
+					boxMeshing.m_Mesh.m_Sections[0].m_Material ==
+						VoxelMaterial::Soil,
+				"Box primitive generation feeds a valid single-section chunk mesh");
+
+			const std::array sampleAlignedBoxPrimitive{
+				MakeMeshingBox(
+					4,
+					{ 4.0, 4.0, 4.0 },
+					{ 2.0, 2.0, 2.0 },
+					VoxelMaterial::Soil),
+			};
+			std::unique_ptr<VoxelWorld> sampleAlignedBoxWorld;
+			PrimitiveWorldGenerationResult
+				sampleAlignedBoxGeneration{};
+			ReferenceChunkMeshingResult
+				sampleAlignedBoxMeshing{};
+			const bool sampleAlignedBoxMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					sampleAlignedBoxPrimitive,
+					sampleAlignedBoxWorld,
+					sampleAlignedBoxGeneration).Succeeded() &&
+				sampleAlignedBoxWorld &&
+				ReferenceMesher(*sampleAlignedBoxWorld).MeshChunk(
+					{},
+					sampleAlignedBoxMeshing).Succeeded();
+			context.Check(
+				sampleAlignedBoxMeshed &&
+					sampleAlignedBoxMeshing
+						.m_Validation.m_TriangleCount > 0 &&
+					sampleAlignedBoxMeshing
+						.m_SkippedDegenerateTriangleCount > 0,
+				"Sample-aligned box faces handle exact-iso topology");
+
+			std::array multiMaterialPrimitives{
+				MakeMeshingSphere(
+					10,
+					{ 2.5, 4.0, 4.0 },
+					1.25,
+					VoxelMaterial::Soil),
+				MakeMeshingSphere(
+					20,
+					{ 5.5, 4.0, 4.0 },
+					1.25,
+					VoxelMaterial::Stone),
+			};
+			std::unique_ptr<VoxelWorld> multiMaterialWorld;
+			PrimitiveWorldGenerationResult
+				multiMaterialGeneration{};
+			ReferenceChunkMeshingResult multiMaterialMeshing{};
+			const bool multiMaterialMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					multiMaterialPrimitives,
+					multiMaterialWorld,
+					multiMaterialGeneration).Succeeded() &&
+				multiMaterialWorld &&
+				ReferenceMesher(*multiMaterialWorld).MeshChunk(
+					{},
+					multiMaterialMeshing).Succeeded();
+
+			std::reverse(
+				multiMaterialPrimitives.begin(),
+				multiMaterialPrimitives.end());
+			std::unique_ptr<VoxelWorld>
+				reversedMultiMaterialWorld;
+			PrimitiveWorldGenerationResult
+				reversedMultiMaterialGeneration{};
+			ReferenceChunkMeshingResult
+				reversedMultiMaterialMeshing{};
+			const bool reversedMultiMaterialMeshed =
+				GeneratePrimitiveVoxelWorld(
+					config,
+					multiMaterialPrimitives,
+					reversedMultiMaterialWorld,
+					reversedMultiMaterialGeneration).Succeeded() &&
+				reversedMultiMaterialWorld &&
+				ReferenceMesher(*reversedMultiMaterialWorld)
+					.MeshChunk(
+						{},
+						reversedMultiMaterialMeshing)
+					.Succeeded();
+			context.Check(
+				multiMaterialMeshed &&
+					multiMaterialMeshing
+						.m_Validation.m_ValidationHash ==
+						0x91fe4f658135d8f3ull &&
+					multiMaterialMeshing
+						.m_Validation.m_VertexCount == 1104 &&
+					multiMaterialMeshing
+						.m_Validation.m_IndexCount == 1104 &&
+					multiMaterialMeshing
+						.m_Validation.m_TriangleCount == 368 &&
+					multiMaterialMeshing
+						.m_Validation.m_SectionCount == 2 &&
+					multiMaterialMeshing
+						.m_SkippedDegenerateTriangleCount == 0 &&
+					multiMaterialMeshing
+						.m_Validation.m_QuantizedBounds ==
+						QuantizedMeshAabb{
+							.m_Min = {
+								81920,
+								187870,
+								187870,
+							},
+							.m_Max = {
+								442368,
+								336418,
+								336418,
+							},
+						} &&
+					multiMaterialMeshing.m_Mesh.m_Sections.size() ==
+						2 &&
+					multiMaterialMeshing
+						.m_Mesh.m_Sections[0].m_Material ==
+						VoxelMaterial::Soil &&
+					multiMaterialMeshing
+						.m_Mesh.m_Sections[1].m_Material ==
+						VoxelMaterial::Stone &&
+					reversedMultiMaterialMeshed &&
+					reversedMultiMaterialMeshing
+						.m_Validation.m_ValidationHash ==
+						multiMaterialMeshing
+							.m_Validation.m_ValidationHash &&
+					reversedMultiMaterialMeshing
+						.m_WindingEvidence ==
+						multiMaterialMeshing
+							.m_WindingEvidence,
+				"Multi-material sections use enum order independently of primitive input order");
+
+			bool repeatedMeshMatches = sphereMeshed;
+			for (std::uint32_t iteration = 0;
+				iteration < 10 && repeatedMeshMatches;
+				++iteration)
+			{
+				ReferenceChunkMeshingResult repeated{};
+				repeatedMeshMatches =
+					ReferenceMesher(*sphereWorld).MeshChunk(
+						{},
+						repeated).Succeeded() &&
+					repeated.m_Validation.m_ValidationHash ==
+						sphereMeshing
+							.m_Validation.m_ValidationHash &&
+					repeated.m_Validation.m_VertexCount ==
+						sphereMeshing
+							.m_Validation.m_VertexCount &&
+					repeated.m_Validation.m_TriangleCount ==
+						sphereMeshing
+							.m_Validation.m_TriangleCount &&
+					repeated.m_WindingEvidence ==
+						sphereMeshing.m_WindingEvidence &&
+					repeated.m_SkippedDegenerateTriangleCount ==
+						sphereMeshing
+							.m_SkippedDegenerateTriangleCount;
+			}
+			context.Check(
+				repeatedMeshMatches,
+				"Repeated chunk meshing produces identical canonical geometry");
+
+			VoxelWorldConfig partialConfig = config;
+			partialConfig.m_LogicalCellBounds = {
+				.m_Min = { 4, 0, 0 },
+				.m_MaxExclusive = { 12, 8, 8 },
+			};
+			std::unique_ptr<VoxelWorld> partialWorld;
+			ReferenceChunkMeshingResult partialLeft{};
+			ReferenceChunkMeshingResult partialRight{};
+			const bool partialMeshed =
+				VoxelWorld::Create(
+					partialConfig,
+					partialWorld).Succeeded() &&
+				partialWorld &&
+				InitializeCurrentSamples(
+					*partialWorld,
+					[](SampleCoord coordinate)
+					{
+						const bool solid =
+							coordinate.m_X <= 8;
+						const std::uint8_t density =
+							coordinate.m_X < 8
+								? 192
+								: coordinate.m_X == 8
+									? IsoValue
+									: 64;
+						return VoxelSample{
+							.m_Density = density,
+							.m_Material =
+								solid
+									? VoxelMaterial::Stone
+									: VoxelMaterial::Empty,
+							.m_Damage = 0,
+						};
+					}) &&
+				ReferenceMesher(*partialWorld).MeshChunk(
+					{},
+					partialLeft).Succeeded() &&
+				ReferenceMesher(*partialWorld).MeshChunk(
+					{ 1, 0, 0 },
+					partialRight).Succeeded();
+			context.Check(
+				partialMeshed &&
+					partialLeft.m_Validation.m_TriangleCount == 0 &&
+					partialRight.m_Validation.m_TriangleCount ==
+						128 &&
+					partialRight
+						.m_SkippedDegenerateTriangleCount == 384 &&
+					partialRight.m_Validation.m_QuantizedBounds
+						.m_Min.m_X == 0 &&
+					partialRight.m_Validation.m_QuantizedBounds
+						.m_Max.m_X == 0,
+				"Partial chunks assign an exact shared-boundary surface to one cell owner");
+
+			ReferenceChunkMeshingResult unchanged{
+				.m_Mesh = MakeSyntheticTriangleMesh(),
+				.m_WindingEvidence = {
+					{
+						.m_OutwardDirection = {
+							0.0f,
+							0.0f,
+							1.0f,
+						},
+					},
+				},
+				.m_Validation = {
+					.m_ValidationHash =
+						0x123456789abcdef0ull,
+					.m_VertexCount = 11,
+					.m_SectionCount = 12,
+					.m_IndexCount = 13,
+					.m_TriangleCount = 14,
+					.m_QuantizedBounds = {
+						.m_Min = { 1, 2, 3 },
+						.m_Max = { 4, 5, 6 },
+					},
+				},
+				.m_SkippedDegenerateTriangleCount = 15,
+			};
+			context.Check(
+				ReferenceMesher(*emptyWorld).MeshChunk(
+					{ 1, 0, 0 },
+					unchanged).m_Error ==
+					ValidationError::
+						ChunkOutsideLogicalCellDomain &&
+					unchanged.m_Mesh.m_Vertices.size() == 3 &&
+					unchanged.m_Mesh.m_Sections.size() == 1 &&
+					unchanged.m_WindingEvidence ==
+						std::vector<MeshTriangleWindingEvidence>{
+							{
+								.m_OutwardDirection = {
+									0.0f,
+									0.0f,
+									1.0f,
+								},
+							},
+						} &&
+					unchanged.m_Validation.m_ValidationHash ==
+						0x123456789abcdef0ull &&
+					unchanged.m_Validation.m_TriangleCount == 14 &&
+					unchanged
+						.m_SkippedDegenerateTriangleCount == 15,
+				"Rejected chunk meshing leaves the published result unchanged");
 		}
 	}
 
@@ -1519,5 +2555,6 @@ namespace gglab
 		RunReferenceGradientTests(context);
 		RunReferenceInterpolationTests(context);
 		RunReferenceTetrahedronPolygonizationTests(context);
+		RunReferenceChunkMeshingTests(context);
 	}
 }

@@ -23,7 +23,7 @@ namespace gglab
 			static_cast<unsigned>(contract.m_ReferenceMesherVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 10, "Core API version is 10");
+		context.Check(contract.m_CoreApiVersion == 11, "Core API version is 11");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -31,8 +31,8 @@ namespace gglab
 			contract.m_MeshHashSchemaVersion == 1,
 			"Mesh hash schema version is 1");
 		context.Check(
-			contract.m_ReferenceMesherVersion == 1,
-			"Reference mesher version is 1");
+			contract.m_ReferenceMesherVersion == 2,
+			"Reference mesher version is 2");
 		context.Check(
 			contract.m_IsoValue == napa::voxel::IsoValue,
 			"Build contract reports the canonical iso value");
