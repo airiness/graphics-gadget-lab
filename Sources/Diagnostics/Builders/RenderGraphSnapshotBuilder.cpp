@@ -201,6 +201,16 @@ namespace gglab
 					resourceInfo.m_LastUserPassIndex = compiledResource ?
 						ToSnapshotPassIndex(compiledResource->m_LastUser) : -1;
 					resourceInfo.m_UsageBits = compiledResource ? compiledResource->m_UsageBits : 0;
+					if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
+					{
+						const auto* texture =
+							static_cast<const RGVirtualResource<RGTextureResource>*>(
+								virtualResource);
+						resourceInfo.m_TextureFormat = texture->m_Desc.m_Format;
+						resourceInfo.m_TextureExtent = texture->m_Desc.m_Extent;
+						resourceInfo.m_TextureClearValue =
+							texture->m_Desc.m_ClearValue;
+					}
 					resourceInfo.m_PoolSlot = GetVirtualResourcePoolSlot(virtualResource);
 					resourceInfo.m_InitialBarrierState = compiledResource ?
 						compiledResource->m_InitialState : virtualResource->m_InitialBarrierState;

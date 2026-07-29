@@ -9,6 +9,7 @@
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
+#include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 
 namespace gglab
@@ -44,6 +45,13 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			renderGraphComputeRegistered,
 			"Failed to register the RenderGraph Compute Lab session.");
+
+		const bool sampleableDepthRegistered = m_Runtime.RegisterLab(
+			SampleableDepthLabSession::GetDescriptor(),
+			&SampleableDepthLabSession::Create);
+		GGLAB_ASSERT_MSG(
+			sampleableDepthRegistered,
+			"Failed to register the Sampleable Depth Lab session.");
 
 		const bool alphaTestRegistered = m_Runtime.RegisterLab(
 			AlphaTestLabSession::GetDescriptor(),

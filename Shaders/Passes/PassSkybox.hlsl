@@ -26,7 +26,7 @@ float3 ReconstructWorldDirection(float2 uv, ViewData viewData)
 	float4 farPositionVS = mul(
 		float4(
 			positionNdc,
-			GetDepthFarValue(DEPTH_CONVENTION_REVERSED),
+			GetDepthFarValue(viewData.DepthConvention),
 			1.0),
 		viewData.InvProjMat);
 	float3 directionVS = SafeNormalize(

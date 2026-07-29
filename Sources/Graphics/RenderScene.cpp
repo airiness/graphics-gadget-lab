@@ -265,6 +265,8 @@ namespace gglab
 			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
+			viewGpu.DepthConvention =
+				static_cast<uint32_t>(renderView.m_DepthConvention);
 			viewData.push_back(viewGpu);
 		}
 

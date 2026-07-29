@@ -27,5 +27,6 @@ namespace gglab
 		void ApplyImmediateParameters() noexcept override;
 
 		std::shared_ptr<RenderGraphComputeLabState> m_State;
+		float m_AnimationTimeSeconds = 0.0f;
 	};
 }

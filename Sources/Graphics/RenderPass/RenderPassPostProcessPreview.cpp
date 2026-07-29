@@ -3,6 +3,7 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 
@@ -15,7 +16,7 @@ namespace gglab
 			uint32_t SourceTextureIndex = 0;
 			uint32_t SourceSamplerIndex = 0;
 			uint32_t ViewIndex = 0;
-			uint32_t Padding0 = 0;
+			uint32_t SourceMode = 0;
 			float SourcePreExposure = 1.0f;
 			float PreviewExposureScale = 1.0f;
 			float Padding1 = 0.0f;
@@ -23,6 +24,8 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<PostProcessPreviewPassParameters>);
 		static_assert(sizeof(PostProcessPreviewPassParameters) == 32);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthRaw) == 4);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthLinearViewZ) == 5);
 
 		struct PassData
 		{
@@ -52,6 +55,12 @@ namespace gglab
 				return {};
 			}
 		}
+
+		bool IsDepthPreview(PostProcessDebugTap tap) noexcept
+		{
+			return tap == PostProcessDebugTap::SceneDepthRaw ||
+				tap == PostProcessDebugTap::SceneDepthLinearViewZ;
+		}
 	}
 
 	void RenderPassPostProcessPreview::AddPass(RenderGraph& rg,
@@ -63,6 +72,24 @@ namespace gglab
 		auto* registry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection();
+		if (IsDepthPreview(selection.m_Tap))
+		{
+			if (!registry->ConsumePostProcessPreviewRequest())
+			{
+				return;
+			}
+			const auto& resources = rg.GetBlackboard().Get<RGPostProcessResources>(
+				PostProcessResourcesName);
+			AddResolvedPass(
+				rg,
+				context,
+				services,
+				resources.m_Inputs.m_SceneDepth,
+				1.0f,
+				resources.m_Inputs.m_SceneDepthSrvFormat,
+				selection);
+			return;
+		}
 		if (selection.m_Tap != PostProcessDebugTap::SceneColor &&
 			selection.m_Tap != PostProcessDebugTap::BloomResult)
 		{
@@ -104,31 +131,40 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
+			"Post-process preview requires scene-linear Rec.709 input.");
 		if (!registry->ConsumePostProcessPreviewRequest())
 		{
 			return;
 		}
 
-		AddResolvedPass(rg, context, services, source, selection);
+		AddResolvedPass(
+			rg,
+			context,
+			services,
+			source.m_Texture,
+			source.m_PreExposure,
+			RHIFormat::Unknown,
+			selection);
 	}
 
 	void RenderPassPostProcessPreview::AddResolvedPass(RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services,
-		const RGPostProcessColor& source,
+		RGTextureId source,
+		float sourcePreExposure,
+		RHIFormat sourceViewFormat,
 		PostProcessDebugSelection selection) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		auto* registry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(registry);
-		if (!source.m_Texture.IsValid())
+		if (!source.IsValid())
 		{
 			return;
 		}
-		GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
-			"Post-process preview requires scene-linear Rec.709 input.");
-		GGLAB_ASSERT_MSG(source.m_PreExposure > 0.0f,
+		GGLAB_ASSERT_MSG(sourcePreExposure > 0.0f,
 			"Post-process preview requires positive pre-exposure.");
 
 		EnsureInitialized(services);
@@ -146,30 +182,49 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(outputDesc);
 		const RGTextureAccess initialAccess = registry->HasPublishedPostProcessPreview() ?
 			RGTextureAccess::Sample : RGTextureAccess::None;
+		const bool depthPreview = IsDepthPreview(selection.m_Tap);
 		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-			SamplerPreset::LinearClamp);
+			depthPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());
 		const auto* contextPtr = &context;
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[source, selection, outputDesc, initialAccess, samplerIndex, previewExposureScale,
-				registry](RenderGraph::RGBuilder& builder, PassData& data)
+			[source, sourcePreExposure, sourceViewFormat, selection, outputDesc,
+				initialAccess, samplerIndex, previewExposureScale, registry](
+				RenderGraph::RGBuilder& builder, PassData& data)
 			{
-				data.m_Source = builder.Read(source.m_Texture, RGTextureAccess::Sample);
+				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
 				data.m_Output = builder.ImportTexture(
 					"PostProcess.Preview.SelectedTap",
 					registry->GetTextureHandle(TextureIndex::Preview_PostProcess),
 					*outputDesc,
 					initialAccess);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
-				data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+				if (sourceViewFormat == RHIFormat::Unknown)
+				{
+					data.m_SourceSrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(
+							data.m_Source);
+				}
+				else
+				{
+					const auto srvDesc = MakeRHITexture2DViewDesc(
+						sourceViewFormat,
+						0,
+						1,
+						RHITextureAspect::Depth);
+					data.m_SourceSrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(
+							data.m_Source,
+							srvDesc);
+				}
 				data.m_OutputRtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 				builder.Export(data.m_Output, RGTextureAccess::Sample, RHIStage::PixelShader);
 				data.m_Selection = selection;
 				data.m_Width = static_cast<uint32_t>(outputDesc->m_Extent.m_Width);
 				data.m_Height = outputDesc->m_Extent.m_Height;
 				data.m_SamplerIndex = samplerIndex;
-				data.m_SourcePreExposure = source.m_PreExposure;
+				data.m_SourcePreExposure = sourcePreExposure;
 				data.m_PreviewExposureScale = previewExposureScale;
 			},
 			[this, renderer, registry, contextPtr, displayViewId](
@@ -202,6 +257,7 @@ namespace gglab
 					.SourceTextureIndex = sourceSrv.m_Index,
 					.SourceSamplerIndex = data.m_SamplerIndex,
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+					.SourceMode = static_cast<uint32_t>(data.m_Selection.m_Tap),
 					.SourcePreExposure = data.m_SourcePreExposure,
 					.PreviewExposureScale = data.m_PreviewExposureScale,
 				};

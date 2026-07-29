@@ -642,6 +642,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -1614,6 +1617,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h">
