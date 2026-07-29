@@ -43,6 +43,7 @@ namespace napa::voxel
 
 	struct MeshVertex
 	{
+		// Physical position relative to the owning Chunk origin.
 		Float3 m_Position{};
 		Float3 m_Normal{};
 	};
@@ -53,6 +54,7 @@ namespace napa::voxel
 		std::vector<std::uint32_t> m_Indices;
 	};
 
+	// Vertex positions and bounds use owning Chunk-local physical space.
 	struct MeshData
 	{
 		std::vector<MeshVertex> m_Vertices;

@@ -307,12 +307,6 @@ namespace napa::voxel
 		MeshQuantizationContext prepared;
 		prepared.m_InverseVoxelSize =
 			1.0 / static_cast<double>(config.m_VoxelSize);
-		prepared.m_ChunkOriginVoxelX =
-			static_cast<double>(originX);
-		prepared.m_ChunkOriginVoxelY =
-			static_cast<double>(originY);
-		prepared.m_ChunkOriginVoxelZ =
-			static_cast<double>(originZ);
 		prepared.m_TargetCellDomainMin = {
 			static_cast<std::int32_t>(
 				localMinimumX * quantizationScale),
@@ -389,8 +383,7 @@ namespace napa::voxel
 		const ValidationResult xResult =
 			QuantizeMeshPositionComponent(
 				static_cast<double>(position.m_X) *
-					context.m_InverseVoxelSize -
-					context.m_ChunkOriginVoxelX,
+					context.m_InverseVoxelSize,
 				prepared.m_X);
 		if (xResult.Failed())
 		{
@@ -399,8 +392,7 @@ namespace napa::voxel
 		const ValidationResult yResult =
 			QuantizeMeshPositionComponent(
 				static_cast<double>(position.m_Y) *
-					context.m_InverseVoxelSize -
-					context.m_ChunkOriginVoxelY,
+					context.m_InverseVoxelSize,
 				prepared.m_Y);
 		if (yResult.Failed())
 		{
@@ -409,8 +401,7 @@ namespace napa::voxel
 		const ValidationResult zResult =
 			QuantizeMeshPositionComponent(
 				static_cast<double>(position.m_Z) *
-					context.m_InverseVoxelSize -
-					context.m_ChunkOriginVoxelZ,
+					context.m_InverseVoxelSize,
 				prepared.m_Z);
 		if (zResult.Failed())
 		{

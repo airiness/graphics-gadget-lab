@@ -2,7 +2,6 @@
 
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -51,73 +50,40 @@ namespace napa::voxel
 			return cube && CheckedNarrow<std::size_t>(*cube).has_value();
 		}
 
-		[[nodiscard]] bool HasRepresentableWorldPositionAxis(
-			std::int32_t minimumSample,
-			std::int32_t maximumSample,
-			float voxelSize) noexcept
+		[[nodiscard]] bool HasRepresentableChunkLocalPositions(
+			const VoxelWorldConfig& config) noexcept
 		{
-			const std::uint64_t minimumMagnitude =
-				static_cast<std::uint64_t>(
-					std::abs(
-						static_cast<std::int64_t>(
-							minimumSample)));
-			const std::uint64_t maximumMagnitude =
-				static_cast<std::uint64_t>(
-					std::abs(
-						static_cast<std::int64_t>(
-							maximumSample)));
-			const double maximumWorldMagnitude =
-				static_cast<double>(std::max(
-					minimumMagnitude,
-					maximumMagnitude)) *
-				static_cast<double>(voxelSize);
-			if (!std::isfinite(maximumWorldMagnitude) ||
-				maximumWorldMagnitude >
+			const double maximumLocalPosition =
+				static_cast<double>(config.m_ChunkCellCount) *
+				static_cast<double>(config.m_VoxelSize);
+			if (!std::isfinite(maximumLocalPosition) ||
+				maximumLocalPosition >
 					static_cast<double>(
 						std::numeric_limits<float>::max()))
 			{
 				return false;
 			}
 
-			const float roundedMaximumWorldMagnitude =
-				static_cast<float>(maximumWorldMagnitude);
-			const float nextWorldPosition = std::nextafter(
-				roundedMaximumWorldMagnitude,
+			const float roundedMaximumLocalPosition =
+				static_cast<float>(maximumLocalPosition);
+			const float nextLocalPosition = std::nextafter(
+				roundedMaximumLocalPosition,
 				std::numeric_limits<float>::infinity());
-			if (!std::isfinite(nextWorldPosition))
+			if (!std::isfinite(nextLocalPosition))
 			{
 				return false;
 			}
 
 			const double maximumFloatSpacing =
-				static_cast<double>(nextWorldPosition) -
+				static_cast<double>(nextLocalPosition) -
 				static_cast<double>(
-					roundedMaximumWorldMagnitude);
+					roundedMaximumLocalPosition);
 			const double canonicalPositionSpacing =
-				static_cast<double>(voxelSize) /
+				static_cast<double>(config.m_VoxelSize) /
 				CanonicalPositionQuantizationScale;
 			return
 				maximumFloatSpacing <=
 					canonicalPositionSpacing;
-		}
-
-		[[nodiscard]] bool HasRepresentableWorldPositions(
-			const VoxelWorldConfig& config) noexcept
-		{
-			const CellAabb& bounds = config.m_LogicalCellBounds;
-			return
-				HasRepresentableWorldPositionAxis(
-					bounds.m_Min.m_X,
-					bounds.m_MaxExclusive.m_X,
-					config.m_VoxelSize) &&
-				HasRepresentableWorldPositionAxis(
-					bounds.m_Min.m_Y,
-					bounds.m_MaxExclusive.m_Y,
-					config.m_VoxelSize) &&
-				HasRepresentableWorldPositionAxis(
-					bounds.m_Min.m_Z,
-					bounds.m_MaxExclusive.m_Z,
-					config.m_VoxelSize);
 		}
 	}
 
@@ -327,10 +293,11 @@ namespace napa::voxel
 		{
 			return metricsResult;
 		}
-		if (!HasRepresentableWorldPositions(config))
+		if (!HasRepresentableChunkLocalPositions(config))
 		{
 			return {
-				ValidationError::UnrepresentableWorldPosition,
+				ValidationError::
+					UnrepresentableChunkLocalPosition,
 			};
 		}
 		return {};

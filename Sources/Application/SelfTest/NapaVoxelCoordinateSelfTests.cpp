@@ -927,22 +927,18 @@ namespace gglab
 				.m_Min = { 1000000, 0, 0 },
 				.m_MaxExclusive = { 1000008, 8, 8 },
 			};
-			CheckValidationError(
-				context,
-				config,
-				ValidationError::UnrepresentableWorldPosition,
-				"ValidateConfig rejects world positions below canonical mesh precision");
+			context.Check(
+				ValidateConfig(config).Succeeded(),
+				"ValidateConfig accepts distant chunk-local mesh domains");
 
 			config = MakeValidConfig();
 			config.m_LogicalCellBounds = {
 				.m_Min = { 16777215, 0, 0 },
 				.m_MaxExclusive = { 16777218, 8, 8 },
 			};
-			CheckValidationError(
-				context,
-				config,
-				ValidationError::UnrepresentableWorldPosition,
-				"ValidateConfig covers precision loss inside a logical axis");
+			context.Check(
+				ValidateConfig(config).Succeeded(),
+				"ValidateConfig does not convert logical coordinates to Float3");
 
 			config = MakeValidConfig();
 			config.m_LogicalCellBounds = {
@@ -951,7 +947,7 @@ namespace gglab
 			};
 			context.Check(
 				ValidateConfig(config).Succeeded(),
-				"ValidateConfig accepts a domain at canonical mesh precision");
+				"ValidateConfig accepts negative multi-chunk domains");
 
 			config = MakeValidConfig();
 			config.m_VoxelSize =
@@ -959,8 +955,19 @@ namespace gglab
 			CheckValidationError(
 				context,
 				config,
-				ValidationError::UnrepresentableWorldPosition,
-				"ValidateConfig rejects finite voxel sizes that overflow world positions");
+				ValidationError::
+					UnrepresentableChunkLocalPosition,
+				"ValidateConfig rejects chunk-local positions that overflow Float3");
+
+			config = MakeValidConfig();
+			config.m_VoxelSize =
+				std::numeric_limits<float>::denorm_min();
+			CheckValidationError(
+				context,
+				config,
+				ValidationError::
+					UnrepresentableChunkLocalPosition,
+				"ValidateConfig rejects voxel sizes below canonical local precision");
 		}
 	}
 

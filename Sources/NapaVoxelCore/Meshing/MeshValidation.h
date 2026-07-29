@@ -92,9 +92,6 @@ namespace napa::voxel
 			QuantizedMeshPosition& quantized) noexcept;
 
 		double m_InverseVoxelSize = 0.0;
-		double m_ChunkOriginVoxelX = 0.0;
-		double m_ChunkOriginVoxelY = 0.0;
-		double m_ChunkOriginVoxelZ = 0.0;
 		QuantizedMeshPosition m_TargetCellDomainMin{};
 		QuantizedMeshPosition m_TargetCellDomainMax{};
 		VoxelWorldConfig m_Config{};
@@ -106,6 +103,7 @@ namespace napa::voxel
 		const VoxelWorldConfig& config,
 		ChunkCoord chunk,
 		MeshQuantizationContext& context) noexcept;
+	// Input positions use target Chunk-local physical space.
 	[[nodiscard]] ValidationResult QuantizeMeshPosition(
 		Float3 position,
 		const MeshQuantizationContext& context,

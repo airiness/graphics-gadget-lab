@@ -71,6 +71,7 @@ namespace napa::voxel
 
 	struct ReferenceEdgeVertex
 	{
+		// Physical position relative to the target Chunk origin.
 		Float3 m_Position{};
 		Float3 m_Normal{};
 		DensityGradient m_DensityGradient{};
@@ -124,9 +125,11 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult ComputeSampleDensityGradient(
 			SampleCoord coordinate,
 			DensityGradient& gradient) const noexcept;
+		// Produces a physical position relative to chunk's origin.
 		[[nodiscard]] ValidationResult InterpolateEdge(
 			ReferenceEdgeEndpoint first,
 			ReferenceEdgeEndpoint second,
+			ChunkCoord chunk,
 			ReferenceEdgeVertex& vertex) const noexcept;
 		[[nodiscard]] ValidationResult PolygonizeTetrahedron(
 			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
@@ -145,6 +148,7 @@ namespace napa::voxel
 					ReferenceEdgeEndpoint,
 					8>& cubeCorners,
 				std::uint8_t tetrahedronIndex,
+				ChunkCoord chunk,
 				const MeshQuantizationContext&
 					quantizationContext,
 				ReferenceTetrahedronPolygonization&

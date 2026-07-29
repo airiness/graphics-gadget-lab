@@ -193,23 +193,40 @@ namespace napa::voxel
 		[[nodiscard]] Float3 InterpolatePosition(
 			SampleCoord first,
 			SampleCoord second,
+			ChunkCoord chunk,
+			std::uint32_t chunkCellCount,
 			double interpolationT,
 			double voxelSize) noexcept
 		{
+			const double originX =
+				static_cast<double>(
+					static_cast<std::int64_t>(chunk.m_X) *
+					static_cast<std::int64_t>(chunkCellCount));
+			const double originY =
+				static_cast<double>(
+					static_cast<std::int64_t>(chunk.m_Y) *
+					static_cast<std::int64_t>(chunkCellCount));
+			const double originZ =
+				static_cast<double>(
+					static_cast<std::int64_t>(chunk.m_Z) *
+					static_cast<std::int64_t>(chunkCellCount));
 			const double x =
-				(static_cast<double>(first.m_X) +
+				(static_cast<double>(first.m_X) -
+					originX +
 					(static_cast<double>(second.m_X) -
 						static_cast<double>(first.m_X)) *
 					interpolationT) *
 				voxelSize;
 			const double y =
-				(static_cast<double>(first.m_Y) +
+				(static_cast<double>(first.m_Y) -
+					originY +
 					(static_cast<double>(second.m_Y) -
 						static_cast<double>(first.m_Y)) *
 					interpolationT) *
 				voxelSize;
 			const double z =
-				(static_cast<double>(first.m_Z) +
+				(static_cast<double>(first.m_Z) -
+					originZ +
 					(static_cast<double>(second.m_Z) -
 						static_cast<double>(first.m_Z)) *
 					interpolationT) *
@@ -277,6 +294,7 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult
 			InterpolatePreparedEdgeCandidate(
 				const VoxelWorldConfig& config,
+				ChunkCoord chunk,
 				ReferenceEdgeEndpoint first,
 				ReferenceEdgeEndpoint second,
 				ReferenceEdgeVertex& vertex) noexcept
@@ -323,6 +341,8 @@ namespace napa::voxel
 			const Float3 position = InterpolatePosition(
 				first.m_Coordinate,
 				second.m_Coordinate,
+				chunk,
+				config.m_ChunkCellCount,
 				interpolationT,
 				static_cast<double>(config.m_VoxelSize));
 			if (!IsFinite(position))
@@ -354,6 +374,7 @@ namespace napa::voxel
 
 		[[nodiscard]] ValidationResult InterpolateEdgeCandidate(
 			const VoxelWorld& world,
+			ChunkCoord chunk,
 			ReferenceEdgeEndpoint first,
 			ReferenceEdgeEndpoint second,
 			ReferenceEdgeVertex& vertex) noexcept
@@ -394,6 +415,7 @@ namespace napa::voxel
 			}
 			return InterpolatePreparedEdgeCandidate(
 				world.GetConfig(),
+				chunk,
 				first,
 				second,
 				vertex);
@@ -1369,12 +1391,25 @@ namespace napa::voxel
 	ValidationResult ReferenceMesher::InterpolateEdge(
 		ReferenceEdgeEndpoint first,
 		ReferenceEdgeEndpoint second,
+		ChunkCoord chunk,
 		ReferenceEdgeVertex& vertex) const noexcept
 	{
+		MeshQuantizationContext quantizationContext;
+		const ValidationResult contextResult =
+			PrepareMeshQuantizationContext(
+				m_World.GetConfig(),
+				chunk,
+				quantizationContext);
+		if (contextResult.Failed())
+		{
+			return contextResult;
+		}
+
 		ReferenceEdgeVertex prepared{};
 		const ValidationResult interpolationResult =
 			InterpolateEdgeCandidate(
 				m_World,
+				chunk,
 				first,
 				second,
 				prepared);
@@ -1391,6 +1426,24 @@ namespace napa::voxel
 		if (normalResult.Failed())
 		{
 			return normalResult;
+		}
+		QuantizedMeshPosition quantizedPosition{};
+		const ValidationResult quantizationResult =
+			QuantizeMeshPosition(
+				prepared.m_Position,
+				quantizationContext,
+				quantizedPosition);
+		if (quantizationResult.Failed())
+		{
+			return quantizationResult;
+		}
+		if (!quantizationContext.ContainsTargetCellDomain(
+			quantizedPosition))
+		{
+			return {
+				ValidationError::
+					MeshGeometryOutsideTargetCellDomain,
+			};
 		}
 		prepared.m_Normal = normal;
 		vertex = prepared;
@@ -1451,6 +1504,7 @@ namespace napa::voxel
 		return PolygonizePreparedTetrahedron(
 			cubeCorners,
 			tetrahedronIndex,
+			cellAddress.m_Owner,
 			quantizationContext,
 			polygonization);
 	}
@@ -1459,6 +1513,7 @@ namespace napa::voxel
 		ReferenceMesher::PolygonizePreparedTetrahedron(
 			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
 			std::uint8_t tetrahedronIndex,
+			ChunkCoord chunk,
 			const MeshQuantizationContext& quantizationContext,
 			ReferenceTetrahedronPolygonization& polygonization)
 			const noexcept
@@ -1527,6 +1582,7 @@ namespace napa::voxel
 				const ValidationResult interpolationResult =
 					InterpolatePreparedEdgeCandidate(
 						m_World.GetConfig(),
+						chunk,
 						cubeCorners[firstCornerId],
 						cubeCorners[secondCornerId],
 						crossingVertices[crossingCount]);
@@ -1579,6 +1635,7 @@ namespace napa::voxel
 				const ValidationResult interpolationResult =
 					InterpolatePreparedEdgeCandidate(
 						m_World.GetConfig(),
+						chunk,
 						cubeCorners[
 							perimeterEdges[edgeIndex][0]],
 						cubeCorners[
@@ -1662,6 +1719,10 @@ namespace napa::voxel
 			prepared.m_Triangles[
 				prepared.m_TriangleCount++] =
 				std::move(candidate);
+		}
+		if (prepared.m_TriangleCount == 0)
+		{
+			prepared.m_Material = VoxelMaterial::Empty;
 		}
 
 		polygonization = std::move(prepared);
@@ -1767,6 +1828,7 @@ namespace napa::voxel
 								PolygonizePreparedTetrahedron(
 									cubeCorners,
 									tetrahedronIndex,
+									chunk,
 									quantizationContext,
 									polygonization);
 						if (polygonizationResult.Failed())

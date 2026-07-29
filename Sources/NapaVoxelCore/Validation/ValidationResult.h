@@ -60,7 +60,7 @@ namespace napa::voxel
 		InvalidReferenceTetrahedron = 51,
 		InvalidMeshWindingEvidence = 52,
 		MismatchedMeshQuantizationContext = 53,
-		UnrepresentableWorldPosition = 54,
+		UnrepresentableChunkLocalPosition = 54,
 	};
 
 	struct ValidationResult
