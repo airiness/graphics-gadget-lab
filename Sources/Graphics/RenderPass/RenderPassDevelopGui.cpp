@@ -43,28 +43,52 @@ namespace gglab
 
 				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(displayViewId);
-				builder.WriteInPlace(viewTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
+				builder.ReadWriteInPlace(
+					viewTargets.m_BackBuffer,
+					RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = viewTargets.m_BackBuffer;
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 
-				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
-				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
+				if (const auto* iblRes =
+					blackboard.TryGet<RGIBLResources>(IBLResourcesName);
+					iblRes && iblRes->m_BrdfLut.IsValid())
+				{
+					data.m_BrdfLut = builder.Read(
+						iblRes->m_BrdfLut,
+						RGTextureAccess::Sample);
+				}
 
-				auto& iblPreviewRes = blackboard.Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
-				data.m_EnvironmentCubemapPreview = builder.Read(
-					iblPreviewRes.m_EnvironmentCubemapPreview,
-					RGTextureAccess::Sample);
-				data.m_IrradianceCubemapPreview = builder.Read(
-					iblPreviewRes.m_IrradianceCubemapPreview,
-					RGTextureAccess::Sample);
-				data.m_PrefilteredSpecularCubemapPreview = builder.Read(
-					iblPreviewRes.m_PrefilteredSpecularCubemapPreview,
-					RGTextureAccess::Sample);
+				if (const auto* iblPreviewRes =
+					blackboard.TryGet<RGIBLPreviewResources>(IBLPreviewResourcesName))
+				{
+					if (iblPreviewRes->m_EnvironmentCubemapPreview.IsValid())
+					{
+						data.m_EnvironmentCubemapPreview = builder.Read(
+							iblPreviewRes->m_EnvironmentCubemapPreview,
+							RGTextureAccess::Sample);
+					}
+					if (iblPreviewRes->m_IrradianceCubemapPreview.IsValid())
+					{
+						data.m_IrradianceCubemapPreview = builder.Read(
+							iblPreviewRes->m_IrradianceCubemapPreview,
+							RGTextureAccess::Sample);
+					}
+					if (iblPreviewRes->m_PrefilteredSpecularCubemapPreview.IsValid())
+					{
+						data.m_PrefilteredSpecularCubemapPreview = builder.Read(
+							iblPreviewRes->m_PrefilteredSpecularCubemapPreview,
+							RGTextureAccess::Sample);
+					}
+				}
 
-				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
-				data.m_DirectionalShadowMapPreview = builder.Read(
-					shadowRes.m_DirectionalShadowMapPreview,
-					RGTextureAccess::Sample);
+				if (const auto* shadowRes =
+					blackboard.TryGet<RGShadowResources>(ShadowResourcesName);
+					shadowRes && shadowRes->m_DirectionalShadowMapPreview.IsValid())
+				{
+					data.m_DirectionalShadowMapPreview = builder.Read(
+						shadowRes->m_DirectionalShadowMapPreview,
+						RGTextureAccess::Sample);
+				}
 			},
 			[developGuiSystem](RGExecuteContext& executeContext, PassData& data)
 			{

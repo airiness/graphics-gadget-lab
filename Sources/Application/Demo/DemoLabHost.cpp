@@ -8,6 +8,7 @@
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
+#include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 
 namespace gglab
@@ -36,6 +37,13 @@ namespace gglab
 			PostProcessLabSession::GetDescriptor(),
 			&PostProcessLabSession::Create);
 		GGLAB_ASSERT_MSG(postProcessRegistered, "Failed to register the Post Process Lab session.");
+
+		const bool renderGraphComputeRegistered = m_Runtime.RegisterLab(
+			RenderGraphComputeLabSession::GetDescriptor(),
+			&RenderGraphComputeLabSession::Create);
+		GGLAB_ASSERT_MSG(
+			renderGraphComputeRegistered,
+			"Failed to register the RenderGraph Compute Lab session.");
 
 		const bool alphaTestRegistered = m_Runtime.RegisterLab(
 			AlphaTestLabSession::GetDescriptor(),

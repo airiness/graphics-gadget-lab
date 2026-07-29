@@ -139,6 +139,7 @@ namespace gglab
 
 			commandContext->TextureBarrier(textureBarriers);
 			commandContext->BufferBarrier(bufferBarriers);
+			commandContext->FlushBarriers();
 		}
 	}
 

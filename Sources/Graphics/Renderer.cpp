@@ -320,15 +320,15 @@ namespace gglab
 		RHIBindingLayoutDesc desc{};
 		desc.m_DebugName = "RendererCommonBindingLayout";
 
-		AddBindingSlot(desc, RHIBindingType::ConstantBuffer, RHIShaderStage::AllGraphics, 0, 0, 1, 0, "SceneCB");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::AllGraphics, 1, 0, 1, MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::AllGraphics, 2, 0, 1, MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 1, 0, 1, 0, "ObjectSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 2, 0, 1, 0, "MaterialSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 3, 0, 1, 0, "ViewSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::AllGraphics, 4, 0, 1, 0, "LightSB");
-		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::AllGraphics, 0, 0, 0, 0, "BindlessTextures");
-		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::AllGraphics, 0, 0, 0, 0, "BindlessSamplers");
+		AddBindingSlot(desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 1, 0, 1, MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 2, 0, 1, MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 1, 0, 1, 0, "ObjectSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 2, 0, 1, 0, "MaterialSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0, "LightSB");
+		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::All, 0, 0, 0, 0, "BindlessTextures");
+		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0, "BindlessSamplers");
 		return desc;
 	}
 

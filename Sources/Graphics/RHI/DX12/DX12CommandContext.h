@@ -40,6 +40,7 @@ namespace gglab
 
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
+		void FlushBarriers() noexcept;
 
 	protected:
 		[[nodiscard]] DX12Device* GetDevice() const noexcept { return m_Device; }
@@ -82,6 +83,7 @@ namespace gglab
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend.TrackBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
+		void FlushBarriers() noexcept override { m_Backend.FlushBarriers(); }
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
@@ -162,6 +164,7 @@ namespace gglab
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend->TrackBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
+		void FlushBarriers() noexcept override { m_Backend->FlushBarriers(); }
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void SetConstantBuffer(uint32_t parameterIndex,

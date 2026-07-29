@@ -90,8 +90,11 @@ namespace gglab
 		virtual RHIQueueType GetQueueType() const noexcept = 0;
 		virtual void TrackTextureUse(RHITextureHandle texture) noexcept = 0;
 		virtual void TrackBufferUse(RHIBufferHandle buffer) noexcept = 0;
+		// Barrier calls may enqueue backend-native groups. Flush once after the
+		// complete synchronization boundary has been recorded.
 		virtual void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept = 0;
 		virtual void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept = 0;
+		virtual void FlushBarriers() noexcept = 0;
 		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};
