@@ -184,6 +184,7 @@ namespace gglab
 			if ((!Test(desc.m_Usage, RHITextureUsage::RenderTarget) &&
 				!Test(desc.m_Usage, RHITextureUsage::DepthStencil)) ||
 				clearValue.m_Format == RHIFormat::Unknown ||
+				GetRHIFormatInfo(clearValue.m_Format).m_IsTypeless ||
 				!AreRHIFormatsInSameFamily(desc.m_Format, clearValue.m_Format) ||
 				(clearValue.m_IsDepthStencil != Test(desc.m_Usage, RHITextureUsage::DepthStencil)))
 			{

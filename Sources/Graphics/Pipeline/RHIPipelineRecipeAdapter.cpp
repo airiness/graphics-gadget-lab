@@ -83,7 +83,7 @@ namespace gglab
 			RHIDepthStencilDesc desc{};
 			switch (preset)
 			{
-			case DepthPreset::DepthReadOnly:
+			case DepthPreset::StandardZReadOnly:
 				desc.m_DepthTestEnable = true;
 				desc.m_DepthWriteEnable = false;
 				desc.m_DepthCompareOp = RHICompareOp::LessEqual;
@@ -93,17 +93,17 @@ namespace gglab
 				desc.m_DepthWriteEnable = false;
 				desc.m_DepthCompareOp = RHICompareOp::Less;
 				break;
-			case DepthPreset::ReverseZ:
+			case DepthPreset::ReversedZWrite:
 				desc.m_DepthTestEnable = true;
 				desc.m_DepthWriteEnable = true;
-				desc.m_DepthCompareOp = RHICompareOp::Greater;
+				desc.m_DepthCompareOp = RHICompareOp::GreaterEqual;
 				break;
-			case DepthPreset::ReverseZReadOnly:
+			case DepthPreset::ReversedZReadOnly:
 				desc.m_DepthTestEnable = true;
 				desc.m_DepthWriteEnable = false;
 				desc.m_DepthCompareOp = RHICompareOp::GreaterEqual;
 				break;
-			case DepthPreset::Default:
+			case DepthPreset::StandardZWrite:
 			default:
 				desc.m_DepthTestEnable = true;
 				desc.m_DepthWriteEnable = true;

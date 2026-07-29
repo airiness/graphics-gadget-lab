@@ -19,10 +19,14 @@ namespace gglab
 			view.m_Name = name;
 			view.m_ViewId = viewId;
 			view.m_IsValid = true;
-			view.m_DepthConvention = DepthConvention::Standard;
+			view.m_DepthConvention = DepthConvention::Reversed;
 
 			view.m_View = camera.GetViewMatrix();
-			view.m_Proj = camera.GetProjMatrix();
+			view.m_Proj = math::CreatePerspectiveFieldOfViewLHReversedZ(
+				math::ToRadians(camera.GetFov()),
+				camera.GetAspect(),
+				camera.GetNear(),
+				camera.GetFar());
 			view.m_ViewProj = view.m_View * view.m_Proj;
 			view.m_InvView = math::Inverse(view.m_View);
 			view.m_InvProj = math::Inverse(view.m_Proj);

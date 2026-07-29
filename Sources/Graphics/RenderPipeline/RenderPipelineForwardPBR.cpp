@@ -73,7 +73,12 @@ namespace gglab
 				// Create depth buffer
 				RHITextureDesc depthBufferDesc{};
 				depthBufferDesc.m_Extent = { width, height, 1u };
-				depthBufferDesc.m_Format = RHIFormat::D24UnormS8Uint;
+				depthBufferDesc.m_Format = RHIFormat::R32Typeless;
+				depthBufferDesc.m_ClearValue = RHIClearValue{
+					.m_Format = RHIFormat::D32Float,
+					.m_Depth = 0.0f,
+					.m_IsDepthStencil = true,
+				};
 
 				targets.m_Depth = builder.CreateTexture("DisplayView.DepthBuffer", depthBufferDesc);
 

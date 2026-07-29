@@ -4,6 +4,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
@@ -89,15 +90,13 @@ namespace gglab
 					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 					data.m_Color = targets.m_SceneColor;
 					data.m_Depth = builder.Read(targets.m_Depth, RGTextureAccess::DepthStencilRead);
-					RHITextureViewDesc dsvDesc{};
-					dsvDesc.m_Type = RHITextureViewType::DepthStencil;
-					dsvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
-					dsvDesc.m_Subresources.m_MipCount = 1;
-					dsvDesc.m_Subresources.m_ArraySliceCount = 1;
-					dsvDesc.m_Subresources.m_Aspects =
-						RHITextureAspect::Depth | RHITextureAspect::Stencil;
+					RHITextureViewDesc dsvDesc =
+						MakeRHITexture2DViewDesc(
+							RHIFormat::D32Float,
+							0,
+							1,
+							RHITextureAspect::Depth);
 					dsvDesc.m_ReadOnlyDepth = true;
-					dsvDesc.m_ReadOnlyStencil = true;
 					data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, dsvDesc);
 					data.m_World = frame.m_Scene;
 				}
@@ -204,11 +203,11 @@ namespace gglab
 					RHIFormat::R16G16B16A16Float : services.m_Renderer->GetSwapChain()->GetFormat();
 			recipe.m_Formats.m_RenderTargetCount = 1;
 			recipe.m_Formats.m_DepthStencilFormat =
-				m_Mode == DebugDrawPassMode::Scene ? RHIFormat::D24UnormS8Uint : RHIFormat::Unknown;
+				m_Mode == DebugDrawPassMode::Scene ? RHIFormat::D32Float : RHIFormat::Unknown;
 			recipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
 			recipe.m_BlendPreset = BlendPreset::AlphaBlend;
 			recipe.m_DepthPreset = m_Mode == DebugDrawPassMode::Scene ?
-				DepthPreset::DepthReadOnly : DepthPreset::DepthDisabled;
+				DepthPreset::ReversedZReadOnly : DepthPreset::DepthDisabled;
 		}
 		m_IsInitialized = true;
 	}

@@ -2,6 +2,7 @@
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RHI/RHITextureViewDescUtils.h"
 
 namespace gglab
 {
@@ -37,7 +38,15 @@ namespace gglab
 				data.m_SceneColor = targets.m_SceneColor;
 				data.m_Depth = targets.m_Depth;
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
-				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth);
+				RHITextureViewDesc dsvDesc =
+					MakeRHITexture2DViewDesc(
+						RHIFormat::D32Float,
+						0,
+						1,
+						RHITextureAspect::Depth);
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
+					data.m_Depth,
+					dsvDesc);
 			},
 			[](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -45,7 +54,7 @@ namespace gglab
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
-				commandContext->ClearDepthStencil(dsv, 1.0f, 0);
+				commandContext->ClearDepthStencil(dsv, 0.0f);
 			});
 	}
 }

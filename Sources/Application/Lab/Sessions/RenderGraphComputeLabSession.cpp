@@ -7,7 +7,6 @@
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
-#include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
@@ -19,6 +18,11 @@ namespace gglab
 		std::atomic<uint64_t> m_ReadWriteExecutions = 0;
 		std::atomic<uint64_t> m_PreviewExecutions = 0;
 		std::atomic<uint64_t> m_CulledExecutions = 0;
+		std::atomic<float> m_AnimationSpeed = 1.0f;
+		std::atomic<float> m_PatternFrequency = 18.0f;
+		std::atomic<float> m_RingRadius = 0.46f;
+		std::atomic<float> m_RingIntensity = 0.82f;
+		std::atomic<uint32_t> m_CheckerCellSize = 32;
 	};
 
 	namespace
@@ -26,6 +30,17 @@ namespace gglab
 		constexpr uint32_t WorkTextureWidth = 512;
 		constexpr uint32_t WorkTextureHeight = 512;
 		constexpr uint32_t ComputeThreadGroupSize = 8;
+
+		const LabParameterId AnimationSpeedId(
+			"render_graph_compute.animation.speed");
+		const LabParameterId PatternFrequencyId(
+			"render_graph_compute.pattern.frequency");
+		const LabParameterId RingRadiusId(
+			"render_graph_compute.ring.radius");
+		const LabParameterId RingIntensityId(
+			"render_graph_compute.ring.intensity");
+		const LabParameterId CheckerCellSizeId(
+			"render_graph_compute.checker.cell_size");
 
 		const RenderPassInfo ComputeWritePassInfo{
 			.m_TypeName = "Lab.RenderGraphCompute.Write",
@@ -101,18 +116,23 @@ namespace gglab
 		{
 			uint32_t m_WorkAIndex = 0;
 			uint32_t m_WorkBIndex = 0;
-			uint32_t m_SamplerIndex = 0;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			float m_Phase = 0.0f;
+			float m_PatternFrequency = 18.0f;
+			float m_RingRadius = 0.46f;
+			float m_RingIntensity = 0.82f;
+			uint32_t m_CheckerCellSize = 32;
 		};
 		static_assert(IsPassRootConstantStruct<ComputeLabPassParameters>);
-		static_assert(sizeof(ComputeLabPassParameters) == 24);
+		static_assert(sizeof(ComputeLabPassParameters) == 36);
 
 		RHITextureDesc MakeWorkTextureDesc() noexcept
 		{
 			RHITextureDesc desc{};
-			desc.m_Format = RHIFormat::R16G16B16A16Float;
+			// R32_UINT typed UAV loads are guaranteed by D3D12. The previous
+			// R16G16B16A16_FLOAT workload required optional typed-load support.
+			desc.m_Format = RHIFormat::R32Uint;
 			desc.m_Extent = { WorkTextureWidth, WorkTextureHeight, 1u };
 			return desc;
 		}
@@ -149,9 +169,20 @@ namespace gglab
 				const uint32_t displayWidth = swapChain->GetBufferWidth();
 				const uint32_t displayHeight = swapChain->GetBufferHeight();
 				const RenderViewID displayViewId = context.GetDisplayViewId();
-				const float phase = std::fmod(
-					static_cast<float>(m_FrameNumber++) * 0.015f,
+				const float animationSpeed =
+					m_State->m_AnimationSpeed.load(std::memory_order_relaxed);
+				const float patternFrequency =
+					m_State->m_PatternFrequency.load(std::memory_order_relaxed);
+				const float ringRadius =
+					m_State->m_RingRadius.load(std::memory_order_relaxed);
+				const float ringIntensity =
+					m_State->m_RingIntensity.load(std::memory_order_relaxed);
+				const uint32_t checkerCellSize =
+					m_State->m_CheckerCellSize.load(std::memory_order_relaxed);
+				m_Phase = std::fmod(
+					m_Phase + 0.015f * animationSpeed,
 					6.28318530718f);
+				const float phase = m_Phase;
 
 				rg.AddPass<SetupPassData>(
 					"Lab.RenderGraphCompute.Setup",
@@ -237,7 +268,7 @@ namespace gglab
 							builder.CreateView<RHITextureViewType::UnorderedAccess>(
 								resources.m_WorkB);
 					},
-					[this, phase](
+					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
 						RGExecuteContext& executeContext,
 						ComputeWritePassData& data)
 					{
@@ -261,6 +292,10 @@ namespace gglab
 								.m_Width = WorkTextureWidth,
 								.m_Height = WorkTextureHeight,
 								.m_Phase = phase,
+								.m_PatternFrequency = patternFrequency,
+								.m_RingRadius = ringRadius,
+								.m_RingIntensity = ringIntensity,
+								.m_CheckerCellSize = checkerCellSize,
 							});
 						commandContext->Dispatch(
 							(WorkTextureWidth + ComputeThreadGroupSize - 1) /
@@ -288,7 +323,7 @@ namespace gglab
 							builder.CreateView<RHITextureViewType::UnorderedAccess>(
 								resources.m_WorkA);
 					},
-					[this, phase](
+					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
 						RGExecuteContext& executeContext,
 						ComputeReadWritePassData& data)
 					{
@@ -309,6 +344,10 @@ namespace gglab
 								.m_Width = WorkTextureWidth,
 								.m_Height = WorkTextureHeight,
 								.m_Phase = phase,
+								.m_PatternFrequency = patternFrequency,
+								.m_RingRadius = ringRadius,
+								.m_RingIntensity = ringIntensity,
+								.m_CheckerCellSize = checkerCellSize,
 							});
 						commandContext->Dispatch(
 							(WorkTextureWidth + ComputeThreadGroupSize - 1) /
@@ -337,7 +376,14 @@ namespace gglab
 							builder.CreateView<RHITextureViewType::UnorderedAccess>(
 								output);
 					},
-					[this](
+					[
+						this,
+						phase,
+						patternFrequency,
+						ringRadius,
+						ringIntensity,
+						checkerCellSize
+					](
 						RGExecuteContext& executeContext,
 						CulledComputePassData& data)
 					{
@@ -354,6 +400,11 @@ namespace gglab
 								.m_WorkBIndex = outputUav.m_Index,
 								.m_Width = WorkTextureWidth,
 								.m_Height = WorkTextureHeight,
+								.m_Phase = phase,
+								.m_PatternFrequency = patternFrequency,
+								.m_RingRadius = ringRadius,
+								.m_RingIntensity = ringIntensity,
+								.m_CheckerCellSize = checkerCellSize,
 							});
 						commandContext->Dispatch(
 							(WorkTextureWidth + ComputeThreadGroupSize - 1) /
@@ -366,9 +417,6 @@ namespace gglab
 							std::memory_order_relaxed);
 					});
 
-				const uint32_t samplerIndex =
-					renderer->GetSamplerRegistry()->GetSamplerIndex(
-						SamplerPreset::LinearClamp);
 				rg.AddPass<PreviewPassData>(
 					PreviewPassInfo.m_TypeName.c_str(),
 					[displayWidth, displayHeight, displayViewId](
@@ -403,7 +451,7 @@ namespace gglab
 						data.m_Width = displayWidth;
 						data.m_Height = displayHeight;
 					},
-					[this, samplerIndex, phase](
+					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
 						RGExecuteContext& executeContext,
 						PreviewPassData& data)
 					{
@@ -445,10 +493,13 @@ namespace gglab
 							ComputeLabPassParameters{
 								.m_WorkAIndex = workASrv.m_Index,
 								.m_WorkBIndex = workBSrv.m_Index,
-								.m_SamplerIndex = samplerIndex,
-								.m_Width = data.m_Width,
-								.m_Height = data.m_Height,
+								.m_Width = WorkTextureWidth,
+								.m_Height = WorkTextureHeight,
 								.m_Phase = phase,
+								.m_PatternFrequency = patternFrequency,
+								.m_RingRadius = ringRadius,
+								.m_RingIntensity = ringIntensity,
+								.m_CheckerCellSize = checkerCellSize,
 							});
 						commandContext->DrawFullscreenTriangle();
 						m_State->m_PreviewExecutions.fetch_add(
@@ -571,7 +622,7 @@ namespace gglab
 			ComputePipelineSlot m_ComputeWriteSlot{};
 			ComputePipelineSlot m_ComputeReadWriteSlot{};
 			GraphicsPipelineSlot m_PreviewSlot{};
-			uint64_t m_FrameNumber = 0;
+			float m_Phase = 0.0f;
 			bool m_IsInitialized = false;
 		};
 	}
@@ -586,12 +637,90 @@ namespace gglab
 	{
 		SetRenderPipeline(
 			std::make_unique<RenderGraphComputeLabPipeline>(m_State));
+
+		auto& parameters = GetMutableParameters();
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = AnimationSpeedId,
+			.m_Name = "Animation Speed",
+			.m_Group = "Pattern",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 1.0f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(4.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = PatternFrequencyId,
+			.m_Name = "Wave Frequency",
+			.m_Group = "Pattern",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 18.0f,
+			.m_MinValue = LabValue(2.0f),
+			.m_MaxValue = LabValue(40.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = RingRadiusId,
+			.m_Name = "Ring Radius",
+			.m_Group = "Ring",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.46f,
+			.m_MinValue = LabValue(0.1f),
+			.m_MaxValue = LabValue(0.85f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = RingIntensityId,
+			.m_Name = "Ring Intensity",
+			.m_Group = "Ring",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.82f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = CheckerCellSizeId,
+			.m_Name = "Checker Cell Size",
+			.m_Group = "Checker",
+			.m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = uint32_t(32),
+			.m_MinValue = LabValue(uint32_t(4)),
+			.m_MaxValue = LabValue(uint32_t(128)),
+		}));
+		ApplyImmediateParameters();
 	}
 
 	void RenderGraphComputeLabSession::Update(float deltaTime) noexcept
 	{
 		GGLAB_UNUSED(deltaTime);
 		GetCamera().Update();
+	}
+
+	void RenderGraphComputeLabSession::ApplyImmediateParameters() noexcept
+	{
+		if (!m_State)
+		{
+			return;
+		}
+
+		const auto& parameters = GetParameters();
+		m_State->m_AnimationSpeed.store(
+			parameters.Get(AnimationSpeedId, 1.0f),
+			std::memory_order_relaxed);
+		m_State->m_PatternFrequency.store(
+			parameters.Get(PatternFrequencyId, 18.0f),
+			std::memory_order_relaxed);
+		m_State->m_RingRadius.store(
+			parameters.Get(RingRadiusId, 0.46f),
+			std::memory_order_relaxed);
+		m_State->m_RingIntensity.store(
+			parameters.Get(RingIntensityId, 0.82f),
+			std::memory_order_relaxed);
+		m_State->m_CheckerCellSize.store(
+			parameters.Get(CheckerCellSizeId, uint32_t(32)),
+			std::memory_order_relaxed);
 	}
 
 	void RenderGraphComputeLabSession::BuildDiagnostics(
@@ -665,7 +794,7 @@ namespace gglab
 			.m_Category = "Rendering",
 			.m_Description = "Validates graphics-to-compute transitions, ordered resource-specific UAV barriers, pass culling, and compute results consumed by graphics.",
 			.m_Kind = LabKind::Pipeline,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 

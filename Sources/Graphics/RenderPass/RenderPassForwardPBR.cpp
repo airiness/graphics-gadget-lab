@@ -87,7 +87,15 @@ namespace gglab
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
 
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
-				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth);
+				RHITextureViewDesc dsvDesc =
+					MakeRHITexture2DViewDesc(
+						RHIFormat::D32Float,
+						0,
+						1,
+						RHITextureAspect::Depth);
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
+					data.m_Depth,
+					dsvDesc);
 
 				const auto shadowSrvDesc = MakeRHITexture2DViewDesc(
 					RHIFormat::R32Float,
@@ -215,12 +223,12 @@ namespace gglab
 			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
 			m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
-			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::D24UnormS8Uint;
+			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
 			m_BaseRecipe.m_Formats.m_SampleCount = 1;
 			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
 			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 			m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
-			m_BaseRecipe.m_DepthPreset = DepthPreset::Default;
+			m_BaseRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
 
 			m_IsInitialized = true;
 		}
@@ -343,12 +351,12 @@ namespace gglab
 			RasterizerPreset::TwoSided :
 			RasterizerPreset::Default;
 		BlendPreset blendPreset = BlendPreset::Default;
-		DepthPreset depthPreset = DepthPreset::Default;
+		DepthPreset depthPreset = DepthPreset::ReversedZWrite;
 
 		if (renderBucket == RenderBucket::Transparent)
 		{
 			blendPreset = BlendPreset::AlphaBlend;
-			depthPreset = DepthPreset::DepthReadOnly;
+			depthPreset = DepthPreset::ReversedZReadOnly;
 		}
 
 		return { rasterizerPreset, depthPreset, blendPreset };

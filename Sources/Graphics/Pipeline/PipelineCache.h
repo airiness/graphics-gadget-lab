@@ -42,7 +42,7 @@ namespace gglab
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 
 		RasterizerPreset m_RasterizerPreset = RasterizerPreset::Default;
-		DepthPreset m_DepthPreset = DepthPreset::Default;
+		DepthPreset m_DepthPreset = DepthPreset::StandardZWrite;
 		BlendPreset m_BlendPreset = BlendPreset::Default;
 
 		int32_t m_DepthBias = 0;
