@@ -1,5 +1,6 @@
 #pragma once
 
+#include "NapaVoxelCore/Meshing/BoundaryContour.h"
 #include "NapaVoxelCore/Meshing/MeshData.h"
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
 #include "NapaVoxelCore/World/Coordinates.h"
@@ -19,5 +20,7 @@ namespace napa::voxel
 			m_WindingEvidence;
 		MeshValidationResult m_Validation{};
 		std::uint64_t m_SkippedDegenerateTriangleCount = 0;
+		ChunkBoundaryContourSet m_BoundaryContours =
+			MakeEmptyChunkBoundaryContourSet();
 	};
 }

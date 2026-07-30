@@ -1,5 +1,6 @@
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 
+#include "NapaVoxelCore/Field/DensityQuantization.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
 #include <algorithm>
@@ -419,6 +420,338 @@ namespace napa::voxel
 				first,
 				second,
 				vertex);
+		}
+
+		[[nodiscard]] ValidationResult
+			QuantizeBoundaryPositionComponent(
+				std::int32_t first,
+				std::int32_t second,
+				double interpolationT,
+				std::int64_t& quantized) noexcept
+		{
+			const std::optional<std::int64_t> base =
+				CheckedMul(
+					static_cast<std::int64_t>(first),
+					BoundaryContourPositionScale);
+			const std::int64_t delta =
+				static_cast<std::int64_t>(second) -
+				static_cast<std::int64_t>(first);
+			std::int64_t offset = 0;
+			const ValidationResult roundResult =
+				RoundHalfAwayFromZero(
+					static_cast<double>(delta) *
+						interpolationT *
+						static_cast<double>(
+							BoundaryContourPositionScale),
+					offset);
+			const std::optional<std::int64_t> prepared =
+				base ? CheckedAdd(*base, offset) : std::nullopt;
+			if (roundResult.Failed() || !prepared)
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+			quantized = *prepared;
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult QuantizeBoundaryPosition(
+			const ReferenceEdgeVertex& vertex,
+			QuantizedBoundaryContourPosition& position) noexcept
+		{
+			QuantizedBoundaryContourPosition prepared{};
+			const ValidationResult xResult =
+				QuantizeBoundaryPositionComponent(
+					vertex.m_EndpointA.m_X,
+					vertex.m_EndpointB.m_X,
+					vertex.m_InterpolationT,
+					prepared.m_X);
+			if (xResult.Failed())
+			{
+				return xResult;
+			}
+			const ValidationResult yResult =
+				QuantizeBoundaryPositionComponent(
+					vertex.m_EndpointA.m_Y,
+					vertex.m_EndpointB.m_Y,
+					vertex.m_InterpolationT,
+					prepared.m_Y);
+			if (yResult.Failed())
+			{
+				return yResult;
+			}
+			const ValidationResult zResult =
+				QuantizeBoundaryPositionComponent(
+					vertex.m_EndpointA.m_Z,
+					vertex.m_EndpointB.m_Z,
+					vertex.m_InterpolationT,
+					prepared.m_Z);
+			if (zResult.Failed())
+			{
+				return zResult;
+			}
+			position = prepared;
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult QuantizeBoundaryNormal(
+			DensityGradient gradient,
+			QuantizedMeshNormal& normal) noexcept
+		{
+			Float3 outwardNormal{};
+			const ValidationResult normalResult =
+				ComputeOutwardNormal(gradient, outwardNormal);
+			if (normalResult.Failed())
+			{
+				return normalResult;
+			}
+			return QuantizeMeshNormal(outwardNormal, normal);
+		}
+
+		[[nodiscard]] ValidationResult
+			AppendBoundaryFaceTriangleContour(
+				const VoxelWorldConfig& config,
+				ChunkCoord chunk,
+				const std::array<
+					ReferenceEdgeEndpoint,
+					8>& cubeCorners,
+				const std::array<std::uint8_t, 3>& triangle,
+				BoundaryContourRecord& contour)
+		{
+			constexpr std::array triangleEdges{
+				std::array<std::uint8_t, 2>{ 0, 1 },
+				std::array<std::uint8_t, 2>{ 0, 2 },
+				std::array<std::uint8_t, 2>{ 1, 2 },
+			};
+			std::array<ReferenceEdgeVertex, 2> crossingVertices{};
+			std::uint8_t crossingCount = 0;
+			for (const std::array<std::uint8_t, 2>& edge :
+				triangleEdges)
+			{
+				const std::uint8_t firstCornerId =
+					triangle[edge[0]];
+				const std::uint8_t secondCornerId =
+					triangle[edge[1]];
+				const bool firstSolid =
+					cubeCorners[firstCornerId]
+						.m_Sample.m_Density >= IsoValue;
+				const bool secondSolid =
+					cubeCorners[secondCornerId]
+						.m_Sample.m_Density >= IsoValue;
+				if (firstSolid == secondSolid)
+				{
+					continue;
+				}
+				if (static_cast<std::size_t>(crossingCount) >=
+					crossingVertices.size())
+				{
+					return {
+						ValidationError::InvalidBoundaryContour,
+					};
+				}
+				const ValidationResult interpolationResult =
+					InterpolatePreparedEdgeCandidate(
+						config,
+						chunk,
+						cubeCorners[firstCornerId],
+						cubeCorners[secondCornerId],
+						crossingVertices[crossingCount]);
+				if (interpolationResult.Failed())
+				{
+					return interpolationResult;
+				}
+				++crossingCount;
+			}
+			if (crossingCount == 0)
+			{
+				return {};
+			}
+			if (static_cast<std::size_t>(crossingCount) !=
+				crossingVertices.size())
+			{
+				return {
+					ValidationError::InvalidBoundaryContour,
+				};
+			}
+
+			std::array<QuantizedBoundaryContourPosition, 2>
+				positions{};
+			for (std::size_t index = 0;
+				index < positions.size();
+				++index)
+			{
+				const ValidationResult positionResult =
+					QuantizeBoundaryPosition(
+						crossingVertices[index],
+						positions[index]);
+				if (positionResult.Failed())
+				{
+					return positionResult;
+				}
+			}
+			if (positions[0] == positions[1])
+			{
+				const std::optional<std::uint64_t> skipped =
+					CheckedAdd(
+						contour
+							.m_SkippedZeroLengthSegmentCount,
+						std::uint64_t{ 1 });
+				if (!skipped)
+				{
+					return {
+						ValidationError::ArithmeticOverflow,
+					};
+				}
+				contour.m_SkippedZeroLengthSegmentCount =
+					*skipped;
+				return {};
+			}
+
+			std::array<QuantizedMeshNormal, 2> normals{};
+			for (std::size_t index = 0;
+				index < normals.size();
+				++index)
+			{
+				const ValidationResult normalResult =
+					QuantizeBoundaryNormal(
+						crossingVertices[index]
+							.m_DensityGradient,
+						normals[index]);
+				if (normalResult.Failed())
+				{
+					return normalResult;
+				}
+			}
+
+			BoundaryContourSegment segment{
+				.m_EndpointA = {
+					.m_Position = positions[0],
+					.m_Normal = normals[0],
+				},
+				.m_EndpointB = {
+					.m_Position = positions[1],
+					.m_Normal = normals[1],
+				},
+			};
+			if (QuantizedBoundaryContourPositionZYXLess{}(
+					segment.m_EndpointB.m_Position,
+					segment.m_EndpointA.m_Position))
+			{
+				std::swap(
+					segment.m_EndpointA,
+					segment.m_EndpointB);
+			}
+			contour.m_Segments.push_back(std::move(segment));
+			return {};
+		}
+
+		[[nodiscard]] ValidationResult AppendBoundaryFaceContours(
+			const VoxelWorldConfig& config,
+			ChunkCoord chunk,
+			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
+			ChunkBoundaryFace face,
+			BoundaryContourRecord& contour)
+		{
+			const auto& faceTriangles =
+				ReferenceBoundaryFaceTriangles[
+					GetChunkBoundaryFaceIndex(face)];
+			for (const std::array<std::uint8_t, 3>& triangle :
+				faceTriangles)
+			{
+				const ValidationResult result =
+					AppendBoundaryFaceTriangleContour(
+						config,
+						chunk,
+						cubeCorners,
+						triangle,
+						contour);
+				if (result.Failed())
+				{
+					return result;
+				}
+			}
+			return {};
+		}
+
+		[[nodiscard]] bool CellTouchesChunkBoundaryFace(
+			const ReferenceEdgeEndpoint& minimumCorner,
+			ChunkCoord chunk,
+			std::uint32_t chunkCellCount,
+			ChunkBoundaryFace face) noexcept
+		{
+			const std::int64_t originX =
+				static_cast<std::int64_t>(chunk.m_X) *
+				static_cast<std::int64_t>(chunkCellCount);
+			const std::int64_t originY =
+				static_cast<std::int64_t>(chunk.m_Y) *
+				static_cast<std::int64_t>(chunkCellCount);
+			const std::int64_t originZ =
+				static_cast<std::int64_t>(chunk.m_Z) *
+				static_cast<std::int64_t>(chunkCellCount);
+			switch (face)
+			{
+			case ChunkBoundaryFace::NegativeX:
+				return minimumCorner.m_Coordinate.m_X == originX;
+			case ChunkBoundaryFace::PositiveX:
+				return
+					static_cast<std::int64_t>(
+						minimumCorner.m_Coordinate.m_X) +
+						1 ==
+					originX + chunkCellCount;
+			case ChunkBoundaryFace::NegativeY:
+				return minimumCorner.m_Coordinate.m_Y == originY;
+			case ChunkBoundaryFace::PositiveY:
+				return
+					static_cast<std::int64_t>(
+						minimumCorner.m_Coordinate.m_Y) +
+						1 ==
+					originY + chunkCellCount;
+			case ChunkBoundaryFace::NegativeZ:
+				return minimumCorner.m_Coordinate.m_Z == originZ;
+			case ChunkBoundaryFace::PositiveZ:
+				return
+					static_cast<std::int64_t>(
+						minimumCorner.m_Coordinate.m_Z) +
+						1 ==
+					originZ + chunkCellCount;
+			case ChunkBoundaryFace::Count:
+				break;
+			}
+			return false;
+		}
+
+		[[nodiscard]] ValidationResult AppendCellBoundaryContours(
+			const VoxelWorldConfig& config,
+			ChunkCoord chunk,
+			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
+			ChunkBoundaryContourSet& contours)
+		{
+			for (std::size_t faceIndex = 0;
+				faceIndex < contours.size();
+				++faceIndex)
+			{
+				const ChunkBoundaryFace face =
+					static_cast<ChunkBoundaryFace>(faceIndex);
+				if (!CellTouchesChunkBoundaryFace(
+						cubeCorners[0],
+						chunk,
+						config.m_ChunkCellCount,
+						face))
+				{
+					continue;
+				}
+				const ValidationResult result =
+					AppendBoundaryFaceContours(
+						config,
+						chunk,
+						cubeCorners,
+						face,
+						contours[faceIndex]);
+				if (result.Failed())
+				{
+					return result;
+				}
+			}
+			return {};
 		}
 
 		[[nodiscard]] ValidationResult ValidateTetrahedronCorners(
@@ -1780,6 +2113,8 @@ namespace napa::voxel
 			materialSections;
 		bool hasBounds = false;
 		std::uint64_t skippedDegenerateTriangleCount = 0;
+		ChunkBoundaryContourSet boundaryContours =
+			MakeEmptyChunkBoundaryContourSet();
 		const std::size_t cellCountX =
 			sampleGrid.m_SampleCountX - 1;
 		const std::size_t cellCountY =
@@ -1812,6 +2147,17 @@ namespace napa::voxel
 								cellZ,
 								ReferenceCubeCornerOffsets[
 									cornerIndex]);
+					}
+
+					const ValidationResult contourResult =
+						AppendCellBoundaryContours(
+							config,
+							chunk,
+							cubeCorners,
+							boundaryContours);
+					if (contourResult.Failed())
+					{
+						return contourResult;
 					}
 
 					for (std::uint8_t tetrahedronIndex = 0;
@@ -1874,6 +2220,23 @@ namespace napa::voxel
 			}
 		}
 
+		for (BoundaryContourRecord& contour : boundaryContours)
+		{
+			std::sort(
+				contour.m_Segments.begin(),
+				contour.m_Segments.end(),
+				BoundaryContourSegmentLess{});
+		}
+		const ValidationResult contourValidationResult =
+			ValidateChunkBoundaryContourSet(
+				boundaryContours,
+				chunk,
+				config);
+		if (contourValidationResult.Failed())
+		{
+			return contourValidationResult;
+		}
+
 		std::vector<MeshTriangleWindingEvidence>
 			windingEvidence;
 		mesh.m_Sections.reserve(materialSections.size());
@@ -1919,6 +2282,8 @@ namespace napa::voxel
 			.m_Validation = validation,
 			.m_SkippedDegenerateTriangleCount =
 				skippedDegenerateTriangleCount,
+			.m_BoundaryContours =
+				std::move(boundaryContours),
 		};
 		record = std::move(prepared);
 		return {};
@@ -1982,6 +2347,15 @@ namespace napa::voxel
 		if (validationResult.Failed())
 		{
 			return validationResult;
+		}
+		const ValidationResult boundaryValidationResult =
+			ValidateBoundaryContourSet(
+				prepared.m_Chunks,
+				m_World.GetConfig(),
+				prepared.m_BoundaryValidation);
+		if (boundaryValidationResult.Failed())
+		{
+			return boundaryValidationResult;
 		}
 
 		result = std::move(prepared);

@@ -2,6 +2,7 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
+#include "NapaVoxelCore/Meshing/BoundaryContour.h"
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 #include "NapaVoxelCore/Meshing/WorldMeshHash.h"
 
@@ -60,6 +61,26 @@ namespace gglab
 					.m_Sphere = {
 						.m_Center = center,
 						.m_Radius = radius,
+					},
+				},
+			};
+		}
+
+		[[nodiscard]] napa::voxel::PrimitiveDesc MakeBox(
+			std::uint64_t stableId,
+			napa::voxel::Double3 center,
+			napa::voxel::Double3 halfExtents) noexcept
+		{
+			using namespace napa::voxel;
+
+			return {
+				.m_StableId = { stableId },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = center,
+						.m_HalfExtents = halfExtents,
 					},
 				},
 			};
@@ -130,11 +151,21 @@ namespace gglab
 				{
 					return false;
 				}
+				for (const napa::voxel::BoundaryContourRecord& contour :
+					record.m_BoundaryContours)
+				{
+					if (!contour.m_Segments.empty() ||
+						contour
+							.m_SkippedZeroLengthSegmentCount != 0)
+					{
+						return false;
+					}
+				}
 			}
 			return true;
 		}
 
-		[[nodiscard]] bool TouchesSharedPlanesAndEdges(
+		[[nodiscard]] bool TouchesSharedPlanesAndEdge(
 			const napa::voxel::ChunkMeshRecord& record) noexcept
 		{
 			using namespace napa::voxel;
@@ -179,6 +210,115 @@ namespace gglab
 			return false;
 		}
 
+		[[nodiscard]] const napa::voxel::ChunkMeshRecord*
+			FindChunkMeshRecord(
+				std::span<const napa::voxel::ChunkMeshRecord> records,
+				napa::voxel::ChunkCoord chunk) noexcept
+		{
+			for (const napa::voxel::ChunkMeshRecord& record : records)
+			{
+				if (record.m_Chunk == chunk)
+				{
+					return &record;
+				}
+			}
+			return nullptr;
+		}
+
+		[[nodiscard]] const napa::voxel::BoundaryContourRecord*
+			FindBoundaryContour(
+				std::span<const napa::voxel::ChunkMeshRecord> records,
+				napa::voxel::ChunkCoord chunk,
+				napa::voxel::ChunkBoundaryFace face) noexcept
+		{
+			const napa::voxel::ChunkMeshRecord* const record =
+				FindChunkMeshRecord(records, chunk);
+			return record
+				? &record->m_BoundaryContours[
+					napa::voxel::GetChunkBoundaryFaceIndex(face)]
+				: nullptr;
+		}
+
+		[[nodiscard]] bool ContainsBoundaryEndpoint(
+			const napa::voxel::BoundaryContourRecord& contour,
+			napa::voxel::QuantizedBoundaryContourPosition position)
+			noexcept
+		{
+			for (const napa::voxel::BoundaryContourSegment& segment :
+				contour.m_Segments)
+			{
+				if (segment.m_EndpointA.m_Position == position ||
+					segment.m_EndpointB.m_Position == position)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		[[nodiscard]] bool ContainsBoundarySegment(
+			const napa::voxel::BoundaryContourRecord& contour,
+			napa::voxel::QuantizedBoundaryContourPosition endpointA,
+			napa::voxel::QuantizedBoundaryContourPosition endpointB)
+			noexcept
+		{
+			for (const napa::voxel::BoundaryContourSegment& segment :
+				contour.m_Segments)
+			{
+				if (segment.m_EndpointA.m_Position == endpointA &&
+					segment.m_EndpointB.m_Position == endpointB)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		void RunBoundaryContourContractTests(SelfTestContext& context)
+		{
+			using namespace napa::voxel;
+
+			constexpr std::array expectedBoundaryFaces{
+				std::array{
+					std::array<std::uint8_t, 3>{ 0, 2, 6 },
+					std::array<std::uint8_t, 3>{ 0, 6, 4 },
+				},
+				std::array{
+					std::array<std::uint8_t, 3>{ 1, 3, 7 },
+					std::array<std::uint8_t, 3>{ 5, 1, 7 },
+				},
+				std::array{
+					std::array<std::uint8_t, 3>{ 0, 4, 5 },
+					std::array<std::uint8_t, 3>{ 0, 5, 1 },
+				},
+				std::array{
+					std::array<std::uint8_t, 3>{ 3, 2, 7 },
+					std::array<std::uint8_t, 3>{ 2, 6, 7 },
+				},
+				std::array{
+					std::array<std::uint8_t, 3>{ 0, 1, 3 },
+					std::array<std::uint8_t, 3>{ 0, 3, 2 },
+				},
+				std::array{
+					std::array<std::uint8_t, 3>{ 6, 4, 7 },
+					std::array<std::uint8_t, 3>{ 4, 5, 7 },
+				},
+			};
+			context.Check(
+				ReferenceBoundaryFaceTriangles ==
+					expectedBoundaryFaces,
+				"Boundary faces use the fixed Freudenthal diagonals");
+
+			context.Check(
+				AreBoundaryContourNormalsEquivalent(
+					{ 32767, 0, 0 },
+					{ 32766, 1, -1 }) &&
+					!AreBoundaryContourNormalsEquivalent(
+						{ 32767, 0, 0 },
+						{ 32765, 0, 0 }),
+				"Boundary normal comparison uses one SNORM16 step of tolerance");
+		}
+
 		void RunCompleteDomainTests(SelfTestContext& context)
 		{
 			using namespace napa::voxel;
@@ -207,7 +347,12 @@ namespace gglab
 					meshing.m_Validation.m_IndexCount == 0 &&
 					meshing.m_Validation.m_TriangleCount == 0 &&
 					meshing.m_Validation.m_ValidationHash ==
-						0x572bf6dcaaab0aa0ull,
+						0x572bf6dcaaab0aa0ull &&
+					meshing.m_BoundaryValidation ==
+						BoundaryContourValidationResult{
+							.m_ChunkRecordCount = 8,
+							.m_ComparedFacePairCount = 12,
+						},
 				"World meshing traverses every Cell-owner Chunk in canonical order");
 			if (!meshed)
 			{
@@ -317,7 +462,7 @@ namespace gglab
 						record.m_Mesh.m_Sections.size() == 1 &&
 						record.m_Mesh.m_Sections[0].m_Material ==
 							VoxelMaterial::Stone &&
-						TouchesSharedPlanesAndEdges(record);
+						TouchesSharedPlanesAndEdge(record);
 					if (!completeBoundaryCoverage)
 					{
 						break;
@@ -326,11 +471,19 @@ namespace gglab
 			}
 			context.Check(
 				completeBoundaryCoverage,
-				"Face-edge-corner surfaces mesh across positive halos and negative Chunks");
+				"Face and edge surfaces mesh across positive halos and negative Chunks");
 			if (!meshed)
 			{
 				return;
 			}
+			context.Check(
+				meshing.m_BoundaryValidation
+						.m_ChunkRecordCount == 8 &&
+					meshing.m_BoundaryValidation
+							.m_ComparedFacePairCount == 12 &&
+					meshing.m_BoundaryValidation
+							.m_ComparedSegmentCount > 0,
+				"Boundary sphere contours match across all adjacent Chunks");
 			context.Check(
 				meshing.m_Validation ==
 					WorldMeshValidationResult{
@@ -361,6 +514,270 @@ namespace gglab
 			context.Check(
 				deterministic,
 				"Repeated multi-Chunk meshing preserves canonical totals and hash");
+
+			const BoundaryContourValidationResult sentinel{
+				.m_ChunkRecordCount = 11,
+				.m_ComparedFacePairCount = 12,
+				.m_ComparedSegmentCount = 13,
+				.m_SkippedZeroLengthSegmentCount = 14,
+			};
+			BoundaryContourValidationResult unchanged = sentinel;
+			std::vector<ChunkMeshRecord> mismatched =
+				meshing.m_Chunks;
+			BoundaryContourRecord& mismatchedContour =
+				mismatched[0].m_BoundaryContours[
+					GetChunkBoundaryFaceIndex(
+						ChunkBoundaryFace::PositiveX)];
+			const bool injected =
+				!mismatchedContour.m_Segments.empty();
+			if (injected)
+			{
+				mismatchedContour.m_Segments.pop_back();
+			}
+			context.Check(
+				injected &&
+					ValidateBoundaryContourSet(
+						mismatched,
+						config,
+						unchanged).m_Error ==
+							ValidationError::
+								MismatchedBoundaryContour &&
+					unchanged == sentinel,
+				"Boundary contour mismatch fails atomically");
+			WorldMeshValidationResult renderMeshValidation{};
+			context.Check(
+				injected &&
+					ValidateAndHashWorldMeshRecords(
+						mismatched,
+						config,
+						renderMeshValidation).Succeeded() &&
+					renderMeshValidation ==
+						meshing.m_Validation,
+				"Boundary evidence does not enter the render mesh hash");
+
+			ChunkMeshRecord nonCanonical =
+				meshing.m_Chunks[0];
+			BoundaryContourRecord& nonCanonicalContour =
+				nonCanonical.m_BoundaryContours[
+					GetChunkBoundaryFaceIndex(
+						ChunkBoundaryFace::PositiveX)];
+			const bool hasSegment =
+				!nonCanonicalContour.m_Segments.empty();
+			if (hasSegment)
+			{
+				std::swap(
+					nonCanonicalContour.m_Segments[0]
+						.m_EndpointA,
+					nonCanonicalContour.m_Segments[0]
+						.m_EndpointB);
+			}
+			context.Check(
+				hasSegment &&
+					ValidateChunkBoundaryContourSet(
+						nonCanonical.m_BoundaryContours,
+						nonCanonical.m_Chunk,
+						config).m_Error ==
+							ValidationError::
+								InvalidBoundaryContour,
+				"Boundary contour validation rejects non-canonical endpoints");
+		}
+
+		void RunExactIsoCornerTests(SelfTestContext& context)
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config =
+				MakeEightChunkConfig();
+			const std::array primitives{
+				MakeBox(
+					1,
+					{ 2.0, 2.0, 2.0 },
+					{ 2.0, 2.0, 2.0 }),
+			};
+			std::unique_ptr<VoxelWorld> world;
+			const bool generated = GenerateWorld(
+				config,
+				primitives,
+				world);
+			VoxelSample cornerSample{};
+			VoxelSample faceSampleA{};
+			VoxelSample faceSampleB{};
+			VoxelSample faceSampleC{};
+			ReferenceWorldMeshingResult meshing{};
+			const bool meshed =
+				generated &&
+				world->ReadCurrentSample(
+					{},
+					cornerSample).Succeeded() &&
+				world->ReadCurrentSample(
+					{ 0, 1, 1 },
+					faceSampleA).Succeeded() &&
+				world->ReadCurrentSample(
+					{ 0, 2, 1 },
+					faceSampleB).Succeeded() &&
+				world->ReadCurrentSample(
+					{ 0, 1, 2 },
+					faceSampleC).Succeeded() &&
+				ReferenceMesher(*world).MeshWorld(
+					meshing).Succeeded();
+
+			struct ExpectedCornerFace
+			{
+				ChunkCoord m_Chunk{};
+				ChunkBoundaryFace m_Face =
+					ChunkBoundaryFace::NegativeX;
+			};
+			// The exact-iso box occupies the positive octant. Its corner
+			// contours lie on the two exterior quadrants of each shared
+			// plane; the interior quadrant is entirely solid.
+			constexpr std::array expectedCornerFaces{
+				ExpectedCornerFace{
+					{ -1, -1, 0 },
+					ChunkBoundaryFace::PositiveX,
+				},
+				ExpectedCornerFace{
+					{ 0, -1, 0 },
+					ChunkBoundaryFace::NegativeX,
+				},
+				ExpectedCornerFace{
+					{ -1, 0, -1 },
+					ChunkBoundaryFace::PositiveX,
+				},
+				ExpectedCornerFace{
+					{ 0, 0, -1 },
+					ChunkBoundaryFace::NegativeX,
+				},
+				ExpectedCornerFace{
+					{ -1, -1, 0 },
+					ChunkBoundaryFace::PositiveY,
+				},
+				ExpectedCornerFace{
+					{ -1, 0, 0 },
+					ChunkBoundaryFace::NegativeY,
+				},
+				ExpectedCornerFace{
+					{ 0, -1, -1 },
+					ChunkBoundaryFace::PositiveY,
+				},
+				ExpectedCornerFace{
+					{ 0, 0, -1 },
+					ChunkBoundaryFace::NegativeY,
+				},
+				ExpectedCornerFace{
+					{ -1, 0, -1 },
+					ChunkBoundaryFace::PositiveZ,
+				},
+				ExpectedCornerFace{
+					{ -1, 0, 0 },
+					ChunkBoundaryFace::NegativeZ,
+				},
+				ExpectedCornerFace{
+					{ 0, -1, -1 },
+					ChunkBoundaryFace::PositiveZ,
+				},
+				ExpectedCornerFace{
+					{ 0, -1, 0 },
+					ChunkBoundaryFace::NegativeZ,
+				},
+			};
+			constexpr QuantizedBoundaryContourPosition sharedCorner{};
+			constexpr QuantizedBoundaryContourPosition exactEdgeEnd{
+				0,
+				0,
+				BoundaryContourPositionScale,
+			};
+			std::uint32_t cornerFaceCount = 0;
+			std::uint32_t exactEdgeFaceCount = 0;
+			if (meshed)
+			{
+				for (const ExpectedCornerFace expected :
+					expectedCornerFaces)
+				{
+					const BoundaryContourRecord* const contour =
+						FindBoundaryContour(
+							meshing.m_Chunks,
+							expected.m_Chunk,
+							expected.m_Face);
+					if (contour &&
+						ContainsBoundaryEndpoint(
+							*contour,
+							sharedCorner))
+					{
+						++cornerFaceCount;
+					}
+					if (contour &&
+						ContainsBoundarySegment(
+							*contour,
+							sharedCorner,
+							exactEdgeEnd))
+					{
+						++exactEdgeFaceCount;
+					}
+				}
+			}
+			context.Check(
+				meshed &&
+					cornerSample.m_Density == IsoValue &&
+					cornerSample.m_Material ==
+						VoxelMaterial::Stone &&
+					cornerFaceCount ==
+						expectedCornerFaces.size(),
+				"Box surface contours meet at the shared Chunk corner");
+			context.Check(
+				meshed &&
+					exactEdgeFaceCount == 4,
+				"Exact-iso face edges produce matching nonzero contours");
+			context.Check(
+				meshed &&
+					faceSampleA.m_Density == IsoValue &&
+					faceSampleB.m_Density == IsoValue &&
+					faceSampleC.m_Density == IsoValue &&
+					meshing.m_BoundaryValidation
+							.m_SkippedZeroLengthSegmentCount > 0,
+				"Exact-iso face vertices discard zero-length contours before normal validation");
+
+			const BoundaryContourRecord* const fullIsoFace =
+				meshed
+					? FindBoundaryContour(
+						meshing.m_Chunks,
+						{},
+						ChunkBoundaryFace::NegativeX)
+					: nullptr;
+			bool hasInteriorSegment = false;
+			if (fullIsoFace)
+			{
+				const std::int64_t maximumInterior =
+					4 * BoundaryContourPositionScale;
+				for (const BoundaryContourSegment& segment :
+					fullIsoFace->m_Segments)
+				{
+					const auto isInterior =
+						[maximumInterior](
+							QuantizedBoundaryContourPosition
+								position)
+						{
+							return
+								position.m_Y > 0 &&
+								position.m_Y <
+									maximumInterior &&
+								position.m_Z > 0 &&
+								position.m_Z <
+									maximumInterior;
+						};
+					if (isInterior(
+							segment.m_EndpointA.m_Position) &&
+						isInterior(
+							segment.m_EndpointB.m_Position))
+					{
+						hasInteriorSegment = true;
+						break;
+					}
+				}
+			}
+			context.Check(
+				fullIsoFace != nullptr &&
+					!hasInteriorSegment,
+				"Fully exact-iso boundary triangles emit no interior contour");
 		}
 
 		void RunGuardAllocationTests(SelfTestContext& context)
@@ -417,8 +834,10 @@ namespace gglab
 	void RunNapaVoxelMultiChunkSelfTests(
 		SelfTestContext& context) noexcept
 	{
+		RunBoundaryContourContractTests(context);
 		RunCompleteDomainTests(context);
 		RunBoundarySurfaceTests(context);
+		RunExactIsoCornerTests(context);
 		RunGuardAllocationTests(context);
 	}
 }

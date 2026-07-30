@@ -39,6 +39,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h">
       <Filter>NapaVoxelCore\Hash</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h">
+      <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h">
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClInclude>
@@ -94,6 +97,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp">
       <Filter>NapaVoxelCore\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.cpp">
+      <Filter>NapaVoxelCore\Meshing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp">
       <Filter>NapaVoxelCore\Meshing</Filter>

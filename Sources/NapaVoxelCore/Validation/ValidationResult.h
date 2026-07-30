@@ -63,6 +63,8 @@ namespace napa::voxel
 		UnrepresentableChunkLocalPosition = 54,
 		InvalidWorldMeshRecordSet = 55,
 		MismatchedChunkMeshValidation = 56,
+		InvalidBoundaryContour = 57,
+		MismatchedBoundaryContour = 58,
 	};
 
 	struct ValidationResult
