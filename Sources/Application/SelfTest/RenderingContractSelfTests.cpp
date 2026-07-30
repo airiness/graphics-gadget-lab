@@ -3,6 +3,8 @@
 #include "Core/Math/MathFunctions.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
+#include "Graphics/Buffer/PersistentStructuredBufferTable.h"
+#include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -59,6 +61,15 @@ namespace gglab
 			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
 			{
 				return "RenderingContract.RecordingDevice";
+			}
+			RHIShaderWaveCapabilities
+				GetShaderWaveCapabilities() const noexcept override
+			{
+				return {
+					.m_Supported = true,
+					.m_MinLaneCount = 32,
+					.m_MaxLaneCount = 64,
+				};
 			}
 			RHITextureSupportResult QueryTextureSupport(
 				const RHITextureDesc&) const noexcept override
@@ -195,6 +206,15 @@ namespace gglab
 				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
 			}
 			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
+			void CopyBuffer(
+				RHIBufferHandle,
+				uint64_t,
+				RHIBufferHandle,
+				uint64_t,
+				uint64_t) noexcept override
+			{
+				++m_CopyBufferCount;
+			}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
@@ -230,6 +250,7 @@ namespace gglab
 			uint32_t m_FlushBarrierCount = 0;
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
+			uint32_t m_CopyBufferCount = 0;
 			std::vector<RHITextureBarrier> m_TextureBarriers;
 		};
 
@@ -249,6 +270,13 @@ namespace gglab
 				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
 			}
 			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
+			void CopyBuffer(
+				RHIBufferHandle,
+				uint64_t,
+				RHIBufferHandle,
+				uint64_t,
+				uint64_t) noexcept override
+			{}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
@@ -1025,6 +1053,164 @@ namespace gglab
 					skyboxVertexArtifact.m_Binary.IsValid() &&
 					skyboxPixelArtifact.m_Binary.IsValid(),
 				"Production DXC compiles Forward shading and the background-depth Skybox");
+
+			desc.m_SourcePath =
+				L"Passes/PassForwardPlusCull.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSMain";
+			const ShaderCompileArtifact forwardPlusArtifact =
+				compiler.CompileOrLoadArtifact(
+					compiler.NormalizeShaderDesc(desc));
+			context.Check(
+				forwardPlusArtifact.m_Binary.IsValid(),
+				"Production DXC compiles the fixed-stride Forward+ cull shader");
+		}
+
+		void RunForwardPlusContractTests(
+			SelfTestContext& context) noexcept
+		{
+			const ForwardPlusTileGrid grid1080 =
+				MakeForwardPlusTileGrid(1920, 1080);
+			const ForwardPlusTileGrid grid4K =
+				MakeForwardPlusTileGrid(3840, 2160);
+			context.Check(
+				grid1080.IsValid() &&
+					grid1080.m_TileCountX == 120 &&
+					grid1080.m_TileCountY == 68 &&
+					grid1080.m_TileCount == 8160 &&
+					grid4K.IsValid() &&
+					grid4K.m_TileCountX == 240 &&
+					grid4K.m_TileCountY == 135 &&
+					grid4K.m_TileCount == 32400 &&
+					!MakeForwardPlusTileGrid(
+						0,
+						1080).IsValid(),
+				"Forward+ tile grids use exact 16x16 ceil-division");
+
+			const ForwardPlusTileHeader header{
+				.m_Offset =
+					GetForwardPlusTileOffset(7),
+				.m_CountAndFlags = 0xabcd0005u,
+			};
+			context.Check(
+				GetForwardPlusTileOffset(0) == 0 &&
+					GetForwardPlusTileOffset(7) == 448 &&
+					header.m_Offset == 448 &&
+					header.GetCount() == 5,
+				"Forward+ headers preserve fixed-stride address and masked count semantics");
+
+			std::array<
+				uint8_t,
+				ForwardPlusTileLightCapacity>
+				emptyHits{};
+			const auto emptyWave32 =
+				BuildStableForwardPlusLightList(
+					emptyHits,
+					32);
+			const auto emptyWave64 =
+				BuildStableForwardPlusLightList(
+					emptyHits,
+					64);
+
+			auto oneHit = emptyHits;
+			oneHit[37] = 1;
+			const auto oneWave32 =
+				BuildStableForwardPlusLightList(
+					oneHit,
+					32);
+			const auto oneWave64 =
+				BuildStableForwardPlusLightList(
+					oneHit,
+					64);
+
+			std::array<
+				uint8_t,
+				ForwardPlusTileLightCapacity>
+				allHits{};
+			allHits.fill(1);
+			const auto allWave32 =
+				BuildStableForwardPlusLightList(
+					allHits,
+					32);
+			const auto allWave64 =
+				BuildStableForwardPlusLightList(
+					allHits,
+					64);
+
+			auto patternedHits = emptyHits;
+			for (uint32_t lightIndex = 0;
+				lightIndex <
+					ForwardPlusTileLightCapacity;
+				++lightIndex)
+			{
+				patternedHits[lightIndex] =
+					(lightIndex % 3u) == 1u ||
+					(lightIndex % 11u) == 0u;
+			}
+			const auto patternedWave32 =
+				BuildStableForwardPlusLightList(
+					patternedHits,
+					32);
+			const auto patternedWave64 =
+				BuildStableForwardPlusLightList(
+					patternedHits,
+					64);
+			context.Check(
+				emptyWave32.empty() &&
+					emptyWave32 == emptyWave64 &&
+					oneWave32 ==
+						std::vector<uint32_t>{ 37 } &&
+					oneWave32 == oneWave64 &&
+					allWave32.size() ==
+						ForwardPlusTileLightCapacity &&
+					allWave32 == allWave64 &&
+					allWave32.front() == 0 &&
+					allWave32.back() == 63 &&
+					patternedWave32 ==
+						patternedWave64 &&
+					std::ranges::is_sorted(
+						patternedWave32),
+				"Forward+ stable compaction preserves global light order for 0, 1, and 64 lights across Wave32 and Wave64 partitions");
+
+			PersistentStructuredBufferTable<
+				uint64_t,
+				uint32_t>
+				fullCapacityTable(2, 1);
+			fullCapacityTable.BeginUpdate();
+			GGLAB_UNUSED(
+				fullCapacityTable.Upsert(1, 10));
+			fullCapacityTable.EndUpdate();
+			fullCapacityTable.BeginUpdate();
+			const uint32_t firstReplacementSlot =
+				fullCapacityTable.Upsert(2, 20);
+			const uint32_t secondReplacementSlot =
+				fullCapacityTable.Upsert(3, 30);
+			fullCapacityTable.EndUpdate();
+			bool oldKeyRemains = false;
+			bool firstKeyPresent = false;
+			bool secondKeyPresent = false;
+			for (uint32_t slot = 0; slot < 2; ++slot)
+			{
+				const auto& key =
+					fullCapacityTable.GetKey(slot);
+				oldKeyRemains |= key && *key == 1;
+				firstKeyPresent |= key && *key == 2;
+				secondKeyPresent |= key && *key == 3;
+			}
+			context.Check(
+				firstReplacementSlot !=
+					decltype(fullCapacityTable)::
+						InvalidSlot &&
+					secondReplacementSlot !=
+						decltype(fullCapacityTable)::
+							InvalidSlot &&
+					firstReplacementSlot !=
+						secondReplacementSlot &&
+					fullCapacityTable.GetLiveCount() == 2 &&
+					!oldKeyRemains &&
+					firstKeyPresent &&
+					secondKeyPresent,
+				"Persistent GPU tables can replace a full prior key set without transient capacity overflow");
 		}
 
 		void RunDepthCoverageContractTests(SelfTestContext& context) noexcept
@@ -1683,9 +1869,34 @@ namespace gglab
 			const DepthCoverageFramePlan rejectedPlan =
 				BuildDepthCoverageFramePlan(
 					invalidPacketBuildInfo);
+
+			DepthCoverageFramePlanBuildInfo
+				standardDepthBuildInfo =
+					framePlanBuildInfo;
+			standardDepthBuildInfo.m_DepthConvention =
+				DepthConvention::Standard;
+			const DepthCoverageFramePlan standardDepthPlan =
+				BuildDepthCoverageFramePlan(
+					standardDepthBuildInfo);
+
+			RenderQueue emptyQueue{
+				.m_ViewId = RenderViewID::Main,
+				.m_CoverageRasterDomain =
+					rasterDomain,
+			};
+			DepthCoverageFramePlanBuildInfo
+				emptyQueueBuildInfo =
+					framePlanBuildInfo;
+			emptyQueueBuildInfo.m_RenderQueue =
+				std::addressof(emptyQueue);
+			const DepthCoverageFramePlan emptyQueuePlan =
+				BuildDepthCoverageFramePlan(
+					emptyQueueBuildInfo);
 			context.Check(
 				equalPlan.UsesDepthPrepassEqual() &&
 					equalPlan.RendersGeometry() &&
+					equalPlan.AddsForwardOpaquePass() &&
+					!equalPlan.AddsForwardTransparentPass() &&
 					fallbackPlan.UsesForwardDepthWrite() &&
 					fallbackPlan.RendersGeometry() &&
 					fallbackPlan.m_Diagnostic.find(
@@ -1694,8 +1905,16 @@ namespace gglab
 					!rejectedPlan.RendersGeometry() &&
 					rejectedPlan.m_ExecutionMode ==
 						DepthCoverageExecutionMode::
-							SkipGeometry,
-				"Frame-level coverage planning selects one consistent EQUAL, Forward-write, or reject path");
+							SkipGeometry &&
+					!standardDepthPlan.RendersGeometry() &&
+					standardDepthPlan.m_Diagnostic.find(
+						"Reversed-Z") !=
+						std::string::npos &&
+					emptyQueuePlan.UsesDepthPrepassEqual() &&
+					!emptyQueuePlan.AddsForwardOpaquePass() &&
+					!emptyQueuePlan.
+						AddsForwardTransparentPass(),
+				"Frame-level coverage planning selects one consistent EQUAL, Forward-write, or reject path and omits empty Forward buckets");
 		}
 
 		void RunScreenSpaceAndDepthContractTests(SelfTestContext& context) noexcept
@@ -1706,6 +1925,7 @@ namespace gglab
 			RunRenderViewConventionTests(context);
 			RunSampleableDepthFormatTests(context);
 			RunDepthCoverageContractTests(context);
+			RunForwardPlusContractTests(context);
 			RunShaderCompileContractTests(context);
 		}
 
@@ -2296,10 +2516,13 @@ namespace gglab
 			uint32_t culledComputeExecutions = 0;
 			bool graphicsContextSelected = false;
 			bool directComputeContextSelected = false;
+			bool copyContextSelected = false;
+			bool copyResourcesResolved = false;
 			bool asyncComputeRemainsUnavailable = false;
+			RecordingDevice encoderDevice;
 			RenderGraph encoderGraph(
 				{
-					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_Device = &encoderDevice,
 					.m_TransientResourcePool =
 						reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
 				});
@@ -2322,12 +2545,71 @@ namespace gglab
 					asyncComputeRemainsUnavailable =
 						executeContext.GetAsyncComputeCommandContext() == nullptr;
 				});
-			encoderGraph.AddTrivialSideEffectPass(
+			encoderGraph.AddPass<
+				DualStorageAccessPassData>(
 				"CopyEncoder",
 				RGPassEncoderType::Copy,
-				[&](RGExecuteContext&)
+				[](RenderGraph::RGBuilder& builder,
+					DualStorageAccessPassData& data)
+				{
+					const RHIBufferDesc copyBufferDesc{
+						.m_SizeInBytes = 64,
+						.m_Usage =
+							RHIBufferUsage::CopySource |
+							RHIBufferUsage::CopyDest,
+					};
+					data.m_FirstBuffer =
+						builder.ImportBuffer(
+							"CopySource",
+							RHIBufferHandle{ 21, 1 },
+							copyBufferDesc,
+							RGBufferAccess::CopySource);
+					data.m_SecondBuffer =
+						builder.ImportBuffer(
+							"CopyDestination",
+							RHIBufferHandle{ 22, 1 },
+							copyBufferDesc,
+							RGBufferAccess::CopyDest);
+					data.m_FirstBuffer = builder.Read(
+						data.m_FirstBuffer,
+						RGBufferAccess::CopySource,
+						RHIStage::Copy);
+					builder.WriteInPlace(
+						data.m_SecondBuffer,
+						RGBufferAccess::CopyDest,
+						RHIStage::Copy);
+					builder.SideEffect();
+				},
+				[&](RGExecuteContext& executeContext,
+					DualStorageAccessPassData& data)
 				{
 					++copyExecutions;
+					auto* copyContext =
+						executeContext.
+							GetCopyCommandContext();
+					copyContextSelected =
+						copyContext ==
+							&graphicsContext;
+					const RHIBufferHandle source =
+						executeContext.GetBufferHandle(
+							data.m_FirstBuffer);
+					const RHIBufferHandle destination =
+						executeContext.GetBufferHandle(
+							data.m_SecondBuffer);
+					copyResourcesResolved =
+						source ==
+							RHIBufferHandle{ 21, 1 } &&
+						destination ==
+							RHIBufferHandle{ 22, 1 };
+					if (copyContext)
+					{
+						copyContext->CopyBuffer(
+							destination,
+							4,
+							source,
+							8,
+							16);
+					}
 				});
 			encoderGraph.AddPass<StorageAccessPassData>(
 				"CulledComputeEncoder",
@@ -2364,10 +2646,14 @@ namespace gglab
 						computeExecutions == 1 &&
 						copyExecutions == 1 &&
 						culledComputeExecutions == 0 &&
-						graphicsContextSelected &&
-						directComputeContextSelected &&
-						asyncComputeRemainsUnavailable,
-					"RenderGraph executes each live pass with its declared direct-list encoder");
+					graphicsContextSelected &&
+					directComputeContextSelected &&
+					copyContextSelected &&
+					copyResourcesResolved &&
+					graphicsContext.
+						m_CopyBufferCount == 1 &&
+					asyncComputeRemainsUnavailable,
+				"RenderGraph executes each live pass with its declared direct-list encoder");
 				context.Check(
 					graphicsContext.m_BeginProfileCount == 2 &&
 						graphicsContext.m_EndProfileCount == 2 &&

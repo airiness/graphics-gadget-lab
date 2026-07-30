@@ -103,6 +103,12 @@ namespace gglab
 		virtual void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept = 0;
 		virtual void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept = 0;
 		virtual void FlushBarriers() noexcept = 0;
+		virtual void CopyBuffer(
+			RHIBufferHandle destination,
+			uint64_t destinationOffset,
+			RHIBufferHandle source,
+			uint64_t sourceOffset,
+			uint64_t sizeInBytes) noexcept = 0;
 		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};

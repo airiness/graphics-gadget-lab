@@ -43,8 +43,15 @@ namespace gglab
 			swapChain->GetBufferWidth();
 		const uint32_t targetHeight =
 			swapChain->GetBufferHeight();
+		const bool forwardPlusEnabled =
+			context.GetDisplayViewRenderSettings().
+				m_Lighting.m_ForwardPlus.m_Enabled;
 
 		PrepareForwardPasses(services);
+		if (forwardPlusEnabled)
+		{
+			m_ForwardPlusCullPass.Prepare(services);
+		}
 		const DepthCoverageFramePlan depthCoverageFramePlan =
 			BuildDepthCoverageFramePlanForFrame(
 				context,
@@ -219,18 +226,34 @@ namespace gglab
 				rg,
 				context,
 				services);
+			if (forwardPlusEnabled &&
+				depthCoverageFramePlan.
+					m_HasDepthCoverageDraws &&
+				context.IsRenderSceneReady())
+			{
+				m_ForwardPlusCullPass.AddPass(
+					rg,
+					context,
+					services);
+			}
 			m_SkyboxPass.AddPass(rg, context, services);
-			m_ForwardOpaquePass.AddPass(
-				rg,
-				context,
-				services);
+			if (depthCoverageFramePlan.AddsForwardOpaquePass())
+			{
+				m_ForwardOpaquePass.AddPass(
+					rg,
+					context,
+					services);
+			}
 		}
 		else if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
-			m_ForwardOpaquePass.AddPass(
-				rg,
-				context,
-				services);
+			if (depthCoverageFramePlan.AddsForwardOpaquePass())
+			{
+				m_ForwardOpaquePass.AddPass(
+					rg,
+					context,
+					services);
+			}
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 		else
@@ -244,7 +267,7 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
-		if (depthCoverageFramePlan.RendersGeometry())
+		if (depthCoverageFramePlan.AddsForwardTransparentPass())
 		{
 			m_ForwardTransparentPass.AddPass(
 				rg,
@@ -267,7 +290,7 @@ namespace gglab
 		// Always-visible debug geometry is composed after all back-buffer previews.
 		m_DebugDrawOverlayPass.AddPass(rg, context, services);
 
-		// DevelopGui	
+		// DevelopGui
 		m_DevelopGuiPass.AddPass(rg, context, services);
 
 		// Return persistent IBL resources to Common only after every consumer and
@@ -325,9 +348,13 @@ namespace gglab
 				shaderManager->LoadShader(shaderDesc);
 		}
 
-		GGLAB_ASSERT_MSG(
-			m_ForwardPBRShaderSet.IsValid(),
-			"Forward renderer failed to prepare its shared shader set.");
+		if (!m_ForwardPBRShaderSet.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Forward renderer failed to prepare its required shared shader set.");
+			GGLAB_UNREACHABLE(
+				"Forward renderer production shaders are unavailable.");
+		}
 		m_DepthPrepassPass.Prepare(
 			services,
 			m_ForwardPBRShaderSet);
@@ -358,53 +385,33 @@ namespace gglab
 			.m_DepthConvention =
 				context.GetDisplayRenderView().
 					m_DepthConvention,
-			.m_ShadingPipelinesAvailable =
-				m_ForwardPBRShaderSet.IsValid(),
 		};
 
-		if (buildInfo.m_ShadingPipelinesAvailable)
+		for (const RenderBucket bucket :
+			{ RenderBucket::Opaque, RenderBucket::AlphaTest })
 		{
-			for (const DrawItem& drawItem :
-				renderQueue.m_DrawItems)
+			for (const bool doubleSided : { false, true })
 			{
-				if (drawItem.m_Bucket !=
-						RenderBucket::Opaque &&
-					drawItem.m_Bucket !=
-						RenderBucket::AlphaTest)
-				{
-					continue;
-				}
-				if ((drawItem.m_VariantBits &
-						~RenderQueueBuilder::VariantMask) != 0 ||
-					RenderQueueBuilder::DecodeVariantBucket(
-						drawItem.m_VariantBits) !=
-						drawItem.m_Bucket)
-				{
-					continue;
-				}
 				const uint64_t variantBits =
-					drawItem.m_VariantBits &
-						RenderQueueBuilder::VariantMask;
+					RenderQueueBuilder::EncodeVariantBits(
+						bucket,
+						doubleSided);
 				const size_t variantIndex =
 					static_cast<size_t>(variantBits);
-				if (!buildInfo.m_PrepassPipelineSignatures[
-					variantIndex])
-				{
-					buildInfo.m_PrepassPipelineSignatures[
-						variantIndex] =
-							m_DepthPrepassPass.
-								DescribePipelineVariant(
-									variantBits).
-							m_LogicalMetadata.
-							m_DepthCoveragePipelineSignature;
-					buildInfo.m_ForwardPipelineSignatures[
-						variantIndex] =
-							m_ForwardOpaquePass.
-								DescribePipelineVariant(
-									variantBits).
-							m_LogicalMetadata.
-							m_DepthCoveragePipelineSignature;
-				}
+				buildInfo.m_PrepassPipelineSignatures[
+					variantIndex] =
+						m_DepthPrepassPass.
+							DescribePipelineVariant(
+								variantBits).
+						m_LogicalMetadata.
+						m_DepthCoveragePipelineSignature;
+				buildInfo.m_ForwardPipelineSignatures[
+					variantIndex] =
+						m_ForwardOpaquePass.
+							DescribePipelineVariant(
+								variantBits).
+						m_LogicalMetadata.
+						m_DepthCoveragePipelineSignature;
 			}
 		}
 

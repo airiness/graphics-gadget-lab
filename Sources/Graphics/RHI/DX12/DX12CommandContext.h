@@ -41,6 +41,12 @@ namespace gglab
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
 		void FlushBarriers() noexcept;
+		void CopyBuffer(
+			RHIBufferHandle destination,
+			uint64_t destinationOffset,
+			RHIBufferHandle source,
+			uint64_t sourceOffset,
+			uint64_t sizeInBytes) noexcept;
 
 	protected:
 		[[nodiscard]] DX12Device* GetDevice() const noexcept { return m_Device; }
@@ -84,6 +90,20 @@ namespace gglab
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void FlushBarriers() noexcept override { m_Backend.FlushBarriers(); }
+		void CopyBuffer(
+			RHIBufferHandle destination,
+			uint64_t destinationOffset,
+			RHIBufferHandle source,
+			uint64_t sourceOffset,
+			uint64_t sizeInBytes) noexcept override
+		{
+			m_Backend.CopyBuffer(
+				destination,
+				destinationOffset,
+				source,
+				sourceOffset,
+				sizeInBytes);
+		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
@@ -165,6 +185,20 @@ namespace gglab
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void FlushBarriers() noexcept override { m_Backend->FlushBarriers(); }
+		void CopyBuffer(
+			RHIBufferHandle destination,
+			uint64_t destinationOffset,
+			RHIBufferHandle source,
+			uint64_t sourceOffset,
+			uint64_t sizeInBytes) noexcept override
+		{
+			m_Backend->CopyBuffer(
+				destination,
+				destinationOffset,
+				source,
+				sourceOffset,
+				sizeInBytes);
+		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void SetConstantBuffer(uint32_t parameterIndex,

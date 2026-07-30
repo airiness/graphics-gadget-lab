@@ -14,75 +14,6 @@ namespace gglab
 			plan.m_Diagnostic = std::move(diagnostic);
 		}
 
-		[[nodiscard]] bool ValidateRenderQueueStructure(
-			const RenderQueue& renderQueue,
-			std::string& diagnostic)
-		{
-			uint32_t expectedStart = 0;
-			for (size_t bucketIndex = 0;
-				bucketIndex < utils::ToIndex(RenderBucket::Count);
-				++bucketIndex)
-			{
-				const auto bucket =
-					static_cast<RenderBucket>(bucketIndex);
-				const DrawItemsRange range =
-					renderQueue.m_BucketDrawRanges[bucketIndex];
-				if (range.m_Start != expectedStart ||
-					range.m_Start > renderQueue.m_DrawItems.size() ||
-					range.m_Count >
-						renderQueue.m_DrawItems.size() -
-							range.m_Start)
-				{
-					diagnostic = std::format(
-						"RenderQueue range {} is not a contiguous in-bounds range.",
-						bucketIndex);
-					return false;
-				}
-
-				for (uint32_t offset = 0;
-					offset < range.m_Count;
-					++offset)
-				{
-					const DrawItem& drawItem =
-						renderQueue.m_DrawItems[
-							range.m_Start + offset];
-					if (drawItem.m_Bucket != bucket ||
-						RenderQueueBuilder::DecodeVariantBucket(
-							drawItem.m_VariantBits) != bucket)
-					{
-						diagnostic = std::format(
-							"RenderQueue item {} disagrees with bucket {}.",
-							range.m_Start + offset,
-							bucketIndex);
-						return false;
-					}
-					if ((drawItem.m_VariantBits &
-						~RenderQueueBuilder::VariantMask) != 0)
-					{
-						diagnostic = std::format(
-							"RenderQueue item {} has unsupported variant bits.",
-							range.m_Start + offset);
-						return false;
-					}
-					if (!drawItem.m_CoverageDrawPacket.IsValid())
-					{
-						diagnostic = std::format(
-							"RenderQueue item {} has an invalid draw packet.",
-							range.m_Start + offset);
-						return false;
-					}
-				}
-				expectedStart += range.m_Count;
-			}
-
-			if (expectedStart != renderQueue.m_DrawItems.size())
-			{
-				diagnostic =
-					"RenderQueue ranges do not cover every draw item exactly once.";
-				return false;
-			}
-			return true;
-		}
 	}
 
 	DepthCoverageFramePlan BuildDepthCoverageFramePlan(
@@ -107,22 +38,17 @@ namespace gglab
 			return plan;
 		}
 
-		const RenderQueue& renderQueue =
-			*buildInfo.m_RenderQueue;
-		if (renderQueue.m_DrawItems.empty())
-		{
-			return plan;
-		}
-		if (!buildInfo.m_ShadingPipelinesAvailable)
+		const RenderQueue& renderQueue = *buildInfo.m_RenderQueue;
+		const DepthCoverageRasterDomain& rasterDomain =
+			renderQueue.m_CoverageRasterDomain;
+		if (buildInfo.m_DepthConvention !=
+			DepthConvention::Reversed)
 		{
 			RejectGeometry(
 				plan,
-				"Forward shading pipelines are unavailable.");
+				"Depth coverage frame planning only supports the Reversed-Z Forward path.");
 			return plan;
 		}
-
-		const DepthCoverageRasterDomain& rasterDomain =
-			renderQueue.m_CoverageRasterDomain;
 		if (renderQueue.m_ViewId != buildInfo.m_ExpectedViewId)
 		{
 			RejectGeometry(
@@ -143,31 +69,82 @@ namespace gglab
 			return plan;
 		}
 
-		std::string queueDiagnostic;
-		if (!ValidateRenderQueueStructure(
-			renderQueue,
-			queueDiagnostic))
+		bool requiresForwardDepthWrite = false;
+		uint32_t expectedStart = 0;
+		for (size_t bucketIndex = 0;
+			bucketIndex < utils::ToIndex(RenderBucket::Count);
+			++bucketIndex)
 		{
-			RejectGeometry(
-				plan,
-				std::move(queueDiagnostic));
-			return plan;
-		}
-
-		const auto& ranges =
-			renderQueue.m_BucketDrawRanges;
-		for (const RenderBucket bucket :
-			{ RenderBucket::Opaque, RenderBucket::AlphaTest })
-		{
+			const auto bucket =
+				static_cast<RenderBucket>(bucketIndex);
 			const DrawItemsRange range =
-				ranges[utils::ToIndex(bucket)];
+				renderQueue.m_BucketDrawRanges[bucketIndex];
+			if (range.m_Start != expectedStart ||
+				range.m_Start > renderQueue.m_DrawItems.size() ||
+				range.m_Count >
+					renderQueue.m_DrawItems.size() -
+						range.m_Start)
+			{
+				RejectGeometry(
+					plan,
+					std::format(
+						"RenderQueue range {} is not a contiguous in-bounds range.",
+						bucketIndex));
+				return plan;
+			}
+
+			plan.m_HasDepthCoverageDraws |=
+				range.m_Count > 0 &&
+				(bucket == RenderBucket::Opaque ||
+					bucket == RenderBucket::AlphaTest);
+			plan.m_HasTransparentDraws |=
+				range.m_Count > 0 &&
+				bucket == RenderBucket::Transparent;
+
 			for (uint32_t offset = 0;
 				offset < range.m_Count;
 				++offset)
 			{
+				const uint32_t drawItemIndex =
+					range.m_Start + offset;
 				const DrawItem& drawItem =
-					renderQueue.m_DrawItems[
-						range.m_Start + offset];
+					renderQueue.m_DrawItems[drawItemIndex];
+				if ((drawItem.m_VariantBits &
+					~RenderQueueBuilder::VariantMask) != 0)
+				{
+					RejectGeometry(
+						plan,
+						std::format(
+							"RenderQueue item {} has unsupported variant bits.",
+							drawItemIndex));
+					return plan;
+				}
+				if (drawItem.m_Bucket != bucket ||
+					RenderQueueBuilder::DecodeVariantBucket(
+						drawItem.m_VariantBits) != bucket)
+				{
+					RejectGeometry(
+						plan,
+						std::format(
+							"RenderQueue item {} disagrees with bucket {}.",
+							drawItemIndex,
+							bucketIndex));
+					return plan;
+				}
+				if (!drawItem.m_CoverageDrawPacket.IsValid())
+				{
+					RejectGeometry(
+						plan,
+						std::format(
+							"RenderQueue item {} has an invalid draw packet.",
+							drawItemIndex));
+					return plan;
+				}
+				if (bucket == RenderBucket::Transparent)
+				{
+					continue;
+				}
+
 				const size_t variantIndex =
 					static_cast<size_t>(
 						drawItem.m_VariantBits &
@@ -180,13 +157,14 @@ namespace gglab
 						variantIndex];
 				if (!prepassSignature || !forwardSignature)
 				{
-					plan.m_ExecutionMode =
-						DepthCoverageExecutionMode::
-							ForwardDepthWrite;
-					plan.m_Diagnostic = std::format(
-						"Coverage variant {} did not publish both pipeline signatures.",
-						variantIndex);
-					return plan;
+					requiresForwardDepthWrite = true;
+					if (plan.m_Diagnostic.empty())
+					{
+						plan.m_Diagnostic = std::format(
+							"Coverage variant {} did not publish both pipeline signatures.",
+							variantIndex);
+					}
+					continue;
 				}
 				if (!prepassSignature->IsValid() ||
 					!forwardSignature->IsValid())
@@ -205,16 +183,30 @@ namespace gglab
 						*forwardSignature);
 				if (!comparison.m_Matches)
 				{
-					plan.m_ExecutionMode =
-						DepthCoverageExecutionMode::
-							ForwardDepthWrite;
-					plan.m_Diagnostic = std::format(
-						"Coverage variant {} mismatch: {}.",
-						variantIndex,
-						comparison.m_Mismatch);
-					return plan;
+					requiresForwardDepthWrite = true;
+					if (plan.m_Diagnostic.empty())
+					{
+						plan.m_Diagnostic = std::format(
+							"Coverage variant {} mismatch: {}.",
+							variantIndex,
+							comparison.m_Mismatch);
+					}
 				}
 			}
+			expectedStart += range.m_Count;
+		}
+
+		if (expectedStart != renderQueue.m_DrawItems.size())
+		{
+			RejectGeometry(
+				plan,
+				"RenderQueue ranges do not cover every draw item exactly once.");
+			return plan;
+		}
+		if (requiresForwardDepthWrite)
+		{
+			plan.m_ExecutionMode =
+				DepthCoverageExecutionMode::ForwardDepthWrite;
 		}
 
 		return plan;

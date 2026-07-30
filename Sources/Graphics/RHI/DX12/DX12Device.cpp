@@ -748,6 +748,24 @@ namespace gglab
 		// Enhanced Barrier
 		m_FeatureSupport.m_EnhancedBarriers = featureSupport.EnhancedBarriersSupported();
 
+		D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1{};
+		if (SUCCEEDED(
+			m_D3D12Device->CheckFeatureSupport(
+				D3D12_FEATURE_D3D12_OPTIONS1,
+				std::addressof(options1),
+				sizeof(options1))))
+		{
+			m_FeatureSupport.
+				m_ShaderWaveCapabilities = {
+					.m_Supported =
+						options1.WaveOps != FALSE,
+					.m_MinLaneCount =
+						options1.WaveLaneCountMin,
+					.m_MaxLaneCount =
+						options1.WaveLaneCountMax,
+				};
+		}
+
 		// Tearing support
 		BOOL tearSupport = FALSE;
 		if (m_DxgiFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearSupport, sizeof(BOOL)) == S_OK)

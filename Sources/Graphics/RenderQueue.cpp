@@ -151,22 +151,6 @@ namespace gglab
 		return static_cast<uint8_t>(utils::ToIndexChecked(bucket));
 	}
 
-	constexpr uint64_t RenderQueueBuilder::EncodeVariantBits(RenderBucket bucket, bool doubleSided) noexcept
-	{
-		const auto encodeBucket = [](RenderBucket bucket)
-			{
-				uint64_t value = utils::ToIndexChecked(bucket);
-				return (value << VariantBit::BucketShift) & VariantBit::BucketMask;
-			};
-
-		const auto encodeDoubleSided = [](bool doubleSided)
-			{
-				return doubleSided ? VariantBit::DoubleSided : 0ull;
-			};
-
-		return encodeBucket(bucket) | encodeDoubleSided(doubleSided);
-	}
-
 	// Pack sort key as:
 	// [8 bits]  Bucket Order
 	// [8 bits]  Variant Bits

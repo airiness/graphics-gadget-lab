@@ -87,9 +87,22 @@ namespace gglab
 		{
 			return static_cast<RenderBucket>((variantBits & VariantBit::BucketMask) >> VariantBit::BucketShift);
 		}
+		static constexpr uint64_t EncodeVariantBits(
+			RenderBucket bucket,
+			bool doubleSided) noexcept
+		{
+			const uint64_t bucketBits =
+				(static_cast<uint64_t>(bucket) <<
+					VariantBit::BucketShift) &
+				VariantBit::BucketMask;
+			const uint64_t sidednessBits =
+				doubleSided ?
+					VariantBit::DoubleSided :
+					0ull;
+			return bucketBits | sidednessBits;
+		}
 	private:
 		static constexpr uint8_t BucketSortOrder(RenderBucket bucket) noexcept;
-		static constexpr uint64_t EncodeVariantBits(RenderBucket bucket, bool doubleSided) noexcept;
 		static constexpr uint64_t PackSortKey(uint8_t bucketOrder,
 			uint8_t variantBits,
 			uint32_t materialKey,

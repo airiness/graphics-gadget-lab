@@ -66,7 +66,8 @@ namespace gglab
 			auto iter = m_Records.find(key);
 			if (iter == m_Records.end())
 			{
-				if (m_FreeSlots.empty())
+				if (m_FreeSlots.empty() &&
+					!ReclaimUnseenSlot())
 				{
 					GGLAB_LOG_GRAPHICS_ERROR("PersistentStructuredBufferTable capacity exhausted.");
 					return InvalidSlot;
@@ -123,6 +124,30 @@ namespace gglab
 		}
 
 	private:
+		[[nodiscard]] bool ReclaimUnseenSlot() noexcept
+		{
+			const auto stale = std::ranges::find_if(
+				m_Records,
+				[this](const auto& item)
+				{
+					return item.second.m_LastSeenUpdate !=
+						m_UpdateSerial;
+				});
+			if (stale == m_Records.end())
+			{
+				return false;
+			}
+
+			// A full table must still support replacing last update's keys with
+			// an equally-sized current set. Reclaim only a record not yet seen
+			// in this update; currently live records are never displaced.
+			const uint32_t slot = stale->second.m_Slot;
+			m_KeysBySlot[slot].reset();
+			m_FreeSlots.push_back(slot);
+			m_Records.erase(stale);
+			return true;
+		}
+
 		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRangesInternal(
 			uint32_t bufferIndex,
 			bool includeFreeSlots) const

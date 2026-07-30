@@ -27,6 +27,8 @@ namespace gglab
 			bool m_MeshShaderSupported = false;
 			bool m_TearingSupported = false;
 			bool m_EnhancedBarriers = false;
+			RHIShaderWaveCapabilities
+				m_ShaderWaveCapabilities{};
 		};
 
 		struct CreateInfo
@@ -57,6 +59,12 @@ namespace gglab
 		std::string_view GetAdapterCompatibilityIdentity() const noexcept override
 		{
 			return m_AdapterCompatibilityIdentity;
+		}
+		RHIShaderWaveCapabilities
+			GetShaderWaveCapabilities() const noexcept override
+		{
+			return m_FeatureSupport.
+				m_ShaderWaveCapabilities;
 		}
 		RHITextureSupportResult QueryTextureSupport(
 			const RHITextureDesc& desc) const noexcept override;

@@ -13,6 +13,20 @@
 
 namespace gglab
 {
+	struct RHIShaderWaveCapabilities
+	{
+		bool m_Supported = false;
+		uint32_t m_MinLaneCount = 0;
+		uint32_t m_MaxLaneCount = 0;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Supported &&
+				m_MinLaneCount > 0 &&
+				m_MaxLaneCount >= m_MinLaneCount;
+		}
+	};
+
 	class RHIDevice
 	{
 	public:
@@ -22,6 +36,8 @@ namespace gglab
 		// Stable across process launches and changes when the adapter or driver
 		// compatibility domain changes. It intentionally excludes transient LUIDs.
 		virtual std::string_view GetAdapterCompatibilityIdentity() const noexcept = 0;
+		virtual RHIShaderWaveCapabilities
+			GetShaderWaveCapabilities() const noexcept = 0;
 		virtual RHITextureSupportResult QueryTextureSupport(
 			const RHITextureDesc& desc) const noexcept = 0;
 		virtual RHITextureSupportResult QueryTextureViewSupport(
