@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderQueue.h"
 
@@ -25,7 +26,9 @@ namespace gglab
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
-		void Prepare(const RenderServices& services) noexcept;
+		void Prepare(
+			const RenderServices& services,
+			const ForwardPBRShaderSet& shaderSet) noexcept;
 
 		[[nodiscard]] static std::optional<DepthCoveragePipelineSignature>
 			BuildDepthCoveragePipelineSignatureForVariant(

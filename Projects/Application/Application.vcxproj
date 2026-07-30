@@ -311,7 +311,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawShapes.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.cpp" />
@@ -324,6 +324,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\PostProcess\ViewRenderSettings.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderFrameBuilder.cpp" />
@@ -616,7 +617,10 @@
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPBRShaderSet.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardOpaque.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardTransparent.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.h" />
@@ -632,6 +636,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessColor.h" />
@@ -781,6 +786,7 @@
     <None Include="..\..\Shaders\Common\Cubemap.hlsli" />
     <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli" />
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
+    <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli" />
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
@@ -798,6 +804,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardCoverage.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />

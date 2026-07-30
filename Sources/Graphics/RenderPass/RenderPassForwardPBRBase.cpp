@@ -1,7 +1,6 @@
 #include "Core/Precompiled.h"
-#include "Graphics/RenderPass/RenderPassForwardPBR.h"
+#include "Graphics/RenderPass/RenderPassForwardPBRBase.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -45,11 +44,9 @@ namespace gglab
 
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 			const RenderQueue* m_ExpectedRenderQueue = nullptr;
-			std::array<
-				bool,
-				RenderQueueBuilder::VariantCount>
-				m_DepthEqualAllowed{};
 			bool m_UseDepthEqual = false;
+			bool m_ClearDepth = false;
+			float m_ClearDepthValue = 0.0f;
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
@@ -57,21 +54,14 @@ namespace gglab
 		};
 	}
 
-	void RenderPassForwardPBR::AddPass(RenderGraph& rg,
+	void RenderPassForwardPBRBase::AddForwardPass(
+		RenderGraph& rg,
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		Prepare(services);
-		AddBucketPass(rg, context, services, false);
-		AddBucketPass(rg, context, services, true);
-	}
-
-	void RenderPassForwardPBR::AddBucketPass(
-		RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services,
-		bool transparent) noexcept
-	{
+		GGLAB_ASSERT_MSG(
+			m_IsInitialized,
+			"Forward pass must be prepared before graph construction.");
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
@@ -79,11 +69,11 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
-		const std::string passName = MakeRenderGraphPassName(
-			transparent ? "Transparent" : "Opaque");
+		const bool transparent =
+			m_PassKind == ForwardPBRPassKind::Transparent;
 
-		rg.AddPass<PassData>(passName.c_str(),
-			[this, contextPtr, servicesPtr, displayViewId, transparent](
+		rg.AddPass<PassData>(GetRenderGraphPassName(),
+			[contextPtr, servicesPtr, displayViewId, transparent](
 				RenderGraph::RGBuilder& builder,
 				PassData& data)
 			{
@@ -97,9 +87,9 @@ namespace gglab
 				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 				auto& sceneDepth = blackboard.Get<RGSceneDepthResources>(
 					SceneDepthResourcesName);
-				const auto& coverageContract =
-					blackboard.Get<RGDepthCoverageContract>(
-						DepthCoverageContractName);
+				const auto& framePlan =
+					blackboard.Get<DepthCoverageFramePlan>(
+						DepthCoverageFramePlanName);
 				const auto& renderQueue =
 					contextPtr->GetRenderQueue(displayViewId);
 
@@ -124,7 +114,7 @@ namespace gglab
 					std::addressof(
 						renderQueue.m_CoverageRasterDomain);
 				data.m_ExpectedRenderQueue =
-					coverageContract.m_SourceRenderQueue;
+					framePlan.m_SourceRenderQueue;
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
 
 				if (!renderQueue.m_DrawItems.empty())
@@ -145,76 +135,27 @@ namespace gglab
 								sceneDepth.m_Texture)),
 						"Forward color and depth extents must match the coverage raster domain.");
 					GGLAB_ASSERT_MSG(
-						coverageContract.m_RasterDomain ==
+						framePlan.m_RasterDomain ==
 							data.m_RasterDomain,
-						"Prepass and Forward must share one raster-domain instance.");
+						"Forward must consume the frame-plan raster domain.");
 					GGLAB_ASSERT_MSG(
 						data.m_ExpectedRenderQueue ==
 							std::addressof(renderQueue),
-						"Prepass and Forward must consume one RenderQueue and its shared draw packets.");
+						"Forward must consume the frame-plan RenderQueue and its shared draw packets.");
 				}
 
 				if (!transparent)
 				{
-					bool allCoverageMatches = true;
-					const auto& ranges =
-						renderQueue.m_BucketDrawRanges;
-					for (const RenderBucket bucket :
-						{ RenderBucket::Opaque,
-							RenderBucket::AlphaTest })
-					{
-						const DrawItemsRange range =
-							ranges[utils::ToIndex(bucket)];
-						for (uint32_t offset = 0;
-							offset < range.m_Count;
-							++offset)
-						{
-							const DrawItem& drawItem =
-								renderQueue.m_DrawItems[
-									range.m_Start + offset];
-							const size_t variantIndex =
-								static_cast<size_t>(
-									drawItem.m_VariantBits &
-										RenderQueueBuilder::VariantMask);
-							if (data.m_DepthEqualAllowed[
-								variantIndex])
-							{
-								continue;
-							}
-
-							const auto& prepassSignature =
-								coverageContract.
-									m_PrepassPipelineSignatures[
-										variantIndex];
-							const auto forwardSignature =
-								DescribePipelineVariant(
-									drawItem.m_VariantBits).
-									m_LogicalMetadata.
-									m_DepthCoveragePipelineSignature;
-							const bool sharedDomainAndPackets =
-								coverageContract.m_RasterDomain ==
-									data.m_RasterDomain &&
-								data.m_ExpectedRenderQueue ==
-									std::addressof(renderQueue);
-							data.m_DepthEqualAllowed[
-								variantIndex] =
-								sharedDomainAndPackets &&
-								ValidateDepthEqualVariant(
-									drawItem.m_VariantBits,
-									prepassSignature,
-									forwardSignature);
-							allCoverageMatches =
-								allCoverageMatches &&
-								data.m_DepthEqualAllowed[
-									variantIndex];
-							GGLAB_ASSERT_MSG(
-								data.m_DepthEqualAllowed[
-									variantIndex],
-								"DepthEqual requires matching prepass and Forward pipeline, raster-domain, and draw-packet contracts.");
-						}
-					}
 					data.m_UseDepthEqual =
-						allCoverageMatches;
+						framePlan.UsesDepthPrepassEqual();
+					data.m_ClearDepth =
+						framePlan.UsesForwardDepthWrite();
+					data.m_ClearDepthValue =
+						screen_space::GetDepthBackgroundValue(
+							sceneDepth.m_Convention);
+					GGLAB_ASSERT_MSG(
+						framePlan.RendersGeometry(),
+						"Opaque Forward pass must not be added for a rejected geometry frame.");
 				}
 
 				if (transparent || data.m_UseDepthEqual)
@@ -255,7 +196,7 @@ namespace gglab
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
-			[this, contextPtr, servicesPtr, displayViewId, transparent](
+			[this, contextPtr, servicesPtr, displayViewId](
 				RGExecuteContext& executeContext,
 				PassData& data)
 			{
@@ -265,6 +206,12 @@ namespace gglab
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 				graphicsContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				if (data.m_ClearDepth)
+				{
+					graphicsContext->ClearDepthStencil(
+						dsv,
+						data.m_ClearDepthValue);
+				}
 
 				const auto shadowSrv = executeContext.GetViewDescriptor(data.m_ShadowSrv);
 				GGLAB_ASSERT_MSG(shadowSrv.IsValid(),
@@ -276,6 +223,58 @@ namespace gglab
 				{
 					return;
 				}
+				const auto& ranges =
+					renderQueue.m_BucketDrawRanges;
+				const DrawItemsRange* firstDrawRange = nullptr;
+				if (m_PassKind ==
+					ForwardPBRPassKind::Transparent)
+				{
+					const auto& range =
+						ranges[utils::ToIndex(
+							RenderBucket::Transparent)];
+					if (range.m_Count > 0)
+					{
+						firstDrawRange =
+							std::addressof(range);
+					}
+				}
+				else
+				{
+					for (const RenderBucket bucket :
+						{ RenderBucket::Opaque,
+							RenderBucket::AlphaTest })
+					{
+						const auto& range =
+							ranges[utils::ToIndex(bucket)];
+						if (range.m_Count > 0)
+						{
+							firstDrawRange =
+								std::addressof(range);
+							break;
+						}
+					}
+				}
+				if (!firstDrawRange)
+				{
+					return;
+				}
+				GGLAB_ASSERT_MSG(
+					firstDrawRange->m_Start <
+						renderQueue.m_DrawItems.size(),
+					"Forward first draw must be inside the frame-plan RenderQueue.");
+				if (firstDrawRange->m_Start >=
+					renderQueue.m_DrawItems.size())
+				{
+					return;
+				}
+				graphicsContext->SetPipeline(
+					GetOrCreatePSOForVariant(
+						*renderer,
+						renderQueue.m_DrawItems[
+							firstDrawRange->m_Start].
+								m_VariantBits,
+						data.m_UseDepthEqual));
+
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 				GGLAB_ASSERT_MSG(
 					data.m_RasterDomain ==
@@ -336,39 +335,37 @@ namespace gglab
 					*contextPtr,
 					*servicesPtr,
 					displayViewId,
-					transparent,
 					data.m_ExpectedRenderQueue,
 					data.m_UseDepthEqual);
 			});
 	}
 
-	void RenderPassForwardPBR::Prepare(const RenderServices& services) noexcept
+	void RenderPassForwardPBRBase::Prepare(
+		const RenderServices& services,
+		const ForwardPBRShaderSet& shaderSet) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(shaderManager);
-
 		if (!m_IsInitialized)
 		{
-			// Shader
-			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
-			shaderDesc.m_Stage = ShaderStage::Vertex;
-			shaderDesc.m_Entry = L"VSMain";
-			const auto vsId = shaderManager->LoadShader(shaderDesc);
-			shaderDesc.m_Stage = ShaderStage::Pixel;
-			shaderDesc.m_Entry = L"PSMain";
-			const auto psId = shaderManager->LoadShader(shaderDesc);
+			GGLAB_ASSERT_MSG(
+				shaderSet.IsValid(),
+				"Forward pass requires the shared Forward shader set.");
+			if (!shaderSet.IsValid())
+			{
+				return;
+			}
 
 			// Pipeline recipe
 			m_BasePhysicalKey.m_BindingLayout =
 				renderer->GetCommonBindingLayout();
 			m_BasePhysicalKey.m_InputLayoutId =
 				InputLayoutID::P3N3T2T2Tan4;
-			m_BasePhysicalKey.m_VSId = vsId;
-			m_BasePhysicalKey.m_PSId = psId;
+			m_BasePhysicalKey.m_VSId =
+				shaderSet.m_CoverageVertexShader;
+			m_BasePhysicalKey.m_PSId =
+				shaderSet.m_ShadingPixelShader;
 
 			m_BasePhysicalKey.m_TopologyType =
 				RHIPrimitiveTopologyType::Triangle;
@@ -392,11 +389,10 @@ namespace gglab
 
 	}
 
-	void RenderPassForwardPBR::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassForwardPBRBase::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services,
 		RenderViewID viewId,
-		bool transparent,
 		const RenderQueue* expectedRenderQueue,
 		bool useDepthEqual) noexcept
 	{
@@ -411,7 +407,7 @@ namespace gglab
 			"Forward depth coverage requires one valid raster domain per view.");
 		const auto ranges = renderQueue.m_BucketDrawRanges;
 
-		if (transparent)
+		if (m_PassKind == ForwardPBRPassKind::Transparent)
 		{
 			DrawRange(
 				graphicsContext,
@@ -442,7 +438,7 @@ namespace gglab
 		}
 	}
 
-	void RenderPassForwardPBR::DrawRange(RHIGraphicsCommandContext* graphicsContext,
+	void RenderPassForwardPBRBase::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
 		const DrawItemsRange& range,
@@ -479,7 +475,7 @@ namespace gglab
 						expectedRenderQueue->m_DrawItems[
 							range.m_Start + index].
 							m_CoverageDrawPacket),
-				"Forward must consume the exact draw-packet instances used by the depth prepass.");
+				"Forward must consume the exact draw-packet instances accepted by the frame plan.");
 
 			// Set PSO
 			if (drawItem.m_VariantBits != lastVariantBits)
@@ -521,7 +517,7 @@ namespace gglab
 		}
 	}
 
-	RHIPipelineHandle RenderPassForwardPBR::GetOrCreatePSOForVariant(
+	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
 		const Renderer& renderer,
 		uint64_t variantBits,
 		bool useDepthEqual) noexcept
@@ -551,7 +547,7 @@ namespace gglab
 	}
 
 	std::optional<DepthCoveragePipelineSignature>
-		RenderPassForwardPBR::BuildDepthCoveragePipelineSignatureForVariant(
+		RenderPassForwardPBRBase::BuildDepthCoveragePipelineSignatureForVariant(
 			const GraphicsPhysicalPipelineKey& physicalKey,
 			uint64_t variantBits) noexcept
 	{
@@ -584,7 +580,7 @@ namespace gglab
 	}
 
 	GraphicsLogicalPipelineMetadata
-		RenderPassForwardPBR::BuildLogicalPipelineMetadataForVariant(
+		RenderPassForwardPBRBase::BuildLogicalPipelineMetadataForVariant(
 			const GraphicsPhysicalPipelineKey& physicalKey,
 			uint64_t variantBits) noexcept
 	{
@@ -597,7 +593,7 @@ namespace gglab
 	}
 
 	GraphicsPipelineDescription
-		RenderPassForwardPBR::DescribePipelineVariant(
+		RenderPassForwardPBRBase::DescribePipelineVariant(
 			uint64_t variantBits) const noexcept
 	{
 		GGLAB_ASSERT(m_IsInitialized);
@@ -621,7 +617,7 @@ namespace gglab
 	}
 
 	std::tuple<RasterizerPreset, DepthPreset, BlendPreset>
-		RenderPassForwardPBR::GetPresetsFromVariantBits(
+		RenderPassForwardPBRBase::GetPresetsFromVariantBits(
 			uint64_t variantBits,
 			bool useDepthEqual) const noexcept
 	{
@@ -643,33 +639,6 @@ namespace gglab
 		}
 
 		return { rasterizerPreset, depthPreset, blendPreset };
-	}
-
-	bool RenderPassForwardPBR::ValidateDepthEqualVariant(
-		uint64_t variantBits,
-		const std::optional<DepthCoveragePipelineSignature>&
-			prepassSignature,
-		const std::optional<DepthCoveragePipelineSignature>&
-			forwardSignature) noexcept
-	{
-		const size_t variantIndex =
-			static_cast<size_t>(
-				variantBits & RenderQueueBuilder::VariantMask);
-		auto& validation =
-			m_DepthEqualVariantValidations[variantIndex];
-		if (validation.m_PrepassSignature != prepassSignature ||
-			validation.m_ForwardSignature != forwardSignature)
-		{
-			validation.m_PrepassSignature = prepassSignature;
-			validation.m_ForwardSignature = forwardSignature;
-			validation.m_Matches =
-				prepassSignature &&
-				forwardSignature &&
-				CompareDepthCoveragePipelineSignatures(
-					*prepassSignature,
-					*forwardSignature).m_Matches;
-		}
-		return validation.m_Matches;
 	}
 
 }

@@ -1,29 +1,26 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
+#include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RenderQueue.h"
 
 namespace gglab
 {
+	enum class ForwardPBRPassKind : uint8_t
+	{
+		Opaque,
+		Transparent,
+	};
+
 	class RHIGraphicsCommandContext;
-	class RenderPassForwardPBR : public RenderPassBase
+	class RenderPassForwardPBRBase : public RenderPassBase
 	{
 	public:
-		RenderPassForwardPBR() noexcept : RenderPassBase({
-			.m_TypeName = "Geometry.ForwardPBR",
-			.m_DisplayName = "Forward PBR",
-			.m_CategoryName = "Geometry",
-			.m_Description = "Renders opaque, alpha-tested and transparent scene geometry with forward PBR shading.",
-			.m_Category = RenderPassCategory::Geometry,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
-		~RenderPassForwardPBR() override = default;
+		~RenderPassForwardPBRBase() override = default;
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
-			const RenderServices& services) noexcept override;
-
-		void Prepare(const RenderServices& services) noexcept;
+		void Prepare(
+			const RenderServices& services,
+			const ForwardPBRShaderSet& shaderSet) noexcept;
 
 		[[nodiscard]] static std::optional<DepthCoveragePipelineSignature>
 			BuildDepthCoveragePipelineSignatureForVariant(
@@ -36,27 +33,24 @@ namespace gglab
 		[[nodiscard]] GraphicsPipelineDescription
 			DescribePipelineVariant(uint64_t variantBits) const noexcept;
 
-	private:
-		struct DepthEqualVariantValidation
-		{
-			std::optional<DepthCoveragePipelineSignature>
-				m_PrepassSignature;
-			std::optional<DepthCoveragePipelineSignature>
-				m_ForwardSignature;
-			bool m_Matches = false;
-		};
+	protected:
+		RenderPassForwardPBRBase(
+			RenderPassInfo info,
+			ForwardPBRPassKind passKind) noexcept :
+			RenderPassBase(std::move(info)),
+			m_PassKind(passKind)
+		{}
 
-		void AddBucketPass(
+		void AddForwardPass(
 			RenderGraph& rg,
 			const RenderFrameContext& context,
-			const RenderServices& services,
-			bool transparent) noexcept;
+			const RenderServices& services) noexcept;
 
+	private:
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context,
 			const RenderServices& services,
 			RenderViewID viewId,
-			bool transparent,
 			const RenderQueue* expectedRenderQueue,
 			bool useDepthEqual) noexcept;
 
@@ -76,22 +70,12 @@ namespace gglab
 			GetPresetsFromVariantBits(
 				uint64_t variantBits,
 				bool useDepthEqual) const noexcept;
-		[[nodiscard]] bool ValidateDepthEqualVariant(
-			uint64_t variantBits,
-			const std::optional<
-				DepthCoveragePipelineSignature>&
-				prepassSignature,
-			const std::optional<
-				DepthCoveragePipelineSignature>&
-				forwardSignature) noexcept;
 
 	private:
+		ForwardPBRPassKind m_PassKind =
+			ForwardPBRPassKind::Opaque;
 		GraphicsPhysicalPipelineKey m_BasePhysicalKey{};
 		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
-		std::array<
-			DepthEqualVariantValidation,
-			RenderQueueBuilder::VariantCount>
-			m_DepthEqualVariantValidations{};
 		bool m_IsInitialized = false;
 	};
 }

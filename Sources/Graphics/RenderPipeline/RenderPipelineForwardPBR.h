@@ -5,12 +5,14 @@
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
-#include "Graphics/RenderPass/RenderPassForwardPBR.h"
+#include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/RenderPassForwardTransparent.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
+#include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 
 namespace gglab
 {
@@ -27,17 +29,27 @@ namespace gglab
 			const RenderServices& services) noexcept override;
 
 	private:
+		void PrepareForwardPasses(
+			const RenderServices& services) noexcept;
+		[[nodiscard]] DepthCoverageFramePlan
+			BuildDepthCoverageFramePlanForFrame(
+				const RenderFrameContext& context,
+				uint32_t targetWidth,
+				uint32_t targetHeight) const;
+
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassClearViewTargets m_ClearViewTargetsPass;
 		RenderPassDepthPrepass m_DepthPrepassPass;
 		RenderPassSkybox m_SkyboxPass;
-		RenderPassForwardPBR m_ForwardPBRPass;
+		RenderPassForwardOpaque m_ForwardOpaquePass;
+		RenderPassForwardTransparent m_ForwardTransparentPass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		PostProcessPipeline m_PostProcessPipeline;
 		RenderPassIBL m_IBLPass;
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
 		RenderPassDevelopGui m_DevelopGuiPass;
+		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
 	};
 }

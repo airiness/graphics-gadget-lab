@@ -547,19 +547,43 @@ namespace gglab
 		// Shader preload
 		{
 			std::vector<ShaderDesc> shaderDescs;
-			const auto addGraphicsShader = [&shaderDescs](const wchar_t* sourcePath)
+			const auto addShader =
+				[&shaderDescs](
+					const wchar_t* sourcePath,
+					ShaderStage stage,
+					const wchar_t* entry)
 				{
-					ShaderDesc desc{};
-					desc.m_SourcePath = sourcePath;
-					desc.m_Stage = ShaderStage::Vertex;
-					desc.m_Entry = L"VSMain";
-					shaderDescs.push_back(desc);
-					desc.m_Stage = ShaderStage::Pixel;
-					desc.m_Entry = L"PSMain";
-					shaderDescs.push_back(std::move(desc));
+					shaderDescs.push_back({
+						.m_SourcePath = sourcePath,
+						.m_Stage = stage,
+						.m_Entry = entry,
+					});
+				};
+			const auto addGraphicsShader =
+				[&addShader](const wchar_t* sourcePath)
+				{
+					addShader(
+						sourcePath,
+						ShaderStage::Vertex,
+						L"VSMain");
+					addShader(
+						sourcePath,
+						ShaderStage::Pixel,
+						L"PSMain");
 				};
 
-			addGraphicsShader(L"Passes/PassForwardPBR.hlsl");
+			addShader(
+				L"Passes/PassForwardCoverage.hlsl",
+				ShaderStage::Vertex,
+				L"VSMain");
+			addShader(
+				L"Passes/PassForwardPBR.hlsl",
+				ShaderStage::Pixel,
+				L"PSMain");
+			addShader(
+				L"Passes/PassDepthPrepass.hlsl",
+				ShaderStage::Pixel,
+				L"PSAlphaTest");
 			addGraphicsShader(L"Passes/PassDirectionalShadowMap.hlsl");
 			addGraphicsShader(L"Passes/PassShadowMapPreview.hlsl");
 			addGraphicsShader(L"Passes/PassFinalColor.hlsl");

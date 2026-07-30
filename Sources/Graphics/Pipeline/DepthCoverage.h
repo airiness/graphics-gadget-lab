@@ -60,6 +60,7 @@ namespace gglab
 
 	struct DepthCoveragePipelineSignature
 	{
+		ShaderID m_CoverageVertexShader{};
 		DepthCoverageVertexProgram m_VertexProgram =
 			DepthCoverageVertexProgram::RigidMesh;
 		DepthCoverageDeformationVariant m_Deformation =
@@ -89,7 +90,8 @@ namespace gglab
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept
 		{
-			return m_InputLayout != InputLayoutID::None &&
+			return m_CoverageVertexShader.IsValid() &&
+				m_InputLayout != InputLayoutID::None &&
 				m_PositionFormat != RHIFormat::Unknown &&
 				m_TopologyType != RHIPrimitiveTopologyType::Unknown &&
 				m_PrimitiveTopology != RHIPrimitiveTopology::Unknown &&

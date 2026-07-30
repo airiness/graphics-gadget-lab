@@ -13,7 +13,7 @@ namespace gglab
 			.m_TypeName = "Background.Skybox",
 			.m_DisplayName = "Skybox",
 			.m_CategoryName = "Lighting",
-			.m_Description = "Renders the active HDR environment into the display view before scene geometry.",
+			.m_Description = "Renders the active HDR environment only where main-view depth is still background.",
 			.m_Category = RenderPassCategory::Lighting,
 			.m_Type = RenderPassType::Graphics,
 		}) {}
