@@ -616,7 +616,7 @@ namespace gglab
 			RenderPassDevelopGui m_DevelopGuiPass;
 			ComputePipelineRecipe m_ComputeWriteRecipe{};
 			ComputePipelineRecipe m_ComputeReadWriteRecipe{};
-			GraphicsPipelineRecipe m_PreviewRecipe{};
+			GraphicsPhysicalPipelineKey m_PreviewRecipe{};
 			ComputePipelineSlot m_ComputeWriteSlot{};
 			ComputePipelineSlot m_ComputeReadWriteSlot{};
 			GraphicsPipelineSlot m_PreviewSlot{};

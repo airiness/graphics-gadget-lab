@@ -10,7 +10,6 @@
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
-#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 
 namespace gglab
@@ -81,9 +80,7 @@ namespace gglab
 					SceneDepthResourcesName);
 
 				builder.ReadWriteInPlace(displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
-				builder.ReadWriteInPlace(
-					sceneDepth.m_Texture,
-					RGTextureAccess::DepthStencilWrite);
+				builder.ReadWriteInPlace(sceneDepth.m_Texture, RGTextureAccess::DepthStencilWrite);
 				data.m_SceneColor = displayTargets.m_SceneColor;
 				data.m_Depth = sceneDepth.m_Texture;
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureAccess::Sample);
@@ -92,9 +89,7 @@ namespace gglab
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
 
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
-				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
-					data.m_Depth,
-					sceneDepth.m_DsvDesc);
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, sceneDepth.m_DsvDesc);
 
 				const auto shadowSrvDesc = MakeRHITexture2DViewDesc(
 					RHIFormat::R32Float,
@@ -138,9 +133,6 @@ namespace gglab
 				{
 					return;
 				}
-				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					*renderer,
-					renderQueue.m_DrawItems.front().m_VariantBits));
 				graphicsContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
 				graphicsContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
@@ -213,21 +205,29 @@ namespace gglab
 			const auto psId = shaderManager->LoadShader(shaderDesc);
 
 			// Pipeline recipe
-			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
-			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
-			m_BaseRecipe.m_VSId = vsId;
-			m_BaseRecipe.m_PSId = psId;
+			m_BasePhysicalKey.m_BindingLayout =
+				renderer->GetCommonBindingLayout();
+			m_BasePhysicalKey.m_InputLayoutId =
+				InputLayoutID::P3N3T2T2Tan4;
+			m_BasePhysicalKey.m_VSId = vsId;
+			m_BasePhysicalKey.m_PSId = psId;
 
-			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
-			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
-			m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
-			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
-			m_BaseRecipe.m_Formats.m_SampleCount = 1;
-			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
-			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
-			m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
-			m_BaseRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
+			m_BasePhysicalKey.m_TopologyType =
+				RHIPrimitiveTopologyType::Triangle;
+			m_BasePhysicalKey.m_PrimitiveTopology =
+				RHIPrimitiveTopology::TriangleList;
+			m_BasePhysicalKey.m_Formats.m_RenderTargetFormats[0] =
+				RHIFormat::R16G16B16A16Float;
+			m_BasePhysicalKey.m_Formats.m_RenderTargetCount = 1;
+			m_BasePhysicalKey.m_Formats.m_DepthStencilFormat =
+				RHIFormat::D32Float;
+			m_BasePhysicalKey.m_Formats.m_SampleCount = 1;
+			m_BasePhysicalKey.m_Formats.m_SampleQuality = 0;
+			m_BasePhysicalKey.m_RasterizerPreset =
+				RasterizerPreset::Default;
+			m_BasePhysicalKey.m_BlendPreset = BlendPreset::Default;
+			m_BasePhysicalKey.m_DepthPreset =
+				DepthPreset::ReversedZWrite;
 
 			m_IsInitialized = true;
 		}
@@ -245,19 +245,21 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_MSG(
+			renderQueue.m_CoverageRasterDomain.IsValid(),
+			"Forward depth coverage requires one valid raster domain per view.");
 		const auto ranges = renderQueue.m_BucketDrawRanges;
 
 		DrawItemsRange opaqueRange = ranges[utils::ToIndex(RenderBucket::Opaque)];
 		DrawItemsRange alphaTestRange = ranges[utils::ToIndex(RenderBucket::AlphaTest)];
 		DrawItemsRange transparentRange = ranges[utils::ToIndex(RenderBucket::Transparent)];
 
-		DrawRange(graphicsContext, context, services, renderQueue, opaqueRange);
-		DrawRange(graphicsContext, context, services, renderQueue, alphaTestRange);
-		DrawRange(graphicsContext, context, services, renderQueue, transparentRange);
+		DrawRange(graphicsContext, services, renderQueue, opaqueRange);
+		DrawRange(graphicsContext, services, renderQueue, alphaTestRange);
+		DrawRange(graphicsContext, services, renderQueue, transparentRange);
 	}
 
 	void RenderPassForwardPBR::DrawRange(RHIGraphicsCommandContext* graphicsContext,
-		const RenderFrameContext& context,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
 		const DrawItemsRange& range) noexcept
@@ -269,7 +271,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 		auto* renderer = services.m_Renderer;
-		auto* assetManager = services.m_AssetManager;
+		GGLAB_ASSERT_NOT_NULL(renderer);
 
 		const auto& drawItems = renderQueue.m_DrawItems;
 
@@ -280,18 +282,11 @@ namespace gglab
 		for (uint32_t index = 0; index < range.m_Count; ++index)
 		{
 			const auto& drawItem = drawItems[range.m_Start + index];
-			if (drawItem.m_Bucket != RenderBucket::Transparent)
-			{
-				const DepthCoverageBinding coverageBinding =
-					BuildDepthCoverageBindingForDraw(
-						*renderer,
-						context,
-						drawItem,
-						renderQueue.m_ViewId);
-				GGLAB_ASSERT_MSG(
-					coverageBinding.IsValid(),
-					"Forward depth coverage requires complete frame, view, object, and material sources.");
-			}
+			const DepthCoverageDrawPacket& drawPacket =
+				drawItem.m_CoverageDrawPacket;
+			GGLAB_ASSERT_MSG(
+				drawPacket.IsValid(),
+				"Forward received an incomplete shared depth coverage draw packet.");
 
 			// Set PSO
 			if (drawItem.m_VariantBits != lastVariantBits)
@@ -302,33 +297,31 @@ namespace gglab
 				lastVariantBits = drawItem.m_VariantBits;
 			}
 
-			// Set Mesh
-			const Mesh* mesh = assetManager->GetMesh(drawItem.m_MeshId);
-			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
-			{
-				GGLAB_LOG_GRAPHICS_WARN("RenderPassForwardPBR: Mesh is invalid, skip draw item.");
-				continue;
-			}
-
-			if (!hasBoundMesh || drawItem.m_MeshId != lastMeshId)
+			const auto& geometry = drawPacket.m_Geometry;
+			if (!hasBoundMesh || geometry.m_MeshId != lastMeshId)
 			{
 				graphicsContext->SetVertexBuffers(
 					0,
-					std::span<const RHIVertexBufferBinding>(&mesh->m_VertexBufferBinding, 1));
-				graphicsContext->SetIndexBuffer(mesh->m_IndexBufferBinding);
-				lastMeshId = drawItem.m_MeshId;
+					std::span<const RHIVertexBufferBinding>(
+						&geometry.m_VertexBuffer,
+						1));
+				graphicsContext->SetIndexBuffer(
+					geometry.m_IndexBuffer);
+				lastMeshId = geometry.m_MeshId;
 				hasBoundMesh = true;
 			}
 
-			// Per draw item bindings
-			const DrawParameters drawParameters{
-				.ObjectOffset = drawItem.m_ObjectOffset,
-			};
 			graphicsContext->SetPushConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
-				drawParameters);
+				drawPacket.m_DrawParameters);
 
-			graphicsContext->DrawIndexed(mesh->m_IndexCount);
+			const auto& draw = drawPacket.m_IndexedDraw;
+			graphicsContext->DrawIndexed(
+				draw.m_IndexCount,
+				draw.m_InstanceCount,
+				draw.m_StartIndexLocation,
+				draw.m_BaseVertexLocation,
+				draw.m_StartInstanceLocation);
 		}
 	}
 
@@ -339,24 +332,32 @@ namespace gglab
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
-		GraphicsPipelineRecipe recipe = m_BaseRecipe;
+		GraphicsPhysicalPipelineKey physicalKey = m_BasePhysicalKey;
 
 		auto [rasterizerPreset, depthPreset, blendPreset] = GetPresetsFromVariantBits(variantBits);
-		recipe.m_RasterizerPreset = rasterizerPreset;
-		recipe.m_DepthPreset = depthPreset;
-		recipe.m_BlendPreset = blendPreset;
-		recipe.m_DepthCoverageSignature =
-			BuildDepthCoverageSignatureForVariant(recipe, variantBits);
+		physicalKey.m_RasterizerPreset = rasterizerPreset;
+		physicalKey.m_DepthPreset = depthPreset;
+		physicalKey.m_BlendPreset = blendPreset;
+		const GraphicsLogicalPipelineMetadata logicalMetadata{
+			.m_DepthCoveragePipelineSignature =
+				BuildDepthCoveragePipelineSignatureForVariant(
+					physicalKey,
+					variantBits),
+		};
 
 		const size_t slotIndex =
 			static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];
-		return pipelineCache->Resolve(slot, recipe, GetInfo());
+		return pipelineCache->Resolve(
+			slot,
+			physicalKey,
+			logicalMetadata,
+			GetInfo());
 	}
 
-	std::optional<DepthCoverageSignature>
-		RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-			const GraphicsPipelineRecipe& recipe,
+	std::optional<DepthCoveragePipelineSignature>
+		RenderPassForwardPBR::BuildDepthCoveragePipelineSignatureForVariant(
+			const GraphicsPhysicalPipelineKey& physicalKey,
 			uint64_t variantBits) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
@@ -369,17 +370,17 @@ namespace gglab
 
 		const bool doubleSided =
 			RenderQueueBuilder::DecodeVariantDoubleSided(variantBits);
-		GraphicsPipelineRecipe coverageRecipe = recipe;
-		coverageRecipe.m_RasterizerPreset = doubleSided ?
+		GraphicsPhysicalPipelineKey coverageKey = physicalKey;
+		coverageKey.m_RasterizerPreset = doubleSided ?
 			RasterizerPreset::TwoSided :
 			RasterizerPreset::Default;
 		const DepthCoverageAlphaVariant alphaVariant =
 			bucket == RenderBucket::AlphaTest ?
-				DepthCoverageAlphaVariant::BaseColorMaskV1 :
+				DepthCoverageAlphaVariant::BaseColorMask :
 				DepthCoverageAlphaVariant::Opaque;
-		return gglab::BuildDepthCoverageSignature(
-			coverageRecipe,
-			DepthCoverageVertexProgram::RigidMeshV1,
+		return gglab::BuildDepthCoveragePipelineSignature(
+			coverageKey,
+			DepthCoverageVertexProgram::RigidMesh,
 			DepthCoverageDeformationVariant::Rigid,
 			DepthCoveragePositionPrecision::Float32,
 			RHIFormat::R32G32B32Float,
@@ -387,50 +388,16 @@ namespace gglab
 			alphaVariant);
 	}
 
-	DepthCoverageBinding RenderPassForwardPBR::BuildDepthCoverageBindingForDraw(
-		const Renderer& renderer,
-		const RenderFrameContext& context,
-		const DrawItem& drawItem,
-		RenderViewID viewId) noexcept
+	const GraphicsLogicalPipelineMetadata&
+		RenderPassForwardPBR::GetLogicalPipelineMetadataForVariant(
+			uint64_t variantBits) const noexcept
 	{
-		const auto* objectBuffer = renderer.GetObjectStructuredBuffer();
-		const auto* materialBuffer = renderer.GetMaterialStructuredBuffer();
-		const auto* viewBuffer = renderer.GetViewStructuredBuffer();
-		GGLAB_ASSERT_NOT_NULL(objectBuffer);
-		GGLAB_ASSERT_NOT_NULL(materialBuffer);
-		GGLAB_ASSERT_NOT_NULL(viewBuffer);
-
-		const uint32_t viewIndex =
-			context.m_RenderScene.m_ViewBaseIndex +
-			static_cast<uint32_t>(utils::ToIndex(viewId));
-		const DepthCoverageBufferSource viewSource{
-			.m_Buffer = viewBuffer->GetBufferHandle(),
-			.m_ElementIndex = viewIndex,
-		};
-		return {
-			.m_FrameSerial = context.m_FrameSerial,
-			.m_ViewBindingId =
-				static_cast<uint32_t>(utils::ToIndex(viewId)),
-			.m_CurrentModelSource = {
-				.m_Buffer = objectBuffer->GetBufferHandle(
-					context.m_BackBufferIndex),
-				.m_ElementIndex =
-					context.m_RenderScene.m_ObjectBaseIndex +
-					drawItem.m_ObjectOffset,
-			},
-			.m_CurrentViewSource = viewSource,
-			.m_CurrentJitteredProjectionSource = viewSource,
-			.m_ProjectionSource =
-				DepthCoverageProjectionSource::
-					ViewDataProjection,
-			.m_MaterialAlphaSource = {
-				.m_Buffer = materialBuffer->GetBufferHandle(
-					context.m_BackBufferIndex),
-				.m_ElementIndex =
-					context.m_RenderScene.m_MaterialBaseIndex +
-					drawItem.m_MaterialOffset,
-			},
-		};
+		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
+		const size_t slotIndex =
+			static_cast<size_t>(
+				variantBits &
+				RenderQueueBuilder::VariantMask);
+		return m_PipelineSlots[slotIndex].GetLogicalMetadata();
 	}
 
 	std::tuple<RasterizerPreset, DepthPreset, BlendPreset>

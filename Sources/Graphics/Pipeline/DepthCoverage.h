@@ -1,7 +1,9 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/RenderParameters.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIPipeline.h"
+#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
 #include <limits>
@@ -9,12 +11,12 @@
 
 namespace gglab
 {
-	struct GraphicsPipelineRecipe;
+	struct GraphicsPhysicalPipelineKey;
 
 	enum class DepthCoverageVertexProgram : uint8_t
 	{
-		RigidMeshV1,
-		SkinnedMeshV1,
+		RigidMesh,
+		SkinnedMesh,
 	};
 
 	enum class DepthCoverageDeformationVariant : uint8_t
@@ -32,7 +34,7 @@ namespace gglab
 	enum class DepthCoverageAlphaVariant : uint8_t
 	{
 		Opaque,
-		BaseColorMaskV1,
+		BaseColorMask,
 	};
 
 	enum class DepthCoverageProjectionSource : uint8_t
@@ -41,10 +43,24 @@ namespace gglab
 		DedicatedJitteredProjection,
 	};
 
-	struct DepthCoverageSignature
+	struct DepthCoverageBufferSource
+	{
+		RHIBufferHandle m_Buffer{};
+		uint32_t m_ElementIndex = std::numeric_limits<uint32_t>::max();
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Buffer.IsValid() &&
+				m_ElementIndex != std::numeric_limits<uint32_t>::max();
+		}
+
+		bool operator==(const DepthCoverageBufferSource&) const noexcept = default;
+	};
+
+	struct DepthCoveragePipelineSignature
 	{
 		DepthCoverageVertexProgram m_VertexProgram =
-			DepthCoverageVertexProgram::RigidMeshV1;
+			DepthCoverageVertexProgram::RigidMesh;
 		DepthCoverageDeformationVariant m_Deformation =
 			DepthCoverageDeformationVariant::Rigid;
 		InputLayoutID m_InputLayout = InputLayoutID::None;
@@ -74,80 +90,135 @@ namespace gglab
 		{
 			return m_InputLayout != InputLayoutID::None &&
 				m_PositionFormat != RHIFormat::Unknown &&
+				m_TopologyType != RHIPrimitiveTopologyType::Unknown &&
+				m_PrimitiveTopology != RHIPrimitiveTopology::Unknown &&
 				m_SampleCount > 0;
 		}
 
 		constexpr bool operator==(
-			const DepthCoverageSignature&) const noexcept = default;
+			const DepthCoveragePipelineSignature&) const noexcept = default;
 	};
 
-	struct DepthCoverageBufferSource
-	{
-		RHIBufferHandle m_Buffer{};
-		uint32_t m_ElementIndex = std::numeric_limits<uint32_t>::max();
-
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_Buffer.IsValid() &&
-				m_ElementIndex != std::numeric_limits<uint32_t>::max();
-		}
-
-		bool operator==(const DepthCoverageBufferSource&) const noexcept = default;
-	};
-
-	struct DepthCoverageBinding
+	struct DepthCoverageRasterDomain
 	{
 		uint64_t m_FrameSerial = 0;
 		uint32_t m_ViewBindingId = std::numeric_limits<uint32_t>::max();
-		DepthCoverageBufferSource m_CurrentModelSource{};
 		DepthCoverageBufferSource m_CurrentViewSource{};
 		DepthCoverageBufferSource m_CurrentJitteredProjectionSource{};
 		DepthCoverageProjectionSource m_ProjectionSource =
 			DepthCoverageProjectionSource::ViewDataProjection;
-		DepthCoverageBufferSource m_MaterialAlphaSource{};
+		RHIViewport m_Viewport{};
+		RHIScissorRect m_Scissor{};
+		DepthConvention m_DepthConvention = DepthConvention::Standard;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
 			return m_FrameSerial != 0 &&
 				m_ViewBindingId != std::numeric_limits<uint32_t>::max() &&
-				m_CurrentModelSource.IsValid() &&
 				m_CurrentViewSource.IsValid() &&
 				m_CurrentJitteredProjectionSource.IsValid() &&
+				m_Viewport.m_Width > 0.0f &&
+				m_Viewport.m_Height > 0.0f &&
+				m_Viewport.m_MinDepth >= 0.0f &&
+				m_Viewport.m_MinDepth <= m_Viewport.m_MaxDepth &&
+				m_Viewport.m_MaxDepth <= 1.0f &&
+				m_Scissor.m_Right > m_Scissor.m_Left &&
+				m_Scissor.m_Bottom > m_Scissor.m_Top;
+		}
+
+		bool operator==(const DepthCoverageRasterDomain&) const noexcept = default;
+	};
+
+	struct DepthCoverageGeometryBinding
+	{
+		MeshID m_MeshId{};
+		RHIVertexBufferBinding m_VertexBuffer{};
+		RHIIndexBufferBinding m_IndexBuffer{};
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_MeshId.IsValid() &&
+				m_VertexBuffer.m_Buffer.IsValid() &&
+				m_VertexBuffer.m_Stride > 0 &&
+				m_VertexBuffer.m_SizeInBytes > 0 &&
+				m_IndexBuffer.m_Buffer.IsValid() &&
+				m_IndexBuffer.m_SizeInBytes > 0 &&
+				m_IndexBuffer.m_Format != RHIFormat::Unknown;
+		}
+
+		bool operator==(const DepthCoverageGeometryBinding&) const noexcept = default;
+	};
+
+	struct DepthCoverageIndexedDrawArguments
+	{
+		uint32_t m_IndexCount = 0;
+		uint32_t m_InstanceCount = 1;
+		uint32_t m_StartIndexLocation = 0;
+		int32_t m_BaseVertexLocation = 0;
+		uint32_t m_StartInstanceLocation = 0;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_IndexCount > 0 && m_InstanceCount > 0;
+		}
+
+		bool operator==(
+			const DepthCoverageIndexedDrawArguments&) const noexcept = default;
+	};
+
+	struct DepthCoverageDrawPacket
+	{
+		DepthCoverageGeometryBinding m_Geometry{};
+		DepthCoverageIndexedDrawArguments m_IndexedDraw{};
+		DrawParameters m_DrawParameters{};
+		DepthCoverageBufferSource m_CurrentModelSource{};
+		DepthCoverageBufferSource m_MaterialAlphaSource{};
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Geometry.IsValid() &&
+				m_IndexedDraw.IsValid() &&
+				m_CurrentModelSource.IsValid() &&
 				m_MaterialAlphaSource.IsValid();
 		}
 
-		bool operator==(const DepthCoverageBinding&) const noexcept = default;
+		bool operator==(const DepthCoverageDrawPacket&) const noexcept = default;
 	};
 
-	struct DepthCoverageComparison
+	struct DepthCoverageValidationResult
 	{
-		bool m_SignatureMatches = false;
-		bool m_BindingMatches = false;
+		bool m_Matches = false;
 		std::string m_Mismatch;
-
-		[[nodiscard]] bool IsCompatible() const noexcept
-		{
-			return m_SignatureMatches && m_BindingMatches;
-		}
 	};
 
-	[[nodiscard]] DepthCoverageSignature BuildDepthCoverageSignature(
-		const GraphicsPipelineRecipe& recipe,
-		DepthCoverageVertexProgram vertexProgram,
-		DepthCoverageDeformationVariant deformation,
-		DepthCoveragePositionPrecision positionPrecision,
-		RHIFormat positionFormat,
-		bool doubleSided,
-		DepthCoverageAlphaVariant alphaVariant) noexcept;
+	[[nodiscard]] DepthCoveragePipelineSignature
+		BuildDepthCoveragePipelineSignature(
+			const GraphicsPhysicalPipelineKey& physicalKey,
+			DepthCoverageVertexProgram vertexProgram,
+			DepthCoverageDeformationVariant deformation,
+			DepthCoveragePositionPrecision positionPrecision,
+			RHIFormat positionFormat,
+			bool doubleSided,
+			DepthCoverageAlphaVariant alphaVariant) noexcept;
 
-	[[nodiscard]] DepthCoverageComparison CompareDepthCoverageContracts(
-		const DepthCoverageSignature& lhsSignature,
-		const DepthCoverageBinding& lhsBinding,
-		const DepthCoverageSignature& rhsSignature,
-		const DepthCoverageBinding& rhsBinding);
+	[[nodiscard]] DepthCoverageValidationResult
+		CompareDepthCoveragePipelineSignatures(
+			const DepthCoveragePipelineSignature& lhs,
+			const DepthCoveragePipelineSignature& rhs);
 
-	[[nodiscard]] std::string DescribeDepthCoverageSignature(
-		const DepthCoverageSignature& signature);
-	[[nodiscard]] std::string DescribeDepthCoverageBinding(
-		const DepthCoverageBinding& binding);
+	[[nodiscard]] DepthCoverageValidationResult
+		CompareDepthCoverageRasterDomains(
+			const DepthCoverageRasterDomain& lhs,
+			const DepthCoverageRasterDomain& rhs);
+
+	[[nodiscard]] bool IsSameDepthCoverageDrawPacket(
+		const DepthCoverageDrawPacket& lhs,
+		const DepthCoverageDrawPacket& rhs) noexcept;
+
+	[[nodiscard]] std::string DescribeDepthCoveragePipelineSignature(
+		const DepthCoveragePipelineSignature& signature);
+	[[nodiscard]] std::string DescribeDepthCoverageRasterDomain(
+		const DepthCoverageRasterDomain& domain);
+	[[nodiscard]] std::string DescribeDepthCoverageDrawPacket(
+		const DepthCoverageDrawPacket& packet);
 }

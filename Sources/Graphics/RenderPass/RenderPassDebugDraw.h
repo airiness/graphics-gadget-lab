@@ -24,7 +24,7 @@ namespace gglab
 		RHIPipelineHandle GetPipeline(const Renderer& renderer, bool triangles) noexcept;
 
 		DebugDrawPassMode m_Mode = DebugDrawPassMode::Scene;
-		std::array<GraphicsPipelineRecipe, 2> m_Recipes{};
+		std::array<GraphicsPhysicalPipelineKey, 2> m_Recipes{};
 		std::array<GraphicsPipelineSlot, 2> m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};

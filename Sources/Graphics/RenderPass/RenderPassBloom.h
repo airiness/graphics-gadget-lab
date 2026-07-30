@@ -43,7 +43,7 @@ namespace gglab
 			RHIFormat renderTargetFormat,
 			bool additive) noexcept;
 
-		GraphicsPipelineRecipe m_BaseRecipe{};
+		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_FilterPipelineSlot{};
 		GraphicsPipelineSlot m_AdditivePipelineSlot{};
 		bool m_IsInitialized = false;

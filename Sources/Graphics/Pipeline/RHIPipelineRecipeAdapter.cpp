@@ -47,7 +47,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] RHIRasterizerDesc ToRHIRasterizerDesc(
-			const GraphicsPipelineRecipe& recipe) noexcept
+			const GraphicsPhysicalPipelineKey& recipe) noexcept
 		{
 			RHIRasterizerDesc desc{};
 			switch (recipe.m_RasterizerPreset)
@@ -214,7 +214,7 @@ namespace gglab
 	}
 
 	RHIGraphicsPipelineDesc BuildRHIGraphicsPipelineDesc(
-		const GraphicsPipelineRecipe& recipe) noexcept
+		const GraphicsPhysicalPipelineKey& recipe) noexcept
 	{
 		RHIGraphicsPipelineDesc desc{};
 		desc.m_BindingLayout = recipe.m_BindingLayout;

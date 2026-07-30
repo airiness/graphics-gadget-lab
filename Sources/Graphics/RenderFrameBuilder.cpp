@@ -262,6 +262,16 @@ namespace gglab
 		result.m_UploadFencePoint = sceneBuildResult.m_UploadFencePoint;
 		result.m_RenderSceneStatus = sceneBuildResult.m_Status;
 
+		const auto* objectBuffer =
+			info.m_Renderer.GetObjectStructuredBuffer();
+		const auto* materialBuffer =
+			info.m_Renderer.GetMaterialStructuredBuffer();
+		const auto* viewBuffer =
+			info.m_Renderer.GetViewStructuredBuffer();
+		GGLAB_ASSERT_NOT_NULL(objectBuffer);
+		GGLAB_ASSERT_NOT_NULL(materialBuffer);
+		GGLAB_ASSERT_NOT_NULL(viewBuffer);
+
 		for (const RenderView& renderView : result.m_RenderViews)
 		{
 			if (!renderView.m_IsValid)
@@ -288,11 +298,51 @@ namespace gglab
 						mainFrustum,
 						hasMainFrustum);
 
+			const uint32_t viewBindingId =
+				static_cast<uint32_t>(utils::ToIndex(renderView.m_ViewId));
+			const DepthCoverageBufferSource viewSource{
+				.m_Buffer = viewBuffer->GetBufferHandle(),
+				.m_ElementIndex =
+					result.m_RenderScene.m_ViewBaseIndex +
+					viewBindingId,
+			};
 			const RenderQueueBuilder::BuildInfo queueBuildInfo{
 				.m_AssetManager = info.m_AssetManager,
 				.m_RenderScene = result.m_RenderScene,
 				.m_RenderView = renderView,
 				.m_CullingFrustums = queueCullFrustums.AsSpan(),
+				.m_CoverageRasterDomain = {
+					.m_FrameSerial = info.m_FrameSerial,
+					.m_ViewBindingId = viewBindingId,
+					.m_CurrentViewSource = viewSource,
+					.m_CurrentJitteredProjectionSource = viewSource,
+					.m_ProjectionSource =
+						DepthCoverageProjectionSource::
+							ViewDataProjection,
+					.m_Viewport = {
+						.m_X = 0.0f,
+						.m_Y = 0.0f,
+						.m_Width = static_cast<float>(renderView.m_Width),
+						.m_Height = static_cast<float>(renderView.m_Height),
+						.m_MinDepth = 0.0f,
+						.m_MaxDepth = 1.0f,
+					},
+					.m_Scissor = {
+						.m_Left = 0,
+						.m_Top = 0,
+						.m_Right = static_cast<int32_t>(renderView.m_Width),
+						.m_Bottom = static_cast<int32_t>(renderView.m_Height),
+					},
+					.m_DepthConvention = renderView.m_DepthConvention,
+				},
+				.m_ObjectBuffer = objectBuffer->GetBufferHandle(
+					info.m_BackBufferIndex),
+				.m_ObjectBaseIndex =
+					result.m_RenderScene.m_ObjectBaseIndex,
+				.m_MaterialBuffer = materialBuffer->GetBufferHandle(
+					info.m_BackBufferIndex),
+				.m_MaterialBaseIndex =
+					result.m_RenderScene.m_MaterialBaseIndex,
 			};
 			renderQueue = m_QueueBuilder.Build(queueBuildInfo);
 		}

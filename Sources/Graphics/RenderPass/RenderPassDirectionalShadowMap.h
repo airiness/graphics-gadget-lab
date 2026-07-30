@@ -47,7 +47,7 @@ namespace gglab
 		RasterizerPreset GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept;
 
 	private:
-		GraphicsPipelineRecipe m_BaseRecipe{};
+		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};

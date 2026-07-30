@@ -26,7 +26,7 @@ namespace gglab
 		constexpr bool operator==(const GraphicsPipelineFormats&) const noexcept = default;
 	};
 
-	struct GraphicsPipelineRecipe
+	struct GraphicsPhysicalPipelineKey
 	{
 		RHIBindingLayoutHandle m_BindingLayout{};
 		InputLayoutID m_InputLayoutId{};
@@ -51,10 +51,18 @@ namespace gglab
 		float m_DepthBiasClamp = 0.0f;
 		float m_SlopeScaledDepthBias = 0.0f;
 
-		std::optional<DepthCoverageSignature> m_DepthCoverageSignature =
+		constexpr bool operator==(
+			const GraphicsPhysicalPipelineKey&) const noexcept = default;
+	};
+
+	struct GraphicsLogicalPipelineMetadata
+	{
+		std::optional<DepthCoveragePipelineSignature>
+			m_DepthCoveragePipelineSignature =
 			std::nullopt;
 
-		constexpr bool operator==(const GraphicsPipelineRecipe&) const noexcept = default;
+		constexpr bool operator==(
+			const GraphicsLogicalPipelineMetadata&) const noexcept = default;
 	};
 
 	struct ComputePipelineRecipe
@@ -69,11 +77,21 @@ namespace gglab
 	{
 	public:
 		void Reset() noexcept { *this = {}; }
+		const GraphicsPhysicalPipelineKey& GetPhysicalKey() const noexcept
+		{
+			return m_PhysicalKey;
+		}
+		const GraphicsLogicalPipelineMetadata& GetLogicalMetadata() const noexcept
+		{
+			return m_LogicalMetadata;
+		}
+		RHIPipelineHandle GetPipeline() const noexcept { return m_Pipeline; }
 
 	private:
 		friend class PipelineCache;
 
-		GraphicsPipelineRecipe m_Recipe{};
+		GraphicsPhysicalPipelineKey m_PhysicalKey{};
+		GraphicsLogicalPipelineMetadata m_LogicalMetadata{};
 		uint64_t m_ShaderRevision = 0;
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
@@ -108,7 +126,12 @@ namespace gglab
 
 		RHIPipelineHandle Resolve(
 			GraphicsPipelineSlot& slot,
-			const GraphicsPipelineRecipe& recipe,
+			const GraphicsPhysicalPipelineKey& physicalKey,
+			const RenderPassInfo& renderPassInfo) noexcept;
+		RHIPipelineHandle Resolve(
+			GraphicsPipelineSlot& slot,
+			const GraphicsPhysicalPipelineKey& physicalKey,
+			const GraphicsLogicalPipelineMetadata& logicalMetadata,
 			const RenderPassInfo& renderPassInfo) noexcept;
 		RHIPipelineHandle Resolve(
 			ComputePipelineSlot& slot,

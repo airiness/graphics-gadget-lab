@@ -181,7 +181,7 @@ namespace gglab
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
-		GraphicsPipelineRecipe recipe = m_BaseRecipe;
+		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
 		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;
 		return pipelineCache->Resolve(m_PipelineSlot, recipe, GetInfo());
 	}

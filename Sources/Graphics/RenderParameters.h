@@ -13,6 +13,8 @@ namespace gglab
 	struct DrawParameters
 	{
 		uint32_t ObjectOffset = 0;
+
+		bool operator==(const DrawParameters&) const noexcept = default;
 	};
 
 	template<typename T>

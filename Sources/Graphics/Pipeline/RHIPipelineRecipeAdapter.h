@@ -5,5 +5,5 @@ namespace gglab
 {
 	[[nodiscard]] RHIVertexInputLayoutDesc BuildRHIVertexInputLayoutDesc(InputLayoutID inputLayoutId) noexcept;
 	[[nodiscard]] RHIGraphicsPipelineDesc BuildRHIGraphicsPipelineDesc(
-		const GraphicsPipelineRecipe& recipe) noexcept;
+		const GraphicsPhysicalPipelineKey& recipe) noexcept;
 }
