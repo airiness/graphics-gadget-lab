@@ -15,6 +15,9 @@ namespace napa::voxel
 		float m_VoxelSize = 1.0f;
 		float m_SurfaceBandVoxels = 2.0f;
 		CellAabb m_LogicalCellBounds{};
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const VoxelWorldConfig&, const VoxelWorldConfig&) noexcept = default;
 	};
 
 	struct LogicalDomainMetrics

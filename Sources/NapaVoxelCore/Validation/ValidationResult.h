@@ -65,6 +65,13 @@ namespace napa::voxel
 		MismatchedChunkMeshValidation = 56,
 		InvalidBoundaryContour = 57,
 		MismatchedBoundaryContour = 58,
+		InvalidCpuMeshCandidateSet = 59,
+		MismatchedCpuMeshCandidateSet = 60,
+		MismatchedCpuMeshTargetRevision = 61,
+		MismatchedCpuMeshSourceRevision = 62,
+		MismatchedCpuMeshConfig = 63,
+		StaleCpuMeshBatch = 64,
+		VisibleMeshSetUninitialized = 65,
 	};
 
 	struct ValidationResult

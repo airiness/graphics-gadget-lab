@@ -224,11 +224,7 @@ namespace napa::voxel
 	bool MeshQuantizationContext::IsCompatible(
 		const VoxelWorldConfig& config, ChunkCoord chunk) const noexcept
 	{
-		return m_IsPrepared && m_TargetChunk == chunk &&
-			m_Config.m_ChunkCellCount == config.m_ChunkCellCount &&
-			m_Config.m_VoxelSize == config.m_VoxelSize &&
-			m_Config.m_SurfaceBandVoxels == config.m_SurfaceBandVoxels &&
-			m_Config.m_LogicalCellBounds == config.m_LogicalCellBounds;
+		return m_IsPrepared && m_TargetChunk == chunk && m_Config == config;
 	}
 
 	bool MeshQuantizationContext::ContainsTargetCellDomain(

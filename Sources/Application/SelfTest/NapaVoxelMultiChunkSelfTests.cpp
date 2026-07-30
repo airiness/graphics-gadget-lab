@@ -3,9 +3,11 @@
 
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/BoundaryContour.h"
+#include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 #include "NapaVoxelCore/Meshing/WorldMeshHash.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -18,6 +20,17 @@ namespace gglab
 {
 	namespace
 	{
+		inline constexpr std::array EightChunkDomain{
+			napa::voxel::ChunkCoord{ -1, -1, -1 },
+			napa::voxel::ChunkCoord{ 0, -1, -1 },
+			napa::voxel::ChunkCoord{ -1, 0, -1 },
+			napa::voxel::ChunkCoord{ 0, 0, -1 },
+			napa::voxel::ChunkCoord{ -1, -1, 0 },
+			napa::voxel::ChunkCoord{ 0, -1, 0 },
+			napa::voxel::ChunkCoord{ -1, 0, 0 },
+			napa::voxel::ChunkCoord{ 0, 0, 0 },
+		};
+
 		[[nodiscard]] napa::voxel::VoxelWorldConfig
 			MakeEightChunkConfig() noexcept
 		{
@@ -107,17 +120,7 @@ namespace gglab
 		{
 			using namespace napa::voxel;
 
-			constexpr std::array expected{
-				ChunkCoord{ -1, -1, -1 },
-				ChunkCoord{ 0, -1, -1 },
-				ChunkCoord{ -1, 0, -1 },
-				ChunkCoord{ 0, 0, -1 },
-				ChunkCoord{ -1, -1, 0 },
-				ChunkCoord{ 0, -1, 0 },
-				ChunkCoord{ -1, 0, 0 },
-				ChunkCoord{ 0, 0, 0 },
-			};
-			if (records.size() != expected.size())
+			if (records.size() != EightChunkDomain.size())
 			{
 				return false;
 			}
@@ -125,7 +128,7 @@ namespace gglab
 				index < records.size();
 				++index)
 			{
-				if (records[index].m_Chunk != expected[index])
+				if (records[index].m_Chunk != EightChunkDomain[index])
 				{
 					return false;
 				}
@@ -272,6 +275,65 @@ namespace gglab
 				}
 			}
 			return false;
+		}
+
+		[[nodiscard]] bool HaveIdenticalBoundaryContours(
+			std::span<const napa::voxel::ChunkMeshRecord> lhs,
+			std::span<const napa::voxel::ChunkMeshRecord> rhs) noexcept
+		{
+			if (lhs.size() != rhs.size())
+			{
+				return false;
+			}
+			for (std::size_t index = 0; index < lhs.size(); ++index)
+			{
+				if (lhs[index].m_Chunk != rhs[index].m_Chunk ||
+					lhs[index].m_BoundaryContours != rhs[index].m_BoundaryContours)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool OffsetFirstBoundaryNormal(
+			std::vector<napa::voxel::ChunkMeshRecord>& records, std::int32_t stepCount)
+		{
+			using namespace napa::voxel;
+
+			if (records.empty() || stepCount <= 0)
+			{
+				return false;
+			}
+			BoundaryContourRecord& contour = records[0].m_BoundaryContours[
+				GetChunkBoundaryFaceIndex(ChunkBoundaryFace::PositiveX)];
+			if (contour.m_Segments.empty())
+			{
+				return false;
+			}
+
+			QuantizedMeshNormal& normal = contour.m_Segments[0].m_EndpointA.m_Normal;
+			std::int16_t* component = &normal.m_X;
+			const auto magnitude = [](std::int16_t value) noexcept
+			{
+				const std::int32_t wide = value;
+				return wide >= 0 ? wide : -wide;
+			};
+			if (magnitude(normal.m_Y) > magnitude(*component))
+			{
+				component = &normal.m_Y;
+			}
+			if (magnitude(normal.m_Z) > magnitude(*component))
+			{
+				component = &normal.m_Z;
+			}
+
+			const std::int32_t wide = *component;
+			*component = static_cast<std::int16_t>(
+				wide > 0 ? wide - stepCount : wide + stepCount);
+			std::sort(contour.m_Segments.begin(), contour.m_Segments.end(),
+				BoundaryContourSegmentLess{});
+			return true;
 		}
 
 		void RunBoundaryContourContractTests(SelfTestContext& context)
@@ -509,11 +571,30 @@ namespace gglab
 					ReferenceMesher(*world).MeshWorld(
 						repeated).Succeeded() &&
 					repeated.m_Validation ==
-						meshing.m_Validation;
+						meshing.m_Validation &&
+					repeated.m_BoundaryValidation ==
+						meshing.m_BoundaryValidation &&
+					HaveIdenticalBoundaryContours(
+						repeated.m_Chunks,
+						meshing.m_Chunks);
 			}
 			context.Check(
 				deterministic,
-				"Repeated multi-Chunk meshing preserves canonical totals and hash");
+				"Repeated multi-Chunk meshing preserves complete boundary evidence");
+
+			std::vector<ChunkMeshRecord> withinNormalTolerance = meshing.m_Chunks;
+			BoundaryContourValidationResult withinToleranceValidation{};
+			const bool withinToleranceInjected =
+				OffsetFirstBoundaryNormal(withinNormalTolerance, 1);
+			context.Check(
+				withinToleranceInjected &&
+					ValidateBoundaryContourSet(
+						withinNormalTolerance,
+						config,
+						withinToleranceValidation).Succeeded() &&
+					withinToleranceValidation ==
+						meshing.m_BoundaryValidation,
+				"Adjacent boundary contours accept one SNORM16 normal step end to end");
 
 			const BoundaryContourValidationResult sentinel{
 				.m_ChunkRecordCount = 11,
@@ -522,6 +603,20 @@ namespace gglab
 				.m_SkippedZeroLengthSegmentCount = 14,
 			};
 			BoundaryContourValidationResult unchanged = sentinel;
+			std::vector<ChunkMeshRecord> outsideNormalTolerance = meshing.m_Chunks;
+			const bool outsideToleranceInjected =
+				OffsetFirstBoundaryNormal(outsideNormalTolerance, 2);
+			context.Check(
+				outsideToleranceInjected &&
+					ValidateBoundaryContourSet(
+						outsideNormalTolerance,
+						config,
+						unchanged).m_Error ==
+							ValidationError::
+								MismatchedBoundaryContour &&
+					unchanged == sentinel,
+				"Adjacent boundary contours reject two SNORM16 normal steps atomically");
+
 			std::vector<ChunkMeshRecord> mismatched =
 				meshing.m_Chunks;
 			BoundaryContourRecord& mismatchedContour =
@@ -780,6 +875,365 @@ namespace gglab
 				"Fully exact-iso boundary triangles emit no interior contour");
 		}
 
+		void RunCpuMeshBatchTests(SelfTestContext& context)
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config = MakeEightChunkConfig();
+			const std::array primitives{
+				MakeSphere(1, {}, 3.0),
+			};
+			std::unique_ptr<VoxelWorld> world;
+			const bool generated = GenerateWorld(config, primitives, world);
+
+			VisibleMeshSet visible;
+			const WorldMeshValidationResult hashSentinel{
+				.m_ValidationHash = 0x123456789abcdef0ull,
+				.m_ChunkCount = 1,
+				.m_VertexCount = 2,
+				.m_SectionCount = 3,
+				.m_IndexCount = 4,
+				.m_TriangleCount = 5,
+				.m_SkippedDegenerateTriangleCount = 6,
+			};
+			WorldMeshValidationResult unchangedHash = hashSentinel;
+			context.Check(
+				generated &&
+					!visible.HasPublishedMeshes() &&
+					visible.GetVisibleWorldRevision() == 0 &&
+					visible.GetChunks().empty() &&
+					ComputeVisibleWorldMeshHash(visible, unchangedHash).m_Error ==
+						ValidationError::VisibleMeshSetUninitialized &&
+					unchangedHash == hashSentinel,
+				"An unpublished Visible Mesh Set has revision zero and no readable hash");
+
+			CpuMeshBatch fullBatch{};
+			const bool built = generated &&
+				BuildCpuMeshBatch(*world, world->GetWorldVoxelRevision(),
+					EightChunkDomain, fullBatch).Succeeded();
+			bool canonicalCandidates = built &&
+				fullBatch.m_TargetWorldVoxelRevision == 1 &&
+				fullBatch.m_RequestedChunks.size() == EightChunkDomain.size() &&
+				fullBatch.m_Candidates.size() == EightChunkDomain.size();
+			for (std::size_t index = 0;
+				index < fullBatch.m_Candidates.size() && canonicalCandidates;
+				++index)
+			{
+				canonicalCandidates =
+					fullBatch.m_RequestedChunks[index] == EightChunkDomain[index] &&
+					fullBatch.m_Candidates[index].m_Chunk == EightChunkDomain[index] &&
+					fullBatch.m_Candidates[index].m_SourceWorldVoxelRevision == 1;
+			}
+			context.Check(
+				canonicalCandidates,
+				"CPU mesh batch build preserves the requested canonical Candidate Set");
+			if (!built)
+			{
+				return;
+			}
+
+			CpuMeshBatch unchangedBuild = fullBatch;
+			const ChunkMeshRecord* const unchangedBuildData =
+				unchangedBuild.m_Candidates.data();
+			context.Check(
+				BuildCpuMeshBatch(
+					*world, 0, EightChunkDomain, unchangedBuild).m_Error ==
+						ValidationError::MismatchedCpuMeshTargetRevision &&
+					unchangedBuild.m_TargetWorldVoxelRevision == 1 &&
+					unchangedBuild.m_Candidates.data() == unchangedBuildData,
+				"CPU mesh batch build rejects a mismatched Target revision atomically");
+
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			const bool validated =
+				ValidateCpuMeshBatch(fullBatch, visible, pending).Succeeded() &&
+				pending != nullptr;
+			PendingCpuMeshBatch* const validatedPending = pending.get();
+			context.Check(
+				validated &&
+					pending->GetTargetWorldVoxelRevision() == 1 &&
+					pending->GetCandidateChunkCount() == EightChunkDomain.size() &&
+					pending->GetChunks().size() == EightChunkDomain.size() &&
+					!visible.HasPublishedMeshes() &&
+					visible.GetVisibleWorldRevision() == 0,
+				"Validated Pending CPU meshes leave Visible state unchanged");
+			if (!validated)
+			{
+				return;
+			}
+
+			CpuMeshBatch missingCandidate = fullBatch;
+			missingCandidate.m_Candidates.pop_back();
+			context.Check(
+				ValidateCpuMeshBatch(missingCandidate, visible, pending).m_Error ==
+						ValidationError::MismatchedCpuMeshCandidateSet &&
+					pending.get() == validatedPending &&
+					!visible.HasPublishedMeshes(),
+				"Missing CPU mesh Candidates fail without replacing Pending or Visible state");
+
+			CpuMeshBatch extraCandidate = fullBatch;
+			extraCandidate.m_Candidates.push_back(fullBatch.m_Candidates.back());
+			context.Check(
+				ValidateCpuMeshBatch(extraCandidate, visible, pending).m_Error ==
+						ValidationError::MismatchedCpuMeshCandidateSet &&
+					pending.get() == validatedPending &&
+					!visible.HasPublishedMeshes(),
+				"Extra CPU mesh Candidates fail without replacing Pending or Visible state");
+
+			CpuMeshBatch sourceRevisionMismatch = fullBatch;
+			sourceRevisionMismatch.m_Candidates[0].m_SourceWorldVoxelRevision = 2;
+			context.Check(
+				ValidateCpuMeshBatch(sourceRevisionMismatch, visible, pending).m_Error ==
+						ValidationError::MismatchedCpuMeshSourceRevision &&
+					pending.get() == validatedPending &&
+					!visible.HasPublishedMeshes(),
+				"CPU mesh Candidate source revisions must match the Batch target");
+
+			constexpr std::array incompleteInitialChunks{
+				ChunkCoord{ -1, -1, -1 },
+			};
+			CpuMeshBatch incompleteInitialBatch{};
+			const bool incompleteInitialBuilt =
+				BuildCpuMeshBatch(
+					*world, 1, incompleteInitialChunks, incompleteInitialBatch).Succeeded();
+			context.Check(
+				incompleteInitialBuilt &&
+					ValidateCpuMeshBatch(
+						incompleteInitialBatch, visible, pending).m_Error ==
+						ValidationError::InvalidWorldMeshRecordSet &&
+					pending.get() == validatedPending &&
+					!visible.HasPublishedMeshes(),
+				"Initial CPU mesh publication requires the complete Cell-owner Chunk Domain");
+
+			CpuMeshBatch invalidCandidate = fullBatch;
+			invalidCandidate.m_Candidates[0].m_Validation.m_ValidationHash ^= 1;
+			context.Check(
+				ValidateCpuMeshBatch(invalidCandidate, visible, pending).m_Error ==
+						ValidationError::MismatchedChunkMeshValidation &&
+					pending.get() == validatedPending &&
+					!visible.HasPublishedMeshes(),
+				"One invalid CPU mesh Candidate prevents partial publication");
+
+			CpuMeshBatch candidateSeamFailure = fullBatch;
+			BoundaryContourRecord& candidateContour =
+				candidateSeamFailure.m_Candidates[0].m_BoundaryContours[
+					GetChunkBoundaryFaceIndex(ChunkBoundaryFace::PositiveX)];
+			const bool candidateSeamInjected = !candidateContour.m_Segments.empty();
+			if (candidateSeamInjected)
+			{
+				candidateContour.m_Segments.pop_back();
+			}
+			context.Check(
+				candidateSeamInjected &&
+					ValidateCpuMeshBatch(candidateSeamFailure, visible, pending).m_Error ==
+						ValidationError::MismatchedBoundaryContour &&
+					pending.get() == validatedPending &&
+					!visible.HasPublishedMeshes(),
+				"Candidate-to-Candidate seam failure prevents partial publication");
+
+			std::unique_ptr<PendingCpuMeshBatch> competingInitialPending;
+			const bool competingInitialValidated =
+				ValidateCpuMeshBatch(fullBatch, visible, competingInitialPending).Succeeded();
+			const WorldMeshValidationResult initialValidation =
+				pending->GetWorldMeshValidation();
+			context.Check(
+				competingInitialValidated &&
+					PublishCpuMeshBatch(pending, visible).Succeeded() &&
+					pending == nullptr &&
+					visible.HasPublishedMeshes() &&
+					visible.GetVisibleWorldRevision() == 1 &&
+					visible.GetChunks().size() == EightChunkDomain.size() &&
+					visible.GetWorldMeshValidation() == initialValidation,
+				"Publishing replaces the complete Visible Mesh Set at one Safe Point");
+
+			WorldMeshValidationResult visibleValidation{};
+			context.Check(
+				ComputeVisibleWorldMeshHash(visible, visibleValidation).Succeeded() &&
+					visibleValidation == initialValidation &&
+					visibleValidation.m_ValidationHash == 0xb939dfe96d74fe89ull,
+				"Visible World mesh hashing reads only the published Mesh Set");
+
+			const PendingCpuMeshBatch* const staleInitialPending =
+				competingInitialPending.get();
+			context.Check(
+				PublishCpuMeshBatch(competingInitialPending, visible).m_Error ==
+						ValidationError::StaleCpuMeshBatch &&
+					competingInitialPending.get() == staleInitialPending &&
+					visible.GetVisibleWorldRevision() == 1 &&
+					visible.GetWorldMeshValidation() == initialValidation,
+				"A Pending batch cannot publish over a different Visible base");
+
+			CpuMeshBatch mismatchedConfig = fullBatch;
+			mismatchedConfig.m_Config.m_VoxelSize = 2.0f;
+			std::unique_ptr<PendingCpuMeshBatch> mismatchedConfigPending;
+			context.Check(
+				ValidateCpuMeshBatch(
+					mismatchedConfig, visible, mismatchedConfigPending).m_Error ==
+						ValidationError::MismatchedCpuMeshConfig &&
+					mismatchedConfigPending == nullptr &&
+					visible.GetVisibleWorldRevision() == 1,
+				"CPU mesh batches cannot merge into a differently configured Visible Set");
+
+			bool changed = false;
+			VoxelSample materialEdit{};
+			const bool materialRead =
+				world->ReadCurrentSample({ -1, -1, -1 }, materialEdit).Succeeded() &&
+				materialEdit.m_Density >= IsoValue &&
+				materialEdit.m_Material == VoxelMaterial::Stone;
+			if (materialRead)
+			{
+				materialEdit.m_Material = VoxelMaterial::Soil;
+			}
+			const bool edited =
+				materialRead &&
+				world->WriteCurrentSample({ -1, -1, -1 }, materialEdit, changed).Succeeded() &&
+				changed &&
+				world->GetWorldVoxelRevision() == 2;
+			constexpr std::array partialChunks{
+				ChunkCoord{ -1, -1, -1 },
+			};
+			CpuMeshBatch partialBatch{};
+			const bool partialBuilt = edited &&
+				BuildCpuMeshBatch(*world, 2, partialChunks, partialBatch).Succeeded();
+			if (!partialBuilt)
+			{
+				context.Check(false, "A local edit builds an explicit partial CPU mesh batch");
+				return;
+			}
+
+			CpuMeshBatch currentNeighborFailure = partialBatch;
+			BoundaryContourRecord& currentNeighborContour =
+				currentNeighborFailure.m_Candidates[0].m_BoundaryContours[
+					GetChunkBoundaryFaceIndex(ChunkBoundaryFace::PositiveX)];
+			const bool currentNeighborFaultInjected =
+				!currentNeighborContour.m_Segments.empty();
+			if (currentNeighborFaultInjected)
+			{
+				currentNeighborContour.m_Segments.pop_back();
+			}
+			std::unique_ptr<PendingCpuMeshBatch> partialPending;
+			context.Check(
+				currentNeighborFaultInjected &&
+					ValidateCpuMeshBatch(
+						currentNeighborFailure, visible, partialPending).m_Error ==
+						ValidationError::MismatchedBoundaryContour &&
+					partialPending == nullptr &&
+					visible.GetVisibleWorldRevision() == 1 &&
+					visible.GetWorldMeshValidation() == initialValidation,
+				"Candidate-to-current Neighbor seam failure leaves Visible state unchanged");
+
+			const bool partialValidated =
+				ValidateCpuMeshBatch(partialBatch, visible, partialPending).Succeeded() &&
+				partialPending != nullptr;
+			std::unique_ptr<PendingCpuMeshBatch> competingPartialPending;
+			const bool competingPartialValidated =
+				ValidateCpuMeshBatch(
+					partialBatch, visible, competingPartialPending).Succeeded();
+			context.Check(
+				partialValidated &&
+					competingPartialValidated &&
+					partialPending->GetTargetWorldVoxelRevision() == 2 &&
+					partialPending->GetCandidateChunkCount() == 1 &&
+					visible.GetVisibleWorldRevision() == 1 &&
+					visible.GetWorldMeshValidation() == initialValidation,
+				"Partial Pending validation compares retained current Neighbors without publishing");
+
+			const bool partialPublished =
+				partialValidated &&
+				PublishCpuMeshBatch(partialPending, visible).Succeeded();
+			const ChunkMeshRecord* const rebuiltRecord =
+				FindChunkMeshRecord(visible.GetChunks(), { -1, -1, -1 });
+			const ChunkMeshRecord* const retainedRecord =
+				FindChunkMeshRecord(visible.GetChunks(), {});
+			WorldMeshValidationResult editedValidation{};
+			context.Check(
+				partialPublished &&
+					visible.GetVisibleWorldRevision() == 2 &&
+					rebuiltRecord != nullptr &&
+					rebuiltRecord->m_SourceWorldVoxelRevision == 2 &&
+					retainedRecord != nullptr &&
+					retainedRecord->m_SourceWorldVoxelRevision == 1 &&
+					ComputeVisibleWorldMeshHash(visible, editedValidation).Succeeded() &&
+					editedValidation.m_ValidationHash !=
+						initialValidation.m_ValidationHash,
+				"Partial publication advances Visible revision while retaining valid older records");
+
+			const PendingCpuMeshBatch* const stalePartialPending =
+				competingPartialPending.get();
+			context.Check(
+				PublishCpuMeshBatch(competingPartialPending, visible).m_Error ==
+						ValidationError::StaleCpuMeshBatch &&
+					competingPartialPending.get() == stalePartialPending &&
+					visible.GetVisibleWorldRevision() == 2 &&
+					visible.GetWorldMeshValidation() == editedValidation,
+				"Concurrent Pending publication is rejected atomically after the base changes");
+
+			VoxelSample damageOnlyEdit{};
+			bool damageOnlyChanged = false;
+			const bool damageOnlyRead =
+				world->ReadCurrentSample({ -1, -1, -1 }, damageOnlyEdit).Succeeded() &&
+				damageOnlyEdit.m_Density >= IsoValue &&
+				damageOnlyEdit.m_Material == VoxelMaterial::Soil;
+			if (damageOnlyRead)
+			{
+				damageOnlyEdit.m_Damage = 1;
+			}
+			const bool damageOnlyWritten =
+				damageOnlyRead &&
+				world->WriteCurrentSample(
+					{ -1, -1, -1 }, damageOnlyEdit, damageOnlyChanged).Succeeded() &&
+				damageOnlyChanged &&
+				world->GetWorldVoxelRevision() == 3;
+			CpuMeshBatch damageOnlyBatch{};
+			std::unique_ptr<PendingCpuMeshBatch> damageOnlyPending;
+			const bool damageOnlyValidated =
+				damageOnlyWritten &&
+				BuildCpuMeshBatch(
+					*world, 3, std::span<const ChunkCoord>{}, damageOnlyBatch).Succeeded() &&
+				ValidateCpuMeshBatch(
+					damageOnlyBatch, visible, damageOnlyPending).Succeeded() &&
+				damageOnlyPending != nullptr &&
+				damageOnlyPending->GetCandidateChunkCount() == 0;
+			WorldMeshValidationResult damageOnlyValidation{};
+			context.Check(
+				damageOnlyValidated &&
+					PublishCpuMeshBatch(damageOnlyPending, visible).Succeeded() &&
+					visible.GetVisibleWorldRevision() == 3 &&
+					ComputeVisibleWorldMeshHash(
+						visible, damageOnlyValidation).Succeeded() &&
+					damageOnlyValidation == editedValidation,
+				"Damage-only World revisions publish without remeshing any Chunk");
+		}
+
+		void RunEmptyCpuMeshBatchTests(SelfTestContext& context)
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config = MakeEightChunkConfig();
+			std::unique_ptr<VoxelWorld> world;
+			VisibleMeshSet visible;
+			CpuMeshBatch batch{};
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			WorldMeshValidationResult validation{};
+			const bool published =
+				GenerateWorld(config, {}, world) &&
+				BuildCpuMeshBatch(*world, 1, EightChunkDomain, batch).Succeeded() &&
+				ValidateCpuMeshBatch(batch, visible, pending).Succeeded() &&
+				PublishCpuMeshBatch(pending, visible).Succeeded() &&
+				ComputeVisibleWorldMeshHash(visible, validation).Succeeded();
+			bool allChunksEmpty = published && visible.GetChunks().size() == EightChunkDomain.size();
+			for (const ChunkMeshRecord& record : visible.GetChunks())
+			{
+				allChunksEmpty = allChunksEmpty &&
+					record.m_Mesh.m_Vertices.empty() &&
+					record.m_Mesh.m_Sections.empty();
+			}
+			context.Check(
+				allChunksEmpty &&
+					validation.m_ChunkCount == EightChunkDomain.size() &&
+					validation.m_ValidationHash == 0x572bf6dcaaab0aa0ull,
+				"Visible World mesh hashing includes every Empty Mesh Chunk");
+		}
+
 		void RunGuardAllocationTests(SelfTestContext& context)
 		{
 			using namespace napa::voxel;
@@ -838,6 +1292,8 @@ namespace gglab
 		RunCompleteDomainTests(context);
 		RunBoundarySurfaceTests(context);
 		RunExactIsoCornerTests(context);
+		RunCpuMeshBatchTests(context);
+		RunEmptyCpuMeshBatchTests(context);
 		RunGuardAllocationTests(context);
 	}
 }
