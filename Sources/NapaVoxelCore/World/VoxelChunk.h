@@ -23,12 +23,9 @@ namespace napa::voxel
 
 	public:
 		[[nodiscard]] static ValidationResult Create(
-			std::uint32_t chunkCellCount,
-			std::unique_ptr<VoxelChunk>& chunk);
+			std::uint32_t chunkCellCount, std::unique_ptr<VoxelChunk>& chunk);
 
-		explicit VoxelChunk(
-			ConstructionToken,
-			std::uint32_t chunkCellCount);
+		explicit VoxelChunk(ConstructionToken, std::uint32_t chunkCellCount);
 
 		VoxelChunk(const VoxelChunk&) = delete;
 		VoxelChunk& operator=(const VoxelChunk&) = delete;
@@ -40,34 +37,25 @@ namespace napa::voxel
 		[[nodiscard]] std::uint64_t GetVoxelRevision() const noexcept;
 
 		[[nodiscard]] ValidationResult ReadOriginalSample(
-			LocalCoord local,
-			VoxelSample& sample) const noexcept;
+			LocalCoord local, VoxelSample& sample) const noexcept;
 		[[nodiscard]] ValidationResult ReadCurrentSample(
-			LocalCoord local,
-			VoxelSample& sample) const noexcept;
+			LocalCoord local, VoxelSample& sample) const noexcept;
 
 		[[nodiscard]] ValidationResult WriteOriginalAndCurrentSample(
-			LocalCoord local,
-			VoxelSample input,
-			bool& changed) noexcept;
+			LocalCoord local, VoxelSample input, bool& changed) noexcept;
 		[[nodiscard]] ValidationResult WriteCurrentSample(
-			LocalCoord local,
-			VoxelSample input,
-			bool& changed) noexcept;
+			LocalCoord local, VoxelSample input, bool& changed) noexcept;
 
 	private:
 		friend class VoxelWorld;
 
 		[[nodiscard]] ValidationResult ResolveFlatIndex(
-			LocalCoord local,
-			std::size_t& flatIndex) const noexcept;
+			LocalCoord local, std::size_t& flatIndex) const noexcept;
 		[[nodiscard]] ValidationResult AdvanceRevision() noexcept;
 		[[nodiscard]] ValidationResult RestoreCurrentSamples(
-			std::span<const LocalCoord> coordinates,
-			bool& changed) noexcept;
+			std::span<const LocalCoord> coordinates, bool& changed) noexcept;
 		[[nodiscard]] ValidationResult InitializePreparedSample(
-			LocalCoord local,
-			VoxelSample prepared) noexcept;
+			LocalCoord local, VoxelSample prepared) noexcept;
 		void CommitInitialState() noexcept;
 
 		std::uint32_t m_ChunkCellCount = 0;

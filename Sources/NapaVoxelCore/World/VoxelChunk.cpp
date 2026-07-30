@@ -24,8 +24,7 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::Create(
-		std::uint32_t chunkCellCount,
-		std::unique_ptr<VoxelChunk>& chunk)
+		std::uint32_t chunkCellCount, std::unique_ptr<VoxelChunk>& chunk)
 	{
 		if (!IsSupportedChunkCellCount(chunkCellCount))
 		{
@@ -33,23 +32,15 @@ namespace napa::voxel
 		}
 
 		std::unique_ptr<VoxelChunk> created =
-			std::make_unique<VoxelChunk>(
-				ConstructionToken{},
-				chunkCellCount);
+			std::make_unique<VoxelChunk>(ConstructionToken{}, chunkCellCount);
 		chunk = std::move(created);
 		return {};
 	}
 
-	VoxelChunk::VoxelChunk(
-		ConstructionToken,
-		std::uint32_t chunkCellCount)
-		: m_ChunkCellCount(chunkCellCount)
-		, m_OriginalSamples(
-			ComputeSampleCount(chunkCellCount),
-			DefaultVoxelSample)
-		, m_CurrentSamples(
-			ComputeSampleCount(chunkCellCount),
-			DefaultVoxelSample)
+	VoxelChunk::VoxelChunk(ConstructionToken, std::uint32_t chunkCellCount) :
+		m_ChunkCellCount(chunkCellCount),
+		m_OriginalSamples(ComputeSampleCount(chunkCellCount), DefaultVoxelSample),
+		m_CurrentSamples(ComputeSampleCount(chunkCellCount), DefaultVoxelSample)
 	{
 	}
 
@@ -69,12 +60,10 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::ReadOriginalSample(
-		LocalCoord local,
-		VoxelSample& sample) const noexcept
+		LocalCoord local, VoxelSample& sample) const noexcept
 	{
 		std::size_t flatIndex = 0;
-		const ValidationResult indexResult =
-			ResolveFlatIndex(local, flatIndex);
+		const ValidationResult indexResult = ResolveFlatIndex(local, flatIndex);
 		if (indexResult.Failed())
 		{
 			return indexResult;
@@ -85,12 +74,10 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::ReadCurrentSample(
-		LocalCoord local,
-		VoxelSample& sample) const noexcept
+		LocalCoord local, VoxelSample& sample) const noexcept
 	{
 		std::size_t flatIndex = 0;
-		const ValidationResult indexResult =
-			ResolveFlatIndex(local, flatIndex);
+		const ValidationResult indexResult = ResolveFlatIndex(local, flatIndex);
 		if (indexResult.Failed())
 		{
 			return indexResult;
@@ -101,28 +88,23 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::WriteOriginalAndCurrentSample(
-		LocalCoord local,
-		VoxelSample input,
-		bool& changed) noexcept
+		LocalCoord local, VoxelSample input, bool& changed) noexcept
 	{
 		std::size_t flatIndex = 0;
-		const ValidationResult indexResult =
-			ResolveFlatIndex(local, flatIndex);
+		const ValidationResult indexResult = ResolveFlatIndex(local, flatIndex);
 		if (indexResult.Failed())
 		{
 			return indexResult;
 		}
 
 		VoxelSample prepared{};
-		const ValidationResult prepareResult =
-			PrepareVoxelSampleForStorage(input, prepared);
+		const ValidationResult prepareResult = PrepareVoxelSampleForStorage(input, prepared);
 		if (prepareResult.Failed())
 		{
 			return prepareResult;
 		}
 
-		if (m_OriginalSamples[flatIndex] == prepared &&
-			m_CurrentSamples[flatIndex] == prepared)
+		if (m_OriginalSamples[flatIndex] == prepared && m_CurrentSamples[flatIndex] == prepared)
 		{
 			changed = false;
 			return {};
@@ -141,21 +123,17 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::WriteCurrentSample(
-		LocalCoord local,
-		VoxelSample input,
-		bool& changed) noexcept
+		LocalCoord local, VoxelSample input, bool& changed) noexcept
 	{
 		std::size_t flatIndex = 0;
-		const ValidationResult indexResult =
-			ResolveFlatIndex(local, flatIndex);
+		const ValidationResult indexResult = ResolveFlatIndex(local, flatIndex);
 		if (indexResult.Failed())
 		{
 			return indexResult;
 		}
 
 		VoxelSample prepared{};
-		const ValidationResult prepareResult =
-			PrepareVoxelSampleForStorage(input, prepared);
+		const ValidationResult prepareResult = PrepareVoxelSampleForStorage(input, prepared);
 		if (prepareResult.Failed())
 		{
 			return prepareResult;
@@ -179,17 +157,14 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::ResolveFlatIndex(
-		LocalCoord local,
-		std::size_t& flatIndex) const noexcept
+		LocalCoord local, std::size_t& flatIndex) const noexcept
 	{
-		const ValidationResult result =
-			FlattenLocal(local, m_ChunkCellCount, flatIndex);
+		const ValidationResult result = FlattenLocal(local, m_ChunkCellCount, flatIndex);
 		if (result.Failed())
 		{
 			return result;
 		}
-		if (flatIndex >= m_CurrentSamples.size() ||
-			flatIndex >= m_OriginalSamples.size())
+		if (flatIndex >= m_CurrentSamples.size() || flatIndex >= m_OriginalSamples.size())
 		{
 			return { ValidationError::FlatIndexOutOfRange };
 		}
@@ -208,24 +183,20 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::RestoreCurrentSamples(
-		std::span<const LocalCoord> coordinates,
-		bool& changed) noexcept
+		std::span<const LocalCoord> coordinates, bool& changed) noexcept
 	{
 		bool hasDifference = false;
 		for (const LocalCoord coordinate : coordinates)
 		{
 			std::size_t flatIndex = 0;
-			const ValidationResult indexResult =
-				ResolveFlatIndex(coordinate, flatIndex);
+			const ValidationResult indexResult = ResolveFlatIndex(coordinate, flatIndex);
 			if (indexResult.Failed())
 			{
 				return indexResult;
 			}
 
 			hasDifference =
-				hasDifference ||
-				m_CurrentSamples[flatIndex] !=
-					m_OriginalSamples[flatIndex];
+				hasDifference || m_CurrentSamples[flatIndex] != m_OriginalSamples[flatIndex];
 		}
 
 		if (!hasDifference)
@@ -243,8 +214,7 @@ namespace napa::voxel
 		for (const LocalCoord coordinate : coordinates)
 		{
 			std::size_t flatIndex = 0;
-			const ValidationResult indexResult =
-				ResolveFlatIndex(coordinate, flatIndex);
+			const ValidationResult indexResult = ResolveFlatIndex(coordinate, flatIndex);
 			if (indexResult.Failed())
 			{
 				return indexResult;
@@ -257,12 +227,10 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelChunk::InitializePreparedSample(
-		LocalCoord local,
-		VoxelSample prepared) noexcept
+		LocalCoord local, VoxelSample prepared) noexcept
 	{
 		std::size_t flatIndex = 0;
-		const ValidationResult indexResult =
-			ResolveFlatIndex(local, flatIndex);
+		const ValidationResult indexResult = ResolveFlatIndex(local, flatIndex);
 		if (indexResult.Failed())
 		{
 			return indexResult;

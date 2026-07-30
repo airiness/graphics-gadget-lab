@@ -36,8 +36,7 @@ namespace napa::voxel
 		std::int64_t m_Y = 0;
 		std::int64_t m_Z = 0;
 
-		[[nodiscard]] friend constexpr bool operator==(
-			const QuantizedBoundaryContourPosition&,
+		[[nodiscard]] friend constexpr bool operator==(const QuantizedBoundaryContourPosition&,
 			const QuantizedBoundaryContourPosition&) noexcept = default;
 	};
 
@@ -47,8 +46,7 @@ namespace napa::voxel
 		QuantizedMeshNormal m_Normal{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const BoundaryContourEndpoint&,
-			const BoundaryContourEndpoint&) noexcept = default;
+			const BoundaryContourEndpoint&, const BoundaryContourEndpoint&) noexcept = default;
 	};
 
 	struct BoundaryContourSegment
@@ -57,8 +55,7 @@ namespace napa::voxel
 		BoundaryContourEndpoint m_EndpointB{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const BoundaryContourSegment&,
-			const BoundaryContourSegment&) noexcept = default;
+			const BoundaryContourSegment&, const BoundaryContourSegment&) noexcept = default;
 	};
 
 	struct BoundaryContourRecord
@@ -68,12 +65,10 @@ namespace napa::voxel
 		std::uint64_t m_SkippedZeroLengthSegmentCount = 0;
 
 		[[nodiscard]] friend bool operator==(
-			const BoundaryContourRecord&,
-			const BoundaryContourRecord&) = default;
+			const BoundaryContourRecord&, const BoundaryContourRecord&) = default;
 	};
 
-	using ChunkBoundaryContourSet =
-		std::array<BoundaryContourRecord, ChunkBoundaryFaceCount>;
+	using ChunkBoundaryContourSet = std::array<BoundaryContourRecord, ChunkBoundaryFaceCount>;
 
 	struct BoundaryContourValidationResult
 	{
@@ -82,15 +77,13 @@ namespace napa::voxel
 		std::uint64_t m_ComparedSegmentCount = 0;
 		std::uint64_t m_SkippedZeroLengthSegmentCount = 0;
 
-		[[nodiscard]] friend constexpr bool operator==(
-			const BoundaryContourValidationResult&,
+		[[nodiscard]] friend constexpr bool operator==(const BoundaryContourValidationResult&,
 			const BoundaryContourValidationResult&) noexcept = default;
 	};
 
 	struct QuantizedBoundaryContourPositionZYXLess
 	{
-		[[nodiscard]] constexpr bool operator()(
-			QuantizedBoundaryContourPosition lhs,
+		[[nodiscard]] constexpr bool operator()(QuantizedBoundaryContourPosition lhs,
 			QuantizedBoundaryContourPosition rhs) const noexcept
 		{
 			if (lhs.m_Z != rhs.m_Z)
@@ -108,21 +101,18 @@ namespace napa::voxel
 	struct BoundaryContourSegmentLess
 	{
 		[[nodiscard]] bool operator()(
-			const BoundaryContourSegment& lhs,
-			const BoundaryContourSegment& rhs) const noexcept;
+			const BoundaryContourSegment& lhs, const BoundaryContourSegment& rhs) const noexcept;
 	};
 
 	struct ChunkMeshRecord;
 
-	[[nodiscard]] constexpr bool IsKnownChunkBoundaryFace(
-		ChunkBoundaryFace face) noexcept
+	[[nodiscard]] constexpr bool IsKnownChunkBoundaryFace(ChunkBoundaryFace face) noexcept
 	{
 		return static_cast<std::uint8_t>(face) <
-			static_cast<std::uint8_t>(ChunkBoundaryFace::Count);
+			   static_cast<std::uint8_t>(ChunkBoundaryFace::Count);
 	}
 
-	[[nodiscard]] constexpr std::size_t GetChunkBoundaryFaceIndex(
-		ChunkBoundaryFace face) noexcept
+	[[nodiscard]] constexpr std::size_t GetChunkBoundaryFaceIndex(ChunkBoundaryFace face) noexcept
 	{
 		return static_cast<std::size_t>(face);
 	}
@@ -151,37 +141,28 @@ namespace napa::voxel
 	}
 
 	[[nodiscard]] constexpr bool AreBoundaryContourNormalsEquivalent(
-		QuantizedMeshNormal lhs,
-		QuantizedMeshNormal rhs) noexcept
+		QuantizedMeshNormal lhs, QuantizedMeshNormal rhs) noexcept
 	{
 		const auto difference = [](std::int16_t a, std::int16_t b)
-			{
-				const std::int32_t wideA = a;
-				const std::int32_t wideB = b;
-				return wideA >= wideB
-					? wideA - wideB
-					: wideB - wideA;
-			};
-		return
-			difference(lhs.m_X, rhs.m_X) <=
-				BoundaryContourNormalTolerance &&
-			difference(lhs.m_Y, rhs.m_Y) <=
-				BoundaryContourNormalTolerance &&
-			difference(lhs.m_Z, rhs.m_Z) <=
-				BoundaryContourNormalTolerance;
+		{
+			const std::int32_t wideA = a;
+			const std::int32_t wideB = b;
+			return wideA >= wideB ? wideA - wideB : wideB - wideA;
+		};
+		return difference(lhs.m_X, rhs.m_X) <= BoundaryContourNormalTolerance &&
+			   difference(lhs.m_Y, rhs.m_Y) <= BoundaryContourNormalTolerance &&
+			   difference(lhs.m_Z, rhs.m_Z) <= BoundaryContourNormalTolerance;
 	}
 
 	[[nodiscard]] ChunkBoundaryContourSet MakeEmptyChunkBoundaryContourSet();
 
 	[[nodiscard]] ValidationResult ValidateChunkBoundaryContourSet(
-		const ChunkBoundaryContourSet& contours,
-		ChunkCoord chunk,
+		const ChunkBoundaryContourSet& contours, ChunkCoord chunk,
 		const VoxelWorldConfig& config) noexcept;
 
 	// Records may be a canonical subset. Every adjacent pair present in the
 	// set is compared; missing-neighbor policy belongs to batch validation.
 	[[nodiscard]] ValidationResult ValidateBoundaryContourSet(
-		std::span<const ChunkMeshRecord> records,
-		const VoxelWorldConfig& config,
+		std::span<const ChunkMeshRecord> records, const VoxelWorldConfig& config,
 		BoundaryContourValidationResult& result);
 }

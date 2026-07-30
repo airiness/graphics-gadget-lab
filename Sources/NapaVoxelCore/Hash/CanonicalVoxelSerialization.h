@@ -7,8 +7,7 @@
 namespace napa::voxel
 {
 	inline void WriteCanonicalVoxelWorldConfig(
-		CanonicalHashWriter& writer,
-		const VoxelWorldConfig& config) noexcept
+		CanonicalHashWriter& writer, const VoxelWorldConfig& config) noexcept
 	{
 		const CellAabb& bounds = config.m_LogicalCellBounds;
 		writer.WriteI32(bounds.m_Min.m_X);

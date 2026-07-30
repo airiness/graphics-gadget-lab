@@ -15,43 +15,37 @@
 
 namespace napa::voxel
 {
-	inline constexpr std::array<CellCornerOffset, 8>
-		ReferenceCubeCornerOffsets{
-			CellCornerOffset{ 0, 0, 0 },
-			CellCornerOffset{ 1, 0, 0 },
-			CellCornerOffset{ 0, 1, 0 },
-			CellCornerOffset{ 1, 1, 0 },
-			CellCornerOffset{ 0, 0, 1 },
-			CellCornerOffset{ 1, 0, 1 },
-			CellCornerOffset{ 0, 1, 1 },
-			CellCornerOffset{ 1, 1, 1 },
-		};
+	inline constexpr std::array<CellCornerOffset, 8> ReferenceCubeCornerOffsets{
+		CellCornerOffset{ 0, 0, 0 },
+		CellCornerOffset{ 1, 0, 0 },
+		CellCornerOffset{ 0, 1, 0 },
+		CellCornerOffset{ 1, 1, 0 },
+		CellCornerOffset{ 0, 0, 1 },
+		CellCornerOffset{ 1, 0, 1 },
+		CellCornerOffset{ 0, 1, 1 },
+		CellCornerOffset{ 1, 1, 1 },
+	};
 
-	inline constexpr std::array<
-		std::array<std::uint8_t, 4>,
-		6> ReferenceFreudenthalTetrahedra{
-			std::array<std::uint8_t, 4>{ 0, 1, 3, 7 },
-			std::array<std::uint8_t, 4>{ 0, 3, 2, 7 },
-			std::array<std::uint8_t, 4>{ 0, 2, 6, 7 },
-			std::array<std::uint8_t, 4>{ 0, 6, 4, 7 },
-			std::array<std::uint8_t, 4>{ 0, 4, 5, 7 },
-			std::array<std::uint8_t, 4>{ 0, 5, 1, 7 },
-		};
+	inline constexpr std::array<std::array<std::uint8_t, 4>, 6> ReferenceFreudenthalTetrahedra{
+		std::array<std::uint8_t, 4>{ 0, 1, 3, 7 },
+		std::array<std::uint8_t, 4>{ 0, 3, 2, 7 },
+		std::array<std::uint8_t, 4>{ 0, 2, 6, 7 },
+		std::array<std::uint8_t, 4>{ 0, 6, 4, 7 },
+		std::array<std::uint8_t, 4>{ 0, 4, 5, 7 },
+		std::array<std::uint8_t, 4>{ 0, 5, 1, 7 },
+	};
 
-	inline constexpr std::array<
-		std::array<std::uint8_t, 2>,
-		6> ReferenceTetrahedronEdges{
-			std::array<std::uint8_t, 2>{ 0, 1 },
-			std::array<std::uint8_t, 2>{ 0, 2 },
-			std::array<std::uint8_t, 2>{ 0, 3 },
-			std::array<std::uint8_t, 2>{ 1, 2 },
-			std::array<std::uint8_t, 2>{ 1, 3 },
-			std::array<std::uint8_t, 2>{ 2, 3 },
-		};
+	inline constexpr std::array<std::array<std::uint8_t, 2>, 6> ReferenceTetrahedronEdges{
+		std::array<std::uint8_t, 2>{ 0, 1 },
+		std::array<std::uint8_t, 2>{ 0, 2 },
+		std::array<std::uint8_t, 2>{ 0, 3 },
+		std::array<std::uint8_t, 2>{ 1, 2 },
+		std::array<std::uint8_t, 2>{ 1, 3 },
+		std::array<std::uint8_t, 2>{ 2, 3 },
+	};
 
-	inline constexpr std::array<
-		std::array<std::array<std::uint8_t, 3>, 2>,
-		ChunkBoundaryFaceCount> ReferenceBoundaryFaceTriangles{
+	inline constexpr std::array<std::array<std::array<std::uint8_t, 3>, 2>, ChunkBoundaryFaceCount>
+		ReferenceBoundaryFaceTriangles{
 			std::array{
 				std::array<std::uint8_t, 3>{ 0, 2, 6 },
 				std::array<std::uint8_t, 3>{ 0, 6, 4 },
@@ -76,7 +70,7 @@ namespace napa::voxel
 				std::array<std::uint8_t, 3>{ 6, 4, 7 },
 				std::array<std::uint8_t, 3>{ 4, 5, 7 },
 			},
-		};
+	};
 
 	struct DensityGradient
 	{
@@ -85,8 +79,7 @@ namespace napa::voxel
 		double m_Z = 0.0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const DensityGradient&,
-			const DensityGradient&) noexcept = default;
+			const DensityGradient&, const DensityGradient&) noexcept = default;
 	};
 
 	struct ReferenceEdgeEndpoint
@@ -96,8 +89,7 @@ namespace napa::voxel
 		DensityGradient m_DensityGradient{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const ReferenceEdgeEndpoint&,
-			const ReferenceEdgeEndpoint&) noexcept = default;
+			const ReferenceEdgeEndpoint&, const ReferenceEdgeEndpoint&) noexcept = default;
 	};
 
 	struct ReferenceEdgeVertex
@@ -111,8 +103,7 @@ namespace napa::voxel
 		double m_InterpolationT = 0.0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const ReferenceEdgeVertex&,
-			const ReferenceEdgeVertex&) noexcept = default;
+			const ReferenceEdgeVertex&, const ReferenceEdgeVertex&) noexcept = default;
 	};
 
 	struct ReferenceTriangle
@@ -121,8 +112,7 @@ namespace napa::voxel
 		MeshTriangleWindingEvidence m_WindingEvidence{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const ReferenceTriangle&,
-			const ReferenceTriangle&) noexcept = default;
+			const ReferenceTriangle&, const ReferenceTriangle&) noexcept = default;
 	};
 
 	struct ReferenceTetrahedronPolygonization
@@ -132,10 +122,8 @@ namespace napa::voxel
 		std::uint8_t m_TriangleCount = 0;
 		std::uint8_t m_SkippedDegenerateTriangleCount = 0;
 
-		[[nodiscard]] friend constexpr bool operator==(
-			const ReferenceTetrahedronPolygonization&,
-			const ReferenceTetrahedronPolygonization&) noexcept =
-			default;
+		[[nodiscard]] friend constexpr bool operator==(const ReferenceTetrahedronPolygonization&,
+			const ReferenceTetrahedronPolygonization&) noexcept = default;
 	};
 
 	struct ReferenceWorldMeshingResult
@@ -152,38 +140,23 @@ namespace napa::voxel
 		explicit ReferenceMesher(const VoxelWorld& world) noexcept;
 
 		[[nodiscard]] ValidationResult ComputeSampleDensityGradient(
-			SampleCoord coordinate,
-			DensityGradient& gradient) const noexcept;
+			SampleCoord coordinate, DensityGradient& gradient) const noexcept;
 		// Produces a physical position relative to chunk's origin.
-		[[nodiscard]] ValidationResult InterpolateEdge(
-			ReferenceEdgeEndpoint first,
-			ReferenceEdgeEndpoint second,
-			ChunkCoord chunk,
+		[[nodiscard]] ValidationResult InterpolateEdge(ReferenceEdgeEndpoint first,
+			ReferenceEdgeEndpoint second, ChunkCoord chunk,
 			ReferenceEdgeVertex& vertex) const noexcept;
 		[[nodiscard]] ValidationResult PolygonizeTetrahedron(
-			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners,
-			std::uint8_t tetrahedronIndex,
+			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners, std::uint8_t tetrahedronIndex,
 			const MeshQuantizationContext& quantizationContext,
-			ReferenceTetrahedronPolygonization& polygonization)
-			const noexcept;
-		[[nodiscard]] ValidationResult MeshChunk(
-			ChunkCoord chunk,
-			ChunkMeshRecord& record) const;
-		[[nodiscard]] ValidationResult MeshWorld(
-			ReferenceWorldMeshingResult& result) const;
+			ReferenceTetrahedronPolygonization& polygonization) const noexcept;
+		[[nodiscard]] ValidationResult MeshChunk(ChunkCoord chunk, ChunkMeshRecord& record) const;
+		[[nodiscard]] ValidationResult MeshWorld(ReferenceWorldMeshingResult& result) const;
 
 	private:
-		[[nodiscard]] ValidationResult
-			PolygonizePreparedTetrahedron(
-				const std::array<
-					ReferenceEdgeEndpoint,
-					8>& cubeCorners,
-				std::uint8_t tetrahedronIndex,
-				ChunkCoord chunk,
-				const MeshQuantizationContext&
-					quantizationContext,
-				ReferenceTetrahedronPolygonization&
-					polygonization) const noexcept;
+		[[nodiscard]] ValidationResult PolygonizePreparedTetrahedron(
+			const std::array<ReferenceEdgeEndpoint, 8>& cubeCorners, std::uint8_t tetrahedronIndex,
+			ChunkCoord chunk, const MeshQuantizationContext& quantizationContext,
+			ReferenceTetrahedronPolygonization& polygonization) const noexcept;
 
 		const VoxelWorld& m_World;
 	};

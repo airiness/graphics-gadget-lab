@@ -14,18 +14,13 @@ namespace napa::voxel
 {
 	namespace
 	{
-		[[nodiscard]] SampleAabb IntersectSampleOwnerChunk(
-			ChunkCoord chunk,
-			std::uint32_t chunkCellCount,
-			const SampleAabb& logicalBounds) noexcept
+		[[nodiscard]] SampleAabb IntersectSampleOwnerChunk(ChunkCoord chunk,
+			std::uint32_t chunkCellCount, const SampleAabb& logicalBounds) noexcept
 		{
 			const std::int64_t chunkSize = chunkCellCount;
-			const std::int64_t minimumX =
-				static_cast<std::int64_t>(chunk.m_X) * chunkSize;
-			const std::int64_t minimumY =
-				static_cast<std::int64_t>(chunk.m_Y) * chunkSize;
-			const std::int64_t minimumZ =
-				static_cast<std::int64_t>(chunk.m_Z) * chunkSize;
+			const std::int64_t minimumX = static_cast<std::int64_t>(chunk.m_X) * chunkSize;
+			const std::int64_t minimumY = static_cast<std::int64_t>(chunk.m_Y) * chunkSize;
+			const std::int64_t minimumZ = static_cast<std::int64_t>(chunk.m_Z) * chunkSize;
 			const std::int64_t maximumX = minimumX + chunkSize;
 			const std::int64_t maximumY = minimumY + chunkSize;
 			const std::int64_t maximumZ = minimumZ + chunkSize;
@@ -64,8 +59,7 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelWorld::Create(
-		const VoxelWorldConfig& config,
-		std::unique_ptr<VoxelWorld>& world)
+		const VoxelWorldConfig& config, std::unique_ptr<VoxelWorld>& world)
 	{
 		const ValidationResult configResult = ValidateConfig(config);
 		if (configResult.Failed())
@@ -74,8 +68,7 @@ namespace napa::voxel
 		}
 
 		LogicalDomainMetrics metrics{};
-		const ValidationResult metricsResult =
-			ComputeLogicalDomainMetrics(config, metrics);
+		const ValidationResult metricsResult = ComputeLogicalDomainMetrics(config, metrics);
 		if (metricsResult.Failed())
 		{
 			return metricsResult;
@@ -83,32 +76,22 @@ namespace napa::voxel
 
 		SampleAabb sampleBounds{};
 		const ValidationResult boundsResult =
-			LogicalCellBoundsToSampleBounds(
-				config.m_LogicalCellBounds,
-				sampleBounds);
+			LogicalCellBoundsToSampleBounds(config.m_LogicalCellBounds, sampleBounds);
 		if (boundsResult.Failed())
 		{
 			return boundsResult;
 		}
 
 		std::unique_ptr<VoxelWorld> created =
-			std::make_unique<VoxelWorld>(
-				ConstructionToken{},
-				config,
-				metrics,
-				sampleBounds);
+			std::make_unique<VoxelWorld>(ConstructionToken{}, config, metrics, sampleBounds);
 		world = std::move(created);
 		return {};
 	}
 
-	VoxelWorld::VoxelWorld(
-		ConstructionToken,
-		const VoxelWorldConfig& config,
-		const LogicalDomainMetrics& metrics,
-		SampleAabb logicalSampleBounds)
-		: m_Config(config)
-		, m_LogicalDomainMetrics(metrics)
-		, m_LogicalSampleBounds(logicalSampleBounds)
+	VoxelWorld::VoxelWorld(ConstructionToken, const VoxelWorldConfig& config,
+		const LogicalDomainMetrics& metrics, SampleAabb logicalSampleBounds) :
+		m_Config(config), m_LogicalDomainMetrics(metrics),
+		m_LogicalSampleBounds(logicalSampleBounds)
 	{
 	}
 
@@ -117,8 +100,7 @@ namespace napa::voxel
 		return m_Config;
 	}
 
-	const LogicalDomainMetrics& VoxelWorld::GetLogicalDomainMetrics()
-		const noexcept
+	const LogicalDomainMetrics& VoxelWorld::GetLogicalDomainMetrics() const noexcept
 	{
 		return m_LogicalDomainMetrics;
 	}
@@ -151,14 +133,10 @@ namespace napa::voxel
 	const VoxelChunk* VoxelWorld::FindChunk(ChunkCoord chunk) const noexcept
 	{
 		const auto iterator = m_Chunks.find(chunk);
-		return iterator != m_Chunks.end()
-			? iterator->second.get()
-			: nullptr;
+		return iterator != m_Chunks.end() ? iterator->second.get() : nullptr;
 	}
 
-	ValidationResult VoxelWorld::EnsureChunkAllocated(
-		ChunkCoord chunk,
-		bool& allocated)
+	ValidationResult VoxelWorld::EnsureChunkAllocated(ChunkCoord chunk, bool& allocated)
 	{
 		if (!m_LogicalDomainMetrics.m_SampleOwnerChunkBounds.Contains(chunk))
 		{
@@ -172,23 +150,19 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelWorld::ReadOriginalSample(
-		SampleCoord coordinate,
-		VoxelSample& sample) const noexcept
+		SampleCoord coordinate, VoxelSample& sample) const noexcept
 	{
 		return ReadSample(coordinate, sample, true);
 	}
 
 	ValidationResult VoxelWorld::ReadCurrentSample(
-		SampleCoord coordinate,
-		VoxelSample& sample) const noexcept
+		SampleCoord coordinate, VoxelSample& sample) const noexcept
 	{
 		return ReadSample(coordinate, sample, false);
 	}
 
 	ValidationResult VoxelWorld::WriteOriginalAndCurrentSample(
-		SampleCoord coordinate,
-		VoxelSample input,
-		bool& changed)
+		SampleCoord coordinate, VoxelSample input, bool& changed)
 	{
 		if (m_OriginalStateSealed)
 		{
@@ -196,24 +170,21 @@ namespace napa::voxel
 		}
 
 		OwnedSampleAddress address{};
-		const ValidationResult addressResult =
-			ResolveLogicalSample(coordinate, address);
+		const ValidationResult addressResult = ResolveLogicalSample(coordinate, address);
 		if (addressResult.Failed())
 		{
 			return addressResult;
 		}
 
 		VoxelSample prepared{};
-		const ValidationResult prepareResult =
-			PrepareVoxelSampleForStorage(input, prepared);
+		const ValidationResult prepareResult = PrepareVoxelSampleForStorage(input, prepared);
 		if (prepareResult.Failed())
 		{
 			return prepareResult;
 		}
 
 		auto iterator = m_Chunks.find(address.m_Owner);
-		if (iterator == m_Chunks.end() &&
-			prepared == DefaultVoxelSample)
+		if (iterator == m_Chunks.end() && prepared == DefaultVoxelSample)
 		{
 			changed = false;
 			return {};
@@ -224,13 +195,9 @@ namespace napa::voxel
 			VoxelSample original{};
 			VoxelSample current{};
 			const ValidationResult originalResult =
-				iterator->second->ReadOriginalSample(
-					address.m_Local,
-					original);
+				iterator->second->ReadOriginalSample(address.m_Local, original);
 			const ValidationResult currentResult =
-				iterator->second->ReadCurrentSample(
-					address.m_Local,
-					current);
+				iterator->second->ReadCurrentSample(address.m_Local, current);
 			if (originalResult.Failed())
 			{
 				return originalResult;
@@ -246,18 +213,15 @@ namespace napa::voxel
 			}
 		}
 
-		if (m_WorldVoxelRevision ==
-			std::numeric_limits<std::uint64_t>::max())
+		if (m_WorldVoxelRevision == std::numeric_limits<std::uint64_t>::max())
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
 
 		VoxelChunk* chunk = nullptr;
 		bool allocated = false;
-		const ValidationResult allocationResult = FindOrCreateChunk(
-			address.m_Owner,
-			chunk,
-			allocated);
+		const ValidationResult allocationResult =
+			FindOrCreateChunk(address.m_Owner, chunk, allocated);
 		if (allocationResult.Failed())
 		{
 			return allocationResult;
@@ -265,10 +229,7 @@ namespace napa::voxel
 		static_cast<void>(allocated);
 		bool chunkChanged = false;
 		const ValidationResult writeResult =
-			chunk->WriteOriginalAndCurrentSample(
-				address.m_Local,
-				prepared,
-				chunkChanged);
+			chunk->WriteOriginalAndCurrentSample(address.m_Local, prepared, chunkChanged);
 		if (writeResult.Failed())
 		{
 			return writeResult;
@@ -284,15 +245,12 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult VoxelWorld::RestoreAll(
-		RestoreResult& result)
+	ValidationResult VoxelWorld::RestoreAll(RestoreResult& result)
 	{
 		return RestoreRegionInternal(m_LogicalSampleBounds, result);
 	}
 
-	ValidationResult VoxelWorld::RestoreSampleOwnerChunk(
-		ChunkCoord chunk,
-		RestoreResult& result)
+	ValidationResult VoxelWorld::RestoreSampleOwnerChunk(ChunkCoord chunk, RestoreResult& result)
 	{
 		if (!m_LogicalDomainMetrics.m_SampleOwnerChunkBounds.Contains(chunk))
 		{
@@ -301,16 +259,12 @@ namespace napa::voxel
 			};
 		}
 
-		const SampleAabb region = IntersectSampleOwnerChunk(
-			chunk,
-			m_Config.m_ChunkCellCount,
-			m_LogicalSampleBounds);
+		const SampleAabb region =
+			IntersectSampleOwnerChunk(chunk, m_Config.m_ChunkCellCount, m_LogicalSampleBounds);
 		return RestoreRegionInternal(region, result);
 	}
 
-	ValidationResult VoxelWorld::RestoreRegion(
-		const SampleAabb& region,
-		RestoreResult& result)
+	ValidationResult VoxelWorld::RestoreRegion(const SampleAabb& region, RestoreResult& result)
 	{
 		if (region.IsEmpty())
 		{
@@ -325,29 +279,24 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelWorld::WriteCurrentSample(
-		SampleCoord coordinate,
-		VoxelSample input,
-		bool& changed)
+		SampleCoord coordinate, VoxelSample input, bool& changed)
 	{
 		OwnedSampleAddress address{};
-		const ValidationResult addressResult =
-			ResolveLogicalSample(coordinate, address);
+		const ValidationResult addressResult = ResolveLogicalSample(coordinate, address);
 		if (addressResult.Failed())
 		{
 			return addressResult;
 		}
 
 		VoxelSample prepared{};
-		const ValidationResult prepareResult =
-			PrepareVoxelSampleForStorage(input, prepared);
+		const ValidationResult prepareResult = PrepareVoxelSampleForStorage(input, prepared);
 		if (prepareResult.Failed())
 		{
 			return prepareResult;
 		}
 
 		auto iterator = m_Chunks.find(address.m_Owner);
-		if (iterator == m_Chunks.end() &&
-			prepared == DefaultVoxelSample)
+		if (iterator == m_Chunks.end() && prepared == DefaultVoxelSample)
 		{
 			changed = false;
 			return {};
@@ -357,9 +306,7 @@ namespace napa::voxel
 		{
 			VoxelSample current{};
 			const ValidationResult readResult =
-				iterator->second->ReadCurrentSample(
-					address.m_Local,
-					current);
+				iterator->second->ReadCurrentSample(address.m_Local, current);
 			if (readResult.Failed())
 			{
 				return readResult;
@@ -371,18 +318,15 @@ namespace napa::voxel
 			}
 		}
 
-		if (m_WorldVoxelRevision ==
-			std::numeric_limits<std::uint64_t>::max())
+		if (m_WorldVoxelRevision == std::numeric_limits<std::uint64_t>::max())
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
 
 		VoxelChunk* chunk = nullptr;
 		bool allocated = false;
-		const ValidationResult allocationResult = FindOrCreateChunk(
-			address.m_Owner,
-			chunk,
-			allocated);
+		const ValidationResult allocationResult =
+			FindOrCreateChunk(address.m_Owner, chunk, allocated);
 		if (allocationResult.Failed())
 		{
 			return allocationResult;
@@ -390,10 +334,7 @@ namespace napa::voxel
 		static_cast<void>(allocated);
 		bool chunkChanged = false;
 		const ValidationResult writeResult =
-			chunk->WriteCurrentSample(
-				address.m_Local,
-				prepared,
-				chunkChanged);
+			chunk->WriteCurrentSample(address.m_Local, prepared, chunkChanged);
 		if (writeResult.Failed())
 		{
 			return writeResult;
@@ -410,28 +351,21 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelWorld::ResolveLogicalSample(
-		SampleCoord coordinate,
-		OwnedSampleAddress& address) const noexcept
+		SampleCoord coordinate, OwnedSampleAddress& address) const noexcept
 	{
 		if (!m_LogicalSampleBounds.Contains(coordinate))
 		{
 			return { ValidationError::SampleOutsideLogicalBounds };
 		}
 
-		return ResolveSampleOwner(
-			coordinate,
-			m_Config.m_ChunkCellCount,
-			address);
+		return ResolveSampleOwner(coordinate, m_Config.m_ChunkCellCount, address);
 	}
 
 	ValidationResult VoxelWorld::ReadSample(
-		SampleCoord coordinate,
-		VoxelSample& sample,
-		bool original) const noexcept
+		SampleCoord coordinate, VoxelSample& sample, bool original) const noexcept
 	{
 		OwnedSampleAddress address{};
-		const ValidationResult addressResult =
-			ResolveLogicalSample(coordinate, address);
+		const ValidationResult addressResult = ResolveLogicalSample(coordinate, address);
 		if (addressResult.Failed())
 		{
 			return addressResult;
@@ -444,15 +378,12 @@ namespace napa::voxel
 			return {};
 		}
 
-		return original
-			? iterator->second->ReadOriginalSample(address.m_Local, sample)
+		return original ? iterator->second->ReadOriginalSample(address.m_Local, sample)
 			: iterator->second->ReadCurrentSample(address.m_Local, sample);
 	}
 
 	ValidationResult VoxelWorld::FindOrCreateChunk(
-		ChunkCoord coordinate,
-		VoxelChunk*& chunk,
-		bool& allocated)
+		ChunkCoord coordinate, VoxelChunk*& chunk, bool& allocated)
 	{
 		const auto existing = m_Chunks.find(coordinate);
 		if (existing != m_Chunks.end())
@@ -463,45 +394,32 @@ namespace napa::voxel
 		}
 
 		std::unique_ptr<VoxelChunk> created;
-		const ValidationResult createResult = VoxelChunk::Create(
-			m_Config.m_ChunkCellCount,
-			created);
+		const ValidationResult createResult =
+			VoxelChunk::Create(m_Config.m_ChunkCellCount, created);
 		if (createResult.Failed())
 		{
 			return createResult;
 		}
 
-		const auto [iterator, inserted] = m_Chunks.try_emplace(
-			coordinate,
-			std::move(created));
+		const auto [iterator, inserted] = m_Chunks.try_emplace(coordinate, std::move(created));
 		chunk = iterator->second.get();
 		allocated = inserted;
 		return {};
 	}
 
 	ValidationResult VoxelWorld::RestoreRegionInternal(
-		const SampleAabb& region,
-		RestoreResult& result)
+		const SampleAabb& region, RestoreResult& result)
 	{
-		using ChunkRestoreMap = std::map<
-			ChunkCoord,
-			std::vector<LocalCoord>,
-			ChunkCoordZYXLess>;
+		using ChunkRestoreMap = std::map<ChunkCoord, std::vector<LocalCoord>, ChunkCoordZYXLess>;
 
 		RestoreResult restored{};
 		ChunkRestoreMap chunkRestores;
 
-		for (std::int64_t z = region.m_Min.m_Z;
-			z < region.m_MaxExclusive.m_Z;
-			++z)
+		for (std::int64_t z = region.m_Min.m_Z; z < region.m_MaxExclusive.m_Z; ++z)
 		{
-			for (std::int64_t y = region.m_Min.m_Y;
-				y < region.m_MaxExclusive.m_Y;
-				++y)
+			for (std::int64_t y = region.m_Min.m_Y; y < region.m_MaxExclusive.m_Y; ++y)
 			{
-				for (std::int64_t x = region.m_Min.m_X;
-					x < region.m_MaxExclusive.m_X;
-					++x)
+				for (std::int64_t x = region.m_Min.m_X; x < region.m_MaxExclusive.m_X; ++x)
 				{
 					const SampleCoord coordinate{
 						static_cast<std::int32_t>(x),
@@ -510,10 +428,7 @@ namespace napa::voxel
 					};
 					OwnedSampleAddress address{};
 					const ValidationResult addressResult =
-						ResolveSampleOwner(
-							coordinate,
-							m_Config.m_ChunkCellCount,
-							address);
+						ResolveSampleOwner(coordinate, m_Config.m_ChunkCellCount, address);
 					if (addressResult.Failed())
 					{
 						return addressResult;
@@ -528,17 +443,13 @@ namespace napa::voxel
 					VoxelSample original{};
 					VoxelSample current{};
 					const ValidationResult originalResult =
-						iterator->second->ReadOriginalSample(
-							address.m_Local,
-							original);
+						iterator->second->ReadOriginalSample(address.m_Local, original);
 					if (originalResult.Failed())
 					{
 						return originalResult;
 					}
 					const ValidationResult currentResult =
-						iterator->second->ReadCurrentSample(
-							address.m_Local,
-							current);
+						iterator->second->ReadCurrentSample(address.m_Local, current);
 					if (currentResult.Failed())
 					{
 						return currentResult;
@@ -548,10 +459,8 @@ namespace napa::voxel
 						continue;
 					}
 
-					restored.m_ChangedSampleCoordinates.push_back(
-						coordinate);
-					chunkRestores[address.m_Owner].push_back(
-						address.m_Local);
+					restored.m_ChangedSampleCoordinates.push_back(coordinate);
+					chunkRestores[address.m_Owner].push_back(address.m_Local);
 				}
 			}
 		}
@@ -562,18 +471,15 @@ namespace napa::voxel
 			return {};
 		}
 
-		if (m_WorldVoxelRevision ==
-			std::numeric_limits<std::uint64_t>::max())
+		if (m_WorldVoxelRevision == std::numeric_limits<std::uint64_t>::max())
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
 		for (const auto& [chunkCoordinate, coordinates] : chunkRestores)
 		{
 			static_cast<void>(coordinates);
-			const VoxelChunk* const chunk =
-				m_Chunks.find(chunkCoordinate)->second.get();
-			if (chunk->GetVoxelRevision() ==
-				std::numeric_limits<std::uint64_t>::max())
+			const VoxelChunk* const chunk = m_Chunks.find(chunkCoordinate)->second.get();
+			if (chunk->GetVoxelRevision() == std::numeric_limits<std::uint64_t>::max())
 			{
 				return { ValidationError::ArithmeticOverflow };
 			}
@@ -581,13 +487,10 @@ namespace napa::voxel
 
 		for (const auto& [chunkCoordinate, coordinates] : chunkRestores)
 		{
-			VoxelChunk* const chunk =
-				m_Chunks.find(chunkCoordinate)->second.get();
+			VoxelChunk* const chunk = m_Chunks.find(chunkCoordinate)->second.get();
 			bool chunkChanged = false;
-			const ValidationResult restoreResult =
-				chunk->RestoreCurrentSamples(
-					std::span<const LocalCoord>{ coordinates },
-					chunkChanged);
+			const ValidationResult restoreResult = chunk->RestoreCurrentSamples(
+				std::span<const LocalCoord>{ coordinates }, chunkChanged);
 			if (restoreResult.Failed())
 			{
 				return restoreResult;
@@ -601,12 +504,10 @@ namespace napa::voxel
 	}
 
 	ValidationResult VoxelWorld::InitializePreparedSample(
-		SampleCoord coordinate,
-		VoxelSample prepared)
+		SampleCoord coordinate, VoxelSample prepared)
 	{
 		OwnedSampleAddress address{};
-		const ValidationResult addressResult =
-			ResolveLogicalSample(coordinate, address);
+		const ValidationResult addressResult = ResolveLogicalSample(coordinate, address);
 		if (addressResult.Failed())
 		{
 			return addressResult;
@@ -618,18 +519,14 @@ namespace napa::voxel
 
 		VoxelChunk* chunk = nullptr;
 		bool allocated = false;
-		const ValidationResult allocationResult = FindOrCreateChunk(
-			address.m_Owner,
-			chunk,
-			allocated);
+		const ValidationResult allocationResult =
+			FindOrCreateChunk(address.m_Owner, chunk, allocated);
 		if (allocationResult.Failed())
 		{
 			return allocationResult;
 		}
 		static_cast<void>(allocated);
-		return chunk->InitializePreparedSample(
-			address.m_Local,
-			prepared);
+		return chunk->InitializePreparedSample(address.m_Local, prepared);
 	}
 
 	void VoxelWorld::CommitGeneratedOriginalState() noexcept

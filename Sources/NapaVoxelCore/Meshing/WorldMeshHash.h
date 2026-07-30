@@ -20,14 +20,12 @@ namespace napa::voxel
 		std::uint64_t m_SkippedDegenerateTriangleCount = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const WorldMeshValidationResult&,
-			const WorldMeshValidationResult&) noexcept = default;
+			const WorldMeshValidationResult&, const WorldMeshValidationResult&) noexcept = default;
 	};
 
 	// Records must cover the complete Cell-owner Chunk Domain in canonical
 	// z/y/x order, including empty Chunk meshes.
 	[[nodiscard]] ValidationResult ValidateAndHashWorldMeshRecords(
-		std::span<const ChunkMeshRecord> records,
-		const VoxelWorldConfig& config,
+		std::span<const ChunkMeshRecord> records, const VoxelWorldConfig& config,
 		WorldMeshValidationResult& result);
 }

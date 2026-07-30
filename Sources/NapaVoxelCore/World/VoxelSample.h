@@ -25,23 +25,18 @@ namespace napa::voxel
 		std::uint8_t m_Damage = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const VoxelSample&,
-			const VoxelSample&) noexcept = default;
+			const VoxelSample&, const VoxelSample&) noexcept = default;
 	};
 
 	inline constexpr VoxelSample DefaultVoxelSample{};
 
-	[[nodiscard]] constexpr bool IsKnownVoxelMaterial(
-		VoxelMaterial material) noexcept
+	[[nodiscard]] constexpr bool IsKnownVoxelMaterial(VoxelMaterial material) noexcept
 	{
-		return
-			material == VoxelMaterial::Empty ||
-			material == VoxelMaterial::Soil ||
-			material == VoxelMaterial::Stone;
+		return material == VoxelMaterial::Empty || material == VoxelMaterial::Soil ||
+			   material == VoxelMaterial::Stone;
 	}
 
-	[[nodiscard]] constexpr ValidationResult ValidateVoxelSample(
-		VoxelSample sample) noexcept
+	[[nodiscard]] constexpr ValidationResult ValidateVoxelSample(VoxelSample sample) noexcept
 	{
 		if (!IsKnownVoxelMaterial(sample.m_Material))
 		{
@@ -50,8 +45,7 @@ namespace napa::voxel
 
 		if (sample.m_Density < IsoValue)
 		{
-			if (sample.m_Material != VoxelMaterial::Empty ||
-				sample.m_Damage != 0)
+			if (sample.m_Material != VoxelMaterial::Empty || sample.m_Damage != 0)
 			{
 				return { ValidationError::NonCanonicalVoxelSample };
 			}
@@ -64,8 +58,7 @@ namespace napa::voxel
 	}
 
 	[[nodiscard]] constexpr ValidationResult PrepareVoxelSampleForStorage(
-		VoxelSample input,
-		VoxelSample& output) noexcept
+		VoxelSample input, VoxelSample& output) noexcept
 	{
 		if (!IsKnownVoxelMaterial(input.m_Material))
 		{
@@ -97,8 +90,5 @@ namespace napa::voxel
 	static_assert(offsetof(VoxelSample, m_Density) == 0);
 	static_assert(offsetof(VoxelSample, m_Material) == 1);
 	static_assert(offsetof(VoxelSample, m_Damage) == 2);
-	static_assert(
-		std::is_same_v<
-			std::underlying_type_t<VoxelMaterial>,
-			std::uint8_t>);
+	static_assert(std::is_same_v<std::underlying_type_t<VoxelMaterial>, std::uint8_t>);
 }

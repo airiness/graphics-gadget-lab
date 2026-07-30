@@ -7,8 +7,7 @@
 
 namespace napa::voxel
 {
-	inline constexpr double CanonicalPositionQuantizationScale =
-		65536.0;
+	inline constexpr double CanonicalPositionQuantizationScale = 65536.0;
 
 	struct VoxelWorldConfig
 	{
@@ -36,13 +35,10 @@ namespace napa::voxel
 		std::uint64_t m_CellOwnerChunkCount = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const LogicalDomainMetrics&,
-			const LogicalDomainMetrics&) noexcept = default;
+			const LogicalDomainMetrics&, const LogicalDomainMetrics&) noexcept = default;
 	};
 
 	[[nodiscard]] ValidationResult ComputeLogicalDomainMetrics(
-		const VoxelWorldConfig& config,
-		LogicalDomainMetrics& metrics) noexcept;
-	[[nodiscard]] ValidationResult ValidateConfig(
-		const VoxelWorldConfig& config) noexcept;
+		const VoxelWorldConfig& config, LogicalDomainMetrics& metrics) noexcept;
+	[[nodiscard]] ValidationResult ValidateConfig(const VoxelWorldConfig& config) noexcept;
 }

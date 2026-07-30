@@ -16,11 +16,9 @@ namespace napa::voxel
 		std::uint64_t m_SourceWorldVoxelRevision = 0;
 		MeshData m_Mesh;
 		// Matches material-section order, then triangle index order.
-		std::vector<MeshTriangleWindingEvidence>
-			m_WindingEvidence;
+		std::vector<MeshTriangleWindingEvidence> m_WindingEvidence;
 		MeshValidationResult m_Validation{};
 		std::uint64_t m_SkippedDegenerateTriangleCount = 0;
-		ChunkBoundaryContourSet m_BoundaryContours =
-			MakeEmptyChunkBoundaryContourSet();
+		ChunkBoundaryContourSet m_BoundaryContours = MakeEmptyChunkBoundaryContourSet();
 	};
 }

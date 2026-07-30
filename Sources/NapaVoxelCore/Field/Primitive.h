@@ -20,8 +20,7 @@ namespace napa::voxel
 		double m_Z = 0.0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const Double3&,
-			const Double3&) noexcept = default;
+			const Double3&, const Double3&) noexcept = default;
 	};
 
 	struct PrimitiveStableId
@@ -29,8 +28,7 @@ namespace napa::voxel
 		std::uint64_t m_Value = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const PrimitiveStableId&,
-			const PrimitiveStableId&) noexcept = default;
+			const PrimitiveStableId&, const PrimitiveStableId&) noexcept = default;
 	};
 
 	struct PrimitivePriority
@@ -38,8 +36,7 @@ namespace napa::voxel
 		std::int32_t m_Value = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const PrimitivePriority&,
-			const PrimitivePriority&) noexcept = default;
+			const PrimitivePriority&, const PrimitivePriority&) noexcept = default;
 	};
 
 	struct SpherePrimitive
@@ -88,20 +85,14 @@ namespace napa::voxel
 		std::uint64_t m_InitialVoxelHash = 0;
 	};
 
-	[[nodiscard]] ValidationResult ValidatePrimitive(
-		const PrimitiveDesc& primitive) noexcept;
+	[[nodiscard]] ValidationResult ValidatePrimitive(const PrimitiveDesc& primitive) noexcept;
 	[[nodiscard]] ValidationResult ValidatePrimitiveSet(
 		std::span<const PrimitiveDesc> primitives) noexcept;
 	[[nodiscard]] ValidationResult EvaluatePrimitiveSignedDistance(
-		const PrimitiveDesc& primitive,
-		Double3 position,
-		double& signedDistance) noexcept;
-	[[nodiscard]] ValidationResult ValidateEmptyCellSafetyMargin(
-		const VoxelWorld& world) noexcept;
-	[[nodiscard]] ValidationResult GeneratePrimitiveVoxelWorld(
-		const VoxelWorldConfig& config,
-		std::span<const PrimitiveDesc> primitives,
-		std::unique_ptr<VoxelWorld>& world,
+		const PrimitiveDesc& primitive, Double3 position, double& signedDistance) noexcept;
+	[[nodiscard]] ValidationResult ValidateEmptyCellSafetyMargin(const VoxelWorld& world) noexcept;
+	[[nodiscard]] ValidationResult GeneratePrimitiveVoxelWorld(const VoxelWorldConfig& config,
+		std::span<const PrimitiveDesc> primitives, std::unique_ptr<VoxelWorld>& world,
 		PrimitiveWorldGenerationResult& result);
 
 	static_assert(std::is_standard_layout_v<Double3>);

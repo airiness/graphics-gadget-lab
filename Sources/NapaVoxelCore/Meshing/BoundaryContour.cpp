@@ -14,9 +14,7 @@ namespace napa::voxel
 {
 	namespace
 	{
-		[[nodiscard]] bool LessNormal(
-			QuantizedMeshNormal lhs,
-			QuantizedMeshNormal rhs) noexcept
+		[[nodiscard]] bool LessNormal(QuantizedMeshNormal lhs, QuantizedMeshNormal rhs) noexcept
 		{
 			if (lhs.m_X != rhs.m_X)
 			{
@@ -30,8 +28,7 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] bool LessEndpoint(
-			const BoundaryContourEndpoint& lhs,
-			const BoundaryContourEndpoint& rhs) noexcept
+			const BoundaryContourEndpoint& lhs, const BoundaryContourEndpoint& rhs) noexcept
 		{
 			const QuantizedBoundaryContourPositionZYXLess lessPosition{};
 			if (lessPosition(lhs.m_Position, rhs.m_Position))
@@ -45,8 +42,7 @@ namespace napa::voxel
 			return LessNormal(lhs.m_Normal, rhs.m_Normal);
 		}
 
-		[[nodiscard]] bool IsValidQuantizedNormal(
-			QuantizedMeshNormal normal) noexcept
+		[[nodiscard]] bool IsValidQuantizedNormal(QuantizedMeshNormal normal) noexcept
 		{
 			if (normal.m_X == std::numeric_limits<std::int16_t>::min() ||
 				normal.m_Y == std::numeric_limits<std::int16_t>::min() ||
@@ -57,68 +53,40 @@ namespace napa::voxel
 			const double x = normal.m_X;
 			const double y = normal.m_Y;
 			const double z = normal.m_Z;
-			const double length =
-				std::sqrt(x * x + y * y + z * z) /
-				MeshNormalQuantizationScale;
-			return
-				std::isfinite(length) &&
-				std::abs(length - 1.0) <=
-					MeshNormalLengthTolerance;
+			const double length = std::sqrt(x * x + y * y + z * z) / MeshNormalQuantizationScale;
+			return std::isfinite(length) && std::abs(length - 1.0) <= MeshNormalLengthTolerance;
 		}
 
 		[[nodiscard]] bool AreSegmentsEquivalent(
-			const BoundaryContourSegment& lhs,
-			const BoundaryContourSegment& rhs) noexcept
+			const BoundaryContourSegment& lhs, const BoundaryContourSegment& rhs) noexcept
 		{
-			return
-				lhs.m_EndpointA.m_Position ==
-					rhs.m_EndpointA.m_Position &&
-				lhs.m_EndpointB.m_Position ==
-					rhs.m_EndpointB.m_Position &&
+			return lhs.m_EndpointA.m_Position == rhs.m_EndpointA.m_Position &&
+				lhs.m_EndpointB.m_Position == rhs.m_EndpointB.m_Position &&
 				AreBoundaryContourNormalsEquivalent(
-					lhs.m_EndpointA.m_Normal,
-					rhs.m_EndpointA.m_Normal) &&
+					lhs.m_EndpointA.m_Normal, rhs.m_EndpointA.m_Normal) &&
 				AreBoundaryContourNormalsEquivalent(
-					lhs.m_EndpointB.m_Normal,
-					rhs.m_EndpointB.m_Normal);
+					lhs.m_EndpointB.m_Normal, rhs.m_EndpointB.m_Normal);
 		}
 
-		[[nodiscard]] ValidationResult ComputeQuantizedChunkBounds(
-			ChunkCoord chunk,
-			std::uint32_t chunkCellCount,
-			QuantizedBoundaryContourPosition& minimum,
+		[[nodiscard]] ValidationResult ComputeQuantizedChunkBounds(ChunkCoord chunk,
+			std::uint32_t chunkCellCount, QuantizedBoundaryContourPosition& minimum,
 			QuantizedBoundaryContourPosition& maximum) noexcept
 		{
-			const auto computeAxis =
-				[chunkCellCount](
-					std::int32_t chunkAxis,
-					std::int64_t& minimumAxis,
-					std::int64_t& maximumAxis) noexcept
+			const auto computeAxis = [chunkCellCount](std::int32_t chunkAxis,
+				std::int64_t& minimumAxis,
+				std::int64_t& maximumAxis) noexcept
 				{
 					const std::optional<std::int64_t> origin =
-						CheckedMul(
-							static_cast<std::int64_t>(chunkAxis),
-							static_cast<std::int64_t>(
-								chunkCellCount));
+						CheckedMul(static_cast<std::int64_t>(chunkAxis),
+							static_cast<std::int64_t>(chunkCellCount));
 					const std::optional<std::int64_t> maximumVoxel =
-						origin
-							? CheckedAdd(
-								*origin,
-								static_cast<std::int64_t>(
-									chunkCellCount))
-							: std::nullopt;
+						origin ? CheckedAdd(*origin, static_cast<std::int64_t>(chunkCellCount))
+						: std::nullopt;
 					const std::optional<std::int64_t> preparedMinimum =
-						origin
-							? CheckedMul(
-								*origin,
-								BoundaryContourPositionScale)
-							: std::nullopt;
+						origin ? CheckedMul(*origin, BoundaryContourPositionScale) : std::nullopt;
 					const std::optional<std::int64_t> preparedMaximum =
-						maximumVoxel
-							? CheckedMul(
-								*maximumVoxel,
-								BoundaryContourPositionScale)
-							: std::nullopt;
+						maximumVoxel ? CheckedMul(*maximumVoxel, BoundaryContourPositionScale)
+						: std::nullopt;
 					if (!preparedMinimum || !preparedMaximum)
 					{
 						return false;
@@ -130,18 +98,9 @@ namespace napa::voxel
 
 			QuantizedBoundaryContourPosition preparedMinimum{};
 			QuantizedBoundaryContourPosition preparedMaximum{};
-			if (!computeAxis(
-					chunk.m_X,
-					preparedMinimum.m_X,
-					preparedMaximum.m_X) ||
-				!computeAxis(
-					chunk.m_Y,
-					preparedMinimum.m_Y,
-					preparedMaximum.m_Y) ||
-				!computeAxis(
-					chunk.m_Z,
-					preparedMinimum.m_Z,
-					preparedMaximum.m_Z))
+			if (!computeAxis(chunk.m_X, preparedMinimum.m_X, preparedMaximum.m_X) ||
+				!computeAxis(chunk.m_Y, preparedMinimum.m_Y, preparedMaximum.m_Y) ||
+				!computeAxis(chunk.m_Z, preparedMinimum.m_Z, preparedMaximum.m_Z))
 			{
 				return { ValidationError::ArithmeticOverflow };
 			}
@@ -150,19 +109,13 @@ namespace napa::voxel
 			return {};
 		}
 
-		[[nodiscard]] bool IsPositionInChunkFace(
-			QuantizedBoundaryContourPosition position,
-			ChunkBoundaryFace face,
-			QuantizedBoundaryContourPosition minimum,
+		[[nodiscard]] bool IsPositionInChunkFace(QuantizedBoundaryContourPosition position,
+			ChunkBoundaryFace face, QuantizedBoundaryContourPosition minimum,
 			QuantizedBoundaryContourPosition maximum) noexcept
 		{
-			const bool inside =
-				position.m_X >= minimum.m_X &&
-				position.m_X <= maximum.m_X &&
-				position.m_Y >= minimum.m_Y &&
-				position.m_Y <= maximum.m_Y &&
-				position.m_Z >= minimum.m_Z &&
-				position.m_Z <= maximum.m_Z;
+			const bool inside = position.m_X >= minimum.m_X && position.m_X <= maximum.m_X &&
+				position.m_Y >= minimum.m_Y && position.m_Y <= maximum.m_Y &&
+				position.m_Z >= minimum.m_Z && position.m_Z <= maximum.m_Z;
 			if (!inside)
 			{
 				return false;
@@ -189,8 +142,7 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] ValidationResult ValidateBoundaryContourRecord(
-			const BoundaryContourRecord& record,
-			ChunkCoord chunk,
+			const BoundaryContourRecord& record, ChunkCoord chunk,
 			const VoxelWorldConfig& config) noexcept
 		{
 			if (!IsKnownChunkBoundaryFace(record.m_Face))
@@ -201,11 +153,7 @@ namespace napa::voxel
 			QuantizedBoundaryContourPosition minimum{};
 			QuantizedBoundaryContourPosition maximum{};
 			const ValidationResult boundsResult =
-				ComputeQuantizedChunkBounds(
-					chunk,
-					config.m_ChunkCellCount,
-					minimum,
-					maximum);
+				ComputeQuantizedChunkBounds(chunk, config.m_ChunkCellCount, minimum, maximum);
 			if (boundsResult.Failed())
 			{
 				return boundsResult;
@@ -214,28 +162,16 @@ namespace napa::voxel
 			const QuantizedBoundaryContourPositionZYXLess lessPosition{};
 			const BoundaryContourSegmentLess lessSegment{};
 			std::optional<BoundaryContourSegment> previous;
-			for (const BoundaryContourSegment& segment :
-				record.m_Segments)
+			for (const BoundaryContourSegment& segment : record.m_Segments)
 			{
-				if (!lessPosition(
-						segment.m_EndpointA.m_Position,
-						segment.m_EndpointB.m_Position) ||
+				if (!lessPosition(segment.m_EndpointA.m_Position, segment.m_EndpointB.m_Position) ||
 					!IsPositionInChunkFace(
-						segment.m_EndpointA.m_Position,
-						record.m_Face,
-						minimum,
-						maximum) ||
+						segment.m_EndpointA.m_Position, record.m_Face, minimum, maximum) ||
 					!IsPositionInChunkFace(
-						segment.m_EndpointB.m_Position,
-						record.m_Face,
-						minimum,
-						maximum) ||
-					!IsValidQuantizedNormal(
-						segment.m_EndpointA.m_Normal) ||
-					!IsValidQuantizedNormal(
-						segment.m_EndpointB.m_Normal) ||
-					(previous &&
-						lessSegment(segment, *previous)))
+						segment.m_EndpointB.m_Position, record.m_Face, minimum, maximum) ||
+					!IsValidQuantizedNormal(segment.m_EndpointA.m_Normal) ||
+					!IsValidQuantizedNormal(segment.m_EndpointB.m_Normal) ||
+					(previous && lessSegment(segment, *previous)))
 				{
 					return {
 						ValidationError::InvalidBoundaryContour,
@@ -247,24 +183,17 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] bool RecordsMatch(
-			const BoundaryContourRecord& lhs,
-			const BoundaryContourRecord& rhs) noexcept
+			const BoundaryContourRecord& lhs, const BoundaryContourRecord& rhs) noexcept
 		{
-			if (GetOppositeChunkBoundaryFace(lhs.m_Face) !=
-					rhs.m_Face ||
-				lhs.m_SkippedZeroLengthSegmentCount !=
-					rhs.m_SkippedZeroLengthSegmentCount ||
+			if (GetOppositeChunkBoundaryFace(lhs.m_Face) != rhs.m_Face ||
+				lhs.m_SkippedZeroLengthSegmentCount != rhs.m_SkippedZeroLengthSegmentCount ||
 				lhs.m_Segments.size() != rhs.m_Segments.size())
 			{
 				return false;
 			}
-			for (std::size_t index = 0;
-				index < lhs.m_Segments.size();
-				++index)
+			for (std::size_t index = 0; index < lhs.m_Segments.size(); ++index)
 			{
-				if (!AreSegmentsEquivalent(
-						lhs.m_Segments[index],
-						rhs.m_Segments[index]))
+				if (!AreSegmentsEquivalent(lhs.m_Segments[index], rhs.m_Segments[index]))
 				{
 					return false;
 				}
@@ -273,37 +202,23 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] const ChunkMeshRecord* FindRecord(
-			std::span<const ChunkMeshRecord> records,
-			ChunkCoord chunk) noexcept
+			std::span<const ChunkMeshRecord> records, ChunkCoord chunk) noexcept
 		{
-			const auto iterator = std::lower_bound(
-				records.begin(),
-				records.end(),
-				chunk,
+			const auto iterator = std::lower_bound(records.begin(), records.end(), chunk,
 				[](const ChunkMeshRecord& record, ChunkCoord coordinate)
-				{
-					return ChunkCoordZYXLess{}(
-						record.m_Chunk,
-						coordinate);
-				});
-			return iterator != records.end() &&
-					iterator->m_Chunk == chunk
-				? &*iterator
-				: nullptr;
+				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+			return iterator != records.end() && iterator->m_Chunk == chunk ? &*iterator : nullptr;
 		}
 
 		[[nodiscard]] const BoundaryContourRecord& GetContour(
-			const ChunkMeshRecord& record,
-			ChunkBoundaryFace face) noexcept
+			const ChunkMeshRecord& record, ChunkBoundaryFace face) noexcept
 		{
-			return record.m_BoundaryContours[
-				GetChunkBoundaryFaceIndex(face)];
+			return record.m_BoundaryContours[GetChunkBoundaryFaceIndex(face)];
 		}
 	}
 
 	bool BoundaryContourSegmentLess::operator()(
-		const BoundaryContourSegment& lhs,
-		const BoundaryContourSegment& rhs) const noexcept
+		const BoundaryContourSegment& lhs, const BoundaryContourSegment& rhs) const noexcept
 	{
 		if (LessEndpoint(lhs.m_EndpointA, rhs.m_EndpointA))
 		{
@@ -321,16 +236,13 @@ namespace napa::voxel
 		ChunkBoundaryContourSet contours{};
 		for (std::size_t index = 0; index < contours.size(); ++index)
 		{
-			contours[index].m_Face =
-				static_cast<ChunkBoundaryFace>(index);
+			contours[index].m_Face = static_cast<ChunkBoundaryFace>(index);
 		}
 		return contours;
 	}
 
-	ValidationResult ValidateChunkBoundaryContourSet(
-		const ChunkBoundaryContourSet& contours,
-		ChunkCoord chunk,
-		const VoxelWorldConfig& config) noexcept
+	ValidationResult ValidateChunkBoundaryContourSet(const ChunkBoundaryContourSet& contours,
+		ChunkCoord chunk, const VoxelWorldConfig& config) noexcept
 	{
 		const ValidationResult configResult = ValidateConfig(config);
 		if (configResult.Failed())
@@ -339,16 +251,12 @@ namespace napa::voxel
 		}
 		for (std::size_t index = 0; index < contours.size(); ++index)
 		{
-			if (contours[index].m_Face !=
-					static_cast<ChunkBoundaryFace>(index))
+			if (contours[index].m_Face != static_cast<ChunkBoundaryFace>(index))
 			{
 				return { ValidationError::InvalidBoundaryContour };
 			}
 			const ValidationResult recordResult =
-				ValidateBoundaryContourRecord(
-					contours[index],
-					chunk,
-					config);
+				ValidateBoundaryContourRecord(contours[index], chunk, config);
 			if (recordResult.Failed())
 			{
 				return recordResult;
@@ -357,10 +265,8 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult ValidateBoundaryContourSet(
-		std::span<const ChunkMeshRecord> records,
-		const VoxelWorldConfig& config,
-		BoundaryContourValidationResult& result)
+	ValidationResult ValidateBoundaryContourSet(std::span<const ChunkMeshRecord> records,
+		const VoxelWorldConfig& config, BoundaryContourValidationResult& result)
 	{
 		const ValidationResult configResult = ValidateConfig(config);
 		if (configResult.Failed())
@@ -368,8 +274,7 @@ namespace napa::voxel
 			return configResult;
 		}
 		LogicalDomainMetrics metrics{};
-		const ValidationResult metricsResult =
-			ComputeLogicalDomainMetrics(config, metrics);
+		const ValidationResult metricsResult = ComputeLogicalDomainMetrics(config, metrics);
 		if (metricsResult.Failed())
 		{
 			return metricsResult;
@@ -380,51 +285,39 @@ namespace napa::voxel
 		std::optional<ChunkCoord> previousChunk;
 		for (const ChunkMeshRecord& record : records)
 		{
-			if (!metrics.m_CellOwnerChunkBounds.Contains(
-					record.m_Chunk) ||
-				(previousChunk &&
-					!chunkLess(*previousChunk, record.m_Chunk)))
+			if (!metrics.m_CellOwnerChunkBounds.Contains(record.m_Chunk) ||
+				(previousChunk && !chunkLess(*previousChunk, record.m_Chunk)))
 			{
 				return {
 					ValidationError::InvalidWorldMeshRecordSet,
 				};
 			}
 			const ValidationResult contourResult =
-				ValidateChunkBoundaryContourSet(
-					record.m_BoundaryContours,
-					record.m_Chunk,
-					config);
+				ValidateChunkBoundaryContourSet(record.m_BoundaryContours, record.m_Chunk, config);
 			if (contourResult.Failed())
 			{
 				return contourResult;
 			}
 
 			const std::optional<std::uint64_t> recordCount =
-				CheckedAdd(
-					validated.m_ChunkRecordCount,
-					std::uint64_t{ 1 });
+				CheckedAdd(validated.m_ChunkRecordCount, std::uint64_t{ 1 });
 			if (!recordCount)
 			{
 				return { ValidationError::ArithmeticOverflow };
 			}
 			validated.m_ChunkRecordCount = *recordCount;
-			for (const BoundaryContourRecord& contour :
-				record.m_BoundaryContours)
+			for (const BoundaryContourRecord& contour : record.m_BoundaryContours)
 			{
 				const std::optional<std::uint64_t> skippedCount =
-					CheckedAdd(
-						validated
-							.m_SkippedZeroLengthSegmentCount,
-						contour
-							.m_SkippedZeroLengthSegmentCount);
+					CheckedAdd(validated.m_SkippedZeroLengthSegmentCount,
+						contour.m_SkippedZeroLengthSegmentCount);
 				if (!skippedCount)
 				{
 					return {
 						ValidationError::ArithmeticOverflow,
 					};
 				}
-				validated.m_SkippedZeroLengthSegmentCount =
-					*skippedCount;
+				validated.m_SkippedZeroLengthSegmentCount = *skippedCount;
 			}
 			previousChunk = record.m_Chunk;
 		}
@@ -442,30 +335,21 @@ namespace napa::voxel
 				switch (face)
 				{
 				case ChunkBoundaryFace::PositiveX:
-					if (record.m_Chunk.m_X >=
-						metrics.m_CellOwnerChunkBounds
-								.m_MaxExclusive.m_X -
-							1)
+					if (record.m_Chunk.m_X >= metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_X - 1)
 					{
 						continue;
 					}
 					++neighbor.m_X;
 					break;
 				case ChunkBoundaryFace::PositiveY:
-					if (record.m_Chunk.m_Y >=
-						metrics.m_CellOwnerChunkBounds
-								.m_MaxExclusive.m_Y -
-							1)
+					if (record.m_Chunk.m_Y >= metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Y - 1)
 					{
 						continue;
 					}
 					++neighbor.m_Y;
 					break;
 				case ChunkBoundaryFace::PositiveZ:
-					if (record.m_Chunk.m_Z >=
-						metrics.m_CellOwnerChunkBounds
-								.m_MaxExclusive.m_Z -
-							1)
+					if (record.m_Chunk.m_Z >= metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Z - 1)
 					{
 						continue;
 					}
@@ -477,35 +361,26 @@ namespace napa::voxel
 					};
 				}
 
-				const ChunkMeshRecord* const neighborRecord =
-					FindRecord(records, neighbor);
+				const ChunkMeshRecord* const neighborRecord = FindRecord(records, neighbor);
 				if (neighborRecord == nullptr)
 				{
 					continue;
 				}
-				const BoundaryContourRecord& contour =
-					GetContour(record, face);
+				const BoundaryContourRecord& contour = GetContour(record, face);
 				const BoundaryContourRecord& neighborContour =
-					GetContour(
-						*neighborRecord,
-						GetOppositeChunkBoundaryFace(face));
+					GetContour(*neighborRecord, GetOppositeChunkBoundaryFace(face));
 				if (!RecordsMatch(contour, neighborContour))
 				{
 					return {
-						ValidationError::
-							MismatchedBoundaryContour,
+						ValidationError::MismatchedBoundaryContour,
 					};
 				}
 
 				const std::optional<std::uint64_t> faceCount =
-					CheckedAdd(
-						validated.m_ComparedFacePairCount,
-						std::uint64_t{ 1 });
+					CheckedAdd(validated.m_ComparedFacePairCount, std::uint64_t{ 1 });
 				const std::optional<std::uint64_t> segmentCount =
-					CheckedAdd(
-						validated.m_ComparedSegmentCount,
-						static_cast<std::uint64_t>(
-							contour.m_Segments.size()));
+					CheckedAdd(validated.m_ComparedSegmentCount,
+						static_cast<std::uint64_t>(contour.m_Segments.size()));
 				if (!faceCount || !segmentCount)
 				{
 					return {

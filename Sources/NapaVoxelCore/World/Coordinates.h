@@ -15,8 +15,7 @@ namespace napa::voxel
 		std::int32_t m_Z = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const SampleCoord&,
-			const SampleCoord&) noexcept = default;
+			const SampleCoord&, const SampleCoord&) noexcept = default;
 	};
 
 	struct CellCoord
@@ -26,8 +25,7 @@ namespace napa::voxel
 		std::int32_t m_Z = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const CellCoord&,
-			const CellCoord&) noexcept = default;
+			const CellCoord&, const CellCoord&) noexcept = default;
 	};
 
 	struct ChunkCoord
@@ -37,8 +35,7 @@ namespace napa::voxel
 		std::int32_t m_Z = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const ChunkCoord&,
-			const ChunkCoord&) noexcept = default;
+			const ChunkCoord&, const ChunkCoord&) noexcept = default;
 	};
 
 	struct LocalCoord
@@ -48,8 +45,7 @@ namespace napa::voxel
 		std::uint32_t m_Z = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const LocalCoord&,
-			const LocalCoord&) noexcept = default;
+			const LocalCoord&, const LocalCoord&) noexcept = default;
 	};
 
 	struct CellCornerOffset
@@ -59,8 +55,7 @@ namespace napa::voxel
 		std::uint32_t m_Z = 0;
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const CellCornerOffset&,
-			const CellCornerOffset&) noexcept = default;
+			const CellCornerOffset&, const CellCornerOffset&) noexcept = default;
 	};
 
 	struct SampleAabb
@@ -70,39 +65,28 @@ namespace napa::voxel
 
 		[[nodiscard]] constexpr bool IsEmpty() const noexcept
 		{
-			return
-				m_Min.m_X >= m_MaxExclusive.m_X ||
-				m_Min.m_Y >= m_MaxExclusive.m_Y ||
-				m_Min.m_Z >= m_MaxExclusive.m_Z;
+			return m_Min.m_X >= m_MaxExclusive.m_X || m_Min.m_Y >= m_MaxExclusive.m_Y ||
+				   m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
-		[[nodiscard]] constexpr bool Contains(
-			SampleCoord coordinate) const noexcept
+		[[nodiscard]] constexpr bool Contains(SampleCoord coordinate) const noexcept
 		{
-			return
-				coordinate.m_X >= m_Min.m_X &&
-				coordinate.m_Y >= m_Min.m_Y &&
-				coordinate.m_Z >= m_Min.m_Z &&
-				coordinate.m_X < m_MaxExclusive.m_X &&
-				coordinate.m_Y < m_MaxExclusive.m_Y &&
-				coordinate.m_Z < m_MaxExclusive.m_Z;
+			return coordinate.m_X >= m_Min.m_X && coordinate.m_Y >= m_Min.m_Y &&
+				   coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
+				   coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
-		[[nodiscard]] constexpr bool ContainsBounds(
-			const SampleAabb& bounds) const noexcept
+		[[nodiscard]] constexpr bool ContainsBounds(const SampleAabb& bounds) const noexcept
 		{
-			return
-				bounds.m_Min.m_X >= m_Min.m_X &&
-				bounds.m_Min.m_Y >= m_Min.m_Y &&
-				bounds.m_Min.m_Z >= m_Min.m_Z &&
-				bounds.m_MaxExclusive.m_X <= m_MaxExclusive.m_X &&
-				bounds.m_MaxExclusive.m_Y <= m_MaxExclusive.m_Y &&
-				bounds.m_MaxExclusive.m_Z <= m_MaxExclusive.m_Z;
+			return bounds.m_Min.m_X >= m_Min.m_X && bounds.m_Min.m_Y >= m_Min.m_Y &&
+				   bounds.m_Min.m_Z >= m_Min.m_Z &&
+				   bounds.m_MaxExclusive.m_X <= m_MaxExclusive.m_X &&
+				   bounds.m_MaxExclusive.m_Y <= m_MaxExclusive.m_Y &&
+				   bounds.m_MaxExclusive.m_Z <= m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const SampleAabb&,
-			const SampleAabb&) noexcept = default;
+			const SampleAabb&, const SampleAabb&) noexcept = default;
 	};
 
 	struct CellAabb
@@ -112,27 +96,19 @@ namespace napa::voxel
 
 		[[nodiscard]] constexpr bool IsEmpty() const noexcept
 		{
-			return
-				m_Min.m_X >= m_MaxExclusive.m_X ||
-				m_Min.m_Y >= m_MaxExclusive.m_Y ||
-				m_Min.m_Z >= m_MaxExclusive.m_Z;
+			return m_Min.m_X >= m_MaxExclusive.m_X || m_Min.m_Y >= m_MaxExclusive.m_Y ||
+				   m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
-		[[nodiscard]] constexpr bool Contains(
-			CellCoord coordinate) const noexcept
+		[[nodiscard]] constexpr bool Contains(CellCoord coordinate) const noexcept
 		{
-			return
-				coordinate.m_X >= m_Min.m_X &&
-				coordinate.m_Y >= m_Min.m_Y &&
-				coordinate.m_Z >= m_Min.m_Z &&
-				coordinate.m_X < m_MaxExclusive.m_X &&
-				coordinate.m_Y < m_MaxExclusive.m_Y &&
-				coordinate.m_Z < m_MaxExclusive.m_Z;
+			return coordinate.m_X >= m_Min.m_X && coordinate.m_Y >= m_Min.m_Y &&
+				   coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
+				   coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const CellAabb&,
-			const CellAabb&) noexcept = default;
+			const CellAabb&, const CellAabb&) noexcept = default;
 	};
 
 	struct ChunkAabb
@@ -142,27 +118,19 @@ namespace napa::voxel
 
 		[[nodiscard]] constexpr bool IsEmpty() const noexcept
 		{
-			return
-				m_Min.m_X >= m_MaxExclusive.m_X ||
-				m_Min.m_Y >= m_MaxExclusive.m_Y ||
-				m_Min.m_Z >= m_MaxExclusive.m_Z;
+			return m_Min.m_X >= m_MaxExclusive.m_X || m_Min.m_Y >= m_MaxExclusive.m_Y ||
+				   m_Min.m_Z >= m_MaxExclusive.m_Z;
 		}
 
-		[[nodiscard]] constexpr bool Contains(
-			ChunkCoord coordinate) const noexcept
+		[[nodiscard]] constexpr bool Contains(ChunkCoord coordinate) const noexcept
 		{
-			return
-				coordinate.m_X >= m_Min.m_X &&
-				coordinate.m_Y >= m_Min.m_Y &&
-				coordinate.m_Z >= m_Min.m_Z &&
-				coordinate.m_X < m_MaxExclusive.m_X &&
-				coordinate.m_Y < m_MaxExclusive.m_Y &&
-				coordinate.m_Z < m_MaxExclusive.m_Z;
+			return coordinate.m_X >= m_Min.m_X && coordinate.m_Y >= m_Min.m_Y &&
+				   coordinate.m_Z >= m_Min.m_Z && coordinate.m_X < m_MaxExclusive.m_X &&
+				   coordinate.m_Y < m_MaxExclusive.m_Y && coordinate.m_Z < m_MaxExclusive.m_Z;
 		}
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const ChunkAabb&,
-			const ChunkAabb&) noexcept = default;
+			const ChunkAabb&, const ChunkAabb&) noexcept = default;
 	};
 
 	struct OwnedSampleAddress
@@ -171,8 +139,7 @@ namespace napa::voxel
 		LocalCoord m_Local{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const OwnedSampleAddress&,
-			const OwnedSampleAddress&) noexcept = default;
+			const OwnedSampleAddress&, const OwnedSampleAddress&) noexcept = default;
 	};
 
 	struct OwnedCellAddress
@@ -181,88 +148,54 @@ namespace napa::voxel
 		LocalCoord m_Local{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const OwnedCellAddress&,
-			const OwnedCellAddress&) noexcept = default;
+			const OwnedCellAddress&, const OwnedCellAddress&) noexcept = default;
 	};
 
 	struct ChunkCoordZYXLess
 	{
-		[[nodiscard]] bool operator()(
-			ChunkCoord lhs,
-			ChunkCoord rhs) const noexcept;
+		[[nodiscard]] bool operator()(ChunkCoord lhs, ChunkCoord rhs) const noexcept;
 	};
 
 	struct SampleCoordZYXLess
 	{
-		[[nodiscard]] bool operator()(
-			SampleCoord lhs,
-			SampleCoord rhs) const noexcept;
+		[[nodiscard]] bool operator()(SampleCoord lhs, SampleCoord rhs) const noexcept;
 	};
 
-	[[nodiscard]] constexpr bool IsSupportedChunkCellCount(
-		std::uint32_t chunkCellCount) noexcept
+	[[nodiscard]] constexpr bool IsSupportedChunkCellCount(std::uint32_t chunkCellCount) noexcept
 	{
-		return
-			chunkCellCount == 8 ||
-			chunkCellCount == 16 ||
-			chunkCellCount == 32;
+		return chunkCellCount == 8 || chunkCellCount == 16 || chunkCellCount == 32;
 	}
 
 	[[nodiscard]] std::optional<std::int32_t> FloorDiv(
-		std::int32_t value,
-		std::uint32_t positiveDivisor) noexcept;
+		std::int32_t value, std::uint32_t positiveDivisor) noexcept;
 	[[nodiscard]] std::optional<std::uint32_t> FloorMod(
-		std::int32_t value,
-		std::uint32_t positiveDivisor) noexcept;
+		std::int32_t value, std::uint32_t positiveDivisor) noexcept;
 
 	[[nodiscard]] ValidationResult ValidateLocalCoord(
-		LocalCoord local,
-		std::uint32_t chunkCellCount) noexcept;
-	[[nodiscard]] ValidationResult ValidateCellCornerOffset(
-		CellCornerOffset corner) noexcept;
+		LocalCoord local, std::uint32_t chunkCellCount) noexcept;
+	[[nodiscard]] ValidationResult ValidateCellCornerOffset(CellCornerOffset corner) noexcept;
 
 	[[nodiscard]] ValidationResult ResolveSampleOwner(
-		SampleCoord sample,
-		std::uint32_t chunkCellCount,
-		OwnedSampleAddress& address) noexcept;
+		SampleCoord sample, std::uint32_t chunkCellCount, OwnedSampleAddress& address) noexcept;
 	[[nodiscard]] ValidationResult ResolveCellOwner(
-		CellCoord cell,
-		std::uint32_t chunkCellCount,
-		OwnedCellAddress& address) noexcept;
+		CellCoord cell, std::uint32_t chunkCellCount, OwnedCellAddress& address) noexcept;
 
 	[[nodiscard]] ValidationResult FlattenLocal(
-		LocalCoord local,
-		std::uint32_t chunkCellCount,
-		std::size_t& flatIndex) noexcept;
+		LocalCoord local, std::uint32_t chunkCellCount, std::size_t& flatIndex) noexcept;
 	[[nodiscard]] ValidationResult UnflattenLocal(
-		std::size_t flatIndex,
-		std::uint32_t chunkCellCount,
-		LocalCoord& local) noexcept;
+		std::size_t flatIndex, std::uint32_t chunkCellCount, LocalCoord& local) noexcept;
 
-	[[nodiscard]] ValidationResult ChunkLocalToGlobalSample(
-		ChunkCoord chunk,
-		LocalCoord local,
-		std::uint32_t chunkCellCount,
-		SampleCoord& sample) noexcept;
+	[[nodiscard]] ValidationResult ChunkLocalToGlobalSample(ChunkCoord chunk, LocalCoord local,
+		std::uint32_t chunkCellCount, SampleCoord& sample) noexcept;
 	[[nodiscard]] ValidationResult ChunkLocalToGlobalCell(
-		ChunkCoord chunk,
-		LocalCoord local,
-		std::uint32_t chunkCellCount,
-		CellCoord& cell) noexcept;
+		ChunkCoord chunk, LocalCoord local, std::uint32_t chunkCellCount, CellCoord& cell) noexcept;
 	[[nodiscard]] ValidationResult CellCornerToGlobalSample(
-		CellCoord cell,
-		CellCornerOffset corner,
-		SampleCoord& sample) noexcept;
+		CellCoord cell, CellCornerOffset corner, SampleCoord& sample) noexcept;
 	[[nodiscard]] ValidationResult LogicalCellBoundsToSampleBounds(
-		const CellAabb& cellBounds,
-		SampleAabb& sampleBounds) noexcept;
-	[[nodiscard]] ValidationResult SampleBoundsToOwnerChunkBounds(
-		const SampleAabb& sampleBounds,
-		std::uint32_t chunkCellCount,
-		ChunkAabb& chunkBounds) noexcept;
-	[[nodiscard]] ValidationResult IntersectCellOwnerChunk(
-		ChunkCoord chunk,
-		std::uint32_t chunkCellCount,
-		const CellAabb& logicalCellBounds,
+		const CellAabb& cellBounds, SampleAabb& sampleBounds) noexcept;
+	[[nodiscard]] ValidationResult SampleBoundsToOwnerChunkBounds(const SampleAabb& sampleBounds,
+		std::uint32_t chunkCellCount, ChunkAabb& chunkBounds) noexcept;
+	[[nodiscard]] ValidationResult IntersectCellOwnerChunk(ChunkCoord chunk,
+		std::uint32_t chunkCellCount, const CellAabb& logicalCellBounds,
 		CellAabb& intersection) noexcept;
 }

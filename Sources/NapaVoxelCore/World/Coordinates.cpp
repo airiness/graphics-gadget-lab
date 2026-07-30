@@ -11,31 +11,22 @@ namespace napa::voxel
 {
 	namespace
 	{
-		template<typename GlobalCoord, typename OwnedAddress>
+		template <typename GlobalCoord, typename OwnedAddress>
 		[[nodiscard]] ValidationResult ResolveOwner(
-			GlobalCoord global,
-			std::uint32_t chunkCellCount,
-			OwnedAddress& address) noexcept
+			GlobalCoord global, std::uint32_t chunkCellCount, OwnedAddress& address) noexcept
 		{
 			if (!IsSupportedChunkCellCount(chunkCellCount))
 			{
 				return { ValidationError::InvalidChunkCellCount };
 			}
 
-			const std::optional<std::int32_t> chunkX =
-				FloorDiv(global.m_X, chunkCellCount);
-			const std::optional<std::int32_t> chunkY =
-				FloorDiv(global.m_Y, chunkCellCount);
-			const std::optional<std::int32_t> chunkZ =
-				FloorDiv(global.m_Z, chunkCellCount);
-			const std::optional<std::uint32_t> localX =
-				FloorMod(global.m_X, chunkCellCount);
-			const std::optional<std::uint32_t> localY =
-				FloorMod(global.m_Y, chunkCellCount);
-			const std::optional<std::uint32_t> localZ =
-				FloorMod(global.m_Z, chunkCellCount);
-			if (!chunkX || !chunkY || !chunkZ ||
-				!localX || !localY || !localZ)
+			const std::optional<std::int32_t> chunkX = FloorDiv(global.m_X, chunkCellCount);
+			const std::optional<std::int32_t> chunkY = FloorDiv(global.m_Y, chunkCellCount);
+			const std::optional<std::int32_t> chunkZ = FloorDiv(global.m_Z, chunkCellCount);
+			const std::optional<std::uint32_t> localX = FloorMod(global.m_X, chunkCellCount);
+			const std::optional<std::uint32_t> localY = FloorMod(global.m_Y, chunkCellCount);
+			const std::optional<std::uint32_t> localZ = FloorMod(global.m_Z, chunkCellCount);
+			if (!chunkX || !chunkY || !chunkZ || !localX || !localY || !localZ)
 			{
 				return { ValidationError::ArithmeticOverflow };
 			}
@@ -48,36 +39,26 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] std::optional<std::int32_t> ComposeGlobalAxis(
-			std::int32_t chunk,
-			std::uint32_t local,
-			std::uint32_t chunkCellCount) noexcept
+			std::int32_t chunk, std::uint32_t local, std::uint32_t chunkCellCount) noexcept
 		{
 			const std::int64_t wideChunk = chunk;
 			const std::int64_t wideChunkCellCount = chunkCellCount;
 			const std::int64_t wideLocal = local;
-			const std::optional<std::int64_t> origin =
-				CheckedMul(wideChunk, wideChunkCellCount);
+			const std::optional<std::int64_t> origin = CheckedMul(wideChunk, wideChunkCellCount);
 			if (!origin)
 			{
 				return std::nullopt;
 			}
 
-			const std::optional<std::int64_t> global =
-				CheckedAdd(*origin, wideLocal);
-			return global
-				? CheckedNarrow<std::int32_t>(*global)
-				: std::nullopt;
+			const std::optional<std::int64_t> global = CheckedAdd(*origin, wideLocal);
+			return global ? CheckedNarrow<std::int32_t>(*global) : std::nullopt;
 		}
 
-		template<typename GlobalCoord>
-		[[nodiscard]] ValidationResult ChunkLocalToGlobal(
-			ChunkCoord chunk,
-			LocalCoord local,
-			std::uint32_t chunkCellCount,
-			GlobalCoord& global) noexcept
+		template <typename GlobalCoord>
+		[[nodiscard]] ValidationResult ChunkLocalToGlobal(ChunkCoord chunk, LocalCoord local,
+			std::uint32_t chunkCellCount, GlobalCoord& global) noexcept
 		{
-			const ValidationResult localValidation =
-				ValidateLocalCoord(local, chunkCellCount);
+			const ValidationResult localValidation = ValidateLocalCoord(local, chunkCellCount);
 			if (localValidation.Failed())
 			{
 				return localValidation;
@@ -99,9 +80,7 @@ namespace napa::voxel
 		}
 	}
 
-	bool ChunkCoordZYXLess::operator()(
-		ChunkCoord lhs,
-		ChunkCoord rhs) const noexcept
+	bool ChunkCoordZYXLess::operator()(ChunkCoord lhs, ChunkCoord rhs) const noexcept
 	{
 		if (lhs.m_Z != rhs.m_Z)
 		{
@@ -114,9 +93,7 @@ namespace napa::voxel
 		return lhs.m_X < rhs.m_X;
 	}
 
-	bool SampleCoordZYXLess::operator()(
-		SampleCoord lhs,
-		SampleCoord rhs) const noexcept
+	bool SampleCoordZYXLess::operator()(SampleCoord lhs, SampleCoord rhs) const noexcept
 	{
 		if (lhs.m_Z != rhs.m_Z)
 		{
@@ -129,9 +106,7 @@ namespace napa::voxel
 		return lhs.m_X < rhs.m_X;
 	}
 
-	std::optional<std::int32_t> FloorDiv(
-		std::int32_t value,
-		std::uint32_t positiveDivisor) noexcept
+	std::optional<std::int32_t> FloorDiv(std::int32_t value, std::uint32_t positiveDivisor) noexcept
 	{
 		if (positiveDivisor == 0)
 		{
@@ -141,8 +116,7 @@ namespace napa::voxel
 		const std::int64_t wideValue = value;
 		const std::int64_t wideDivisor = positiveDivisor;
 		std::int64_t quotient = wideValue / wideDivisor;
-		const bool hasRemainder =
-			quotient * wideDivisor != wideValue;
+		const bool hasRemainder = quotient * wideDivisor != wideValue;
 		if (wideValue < 0 && hasRemainder)
 		{
 			--quotient;
@@ -151,8 +125,7 @@ namespace napa::voxel
 	}
 
 	std::optional<std::uint32_t> FloorMod(
-		std::int32_t value,
-		std::uint32_t positiveDivisor) noexcept
+		std::int32_t value, std::uint32_t positiveDivisor) noexcept
 	{
 		if (positiveDivisor == 0)
 		{
@@ -160,8 +133,7 @@ namespace napa::voxel
 		}
 
 		const std::int64_t wideDivisor = positiveDivisor;
-		std::int64_t remainder =
-			static_cast<std::int64_t>(value) % wideDivisor;
+		std::int64_t remainder = static_cast<std::int64_t>(value) % wideDivisor;
 		if (remainder < 0)
 		{
 			remainder += wideDivisor;
@@ -169,16 +141,13 @@ namespace napa::voxel
 		return CheckedNarrow<std::uint32_t>(remainder);
 	}
 
-	ValidationResult ValidateLocalCoord(
-		LocalCoord local,
-		std::uint32_t chunkCellCount) noexcept
+	ValidationResult ValidateLocalCoord(LocalCoord local, std::uint32_t chunkCellCount) noexcept
 	{
 		if (!IsSupportedChunkCellCount(chunkCellCount))
 		{
 			return { ValidationError::InvalidChunkCellCount };
 		}
-		if (local.m_X >= chunkCellCount ||
-			local.m_Y >= chunkCellCount ||
+		if (local.m_X >= chunkCellCount || local.m_Y >= chunkCellCount ||
 			local.m_Z >= chunkCellCount)
 		{
 			return { ValidationError::InvalidLocalCoordinate };
@@ -186,8 +155,7 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult ValidateCellCornerOffset(
-		CellCornerOffset corner) noexcept
+	ValidationResult ValidateCellCornerOffset(CellCornerOffset corner) noexcept
 	{
 		if (corner.m_X > 1 || corner.m_Y > 1 || corner.m_Z > 1)
 		{
@@ -197,49 +165,37 @@ namespace napa::voxel
 	}
 
 	ValidationResult ResolveSampleOwner(
-		SampleCoord sample,
-		std::uint32_t chunkCellCount,
-		OwnedSampleAddress& address) noexcept
+		SampleCoord sample, std::uint32_t chunkCellCount, OwnedSampleAddress& address) noexcept
 	{
 		return ResolveOwner(sample, chunkCellCount, address);
 	}
 
 	ValidationResult ResolveCellOwner(
-		CellCoord cell,
-		std::uint32_t chunkCellCount,
-		OwnedCellAddress& address) noexcept
+		CellCoord cell, std::uint32_t chunkCellCount, OwnedCellAddress& address) noexcept
 	{
 		return ResolveOwner(cell, chunkCellCount, address);
 	}
 
 	ValidationResult FlattenLocal(
-		LocalCoord local,
-		std::uint32_t chunkCellCount,
-		std::size_t& flatIndex) noexcept
+		LocalCoord local, std::uint32_t chunkCellCount, std::size_t& flatIndex) noexcept
 	{
-		const ValidationResult localValidation =
-			ValidateLocalCoord(local, chunkCellCount);
+		const ValidationResult localValidation = ValidateLocalCoord(local, chunkCellCount);
 		if (localValidation.Failed())
 		{
 			return localValidation;
 		}
 
-		const std::optional<std::size_t> n =
-			CheckedNarrow<std::size_t>(chunkCellCount);
-		const std::optional<std::size_t> x =
-			CheckedNarrow<std::size_t>(local.m_X);
-		const std::optional<std::size_t> y =
-			CheckedNarrow<std::size_t>(local.m_Y);
-		const std::optional<std::size_t> z =
-			CheckedNarrow<std::size_t>(local.m_Z);
+		const std::optional<std::size_t> n = CheckedNarrow<std::size_t>(chunkCellCount);
+		const std::optional<std::size_t> x = CheckedNarrow<std::size_t>(local.m_X);
+		const std::optional<std::size_t> y = CheckedNarrow<std::size_t>(local.m_Y);
+		const std::optional<std::size_t> z = CheckedNarrow<std::size_t>(local.m_Z);
 		if (!n || !x || !y || !z)
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
 
 		const std::optional<std::size_t> nTimesZ = CheckedMul(*n, *z);
-		const std::optional<std::size_t> yAndZ =
-			nTimesZ ? CheckedAdd(*y, *nTimesZ) : std::nullopt;
+		const std::optional<std::size_t> yAndZ = nTimesZ ? CheckedAdd(*y, *nTimesZ) : std::nullopt;
 		const std::optional<std::size_t> nTimesYAndZ =
 			yAndZ ? CheckedMul(*n, *yAndZ) : std::nullopt;
 		const std::optional<std::size_t> result =
@@ -254,21 +210,16 @@ namespace napa::voxel
 	}
 
 	ValidationResult UnflattenLocal(
-		std::size_t flatIndex,
-		std::uint32_t chunkCellCount,
-		LocalCoord& local) noexcept
+		std::size_t flatIndex, std::uint32_t chunkCellCount, LocalCoord& local) noexcept
 	{
 		if (!IsSupportedChunkCellCount(chunkCellCount))
 		{
 			return { ValidationError::InvalidChunkCellCount };
 		}
 
-		const std::optional<std::size_t> n =
-			CheckedNarrow<std::size_t>(chunkCellCount);
-		const std::optional<std::size_t> square =
-			n ? CheckedMul(*n, *n) : std::nullopt;
-		const std::optional<std::size_t> capacity =
-			square ? CheckedMul(*square, *n) : std::nullopt;
+		const std::optional<std::size_t> n = CheckedNarrow<std::size_t>(chunkCellCount);
+		const std::optional<std::size_t> square = n ? CheckedMul(*n, *n) : std::nullopt;
+		const std::optional<std::size_t> capacity = square ? CheckedMul(*square, *n) : std::nullopt;
 		if (!n || !capacity)
 		{
 			return { ValidationError::ArithmeticOverflow };
@@ -282,12 +233,9 @@ namespace napa::voxel
 		const std::size_t yz = flatIndex / *n;
 		const std::size_t y = yz % *n;
 		const std::size_t z = yz / *n;
-		const std::optional<std::uint32_t> localX =
-			CheckedNarrow<std::uint32_t>(x);
-		const std::optional<std::uint32_t> localY =
-			CheckedNarrow<std::uint32_t>(y);
-		const std::optional<std::uint32_t> localZ =
-			CheckedNarrow<std::uint32_t>(z);
+		const std::optional<std::uint32_t> localX = CheckedNarrow<std::uint32_t>(x);
+		const std::optional<std::uint32_t> localY = CheckedNarrow<std::uint32_t>(y);
+		const std::optional<std::uint32_t> localZ = CheckedNarrow<std::uint32_t>(z);
 		if (!localX || !localY || !localZ)
 		{
 			return { ValidationError::ArithmeticOverflow };
@@ -297,31 +245,22 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult ChunkLocalToGlobalSample(
-		ChunkCoord chunk,
-		LocalCoord local,
-		std::uint32_t chunkCellCount,
-		SampleCoord& sample) noexcept
+	ValidationResult ChunkLocalToGlobalSample(ChunkCoord chunk, LocalCoord local,
+		std::uint32_t chunkCellCount, SampleCoord& sample) noexcept
 	{
 		return ChunkLocalToGlobal(chunk, local, chunkCellCount, sample);
 	}
 
 	ValidationResult ChunkLocalToGlobalCell(
-		ChunkCoord chunk,
-		LocalCoord local,
-		std::uint32_t chunkCellCount,
-		CellCoord& cell) noexcept
+		ChunkCoord chunk, LocalCoord local, std::uint32_t chunkCellCount, CellCoord& cell) noexcept
 	{
 		return ChunkLocalToGlobal(chunk, local, chunkCellCount, cell);
 	}
 
 	ValidationResult CellCornerToGlobalSample(
-		CellCoord cell,
-		CellCornerOffset corner,
-		SampleCoord& sample) noexcept
+		CellCoord cell, CellCornerOffset corner, SampleCoord& sample) noexcept
 	{
-		const ValidationResult cornerValidation =
-			ValidateCellCornerOffset(corner);
+		const ValidationResult cornerValidation = ValidateCellCornerOffset(corner);
 		if (cornerValidation.Failed())
 		{
 			return cornerValidation;
@@ -343,8 +282,7 @@ namespace napa::voxel
 	}
 
 	ValidationResult LogicalCellBoundsToSampleBounds(
-		const CellAabb& cellBounds,
-		SampleAabb& sampleBounds) noexcept
+		const CellAabb& cellBounds, SampleAabb& sampleBounds) noexcept
 	{
 		if (cellBounds.IsEmpty())
 		{
@@ -373,10 +311,8 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult SampleBoundsToOwnerChunkBounds(
-		const SampleAabb& sampleBounds,
-		std::uint32_t chunkCellCount,
-		ChunkAabb& chunkBounds) noexcept
+	ValidationResult SampleBoundsToOwnerChunkBounds(const SampleAabb& sampleBounds,
+		std::uint32_t chunkCellCount, ChunkAabb& chunkBounds) noexcept
 	{
 		if (sampleBounds.IsEmpty())
 		{
@@ -390,18 +326,14 @@ namespace napa::voxel
 		};
 		OwnedSampleAddress minimumAddress{};
 		OwnedSampleAddress maximumAddress{};
-		const ValidationResult minimumResult = ResolveSampleOwner(
-			sampleBounds.m_Min,
-			chunkCellCount,
-			minimumAddress);
+		const ValidationResult minimumResult =
+			ResolveSampleOwner(sampleBounds.m_Min, chunkCellCount, minimumAddress);
 		if (minimumResult.Failed())
 		{
 			return minimumResult;
 		}
-		const ValidationResult maximumResult = ResolveSampleOwner(
-			maximumInclusive,
-			chunkCellCount,
-			maximumAddress);
+		const ValidationResult maximumResult =
+			ResolveSampleOwner(maximumInclusive, chunkCellCount, maximumAddress);
 		if (maximumResult.Failed())
 		{
 			return maximumResult;
@@ -413,9 +345,7 @@ namespace napa::voxel
 			CheckedAdd(maximumAddress.m_Owner.m_Y, std::int32_t{ 1 });
 		const std::optional<std::int32_t> maximumExclusiveZ =
 			CheckedAdd(maximumAddress.m_Owner.m_Z, std::int32_t{ 1 });
-		if (!maximumExclusiveX ||
-			!maximumExclusiveY ||
-			!maximumExclusiveZ)
+		if (!maximumExclusiveX || !maximumExclusiveY || !maximumExclusiveZ)
 		{
 			return { ValidationError::LogicalChunkCountOverflow };
 		}
@@ -431,11 +361,8 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult IntersectCellOwnerChunk(
-		ChunkCoord chunk,
-		std::uint32_t chunkCellCount,
-		const CellAabb& logicalCellBounds,
-		CellAabb& intersection) noexcept
+	ValidationResult IntersectCellOwnerChunk(ChunkCoord chunk, std::uint32_t chunkCellCount,
+		const CellAabb& logicalCellBounds, CellAabb& intersection) noexcept
 	{
 		if (!IsSupportedChunkCellCount(chunkCellCount))
 		{
@@ -448,65 +375,34 @@ namespace napa::voxel
 
 		const std::int64_t chunkSize = chunkCellCount;
 		const std::optional<std::int64_t> minimumX =
-			CheckedMul(
-				static_cast<std::int64_t>(chunk.m_X),
-				chunkSize);
+			CheckedMul(static_cast<std::int64_t>(chunk.m_X), chunkSize);
 		const std::optional<std::int64_t> minimumY =
-			CheckedMul(
-				static_cast<std::int64_t>(chunk.m_Y),
-				chunkSize);
+			CheckedMul(static_cast<std::int64_t>(chunk.m_Y), chunkSize);
 		const std::optional<std::int64_t> minimumZ =
-			CheckedMul(
-				static_cast<std::int64_t>(chunk.m_Z),
-				chunkSize);
+			CheckedMul(static_cast<std::int64_t>(chunk.m_Z), chunkSize);
 		const std::optional<std::int64_t> maximumX =
-			minimumX
-				? CheckedAdd(*minimumX, chunkSize)
-				: std::nullopt;
+			minimumX ? CheckedAdd(*minimumX, chunkSize) : std::nullopt;
 		const std::optional<std::int64_t> maximumY =
-			minimumY
-				? CheckedAdd(*minimumY, chunkSize)
-				: std::nullopt;
+			minimumY ? CheckedAdd(*minimumY, chunkSize) : std::nullopt;
 		const std::optional<std::int64_t> maximumZ =
-			minimumZ
-				? CheckedAdd(*minimumZ, chunkSize)
-				: std::nullopt;
-		if (!minimumX || !minimumY || !minimumZ ||
-			!maximumX || !maximumY || !maximumZ)
+			minimumZ ? CheckedAdd(*minimumZ, chunkSize) : std::nullopt;
+		if (!minimumX || !minimumY || !minimumZ || !maximumX || !maximumY || !maximumZ)
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
 
 		const std::int64_t intersectionMinimumX =
-			std::max(
-				*minimumX,
-				static_cast<std::int64_t>(
-					logicalCellBounds.m_Min.m_X));
+			std::max(*minimumX, static_cast<std::int64_t>(logicalCellBounds.m_Min.m_X));
 		const std::int64_t intersectionMinimumY =
-			std::max(
-				*minimumY,
-				static_cast<std::int64_t>(
-					logicalCellBounds.m_Min.m_Y));
+			std::max(*minimumY, static_cast<std::int64_t>(logicalCellBounds.m_Min.m_Y));
 		const std::int64_t intersectionMinimumZ =
-			std::max(
-				*minimumZ,
-				static_cast<std::int64_t>(
-					logicalCellBounds.m_Min.m_Z));
+			std::max(*minimumZ, static_cast<std::int64_t>(logicalCellBounds.m_Min.m_Z));
 		const std::int64_t intersectionMaximumX =
-			std::min(
-				*maximumX,
-				static_cast<std::int64_t>(
-					logicalCellBounds.m_MaxExclusive.m_X));
+			std::min(*maximumX, static_cast<std::int64_t>(logicalCellBounds.m_MaxExclusive.m_X));
 		const std::int64_t intersectionMaximumY =
-			std::min(
-				*maximumY,
-				static_cast<std::int64_t>(
-					logicalCellBounds.m_MaxExclusive.m_Y));
+			std::min(*maximumY, static_cast<std::int64_t>(logicalCellBounds.m_MaxExclusive.m_Y));
 		const std::int64_t intersectionMaximumZ =
-			std::min(
-				*maximumZ,
-				static_cast<std::int64_t>(
-					logicalCellBounds.m_MaxExclusive.m_Z));
+			std::min(*maximumZ, static_cast<std::int64_t>(logicalCellBounds.m_MaxExclusive.m_Z));
 		if (intersectionMinimumX >= intersectionMaximumX ||
 			intersectionMinimumY >= intersectionMaximumY ||
 			intersectionMinimumZ >= intersectionMaximumZ)
@@ -528,12 +424,8 @@ namespace napa::voxel
 			CheckedNarrow<std::int32_t>(intersectionMaximumY);
 		const std::optional<std::int32_t> narrowedMaximumZ =
 			CheckedNarrow<std::int32_t>(intersectionMaximumZ);
-		if (!narrowedMinimumX ||
-			!narrowedMinimumY ||
-			!narrowedMinimumZ ||
-			!narrowedMaximumX ||
-			!narrowedMaximumY ||
-			!narrowedMaximumZ)
+		if (!narrowedMinimumX || !narrowedMinimumY || !narrowedMinimumZ || !narrowedMaximumX ||
+			!narrowedMaximumY || !narrowedMaximumZ)
 		{
 			return { ValidationError::CoordinateOutOfRange };
 		}

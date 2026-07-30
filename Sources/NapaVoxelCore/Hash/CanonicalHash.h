@@ -5,8 +5,7 @@
 
 namespace napa::voxel
 {
-	inline constexpr std::uint64_t Fnv1a64OffsetBasis =
-		14695981039346656037ull;
+	inline constexpr std::uint64_t Fnv1a64OffsetBasis = 14695981039346656037ull;
 	inline constexpr std::uint64_t Fnv1a64Prime = 1099511628211ull;
 
 	class CanonicalHashWriter final
@@ -26,7 +25,7 @@ namespace napa::voxel
 		void WriteCount(std::uint32_t value) noexcept;
 		void WriteCount(std::uint64_t value) noexcept;
 
-		template<typename Enum>
+		template <typename Enum>
 			requires std::is_enum_v<Enum>
 		void WriteEnum(Enum value) noexcept
 		{

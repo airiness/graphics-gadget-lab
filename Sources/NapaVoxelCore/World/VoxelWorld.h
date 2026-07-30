@@ -27,91 +27,62 @@ namespace napa::voxel
 
 	public:
 		[[nodiscard]] static ValidationResult Create(
-			const VoxelWorldConfig& config,
-			std::unique_ptr<VoxelWorld>& world);
+			const VoxelWorldConfig& config, std::unique_ptr<VoxelWorld>& world);
 
-		VoxelWorld(
-			ConstructionToken,
-			const VoxelWorldConfig& config,
-			const LogicalDomainMetrics& metrics,
-			SampleAabb logicalSampleBounds);
+		VoxelWorld(ConstructionToken, const VoxelWorldConfig& config,
+			const LogicalDomainMetrics& metrics, SampleAabb logicalSampleBounds);
 
 		VoxelWorld(const VoxelWorld&) = delete;
 		VoxelWorld& operator=(const VoxelWorld&) = delete;
 
 		[[nodiscard]] const VoxelWorldConfig& GetConfig() const noexcept;
-		[[nodiscard]] const LogicalDomainMetrics& GetLogicalDomainMetrics()
-			const noexcept;
+		[[nodiscard]] const LogicalDomainMetrics& GetLogicalDomainMetrics() const noexcept;
 		[[nodiscard]] SampleAabb GetLogicalSampleBounds() const noexcept;
 		[[nodiscard]] std::size_t GetResidentChunkCount() const noexcept;
 		[[nodiscard]] std::uint64_t GetWorldVoxelRevision() const noexcept;
 		[[nodiscard]] bool IsOriginalStateSealed() const noexcept;
 		void SealOriginalState() noexcept;
 
-		[[nodiscard]] const VoxelChunk* FindChunk(
-			ChunkCoord chunk) const noexcept;
-		[[nodiscard]] ValidationResult EnsureChunkAllocated(
-			ChunkCoord chunk,
-			bool& allocated);
+		[[nodiscard]] const VoxelChunk* FindChunk(ChunkCoord chunk) const noexcept;
+		[[nodiscard]] ValidationResult EnsureChunkAllocated(ChunkCoord chunk, bool& allocated);
 
 		[[nodiscard]] ValidationResult ReadOriginalSample(
-			SampleCoord coordinate,
-			VoxelSample& sample) const noexcept;
+			SampleCoord coordinate, VoxelSample& sample) const noexcept;
 		[[nodiscard]] ValidationResult ReadCurrentSample(
-			SampleCoord coordinate,
-			VoxelSample& sample) const noexcept;
+			SampleCoord coordinate, VoxelSample& sample) const noexcept;
 
 		[[nodiscard]] ValidationResult WriteOriginalAndCurrentSample(
-			SampleCoord coordinate,
-			VoxelSample input,
-			bool& changed);
+			SampleCoord coordinate, VoxelSample input, bool& changed);
 		[[nodiscard]] ValidationResult WriteCurrentSample(
-			SampleCoord coordinate,
-			VoxelSample input,
-			bool& changed);
+			SampleCoord coordinate, VoxelSample input, bool& changed);
 
-		[[nodiscard]] ValidationResult RestoreAll(
-			RestoreResult& result);
+		[[nodiscard]] ValidationResult RestoreAll(RestoreResult& result);
 		[[nodiscard]] ValidationResult RestoreSampleOwnerChunk(
-			ChunkCoord chunk,
-			RestoreResult& result);
+			ChunkCoord chunk, RestoreResult& result);
 		[[nodiscard]] ValidationResult RestoreRegion(
-			const SampleAabb& region,
-			RestoreResult& result);
+			const SampleAabb& region, RestoreResult& result);
 
 	private:
-		friend ValidationResult GeneratePrimitiveVoxelWorld(
-			const VoxelWorldConfig& config,
-			std::span<const PrimitiveDesc> primitives,
-			std::unique_ptr<VoxelWorld>& world,
+		friend ValidationResult GeneratePrimitiveVoxelWorld(const VoxelWorldConfig& config,
+			std::span<const PrimitiveDesc> primitives, std::unique_ptr<VoxelWorld>& world,
 			PrimitiveWorldGenerationResult& result);
 
 		[[nodiscard]] ValidationResult ResolveLogicalSample(
-			SampleCoord coordinate,
-			OwnedSampleAddress& address) const noexcept;
+			SampleCoord coordinate, OwnedSampleAddress& address) const noexcept;
 		[[nodiscard]] ValidationResult ReadSample(
-			SampleCoord coordinate,
-			VoxelSample& sample,
-			bool original) const noexcept;
+			SampleCoord coordinate, VoxelSample& sample, bool original) const noexcept;
 		[[nodiscard]] ValidationResult FindOrCreateChunk(
-			ChunkCoord coordinate,
-			VoxelChunk*& chunk,
-			bool& allocated);
+			ChunkCoord coordinate, VoxelChunk*& chunk, bool& allocated);
 		[[nodiscard]] ValidationResult RestoreRegionInternal(
-			const SampleAabb& region,
-			RestoreResult& result);
+			const SampleAabb& region, RestoreResult& result);
 		[[nodiscard]] ValidationResult InitializePreparedSample(
-			SampleCoord coordinate,
-			VoxelSample prepared);
+			SampleCoord coordinate, VoxelSample prepared);
 		void CommitGeneratedOriginalState() noexcept;
 
 		VoxelWorldConfig m_Config{};
 		LogicalDomainMetrics m_LogicalDomainMetrics{};
 		SampleAabb m_LogicalSampleBounds{};
-		std::map<
-			ChunkCoord,
-			std::unique_ptr<VoxelChunk>,
-			ChunkCoordZYXLess> m_Chunks;
+		std::map<ChunkCoord, std::unique_ptr<VoxelChunk>, ChunkCoordZYXLess> m_Chunks;
 		std::uint64_t m_WorldVoxelRevision = 0;
 		bool m_OriginalStateSealed = false;
 	};
