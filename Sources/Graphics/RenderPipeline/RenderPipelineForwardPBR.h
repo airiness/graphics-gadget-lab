@@ -3,6 +3,7 @@
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
+#include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
@@ -29,6 +30,7 @@ namespace gglab
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassClearViewTargets m_ClearViewTargetsPass;
+		RenderPassDepthPrepass m_DepthPrepassPass;
 		RenderPassSkybox m_SkyboxPass;
 		RenderPassForwardPBR m_ForwardPBRPass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };

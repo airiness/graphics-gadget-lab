@@ -23,7 +23,7 @@ namespace gglab
 		{
 			RGTextureId m_ShadowMap{};
 			RGTextureViewId m_Dsv{};
-			uint32_t m_ShadowMapSize = 0;
+			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 		};
 
 	}
@@ -41,14 +41,31 @@ namespace gglab
 		EnsureInitialized(services);
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[](RenderGraph::RGBuilder& builder, PassData& data)
+			[contextPtr](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 				builder.WriteInPlace(
 					shadowRes.m_DirectionalShadowMap,
 					RGTextureAccess::DepthStencilWrite);
 				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
-				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
+				const auto& renderQueue =
+					contextPtr->GetRenderQueue(
+						RenderViewID::DirectionalShadow);
+				data.m_RasterDomain =
+					std::addressof(
+						renderQueue.m_CoverageRasterDomain);
+				if (!renderQueue.m_DrawItems.empty())
+				{
+					const auto& shadowDesc =
+						builder.GetTextureDesc(
+							data.m_ShadowMap);
+					GGLAB_ASSERT_MSG(
+						data.m_RasterDomain->IsValid() &&
+							IsDepthCoverageTargetExtentCompatible(
+								*data.m_RasterDomain,
+								shadowDesc),
+						"Shadow-map extent must match its coverage raster domain.");
+				}
 
 				const auto dsvDesc = MakeRHITexture2DViewDesc(
 					RHIFormat::D32Float,
@@ -73,8 +90,16 @@ namespace gglab
 				{
 					return;
 				}
-				graphicsContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_ShadowMapSize), static_cast<float>(data.m_ShadowMapSize) });
-				graphicsContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_ShadowMapSize), static_cast<int32_t>(data.m_ShadowMapSize) });
+				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
+				GGLAB_ASSERT_MSG(
+					data.m_RasterDomain ==
+						std::addressof(
+							renderQueue.m_CoverageRasterDomain),
+					"Shadow rendering must consume the RenderQueue raster domain directly.");
+				graphicsContext->SetViewport(
+					data.m_RasterDomain->m_Viewport);
+				graphicsContext->SetScissorRect(
+					data.m_RasterDomain->m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();

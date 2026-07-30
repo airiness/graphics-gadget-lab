@@ -172,6 +172,7 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
@@ -614,6 +615,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
@@ -793,6 +795,7 @@
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />

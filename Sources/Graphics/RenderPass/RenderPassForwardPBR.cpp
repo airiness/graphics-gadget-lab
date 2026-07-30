@@ -43,8 +43,13 @@ namespace gglab
 			RGTextureViewId m_Dsv{};
 			RGTextureViewId m_ShadowSrv{};
 
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
+			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
+			const RenderQueue* m_ExpectedRenderQueue = nullptr;
+			std::array<
+				bool,
+				RenderQueueBuilder::VariantCount>
+				m_DepthEqualAllowed{};
+			bool m_UseDepthEqual = false;
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
@@ -56,17 +61,31 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		Prepare(services);
+		AddBucketPass(rg, context, services, false);
+		AddBucketPass(rg, context, services, true);
+	}
+
+	void RenderPassForwardPBR::AddBucketPass(
+		RenderGraph& rg,
+		const RenderFrameContext& context,
+		const RenderServices& services,
+		bool transparent) noexcept
+	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
 		auto* servicesPtr = &services;
 		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
-		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const std::string passName = MakeRenderGraphPassName(
+			transparent ? "Transparent" : "Opaque");
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[contextPtr, servicesPtr, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
+		rg.AddPass<PassData>(passName.c_str(),
+			[this, contextPtr, servicesPtr, displayViewId, transparent](
+				RenderGraph::RGBuilder& builder,
+				PassData& data)
 			{
 				builder.SideEffect();
 
@@ -78,18 +97,20 @@ namespace gglab
 				auto& shadowRes = blackboard.Get<RGShadowResources>(ShadowResourcesName);
 				auto& sceneDepth = blackboard.Get<RGSceneDepthResources>(
 					SceneDepthResourcesName);
+				const auto& coverageContract =
+					blackboard.Get<RGDepthCoverageContract>(
+						DepthCoverageContractName);
+				const auto& renderQueue =
+					contextPtr->GetRenderQueue(displayViewId);
 
 				builder.ReadWriteInPlace(displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
-				builder.ReadWriteInPlace(sceneDepth.m_Texture, RGTextureAccess::DepthStencilWrite);
 				data.m_SceneColor = displayTargets.m_SceneColor;
-				data.m_Depth = sceneDepth.m_Texture;
 				data.m_IrradianceCubemap = builder.Read(iblRes.m_IrradianceCubemap, RGTextureAccess::Sample);
 				data.m_PrefilteredSpecularCubemap = builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
 				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
 
 				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
-				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, sceneDepth.m_DsvDesc);
 
 				const auto shadowSrvDesc = MakeRHITexture2DViewDesc(
 					RHIFormat::R32Float,
@@ -99,9 +120,129 @@ namespace gglab
 				data.m_ShadowSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_ShadowMap, shadowSrvDesc);
 
-				data.m_Width = displayTargets.m_Width;
-				data.m_Height = displayTargets.m_Height;
+				data.m_RasterDomain =
+					std::addressof(
+						renderQueue.m_CoverageRasterDomain);
+				data.m_ExpectedRenderQueue =
+					coverageContract.m_SourceRenderQueue;
 				data.m_ShadowMapSize = shadowRes.m_ShadowMapSize;
+
+				if (!renderQueue.m_DrawItems.empty())
+				{
+					GGLAB_ASSERT_MSG(
+						data.m_RasterDomain->IsValid(),
+						"Forward rendering requires a valid coverage raster domain.");
+					GGLAB_ASSERT_MSG(
+						data.m_RasterDomain->m_DepthConvention ==
+							sceneDepth.m_Convention,
+						"Forward raster and resource depth conventions must match.");
+					GGLAB_ASSERT_MSG(
+						AreDepthCoverageTargetExtentsCompatible(
+							*data.m_RasterDomain,
+							builder.GetTextureDesc(
+								displayTargets.m_SceneColor),
+							builder.GetTextureDesc(
+								sceneDepth.m_Texture)),
+						"Forward color and depth extents must match the coverage raster domain.");
+					GGLAB_ASSERT_MSG(
+						coverageContract.m_RasterDomain ==
+							data.m_RasterDomain,
+						"Prepass and Forward must share one raster-domain instance.");
+					GGLAB_ASSERT_MSG(
+						data.m_ExpectedRenderQueue ==
+							std::addressof(renderQueue),
+						"Prepass and Forward must consume one RenderQueue and its shared draw packets.");
+				}
+
+				if (!transparent)
+				{
+					bool allCoverageMatches = true;
+					const auto& ranges =
+						renderQueue.m_BucketDrawRanges;
+					for (const RenderBucket bucket :
+						{ RenderBucket::Opaque,
+							RenderBucket::AlphaTest })
+					{
+						const DrawItemsRange range =
+							ranges[utils::ToIndex(bucket)];
+						for (uint32_t offset = 0;
+							offset < range.m_Count;
+							++offset)
+						{
+							const DrawItem& drawItem =
+								renderQueue.m_DrawItems[
+									range.m_Start + offset];
+							const size_t variantIndex =
+								static_cast<size_t>(
+									drawItem.m_VariantBits &
+										RenderQueueBuilder::VariantMask);
+							if (data.m_DepthEqualAllowed[
+								variantIndex])
+							{
+								continue;
+							}
+
+							const auto& prepassSignature =
+								coverageContract.
+									m_PrepassPipelineSignatures[
+										variantIndex];
+							const auto forwardSignature =
+								DescribePipelineVariant(
+									drawItem.m_VariantBits).
+									m_LogicalMetadata.
+									m_DepthCoveragePipelineSignature;
+							const bool sharedDomainAndPackets =
+								coverageContract.m_RasterDomain ==
+									data.m_RasterDomain &&
+								data.m_ExpectedRenderQueue ==
+									std::addressof(renderQueue);
+							data.m_DepthEqualAllowed[
+								variantIndex] =
+								sharedDomainAndPackets &&
+								ValidateDepthEqualVariant(
+									drawItem.m_VariantBits,
+									prepassSignature,
+									forwardSignature);
+							allCoverageMatches =
+								allCoverageMatches &&
+								data.m_DepthEqualAllowed[
+									variantIndex];
+							GGLAB_ASSERT_MSG(
+								data.m_DepthEqualAllowed[
+									variantIndex],
+								"DepthEqual requires matching prepass and Forward pipeline, raster-domain, and draw-packet contracts.");
+						}
+					}
+					data.m_UseDepthEqual =
+						allCoverageMatches;
+				}
+
+				if (transparent || data.m_UseDepthEqual)
+				{
+					data.m_Depth = builder.Read(
+						sceneDepth.m_Texture,
+						RGTextureAccess::DepthStencilRead);
+					RHITextureViewDesc readOnlyDsvDesc =
+						sceneDepth.m_DsvDesc;
+					readOnlyDsvDesc.m_ReadOnlyDepth = true;
+					data.m_Dsv =
+						builder.CreateView<
+							RHITextureViewType::DepthStencil>(
+							data.m_Depth,
+							readOnlyDsvDesc);
+				}
+				else
+				{
+					builder.ReadWriteInPlace(
+						sceneDepth.m_Texture,
+						RGTextureAccess::DepthStencilWrite);
+					data.m_Depth = sceneDepth.m_Texture;
+					data.m_Dsv =
+						builder.CreateView<
+							RHITextureViewType::DepthStencil>(
+							data.m_Depth,
+							sceneDepth.m_DsvDesc);
+				}
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
@@ -114,7 +255,9 @@ namespace gglab
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
-			[this, contextPtr, servicesPtr, displayViewId](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr, displayViewId, transparent](
+				RGExecuteContext& executeContext,
+				PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
@@ -133,8 +276,16 @@ namespace gglab
 				{
 					return;
 				}
-				graphicsContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				graphicsContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
+				GGLAB_ASSERT_MSG(
+					data.m_RasterDomain ==
+						std::addressof(
+							renderQueue.m_CoverageRasterDomain),
+					"Forward must consume the RenderQueue raster domain directly.");
+				graphicsContext->SetViewport(
+					data.m_RasterDomain->m_Viewport);
+				graphicsContext->SetScissorRect(
+					data.m_RasterDomain->m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
@@ -180,11 +331,18 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 					passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId);
+				DrawRenderQueue(
+					graphicsContext,
+					*contextPtr,
+					*servicesPtr,
+					displayViewId,
+					transparent,
+					data.m_ExpectedRenderQueue,
+					data.m_UseDepthEqual);
 			});
 	}
 
-	void RenderPassForwardPBR::EnsureInitialized(const RenderServices& services) noexcept
+	void RenderPassForwardPBR::Prepare(const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
@@ -237,7 +395,10 @@ namespace gglab
 	void RenderPassForwardPBR::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context,
 		const RenderServices& services,
-		RenderViewID viewId) noexcept
+		RenderViewID viewId,
+		bool transparent,
+		const RenderQueue* expectedRenderQueue,
+		bool useDepthEqual) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		const auto& renderQueue = context.GetRenderQueue(viewId);
@@ -250,19 +411,43 @@ namespace gglab
 			"Forward depth coverage requires one valid raster domain per view.");
 		const auto ranges = renderQueue.m_BucketDrawRanges;
 
-		DrawItemsRange opaqueRange = ranges[utils::ToIndex(RenderBucket::Opaque)];
-		DrawItemsRange alphaTestRange = ranges[utils::ToIndex(RenderBucket::AlphaTest)];
-		DrawItemsRange transparentRange = ranges[utils::ToIndex(RenderBucket::Transparent)];
+		if (transparent)
+		{
+			DrawRange(
+				graphicsContext,
+				services,
+				renderQueue,
+				ranges[utils::ToIndex(RenderBucket::Transparent)],
+				false,
+				expectedRenderQueue);
+			return;
+		}
 
-		DrawRange(graphicsContext, services, renderQueue, opaqueRange);
-		DrawRange(graphicsContext, services, renderQueue, alphaTestRange);
-		DrawRange(graphicsContext, services, renderQueue, transparentRange);
+		for (const RenderBucket bucket :
+			{ RenderBucket::Opaque, RenderBucket::AlphaTest })
+		{
+			const DrawItemsRange range =
+				ranges[utils::ToIndex(bucket)];
+			if (range.m_Count == 0)
+			{
+				continue;
+			}
+			DrawRange(
+				graphicsContext,
+				services,
+				renderQueue,
+				range,
+				useDepthEqual,
+				expectedRenderQueue);
+		}
 	}
 
 	void RenderPassForwardPBR::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services,
 		const RenderQueue& renderQueue,
-		const DrawItemsRange& range) noexcept
+		const DrawItemsRange& range,
+		bool useDepthEqual,
+		const RenderQueue* expectedRenderQueue) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -287,12 +472,23 @@ namespace gglab
 			GGLAB_ASSERT_MSG(
 				drawPacket.IsValid(),
 				"Forward received an incomplete shared depth coverage draw packet.");
+			GGLAB_ASSERT_MSG(
+				expectedRenderQueue == std::addressof(renderQueue) &&
+					IsSameDepthCoverageDrawPacket(
+						drawPacket,
+						expectedRenderQueue->m_DrawItems[
+							range.m_Start + index].
+							m_CoverageDrawPacket),
+				"Forward must consume the exact draw-packet instances used by the depth prepass.");
 
 			// Set PSO
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				graphicsContext->SetPipeline(
-					GetOrCreatePSOForVariant(*services.m_Renderer, drawItem.m_VariantBits));
+					GetOrCreatePSOForVariant(
+						*services.m_Renderer,
+						drawItem.m_VariantBits,
+						useDepthEqual));
 
 				lastVariantBits = drawItem.m_VariantBits;
 			}
@@ -326,32 +522,31 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassForwardPBR::GetOrCreatePSOForVariant(
-		const Renderer& renderer, uint64_t variantBits) noexcept
+		const Renderer& renderer,
+		uint64_t variantBits,
+		bool useDepthEqual) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
-		GraphicsPhysicalPipelineKey physicalKey = m_BasePhysicalKey;
-
-		auto [rasterizerPreset, depthPreset, blendPreset] = GetPresetsFromVariantBits(variantBits);
-		physicalKey.m_RasterizerPreset = rasterizerPreset;
-		physicalKey.m_DepthPreset = depthPreset;
-		physicalKey.m_BlendPreset = blendPreset;
-		const GraphicsLogicalPipelineMetadata logicalMetadata{
-			.m_DepthCoveragePipelineSignature =
-				BuildDepthCoveragePipelineSignatureForVariant(
-					physicalKey,
-					variantBits),
-		};
+		GraphicsPipelineDescription description =
+			DescribePipelineVariant(variantBits);
+		auto [rasterizerPreset, depthPreset, blendPreset] =
+			GetPresetsFromVariantBits(
+				variantBits,
+				useDepthEqual);
+		description.m_PhysicalKey.m_RasterizerPreset =
+			rasterizerPreset;
+		description.m_PhysicalKey.m_DepthPreset = depthPreset;
+		description.m_PhysicalKey.m_BlendPreset = blendPreset;
 
 		const size_t slotIndex =
 			static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];
 		return pipelineCache->Resolve(
 			slot,
-			physicalKey,
-			logicalMetadata,
+			description.m_PhysicalKey,
 			GetInfo());
 	}
 
@@ -388,20 +583,47 @@ namespace gglab
 			alphaVariant);
 	}
 
-	const GraphicsLogicalPipelineMetadata&
-		RenderPassForwardPBR::GetLogicalPipelineMetadataForVariant(
+	GraphicsLogicalPipelineMetadata
+		RenderPassForwardPBR::BuildLogicalPipelineMetadataForVariant(
+			const GraphicsPhysicalPipelineKey& physicalKey,
+			uint64_t variantBits) noexcept
+	{
+		return {
+			.m_DepthCoveragePipelineSignature =
+				BuildDepthCoveragePipelineSignatureForVariant(
+					physicalKey,
+					variantBits),
+		};
+	}
+
+	GraphicsPipelineDescription
+		RenderPassForwardPBR::DescribePipelineVariant(
 			uint64_t variantBits) const noexcept
 	{
-		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
-		const size_t slotIndex =
-			static_cast<size_t>(
-				variantBits &
-				RenderQueueBuilder::VariantMask);
-		return m_PipelineSlots[slotIndex].GetLogicalMetadata();
+		GGLAB_ASSERT(m_IsInitialized);
+		GGLAB_ASSERT(
+			(variantBits & ~RenderQueueBuilder::VariantMask) == 0);
+
+		GraphicsPhysicalPipelineKey physicalKey =
+			m_BasePhysicalKey;
+		auto [rasterizerPreset, depthPreset, blendPreset] =
+			GetPresetsFromVariantBits(variantBits, true);
+		physicalKey.m_RasterizerPreset = rasterizerPreset;
+		physicalKey.m_DepthPreset = depthPreset;
+		physicalKey.m_BlendPreset = blendPreset;
+		return {
+			.m_PhysicalKey = physicalKey,
+			.m_LogicalMetadata =
+				BuildLogicalPipelineMetadataForVariant(
+					physicalKey,
+					variantBits),
+		};
 	}
 
 	std::tuple<RasterizerPreset, DepthPreset, BlendPreset>
-		RenderPassForwardPBR::GetPresetsFromVariantBits(uint64_t variantBits) const noexcept
+		RenderPassForwardPBR::GetPresetsFromVariantBits(
+			uint64_t variantBits,
+			bool useDepthEqual) const noexcept
 	{
 		const bool doubleSided = RenderQueueBuilder::DecodeVariantDoubleSided(variantBits);
 		const auto renderBucket = RenderQueueBuilder::DecodeVariantBucket(variantBits);
@@ -410,7 +632,9 @@ namespace gglab
 			RasterizerPreset::TwoSided :
 			RasterizerPreset::Default;
 		BlendPreset blendPreset = BlendPreset::Default;
-		DepthPreset depthPreset = DepthPreset::ReversedZWrite;
+		DepthPreset depthPreset = useDepthEqual ?
+			DepthPreset::ReversedZEqualReadOnly :
+			DepthPreset::ReversedZWrite;
 
 		if (renderBucket == RenderBucket::Transparent)
 		{
@@ -419,6 +643,33 @@ namespace gglab
 		}
 
 		return { rasterizerPreset, depthPreset, blendPreset };
+	}
+
+	bool RenderPassForwardPBR::ValidateDepthEqualVariant(
+		uint64_t variantBits,
+		const std::optional<DepthCoveragePipelineSignature>&
+			prepassSignature,
+		const std::optional<DepthCoveragePipelineSignature>&
+			forwardSignature) noexcept
+	{
+		const size_t variantIndex =
+			static_cast<size_t>(
+				variantBits & RenderQueueBuilder::VariantMask);
+		auto& validation =
+			m_DepthEqualVariantValidations[variantIndex];
+		if (validation.m_PrepassSignature != prepassSignature ||
+			validation.m_ForwardSignature != forwardSignature)
+		{
+			validation.m_PrepassSignature = prepassSignature;
+			validation.m_ForwardSignature = forwardSignature;
+			validation.m_Matches =
+				prepassSignature &&
+				forwardSignature &&
+				CompareDepthCoveragePipelineSignatures(
+					*prepassSignature,
+					*forwardSignature).m_Matches;
+		}
+		return validation.m_Matches;
 	}
 
 }

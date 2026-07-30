@@ -27,5 +27,6 @@ namespace gglab
 		DepthDisabled,
 		ReversedZWrite,
 		ReversedZReadOnly,
+		ReversedZEqualReadOnly,
 	};
 }

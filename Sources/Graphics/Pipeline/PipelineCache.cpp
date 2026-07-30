@@ -19,15 +19,6 @@ namespace gglab
 		const GraphicsPhysicalPipelineKey& physicalKey,
 		const RenderPassInfo& renderPassInfo) noexcept
 	{
-		return Resolve(slot, physicalKey, {}, renderPassInfo);
-	}
-
-	RHIPipelineHandle PipelineCache::Resolve(
-		GraphicsPipelineSlot& slot,
-		const GraphicsPhysicalPipelineKey& physicalKey,
-		const GraphicsLogicalPipelineMetadata& logicalMetadata,
-		const RenderPassInfo& renderPassInfo) noexcept
-	{
 		const uint64_t shaderRevision = m_ShaderManager->GetRevision();
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
 		const bool canReusePhysicalPipeline =
@@ -36,7 +27,6 @@ namespace gglab
 			slot.m_PipelineSystemRevision == pipelineSystemRevision &&
 			slot.m_PhysicalKey == physicalKey &&
 			slot.m_ShaderRevision == shaderRevision;
-		slot.m_LogicalMetadata = logicalMetadata;
 		if (canReusePhysicalPipeline)
 		{
 			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
