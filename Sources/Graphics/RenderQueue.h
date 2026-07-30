@@ -2,6 +2,7 @@
 #include "Core/Math/Culling.h"
 #include "Core/Math/Vector.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/Pipeline/DepthCoverage.h"
 #include "Graphics/RenderScene.h"
 
 #include <span>
@@ -10,10 +11,8 @@ namespace gglab
 {
 	struct DrawItem
 	{
-		MeshID m_MeshId{};
 		RenderMaterialKey m_MaterialKey{};
-		uint32_t m_ObjectOffset = 0;
-		uint32_t m_MaterialOffset = 0;
+		DepthCoverageDrawPacket m_CoverageDrawPacket{};
 
 		RenderBucket m_Bucket = RenderBucket::Opaque;
 		uint64_t m_VariantBits = 0;
@@ -44,6 +43,7 @@ namespace gglab
 		std::array<DrawItemsRange, utils::ToIndex(RenderBucket::Count)> m_BucketDrawRanges{};
 
 		RenderViewID m_ViewId = RenderViewID::Unknown;
+		DepthCoverageRasterDomain m_CoverageRasterDomain{};
 		RenderQueueStatistics m_Statistics{};
 	};
 
@@ -56,6 +56,11 @@ namespace gglab
 			const RenderScene& m_RenderScene;
 			const RenderView& m_RenderView;
 			std::span<const math::Frustum> m_CullingFrustums;
+			DepthCoverageRasterDomain m_CoverageRasterDomain{};
+			RHIBufferHandle m_ObjectBuffer{};
+			uint32_t m_ObjectBaseIndex = 0;
+			RHIBufferHandle m_MaterialBuffer{};
+			uint32_t m_MaterialBaseIndex = 0;
 		};
 
 		enum VariantBit : uint64_t

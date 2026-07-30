@@ -46,6 +46,8 @@ namespace gglab
 		uint64_t m_Offset = 0;
 		uint32_t m_Stride = 0;
 		uint32_t m_SizeInBytes = 0;
+
+		bool operator==(const RHIVertexBufferBinding&) const noexcept = default;
 	};
 
 	struct RHIIndexBufferBinding
@@ -54,6 +56,8 @@ namespace gglab
 		uint64_t m_Offset = 0;
 		uint32_t m_SizeInBytes = 0;
 		RHIFormat m_Format = RHIFormat::Unknown;
+
+		bool operator==(const RHIIndexBufferBinding&) const noexcept = default;
 	};
 
 	struct RHIDescriptorTableBinding
@@ -71,6 +75,8 @@ namespace gglab
 		float m_Height = 0.0f;
 		float m_MinDepth = 0.0f;
 		float m_MaxDepth = 1.0f;
+
+		bool operator==(const RHIViewport&) const noexcept = default;
 	};
 
 	struct RHIScissorRect
@@ -79,6 +85,8 @@ namespace gglab
 		int32_t m_Top = 0;
 		int32_t m_Right = 0;
 		int32_t m_Bottom = 0;
+
+		bool operator==(const RHIScissorRect&) const noexcept = default;
 	};
 
 	class RHICommandContext

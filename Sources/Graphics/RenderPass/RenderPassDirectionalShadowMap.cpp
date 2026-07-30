@@ -2,7 +2,6 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
@@ -74,10 +73,6 @@ namespace gglab
 				{
 					return;
 				}
-				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					*renderer,
-					renderQueue.m_DrawItems.front().m_VariantBits,
-					contextPtr->GetDirectionalShadowSettings()));
 				graphicsContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_ShadowMapSize), static_cast<float>(data.m_ShadowMapSize) });
 				graphicsContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_ShadowMapSize), static_cast<int32_t>(data.m_ShadowMapSize) });
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
@@ -184,8 +179,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 		auto* renderer = services.m_Renderer;
-		auto* assetManager = services.m_AssetManager;
-
+		GGLAB_ASSERT_NOT_NULL(renderer);
 		const auto& drawItems = renderQueue.m_DrawItems;
 
 		uint64_t lastVariantBits = std::numeric_limits<uint64_t>::max();
@@ -195,6 +189,8 @@ namespace gglab
 		for (uint32_t index = 0; index < range.m_Count; ++index)
 		{
 			const auto& drawItem = drawItems[range.m_Start + index];
+			const auto& drawPacket = drawItem.m_CoverageDrawPacket;
+			GGLAB_ASSERT(drawPacket.IsValid());
 
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
@@ -207,31 +203,28 @@ namespace gglab
 				lastVariantBits = drawItem.m_VariantBits;
 			}
 
-			const Mesh* mesh = assetManager->GetMesh(drawItem.m_MeshId);
-			if (!mesh || mesh->m_IndexCount == 0 || !mesh->m_IsUploaded)
-			{
-				GGLAB_LOG_GRAPHICS_WARN("RenderPassDirectionalShadowMap: Mesh is invalid, skip draw item.");
-				continue;
-			}
-
-			if (!hasBoundMesh || drawItem.m_MeshId != lastMeshId)
+			const auto& geometry = drawPacket.m_Geometry;
+			if (!hasBoundMesh || geometry.m_MeshId != lastMeshId)
 			{
 				graphicsContext->SetVertexBuffers(
 					0,
-					std::span<const RHIVertexBufferBinding>(&mesh->m_VertexBufferBinding, 1));
-				graphicsContext->SetIndexBuffer(mesh->m_IndexBufferBinding);
-				lastMeshId = drawItem.m_MeshId;
+					std::span<const RHIVertexBufferBinding>(&geometry.m_VertexBuffer, 1));
+				graphicsContext->SetIndexBuffer(geometry.m_IndexBuffer);
+				lastMeshId = geometry.m_MeshId;
 				hasBoundMesh = true;
 			}
 
-			const DrawParameters drawParameters{
-				.ObjectOffset = drawItem.m_ObjectOffset,
-			};
 			graphicsContext->SetPushConstants(
 				static_cast<uint32_t>(CommonRSRootParamIndex::DrawConstants),
-				drawParameters);
+				drawPacket.m_DrawParameters);
 
-			graphicsContext->DrawIndexed(mesh->m_IndexCount);
+			const auto& arguments = drawPacket.m_IndexedDraw;
+			graphicsContext->DrawIndexed(
+				arguments.m_IndexCount,
+				arguments.m_InstanceCount,
+				arguments.m_StartIndexLocation,
+				arguments.m_BaseVertexLocation,
+				arguments.m_StartInstanceLocation);
 		}
 	}
 
@@ -244,7 +237,7 @@ namespace gglab
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
-		GraphicsPipelineRecipe recipe = m_BaseRecipe;
+		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
 		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
 		recipe.m_DepthBias = shadowSettings.m_RasterizerDepthBias;
 		recipe.m_SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;

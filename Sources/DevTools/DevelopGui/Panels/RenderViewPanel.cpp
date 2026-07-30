@@ -389,7 +389,10 @@ namespace gglab
 				const uint32_t uniqueMeshes = CountUniqueInRange<MeshID>(
 					queue.m_DrawItems,
 					range,
-					[](const DrawItem& item) noexcept { return item.m_MeshId; });
+					[](const DrawItem& item) noexcept
+					{
+						return item.m_CoverageDrawPacket.m_Geometry.m_MeshId;
+					});
 				const uint32_t uniqueMaterials = CountUniqueInRange<RenderMaterialKey>(
 					queue.m_DrawItems,
 					range,

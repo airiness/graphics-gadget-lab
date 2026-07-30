@@ -21,83 +21,94 @@ namespace gglab
 			output += field;
 		}
 
-		void CompareSignatureFields(
-			const DepthCoverageSignature& lhs,
-			const DepthCoverageSignature& rhs,
+		void ComparePipelineSignatureFields(
+			const DepthCoveragePipelineSignature& lhs,
+			const DepthCoveragePipelineSignature& rhs,
 			std::string& mismatch)
 		{
 			if (lhs.m_VertexProgram != rhs.m_VertexProgram)
-				AppendMismatch(mismatch, "Signature", "VertexProgram");
+				AppendMismatch(mismatch, "Pipeline", "VertexProgram");
 			if (lhs.m_Deformation != rhs.m_Deformation)
-				AppendMismatch(mismatch, "Signature", "Deformation");
+				AppendMismatch(mismatch, "Pipeline", "Deformation");
 			if (lhs.m_InputLayout != rhs.m_InputLayout)
-				AppendMismatch(mismatch, "Signature", "InputLayout");
+				AppendMismatch(mismatch, "Pipeline", "InputLayout");
 			if (lhs.m_PositionPrecision != rhs.m_PositionPrecision)
-				AppendMismatch(mismatch, "Signature", "PositionPrecision");
+				AppendMismatch(mismatch, "Pipeline", "PositionPrecision");
 			if (lhs.m_PositionFormat != rhs.m_PositionFormat)
-				AppendMismatch(mismatch, "Signature", "PositionFormat");
+				AppendMismatch(mismatch, "Pipeline", "PositionFormat");
 			if (lhs.m_TopologyType != rhs.m_TopologyType)
-				AppendMismatch(mismatch, "Signature", "TopologyType");
+				AppendMismatch(mismatch, "Pipeline", "TopologyType");
 			if (lhs.m_PrimitiveTopology != rhs.m_PrimitiveTopology)
-				AppendMismatch(mismatch, "Signature", "PrimitiveTopology");
+				AppendMismatch(mismatch, "Pipeline", "PrimitiveTopology");
 			if (lhs.m_FillMode != rhs.m_FillMode)
-				AppendMismatch(mismatch, "Signature", "FillMode");
+				AppendMismatch(mismatch, "Pipeline", "FillMode");
 			if (lhs.m_CullMode != rhs.m_CullMode)
-				AppendMismatch(mismatch, "Signature", "CullMode");
+				AppendMismatch(mismatch, "Pipeline", "CullMode");
 			if (lhs.m_FrontCounterClockwise != rhs.m_FrontCounterClockwise)
-				AppendMismatch(mismatch, "Signature", "FrontCounterClockwise");
+				AppendMismatch(mismatch, "Pipeline", "FrontCounterClockwise");
 			if (lhs.m_DepthBias != rhs.m_DepthBias)
-				AppendMismatch(mismatch, "Signature", "DepthBias");
+				AppendMismatch(mismatch, "Pipeline", "DepthBias");
 			if (lhs.m_DepthBiasClamp != rhs.m_DepthBiasClamp)
-				AppendMismatch(mismatch, "Signature", "DepthBiasClamp");
+				AppendMismatch(mismatch, "Pipeline", "DepthBiasClamp");
 			if (lhs.m_SlopeScaledDepthBias != rhs.m_SlopeScaledDepthBias)
-				AppendMismatch(mismatch, "Signature", "SlopeScaledDepthBias");
+				AppendMismatch(mismatch, "Pipeline", "SlopeScaledDepthBias");
 			if (lhs.m_DepthClipEnable != rhs.m_DepthClipEnable)
-				AppendMismatch(mismatch, "Signature", "DepthClipEnable");
+				AppendMismatch(mismatch, "Pipeline", "DepthClipEnable");
 			if (lhs.m_DoubleSided != rhs.m_DoubleSided)
-				AppendMismatch(mismatch, "Signature", "DoubleSided");
+				AppendMismatch(mismatch, "Pipeline", "DoubleSided");
 			if (lhs.m_SampleCount != rhs.m_SampleCount)
-				AppendMismatch(mismatch, "Signature", "SampleCount");
+				AppendMismatch(mismatch, "Pipeline", "SampleCount");
 			if (lhs.m_SampleQuality != rhs.m_SampleQuality)
-				AppendMismatch(mismatch, "Signature", "SampleQuality");
+				AppendMismatch(mismatch, "Pipeline", "SampleQuality");
 			if (lhs.m_SampleMask != rhs.m_SampleMask)
-				AppendMismatch(mismatch, "Signature", "SampleMask");
+				AppendMismatch(mismatch, "Pipeline", "SampleMask");
 			if (lhs.m_AlphaToCoverageEnable != rhs.m_AlphaToCoverageEnable)
-				AppendMismatch(mismatch, "Signature", "AlphaToCoverage");
+				AppendMismatch(mismatch, "Pipeline", "AlphaToCoverage");
 			if (lhs.m_AlphaVariant != rhs.m_AlphaVariant)
-				AppendMismatch(mismatch, "Signature", "AlphaVariant");
+				AppendMismatch(mismatch, "Pipeline", "AlphaVariant");
 		}
 
-		void CompareBindingFields(
-			const DepthCoverageBinding& lhs,
-			const DepthCoverageBinding& rhs,
+		void CompareRasterDomainFields(
+			const DepthCoverageRasterDomain& lhs,
+			const DepthCoverageRasterDomain& rhs,
 			std::string& mismatch)
 		{
 			if (lhs.m_FrameSerial != rhs.m_FrameSerial)
-				AppendMismatch(mismatch, "Binding", "FrameSerial");
+				AppendMismatch(mismatch, "RasterDomain", "FrameSerial");
 			if (lhs.m_ViewBindingId != rhs.m_ViewBindingId)
-				AppendMismatch(mismatch, "Binding", "ViewBindingId");
-			if (lhs.m_CurrentModelSource != rhs.m_CurrentModelSource)
-				AppendMismatch(mismatch, "Binding", "CurrentModelSource");
+				AppendMismatch(mismatch, "RasterDomain", "ViewBindingId");
 			if (lhs.m_CurrentViewSource != rhs.m_CurrentViewSource)
-				AppendMismatch(mismatch, "Binding", "CurrentViewSource");
+				AppendMismatch(mismatch, "RasterDomain", "CurrentViewSource");
 			if (lhs.m_CurrentJitteredProjectionSource !=
 				rhs.m_CurrentJitteredProjectionSource)
 			{
 				AppendMismatch(
 					mismatch,
-					"Binding",
+					"RasterDomain",
 					"CurrentJitteredProjectionSource");
 			}
 			if (lhs.m_ProjectionSource != rhs.m_ProjectionSource)
-				AppendMismatch(mismatch, "Binding", "ProjectionSource");
-			if (lhs.m_MaterialAlphaSource != rhs.m_MaterialAlphaSource)
-				AppendMismatch(mismatch, "Binding", "MaterialAlphaSource");
+				AppendMismatch(mismatch, "RasterDomain", "ProjectionSource");
+			if (lhs.m_Viewport != rhs.m_Viewport)
+				AppendMismatch(mismatch, "RasterDomain", "Viewport");
+			if (lhs.m_Scissor != rhs.m_Scissor)
+				AppendMismatch(mismatch, "RasterDomain", "Scissor");
+			if (lhs.m_DepthConvention != rhs.m_DepthConvention)
+				AppendMismatch(mismatch, "RasterDomain", "DepthConvention");
+		}
+
+		std::string DescribeSource(const DepthCoverageBufferSource& source)
+		{
+			return std::format(
+				"{}:{}:{}",
+				source.m_Buffer.Index(),
+				source.m_Buffer.Generation(),
+				source.m_ElementIndex);
 		}
 	}
 
-	DepthCoverageSignature BuildDepthCoverageSignature(
-		const GraphicsPipelineRecipe& recipe,
+	DepthCoveragePipelineSignature BuildDepthCoveragePipelineSignature(
+		const GraphicsPhysicalPipelineKey& physicalKey,
 		DepthCoverageVertexProgram vertexProgram,
 		DepthCoverageDeformationVariant deformation,
 		DepthCoveragePositionPrecision positionPrecision,
@@ -106,11 +117,11 @@ namespace gglab
 		DepthCoverageAlphaVariant alphaVariant) noexcept
 	{
 		const RHIGraphicsPipelineDesc pipeline =
-			BuildRHIGraphicsPipelineDesc(recipe);
+			BuildRHIGraphicsPipelineDesc(physicalKey);
 		return {
 			.m_VertexProgram = vertexProgram,
 			.m_Deformation = deformation,
-			.m_InputLayout = recipe.m_InputLayoutId,
+			.m_InputLayout = physicalKey.m_InputLayoutId,
 			.m_PositionPrecision = positionPrecision,
 			.m_PositionFormat = positionFormat,
 			.m_TopologyType = pipeline.m_TopologyType,
@@ -135,65 +146,63 @@ namespace gglab
 		};
 	}
 
-	DepthCoverageComparison CompareDepthCoverageContracts(
-		const DepthCoverageSignature& lhsSignature,
-		const DepthCoverageBinding& lhsBinding,
-		const DepthCoverageSignature& rhsSignature,
-		const DepthCoverageBinding& rhsBinding)
+	DepthCoverageValidationResult CompareDepthCoveragePipelineSignatures(
+		const DepthCoveragePipelineSignature& lhs,
+		const DepthCoveragePipelineSignature& rhs)
 	{
-		const bool lhsSignatureValid = lhsSignature.IsValid();
-		const bool rhsSignatureValid = rhsSignature.IsValid();
-		const bool lhsBindingValid = lhsBinding.IsValid();
-		const bool rhsBindingValid = rhsBinding.IsValid();
-		DepthCoverageComparison comparison{
-			.m_SignatureMatches =
-				lhsSignatureValid &&
-				rhsSignatureValid &&
-				lhsSignature == rhsSignature,
-			.m_BindingMatches =
-				lhsBindingValid &&
-				rhsBindingValid &&
-				lhsBinding == rhsBinding,
+		const bool lhsValid = lhs.IsValid();
+		const bool rhsValid = rhs.IsValid();
+		DepthCoverageValidationResult result{
+			.m_Matches = lhsValid && rhsValid && lhs == rhs,
 		};
-		if (!lhsSignatureValid)
+		if (!lhsValid)
 		{
-			AppendMismatch(comparison.m_Mismatch, "Signature", "LhsInvalid");
+			AppendMismatch(result.m_Mismatch, "Pipeline", "LhsInvalid");
 		}
-		if (!rhsSignatureValid)
+		if (!rhsValid)
 		{
-			AppendMismatch(comparison.m_Mismatch, "Signature", "RhsInvalid");
+			AppendMismatch(result.m_Mismatch, "Pipeline", "RhsInvalid");
 		}
-		if (lhsSignatureValid &&
-			rhsSignatureValid &&
-			!comparison.m_SignatureMatches)
+		if (lhsValid && rhsValid && !result.m_Matches)
 		{
-			CompareSignatureFields(
-				lhsSignature,
-				rhsSignature,
-				comparison.m_Mismatch);
+			ComparePipelineSignatureFields(lhs, rhs, result.m_Mismatch);
 		}
-		if (!lhsBindingValid)
-		{
-			AppendMismatch(comparison.m_Mismatch, "Binding", "LhsInvalid");
-		}
-		if (!rhsBindingValid)
-		{
-			AppendMismatch(comparison.m_Mismatch, "Binding", "RhsInvalid");
-		}
-		if (lhsBindingValid &&
-			rhsBindingValid &&
-			!comparison.m_BindingMatches)
-		{
-			CompareBindingFields(
-				lhsBinding,
-				rhsBinding,
-				comparison.m_Mismatch);
-		}
-		return comparison;
+		return result;
 	}
 
-	std::string DescribeDepthCoverageSignature(
-		const DepthCoverageSignature& signature)
+	DepthCoverageValidationResult CompareDepthCoverageRasterDomains(
+		const DepthCoverageRasterDomain& lhs,
+		const DepthCoverageRasterDomain& rhs)
+	{
+		const bool lhsValid = lhs.IsValid();
+		const bool rhsValid = rhs.IsValid();
+		DepthCoverageValidationResult result{
+			.m_Matches = lhsValid && rhsValid && lhs == rhs,
+		};
+		if (!lhsValid)
+		{
+			AppendMismatch(result.m_Mismatch, "RasterDomain", "LhsInvalid");
+		}
+		if (!rhsValid)
+		{
+			AppendMismatch(result.m_Mismatch, "RasterDomain", "RhsInvalid");
+		}
+		if (lhsValid && rhsValid && !result.m_Matches)
+		{
+			CompareRasterDomainFields(lhs, rhs, result.m_Mismatch);
+		}
+		return result;
+	}
+
+	bool IsSameDepthCoverageDrawPacket(
+		const DepthCoverageDrawPacket& lhs,
+		const DepthCoverageDrawPacket& rhs) noexcept
+	{
+		return std::addressof(lhs) == std::addressof(rhs);
+	}
+
+	std::string DescribeDepthCoveragePipelineSignature(
+		const DepthCoveragePipelineSignature& signature)
 	{
 		return std::format(
 			"VertexProgram={} Deformation={} InputLayout={} "
@@ -223,27 +232,60 @@ namespace gglab
 			std::to_underlying(signature.m_AlphaVariant));
 	}
 
-	std::string DescribeDepthCoverageBinding(
-		const DepthCoverageBinding& binding)
+	std::string DescribeDepthCoverageRasterDomain(
+		const DepthCoverageRasterDomain& domain)
 	{
-		const auto describeSource =
-			[](const DepthCoverageBufferSource& source)
-			{
-				return std::format(
-					"{}:{}:{}",
-					source.m_Buffer.Index(),
-					source.m_Buffer.Generation(),
-					source.m_ElementIndex);
-			};
 		return std::format(
-			"Frame={} ViewBinding={} Model={} View={} "
-			"JitteredProjection={} ProjectionSource={} MaterialAlpha={}",
-			binding.m_FrameSerial,
-			binding.m_ViewBindingId,
-			describeSource(binding.m_CurrentModelSource),
-			describeSource(binding.m_CurrentViewSource),
-			describeSource(binding.m_CurrentJitteredProjectionSource),
-			std::to_underlying(binding.m_ProjectionSource),
-			describeSource(binding.m_MaterialAlphaSource));
+			"Frame={} ViewBinding={} View={} JitteredProjection={} "
+			"ProjectionSource={} Viewport={},{},{},{} Depth={}:{} "
+			"Scissor={},{},{},{} DepthConvention={}",
+			domain.m_FrameSerial,
+			domain.m_ViewBindingId,
+			DescribeSource(domain.m_CurrentViewSource),
+			DescribeSource(domain.m_CurrentJitteredProjectionSource),
+			std::to_underlying(domain.m_ProjectionSource),
+			domain.m_Viewport.m_X,
+			domain.m_Viewport.m_Y,
+			domain.m_Viewport.m_Width,
+			domain.m_Viewport.m_Height,
+			domain.m_Viewport.m_MinDepth,
+			domain.m_Viewport.m_MaxDepth,
+			domain.m_Scissor.m_Left,
+			domain.m_Scissor.m_Top,
+			domain.m_Scissor.m_Right,
+			domain.m_Scissor.m_Bottom,
+			std::to_underlying(domain.m_DepthConvention));
+	}
+
+	std::string DescribeDepthCoverageDrawPacket(
+		const DepthCoverageDrawPacket& packet)
+	{
+		const uint32_t meshId = packet.m_Geometry.m_MeshId.IsValid() ?
+			packet.m_Geometry.m_MeshId.Value() :
+			std::numeric_limits<uint32_t>::max();
+		return std::format(
+			"Mesh={} VertexBuffer={}:{}+{} stride={} size={} "
+			"IndexBuffer={}:{}+{} format={} size={} "
+			"DrawIndexed={},{},{},{},{} Draw.ObjectOffset={} "
+			"Model={} MaterialAlpha={}",
+			meshId,
+			packet.m_Geometry.m_VertexBuffer.m_Buffer.Index(),
+			packet.m_Geometry.m_VertexBuffer.m_Buffer.Generation(),
+			packet.m_Geometry.m_VertexBuffer.m_Offset,
+			packet.m_Geometry.m_VertexBuffer.m_Stride,
+			packet.m_Geometry.m_VertexBuffer.m_SizeInBytes,
+			packet.m_Geometry.m_IndexBuffer.m_Buffer.Index(),
+			packet.m_Geometry.m_IndexBuffer.m_Buffer.Generation(),
+			packet.m_Geometry.m_IndexBuffer.m_Offset,
+			std::to_underlying(packet.m_Geometry.m_IndexBuffer.m_Format),
+			packet.m_Geometry.m_IndexBuffer.m_SizeInBytes,
+			packet.m_IndexedDraw.m_IndexCount,
+			packet.m_IndexedDraw.m_InstanceCount,
+			packet.m_IndexedDraw.m_StartIndexLocation,
+			packet.m_IndexedDraw.m_BaseVertexLocation,
+			packet.m_IndexedDraw.m_StartInstanceLocation,
+			packet.m_DrawParameters.ObjectOffset,
+			DescribeSource(packet.m_CurrentModelSource),
+			DescribeSource(packet.m_MaterialAlphaSource));
 	}
 }

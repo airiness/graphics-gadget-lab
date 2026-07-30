@@ -23,10 +23,13 @@ namespace gglab
 			const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
-		[[nodiscard]] static std::optional<DepthCoverageSignature>
-			BuildDepthCoverageSignatureForVariant(
-				const GraphicsPipelineRecipe& recipe,
+		[[nodiscard]] static std::optional<DepthCoveragePipelineSignature>
+			BuildDepthCoveragePipelineSignatureForVariant(
+				const GraphicsPhysicalPipelineKey& physicalKey,
 				uint64_t variantBits) noexcept;
+		[[nodiscard]] const GraphicsLogicalPipelineMetadata&
+			GetLogicalPipelineMetadataForVariant(
+				uint64_t variantBits) const noexcept;
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
@@ -37,7 +40,6 @@ namespace gglab
 			RenderViewID viewId) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
-			const RenderFrameContext& context,
 			const RenderServices& services,
 			const RenderQueue& renderQueue,
 			const DrawItemsRange& range) noexcept;
@@ -46,17 +48,11 @@ namespace gglab
 			const Renderer& renderer,
 			uint64_t variantBits) noexcept;
 
-		[[nodiscard]] static DepthCoverageBinding BuildDepthCoverageBindingForDraw(
-			const Renderer& renderer,
-			const RenderFrameContext& context,
-			const DrawItem& drawItem,
-			RenderViewID viewId) noexcept;
-
 		std::tuple<RasterizerPreset, DepthPreset, BlendPreset>
 			GetPresetsFromVariantBits(uint64_t variantBits) const noexcept;
 
 	private:
-		GraphicsPipelineRecipe m_BaseRecipe{};
+		GraphicsPhysicalPipelineKey m_BasePhysicalKey{};
 		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};

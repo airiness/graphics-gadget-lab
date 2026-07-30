@@ -16,30 +16,51 @@ namespace gglab
 
 	RHIPipelineHandle PipelineCache::Resolve(
 		GraphicsPipelineSlot& slot,
-		const GraphicsPipelineRecipe& recipe,
+		const GraphicsPhysicalPipelineKey& physicalKey,
+		const RenderPassInfo& renderPassInfo) noexcept
+	{
+		return Resolve(slot, physicalKey, {}, renderPassInfo);
+	}
+
+	RHIPipelineHandle PipelineCache::Resolve(
+		GraphicsPipelineSlot& slot,
+		const GraphicsPhysicalPipelineKey& physicalKey,
+		const GraphicsLogicalPipelineMetadata& logicalMetadata,
 		const RenderPassInfo& renderPassInfo) noexcept
 	{
 		const uint64_t shaderRevision = m_ShaderManager->GetRevision();
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
-		if (slot.m_Pipeline.IsValid() &&
+		const bool canReusePhysicalPipeline =
+			slot.m_Pipeline.IsValid() &&
 			m_PipelineSystem->IsAlive(slot.m_Pipeline) &&
 			slot.m_PipelineSystemRevision == pipelineSystemRevision &&
-			slot.m_Recipe == recipe &&
-			slot.m_ShaderRevision == shaderRevision)
+			slot.m_PhysicalKey == physicalKey &&
+			slot.m_ShaderRevision == shaderRevision;
+		slot.m_LogicalMetadata = logicalMetadata;
+		if (canReusePhysicalPipeline)
 		{
 			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 			return slot.m_Pipeline;
 		}
 
 		RHIGraphicsPipelineCreateInfo createInfo{};
-		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(recipe);
-		createInfo.m_VertexShader = m_ShaderManager->GetBytecode(recipe.m_VSId);
-		createInfo.m_PixelShader = recipe.m_PSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_PSId) : ShaderBytecode{};
-		createInfo.m_DomainShader = recipe.m_DSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_DSId) : ShaderBytecode{};
-		createInfo.m_HullShader = recipe.m_HSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_HSId) : ShaderBytecode{};
-		createInfo.m_GeometryShader = recipe.m_GSId.IsValid() ? m_ShaderManager->GetBytecode(recipe.m_GSId) : ShaderBytecode{};
+		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(physicalKey);
+		createInfo.m_VertexShader =
+			m_ShaderManager->GetBytecode(physicalKey.m_VSId);
+		createInfo.m_PixelShader = physicalKey.m_PSId.IsValid() ?
+			m_ShaderManager->GetBytecode(physicalKey.m_PSId) :
+			ShaderBytecode{};
+		createInfo.m_DomainShader = physicalKey.m_DSId.IsValid() ?
+			m_ShaderManager->GetBytecode(physicalKey.m_DSId) :
+			ShaderBytecode{};
+		createInfo.m_HullShader = physicalKey.m_HSId.IsValid() ?
+			m_ShaderManager->GetBytecode(physicalKey.m_HSId) :
+			ShaderBytecode{};
+		createInfo.m_GeometryShader = physicalKey.m_GSId.IsValid() ?
+			m_ShaderManager->GetBytecode(physicalKey.m_GSId) :
+			ShaderBytecode{};
 		slot.m_Pipeline = m_PipelineSystem->CreateGraphicsPipeline(createInfo);
-		slot.m_Recipe = recipe;
+		slot.m_PhysicalKey = physicalKey;
 		slot.m_ShaderRevision = shaderRevision;
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
 		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);

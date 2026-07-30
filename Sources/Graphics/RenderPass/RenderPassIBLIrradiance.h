@@ -29,7 +29,7 @@ namespace gglab
 		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer, RHIFormat renderTargetFormat) noexcept;
 
 	private:
-		GraphicsPipelineRecipe m_BaseRecipe{};
+		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};
 		bool m_IsInitialized = false;
 	};

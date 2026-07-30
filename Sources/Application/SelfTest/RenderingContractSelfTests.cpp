@@ -7,6 +7,7 @@
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
+#include "Graphics/RenderQueue.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
@@ -578,15 +579,15 @@ namespace gglab
 				!ValidateRHITextureDesc(typelessClearDesc).IsValid(),
 				"Optimized clear values reject typeless formats");
 
-			GraphicsPipelineRecipe reversedWriteRecipe{};
+			GraphicsPhysicalPipelineKey reversedWriteRecipe{};
 			reversedWriteRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
 			const auto reversedWrite =
 				BuildRHIGraphicsPipelineDesc(reversedWriteRecipe).m_DepthStencil;
-			GraphicsPipelineRecipe reversedReadRecipe{};
+			GraphicsPhysicalPipelineKey reversedReadRecipe{};
 			reversedReadRecipe.m_DepthPreset = DepthPreset::ReversedZReadOnly;
 			const auto reversedRead =
 				BuildRHIGraphicsPipelineDesc(reversedReadRecipe).m_DepthStencil;
-			GraphicsPipelineRecipe standardWriteRecipe{};
+			GraphicsPhysicalPipelineKey standardWriteRecipe{};
 			standardWriteRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
 			const auto standardWrite =
 				BuildRHIGraphicsPipelineDesc(standardWriteRecipe).m_DepthStencil;
@@ -890,71 +891,77 @@ namespace gglab
 					return bits;
 				};
 
-			GraphicsPipelineRecipe baseRecipe{};
-			baseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
-			baseRecipe.m_TopologyType =
+			GraphicsPhysicalPipelineKey basePhysicalKey{};
+			basePhysicalKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			basePhysicalKey.m_TopologyType =
 				RHIPrimitiveTopologyType::Triangle;
-			baseRecipe.m_PrimitiveTopology =
+			basePhysicalKey.m_PrimitiveTopology =
 				RHIPrimitiveTopology::TriangleList;
-			baseRecipe.m_Formats.m_SampleCount = 1;
-			baseRecipe.m_Formats.m_SampleQuality = 0;
-			baseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
-			baseRecipe.m_DepthPreset = DepthPreset::ReversedZWrite;
-			baseRecipe.m_BlendPreset = BlendPreset::Default;
+			basePhysicalKey.m_Formats.m_SampleCount = 1;
+			basePhysicalKey.m_Formats.m_SampleQuality = 0;
+			basePhysicalKey.m_RasterizerPreset = RasterizerPreset::Default;
+			basePhysicalKey.m_DepthPreset = DepthPreset::ReversedZWrite;
+			basePhysicalKey.m_BlendPreset = BlendPreset::Default;
 
 			const auto opaque =
-				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-					baseRecipe,
+				RenderPassForwardPBR::
+					BuildDepthCoveragePipelineSignatureForVariant(
+					basePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, false));
 			const auto opaqueRepeat =
-				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-					baseRecipe,
+				RenderPassForwardPBR::
+					BuildDepthCoveragePipelineSignatureForVariant(
+					basePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, false));
 			const auto alphaTest =
-				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-					baseRecipe,
+				RenderPassForwardPBR::
+					BuildDepthCoveragePipelineSignatureForVariant(
+					basePhysicalKey,
 					makeVariantBits(RenderBucket::AlphaTest, false));
 			const auto doubleSided =
-				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-					baseRecipe,
+				RenderPassForwardPBR::
+					BuildDepthCoveragePipelineSignatureForVariant(
+					basePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, true));
 			const auto transparent =
-				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-					baseRecipe,
+				RenderPassForwardPBR::
+					BuildDepthCoveragePipelineSignatureForVariant(
+					basePhysicalKey,
 					makeVariantBits(RenderBucket::Transparent, false));
 			context.Check(
 				opaque && opaqueRepeat && alphaTest && doubleSided &&
 					*opaque == *opaqueRepeat &&
 					!transparent,
-				"Forward variants generate stable depth coverage eligibility");
+				"Forward variants generate stable coverage pipeline signatures");
 			if (!opaque || !alphaTest || !doubleSided)
 			{
 				return;
 			}
 
-			DepthCoverageSignature alphaNormalized = *alphaTest;
+			DepthCoveragePipelineSignature alphaNormalized = *alphaTest;
 			alphaNormalized.m_AlphaVariant =
 				DepthCoverageAlphaVariant::Opaque;
-			DepthCoverageSignature doubleSidedNormalized = *doubleSided;
+			DepthCoveragePipelineSignature doubleSidedNormalized =
+				*doubleSided;
 			doubleSidedNormalized.m_CullMode = opaque->m_CullMode;
 			doubleSidedNormalized.m_DoubleSided = false;
 			context.Check(
 				alphaNormalized == *opaque &&
 					doubleSidedNormalized == *opaque,
-				"Alpha-test and double-sided variants differ only in their coverage fields");
+				"Coverage variants differ only in their declared pipeline fields");
 
 			const auto differsAfter =
 				[&opaque](auto mutate) noexcept
 				{
-					DepthCoverageSignature changed = *opaque;
+					DepthCoveragePipelineSignature changed = *opaque;
 					mutate(changed);
 					return changed != *opaque;
 				};
-			const bool staticFieldsParticipate =
+			const bool pipelineFieldsParticipate =
 				differsAfter([](auto& value)
 					{
 						value.m_VertexProgram =
-							DepthCoverageVertexProgram::SkinnedMeshV1;
+							DepthCoverageVertexProgram::SkinnedMesh;
 					}) &&
 				differsAfter([](auto& value)
 					{
@@ -977,6 +984,20 @@ namespace gglab
 					}) &&
 				differsAfter([](auto& value)
 					{
+						value.m_TopologyType =
+							RHIPrimitiveTopologyType::Line;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_PrimitiveTopology =
+							RHIPrimitiveTopology::LineList;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_FillMode = RHIFillMode::Wireframe;
+					}) &&
+				differsAfter([](auto& value)
+					{
 						value.m_CullMode = RHICullMode::Front;
 					}) &&
 				differsAfter([](auto& value)
@@ -989,47 +1010,80 @@ namespace gglab
 					}) &&
 				differsAfter([](auto& value)
 					{
+						value.m_DoubleSided = true;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						++value.m_DepthBias;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_DepthBiasClamp = 1.0f;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_SlopeScaledDepthBias = 1.0f;
+					}) &&
+				differsAfter([](auto& value)
+					{
 						value.m_SampleCount = 4;
 					}) &&
 				differsAfter([](auto& value)
 					{
+						value.m_SampleQuality = 1;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_SampleMask = 0x7FFFFFFFu;
+					}) &&
+				differsAfter([](auto& value)
+					{
+						value.m_AlphaToCoverageEnable = true;
+					}) &&
+				differsAfter([](auto& value)
+					{
 						value.m_AlphaVariant =
-							DepthCoverageAlphaVariant::BaseColorMaskV1;
+							DepthCoverageAlphaVariant::BaseColorMask;
 					});
 			context.Check(
-				staticFieldsParticipate,
-				"Coverage-relevant static fields participate in signature identity");
+				pipelineFieldsParticipate,
+				"Every coverage pipeline field participates in signature identity");
 
-			GraphicsPipelineRecipe nonCoverageRecipe = baseRecipe;
-			nonCoverageRecipe.m_DepthPreset =
+			GraphicsPhysicalPipelineKey nonCoveragePhysicalKey =
+				basePhysicalKey;
+			nonCoveragePhysicalKey.m_DepthPreset =
 				DepthPreset::ReversedZReadOnly;
-			nonCoverageRecipe.m_BlendPreset = BlendPreset::AlphaBlend;
-			nonCoverageRecipe.m_Formats.m_RenderTargetFormats[0] =
+			nonCoveragePhysicalKey.m_BlendPreset = BlendPreset::AlphaBlend;
+			nonCoveragePhysicalKey.m_Formats.m_RenderTargetFormats[0] =
 				RHIFormat::R8G8B8A8Unorm;
 			const auto nonCoverageSignature =
-				RenderPassForwardPBR::BuildDepthCoverageSignatureForVariant(
-					nonCoverageRecipe,
+				RenderPassForwardPBR::
+					BuildDepthCoveragePipelineSignatureForVariant(
+					nonCoveragePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, false));
 			context.Check(
 				nonCoverageSignature &&
 					*nonCoverageSignature == *opaque,
 				"Depth, blend, and render-target state do not change coverage identity");
 
-			GraphicsPipelineRecipe opaqueLogicalRecipe = baseRecipe;
-			opaqueLogicalRecipe.m_DepthCoverageSignature = *opaque;
-			GraphicsPipelineRecipe alphaLogicalRecipe = baseRecipe;
-			alphaLogicalRecipe.m_DepthCoverageSignature = *alphaTest;
+			const GraphicsLogicalPipelineMetadata opaqueMetadata{
+				.m_DepthCoveragePipelineSignature = *opaque,
+			};
+			const GraphicsLogicalPipelineMetadata alphaMetadata{
+				.m_DepthCoveragePipelineSignature = *alphaTest,
+			};
+			const GraphicsPhysicalPipelineKey opaquePhysicalKey =
+				basePhysicalKey;
+			const GraphicsPhysicalPipelineKey alphaPhysicalKey =
+				basePhysicalKey;
 			context.Check(
-				opaqueLogicalRecipe != alphaLogicalRecipe,
-				"Depth coverage signature participates in logical pipeline recipe identity");
+				opaquePhysicalKey == alphaPhysicalKey &&
+					opaqueMetadata != alphaMetadata,
+				"Logical coverage metadata changes without changing the physical pipeline key");
 
-			const DepthCoverageBinding binding{
+			const DepthCoverageRasterDomain rasterDomain{
 				.m_FrameSerial = 23,
 				.m_ViewBindingId = 1,
-				.m_CurrentModelSource = {
-					.m_Buffer = RHIBufferHandle{ 2, 3 },
-					.m_ElementIndex = 17,
-				},
 				.m_CurrentViewSource = {
 					.m_Buffer = RHIBufferHandle{ 4, 5 },
 					.m_ElementIndex = 29,
@@ -1040,105 +1094,286 @@ namespace gglab
 				},
 				.m_ProjectionSource =
 					DepthCoverageProjectionSource::ViewDataProjection,
-				.m_MaterialAlphaSource = {
-					.m_Buffer = RHIBufferHandle{ 6, 7 },
-					.m_ElementIndex = 31,
+				.m_Viewport = {
+					.m_Width = 1280.0f,
+					.m_Height = 720.0f,
 				},
+				.m_Scissor = {
+					.m_Right = 1280,
+					.m_Bottom = 720,
+				},
+				.m_DepthConvention = DepthConvention::Reversed,
 			};
-			const auto bindingDiffersAfter =
-				[&binding](auto mutate) noexcept
+			const auto rasterDomainDiffersAfter =
+				[&rasterDomain](auto mutate) noexcept
 				{
-					DepthCoverageBinding changed = binding;
+					DepthCoverageRasterDomain changed = rasterDomain;
 					mutate(changed);
-					return changed != binding;
+					return changed != rasterDomain;
 				};
 			context.Check(
-				binding.IsValid() &&
-					binding == DepthCoverageBinding(binding) &&
-					bindingDiffersAfter([](auto& value)
+				rasterDomain.IsValid() &&
+					CompareDepthCoverageRasterDomains(
+						rasterDomain,
+						rasterDomain).m_Matches &&
+					rasterDomainDiffersAfter([](auto& value)
 						{
 							++value.m_FrameSerial;
 						}) &&
-					bindingDiffersAfter([](auto& value)
+					rasterDomainDiffersAfter([](auto& value)
 						{
 							++value.m_ViewBindingId;
 						}) &&
-					bindingDiffersAfter([](auto& value)
-						{
-							++value.m_CurrentModelSource.m_ElementIndex;
-						}) &&
-					bindingDiffersAfter([](auto& value)
+					rasterDomainDiffersAfter([](auto& value)
 						{
 							value.m_CurrentViewSource.m_Buffer =
 								RHIBufferHandle{ 4, 6 };
 						}) &&
-					bindingDiffersAfter([](auto& value)
+					rasterDomainDiffersAfter([](auto& value)
 						{
 							++value.m_CurrentJitteredProjectionSource.m_ElementIndex;
 						}) &&
-					bindingDiffersAfter([](auto& value)
+					rasterDomainDiffersAfter([](auto& value)
 						{
 							value.m_ProjectionSource =
 								DepthCoverageProjectionSource::
 									DedicatedJitteredProjection;
 						}) &&
-					bindingDiffersAfter([](auto& value)
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Viewport.m_X = 1.0f;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Viewport.m_Y = 1.0f;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Viewport.m_Width = 1920.0f;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Viewport.m_Height = 1080.0f;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Viewport.m_MinDepth = 0.25f;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Viewport.m_MaxDepth = 0.75f;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Scissor.m_Left = 1;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Scissor.m_Top = 1;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Scissor.m_Right = 1920;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_Scissor.m_Bottom = 1080;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							value.m_DepthConvention =
+								DepthConvention::Standard;
+						}),
+				"Raster-domain identity covers the complete view and raster state");
+
+			DepthCoverageRasterDomain changedRasterDomain = rasterDomain;
+			++changedRasterDomain.m_FrameSerial;
+			changedRasterDomain.m_Viewport.m_Width = 1920.0f;
+			const auto pipelineComparison =
+				CompareDepthCoveragePipelineSignatures(*opaque, *alphaTest);
+			const auto rasterComparison =
+				CompareDepthCoverageRasterDomains(
+					rasterDomain,
+					changedRasterDomain);
+			context.Check(
+				!pipelineComparison.m_Matches &&
+					pipelineComparison.m_Mismatch.find("AlphaVariant") !=
+						std::string::npos &&
+					!rasterComparison.m_Matches &&
+					rasterComparison.m_Mismatch.find("FrameSerial") !=
+						std::string::npos &&
+					rasterComparison.m_Mismatch.find("Viewport") !=
+						std::string::npos &&
+					DescribeDepthCoveragePipelineSignature(*opaque).find(
+						"InputLayout") != std::string::npos &&
+					DescribeDepthCoverageRasterDomain(rasterDomain).find(
+						"Scissor") != std::string::npos,
+				"Coverage diagnostics identify pipeline and raster-domain mismatches");
+
+			const auto invalidPipelineComparison =
+				CompareDepthCoveragePipelineSignatures(
+					DepthCoveragePipelineSignature{},
+					DepthCoveragePipelineSignature{});
+			DepthCoverageRasterDomain invalidRhsDomain = rasterDomain;
+			invalidRhsDomain.m_FrameSerial = 0;
+			const auto invalidRasterComparison =
+				CompareDepthCoverageRasterDomains(
+					rasterDomain,
+					invalidRhsDomain);
+			context.Check(
+				!invalidPipelineComparison.m_Matches &&
+					invalidPipelineComparison.m_Mismatch.find(
+						"Pipeline.LhsInvalid") != std::string::npos &&
+					!invalidRasterComparison.m_Matches &&
+					invalidRasterComparison.m_Mismatch.find(
+						"RasterDomain.RhsInvalid") != std::string::npos,
+				"Coverage comparison fails closed for invalid contract domains");
+
+			const DepthCoverageDrawPacket packet{
+				.m_Geometry = {
+					.m_MeshId = ProceduralCubeMeshID,
+					.m_VertexBuffer = {
+						.m_Buffer = RHIBufferHandle{ 8, 9 },
+						.m_Offset = 64,
+						.m_Stride = 48,
+						.m_SizeInBytes = 480,
+					},
+					.m_IndexBuffer = {
+						.m_Buffer = RHIBufferHandle{ 10, 11 },
+						.m_Offset = 32,
+						.m_SizeInBytes = 72,
+						.m_Format = RHIFormat::R32Uint,
+					},
+				},
+				.m_IndexedDraw = {
+					.m_IndexCount = 18,
+					.m_InstanceCount = 2,
+					.m_StartIndexLocation = 3,
+					.m_BaseVertexLocation = -2,
+					.m_StartInstanceLocation = 4,
+				},
+				.m_DrawParameters = {
+					.ObjectOffset = 17,
+				},
+				.m_CurrentModelSource = {
+					.m_Buffer = RHIBufferHandle{ 2, 3 },
+					.m_ElementIndex = 17,
+				},
+				.m_MaterialAlphaSource = {
+					.m_Buffer = RHIBufferHandle{ 6, 7 },
+					.m_ElementIndex = 31,
+				},
+			};
+			const auto packetDiffersAfter =
+				[&packet](auto mutate) noexcept
+				{
+					DepthCoverageDrawPacket changed = packet;
+					mutate(changed);
+					return changed != packet;
+				};
+			RenderQueue queue{
+				.m_DrawItems = {
+					DrawItem{ .m_CoverageDrawPacket = packet },
+				},
+			};
+			const auto& prepassPacket =
+				queue.m_DrawItems.front().m_CoverageDrawPacket;
+			const auto& forwardPacket =
+				queue.m_DrawItems.front().m_CoverageDrawPacket;
+			const DepthCoverageDrawPacket copiedPacket = packet;
+			context.Check(
+				packet.IsValid() &&
+					IsSameDepthCoverageDrawPacket(
+						prepassPacket,
+						forwardPacket) &&
+					!IsSameDepthCoverageDrawPacket(packet, copiedPacket) &&
+					packetDiffersAfter([](auto& value)
+						{
+							value.m_Geometry.m_MeshId =
+								ProceduralSphereMeshID;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							value.m_Geometry.m_VertexBuffer.m_Buffer =
+								RHIBufferHandle{ 8, 10 };
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_Geometry.m_VertexBuffer.m_Offset;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_Geometry.m_VertexBuffer.m_Stride;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_Geometry.m_VertexBuffer.m_SizeInBytes;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							value.m_Geometry.m_IndexBuffer.m_Buffer =
+								RHIBufferHandle{ 10, 12 };
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_Geometry.m_IndexBuffer.m_Offset;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_Geometry.m_IndexBuffer.m_SizeInBytes;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							value.m_Geometry.m_IndexBuffer.m_Format =
+								RHIFormat::R32Float;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_IndexedDraw.m_IndexCount;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_IndexedDraw.m_InstanceCount;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_IndexedDraw.m_StartIndexLocation;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_IndexedDraw.m_BaseVertexLocation;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_IndexedDraw.m_StartInstanceLocation;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_DrawParameters.ObjectOffset;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							value.m_CurrentModelSource.m_Buffer =
+								RHIBufferHandle{ 2, 4 };
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							++value.m_CurrentModelSource.m_ElementIndex;
+						}) &&
+					packetDiffersAfter([](auto& value)
+						{
+							value.m_MaterialAlphaSource.m_Buffer =
+								RHIBufferHandle{ 6, 8 };
+						}) &&
+					packetDiffersAfter([](auto& value)
 						{
 							++value.m_MaterialAlphaSource.m_ElementIndex;
-						}),
-				"Dynamic depth coverage binding identifies every GPU data source");
-
-			DepthCoverageBinding changedBinding = binding;
-			++changedBinding.m_FrameSerial;
-			const DepthCoverageComparison comparison =
-				CompareDepthCoverageContracts(
-					*opaque,
-					binding,
-					*alphaTest,
-					changedBinding);
-			context.Check(
-				!comparison.IsCompatible() &&
-					comparison.m_Mismatch.find("AlphaVariant") !=
-						std::string::npos &&
-					comparison.m_Mismatch.find("FrameSerial") !=
-						std::string::npos &&
-					DescribeDepthCoverageSignature(*opaque).find(
-						"InputLayout") != std::string::npos &&
-					DescribeDepthCoverageBinding(binding).find(
+						}) &&
+					DescribeDepthCoverageDrawPacket(packet).find(
+						"DrawIndexed") != std::string::npos &&
+					DescribeDepthCoverageDrawPacket(packet).find(
 						"MaterialAlpha") != std::string::npos,
-				"Depth coverage diagnostics identify mismatched signature and binding fields");
-
-			const DepthCoverageComparison invalidBindingComparison =
-				CompareDepthCoverageContracts(
-					*opaque,
-					DepthCoverageBinding{},
-					*opaque,
-					DepthCoverageBinding{});
-			const DepthCoverageComparison invalidSignatureComparison =
-				CompareDepthCoverageContracts(
-					DepthCoverageSignature{},
-					binding,
-					DepthCoverageSignature{},
-					binding);
-			DepthCoverageBinding invalidRhsBinding = binding;
-			invalidRhsBinding.m_FrameSerial = 0;
-			const DepthCoverageComparison oneInvalidBindingComparison =
-				CompareDepthCoverageContracts(
-					*opaque,
-					binding,
-					*opaque,
-					invalidRhsBinding);
-			context.Check(
-				!invalidBindingComparison.IsCompatible() &&
-					invalidBindingComparison.m_Mismatch.find(
-						"Binding.LhsInvalid") != std::string::npos &&
-					!invalidSignatureComparison.IsCompatible() &&
-					invalidSignatureComparison.m_Mismatch.find(
-						"Signature.LhsInvalid") != std::string::npos &&
-					!oneInvalidBindingComparison.IsCompatible() &&
-					oneInvalidBindingComparison.m_Mismatch.find(
-						"Binding.RhsInvalid") != std::string::npos,
-				"Depth coverage comparison rejects missing signature and binding sources");
+				"RenderQueue owns one complete coverage draw packet shared by both passes");
 		}
 
 		void RunScreenSpaceAndDepthContractTests(SelfTestContext& context) noexcept

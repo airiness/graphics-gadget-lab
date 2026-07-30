@@ -27,7 +27,7 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer, RHIFormat renderTargetFormat) noexcept;
 
-		GraphicsPipelineRecipe m_BaseRecipe{};
+		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};
 		bool m_IsInitialized = false;
 	};

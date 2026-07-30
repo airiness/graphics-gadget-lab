@@ -29,7 +29,7 @@ namespace gglab
 		RHIPipelineHandle GetOrCreateCubemapPreviewPSO(const Renderer& renderer) noexcept;
 
 	private:
-		GraphicsPipelineRecipe m_CubemapPreviewRecipe{};
+		GraphicsPhysicalPipelineKey m_CubemapPreviewRecipe{};
 		GraphicsPipelineSlot m_CubemapPreviewPipelineSlot{};
 		bool m_IsInitialized = false;
 	};
