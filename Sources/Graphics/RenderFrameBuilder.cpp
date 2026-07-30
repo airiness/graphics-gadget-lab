@@ -319,6 +319,8 @@ namespace gglab
 					.m_ProjectionSource =
 						DepthCoverageProjectionSource::
 							ViewDataProjection,
+					.m_TargetWidth = renderView.m_Width,
+					.m_TargetHeight = renderView.m_Height,
 					.m_Viewport = {
 						.m_X = 0.0f,
 						.m_Y = 0.0f,

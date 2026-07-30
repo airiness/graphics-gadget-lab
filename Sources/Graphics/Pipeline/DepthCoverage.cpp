@@ -89,6 +89,10 @@ namespace gglab
 			}
 			if (lhs.m_ProjectionSource != rhs.m_ProjectionSource)
 				AppendMismatch(mismatch, "RasterDomain", "ProjectionSource");
+			if (lhs.m_TargetWidth != rhs.m_TargetWidth)
+				AppendMismatch(mismatch, "RasterDomain", "TargetWidth");
+			if (lhs.m_TargetHeight != rhs.m_TargetHeight)
+				AppendMismatch(mismatch, "RasterDomain", "TargetHeight");
 			if (lhs.m_Viewport != rhs.m_Viewport)
 				AppendMismatch(mismatch, "RasterDomain", "Viewport");
 			if (lhs.m_Scissor != rhs.m_Scissor)
@@ -194,6 +198,37 @@ namespace gglab
 		return result;
 	}
 
+	bool IsDepthCoverageTargetExtentCompatible(
+		const DepthCoverageRasterDomain& rasterDomain,
+		const RHITextureDesc& textureDesc) noexcept
+	{
+		return textureDesc.m_Extent.m_Depth == 1 &&
+			rasterDomain.MatchesTargetExtent(
+				textureDesc.m_Extent.m_Width,
+				textureDesc.m_Extent.m_Height);
+	}
+
+	bool AreDepthCoverageTargetExtentsCompatible(
+		const DepthCoverageRasterDomain& rasterDomain,
+		const RHITextureDesc& colorDesc,
+		const RHITextureDesc& depthDesc) noexcept
+	{
+		return IsDepthCoverageTargetExtentCompatible(
+				rasterDomain,
+				colorDesc) &&
+			IsDepthCoverageTargetExtentCompatible(
+				rasterDomain,
+				depthDesc) &&
+			colorDesc.m_Extent.m_Width ==
+				depthDesc.m_Extent.m_Width &&
+			colorDesc.m_Extent.m_Height ==
+				depthDesc.m_Extent.m_Height &&
+			colorDesc.m_Extent.m_Depth ==
+				depthDesc.m_Extent.m_Depth &&
+			colorDesc.m_SampleCount ==
+				depthDesc.m_SampleCount;
+	}
+
 	bool IsSameDepthCoverageDrawPacket(
 		const DepthCoverageDrawPacket& lhs,
 		const DepthCoverageDrawPacket& rhs) noexcept
@@ -237,13 +272,16 @@ namespace gglab
 	{
 		return std::format(
 			"Frame={} ViewBinding={} View={} JitteredProjection={} "
-			"ProjectionSource={} Viewport={},{},{},{} Depth={}:{} "
+			"ProjectionSource={} Target={}x{} "
+			"Viewport={},{},{},{} Depth={}:{} "
 			"Scissor={},{},{},{} DepthConvention={}",
 			domain.m_FrameSerial,
 			domain.m_ViewBindingId,
 			DescribeSource(domain.m_CurrentViewSource),
 			DescribeSource(domain.m_CurrentJitteredProjectionSource),
 			std::to_underlying(domain.m_ProjectionSource),
+			domain.m_TargetWidth,
+			domain.m_TargetHeight,
 			domain.m_Viewport.m_X,
 			domain.m_Viewport.m_Y,
 			domain.m_Viewport.m_Width,

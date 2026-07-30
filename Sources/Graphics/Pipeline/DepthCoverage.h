@@ -3,6 +3,7 @@
 #include "Graphics/RenderParameters.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIPipeline.h"
+#include "Graphics/RHI/RHITexture.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
@@ -107,9 +108,18 @@ namespace gglab
 		DepthCoverageBufferSource m_CurrentJitteredProjectionSource{};
 		DepthCoverageProjectionSource m_ProjectionSource =
 			DepthCoverageProjectionSource::ViewDataProjection;
+		uint32_t m_TargetWidth = 0;
+		uint32_t m_TargetHeight = 0;
 		RHIViewport m_Viewport{};
 		RHIScissorRect m_Scissor{};
 		DepthConvention m_DepthConvention = DepthConvention::Standard;
+
+		[[nodiscard]] constexpr bool MatchesTargetExtent(
+			uint32_t width,
+			uint32_t height) const noexcept
+		{
+			return m_TargetWidth == width && m_TargetHeight == height;
+		}
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
@@ -117,13 +127,25 @@ namespace gglab
 				m_ViewBindingId != std::numeric_limits<uint32_t>::max() &&
 				m_CurrentViewSource.IsValid() &&
 				m_CurrentJitteredProjectionSource.IsValid() &&
+				m_TargetWidth > 0 &&
+				m_TargetHeight > 0 &&
+				m_Viewport.m_X >= 0.0f &&
+				m_Viewport.m_Y >= 0.0f &&
 				m_Viewport.m_Width > 0.0f &&
 				m_Viewport.m_Height > 0.0f &&
+				m_Viewport.m_X + m_Viewport.m_Width <=
+					static_cast<float>(m_TargetWidth) &&
+				m_Viewport.m_Y + m_Viewport.m_Height <=
+					static_cast<float>(m_TargetHeight) &&
 				m_Viewport.m_MinDepth >= 0.0f &&
 				m_Viewport.m_MinDepth <= m_Viewport.m_MaxDepth &&
 				m_Viewport.m_MaxDepth <= 1.0f &&
+				m_Scissor.m_Left >= 0 &&
+				m_Scissor.m_Top >= 0 &&
 				m_Scissor.m_Right > m_Scissor.m_Left &&
-				m_Scissor.m_Bottom > m_Scissor.m_Top;
+				m_Scissor.m_Bottom > m_Scissor.m_Top &&
+				m_Scissor.m_Right <= static_cast<int32_t>(m_TargetWidth) &&
+				m_Scissor.m_Bottom <= static_cast<int32_t>(m_TargetHeight);
 		}
 
 		bool operator==(const DepthCoverageRasterDomain&) const noexcept = default;
@@ -210,6 +232,14 @@ namespace gglab
 		CompareDepthCoverageRasterDomains(
 			const DepthCoverageRasterDomain& lhs,
 			const DepthCoverageRasterDomain& rhs);
+
+	[[nodiscard]] bool IsDepthCoverageTargetExtentCompatible(
+		const DepthCoverageRasterDomain& rasterDomain,
+		const RHITextureDesc& textureDesc) noexcept;
+	[[nodiscard]] bool AreDepthCoverageTargetExtentsCompatible(
+		const DepthCoverageRasterDomain& rasterDomain,
+		const RHITextureDesc& colorDesc,
+		const RHITextureDesc& depthDesc) noexcept;
 
 	[[nodiscard]] bool IsSameDepthCoverageDrawPacket(
 		const DepthCoverageDrawPacket& lhs,

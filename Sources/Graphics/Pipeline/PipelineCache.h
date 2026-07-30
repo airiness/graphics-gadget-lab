@@ -65,6 +65,15 @@ namespace gglab
 			const GraphicsLogicalPipelineMetadata&) const noexcept = default;
 	};
 
+	struct GraphicsPipelineDescription
+	{
+		GraphicsPhysicalPipelineKey m_PhysicalKey{};
+		GraphicsLogicalPipelineMetadata m_LogicalMetadata{};
+
+		constexpr bool operator==(
+			const GraphicsPipelineDescription&) const noexcept = default;
+	};
+
 	struct ComputePipelineRecipe
 	{
 		RHIBindingLayoutHandle m_BindingLayout{};
@@ -81,17 +90,12 @@ namespace gglab
 		{
 			return m_PhysicalKey;
 		}
-		const GraphicsLogicalPipelineMetadata& GetLogicalMetadata() const noexcept
-		{
-			return m_LogicalMetadata;
-		}
 		RHIPipelineHandle GetPipeline() const noexcept { return m_Pipeline; }
 
 	private:
 		friend class PipelineCache;
 
 		GraphicsPhysicalPipelineKey m_PhysicalKey{};
-		GraphicsLogicalPipelineMetadata m_LogicalMetadata{};
 		uint64_t m_ShaderRevision = 0;
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
@@ -127,11 +131,6 @@ namespace gglab
 		RHIPipelineHandle Resolve(
 			GraphicsPipelineSlot& slot,
 			const GraphicsPhysicalPipelineKey& physicalKey,
-			const RenderPassInfo& renderPassInfo) noexcept;
-		RHIPipelineHandle Resolve(
-			GraphicsPipelineSlot& slot,
-			const GraphicsPhysicalPipelineKey& physicalKey,
-			const GraphicsLogicalPipelineMetadata& logicalMetadata,
 			const RenderPassInfo& renderPassInfo) noexcept;
 		RHIPipelineHandle Resolve(
 			ComputePipelineSlot& slot,

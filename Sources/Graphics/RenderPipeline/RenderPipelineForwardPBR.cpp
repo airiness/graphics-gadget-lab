@@ -86,6 +86,16 @@ namespace gglab
 						displayDepthConvention),
 					.m_IsDepthStencil = true,
 				};
+				GGLAB_ASSERT_MSG(
+					sceneColorDesc.m_Extent.m_Width ==
+						depthBufferDesc.m_Extent.m_Width &&
+					sceneColorDesc.m_Extent.m_Height ==
+						depthBufferDesc.m_Extent.m_Height &&
+					sceneColorDesc.m_Extent.m_Depth ==
+						depthBufferDesc.m_Extent.m_Depth &&
+					sceneColorDesc.m_SampleCount ==
+						depthBufferDesc.m_SampleCount,
+					"Display view color and depth targets must have matching extents and sample counts.");
 
 				auto& sceneDepth = blackboard.GetOrCreate<RGSceneDepthResources>(
 					SceneDepthResourcesName);
@@ -169,8 +179,11 @@ namespace gglab
 		// ShadowMap Preview
 		m_ShadowMapPreviewPass.AddPass(rg, context, services);
 
-		// Clear HDR color and depth before background and scene geometry.
+		// Clear HDR color before background and scene geometry.
 		m_ClearViewTargetsPass.AddPass(rg, context, services);
+
+		// Establish opaque and alpha-tested coverage and own the main-depth clear.
+		m_DepthPrepassPass.AddPass(rg, context, services);
 
 		// Render the environment first so transparent geometry blends over it.
 		m_SkyboxPass.AddPass(rg, context, services);

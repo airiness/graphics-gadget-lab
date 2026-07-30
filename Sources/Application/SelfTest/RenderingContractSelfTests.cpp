@@ -6,6 +6,7 @@
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassForwardPBR.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RHI/RHICommandContext.h"
@@ -587,6 +588,12 @@ namespace gglab
 			reversedReadRecipe.m_DepthPreset = DepthPreset::ReversedZReadOnly;
 			const auto reversedRead =
 				BuildRHIGraphicsPipelineDesc(reversedReadRecipe).m_DepthStencil;
+			GraphicsPhysicalPipelineKey reversedEqualRecipe{};
+			reversedEqualRecipe.m_DepthPreset =
+				DepthPreset::ReversedZEqualReadOnly;
+			const auto reversedEqual =
+				BuildRHIGraphicsPipelineDesc(
+					reversedEqualRecipe).m_DepthStencil;
 			GraphicsPhysicalPipelineKey standardWriteRecipe{};
 			standardWriteRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
 			const auto standardWrite =
@@ -598,6 +605,10 @@ namespace gglab
 					reversedRead.m_DepthTestEnable &&
 					!reversedRead.m_DepthWriteEnable &&
 					reversedRead.m_DepthCompareOp == RHICompareOp::GreaterEqual &&
+					reversedEqual.m_DepthTestEnable &&
+					!reversedEqual.m_DepthWriteEnable &&
+					reversedEqual.m_DepthCompareOp ==
+						RHICompareOp::Equal &&
 					standardWrite.m_DepthTestEnable &&
 					standardWrite.m_DepthWriteEnable &&
 					standardWrite.m_DepthCompareOp == RHICompareOp::Less,
@@ -854,6 +865,102 @@ namespace gglab
 					nativeBarrierMatches,
 					"DX12 lowers the depth transition to the exact Enhanced Barrier contract");
 			}
+
+			struct DepthAccessChainPassData {};
+			RenderGraph accessChainGraph({
+				.m_Device = &recordingDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(
+						uintptr_t{ 1 }),
+			});
+			RGTextureId accessChainDepth;
+			accessChainGraph.AddPass<DepthAccessChainPassData>(
+				"DepthAccessChain.Prepass",
+				[&accessChainDepth,
+					graphDepthDesc,
+					graphDepthHandle](
+					RenderGraph::RGBuilder& builder,
+					DepthAccessChainPassData&)
+				{
+					accessChainDepth = builder.ImportTexture(
+						"DepthAccessChain.Depth",
+						graphDepthHandle,
+						graphDepthDesc,
+						RGTextureAccess::None);
+					builder.WriteInPlace(
+						accessChainDepth,
+						RGTextureAccess::DepthStencilWrite);
+				});
+			accessChainGraph.AddPass<DepthAccessChainPassData>(
+				"DepthAccessChain.Sample",
+				[&accessChainDepth](
+					RenderGraph::RGBuilder& builder,
+					DepthAccessChainPassData&)
+				{
+					accessChainDepth = builder.Read(
+						accessChainDepth,
+						RGTextureAccess::Sample,
+						RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			accessChainGraph.AddPass<DepthAccessChainPassData>(
+				"DepthAccessChain.Forward",
+				[&accessChainDepth](
+					RenderGraph::RGBuilder& builder,
+					DepthAccessChainPassData&)
+				{
+					accessChainDepth = builder.Read(
+						accessChainDepth,
+						RGTextureAccess::DepthStencilRead);
+					builder.SideEffect();
+				});
+
+			const bool accessChainCompiled =
+				accessChainGraph.Compile();
+			bool accessChainMatches = accessChainCompiled;
+			if (accessChainCompiled)
+			{
+				const auto* plan =
+					accessChainGraph.GetExecutionPlan();
+				const RHIResourceState writeState =
+					ToRHIResourceState(
+						RGTextureAccess::DepthStencilWrite);
+				const RHIResourceState sampleState =
+					ToRHIResourceState(
+						RGTextureAccess::Sample,
+						RHIStage::ComputeShader);
+				const RHIResourceState readState =
+					ToRHIResourceState(
+						RGTextureAccess::DepthStencilRead);
+				accessChainMatches =
+					plan &&
+					plan->GetPasses().size() == 3 &&
+					plan->GetPasses()[0].m_PreBarriers.size() ==
+						1 &&
+					plan->GetPasses()[1].m_PreBarriers.size() ==
+						1 &&
+					plan->GetPasses()[2].m_PreBarriers.size() ==
+						1 &&
+					plan->GetPasses()[2].m_PostBarriers.size() ==
+						1;
+				if (accessChainMatches)
+				{
+					const auto& sampleBarrier =
+						plan->GetPasses()[1].
+							m_PreBarriers.front();
+					const auto& readBarrier =
+						plan->GetPasses()[2].
+							m_PreBarriers.front();
+					accessChainMatches =
+						sampleBarrier.m_Before == writeState &&
+						sampleBarrier.m_After == sampleState &&
+						readBarrier.m_Before == sampleState &&
+						readBarrier.m_After == readState;
+				}
+			}
+			context.Check(
+				accessChainMatches,
+				"RenderGraph preserves the depth-write to sample to read-only-depth access chain");
 		}
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
@@ -873,6 +980,23 @@ namespace gglab
 			context.Check(
 				artifact.m_Binary.IsValid(),
 				"Production DXC compiles screen-space and depth reconstruction helpers");
+
+			desc.m_SourcePath =
+				L"Passes/PassDepthPrepass.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			const ShaderCompileArtifact depthVertexArtifact =
+				compiler.CompileOrLoadArtifact(
+					compiler.NormalizeShaderDesc(desc));
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSAlphaTest";
+			const ShaderCompileArtifact depthAlphaArtifact =
+				compiler.CompileOrLoadArtifact(
+					compiler.NormalizeShaderDesc(desc));
+			context.Check(
+				depthVertexArtifact.m_Binary.IsValid() &&
+					depthAlphaArtifact.m_Binary.IsValid(),
+				"Production DXC compiles depth-only and alpha-tested prepass variants");
 		}
 
 		void RunDepthCoverageContractTests(SelfTestContext& context) noexcept
@@ -928,15 +1052,62 @@ namespace gglab
 					BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey,
 					makeVariantBits(RenderBucket::Transparent, false));
+			GraphicsPhysicalPipelineKey prepassPhysicalKey =
+				basePhysicalKey;
+			prepassPhysicalKey.m_Formats.m_RenderTargetCount = 0;
+			prepassPhysicalKey.m_BlendPreset =
+				BlendPreset::ColorWriteDisable;
+			const auto prepassOpaque =
+				RenderPassDepthPrepass::
+					BuildDepthCoveragePipelineSignatureForVariant(
+						prepassPhysicalKey,
+						makeVariantBits(
+							RenderBucket::Opaque,
+							false));
+			const auto prepassAlpha =
+				RenderPassDepthPrepass::
+					BuildDepthCoveragePipelineSignatureForVariant(
+						prepassPhysicalKey,
+						makeVariantBits(
+							RenderBucket::AlphaTest,
+							false));
 			context.Check(
 				opaque && opaqueRepeat && alphaTest && doubleSided &&
+					prepassOpaque && prepassAlpha &&
 					*opaque == *opaqueRepeat &&
+					*opaque == *prepassOpaque &&
+					*alphaTest == *prepassAlpha &&
 					!transparent,
-				"Forward variants generate stable coverage pipeline signatures");
+				"Prepass and Forward variants generate matching stable coverage signatures");
 			if (!opaque || !alphaTest || !doubleSided)
 			{
 				return;
 			}
+
+			const uint64_t opaqueVariant =
+				makeVariantBits(RenderBucket::Opaque, false);
+			const GraphicsLogicalPipelineMetadata
+				forwardMetadata =
+					RenderPassForwardPBR::
+						BuildLogicalPipelineMetadataForVariant(
+							basePhysicalKey,
+							opaqueVariant);
+			const GraphicsLogicalPipelineMetadata
+				forwardMetadataRepeat =
+					RenderPassForwardPBR::
+						BuildLogicalPipelineMetadataForVariant(
+							basePhysicalKey,
+							opaqueVariant);
+			const GraphicsLogicalPipelineMetadata
+				prepassMetadata =
+					RenderPassDepthPrepass::
+						BuildLogicalPipelineMetadataForVariant(
+							prepassPhysicalKey,
+							opaqueVariant);
+			context.Check(
+				forwardMetadata == forwardMetadataRepeat &&
+					forwardMetadata == prepassMetadata,
+				"Logical coverage metadata is deterministic before any physical pipeline is resolved");
 
 			DepthCoveragePipelineSignature alphaNormalized = *alphaTest;
 			alphaNormalized.m_AlphaVariant =
@@ -1094,6 +1265,8 @@ namespace gglab
 				},
 				.m_ProjectionSource =
 					DepthCoverageProjectionSource::ViewDataProjection,
+				.m_TargetWidth = 1280,
+				.m_TargetHeight = 720,
 				.m_Viewport = {
 					.m_Width = 1280.0f,
 					.m_Height = 720.0f,
@@ -1138,6 +1311,14 @@ namespace gglab
 							value.m_ProjectionSource =
 								DepthCoverageProjectionSource::
 									DedicatedJitteredProjection;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							++value.m_TargetWidth;
+						}) &&
+					rasterDomainDiffersAfter([](auto& value)
+						{
+							++value.m_TargetHeight;
 						}) &&
 					rasterDomainDiffersAfter([](auto& value)
 						{
@@ -1186,8 +1367,43 @@ namespace gglab
 						}),
 				"Raster-domain identity covers the complete view and raster state");
 
+			DepthCoverageRasterDomain undersizedDomain =
+				rasterDomain;
+			undersizedDomain.m_TargetWidth = 1279;
+			DepthCoverageRasterDomain oversizedViewportDomain =
+				rasterDomain;
+			oversizedViewportDomain.m_Viewport.m_Width =
+				1281.0f;
+			const RHITextureDesc coverageColorDesc{
+				.m_Format = RHIFormat::R16G16B16A16Float,
+				.m_Extent = { 1280, 720, 1 },
+			};
+			const RHITextureDesc coverageDepthDesc{
+				.m_Format = RHIFormat::R32Typeless,
+				.m_Extent = { 1280, 720, 1 },
+			};
+			RHITextureDesc mismatchedCoverageDepthDesc =
+				coverageDepthDesc;
+			mismatchedCoverageDepthDesc.m_Extent.m_Height =
+				719;
+			context.Check(
+				rasterDomain.MatchesTargetExtent(1280, 720) &&
+					!rasterDomain.MatchesTargetExtent(1281, 720) &&
+					!undersizedDomain.IsValid() &&
+					!oversizedViewportDomain.IsValid() &&
+					AreDepthCoverageTargetExtentsCompatible(
+						rasterDomain,
+						coverageColorDesc,
+						coverageDepthDesc) &&
+					!AreDepthCoverageTargetExtentsCompatible(
+						rasterDomain,
+						coverageColorDesc,
+						mismatchedCoverageDepthDesc),
+				"Raster domains and target descriptors reject color-depth extent mismatches");
+
 			DepthCoverageRasterDomain changedRasterDomain = rasterDomain;
 			++changedRasterDomain.m_FrameSerial;
+			changedRasterDomain.m_TargetWidth = 1920;
 			changedRasterDomain.m_Viewport.m_Width = 1920.0f;
 			const auto pipelineComparison =
 				CompareDepthCoveragePipelineSignatures(*opaque, *alphaTest);
