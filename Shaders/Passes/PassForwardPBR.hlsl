@@ -1,8 +1,9 @@
 #include <Common/Common.hlsli>
+#include <Common/ApplicationBinding.hlsli>
+#include <Common/ForwardCoverageVaryings.hlsli>
 #include <Common/MaterialSampling.hlsli>
 #include <Common/MaterialUtils.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
-#include <Common/VertexTransform.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
 #include <PBR/BRDF.hlsli>
 
@@ -36,19 +37,6 @@ bool IsShadowPCFEnabled()
 {
 	return (g_Pass.ShadowFlags & 2u) != 0u;
 }
-
-struct VSOutput
-{
-	float4 PositionCS : SV_POSITION;
-	float3 PositionWS : TEXCOORD0;
-	float3 NormalWS : TEXCOORD1;
-	float2 UV0 : TEXCOORD2;
-	float2 UV1 : TEXCOORD3;
-	float4 TangentWS : TEXCOORD4;
-
-	nointerpolation uint MaterialIndex : TEXCOORD5;
-	nointerpolation uint ViewIndex : TEXCOORD6;
-};
 
 // Sample normal map and compute perturbed normal in world space
 float3 SampleNormalWS(MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
@@ -200,34 +188,9 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 	return attenuation > 0.0;
 }
 
-VSOutput VSMain(VertexInputP3N3T2T2Tan4 IN)
-{
-	VSOutput OUT;
-
-	const ObjectData objData = LoadCurrentObjectData();
-	const ViewData viewData = LoadViewData(g_Pass.ViewIndex);
-
-	const RigidCoveragePosition position =
-		ResolveRigidCoveragePosition(IN.Position, objData, viewData);
-	const float3 normalWS = TransformNormalWS(IN.Normal, objData);
-	const float4 tangentWS = TransformTangentWS(IN.Tangent, objData);
-
-	OUT.PositionCS = position.PositionCS;
-	OUT.PositionWS = position.PositionWS.xyz;
-	OUT.NormalWS = normalWS;
-	OUT.UV0 = IN.UV0;
-	OUT.UV1 = IN.UV1;
-	OUT.TangentWS = tangentWS;
-
-	// output material index
-	const uint materialIndex = g_Scene.MaterialBaseIndex + objData.MaterialIndex;
-	OUT.MaterialIndex = materialIndex;
-	OUT.ViewIndex = GetViewDataIndex(g_Pass.ViewIndex);
-
-	return OUT;
-}
-
-float4 PSMain(VSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
+float4 PSMain(
+	ForwardCoverageVSOutput IN,
+	bool isFrontFace : SV_IsFrontFace) : SV_Target
 {
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 

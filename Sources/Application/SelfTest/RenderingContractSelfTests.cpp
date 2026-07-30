@@ -7,12 +7,13 @@
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
-#include "Graphics/RenderPass/RenderPassForwardPBR.h"
+#include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RenderView.h"
+#include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 
@@ -982,21 +983,48 @@ namespace gglab
 				"Production DXC compiles screen-space and depth reconstruction helpers");
 
 			desc.m_SourcePath =
-				L"Passes/PassDepthPrepass.hlsl";
+				L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
-			const ShaderCompileArtifact depthVertexArtifact =
+			const ShaderCompileArtifact coverageVertexArtifact =
 				compiler.CompileOrLoadArtifact(
 					compiler.NormalizeShaderDesc(desc));
+			desc.m_SourcePath =
+				L"Passes/PassDepthPrepass.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSAlphaTest";
 			const ShaderCompileArtifact depthAlphaArtifact =
 				compiler.CompileOrLoadArtifact(
 					compiler.NormalizeShaderDesc(desc));
 			context.Check(
-				depthVertexArtifact.m_Binary.IsValid() &&
+				coverageVertexArtifact.m_Binary.IsValid() &&
 					depthAlphaArtifact.m_Binary.IsValid(),
-				"Production DXC compiles depth-only and alpha-tested prepass variants");
+				"Production DXC compiles the shared coverage vertex shader and alpha-tested prepass");
+
+			desc.m_SourcePath =
+				L"Passes/PassForwardPBR.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			const ShaderCompileArtifact forwardPixelArtifact =
+				compiler.CompileOrLoadArtifact(
+					compiler.NormalizeShaderDesc(desc));
+			desc.m_SourcePath =
+				L"Passes/PassSkybox.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			const ShaderCompileArtifact skyboxVertexArtifact =
+				compiler.CompileOrLoadArtifact(
+					compiler.NormalizeShaderDesc(desc));
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			const ShaderCompileArtifact skyboxPixelArtifact =
+				compiler.CompileOrLoadArtifact(
+					compiler.NormalizeShaderDesc(desc));
+			context.Check(
+				forwardPixelArtifact.m_Binary.IsValid() &&
+					skyboxVertexArtifact.m_Binary.IsValid() &&
+					skyboxPixelArtifact.m_Binary.IsValid(),
+				"Production DXC compiles Forward shading and the background-depth Skybox");
 		}
 
 		void RunDepthCoverageContractTests(SelfTestContext& context) noexcept
@@ -1016,6 +1044,7 @@ namespace gglab
 				};
 
 			GraphicsPhysicalPipelineKey basePhysicalKey{};
+			basePhysicalKey.m_VSId = ShaderID{ 17 };
 			basePhysicalKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 			basePhysicalKey.m_TopologyType =
 				RHIPrimitiveTopologyType::Triangle;
@@ -1028,27 +1057,27 @@ namespace gglab
 			basePhysicalKey.m_BlendPreset = BlendPreset::Default;
 
 			const auto opaque =
-				RenderPassForwardPBR::
+				RenderPassForwardOpaque::
 					BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, false));
 			const auto opaqueRepeat =
-				RenderPassForwardPBR::
+				RenderPassForwardOpaque::
 					BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, false));
 			const auto alphaTest =
-				RenderPassForwardPBR::
+				RenderPassForwardOpaque::
 					BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey,
 					makeVariantBits(RenderBucket::AlphaTest, false));
 			const auto doubleSided =
-				RenderPassForwardPBR::
+				RenderPassForwardOpaque::
 					BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, true));
 			const auto transparent =
-				RenderPassForwardPBR::
+				RenderPassForwardOpaque::
 					BuildDepthCoveragePipelineSignatureForVariant(
 					basePhysicalKey,
 					makeVariantBits(RenderBucket::Transparent, false));
@@ -1079,7 +1108,8 @@ namespace gglab
 					*alphaTest == *prepassAlpha &&
 					!transparent,
 				"Prepass and Forward variants generate matching stable coverage signatures");
-			if (!opaque || !alphaTest || !doubleSided)
+			if (!opaque || !alphaTest || !doubleSided ||
+				!prepassOpaque || !prepassAlpha)
 			{
 				return;
 			}
@@ -1088,13 +1118,13 @@ namespace gglab
 				makeVariantBits(RenderBucket::Opaque, false);
 			const GraphicsLogicalPipelineMetadata
 				forwardMetadata =
-					RenderPassForwardPBR::
+					RenderPassForwardOpaque::
 						BuildLogicalPipelineMetadataForVariant(
 							basePhysicalKey,
 							opaqueVariant);
 			const GraphicsLogicalPipelineMetadata
 				forwardMetadataRepeat =
-					RenderPassForwardPBR::
+					RenderPassForwardOpaque::
 						BuildLogicalPipelineMetadataForVariant(
 							basePhysicalKey,
 							opaqueVariant);
@@ -1129,6 +1159,11 @@ namespace gglab
 					return changed != *opaque;
 				};
 			const bool pipelineFieldsParticipate =
+				differsAfter([](auto& value)
+					{
+						value.m_CoverageVertexShader =
+							ShaderID{ 18 };
+					}) &&
 				differsAfter([](auto& value)
 					{
 						value.m_VertexProgram =
@@ -1228,7 +1263,7 @@ namespace gglab
 			nonCoveragePhysicalKey.m_Formats.m_RenderTargetFormats[0] =
 				RHIFormat::R8G8B8A8Unorm;
 			const auto nonCoverageSignature =
-				RenderPassForwardPBR::
+				RenderPassForwardOpaque::
 					BuildDepthCoveragePipelineSignatureForVariant(
 					nonCoveragePhysicalKey,
 					makeVariantBits(RenderBucket::Opaque, false));
@@ -1489,9 +1524,28 @@ namespace gglab
 				};
 			RenderQueue queue{
 				.m_DrawItems = {
-					DrawItem{ .m_CoverageDrawPacket = packet },
+					DrawItem{
+						.m_CoverageDrawPacket = packet,
+						.m_Bucket = RenderBucket::Opaque,
+						.m_VariantBits = opaqueVariant,
+					},
 				},
+				.m_ViewId = RenderViewID::Main,
+				.m_CoverageRasterDomain = rasterDomain,
 			};
+			queue.m_BucketDrawRanges[
+				utils::ToIndex(RenderBucket::Opaque)] = {
+					.m_Start = 0,
+					.m_Count = 1,
+				};
+			queue.m_BucketDrawRanges[
+				utils::ToIndex(RenderBucket::AlphaTest)] = {
+					.m_Start = 1,
+				};
+			queue.m_BucketDrawRanges[
+				utils::ToIndex(RenderBucket::Transparent)] = {
+					.m_Start = 1,
+				};
 			const auto& prepassPacket =
 				queue.m_DrawItems.front().m_CoverageDrawPacket;
 			const auto& forwardPacket =
@@ -1590,6 +1644,58 @@ namespace gglab
 					DescribeDepthCoverageDrawPacket(packet).find(
 						"MaterialAlpha") != std::string::npos,
 				"RenderQueue owns one complete coverage draw packet shared by both passes");
+
+			DepthCoverageFramePlanBuildInfo framePlanBuildInfo{
+				.m_RenderQueue = std::addressof(queue),
+				.m_ExpectedViewId = RenderViewID::Main,
+				.m_TargetWidth = 1280,
+				.m_TargetHeight = 720,
+				.m_DepthConvention =
+					DepthConvention::Reversed,
+			};
+			framePlanBuildInfo.m_PrepassPipelineSignatures[
+				opaqueVariant] = *prepassOpaque;
+			framePlanBuildInfo.m_ForwardPipelineSignatures[
+				opaqueVariant] = *opaque;
+			const DepthCoverageFramePlan equalPlan =
+				BuildDepthCoverageFramePlan(
+					framePlanBuildInfo);
+
+			DepthCoverageFramePlanBuildInfo
+				mismatchedShaderBuildInfo =
+					framePlanBuildInfo;
+			mismatchedShaderBuildInfo.
+				m_ForwardPipelineSignatures[
+					opaqueVariant]->
+				m_CoverageVertexShader = ShaderID{ 18 };
+			const DepthCoverageFramePlan fallbackPlan =
+				BuildDepthCoverageFramePlan(
+					mismatchedShaderBuildInfo);
+
+			RenderQueue invalidPacketQueue = queue;
+			invalidPacketQueue.m_DrawItems.front().
+				m_CoverageDrawPacket = {};
+			DepthCoverageFramePlanBuildInfo
+				invalidPacketBuildInfo =
+					framePlanBuildInfo;
+			invalidPacketBuildInfo.m_RenderQueue =
+				std::addressof(invalidPacketQueue);
+			const DepthCoverageFramePlan rejectedPlan =
+				BuildDepthCoverageFramePlan(
+					invalidPacketBuildInfo);
+			context.Check(
+				equalPlan.UsesDepthPrepassEqual() &&
+					equalPlan.RendersGeometry() &&
+					fallbackPlan.UsesForwardDepthWrite() &&
+					fallbackPlan.RendersGeometry() &&
+					fallbackPlan.m_Diagnostic.find(
+						"CoverageVertexShader") !=
+						std::string::npos &&
+					!rejectedPlan.RendersGeometry() &&
+					rejectedPlan.m_ExecutionMode ==
+						DepthCoverageExecutionMode::
+							SkipGeometry,
+				"Frame-level coverage planning selects one consistent EQUAL, Forward-write, or reject path");
 		}
 
 		void RunScreenSpaceAndDepthContractTests(SelfTestContext& context) noexcept

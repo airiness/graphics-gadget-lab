@@ -17,7 +17,16 @@ ConstantBuffer<SkyboxPassParameters> g_Pass : register(b2);
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
-	return FullscreenTriangleVS(vertexId);
+	FullscreenTriangleVSOutput output =
+		FullscreenTriangleVS(vertexId);
+	const ViewData viewData =
+		g_Views[
+			g_Scene.ViewBaseIndex +
+				g_Pass.ViewIndex];
+	output.PositionCS.z =
+		GetDepthBackgroundValue(
+			viewData.DepthConvention);
+	return output;
 }
 
 float3 ReconstructWorldDirection(float2 uv, ViewData viewData)
@@ -37,6 +46,7 @@ float3 ReconstructWorldDirection(float2 uv, ViewData viewData)
 		float3(0.0, 0.0, 1.0));
 }
 
+[earlydepthstencil]
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;

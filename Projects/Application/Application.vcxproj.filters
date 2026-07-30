@@ -486,7 +486,7 @@
     <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.cpp">
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.cpp">
@@ -667,6 +667,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.cpp">
@@ -1502,7 +1505,16 @@
     <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBR.h">
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPBRShaderSet.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardOpaque.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardTransparent.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.h">
@@ -1656,6 +1668,9 @@
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.h">
@@ -2104,6 +2119,9 @@
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -2149,6 +2167,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardCoverage.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl">

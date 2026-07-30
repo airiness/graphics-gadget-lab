@@ -26,6 +26,14 @@ namespace gglab
 			const DepthCoveragePipelineSignature& rhs,
 			std::string& mismatch)
 		{
+			if (lhs.m_CoverageVertexShader !=
+				rhs.m_CoverageVertexShader)
+			{
+				AppendMismatch(
+					mismatch,
+					"Pipeline",
+					"CoverageVertexShader");
+			}
 			if (lhs.m_VertexProgram != rhs.m_VertexProgram)
 				AppendMismatch(mismatch, "Pipeline", "VertexProgram");
 			if (lhs.m_Deformation != rhs.m_Deformation)
@@ -123,6 +131,7 @@ namespace gglab
 		const RHIGraphicsPipelineDesc pipeline =
 			BuildRHIGraphicsPipelineDesc(physicalKey);
 		return {
+			.m_CoverageVertexShader = physicalKey.m_VSId,
 			.m_VertexProgram = vertexProgram,
 			.m_Deformation = deformation,
 			.m_InputLayout = physicalKey.m_InputLayoutId,
@@ -240,11 +249,12 @@ namespace gglab
 		const DepthCoveragePipelineSignature& signature)
 	{
 		return std::format(
-			"VertexProgram={} Deformation={} InputLayout={} "
+			"CoverageVS={} VertexProgram={} Deformation={} InputLayout={} "
 			"PositionPrecision={} PositionFormat={} Topology={}/{} "
 			"Raster={}/{}/ccw:{} Bias={}/{}/{} DepthClip={} "
 			"DoubleSided={} Samples={}/{} Mask=0x{:08X} "
 			"AlphaToCoverage={} AlphaVariant={}",
+			signature.m_CoverageVertexShader.Value(),
 			std::to_underlying(signature.m_VertexProgram),
 			std::to_underlying(signature.m_Deformation),
 			std::to_underlying(signature.m_InputLayout),

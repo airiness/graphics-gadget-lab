@@ -4,7 +4,6 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
 {
@@ -23,7 +22,9 @@ namespace gglab
 			RGTextureId m_Depth{};
 			RGTextureViewId m_Dsv{};
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
+			const RenderQueue* m_ExpectedRenderQueue = nullptr;
 			float m_ClearDepth = 0.0f;
+			bool m_DrawCoverage = false;
 		};
 	}
 
@@ -32,7 +33,9 @@ namespace gglab
 		const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		Prepare(services);
+		GGLAB_ASSERT_MSG(
+			m_IsInitialized,
+			"Depth prepass must be prepared before graph construction.");
 
 		const auto* contextPtr = &context;
 		const auto* servicesPtr = &services;
@@ -51,6 +54,9 @@ namespace gglab
 					SceneDepthResourcesName);
 				const auto& renderQueue =
 					contextPtr->GetRenderQueue(displayViewId);
+				const auto& framePlan =
+					blackboard.Get<DepthCoverageFramePlan>(
+						DepthCoverageFramePlanName);
 
 				builder.WriteInPlace(
 					sceneDepth.m_Texture,
@@ -65,17 +71,28 @@ namespace gglab
 						sceneDepth.m_Convention);
 				data.m_RasterDomain =
 					std::addressof(renderQueue.m_CoverageRasterDomain);
+				data.m_ExpectedRenderQueue =
+					framePlan.m_SourceRenderQueue;
+				data.m_DrawCoverage =
+					framePlan.UsesDepthPrepassEqual();
 
-				auto& coverageContract =
-					blackboard.GetOrCreate<RGDepthCoverageContract>(
-						DepthCoverageContractName);
-				coverageContract = {};
-				coverageContract.m_SourceRenderQueue =
-					std::addressof(renderQueue);
-				coverageContract.m_RasterDomain =
-					data.m_RasterDomain;
+				GGLAB_ASSERT_MSG(
+					framePlan.UsesDepthPrepassEqual() ||
+						framePlan.m_ExecutionMode ==
+							DepthCoverageExecutionMode::
+								SkipGeometry,
+					"Depth prepass can only execute the validated EQUAL path or a clear-only safety path.");
+				GGLAB_ASSERT_MSG(
+					data.m_ExpectedRenderQueue ==
+						std::addressof(renderQueue),
+					"Depth prepass must consume the frame-plan RenderQueue.");
+				GGLAB_ASSERT_MSG(
+					framePlan.m_RasterDomain ==
+						data.m_RasterDomain,
+					"Depth prepass must consume the frame-plan raster domain.");
 
-				if (renderQueue.m_DrawItems.empty())
+				if (!data.m_DrawCoverage ||
+					renderQueue.m_DrawItems.empty())
 				{
 					return;
 				}
@@ -97,41 +114,6 @@ namespace gglab
 						depthDesc),
 					"Depth prepass target extent must match its coverage raster domain.");
 
-				const auto& ranges =
-					renderQueue.m_BucketDrawRanges;
-				for (const RenderBucket bucket :
-					{ RenderBucket::Opaque, RenderBucket::AlphaTest })
-				{
-					const DrawItemsRange range =
-						ranges[utils::ToIndex(bucket)];
-					for (uint32_t offset = 0;
-						offset < range.m_Count;
-						++offset)
-					{
-						const DrawItem& drawItem =
-							renderQueue.m_DrawItems[
-								range.m_Start + offset];
-						const size_t variantIndex =
-							static_cast<size_t>(
-								drawItem.m_VariantBits &
-									RenderQueueBuilder::VariantMask);
-						auto& signature =
-							coverageContract.
-								m_PrepassPipelineSignatures[
-									variantIndex];
-						if (!signature)
-						{
-							signature =
-								DescribePipelineVariant(
-									drawItem.m_VariantBits).
-									m_LogicalMetadata.
-									m_DepthCoveragePipelineSignature;
-						}
-						GGLAB_ASSERT_MSG(
-							signature.has_value(),
-							"Depth prepass variants must publish coverage metadata.");
-					}
-				}
 			},
 			[this, contextPtr, servicesPtr, displayViewId](
 				RGExecuteContext& executeContext,
@@ -148,12 +130,56 @@ namespace gglab
 					dsv,
 					data.m_ClearDepth);
 
+				if (!data.m_DrawCoverage)
+				{
+					return;
+				}
+
 				const auto& renderQueue =
 					contextPtr->GetRenderQueue(displayViewId);
 				if (renderQueue.m_DrawItems.empty())
 				{
 					return;
 				}
+
+				const auto& ranges =
+					renderQueue.m_BucketDrawRanges;
+				const DrawItemsRange* firstDrawRange = nullptr;
+				for (const RenderBucket bucket :
+					{ RenderBucket::Opaque,
+						RenderBucket::AlphaTest })
+				{
+					const auto& range =
+						ranges[utils::ToIndex(bucket)];
+					if (range.m_Count > 0)
+					{
+						firstDrawRange =
+							std::addressof(range);
+						break;
+					}
+				}
+				if (!firstDrawRange)
+				{
+					return;
+				}
+				GGLAB_ASSERT_MSG(
+					firstDrawRange->m_Start <
+						renderQueue.m_DrawItems.size(),
+					"Depth prepass first draw must be inside the frame-plan RenderQueue.");
+				if (firstDrawRange->m_Start >=
+					renderQueue.m_DrawItems.size())
+				{
+					return;
+				}
+
+				auto* renderer = servicesPtr->m_Renderer;
+				GGLAB_ASSERT_NOT_NULL(renderer);
+				graphicsContext->SetPipeline(
+					GetOrCreatePSOForVariant(
+						*renderer,
+						renderQueue.m_DrawItems[
+							firstDrawRange->m_Start].
+								m_VariantBits));
 
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 				GGLAB_ASSERT_MSG(
@@ -168,8 +194,6 @@ namespace gglab
 				graphicsContext->SetPrimitiveTopology(
 					RHIPrimitiveTopology::TriangleList);
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 				const auto* sceneBuffer =
 					renderer->GetSceneConstantBuffer();
 				graphicsContext->SetConstantBuffer(
@@ -214,7 +238,8 @@ namespace gglab
 	}
 
 	void RenderPassDepthPrepass::Prepare(
-		const RenderServices& services) noexcept
+		const RenderServices& services,
+		const ForwardPBRShaderSet& shaderSet) noexcept
 	{
 		if (m_IsInitialized)
 		{
@@ -222,27 +247,23 @@ namespace gglab
 		}
 
 		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
 		GGLAB_ASSERT_NOT_NULL(renderer);
-		GGLAB_ASSERT_NOT_NULL(shaderManager);
-
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath =
-			L"Passes/PassDepthPrepass.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Vertex;
-		shaderDesc.m_Entry = L"VSMain";
-		const ShaderID vertexShader =
-			shaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Stage = ShaderStage::Pixel;
-		shaderDesc.m_Entry = L"PSAlphaTest";
+		GGLAB_ASSERT_MSG(
+			shaderSet.IsValid(),
+			"Depth prepass requires the shared Forward shader set.");
+		if (!shaderSet.IsValid())
+		{
+			return;
+		}
 		m_AlphaTestPixelShader =
-			shaderManager->LoadShader(shaderDesc);
+			shaderSet.m_AlphaTestPixelShader;
 
 		m_BasePhysicalKey.m_BindingLayout =
 			renderer->GetCommonBindingLayout();
 		m_BasePhysicalKey.m_InputLayoutId =
 			InputLayoutID::P3N3T2T2Tan4;
-		m_BasePhysicalKey.m_VSId = vertexShader;
+		m_BasePhysicalKey.m_VSId =
+			shaderSet.m_CoverageVertexShader;
 		m_BasePhysicalKey.m_TopologyType =
 			RHIPrimitiveTopologyType::Triangle;
 		m_BasePhysicalKey.m_PrimitiveTopology =

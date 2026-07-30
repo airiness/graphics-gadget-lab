@@ -90,6 +90,44 @@ namespace gglab
 				{
 					return;
 				}
+				const auto& ranges =
+					renderQueue.m_BucketDrawRanges;
+				const DrawItemsRange* firstDrawRange = nullptr;
+				for (const RenderBucket bucket :
+					{ RenderBucket::Opaque,
+						RenderBucket::AlphaTest })
+				{
+					const auto& range =
+						ranges[utils::ToIndex(bucket)];
+					if (range.m_Count > 0)
+					{
+						firstDrawRange =
+							std::addressof(range);
+						break;
+					}
+				}
+				if (!firstDrawRange)
+				{
+					return;
+				}
+				GGLAB_ASSERT_MSG(
+					firstDrawRange->m_Start <
+						renderQueue.m_DrawItems.size(),
+					"Directional shadow first draw must be inside its RenderQueue.");
+				if (firstDrawRange->m_Start >=
+					renderQueue.m_DrawItems.size())
+				{
+					return;
+				}
+				graphicsContext->SetPipeline(
+					GetOrCreatePSOForVariant(
+						*renderer,
+						renderQueue.m_DrawItems[
+							firstDrawRange->m_Start].
+								m_VariantBits,
+						contextPtr->
+							GetDirectionalShadowSettings()));
+
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 				GGLAB_ASSERT_MSG(
 					data.m_RasterDomain ==
