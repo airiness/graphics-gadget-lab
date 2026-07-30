@@ -20,6 +20,10 @@ namespace gglab
 				.m_CompensationEV = camera.GetExposureCompensationEV(),
 				.m_ExposureScale = camera.GetExposureMultiplier(),
 			},
+			.m_Lighting = {
+				.m_ForwardPlus =
+					profile.m_Lighting.m_ForwardPlus,
+			},
 			.m_PostProcess = {
 				.m_Bloom = bloom,
 				.m_ToneMapping = profile.m_PostProcess.m_ToneMapping,

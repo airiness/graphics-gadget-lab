@@ -21,6 +21,8 @@ namespace gglab
 		const RenderQueue* m_SourceRenderQueue = nullptr;
 		const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 		std::string m_Diagnostic;
+		bool m_HasDepthCoverageDraws = false;
+		bool m_HasTransparentDraws = false;
 
 		[[nodiscard]] bool UsesDepthPrepassEqual() const noexcept
 		{
@@ -39,6 +41,16 @@ namespace gglab
 			return m_ExecutionMode !=
 				DepthCoverageExecutionMode::SkipGeometry;
 		}
+
+		[[nodiscard]] bool AddsForwardOpaquePass() const noexcept
+		{
+			return RendersGeometry() && m_HasDepthCoverageDraws;
+		}
+
+		[[nodiscard]] bool AddsForwardTransparentPass() const noexcept
+		{
+			return RendersGeometry() && m_HasTransparentDraws;
+		}
 	};
 
 	struct DepthCoverageFramePlanBuildInfo
@@ -49,7 +61,6 @@ namespace gglab
 		uint32_t m_TargetHeight = 0;
 		DepthConvention m_DepthConvention =
 			DepthConvention::Reversed;
-		bool m_ShadingPipelinesAvailable = true;
 		std::array<
 			std::optional<DepthCoveragePipelineSignature>,
 			RenderQueueBuilder::VariantCount>

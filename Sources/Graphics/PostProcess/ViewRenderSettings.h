@@ -32,9 +32,20 @@ namespace gglab
 		ToneMappingSettings m_ToneMapping{};
 	};
 
+	struct ForwardPlusSettings
+	{
+		bool m_Enabled = true;
+	};
+
+	struct LightingProfile
+	{
+		ForwardPlusSettings m_ForwardPlus{};
+	};
+
 	// Authoring settings owned above the renderer by the active Demo or Lab.
 	struct ViewRenderProfile
 	{
+		LightingProfile m_Lighting{};
 		PostProcessProfile m_PostProcess{};
 	};
 
@@ -50,10 +61,16 @@ namespace gglab
 		ToneMappingSettings m_ToneMapping{};
 	};
 
+	struct ResolvedLightingSettings
+	{
+		ForwardPlusSettings m_ForwardPlus{};
+	};
+
 	// Immutable settings resolved for one RenderView and one frame.
 	struct ResolvedViewRenderSettings
 	{
 		ResolvedExposureSettings m_Exposure{};
+		ResolvedLightingSettings m_Lighting{};
 		ResolvedPostProcessSettings m_PostProcess{};
 	};
 

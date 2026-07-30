@@ -3,6 +3,7 @@
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
+#include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
@@ -52,6 +53,14 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			sampleableDepthRegistered,
 			"Failed to register the Sampleable Depth Lab session.");
+
+		const bool forwardPlusRegistered =
+			m_Runtime.RegisterLab(
+				ForwardPlusLabSession::GetDescriptor(),
+				&ForwardPlusLabSession::Create);
+		GGLAB_ASSERT_MSG(
+			forwardPlusRegistered,
+			"Failed to register the Forward+ Lab session.");
 
 		const bool alphaTestRegistered = m_Runtime.RegisterLab(
 			AlphaTestLabSession::GetDescriptor(),

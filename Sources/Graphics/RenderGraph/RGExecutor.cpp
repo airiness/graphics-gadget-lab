@@ -166,6 +166,39 @@ namespace gglab
 		return m_Device && view.IsValid() ? m_Device->GetTextureViewDescriptor(view) : RHIDescriptorHandle{};
 	}
 
+	RHIBufferHandle RGExecuteContext::GetBufferHandle(
+		RGBufferId bufferId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ExecutionPlan);
+		if (!m_ExecutionPlan || !bufferId.IsValid())
+		{
+			return {};
+		}
+
+		const size_t resourceIndex =
+			bufferId.GetHandle().Value();
+		GGLAB_ASSERT_MSG(
+			resourceIndex <
+				m_ExecutionPlan->GetResources().size(),
+			"RenderGraph buffer id must resolve to a compiled resource.");
+		if (resourceIndex >=
+			m_ExecutionPlan->GetResources().size())
+		{
+			return {};
+		}
+
+		const auto& resource =
+			m_ExecutionPlan->GetResources()[resourceIndex];
+		GGLAB_ASSERT_MSG(
+			resource.m_ResourceType ==
+				RGResourceType::RGBuffer,
+			"RenderGraph buffer resolution requires a buffer resource.");
+		return resource.m_ResourceType ==
+			RGResourceType::RGBuffer ?
+				ResolveBufferHandle(resource) :
+				RHIBufferHandle{};
+	}
+
 	RHIGraphicsCommandContext* RGExecuteContext::GetGraphicsCommandContext() const noexcept
 	{
 		const bool compatible =
@@ -194,6 +227,21 @@ namespace gglab
 			compatible,
 			"Async compute command context access requires a Compute RenderGraph pass.");
 		return compatible ? m_Backend.m_AsyncComputeCommandContext : nullptr;
+	}
+
+	RHICommandContext*
+		RGExecuteContext::GetCopyCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType ||
+			*m_ActiveEncoderType ==
+				RGPassEncoderType::Copy;
+		GGLAB_ASSERT_MSG(
+			compatible,
+			"Copy command context access requires a Copy RenderGraph pass.");
+		return compatible ?
+			m_Backend.m_GraphicsCommandContext :
+			nullptr;
 	}
 
 	void RGExecutor::Execute(

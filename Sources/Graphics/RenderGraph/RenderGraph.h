@@ -42,9 +42,11 @@ namespace gglab
 
 		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
 		RHIDescriptorHandle GetViewDescriptor(RGTextureViewId viewId) const noexcept;
+		RHIBufferHandle GetBufferHandle(RGBufferId bufferId) const noexcept;
 		RHIGraphicsCommandContext* GetGraphicsCommandContext() const noexcept;
 		RHIComputeCommandContext* GetDirectComputeCommandContext() const noexcept;
 		RHIComputeCommandContext* GetAsyncComputeCommandContext() const noexcept;
+		RHICommandContext* GetCopyCommandContext() const noexcept;
 
 	private:
 		RGBackendExecuteContext m_Backend{};

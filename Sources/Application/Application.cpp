@@ -584,6 +584,10 @@ namespace gglab
 				L"Passes/PassDepthPrepass.hlsl",
 				ShaderStage::Pixel,
 				L"PSAlphaTest");
+			addShader(
+				L"Passes/PassForwardPlusCull.hlsl",
+				ShaderStage::Compute,
+				L"CSMain");
 			addGraphicsShader(L"Passes/PassDirectionalShadowMap.hlsl");
 			addGraphicsShader(L"Passes/PassShadowMapPreview.hlsl");
 			addGraphicsShader(L"Passes/PassFinalColor.hlsl");

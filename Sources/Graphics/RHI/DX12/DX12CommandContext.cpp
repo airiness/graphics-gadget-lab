@@ -125,6 +125,49 @@ namespace gglab
 		}
 	}
 
+	void DX12CommandContext::CopyBuffer(
+		RHIBufferHandle destination,
+		uint64_t destinationOffset,
+		RHIBufferHandle source,
+		uint64_t sourceOffset,
+		uint64_t sizeInBytes) noexcept
+	{
+		DX12Buffer* destinationBuffer =
+			m_Device ?
+				m_Device->ResolveBuffer(destination) :
+				nullptr;
+		DX12Buffer* sourceBuffer =
+			m_Device ?
+				m_Device->ResolveBuffer(source) :
+				nullptr;
+		if (!destinationBuffer || !sourceBuffer ||
+			sizeInBytes == 0 ||
+			destinationOffset >
+				destinationBuffer->SizeInBytes() ||
+			sizeInBytes >
+				destinationBuffer->SizeInBytes() -
+					destinationOffset ||
+			sourceOffset >
+				sourceBuffer->SizeInBytes() ||
+			sizeInBytes >
+				sourceBuffer->SizeInBytes() -
+					sourceOffset)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12CommandContext::CopyBuffer received an invalid buffer or copy range.");
+			return;
+		}
+
+		Get()->CopyBufferRegion(
+			destinationBuffer->Get(),
+			destinationOffset,
+			sourceBuffer->Get(),
+			sourceOffset,
+			sizeInBytes);
+		TrackBufferUse(destination);
+		TrackBufferUse(source);
+	}
+
 	void DX12CommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept
 	{
 		if (std::ranges::find(m_UsedBuffers, buffer) == m_UsedBuffers.end())
