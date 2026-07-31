@@ -268,7 +268,7 @@ namespace napa::voxel
 			return { ValidationError::MismatchedCpuMeshConfig };
 		}
 		if (visible.m_State.m_HasPublishedMeshes &&
-			batch.m_TargetWorldVoxelRevision < visible.m_State.m_VisibleWorldRevision)
+			batch.m_TargetWorldVoxelRevision <= visible.m_State.m_VisibleWorldRevision)
 		{
 			return { ValidationError::StaleCpuMeshBatch };
 		}
@@ -328,6 +328,11 @@ namespace napa::voxel
 			return { ValidationError::InvalidCpuMeshCandidateSet };
 		}
 		const PendingCpuMeshBatch::State& pendingState = pending->m_State;
+		if (pendingState.m_TargetWorldVoxelRevision <=
+			visible.m_State.m_VisibleWorldRevision)
+		{
+			return { ValidationError::StaleCpuMeshBatch };
+		}
 		const bool baseMatches =
 			pendingState.m_BaseWasPublished == visible.m_State.m_HasPublishedMeshes &&
 			(!pendingState.m_BaseWasPublished ||

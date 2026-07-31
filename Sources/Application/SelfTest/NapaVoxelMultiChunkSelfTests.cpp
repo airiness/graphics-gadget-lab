@@ -1052,6 +1052,15 @@ namespace gglab
 					visibleValidation.m_ValidationHash == 0xb939dfe96d74fe89ull,
 				"Visible World mesh hashing reads only the published Mesh Set");
 
+			std::unique_ptr<PendingCpuMeshBatch> sameRevisionPending;
+			context.Check(
+				ValidateCpuMeshBatch(fullBatch, visible, sameRevisionPending).m_Error ==
+						ValidationError::StaleCpuMeshBatch &&
+					sameRevisionPending == nullptr &&
+					visible.GetVisibleWorldRevision() == 1 &&
+					visible.GetWorldMeshValidation() == initialValidation,
+				"A published Visible revision cannot create another same-revision Pending batch");
+
 			const PendingCpuMeshBatch* const staleInitialPending =
 				competingInitialPending.get();
 			context.Check(
