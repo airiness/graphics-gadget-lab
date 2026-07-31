@@ -124,40 +124,36 @@ namespace gglab
 	class DebugDrawContext
 	{
 	public:
-		void Line(const Vector3& start, const Vector3& end,
-			const DebugDrawStyle& style = {}) noexcept;
+		void Line(
+			const Vector3& start, const Vector3& end, const DebugDrawStyle& style = {}) noexcept;
 		void Polyline(std::span<const Vector3> points, bool closed,
 			const DebugDrawStyle& style = {}) noexcept;
-		void Point(const Vector3& position, float size,
-			const DebugDrawStyle& style = {}) noexcept;
+		void Point(const Vector3& position, float size, const DebugDrawStyle& style = {}) noexcept;
 		void Arrow(const Vector3& start, const Vector3& end, float headLength,
 			const DebugDrawStyle& style = {}, uint32_t segments = 12) noexcept;
-		void Axes(const Matrix& transform, float length = 1.0f,
-			float headLength = 0.2f,
+		void Axes(const Matrix& transform, float length = 1.0f, float headLength = 0.2f,
 			const DebugDrawStyle& style = {
 				.m_FillMode = DebugDrawFillMode::Solid,
 			}) noexcept;
-		void Aabb(const math::Aabb& bounds,
-			const DebugDrawStyle& style = {}) noexcept;
+		void Aabb(const math::Aabb& bounds, const DebugDrawStyle& style = {}) noexcept;
 		void Box(const Vector3& center, const Vector3& extents,
 			const DebugDrawStyle& style = {}) noexcept;
 		void Obb(const Matrix& transform, const Vector3& extents,
 			const DebugDrawStyle& style = {}) noexcept;
 		void Circle(const Vector3& center, const Vector3& normal, float radius,
 			const DebugDrawStyle& style = {}, uint32_t segments = 32) noexcept;
-		void Sphere(const Vector3& center, float radius,
-			const DebugDrawStyle& style = {}, uint32_t segments = 24) noexcept;
+		void Sphere(const Vector3& center, float radius, const DebugDrawStyle& style = {},
+			uint32_t segments = 24) noexcept;
 		void Cone(const Vector3& apex, const Vector3& direction, float height, float radius,
 			const DebugDrawStyle& style = {}, uint32_t segments = 24) noexcept;
 		void Cylinder(const Vector3& center, const Vector3& axis, float height, float radius,
 			const DebugDrawStyle& style = {}, uint32_t segments = 24) noexcept;
 		void Capsule(const Vector3& center, const Vector3& axis, float halfHeight, float radius,
 			const DebugDrawStyle& style = {}, uint32_t segments = 24) noexcept;
-		void Frustum(std::span<const Vector3, 8> corners,
-			const DebugDrawStyle& style = {}) noexcept;
+		void Frustum(
+			std::span<const Vector3, 8> corners, const DebugDrawStyle& style = {}) noexcept;
 		void Grid(const Vector3& center, const Vector3& normal, const Vector3& tangent,
-			float halfExtent, uint32_t divisions,
-			const DebugDrawStyle& style = {}) noexcept;
+			float halfExtent, uint32_t divisions, const DebugDrawStyle& style = {}) noexcept;
 
 		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
 		[[nodiscard]] bool IsChannelEnabled(StringID channel) const noexcept;

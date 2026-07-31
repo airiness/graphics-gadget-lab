@@ -8,7 +8,8 @@ namespace gglab
 {
 	namespace
 	{
-		void MixShaderHash(uint64_t& lowBits, uint64_t& highBits, const ShaderHash128& hash) noexcept
+		void MixShaderHash(
+			uint64_t& lowBits, uint64_t& highBits, const ShaderHash128& hash) noexcept
 		{
 			FNV1a64::MixValue(lowBits, hash.m_LowBits);
 			FNV1a64::MixValue(lowBits, hash.m_HighBits);
@@ -149,17 +150,15 @@ namespace gglab
 		{
 			CD3DX12_DEPTH_STENCIL_DESC1 desc(D3D12_DEFAULT);
 			desc.DepthEnable = rhiDesc.m_DepthTestEnable;
-			desc.DepthWriteMask = rhiDesc.m_DepthWriteEnable ?
-				D3D12_DEPTH_WRITE_MASK_ALL :
-				D3D12_DEPTH_WRITE_MASK_ZERO;
+			desc.DepthWriteMask = rhiDesc.m_DepthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL
+				: D3D12_DEPTH_WRITE_MASK_ZERO;
 			desc.DepthFunc = ToD3D12ComparisonFunc(rhiDesc.m_DepthCompareOp);
 			desc.StencilEnable = rhiDesc.m_StencilEnable;
 			return desc;
 		}
 
 		[[nodiscard]] CD3DX12_BLEND_DESC ToDX12BlendDesc(
-			const RHIBlendDesc& rhiDesc,
-			uint32_t renderTargetCount) noexcept
+			const RHIBlendDesc& rhiDesc, uint32_t renderTargetCount) noexcept
 		{
 			CD3DX12_BLEND_DESC desc(D3D12_DEFAULT);
 			desc.AlphaToCoverageEnable = rhiDesc.m_AlphaToCoverageEnable;
@@ -181,8 +180,7 @@ namespace gglab
 		}
 	}
 
-	GraphicsPipelineDesc BuildDX12GraphicsPipelineDesc(
-		const RHIGraphicsPipelineDesc& rhiDesc,
+	GraphicsPipelineDesc BuildDX12GraphicsPipelineDesc(const RHIGraphicsPipelineDesc& rhiDesc,
 		const RootSignatureHandle& rootSignature,
 		const DX12GraphicsPipelineShaderInputs& shaderInputs,
 		const DX12InputLayoutBuildResult& inputLayout) noexcept
@@ -197,7 +195,8 @@ namespace gglab
 		desc.m_HullShader = shaderInputs.m_HullShader;
 		desc.m_GeometryShader = shaderInputs.m_GeometryShader;
 		desc.m_Formats.m_RtvFormats.NumRenderTargets = rhiDesc.m_RenderTargetCount;
-		for (uint32_t i = 0; i < rhiDesc.m_RenderTargetCount && i < RHIGraphicsPipelineDesc::MaxRenderTargets; ++i)
+		for (uint32_t i = 0;
+			i < rhiDesc.m_RenderTargetCount && i < RHIGraphicsPipelineDesc::MaxRenderTargets; ++i)
 		{
 			desc.m_Formats.m_RtvFormats.RTFormats[i] =
 				ToDXGIFormat(rhiDesc.m_RenderTargetFormats[i]);
@@ -213,8 +212,7 @@ namespace gglab
 		return desc;
 	}
 
-	DX12RHIGraphicsPSOKey MakeDX12RHIGraphicsPSOKey(
-		const RHIGraphicsPipelineDesc& rhiDesc,
+	DX12RHIGraphicsPSOKey MakeDX12RHIGraphicsPSOKey(const RHIGraphicsPipelineDesc& rhiDesc,
 		RootSignatureID rootSignatureId,
 		const DX12GraphicsPipelineShaderInputs& shaderInputs) noexcept
 	{

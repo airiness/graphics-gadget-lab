@@ -5,7 +5,6 @@
 
 void PSAlphaTest(ForwardCoverageVSOutput input)
 {
-	const MaterialData materialData =
-		g_Materials[input.MaterialIndex];
+	const MaterialData materialData = g_Materials[input.MaterialIndex];
 	ApplyMaterialAlphaClip(materialData, input.UV0, input.UV1);
 }

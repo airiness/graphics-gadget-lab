@@ -24,15 +24,14 @@ ConstantBuffer<IBLPrefilteredSpecularPassParameters> g_Pass : register(b2);
 
 TextureSamplerBindingData GetEnvironmentBinding()
 {
-	return MakeTextureSamplerBinding(uint2(g_Pass.EnvironmentTextureIndex, g_Pass.EnvironmentSamplerIndex));
+	return MakeTextureSamplerBinding(
+		uint2(g_Pass.EnvironmentTextureIndex, g_Pass.EnvironmentSamplerIndex));
 }
 
 float GetPerceptualRoughness()
 {
 	uint mipLevels = max(g_Pass.MipLevels, 1u);
-	return mipLevels > 1u
-		? (float) g_Pass.MipLevel / (float) (mipLevels - 1u)
-		: 0.0;
+	return mipLevels > 1u ? (float) g_Pass.MipLevel / (float) (mipLevels - 1u) : 0.0;
 }
 
 float3 ClampSampleLuminance(float3 radiance)
@@ -40,15 +39,11 @@ float3 ClampSampleLuminance(float3 radiance)
 	radiance = SanitizeHDRColor(radiance);
 	const float luminance = dot(radiance, float3(0.2126, 0.7152, 0.0722));
 	const float maxLuminance = max(g_Pass.MaxSampleLuminance, 1.0);
-	return luminance > maxLuminance
-		? radiance * (maxLuminance / luminance)
-		: radiance;
+	return luminance > maxLuminance ? radiance * (maxLuminance / luminance) : radiance;
 }
 
 float3 IntegratePrefilteredSpecular(
-	TextureSamplerBindingData environmentBinding,
-	float3 normalWS,
-	float perceptualRoughness)
+	TextureSamplerBindingData environmentBinding, float3 normalWS, float perceptualRoughness)
 {
 	// GGX degenerates to a delta distribution at zero roughness. Preserve the
 	// original environment texel instead of integrating an ill-conditioned PDF.
@@ -88,7 +83,8 @@ float3 IntegratePrefilteredSpecular(
 			float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
 			sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
 
-			float3 sampleRadiance = SampleTextureCubeLevel(environmentBinding, lightWS, sourceMip).rgb;
+			float3 sampleRadiance =
+				SampleTextureCubeLevel(environmentBinding, lightWS, sourceMip).rgb;
 			prefilteredColor += ClampSampleLuminance(sampleRadiance) * NoL;
 			totalWeight += NoL;
 		}
@@ -105,10 +101,8 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float3 normalWS = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
-	float3 color = IntegratePrefilteredSpecular(
-		GetEnvironmentBinding(),
-		normalWS,
-		GetPerceptualRoughness());
+	float3 color =
+		IntegratePrefilteredSpecular(GetEnvironmentBinding(), normalWS, GetPerceptualRoughness());
 
 	return float4(color, 1.0);
 }

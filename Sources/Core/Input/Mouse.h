@@ -20,9 +20,10 @@ namespace gglab
 	public:
 		enum class MouseMode : uint32_t
 		{
-			Absolute,	// absolute coordinate: used in ui, debug menu and so on.
-			Relative	// relative coordinate: used in fps camera and so on.
+			Absolute, // absolute coordinate: used in ui, debug menu and so on.
+			Relative  // relative coordinate: used in fps camera and so on.
 		};
+
 	private:
 		struct State
 		{

@@ -48,14 +48,12 @@ namespace gglab
 	ArtifactContentDigest ComputeTextureArtifactContentDigest(
 		const TextureAssetData& textureData) noexcept
 	{
-		return textureData.IsValid() ?
-			ComputeValidatedTextureArtifactContentDigest(textureData) :
-			ArtifactContentDigest{};
+		return textureData.IsValid() ? ComputeValidatedTextureArtifactContentDigest(textureData)
+			: ArtifactContentDigest{};
 	}
 
 	TextureArtifactBuildResult CreateTextureArtifact(
-		TextureAssetData&& textureData,
-		TextureAssetValidationLimits limits) noexcept
+		TextureAssetData&& textureData, TextureAssetValidationLimits limits) noexcept
 	{
 		TextureArtifactBuildResult result{};
 		const TextureStructureValidationResult validation =

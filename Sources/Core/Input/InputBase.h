@@ -13,13 +13,9 @@ namespace gglab
 		bool IsConnected() const noexcept;
 
 	protected:
-		static void CALLBACK OnGameInputDevice(
-			GameInputCallbackToken callbackToken,
-			void* context,
-			IGameInputDevice* gameInputDevice,
-			uint64_t timestamp,
-			GameInputDeviceStatus currentStatus,
-			GameInputDeviceStatus previousStatus) noexcept;
+		static void CALLBACK OnGameInputDevice(GameInputCallbackToken callbackToken, void* context,
+			IGameInputDevice* gameInputDevice, uint64_t timestamp,
+			GameInputDeviceStatus currentStatus, GameInputDeviceStatus previousStatus) noexcept;
 
 	protected:
 		ComPtr<IGameInput> m_GameInput;

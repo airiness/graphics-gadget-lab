@@ -4,10 +4,7 @@
 namespace gglab
 {
 	[[nodiscard]] constexpr inline RHITextureViewDesc MakeRHITexture2DArrayViewDesc(
-		RHIFormat format,
-		uint32_t mip,
-		uint32_t firstSlice,
-		uint32_t arraySize,
+		RHIFormat format, uint32_t mip, uint32_t firstSlice, uint32_t arraySize,
 		RHITextureAspect aspect = RHITextureAspect::Color) noexcept
 	{
 		return RHITextureViewDesc{
@@ -15,20 +12,18 @@ namespace gglab
 			.m_Dimension = RHITextureViewDimension::Texture2DArray,
 			.m_Format = format,
 			.m_Subresources =
-			{
-				.m_BaseMip = mip,
-				.m_MipCount = 1,
-				.m_BaseArraySlice = firstSlice,
-				.m_ArraySliceCount = arraySize,
-				.m_Aspects = aspect,
-			},
+				{
+					.m_BaseMip = mip,
+					.m_MipCount = 1,
+					.m_BaseArraySlice = firstSlice,
+					.m_ArraySliceCount = arraySize,
+					.m_Aspects = aspect,
+				},
 		};
 	}
 
-	[[nodiscard]] constexpr inline RHITextureViewDesc MakeRHITexture2DViewDesc(
-		RHIFormat format,
-		uint32_t mip = 0,
-		uint32_t mipLevels = 1,
+	[[nodiscard]] constexpr inline RHITextureViewDesc MakeRHITexture2DViewDesc(RHIFormat format,
+		uint32_t mip = 0, uint32_t mipLevels = 1,
 		RHITextureAspect aspect = RHITextureAspect::Color) noexcept
 	{
 		return RHITextureViewDesc{
@@ -36,11 +31,11 @@ namespace gglab
 			.m_Dimension = RHITextureViewDimension::Texture2D,
 			.m_Format = format,
 			.m_Subresources =
-			{
-				.m_BaseMip = mip,
-				.m_MipCount = mipLevels,
-				.m_Aspects = aspect,
-			},
+				{
+					.m_BaseMip = mip,
+					.m_MipCount = mipLevels,
+					.m_Aspects = aspect,
+				},
 		};
 	}
 }

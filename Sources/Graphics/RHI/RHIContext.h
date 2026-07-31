@@ -51,8 +51,8 @@ namespace gglab
 		[[nodiscard]] virtual RHIFrameContext& BeginFrame() noexcept = 0;
 		[[nodiscard]] virtual RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept = 0;
 		virtual void AbortFrame(RHIFrameContext& frame) noexcept = 0;
-		virtual void WaitForFence(RHIQueueType waitingQueue,
-			const RHIFencePoint& fencePoint) noexcept = 0;
+		virtual void WaitForFence(
+			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept = 0;
 
 		virtual void Resize(uint32_t width, uint32_t height) noexcept = 0;
 		virtual void WaitIdle() noexcept = 0;
@@ -61,6 +61,5 @@ namespace gglab
 		[[nodiscard]] virtual uint32_t GetCurrentFrameIndex() const noexcept = 0;
 	};
 
-	[[nodiscard]] std::unique_ptr<RHIContext> CreateRHIContext(
-		const RHIContextDesc& desc) noexcept;
+	[[nodiscard]] std::unique_ptr<RHIContext> CreateRHIContext(const RHIContextDesc& desc) noexcept;
 }

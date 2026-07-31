@@ -18,7 +18,7 @@ namespace gglab
 	struct DX12DescriptorSpan
 	{
 		static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
-		uint32_t m_Index = InvalidIndex;	// Heap global index
+		uint32_t m_Index = InvalidIndex; // Heap global index
 		uint32_t m_Count = 0;
 
 		bool IsValid() const noexcept { return m_Index != InvalidIndex && m_Count > 0; }
@@ -42,7 +42,7 @@ namespace gglab
 	struct DX12DescriptorID
 	{
 		static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
-		uint32_t m_Index = InvalidIndex;	//  Heap global index
+		uint32_t m_Index = InvalidIndex; //  Heap global index
 		uint32_t m_Generation = 0;
 
 		bool IsValid() const noexcept { return m_Index != InvalidIndex; }

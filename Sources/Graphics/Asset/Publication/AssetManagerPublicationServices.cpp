@@ -9,8 +9,7 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] constexpr bool IsTerminalPublicationState(
-			AssetState state) noexcept
+		[[nodiscard]] constexpr bool IsTerminalPublicationState(AssetState state) noexcept
 		{
 			return state == AssetState::Failed || state == AssetState::Cancelled;
 		}
@@ -36,20 +35,17 @@ namespace gglab
 			if (model->m_State == AssetState::CpuReady)
 			{
 				SetAssetState(*model, AssetState::Publishing);
-				ProgressReporter(model->m_LoadProgress).Report(
-					0.64f,
-					"Publishing model resources incrementally");
+				ProgressReporter(model->m_LoadProgress)
+					.Report(0.64f, "Publishing model resources incrementally");
 			}
 			return true;
 		}
 
 		[[nodiscard]] ModelPublicationTextureResult PublishTexture(
-			const ModelImportTexture& importedTexture,
-			TaskPriority priority) noexcept override
+			const ModelImportTexture& importedTexture, TaskPriority priority) noexcept override
 		{
 			ModelPublicationTextureResult result{};
-			const auto fail = [](
-				ModelPublicationTextureResult& failedResult,
+			const auto fail = [](ModelPublicationTextureResult& failedResult,
 				std::string error) noexcept -> ModelPublicationTextureResult
 				{
 					failedResult.m_Error = std::move(error);
@@ -57,15 +53,12 @@ namespace gglab
 				};
 			if (importedTexture.m_ImportSettings.m_Semantic != importedTexture.m_Semantic)
 			{
-				return fail(
-					result,
-					"Imported texture semantic does not match its import settings");
+				return fail(result, "Imported texture semantic does not match its import settings");
 			}
 
 			TextureAssetSystem& textureAssets = *m_AssetManager->m_TextureAssets;
 			TextureID textureId = textureAssets.FindTexture(
-				importedTexture.m_CanonicalPath,
-				importedTexture.m_ImportSettings);
+				importedTexture.m_CanonicalPath, importedTexture.m_ImportSettings);
 			const Texture* texture = textureAssets.GetTexture(textureId);
 			if (textureId.IsValid() && !texture)
 			{
@@ -76,15 +69,10 @@ namespace gglab
 			{
 				const AssetKey textureKey = MakeAssetKey(textureId);
 				if (m_AssetManager->HasActiveInterest(textureKey) ||
-					m_AssetManager->HasPublicationRetain(
-						textureKey,
-						texture->m_ContentGeneration))
+					m_AssetManager->HasPublicationRetain(textureKey, texture->m_ContentGeneration))
 				{
-					return fail(
-						result,
-						std::format(
-							"Terminal texture {} is still retained",
-							textureId.Value()));
+					return fail(result,
+						std::format("Terminal texture {} is still retained", textureId.Value()));
 				}
 				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
 				textureId.Reset();
@@ -94,32 +82,25 @@ namespace gglab
 			bool created = false;
 			if (!textureId.IsValid())
 			{
-				if (!importedTexture.m_Artifact ||
-					!importedTexture.m_Artifact->IsValid())
+				if (!importedTexture.m_Artifact || !importedTexture.m_Artifact->IsValid())
 				{
 					return fail(result, "Imported texture payload is invalid");
 				}
 				textureId = textureAssets.CreateTexture(
-					importedTexture.m_CanonicalPath,
-					importedTexture.m_ImportSettings);
+					importedTexture.m_CanonicalPath, importedTexture.m_ImportSettings);
 				texture = textureAssets.GetTexture(textureId);
 				if (!textureId.IsValid() || !texture)
 				{
-					return fail(
-						result,
-						"Failed to create texture entry during model publication");
+					return fail(result, "Failed to create texture entry during model publication");
 				}
 				created = true;
 			}
 
-			const AssetContentVersion contentVersion = MakeAssetContentVersion(
-				textureId,
-				texture->m_ContentGeneration);
-			ModelPublicationRetainToken retain = StoreRetain(
-				m_AssetManager->AcquirePublicationRetain(
-					AssetKind::Texture,
-					textureId.Value(),
-					texture->m_ContentGeneration));
+			const AssetContentVersion contentVersion =
+				MakeAssetContentVersion(textureId, texture->m_ContentGeneration);
+			ModelPublicationRetainToken retain =
+				StoreRetain(m_AssetManager->AcquirePublicationRetain(
+					AssetKind::Texture, textureId.Value(), texture->m_ContentGeneration));
 			if (!retain.IsValid())
 			{
 				if (created)
@@ -138,9 +119,8 @@ namespace gglab
 			result.m_TextureId = textureId;
 			result.m_Claim = {
 				.m_ContentVersion = contentVersion,
-				.m_Origin = created ?
-					ModelPublicationClaimOrigin::Created :
-					ModelPublicationClaimOrigin::Reused,
+				.m_Origin = created ? ModelPublicationClaimOrigin::Created
+									: ModelPublicationClaimOrigin::Reused,
 				.m_Retain = retain,
 			};
 			if (!IsReservedTextureId(textureId))
@@ -152,16 +132,11 @@ namespace gglab
 				return result;
 			}
 
-			auto uploadData = textureAssets.MakeTextureUploadData(
-				textureId,
-				importedTexture.m_Artifact,
-				importedTexture.m_ImportSettings,
-				importedTexture.m_ContentFingerprint,
-				importedTexture.m_SourceDigest,
-				importedTexture.m_DerivedDataKey);
-			const bool queued = textureAssets.QueueTextureUpload(
-				std::move(uploadData),
-				priority);
+			auto uploadData =
+				textureAssets.MakeTextureUploadData(textureId, importedTexture.m_Artifact,
+					importedTexture.m_ImportSettings, importedTexture.m_ContentFingerprint,
+					importedTexture.m_SourceDigest, importedTexture.m_DerivedDataKey);
+			const bool queued = textureAssets.QueueTextureUpload(std::move(uploadData), priority);
 			result.m_Usage.m_ResourceCreations = 1;
 			if (!queued)
 			{
@@ -170,9 +145,8 @@ namespace gglab
 				result.m_Dependency = {};
 				result.m_TextureId.Reset();
 				GGLAB_UNUSED(textureAssets.RemoveTexture(textureId));
-				result.m_Error = std::format(
-					"Failed to queue texture {} upload",
-					textureId.Value());
+				result.m_Error =
+					std::format("Failed to queue texture {} upload", textureId.Value());
 				return result;
 			}
 			result.m_UploadQueued = true;
@@ -187,11 +161,9 @@ namespace gglab
 			auto material = std::make_unique<Material>();
 			if (importedMaterial)
 			{
-				static_cast<MaterialProperties&>(*material) =
-					importedMaterial->m_Properties;
+				static_cast<MaterialProperties&>(*material) = importedMaterial->m_Properties;
 				material->m_Name = StringID(importedMaterial->m_Name);
-				for (uint32_t slotIndex = 0;
-					slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
+				for (uint32_t slotIndex = 0; slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
 					++slotIndex)
 				{
 					const ImportedMaterialTextureBinding& importedBinding =
@@ -211,9 +183,7 @@ namespace gglab
 						importedBinding.m_SamplerKey);
 					binding.m_TexCoordIndex = importedBinding.m_TexCoordIndex;
 					AssetManager::SetMaterialTexture(
-						*material,
-						static_cast<MaterialTextureSlot>(slotIndex),
-						binding);
+						*material, static_cast<MaterialTextureSlot>(slotIndex), binding);
 				}
 			}
 
@@ -228,8 +198,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] ModelPublicationMeshResult PublishMesh(
-			const AssetContentVersion& modelVersion,
-			ModelMeshUploadSource source,
+			const AssetContentVersion& modelVersion, ModelMeshUploadSource source,
 			TaskPriority priority) noexcept override
 		{
 			ModelPublicationMeshResult result{};
@@ -257,14 +226,10 @@ namespace gglab
 			mesh->m_SourceMeshIndex = source.m_MeshIndex;
 			m_AssetManager->SetMeshState(*mesh, AssetState::Publishing);
 			AssetPublicationRetain retain = m_AssetManager->AcquirePublicationRetain(
-				AssetKind::Mesh,
-				meshId.Value(),
-				mesh->m_ContentGeneration);
+				AssetKind::Mesh, meshId.Value(), mesh->m_ContentGeneration);
 			result.m_Claim = {
 				.m_ContentVersion = MakeAssetContentVersion(
-					AssetKind::Mesh,
-					meshId.Value(),
-					mesh->m_ContentGeneration),
+					AssetKind::Mesh, meshId.Value(), mesh->m_ContentGeneration),
 				.m_Origin = ModelPublicationClaimOrigin::Created,
 				.m_Retain = StoreRetain(std::move(retain)),
 			};
@@ -273,15 +238,11 @@ namespace gglab
 			AssetManager::MeshUploadData uploadData{};
 			uploadData.m_MeshId = meshId;
 			uploadData.m_ModelSource = std::move(source);
-			const bool queued = m_AssetManager->QueueMeshUpload(
-				std::move(uploadData),
-				priority);
+			const bool queued = m_AssetManager->QueueMeshUpload(std::move(uploadData), priority);
 			result.m_Usage.m_ResourceCreations = 1;
 			if (!queued)
 			{
-				result.m_Error = std::format(
-					"Failed to queue mesh {} upload",
-					meshId.Value());
+				result.m_Error = std::format("Failed to queue mesh {} upload", meshId.Value());
 				return result;
 			}
 			result.m_UploadQueued = true;
@@ -300,8 +261,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] ModelPublicationLeaseToken AcquireDependencyLease(
-			ModelPublicationOwnerToken ownerToken,
-			const AssetContentVersion& dependency,
+			ModelPublicationOwnerToken ownerToken, const AssetContentVersion& dependency,
 			TaskPriority priority) noexcept override
 		{
 			const std::optional<AssetKey> interestKey = ToInterestKey(dependency.m_Key);
@@ -310,11 +270,8 @@ namespace gglab
 				return {};
 			}
 
-			AssetLease lease = m_AssetManager->AcquireAssetLease(
-				AssetOwnerId{ ownerToken.m_Value },
-				interestKey->m_Kind,
-				dependency.m_Key.m_StableId,
-				dependency.m_ContentGeneration,
+			AssetLease lease = m_AssetManager->AcquireAssetLease(AssetOwnerId{ ownerToken.m_Value },
+				interestKey->m_Kind, dependency.m_Key.m_StableId, dependency.m_ContentGeneration,
 				priority);
 			if (!lease.IsValid())
 			{
@@ -326,8 +283,7 @@ namespace gglab
 			return token;
 		}
 
-		[[nodiscard]] std::string CommitModel(
-			ModelPublicationCommit&& commit) noexcept override
+		[[nodiscard]] std::string CommitModel(ModelPublicationCommit&& commit) noexcept override
 		{
 			Model* model = GetModel(commit.m_Model);
 			if (!model || model->m_CancelRequested)
@@ -365,23 +321,16 @@ namespace gglab
 			model->m_Type = commit.m_Type;
 			model->m_MeshInstance = std::move(commit.m_MeshInstances);
 			m_AssetManager->m_ModelDependencyOwners.emplace(
-				modelId,
-				AssetOwnerId{ commit.m_DependencyOwner.m_Value });
+				modelId, AssetOwnerId{ commit.m_DependencyOwner.m_Value });
 			m_AssetManager->m_ModelDependencyLeaseTokens.emplace(
-				modelId,
-				std::move(dependencyLeaseTokens));
+				modelId, std::move(dependencyLeaseTokens));
 			SetAssetState(*model, AssetState::UploadQueued);
-			m_AssetManager->RegisterModelDependencies(
-				modelId,
-				commit.m_Model.m_ContentGeneration);
+			m_AssetManager->RegisterModelDependencies(modelId, commit.m_Model.m_ContentGeneration);
 			m_AssetManager->m_PendingModels.insert(modelId);
-			ProgressReporter(model->m_LoadProgress).Report(
-				0.66f,
-				"Waiting for model dependency uploads",
-				std::format(
-					"{} texture uploads, {} mesh uploads",
-					commit.m_QueuedTextureUploads,
-					commit.m_QueuedMeshUploads));
+			ProgressReporter(model->m_LoadProgress)
+				.Report(0.66f, "Waiting for model dependency uploads",
+					std::format("{} texture uploads, {} mesh uploads",
+						commit.m_QueuedTextureUploads, commit.m_QueuedMeshUploads));
 			if (m_AssetManager->RefreshModelState(modelId))
 			{
 				m_AssetManager->m_PendingModels.erase(modelId);
@@ -404,33 +353,26 @@ namespace gglab
 			m_Retains.erase(retained);
 		}
 
-		void CancelClaimIfUnreferenced(
-			const ModelPublicationClaim& claim) noexcept override
+		void CancelClaimIfUnreferenced(const ModelPublicationClaim& claim) noexcept override
 		{
-			const std::optional<AssetKey> key = ToInterestKey(
-				claim.m_ContentVersion.m_Key);
+			const std::optional<AssetKey> key = ToInterestKey(claim.m_ContentVersion.m_Key);
 			if (!key ||
 				m_AssetManager->HasPublicationRetain(
-					*key,
-					claim.m_ContentVersion.m_ContentGeneration) ||
+					*key, claim.m_ContentVersion.m_ContentGeneration) ||
 				m_AssetManager->HasActiveInterest(*key))
 			{
 				return;
 			}
 			m_AssetManager->CancelAssetIfUnreferenced(
-				*key,
-				claim.m_ContentVersion.m_ContentGeneration);
+				*key, claim.m_ContentVersion.m_ContentGeneration);
 		}
 
-		void RollbackClaimIfUnreferenced(
-			const ModelPublicationClaim& claim) noexcept override
+		void RollbackClaimIfUnreferenced(const ModelPublicationClaim& claim) noexcept override
 		{
-			const std::optional<AssetKey> key = ToInterestKey(
-				claim.m_ContentVersion.m_Key);
+			const std::optional<AssetKey> key = ToInterestKey(claim.m_ContentVersion.m_Key);
 			if (!key ||
 				m_AssetManager->HasPublicationRetain(
-					*key,
-					claim.m_ContentVersion.m_ContentGeneration) ||
+					*key, claim.m_ContentVersion.m_ContentGeneration) ||
 				m_AssetManager->HasActiveInterest(*key))
 			{
 				return;
@@ -441,23 +383,20 @@ namespace gglab
 				if (claim.m_ContentVersion.m_Key.m_Kind == AssetKind::Texture)
 				{
 					m_AssetManager->m_TextureAssets->RollbackPublicationTexture(
-						TextureID{ static_cast<uint32_t>(
-							claim.m_ContentVersion.m_Key.m_StableId) },
+						TextureID{ static_cast<uint32_t>(claim.m_ContentVersion.m_Key.m_StableId) },
 						claim.m_ContentVersion.m_ContentGeneration);
 				}
 				else if (claim.m_ContentVersion.m_Key.m_Kind == AssetKind::Mesh)
 				{
 					m_AssetManager->RollbackPublicationMesh(
-						MeshID{ static_cast<uint32_t>(
-							claim.m_ContentVersion.m_Key.m_StableId) },
+						MeshID{ static_cast<uint32_t>(claim.m_ContentVersion.m_Key.m_StableId) },
 						claim.m_ContentVersion.m_ContentGeneration);
 				}
 				return;
 			}
 
 			m_AssetManager->CancelAssetIfUnreferenced(
-				*key,
-				claim.m_ContentVersion.m_ContentGeneration);
+				*key, claim.m_ContentVersion.m_ContentGeneration);
 		}
 
 		void RemoveMaterial(MaterialID materialId) noexcept override
@@ -465,8 +404,7 @@ namespace gglab
 			GGLAB_UNUSED(m_AssetManager->RemoveMaterial(materialId));
 		}
 
-		void ReleaseDependencyLease(
-			ModelPublicationLeaseToken lease) noexcept override
+		void ReleaseDependencyLease(ModelPublicationLeaseToken lease) noexcept override
 		{
 			if (lease.IsValid())
 			{
@@ -474,8 +412,7 @@ namespace gglab
 			}
 		}
 
-		void DestroyDependencyOwner(
-			ModelPublicationOwnerToken owner) noexcept override
+		void DestroyDependencyOwner(ModelPublicationOwnerToken owner) noexcept override
 		{
 			if (owner.IsValid())
 			{
@@ -483,8 +420,7 @@ namespace gglab
 			}
 		}
 
-		void AbortModel(
-			const AssetContentVersion& modelVersion,
+		void AbortModel(const AssetContentVersion& modelVersion,
 			AssetResourcePublicationAbortReason reason) noexcept override
 		{
 			Model* model = GetModel(modelVersion);
@@ -493,24 +429,20 @@ namespace gglab
 				return;
 			}
 			const ModelID modelId = ToModelId(modelVersion);
-			m_AssetManager->UnregisterModelDependencies(
-				modelId,
-				modelVersion.m_ContentGeneration);
+			m_AssetManager->UnregisterModelDependencies(modelId, modelVersion.m_ContentGeneration);
 			model->m_MeshInstance.clear();
-			SetAssetState(
-				*model,
-				reason == AssetResourcePublicationAbortReason::Failed ?
-					AssetState::Failed : AssetState::Cancelled);
+			SetAssetState(*model, reason == AssetResourcePublicationAbortReason::Failed
+				? AssetState::Failed
+				: AssetState::Cancelled);
 			m_AssetManager->m_PendingModels.erase(modelId);
-			ProgressReporter(model->m_LoadProgress).Report(
-				0.62f,
-				reason == AssetResourcePublicationAbortReason::Failed ?
-					"Model publication failed" : "Model publication cancelled");
+			ProgressReporter(model->m_LoadProgress)
+				.Report(0.62f, reason == AssetResourcePublicationAbortReason::Failed
+					? "Model publication failed"
+					: "Model publication cancelled");
 		}
 
 	private:
-		[[nodiscard]] ModelPublicationRetainToken StoreRetain(
-			AssetPublicationRetain&& retain)
+		[[nodiscard]] ModelPublicationRetainToken StoreRetain(AssetPublicationRetain&& retain)
 		{
 			if (!retain.IsValid())
 			{
@@ -521,12 +453,10 @@ namespace gglab
 			return token;
 		}
 
-		[[nodiscard]] static std::optional<AssetKey> ToInterestKey(
-			const AssetKey& key) noexcept
+		[[nodiscard]] static std::optional<AssetKey> ToInterestKey(const AssetKey& key) noexcept
 		{
 			if (!key.IsValid() ||
-				(key.m_Kind != AssetKind::Model &&
-					key.m_Kind != AssetKind::Texture &&
+				(key.m_Kind != AssetKind::Model && key.m_Kind != AssetKind::Texture &&
 					key.m_Kind != AssetKind::Mesh))
 			{
 				return std::nullopt;
@@ -534,8 +464,7 @@ namespace gglab
 			return key;
 		}
 
-		[[nodiscard]] static ModelID ToModelId(
-			const AssetContentVersion& modelVersion) noexcept
+		[[nodiscard]] static ModelID ToModelId(const AssetContentVersion& modelVersion) noexcept
 		{
 			if (modelVersion.m_Key.m_Kind != AssetKind::Model)
 			{
@@ -546,14 +475,13 @@ namespace gglab
 			};
 		}
 
-		[[nodiscard]] Model* GetModel(
-			const AssetContentVersion& modelVersion) const noexcept
+		[[nodiscard]] Model* GetModel(const AssetContentVersion& modelVersion) const noexcept
 		{
 			const ModelID modelId = ToModelId(modelVersion);
 			Model* model = m_AssetManager->EditModel(modelId);
-			return model &&
-				model->m_ContentGeneration == modelVersion.m_ContentGeneration ?
-				model : nullptr;
+			return model && model->m_ContentGeneration == modelVersion.m_ContentGeneration
+				? model
+				: nullptr;
 		}
 
 		AssetManager* m_AssetManager = nullptr;
@@ -561,8 +489,8 @@ namespace gglab
 		std::unordered_map<uint64_t, AssetPublicationRetain> m_Retains;
 	};
 
-	std::unique_ptr<AssetPublicationServicesBase>
-		AssetManager::CreateModelPublicationServices() noexcept
+	std::unique_ptr<AssetPublicationServicesBase> AssetManager::
+		CreateModelPublicationServices() noexcept
 	{
 		return std::make_unique<AssetManagerPublicationServices>(this);
 	}

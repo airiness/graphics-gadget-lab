@@ -44,8 +44,7 @@ namespace gglab::win32
 		void Release() noexcept;
 
 		void* m_Handle = nullptr;
-		NamedMutexAcquireDisposition m_Disposition =
-			NamedMutexAcquireDisposition::Failed;
+		NamedMutexAcquireDisposition m_Disposition = NamedMutexAcquireDisposition::Failed;
 	};
 
 	class NamedMutex final

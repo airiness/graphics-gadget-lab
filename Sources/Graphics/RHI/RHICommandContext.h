@@ -103,12 +103,8 @@ namespace gglab
 		virtual void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept = 0;
 		virtual void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept = 0;
 		virtual void FlushBarriers() noexcept = 0;
-		virtual void CopyBuffer(
-			RHIBufferHandle destination,
-			uint64_t destinationOffset,
-			RHIBufferHandle source,
-			uint64_t sourceOffset,
-			uint64_t sizeInBytes) noexcept = 0;
+		virtual void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept = 0;
 		virtual void BeginGpuProfileScope(std::string_view name) noexcept { GGLAB_UNUSED(name); }
 		virtual void EndGpuProfileScope() noexcept {}
 	};
@@ -120,34 +116,25 @@ namespace gglab
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
-		virtual void SetRenderTargets(
-			std::span<const RHITextureViewHandle> renderTargets,
+		virtual void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
 			RHITextureViewHandle depthStencil = {}) noexcept = 0;
 		virtual void ClearColor(
-			RHITextureViewHandle renderTarget,
-			const std::array<float, 4>& color) noexcept = 0;
-		virtual void ClearDepthStencil(
-			RHITextureViewHandle depthStencil,
-			float depth,
+			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept = 0;
+		virtual void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,
 			std::optional<uint8_t> stencil = std::nullopt) noexcept = 0;
 		virtual void SetViewport(const RHIViewport& viewport) noexcept = 0;
 		virtual void SetScissorRect(const RHIScissorRect& rect) noexcept = 0;
 		virtual void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept = 0;
 		virtual void SetConstantBuffer(
-			uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept = 0;
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetReadOnlyBuffer(
-			uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept = 0;
-		virtual void SetPushConstants(
-			uint32_t parameterIndex,
-			std::span<const uint32_t> values,
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
+		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
 			uint32_t destOffset = 0) noexcept = 0;
 
-		template<typename T>
-		void SetPushConstants(uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
+		template <typename T>
+		void SetPushConstants(
+			uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
 		{
 			static_assert(std::is_trivially_copyable_v<T>);
 			static_assert(std::is_standard_layout_v<T>);
@@ -158,18 +145,14 @@ namespace gglab
 			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
 		}
 
-		virtual void SetVertexBuffers(uint32_t startSlot,
-			std::span<const RHIVertexBufferBinding> bindings) noexcept = 0;
+		virtual void SetVertexBuffers(
+			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept = 0;
 		virtual void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept = 0;
-		virtual void DrawIndexed(uint32_t indexCount,
-			uint32_t instanceCount = 1,
-			uint32_t startIndexLocation = 0,
-			int32_t baseVertexLocation = 0,
+		virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount = 1,
+			uint32_t startIndexLocation = 0, int32_t baseVertexLocation = 0,
 			uint32_t startInstanceLocation = 0) noexcept = 0;
-		virtual void Draw(uint32_t vertexCount,
-			uint32_t instanceCount = 1,
-			uint32_t startVertexLocation = 0,
-			uint32_t startInstanceLocation = 0) noexcept = 0;
+		virtual void Draw(uint32_t vertexCount, uint32_t instanceCount = 1,
+			uint32_t startVertexLocation = 0, uint32_t startInstanceLocation = 0) noexcept = 0;
 
 		void DrawFullscreenTriangle() noexcept
 		{
@@ -186,24 +169,17 @@ namespace gglab
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
 		virtual void SetConstantBuffer(
-			uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept = 0;
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetReadOnlyBuffer(
-			uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept = 0;
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
 		virtual void SetReadWriteBuffer(
-			uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept = 0;
-		virtual void SetPushConstants(
-			uint32_t parameterIndex,
-			std::span<const uint32_t> values,
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept = 0;
+		virtual void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
 			uint32_t destOffset = 0) noexcept = 0;
 
-		template<typename T>
-		void SetPushConstants(uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
+		template <typename T>
+		void SetPushConstants(
+			uint32_t parameterIndex, const T& values, uint32_t destOffset = 0) noexcept
 		{
 			static_assert(std::is_trivially_copyable_v<T>);
 			static_assert(std::is_standard_layout_v<T>);
@@ -214,8 +190,7 @@ namespace gglab
 			SetPushConstants(parameterIndex, std::span<const uint32_t>(data), destOffset);
 		}
 
-		virtual void Dispatch(uint32_t groupCountX,
-			uint32_t groupCountY,
-			uint32_t groupCountZ) noexcept = 0;
+		virtual void Dispatch(
+			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept = 0;
 	};
 }

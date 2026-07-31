@@ -61,8 +61,7 @@ namespace gglab
 		std::string m_DebugOwner;
 		uint64_t m_DebugBindingSerial = 0;
 		bool m_HasDebugBindingSerial = false;
-		RHIResourceDebugBindingMode m_DebugBindingMode =
-			RHIResourceDebugBindingMode::Exclusive;
+		RHIResourceDebugBindingMode m_DebugBindingMode = RHIResourceDebugBindingMode::Exclusive;
 		std::vector<DX12ResourceDebugBindingSnapshot> m_DebugBindingHistory;
 		std::string m_DebugName;
 		uint32_t m_LastUseFenceCount = 0;
@@ -79,8 +78,7 @@ namespace gglab
 		std::vector<DX12ResourceSlotSnapshot> m_Buffers;
 	};
 
-	template<>
-	struct SnapshotTraits<DX12ResourceManagerSnapshot>
+	template <> struct SnapshotTraits<DX12ResourceManagerSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.DX12ResourceManagerSnapshot");
 	};

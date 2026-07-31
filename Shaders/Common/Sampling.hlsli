@@ -50,25 +50,18 @@ float3 CosineSampleHemisphere(float2 Xi)
 	float sinPhi;
 	float cosPhi;
 	sincos(phi, sinPhi, cosPhi);
-	
-	return float3(
-		cosPhi * sinTheta,
-		sinPhi * sinTheta,
-		cosTheta);
+
+	return float3(cosPhi * sinTheta, sinPhi * sinTheta, cosTheta);
 }
 
 // Builds an orthonormal basis around normalWS and transforms a tangent-space direction to world space.
 // normalWS is expected to be normalized.
 float3 TangentToWorld(float3 directionTS, float3 normalWS)
 {
-	float3 up = abs(normalWS.y) < 0.999
-		? float3(0.0, 1.0, 0.0)
-		: float3(0.0, 0.0, 1.0);
+	float3 up = abs(normalWS.y) < 0.999 ? float3(0.0, 1.0, 0.0) : float3(0.0, 0.0, 1.0);
 	float3 tangent = normalize(cross(up, normalWS));
 	float3 bitangent = cross(normalWS, tangent);
 
 	return normalize(
-		directionTS.x * tangent +
-		directionTS.y * bitangent +
-		directionTS.z * normalWS);
+		directionTS.x * tangent + directionTS.y * bitangent + directionTS.z * normalWS);
 }

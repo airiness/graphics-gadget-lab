@@ -24,10 +24,7 @@ namespace gglab
 		const StringID StartDemoDebugChannel("Demo.Start.Guides");
 
 		components::MaterialInstanceComponent MakeMaterial(
-			std::string_view key,
-			const Color& baseColor,
-			float metallic,
-			float roughness) noexcept
+			std::string_view key, const Color& baseColor, float metallic, float roughness) noexcept
 		{
 			components::MaterialInstanceComponent material{};
 			material.m_Key = RuntimeMaterialKey(key);
@@ -98,21 +95,18 @@ namespace gglab
 			const Mesh* mesh = m_Services.m_AssetManager->GetMesh(meshId);
 			if (!mesh)
 			{
-				progress.AddStep(0.45f, {
-					.m_Status = LoadingStatus::Failed,
-					.m_Fraction = 0.0f,
-					.m_Stage = "Procedural mesh unavailable",
-					.m_Detail = name,
-				});
+				progress.AddStep(0.45f,
+					{
+						.m_Status = LoadingStatus::Failed,
+						.m_Fraction = 0.0f,
+						.m_Stage = "Procedural mesh unavailable",
+						.m_Detail = name,
+					});
 				continue;
 			}
 
-			progress.AddAssetStep(
-				0.45f,
-				GetAssetLoadProgress(
-					mesh->m_State,
-					AssetLoadKind::Mesh,
-					mesh->m_LoadProgress),
+			progress.AddAssetStep(0.45f,
+				GetAssetLoadProgress(mesh->m_State, AssetLoadKind::Mesh, mesh->m_LoadProgress),
 				name);
 		}
 
@@ -126,7 +120,8 @@ namespace gglab
 
 	void StartDemo::CommitPrepare() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(), "StartDemo committed before preparation completed.");
+		GGLAB_ASSERT_MSG(
+			m_LoadingProgress.IsReady(), "StartDemo committed before preparation completed.");
 	}
 
 	void StartDemo::CancelPrepare() noexcept
@@ -155,30 +150,17 @@ namespace gglab
 			.m_Channel = StartDemoDebugChannel,
 			.m_DurationSeconds = 3600.0f,
 		};
-		debugDraw->Grid(
-			Vector3(0.0f, -1.0f, 6.0f),
-			Vector3::UnitY,
-			Vector3::UnitX,
-			5.0f,
-			10,
+		debugDraw->Grid(Vector3(0.0f, -1.0f, 6.0f), Vector3::UnitY, Vector3::UnitX, 5.0f, 10,
 			{
 				.m_Color = Color(0.24f, 0.26f, 0.3f, 1.0f),
 				.m_Channel = StartDemoDebugChannel,
 				.m_DurationSeconds = 3600.0f,
 			});
 		debugDraw->Axes(
-			math::CreateTranslation(Vector3(0.0f, -0.9f, 6.0f)),
-			1.5f,
-			0.2f,
-			guideStyle);
+			math::CreateTranslation(Vector3(0.0f, -0.9f, 6.0f)), 1.5f, 0.2f, guideStyle);
 		debugDraw->Box(Vector3(-2.2f, 0.0f, 6.0f), Vector3(1.15f), guideStyle);
 		debugDraw->Sphere(Vector3(0.0f, 0.0f, 6.0f), 1.2f, guideStyle);
-		debugDraw->Capsule(
-			Vector3(2.2f, 0.0f, 6.0f),
-			Vector3::UnitY,
-			0.9f,
-			0.55f,
-			guideStyle);
+		debugDraw->Capsule(Vector3(2.2f, 0.0f, 6.0f), Vector3::UnitY, 0.9f, 0.55f, guideStyle);
 	}
 
 	void StartDemo::OnResize(uint32_t width, uint32_t height) noexcept
@@ -241,9 +223,7 @@ namespace gglab
 		{
 			auto& transform = registry.get<components::TransformComponent>(m_AnimatedCubeEntity);
 			transform.m_Rotation = math::CreateFromYawPitchRoll(
-				0.45f + m_AnimationTime * 0.7f,
-				std::sin(m_AnimationTime * 0.8f) * 0.12f,
-				0.15f);
+				0.45f + m_AnimationTime * 0.7f, std::sin(m_AnimationTime * 0.8f) * 0.12f, 0.15f);
 		}
 		camera.Update();
 	}
@@ -264,12 +244,9 @@ namespace gglab
 			.m_SamplerRegistry = samplerRegistry,
 			.m_World = &m_World,
 			.m_Transform = platformTransform,
-			.m_MaterialInstance = MakeMaterial(
-				"gglab.demo.start.material.platform",
-				Color(0.18f, 0.2f, 0.24f, 1.0f),
-				0.05f,
-				0.75f),
-		}));
+			.m_MaterialInstance = MakeMaterial("gglab.demo.start.material.platform",
+				Color(0.18f, 0.2f, 0.24f, 1.0f), 0.05f, 0.75f),
+			}));
 
 		components::TransformComponent cubeTransform{};
 		cubeTransform.m_Position = Vector3(-2.2f, 0.0f, 6.0f);
@@ -279,11 +256,8 @@ namespace gglab
 			.m_World = &m_World,
 			.m_Transform = cubeTransform,
 			.m_MaterialInstance = MakeMaterial(
-				"gglab.demo.start.material.cube",
-				Color(0.08f, 0.42f, 0.9f, 1.0f),
-				0.15f,
-				0.28f),
-		}));
+				"gglab.demo.start.material.cube", Color(0.08f, 0.42f, 0.9f, 1.0f), 0.15f, 0.28f),
+			}));
 
 		components::TransformComponent sphereTransform{};
 		sphereTransform.m_Position = Vector3(0.0f, 0.0f, 6.0f);
@@ -293,11 +267,8 @@ namespace gglab
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance = MakeMaterial(
-				"gglab.demo.start.material.sphere",
-				Color(0.95f, 0.38f, 0.08f, 1.0f),
-				0.7f,
-				0.2f),
-		});
+				"gglab.demo.start.material.sphere", Color(0.95f, 0.38f, 0.08f, 1.0f), 0.7f, 0.2f),
+			});
 
 		components::TransformComponent tallCubeTransform{};
 		tallCubeTransform.m_Position = Vector3(2.2f, 0.0f, 6.0f);
@@ -308,12 +279,9 @@ namespace gglab
 			.m_SamplerRegistry = samplerRegistry,
 			.m_World = &m_World,
 			.m_Transform = tallCubeTransform,
-			.m_MaterialInstance = MakeMaterial(
-				"gglab.demo.start.material.tall_cube",
-				Color(0.2f, 0.82f, 0.48f, 1.0f),
-				0.3f,
-				0.42f),
-		});
+			.m_MaterialInstance = MakeMaterial("gglab.demo.start.material.tall_cube",
+				Color(0.2f, 0.82f, 0.48f, 1.0f), 0.3f, 0.42f),
+			});
 
 		auto& registry = m_World.GetRegistry();
 		const entt::entity lightEntity = registry.create();

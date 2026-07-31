@@ -33,8 +33,7 @@ VSOutput VSMain(VSInput input)
 	if ((g_Pass.Flags & DebugDrawFlagScreenSpace) != 0)
 	{
 		const float2 viewportSize = max(float2(viewData.Width, viewData.Height), float2(1.0, 1.0));
-		const float2 clip = float2(
-			input.Position.x / viewportSize.x * 2.0 - 1.0,
+		const float2 clip = float2(input.Position.x / viewportSize.x * 2.0 - 1.0,
 			1.0 - input.Position.y / viewportSize.y * 2.0);
 		output.Position = float4(clip, input.Position.z, 1.0);
 	}

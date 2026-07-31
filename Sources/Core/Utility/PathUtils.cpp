@@ -5,8 +5,7 @@
 namespace gglab::utils
 {
 	bool ExtensionEqualsIgnoreCase(
-		const std::filesystem::path& path,
-		std::string_view extension) noexcept
+		const std::filesystem::path& path, std::string_view extension) noexcept
 	{
 		return EqualsIgnoreCase(path.extension().string(), extension);
 	}
@@ -59,7 +58,8 @@ namespace gglab::utils
 			return 0;
 		}
 
-		return std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count();
+		return std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
+			.count();
 	}
 
 	bool WriteFileBinary(const std::filesystem::path& file, const void* data, size_t size) noexcept
@@ -83,7 +83,8 @@ namespace gglab::utils
 		return static_cast<bool>(out);
 	}
 
-	bool LinkDirectory(const std::filesystem::path& srcDir, const std::filesystem::path& dstDir) noexcept
+	bool LinkDirectory(
+		const std::filesystem::path& srcDir, const std::filesystem::path& dstDir) noexcept
 	{
 		std::error_code errorCode;
 		if (!std::filesystem::exists(srcDir, errorCode))

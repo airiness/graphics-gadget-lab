@@ -76,10 +76,9 @@ namespace gglab
 		bool m_GpuTimingAvailable = false;
 	};
 
-	template<>
-	struct SnapshotTraits<PostProcessDiagnosticsSnapshot>
+	template <> struct SnapshotTraits<PostProcessDiagnosticsSnapshot>
 	{
-		static constexpr SnapshotId Id = MakeSnapshotId(
-			"Diagnostics.PostProcessDiagnosticsSnapshot");
+		static constexpr SnapshotId Id =
+			MakeSnapshotId("Diagnostics.PostProcessDiagnosticsSnapshot");
 	};
 }

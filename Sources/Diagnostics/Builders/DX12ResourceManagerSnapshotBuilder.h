@@ -6,6 +6,5 @@ namespace gglab
 	struct DX12ResourceManagerSnapshot;
 
 	void BuildDX12ResourceManagerSnapshot(
-		const DX12ResourceManager& manager,
-		DX12ResourceManagerSnapshot& outSnapshot) noexcept;
+		const DX12ResourceManager& manager, DX12ResourceManagerSnapshot& outSnapshot) noexcept;
 }

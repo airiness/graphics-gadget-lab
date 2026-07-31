@@ -157,8 +157,8 @@ namespace gglab
 			SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
 		}
 
-		return window ? window->HandleMessage(hwnd, message, wParam, lParam) :
-			DefWindowProcW(hwnd, message, wParam, lParam);
+		return window ? window->HandleMessage(hwnd, message, wParam, lParam)
+			: DefWindowProcW(hwnd, message, wParam, lParam);
 	}
 
 	LRESULT Win32Window::HandleMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept
@@ -253,8 +253,8 @@ namespace gglab
 			return handlerResult.m_Result;
 		}
 
-		return windowMessageHandled ? windowMessageResult :
-			DefWindowProcW(hwnd, message, wParam, lParam);
+		return windowMessageHandled ? windowMessageResult
+			: DefWindowProcW(hwnd, message, wParam, lParam);
 	}
 
 	Win32MessageResult Win32Window::DispatchMessageHandlers(
@@ -284,13 +284,12 @@ namespace gglab
 			[id](const MessageHandlerEntry& entry) { return entry.m_Id == id; });
 	}
 
-	void Win32Window::PushEvent(
-		PlatformEventType type, uint32_t width, uint32_t height) noexcept
+	void Win32Window::PushEvent(PlatformEventType type, uint32_t width, uint32_t height) noexcept
 	{
 		m_Events.push_back({
 			.m_Type = type,
 			.m_Width = width,
 			.m_Height = height,
-		});
+			});
 	}
 }

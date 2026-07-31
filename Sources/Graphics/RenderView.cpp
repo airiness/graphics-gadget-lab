@@ -7,12 +7,8 @@ namespace gglab
 {
 	namespace
 	{
-		RenderView BuildPerspectiveCameraView(
-			RenderViewID viewId,
-			const Camera& camera,
-			const ResolvedViewRenderSettings& renderSettings,
-			uint32_t width,
-			uint32_t height,
+		RenderView BuildPerspectiveCameraView(RenderViewID viewId, const Camera& camera,
+			const ResolvedViewRenderSettings& renderSettings, uint32_t width, uint32_t height,
 			StringID name) noexcept
 		{
 			RenderView view{};
@@ -22,11 +18,8 @@ namespace gglab
 			view.m_DepthConvention = DepthConvention::Reversed;
 
 			view.m_View = camera.GetViewMatrix();
-			view.m_Proj = math::CreatePerspectiveFieldOfViewLHReversedZ(
-				math::ToRadians(camera.GetFov()),
-				camera.GetAspect(),
-				camera.GetNear(),
-				camera.GetFar());
+			view.m_Proj = math::CreatePerspectiveFieldOfViewLHReversedZ(math::ToRadians(camera.GetFov()),
+				camera.GetAspect(), camera.GetNear(), camera.GetFar());
 			view.m_ViewProj = view.m_View * view.m_Proj;
 			view.m_InvView = math::Inverse(view.m_View);
 			view.m_InvProj = math::Inverse(view.m_Proj);
@@ -47,12 +40,8 @@ namespace gglab
 		}
 	}
 
-	RenderView RenderViewBuilder::BuildDebugCameraView(
-		RenderViewID viewId,
-		const Camera& camera,
-		const ResolvedViewRenderSettings& renderSettings,
-		uint32_t width,
-		uint32_t height,
+	RenderView RenderViewBuilder::BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
+		const ResolvedViewRenderSettings& renderSettings, uint32_t width, uint32_t height,
 		StringID name) const noexcept
 	{
 		GGLAB_ASSERT(IsDebugCameraRenderViewID(viewId));
@@ -62,13 +51,8 @@ namespace gglab
 	RenderView RenderViewBuildTraits<RenderViewID::Main>::Build(
 		const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept
 	{
-		return BuildPerspectiveCameraView(
-			RenderViewID::Main,
-			info.m_Camera,
-			info.m_RenderSettings,
-			info.m_Width,
-			info.m_Height,
-			info.m_Name);
+		return BuildPerspectiveCameraView(RenderViewID::Main, info.m_Camera, info.m_RenderSettings,
+			info.m_Width, info.m_Height, info.m_Name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::DirectionalShadow>::Build(
@@ -81,7 +65,8 @@ namespace gglab
 		}
 		lightDir.Normalize();
 
-		Vector3 cameraForward = math::TransformDirection(Vector3::Forward, info.m_MainView.m_InvView);
+		Vector3 cameraForward =
+			math::TransformDirection(Vector3::Forward, info.m_MainView.m_InvView);
 		Vector3 cameraRight = math::TransformDirection(Vector3::Right, info.m_MainView.m_InvView);
 		Vector3 cameraUp = math::TransformDirection(Vector3::Up, info.m_MainView.m_InvView);
 		if (cameraForward.LengthSquared() <= 1.0e-8f)
@@ -101,7 +86,8 @@ namespace gglab
 		cameraUp.Normalize();
 
 		const float nearZ = std::max(info.m_MainView.m_Near, 0.001f);
-		const float farZ = std::max(nearZ + 0.001f, std::min(info.m_MainView.m_Far, info.m_MaxShadowDistance));
+		const float farZ =
+			std::max(nearZ + 0.001f, std::min(info.m_MainView.m_Far, info.m_MaxShadowDistance));
 		const float tanHalfFov = std::tan(info.m_MainView.m_FovRadians * 0.5f);
 		const float nearHalfHeight = tanHalfFov * nearZ;
 		const float nearHalfWidth = nearHalfHeight * std::max(info.m_MainView.m_Aspect, 0.001f);
@@ -136,16 +122,16 @@ namespace gglab
 		}
 
 		const Vector3 lightEyeForBounds = frustumCenter - lightDir;
-		const Matrix lightViewForBounds = math::CreateLookAtLH(
-			lightEyeForBounds,
-			frustumCenter,
-			lightUp);
+		const Matrix lightViewForBounds =
+			math::CreateLookAtLH(lightEyeForBounds, frustumCenter, lightUp);
 
-		Vector3 minLS(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
-		Vector3 maxLS(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest());
+		Vector3 minLS(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+			std::numeric_limits<float>::max());
+		Vector3 maxLS(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
+			std::numeric_limits<float>::lowest());
 
-		const auto includeLightSpacePoint =
-			[&minLS, &maxLS, &lightViewForBounds](const Vector3& pointWS) noexcept
+		const auto includeLightSpacePoint = [&minLS, &maxLS, &lightViewForBounds](
+			const Vector3& pointWS) noexcept
 			{
 				const Vector3 pointLS = math::TransformPoint(pointWS, lightViewForBounds);
 				minLS = math::Min(minLS, pointLS);

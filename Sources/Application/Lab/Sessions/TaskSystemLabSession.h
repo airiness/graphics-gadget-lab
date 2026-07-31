@@ -41,10 +41,7 @@ namespace gglab
 		void CancelScenario() noexcept;
 		void SubmitGatedTargets() noexcept;
 		void EvaluateScenario() noexcept;
-		TaskHandle SubmitTask(
-			TaskDesc desc,
-			TaskWork work,
-			bool targetTask) noexcept;
+		TaskHandle SubmitTask(TaskDesc desc, TaskWork work, bool targetTask) noexcept;
 
 		std::shared_ptr<ScenarioState> m_State;
 		std::vector<TaskHandle> m_Handles;

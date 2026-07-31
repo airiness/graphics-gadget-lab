@@ -11,7 +11,8 @@ namespace gglab
 		return std::bit_width(size == 0 ? 1u : size);
 	}
 
-	[[nodiscard]] constexpr TextureColorSpace GetTextureColorSpaceFromSemantic(TextureSemantic semantic) noexcept
+	[[nodiscard]] constexpr TextureColorSpace GetTextureColorSpaceFromSemantic(
+		TextureSemantic semantic) noexcept
 	{
 		switch (semantic)
 		{

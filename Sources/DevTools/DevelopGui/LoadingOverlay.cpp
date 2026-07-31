@@ -16,21 +16,16 @@ namespace gglab
 
 		const float fraction = std::clamp(progress.m_Fraction, 0.0f, 1.0f);
 		const int32_t percentage = static_cast<int32_t>(std::round(fraction * 100.0f));
-		const ImVec2 position(
-			viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+		const ImVec2 position(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
 			viewport->WorkPos.y + viewport->WorkSize.y * 0.78f);
 		ImGui::SetNextWindowPos(position, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-		ImGui::SetNextWindowSize(ImVec2(
-			std::clamp(viewport->WorkSize.x * 0.48f, 420.0f, 720.0f),
-			0.0f));
+		ImGui::SetNextWindowSize(
+			ImVec2(std::clamp(viewport->WorkSize.x * 0.48f, 420.0f, 720.0f), 0.0f));
 		ImGui::SetNextWindowBgAlpha(0.92f);
 
 		constexpr ImGuiWindowFlags flags =
-			ImGuiWindowFlags_NoDecoration |
-			ImGuiWindowFlags_NoDocking |
-			ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoSavedSettings |
-			ImGuiWindowFlags_NoInputs;
+			ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoMove |
+			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs;
 		if (ImGui::Begin("##LoadingOverlay", nullptr, flags))
 		{
 			const char* title = progress.m_Title.empty() ? "Loading" : progress.m_Title.c_str();

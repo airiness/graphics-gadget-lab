@@ -8,15 +8,13 @@ namespace gglab
 	{
 		[[nodiscard]] bool IsComparisonFilter(RHISamplerFilter filter) noexcept
 		{
-			return
-				filter == RHISamplerFilter::ComparisonMinMagLinearMipPoint ||
+			return filter == RHISamplerFilter::ComparisonMinMagLinearMipPoint ||
 				filter == RHISamplerFilter::ComparisonAnisotropic;
 		}
 
 		[[nodiscard]] bool IsAnisotropicFilter(RHISamplerFilter filter) noexcept
 		{
-			return
-				filter == RHISamplerFilter::Anisotropic ||
+			return filter == RHISamplerFilter::Anisotropic ||
 				filter == RHISamplerFilter::ComparisonAnisotropic;
 		}
 
@@ -68,7 +66,8 @@ namespace gglab
 			static_assert(utils::EnumCount<SamplerPreset>() <= 32);
 			const auto preset = static_cast<SamplerPreset>(index);
 			m_PresetSamplers[index] = GetOrCreateSampler(MakePresetSamplerKey(preset));
-			GGLAB_ASSERT_MSG(m_PresetSamplers[index].IsValid(), "SamplerRegistry: failed to create preset sampler.");
+			GGLAB_ASSERT_MSG(m_PresetSamplers[index].IsValid(),
+				"SamplerRegistry: failed to create preset sampler.");
 			if (auto entry = m_SamplerEntries.find(m_PresetSamplers[index]);
 				entry != m_SamplerEntries.end())
 			{
@@ -149,11 +148,13 @@ namespace gglab
 		const auto& entry = GetEntry(samplerId);
 		const RHIDescriptorHandle descriptor = m_Device->GetSamplerDescriptor(entry.m_Sampler);
 		GGLAB_ASSERT_MSG(descriptor.IsValid(), "SamplerRegistry: invalid RHI sampler descriptor.");
-		GGLAB_ASSERT_MSG(descriptor.m_HeapType == RHIDescriptorHeapType::Sampler, "SamplerRegistry: sampler descriptor is not in sampler heap.");
+		GGLAB_ASSERT_MSG(descriptor.m_HeapType == RHIDescriptorHeapType::Sampler,
+			"SamplerRegistry: sampler descriptor is not in sampler heap.");
 		return descriptor.m_Index;
 	}
 
-	uint32_t SamplerRegistry::ResolveSamplerIndex(SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept
+	uint32_t SamplerRegistry::ResolveSamplerIndex(
+		SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept
 	{
 		if (samplerId.IsValid())
 		{
@@ -165,14 +166,14 @@ namespace gglab
 
 	SamplerRegistryStatistics SamplerRegistry::GetStatistics() const noexcept
 	{
-		const uint32_t presetSamplerCount = static_cast<uint32_t>(std::ranges::count_if(
-			m_SamplerEntries | std::views::values,
-			[](const SamplerEntry& entry) noexcept { return entry.m_PresetMask != 0; }));
+		const uint32_t presetSamplerCount =
+			static_cast<uint32_t>(std::ranges::count_if(m_SamplerEntries | std::views::values,
+				[](const SamplerEntry& entry) noexcept { return entry.m_PresetMask != 0; }));
 		return {
 			.m_UniqueSamplerCount = static_cast<uint32_t>(m_SamplerEntries.size()),
 			.m_PresetSamplerCount = presetSamplerCount,
-			.m_CustomSamplerCount = static_cast<uint32_t>(m_SamplerEntries.size()) -
-				presetSamplerCount,
+			.m_CustomSamplerCount =
+				static_cast<uint32_t>(m_SamplerEntries.size()) - presetSamplerCount,
 			.m_PresetBindingCount = static_cast<uint32_t>(m_PresetSamplers.size()),
 			.m_CacheHitCount = m_CacheHitCount,
 			.m_CacheMissCount = m_CacheMissCount,
@@ -185,11 +186,9 @@ namespace gglab
 		infos.reserve(m_SamplerEntries.size());
 		for (const SamplerEntry& entry : m_SamplerEntries | std::views::values)
 		{
-			const RHIDescriptorHandle descriptor =
-				m_Device->GetSamplerDescriptor(entry.m_Sampler);
+			const RHIDescriptorHandle descriptor = m_Device->GetSamplerDescriptor(entry.m_Sampler);
 			GGLAB_ASSERT_MSG(
-				descriptor.IsValid() &&
-					descriptor.m_HeapType == RHIDescriptorHeapType::Sampler,
+				descriptor.IsValid() && descriptor.m_HeapType == RHIDescriptorHeapType::Sampler,
 				"SamplerRegistry diagnostics encountered an invalid sampler descriptor.");
 			infos.push_back({
 				.m_Id = entry.m_SamplerId,
@@ -197,114 +196,115 @@ namespace gglab
 				.m_Sampler = entry.m_Sampler,
 				.m_DescriptorIndex = descriptor.m_Index,
 				.m_PresetMask = entry.m_PresetMask,
-			});
+				});
 		}
-		std::ranges::sort(
-			infos,
-			{},
-			&SamplerRegistryReadInfo::m_Id);
+		std::ranges::sort(infos, {}, &SamplerRegistryReadInfo::m_Id);
 		return infos;
 	}
 
-	const SamplerRegistry::SamplerEntry& SamplerRegistry::GetEntry(SamplerID samplerId) const noexcept
+	const SamplerRegistry::SamplerEntry& SamplerRegistry::GetEntry(
+		SamplerID samplerId) const noexcept
 	{
 		GGLAB_ASSERT_MSG(samplerId.IsValid(), "SamplerRegistry: invalid sampler id.");
 
 		const auto iterator = m_SamplerEntries.find(samplerId);
 
-		GGLAB_ASSERT_MSG(iterator != m_SamplerEntries.end(), "SamplerRegistry: sampler id not found.");
+		GGLAB_ASSERT_MSG(
+			iterator != m_SamplerEntries.end(), "SamplerRegistry: sampler id not found.");
 
 		const auto& entry = iterator->second;
 
-		GGLAB_ASSERT_MSG(entry.m_SamplerId == samplerId, "SamplerRegistry: sampler entry id mismatch.");
+		GGLAB_ASSERT_MSG(
+			entry.m_SamplerId == samplerId, "SamplerRegistry: sampler entry id mismatch.");
 
-		GGLAB_ASSERT_MSG(entry.m_Sampler.IsValid(), "SamplerRegistry: invalid RHI sampler handle in sampler entry.");
+		GGLAB_ASSERT_MSG(entry.m_Sampler.IsValid(),
+			"SamplerRegistry: invalid RHI sampler handle in sampler entry.");
 
 		return entry;
 	}
 
 	namespace
 	{
-	SamplerKey MakePresetSamplerKey(SamplerPreset preset) noexcept
-	{
-		SamplerKey key{};
+		SamplerKey MakePresetSamplerKey(SamplerPreset preset) noexcept
+		{
+			SamplerKey key{};
 
-		switch (preset)
-		{
-		case SamplerPreset::PointClamp:
-		{
-			key.m_Filter = RHISamplerFilter::MinMagMipPoint;
-			key.m_AddressU = RHITextureAddressMode::Clamp;
-			key.m_AddressV = RHITextureAddressMode::Clamp;
-			key.m_AddressW = RHITextureAddressMode::Clamp;
-			break;
-		}
-		case SamplerPreset::PointWrap:
-		{
-			key.m_Filter = RHISamplerFilter::MinMagMipPoint;
-			key.m_AddressU = RHITextureAddressMode::Wrap;
-			key.m_AddressV = RHITextureAddressMode::Wrap;
-			key.m_AddressW = RHITextureAddressMode::Wrap;
-			break;
-		}
-		case SamplerPreset::LinearClamp:
-		{
-			key.m_Filter = RHISamplerFilter::MinMagMipLinear;
-			key.m_AddressU = RHITextureAddressMode::Clamp;
-			key.m_AddressV = RHITextureAddressMode::Clamp;
-			key.m_AddressW = RHITextureAddressMode::Clamp;
-			break;
-		}
-		case SamplerPreset::LinearWrap:
-		{
-			key.m_Filter = RHISamplerFilter::MinMagMipLinear;
-			key.m_AddressU = RHITextureAddressMode::Wrap;
-			key.m_AddressV = RHITextureAddressMode::Wrap;
-			key.m_AddressW = RHITextureAddressMode::Wrap;
-			break;
-		}
-		case SamplerPreset::LinearWrapUClampV:
-		{
-			key.m_Filter = RHISamplerFilter::MinMagMipLinear;
-			key.m_AddressU = RHITextureAddressMode::Wrap;
-			key.m_AddressV = RHITextureAddressMode::Clamp;
-			key.m_AddressW = RHITextureAddressMode::Clamp;
-			break;
-		}
-		case SamplerPreset::AnisotropicClamp:
-		{
-			key.m_Filter = RHISamplerFilter::Anisotropic;
-			key.m_AddressU = RHITextureAddressMode::Clamp;
-			key.m_AddressV = RHITextureAddressMode::Clamp;
-			key.m_AddressW = RHITextureAddressMode::Clamp;
-			key.m_MaxAnisotropy = 16;
-			break;
-		}
-		case SamplerPreset::AnisotropicWrap:
-		{
-			key.m_Filter = RHISamplerFilter::Anisotropic;
-			key.m_AddressU = RHITextureAddressMode::Wrap;
-			key.m_AddressV = RHITextureAddressMode::Wrap;
-			key.m_AddressW = RHITextureAddressMode::Wrap;
-			key.m_MaxAnisotropy = 16;
-			break;
-		}
-		case SamplerPreset::ShadowCmpLinearClamp:
-		{
-			key.m_Filter = RHISamplerFilter::ComparisonMinMagLinearMipPoint;
-			key.m_AddressU = RHITextureAddressMode::Clamp;
-			key.m_AddressV = RHITextureAddressMode::Clamp;
-			key.m_AddressW = RHITextureAddressMode::Clamp;
-			key.m_CompareOp = RHICompareOp::LessEqual;
-			key.m_MaxAnisotropy = 1;
-			break;
-		}
-		default:
-			GGLAB_UNREACHABLE("Unknown SamplerPreset.");
-			break;
-		}
+			switch (preset)
+			{
+			case SamplerPreset::PointClamp:
+			{
+				key.m_Filter = RHISamplerFilter::MinMagMipPoint;
+				key.m_AddressU = RHITextureAddressMode::Clamp;
+				key.m_AddressV = RHITextureAddressMode::Clamp;
+				key.m_AddressW = RHITextureAddressMode::Clamp;
+				break;
+			}
+			case SamplerPreset::PointWrap:
+			{
+				key.m_Filter = RHISamplerFilter::MinMagMipPoint;
+				key.m_AddressU = RHITextureAddressMode::Wrap;
+				key.m_AddressV = RHITextureAddressMode::Wrap;
+				key.m_AddressW = RHITextureAddressMode::Wrap;
+				break;
+			}
+			case SamplerPreset::LinearClamp:
+			{
+				key.m_Filter = RHISamplerFilter::MinMagMipLinear;
+				key.m_AddressU = RHITextureAddressMode::Clamp;
+				key.m_AddressV = RHITextureAddressMode::Clamp;
+				key.m_AddressW = RHITextureAddressMode::Clamp;
+				break;
+			}
+			case SamplerPreset::LinearWrap:
+			{
+				key.m_Filter = RHISamplerFilter::MinMagMipLinear;
+				key.m_AddressU = RHITextureAddressMode::Wrap;
+				key.m_AddressV = RHITextureAddressMode::Wrap;
+				key.m_AddressW = RHITextureAddressMode::Wrap;
+				break;
+			}
+			case SamplerPreset::LinearWrapUClampV:
+			{
+				key.m_Filter = RHISamplerFilter::MinMagMipLinear;
+				key.m_AddressU = RHITextureAddressMode::Wrap;
+				key.m_AddressV = RHITextureAddressMode::Clamp;
+				key.m_AddressW = RHITextureAddressMode::Clamp;
+				break;
+			}
+			case SamplerPreset::AnisotropicClamp:
+			{
+				key.m_Filter = RHISamplerFilter::Anisotropic;
+				key.m_AddressU = RHITextureAddressMode::Clamp;
+				key.m_AddressV = RHITextureAddressMode::Clamp;
+				key.m_AddressW = RHITextureAddressMode::Clamp;
+				key.m_MaxAnisotropy = 16;
+				break;
+			}
+			case SamplerPreset::AnisotropicWrap:
+			{
+				key.m_Filter = RHISamplerFilter::Anisotropic;
+				key.m_AddressU = RHITextureAddressMode::Wrap;
+				key.m_AddressV = RHITextureAddressMode::Wrap;
+				key.m_AddressW = RHITextureAddressMode::Wrap;
+				key.m_MaxAnisotropy = 16;
+				break;
+			}
+			case SamplerPreset::ShadowCmpLinearClamp:
+			{
+				key.m_Filter = RHISamplerFilter::ComparisonMinMagLinearMipPoint;
+				key.m_AddressU = RHITextureAddressMode::Clamp;
+				key.m_AddressV = RHITextureAddressMode::Clamp;
+				key.m_AddressW = RHITextureAddressMode::Clamp;
+				key.m_CompareOp = RHICompareOp::LessEqual;
+				key.m_MaxAnisotropy = 1;
+				break;
+			}
+			default:
+				GGLAB_UNREACHABLE("Unknown SamplerPreset.");
+				break;
+			}
 
-		return NormalizeSamplerKey(key);
-	}
+			return NormalizeSamplerKey(key);
+		}
 	}
 }

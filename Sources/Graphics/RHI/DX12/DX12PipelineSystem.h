@@ -39,12 +39,10 @@ namespace gglab
 		}
 		void Clear() noexcept override;
 
-		bool ResolveGraphicsPipeline(
-			RHIPipelineHandle pipeline,
+		bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,
 			DX12RootSignature*& outRootSignature) const noexcept;
-		bool ResolveComputePipeline(
-			RHIPipelineHandle pipeline,
+		bool ResolveComputePipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,
 			DX12RootSignature*& outRootSignature) const noexcept;
 
@@ -83,15 +81,12 @@ namespace gglab
 		};
 
 		DX12RootSignature* ResolveBindingLayout(RHIBindingLayoutHandle layout) const noexcept;
-		RHIPipelineHandle RegisterGraphicsPipeline(
-			const PipelineBinding& binding,
+		RHIPipelineHandle RegisterGraphicsPipeline(const PipelineBinding& binding,
 			const RHIGraphicsPipelineCreateInfo& createInfo) noexcept;
-		RHIPipelineHandle RegisterComputePipeline(
-			const PipelineBinding& binding,
+		RHIPipelineHandle RegisterComputePipeline(const PipelineBinding& binding,
 			const RHIComputePipelineCreateInfo& createInfo) noexcept;
 		RHIPipelineHandle RegisterPipeline(PipelineBinding binding) noexcept;
-		bool ResolvePipeline(RHIPipelineHandle pipeline,
-			PipelineType expectedType,
+		bool ResolvePipeline(RHIPipelineHandle pipeline, PipelineType expectedType,
 			DX12PipelineState*& outPipelineState,
 			DX12RootSignature*& outRootSignature) const noexcept;
 
@@ -105,9 +100,7 @@ namespace gglab
 		RHIBindingLayoutHandle::GenerationType m_BindingLayoutGeneration = 1;
 		RHIPipelineHandle::GenerationType m_PipelineGeneration = 1;
 
-		friend void BuildDX12PipelineSystemSnapshot(
-			const DX12PipelineSystem& system,
-			const PipelineCache* pipelineCache,
-			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
+		friend void BuildDX12PipelineSystemSnapshot(const DX12PipelineSystem& system,
+			const PipelineCache* pipelineCache, RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

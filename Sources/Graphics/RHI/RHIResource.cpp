@@ -7,9 +7,9 @@
 namespace gglab
 {
 	RHITextureOwner::RHITextureOwner(RHIDevice* device, RHITextureHandle handle) noexcept :
-		m_Device(device),
-		m_Handle(handle)
-	{}
+		m_Device(device), m_Handle(handle)
+	{
+	}
 
 	RHITextureOwner::~RHITextureOwner() noexcept
 	{
@@ -17,9 +17,9 @@ namespace gglab
 	}
 
 	RHITextureOwner::RHITextureOwner(RHITextureOwner&& rhs) noexcept :
-		m_Device(std::exchange(rhs.m_Device, nullptr)),
-		m_Handle(std::exchange(rhs.m_Handle, {}))
-	{}
+		m_Device(std::exchange(rhs.m_Device, nullptr)), m_Handle(std::exchange(rhs.m_Handle, {}))
+	{
+	}
 
 	RHITextureOwner& RHITextureOwner::operator=(RHITextureOwner&& rhs) noexcept
 	{
@@ -43,9 +43,9 @@ namespace gglab
 	}
 
 	RHIBufferOwner::RHIBufferOwner(RHIDevice* device, RHIBufferHandle handle) noexcept :
-		m_Device(device),
-		m_Handle(handle)
-	{}
+		m_Device(device), m_Handle(handle)
+	{
+	}
 
 	RHIBufferOwner::~RHIBufferOwner() noexcept
 	{
@@ -53,9 +53,9 @@ namespace gglab
 	}
 
 	RHIBufferOwner::RHIBufferOwner(RHIBufferOwner&& rhs) noexcept :
-		m_Device(std::exchange(rhs.m_Device, nullptr)),
-		m_Handle(std::exchange(rhs.m_Handle, {}))
-	{}
+		m_Device(std::exchange(rhs.m_Device, nullptr)), m_Handle(std::exchange(rhs.m_Handle, {}))
+	{
+	}
 
 	RHIBufferOwner& RHIBufferOwner::operator=(RHIBufferOwner&& rhs) noexcept
 	{

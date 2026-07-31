@@ -8,9 +8,7 @@ namespace gglab
 	class DemoPanel final : public DevelopGuiPanelBase
 	{
 	public:
-		explicit DemoPanel(DemoManager* demoManager) noexcept :
-			m_DemoManager(demoManager)
-		{}
+		explicit DemoPanel(DemoManager* demoManager) noexcept : m_DemoManager(demoManager) {}
 
 		std::string_view GetPath() const noexcept override { return "Application/Demo"; }
 		std::string_view GetTitle() const noexcept override { return "Demo Selection"; }

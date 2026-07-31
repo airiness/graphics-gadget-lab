@@ -8,12 +8,13 @@ namespace gglab
 {
 	namespace
 	{
-		struct PassData {};
+		struct PassData
+		{
+		};
 	}
 
-	void RenderPassIBL::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassIBL::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
@@ -24,69 +25,59 @@ namespace gglab
 		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(), [renderResRegistry](RenderGraph::RGBuilder& builder, PassData&)
+		rg.AddPass<PassData>(GetRenderGraphPassName(),
+			[renderResRegistry](RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();
 
-				auto& iblRes = builder.GetBlackboard().GetOrCreate<RGIBLResources>(IBLResourcesName);
+				auto& iblRes =
+					builder.GetBlackboard().GetOrCreate<RGIBLResources>(IBLResourcesName);
 
-				iblRes.m_EnvironmentCubemap = ImportRuntimeTexture(builder,
-					*renderResRegistry,
+				iblRes.m_EnvironmentCubemap = ImportRuntimeTexture(builder, *renderResRegistry,
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
 					"IBL.EnvironmentCubemap");
 
-				iblRes.m_IrradianceCubemap = ImportRuntimeTexture(builder,
-					*renderResRegistry,
+				iblRes.m_IrradianceCubemap = ImportRuntimeTexture(builder, *renderResRegistry,
 					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
 					"IBL.IrradianceCubemap");
 
-				iblRes.m_PrefilteredSpecularCubemap = ImportRuntimeTexture(builder,
-					*renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
-					"IBL.PrefilteredSpecularCubemap");
+				iblRes.m_PrefilteredSpecularCubemap =
+					ImportRuntimeTexture(builder, *renderResRegistry,
+						RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
+						"IBL.PrefilteredSpecularCubemap");
 
-				iblRes.m_BrdfLut = ImportRuntimeTexture(builder,
-					*renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_BrdfLut,
-					"IBL.BrdfLut");
+				iblRes.m_BrdfLut = ImportRuntimeTexture(builder, *renderResRegistry,
+					RenderResourceRegistry::TextureIndex::IBL_BrdfLut, "IBL.BrdfLut");
 
 				if (renderResRegistry->HasIBLBakeResources())
 				{
-					iblRes.m_BakeEnvironmentCubemap = ImportRuntimeTexture(builder,
-						*renderResRegistry,
-						RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
-						"IBL.Bake.EnvironmentCubemap",
-						true);
-					iblRes.m_BakeIrradianceCubemap = ImportRuntimeTexture(builder,
-						*renderResRegistry,
-						RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
-						"IBL.Bake.IrradianceCubemap",
-						true);
-					iblRes.m_BakePrefilteredSpecularCubemap = ImportRuntimeTexture(builder,
-						*renderResRegistry,
-						RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
-						"IBL.Bake.PrefilteredSpecularCubemap",
-						true);
-					iblRes.m_BakeBrdfLut = ImportRuntimeTexture(builder,
-						*renderResRegistry,
-						RenderResourceRegistry::TextureIndex::IBL_BrdfLut,
-						"IBL.Bake.BrdfLut",
+					iblRes.m_BakeEnvironmentCubemap =
+						ImportRuntimeTexture(builder, *renderResRegistry,
+							RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
+							"IBL.Bake.EnvironmentCubemap", true);
+					iblRes.m_BakeIrradianceCubemap =
+						ImportRuntimeTexture(builder, *renderResRegistry,
+							RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
+							"IBL.Bake.IrradianceCubemap", true);
+					iblRes.m_BakePrefilteredSpecularCubemap =
+						ImportRuntimeTexture(builder, *renderResRegistry,
+							RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
+							"IBL.Bake.PrefilteredSpecularCubemap", true);
+					iblRes.m_BakeBrdfLut = ImportRuntimeTexture(builder, *renderResRegistry,
+						RenderResourceRegistry::TextureIndex::IBL_BrdfLut, "IBL.Bake.BrdfLut",
 						true);
 				}
 
-				auto& previewResources = builder.GetBlackboard()
-					.GetOrCreate<RGIBLPreviewResources>(IBLPreviewResourcesName);
-				auto importPreview = [&builder, renderResRegistry](
-					RenderResourceRegistry::TextureIndex index,
-					const char* name) noexcept
+				auto& previewResources = builder.GetBlackboard().GetOrCreate<RGIBLPreviewResources>(
+					IBLPreviewResourcesName);
+				auto importPreview =
+					[&builder, renderResRegistry](
+						RenderResourceRegistry::TextureIndex index, const char* name) noexcept
 					{
 						const auto* desc = renderResRegistry->GetTextureDesc(index);
 						GGLAB_ASSERT_NOT_NULL(desc);
-						return builder.ImportTexture(
-							name,
-							renderResRegistry->GetTextureHandle(index),
-							*desc,
-							RGTextureAccess::None);
+						return builder.ImportTexture(name, renderResRegistry->GetTextureHandle(index),
+							*desc, RGTextureAccess::None);
 					};
 				previewResources.m_EnvironmentCubemapPreview = importPreview(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap,
@@ -97,7 +88,6 @@ namespace gglab
 				previewResources.m_PrefilteredSpecularCubemapPreview = importPreview(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
 					"Preview.IBL.PrefilteredSpecularCubemap");
-
 			});
 
 		m_IBLClearPass.AddPass(rg, context, services);
@@ -127,8 +117,11 @@ namespace gglab
 
 	void RenderPassIBL::AddFinishPass(RenderGraph& rg) noexcept
 	{
-		struct FinishPassData {};
-		rg.AddPass<FinishPassData>("IBL.FinishResources",
+		struct FinishPassData
+		{
+		};
+		rg.AddPass<FinishPassData>(
+			"IBL.FinishResources",
 			[](RenderGraph::RGBuilder& builder, FinishPassData&)
 			{
 				builder.SideEffect();
@@ -145,7 +138,8 @@ namespace gglab
 					builder.Export(ibl.m_BakeBrdfLut, RGTextureAccess::None);
 				}
 
-				auto& previews = builder.GetBlackboard().Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
+				auto& previews =
+					builder.GetBlackboard().Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
 				builder.Export(previews.m_EnvironmentCubemapPreview, RGTextureAccess::None);
 				builder.Export(previews.m_IrradianceCubemapPreview, RGTextureAccess::None);
 				builder.Export(previews.m_PrefilteredSpecularCubemapPreview, RGTextureAccess::None);
@@ -154,19 +148,16 @@ namespace gglab
 	}
 
 	RGTextureId RenderPassIBL::ImportRuntimeTexture(RenderGraph::RGBuilder& builder,
-		RenderResourceRegistry& registry,
-		RenderResourceRegistry::TextureIndex texIndex,
-		const char* name,
-		bool bakeTarget) noexcept
+		RenderResourceRegistry& registry, RenderResourceRegistry::TextureIndex texIndex,
+		const char* name, bool bakeTarget) noexcept
 	{
-		const auto* desc = bakeTarget ?
-			registry.GetIBLBakeTextureDesc(texIndex) : registry.GetTextureDesc(texIndex);
+		const auto* desc = bakeTarget ? registry.GetIBLBakeTextureDesc(texIndex)
+			: registry.GetTextureDesc(texIndex);
 		GGLAB_ASSERT_NOT_NULL(desc);
 
-		return builder.ImportTexture(
-			name,
-			bakeTarget ? registry.GetIBLBakeTextureHandle(texIndex) : registry.GetTextureHandle(texIndex),
-			*desc,
-			RGTextureAccess::None);
+		return builder.ImportTexture(name,
+			bakeTarget ? registry.GetIBLBakeTextureHandle(texIndex)
+			: registry.GetTextureHandle(texIndex),
+			*desc, RGTextureAccess::None);
 	}
 }

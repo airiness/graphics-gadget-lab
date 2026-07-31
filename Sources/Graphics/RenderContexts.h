@@ -34,7 +34,7 @@ namespace gglab
 		uint32_t m_BackBufferIndex = 0;
 		uint64_t m_FrameSerial = 0;
 
-		RHIFencePoint m_UploadFencePoint{};	// TODO: multi fence points support
+		RHIFencePoint m_UploadFencePoint{}; // TODO: multi fence points support
 		RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
 		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
 
@@ -50,10 +50,7 @@ namespace gglab
 			return m_RenderQueues[index];
 		}
 
-		RenderViewID GetDisplayViewId() const noexcept
-		{
-			return m_DisplayViewId;
-		}
+		RenderViewID GetDisplayViewId() const noexcept { return m_DisplayViewId; }
 
 		const RenderView& GetDisplayRenderView() const noexcept
 		{
@@ -81,7 +78,8 @@ namespace gglab
 
 		const ShadowVisualizationSettings& GetShadowVisualizationSettings() const noexcept
 		{
-			return m_ShadowVisualizationSettings ? *m_ShadowVisualizationSettings : DefaultShadowVisualizationSettings();
+			return m_ShadowVisualizationSettings ? *m_ShadowVisualizationSettings
+				: DefaultShadowVisualizationSettings();
 		}
 
 		bool IsValid() const noexcept
@@ -100,9 +98,6 @@ namespace gglab
 		ShaderManager* m_ShaderManager = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 
-		bool IsValid() const noexcept
-		{
-			return m_Renderer && m_AssetManager && m_ShaderManager;
-		}
+		bool IsValid() const noexcept { return m_Renderer && m_AssetManager && m_ShaderManager; }
 	};
 }

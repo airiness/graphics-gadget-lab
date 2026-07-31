@@ -5,14 +5,13 @@
 namespace gglab
 {
 	DX12DescriptorRingAllocator::DX12DescriptorRingAllocator(const CreateInfo& createInfo) noexcept :
-		DX12DescriptorAllocatorBase(createInfo),
-		m_Allocator(createInfo.m_Range.m_Count)
+		DX12DescriptorAllocatorBase(createInfo), m_Allocator(createInfo.m_Range.m_Count)
 	{
 	}
 
 	DX12DescriptorHandle DX12DescriptorRingAllocator::AllocateHandle(uint32_t count) noexcept
 	{
-		std::lock_guard	lock(m_Mutex);
+		std::lock_guard lock(m_Mutex);
 
 		FreeCompleted();
 
@@ -35,17 +34,20 @@ namespace gglab
 		FreeCompleted();
 	}
 
-	void DX12DescriptorRingAllocator::FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept
+	void DX12DescriptorRingAllocator::FreeHandleInternal(
+		DX12DescriptorHandle& descriptorHandle) noexcept
 	{
-		GGLAB_ASSERT_MSG(false, "DX12DescriptorRingAllocator does not support Free(). Use Retire().");
+		GGLAB_ASSERT_MSG(
+			false, "DX12DescriptorRingAllocator does not support Free(). Use Retire().");
 	}
 
-	void DX12DescriptorRingAllocator::RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
-		const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorRingAllocator::RetireHandleInternal(
+		const DX12DescriptorHandle& descriptorHandle, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 
-		GGLAB_ASSERT_MSG(descriptorHandle.OwnerAllocator() == this, "RetireHandleInternal: wrong owner.");
+		GGLAB_ASSERT_MSG(
+			descriptorHandle.OwnerAllocator() == this, "RetireHandleInternal: wrong owner.");
 		const DX12DescriptorSpan globalSpan{ descriptorHandle.Index(), descriptorHandle.Count() };
 		const DX12DescriptorSpan localSpan = ToLocalSpan(globalSpan);
 

@@ -8,8 +8,7 @@
 
 namespace gglab
 {
-	template<typename T>
-	class PersistentStructuredBuffer
+	template <typename T> class PersistentStructuredBuffer
 	{
 	public:
 		struct CreateInfo
@@ -21,46 +20,54 @@ namespace gglab
 		};
 
 		explicit PersistentStructuredBuffer(const CreateInfo& createInfo) noexcept :
-			m_Device(createInfo.m_Device),
-			m_ElementCapacity(createInfo.m_ElementCapacity),
+			m_Device(createInfo.m_Device), m_ElementCapacity(createInfo.m_ElementCapacity),
 			m_Buffers(createInfo.m_BufferCount)
 		{
-			GGLAB_ASSERT_MSG(m_Device != nullptr, "PersistentStructuredBuffer requires an RHI device.");
+			GGLAB_ASSERT_MSG(
+				m_Device != nullptr, "PersistentStructuredBuffer requires an RHI device.");
 			GGLAB_ASSERT_MSG(m_ElementCapacity > 0 && m_ElementCapacity <= UINT32_MAX / sizeof(T),
 				"PersistentStructuredBuffer capacity is invalid.");
-			GGLAB_ASSERT_MSG(!m_Buffers.empty(), "PersistentStructuredBuffer requires at least one physical buffer.");
+			GGLAB_ASSERT_MSG(!m_Buffers.empty(),
+				"PersistentStructuredBuffer requires at least one physical buffer.");
 
 			for (uint32_t bufferIndex = 0; bufferIndex < m_Buffers.size(); ++bufferIndex)
 			{
 				RHIBufferOwner& buffer = m_Buffers[bufferIndex];
-				std::string debugName = createInfo.m_DebugName ? createInfo.m_DebugName : "PersistentStructuredBuffer";
+				std::string debugName =
+					createInfo.m_DebugName ? createInfo.m_DebugName : "PersistentStructuredBuffer";
 				debugName += "[" + std::to_string(bufferIndex) + "]";
 				RHIBufferDesc desc{};
 				desc.m_SizeInBytes = static_cast<uint64_t>(sizeof(T)) * m_ElementCapacity;
 				desc.m_StrideInBytes = static_cast<uint32_t>(sizeof(T));
 				desc.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest;
 				desc.m_MemoryUsage = RHIMemoryUsage::GpuOnly;
-				const RHIResourceDebugIdentityDesc debugIdentity
-				{
+				const RHIResourceDebugIdentityDesc debugIdentity{
 					.m_Domain = RHIResourceDebugDomain::Renderer,
 					.m_Category = "PersistentStructuredBuffer",
 					.m_Label = debugName,
 					.m_StableId = bufferIndex,
 				};
-				buffer = RHIBufferOwner(
-					m_Device, m_Device->CreateBuffer(desc, debugIdentity));
-				GGLAB_ASSERT_MSG(buffer, "PersistentStructuredBuffer failed to create an RHI buffer.");
+				buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc, debugIdentity));
+				GGLAB_ASSERT_MSG(
+					buffer, "PersistentStructuredBuffer failed to create an RHI buffer.");
 			}
 		}
 
 		[[nodiscard]] RHIBufferHandle GetBufferHandle(uint32_t bufferIndex = 0) const noexcept
 		{
 			GGLAB_ASSERT(bufferIndex < m_Buffers.size());
-			return bufferIndex < m_Buffers.size() ? m_Buffers[bufferIndex].Get() : RHIBufferHandle{};
+			return bufferIndex < m_Buffers.size() ? m_Buffers[bufferIndex].Get()
+				: RHIBufferHandle{};
 		}
 		[[nodiscard]] uint32_t GetElementCapacity() const noexcept { return m_ElementCapacity; }
-		[[nodiscard]] uint32_t GetBufferCount() const noexcept { return static_cast<uint32_t>(m_Buffers.size()); }
-		[[nodiscard]] BufferAllocationType GetAllocationType() const noexcept { return BufferAllocationType::Persistent; }
+		[[nodiscard]] uint32_t GetBufferCount() const noexcept
+		{
+			return static_cast<uint32_t>(m_Buffers.size());
+		}
+		[[nodiscard]] BufferAllocationType GetAllocationType() const noexcept
+		{
+			return BufferAllocationType::Persistent;
+		}
 
 	private:
 		RHIDevice* m_Device = nullptr;

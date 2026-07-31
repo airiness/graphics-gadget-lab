@@ -10,9 +10,7 @@ namespace gglab
 	class MaterialGpuEncoder
 	{
 	public:
-		[[nodiscard]] static MaterialGPU Encode(
-			const MaterialProperties& material,
-			const AssetManager& assetManager,
-			const SamplerRegistry& samplerRegistry) noexcept;
+		[[nodiscard]] static MaterialGPU Encode(const MaterialProperties& material,
+			const AssetManager& assetManager, const SamplerRegistry& samplerRegistry) noexcept;
 	};
 }

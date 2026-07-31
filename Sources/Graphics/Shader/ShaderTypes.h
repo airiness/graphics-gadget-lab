@@ -18,10 +18,7 @@ namespace gglab
 		uint64_t m_LowBits = 0;
 		uint64_t m_HighBits = 0;
 
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_LowBits, m_HighBits);
-		}
+		auto AsTuple() const noexcept { return std::make_tuple(m_LowBits, m_HighBits); }
 		constexpr bool operator==(const ShaderHash128&) const noexcept = default;
 	};
 

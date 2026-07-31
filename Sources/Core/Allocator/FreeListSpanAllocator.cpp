@@ -20,7 +20,8 @@ namespace gglab
 		const auto countMapIt = m_CountMap.lower_bound(count);
 		if (countMapIt == m_CountMap.end())
 		{
-			GGLAB_LOG_WARN("FreeListSpanAllocator: Allocate(). Don't have enough count. needed:{}, total:{}, free:{}",
+			GGLAB_LOG_WARN(
+				"FreeListSpanAllocator: Allocate(). Don't have enough count. needed:{}, total:{}, free:{}",
 				count, m_Capacity, m_FreeCount);
 			return IndexSpan();
 		}
@@ -63,7 +64,8 @@ namespace gglab
 		auto newCount = count;
 
 		// Has prev free block
-		if (prevOffsetIt != m_OffsetMap.end() && prevOffsetIt->first + prevOffsetIt->second.m_Count == offset)
+		if (prevOffsetIt != m_OffsetMap.end() &&
+			prevOffsetIt->first + prevOffsetIt->second.m_Count == offset)
 		{
 			newOffset = prevOffsetIt->first;
 			newCount += prevOffsetIt->second.m_Count;

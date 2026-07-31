@@ -70,10 +70,10 @@ namespace gglab
 			uploadData.m_Subresources.resize(data.m_Subresources.size());
 			for (const TextureAssetSubresource& subresource : data.m_Subresources)
 			{
-				const size_t index = static_cast<size_t>(subresource.m_ArraySlice) *
-					data.m_MipLevels + subresource.m_MipLevel;
-				uploadData.m_Subresources[index] =
-				{
+				const size_t index =
+					static_cast<size_t>(subresource.m_ArraySlice) * data.m_MipLevels +
+					subresource.m_MipLevel;
+				uploadData.m_Subresources[index] = {
 					.m_Data = data.m_Pixels.data() + subresource.m_DataOffset,
 					.m_RowPitch = subresource.m_RowPitch,
 					.m_SlicePitch = subresource.m_SlicePitch,
@@ -88,24 +88,42 @@ namespace gglab
 	{
 		switch (error)
 		{
-		case TextureStructureValidationError::None: return "none";
-		case TextureStructureValidationError::InvalidEnum: return "invalid texture enum";
-		case TextureStructureValidationError::IncompatibleFormats: return "incompatible texture formats";
-		case TextureStructureValidationError::InvalidExtent: return "invalid texture extent";
-		case TextureStructureValidationError::InvalidMipCount: return "invalid texture mip count";
-		case TextureStructureValidationError::InvalidArrayConfiguration: return "invalid texture array configuration";
-		case TextureStructureValidationError::InvalidSubresourceCount: return "invalid texture subresource count";
-		case TextureStructureValidationError::InvalidSubresourceIndex: return "invalid texture subresource index";
-		case TextureStructureValidationError::DuplicateSubresource: return "duplicate texture subresource";
-		case TextureStructureValidationError::MissingSubresource: return "missing texture subresource";
-		case TextureStructureValidationError::NonCanonicalSubresourceOrder: return "non-canonical texture subresource order";
-		case TextureStructureValidationError::InvalidSubresourceExtent: return "invalid texture subresource extent";
-		case TextureStructureValidationError::OffsetOverflow: return "texture subresource offset overflow";
-		case TextureStructureValidationError::OutOfBounds: return "texture subresource is out of bounds";
-		case TextureStructureValidationError::InvalidRowPitch: return "invalid texture row pitch";
-		case TextureStructureValidationError::InvalidSlicePitch: return "invalid texture slice pitch";
-		case TextureStructureValidationError::InvalidDataSize: return "invalid texture data size";
-		case TextureStructureValidationError::ExceedsConfiguredLimit: return "texture exceeds configured validation limits";
+		case TextureStructureValidationError::None:
+			return "none";
+		case TextureStructureValidationError::InvalidEnum:
+			return "invalid texture enum";
+		case TextureStructureValidationError::IncompatibleFormats:
+			return "incompatible texture formats";
+		case TextureStructureValidationError::InvalidExtent:
+			return "invalid texture extent";
+		case TextureStructureValidationError::InvalidMipCount:
+			return "invalid texture mip count";
+		case TextureStructureValidationError::InvalidArrayConfiguration:
+			return "invalid texture array configuration";
+		case TextureStructureValidationError::InvalidSubresourceCount:
+			return "invalid texture subresource count";
+		case TextureStructureValidationError::InvalidSubresourceIndex:
+			return "invalid texture subresource index";
+		case TextureStructureValidationError::DuplicateSubresource:
+			return "duplicate texture subresource";
+		case TextureStructureValidationError::MissingSubresource:
+			return "missing texture subresource";
+		case TextureStructureValidationError::NonCanonicalSubresourceOrder:
+			return "non-canonical texture subresource order";
+		case TextureStructureValidationError::InvalidSubresourceExtent:
+			return "invalid texture subresource extent";
+		case TextureStructureValidationError::OffsetOverflow:
+			return "texture subresource offset overflow";
+		case TextureStructureValidationError::OutOfBounds:
+			return "texture subresource is out of bounds";
+		case TextureStructureValidationError::InvalidRowPitch:
+			return "invalid texture row pitch";
+		case TextureStructureValidationError::InvalidSlicePitch:
+			return "invalid texture slice pitch";
+		case TextureStructureValidationError::InvalidDataSize:
+			return "invalid texture data size";
+		case TextureStructureValidationError::ExceedsConfiguredLimit:
+			return "texture exceeds configured validation limits";
 		}
 		return "unknown texture structure validation error";
 	}
@@ -115,17 +133,18 @@ namespace gglab
 	{
 		switch (disposition)
 		{
-		case TextureUploadValidationDisposition::Valid: return "valid";
-		case TextureUploadValidationDisposition::Corrupt: return "corrupt";
-		case TextureUploadValidationDisposition::Unsupported: return "unsupported";
+		case TextureUploadValidationDisposition::Valid:
+			return "valid";
+		case TextureUploadValidationDisposition::Corrupt:
+			return "corrupt";
+		case TextureUploadValidationDisposition::Unsupported:
+			return "unsupported";
 		}
 		return "unknown";
 	}
 
-	TextureStructureValidationResult ValidateTextureAssetMetadata(
-		const TextureAssetData& data,
-		uint64_t declaredSubresourceCount,
-		uint64_t declaredPixelBytes,
+	TextureStructureValidationResult ValidateTextureAssetMetadata(const TextureAssetData& data,
+		uint64_t declaredSubresourceCount, uint64_t declaredPixelBytes,
 		TextureAssetValidationLimits limits) noexcept
 	{
 		const RHIFormatInfo& resourceFormat = GetRHIFormatInfo(data.m_ResourceFormat);
@@ -143,8 +162,7 @@ namespace gglab
 			return Error(TextureStructureValidationError::IncompatibleFormats);
 		}
 
-		if (data.m_Extent.m_Width == 0 || data.m_Extent.m_Height == 0 ||
-			data.m_Extent.m_Depth != 1)
+		if (data.m_Extent.m_Width == 0 || data.m_Extent.m_Height == 0 || data.m_Extent.m_Depth != 1)
 		{
 			return Error(TextureStructureValidationError::InvalidExtent);
 		}
@@ -153,8 +171,8 @@ namespace gglab
 			return Error(TextureStructureValidationError::InvalidArrayConfiguration);
 		}
 		if (data.m_MipLevels == 0 ||
-			data.m_MipLevels > std::bit_width(
-				std::max(data.m_Extent.m_Width, data.m_Extent.m_Height)))
+			data.m_MipLevels >
+			std::bit_width(std::max(data.m_Extent.m_Width, data.m_Extent.m_Height)))
 		{
 			return Error(TextureStructureValidationError::InvalidMipCount);
 		}
@@ -190,8 +208,7 @@ namespace gglab
 			}
 			break;
 		case RHITextureViewDimension::TextureCubeArray:
-			if (data.m_ArraySize < CubemapFaceCount ||
-				(data.m_ArraySize % CubemapFaceCount) != 0 ||
+			if (data.m_ArraySize < CubemapFaceCount || (data.m_ArraySize % CubemapFaceCount) != 0 ||
 				data.m_Extent.m_Width != data.m_Extent.m_Height)
 			{
 				return Error(TextureStructureValidationError::InvalidArrayConfiguration);
@@ -227,14 +244,12 @@ namespace gglab
 	}
 
 	TextureStructureValidationResult ValidateTextureAssetStructure(
-		const TextureAssetData& data,
-		TextureAssetValidationLimits limits) noexcept
+		const TextureAssetData& data, TextureAssetValidationLimits limits) noexcept
 	{
-		if (const auto result = ValidateTextureAssetMetadata(
-			data,
+		if (const auto result = ValidateTextureAssetMetadata(data,
 			static_cast<uint64_t>(data.m_Subresources.size()),
-			static_cast<uint64_t>(data.m_Pixels.size()),
-			limits); !result.IsValid())
+			static_cast<uint64_t>(data.m_Pixels.size()), limits);
+			!result.IsValid())
 		{
 			return result;
 		}
@@ -252,8 +267,9 @@ namespace gglab
 			{
 				return Error(TextureStructureValidationError::InvalidSubresourceIndex);
 			}
-			const size_t subresourceIndex = static_cast<size_t>(subresource.m_ArraySlice) *
-				data.m_MipLevels + subresource.m_MipLevel;
+			const size_t subresourceIndex =
+				static_cast<size_t>(subresource.m_ArraySlice) * data.m_MipLevels +
+				subresource.m_MipLevel;
 			if (seen[subresourceIndex] != 0)
 			{
 				return Error(TextureStructureValidationError::DuplicateSubresource);
@@ -268,8 +284,8 @@ namespace gglab
 				std::max(1u, data.m_Extent.m_Width >> subresource.m_MipLevel);
 			const uint32_t expectedHeight =
 				std::max(1u, data.m_Extent.m_Height >> subresource.m_MipLevel);
-			if (subresource.m_Width != expectedWidth ||
-				subresource.m_Height != expectedHeight || subresource.m_Depth != 1)
+			if (subresource.m_Width != expectedWidth || subresource.m_Height != expectedHeight ||
+				subresource.m_Depth != 1)
 			{
 				return Error(TextureStructureValidationError::InvalidSubresourceExtent);
 			}
@@ -331,8 +347,7 @@ namespace gglab
 
 	RHITextureDesc BuildTextureRHITextureDesc(const TextureAssetData& data) noexcept
 	{
-		return
-		{
+		return {
 			.m_Dimension = RHITextureDimension::Texture2D,
 			.m_Format = data.m_ResourceFormat,
 			.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest,
@@ -345,32 +360,28 @@ namespace gglab
 
 	RHITextureViewDesc BuildTextureRHISRVDesc(const TextureAssetData& data) noexcept
 	{
-		return
-		{
+		return {
 			.m_Type = RHITextureViewType::ShaderResource,
 			.m_Dimension = data.m_SrvDimension,
 			.m_Format = data.m_ViewFormat,
 			.m_Subresources =
-			{
-				.m_BaseMip = 0,
-				.m_MipCount = data.m_MipLevels,
-				.m_BaseArraySlice = 0,
-				.m_ArraySliceCount = data.m_ArraySize,
-			},
+				{
+					.m_BaseMip = 0,
+					.m_MipCount = data.m_MipLevels,
+					.m_BaseArraySlice = 0,
+					.m_ArraySliceCount = data.m_ArraySize,
+				},
 		};
 	}
 
-	TextureUploadValidationResult ValidateTextureUploadForDevice(
-		const TextureAssetData& data,
-		const RHIDevice& device,
-		TextureAssetValidationLimits limits) noexcept
+	TextureUploadValidationResult ValidateTextureUploadForDevice(const TextureAssetData& data,
+		const RHIDevice& device, TextureAssetValidationLimits limits) noexcept
 	{
 		const TextureStructureValidationResult structure =
 			ValidateTextureAssetStructure(data, limits);
 		if (!structure.IsValid())
 		{
-			return
-			{
+			return {
 				.m_Disposition = TextureUploadValidationDisposition::Corrupt,
 				.m_StructureError = structure.m_Error,
 			};
@@ -378,16 +389,15 @@ namespace gglab
 
 		const RHITextureDesc textureDesc = BuildTextureRHITextureDesc(data);
 		const RHITextureViewDesc viewDesc = BuildTextureRHISRVDesc(data);
-		const RHITextureValidationResult uploadValidation = ValidateRHITextureUploadData(
-			textureDesc, BuildTextureUploadDataUnchecked(data));
+		const RHITextureValidationResult uploadValidation =
+			ValidateRHITextureUploadData(textureDesc, BuildTextureUploadDataUnchecked(data));
 		if (!uploadValidation.IsValid())
 		{
-			return
-			{
-				.m_Disposition = uploadValidation.m_Error ==
-					RHITextureValidationError::UnsupportedUploadFormat ?
-					TextureUploadValidationDisposition::Unsupported :
-					TextureUploadValidationDisposition::Corrupt,
+			return {
+				.m_Disposition =
+					uploadValidation.m_Error == RHITextureValidationError::UnsupportedUploadFormat
+						? TextureUploadValidationDisposition::Unsupported
+						: TextureUploadValidationDisposition::Corrupt,
 				.m_RHIError = uploadValidation.m_Error,
 			};
 		}
@@ -395,11 +405,10 @@ namespace gglab
 		const RHITextureSupportResult textureSupport = device.QueryTextureSupport(textureDesc);
 		if (!textureSupport.IsSupported())
 		{
-			return
-			{
-				.m_Disposition = textureSupport.IsDescriptionValid() ?
-					TextureUploadValidationDisposition::Unsupported :
-					TextureUploadValidationDisposition::Corrupt,
+			return {
+				.m_Disposition = textureSupport.IsDescriptionValid()
+					? TextureUploadValidationDisposition::Unsupported
+					: TextureUploadValidationDisposition::Corrupt,
 				.m_RHIError = textureSupport.m_ValidationError,
 			};
 		}
@@ -407,11 +416,10 @@ namespace gglab
 			device.QueryTextureViewSupport(textureDesc, viewDesc);
 		if (!viewSupport.IsSupported())
 		{
-			return
-			{
-				.m_Disposition = viewSupport.IsDescriptionValid() ?
-					TextureUploadValidationDisposition::Unsupported :
-					TextureUploadValidationDisposition::Corrupt,
+			return {
+				.m_Disposition = viewSupport.IsDescriptionValid()
+					? TextureUploadValidationDisposition::Unsupported
+					: TextureUploadValidationDisposition::Corrupt,
 				.m_RHIError = viewSupport.m_ValidationError,
 			};
 		}

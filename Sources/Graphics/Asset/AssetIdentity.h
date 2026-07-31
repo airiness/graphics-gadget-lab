@@ -46,15 +46,11 @@ namespace gglab
 
 		[[nodiscard]] constexpr auto AsTuple() const noexcept
 		{
-			return std::tie(
-				m_Key.m_Kind,
-				m_Key.m_StableId,
-				m_ContentGeneration);
+			return std::tie(m_Key.m_Kind, m_Key.m_StableId, m_ContentGeneration);
 		}
 
 		friend constexpr bool operator==(
-			const AssetContentVersion&,
-			const AssetContentVersion&) = default;
+			const AssetContentVersion&, const AssetContentVersion&) = default;
 	};
 	using AssetContentVersionHash = KeyHash<AssetContentVersion>;
 
@@ -69,21 +65,17 @@ namespace gglab
 		}
 
 		friend constexpr bool operator==(
-			const AssetOperationToken&,
-			const AssetOperationToken&) = default;
+			const AssetOperationToken&, const AssetOperationToken&) = default;
 	};
 
-	[[nodiscard]] constexpr AssetKey MakeAssetKey(
-		AssetKind kind,
-		uint64_t stableId) noexcept
+	[[nodiscard]] constexpr AssetKey MakeAssetKey(AssetKind kind, uint64_t stableId) noexcept
 	{
-		return kind != AssetKind::Unknown ?
-			AssetKey{ .m_Kind = kind, .m_StableId = stableId } : AssetKey{};
+		return kind != AssetKind::Unknown ? AssetKey{ .m_Kind = kind, .m_StableId = stableId }
+		: AssetKey{};
 	}
 
 	[[nodiscard]] constexpr AssetContentVersion MakeAssetContentVersion(
-		AssetKey key,
-		uint64_t contentGeneration) noexcept
+		AssetKey key, uint64_t contentGeneration) noexcept
 	{
 		return {
 			.m_Key = key,
@@ -92,18 +84,13 @@ namespace gglab
 	}
 
 	[[nodiscard]] constexpr AssetContentVersion MakeAssetContentVersion(
-		AssetKind kind,
-		uint64_t stableId,
-		uint64_t contentGeneration) noexcept
+		AssetKind kind, uint64_t stableId, uint64_t contentGeneration) noexcept
 	{
-		return MakeAssetContentVersion(
-			MakeAssetKey(kind, stableId),
-			contentGeneration);
+		return MakeAssetContentVersion(MakeAssetKey(kind, stableId), contentGeneration);
 	}
 
 	[[nodiscard]] constexpr AssetOperationToken MakeAssetOperationToken(
-		AssetContentVersion contentVersion,
-		uint64_t operationSerial) noexcept
+		AssetContentVersion contentVersion, uint64_t operationSerial) noexcept
 	{
 		return {
 			.m_ContentVersion = contentVersion,

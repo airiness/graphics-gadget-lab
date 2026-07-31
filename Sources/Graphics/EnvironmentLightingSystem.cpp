@@ -69,7 +69,8 @@ namespace gglab
 		RequestRebake();
 	}
 
-	void EnvironmentLightingSystem::SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept
+	void EnvironmentLightingSystem::SetPrefilteredSpecularMaxSampleLuminance(
+		float maxSampleLuminance) noexcept
 	{
 		if (!std::isfinite(maxSampleLuminance))
 		{

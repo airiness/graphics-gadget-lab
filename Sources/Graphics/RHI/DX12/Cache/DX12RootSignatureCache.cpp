@@ -11,7 +11,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device must not be null");
 	}
 
-	RootSignatureHandle DX12RootSignatureCache::GetOrCreate(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept
+	RootSignatureHandle DX12RootSignatureCache::GetOrCreate(
+		const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept
 	{
 		const RootSignatureKey key = MakeKey(desc);
 
@@ -30,7 +31,8 @@ namespace gglab
 		auto rootSignature = std::make_unique<DX12RootSignature>(m_DX12Device, desc);
 		if (rootSignature->Get() == nullptr)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("DX12RootSignatureCache::GetOrCreate: Failed to create root signature");
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DX12RootSignatureCache::GetOrCreate: Failed to create root signature");
 			return {};
 		}
 
@@ -52,14 +54,16 @@ namespace gglab
 		}
 	}
 
-	RootSignatureHandle DX12RootSignatureCache::GetOrCreate(const RHIBindingLayoutDesc& desc) noexcept
+	RootSignatureHandle DX12RootSignatureCache::GetOrCreate(
+		const RHIBindingLayoutDesc& desc) noexcept
 	{
 		DX12BindingLayoutBuildResult dx12Desc{};
 		BuildDX12RootSignatureDesc(desc, dx12Desc);
 		return GetOrCreate(dx12Desc.m_Desc);
 	}
 
-	DX12RootSignature* DX12RootSignatureCache::GetDX12RootSignature(RootSignatureID id) const noexcept
+	DX12RootSignature* DX12RootSignatureCache::GetDX12RootSignature(
+		RootSignatureID id) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		if (id.IsValid() && id.Value() < m_RootSignatures.size())
@@ -76,7 +80,8 @@ namespace gglab
 		m_RootSignatures.clear();
 	}
 
-	RootSignatureKey DX12RootSignatureCache::MakeKey(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept
+	RootSignatureKey DX12RootSignatureCache::MakeKey(
+		const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept
 	{
 		RootSignatureKey key{};
 

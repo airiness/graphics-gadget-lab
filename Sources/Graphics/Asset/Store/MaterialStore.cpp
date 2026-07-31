@@ -9,8 +9,7 @@ namespace gglab
 		return iterator != m_Entries.end() ? iterator->second.get() : nullptr;
 	}
 
-	MaterialStore::InsertResult MaterialStore::Insert(
-		std::unique_ptr<Material>&& material) noexcept
+	MaterialStore::InsertResult MaterialStore::Insert(std::unique_ptr<Material>&& material) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(material);
 		if (!material)

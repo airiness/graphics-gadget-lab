@@ -5,8 +5,7 @@
 
 namespace gglab
 {
-	DemoManager::DemoManager(Renderer* renderer) noexcept :
-		m_Renderer(renderer)
+	DemoManager::DemoManager(Renderer* renderer) noexcept : m_Renderer(renderer)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Renderer);
 	}
@@ -45,8 +44,7 @@ namespace gglab
 		if (index >= m_DemoSlots.size())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
-				"DemoManager: GetDemo, invalid index:{}, size:{}.",
-				index, m_DemoSlots.size());
+				"DemoManager: GetDemo, invalid index:{}, size:{}.", index, m_DemoSlots.size());
 
 			return nullptr;
 		}
@@ -59,12 +57,8 @@ namespace gglab
 		{
 			return m_PendingDemo.get();
 		}
-		const auto iterator = std::ranges::find_if(
-			m_RetiringDemos,
-			[index](const RetiringDemo& retiring) noexcept
-			{
-				return retiring.m_Index == index;
-			});
+		const auto iterator = std::ranges::find_if(m_RetiringDemos,
+			[index](const RetiringDemo& retiring) noexcept { return retiring.m_Index == index; });
 		return iterator != m_RetiringDemos.end() ? iterator->m_Instance.get() : nullptr;
 	}
 
@@ -73,8 +67,7 @@ namespace gglab
 		if (index >= m_DemoSlots.size())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
-				"DemoManager: GetDemoName, invalid index:{}, size:{}.",
-				index, m_DemoSlots.size());
+				"DemoManager: GetDemoName, invalid index:{}, size:{}.", index, m_DemoSlots.size());
 			return {};
 		}
 		return m_DemoSlots[index].m_Name;
@@ -97,7 +90,7 @@ namespace gglab
 		m_DemoSlots.push_back({
 			.m_Name = std::move(name),
 			.m_Factory = std::move(factory),
-		});
+			});
 		return registeredIndex;
 	}
 
@@ -124,8 +117,7 @@ namespace gglab
 	{
 		if (index >= m_DemoSlots.size())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"DemoManager: RequestActiveDemo, invalid index:{}, size:{}.",
+			GGLAB_LOG_GRAPHICS_WARN("DemoManager: RequestActiveDemo, invalid index:{}, size:{}.",
 				index, m_DemoSlots.size());
 
 			return;
@@ -146,10 +138,8 @@ namespace gglab
 		const LoadingProgress progress = m_PendingDemo->GetPreparationProgress();
 		if (progress.HasFailed())
 		{
-			GGLAB_LOG_ERROR(
-				"DemoManager: failed to prepare demo '{}': {}",
-				GetDemoName(m_PendingDemoIndex),
-				progress.m_Detail);
+			GGLAB_LOG_ERROR("DemoManager: failed to prepare demo '{}': {}",
+				GetDemoName(m_PendingDemoIndex), progress.m_Detail);
 			m_PendingDemo->CancelPrepare();
 			m_PendingDemo.reset();
 			m_PendingDemoIndex = InvalidDemoIndex;
@@ -178,12 +168,11 @@ namespace gglab
 		{
 			LoadingProgress progress = m_PendingDemo->GetPreparationProgress();
 			const std::string nestedTitle = std::move(progress.m_Title);
-			progress.m_Title = nestedTitle.empty() ?
-				std::format("Loading Demo: {}", GetDemoName(m_PendingDemoIndex)) :
-				std::format(
-					"Loading Demo: {} / {}",
-					GetDemoName(m_PendingDemoIndex),
-					nestedTitle);
+			progress.m_Title =
+				nestedTitle.empty()
+				? std::format("Loading Demo: {}", GetDemoName(m_PendingDemoIndex))
+				: std::format(
+					"Loading Demo: {} / {}", GetDemoName(m_PendingDemoIndex), nestedTitle);
 			return progress;
 		}
 		if (m_RequestedDemoIndex != InvalidDemoIndex)
@@ -191,9 +180,7 @@ namespace gglab
 			return LoadingProgress{
 				.m_Status = LoadingStatus::Preparing,
 				.m_Fraction = 0.0f,
-				.m_Title = std::format(
-					"Loading Demo: {}",
-					GetDemoName(m_RequestedDemoIndex)),
+				.m_Title = std::format("Loading Demo: {}", GetDemoName(m_RequestedDemoIndex)),
 				.m_Stage = "Creating demo",
 				.m_Detail = "Waiting for the next frame boundary.",
 			};
@@ -203,8 +190,7 @@ namespace gglab
 
 	uint32_t DemoManager::GetPendingActiveIndex() const noexcept
 	{
-		return m_RequestedDemoIndex != InvalidDemoIndex ?
-			m_RequestedDemoIndex : m_PendingDemoIndex;
+		return m_RequestedDemoIndex != InvalidDemoIndex ? m_RequestedDemoIndex : m_PendingDemoIndex;
 	}
 
 	void DemoManager::BeginRequestedTransition() noexcept
@@ -214,9 +200,7 @@ namespace gglab
 			return;
 		}
 
-		const uint32_t requestedIndex = std::exchange(
-			m_RequestedDemoIndex,
-			InvalidDemoIndex);
+		const uint32_t requestedIndex = std::exchange(m_RequestedDemoIndex, InvalidDemoIndex);
 		if (requestedIndex == m_ActiveDemoIndex)
 		{
 			if (m_PendingDemo)
@@ -242,8 +226,7 @@ namespace gglab
 		if (!m_PendingDemo)
 		{
 			GGLAB_LOG_ERROR(
-				"DemoManager: failed to create demo '{}'.",
-				GetDemoName(requestedIndex));
+				"DemoManager: failed to create demo '{}'.", GetDemoName(requestedIndex));
 			m_PendingDemoIndex = InvalidDemoIndex;
 			return;
 		}
@@ -262,9 +245,9 @@ namespace gglab
 			m_RetiringDemos.push_back({
 				.m_Index = m_ActiveDemoIndex,
 				.m_Instance = std::move(m_ActiveInstance),
-				.m_RetireFence = m_HasLastActiveFrame ?
-					m_LastActiveFrame.m_SubmittedFence : RHIFencePoint{},
-			});
+				.m_RetireFence =
+					m_HasLastActiveFrame ? m_LastActiveFrame.m_SubmittedFence : RHIFencePoint{},
+				});
 		}
 
 		m_ActiveInstance = std::move(m_PendingDemo);
@@ -285,8 +268,7 @@ namespace gglab
 		{
 			return;
 		}
-		std::erase_if(
-			m_RetiringDemos,
+		std::erase_if(m_RetiringDemos,
 			[device](const RetiringDemo& retiring) noexcept
 			{
 				return !retiring.m_RetireFence.IsValid() ||

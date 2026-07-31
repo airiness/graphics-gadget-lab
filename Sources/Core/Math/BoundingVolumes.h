@@ -7,8 +7,7 @@ namespace gglab::math
 	{
 		constexpr Aabb() noexcept = default;
 		constexpr Aabb(const Vector3& center, const Vector3& extents) noexcept :
-			m_Center(center),
-			m_Extents(extents)
+			m_Center(center), m_Extents(extents)
 		{
 		}
 
@@ -20,8 +19,7 @@ namespace gglab::math
 	{
 		constexpr Sphere() noexcept = default;
 		constexpr Sphere(const Vector3& center, float radius) noexcept :
-			m_Center(center),
-			m_Radius(radius)
+			m_Center(center), m_Radius(radius)
 		{
 		}
 

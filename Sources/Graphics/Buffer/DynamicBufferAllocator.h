@@ -42,22 +42,28 @@ namespace gglab
 		~DynamicBufferAllocator() noexcept;
 
 		[[nodiscard]] DynamicBufferAllocation Allocate(
-			uint32_t sizeInBytes,
-			uint32_t alignment = 1) noexcept;
-		bool Write(const DynamicBufferAllocation& allocation,
-			const void* data,
+			uint32_t sizeInBytes, uint32_t alignment = 1) noexcept;
+		bool Write(const DynamicBufferAllocation& allocation, const void* data,
 			uint32_t sizeInBytes) noexcept;
-		void Retire(DynamicBufferAllocation* allocation,
-			const RHIFencePoint& fencePoint) noexcept;
+		void Retire(DynamicBufferAllocation* allocation, const RHIFencePoint& fencePoint) noexcept;
 		void Tick() noexcept;
 
 		[[nodiscard]] RHIBufferHandle GetBufferHandle() const noexcept { return m_Buffer.Get(); }
-		[[nodiscard]] BufferAllocationType GetAllocationType() const noexcept { return BufferAllocationType::Dynamic; }
+		[[nodiscard]] BufferAllocationType GetAllocationType() const noexcept
+		{
+			return BufferAllocationType::Dynamic;
+		}
 		[[nodiscard]] RHIMemoryUsage GetMemoryUsage() const noexcept { return m_MemoryUsage; }
 		[[nodiscard]] RHIBufferViewType GetViewType() const noexcept { return m_ViewType; }
 		[[nodiscard]] uint32_t GetCapacityInBytes() const noexcept { return m_CapacityInBytes; }
-		[[nodiscard]] uint32_t GetCurrentUsageInBytes() const noexcept { return m_Ring.GetCurrentUsage(); }
-		[[nodiscard]] uint32_t GetHighWaterInBytes() const noexcept { return m_Ring.GetHighWater(); }
+		[[nodiscard]] uint32_t GetCurrentUsageInBytes() const noexcept
+		{
+			return m_Ring.GetCurrentUsage();
+		}
+		[[nodiscard]] uint32_t GetHighWaterInBytes() const noexcept
+		{
+			return m_Ring.GetHighWater();
+		}
 
 	private:
 		struct PendingRetirement

@@ -10,10 +10,10 @@
 
 namespace gglab
 {
-class DX12Device;
-class DX12Buffer;
-class DX12Texture;
-class DX12DescriptorManager;
+	class DX12Device;
+	class DX12Buffer;
+	class DX12Texture;
+	class DX12DescriptorManager;
 
 	class DX12DescriptorCache
 	{
@@ -30,11 +30,9 @@ class DX12DescriptorManager;
 		~DX12DescriptorCache();
 
 		RHITextureViewHandle GetOrCreateTextureView(
-			RHITextureHandle texture,
-			const RHITextureViewDesc& desc) noexcept;
+			RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept;
 		RHIBufferViewHandle GetOrCreateBufferView(
-			RHIBufferHandle buffer,
-			const RHIBufferViewDesc& desc) noexcept;
+			RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept;
 		RHISamplerHandle GetOrCreateSampler(const RHISamplerDesc& desc) noexcept;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
 		DX12DescriptorView ResolveBufferView(RHIBufferViewHandle view) const noexcept;
@@ -48,22 +46,18 @@ class DX12DescriptorManager;
 		DX12DescriptorManager* GetDescriptorManager() const noexcept { return m_DescriptorManager; }
 
 		void RetireTextureViews(
-			RHITextureHandle texture,
-			std::span<const RHIFencePoint> fencePoints) noexcept;
+			RHITextureHandle texture, std::span<const RHIFencePoint> fencePoints) noexcept;
 		void RetireBufferViews(
-			RHIBufferHandle buffer,
-			std::span<const RHIFencePoint> fencePoints) noexcept;
+			RHIBufferHandle buffer, std::span<const RHIFencePoint> fencePoints) noexcept;
 		void GarbageCollect() noexcept;
 
 	private:
 		DX12DescriptorHandle AllocateHandle(
 			DX12DescriptorManager::AllocatorType allocatorType) const noexcept;
 		DX12DescriptorHandle CreateTextureDescriptor(
-			const RHITextureViewKey& key,
-			DX12Texture* texture) const noexcept;
+			const RHITextureViewKey& key, DX12Texture* texture) const noexcept;
 		DX12DescriptorHandle CreateBufferDescriptor(
-			const RHIBufferViewKey& key,
-			DX12Buffer* buffer) const noexcept;
+			const RHIBufferViewKey& key, DX12Buffer* buffer) const noexcept;
 		DX12DescriptorHandle CreateSamplerDescriptor(const RHISamplerDesc& desc) const noexcept;
 		void DestroyTextureViewLocked(RHITextureViewHandle view) noexcept;
 		void DestroyBufferViewLocked(RHIBufferViewHandle view) noexcept;
@@ -73,8 +67,7 @@ class DX12DescriptorManager;
 		DX12Device* m_DX12Device = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 
-		template<typename HandleT, typename KeyT>
-		struct ViewSlot
+		template <typename HandleT, typename KeyT> struct ViewSlot
 		{
 			typename HandleT::GenerationType m_Generation = 1;
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
@@ -90,11 +83,16 @@ class DX12DescriptorManager;
 		RHIHandleTable<RHITextureViewHandle, TextureViewSlot> m_RHITextureViews;
 		RHIHandleTable<RHIBufferViewHandle, BufferViewSlot> m_RHIBufferViews;
 		RHIHandleTable<RHISamplerHandle, SamplerSlot> m_RHISamplers;
-		std::unordered_map<RHITextureViewKey, RHITextureViewHandle, RHITextureViewKeyHash> m_RHITextureViewCache;
-		std::unordered_map<RHIBufferViewKey, RHIBufferViewHandle, RHIBufferViewKeyHash> m_RHIBufferViewCache;
-		std::unordered_map<RHISamplerDesc, RHISamplerHandle, KeyHash<RHISamplerDesc>> m_RHISamplerCache;
-		std::unordered_map<RHITextureHandle, std::vector<RHITextureViewHandle>> m_RHITextureResourceViews;
-		std::unordered_map<RHIBufferHandle, std::vector<RHIBufferViewHandle>> m_RHIBufferResourceViews;
+		std::unordered_map<RHITextureViewKey, RHITextureViewHandle, RHITextureViewKeyHash>
+			m_RHITextureViewCache;
+		std::unordered_map<RHIBufferViewKey, RHIBufferViewHandle, RHIBufferViewKeyHash>
+			m_RHIBufferViewCache;
+		std::unordered_map<RHISamplerDesc, RHISamplerHandle, KeyHash<RHISamplerDesc>>
+			m_RHISamplerCache;
+		std::unordered_map<RHITextureHandle, std::vector<RHITextureViewHandle>>
+			m_RHITextureResourceViews;
+		std::unordered_map<RHIBufferHandle, std::vector<RHIBufferViewHandle>>
+			m_RHIBufferResourceViews;
 
 		mutable std::shared_mutex m_Mutex;
 	};

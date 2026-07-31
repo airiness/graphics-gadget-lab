@@ -21,10 +21,8 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float3 direction = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
-	float3 color = SampleTextureCubeLevel(
-		g_Pass.SourceTextureIndex,
-		g_Pass.SourceSamplerIndex,
-		direction,
-		0.0).rgb;
+	float3 color =
+		SampleTextureCubeLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, direction, 0.0)
+			.rgb;
 	return float4(SanitizeHDRColor(color), 1.0);
 }

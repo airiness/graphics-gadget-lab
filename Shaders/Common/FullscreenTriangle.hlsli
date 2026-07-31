@@ -16,10 +16,10 @@ FullscreenTriangleVSOutput FullscreenTriangleVS(uint vertexId)
 	//};
 	//
 	// D3D-style fullscreen triangle UV:
-    // top-left    : (0, 0)
-    // bottom-left : (0, 1)
-    // bottom-right: (1, 1)
-	// 
+	// top-left    : (0, 0)
+	// bottom-left : (0, 1)
+	// bottom-right: (1, 1)
+	//
 	// NDC +y ↑
 	// Render target(texture) +y ↓
 	// NDC (-1,  1) -> UV (0, 0) left top
@@ -39,12 +39,10 @@ FullscreenTriangleVSOutput FullscreenTriangleVS(uint vertexId)
 	//	float2(0.0, -1.0),
 	//	float2(2.0, 1.0)
 	//};
-	
+
 	FullscreenTriangleVSOutput output;
 
-	float2 pos = float2(
-		(vertexId == 2) ? 3.0 : -1.0,
-		(vertexId == 1) ? 3.0 : -1.0);
+	float2 pos = float2((vertexId == 2) ? 3.0 : -1.0, (vertexId == 1) ? 3.0 : -1.0);
 
 	output.PositionCS = float4(pos, 0.0, 1.0);
 	output.UV = pos * float2(0.5, -0.5) + 0.5;

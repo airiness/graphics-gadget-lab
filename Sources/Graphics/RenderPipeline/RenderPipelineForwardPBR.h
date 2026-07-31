@@ -21,29 +21,21 @@ namespace gglab
 	{
 	public:
 		explicit RenderPipelineForwardPBR(
-			std::shared_ptr<
-				ForwardPlusDebugReadback>
-				forwardPlusDebugReadback = {}) noexcept :
-			m_ForwardPlusCullPass(
-				std::move(
-					forwardPlusDebugReadback))
-		{}
+			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
+			m_ForwardPlusCullPass(std::move(forwardPlusDebugReadback))
+		{
+		}
 		~RenderPipelineForwardPBR() override = default;
 
 		std::string_view GetName() const noexcept override { return "ForwardPBR"; }
 
-		void BuildRenderGraph(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:
-		void PrepareForwardPasses(
-			const RenderServices& services) noexcept;
-		[[nodiscard]] DepthCoverageFramePlan
-			BuildDepthCoverageFramePlanForFrame(
-				const RenderFrameContext& context,
-				uint32_t targetWidth,
-				uint32_t targetHeight) const;
+		void PrepareForwardPasses(const RenderServices& services) noexcept;
+		[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlanForFrame(
+			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
 
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;

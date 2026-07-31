@@ -45,7 +45,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassIBLEnvironment::AddPass(RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
+	void RenderPassIBLEnvironment::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
 
@@ -68,21 +69,20 @@ namespace gglab
 		const EnvironmentTextureSource source = bakeScheduler->GetBakingSource();
 		if (source.IsValid())
 		{
-			const auto sourceResource =
-				assetManager->GetResidentTextureResource(source.m_Content);
+			const auto sourceResource = assetManager->GetResidentTextureResource(source.m_Content);
 			if (sourceResource)
 			{
 				assetManager->MarkTextureUsed(source.m_Content.m_Id);
 				sourceTextureHandle = sourceResource->m_Texture;
 				sourceTextureDesc = sourceResource->m_Desc;
 				sourceTextureIndex = sourceResource->m_SrvIndex;
-				sourceMode = source.m_Type == EnvironmentTextureSourceType::Cubemap ?
-					EnvironmentSourceMode::Cubemap :
-					EnvironmentSourceMode::Equirectangular;
+				sourceMode = source.m_Type == EnvironmentTextureSourceType::Cubemap
+					? EnvironmentSourceMode::Cubemap
+					: EnvironmentSourceMode::Equirectangular;
 				sourceSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-					sourceMode == EnvironmentSourceMode::Cubemap ?
-						SamplerPreset::LinearClamp :
-						SamplerPreset::LinearWrapUClampV);
+					sourceMode == EnvironmentSourceMode::Cubemap
+					? SamplerPreset::LinearClamp
+					: SamplerPreset::LinearWrapUClampV);
 				hasSource = true;
 			}
 		}
@@ -92,26 +92,19 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[renderResRegistry,
-				sourceTextureHandle,
-				sourceTextureDesc,
-				sourceTextureIndex,
-				sourceSamplerIndex,
-				sourceMode,
-				hasSource](RenderGraph::RGBuilder& builder, PassData& data)
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
+			[renderResRegistry, sourceTextureHandle, sourceTextureDesc, sourceTextureIndex,
+			sourceSamplerIndex, sourceMode,
+			hasSource](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 				if (hasSource)
 				{
-					data.m_SourceTexture = builder.ImportTexture(
-						"IBL.SourceEnvironment",
-						sourceTextureHandle,
-						sourceTextureDesc,
-						RGTextureAccess::Sample);
-					data.m_SourceTexture = builder.Read(
-						data.m_SourceTexture,
-						RGTextureAccess::Sample);
+					data.m_SourceTexture = builder.ImportTexture("IBL.SourceEnvironment",
+						sourceTextureHandle, sourceTextureDesc, RGTextureAccess::Sample);
+					data.m_SourceTexture =
+						builder.Read(data.m_SourceTexture, RGTextureAccess::Sample);
 				}
 
 				auto& blackboard = builder.GetBlackboard();
@@ -129,16 +122,15 @@ namespace gglab
 					.m_Aspects = RHITextureAspect::Color,
 				};
 				builder.WriteInPlace(
-					iblRes.m_BakeEnvironmentCubemap,
-					RGTextureAccess::RenderTarget,
-					mipZeroRange);
+					iblRes.m_BakeEnvironmentCubemap, RGTextureAccess::RenderTarget, mipZeroRange);
 				data.m_EnvironmentCubemap = iblRes.m_BakeEnvironmentCubemap;
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
-					const auto rtvDesc = MakeRHITexture2DArrayViewDesc(textureDesc->m_Format, 0, face, 1);
-					data.m_Rtvs[face] =
-						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_EnvironmentCubemap, rtvDesc);
+					const auto rtvDesc =
+						MakeRHITexture2DArrayViewDesc(textureDesc->m_Format, 0, face, 1);
+					data.m_Rtvs[face] = builder.CreateView<RHITextureViewType::RenderTarget>(
+						data.m_EnvironmentCubemap, rtvDesc);
 				}
 
 				data.m_Width = textureDesc->m_Extent.m_Width;
@@ -148,17 +140,21 @@ namespace gglab
 				data.m_SourceMode = static_cast<uint32_t>(sourceMode);
 				data.m_RenderTargetFormat = textureDesc->m_Format;
 			},
-			[this, renderer, bakeScheduler, bakeGeneration](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, bakeScheduler, bakeGeneration](
+				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
 					const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[face]);
-					commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+					commandContext->SetRenderTargets(
+						std::span<const RHITextureViewHandle>(&rtv, 1));
 					commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 					const IBLEnvironmentPassParameters passParameters{
@@ -176,7 +172,6 @@ namespace gglab
 
 				bakeScheduler->NotifyStageExecuted(IBLBakeStage::Environment, bakeGeneration);
 			});
-
 	}
 	void RenderPassIBLEnvironment::EnsureInitialized(const RenderServices& services) noexcept
 	{
@@ -219,12 +214,10 @@ namespace gglab
 
 			m_IsInitialized = true;
 		}
-
 	}
 
 	RHIPipelineHandle RenderPassIBLEnvironment::GetOrCreatePSO(
-		const Renderer& renderer,
-		RHIFormat renderTargetFormat) noexcept
+		const Renderer& renderer, RHIFormat renderTargetFormat) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

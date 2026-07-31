@@ -70,12 +70,12 @@ namespace gglab
 		void SortTreeNodes(MenuNode& node) noexcept;
 		void DrawMenuNode(MenuNode& node) noexcept;
 
-		static uint64_t MakePanelKey(std::string_view fullPath,
-			std::string_view titleForKey,
+		static uint64_t MakePanelKey(std::string_view fullPath, std::string_view titleForKey,
 			const std::vector<PanelRuntime>& existingPanels) noexcept;
 		static std::string MakeImGuiLabeledId(std::string_view display, uint64_t key) noexcept;
 
 		static constexpr std::string_view DefaultLeaf = "Panel";
+
 	private:
 		DevelopGuiStateStore m_StateStore;
 

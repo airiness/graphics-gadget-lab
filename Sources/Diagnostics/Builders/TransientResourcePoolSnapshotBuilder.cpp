@@ -8,26 +8,33 @@ namespace gglab
 	namespace
 	{
 		void AccumulateState(
-			TransientPoolStateCounts& counts,
-			TransientPoolSlotState state) noexcept
+			TransientPoolStateCounts& counts, TransientPoolSlotState state) noexcept
 		{
 			++counts.m_Total;
 			switch (state)
 			{
-			case TransientPoolSlotState::Leased: ++counts.m_Leased; break;
-			case TransientPoolSlotState::PendingRetirement: ++counts.m_PendingRetirement; break;
-			case TransientPoolSlotState::Available: ++counts.m_Available; break;
-			case TransientPoolSlotState::Destroyed: ++counts.m_Destroyed; break;
+			case TransientPoolSlotState::Leased:
+				++counts.m_Leased;
+				break;
+			case TransientPoolSlotState::PendingRetirement:
+				++counts.m_PendingRetirement;
+				break;
+			case TransientPoolSlotState::Available:
+				++counts.m_Available;
+				break;
+			case TransientPoolSlotState::Destroyed:
+				++counts.m_Destroyed;
+				break;
 			}
 		}
 	}
 
 	void BuildTransientResourcePoolSnapshot(
-		const TransientResourcePool& pool,
-		TransientResourcePoolSnapshot& outSnapshot) noexcept
+		const TransientResourcePool& pool, TransientResourcePoolSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
-		outSnapshot.m_PendingRetirementCount = static_cast<uint32_t>(pool.m_PendingRetirements.size());
+		outSnapshot.m_PendingRetirementCount =
+			static_cast<uint32_t>(pool.m_PendingRetirements.size());
 		outSnapshot.m_MaxCachedPerKey = pool.m_MaxCachedPerKey;
 
 		std::unordered_set<uint32_t> availableTextures;
@@ -71,11 +78,11 @@ namespace gglab
 			const auto& record = pool.m_Textures[index];
 			const auto pending = pendingTextures.find(index);
 			const bool isPending = pending != pendingTextures.end();
-			const auto state = !record.m_Texture.IsValid() ?
-				TransientPoolSlotState::Destroyed :
-				isPending ? TransientPoolSlotState::PendingRetirement :
-				availableTextures.contains(index) ? TransientPoolSlotState::Available :
-				TransientPoolSlotState::Leased;
+			const auto state = !record.m_Texture.IsValid() ? TransientPoolSlotState::Destroyed
+				: isPending ? TransientPoolSlotState::PendingRetirement
+				: availableTextures.contains(index)
+				? TransientPoolSlotState::Available
+				: TransientPoolSlotState::Leased;
 
 			TransientTextureSlotSnapshot snapshot{};
 			snapshot.m_PoolSlot = TransientResourcePoolSlot(index);
@@ -83,8 +90,9 @@ namespace gglab
 			snapshot.m_Texture = record.m_Texture;
 			snapshot.m_Key = record.m_Key;
 			snapshot.m_LogicalName = record.m_LogicalName;
-			snapshot.m_DebugName = pool.m_Device ?
-				std::string(pool.m_Device->GetTextureDebugName(record.m_Texture)) : std::string{};
+			snapshot.m_DebugName =
+				pool.m_Device ? std::string(pool.m_Device->GetTextureDebugName(record.m_Texture))
+				: std::string{};
 			snapshot.m_AcquireSerial = record.m_AcquireSerial;
 			if (isPending)
 			{
@@ -102,11 +110,11 @@ namespace gglab
 			const auto& record = pool.m_Buffers[index];
 			const auto pending = pendingBuffers.find(index);
 			const bool isPending = pending != pendingBuffers.end();
-			const auto state = !record.m_Buffer.IsValid() ?
-				TransientPoolSlotState::Destroyed :
-				isPending ? TransientPoolSlotState::PendingRetirement :
-				availableBuffers.contains(index) ? TransientPoolSlotState::Available :
-				TransientPoolSlotState::Leased;
+			const auto state = !record.m_Buffer.IsValid() ? TransientPoolSlotState::Destroyed
+				: isPending ? TransientPoolSlotState::PendingRetirement
+				: availableBuffers.contains(index)
+				? TransientPoolSlotState::Available
+				: TransientPoolSlotState::Leased;
 
 			TransientBufferSlotSnapshot snapshot{};
 			snapshot.m_PoolSlot = TransientResourcePoolSlot(index);
@@ -114,8 +122,9 @@ namespace gglab
 			snapshot.m_Buffer = record.m_Buffer;
 			snapshot.m_Key = record.m_Key;
 			snapshot.m_LogicalName = record.m_LogicalName;
-			snapshot.m_DebugName = pool.m_Device ?
-				std::string(pool.m_Device->GetBufferDebugName(record.m_Buffer)) : std::string{};
+			snapshot.m_DebugName =
+				pool.m_Device ? std::string(pool.m_Device->GetBufferDebugName(record.m_Buffer))
+				: std::string{};
 			snapshot.m_AcquireSerial = record.m_AcquireSerial;
 			if (isPending)
 			{

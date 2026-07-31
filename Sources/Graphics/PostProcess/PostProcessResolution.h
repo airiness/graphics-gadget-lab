@@ -16,9 +16,7 @@ namespace gglab
 	};
 
 	[[nodiscard]] inline RHITextureDesc MakeRelativeTextureDesc(
-		const RenderGraph::RGBuilder& builder,
-		RGTextureId source,
-		PostProcessResolutionScale scale,
+		const RenderGraph::RGBuilder& builder, RGTextureId source, PostProcessResolutionScale scale,
 		RHIFormat format = RHIFormat::Unknown) noexcept
 	{
 		const RHITextureDesc& sourceDesc = builder.GetTextureDesc(source);

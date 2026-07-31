@@ -10,8 +10,8 @@ namespace gglab
 		std::string HexHr(HRESULT hr)
 		{
 			std::ostringstream os;
-			os << "0x" << std::uppercase << std::hex
-				<< std::setw(8) << std::setfill('0') << static_cast<unsigned>(hr);
+			os << "0x" << std::uppercase << std::hex << std::setw(8) << std::setfill('0')
+				<< static_cast<unsigned>(hr);
 			return os.str();
 		}
 
@@ -32,23 +32,19 @@ namespace gglab
 
 	bool IsDeviceRemovedHResult(HRESULT hr) noexcept
 	{
-		return hr == DXGI_ERROR_DEVICE_REMOVED
-			|| hr == DXGI_ERROR_DEVICE_HUNG
-			|| hr == DXGI_ERROR_DEVICE_RESET;
+		return hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_HUNG ||
+			hr == DXGI_ERROR_DEVICE_RESET;
 	}
 
-	void ReportAndAbort(
-		HRESULT hr,
-		std::string_view context,
-		std::source_location loc) noexcept
+	void ReportAndAbort(HRESULT hr, std::string_view context, std::source_location loc) noexcept
 	{
 		std::ostringstream os;
 
 		os << "=== FATAL: HRESULT Failure ===\n";
 		os << "Time   : " << win32::FormatLocalTime() << "\n";
 		os << "Thread : " << ::GetCurrentThreadId() << "\n";
-		os << "Where  : " << loc.file_name() << ":" << loc.line()
-			<< " (" << loc.function_name() << ")\n";
+		os << "Where  : " << loc.file_name() << ":" << loc.line() << " (" << loc.function_name()
+			<< ")\n";
 		if (!context.empty())
 		{
 			os << "Expr   : " << context << "\n";

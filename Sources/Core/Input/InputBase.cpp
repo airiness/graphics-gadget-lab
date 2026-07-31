@@ -50,7 +50,6 @@ namespace gglab
 		if (isConnected && !wasConnected)
 		{
 			++inputDevice->m_Connected;
-
 		}
 		else if (!isConnected && wasConnected && inputDevice->m_Connected > 0)
 		{
@@ -58,4 +57,3 @@ namespace gglab
 		}
 	}
 }
-

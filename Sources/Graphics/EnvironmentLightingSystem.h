@@ -54,9 +54,18 @@ namespace gglab
 			return m_Source;
 		}
 
-		[[nodiscard]] const EnvironmentLightingSettings& GetSettings() const noexcept { return m_Settings; }
-		[[nodiscard]] const IBLBakeConfig& GetBakeConfig() const noexcept { return m_Settings.m_BakeConfig; }
-		[[nodiscard]] uint64_t GetBakeRequestGeneration() const noexcept { return m_BakeRequestGeneration; }
+		[[nodiscard]] const EnvironmentLightingSettings& GetSettings() const noexcept
+		{
+			return m_Settings;
+		}
+		[[nodiscard]] const IBLBakeConfig& GetBakeConfig() const noexcept
+		{
+			return m_Settings.m_BakeConfig;
+		}
+		[[nodiscard]] uint64_t GetBakeRequestGeneration() const noexcept
+		{
+			return m_BakeRequestGeneration;
+		}
 		[[nodiscard]] bool ShouldIgnoreCache(uint64_t generation) const noexcept
 		{
 			return generation == m_IgnoreCacheGeneration;

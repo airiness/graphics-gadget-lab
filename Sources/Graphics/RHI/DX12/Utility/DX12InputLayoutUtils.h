@@ -14,6 +14,5 @@ namespace gglab
 	};
 
 	void BuildDX12InputLayoutDesc(
-		const RHIVertexInputLayoutDesc& rhiDesc,
-		DX12InputLayoutBuildResult& outDesc) noexcept;
+		const RHIVertexInputLayoutDesc& rhiDesc, DX12InputLayoutBuildResult& outDesc) noexcept;
 }

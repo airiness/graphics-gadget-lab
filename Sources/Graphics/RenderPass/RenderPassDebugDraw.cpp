@@ -43,9 +43,9 @@ namespace gglab
 	}
 
 	RenderPassDebugDraw::RenderPassDebugDraw(DebugDrawPassMode mode) noexcept :
-		RenderPassBase(MakeInfo(mode)),
-		m_Mode(mode)
-	{}
+		RenderPassBase(MakeInfo(mode)), m_Mode(mode)
+	{
+	}
 
 	RenderPassInfo RenderPassDebugDraw::MakeInfo(DebugDrawPassMode mode) noexcept
 	{
@@ -54,16 +54,15 @@ namespace gglab
 			.m_TypeName = scene ? "Debug.DebugDrawScene" : "Debug.DebugDrawOverlay",
 			.m_DisplayName = scene ? "Debug Draw Scene" : "Debug Draw Overlay",
 			.m_CategoryName = "Debug",
-			.m_Description = scene ?
-				"Draws depth-tested debug geometry into scene color." :
-				"Draws always-visible world and screen-space debug geometry.",
+			.m_Description = scene ? "Draws depth-tested debug geometry into scene color."
+								   : "Draws always-visible world and screen-space debug geometry.",
 			.m_Category = RenderPassCategory::Debug,
 			.m_Type = RenderPassType::Graphics,
 		};
 	}
 
-	void RenderPassDebugDraw::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context, const RenderServices& services) noexcept
+	void RenderPassDebugDraw::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		if (!context.IsRenderSceneReady())
 		{
@@ -79,7 +78,8 @@ namespace gglab
 		EnsureInitialized(services);
 		const auto* contextPtr = &context;
 		const RenderViewID displayViewId = context.GetDisplayViewId();
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
 			[frame, scene, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& targets = builder.GetBlackboard()
@@ -87,16 +87,16 @@ namespace gglab
 					.GetViewTargets(displayViewId);
 				if (scene)
 				{
-					auto& sceneDepth = builder.GetBlackboard()
-						.Get<RGSceneDepthResources>(SceneDepthResourcesName);
+					auto& sceneDepth =
+						builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
 					builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 					data.m_Color = targets.m_SceneColor;
-					data.m_Depth = builder.Read(
-						sceneDepth.m_Texture,
-						RGTextureAccess::DepthStencilRead);
+					data.m_Depth =
+						builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
 					RHITextureViewDesc dsvDesc = sceneDepth.m_DsvDesc;
 					dsvDesc.m_ReadOnlyDepth = true;
-					data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, dsvDesc);
+					data.m_Dsv =
+						builder.CreateView<RHITextureViewType::DepthStencil>(data.m_Depth, dsvDesc);
 					data.m_World = frame.m_Scene;
 				}
 				else
@@ -112,17 +112,20 @@ namespace gglab
 				data.m_Width = targets.m_Width;
 				data.m_Height = targets.m_Height;
 			},
-			[this, contextPtr, &services, scene, displayViewId](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, &services, scene, displayViewId](
+				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				auto* renderer = services.m_Renderer;
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				const auto dsv = scene ? executeContext.GetViewHandle(data.m_Dsv) : RHITextureViewHandle{};
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
-				commandContext->SetViewport({ 0.0f, 0.0f,
-					static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0,
-					static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				const auto dsv =
+					scene ? executeContext.GetViewHandle(data.m_Dsv) : RHITextureViewHandle{};
+				commandContext->SetRenderTargets(
+					std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					renderer->GetSceneConstantBuffer()->GetBufferHandle(),
@@ -132,27 +135,32 @@ namespace gglab
 					renderer->GetViewStructuredBuffer()->GetBufferHandle());
 
 				const uint32_t lastVertex = std::max({
-					RangeEnd(data.m_World.m_Lines), RangeEnd(data.m_World.m_Triangles),
-					RangeEnd(data.m_Screen.m_Lines), RangeEnd(data.m_Screen.m_Triangles),
-				});
+					RangeEnd(data.m_World.m_Lines),
+					RangeEnd(data.m_World.m_Triangles),
+					RangeEnd(data.m_Screen.m_Lines),
+					RangeEnd(data.m_Screen.m_Triangles),
+					});
 				const RHIVertexBufferBinding binding{
 					.m_Buffer = data.m_VertexBuffer,
 					.m_Offset = data.m_VertexBufferOffset,
 					.m_Stride = sizeof(DebugDrawVertex),
 					.m_SizeInBytes = lastVertex * sizeof(DebugDrawVertex),
 				};
-				commandContext->SetVertexBuffers(0, std::span<const RHIVertexBufferBinding>(&binding, 1));
+				commandContext->SetVertexBuffers(
+					0, std::span<const RHIVertexBufferBinding>(&binding, 1));
 
-				auto draw = [this, commandContext, renderer, displayViewId](
-					const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
+				auto draw =
+					[this, commandContext, renderer, displayViewId](
+						const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
 					{
 						if (range.IsEmpty())
 						{
 							return;
 						}
 						commandContext->SetPipeline(GetPipeline(*renderer, triangles));
-						commandContext->SetPrimitiveTopology(triangles ?
-							RHIPrimitiveTopology::TriangleList : RHIPrimitiveTopology::LineList);
+						commandContext->SetPrimitiveTopology(triangles
+							? RHIPrimitiveTopology::TriangleList
+							: RHIPrimitiveTopology::LineList);
 						const DebugDrawPassParameters parameters{
 							.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
 							.Flags = flags,
@@ -193,20 +201,22 @@ namespace gglab
 			recipe.m_InputLayoutId = InputLayoutID::P3C4;
 			recipe.m_VSId = vs;
 			recipe.m_PSId = ps;
-			recipe.m_TopologyType = triangles ?
-				RHIPrimitiveTopologyType::Triangle : RHIPrimitiveTopologyType::Line;
-			recipe.m_PrimitiveTopology = triangles ?
-				RHIPrimitiveTopology::TriangleList : RHIPrimitiveTopology::LineList;
+			recipe.m_TopologyType =
+				triangles ? RHIPrimitiveTopologyType::Triangle : RHIPrimitiveTopologyType::Line;
+			recipe.m_PrimitiveTopology =
+				triangles ? RHIPrimitiveTopology::TriangleList : RHIPrimitiveTopology::LineList;
 			recipe.m_Formats.m_RenderTargetFormats[0] =
-				m_Mode == DebugDrawPassMode::Scene ?
-					RHIFormat::R16G16B16A16Float : services.m_Renderer->GetSwapChain()->GetFormat();
+				m_Mode == DebugDrawPassMode::Scene
+				? RHIFormat::R16G16B16A16Float
+				: services.m_Renderer->GetSwapChain()->GetFormat();
 			recipe.m_Formats.m_RenderTargetCount = 1;
 			recipe.m_Formats.m_DepthStencilFormat =
 				m_Mode == DebugDrawPassMode::Scene ? RHIFormat::D32Float : RHIFormat::Unknown;
 			recipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
 			recipe.m_BlendPreset = BlendPreset::AlphaBlend;
-			recipe.m_DepthPreset = m_Mode == DebugDrawPassMode::Scene ?
-				DepthPreset::ReversedZReadOnly : DepthPreset::DepthDisabled;
+			recipe.m_DepthPreset = m_Mode == DebugDrawPassMode::Scene
+				? DepthPreset::ReversedZReadOnly
+				: DepthPreset::DepthDisabled;
 		}
 		m_IsInitialized = true;
 	}

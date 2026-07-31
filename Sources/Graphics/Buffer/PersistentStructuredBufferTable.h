@@ -11,8 +11,7 @@
 
 namespace gglab
 {
-	template<typename Key, typename T>
-	class PersistentStructuredBufferTable
+	template <typename Key, typename T> class PersistentStructuredBufferTable
 	{
 	public:
 		static_assert(std::is_trivially_copyable_v<T>);
@@ -31,15 +30,10 @@ namespace gglab
 			uint32_t m_LastUploadRangeCount = 0;
 		};
 
-		explicit PersistentStructuredBufferTable(
-			uint32_t capacity,
-			uint32_t bufferCount) :
-			m_Data(capacity),
-			m_Revisions(capacity, 1),
-			m_KeysBySlot(capacity),
+		explicit PersistentStructuredBufferTable(uint32_t capacity, uint32_t bufferCount) :
+			m_Data(capacity), m_Revisions(capacity, 1), m_KeysBySlot(capacity),
 			m_UploadedRevisions(bufferCount, std::vector<uint64_t>(capacity, 0)),
-			m_BufferVersionStats(bufferCount),
-			m_NextRevision(1)
+			m_BufferVersionStats(bufferCount), m_NextRevision(1)
 		{
 			m_FreeSlots.reserve(capacity);
 			for (uint32_t slot = capacity; slot > 0; --slot)
@@ -66,8 +60,7 @@ namespace gglab
 			auto iter = m_Records.find(key);
 			if (iter == m_Records.end())
 			{
-				if (m_FreeSlots.empty() &&
-					!ReclaimUnseenSlot())
+				if (m_FreeSlots.empty() && !ReclaimUnseenSlot())
 				{
 					GGLAB_LOG_GRAPHICS_ERROR("PersistentStructuredBufferTable capacity exhausted.");
 					return InvalidSlot;
@@ -118,7 +111,8 @@ namespace gglab
 			return BuildDirtyRangesInternal(bufferIndex, false);
 		}
 
-		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRangesIncludingFreeSlots(uint32_t bufferIndex) const
+		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRangesIncludingFreeSlots(
+			uint32_t bufferIndex) const
 		{
 			return BuildDirtyRangesInternal(bufferIndex, true);
 		}
@@ -126,13 +120,8 @@ namespace gglab
 	private:
 		[[nodiscard]] bool ReclaimUnseenSlot() noexcept
 		{
-			const auto stale = std::ranges::find_if(
-				m_Records,
-				[this](const auto& item)
-				{
-					return item.second.m_LastSeenUpdate !=
-						m_UpdateSerial;
-				});
+			const auto stale = std::ranges::find_if(m_Records, [this](const auto& item)
+				{ return item.second.m_LastSeenUpdate != m_UpdateSerial; });
 			if (stale == m_Records.end())
 			{
 				return false;
@@ -149,8 +138,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] std::vector<DirtyRange> BuildDirtyRangesInternal(
-			uint32_t bufferIndex,
-			bool includeFreeSlots) const
+			uint32_t bufferIndex, bool includeFreeSlots) const
 		{
 			GGLAB_ASSERT(bufferIndex < m_UploadedRevisions.size());
 			std::vector<DirtyRange> ranges;
@@ -180,6 +168,7 @@ namespace gglab
 			}
 			return ranges;
 		}
+
 	public:
 		[[nodiscard]] std::span<const T> GetData(const DirtyRange& range) const noexcept
 		{
@@ -204,8 +193,7 @@ namespace gglab
 			{
 				stats.m_LastUploadBytes += static_cast<uint64_t>(range.m_ElementCount) * sizeof(T);
 				for (uint32_t slot = range.m_FirstElement;
-					slot < range.m_FirstElement + range.m_ElementCount;
-					++slot)
+					slot < range.m_FirstElement + range.m_ElementCount; ++slot)
 				{
 					uploaded[slot] = m_Revisions[slot];
 				}
@@ -217,9 +205,18 @@ namespace gglab
 		{
 			return static_cast<uint32_t>(m_Records.size());
 		}
-		[[nodiscard]] uint32_t GetCapacity() const noexcept { return static_cast<uint32_t>(m_Data.size()); }
-		[[nodiscard]] uint32_t GetBufferCount() const noexcept { return static_cast<uint32_t>(m_UploadedRevisions.size()); }
-		[[nodiscard]] uint32_t GetFreeCount() const noexcept { return static_cast<uint32_t>(m_FreeSlots.size()); }
+		[[nodiscard]] uint32_t GetCapacity() const noexcept
+		{
+			return static_cast<uint32_t>(m_Data.size());
+		}
+		[[nodiscard]] uint32_t GetBufferCount() const noexcept
+		{
+			return static_cast<uint32_t>(m_UploadedRevisions.size());
+		}
+		[[nodiscard]] uint32_t GetFreeCount() const noexcept
+		{
+			return static_cast<uint32_t>(m_FreeSlots.size());
+		}
 		[[nodiscard]] uint64_t GetUpdateSerial() const noexcept { return m_UpdateSerial; }
 		[[nodiscard]] bool IsOccupied(uint32_t slot) const noexcept
 		{
@@ -234,13 +231,16 @@ namespace gglab
 		{
 			return slot < m_Revisions.size() ? m_Revisions[slot] : 0;
 		}
-		[[nodiscard]] uint64_t GetUploadedRevision(uint32_t bufferIndex, uint32_t slot) const noexcept
+		[[nodiscard]] uint64_t GetUploadedRevision(
+			uint32_t bufferIndex, uint32_t slot) const noexcept
 		{
 			GGLAB_ASSERT(bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size());
-			return bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size() ?
-				m_UploadedRevisions[bufferIndex][slot] : 0;
+			return bufferIndex < m_UploadedRevisions.size() && slot < m_Data.size()
+				? m_UploadedRevisions[bufferIndex][slot]
+				: 0;
 		}
-		[[nodiscard]] const BufferVersionStats& GetBufferVersionStats(uint32_t bufferIndex) const noexcept
+		[[nodiscard]] const BufferVersionStats& GetBufferVersionStats(
+			uint32_t bufferIndex) const noexcept
 		{
 			GGLAB_ASSERT(bufferIndex < m_BufferVersionStats.size());
 			return m_BufferVersionStats[bufferIndex];

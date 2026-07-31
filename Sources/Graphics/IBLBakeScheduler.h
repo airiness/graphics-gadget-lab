@@ -52,10 +52,7 @@ namespace gglab
 				return true;
 			}
 
-			[[nodiscard]] constexpr bool HasExecuted() const noexcept
-			{
-				return m_Executed;
-			}
+			[[nodiscard]] constexpr bool HasExecuted() const noexcept { return m_Executed; }
 
 			[[nodiscard]] constexpr bool Submit() noexcept
 			{
@@ -69,15 +66,9 @@ namespace gglab
 				return true;
 			}
 
-			constexpr void AbortFrame() noexcept
-			{
-				m_Executed = false;
-			}
+			constexpr void AbortFrame() noexcept { m_Executed = false; }
 
-			[[nodiscard]] constexpr bool IsInFlight() const noexcept
-			{
-				return m_InFlight;
-			}
+			[[nodiscard]] constexpr bool IsInFlight() const noexcept { return m_InFlight; }
 
 			[[nodiscard]] constexpr uint64_t Complete() noexcept
 			{
@@ -150,8 +141,7 @@ namespace gglab
 		[[nodiscard]] IBLBakeStage GetStageForRecording() const noexcept;
 		[[nodiscard]] bool ShouldInitializeBakeResources() const noexcept
 		{
-			return m_BakeResourceInitialization.ShouldRecord(
-				m_Status.m_BakingGeneration);
+			return m_BakeResourceInitialization.ShouldRecord(m_Status.m_BakingGeneration);
 		}
 		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept
 		{
@@ -185,12 +175,10 @@ namespace gglab
 		struct CacheWriteWork;
 
 		void StartRequestedBake(const RHIFencePoint& retireFence) noexcept;
-		void CompleteCacheLookup(
-			const TaskCompletionInfo& completion,
+		void CompleteCacheLookup(const TaskCompletionInfo& completion,
 			const std::shared_ptr<CacheLoadWork>& work) noexcept;
 		void BeginBakeResourceInitialization(
-			const RHIFencePoint& retireFence,
-			const std::shared_ptr<CacheLoadWork>& work) noexcept;
+			const RHIFencePoint& retireFence, const std::shared_ptr<CacheLoadWork>& work) noexcept;
 		void ContinueRequestedBakeAfterInitialization(uint64_t generation) noexcept;
 		void AdvanceCompletedStage() noexcept;
 		void AdvanceToNextMissingStage() noexcept;
@@ -198,8 +186,7 @@ namespace gglab
 		bool UploadCachedArtifacts(const IBLDerivedDataLookupResult& result) noexcept;
 		bool StartCacheReadback() noexcept;
 		void StartCacheWrite() noexcept;
-		void CompleteCacheWrite(
-			const TaskCompletionInfo& completion,
+		void CompleteCacheWrite(const TaskCompletionInfo& completion,
 			const std::shared_ptr<CacheWriteWork>& work) noexcept;
 		void PublishBake() noexcept;
 		void CaptureGpuTime(IBLBakeStage stage) noexcept;
@@ -238,12 +225,10 @@ namespace gglab
 		{
 			uint64_t m_Generation = 0;
 			IBLBakeConfig m_Config{};
-			std::array<DerivedDataKey,
-				static_cast<size_t>(IBLArtifactStage::Count)> m_Keys{};
-			std::array<bool,
-				static_cast<size_t>(IBLArtifactStage::Count)> m_BuiltStages{};
-			std::array<RHITextureReadbackRequest,
-				static_cast<size_t>(IBLArtifactStage::Count)> m_Requests{};
+			std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> m_Keys{};
+			std::array<bool, static_cast<size_t>(IBLArtifactStage::Count)> m_BuiltStages{};
+			std::array<RHITextureReadbackRequest, static_cast<size_t>(IBLArtifactStage::Count)>
+				m_Requests{};
 			IBLStageArtifactSet m_Artifacts;
 			TaskHandle m_Task{};
 		};

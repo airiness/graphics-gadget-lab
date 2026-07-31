@@ -10,14 +10,10 @@ namespace gglab
 {
 	namespace
 	{
-		template<typename Key, typename T, typename KeyFormatter>
-		void BuildTableSnapshot(
-			std::string_view name,
-			const PersistentStructuredBuffer<T>& buffer,
-			const PersistentStructuredBufferTable<Key, T>& table,
-			KeyFormatter&& keyFormatter,
-			bool includeFreeDirtySlots,
-			PersistentBufferTableSnapshot& outSnapshot)
+		template <typename Key, typename T, typename KeyFormatter>
+		void BuildTableSnapshot(std::string_view name, const PersistentStructuredBuffer<T>& buffer,
+			const PersistentStructuredBufferTable<Key, T>& table, KeyFormatter&& keyFormatter,
+			bool includeFreeDirtySlots, PersistentBufferTableSnapshot& outSnapshot)
 		{
 			outSnapshot = {};
 			outSnapshot.m_Name = name;
@@ -31,9 +27,9 @@ namespace gglab
 			outSnapshot.m_BufferVersions.reserve(table.GetBufferCount());
 			for (uint32_t bufferIndex = 0; bufferIndex < table.GetBufferCount(); ++bufferIndex)
 			{
-				const auto dirtyRanges = includeFreeDirtySlots ?
-					table.BuildDirtyRangesIncludingFreeSlots(bufferIndex) :
-					table.BuildDirtyRanges(bufferIndex);
+				const auto dirtyRanges = includeFreeDirtySlots
+					? table.BuildDirtyRangesIncludingFreeSlots(bufferIndex)
+					: table.BuildDirtyRanges(bufferIndex);
 				uint32_t pendingSlots = 0;
 				for (const auto& range : dirtyRanges)
 				{
@@ -49,7 +45,7 @@ namespace gglab
 					.m_LastUploadRangeCount = stats.m_LastUploadRangeCount,
 					.m_LastUploadBytes = stats.m_LastUploadBytes,
 					.m_TotalUploadBytes = stats.m_TotalUploadBytes,
-				});
+					});
 			}
 
 			outSnapshot.m_Slots.reserve(table.GetCapacity());
@@ -75,8 +71,7 @@ namespace gglab
 	}
 
 	void BuildPersistentSceneBufferSnapshot(
-		const Renderer& renderer,
-		PersistentSceneBufferSnapshot& outSnapshot) noexcept
+		const Renderer& renderer, PersistentSceneBufferSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
 		const auto* objectBuffer = renderer.GetObjectStructuredBuffer();
@@ -97,8 +92,7 @@ namespace gglab
 			{
 				return std::format("entity={} submesh={}", key >> 32, key & 0xffffffffull);
 			},
-			false,
-			outSnapshot.m_Objects);
+			false, outSnapshot.m_Objects);
 		BuildTableSnapshot(
 			"Materials", *materialBuffer, *materialTable,
 			[](RenderMaterialKey key)
@@ -109,21 +103,18 @@ namespace gglab
 				}
 
 				const std::string_view name = StringID::LookupName(key.m_Value);
-				return name.empty() ?
-					std::format("Runtime MaterialKey 0x{:016X}", key.m_Value) :
-					std::format("Runtime MaterialKey {}", name);
+				return name.empty() ? std::format("Runtime MaterialKey 0x{:016X}", key.m_Value)
+					: std::format("Runtime MaterialKey {}", name);
 			},
-			false,
-			outSnapshot.m_Materials);
+			false, outSnapshot.m_Materials);
 		BuildTableSnapshot(
 			"Lights", *lightBuffer, *lightTable,
 			[](uint64_t key)
 			{
-				return key == std::numeric_limits<uint64_t>::max() ?
-					std::string("DefaultDirectionalLight") :
-					std::format("entity={}", key);
+				return key == std::numeric_limits<uint64_t>::max()
+					? std::string("DefaultDirectionalLight")
+					: std::format("entity={}", key);
 			},
-			true,
-			outSnapshot.m_Lights);
+			true, outSnapshot.m_Lights);
 	}
 }

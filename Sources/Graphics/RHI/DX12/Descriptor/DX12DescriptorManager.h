@@ -55,16 +55,18 @@ namespace gglab
 		void EndFrame(const DX12FencePoint& fencePoint) noexcept;
 
 		DX12DescriptorHeap* GetHeap(HeapType heapType) const noexcept;
-		DX12DescriptorFreeListAllocator* GetFreeListAllocator(AllocatorType allocatorType) const noexcept;
+		DX12DescriptorFreeListAllocator* GetFreeListAllocator(
+			AllocatorType allocatorType) const noexcept;
 
 		DX12DescriptorView AllocateDevelopGuiSrvView() noexcept;
 		void DeferFreeDevelopGuiSrvInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept;
 		void DeferFreeDevelopGuiSrvInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept;
 
 	private:
-		using HeapArray = std::array<std::unique_ptr<DX12DescriptorHeap>, utils::EnumCount<HeapType>()>;
-		using FreeListAllocatorArray =
-			std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>, utils::EnumCount<AllocatorType>()>;
+		using HeapArray =
+			std::array<std::unique_ptr<DX12DescriptorHeap>, utils::EnumCount<HeapType>()>;
+		using FreeListAllocatorArray = std::array<std::unique_ptr<DX12DescriptorFreeListAllocator>,
+			utils::EnumCount<AllocatorType>()>;
 
 		DX12Device* m_DX12Device = nullptr;
 		HeapArray m_Heaps;

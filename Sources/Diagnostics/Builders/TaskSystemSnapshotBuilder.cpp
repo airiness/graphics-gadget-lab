@@ -6,8 +6,7 @@
 namespace gglab
 {
 	void BuildTaskSystemSnapshot(
-		const TaskSystem& taskSystem,
-		TaskSystemSnapshot& outSnapshot) noexcept
+		const TaskSystem& taskSystem, TaskSystemSnapshot& outSnapshot) noexcept
 	{
 		const TaskSystemStatistics statistics = taskSystem.GetStatistics();
 		outSnapshot.m_WorkerCount = statistics.m_WorkerCount;
@@ -20,8 +19,7 @@ namespace gglab
 		outSnapshot.m_FailedCount = statistics.m_FailedCount;
 		outSnapshot.m_CancelledCount = statistics.m_CancelledCount;
 		outSnapshot.m_CompletionCallbackCount = statistics.m_CompletionCallbackCount;
-		outSnapshot.m_CompletionCallbackFailureCount =
-			statistics.m_CompletionCallbackFailureCount;
+		outSnapshot.m_CompletionCallbackFailureCount = statistics.m_CompletionCallbackFailureCount;
 		outSnapshot.m_AcceptingTasks = statistics.m_AcceptingTasks;
 		outSnapshot.m_ActiveTasks = statistics.m_ActiveTasks;
 		outSnapshot.m_RecentTasks = statistics.m_RecentTasks;

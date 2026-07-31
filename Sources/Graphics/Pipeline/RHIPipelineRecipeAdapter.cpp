@@ -18,12 +18,8 @@ namespace gglab
 			return RHIShaderHandle{ shaderId.Value(), 1u };
 		}
 
-		void AddVertexAttribute(
-			RHIVertexInputLayoutDesc& desc,
-			const char* semanticName,
-			uint32_t semanticIndex,
-			RHIFormat format,
-			uint32_t offset) noexcept
+		void AddVertexAttribute(RHIVertexInputLayoutDesc& desc, const char* semanticName,
+			uint32_t semanticIndex, RHIFormat format, uint32_t offset) noexcept
 		{
 			GGLAB_ASSERT(desc.m_AttributeCount < RHIVertexInputLayoutDesc::MaxAttributes);
 			auto& attribute = desc.m_Attributes[desc.m_AttributeCount++];
@@ -34,9 +30,7 @@ namespace gglab
 			attribute.m_AlignedByteOffset = offset;
 		}
 
-		void SetVertexBufferLayout(
-			RHIVertexInputLayoutDesc& desc,
-			uint32_t strideInBytes) noexcept
+		void SetVertexBufferLayout(RHIVertexInputLayoutDesc& desc, uint32_t strideInBytes) noexcept
 		{
 			GGLAB_ASSERT(desc.m_VertexBufferCount < RHIVertexInputLayoutDesc::MaxVertexBuffers);
 			auto& vertexBuffer = desc.m_VertexBuffers[desc.m_VertexBufferCount++];
@@ -77,8 +71,7 @@ namespace gglab
 			return desc;
 		}
 
-		[[nodiscard]] RHIDepthStencilDesc ToRHIDepthStencilDesc(
-			DepthPreset preset) noexcept
+		[[nodiscard]] RHIDepthStencilDesc ToRHIDepthStencilDesc(DepthPreset preset) noexcept
 		{
 			RHIDepthStencilDesc desc{};
 			switch (preset)
@@ -235,7 +228,8 @@ namespace gglab
 		desc.m_DepthStencil = ToRHIDepthStencilDesc(recipe.m_DepthPreset);
 		desc.m_Blend = ToRHIBlendDesc(recipe.m_BlendPreset);
 		desc.m_RenderTargetCount = recipe.m_Formats.m_RenderTargetCount;
-		for (uint32_t i = 0; i < desc.m_RenderTargetCount && i < RHIGraphicsPipelineDesc::MaxRenderTargets; ++i)
+		for (uint32_t i = 0;
+			i < desc.m_RenderTargetCount && i < RHIGraphicsPipelineDesc::MaxRenderTargets; ++i)
 		{
 			desc.m_RenderTargetFormats[i] = recipe.m_Formats.m_RenderTargetFormats[i];
 		}

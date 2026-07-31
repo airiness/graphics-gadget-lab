@@ -36,11 +36,8 @@ namespace gglab
 			uint32_t m_TileCountX = 0;
 			uint32_t m_TileCountY = 0;
 		};
-		static_assert(
-			IsPassRootConstantStruct<
-				ForwardPlusCullParameters>);
-		static_assert(
-			sizeof(ForwardPlusCullParameters) == 32);
+		static_assert(IsPassRootConstantStruct<ForwardPlusCullParameters>);
+		static_assert(sizeof(ForwardPlusCullParameters) == 32);
 
 		struct PassData
 		{
@@ -68,80 +65,42 @@ namespace gglab
 			uint64_t m_FrameSerial = 0;
 		};
 
-		void AppendBindingSlot(
-			RHIBindingLayoutDesc& desc,
-			RHIBindingType type,
-			uint32_t binding,
-			uint32_t sizeInBytes,
-			const char* debugName) noexcept
+		void AppendBindingSlot(RHIBindingLayoutDesc& desc, RHIBindingType type, uint32_t binding,
+			uint32_t sizeInBytes, const char* debugName) noexcept
 		{
-			GGLAB_ASSERT(
-				desc.m_SlotCount <
-					desc.MaxSlots);
+			GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
 			desc.m_Slots[desc.m_SlotCount++] = {
 				.m_Type = type,
-				.m_Visibility =
-					RHIShaderStage::Compute,
+				.m_Visibility = RHIShaderStage::Compute,
 				.m_Binding = binding,
 				.m_Space = 0,
-				.m_Count =
-					IsBindlessBindingType(type) ?
-						0u :
-						1u,
+				.m_Count = IsBindlessBindingType(type) ? 0u : 1u,
 				.m_SizeInBytes = sizeInBytes,
 				.m_DebugName = debugName,
 			};
 		}
 
-		RHIBindingLayoutDesc
-			BuildForwardPlusBindingLayout() noexcept
+		RHIBindingLayoutDesc BuildForwardPlusBindingLayout() noexcept
 		{
 			RHIBindingLayoutDesc desc{};
-			desc.m_DebugName =
-				"ForwardPlusCull.BindingLayout";
+			desc.m_DebugName = "ForwardPlusCull.BindingLayout";
+			AppendBindingSlot(desc, RHIBindingType::PushConstants, 0,
+				sizeof(ForwardPlusCullParameters), "ForwardPlusCullConstants");
 			AppendBindingSlot(
-				desc,
-				RHIBindingType::PushConstants,
-				0,
-				sizeof(ForwardPlusCullParameters),
-				"ForwardPlusCullConstants");
+				desc, RHIBindingType::ReadOnlyStorageBuffer, 0, 0, "ForwardPlusViews");
 			AppendBindingSlot(
-				desc,
-				RHIBindingType::ReadOnlyStorageBuffer,
-				0,
-				0,
-				"ForwardPlusViews");
+				desc, RHIBindingType::ReadOnlyStorageBuffer, 1, 0, "ForwardPlusLights");
 			AppendBindingSlot(
-				desc,
-				RHIBindingType::ReadOnlyStorageBuffer,
-				1,
-				0,
-				"ForwardPlusLights");
+				desc, RHIBindingType::ReadWriteStorageBuffer, 0, 0, "ForwardPlusTileHeaders");
 			AppendBindingSlot(
-				desc,
-				RHIBindingType::ReadWriteStorageBuffer,
-				0,
-				0,
-				"ForwardPlusTileHeaders");
+				desc, RHIBindingType::ReadWriteStorageBuffer, 1, 0, "ForwardPlusTileIndices");
 			AppendBindingSlot(
-				desc,
-				RHIBindingType::ReadWriteStorageBuffer,
-				1,
-				0,
-				"ForwardPlusTileIndices");
-			AppendBindingSlot(
-				desc,
-				RHIBindingType::
-					BindlessSampledTextureTable,
-				0,
-				0,
-				"BindlessTextures");
+				desc, RHIBindingType::BindlessSampledTextureTable, 0, 0, "BindlessTextures");
 			return desc;
 		}
 	}
 
-	void RenderPassForwardPlusCull::Prepare(
-		const RenderServices& services) noexcept
+	void RenderPassForwardPlusCull::Prepare(const RenderServices& services) noexcept
 	{
 		if (m_IsInitialized)
 		{
@@ -149,247 +108,143 @@ namespace gglab
 		}
 
 		auto* renderer = services.m_Renderer;
-		auto* shaderManager =
-			services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderManager;
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath =
-			L"Passes/PassForwardPlusCull.hlsl";
+		shaderDesc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Compute;
 		shaderDesc.m_Entry = L"CSMain";
-		m_PipelineRecipe.m_CSId =
-			shaderManager->LoadShader(shaderDesc);
+		m_PipelineRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
 
 		auto* rhiContext = renderer->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
 		m_PipelineRecipe.m_BindingLayout =
-			rhiContext->GetPipelineSystem().
-				CreateBindingLayout(
-					BuildForwardPlusBindingLayout());
-		if (!m_PipelineRecipe.m_CSId.IsValid() ||
-			!m_PipelineRecipe.m_BindingLayout.IsValid())
+			rhiContext->GetPipelineSystem().CreateBindingLayout(BuildForwardPlusBindingLayout());
+		if (!m_PipelineRecipe.m_CSId.IsValid() || !m_PipelineRecipe.m_BindingLayout.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Forward+ failed to prepare its required compute shader or binding layout.");
-			GGLAB_UNREACHABLE(
-				"Forward+ production shader is unavailable.");
+			GGLAB_UNREACHABLE("Forward+ production shader is unavailable.");
 		}
 		m_IsInitialized = true;
 	}
 
 	void RenderPassForwardPlusCull::AddPass(
-		RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			m_IsInitialized,
-			"Forward+ cull must be prepared before graph construction.");
-		const RenderViewID displayViewId =
-			context.GetDisplayViewId();
-		const RenderScene& renderScene =
-			context.m_RenderScene;
+			m_IsInitialized, "Forward+ cull must be prepared before graph construction.");
+		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const RenderScene& renderScene = context.m_RenderScene;
 		const uint32_t viewIndex =
-			renderScene.m_ViewBaseIndex +
-			static_cast<uint32_t>(
-				utils::ToIndex(displayViewId));
+			renderScene.m_ViewBaseIndex + static_cast<uint32_t>(utils::ToIndex(displayViewId));
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		if (m_DebugReadback)
 		{
 			auto* device = renderer->GetDevice();
-			auto* swapChain =
-				renderer->GetSwapChain();
+			auto* swapChain = renderer->GetSwapChain();
 			GGLAB_ASSERT_NOT_NULL(device);
 			GGLAB_ASSERT_NOT_NULL(swapChain);
-			m_DebugReadback->Initialize(
-				*device,
-				swapChain->GetBufferCount());
-			m_DebugReadback->
-				ConsumeCompletedSlot(
-					context.m_BackBufferIndex);
+			m_DebugReadback->Initialize(*device, swapChain->GetBufferCount());
+			m_DebugReadback->ConsumeCompletedSlot(context.m_BackBufferIndex);
 		}
 
 		rg.AddPass<PassData>(
-			GetRenderGraphPassName(),
-			RGPassEncoderType::Compute,
-			[viewIndex, &renderScene](
-				RenderGraph::RGBuilder& builder,
-				PassData& data)
+			GetRenderGraphPassName(), RGPassEncoderType::Compute,
+			[viewIndex, &renderScene](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
-				auto& blackboard =
-					builder.GetBlackboard();
+				auto& blackboard = builder.GetBlackboard();
 				const auto& sceneDepth =
-					blackboard.Get<
-						RGSceneDepthResources>(
-							SceneDepthResourcesName);
+					blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				const auto& framePlan =
-					blackboard.Get<
-						DepthCoverageFramePlan>(
-							DepthCoverageFramePlanName);
+					blackboard.Get<DepthCoverageFramePlan>(DepthCoverageFramePlanName);
 				GGLAB_ASSERT_MSG(
-					framePlan.UsesDepthPrepassEqual() &&
-						framePlan.m_HasDepthCoverageDraws,
+					framePlan.UsesDepthPrepassEqual() && framePlan.m_HasDepthCoverageDraws,
 					"Forward+ requires a complete validated depth prepass.");
-				GGLAB_ASSERT_MSG(
-					sceneDepth.m_Convention ==
-						DepthConvention::Reversed,
+				GGLAB_ASSERT_MSG(sceneDepth.m_Convention == DepthConvention::Reversed,
 					"Forward+ only supports Reversed-Z display depth.");
 
-				const RHITextureDesc& depthDesc =
-					builder.GetTextureDesc(
-						sceneDepth.m_Texture);
-				data.m_TileGrid =
-					MakeForwardPlusTileGrid(
-						depthDesc.m_Extent.m_Width,
-						depthDesc.m_Extent.m_Height);
+				const RHITextureDesc& depthDesc = builder.GetTextureDesc(sceneDepth.m_Texture);
+				data.m_TileGrid = MakeForwardPlusTileGrid(
+					depthDesc.m_Extent.m_Width, depthDesc.m_Extent.m_Height);
 				GGLAB_ASSERT_MSG(
-					data.m_TileGrid.IsValid(),
-					"Forward+ requires a non-empty display extent.");
+					data.m_TileGrid.IsValid(), "Forward+ requires a non-empty display extent.");
 
 				data.m_Depth = builder.Read(
-					sceneDepth.m_Texture,
-					RGTextureAccess::Sample,
-					RHIStage::ComputeShader);
-				data.m_DepthSrv =
-					builder.CreateView<
-						RHITextureViewType::
-							ShaderResource>(
-								data.m_Depth,
-								sceneDepth.m_SrvDesc);
+					sceneDepth.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
+				data.m_DepthSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+					data.m_Depth, sceneDepth.m_SrvDesc);
 
 				RHIBufferDesc headersDesc{};
-				headersDesc.m_SizeInBytes =
-					static_cast<uint64_t>(
-						data.m_TileGrid.m_TileCount) *
+				headersDesc.m_SizeInBytes = static_cast<uint64_t>(data.m_TileGrid.m_TileCount) *
 					sizeof(ForwardPlusTileHeader);
-				headersDesc.m_StrideInBytes =
-					sizeof(ForwardPlusTileHeader);
+				headersDesc.m_StrideInBytes = sizeof(ForwardPlusTileHeader);
 
 				RHIBufferDesc indicesDesc{};
-				indicesDesc.m_SizeInBytes =
-					static_cast<uint64_t>(
-						data.m_TileGrid.m_TileCount) *
-					ForwardPlusTileLightCapacity *
-					sizeof(uint32_t);
-				indicesDesc.m_StrideInBytes =
-					sizeof(uint32_t);
+				indicesDesc.m_SizeInBytes = static_cast<uint64_t>(data.m_TileGrid.m_TileCount) *
+					ForwardPlusTileLightCapacity * sizeof(uint32_t);
+				indicesDesc.m_StrideInBytes = sizeof(uint32_t);
 
 				auto& resources =
-					blackboard.Create<
-						RGForwardPlusResources>(
-							ForwardPlusResourcesName);
-				resources.m_TileGrid =
-					data.m_TileGrid;
+					blackboard.Create<RGForwardPlusResources>(ForwardPlusResourcesName);
+				resources.m_TileGrid = data.m_TileGrid;
 				resources.m_TileLightHeaders =
-					builder.CreateBuffer(
-						"ForwardPlus.TileLightHeaders",
-						headersDesc);
+					builder.CreateBuffer("ForwardPlus.TileLightHeaders", headersDesc);
 				resources.m_TileLightIndices =
-					builder.CreateBuffer(
-						"ForwardPlus.TileLightIndices",
-						indicesDesc);
-				builder.WriteInPlace(
-					resources.m_TileLightHeaders,
-					RGBufferAccess::StorageWrite,
+					builder.CreateBuffer("ForwardPlus.TileLightIndices", indicesDesc);
+				builder.WriteInPlace(resources.m_TileLightHeaders, RGBufferAccess::StorageWrite,
 					RHIStage::ComputeShader);
-				builder.WriteInPlace(
-					resources.m_TileLightIndices,
-					RGBufferAccess::StorageWrite,
+				builder.WriteInPlace(resources.m_TileLightIndices, RGBufferAccess::StorageWrite,
 					RHIStage::ComputeShader);
-				data.m_TileHeaders =
-					resources.m_TileLightHeaders;
-				data.m_TileIndices =
-					resources.m_TileLightIndices;
+				data.m_TileHeaders = resources.m_TileLightHeaders;
+				data.m_TileIndices = resources.m_TileLightIndices;
 				data.m_ViewIndex = viewIndex;
-				data.m_LightBaseIndex =
-					renderScene.m_LightBaseIndex;
-				data.m_LightCount = std::min(
-					renderScene.m_LightCount,
-					ForwardPlusTileLightCapacity);
+				data.m_LightBaseIndex = renderScene.m_LightBaseIndex;
+				data.m_LightCount =
+					std::min(renderScene.m_LightCount, ForwardPlusTileLightCapacity);
 			},
-			[this, renderer, &context](
-				RGExecuteContext& executeContext,
-				PassData& data)
+			[this, renderer, &context](RGExecuteContext& executeContext, PassData& data)
 			{
-				auto* commandContext =
-					executeContext.
-						GetDirectComputeCommandContext();
+				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
 
-				const auto depthSrv =
-					executeContext.GetViewDescriptor(
-						data.m_DepthSrv);
-				const auto headers =
-					executeContext.GetBufferHandle(
-						data.m_TileHeaders);
-				const auto indices =
-					executeContext.GetBufferHandle(
-						data.m_TileIndices);
-				GGLAB_ASSERT_MSG(
-					depthSrv.IsValid() &&
-						headers.IsValid() &&
-						indices.IsValid(),
+				const auto depthSrv = executeContext.GetViewDescriptor(data.m_DepthSrv);
+				const auto headers = executeContext.GetBufferHandle(data.m_TileHeaders);
+				const auto indices = executeContext.GetBufferHandle(data.m_TileIndices);
+				GGLAB_ASSERT_MSG(depthSrv.IsValid() && headers.IsValid() && indices.IsValid(),
 					"Forward+ graph resources must resolve before dispatch.");
 
-				commandContext->SetPipeline(
-					GetOrCreatePipeline(
-						*renderer));
+				commandContext->SetPipeline(GetOrCreatePipeline(*renderer));
 				commandContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(
-						ForwardPlusRootParameter::
-							ViewBuffer),
-					renderer->
-						GetViewStructuredBuffer()->
-						GetBufferHandle());
+					static_cast<uint32_t>(ForwardPlusRootParameter::ViewBuffer),
+					renderer->GetViewStructuredBuffer()->GetBufferHandle());
 				commandContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(
-						ForwardPlusRootParameter::
-							LightBuffer),
-					renderer->
-						GetLightStructuredBuffer()->
-						GetBufferHandle(
-							context.m_BackBufferIndex));
+					static_cast<uint32_t>(ForwardPlusRootParameter::LightBuffer),
+					renderer->GetLightStructuredBuffer()->GetBufferHandle(
+						context.m_BackBufferIndex));
 				commandContext->SetReadWriteBuffer(
-					static_cast<uint32_t>(
-						ForwardPlusRootParameter::
-							TileHeaders),
-					headers);
+					static_cast<uint32_t>(ForwardPlusRootParameter::TileHeaders), headers);
 				commandContext->SetReadWriteBuffer(
-					static_cast<uint32_t>(
-						ForwardPlusRootParameter::
-							TileIndices),
-					indices);
+					static_cast<uint32_t>(ForwardPlusRootParameter::TileIndices), indices);
 				commandContext->SetPushConstants(
-					static_cast<uint32_t>(
-						ForwardPlusRootParameter::
-							PassConstants),
+					static_cast<uint32_t>(ForwardPlusRootParameter::PassConstants),
 					ForwardPlusCullParameters{
-						.m_DepthTextureIndex =
-							depthSrv.m_Index,
-						.m_ViewIndex =
-							data.m_ViewIndex,
-						.m_LightBaseIndex =
-							data.m_LightBaseIndex,
-						.m_LightCount =
-							data.m_LightCount,
-						.m_Width =
-							data.m_TileGrid.m_Width,
-						.m_Height =
-							data.m_TileGrid.m_Height,
-						.m_TileCountX =
-							data.m_TileGrid.m_TileCountX,
-						.m_TileCountY =
-							data.m_TileGrid.m_TileCountY,
+						.m_DepthTextureIndex = depthSrv.m_Index,
+						.m_ViewIndex = data.m_ViewIndex,
+						.m_LightBaseIndex = data.m_LightBaseIndex,
+						.m_LightCount = data.m_LightCount,
+						.m_Width = data.m_TileGrid.m_Width,
+						.m_Height = data.m_TileGrid.m_Height,
+						.m_TileCountX = data.m_TileGrid.m_TileCountX,
+						.m_TileCountY = data.m_TileGrid.m_TileCountY,
 					});
 				commandContext->Dispatch(
-					data.m_TileGrid.m_TileCountX,
-					data.m_TileGrid.m_TileCountY,
-					1);
+					data.m_TileGrid.m_TileCountX, data.m_TileGrid.m_TileCountY, 1);
 			});
 
 		if (!m_DebugReadback)
@@ -397,149 +252,73 @@ namespace gglab
 			return;
 		}
 
-		const auto debugReadback =
-			m_DebugReadback;
-		const uint32_t bufferIndex =
-			context.m_BackBufferIndex;
-		const uint64_t frameSerial =
-			context.m_FrameSerial;
+		const auto debugReadback = m_DebugReadback;
+		const uint32_t bufferIndex = context.m_BackBufferIndex;
+		const uint64_t frameSerial = context.m_FrameSerial;
 		rg.AddPass<ReadbackPassData>(
-			"Lighting.ForwardPlus.Readback",
-			RGPassEncoderType::Copy,
-			[debugReadback,
-				bufferIndex,
-				frameSerial](
-				RenderGraph::RGBuilder& builder,
-				ReadbackPassData& data)
+			"Lighting.ForwardPlus.Readback", RGPassEncoderType::Copy,
+			[debugReadback, bufferIndex, frameSerial](
+				RenderGraph::RGBuilder& builder, ReadbackPassData& data)
 			{
 				builder.SideEffect();
 				auto& resources =
-					builder.GetBlackboard().Get<
-						RGForwardPlusResources>(
-							ForwardPlusResourcesName);
-				GGLAB_ASSERT_MSG(
-					resources.IsValid(),
-					"Forward+ readback requires cull outputs.");
-				data.m_TileGrid =
-					resources.m_TileGrid;
-				data.m_TileX = std::min(
-					debugReadback->
-						GetSelectedTileX(),
-					data.m_TileGrid.m_TileCountX -
-						1);
-				data.m_TileY = std::min(
-					debugReadback->
-						GetSelectedTileY(),
-					data.m_TileGrid.m_TileCountY -
-						1);
+					builder.GetBlackboard().Get<RGForwardPlusResources>(ForwardPlusResourcesName);
+				GGLAB_ASSERT_MSG(resources.IsValid(), "Forward+ readback requires cull outputs.");
+				data.m_TileGrid = resources.m_TileGrid;
+				data.m_TileX =
+					std::min(debugReadback->GetSelectedTileX(), data.m_TileGrid.m_TileCountX - 1);
+				data.m_TileY =
+					std::min(debugReadback->GetSelectedTileY(), data.m_TileGrid.m_TileCountY - 1);
 				const uint32_t tileIndex =
-					data.m_TileY *
-						data.m_TileGrid.m_TileCountX +
-					data.m_TileX;
+					data.m_TileY * data.m_TileGrid.m_TileCountX + data.m_TileX;
 				data.m_HeaderSourceOffset =
-					static_cast<uint64_t>(tileIndex) *
-					sizeof(ForwardPlusTileHeader);
+					static_cast<uint64_t>(tileIndex) * sizeof(ForwardPlusTileHeader);
 				data.m_IndicesSourceOffset =
-					static_cast<uint64_t>(
-						GetForwardPlusTileOffset(
-							tileIndex)) *
-					sizeof(uint32_t);
-				data.m_TileHeaders =
-					builder.Read(
-						resources.m_TileLightHeaders,
-						RGBufferAccess::CopySource,
-						RHIStage::Copy);
-				data.m_TileIndices =
-					builder.Read(
-						resources.m_TileLightIndices,
-						RGBufferAccess::CopySource,
-						RHIStage::Copy);
+					static_cast<uint64_t>(GetForwardPlusTileOffset(tileIndex)) * sizeof(uint32_t);
+				data.m_TileHeaders = builder.Read(
+					resources.m_TileLightHeaders, RGBufferAccess::CopySource, RHIStage::Copy);
+				data.m_TileIndices = builder.Read(
+					resources.m_TileLightIndices, RGBufferAccess::CopySource, RHIStage::Copy);
 
 				RHIBufferDesc readbackDesc{};
-				readbackDesc.m_SizeInBytes =
-					ForwardPlusDebugReadback::
-						ReadbackSizeInBytes;
-				readbackDesc.m_Usage =
-					RHIBufferUsage::CopyDest;
-				readbackDesc.m_MemoryUsage =
-					RHIMemoryUsage::GpuToCpu;
-				readbackDesc.m_DebugName =
-					"ForwardPlus.DebugReadback";
-				data.m_Readback =
-					builder.ImportBuffer(
-						"ForwardPlus.DebugReadback",
-						debugReadback->GetBuffer(
-							bufferIndex),
-						readbackDesc,
-						RGBufferAccess::CopyDest);
-				builder.WriteInPlace(
-					data.m_Readback,
-					RGBufferAccess::CopyDest,
-					RHIStage::Copy);
+				readbackDesc.m_SizeInBytes = ForwardPlusDebugReadback::ReadbackSizeInBytes;
+				readbackDesc.m_Usage = RHIBufferUsage::CopyDest;
+				readbackDesc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
+				readbackDesc.m_DebugName = "ForwardPlus.DebugReadback";
+				data.m_Readback = builder.ImportBuffer("ForwardPlus.DebugReadback",
+					debugReadback->GetBuffer(bufferIndex), readbackDesc, RGBufferAccess::CopyDest);
+				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;
 				data.m_FrameSerial = frameSerial;
 			},
-			[debugReadback](
-				RGExecuteContext& executeContext,
-				ReadbackPassData& data)
+			[debugReadback](RGExecuteContext& executeContext, ReadbackPassData& data)
 			{
-				auto* commandContext =
-					executeContext.
-						GetCopyCommandContext();
-				GGLAB_ASSERT_NOT_NULL(
-					commandContext);
-				const RHIBufferHandle headers =
-					executeContext.GetBufferHandle(
-						data.m_TileHeaders);
-				const RHIBufferHandle indices =
-					executeContext.GetBufferHandle(
-						data.m_TileIndices);
-				const RHIBufferHandle readback =
-					executeContext.GetBufferHandle(
-						data.m_Readback);
-				commandContext->CopyBuffer(
-					readback,
-					ForwardPlusDebugReadback::
-						HeaderReadbackOffset,
-					headers,
-					data.m_HeaderSourceOffset,
-					sizeof(ForwardPlusTileHeader));
-				commandContext->CopyBuffer(
-					readback,
-					ForwardPlusDebugReadback::
-						IndicesReadbackOffset,
-					indices,
-					data.m_IndicesSourceOffset,
-					sizeof(uint32_t) *
-						ForwardPlusTileLightCapacity);
-				debugReadback->MarkScheduled(
-					data.m_BufferIndex,
-					data.m_FrameSerial,
-					data.m_TileGrid,
-					data.m_TileX,
-					data.m_TileY);
+				auto* commandContext = executeContext.GetCopyCommandContext();
+				GGLAB_ASSERT_NOT_NULL(commandContext);
+				const RHIBufferHandle headers = executeContext.GetBufferHandle(data.m_TileHeaders);
+				const RHIBufferHandle indices = executeContext.GetBufferHandle(data.m_TileIndices);
+				const RHIBufferHandle readback = executeContext.GetBufferHandle(data.m_Readback);
+				commandContext->CopyBuffer(readback, ForwardPlusDebugReadback::HeaderReadbackOffset,
+					headers, data.m_HeaderSourceOffset, sizeof(ForwardPlusTileHeader));
+				commandContext->CopyBuffer(readback,
+					ForwardPlusDebugReadback::IndicesReadbackOffset, indices,
+					data.m_IndicesSourceOffset, sizeof(uint32_t) * ForwardPlusTileLightCapacity);
+				debugReadback->MarkScheduled(data.m_BufferIndex, data.m_FrameSerial,
+					data.m_TileGrid, data.m_TileX, data.m_TileY);
 			});
 	}
 
-	RHIPipelineHandle
-		RenderPassForwardPlusCull::
-			GetOrCreatePipeline(
-				const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassForwardPlusCull::GetOrCreatePipeline(
+		const Renderer& renderer) noexcept
 	{
-		auto* pipelineCache =
-			renderer.GetPipelineCache();
+		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		const RHIPipelineHandle pipeline =
-			pipelineCache->Resolve(
-				m_PipelineSlot,
-				m_PipelineRecipe,
-				GetInfo());
+			pipelineCache->Resolve(m_PipelineSlot, m_PipelineRecipe, GetInfo());
 		if (!pipeline.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Forward+ failed to create its required compute pipeline.");
-			GGLAB_UNREACHABLE(
-				"Forward+ compute pipeline is unavailable.");
+			GGLAB_LOG_GRAPHICS_ERROR("Forward+ failed to create its required compute pipeline.");
+			GGLAB_UNREACHABLE("Forward+ compute pipeline is unavailable.");
 		}
 		return pipeline;
 	}

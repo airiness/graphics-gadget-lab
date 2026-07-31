@@ -39,7 +39,8 @@ bool IsShadowPCFEnabled()
 }
 
 // Sample normal map and compute perturbed normal in world space
-float3 SampleNormalWS(MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
+float3 SampleNormalWS(
+	MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
 {
 	// TODO: flip Y for normal map?
 
@@ -57,10 +58,7 @@ float3 SampleNormalWS(MaterialData matData, float3 normalWS, float4 tangentWS, f
 
 	// Build TBN matrix
 	float3x3 TBN = BuildTBNFromTangent(
-		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)),
-		tangentWS,
-		positionWS,
-		uv);
+		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)), tangentWS, positionWS, uv);
 
 	// Transform normal from tangent space to world space
 	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled.xyz, TBN), TBN[2]);
@@ -81,33 +79,33 @@ float FilterPerceptualRoughness(float perceptualRoughness, float3 normalWS)
 
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
 {
-	float4 value = SampleTextureBindingLevel(
-		MakeTextureSamplerBinding(g_Scene.IBLResource.BrdfLutBinding),
-		float2(saturate(NoV), saturate(perceptualRoughness)),
-		0);
+	float4 value =
+		SampleTextureBindingLevel(MakeTextureSamplerBinding(g_Scene.IBLResource.BrdfLutBinding),
+			float2(saturate(NoV), saturate(perceptualRoughness)), 0);
 
 	return value.rg;
 }
 
 float3 SampleIBLIrradiance(float3 normalWS)
 {
-	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.IrradianceBinding);
-	float3 direction = WorldToEnvironmentDirection(
-		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)),
+	TextureSamplerBindingData binding =
+		MakeTextureSamplerBinding(g_Scene.IBLResource.IrradianceBinding);
+	float3 direction = WorldToEnvironmentDirection(SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)),
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCube(binding, direction).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 {
-	TextureSamplerBindingData binding = MakeTextureSamplerBinding(g_Scene.IBLResource.PrefilteredSpecularBinding);
+	TextureSamplerBindingData binding =
+		MakeTextureSamplerBinding(g_Scene.IBLResource.PrefilteredSpecularBinding);
 	const uint mipLevels = max(g_Scene.IBLResource.PrefilteredSpecularMipLevels, 1u);
 	const float maxMipLevel = (float) (mipLevels - 1u);
 	const float lod = saturate(perceptualRoughness) * maxMipLevel;
-	float3 direction = WorldToEnvironmentDirection(
-		SafeNormalize(reflectWS, float3(0.0, 1.0, 0.0)),
+	float3 direction = WorldToEnvironmentDirection(SafeNormalize(reflectWS, float3(0.0, 1.0, 0.0)),
 		g_Scene.IBLResource.EnvironmentRotationRadians);
-	return SampleTextureCubeLevel(binding, direction, lod).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+	return SampleTextureCubeLevel(binding, direction, lod).rgb *
+		   g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 float SampleDirectionalShadow(float3 positionWS, float NoL)
@@ -117,7 +115,8 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 		return 1.0;
 	}
 
-	const ShadowProjection shadowProjection = ProjectToShadowMap(positionWS, g_Pass.ShadowViewIndex);
+	const ShadowProjection shadowProjection =
+		ProjectToShadowMap(positionWS, g_Pass.ShadowViewIndex);
 	if (!shadowProjection.IsValid)
 	{
 		return 1.0;
@@ -126,7 +125,8 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 	Texture2D<float> shadowMap = GetTexture2DFloat(g_Pass.ShadowMapTextureIndex);
 	SamplerComparisonState shadowSampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
 
-	const float compareDepth = saturate(shadowProjection.ReceiverDepth - g_Pass.ShadowReceiverDepthBias);
+	const float compareDepth =
+		saturate(shadowProjection.ReceiverDepth - g_Pass.ShadowReceiverDepthBias);
 
 	if (!IsShadowPCFEnabled())
 	{
@@ -135,7 +135,8 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 
 	const float shadowMapSize = max((float) g_Pass.ShadowMapSize, 1.0);
 	const float2 shadowTexelSize = 1.0.xx / shadowMapSize;
-	return SampleShadowPCF3x3(shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
+	return SampleShadowPCF3x3(
+		shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
 }
 
 bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out float attenuation)
@@ -177,7 +178,8 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 		const float cosTheta = dot(normalize(-L), spotDirection);
 		const float outerCos = cos(radians(max(light.SpotAngle, 0.001) * 0.5));
 		const float innerCos = cos(radians(max(light.SpotAngle * 0.8, 0.001) * 0.5));
-		const float spotAttenuation = saturate((cosTheta - outerCos) / max(innerCos - outerCos, 0.001));
+		const float spotAttenuation =
+			saturate((cosTheta - outerCos) / max(innerCos - outerCos, 0.001));
 		attenuation *= spotAttenuation * spotAttenuation;
 	}
 	else if (light.LightType != LightTypePoint)
@@ -188,9 +190,7 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 	return attenuation > 0.0;
 }
 
-float4 PSMain(
-	ForwardCoverageVSOutput IN,
-	bool isFrontFace : SV_IsFrontFace) : SV_Target
+float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 {
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 
@@ -198,17 +198,15 @@ float4 PSMain(
 	ViewData viewData = g_Views[IN.ViewIndex];
 
 	// BaseColor
-	const float4 baseColorSampled =
-		SampleMaterialBaseColor(matData, IN.UV0, IN.UV1);
+	const float4 baseColorSampled = SampleMaterialBaseColor(matData, IN.UV0, IN.UV1);
 	const float3 baseColor = baseColorSampled.rgb;
 
-	float alpha = ResolveMaterialAlpha(
-		matData,
-		baseColorSampled.a);
+	float alpha = ResolveMaterialAlpha(matData, baseColorSampled.a);
 
 	// Mataliic and Roughness (linear, B=metallic, G=roughness)
 	float2 metallicRoughnessUV = SelectUV(matData.MetallicRoughnessBinding, IN.UV0, IN.UV1);
-	float4 mrSampled = SampleTextureBinding(matData.MetallicRoughnessBinding.TextureSamplerBinding, metallicRoughnessUV);
+	float4 mrSampled = SampleTextureBinding(
+		matData.MetallicRoughnessBinding.TextureSamplerBinding, metallicRoughnessUV);
 	float metallic = saturate(matData.MetallicFactor * mrSampled.b);
 	float perceptualRoughness = saturate(matData.RoughnessFactor * mrSampled.g);
 	perceptualRoughness = ClampPerceptualRoughnessForBRDF(perceptualRoughness);
@@ -274,11 +272,13 @@ float4 PSMain(
 
 		float D = D_GGX(NoH, a);
 		float Vis = V_SmithGGXCorrelated(NoV, NoL, a);
-		float3 F = F_Schlick(F0, 1.0.xxx, VoH); // use F90 = 1.0, TODO: use Fresnel reflectance at grazing angle
+		float3 F = F_Schlick(
+			F0, 1.0.xxx, VoH); // use F90 = 1.0, TODO: use Fresnel reflectance at grazing angle
 
 		float3 specular = D * Vis * F;
 
-		float3 kd = (1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
+		float3 kd =
+			(1.0.xxx - F) * (1.0 - metallic); // energy rest after specular and used for diffuse
 		float3 diffuse = kd * Fd_Lambert(baseColor);
 
 		float shadowVisibility = 1.0;
@@ -287,16 +287,16 @@ float4 PSMain(
 			shadowVisibility = SampleDirectionalShadow(IN.PositionWS, NoL);
 		}
 
-		directLighting += (diffuse + specular) *
-			light.Color.rgb *
-			light.Intensity * NoL * attenuation * shadowVisibility;
+		directLighting += (diffuse + specular) * light.Color.rgb * light.Intensity * NoL *
+						  attenuation * shadowVisibility;
 	}
 
 	float3 Lo = directLighting;
 
 	// Emissive texture(sRGB)
 	float2 emissiveUV = SelectUV(matData.EmissiveBinding, IN.UV0, IN.UV1);
-	float3 emissiveSampled = SampleTextureBinding(matData.EmissiveBinding.TextureSamplerBinding, emissiveUV).rgb;
+	float3 emissiveSampled =
+		SampleTextureBinding(matData.EmissiveBinding.TextureSamplerBinding, emissiveUV).rgb;
 	float3 emissive = emissiveSampled * matData.EmissiveColorFactor.rgb;
 
 	// Add emissive
@@ -304,7 +304,7 @@ float4 PSMain(
 
 	// IBL
 	float3 iblF = F_Schlick(F0, max((1.0 - perceptualRoughness).xxx, F0), NoV);
-	
+
 	float3 diffuseIBLFactor = (1.0.xxx - iblF) * (1.0 - metallic);
 	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseIBLFactor * Fd_Lambert(baseColor);
 
@@ -317,7 +317,8 @@ float4 PSMain(
 
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
-	float aoSampled = SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, occlusionUV).r;
+	float aoSampled =
+		SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, occlusionUV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 

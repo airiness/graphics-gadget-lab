@@ -34,14 +34,9 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_RAW ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_LINEAR_VIEW_Z)
 	{
-		Texture2D<float> depthTexture =
-			GetTexture2DFloat(g_Pass.SourceTextureIndex);
-		SamplerState pointSampler =
-			GetSamplerState(g_Pass.SourceSamplerIndex);
-		const float rawDepth = depthTexture.SampleLevel(
-			pointSampler,
-			input.UV,
-			0.0);
+		Texture2D<float> depthTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
+		SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
+		const float rawDepth = depthTexture.SampleLevel(pointSampler, input.UV, 0.0);
 		if (g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_RAW)
 		{
 			return float4(rawDepth.xxx, 1.0);
@@ -51,25 +46,19 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 			return float4(0.0, 0.0, 0.0, 1.0);
 		}
 
-		const float viewZ = RawDepthToPositiveViewZ(
-			input.UV,
-			rawDepth,
-			viewData.InvProjMat);
+		const float viewZ = RawDepthToPositiveViewZ(input.UV, rawDepth, viewData.InvProjMat);
 		const float depthRange = max(viewData.Far / max(viewData.Near, 1.0e-6), 1.0);
 		const float normalizedViewZ = saturate(
-			log2(max(viewZ / max(viewData.Near, 1.0e-6), 1.0)) /
-			max(log2(depthRange), 1.0e-6));
+			log2(max(viewZ / max(viewData.Near, 1.0e-6), 1.0)) / max(log2(depthRange), 1.0e-6));
 		return float4((1.0 - normalizedViewZ).xxx, 1.0);
 	}
 
 	const float exposureScaleOverPreExposure =
 		viewData.ExposureMultiplier / max(g_Pass.SourcePreExposure, 1e-6);
-	const float3 storedColor = SanitizeHDRColor(SampleTexture2D(
-		g_Pass.SourceTextureIndex,
-		g_Pass.SourceSamplerIndex,
-		input.UV).rgb);
-	float3 color = ACESFitted(
-		storedColor * exposureScaleOverPreExposure * g_Pass.PreviewExposureScale);
+	const float3 storedColor = SanitizeHDRColor(
+		SampleTexture2D(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, input.UV).rgb);
+	float3 color =
+		ACESFitted(storedColor * exposureScaleOverPreExposure * g_Pass.PreviewExposureScale);
 	color = LinearToSRGB(color);
 	return float4(color, 1.0);
 }

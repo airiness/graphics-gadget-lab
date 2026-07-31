@@ -21,7 +21,7 @@ namespace gglab
 			return sizeof(TextureArtifact) +
 				static_cast<uint64_t>(m_Data.m_Pixels.capacity()) * sizeof(std::byte) +
 				static_cast<uint64_t>(m_Data.m_Subresources.capacity()) *
-					sizeof(TextureAssetSubresource);
+				sizeof(TextureAssetSubresource);
 		}
 	};
 
@@ -38,8 +38,7 @@ namespace gglab
 	{
 		TextureArtifact m_Artifact;
 		TextureArtifactBuildError m_Error = TextureArtifactBuildError::None;
-		TextureStructureValidationError m_StructureError =
-			TextureStructureValidationError::None;
+		TextureStructureValidationError m_StructureError = TextureStructureValidationError::None;
 
 		[[nodiscard]] bool Succeeded() const noexcept
 		{
@@ -50,6 +49,5 @@ namespace gglab
 	[[nodiscard]] ArtifactContentDigest ComputeTextureArtifactContentDigest(
 		const TextureAssetData& textureData) noexcept;
 	[[nodiscard]] TextureArtifactBuildResult CreateTextureArtifact(
-		TextureAssetData&& textureData,
-		TextureAssetValidationLimits limits = {}) noexcept;
+		TextureAssetData&& textureData, TextureAssetValidationLimits limits = {}) noexcept;
 }

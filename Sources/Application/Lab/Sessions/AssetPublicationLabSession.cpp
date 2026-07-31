@@ -115,50 +115,38 @@ namespace gglab
 			return AssetResourcePublicationFaultAction::None;
 		}
 
-		[[nodiscard]] bool HasPendingIdentity(
-			const AssetStreamingQueueStatistics& queue,
+		[[nodiscard]] bool HasPendingIdentity(const AssetStreamingQueueStatistics& queue,
 			const AssetStreamingIdentity& identity) noexcept
 		{
 			return std::ranges::any_of(queue.m_PendingWork,
 				[identity](const AssetStreamingWorkActivity& work) noexcept
-				{
-					return work.m_Identity == identity;
-				});
+				{ return work.m_Identity == identity; });
 		}
 
-		[[nodiscard]] bool IsStreamingIdle(
-			const AssetUploadStatistics& statistics) noexcept
+		[[nodiscard]] bool IsStreamingIdle(const AssetUploadStatistics& statistics) noexcept
 		{
 			return statistics.m_CpuPayloadQueue.m_PendingCount == 0 &&
 				statistics.m_ResourcePublicationQueue.m_PendingCount == 0 &&
 				statistics.m_UploadRecordingQueue.m_PendingCount == 0 &&
 				statistics.m_GpuFinalizeQueue.m_PendingCount == 0 &&
-				statistics.m_PendingCount == 0 &&
-				statistics.m_ReadyPayloadBytes == 0 &&
+				statistics.m_PendingCount == 0 && statistics.m_ReadyPayloadBytes == 0 &&
 				statistics.m_InFlightBytes == 0;
 		}
 
 		[[nodiscard]] const AssetSnapshot::Texture* FindTextureSnapshot(
-			const AssetSnapshot& snapshot,
-			TextureID textureId) noexcept
+			const AssetSnapshot& snapshot, TextureID textureId) noexcept
 		{
-			const auto texture = std::ranges::find(
-				snapshot.m_Textures,
-				textureId,
-				&AssetSnapshot::Texture::m_Id);
+			const auto texture =
+				std::ranges::find(snapshot.m_Textures, textureId, &AssetSnapshot::Texture::m_Id);
 			return texture != snapshot.m_Textures.end() ? &*texture : nullptr;
 		}
 
-		[[nodiscard]] bool HasPendingUpload(
-			const AssetUploadStatistics& statistics,
+		[[nodiscard]] bool HasPendingUpload(const AssetUploadStatistics& statistics,
 			const AssetStreamingIdentity& identity) noexcept
 		{
-			return std::ranges::any_of(
-				statistics.m_PendingUploads,
+			return std::ranges::any_of(statistics.m_PendingUploads,
 				[identity](const AssetUploadActivity& upload) noexcept
-				{
-					return upload.m_Identity == identity;
-				});
+				{ return upload.m_Identity == identity; });
 		}
 
 		struct SyntheticPublicationState
@@ -178,7 +166,8 @@ namespace gglab
 			explicit SyntheticPublicationJob(
 				std::shared_ptr<SyntheticPublicationState> state) noexcept :
 				m_State(std::move(state))
-			{}
+			{
+			}
 
 			[[nodiscard]] AssetResourcePublicationStepResult Step(
 				AssetResourcePublicationContext& context) noexcept override
@@ -191,17 +180,16 @@ namespace gglab
 					m_State->m_Completed = true;
 					return {
 						.m_Status = AssetResourcePublicationStepStatus::Completed,
-						.m_Usage = { .m_Stage = AssetResourcePublicationStage::Textures },
+						.m_Usage = {.m_Stage = AssetResourcePublicationStage::Textures},
 					};
 				}
 				return {
 					.m_Status = AssetResourcePublicationStepStatus::Continue,
-					.m_Usage = { .m_Stage = AssetResourcePublicationStage::Textures },
+					.m_Usage = {.m_Stage = AssetResourcePublicationStage::Textures},
 				};
 			}
 
-			void Abort(
-				AssetResourcePublicationContext& context,
+			void Abort(AssetResourcePublicationContext& context,
 				AssetResourcePublicationAbortReason reason) noexcept override
 			{
 				GGLAB_UNUSED(context);
@@ -324,10 +312,7 @@ namespace gglab
 
 	AssetPublicationLabSession::AssetPublicationLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -337,18 +322,19 @@ namespace gglab
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(0),
-			.m_EnumItems = {
-				{ .m_Value = 0, .m_Name = "Asset Publication Acceptance Suite" },
-				{ .m_Value = 1, .m_Name = "Incremental Success" },
-				{ .m_Value = 2, .m_Name = "Cancel During Textures" },
-				{ .m_Value = 3, .m_Name = "Cancel During Materials" },
-				{ .m_Value = 4, .m_Name = "Cancel During Meshes" },
-				{ .m_Value = 5, .m_Name = "Cancel During Mesh Instances" },
-				{ .m_Value = 6, .m_Name = "Cancel During Dependencies" },
-				{ .m_Value = 7, .m_Name = "Cancel Before Commit" },
-				{ .m_Value = 8, .m_Name = "Fail During Materials" },
-			},
-		}));
+			.m_EnumItems =
+				{
+					{.m_Value = 0, .m_Name = "Asset Publication Acceptance Suite"},
+					{.m_Value = 1, .m_Name = "Incremental Success"},
+					{.m_Value = 2, .m_Name = "Cancel During Textures"},
+					{.m_Value = 3, .m_Name = "Cancel During Materials"},
+					{.m_Value = 4, .m_Name = "Cancel During Meshes"},
+					{.m_Value = 5, .m_Name = "Cancel During Mesh Instances"},
+					{.m_Value = 6, .m_Name = "Cancel During Dependencies"},
+					{.m_Value = 7, .m_Name = "Cancel Before Commit"},
+					{.m_Value = 8, .m_Name = "Fail During Materials"},
+				},
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = FaultOccurrenceId,
 			.m_Name = "Fault Step Occurrence",
@@ -358,7 +344,7 @@ namespace gglab
 			.m_DefaultValue = uint32_t(1),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(uint32_t(64)),
-		}));
+			}));
 		ApplyImmediateParameters();
 	}
 
@@ -393,36 +379,30 @@ namespace gglab
 		}
 
 		m_State->m_ElapsedSeconds += deltaTime;
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
-		const uint64_t processed =
-			statistics.m_ResourcePublicationQueue.m_ProcessedCount;
+		const uint64_t processed = statistics.m_ResourcePublicationQueue.m_ProcessedCount;
 		if (processed > m_State->m_LastProcessed)
 		{
 			++m_State->m_FramesWithPublicationSteps;
 			m_State->m_LastProcessed = processed;
 		}
-		m_State->m_SawPublicationQueue |= HasPendingIdentity(
-			statistics.m_ResourcePublicationQueue,
-			m_State->m_Identity);
+		m_State->m_SawPublicationQueue |=
+			HasPendingIdentity(statistics.m_ResourcePublicationQueue, m_State->m_Identity);
 
-		const Model* model = m_Services.m_AssetManager->GetModel(
-			m_State->m_Request.m_ModelId);
+		const Model* model = m_Services.m_AssetManager->GetModel(m_State->m_Request.m_ModelId);
 		if (model && model->m_ContentGeneration == m_State->m_Request.m_Generation)
 		{
 			m_State->m_FinalModelState = model->m_State;
-			if (model->m_State == AssetState::Publishing &&
-				!model->m_MeshInstance.empty())
+			if (model->m_State == AssetState::Publishing && !model->m_MeshInstance.empty())
 			{
 				m_State->m_HalfPublishedModelObserved = true;
 			}
 			const bool terminal = model->m_State == AssetState::Ready ||
 				model->m_State == AssetState::Failed ||
 				model->m_State == AssetState::Cancelled;
-			if (terminal && IsStreamingIdle(statistics) && !HasPendingIdentity(
-				statistics.m_ResourcePublicationQueue,
-				m_State->m_Identity))
+			if (terminal && IsStreamingIdle(statistics) &&
+				!HasPendingIdentity(statistics.m_ResourcePublicationQueue, m_State->m_Identity))
 			{
 				++m_State->m_SettleFrames;
 			}
@@ -449,32 +429,33 @@ namespace gglab
 		if (m_Suite)
 		{
 			diagnostics.m_Metrics = {
-				{ .m_Name = "Scenario", .m_Value = "Asset Publication Acceptance Suite" },
-				{ .m_Name = "Completed cases",
-					.m_Value = std::format("{} / {}",
-						m_Suite->m_Results.size(),
-						static_cast<size_t>(AcceptanceSuiteState::Case::Count)) },
-				{ .m_Name = "Elapsed",
-					.m_Value = std::format("{:.2f} s", m_Suite->m_TotalElapsedSeconds) },
+				{.m_Name = "Scenario", .m_Value = "Asset Publication Acceptance Suite"},
+				{.m_Name = "Completed cases",
+					.m_Value = std::format("{} / {}", m_Suite->m_Results.size(),
+						static_cast<size_t>(AcceptanceSuiteState::Case::Count))},
+				{.m_Name = "Elapsed",
+					.m_Value = std::format("{:.2f} s", m_Suite->m_TotalElapsedSeconds)},
 			};
 			diagnostics.m_Checks.push_back({
 				.m_Name = "Acceptance suite",
-				.m_Status = !m_Suite->m_Finished ? LabDiagnosticCheckStatus::Pending :
-					m_Suite->m_Passed ? LabDiagnosticCheckStatus::Passed :
-					LabDiagnosticCheckStatus::Failed,
-				.m_Detail = !m_Suite->m_Finished ? "Acceptance cases are running." :
-					m_Suite->m_Passed ? "All asset publication acceptance cases passed." :
-						"One or more asset publication acceptance cases failed.",
-			});
+				.m_Status = !m_Suite->m_Finished ? LabDiagnosticCheckStatus::Pending
+							: m_Suite->m_Passed ? LabDiagnosticCheckStatus::Passed
+												 : LabDiagnosticCheckStatus::Failed,
+				.m_Detail = !m_Suite->m_Finished ? "Acceptance cases are running."
+							: m_Suite->m_Passed
+								? "All asset publication acceptance cases passed."
+								: "One or more asset publication acceptance cases failed.",
+				});
 			for (const AcceptanceSuiteState::Result& result : m_Suite->m_Results)
 			{
 				diagnostics.m_Checks.push_back({
 					.m_Name = result.m_Name,
-					.m_Status = result.m_Passed ? LabDiagnosticCheckStatus::Passed :
-						LabDiagnosticCheckStatus::Failed,
-					.m_Detail = result.m_Passed ? "Passed." :
-						std::format("{} invariant errors.", result.m_Errors.size()),
-				});
+					.m_Status = result.m_Passed ? LabDiagnosticCheckStatus::Passed
+												: LabDiagnosticCheckStatus::Failed,
+					.m_Detail = result.m_Passed
+									? "Passed."
+									: std::format("{} invariant errors.", result.m_Errors.size()),
+					});
 			}
 			for (const std::string& error : m_Suite->m_FinalErrors)
 			{
@@ -482,7 +463,7 @@ namespace gglab
 					.m_Name = "Suite invariant",
 					.m_Status = LabDiagnosticCheckStatus::Failed,
 					.m_Detail = error,
-				});
+					});
 			}
 			return;
 		}
@@ -492,51 +473,47 @@ namespace gglab
 				.m_Name = "Scenario state",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "No active scenario.",
-			});
+				});
 			return;
 		}
 
 		const AssetOwnershipStatistics ownership =
 			m_Services.m_AssetManager->GetOwnershipStatistics();
 		diagnostics.m_Metrics = {
-			{ .m_Name = "Scenario", .m_Value = ScenarioText(m_State->m_Scenario) },
-			{ .m_Name = "Model", .m_Value = m_State->m_ModelPath.generic_string() },
-			{ .m_Name = "Model ID / generation",
-				.m_Value = std::format("{} / {}",
-					m_State->m_Request.m_ModelId.Value(),
-					m_State->m_Request.m_Generation) },
-			{ .m_Name = "Frames with publication steps",
-				.m_Value = std::to_string(m_State->m_FramesWithPublicationSteps) },
-			{ .m_Name = "Active publication retains",
-				.m_Value = std::to_string(ownership.m_PublicationRetainCount) },
-			{ .m_Name = "Elapsed", .m_Value = std::format("{:.2f} s", m_State->m_ElapsedSeconds) },
+			{.m_Name = "Scenario", .m_Value = ScenarioText(m_State->m_Scenario)},
+			{.m_Name = "Model", .m_Value = m_State->m_ModelPath.generic_string()},
+			{.m_Name = "Model ID / generation",
+				.m_Value = std::format("{} / {}", m_State->m_Request.m_ModelId.Value(),
+					m_State->m_Request.m_Generation)},
+			{.m_Name = "Frames with publication steps",
+				.m_Value = std::to_string(m_State->m_FramesWithPublicationSteps)},
+			{.m_Name = "Active publication retains",
+				.m_Value = std::to_string(ownership.m_PublicationRetainCount)},
+			{.m_Name = "Elapsed", .m_Value = std::format("{:.2f} s", m_State->m_ElapsedSeconds)},
 		};
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Scenario result",
-			.m_Status = !m_State->m_Finished ? LabDiagnosticCheckStatus::Pending :
-				m_State->m_Passed ? LabDiagnosticCheckStatus::Passed :
-				LabDiagnosticCheckStatus::Failed,
-			.m_Detail = !m_State->m_Finished ? "Scenario is running." :
-				m_State->m_Passed ? "All publication invariants passed." :
-				"One or more publication invariants failed.",
-		});
+			.m_Status = !m_State->m_Finished ? LabDiagnosticCheckStatus::Pending
+						: m_State->m_Passed ? LabDiagnosticCheckStatus::Passed
+											 : LabDiagnosticCheckStatus::Failed,
+			.m_Detail = !m_State->m_Finished ? "Scenario is running."
+						: m_State->m_Passed ? "All publication invariants passed."
+											 : "One or more publication invariants failed.",
+			});
 		for (const std::string& error : m_State->m_Errors)
 		{
 			diagnostics.m_Checks.push_back({
 				.m_Name = "Invariant",
 				.m_Status = LabDiagnosticCheckStatus::Failed,
 				.m_Detail = error,
-			});
+				});
 		}
 	}
 
 	void AssetPublicationLabSession::ApplyImmediateParameters() noexcept
 	{
-		m_Scenario = static_cast<Scenario>(
-			GetParameters().Get(ScenarioId, int32_t(0)));
-		m_FaultOccurrence = GetParameters().Get(
-			FaultOccurrenceId,
-			uint32_t(1));
+		m_Scenario = static_cast<Scenario>(GetParameters().Get(ScenarioId, int32_t(0)));
+		m_FaultOccurrence = GetParameters().Get(FaultOccurrenceId, uint32_t(1));
 		if (m_Entered)
 		{
 			StartScenario();
@@ -546,8 +523,7 @@ namespace gglab
 	void AssetPublicationLabSession::StartScenario() noexcept
 	{
 		StopScenario();
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		if (!m_HasOriginalBudget)
 		{
 			m_OriginalBudget = scheduler->GetFrameBudget();
@@ -567,18 +543,15 @@ namespace gglab
 	}
 
 	void AssetPublicationLabSession::StartModelScenario(
-		Scenario scenario,
-		uint32_t faultOccurrence) noexcept
+		Scenario scenario, uint32_t faultOccurrence) noexcept
 	{
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		scheduler->ClearResourcePublicationFault();
 		ResetAssetInterests();
 		m_State = std::make_unique<ScenarioState>();
 		m_State->m_Scenario = scenario;
 		m_State->m_ModelPath = ScenarioModelPath(scenario);
-		m_State->m_BaselineOwnership =
-			m_Services.m_AssetManager->GetOwnershipStatistics();
+		m_State->m_BaselineOwnership = m_Services.m_AssetManager->GetOwnershipStatistics();
 		const AssetUploadStatistics before = scheduler->GetStatistics();
 		const auto& publicationBefore = before.m_ResourcePublicationQueue;
 		m_State->m_StartEnqueued = publicationBefore.m_EnqueuedCount;
@@ -588,13 +561,11 @@ namespace gglab
 		m_State->m_StartFailed = publicationBefore.m_FailedCount;
 		m_State->m_StartCancelled = publicationBefore.m_CancelledCount;
 		m_State->m_StartFaultInjections = publicationBefore.m_FaultInjectionCount;
-		m_State->m_StartNoProgressContinues =
-			publicationBefore.m_NoProgressContinueCount;
+		m_State->m_StartNoProgressContinues = publicationBefore.m_NoProgressContinueCount;
 		m_State->m_LastProcessed = publicationBefore.m_ProcessedCount;
 
-		m_State->m_Request = GetAssetOwnerScope().LoadModelAsync(
-			m_State->m_ModelPath,
-			TaskPriority::Normal);
+		m_State->m_Request =
+			GetAssetOwnerScope().LoadModelAsync(m_State->m_ModelPath, TaskPriority::Normal);
 		if (!m_State->m_Request.IsValid())
 		{
 			m_State->m_Finished = true;
@@ -614,11 +585,11 @@ namespace gglab
 				.m_Identity = m_State->m_Identity,
 				.m_Stage = FaultStage(scenario),
 				.m_Action = action,
-				.m_Timing = scenario == Scenario::CancelBeforeCommit ?
-					AssetResourcePublicationFaultTiming::BeforeStep :
-					AssetResourcePublicationFaultTiming::AfterStep,
+				.m_Timing = scenario == Scenario::CancelBeforeCommit
+								? AssetResourcePublicationFaultTiming::BeforeStep
+								: AssetResourcePublicationFaultTiming::AfterStep,
 				.m_TriggerOccurrence = faultOccurrence,
-			});
+				});
 		}
 	}
 
@@ -626,8 +597,7 @@ namespace gglab
 	{
 		if (m_Services.m_Renderer)
 		{
-			AssetUploadScheduler* scheduler =
-				m_Services.m_Renderer->GetAssetUploadScheduler();
+			AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 			scheduler->ClearResourcePublicationFault();
 			scheduler->ClearGpuCompletionHold();
 			if (m_HasOriginalBudget)
@@ -647,21 +617,20 @@ namespace gglab
 		const auto& publication = statistics.m_ResourcePublicationQueue;
 		const AssetOwnershipStatistics ownership =
 			m_Services.m_AssetManager->GetOwnershipStatistics();
-		const bool successScenario =
-			m_State->m_Scenario == Scenario::IncrementalSuccess;
-		const AssetResourcePublicationFaultAction action =
-			FaultAction(m_State->m_Scenario);
-		const AssetState expectedState = successScenario ? AssetState::Ready :
-			action == AssetResourcePublicationFaultAction::Fail ?
-				AssetState::Failed : AssetState::Cancelled;
+		const bool successScenario = m_State->m_Scenario == Scenario::IncrementalSuccess;
+		const AssetResourcePublicationFaultAction action = FaultAction(m_State->m_Scenario);
+		const AssetState expectedState = successScenario ? AssetState::Ready
+			: action == AssetResourcePublicationFaultAction::Fail
+			? AssetState::Failed
+			: AssetState::Cancelled;
 
 		const auto require = [this](bool condition, std::string error)
-		{
-			if (!condition)
 			{
-				m_State->m_Errors.push_back(std::move(error));
-			}
-		};
+				if (!condition)
+				{
+					m_State->m_Errors.push_back(std::move(error));
+				}
+			};
 		require(m_State->m_FinalModelState == expectedState,
 			std::format("Expected terminal model state {}, observed {}.",
 				static_cast<uint32_t>(expectedState),
@@ -670,8 +639,7 @@ namespace gglab
 			"The scenario did not enqueue exactly one resource publication job.");
 		require(publication.m_ProcessedCount > m_State->m_StartProcessed,
 			"The publication job executed no steps.");
-		require(publication.m_NoProgressContinueCount ==
-			m_State->m_StartNoProgressContinues,
+		require(publication.m_NoProgressContinueCount == m_State->m_StartNoProgressContinues,
 			"A publication job returned Continue without progress.");
 		require(ownership.m_PublicationRetainCount ==
 			m_State->m_BaselineOwnership.m_PublicationRetainCount,
@@ -696,8 +664,7 @@ namespace gglab
 		}
 		else
 		{
-			require(publication.m_FaultInjectionCount ==
-				m_State->m_StartFaultInjections + 1,
+			require(publication.m_FaultInjectionCount == m_State->m_StartFaultInjections + 1,
 				"The configured publication fault did not trigger exactly once.");
 			if (action == AssetResourcePublicationFaultAction::Fail)
 			{
@@ -706,12 +673,10 @@ namespace gglab
 			}
 			else
 			{
-				require(publication.m_CancelledCount ==
-					m_State->m_StartCancelled + 1,
+				require(publication.m_CancelledCount == m_State->m_StartCancelled + 1,
 					"The injected cancellation did not terminate the publication as Cancelled.");
 			}
-			require(ownership.m_LeaseCount ==
-				m_State->m_BaselineOwnership.m_LeaseCount + 1,
+			require(ownership.m_LeaseCount == m_State->m_BaselineOwnership.m_LeaseCount + 1,
 				"Temporary dependency leases leaked after rollback.");
 		}
 
@@ -721,16 +686,13 @@ namespace gglab
 		{
 			GGLAB_LOG_INFO(
 				"Asset Publication Lab ({}) PASS: framesWithSteps={}, processedDelta={}.",
-				ScenarioText(m_State->m_Scenario),
-				m_State->m_FramesWithPublicationSteps,
+				ScenarioText(m_State->m_Scenario), m_State->m_FramesWithPublicationSteps,
 				publication.m_ProcessedCount - m_State->m_StartProcessed);
 		}
 		else
 		{
-			GGLAB_LOG_ERROR(
-				"Asset Publication Lab ({}) FAIL with {} invariant errors.",
-				ScenarioText(m_State->m_Scenario),
-				m_State->m_Errors.size());
+			GGLAB_LOG_ERROR("Asset Publication Lab ({}) FAIL with {} invariant errors.",
+				ScenarioText(m_State->m_Scenario), m_State->m_Errors.size());
 			for (const std::string& error : m_State->m_Errors)
 			{
 				GGLAB_LOG_ERROR("Asset Publication Lab invariant: {}", error);
@@ -740,11 +702,9 @@ namespace gglab
 
 	void AssetPublicationLabSession::StartAcceptanceSuite() noexcept
 	{
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		m_Suite = std::make_unique<AcceptanceSuiteState>();
-		m_Suite->m_BaselineOwnership =
-			m_Services.m_AssetManager->GetOwnershipStatistics();
+		m_Suite->m_BaselineOwnership = m_Services.m_AssetManager->GetOwnershipStatistics();
 		m_Suite->m_BaselineUpload = scheduler->GetStatistics();
 		StartAcceptanceCase();
 	}
@@ -752,8 +712,7 @@ namespace gglab
 	void AssetPublicationLabSession::StartAcceptanceCase() noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		scheduler->ClearResourcePublicationFault();
 		scheduler->ClearGpuCompletionHold();
@@ -764,10 +723,10 @@ namespace gglab
 		m_Suite->m_GpuHoldObserved = false;
 
 		const auto startModel = [this](Scenario scenario, uint32_t occurrence) noexcept
-		{
-			StartModelScenario(scenario, occurrence);
-			m_Suite->m_Phase = AcceptanceSuiteState::Phase::RunningModel;
-		};
+			{
+				StartModelScenario(scenario, occurrence);
+				m_Suite->m_Phase = AcceptanceSuiteState::Phase::RunningModel;
+			};
 		switch (m_Suite->m_Case)
 		{
 		case AcceptanceSuiteState::Case::IncrementalSuccess:
@@ -828,12 +787,10 @@ namespace gglab
 			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope();
 			m_Suite->m_TextureRequest = m_Suite->m_PrimaryOwner.LoadTextureAsync(
 				"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
-				TextureSemantic::BaseColor,
-				TaskPriority::Normal);
+				TextureSemantic::BaseColor, TaskPriority::Normal);
 			if (!m_Suite->m_TextureRequest.IsValid())
 			{
-				CompleteAcceptanceCase(
-					"Shared Texture rollback",
+				CompleteAcceptanceCase("Shared Texture rollback",
 					{ "AssetManager rejected the shared texture request." });
 				return;
 			}
@@ -852,13 +809,11 @@ namespace gglab
 			const AssetManager::TextureLoadRequest backgroundRequest =
 				m_Suite->m_PrimaryOwner.LoadTextureAsync(
 					"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
-					TextureSemantic::BaseColor,
-					TaskPriority::Background);
+					TextureSemantic::BaseColor, TaskPriority::Background);
 			const AssetManager::TextureLoadRequest criticalRequest =
 				m_Suite->m_SecondaryOwner.LoadTextureAsync(
 					"Assets/Models/NormalTangentTest/NormalTangentTest_BaseColor.png",
-					TextureSemantic::BaseColor,
-					TaskPriority::Critical);
+					TextureSemantic::BaseColor, TaskPriority::Critical);
 			std::vector<std::string> errors;
 			if (!backgroundRequest.IsValid() || !criticalRequest.IsValid() ||
 				backgroundRequest.m_TextureId != criticalRequest.m_TextureId ||
@@ -872,26 +827,24 @@ namespace gglab
 					const AssetOwnershipStatistics& ownership) noexcept
 					-> const AssetInterestActivity*
 					{
-						const auto interest = std::ranges::find_if(
-							ownership.m_ActiveInterests,
+						const auto interest = std::ranges::find_if(ownership.m_ActiveInterests,
 							[id](const AssetInterestActivity& activity) noexcept
 							{
 								return activity.m_Kind == AssetKind::Texture &&
 									activity.m_StableId == id.Value();
 							});
-						return interest != ownership.m_ActiveInterests.end() ?
-							&*interest : nullptr;
+						return interest != ownership.m_ActiveInterests.end() ? &*interest : nullptr;
 					};
 
 				const AssetOwnershipStatistics merged = assetManager->GetOwnershipStatistics();
 				const AssetInterestActivity* mergedInterest = findInterest(merged);
 				if (!mergedInterest ||
 					mergedInterest->m_Generation != backgroundRequest.m_Generation ||
-					mergedInterest->m_LeaseCount != 2 ||
-					mergedInterest->m_OwnerCount != 2 ||
+					mergedInterest->m_LeaseCount != 2 || mergedInterest->m_OwnerCount != 2 ||
 					mergedInterest->m_EffectivePriority != TaskPriority::Critical)
 				{
-					errors.push_back("Multiple leases did not merge to the highest owner priority.");
+					errors.push_back(
+						"Multiple leases did not merge to the highest owner priority.");
 				}
 
 				m_Suite->m_SecondaryOwner.Reset();
@@ -899,11 +852,11 @@ namespace gglab
 				const AssetInterestActivity* reducedInterest = findInterest(reduced);
 				if (!reducedInterest ||
 					reducedInterest->m_Generation != backgroundRequest.m_Generation ||
-					reducedInterest->m_LeaseCount != 1 ||
-					reducedInterest->m_OwnerCount != 1 ||
+					reducedInterest->m_LeaseCount != 1 || reducedInterest->m_OwnerCount != 1 ||
 					reducedInterest->m_EffectivePriority != TaskPriority::Background)
 				{
-					errors.push_back("Releasing the critical lease did not restore background priority.");
+					errors.push_back(
+						"Releasing the critical lease did not restore background priority.");
 				}
 				if (reduced.m_PriorityUpdateCount <
 					m_Suite->m_CaseBaselineOwnership.m_PriorityUpdateCount + 2)
@@ -919,12 +872,10 @@ namespace gglab
 			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope();
 			m_Suite->m_TextureRequest = m_Suite->m_PrimaryOwner.LoadTextureAsync(
 				"Assets/Models/FlightHelmet/FlightHelmet_Materials_LensesMat_BaseColor.png",
-				TextureSemantic::BaseColor,
-				TaskPriority::Normal);
+				TextureSemantic::BaseColor, TaskPriority::Normal);
 			if (!m_Suite->m_TextureRequest.IsValid())
 			{
-				CompleteAcceptanceCase(
-					"GPU submitted cancellation",
+				CompleteAcceptanceCase("GPU submitted cancellation",
 					{ "AssetManager rejected the GPU cancellation texture request." });
 				return;
 			}
@@ -996,17 +947,14 @@ namespace gglab
 		}
 		m_Suite->m_TotalElapsedSeconds += deltaTime;
 		m_Suite->m_CaseElapsedSeconds += deltaTime;
-		if (m_Suite->m_TotalElapsedSeconds > 600.0f ||
-			m_Suite->m_CaseElapsedSeconds > 120.0f)
+		if (m_Suite->m_TotalElapsedSeconds > 600.0f || m_Suite->m_CaseElapsedSeconds > 120.0f)
 		{
-			CompleteAcceptanceCase(
-				"Timed out acceptance case",
+			CompleteAcceptanceCase("Timed out acceptance case",
 				{ "The acceptance case exceeded its deterministic timeout." });
 			return;
 		}
 
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		switch (m_Suite->m_Phase)
@@ -1015,9 +963,7 @@ namespace gglab
 			UpdateModelScenario(deltaTime);
 			if (m_State && m_State->m_Finished)
 			{
-				CompleteAcceptanceCase(
-					ScenarioText(m_State->m_Scenario),
-					m_State->m_Errors);
+				CompleteAcceptanceCase(ScenarioText(m_State->m_Scenario), m_State->m_Errors);
 			}
 			break;
 
@@ -1035,9 +981,9 @@ namespace gglab
 				m_Suite->m_OldStepsAtCancellation = m_Suite->m_OldGeneration->m_Steps;
 				if (cancelled != 1)
 				{
-					CompleteAcceptanceCase(
-						"Stale generation rejection",
-						{ std::format("Expected one stale job cancellation, observed {}.", cancelled) });
+					CompleteAcceptanceCase("Stale generation rejection",
+						{ std::format(
+							"Expected one stale job cancellation, observed {}.", cancelled) });
 					return;
 				}
 				m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingNewGeneration;
@@ -1046,24 +992,24 @@ namespace gglab
 
 		case AcceptanceSuiteState::Phase::WaitingNewGeneration:
 			if (m_Suite->m_NewGeneration->m_Completed &&
-				!HasPendingIdentity(statistics.m_ResourcePublicationQueue, m_Suite->m_NewIdentity) &&
+				!HasPendingIdentity(
+					statistics.m_ResourcePublicationQueue, m_Suite->m_NewIdentity) &&
 				!HasPendingIdentity(statistics.m_ResourcePublicationQueue, m_Suite->m_OldIdentity))
 			{
 				std::vector<std::string> errors;
 				if (m_Suite->m_OldGeneration->m_AbortCount != 1 ||
 					m_Suite->m_OldGeneration->m_AbortReason !=
-						AssetResourcePublicationAbortReason::Cancelled)
+					AssetResourcePublicationAbortReason::Cancelled)
 				{
-					errors.push_back("The stale generation was not aborted exactly once as Cancelled.");
+					errors.push_back(
+						"The stale generation was not aborted exactly once as Cancelled.");
 				}
-				if (m_Suite->m_OldGeneration->m_Steps !=
-					m_Suite->m_OldStepsAtCancellation)
+				if (m_Suite->m_OldGeneration->m_Steps != m_Suite->m_OldStepsAtCancellation)
 				{
 					errors.push_back("The stale generation executed again after cancellation.");
 				}
 				if (m_Suite->m_NewGeneration->m_AbortCount != 0 ||
-					m_Suite->m_NewGeneration->m_Steps !=
-						m_Suite->m_NewGeneration->m_TargetSteps)
+					m_Suite->m_NewGeneration->m_Steps != m_Suite->m_NewGeneration->m_TargetSteps)
 				{
 					errors.push_back("The current generation did not complete independently.");
 				}
@@ -1079,19 +1025,16 @@ namespace gglab
 		case AcceptanceSuiteState::Phase::WaitingSharedTexture:
 		{
 			const AssetSnapshot snapshot = BuildAssetSnapshot(*assetManager);
-			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
-				snapshot,
-				m_Suite->m_TextureRequest.m_TextureId);
+			const AssetSnapshot::Texture* texture =
+				FindTextureSnapshot(snapshot, m_Suite->m_TextureRequest.m_TextureId);
 			if (texture && texture->m_State == AssetState::Ready && texture->m_IsUploaded)
 			{
 				m_Suite->m_SecondaryOwner = assetManager->CreateOwnerScope();
 				m_Suite->m_ModelRequest = m_Suite->m_SecondaryOwner.LoadModelAsync(
-					"Assets/Models/NormalTangentTest/NormalTangentTest.gltf",
-					TaskPriority::Normal);
+					"Assets/Models/NormalTangentTest/NormalTangentTest.gltf", TaskPriority::Normal);
 				if (!m_Suite->m_ModelRequest.IsValid())
 				{
-					CompleteAcceptanceCase(
-						"Shared Texture rollback",
+					CompleteAcceptanceCase("Shared Texture rollback",
 						{ "AssetManager rejected the rollback model request." });
 					return;
 				}
@@ -1105,14 +1048,13 @@ namespace gglab
 					.m_Stage = AssetResourcePublicationStage::Materials,
 					.m_Action = AssetResourcePublicationFaultAction::Fail,
 					.m_TriggerOccurrence = 1,
-				});
+					});
 				m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingSharedRollback;
 			}
 			else if (texture && (texture->m_State == AssetState::Failed ||
 				texture->m_State == AssetState::Cancelled))
 			{
-				CompleteAcceptanceCase(
-					"Shared Texture rollback",
+				CompleteAcceptanceCase("Shared Texture rollback",
 					{ "The shared texture failed before the rollback model started." });
 			}
 			break;
@@ -1130,20 +1072,17 @@ namespace gglab
 				}
 				std::vector<std::string> errors;
 				const AssetSnapshot snapshot = BuildAssetSnapshot(*assetManager);
-				const AssetSnapshot::Texture* texture = FindTextureSnapshot(
-					snapshot,
-					m_Suite->m_TextureRequest.m_TextureId);
+				const AssetSnapshot::Texture* texture =
+					FindTextureSnapshot(snapshot, m_Suite->m_TextureRequest.m_TextureId);
 				if (!texture ||
 					texture->m_ContentGeneration != m_Suite->m_TextureRequest.m_Generation ||
-					texture->m_State != AssetState::Ready ||
-					!texture->m_IsUploaded ||
+					texture->m_State != AssetState::Ready || !texture->m_IsUploaded ||
 					!texture->m_Texture.IsValid())
 				{
 					errors.push_back("Rollback removed or invalidated the shared Ready texture.");
 				}
 				const AssetOwnershipStatistics ownership = assetManager->GetOwnershipStatistics();
-				const bool sharedInterestAlive = std::ranges::any_of(
-					ownership.m_ActiveInterests,
+				const bool sharedInterestAlive = std::ranges::any_of(ownership.m_ActiveInterests,
 					[this](const AssetInterestActivity& interest) noexcept
 					{
 						return interest.m_Kind == AssetKind::Texture &&
@@ -1153,7 +1092,8 @@ namespace gglab
 					});
 				if (!sharedInterestAlive)
 				{
-					errors.push_back("The surviving shared texture lost its external owner interest.");
+					errors.push_back(
+						"The surviving shared texture lost its external owner interest.");
 				}
 				if (ownership.m_PublicationRetainCount !=
 					m_Suite->m_CaseBaselineOwnership.m_PublicationRetainCount)
@@ -1170,26 +1110,25 @@ namespace gglab
 			{
 				std::vector<std::string> errors;
 				const AssetSnapshot beforeCancellation = BuildAssetSnapshot(*assetManager);
-				const AssetSnapshot::Texture* heldTexture = FindTextureSnapshot(
-					beforeCancellation,
-					m_Suite->m_TextureRequest.m_TextureId);
+				const AssetSnapshot::Texture* heldTexture =
+					FindTextureSnapshot(beforeCancellation, m_Suite->m_TextureRequest.m_TextureId);
 				m_Suite->m_GpuHoldObserved = heldTexture &&
 					heldTexture->m_State == AssetState::GpuProcessing &&
 					heldTexture->m_Texture.IsValid();
 				if (!m_Suite->m_GpuHoldObserved)
 				{
-					errors.push_back("The held upload was not observable as an allocated GPU resource.");
+					errors.push_back(
+						"The held upload was not observable as an allocated GPU resource.");
 				}
 				m_Suite->m_PrimaryOwner.Reset();
 				const AssetSnapshot afterCancellation = BuildAssetSnapshot(*assetManager);
-				const AssetSnapshot::Texture* cancelledTexture = FindTextureSnapshot(
-					afterCancellation,
-					m_Suite->m_TextureRequest.m_TextureId);
-				if (!cancelledTexture ||
-					cancelledTexture->m_State != AssetState::GpuProcessing ||
+				const AssetSnapshot::Texture* cancelledTexture =
+					FindTextureSnapshot(afterCancellation, m_Suite->m_TextureRequest.m_TextureId);
+				if (!cancelledTexture || cancelledTexture->m_State != AssetState::GpuProcessing ||
 					!cancelledTexture->m_Texture.IsValid())
 				{
-					errors.push_back("Post-submit cancellation destroyed the texture before fence finalization.");
+					errors.push_back(
+						"Post-submit cancellation destroyed the texture before fence finalization.");
 				}
 				if (!errors.empty())
 				{
@@ -1205,9 +1144,8 @@ namespace gglab
 		case AcceptanceSuiteState::Phase::WaitingGpuCancellation:
 		{
 			const AssetSnapshot snapshot = BuildAssetSnapshot(*assetManager);
-			const AssetSnapshot::Texture* texture = FindTextureSnapshot(
-				snapshot,
-				m_Suite->m_TextureRequest.m_TextureId);
+			const AssetSnapshot::Texture* texture =
+				FindTextureSnapshot(snapshot, m_Suite->m_TextureRequest.m_TextureId);
 			if (texture && texture->m_State == AssetState::Cancelled &&
 				!HasPendingUpload(statistics, m_Suite->m_TextureIdentity) &&
 				IsStreamingIdle(statistics))
@@ -1225,7 +1163,8 @@ namespace gglab
 				if (ownership.m_GpuDeferredCancellationCount !=
 					m_Suite->m_StartGpuDeferredCancellations + 1)
 				{
-					errors.push_back("GPU deferred cancellation telemetry did not advance exactly once.");
+					errors.push_back(
+						"GPU deferred cancellation telemetry did not advance exactly once.");
 				}
 				if (!m_Suite->m_GpuHoldObserved)
 				{
@@ -1243,8 +1182,7 @@ namespace gglab
 	}
 
 	void AssetPublicationLabSession::CompleteAcceptanceCase(
-		std::string name,
-		std::vector<std::string> errors) noexcept
+		std::string name, std::vector<std::string> errors) noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
 		const bool passed = errors.empty();
@@ -1254,10 +1192,8 @@ namespace gglab
 		}
 		else
 		{
-			GGLAB_LOG_ERROR(
-				"Asset publication acceptance case FAIL: {} ({} invariant errors).",
-				name,
-				errors.size());
+			GGLAB_LOG_ERROR("Asset publication acceptance case FAIL: {} ({} invariant errors).",
+				name, errors.size());
 			for (const std::string& error : errors)
 			{
 				GGLAB_LOG_ERROR("Asset publication acceptance invariant: {}", error);
@@ -1267,10 +1203,9 @@ namespace gglab
 			.m_Name = std::move(name),
 			.m_Passed = passed,
 			.m_Errors = std::move(errors),
-		});
+			});
 
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		scheduler->ClearResourcePublicationFault();
 		scheduler->ClearGpuCompletionHold();
 		ResetAssetInterests();
@@ -1280,8 +1215,8 @@ namespace gglab
 		m_Suite->m_PrimaryOwner = {};
 		m_Suite->m_SecondaryOwner = {};
 		m_Suite->m_Phase = AcceptanceSuiteState::Phase::Starting;
-		m_Suite->m_Case = static_cast<AcceptanceSuiteState::Case>(
-			static_cast<uint8_t>(m_Suite->m_Case) + 1);
+		m_Suite->m_Case =
+			static_cast<AcceptanceSuiteState::Case>(static_cast<uint8_t>(m_Suite->m_Case) + 1);
 		if (m_Suite->m_Case == AcceptanceSuiteState::Case::Count)
 		{
 			CompleteAcceptanceSuite();
@@ -1295,25 +1230,23 @@ namespace gglab
 	void AssetPublicationLabSession::CompleteAcceptanceSuite() noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
-		AssetUploadScheduler* scheduler =
-			m_Services.m_Renderer->GetAssetUploadScheduler();
+		AssetUploadScheduler* scheduler = m_Services.m_Renderer->GetAssetUploadScheduler();
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		const AssetOwnershipStatistics ownership =
 			m_Services.m_AssetManager->GetOwnershipStatistics();
 		const auto& before = m_Suite->m_BaselineUpload.m_ResourcePublicationQueue;
 		const auto& after = statistics.m_ResourcePublicationQueue;
 		const uint64_t enqueuedDelta = after.m_EnqueuedCount - before.m_EnqueuedCount;
-		const uint64_t terminalDelta =
-			(after.m_CompletedCount - before.m_CompletedCount) +
+		const uint64_t terminalDelta = (after.m_CompletedCount - before.m_CompletedCount) +
 			(after.m_FailedCount - before.m_FailedCount) +
 			(after.m_CancelledCount - before.m_CancelledCount);
 		const auto require = [this](bool condition, std::string error)
-		{
-			if (!condition)
 			{
-				m_Suite->m_FinalErrors.push_back(std::move(error));
-			}
-		};
+				if (!condition)
+				{
+					m_Suite->m_FinalErrors.push_back(std::move(error));
+				}
+			};
 		require(enqueuedDelta == terminalDelta + after.m_PendingCount,
 			"Publication queue conservation failed: enqueued != terminal + pending.");
 		require(after.m_QueueSampleCount - before.m_QueueSampleCount == enqueuedDelta,
@@ -1340,27 +1273,22 @@ namespace gglab
 		require(submittedDelta == finalizedDelta,
 			"Upload submission conservation failed after GPU finalization.");
 
-		m_Suite->m_Passed = m_Suite->m_FinalErrors.empty() &&
-			std::ranges::all_of(
-				m_Suite->m_Results,
-				&AcceptanceSuiteState::Result::m_Passed);
+		m_Suite->m_Passed =
+			m_Suite->m_FinalErrors.empty() &&
+			std::ranges::all_of(m_Suite->m_Results, &AcceptanceSuiteState::Result::m_Passed);
 		m_Suite->m_Finished = true;
 		m_Suite->m_Phase = AcceptanceSuiteState::Phase::Completed;
 		if (m_Suite->m_Passed)
 		{
-			GGLAB_LOG_INFO(
-				"ASSET PUBLICATION ACCEPTANCE PASS: {}/{} cases completed in {:.2f} s.",
-				m_Suite->m_Results.size(),
-				static_cast<size_t>(AcceptanceSuiteState::Case::Count),
+			GGLAB_LOG_INFO("ASSET PUBLICATION ACCEPTANCE PASS: {}/{} cases completed in {:.2f} s.",
+				m_Suite->m_Results.size(), static_cast<size_t>(AcceptanceSuiteState::Case::Count),
 				m_Suite->m_TotalElapsedSeconds);
 		}
 		else
 		{
 			GGLAB_LOG_ERROR(
 				"ASSET PUBLICATION ACCEPTANCE FAIL: {}/{} cases passed, {} suite invariant errors.",
-				std::ranges::count_if(
-					m_Suite->m_Results,
-					&AcceptanceSuiteState::Result::m_Passed),
+				std::ranges::count_if(m_Suite->m_Results, &AcceptanceSuiteState::Result::m_Passed),
 				static_cast<size_t>(AcceptanceSuiteState::Case::Count),
 				m_Suite->m_FinalErrors.size());
 			for (const std::string& error : m_Suite->m_FinalErrors)
@@ -1381,7 +1309,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Asset Publication Lab",
 			.m_Category = "Systems",
-			.m_Description = "Deterministic one-step publication budgeting and stage fault injection for transaction rollback verification.",
+			.m_Description =
+				"Deterministic one-step publication budgeting and stage fault injection for transaction rollback verification.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

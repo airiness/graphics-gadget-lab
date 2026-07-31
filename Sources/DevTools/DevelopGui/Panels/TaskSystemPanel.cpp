@@ -27,11 +27,16 @@ namespace gglab
 		{
 			switch (priority)
 			{
-			case TaskPriority::Critical: return "Critical";
-			case TaskPriority::High: return "High";
-			case TaskPriority::Normal: return "Normal";
-			case TaskPriority::Background: return "Background";
-			case TaskPriority::Count: break;
+			case TaskPriority::Critical:
+				return "Critical";
+			case TaskPriority::High:
+				return "High";
+			case TaskPriority::Normal:
+				return "Normal";
+			case TaskPriority::Background:
+				return "Background";
+			case TaskPriority::Count:
+				break;
 			}
 			return "Unknown";
 		}
@@ -40,12 +45,18 @@ namespace gglab
 		{
 			switch (status)
 			{
-			case TaskStatus::Invalid: return "Invalid";
-			case TaskStatus::Queued: return "Queued";
-			case TaskStatus::Running: return "Running";
-			case TaskStatus::Succeeded: return "Succeeded";
-			case TaskStatus::Failed: return "Failed";
-			case TaskStatus::Cancelled: return "Cancelled";
+			case TaskStatus::Invalid:
+				return "Invalid";
+			case TaskStatus::Queued:
+				return "Queued";
+			case TaskStatus::Running:
+				return "Running";
+			case TaskStatus::Succeeded:
+				return "Succeeded";
+			case TaskStatus::Failed:
+				return "Failed";
+			case TaskStatus::Cancelled:
+				return "Cancelled";
 			}
 			return "Unknown";
 		}
@@ -81,7 +92,7 @@ namespace gglab
 			return false;
 		}
 
-		template<typename T>
+		template <typename T>
 		bool MatchesFilters(const T& task, const TaskSystemPanelState& state) noexcept
 		{
 			return ContainsInsensitive(task.m_Name, state.m_NameFilter.data()) &&
@@ -107,8 +118,10 @@ namespace gglab
 				state.m_NameFilter.data(), state.m_NameFilter.size());
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(125.0f);
-			const char* priorityPreview = state.m_PriorityFilter < 0 ? "All priorities" :
-				PriorityText(static_cast<TaskPriority>(state.m_PriorityFilter));
+			const char* priorityPreview =
+				state.m_PriorityFilter < 0
+				? "All priorities"
+				: PriorityText(static_cast<TaskPriority>(state.m_PriorityFilter));
 			if (ImGui::BeginCombo("##TaskPriorityFilter", priorityPreview))
 			{
 				if (ImGui::Selectable("All priorities", state.m_PriorityFilter < 0))
@@ -127,8 +140,10 @@ namespace gglab
 			}
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(125.0f);
-			const char* statusPreview = state.m_StatusFilter < 0 ? "All statuses" :
-				StatusText(static_cast<TaskStatus>(state.m_StatusFilter));
+			const char* statusPreview =
+				state.m_StatusFilter < 0
+				? "All statuses"
+				: StatusText(static_cast<TaskStatus>(state.m_StatusFilter));
 			if (ImGui::BeginCombo("##TaskStatusFilter", statusPreview))
 			{
 				if (ImGui::Selectable("All statuses", state.m_StatusFilter < 0))
@@ -153,22 +168,31 @@ namespace gglab
 			const uint32_t queued = std::accumulate(
 				snapshot.m_QueuedByPriority.begin(), snapshot.m_QueuedByPriority.end(), 0u);
 			if (ImGui::BeginTable("TaskSystemOverview", 4,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_SizingStretchSame))
 			{
 				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0); ImGui::Text("Workers\n%u", snapshot.m_WorkerCount);
-				ImGui::TableSetColumnIndex(1); ImGui::Text("Queued\n%u", queued);
-				ImGui::TableSetColumnIndex(2); ImGui::Text("Running\n%u", snapshot.m_RunningCount);
-				ImGui::TableSetColumnIndex(3); ImGui::Text("Completions\n%u", snapshot.m_PendingCompletionCount);
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("Workers\n%u", snapshot.m_WorkerCount);
+				ImGui::TableSetColumnIndex(1);
+				ImGui::Text("Queued\n%u", queued);
+				ImGui::TableSetColumnIndex(2);
+				ImGui::Text("Running\n%u", snapshot.m_RunningCount);
+				ImGui::TableSetColumnIndex(3);
+				ImGui::Text("Completions\n%u", snapshot.m_PendingCompletionCount);
 				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0); ImGui::Text("Submitted\n%llu",
-					static_cast<unsigned long long>(snapshot.m_SubmittedCount));
-				ImGui::TableSetColumnIndex(1); ImGui::Text("Succeeded\n%llu",
-					static_cast<unsigned long long>(snapshot.m_SucceededCount));
-				ImGui::TableSetColumnIndex(2); ImGui::Text("Failed\n%llu",
-					static_cast<unsigned long long>(snapshot.m_FailedCount));
-				ImGui::TableSetColumnIndex(3); ImGui::Text("Cancelled\n%llu",
-					static_cast<unsigned long long>(snapshot.m_CancelledCount));
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text(
+					"Submitted\n%llu", static_cast<unsigned long long>(snapshot.m_SubmittedCount));
+				ImGui::TableSetColumnIndex(1);
+				ImGui::Text(
+					"Succeeded\n%llu", static_cast<unsigned long long>(snapshot.m_SucceededCount));
+				ImGui::TableSetColumnIndex(2);
+				ImGui::Text(
+					"Failed\n%llu", static_cast<unsigned long long>(snapshot.m_FailedCount));
+				ImGui::TableSetColumnIndex(3);
+				ImGui::Text(
+					"Cancelled\n%llu", static_cast<unsigned long long>(snapshot.m_CancelledCount));
 				ImGui::EndTable();
 			}
 
@@ -182,17 +206,18 @@ namespace gglab
 				static_cast<unsigned long long>(snapshot.m_CompletionCallbackFailureCount));
 		}
 
-		void DrawActiveTasks(const TaskSystemSnapshot& snapshot,
-			const TaskSystemPanelState& state) noexcept
+		void DrawActiveTasks(
+			const TaskSystemSnapshot& snapshot, const TaskSystemPanelState& state) noexcept
 		{
 			std::vector<const TaskActivity*> tasks;
 			for (const TaskActivity& task : snapshot.m_ActiveTasks)
 			{
-				if (MatchesFilters(task, state)) tasks.push_back(&task);
+				if (MatchesFilters(task, state))
+					tasks.push_back(&task);
 			}
 			if (!ImGui::BeginTable("ActiveTasks", 9,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable,
 				ImVec2(0.0f, 180.0f)))
 			{
 				return;
@@ -211,34 +236,71 @@ namespace gglab
 				sortSpecs && sortSpecs->SpecsCount > 0)
 			{
 				const ImGuiTableColumnSortSpecs spec = sortSpecs->Specs[0];
-				std::sort(tasks.begin(), tasks.end(), [spec](const TaskActivity* lhs, const TaskActivity* rhs)
+				std::sort(tasks.begin(), tasks.end(),
+					[spec](const TaskActivity* lhs, const TaskActivity* rhs)
 					{
 						int comparison = 0;
 						switch (spec.ColumnIndex)
 						{
-						case 0: comparison = lhs->m_Handle < rhs->m_Handle ? -1 : lhs->m_Handle > rhs->m_Handle ? 1 : 0; break;
-						case 1: comparison = lhs->m_Name.compare(rhs->m_Name); break;
-						case 2: comparison = static_cast<int>(lhs->m_Priority) - static_cast<int>(rhs->m_Priority); break;
-						case 3: comparison = static_cast<int>(lhs->m_Status) - static_cast<int>(rhs->m_Status); break;
-						case 4: comparison = lhs->m_Progress.m_Fraction < rhs->m_Progress.m_Fraction ? -1 : lhs->m_Progress.m_Fraction > rhs->m_Progress.m_Fraction ? 1 : 0; break;
-						case 5: comparison = lhs->m_Progress.m_Stage.compare(rhs->m_Progress.m_Stage); break;
-						case 6: comparison = lhs->m_WorkerIndex < rhs->m_WorkerIndex ? -1 : lhs->m_WorkerIndex > rhs->m_WorkerIndex ? 1 : 0; break;
-						case 7: comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1 : lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1 : 0; break;
-						case 8: comparison = lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1 : lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1 : 0; break;
-						default: break;
+						case 0:
+							comparison = lhs->m_Handle < rhs->m_Handle ? -1
+								: lhs->m_Handle > rhs->m_Handle ? 1
+								: 0;
+							break;
+						case 1:
+							comparison = lhs->m_Name.compare(rhs->m_Name);
+							break;
+						case 2:
+							comparison = static_cast<int>(lhs->m_Priority) -
+								static_cast<int>(rhs->m_Priority);
+							break;
+						case 3:
+							comparison =
+								static_cast<int>(lhs->m_Status) - static_cast<int>(rhs->m_Status);
+							break;
+						case 4:
+							comparison =
+								lhs->m_Progress.m_Fraction < rhs->m_Progress.m_Fraction ? -1
+								: lhs->m_Progress.m_Fraction > rhs->m_Progress.m_Fraction ? 1
+								: 0;
+							break;
+						case 5:
+							comparison = lhs->m_Progress.m_Stage.compare(rhs->m_Progress.m_Stage);
+							break;
+						case 6:
+							comparison = lhs->m_WorkerIndex < rhs->m_WorkerIndex ? -1
+								: lhs->m_WorkerIndex > rhs->m_WorkerIndex ? 1
+								: 0;
+							break;
+						case 7:
+							comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1
+								: lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1
+								: 0;
+							break;
+						case 8:
+							comparison =
+								lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1
+								: lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1
+								: 0;
+							break;
+						default:
+							break;
 						}
-						return spec.SortDirection == ImGuiSortDirection_Ascending ?
-							comparison < 0 : comparison > 0;
+						return spec.SortDirection == ImGuiSortDirection_Ascending ? comparison < 0
+							: comparison > 0;
 					});
 			}
 			for (const TaskActivity* task : tasks)
 			{
 				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0); ImGui::Text("%llu",
-					static_cast<unsigned long long>(task->m_Handle.m_Value));
-				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(task->m_Name.c_str());
-				ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(PriorityText(task->m_Priority));
-				ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(StatusText(task->m_Status));
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("%llu", static_cast<unsigned long long>(task->m_Handle.m_Value));
+				ImGui::TableSetColumnIndex(1);
+				ImGui::TextUnformatted(task->m_Name.c_str());
+				ImGui::TableSetColumnIndex(2);
+				ImGui::TextUnformatted(PriorityText(task->m_Priority));
+				ImGui::TableSetColumnIndex(3);
+				ImGui::TextUnformatted(StatusText(task->m_Status));
 				ImGui::TableSetColumnIndex(4);
 				if (task->m_Progress.HasProgress())
 				{
@@ -249,32 +311,37 @@ namespace gglab
 					ImGui::TextUnformatted("-");
 				}
 				ImGui::TableSetColumnIndex(5);
-				ImGui::TextUnformatted(task->m_Progress.m_Stage.empty() ?
-					"-" : task->m_Progress.m_Stage.c_str());
+				ImGui::TextUnformatted(
+					task->m_Progress.m_Stage.empty() ? "-" : task->m_Progress.m_Stage.c_str());
 				if (!task->m_Progress.m_Detail.empty() && ImGui::IsItemHovered())
 				{
 					ImGui::SetTooltip("%s", task->m_Progress.m_Detail.c_str());
 				}
 				ImGui::TableSetColumnIndex(6);
-				if (task->m_Status == TaskStatus::Running) ImGui::Text("%u", task->m_WorkerIndex);
-				else ImGui::TextUnformatted("-");
-				ImGui::TableSetColumnIndex(7); ImGui::Text("%.3f", task->m_QueueMilliseconds);
-				ImGui::TableSetColumnIndex(8); ImGui::Text("%.3f", task->m_ExecutionMilliseconds);
+				if (task->m_Status == TaskStatus::Running)
+					ImGui::Text("%u", task->m_WorkerIndex);
+				else
+					ImGui::TextUnformatted("-");
+				ImGui::TableSetColumnIndex(7);
+				ImGui::Text("%.3f", task->m_QueueMilliseconds);
+				ImGui::TableSetColumnIndex(8);
+				ImGui::Text("%.3f", task->m_ExecutionMilliseconds);
 			}
 			ImGui::EndTable();
 		}
 
-		void DrawRecentTasks(const TaskSystemSnapshot& snapshot,
-			const TaskSystemPanelState& state) noexcept
+		void DrawRecentTasks(
+			const TaskSystemSnapshot& snapshot, const TaskSystemPanelState& state) noexcept
 		{
 			std::vector<const TaskCompletionInfo*> tasks;
 			for (const TaskCompletionInfo& task : snapshot.m_RecentTasks)
 			{
-				if (MatchesFilters(task, state)) tasks.push_back(&task);
+				if (MatchesFilters(task, state))
+					tasks.push_back(&task);
 			}
 			if (!ImGui::BeginTable("RecentTasks", 7,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable,
 				ImVec2(0.0f, 220.0f)))
 			{
 				return;
@@ -291,34 +358,64 @@ namespace gglab
 				sortSpecs && sortSpecs->SpecsCount > 0)
 			{
 				const ImGuiTableColumnSortSpecs spec = sortSpecs->Specs[0];
-				std::sort(tasks.begin(), tasks.end(), [spec](const TaskCompletionInfo* lhs, const TaskCompletionInfo* rhs)
+				std::sort(tasks.begin(), tasks.end(),
+					[spec](const TaskCompletionInfo* lhs, const TaskCompletionInfo* rhs)
 					{
 						int comparison = 0;
 						switch (spec.ColumnIndex)
 						{
-						case 0: comparison = lhs->m_Handle < rhs->m_Handle ? -1 : lhs->m_Handle > rhs->m_Handle ? 1 : 0; break;
-						case 1: comparison = lhs->m_Name.compare(rhs->m_Name); break;
-						case 2: comparison = static_cast<int>(lhs->m_Priority) - static_cast<int>(rhs->m_Priority); break;
-						case 3: comparison = static_cast<int>(lhs->m_Status) - static_cast<int>(rhs->m_Status); break;
-						case 4: comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1 : lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1 : 0; break;
-						case 5: comparison = lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1 : lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1 : 0; break;
-						case 6: comparison = lhs->m_Error.compare(rhs->m_Error); break;
-						default: break;
+						case 0:
+							comparison = lhs->m_Handle < rhs->m_Handle ? -1
+								: lhs->m_Handle > rhs->m_Handle ? 1
+								: 0;
+							break;
+						case 1:
+							comparison = lhs->m_Name.compare(rhs->m_Name);
+							break;
+						case 2:
+							comparison = static_cast<int>(lhs->m_Priority) -
+								static_cast<int>(rhs->m_Priority);
+							break;
+						case 3:
+							comparison =
+								static_cast<int>(lhs->m_Status) - static_cast<int>(rhs->m_Status);
+							break;
+						case 4:
+							comparison = lhs->m_QueueMilliseconds < rhs->m_QueueMilliseconds ? -1
+								: lhs->m_QueueMilliseconds > rhs->m_QueueMilliseconds ? 1
+								: 0;
+							break;
+						case 5:
+							comparison =
+								lhs->m_ExecutionMilliseconds < rhs->m_ExecutionMilliseconds ? -1
+								: lhs->m_ExecutionMilliseconds > rhs->m_ExecutionMilliseconds ? 1
+								: 0;
+							break;
+						case 6:
+							comparison = lhs->m_Error.compare(rhs->m_Error);
+							break;
+						default:
+							break;
 						}
-						return spec.SortDirection == ImGuiSortDirection_Ascending ?
-							comparison < 0 : comparison > 0;
+						return spec.SortDirection == ImGuiSortDirection_Ascending ? comparison < 0
+							: comparison > 0;
 					});
 			}
 			for (const TaskCompletionInfo* task : tasks)
 			{
 				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0); ImGui::Text("%llu",
-					static_cast<unsigned long long>(task->m_Handle.m_Value));
-				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(task->m_Name.c_str());
-				ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(PriorityText(task->m_Priority));
-				ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(StatusText(task->m_Status));
-				ImGui::TableSetColumnIndex(4); ImGui::Text("%.3f", task->m_QueueMilliseconds);
-				ImGui::TableSetColumnIndex(5); ImGui::Text("%.3f", task->m_ExecutionMilliseconds);
+				ImGui::TableSetColumnIndex(0);
+				ImGui::Text("%llu", static_cast<unsigned long long>(task->m_Handle.m_Value));
+				ImGui::TableSetColumnIndex(1);
+				ImGui::TextUnformatted(task->m_Name.c_str());
+				ImGui::TableSetColumnIndex(2);
+				ImGui::TextUnformatted(PriorityText(task->m_Priority));
+				ImGui::TableSetColumnIndex(3);
+				ImGui::TextUnformatted(StatusText(task->m_Status));
+				ImGui::TableSetColumnIndex(4);
+				ImGui::Text("%.3f", task->m_QueueMilliseconds);
+				ImGui::TableSetColumnIndex(5);
+				ImGui::Text("%.3f", task->m_ExecutionMilliseconds);
 				ImGui::TableSetColumnIndex(6);
 				ImGui::TextUnformatted(task->m_Error.empty() ? "-" : task->m_Error.c_str());
 			}
@@ -328,8 +425,9 @@ namespace gglab
 
 	void TaskSystemPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		const auto* snapshot = context.m_Diagnostics ?
-			context.m_Diagnostics->GetSnapshot<TaskSystemSnapshot>() : nullptr;
+		const auto* snapshot = context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<TaskSystemSnapshot>()
+			: nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("TaskSystem snapshot provider is not available.");
@@ -341,11 +439,11 @@ namespace gglab
 			snapshot->m_QueuedByPriority.begin(), snapshot->m_QueuedByPriority.end(), 0u);
 		AppendHistory(state.m_QueuedHistory, static_cast<float>(queued));
 		AppendHistory(state.m_RunningHistory, static_cast<float>(snapshot->m_RunningCount));
-		AppendHistory(state.m_CompletionHistory,
-			static_cast<float>(snapshot->m_PendingCompletionCount));
+		AppendHistory(
+			state.m_CompletionHistory, static_cast<float>(snapshot->m_PendingCompletionCount));
 
-		ImGui::TextColored(snapshot->m_AcceptingTasks ?
-			ImVec4(0.25f, 0.85f, 0.35f, 1.0f) : ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
+		ImGui::TextColored(snapshot->m_AcceptingTasks ? ImVec4(0.25f, 0.85f, 0.35f, 1.0f)
+			: ImVec4(1.0f, 0.35f, 0.3f, 1.0f),
 			snapshot->m_AcceptingTasks ? "Accepting tasks" : "Not accepting tasks");
 		DrawOverview(*snapshot);
 

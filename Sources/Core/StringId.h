@@ -28,8 +28,9 @@ namespace gglab
 		{
 			return[]<size_t... I>(std::index_sequence<I...>)
 			{
-				return std::array<uint64_t, sizeof...(I)>{ Crc64TableEntry(I)... };
-			}(std::make_index_sequence<256>{});
+				return std::array<uint64_t, sizeof...(I)>{Crc64TableEntry(I)...};
+			}(
+				std::make_index_sequence<256>{});
 		}();
 
 	constexpr uint64_t Crc64Bytes(const unsigned char* data, size_t size) noexcept
@@ -44,12 +45,14 @@ namespace gglab
 
 	constexpr uint64_t Crc64(std::string_view stringView)
 	{
-		return Crc64Bytes(reinterpret_cast<const unsigned char*>(stringView.data()), stringView.size());
+		return Crc64Bytes(
+			reinterpret_cast<const unsigned char*>(stringView.data()), stringView.size());
 	}
 
 	constexpr uint64_t Crc64(std::wstring_view wideStringView)
 	{
-		return Crc64Bytes(reinterpret_cast<const unsigned char*>(wideStringView.data()), wideStringView.size() * sizeof(wchar_t));
+		return Crc64Bytes(reinterpret_cast<const unsigned char*>(wideStringView.data()),
+			wideStringView.size() * sizeof(wchar_t));
 	}
 
 #if defined(GGLAB_ENABLE_STRING_ID_REGISTRY)
@@ -106,24 +109,17 @@ namespace gglab
 	class StringID
 	{
 	public:
-		constexpr explicit StringID(uint64_t v) noexcept :
-			m_Value(v)
-		{
-		}
+		constexpr explicit StringID(uint64_t v) noexcept : m_Value(v) {}
 		constexpr StringID() = default;
 
-		explicit StringID(std::string_view stringView) noexcept :
-			m_Value(Crc64(stringView))
+		explicit StringID(std::string_view stringView) noexcept : m_Value(Crc64(stringView))
 		{
 #if defined(GGLAB_ENABLE_STRING_ID_REGISTRY)
 			StringIdRegistry::Instance().RegisterName(m_Value, stringView);
 #endif
 		}
 
-		uint64_t Value() const noexcept
-		{
-			return m_Value;
-		}
+		uint64_t Value() const noexcept { return m_Value; }
 
 		constexpr auto operator<=>(const StringID&) const = default;
 
@@ -136,10 +132,7 @@ namespace gglab
 #endif
 		}
 
-		[[nodiscard]] std::string_view Name() const noexcept
-		{
-			return LookupName(m_Value);
-		}
+		[[nodiscard]] std::string_view Name() const noexcept { return LookupName(m_Value); }
 
 	private:
 		uint64_t m_Value = 0;
@@ -148,14 +141,14 @@ namespace gglab
 	// Generate Id in compile time
 	consteval StringID operator"" _id(const char* str, size_t len)
 	{
-		return StringID{ Crc64(std::string_view{ str, len }) };
+		return StringID{ Crc64(std::string_view{str, len}) };
 	}
 }
 
 // StringID hash for using as a key
 namespace std
 {
-	template<> struct hash<gglab::StringID>
+	template <> struct hash<gglab::StringID>
 	{
 		size_t operator()(const gglab::StringID& id) const noexcept
 		{

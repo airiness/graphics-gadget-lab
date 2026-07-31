@@ -36,7 +36,8 @@ namespace gglab
 		std::scoped_lock lock(m_Mutex);
 		if (m_IsCollecting.load(std::memory_order_relaxed))
 		{
-			GGLAB_ASSERT_MSG(false, "CpuProfiler::BeginFrame called while another frame is active.");
+			GGLAB_ASSERT_MSG(
+				false, "CpuProfiler::BeginFrame called while another frame is active.");
 			return false;
 		}
 
@@ -74,9 +75,8 @@ namespace gglab
 		return m_LatestFrame;
 	}
 
-	void CpuProfiler::RecordSample(std::string_view name,
-		Clock::duration inclusive,
-		Clock::duration self) noexcept
+	void CpuProfiler::RecordSample(
+		std::string_view name, Clock::duration inclusive, Clock::duration self) noexcept
 	{
 		if (name.empty() || !IsCollecting())
 		{
@@ -90,10 +90,7 @@ namespace gglab
 		}
 
 		auto sampleIter = std::ranges::find_if(m_CurrentSamples,
-			[name](const CpuProfileSample& sample)
-			{
-				return sample.m_Name == name;
-			});
+			[name](const CpuProfileSample& sample) { return sample.m_Name == name; });
 		if (sampleIter == m_CurrentSamples.end())
 		{
 			m_CurrentSamples.push_back({ .m_Name = std::string(name) });
@@ -102,18 +99,17 @@ namespace gglab
 
 		sampleIter->m_InclusiveMilliseconds +=
 			std::chrono::duration<double, std::milli>(inclusive).count();
-		sampleIter->m_SelfMilliseconds +=
-			std::chrono::duration<double, std::milli>(self).count();
+		sampleIter->m_SelfMilliseconds += std::chrono::duration<double, std::milli>(self).count();
 		++sampleIter->m_CallCount;
 	}
 
 	CpuProfileScope::CpuProfileScope(std::string_view name) noexcept :
 		CpuProfileScope(CpuProfiler::Get(), name)
-	{}
+	{
+	}
 
 	CpuProfileScope::CpuProfileScope(CpuProfiler& profiler, std::string_view name) noexcept :
-		m_Profiler(&profiler),
-		m_Name(name)
+		m_Profiler(&profiler), m_Name(name)
 	{
 		if (name.empty() || !profiler.IsCollecting())
 		{
@@ -142,19 +138,21 @@ namespace gglab
 			m_Parent->m_ChildDuration += duration;
 		}
 
-		const auto selfDuration = duration >= m_ChildDuration ?
-			duration - m_ChildDuration : CpuProfiler::Clock::duration::zero();
+		const auto selfDuration = duration >= m_ChildDuration
+			? duration - m_ChildDuration
+			: CpuProfiler::Clock::duration::zero();
 		m_Profiler->RecordSample(m_Name, duration, selfDuration);
 	}
 
 	CpuProfileFrameScope::CpuProfileFrameScope(uint64_t frameIndex) noexcept :
 		CpuProfileFrameScope(CpuProfiler::Get(), frameIndex)
-	{}
+	{
+	}
 
 	CpuProfileFrameScope::CpuProfileFrameScope(CpuProfiler& profiler, uint64_t frameIndex) noexcept :
-		m_Profiler(&profiler),
-		m_IsActive(profiler.BeginFrame(frameIndex))
-	{}
+		m_Profiler(&profiler), m_IsActive(profiler.BeginFrame(frameIndex))
+	{
+	}
 
 	CpuProfileFrameScope::~CpuProfileFrameScope() noexcept
 	{

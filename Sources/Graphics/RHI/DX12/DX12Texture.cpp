@@ -8,7 +8,8 @@ namespace gglab
 		AdoptExternal(std::move(backBuffer), D3D12_RESOURCE_STATE_PRESENT);
 	}
 
-	DX12Resource::CreateInfo DX12Texture::AssetTextureCreateInfo(D3D12MA::Allocator* allocator, CD3DX12_RESOURCE_DESC resourceDesc) noexcept
+	DX12Resource::CreateInfo DX12Texture::AssetTextureCreateInfo(
+		D3D12MA::Allocator* allocator, CD3DX12_RESOURCE_DESC resourceDesc) noexcept
 	{
 		DX12Resource::CreateInfo createInfo = {};
 		createInfo.m_Allocator = allocator;

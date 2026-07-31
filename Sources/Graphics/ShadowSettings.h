@@ -27,7 +27,8 @@ namespace gglab
 
 		float m_ReceiverDepthBias = DefaultDirectionalShadowReceiverDepthBias;
 		int32_t m_RasterizerDepthBias = DefaultDirectionalShadowRasterizerDepthBias;
-		float m_RasterizerSlopeScaledDepthBias = DefaultDirectionalShadowRasterizerSlopeScaledDepthBias;
+		float m_RasterizerSlopeScaledDepthBias =
+			DefaultDirectionalShadowRasterizerSlopeScaledDepthBias;
 	};
 
 	struct ShadowVisualizationSettings

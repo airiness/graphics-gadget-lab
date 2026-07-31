@@ -41,10 +41,12 @@ namespace gglab
 		D3D12_RESOURCE_STATES GetState() const noexcept;
 
 		bool TransitionNeeded(D3D12_RESOURCE_STATES newStates) const noexcept;
-		void AdoptExternal(ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept;
+		void AdoptExternal(
+			ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept;
 		void AliasTo(const AliasingInfo& aliasingInfo) noexcept;
 		void Release() noexcept;
-		D3D12_RESOURCE_BARRIER MakeTransition(D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept;
+		D3D12_RESOURCE_BARRIER MakeTransition(
+			D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept;
 		void SetDebugName(const wchar_t* name) noexcept;
 
 		bool IsValid() const noexcept;
@@ -55,7 +57,8 @@ namespace gglab
 		const D3D12_CLEAR_VALUE* GetClearValue() const noexcept;
 
 	public:
-		static D3D12_RESOURCE_BARRIER MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept;
+		static D3D12_RESOURCE_BARRIER MakeAliasingBarrier(
+			const DX12Resource* before, const DX12Resource* after) noexcept;
 
 	protected:
 		D3D12MA::Allocator* m_Allocator = nullptr;

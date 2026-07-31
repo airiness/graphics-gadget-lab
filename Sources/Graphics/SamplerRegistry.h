@@ -60,7 +60,8 @@ namespace gglab
 		uint32_t GetSamplerIndex(SamplerPreset preset) const noexcept;
 		uint32_t GetSamplerIndex(const SamplerID& samplerId) const noexcept;
 
-		uint32_t ResolveSamplerIndex(SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept;
+		uint32_t ResolveSamplerIndex(
+			SamplerID samplerId, SamplerPreset fallbackPreset) const noexcept;
 		[[nodiscard]] SamplerRegistryStatistics GetStatistics() const noexcept;
 		[[nodiscard]] std::vector<SamplerRegistryReadInfo> GetReadInfos() const;
 

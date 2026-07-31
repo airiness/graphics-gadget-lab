@@ -27,11 +27,13 @@ namespace gglab
 	class DX12CommandAllocatorPool final
 	{
 	public:
-		explicit DX12CommandAllocatorPool(const DX12CommandAllocator::CreateInfo& createInfo) noexcept;
+		explicit DX12CommandAllocatorPool(
+			const DX12CommandAllocator::CreateInfo& createInfo) noexcept;
 		~DX12CommandAllocatorPool() = default;
 
 		DX12CommandAllocator* RequestCommandAllocator() noexcept;
-		void RecycleCommandAllocator(DX12CommandAllocator* allocator, DX12FencePoint fencePoint) noexcept;
+		void RecycleCommandAllocator(
+			DX12CommandAllocator* allocator, DX12FencePoint fencePoint) noexcept;
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

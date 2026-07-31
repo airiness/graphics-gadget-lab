@@ -109,9 +109,10 @@ namespace gglab
 		if (m_ActiveSession)
 		{
 			const LabRunConfig& config = m_CreateInfo.m_RunConfig;
-			m_EffectiveDeltaTime = config.m_UseFixedDeltaTime ?
-				config.m_FixedDeltaTime :
-				static_cast<float>(m_CreateInfo.m_Services.m_Time->GetDeltaTime());
+			m_EffectiveDeltaTime =
+				config.m_UseFixedDeltaTime
+				? config.m_FixedDeltaTime
+				: static_cast<float>(m_CreateInfo.m_Services.m_Time->GetDeltaTime());
 			m_ActiveSession->Update(m_EffectiveDeltaTime);
 		}
 	}
@@ -240,10 +241,7 @@ namespace gglab
 			m_PendingSession->CancelPrepare();
 			m_PendingSession.reset();
 			m_State = m_ActiveSession ? m_StateBeforeTransition : LabRunState::Failed;
-			SetError(std::format(
-				"Failed to prepare lab '{}': {}",
-				labName,
-				progress.m_Detail));
+			SetError(std::format("Failed to prepare lab '{}': {}", labName, progress.m_Detail));
 			return;
 		}
 		if (progress.IsReady())
@@ -311,7 +309,7 @@ namespace gglab
 			snapshot.m_Parameters.push_back({
 				.m_Desc = parameter.m_Desc,
 				.m_Value = parameter.m_Value,
-			});
+				});
 		}
 		m_ActiveSession->BuildDiagnostics(snapshot.m_Diagnostics);
 		return snapshot;
@@ -325,9 +323,8 @@ namespace gglab
 		}
 
 		LoadingProgress progress = m_PendingSession->GetPreparationProgress();
-		progress.m_Title = std::format(
-			"Loading Lab: {}",
-			m_PendingSession->GetDescriptor().m_DisplayName);
+		progress.m_Title =
+			std::format("Loading Lab: {}", m_PendingSession->GetDescriptor().m_DisplayName);
 		return progress;
 	}
 
@@ -368,8 +365,7 @@ namespace gglab
 	}
 
 	bool LabRuntime::BeginSessionTransition(
-		const LabId& id,
-		std::span<const LabParameterValue> values) noexcept
+		const LabId& id, std::span<const LabParameterValue> values) noexcept
 	{
 		if (!m_PendingSession)
 		{
@@ -425,9 +421,9 @@ namespace gglab
 		{
 			m_RetiringSessions.push_back({
 				.m_Instance = std::move(m_ActiveSession),
-				.m_RetireFence = m_HasFrameFeedback ?
-					m_LastFrameFeedback.m_SubmittedFence : RHIFencePoint{},
-			});
+				.m_RetireFence =
+					m_HasFrameFeedback ? m_LastFrameFeedback.m_SubmittedFence : RHIFencePoint{},
+				});
 		}
 
 		m_ActiveSession = std::move(m_PendingSession);
@@ -439,15 +435,12 @@ namespace gglab
 
 		m_LastError.clear();
 		m_WarmupFramesRemaining = m_CreateInfo.m_RunConfig.m_WarmupFrames;
-		m_State = m_WarmupFramesRemaining > 0 ?
-			LabRunState::WarmingUp : LabRunState::Ready;
+		m_State = m_WarmupFramesRemaining > 0 ? LabRunState::WarmingUp : LabRunState::Ready;
 		m_FrameInSession = 0;
 		m_EffectiveDeltaTime = 0.0f;
 		m_LastFrameFeedback = {};
 		m_HasFrameFeedback = false;
-		GGLAB_LOG_INFO(
-			"Activated lab '{}'.",
-			m_ActiveSession->GetDescriptor().m_Id.GetName());
+		GGLAB_LOG_INFO("Activated lab '{}'.", m_ActiveSession->GetDescriptor().m_Id.GetName());
 		return true;
 	}
 
@@ -472,8 +465,7 @@ namespace gglab
 		{
 			return;
 		}
-		std::erase_if(
-			m_RetiringSessions,
+		std::erase_if(m_RetiringSessions,
 			[device](const RetiringSession& retiring) noexcept
 			{
 				return !retiring.m_RetireFence.IsValid() ||
@@ -491,12 +483,9 @@ namespace gglab
 		GGLAB_LOG_ERROR("{}", m_LastError);
 	}
 
-	LabChangeImpact LabRuntime::MaxImpact(
-		LabChangeImpact lhs,
-		LabChangeImpact rhs) noexcept
+	LabChangeImpact LabRuntime::MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept
 	{
-		return static_cast<LabChangeImpact>(std::max(
-			static_cast<uint8_t>(lhs),
-			static_cast<uint8_t>(rhs)));
+		return static_cast<LabChangeImpact>(
+			std::max(static_cast<uint8_t>(lhs), static_cast<uint8_t>(rhs)));
 	}
 }

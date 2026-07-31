@@ -32,9 +32,7 @@ namespace gglab
 		[[nodiscard]] bool TopologicalSortPasses() noexcept;
 		void BuildResourceLifetimes() noexcept;
 		[[nodiscard]] bool HasErrors() const noexcept;
-		void AddDiagnostic(
-			RGCompileDiagnosticCode code,
-			const char* message,
+		void AddDiagnostic(RGCompileDiagnosticCode code, const char* message,
 			RGPassNodeIndex pass = InvalidRGPassNodeIndex,
 			RGVirtualResourceIndex resource = InvalidRGVirtualResourceIndex) noexcept;
 

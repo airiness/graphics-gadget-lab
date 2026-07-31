@@ -53,7 +53,9 @@ namespace gglab
 		static void PullFromCamera(CameraPanelState& state, const Camera& camera) noexcept
 		{
 			const Vector3 p = camera.GetPosition();
-			state.m_Pos[0] = p.m_X; state.m_Pos[1] = p.m_Y; state.m_Pos[2] = p.m_Z;
+			state.m_Pos[0] = p.m_X;
+			state.m_Pos[1] = p.m_Y;
+			state.m_Pos[2] = p.m_Z;
 
 			state.m_YawDegree = math::ToDegrees(camera.GetYaw());
 			state.m_PitchDegree = math::ToDegrees(camera.GetPitch());
@@ -64,7 +66,8 @@ namespace gglab
 			state.m_ExposureCompensationEV = camera.GetExposureCompensationEV();
 		}
 
-		static void PullFromController(CameraPanelState& state, const CameraController& camCtrl) noexcept
+		static void PullFromController(
+			CameraPanelState& state, const CameraController& camCtrl) noexcept
 		{
 			state.m_CtrlParams = camCtrl.GetParams();
 		}
@@ -79,7 +82,8 @@ namespace gglab
 				Camera::ClampExposureCompensationEV(state.m_ExposureCompensationEV);
 
 			camera.SetPosition(Vector3{ state.m_Pos[0], state.m_Pos[1], state.m_Pos[2] });
-			camera.SetYawPitch(math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree));
+			camera.SetYawPitch(
+				math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree));
 			camera.SetFov(state.m_FovDegree);
 			camera.SetNearFar(state.m_NearZ, state.m_FarZ);
 			camera.SetExposureCompensationEV(state.m_ExposureCompensationEV);
@@ -94,8 +98,7 @@ namespace gglab
 		}
 
 		static CameraBinding ResolveCameraBinding(
-			CameraPanelState& state,
-			DevelopGuiContext& context) noexcept
+			CameraPanelState& state, DevelopGuiContext& context) noexcept
 		{
 			if (auto* rig = context.m_CameraRig)
 			{
@@ -103,9 +106,8 @@ namespace gglab
 				{
 					return {};
 				}
-				state.m_SelectedCameraIndex = std::min(
-					state.m_SelectedCameraIndex,
-					rig->GetCameraCount() - 1);
+				state.m_SelectedCameraIndex =
+					std::min(state.m_SelectedCameraIndex, rig->GetCameraCount() - 1);
 				if (!state.m_Initialized)
 				{
 					state.m_SelectedCameraIndex = rig->GetActiveCameraIndex();
@@ -127,9 +129,7 @@ namespace gglab
 			};
 		}
 
-		static void DrawCameraRigControls(
-			CameraPanelState& state,
-			CameraRig& rig) noexcept
+		static void DrawCameraRigControls(CameraPanelState& state, CameraRig& rig) noexcept
 		{
 			if (rig.GetCameraCount() == 0)
 			{
@@ -140,9 +140,10 @@ namespace gglab
 			const RenderViewID displayViewId = rig.GetDisplayViewId();
 			const CameraRig::CameraSlot* displaySlot = rig.FindRenderViewSlot(displayViewId);
 			const std::string displayViewIdText = devtools::EnumText(displayViewId);
-			const char* displayPreview = displayViewId == RenderViewID::Main ?
-				"Main Camera" :
-				(displaySlot ? displaySlot->m_Name.c_str() : displayViewIdText.c_str());
+			const char* displayPreview =
+				displayViewId == RenderViewID::Main
+				? "Main Camera"
+				: (displaySlot ? displaySlot->m_Name.c_str() : displayViewIdText.c_str());
 			if (ImGui::BeginCombo("Display View", displayPreview))
 			{
 				const bool mainSelected = displayViewId == RenderViewID::Main;
@@ -177,9 +178,8 @@ namespace gglab
 				ImGui::EndCombo();
 			}
 
-			state.m_SelectedCameraIndex = std::min(
-				state.m_SelectedCameraIndex,
-				rig.GetCameraCount() - 1);
+			state.m_SelectedCameraIndex =
+				std::min(state.m_SelectedCameraIndex, rig.GetCameraCount() - 1);
 
 			const auto* selectedSlot = rig.GetCameraSlot(state.m_SelectedCameraIndex);
 			const char* preview = selectedSlot ? selectedSlot->m_Name.c_str() : "Camera";
@@ -301,13 +301,13 @@ namespace gglab
 				if (ImGui::Checkbox("Build RenderView", &enableRenderView))
 				{
 					GGLAB_UNUSED(context.m_CameraRig->SetDebugRenderViewEnabled(
-						binding.m_Index,
-						enableRenderView));
+						binding.m_Index, enableRenderView));
 				}
 				if (binding.m_Slot->m_EnableRenderView &&
 					IsDebugCameraRenderViewID(binding.m_Slot->m_RenderViewId))
 				{
-					ImGui::Text("RenderView: %s", devtools::EnumText(binding.m_Slot->m_RenderViewId).c_str());
+					ImGui::Text("RenderView: %s",
+						devtools::EnumText(binding.m_Slot->m_RenderViewId).c_str());
 					RenderViewVisibilityMode visibilityMode = binding.m_Slot->m_VisibilityMode;
 					const std::string visibilityModeText = devtools::EnumText(visibilityMode);
 					if (ImGui::BeginCombo("Visibility Mode", visibilityModeText.c_str()))
@@ -358,17 +358,11 @@ namespace gglab
 		camChanged |= ImGui::DragFloat("Far", &state.m_FarZ, 1.0f, 0.1f, 100000.0f);
 
 		ImGui::SeparatorText("Exposure");
-		camChanged |= ImGui::SliderFloat(
-			"Exposure Compensation",
-			&state.m_ExposureCompensationEV,
-			-10.0f,
-			10.0f,
-			"%+.2f EV",
-			ImGuiSliderFlags_AlwaysClamp);
+		camChanged |= ImGui::SliderFloat("Exposure Compensation", &state.m_ExposureCompensationEV,
+			-10.0f, 10.0f, "%+.2f EV", ImGuiSliderFlags_AlwaysClamp);
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
 		{
-			ImGui::SetTooltip(
-				"Adjusts image brightness in photographic stops.\n"
+			ImGui::SetTooltip("Adjusts image brightness in photographic stops.\n"
 				"+1 EV doubles exposure; -1 EV halves it.");
 		}
 		ImGui::Text("Exposure Multiplier: %.4fx", std::exp2(state.m_ExposureCompensationEV));
@@ -382,10 +376,15 @@ namespace gglab
 		ImGui::SeparatorText("Controller");
 		if (cameraCtrl)
 		{
-			ctrlChanged |= ImGui::DragFloat("Movement Speed", &state.m_CtrlParams.m_MovementSpeed, 0.1f, 0.0f, 1000.0f);
-			ctrlChanged |= ImGui::DragFloat("Sensitivity(Rad/Count)", &state.m_CtrlParams.m_MouseSensitivityRadPerCount, 0.00001f, 0.0001f, 0.005f, "%.4f");
-			ctrlChanged |= ImGui::DragFloat("Accelerate Multiplier", &state.m_CtrlParams.m_AccelerateMultiplier, 0.05f, 1.0f, 20.0f);
-			ctrlChanged |= ImGui::SliderFloat("SmoothStep T", &state.m_CtrlParams.m_SmoothStepT, 0.0f, 1.0f);
+			ctrlChanged |= ImGui::DragFloat(
+				"Movement Speed", &state.m_CtrlParams.m_MovementSpeed, 0.1f, 0.0f, 1000.0f);
+			ctrlChanged |= ImGui::DragFloat("Sensitivity(Rad/Count)",
+				&state.m_CtrlParams.m_MouseSensitivityRadPerCount, 0.00001f, 0.0001f, 0.005f,
+				"%.4f");
+			ctrlChanged |= ImGui::DragFloat("Accelerate Multiplier",
+				&state.m_CtrlParams.m_AccelerateMultiplier, 0.05f, 1.0f, 20.0f);
+			ctrlChanged |=
+				ImGui::SliderFloat("SmoothStep T", &state.m_CtrlParams.m_SmoothStepT, 0.0f, 1.0f);
 
 			if (ImGui::Button("Reset Velocity"))
 			{

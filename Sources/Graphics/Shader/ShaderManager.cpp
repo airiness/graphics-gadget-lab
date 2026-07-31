@@ -24,18 +24,24 @@ namespace gglab
 
 	namespace
 	{
-		[[nodiscard]] constexpr std::string_view ShaderStageAbbreviation(
-			ShaderStage stage) noexcept
+		[[nodiscard]] constexpr std::string_view ShaderStageAbbreviation(ShaderStage stage) noexcept
 		{
 			switch (stage)
 			{
-			case ShaderStage::Vertex: return "VS";
-			case ShaderStage::Pixel: return "PS";
-			case ShaderStage::Hull: return "HS";
-			case ShaderStage::Domain: return "DS";
-			case ShaderStage::Geometry: return "GS";
-			case ShaderStage::Mesh: return "MS";
-			case ShaderStage::Compute: return "CS";
+			case ShaderStage::Vertex:
+				return "VS";
+			case ShaderStage::Pixel:
+				return "PS";
+			case ShaderStage::Hull:
+				return "HS";
+			case ShaderStage::Domain:
+				return "DS";
+			case ShaderStage::Geometry:
+				return "GS";
+			case ShaderStage::Mesh:
+				return "MS";
+			case ShaderStage::Compute:
+				return "CS";
 			}
 			return "Unknown";
 		}
@@ -45,8 +51,8 @@ namespace gglab
 	{
 		m_Compiler = std::make_unique<ShaderCompiler>();
 
-		m_DefaultShaderConfig.m_Flags |= IsDebuggerPresent() ?
-			ShaderCompileFlags::Debug : ShaderCompileFlags::None;
+		m_DefaultShaderConfig.m_Flags |=
+			IsDebuggerPresent() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
 		m_DefaultShaderConfig.m_IncludeDirs = { m_Compiler->GetSourceRootDirectory() };
 		m_DefaultShaderConfig.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(m_DefaultShaderConfig);
@@ -80,14 +86,16 @@ namespace gglab
 		// create shader if not exist
 		if (!std::filesystem::exists(norm.m_SourcePath))
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: File not found: {}", norm.m_SourcePath.string());
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"ShaderManager::LoadShader: File not found: {}", norm.m_SourcePath.string());
 			return ShaderID();
 		}
 
 		std::unique_ptr<Shader> shader = std::make_unique<Shader>(desc);
 		if (!RefreshShaderInternal(*shader, norm))
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: Shader compile failed: {}", norm.m_SourcePath.string());
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"ShaderManager::LoadShader: Shader compile failed: {}", norm.m_SourcePath.string());
 			return ShaderID();
 		}
 
@@ -106,9 +114,7 @@ namespace gglab
 	}
 
 	TaskHandle ShaderManager::PreloadAsync(
-		TaskSystem& taskSystem,
-		std::vector<ShaderDesc> descList,
-		TaskPriority priority) noexcept
+		TaskSystem& taskSystem, std::vector<ShaderDesc> descList, TaskPriority priority) noexcept
 	{
 		if (m_PreloadStatus == TaskStatus::Queued || m_PreloadStatus == TaskStatus::Running)
 		{
@@ -136,10 +142,9 @@ namespace gglab
 		job->m_Labels.reserve(job->m_Descs.size());
 		for (const ShaderDesc& desc : job->m_Descs)
 		{
-			job->m_Labels.push_back(std::format(
-				"{} [{}]",
-				desc.m_SourcePath.filename().generic_string(),
-				ShaderStageAbbreviation(desc.m_Stage)));
+			job->m_Labels.push_back(
+				std::format("{} [{}]", desc.m_SourcePath.filename().generic_string(),
+					ShaderStageAbbreviation(desc.m_Stage)));
 		}
 
 		m_PreloadJob = job;
@@ -167,22 +172,21 @@ namespace gglab
 					entry.m_NormalizedDesc = compiler.NormalizeShaderDesc(entry.m_Desc);
 					if (!std::filesystem::exists(entry.m_NormalizedDesc.m_SourcePath))
 					{
-						return TaskResult::Failure(std::format(
-							"Shader source file was not found: {}",
-							entry.m_NormalizedDesc.m_SourcePath.string()));
+						return TaskResult::Failure(
+							std::format("Shader source file was not found: {}",
+								entry.m_NormalizedDesc.m_SourcePath.string()));
 					}
 					entry.m_Artifact = compiler.CompileOrLoadArtifact(entry.m_NormalizedDesc);
 					if (!entry.m_Artifact.m_Binary.IsValid())
 					{
-						return TaskResult::Failure(std::format(
-							"Shader compile produced no bytecode: {}",
-							entry.m_NormalizedDesc.m_SourcePath.string()));
+						return TaskResult::Failure(
+							std::format("Shader compile produced no bytecode: {}",
+								entry.m_NormalizedDesc.m_SourcePath.string()));
 					}
 
 					std::error_code errorCode;
 					entry.m_Artifact.m_SourceTimeStamp = std::filesystem::last_write_time(
-						entry.m_NormalizedDesc.m_SourcePath,
-						errorCode);
+						entry.m_NormalizedDesc.m_SourcePath, errorCode);
 					job->m_Entries.push_back(std::move(entry));
 					job->m_CompletedCount.store(index + 1, std::memory_order_relaxed);
 				}
@@ -201,8 +205,7 @@ namespace gglab
 				{
 					GGLAB_LOG_GRAPHICS_INFO(
 						"Async shader preload published {} shaders (queueMs={:.2f}, cpuMs={:.2f}).",
-						job->m_Entries.size(),
-						completion.m_QueueMilliseconds,
+						job->m_Entries.size(), completion.m_QueueMilliseconds,
 						completion.m_ExecutionMilliseconds);
 				}
 				m_PreloadTask = {};
@@ -277,7 +280,8 @@ namespace gglab
 				}
 				else
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("RefreshChanged: recompile failed: {}", shader->GetDesc().m_SourcePath.string());
+					GGLAB_LOG_GRAPHICS_ERROR("RefreshChanged: recompile failed: {}",
+						shader->GetDesc().m_SourcePath.string());
 				}
 			}
 		}
@@ -291,7 +295,8 @@ namespace gglab
 	bool ShaderManager::RefreshShader(ShaderID shaderId) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
-		if (!shaderId.IsValid() || shaderId.Value() >= m_Shaders.size() || !m_Shaders[shaderId.Value()])
+		if (!shaderId.IsValid() || shaderId.Value() >= m_Shaders.size() ||
+			!m_Shaders[shaderId.Value()])
 		{
 			return false;
 		}
@@ -306,18 +311,21 @@ namespace gglab
 	ShaderBytecode ShaderManager::GetBytecode(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() &&
+			m_Shaders[shaderId.Value()])
 		{
 			return m_Shaders[shaderId.Value()]->GetBytecode();
 		}
-		GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::GetBytecode: Invalid shader ID {}", shaderId.Value());
+		GGLAB_LOG_GRAPHICS_ERROR(
+			"ShaderManager::GetBytecode: Invalid shader ID {}", shaderId.Value());
 		return {};
 	}
 
 	ShaderHash128 ShaderManager::GetHash(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() &&
+			m_Shaders[shaderId.Value()])
 		{
 			return m_Shaders[shaderId.Value()]->GetCompileArtifact().m_Hash;
 		}
@@ -342,7 +350,8 @@ namespace gglab
 	uint64_t ShaderManager::GetGeneration(ShaderID shaderId) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
-		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() && m_Shaders[shaderId.Value()])
+		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() &&
+			m_Shaders[shaderId.Value()])
 		{
 			return m_Shaders[shaderId.Value()]->GetGeneration();
 		}
@@ -355,7 +364,8 @@ namespace gglab
 		return RefreshShaderInternal(shader, norm);
 	}
 
-	bool ShaderManager::RefreshShaderInternal(Shader& shader, const ShaderDesc& normalizedDesc) noexcept
+	bool ShaderManager::RefreshShaderInternal(
+		Shader& shader, const ShaderDesc& normalizedDesc) noexcept
 	{
 		ShaderCompileArtifact artifact = m_Compiler->CompileOrLoadArtifact(normalizedDesc);
 
@@ -363,9 +373,10 @@ namespace gglab
 			(artifact.m_Hash != shader.GetCompileArtifact().m_Hash);
 
 		std::error_code errorCode;
-		artifact.m_SourceTimeStamp = std::filesystem::exists(normalizedDesc.m_SourcePath, errorCode) ?
-			std::filesystem::last_write_time(normalizedDesc.m_SourcePath, errorCode) :
-			std::filesystem::file_time_type{};
+		artifact.m_SourceTimeStamp =
+			std::filesystem::exists(normalizedDesc.m_SourcePath, errorCode)
+			? std::filesystem::last_write_time(normalizedDesc.m_SourcePath, errorCode)
+			: std::filesystem::file_time_type{};
 
 		shader.SetCompileArtifact(std::move(artifact), changed);
 		return changed;

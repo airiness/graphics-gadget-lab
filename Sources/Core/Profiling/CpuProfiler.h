@@ -44,9 +44,8 @@ namespace gglab
 		friend class CpuProfileScope;
 
 		CpuProfiler() = default;
-		void RecordSample(std::string_view name,
-			Clock::duration inclusive,
-			Clock::duration self) noexcept;
+		void RecordSample(
+			std::string_view name, Clock::duration inclusive, Clock::duration self) noexcept;
 
 	private:
 		mutable std::mutex m_Mutex;

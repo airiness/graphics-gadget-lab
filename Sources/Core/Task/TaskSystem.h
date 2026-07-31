@@ -29,13 +29,10 @@ namespace gglab
 		~TaskSystem();
 
 		[[nodiscard]] TaskHandle Submit(
-			TaskDesc desc,
-			TaskWork work,
-			TaskCompletion completion = {}) noexcept;
+			TaskDesc desc, TaskWork work, TaskCompletion completion = {}) noexcept;
 		bool Cancel(TaskHandle handle) noexcept;
 		bool UpdatePriority(TaskHandle handle, TaskPriority priority) noexcept;
-		uint32_t PumpCompletions(
-			const TaskCompletionPumpBudget& budget = {}) noexcept;
+		uint32_t PumpCompletions(const TaskCompletionPumpBudget& budget = {}) noexcept;
 
 		void Shutdown() noexcept;
 		[[nodiscard]] bool IsAcceptingTasks() const noexcept;
@@ -54,9 +51,7 @@ namespace gglab
 		[[nodiscard]] std::shared_ptr<TaskRecord> PopNextTaskLocked() noexcept;
 		void WorkerMain(std::stop_token systemStopToken, uint32_t workerIndex) noexcept;
 		void FinishTask(
-			const std::shared_ptr<TaskRecord>& task,
-			TaskStatus status,
-			std::string error) noexcept;
+			const std::shared_ptr<TaskRecord>& task, TaskStatus status, std::string error) noexcept;
 		void DiscardCompletions() noexcept;
 
 		mutable std::mutex m_Mutex;

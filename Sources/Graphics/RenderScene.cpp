@@ -18,8 +18,7 @@ namespace gglab
 		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
 
 		void MarkMaterialTexturesUsed(
-			const MaterialProperties& material,
-			AssetManager& assetManager) noexcept
+			const MaterialProperties& material, AssetManager& assetManager) noexcept
 		{
 			assetManager.MarkTextureUsed(material.m_BaseColorBinding.m_TextureId);
 			assetManager.MarkTextureUsed(material.m_EmissiveBinding.m_TextureId);
@@ -88,12 +87,9 @@ namespace gglab
 				assetManager.MarkModelUsed(modelComp.m_ModelId);
 
 				const Matrix entityWorld = math::CreateTransformMatrix(
-					transformComp.m_Scale,
-					transformComp.m_Rotation,
-					transformComp.m_Position);
+					transformComp.m_Scale, transformComp.m_Rotation, transformComp.m_Position);
 
-				for (uint32_t modelMeshIndex = 0;
-					modelMeshIndex < model->m_MeshInstance.size();
+				for (uint32_t modelMeshIndex = 0; modelMeshIndex < model->m_MeshInstance.size();
 					++modelMeshIndex)
 				{
 					const ModelMesh& modelMesh = model->m_MeshInstance[modelMeshIndex];
@@ -130,10 +126,8 @@ namespace gglab
 					}
 
 					MarkMaterialTexturesUsed(*material, assetManager);
-					const MaterialGPU materialGpu = MaterialGpuEncoder::Encode(
-						*material,
-						assetManager,
-						info.m_SamplerRegistry);
+					const MaterialGPU materialGpu =
+						MaterialGpuEncoder::Encode(*material, assetManager, info.m_SamplerRegistry);
 					auto iter = materialRecords.find(materialKey);
 					if (iter == materialRecords.end())
 					{
@@ -143,21 +137,24 @@ namespace gglab
 						{
 							continue;
 						}
-						iter = materialRecords.emplace(materialKey, MaterialUploadRecord{
-							.m_Gpu = materialGpu,
-							.m_Index = materialIndex,
-							.m_Flags = material->m_Flags,
-							.m_AlphaMode = material->m_AlphaMode,
-						}).first;
+						iter = materialRecords
+							.emplace(materialKey,
+								MaterialUploadRecord{
+									.m_Gpu = materialGpu,
+									.m_Index = materialIndex,
+									.m_Flags = material->m_Flags,
+									.m_AlphaMode = material->m_AlphaMode,
+								})
+								.first;
 					}
-					else if (std::memcmp(&iter->second.m_Gpu, &materialGpu, sizeof(MaterialGPU)) != 0 ||
+					else if (std::memcmp(&iter->second.m_Gpu, &materialGpu, sizeof(MaterialGPU)) !=
+						0 ||
 						iter->second.m_Flags != material->m_Flags ||
 						iter->second.m_AlphaMode != material->m_AlphaMode)
 					{
 						GGLAB_LOG_GRAPHICS_WARN(
 							"Render material key collision for domain={} value=0x{:016X}.",
-							static_cast<uint32_t>(materialKey.m_Domain),
-							materialKey.m_Value);
+							static_cast<uint32_t>(materialKey.m_Domain), materialKey.m_Value);
 					}
 
 					ObjectGPU objectGpu{};
@@ -166,8 +163,7 @@ namespace gglab
 					objectGpu.MaterialIndex = iter->second.m_Index;
 
 					const uint64_t objectKey =
-						(static_cast<uint64_t>(entt::to_integral(entity)) << 32) |
-						modelMeshIndex;
+						(static_cast<uint64_t>(entt::to_integral(entity)) << 32) | modelMeshIndex;
 					const uint32_t objectOffset = info.m_ObjectTable.Upsert(objectKey, objectGpu);
 					if (objectOffset == ObjectTable::InvalidSlot)
 					{
@@ -203,7 +199,8 @@ namespace gglab
 		// Light data
 		{
 			bool foundLight = false;
-			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
+			auto lightView =
+				registry.view<components::TransformComponent, components::LightComponent>();
 			for (auto&& [entity, transComp, lightComp] : lightView.each())
 			{
 				LightGPU lightGpu{};
@@ -266,8 +263,7 @@ namespace gglab
 			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
-			viewGpu.DepthConvention =
-				static_cast<uint32_t>(renderView.m_DepthConvention);
+			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
 			viewData.push_back(viewGpu);
 		}
 
@@ -300,10 +296,8 @@ namespace gglab
 			for (const auto& range : objectDirtyRanges)
 			{
 				const std::span<const ObjectGPU> data = info.m_ObjectTable.GetData(range);
-				objectsUploadSucceeded &= batch.UploadBuffer(
-					objectBuffer,
-					static_cast<uint64_t>(range.m_FirstElement) * sizeof(ObjectGPU),
-					data.data(),
+				objectsUploadSucceeded &= batch.UploadBuffer(objectBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(ObjectGPU), data.data(),
 					data.size_bytes());
 			}
 
@@ -312,10 +306,8 @@ namespace gglab
 			for (const auto& range : materialDirtyRanges)
 			{
 				const std::span<const MaterialGPU> data = info.m_MaterialTable.GetData(range);
-				materialsUploadSucceeded &= batch.UploadBuffer(
-					materialBuffer,
-					static_cast<uint64_t>(range.m_FirstElement) * sizeof(MaterialGPU),
-					data.data(),
+				materialsUploadSucceeded &= batch.UploadBuffer(materialBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(MaterialGPU), data.data(),
 					data.size_bytes());
 			}
 
@@ -324,10 +316,8 @@ namespace gglab
 			for (const auto& range : lightDirtyRanges)
 			{
 				const std::span<const LightGPU> data = info.m_LightTable.GetData(range);
-				lightsUploadSucceeded &= batch.UploadBuffer(
-					lightBuffer,
-					static_cast<uint64_t>(range.m_FirstElement) * sizeof(LightGPU),
-					data.data(),
+				lightsUploadSucceeded &= batch.UploadBuffer(lightBuffer,
+					static_cast<uint64_t>(range.m_FirstElement) * sizeof(LightGPU), data.data(),
 					data.size_bytes());
 			}
 
@@ -355,12 +345,9 @@ namespace gglab
 		result.m_UploadFencePoint = uploadFencePoint;
 		result.m_GpuAllocations.m_Views = viewsBufferResult;
 
-		const bool viewsUploadSucceeded =
-			viewData.empty() || viewsBufferResult.IsValid();
+		const bool viewsUploadSucceeded = viewData.empty() || viewsBufferResult.IsValid();
 
-		if (objectsUploadSucceeded &&
-			materialsUploadSucceeded &&
-			lightsUploadSucceeded &&
+		if (objectsUploadSucceeded && materialsUploadSucceeded && lightsUploadSucceeded &&
 			viewsUploadSucceeded)
 		{
 			result.m_Status = RenderSceneBuildStatus::Ready;
@@ -384,9 +371,7 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"RenderSceneBuilder: GPU scene upload failed "
 				"(objects={}, materials={}, lights={}, views={}). Rendering is disabled for this frame.",
-				objectsUploadSucceeded,
-				materialsUploadSucceeded,
-				lightsUploadSucceeded,
+				objectsUploadSucceeded, materialsUploadSucceeded, lightsUploadSucceeded,
 				viewsUploadSucceeded);
 		}
 

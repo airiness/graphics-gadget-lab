@@ -22,12 +22,9 @@ namespace gglab
 		virtual ~SelfTestReporterBase() = default;
 
 		virtual void OnSuiteStarted(std::string_view suiteName) noexcept = 0;
-		virtual void OnCheckCompleted(
-			std::string_view checkName,
-			bool succeeded) noexcept = 0;
+		virtual void OnCheckCompleted(std::string_view checkName, bool succeeded) noexcept = 0;
 		virtual void OnSuiteFinished(
-			std::string_view suiteName,
-			const SelfTestSummary& summary) noexcept = 0;
+			std::string_view suiteName, const SelfTestSummary& summary) noexcept = 0;
 	};
 
 	class SelfTestContext final
@@ -50,25 +47,18 @@ namespace gglab
 		std::string_view m_Id;
 		SelfTestSuiteFunction m_Run = nullptr;
 
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return !m_Id.empty() && m_Run != nullptr;
-		}
+		[[nodiscard]] bool IsValid() const noexcept { return !m_Id.empty() && m_Run != nullptr; }
 	};
 
 	class ConsoleSelfTestReporter final : public SelfTestReporterBase
 	{
 	public:
 		void OnSuiteStarted(std::string_view suiteName) noexcept override;
-		void OnCheckCompleted(
-			std::string_view checkName,
-			bool succeeded) noexcept override;
+		void OnCheckCompleted(std::string_view checkName, bool succeeded) noexcept override;
 		void OnSuiteFinished(
-			std::string_view suiteName,
-			const SelfTestSummary& summary) noexcept override;
+			std::string_view suiteName, const SelfTestSummary& summary) noexcept override;
 	};
 
 	[[nodiscard]] bool RunSelfTestSuite(
-		const SelfTestSuiteDesc& suite,
-		SelfTestReporterBase& reporter) noexcept;
+		const SelfTestSuiteDesc& suite, SelfTestReporterBase& reporter) noexcept;
 }

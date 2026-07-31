@@ -18,8 +18,7 @@ namespace gglab
 
 		virtual std::string_view GetName() const noexcept = 0;
 
-		virtual void BuildRenderGraph(RenderGraph& rg,
-			const RenderFrameContext& context,
+		virtual void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept = 0;
 	};
 }

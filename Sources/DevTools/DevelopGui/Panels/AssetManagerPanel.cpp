@@ -27,8 +27,7 @@ namespace gglab
 			std::string m_Status;
 		};
 
-		constexpr std::array TextureSemantics =
-		{
+		constexpr std::array TextureSemantics = {
 			TextureSemantic::BaseColor,
 			TextureSemantic::Emissive,
 			TextureSemantic::Normal,
@@ -49,10 +48,14 @@ namespace gglab
 		{
 			switch (kind)
 			{
-			case AssetStreamingWorkKind::Model: return "Model";
-			case AssetStreamingWorkKind::Texture: return "Texture";
-			case AssetStreamingWorkKind::Mesh: return "Mesh";
-			default: return "Unknown";
+			case AssetStreamingWorkKind::Model:
+				return "Model";
+			case AssetStreamingWorkKind::Texture:
+				return "Texture";
+			case AssetStreamingWorkKind::Mesh:
+				return "Mesh";
+			default:
+				return "Unknown";
 			}
 		}
 
@@ -60,27 +63,39 @@ namespace gglab
 		{
 			switch (priority)
 			{
-			case TaskPriority::Critical: return "Critical";
-			case TaskPriority::High: return "High";
-			case TaskPriority::Normal: return "Normal";
-			case TaskPriority::Background: return "Background";
-			default: return "Unknown";
+			case TaskPriority::Critical:
+				return "Critical";
+			case TaskPriority::High:
+				return "High";
+			case TaskPriority::Normal:
+				return "Normal";
+			case TaskPriority::Background:
+				return "Background";
+			default:
+				return "Unknown";
 			}
 		}
 
-		[[nodiscard]] const char* PublicationStageText(
-			AssetResourcePublicationStage stage) noexcept
+		[[nodiscard]] const char* PublicationStageText(AssetResourcePublicationStage stage) noexcept
 		{
 			switch (stage)
 			{
-			case AssetResourcePublicationStage::Textures: return "Textures";
-			case AssetResourcePublicationStage::Materials: return "Materials";
-			case AssetResourcePublicationStage::Meshes: return "Meshes";
-			case AssetResourcePublicationStage::MeshInstances: return "Mesh Instances";
-			case AssetResourcePublicationStage::Dependencies: return "Dependencies";
-			case AssetResourcePublicationStage::Commit: return "Commit";
-			case AssetResourcePublicationStage::ReleaseRetains: return "Release Retains";
-			default: return "Unknown";
+			case AssetResourcePublicationStage::Textures:
+				return "Textures";
+			case AssetResourcePublicationStage::Materials:
+				return "Materials";
+			case AssetResourcePublicationStage::Meshes:
+				return "Meshes";
+			case AssetResourcePublicationStage::MeshInstances:
+				return "Mesh Instances";
+			case AssetResourcePublicationStage::Dependencies:
+				return "Dependencies";
+			case AssetResourcePublicationStage::Commit:
+				return "Commit";
+			case AssetResourcePublicationStage::ReleaseRetains:
+				return "Release Retains";
+			default:
+				return "Unknown";
 			}
 		}
 
@@ -100,11 +115,10 @@ namespace gglab
 			{
 				const std::filesystem::path path(state.m_ModelPath.data());
 				const auto request = assetManager.LoadModelAsync(path);
-				state.m_Status = request.IsValid() ?
-					std::format("Queued model {} (task {}).",
-						request.m_ModelId.Value(),
-						request.m_Task.m_Value) :
-					"Failed to load model. Only .gltf is currently supported.";
+				state.m_Status = request.IsValid()
+					? std::format("Queued model {} (task {}).",
+						request.m_ModelId.Value(), request.m_Task.m_Value)
+					: "Failed to load model. Only .gltf is currently supported.";
 			}
 			if (!hasPath)
 			{
@@ -113,30 +127,34 @@ namespace gglab
 
 			const auto& models = assetSnapshot.m_Models;
 			ImGui::SeparatorText("Model Import CPU Artifact Cache");
-			const uint64_t artifactLookupCount =
-				assetSnapshot.m_ModelImportArtifactCacheHitCount +
+			const uint64_t artifactLookupCount = assetSnapshot.m_ModelImportArtifactCacheHitCount +
 				assetSnapshot.m_ModelImportArtifactCacheMissCount;
-			const double artifactHitRate = artifactLookupCount == 0 ? 0.0 :
-				100.0 * static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheHitCount) /
-					static_cast<double>(artifactLookupCount);
-			ImGui::Text(
-				"Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
+			const double artifactHitRate =
+				artifactLookupCount == 0
+				? 0.0
+				: 100.0 *
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheHitCount) /
+				static_cast<double>(artifactLookupCount);
+			ImGui::Text("Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
 				assetSnapshot.m_ModelImportArtifactCachedEntryCount,
 				assetSnapshot.m_ModelImportArtifactCacheHitCount,
-				assetSnapshot.m_ModelImportArtifactCacheMissCount,
-				artifactHitRate);
+				assetSnapshot.m_ModelImportArtifactCacheMissCount, artifactHitRate);
 			ImGui::Text(
 				"Memory: cached %.2f MiB / %.2f MiB | externally retained %.2f MiB | total live %.2f MiB",
-				static_cast<double>(assetSnapshot.m_ModelImportArtifactCachedBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheBudgetBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_ModelImportArtifactExternallyRetainedBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_ModelImportArtifactTotalLiveBytes) / (1024.0 * 1024.0));
-			ImGui::Text(
-				"Admissions: %llu | Rejected: %llu | Evictions: %llu (%.2f MiB)",
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactCachedBytes) /
+				(1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactCacheBudgetBytes) /
+				(1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactExternallyRetainedBytes) /
+				(1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactTotalLiveBytes) /
+				(1024.0 * 1024.0));
+			ImGui::Text("Admissions: %llu | Rejected: %llu | Evictions: %llu (%.2f MiB)",
 				assetSnapshot.m_ModelImportArtifactAdmissionCount,
 				assetSnapshot.m_ModelImportArtifactAdmissionRejectedCount,
 				assetSnapshot.m_ModelImportArtifactEvictionCount,
-				static_cast<double>(assetSnapshot.m_ModelImportArtifactEvictedBytes) / (1024.0 * 1024.0));
+				static_cast<double>(assetSnapshot.m_ModelImportArtifactEvictedBytes) /
+				(1024.0 * 1024.0));
 			if (ImGui::Button("Clear Model Import CPU Cache"))
 			{
 				assetManager.ClearModelImportArtifactCache();
@@ -146,8 +164,8 @@ namespace gglab
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
 			if (ImGui::BeginTable("ModelAssetsTable", 17,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Content Gen", ImGuiTableColumnFlags_WidthFixed, 88.0f);
@@ -198,11 +216,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(10);
 					if (model.m_HasDependencyState)
 					{
-						ImGui::Text(
-							"%u/%u/%u/%u",
-							model.m_ReadyDependencyCount,
-							model.m_PendingDependencyCount,
-							model.m_FailedDependencyCount,
+						ImGui::Text("%u/%u/%u/%u", model.m_ReadyDependencyCount,
+							model.m_PendingDependencyCount, model.m_FailedDependencyCount,
 							model.m_CancelledDependencyCount);
 					}
 					else
@@ -219,8 +234,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(14);
 					ImGui::TextUnformatted(utils::BoolToString(model.m_IsImportArtifactCached));
 					ImGui::TableSetColumnIndex(15);
-					const std::string artifactDigest = ArtifactContentDigestText(
-						model.m_ImportArtifactContentDigest);
+					const std::string artifactDigest =
+						ArtifactContentDigestText(model.m_ImportArtifactContentDigest);
 					ImGui::TextUnformatted(artifactDigest.empty() ? "-" : artifactDigest.c_str());
 					ImGui::TableSetColumnIndex(16);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
@@ -237,7 +252,8 @@ namespace gglab
 		{
 			ImGui::PushID("Textures");
 			ImGui::SeparatorText("Load Texture");
-			ImGui::InputText("Texture Path", state.m_TexturePath.data(), state.m_TexturePath.size());
+			ImGui::InputText(
+				"Texture Path", state.m_TexturePath.data(), state.m_TexturePath.size());
 			const std::string semanticPreview = devtools::EnumText(
 				TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)]);
 			if (ImGui::BeginCombo("Semantic", semanticPreview.c_str()))
@@ -266,13 +282,13 @@ namespace gglab
 			if (ImGui::Button("Load Texture"))
 			{
 				const std::filesystem::path path(state.m_TexturePath.data());
-				const TextureSemantic semantic = TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)];
+				const TextureSemantic semantic =
+					TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)];
 				const auto request = assetManager.LoadTextureAsync(path, semantic);
-				state.m_Status = request.IsValid() ?
-					std::format("Queued texture {} (task {}).",
-						request.m_TextureId.Value(),
-						request.m_Task.m_Value) :
-					"Failed to load texture.";
+				state.m_Status = request.IsValid()
+					? std::format("Queued texture {} (task {}).",
+						request.m_TextureId.Value(), request.m_Task.m_Value)
+					: "Failed to load texture.";
 			}
 			if (!hasPath)
 			{
@@ -281,30 +297,32 @@ namespace gglab
 
 			const auto& textures = assetSnapshot.m_Textures;
 			ImGui::SeparatorText("Texture CPU Artifact Cache");
-			const uint64_t artifactLookupCount =
-				assetSnapshot.m_TextureArtifactCacheHitCount +
+			const uint64_t artifactLookupCount = assetSnapshot.m_TextureArtifactCacheHitCount +
 				assetSnapshot.m_TextureArtifactCacheMissCount;
-			const double artifactHitRate = artifactLookupCount == 0 ? 0.0 :
-				100.0 * static_cast<double>(assetSnapshot.m_TextureArtifactCacheHitCount) /
-					static_cast<double>(artifactLookupCount);
-			ImGui::Text(
-				"Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
+			const double artifactHitRate =
+				artifactLookupCount == 0
+				? 0.0
+				: 100.0 * static_cast<double>(assetSnapshot.m_TextureArtifactCacheHitCount) /
+				static_cast<double>(artifactLookupCount);
+			ImGui::Text("Entries: %u | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
 				assetSnapshot.m_TextureArtifactCachedEntryCount,
 				assetSnapshot.m_TextureArtifactCacheHitCount,
-				assetSnapshot.m_TextureArtifactCacheMissCount,
-				artifactHitRate);
+				assetSnapshot.m_TextureArtifactCacheMissCount, artifactHitRate);
 			ImGui::Text(
 				"Memory: cached %.2f MiB / %.2f MiB | externally retained %.2f MiB | total live %.2f MiB",
 				static_cast<double>(assetSnapshot.m_TextureArtifactCachedBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_TextureArtifactCacheBudgetBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_TextureArtifactExternallyRetainedBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_TextureArtifactTotalLiveBytes) / (1024.0 * 1024.0));
-			ImGui::Text(
-				"Admissions: %llu | Rejected: %llu | Evictions: %llu (%.2f MiB)",
+				static_cast<double>(assetSnapshot.m_TextureArtifactCacheBudgetBytes) /
+				(1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_TextureArtifactExternallyRetainedBytes) /
+				(1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_TextureArtifactTotalLiveBytes) /
+				(1024.0 * 1024.0));
+			ImGui::Text("Admissions: %llu | Rejected: %llu | Evictions: %llu (%.2f MiB)",
 				assetSnapshot.m_TextureArtifactAdmissionCount,
 				assetSnapshot.m_TextureArtifactAdmissionRejectedCount,
 				assetSnapshot.m_TextureArtifactEvictionCount,
-				static_cast<double>(assetSnapshot.m_TextureArtifactEvictedBytes) / (1024.0 * 1024.0));
+				static_cast<double>(assetSnapshot.m_TextureArtifactEvictedBytes) /
+				(1024.0 * 1024.0));
 			if (ImGui::Button("Clear Texture CPU Cache"))
 			{
 				assetManager.ClearTextureArtifactCache();
@@ -313,21 +331,24 @@ namespace gglab
 			ImGui::SeparatorText("Texture Local DDC");
 			const uint64_t ddcLookupCount = assetSnapshot.m_TextureDerivedDataHitCount +
 				assetSnapshot.m_TextureDerivedDataMissCount;
-			const double ddcHitRate = ddcLookupCount == 0 ? 0.0 :
-				100.0 * static_cast<double>(assetSnapshot.m_TextureDerivedDataHitCount) /
-					static_cast<double>(ddcLookupCount);
-			ImGui::Text(
-				"Entries: %llu (%.2f MiB) | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
+			const double ddcHitRate =
+				ddcLookupCount == 0
+				? 0.0
+				: 100.0 * static_cast<double>(assetSnapshot.m_TextureDerivedDataHitCount) /
+				static_cast<double>(ddcLookupCount);
+			ImGui::Text("Entries: %llu (%.2f MiB) | Hits: %llu | Misses: %llu | Hit rate: %.1f%%",
 				assetSnapshot.m_TextureDerivedDataStoredEntryCount,
-				static_cast<double>(assetSnapshot.m_TextureDerivedDataStoredBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_TextureDerivedDataStoredBytes) /
+				(1024.0 * 1024.0),
 				assetSnapshot.m_TextureDerivedDataHitCount,
-				assetSnapshot.m_TextureDerivedDataMissCount,
-				ddcHitRate);
+				assetSnapshot.m_TextureDerivedDataMissCount, ddcHitRate);
 			ImGui::Text(
 				"Reads: %.2f MiB | Writes: %llu (%.2f MiB) | Failures: %llu | Corruptions: %llu",
-				static_cast<double>(assetSnapshot.m_TextureDerivedDataReadBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_TextureDerivedDataReadBytes) /
+				(1024.0 * 1024.0),
 				assetSnapshot.m_TextureDerivedDataWriteCount,
-				static_cast<double>(assetSnapshot.m_TextureDerivedDataWrittenBytes) / (1024.0 * 1024.0),
+				static_cast<double>(assetSnapshot.m_TextureDerivedDataWrittenBytes) /
+				(1024.0 * 1024.0),
 				assetSnapshot.m_TextureDerivedDataWriteFailureCount,
 				assetSnapshot.m_TextureDerivedDataCorruptionCount);
 			if (assetSnapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds == 0)
@@ -336,17 +357,22 @@ namespace gglab
 			}
 			else
 			{
-				const uint64_t catalogNowMilliseconds = static_cast<uint64_t>(
-					std::chrono::duration_cast<std::chrono::milliseconds>(
-						std::chrono::system_clock::now().time_since_epoch()).count());
+				const uint64_t catalogNowMilliseconds =
+					static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+						std::chrono::system_clock::now().time_since_epoch())
+						.count());
 				const uint64_t catalogAgeMilliseconds =
 					catalogNowMilliseconds >=
-						assetSnapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds ?
-					catalogNowMilliseconds -
-						assetSnapshot.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds : 0;
+					assetSnapshot
+					.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds
+					? catalogNowMilliseconds -
+					assetSnapshot
+					.m_TextureDerivedDataCatalogLastReconciledAtUnixMilliseconds
+					: 0;
 				ImGui::TextDisabled(
 					"Catalog: %s | reconciled %.1f s ago | refreshes %llu | failures %llu",
-					assetSnapshot.m_IsTextureDerivedDataCatalogApproximate ? "approximate" : "exact",
+					assetSnapshot.m_IsTextureDerivedDataCatalogApproximate ? "approximate"
+					: "exact",
 					static_cast<double>(catalogAgeMilliseconds) / 1000.0,
 					assetSnapshot.m_TextureDerivedDataCatalogReconciliationCount,
 					assetSnapshot.m_TextureDerivedDataCatalogReconciliationFailureCount);
@@ -363,22 +389,22 @@ namespace gglab
 				assetSnapshot.m_TextureDerivedDataActiveWaiterCount,
 				assetSnapshot.m_TextureDerivedDataPublishCount,
 				assetSnapshot.m_TextureDerivedDataFanoutDeliveryCount);
-			ImGui::Text(
-				"Shared failures: %llu | Cancelled participants: %llu",
+			ImGui::Text("Shared failures: %llu | Cancelled participants: %llu",
 				assetSnapshot.m_TextureDerivedDataBuildFailureCount,
 				assetSnapshot.m_TextureDerivedDataCancelledWaiterCount);
 			if (ImGui::Button("Clear Texture Local DDC"))
 			{
-				state.m_Status = assetManager.ClearTextureDerivedDataCache() ?
-					"Texture local DDC cleared." :
-					"Texture local DDC clear failed; existing data was preserved.";
+				state.m_Status =
+					assetManager.ClearTextureDerivedDataCache()
+					? "Texture local DDC cleared."
+					: "Texture local DDC clear failed; existing data was preserved.";
 			}
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
 			if (ImGui::BeginTable("TextureAssetsTable", 21,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Content Gen", ImGuiTableColumnFlags_WidthFixed, 88.0f);
@@ -436,8 +462,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(11);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsCpuArtifactCached));
 					ImGui::TableSetColumnIndex(12);
-					const std::string artifactId = ArtifactContentDigestText(
-						texture.m_ArtifactContentDigest);
+					const std::string artifactId =
+						ArtifactContentDigestText(texture.m_ArtifactContentDigest);
 					ImGui::TextUnformatted(artifactId.empty() ? "-" : artifactId.c_str());
 					ImGui::TableSetColumnIndex(13);
 					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsDerivedDataCached));
@@ -455,7 +481,8 @@ namespace gglab
 					const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
 					ImGui::TextUnformatted(textureHandle.c_str());
 					ImGui::TableSetColumnIndex(19);
-					ImGui::TextUnformatted(texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
+					ImGui::TextUnformatted(
+						texture.m_DebugName.empty() ? "-" : texture.m_DebugName.c_str());
 					ImGui::TableSetColumnIndex(20);
 					ImGui::TextUnformatted(path.empty() ? "<generated>" : path.c_str());
 					ImGui::PopID();
@@ -472,8 +499,8 @@ namespace gglab
 			ImGui::Text("%u meshes", static_cast<uint32_t>(meshes.size()));
 
 			if (ImGui::BeginTable("MeshAssetsTable", 13,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
 				ImGui::TableSetupColumn("Content Gen", ImGuiTableColumnFlags_WidthFixed, 88.0f);
@@ -549,26 +576,19 @@ namespace gglab
 		void DrawSamplerRegistry(const SamplerRegistrySnapshot& snapshot) noexcept
 		{
 			const uint64_t lookupCount = snapshot.m_CacheHitCount + snapshot.m_CacheMissCount;
-			const double hitRate = lookupCount == 0 ? 0.0 :
-				100.0 * static_cast<double>(snapshot.m_CacheHitCount) /
+			const double hitRate = lookupCount == 0
+				? 0.0
+				: 100.0 * static_cast<double>(snapshot.m_CacheHitCount) /
 				static_cast<double>(lookupCount);
-			ImGui::Text(
-				"Unique: %u | Preset-backed: %u | Custom: %u | Preset bindings: %u",
-				snapshot.m_UniqueSamplerCount,
-				snapshot.m_PresetSamplerCount,
-				snapshot.m_CustomSamplerCount,
-				snapshot.m_PresetBindingCount);
-			ImGui::Text(
-				"Cache lookups: %llu hits / %llu misses (%.1f%% hit rate)",
-				snapshot.m_CacheHitCount,
-				snapshot.m_CacheMissCount,
-				hitRate);
+			ImGui::Text("Unique: %u | Preset-backed: %u | Custom: %u | Preset bindings: %u",
+				snapshot.m_UniqueSamplerCount, snapshot.m_PresetSamplerCount,
+				snapshot.m_CustomSamplerCount, snapshot.m_PresetBindingCount);
+			ImGui::Text("Cache lookups: %llu hits / %llu misses (%.1f%% hit rate)",
+				snapshot.m_CacheHitCount, snapshot.m_CacheMissCount, hitRate);
 
-			if (ImGui::BeginTable(
-				"SamplerRegistryTable",
-				12,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-					ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX))
+			if (ImGui::BeginTable("SamplerRegistryTable", 12,
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollX))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 52.0f);
 				ImGui::TableSetupColumn("Preset / Kind", ImGuiTableColumnFlags_WidthFixed, 180.0f);
@@ -629,12 +649,9 @@ namespace gglab
 		}
 
 		void DrawUploadTable(
-			const char* tableId,
-			const std::vector<AssetSnapshot::Upload>& uploads) noexcept
+			const char* tableId, const std::vector<AssetSnapshot::Upload>& uploads) noexcept
 		{
-			if (ImGui::BeginTable(
-				tableId,
-				10,
+			if (ImGui::BeginTable(tableId, 10,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 64.0f);
@@ -672,8 +689,9 @@ namespace gglab
 						ImGui::TextUnformatted("-");
 					}
 					ImGui::TableSetColumnIndex(5);
-					ImGui::TextUnformatted(upload.m_Progress.m_Stage.empty() ?
-						"-" : upload.m_Progress.m_Stage.c_str());
+					ImGui::TextUnformatted(upload.m_Progress.m_Stage.empty()
+						? "-"
+						: upload.m_Progress.m_Stage.c_str());
 					if (!upload.m_Progress.m_Detail.empty() && ImGui::IsItemHovered())
 					{
 						ImGui::SetTooltip("%s", upload.m_Progress.m_Detail.c_str());
@@ -681,11 +699,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(6);
 					if (upload.m_FencePoint.IsValid())
 					{
-						ImGui::Text(
-							"%u:%u / %llu",
-							upload.m_FencePoint.m_Fence.Index(),
-							upload.m_FencePoint.m_Fence.Generation(),
-							upload.m_FencePoint.m_Value);
+						ImGui::Text("%u:%u / %llu", upload.m_FencePoint.m_Fence.Index(),
+							upload.m_FencePoint.m_Fence.Generation(), upload.m_FencePoint.m_Value);
 					}
 					else
 					{
@@ -694,7 +709,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%.2f", upload.m_ElapsedMilliseconds);
 					ImGui::TableSetColumnIndex(8);
-					ImGui::Text("%.1f", static_cast<double>(upload.m_Estimate.m_StagingBytes) / 1024.0);
+					ImGui::Text(
+						"%.1f", static_cast<double>(upload.m_Estimate.m_StagingBytes) / 1024.0);
 					ImGui::TableSetColumnIndex(9);
 					ImGui::Text("%u", upload.m_Estimate.m_OperationCount);
 					ImGui::PopID();
@@ -704,53 +720,40 @@ namespace gglab
 			}
 		}
 
-		void DrawStreamingQueue(
-			const char* label,
-			const char* tableId,
+		void DrawStreamingQueue(const char* label, const char* tableId,
 			const AssetStreamingQueueStatistics& queue) noexcept
 		{
-			const double averageWait = queue.m_QueueSampleCount > 0 ?
-				queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_QueueSampleCount) : 0.0;
-			const double averageExecution = queue.m_ProcessedCount > 0 ?
-				queue.m_TotalExecutionMilliseconds / static_cast<double>(queue.m_ProcessedCount) : 0.0;
+			const double averageWait =
+				queue.m_QueueSampleCount > 0
+				? queue.m_TotalQueueMilliseconds / static_cast<double>(queue.m_QueueSampleCount)
+				: 0.0;
+			const double averageExecution = queue.m_ProcessedCount > 0
+				? queue.m_TotalExecutionMilliseconds /
+				static_cast<double>(queue.m_ProcessedCount)
+				: 0.0;
 			ImGui::Text(
 				"%s: pending=%u high=%u payload=%.2f/%.2f MiB ops=%llu enqueued=%llu processed=%llu cancelled=%llu failures=%llu wait(avg/max)=%.3f/%.3f ms run(avg/p95/max)=%.3f/%.3f/%.3f ms",
-				label,
-				queue.m_PendingCount,
-				queue.m_HighWatermark,
+				label, queue.m_PendingCount, queue.m_HighWatermark,
 				static_cast<double>(queue.m_PendingSourceBytes) / (1024.0 * 1024.0),
 				static_cast<double>(queue.m_PendingStagingBytes) / (1024.0 * 1024.0),
-				queue.m_PendingOperationCount,
-				queue.m_EnqueuedCount,
-				queue.m_ProcessedCount,
-				queue.m_CancelledCount,
-				queue.m_CallbackFailureCount,
-				averageWait,
-				queue.m_MaxQueueMilliseconds,
-				averageExecution,
-				queue.m_ExecutionP95Milliseconds,
+				queue.m_PendingOperationCount, queue.m_EnqueuedCount, queue.m_ProcessedCount,
+				queue.m_CancelledCount, queue.m_CallbackFailureCount, averageWait,
+				queue.m_MaxQueueMilliseconds, averageExecution, queue.m_ExecutionP95Milliseconds,
 				queue.m_MaxExecutionMilliseconds);
-			if (queue.m_ContinueCount > 0 ||
-				queue.m_CompletedCount > 0 ||
-				queue.m_FailedCount > 0 ||
-				queue.m_ResourceCreationCount > 0)
+			if (queue.m_ContinueCount > 0 || queue.m_CompletedCount > 0 ||
+				queue.m_FailedCount > 0 || queue.m_ResourceCreationCount > 0)
 			{
 				ImGui::Text(
 					"Step jobs: continue=%llu completed=%llu failed=%llu creations=%llu source released/copied=%.2f/%.2f MiB",
-					queue.m_ContinueCount,
-					queue.m_CompletedCount,
-					queue.m_FailedCount,
+					queue.m_ContinueCount, queue.m_CompletedCount, queue.m_FailedCount,
 					queue.m_ResourceCreationCount,
 					static_cast<double>(queue.m_SourceBytesReleased) / (1024.0 * 1024.0),
 					static_cast<double>(queue.m_SourceBytesCopiedToUpload) / (1024.0 * 1024.0));
 				ImGui::Text(
 					"Step diagnostics: over-budget=%llu no-progress=%llu injected-faults=%llu",
-					queue.m_OverBudgetExecutionCount,
-					queue.m_NoProgressContinueCount,
+					queue.m_OverBudgetExecutionCount, queue.m_NoProgressContinueCount,
 					queue.m_FaultInjectionCount);
-				if (ImGui::BeginTable(
-					"PublicationStageTelemetry",
-					5,
+				if (ImGui::BeginTable("PublicationStageTelemetry", 5,
 					ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 				{
 					ImGui::TableSetupColumn("Stage");
@@ -759,8 +762,7 @@ namespace gglab
 					ImGui::TableSetupColumn("P95 (ms)");
 					ImGui::TableSetupColumn("Max (ms)");
 					ImGui::TableHeadersRow();
-					for (size_t stageIndex = 1;
-						stageIndex < queue.m_PublicationStages.size();
+					for (size_t stageIndex = 1; stageIndex < queue.m_PublicationStages.size();
 						++stageIndex)
 					{
 						const auto& stage = queue.m_PublicationStages[stageIndex];
@@ -775,8 +777,8 @@ namespace gglab
 						ImGui::TableSetColumnIndex(1);
 						ImGui::Text("%llu", stage.m_StepCount);
 						ImGui::TableSetColumnIndex(2);
-						ImGui::Text("%.3f", stage.m_TotalMilliseconds /
-							static_cast<double>(stage.m_StepCount));
+						ImGui::Text("%.3f",
+							stage.m_TotalMilliseconds / static_cast<double>(stage.m_StepCount));
 						ImGui::TableSetColumnIndex(3);
 						ImGui::Text("%.3f", stage.m_P95Milliseconds);
 						ImGui::TableSetColumnIndex(4);
@@ -790,9 +792,7 @@ namespace gglab
 				return;
 			}
 
-			if (ImGui::BeginTable(
-				tableId,
-				9,
+			if (ImGui::BeginTable(tableId, 9,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
@@ -819,9 +819,11 @@ namespace gglab
 					ImGui::TableSetColumnIndex(4);
 					ImGui::Text("%.3f", work.m_QueueMilliseconds);
 					ImGui::TableSetColumnIndex(5);
-					ImGui::Text("%.1f", static_cast<double>(work.m_Estimate.m_SourceBytes) / 1024.0);
+					ImGui::Text(
+						"%.1f", static_cast<double>(work.m_Estimate.m_SourceBytes) / 1024.0);
 					ImGui::TableSetColumnIndex(6);
-					ImGui::Text("%.1f", static_cast<double>(work.m_Estimate.m_StagingBytes) / 1024.0);
+					ImGui::Text(
+						"%.1f", static_cast<double>(work.m_Estimate.m_StagingBytes) / 1024.0);
 					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%u", work.m_Estimate.m_OperationCount);
 					ImGui::TableSetColumnIndex(8);
@@ -834,31 +836,25 @@ namespace gglab
 		void DrawAssetUploads(const AssetSnapshot& assetSnapshot) noexcept
 		{
 			ImGui::SeparatorText("Ownership");
-			ImGui::Text(
-				"Owners: %u   Leases: %u   Managed assets: %u   Priority updates: %llu",
-				assetSnapshot.m_AssetOwnerCount,
-				assetSnapshot.m_AssetLeaseCount,
-				assetSnapshot.m_ManagedAssetCount,
-				assetSnapshot.m_OwnershipPriorityUpdateCount);
+			ImGui::Text("Owners: %u   Leases: %u   Managed assets: %u   Priority updates: %llu",
+				assetSnapshot.m_AssetOwnerCount, assetSnapshot.m_AssetLeaseCount,
+				assetSnapshot.m_ManagedAssetCount, assetSnapshot.m_OwnershipPriorityUpdateCount);
 			ImGui::Text(
 				"Last-interest policy: CPU cancelled=%llu ready-work cancelled=%llu GPU deferred=%llu",
 				assetSnapshot.m_OwnershipCpuCancellationCount,
 				assetSnapshot.m_OwnershipReadyCancellationCount,
 				assetSnapshot.m_OwnershipGpuDeferredCancellationCount);
-			ImGui::Text(
-				"Runtime retirement: requested=%llu revived=%llu retired=%llu pending=%u",
+			ImGui::Text("Runtime retirement: requested=%llu revived=%llu retired=%llu pending=%u",
 				assetSnapshot.m_RuntimeRetirementRequestCount,
 				assetSnapshot.m_RuntimeRetirementCancellationCount,
 				assetSnapshot.m_RuntimeRetirementCount,
 				assetSnapshot.m_PendingRuntimeRetirementCount);
-			ImGui::Text(
-				"Publication transaction: active retains=%llu protected cancellations=%llu",
+			ImGui::Text("Publication transaction: active retains=%llu protected cancellations=%llu",
 				assetSnapshot.m_PublicationRetainCount,
 				assetSnapshot.m_PublicationProtectedCancellationCount);
-			if (!assetSnapshot.m_ActiveOwnershipInterests.empty() && ImGui::BeginTable(
-				"AssetOwnershipInterests",
-				6,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+			if (!assetSnapshot.m_ActiveOwnershipInterests.empty() &&
+				ImGui::BeginTable("AssetOwnershipInterests", 6,
+					ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthFixed, 72.0f);
 				ImGui::TableSetupColumn("Asset", ImGuiTableColumnFlags_WidthFixed, 72.0f);
@@ -892,30 +888,21 @@ namespace gglab
 			ImGui::SeparatorText("Frame Admission Budget");
 			ImGui::Text(
 				"CPU payload: %u/%u items, %.3f/%.3f ms   Resource publication: %u/%u steps, %u/%u creations, %.3f/%.3f ms",
-				usage.m_CpuPayloadItems,
-				budget.m_MaxCpuPayloadItems,
-				usage.m_CpuPayloadMilliseconds,
-				budget.m_MaxCpuPayloadMilliseconds,
-				usage.m_ResourcePublicationSteps,
-				budget.m_MaxResourcePublicationSteps,
-				usage.m_ResourcePublicationCreations,
-				budget.m_MaxResourcePublicationCreations,
+				usage.m_CpuPayloadItems, budget.m_MaxCpuPayloadItems,
+				usage.m_CpuPayloadMilliseconds, budget.m_MaxCpuPayloadMilliseconds,
+				usage.m_ResourcePublicationSteps, budget.m_MaxResourcePublicationSteps,
+				usage.m_ResourcePublicationCreations, budget.m_MaxResourcePublicationCreations,
 				usage.m_ResourcePublicationMilliseconds,
 				budget.m_MaxResourcePublicationMilliseconds);
 			ImGui::Text(
 				"Upload recording: %u/%u items, %.2f/%.2f MiB, %u/%u ops, %.3f/%.3f ms   GPU finalize: %u/%u items, %.3f/%.3f ms",
-				usage.m_UploadRecordingItems,
-				budget.m_MaxUploadRecordingItems,
+				usage.m_UploadRecordingItems, budget.m_MaxUploadRecordingItems,
 				static_cast<double>(usage.m_UploadBytes) / (1024.0 * 1024.0),
 				static_cast<double>(budget.m_MaxUploadBytes) / (1024.0 * 1024.0),
-				usage.m_UploadOperations,
-				budget.m_MaxUploadOperations,
-				usage.m_UploadRecordingMilliseconds,
-				budget.m_MaxUploadRecordingMilliseconds,
-				usage.m_GpuFinalizeItems,
-				budget.m_MaxGpuFinalizeItems,
-				usage.m_GpuFinalizeMilliseconds,
-				budget.m_MaxGpuFinalizeMilliseconds);
+				usage.m_UploadOperations, budget.m_MaxUploadOperations,
+				usage.m_UploadRecordingMilliseconds, budget.m_MaxUploadRecordingMilliseconds,
+				usage.m_GpuFinalizeItems, budget.m_MaxGpuFinalizeItems,
+				usage.m_GpuFinalizeMilliseconds, budget.m_MaxGpuFinalizeMilliseconds);
 			ImGui::Text(
 				"Observed queued payload: %.2f MiB (high %.2f)   Upload-recording promotion limit: %.2f MiB   In-flight staging: %.2f/%.2f MiB (high %.2f)",
 				static_cast<double>(assetSnapshot.m_ReadyPayloadBytes) / (1024.0 * 1024.0),
@@ -923,7 +910,8 @@ namespace gglab
 				static_cast<double>(budget.m_MaxUploadRecordingBacklogBytes) / (1024.0 * 1024.0),
 				static_cast<double>(assetSnapshot.m_InFlightUploadBytes) / (1024.0 * 1024.0),
 				static_cast<double>(budget.m_MaxInFlightBytes) / (1024.0 * 1024.0),
-				static_cast<double>(assetSnapshot.m_InFlightUploadHighWatermark) / (1024.0 * 1024.0));
+				static_cast<double>(assetSnapshot.m_InFlightUploadHighWatermark) /
+				(1024.0 * 1024.0));
 			ImGui::Text(
 				"Deferrals: upload-promotion=%llu upload-budget=%llu in-flight=%llu   Oversized admissions=%llu",
 				assetSnapshot.m_UploadPromotionBudgetDeferralCount,
@@ -933,33 +921,27 @@ namespace gglab
 
 			ImGui::SeparatorText("Streaming Queues");
 			DrawStreamingQueue("CPU Payload", "CpuPayloadQueue", assetSnapshot.m_CpuPayloadQueue);
-			DrawStreamingQueue(
-				"Resource Publication",
-				"ResourcePublicationQueue",
+			DrawStreamingQueue("Resource Publication", "ResourcePublicationQueue",
 				assetSnapshot.m_ResourcePublicationQueue);
 			DrawStreamingQueue(
-				"Upload Recording",
-				"UploadRecordingQueue",
-				assetSnapshot.m_UploadRecordingQueue);
-			DrawStreamingQueue("GPU Finalize", "GpuFinalizeQueue", assetSnapshot.m_GpuFinalizeQueue);
+				"Upload Recording", "UploadRecordingQueue", assetSnapshot.m_UploadRecordingQueue);
+			DrawStreamingQueue(
+				"GPU Finalize", "GpuFinalizeQueue", assetSnapshot.m_GpuFinalizeQueue);
 
 			ImGui::SeparatorText("GPU Uploads");
 			ImGui::Text(
 				"Pending: %u   Submitted: %llu   Succeeded: %llu   Failed: %llu   Callback failures: %llu",
-				assetSnapshot.m_PendingUploadCount,
-				assetSnapshot.m_SubmittedUploadCount,
-				assetSnapshot.m_SucceededUploadCount,
-				assetSnapshot.m_FailedUploadCount,
+				assetSnapshot.m_PendingUploadCount, assetSnapshot.m_SubmittedUploadCount,
+				assetSnapshot.m_SucceededUploadCount, assetSnapshot.m_FailedUploadCount,
 				assetSnapshot.m_UploadCompletionCallbackFailureCount);
 			const double averageResourcesPerBatch =
-				assetSnapshot.m_UploadBatchSubmissionCount > 0 ?
-				static_cast<double>(assetSnapshot.m_SubmittedUploadCount) /
-					static_cast<double>(assetSnapshot.m_UploadBatchSubmissionCount) : 0.0;
-			ImGui::Text(
-				"Transfer batches: %llu   Resources/batch: last=%u average=%.2f max=%u",
+				assetSnapshot.m_UploadBatchSubmissionCount > 0
+				? static_cast<double>(assetSnapshot.m_SubmittedUploadCount) /
+				static_cast<double>(assetSnapshot.m_UploadBatchSubmissionCount)
+				: 0.0;
+			ImGui::Text("Transfer batches: %llu   Resources/batch: last=%u average=%.2f max=%u",
 				assetSnapshot.m_UploadBatchSubmissionCount,
-				assetSnapshot.m_LastUploadBatchResourceCount,
-				averageResourcesPerBatch,
+				assetSnapshot.m_LastUploadBatchResourceCount, averageResourcesPerBatch,
 				assetSnapshot.m_MaxResourcesPerUploadBatch);
 
 			ImGui::SeparatorText("Pending GPU Uploads");
@@ -993,19 +975,18 @@ namespace gglab
 		}
 
 		auto& state = context.PanelState<AssetManagerPanelState>();
-		const auto* snapshot = context.m_Diagnostics ?
-			context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
-		const auto* samplerSnapshot = context.m_Diagnostics ?
-			context.m_Diagnostics->GetSnapshot<SamplerRegistrySnapshot>() : nullptr;
+		const auto* snapshot =
+			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
+		const auto* samplerSnapshot =
+			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<SamplerRegistrySnapshot>()
+			: nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Asset snapshot provider is not available.");
 			return;
 		}
 		state.m_TextureSemanticIndex = std::clamp<int32_t>(
-			state.m_TextureSemanticIndex,
-			0,
-			static_cast<int32_t>(TextureSemantics.size() - 1));
+			state.m_TextureSemanticIndex, 0, static_cast<int32_t>(TextureSemantics.size() - 1));
 
 		ImGui::TextUnformatted("Asset Manager");
 		ImGui::Separator();
@@ -1019,13 +1000,10 @@ namespace gglab
 		ImGui::SeparatorText("Logical Residency");
 		ImGui::Text(
 			"Usage frame: %llu | Resident: %u | Pinned: %u | Cacheable: %u | Candidates: %u",
-			snapshot->m_AssetUsageFrame,
-			snapshot->m_ResidentAssetCount,
-			snapshot->m_PinnedAssetCount,
-			snapshot->m_CacheableAssetCount,
+			snapshot->m_AssetUsageFrame, snapshot->m_ResidentAssetCount,
+			snapshot->m_PinnedAssetCount, snapshot->m_CacheableAssetCount,
 			snapshot->m_EvictionCandidateCount);
-		ImGui::Text(
-			"Controller: %s | Resident: %.2f MiB | Pending release: %.2f MiB (%u)",
+		ImGui::Text("Controller: %s | Resident: %.2f MiB | Pending release: %.2f MiB (%u)",
 			snapshot->m_AutomaticResidencyEvictionEnabled ? "Enabled" : "Disabled",
 			static_cast<double>(snapshot->m_LogicalResidentBytes) / (1024.0 * 1024.0),
 			static_cast<double>(snapshot->m_PendingEvictionBytes) / (1024.0 * 1024.0),
@@ -1034,52 +1012,34 @@ namespace gglab
 			"Watermarks: %.2f / %.2f MiB | Min unused: %llu frames | Max releases/frame: %u",
 			static_cast<double>(snapshot->m_ResidencyLowWatermarkBytes) / (1024.0 * 1024.0),
 			static_cast<double>(snapshot->m_ResidencyHighWatermarkBytes) / (1024.0 * 1024.0),
-			snapshot->m_ResidencyMinUnusedFrames,
-			snapshot->m_MaxResidencyEvictionsPerFrame);
-		ImGui::Text(
-			"Runtime cache: retain %llu frames | Max retirements/frame: %u",
-			snapshot->m_RuntimeEntryRetentionFrames,
-			snapshot->m_MaxRuntimeRetirementsPerFrame);
-		ImGui::Text(
-			"Released: %llu assets / %.2f MiB | Rescinded: %llu | Reloading: %u",
+			snapshot->m_ResidencyMinUnusedFrames, snapshot->m_MaxResidencyEvictionsPerFrame);
+		ImGui::Text("Runtime cache: retain %llu frames | Max retirements/frame: %u",
+			snapshot->m_RuntimeEntryRetentionFrames, snapshot->m_MaxRuntimeRetirementsPerFrame);
+		ImGui::Text("Released: %llu assets / %.2f MiB | Rescinded: %llu | Reloading: %u",
 			snapshot->m_ResidencyEvictionCount,
 			static_cast<double>(snapshot->m_ResidencyEvictedBytes) / (1024.0 * 1024.0),
-			snapshot->m_ResidencyEvictionCancellationCount,
-			snapshot->m_ReloadingAssetCount);
-		ImGui::Text(
-			"Reload requests: %llu | Coalesced: %llu | Last frame: %u | Peak/frame: %u",
-			snapshot->m_ResidencyReloadRequestCount,
-			snapshot->m_ResidencyReloadCoalescedCount,
-			snapshot->m_LastFrameReloadRequestCount,
-			snapshot->m_ReloadRequestHighWatermark);
-		ImGui::Text(
-			"Planning: %llu frames | Last plan: frame %llu, %u actions / %.2f MiB",
-			snapshot->m_ResidencyPlanningCount,
-			snapshot->m_LastResidencyPlanFrame,
+			snapshot->m_ResidencyEvictionCancellationCount, snapshot->m_ReloadingAssetCount);
+		ImGui::Text("Reload requests: %llu | Coalesced: %llu | Last frame: %u | Peak/frame: %u",
+			snapshot->m_ResidencyReloadRequestCount, snapshot->m_ResidencyReloadCoalescedCount,
+			snapshot->m_LastFrameReloadRequestCount, snapshot->m_ReloadRequestHighWatermark);
+		ImGui::Text("Planning: %llu frames | Last plan: frame %llu, %u actions / %.2f MiB",
+			snapshot->m_ResidencyPlanningCount, snapshot->m_LastResidencyPlanFrame,
 			snapshot->m_LastPlannedResidencyActionCount,
-			static_cast<double>(snapshot->m_LastPlannedResidencyBytes) /
-				(1024.0 * 1024.0));
-		ImGui::Text(
-			"Operations: %llu | Revalidation rejects: %llu | Stale completions: %llu",
-			snapshot->m_ResidencyOperationCount,
-			snapshot->m_ResidencyRevalidationRejectionCount,
+			static_cast<double>(snapshot->m_LastPlannedResidencyBytes) / (1024.0 * 1024.0));
+		ImGui::Text("Operations: %llu | Revalidation rejects: %llu | Stale completions: %llu",
+			snapshot->m_ResidencyOperationCount, snapshot->m_ResidencyRevalidationRejectionCount,
 			snapshot->m_ResidencyStaleCompletionCount);
-		ImGui::Text(
-			"Operation events: %llu accepted / %llu completed | Stale: %llu",
+		ImGui::Text("Operation events: %llu accepted / %llu completed | Stale: %llu",
 			snapshot->m_ResidencyAcceptedStateEventCount,
 			snapshot->m_ResidencyCompletedStateEventCount,
 			snapshot->m_ResidencyStaleStateEventCount);
 		ImGui::Text(
 			"Dependency graph: %u models | %u resources | %u edges | Builds: %llu | Events: %llu",
-			snapshot->m_TrackedModelDependencyCount,
-			snapshot->m_ReverseDependencyCount,
-			snapshot->m_ReverseDependencyEdgeCount,
-			snapshot->m_DependencyGraphBuildCount,
+			snapshot->m_TrackedModelDependencyCount, snapshot->m_ReverseDependencyCount,
+			snapshot->m_ReverseDependencyEdgeCount, snapshot->m_DependencyGraphBuildCount,
 			snapshot->m_DependencyEventUpdateCount);
-		ImGui::Text(
-			"Dependency validation: %llu checks | %llu mismatches",
-			snapshot->m_DependencyValidationCount,
-			snapshot->m_DependencyValidationMismatchCount);
+		ImGui::Text("Dependency validation: %llu checks | %llu mismatches",
+			snapshot->m_DependencyValidationCount, snapshot->m_DependencyValidationMismatchCount);
 
 		if (ImGui::BeginTabBar("AssetManagerTabs"))
 		{

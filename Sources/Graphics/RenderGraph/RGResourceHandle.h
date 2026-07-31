@@ -17,33 +17,20 @@ namespace gglab
 		static constexpr Version UnintializedVersion = 0;
 
 	public:
-		bool IsValid() const noexcept
-		{
-			return m_Handle.IsValid();
-		}
+		bool IsValid() const noexcept { return m_Handle.IsValid(); }
 
-		void Clear() noexcept
-		{
-			m_Handle = InvalidHandle;
-		}
+		void Clear() noexcept { m_Handle = InvalidHandle; }
 
-		Handle GetHandle() const noexcept
-		{
-			return m_Handle;
-		}
+		Handle GetHandle() const noexcept { return m_Handle; }
 
-		Version GetVersion() const noexcept
-		{
-			return m_Version;
-		}
+		Version GetVersion() const noexcept { return m_Version; }
 
 		auto operator<=>(const RGResourceHandle&) const = default;
 
 	protected:
 		RGResourceHandle() noexcept = default;
 		explicit RGResourceHandle(Handle handle, Version version) noexcept :
-			m_Handle(handle),
-			m_Version(version)
+			m_Handle(handle), m_Version(version)
 		{
 		}
 
@@ -55,15 +42,11 @@ namespace gglab
 		friend class RGBuilder;
 	};
 
-	template<typename RESOURCE>
-	class RGResourceId : public RGResourceHandle
+	template <typename RESOURCE> class RGResourceId : public RGResourceHandle
 	{
 	public:
 		using RGResourceHandle::RGResourceHandle;
 		RGResourceId() noexcept = default;
-		explicit RGResourceId(const RGResourceHandle& handle) :
-			RGResourceHandle(handle)
-		{
-		}
+		explicit RGResourceId(const RGResourceHandle& handle) : RGResourceHandle(handle) {}
 	};
 }

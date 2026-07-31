@@ -61,11 +61,7 @@ namespace gglab
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(
-				m_Type,
-				m_OffsetInBytes,
-				m_SizeInBytes,
-				m_StrideInBytes,
-				m_Format);
+				m_Type, m_OffsetInBytes, m_SizeInBytes, m_StrideInBytes, m_Format);
 		}
 	};
 }

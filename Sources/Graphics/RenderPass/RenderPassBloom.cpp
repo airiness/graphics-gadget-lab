@@ -66,22 +66,19 @@ namespace gglab
 		};
 	}
 
-	void RenderPassBloom::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassBloom::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		AddPass(rg, context, services, DebugTapCallback{});
 	}
 
-	void RenderPassBloom::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services,
-		const DebugTapCallback& debugTapCallback) noexcept
+	void RenderPassBloom::AddPass(RenderGraph& rg, const RenderFrameContext& context,
+		const RenderServices& services, const DebugTapCallback& debugTapCallback) noexcept
 	{
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const auto settings = context.GetViewRenderSettings(displayViewId).m_PostProcess.m_Bloom;
-		auto& postProcess = rg.GetBlackboard().Get<RGPostProcessResources>(
-			PostProcessResourcesName);
+		auto& postProcess =
+			rg.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
 		postProcess.m_Bloom = {};
 		if (!settings.m_Enabled || settings.m_Intensity <= 0.0f)
 		{
@@ -97,41 +94,36 @@ namespace gglab
 
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
-		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-			SamplerPreset::LinearClamp);
+		const uint32_t samplerIndex =
+			renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const float exposureScaleOverPreExposure =
 			context.GetViewRenderSettings(displayViewId).m_Exposure.m_ExposureScale /
 			postProcess.m_Inputs.m_SceneColor.m_PreExposure;
 
 		const std::string prefilterName = MakeRenderGraphPassName("Prefilter");
-		rg.AddPass<PassData>(prefilterName.c_str(),
+		rg.AddPass<PassData>(
+			prefilterName.c_str(),
 			[settings, samplerIndex, exposureScaleOverPreExposure](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
-				auto& resources = builder.GetBlackboard().Get<RGPostProcessResources>(
-					PostProcessResourcesName);
+				auto& resources =
+					builder.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
 				auto& bloom = resources.m_Bloom;
 				const RGPostProcessColor& sceneColor = resources.m_Inputs.m_SceneColor;
 				const RHITextureDesc& sceneDesc = builder.GetTextureDesc(sceneColor.m_Texture);
-				GGLAB_ASSERT_MSG(
-					sceneDesc.m_Dimension == RHITextureDimension::Texture2D &&
+				GGLAB_ASSERT_MSG(sceneDesc.m_Dimension == RHITextureDimension::Texture2D &&
 					sceneDesc.m_SampleCount == 1,
 					"Bloom requires a single-sampled 2D scene color texture.");
 
 				RGTextureId extentSource = sceneColor.m_Texture;
-				const uint32_t requestedLevels = std::min(
-					settings.m_MaxLevels,
-					MaxBloomPyramidLevels);
+				const uint32_t requestedLevels =
+					std::min(settings.m_MaxLevels, MaxBloomPyramidLevels);
 				for (uint32_t level = 0; level < requestedLevels; ++level)
 				{
-					const RHITextureDesc levelDesc = MakeRelativeTextureDesc(
-						builder,
-						extentSource,
-						PostProcessResolutionScale::Half,
-						RHIFormat::R16G16B16A16Float);
-					bloom.m_Pyramid[level] = builder.CreateTexture(
-						BloomPyramidNames[level],
-						levelDesc);
+					const RHITextureDesc levelDesc = MakeRelativeTextureDesc(builder, extentSource,
+						PostProcessResolutionScale::Half, RHIFormat::R16G16B16A16Float);
+					bloom.m_Pyramid[level] =
+						builder.CreateTexture(BloomPyramidNames[level], levelDesc);
 					++bloom.m_LevelCount;
 					extentSource = bloom.m_Pyramid[level];
 					if (levelDesc.m_Extent.m_Width == 1 && levelDesc.m_Extent.m_Height == 1)
@@ -144,8 +136,10 @@ namespace gglab
 				data.m_Source = builder.Read(sceneColor.m_Texture, RGTextureAccess::Sample);
 				builder.WriteInPlace(bloom.m_Pyramid[0], RGTextureAccess::RenderTarget);
 				data.m_Output = bloom.m_Pyramid[0];
-				data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
-				data.m_OutputRtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
+				data.m_SourceSrv =
+					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+				data.m_OutputRtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 
 				const RHITextureDesc& outputDesc = builder.GetTextureDesc(data.m_Output);
 				data.m_Width = outputDesc.m_Extent.m_Width;
@@ -166,10 +160,14 @@ namespace gglab
 				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
 				GGLAB_ASSERT_MSG(sourceSrv.IsValid(), "Bloom source SRV must be shader visible.");
 				commandContext->ClearColor(outputRtv, { 0.0f, 0.0f, 0.0f, 1.0f });
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, false));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&outputRtv, 1));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetPipeline(
+					GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, false));
+				commandContext->SetRenderTargets(
+					std::span<const RHITextureViewHandle>(&outputRtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 				const BloomPassParameters parameters{
 					.SourceTextureIndex = sourceSrv.m_Index,
 					.SourceSamplerIndex = data.m_SamplerIndex,
@@ -181,8 +179,7 @@ namespace gglab
 					.ExposureScaleOverPreExposure = data.m_ExposureScaleOverPreExposure,
 				};
 				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					parameters);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->DrawFullscreenTriangle();
 			});
 		postProcess.m_Bloom.m_Prefilter = {
@@ -194,31 +191,31 @@ namespace gglab
 		if (debugTapCallback)
 		{
 			debugTapCallback(
-				postProcess.m_Bloom.m_Prefilter,
-				PostProcessDebugTap::BloomPrefilter,
-				0);
+				postProcess.m_Bloom.m_Prefilter, PostProcessDebugTap::BloomPrefilter, 0);
 			debugTapCallback(
-				postProcess.m_Bloom.m_DownsampledPyramid[0],
-				PostProcessDebugTap::BloomPyramid,
-				0);
+				postProcess.m_Bloom.m_DownsampledPyramid[0], PostProcessDebugTap::BloomPyramid, 0);
 		}
 
 		const uint32_t levelCount = postProcess.m_Bloom.m_LevelCount;
 		for (uint32_t level = 1; level < levelCount; ++level)
 		{
-			const std::string passName = MakeRenderGraphPassName(
-				std::format("Downsample.{}", level));
-			rg.AddPass<PassData>(passName.c_str(),
+			const std::string passName =
+				MakeRenderGraphPassName(std::format("Downsample.{}", level));
+			rg.AddPass<PassData>(
+				passName.c_str(),
 				[level, samplerIndex](RenderGraph::RGBuilder& builder, PassData& data)
 				{
 					auto& bloom = builder.GetBlackboard()
 						.Get<RGPostProcessResources>(PostProcessResourcesName)
 						.m_Bloom;
-					data.m_Source = builder.Read(bloom.m_Pyramid[level - 1], RGTextureAccess::Sample);
+					data.m_Source =
+						builder.Read(bloom.m_Pyramid[level - 1], RGTextureAccess::Sample);
 					builder.WriteInPlace(bloom.m_Pyramid[level], RGTextureAccess::RenderTarget);
 					data.m_Output = bloom.m_Pyramid[level];
-					data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
-					data.m_OutputRtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
+					data.m_SourceSrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+					data.m_OutputRtv =
+						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 					const auto& sourceDesc = builder.GetTextureDesc(data.m_Source);
 					const auto& outputDesc = builder.GetTextureDesc(data.m_Output);
 					data.m_SourceWidth = sourceDesc.m_Extent.m_Width;
@@ -234,12 +231,17 @@ namespace gglab
 					auto* commandContext = executeContext.GetGraphicsCommandContext();
 					const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
 					const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
-					GGLAB_ASSERT_MSG(sourceSrv.IsValid(), "Bloom source SRV must be shader visible.");
+					GGLAB_ASSERT_MSG(
+						sourceSrv.IsValid(), "Bloom source SRV must be shader visible.");
 					commandContext->ClearColor(outputRtv, { 0.0f, 0.0f, 0.0f, 1.0f });
-					commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, false));
-					commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&outputRtv, 1));
-					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+					commandContext->SetPipeline(
+						GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, false));
+					commandContext->SetRenderTargets(
+						std::span<const RHITextureViewHandle>(&outputRtv, 1));
+					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+						static_cast<float>(data.m_Height) });
+					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+						static_cast<int32_t>(data.m_Height) });
 					const BloomPassParameters parameters{
 						.SourceTextureIndex = sourceSrv.m_Index,
 						.SourceSamplerIndex = data.m_SamplerIndex,
@@ -248,8 +250,7 @@ namespace gglab
 						.SourceTexelSizeY = 1.0f / static_cast<float>(data.m_SourceHeight),
 					};
 					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-						parameters);
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 					commandContext->DrawFullscreenTriangle();
 				});
 			postProcess.m_Bloom.m_DownsampledPyramid[level] = {
@@ -259,32 +260,33 @@ namespace gglab
 			};
 			if (debugTapCallback)
 			{
-				debugTapCallback(
-					postProcess.m_Bloom.m_DownsampledPyramid[level],
-					PostProcessDebugTap::BloomPyramid,
-					level);
+				debugTapCallback(postProcess.m_Bloom.m_DownsampledPyramid[level],
+					PostProcessDebugTap::BloomPyramid, level);
 			}
 		}
 
 		for (uint32_t sourceLevel = levelCount - 1; sourceLevel > 0; --sourceLevel)
 		{
 			const uint32_t targetLevel = sourceLevel - 1;
-			const std::string passName = MakeRenderGraphPassName(
-				std::format("Upsample.{}", targetLevel));
-			rg.AddPass<PassData>(passName.c_str(),
+			const std::string passName =
+				MakeRenderGraphPassName(std::format("Upsample.{}", targetLevel));
+			rg.AddPass<PassData>(
+				passName.c_str(),
 				[sourceLevel, targetLevel, samplerIndex, settings](
 					RenderGraph::RGBuilder& builder, PassData& data)
 				{
 					auto& bloom = builder.GetBlackboard()
 						.Get<RGPostProcessResources>(PostProcessResourcesName)
 						.m_Bloom;
-					data.m_Source = builder.Read(bloom.m_Pyramid[sourceLevel], RGTextureAccess::Sample);
+					data.m_Source =
+						builder.Read(bloom.m_Pyramid[sourceLevel], RGTextureAccess::Sample);
 					builder.ReadWriteInPlace(
-						bloom.m_Pyramid[targetLevel],
-						RGTextureAccess::RenderTarget);
+						bloom.m_Pyramid[targetLevel], RGTextureAccess::RenderTarget);
 					data.m_Output = bloom.m_Pyramid[targetLevel];
-					data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
-					data.m_OutputRtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
+					data.m_SourceSrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
+					data.m_OutputRtv =
+						builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 					const auto& sourceDesc = builder.GetTextureDesc(data.m_Source);
 					const auto& outputDesc = builder.GetTextureDesc(data.m_Output);
 					data.m_SourceWidth = sourceDesc.m_Extent.m_Width;
@@ -301,11 +303,16 @@ namespace gglab
 					auto* commandContext = executeContext.GetGraphicsCommandContext();
 					const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
 					const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
-					GGLAB_ASSERT_MSG(sourceSrv.IsValid(), "Bloom source SRV must be shader visible.");
-					commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, true));
-					commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&outputRtv, 1));
-					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+					GGLAB_ASSERT_MSG(
+						sourceSrv.IsValid(), "Bloom source SRV must be shader visible.");
+					commandContext->SetPipeline(
+						GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, true));
+					commandContext->SetRenderTargets(
+						std::span<const RHITextureViewHandle>(&outputRtv, 1));
+					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+						static_cast<float>(data.m_Height) });
+					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+						static_cast<int32_t>(data.m_Height) });
 					const BloomPassParameters parameters{
 						.SourceTextureIndex = sourceSrv.m_Index,
 						.SourceSamplerIndex = data.m_SamplerIndex,
@@ -315,8 +322,7 @@ namespace gglab
 						.Scatter = data.m_Scatter,
 					};
 					commandContext->SetPushConstants(
-						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-						parameters);
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 					commandContext->DrawFullscreenTriangle();
 				});
 		}
@@ -365,9 +371,7 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassBloom::GetOrCreatePSO(
-		const Renderer& renderer,
-		RHIFormat renderTargetFormat,
-		bool additive) noexcept
+		const Renderer& renderer, RHIFormat renderTargetFormat, bool additive) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
@@ -375,8 +379,6 @@ namespace gglab
 		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;
 		recipe.m_BlendPreset = additive ? BlendPreset::Additive : BlendPreset::Default;
 		return pipelineCache->Resolve(
-			additive ? m_AdditivePipelineSlot : m_FilterPipelineSlot,
-			recipe,
-			GetInfo());
+			additive ? m_AdditivePipelineSlot : m_FilterPipelineSlot, recipe, GetInfo());
 	}
 }

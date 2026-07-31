@@ -14,9 +14,6 @@ namespace gglab
 		virtual ~Win32MessageHandler() = default;
 
 		[[nodiscard]] virtual Win32MessageResult HandleWin32Message(
-			HWND hwnd,
-			UINT message,
-			WPARAM wParam,
-			LPARAM lParam) noexcept = 0;
+			HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept = 0;
 	};
 }

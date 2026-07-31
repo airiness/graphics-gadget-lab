@@ -27,8 +27,8 @@ namespace gglab
 
 	struct IBLStageArtifactSet
 	{
-		std::array<IBLStageArtifactHandle,
-			static_cast<size_t>(IBLArtifactStage::Count)> m_Artifacts{};
+		std::array<IBLStageArtifactHandle, static_cast<size_t>(IBLArtifactStage::Count)>
+			m_Artifacts{};
 
 		[[nodiscard]] const IBLStageArtifactHandle& Get(IBLArtifactStage stage) const noexcept;
 		void Set(IBLArtifactStage stage, IBLStageArtifactHandle artifact) noexcept;
@@ -39,6 +39,5 @@ namespace gglab
 	[[nodiscard]] ArtifactContentDigest ComputeIBLStageArtifactContentDigest(
 		const IBLStageArtifact& artifact) noexcept;
 	[[nodiscard]] IBLStageArtifactHandle CreateIBLStageArtifact(
-		IBLArtifactStage stage,
-		TextureAssetData&& texture) noexcept;
+		IBLArtifactStage stage, TextureAssetData&& texture) noexcept;
 }

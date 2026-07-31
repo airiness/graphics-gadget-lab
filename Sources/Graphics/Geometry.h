@@ -28,12 +28,8 @@ namespace gglab
 			using VertexBuilder = std::vector<Vertex>(*)() noexcept;
 			using IndexBuilder = std::vector<uint32_t>(*)() noexcept;
 
-			static entt::entity CreatePrimitive(
-				const CreateInfo& info,
-				ModelID modelId,
-				MeshID meshId,
-				std::string_view name,
-				VertexBuilder buildVertices,
+			static entt::entity CreatePrimitive(const CreateInfo& info, ModelID modelId,
+				MeshID meshId, std::string_view name, VertexBuilder buildVertices,
 				IndexBuilder buildIndices) noexcept;
 		};
 

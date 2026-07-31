@@ -102,22 +102,18 @@ namespace gglab
 
 	[[nodiscard]] constexpr inline bool IsStorageAccess(RGTextureAccess access) noexcept
 	{
-		return access == RGTextureAccess::StorageRead ||
-			access == RGTextureAccess::StorageWrite ||
+		return access == RGTextureAccess::StorageRead || access == RGTextureAccess::StorageWrite ||
 			access == RGTextureAccess::StorageReadWrite;
 	}
 
 	[[nodiscard]] constexpr inline bool IsStorageAccess(RGBufferAccess access) noexcept
 	{
-		return access == RGBufferAccess::StorageRead ||
-			access == RGBufferAccess::StorageWrite ||
+		return access == RGBufferAccess::StorageRead || access == RGBufferAccess::StorageWrite ||
 			access == RGBufferAccess::StorageReadWrite;
 	}
 
-	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(
-		RGTextureAccess access,
-		RGDependencyAccess dependencyAccess,
-		RGOrderingRequirement ordering) noexcept
+	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(RGTextureAccess access,
+		RGDependencyAccess dependencyAccess, RGOrderingRequirement ordering) noexcept
 	{
 		if (ordering == RGOrderingRequirement::Unordered && !IsStorageAccess(access))
 		{
@@ -147,10 +143,8 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RGTextureAccess.");
 	}
 
-	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(
-		RGBufferAccess access,
-		RGDependencyAccess dependencyAccess,
-		RGOrderingRequirement ordering) noexcept
+	[[nodiscard]] constexpr inline bool IsRGAccessCompatible(RGBufferAccess access,
+		RGDependencyAccess dependencyAccess, RGOrderingRequirement ordering) noexcept
 	{
 		if (ordering == RGOrderingRequirement::Unordered && !IsStorageAccess(access))
 		{
@@ -178,8 +172,7 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RGBufferAccess.");
 	}
 
-	template<typename RESOURCE>
-	struct RGResourceTraits;
+	template <typename RESOURCE> struct RGResourceTraits;
 
 	struct RGTextureResource
 	{
@@ -203,8 +196,7 @@ namespace gglab
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
 
-	template<>
-	struct RGResourceTraits<RGTextureResource>
+	template <> struct RGResourceTraits<RGTextureResource>
 	{
 		using Access = RGTextureAccess;
 		using Handle = RHITextureHandle;
@@ -212,8 +204,7 @@ namespace gglab
 		static constexpr RGResourceType ResourceType = RGResourceType::RGTexture;
 	};
 
-	template<>
-	struct RGResourceTraits<RGBufferResource>
+	template <> struct RGResourceTraits<RGBufferResource>
 	{
 		using Access = RGBufferAccess;
 		using Handle = RHIBufferHandle;

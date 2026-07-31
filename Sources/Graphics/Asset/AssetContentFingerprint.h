@@ -13,9 +13,7 @@ namespace gglab
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept
 		{
-			return m_SourceContentHash != 0 &&
-				m_ImportSettingsHash != 0 &&
-				m_DecoderVersion != 0;
+			return m_SourceContentHash != 0 && m_ImportSettingsHash != 0 && m_DecoderVersion != 0;
 		}
 
 		bool operator==(const AssetContentFingerprint&) const noexcept = default;

@@ -9,18 +9,20 @@ namespace gglab
 	class RenderPassFinalColor final : public RenderPassBase
 	{
 	public:
-		RenderPassFinalColor() noexcept : RenderPassBase({
-			.m_TypeName = "PostProcess.FinalColor",
-			.m_DisplayName = "Final Color",
-			.m_CategoryName = "PostProcess",
-			.m_Description = "Applies the final color transform to the presentation target.",
-			.m_Category = RenderPassCategory::PostProcess,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
+		RenderPassFinalColor() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "PostProcess.FinalColor",
+				  .m_DisplayName = "Final Color",
+				  .m_CategoryName = "PostProcess",
+				  .m_Description = "Applies the final color transform to the presentation target.",
+				  .m_Category = RenderPassCategory::PostProcess,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
 		~RenderPassFinalColor() override = default;
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:

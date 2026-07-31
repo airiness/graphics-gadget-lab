@@ -4,29 +4,24 @@
 namespace gglab::win32
 {
 	NamedMutexGuard::NamedMutexGuard(
-		void* handle,
-		NamedMutexAcquireDisposition disposition) noexcept :
-		m_Handle(handle),
-		m_Disposition(disposition)
+		void* handle, NamedMutexAcquireDisposition disposition) noexcept :
+		m_Handle(handle), m_Disposition(disposition)
 	{
 	}
 
 	NamedMutexGuard::NamedMutexGuard(NamedMutexGuard&& other) noexcept :
 		m_Handle(std::exchange(other.m_Handle, nullptr)),
-		m_Disposition(std::exchange(
-			other.m_Disposition,
-			NamedMutexAcquireDisposition::Failed))
+		m_Disposition(std::exchange(other.m_Disposition, NamedMutexAcquireDisposition::Failed))
 	{
 	}
 
 	NamedMutexGuard& NamedMutexGuard::operator=(NamedMutexGuard&& other) noexcept
 	{
-		if (this == &other) return *this;
+		if (this == &other)
+			return *this;
 		Release();
 		m_Handle = std::exchange(other.m_Handle, nullptr);
-		m_Disposition = std::exchange(
-			other.m_Disposition,
-			NamedMutexAcquireDisposition::Failed);
+		m_Disposition = std::exchange(other.m_Disposition, NamedMutexAcquireDisposition::Failed);
 		return *this;
 	}
 
@@ -47,7 +42,8 @@ namespace gglab::win32
 
 	NamedMutex::NamedMutex(std::wstring_view name) noexcept
 	{
-		if (name.empty()) return;
+		if (name.empty())
+			return;
 		const std::wstring nullTerminatedName(name);
 		m_Handle = ::CreateMutexW(nullptr, FALSE, nullTerminatedName.c_str());
 	}
@@ -62,9 +58,11 @@ namespace gglab::win32
 
 	NamedMutexGuard NamedMutex::Acquire(uint32_t timeoutMilliseconds) const noexcept
 	{
-		if (!m_Handle) return {};
-		const DWORD timeout = timeoutMilliseconds == std::numeric_limits<uint32_t>::max() ?
-			INFINITE : timeoutMilliseconds;
+		if (!m_Handle)
+			return {};
+		const DWORD timeout = timeoutMilliseconds == std::numeric_limits<uint32_t>::max()
+			? INFINITE
+			: timeoutMilliseconds;
 		const DWORD result = ::WaitForSingleObject(static_cast<HANDLE>(m_Handle), timeout);
 		switch (result)
 		{

@@ -76,8 +76,7 @@ namespace gglab
 		}
 
 		void AddMaterialBinding(
-			ArtifactDigestWriter& writer,
-			const MaterialTextureBinding& binding) noexcept
+			ArtifactDigestWriter& writer, const MaterialTextureBinding& binding) noexcept
 		{
 			writer.U32(binding.m_TextureId.Value());
 			writer.U32(binding.m_SamplerId.Value());
@@ -85,8 +84,7 @@ namespace gglab
 		}
 
 		void AddMaterialProperties(
-			ArtifactDigestWriter& writer,
-			const MaterialProperties& properties) noexcept
+			ArtifactDigestWriter& writer, const MaterialProperties& properties) noexcept
 		{
 			AddMaterialBinding(writer, properties.m_BaseColorBinding);
 			AddMaterialBinding(writer, properties.m_EmissiveBinding);
@@ -126,9 +124,10 @@ namespace gglab
 
 	uint64_t ModelImportArtifact::GetAllocatedBytes() const noexcept
 	{
-		uint64_t bytes = sizeof(ModelImportArtifact) +
+		uint64_t bytes =
+			sizeof(ModelImportArtifact) +
 			static_cast<uint64_t>(m_CanonicalPath.native().capacity()) *
-				sizeof(std::filesystem::path::value_type) +
+			sizeof(std::filesystem::path::value_type) +
 			static_cast<uint64_t>(m_Name.capacity()) +
 			static_cast<uint64_t>(m_Textures.capacity()) * sizeof(ModelImportTexture) +
 			static_cast<uint64_t>(m_Materials.capacity()) * sizeof(ImportedMaterial) +
@@ -237,8 +236,7 @@ namespace gglab
 		return digest;
 	}
 
-	ModelImportArtifactHandle CreateModelImportArtifact(
-		ImportedModel&& importedModel,
+	ModelImportArtifactHandle CreateModelImportArtifact(ImportedModel&& importedModel,
 		std::vector<ResolvedModelImportTexture>&& resolvedTextures,
 		TextureArtifactCache& textureArtifactCache) noexcept
 	{
@@ -257,20 +255,18 @@ namespace gglab
 			.m_MeshInstances = std::move(importedModel.m_MeshInstances),
 		};
 		artifact.m_Textures.reserve(importedModel.m_TextureSources.size());
-		for (size_t textureIndex = 0;
-			textureIndex < importedModel.m_TextureSources.size();
+		for (size_t textureIndex = 0; textureIndex < importedModel.m_TextureSources.size();
 			++textureIndex)
 		{
-			ImportedTextureSource& textureSource =
-				importedModel.m_TextureSources[textureIndex];
+			ImportedTextureSource& textureSource = importedModel.m_TextureSources[textureIndex];
 			ResolvedModelImportTexture& resolvedTexture = resolvedTextures[textureIndex];
 			if (textureSource.m_ImportSettings.m_Semantic != textureSource.m_Semantic ||
 				!resolvedTexture.IsValid())
 			{
 				return {};
 			}
-			TextureArtifactHandle textureArtifact = textureArtifactCache.Admit(
-				std::move(resolvedTexture.m_Artifact));
+			TextureArtifactHandle textureArtifact =
+				textureArtifactCache.Admit(std::move(resolvedTexture.m_Artifact));
 			if (!textureArtifact)
 			{
 				return {};
@@ -283,7 +279,7 @@ namespace gglab
 				.m_ContentFingerprint = resolvedTexture.m_ContentFingerprint,
 				.m_SourceDigest = resolvedTexture.m_SourceDigest,
 				.m_DerivedDataKey = resolvedTexture.m_DerivedDataKey,
-			});
+				});
 		}
 
 		ArtifactContentDigest digest = ComputeModelImportArtifactContentDigest(artifact);

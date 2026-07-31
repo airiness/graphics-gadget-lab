@@ -28,7 +28,8 @@ namespace gglab
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
 		explicit constexpr operator bool() const noexcept { return IsValid(); }
-		friend constexpr auto operator<=>(const AssetUploadHandle&, const AssetUploadHandle&) = default;
+		friend constexpr auto operator<=>(
+			const AssetUploadHandle&, const AssetUploadHandle&) = default;
 	};
 
 	enum class AssetUploadStatus : uint8_t
@@ -53,12 +54,10 @@ namespace gglab
 		uint64_t m_Generation = 0;
 
 		friend constexpr bool operator==(
-			const AssetStreamingIdentity&,
-			const AssetStreamingIdentity&) = default;
+			const AssetStreamingIdentity&, const AssetStreamingIdentity&) = default;
 	};
 
-	[[nodiscard]] constexpr AssetKind ToAssetKind(
-		AssetStreamingWorkKind kind) noexcept
+	[[nodiscard]] constexpr AssetKind ToAssetKind(AssetStreamingWorkKind kind) noexcept
 	{
 		switch (kind)
 		{
@@ -74,8 +73,7 @@ namespace gglab
 		return AssetKind::Unknown;
 	}
 
-	[[nodiscard]] constexpr AssetStreamingWorkKind ToAssetStreamingWorkKind(
-		AssetKind kind) noexcept
+	[[nodiscard]] constexpr AssetStreamingWorkKind ToAssetStreamingWorkKind(AssetKind kind) noexcept
 	{
 		switch (kind)
 		{
@@ -96,9 +94,7 @@ namespace gglab
 		const AssetStreamingIdentity& identity) noexcept
 	{
 		return MakeAssetContentVersion(
-			ToAssetKind(identity.m_Kind),
-			identity.m_StableId,
-			identity.m_Generation);
+			ToAssetKind(identity.m_Kind), identity.m_StableId, identity.m_Generation);
 	}
 
 	[[nodiscard]] constexpr AssetStreamingIdentity ToAssetStreamingIdentity(
@@ -290,8 +286,7 @@ namespace gglab
 	{
 		AssetStreamingIdentity m_Identity{};
 		AssetResourcePublicationStage m_Stage = AssetResourcePublicationStage::Unknown;
-		AssetResourcePublicationFaultAction m_Action =
-			AssetResourcePublicationFaultAction::None;
+		AssetResourcePublicationFaultAction m_Action = AssetResourcePublicationFaultAction::None;
 		AssetResourcePublicationFaultTiming m_Timing =
 			AssetResourcePublicationFaultTiming::AfterStep;
 		uint32_t m_TriggerOccurrence = 1;
@@ -301,8 +296,7 @@ namespace gglab
 			return m_Identity.m_Kind != AssetStreamingWorkKind::Unknown &&
 				m_Stage != AssetResourcePublicationStage::Unknown &&
 				m_Stage != AssetResourcePublicationStage::Count &&
-				m_Action != AssetResourcePublicationFaultAction::None &&
-				m_TriggerOccurrence > 0;
+				m_Action != AssetResourcePublicationFaultAction::None && m_TriggerOccurrence > 0;
 		}
 	};
 
@@ -323,27 +317,18 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetUploadScheduler);
 		~AssetUploadScheduler();
 
-		void EnqueueCpuPayload(
-			AssetStreamingWorkDesc desc,
-			AssetStreamingWork work) noexcept;
+		void EnqueueCpuPayload(AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept;
 		void EnqueueResourcePublication(
-			AssetStreamingWorkDesc desc,
-			std::unique_ptr<IResourcePublicationJob>&& job) noexcept;
-		void EnqueueUploadRecording(
-			AssetStreamingWorkDesc desc,
-			AssetStreamingWork work) noexcept;
+			AssetStreamingWorkDesc desc, std::unique_ptr<IResourcePublicationJob>&& job) noexcept;
+		void EnqueueUploadRecording(AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept;
 		uint32_t CancelReadyWork(const AssetContentVersion& contentVersion) noexcept;
 		uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept;
 		uint32_t UpdateWorkPriority(
-			const AssetContentVersion& contentVersion,
-			TaskPriority priority) noexcept;
+			const AssetContentVersion& contentVersion, TaskPriority priority) noexcept;
 		uint32_t UpdateWorkPriority(
-			const AssetStreamingIdentity& identity,
-			TaskPriority priority) noexcept;
+			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept;
 
-		[[nodiscard]] AssetUploadHandle RecordUpload(
-			AssetUploadDesc desc,
-			AssetUploadRecord record,
+		[[nodiscard]] AssetUploadHandle RecordUpload(AssetUploadDesc desc, AssetUploadRecord record,
 			AssetUploadCompletion completion = {}) noexcept;
 		uint32_t Tick() noexcept;
 		void DrainReadyWork() noexcept;
@@ -425,55 +410,39 @@ namespace gglab
 		};
 
 		[[nodiscard]] bool IsOwnerThread() const noexcept;
-		void EnqueueWork(
-			std::deque<QueuedWork>& queue,
-			QueueTelemetry& telemetry,
-			AssetStreamingWorkDesc desc,
-			AssetStreamingWork work) noexcept;
+		void EnqueueWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
+			AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept;
 		[[nodiscard]] double ExecuteWork(
-			QueuedWork&& queued,
-			QueueTelemetry& telemetry,
-			std::string_view queueName) noexcept;
+			QueuedWork&& queued, QueueTelemetry& telemetry, std::string_view queueName) noexcept;
 		void InsertResourcePublication(QueuedResourcePublication&& publication) noexcept;
 		uint32_t DrainCpuPayloadQueue(bool ignoreBudget) noexcept;
 		uint32_t DrainResourcePublicationQueue(bool ignoreBudget) noexcept;
-		[[nodiscard]] bool TryApplyResourcePublicationFault(
-			const AssetStreamingIdentity& identity,
-			AssetResourcePublicationStage stage,
-			AssetResourcePublicationFaultTiming timing,
+		[[nodiscard]] bool TryApplyResourcePublicationFault(const AssetStreamingIdentity& identity,
+			AssetResourcePublicationStage stage, AssetResourcePublicationFaultTiming timing,
 			AssetResourcePublicationStepResult& result) noexcept;
 		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
 		void FlushRecordedUploads() noexcept;
 		uint32_t PollCompletedUploads() noexcept;
-		void EnqueueGpuFinalize(
-			PendingUpload&& upload,
-			AssetUploadStatus status) noexcept;
+		void EnqueueGpuFinalize(PendingUpload&& upload, AssetUploadStatus status) noexcept;
 		uint32_t DrainGpuFinalizeQueue(bool ignoreBudget) noexcept;
-		void RemoveReadyPayload(const AssetStreamingWorkEstimate& estimate, bool uploadRecording) noexcept;
+		void RemoveReadyPayload(
+			const AssetStreamingWorkEstimate& estimate, bool uploadRecording) noexcept;
 		[[nodiscard]] uint64_t RetireResourcePublicationPayload(
 			QueuedResourcePublication& publication,
 			const AssetResourcePublicationStepUsage& usage) noexcept;
 		void RetireTerminalResourcePublicationPayload(
 			QueuedResourcePublication& publication) noexcept;
 		void RetireReadyPayloadBytes(uint64_t bytes) noexcept;
-		uint32_t CancelQueuedWork(
-			std::deque<QueuedWork>& queue,
-			QueueTelemetry& telemetry,
-			const AssetStreamingIdentity& identity,
-			bool uploadRecording) noexcept;
-		uint32_t CancelResourcePublication(
-			const AssetStreamingIdentity& identity,
+		uint32_t CancelQueuedWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
+			const AssetStreamingIdentity& identity, bool uploadRecording) noexcept;
+		uint32_t CancelResourcePublication(const AssetStreamingIdentity& identity,
 			AssetResourcePublicationAbortReason reason) noexcept;
-		uint32_t UpdateQueuedWorkPriority(
-			std::deque<QueuedWork>& queue,
-			const AssetStreamingIdentity& identity,
-			TaskPriority priority) noexcept;
+		uint32_t UpdateQueuedWorkPriority(std::deque<QueuedWork>& queue,
+			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept;
 		uint32_t UpdateResourcePublicationPriority(
-			const AssetStreamingIdentity& identity,
-			TaskPriority priority) noexcept;
+			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept;
 		[[nodiscard]] AssetStreamingQueueStatistics BuildQueueStatistics(
-			const std::deque<QueuedWork>& queue,
-			const QueueTelemetry& telemetry) const;
+			const std::deque<QueuedWork>& queue, const QueueTelemetry& telemetry) const;
 		[[nodiscard]] AssetStreamingQueueStatistics BuildResourcePublicationQueueStatistics() const;
 		[[nodiscard]] AssetStreamingQueueStatistics BuildGpuFinalizeQueueStatistics() const;
 		void FinishUpload(PendingUpload&& upload, AssetUploadStatus status) noexcept;

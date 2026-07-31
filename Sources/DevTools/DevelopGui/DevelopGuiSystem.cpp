@@ -12,8 +12,8 @@ namespace gglab
 
 	DevelopGuiSystem::~DevelopGuiSystem()
 	{
-		GGLAB_ASSERT_MSG(m_State == State::Inactive,
-			"DevelopGuiSystem destroyed without Finalize.");
+		GGLAB_ASSERT_MSG(
+			m_State == State::Inactive, "DevelopGuiSystem destroyed without Finalize.");
 	}
 
 	bool DevelopGuiSystem::Initialize(const CreateInfo& createInfo) noexcept
@@ -103,8 +103,8 @@ namespace gglab
 
 	void DevelopGuiSystem::Draw(DevelopGuiContext& context) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_State == State::FrameOpen,
-			"DevelopGuiSystem::Draw called without BeginFrame.");
+		GGLAB_ASSERT_MSG(
+			m_State == State::FrameOpen, "DevelopGuiSystem::Draw called without BeginFrame.");
 		if (m_State != State::FrameOpen)
 		{
 			return;
@@ -115,8 +115,7 @@ namespace gglab
 	}
 
 	void DevelopGuiSystem::RenderDrawData(
-		RHIGraphicsCommandContext* commandContext,
-		RHITextureViewHandle renderTarget) noexcept
+		RHIGraphicsCommandContext* commandContext, RHITextureViewHandle renderTarget) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == State::FrameOpen,
 			"DevelopGuiSystem::RenderDrawData called without BeginFrame.");
@@ -141,10 +140,9 @@ namespace gglab
 		m_State = State::Active;
 	}
 
-	ImTextureID DevelopGuiSystem::ResolveTextureId(
-		RHIDescriptorHandle descriptor) const noexcept
+	ImTextureID DevelopGuiSystem::ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept
 	{
-		return IsActive() && m_RenderBackend ?
-			m_RenderBackend->ResolveTextureId(descriptor) : ImTextureID{};
+		return IsActive() && m_RenderBackend ? m_RenderBackend->ResolveTextureId(descriptor)
+			: ImTextureID{};
 	}
 }

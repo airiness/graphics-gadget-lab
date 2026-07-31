@@ -3,14 +3,13 @@
 
 namespace gglab
 {
-	IBLStageArtifactCache::IBLStageArtifactCache(
-		const IBLStageArtifactCacheConfig& config) noexcept :
+	IBLStageArtifactCache::IBLStageArtifactCache(const IBLStageArtifactCacheConfig& config) noexcept :
 		m_Core(config.m_BudgetBytes)
-	{}
+	{
+	}
 
 	IBLStageArtifactHandle IBLStageArtifactCache::Admit(
-		const DerivedDataKey& key,
-		IBLStageArtifactHandle artifact) noexcept
+		const DerivedDataKey& key, IBLStageArtifactHandle artifact) noexcept
 	{
 		if (!key.IsValid() || !artifact || !artifact->IsValid())
 		{
@@ -19,14 +18,12 @@ namespace gglab
 		return m_Core.Admit(key, std::move(artifact));
 	}
 
-	IBLStageArtifactHandle IBLStageArtifactCache::Find(
-		const DerivedDataKey& key) noexcept
+	IBLStageArtifactHandle IBLStageArtifactCache::Find(const DerivedDataKey& key) noexcept
 	{
 		return m_Core.Find(key);
 	}
 
-	bool IBLStageArtifactCache::Contains(
-		const DerivedDataKey& key) const noexcept
+	bool IBLStageArtifactCache::Contains(const DerivedDataKey& key) const noexcept
 	{
 		return m_Core.Contains(key);
 	}

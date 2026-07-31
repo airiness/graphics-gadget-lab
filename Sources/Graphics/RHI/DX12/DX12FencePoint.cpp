@@ -5,22 +5,19 @@
 namespace gglab
 {
 	DX12FencePoint::DX12FencePoint(DX12Fence* fence, uint64_t fenceValue) noexcept :
-		m_FencePtr(fence),
-		m_PointValue(fenceValue)
+		m_FencePtr(fence), m_PointValue(fenceValue)
 	{
 	}
 
 	bool DX12FencePoint::operator==(const DX12FencePoint& other) const noexcept
 	{
-		return m_FencePtr == other.m_FencePtr &&
-			m_PointValue == other.m_PointValue;
+		return m_FencePtr == other.m_FencePtr && m_PointValue == other.m_PointValue;
 	}
 
 	bool DX12FencePoint::operator<(const DX12FencePoint& other) const noexcept
 	{
-		return m_FencePtr == other.m_FencePtr ?
-			m_PointValue < other.m_PointValue :
-			m_FencePtr < other.m_FencePtr;
+		return m_FencePtr == other.m_FencePtr ? m_PointValue < other.m_PointValue
+			: m_FencePtr < other.m_FencePtr;
 	}
 
 	bool DX12FencePoint::IsCompleted() const noexcept

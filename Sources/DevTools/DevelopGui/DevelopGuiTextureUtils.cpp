@@ -5,10 +5,8 @@
 namespace gglab::devtools
 {
 	ImTextureID ResolveImGuiTextureId(
-		const DevelopGuiSystem* developGuiSystem,
-		RHIDescriptorHandle descriptor) noexcept
+		const DevelopGuiSystem* developGuiSystem, RHIDescriptorHandle descriptor) noexcept
 	{
-		return developGuiSystem ?
-			developGuiSystem->ResolveTextureId(descriptor) : ImTextureID{};
+		return developGuiSystem ? developGuiSystem->ResolveTextureId(descriptor) : ImTextureID{};
 	}
 }

@@ -13,10 +13,7 @@ namespace gglab
 		IBLStageArtifact m_Artifact;
 		std::string m_Error;
 
-		[[nodiscard]] bool Succeeded() const noexcept
-		{
-			return m_Artifact.IsValid();
-		}
+		[[nodiscard]] bool Succeeded() const noexcept { return m_Artifact.IsValid(); }
 	};
 
 	class IBLStageArtifactCodec final
@@ -27,8 +24,7 @@ namespace gglab
 		[[nodiscard]] static uint64_t GetMaximumSerializedBytes(
 			TextureAssetValidationLimits limits = {}) noexcept;
 		[[nodiscard]] static IBLStageArtifactDecodeResult Deserialize(
-			std::span<const std::byte> payload,
-			IBLArtifactStage expectedStage,
+			std::span<const std::byte> payload, IBLArtifactStage expectedStage,
 			const ArtifactContentDigest& expectedContentDigest) noexcept;
 	};
 }

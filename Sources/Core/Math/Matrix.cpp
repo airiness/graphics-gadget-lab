@@ -3,8 +3,7 @@
 
 namespace gglab::math
 {
-	const Matrix Matrix::Identity =
-	{
+	const Matrix Matrix::Identity = {
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,

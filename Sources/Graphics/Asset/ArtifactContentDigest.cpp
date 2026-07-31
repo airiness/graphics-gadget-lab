@@ -3,9 +3,7 @@
 
 namespace gglab
 {
-	std::string ArtifactContentDigestText(
-		const ArtifactContentDigest& digest,
-		size_t byteCount)
+	std::string ArtifactContentDigestText(const ArtifactContentDigest& digest, size_t byteCount)
 	{
 		if (!digest.IsValid())
 		{

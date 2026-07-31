@@ -9,8 +9,7 @@ namespace gglab
 		RenderQueue renderQueue{};
 		renderQueue.m_ViewId = info.m_RenderView.m_ViewId;
 		renderQueue.m_CoverageRasterDomain = info.m_CoverageRasterDomain;
-		GGLAB_ASSERT_MSG(
-			renderQueue.m_CoverageRasterDomain.IsValid(),
+		GGLAB_ASSERT_MSG(renderQueue.m_CoverageRasterDomain.IsValid(),
 			"RenderQueue coverage raster domain must identify its frame, view, and viewport.");
 		GGLAB_ASSERT(info.m_ObjectBuffer.IsValid());
 		GGLAB_ASSERT(info.m_MaterialBuffer.IsValid());
@@ -59,42 +58,44 @@ namespace gglab
 
 			const uint8_t bucketOrder = BucketSortOrder(bucket);
 			const uint8_t variantBits8 = static_cast<uint8_t>(variantBits & VariantMask);
-			const uint64_t materialValue = instance.m_MaterialKey.m_Value ^
+			const uint64_t materialValue =
+				instance.m_MaterialKey.m_Value ^
 				(static_cast<uint64_t>(instance.m_MaterialKey.m_Domain) << 63);
-			const uint32_t materialKey = static_cast<uint32_t>(
-				materialValue ^ (materialValue >> 32));
-			const uint32_t meshKey = static_cast<uint32_t>(instance.m_MeshId.IsValid() ? instance.m_MeshId.Value() : 0);
+			const uint32_t materialKey =
+				static_cast<uint32_t>(materialValue ^ (materialValue >> 32));
+			const uint32_t meshKey =
+				static_cast<uint32_t>(instance.m_MeshId.IsValid() ? instance.m_MeshId.Value() : 0);
 			uint64_t sortKey = PackSortKey(bucketOrder, variantBits8, materialKey, meshKey);
 
 			DrawItem drawItem{};
 			drawItem.m_MaterialKey = instance.m_MaterialKey;
 			drawItem.m_CoverageDrawPacket = {
-				.m_Geometry = {
-					.m_MeshId = instance.m_MeshId,
-					.m_VertexBuffer = mesh->m_VertexBufferBinding,
-					.m_IndexBuffer = mesh->m_IndexBufferBinding,
-				},
-				.m_IndexedDraw = {
-					.m_IndexCount = mesh->m_IndexCount,
-				},
-				.m_DrawParameters = {
-					.ObjectOffset = instance.m_ObjectOffset,
-				},
-				.m_CurrentModelSource = {
-					.m_Buffer = info.m_ObjectBuffer,
-					.m_ElementIndex =
-						info.m_ObjectBaseIndex +
-						instance.m_ObjectOffset,
-				},
-				.m_MaterialAlphaSource = {
-					.m_Buffer = info.m_MaterialBuffer,
-					.m_ElementIndex =
-						info.m_MaterialBaseIndex +
-						instance.m_MaterialOffset,
-				},
+				.m_Geometry =
+					{
+						.m_MeshId = instance.m_MeshId,
+						.m_VertexBuffer = mesh->m_VertexBufferBinding,
+						.m_IndexBuffer = mesh->m_IndexBufferBinding,
+					},
+				.m_IndexedDraw =
+					{
+						.m_IndexCount = mesh->m_IndexCount,
+					},
+				.m_DrawParameters =
+					{
+						.ObjectOffset = instance.m_ObjectOffset,
+					},
+				.m_CurrentModelSource =
+					{
+						.m_Buffer = info.m_ObjectBuffer,
+						.m_ElementIndex = info.m_ObjectBaseIndex + instance.m_ObjectOffset,
+					},
+				.m_MaterialAlphaSource =
+					{
+						.m_Buffer = info.m_MaterialBuffer,
+						.m_ElementIndex = info.m_MaterialBaseIndex + instance.m_MaterialOffset,
+					},
 			};
-			GGLAB_ASSERT_MSG(
-				drawItem.m_CoverageDrawPacket.IsValid(),
+			GGLAB_ASSERT_MSG(drawItem.m_CoverageDrawPacket.IsValid(),
 				"RenderQueue generated an incomplete depth coverage draw packet.");
 			drawItem.m_Bucket = bucket;
 			drawItem.m_VariantBits = variantBits;
@@ -104,7 +105,8 @@ namespace gglab
 			renderQueue.m_DrawItems.push_back(drawItem);
 			++renderQueue.m_Statistics.m_VisibleInstanceCount;
 		}
-		renderQueue.m_Statistics.m_DrawItemCount = static_cast<uint32_t>(renderQueue.m_DrawItems.size());
+		renderQueue.m_Statistics.m_DrawItemCount =
+			static_cast<uint32_t>(renderQueue.m_DrawItems.size());
 
 		// Sort draw items by sort key
 		std::stable_sort(renderQueue.m_DrawItems.begin(), renderQueue.m_DrawItems.end(),
@@ -129,7 +131,8 @@ namespace gglab
 
 		// Build draw ranges
 		uint32_t currentIndex = 0;
-		for (size_t bucketIndex = 0; bucketIndex < utils::ToIndex(RenderBucket::Count); ++bucketIndex)
+		for (size_t bucketIndex = 0; bucketIndex < utils::ToIndex(RenderBucket::Count);
+			++bucketIndex)
 		{
 			RenderBucket bucket = static_cast<RenderBucket>(bucketIndex);
 			DrawItemsRange& drawRange = renderQueue.m_BucketDrawRanges[bucketIndex];
@@ -156,8 +159,8 @@ namespace gglab
 	// [8 bits]  Variant Bits
 	// [24 bits]  Material Key
 	// [24 bits]  Mesh Key
-	constexpr uint64_t RenderQueueBuilder::PackSortKey(uint8_t bucketOrder,
-		uint8_t variantBits, uint32_t materialKey, uint32_t meshKey) noexcept
+	constexpr uint64_t RenderQueueBuilder::PackSortKey(
+		uint8_t bucketOrder, uint8_t variantBits, uint32_t materialKey, uint32_t meshKey) noexcept
 	{
 		const uint64_t bucketPart = (static_cast<uint64_t>(bucketOrder) & 0xFFull) << 56;
 		const uint64_t variantPart = (static_cast<uint64_t>(variantBits) & VariantMask) << 48;
@@ -186,7 +189,8 @@ namespace gglab
 		return (flags & MaterialFlags::DoubleSided) != MaterialFlags::None;
 	}
 
-	uint32_t RenderQueueBuilder::MakeDepthKey(const RenderView& renderView, const Vector3& worldCenterPos) noexcept
+	uint32_t RenderQueueBuilder::MakeDepthKey(
+		const RenderView& renderView, const Vector3& worldCenterPos) noexcept
 	{
 		const Vector3 centerViewPos = math::TransformPoint(worldCenterPos, renderView.m_View);
 

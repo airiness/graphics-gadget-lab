@@ -6,17 +6,17 @@
 float2 IntegrateBRDF(float NoV, float perceptualRoughness)
 {
 	NoV = max(NoV, 1e-5);
-	
+
 	float a = PerceptualRoughnessToAlpha(perceptualRoughness);
-	
+
 	// N = (0, 0, 1)
 	float3 V = float3(sqrt(max(0.0, 1.0 - NoV * NoV)), 0.0, NoV);
-	
+
 	float A = 0.0;
 	float B = 0.0;
 
 	const uint SAMPLE_COUNT = 1024;
-	
+
 	for (uint i = 0; i < SAMPLE_COUNT; ++i)
 	{
 		float2 Xi = Hammersley(i, SAMPLE_COUNT);
@@ -57,8 +57,8 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float NoV = saturate(IN.UV.x);
 	float roughness = saturate(IN.UV.y);
-	
+
 	float2 brdf = IntegrateBRDF(NoV, roughness);
-	
+
 	return float4(brdf, 0.0, 1.0);
 }

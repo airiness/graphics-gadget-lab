@@ -8,8 +8,7 @@ namespace gglab
 	class SampleableDepthLabSession final : public LabSessionBase
 	{
 	public:
-		explicit SampleableDepthLabSession(
-			const LabSessionCreateInfo& createInfo) noexcept;
+		explicit SampleableDepthLabSession(const LabSessionCreateInfo& createInfo) noexcept;
 		~SampleableDepthLabSession() override = default;
 
 		void BeginPrepare() noexcept override;
@@ -24,8 +23,7 @@ namespace gglab
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
-		void BuildDiagnostics(
-			LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -35,8 +33,7 @@ namespace gglab
 	private:
 		void ApplyImmediateParameters() noexcept override;
 		void RebuildScene() noexcept override;
-		void OnParametersRestoredForPrepare(
-			LabChangeImpact impact) noexcept override;
+		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		void BuildScene() noexcept;
 		void BuildLighting() noexcept;
 		void ApplyCameraPreset() noexcept;

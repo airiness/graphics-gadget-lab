@@ -9,8 +9,8 @@ namespace gglab
 	class LabSessionBase;
 	struct LabSessionCreateInfo;
 
-	using LabSessionFactory =
-		std::unique_ptr<LabSessionBase>(*)(const LabSessionCreateInfo& createInfo) noexcept;
+	using LabSessionFactory = std::unique_ptr<LabSessionBase>(*)(
+		const LabSessionCreateInfo& createInfo) noexcept;
 
 	class LabCatalog
 	{
@@ -21,8 +21,7 @@ namespace gglab
 		const LabDescriptor* GetDescriptor(uint32_t index) const noexcept;
 		const LabDescriptor* Find(const LabId& id) const noexcept;
 		std::unique_ptr<LabSessionBase> Create(
-			const LabId& id,
-			const LabSessionCreateInfo& createInfo) const noexcept;
+			const LabId& id, const LabSessionCreateInfo& createInfo) const noexcept;
 
 	private:
 		struct Entry

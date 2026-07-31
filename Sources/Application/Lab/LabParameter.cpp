@@ -25,7 +25,7 @@ namespace gglab
 			.m_Desc = std::move(desc),
 			.m_Value = false,
 			.m_Dirty = false,
-		});
+			});
 		m_Parameters.back().m_Value = m_Parameters.back().m_Desc.m_DefaultValue;
 		return true;
 	}
@@ -43,14 +43,10 @@ namespace gglab
 	}
 
 	bool LabParameterSet::Set(
-		const LabParameterId& id,
-		const LabValue& value,
-		LabChangeImpact* impact) noexcept
+		const LabParameterId& id, const LabValue& value, LabChangeImpact* impact) noexcept
 	{
-		const auto iter = std::ranges::find_if(m_Parameters, [&id](const LabParameter& parameter)
-			{
-				return parameter.m_Desc.m_Id == id;
-			});
+		const auto iter = std::ranges::find_if(m_Parameters,
+			[&id](const LabParameter& parameter) { return parameter.m_Desc.m_Id == id; });
 		if (iter == m_Parameters.end() || !IsValueCompatible(iter->m_Desc.m_Type, value))
 		{
 			return false;
@@ -67,10 +63,8 @@ namespace gglab
 
 	const LabParameter* LabParameterSet::Find(const LabParameterId& id) const noexcept
 	{
-		const auto iter = std::ranges::find_if(m_Parameters, [&id](const LabParameter& parameter)
-			{
-				return parameter.m_Desc.m_Id == id;
-			});
+		const auto iter = std::ranges::find_if(m_Parameters,
+			[&id](const LabParameter& parameter) { return parameter.m_Desc.m_Id == id; });
 		return iter != m_Parameters.end() ? &*iter : nullptr;
 	}
 
@@ -83,14 +77,12 @@ namespace gglab
 			values.push_back({
 				.m_Id = parameter.m_Desc.m_Id,
 				.m_Value = parameter.m_Value,
-			});
+				});
 		}
 		return values;
 	}
 
-	bool LabParameterSet::IsValueCompatible(
-		LabParameterType type,
-		const LabValue& value) noexcept
+	bool LabParameterSet::IsValueCompatible(LabParameterType type, const LabValue& value) noexcept
 	{
 		switch (type)
 		{
@@ -112,85 +104,80 @@ namespace gglab
 	}
 
 	LabValue LabParameterSet::SanitizeValue(
-		const LabParameterDesc& desc,
-		const LabValue& value) noexcept
+		const LabParameterDesc& desc, const LabValue& value) noexcept
 	{
 		if (desc.m_Type == LabParameterType::Enum)
 		{
 			const int32_t candidate = std::get<int32_t>(value);
-			const bool exists = std::ranges::any_of(desc.m_EnumItems, [candidate](const LabEnumItem& item)
-				{
-					return item.m_Value == candidate;
-				});
+			const bool exists = std::ranges::any_of(desc.m_EnumItems,
+				[candidate](const LabEnumItem& item) { return item.m_Value == candidate; });
 			return exists ? value : desc.m_DefaultValue;
 		}
 
-		return std::visit([&desc]<typename T>(const T& candidate) -> LabValue
+		return std::visit(
+			[&desc]<typename T>(const T & candidate) -> LabValue
+		{
+			if constexpr (std::is_same_v<T, int32_t> || std::is_same_v<T, uint32_t> ||
+				std::is_same_v<T, float>)
 			{
-				if constexpr (std::is_same_v<T, int32_t> ||
-					std::is_same_v<T, uint32_t> || std::is_same_v<T, float>)
+				T result = candidate;
+				if (desc.m_MinValue)
 				{
-					T result = candidate;
-					if (desc.m_MinValue)
+					if (const auto* minValue = std::get_if<T>(&*desc.m_MinValue))
 					{
-						if (const auto* minValue = std::get_if<T>(&*desc.m_MinValue))
-						{
-							result = std::max(result, *minValue);
-						}
+						result = std::max(result, *minValue);
 					}
-					if (desc.m_MaxValue)
-					{
-						if (const auto* maxValue = std::get_if<T>(&*desc.m_MaxValue))
-						{
-							result = std::min(result, *maxValue);
-						}
-					}
-					return result;
 				}
-				else if constexpr (std::is_same_v<T, Vector3>)
+				if (desc.m_MaxValue)
 				{
-					Vector3 result = candidate;
-					if (desc.m_MinValue)
+					if (const auto* maxValue = std::get_if<T>(&*desc.m_MaxValue))
 					{
-						if (const auto* minValue = std::get_if<Vector3>(&*desc.m_MinValue))
-						{
-							result.m_X = std::max(result.m_X, minValue->m_X);
-							result.m_Y = std::max(result.m_Y, minValue->m_Y);
-							result.m_Z = std::max(result.m_Z, minValue->m_Z);
-						}
+						result = std::min(result, *maxValue);
 					}
-					if (desc.m_MaxValue)
+				}
+				return result;
+			}
+			else if constexpr (std::is_same_v<T, Vector3>)
+			{
+				Vector3 result = candidate;
+				if (desc.m_MinValue)
+				{
+					if (const auto* minValue = std::get_if<Vector3>(&*desc.m_MinValue))
 					{
-						if (const auto* maxValue = std::get_if<Vector3>(&*desc.m_MaxValue))
-						{
-							result.m_X = std::min(result.m_X, maxValue->m_X);
-							result.m_Y = std::min(result.m_Y, maxValue->m_Y);
-							result.m_Z = std::min(result.m_Z, maxValue->m_Z);
-						}
+						result.m_X = std::max(result.m_X, minValue->m_X);
+						result.m_Y = std::max(result.m_Y, minValue->m_Y);
+						result.m_Z = std::max(result.m_Z, minValue->m_Z);
 					}
-					return result;
 				}
-				else if constexpr (std::is_same_v<T, Color>)
+				if (desc.m_MaxValue)
 				{
-					return Color(
-						std::clamp(candidate.m_R, 0.0f, 1.0f),
-						std::clamp(candidate.m_G, 0.0f, 1.0f),
-						std::clamp(candidate.m_B, 0.0f, 1.0f),
-						std::clamp(candidate.m_A, 0.0f, 1.0f));
+					if (const auto* maxValue = std::get_if<Vector3>(&*desc.m_MaxValue))
+					{
+						result.m_X = std::min(result.m_X, maxValue->m_X);
+						result.m_Y = std::min(result.m_Y, maxValue->m_Y);
+						result.m_Z = std::min(result.m_Z, maxValue->m_Z);
+					}
 				}
-				else
-				{
-					return candidate;
-				}
-			}, value);
+				return result;
+			}
+			else if constexpr (std::is_same_v<T, Color>)
+			{
+				return Color(std::clamp(candidate.m_R, 0.0f, 1.0f),
+					std::clamp(candidate.m_G, 0.0f, 1.0f),
+					std::clamp(candidate.m_B, 0.0f, 1.0f),
+					std::clamp(candidate.m_A, 0.0f, 1.0f));
+			}
+			else
+			{
+				return candidate;
+			}
+		},
+			value);
 	}
 
-	LabChangeImpact LabParameterSet::MaxImpact(
-		LabChangeImpact lhs,
-		LabChangeImpact rhs) noexcept
+	LabChangeImpact LabParameterSet::MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept
 	{
-		return static_cast<LabChangeImpact>(std::max(
-			static_cast<uint8_t>(lhs),
-			static_cast<uint8_t>(rhs)));
+		return static_cast<LabChangeImpact>(
+			std::max(static_cast<uint8_t>(lhs), static_cast<uint8_t>(rhs)));
 	}
 }

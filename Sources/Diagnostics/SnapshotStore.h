@@ -16,16 +16,14 @@ namespace gglab
 			virtual ~HolderBase() = default;
 		};
 
-		template<typename T>
-		class Holder final : public HolderBase
+		template <typename T> class Holder final : public HolderBase
 		{
 		public:
 			T m_Value{};
 		};
 
 	public:
-		template<typename T>
-		T& GetOrCreate()
+		template <typename T> T& GetOrCreate()
 		{
 			const SnapshotId id = SnapshotIdOf<T>;
 			auto iterator = m_Snapshots.find(id);
@@ -39,12 +37,12 @@ namespace gglab
 			return static_cast<Holder<T>&>(*iterator->second).m_Value;
 		}
 
-		template<typename T>
-		[[nodiscard]] const T* Get() const noexcept
+		template <typename T> [[nodiscard]] const T* Get() const noexcept
 		{
 			const auto iterator = m_Snapshots.find(SnapshotIdOf<T>);
-			return iterator == m_Snapshots.end() ? nullptr :
-				&static_cast<const Holder<T>&>(*iterator->second).m_Value;
+			return iterator == m_Snapshots.end()
+				? nullptr
+				: &static_cast<const Holder<T>&>(*iterator->second).m_Value;
 		}
 
 		[[nodiscard]] bool Contains(SnapshotId id) const noexcept

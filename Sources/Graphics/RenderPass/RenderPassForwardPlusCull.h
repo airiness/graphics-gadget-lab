@@ -10,44 +10,35 @@ namespace gglab
 	class Renderer;
 	class ForwardPlusDebugReadback;
 
-	class RenderPassForwardPlusCull final :
-		public RenderPassBase
+	class RenderPassForwardPlusCull final : public RenderPassBase
 	{
 	public:
 		explicit RenderPassForwardPlusCull(
-			std::shared_ptr<
-				ForwardPlusDebugReadback>
-				debugReadback = {}) noexcept :
+			std::shared_ptr<ForwardPlusDebugReadback> debugReadback = {}) noexcept :
 			RenderPassBase({
-				.m_TypeName = "Lighting.ForwardPlus.Cull",
-				.m_DisplayName = "Forward+ Cull",
-				.m_CategoryName = "Lighting",
-				.m_Description = "Builds deterministic fixed-stride local-light lists from the display depth buffer.",
-				.m_Category = RenderPassCategory::Lighting,
-				.m_Type = RenderPassType::Compute,
-			}),
-			m_DebugReadback(
-				std::move(debugReadback))
-		{}
+				  .m_TypeName = "Lighting.ForwardPlus.Cull",
+				  .m_DisplayName = "Forward+ Cull",
+				  .m_CategoryName = "Lighting",
+				  .m_Description =
+					  "Builds deterministic fixed-stride local-light lists from the display depth buffer.",
+				  .m_Category = RenderPassCategory::Lighting,
+				  .m_Type = RenderPassType::Compute,
+				}),
+			m_DebugReadback(std::move(debugReadback))
+		{
+		}
 		~RenderPassForwardPlusCull() override = default;
 
-		void Prepare(
-			const RenderServices& services) noexcept;
-		void AddPass(
-			RenderGraph& rg,
-			const RenderFrameContext& context,
+		void Prepare(const RenderServices& services) noexcept;
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:
-		[[nodiscard]] RHIPipelineHandle
-			GetOrCreatePipeline(
-				const Renderer& renderer) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const Renderer& renderer) noexcept;
 
 		ComputePipelineRecipe m_PipelineRecipe{};
 		ComputePipelineSlot m_PipelineSlot{};
-		std::shared_ptr<
-			ForwardPlusDebugReadback>
-			m_DebugReadback;
+		std::shared_ptr<ForwardPlusDebugReadback> m_DebugReadback;
 		bool m_IsInitialized = false;
 	};
 }

@@ -16,8 +16,16 @@ namespace gglab::math
 		constexpr explicit Vector2(float value) noexcept : m_X(value), m_Y(value) {}
 		constexpr Vector2(float x, float y) noexcept : m_X(x), m_Y(y) {}
 
-		float& operator[](size_t index) noexcept { GGLAB_ASSERT(index < 2); return (&m_X)[index]; }
-		const float& operator[](size_t index) const noexcept { GGLAB_ASSERT(index < 2); return (&m_X)[index]; }
+		float& operator[](size_t index) noexcept
+		{
+			GGLAB_ASSERT(index < 2);
+			return (&m_X)[index];
+		}
+		const float& operator[](size_t index) const noexcept
+		{
+			GGLAB_ASSERT(index < 2);
+			return (&m_X)[index];
+		}
 
 		Vector2& operator+=(const Vector2& rhs) noexcept;
 		Vector2& operator-=(const Vector2& rhs) noexcept;
@@ -49,8 +57,16 @@ namespace gglab::math
 		constexpr explicit Vector3(float value) noexcept : m_X(value), m_Y(value), m_Z(value) {}
 		constexpr Vector3(float x, float y, float z) noexcept : m_X(x), m_Y(y), m_Z(z) {}
 
-		float& operator[](size_t index) noexcept { GGLAB_ASSERT(index < 3); return (&m_X)[index]; }
-		const float& operator[](size_t index) const noexcept { GGLAB_ASSERT(index < 3); return (&m_X)[index]; }
+		float& operator[](size_t index) noexcept
+		{
+			GGLAB_ASSERT(index < 3);
+			return (&m_X)[index];
+		}
+		const float& operator[](size_t index) const noexcept
+		{
+			GGLAB_ASSERT(index < 3);
+			return (&m_X)[index];
+		}
 
 		Vector3& operator+=(const Vector3& rhs) noexcept;
 		Vector3& operator-=(const Vector3& rhs) noexcept;
@@ -89,12 +105,29 @@ namespace gglab::math
 	struct Vector4
 	{
 		constexpr Vector4() noexcept = default;
-		constexpr explicit Vector4(float value) noexcept : m_X(value), m_Y(value), m_Z(value), m_W(value) {}
-		constexpr Vector4(float x, float y, float z, float w) noexcept : m_X(x), m_Y(y), m_Z(z), m_W(w) {}
-		constexpr Vector4(const Vector3& value, float w) noexcept : m_X(value.m_X), m_Y(value.m_Y), m_Z(value.m_Z), m_W(w) {}
+		constexpr explicit Vector4(float value) noexcept :
+			m_X(value), m_Y(value), m_Z(value), m_W(value)
+		{
+		}
+		constexpr Vector4(float x, float y, float z, float w) noexcept :
+			m_X(x), m_Y(y), m_Z(z), m_W(w)
+		{
+		}
+		constexpr Vector4(const Vector3& value, float w) noexcept :
+			m_X(value.m_X), m_Y(value.m_Y), m_Z(value.m_Z), m_W(w)
+		{
+		}
 
-		float& operator[](size_t index) noexcept { GGLAB_ASSERT(index < 4); return (&m_X)[index]; }
-		const float& operator[](size_t index) const noexcept { GGLAB_ASSERT(index < 4); return (&m_X)[index]; }
+		float& operator[](size_t index) noexcept
+		{
+			GGLAB_ASSERT(index < 4);
+			return (&m_X)[index];
+		}
+		const float& operator[](size_t index) const noexcept
+		{
+			GGLAB_ASSERT(index < 4);
+			return (&m_X)[index];
+		}
 
 		Vector4& operator+=(const Vector4& rhs) noexcept;
 		Vector4& operator-=(const Vector4& rhs) noexcept;
@@ -134,13 +167,9 @@ namespace gglab::math
 	Vector2 Max(const Vector2& lhs, const Vector2& rhs) noexcept;
 	Vector2 Lerp(const Vector2& lhs, const Vector2& rhs, float t) noexcept;
 	[[nodiscard]] bool TryNormalize(
-		const Vector2& value,
-		Vector2& result,
-		float tolerance = 1.0e-6f) noexcept;
+		const Vector2& value, Vector2& result, float tolerance = 1.0e-6f) noexcept;
 	Vector2 NormalizeOr(
-		const Vector2& value,
-		const Vector2& fallback,
-		float tolerance = 1.0e-6f) noexcept;
+		const Vector2& value, const Vector2& fallback, float tolerance = 1.0e-6f) noexcept;
 
 	Vector3 operator+(const Vector3& lhs, const Vector3& rhs) noexcept;
 	Vector3 operator-(const Vector3& lhs, const Vector3& rhs) noexcept;
@@ -155,13 +184,9 @@ namespace gglab::math
 	Vector4 TransformPointHomogeneous(const Vector3& value, const Matrix& matrix) noexcept;
 	Vector3 TransformDirection(const Vector3& value, const Matrix& matrix) noexcept;
 	[[nodiscard]] bool TryNormalize(
-		const Vector3& value,
-		Vector3& result,
-		float tolerance = 1.0e-6f) noexcept;
+		const Vector3& value, Vector3& result, float tolerance = 1.0e-6f) noexcept;
 	Vector3 NormalizeOr(
-		const Vector3& value,
-		const Vector3& fallback,
-		float tolerance = 1.0e-6f) noexcept;
+		const Vector3& value, const Vector3& fallback, float tolerance = 1.0e-6f) noexcept;
 
 	Vector4 operator+(const Vector4& lhs, const Vector4& rhs) noexcept;
 	Vector4 operator-(const Vector4& lhs, const Vector4& rhs) noexcept;
@@ -174,13 +199,9 @@ namespace gglab::math
 	Vector4 Lerp(const Vector4& lhs, const Vector4& rhs, float t) noexcept;
 	Vector4 Transform(const Vector4& value, const Matrix& matrix) noexcept;
 	[[nodiscard]] bool TryNormalize(
-		const Vector4& value,
-		Vector4& result,
-		float tolerance = 1.0e-6f) noexcept;
+		const Vector4& value, Vector4& result, float tolerance = 1.0e-6f) noexcept;
 	Vector4 NormalizeOr(
-		const Vector4& value,
-		const Vector4& fallback,
-		float tolerance = 1.0e-6f) noexcept;
+		const Vector4& value, const Vector4& fallback, float tolerance = 1.0e-6f) noexcept;
 }
 
 namespace gglab

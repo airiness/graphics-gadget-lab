@@ -9,8 +9,7 @@
 
 namespace gglab
 {
-	template<typename Tag>
-	class RHIHandle
+	template <typename Tag> class RHIHandle
 	{
 	public:
 		using IndexType = uint32_t;
@@ -21,9 +20,9 @@ namespace gglab
 
 		constexpr RHIHandle() noexcept = default;
 		constexpr RHIHandle(IndexType index, GenerationType generation) noexcept :
-			m_Index(index),
-			m_Generation(generation)
-		{}
+			m_Index(index), m_Generation(generation)
+		{
+		}
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept
 		{
@@ -51,17 +50,39 @@ namespace gglab
 		GenerationType m_Generation = InvalidGeneration;
 	};
 
-	struct RHITextureHandleTag {};
-	struct RHIBufferHandleTag {};
-	struct RHISamplerHandleTag {};
-	struct RHIPipelineHandleTag {};
-	struct RHIBindingLayoutHandleTag {};
-	struct RHIRootSignatureHandleTag {};
-	struct RHIShaderHandleTag {};
-	struct RHITextureViewHandleTag {};
-	struct RHIBufferViewHandleTag {};
-	struct RHIFenceHandleTag {};
-	struct RHICommandContextHandleTag {};
+	struct RHITextureHandleTag
+	{
+	};
+	struct RHIBufferHandleTag
+	{
+	};
+	struct RHISamplerHandleTag
+	{
+	};
+	struct RHIPipelineHandleTag
+	{
+	};
+	struct RHIBindingLayoutHandleTag
+	{
+	};
+	struct RHIRootSignatureHandleTag
+	{
+	};
+	struct RHIShaderHandleTag
+	{
+	};
+	struct RHITextureViewHandleTag
+	{
+	};
+	struct RHIBufferViewHandleTag
+	{
+	};
+	struct RHIFenceHandleTag
+	{
+	};
+	struct RHICommandContextHandleTag
+	{
+	};
 
 	using RHITextureHandle = RHIHandle<RHITextureHandleTag>;
 	using RHIBufferHandle = RHIHandle<RHIBufferHandleTag>;
@@ -78,8 +99,7 @@ namespace gglab
 
 namespace std
 {
-	template<typename Tag>
-	struct hash<gglab::RHIHandle<Tag>>
+	template <typename Tag> struct hash<gglab::RHIHandle<Tag>>
 	{
 		size_t operator()(const gglab::RHIHandle<Tag>& handle) const noexcept
 		{

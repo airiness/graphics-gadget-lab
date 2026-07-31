@@ -34,7 +34,8 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(PlatformHost);
 		virtual ~PlatformHost() = default;
 
-		[[nodiscard]] virtual bool Initialize(const PlatformWindowCreateInfo& createInfo) noexcept = 0;
+		[[nodiscard]] virtual bool Initialize(
+			const PlatformWindowCreateInfo& createInfo) noexcept = 0;
 		virtual void Finalize() noexcept = 0;
 
 		virtual void PumpEvents() noexcept = 0;

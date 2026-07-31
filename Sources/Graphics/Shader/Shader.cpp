@@ -3,8 +3,7 @@
 
 namespace gglab
 {
-	Shader::Shader(const ShaderDesc& desc) noexcept :
-		m_Desc(desc)
+	Shader::Shader(const ShaderDesc& desc) noexcept : m_Desc(desc)
 	{
 	}
 

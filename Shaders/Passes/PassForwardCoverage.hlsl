@@ -15,23 +15,16 @@ ForwardCoverageVSOutput VSMain(VertexInputP3N3T2T2Tan4 input)
 	const ObjectData objectData = LoadCurrentObjectData();
 	const ViewData viewData = LoadViewData(g_Pass.ViewIndex);
 	const RigidCoveragePosition position =
-		ResolveRigidCoveragePosition(
-			input.Position,
-			objectData,
-			viewData);
+		ResolveRigidCoveragePosition(input.Position, objectData, viewData);
 
 	ForwardCoverageVSOutput output;
 	output.PositionCS = position.PositionCS;
 	output.PositionWS = position.PositionWS.xyz;
-	output.NormalWS =
-		TransformNormalWS(input.Normal, objectData);
+	output.NormalWS = TransformNormalWS(input.Normal, objectData);
 	output.UV0 = input.UV0;
 	output.UV1 = input.UV1;
-	output.TangentWS =
-		TransformTangentWS(input.Tangent, objectData);
-	output.MaterialIndex =
-		g_Scene.MaterialBaseIndex + objectData.MaterialIndex;
-	output.ViewIndex =
-		GetViewDataIndex(g_Pass.ViewIndex);
+	output.TangentWS = TransformTangentWS(input.Tangent, objectData);
+	output.MaterialIndex = g_Scene.MaterialBaseIndex + objectData.MaterialIndex;
+	output.ViewIndex = GetViewDataIndex(g_Pass.ViewIndex);
 	return output;
 }

@@ -15,8 +15,10 @@ namespace gglab
 	public:
 		virtual ~IPSOCreator() = default;
 
-		virtual std::unique_ptr<DX12PipelineState> CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc) = 0;
-		virtual std::unique_ptr<DX12PipelineState> CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc) = 0;
+		virtual std::unique_ptr<DX12PipelineState> CreateGraphicsPSO(
+			DX12Device* dx12Device, const GraphicsPipelineDesc& desc) = 0;
+		virtual std::unique_ptr<DX12PipelineState> CreateComputePSO(
+			DX12Device* dx12Device, const ComputePipelineDesc& desc) = 0;
 	};
 
 	class StreamPSOCreator final : public IPSOCreator
@@ -27,25 +29,30 @@ namespace gglab
 		public:
 			explicit StreamWriter(void* storage, size_t capacityBytes) noexcept :
 				m_Begin(AlignUp(reinterpret_cast<std::byte*>(storage), alignof(void*))),
-				m_Current(m_Begin),
-				m_End(reinterpret_cast<std::byte*>(storage) + capacityBytes)
+				m_Current(m_Begin), m_End(reinterpret_cast<std::byte*>(storage) + capacityBytes)
 			{
 			}
 
-			template<typename SubObjType>
-			void Add(const SubObjType& subObj) noexcept
+			template <typename SubObjType> void Add(const SubObjType& subObj) noexcept
 			{
-				static_assert(std::is_trivially_copyable_v<SubObjType>, "SubObj must be trivially copyable.");
+				static_assert(
+					std::is_trivially_copyable_v<SubObjType>, "SubObj must be trivially copyable.");
 				m_Current = AlignUp(m_Current, alignof(void*));
-				GGLAB_ASSERT_MSG(m_Current + sizeof(SubObjType) <= m_End, "Stream memory is overflow.");
-				std::memcpy(m_Current, std::addressof(subObj), sizeof(SubObjType)); // this place must be std::addressof, operator& is overloaded, can not get right address.
+				GGLAB_ASSERT_MSG(
+					m_Current + sizeof(SubObjType) <= m_End, "Stream memory is overflow.");
+				std::memcpy(m_Current, std::addressof(subObj),
+					sizeof(
+						SubObjType)); // this place must be std::addressof, operator& is overloaded, can not get right address.
 				m_Current += sizeof(SubObjType);
 			}
 
-			template<typename SubObjType>
+			template <typename SubObjType>
 			void AddIf(bool condition, const SubObjType& subObj) noexcept
 			{
-				if (condition) { Add(subObj); }
+				if (condition)
+				{
+					Add(subObj);
+				}
 			}
 
 			D3D12_PIPELINE_STATE_STREAM_DESC GetDesc() const noexcept
@@ -71,12 +78,16 @@ namespace gglab
 		};
 
 	public:
-		std::unique_ptr<DX12PipelineState> CreateGraphicsPSO(DX12Device* dx12Device, const GraphicsPipelineDesc& desc) override;
-		std::unique_ptr<DX12PipelineState> CreateComputePSO(DX12Device* dx12Device, const ComputePipelineDesc& desc) override;
+		std::unique_ptr<DX12PipelineState> CreateGraphicsPSO(
+			DX12Device* dx12Device, const GraphicsPipelineDesc& desc) override;
+		std::unique_ptr<DX12PipelineState> CreateComputePSO(
+			DX12Device* dx12Device, const ComputePipelineDesc& desc) override;
 
 	private:
-		static D3D12_PIPELINE_STATE_STREAM_DESC BuildGraphicsStream(const GraphicsPipelineDesc& desc, StreamWriter& writer) noexcept;
-		static D3D12_PIPELINE_STATE_STREAM_DESC BuildComputeStream(const ComputePipelineDesc& desc, StreamWriter& writer) noexcept;
+		static D3D12_PIPELINE_STATE_STREAM_DESC BuildGraphicsStream(
+			const GraphicsPipelineDesc& desc, StreamWriter& writer) noexcept;
+		static D3D12_PIPELINE_STATE_STREAM_DESC BuildComputeStream(
+			const ComputePipelineDesc& desc, StreamWriter& writer) noexcept;
 	};
 
 }

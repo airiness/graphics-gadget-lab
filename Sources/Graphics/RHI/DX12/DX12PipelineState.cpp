@@ -10,8 +10,11 @@ namespace gglab
 	{
 	}
 
-	DX12PipelineState::DX12PipelineState(DX12Device* dx12Device, const D3D12_PIPELINE_STATE_STREAM_DESC& streamDesc) noexcept
+	DX12PipelineState::DX12PipelineState(
+		DX12Device* dx12Device, const D3D12_PIPELINE_STATE_STREAM_DESC& streamDesc) noexcept
 	{
-		GGLAB_HR_DX(dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&m_PipelineState)), dx12Device->Get());
+		GGLAB_HR_DX(
+			dx12Device->Get()->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&m_PipelineState)),
+			dx12Device->Get());
 	}
 }

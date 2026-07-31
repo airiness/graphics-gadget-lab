@@ -55,15 +55,12 @@ namespace gglab
 	{
 		uint64_t m_RemainingSourceBytes = 0;
 
-		[[nodiscard]] uint64_t RetireStep(
-			const AssetResourcePublicationStepUsage& usage) noexcept
+		[[nodiscard]] uint64_t RetireStep(const AssetResourcePublicationStepUsage& usage) noexcept
 		{
-			GGLAB_ASSERT_MSG(
-				usage.m_SourceBytesReleased <= m_RemainingSourceBytes,
+			GGLAB_ASSERT_MSG(usage.m_SourceBytesReleased <= m_RemainingSourceBytes,
 				"Resource publication step released more source bytes than the job owns.");
-			const uint64_t releasedBytes = std::min(
-				usage.m_SourceBytesReleased,
-				m_RemainingSourceBytes);
+			const uint64_t releasedBytes =
+				std::min(usage.m_SourceBytesReleased, m_RemainingSourceBytes);
 			m_RemainingSourceBytes -= releasedBytes;
 			return releasedBytes;
 		}
@@ -76,8 +73,7 @@ namespace gglab
 
 	struct AssetResourcePublicationStepResult
 	{
-		AssetResourcePublicationStepStatus m_Status =
-			AssetResourcePublicationStepStatus::Continue;
+		AssetResourcePublicationStepStatus m_Status = AssetResourcePublicationStepStatus::Continue;
 		AssetResourcePublicationStepUsage m_Usage{};
 		std::string m_Error;
 	};
@@ -97,8 +93,7 @@ namespace gglab
 
 		[[nodiscard]] virtual AssetResourcePublicationStepResult Step(
 			AssetResourcePublicationContext& context) noexcept = 0;
-		virtual void Abort(
-			AssetResourcePublicationContext& context,
+		virtual void Abort(AssetResourcePublicationContext& context,
 			AssetResourcePublicationAbortReason reason) noexcept = 0;
 		[[nodiscard]] virtual uint64_t GetProgressToken() const noexcept = 0;
 		[[nodiscard]] virtual AssetResourcePublicationStage GetCurrentStage() const noexcept = 0;

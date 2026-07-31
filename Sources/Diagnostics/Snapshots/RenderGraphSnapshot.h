@@ -106,8 +106,7 @@ namespace gglab
 		std::vector<RGSnapshotDependencyEdge> m_DependencyEdges;
 	};
 
-	template<>
-	struct SnapshotTraits<RGSnapshot>
+	template <> struct SnapshotTraits<RGSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.RenderGraphSnapshot");
 	};

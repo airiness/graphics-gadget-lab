@@ -5,7 +5,8 @@
 
 namespace gglab
 {
-	DX12DescriptorFreeListAllocator::DX12DescriptorFreeListAllocator(const CreateInfo& createInfo) noexcept :
+	DX12DescriptorFreeListAllocator::DX12DescriptorFreeListAllocator(
+		const CreateInfo& createInfo) noexcept :
 		DX12DescriptorAllocatorBase(createInfo),
 		m_Allocator(createInfo.m_Range.m_Count),
 		m_Generation(createInfo.m_Range.m_Count, 1),
@@ -62,9 +63,9 @@ namespace gglab
 		const auto globalSpan = ToGlobalSpan(localSpan);
 		const auto globalIndex = globalSpan.m_Index;
 
-		return {
-			.m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
-			.m_GpuHandle = IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex) : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
+		return { .m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
+			.m_GpuHandle = IsShaderVisible() ? GpuHandleAtGlobalIndex(globalIndex)
+											 : CD3DX12_GPU_DESCRIPTOR_HANDLE{},
 #if defined(BUILD_DEBUG)
 			.m_DebugType = GetHeap()->Type()
 #endif
@@ -95,7 +96,8 @@ namespace gglab
 		return { .m_Index = globalIndex, .m_Generation = m_Generation[localSpan.m_Index] };
 	}
 
-	bool DX12DescriptorFreeListAllocator::IsIdAlive(const DX12DescriptorID& descriptorId) const noexcept
+	bool DX12DescriptorFreeListAllocator::IsIdAlive(
+		const DX12DescriptorID& descriptorId) const noexcept
 	{
 		if (!descriptorId.IsValid())
 		{
@@ -119,7 +121,8 @@ namespace gglab
 		return m_SlotStates[localIndex] == SlotState::Allocated;
 	}
 
-	DX12DescriptorView DX12DescriptorFreeListAllocator::ViewAtId(const DX12DescriptorID& descriptorId) const noexcept
+	DX12DescriptorView DX12DescriptorFreeListAllocator::ViewAtId(
+		const DX12DescriptorID& descriptorId) const noexcept
 	{
 		if (!descriptorId.IsValid())
 		{
@@ -157,8 +160,7 @@ namespace gglab
 	}
 
 	void DX12DescriptorFreeListAllocator::RetireId(
-		const DX12DescriptorID& descriptorId,
-		const DX12FencePoint& fencePoint) noexcept
+		const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept
 	{
 		if (!descriptorId.IsValid())
 		{
@@ -194,7 +196,8 @@ namespace gglab
 		AddPending(Pending{ localSpan, fencePoint });
 	}
 
-	void DX12DescriptorFreeListAllocator::DeferFreeFromCpuHandleInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept
+	void DX12DescriptorFreeListAllocator::DeferFreeFromCpuHandleInFrame(
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept
 	{
 		if (cpuHandle.ptr == 0)
 		{
@@ -207,7 +210,8 @@ namespace gglab
 		DeferFreeFromGlobalIndexInFrame(globalIndex);
 	}
 
-	void DX12DescriptorFreeListAllocator::DeferFreeFromGpuHandleInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept
+	void DX12DescriptorFreeListAllocator::DeferFreeFromGpuHandleInFrame(
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept
 	{
 		if (gpuHandle.ptr == 0)
 		{
@@ -238,11 +242,13 @@ namespace gglab
 		m_FreeInFrameSpans.clear();
 	}
 
-	void DX12DescriptorFreeListAllocator::FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept
+	void DX12DescriptorFreeListAllocator::FreeHandleInternal(
+		DX12DescriptorHandle& descriptorHandle) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 
-		GGLAB_ASSERT_MSG(descriptorHandle.OwnerAllocator() == this, "FreeHandleInternal: wrong owner.");
+		GGLAB_ASSERT_MSG(
+			descriptorHandle.OwnerAllocator() == this, "FreeHandleInternal: wrong owner.");
 		const DX12DescriptorSpan globalSpan{ descriptorHandle.Index(), descriptorHandle.Count() };
 		const DX12DescriptorSpan localSpan = ToLocalSpan(globalSpan);
 
@@ -252,7 +258,8 @@ namespace gglab
 			if (m_SlotStates[descriptorIndex] == SlotState::Pending)
 			{
 #if defined(BUILD_DEBUG)
-				GGLAB_ASSERT_MSG(false, "FreeHandleInternal: freeing a pending span. Use Retire() instead.");
+				GGLAB_ASSERT_MSG(
+					false, "FreeHandleInternal: freeing a pending span. Use Retire() instead.");
 #endif
 				return;
 			}
@@ -261,11 +268,13 @@ namespace gglab
 		FreeLocalSpanImmediately(localSpan);
 	}
 
-	void DX12DescriptorFreeListAllocator::RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle, const DX12FencePoint& fencePoint) noexcept
+	void DX12DescriptorFreeListAllocator::RetireHandleInternal(
+		const DX12DescriptorHandle& descriptorHandle, const DX12FencePoint& fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 
-		GGLAB_ASSERT_MSG(descriptorHandle.OwnerAllocator() == this, "RetireHandleInternal: wrong owner.");
+		GGLAB_ASSERT_MSG(
+			descriptorHandle.OwnerAllocator() == this, "RetireHandleInternal: wrong owner.");
 		const DX12DescriptorSpan globalSpan{ descriptorHandle.Index(), descriptorHandle.Count() };
 		const DX12DescriptorSpan localSpan = ToLocalSpan(globalSpan);
 
@@ -277,7 +286,8 @@ namespace gglab
 		AddPending(Pending{ localSpan, fencePoint });
 	}
 
-	bool DX12DescriptorFreeListAllocator::TryMarkAllocated(const DX12DescriptorSpan& localSpan) noexcept
+	bool DX12DescriptorFreeListAllocator::TryMarkAllocated(
+		const DX12DescriptorSpan& localSpan) noexcept
 	{
 		GGLAB_ASSERT_MSG(localSpan.IsValid(), "TryMarkAllocated: invalid span.");
 		GGLAB_ASSERT_MSG(localSpan.End() <= m_Range.m_Count, "TryMarkAllocated: out of range.");
@@ -288,7 +298,8 @@ namespace gglab
 			if (m_SlotStates[descriptorIndex] != SlotState::Free)
 			{
 #if defined(BUILD_DEBUG)
-				GGLAB_ASSERT_MSG(false, "TryMarkAllocated: double allocate or allocator corruption.");
+				GGLAB_ASSERT_MSG(
+					false, "TryMarkAllocated: double allocate or allocator corruption.");
 #endif
 				return false;
 			}
@@ -301,7 +312,8 @@ namespace gglab
 		return true;
 	}
 
-	bool DX12DescriptorFreeListAllocator::TryMarkPending(const DX12DescriptorSpan& localSpan) noexcept
+	bool DX12DescriptorFreeListAllocator::TryMarkPending(
+		const DX12DescriptorSpan& localSpan) noexcept
 	{
 		GGLAB_ASSERT_MSG(localSpan.IsValid(), "TryMarkPending: invalid span.");
 		GGLAB_ASSERT_MSG(localSpan.End() <= m_Range.m_Count, "TryMarkPending: out of range.");
@@ -379,10 +391,11 @@ namespace gglab
 
 	void DX12DescriptorFreeListAllocator::AddPending(const Pending& pending) noexcept
 	{
-#if defined (BUILD_DEBUG)
+#if defined(BUILD_DEBUG)
 		if (!m_PendingQueue.empty())
 		{
-			GGLAB_ASSERT_MSG(pending.m_FencePoint.GetValue() >= m_PendingQueue.back().m_FencePoint.GetValue(),
+			GGLAB_ASSERT_MSG(
+				pending.m_FencePoint.GetValue() >= m_PendingQueue.back().m_FencePoint.GetValue(),
 				"Pending fence value must be non-decreasing.");
 		}
 #endif
@@ -404,10 +417,12 @@ namespace gglab
 		}
 	}
 
-	void DX12DescriptorFreeListAllocator::FreeLocalSpanImmediately(const DX12DescriptorSpan& localSpan) noexcept
+	void DX12DescriptorFreeListAllocator::FreeLocalSpanImmediately(
+		const DX12DescriptorSpan& localSpan) noexcept
 	{
 		GGLAB_ASSERT_MSG(localSpan.IsValid(), "FreeLocalSpanImmediate: invalid span.");
-		GGLAB_ASSERT_MSG(localSpan.End() <= m_Range.m_Count, "FreeLocalSpanImmediate: out of local range.");
+		GGLAB_ASSERT_MSG(
+			localSpan.End() <= m_Range.m_Count, "FreeLocalSpanImmediate: out of local range.");
 
 		if (!MarkFreed(localSpan))
 		{
@@ -420,10 +435,12 @@ namespace gglab
 			++m_Generation[localSpan.m_Index + index];
 		}
 
-		m_Allocator.Free(AllocatorBase::IndexSpan{ .m_Index = localSpan.m_Index, .m_Count = localSpan.m_Count });
+		m_Allocator.Free(
+			AllocatorBase::IndexSpan{ .m_Index = localSpan.m_Index, .m_Count = localSpan.m_Count });
 	}
 
-	void DX12DescriptorFreeListAllocator::DeferFreeFromGlobalIndexInFrame(uint32_t globalIndex) noexcept
+	void DX12DescriptorFreeListAllocator::DeferFreeFromGlobalIndexInFrame(
+		uint32_t globalIndex) noexcept
 	{
 		const DX12DescriptorSpan globalSpan{ .m_Index = globalIndex, .m_Count = 1 };
 		const DX12DescriptorSpan localSpan = ToLocalSpan(globalSpan);
@@ -437,7 +454,8 @@ namespace gglab
 		m_FreeInFrameSpans.push_back(localSpan);
 	}
 
-	DX12DescriptorSpan DX12DescriptorFreeListAllocator::ToSpan(const AllocatorBase::IndexSpan& indexSpan) noexcept
+	DX12DescriptorSpan DX12DescriptorFreeListAllocator::ToSpan(
+		const AllocatorBase::IndexSpan& indexSpan) noexcept
 	{
 		return { .m_Index = indexSpan.m_Index, .m_Count = indexSpan.m_Count };
 	}

@@ -23,8 +23,7 @@ namespace gglab
 	ModelID ModelStore::Create(const std::filesystem::path& canonicalPath) noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			!canonicalPath.empty(),
-			"A stored model path must be canonical and non-empty.");
+			!canonicalPath.empty(), "A stored model path must be canonical and non-empty.");
 		if (canonicalPath.empty() || m_PathIndex.contains(canonicalPath))
 		{
 			GGLAB_ASSERT_MSG(false, "A model path may only have one active store entry.");
@@ -79,8 +78,7 @@ namespace gglab
 	}
 
 	bool ModelStore::DetachPath(
-		const std::filesystem::path& canonicalPath,
-		ModelID modelId) noexcept
+		const std::filesystem::path& canonicalPath, ModelID modelId) noexcept
 	{
 		const auto iterator = m_PathIndex.find(canonicalPath);
 		if (iterator == m_PathIndex.end() || iterator->second != modelId)
@@ -95,11 +93,7 @@ namespace gglab
 	{
 		const bool removed = m_Entries.erase(modelId) > 0;
 		const size_t removedPaths = std::erase_if(
-			m_PathIndex,
-			[modelId](const auto& entry) noexcept
-			{
-				return entry.second == modelId;
-			});
+			m_PathIndex, [modelId](const auto& entry) noexcept { return entry.second == modelId; });
 		return removed || removedPaths > 0;
 	}
 }

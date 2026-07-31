@@ -12,17 +12,13 @@ namespace gglab
 	class ModelPublicationJob final : public IResourcePublicationJob
 	{
 	public:
-		ModelPublicationJob(
-			std::unique_ptr<AssetPublicationServicesBase>&& services,
-			AssetContentVersion model,
-			double importQueueMilliseconds,
-			double importExecutionMilliseconds,
-			ModelImportArtifactHandle artifact) noexcept;
+		ModelPublicationJob(std::unique_ptr<AssetPublicationServicesBase>&& services,
+			AssetContentVersion model, double importQueueMilliseconds,
+			double importExecutionMilliseconds, ModelImportArtifactHandle artifact) noexcept;
 
 		[[nodiscard]] AssetResourcePublicationStepResult Step(
 			AssetResourcePublicationContext& context) noexcept override;
-		void Abort(
-			AssetResourcePublicationContext& context,
+		void Abort(AssetResourcePublicationContext& context,
 			AssetResourcePublicationAbortReason reason) noexcept override;
 		[[nodiscard]] uint64_t GetProgressToken() const noexcept override
 		{
@@ -76,11 +72,9 @@ namespace gglab
 		[[nodiscard]] AssetResourcePublicationStepResult FinalizeStep(
 			AssetResourcePublicationStepResult result,
 			const ProgressState& progressBefore) noexcept;
-		[[nodiscard]] static AssetResourcePublicationStage PublicationStage(
-			Stage stage) noexcept;
+		[[nodiscard]] static AssetResourcePublicationStage PublicationStage(Stage stage) noexcept;
 		[[nodiscard]] static AssetResourcePublicationStepResult Failed(
-			std::string error,
-			AssetResourcePublicationStepUsage usage = {}) noexcept;
+			std::string error, AssetResourcePublicationStepUsage usage = {}) noexcept;
 		[[nodiscard]] static AssetResourcePublicationStepResult Continued(
 			AssetResourcePublicationStepUsage usage = {}) noexcept;
 

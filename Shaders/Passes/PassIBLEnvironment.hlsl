@@ -30,18 +30,12 @@ float3 SampleEnvironmentSource(float3 dir)
 	if (g_Pass.SourceMode == ENVIRONMENT_SOURCE_CUBEMAP)
 	{
 		return SampleTextureCubeLevel(
-			g_Pass.SourceTextureIndex,
-			g_Pass.SourceSamplerIndex,
-			dir,
-			0.0).rgb;
+			g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, dir, 0.0)
+			.rgb;
 	}
 
 	float2 uv = EquirectangularUvFromDirection(dir);
-	return SampleTexture2DLevel(
-		g_Pass.SourceTextureIndex,
-		g_Pass.SourceSamplerIndex,
-		uv,
-		0.0).rgb;
+	return SampleTexture2DLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, uv, 0.0).rgb;
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

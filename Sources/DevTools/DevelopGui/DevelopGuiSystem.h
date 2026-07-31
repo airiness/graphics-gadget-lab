@@ -41,16 +41,14 @@ namespace gglab
 		[[nodiscard]] bool BeginFrame() noexcept;
 		void Draw(DevelopGuiContext& context) noexcept;
 		void RenderDrawData(
-			RHIGraphicsCommandContext* commandContext,
-			RHITextureViewHandle renderTarget) noexcept;
+			RHIGraphicsCommandContext* commandContext, RHITextureViewHandle renderTarget) noexcept;
 		void EndFrame() noexcept;
 
 		[[nodiscard]] State GetState() const noexcept { return m_State; }
 		[[nodiscard]] bool IsActive() const noexcept { return m_State != State::Inactive; }
 		[[nodiscard]] bool IsFrameOpen() const noexcept { return m_State == State::FrameOpen; }
 
-		[[nodiscard]] ImTextureID ResolveTextureId(
-			RHIDescriptorHandle descriptor) const noexcept;
+		[[nodiscard]] ImTextureID ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept;
 
 		[[nodiscard]] DevToolsRuntime& GetDevToolsRuntime() noexcept { return m_DevToolsRuntime; }
 

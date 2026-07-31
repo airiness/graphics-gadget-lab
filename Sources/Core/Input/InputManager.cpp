@@ -24,7 +24,7 @@ namespace gglab
 
 	Keyboard* InputManager::GetKeyboard() const noexcept
 	{
-		return m_Keyboard.get(); 
+		return m_Keyboard.get();
 	}
 
 	Mouse* InputManager::GetMouse() const noexcept

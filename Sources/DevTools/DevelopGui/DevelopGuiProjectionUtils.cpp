@@ -10,9 +10,7 @@ namespace gglab::devtools
 	namespace
 	{
 		[[nodiscard]] bool ProjectWorldPositionToNdc(
-			const RenderView& view,
-			const Vector3& worldPosition,
-			Vector3& outNdc) noexcept
+			const RenderView& view, const Vector3& worldPosition, Vector3& outNdc) noexcept
 		{
 			if (view.m_Width == 0 || view.m_Height == 0)
 			{
@@ -21,10 +19,8 @@ namespace gglab::devtools
 
 			Vector4 clipPosition;
 			clipPosition = math::TransformPointHomogeneous(worldPosition, view.m_ViewProj);
-			if (!math::IsFinite(clipPosition.m_X) ||
-				!math::IsFinite(clipPosition.m_Y) ||
-				!math::IsFinite(clipPosition.m_Z) ||
-				!math::IsFinite(clipPosition.m_W) ||
+			if (!math::IsFinite(clipPosition.m_X) || !math::IsFinite(clipPosition.m_Y) ||
+				!math::IsFinite(clipPosition.m_Z) || !math::IsFinite(clipPosition.m_W) ||
 				clipPosition.m_W <= 1.0e-5f)
 			{
 				return false;
@@ -34,27 +30,20 @@ namespace gglab::devtools
 			outNdc.m_X = clipPosition.m_X * invW;
 			outNdc.m_Y = clipPosition.m_Y * invW;
 			outNdc.m_Z = clipPosition.m_Z * invW;
-			return
-				math::IsFinite(outNdc.m_X) &&
-				math::IsFinite(outNdc.m_Y) &&
+			return math::IsFinite(outNdc.m_X) && math::IsFinite(outNdc.m_Y) &&
 				math::IsFinite(outNdc.m_Z);
 		}
 
-		[[nodiscard]] ImVec2 NdcToScreen(
-			const Vector3& ndc,
-			const ImGuiViewport& viewport) noexcept
+		[[nodiscard]] ImVec2 NdcToScreen(const Vector3& ndc, const ImGuiViewport& viewport) noexcept
 		{
-			return interop::ToImGui(Vector2(
-				viewport.Pos.x + (ndc.m_X * 0.5f + 0.5f) * viewport.Size.x,
-				viewport.Pos.y + (0.5f - ndc.m_Y * 0.5f) * viewport.Size.y));
+			return interop::ToImGui(
+				Vector2(viewport.Pos.x + (ndc.m_X * 0.5f + 0.5f) * viewport.Size.x,
+					viewport.Pos.y + (0.5f - ndc.m_Y * 0.5f) * viewport.Size.y));
 		}
 	}
 
-	bool ProjectWorldPositionToScreen(
-		const RenderView& view,
-		const Vector3& worldPosition,
-		const ImGuiViewport& viewport,
-		ImVec2& outScreenPosition) noexcept
+	bool ProjectWorldPositionToScreen(const RenderView& view, const Vector3& worldPosition,
+		const ImGuiViewport& viewport, ImVec2& outScreenPosition) noexcept
 	{
 		Vector3 ndc;
 		if (!ProjectWorldPositionToNdc(view, worldPosition, ndc) ||
@@ -70,9 +59,7 @@ namespace gglab::devtools
 	}
 
 	bool ProjectWorldPositionToScreen(
-		const RenderView& view,
-		const Vector3& worldPosition,
-		ImVec2& outScreenPosition) noexcept
+		const RenderView& view, const Vector3& worldPosition, ImVec2& outScreenPosition) noexcept
 	{
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 		if (viewport == nullptr)
@@ -83,12 +70,8 @@ namespace gglab::devtools
 		return ProjectWorldPositionToScreen(view, worldPosition, *viewport, outScreenPosition);
 	}
 
-	bool ProjectWorldPositionToScreenClamped(
-		const RenderView& view,
-		const Vector3& worldPosition,
-		const ImGuiViewport& viewport,
-		ImVec2& outScreenPosition,
-		bool& outClamped) noexcept
+	bool ProjectWorldPositionToScreenClamped(const RenderView& view, const Vector3& worldPosition,
+		const ImGuiViewport& viewport, ImVec2& outScreenPosition, bool& outClamped) noexcept
 	{
 		outClamped = false;
 
@@ -100,22 +83,15 @@ namespace gglab::devtools
 		}
 
 		const Vector3 clampedNdc(
-			std::clamp(ndc.m_X, -1.0f, 1.0f),
-			std::clamp(ndc.m_Y, -1.0f, 1.0f),
-			ndc.m_Z);
-		outClamped =
-			clampedNdc.m_X != ndc.m_X ||
-			clampedNdc.m_Y != ndc.m_Y;
+			std::clamp(ndc.m_X, -1.0f, 1.0f), std::clamp(ndc.m_Y, -1.0f, 1.0f), ndc.m_Z);
+		outClamped = clampedNdc.m_X != ndc.m_X || clampedNdc.m_Y != ndc.m_Y;
 
 		outScreenPosition = NdcToScreen(clampedNdc, viewport);
 		return true;
 	}
 
-	bool ProjectWorldPositionToScreenClamped(
-		const RenderView& view,
-		const Vector3& worldPosition,
-		ImVec2& outScreenPosition,
-		bool& outClamped) noexcept
+	bool ProjectWorldPositionToScreenClamped(const RenderView& view, const Vector3& worldPosition,
+		ImVec2& outScreenPosition, bool& outClamped) noexcept
 	{
 		const ImGuiViewport* viewport = ImGui::GetMainViewport();
 		if (viewport == nullptr)
@@ -125,10 +101,6 @@ namespace gglab::devtools
 		}
 
 		return ProjectWorldPositionToScreenClamped(
-			view,
-			worldPosition,
-			*viewport,
-			outScreenPosition,
-			outClamped);
+			view, worldPosition, *viewport, outScreenPosition, outClamped);
 	}
 }

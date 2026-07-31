@@ -21,9 +21,8 @@ namespace gglab
 	class DX12CommandContext
 	{
 	public:
-		DX12CommandContext(DX12Device* device,
-			DX12CommandList* commandList,
-			RHIQueueType queueType) noexcept;
+		DX12CommandContext(
+			DX12Device* device, DX12CommandList* commandList, RHIQueueType queueType) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12CommandContext);
 		virtual ~DX12CommandContext() = default;
 
@@ -32,8 +31,14 @@ namespace gglab
 		[[nodiscard]] DX12CommandList* GetCommandList() const noexcept { return m_CommandList; }
 		[[nodiscard]] ID3D12GraphicsCommandList* Get() const noexcept;
 
-		[[nodiscard]] std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept { return m_UsedBuffers; }
-		[[nodiscard]] std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_UsedTextures; }
+		[[nodiscard]] std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
+		{
+			return m_UsedBuffers;
+		}
+		[[nodiscard]] std::span<const RHITextureHandle> GetUsedTextures() const noexcept
+		{
+			return m_UsedTextures;
+		}
 		void ClearTrackedResourceUses() noexcept;
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept;
 		void TrackTextureUse(RHITextureHandle texture) noexcept;
@@ -41,12 +46,8 @@ namespace gglab
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
 		void FlushBarriers() noexcept;
-		void CopyBuffer(
-			RHIBufferHandle destination,
-			uint64_t destinationOffset,
-			RHIBufferHandle source,
-			uint64_t sourceOffset,
-			uint64_t sizeInBytes) noexcept;
+		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept;
 
 	protected:
 		[[nodiscard]] DX12Device* GetDevice() const noexcept { return m_Device; }
@@ -66,77 +67,74 @@ namespace gglab
 	class DX12GraphicsCommandContext final : public RHIGraphicsCommandContext
 	{
 	public:
-		DX12GraphicsCommandContext(DX12Device* device,
-			DX12PipelineSystem* pipelineSystem,
+		DX12GraphicsCommandContext(DX12Device* device, DX12PipelineSystem* pipelineSystem,
 			DX12CommandList* commandList) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12GraphicsCommandContext);
 		~DX12GraphicsCommandContext() override = default;
 
-		RHICommandContextHandle GetHandle() const noexcept override { return m_Backend.GetHandle(); }
+		RHICommandContextHandle GetHandle() const noexcept override
+		{
+			return m_Backend.GetHandle();
+		}
 		RHIQueueType GetQueueType() const noexcept override { return m_Backend.GetQueueType(); }
 		DX12CommandList* GetCommandList() const noexcept { return m_Backend.GetCommandList(); }
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_Backend.Get(); }
 
-		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept { return m_Backend.GetUsedBuffers(); }
-		std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_Backend.GetUsedTextures(); }
+		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
+		{
+			return m_Backend.GetUsedBuffers();
+		}
+		std::span<const RHITextureHandle> GetUsedTextures() const noexcept
+		{
+			return m_Backend.GetUsedTextures();
+		}
 		void ClearTrackedResourceUses() noexcept
 		{
 			m_Backend.ClearTrackedResourceUses();
 			m_CurrentRootSignature = nullptr;
 		}
 
-		void TrackTextureUse(RHITextureHandle texture) noexcept override { m_Backend.TrackTextureUse(texture); }
-		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend.TrackBufferUse(buffer); }
+		void TrackTextureUse(RHITextureHandle texture) noexcept override
+		{
+			m_Backend.TrackTextureUse(texture);
+		}
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept override
+		{
+			m_Backend.TrackBufferUse(buffer);
+		}
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void FlushBarriers() noexcept override { m_Backend.FlushBarriers(); }
-		void CopyBuffer(
-			RHIBufferHandle destination,
-			uint64_t destinationOffset,
-			RHIBufferHandle source,
-			uint64_t sourceOffset,
-			uint64_t sizeInBytes) noexcept override
+		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override
 		{
-			m_Backend.CopyBuffer(
-				destination,
-				destinationOffset,
-				source,
-				sourceOffset,
-				sizeInBytes);
+			m_Backend.CopyBuffer(destination, destinationOffset, source, sourceOffset, sizeInBytes);
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
 			RHITextureViewHandle depthStencil = {}) noexcept override;
-		void ClearColor(RHITextureViewHandle renderTarget,
-			const std::array<float, 4>& color) noexcept override;
-		void ClearDepthStencil(RHITextureViewHandle depthStencil,
-			float depth,
+		void ClearColor(
+			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept override;
+		void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,
 			std::optional<uint8_t> stencil = std::nullopt) noexcept override;
 		void SetViewport(const RHIViewport& viewport) noexcept override;
 		void SetScissorRect(const RHIScissorRect& rect) noexcept override;
 		void SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept override;
-		void SetConstantBuffer(uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept override;
-		void SetReadOnlyBuffer(uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex,
-			std::span<const uint32_t> values,
+		void SetConstantBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetReadOnlyBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
 			uint32_t destOffset = 0) noexcept override;
-		void SetVertexBuffers(uint32_t startSlot,
-			std::span<const RHIVertexBufferBinding> bindings) noexcept override;
+		void SetVertexBuffers(
+			uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept override;
 		void SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept override;
-		void DrawIndexed(uint32_t indexCount,
-			uint32_t instanceCount = 1,
-			uint32_t startIndexLocation = 0,
-			int32_t baseVertexLocation = 0,
+		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount = 1,
+			uint32_t startIndexLocation = 0, int32_t baseVertexLocation = 0,
 			uint32_t startInstanceLocation = 0) noexcept override;
-		void Draw(uint32_t vertexCount,
-			uint32_t instanceCount = 1,
-			uint32_t startVertexLocation = 0,
-			uint32_t startInstanceLocation = 0) noexcept override;
+		void Draw(uint32_t vertexCount, uint32_t instanceCount = 1,
+			uint32_t startVertexLocation = 0, uint32_t startInstanceLocation = 0) noexcept override;
 		void BeginGpuProfileScope(std::string_view name) noexcept override;
 		void EndGpuProfileScope() noexcept override;
 		void SetGpuProfiler(DX12GpuProfiler* profiler) noexcept { m_GpuProfiler = profiler; }
@@ -157,22 +155,29 @@ namespace gglab
 	class DX12ComputeCommandContext final : public RHIComputeCommandContext
 	{
 	public:
-		DX12ComputeCommandContext(DX12Device* device,
-			DX12PipelineSystem* pipelineSystem,
+		DX12ComputeCommandContext(DX12Device* device, DX12PipelineSystem* pipelineSystem,
 			DX12CommandList* commandList) noexcept;
-		DX12ComputeCommandContext(
-			DX12GraphicsCommandContext& graphicsContext,
+		DX12ComputeCommandContext(DX12GraphicsCommandContext& graphicsContext,
 			DX12PipelineSystem* pipelineSystem) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ComputeCommandContext);
 		~DX12ComputeCommandContext() override = default;
 
-		RHICommandContextHandle GetHandle() const noexcept override { return m_Backend->GetHandle(); }
+		RHICommandContextHandle GetHandle() const noexcept override
+		{
+			return m_Backend->GetHandle();
+		}
 		RHIQueueType GetQueueType() const noexcept override { return m_Backend->GetQueueType(); }
 		DX12CommandList* GetCommandList() const noexcept { return m_Backend->GetCommandList(); }
 		ID3D12GraphicsCommandList* Get() const noexcept { return m_Backend->Get(); }
 
-		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept { return m_Backend->GetUsedBuffers(); }
-		std::span<const RHITextureHandle> GetUsedTextures() const noexcept { return m_Backend->GetUsedTextures(); }
+		std::span<const RHIBufferHandle> GetUsedBuffers() const noexcept
+		{
+			return m_Backend->GetUsedBuffers();
+		}
+		std::span<const RHITextureHandle> GetUsedTextures() const noexcept
+		{
+			return m_Backend->GetUsedTextures();
+		}
 		void ClearTrackedResourceUses() noexcept
 		{
 			m_Backend->ClearTrackedResourceUses();
@@ -180,42 +185,35 @@ namespace gglab
 		}
 		void ResetEncoderState() noexcept { m_CurrentRootSignature = nullptr; }
 
-		void TrackTextureUse(RHITextureHandle texture) noexcept override { m_Backend->TrackTextureUse(texture); }
-		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { m_Backend->TrackBufferUse(buffer); }
+		void TrackTextureUse(RHITextureHandle texture) noexcept override
+		{
+			m_Backend->TrackTextureUse(texture);
+		}
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept override
+		{
+			m_Backend->TrackBufferUse(buffer);
+		}
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
 		void FlushBarriers() noexcept override { m_Backend->FlushBarriers(); }
-		void CopyBuffer(
-			RHIBufferHandle destination,
-			uint64_t destinationOffset,
-			RHIBufferHandle source,
-			uint64_t sourceOffset,
-			uint64_t sizeInBytes) noexcept override
+		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override
 		{
 			m_Backend->CopyBuffer(
-				destination,
-				destinationOffset,
-				source,
-				sourceOffset,
-				sizeInBytes);
+				destination, destinationOffset, source, sourceOffset, sizeInBytes);
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
-		void SetConstantBuffer(uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept override;
-		void SetReadOnlyBuffer(uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept override;
-		void SetReadWriteBuffer(uint32_t parameterIndex,
-			RHIBufferHandle buffer,
-			uint64_t offset = 0) noexcept override;
-		void SetPushConstants(uint32_t parameterIndex,
-			std::span<const uint32_t> values,
+		void SetConstantBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetReadOnlyBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetReadWriteBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
 			uint32_t destOffset = 0) noexcept override;
-		void Dispatch(uint32_t groupCountX,
-			uint32_t groupCountY,
-			uint32_t groupCountZ) noexcept override;
+		void Dispatch(
+			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept override;
 		void BeginGpuProfileScope(std::string_view name) noexcept override;
 		void EndGpuProfileScope() noexcept override;
 		void SetGpuProfiler(DX12GpuProfiler* profiler) noexcept { m_GpuProfiler = profiler; }

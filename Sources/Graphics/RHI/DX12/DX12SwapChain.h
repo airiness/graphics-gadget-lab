@@ -52,9 +52,15 @@ namespace gglab
 
 		uint32_t GetCurrentBackBufferIndex() const noexcept override { return m_BackBufferIndex; }
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override;
-		RHITextureHandle GetCurrentBackBufferHandle() const noexcept { return GetBackBufferHandle(m_BackBufferIndex); }
+		RHITextureHandle GetCurrentBackBufferHandle() const noexcept
+		{
+			return GetBackBufferHandle(m_BackBufferIndex);
+		}
 		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
-		DX12Texture* GetCurrentBackBuffer() const noexcept { return GetBackBuffer(m_BackBufferIndex); }
+		DX12Texture* GetCurrentBackBuffer() const noexcept
+		{
+			return GetBackBuffer(m_BackBufferIndex);
+		}
 
 	private:
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;

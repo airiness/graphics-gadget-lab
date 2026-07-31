@@ -35,9 +35,8 @@ namespace gglab
 		{
 			return nullptr;
 		}
-		const auto* mapped = static_cast<const std::byte*>(device.MapBuffer(
-			request.m_Buffer.Get(),
-			{ 0, request.m_BufferSizeInBytes }));
+		const auto* mapped = static_cast<const std::byte*>(
+			device.MapBuffer(request.m_Buffer.Get(), { 0, request.m_BufferSizeInBytes }));
 		if (!mapped)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("TransferManager failed to map a texture readback buffer.");

@@ -27,16 +27,14 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 
-	float3 storedColor = SanitizeHDRColor(SampleTexture2D(
-		g_Pass.SceneColorTextureIndex,
-		g_Pass.SceneColorSamplerIndex,
-		IN.UV).rgb);
+	float3 storedColor = SanitizeHDRColor(
+		SampleTexture2D(g_Pass.SceneColorTextureIndex, g_Pass.SceneColorSamplerIndex, IN.UV).rgb);
 	if (g_Pass.BloomEnabled != 0)
 	{
-		storedColor += SanitizeHDRColor(SampleTexture2D(
-			g_Pass.BloomTextureIndex,
-			g_Pass.BloomSamplerIndex,
-			IN.UV).rgb) * g_Pass.BloomIntensity;
+		storedColor +=
+			SanitizeHDRColor(
+				SampleTexture2D(g_Pass.BloomTextureIndex, g_Pass.BloomSamplerIndex, IN.UV).rgb) *
+			g_Pass.BloomIntensity;
 	}
 
 	const float exposureScaleOverPreExposure =

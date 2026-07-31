@@ -54,11 +54,7 @@ namespace gglab
 		auto AsTuple() const noexcept
 		{
 			return std::make_tuple(
-				m_BaseMip,
-				m_MipCount,
-				m_BaseArraySlice,
-				m_ArraySliceCount,
-				m_Aspects);
+				m_BaseMip, m_MipCount, m_BaseArraySlice, m_ArraySliceCount, m_Aspects);
 		}
 	};
 

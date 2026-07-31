@@ -36,8 +36,8 @@ namespace gglab
 
 	struct IBLDerivedDataLookupResult
 	{
-		std::array<IBLStageDerivedDataLookupResult,
-			static_cast<size_t>(IBLArtifactStage::Count)> m_Stages{};
+		std::array<IBLStageDerivedDataLookupResult, static_cast<size_t>(IBLArtifactStage::Count)>
+			m_Stages{};
 
 		[[nodiscard]] IBLStageDerivedDataLookupResult& Get(IBLArtifactStage stage) noexcept
 		{
@@ -67,16 +67,12 @@ namespace gglab
 
 		[[nodiscard]] IBLDerivedDataLookupResult Lookup(
 			const AssetContentFingerprint& contentFingerprint,
-			EnvironmentTextureSourceType sourceType,
-			const IBLBakeConfig& config,
-			bool ignoreCache,
+			EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config, bool ignoreCache,
 			std::stop_token stopToken = {}) noexcept;
 		[[nodiscard]] IBLStageArtifactHandle Admit(
-			const DerivedDataKey& key,
-			IBLStageArtifactHandle artifact) noexcept;
+			const DerivedDataKey& key, IBLStageArtifactHandle artifact) noexcept;
 		[[nodiscard]] bool Store(
-			const DerivedDataKey& key,
-			const IBLStageArtifactHandle& artifact) noexcept;
+			const DerivedDataKey& key, const IBLStageArtifactHandle& artifact) noexcept;
 
 		[[nodiscard]] IBLStageArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept;
@@ -84,15 +80,12 @@ namespace gglab
 		[[nodiscard]] bool ClearStore() noexcept;
 
 	private:
-		[[nodiscard]] std::array<DerivedDataKey,
-			static_cast<size_t>(IBLArtifactStage::Count)> BuildKeys(
-				const AssetContentFingerprint& contentFingerprint,
-				EnvironmentTextureSourceType sourceType,
-				const IBLBakeConfig& config,
+		[[nodiscard]] std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)>
+			BuildKeys(const AssetContentFingerprint& contentFingerprint,
+				EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
 				std::stop_token stopToken) const noexcept;
 		[[nodiscard]] SourceDigest ComputeShaderDependencyDigest(
-			IBLArtifactStage stage,
-			std::stop_token stopToken) const noexcept;
+			IBLArtifactStage stage, std::stop_token stopToken) const noexcept;
 
 		IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 		std::string m_AdapterScopeIdentity;
@@ -101,6 +94,5 @@ namespace gglab
 		LocalDerivedDataStore m_Store;
 	};
 
-	[[nodiscard]] std::string_view GetIBLStageArtifactType(
-		IBLArtifactStage stage) noexcept;
+	[[nodiscard]] std::string_view GetIBLStageArtifactType(IBLArtifactStage stage) noexcept;
 }

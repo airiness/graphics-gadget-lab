@@ -29,7 +29,8 @@ namespace gglab
 		[[nodiscard]] virtual uint32_t GetBufferHeight() const noexcept = 0;
 		[[nodiscard]] virtual RHIFormat GetFormat() const noexcept = 0;
 		[[nodiscard]] virtual uint32_t GetCurrentBackBufferIndex() const noexcept = 0;
-		[[nodiscard]] virtual RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept = 0;
+		[[nodiscard]] virtual RHITextureHandle GetBackBufferHandle(
+			uint32_t bufferIndex) const noexcept = 0;
 
 		virtual void WaitFrameCompletion() noexcept = 0;
 		virtual void SetFrameCompletionFence(const RHIFencePoint& fencePoint) noexcept = 0;

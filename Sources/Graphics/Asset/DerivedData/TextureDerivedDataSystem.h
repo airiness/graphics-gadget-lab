@@ -27,8 +27,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Artifact && m_Artifact->IsValid() &&
-				m_ContentFingerprint.IsValid();
+			return m_Artifact && m_Artifact->IsValid() && m_ContentFingerprint.IsValid();
 		}
 	};
 
@@ -46,8 +45,7 @@ namespace gglab
 
 	private:
 		friend class TextureDerivedDataSystem;
-		TextureArtifactWaiterHandle(
-			std::shared_ptr<TextureDerivedDataCoordinatorCore> core,
+		TextureArtifactWaiterHandle(std::shared_ptr<TextureDerivedDataCoordinatorCore> core,
 			std::shared_ptr<TextureDerivedDataRequestState> state) noexcept;
 		void Release(bool cancelled) noexcept;
 
@@ -68,14 +66,10 @@ namespace gglab
 
 	private:
 		friend class TextureDerivedDataSystem;
-		friend bool FinishTextureDerivedDataBuild(
-			TextureArtifactBuildClaim& claim,
-			TextureDerivedDataArtifact artifact,
-			std::string error) noexcept;
-		TextureArtifactBuildClaim(
-			std::shared_ptr<TextureDerivedDataCoordinatorCore> core,
-			std::shared_ptr<TextureDerivedDataRequestState> state,
-			uint64_t serial) noexcept;
+		friend bool FinishTextureDerivedDataBuild(TextureArtifactBuildClaim& claim,
+			TextureDerivedDataArtifact artifact, std::string error) noexcept;
+		TextureArtifactBuildClaim(std::shared_ptr<TextureDerivedDataCoordinatorCore> core,
+			std::shared_ptr<TextureDerivedDataRequestState> state, uint64_t serial) noexcept;
 		void Abandon() noexcept;
 
 		std::shared_ptr<TextureDerivedDataCoordinatorCore> m_Core;
@@ -126,26 +120,20 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(TextureDerivedDataSystem);
 		~TextureDerivedDataSystem();
 
-		[[nodiscard]] TextureDerivedDataRequestResult Request(
-			const DerivedDataKey& key) noexcept;
+		[[nodiscard]] TextureDerivedDataRequestResult Request(const DerivedDataKey& key) noexcept;
 		[[nodiscard]] TextureArtifactWaitResult Wait(
-			TextureArtifactWaiterHandle waiter,
-			std::stop_token stopToken) noexcept;
+			TextureArtifactWaiterHandle waiter, std::stop_token stopToken) noexcept;
 		[[nodiscard]] bool Publish(
-			TextureArtifactBuildClaim claim,
-			TextureDerivedDataArtifact artifact) noexcept;
-		[[nodiscard]] bool Fail(
-			TextureArtifactBuildClaim claim,
-			std::string error) noexcept;
+			TextureArtifactBuildClaim claim, TextureDerivedDataArtifact artifact) noexcept;
+		[[nodiscard]] bool Fail(TextureArtifactBuildClaim claim, std::string error) noexcept;
 
 		[[nodiscard]] TextureDerivedDataArtifact Read(
-			const DerivedDataKey& key,
-			const TextureImportSettings& importSettings) noexcept;
+			const DerivedDataKey& key, const TextureImportSettings& importSettings) noexcept;
 		[[nodiscard]] bool Write(
-			const DerivedDataKey& key,
-			const TextureArtifact& artifact) noexcept;
+			const DerivedDataKey& key, const TextureArtifact& artifact) noexcept;
 
-		[[nodiscard]] TextureDerivedDataCoordinatorStatistics GetCoordinatorStatistics() const noexcept;
+		[[nodiscard]] TextureDerivedDataCoordinatorStatistics GetCoordinatorStatistics()
+			const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept
 		{
 			return m_Store.GetStatistics();

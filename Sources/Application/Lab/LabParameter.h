@@ -95,9 +95,7 @@ namespace gglab
 	public:
 		bool Add(LabParameterDesc desc) noexcept;
 		LabChangeImpact ResetAll() noexcept;
-		bool Set(
-			const LabParameterId& id,
-			const LabValue& value,
+		bool Set(const LabParameterId& id, const LabValue& value,
 			LabChangeImpact* impact = nullptr) noexcept;
 
 		const LabParameter* Find(const LabParameterId& id) const noexcept;

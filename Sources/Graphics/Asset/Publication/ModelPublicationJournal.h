@@ -10,10 +10,7 @@ namespace gglab
 	class ModelPublicationJournal final
 	{
 	public:
-		void Reserve(
-			size_t claimCount,
-			size_t materialCount,
-			size_t dependencyCount);
+		void Reserve(size_t claimCount, size_t materialCount, size_t dependencyCount);
 
 		void RecordClaim(ModelPublicationClaim claim);
 		void RecordCreatedMaterial(MaterialID materialId);
@@ -24,8 +21,8 @@ namespace gglab
 		{
 			return m_DependencyOwner;
 		}
-		[[nodiscard]] std::span<const ModelPublicationLeaseToken>
-			GetDependencyLeases() const noexcept
+		[[nodiscard]] std::span<const ModelPublicationLeaseToken> GetDependencyLeases()
+			const noexcept
 		{
 			return m_DependencyLeases;
 		}
@@ -34,8 +31,7 @@ namespace gglab
 		[[nodiscard]] size_t GetClaimCount() const noexcept { return m_Claims.size(); }
 
 		void Commit() noexcept;
-		[[nodiscard]] bool ReleaseNextRetain(
-			AssetPublicationServicesBase& services) noexcept;
+		[[nodiscard]] bool ReleaseNextRetain(AssetPublicationServicesBase& services) noexcept;
 		void Abort(AssetPublicationServicesBase& services) noexcept;
 
 	private:

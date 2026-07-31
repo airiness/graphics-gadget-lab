@@ -38,9 +38,7 @@ namespace gglab
 		const LabDescriptor& GetDescriptor() const noexcept { return m_Descriptor; }
 		const LabParameterSet& GetParameters() const noexcept { return m_Parameters; }
 		bool IsValid() const noexcept;
-		bool SetParameter(
-			const LabParameterId& id,
-			const LabValue& value,
+		bool SetParameter(const LabParameterId& id, const LabValue& value,
 			LabChangeImpact* impact = nullptr) noexcept;
 		LabChangeImpact ResetParameters() noexcept;
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
@@ -75,13 +73,14 @@ namespace gglab
 		const Camera& GetCamera() const noexcept { return *m_Camera; }
 		CameraController& GetCameraController() noexcept { return *m_CameraController; }
 		CameraRig& GetCameraRig() noexcept { return m_CameraRig; }
-		const ViewRenderProfile& GetViewRenderProfile() const noexcept { return m_ViewRenderProfile; }
+		const ViewRenderProfile& GetViewRenderProfile() const noexcept
+		{
+			return m_ViewRenderProfile;
+		}
 		RenderPipelineBase& GetRenderPipeline() noexcept { return *m_RenderPipeline; }
 
 	protected:
-		LabSessionBase(
-			LabDescriptor descriptor,
-			const LabSessionCreateInfo& createInfo,
+		LabSessionBase(LabDescriptor descriptor, const LabSessionCreateInfo& createInfo,
 			std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept;
 
 		void UpdateCamera(float deltaTime) noexcept;

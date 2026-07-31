@@ -31,8 +31,7 @@ namespace gglab
 	}
 
 	DX12PipelineSystem::DX12PipelineSystem(DX12Device* device) noexcept :
-		m_Device(device),
-		m_RootSignatureCache(std::make_unique<DX12RootSignatureCache>(device)),
+		m_Device(device), m_RootSignatureCache(std::make_unique<DX12RootSignatureCache>(device)),
 		m_PSOCache(std::make_unique<DX12PSOCache>(device, std::make_unique<StreamPSOCreator>()))
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
@@ -94,7 +93,7 @@ namespace gglab
 		}
 
 		const RootSignatureHandle nativeRoot{
-			.m_Id = RootSignatureID{ createInfo.m_Desc.m_BindingLayout.Index() },
+			.m_Id = RootSignatureID{createInfo.m_Desc.m_BindingLayout.Index()},
 			.m_RootSignature = rootSignature->Get(),
 		};
 		DX12GraphicsPipelineShaderInputs shaders{};
@@ -109,10 +108,8 @@ namespace gglab
 		shaders.m_HullShaderHash = ToDX12ShaderHash(createInfo.m_HullShader);
 		shaders.m_GeometryShaderHash = ToDX12ShaderHash(createInfo.m_GeometryShader);
 
-		DX12PipelineState* pipelineState = m_PSOCache->GetOrCreate(
-			createInfo.m_Desc,
-			nativeRoot,
-			shaders);
+		DX12PipelineState* pipelineState =
+			m_PSOCache->GetOrCreate(createInfo.m_Desc, nativeRoot, shaders);
 		return RegisterGraphicsPipeline(
 			{ pipelineState, rootSignature, PipelineType::Graphics }, createInfo);
 	}
@@ -168,22 +165,17 @@ namespace gglab
 		m_Revision.fetch_add(1, std::memory_order_relaxed);
 	}
 
-	bool DX12PipelineSystem::ResolveGraphicsPipeline(
-		RHIPipelineHandle pipeline,
-		DX12PipelineState*& outPipelineState,
-		DX12RootSignature*& outRootSignature) const noexcept
+	bool DX12PipelineSystem::ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
+		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature) const noexcept
 	{
 		return ResolvePipeline(
 			pipeline, PipelineType::Graphics, outPipelineState, outRootSignature);
 	}
 
-	bool DX12PipelineSystem::ResolveComputePipeline(
-		RHIPipelineHandle pipeline,
-		DX12PipelineState*& outPipelineState,
-		DX12RootSignature*& outRootSignature) const noexcept
+	bool DX12PipelineSystem::ResolveComputePipeline(RHIPipelineHandle pipeline,
+		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature) const noexcept
 	{
-		return ResolvePipeline(
-			pipeline, PipelineType::Compute, outPipelineState, outRootSignature);
+		return ResolvePipeline(pipeline, PipelineType::Compute, outPipelineState, outRootSignature);
 	}
 
 	DX12RootSignature* DX12PipelineSystem::ResolveBindingLayout(
@@ -193,18 +185,15 @@ namespace gglab
 		{
 			return nullptr;
 		}
-		return m_RootSignatureCache->GetDX12RootSignature(
-			RootSignatureID{ layout.Index() });
+		return m_RootSignatureCache->GetDX12RootSignature(RootSignatureID{ layout.Index() });
 	}
 
 	RHIPipelineHandle DX12PipelineSystem::RegisterGraphicsPipeline(
-		const PipelineBinding& binding,
-		const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
+		const PipelineBinding& binding, const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
 	{
 		PipelineBinding registered = binding;
 		registered.m_GraphicsDesc = createInfo.m_Desc;
-		const uint32_t attributeCount = std::min(
-			createInfo.m_Desc.m_VertexInput.m_AttributeCount,
+		const uint32_t attributeCount = std::min(createInfo.m_Desc.m_VertexInput.m_AttributeCount,
 			RHIVertexInputLayoutDesc::MaxAttributes);
 		for (uint32_t index = 0; index < attributeCount; ++index)
 		{
@@ -222,8 +211,7 @@ namespace gglab
 	}
 
 	RHIPipelineHandle DX12PipelineSystem::RegisterComputePipeline(
-		const PipelineBinding& binding,
-		const RHIComputePipelineCreateInfo& createInfo) noexcept
+		const PipelineBinding& binding, const RHIComputePipelineCreateInfo& createInfo) noexcept
 	{
 		PipelineBinding registered = binding;
 		registered.m_ComputeDesc = createInfo.m_Desc;
@@ -231,8 +219,7 @@ namespace gglab
 		return RegisterPipeline(std::move(registered));
 	}
 
-	RHIPipelineHandle DX12PipelineSystem::RegisterPipeline(
-		PipelineBinding binding) noexcept
+	RHIPipelineHandle DX12PipelineSystem::RegisterPipeline(PipelineBinding binding) noexcept
 	{
 		if (!binding.m_PipelineState || !binding.m_RootSignature)
 		{
@@ -254,11 +241,8 @@ namespace gglab
 		return RHIPipelineHandle(index, m_PipelineGeneration);
 	}
 
-	bool DX12PipelineSystem::ResolvePipeline(
-		RHIPipelineHandle pipeline,
-		PipelineType expectedType,
-		DX12PipelineState*& outPipelineState,
-		DX12RootSignature*& outRootSignature) const noexcept
+	bool DX12PipelineSystem::ResolvePipeline(RHIPipelineHandle pipeline, PipelineType expectedType,
+		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature) const noexcept
 	{
 		outPipelineState = nullptr;
 		outRootSignature = nullptr;

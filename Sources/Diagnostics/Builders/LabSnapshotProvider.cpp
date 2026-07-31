@@ -12,14 +12,12 @@ namespace gglab
 		return SnapshotIdOf<LabSnapshot>;
 	}
 
-	void LabSnapshotProvider::Capture(
-		const SnapshotContext& context,
-		SnapshotStore& store) noexcept
+	void LabSnapshotProvider::Capture(const SnapshotContext& context, SnapshotStore& store) noexcept
 	{
 		GGLAB_UNUSED(context);
 		auto& snapshot = store.GetOrCreate<LabSnapshot>();
-		const LabRuntime* runtime = m_RuntimeLocator ?
-			m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr;
+		const LabRuntime* runtime =
+			m_RuntimeLocator ? m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr;
 		snapshot = runtime ? runtime->GetLabSnapshot() : LabSnapshot{};
 	}
 }

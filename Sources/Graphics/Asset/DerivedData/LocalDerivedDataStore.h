@@ -43,8 +43,7 @@ namespace gglab
 	};
 
 	[[nodiscard]] uint64_t ComputeLocalDerivedDataContainerByteLimit(
-		std::string_view artifactType,
-		uint64_t maximumPayloadBytes) noexcept;
+		std::string_view artifactType, uint64_t maximumPayloadBytes) noexcept;
 
 	struct LocalDerivedDataStoreStatistics
 	{
@@ -70,16 +69,11 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(LocalDerivedDataStore);
 		~LocalDerivedDataStore() = default;
 
-		[[nodiscard]] DerivedDataReadResult Read(
-			const DerivedDataKey& key,
-			std::string_view artifactType,
-			uint32_t schemaVersion,
+		[[nodiscard]] DerivedDataReadResult Read(const DerivedDataKey& key,
+			std::string_view artifactType, uint32_t schemaVersion,
 			LocalDerivedDataReadOptions options = {}) noexcept;
-		[[nodiscard]] bool Write(
-			const DerivedDataKey& key,
-			std::string_view artifactType,
-			uint32_t schemaVersion,
-			const ArtifactContentDigest& artifactContentDigest,
+		[[nodiscard]] bool Write(const DerivedDataKey& key, std::string_view artifactType,
+			uint32_t schemaVersion, const ArtifactContentDigest& artifactContentDigest,
 			std::span<const std::byte> payload) noexcept;
 		// Present means that the entry path exists; Read performs container validation.
 		[[nodiscard]] DerivedDataPresence Probe(const DerivedDataKey& key) const noexcept;
@@ -87,11 +81,8 @@ namespace gglab
 		{
 			return Probe(key) == DerivedDataPresence::Present;
 		}
-		void DiscardObservedCorrupt(
-			const DerivedDataKey& key,
-			std::string_view artifactType,
-			uint32_t schemaVersion,
-			const ArtifactContentDigest& observedArtifactContentDigest,
+		void DiscardObservedCorrupt(const DerivedDataKey& key, std::string_view artifactType,
+			uint32_t schemaVersion, const ArtifactContentDigest& observedArtifactContentDigest,
 			const Sha256Hash& observedPayloadDigest,
 			LocalDerivedDataReadOptions options = {}) noexcept;
 		[[nodiscard]] bool Clear() noexcept;
@@ -105,8 +96,7 @@ namespace gglab
 		void CleanupOrphanTemporaryFilesLocked() noexcept;
 		[[nodiscard]] std::vector<std::filesystem::path> CollectTrashPathsLocked() const noexcept;
 		[[nodiscard]] std::filesystem::path MakeTrashPath() noexcept;
-		static void ScheduleTrashCleanup(
-			std::vector<std::filesystem::path> trashPaths) noexcept;
+		static void ScheduleTrashCleanup(std::vector<std::filesystem::path> trashPaths) noexcept;
 
 		LocalDerivedDataRootIdentity m_RootIdentity;
 		std::filesystem::path m_RootDirectory;

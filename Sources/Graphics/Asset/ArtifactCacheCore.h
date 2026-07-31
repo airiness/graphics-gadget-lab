@@ -31,22 +31,20 @@ namespace gglab
 	// entries and allocation records on the same lifetime model. Records remain
 	// discoverable through external handles so re-admission cannot count the same
 	// physical allocation twice after eviction.
-	template<typename Key, typename Artifact, typename KeyHash = std::hash<Key>>
+	template <typename Key, typename Artifact, typename KeyHash = std::hash<Key>>
 	class ArtifactCacheCore final
 	{
 	public:
 		using Handle = std::shared_ptr<const Artifact>;
 
 		explicit ArtifactCacheCore(uint64_t budgetBytes) noexcept :
-			m_BudgetBytes(budgetBytes),
-			m_LiveState(std::make_shared<LiveState>())
-		{}
+			m_BudgetBytes(budgetBytes), m_LiveState(std::make_shared<LiveState>())
+		{
+		}
 		GGLAB_DELETE_COPYABLE_MOVABLE(ArtifactCacheCore);
 		~ArtifactCacheCore() = default;
 
-		[[nodiscard]] Handle Admit(
-			const Key& key,
-			Handle artifact) noexcept
+		[[nodiscard]] Handle Admit(const Key& key, Handle artifact) noexcept
 		{
 			if (!artifact)
 			{
@@ -81,9 +79,7 @@ namespace gglab
 			{
 				return {};
 			}
-			Handle trackedArtifact = TrackAllocation(
-				std::move(artifact),
-				physicalBytes);
+			Handle trackedArtifact = TrackAllocation(std::move(artifact), physicalBytes);
 			if (physicalBytes > m_BudgetBytes)
 			{
 				++m_AdmissionRejectedCount;
@@ -98,13 +94,12 @@ namespace gglab
 			}
 
 			m_Lru.push_front(key);
-			const auto [entry, inserted] = m_Entries.emplace(
-				key,
-				Entry{
-					.m_Artifact = trackedArtifact,
-					.m_PhysicalBytes = physicalBytes,
-					.m_Lru = m_Lru.begin(),
-				});
+			const auto [entry, inserted] =
+				m_Entries.emplace(key, Entry{
+										   .m_Artifact = trackedArtifact,
+										   .m_PhysicalBytes = physicalBytes,
+										   .m_Lru = m_Lru.begin(),
+					});
 			GGLAB_ASSERT_MSG(inserted, "Artifact cache key admission must be unique.");
 			if (!inserted)
 			{
@@ -146,13 +141,12 @@ namespace gglab
 
 		[[nodiscard]] ArtifactCacheCoreStatistics GetStatistics() const noexcept
 		{
-			const uint64_t liveBytes =
-				m_LiveState->m_Bytes.load(std::memory_order_relaxed);
+			const uint64_t liveBytes = m_LiveState->m_Bytes.load(std::memory_order_relaxed);
 			return {
 				.m_BudgetBytes = m_BudgetBytes,
 				.m_CachedBytes = m_CachedBytes,
-				.m_ExternallyRetainedBytes = liveBytes > m_CachedBytes ?
-					liveBytes - m_CachedBytes : 0,
+				.m_ExternallyRetainedBytes =
+					liveBytes > m_CachedBytes ? liveBytes - m_CachedBytes : 0,
 				.m_TotalLiveBytes = liveBytes,
 				.m_CachedEntryCount = static_cast<uint32_t>(m_Entries.size()),
 				.m_HitCount = m_HitCount,
@@ -181,24 +175,17 @@ namespace gglab
 
 		struct AllocationRecord
 		{
-			AllocationRecord(
-				std::shared_ptr<LiveState> liveState,
-				Handle artifact,
+			AllocationRecord(std::shared_ptr<LiveState> liveState, Handle artifact,
 				uint64_t physicalBytes) noexcept :
-				m_LiveState(std::move(liveState)),
-				m_Artifact(std::move(artifact)),
+				m_LiveState(std::move(liveState)), m_Artifact(std::move(artifact)),
 				m_PhysicalBytes(physicalBytes)
 			{
-				m_LiveState->m_Bytes.fetch_add(
-					m_PhysicalBytes,
-					std::memory_order_relaxed);
+				m_LiveState->m_Bytes.fetch_add(m_PhysicalBytes, std::memory_order_relaxed);
 			}
 
 			~AllocationRecord()
 			{
-				m_LiveState->m_Bytes.fetch_sub(
-					m_PhysicalBytes,
-					std::memory_order_relaxed);
+				m_LiveState->m_Bytes.fetch_sub(m_PhysicalBytes, std::memory_order_relaxed);
 			}
 
 			std::shared_ptr<LiveState> m_LiveState;
@@ -213,34 +200,25 @@ namespace gglab
 			std::shared_ptr<AllocationRecord> m_Allocation;
 		};
 
-		[[nodiscard]] Handle TrackAllocation(
-			Handle artifact,
-			uint64_t physicalBytes) noexcept
+		[[nodiscard]] Handle TrackAllocation(Handle artifact, uint64_t physicalBytes) noexcept
 		{
 			if (const TrackedArtifactDeleter* tracked =
 				std::get_deleter<TrackedArtifactDeleter>(artifact);
 				tracked && tracked->m_Allocation &&
 				tracked->m_Allocation->m_LiveState == m_LiveState)
 			{
-				GGLAB_ASSERT_MSG(
-					tracked->m_Allocation->m_Artifact.get() == artifact.get(),
+				GGLAB_ASSERT_MSG(tracked->m_Allocation->m_Artifact.get() == artifact.get(),
 					"Tracked artifact allocation changed its physical address.");
-				GGLAB_ASSERT_MSG(
-					tracked->m_Allocation->m_PhysicalBytes == physicalBytes,
+				GGLAB_ASSERT_MSG(tracked->m_Allocation->m_PhysicalBytes == physicalBytes,
 					"Tracked artifact allocation changed its physical byte estimate.");
 				return artifact;
 			}
 
 			const Artifact* value = artifact.get();
 			std::shared_ptr<AllocationRecord> allocation =
-				std::make_shared<AllocationRecord>(
-					m_LiveState,
-					std::move(artifact),
-					physicalBytes);
-			return Handle(
-				value,
-				TrackedArtifactDeleter{
-					.m_Allocation = std::move(allocation),
+				std::make_shared<AllocationRecord>(m_LiveState, std::move(artifact), physicalBytes);
+			return Handle(value, TrackedArtifactDeleter{
+									 .m_Allocation = std::move(allocation),
 				});
 		}
 
@@ -276,8 +254,7 @@ namespace gglab
 
 			const uint64_t physicalBytes = entry->second.m_PhysicalBytes;
 			GGLAB_ASSERT(physicalBytes <= m_CachedBytes);
-			m_CachedBytes = physicalBytes <= m_CachedBytes ?
-				m_CachedBytes - physicalBytes : 0;
+			m_CachedBytes = physicalBytes <= m_CachedBytes ? m_CachedBytes - physicalBytes : 0;
 			++m_EvictionCount;
 			m_EvictedBytes += physicalBytes;
 			m_Entries.erase(entry);

@@ -16,6 +16,5 @@ namespace gglab
 	};
 
 	void BuildDX12RootSignatureDesc(
-		const RHIBindingLayoutDesc& rhiDesc,
-		DX12BindingLayoutBuildResult& outDesc) noexcept;
+		const RHIBindingLayoutDesc& rhiDesc, DX12BindingLayoutBuildResult& outDesc) noexcept;
 }

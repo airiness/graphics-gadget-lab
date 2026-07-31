@@ -19,20 +19,17 @@ namespace gglab
 		[[nodiscard]] bool Initialize(RHIContext& context) noexcept override;
 		void Finalize() noexcept override;
 		void NewFrame() noexcept override;
-		void RenderDrawData(
-			RHIGraphicsCommandContext* commandContext,
+		void RenderDrawData(RHIGraphicsCommandContext* commandContext,
 			RHITextureViewHandle renderTarget) noexcept override;
 		[[nodiscard]] ImTextureID ResolveTextureId(
 			RHIDescriptorHandle descriptor) const noexcept override;
 
 	private:
 		static void DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
-			D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle,
-			D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle);
+			D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle);
 
 		static void DescriptorFree(ImGui_ImplDX12_InitInfo* info,
-			D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
-			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
+			D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
 
 	private:
 		DX12Device* m_DX12Device = nullptr;

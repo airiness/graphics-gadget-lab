@@ -6,20 +6,24 @@ namespace gglab
 {
 	D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(RHITextureUsage usage) noexcept
 	{
-		return
-			(Test(usage, RHITextureUsage::RenderTarget) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET : D3D12_RESOURCE_FLAG_NONE) |
-			(Test(usage, RHITextureUsage::DepthStencil) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_NONE) |
-			(Test(usage, RHITextureUsage::UnorderedAccess) ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE);
+		return (Test(usage, RHITextureUsage::RenderTarget) ? D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
+			: D3D12_RESOURCE_FLAG_NONE) |
+			(Test(usage, RHITextureUsage::DepthStencil) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
+				: D3D12_RESOURCE_FLAG_NONE) |
+			(Test(usage, RHITextureUsage::UnorderedAccess)
+				? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+				: D3D12_RESOURCE_FLAG_NONE);
 	}
 
 	D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(RHIBufferUsage usage) noexcept
 	{
-		return Test(usage, RHIBufferUsage::UnorderedAccess) ?
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS :
-			D3D12_RESOURCE_FLAG_NONE;
+		return Test(usage, RHIBufferUsage::UnorderedAccess)
+			? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+			: D3D12_RESOURCE_FLAG_NONE;
 	}
 
-	std::optional<D3D12_CLEAR_VALUE> ToD3D12ClearValue(const std::optional<RHIClearValue>& clearValue) noexcept
+	std::optional<D3D12_CLEAR_VALUE> ToD3D12ClearValue(
+		const std::optional<RHIClearValue>& clearValue) noexcept
 	{
 		if (!clearValue.has_value())
 		{
@@ -88,7 +92,6 @@ namespace gglab
 	CD3DX12_RESOURCE_DESC ToD3D12ResourceDesc(const RHIBufferDesc& desc) noexcept
 	{
 		return CD3DX12_RESOURCE_DESC::Buffer(
-			static_cast<UINT64>(desc.m_SizeInBytes),
-			ToD3D12ResourceFlags(desc.m_Usage));
+			static_cast<UINT64>(desc.m_SizeInBytes), ToD3D12ResourceFlags(desc.m_Usage));
 	}
 }

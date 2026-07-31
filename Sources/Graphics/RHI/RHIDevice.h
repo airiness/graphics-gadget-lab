@@ -21,9 +21,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Supported &&
-				m_MinLaneCount > 0 &&
-				m_MaxLaneCount >= m_MinLaneCount;
+			return m_Supported && m_MinLaneCount > 0 && m_MaxLaneCount >= m_MinLaneCount;
 		}
 	};
 
@@ -36,23 +34,19 @@ namespace gglab
 		// Stable across process launches and changes when the adapter or driver
 		// compatibility domain changes. It intentionally excludes transient LUIDs.
 		virtual std::string_view GetAdapterCompatibilityIdentity() const noexcept = 0;
-		virtual RHIShaderWaveCapabilities
-			GetShaderWaveCapabilities() const noexcept = 0;
+		virtual RHIShaderWaveCapabilities GetShaderWaveCapabilities() const noexcept = 0;
 		virtual RHITextureSupportResult QueryTextureSupport(
 			const RHITextureDesc& desc) const noexcept = 0;
-		virtual RHITextureSupportResult QueryTextureViewSupport(
-			const RHITextureDesc& textureDesc,
+		virtual RHITextureSupportResult QueryTextureViewSupport(const RHITextureDesc& textureDesc,
 			const RHITextureViewDesc& viewDesc) const noexcept = 0;
-		virtual RHITextureHandle CreateTexture(
-			const RHITextureDesc& desc,
+		virtual RHITextureHandle CreateTexture(const RHITextureDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;
-		virtual RHIBufferHandle CreateBuffer(
-			const RHIBufferDesc& desc,
+		virtual RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;
-		virtual RHITextureViewHandle CreateTextureView(RHITextureHandle texture,
-			const RHITextureViewDesc& desc) noexcept = 0;
-		virtual RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer,
-			const RHIBufferViewDesc& desc) noexcept = 0;
+		virtual RHITextureViewHandle CreateTextureView(
+			RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept = 0;
+		virtual RHIBufferViewHandle CreateBufferView(
+			RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept = 0;
 		virtual RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept = 0;
 
 		virtual void DestroyTexture(RHITextureHandle texture) noexcept = 0;
@@ -61,31 +55,32 @@ namespace gglab
 		virtual void DestroyBufferView(RHIBufferViewHandle view) noexcept = 0;
 		virtual void DestroySampler(RHISamplerHandle sampler) noexcept = 0;
 		virtual void SetTextureDebugBinding(
-			RHITextureHandle texture,
-			const RHIResourceDebugBindingDesc& binding) noexcept = 0;
+			RHITextureHandle texture, const RHIResourceDebugBindingDesc& binding) noexcept = 0;
 		virtual void SetBufferDebugBinding(
-			RHIBufferHandle buffer,
-			const RHIResourceDebugBindingDesc& binding) noexcept = 0;
+			RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept = 0;
 		virtual std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept = 0;
 		virtual std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept = 0;
-		virtual void* MapBuffer(RHIBufferHandle buffer,
-			RHIMappedBufferRange readRange) noexcept = 0;
-		virtual void UnmapBuffer(RHIBufferHandle buffer,
-			RHIMappedBufferRange writtenRange) noexcept = 0;
+		virtual void* MapBuffer(
+			RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept = 0;
+		virtual void UnmapBuffer(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept = 0;
 		virtual uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept = 0;
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
 		virtual bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept = 0;
-		virtual void RecordTextureUse(RHITextureHandle texture,
-			const RHIFencePoint& fencePoint) noexcept = 0;
-		virtual void RecordBufferUse(RHIBufferHandle buffer,
-			const RHIFencePoint& fencePoint) noexcept = 0;
+		virtual void RecordTextureUse(
+			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept = 0;
+		virtual void RecordBufferUse(
+			RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept = 0;
 
-		virtual RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept = 0;
-		virtual RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept = 0;
-		virtual RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept = 0;
+		virtual RHIDescriptorHandle GetTextureViewDescriptor(
+			RHITextureViewHandle view) const noexcept = 0;
+		virtual RHIDescriptorHandle GetBufferViewDescriptor(
+			RHIBufferViewHandle view) const noexcept = 0;
+		virtual RHIDescriptorHandle GetSamplerDescriptor(
+			RHISamplerHandle sampler) const noexcept = 0;
 
 		virtual void RetireCompletedWork() noexcept = 0;
 	};

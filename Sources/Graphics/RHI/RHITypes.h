@@ -87,7 +87,8 @@ namespace gglab
 		Copy = 1ull << 7,
 		Resolve = 1ull << 8,
 		Present = 1ull << 9,
-		AllGraphics = DrawIndirect | IndexInput | VertexShader | PixelShader | RenderTarget | DepthStencil,
+		AllGraphics =
+		DrawIndirect | IndexInput | VertexShader | PixelShader | RenderTarget | DepthStencil,
 		AllShaders = VertexShader | PixelShader | ComputeShader,
 		All = AllGraphics | ComputeShader | Copy | Resolve | Present,
 	};

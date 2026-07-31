@@ -20,15 +20,13 @@ namespace gglab
 			FailMaterials,
 		};
 
-		explicit AssetPublicationLabSession(
-			const LabSessionCreateInfo& createInfo) noexcept;
+		explicit AssetPublicationLabSession(const LabSessionCreateInfo& createInfo) noexcept;
 		~AssetPublicationLabSession() override = default;
 
 		void OnEnter() noexcept override;
 		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
-		void BuildDiagnostics(
-			LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -48,9 +46,7 @@ namespace gglab
 		void StartAcceptanceSuite() noexcept;
 		void UpdateAcceptanceSuite(float deltaTime) noexcept;
 		void StartAcceptanceCase() noexcept;
-		void CompleteAcceptanceCase(
-			std::string name,
-			std::vector<std::string> errors) noexcept;
+		void CompleteAcceptanceCase(std::string name, std::vector<std::string> errors) noexcept;
 		void CompleteAcceptanceSuite() noexcept;
 
 		Scenario m_Scenario = Scenario::AcceptanceSuite;

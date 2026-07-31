@@ -23,7 +23,10 @@ namespace gglab
 		};
 
 	public:
-		explicit AllocatorBase(CountType capacity) noexcept : m_Capacity(capacity), m_FreeCount(capacity) {}
+		explicit AllocatorBase(CountType capacity) noexcept :
+			m_Capacity(capacity), m_FreeCount(capacity)
+		{
+		}
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(AllocatorBase);
 		virtual ~AllocatorBase() = default;
 

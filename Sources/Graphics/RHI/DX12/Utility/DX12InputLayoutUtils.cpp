@@ -21,8 +21,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] const RHIVertexBufferLayoutDesc* FindVertexBufferLayout(
-			const RHIVertexInputLayoutDesc& rhiDesc,
-			uint32_t inputSlot) noexcept
+			const RHIVertexInputLayoutDesc& rhiDesc, uint32_t inputSlot) noexcept
 		{
 			for (uint32_t i = 0; i < rhiDesc.m_VertexBufferCount; ++i)
 			{
@@ -36,8 +35,7 @@ namespace gglab
 	}
 
 	void BuildDX12InputLayoutDesc(
-		const RHIVertexInputLayoutDesc& rhiDesc,
-		DX12InputLayoutBuildResult& outDesc) noexcept
+		const RHIVertexInputLayoutDesc& rhiDesc, DX12InputLayoutBuildResult& outDesc) noexcept
 	{
 		outDesc = {};
 		outDesc.m_ElementCount = rhiDesc.m_AttributeCount;
@@ -54,15 +52,12 @@ namespace gglab
 			element.Format = ToDXGIFormat(attribute.m_Format);
 			element.InputSlot = attribute.m_InputSlot;
 			element.AlignedByteOffset = attribute.m_AlignedByteOffset;
-			element.InputSlotClass = vertexBuffer ?
-				ToDX12InputClassification(vertexBuffer->m_InputRate) :
-				D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+			element.InputSlotClass = vertexBuffer
+				? ToDX12InputClassification(vertexBuffer->m_InputRate)
+				: D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 			element.InstanceDataStepRate = vertexBuffer ? vertexBuffer->m_InstanceStepRate : 0;
 		}
 
-		outDesc.m_Desc = D3D12_INPUT_LAYOUT_DESC{
-			outDesc.m_Elements.data(),
-			outDesc.m_ElementCount
-		};
+		outDesc.m_Desc = D3D12_INPUT_LAYOUT_DESC{ outDesc.m_Elements.data(), outDesc.m_ElementCount };
 	}
 }

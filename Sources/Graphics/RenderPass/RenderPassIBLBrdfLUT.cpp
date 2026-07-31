@@ -20,9 +20,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassIBLBrdfLUT::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassIBLBrdfLUT::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
 
@@ -38,7 +37,8 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
 			[renderResRegistry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -58,15 +58,18 @@ namespace gglab
 				data.m_Height = textureDesc->m_Extent.m_Height;
 				data.m_RenderTargetFormat = textureDesc->m_Format;
 			},
-			[this, renderer, bakeScheduler, bakeGeneration](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, bakeScheduler, bakeGeneration](
+				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
 				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 				commandContext->DrawFullscreenTriangle();
 
 				bakeScheduler->NotifyStageExecuted(IBLBakeStage::BrdfLut, bakeGeneration);
@@ -114,12 +117,10 @@ namespace gglab
 
 			m_IsInitialized = true;
 		}
-
 	}
 
 	RHIPipelineHandle RenderPassIBLBrdfLUT::GetOrCreatePSO(
-		const Renderer& renderer,
-		RHIFormat renderTargetFormat) noexcept
+		const Renderer& renderer, RHIFormat renderTargetFormat) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

@@ -90,8 +90,8 @@ namespace gglab
 		float m_Progress = 0.0f;
 		double m_GpuMilliseconds = 0.0;
 		bool m_GpuTimingAvailable = false;
-		std::array<IBLStageArtifactStatus,
-			static_cast<size_t>(IBLArtifactStage::Count)> m_Artifacts{};
+		std::array<IBLStageArtifactStatus, static_cast<size_t>(IBLArtifactStage::Count)>
+			m_Artifacts{};
 		bool m_CacheHit = false;
 		bool m_PartialCacheHit = false;
 		bool m_CpuCacheHit = false;
@@ -150,16 +150,23 @@ namespace gglab
 		return {};
 	}
 
-	[[nodiscard]] constexpr std::string_view GetIBLQualityPresetName(IBLQualityPreset preset) noexcept
+	[[nodiscard]] constexpr std::string_view GetIBLQualityPresetName(
+		IBLQualityPreset preset) noexcept
 	{
 		switch (preset)
 		{
-		case IBLQualityPreset::Low: return "Low";
-		case IBLQualityPreset::Medium: return "Medium";
-		case IBLQualityPreset::High: return "High";
-		case IBLQualityPreset::Offline: return "Offline";
-		case IBLQualityPreset::Custom: return "Custom";
-		case IBLQualityPreset::Count: break;
+		case IBLQualityPreset::Low:
+			return "Low";
+		case IBLQualityPreset::Medium:
+			return "Medium";
+		case IBLQualityPreset::High:
+			return "High";
+		case IBLQualityPreset::Offline:
+			return "Offline";
+		case IBLQualityPreset::Custom:
+			return "Custom";
+		case IBLQualityPreset::Count:
+			break;
 		}
 		return "Unknown";
 	}
@@ -168,17 +175,28 @@ namespace gglab
 	{
 		switch (stage)
 		{
-		case IBLBakeStage::Idle: return "Idle";
-		case IBLBakeStage::LoadingCache: return "Loading cache";
-		case IBLBakeStage::Environment: return "Environment";
-		case IBLBakeStage::EnvironmentMipChain: return "Environment mip chain";
-		case IBLBakeStage::Irradiance: return "Irradiance";
-		case IBLBakeStage::PrefilteredSpecular: return "Prefiltered specular";
-		case IBLBakeStage::BrdfLut: return "BRDF LUT";
-		case IBLBakeStage::WaitingForGpu: return "Waiting for GPU";
-		case IBLBakeStage::SavingCache: return "Saving cache";
-		case IBLBakeStage::Ready: return "Ready";
-		case IBLBakeStage::Failed: return "Failed";
+		case IBLBakeStage::Idle:
+			return "Idle";
+		case IBLBakeStage::LoadingCache:
+			return "Loading cache";
+		case IBLBakeStage::Environment:
+			return "Environment";
+		case IBLBakeStage::EnvironmentMipChain:
+			return "Environment mip chain";
+		case IBLBakeStage::Irradiance:
+			return "Irradiance";
+		case IBLBakeStage::PrefilteredSpecular:
+			return "Prefiltered specular";
+		case IBLBakeStage::BrdfLut:
+			return "BRDF LUT";
+		case IBLBakeStage::WaitingForGpu:
+			return "Waiting for GPU";
+		case IBLBakeStage::SavingCache:
+			return "Saving cache";
+		case IBLBakeStage::Ready:
+			return "Ready";
+		case IBLBakeStage::Failed:
+			return "Failed";
 		}
 		return "Unknown";
 	}
@@ -188,11 +206,16 @@ namespace gglab
 	{
 		switch (stage)
 		{
-		case IBLArtifactStage::Environment: return "Environment";
-		case IBLArtifactStage::Irradiance: return "Irradiance";
-		case IBLArtifactStage::PrefilteredSpecular: return "Prefiltered specular";
-		case IBLArtifactStage::BrdfLut: return "BRDF LUT";
-		case IBLArtifactStage::Count: break;
+		case IBLArtifactStage::Environment:
+			return "Environment";
+		case IBLArtifactStage::Irradiance:
+			return "Irradiance";
+		case IBLArtifactStage::PrefilteredSpecular:
+			return "Prefiltered specular";
+		case IBLArtifactStage::BrdfLut:
+			return "BRDF LUT";
+		case IBLArtifactStage::Count:
+			break;
 		}
 		return "Unknown";
 	}
@@ -202,10 +225,14 @@ namespace gglab
 	{
 		switch (resolution)
 		{
-		case IBLArtifactResolution::Miss: return "Miss";
-		case IBLArtifactResolution::CpuCache: return "CPU cache";
-		case IBLArtifactResolution::LocalDdc: return "Local DDC";
-		case IBLArtifactResolution::GpuBuild: return "GPU build";
+		case IBLArtifactResolution::Miss:
+			return "Miss";
+		case IBLArtifactResolution::CpuCache:
+			return "CPU cache";
+		case IBLArtifactResolution::LocalDdc:
+			return "Local DDC";
+		case IBLArtifactResolution::GpuBuild:
+			return "GPU build";
 		}
 		return "Unknown";
 	}

@@ -26,8 +26,7 @@ namespace gglab
 				return;
 			}
 
-			constexpr ImGuiTableFlags tableFlags =
-				ImGuiTableFlags_Borders |
+			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_Borders |
 				ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
@@ -71,9 +70,7 @@ namespace gglab
 		{
 			ImGui::TextUnformatted("CPU:");
 
-			constexpr ImGuiTableFlags tableFlags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
+			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 			if (!ImGui::BeginTable("CpuProfileSamples", 4, tableFlags))
@@ -125,20 +122,29 @@ namespace gglab
 			ImGui::TableHeadersRow();
 			for (const auto& profile : profiles)
 			{
-				const char* policy = profile.m_Policy == SnapshotUpdatePolicy::EveryFrame ? "Every Frame" :
-					profile.m_Policy == SnapshotUpdatePolicy::OnDemand ? "On Demand" : "Manual";
+				const char* policy =
+					profile.m_Policy == SnapshotUpdatePolicy::EveryFrame ? "Every Frame"
+					: profile.m_Policy == SnapshotUpdatePolicy::OnDemand ? "On Demand"
+					: "Manual";
 				ImGui::PushID(static_cast<int>(profile.m_Id));
 				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(profile.m_Name.data(), profile.m_Name.data() + profile.m_Name.size());
-				ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(policy);
-				ImGui::TableSetColumnIndex(2); ImGui::Text("%.3f", profile.m_LastCaptureMilliseconds);
-				ImGui::TableSetColumnIndex(3); ImGui::Text("%.3f", profile.m_AverageCaptureMilliseconds);
-				ImGui::TableSetColumnIndex(4); ImGui::Text("%.3f", profile.m_MaxCaptureMilliseconds);
-				ImGui::TableSetColumnIndex(5); ImGui::Text("%llu / %llu",
-					static_cast<unsigned long long>(profile.m_CaptureCount),
+				ImGui::TableSetColumnIndex(0);
+				ImGui::TextUnformatted(
+					profile.m_Name.data(), profile.m_Name.data() + profile.m_Name.size());
+				ImGui::TableSetColumnIndex(1);
+				ImGui::TextUnformatted(policy);
+				ImGui::TableSetColumnIndex(2);
+				ImGui::Text("%.3f", profile.m_LastCaptureMilliseconds);
+				ImGui::TableSetColumnIndex(3);
+				ImGui::Text("%.3f", profile.m_AverageCaptureMilliseconds);
+				ImGui::TableSetColumnIndex(4);
+				ImGui::Text("%.3f", profile.m_MaxCaptureMilliseconds);
+				ImGui::TableSetColumnIndex(5);
+				ImGui::Text("%llu / %llu", static_cast<unsigned long long>(profile.m_CaptureCount),
 					static_cast<unsigned long long>(profile.m_CacheHitCount));
 				ImGui::TableSetColumnIndex(6);
-				if (ImGui::SmallButton("Refresh")) diagnostics->RequestRefresh(profile.m_Id);
+				if (ImGui::SmallButton("Refresh"))
+					diagnostics->RequestRefresh(profile.m_Id);
 				ImGui::PopID();
 			}
 			ImGui::EndTable();
@@ -149,7 +155,8 @@ namespace gglab
 	{
 		auto& state = context.PanelState<ProfilingPanelState>();
 		auto& profiler = CpuProfiler::Get();
-		GpuProfiler* gpuProfiler = context.m_Renderer ? context.m_Renderer->GetGpuProfiler() : nullptr;
+		GpuProfiler* gpuProfiler =
+			context.m_Renderer ? context.m_Renderer->GetGpuProfiler() : nullptr;
 
 		bool enabled = profiler.IsEnabled();
 		if (ImGui::Checkbox("CPU profiling", &enabled))
@@ -204,8 +211,8 @@ namespace gglab
 			return;
 		}
 
-		const double fps = frame.m_FrameMilliseconds > 0.0 ?
-			1000.0 / frame.m_FrameMilliseconds : 0.0;
+		const double fps =
+			frame.m_FrameMilliseconds > 0.0 ? 1000.0 / frame.m_FrameMilliseconds : 0.0;
 		ImGui::Text("Frame: %.2f ms / %.1f fps", frame.m_FrameMilliseconds, fps);
 		ImGui::Text("CPU Frame: %.2f ms", frame.m_FrameMilliseconds);
 		if (state.m_DisplayedGpuFrame.IsValid())
@@ -216,8 +223,8 @@ namespace gglab
 		{
 			ImGui::TextDisabled("GPU Frame: waiting for timestamp data");
 		}
-		ImGui::TextDisabled("Frame %llu (latest completed)",
-			static_cast<unsigned long long>(frame.m_FrameIndex));
+		ImGui::TextDisabled(
+			"Frame %llu (latest completed)", static_cast<unsigned long long>(frame.m_FrameIndex));
 
 		ImGui::Spacing();
 		DrawGpuSamples(state.m_DisplayedGpuFrame);

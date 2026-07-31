@@ -10,23 +10,27 @@ namespace gglab
 	class RenderPassIBLPrefilteredSpecular : public RenderPassBase
 	{
 	public:
-		RenderPassIBLPrefilteredSpecular() noexcept : RenderPassBase({
-			.m_TypeName = "IBL.PrefilteredSpecular",
-			.m_DisplayName = "IBL Prefiltered Specular",
-			.m_CategoryName = "IBL",
-			.m_Description = "Builds the roughness mip chain used for specular image-based lighting.",
-			.m_Category = RenderPassCategory::IBL,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
+		RenderPassIBLPrefilteredSpecular() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "IBL.PrefilteredSpecular",
+				  .m_DisplayName = "IBL Prefiltered Specular",
+				  .m_CategoryName = "IBL",
+				  .m_Description =
+					  "Builds the roughness mip chain used for specular image-based lighting.",
+				  .m_Category = RenderPassCategory::IBL,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
-		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer, RHIFormat renderTargetFormat) noexcept;
+		RHIPipelineHandle GetOrCreatePSO(
+			const Renderer& renderer, RHIFormat renderTargetFormat) noexcept;
 
 	private:
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};

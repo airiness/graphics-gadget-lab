@@ -14,14 +14,11 @@ namespace gglab
 
 		constexpr RHIFencePoint() noexcept = default;
 		constexpr RHIFencePoint(RHIFenceHandle fence, uint64_t value) noexcept :
-			m_Fence(fence),
-			m_Value(value)
-		{}
-
-		[[nodiscard]] bool IsValid() const noexcept
+			m_Fence(fence), m_Value(value)
 		{
-			return m_Fence.IsValid() && m_Value != 0;
 		}
+
+		[[nodiscard]] bool IsValid() const noexcept { return m_Fence.IsValid() && m_Value != 0; }
 
 		constexpr void Reset() noexcept
 		{
@@ -29,10 +26,7 @@ namespace gglab
 			m_Value = 0;
 		}
 
-		[[nodiscard]] constexpr auto AsTuple() const noexcept
-		{
-			return std::tie(m_Fence, m_Value);
-		}
+		[[nodiscard]] constexpr auto AsTuple() const noexcept { return std::tie(m_Fence, m_Value); }
 
 		explicit operator bool() const noexcept { return IsValid(); }
 

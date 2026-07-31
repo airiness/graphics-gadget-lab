@@ -110,14 +110,14 @@ namespace gglab
 
 			[[nodiscard]] std::span<const Vertex> GetVertices() const noexcept
 			{
-				return m_ModelSource.m_Owner ? m_ModelSource.GetVertices() :
-					std::span<const Vertex>(m_VerticesData);
+				return m_ModelSource.m_Owner ? m_ModelSource.GetVertices()
+					: std::span<const Vertex>(m_VerticesData);
 			}
 
 			[[nodiscard]] std::span<const uint32_t> GetIndices() const noexcept
 			{
-				return m_ModelSource.m_Owner ? m_ModelSource.GetIndices() :
-					std::span<const uint32_t>(m_IndicesData);
+				return m_ModelSource.m_Owner ? m_ModelSource.GetIndices()
+					: std::span<const uint32_t>(m_IndicesData);
 			}
 
 			void ReleaseBorrowedSource() noexcept { m_ModelSource.Reset(); }
@@ -128,11 +128,9 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetManager);
 		~AssetManager();
 
-		[[nodiscard]] ModelLoadRequest LoadModelAsync(
-			const std::filesystem::path& path,
+		[[nodiscard]] ModelLoadRequest LoadModelAsync(const std::filesystem::path& path,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
-		[[nodiscard]] TextureLoadRequest LoadTextureAsync(
-			const std::filesystem::path& path,
+		[[nodiscard]] TextureLoadRequest LoadTextureAsync(const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 		[[nodiscard]] AssetOwnerScope CreateOwnerScope() noexcept;
@@ -144,10 +142,7 @@ namespace gglab
 		// Terminal owner-thread transition. Requires task/upload producers to be
 		// stopped and the RHI context to be idle.
 		void PrepareForShutdown(const RHIFencePoint& lastSubmittedFence) noexcept;
-		[[nodiscard]] bool IsAcceptingCommands() const noexcept
-		{
-			return m_AcceptingCommands;
-		}
+		[[nodiscard]] bool IsAcceptingCommands() const noexcept { return m_AcceptingCommands; }
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
 		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
 		{
@@ -159,14 +154,11 @@ namespace gglab
 		void MarkMeshUsed(MeshID meshId) noexcept;
 		void MarkTextureUsed(TextureID textureId) noexcept;
 		[[nodiscard]] bool SetModelResidencyPolicy(
-			ModelID modelId,
-			AssetResidencyPolicy policy) noexcept;
+			ModelID modelId, AssetResidencyPolicy policy) noexcept;
 		[[nodiscard]] bool SetMeshResidencyPolicy(
-			MeshID meshId,
-			AssetResidencyPolicy policy) noexcept;
+			MeshID meshId, AssetResidencyPolicy policy) noexcept;
 		[[nodiscard]] bool SetTextureResidencyPolicy(
-			TextureID textureId,
-			AssetResidencyPolicy policy) noexcept;
+			TextureID textureId, AssetResidencyPolicy policy) noexcept;
 		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
 		[[nodiscard]] std::optional<AssetContentFingerprint> GetTextureContentFingerprint(
 			TextureContentRef content) const noexcept;
@@ -174,13 +166,16 @@ namespace gglab
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
 			TextureContentRef content) const noexcept;
-		[[nodiscard]] TextureArtifactCacheStatistics GetTextureArtifactCacheStatistics() const noexcept;
+		[[nodiscard]] TextureArtifactCacheStatistics GetTextureArtifactCacheStatistics()
+			const noexcept;
 		void ClearTextureArtifactCache() noexcept;
-		[[nodiscard]] ModelImportArtifactCacheStatistics GetModelImportArtifactCacheStatistics() const noexcept;
+		[[nodiscard]] ModelImportArtifactCacheStatistics GetModelImportArtifactCacheStatistics()
+			const noexcept;
 		void ClearModelImportArtifactCache() noexcept;
-		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept;
+		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics()
+			const noexcept;
 		[[nodiscard]] TextureDerivedDataCoordinatorStatistics
-		GetTextureDerivedDataCoordinatorStatistics() const noexcept;
+			GetTextureDerivedDataCoordinatorStatistics() const noexcept;
 		[[nodiscard]] bool ClearTextureDerivedDataCache() noexcept;
 
 		const Mesh* GetMesh(MeshID meshId) const noexcept;
@@ -190,60 +185,45 @@ namespace gglab
 		const Model* GetModel(ModelID modelId) const noexcept;
 
 		MeshID AddProceduralMesh(
-			std::unique_ptr<Mesh>&& mesh,
-			MeshUploadData& meshUploadData) noexcept;
+			std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept;
 		MaterialID AddProceduralMaterial(std::unique_ptr<Material>&& material) noexcept;
 		ModelID AddProceduralModel(std::unique_ptr<Model>&& model) noexcept;
 
-		uint32_t ResolveSrvIndex(TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
+		uint32_t ResolveSrvIndex(
+			TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
 
 	private:
 		[[nodiscard]] Mesh* EditMesh(MeshID meshId) noexcept;
 		[[nodiscard]] Model* EditModel(ModelID modelId) noexcept;
 		MaterialID AddMaterial(std::unique_ptr<Material>&& material) noexcept;
-		[[nodiscard]] bool UploadMesh(
-			MeshUploadData& uploadData,
-			TransferBatch& transferBatch,
+		[[nodiscard]] bool UploadMesh(MeshUploadData& uploadData, TransferBatch& transferBatch,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
-		bool QueueMeshUpload(
-			MeshUploadData&& uploadData,
+		bool QueueMeshUpload(MeshUploadData&& uploadData,
 			TaskPriority priority = TaskPriority::Normal,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
-		void CompleteMeshUpload(
-			MeshID meshId,
-			bool succeeded,
+		void CompleteMeshUpload(MeshID meshId, bool succeeded,
 			AssetResidencyOperation residencyOperation = {}) noexcept;
 		bool RemoveMesh(MeshID meshId) noexcept;
 		bool RemoveMaterial(MaterialID materialId) noexcept;
 		void RollbackPublicationMesh(MeshID meshId, uint64_t generation) noexcept;
 		[[nodiscard]] std::unique_ptr<AssetPublicationServicesBase>
 			CreateModelPublicationServices() noexcept;
-		void RouteModelImportCompletion(
-			AssetOperationToken operation,
-			const TaskCompletionInfo& completion,
+		void RouteModelImportCompletion(AssetOperationToken operation,
+			const TaskCompletionInfo& completion, ModelImportArtifactHandle artifact) noexcept;
+		void RouteMeshReloadCompletion(AssetOperationToken operation,
+			const TaskCompletionInfo& completion, ModelImportArtifactHandle artifact) noexcept;
+		void CompleteModelLoad(AssetOperationToken operation, const TaskCompletionInfo& completion,
 			ModelImportArtifactHandle artifact) noexcept;
-		void RouteMeshReloadCompletion(
-			AssetOperationToken operation,
-			const TaskCompletionInfo& completion,
-			ModelImportArtifactHandle artifact) noexcept;
-		void CompleteModelLoad(
-			AssetOperationToken operation,
-			const TaskCompletionInfo& completion,
-			ModelImportArtifactHandle artifact) noexcept;
-		void CompleteMeshReload(
-			AssetOperationToken operation,
-			const TaskCompletionInfo& completion,
+		void CompleteMeshReload(AssetOperationToken operation, const TaskCompletionInfo& completion,
 			ModelImportArtifactHandle artifact) noexcept;
 
 		MeshID CreateMesh() noexcept;
-		ModelID CreateModel(
-			const std::filesystem::path& canonicalPath,
+		ModelID CreateModel(const std::filesystem::path& canonicalPath,
 			AssetState initialState = AssetState::LoadingCpu) noexcept;
 
 		ModelID FindModel(const std::filesystem::path& canonicalPath) const noexcept;
 		bool DetachTerminalModelPath(
-			const std::filesystem::path& canonicalPath,
-			ModelID modelId) noexcept;
+			const std::filesystem::path& canonicalPath, ModelID modelId) noexcept;
 		bool RefreshModelState(ModelID modelId) noexcept;
 		void CancelModelIfUnreferenced(ModelID modelId, uint64_t generation) noexcept;
 		void CancelMeshIfUnreferenced(MeshID meshId, uint64_t generation) noexcept;
@@ -266,91 +246,59 @@ namespace gglab
 
 		AssetOwnerId RegisterAssetOwner() noexcept;
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
-		AssetLease AcquireAssetLease(
-			AssetOwnerId owner,
-			AssetKind kind,
-			uint64_t stableId,
-			uint64_t generation,
-			TaskPriority priority) noexcept;
+		AssetLease AcquireAssetLease(AssetOwnerId owner, AssetKind kind, uint64_t stableId,
+			uint64_t generation, TaskPriority priority) noexcept;
 		void ReleaseAssetLease(uint64_t leaseToken) noexcept;
 		void UpdateAssetLeasePriority(uint64_t leaseToken, TaskPriority priority) noexcept;
 		[[nodiscard]] AssetPublicationRetain AcquirePublicationRetain(
-			AssetKind kind,
-			uint64_t stableId,
-			uint64_t generation) noexcept;
+			AssetKind kind, uint64_t stableId, uint64_t generation) noexcept;
 		void ReleasePublicationRetain(
-			AssetKind kind,
-			uint64_t stableId,
-			uint64_t generation) noexcept;
-		[[nodiscard]] bool HasPublicationRetain(
-			AssetKey key,
-			uint64_t generation) const noexcept;
+			AssetKind kind, uint64_t stableId, uint64_t generation) noexcept;
+		[[nodiscard]] bool HasPublicationRetain(AssetKey key, uint64_t generation) const noexcept;
 		void HandleInterestChange(const AssetInterestChange& change) noexcept;
 		void ApplyInterestPriority(
-			AssetKey key,
-			uint64_t generation,
-			TaskPriority priority) noexcept;
-		void CancelAssetIfUnreferenced(
-			AssetKey key,
-			uint64_t generation) noexcept;
+			AssetKey key, uint64_t generation, TaskPriority priority) noexcept;
+		void CancelAssetIfUnreferenced(AssetKey key, uint64_t generation) noexcept;
 		void QueueRuntimeRetirement(AssetContentVersion contentVersion) noexcept;
 		void CancelRuntimeRetirement(AssetContentVersion contentVersion) noexcept;
 		void FinalizeRuntimeRetirements() noexcept;
-		[[nodiscard]] bool RetireRuntimeEntry(
-			AssetContentVersion contentVersion) noexcept;
+		[[nodiscard]] bool RetireRuntimeEntry(AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] TaskPriority GetEffectivePriority(
-			AssetKey key,
-			TaskPriority fallback = TaskPriority::Normal) const noexcept;
+			AssetKey key, TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept;
 		[[nodiscard]] bool HasPinnedDependentModel(
-			AssetKind kind,
-			uint64_t stableId,
-			uint64_t generation) const noexcept;
+			AssetKind kind, uint64_t stableId, uint64_t generation) const noexcept;
 		void FinalizeResidencyEvictions() noexcept;
 		void TickResidencyPhase() noexcept;
-		[[nodiscard]] AssetResidencyInventorySnapshot
-			BuildResidencyInventorySnapshot() const noexcept;
+		[[nodiscard]] AssetResidencyInventorySnapshot BuildResidencyInventorySnapshot()
+			const noexcept;
 		[[nodiscard]] bool BuildResidencyInventoryEntry(
-			AssetKey key,
-			AssetResidencyInventoryEntry& entry) const noexcept;
+			AssetKey key, AssetResidencyInventoryEntry& entry) const noexcept;
 		[[nodiscard]] AssetLifecycle* FindResidencyLifecycle(AssetKey key) noexcept;
 		[[nodiscard]] bool ApplyResidencyAction(
-			const AssetResidencyAction& action,
-			uint64_t projectedResidentBytes) noexcept;
+			const AssetResidencyAction& action, uint64_t projectedResidentBytes) noexcept;
 		void ApplyResidencyPlan(const AssetResidencyPlan& plan) noexcept;
 		void RequestModelResidency(ModelID modelId, uint64_t generation) noexcept;
 		[[nodiscard]] TaskHandle RequestTextureResidency(
-			TextureID textureId,
-			uint64_t generation,
-			TaskPriority priority) noexcept;
+			TextureID textureId, uint64_t generation, TaskPriority priority) noexcept;
 		void RequestMeshResidency(
-			MeshID meshId,
-			uint64_t generation,
-			TaskPriority priority) noexcept;
-		void QueueMeshResidencyReload(
-			ModelID sourceModelId,
-			TaskPriority priority) noexcept;
-		void SetMeshState(
-			Mesh& mesh,
-			AssetState state,
+			MeshID meshId, uint64_t generation, TaskPriority priority) noexcept;
+		void QueueMeshResidencyReload(ModelID sourceModelId, TaskPriority priority) noexcept;
+		void SetMeshState(Mesh& mesh, AssetState state,
 			AssetResidencyOperation residencyOperation = {},
 			AssetStateEventOperationPhase operationPhase =
-				AssetStateEventOperationPhase::None) noexcept;
+			AssetStateEventOperationPhase::None) noexcept;
 		void RegisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
 		void UnregisterModelDependencies(ModelID modelId, uint64_t generation) noexcept;
-		void QueueDependencyStateChange(
-			AssetContentVersion contentVersion,
-			AssetContentState contentState,
-			AssetResidencyState residencyState,
+		void QueueDependencyStateChange(AssetContentVersion contentVersion,
+			AssetContentState contentState, AssetResidencyState residencyState,
 			std::optional<AssetOperationToken> operation = std::nullopt,
 			AssetStateEventOperationPhase operationPhase =
-				AssetStateEventOperationPhase::None) noexcept;
+			AssetStateEventOperationPhase::None) noexcept;
 		[[nodiscard]] ModelDependencyOutcome EvaluateModelDependenciesByTraversal(
 			const Model& model) const noexcept;
 		void VerifyModelDependencyState(
-			ModelID modelId,
-			uint64_t generation,
-			ModelDependencyOutcome traversalOutcome) noexcept;
+			ModelID modelId, uint64_t generation, ModelDependencyOutcome traversalOutcome) noexcept;
 
 	public:
 		static void ComputeMeshBounds(Mesh& mesh, std::span<const Vertex> vertices) noexcept;
@@ -364,7 +312,8 @@ namespace gglab
 
 		[[nodiscard]] std::vector<TextureAssetReadInfo> GetTextureAssetReadInfos() const;
 
-		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot, const MaterialTextureBinding& binding) noexcept;
+		static void SetMaterialTexture(Material& material, MaterialTextureSlot slot,
+			const MaterialTextureBinding& binding) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -423,15 +372,10 @@ namespace gglab
 	private:
 		friend class AssetManager;
 		AssetPublicationRetain(
-			AssetManager* manager,
-			AssetKind kind,
-			uint64_t stableId,
-			uint64_t generation) noexcept :
-			m_Manager(manager),
-			m_Kind(kind),
-			m_StableId(stableId),
-			m_Generation(generation)
-		{}
+			AssetManager* manager, AssetKind kind, uint64_t stableId, uint64_t generation) noexcept :
+			m_Manager(manager), m_Kind(kind), m_StableId(stableId), m_Generation(generation)
+		{
+		}
 
 		AssetManager* m_Manager = nullptr;
 		AssetKind m_Kind = AssetKind::Model;
@@ -456,9 +400,9 @@ namespace gglab
 		friend class AssetManager;
 		friend class AssetManagerPublicationServices;
 		AssetLease(AssetManager* manager, uint64_t leaseToken) noexcept :
-			m_Manager(manager),
-			m_LeaseToken(leaseToken)
-		{}
+			m_Manager(manager), m_LeaseToken(leaseToken)
+		{
+		}
 
 		AssetManager* m_Manager = nullptr;
 		uint64_t m_LeaseToken = 0;
@@ -482,15 +426,15 @@ namespace gglab
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
 		[[nodiscard]] bool RetainTexture(
-			TextureContentRef content,
-			TaskPriority priority = TaskPriority::High) noexcept;
+			TextureContentRef content, TaskPriority priority = TaskPriority::High) noexcept;
 		void Reset() noexcept;
+
 	private:
 		friend class AssetManager;
 		AssetOwnerScope(AssetManager* manager, AssetOwnerId owner) noexcept :
-			m_Manager(manager),
-			m_Owner(owner)
-		{}
+			m_Manager(manager), m_Owner(owner)
+		{
+		}
 
 		AssetManager* m_Manager = nullptr;
 		AssetOwnerId m_Owner{};

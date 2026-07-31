@@ -6,7 +6,8 @@ namespace gglab
 	ModelImportArtifactCache::ModelImportArtifactCache(
 		const ModelImportArtifactCacheConfig& config) noexcept :
 		m_Core(config.m_BudgetBytes)
-	{}
+	{
+	}
 
 	ModelImportArtifactHandle ModelImportArtifactCache::Admit(
 		ModelImportArtifactHandle artifact) noexcept

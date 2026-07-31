@@ -117,6 +117,6 @@ namespace gglab
 		uint32_t DepthConvention;
 	};
 	static_assert(sizeof(ViewGPU) == 304);
-	static constexpr uint32_t MaxViewCapacity = 
+	static constexpr uint32_t MaxViewCapacity =
 		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;
 }

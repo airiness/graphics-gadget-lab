@@ -17,10 +17,10 @@ namespace gglab
 
 	namespace
 	{
-		template<class T>
-		[[nodiscard]] std::string DigestText(const T& digest, size_t byteCount)
+		template <class T> [[nodiscard]] std::string DigestText(const T& digest, size_t byteCount)
 		{
-			if (!digest.IsValid()) return {};
+			if (!digest.IsValid())
+				return {};
 			constexpr char HexDigits[] = "0123456789abcdef";
 			const size_t count = std::min(byteCount, digest.m_Value.size());
 			std::string result(count * 2, '0');
@@ -41,16 +41,14 @@ namespace gglab
 		return key;
 	}
 
-	DerivedDataKey BuildTextureDerivedDataKey(
-		const SourceDigest& sourceDigest,
+	DerivedDataKey BuildTextureDerivedDataKey(const SourceDigest& sourceDigest,
 		const std::filesystem::path& sourceIdentity,
 		const TextureImportSettings& importSettings) noexcept
 	{
-		if (!sourceDigest.IsValid()) return {};
+		if (!sourceDigest.IsValid())
+			return {};
 		std::string sourceExtension = sourceIdentity.extension().generic_string();
-		std::ranges::transform(
-			sourceExtension,
-			sourceExtension.begin(),
+		std::ranges::transform(sourceExtension, sourceExtension.begin(),
 			[](unsigned char value) noexcept
 			{
 				return static_cast<char>(

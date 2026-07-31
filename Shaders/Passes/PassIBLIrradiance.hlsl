@@ -20,16 +20,17 @@ ConstantBuffer<IBLIrradiancePassParameters> g_Pass : register(b2);
 
 TextureSamplerBindingData GetEnvironmentBinding()
 {
-	return MakeTextureSamplerBinding(uint2(g_Pass.EnvironmentTextureIndex, g_Pass.EnvironmentSamplerIndex));
+	return MakeTextureSamplerBinding(
+		uint2(g_Pass.EnvironmentTextureIndex, g_Pass.EnvironmentSamplerIndex));
 }
 
 float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 normalWS)
 {
 	const uint SAMPLE_COUNT = max(g_Pass.SampleCount, 1u);
-	const float environmentResolution = max((float) g_Pass.EnvironmentResolution, 1.0);
+	const float environmentResolution = max((float)g_Pass.EnvironmentResolution, 1.0);
 	const float environmentTexelSolidAngle =
 		4.0 * PI / (6.0 * environmentResolution * environmentResolution);
-	const float maxEnvironmentMip = (float) (max(g_Pass.EnvironmentMipLevels, 1u) - 1u);
+	const float maxEnvironmentMip = (float)(max(g_Pass.EnvironmentMipLevels, 1u) - 1u);
 	float3 irradiance = 0.0.xxx;
 
 	for (uint i = 0; i < SAMPLE_COUNT; ++i)
@@ -43,7 +44,7 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 		float3 directionWS = TangentToWorld(directionTS, normalWS);
 		float NoL = saturate(directionTS.z);
 		float pdf = NoL * INV_PI;
-		float sampleSolidAngle = 1.0 / max((float) SAMPLE_COUNT * pdf, 1.0e-6);
+		float sampleSolidAngle = 1.0 / max((float)SAMPLE_COUNT * pdf, 1.0e-6);
 		float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
 		sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
 

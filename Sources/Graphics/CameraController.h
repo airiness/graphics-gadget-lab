@@ -51,8 +51,14 @@ namespace gglab
 		float GetSmoothStepT() const noexcept { return m_Params.m_SmoothStepT; }
 
 		void SetMovementSpeed(float value) noexcept { m_Params.m_MovementSpeed = value; }
-		void SetRotationSpeed(float value) noexcept { m_Params.m_MouseSensitivityRadPerCount = value; }
-		void SetAccelerateMultiplier(float value) noexcept { m_Params.m_AccelerateMultiplier = value; }
+		void SetRotationSpeed(float value) noexcept
+		{
+			m_Params.m_MouseSensitivityRadPerCount = value;
+		}
+		void SetAccelerateMultiplier(float value) noexcept
+		{
+			m_Params.m_AccelerateMultiplier = value;
+		}
 		void SetSmoothStepT(float value) noexcept { m_Params.m_SmoothStepT = value; }
 
 		void ResetVelocity() noexcept { m_Velocity = Vector3::Zero; }

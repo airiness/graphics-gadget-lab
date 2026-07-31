@@ -37,15 +37,11 @@ namespace gglab
 		bool m_WasActive = false;
 		bool m_IsActive = false;
 
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_ContentVersion.IsValid();
-		}
+		[[nodiscard]] bool IsValid() const noexcept { return m_ContentVersion.IsValid(); }
 
 		[[nodiscard]] bool EffectivePriorityChanged() const noexcept
 		{
-			return m_WasActive && m_IsActive &&
-				m_PreviousPriority != m_EffectivePriority;
+			return m_WasActive && m_IsActive && m_PreviousPriority != m_EffectivePriority;
 		}
 	};
 
@@ -82,25 +78,18 @@ namespace gglab
 		void UnregisterOwner(AssetOwnerId owner) noexcept;
 
 		[[nodiscard]] AssetLeaseAcquireResult AcquireLease(
-			AssetOwnerId owner,
-			AssetContentVersion contentVersion,
-			TaskPriority priority) noexcept;
-		[[nodiscard]] std::optional<AssetInterestChange> ReleaseLease(
-			uint64_t leaseToken) noexcept;
+			AssetOwnerId owner, AssetContentVersion contentVersion, TaskPriority priority) noexcept;
+		[[nodiscard]] std::optional<AssetInterestChange> ReleaseLease(uint64_t leaseToken) noexcept;
 		[[nodiscard]] std::optional<AssetInterestChange> UpdateLeasePriority(
-			uint64_t leaseToken,
-			TaskPriority priority) noexcept;
+			uint64_t leaseToken, TaskPriority priority) noexcept;
 
-		[[nodiscard]] bool AcquirePublicationRetain(
-			AssetContentVersion contentVersion) noexcept;
+		[[nodiscard]] bool AcquirePublicationRetain(AssetContentVersion contentVersion) noexcept;
 		void ReleasePublicationRetain(AssetContentVersion contentVersion) noexcept;
-		[[nodiscard]] bool HasPublicationRetain(
-			AssetContentVersion contentVersion) const noexcept;
+		[[nodiscard]] bool HasPublicationRetain(AssetContentVersion contentVersion) const noexcept;
 
 		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept;
 		[[nodiscard]] TaskPriority GetEffectivePriority(
-			AssetKey key,
-			TaskPriority fallback = TaskPriority::Normal) const noexcept;
+			AssetKey key, TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] AssetInterestTrackerStatistics GetStatistics() const;
 
 		[[nodiscard]] bool HasOwners() const noexcept { return !m_Owners.empty(); }
@@ -133,17 +122,14 @@ namespace gglab
 		};
 
 		[[nodiscard]] AssetInterestChange RecomputeInterest(
-			AssetKey key,
-			TaskPriority previousPriority,
-			bool wasActive) noexcept;
+			AssetKey key, TaskPriority previousPriority, bool wasActive) noexcept;
 
 		uint64_t m_NextOwnerId = 1;
 		uint64_t m_NextLeaseToken = 1;
 		std::unordered_set<AssetOwnerId, AssetOwnerIdHash> m_Owners;
 		std::unordered_map<uint64_t, LeaseRecord> m_Leases;
 		std::unordered_map<AssetKey, InterestRecord, AssetKeyHash> m_Interests;
-		std::unordered_map<AssetKey, PublicationRetainRecord, AssetKeyHash>
-			m_PublicationRetains;
+		std::unordered_map<AssetKey, PublicationRetainRecord, AssetKeyHash> m_PublicationRetains;
 		uint64_t m_PriorityUpdateCount = 0;
 		uint64_t m_PublicationRetainCount = 0;
 	};

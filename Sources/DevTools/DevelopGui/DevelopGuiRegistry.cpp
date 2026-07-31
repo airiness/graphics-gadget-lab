@@ -213,8 +213,7 @@ namespace gglab
 	{
 		const StringID id(name);
 
-		if (auto iterator = parent.m_ChildrenMap.find(id);
-			iterator != parent.m_ChildrenMap.end())
+		if (auto iterator = parent.m_ChildrenMap.find(id); iterator != parent.m_ChildrenMap.end())
 		{
 			GGLAB_ASSERT(iterator->second->m_Name == name);
 			return iterator->second.get();
@@ -239,10 +238,7 @@ namespace gglab
 
 		// Sort by MenuNode name
 		std::sort(node.m_ChildrenSorted.begin(), node.m_ChildrenSorted.end(),
-			[](const MenuNode* a, const MenuNode* b)
-			{
-				return a->m_Name < b->m_Name;
-			});
+			[](const MenuNode* a, const MenuNode* b) { return a->m_Name < b->m_Name; });
 
 		// Sort panel indices
 		std::sort(node.m_PanelIndices.begin(), node.m_PanelIndices.end(),
@@ -284,8 +280,7 @@ namespace gglab
 	}
 
 	uint64_t DevelopGuiRegistry::MakePanelKey(std::string_view fullPath,
-		std::string_view titleForKey,
-		const std::vector<PanelRuntime>& existingPanels) noexcept
+		std::string_view titleForKey, const std::vector<PanelRuntime>& existingPanels) noexcept
 	{
 		// "path|title"
 		std::string baseInput;
@@ -331,7 +326,8 @@ namespace gglab
 		}
 	}
 
-	std::string DevelopGuiRegistry::MakeImGuiLabeledId(std::string_view display, uint64_t key) noexcept
+	std::string DevelopGuiRegistry::MakeImGuiLabeledId(
+		std::string_view display, uint64_t key) noexcept
 	{
 		std::string labeledId;
 

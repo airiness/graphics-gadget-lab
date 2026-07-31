@@ -19,11 +19,9 @@ namespace gglab
 		RGArenaAllocator(RGArenaAllocator&& other) noexcept;
 		RGArenaAllocator& operator=(RGArenaAllocator&& other) noexcept;
 
-		template<typename T, typename... ARGS>
-		T* Make(ARGS&&... args) noexcept;
+		template <typename T, typename... ARGS> T* Make(ARGS&&... args) noexcept;
 
-		template<typename T, typename... ARGS>
-		T* MakeTracked(ARGS&&... args) noexcept;
+		template <typename T, typename... ARGS> T* MakeTracked(ARGS&&... args) noexcept;
 
 		void Reset() noexcept;
 
@@ -47,8 +45,8 @@ namespace gglab
 		std::vector<DtorEntry> m_DtorEntries;
 	};
 
-	template<typename T, typename... ARGS>
-	inline T* RGArenaAllocator::Make(ARGS&&...args) noexcept
+	template <typename T, typename... ARGS>
+	inline T* RGArenaAllocator::Make(ARGS&&... args) noexcept
 	{
 		void* mem = AllocateBytes(sizeof(T), alignof(T));
 
@@ -56,7 +54,7 @@ namespace gglab
 		return ::new (mem) T(std::forward<ARGS>(args)...);
 	}
 
-	template<typename T, typename... ARGS>
+	template <typename T, typename... ARGS>
 	inline T* RGArenaAllocator::MakeTracked(ARGS&&... args) noexcept
 	{
 		void* mem = AllocateBytes(sizeof(T), alignof(T));

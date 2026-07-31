@@ -11,11 +11,9 @@ namespace gglab
 {
 	class Camera;
 
-	template<RenderViewID ViewId>
-	struct RenderViewBuildInfo;
+	template <RenderViewID ViewId> struct RenderViewBuildInfo;
 
-	template<RenderViewID ViewId>
-	struct RenderViewBuildTraits;
+	template <RenderViewID ViewId> struct RenderViewBuildTraits;
 
 	struct RenderView
 	{
@@ -46,23 +44,18 @@ namespace gglab
 	class RenderViewBuilder
 	{
 	public:
-		RenderView BuildDebugCameraView(
-			RenderViewID viewId,
-			const Camera& camera,
-			const ResolvedViewRenderSettings& renderSettings,
-			uint32_t width,
-			uint32_t height,
+		RenderView BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
+			const ResolvedViewRenderSettings& renderSettings, uint32_t width, uint32_t height,
 			StringID name) const noexcept;
 
-		template<RenderViewID ViewId>
+		template <RenderViewID ViewId>
 		RenderView Build(const RenderViewBuildInfo<ViewId>& info) const noexcept
 		{
 			return RenderViewBuildTraits<ViewId>::Build(info);
 		}
 	};
 
-	template<>
-	struct RenderViewBuildInfo<RenderViewID::Main>
+	template <> struct RenderViewBuildInfo<RenderViewID::Main>
 	{
 		const Camera& m_Camera;
 		const ResolvedViewRenderSettings& m_RenderSettings;
@@ -71,8 +64,7 @@ namespace gglab
 		StringID m_Name = StringID("MainView");
 	};
 
-	template<>
-	struct RenderViewBuildInfo<RenderViewID::DirectionalShadow>
+	template <> struct RenderViewBuildInfo<RenderViewID::DirectionalShadow>
 	{
 		const RenderView& m_MainView;
 		Vector3 m_LightDirection = -Vector3::UnitY;
@@ -84,15 +76,14 @@ namespace gglab
 		StringID m_Name = StringID("DirectionalShadowView");
 	};
 
-	template<>
-	struct RenderViewBuildTraits<RenderViewID::Main>
+	template <> struct RenderViewBuildTraits<RenderViewID::Main>
 	{
 		static RenderView Build(const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept;
 	};
 
-	template<>
-	struct RenderViewBuildTraits<RenderViewID::DirectionalShadow>
+	template <> struct RenderViewBuildTraits<RenderViewID::DirectionalShadow>
 	{
-		static RenderView Build(const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
+		static RenderView Build(
+			const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
 	};
 }

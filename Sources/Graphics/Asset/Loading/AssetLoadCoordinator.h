@@ -80,13 +80,8 @@ namespace gglab
 		AssetResidencyOperation m_ResidencyOperation{};
 	};
 
-	using AssetLoadCompletion = std::variant<
-		ModelImportSucceeded,
-		ModelImportFailed,
-		MeshReloadSucceeded,
-		MeshReloadFailed,
-		TextureDecodeSucceeded,
-		TextureDecodeFailed>;
+	using AssetLoadCompletion = std::variant<ModelImportSucceeded, ModelImportFailed,
+		MeshReloadSucceeded, MeshReloadFailed, TextureDecodeSucceeded, TextureDecodeFailed>;
 
 	struct ModelImportRequest
 	{
@@ -136,39 +131,28 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetLoadCoordinator);
 		~AssetLoadCoordinator();
 
-		[[nodiscard]] AssetLoadSubmission SubmitModelImport(
-			ModelImportRequest request) noexcept;
-		[[nodiscard]] AssetLoadSubmission SubmitMeshReload(
-			MeshReloadRequest request) noexcept;
+		[[nodiscard]] AssetLoadSubmission SubmitModelImport(ModelImportRequest request) noexcept;
+		[[nodiscard]] AssetLoadSubmission SubmitMeshReload(MeshReloadRequest request) noexcept;
 		[[nodiscard]] AssetLoadSubmission SubmitTextureDecode(
 			TextureDecodeRequest request) noexcept;
 
 		[[nodiscard]] TaskHandle GetModelImportTask(
 			AssetContentVersion contentVersion) const noexcept;
-		[[nodiscard]] bool HasMeshReload(
-			AssetContentVersion sourceModelVersion) const noexcept;
+		[[nodiscard]] bool HasMeshReload(AssetContentVersion sourceModelVersion) const noexcept;
 		[[nodiscard]] TaskHandle GetTextureDecodeTask(
 			AssetContentVersion contentVersion) const noexcept;
-		[[nodiscard]] bool CancelModelImport(
-			AssetContentVersion contentVersion) noexcept;
+		[[nodiscard]] bool CancelModelImport(AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] bool UpdateModelImportPriority(
-			AssetContentVersion contentVersion,
-			TaskPriority priority) noexcept;
+			AssetContentVersion contentVersion, TaskPriority priority) noexcept;
 		[[nodiscard]] bool UpdateMeshReloadPriority(
-			AssetContentVersion sourceModelVersion,
-			TaskPriority priority) noexcept;
-		[[nodiscard]] bool CancelTextureDecode(
-			AssetContentVersion contentVersion) noexcept;
+			AssetContentVersion sourceModelVersion, TaskPriority priority) noexcept;
+		[[nodiscard]] bool CancelTextureDecode(AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] bool UpdateTextureDecodePriority(
-			AssetContentVersion contentVersion,
-			TaskPriority priority) noexcept;
+			AssetContentVersion contentVersion, TaskPriority priority) noexcept;
 
-		[[nodiscard]] bool IsCurrentModelImport(
-			AssetOperationToken operation) const noexcept;
-		[[nodiscard]] bool IsCurrentMeshReload(
-			AssetOperationToken operation) const noexcept;
-		[[nodiscard]] bool IsCurrentTextureDecode(
-			AssetOperationToken operation) const noexcept;
+		[[nodiscard]] bool IsCurrentModelImport(AssetOperationToken operation) const noexcept;
+		[[nodiscard]] bool IsCurrentMeshReload(AssetOperationToken operation) const noexcept;
+		[[nodiscard]] bool IsCurrentTextureDecode(AssetOperationToken operation) const noexcept;
 		void CompleteModelImport(AssetOperationToken operation) noexcept;
 		void CompleteMeshReload(AssetOperationToken operation) noexcept;
 		void CompleteTextureDecode(AssetOperationToken operation) noexcept;
@@ -177,12 +161,13 @@ namespace gglab
 
 		void DrainCompletions(std::vector<AssetLoadCompletion>& output) noexcept;
 		[[nodiscard]] bool HasActiveOperations() const noexcept;
-		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics() const noexcept
+		[[nodiscard]] LocalDerivedDataStoreStatistics GetTextureDerivedDataStatistics()
+			const noexcept
 		{
 			return m_TextureDerivedDataSystem.GetStoreStatistics();
 		}
 		[[nodiscard]] TextureDerivedDataCoordinatorStatistics
-		GetTextureDerivedDataCoordinatorStatistics() const noexcept
+			GetTextureDerivedDataCoordinatorStatistics() const noexcept
 		{
 			return m_TextureDerivedDataSystem.GetCoordinatorStatistics();
 		}
@@ -208,17 +193,13 @@ namespace gglab
 			TaskPriority m_Priority = TaskPriority::Normal;
 		};
 
-		using OperationMap =
-			std::unordered_map<AssetKey, OperationRecord, AssetKeyHash>;
+		using OperationMap = std::unordered_map<AssetKey, OperationRecord, AssetKeyHash>;
 
 		[[nodiscard]] AssetOperationToken AllocateOperation(
 			AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] static bool Matches(
-			const OperationMap& operations,
-			AssetOperationToken operation) noexcept;
-		static void Complete(
-			OperationMap& operations,
-			AssetOperationToken operation) noexcept;
+			const OperationMap& operations, AssetOperationToken operation) noexcept;
+		static void Complete(OperationMap& operations, AssetOperationToken operation) noexcept;
 
 		TaskSystem* m_TaskSystem = nullptr;
 		ModelImportArtifactCache* m_ModelImportArtifactCache = nullptr;

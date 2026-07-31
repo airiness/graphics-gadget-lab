@@ -37,9 +37,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassIBLEnvironmentMipChain::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassIBLEnvironmentMipChain::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
 
@@ -61,14 +60,16 @@ namespace gglab
 		}
 
 		EnsureInitialized(services);
-		const uint32_t sourceSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-			SamplerPreset::LinearClamp);
+		const uint32_t sourceSamplerIndex =
+			renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
 
 		for (uint32_t mipLevel = 1; mipLevel < textureDesc->m_MipLevels; ++mipLevel)
 		{
 			const std::string passName = MakeRenderGraphPassName(std::to_string(mipLevel));
-			rg.AddPass<PassData>(passName.c_str(),
-				[renderResRegistry, mipLevel, sourceSamplerIndex](RenderGraph::RGBuilder& builder, PassData& data)
+			rg.AddPass<PassData>(
+				passName.c_str(),
+				[renderResRegistry, mipLevel, sourceSamplerIndex](
+					RenderGraph::RGBuilder& builder, PassData& data)
 				{
 					builder.SideEffect();
 
@@ -85,9 +86,7 @@ namespace gglab
 						.m_Aspects = RHITextureAspect::Color,
 					};
 					data.m_SourceEnvironmentCubemap = builder.Read(
-						iblRes.m_BakeEnvironmentCubemap,
-						RGTextureAccess::Sample,
-						sourceRange);
+						iblRes.m_BakeEnvironmentCubemap, RGTextureAccess::Sample, sourceRange);
 
 					const RHISubresourceRange targetRange{
 						.m_BaseMip = mipLevel,
@@ -96,10 +95,8 @@ namespace gglab
 						.m_ArraySliceCount = CubemapFaceCount,
 						.m_Aspects = RHITextureAspect::Color,
 					};
-					builder.WriteInPlace(
-						iblRes.m_BakeEnvironmentCubemap,
-						RGTextureAccess::RenderTarget,
-						targetRange);
+					builder.WriteInPlace(iblRes.m_BakeEnvironmentCubemap,
+						RGTextureAccess::RenderTarget, targetRange);
 					data.m_EnvironmentCubemap = iblRes.m_BakeEnvironmentCubemap;
 
 					RHITextureViewDesc sourceSrvDesc{};
@@ -108,15 +105,14 @@ namespace gglab
 					sourceSrvDesc.m_Format = desc->m_Format;
 					sourceSrvDesc.m_Subresources = sourceRange;
 					data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
-						data.m_SourceEnvironmentCubemap,
-						sourceSrvDesc);
+						data.m_SourceEnvironmentCubemap, sourceSrvDesc);
 
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 					{
-						const auto rtvDesc = MakeRHITexture2DArrayViewDesc(desc->m_Format, mipLevel, face, 1);
+						const auto rtvDesc =
+							MakeRHITexture2DArrayViewDesc(desc->m_Format, mipLevel, face, 1);
 						data.m_Rtvs[face] = builder.CreateView<RHITextureViewType::RenderTarget>(
-							data.m_EnvironmentCubemap,
-							rtvDesc);
+							data.m_EnvironmentCubemap, rtvDesc);
 					}
 
 					data.m_Width = std::max(1u, desc->m_Extent.m_Width >> mipLevel);
@@ -125,19 +121,25 @@ namespace gglab
 					data.m_IsLastMip = mipLevel + 1u == desc->m_MipLevels;
 					data.m_RenderTargetFormat = desc->m_Format;
 				},
-				[this, renderer, bakeScheduler, bakeGeneration](RGExecuteContext& executeContext, PassData& data)
+				[this, renderer, bakeScheduler, bakeGeneration](
+					RGExecuteContext& executeContext, PassData& data)
 				{
 					auto* commandContext = executeContext.GetGraphicsCommandContext();
-					commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
-					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+					commandContext->SetPipeline(
+						GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
+					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+						static_cast<float>(data.m_Height) });
+					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+						static_cast<int32_t>(data.m_Height) });
 
 					const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
-					GGLAB_ASSERT_MSG(sourceSrv.IsValid(), "Environment mip source SRV must be shader visible.");
+					GGLAB_ASSERT_MSG(
+						sourceSrv.IsValid(), "Environment mip source SRV must be shader visible.");
 					for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 					{
 						const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[face]);
-						commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
+						commandContext->SetRenderTargets(
+							std::span<const RHITextureViewHandle>(&rtv, 1));
 						commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 						const IBLEnvironmentMipPassParameters passParameters{
@@ -154,14 +156,14 @@ namespace gglab
 					if (data.m_IsLastMip)
 					{
 						bakeScheduler->NotifyStageExecuted(
-							IBLBakeStage::EnvironmentMipChain,
-							bakeGeneration);
+							IBLBakeStage::EnvironmentMipChain, bakeGeneration);
 					}
 				});
 		}
 	}
 
-	void RenderPassIBLEnvironmentMipChain::EnsureInitialized(const RenderServices& services) noexcept
+	void RenderPassIBLEnvironmentMipChain::EnsureInitialized(
+		const RenderServices& services) noexcept
 	{
 		if (m_IsInitialized)
 		{
@@ -201,8 +203,7 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassIBLEnvironmentMipChain::GetOrCreatePSO(
-		const Renderer& renderer,
-		RHIFormat renderTargetFormat) noexcept
+		const Renderer& renderer, RHIFormat renderTargetFormat) noexcept
 	{
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);

@@ -27,7 +27,10 @@ namespace gglab
 
 		RHICommandContextHandle GetHandle() const noexcept override { return m_Handle; }
 		RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Transfer; }
-		void TrackTextureUse(RHITextureHandle texture) noexcept override { RecordTextureUse(texture); }
+		void TrackTextureUse(RHITextureHandle texture) noexcept override
+		{
+			RecordTextureUse(texture);
+		}
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { RecordBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
@@ -37,16 +40,14 @@ namespace gglab
 		RHIFencePoint Submit(bool wait = false) noexcept override;
 		void Abort() noexcept override;
 		void ReclaimCompleted() noexcept override;
-		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset,
-			RHIBufferHandle src, uint64_t srcOffset,
-			uint64_t numBytes) noexcept override;
-		bool UploadBuffer(const void* data, uint64_t sizeInBytes,
-			RHIBufferHandle dst, uint64_t dstOffset = 0) noexcept override;
-		bool UploadTexture(const RHITextureUploadData& uploadData,
-			RHITextureHandle dst) noexcept override;
+		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset, RHIBufferHandle src,
+			uint64_t srcOffset, uint64_t numBytes) noexcept override;
+		bool UploadBuffer(const void* data, uint64_t sizeInBytes, RHIBufferHandle dst,
+			uint64_t dstOffset = 0) noexcept override;
+		bool UploadTexture(
+			const RHITextureUploadData& uploadData, RHITextureHandle dst) noexcept override;
 		RHITextureReadbackRequest ReadbackTexture(
-			RHITextureHandle src,
-			const RHITextureDesc& desc) noexcept override;
+			RHITextureHandle src, const RHITextureDesc& desc) noexcept override;
 
 	private:
 		struct InFlightInfo
@@ -58,18 +59,12 @@ namespace gglab
 		};
 
 		DX12FencePoint End(bool wait) noexcept;
-		RHIBufferOwner CreateUploadBuffer(
-			uint64_t sizeInBytes,
-			std::string_view owner) noexcept;
-		RHIBufferOwner CreateReadbackBuffer(
-			uint64_t sizeInBytes,
-			std::string_view owner) noexcept;
-		void CopyBuffer(DX12Buffer* dst, uint64_t dstOffset,
-			DX12Buffer* src, uint64_t srcOffset,
+		RHIBufferOwner CreateUploadBuffer(uint64_t sizeInBytes, std::string_view owner) noexcept;
+		RHIBufferOwner CreateReadbackBuffer(uint64_t sizeInBytes, std::string_view owner) noexcept;
+		void CopyBuffer(DX12Buffer* dst, uint64_t dstOffset, DX12Buffer* src, uint64_t srcOffset,
 			uint64_t numBytes) noexcept;
 		bool UploadResource(const std::vector<D3D12_SUBRESOURCE_DATA>& subResources,
-			const DX12Resource* dstResource,
-			std::string_view owner) noexcept;
+			const DX12Resource* dstResource, std::string_view owner) noexcept;
 		void RecordBufferUse(RHIBufferHandle buffer) noexcept;
 		void RecordTextureUse(RHITextureHandle texture) noexcept;
 

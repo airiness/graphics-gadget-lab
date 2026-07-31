@@ -7,9 +7,11 @@ namespace gglab
 {
 	CameraController::CameraController(const CreateInfo& createInfo) noexcept :
 		m_Params(Sanitize(createInfo.m_Params))
-	{}
+	{
+	}
 
-	void CameraController::Update(Camera& camera, const CameraInput& input, float deltaTime) noexcept
+	void CameraController::Update(
+		Camera& camera, const CameraInput& input, float deltaTime) noexcept
 	{
 		if (deltaTime <= 0.0f)
 		{
@@ -20,7 +22,8 @@ namespace gglab
 		if (input.m_IsMouseRelative)
 		{
 			const float yawDelta = input.m_MouseDelta.m_X * m_Params.m_MouseSensitivityRadPerCount;
-			const float pitchDelta = (-input.m_MouseDelta.m_Y) * m_Params.m_MouseSensitivityRadPerCount;
+			const float pitchDelta =
+				(-input.m_MouseDelta.m_Y) * m_Params.m_MouseSensitivityRadPerCount;
 
 			camera.SetYawPitch(camera.GetYaw() + yawDelta, camera.GetPitch() + pitchDelta);
 		}
@@ -38,9 +41,7 @@ namespace gglab
 
 		// Desired direction
 		Vector3 desiredDir =
-			right * moveIntent.m_X +
-			worldUp * moveIntent.m_Y +
-			forwardXZ * moveIntent.m_Z;
+			right * moveIntent.m_X + worldUp * moveIntent.m_Y + forwardXZ * moveIntent.m_Z;
 
 		// Normalize desiredDir
 		desiredDir = math::SafeNormalize(desiredDir, Vector3::Zero);
@@ -89,14 +90,32 @@ namespace gglab
 		float y = 0.0f;
 		float z = 0.0f;
 
-		if (input.m_Right) { x += 1.0f; }
-		if (input.m_Left) { x -= 1.0f; }
+		if (input.m_Right)
+		{
+			x += 1.0f;
+		}
+		if (input.m_Left)
+		{
+			x -= 1.0f;
+		}
 
-		if (input.m_Up) { y += 1.0f; }
-		if (input.m_Down) { y -= 1.0f; }
+		if (input.m_Up)
+		{
+			y += 1.0f;
+		}
+		if (input.m_Down)
+		{
+			y -= 1.0f;
+		}
 
-		if (input.m_Front) { z += 1.0f; }
-		if (input.m_Back) { z -= 1.0f; }
+		if (input.m_Front)
+		{
+			z += 1.0f;
+		}
+		if (input.m_Back)
+		{
+			z -= 1.0f;
+		}
 
 		return Vector3(x, y, z);
 	}

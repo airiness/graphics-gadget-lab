@@ -4,8 +4,7 @@
 
 namespace gglab
 {
-	EnvironmentAssetController::EnvironmentAssetController(
-		const CreateInfo& createInfo) noexcept :
+	EnvironmentAssetController::EnvironmentAssetController(const CreateInfo& createInfo) noexcept :
 		m_AssetManager(createInfo.m_AssetManager),
 		m_EnvironmentLighting(createInfo.m_EnvironmentLighting)
 	{
@@ -18,8 +17,7 @@ namespace gglab
 		Reset();
 	}
 
-	void EnvironmentAssetController::Initialize(
-		const std::filesystem::path& rootDirectory) noexcept
+	void EnvironmentAssetController::Initialize(const std::filesystem::path& rootDirectory) noexcept
 	{
 		Reset();
 		m_Entries.clear();
@@ -35,8 +33,7 @@ namespace gglab
 		}
 
 		for (std::filesystem::directory_iterator iterator(rootDirectory, errorCode), end;
-			iterator != end && !errorCode;
-			iterator.increment(errorCode))
+			iterator != end && !errorCode; iterator.increment(errorCode))
 		{
 			const auto& entry = *iterator;
 			if (!entry.is_regular_file(errorCode) || errorCode ||
@@ -47,21 +44,17 @@ namespace gglab
 			m_Entries.push_back({
 				.m_Path = entry.path(),
 				.m_DisplayName = entry.path().stem().string(),
-			});
+				});
 		}
 
 		if (errorCode)
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"EnvironmentAssetController: failed while scanning '{}': {}.",
-				rootDirectory.string(),
-				errorCode.message());
+			GGLAB_LOG_GRAPHICS_WARN("EnvironmentAssetController: failed while scanning '{}': {}.",
+				rootDirectory.string(), errorCode.message());
 		}
 		std::ranges::sort(m_Entries,
 			[](const EnvironmentMapEntry& lhs, const EnvironmentMapEntry& rhs) noexcept
-			{
-				return lhs.m_Path.generic_string() < rhs.m_Path.generic_string();
-			});
+			{ return lhs.m_Path.generic_string() < rhs.m_Path.generic_string(); });
 
 		if (m_Entries.empty())
 		{
@@ -127,7 +120,8 @@ namespace gglab
 		}
 		if (!ValidateEnvironmentShape(resource->m_Desc))
 		{
-			RejectPending(EnvironmentAssetEntryState::InvalidShape, "texture is not a 2:1 2D environment");
+			RejectPending(
+				EnvironmentAssetEntryState::InvalidShape, "texture is not a 2:1 2D environment");
 			return;
 		}
 		CommitPending();
@@ -182,9 +176,7 @@ namespace gglab
 
 		AssetOwnerScope pendingOwner = m_AssetManager->CreateOwnerScope();
 		const AssetManager::TextureLoadRequest request = pendingOwner.LoadTextureAsync(
-			entry.m_Path,
-			TextureSemantic::Environment,
-			TaskPriority::High);
+			entry.m_Path, TextureSemantic::Environment, TaskPriority::High);
 		if (!request.IsValid())
 		{
 			entry.m_State = EnvironmentAssetEntryState::Failed;
@@ -194,24 +186,23 @@ namespace gglab
 		m_PendingOwner = std::move(pendingOwner);
 		m_PendingSelection = {
 			.m_EntryIndex = entryIndex,
-			.m_Content = {
-				.m_Id = request.m_TextureId,
-				.m_Generation = request.m_Generation,
-			},
+			.m_Content =
+				{
+					.m_Id = request.m_TextureId,
+					.m_Generation = request.m_Generation,
+				},
 			.m_Serial = m_SelectionSerial,
 		};
 		entry.m_Content = m_PendingSelection.m_Content;
 		entry.m_State = EnvironmentAssetEntryState::Loading;
 		GGLAB_LOG_GRAPHICS_INFO(
 			"EnvironmentAssetController: loading environment candidate '{}' (selection {}).",
-			entry.m_Path.string(),
-			m_SelectionSerial);
+			entry.m_Path.string(), m_SelectionSerial);
 		return true;
 	}
 
 	bool EnvironmentAssetController::SelectEnvironmentFile(
-		const std::filesystem::path& path,
-		std::string_view displayName) noexcept
+		const std::filesystem::path& path, std::string_view displayName) noexcept
 	{
 		const auto existing = std::ranges::find(m_Entries, path, &EnvironmentMapEntry::m_Path);
 		if (existing != m_Entries.end())
@@ -221,7 +212,7 @@ namespace gglab
 		m_Entries.push_back({
 			.m_Path = path,
 			.m_DisplayName = displayName.empty() ? path.stem().string() : std::string(displayName),
-		});
+			});
 		return SelectEnvironment(m_Entries.size() - 1);
 	}
 
@@ -232,8 +223,7 @@ namespace gglab
 
 	size_t EnvironmentAssetController::GetPendingEnvironmentIndex() const noexcept
 	{
-		return m_PendingSelection.IsValid() ?
-			m_PendingSelection.m_EntryIndex : InvalidEntryIndex;
+		return m_PendingSelection.IsValid() ? m_PendingSelection.m_EntryIndex : InvalidEntryIndex;
 	}
 
 	void EnvironmentAssetController::CommitFallback() noexcept
@@ -241,10 +231,8 @@ namespace gglab
 		const TextureID fallbackId =
 			ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
 		const TextureContentRef content = m_AssetManager->GetTextureContentRef(fallbackId);
-		const auto contentFingerprint =
-			m_AssetManager->GetTextureContentFingerprint(content);
-		GGLAB_ASSERT_MSG(
-			m_AssetManager->GetResidentTextureResource(content).has_value(),
+		const auto contentFingerprint = m_AssetManager->GetTextureContentFingerprint(content);
+		GGLAB_ASSERT_MSG(m_AssetManager->GetResidentTextureResource(content).has_value(),
 			"Environment fallback cubemap must be resident before controller reset.");
 		if (!content.IsValid() || !contentFingerprint)
 		{
@@ -254,7 +242,7 @@ namespace gglab
 			.m_Content = content,
 			.m_Type = EnvironmentTextureSourceType::Cubemap,
 			.m_ContentFingerprint = *contentFingerprint,
-		});
+			});
 	}
 
 	void EnvironmentAssetController::CommitPending() noexcept
@@ -262,16 +250,13 @@ namespace gglab
 		GGLAB_ASSERT(m_PendingSelection.IsValid());
 		const size_t entryIndex = m_PendingSelection.m_EntryIndex;
 		const TextureContentRef content = m_PendingSelection.m_Content;
-		const auto contentFingerprint =
-			m_AssetManager->GetTextureContentFingerprint(content);
-		GGLAB_ASSERT_MSG(
-			contentFingerprint.has_value(),
+		const auto contentFingerprint = m_AssetManager->GetTextureContentFingerprint(content);
+		GGLAB_ASSERT_MSG(contentFingerprint.has_value(),
 			"A ready environment texture must have decoded-content provenance.");
 		if (!contentFingerprint)
 		{
 			RejectPending(
-				EnvironmentAssetEntryState::Failed,
-				"decoded-content fingerprint unavailable");
+				EnvironmentAssetEntryState::Failed, "decoded-content fingerprint unavailable");
 			return;
 		}
 		AssetOwnerScope oldActive = std::move(m_ActiveOwner);
@@ -286,18 +271,16 @@ namespace gglab
 			.m_Content = content,
 			.m_Type = EnvironmentTextureSourceType::Equirectangular,
 			.m_ContentFingerprint = *contentFingerprint,
-		});
+			});
 
 		// Release the previous source only after the new source and lease are committed.
 		oldActive.Reset();
 		GGLAB_LOG_GRAPHICS_INFO(
-			"EnvironmentAssetController: committed HDR environment '{}'.",
-			entry.m_Path.string());
+			"EnvironmentAssetController: committed HDR environment '{}'.", entry.m_Path.string());
 	}
 
 	void EnvironmentAssetController::RejectPending(
-		EnvironmentAssetEntryState state,
-		std::string_view reason) noexcept
+		EnvironmentAssetEntryState state, std::string_view reason) noexcept
 	{
 		if (m_PendingSelection.m_EntryIndex < m_Entries.size())
 		{
@@ -305,8 +288,7 @@ namespace gglab
 			entry.m_State = state;
 			GGLAB_LOG_GRAPHICS_WARN(
 				"EnvironmentAssetController: rejected environment candidate '{}': {}.",
-				entry.m_Path.string(),
-				reason);
+				entry.m_Path.string(), reason);
 		}
 		m_PendingSelection = {};
 		m_PendingOwner = {};
@@ -315,8 +297,8 @@ namespace gglab
 	bool EnvironmentAssetController::ValidateEnvironmentShape(
 		const RHITextureDesc& desc) const noexcept
 	{
-		return desc.m_Dimension == RHITextureDimension::Texture2D &&
-			desc.m_ArraySize == 1 && desc.m_Extent.m_Depth == 1 &&
+		return desc.m_Dimension == RHITextureDimension::Texture2D && desc.m_ArraySize == 1 &&
+			desc.m_Extent.m_Depth == 1 &&
 			static_cast<uint64_t>(desc.m_Extent.m_Height) * 2u == desc.m_Extent.m_Width;
 	}
 }

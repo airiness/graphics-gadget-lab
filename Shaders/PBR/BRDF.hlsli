@@ -58,16 +58,16 @@ float3 Fd_Lambert(float3 DiffuseColor)
 float3 ImportanceSampleGGX(float2 Xi, float a)
 {
 	float a2 = a * a;
-	
+
 	float phi = 2.0 * PI * Xi.x;
-	
+
 	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a2 - 1.0) * Xi.y));
 	float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
-	
+
 	float3 H;
 	H.x = cos(phi) * sinTheta;
 	H.y = sin(phi) * sinTheta;
 	H.z = cosTheta;
-	
+
 	return H;
 }

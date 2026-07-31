@@ -9,17 +9,20 @@ namespace gglab
 	class RenderPassSkybox : public RenderPassBase
 	{
 	public:
-		RenderPassSkybox() noexcept : RenderPassBase({
-			.m_TypeName = "Background.Skybox",
-			.m_DisplayName = "Skybox",
-			.m_CategoryName = "Lighting",
-			.m_Description = "Renders the active HDR environment only where main-view depth is still background.",
-			.m_Category = RenderPassCategory::Lighting,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
+		RenderPassSkybox() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "Background.Skybox",
+				  .m_DisplayName = "Skybox",
+				  .m_CategoryName = "Lighting",
+				  .m_Description =
+					  "Renders the active HDR environment only where main-view depth is still background.",
+				  .m_Category = RenderPassCategory::Lighting,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:

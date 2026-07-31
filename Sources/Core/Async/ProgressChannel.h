@@ -23,12 +23,8 @@ namespace gglab
 	class ProgressChannel final
 	{
 	public:
-		void Report(
-			float fraction,
-			std::string_view stage,
-			std::string_view detail = {},
-			uint32_t completedUnits = 0,
-			uint32_t totalUnits = 0) noexcept;
+		void Report(float fraction, std::string_view stage, std::string_view detail = {},
+			uint32_t completedUnits = 0, uint32_t totalUnits = 0) noexcept;
 		[[nodiscard]] ProgressSnapshot GetSnapshot() const noexcept;
 
 	private:
@@ -45,16 +41,10 @@ namespace gglab
 	public:
 		ProgressReporter() noexcept = default;
 		explicit ProgressReporter(
-			ProgressChannelPtr channel,
-			float begin = 0.0f,
-			float end = 1.0f) noexcept;
+			ProgressChannelPtr channel, float begin = 0.0f, float end = 1.0f) noexcept;
 
-		void Report(
-			float fraction,
-			std::string_view stage,
-			std::string_view detail = {},
-			uint32_t completedUnits = 0,
-			uint32_t totalUnits = 0) const noexcept;
+		void Report(float fraction, std::string_view stage, std::string_view detail = {},
+			uint32_t completedUnits = 0, uint32_t totalUnits = 0) const noexcept;
 		[[nodiscard]] ProgressReporter Subrange(float begin, float end) const noexcept;
 		[[nodiscard]] const ProgressChannelPtr& GetChannel() const noexcept { return m_Channel; }
 		explicit operator bool() const noexcept { return m_Channel != nullptr; }

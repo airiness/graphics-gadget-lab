@@ -42,8 +42,7 @@ namespace gglab
 		};
 
 		RGPostProcessColor ResolvePreviewSource(
-			const RGPostProcessResources& resources,
-			PostProcessDebugSelection selection) noexcept
+			const RGPostProcessResources& resources, PostProcessDebugSelection selection) noexcept
 		{
 			switch (selection.m_Tap)
 			{
@@ -63,9 +62,8 @@ namespace gglab
 		}
 	}
 
-	void RenderPassPostProcessPreview::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassPostProcessPreview::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		auto* renderer = services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(renderer);
@@ -78,16 +76,10 @@ namespace gglab
 			{
 				return;
 			}
-			const auto& sceneDepth = rg.GetBlackboard().Get<RGSceneDepthResources>(
-				SceneDepthResourcesName);
+			const auto& sceneDepth =
+				rg.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
 			AddResolvedPass(
-				rg,
-				context,
-				services,
-				sceneDepth.m_Texture,
-				1.0f,
-				sceneDepth.m_SrvDesc,
-				selection);
+				rg, context, services, sceneDepth.m_Texture, 1.0f, sceneDepth.m_SrvDesc, selection);
 			return;
 		}
 		if (selection.m_Tap != PostProcessDebugTap::SceneColor &&
@@ -96,23 +88,16 @@ namespace gglab
 			return;
 		}
 
-		const auto& resources = rg.GetBlackboard().Get<RGPostProcessResources>(
-			PostProcessResourcesName);
+		const auto& resources =
+			rg.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
 		const RGPostProcessColor source = ResolvePreviewSource(resources, selection);
 		AddPassForTap(
-			rg,
-			context,
-			services,
-			source,
-			selection.m_Tap,
-			selection.m_BloomPyramidLevel);
+			rg, context, services, source, selection.m_Tap, selection.m_BloomPyramidLevel);
 	}
 
 	void RenderPassPostProcessPreview::AddPassForTap(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services,
-		const RGPostProcessColor& source,
-		PostProcessDebugTap tap,
+		const RenderFrameContext& context, const RenderServices& services,
+		const RGPostProcessColor& source, PostProcessDebugTap tap,
 		uint32_t bloomPyramidLevel) noexcept
 	{
 		auto* renderer = services.m_Renderer;
@@ -139,21 +124,12 @@ namespace gglab
 		}
 
 		AddResolvedPass(
-			rg,
-			context,
-			services,
-			source.m_Texture,
-			source.m_PreExposure,
-			std::nullopt,
-			selection);
+			rg, context, services, source.m_Texture, source.m_PreExposure, std::nullopt, selection);
 	}
 
 	void RenderPassPostProcessPreview::AddResolvedPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services,
-		RGTextureId source,
-		float sourcePreExposure,
-		std::optional<RHITextureViewDesc> sourceViewDesc,
+		const RenderFrameContext& context, const RenderServices& services, RGTextureId source,
+		float sourcePreExposure, std::optional<RHITextureViewDesc> sourceViewDesc,
 		PostProcessDebugSelection selection) noexcept
 	{
 		auto* renderer = services.m_Renderer;
@@ -164,56 +140,52 @@ namespace gglab
 		{
 			return;
 		}
-		GGLAB_ASSERT_MSG(sourcePreExposure > 0.0f,
-			"Post-process preview requires positive pre-exposure.");
+		GGLAB_ASSERT_MSG(
+			sourcePreExposure > 0.0f, "Post-process preview requires positive pre-exposure.");
 
 		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const RenderView& displayView = context.GetDisplayRenderView();
 		const RHIFencePoint retireFence = renderer->GetLastSubmittedFencePoint();
-		registry->EnsurePostProcessPreviewResources(
-			displayView.m_Width,
-			displayView.m_Height,
+		registry->EnsurePostProcessPreviewResources(displayView.m_Width, displayView.m_Height,
 			retireFence.IsValid() ? &retireFence : nullptr);
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		constexpr TextureIndex PreviewIndex = TextureIndex::Preview_PostProcess;
 		const auto* outputDesc = registry->GetTextureDesc(PreviewIndex);
 		GGLAB_ASSERT_NOT_NULL(outputDesc);
-		const RGTextureAccess initialAccess = registry->HasPublishedPostProcessPreview() ?
-			RGTextureAccess::Sample : RGTextureAccess::None;
+		const RGTextureAccess initialAccess = registry->HasPublishedPostProcessPreview()
+			? RGTextureAccess::Sample
+			: RGTextureAccess::None;
 		const bool depthPreview = IsDepthPreview(selection.m_Tap);
 		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 			depthPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());
 		const auto* contextPtr = &context;
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc,
-				initialAccess, samplerIndex, previewExposureScale, registry](
-				RenderGraph::RGBuilder& builder, PassData& data)
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
+			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, initialAccess,
+			samplerIndex, previewExposureScale,
+			registry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
-				data.m_Output = builder.ImportTexture(
-					"PostProcess.Preview.SelectedTap",
-					registry->GetTextureHandle(TextureIndex::Preview_PostProcess),
-					*outputDesc,
+				data.m_Output = builder.ImportTexture("PostProcess.Preview.SelectedTap",
+					registry->GetTextureHandle(TextureIndex::Preview_PostProcess), *outputDesc,
 					initialAccess);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
 				if (!sourceViewDesc)
 				{
 					data.m_SourceSrv =
-						builder.CreateView<RHITextureViewType::ShaderResource>(
-							data.m_Source);
+						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Source);
 				}
 				else
 				{
-					data.m_SourceSrv =
-						builder.CreateView<RHITextureViewType::ShaderResource>(
-							data.m_Source,
-							*sourceViewDesc);
+					data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+						data.m_Source, *sourceViewDesc);
 				}
-				data.m_OutputRtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
+				data.m_OutputRtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
 				builder.Export(data.m_Output, RGTextureAccess::Sample, RHIStage::PixelShader);
 				data.m_Selection = selection;
 				data.m_Width = static_cast<uint32_t>(outputDesc->m_Extent.m_Width);
@@ -228,16 +200,17 @@ namespace gglab
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
 				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
-				GGLAB_ASSERT_MSG(sourceSrv.IsValid(),
-					"Post-process preview source SRV must be shader visible.");
+				GGLAB_ASSERT_MSG(
+					sourceSrv.IsValid(), "Post-process preview source SRV must be shader visible.");
 
 				commandContext->ClearColor(outputRtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&outputRtv, 1));
-				commandContext->SetViewport({
-					0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({
-					0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetRenderTargets(
+					std::span<const RHITextureViewHandle>(&outputRtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
@@ -257,8 +230,7 @@ namespace gglab
 					.PreviewExposureScale = data.m_PreviewExposureScale,
 				};
 				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					parameters);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->DrawFullscreenTriangle();
 				registry->PublishPostProcessPreview(data.m_Selection);
 			});
@@ -276,7 +248,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Passes/PassPostProcessPreview.hlsl";
+		shaderDesc.m_SourcePath = L"Passes/PassPostProcessPreview.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Vertex;
 		shaderDesc.m_Entry = L"VSMain";
 		m_BaseRecipe.m_VSId = shaderManager->LoadShader(shaderDesc);

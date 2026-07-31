@@ -51,18 +51,15 @@ namespace gglab
 		float m_DepthBiasClamp = 0.0f;
 		float m_SlopeScaledDepthBias = 0.0f;
 
-		constexpr bool operator==(
-			const GraphicsPhysicalPipelineKey&) const noexcept = default;
+		constexpr bool operator==(const GraphicsPhysicalPipelineKey&) const noexcept = default;
 	};
 
 	struct GraphicsLogicalPipelineMetadata
 	{
-		std::optional<DepthCoveragePipelineSignature>
-			m_DepthCoveragePipelineSignature =
+		std::optional<DepthCoveragePipelineSignature> m_DepthCoveragePipelineSignature =
 			std::nullopt;
 
-		constexpr bool operator==(
-			const GraphicsLogicalPipelineMetadata&) const noexcept = default;
+		constexpr bool operator==(const GraphicsLogicalPipelineMetadata&) const noexcept = default;
 	};
 
 	struct GraphicsPipelineDescription
@@ -70,8 +67,7 @@ namespace gglab
 		GraphicsPhysicalPipelineKey m_PhysicalKey{};
 		GraphicsLogicalPipelineMetadata m_LogicalMetadata{};
 
-		constexpr bool operator==(
-			const GraphicsPipelineDescription&) const noexcept = default;
+		constexpr bool operator==(const GraphicsPipelineDescription&) const noexcept = default;
 	};
 
 	struct ComputePipelineRecipe
@@ -86,10 +82,7 @@ namespace gglab
 	{
 	public:
 		void Reset() noexcept { *this = {}; }
-		const GraphicsPhysicalPipelineKey& GetPhysicalKey() const noexcept
-		{
-			return m_PhysicalKey;
-		}
+		const GraphicsPhysicalPipelineKey& GetPhysicalKey() const noexcept { return m_PhysicalKey; }
 		RHIPipelineHandle GetPipeline() const noexcept { return m_Pipeline; }
 
 	private:
@@ -128,23 +121,18 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(PipelineCache);
 		~PipelineCache() = default;
 
-		RHIPipelineHandle Resolve(
-			GraphicsPipelineSlot& slot,
+		RHIPipelineHandle Resolve(GraphicsPipelineSlot& slot,
 			const GraphicsPhysicalPipelineKey& physicalKey,
 			const RenderPassInfo& renderPassInfo) noexcept;
-		RHIPipelineHandle Resolve(
-			ComputePipelineSlot& slot,
-			const ComputePipelineRecipe& recipe,
+		RHIPipelineHandle Resolve(ComputePipelineSlot& slot, const ComputePipelineRecipe& recipe,
 			const RenderPassInfo& renderPassInfo) noexcept;
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager; }
 		void GetPipelineUsages(
-			RHIPipelineHandle pipeline,
-			std::vector<RenderPassInfo>& outUsages) const noexcept;
+			RHIPipelineHandle pipeline, std::vector<RenderPassInfo>& outUsages) const noexcept;
 
 	private:
 		void RecordPipelineUsage(
-			RHIPipelineHandle pipeline,
-			const RenderPassInfo& renderPassInfo) noexcept;
+			RHIPipelineHandle pipeline, const RenderPassInfo& renderPassInfo) noexcept;
 
 		ShaderManager* m_ShaderManager = nullptr;
 		RHIPipelineSystem* m_PipelineSystem = nullptr;

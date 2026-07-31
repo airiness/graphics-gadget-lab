@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Windows.h>
-#include <Shlwapi.h>	// PathRemoveFileSpecW
+#include <Shlwapi.h> // PathRemoveFileSpecW
 #include <shlobj.h>
 #include <comdef.h>
 

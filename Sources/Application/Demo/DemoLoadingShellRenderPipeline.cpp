@@ -19,7 +19,9 @@ namespace gglab
 			RGTextureViewId m_Rtv{};
 		};
 
-		struct LoadingShellFinishPassData {};
+		struct LoadingShellFinishPassData
+		{
+		};
 
 		class RenderPipelineLoadingShell final : public RenderPipelineBase
 		{
@@ -29,9 +31,7 @@ namespace gglab
 				return "RenderPipeline.LoadingShell";
 			}
 
-			void BuildRenderGraph(
-				RenderGraph& rg,
-				const RenderFrameContext& context,
+			void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 				const RenderServices& services) noexcept override
 			{
 				auto* renderer = services.m_Renderer;
@@ -47,8 +47,7 @@ namespace gglab
 				rg.AddPass<LoadingShellSetupPassData>(
 					"LoadingShell.Setup",
 					[swapChain, resourceRegistry, backBufferIndex, displayViewId](
-						RenderGraph::RGBuilder& builder,
-						LoadingShellSetupPassData& data)
+						RenderGraph::RGBuilder& builder, LoadingShellSetupPassData& data)
 					{
 						builder.SideEffect();
 						auto& targets = builder.GetBlackboard()
@@ -64,27 +63,24 @@ namespace gglab
 							1u,
 						};
 						backBufferDesc.m_Format = swapChain->GetFormat();
-						targets.m_BackBuffer = builder.ImportTexture(
-							"LoadingShell.BackBuffer",
-							swapChain->GetBackBufferHandle(backBufferIndex),
-							backBufferDesc,
+						targets.m_BackBuffer = builder.ImportTexture("LoadingShell.BackBuffer",
+							swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
 							RGTextureAccess::Present);
 						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 						data.m_BackBuffer = targets.m_BackBuffer;
-						data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(
-							data.m_BackBuffer);
+						data.m_Rtv =
+							builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 
-						auto& shadow = builder.GetBlackboard()
-							.GetOrCreate<RGShadowResources>(ShadowResourcesName);
+						auto& shadow = builder.GetBlackboard().GetOrCreate<RGShadowResources>(
+							ShadowResourcesName);
 						const auto shadowIndex = RenderResourceRegistry::TextureIndex::
 							Preview_Shadow_DirectionalShadowMap;
 						const auto* shadowDesc = resourceRegistry->GetTextureDesc(shadowIndex);
 						GGLAB_ASSERT_NOT_NULL(shadowDesc);
-						shadow.m_DirectionalShadowMapPreview = builder.ImportTexture(
-							"LoadingShell.ShadowPreview",
-							resourceRegistry->GetTextureHandle(shadowIndex),
-							*shadowDesc,
-							RGTextureAccess::None);
+						shadow.m_DirectionalShadowMapPreview =
+							builder.ImportTexture("LoadingShell.ShadowPreview",
+								resourceRegistry->GetTextureHandle(shadowIndex), *shadowDesc,
+								RGTextureAccess::None);
 					},
 					[renderer](RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{
@@ -97,22 +93,17 @@ namespace gglab
 				m_DevelopGuiPass.AddPass(rg, context, services);
 				m_IBLPass.AddFinishPass(rg);
 
-				rg.AddPass<LoadingShellFinishPassData>(
-					"LoadingShell.Finish",
+				rg.AddPass<LoadingShellFinishPassData>("LoadingShell.Finish",
 					[displayViewId](RenderGraph::RGBuilder& builder, LoadingShellFinishPassData&)
 					{
 						builder.SideEffect();
 						auto& targets = builder.GetBlackboard()
 							.Get<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
-						auto& shadow = builder.GetBlackboard()
-							.Get<RGShadowResources>(ShadowResourcesName);
-						builder.Export(
-							shadow.m_DirectionalShadowMapPreview,
-							RGTextureAccess::None);
-						builder.Export(
-							targets.m_BackBuffer,
-							RGTextureAccess::Present,
+						auto& shadow =
+							builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+						builder.Export(shadow.m_DirectionalShadowMapPreview, RGTextureAccess::None);
+						builder.Export(targets.m_BackBuffer, RGTextureAccess::Present,
 							RHISubresourceRange{
 								.m_MipCount = 1,
 								.m_ArraySliceCount = 1,

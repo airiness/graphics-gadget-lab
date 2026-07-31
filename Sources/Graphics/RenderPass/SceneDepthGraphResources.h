@@ -15,6 +15,5 @@ namespace gglab
 
 	inline constexpr const char* SceneDepthResourcesName = "RGSceneDepthResources";
 
-	inline constexpr const char* DepthCoverageFramePlanName =
-		"DepthCoverageFramePlan";
+	inline constexpr const char* DepthCoverageFramePlanName = "DepthCoverageFramePlan";
 }

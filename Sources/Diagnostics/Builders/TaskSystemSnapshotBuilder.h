@@ -6,6 +6,5 @@ namespace gglab
 	struct TaskSystemSnapshot;
 
 	void BuildTaskSystemSnapshot(
-		const TaskSystem& taskSystem,
-		TaskSystemSnapshot& outSnapshot) noexcept;
+		const TaskSystem& taskSystem, TaskSystemSnapshot& outSnapshot) noexcept;
 }
