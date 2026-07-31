@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -144,6 +144,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelHashSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMesherSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMultiChunkSelfTests.cpp" />
@@ -310,6 +311,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabParameter.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\EnvironmentAssetLabSession.cpp" />
@@ -623,6 +625,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\EnvironmentAssetLabSession.h" />

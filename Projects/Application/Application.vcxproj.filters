@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Shaders">
@@ -148,6 +148,9 @@
     <Filter Include="Application\Lab">
       <UniqueIdentifier>{34A27B34-9CA4-44BA-B51C-041607A5D962}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Lab\NapaVoxel">
+      <UniqueIdentifier>{A91A3A68-6880-438B-896B-25336CD64E6B}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Lab\Sessions">
       <UniqueIdentifier>{5A6E10E0-25EE-4589-B9B4-B3BD7320055D}</UniqueIdentifier>
     </Filter>
@@ -271,6 +274,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelHashSelfTests.cpp">
@@ -668,6 +674,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp">
       <Filter>Application\Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
@@ -1714,6 +1723,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h">
       <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
