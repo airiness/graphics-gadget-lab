@@ -13,8 +13,7 @@ namespace gglab
 
 		virtual void RequestSwitchLab(const LabId& id) noexcept = 0;
 		virtual void RequestSetParameter(
-			const LabParameterId& id,
-			const LabValue& value) noexcept = 0;
+			const LabParameterId& id, const LabValue& value) noexcept = 0;
 		virtual void RequestResetParameters() noexcept = 0;
 		virtual void RequestRebuildScene() noexcept = 0;
 		virtual void RequestRestartSession() noexcept = 0;

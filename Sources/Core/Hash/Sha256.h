@@ -49,6 +49,5 @@ namespace gglab
 		std::vector<uint8_t> m_Object;
 	};
 
-	[[nodiscard]] Sha256Hash ComputeSha256(
-		std::span<const std::byte> bytes) noexcept;
+	[[nodiscard]] Sha256Hash ComputeSha256(std::span<const std::byte> bytes) noexcept;
 }

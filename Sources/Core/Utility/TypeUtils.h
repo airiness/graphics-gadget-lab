@@ -8,18 +8,16 @@
 
 namespace gglab::utils
 {
-	template<typename T>
+	template <typename T>
 	concept Integer = std::is_integral_v<std::remove_cvref_t<T>>;
 
-	template<typename T>
-	concept UnsignedInteger =
-		std::is_unsigned_v<std::remove_cvref_t<T>> && Integer<T>;
+	template <typename T>
+	concept UnsignedInteger = std::is_unsigned_v<std::remove_cvref_t<T>> && Integer<T>;
 
-	template<typename T>
+	template <typename T>
 	concept Enum = std::is_enum_v<std::remove_cvref_t<T>>;
 
-	template<Enum E>
-	[[nodiscard]] constexpr std::underlying_type_t<E> ToUnderlying(E e) noexcept
+	template <Enum E> [[nodiscard]] constexpr std::underlying_type_t<E> ToUnderlying(E e) noexcept
 	{
 		return static_cast<std::underlying_type_t<E>>(e);
 	}
@@ -29,21 +27,20 @@ namespace gglab::utils
 
 	namespace detail
 	{
-		template<typename Tag, typename... Args>
-		concept TagInvocable = requires(const Tag & tag, Args&&... args)
-		{
+		template <typename Tag, typename... Args>
+		concept TagInvocable = requires(
+			const Tag & tag, Args&&... args) {
 			tag_invoke(tag, std::forward<Args>(args)...);
 		};
 
-		template<typename Tag, typename... Args>
+		template <typename Tag, typename... Args>
 		using tag_invoke_result_t =
 			decltype(tag_invoke(std::declval<Tag>(), std::declval<Args>()...));
 	}
 
 	struct ToIndexType
 	{
-		template<Enum E>
-		[[nodiscard]] constexpr std::size_t operator()(E e) const noexcept
+		template <Enum E> [[nodiscard]] constexpr std::size_t operator()(E e) const noexcept
 		{
 			// user customize tag_invoke
 			if constexpr (detail::TagInvocable<ToIndexType, E>)
@@ -61,7 +58,8 @@ namespace gglab::utils
 
 				if constexpr (std::is_signed_v<UT>)
 				{
-					GGLAB_ASSERT_MSG(value >= 0, "Enum value is negative; not valid as an array index.");
+					GGLAB_ASSERT_MSG(
+						value >= 0, "Enum value is negative; not valid as an array index.");
 				}
 
 				using UUT = std::make_unsigned_t<UT>;
@@ -72,7 +70,7 @@ namespace gglab::utils
 
 	inline constexpr ToIndexType ToIndex{};
 
-	template<Enum E>
+	template <Enum E>
 	[[nodiscard]] constexpr std::size_t ToIndexChecked(E e, E countSentinel) noexcept
 	{
 		const std::size_t index = ToIndex(e);
@@ -81,25 +79,25 @@ namespace gglab::utils
 		return index;
 	}
 
-	template<Enum E>
+	template <Enum E>
 	[[nodiscard]] constexpr std::size_t ToIndexChecked(E e) noexcept
 		requires requires { E::Count; }
 	{
 		return ToIndexChecked(e, E::Count);
 	}
 
-	template<Enum E>
+	template <Enum E>
 	[[nodiscard]] constexpr std::size_t EnumCount() noexcept
 		requires requires { E::Count; }
 	{
 		return ToIndex(E::Count);
 	}
 
-	template<Enum E>
-	constexpr auto EnumRange() noexcept
+	template <Enum E> constexpr auto EnumRange() noexcept
 	{
-		return std::views::iota(std::size_t{ 0 }, EnumCount<E>())
-			| std::views::transform([](std::size_t index)
+		return std::views::iota(std::size_t{ 0 }, EnumCount<E>()) |
+			std::views::transform(
+				[](std::size_t index)
 				{
 					using UT = std::underlying_type_t<E>;
 					return static_cast<E>(static_cast<UT>(index));

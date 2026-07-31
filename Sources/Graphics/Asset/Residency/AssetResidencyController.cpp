@@ -7,8 +7,7 @@ namespace gglab
 	{
 		m_Statistics.m_Config = config;
 		m_Statistics.m_Config.m_LowWatermarkBytes = std::min(
-			m_Statistics.m_Config.m_LowWatermarkBytes,
-			m_Statistics.m_Config.m_HighWatermarkBytes);
+			m_Statistics.m_Config.m_LowWatermarkBytes, m_Statistics.m_Config.m_HighWatermarkBytes);
 	}
 
 	const AssetResidencyConfig& AssetResidencyController::GetConfig() const noexcept
@@ -16,10 +15,8 @@ namespace gglab
 		return m_Statistics.m_Config;
 	}
 
-	AssetResidencyStatistics AssetResidencyController::GetStatistics(
-		uint64_t logicalResidentBytes,
-		uint64_t pendingEvictionBytes,
-		uint32_t pendingEvictionCount,
+	AssetResidencyStatistics AssetResidencyController::GetStatistics(uint64_t logicalResidentBytes,
+		uint64_t pendingEvictionBytes, uint32_t pendingEvictionCount,
 		uint32_t reloadingAssetCount) const noexcept
 	{
 		AssetResidencyStatistics statistics = m_Statistics;
@@ -31,8 +28,7 @@ namespace gglab
 	}
 
 	AssetResidencyOperation AssetResidencyController::BeginResidencyOperation(
-		AssetLifecycle& lifecycle,
-		AssetContentVersion contentVersion,
+		AssetLifecycle& lifecycle, AssetContentVersion contentVersion,
 		AssetResidencyOperationKind kind) noexcept
 	{
 		GGLAB_ASSERT(contentVersion.IsValid());
@@ -58,26 +54,21 @@ namespace gglab
 	}
 
 	bool AssetResidencyController::IsCurrentOperation(
-		const AssetLifecycle& lifecycle,
-		const AssetResidencyOperation& operation) noexcept
+		const AssetLifecycle& lifecycle, const AssetResidencyOperation& operation) noexcept
 	{
 		return operation.IsValid() && IsCurrentOperation(lifecycle, operation.m_Token);
 	}
 
 	bool AssetResidencyController::IsCurrentOperation(
-		const AssetLifecycle& lifecycle,
-		const AssetOperationToken& operation) noexcept
+		const AssetLifecycle& lifecycle, const AssetOperationToken& operation) noexcept
 	{
 		return operation.IsValid() &&
-			lifecycle.m_ContentGeneration ==
-				operation.m_ContentVersion.m_ContentGeneration &&
-			lifecycle.m_ResidencyOperationSerial ==
-				operation.m_OperationSerial;
+			lifecycle.m_ContentGeneration == operation.m_ContentVersion.m_ContentGeneration &&
+			lifecycle.m_ResidencyOperationSerial == operation.m_OperationSerial;
 	}
 
 	void AssetResidencyController::CompleteResidencyOperation(
-		AssetLifecycle& lifecycle,
-		const AssetResidencyOperation& operation) noexcept
+		AssetLifecycle& lifecycle, const AssetResidencyOperation& operation) noexcept
 	{
 		if (operation.IsValid())
 		{
@@ -86,8 +77,7 @@ namespace gglab
 	}
 
 	void AssetResidencyController::CompleteResidencyOperation(
-		AssetLifecycle& lifecycle,
-		const AssetOperationToken& operation) noexcept
+		AssetLifecycle& lifecycle, const AssetOperationToken& operation) noexcept
 	{
 		if (IsCurrentOperation(lifecycle, operation))
 		{
@@ -95,8 +85,7 @@ namespace gglab
 		}
 	}
 
-	void AssetResidencyController::InvalidateResidencyOperation(
-		AssetLifecycle& lifecycle) noexcept
+	void AssetResidencyController::InvalidateResidencyOperation(AssetLifecycle& lifecycle) noexcept
 	{
 		lifecycle.m_ResidencyOperationSerial = 0;
 	}
@@ -128,12 +117,10 @@ namespace gglab
 			[](const AssetResidencyInventoryEntry* lhs,
 				const AssetResidencyInventoryEntry* rhs) noexcept
 			{
-				return std::tie(
-					lhs->m_Stamp.m_LastUsedFrame,
+				return std::tie(lhs->m_Stamp.m_LastUsedFrame,
 					lhs->m_Stamp.m_ContentVersion.m_Key.m_Kind,
 					lhs->m_Stamp.m_ContentVersion.m_Key.m_StableId) <
-					std::tie(
-						rhs->m_Stamp.m_LastUsedFrame,
+					std::tie(rhs->m_Stamp.m_LastUsedFrame,
 						rhs->m_Stamp.m_ContentVersion.m_Key.m_Kind,
 						rhs->m_Stamp.m_ContentVersion.m_Key.m_StableId);
 			});
@@ -149,18 +136,16 @@ namespace gglab
 			plan.m_Actions.push_back({
 				.m_ExpectedStamp = candidate->m_Stamp,
 				.m_EstimatedBytes = candidate->m_EstimatedBytes,
-			});
-			projectedResidentBytes =
-				projectedResidentBytes > candidate->m_EstimatedBytes ?
-					projectedResidentBytes - candidate->m_EstimatedBytes : 0;
+				});
+			projectedResidentBytes = projectedResidentBytes > candidate->m_EstimatedBytes
+				? projectedResidentBytes - candidate->m_EstimatedBytes
+				: 0;
 		}
 		return plan;
 	}
 
-	bool AssetResidencyController::StillEligible(
-		const AssetResidencyAction& action,
-		const AssetResidencyInventoryEntry& currentEntry,
-		uint64_t currentFrame,
+	bool AssetResidencyController::StillEligible(const AssetResidencyAction& action,
+		const AssetResidencyInventoryEntry& currentEntry, uint64_t currentFrame,
 		uint64_t projectedResidentBytes) const noexcept
 	{
 		return m_Statistics.m_Config.m_EnableAutomaticEviction &&
@@ -171,11 +156,10 @@ namespace gglab
 	}
 
 	void AssetResidencyController::MarkAssetUsed(
-		AssetLifecycle& lifecycle,
-		uint64_t currentFrame) noexcept
+		AssetLifecycle& lifecycle, uint64_t currentFrame) noexcept
 	{
-		if (lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
-			currentFrame != 0 && lifecycle.m_LastUsedFrame != currentFrame)
+		if (lifecycle.m_ResidencyState == AssetResidencyState::Resident && currentFrame != 0 &&
+			lifecycle.m_LastUsedFrame != currentFrame)
 		{
 			lifecycle.m_LastUsedFrame = currentFrame;
 			++lifecycle.m_UseCount;
@@ -183,9 +167,7 @@ namespace gglab
 	}
 
 	bool AssetResidencyController::SetResidencyPolicy(
-		AssetLifecycle& lifecycle,
-		AssetResidencyPolicy policy,
-		bool isReserved) noexcept
+		AssetLifecycle& lifecycle, AssetResidencyPolicy policy, bool isReserved) noexcept
 	{
 		if (isReserved && policy != AssetResidencyPolicy::Pinned)
 		{
@@ -207,9 +189,7 @@ namespace gglab
 		}
 	}
 
-	void AssetResidencyController::RecordEviction(
-		bool cancelled,
-		uint64_t residentBytes) noexcept
+	void AssetResidencyController::RecordEviction(bool cancelled, uint64_t residentBytes) noexcept
 	{
 		if (cancelled)
 		{
@@ -242,8 +222,7 @@ namespace gglab
 		++m_Statistics.m_StaleCompletionCount;
 	}
 
-	void AssetResidencyController::RecordAcceptedStateEvent(
-		bool completedOperation) noexcept
+	void AssetResidencyController::RecordAcceptedStateEvent(bool completedOperation) noexcept
 	{
 		++m_Statistics.m_AcceptedStateEventCount;
 		m_Statistics.m_CompletedStateEventCount += completedOperation ? 1 : 0;
@@ -259,18 +238,17 @@ namespace gglab
 		m_Statistics.m_LastFrameReloadRequestCount =
 			std::exchange(m_CurrentFrameReloadRequestCount, 0);
 		m_Statistics.m_ReloadRequestHighWatermark = std::max(
-			m_Statistics.m_ReloadRequestHighWatermark,
-			m_Statistics.m_LastFrameReloadRequestCount);
+			m_Statistics.m_ReloadRequestHighWatermark, m_Statistics.m_LastFrameReloadRequestCount);
 	}
 
-	bool AssetResidencyController::IsEvictionCandidate(
-		const AssetResidencyInventoryEntry& entry,
-		uint64_t snapshotFrame,
-		const AssetResidencyConfig& config) noexcept
+	bool AssetResidencyController::IsEvictionCandidate(const AssetResidencyInventoryEntry& entry,
+		uint64_t snapshotFrame, const AssetResidencyConfig& config) noexcept
 	{
 		const uint64_t lastUsedFrame = entry.m_Stamp.m_LastUsedFrame;
-		const uint64_t unusedFrames = lastUsedFrame == 0 ?
-			snapshotFrame : snapshotFrame > lastUsedFrame ? snapshotFrame - lastUsedFrame : 0;
+		const uint64_t unusedFrames = lastUsedFrame == 0 ? snapshotFrame
+			: snapshotFrame > lastUsedFrame
+			? snapshotFrame - lastUsedFrame
+			: 0;
 		return entry.m_Stamp.m_ContentVersion.IsValid() &&
 			entry.m_Stamp.m_ResidencyOperationSerial == 0 &&
 			(entry.m_Stamp.m_ContentVersion.m_Key.m_Kind == AssetKind::Mesh ||
@@ -278,9 +256,8 @@ namespace gglab
 			entry.m_Stamp.m_State == AssetState::Ready &&
 			entry.m_Stamp.m_ResidencyState == AssetResidencyState::Resident &&
 			entry.m_Stamp.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
-			entry.m_EstimatedBytes != 0 && entry.m_HasReloadSource &&
-			!entry.m_IsReserved && !entry.m_HasActiveInterest &&
-			!entry.m_HasPublicationRetain && !entry.m_HasPinnedDependentModel &&
-			unusedFrames >= config.m_MinUnusedFrames;
+			entry.m_EstimatedBytes != 0 && entry.m_HasReloadSource && !entry.m_IsReserved &&
+			!entry.m_HasActiveInterest && !entry.m_HasPublicationRetain &&
+			!entry.m_HasPinnedDependentModel && unusedFrames >= config.m_MinUnusedFrames;
 	}
 }

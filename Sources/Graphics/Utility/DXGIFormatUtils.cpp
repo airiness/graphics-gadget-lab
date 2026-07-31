@@ -7,8 +7,7 @@ namespace gglab
 {
 	namespace
 	{
-		constexpr std::array<DXGI_FORMAT, static_cast<size_t>(RHIFormat::Count)> DXGIFormats =
-		{
+		constexpr std::array<DXGI_FORMAT, static_cast<size_t>(RHIFormat::Count)> DXGIFormats = {
 			DXGI_FORMAT_UNKNOWN,
 			DXGI_FORMAT_R8G8B8A8_TYPELESS,
 			DXGI_FORMAT_R8G8B8A8_UNORM,
@@ -26,7 +25,8 @@ namespace gglab
 			DXGI_FORMAT_D32_FLOAT,
 		};
 
-		static_assert([]
+		static_assert(
+			[]
 			{
 				for (size_t index = 1; index < DXGIFormats.size(); ++index)
 				{
@@ -36,7 +36,8 @@ namespace gglab
 					}
 				}
 				return DXGIFormats[0] == DXGI_FORMAT_UNKNOWN;
-			}(), "Every RHIFormat must have a DXGI_FORMAT mapping.");
+			}(),
+				"Every RHIFormat must have a DXGI_FORMAT mapping.");
 	}
 
 	DXGI_FORMAT ToDXGIFormat(RHIFormat format) noexcept

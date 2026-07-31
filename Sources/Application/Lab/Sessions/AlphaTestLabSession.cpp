@@ -20,10 +20,7 @@ namespace gglab
 	}
 
 	AlphaTestLabSession::AlphaTestLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -33,7 +30,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = true,
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = CameraFovId,
 			.m_Name = "Field of View",
@@ -43,7 +40,7 @@ namespace gglab
 			.m_DefaultValue = 45.0f,
 			.m_MinValue = LabValue(30.0f),
 			.m_MaxValue = LabValue(90.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ModelScaleId,
 			.m_Name = "Model Scale",
@@ -53,7 +50,7 @@ namespace gglab
 			.m_DefaultValue = 1.0f,
 			.m_MinValue = LabValue(0.25f),
 			.m_MaxValue = LabValue(4.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
 			.m_Name = "Intensity",
@@ -63,7 +60,7 @@ namespace gglab
 			.m_DefaultValue = 3.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(20.0f),
-		}));
+			}));
 
 		ApplyImmediateParameters();
 	}
@@ -73,9 +70,8 @@ namespace gglab
 		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		RebuildScene();
-		m_LoadingProgress = m_AssetPreparation.BuildProgress(
-			*m_Services.m_AssetManager,
-			"Preparing Alpha Test");
+		m_LoadingProgress =
+			m_AssetPreparation.BuildProgress(*m_Services.m_AssetManager, "Preparing Alpha Test");
 	}
 
 	void AlphaTestLabSession::TickPrepare() noexcept
@@ -84,16 +80,14 @@ namespace gglab
 		{
 			return;
 		}
-		m_LoadingProgress = m_AssetPreparation.BuildProgress(
-			*m_Services.m_AssetManager,
-			"Preparing Alpha Test");
+		m_LoadingProgress =
+			m_AssetPreparation.BuildProgress(*m_Services.m_AssetManager, "Preparing Alpha Test");
 	}
 
 	void AlphaTestLabSession::CommitPrepare() noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			m_LoadingProgress.IsReady(),
-			"Alpha Test committed before its model was ready.");
+			m_LoadingProgress.IsReady(), "Alpha Test committed before its model was ready.");
 	}
 
 	void AlphaTestLabSession::CancelPrepare() noexcept
@@ -140,8 +134,9 @@ namespace gglab
 
 		auto* assetManager = m_Services.m_AssetManager;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		const ModelID modelId = GetAssetOwnerScope().LoadModelAsync(
-			std::filesystem::path(AlphaBlendModeTestPath)).m_ModelId;
+		const ModelID modelId = GetAssetOwnerScope()
+			.LoadModelAsync(std::filesystem::path(AlphaBlendModeTestPath))
+			.m_ModelId;
 		m_AssetPreparation.TrackModel(modelId, AlphaBlendModeTestPath);
 
 		const entt::entity modelEntity = registry.create();
@@ -150,15 +145,14 @@ namespace gglab
 		modelTransform.m_Scale = Vector3::One * GetParameters().Get(ModelScaleId, 1.0f);
 		registry.emplace<components::TransformComponent>(modelEntity, modelTransform);
 		registry.emplace<components::ModelComponent>(modelEntity, components::ModelComponent{
-			.m_ModelId = modelId,
-		});
+																	  .m_ModelId = modelId,
+			});
 
 		BuildLighting();
 		ApplyImmediateParameters();
 	}
 
-	void AlphaTestLabSession::OnParametersRestoredForPrepare(
-		LabChangeImpact impact) noexcept
+	void AlphaTestLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
 	{
 		GGLAB_UNUSED(impact);
 		ApplyImmediateParameters();
@@ -185,9 +179,7 @@ namespace gglab
 
 	void AlphaTestLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(
-			Vector3(0.0f, 1.0f, -9.0f),
-			Vector3(0.0f, 0.8f, 0.0f));
+		GetCamera().LookAt(Vector3(0.0f, 1.0f, -9.0f), Vector3(0.0f, 0.8f, 0.0f));
 		GetCamera().Update();
 	}
 
@@ -202,7 +194,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Alpha Test",
 			.m_Category = "Materials",
-			.m_Description = "Validates alpha mask, alpha blend and opaque material rendering using the AlphaBlendModeTest glTF asset.",
+			.m_Description =
+				"Validates alpha mask, alpha blend and opaque material rendering using the AlphaBlendModeTest glTF asset.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

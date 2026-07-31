@@ -18,9 +18,7 @@ namespace gglab
 	class RGExecutor final
 	{
 	public:
-		static void Execute(
-			const RGExecutionPlan& plan,
-			const RGExecutorRuntime& runtime,
+		static void Execute(const RGExecutionPlan& plan, const RGExecutorRuntime& runtime,
 			RGExecuteContext& executeContext) noexcept;
 	};
 }

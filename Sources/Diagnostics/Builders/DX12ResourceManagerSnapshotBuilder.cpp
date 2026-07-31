@@ -11,13 +11,11 @@
 namespace gglab
 {
 	void BuildDX12ResourceManagerSnapshot(
-		const DX12ResourceManager& manager,
-		DX12ResourceManagerSnapshot& outSnapshot) noexcept
+		const DX12ResourceManager& manager, DX12ResourceManagerSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
 
-		outSnapshot.m_Diagnostics =
-		{
+		outSnapshot.m_Diagnostics = {
 			.m_TextureCreateCount = manager.m_Diagnostics.m_TextureCreateCount,
 			.m_BufferCreateCount = manager.m_Diagnostics.m_BufferCreateCount,
 			.m_TextureImportCount = manager.m_Diagnostics.m_TextureImportCount,
@@ -79,29 +77,22 @@ namespace gglab
 				result.m_DebugBindingHistory.reserve(slot.m_DebugBindingHistory.size());
 				for (const auto& binding : slot.m_DebugBindingHistory)
 				{
-					result.m_DebugBindingHistory.push_back(
-						{
-							.m_Owner = binding.m_Owner,
-							.m_Serial = binding.m_Serial.value_or(0),
-							.m_HasSerial = binding.m_Serial.has_value(),
-							.m_Mode = binding.m_Mode,
+					result.m_DebugBindingHistory.push_back({
+						.m_Owner = binding.m_Owner,
+						.m_Serial = binding.m_Serial.value_or(0),
+						.m_HasSerial = binding.m_Serial.has_value(),
+						.m_Mode = binding.m_Mode,
 						});
 				}
 				result.m_DebugName = slot.m_DebugName;
 				result.m_LastUseFenceCount = static_cast<uint32_t>(slot.m_LastUsePoints.size());
 				result.m_CompletedLastUseFenceCount = static_cast<uint32_t>(std::ranges::count_if(
-					slot.m_LastUsePoints,
-					[&manager](const RHIFencePoint& point)
-					{
-						return manager.m_Device && manager.m_Device->IsFencePointCompleted(point);
-					}));
+					slot.m_LastUsePoints, [&manager](const RHIFencePoint& point)
+					{ return manager.m_Device && manager.m_Device->IsFencePointCompleted(point); }));
 				result.m_PendingFenceCount = static_cast<uint32_t>(slot.m_RetirementPoints.size());
 				result.m_CompletedFenceCount = static_cast<uint32_t>(std::ranges::count_if(
-					slot.m_RetirementPoints,
-					[&manager](const RHIFencePoint& point)
-					{
-						return manager.m_Device && manager.m_Device->IsFencePointCompleted(point);
-					}));
+					slot.m_RetirementPoints, [&manager](const RHIFencePoint& point)
+					{ return manager.m_Device && manager.m_Device->IsFencePointCompleted(point); }));
 				result.m_NativeResourceValid = resource != nullptr && resource->IsValid();
 				return result;
 			};

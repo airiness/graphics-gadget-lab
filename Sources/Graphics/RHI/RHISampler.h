@@ -53,21 +53,9 @@ namespace gglab
 
 		constexpr auto AsTuple() const noexcept
 		{
-			return std::tuple{
-				m_Filter,
-				m_AddressU,
-				m_AddressV,
-				m_AddressW,
-				m_MipLODBias,
-				m_MaxAnisotropy,
-				m_CompareOp,
-				m_BorderColor[0],
-				m_BorderColor[1],
-				m_BorderColor[2],
-				m_BorderColor[3],
-				m_MinLOD,
-				m_MaxLOD
-			};
+			return std::tuple{ m_Filter, m_AddressU, m_AddressV, m_AddressW, m_MipLODBias,
+				m_MaxAnisotropy, m_CompareOp, m_BorderColor[0], m_BorderColor[1], m_BorderColor[2],
+				m_BorderColor[3], m_MinLOD, m_MaxLOD };
 		}
 	};
 }

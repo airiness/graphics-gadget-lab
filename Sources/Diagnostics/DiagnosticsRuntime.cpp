@@ -6,8 +6,7 @@
 namespace gglab
 {
 	void DiagnosticsRuntime::RegisterProvider(
-		std::unique_ptr<SnapshotProviderBase> provider,
-		SnapshotUpdatePolicy policy) noexcept
+		std::unique_ptr<SnapshotProviderBase> provider, SnapshotUpdatePolicy policy) noexcept
 	{
 		GGLAB_ASSERT(provider);
 		GGLAB_ASSERT(!FindProvider(provider->GetId()));
@@ -78,10 +77,7 @@ namespace gglab
 	DiagnosticsRuntime::ProviderRuntime* DiagnosticsRuntime::FindProvider(SnapshotId id) noexcept
 	{
 		const auto iterator = std::find_if(m_Providers.begin(), m_Providers.end(),
-			[id](const ProviderRuntime& runtime)
-			{
-				return runtime.m_Profile.m_Id == id;
-			});
+			[id](const ProviderRuntime& runtime) { return runtime.m_Profile.m_Id == id; });
 		return iterator == m_Providers.end() ? nullptr : &*iterator;
 	}
 
@@ -96,7 +92,8 @@ namespace gglab
 		++runtime.m_Profile.m_CaptureCount;
 		runtime.m_Profile.m_LastCaptureMilliseconds = milliseconds;
 		runtime.m_Profile.m_AverageCaptureMilliseconds =
-			runtime.m_TotalCaptureMilliseconds / static_cast<double>(runtime.m_Profile.m_CaptureCount);
+			runtime.m_TotalCaptureMilliseconds /
+			static_cast<double>(runtime.m_Profile.m_CaptureCount);
 		runtime.m_Profile.m_MaxCaptureMilliseconds =
 			std::max(runtime.m_Profile.m_MaxCaptureMilliseconds, milliseconds);
 		runtime.m_Profile.m_LastCaptureFrame = m_FrameIndex;

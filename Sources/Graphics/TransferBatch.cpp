@@ -29,10 +29,7 @@ namespace gglab
 	}
 
 	bool TransferBatch::UploadBuffer(
-		RHIBufferHandle dstBuffer,
-		uint64_t dstOffset,
-		const void* src,
-		uint64_t numBytes) noexcept
+		RHIBufferHandle dstBuffer, uint64_t dstOffset, const void* src, uint64_t numBytes) noexcept
 	{
 		if (!dstBuffer.IsValid() || !src || numBytes == 0)
 		{
@@ -44,25 +41,19 @@ namespace gglab
 	}
 
 	bool TransferBatch::UploadTexture(
-		RHITextureHandle dstTexture,
-		const RHITextureUploadData& uploadData) noexcept
+		RHITextureHandle dstTexture, const RHITextureUploadData& uploadData) noexcept
 	{
 		return m_TransferContext->UploadTexture(uploadData, dstTexture);
 	}
 
 	RHITextureReadbackRequest TransferBatch::ReadbackTexture(
-		RHITextureHandle srcTexture,
-		const RHITextureDesc& desc) noexcept
+		RHITextureHandle srcTexture, const RHITextureDesc& desc) noexcept
 	{
 		return m_TransferContext->ReadbackTexture(srcTexture, desc);
 	}
 
-	void TransferBatch::CopyBuffer(
-		RHIBufferHandle dst,
-		uint64_t dstOffset,
-		RHIBufferHandle src,
-		uint64_t srcOffset,
-		uint64_t numBytes) noexcept
+	void TransferBatch::CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset, RHIBufferHandle src,
+		uint64_t srcOffset, uint64_t numBytes) noexcept
 	{
 		m_TransferContext->CopyBuffer(dst, dstOffset, src, srcOffset, numBytes);
 	}

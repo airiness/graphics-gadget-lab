@@ -12,8 +12,7 @@ namespace gglab
 	private:
 		static const void* TypeTagImpl(const void* ptr) noexcept { return ptr; }
 
-		template<typename T>
-		static const void* TypeTag() noexcept
+		template <typename T> static const void* TypeTag() noexcept
 		{
 			static int s_Tag;
 			return TypeTagImpl(&s_Tag);
@@ -21,19 +20,18 @@ namespace gglab
 
 		struct IBox
 		{
-			explicit IBox(const void* tag) noexcept :m_TypeTag(tag) {}
+			explicit IBox(const void* tag) noexcept : m_TypeTag(tag) {}
 			virtual ~IBox() = default;
 
 			const void* m_TypeTag = nullptr;
 		};
 
-		template<typename T>
-		struct Box final : IBox
+		template <typename T> struct Box final : IBox
 		{
-			template<typename... ARGS>
-			explicit Box(ARGS&&... args) :
-				IBox(TypeTag<T>()),
-				m_Value(std::forward<ARGS>(args)...) {}
+			template <typename... ARGS>
+			explicit Box(ARGS&&... args) : IBox(TypeTag<T>()), m_Value(std::forward<ARGS>(args)...)
+			{
+			}
 
 			T m_Value;
 		};
@@ -43,7 +41,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DevelopGuiStateStore);
 		~DevelopGuiStateStore() = default;
 
-		template<typename T, typename... ARGS>
+		template <typename T, typename... ARGS>
 		T& GetOrCreate(uint64_t key, ARGS&&... args) noexcept
 		{
 			auto iterator = m_StoreMap.find(key);

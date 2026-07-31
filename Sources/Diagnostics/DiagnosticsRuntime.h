@@ -26,13 +26,11 @@ namespace gglab
 		~DiagnosticsRuntime() = default;
 
 		void RegisterProvider(
-			std::unique_ptr<SnapshotProviderBase> provider,
-			SnapshotUpdatePolicy policy) noexcept;
+			std::unique_ptr<SnapshotProviderBase> provider, SnapshotUpdatePolicy policy) noexcept;
 		void BeginFrame(const SnapshotContext& context) noexcept;
 		void Reset() noexcept;
 
-		template<typename T>
-		[[nodiscard]] const T* GetSnapshot() noexcept
+		template <typename T> [[nodiscard]] const T* GetSnapshot() noexcept
 		{
 			ProviderRuntime* runtime = FindProvider(SnapshotIdOf<T>);
 			if (!runtime)
@@ -41,10 +39,12 @@ namespace gglab
 			}
 
 			const bool missing = !m_Store.Contains(runtime->m_Profile.m_Id);
-			const bool capture = missing ||
+			const bool capture =
+				missing ||
 				(runtime->m_Profile.m_Policy == SnapshotUpdatePolicy::EveryFrame &&
 					runtime->m_Profile.m_LastCaptureFrame != m_FrameIndex) ||
-				(runtime->m_Profile.m_Policy != SnapshotUpdatePolicy::ManualRefresh && runtime->m_Dirty) ||
+				(runtime->m_Profile.m_Policy != SnapshotUpdatePolicy::ManualRefresh &&
+					runtime->m_Dirty) ||
 				runtime->m_Profile.m_RefreshPending;
 			if (capture)
 			{
@@ -57,8 +57,7 @@ namespace gglab
 			return m_Store.Get<T>();
 		}
 
-		template<typename T>
-		void Invalidate() noexcept
+		template <typename T> void Invalidate() noexcept
 		{
 			if (ProviderRuntime* runtime = FindProvider(SnapshotIdOf<T>))
 			{
@@ -66,8 +65,7 @@ namespace gglab
 			}
 		}
 
-		template<typename T>
-		void RequestRefresh() noexcept { RequestRefresh(SnapshotIdOf<T>); }
+		template <typename T> void RequestRefresh() noexcept { RequestRefresh(SnapshotIdOf<T>); }
 
 		void RequestRefresh(SnapshotId id) noexcept;
 		[[nodiscard]] std::vector<SnapshotProfile> GetProfiles() const;

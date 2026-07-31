@@ -29,14 +29,13 @@ namespace gglab
 			.m_RenderGraph = context.m_RenderGraph,
 			.m_RenderViews = context.m_RenderViews,
 			.m_MainRenderView = context.m_MainRenderView,
-		});
+			});
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
-			ImGui::DockSpaceOverViewport(0,
-				ImGui::GetMainViewport(),
-				ImGuiDockNodeFlags_PassthruCentralNode);
+			ImGui::DockSpaceOverViewport(
+				0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 		}
 
 		m_Registry.DrawMenuBar();

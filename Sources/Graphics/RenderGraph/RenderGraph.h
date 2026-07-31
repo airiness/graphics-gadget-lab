@@ -19,8 +19,8 @@ namespace gglab
 	class RGExecutionPlan;
 	class RGExecutor;
 	class RGCompiler;
-	template<typename PassData> class RGPass;
-	template<typename PassData, typename ExecuteFunc> class RGPassConcrete;
+	template <typename PassData> class RGPass;
+	template <typename PassData, typename ExecuteFunc> class RGPassConcrete;
 
 	struct RGPassNode;
 	struct RGResourceNode;
@@ -38,7 +38,8 @@ namespace gglab
 	{
 		explicit RGExecuteContext(RGBackendExecuteContext backend = {}) noexcept :
 			m_Backend(backend)
-		{}
+		{
+		}
 
 		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
 		RHIDescriptorHandle GetViewDescriptor(RGTextureViewId viewId) const noexcept;
@@ -62,8 +63,7 @@ namespace gglab
 		RGVirtualResourceBase() noexcept = default;
 		virtual ~RGVirtualResourceBase() = default;
 		virtual void Devirtualize(TransientResourcePool*, uint64_t usageBits) noexcept = 0;
-		virtual void Release(
-			std::vector<TransientTextureAllocation>& retireTextures,
+		virtual void Release(std::vector<TransientTextureAllocation>& retireTextures,
 			std::vector<TransientBufferAllocation>& retireBuffers) noexcept = 0;
 
 		StringID m_NameId;
@@ -79,8 +79,7 @@ namespace gglab
 		RGResourceType m_ResourceType = RGResourceType::RGTexture;
 	};
 
-	template<typename RESOURCE>
-	struct RGVirtualResource : RGVirtualResourceBase
+	template <typename RESOURCE> struct RGVirtualResource : RGVirtualResourceBase
 	{
 		using Desc = typename RESOURCE::Descriptor;
 		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
@@ -94,8 +93,7 @@ namespace gglab
 		Handle m_ImportedHandle{};
 
 		void Devirtualize(TransientResourcePool* pool, uint64_t usageBits) noexcept override;
-		void Release(
-			std::vector<TransientTextureAllocation>& retireTextures,
+		void Release(std::vector<TransientTextureAllocation>& retireTextures,
 			std::vector<TransientBufferAllocation>& retireBuffers) noexcept override;
 	};
 
@@ -158,13 +156,14 @@ namespace gglab
 		{
 		public:
 			RGBuilder(RenderGraph& rg, RGPassNodeIndex passNodeIndex) :
-				m_RG(rg),
-				m_PassNodeIndex(passNodeIndex)
-			{}
+				m_RG(rg), m_PassNodeIndex(passNodeIndex)
+			{
+			}
 			~RGBuilder() = default;
 
-			template<typename RESOURCE>
-			RGResourceId<RESOURCE> Create(const char* name, const RESOURCE::Descriptor& desc = {}) noexcept
+			template <typename RESOURCE>
+			RGResourceId<RESOURCE> Create(
+				const char* name, const RESOURCE::Descriptor& desc = {}) noexcept
 			{
 				return m_RG.CreateInternal<RESOURCE>(name, desc);
 			}
@@ -184,7 +183,7 @@ namespace gglab
 				return Create<RGBufferResource>(name, desc);
 			}
 
-			template<typename RESOURCE>
+			template <typename RESOURCE>
 			RGResourceId<RESOURCE> Import(const char* name,
 				typename RGResourceTraits<RESOURCE>::Handle handle,
 				const typename RESOURCE::Descriptor& desc,
@@ -193,49 +192,38 @@ namespace gglab
 				return m_RG.ImportInternal<RESOURCE>(name, handle, desc, initialAccess);
 			}
 
-			RGTextureId ImportTexture(const char* name,
-				RHITextureHandle texture,
-				const RHITextureDesc& desc,
-				RGTextureAccess initialAccess) noexcept
+			RGTextureId ImportTexture(const char* name, RHITextureHandle texture,
+				const RHITextureDesc& desc, RGTextureAccess initialAccess) noexcept
 			{
 				return Import<RGTextureResource>(name, texture, desc, initialAccess);
 			}
 
-			template<RHITextureViewType T>
-			RGTextureViewId CreateView(
-				RGTextureId textureId,
+			template <RHITextureViewType T>
+			RGTextureViewId CreateView(RGTextureId textureId,
 				std::optional<RHITextureViewDesc> desc = std::nullopt) noexcept
 			{
 				return m_RG.CreateTextureView<T>(textureId, desc);
 			}
 
-			RGBufferId ImportBuffer(const char* name,
-				RHIBufferHandle buffer,
-				const RHIBufferDesc& desc,
-				RGBufferAccess initialAccess) noexcept
+			RGBufferId ImportBuffer(const char* name, RHIBufferHandle buffer,
+				const RHIBufferDesc& desc, RGBufferAccess initialAccess) noexcept
 			{
 				return Import<RGBufferResource>(name, buffer, desc, initialAccess);
 			}
 
-			template<typename RESOURCE>
+			template <typename RESOURCE>
 			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultReadAccess,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				return m_RG.ReadInternal<RESOURCE>(
-					m_PassNodeIndex,
-					resourceId,
-					access,
-					ToRHIStages(access),
-					subresources,
-					ordering);
+				return m_RG.ReadInternal<RESOURCE>(m_PassNodeIndex, resourceId, access,
+					ToRHIStages(access), subresources, ordering);
 			}
 
-			template<typename RESOURCE>
+			template <typename RESOURCE>
 			RGResourceId<RESOURCE> Read(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access access,
-				RHIStage stages,
+				typename RESOURCE::Access access, RHIStage stages,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
@@ -243,27 +231,23 @@ namespace gglab
 					m_PassNodeIndex, resourceId, access, stages, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
-			[[nodiscard("Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
+			template <typename RESOURCE>
+			[[nodiscard(
+				"Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				return m_RG.WriteInternal<RESOURCE>(
-					m_PassNodeIndex,
-					resourceId,
-					access,
-					ToRHIStages(access),
-					subresources,
-					ordering);
+				return m_RG.WriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access,
+					ToRHIStages(access), subresources, ordering);
 			}
 
-			template<typename RESOURCE>
-			[[nodiscard("Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
+			template <typename RESOURCE>
+			[[nodiscard(
+				"Write returns the next resource version. Use WriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> Write(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access access,
-				RHIStage stages,
+				typename RESOURCE::Access access, RHIStage stages,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
@@ -271,7 +255,7 @@ namespace gglab
 					m_PassNodeIndex, resourceId, access, stages, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
+			template <typename RESOURCE>
 			void WriteInPlace(RGResourceId<RESOURCE>& resourceId,
 				typename RESOURCE::Access access = RESOURCE::DefaultWriteAccess,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
@@ -280,9 +264,8 @@ namespace gglab
 				resourceId = Write(resourceId, access, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
-			void WriteInPlace(RGResourceId<RESOURCE>& resourceId,
-				typename RESOURCE::Access access,
+			template <typename RESOURCE>
+			void WriteInPlace(RGResourceId<RESOURCE>& resourceId, typename RESOURCE::Access access,
 				RHIStage stages,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
@@ -290,27 +273,23 @@ namespace gglab
 				resourceId = Write(resourceId, access, stages, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
-			[[nodiscard("ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
+			template <typename RESOURCE>
+			[[nodiscard(
+				"ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
 				typename RESOURCE::Access access,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
-				return m_RG.ReadWriteInternal<RESOURCE>(
-					m_PassNodeIndex,
-					resourceId,
-					access,
-					ToRHIStages(access),
-					subresources,
-					ordering);
+				return m_RG.ReadWriteInternal<RESOURCE>(m_PassNodeIndex, resourceId, access,
+					ToRHIStages(access), subresources, ordering);
 			}
 
-			template<typename RESOURCE>
-			[[nodiscard("ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
+			template <typename RESOURCE>
+			[[nodiscard(
+				"ReadWrite returns the next resource version. Use ReadWriteInPlace when the resource id should be updated immediately.")]]
 			RGResourceId<RESOURCE> ReadWrite(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access access,
-				RHIStage stages,
+				typename RESOURCE::Access access, RHIStage stages,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
@@ -318,7 +297,7 @@ namespace gglab
 					m_PassNodeIndex, resourceId, access, stages, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
+			template <typename RESOURCE>
 			void ReadWriteInPlace(RGResourceId<RESOURCE>& resourceId,
 				typename RESOURCE::Access access,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
@@ -327,36 +306,32 @@ namespace gglab
 				resourceId = ReadWrite(resourceId, access, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
+			template <typename RESOURCE>
 			void ReadWriteInPlace(RGResourceId<RESOURCE>& resourceId,
-				typename RESOURCE::Access access,
-				RHIStage stages,
+				typename RESOURCE::Access access, RHIStage stages,
 				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt,
 				RGOrderingRequirement ordering = RGOrderingRequirement::Ordered) noexcept
 			{
 				resourceId = ReadWrite(resourceId, access, stages, subresources, ordering);
 			}
 
-			template<typename RESOURCE>
-			void Export(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access finalAccess,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+			template <typename RESOURCE>
+			void Export(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access finalAccess,
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources =
+				std::nullopt) noexcept
 			{
-				m_RG.ExportInternal<RESOURCE>(
-					m_PassNodeIndex,
-					resourceId,
-					finalAccess,
-					ToRHIStages(finalAccess),
-					subresources);
+				m_RG.ExportInternal<RESOURCE>(m_PassNodeIndex, resourceId, finalAccess,
+					ToRHIStages(finalAccess), subresources);
 			}
 
-			template<typename RESOURCE>
-			void Export(RGResourceId<RESOURCE> resourceId,
-				typename RESOURCE::Access finalAccess,
+			template <typename RESOURCE>
+			void Export(RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access finalAccess,
 				RHIStage stages,
-				std::optional<typename RESOURCE::SubresourceDescriptor> subresources = std::nullopt) noexcept
+				std::optional<typename RESOURCE::SubresourceDescriptor> subresources =
+				std::nullopt) noexcept
 			{
-				m_RG.ExportInternal<RESOURCE>(m_PassNodeIndex, resourceId, finalAccess, stages, subresources);
+				m_RG.ExportInternal<RESOURCE>(
+					m_PassNodeIndex, resourceId, finalAccess, stages, subresources);
 			}
 
 			void SideEffect() noexcept
@@ -379,37 +354,37 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderGraph);
 		~RenderGraph() noexcept;
 
-		template<typename PassData, typename SetupFunc, typename ExecuteFunc>
-		auto* AddPass(const char* passName, SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept;
+		template <typename PassData, typename SetupFunc, typename ExecuteFunc>
+		auto* AddPass(
+			const char* passName, SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept;
 
-		template<typename PassData, typename SetupFunc, typename ExecuteFunc>
-		auto* AddPass(const char* passName,
-			RGPassEncoderType encoderType,
-			SetupFunc setupFunc,
+		template <typename PassData, typename SetupFunc, typename ExecuteFunc>
+		auto* AddPass(const char* passName, RGPassEncoderType encoderType, SetupFunc setupFunc,
 			ExecuteFunc&& executeFunc) noexcept;
 
-		template<typename PassData, typename SetupFunc>
+		template <typename PassData, typename SetupFunc>
 		auto* AddPass(const char* passName, SetupFunc setupFunc) noexcept;
 
-		template<typename PassData, typename SetupFunc>
-		auto* AddPass(const char* passName,
-			RGPassEncoderType encoderType,
-			SetupFunc setupFunc) noexcept;
+		template <typename PassData, typename SetupFunc>
+		auto* AddPass(
+			const char* passName, RGPassEncoderType encoderType, SetupFunc setupFunc) noexcept;
 
 		// Add an always - executed pass with no pass data or resource declarations.
-		template<typename ExecuteFunc>
+		template <typename ExecuteFunc>
 		auto* AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept;
 
-		template<typename ExecuteFunc>
-		auto* AddTrivialSideEffectPass(const char* passName,
-			RGPassEncoderType encoderType,
+		template <typename ExecuteFunc>
+		auto* AddTrivialSideEffectPass(const char* passName, RGPassEncoderType encoderType,
 			ExecuteFunc&& executeFunc) noexcept;
 
 		[[nodiscard]] bool Compile() noexcept;
 		void Execute(RGExecuteContext& executeContext) noexcept;
 		void Retire(const RHIFencePoint& fencePoint) noexcept;
 
-		[[nodiscard]] const RGExecutionPlan* GetExecutionPlan() const noexcept { return m_ExecutionPlan.get(); }
+		[[nodiscard]] const RGExecutionPlan* GetExecutionPlan() const noexcept
+		{
+			return m_ExecutionPlan.get();
+		}
 		[[nodiscard]] const std::vector<RGCompileDiagnostic>& GetCompileDiagnostics() const noexcept
 		{
 			return m_CompileDiagnostics;
@@ -427,51 +402,42 @@ namespace gglab
 			RHITextureViewType m_Type = RHITextureViewType::RenderTarget;
 		};
 
-		template<typename RESOURCE>
-		RGResourceId<RESOURCE> CreateInternal(const char* name,
-			const typename RESOURCE::Descriptor& desc) noexcept;
+		template <typename RESOURCE>
+		RGResourceId<RESOURCE> CreateInternal(
+			const char* name, const typename RESOURCE::Descriptor& desc) noexcept;
 
-		template<typename RESOURCE>
+		template <typename RESOURCE>
 		RGResourceId<RESOURCE> ImportInternal(const char* name,
 			typename RGResourceTraits<RESOURCE>::Handle handle,
 			const typename RESOURCE::Descriptor& desc,
 			typename RESOURCE::Access initialAccess) noexcept;
 
-		template<typename RESOURCE>
+		template <typename RESOURCE>
 		RGResourceId<RESOURCE> ReadInternal(RGPassNodeIndex passNodeIndex,
-			RGResourceId<RESOURCE> resourceId,
-			RESOURCE::Access access,
-			RHIStage stages,
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access, RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
 			RGOrderingRequirement ordering) noexcept;
 
-		template<typename RESOURCE>
+		template <typename RESOURCE>
 		RGResourceId<RESOURCE> WriteInternal(RGPassNodeIndex passNodeIndex,
-			RGResourceId<RESOURCE> resourceId,
-			RESOURCE::Access access,
-			RHIStage stages,
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access, RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
 			RGOrderingRequirement ordering) noexcept;
 
-		template<typename RESOURCE>
+		template <typename RESOURCE>
 		RGResourceId<RESOURCE> ReadWriteInternal(RGPassNodeIndex passNodeIndex,
-			RGResourceId<RESOURCE> resourceId,
-			RESOURCE::Access access,
-			RHIStage stages,
+			RGResourceId<RESOURCE> resourceId, RESOURCE::Access access, RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
 			RGOrderingRequirement ordering) noexcept;
 
-		template<typename RESOURCE>
-		void ExportInternal(RGPassNodeIndex passNodeIndex,
-			RGResourceId<RESOURCE> resourceId,
-			RESOURCE::Access finalAccess,
-			RHIStage stages,
+		template <typename RESOURCE>
+		void ExportInternal(RGPassNodeIndex passNodeIndex, RGResourceId<RESOURCE> resourceId,
+			RESOURCE::Access finalAccess, RHIStage stages,
 			std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept;
 
-		template<RHITextureViewType T>
+		template <RHITextureViewType T>
 		RGTextureViewId CreateTextureView(
-			RGTextureId textureId,
-			std::optional<RHITextureViewDesc> desc) noexcept;
+			RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
 
@@ -499,25 +465,21 @@ namespace gglab
 		friend class RGBuilder;
 		friend class RGCompiler;
 
-		friend void BuildRenderGraphSnapshot(const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
+		friend void BuildRenderGraphSnapshot(
+			const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;
 	};
 
-	template<typename PassData, typename SetupFunc, typename ExecuteFunc>
-	inline auto* RenderGraph::AddPass(const char* passName, SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept
+	template <typename PassData, typename SetupFunc, typename ExecuteFunc>
+	inline auto* RenderGraph::AddPass(
+		const char* passName, SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept
 	{
-		return AddPass<PassData>(
-			passName,
-			RGPassEncoderType::Graphics,
-			std::move(setupFunc),
+		return AddPass<PassData>(passName, RGPassEncoderType::Graphics, std::move(setupFunc),
 			std::forward<ExecuteFunc>(executeFunc));
 	}
 
-	template<typename PassData, typename SetupFunc, typename ExecuteFunc>
-	inline auto* RenderGraph::AddPass(
-		const char* passName,
-		RGPassEncoderType encoderType,
-		SetupFunc setupFunc,
-		ExecuteFunc&& executeFunc) noexcept
+	template <typename PassData, typename SetupFunc, typename ExecuteFunc>
+	inline auto* RenderGraph::AddPass(const char* passName, RGPassEncoderType encoderType,
+		SetupFunc setupFunc, ExecuteFunc&& executeFunc) noexcept
 	{
 		using PassDataType = std::decay_t<PassData>;
 		using ExecuteFuncType = std::decay_t<ExecuteFunc>;
@@ -541,13 +503,12 @@ namespace gglab
 		return pass;
 	}
 
-	template<RHITextureViewType T>
+	template <RHITextureViewType T>
 	inline RGTextureViewId RenderGraph::CreateTextureView(
-		RGTextureId textureId,
-		std::optional<RHITextureViewDesc> desc) noexcept
+		RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept
 	{
-		GGLAB_ASSERT_MSG(textureId.IsValid(),
-			"RenderGraph::CreateTextureView requires a valid texture id.");
+		GGLAB_ASSERT_MSG(
+			textureId.IsValid(), "RenderGraph::CreateTextureView requires a valid texture id.");
 		if (!textureId.IsValid())
 		{
 			return InvalidRGTextureViewId;
@@ -557,8 +518,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			virtualResource && virtualResource->m_ResourceType == RGResourceType::RGTexture,
 			"RenderGraph::CreateTextureView requires a texture resource.");
-		if (!virtualResource ||
-			virtualResource->m_ResourceType != RGResourceType::RGTexture)
+		if (!virtualResource || virtualResource->m_ResourceType != RGResourceType::RGTexture)
 		{
 			return InvalidRGTextureViewId;
 		}
@@ -582,87 +542,80 @@ namespace gglab
 		}
 
 		const RGTextureViewId viewId{
-			static_cast<RGTextureViewId::ValueType>(m_TextureViews.size())
-		};
+			static_cast<RGTextureViewId::ValueType>(m_TextureViews.size()) };
 		m_TextureViews.push_back(std::move(view));
 		return viewId;
 	}
 
-	template<typename PassData, typename SetupFunc>
+	template <typename PassData, typename SetupFunc>
 	inline auto* RenderGraph::AddPass(const char* passName, SetupFunc setupFunc) noexcept
 	{
 		using PassDataType = std::decay_t<PassData>;
 
-		return AddPass<PassDataType>(passName, std::move(setupFunc),
-			[](RGExecuteContext&, PassDataType&) noexcept {});
+		return AddPass<PassDataType>(
+			passName, std::move(setupFunc), [](RGExecuteContext&, PassDataType&) noexcept {});
 	}
 
-	template<typename PassData, typename SetupFunc>
+	template <typename PassData, typename SetupFunc>
 	inline auto* RenderGraph::AddPass(
-		const char* passName,
-		RGPassEncoderType encoderType,
-		SetupFunc setupFunc) noexcept
+		const char* passName, RGPassEncoderType encoderType, SetupFunc setupFunc) noexcept
 	{
 		using PassDataType = std::decay_t<PassData>;
 
-		return AddPass<PassDataType>(
-			passName,
-			encoderType,
-			std::move(setupFunc),
+		return AddPass<PassDataType>(passName, encoderType, std::move(setupFunc),
 			[](RGExecuteContext&, PassDataType&) noexcept {});
 	}
 
-	template<typename ExecuteFunc>
-	inline auto* RenderGraph::AddTrivialSideEffectPass(const char* passName, ExecuteFunc&& executeFunc) noexcept
+	template <typename ExecuteFunc>
+	inline auto* RenderGraph::AddTrivialSideEffectPass(
+		const char* passName, ExecuteFunc&& executeFunc) noexcept
 	{
 		return AddTrivialSideEffectPass(
-			passName,
-			RGPassEncoderType::Graphics,
-			std::forward<ExecuteFunc>(executeFunc));
+			passName, RGPassEncoderType::Graphics, std::forward<ExecuteFunc>(executeFunc));
 	}
 
-	template<typename ExecuteFunc>
+	template <typename ExecuteFunc>
 	inline auto* RenderGraph::AddTrivialSideEffectPass(
-		const char* passName,
-		RGPassEncoderType encoderType,
-		ExecuteFunc&& executeFunc) noexcept
+		const char* passName, RGPassEncoderType encoderType, ExecuteFunc&& executeFunc) noexcept
 	{
-		struct EmptyData {};
-		return AddPass<EmptyData>(passName,
-			encoderType,
-			[](RGBuilder& builder, EmptyData&) { builder.SideEffect(); },
-			[fn = std::forward<ExecuteFunc>(executeFunc)](RGExecuteContext& executeContext, EmptyData&)
-			{
-				fn(executeContext);
-			});
+		struct EmptyData
+		{
+		};
+		return AddPass<EmptyData>(
+			passName, encoderType, [](RGBuilder& builder, EmptyData&) { builder.SideEffect(); },
+			[fn = std::forward<ExecuteFunc>(executeFunc)](
+				RGExecuteContext& executeContext, EmptyData&) { fn(executeContext); });
 	}
 
-	template<typename RESOURCE>
-	inline RGResourceId<RESOURCE> RenderGraph::CreateInternal(const char* name,
-		const typename RESOURCE::Descriptor& desc) noexcept
+	template <typename RESOURCE>
+	inline RGResourceId<RESOURCE> RenderGraph::CreateInternal(
+		const char* name, const typename RESOURCE::Descriptor& desc) noexcept
 	{
 		using RHIUsage = std::remove_cvref_t<decltype(desc.m_Usage)>;
 		GGLAB_ASSERT_MSG(desc.m_Usage == RHIUsage::None,
 			"RenderGraph resource usage is inferred from reachable pass accesses during Compile().");
 
-		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
+		RGResourceHandle handle{
+			RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
 		RGResourceSlot slot;
-		slot.m_VirtualResourceIndex = RGVirtualResourceIndex{ static_cast<uint32_t>(m_VirtualResources.size()) };
-		slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
+		slot.m_VirtualResourceIndex =
+			RGVirtualResourceIndex{ static_cast<uint32_t>(m_VirtualResources.size()) };
+		slot.m_ResourceNodeIndex =
+			RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		slot.m_Version = 1;
 
 		m_ResourceSlots.push_back(slot);
 
-		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
+		RGVirtualResource<RESOURCE>* virtualResource =
+			m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Devirtualized = false;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		m_VirtualResources.push_back(virtualResource);
 
-		RGResourceNode resourceNode
-		{
+		RGResourceNode resourceNode{
 			.m_ResourceHandle = handle,
 			.m_VirtualResource = virtualResource,
 		};
@@ -675,37 +628,40 @@ namespace gglab
 		return RGResourceId<RESOURCE>{handle};
 	}
 
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ImportInternal(const char* name,
 		typename RGResourceTraits<RESOURCE>::Handle importedHandle,
-		const typename RESOURCE::Descriptor& desc,
-		typename RESOURCE::Access initialAccess) noexcept
+		const typename RESOURCE::Descriptor& desc, typename RESOURCE::Access initialAccess) noexcept
 	{
 		GGLAB_ASSERT_MSG(name && *name, "Import name must be valid.");
 		GGLAB_ASSERT_MSG(importedHandle.IsValid(), "Import RHI resource handle must be valid.");
-		GGLAB_ASSERT_MSG(m_Device->IsAlive(importedHandle), "Import RHI resource handle must be live.");
+		GGLAB_ASSERT_MSG(
+			m_Device->IsAlive(importedHandle), "Import RHI resource handle must be live.");
 
-		RGResourceHandle handle{ RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
+		RGResourceHandle handle{
+			RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
 
 		RGResourceSlot slot;
-		slot.m_VirtualResourceIndex = RGVirtualResourceIndex{ static_cast<uint32_t>(m_VirtualResources.size()) };
-		slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
+		slot.m_VirtualResourceIndex =
+			RGVirtualResourceIndex{ static_cast<uint32_t>(m_VirtualResources.size()) };
+		slot.m_ResourceNodeIndex =
+			RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		slot.m_Version = 1;
 
 		m_ResourceSlots.push_back(slot);
 
-		RGVirtualResource<RESOURCE>* virtualResource = m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
+		RGVirtualResource<RESOURCE>* virtualResource =
+			m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Imported = true;
-		virtualResource->m_Devirtualized = true;	// import resource alreay devirtualized.
+		virtualResource->m_Devirtualized = true; // import resource alreay devirtualized.
 		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialAccess);
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		virtualResource->m_ImportedHandle = importedHandle;
 		m_VirtualResources.push_back(virtualResource);
 
-		RGResourceNode resourceNode
-		{
+		RGResourceNode resourceNode{
 			.m_ResourceHandle = handle,
 			.m_VirtualResource = virtualResource,
 		};
@@ -718,21 +674,17 @@ namespace gglab
 		return RGResourceId<RESOURCE>{handle};
 	}
 
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ReadInternal(RGPassNodeIndex passNodeIndex,
-		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access resourceAccess,
-		RHIStage stages,
-		std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+		RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access resourceAccess,
+		RHIStage stages, std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
 		RGOrderingRequirement ordering) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read valid resource.");
 		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Read requires a non-empty pipeline stage.");
-		GGLAB_ASSERT_MSG(
-			IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Read, ordering),
+		GGLAB_ASSERT_MSG(IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Read, ordering),
 			"Read access is incompatible with its storage or ordering semantics.");
-		if (!resourceId.IsValid() ||
-			stages == RHIStage::None ||
+		if (!resourceId.IsValid() || stages == RHIStage::None ||
 			!IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Read, ordering))
 		{
 			m_BuildValid = false;
@@ -740,7 +692,8 @@ namespace gglab
 		}
 
 		const auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
-		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Read with stale handle.Version");
+		GGLAB_ASSERT_MSG(
+			slot.m_Version == resourceId.GetVersion(), "Read with stale handle.Version");
 		if (slot.m_Version != resourceId.GetVersion())
 		{
 			m_BuildValid = false;
@@ -758,7 +711,8 @@ namespace gglab
 		RGPassNode& passNode = m_PassNodes[passNodeIndex.Value()];
 		const RGPassNodeIndex stablePassNodeIndex = passNodeIndex;
 
-		GGLAB_ASSERT_MSG(resourceNode.m_Writer != stablePassNodeIndex, "Pass can not read this resource and write same resource.");
+		GGLAB_ASSERT_MSG(resourceNode.m_Writer != stablePassNodeIndex,
+			"Pass can not read this resource and write same resource.");
 
 		resourceNode.m_Readers.push_back(stablePassNodeIndex);
 
@@ -778,11 +732,9 @@ namespace gglab
 		return resourceId;
 	}
 
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline void RenderGraph::ExportInternal(RGPassNodeIndex passNodeIndex,
-		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access finalAccess,
-		RHIStage stages,
+		RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access finalAccess, RHIStage stages,
 		std::optional<typename RESOURCE::SubresourceDescriptor> subresources) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must export valid resource.");
@@ -794,7 +746,8 @@ namespace gglab
 		}
 
 		const auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
-		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Export with stale handle.Version");
+		GGLAB_ASSERT_MSG(
+			slot.m_Version == resourceId.GetVersion(), "Export with stale handle.Version");
 		if (slot.m_Version != resourceId.GetVersion())
 		{
 			m_BuildValid = false;
@@ -803,7 +756,8 @@ namespace gglab
 
 		auto* virtualResource = GetVirtualResource(resourceId);
 		GGLAB_ASSERT_MSG(virtualResource != nullptr, "Export resource must exist.");
-		GGLAB_ASSERT_MSG(virtualResource->m_Imported, "Only imported resources may declare an exported state.");
+		GGLAB_ASSERT_MSG(
+			virtualResource->m_Imported, "Only imported resources may declare an exported state.");
 		if (!virtualResource || !virtualResource->m_Imported)
 		{
 			m_BuildValid = false;
@@ -831,21 +785,17 @@ namespace gglab
 		}
 	}
 
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::WriteInternal(RGPassNodeIndex passNodeIndex,
-		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access resourceAccess,
-		RHIStage stages,
-		std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+		RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access resourceAccess,
+		RHIStage stages, std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
 		RGOrderingRequirement ordering) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must write valid resource.");
 		GGLAB_ASSERT_MSG(stages != RHIStage::None, "Write requires a non-empty pipeline stage.");
-		GGLAB_ASSERT_MSG(
-			IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Write, ordering),
+		GGLAB_ASSERT_MSG(IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Write, ordering),
 			"Write access is incompatible with its storage or ordering semantics.");
-		if (!resourceId.IsValid() ||
-			stages == RHIStage::None ||
+		if (!resourceId.IsValid() || stages == RHIStage::None ||
 			!IsRGAccessCompatible(resourceAccess, RGDependencyAccess::Write, ordering))
 		{
 			m_BuildValid = false;
@@ -853,7 +803,8 @@ namespace gglab
 		}
 
 		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
-		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "Write with stale handle.Version");
+		GGLAB_ASSERT_MSG(
+			slot.m_Version == resourceId.GetVersion(), "Write with stale handle.Version");
 		if (slot.m_Version != resourceId.GetVersion())
 		{
 			m_BuildValid = false;
@@ -881,7 +832,8 @@ namespace gglab
 			nextResourceNode.m_ResourceHandle = resourceId;
 			nextResourceNode.m_VirtualResource = curResourceNode->m_VirtualResource;
 			nextResourceNode.m_Previous = previousNodeIndex;
-			slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
+			slot.m_ResourceNodeIndex =
+				RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 			m_ResourceNodes.push_back(nextResourceNode);
 
 			curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
@@ -910,21 +862,19 @@ namespace gglab
 		return resourceId;
 	}
 
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ReadWriteInternal(RGPassNodeIndex passNodeIndex,
-		RGResourceId<RESOURCE> resourceId,
-		typename RESOURCE::Access resourceAccess,
-		RHIStage stages,
-		std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
+		RGResourceId<RESOURCE> resourceId, typename RESOURCE::Access resourceAccess,
+		RHIStage stages, std::optional<typename RESOURCE::SubresourceDescriptor> subresources,
 		RGOrderingRequirement ordering) noexcept
 	{
 		GGLAB_ASSERT_MSG(resourceId.IsValid(), "Must read-write valid resource.");
-		GGLAB_ASSERT_MSG(stages != RHIStage::None, "ReadWrite requires a non-empty pipeline stage.");
+		GGLAB_ASSERT_MSG(
+			stages != RHIStage::None, "ReadWrite requires a non-empty pipeline stage.");
 		GGLAB_ASSERT_MSG(
 			IsRGAccessCompatible(resourceAccess, RGDependencyAccess::ReadWrite, ordering),
 			"ReadWrite access is incompatible with its storage or ordering semantics.");
-		if (!resourceId.IsValid() ||
-			stages == RHIStage::None ||
+		if (!resourceId.IsValid() || stages == RHIStage::None ||
 			!IsRGAccessCompatible(resourceAccess, RGDependencyAccess::ReadWrite, ordering))
 		{
 			m_BuildValid = false;
@@ -932,7 +882,8 @@ namespace gglab
 		}
 
 		auto& slot = m_ResourceSlots[resourceId.GetHandle().Value()];
-		GGLAB_ASSERT_MSG(slot.m_Version == resourceId.GetVersion(), "ReadWrite with stale handle.Version");
+		GGLAB_ASSERT_MSG(
+			slot.m_Version == resourceId.GetVersion(), "ReadWrite with stale handle.Version");
 		if (slot.m_Version != resourceId.GetVersion())
 		{
 			m_BuildValid = false;
@@ -953,7 +904,8 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(previousNode.m_Writer != stablePassNodeIndex,
 			"Pass can not read-write a resource it already writes.");
-		GGLAB_ASSERT_MSG(previousNode.m_Writer.IsValid() || previousNode.m_VirtualResource->m_Imported,
+		GGLAB_ASSERT_MSG(
+			previousNode.m_Writer.IsValid() || previousNode.m_VirtualResource->m_Imported,
 			"ReadWrite requires existing contents. Use Write to initialize a transient resource.");
 
 		previousNode.m_Readers.push_back(stablePassNodeIndex);
@@ -966,7 +918,8 @@ namespace gglab
 		nextResourceNode.m_VirtualResource = virtualResource;
 		nextResourceNode.m_Previous = previousNodeIndex;
 		nextResourceNode.m_Writer = stablePassNodeIndex;
-		slot.m_ResourceNodeIndex = RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
+		slot.m_ResourceNodeIndex =
+			RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		m_ResourceNodes.push_back(nextResourceNode);
 
 		if (virtualResource && virtualResource->m_Imported)
@@ -974,34 +927,32 @@ namespace gglab
 			passNode.m_SideEffect = true;
 		}
 
-		passNode.m_Accesses.push_back(
+		passNode.m_Accesses.push_back({
+			.m_ResourceNodeIndex = previousNodeIndex,
+			.m_AccessValue = static_cast<uint64_t>(resourceAccess),
+			.m_Stages = stages,
+			.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,
+			.m_DependencyAccess = RGDependencyAccess::ReadWrite,
+			.m_Ordering = ordering,
+			.m_Subresources = [&]() -> std::optional<RHISubresourceRange>
 			{
-				.m_ResourceNodeIndex = previousNodeIndex,
-				.m_AccessValue = static_cast<uint64_t>(resourceAccess),
-				.m_Stages = stages,
-				.m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType,
-				.m_DependencyAccess = RGDependencyAccess::ReadWrite,
-				.m_Ordering = ordering,
-				.m_Subresources = [&]() -> std::optional<RHISubresourceRange>
+				if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
 				{
-					if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
-					{
-						return subresources;
-					}
-					else
-					{
-						return std::nullopt;
-					}
-				}(),
+					return subresources;
+				}
+				else
+				{
+					return std::nullopt;
+				}
+			}(),
 			});
 		return resourceId;
 	}
 
 	// RGVirtualResource functions
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline void RGVirtualResource<RESOURCE>::Devirtualize(
-		TransientResourcePool* pool,
-		uint64_t usageBits) noexcept
+		TransientResourcePool* pool, uint64_t usageBits) noexcept
 	{
 		if (m_Devirtualized)
 		{
@@ -1031,7 +982,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Devirtualized, "Failed to acquire a transient physical resource.");
 	}
 
-	template<typename RESOURCE>
+	template <typename RESOURCE>
 	inline void RGVirtualResource<RESOURCE>::Release(
 		std::vector<TransientTextureAllocation>& retireTextures,
 		std::vector<TransientBufferAllocation>& retireBuffers) noexcept

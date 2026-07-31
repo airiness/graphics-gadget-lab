@@ -41,9 +41,10 @@ namespace gglab
 		initInfo.NumFramesInFlight = swapChain.GetBufferCount();
 		initInfo.RTVFormat = ToDXGIFormat(swapChain.GetFormat());
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		initInfo.SrvDescriptorHeap =
-			m_DescriptorManager->GetFreeListAllocator(
-				DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap()->Get();
+		initInfo.SrvDescriptorHeap = m_DescriptorManager
+			->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)
+			->GetHeap()
+			->Get();
 		initInfo.SrvDescriptorAllocFn = DescriptorAlloc;
 		initInfo.SrvDescriptorFreeFn = DescriptorFree;
 		initInfo.UserData = this;
@@ -87,8 +88,7 @@ namespace gglab
 	}
 
 	void DevelopGuiDX12RenderBackend::RenderDrawData(
-		RHIGraphicsCommandContext* commandContext,
-		RHITextureViewHandle renderTarget) noexcept
+		RHIGraphicsCommandContext* commandContext, RHITextureViewHandle renderTarget) noexcept
 	{
 		GGLAB_ASSERT(m_IsInitialized);
 		if (!m_IsInitialized)
@@ -105,8 +105,9 @@ namespace gglab
 
 		commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&renderTarget, 1));
 
-		auto* heap = m_DescriptorManager->GetFreeListAllocator(
-			DX12DescriptorManager::AllocatorType::DevelopGuiSrv)->GetHeap();
+		auto* heap = m_DescriptorManager
+			->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)
+			->GetHeap();
 		dx12Context->GetCommandList()->SetDescriptorHeap(*heap);
 
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx12Context->Get());
@@ -115,23 +116,19 @@ namespace gglab
 	ImTextureID DevelopGuiDX12RenderBackend::ResolveTextureId(
 		RHIDescriptorHandle descriptor) const noexcept
 	{
-		if (!m_IsInitialized || !m_DescriptorManager ||
-			!descriptor.IsValid() ||
+		if (!m_IsInitialized || !m_DescriptorManager || !descriptor.IsValid() ||
 			descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
 		{
 			return {};
 		}
 
-		auto* heap = m_DescriptorManager->GetHeap(
-			DX12DescriptorManager::HeapType::CbvSrvUav);
-		return heap ? static_cast<ImTextureID>(heap->GpuHandleAt(descriptor.m_Index).ptr) :
-			ImTextureID{};
+		auto* heap = m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
+		return heap ? static_cast<ImTextureID>(heap->GpuHandleAt(descriptor.m_Index).ptr)
+			: ImTextureID{};
 	}
 
-	void DevelopGuiDX12RenderBackend::DescriptorAlloc(
-		ImGui_ImplDX12_InitInfo* info,
-		D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle,
-		D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
+	void DevelopGuiDX12RenderBackend::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
+		D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
 		auto* backend = static_cast<DevelopGuiDX12RenderBackend*>(info->UserData);
 		auto descriptorView = backend->m_DescriptorManager->AllocateDevelopGuiSrvView();
@@ -139,10 +136,8 @@ namespace gglab
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
 
-	void DevelopGuiDX12RenderBackend::DescriptorFree(
-		ImGui_ImplDX12_InitInfo* info,
-		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
+	void DevelopGuiDX12RenderBackend::DescriptorFree(ImGui_ImplDX12_InitInfo* info,
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle)
 	{
 		GGLAB_UNUSED(cpuHandle);
 		auto* backend = static_cast<DevelopGuiDX12RenderBackend*>(info->UserData);

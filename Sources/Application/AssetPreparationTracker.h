@@ -13,22 +13,14 @@ namespace gglab
 	{
 	public:
 		void Reset() noexcept;
-		void TrackModel(
-			ModelID modelId,
-			std::string_view label,
-			float weight = 1.0f) noexcept;
-		void TrackMesh(
-			MeshID meshId,
-			std::string_view label,
-			float weight = 1.0f) noexcept;
+		void TrackModel(ModelID modelId, std::string_view label, float weight = 1.0f) noexcept;
+		void TrackMesh(MeshID meshId, std::string_view label, float weight = 1.0f) noexcept;
 
 		[[nodiscard]] LoadingProgress BuildProgress(
-			const AssetManager& assetManager,
-			std::string title = {}) const noexcept;
+			const AssetManager& assetManager, std::string title = {}) const noexcept;
 
 	private:
-		template<typename AssetId>
-		struct Dependency
+		template <typename AssetId> struct Dependency
 		{
 			AssetId m_Id{};
 			std::string m_Label;

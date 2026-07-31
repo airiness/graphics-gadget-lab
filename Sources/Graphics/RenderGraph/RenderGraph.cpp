@@ -7,12 +7,12 @@ namespace gglab
 {
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
-		m_TransientResourcePool(createInfo.m_TransientResourcePool),
-		m_ArenaAllocator(1u << 20),
+		m_TransientResourcePool(createInfo.m_TransientResourcePool), m_ArenaAllocator(1u << 20),
 		m_Blackboard(m_ArenaAllocator)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice can not be null.");
-		GGLAB_ASSERT_MSG(m_TransientResourcePool != nullptr, "TransientResourcePool can not be null.");
+		GGLAB_ASSERT_MSG(
+			m_TransientResourcePool != nullptr, "TransientResourcePool can not be null.");
 	}
 
 	RenderGraph::~RenderGraph() noexcept = default;
@@ -42,16 +42,15 @@ namespace gglab
 
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_ExecutionPlan != nullptr,
-			"RenderGraph::Execute requires a successful Compile().");
+		GGLAB_ASSERT_MSG(
+			m_ExecutionPlan != nullptr, "RenderGraph::Execute requires a successful Compile().");
 		if (!m_ExecutionPlan)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RenderGraph execution skipped because compilation failed.");
 			return;
 		}
 
-		RGExecutor::Execute(
-			*m_ExecutionPlan,
+		RGExecutor::Execute(*m_ExecutionPlan,
 			{
 				.m_Device = m_Device,
 				.m_TransientResourcePool = m_TransientResourcePool,
@@ -99,15 +98,14 @@ namespace gglab
 	const RHITextureDesc& RenderGraph::GetTextureDesc(RGTextureId textureId) const noexcept
 	{
 		static const RHITextureDesc InvalidTextureDesc{};
-		GGLAB_ASSERT_MSG(textureId.IsValid(),
-			"RenderGraph::GetTextureDesc requires a valid texture id.");
+		GGLAB_ASSERT_MSG(
+			textureId.IsValid(), "RenderGraph::GetTextureDesc requires a valid texture id.");
 		if (!textureId.IsValid())
 		{
 			return InvalidTextureDesc;
 		}
 		auto* resource = GetVirtualResource(textureId);
-		GGLAB_ASSERT_MSG(
-			resource && resource->m_ResourceType == RGResourceType::RGTexture,
+		GGLAB_ASSERT_MSG(resource && resource->m_ResourceType == RGResourceType::RGTexture,
 			"RenderGraph::GetTextureDesc requires a texture resource.");
 		if (!resource || resource->m_ResourceType != RGResourceType::RGTexture)
 		{

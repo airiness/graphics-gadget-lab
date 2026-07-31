@@ -6,6 +6,5 @@ namespace gglab
 	struct TransientResourcePoolSnapshot;
 
 	void BuildTransientResourcePoolSnapshot(
-		const TransientResourcePool& pool,
-		TransientResourcePoolSnapshot& outSnapshot) noexcept;
+		const TransientResourcePool& pool, TransientResourcePoolSnapshot& outSnapshot) noexcept;
 }

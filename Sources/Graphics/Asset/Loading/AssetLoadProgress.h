@@ -20,10 +20,7 @@ namespace gglab
 		std::string m_Stage;
 		std::string m_Detail;
 
-		[[nodiscard]] bool IsReady() const noexcept
-		{
-			return m_State == AssetState::Ready;
-		}
+		[[nodiscard]] bool IsReady() const noexcept { return m_State == AssetState::Ready; }
 
 		[[nodiscard]] bool HasFailed() const noexcept
 		{
@@ -31,8 +28,7 @@ namespace gglab
 		}
 	};
 
-	[[nodiscard]] AssetLoadProgress GetAssetLoadProgress(
-		AssetState state,
+	[[nodiscard]] AssetLoadProgress GetAssetLoadProgress(AssetState state,
 		AssetLoadKind kind = AssetLoadKind::Generic,
 		const ProgressChannelPtr& progress = {}) noexcept;
 }

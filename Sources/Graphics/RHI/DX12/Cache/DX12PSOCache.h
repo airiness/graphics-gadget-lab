@@ -13,34 +13,33 @@ namespace gglab
 	class DX12PSOCache
 	{
 	public:
-		explicit DX12PSOCache(DX12Device* dx12Device, std::unique_ptr<IPSOCreator> creator) noexcept;
+		explicit DX12PSOCache(
+			DX12Device* dx12Device, std::unique_ptr<IPSOCreator> creator) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PSOCache);
 		~DX12PSOCache();
 
-		DX12PipelineState* GetOrCreate(
-			const RHIGraphicsPipelineDesc& desc,
+		DX12PipelineState* GetOrCreate(const RHIGraphicsPipelineDesc& desc,
 			const RootSignatureHandle& rootSignature,
 			const DX12GraphicsPipelineShaderInputs& shaderInputs) noexcept;
-		DX12PipelineState* GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept;
+		DX12PipelineState* GetOrCreate(
+			const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept;
 
 		void Clear() noexcept;
-		uint64_t GetRevision() const noexcept
-		{
-			return m_Revision.load(std::memory_order_relaxed);
-		}
+		uint64_t GetRevision() const noexcept { return m_Revision.load(std::memory_order_relaxed); }
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
 		std::unique_ptr<IPSOCreator> m_Creator;
-		std::unordered_map<DX12RHIGraphicsPSOKey, std::unique_ptr<DX12PipelineState>, DX12RHIGraphicsPSOKeyHash> m_RHIGraphicsPSOMap;
-		std::unordered_map<ComputePSOKey, std::unique_ptr<DX12PipelineState>, ComputePSOKeyHash> m_ComputePSOMap;
+		std::unordered_map<DX12RHIGraphicsPSOKey, std::unique_ptr<DX12PipelineState>,
+			DX12RHIGraphicsPSOKeyHash>
+			m_RHIGraphicsPSOMap;
+		std::unordered_map<ComputePSOKey, std::unique_ptr<DX12PipelineState>, ComputePSOKeyHash>
+			m_ComputePSOMap;
 
 		mutable std::shared_mutex m_Mutex;
 		std::atomic_uint64_t m_Revision = 1;
 
-		friend void BuildDX12PipelineSystemSnapshot(
-			const DX12PipelineSystem& system,
-			const PipelineCache* pipelineCache,
-			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
+		friend void BuildDX12PipelineSystemSnapshot(const DX12PipelineSystem& system,
+			const PipelineCache* pipelineCache, RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

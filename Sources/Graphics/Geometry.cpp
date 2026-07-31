@@ -10,12 +10,8 @@ namespace gglab
 {
 	namespace primitive
 	{
-		entt::entity PrimitiveBase::CreatePrimitive(
-			const CreateInfo& info,
-			ModelID modelId,
-			MeshID meshId,
-			std::string_view name,
-			VertexBuilder buildVertices,
+		entt::entity PrimitiveBase::CreatePrimitive(const CreateInfo& info, ModelID modelId,
+			MeshID meshId, std::string_view name, VertexBuilder buildVertices,
 			IndexBuilder buildIndices) noexcept
 		{
 			GGLAB_ASSERT_NOT_NULL(info.m_AssetManager);
@@ -55,7 +51,7 @@ namespace gglab
 				model->m_MeshInstance.push_back({
 					.m_MeshId = meshId,
 					.m_MaterialId = ProceduralPrimitiveMaterialID,
-				});
+					});
 				assetManager.AddProceduralModel(std::move(model));
 			}
 
@@ -68,67 +64,57 @@ namespace gglab
 				GGLAB_ASSERT_MSG(info.m_MaterialInstance->m_Key.IsValid(),
 					"A procedural primitive material instance requires a stable key.");
 				registry.emplace<components::MaterialInstanceComponent>(
-					entity,
-					*info.m_MaterialInstance);
+					entity, *info.m_MaterialInstance);
 			}
 			return entity;
 		}
 
 		entt::entity Cube::Create(const CreateInfo& info) noexcept
 		{
-			return CreatePrimitive(
-				info,
-				ProceduralCubeModelID,
-				ProceduralCubeMeshID,
-				"ProceduralCube",
-				&GetVerticesData,
-				&GetIndicesData);
+			return CreatePrimitive(info, ProceduralCubeModelID, ProceduralCubeMeshID,
+				"ProceduralCube", &GetVerticesData, &GetIndicesData);
 		}
 
 		std::vector<Vertex> Cube::GetVerticesData() noexcept
 		{
-			constexpr std::array<std::array<Vector3, VertexCountPerFace>, FaceCount> facePositions =
-			{ {
+			constexpr std::array<std::array<Vector3, VertexCountPerFace>, FaceCount> facePositions = { {
 				// Front face (-Z)
-				{{{-1.0f, -1.0f, -1.0f}, {-1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}}},
+				{{{-1.0f, -1.0f, -1.0f}, {-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, -1.0f}, {1.0f, -1.0f, -1.0f}}},
 				// Back face (+Z)
-				{{{ 1.0f, -1.0f,  1.0f}, { 1.0f,  1.0f,  1.0f}, {-1.0f,  1.0f,  1.0f}, {-1.0f, -1.0f,  1.0f}}},
+				{{{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f, 1.0f}}},
 				// Top face (+Y)
-				{{{-1.0f,  1.0f, -1.0f}, {-1.0f,  1.0f,  1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f,  1.0f, -1.0f}}},
+				{{{-1.0f, 1.0f, -1.0f}, {-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, -1.0f}}},
 				// Bottom face (-Y)
-				{{{-1.0f, -1.0f,  1.0f}, {-1.0f, -1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}, { 1.0f, -1.0f,  1.0f}}},
+				{{{-1.0f, -1.0f, 1.0f}, {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, 1.0f}}},
 				// Left face (-X)
-				{{{-1.0f, -1.0f,  1.0f}, {-1.0f,  1.0f,  1.0f}, {-1.0f,  1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}}},
+				{{{-1.0f, -1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f, -1.0f}, {-1.0f, -1.0f, -1.0f}}},
 				// Right face (+X)
-				{{{ 1.0f, -1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f, -1.0f,  1.0f}}},
+				{{{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, -1.0f, 1.0f}}},
 			} };
 
-			constexpr std::array<Vector2, VertexCountPerFace> texCoords =
-			{ {
-				{ 0.0f, 1.0f },
-				{ 0.0f, 0.0f },
-				{ 1.0f, 0.0f },
-				{ 1.0f, 1.0f },
+			constexpr std::array<Vector2, VertexCountPerFace> texCoords = { {
+				{0.0f, 1.0f},
+				{0.0f, 0.0f},
+				{1.0f, 0.0f},
+				{1.0f, 1.0f},
 			} };
 
-			constexpr std::array<Vector3, FaceCount> faceNormals =
-			{ {
-				{ 0.0f,  0.0f, -1.0f }, // Front
-				{ 0.0f,  0.0f,  1.0f }, // Back
-				{ 0.0f,  1.0f,  0.0f }, // Top
-				{ 0.0f, -1.0f,  0.0f }, // Bottom
-				{-1.0f,  0.0f,  0.0f }, // Left
-				{ 1.0f,  0.0f,  0.0f }, // Right
+			constexpr std::array<Vector3, FaceCount> faceNormals = { {
+				{0.0f, 0.0f, -1.0f}, // Front
+				{0.0f, 0.0f, 1.0f},	 // Back
+				{0.0f, 1.0f, 0.0f},	 // Top
+				{0.0f, -1.0f, 0.0f}, // Bottom
+				{-1.0f, 0.0f, 0.0f}, // Left
+				{1.0f, 0.0f, 0.0f},	 // Right
 			} };
 
-			constexpr std::array<Vector4, FaceCount> faceTangents =
-			{ {
-				{ 1.0f, 0.0f,  0.0f, 1.0f }, // Front
-				{-1.0f, 0.0f,  0.0f, 1.0f }, // Back
-				{ 1.0f, 0.0f,  0.0f, 1.0f }, // Top
-				{ 1.0f, 0.0f,  0.0f, 1.0f }, // Bottom
-				{ 0.0f, 0.0f, -1.0f, 1.0f }, // Left
-				{ 0.0f, 0.0f,  1.0f, 1.0f }, // Right
+			constexpr std::array<Vector4, FaceCount> faceTangents = { {
+				{1.0f, 0.0f, 0.0f, 1.0f},  // Front
+				{-1.0f, 0.0f, 0.0f, 1.0f}, // Back
+				{1.0f, 0.0f, 0.0f, 1.0f},  // Top
+				{1.0f, 0.0f, 0.0f, 1.0f},  // Bottom
+				{0.0f, 0.0f, -1.0f, 1.0f}, // Left
+				{0.0f, 0.0f, 1.0f, 1.0f},  // Right
 			} };
 
 			std::vector<Vertex> vertices;
@@ -171,13 +157,8 @@ namespace gglab
 
 		entt::entity Sphere::Create(const CreateInfo& info) noexcept
 		{
-			return CreatePrimitive(
-				info,
-				ProceduralSphereModelID,
-				ProceduralSphereMeshID,
-				"ProceduralSphere",
-				&GetVerticesData,
-				&GetIndicesData);
+			return CreatePrimitive(info, ProceduralSphereModelID, ProceduralSphereMeshID,
+				"ProceduralSphere", &GetVerticesData, &GetIndicesData);
 		}
 
 		std::vector<Vertex> Sphere::GetVerticesData() noexcept
@@ -195,16 +176,14 @@ namespace gglab
 					const float u = static_cast<float>(slice) / static_cast<float>(SliceCount);
 					const float phi = u * math::TwoPi;
 					const Vector3 normal(
-						sinTheta * std::cos(phi),
-						cosTheta,
-						sinTheta * std::sin(phi));
+						sinTheta * std::cos(phi), cosTheta, sinTheta * std::sin(phi));
 					vertices.push_back({
 						normal,
 						normal,
 						Vector2(u, v),
 						Vector2(u, v),
 						Vector4(-std::sin(phi), 0.0f, std::cos(phi), 1.0f),
-					});
+						});
 				}
 			}
 			return vertices;
@@ -221,10 +200,15 @@ namespace gglab
 				{
 					const uint32_t topLeft = stack * rowStride + slice;
 					const uint32_t bottomLeft = topLeft + rowStride;
-					indices.insert(indices.end(), {
-						topLeft, topLeft + 1, bottomLeft,
-						topLeft + 1, bottomLeft + 1, bottomLeft,
-					});
+					indices.insert(indices.end(),
+						{
+							topLeft,
+							topLeft + 1,
+							bottomLeft,
+							topLeft + 1,
+							bottomLeft + 1,
+							bottomLeft,
+						});
 				}
 			}
 			return indices;

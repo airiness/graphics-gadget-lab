@@ -14,9 +14,7 @@ namespace gglab
 			uint32_t m_PlaneCount = 1;
 		};
 
-		DX12PlaneRange ToD3D12PlaneRange(
-			RHITextureAspect aspects,
-			uint32_t planeCount) noexcept
+		DX12PlaneRange ToD3D12PlaneRange(RHITextureAspect aspects, uint32_t planeCount) noexcept
 		{
 			if (planeCount <= 1)
 			{
@@ -25,8 +23,7 @@ namespace gglab
 				return { 0, 1 };
 			}
 
-			if (Test(aspects, RHITextureAspect::Depth) &&
-				Test(aspects, RHITextureAspect::Stencil))
+			if (Test(aspects, RHITextureAspect::Depth) && Test(aspects, RHITextureAspect::Stencil))
 			{
 				return { 0, std::min<uint32_t>(2, planeCount) };
 			}
@@ -59,55 +56,38 @@ namespace gglab
 		{
 			if (!subresources)
 			{
-				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
-					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 			}
 
 			RHISubresourceRange range = *subresources;
 			const uint32_t mipLevels = std::max<uint32_t>(1, resourceDesc.MipLevels);
 			const uint32_t arraySize = GetD3D12TextureArraySize(resourceDesc);
 			const uint32_t planeCount = GetD3D12TexturePlaneCount(resourceDesc);
-			range.m_MipCount = ResolveSubresourceCount(
-				range.m_BaseMip,
-				range.m_MipCount,
-				mipLevels);
-			range.m_ArraySliceCount = ResolveSubresourceCount(
-				range.m_BaseArraySlice,
-				range.m_ArraySliceCount,
-				arraySize);
+			range.m_MipCount =
+				ResolveSubresourceCount(range.m_BaseMip, range.m_MipCount, mipLevels);
+			range.m_ArraySliceCount =
+				ResolveSubresourceCount(range.m_BaseArraySlice, range.m_ArraySliceCount, arraySize);
 
-			const DX12PlaneRange planeRange =
-				ToD3D12PlaneRange(range.m_Aspects, planeCount);
+			const DX12PlaneRange planeRange = ToD3D12PlaneRange(range.m_Aspects, planeCount);
 			GGLAB_ASSERT_MSG(range.m_MipCount > 0 && range.m_ArraySliceCount > 0,
 				"DX12 texture barrier received an empty subresource range.");
-			GGLAB_ASSERT_MSG(
-				planeRange.m_BasePlane + planeRange.m_PlaneCount <= planeCount,
+			GGLAB_ASSERT_MSG(planeRange.m_BasePlane + planeRange.m_PlaneCount <= planeCount,
 				"DX12 texture barrier received an out-of-range plane selection.");
-			if (range.m_MipCount == 0 ||
-				range.m_ArraySliceCount == 0 ||
+			if (range.m_MipCount == 0 || range.m_ArraySliceCount == 0 ||
 				planeRange.m_BasePlane + planeRange.m_PlaneCount > planeCount)
 			{
-				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
-					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 			}
 
-			if (range.m_BaseMip == 0 &&
-				range.m_MipCount == mipLevels &&
-				range.m_BaseArraySlice == 0 &&
-				range.m_ArraySliceCount == arraySize &&
-				planeRange.m_BasePlane == 0 &&
-				planeRange.m_PlaneCount == planeCount)
+			if (range.m_BaseMip == 0 && range.m_MipCount == mipLevels &&
+				range.m_BaseArraySlice == 0 && range.m_ArraySliceCount == arraySize &&
+				planeRange.m_BasePlane == 0 && planeRange.m_PlaneCount == planeCount)
 			{
-				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
-					D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+				return CD3DX12_BARRIER_SUBRESOURCE_RANGE(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
 			}
 
-			return CD3DX12_BARRIER_SUBRESOURCE_RANGE(
-				range.m_BaseMip,
-				range.m_MipCount,
-				range.m_BaseArraySlice,
-				range.m_ArraySliceCount,
-				planeRange.m_BasePlane,
+			return CD3DX12_BARRIER_SUBRESOURCE_RANGE(range.m_BaseMip, range.m_MipCount,
+				range.m_BaseArraySlice, range.m_ArraySliceCount, planeRange.m_BasePlane,
 				planeRange.m_PlaneCount);
 		}
 	}
@@ -248,22 +228,16 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RHILayout.");
 	}
 
-	D3D12_TEXTURE_BARRIER BuildD3D12TextureBarrier(
-		const RHITextureBarrier& barrier,
-		ID3D12Resource* resource,
-		const D3D12_RESOURCE_DESC& resourceDesc) noexcept
+	D3D12_TEXTURE_BARRIER BuildD3D12TextureBarrier(const RHITextureBarrier& barrier,
+		ID3D12Resource* resource, const D3D12_RESOURCE_DESC& resourceDesc) noexcept
 	{
-		return CD3DX12_TEXTURE_BARRIER(
-			ToD3D12BarrierSync(barrier.m_Before.m_Stages),
+		return CD3DX12_TEXTURE_BARRIER(ToD3D12BarrierSync(barrier.m_Before.m_Stages),
 			ToD3D12BarrierSync(barrier.m_After.m_Stages),
 			ToD3D12BarrierAccess(barrier.m_Before.m_Access),
 			ToD3D12BarrierAccess(barrier.m_After.m_Access),
 			ToD3D12BarrierLayout(barrier.m_Before.m_Layout),
-			ToD3D12BarrierLayout(barrier.m_After.m_Layout),
-			resource,
-			BuildD3D12BarrierSubresourceRange(
-				barrier.m_Subresources,
-				resourceDesc));
+			ToD3D12BarrierLayout(barrier.m_After.m_Layout), resource,
+			BuildD3D12BarrierSubresourceRange(barrier.m_Subresources, resourceDesc));
 	}
 
 	D3D12_RESOURCE_STATES ToD3D12ResourceStates(RHIAccess access) noexcept
@@ -282,7 +256,8 @@ namespace gglab
 		D3D12_RESOURCE_STATES states = D3D12_RESOURCE_STATE_COMMON;
 		if (Test(access, RHIAccess::ShaderResource))
 		{
-			states |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			states |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+				D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		}
 		if (Test(access, RHIAccess::RenderTarget))
 		{

@@ -17,9 +17,7 @@ namespace gglab
 	class DX12GpuProfiler final : public GpuProfiler
 	{
 	public:
-		DX12GpuProfiler(DX12Device* device,
-			DX12CommandQueue* graphicsQueue,
-			uint32_t frameCount) noexcept;
+		DX12GpuProfiler(DX12Device* device, DX12CommandQueue* graphicsQueue, uint32_t frameCount) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12GpuProfiler);
 		~DX12GpuProfiler() override;
 

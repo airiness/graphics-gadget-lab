@@ -5,9 +5,8 @@
 
 namespace gglab
 {
-	class DevelopGuiWin32PlatformBackend final :
-		public DevelopGuiPlatformBackend,
-		public Win32MessageHandler
+	class DevelopGuiWin32PlatformBackend final : public DevelopGuiPlatformBackend,
+												 public Win32MessageHandler
 	{
 	public:
 		DevelopGuiWin32PlatformBackend() noexcept = default;
@@ -19,10 +18,7 @@ namespace gglab
 		void NewFrame() noexcept override;
 
 		[[nodiscard]] Win32MessageResult HandleWin32Message(
-			HWND hwnd,
-			UINT message,
-			WPARAM wParam,
-			LPARAM lParam) noexcept override;
+			HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) noexcept override;
 
 	private:
 		Win32Window::MessageSubscription m_MessageSubscription;

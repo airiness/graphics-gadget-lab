@@ -23,8 +23,7 @@ namespace gglab
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
 		friend constexpr auto operator<=>(
-			const ModelPublicationRetainToken&,
-			const ModelPublicationRetainToken&) = default;
+			const ModelPublicationRetainToken&, const ModelPublicationRetainToken&) = default;
 	};
 
 	struct ModelPublicationOwnerToken
@@ -33,8 +32,7 @@ namespace gglab
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
 		friend constexpr auto operator<=>(
-			const ModelPublicationOwnerToken&,
-			const ModelPublicationOwnerToken&) = default;
+			const ModelPublicationOwnerToken&, const ModelPublicationOwnerToken&) = default;
 	};
 
 	struct ModelPublicationLeaseToken
@@ -43,8 +41,7 @@ namespace gglab
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
 		friend constexpr auto operator<=>(
-			const ModelPublicationLeaseToken&,
-			const ModelPublicationLeaseToken&) = default;
+			const ModelPublicationLeaseToken&, const ModelPublicationLeaseToken&) = default;
 	};
 
 	struct ModelPublicationClaim
@@ -107,37 +104,28 @@ namespace gglab
 		[[nodiscard]] virtual bool PrepareModelForPublication(
 			const AssetContentVersion& model) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationTextureResult PublishTexture(
-			const ModelImportTexture& importedTexture,
-			TaskPriority priority) noexcept = 0;
+			const ModelImportTexture& importedTexture, TaskPriority priority) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationMaterialResult PublishMaterial(
 			const ImportedMaterial* importedMaterial,
 			std::span<const TextureID> textureIds) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationMeshResult PublishMesh(
-			const AssetContentVersion& model,
-			ModelMeshUploadSource source,
+			const AssetContentVersion& model, ModelMeshUploadSource source,
 			TaskPriority priority) noexcept = 0;
 
 		[[nodiscard]] virtual ModelPublicationOwnerToken CreateDependencyOwner(
 			const AssetContentVersion& model) noexcept = 0;
 		[[nodiscard]] virtual ModelPublicationLeaseToken AcquireDependencyLease(
-			ModelPublicationOwnerToken owner,
-			const AssetContentVersion& dependency,
+			ModelPublicationOwnerToken owner, const AssetContentVersion& dependency,
 			TaskPriority priority) noexcept = 0;
-		[[nodiscard]] virtual std::string CommitModel(
-			ModelPublicationCommit&& commit) noexcept = 0;
+		[[nodiscard]] virtual std::string CommitModel(ModelPublicationCommit&& commit) noexcept = 0;
 
 		virtual void ReleaseRetain(ModelPublicationRetainToken retain) noexcept = 0;
-		virtual void CancelClaimIfUnreferenced(
-			const ModelPublicationClaim& claim) noexcept = 0;
-		virtual void RollbackClaimIfUnreferenced(
-			const ModelPublicationClaim& claim) noexcept = 0;
+		virtual void CancelClaimIfUnreferenced(const ModelPublicationClaim& claim) noexcept = 0;
+		virtual void RollbackClaimIfUnreferenced(const ModelPublicationClaim& claim) noexcept = 0;
 		virtual void RemoveMaterial(MaterialID materialId) noexcept = 0;
-		virtual void ReleaseDependencyLease(
-			ModelPublicationLeaseToken lease) noexcept = 0;
-		virtual void DestroyDependencyOwner(
-			ModelPublicationOwnerToken owner) noexcept = 0;
-		virtual void AbortModel(
-			const AssetContentVersion& model,
+		virtual void ReleaseDependencyLease(ModelPublicationLeaseToken lease) noexcept = 0;
+		virtual void DestroyDependencyOwner(ModelPublicationOwnerToken owner) noexcept = 0;
+		virtual void AbortModel(const AssetContentVersion& model,
 			AssetResourcePublicationAbortReason reason) noexcept = 0;
 	};
 }

@@ -78,7 +78,8 @@ float4 SampleTextureCube(TextureSamplerBindingData bindingData, float3 direction
 // Sample textureCubeLevel with binding data
 float4 SampleTextureCubeLevel(TextureSamplerBindingData bindingData, float3 direction, float lod)
 {
-	return SampleTextureCubeLevel(bindingData.TextureIndex, bindingData.SamplerIndex, direction, lod);
+	return SampleTextureCubeLevel(
+		bindingData.TextureIndex, bindingData.SamplerIndex, direction, lod);
 }
 
 // Make TextureSamplerBindingData by uint2 binding data

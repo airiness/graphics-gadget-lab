@@ -42,16 +42,14 @@ namespace gglab
 
 		[[nodiscard]] bool CanUseRootDescriptor(const RHIBindingSlotDesc& slot) noexcept
 		{
-			return slot.m_Count == 1 &&
-				(slot.m_Type == RHIBindingType::ConstantBuffer ||
-					slot.m_Type == RHIBindingType::ReadOnlyStorageBuffer ||
-					slot.m_Type == RHIBindingType::ReadWriteStorageBuffer);
+			return slot.m_Count == 1 && (slot.m_Type == RHIBindingType::ConstantBuffer ||
+				slot.m_Type == RHIBindingType::ReadOnlyStorageBuffer ||
+				slot.m_Type == RHIBindingType::ReadWriteStorageBuffer);
 		}
 	}
 
 	void BuildDX12RootSignatureDesc(
-		const RHIBindingLayoutDesc& rhiDesc,
-		DX12BindingLayoutBuildResult& outDesc) noexcept
+		const RHIBindingLayoutDesc& rhiDesc, DX12BindingLayoutBuildResult& outDesc) noexcept
 	{
 		outDesc = {};
 
@@ -68,9 +66,9 @@ namespace gglab
 
 			if (IsBindlessBindingType(slot.m_Type))
 			{
-				flags |= slot.m_Type == RHIBindingType::BindlessSampledTextureTable ?
-					D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED :
-					D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
+				flags |= slot.m_Type == RHIBindingType::BindlessSampledTextureTable
+					? D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
+					: D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
 				continue;
 			}
 
@@ -81,11 +79,8 @@ namespace gglab
 			if (slot.m_Type == RHIBindingType::PushConstants)
 			{
 				GGLAB_ASSERT(slot.m_SizeInBytes % sizeof(uint32_t) == 0);
-				rootParameter.InitAsConstants(
-					slot.m_SizeInBytes / sizeof(uint32_t),
-					slot.m_Binding,
-					slot.m_Space,
-					visibility);
+				rootParameter.InitAsConstants(slot.m_SizeInBytes / sizeof(uint32_t), slot.m_Binding,
+					slot.m_Space, visibility);
 				continue;
 			}
 
@@ -95,24 +90,15 @@ namespace gglab
 				{
 				case RHIBindingType::ConstantBuffer:
 					rootParameter.InitAsConstantBufferView(
-						slot.m_Binding,
-						slot.m_Space,
-						D3D12_ROOT_DESCRIPTOR_FLAG_NONE,
-						visibility);
+						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;
 				case RHIBindingType::ReadOnlyStorageBuffer:
 					rootParameter.InitAsShaderResourceView(
-						slot.m_Binding,
-						slot.m_Space,
-						D3D12_ROOT_DESCRIPTOR_FLAG_NONE,
-						visibility);
+						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;
 				case RHIBindingType::ReadWriteStorageBuffer:
 					rootParameter.InitAsUnorderedAccessView(
-						slot.m_Binding,
-						slot.m_Space,
-						D3D12_ROOT_DESCRIPTOR_FLAG_NONE,
-						visibility);
+						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;
 				default:
 					GGLAB_UNREACHABLE("Unexpected root descriptor binding type.");
@@ -122,20 +108,13 @@ namespace gglab
 
 			GGLAB_ASSERT(outDesc.m_DescriptorRangeCount < RHIBindingLayoutDesc::MaxSlots);
 			auto& range = outDesc.m_DescriptorRanges[outDesc.m_DescriptorRangeCount++];
-			range.Init(
-				ToDX12DescriptorRangeType(slot.m_Type),
-				slot.m_Count == 0 ? UINT_MAX : slot.m_Count,
-				slot.m_Binding,
-				slot.m_Space,
+			range.Init(ToDX12DescriptorRangeType(slot.m_Type),
+				slot.m_Count == 0 ? UINT_MAX : slot.m_Count, slot.m_Binding, slot.m_Space,
 				D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
 			rootParameter.InitAsDescriptorTable(1, &range, visibility);
 		}
 
 		outDesc.m_Desc.Init_1_1(
-			outDesc.m_RootParameterCount,
-			outDesc.m_RootParameters.data(),
-			0,
-			nullptr,
-			flags);
+			outDesc.m_RootParameterCount, outDesc.m_RootParameters.data(), 0, nullptr, flags);
 	}
 }

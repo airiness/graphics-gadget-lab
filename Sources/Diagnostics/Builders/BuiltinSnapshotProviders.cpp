@@ -32,8 +32,7 @@ namespace gglab
 {
 	namespace
 	{
-		template<typename Snapshot>
-		class SnapshotProvider : public SnapshotProviderBase
+		template <typename Snapshot> class SnapshotProvider : public SnapshotProviderBase
 		{
 		public:
 			[[nodiscard]] SnapshotId GetId() const noexcept final { return SnapshotIdOf<Snapshot>; }
@@ -46,61 +45,93 @@ namespace gglab
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<AssetSnapshot>();
-				snapshot = context.m_AssetManager ? BuildAssetSnapshot(*context.m_AssetManager) : AssetSnapshot{};
+				snapshot = context.m_AssetManager ? BuildAssetSnapshot(*context.m_AssetManager)
+					: AssetSnapshot{};
 			}
 		};
 
 		class TaskSystemSnapshotProvider final : public SnapshotProvider<TaskSystemSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "Task System"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Task System";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TaskSystemSnapshot>();
-				if (context.m_TaskSystem) BuildTaskSystemSnapshot(*context.m_TaskSystem, snapshot);
-				else snapshot = {};
+				if (context.m_TaskSystem)
+				{
+					BuildTaskSystemSnapshot(*context.m_TaskSystem, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
 			}
 		};
 
-		class PersistentSceneBufferSnapshotProvider final : public SnapshotProvider<PersistentSceneBufferSnapshot>
+		class PersistentSceneBufferSnapshotProvider final
+			: public SnapshotProvider<PersistentSceneBufferSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "Persistent Scene Buffers"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Persistent Scene Buffers";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PersistentSceneBufferSnapshot>();
-				if (context.m_Renderer) BuildPersistentSceneBufferSnapshot(*context.m_Renderer, snapshot);
-				else snapshot = {};
+				if (context.m_Renderer)
+				{
+					BuildPersistentSceneBufferSnapshot(*context.m_Renderer, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
 			}
 		};
 
 		class IBLDiagnosticsSnapshotProvider final : public SnapshotProvider<IBLDiagnosticsSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "IBL Diagnostics"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "IBL Diagnostics";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
-				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(
-					*context.m_Renderer,
-					context.m_EnvironmentAssetController) : IBLDiagnosticsSnapshot{};
+				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(*context.m_Renderer,
+					context.m_EnvironmentAssetController)
+					: IBLDiagnosticsSnapshot{};
 			}
 		};
 
 		class RenderGraphSnapshotProvider final : public SnapshotProvider<RGSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "Render Graph"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Render Graph";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<RGSnapshot>();
-				if (context.m_RenderGraph) BuildRenderGraphSnapshot(*context.m_RenderGraph, snapshot);
-				else snapshot = {};
+				if (context.m_RenderGraph)
+				{
+					BuildRenderGraphSnapshot(*context.m_RenderGraph, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
 			}
 		};
 
-		class PostProcessDiagnosticsSnapshotProvider final :
-			public SnapshotProvider<PostProcessDiagnosticsSnapshot>
+		class PostProcessDiagnosticsSnapshotProvider final
+			: public SnapshotProvider<PostProcessDiagnosticsSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -122,50 +153,84 @@ namespace gglab
 			}
 		};
 
-		class TransientResourcePoolSnapshotProvider final : public SnapshotProvider<TransientResourcePoolSnapshot>
+		class TransientResourcePoolSnapshotProvider final
+			: public SnapshotProvider<TransientResourcePoolSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "Transient Resource Pool"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Transient Resource Pool";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TransientResourcePoolSnapshot>();
-				const auto* pool = context.m_Renderer ? context.m_Renderer->GetTransientResourcePool() : nullptr;
-				if (pool) BuildTransientResourcePoolSnapshot(*pool, snapshot);
-				else snapshot = {};
+				const auto* pool =
+					context.m_Renderer ? context.m_Renderer->GetTransientResourcePool() : nullptr;
+				if (pool)
+				{
+					BuildTransientResourcePoolSnapshot(*pool, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
 			}
 		};
 
-		class DX12ResourceManagerSnapshotProvider final : public SnapshotProvider<DX12ResourceManagerSnapshot>
+		class DX12ResourceManagerSnapshotProvider final
+			: public SnapshotProvider<DX12ResourceManagerSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "DX12 Resources"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "DX12 Resources";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<DX12ResourceManagerSnapshot>();
-				auto* dx12 = context.m_Renderer ? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext()) : nullptr;
+				auto* dx12 = context.m_Renderer
+					? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext())
+					: nullptr;
 				auto* manager = dx12 ? dx12->GetDX12Device().GetResourceManager() : nullptr;
-				if (manager) BuildDX12ResourceManagerSnapshot(*manager, snapshot);
-				else snapshot = {};
+				if (manager)
+				{
+					BuildDX12ResourceManagerSnapshot(*manager, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
 			}
 		};
 
-		class RHIPipelineSystemSnapshotProvider final : public SnapshotProvider<RHIPipelineSystemSnapshot>
+		class RHIPipelineSystemSnapshotProvider final
+			: public SnapshotProvider<RHIPipelineSystemSnapshot>
 		{
 		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override { return "RHI Pipeline System"; }
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "RHI Pipeline System";
+			}
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<RHIPipelineSystemSnapshot>();
 				auto* rhi = context.m_Renderer ? context.m_Renderer->GetRHIContext() : nullptr;
-				auto* system = rhi ? dynamic_cast<DX12PipelineSystem*>(&rhi->GetPipelineSystem()) : nullptr;
-				if (system) BuildDX12PipelineSystemSnapshot(
-					*system, context.m_Renderer->GetPipelineCache(), snapshot);
-				else snapshot = {};
+				auto* system =
+					rhi ? dynamic_cast<DX12PipelineSystem*>(&rhi->GetPipelineSystem()) : nullptr;
+				if (system)
+				{
+					BuildDX12PipelineSystemSnapshot(
+						*system, context.m_Renderer->GetPipelineCache(), snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
 			}
 		};
 
-		class SamplerRegistrySnapshotProvider final :
-			public SnapshotProvider<SamplerRegistrySnapshot>
+		class SamplerRegistrySnapshotProvider final
+			: public SnapshotProvider<SamplerRegistrySnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -175,8 +240,8 @@ namespace gglab
 			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<SamplerRegistrySnapshot>();
-				const SamplerRegistry* registry = context.m_Renderer ?
-					context.m_Renderer->GetSamplerRegistry() : nullptr;
+				const SamplerRegistry* registry =
+					context.m_Renderer ? context.m_Renderer->GetSamplerRegistry() : nullptr;
 				if (registry)
 				{
 					BuildSamplerRegistrySnapshot(*registry, snapshot);
@@ -191,15 +256,25 @@ namespace gglab
 
 	void RegisterBuiltinSnapshotProviders(DiagnosticsRuntime& runtime) noexcept
 	{
-		runtime.RegisterProvider(std::make_unique<AssetSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<TaskSystemSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<IBLDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<PersistentSceneBufferSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<SamplerRegistrySnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(
+			std::make_unique<AssetSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(
+			std::make_unique<TaskSystemSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(
+			std::make_unique<IBLDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<PersistentSceneBufferSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(
+			std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(
+			std::make_unique<SamplerRegistrySnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 	}
 }

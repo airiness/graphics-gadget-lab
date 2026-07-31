@@ -9,12 +9,10 @@ namespace gglab
 {
 	class ForwardPlusDebugReadback;
 
-	class ForwardPlusLabSession final :
-		public LabSessionBase
+	class ForwardPlusLabSession final : public LabSessionBase
 	{
 	public:
-		explicit ForwardPlusLabSession(
-			const LabSessionCreateInfo& createInfo) noexcept;
+		explicit ForwardPlusLabSession(const LabSessionCreateInfo& createInfo) noexcept;
 		~ForwardPlusLabSession() override = default;
 
 		void BeginPrepare() noexcept override;
@@ -26,11 +24,8 @@ namespace gglab
 		void CommitPrepare() noexcept override;
 		void CancelPrepare() noexcept override;
 		void Update(float deltaTime) noexcept override;
-		void OnResize(
-			uint32_t width,
-			uint32_t height) noexcept override;
-		void BuildDiagnostics(
-			LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void OnResize(uint32_t width, uint32_t height) noexcept override;
+		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -38,23 +33,17 @@ namespace gglab
 			const LabSessionCreateInfo& createInfo) noexcept;
 
 	private:
-		ForwardPlusLabSession(
-			const LabSessionCreateInfo& createInfo,
-			std::shared_ptr<
-				ForwardPlusDebugReadback>
-					debugReadback) noexcept;
+		ForwardPlusLabSession(const LabSessionCreateInfo& createInfo,
+			std::shared_ptr<ForwardPlusDebugReadback> debugReadback) noexcept;
 		void ApplyImmediateParameters() noexcept override;
 		void RebuildScene() noexcept override;
-		void OnParametersRestoredForPrepare(
-			LabChangeImpact impact) noexcept override;
+		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		void BuildScene() noexcept;
 		void BuildLighting() noexcept;
 		void ApplyCameraPreset() noexcept;
 		void UpdateSelectedTile() noexcept;
 
-		std::shared_ptr<
-			ForwardPlusDebugReadback>
-			m_DebugReadback;
+		std::shared_ptr<ForwardPlusDebugReadback> m_DebugReadback;
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};
 		uint32_t m_ViewportWidth = 0;

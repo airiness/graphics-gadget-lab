@@ -17,7 +17,8 @@ namespace gglab
 	RenderDirectionalLight RenderWorldExtractor::ExtractMainDirectionalLight(World& world) noexcept
 	{
 		auto& registry = world.GetRegistry();
-		auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
+		auto lightView =
+			registry.view<components::TransformComponent, components::LightComponent>();
 		for (auto [entity, transform, light] : lightView.each())
 		{
 			GGLAB_UNUSED(entity);
@@ -41,7 +42,8 @@ namespace gglab
 		return {};
 	}
 
-	Vector3 RenderWorldExtractor::ResolveLightDirection(const components::TransformComponent& transform) noexcept
+	Vector3 RenderWorldExtractor::ResolveLightDirection(
+		const components::TransformComponent& transform) noexcept
 	{
 		const Matrix rotation = math::CreateFromQuaternion(transform.m_Rotation);
 		Vector3 forward = math::TransformDirection(Vector3::Forward, rotation);

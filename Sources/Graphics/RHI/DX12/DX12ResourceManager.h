@@ -21,8 +21,7 @@ namespace gglab
 	class DX12DescriptorCache;
 	struct DX12ResourceManagerSnapshot;
 	void BuildDX12ResourceManagerSnapshot(
-		const DX12ResourceManager& manager,
-		DX12ResourceManagerSnapshot& outSnapshot) noexcept;
+		const DX12ResourceManager& manager, DX12ResourceManagerSnapshot& outSnapshot) noexcept;
 
 	class DX12ResourceManager
 	{
@@ -66,13 +65,14 @@ namespace gglab
 
 		void Initialize(DX12Device* device) noexcept;
 		void Finalize() noexcept;
-		void SetDescriptorCache(DX12DescriptorCache* descriptorCache) noexcept { m_DescriptorCache = descriptorCache; }
+		void SetDescriptorCache(DX12DescriptorCache* descriptorCache) noexcept
+		{
+			m_DescriptorCache = descriptorCache;
+		}
 
-		RHITextureHandle CreateTexture(
-			const RHITextureDesc& desc,
+		RHITextureHandle CreateTexture(const RHITextureDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
-		RHIBufferHandle CreateBuffer(
-			const RHIBufferDesc& desc,
+		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
 		RHITextureHandle ImportTexture(const ImportedTextureDesc& desc) noexcept;
 		RHIBufferHandle ImportBuffer(const ImportedBufferDesc& desc) noexcept;
@@ -80,11 +80,9 @@ namespace gglab
 		void DestroyTexture(RHITextureHandle texture) noexcept;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept;
 		void SetTextureDebugBinding(
-			RHITextureHandle texture,
-			const RHIResourceDebugBindingDesc& binding) noexcept;
+			RHITextureHandle texture, const RHIResourceDebugBindingDesc& binding) noexcept;
 		void SetBufferDebugBinding(
-			RHIBufferHandle buffer,
-			const RHIResourceDebugBindingDesc& binding) noexcept;
+			RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept;
 		std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept;
 		std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept;
 		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept;
@@ -101,8 +99,7 @@ namespace gglab
 		void RetireCompletedResources() noexcept;
 
 	private:
-		template<typename HandleT, typename ResourceT>
-		struct ResourceSlot
+		template <typename HandleT, typename ResourceT> struct ResourceSlot
 		{
 			typename HandleT::GenerationType m_Generation = 1;
 			RHIResourceOwnership m_Ownership = RHIResourceOwnership::Owned;
@@ -120,52 +117,36 @@ namespace gglab
 		using BufferSlot = ResourceSlot<RHIBufferHandle, DX12Buffer>;
 
 	private:
-		RHITextureHandle AllocateTextureSlot(
-			std::unique_ptr<DX12Texture> texture,
+		RHITextureHandle AllocateTextureSlot(std::unique_ptr<DX12Texture> texture,
 			RHIResourceOwnership ownership,
 			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
-		RHIBufferHandle AllocateBufferSlot(
-			std::unique_ptr<DX12Buffer> buffer,
+		RHIBufferHandle AllocateBufferSlot(std::unique_ptr<DX12Buffer> buffer,
 			RHIResourceOwnership ownership,
 			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
 		static void RecordLastUsePoint(
-			std::vector<RHIFencePoint>& points,
-			const RHIFencePoint& fencePoint) noexcept;
-		template<typename HandleT, typename SlotT>
-		void SetResourceDebugBinding(
-			RHIHandleTable<HandleT, SlotT>& table,
-			HandleT handle,
-			RHIResourceType resourceType,
-			const RHIResourceDebugBindingDesc& binding,
+			std::vector<RHIFencePoint>& points, const RHIFencePoint& fencePoint) noexcept;
+		template <typename HandleT, typename SlotT>
+		void SetResourceDebugBinding(RHIHandleTable<HandleT, SlotT>& table, HandleT handle,
+			RHIResourceType resourceType, const RHIResourceDebugBindingDesc& binding,
 			const char* functionName) noexcept;
-		template<typename HandleT, typename SlotT, typename ResourceT>
-		static HandleT AllocateResourceSlot(
-			RHIHandleTable<HandleT, SlotT>& table,
-			std::unique_ptr<ResourceT> resource,
-			RHIResourceOwnership ownership,
+		template <typename HandleT, typename SlotT, typename ResourceT>
+		static HandleT AllocateResourceSlot(RHIHandleTable<HandleT, SlotT>& table,
+			std::unique_ptr<ResourceT> resource, RHIResourceOwnership ownership,
 			RHIResourceType resourceType,
 			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
-		template<typename HandleT, typename SlotT>
+		template <typename HandleT, typename SlotT>
 		static std::string_view GetResourceDebugName(
-			const RHIHandleTable<HandleT, SlotT>& table,
-			HandleT handle) noexcept;
-		template<typename HandleT, typename SlotT, typename OnValidT>
-		void DestroyResource(
-			RHIHandleTable<HandleT, SlotT>& table,
-			HandleT handle,
-			const char* functionName,
-			OnValidT onValid) noexcept;
-		template<typename HandleT, typename SlotT>
-		void RecordResourceUse(
-			RHIHandleTable<HandleT, SlotT>& table,
-			HandleT handle,
-			const RHIFencePoint& fencePoint,
-			const char* functionName,
+			const RHIHandleTable<HandleT, SlotT>& table, HandleT handle) noexcept;
+		template <typename HandleT, typename SlotT, typename OnValidT>
+		void DestroyResource(RHIHandleTable<HandleT, SlotT>& table, HandleT handle,
+			const char* functionName, OnValidT onValid) noexcept;
+		template <typename HandleT, typename SlotT>
+		void RecordResourceUse(RHIHandleTable<HandleT, SlotT>& table, HandleT handle,
+			const RHIFencePoint& fencePoint, const char* functionName,
 			const char* resourceKind) noexcept;
-		template<typename HandleT, typename SlotT>
+		template <typename HandleT, typename SlotT>
 		void RetireCompletedResourceTable(
-			RHIHandleTable<HandleT, SlotT>& table,
-			uint64_t& retireCount) noexcept;
+			RHIHandleTable<HandleT, SlotT>& table, uint64_t& retireCount) noexcept;
 		void ReportLiveResources() const noexcept;
 
 	private:
@@ -178,7 +159,6 @@ namespace gglab
 		Diagnostics m_Diagnostics;
 
 		friend void BuildDX12ResourceManagerSnapshot(
-			const DX12ResourceManager& manager,
-			DX12ResourceManagerSnapshot& outSnapshot) noexcept;
+			const DX12ResourceManager& manager, DX12ResourceManagerSnapshot& outSnapshot) noexcept;
 	};
 }

@@ -30,26 +30,22 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool HasFormatSupport1(
-			D3D12_FORMAT_SUPPORT1 actual,
-			D3D12_FORMAT_SUPPORT1 required) noexcept
+			D3D12_FORMAT_SUPPORT1 actual, D3D12_FORMAT_SUPPORT1 required) noexcept
 		{
 			return (actual & required) == required;
 		}
 
 		[[nodiscard]] bool SupportsMultisampling(
-			ID3D12Device* device,
-			DXGI_FORMAT format,
-			uint16_t sampleCount) noexcept
+			ID3D12Device* device, DXGI_FORMAT format, uint16_t sampleCount) noexcept
 		{
 			D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS multisampleSupport{
 				.Format = format,
 				.SampleCount = sampleCount,
 				.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE,
 			};
-			return SUCCEEDED(device->CheckFeatureSupport(
-				D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
-				&multisampleSupport,
-				sizeof(multisampleSupport))) && multisampleSupport.NumQualityLevels > 0;
+			return SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+				&multisampleSupport, sizeof(multisampleSupport))) &&
+				multisampleSupport.NumQualityLevels > 0;
 		}
 	}
 
@@ -129,9 +125,7 @@ namespace gglab
 			.Format = ToDXGIFormat(desc.m_Format),
 		};
 		if (FAILED(m_D3D12Device->CheckFeatureSupport(
-			D3D12_FEATURE_FORMAT_SUPPORT,
-			&formatSupport,
-			sizeof(formatSupport))))
+			D3D12_FEATURE_FORMAT_SUPPORT, &formatSupport, sizeof(formatSupport))))
 		{
 			return {};
 		}
@@ -172,8 +166,7 @@ namespace gglab
 	}
 
 	RHITextureSupportResult DX12Device::QueryTextureViewSupport(
-		const RHITextureDesc& textureDesc,
-		const RHITextureViewDesc& viewDesc) const noexcept
+		const RHITextureDesc& textureDesc, const RHITextureViewDesc& viewDesc) const noexcept
 	{
 		const RHITextureValidationResult validation =
 			ValidateRHITextureViewDesc(textureDesc, viewDesc);
@@ -186,15 +179,13 @@ namespace gglab
 			return {};
 		}
 
-		const RHIFormat viewFormat = viewDesc.m_Format == RHIFormat::Unknown ?
-			textureDesc.m_Format : viewDesc.m_Format;
+		const RHIFormat viewFormat =
+			viewDesc.m_Format == RHIFormat::Unknown ? textureDesc.m_Format : viewDesc.m_Format;
 		D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport{
 			.Format = ToDXGIFormat(viewFormat),
 		};
 		if (FAILED(m_D3D12Device->CheckFeatureSupport(
-			D3D12_FEATURE_FORMAT_SUPPORT,
-			&formatSupport,
-			sizeof(formatSupport))))
+			D3D12_FEATURE_FORMAT_SUPPORT, &formatSupport, sizeof(formatSupport))))
 		{
 			return {};
 		}
@@ -239,45 +230,49 @@ namespace gglab
 	}
 
 	RHITextureHandle DX12Device::CreateTexture(
-		const RHITextureDesc& desc,
-		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+		const RHITextureDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		return m_ResourceManager.CreateTexture(desc, debugIdentity);
 	}
 
 	RHIBufferHandle DX12Device::CreateBuffer(
-		const RHIBufferDesc& desc,
-		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+		const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		return m_ResourceManager.CreateBuffer(desc, debugIdentity);
 	}
 
-	RHITextureHandle DX12Device::ImportTexture(const DX12ResourceManager::ImportedTextureDesc& desc) noexcept
+	RHITextureHandle DX12Device::ImportTexture(
+		const DX12ResourceManager::ImportedTextureDesc& desc) noexcept
 	{
 		return m_ResourceManager.ImportTexture(desc);
 	}
 
-	RHIBufferHandle DX12Device::ImportBuffer(const DX12ResourceManager::ImportedBufferDesc& desc) noexcept
+	RHIBufferHandle DX12Device::ImportBuffer(
+		const DX12ResourceManager::ImportedBufferDesc& desc) noexcept
 	{
 		return m_ResourceManager.ImportBuffer(desc);
 	}
 
-	RHITextureViewHandle DX12Device::CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
+	RHITextureViewHandle DX12Device::CreateTextureView(
+		RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateTextureView called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::CreateTextureView called without a DX12DescriptorCache.");
 			return {};
 		}
 
 		return m_DescriptorCache->GetOrCreateTextureView(texture, desc);
 	}
 
-	RHIBufferViewHandle DX12Device::CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
+	RHIBufferViewHandle DX12Device::CreateBufferView(
+		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateBufferView called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::CreateBufferView called without a DX12DescriptorCache.");
 			return {};
 		}
 
@@ -288,7 +283,8 @@ namespace gglab
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateSampler called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::CreateSampler called without a DX12DescriptorCache.");
 			return {};
 		}
 
@@ -309,7 +305,8 @@ namespace gglab
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyTextureView called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::DestroyTextureView called without a DX12DescriptorCache.");
 			return;
 		}
 
@@ -320,7 +317,8 @@ namespace gglab
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroyBufferView called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::DestroyBufferView called without a DX12DescriptorCache.");
 			return;
 		}
 
@@ -331,7 +329,8 @@ namespace gglab
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::DestroySampler called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::DestroySampler called without a DX12DescriptorCache.");
 			return;
 		}
 
@@ -339,15 +338,13 @@ namespace gglab
 	}
 
 	void DX12Device::SetTextureDebugBinding(
-		RHITextureHandle texture,
-		const RHIResourceDebugBindingDesc& binding) noexcept
+		RHITextureHandle texture, const RHIResourceDebugBindingDesc& binding) noexcept
 	{
 		m_ResourceManager.SetTextureDebugBinding(texture, binding);
 	}
 
 	void DX12Device::SetBufferDebugBinding(
-		RHIBufferHandle buffer,
-		const RHIResourceDebugBindingDesc& binding) noexcept
+		RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept
 	{
 		m_ResourceManager.SetBufferDebugBinding(buffer, binding);
 	}
@@ -362,8 +359,7 @@ namespace gglab
 		return m_ResourceManager.GetBufferDebugName(buffer);
 	}
 
-	void* DX12Device::MapBuffer(RHIBufferHandle buffer,
-		RHIMappedBufferRange readRange) noexcept
+	void* DX12Device::MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept
 	{
 		auto* nativeBuffer = ResolveBuffer(buffer);
 		if (!nativeBuffer)
@@ -380,8 +376,7 @@ namespace gglab
 		return nativeBuffer->Map(0, &dx12ReadRange);
 	}
 
-	void DX12Device::UnmapBuffer(RHIBufferHandle buffer,
-		RHIMappedBufferRange writtenRange) noexcept
+	void DX12Device::UnmapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
 	{
 		if (auto* nativeBuffer = ResolveBuffer(buffer))
 		{
@@ -397,31 +392,37 @@ namespace gglab
 
 	uint32_t DX12Device::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
 	{
-		return viewType == RHIBufferViewType::ConstantBuffer ?
-			D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT : 1u;
+		return viewType == RHIBufferViewType::ConstantBuffer
+			? D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT
+			: 1u;
 	}
 
 	bool DX12Device::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
-		return m_QueueSystem ? m_QueueSystem->IsFencePointCompleted(fencePoint) : !fencePoint.IsValid();
+		return m_QueueSystem ? m_QueueSystem->IsFencePointCompleted(fencePoint)
+			: !fencePoint.IsValid();
 	}
 
-	void DX12Device::RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
+	void DX12Device::RecordTextureUse(
+		RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
 	{
 		RecordTextureUse(texture, fencePoint.ToRHI());
 	}
 
-	void DX12Device::RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
+	void DX12Device::RecordTextureUse(
+		RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
 	{
 		m_ResourceManager.RecordTextureUse(texture, fencePoint);
 	}
 
-	void DX12Device::RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
+	void DX12Device::RecordBufferUse(
+		RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept
 	{
 		RecordBufferUse(buffer, fencePoint.ToRHI());
 	}
 
-	void DX12Device::RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept
+	void DX12Device::RecordBufferUse(
+		RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept
 	{
 		m_ResourceManager.RecordBufferUse(buffer, fencePoint);
 	}
@@ -463,11 +464,13 @@ namespace gglab
 		return m_DescriptorCache && m_DescriptorCache->IsSamplerAlive(sampler);
 	}
 
-	RHIDescriptorHandle DX12Device::GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept
+	RHIDescriptorHandle DX12Device::GetTextureViewDescriptor(
+		RHITextureViewHandle view) const noexcept
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetTextureViewDescriptor called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::GetTextureViewDescriptor called without a DX12DescriptorCache.");
 			return {};
 		}
 
@@ -478,7 +481,8 @@ namespace gglab
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetBufferViewDescriptor called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::GetBufferViewDescriptor called without a DX12DescriptorCache.");
 			return {};
 		}
 
@@ -489,7 +493,8 @@ namespace gglab
 	{
 		if (!m_DescriptorCache)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::GetSamplerDescriptor called without a DX12DescriptorCache.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::GetSamplerDescriptor called without a DX12DescriptorCache.");
 			return {};
 		}
 
@@ -498,12 +503,12 @@ namespace gglab
 
 	DX12DescriptorView DX12Device::ResolveTextureView(RHITextureViewHandle view) const noexcept
 	{
-		return m_DescriptorCache ? m_DescriptorCache->ResolveTextureView(view) : DX12DescriptorView{};
+		return m_DescriptorCache ? m_DescriptorCache->ResolveTextureView(view)
+			: DX12DescriptorView{};
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(
-		RHIDescriptorHeapType heapType,
-		uint32_t descriptorIndex) const noexcept
+		RHIDescriptorHeapType heapType, uint32_t descriptorIndex) const noexcept
 	{
 		if (!m_DescriptorManager)
 		{
@@ -520,7 +525,8 @@ namespace gglab
 			nativeHeapType = DX12DescriptorManager::HeapType::Sampler;
 			break;
 		default:
-			GGLAB_LOG_GRAPHICS_WARN("DX12Device::ResolveShaderVisibleDescriptor received a non-shader-visible heap type.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12Device::ResolveShaderVisibleDescriptor received a non-shader-visible heap type.");
 			return {};
 		}
 
@@ -609,14 +615,16 @@ namespace gglab
 	{
 		UINT createFactoryFlags = 0;
 
-#if defined (BUILD_DEBUG)
+#if defined(BUILD_DEBUG)
 		createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 
 		ComPtr<IDXGIInfoQueue> dxgiInfoQueue;
 		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue))))
 		{
-			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-			dxgiInfoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+			dxgiInfoQueue->SetBreakOnSeverity(
+				DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+			dxgiInfoQueue->SetBreakOnSeverity(
+				DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
 		}
 #endif
 		ComPtr<IDXGIFactory7> dxgiFactory;
@@ -628,8 +636,10 @@ namespace gglab
 	void DX12Device::InitializeDXGIAdapter() noexcept
 	{
 		ComPtr<IDXGIAdapter1> dxgiAdapter;
-		for (UINT i = 0; m_DxgiFactory->EnumAdapterByGpuPreference(i,
-			DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&dxgiAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
+		for (UINT i = 0;
+			m_DxgiFactory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+				IID_PPV_ARGS(&dxgiAdapter)) != DXGI_ERROR_NOT_FOUND;
+			++i)
 		{
 			DXGI_ADAPTER_DESC1 desc = {};
 			dxgiAdapter->GetDesc1(&desc);
@@ -639,7 +649,8 @@ namespace gglab
 				continue;
 			}
 
-			if (SUCCEEDED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr)))
+			if (SUCCEEDED(D3D12CreateDevice(
+				dxgiAdapter.Get(), D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr)))
 			{
 				m_DxgiAdapter = dxgiAdapter;
 				break;
@@ -652,16 +663,11 @@ namespace gglab
 			DXGI_ADAPTER_DESC1 desc{};
 			LARGE_INTEGER driverVersion{};
 			GGLAB_HR(m_DxgiAdapter->GetDesc1(&desc));
-			GGLAB_UNUSED(m_DxgiAdapter->CheckInterfaceSupport(
-				__uuidof(IDXGIDevice),
-				&driverVersion));
+			GGLAB_UNUSED(
+				m_DxgiAdapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driverVersion));
 			m_AdapterCompatibilityIdentity = std::format(
-				"dx12:{:08x}:{:08x}:{:08x}:{:08x}:driver-{:016x}",
-				desc.VendorId,
-				desc.DeviceId,
-				desc.SubSysId,
-				desc.Revision,
-				static_cast<uint64_t>(driverVersion.QuadPart));
+				"dx12:{:08x}:{:08x}:{:08x}:{:08x}:driver-{:016x}", desc.VendorId, desc.DeviceId,
+				desc.SubSysId, desc.Revision, static_cast<uint64_t>(driverVersion.QuadPart));
 		}
 	}
 
@@ -669,10 +675,7 @@ namespace gglab
 	{
 		// Feature check and Create Device
 		constexpr D3D_FEATURE_LEVEL featureLevels[] = {
-			D3D_FEATURE_LEVEL_12_2,
-			D3D_FEATURE_LEVEL_12_1,
-			D3D_FEATURE_LEVEL_12_0
-		};
+			D3D_FEATURE_LEVEL_12_2, D3D_FEATURE_LEVEL_12_1, D3D_FEATURE_LEVEL_12_0 };
 
 		HRESULT result = E_FAIL;
 
@@ -701,15 +704,11 @@ namespace gglab
 			// Suppress whole categories of messages
 			//D3D12_MESSAGE_CATEGORY categories[] = {};
 			// Suppress messages based on their severity level
-			D3D12_MESSAGE_SEVERITY severities[] =
-			{
-				D3D12_MESSAGE_SEVERITY_INFO
-			};
+			D3D12_MESSAGE_SEVERITY severities[] = { D3D12_MESSAGE_SEVERITY_INFO };
 			// ImGui's vendored DX12 backend creates its internal upload buffers through
 			// legacy CreateCommittedResource. On an enhanced-barrier device the initial
 			// state is intentionally ignored. Project-owned resources use CreateResource3.
-			D3D12_MESSAGE_ID denyIds[] =
-			{
+			D3D12_MESSAGE_ID denyIds[] = {
 				D3D12_MESSAGE_ID_CREATERESOURCE_STATE_IGNORED,
 			};
 			D3D12_INFO_QUEUE_FILTER filter = {};
@@ -728,7 +727,8 @@ namespace gglab
 	{
 		using namespace D3D12MA;
 		D3D12MA::ALLOCATOR_DESC allocatorDesc = {};
-		allocatorDesc.Flags = static_cast<D3D12MA::ALLOCATOR_FLAGS>(D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS);
+		allocatorDesc.Flags =
+			static_cast<D3D12MA::ALLOCATOR_FLAGS>(D3D12MA_RECOMMENDED_ALLOCATOR_FLAGS);
 		allocatorDesc.pDevice = m_D3D12Device.Get();
 		allocatorDesc.pAdapter = m_DxgiAdapter.Get();
 		GGLAB_HR(D3D12MA::CreateAllocator(&allocatorDesc, &m_MemAllocator));
@@ -740,35 +740,31 @@ namespace gglab
 		featureSupport.Init(m_D3D12Device.Get());
 
 		// RatTracing support
-		m_FeatureSupport.m_RayTracingSupported = featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+		m_FeatureSupport.m_RayTracingSupported =
+			featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
 
 		// MeshShader support
-		m_FeatureSupport.m_MeshShaderSupported = featureSupport.MeshShaderTier() != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED;
+		m_FeatureSupport.m_MeshShaderSupported =
+			featureSupport.MeshShaderTier() != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED;
 
 		// Enhanced Barrier
 		m_FeatureSupport.m_EnhancedBarriers = featureSupport.EnhancedBarriersSupported();
 
 		D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1{};
-		if (SUCCEEDED(
-			m_D3D12Device->CheckFeatureSupport(
-				D3D12_FEATURE_D3D12_OPTIONS1,
-				std::addressof(options1),
-				sizeof(options1))))
+		if (SUCCEEDED(m_D3D12Device->CheckFeatureSupport(
+			D3D12_FEATURE_D3D12_OPTIONS1, std::addressof(options1), sizeof(options1))))
 		{
-			m_FeatureSupport.
-				m_ShaderWaveCapabilities = {
-					.m_Supported =
-						options1.WaveOps != FALSE,
-					.m_MinLaneCount =
-						options1.WaveLaneCountMin,
-					.m_MaxLaneCount =
-						options1.WaveLaneCountMax,
-				};
+			m_FeatureSupport.m_ShaderWaveCapabilities = {
+				.m_Supported = options1.WaveOps != FALSE,
+				.m_MinLaneCount = options1.WaveLaneCountMin,
+				.m_MaxLaneCount = options1.WaveLaneCountMax,
+			};
 		}
 
 		// Tearing support
 		BOOL tearSupport = FALSE;
-		if (m_DxgiFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearSupport, sizeof(BOOL)) == S_OK)
+		if (m_DxgiFactory->CheckFeatureSupport(
+			DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearSupport, sizeof(BOOL)) == S_OK)
 		{
 			m_FeatureSupport.m_TearingSupported = tearSupport;
 		}
@@ -777,7 +773,8 @@ namespace gglab
 	std::wstring DX12Device::GetLatestWinPixGpuCapturerPath() noexcept
 	{
 		LPWSTR programFilesPath = nullptr;
-		if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath)))
+		if (FAILED(SHGetKnownFolderPath(
+			FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath)))
 		{
 			return L"";
 		}

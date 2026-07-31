@@ -7,9 +7,7 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] TaskPriority HigherPriority(
-			TaskPriority lhs,
-			TaskPriority rhs) noexcept
+		[[nodiscard]] TaskPriority HigherPriority(TaskPriority lhs, TaskPriority rhs) noexcept
 		{
 			return static_cast<uint8_t>(lhs) < static_cast<uint8_t>(rhs) ? lhs : rhs;
 		}
@@ -24,26 +22,19 @@ namespace gglab
 
 	void AssetInterestTracker::UnregisterOwner(AssetOwnerId owner) noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			std::ranges::none_of(m_Leases,
-				[owner](const auto& entry) noexcept
-				{
-					return entry.second.m_Owner == owner;
-				}),
+		GGLAB_ASSERT_MSG(std::ranges::none_of(m_Leases, [owner](const auto& entry) noexcept
+			{ return entry.second.m_Owner == owner; }),
 			"Asset owner unregistered while leases are still active.");
 		m_Owners.erase(owner);
 	}
 
 	AssetLeaseAcquireResult AssetInterestTracker::AcquireLease(
-		AssetOwnerId owner,
-		AssetContentVersion contentVersion,
-		TaskPriority priority) noexcept
+		AssetOwnerId owner, AssetContentVersion contentVersion, TaskPriority priority) noexcept
 	{
-		if (!owner.IsValid() || !contentVersion.IsValid() ||
-			priority == TaskPriority::Count || !m_Owners.contains(owner))
+		if (!owner.IsValid() || !contentVersion.IsValid() || priority == TaskPriority::Count ||
+			!m_Owners.contains(owner))
 		{
-			GGLAB_ASSERT_MSG(
-				!owner.IsValid() || m_Owners.contains(owner),
+			GGLAB_ASSERT_MSG(!owner.IsValid() || m_Owners.contains(owner),
 				"Asset lease acquired for an unknown owner.");
 			return {};
 		}
@@ -64,17 +55,14 @@ namespace gglab
 		const bool wasActive = !interest->second.m_LeaseTokens.empty();
 		const uint64_t token = m_NextLeaseToken++;
 		m_Leases.emplace(token, LeaseRecord{
-			.m_ContentVersion = contentVersion,
-			.m_Owner = owner,
-			.m_Priority = priority,
-		});
+									.m_ContentVersion = contentVersion,
+									.m_Owner = owner,
+									.m_Priority = priority,
+			});
 		interest->second.m_LeaseTokens.insert(token);
 		return {
 			.m_LeaseToken = token,
-			.m_Change = RecomputeInterest(
-				contentVersion.m_Key,
-				previousPriority,
-				wasActive),
+			.m_Change = RecomputeInterest(contentVersion.m_Key, previousPriority, wasActive),
 		};
 	}
 
@@ -108,15 +96,11 @@ namespace gglab
 				.m_IsActive = false,
 			};
 		}
-		return RecomputeInterest(
-			record.m_ContentVersion.m_Key,
-			previousPriority,
-			true);
+		return RecomputeInterest(record.m_ContentVersion.m_Key, previousPriority, true);
 	}
 
 	std::optional<AssetInterestChange> AssetInterestTracker::UpdateLeasePriority(
-		uint64_t leaseToken,
-		TaskPriority priority) noexcept
+		uint64_t leaseToken, TaskPriority priority) noexcept
 	{
 		const auto lease = m_Leases.find(leaseToken);
 		if (lease == m_Leases.end() || priority == TaskPriority::Count)
@@ -132,8 +116,7 @@ namespace gglab
 		return RecomputeInterest(key, previousPriority, true);
 	}
 
-	bool AssetInterestTracker::AcquirePublicationRetain(
-		AssetContentVersion contentVersion) noexcept
+	bool AssetInterestTracker::AcquirePublicationRetain(AssetContentVersion contentVersion) noexcept
 	{
 		if (!contentVersion.IsValid())
 		{
@@ -154,8 +137,7 @@ namespace gglab
 		return true;
 	}
 
-	void AssetInterestTracker::ReleasePublicationRetain(
-		AssetContentVersion contentVersion) noexcept
+	void AssetInterestTracker::ReleasePublicationRetain(AssetContentVersion contentVersion) noexcept
 	{
 		const auto retain = m_PublicationRetains.find(contentVersion.m_Key);
 		if (retain == m_PublicationRetains.end() ||
@@ -189,12 +171,10 @@ namespace gglab
 	}
 
 	TaskPriority AssetInterestTracker::GetEffectivePriority(
-		AssetKey key,
-		TaskPriority fallback) const noexcept
+		AssetKey key, TaskPriority fallback) const noexcept
 	{
 		const auto interest = m_Interests.find(key);
-		return interest != m_Interests.end() ?
-			interest->second.m_EffectivePriority : fallback;
+		return interest != m_Interests.end() ? interest->second.m_EffectivePriority : fallback;
 	}
 
 	AssetInterestTrackerStatistics AssetInterestTracker::GetStatistics() const
@@ -218,21 +198,17 @@ namespace gglab
 				}
 			}
 			statistics.m_ActiveInterests.push_back({
-				.m_ContentVersion = MakeAssetContentVersion(
-					key,
-					interest.m_ContentGeneration),
+				.m_ContentVersion = MakeAssetContentVersion(key, interest.m_ContentGeneration),
 				.m_LeaseCount = static_cast<uint32_t>(interest.m_LeaseTokens.size()),
 				.m_OwnerCount = static_cast<uint32_t>(owners.size()),
 				.m_EffectivePriority = interest.m_EffectivePriority,
-			});
+				});
 		}
 		return statistics;
 	}
 
 	AssetInterestChange AssetInterestTracker::RecomputeInterest(
-		AssetKey key,
-		TaskPriority previousPriority,
-		bool wasActive) noexcept
+		AssetKey key, TaskPriority previousPriority, bool wasActive) noexcept
 	{
 		const auto interest = m_Interests.find(key);
 		if (interest == m_Interests.end() || interest->second.m_LeaseTokens.empty())
@@ -253,9 +229,7 @@ namespace gglab
 			++m_PriorityUpdateCount;
 		}
 		return {
-			.m_ContentVersion = MakeAssetContentVersion(
-				key,
-				interest->second.m_ContentGeneration),
+			.m_ContentVersion = MakeAssetContentVersion(key, interest->second.m_ContentGeneration),
 			.m_PreviousPriority = previousPriority,
 			.m_EffectivePriority = effective,
 			.m_WasActive = wasActive,

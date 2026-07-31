@@ -27,9 +27,9 @@ namespace gglab
 
 		const DirectionalShadowSettings& GetMainDirectionalShadowSettings() const noexcept
 		{
-			return m_MainDirectionalLight.m_ShadowSettings ?
-				*m_MainDirectionalLight.m_ShadowSettings :
-				DisabledDirectionalShadowSettings();
+			return m_MainDirectionalLight.m_ShadowSettings
+				? *m_MainDirectionalLight.m_ShadowSettings
+				: DisabledDirectionalShadowSettings();
 		}
 	};
 
@@ -40,6 +40,7 @@ namespace gglab
 
 	private:
 		static RenderDirectionalLight ExtractMainDirectionalLight(World& world) noexcept;
-		static Vector3 ResolveLightDirection(const components::TransformComponent& transform) noexcept;
+		static Vector3 ResolveLightDirection(
+			const components::TransformComponent& transform) noexcept;
 	};
 }

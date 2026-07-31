@@ -70,8 +70,8 @@ namespace gglab
 				.m_CullingMode = DebugDrawCullingMode::None,
 				.m_Channel = channel,
 			};
-			const Matrix inverseViewProjection = math::SafeInverse(
-				slot.m_Camera->GetViewMatrix() * slot.m_Camera->GetProjMatrix());
+			const Matrix inverseViewProjection =
+				math::SafeInverse(slot.m_Camera->GetViewMatrix() * slot.m_Camera->GetProjMatrix());
 			const std::array<Vector3, 8> corners =
 				math::BuildFrustumCornersFromInverseViewProjection(inverseViewProjection);
 			debugDraw.Frustum(corners, style);

@@ -11,8 +11,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_CoverageVertexShader.IsValid() &&
-				m_ShadingPixelShader.IsValid() &&
+			return m_CoverageVertexShader.IsValid() && m_ShadingPixelShader.IsValid() &&
 				m_AlphaTestPixelShader.IsValid();
 		}
 	};

@@ -11,7 +11,8 @@ namespace gglab
 		void DrawStatistics(const DebugDrawStatistics& stats) noexcept
 		{
 			if (!ImGui::BeginTable("DebugDrawStats", 2,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_SizingStretchProp))
 			{
 				return;
 			}

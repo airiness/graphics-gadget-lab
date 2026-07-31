@@ -37,10 +37,7 @@ namespace gglab
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(
-				m_Texture.Index(),
-				m_Texture.Generation(),
-				m_Desc.AsTuple());
+			return std::make_tuple(m_Texture.Index(), m_Texture.Generation(), m_Desc.AsTuple());
 		}
 	};
 
@@ -53,10 +50,7 @@ namespace gglab
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(
-				m_Buffer.Index(),
-				m_Buffer.Generation(),
-				m_Desc.AsTuple());
+			return std::make_tuple(m_Buffer.Index(), m_Buffer.Generation(), m_Desc.AsTuple());
 		}
 	};
 

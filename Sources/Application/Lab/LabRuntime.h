@@ -23,10 +23,11 @@ namespace gglab
 		void Update() noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
 
-		void RequestSwitchLab(const LabId& id) noexcept override { m_CommandQueue.RequestSwitch(id); }
-		void RequestSetParameter(
-			const LabParameterId& id,
-			const LabValue& value) noexcept override
+		void RequestSwitchLab(const LabId& id) noexcept override
+		{
+			m_CommandQueue.RequestSwitch(id);
+		}
+		void RequestSetParameter(const LabParameterId& id, const LabValue& value) noexcept override
 		{
 			m_CommandQueue.RequestSetParameter(id, value);
 		}
@@ -45,8 +46,7 @@ namespace gglab
 		LabRunState GetState() const noexcept { return m_State; }
 		bool IsInitialized() const noexcept
 		{
-			return m_ActiveSession &&
-				m_State != LabRunState::Uninitialized &&
+			return m_ActiveSession && m_State != LabRunState::Uninitialized &&
 				m_State != LabRunState::Failed;
 		}
 		bool IsReady() const noexcept { return m_State == LabRunState::Ready && m_ActiveSession; }
@@ -68,11 +68,9 @@ namespace gglab
 
 	private:
 		bool BeginSessionTransition(
-			const LabId& id,
-			std::span<const LabParameterValue> values = {}) noexcept;
+			const LabId& id, std::span<const LabParameterValue> values = {}) noexcept;
 		bool CommitPendingSession() noexcept;
-		bool RestartActiveSessionWithValues(
-			std::span<const LabParameterValue> values) noexcept;
+		bool RestartActiveSessionWithValues(std::span<const LabParameterValue> values) noexcept;
 		void PollRetiringSessions() noexcept;
 		void SetError(std::string message) noexcept;
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;

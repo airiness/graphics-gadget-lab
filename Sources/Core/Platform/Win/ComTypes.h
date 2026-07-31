@@ -3,6 +3,5 @@
 
 namespace gglab
 {
-	template<typename T>
-	using ComPtr = Microsoft::WRL::ComPtr<T>;
+	template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 }

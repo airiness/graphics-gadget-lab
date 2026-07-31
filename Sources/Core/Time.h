@@ -29,6 +29,5 @@ namespace gglab
 		uint64_t m_FpsCounter = 0;
 
 		uint64_t m_FrameCount = 0;
-
 	};
 }

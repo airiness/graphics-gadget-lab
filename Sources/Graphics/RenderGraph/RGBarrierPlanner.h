@@ -6,8 +6,7 @@ namespace gglab
 	class RGBarrierPlanner final
 	{
 	public:
-		RGBarrierPlanner(
-			std::vector<RGCompiledPass>& passes,
+		RGBarrierPlanner(std::vector<RGCompiledPass>& passes,
 			std::vector<RGCompiledResource>& resources,
 			const std::vector<RGPassNodeIndex>& executionOrder) noexcept;
 

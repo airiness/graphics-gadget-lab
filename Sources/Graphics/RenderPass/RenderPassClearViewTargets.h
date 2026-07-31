@@ -6,17 +6,20 @@ namespace gglab
 	class RenderPassClearViewTargets : public RenderPassBase
 	{
 	public:
-		RenderPassClearViewTargets() noexcept : RenderPassBase({
-			.m_TypeName = "View.ClearSceneColor",
-			.m_DisplayName = "Clear Scene Color",
-			.m_CategoryName = "Geometry",
-			.m_Description = "Clears the display view HDR color before background and geometry rendering.",
-			.m_Category = RenderPassCategory::Geometry,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
+		RenderPassClearViewTargets() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "View.ClearSceneColor",
+				  .m_DisplayName = "Clear Scene Color",
+				  .m_CategoryName = "Geometry",
+				  .m_Description =
+					  "Clears the display view HDR color before background and geometry rendering.",
+				  .m_Category = RenderPassCategory::Geometry,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 	};
 }

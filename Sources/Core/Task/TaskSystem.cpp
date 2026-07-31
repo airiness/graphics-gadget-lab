@@ -27,16 +27,15 @@ namespace gglab
 			return index < TaskPriorityCount ? index : static_cast<size_t>(TaskPriority::Normal);
 		}
 
-		[[nodiscard]] double Milliseconds(
-			std::chrono::steady_clock::duration duration) noexcept
+		[[nodiscard]] double Milliseconds(std::chrono::steady_clock::duration duration) noexcept
 		{
 			return std::chrono::duration<double, std::milli>(duration).count();
 		}
 	}
 
-	TaskSystem::TaskSystem() noexcept :
-		TaskSystem(CreateInfo{})
-	{}
+	TaskSystem::TaskSystem() noexcept : TaskSystem(CreateInfo{})
+	{
+	}
 
 	TaskSystem::TaskSystem(const CreateInfo& createInfo) noexcept :
 		m_OwnerThreadId(std::this_thread::get_id()),
@@ -46,11 +45,8 @@ namespace gglab
 		m_Workers.reserve(workerCount);
 		for (uint32_t workerIndex = 0; workerIndex < workerCount; ++workerIndex)
 		{
-			m_Workers.emplace_back(
-				[this, workerIndex](std::stop_token stopToken) noexcept
-				{
-					WorkerMain(stopToken, workerIndex);
-				});
+			m_Workers.emplace_back([this, workerIndex](std::stop_token stopToken) noexcept
+				{ WorkerMain(stopToken, workerIndex); });
 		}
 	}
 
@@ -60,10 +56,7 @@ namespace gglab
 		DiscardCompletions();
 	}
 
-	TaskHandle TaskSystem::Submit(
-		TaskDesc desc,
-		TaskWork work,
-		TaskCompletion completion) noexcept
+	TaskHandle TaskSystem::Submit(TaskDesc desc, TaskWork work, TaskCompletion completion) noexcept
 	{
 		if (!work)
 		{
@@ -143,8 +136,7 @@ namespace gglab
 		{
 			auto& oldQueue = m_Queues[PriorityIndex(task->m_Desc.m_Priority)];
 			const auto queuedTask = std::ranges::find(oldQueue, task);
-			GGLAB_ASSERT_MSG(
-				queuedTask != oldQueue.end(),
+			GGLAB_ASSERT_MSG(queuedTask != oldQueue.end(),
 				"Queued TaskSystem record was not present in its priority queue.");
 			if (queuedTask == oldQueue.end())
 			{
@@ -158,11 +150,11 @@ namespace gglab
 		return true;
 	}
 
-	uint32_t TaskSystem::PumpCompletions(
-		const TaskCompletionPumpBudget& budget) noexcept
+	uint32_t TaskSystem::PumpCompletions(const TaskCompletionPumpBudget& budget) noexcept
 	{
 		const bool isOwnerThread = std::this_thread::get_id() == m_OwnerThreadId;
-		GGLAB_ASSERT_MSG(isOwnerThread, "TaskSystem completions must be pumped on the owner thread.");
+		GGLAB_ASSERT_MSG(
+			isOwnerThread, "TaskSystem completions must be pumped on the owner thread.");
 		if (!isOwnerThread)
 		{
 			return 0;
@@ -195,17 +187,14 @@ namespace gglab
 				catch (const std::exception& exception)
 				{
 					GGLAB_UNUSED(exception);
-					GGLAB_LOG_ERROR(
-						"TaskSystem completion '{}' threw an exception: {}",
-						completion.m_Info.m_Name,
-						exception.what());
+					GGLAB_LOG_ERROR("TaskSystem completion '{}' threw an exception: {}",
+						completion.m_Info.m_Name, exception.what());
 					std::scoped_lock lock(m_Mutex);
 					++m_CompletionCallbackFailureCount;
 				}
 				catch (...)
 				{
-					GGLAB_LOG_ERROR(
-						"TaskSystem completion '{}' threw an unknown exception.",
+					GGLAB_LOG_ERROR("TaskSystem completion '{}' threw an unknown exception.",
 						completion.m_Info.m_Name);
 					std::scoped_lock lock(m_Mutex);
 					++m_CompletionCallbackFailureCount;
@@ -308,8 +297,9 @@ namespace gglab
 				activity.m_Progress = task->m_Desc.m_Progress->GetSnapshot();
 			}
 			activity.m_WorkerIndex = task->m_WorkerIndex;
-			activity.m_QueueMilliseconds = Milliseconds(
-				(task->m_Status == TaskStatus::Queued ? now : task->m_StartedAt) - task->m_QueuedAt);
+			activity.m_QueueMilliseconds =
+				Milliseconds((task->m_Status == TaskStatus::Queued ? now : task->m_StartedAt) -
+					task->m_QueuedAt);
 			if (task->m_Status == TaskStatus::Running)
 			{
 				activity.m_ExecutionMilliseconds = Milliseconds(now - task->m_StartedAt);
@@ -332,8 +322,8 @@ namespace gglab
 
 	bool TaskSystem::HasQueuedTasksLocked() const noexcept
 	{
-		return std::ranges::any_of(m_Queues,
-			[](const auto& queue) noexcept { return !queue.empty(); });
+		return std::ranges::any_of(
+			m_Queues, [](const auto& queue) noexcept { return !queue.empty(); });
 	}
 
 	std::shared_ptr<TaskSystem::TaskRecord> TaskSystem::PopNextTaskLocked() noexcept
@@ -350,9 +340,7 @@ namespace gglab
 		return {};
 	}
 
-	void TaskSystem::WorkerMain(
-		std::stop_token systemStopToken,
-		uint32_t workerIndex) noexcept
+	void TaskSystem::WorkerMain(std::stop_token systemStopToken, uint32_t workerIndex) noexcept
 	{
 		const std::wstring threadName = std::format(L"gglab.TaskWorker.{}", workerIndex);
 		GGLAB_UNUSED(SetThreadDescription(GetCurrentThread(), threadName.c_str()));
@@ -360,9 +348,7 @@ namespace gglab
 		const bool uninitializeCom = SUCCEEDED(comResult);
 		if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE)
 		{
-			GGLAB_LOG_ERROR(
-				"TaskSystem worker {} failed to initialize COM: 0x{:08X}.",
-				workerIndex,
+			GGLAB_LOG_ERROR("TaskSystem worker {} failed to initialize COM: 0x{:08X}.", workerIndex,
 				static_cast<uint32_t>(comResult));
 		}
 
@@ -371,8 +357,8 @@ namespace gglab
 			std::shared_ptr<TaskRecord> task;
 			{
 				std::unique_lock lock(m_Mutex);
-				m_WorkAvailable.wait(lock, systemStopToken,
-					[this]() noexcept { return HasQueuedTasksLocked(); });
+				m_WorkAvailable.wait(
+					lock, systemStopToken, [this]() noexcept { return HasQueuedTasksLocked(); });
 				if (systemStopToken.stop_requested())
 				{
 					break;
@@ -428,9 +414,7 @@ namespace gglab
 	}
 
 	void TaskSystem::FinishTask(
-		const std::shared_ptr<TaskRecord>& task,
-		TaskStatus status,
-		std::string error) noexcept
+		const std::shared_ptr<TaskRecord>& task, TaskStatus status, std::string error) noexcept
 	{
 		const auto finishedAt = std::chrono::steady_clock::now();
 		TaskCompletionInfo info{};
@@ -439,10 +423,10 @@ namespace gglab
 		info.m_Status = status;
 		info.m_Error = std::move(error);
 		const bool wasRunning = task->m_Status == TaskStatus::Running;
-		info.m_QueueMilliseconds = Milliseconds(
-			(wasRunning ? task->m_StartedAt : finishedAt) - task->m_QueuedAt);
-		info.m_ExecutionMilliseconds = wasRunning ?
-			Milliseconds(finishedAt - task->m_StartedAt) : 0.0;
+		info.m_QueueMilliseconds =
+			Milliseconds((wasRunning ? task->m_StartedAt : finishedAt) - task->m_QueuedAt);
+		info.m_ExecutionMilliseconds =
+			wasRunning ? Milliseconds(finishedAt - task->m_StartedAt) : 0.0;
 
 		{
 			std::scoped_lock lock(m_Mutex);
@@ -456,10 +440,17 @@ namespace gglab
 			}
 			switch (status)
 			{
-			case TaskStatus::Succeeded: ++m_SucceededCount; break;
-			case TaskStatus::Failed: ++m_FailedCount; break;
-			case TaskStatus::Cancelled: ++m_CancelledCount; break;
-			default: break;
+			case TaskStatus::Succeeded:
+				++m_SucceededCount;
+				break;
+			case TaskStatus::Failed:
+				++m_FailedCount;
+				break;
+			case TaskStatus::Cancelled:
+				++m_CancelledCount;
+				break;
+			default:
+				break;
 			}
 			m_Completions.push_back({ info, std::move(task->m_Completion) });
 			if (m_RecentTaskCapacity > 0)

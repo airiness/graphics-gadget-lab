@@ -49,9 +49,9 @@ namespace gglab
 		PersistentBufferTableSnapshot m_Lights;
 	};
 
-	template<>
-	struct SnapshotTraits<PersistentSceneBufferSnapshot>
+	template <> struct SnapshotTraits<PersistentSceneBufferSnapshot>
 	{
-		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.PersistentSceneBufferSnapshot");
+		static constexpr SnapshotId Id =
+			MakeSnapshotId("Diagnostics.PersistentSceneBufferSnapshot");
 	};
 }

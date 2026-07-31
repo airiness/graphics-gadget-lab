@@ -31,7 +31,7 @@ static const uint IBL_PREVIEW_LAYOUT_CROSS = 1;
 bool TryGetGrid2x3Face(float2 uv, out uint face, out float2 faceUv)
 {
 	float2 atlasCoord = saturate(uv) * float2(4.0, 3.0);
-	uint2 tile = min((uint2) atlasCoord, uint2(3u, 2u));
+	uint2 tile = min((uint2)atlasCoord, uint2(3u, 2u));
 
 	if (tile.x >= 3u || tile.y >= 2u)
 	{
@@ -48,7 +48,7 @@ bool TryGetGrid2x3Face(float2 uv, out uint face, out float2 faceUv)
 bool TryGetCrossFace(float2 uv, out uint face, out float2 faceUv)
 {
 	float2 atlasCoord = saturate(uv) * float2(4.0, 3.0);
-	uint2 tile = min((uint2) atlasCoord, uint2(3u, 2u));
+	uint2 tile = min((uint2)atlasCoord, uint2(3u, 2u));
 
 	face = 0u;
 	faceUv = frac(atlasCoord);
@@ -62,18 +62,18 @@ bool TryGetCrossFace(float2 uv, out uint face, out float2 faceUv)
 	{
 		switch (tile.x)
 		{
-			case 0u:
-				face = CUBEMAP_FACE_NEGATIVE_X;
-				return true;
-			case 1u:
-				face = CUBEMAP_FACE_POSITIVE_Z;
-				return true;
-			case 2u:
-				face = CUBEMAP_FACE_POSITIVE_X;
-				return true;
-			case 3u:
-				face = CUBEMAP_FACE_NEGATIVE_Z;
-				return true;
+		case 0u:
+			face = CUBEMAP_FACE_NEGATIVE_X;
+			return true;
+		case 1u:
+			face = CUBEMAP_FACE_POSITIVE_Z;
+			return true;
+		case 2u:
+			face = CUBEMAP_FACE_POSITIVE_X;
+			return true;
+		case 3u:
+			face = CUBEMAP_FACE_NEGATIVE_Z;
+			return true;
 		}
 	}
 	if (tile.y == 2u && tile.x == 1u)
@@ -110,7 +110,8 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 	float3 dir = WorldToEnvironmentDirection(
 		CubemapFaceUvToDirection(face, faceUv),
 		g_Scene.IBLResource.EnvironmentRotationRadians);
-	float3 hdr = SampleTextureCubeLevel(binding, dir, float(g_Pass.SampleMip)).rgb * g_Scene.IBLResource.EnvironmentIntensity;
+	float3 hdr = SampleTextureCubeLevel(binding, dir, float(g_Pass.SampleMip)).rgb *
+		g_Scene.IBLResource.EnvironmentIntensity;
 	float3 color = LinearToSRGB(ACESFitted(hdr));
 	return float4(color, 1.0);
 }

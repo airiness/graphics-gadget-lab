@@ -5,21 +5,19 @@ namespace gglab
 {
 	AssetStateEventQueue::AssetStateEventQueue() noexcept :
 		m_OwnerThread(std::this_thread::get_id())
-	{}
+	{
+	}
 
-	void AssetStateEventQueue::Push(
-		DependencyStatus status,
+	void AssetStateEventQueue::Push(DependencyStatus status,
 		std::optional<AssetOperationToken> operation,
 		AssetStateEventOperationPhase operationPhase) noexcept
 	{
 		AssertOwnerThread();
 		const bool hasOperation = operation.has_value();
-		const bool hasOperationPhase =
-			operationPhase != AssetStateEventOperationPhase::None;
-		if (!status.IsValid() ||
-			hasOperation != hasOperationPhase ||
-			(operation && (!operation->IsValid() ||
-				operation->m_ContentVersion != status.m_ContentVersion)))
+		const bool hasOperationPhase = operationPhase != AssetStateEventOperationPhase::None;
+		if (!status.IsValid() || hasOperation != hasOperationPhase ||
+			(operation &&
+				(!operation->IsValid() || operation->m_ContentVersion != status.m_ContentVersion)))
 		{
 			GGLAB_ASSERT_MSG(false, "Invalid or mismatched asset state event.");
 			return;
@@ -29,7 +27,7 @@ namespace gglab
 			.m_Status = status,
 			.m_Operation = operation,
 			.m_OperationPhase = operationPhase,
-		});
+			});
 	}
 
 	void AssetStateEventQueue::Drain(std::vector<AssetStateEvent>& output) noexcept
@@ -41,8 +39,7 @@ namespace gglab
 
 	void AssetStateEventQueue::AssertOwnerThread() const noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			std::this_thread::get_id() == m_OwnerThread,
+		GGLAB_ASSERT_MSG(std::this_thread::get_id() == m_OwnerThread,
 			"AssetStateEventQueue accessed from a non-owner thread.");
 	}
 }

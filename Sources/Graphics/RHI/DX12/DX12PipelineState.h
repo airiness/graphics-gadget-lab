@@ -7,7 +7,8 @@ namespace gglab
 	{
 	public:
 		explicit DX12PipelineState(ComPtr<ID3D12PipelineState> pipelineState) noexcept;
-		explicit DX12PipelineState(DX12Device* dx12Device, const D3D12_PIPELINE_STATE_STREAM_DESC& streamDesc) noexcept;
+		explicit DX12PipelineState(
+			DX12Device* dx12Device, const D3D12_PIPELINE_STATE_STREAM_DESC& streamDesc) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12PipelineState);
 		virtual ~DX12PipelineState() = default;
 
@@ -17,5 +18,3 @@ namespace gglab
 		ComPtr<ID3D12PipelineState> m_PipelineState;
 	};
 }
-
-

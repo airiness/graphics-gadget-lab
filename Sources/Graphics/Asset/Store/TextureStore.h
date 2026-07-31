@@ -35,13 +35,10 @@ namespace gglab
 
 		[[nodiscard]] const Texture* Find(TextureID textureId) const noexcept;
 		[[nodiscard]] Texture* Edit(TextureID textureId) noexcept;
-		[[nodiscard]] TextureID FindCached(
-			const std::filesystem::path& canonicalPath,
+		[[nodiscard]] TextureID FindCached(const std::filesystem::path& canonicalPath,
 			const TextureImportSettings& importSettings) const noexcept;
-		[[nodiscard]] bool BindCacheKey(
-			const std::filesystem::path& canonicalPath,
-			const TextureImportSettings& importSettings,
-			TextureID textureId) noexcept;
+		[[nodiscard]] bool BindCacheKey(const std::filesystem::path& canonicalPath,
+			const TextureImportSettings& importSettings, TextureID textureId) noexcept;
 		[[nodiscard]] bool Insert(TextureID textureId, std::unique_ptr<Texture>&& texture) noexcept;
 		[[nodiscard]] bool Remove(TextureID textureId) noexcept;
 

@@ -6,7 +6,10 @@ namespace gglab
 	class IBLViewerPanel final : public DevelopGuiPanelBase
 	{
 	public:
-		std::string_view GetPath() const noexcept override { return "Rendering/Lighting/Environment Lighting"; }
+		std::string_view GetPath() const noexcept override
+		{
+			return "Rendering/Lighting/Environment Lighting";
+		}
 		std::string_view GetTitle() const noexcept override { return "IBL Viewer"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
 	};

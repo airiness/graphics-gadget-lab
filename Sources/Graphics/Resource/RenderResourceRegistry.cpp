@@ -19,22 +19,21 @@ namespace gglab
 		};
 
 		constexpr std::array TextureLogicalNameEntries = {
-			TextureLogicalNameEntry{ "IBL.Active", "EnvironmentCubemap", true },
-			TextureLogicalNameEntry{ "IBL.Active", "IrradianceCubemap", true },
-			TextureLogicalNameEntry{ "IBL.Active", "PrefilteredSpecularCubemap", true },
-			TextureLogicalNameEntry{ "IBL.Active", "BrdfLut", true },
-			TextureLogicalNameEntry{ "Preview.IBL", "EnvironmentCubemap" },
-			TextureLogicalNameEntry{ "Preview.IBL", "IrradianceCubemap" },
-			TextureLogicalNameEntry{ "Preview.IBL", "PrefilteredSpecularCubemap" },
-			TextureLogicalNameEntry{ "Preview.Shadow", "DirectionalShadowMap" },
-			TextureLogicalNameEntry{ "Preview.PostProcess", "SelectedTap" },
+			TextureLogicalNameEntry{"IBL.Active", "EnvironmentCubemap", true},
+			TextureLogicalNameEntry{"IBL.Active", "IrradianceCubemap", true},
+			TextureLogicalNameEntry{"IBL.Active", "PrefilteredSpecularCubemap", true},
+			TextureLogicalNameEntry{"IBL.Active", "BrdfLut", true},
+			TextureLogicalNameEntry{"Preview.IBL", "EnvironmentCubemap"},
+			TextureLogicalNameEntry{"Preview.IBL", "IrradianceCubemap"},
+			TextureLogicalNameEntry{"Preview.IBL", "PrefilteredSpecularCubemap"},
+			TextureLogicalNameEntry{"Preview.Shadow", "DirectionalShadowMap"},
+			TextureLogicalNameEntry{"Preview.PostProcess", "SelectedTap"},
 		};
 		static_assert(TextureLogicalNameEntries.size() ==
 			utils::EnumCount<RenderResourceRegistry::TextureIndex>());
 
 		std::string TextureLogicalName(
-			RenderResourceRegistry::TextureIndex index,
-			bool bakeResource) noexcept
+			RenderResourceRegistry::TextureIndex index, bool bakeResource) noexcept
 		{
 			const size_t entryIndex = utils::ToIndex(index);
 			if (entryIndex >= TextureLogicalNameEntries.size())
@@ -60,14 +59,17 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_SamplerRegistry);
 	}
 
-	void RenderResourceRegistry::EnsureIblResources(const IBLResourceCreateInfo& createInfo, const RHIFencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureIblResources(
+		const IBLResourceCreateInfo& createInfo, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		// IBL_EnvironmentCubemap
 		{
 			RHITextureDesc desc{};
-			desc.m_Extent = { createInfo.m_EnvironmentCubemapSize, createInfo.m_EnvironmentCubemapSize, 1u };
+			desc.m_Extent = {
+				createInfo.m_EnvironmentCubemapSize, createInfo.m_EnvironmentCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
-			desc.m_MipLevels = static_cast<uint16_t>(CalculateMipLevelCount(createInfo.m_EnvironmentCubemapSize));
+			desc.m_MipLevels =
+				static_cast<uint16_t>(CalculateMipLevelCount(createInfo.m_EnvironmentCubemapSize));
 			desc.m_SampleCount = 1;
 			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
 			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
@@ -86,7 +88,8 @@ namespace gglab
 		// IBL_IrradianceCubemap
 		{
 			RHITextureDesc desc{};
-			desc.m_Extent = { createInfo.m_IrradianceCubemapSize, createInfo.m_IrradianceCubemapSize, 1u };
+			desc.m_Extent = {
+				createInfo.m_IrradianceCubemapSize, createInfo.m_IrradianceCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
@@ -106,13 +109,13 @@ namespace gglab
 
 		// IBL_PrefilteredSpecularCubemap
 		{
-			const uint32_t prefilteredMipLevels = std::clamp(
-				createInfo.m_PrefilteredSpecularMipLevels,
-				1u,
-				CalculateMipLevelCount(createInfo.m_PrefilteredSpecularCubemapSize));
+			const uint32_t prefilteredMipLevels =
+				std::clamp(createInfo.m_PrefilteredSpecularMipLevels, 1u,
+					CalculateMipLevelCount(createInfo.m_PrefilteredSpecularCubemapSize));
 
 			RHITextureDesc desc{};
-			desc.m_Extent = { createInfo.m_PrefilteredSpecularCubemapSize, createInfo.m_PrefilteredSpecularCubemapSize, 1u };
+			desc.m_Extent = { createInfo.m_PrefilteredSpecularCubemapSize,
+				createInfo.m_PrefilteredSpecularCubemapSize, 1u };
 			desc.m_ArraySize = static_cast<uint16_t>(CubemapFaceCount);
 			desc.m_MipLevels = static_cast<uint16_t>(prefilteredMipLevels);
 			desc.m_SampleCount = 1;
@@ -127,7 +130,8 @@ namespace gglab
 			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 			srvDesc.m_Subresources.m_ArraySliceCount = CubemapFaceCount;
 
-			EnsureTexture(TextureIndex::IBL_PrefilteredSpecularCubemap, desc, srvDesc, retireFenceOpt);
+			EnsureTexture(
+				TextureIndex::IBL_PrefilteredSpecularCubemap, desc, srvDesc, retireFenceOpt);
 		}
 
 		// IBL_BrdfLut
@@ -153,10 +157,8 @@ namespace gglab
 		// Preview_IBL_EnvironmentCubemap
 		{
 			RHITextureDesc desc{};
-			desc.m_Extent = {
-				createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 4u,
-				createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 3u,
-				1u };
+			desc.m_Extent = { createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 4u,
+				createInfo.m_PreviewIBLEnvironmentCubemapFaceSize * 3u, 1u };
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
@@ -169,16 +171,15 @@ namespace gglab
 			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
-			EnsureTexture(TextureIndex::Preview_IBL_EnvironmentCubemap, desc, srvDesc, retireFenceOpt);
+			EnsureTexture(
+				TextureIndex::Preview_IBL_EnvironmentCubemap, desc, srvDesc, retireFenceOpt);
 		}
 
 		// Preview_IBL_IrradianceCubemap
 		{
 			RHITextureDesc desc{};
-			desc.m_Extent = {
-				createInfo.m_PreviewIBLIrradianceCubemapFaceSize * 4u,
-				createInfo.m_PreviewIBLIrradianceCubemapFaceSize * 3u,
-				1u };
+			desc.m_Extent = { createInfo.m_PreviewIBLIrradianceCubemapFaceSize * 4u,
+				createInfo.m_PreviewIBLIrradianceCubemapFaceSize * 3u, 1u };
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
@@ -191,16 +192,15 @@ namespace gglab
 			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
-			EnsureTexture(TextureIndex::Preview_IBL_IrradianceCubemap, desc, srvDesc, retireFenceOpt);
+			EnsureTexture(
+				TextureIndex::Preview_IBL_IrradianceCubemap, desc, srvDesc, retireFenceOpt);
 		}
 
 		// Preview_IBL_PrefilteredSpecularCubemap
 		{
 			RHITextureDesc desc{};
-			desc.m_Extent = {
-				createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 4u,
-				createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 3u,
-				1u };
+			desc.m_Extent = { createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 4u,
+				createInfo.m_PreviewIBLPrefilteredSpecularCubemapFaceSize * 3u, 1u };
 			desc.m_ArraySize = 1;
 			desc.m_MipLevels = 1;
 			desc.m_SampleCount = 1;
@@ -213,27 +213,23 @@ namespace gglab
 			srvDesc.m_Format = desc.m_Format;
 			srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
-			EnsureTexture(TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, desc, srvDesc, retireFenceOpt);
+			EnsureTexture(TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, desc, srvDesc,
+				retireFenceOpt);
 		}
 	}
 
 	void RenderResourceRegistry::EnsureIBLBakeResources(
-		const IBLBakeConfig& config,
-		const RHIFencePoint* retireFenceOpt) noexcept
+		const IBLBakeConfig& config, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		EnsureIBLTextureSet(m_IBLBakeTextureEntries, config, retireFenceOpt);
 	}
 
 	void RenderResourceRegistry::EnsureIBLTextureSet(
 		std::array<TextureEntry, utils::EnumCount<TextureIndex>()>& entries,
-		const IBLBakeConfig& config,
-		const RHIFencePoint* retireFenceOpt) noexcept
+		const IBLBakeConfig& config, const RHIFencePoint* retireFenceOpt) noexcept
 	{
-		auto ensureCubemap = [this, &entries, retireFenceOpt](
-			TextureIndex index,
-			uint32_t size,
-			uint32_t mipLevels,
-			RHIFormat format) noexcept
+		auto ensureCubemap = [this, &entries, retireFenceOpt](TextureIndex index, uint32_t size,
+			uint32_t mipLevels, RHIFormat format) noexcept
 			{
 				RHITextureDesc desc{};
 				desc.m_Extent = { size, size, 1u };
@@ -253,28 +249,22 @@ namespace gglab
 			};
 
 		const uint32_t environmentSize = std::max(config.m_EnvironmentCubemapSize, 1u);
-		ensureCubemap(
-			TextureIndex::IBL_EnvironmentCubemap,
-			environmentSize,
-			CalculateMipLevelCount(environmentSize),
-			config.m_EnvironmentCubemapFormat);
+		ensureCubemap(TextureIndex::IBL_EnvironmentCubemap, environmentSize,
+			CalculateMipLevelCount(environmentSize), config.m_EnvironmentCubemapFormat);
 
 		const uint32_t irradianceSize = std::max(config.m_IrradianceCubemapSize, 1u);
-		ensureCubemap(
-			TextureIndex::IBL_IrradianceCubemap,
-			irradianceSize,
-			1,
+		ensureCubemap(TextureIndex::IBL_IrradianceCubemap, irradianceSize, 1,
 			config.m_IrradianceCubemapFormat);
 
 		const uint32_t specularSize = std::max(config.m_PrefilteredSpecularCubemapSize, 1u);
-		ensureCubemap(
-			TextureIndex::IBL_PrefilteredSpecularCubemap,
-			specularSize,
-			std::clamp(config.m_PrefilteredSpecularMipLevels, 1u, CalculateMipLevelCount(specularSize)),
+		ensureCubemap(TextureIndex::IBL_PrefilteredSpecularCubemap, specularSize,
+			std::clamp(
+				config.m_PrefilteredSpecularMipLevels, 1u, CalculateMipLevelCount(specularSize)),
 			config.m_PrefilteredSpecularCubemapFormat);
 
 		RHITextureDesc brdfDesc{};
-		brdfDesc.m_Extent = { std::max(config.m_BrdfLutSize, 1u), std::max(config.m_BrdfLutSize, 1u), 1u };
+		brdfDesc.m_Extent = {
+			std::max(config.m_BrdfLutSize, 1u), std::max(config.m_BrdfLutSize, 1u), 1u };
 		brdfDesc.m_Format = config.m_BrdfLutFormat;
 		brdfDesc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
 			RHITextureUsage::CopySource | RHITextureUsage::CopyDest;
@@ -301,7 +291,8 @@ namespace gglab
 
 	void RenderResourceRegistry::PublishIBLBakeResources() noexcept
 	{
-		GGLAB_ASSERT_MSG(HasIBLBakeResources(), "IBL bake resources must be complete before publication.");
+		GGLAB_ASSERT_MSG(
+			HasIBLBakeResources(), "IBL bake resources must be complete before publication.");
 		if (!HasIBLBakeResources())
 		{
 			return;
@@ -326,7 +317,8 @@ namespace gglab
 		MarkAllIBLPreviewsDirty();
 	}
 
-	void RenderResourceRegistry::EnsureShadowPreviewResources(uint32_t previewSize, const RHIFencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureShadowPreviewResources(
+		uint32_t previewSize, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		const uint32_t size = std::max(previewSize, 1u);
 
@@ -344,29 +336,27 @@ namespace gglab
 		srvDesc.m_Format = desc.m_Format;
 		srvDesc.m_Subresources.m_MipCount = desc.m_MipLevels;
 
-		EnsureTexture(TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
+		EnsureTexture(
+			TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
 	}
 
 	void RenderResourceRegistry::EnsurePostProcessPreviewResources(
-		uint32_t sourceWidth,
-		uint32_t sourceHeight,
-		const RHIFencePoint* retireFenceOpt) noexcept
+		uint32_t sourceWidth, uint32_t sourceHeight, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		constexpr uint32_t MaxPreviewDimension = 512;
 		const uint32_t safeWidth = std::max(sourceWidth, 1u);
 		const uint32_t safeHeight = std::max(sourceHeight, 1u);
 		const float scale = static_cast<float>(MaxPreviewDimension) /
 			static_cast<float>(std::max(safeWidth, safeHeight));
-		const uint32_t previewWidth = std::max(
-			static_cast<uint32_t>(std::round(static_cast<float>(safeWidth) * scale)),
-			1u);
-		const uint32_t previewHeight = std::max(
-			static_cast<uint32_t>(std::round(static_cast<float>(safeHeight) * scale)),
-			1u);
+		const uint32_t previewWidth =
+			std::max(static_cast<uint32_t>(std::round(static_cast<float>(safeWidth) * scale)), 1u);
+		const uint32_t previewHeight =
+			std::max(static_cast<uint32_t>(std::round(static_cast<float>(safeHeight) * scale)), 1u);
 
 		const auto index = TextureIndex::Preview_PostProcess;
 		const auto& previousEntry = m_TextureEntries[utils::ToIndex(index)];
-		const bool descriptorChanged = previousEntry.m_Allocated &&
+		const bool descriptorChanged =
+			previousEntry.m_Allocated &&
 			(previousEntry.m_TextureDesc.m_Extent.m_Width != previewWidth ||
 				previousEntry.m_TextureDesc.m_Extent.m_Height != previewHeight);
 
@@ -469,7 +459,8 @@ namespace gglab
 		return descriptor.m_Index;
 	}
 
-	const RHITextureDesc* RenderResourceRegistry::GetIBLBakeTextureDesc(TextureIndex index) const noexcept
+	const RHITextureDesc* RenderResourceRegistry::GetIBLBakeTextureDesc(
+		TextureIndex index) const noexcept
 	{
 		const auto& entry = m_IBLBakeTextureEntries[utils::ToIndex(index)];
 		return entry.m_Allocated ? &entry.m_TextureDesc : nullptr;
@@ -481,10 +472,12 @@ namespace gglab
 		return entry.m_Allocated ? entry.m_PhysicalAllocation.m_Texture : RHITextureHandle{};
 	}
 
-	uint32_t RenderResourceRegistry::GetIBLBakeShaderVisibleSrvIndex(TextureIndex index) const noexcept
+	uint32_t RenderResourceRegistry::GetIBLBakeShaderVisibleSrvIndex(
+		TextureIndex index) const noexcept
 	{
 		const auto& entry = m_IBLBakeTextureEntries[utils::ToIndex(index)];
-		GGLAB_ASSERT_MSG(entry.m_Allocated && entry.m_Srv.IsValid(), "IBL bake texture SRV is unavailable.");
+		GGLAB_ASSERT_MSG(
+			entry.m_Allocated && entry.m_Srv.IsValid(), "IBL bake texture SRV is unavailable.");
 		const RHIDescriptorHandle descriptor = m_Device->GetTextureViewDescriptor(entry.m_Srv);
 		GGLAB_ASSERT_MSG(descriptor.IsValid(), "IBL bake texture SRV descriptor is invalid.");
 		return descriptor.m_Index;
@@ -521,7 +514,8 @@ namespace gglab
 		MarkIBLPreviewDirty(IBLPreviewType::Irradiance);
 	}
 
-	void RenderResourceRegistry::SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept
+	void RenderResourceRegistry::SetIBLPrefilteredSpecularPreviewLayout(
+		IBLPreviewLayout layout) noexcept
 	{
 		if (layout >= IBLPreviewLayout::Count)
 		{
@@ -600,9 +594,8 @@ namespace gglab
 		{
 			return;
 		}
-		selection.m_BloomPyramidLevel = std::min(
-			selection.m_BloomPyramidLevel,
-			MaxBloomPyramidLevels - 1u);
+		selection.m_BloomPyramidLevel =
+			std::min(selection.m_BloomPyramidLevel, MaxBloomPyramidLevels - 1u);
 		m_PostProcessPreviewState.m_Selection = selection;
 	}
 
@@ -653,8 +646,7 @@ namespace gglab
 	{
 		out = {};
 
-		auto fillTextureSamplerBinding = [this](
-			TextureIndex index,
+		auto fillTextureSamplerBinding = [this](TextureIndex index,
 			TextureSamplerBindingGPU& outBinding,
 			SamplerPreset samplerPreset) noexcept
 			{
@@ -666,23 +658,20 @@ namespace gglab
 				outBinding.SamplerIndex = m_SamplerRegistry->GetSamplerIndex(samplerPreset);
 			};
 
-		fillTextureSamplerBinding(TextureIndex::IBL_EnvironmentCubemap,
-			out.EnvironmentBinding,
+		fillTextureSamplerBinding(TextureIndex::IBL_EnvironmentCubemap, out.EnvironmentBinding,
 			SamplerPreset::LinearClamp);
 
-		fillTextureSamplerBinding(TextureIndex::IBL_IrradianceCubemap,
-			out.IrradianceBinding,
-			SamplerPreset::LinearClamp);
+		fillTextureSamplerBinding(
+			TextureIndex::IBL_IrradianceCubemap, out.IrradianceBinding, SamplerPreset::LinearClamp);
 
 		fillTextureSamplerBinding(TextureIndex::IBL_PrefilteredSpecularCubemap,
-			out.PrefilteredSpecularBinding,
-			SamplerPreset::LinearClamp);
+			out.PrefilteredSpecularBinding, SamplerPreset::LinearClamp);
 
-		fillTextureSamplerBinding(TextureIndex::IBL_BrdfLut,
-			out.BrdfLutBinding,
-			SamplerPreset::LinearClamp);
+		fillTextureSamplerBinding(
+			TextureIndex::IBL_BrdfLut, out.BrdfLutBinding, SamplerPreset::LinearClamp);
 
-		const auto& prefilteredEntry = m_TextureEntries[utils::ToIndex(TextureIndex::IBL_PrefilteredSpecularCubemap)];
+		const auto& prefilteredEntry =
+			m_TextureEntries[utils::ToIndex(TextureIndex::IBL_PrefilteredSpecularCubemap)];
 		out.PrefilteredSpecularMipLevels = prefilteredEntry.m_TextureDesc.m_MipLevels;
 		out.EnvironmentIntensity = 1.0f;
 	}
@@ -702,7 +691,8 @@ namespace gglab
 			auto& entry = m_IBLBakeTextureEntries[index];
 			if (entry.m_Allocated)
 			{
-				m_TransientResourcePool->RetireTexture(std::move(entry.m_PhysicalAllocation), fencePoint);
+				m_TransientResourcePool->RetireTexture(
+					std::move(entry.m_PhysicalAllocation), fencePoint);
 				entry = {};
 			}
 		}
@@ -712,33 +702,28 @@ namespace gglab
 		m_PostProcessPreviewState.m_HasPublished = false;
 	}
 
-	void RenderResourceRegistry::EnsureTexture(TextureIndex index,
-		const RHITextureDesc& desc,
-		const RHITextureViewDesc& srvDesc,
-		const RHIFencePoint* retireFenceOpt) noexcept
+	void RenderResourceRegistry::EnsureTexture(TextureIndex index, const RHITextureDesc& desc,
+		const RHITextureViewDesc& srvDesc, const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		EnsureTexture(m_TextureEntries, index, desc, srvDesc, retireFenceOpt);
 	}
 
 	void RenderResourceRegistry::EnsureTexture(
-		std::array<TextureEntry, utils::EnumCount<TextureIndex>()>& entries,
-		TextureIndex index,
-		const RHITextureDesc& desc,
-		const RHITextureViewDesc& srvDesc,
+		std::array<TextureEntry, utils::EnumCount<TextureIndex>()>& entries, TextureIndex index,
+		const RHITextureDesc& desc, const RHITextureViewDesc& srvDesc,
 		const RHIFencePoint* retireFenceOpt) noexcept
 	{
 		auto& entry = entries[utils::ToIndex(index)];
 
 		// Acquire a physical texture allocation from the reusable pool.
-		auto createTexture = [this, index, &srvDesc, &entries](TextureEntry& outEntry, const RHITextureDesc& desc) noexcept
+		auto createTexture = [this, index, &srvDesc, &entries](
+			TextureEntry& outEntry, const RHITextureDesc& desc) noexcept
 			{
 				const bool bakeResource = &entries == &m_IBLBakeTextureEntries;
-				auto allocation = m_TransientResourcePool->AcquireTexture(
-					desc,
-					TextureLogicalName(index, bakeResource),
-					RHIResourceDebugBindingMode::Aliased);
-				GGLAB_ASSERT_MSG(allocation.IsValid(),
-					"RenderResourceRegistry: Acquire texture failed.");
+				auto allocation = m_TransientResourcePool->AcquireTexture(desc,
+					TextureLogicalName(index, bakeResource), RHIResourceDebugBindingMode::Aliased);
+				GGLAB_ASSERT_MSG(
+					allocation.IsValid(), "RenderResourceRegistry: Acquire texture failed.");
 				if (!allocation.IsValid())
 				{
 					return;
@@ -796,14 +781,14 @@ namespace gglab
 
 			if (!retireFenceOpt)
 			{
-				GGLAB_LOG_GRAPHICS_ERROR("RenderResourceRegistry: desc changed but no fence, keep old resource (index={}).",
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"RenderResourceRegistry: desc changed but no fence, keep old resource (index={}).",
 					static_cast<uint32_t>(index));
 				return;
 			}
 
 			m_TransientResourcePool->RetireTexture(
-				std::move(entry.m_PhysicalAllocation),
-				*retireFenceOpt);
+				std::move(entry.m_PhysicalAllocation), *retireFenceOpt);
 
 			// Create new
 			createTexture(entry, desc);
@@ -816,7 +801,8 @@ namespace gglab
 		}
 	}
 
-	void RenderResourceRegistry::DestroyTexture(TextureIndex index, const RHIFencePoint& fencePoint) noexcept
+	void RenderResourceRegistry::DestroyTexture(
+		TextureIndex index, const RHIFencePoint& fencePoint) noexcept
 	{
 		auto& entry = m_TextureEntries[utils::ToIndex(index)];
 		if (!entry.m_Allocated)

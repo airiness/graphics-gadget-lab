@@ -38,12 +38,16 @@ namespace gglab
 					switch (slot.m_Type)
 					{
 					case RHIBindingType::ConstantBuffer:
-					case RHIBindingType::PushConstants: return 'b';
+					case RHIBindingType::PushConstants:
+						return 'b';
 					case RHIBindingType::ReadWriteStorageBuffer:
-					case RHIBindingType::StorageTexture: return 'u';
+					case RHIBindingType::StorageTexture:
+						return 'u';
 					case RHIBindingType::Sampler:
-					case RHIBindingType::BindlessSamplerTable: return 's';
-					default: return 't';
+					case RHIBindingType::BindlessSamplerTable:
+						return 's';
+					default:
+						return 't';
 					}
 				}();
 			return std::format("{}{} space{}", prefix, slot.m_Binding, slot.m_Space);
@@ -65,17 +69,21 @@ namespace gglab
 
 		std::string ShaderSummary(const RHIShaderSnapshot& shader)
 		{
-			if (!shader.m_Present) return "-";
-			return shader.m_DebugName.empty() ? devtools::RHIHandleText(shader.m_Handle) : shader.m_DebugName;
+			if (!shader.m_Present)
+				return "-";
+			return shader.m_DebugName.empty() ? devtools::RHIHandleText(shader.m_Handle)
+				: shader.m_DebugName;
 		}
 
 		std::string RenderTargetFormatsText(const RHIPipelineSnapshot& pipeline)
 		{
-			if (pipeline.m_RenderTargetFormats.empty()) return "None";
+			if (pipeline.m_RenderTargetFormats.empty())
+				return "None";
 			std::string result;
 			for (size_t index = 0; index < pipeline.m_RenderTargetFormats.size(); ++index)
 			{
-				if (index) result += ", ";
+				if (index)
+					result += ", ";
 				result += FormatText(pipeline.m_RenderTargetFormats[index]);
 			}
 			return result;
@@ -83,11 +91,13 @@ namespace gglab
 
 		std::string PipelineUsagesText(const RHIPipelineSnapshot& pipeline)
 		{
-			if (pipeline.m_RenderPasses.empty()) return "Unregistered";
+			if (pipeline.m_RenderPasses.empty())
+				return "Unregistered";
 			std::string result;
 			for (size_t index = 0; index < pipeline.m_RenderPasses.size(); ++index)
 			{
-				if (index) result += ", ";
+				if (index)
+					result += ", ";
 				const auto& pass = pipeline.m_RenderPasses[index];
 				result += pass.m_DisplayName.empty() ? pass.m_TypeName : pass.m_DisplayName;
 			}
@@ -124,24 +134,33 @@ namespace gglab
 					const std::string registerText = RegisterText(slot);
 					const std::string mappingText = BackendMappingText(slot);
 					ImGui::TableNextRow();
-					ImGui::TableSetColumnIndex(0); ImGui::Text("%u", slot.m_Slot);
-					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(slot.m_DebugName.empty() ? "-" : slot.m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%u", slot.m_Slot);
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(
+						slot.m_DebugName.empty() ? "-" : slot.m_DebugName.c_str());
 					const std::string bindingType = devtools::EnumText(slot.m_Type);
 					const std::string shaderVisibility = devtools::EnumText(slot.m_Visibility);
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(bindingType.c_str());
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(shaderVisibility.c_str());
-					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(registerText.c_str());
-					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(slot.m_Count == 0 ? "Unbounded" : std::to_string(slot.m_Count).c_str());
-					ImGui::TableSetColumnIndex(6); ImGui::Text("%u B", slot.m_SizeInBytes);
-					ImGui::TableSetColumnIndex(7); ImGui::TextUnformatted(mappingText.c_str());
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(bindingType.c_str());
+					ImGui::TableSetColumnIndex(3);
+					ImGui::TextUnformatted(shaderVisibility.c_str());
+					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(registerText.c_str());
+					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(
+						slot.m_Count == 0 ? "Unbounded" : std::to_string(slot.m_Count).c_str());
+					ImGui::TableSetColumnIndex(6);
+					ImGui::Text("%u B", slot.m_SizeInBytes);
+					ImGui::TableSetColumnIndex(7);
+					ImGui::TextUnformatted(mappingText.c_str());
 				}
 				ImGui::EndTable();
 			}
 		}
 
 		void DrawBindingLayouts(
-			const RHIPipelineSystemSnapshot& snapshot,
-			PipelineSystemPanelState& state) noexcept
+			const RHIPipelineSystemSnapshot& snapshot, PipelineSystemPanelState& state) noexcept
 		{
 			if (state.m_SelectedLayout == RHIBindingLayoutHandle::InvalidIndex &&
 				!snapshot.m_BindingLayouts.empty())
@@ -163,39 +182,54 @@ namespace gglab
 					const std::string handle = devtools::RHIHandleText(layout.m_Handle);
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					if (ImGui::Selectable(handle.c_str(), state.m_SelectedLayout == layout.m_Handle.Index(),
+					if (ImGui::Selectable(handle.c_str(),
+						state.m_SelectedLayout == layout.m_Handle.Index(),
 						ImGuiSelectableFlags_SpanAllColumns))
 					{
 						state.m_SelectedLayout = layout.m_Handle.Index();
 					}
-					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(layout.m_Alive ? "Yes" : "No");
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(layout.m_DebugName.empty() ? "-" : layout.m_DebugName.c_str());
-					ImGui::TableSetColumnIndex(3); ImGui::Text("%u", static_cast<uint32_t>(layout.m_Slots.size()));
-					ImGui::TableSetColumnIndex(4); ImGui::Text("%u", layout.m_RootParameterCount);
-					ImGui::TableSetColumnIndex(5); ImGui::Text("ID %u / 0x%llX", layout.m_BackendRootSignatureId,
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(layout.m_Alive ? "Yes" : "No");
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(
+						layout.m_DebugName.empty() ? "-" : layout.m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(3);
+					ImGui::Text("%u", static_cast<uint32_t>(layout.m_Slots.size()));
+					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%u", layout.m_RootParameterCount);
+					ImGui::TableSetColumnIndex(5);
+					ImGui::Text("ID %u / 0x%llX", layout.m_BackendRootSignatureId,
 						static_cast<unsigned long long>(layout.m_BackendRootSignaturePointer));
 				}
 				ImGui::EndTable();
 			}
 
-			const auto selected = std::ranges::find_if(snapshot.m_BindingLayouts,
-				[&state](const auto& layout) { return layout.m_Handle.Index() == state.m_SelectedLayout; });
-			if (selected != snapshot.m_BindingLayouts.end()) DrawBindingLayoutDetail(*selected);
+			const auto selected =
+				std::ranges::find_if(snapshot.m_BindingLayouts, [&state](const auto& layout)
+					{ return layout.m_Handle.Index() == state.m_SelectedLayout; });
+			if (selected != snapshot.m_BindingLayouts.end())
+				DrawBindingLayoutDetail(*selected);
 		}
 
 		void DrawShaderTable(const RHIPipelineSnapshot& pipeline) noexcept
 		{
-			struct StageEntry { const char* m_Stage; const RHIShaderSnapshot* m_Shader; };
-			const StageEntry graphicsStages[] = {
-				{ "VS", &pipeline.m_VertexShader }, { "PS", &pipeline.m_PixelShader },
-				{ "DS", &pipeline.m_DomainShader }, { "HS", &pipeline.m_HullShader },
-				{ "GS", &pipeline.m_GeometryShader },
+			struct StageEntry
+			{
+				const char* m_Stage;
+				const RHIShaderSnapshot* m_Shader;
 			};
-			const StageEntry computeStages[] = { { "CS", &pipeline.m_ComputeShader } };
+			const StageEntry graphicsStages[] = {
+				{"VS", &pipeline.m_VertexShader},
+				{"PS", &pipeline.m_PixelShader},
+				{"DS", &pipeline.m_DomainShader},
+				{"HS", &pipeline.m_HullShader},
+				{"GS", &pipeline.m_GeometryShader},
+			};
+			const StageEntry computeStages[] = { {"CS", &pipeline.m_ComputeShader} };
 			const std::span<const StageEntry> stages =
-				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
-				std::span<const StageEntry>(graphicsStages) :
-				std::span<const StageEntry>(computeStages);
+				pipeline.m_Type == RHIPipelineSnapshotType::Graphics
+				? std::span<const StageEntry>(graphicsStages)
+				: std::span<const StageEntry>(computeStages);
 			if (ImGui::BeginTable("PipelineShaders", 4,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
@@ -206,14 +240,21 @@ namespace gglab
 				ImGui::TableHeadersRow();
 				for (const auto& stage : stages)
 				{
-					if (!stage.m_Shader->m_Present) continue;
+					if (!stage.m_Shader->m_Present)
+						continue;
 					const std::string handle = devtools::RHIHandleText(stage.m_Shader->m_Handle);
 					const std::string hash = HashText(stage.m_Shader->m_Hash);
 					ImGui::TableNextRow();
-					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(stage.m_Stage);
-					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(handle.c_str());
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(stage.m_Shader->m_DebugName.empty() ? "-" : stage.m_Shader->m_DebugName.c_str());
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(hash.c_str());
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(stage.m_Stage);
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(handle.c_str());
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(stage.m_Shader->m_DebugName.empty()
+						? "-"
+						: stage.m_Shader->m_DebugName.c_str());
+					ImGui::TableSetColumnIndex(3);
+					ImGui::TextUnformatted(hash.c_str());
 				}
 				ImGui::EndTable();
 			}
@@ -225,20 +266,20 @@ namespace gglab
 			const std::string topology = devtools::EnumText(pipeline.m_PrimitiveTopology);
 			const std::string fillMode = devtools::EnumText(pipeline.m_Rasterizer.m_FillMode);
 			const std::string cullMode = devtools::EnumText(pipeline.m_Rasterizer.m_CullMode);
-			const std::string depthCompare = devtools::EnumText(pipeline.m_DepthStencil.m_DepthCompareOp);
+			const std::string depthCompare =
+				devtools::EnumText(pipeline.m_DepthStencil.m_DepthCompareOp);
 			ImGui::Text("Topology: %s | RTV: %s | DSV: %s | Samples: %u quality %u",
-				topology.c_str(), rtFormats.c_str(),
-				FormatText(pipeline.m_DepthStencilFormat), pipeline.m_SampleCount,
-				pipeline.m_SampleQuality);
-			ImGui::Text("Rasterizer: fill=%s cull=%s frontCCW=%s depthBias=%d slopeBias=%.3f depthClip=%s",
+				topology.c_str(), rtFormats.c_str(), FormatText(pipeline.m_DepthStencilFormat),
+				pipeline.m_SampleCount, pipeline.m_SampleQuality);
+			ImGui::Text(
+				"Rasterizer: fill=%s cull=%s frontCCW=%s depthBias=%d slopeBias=%.3f depthClip=%s",
 				fillMode.c_str(), cullMode.c_str(),
 				pipeline.m_Rasterizer.m_FrontCounterClockwise ? "yes" : "no",
 				pipeline.m_Rasterizer.m_DepthBias, pipeline.m_Rasterizer.m_SlopeScaledDepthBias,
 				pipeline.m_Rasterizer.m_DepthClipEnable ? "yes" : "no");
 			ImGui::Text("Depth: test=%s write=%s compare=%s | Stencil=%s | AlphaToCoverage=%s",
 				pipeline.m_DepthStencil.m_DepthTestEnable ? "on" : "off",
-				pipeline.m_DepthStencil.m_DepthWriteEnable ? "on" : "off",
-				depthCompare.c_str(),
+				pipeline.m_DepthStencil.m_DepthWriteEnable ? "on" : "off", depthCompare.c_str(),
 				pipeline.m_DepthStencil.m_StencilEnable ? "on" : "off",
 				pipeline.m_Blend.m_AlphaToCoverageEnable ? "on" : "off");
 
@@ -246,24 +287,36 @@ namespace gglab
 			{
 				if (pipeline.m_VertexAttributes.empty())
 				{
-					ImGui::TextDisabled("No vertex attributes (procedural geometry / SV_VertexID).");
+					ImGui::TextDisabled(
+						"No vertex attributes (procedural geometry / SV_VertexID).");
 				}
-				if (ImGui::BeginTable("PipelineInputLayout", 5,
-					ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+				if (ImGui::BeginTable(
+					"PipelineInputLayout", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 				{
-					ImGui::TableSetupColumn("Semantic"); ImGui::TableSetupColumn("Format");
-					ImGui::TableSetupColumn("Input Slot"); ImGui::TableSetupColumn("Offset");
-					ImGui::TableSetupColumn("Buffer Stride"); ImGui::TableHeadersRow();
+					ImGui::TableSetupColumn("Semantic");
+					ImGui::TableSetupColumn("Format");
+					ImGui::TableSetupColumn("Input Slot");
+					ImGui::TableSetupColumn("Offset");
+					ImGui::TableSetupColumn("Buffer Stride");
+					ImGui::TableHeadersRow();
 					for (const auto& attribute : pipeline.m_VertexAttributes)
 					{
 						const auto buffer = std::ranges::find_if(pipeline.m_VertexBuffers,
-							[&attribute](const auto& value) { return value.m_InputSlot == attribute.m_InputSlot; });
+							[&attribute](const auto& value)
+							{ return value.m_InputSlot == attribute.m_InputSlot; });
 						ImGui::TableNextRow();
-						ImGui::TableSetColumnIndex(0); ImGui::Text("%s%u", attribute.m_SemanticName.c_str(), attribute.m_SemanticIndex);
-						ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(FormatText(attribute.m_Format));
-						ImGui::TableSetColumnIndex(2); ImGui::Text("%u", attribute.m_InputSlot);
-						ImGui::TableSetColumnIndex(3); ImGui::Text("%u", attribute.m_AlignedByteOffset);
-						ImGui::TableSetColumnIndex(4); ImGui::Text("%u", buffer != pipeline.m_VertexBuffers.end() ? buffer->m_StrideInBytes : 0);
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text(
+							"%s%u", attribute.m_SemanticName.c_str(), attribute.m_SemanticIndex);
+						ImGui::TableSetColumnIndex(1);
+						ImGui::TextUnformatted(FormatText(attribute.m_Format));
+						ImGui::TableSetColumnIndex(2);
+						ImGui::Text("%u", attribute.m_InputSlot);
+						ImGui::TableSetColumnIndex(3);
+						ImGui::Text("%u", attribute.m_AlignedByteOffset);
+						ImGui::TableSetColumnIndex(4);
+						ImGui::Text("%u",
+							buffer != pipeline.m_VertexBuffers.end() ? buffer->m_StrideInBytes : 0);
 					}
 					ImGui::EndTable();
 				}
@@ -275,7 +328,8 @@ namespace gglab
 				{
 					const auto& blend = pipeline.m_Blend.m_RenderTargets[index];
 					ImGui::Text("RT%u: blend=%s writeMask=0x%X", index,
-						blend.m_BlendEnable ? "on" : "off", static_cast<uint32_t>(blend.m_WriteMask));
+						blend.m_BlendEnable ? "on" : "off",
+						static_cast<uint32_t>(blend.m_WriteMask));
 				}
 				ImGui::TreePop();
 			}
@@ -302,21 +356,29 @@ namespace gglab
 				ImGui::TableHeadersRow();
 				for (const auto& pass : pipeline.m_RenderPasses)
 				{
-					const std::string category = pass.m_CategoryName.empty() ?
-						devtools::EnumText(pass.m_Category) : pass.m_CategoryName;
+					const std::string category = pass.m_CategoryName.empty()
+						? devtools::EnumText(pass.m_Category)
+						: pass.m_CategoryName;
 					const std::string type = devtools::EnumText(pass.m_Type);
 					ImGui::TableNextRow();
-					ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(pass.m_TypeName.c_str());
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(pass.m_TypeName.c_str());
 					if (!pass.m_Description.empty() && ImGui::IsItemHovered())
 					{
 						ImGui::SetTooltip("%s", pass.m_Description.c_str());
 					}
-					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(pass.m_DisplayName.c_str());
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(category.c_str());
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(type.c_str());
-					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(pass.m_ShowInDevelopGui ? "Yes" : "No");
-					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(pass.m_EnableGpuMarker ? "On" : "Off");
-					ImGui::TableSetColumnIndex(6); ImGui::TextUnformatted(pass.m_EnableProfiling ? "On" : "Off");
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(pass.m_DisplayName.c_str());
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(category.c_str());
+					ImGui::TableSetColumnIndex(3);
+					ImGui::TextUnformatted(type.c_str());
+					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(pass.m_ShowInDevelopGui ? "Yes" : "No");
+					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(pass.m_EnableGpuMarker ? "On" : "Off");
+					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(pass.m_EnableProfiling ? "On" : "Off");
 				}
 				ImGui::EndTable();
 			}
@@ -325,8 +387,7 @@ namespace gglab
 		void DrawPipelineDetail(const RHIPipelineSnapshot& pipeline) noexcept
 		{
 			ImGui::SeparatorText("Pipeline Detail");
-			ImGui::Text("Handle %s | %s | %s",
-				devtools::RHIHandleText(pipeline.m_Handle).c_str(),
+			ImGui::Text("Handle %s | %s | %s", devtools::RHIHandleText(pipeline.m_Handle).c_str(),
 				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? "Graphics" : "Compute",
 				pipeline.m_Alive ? "Alive" : "Dead");
 			ImGui::Text("BindingLayout %s | Backend PSO 0x%llX | RootSignature ID %u / 0x%llX",
@@ -336,12 +397,12 @@ namespace gglab
 				static_cast<unsigned long long>(pipeline.m_BackendRootSignaturePointer));
 			DrawRenderPassUsages(pipeline);
 			DrawShaderTable(pipeline);
-			if (pipeline.m_Type == RHIPipelineSnapshotType::Graphics) DrawGraphicsState(pipeline);
+			if (pipeline.m_Type == RHIPipelineSnapshotType::Graphics)
+				DrawGraphicsState(pipeline);
 		}
 
 		void DrawPipelines(
-			const RHIPipelineSystemSnapshot& snapshot,
-			PipelineSystemPanelState& state) noexcept
+			const RHIPipelineSystemSnapshot& snapshot, PipelineSystemPanelState& state) noexcept
 		{
 			if (state.m_SelectedPipeline == RHIPipelineHandle::InvalidIndex &&
 				!snapshot.m_Pipelines.empty())
@@ -349,42 +410,66 @@ namespace gglab
 				state.m_SelectedPipeline = snapshot.m_Pipelines.front().m_Handle.Index();
 			}
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX |
+				ImGuiTableFlags_ScrollY;
 			if (ImGui::BeginTable("Pipelines", 9, flags, ImVec2(0.0f, 280.0f)))
 			{
-				ImGui::TableSetupColumn("Handle"); ImGui::TableSetupColumn("Type");
-				ImGui::TableSetupColumn("Alive"); ImGui::TableSetupColumn("Used By RenderPass");
-				ImGui::TableSetupColumn("Binding Layout"); ImGui::TableSetupColumn("VS/CS");
-				ImGui::TableSetupColumn("PS"); ImGui::TableSetupColumn("Formats");
-				ImGui::TableSetupColumn("Backend PSO"); ImGui::TableHeadersRow();
+				ImGui::TableSetupColumn("Handle");
+				ImGui::TableSetupColumn("Type");
+				ImGui::TableSetupColumn("Alive");
+				ImGui::TableSetupColumn("Used By RenderPass");
+				ImGui::TableSetupColumn("Binding Layout");
+				ImGui::TableSetupColumn("VS/CS");
+				ImGui::TableSetupColumn("PS");
+				ImGui::TableSetupColumn("Formats");
+				ImGui::TableSetupColumn("Backend PSO");
+				ImGui::TableHeadersRow();
 				for (const auto& pipeline : snapshot.m_Pipelines)
 				{
 					const std::string handle = devtools::RHIHandleText(pipeline.m_Handle);
 					const std::string layout = devtools::RHIHandleText(pipeline.m_BindingLayout);
-					const std::string primaryShader = ShaderSummary(
-						pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? pipeline.m_VertexShader : pipeline.m_ComputeShader);
+					const std::string primaryShader =
+						ShaderSummary(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
+							? pipeline.m_VertexShader
+							: pipeline.m_ComputeShader);
 					const std::string pixelShader = ShaderSummary(pipeline.m_PixelShader);
 					const std::string usages = PipelineUsagesText(pipeline);
-					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics ?
-						RenderTargetFormatsText(pipeline) : "-";
+					const std::string formats = pipeline.m_Type == RHIPipelineSnapshotType::Graphics
+						? RenderTargetFormatsText(pipeline)
+						: "-";
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					if (ImGui::Selectable(handle.c_str(), state.m_SelectedPipeline == pipeline.m_Handle.Index(),
-						ImGuiSelectableFlags_SpanAllColumns)) state.m_SelectedPipeline = pipeline.m_Handle.Index();
-					ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? "Graphics" : "Compute");
-					ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(pipeline.m_Alive ? "Yes" : "No");
-					ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(usages.c_str());
-					ImGui::TableSetColumnIndex(4); ImGui::TextUnformatted(layout.c_str());
-					ImGui::TableSetColumnIndex(5); ImGui::TextUnformatted(primaryShader.c_str());
-					ImGui::TableSetColumnIndex(6); ImGui::TextUnformatted(pixelShader.c_str());
-					ImGui::TableSetColumnIndex(7); ImGui::TextUnformatted(formats.c_str());
-					ImGui::TableSetColumnIndex(8); ImGui::Text("0x%llX", static_cast<unsigned long long>(pipeline.m_BackendPipelinePointer));
+					if (ImGui::Selectable(handle.c_str(),
+						state.m_SelectedPipeline == pipeline.m_Handle.Index(),
+						ImGuiSelectableFlags_SpanAllColumns))
+						state.m_SelectedPipeline = pipeline.m_Handle.Index();
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextUnformatted(pipeline.m_Type == RHIPipelineSnapshotType::Graphics
+						? "Graphics"
+						: "Compute");
+					ImGui::TableSetColumnIndex(2);
+					ImGui::TextUnformatted(pipeline.m_Alive ? "Yes" : "No");
+					ImGui::TableSetColumnIndex(3);
+					ImGui::TextUnformatted(usages.c_str());
+					ImGui::TableSetColumnIndex(4);
+					ImGui::TextUnformatted(layout.c_str());
+					ImGui::TableSetColumnIndex(5);
+					ImGui::TextUnformatted(primaryShader.c_str());
+					ImGui::TableSetColumnIndex(6);
+					ImGui::TextUnformatted(pixelShader.c_str());
+					ImGui::TableSetColumnIndex(7);
+					ImGui::TextUnformatted(formats.c_str());
+					ImGui::TableSetColumnIndex(8);
+					ImGui::Text("0x%llX",
+						static_cast<unsigned long long>(pipeline.m_BackendPipelinePointer));
 				}
 				ImGui::EndTable();
 			}
-			const auto selected = std::ranges::find_if(snapshot.m_Pipelines,
-				[&state](const auto& pipeline) { return pipeline.m_Handle.Index() == state.m_SelectedPipeline; });
-			if (selected != snapshot.m_Pipelines.end()) DrawPipelineDetail(*selected);
+			const auto selected =
+				std::ranges::find_if(snapshot.m_Pipelines, [&state](const auto& pipeline)
+					{ return pipeline.m_Handle.Index() == state.m_SelectedPipeline; });
+			if (selected != snapshot.m_Pipelines.end())
+				DrawPipelineDetail(*selected);
 		}
 
 		void DrawCache(const RHIPipelineSystemSnapshot& snapshot) noexcept
@@ -397,11 +482,12 @@ namespace gglab
 			ImGui::Text("Registered handles: %u graphics / %u compute",
 				cache.m_RegisteredGraphicsPipelines, cache.m_RegisteredComputePipelines);
 			ImGui::SeparatorText("DX12 Backend Cache");
-			ImGui::Text("PSOs: %u graphics / %u compute",
-				cache.m_BackendRHIGraphicsPSOs, cache.m_BackendComputePSOs);
+			ImGui::Text("PSOs: %u graphics / %u compute", cache.m_BackendRHIGraphicsPSOs,
+				cache.m_BackendComputePSOs);
 			ImGui::Text("Root signatures: %u", cache.m_BackendRootSignatures);
 			ImGui::Spacing();
-			ImGui::TextWrapped("PipelineCache is currently a recipe resolver with caller-owned slots. "
+			ImGui::TextWrapped(
+				"PipelineCache is currently a recipe resolver with caller-owned slots. "
 				"The centralized native object cache shown here is DX12PSOCache.");
 		}
 	}
@@ -422,8 +508,9 @@ namespace gglab
 			return;
 		}
 
-		const auto* snapshotPtr = context.m_Diagnostics ?
-			context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>() : nullptr;
+		const auto* snapshotPtr =
+			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>()
+			: nullptr;
 		if (!snapshotPtr)
 		{
 			ImGui::TextDisabled("Pipeline snapshot provider is not available.");
@@ -433,8 +520,7 @@ namespace gglab
 		auto& state = context.PanelState<PipelineSystemPanelState>();
 
 		ImGui::Text("Backend: %s | Binding layouts: %u | Pipelines: %u",
-			snapshot.m_BackendName.c_str(),
-			static_cast<uint32_t>(snapshot.m_BindingLayouts.size()),
+			snapshot.m_BackendName.c_str(), static_cast<uint32_t>(snapshot.m_BindingLayouts.size()),
 			static_cast<uint32_t>(snapshot.m_Pipelines.size()));
 		if (ImGui::BeginTabBar("PipelineSystemTabs"))
 		{

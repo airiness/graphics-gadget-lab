@@ -6,215 +6,198 @@
 
 namespace gglab::devtools
 {
-	template<>
-	struct EnumTextTraits<RGPassEncoderType>
+	template <> struct EnumTextTraits<RGPassEncoderType>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGPassEncoderType::Graphics, "Graphics" },
-			EnumTextEntry{ RGPassEncoderType::Compute, "Compute" },
-			EnumTextEntry{ RGPassEncoderType::Copy, "Copy" },
+			EnumTextEntry{RGPassEncoderType::Graphics, "Graphics"},
+			EnumTextEntry{RGPassEncoderType::Compute, "Compute"},
+			EnumTextEntry{RGPassEncoderType::Copy, "Copy"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGResourceType>
+	template <> struct EnumTextTraits<RGResourceType>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGResourceType::RGTexture, "Texture" },
-			EnumTextEntry{ RGResourceType::RGBuffer, "Buffer" },
+			EnumTextEntry{RGResourceType::RGTexture, "Texture"},
+			EnumTextEntry{RGResourceType::RGBuffer, "Buffer"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGOrderingRequirement>
+	template <> struct EnumTextTraits<RGOrderingRequirement>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGOrderingRequirement::Ordered, "Ordered" },
-			EnumTextEntry{ RGOrderingRequirement::Unordered, "Unordered" },
+			EnumTextEntry{RGOrderingRequirement::Ordered, "Ordered"},
+			EnumTextEntry{RGOrderingRequirement::Unordered, "Unordered"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGDependencyAccess>
+	template <> struct EnumTextTraits<RGDependencyAccess>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGDependencyAccess::Read, "Read" },
-			EnumTextEntry{ RGDependencyAccess::Write, "Write" },
-			EnumTextEntry{ RGDependencyAccess::ReadWrite, "ReadWrite" },
+			EnumTextEntry{RGDependencyAccess::Read, "Read"},
+			EnumTextEntry{RGDependencyAccess::Write, "Write"},
+			EnumTextEntry{RGDependencyAccess::ReadWrite, "ReadWrite"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGDependencyReason>
+	template <> struct EnumTextTraits<RGDependencyReason>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGDependencyReason::WriterToReader, "Writer -> Reader" },
-			EnumTextEntry{ RGDependencyReason::PreviousWriterToWriter, "Previous Writer -> Writer" },
-			EnumTextEntry{ RGDependencyReason::PreviousReaderToWriter, "Previous Reader -> Writer" },
-			EnumTextEntry{ RGDependencyReason::ExportWriterToExport, "Export Writer -> Export" },
-			EnumTextEntry{ RGDependencyReason::ExportReaderToExport, "Export Reader -> Export" },
+			EnumTextEntry{RGDependencyReason::WriterToReader, "Writer -> Reader"},
+			EnumTextEntry{RGDependencyReason::PreviousWriterToWriter, "Previous Writer -> Writer"},
+			EnumTextEntry{RGDependencyReason::PreviousReaderToWriter, "Previous Reader -> Writer"},
+			EnumTextEntry{RGDependencyReason::ExportWriterToExport, "Export Writer -> Export"},
+			EnumTextEntry{RGDependencyReason::ExportReaderToExport, "Export Reader -> Export"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGBarrierKind>
+	template <> struct EnumTextTraits<RGBarrierKind>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGBarrierKind::Transition, "Transition" },
-			EnumTextEntry{ RGBarrierKind::Uav, "UAV" },
+			EnumTextEntry{RGBarrierKind::Transition, "Transition"},
+			EnumTextEntry{RGBarrierKind::Uav, "UAV"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGBarrierReason>
+	template <> struct EnumTextTraits<RGBarrierReason>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGBarrierReason::AccessTransition, "Access Transition" },
-			EnumTextEntry{ RGBarrierReason::OrderedStorageHazard, "Ordered Storage Hazard" },
-			EnumTextEntry{ RGBarrierReason::FinalStateTransition, "Final State Transition" },
+			EnumTextEntry{RGBarrierReason::AccessTransition, "Access Transition"},
+			EnumTextEntry{RGBarrierReason::OrderedStorageHazard, "Ordered Storage Hazard"},
+			EnumTextEntry{RGBarrierReason::FinalStateTransition, "Final State Transition"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGTextureAccess>
+	template <> struct EnumTextTraits<RGTextureAccess>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGTextureAccess::None, "None" },
-			EnumTextEntry{ RGTextureAccess::Sample, "Sample" },
-			EnumTextEntry{ RGTextureAccess::RenderTarget, "RTV" },
-			EnumTextEntry{ RGTextureAccess::DepthStencilWrite, "DSV Write" },
-			EnumTextEntry{ RGTextureAccess::DepthStencilRead, "DSV Read" },
-			EnumTextEntry{ RGTextureAccess::StorageRead, "Storage Read" },
-			EnumTextEntry{ RGTextureAccess::StorageWrite, "Storage Write" },
-			EnumTextEntry{ RGTextureAccess::StorageReadWrite, "Storage ReadWrite" },
-			EnumTextEntry{ RGTextureAccess::CopySource, "CopySrc" },
-			EnumTextEntry{ RGTextureAccess::CopyDest, "CopyDst" },
-			EnumTextEntry{ RGTextureAccess::Present, "Present" },
+			EnumTextEntry{RGTextureAccess::None, "None"},
+			EnumTextEntry{RGTextureAccess::Sample, "Sample"},
+			EnumTextEntry{RGTextureAccess::RenderTarget, "RTV"},
+			EnumTextEntry{RGTextureAccess::DepthStencilWrite, "DSV Write"},
+			EnumTextEntry{RGTextureAccess::DepthStencilRead, "DSV Read"},
+			EnumTextEntry{RGTextureAccess::StorageRead, "Storage Read"},
+			EnumTextEntry{RGTextureAccess::StorageWrite, "Storage Write"},
+			EnumTextEntry{RGTextureAccess::StorageReadWrite, "Storage ReadWrite"},
+			EnumTextEntry{RGTextureAccess::CopySource, "CopySrc"},
+			EnumTextEntry{RGTextureAccess::CopyDest, "CopyDst"},
+			EnumTextEntry{RGTextureAccess::Present, "Present"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RGBufferAccess>
+	template <> struct EnumTextTraits<RGBufferAccess>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RGBufferAccess::None, "None" },
-			EnumTextEntry{ RGBufferAccess::Vertex, "Vertex" },
-			EnumTextEntry{ RGBufferAccess::Index, "Index" },
-			EnumTextEntry{ RGBufferAccess::Constant, "Constant" },
-			EnumTextEntry{ RGBufferAccess::StructuredRead, "StructuredRead" },
-			EnumTextEntry{ RGBufferAccess::StorageRead, "Storage Read" },
-			EnumTextEntry{ RGBufferAccess::StorageWrite, "Storage Write" },
-			EnumTextEntry{ RGBufferAccess::StorageReadWrite, "Storage ReadWrite" },
-			EnumTextEntry{ RGBufferAccess::CopySource, "CopySrc" },
-			EnumTextEntry{ RGBufferAccess::CopyDest, "CopyDst" },
-			EnumTextEntry{ RGBufferAccess::IndirectArgument, "IndirectArgument" },
+			EnumTextEntry{RGBufferAccess::None, "None"},
+			EnumTextEntry{RGBufferAccess::Vertex, "Vertex"},
+			EnumTextEntry{RGBufferAccess::Index, "Index"},
+			EnumTextEntry{RGBufferAccess::Constant, "Constant"},
+			EnumTextEntry{RGBufferAccess::StructuredRead, "StructuredRead"},
+			EnumTextEntry{RGBufferAccess::StorageRead, "Storage Read"},
+			EnumTextEntry{RGBufferAccess::StorageWrite, "Storage Write"},
+			EnumTextEntry{RGBufferAccess::StorageReadWrite, "Storage ReadWrite"},
+			EnumTextEntry{RGBufferAccess::CopySource, "CopySrc"},
+			EnumTextEntry{RGBufferAccess::CopyDest, "CopyDst"},
+			EnumTextEntry{RGBufferAccess::IndirectArgument, "IndirectArgument"},
 		};
 	};
 
-	template<>
-	struct EnumTextTraits<RHITextureUsage>
+	template <> struct EnumTextTraits<RHITextureUsage>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RHITextureUsage::Sampled, "Sampled" },
-			EnumTextEntry{ RHITextureUsage::RenderTarget, "RenderTarget" },
-			EnumTextEntry{ RHITextureUsage::DepthStencil, "DepthStencil" },
-			EnumTextEntry{ RHITextureUsage::UnorderedAccess, "UnorderedAccess" },
-			EnumTextEntry{ RHITextureUsage::CopySource, "CopySource" },
-			EnumTextEntry{ RHITextureUsage::CopyDest, "CopyDest" },
-			EnumTextEntry{ RHITextureUsage::Present, "Present" },
+			EnumTextEntry{RHITextureUsage::Sampled, "Sampled"},
+			EnumTextEntry{RHITextureUsage::RenderTarget, "RenderTarget"},
+			EnumTextEntry{RHITextureUsage::DepthStencil, "DepthStencil"},
+			EnumTextEntry{RHITextureUsage::UnorderedAccess, "UnorderedAccess"},
+			EnumTextEntry{RHITextureUsage::CopySource, "CopySource"},
+			EnumTextEntry{RHITextureUsage::CopyDest, "CopyDest"},
+			EnumTextEntry{RHITextureUsage::Present, "Present"},
 		};
 		static constexpr std::string_view NoneText = "None";
 	};
 
-	template<>
-	struct EnumTextTraits<RHIBufferUsage>
+	template <> struct EnumTextTraits<RHIBufferUsage>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RHIBufferUsage::Vertex, "Vertex" },
-			EnumTextEntry{ RHIBufferUsage::Index, "Index" },
-			EnumTextEntry{ RHIBufferUsage::Constant, "Constant" },
-			EnumTextEntry{ RHIBufferUsage::Structured, "Structured" },
-			EnumTextEntry{ RHIBufferUsage::UnorderedAccess, "UnorderedAccess" },
-			EnumTextEntry{ RHIBufferUsage::IndirectArgument, "IndirectArgument" },
-			EnumTextEntry{ RHIBufferUsage::CopySource, "CopySource" },
-			EnumTextEntry{ RHIBufferUsage::CopyDest, "CopyDest" },
+			EnumTextEntry{RHIBufferUsage::Vertex, "Vertex"},
+			EnumTextEntry{RHIBufferUsage::Index, "Index"},
+			EnumTextEntry{RHIBufferUsage::Constant, "Constant"},
+			EnumTextEntry{RHIBufferUsage::Structured, "Structured"},
+			EnumTextEntry{RHIBufferUsage::UnorderedAccess, "UnorderedAccess"},
+			EnumTextEntry{RHIBufferUsage::IndirectArgument, "IndirectArgument"},
+			EnumTextEntry{RHIBufferUsage::CopySource, "CopySource"},
+			EnumTextEntry{RHIBufferUsage::CopyDest, "CopyDest"},
 		};
 		static constexpr std::string_view NoneText = "None";
 	};
 
-	template<>
-	struct EnumTextTraits<RHIStage>
+	template <> struct EnumTextTraits<RHIStage>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RHIStage::DrawIndirect, "DrawIndirect" },
-			EnumTextEntry{ RHIStage::IndexInput, "IndexInput" },
-			EnumTextEntry{ RHIStage::VertexShader, "VertexShader" },
-			EnumTextEntry{ RHIStage::PixelShader, "PixelShader" },
-			EnumTextEntry{ RHIStage::ComputeShader, "ComputeShader" },
-			EnumTextEntry{ RHIStage::RenderTarget, "RenderTarget" },
-			EnumTextEntry{ RHIStage::DepthStencil, "DepthStencil" },
-			EnumTextEntry{ RHIStage::Copy, "Copy" },
-			EnumTextEntry{ RHIStage::Resolve, "Resolve" },
-			EnumTextEntry{ RHIStage::Present, "Present" },
+			EnumTextEntry{RHIStage::DrawIndirect, "DrawIndirect"},
+			EnumTextEntry{RHIStage::IndexInput, "IndexInput"},
+			EnumTextEntry{RHIStage::VertexShader, "VertexShader"},
+			EnumTextEntry{RHIStage::PixelShader, "PixelShader"},
+			EnumTextEntry{RHIStage::ComputeShader, "ComputeShader"},
+			EnumTextEntry{RHIStage::RenderTarget, "RenderTarget"},
+			EnumTextEntry{RHIStage::DepthStencil, "DepthStencil"},
+			EnumTextEntry{RHIStage::Copy, "Copy"},
+			EnumTextEntry{RHIStage::Resolve, "Resolve"},
+			EnumTextEntry{RHIStage::Present, "Present"},
 		};
 		static constexpr std::string_view NoneText = "None";
 	};
 
-	template<>
-	struct EnumTextTraits<RHITextureAspect>
+	template <> struct EnumTextTraits<RHITextureAspect>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RHITextureAspect::Color, "Color" },
-			EnumTextEntry{ RHITextureAspect::Depth, "Depth" },
-			EnumTextEntry{ RHITextureAspect::Stencil, "Stencil" },
+			EnumTextEntry{RHITextureAspect::Color, "Color"},
+			EnumTextEntry{RHITextureAspect::Depth, "Depth"},
+			EnumTextEntry{RHITextureAspect::Stencil, "Stencil"},
 		};
 		static constexpr std::string_view NoneText = "None";
 	};
 
-	template<>
-	struct EnumTextTraits<RHIAccess>
+	template <> struct EnumTextTraits<RHIAccess>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RHIAccess::Common, "Common" },
-			EnumTextEntry{ RHIAccess::ShaderResource, "ShaderResource" },
-			EnumTextEntry{ RHIAccess::RenderTarget, "RenderTarget" },
-			EnumTextEntry{ RHIAccess::DepthStencilRead, "DepthStencilRead" },
-			EnumTextEntry{ RHIAccess::DepthStencilWrite, "DepthStencilWrite" },
-			EnumTextEntry{ RHIAccess::UnorderedAccess, "UnorderedAccess" },
-			EnumTextEntry{ RHIAccess::CopySource, "CopySource" },
-			EnumTextEntry{ RHIAccess::CopyDest, "CopyDest" },
-			EnumTextEntry{ RHIAccess::VertexBuffer, "VertexBuffer" },
-			EnumTextEntry{ RHIAccess::IndexBuffer, "IndexBuffer" },
-			EnumTextEntry{ RHIAccess::ConstantBuffer, "ConstantBuffer" },
-			EnumTextEntry{ RHIAccess::IndirectArgument, "IndirectArgument" },
-			EnumTextEntry{ RHIAccess::Present, "Present" },
+			EnumTextEntry{RHIAccess::Common, "Common"},
+			EnumTextEntry{RHIAccess::ShaderResource, "ShaderResource"},
+			EnumTextEntry{RHIAccess::RenderTarget, "RenderTarget"},
+			EnumTextEntry{RHIAccess::DepthStencilRead, "DepthStencilRead"},
+			EnumTextEntry{RHIAccess::DepthStencilWrite, "DepthStencilWrite"},
+			EnumTextEntry{RHIAccess::UnorderedAccess, "UnorderedAccess"},
+			EnumTextEntry{RHIAccess::CopySource, "CopySource"},
+			EnumTextEntry{RHIAccess::CopyDest, "CopyDest"},
+			EnumTextEntry{RHIAccess::VertexBuffer, "VertexBuffer"},
+			EnumTextEntry{RHIAccess::IndexBuffer, "IndexBuffer"},
+			EnumTextEntry{RHIAccess::ConstantBuffer, "ConstantBuffer"},
+			EnumTextEntry{RHIAccess::IndirectArgument, "IndirectArgument"},
+			EnumTextEntry{RHIAccess::Present, "Present"},
 		};
 		static constexpr std::string_view NoneText = "None";
 	};
 
-	template<>
-	struct EnumTextTraits<RHILayout>
+	template <> struct EnumTextTraits<RHILayout>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{ RHILayout::Unknown, "Unknown" },
-			EnumTextEntry{ RHILayout::Common, "Common" },
-			EnumTextEntry{ RHILayout::ShaderResource, "ShaderResource" },
-			EnumTextEntry{ RHILayout::RenderTarget, "RenderTarget" },
-			EnumTextEntry{ RHILayout::DepthStencilRead, "DepthStencilRead" },
-			EnumTextEntry{ RHILayout::DepthStencilWrite, "DepthStencilWrite" },
-			EnumTextEntry{ RHILayout::UnorderedAccess, "UnorderedAccess" },
-			EnumTextEntry{ RHILayout::CopySource, "CopySource" },
-			EnumTextEntry{ RHILayout::CopyDest, "CopyDest" },
-			EnumTextEntry{ RHILayout::Present, "Present" },
+			EnumTextEntry{RHILayout::Unknown, "Unknown"},
+			EnumTextEntry{RHILayout::Common, "Common"},
+			EnumTextEntry{RHILayout::ShaderResource, "ShaderResource"},
+			EnumTextEntry{RHILayout::RenderTarget, "RenderTarget"},
+			EnumTextEntry{RHILayout::DepthStencilRead, "DepthStencilRead"},
+			EnumTextEntry{RHILayout::DepthStencilWrite, "DepthStencilWrite"},
+			EnumTextEntry{RHILayout::UnorderedAccess, "UnorderedAccess"},
+			EnumTextEntry{RHILayout::CopySource, "CopySource"},
+			EnumTextEntry{RHILayout::CopyDest, "CopyDest"},
+			EnumTextEntry{RHILayout::Present, "Present"},
 		};
 	};
 
 	[[nodiscard]] inline std::string BarrierStateText(const RHIResourceState& state)
 	{
-		return std::format("stage={}, access={}, layout={}",
-			EnumFlagsTextWithBits(state.m_Stages),
-			EnumFlagsTextWithBits(state.m_Access),
-			EnumValueTextWithBits(state.m_Layout));
+		return std::format("stage={}, access={}, layout={}", EnumFlagsTextWithBits(state.m_Stages),
+			EnumFlagsTextWithBits(state.m_Access), EnumValueTextWithBits(state.m_Layout));
 	}
 
 	[[nodiscard]] inline std::string SubresourceRangeText(
@@ -227,15 +210,11 @@ namespace gglab::devtools
 
 		auto countText = [](uint32_t count)
 			{
-				return count == RHISubresourceRange::Remaining ?
-					std::string("Remaining") :
-					std::to_string(count);
+				return count == RHISubresourceRange::Remaining ? std::string("Remaining")
+					: std::to_string(count);
 			};
-		return std::format("mip {}+{}, array {}+{}, aspects {}",
-			range->m_BaseMip,
-			countText(range->m_MipCount),
-			range->m_BaseArraySlice,
-			countText(range->m_ArraySliceCount),
-			EnumFlagsTextWithBits(range->m_Aspects));
+		return std::format("mip {}+{}, array {}+{}, aspects {}", range->m_BaseMip,
+			countText(range->m_MipCount), range->m_BaseArraySlice,
+			countText(range->m_ArraySliceCount), EnumFlagsTextWithBits(range->m_Aspects));
 	}
 }

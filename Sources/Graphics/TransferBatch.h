@@ -13,17 +13,14 @@ namespace gglab
 		TransferBatch& operator=(TransferBatch&& other) noexcept;
 		~TransferBatch();
 
-		bool UploadBuffer(RHIBufferHandle dstBuffer, uint64_t dstOffset,
-			const void* src, uint64_t numBytes) noexcept;
-		bool UploadTexture(
-			RHITextureHandle dstTexture,
-			const RHITextureUploadData& uploadData) noexcept;
-		[[nodiscard]] RHITextureReadbackRequest ReadbackTexture(
-			RHITextureHandle srcTexture,
-			const RHITextureDesc& desc) noexcept;
-		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset,
-			RHIBufferHandle src, uint64_t srcOffset,
+		bool UploadBuffer(RHIBufferHandle dstBuffer, uint64_t dstOffset, const void* src,
 			uint64_t numBytes) noexcept;
+		bool UploadTexture(
+			RHITextureHandle dstTexture, const RHITextureUploadData& uploadData) noexcept;
+		[[nodiscard]] RHITextureReadbackRequest ReadbackTexture(
+			RHITextureHandle srcTexture, const RHITextureDesc& desc) noexcept;
+		void CopyBuffer(RHIBufferHandle dst, uint64_t dstOffset, RHIBufferHandle src,
+			uint64_t srcOffset, uint64_t numBytes) noexcept;
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
 

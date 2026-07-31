@@ -233,8 +233,7 @@ namespace gglab
 		std::vector<Upload> m_RecentUploads;
 	};
 
-	template<>
-	struct SnapshotTraits<AssetSnapshot>
+	template <> struct SnapshotTraits<AssetSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.AssetSnapshot");
 	};

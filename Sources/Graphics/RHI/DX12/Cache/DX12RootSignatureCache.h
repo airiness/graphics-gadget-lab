@@ -14,10 +14,7 @@ namespace gglab
 		uint64_t m_HighBits = 0;
 
 		bool operator==(const RootSignatureKey&) const noexcept = default;
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_LowBits, m_HighBits);
-		}
+		auto AsTuple() const noexcept { return std::make_tuple(m_LowBits, m_HighBits); }
 	};
 	using RootSignatureKeyHash = KeyHash<RootSignatureKey>;
 
@@ -48,13 +45,12 @@ namespace gglab
 
 	private:
 		DX12Device* m_DX12Device = nullptr;
-		std::unordered_map<RootSignatureKey, RootSignatureID, RootSignatureKeyHash> m_RootSignatureMap;
+		std::unordered_map<RootSignatureKey, RootSignatureID, RootSignatureKeyHash>
+			m_RootSignatureMap;
 		std::vector<std::unique_ptr<DX12RootSignature>> m_RootSignatures;
 		mutable std::shared_mutex m_Mutex;
 
-		friend void BuildDX12PipelineSystemSnapshot(
-			const DX12PipelineSystem& system,
-			const PipelineCache* pipelineCache,
-			RHIPipelineSystemSnapshot& outSnapshot) noexcept;
+		friend void BuildDX12PipelineSystemSnapshot(const DX12PipelineSystem& system,
+			const PipelineCache* pipelineCache, RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

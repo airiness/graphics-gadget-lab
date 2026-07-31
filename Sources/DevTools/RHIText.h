@@ -6,10 +6,8 @@
 
 namespace gglab::devtools
 {
-	template<typename Tag>
-	[[nodiscard]] std::string RHIHandleText(RHIHandle<Tag> handle)
+	template <typename Tag> [[nodiscard]] std::string RHIHandleText(RHIHandle<Tag> handle)
 	{
-		return handle.IsValid() ?
-			std::format("{}:{}", handle.Index(), handle.Generation()) : "-";
+		return handle.IsValid() ? std::format("{}:{}", handle.Index(), handle.Generation()) : "-";
 	}
 }

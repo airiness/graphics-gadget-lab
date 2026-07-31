@@ -17,20 +17,15 @@ namespace gglab
 	}
 
 	void LabCommandQueue::RequestSetParameter(
-		const LabParameterId& id,
-		const LabValue& value) noexcept
+		const LabParameterId& id, const LabValue& value) noexcept
 	{
 		if (!id.IsValid())
 		{
 			return;
 		}
 
-		const auto iter = std::ranges::find_if(
-			m_Pending.m_ParameterChanges,
-			[&id](const LabParameterValue& change)
-			{
-				return change.m_Id == id;
-			});
+		const auto iter = std::ranges::find_if(m_Pending.m_ParameterChanges,
+			[&id](const LabParameterValue& change) { return change.m_Id == id; });
 		if (iter != m_Pending.m_ParameterChanges.end())
 		{
 			iter->m_Value = value;
@@ -40,7 +35,7 @@ namespace gglab
 			m_Pending.m_ParameterChanges.push_back({
 				.m_Id = id,
 				.m_Value = value,
-			});
+				});
 		}
 	}
 
@@ -69,11 +64,8 @@ namespace gglab
 
 	bool LabCommandQueue::IsEmpty() const noexcept
 	{
-		return !m_Pending.m_SwitchTarget.has_value() &&
-			!m_Pending.m_RunConfig.has_value() &&
-			m_Pending.m_ParameterChanges.empty() &&
-			!m_Pending.m_RestartRequested &&
-			!m_Pending.m_ResetParametersRequested &&
-			!m_Pending.m_RebuildSceneRequested;
+		return !m_Pending.m_SwitchTarget.has_value() && !m_Pending.m_RunConfig.has_value() &&
+			m_Pending.m_ParameterChanges.empty() && !m_Pending.m_RestartRequested &&
+			!m_Pending.m_ResetParametersRequested && !m_Pending.m_RebuildSceneRequested;
 	}
 }

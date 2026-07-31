@@ -17,10 +17,9 @@ namespace gglab
 
 	namespace
 	{
-		class ShaderIncludeHandler final :
-			public Microsoft::WRL::RuntimeClass<
-				Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
-				IDxcIncludeHandler>
+		class ShaderIncludeHandler final
+			: public Microsoft::WRL::RuntimeClass<
+			Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDxcIncludeHandler>
 		{
 		public:
 			HRESULT RuntimeClassInitialize(ComPtr<IDxcUtils> utils,
@@ -31,8 +30,8 @@ namespace gglab
 				return S_OK;
 			}
 
-			HRESULT STDMETHODCALLTYPE
-				LoadSource(_In_z_ LPCWSTR pFilename, _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource) override
+			HRESULT STDMETHODCALLTYPE LoadSource(_In_z_ LPCWSTR pFilename,
+				_COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource) override
 			{
 				const auto path = utils::Canonical(pFilename);
 				ComPtr<IDxcBlobEncoding> blob;
@@ -59,13 +58,15 @@ namespace gglab
 				return E_FAIL;
 			}
 
-			const std::vector<std::filesystem::path>& Includes() const noexcept { return m_Includes; }
+			const std::vector<std::filesystem::path>& Includes() const noexcept
+			{
+				return m_Includes;
+			}
 
 		private:
 			ComPtr<IDxcUtils> m_Utils;
 			std::vector<std::filesystem::path> m_IncludeDirs;
 			std::vector<std::filesystem::path> m_Includes;
-
 		};
 
 		ShaderBinary CopyShaderBinary(IDxcBlob* blob) noexcept
@@ -81,8 +82,7 @@ namespace gglab
 		}
 	}
 
-	ShaderCompiler::ShaderCompiler() noexcept :
-		m_Impl(std::make_unique<Impl>())
+	ShaderCompiler::ShaderCompiler() noexcept : m_Impl(std::make_unique<Impl>())
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Impl->m_Compiler)));
@@ -109,8 +109,10 @@ namespace gglab
 
 	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
 	{
-		GGLAB_ASSERT_MSG(!desc.m_Entry.empty(), "Shader entry is empty, ShaderDesc may not be normalized.");
-		GGLAB_ASSERT_MSG(utils::Canonical(desc.m_SourcePath) == desc.m_SourcePath, "Shader source path is not be canonical, ShaderDesc may not be normalized.");
+		GGLAB_ASSERT_MSG(
+			!desc.m_Entry.empty(), "Shader entry is empty, ShaderDesc may not be normalized.");
+		GGLAB_ASSERT_MSG(utils::Canonical(desc.m_SourcePath) == desc.m_SourcePath,
+			"Shader source path is not be canonical, ShaderDesc may not be normalized.");
 
 		ShaderCompileArtifact artifact{};
 		const auto recipeHash = ComputeRecipeHash(desc);
@@ -126,7 +128,8 @@ namespace gglab
 
 		// Exist
 		std::error_code errorCode;
-		if (std::filesystem::exists(binaryPath, errorCode) && std::filesystem::exists(meta, errorCode))
+		if (std::filesystem::exists(binaryPath, errorCode) &&
+			std::filesystem::exists(meta, errorCode))
 		{
 			if (IsMetaUpToDate(meta))
 			{
@@ -163,12 +166,24 @@ namespace gglab
 			desc.m_Entry = DefaultEntry(desc.m_Stage);
 		}
 
-		desc.m_IncludeDirs.insert(desc.m_IncludeDirs.end(), m_DefaultShaderConfig.m_IncludeDirs.begin(), m_DefaultShaderConfig.m_IncludeDirs.end());
-		desc.m_Defines.insert(desc.m_Defines.end(), m_DefaultShaderConfig.m_Defines.begin(), m_DefaultShaderConfig.m_Defines.end());
-		desc.m_ExtraArgs.insert(desc.m_ExtraArgs.end(), m_DefaultShaderConfig.m_ExtraArgs.begin(), m_DefaultShaderConfig.m_ExtraArgs.end());
-		if (desc.m_HlslVersion.empty()) { desc.m_HlslVersion = m_DefaultShaderConfig.m_HlslVersion; }
-		if (desc.m_OptLevel.empty()) { desc.m_OptLevel = m_DefaultShaderConfig.m_OptLevel; }
-		if (desc.m_Flags == ShaderCompileFlags::None) { desc.m_Flags = m_DefaultShaderConfig.m_Flags; }
+		desc.m_IncludeDirs.insert(desc.m_IncludeDirs.end(),
+			m_DefaultShaderConfig.m_IncludeDirs.begin(), m_DefaultShaderConfig.m_IncludeDirs.end());
+		desc.m_Defines.insert(desc.m_Defines.end(), m_DefaultShaderConfig.m_Defines.begin(),
+			m_DefaultShaderConfig.m_Defines.end());
+		desc.m_ExtraArgs.insert(desc.m_ExtraArgs.end(), m_DefaultShaderConfig.m_ExtraArgs.begin(),
+			m_DefaultShaderConfig.m_ExtraArgs.end());
+		if (desc.m_HlslVersion.empty())
+		{
+			desc.m_HlslVersion = m_DefaultShaderConfig.m_HlslVersion;
+		}
+		if (desc.m_OptLevel.empty())
+		{
+			desc.m_OptLevel = m_DefaultShaderConfig.m_OptLevel;
+		}
+		if (desc.m_Flags == ShaderCompileFlags::None)
+		{
+			desc.m_Flags = m_DefaultShaderConfig.m_Flags;
+		}
 
 		// Source and include paths supplied by shader users are relative to the configured source root.
 		if (desc.m_SourcePath.is_relative())
@@ -191,14 +206,18 @@ namespace gglab
 			for (auto& dir : desc.m_IncludeDirs)
 			{
 				auto dirStr = dir.wstring();
-				if (seen.insert(dirStr).second) { uniqueIncludeDirs.emplace_back(std::move(dirStr)); }
+				if (seen.insert(dirStr).second)
+				{
+					uniqueIncludeDirs.emplace_back(std::move(dirStr));
+				}
 			}
 			desc.m_IncludeDirs.swap(uniqueIncludeDirs);
 		}
 
 		// defines: sort, exclude duplicate
 		std::sort(desc.m_Defines.begin(), desc.m_Defines.end());
-		desc.m_Defines.erase(std::unique(desc.m_Defines.begin(), desc.m_Defines.end()), desc.m_Defines.end());
+		desc.m_Defines.erase(
+			std::unique(desc.m_Defines.begin(), desc.m_Defines.end()), desc.m_Defines.end());
 
 		// extra arguments, exclude duplicate
 		{
@@ -207,7 +226,10 @@ namespace gglab
 			uniqueExtraArgs.reserve(desc.m_ExtraArgs.size());
 			for (auto& arg : desc.m_ExtraArgs)
 			{
-				if (seen.insert(arg).second) { uniqueExtraArgs.push_back(std::move(arg)); }
+				if (seen.insert(arg).second)
+				{
+					uniqueExtraArgs.push_back(std::move(arg));
+				}
 			}
 			desc.m_ExtraArgs.swap(uniqueExtraArgs);
 		}
@@ -228,7 +250,8 @@ namespace gglab
 		return hash;
 	}
 
-	std::filesystem::path ShaderCompiler::MakeCacheBinaryPath(const std::wstring& keyHex, ShaderStage stage) const noexcept
+	std::filesystem::path ShaderCompiler::MakeCacheBinaryPath(
+		const std::wstring& keyHex, ShaderStage stage) const noexcept
 	{
 		std::wstring extension;
 		switch (stage)
@@ -259,15 +282,18 @@ namespace gglab
 			break;
 		}
 
-		auto path = m_CacheRootDir / keyHex.substr(0, 2) / keyHex.substr(2, 2) / (keyHex + extension);
+		auto path =
+			m_CacheRootDir / keyHex.substr(0, 2) / keyHex.substr(2, 2) / (keyHex + extension);
 		utils::CreateParentDirectoryIfNotExist(path);
 		return path;
 	}
 
-	ShaderBinary ShaderCompiler::CompileShader(const ShaderDesc& desc, std::vector<std::filesystem::path>& outDeps) const noexcept
+	ShaderBinary ShaderCompiler::CompileShader(
+		const ShaderDesc& desc, std::vector<std::filesystem::path>& outDeps) const noexcept
 	{
 		ComPtr<IDxcBlobEncoding> src;
-		GGLAB_HR(m_Impl->m_Utils->LoadFile(utils::Canonical(desc.m_SourcePath).c_str(), nullptr, &src));
+		GGLAB_HR(
+			m_Impl->m_Utils->LoadFile(utils::Canonical(desc.m_SourcePath).c_str(), nullptr, &src));
 
 		DxcBuffer buffer{};
 		buffer.Ptr = src->GetBufferPointer();
@@ -275,7 +301,8 @@ namespace gglab
 		buffer.Encoding = DXC_CP_UTF8;
 
 		ComPtr<ShaderIncludeHandler> includeHandler;
-		GGLAB_HR(MakeAndInitialize<ShaderIncludeHandler>(&includeHandler, m_Impl->m_Utils, desc.m_IncludeDirs));
+		GGLAB_HR(MakeAndInitialize<ShaderIncludeHandler>(
+			&includeHandler, m_Impl->m_Utils, desc.m_IncludeDirs));
 
 		std::vector<const wchar_t*> args;
 		const std::wstring entry = desc.m_Entry.empty() ? L"Main" : desc.m_Entry;
@@ -325,7 +352,10 @@ namespace gglab
 		for (const auto& define : desc.m_Defines)
 		{
 			std::wstring arg = define.m_Name;
-			if (!define.m_Value.empty()) { arg += L"=" + define.m_Value; }
+			if (!define.m_Value.empty())
+			{
+				arg += L"=" + define.m_Value;
+			}
 			defines.push_back(std::move(arg));
 		}
 
@@ -343,7 +373,8 @@ namespace gglab
 
 		// Compile
 		ComPtr<IDxcResult> result;
-		GGLAB_HR(m_Impl->m_Compiler->Compile(&buffer, args.data(), (UINT32)args.size(), includeHandler.Get(), IID_PPV_ARGS(&result)));
+		GGLAB_HR(m_Impl->m_Compiler->Compile(&buffer, args.data(), (UINT32)args.size(),
+			includeHandler.Get(), IID_PPV_ARGS(&result)));
 
 		HRESULT status = S_OK;
 		result->GetStatus(&status);
@@ -353,7 +384,8 @@ namespace gglab
 			result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&log), nullptr);
 			if (log && log->GetStringLength())
 			{
-				GGLAB_LOG_GRAPHICS_ERROR("DXC error:\n{}", static_cast<const char*>(log->GetBufferPointer()));
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"DXC error:\n{}", static_cast<const char*>(log->GetBufferPointer()));
 			}
 			GGLAB_HR(status);
 		}
@@ -375,7 +407,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(created, "Create shader meta failed.");
 
 		std::ofstream out(meta, std::ios::binary);
-		if (!out) { return; }
+		if (!out)
+		{
+			return;
+		}
 
 		const auto src = utils::Canonical(desc.m_SourcePath).string();
 		const auto entry = utils::ToString(desc.m_Entry);
@@ -430,10 +465,16 @@ namespace gglab
 	bool ShaderCompiler::IsMetaUpToDate(const std::filesystem::path& meta) const noexcept
 	{
 		std::error_code errorCode;
-		if (!std::filesystem::exists(meta, errorCode)) { return false; }
+		if (!std::filesystem::exists(meta, errorCode))
+		{
+			return false;
+		}
 
 		std::ifstream in(meta, std::ios::binary);
-		if (!in) { return false; }
+		if (!in)
+		{
+			return false;
+		}
 
 		std::string line;
 		while (std::getline(in, line))
@@ -591,7 +632,8 @@ namespace gglab
 		return str;
 	}
 
-	bool ShaderCompiler::GetContainerHash(const void* data, size_t size, ShaderHash128& outHash) noexcept
+	bool ShaderCompiler::GetContainerHash(
+		const void* data, size_t size, ShaderHash128& outHash) noexcept
 	{
 		constexpr size_t MinDxilSize = 20;
 		if (data == nullptr || size < MinDxilSize)
@@ -631,7 +673,8 @@ namespace gglab
 		}
 
 		// FNV-1a 64-bit hash
-		GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBinary: Failed to get container hash, fallback to FNV-1a hash.");
+		GGLAB_LOG_GRAPHICS_WARN(
+			"ShaderCompiler::ComputeHashFromBinary: Failed to get container hash, fallback to FNV-1a hash.");
 		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
 		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
 		return hash;

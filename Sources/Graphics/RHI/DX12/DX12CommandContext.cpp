@@ -23,13 +23,19 @@ namespace gglab
 		{
 			switch (topology)
 			{
-			case RHIPrimitiveTopology::PointList: return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-			case RHIPrimitiveTopology::LineList: return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-			case RHIPrimitiveTopology::LineStrip: return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
-			case RHIPrimitiveTopology::TriangleList: return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-			case RHIPrimitiveTopology::TriangleStrip: return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+			case RHIPrimitiveTopology::PointList:
+				return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+			case RHIPrimitiveTopology::LineList:
+				return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+			case RHIPrimitiveTopology::LineStrip:
+				return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+			case RHIPrimitiveTopology::TriangleList:
+				return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+			case RHIPrimitiveTopology::TriangleStrip:
+				return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
 			case RHIPrimitiveTopology::Unknown:
-			default: return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+			default:
+				return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 			}
 		}
 	}
@@ -40,16 +46,14 @@ namespace gglab
 		return RHICommandContextHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
 	}
 
-	DX12CommandContext::DX12CommandContext(DX12Device* device,
-		DX12CommandList* commandList,
-		RHIQueueType queueType) noexcept :
-		m_Handle(AllocateDX12CommandContextHandle()),
-		m_Device(device),
-		m_CommandList(commandList),
-		m_QueueType(queueType)
+	DX12CommandContext::DX12CommandContext(
+		DX12Device* device, DX12CommandList* commandList, RHIQueueType queueType) noexcept :
+		m_Handle(AllocateDX12CommandContextHandle()), m_Device(device),
+		m_CommandList(commandList), m_QueueType(queueType)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "DX12CommandContext requires a valid DX12Device.");
-		GGLAB_ASSERT_MSG(m_CommandList != nullptr, "DX12CommandContext requires a valid DX12CommandList.");
+		GGLAB_ASSERT_MSG(
+			m_CommandList != nullptr, "DX12CommandContext requires a valid DX12CommandList.");
 	}
 
 	ID3D12GraphicsCommandList* DX12CommandContext::Get() const noexcept
@@ -75,18 +79,15 @@ namespace gglab
 			DX12Texture* texture = m_Device->ResolveTexture(barrier.m_Texture);
 			if (!texture)
 			{
-				GGLAB_LOG_GRAPHICS_WARN("DX12CommandContext::TextureBarrier received a non-live texture handle.");
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12CommandContext::TextureBarrier received a non-live texture handle.");
 				continue;
 			}
 
 			m_CommandList->AddTextureBarrier(
-				BuildD3D12TextureBarrier(
-					barrier,
-					texture->Get(),
-					texture->GetDesc()));
+				BuildD3D12TextureBarrier(barrier, texture->Get(), texture->GetDesc()));
 			TrackTextureUse(barrier.m_Texture);
 		}
-
 	}
 
 	void DX12CommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
@@ -101,20 +102,18 @@ namespace gglab
 			DX12Buffer* buffer = m_Device->ResolveBuffer(barrier.m_Buffer);
 			if (!buffer)
 			{
-				GGLAB_LOG_GRAPHICS_WARN("DX12CommandContext::BufferBarrier received a non-live buffer handle.");
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12CommandContext::BufferBarrier received a non-live buffer handle.");
 				continue;
 			}
 
 			m_CommandList->AddBufferBarrier(
-				CD3DX12_BUFFER_BARRIER(
-					ToD3D12BarrierSync(barrier.m_Before.m_Stages),
+				CD3DX12_BUFFER_BARRIER(ToD3D12BarrierSync(barrier.m_Before.m_Stages),
 					ToD3D12BarrierSync(barrier.m_After.m_Stages),
 					ToD3D12BarrierAccess(barrier.m_Before.m_Access),
-					ToD3D12BarrierAccess(barrier.m_After.m_Access),
-					buffer->Get()));
+					ToD3D12BarrierAccess(barrier.m_After.m_Access), buffer->Get()));
 			TrackBufferUse(barrier.m_Buffer);
 		}
-
 	}
 
 	void DX12CommandContext::FlushBarriers() noexcept
@@ -125,45 +124,24 @@ namespace gglab
 		}
 	}
 
-	void DX12CommandContext::CopyBuffer(
-		RHIBufferHandle destination,
-		uint64_t destinationOffset,
-		RHIBufferHandle source,
-		uint64_t sourceOffset,
-		uint64_t sizeInBytes) noexcept
+	void DX12CommandContext::CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+		RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept
 	{
-		DX12Buffer* destinationBuffer =
-			m_Device ?
-				m_Device->ResolveBuffer(destination) :
-				nullptr;
-		DX12Buffer* sourceBuffer =
-			m_Device ?
-				m_Device->ResolveBuffer(source) :
-				nullptr;
-		if (!destinationBuffer || !sourceBuffer ||
-			sizeInBytes == 0 ||
-			destinationOffset >
-				destinationBuffer->SizeInBytes() ||
-			sizeInBytes >
-				destinationBuffer->SizeInBytes() -
-					destinationOffset ||
-			sourceOffset >
-				sourceBuffer->SizeInBytes() ||
-			sizeInBytes >
-				sourceBuffer->SizeInBytes() -
-					sourceOffset)
+		DX12Buffer* destinationBuffer = m_Device ? m_Device->ResolveBuffer(destination) : nullptr;
+		DX12Buffer* sourceBuffer = m_Device ? m_Device->ResolveBuffer(source) : nullptr;
+		if (!destinationBuffer || !sourceBuffer || sizeInBytes == 0 ||
+			destinationOffset > destinationBuffer->SizeInBytes() ||
+			sizeInBytes > destinationBuffer->SizeInBytes() - destinationOffset ||
+			sourceOffset > sourceBuffer->SizeInBytes() ||
+			sizeInBytes > sourceBuffer->SizeInBytes() - sourceOffset)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"DX12CommandContext::CopyBuffer received an invalid buffer or copy range.");
 			return;
 		}
 
-		Get()->CopyBufferRegion(
-			destinationBuffer->Get(),
-			destinationOffset,
-			sourceBuffer->Get(),
-			sourceOffset,
-			sizeInBytes);
+		Get()->CopyBufferRegion(destinationBuffer->Get(), destinationOffset, sourceBuffer->Get(),
+			sourceOffset, sizeInBytes);
 		TrackBufferUse(destination);
 		TrackBufferUse(source);
 	}
@@ -184,20 +162,20 @@ namespace gglab
 		}
 	}
 
-	DX12GraphicsCommandContext::DX12GraphicsCommandContext(
-		DX12Device* device,
-		DX12PipelineSystem* pipelineSystem,
-		DX12CommandList* commandList) noexcept :
-		m_Backend(device, commandList, RHIQueueType::Graphics),
-		m_PipelineSystem(pipelineSystem)
-	{}
+	DX12GraphicsCommandContext::DX12GraphicsCommandContext(DX12Device* device,
+		DX12PipelineSystem* pipelineSystem, DX12CommandList* commandList) noexcept :
+		m_Backend(device, commandList, RHIQueueType::Graphics), m_PipelineSystem(pipelineSystem)
+	{
+	}
 
-	void DX12GraphicsCommandContext::TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept
+	void DX12GraphicsCommandContext::TextureBarrier(
+		std::span<const RHITextureBarrier> barriers) noexcept
 	{
 		m_Backend.TextureBarrier(barriers);
 	}
 
-	void DX12GraphicsCommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
+	void DX12GraphicsCommandContext::BufferBarrier(
+		std::span<const RHIBufferBarrier> barriers) noexcept
 	{
 		m_Backend.BufferBarrier(barriers);
 	}
@@ -209,7 +187,8 @@ namespace gglab
 		if (!m_PipelineSystem ||
 			!m_PipelineSystem->ResolveGraphicsPipeline(pipeline, pipelineState, rootSignature))
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetPipeline received an invalid pipeline handle.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12GraphicsCommandContext::SetPipeline received an invalid pipeline handle.");
 			return;
 		}
 
@@ -221,14 +200,16 @@ namespace gglab
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 	}
 
-	void DX12GraphicsCommandContext::SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept
+	void DX12GraphicsCommandContext::SetDescriptorTable(
+		const RHIDescriptorTableBinding& binding) noexcept
 	{
-		const D3D12_GPU_DESCRIPTOR_HANDLE table = m_Backend.GetDevice()->ResolveShaderVisibleDescriptor(
-			binding.m_HeapType,
-			binding.m_TableIndex);
+		const D3D12_GPU_DESCRIPTOR_HANDLE table =
+			m_Backend.GetDevice()->ResolveShaderVisibleDescriptor(
+				binding.m_HeapType, binding.m_TableIndex);
 		if (table.ptr == 0)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetDescriptorTable received an invalid descriptor table binding.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12GraphicsCommandContext::SetDescriptorTable received an invalid descriptor table binding.");
 			return;
 		}
 		m_Backend.Get()->SetGraphicsRootDescriptorTable(binding.m_ParameterIndex, table);
@@ -251,8 +232,10 @@ namespace gglab
 
 		if (depthStencil.IsValid())
 		{
-			const DX12DescriptorView nativeDepth = m_Backend.GetDevice()->ResolveTextureView(depthStencil);
-			GGLAB_ASSERT_MSG(nativeDepth.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
+			const DX12DescriptorView nativeDepth =
+				m_Backend.GetDevice()->ResolveTextureView(depthStencil);
+			GGLAB_ASSERT_MSG(
+				nativeDepth.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
 			m_Backend.GetCommandList()->SetRenderTargets(nativeRenderTargets, nativeDepth);
 		}
 		else
@@ -262,8 +245,7 @@ namespace gglab
 	}
 
 	void DX12GraphicsCommandContext::ClearColor(
-		RHITextureViewHandle renderTarget,
-		const std::array<float, 4>& color) noexcept
+		RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept
 	{
 		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(renderTarget);
 		GGLAB_ASSERT_MSG(view.IsValid(), "Render-target view must resolve to a DX12 descriptor.");
@@ -274,9 +256,7 @@ namespace gglab
 	}
 
 	void DX12GraphicsCommandContext::ClearDepthStencil(
-		RHITextureViewHandle depthStencil,
-		float depth,
-		std::optional<uint8_t> stencil) noexcept
+		RHITextureViewHandle depthStencil, float depth, std::optional<uint8_t> stencil) noexcept
 	{
 		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(depthStencil);
 		GGLAB_ASSERT_MSG(view.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
@@ -308,54 +288,50 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetPrimitiveTopology(RHIPrimitiveTopology topology) noexcept
 	{
 		const D3D12_PRIMITIVE_TOPOLOGY nativeTopology = ToD3D12PrimitiveTopology(topology);
-		GGLAB_ASSERT_MSG(nativeTopology != D3D_PRIMITIVE_TOPOLOGY_UNDEFINED, "Invalid RHI primitive topology.");
+		GGLAB_ASSERT_MSG(
+			nativeTopology != D3D_PRIMITIVE_TOPOLOGY_UNDEFINED, "Invalid RHI primitive topology.");
 		m_Backend.GetCommandList()->SetPrimitiveTopology(nativeTopology);
 	}
 
 	void DX12GraphicsCommandContext::SetConstantBuffer(
-		uint32_t parameterIndex,
-		RHIBufferHandle buffer,
-		uint64_t offset) noexcept
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetConstantBuffer received an invalid buffer binding.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12GraphicsCommandContext::SetConstantBuffer received an invalid buffer binding.");
 			return;
 		}
 		m_Backend.GetCommandList()->SetGraphicsConstantBuffer(
-			parameterIndex,
-			nativeBuffer->GPUVirtualAddress() + offset);
+			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
 		m_Backend.TrackBufferUse(buffer);
 	}
 
 	void DX12GraphicsCommandContext::SetReadOnlyBuffer(
-		uint32_t parameterIndex,
-		RHIBufferHandle buffer,
-		uint64_t offset) noexcept
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12GraphicsCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
 			return;
 		}
 		m_Backend.Get()->SetGraphicsRootShaderResourceView(
-			parameterIndex,
-			nativeBuffer->GPUVirtualAddress() + offset);
+			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
 		m_Backend.TrackBufferUse(buffer);
 	}
 
 	void DX12GraphicsCommandContext::SetPushConstants(
-		uint32_t parameterIndex,
-		std::span<const uint32_t> values,
-		uint32_t destOffset) noexcept
+		uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
-		m_Backend.GetCommandList()->SetGraphicsRoot32BitConstants(parameterIndex, values, destOffset);
+		m_Backend.GetCommandList()->SetGraphicsRoot32BitConstants(
+			parameterIndex, values, destOffset);
 	}
 
-	void DX12GraphicsCommandContext::SetVertexBuffers(uint32_t startSlot,
-		std::span<const RHIVertexBufferBinding> bindings) noexcept
+	void DX12GraphicsCommandContext::SetVertexBuffers(
+		uint32_t startSlot, std::span<const RHIVertexBufferBinding> bindings) noexcept
 	{
 		if (bindings.empty())
 		{
@@ -372,7 +348,8 @@ namespace gglab
 			DX12Buffer* buffer = device->ResolveBuffer(binding.m_Buffer);
 			if (!buffer)
 			{
-				GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetVertexBuffers received a non-live buffer handle.");
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12GraphicsCommandContext::SetVertexBuffers received a non-live buffer handle.");
 				continue;
 			}
 
@@ -386,11 +363,8 @@ namespace gglab
 
 		if (!nativeBindings.empty())
 		{
-			m_Backend.GetCommandList()->SetVertexBuffers(
-				startSlot,
-				std::span<D3D12_VERTEX_BUFFER_VIEW>(
-					nativeBindings.data(),
-					nativeBindings.size()));
+			m_Backend.GetCommandList()->SetVertexBuffers(startSlot,
+				std::span<D3D12_VERTEX_BUFFER_VIEW>(nativeBindings.data(), nativeBindings.size()));
 		}
 	}
 
@@ -402,7 +376,8 @@ namespace gglab
 		DX12Buffer* buffer = device->ResolveBuffer(binding.m_Buffer);
 		if (!buffer)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12GraphicsCommandContext::SetIndexBuffer received a non-live buffer handle.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12GraphicsCommandContext::SetIndexBuffer received a non-live buffer handle.");
 			return;
 		}
 
@@ -414,31 +389,19 @@ namespace gglab
 		m_Backend.TrackBufferUse(binding.m_Buffer);
 	}
 
-	void DX12GraphicsCommandContext::DrawIndexed(uint32_t indexCount,
-		uint32_t instanceCount,
-		uint32_t startIndexLocation,
-		int32_t baseVertexLocation,
+	void DX12GraphicsCommandContext::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
-		m_Backend.Get()->DrawIndexedInstanced(
-			indexCount,
-			instanceCount,
-			startIndexLocation,
-			baseVertexLocation,
-			startInstanceLocation);
+		m_Backend.Get()->DrawIndexedInstanced(indexCount, instanceCount, startIndexLocation,
+			baseVertexLocation, startInstanceLocation);
 	}
 
-	void DX12GraphicsCommandContext::Draw(
-		uint32_t vertexCount,
-		uint32_t instanceCount,
-		uint32_t startVertexLocation,
-		uint32_t startInstanceLocation) noexcept
+	void DX12GraphicsCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
+		uint32_t startVertexLocation, uint32_t startInstanceLocation) noexcept
 	{
 		m_Backend.Get()->DrawInstanced(
-			vertexCount,
-			instanceCount,
-			startVertexLocation,
-			startInstanceLocation);
+			vertexCount, instanceCount, startVertexLocation, startInstanceLocation);
 	}
 
 	void DX12GraphicsCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
@@ -457,53 +420,50 @@ namespace gglab
 		}
 	}
 
-	void DX12GraphicsCommandContext::SetRootSignature(const DX12RootSignature& rootSignature) noexcept
+	void DX12GraphicsCommandContext::SetRootSignature(
+		const DX12RootSignature& rootSignature) noexcept
 	{
 		m_Backend.GetCommandList()->SetGraphicsRootSignature(rootSignature);
 	}
 
-	void DX12GraphicsCommandContext::SetPipelineState(const DX12PipelineState& pipelineState) noexcept
+	void DX12GraphicsCommandContext::SetPipelineState(
+		const DX12PipelineState& pipelineState) noexcept
 	{
 		m_Backend.GetCommandList()->SetPipelineState(pipelineState);
 	}
 
-	void DX12GraphicsCommandContext::SetDescriptor(uint32_t parameterIndex,
-		const DX12DescriptorView& descriptor) noexcept
+	void DX12GraphicsCommandContext::SetDescriptor(
+		uint32_t parameterIndex, const DX12DescriptorView& descriptor) noexcept
 	{
 		m_Backend.GetCommandList()->SetGraphicsDescriptor(parameterIndex, descriptor);
 	}
 
-	DX12ComputeCommandContext::DX12ComputeCommandContext(
-		DX12Device* device,
-		DX12PipelineSystem* pipelineSystem,
-		DX12CommandList* commandList) noexcept :
+	DX12ComputeCommandContext::DX12ComputeCommandContext(DX12Device* device,
+		DX12PipelineSystem* pipelineSystem, DX12CommandList* commandList) noexcept :
 		m_PipelineSystem(pipelineSystem)
 	{
-		m_OwnedBackend = std::make_unique<DX12CommandContext>(
-			device,
-			commandList,
-			RHIQueueType::Compute);
+		m_OwnedBackend =
+			std::make_unique<DX12CommandContext>(device, commandList, RHIQueueType::Compute);
 		m_Backend = m_OwnedBackend.get();
 	}
 
 	DX12ComputeCommandContext::DX12ComputeCommandContext(
-		DX12GraphicsCommandContext& graphicsContext,
-		DX12PipelineSystem* pipelineSystem) noexcept :
-		m_Backend(&graphicsContext.m_Backend),
-		m_PipelineSystem(pipelineSystem)
+		DX12GraphicsCommandContext& graphicsContext, DX12PipelineSystem* pipelineSystem) noexcept :
+		m_Backend(&graphicsContext.m_Backend), m_PipelineSystem(pipelineSystem)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Backend);
-		GGLAB_ASSERT_MSG(
-			m_Backend->GetQueueType() == RHIQueueType::Graphics,
+		GGLAB_ASSERT_MSG(m_Backend->GetQueueType() == RHIQueueType::Graphics,
 			"A direct compute encoder must wrap a graphics/direct command context.");
 	}
 
-	void DX12ComputeCommandContext::TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept
+	void DX12ComputeCommandContext::TextureBarrier(
+		std::span<const RHITextureBarrier> barriers) noexcept
 	{
 		m_Backend->TextureBarrier(barriers);
 	}
 
-	void DX12ComputeCommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
+	void DX12ComputeCommandContext::BufferBarrier(
+		std::span<const RHIBufferBarrier> barriers) noexcept
 	{
 		m_Backend->BufferBarrier(barriers);
 	}
@@ -527,11 +487,12 @@ namespace gglab
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 	}
 
-	void DX12ComputeCommandContext::SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept
+	void DX12ComputeCommandContext::SetDescriptorTable(
+		const RHIDescriptorTableBinding& binding) noexcept
 	{
-		const D3D12_GPU_DESCRIPTOR_HANDLE table = m_Backend->GetDevice()->ResolveShaderVisibleDescriptor(
-			binding.m_HeapType,
-			binding.m_TableIndex);
+		const D3D12_GPU_DESCRIPTOR_HANDLE table =
+			m_Backend->GetDevice()->ResolveShaderVisibleDescriptor(
+				binding.m_HeapType, binding.m_TableIndex);
 		if (table.ptr == 0)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -542,9 +503,7 @@ namespace gglab
 	}
 
 	void DX12ComputeCommandContext::SetConstantBuffer(
-		uint32_t parameterIndex,
-		RHIBufferHandle buffer,
-		uint64_t offset) noexcept
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
@@ -554,15 +513,12 @@ namespace gglab
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeConstantBuffer(
-			parameterIndex,
-			nativeBuffer->GPUVirtualAddress() + offset);
+			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
 		m_Backend->TrackBufferUse(buffer);
 	}
 
 	void DX12ComputeCommandContext::SetReadOnlyBuffer(
-		uint32_t parameterIndex,
-		RHIBufferHandle buffer,
-		uint64_t offset) noexcept
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
@@ -572,15 +528,12 @@ namespace gglab
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeReadOnlyBuffer(
-			parameterIndex,
-			nativeBuffer->GPUVirtualAddress() + offset);
+			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
 		m_Backend->TrackBufferUse(buffer);
 	}
 
 	void DX12ComputeCommandContext::SetReadWriteBuffer(
-		uint32_t parameterIndex,
-		RHIBufferHandle buffer,
-		uint64_t offset) noexcept
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
@@ -590,38 +543,34 @@ namespace gglab
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeReadWriteBuffer(
-			parameterIndex,
-			nativeBuffer->GPUVirtualAddress() + offset);
+			parameterIndex, nativeBuffer->GPUVirtualAddress() + offset);
 		m_Backend->TrackBufferUse(buffer);
 	}
 
 	void DX12ComputeCommandContext::SetPushConstants(
-		uint32_t parameterIndex,
-		std::span<const uint32_t> values,
-		uint32_t destOffset) noexcept
+		uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
 		m_Backend->GetCommandList()->SetComputeRoot32BitConstants(
-			parameterIndex,
-			values,
-			destOffset);
+			parameterIndex, values, destOffset);
 	}
 
-	void DX12ComputeCommandContext::Dispatch(uint32_t groupCountX,
-		uint32_t groupCountY,
-		uint32_t groupCountZ) noexcept
+	void DX12ComputeCommandContext::Dispatch(
+		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
 	{
 		m_Backend->GetCommandList()->Dispatch(groupCountX, groupCountY, groupCountZ);
 	}
 
-	void DX12ComputeCommandContext::SetPipelineState(const DX12PipelineState& pipelineState) noexcept
+	void DX12ComputeCommandContext::SetPipelineState(
+		const DX12PipelineState& pipelineState) noexcept
 	{
 		m_Backend->GetCommandList()->SetPipelineState(pipelineState);
 	}
 
-	void DX12ComputeCommandContext::SetDescriptor(uint32_t parameterIndex,
-		const DX12DescriptorView& descriptor) noexcept
+	void DX12ComputeCommandContext::SetDescriptor(
+		uint32_t parameterIndex, const DX12DescriptorView& descriptor) noexcept
 	{
-		m_Backend->GetCommandList()->SetComputeDescriptorTable(parameterIndex, descriptor.m_GpuHandle);
+		m_Backend->GetCommandList()->SetComputeDescriptorTable(
+			parameterIndex, descriptor.m_GpuHandle);
 	}
 
 	void DX12ComputeCommandContext::BeginGpuProfileScope(std::string_view name) noexcept

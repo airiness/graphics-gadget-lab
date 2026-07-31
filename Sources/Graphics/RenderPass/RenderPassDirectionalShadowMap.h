@@ -12,36 +12,34 @@ namespace gglab
 	class RenderPassDirectionalShadowMap final : public RenderPassBase
 	{
 	public:
-		RenderPassDirectionalShadowMap() noexcept : RenderPassBase({
-			.m_TypeName = "Shadow.Directional",
-			.m_DisplayName = "Directional Shadow Map",
-			.m_CategoryName = "Shadow",
-			.m_Description = "Renders the directional light shadow depth map for the main scene.",
-			.m_Category = RenderPassCategory::Shadow,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
+		RenderPassDirectionalShadowMap() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "Shadow.Directional",
+				  .m_DisplayName = "Directional Shadow Map",
+				  .m_CategoryName = "Shadow",
+				  .m_Description =
+					  "Renders the directional light shadow depth map for the main scene.",
+				  .m_Category = RenderPassCategory::Shadow,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
 		~RenderPassDirectionalShadowMap() override = default;
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-			const RenderFrameContext& context,
-			const RenderServices& services) noexcept;
+			const RenderFrameContext& context, const RenderServices& services) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
-			const RenderFrameContext& context,
-			const RenderServices& services,
-			const RenderQueue& renderQueue,
-			const DrawItemsRange& range) noexcept;
+			const RenderFrameContext& context, const RenderServices& services,
+			const RenderQueue& renderQueue, const DrawItemsRange& range) noexcept;
 
-		RHIPipelineHandle GetOrCreatePSOForVariant(
-			const Renderer& renderer,
-			uint64_t variantBits,
+		RHIPipelineHandle GetOrCreatePSOForVariant(const Renderer& renderer, uint64_t variantBits,
 			const DirectionalShadowSettings& shadowSettings) noexcept;
 
 		RasterizerPreset GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept;

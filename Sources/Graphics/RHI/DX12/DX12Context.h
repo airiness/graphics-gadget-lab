@@ -59,8 +59,8 @@ namespace gglab
 		RHIFrameContext& BeginFrame() noexcept override;
 		RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept override;
 		void AbortFrame(RHIFrameContext& frame) noexcept override;
-		void WaitForFence(RHIQueueType waitingQueue,
-			const RHIFencePoint& fencePoint) noexcept override;
+		void WaitForFence(
+			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
 
 		void Resize(uint32_t width, uint32_t height) noexcept override;
 		void WaitIdle() noexcept override;

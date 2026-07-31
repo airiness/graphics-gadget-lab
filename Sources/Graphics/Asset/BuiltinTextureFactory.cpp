@@ -10,12 +10,9 @@ namespace gglab
 {
 	namespace
 	{
-		template<typename PixelFunction>
-		[[nodiscard]] TextureAssetData MakeTexture2DRgba8(
-			uint32_t width,
-			uint32_t height,
-			TextureColorSpace colorSpace,
-			PixelFunction&& pixelFunction) noexcept
+		template <typename PixelFunction>
+		[[nodiscard]] TextureAssetData MakeTexture2DRgba8(uint32_t width, uint32_t height,
+			TextureColorSpace colorSpace, PixelFunction&& pixelFunction) noexcept
 		{
 			GGLAB_ASSERT(width > 0 && height > 0);
 			constexpr size_t formatBytes = 4;
@@ -26,8 +23,8 @@ namespace gglab
 				for (uint32_t x = 0; x < width; ++x)
 				{
 					const auto color = pixelFunction(x, y);
-					uint8_t* pixel = pixels.data() +
-						(static_cast<size_t>(y) * width + x) * formatBytes;
+					uint8_t* pixel =
+						pixels.data() + (static_cast<size_t>(y) * width + x) * formatBytes;
 					pixel[0] = color[0];
 					pixel[1] = color[1];
 					pixel[2] = color[2];
@@ -84,69 +81,40 @@ namespace gglab
 		std::vector<BuiltinTextureAsset> textures;
 		textures.reserve(9);
 
-		const auto addGeneratedTexture = [&textures](
-			ReservedTextureIDIndex id,
-			std::string_view name,
-			TextureSemantic semantic,
-			uint32_t width,
-			uint32_t height,
-			auto&& pixelFunction) noexcept
+		const auto addGeneratedTexture =
+			[&textures](ReservedTextureIDIndex id, std::string_view name, TextureSemantic semantic,
+				uint32_t width, uint32_t height, auto&& pixelFunction) noexcept
 			{
 				textures.push_back({
 					.m_Id = id,
 					.m_Name = name,
 					.m_Semantic = semantic,
-					.m_Data = MakeTexture2DRgba8(
-						width,
-						height,
-						GetTextureColorSpaceFromSemantic(semantic),
-						std::forward<decltype(pixelFunction)>(pixelFunction)),
-				});
+					.m_Data =
+						MakeTexture2DRgba8(width, height, GetTextureColorSpaceFromSemantic(semantic),
+							std::forward<decltype(pixelFunction)>(pixelFunction)),
+					});
 			};
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::BaseColorWhite,
-			"BaseColorWhite",
-			TextureSemantic::BaseColor,
-			1,
-			1,
-			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
-			{
-				return { 255, 255, 255, 255 };
-			});
+		addGeneratedTexture(ReservedTextureIDIndex::BaseColorWhite, "BaseColorWhite",
+			TextureSemantic::BaseColor, 1, 1,
+			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 255, 255, 255, 255 }; });
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::MissingTextureChecker,
-			"MissingTextureChecker",
-			TextureSemantic::BaseColor,
-			64,
-			64,
+		addGeneratedTexture(ReservedTextureIDIndex::MissingTextureChecker, "MissingTextureChecker",
+			TextureSemantic::BaseColor, 64, 64,
 			[](uint32_t x, uint32_t y) -> std::array<uint8_t, 4>
 			{
 				constexpr uint32_t tileSize = 8;
 				const bool isPurple = ((x / tileSize) + (y / tileSize)) & 1;
-				return isPurple ?
-					std::array<uint8_t, 4>{ 255, 0, 255, 255 } :
-					std::array<uint8_t, 4>{ 0, 0, 0, 255 };
+				return isPurple ? std::array<uint8_t, 4>{255, 0, 255, 255}
+				: std::array<uint8_t, 4>{ 0, 0, 0, 255 };
 			});
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::NormalFlat,
-			"NormalFlat",
-			TextureSemantic::Normal,
-			1,
-			1,
-			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
-			{
-				return { 128, 128, 255, 255 };
-			});
+		addGeneratedTexture(ReservedTextureIDIndex::NormalFlat, "NormalFlat",
+			TextureSemantic::Normal, 1, 1,
+			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 128, 128, 255, 255 }; });
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::DefaultMetallicRoughness,
-			"DefaultMetallicRoughness",
-			TextureSemantic::MetallicRoughness,
-			1,
-			1,
+		addGeneratedTexture(ReservedTextureIDIndex::DefaultMetallicRoughness,
+			"DefaultMetallicRoughness", TextureSemantic::MetallicRoughness, 1, 1,
 			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
 			{
 				// The shader multiplies sampled values by material factors, so an
@@ -154,44 +122,19 @@ namespace gglab
 				return { 0, 255, 255, 255 };
 			});
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::OcclusionWhite,
-			"OcclusionWhite",
-			TextureSemantic::Occlusion,
-			1,
-			1,
-			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
-			{
-				return { 255, 255, 255, 255 };
-			});
+		addGeneratedTexture(ReservedTextureIDIndex::OcclusionWhite, "OcclusionWhite",
+			TextureSemantic::Occlusion, 1, 1,
+			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 255, 255, 255, 255 }; });
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::EmissiveWhite,
-			"EmissiveWhite",
-			TextureSemantic::Emissive,
-			1,
-			1,
-			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
-			{
-				return { 255, 255, 255, 255 };
-			});
+		addGeneratedTexture(ReservedTextureIDIndex::EmissiveWhite, "EmissiveWhite",
+			TextureSemantic::Emissive, 1, 1,
+			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 255, 255, 255, 255 }; });
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::ErrorRed,
-			"ErrorRed",
-			TextureSemantic::BaseColor,
-			1,
-			1,
-			[](uint32_t, uint32_t) -> std::array<uint8_t, 4>
-			{
-				return { 255, 0, 0, 255 };
-			});
+		addGeneratedTexture(ReservedTextureIDIndex::ErrorRed, "ErrorRed",
+			TextureSemantic::BaseColor, 1, 1,
+			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 255, 0, 0, 255 }; });
 
-		addGeneratedTexture(
-			ReservedTextureIDIndex::UVTest,
-			"UVTest",
-			TextureSemantic::UVTest,
-			256,
+		addGeneratedTexture(ReservedTextureIDIndex::UVTest, "UVTest", TextureSemantic::UVTest, 256,
 			256,
 			[](uint32_t x, uint32_t y) -> std::array<uint8_t, 4>
 			{
@@ -213,7 +156,7 @@ namespace gglab
 			.m_Name = "FallbackEnvironmentCubemap",
 			.m_Semantic = TextureSemantic::Environment,
 			.m_Data = MakeProceduralEnvironmentCubemap(),
-		});
+			});
 
 		return textures;
 	}

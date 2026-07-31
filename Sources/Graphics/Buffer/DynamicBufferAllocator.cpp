@@ -5,46 +5,41 @@
 namespace gglab
 {
 	DynamicBufferAllocator::DynamicBufferAllocator(const CreateInfo& createInfo) noexcept :
-		m_Device(createInfo.m_Device),
-		m_Ring(createInfo.m_CapacityInBytes),
-		m_CapacityInBytes(createInfo.m_CapacityInBytes),
-		m_MemoryUsage(createInfo.m_MemoryUsage),
+		m_Device(createInfo.m_Device), m_Ring(createInfo.m_CapacityInBytes),
+		m_CapacityInBytes(createInfo.m_CapacityInBytes), m_MemoryUsage(createInfo.m_MemoryUsage),
 		m_ViewType(createInfo.m_ViewType)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "DynamicBufferAllocator requires an RHI device.");
-		GGLAB_ASSERT_MSG(m_CapacityInBytes > 0, "DynamicBufferAllocator capacity must be non-zero.");
+		GGLAB_ASSERT_MSG(
+			m_CapacityInBytes > 0, "DynamicBufferAllocator capacity must be non-zero.");
 		GGLAB_ASSERT_MSG(m_MemoryUsage != RHIMemoryUsage::GpuOnly,
 			"DynamicBufferAllocator requires CPU-visible memory.");
 
 		m_AllocationAlignment = std::max(
-			createInfo.m_AllocationAlignment,
-			m_Device->GetBufferViewAlignment(m_ViewType));
+			createInfo.m_AllocationAlignment, m_Device->GetBufferViewAlignment(m_ViewType));
 
 		RHIBufferDesc desc{};
 		desc.m_SizeInBytes = m_CapacityInBytes;
 		desc.m_StrideInBytes = createInfo.m_StrideInBytes;
 		desc.m_Usage = createInfo.m_Usage;
 		desc.m_MemoryUsage = m_MemoryUsage;
-		const RHIResourceDebugIdentityDesc debugIdentity
-		{
+		const RHIResourceDebugIdentityDesc debugIdentity{
 			.m_Domain = RHIResourceDebugDomain::Renderer,
 			.m_Category = "DynamicBuffer",
-			.m_Label = createInfo.m_DebugName ?
-				std::string_view(createInfo.m_DebugName) : std::string_view("Unspecified"),
+			.m_Label = createInfo.m_DebugName ? std::string_view(createInfo.m_DebugName)
+											  : std::string_view("Unspecified"),
 		};
-		m_Buffer = RHIBufferOwner(
-			m_Device, m_Device->CreateBuffer(desc, debugIdentity));
+		m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 		GGLAB_ASSERT_MSG(m_Buffer, "DynamicBufferAllocator failed to create its RHI buffer.");
 
 		if (m_Buffer)
 		{
-			const RHIMappedBufferRange readRange =
-				m_MemoryUsage == RHIMemoryUsage::GpuToCpu ?
+			const RHIMappedBufferRange readRange = m_MemoryUsage == RHIMemoryUsage::GpuToCpu ?
 				RHIMappedBufferRange{ 0, m_CapacityInBytes } : RHIMappedBufferRange{};
-			m_MappedData = static_cast<std::byte*>(
-				m_Device->MapBuffer(m_Buffer.Get(), readRange));
+			m_MappedData = static_cast<std::byte*>(m_Device->MapBuffer(m_Buffer.Get(), readRange));
 		}
-		GGLAB_ASSERT_MSG(m_MappedData != nullptr, "DynamicBufferAllocator failed to map its RHI buffer.");
+		GGLAB_ASSERT_MSG(
+			m_MappedData != nullptr, "DynamicBufferAllocator failed to map its RHI buffer.");
 	}
 
 	DynamicBufferAllocator::~DynamicBufferAllocator() noexcept
@@ -56,15 +51,15 @@ namespace gglab
 		{
 			const RHIMappedBufferRange writtenRange =
 				m_MemoryUsage == RHIMemoryUsage::CpuToGpu ?
-				RHIMappedBufferRange{ 0, m_CapacityInBytes } : RHIMappedBufferRange{};
+				RHIMappedBufferRange{ 0, m_CapacityInBytes } :
+				RHIMappedBufferRange{};
 			m_Device->UnmapBuffer(m_Buffer.Get(), writtenRange);
 			m_MappedData = nullptr;
 		}
 	}
 
 	DynamicBufferAllocation DynamicBufferAllocator::Allocate(
-		uint32_t sizeInBytes,
-		uint32_t alignment) noexcept
+		uint32_t sizeInBytes, uint32_t alignment) noexcept
 	{
 		DynamicBufferAllocation result{};
 		if (!m_MappedData || !m_Buffer)
@@ -78,10 +73,7 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"DynamicBufferAllocator allocation failed (size={}, alignment={}, capacity={}, used={}).",
-				sizeInBytes,
-				effectiveAlignment,
-				m_CapacityInBytes,
-				m_Ring.GetCurrentUsage());
+				sizeInBytes, effectiveAlignment, m_CapacityInBytes, m_Ring.GetCurrentUsage());
 			return result;
 		}
 
@@ -92,9 +84,7 @@ namespace gglab
 	}
 
 	bool DynamicBufferAllocator::Write(
-		const DynamicBufferAllocation& allocation,
-		const void* data,
-		uint32_t sizeInBytes) noexcept
+		const DynamicBufferAllocation& allocation, const void* data, uint32_t sizeInBytes) noexcept
 	{
 		if (!allocation.IsValid() || !data || !m_MappedData ||
 			sizeInBytes > allocation.m_SizeInBytes ||
@@ -109,8 +99,7 @@ namespace gglab
 	}
 
 	void DynamicBufferAllocator::Retire(
-		DynamicBufferAllocation* allocation,
-		const RHIFencePoint& fencePoint) noexcept
+		DynamicBufferAllocation* allocation, const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!allocation || !allocation->IsValid())
 		{

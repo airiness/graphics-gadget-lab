@@ -39,7 +39,7 @@ namespace gglab
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept {}
 		virtual void OnExit() noexcept {}
-		virtual void Update()  noexcept = 0;
+		virtual void Update() noexcept = 0;
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 		{
 			GGLAB_UNUSED(feedback);

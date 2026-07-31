@@ -18,10 +18,11 @@ namespace gglab
 	}
 
 	DX12Fence::DX12Fence(DX12Device* device, uint64_t initValue) noexcept :
-		m_RHIHandle(AllocateRHIFenceHandle()),
-		m_NextRequestValue(initValue)
+		m_RHIHandle(AllocateRHIFenceHandle()), m_NextRequestValue(initValue)
 	{
-		GGLAB_HR_DX(device->Get()->CreateFence(m_CurrentValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_D3D12Fence)), device->Get());
+		GGLAB_HR_DX(device->Get()->CreateFence(
+			m_CurrentValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_D3D12Fence)),
+			device->Get());
 		m_EventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	}
 

@@ -14,10 +14,7 @@ namespace gglab
 		TextureID m_Id{};
 		uint64_t m_Generation = 0;
 
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_Id.IsValid() && m_Generation != 0;
-		}
+		[[nodiscard]] bool IsValid() const noexcept { return m_Id.IsValid() && m_Generation != 0; }
 
 		bool operator==(const TextureContentRef&) const noexcept = default;
 	};

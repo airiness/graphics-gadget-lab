@@ -33,9 +33,8 @@ namespace gglab
 
 		bool IsCompatible(const LabDescriptor& descriptor) const noexcept
 		{
-			return m_FormatVersion == CurrentFormatVersion &&
-				m_PresetId.IsValid() && m_LabId == descriptor.m_Id &&
-				m_LabSchemaVersion == descriptor.m_SchemaVersion;
+			return m_FormatVersion == CurrentFormatVersion && m_PresetId.IsValid() &&
+				m_LabId == descriptor.m_Id && m_LabSchemaVersion == descriptor.m_SchemaVersion;
 		}
 	};
 }

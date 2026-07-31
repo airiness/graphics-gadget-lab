@@ -7,6 +7,5 @@ namespace gglab
 	struct IBLDiagnosticsSnapshot;
 
 	[[nodiscard]] IBLDiagnosticsSnapshot BuildIBLDiagnosticsSnapshot(
-		const Renderer& renderer,
-		const EnvironmentAssetController* environmentAssets) noexcept;
+		const Renderer& renderer, const EnvironmentAssetController* environmentAssets) noexcept;
 }

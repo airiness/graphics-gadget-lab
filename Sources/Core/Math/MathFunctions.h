@@ -25,19 +25,17 @@ namespace gglab::math
 		return { vec3.m_X, vec3.m_Y, vec3.m_Z, a };
 	}
 
-	template<typename T>
-	concept HasLengthSquared = requires(const T & vec)
-	{
+	template <typename T>
+	concept HasLengthSquared = requires(const T & vec) {
 		{ vec.LengthSquared() } -> std::convertible_to<float>;
 	};
 
-	template<typename T>
-	concept HasNormalize = requires(T vec)
-	{
+	template <typename T>
+	concept HasNormalize = requires(T vec) {
 		{ vec.Normalize() };
 	};
 
-	template<typename T>
+	template <typename T>
 		requires HasLengthSquared<T>
 	constexpr bool IsZeroVector(const T& vec, float tolerance = 1e-6f) noexcept
 	{
@@ -45,7 +43,7 @@ namespace gglab::math
 		return lenSq <= tolerance * tolerance;
 	}
 
-	template<typename T>
+	template <typename T>
 		requires(HasLengthSquared<T>&& HasNormalize<T>)
 	constexpr T SafeNormalize(const T& vec, const T& fallback, float tolerance = 1e-6f) noexcept
 	{
@@ -76,18 +74,20 @@ namespace gglab::math
 
 	[[nodiscard]] inline bool IsFinite(const Vector4& value) noexcept
 	{
-		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z) && IsFinite(value.m_W);
+		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z) &&
+			IsFinite(value.m_W);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Color& value) noexcept
 	{
-		return IsFinite(value.m_R) && IsFinite(value.m_G) && IsFinite(value.m_B) && IsFinite(value.m_A);
+		return IsFinite(value.m_R) && IsFinite(value.m_G) && IsFinite(value.m_B) &&
+			IsFinite(value.m_A);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Quaternion& value) noexcept
 	{
-		return IsFinite(value.m_X) && IsFinite(value.m_Y) &&
-			IsFinite(value.m_Z) && IsFinite(value.m_W);
+		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z) &&
+			IsFinite(value.m_W);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Matrix& value) noexcept

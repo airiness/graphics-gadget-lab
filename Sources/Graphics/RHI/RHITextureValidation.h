@@ -58,9 +58,7 @@ namespace gglab
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureDesc(
 		const RHITextureDesc& desc) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureViewDesc(
-		const RHITextureDesc& textureDesc,
-		const RHITextureViewDesc& viewDesc) noexcept;
+		const RHITextureDesc& textureDesc, const RHITextureViewDesc& viewDesc) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureUploadData(
-		const RHITextureDesc& textureDesc,
-		const RHITextureUploadData& uploadData) noexcept;
+		const RHITextureDesc& textureDesc, const RHITextureUploadData& uploadData) noexcept;
 }

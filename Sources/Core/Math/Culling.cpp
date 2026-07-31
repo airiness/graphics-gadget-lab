@@ -39,14 +39,12 @@ namespace gglab::math
 		return plane.m_Normal.Dot(point) + plane.m_Distance;
 	}
 
-	bool TryHomogeneousDivide(
-		const Vector4& value,
-		Vector3& result,
-		float tolerance) noexcept
+	bool TryHomogeneousDivide(const Vector4& value, Vector3& result, float tolerance) noexcept
 	{
 		result = Vector3::Zero;
-		if (!IsFinite(value) || !std::isfinite(tolerance) ||
-			tolerance < 0.0f || std::abs(value.m_W) <= tolerance)
+		if (!IsFinite(value) ||
+			!std::isfinite(tolerance) || tolerance < 0.0f ||
+			std::abs(value.m_W) <= tolerance)
 		{
 			return false;
 		}
@@ -65,18 +63,21 @@ namespace gglab::math
 		const Matrix& inverseViewProjection) noexcept
 	{
 		constexpr std::array<Vector4, 8> clipCorners = {
-			Vector4(-1.0f, 1.0f, 0.0f, 1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f),
-			Vector4(1.0f, -1.0f, 0.0f, 1.0f), Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
-			Vector4(-1.0f, 1.0f, 1.0f, 1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-			Vector4(1.0f, -1.0f, 1.0f, 1.0f), Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
+			Vector4(-1.0f, 1.0f, 0.0f, 1.0f),
+			Vector4(1.0f, 1.0f, 0.0f, 1.0f),
+			Vector4(1.0f, -1.0f, 0.0f, 1.0f),
+			Vector4(-1.0f, -1.0f, 0.0f, 1.0f),
+			Vector4(-1.0f, 1.0f, 1.0f, 1.0f),
+			Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+			Vector4(1.0f, -1.0f, 1.0f, 1.0f),
+			Vector4(-1.0f, -1.0f, 1.0f, 1.0f),
 		};
 
 		std::array<Vector3, 8> corners{};
 		for (size_t index = 0; index < clipCorners.size(); ++index)
 		{
 			GGLAB_UNUSED(TryHomogeneousDivide(
-				Transform(clipCorners[index], inverseViewProjection),
-				corners[index]));
+				Transform(clipCorners[index], inverseViewProjection), corners[index]));
 		}
 		return corners;
 	}
@@ -90,35 +91,22 @@ namespace gglab::math
 		}
 
 		// Row-vector extraction for D3D clip space: -w <= x,y <= w and 0 <= z <= w.
-		frustum[FrustumPlane::Left] = MakePlane(
-			viewProjection.m_14 + viewProjection.m_11,
-			viewProjection.m_24 + viewProjection.m_21,
-			viewProjection.m_34 + viewProjection.m_31,
+		frustum[FrustumPlane::Left] = MakePlane(viewProjection.m_14 + viewProjection.m_11,
+			viewProjection.m_24 + viewProjection.m_21, viewProjection.m_34 + viewProjection.m_31,
 			viewProjection.m_44 + viewProjection.m_41);
-		frustum[FrustumPlane::Right] = MakePlane(
-			viewProjection.m_14 - viewProjection.m_11,
-			viewProjection.m_24 - viewProjection.m_21,
-			viewProjection.m_34 - viewProjection.m_31,
+		frustum[FrustumPlane::Right] = MakePlane(viewProjection.m_14 - viewProjection.m_11,
+			viewProjection.m_24 - viewProjection.m_21, viewProjection.m_34 - viewProjection.m_31,
 			viewProjection.m_44 - viewProjection.m_41);
-		frustum[FrustumPlane::Bottom] = MakePlane(
-			viewProjection.m_14 + viewProjection.m_12,
-			viewProjection.m_24 + viewProjection.m_22,
-			viewProjection.m_34 + viewProjection.m_32,
+		frustum[FrustumPlane::Bottom] = MakePlane(viewProjection.m_14 + viewProjection.m_12,
+			viewProjection.m_24 + viewProjection.m_22, viewProjection.m_34 + viewProjection.m_32,
 			viewProjection.m_44 + viewProjection.m_42);
-		frustum[FrustumPlane::Top] = MakePlane(
-			viewProjection.m_14 - viewProjection.m_12,
-			viewProjection.m_24 - viewProjection.m_22,
-			viewProjection.m_34 - viewProjection.m_32,
+		frustum[FrustumPlane::Top] = MakePlane(viewProjection.m_14 - viewProjection.m_12,
+			viewProjection.m_24 - viewProjection.m_22, viewProjection.m_34 - viewProjection.m_32,
 			viewProjection.m_44 - viewProjection.m_42);
 		frustum[FrustumPlane::Near] = MakePlane(
-			viewProjection.m_13,
-			viewProjection.m_23,
-			viewProjection.m_33,
-			viewProjection.m_43);
-		frustum[FrustumPlane::Far] = MakePlane(
-			viewProjection.m_14 - viewProjection.m_13,
-			viewProjection.m_24 - viewProjection.m_23,
-			viewProjection.m_34 - viewProjection.m_33,
+			viewProjection.m_13, viewProjection.m_23, viewProjection.m_33, viewProjection.m_43);
+		frustum[FrustumPlane::Far] = MakePlane(viewProjection.m_14 - viewProjection.m_13,
+			viewProjection.m_24 - viewProjection.m_23, viewProjection.m_34 - viewProjection.m_33,
 			viewProjection.m_44 - viewProjection.m_43);
 
 		return frustum;
@@ -127,8 +115,8 @@ namespace gglab::math
 	bool Intersects(const Plane& plane, const Sphere& sphere) noexcept
 	{
 		if (!IsFinite(plane.m_Normal) || !IsFinite(plane.m_Distance) ||
-			!IsFinite(sphere.m_Center) || !std::isfinite(sphere.m_Radius) ||
-			sphere.m_Radius < 0.0f)
+			!IsFinite(sphere.m_Center) ||
+			!std::isfinite(sphere.m_Radius) || sphere.m_Radius < 0.0f)
 		{
 			return true;
 		}
@@ -143,13 +131,9 @@ namespace gglab::math
 			return true;
 		}
 
-		const Vector3 extents(
-			std::abs(aabb.m_Extents.m_X),
-			std::abs(aabb.m_Extents.m_Y),
+		const Vector3 extents(std::abs(aabb.m_Extents.m_X), std::abs(aabb.m_Extents.m_Y),
 			std::abs(aabb.m_Extents.m_Z));
-		const Vector3 absNormal(
-			std::abs(plane.m_Normal.m_X),
-			std::abs(plane.m_Normal.m_Y),
+		const Vector3 absNormal(std::abs(plane.m_Normal.m_X), std::abs(plane.m_Normal.m_Y),
 			std::abs(plane.m_Normal.m_Z));
 		const float radius = extents.Dot(absNormal);
 		return SignedDistance(plane, aabb.m_Center) >= -radius;

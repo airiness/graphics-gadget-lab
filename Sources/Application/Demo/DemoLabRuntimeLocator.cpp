@@ -7,11 +7,10 @@
 namespace gglab
 {
 	DemoLabRuntimeLocator::DemoLabRuntimeLocator(
-		DemoManager* demoManager,
-		uint32_t labHostIndex) noexcept :
-		m_DemoManager(demoManager),
-		m_LabHostIndex(labHostIndex)
-	{}
+		DemoManager* demoManager, uint32_t labHostIndex) noexcept :
+		m_DemoManager(demoManager), m_LabHostIndex(labHostIndex)
+	{
+	}
 
 	LabRuntime* DemoLabRuntimeLocator::GetLabRuntimeIfCreated() noexcept
 	{

@@ -98,28 +98,25 @@ namespace gglab
 
 		LoadingProgressBuilder progress;
 		progress.AddCompletedStep(0.05f);
-		const float modelWeight = m_PendingModels.empty() ? 0.0f :
-			0.95f / static_cast<float>(m_PendingModels.size());
+		const float modelWeight =
+			m_PendingModels.empty() ? 0.0f : 0.95f / static_cast<float>(m_PendingModels.size());
 		for (const PendingModel& pending : m_PendingModels)
 		{
 			const Model* model = m_Services.m_AssetManager->GetModel(pending.m_ModelId);
 			if (!model)
 			{
-				progress.AddStep(modelWeight, {
-					.m_Status = LoadingStatus::Failed,
-					.m_Fraction = 0.0f,
-					.m_Stage = "Model request unavailable",
-					.m_Detail = pending.m_Path.generic_string(),
-				});
+				progress.AddStep(modelWeight,
+					{
+						.m_Status = LoadingStatus::Failed,
+						.m_Fraction = 0.0f,
+						.m_Stage = "Model request unavailable",
+						.m_Detail = pending.m_Path.generic_string(),
+					});
 				continue;
 			}
 
-			progress.AddAssetStep(
-				modelWeight,
-				GetAssetLoadProgress(
-					model->m_State,
-					AssetLoadKind::Model,
-					model->m_LoadProgress),
+			progress.AddAssetStep(modelWeight,
+				GetAssetLoadProgress(model->m_State, AssetLoadKind::Model, model->m_LoadProgress),
 				pending.m_Path.generic_string());
 		}
 
@@ -139,7 +136,8 @@ namespace gglab
 
 	void DemoPlayground::CommitPrepare() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(), "DemoPlayground committed before preparation completed.");
+		GGLAB_ASSERT_MSG(
+			m_LoadingProgress.IsReady(), "DemoPlayground committed before preparation completed.");
 		CommitScene();
 		m_PendingModels.clear();
 	}
@@ -202,8 +200,7 @@ namespace gglab
 			components::TransformComponent transformComp{};
 			transformComp.m_Position = pending.m_Position;
 			transformComp.m_Rotation = math::CreateFromYawPitchRoll(
-				math::ToRadians(pending.m_Rotation.m_Y),
-				math::ToRadians(pending.m_Rotation.m_X),
+				math::ToRadians(pending.m_Rotation.m_Y), math::ToRadians(pending.m_Rotation.m_X),
 				math::ToRadians(pending.m_Rotation.m_Z));
 			transformComp.m_Scale = pending.m_Scale;
 			registry.emplace<components::TransformComponent>(entity, transformComp);

@@ -17,13 +17,20 @@ namespace gglab
 		{
 			switch (tap)
 			{
-			case PostProcessDebugTap::SceneColor: return "Scene Color";
-			case PostProcessDebugTap::BloomPrefilter: return "Bloom Prefilter";
-			case PostProcessDebugTap::BloomPyramid: return "Bloom Pyramid";
-			case PostProcessDebugTap::BloomResult: return "Bloom Result";
-			case PostProcessDebugTap::SceneDepthRaw: return "Scene Depth / Raw";
-			case PostProcessDebugTap::SceneDepthLinearViewZ: return "Scene Depth / Linear View Z";
-			default: return "Unknown";
+			case PostProcessDebugTap::SceneColor:
+				return "Scene Color";
+			case PostProcessDebugTap::BloomPrefilter:
+				return "Bloom Prefilter";
+			case PostProcessDebugTap::BloomPyramid:
+				return "Bloom Pyramid";
+			case PostProcessDebugTap::BloomResult:
+				return "Bloom Result";
+			case PostProcessDebugTap::SceneDepthRaw:
+				return "Scene Depth / Raw";
+			case PostProcessDebugTap::SceneDepthLinearViewZ:
+				return "Scene Depth / Linear View Z";
+			default:
+				return "Unknown";
 			}
 		}
 
@@ -69,8 +76,9 @@ namespace gglab
 			case PostProcessDebugTap::BloomPrefilter:
 				return &snapshot.m_BloomPrefilter;
 			case PostProcessDebugTap::BloomPyramid:
-				return selection.m_BloomPyramidLevel < snapshot.m_BloomLevelCount ?
-					&snapshot.m_BloomPyramid[selection.m_BloomPyramidLevel] : nullptr;
+				return selection.m_BloomPyramidLevel < snapshot.m_BloomLevelCount
+					? &snapshot.m_BloomPyramid[selection.m_BloomPyramidLevel]
+					: nullptr;
 			case PostProcessDebugTap::BloomResult:
 				return &snapshot.m_BloomResult;
 			default:
@@ -79,8 +87,7 @@ namespace gglab
 		}
 
 		void DrawTextureRow(
-			const char* label,
-			const PostProcessTextureDiagnostics& texture) noexcept
+			const char* label, const PostProcessTextureDiagnostics& texture) noexcept
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
@@ -95,8 +102,8 @@ namespace gglab
 				ImGui::TextDisabled("Unavailable");
 			}
 			ImGui::TableSetColumnIndex(2);
-			ImGui::TextUnformatted(texture.m_Available ?
-				GetRHIFormatInfo(texture.m_Format).m_Name : "-");
+			ImGui::TextUnformatted(
+				texture.m_Available ? GetRHIFormatInfo(texture.m_Format).m_Name : "-");
 			ImGui::TableSetColumnIndex(3);
 			ImGui::Text("%.1f KiB", static_cast<double>(texture.m_LogicalBytes) / 1024.0);
 		}
@@ -129,8 +136,9 @@ namespace gglab
 		bool selectionChanged = DrawTapCombo(selection.m_Tap);
 		if (selection.m_Tap == PostProcessDebugTap::BloomPyramid)
 		{
-			const int maxLevel = snapshot->m_BloomLevelCount > 0 ?
-				static_cast<int>(snapshot->m_BloomLevelCount - 1u) : 0;
+			const int maxLevel = snapshot->m_BloomLevelCount > 0
+				? static_cast<int>(snapshot->m_BloomLevelCount - 1u)
+				: 0;
 			const uint32_t clampedLevel = static_cast<uint32_t>(
 				std::clamp(static_cast<int>(selection.m_BloomPyramidLevel), 0, maxLevel));
 			if (selection.m_BloomPyramidLevel != clampedLevel)
@@ -162,29 +170,24 @@ namespace gglab
 
 		registry->RequestPostProcessPreview();
 		const auto* selectedTexture = ResolveSelectedTexture(*snapshot, selection);
-		const bool depthSelection =
-			selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
+		const bool depthSelection = selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
 			selection.m_Tap == PostProcessDebugTap::SceneDepthLinearViewZ;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
-			ImGui::TextDisabled(
-				"Source: %u x %u, %s resource, %s SRV",
-				snapshot->m_SceneDepth.m_Width,
-				snapshot->m_SceneDepth.m_Height,
+			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
+				snapshot->m_SceneDepth.m_Width, snapshot->m_SceneDepth.m_Height,
 				GetRHIFormatInfo(snapshot->m_SceneDepth.m_ResourceFormat).m_Name,
 				GetRHIFormatInfo(snapshot->m_SceneDepth.m_SrvFormat).m_Name);
 		}
 		else if (!selectedTexture || !selectedTexture->m_Available)
 		{
-			ImGui::TextDisabled("The selected tap is unavailable in the current pipeline configuration.");
+			ImGui::TextDisabled(
+				"The selected tap is unavailable in the current pipeline configuration.");
 		}
 		else
 		{
-			ImGui::TextDisabled(
-				"Source: %u x %u, %s, pre-exposure %.3f",
-				selectedTexture->m_Width,
-				selectedTexture->m_Height,
-				GetRHIFormatInfo(selectedTexture->m_Format).m_Name,
+			ImGui::TextDisabled("Source: %u x %u, %s, pre-exposure %.3f", selectedTexture->m_Width,
+				selectedTexture->m_Height, GetRHIFormatInfo(selectedTexture->m_Format).m_Name,
 				selectedTexture->m_PreExposure);
 		}
 
@@ -197,9 +200,9 @@ namespace gglab
 			{
 				ImGui::TextDisabled("Preview update pending...");
 			}
-			const ImTextureID textureId = devtools::ResolveImGuiTextureId(
-				context.m_DevelopGuiSystem,
-				registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess));
+			const ImTextureID textureId =
+				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
+					registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess));
 			if (textureId)
 			{
 				const float availableWidth = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
@@ -224,17 +227,13 @@ namespace gglab
 			else
 			{
 				ImGui::Text("Extent: %u x %u", depth.m_Width, depth.m_Height);
-				ImGui::Text(
-					"Resource / DSV / SRV: %s / %s / %s",
+				ImGui::Text("Resource / DSV / SRV: %s / %s / %s",
 					GetRHIFormatInfo(depth.m_ResourceFormat).m_Name,
 					GetRHIFormatInfo(depth.m_DsvFormat).m_Name,
 					GetRHIFormatInfo(depth.m_SrvFormat).m_Name);
-				ImGui::Text(
-					"Clear: %.3f (%s) | Convention: %s",
-					depth.m_ClearDepth,
+				ImGui::Text("Clear: %.3f (%s) | Convention: %s", depth.m_ClearDepth,
 					depth.m_HasTypedClear ? "typed" : "none",
-					depth.m_Convention == DepthConvention::Reversed ?
-						"Reversed-Z" : "Standard-Z");
+					depth.m_Convention == DepthConvention::Reversed ? "Reversed-Z" : "Standard-Z");
 				ImGui::TextDisabled(
 					"Filter DisplayView.DepthBuffer in RenderGraph Inspector to inspect its access chain.");
 			}
@@ -242,12 +241,9 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("Bloom Resources", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::Text("Levels: %u | Logical footprint: %.1f KiB",
-				snapshot->m_BloomLevelCount,
+			ImGui::Text("Levels: %u | Logical footprint: %.1f KiB", snapshot->m_BloomLevelCount,
 				static_cast<double>(snapshot->m_BloomLogicalBytes) / 1024.0);
-			if (ImGui::BeginTable(
-				"PostProcessBloomResources",
-				4,
+			if (ImGui::BeginTable("PostProcessBloomResources", 4,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 			{
 				ImGui::TableSetupColumn("Resource");
@@ -290,13 +286,10 @@ namespace gglab
 			else
 			{
 				ImGui::Text("Post Process: %.3f ms | Bloom: %.3f ms | Frame %llu",
-					snapshot->m_PostProcessGpuMilliseconds,
-					snapshot->m_BloomGpuMilliseconds,
+					snapshot->m_PostProcessGpuMilliseconds, snapshot->m_BloomGpuMilliseconds,
 					static_cast<unsigned long long>(snapshot->m_GpuFrameIndex));
 				if (ImGui::BeginTable(
-					"PostProcessGpuPasses",
-					3,
-					ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+					"PostProcessGpuPasses", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 				{
 					ImGui::TableSetupColumn("Pass");
 					ImGui::TableSetupColumn("GPU ms");

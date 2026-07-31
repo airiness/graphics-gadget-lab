@@ -117,8 +117,7 @@ namespace gglab
 		IBLPreviewDiagnostics m_PrefilteredSpecularPreview;
 	};
 
-	template<>
-	struct SnapshotTraits<IBLDiagnosticsSnapshot>
+	template <> struct SnapshotTraits<IBLDiagnosticsSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.IBLDiagnosticsSnapshot");
 	};

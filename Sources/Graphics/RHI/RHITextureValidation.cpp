@@ -11,13 +11,9 @@ namespace gglab
 	namespace
 	{
 		constexpr RHITextureUsage KnownTextureUsages =
-			RHITextureUsage::Sampled |
-			RHITextureUsage::RenderTarget |
-			RHITextureUsage::DepthStencil |
-			RHITextureUsage::UnorderedAccess |
-			RHITextureUsage::CopySource |
-			RHITextureUsage::CopyDest |
-			RHITextureUsage::Present;
+			RHITextureUsage::Sampled | RHITextureUsage::RenderTarget |
+			RHITextureUsage::DepthStencil | RHITextureUsage::UnorderedAccess |
+			RHITextureUsage::CopySource | RHITextureUsage::CopyDest | RHITextureUsage::Present;
 
 		[[nodiscard]] constexpr RHITextureValidationResult Error(
 			RHITextureValidationError error) noexcept
@@ -26,8 +22,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] constexpr bool IsDimensionCompatible(
-			RHITextureDimension textureDimension,
-			RHITextureViewDimension viewDimension) noexcept
+			RHITextureDimension textureDimension, RHITextureViewDimension viewDimension) noexcept
 		{
 			if (viewDimension == RHITextureViewDimension::Unknown)
 			{
@@ -50,8 +45,7 @@ namespace gglab
 			return false;
 		}
 
-		[[nodiscard]] constexpr RHITextureUsage RequiredUsage(
-			RHITextureViewType viewType) noexcept
+		[[nodiscard]] constexpr RHITextureUsage RequiredUsage(RHITextureViewType viewType) noexcept
 		{
 			switch (viewType)
 			{
@@ -72,23 +66,40 @@ namespace gglab
 	{
 		switch (error)
 		{
-		case RHITextureValidationError::None: return "none";
-		case RHITextureValidationError::InvalidFormat: return "invalid texture format";
-		case RHITextureValidationError::InvalidUsage: return "invalid texture usage";
-		case RHITextureValidationError::InvalidExtent: return "invalid texture extent";
-		case RHITextureValidationError::InvalidArraySize: return "invalid texture array size";
-		case RHITextureValidationError::InvalidMipLevelCount: return "invalid texture mip-level count";
-		case RHITextureValidationError::InvalidSampleCount: return "invalid texture sample count";
-		case RHITextureValidationError::InvalidDimension: return "invalid texture dimension";
-		case RHITextureValidationError::InvalidClearValue: return "invalid texture clear value";
-		case RHITextureValidationError::IncompatibleViewFormat: return "incompatible texture view format";
-		case RHITextureValidationError::IncompatibleViewDimension: return "incompatible texture view dimension";
-		case RHITextureValidationError::InvalidSubresourceRange: return "invalid texture subresource range";
-		case RHITextureValidationError::UnsupportedUploadFormat: return "unsupported texture upload format";
-		case RHITextureValidationError::InvalidUploadSubresourceCount: return "invalid texture upload subresource count";
-		case RHITextureValidationError::InvalidUploadSubresourceData: return "invalid texture upload subresource data";
-		case RHITextureValidationError::InvalidUploadRowPitch: return "invalid texture upload row pitch";
-		case RHITextureValidationError::InvalidUploadSlicePitch: return "invalid texture upload slice pitch";
+		case RHITextureValidationError::None:
+			return "none";
+		case RHITextureValidationError::InvalidFormat:
+			return "invalid texture format";
+		case RHITextureValidationError::InvalidUsage:
+			return "invalid texture usage";
+		case RHITextureValidationError::InvalidExtent:
+			return "invalid texture extent";
+		case RHITextureValidationError::InvalidArraySize:
+			return "invalid texture array size";
+		case RHITextureValidationError::InvalidMipLevelCount:
+			return "invalid texture mip-level count";
+		case RHITextureValidationError::InvalidSampleCount:
+			return "invalid texture sample count";
+		case RHITextureValidationError::InvalidDimension:
+			return "invalid texture dimension";
+		case RHITextureValidationError::InvalidClearValue:
+			return "invalid texture clear value";
+		case RHITextureValidationError::IncompatibleViewFormat:
+			return "incompatible texture view format";
+		case RHITextureValidationError::IncompatibleViewDimension:
+			return "incompatible texture view dimension";
+		case RHITextureValidationError::InvalidSubresourceRange:
+			return "invalid texture subresource range";
+		case RHITextureValidationError::UnsupportedUploadFormat:
+			return "unsupported texture upload format";
+		case RHITextureValidationError::InvalidUploadSubresourceCount:
+			return "invalid texture upload subresource count";
+		case RHITextureValidationError::InvalidUploadSubresourceData:
+			return "invalid texture upload subresource data";
+		case RHITextureValidationError::InvalidUploadRowPitch:
+			return "invalid texture upload row pitch";
+		case RHITextureValidationError::InvalidUploadSlicePitch:
+			return "invalid texture upload slice pitch";
 		}
 		return "unknown texture validation error";
 	}
@@ -148,8 +159,8 @@ namespace gglab
 			{
 				return Error(RHITextureValidationError::InvalidArraySize);
 			}
-			largestMipDimension = std::max({
-				desc.m_Extent.m_Width, desc.m_Extent.m_Height, desc.m_Extent.m_Depth });
+			largestMipDimension =
+				std::max({ desc.m_Extent.m_Width, desc.m_Extent.m_Height, desc.m_Extent.m_Depth });
 			break;
 		default:
 			return Error(RHITextureValidationError::InvalidDimension);
@@ -196,16 +207,15 @@ namespace gglab
 	}
 
 	RHITextureValidationResult ValidateRHITextureViewDesc(
-		const RHITextureDesc& textureDesc,
-		const RHITextureViewDesc& viewDesc) noexcept
+		const RHITextureDesc& textureDesc, const RHITextureViewDesc& viewDesc) noexcept
 	{
 		if (const auto result = ValidateRHITextureDesc(textureDesc); !result.IsValid())
 		{
 			return result;
 		}
 
-		const RHIFormat viewFormat = viewDesc.m_Format == RHIFormat::Unknown ?
-			textureDesc.m_Format : viewDesc.m_Format;
+		const RHIFormat viewFormat =
+			viewDesc.m_Format == RHIFormat::Unknown ? textureDesc.m_Format : viewDesc.m_Format;
 		const RHIFormatInfo& viewFormatInfo = GetRHIFormatInfo(viewFormat);
 		if (viewFormatInfo.m_Format == RHIFormat::Unknown || viewFormatInfo.m_IsTypeless ||
 			!AreRHIFormatsInSameFamily(textureDesc.m_Format, viewFormat))
@@ -227,8 +237,8 @@ namespace gglab
 			return Error(RHITextureValidationError::IncompatibleViewDimension);
 		}
 
-		const RHISubresourceRange range = NormalizeTextureSubresourceRange(
-			textureDesc, viewDesc.m_Subresources);
+		const RHISubresourceRange range =
+			NormalizeTextureSubresourceRange(textureDesc, viewDesc.m_Subresources);
 		if (range.m_MipCount == 0 || range.m_ArraySliceCount == 0 ||
 			range.m_Aspects == RHITextureAspect::None)
 		{
@@ -261,8 +271,7 @@ namespace gglab
 	}
 
 	RHITextureValidationResult ValidateRHITextureUploadData(
-		const RHITextureDesc& textureDesc,
-		const RHITextureUploadData& uploadData) noexcept
+		const RHITextureDesc& textureDesc, const RHITextureUploadData& uploadData) noexcept
 	{
 		if (const auto result = ValidateRHITextureDesc(textureDesc); !result.IsValid())
 		{
@@ -282,16 +291,23 @@ namespace gglab
 			return Error(RHITextureValidationError::InvalidUploadSubresourceCount);
 		}
 
-		for (size_t subresourceIndex = 0; subresourceIndex < expectedSubresourceCount; ++subresourceIndex)
+		for (size_t subresourceIndex = 0; subresourceIndex < expectedSubresourceCount;
+			++subresourceIndex)
 		{
-			const uint32_t mipLevel = static_cast<uint32_t>(subresourceIndex % textureDesc.m_MipLevels);
+			const uint32_t mipLevel =
+				static_cast<uint32_t>(subresourceIndex % textureDesc.m_MipLevels);
 			const uint64_t width = std::max<uint32_t>(1, textureDesc.m_Extent.m_Width >> mipLevel);
-			const uint64_t height = textureDesc.m_Dimension == RHITextureDimension::Texture1D ? 1 :
-				std::max<uint32_t>(1, textureDesc.m_Extent.m_Height >> mipLevel);
-			const uint64_t blockColumns = (width + formatInfo.m_BlockWidth - 1) / formatInfo.m_BlockWidth;
-			const uint64_t blockRows = (height + formatInfo.m_BlockHeight - 1) / formatInfo.m_BlockHeight;
+			const uint64_t height =
+				textureDesc.m_Dimension == RHITextureDimension::Texture1D
+				? 1
+				: std::max<uint32_t>(1, textureDesc.m_Extent.m_Height >> mipLevel);
+			const uint64_t blockColumns =
+				(width + formatInfo.m_BlockWidth - 1) / formatInfo.m_BlockWidth;
+			const uint64_t blockRows =
+				(height + formatInfo.m_BlockHeight - 1) / formatInfo.m_BlockHeight;
 			const uint64_t minimumRowPitch = blockColumns * formatInfo.m_BytesPerBlock;
-			const RHITextureSubresourceData& subresource = uploadData.m_Subresources[subresourceIndex];
+			const RHITextureSubresourceData& subresource =
+				uploadData.m_Subresources[subresourceIndex];
 
 			if (!subresource.m_Data)
 			{
@@ -304,7 +320,8 @@ namespace gglab
 			}
 			if (blockRows > std::numeric_limits<uint64_t>::max() / subresource.m_RowPitch ||
 				subresource.m_SlicePitch < subresource.m_RowPitch * blockRows ||
-				subresource.m_SlicePitch > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
+				subresource.m_SlicePitch >
+				static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
 			{
 				return Error(RHITextureValidationError::InvalidUploadSlicePitch);
 			}

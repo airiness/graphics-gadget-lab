@@ -27,7 +27,10 @@ namespace gglab
 		const DX12DescriptorRange& Range() const noexcept { return m_Range; }
 
 		D3D12_DESCRIPTOR_HEAP_TYPE HeapType() const noexcept { return m_Type; }
-		bool IsShaderVisible() const noexcept { return (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) != 0; }
+		bool IsShaderVisible() const noexcept
+		{
+			return (m_Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) != 0;
+		}
 		uint32_t IncrementSize() const noexcept { return m_IncrementSize; }
 
 		bool ContainsGlobalIndex(uint32_t globalIndex) const noexcept;
@@ -48,10 +51,11 @@ namespace gglab
 		DX12DescriptorView ViewAtGlobalIndex(uint32_t globalIndex) const noexcept;
 
 	protected:
-		DX12DescriptorHandle CreateHandleFromGlobalSpan(const DX12DescriptorSpan& globalSpan, uint32_t generation) noexcept;
+		DX12DescriptorHandle CreateHandleFromGlobalSpan(
+			const DX12DescriptorSpan& globalSpan, uint32_t generation) noexcept;
 
 		virtual void FreeHandleInternal(DX12DescriptorHandle& descriptorHandle) noexcept = 0;
-		virtual void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle, 
+		virtual void RetireHandleInternal(const DX12DescriptorHandle& descriptorHandle,
 			const DX12FencePoint& fencePoint) noexcept = 0;
 
 	protected:

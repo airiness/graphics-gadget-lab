@@ -34,10 +34,9 @@ namespace gglab
 		float m_ElapsedSeconds = 0.0f;
 		uint64_t m_PreviousIBLGeneration = 0;
 		uint64_t m_DerivedDataHitCountBaseline = 0;
-		std::array<DerivedDataKey,
-			static_cast<size_t>(IBLArtifactStage::Count)> m_IBLKeys{};
-		std::array<ArtifactContentDigest,
-			static_cast<size_t>(IBLArtifactStage::Count)> m_IBLArtifactDigests{};
+		std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> m_IBLKeys{};
+		std::array<ArtifactContentDigest, static_cast<size_t>(IBLArtifactStage::Count)>
+			m_IBLArtifactDigests{};
 		IBLQualityPreset m_OriginalQualityPreset = IBLQualityPreset::Medium;
 		uint32_t m_OriginalSpecularSampleCount = 0;
 		uint32_t m_CpuPartialSpecularSampleCount = 0;
@@ -49,11 +48,9 @@ namespace gglab
 
 	EnvironmentAssetLabSession::EnvironmentAssetLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
-	{}
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+	{
+	}
 
 	void EnvironmentAssetLabSession::OnEnter() noexcept
 	{
@@ -64,25 +61,25 @@ namespace gglab
 		// recoverable derived data, so start this cache-focused Lab from a clean set.
 		scheduler->ClearArtifactCache();
 		GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
-		const auto& settings = m_Services.m_Renderer->
-			GetEnvironmentLightingSystem()->GetSettings();
+		const auto& settings = m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetSettings();
 		m_State->m_OriginalQualityPreset = settings.m_QualityPreset;
 		m_State->m_OriginalSpecularSampleCount =
 			settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-		m_State->m_CpuPartialSpecularSampleCount =
-			m_State->m_OriginalSpecularSampleCount < 4096 ?
-				m_State->m_OriginalSpecularSampleCount + 1 : 4095;
+		m_State->m_CpuPartialSpecularSampleCount = m_State->m_OriginalSpecularSampleCount < 4096
+			? m_State->m_OriginalSpecularSampleCount + 1
+			: 4095;
 		m_State->m_DdcPartialSpecularSampleCount =
-			m_State->m_CpuPartialSpecularSampleCount < 4096 ?
-				m_State->m_CpuPartialSpecularSampleCount + 1 : 4094;
+			m_State->m_CpuPartialSpecularSampleCount < 4096
+			? m_State->m_CpuPartialSpecularSampleCount + 1
+			: 4094;
 	}
 
 	void EnvironmentAssetLabSession::OnExit() noexcept
 	{
 		if (m_State)
 		{
-			EnvironmentLightingSystem* environment = m_Services.m_Renderer->
-				GetEnvironmentLightingSystem();
+			EnvironmentLightingSystem* environment =
+				m_Services.m_Renderer->GetEnvironmentLightingSystem();
 			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
 			{
 				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
@@ -122,8 +119,7 @@ namespace gglab
 			return;
 		}
 
-		EnvironmentAssetController& controller =
-			*m_Services.m_EnvironmentAssetController;
+		EnvironmentAssetController& controller = *m_Services.m_EnvironmentAssetController;
 		const auto entries = controller.GetEntries();
 		switch (m_State->m_Phase)
 		{
@@ -143,8 +139,7 @@ namespace gglab
 			const size_t first = (activeIndex + 1) % entries.size();
 			const size_t second = (activeIndex + 2) % entries.size();
 			const size_t third = (activeIndex + 3) % entries.size();
-			if (!controller.SelectEnvironment(first) ||
-				!controller.SelectEnvironment(second) ||
+			if (!controller.SelectEnvironment(first) || !controller.SelectEnvironment(second) ||
 				!controller.SelectEnvironment(third))
 			{
 				Fail("Rapid A-to-B-to-C selection was rejected.");
@@ -196,7 +191,7 @@ namespace gglab
 			const auto entriesAfterFailure = controller.GetEntries();
 			if (controller.GetActiveEnvironmentIndex() != m_State->m_ExpectedActiveIndex ||
 				controller.GetPendingEnvironmentIndex() !=
-					EnvironmentAssetController::InvalidEntryIndex ||
+				EnvironmentAssetController::InvalidEntryIndex ||
 				controller.GetSelectionSerial() <= serialBeforeImmediateFailure ||
 				entriesAfterFailure.empty() ||
 				entriesAfterFailure.back().m_State != EnvironmentAssetEntryState::Failed)
@@ -233,8 +228,7 @@ namespace gglab
 				return;
 			}
 			if (!controller.SelectEnvironmentFile(
-				"Shaders/Passes/PassForwardPBR.hlsl",
-				"Decode Failure Probe"))
+				"Shaders/Passes/PassForwardPBR.hlsl", "Decode Failure Probe"))
 			{
 				Fail("Decode-failure probe was rejected before asynchronous loading.");
 				return;
@@ -263,8 +257,7 @@ namespace gglab
 				return;
 			}
 			if (!controller.SelectEnvironmentFile(
-				"Assets/Textures/UVTest1K.png",
-				"Invalid Shape Probe"))
+				"Assets/Textures/UVTest1K.png", "Invalid Shape Probe"))
 			{
 				Fail("Invalid-shape probe was rejected before loading.");
 				return;
@@ -288,15 +281,15 @@ namespace gglab
 			}
 			if (m_State->m_ProbeEntryIndex >= entries.size() ||
 				entries[m_State->m_ProbeEntryIndex].m_State !=
-					EnvironmentAssetEntryState::InvalidShape)
+				EnvironmentAssetEntryState::InvalidShape)
 			{
 				Fail("The non-2:1 candidate did not end in InvalidShape state.");
 				return;
 			}
 
 			controller.Reset();
-			const EnvironmentTextureSource& source = m_Services.m_Renderer->
-				GetEnvironmentLightingSystem()->GetBakeSource();
+			const EnvironmentTextureSource& source =
+				m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetBakeSource();
 			if (controller.GetActiveEnvironment() ||
 				source.m_Type != EnvironmentTextureSourceType::Cubemap ||
 				!IsReservedTextureId(source.m_Content.m_Id))
@@ -321,8 +314,8 @@ namespace gglab
 				break;
 			}
 			if (!controller.GetActiveEnvironment() ||
-				m_Services.m_Renderer->GetEnvironmentLightingSystem()->
-					GetBakeSource().m_Type != EnvironmentTextureSourceType::Equirectangular)
+				m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetBakeSource().m_Type !=
+				EnvironmentTextureSourceType::Equirectangular)
 			{
 				Fail("Environment reselection did not replace the fallback.");
 				return;
@@ -333,8 +326,7 @@ namespace gglab
 
 		case State::Phase::WaitForInitialStageSet:
 		{
-			IBLBakeScheduler& scheduler =
-				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
 			const IBLBakeStatus& status = scheduler.GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
@@ -349,8 +341,7 @@ namespace gglab
 			}
 			const auto cpuCache = scheduler.GetArtifactCacheStatistics();
 			const auto ddc = scheduler.GetDerivedDataStoreStatistics();
-			const bool validArtifacts = std::ranges::all_of(
-				status.m_Artifacts,
+			const bool validArtifacts = std::ranges::all_of(status.m_Artifacts,
 				[](const IBLStageArtifactStatus& artifact) noexcept
 				{
 					return artifact.m_DerivedDataKey.IsValid() &&
@@ -376,8 +367,7 @@ namespace gglab
 
 		case State::Phase::WaitForCpuCacheHit:
 		{
-			IBLBakeScheduler& scheduler =
-				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
 			const IBLBakeStatus& status = scheduler.GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
@@ -389,20 +379,22 @@ namespace gglab
 			{
 				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("The CPU cache reload replaced the active IBL stage set before publication.");
+					Fail(
+						"The CPU cache reload replaced the active IBL stage set before publication.");
 				}
 				break;
 			}
-			bool exactCpuHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
-				status.m_CacheHit && !status.m_PartialCacheHit &&
+			bool exactCpuHit =
+				status.m_ActiveGeneration == status.m_RequestedGeneration && status.m_CacheHit &&
+				!status.m_PartialCacheHit &&
 				status.m_CacheHitStageCount == static_cast<uint32_t>(IBLArtifactStage::Count) &&
 				status.m_GpuBuildStageCount == 0;
 			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
 			{
-				exactCpuHit &= status.m_Artifacts[index].m_Resolution ==
-					IBLArtifactResolution::CpuCache;
-				exactCpuHit &= status.m_Artifacts[index].m_DerivedDataKey ==
-					m_State->m_IBLKeys[index];
+				exactCpuHit &=
+					status.m_Artifacts[index].m_Resolution == IBLArtifactResolution::CpuCache;
+				exactCpuHit &=
+					status.m_Artifacts[index].m_DerivedDataKey == m_State->m_IBLKeys[index];
 				exactCpuHit &= status.m_Artifacts[index].m_ContentDigest ==
 					m_State->m_IBLArtifactDigests[index];
 			}
@@ -428,8 +420,7 @@ namespace gglab
 
 		case State::Phase::WaitForDerivedDataCacheHit:
 		{
-			IBLBakeScheduler& scheduler =
-				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
 			const IBLBakeStatus& status = scheduler.GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
@@ -441,44 +432,43 @@ namespace gglab
 			{
 				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("The local DDC reload replaced the active IBL stage set before publication.");
+					Fail(
+						"The local DDC reload replaced the active IBL stage set before publication.");
 				}
 				break;
 			}
-			bool exactDdcHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
-				status.m_CacheHit && !status.m_PartialCacheHit &&
+			bool exactDdcHit =
+				status.m_ActiveGeneration == status.m_RequestedGeneration && status.m_CacheHit &&
+				!status.m_PartialCacheHit &&
 				status.m_CacheHitStageCount == static_cast<uint32_t>(IBLArtifactStage::Count) &&
 				status.m_GpuBuildStageCount == 0;
 			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
 			{
-				exactDdcHit &= status.m_Artifacts[index].m_Resolution ==
-					IBLArtifactResolution::LocalDdc;
-				exactDdcHit &= status.m_Artifacts[index].m_DerivedDataKey ==
-					m_State->m_IBLKeys[index];
+				exactDdcHit &=
+					status.m_Artifacts[index].m_Resolution == IBLArtifactResolution::LocalDdc;
+				exactDdcHit &=
+					status.m_Artifacts[index].m_DerivedDataKey == m_State->m_IBLKeys[index];
 				exactDdcHit &= status.m_Artifacts[index].m_ContentDigest ==
 					m_State->m_IBLArtifactDigests[index];
 			}
-			if (!exactDdcHit ||
-				scheduler.GetDerivedDataStoreStatistics().m_HitCount <
-					m_State->m_DerivedDataHitCountBaseline +
-					static_cast<uint32_t>(IBLArtifactStage::Count))
+			if (!exactDdcHit || scheduler.GetDerivedDataStoreStatistics().m_HitCount <
+				m_State->m_DerivedDataHitCountBaseline +
+				static_cast<uint32_t>(IBLArtifactStage::Count))
 			{
 				Fail("The IBL request did not restore the exact stage artifacts from local DDC.");
 				return;
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_Renderer->GetEnvironmentLightingSystem()->
-				SetPrefilteredSpecularSampleCount(
-					m_State->m_CpuPartialSpecularSampleCount);
+			m_Services.m_Renderer->GetEnvironmentLightingSystem()
+				->SetPrefilteredSpecularSampleCount(m_State->m_CpuPartialSpecularSampleCount);
 			m_State->m_Phase = State::Phase::WaitForCpuPartialHit;
 			break;
 		}
 
 		case State::Phase::WaitForCpuPartialHit:
 		{
-			IBLBakeScheduler& scheduler =
-				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
 			const IBLBakeStatus& status = scheduler.GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
@@ -491,7 +481,8 @@ namespace gglab
 				if (status.m_Stage != IBLBakeStage::Ready &&
 					status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("A CPU partial hit replaced the active IBL before its complete stage set was ready.");
+					Fail(
+						"A CPU partial hit replaced the active IBL before its complete stage set was ready.");
 				}
 				break;
 			}
@@ -500,8 +491,7 @@ namespace gglab
 				break;
 			}
 
-			const size_t specular = static_cast<size_t>(
-				IBLArtifactStage::PrefilteredSpecular);
+			const size_t specular = static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular);
 			bool partialHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
 				status.m_PartialCacheHit && !status.m_CacheHit &&
 				status.m_CacheHitStageCount == 3 && status.m_GpuBuildStageCount == 1;
@@ -523,7 +513,8 @@ namespace gglab
 			}
 			if (!partialHit)
 			{
-				Fail("Changing only specular samples did not produce a 3-stage CPU hit plus 1-stage GPU build.");
+				Fail(
+					"Changing only specular samples did not produce a 3-stage CPU hit plus 1-stage GPU build.");
 				return;
 			}
 
@@ -531,17 +522,15 @@ namespace gglab
 			scheduler.ClearArtifactCache();
 			m_State->m_DerivedDataHitCountBaseline =
 				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
-			m_Services.m_Renderer->GetEnvironmentLightingSystem()->
-				SetPrefilteredSpecularSampleCount(
-					m_State->m_DdcPartialSpecularSampleCount);
+			m_Services.m_Renderer->GetEnvironmentLightingSystem()
+				->SetPrefilteredSpecularSampleCount(m_State->m_DdcPartialSpecularSampleCount);
 			m_State->m_Phase = State::Phase::WaitForDerivedDataPartialHit;
 			break;
 		}
 
 		case State::Phase::WaitForDerivedDataPartialHit:
 		{
-			IBLBakeScheduler& scheduler =
-				*m_Services.m_Renderer->GetIBLBakeScheduler();
+			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
 			const IBLBakeStatus& status = scheduler.GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
@@ -554,7 +543,8 @@ namespace gglab
 				if (status.m_Stage != IBLBakeStage::Ready &&
 					status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("A DDC partial hit replaced the active IBL before its complete stage set was ready.");
+					Fail(
+						"A DDC partial hit replaced the active IBL before its complete stage set was ready.");
 				}
 				break;
 			}
@@ -563,8 +553,7 @@ namespace gglab
 				break;
 			}
 
-			const size_t specular = static_cast<size_t>(
-				IBLArtifactStage::PrefilteredSpecular);
+			const size_t specular = static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular);
 			bool partialHit = status.m_ActiveGeneration == status.m_RequestedGeneration &&
 				status.m_PartialCacheHit && !status.m_CacheHit &&
 				status.m_CacheHitStageCount == 3 && status.m_GpuBuildStageCount == 1;
@@ -587,13 +576,14 @@ namespace gglab
 				m_State->m_DerivedDataHitCountBaseline + 3;
 			if (!partialHit)
 			{
-				Fail("Changing only specular samples did not produce a 3-stage DDC hit plus 1-stage GPU build.");
+				Fail(
+					"Changing only specular samples did not produce a 3-stage DDC hit plus 1-stage GPU build.");
 				return;
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			EnvironmentLightingSystem* environment = m_Services.m_Renderer->
-				GetEnvironmentLightingSystem();
+			EnvironmentLightingSystem* environment =
+				m_Services.m_Renderer->GetEnvironmentLightingSystem();
 			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
 			{
 				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
@@ -609,8 +599,7 @@ namespace gglab
 
 		case State::Phase::WaitForRestore:
 		{
-			const IBLBakeStatus& status = m_Services.m_Renderer->
-				GetIBLBakeScheduler()->GetStatus();
+			const IBLBakeStatus& status = m_Services.m_Renderer->GetIBLBakeScheduler()->GetStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("Restoring the original IBL configuration failed.");
@@ -621,15 +610,15 @@ namespace gglab
 			{
 				if (status.m_ActiveGeneration != m_State->m_PreviousIBLGeneration)
 				{
-					Fail("Restoring the original IBL replaced the active set before atomic publication.");
+					Fail(
+						"Restoring the original IBL replaced the active set before atomic publication.");
 				}
 				break;
 			}
 			bool restored = status.m_CacheHit && status.m_GpuBuildStageCount == 0;
 			for (size_t index = 0; index < status.m_Artifacts.size(); ++index)
 			{
-				restored &= status.m_Artifacts[index].m_DerivedDataKey ==
-					m_State->m_IBLKeys[index];
+				restored &= status.m_Artifacts[index].m_DerivedDataKey == m_State->m_IBLKeys[index];
 				restored &= status.m_Artifacts[index].m_ContentDigest ==
 					m_State->m_IBLArtifactDigests[index];
 			}
@@ -656,27 +645,28 @@ namespace gglab
 			return;
 		}
 		diagnostics.m_Metrics = {
-			{ .m_Name = "Elapsed", .m_Value = std::format("{:.2f} s", m_State->m_ElapsedSeconds) },
-			{ .m_Name = "Selection phase", .m_Value = std::to_string(std::to_underlying(m_State->m_Phase)) },
+			{.m_Name = "Elapsed", .m_Value = std::format("{:.2f} s", m_State->m_ElapsedSeconds)},
+			{.m_Name = "Selection phase",
+				.m_Value = std::to_string(std::to_underlying(m_State->m_Phase))},
 		};
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Transactional environment selection",
-			.m_Status = m_State->m_Phase != State::Phase::Completed ?
-				LabDiagnosticCheckStatus::Pending :
-				m_State->m_Passed ? LabDiagnosticCheckStatus::Passed :
-					LabDiagnosticCheckStatus::Failed,
-			.m_Detail = m_State->m_Phase != State::Phase::Completed ?
-				"Verification is running." :
-				m_State->m_Passed ? "Environment selection and IBL cache/DDC invariants passed." :
-					std::format("{} invariant errors.", m_State->m_Errors.size()),
-		});
+			.m_Status = m_State->m_Phase != State::Phase::Completed
+							? LabDiagnosticCheckStatus::Pending
+						: m_State->m_Passed ? LabDiagnosticCheckStatus::Passed
+											: LabDiagnosticCheckStatus::Failed,
+			.m_Detail = m_State->m_Phase != State::Phase::Completed ? "Verification is running."
+						: m_State->m_Passed
+							? "Environment selection and IBL cache/DDC invariants passed."
+							: std::format("{} invariant errors.", m_State->m_Errors.size()),
+			});
 		for (const std::string& error : m_State->m_Errors)
 		{
 			diagnostics.m_Checks.push_back({
 				.m_Name = "Invariant",
 				.m_Status = LabDiagnosticCheckStatus::Failed,
 				.m_Detail = error,
-			});
+				});
 		}
 	}
 
@@ -713,7 +703,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Environment Asset Lab",
 			.m_Category = "Systems",
-			.m_Description = "Validates transactional HDR selection plus atomic full/partial IBL CPU cache and local DDC restoration.",
+			.m_Description =
+				"Validates transactional HDR selection plus atomic full/partial IBL CPU cache and local DDC restoration.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 3,
 		};

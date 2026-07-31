@@ -19,10 +19,7 @@ namespace gglab
 		uint32_t m_TileX = 0;
 		uint32_t m_TileY = 0;
 		ForwardPlusTileHeader m_Header{};
-		std::array<
-			uint32_t,
-			ForwardPlusTileLightCapacity>
-			m_LightIndices{};
+		std::array<uint32_t, ForwardPlusTileLightCapacity> m_LightIndices{};
 		bool m_IsValid = false;
 	};
 
@@ -30,50 +27,28 @@ namespace gglab
 	{
 	public:
 		ForwardPlusDebugReadback() noexcept = default;
-		GGLAB_DELETE_COPYABLE_MOVABLE(
-			ForwardPlusDebugReadback);
+		GGLAB_DELETE_COPYABLE_MOVABLE(ForwardPlusDebugReadback);
 		~ForwardPlusDebugReadback();
 
-		void Initialize(
-			RHIDevice& device,
-			uint32_t bufferCount) noexcept;
-		void SetSelectedTile(
-			uint32_t tileX,
-			uint32_t tileY) noexcept;
-		void ConsumeCompletedSlot(
-			uint32_t bufferIndex) noexcept;
-		void MarkScheduled(
-			uint32_t bufferIndex,
-			uint64_t frameSerial,
-			const ForwardPlusTileGrid& tileGrid,
-			uint32_t tileX,
-			uint32_t tileY) noexcept;
+		void Initialize(RHIDevice& device, uint32_t bufferCount) noexcept;
+		void SetSelectedTile(uint32_t tileX, uint32_t tileY) noexcept;
+		void ConsumeCompletedSlot(uint32_t bufferIndex) noexcept;
+		void MarkScheduled(uint32_t bufferIndex, uint64_t frameSerial,
+			const ForwardPlusTileGrid& tileGrid, uint32_t tileX, uint32_t tileY) noexcept;
 
-		[[nodiscard]] RHIBufferHandle
-			GetBuffer(uint32_t bufferIndex) const noexcept;
-		[[nodiscard]] uint32_t
-			GetSelectedTileX() const noexcept;
-		[[nodiscard]] uint32_t
-			GetSelectedTileY() const noexcept;
-		[[nodiscard]] ForwardPlusTileReadback
-			GetLatest() const noexcept;
-		[[nodiscard]] uint64_t
-			GetScheduledCount() const noexcept
+		[[nodiscard]] RHIBufferHandle GetBuffer(uint32_t bufferIndex) const noexcept;
+		[[nodiscard]] uint32_t GetSelectedTileX() const noexcept;
+		[[nodiscard]] uint32_t GetSelectedTileY() const noexcept;
+		[[nodiscard]] ForwardPlusTileReadback GetLatest() const noexcept;
+		[[nodiscard]] uint64_t GetScheduledCount() const noexcept
 		{
-			return m_ScheduledCount.load(
-				std::memory_order_relaxed);
+			return m_ScheduledCount.load(std::memory_order_relaxed);
 		}
 
-		static constexpr uint64_t
-			HeaderReadbackOffset = 0;
-		static constexpr uint64_t
-			IndicesReadbackOffset =
-				sizeof(ForwardPlusTileHeader);
-		static constexpr uint64_t
-			ReadbackSizeInBytes =
-				IndicesReadbackOffset +
-				sizeof(uint32_t) *
-					ForwardPlusTileLightCapacity;
+		static constexpr uint64_t HeaderReadbackOffset = 0;
+		static constexpr uint64_t IndicesReadbackOffset = sizeof(ForwardPlusTileHeader);
+		static constexpr uint64_t ReadbackSizeInBytes =
+			IndicesReadbackOffset + sizeof(uint32_t) * ForwardPlusTileLightCapacity;
 
 	private:
 		struct PendingSlot

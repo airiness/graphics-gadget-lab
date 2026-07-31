@@ -3,10 +3,8 @@
 
 namespace gglab
 {
-	bool AssetDependencyGraph::RegisterModel(
-		AssetContentVersion model,
-		std::span<const DependencyStatus> dependencies,
-		uint32_t structuralFailureCount) noexcept
+	bool AssetDependencyGraph::RegisterModel(AssetContentVersion model,
+		std::span<const DependencyStatus> dependencies, uint32_t structuralFailureCount) noexcept
 	{
 		if (!model.IsValid() || model.m_Key.m_Kind != AssetKind::Model)
 		{
@@ -25,9 +23,8 @@ namespace gglab
 				++state.m_StructuralFailureCount;
 				continue;
 			}
-			const auto [stored, inserted] = state.m_DependencyStates.emplace(
-				dependency.m_ContentVersion,
-				dependency);
+			const auto [stored, inserted] =
+				state.m_DependencyStates.emplace(dependency.m_ContentVersion, dependency);
 			if (inserted)
 			{
 				IncrementCounter(state, ProjectDependencyOutcome(stored->second));
@@ -62,8 +59,7 @@ namespace gglab
 	}
 
 	void AssetDependencyGraph::ApplyStatus(
-		const DependencyStatus& status,
-		std::vector<AssetDependencyChange>& changes) noexcept
+		const DependencyStatus& status, std::vector<AssetDependencyChange>& changes) noexcept
 	{
 		changes.clear();
 		if (!status.IsValid())
@@ -85,8 +81,7 @@ namespace gglab
 			{
 				continue;
 			}
-			auto dependency = model->second.m_DependencyStates.find(
-				status.m_ContentVersion);
+			auto dependency = model->second.m_DependencyStates.find(status.m_ContentVersion);
 			if (dependency == model->second.m_DependencyStates.end() ||
 				dependency->second == status)
 			{
@@ -94,9 +89,7 @@ namespace gglab
 			}
 
 			const ModelDependencyOutcome previousOutcome = EvaluateModel(model->second);
-			DecrementCounter(
-				model->second,
-				ProjectDependencyOutcome(dependency->second));
+			DecrementCounter(model->second, ProjectDependencyOutcome(dependency->second));
 			dependency->second = status;
 			IncrementCounter(model->second, ProjectDependencyOutcome(status));
 			++model->second.m_EventUpdateCount;
@@ -107,7 +100,7 @@ namespace gglab
 				changes.push_back({
 					.m_Model = dependent,
 					.m_CurrentOutcome = currentOutcome,
-				});
+					});
 			}
 		}
 	}
@@ -116,17 +109,18 @@ namespace gglab
 		AssetContentVersion model) const noexcept
 	{
 		const auto current = m_Models.find(model.m_Key);
-		return current != m_Models.end() && current->second.m_Model == model ?
-			std::addressof(current->second) : nullptr;
+		return current != m_Models.end() && current->second.m_Model == model
+			? std::addressof(current->second)
+			: nullptr;
 	}
 
 	std::span<const AssetContentVersion> AssetDependencyGraph::FindDependents(
 		AssetContentVersion dependency) const noexcept
 	{
 		const auto dependents = m_ReverseDependencies.find(dependency);
-		return dependents != m_ReverseDependencies.end() ?
-			std::span<const AssetContentVersion>(dependents->second) :
-			std::span<const AssetContentVersion>{};
+		return dependents != m_ReverseDependencies.end()
+			? std::span<const AssetContentVersion>(dependents->second)
+			: std::span<const AssetContentVersion>{};
 	}
 
 	ModelDependencyOutcome AssetDependencyGraph::EvaluateModel(
@@ -140,16 +134,14 @@ namespace gglab
 	{
 		AssetDependencyGraphStatistics statistics{
 			.m_TrackedModelCount = static_cast<uint32_t>(m_Models.size()),
-			.m_ReverseDependencyCount = static_cast<uint32_t>(
-				m_ReverseDependencies.size()),
+			.m_ReverseDependencyCount = static_cast<uint32_t>(m_ReverseDependencies.size()),
 			.m_GraphBuildCount = m_GraphBuildCount,
 			.m_EventUpdateCount = m_EventUpdateCount,
 			.m_IgnoredEventCount = m_IgnoredEventCount,
 		};
 		for (const auto& dependents : m_ReverseDependencies | std::views::values)
 		{
-			statistics.m_ReverseDependencyEdgeCount +=
-				static_cast<uint32_t>(dependents.size());
+			statistics.m_ReverseDependencyEdgeCount += static_cast<uint32_t>(dependents.size());
 		}
 		return statistics;
 	}
@@ -181,21 +173,27 @@ namespace gglab
 	}
 
 	void AssetDependencyGraph::IncrementCounter(
-		AssetDependencyModelState& state,
-		ModelDependencyOutcome outcome) noexcept
+		AssetDependencyModelState& state, ModelDependencyOutcome outcome) noexcept
 	{
 		switch (outcome)
 		{
-		case ModelDependencyOutcome::Ready: ++state.m_ReadyCount; break;
-		case ModelDependencyOutcome::Pending: ++state.m_PendingCount; break;
-		case ModelDependencyOutcome::Failed: ++state.m_FailedCount; break;
-		case ModelDependencyOutcome::Cancelled: ++state.m_CancelledCount; break;
+		case ModelDependencyOutcome::Ready:
+			++state.m_ReadyCount;
+			break;
+		case ModelDependencyOutcome::Pending:
+			++state.m_PendingCount;
+			break;
+		case ModelDependencyOutcome::Failed:
+			++state.m_FailedCount;
+			break;
+		case ModelDependencyOutcome::Cancelled:
+			++state.m_CancelledCount;
+			break;
 		}
 	}
 
 	void AssetDependencyGraph::DecrementCounter(
-		AssetDependencyModelState& state,
-		ModelDependencyOutcome outcome) noexcept
+		AssetDependencyModelState& state, ModelDependencyOutcome outcome) noexcept
 	{
 		switch (outcome)
 		{
@@ -233,7 +231,7 @@ namespace gglab
 		{
 			return ModelDependencyOutcome::Pending;
 		}
-		return state.m_ReadyCount > 0 ?
-			ModelDependencyOutcome::Ready : ModelDependencyOutcome::Failed;
+		return state.m_ReadyCount > 0 ? ModelDependencyOutcome::Ready
+			: ModelDependencyOutcome::Failed;
 	}
 }

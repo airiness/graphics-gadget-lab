@@ -56,10 +56,7 @@ namespace gglab::math
 		return StoreAabb(dxResult);
 	}
 
-	Aabb CreateAabbFromPoints(
-		size_t count,
-		const Vector3* points,
-		size_t stride) noexcept
+	Aabb CreateAabbFromPoints(size_t count, const Vector3* points, size_t stride) noexcept
 	{
 		if (points == nullptr || count == 0)
 		{
@@ -68,21 +65,14 @@ namespace gglab::math
 
 		DirectX::BoundingBox dxResult;
 		DirectX::BoundingBox::CreateFromPoints(
-			dxResult,
-			count,
-			reinterpret_cast<const DirectX::XMFLOAT3*>(points),
-			stride);
+			dxResult, count, reinterpret_cast<const DirectX::XMFLOAT3*>(points), stride);
 		return StoreAabb(dxResult);
 	}
 
-	Aabb Merge(const Aabb& lhs,
-		const Aabb& rhs) noexcept
+	Aabb Merge(const Aabb& lhs, const Aabb& rhs) noexcept
 	{
 		DirectX::BoundingBox dxResult;
-		DirectX::BoundingBox::CreateMerged(
-			dxResult,
-			ToDXBoundingBox(lhs),
-			ToDXBoundingBox(rhs));
+		DirectX::BoundingBox::CreateMerged(dxResult, ToDXBoundingBox(lhs), ToDXBoundingBox(rhs));
 		return StoreAabb(dxResult);
 	}
 
@@ -93,10 +83,7 @@ namespace gglab::math
 		return StoreSphere(dxResult);
 	}
 
-	Sphere CreateSphereFromPoints(
-		size_t count,
-		const Vector3* points,
-		size_t stride) noexcept
+	Sphere CreateSphereFromPoints(size_t count, const Vector3* points, size_t stride) noexcept
 	{
 		if (points == nullptr || count == 0)
 		{
@@ -105,10 +92,7 @@ namespace gglab::math
 
 		DirectX::BoundingSphere dxResult;
 		DirectX::BoundingSphere::CreateFromPoints(
-			dxResult,
-			count,
-			reinterpret_cast<const DirectX::XMFLOAT3*>(points),
-			stride);
+			dxResult, count, reinterpret_cast<const DirectX::XMFLOAT3*>(points), stride);
 		return StoreSphere(dxResult);
 	}
 

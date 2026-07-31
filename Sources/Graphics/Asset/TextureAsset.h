@@ -81,6 +81,5 @@ namespace gglab
 	};
 
 	[[nodiscard]] AssetContentFingerprint ComputeTextureContentFingerprint(
-		const TextureAssetData& textureData,
-		const TextureImportSettings& importSettings) noexcept;
+		const TextureAssetData& textureData, const TextureImportSettings& importSettings) noexcept;
 }

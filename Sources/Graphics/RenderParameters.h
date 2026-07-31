@@ -17,16 +17,14 @@ namespace gglab
 		bool operator==(const DrawParameters&) const noexcept = default;
 	};
 
-	template<typename T>
+	template <typename T>
 	inline constexpr bool IsShaderParameterStruct =
-		std::is_trivially_copyable_v<T> &&
-		std::is_standard_layout_v<T> &&
+		std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T> &&
 		(sizeof(T) % sizeof(uint32_t) == 0);
 
-	template<typename T>
+	template <typename T>
 	inline constexpr bool IsPassRootConstantStruct =
-		IsShaderParameterStruct<T> &&
-		(sizeof(T) <= MaxPassConstantDWORDs * sizeof(uint32_t));
+		IsShaderParameterStruct<T> && (sizeof(T) <= MaxPassConstantDWORDs * sizeof(uint32_t));
 
 	static_assert(IsShaderParameterStruct<DrawParameters>);
 	static_assert(sizeof(DrawParameters) == 4);

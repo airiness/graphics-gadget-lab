@@ -6,8 +6,7 @@
 namespace gglab
 {
 	void BuildSamplerRegistrySnapshot(
-		const SamplerRegistry& registry,
-		SamplerRegistrySnapshot& snapshot) noexcept
+		const SamplerRegistry& registry, SamplerRegistrySnapshot& snapshot) noexcept
 	{
 		snapshot = {};
 		const SamplerRegistryStatistics statistics = registry.GetStatistics();
@@ -28,7 +27,7 @@ namespace gglab
 				.m_Sampler = info.m_Sampler,
 				.m_DescriptorIndex = info.m_DescriptorIndex,
 				.m_PresetMask = info.m_PresetMask,
-			});
+				});
 		}
 	}
 }

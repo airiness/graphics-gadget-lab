@@ -25,7 +25,10 @@ namespace gglab
 		std::string_view GetName() const noexcept override { return "Demo.Playground"; }
 		void BeginPrepare() noexcept override;
 		void TickPrepare() noexcept override;
-		LoadingProgress GetPreparationProgress() const noexcept override { return m_LoadingProgress; }
+		LoadingProgress GetPreparationProgress() const noexcept override
+		{
+			return m_LoadingProgress;
+		}
 		void CommitPrepare() noexcept override;
 		void CancelPrepare() noexcept override;
 

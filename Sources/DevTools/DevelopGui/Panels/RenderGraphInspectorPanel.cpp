@@ -29,10 +29,12 @@ namespace gglab
 		{
 			if (resourceType == RGResourceType::RGTexture)
 			{
-				return devtools::EnumFlagsText<RHITextureUsage>(static_cast<std::underlying_type_t<RHITextureUsage>>(bits));
+				return devtools::EnumFlagsText<RHITextureUsage>(
+					static_cast<std::underlying_type_t<RHITextureUsage>>(bits));
 			}
 
-			return devtools::EnumFlagsText<RHIBufferUsage>(static_cast<std::underlying_type_t<RHIBufferUsage>>(bits));
+			return devtools::EnumFlagsText<RHIBufferUsage>(
+				static_cast<std::underlying_type_t<RHIBufferUsage>>(bits));
 		}
 
 		static std::string AccessText(uint64_t value, RGResourceType resourceType) noexcept
@@ -75,8 +77,7 @@ namespace gglab
 		}
 
 		static std::string ResourceListToString(
-			const RGSnapshot& snapshot,
-			const std::vector<uint32_t>& resourceIndices) noexcept
+			const RGSnapshot& snapshot, const std::vector<uint32_t>& resourceIndices) noexcept
 		{
 			if (resourceIndices.empty())
 			{
@@ -93,7 +94,8 @@ namespace gglab
 
 				if (resourceIndex < snapshot.m_Resources.size())
 				{
-					result += std::format("#{} {}", resourceIndex, snapshot.m_Resources[resourceIndex].m_Name);
+					result += std::format(
+						"#{} {}", resourceIndex, snapshot.m_Resources[resourceIndex].m_Name);
 				}
 				else
 				{
@@ -121,12 +123,14 @@ namespace gglab
 			return false;
 		}
 
-		static bool ResourceMatchesFilter(const RGSnapshotResourceInfo& resource, const char* filter) noexcept
+		static bool ResourceMatchesFilter(
+			const RGSnapshotResourceInfo& resource, const char* filter) noexcept
 		{
 			return utils::ContainsIgnoreCase(resource.m_Name, filter ? filter : "");
 		}
 
-		static bool PassAccessesResource(const RGSnapshotPassInfo& pass, uint32_t resourceIndex) noexcept
+		static bool PassAccessesResource(
+			const RGSnapshotPassInfo& pass, uint32_t resourceIndex) noexcept
 		{
 			for (const auto& access : pass.m_Accesses)
 			{
@@ -139,24 +143,16 @@ namespace gglab
 			return false;
 		}
 
-		static void DrawClippedText(
-			ImDrawList* drawList,
-			const ImVec2& min,
-			const ImVec2& max,
-			const char* text,
-			ImU32 color) noexcept
+		static void DrawClippedText(ImDrawList* drawList, const ImVec2& min, const ImVec2& max,
+			const char* text, ImU32 color) noexcept
 		{
 			drawList->PushClipRect(min, max, true);
 			drawList->AddText(min, color, text);
 			drawList->PopClipRect();
 		}
 
-		static void DrawArrow(
-			ImDrawList* drawList,
-			const ImVec2& start,
-			const ImVec2& end,
-			ImU32 color,
-			float thickness) noexcept
+		static void DrawArrow(ImDrawList* drawList, const ImVec2& start, const ImVec2& end,
+			ImU32 color, float thickness) noexcept
 		{
 			const ImVec2 delta = end - start;
 			const float length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
@@ -171,18 +167,14 @@ namespace gglab
 			const ImVec2 headBase = end - direction * arrowSize;
 
 			drawList->AddLine(start, end, color, thickness);
-			drawList->AddTriangleFilled(
-				end,
-				headBase + normal * (arrowSize * 0.55f),
-				headBase - normal * (arrowSize * 0.55f),
-				color);
+			drawList->AddTriangleFilled(end, headBase + normal * (arrowSize * 0.55f),
+				headBase - normal * (arrowSize * 0.55f), color);
 		}
 
 		static void BeginGraphNodeTooltip() noexcept
 		{
 			ImGui::SetNextWindowSizeConstraints(
-				ImVec2(340.0f, 0.0f),
-				ImVec2(520.0f, std::numeric_limits<float>::max()));
+				ImVec2(340.0f, 0.0f), ImVec2(520.0f, std::numeric_limits<float>::max()));
 			ImGui::BeginTooltip();
 			ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 500.0f);
 		}
@@ -216,7 +208,8 @@ namespace gglab
 		static void DrawGraphResourcePopupContent(const RGSnapshotResourceInfo& resource) noexcept
 		{
 			const std::string usage = UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
-			const std::string initialState = devtools::BarrierStateText(resource.m_InitialBarrierState);
+			const std::string initialState =
+				devtools::BarrierStateText(resource.m_InitialBarrierState);
 
 			ImGui::Text("Resource #%u", resource.m_Index);
 			ImGui::TextWrapped("%s", resource.m_Name.c_str());
@@ -229,23 +222,17 @@ namespace gglab
 			ImGui::TextWrapped("Usage: %s", usage.c_str());
 			if (resource.m_ResourceType == RGResourceType::RGTexture)
 			{
-				ImGui::Text(
-					"Texture: %llu x %u x %u, %s",
-					static_cast<unsigned long long>(
-						resource.m_TextureExtent.m_Width),
-					resource.m_TextureExtent.m_Height,
-					resource.m_TextureExtent.m_Depth,
+				ImGui::Text("Texture: %llu x %u x %u, %s",
+					static_cast<unsigned long long>(resource.m_TextureExtent.m_Width),
+					resource.m_TextureExtent.m_Height, resource.m_TextureExtent.m_Depth,
 					GetRHIFormatInfo(resource.m_TextureFormat).m_Name);
 				if (resource.m_TextureClearValue)
 				{
 					const auto& clearValue = *resource.m_TextureClearValue;
 					if (clearValue.m_IsDepthStencil)
 					{
-						ImGui::Text(
-							"Clear: depth %.3f, stencil %u, %s",
-							clearValue.m_Depth,
-							clearValue.m_Stencil,
-							GetRHIFormatInfo(clearValue.m_Format).m_Name);
+						ImGui::Text("Clear: depth %.3f, stencil %u, %s", clearValue.m_Depth,
+							clearValue.m_Stencil, GetRHIFormatInfo(clearValue.m_Format).m_Name);
 					}
 				}
 			}
@@ -253,23 +240,22 @@ namespace gglab
 		}
 
 		static void DrawSelectedPassDetails(
-			const RGSnapshot& snapshot,
-			const RenderGraphInspectorPanelState& state) noexcept;
+			const RGSnapshot& snapshot, const RenderGraphInspectorPanelState& state) noexcept;
 
 		static void DrawSelectedResourceDetails(
-			const RGSnapshot& snapshot,
-			const RenderGraphInspectorPanelState& state) noexcept;
+			const RGSnapshot& snapshot, const RenderGraphInspectorPanelState& state) noexcept;
 
 		static void DrawGraphTab(
-			const RGSnapshot& snapshot,
-			RenderGraphInspectorPanelState& state) noexcept
+			const RGSnapshot& snapshot, RenderGraphInspectorPanelState& state) noexcept
 		{
 			const bool hasFilter = state.m_Filter[0] != '\0';
 
 			std::vector<uint8_t> resourceMatches(snapshot.m_Resources.size(), false);
-			for (size_t resourcePosition = 0; resourcePosition < snapshot.m_Resources.size(); ++resourcePosition)
+			for (size_t resourcePosition = 0; resourcePosition < snapshot.m_Resources.size();
+				++resourcePosition)
 			{
-				resourceMatches[resourcePosition] = ResourceMatchesFilter(snapshot.m_Resources[resourcePosition], state.m_Filter);
+				resourceMatches[resourcePosition] =
+					ResourceMatchesFilter(snapshot.m_Resources[resourcePosition], state.m_Filter);
 			}
 
 			std::vector<size_t> visiblePassPositions;
@@ -307,12 +293,12 @@ namespace gglab
 				{
 					const auto& lhsPass = snapshot.m_Passes[lhs];
 					const auto& rhsPass = snapshot.m_Passes[rhs];
-					const int32_t lhsOrder = lhsPass.m_ExecutionOrder >= 0 ?
-						lhsPass.m_ExecutionOrder :
-						std::numeric_limits<int32_t>::max();
-					const int32_t rhsOrder = rhsPass.m_ExecutionOrder >= 0 ?
-						rhsPass.m_ExecutionOrder :
-						std::numeric_limits<int32_t>::max();
+					const int32_t lhsOrder = lhsPass.m_ExecutionOrder >= 0
+						? lhsPass.m_ExecutionOrder
+						: std::numeric_limits<int32_t>::max();
+					const int32_t rhsOrder = rhsPass.m_ExecutionOrder >= 0
+						? rhsPass.m_ExecutionOrder
+						: std::numeric_limits<int32_t>::max();
 					if (lhsOrder != rhsOrder)
 					{
 						return lhsOrder < rhsOrder;
@@ -335,9 +321,11 @@ namespace gglab
 			}
 
 			std::vector<uint8_t> visibleResources(snapshot.m_Resources.size(), !hasFilter);
-			for (size_t resourcePosition = 0; resourcePosition < snapshot.m_Resources.size(); ++resourcePosition)
+			for (size_t resourcePosition = 0; resourcePosition < snapshot.m_Resources.size();
+				++resourcePosition)
 			{
-				visibleResources[resourcePosition] = visibleResources[resourcePosition] || resourceMatches[resourcePosition];
+				visibleResources[resourcePosition] =
+					visibleResources[resourcePosition] || resourceMatches[resourcePosition];
 			}
 			for (const size_t passPosition : visiblePassPositions)
 			{
@@ -352,7 +340,8 @@ namespace gglab
 
 			std::vector<size_t> visibleResourcePositions;
 			visibleResourcePositions.reserve(snapshot.m_Resources.size());
-			for (size_t resourcePosition = 0; resourcePosition < visibleResources.size(); ++resourcePosition)
+			for (size_t resourcePosition = 0; resourcePosition < visibleResources.size();
+				++resourcePosition)
 			{
 				if (visibleResources[resourcePosition])
 				{
@@ -380,19 +369,23 @@ namespace gglab
 
 			ImGui::TextUnformatted("Legend:");
 			ImGui::SameLine();
-			ImGui::ColorButton("##RGGraphPassLegend", ImVec4(0.16f, 0.26f, 0.40f, 1.0f), ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
+			ImGui::ColorButton("##RGGraphPassLegend", ImVec4(0.16f, 0.26f, 0.40f, 1.0f),
+				ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
 			ImGui::SameLine();
 			ImGui::TextUnformatted("Pass");
 			ImGui::SameLine();
-			ImGui::ColorButton("##RGGraphResourceLegend", ImVec4(0.20f, 0.38f, 0.30f, 1.0f), ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
+			ImGui::ColorButton("##RGGraphResourceLegend", ImVec4(0.20f, 0.38f, 0.30f, 1.0f),
+				ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
 			ImGui::SameLine();
 			ImGui::TextUnformatted("Resource");
 			ImGui::SameLine();
-			ImGui::ColorButton("##RGGraphReadLegend", ImVec4(0.24f, 0.72f, 0.96f, 0.82f), ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
+			ImGui::ColorButton("##RGGraphReadLegend", ImVec4(0.24f, 0.72f, 0.96f, 0.82f),
+				ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
 			ImGui::SameLine();
 			ImGui::TextUnformatted("Read");
 			ImGui::SameLine();
-			ImGui::ColorButton("##RGGraphWriteLegend", ImVec4(1.0f, 0.56f, 0.22f, 0.88f), ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
+			ImGui::ColorButton("##RGGraphWriteLegend", ImVec4(1.0f, 0.56f, 0.22f, 0.88f),
+				ImGuiColorEditFlags_NoTooltip, ImVec2(12.0f, 12.0f));
 			ImGui::SameLine();
 			ImGui::TextUnformatted("Write");
 
@@ -405,17 +398,15 @@ namespace gglab
 			const float resourceHeight = 28.0f;
 			const float resourceRowStride = 44.0f;
 			const float resourceMinWidth = 150.0f;
-			const float canvasWidth = std::max(
-				ImGui::GetContentRegionAvail().x,
-				leftMargin * 2.0f + std::max<size_t>(visiblePassPositions.size(), 1) * columnStride + passWidth);
-			const float canvasHeight = std::max(
-				360.0f,
-				resourceTop + std::max<size_t>(visibleResourcePositions.size(), 1) * resourceRowStride + 48.0f);
+			const float canvasWidth = std::max(ImGui::GetContentRegionAvail().x,
+				leftMargin * 2.0f +
+				std::max<size_t>(visiblePassPositions.size(), 1) * columnStride + passWidth);
+			const float canvasHeight = std::max(360.0f,
+				resourceTop +
+				std::max<size_t>(visibleResourcePositions.size(), 1) * resourceRowStride +
+				48.0f);
 
-			if (!ImGui::BeginChild(
-				"RenderGraphGraphCanvas",
-				ImVec2(0.0f, 800.0f),
-				true,
+			if (!ImGui::BeginChild("RenderGraphGraphCanvas", ImVec2(0.0f, 800.0f), true,
 				ImGuiWindowFlags_HorizontalScrollbar))
 			{
 				ImGui::EndChild();
@@ -426,8 +417,7 @@ namespace gglab
 			const ImVec2 origin = ImGui::GetCursorScreenPos();
 			const ImVec2 childMin = ImGui::GetWindowPos();
 			const ImVec2 childMax = childMin + ImGui::GetWindowSize();
-			const bool graphInputActive =
-				ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
+			const bool graphInputActive = ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
 				ImGui::IsMouseHoveringRect(childMin, childMax, true);
 			ImGui::Dummy(ImVec2(canvasWidth, canvasHeight));
 			drawList->PushClipRect(childMin, childMax, true);
@@ -442,11 +432,8 @@ namespace gglab
 			for (size_t ordinal = 0; ordinal < visiblePassPositions.size(); ++ordinal)
 			{
 				const float x = leftMargin + static_cast<float>(ordinal) * columnStride;
-				drawList->AddLine(
-					origin + ImVec2(x + passWidth * 0.5f, 8.0f),
-					origin + ImVec2(x + passWidth * 0.5f, canvasHeight - 8.0f),
-					gridColor,
-					1.0f);
+				drawList->AddLine(origin + ImVec2(x + passWidth * 0.5f, 8.0f),
+					origin + ImVec2(x + passWidth * 0.5f, canvasHeight - 8.0f), gridColor, 1.0f);
 
 				const size_t passPosition = visiblePassPositions[ordinal];
 				passMins[passPosition] = origin + ImVec2(x, topMargin);
@@ -477,7 +464,8 @@ namespace gglab
 				if (firstColumn == std::numeric_limits<int32_t>::max())
 				{
 					if (resource.m_FirstUserPassIndex >= 0 &&
-						static_cast<size_t>(resource.m_FirstUserPassIndex) < passColumnByIndex.size() &&
+						static_cast<size_t>(resource.m_FirstUserPassIndex) <
+						passColumnByIndex.size() &&
 						passColumnByIndex[resource.m_FirstUserPassIndex] >= 0)
 					{
 						firstColumn = passColumnByIndex[resource.m_FirstUserPassIndex];
@@ -491,7 +479,8 @@ namespace gglab
 				if (lastColumn < firstColumn)
 				{
 					if (resource.m_LastUserPassIndex >= 0 &&
-						static_cast<size_t>(resource.m_LastUserPassIndex) < passColumnByIndex.size() &&
+						static_cast<size_t>(resource.m_LastUserPassIndex) <
+						passColumnByIndex.size() &&
 						passColumnByIndex[resource.m_LastUserPassIndex] >= 0)
 					{
 						lastColumn = passColumnByIndex[resource.m_LastUserPassIndex];
@@ -503,8 +492,7 @@ namespace gglab
 				}
 
 				const float xMin = leftMargin + static_cast<float>(firstColumn) * columnStride;
-				const float xMax = std::max(
-					xMin + resourceMinWidth,
+				const float xMax = std::max(xMin + resourceMinWidth,
 					leftMargin + static_cast<float>(lastColumn) * columnStride + passWidth);
 				const float y = resourceTop + static_cast<float>(row) * resourceRowStride;
 				resourceMins[resourcePosition] = origin + ImVec2(xMin, y);
@@ -558,22 +546,21 @@ namespace gglab
 						const int32_t readCount = std::max(visibleReadCounts[passPosition], 1);
 						const int32_t readSlot = readSlotCursors[passPosition]++;
 						const float readStep = passWidth / static_cast<float>(readCount + 1);
-						laneX = passMins[passPosition].x + readStep * static_cast<float>(readSlot + 1);
+						laneX =
+							passMins[passPosition].x + readStep * static_cast<float>(readSlot + 1);
 					}
 
 					const ImVec2 passPort(laneX, passMaxs[passPosition].y + 4.0f);
-					const ImVec2 resourcePort(laneX, resourceMins[access.m_VirtualResourceIndex].y - 4.0f);
+					const ImVec2 resourcePort(
+						laneX, resourceMins[access.m_VirtualResourceIndex].y - 4.0f);
 					const float horizontalLimit = std::min(
 						std::max(laneX, resourceMins[access.m_VirtualResourceIndex].x + 12.0f),
 						resourceMaxs[access.m_VirtualResourceIndex].x - 12.0f);
 					const ImVec2 clampedResourcePort(horizontalLimit, resourcePort.y);
 
-					DrawArrow(
-						drawList,
-						writeAccess ? passPort : clampedResourcePort,
+					DrawArrow(drawList, writeAccess ? passPort : clampedResourcePort,
 						writeAccess ? clampedResourcePort : passPort,
-						writeAccess ? writeArrow : readArrow,
-						1.8f);
+						writeAccess ? writeArrow : readArrow, 1.8f);
 				}
 			}
 
@@ -587,11 +574,12 @@ namespace gglab
 
 				const ImVec2 min = resourceMins[resourcePosition];
 				const ImVec2 max = resourceMaxs[resourcePosition];
-				const bool selected = state.m_SelectedResourceIndex == static_cast<int32_t>(resource.m_Index);
+				const bool selected =
+					state.m_SelectedResourceIndex == static_cast<int32_t>(resource.m_Index);
 				const bool hovered = graphInputActive && ImGui::IsMouseHoveringRect(min, max, true);
-				const ImU32 fill = resource.m_ResourceType == RGResourceType::RGTexture ?
-					resourceTextureFill :
-					resourceBufferFill;
+				const ImU32 fill = resource.m_ResourceType == RGResourceType::RGTexture
+					? resourceTextureFill
+					: resourceBufferFill;
 				const ImU32 border = selected || hovered ? selectedBorder : resourceBorder;
 				const float borderThickness = selected ? 2.4f : 1.4f;
 
@@ -603,7 +591,8 @@ namespace gglab
 				}
 
 				const std::string label = std::format("#{} {}", resource.m_Index, resource.m_Name);
-				DrawClippedText(drawList, min + ImVec2(8.0f, 6.0f), max - ImVec2(8.0f, 4.0f), label.c_str(), textColor);
+				DrawClippedText(drawList, min + ImVec2(8.0f, 6.0f), max - ImVec2(8.0f, 4.0f),
+					label.c_str(), textColor);
 
 				if (hovered)
 				{
@@ -632,7 +621,8 @@ namespace gglab
 
 				const ImVec2 min = passMins[passPosition];
 				const ImVec2 max = passMaxs[passPosition];
-				const bool selected = state.m_SelectedPassIndex == static_cast<int32_t>(pass.m_Index);
+				const bool selected =
+					state.m_SelectedPassIndex == static_cast<int32_t>(pass.m_Index);
 				const bool hovered = graphInputActive && ImGui::IsMouseHoveringRect(min, max, true);
 				const ImU32 fill = pass.m_Culled ? passCulledFill : passFill;
 				const ImU32 border = selected || hovered ? selectedBorder : passBorder;
@@ -642,9 +632,12 @@ namespace gglab
 				drawList->AddRect(min, max, border, 0.0f, 0, borderThickness);
 
 				const std::string label = std::format("#{} {}", pass.m_Index, pass.m_Name);
-				const std::string order = std::format("order {}", PassIndexToString(pass.m_ExecutionOrder));
-				DrawClippedText(drawList, min + ImVec2(8.0f, 7.0f), max - ImVec2(8.0f, 22.0f), label.c_str(), textColor);
-				DrawClippedText(drawList, min + ImVec2(8.0f, 25.0f), max - ImVec2(8.0f, 5.0f), order.c_str(), textColor);
+				const std::string order =
+					std::format("order {}", PassIndexToString(pass.m_ExecutionOrder));
+				DrawClippedText(drawList, min + ImVec2(8.0f, 7.0f), max - ImVec2(8.0f, 22.0f),
+					label.c_str(), textColor);
+				DrawClippedText(drawList, min + ImVec2(8.0f, 25.0f), max - ImVec2(8.0f, 5.0f),
+					order.c_str(), textColor);
 
 				if (hovered)
 				{
@@ -666,8 +659,7 @@ namespace gglab
 			drawList->PopClipRect();
 
 			ImGui::SetNextWindowSizeConstraints(
-				ImVec2(340.0f, 0.0f),
-				ImVec2(520.0f, std::numeric_limits<float>::max()));
+				ImVec2(340.0f, 0.0f), ImVec2(520.0f, std::numeric_limits<float>::max()));
 			if (ImGui::BeginPopup("RenderGraphGraphNodePopup"))
 			{
 				PushGraphNodePopupWrap();
@@ -677,9 +669,11 @@ namespace gglab
 					DrawGraphPassPopupContent(snapshot.m_Passes[state.m_GraphPopupPassIndex]);
 				}
 				else if (state.m_GraphPopupResourceIndex >= 0 &&
-					static_cast<size_t>(state.m_GraphPopupResourceIndex) < snapshot.m_Resources.size())
+					static_cast<size_t>(state.m_GraphPopupResourceIndex) <
+					snapshot.m_Resources.size())
 				{
-					DrawGraphResourcePopupContent(snapshot.m_Resources[state.m_GraphPopupResourceIndex]);
+					DrawGraphResourcePopupContent(
+						snapshot.m_Resources[state.m_GraphPopupResourceIndex]);
 				}
 
 				ImGui::PopTextWrapPos();
@@ -698,7 +692,8 @@ namespace gglab
 			}
 		}
 
-		static void DrawBarrierTable(const char* label, const std::vector<RGSnapshotBarrierInfo>& barriers) noexcept
+		static void DrawBarrierTable(
+			const char* label, const std::vector<RGSnapshotBarrierInfo>& barriers) noexcept
 		{
 			if (barriers.empty())
 			{
@@ -707,9 +702,7 @@ namespace gglab
 			}
 
 			ImGui::Text("%s: %u", label, static_cast<uint32_t>(barriers.size()));
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
@@ -733,9 +726,11 @@ namespace gglab
 				const std::string before = devtools::BarrierStateText(barrier.m_Before);
 				const std::string after = devtools::BarrierStateText(barrier.m_After);
 				const std::string range = devtools::SubresourceRangeText(barrier.m_Subresources);
-				const std::string physical = barrier.m_HasPhysicalHandle ?
-					std::format("{}:{}", barrier.m_PhysicalHandleIndex, barrier.m_PhysicalHandleGeneration) :
-					"Pending";
+				const std::string physical =
+					barrier.m_HasPhysicalHandle
+					? std::format("{}:{}", barrier.m_PhysicalHandleIndex,
+						barrier.m_PhysicalHandleGeneration)
+					: "Pending";
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -760,13 +755,13 @@ namespace gglab
 		}
 
 		static void DrawSelectedPassDetails(
-			const RGSnapshot& snapshot,
-			const RenderGraphInspectorPanelState& state) noexcept
+			const RGSnapshot& snapshot, const RenderGraphInspectorPanelState& state) noexcept
 		{
 			if (state.m_SelectedPassIndex < 0 ||
 				static_cast<size_t>(state.m_SelectedPassIndex) >= snapshot.m_Passes.size())
 			{
-				ImGui::TextDisabled("Select a pass to inspect its declared accesses and generated barriers.");
+				ImGui::TextDisabled(
+					"Select a pass to inspect its declared accesses and generated barriers.");
 				return;
 			}
 
@@ -775,20 +770,21 @@ namespace gglab
 			ImGui::Text("Pass #%u: %s", pass.m_Index, pass.m_Name.c_str());
 			ImGui::Text("Execution Order: %s", PassIndexToString(pass.m_ExecutionOrder).c_str());
 			ImGui::Text("Encoder: %s", devtools::EnumText(pass.m_EncoderType).data());
-			ImGui::Text("Culled: %s, SideEffect: %s", utils::BoolToString(pass.m_Culled), utils::BoolToString(pass.m_SideEffect));
+			ImGui::Text("Culled: %s, SideEffect: %s", utils::BoolToString(pass.m_Culled),
+				utils::BoolToString(pass.m_SideEffect));
 			const std::string dependencies = PassListToString(pass.m_DependencyPassIndices);
 			const std::string dependents = PassListToString(pass.m_DependentPassIndices);
 			ImGui::TextWrapped("Depends On: %s", dependencies.c_str());
 			ImGui::TextWrapped("Dependents: %s", dependents.c_str());
 
-			const std::string devirtualizeResources = ResourceListToString(snapshot, pass.m_DevirtualizeResources);
-			const std::string destroyResources = ResourceListToString(snapshot, pass.m_DestroyResources);
+			const std::string devirtualizeResources =
+				ResourceListToString(snapshot, pass.m_DevirtualizeResources);
+			const std::string destroyResources =
+				ResourceListToString(snapshot, pass.m_DestroyResources);
 			ImGui::TextWrapped("Devirtualize: %s", devirtualizeResources.c_str());
 			ImGui::TextWrapped("Destroy: %s", destroyResources.c_str());
 
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
@@ -807,7 +803,8 @@ namespace gglab
 
 				for (const auto& access : pass.m_Accesses)
 				{
-					const std::string accessText = AccessText(access.m_AccessValue, access.m_ResourceType);
+					const std::string accessText =
+						AccessText(access.m_AccessValue, access.m_ResourceType);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -824,7 +821,8 @@ namespace gglab
 					const std::string stagesText = devtools::EnumFlagsTextWithBits(access.m_Stages);
 					ImGui::TextUnformatted(stagesText.c_str());
 					ImGui::TableSetColumnIndex(6);
-					const std::string rangeText = devtools::SubresourceRangeText(access.m_Subresources);
+					const std::string rangeText =
+						devtools::SubresourceRangeText(access.m_Subresources);
 					ImGui::TextUnformatted(rangeText.c_str());
 					ImGui::TableSetColumnIndex(7);
 					ImGui::Text("%u", access.m_ResourceNodeIndex);
@@ -843,8 +841,7 @@ namespace gglab
 		}
 
 		static void DrawSelectedResourceDetails(
-			const RGSnapshot& snapshot,
-			const RenderGraphInspectorPanelState& state) noexcept
+			const RGSnapshot& snapshot, const RenderGraphInspectorPanelState& state) noexcept
 		{
 			if (state.m_SelectedResourceIndex < 0 ||
 				static_cast<size_t>(state.m_SelectedResourceIndex) >= snapshot.m_Resources.size())
@@ -854,10 +851,12 @@ namespace gglab
 			}
 
 			const auto& resource = snapshot.m_Resources[state.m_SelectedResourceIndex];
-			const std::string initialState = devtools::BarrierStateText(resource.m_InitialBarrierState);
-			const std::string finalState = resource.m_HasFinalBarrierState ?
-				devtools::BarrierStateText(resource.m_FinalBarrierState) :
-				"-";
+			const std::string initialState =
+				devtools::BarrierStateText(resource.m_InitialBarrierState);
+			const std::string finalState =
+				resource.m_HasFinalBarrierState
+				? devtools::BarrierStateText(resource.m_FinalBarrierState)
+				: "-";
 			const std::string usage = UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
 			const std::string poolSlot = PoolSlotToString(resource.m_PoolSlot);
 
@@ -866,50 +865,38 @@ namespace gglab
 			ImGui::Text("Type: %s", devtools::EnumText(resource.m_ResourceType).data());
 			ImGui::Text("Imported: %s, Devirtualized: %s, RefCount: %d",
 				utils::BoolToString(resource.m_Imported),
-				utils::BoolToString(resource.m_Devirtualized),
-				resource.m_RefCount);
+				utils::BoolToString(resource.m_Devirtualized), resource.m_RefCount);
 			ImGui::Text("First User: %s, Last User: %s, Pool Slot: %s",
 				PassIndexToString(resource.m_FirstUserPassIndex).c_str(),
-				PassIndexToString(resource.m_LastUserPassIndex).c_str(),
-				poolSlot.c_str());
+				PassIndexToString(resource.m_LastUserPassIndex).c_str(), poolSlot.c_str());
 			ImGui::TextWrapped("Accumulated Usage: %s", usage.c_str());
 			if (resource.m_ResourceType == RGResourceType::RGTexture)
 			{
-				ImGui::Text(
-					"Texture: %llu x %u x %u, %s",
-					static_cast<unsigned long long>(
-						resource.m_TextureExtent.m_Width),
-					resource.m_TextureExtent.m_Height,
-					resource.m_TextureExtent.m_Depth,
+				ImGui::Text("Texture: %llu x %u x %u, %s",
+					static_cast<unsigned long long>(resource.m_TextureExtent.m_Width),
+					resource.m_TextureExtent.m_Height, resource.m_TextureExtent.m_Depth,
 					GetRHIFormatInfo(resource.m_TextureFormat).m_Name);
-				if (resource.m_TextureClearValue &&
-					resource.m_TextureClearValue->m_IsDepthStencil)
+				if (resource.m_TextureClearValue && resource.m_TextureClearValue->m_IsDepthStencil)
 				{
 					const auto& clearValue = *resource.m_TextureClearValue;
-					ImGui::Text(
-						"Typed Clear: depth %.3f, stencil %u, %s",
-						clearValue.m_Depth,
-						clearValue.m_Stencil,
-						GetRHIFormatInfo(clearValue.m_Format).m_Name);
+					ImGui::Text("Typed Clear: depth %.3f, stencil %u, %s", clearValue.m_Depth,
+						clearValue.m_Stencil, GetRHIFormatInfo(clearValue.m_Format).m_Name);
 				}
 			}
 			ImGui::TextWrapped("Initial State: %s", initialState.c_str());
 			ImGui::TextWrapped("Exported Final State: %s", finalState.c_str());
-			const std::string finalRange = resource.m_HasFinalBarrierState ?
-				devtools::SubresourceRangeText(resource.m_FinalBarrierSubresources) :
-				"-";
+			const std::string finalRange =
+				resource.m_HasFinalBarrierState
+				? devtools::SubresourceRangeText(resource.m_FinalBarrierSubresources)
+				: "-";
 			ImGui::TextWrapped("Exported Final Range: %s", finalRange.c_str());
 		}
 
 		static void DrawPassesTab(
-			const RGSnapshot& snapshot,
-			RenderGraphInspectorPanelState& state) noexcept
+			const RGSnapshot& snapshot, RenderGraphInspectorPanelState& state) noexcept
 		{
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_ScrollY |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingStretchProp;
 
 			if (ImGui::BeginTable("RenderGraphPasses", 11, flags, ImVec2(0.0f, 280.0f)))
@@ -945,9 +932,12 @@ namespace gglab
 					ImGui::TableSetColumnIndex(1);
 					ImGui::Text("%u", pass.m_Index);
 					ImGui::TableSetColumnIndex(2);
-					const bool selected = state.m_SelectedPassIndex == static_cast<int32_t>(pass.m_Index);
-					const std::string label = std::format("{}##rg_pass_{}", pass.m_Name, pass.m_Index);
-					if (ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
+					const bool selected =
+						state.m_SelectedPassIndex == static_cast<int32_t>(pass.m_Index);
+					const std::string label =
+						std::format("{}##rg_pass_{}", pass.m_Name, pass.m_Index);
+					if (ImGui::Selectable(
+						label.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
 					{
 						state.m_SelectedPassIndex = static_cast<int32_t>(pass.m_Index);
 					}
@@ -976,14 +966,10 @@ namespace gglab
 		}
 
 		static void DrawResourcesTab(
-			const RGSnapshot& snapshot,
-			RenderGraphInspectorPanelState& state) noexcept
+			const RGSnapshot& snapshot, RenderGraphInspectorPanelState& state) noexcept
 		{
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_ScrollY |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingStretchProp;
 
 			if (ImGui::BeginTable("RenderGraphResources", 10, flags, ImVec2(0.0f, 280.0f)))
@@ -1008,16 +994,20 @@ namespace gglab
 						continue;
 					}
 
-					const std::string usage = UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
+					const std::string usage =
+						UsageBitsText(resource.m_UsageBits, resource.m_ResourceType);
 					const std::string poolSlot = PoolSlotToString(resource.m_PoolSlot);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
 					ImGui::Text("%u", resource.m_Index);
 					ImGui::TableSetColumnIndex(1);
-					const bool selected = state.m_SelectedResourceIndex == static_cast<int32_t>(resource.m_Index);
-					const std::string label = std::format("{}##rg_resource_{}", resource.m_Name, resource.m_Index);
-					if (ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
+					const bool selected =
+						state.m_SelectedResourceIndex == static_cast<int32_t>(resource.m_Index);
+					const std::string label =
+						std::format("{}##rg_resource_{}", resource.m_Name, resource.m_Index);
+					if (ImGui::Selectable(
+						label.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
 					{
 						state.m_SelectedResourceIndex = static_cast<int32_t>(resource.m_Index);
 					}
@@ -1030,7 +1020,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(5);
 					ImGui::Text("%d", resource.m_RefCount);
 					ImGui::TableSetColumnIndex(6);
-					ImGui::TextUnformatted(PassIndexToString(resource.m_FirstUserPassIndex).c_str());
+					ImGui::TextUnformatted(
+						PassIndexToString(resource.m_FirstUserPassIndex).c_str());
 					ImGui::TableSetColumnIndex(7);
 					ImGui::TextUnformatted(PassIndexToString(resource.m_LastUserPassIndex).c_str());
 					ImGui::TableSetColumnIndex(8);
@@ -1047,11 +1038,8 @@ namespace gglab
 
 		static void DrawResourceNodesTab(const RGSnapshot& snapshot) noexcept
 		{
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_ScrollY |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingStretchProp;
 
 			if (!ImGui::BeginTable("RenderGraphResourceNodes", 7, flags, ImVec2(0.0f, 360.0f)))
@@ -1095,11 +1083,8 @@ namespace gglab
 
 		static void DrawDependenciesTab(const RGSnapshot& snapshot) noexcept
 		{
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_ScrollY |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingStretchProp;
 
 			if (!ImGui::BeginTable("RenderGraphDependencies", 5, flags, ImVec2(0.0f, 360.0f)))
@@ -1119,9 +1104,11 @@ namespace gglab
 			{
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("%s #%s", edge.m_FromPassName.c_str(), PassIndexToString(edge.m_FromPassIndex).c_str());
+				ImGui::Text("%s #%s", edge.m_FromPassName.c_str(),
+					PassIndexToString(edge.m_FromPassIndex).c_str());
 				ImGui::TableSetColumnIndex(1);
-				ImGui::Text("%s #%s", edge.m_ToPassName.c_str(), PassIndexToString(edge.m_ToPassIndex).c_str());
+				ImGui::Text("%s #%s", edge.m_ToPassName.c_str(),
+					PassIndexToString(edge.m_ToPassIndex).c_str());
 				ImGui::TableSetColumnIndex(2);
 				ImGui::TextUnformatted(edge.m_ResourceName.c_str());
 				ImGui::TableSetColumnIndex(3);
@@ -1147,8 +1134,8 @@ namespace gglab
 			return;
 		}
 
-		const auto* snapshotPtr = context.m_Diagnostics ?
-			context.m_Diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
+		const auto* snapshotPtr =
+			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
 		if (!snapshotPtr)
 		{
 			ImGui::TextDisabled("RenderGraph snapshot provider is not available.");

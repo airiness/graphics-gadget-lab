@@ -14,19 +14,13 @@ namespace gglab
 	public:
 		virtual ~RenderPassBase() = default;
 		const RenderPassInfo& GetInfo() const noexcept { return m_Info; }
-		virtual void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
-			const RenderServices& services) = 0;
+		virtual void AddPass(
+			RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) = 0;
 
 	protected:
-		explicit RenderPassBase(RenderPassInfo info) noexcept :
-			m_Info(std::move(info))
-		{}
+		explicit RenderPassBase(RenderPassInfo info) noexcept : m_Info(std::move(info)) {}
 
-		const char* GetRenderGraphPassName() const noexcept
-		{
-			return m_Info.m_TypeName.c_str();
-		}
+		const char* GetRenderGraphPassName() const noexcept { return m_Info.m_TypeName.c_str(); }
 
 		std::string MakeRenderGraphPassName(std::string_view suffix) const
 		{

@@ -23,14 +23,11 @@ namespace gglab
 
 		[[nodiscard]] const Model* Find(ModelID modelId) const noexcept;
 		[[nodiscard]] Model* Edit(ModelID modelId) noexcept;
-		[[nodiscard]] ModelID FindByPath(
-			const std::filesystem::path& canonicalPath) const noexcept;
-		[[nodiscard]] ModelID Create(
-			const std::filesystem::path& canonicalPath) noexcept;
+		[[nodiscard]] ModelID FindByPath(const std::filesystem::path& canonicalPath) const noexcept;
+		[[nodiscard]] ModelID Create(const std::filesystem::path& canonicalPath) noexcept;
 		[[nodiscard]] InsertResult Insert(std::unique_ptr<Model>&& model) noexcept;
 		[[nodiscard]] bool DetachPath(
-			const std::filesystem::path& canonicalPath,
-			ModelID modelId) noexcept;
+			const std::filesystem::path& canonicalPath, ModelID modelId) noexcept;
 		[[nodiscard]] bool Remove(ModelID modelId) noexcept;
 
 		[[nodiscard]] const EntryMap& Entries() const noexcept { return m_Entries; }

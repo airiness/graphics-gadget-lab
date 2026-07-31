@@ -11,13 +11,15 @@ namespace gglab
 		GGLAB_ASSERT(createInfo.m_DX12Device);
 
 		auto* device = createInfo.m_DX12Device->Get();
-		GGLAB_HR_DX(device->CreateCommandAllocator(createInfo.m_Type, IID_PPV_ARGS(&m_D3D12CommandAllocator)), device);
+		GGLAB_HR_DX(device->CreateCommandAllocator(
+			createInfo.m_Type, IID_PPV_ARGS(&m_D3D12CommandAllocator)),
+			device);
 	}
 
 	// DX12CommandAllocatorPool
-	DX12CommandAllocatorPool::DX12CommandAllocatorPool(const DX12CommandAllocator::CreateInfo& createInfo) noexcept :
-		m_DX12Device(createInfo.m_DX12Device),
-		m_Type(createInfo.m_Type)
+	DX12CommandAllocatorPool::DX12CommandAllocatorPool(
+		const DX12CommandAllocator::CreateInfo& createInfo) noexcept :
+		m_DX12Device(createInfo.m_DX12Device), m_Type(createInfo.m_Type)
 	{
 	}
 
@@ -35,11 +37,7 @@ namespace gglab
 			}
 		}
 
-		DX12CommandAllocator::CreateInfo createInfo
-		{
-			.m_DX12Device = m_DX12Device,
-			.m_Type = m_Type
-		};
+		DX12CommandAllocator::CreateInfo createInfo{ .m_DX12Device = m_DX12Device, .m_Type = m_Type };
 		auto newAllocator = std::make_unique<DX12CommandAllocator>(createInfo);
 		auto allocatorPtr = newAllocator.get();
 		m_Pool.push_back(std::move(newAllocator));
@@ -47,7 +45,8 @@ namespace gglab
 		return allocatorPtr;
 	}
 
-	void DX12CommandAllocatorPool::RecycleCommandAllocator(DX12CommandAllocator* allocator, DX12FencePoint fencePoint) noexcept
+	void DX12CommandAllocatorPool::RecycleCommandAllocator(
+		DX12CommandAllocator* allocator, DX12FencePoint fencePoint) noexcept
 	{
 		std::lock_guard lock(m_Mutex);
 		mRecycledAllocators.emplace(allocator, fencePoint);

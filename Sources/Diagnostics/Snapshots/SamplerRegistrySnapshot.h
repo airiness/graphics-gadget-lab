@@ -27,10 +27,8 @@ namespace gglab
 		std::vector<Entry> m_Entries;
 	};
 
-	template<>
-	struct SnapshotTraits<SamplerRegistrySnapshot>
+	template <> struct SnapshotTraits<SamplerRegistrySnapshot>
 	{
-		static constexpr SnapshotId Id =
-			MakeSnapshotId("Diagnostics.SamplerRegistrySnapshot");
+		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.SamplerRegistrySnapshot");
 	};
 }

@@ -22,9 +22,7 @@ float GetDepthFarValue(uint convention)
 
 bool IsDepthBackground(float rawDepth, uint convention)
 {
-	return convention == DEPTH_CONVENTION_REVERSED ?
-		rawDepth <= 0.0 :
-		rawDepth >= 1.0;
+	return convention == DEPTH_CONVENTION_REVERSED ? rawDepth <= 0.0 : rawDepth >= 1.0;
 }
 
 bool IsDepthNearer(float lhs, float rhs, uint convention)
@@ -37,26 +35,17 @@ bool IsDepthFarther(float lhs, float rhs, uint convention)
 	return convention == DEPTH_CONVENTION_REVERSED ? lhs < rhs : lhs > rhs;
 }
 
-float3 ReconstructViewPosition(
-	float2 uv,
-	float rawDepth,
-	float4x4 inverseProjection)
+float3 ReconstructViewPosition(float2 uv, float rawDepth, float4x4 inverseProjection)
 {
 	return ReconstructPositionFromRawDepth(uv, rawDepth, inverseProjection);
 }
 
-float3 ReconstructWorldPosition(
-	float2 uv,
-	float rawDepth,
-	float4x4 inverseViewProjection)
+float3 ReconstructWorldPosition(float2 uv, float rawDepth, float4x4 inverseViewProjection)
 {
 	return ReconstructPositionFromRawDepth(uv, rawDepth, inverseViewProjection);
 }
 
-float RawDepthToPositiveViewZ(
-	float2 uv,
-	float rawDepth,
-	float4x4 inverseProjection)
+float RawDepthToPositiveViewZ(float2 uv, float rawDepth, float4x4 inverseProjection)
 {
 	return max(ReconstructViewPosition(uv, rawDepth, inverseProjection).z, 0.0);
 }

@@ -31,8 +31,7 @@ namespace gglab
 		const LabParameterId InterpolationId("math.quaternion.interpolation");
 		const StringID MathChannel("Math.Foundation");
 
-		DebugDrawStyle MakeStyle(
-			const Color& color,
+		DebugDrawStyle MakeStyle(const Color& color,
 			DebugDrawFillMode fillMode = DebugDrawFillMode::Wireframe,
 			DebugDrawDepthMode depthMode = DebugDrawDepthMode::Tested) noexcept
 		{
@@ -48,10 +47,7 @@ namespace gglab
 
 	MathFoundationLabSession::MathFoundationLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -61,17 +57,20 @@ namespace gglab
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(MathTopic::Vector),
-			.m_EnumItems = {
-				{ .m_Value = int32_t(MathTopic::Vector), .m_Name = "Vector Operations" },
-				{ .m_Value = int32_t(MathTopic::MatrixTransform), .m_Name = "Matrix / Transform" },
-				{ .m_Value = int32_t(MathTopic::NormalMatrix), .m_Name = "Normal Matrix" },
-				{ .m_Value = int32_t(MathTopic::Quaternion), .m_Name = "Quaternion" },
-				{ .m_Value = int32_t(MathTopic::Bounds), .m_Name = "Bounds" },
-				{ .m_Value = int32_t(MathTopic::ProjectionFrustum), .m_Name = "Projection / Frustum" },
-				{ .m_Value = int32_t(MathTopic::FrustumCulling), .m_Name = "Frustum Culling" },
-				{ .m_Value = int32_t(MathTopic::Degenerate), .m_Name = "Degenerate Inputs" },
-			},
-		}));
+			.m_EnumItems =
+				{
+					{.m_Value = int32_t(MathTopic::Vector), .m_Name = "Vector Operations"},
+					{.m_Value = int32_t(MathTopic::MatrixTransform),
+						.m_Name = "Matrix / Transform"},
+					{.m_Value = int32_t(MathTopic::NormalMatrix), .m_Name = "Normal Matrix"},
+					{.m_Value = int32_t(MathTopic::Quaternion), .m_Name = "Quaternion"},
+					{.m_Value = int32_t(MathTopic::Bounds), .m_Name = "Bounds"},
+					{.m_Value = int32_t(MathTopic::ProjectionFrustum),
+						.m_Name = "Projection / Frustum"},
+					{.m_Value = int32_t(MathTopic::FrustumCulling), .m_Name = "Frustum Culling"},
+					{.m_Value = int32_t(MathTopic::Degenerate), .m_Name = "Degenerate Inputs"},
+				},
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,
 			.m_Name = "Enable Camera Input",
@@ -79,7 +78,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = true,
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = AnimateId,
 			.m_Name = "Animate Interpolation",
@@ -87,7 +86,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = true,
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = InterpolationId,
 			.m_Name = "Interpolation",
@@ -97,7 +96,7 @@ namespace gglab
 			.m_DefaultValue = 0.5f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 
 		ApplyImmediateParameters();
 		ApplyCameraPreset();
@@ -129,12 +128,11 @@ namespace gglab
 		}
 
 		auto& debugDraw = *m_Services.m_DebugDraw;
-		debugDraw.Grid(
-			Vector3(0.0f, -1.0f, 6.0f), Vector3::UnitY, Vector3::UnitX,
-			8.0f, 16, MakeStyle(Color(0.18f, 0.18f, 0.18f, 1.0f)));
+		debugDraw.Grid(Vector3(0.0f, -1.0f, 6.0f), Vector3::UnitY, Vector3::UnitX, 8.0f, 16,
+			MakeStyle(Color(0.18f, 0.18f, 0.18f, 1.0f)));
 
-		const auto topic = static_cast<MathTopic>(
-			GetParameters().Get(TopicId, int32_t(MathTopic::Vector)));
+		const auto topic =
+			static_cast<MathTopic>(GetParameters().Get(TopicId, int32_t(MathTopic::Vector)));
 		switch (topic)
 		{
 		case MathTopic::MatrixTransform:
@@ -146,9 +144,8 @@ namespace gglab
 		case MathTopic::Quaternion:
 		{
 			const bool animate = GetParameters().Get(AnimateId, true);
-			const float t = animate ?
-				0.5f + 0.5f * std::sin(m_ElapsedTime) :
-				GetParameters().Get(InterpolationId, 0.5f);
+			const float t = animate ? 0.5f + 0.5f * std::sin(m_ElapsedTime)
+				: GetParameters().Get(InterpolationId, 0.5f);
 			DrawQuaternionValidation(debugDraw, t);
 			break;
 		}
@@ -192,9 +189,12 @@ namespace gglab
 		debugDraw.Axes(math::CreateTranslation(origin), 1.2f, 0.18f,
 			MakeStyle(Color::White, DebugDrawFillMode::Solid));
 		debugDraw.Arrow(origin, origin + a, 0.35f, MakeStyle(Color::Red, DebugDrawFillMode::Solid));
-		debugDraw.Arrow(origin, origin + b, 0.35f, MakeStyle(Color::Green, DebugDrawFillMode::Solid));
-		debugDraw.Arrow(origin, origin + a + b, 0.35f, MakeStyle(Color::Yellow, DebugDrawFillMode::Solid));
-		debugDraw.Arrow(origin, origin + cross, 0.35f, MakeStyle(Color::Cyan, DebugDrawFillMode::Solid));
+		debugDraw.Arrow(
+			origin, origin + b, 0.35f, MakeStyle(Color::Green, DebugDrawFillMode::Solid));
+		debugDraw.Arrow(
+			origin, origin + a + b, 0.35f, MakeStyle(Color::Yellow, DebugDrawFillMode::Solid));
+		debugDraw.Arrow(
+			origin, origin + cross, 0.35f, MakeStyle(Color::Cyan, DebugDrawFillMode::Solid));
 		const std::array parallelogram = { origin + a, origin + a + b, origin + b };
 		debugDraw.Polyline(parallelogram, false, MakeStyle(Color::Silver));
 	}
@@ -202,18 +202,16 @@ namespace gglab
 	void MathFoundationLabSession::DrawMatrixValidation(DebugDrawContext& debugDraw) noexcept
 	{
 		const Matrix scale = math::CreateScale(Vector3(1.5f, 0.65f, 0.9f));
-		const Matrix rotation = math::CreateFromQuaternion(
-			math::CreateFromYawPitchRoll(0.65f, 0.3f, 0.15f));
+		const Matrix rotation =
+			math::CreateFromQuaternion(math::CreateFromYawPitchRoll(0.65f, 0.3f, 0.15f));
 		const Matrix translation = math::CreateTranslation(Vector3(-1.5f, 0.5f, 6.0f));
 		const Matrix expectedOrder = scale * rotation * translation;
 		const Matrix reversedOrder = translation * rotation * scale;
 
-		debugDraw.Obb(expectedOrder, Vector3::One,
-			MakeStyle(Color::Green));
-		debugDraw.Axes(expectedOrder, 1.6f, 0.2f,
-			MakeStyle(Color::White, DebugDrawFillMode::Solid));
-		debugDraw.Obb(reversedOrder, Vector3::One,
-			MakeStyle(Color::Red));
+		debugDraw.Obb(expectedOrder, Vector3::One, MakeStyle(Color::Green));
+		debugDraw.Axes(
+			expectedOrder, 1.6f, 0.2f, MakeStyle(Color::White, DebugDrawFillMode::Solid));
+		debugDraw.Obb(reversedOrder, Vector3::One, MakeStyle(Color::Red));
 
 		const Vector3 localPoint(1.0f, 0.0f, 0.0f);
 		const Vector3 transformedPoint = math::TransformPoint(localPoint, translation);
@@ -226,20 +224,16 @@ namespace gglab
 
 	void MathFoundationLabSession::DrawNormalMatrixValidation(DebugDrawContext& debugDraw) noexcept
 	{
-		const Matrix transform = math::CreateTransformMatrix(
-			Vector3(2.0f, 0.35f, 1.1f),
-			math::CreateFromYawPitchRoll(0.75f, 0.35f, 0.45f),
-			Vector3(0.0f, 0.6f, 6.0f));
+		const Matrix transform = math::CreateTransformMatrix(Vector3(2.0f, 0.35f, 1.1f),
+			math::CreateFromYawPitchRoll(0.75f, 0.35f, 0.45f), Vector3(0.0f, 0.6f, 6.0f));
 		const Matrix normalMatrix = math::CreateNormalMatrix(transform);
 		const Vector3 localNormal = math::NormalizeOr(Vector3(0.8f, 1.0f, 0.25f), Vector3::UnitY);
 		const Vector3 localPoint = localNormal;
 		const Vector3 anchor = math::TransformPoint(localPoint, transform);
-		const Vector3 transformedNormal = math::NormalizeOr(
-			math::TransformDirection(localNormal, transform),
-			Vector3::UnitY);
-		const Vector3 correctedNormal = math::NormalizeOr(
-			math::TransformDirection(localNormal, normalMatrix),
-			Vector3::UnitY);
+		const Vector3 transformedNormal =
+			math::NormalizeOr(math::TransformDirection(localNormal, transform), Vector3::UnitY);
+		const Vector3 correctedNormal =
+			math::NormalizeOr(math::TransformDirection(localNormal, normalMatrix), Vector3::UnitY);
 
 		debugDraw.Obb(transform, Vector3::One, MakeStyle(Color::Silver));
 		debugDraw.Point(anchor, 0.18f, MakeStyle(Color::Gold));
@@ -247,8 +241,7 @@ namespace gglab
 			MakeStyle(Color::Red, DebugDrawFillMode::Solid));
 		debugDraw.Arrow(anchor, anchor + correctedNormal * 1.6f, 0.25f,
 			MakeStyle(Color::Green, DebugDrawFillMode::Solid));
-		debugDraw.Axes(transform, 1.4f, 0.18f,
-			MakeStyle(Color::White, DebugDrawFillMode::Solid));
+		debugDraw.Axes(transform, 1.4f, 0.18f, MakeStyle(Color::White, DebugDrawFillMode::Solid));
 	}
 
 	void MathFoundationLabSession::DrawQuaternionValidation(
@@ -259,8 +252,9 @@ namespace gglab
 		const Quaternion targetRotation = math::RotationFromTo(Vector3::Forward, target);
 		const Quaternion interpolated = math::Slerp(
 			Quaternion::Identity, targetRotation, std::clamp(interpolationT, 0.0f, 1.0f));
-		const Vector3 rotatedForward = math::TransformDirection(
-			Vector3::Forward, math::CreateFromQuaternion(interpolated)).Normalized();
+		const Vector3 rotatedForward =
+			math::TransformDirection(Vector3::Forward, math::CreateFromQuaternion(interpolated))
+			.Normalized();
 
 		debugDraw.Arrow(origin, origin + Vector3::Forward * 3.0f, 0.35f,
 			MakeStyle(Color::Blue, DebugDrawFillMode::Solid));
@@ -270,27 +264,26 @@ namespace gglab
 			MakeStyle(Color::Gold, DebugDrawFillMode::Solid));
 		const Matrix interpolatedTransform =
 			math::CreateFromQuaternion(interpolated) * math::CreateTranslation(origin);
-		debugDraw.Axes(interpolatedTransform, 1.4f, 0.18f,
-			MakeStyle(Color::White, DebugDrawFillMode::Solid));
+		debugDraw.Axes(
+			interpolatedTransform, 1.4f, 0.18f, MakeStyle(Color::White, DebugDrawFillMode::Solid));
 	}
 
 	void MathFoundationLabSession::DrawBoundsValidation(DebugDrawContext& debugDraw) noexcept
 	{
 		const math::Aabb sourceAabb(Vector3(-2.5f, 0.0f, 5.0f), Vector3(1.2f, 0.7f, 0.9f));
 		const math::Sphere sourceSphere(Vector3(2.0f, 0.0f, 5.0f), 1.0f);
-		const Matrix transform = math::CreateTransformMatrix(
-			Vector3(1.5f, 0.7f, 1.1f),
-			math::CreateFromYawPitchRoll(0.55f, 0.2f, 0.0f),
-			Vector3(0.8f, 1.0f, 3.0f));
+		const Matrix transform = math::CreateTransformMatrix(Vector3(1.5f, 0.7f, 1.1f),
+			math::CreateFromYawPitchRoll(0.55f, 0.2f, 0.0f), Vector3(0.8f, 1.0f, 3.0f));
 		const math::Aabb transformedAabb = math::Transform(sourceAabb, transform);
 		const math::Sphere transformedSphere = math::Transform(sourceSphere, transform);
 
 		debugDraw.Aabb(sourceAabb, MakeStyle(Color::White));
 		debugDraw.Sphere(sourceSphere.m_Center, sourceSphere.m_Radius, MakeStyle(Color::White));
 		debugDraw.Aabb(transformedAabb, MakeStyle(Color::Yellow));
-		debugDraw.Sphere(transformedSphere.m_Center, transformedSphere.m_Radius, MakeStyle(Color::Cyan));
-		debugDraw.Obb(math::CreateTranslation(sourceAabb.m_Center) * transform, sourceAabb.m_Extents,
-			MakeStyle(Color::Green));
+		debugDraw.Sphere(
+			transformedSphere.m_Center, transformedSphere.m_Radius, MakeStyle(Color::Cyan));
+		debugDraw.Obb(math::CreateTranslation(sourceAabb.m_Center) * transform,
+			sourceAabb.m_Extents, MakeStyle(Color::Green));
 	}
 
 	void MathFoundationLabSession::DrawProjectionValidation(DebugDrawContext& debugDraw) noexcept
@@ -298,8 +291,8 @@ namespace gglab
 		const Vector3 eye(-2.0f, 1.5f, 1.0f);
 		const Vector3 target(0.0f, 0.5f, 6.0f);
 		const Matrix view = math::CreateLookAtLH(eye, target, Vector3::UnitY);
-		const Matrix projection = math::CreatePerspectiveFieldOfViewLH(
-			math::ToRadians(50.0f), 1.6f, 0.5f, 7.0f);
+		const Matrix projection =
+			math::CreatePerspectiveFieldOfViewLH(math::ToRadians(50.0f), 1.6f, 0.5f, 7.0f);
 		const Matrix inverseViewProjection = math::Inverse(view * projection);
 		const std::array<Vector3, 8> worldCorners =
 			math::BuildFrustumCornersFromInverseViewProjection(inverseViewProjection);
@@ -308,13 +301,14 @@ namespace gglab
 		debugDraw.Arrow(eye, target, 0.35f, MakeStyle(Color::Green, DebugDrawFillMode::Solid));
 	}
 
-	void MathFoundationLabSession::DrawFrustumCullingValidation(DebugDrawContext& debugDraw) noexcept
+	void MathFoundationLabSession::DrawFrustumCullingValidation(
+		DebugDrawContext& debugDraw) noexcept
 	{
 		const Vector3 eye(-2.0f, 1.6f, 1.0f);
 		const Vector3 target(0.0f, 0.6f, 6.0f);
 		const Matrix view = math::CreateLookAtLH(eye, target, Vector3::UnitY);
-		const Matrix projection = math::CreatePerspectiveFieldOfViewLH(
-			math::ToRadians(45.0f), 1.35f, 0.5f, 6.0f);
+		const Matrix projection =
+			math::CreatePerspectiveFieldOfViewLH(math::ToRadians(45.0f), 1.35f, 0.5f, 6.0f);
 		const Matrix viewProjection = view * projection;
 		const Matrix inverseViewProjection = math::SafeInverse(viewProjection);
 		const math::Frustum frustum = math::CreateFrustumFromViewProjection(viewProjection);
@@ -328,9 +322,8 @@ namespace gglab
 		const auto clipToWorld = [inverseViewProjection](const Vector4& clip) noexcept
 			{
 				Vector3 point = Vector3::Zero;
-				GGLAB_UNUSED(math::TryHomogeneousDivide(
-					math::Transform(clip, inverseViewProjection),
-					point));
+				GGLAB_UNUSED(
+					math::TryHomogeneousDivide(math::Transform(clip, inverseViewProjection), point));
 				return point;
 			};
 		const std::array spheres = {
@@ -342,13 +335,15 @@ namespace gglab
 		for (const math::Sphere& sphere : spheres)
 		{
 			const bool visible = math::Intersects(frustum, sphere);
-			debugDraw.Sphere(sphere.m_Center, sphere.m_Radius,
-				MakeStyle(visible ? Color::Green : Color::Red));
+			debugDraw.Sphere(
+				sphere.m_Center, sphere.m_Radius, MakeStyle(visible ? Color::Green : Color::Red));
 		}
 
 		const std::array boxes = {
-			math::Aabb(clipToWorld(Vector4(-0.45f, -0.45f, 0.35f, 1.0f)), Vector3(0.25f, 0.25f, 0.25f)),
-			math::Aabb(clipToWorld(Vector4(-1.45f, 0.0f, 0.6f, 1.0f)), Vector3(0.35f, 0.35f, 0.35f)),
+			math::Aabb(
+				clipToWorld(Vector4(-0.45f, -0.45f, 0.35f, 1.0f)), Vector3(0.25f, 0.25f, 0.25f)),
+			math::Aabb(
+				clipToWorld(Vector4(-1.45f, 0.0f, 0.6f, 1.0f)), Vector3(0.35f, 0.35f, 0.35f)),
 		};
 		for (const math::Aabb& aabb : boxes)
 		{
@@ -369,15 +364,14 @@ namespace gglab
 		const bool tryNormalizeRejected = !math::TryNormalize(Vector3::Zero, tryNormalizedZero);
 		Quaternion opposite = Quaternion::Identity;
 		GGLAB_UNUSED(math::TryRotationFromTo(Vector3::Forward, Vector3::Backward, opposite));
-		const Vector3 oppositeResult = math::TransformDirection(
-			Vector3::Forward, math::CreateFromQuaternion(opposite));
+		const Vector3 oppositeResult =
+			math::TransformDirection(Vector3::Forward, math::CreateFromQuaternion(opposite));
 		Quaternion zeroDirectionRotation{};
 		const bool zeroDirectionRejected =
 			!math::TryRotationFromTo(Vector3::Zero, Vector3::Forward, zeroDirectionRotation);
 		Matrix singularInverse{};
-		const bool singularInverseRejected = !math::TryInverse(
-			math::CreateScale(Vector3(1.0f, 0.0f, 1.0f)),
-			singularInverse);
+		const bool singularInverseRejected =
+			!math::TryInverse(math::CreateScale(Vector3(1.0f, 0.0f, 1.0f)), singularInverse);
 
 		debugDraw.Arrow(origin, origin + safeZero * 2.0f, 0.3f,
 			MakeStyle(Color::Green, DebugDrawFillMode::Solid));
@@ -392,7 +386,8 @@ namespace gglab
 		debugDraw.Point(origin + Vector3(-1.0f, 0.8f, 0.0f), 0.25f,
 			MakeStyle(tryNormalizeRejected ? Color::Green : Color::Red));
 		debugDraw.Point(origin + Vector3(-1.0f, 1.6f, 0.0f), 0.25f,
-			MakeStyle(zeroDirectionRejected && singularInverseRejected ? Color::Green : Color::Red));
+			MakeStyle(
+				zeroDirectionRejected && singularInverseRejected ? Color::Green : Color::Red));
 
 		const float nan = std::numeric_limits<float>::quiet_NaN();
 		debugDraw.Line(Vector3(nan, 0.0f, 0.0f), Vector3::Zero, MakeStyle(Color::Red));
@@ -409,7 +404,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Math Foundation",
 			.m_Category = "Foundation",
-			.m_Description = "Visual validation for vectors, matrices, transforms, quaternions, bounds, projection and degenerate inputs.",
+			.m_Description =
+				"Visual validation for vectors, matrices, transforms, quaternions, bounds, projection and degenerate inputs.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

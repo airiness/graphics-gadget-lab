@@ -26,11 +26,10 @@ namespace gglab
 				DXGI_ADAPTER_DESC desc{};
 				if (SUCCEEDED(adapter->GetDesc(&desc)))
 				{
-					os << "Adapter: VendorId=" << desc.VendorId
-						<< " DeviceId=" << desc.DeviceId
-						<< " SubSysId=" << desc.SubSysId
-						<< " Revision=" << desc.Revision
-						<< " | Luid=(" << desc.AdapterLuid.HighPart << "," << desc.AdapterLuid.LowPart << ")\n"
+					os << "Adapter: VendorId=" << desc.VendorId << " DeviceId=" << desc.DeviceId
+						<< " SubSysId=" << desc.SubSysId << " Revision=" << desc.Revision
+						<< " | Luid=(" << desc.AdapterLuid.HighPart << ","
+						<< desc.AdapterLuid.LowPart << ")\n"
 						<< "         Desc=\"" << utils::ToString(desc.Description) << "\"\n";
 				}
 				adapter->Release();
@@ -39,10 +38,7 @@ namespace gglab
 		}
 	}
 
-	void ReportAndAbortDX12(
-		HRESULT hr,
-		ID3D12Device* device,
-		std::string_view context,
+	void ReportAndAbortDX12(HRESULT hr, ID3D12Device* device, std::string_view context,
 		std::source_location loc) noexcept
 	{
 		std::ostringstream os;
@@ -50,8 +46,8 @@ namespace gglab
 		os << "=== FATAL: DirectX 12 Failure ===\n";
 		os << "Time   : " << win32::FormatLocalTime() << "\n";
 		os << "Thread : " << ::GetCurrentThreadId() << "\n";
-		os << "Where  : " << loc.file_name() << ":" << loc.line()
-			<< " (" << loc.function_name() << ")\n";
+		os << "Where  : " << loc.file_name() << ":" << loc.line() << " (" << loc.function_name()
+			<< ")\n";
 		if (!context.empty())
 		{
 			os << "Expr   : " << context << "\n";

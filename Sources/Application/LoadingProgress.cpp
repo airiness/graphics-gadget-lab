@@ -6,11 +6,10 @@ namespace gglab
 {
 	LoadingProgressBuilder::LoadingProgressBuilder(std::string title) noexcept :
 		m_Title(std::move(title))
-	{}
+	{
+	}
 
-	void LoadingProgressBuilder::AddStep(
-		float weight,
-		const LoadingProgressStep& step) noexcept
+	void LoadingProgressBuilder::AddStep(float weight, const LoadingProgressStep& step) noexcept
 	{
 		weight = std::max(weight, 0.0f);
 		m_TotalWeight += weight;
@@ -41,9 +40,7 @@ namespace gglab
 	}
 
 	void LoadingProgressBuilder::AddAssetStep(
-		float weight,
-		const AssetLoadProgress& progress,
-		std::string_view detail) noexcept
+		float weight, const AssetLoadProgress& progress, std::string_view detail) noexcept
 	{
 		LoadingStatus status = LoadingStatus::Preparing;
 		if (progress.IsReady())
@@ -58,34 +55,38 @@ namespace gglab
 		std::string combinedDetail(detail);
 		if (!progress.m_Detail.empty())
 		{
-			combinedDetail = combinedDetail.empty() ? progress.m_Detail :
-				std::format("{} | {}", combinedDetail, progress.m_Detail);
+			combinedDetail = combinedDetail.empty()
+				? progress.m_Detail
+				: std::format("{} | {}", combinedDetail, progress.m_Detail);
 		}
 
 		AddStep(weight, {
-			.m_Status = status,
-			.m_Fraction = progress.m_Fraction,
-			.m_Stage = progress.m_Stage,
-			.m_Detail = combinedDetail,
-		});
+							.m_Status = status,
+							.m_Fraction = progress.m_Fraction,
+							.m_Stage = progress.m_Stage,
+							.m_Detail = combinedDetail,
+			});
 	}
 
 	void LoadingProgressBuilder::AddCompletedStep(float weight) noexcept
 	{
 		AddStep(weight, {
-			.m_Status = LoadingStatus::Ready,
-			.m_Fraction = 1.0f,
-		});
+							.m_Status = LoadingStatus::Ready,
+							.m_Fraction = 1.0f,
+			});
 	}
 
 	LoadingProgress LoadingProgressBuilder::Build() const noexcept
 	{
-		const LoadingStatus status = m_HasFailedStep ? LoadingStatus::Failed :
-			(m_HasPreparingStep ? LoadingStatus::Preparing : LoadingStatus::Ready);
+		const LoadingStatus status =
+			m_HasFailedStep
+			? LoadingStatus::Failed
+			: (m_HasPreparingStep ? LoadingStatus::Preparing : LoadingStatus::Ready);
 		return {
 			.m_Status = status,
-			.m_Fraction = status == LoadingStatus::Ready ? 1.0f :
-				(m_TotalWeight > 0.0f ? m_WeightedFraction / m_TotalWeight : 0.0f),
+			.m_Fraction = status == LoadingStatus::Ready
+							  ? 1.0f
+							  : (m_TotalWeight > 0.0f ? m_WeightedFraction / m_TotalWeight : 0.0f),
 			.m_Title = m_Title,
 			.m_Stage = m_CurrentStage,
 			.m_Detail = m_CurrentDetail,

@@ -13,32 +13,29 @@ namespace gglab
 	class RenderPassPostProcessPreview final : public RenderPassBase
 	{
 	public:
-		RenderPassPostProcessPreview() noexcept : RenderPassBase({
-			.m_TypeName = "PostProcess.Preview",
-			.m_DisplayName = "Post Process Preview",
-			.m_CategoryName = "PostProcess",
-			.m_Description = "Publishes the selected HDR post-process tap to one persistent SDR preview texture.",
-			.m_Category = RenderPassCategory::PostProcess,
-			.m_Type = RenderPassType::Graphics,
-		}) {}
+		RenderPassPostProcessPreview() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "PostProcess.Preview",
+				  .m_DisplayName = "Post Process Preview",
+				  .m_CategoryName = "PostProcess",
+				  .m_Description =
+					  "Publishes the selected HDR post-process tap to one persistent SDR preview texture.",
+				  .m_Category = RenderPassCategory::PostProcess,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
 		~RenderPassPostProcessPreview() override = default;
 
-		void AddPass(RenderGraph& rg,
-			const RenderFrameContext& context,
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
-		void AddPassForTap(RenderGraph& rg,
-			const RenderFrameContext& context,
-			const RenderServices& services,
-			const RGPostProcessColor& source,
-			PostProcessDebugTap tap,
-			uint32_t bloomPyramidLevel = 0) noexcept;
+		void AddPassForTap(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services, const RGPostProcessColor& source,
+			PostProcessDebugTap tap, uint32_t bloomPyramidLevel = 0) noexcept;
 
 	private:
-		void AddResolvedPass(RenderGraph& rg,
-			const RenderFrameContext& context,
-			const RenderServices& services,
-			RGTextureId source,
-			float sourcePreExposure,
+		void AddResolvedPass(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services, RGTextureId source, float sourcePreExposure,
 			std::optional<RHITextureViewDesc> sourceViewDesc,
 			PostProcessDebugSelection selection) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;

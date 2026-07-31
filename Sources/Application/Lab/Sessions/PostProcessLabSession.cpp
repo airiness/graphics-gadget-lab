@@ -28,12 +28,8 @@ namespace gglab
 		};
 	}
 
-	PostProcessLabSession::PostProcessLabSession(
-		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
+	PostProcessLabSession::PostProcessLabSession(const LabSessionCreateInfo& createInfo) noexcept :
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -43,7 +39,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = true,
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ExposureEvId,
 			.m_Name = "Exposure Compensation EV",
@@ -53,7 +49,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(-6.0f),
 			.m_MaxValue = LabValue(6.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EmissiveIntensityId,
 			.m_Name = "Emitter Intensity",
@@ -63,7 +59,7 @@ namespace gglab
 			.m_DefaultValue = 12.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(64.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomEnabledId,
 			.m_Name = "Enabled",
@@ -71,7 +67,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = true,
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomThresholdId,
 			.m_Name = "Threshold",
@@ -81,7 +77,7 @@ namespace gglab
 			.m_DefaultValue = 1.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(16.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomSoftKneeId,
 			.m_Name = "Soft Knee",
@@ -91,7 +87,7 @@ namespace gglab
 			.m_DefaultValue = 0.5f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomIntensityId,
 			.m_Name = "Intensity",
@@ -101,7 +97,7 @@ namespace gglab
 			.m_DefaultValue = 0.08f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(2.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomScatterId,
 			.m_Name = "Scatter",
@@ -111,7 +107,7 @@ namespace gglab
 			.m_DefaultValue = 0.7f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomLevelsId,
 			.m_Name = "Pyramid Levels",
@@ -121,7 +117,7 @@ namespace gglab
 			.m_DefaultValue = uint32_t(6),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(uint32_t(8)),
-		}));
+			}));
 
 		ApplyImmediateParameters();
 	}
@@ -134,8 +130,7 @@ namespace gglab
 		m_AssetPreparation.TrackModel(ProceduralCubeModelID, "ProceduralCube", 0.35f);
 		m_AssetPreparation.TrackModel(ProceduralSphereModelID, "ProceduralSphere", 0.65f);
 		m_LoadingProgress = m_AssetPreparation.BuildProgress(
-			*m_Services.m_AssetManager,
-			"Preparing Post Process Lab");
+			*m_Services.m_AssetManager, "Preparing Post Process Lab");
 	}
 
 	void PostProcessLabSession::TickPrepare() noexcept
@@ -145,14 +140,12 @@ namespace gglab
 			return;
 		}
 		m_LoadingProgress = m_AssetPreparation.BuildProgress(
-			*m_Services.m_AssetManager,
-			"Preparing Post Process Lab");
+			*m_Services.m_AssetManager, "Preparing Post Process Lab");
 	}
 
 	void PostProcessLabSession::CommitPrepare() noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			m_LoadingProgress.IsReady(),
+		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(),
 			"Post Process Lab committed before its procedural models were ready.");
 	}
 
@@ -191,19 +184,16 @@ namespace gglab
 		bloom.m_MaxLevels = parameters.Get(BloomLevelsId, uint32_t(6));
 
 		const float baseIntensity = parameters.Get(EmissiveIntensityId, 12.0f);
-		auto emitterView = m_World.GetRegistry().view<
-			BloomEmitterComponent,
-			components::MaterialInstanceComponent>();
+		auto emitterView =
+			m_World.GetRegistry()
+			.view<BloomEmitterComponent, components::MaterialInstanceComponent>();
 		for (const entt::entity entity : emitterView)
 		{
 			const auto& emitter = emitterView.get<BloomEmitterComponent>(entity);
 			auto& material = emitterView.get<components::MaterialInstanceComponent>(entity);
 			const float intensity = baseIntensity * emitter.m_IntensityScale;
-			material.m_Properties.m_EmissiveColor = Color(
-				emitter.m_Color.m_R * intensity,
-				emitter.m_Color.m_G * intensity,
-				emitter.m_Color.m_B * intensity,
-				1.0f);
+			material.m_Properties.m_EmissiveColor = Color(emitter.m_Color.m_R * intensity,
+				emitter.m_Color.m_G * intensity, emitter.m_Color.m_B * intensity, 1.0f);
 		}
 	}
 
@@ -212,8 +202,7 @@ namespace gglab
 		BuildScene();
 	}
 
-	void PostProcessLabSession::OnParametersRestoredForPrepare(
-		LabChangeImpact impact) noexcept
+	void PostProcessLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
 	{
 		GGLAB_UNUSED(impact);
 		ApplyImmediateParameters();
@@ -239,7 +228,7 @@ namespace gglab
 			.m_World = &m_World,
 			.m_Transform = floorTransform,
 			.m_MaterialInstance = floorMaterial,
-		}));
+			}));
 
 		constexpr std::array<Vector3, 5> positions = {
 			Vector3(-4.2f, 0.3f, 5.5f),
@@ -263,14 +252,10 @@ namespace gglab
 			transform.m_Position = positions[index];
 			transform.m_Scale = Vector3::One * (0.5f + static_cast<float>(index) * 0.1f);
 			components::MaterialInstanceComponent material{};
-			material.m_Key = RuntimeMaterialKey(std::format(
-				"gglab.lab.post_process.material.emitter.{}",
-				index));
-			material.m_Properties.m_BaseColor = Color(
-				colors[index].m_R * 0.08f,
-				colors[index].m_G * 0.08f,
-				colors[index].m_B * 0.08f,
-				1.0f);
+			material.m_Key = RuntimeMaterialKey(
+				std::format("gglab.lab.post_process.material.emitter.{}", index));
+			material.m_Properties.m_BaseColor = Color(colors[index].m_R * 0.08f,
+				colors[index].m_G * 0.08f, colors[index].m_B * 0.08f, 1.0f);
 			material.m_Properties.m_RoughnessFactor = 0.25f;
 			const entt::entity emitter = primitive::Sphere::Create({
 				.m_AssetManager = m_Services.m_AssetManager,
@@ -278,11 +263,12 @@ namespace gglab
 				.m_World = &m_World,
 				.m_Transform = transform,
 				.m_MaterialInstance = material,
-			});
-			registry.emplace<BloomEmitterComponent>(emitter, BloomEmitterComponent{
-				.m_Color = colors[index],
-				.m_IntensityScale = intensityScales[index],
-			});
+				});
+			registry.emplace<BloomEmitterComponent>(
+				emitter, BloomEmitterComponent{
+							 .m_Color = colors[index],
+							 .m_IntensityScale = intensityScales[index],
+				});
 		}
 
 		const entt::entity lightEntity = registry.create();
@@ -303,9 +289,7 @@ namespace gglab
 
 	void PostProcessLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(
-			Vector3(0.0f, 2.1f, -7.5f),
-			Vector3(0.0f, 0.35f, 5.8f));
+		GetCamera().LookAt(Vector3(0.0f, 2.1f, -7.5f), Vector3(0.0f, 0.35f, 5.8f));
 		GetCamera().SetFov(46.0f);
 		GetCamera().Update();
 	}

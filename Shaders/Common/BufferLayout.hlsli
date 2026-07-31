@@ -44,7 +44,7 @@ struct SceneData
 	uint LightCount;
 	uint DirectionalShadowLightIndex;
 	uint3 Padding;
-	
+
 	IBLResourceData IBLResource;
 };
 
@@ -67,22 +67,22 @@ struct MaterialTextureBindingData
 struct MaterialData
 {
 	MaterialTextureBindingData BaseColorBinding;
-	MaterialTextureBindingData EmissiveBinding;	
+	MaterialTextureBindingData EmissiveBinding;
 	MaterialTextureBindingData MetallicRoughnessBinding;
 	MaterialTextureBindingData NormalBinding;
 	MaterialTextureBindingData OcclusionBinding;
-	
+
 	float4 BaseColorFactor;
 	float4 EmissiveColorFactor;
-	
+
 	float MetallicFactor;
 	float RoughnessFactor;
 	float NormalScale;
 	float OcclusionStrength;
-	
+
 	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND. Defined in MaterialUtils.hlsli
 	float AlphaCutoff;
-	uint Flags; // bit 0: doubleSided
+	uint Flags;		// bit 0: doubleSided
 	uint DebugView; // 0: lit, 1: base color, 2: metallic, 3: roughness, 4: normal
 };
 

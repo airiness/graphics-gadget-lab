@@ -27,8 +27,7 @@ namespace gglab
 			bool m_MeshShaderSupported = false;
 			bool m_TearingSupported = false;
 			bool m_EnhancedBarriers = false;
-			RHIShaderWaveCapabilities
-				m_ShaderWaveCapabilities{};
+			RHIShaderWaveCapabilities m_ShaderWaveCapabilities{};
 		};
 
 		struct CreateInfo
@@ -60,28 +59,26 @@ namespace gglab
 		{
 			return m_AdapterCompatibilityIdentity;
 		}
-		RHIShaderWaveCapabilities
-			GetShaderWaveCapabilities() const noexcept override
+		RHIShaderWaveCapabilities GetShaderWaveCapabilities() const noexcept override
 		{
-			return m_FeatureSupport.
-				m_ShaderWaveCapabilities;
+			return m_FeatureSupport.m_ShaderWaveCapabilities;
 		}
 		RHITextureSupportResult QueryTextureSupport(
 			const RHITextureDesc& desc) const noexcept override;
-		RHITextureSupportResult QueryTextureViewSupport(
-			const RHITextureDesc& textureDesc,
+		RHITextureSupportResult QueryTextureViewSupport(const RHITextureDesc& textureDesc,
 			const RHITextureViewDesc& viewDesc) const noexcept override;
 
-		RHITextureHandle CreateTexture(
-			const RHITextureDesc& desc,
+		RHITextureHandle CreateTexture(const RHITextureDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept override;
-		RHIBufferHandle CreateBuffer(
-			const RHIBufferDesc& desc,
+		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept override;
-		RHITextureHandle ImportTexture(const DX12ResourceManager::ImportedTextureDesc& desc) noexcept;
+		RHITextureHandle ImportTexture(
+			const DX12ResourceManager::ImportedTextureDesc& desc) noexcept;
 		RHIBufferHandle ImportBuffer(const DX12ResourceManager::ImportedBufferDesc& desc) noexcept;
-		RHITextureViewHandle CreateTextureView(RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept override;
-		RHIBufferViewHandle CreateBufferView(RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept override;
+		RHITextureViewHandle CreateTextureView(
+			RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept override;
+		RHIBufferViewHandle CreateBufferView(
+			RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept override;
 		RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept override;
 
 		void DestroyTexture(RHITextureHandle texture) noexcept override;
@@ -90,36 +87,36 @@ namespace gglab
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
 		void SetTextureDebugBinding(
-			RHITextureHandle texture,
-			const RHIResourceDebugBindingDesc& binding) noexcept override;
+			RHITextureHandle texture, const RHIResourceDebugBindingDesc& binding) noexcept override;
 		void SetBufferDebugBinding(
-			RHIBufferHandle buffer,
-			const RHIResourceDebugBindingDesc& binding) noexcept override;
+			RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept override;
 		std::string_view GetTextureDebugName(RHITextureHandle texture) const noexcept override;
 		std::string_view GetBufferDebugName(RHIBufferHandle buffer) const noexcept override;
-		void* MapBuffer(RHIBufferHandle buffer,
-			RHIMappedBufferRange readRange) noexcept override;
-		void UnmapBuffer(RHIBufferHandle buffer,
-			RHIMappedBufferRange writtenRange) noexcept override;
+		void* MapBuffer(RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept override;
+		void UnmapBuffer(
+			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		uint32_t GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept override;
 		bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept;
-		void RecordTextureUse(RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
+		void RecordTextureUse(
+			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
 		void RecordBufferUse(RHIBufferHandle buffer, const DX12FencePoint& fencePoint) noexcept;
-		void RecordBufferUse(RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept override;
+		void RecordBufferUse(
+			RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept override;
 		void SetDescriptorManager(DX12DescriptorManager* descriptorManager) noexcept;
 		void SetQueueSystem(DX12QueueSystem* queueSystem) noexcept { m_QueueSystem = queueSystem; }
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
-		RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept override;
-		RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept override;
+		RHIDescriptorHandle GetTextureViewDescriptor(
+			RHITextureViewHandle view) const noexcept override;
+		RHIDescriptorHandle GetBufferViewDescriptor(
+			RHIBufferViewHandle view) const noexcept override;
 		RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE ResolveShaderVisibleDescriptor(
-			RHIDescriptorHeapType heapType,
-			uint32_t descriptorIndex) const noexcept;
+			RHIDescriptorHeapType heapType, uint32_t descriptorIndex) const noexcept;
 
 		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;
 		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;
@@ -130,7 +127,10 @@ namespace gglab
 		void RetireCompletedRHIResources() noexcept;
 
 		DX12ResourceManager* GetResourceManager() noexcept { return &m_ResourceManager; }
-		const DX12ResourceManager* GetResourceManager() const noexcept { return &m_ResourceManager; }
+		const DX12ResourceManager* GetResourceManager() const noexcept
+		{
+			return &m_ResourceManager;
+		}
 
 	private:
 		void InitializeWinPIX() noexcept;

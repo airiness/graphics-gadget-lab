@@ -4,13 +4,10 @@
 namespace gglab
 {
 	ModelPublicationJob::ModelPublicationJob(
-		std::unique_ptr<AssetPublicationServicesBase>&& services,
-		AssetContentVersion model,
-		double importQueueMilliseconds,
-		double importExecutionMilliseconds,
+		std::unique_ptr<AssetPublicationServicesBase>&& services, AssetContentVersion model,
+		double importQueueMilliseconds, double importExecutionMilliseconds,
 		ModelImportArtifactHandle artifact) noexcept :
-		m_Services(std::move(services)),
-		m_Model(model),
+		m_Services(std::move(services)), m_Model(model),
 		m_ImportQueueMilliseconds(importQueueMilliseconds),
 		m_ImportExecutionMilliseconds(importExecutionMilliseconds),
 		m_Artifact(std::move(artifact)),
@@ -22,12 +19,9 @@ namespace gglab
 		GGLAB_ASSERT(m_Artifact && m_Artifact->IsValid());
 		const ModelImportArtifact& source = *m_Artifact;
 		m_MaterialIds.reserve(std::max<size_t>(source.m_Materials.size(), 1));
-		m_PendingInstances.reserve(std::max(
-			source.m_MeshInstances.size(),
-			source.m_Meshes.size()));
+		m_PendingInstances.reserve(std::max(source.m_MeshInstances.size(), source.m_Meshes.size()));
 		m_Dependencies.reserve(source.m_Textures.size() + source.m_Meshes.size());
-		m_Journal.Reserve(
-			source.m_Textures.size() + source.m_Meshes.size(),
+		m_Journal.Reserve(source.m_Textures.size() + source.m_Meshes.size(),
 			std::max<size_t>(source.m_Materials.size(), 1),
 			source.m_Textures.size() + source.m_Meshes.size());
 	}
@@ -39,26 +33,21 @@ namespace gglab
 		if (!m_Services)
 		{
 			return FinalizeStep(
-				Failed("Model publication job has no publication services"),
-				progressBefore);
+				Failed("Model publication job has no publication services"), progressBefore);
 		}
 		if (m_Journal.IsAborted())
 		{
 			return FinalizeStep(
-				{ .m_Status = AssetResourcePublicationStepStatus::Cancelled },
-				progressBefore);
+				{ .m_Status = AssetResourcePublicationStepStatus::Cancelled }, progressBefore);
 		}
 		if (!m_Services->PrepareModelForPublication(m_Model))
 		{
 			return FinalizeStep(
-				{ .m_Status = AssetResourcePublicationStepStatus::Cancelled },
-				progressBefore);
+				{ .m_Status = AssetResourcePublicationStepStatus::Cancelled }, progressBefore);
 		}
 		if (!m_Artifact || m_Artifact->m_Meshes.empty())
 		{
-			return FinalizeStep(
-				Failed("Imported model contains no meshes"),
-				progressBefore);
+			return FinalizeStep(Failed("Imported model contains no meshes"), progressBefore);
 		}
 
 		for (;;)
@@ -105,8 +94,7 @@ namespace gglab
 		}
 	}
 
-	void ModelPublicationJob::Abort(
-		AssetResourcePublicationContext& context,
+	void ModelPublicationJob::Abort(AssetResourcePublicationContext& context,
 		AssetResourcePublicationAbortReason reason) noexcept
 	{
 		GGLAB_UNUSED(context);
@@ -162,8 +150,8 @@ namespace gglab
 				{
 					return AssetResourcePublicationStage::MeshInstances;
 				}
-				stage = m_PendingInstances.empty() ?
-					Stage::FallbackMeshInstances : Stage::Dependencies;
+				stage =
+					m_PendingInstances.empty() ? Stage::FallbackMeshInstances : Stage::Dependencies;
 				break;
 			case Stage::FallbackMeshInstances:
 				if (m_FallbackInstanceCursor < m_MeshIds.size())
@@ -199,9 +187,8 @@ namespace gglab
 		}
 
 		const size_t textureIndex = m_TextureCursor++;
-		ModelPublicationTextureResult result = m_Services->PublishTexture(
-			source.m_Textures[textureIndex],
-			priority);
+		ModelPublicationTextureResult result =
+			m_Services->PublishTexture(source.m_Textures[textureIndex], priority);
 		m_TextureIds[textureIndex] = result.m_TextureId;
 		if (result.m_Claim.m_ContentVersion.IsValid())
 		{
@@ -240,9 +227,8 @@ namespace gglab
 			return std::nullopt;
 		}
 
-		ModelPublicationMaterialResult result = m_Services->PublishMaterial(
-			importedMaterial,
-			m_TextureIds);
+		ModelPublicationMaterialResult result =
+			m_Services->PublishMaterial(importedMaterial, m_TextureIds);
 		if (!result.Succeeded())
 		{
 			return Failed(std::move(result.m_Error), result.m_Usage);
@@ -263,8 +249,7 @@ namespace gglab
 		}
 
 		const size_t meshIndex = m_MeshCursor++;
-		ModelPublicationMeshResult result = m_Services->PublishMesh(
-			m_Model,
+		ModelPublicationMeshResult result = m_Services->PublishMesh(m_Model,
 			{
 				.m_Owner = m_Artifact,
 				.m_MeshIndex = static_cast<uint32_t>(meshIndex),
@@ -295,30 +280,29 @@ namespace gglab
 		const ModelImportArtifact& source = *m_Artifact;
 		if (m_InstanceCursor >= source.m_MeshInstances.size())
 		{
-			m_Stage = m_PendingInstances.empty() ?
-				Stage::FallbackMeshInstances : Stage::Dependencies;
+			m_Stage =
+				m_PendingInstances.empty() ? Stage::FallbackMeshInstances : Stage::Dependencies;
 			return std::nullopt;
 		}
 
-		const ImportedModelMesh& importedInstance =
-			source.m_MeshInstances[m_InstanceCursor++];
+		const ImportedModelMesh& importedInstance = source.m_MeshInstances[m_InstanceCursor++];
 		if (importedInstance.m_MeshIndex >= m_MeshIds.size())
 		{
 			return Continued();
 		}
-		const uint32_t materialIndex =
-			importedInstance.m_MaterialIndex < m_MaterialIds.size() ?
-			importedInstance.m_MaterialIndex : 0;
+		const uint32_t materialIndex = importedInstance.m_MaterialIndex < m_MaterialIds.size()
+			? importedInstance.m_MaterialIndex
+			: 0;
 		m_PendingInstances.push_back({
 			.m_MeshId = m_MeshIds[importedInstance.m_MeshIndex],
 			.m_MaterialId = m_MaterialIds[materialIndex],
 			.m_LocalTransform = importedInstance.m_LocalTransform,
-		});
+			});
 		return Continued({ .m_ResourceCreations = 1 });
 	}
 
-	ModelPublicationJob::OptionalStepResult
-		ModelPublicationJob::StepFallbackMeshInstances() noexcept
+	ModelPublicationJob::OptionalStepResult ModelPublicationJob::
+		StepFallbackMeshInstances() noexcept
 	{
 		if (m_FallbackInstanceCursor >= m_MeshIds.size())
 		{
@@ -327,14 +311,13 @@ namespace gglab
 		}
 
 		const size_t meshIndex = m_FallbackInstanceCursor++;
-		const uint32_t sourceMaterialIndex =
-			m_Artifact->m_Meshes[meshIndex].m_MaterialIndex;
+		const uint32_t sourceMaterialIndex = m_Artifact->m_Meshes[meshIndex].m_MaterialIndex;
 		const uint32_t materialIndex =
 			sourceMaterialIndex < m_MaterialIds.size() ? sourceMaterialIndex : 0;
 		m_PendingInstances.push_back({
 			.m_MeshId = m_MeshIds[meshIndex],
 			.m_MaterialId = m_MaterialIds[materialIndex],
-		});
+			});
 		return Continued({ .m_ResourceCreations = 1 });
 	}
 
@@ -348,8 +331,7 @@ namespace gglab
 		}
 		if (!m_Journal.GetDependencyOwner().IsValid())
 		{
-			const ModelPublicationOwnerToken owner =
-				m_Services->CreateDependencyOwner(m_Model);
+			const ModelPublicationOwnerToken owner = m_Services->CreateDependencyOwner(m_Model);
 			if (!owner.IsValid())
 			{
 				return Failed("Failed to create model dependency owner");
@@ -359,9 +341,7 @@ namespace gglab
 
 		const AssetContentVersion dependency = m_Dependencies[m_DependencyCursor++];
 		const ModelPublicationLeaseToken lease = m_Services->AcquireDependencyLease(
-			m_Journal.GetDependencyOwner(),
-			dependency,
-			priority);
+			m_Journal.GetDependencyOwner(), dependency, priority);
 		if (!lease.IsValid())
 		{
 			return Failed("Failed to acquire model dependency lease");
@@ -378,8 +358,7 @@ namespace gglab
 		}
 		if (!m_Journal.GetDependencyOwner().IsValid())
 		{
-			const ModelPublicationOwnerToken owner =
-				m_Services->CreateDependencyOwner(m_Model);
+			const ModelPublicationOwnerToken owner = m_Services->CreateDependencyOwner(m_Model);
 			if (!owner.IsValid())
 			{
 				return Failed("Failed to create model dependency owner");
@@ -397,7 +376,7 @@ namespace gglab
 			.m_DependencyLeases = m_Journal.GetDependencyLeases(),
 			.m_QueuedTextureUploads = m_QueuedTextureUploads,
 			.m_QueuedMeshUploads = m_QueuedMeshUploads,
-		});
+			});
 		if (!error.empty())
 		{
 			return Failed(std::move(error));
@@ -423,19 +402,14 @@ namespace gglab
 		m_Stage = Stage::Finished;
 		GGLAB_LOG_GRAPHICS_INFO(
 			"Async model {} published incrementally (instances={}, textureUploads={}, meshUploads={}, queueMs={:.2f}, cpuMs={:.2f}).",
-			m_Model.m_Key.m_StableId,
-			m_CommittedInstanceCount,
-			m_QueuedTextureUploads,
-			m_QueuedMeshUploads,
-			m_ImportQueueMilliseconds,
-			m_ImportExecutionMilliseconds);
+			m_Model.m_Key.m_StableId, m_CommittedInstanceCount, m_QueuedTextureUploads,
+			m_QueuedMeshUploads, m_ImportQueueMilliseconds, m_ImportExecutionMilliseconds);
 		return AssetResourcePublicationStepResult{
 			.m_Status = AssetResourcePublicationStepStatus::Completed,
 		};
 	}
 
-	void ModelPublicationJob::AddDependency(
-		const AssetContentVersion& dependency)
+	void ModelPublicationJob::AddDependency(const AssetContentVersion& dependency)
 	{
 		GGLAB_ASSERT(dependency.IsValid());
 		if (m_DependencyKeys.insert(dependency.m_Key).second)
@@ -461,8 +435,7 @@ namespace gglab
 	}
 
 	AssetResourcePublicationStepResult ModelPublicationJob::FinalizeStep(
-		AssetResourcePublicationStepResult result,
-		const ProgressState& progressBefore) noexcept
+		AssetResourcePublicationStepResult result, const ProgressState& progressBefore) noexcept
 	{
 		result.m_Usage.m_Stage = PublicationStage(m_LastStepStage);
 		if (CaptureProgressState() != progressBefore)
@@ -476,23 +449,29 @@ namespace gglab
 	{
 		switch (stage)
 		{
-		case Stage::Textures: return AssetResourcePublicationStage::Textures;
-		case Stage::Materials: return AssetResourcePublicationStage::Materials;
-		case Stage::Meshes: return AssetResourcePublicationStage::Meshes;
+		case Stage::Textures:
+			return AssetResourcePublicationStage::Textures;
+		case Stage::Materials:
+			return AssetResourcePublicationStage::Materials;
+		case Stage::Meshes:
+			return AssetResourcePublicationStage::Meshes;
 		case Stage::MeshInstances:
 		case Stage::FallbackMeshInstances:
 			return AssetResourcePublicationStage::MeshInstances;
-		case Stage::Dependencies: return AssetResourcePublicationStage::Dependencies;
-		case Stage::Commit: return AssetResourcePublicationStage::Commit;
-		case Stage::ReleaseRetains: return AssetResourcePublicationStage::ReleaseRetains;
-		case Stage::Finished: return AssetResourcePublicationStage::Unknown;
+		case Stage::Dependencies:
+			return AssetResourcePublicationStage::Dependencies;
+		case Stage::Commit:
+			return AssetResourcePublicationStage::Commit;
+		case Stage::ReleaseRetains:
+			return AssetResourcePublicationStage::ReleaseRetains;
+		case Stage::Finished:
+			return AssetResourcePublicationStage::Unknown;
 		}
 		return AssetResourcePublicationStage::Unknown;
 	}
 
 	AssetResourcePublicationStepResult ModelPublicationJob::Failed(
-		std::string error,
-		AssetResourcePublicationStepUsage usage) noexcept
+		std::string error, AssetResourcePublicationStepUsage usage) noexcept
 	{
 		return {
 			.m_Status = AssetResourcePublicationStepStatus::Failed,

@@ -5,6 +5,5 @@
 
 namespace gglab
 {
-	[[nodiscard]] D3D12_COMPARISON_FUNC ToD3D12ComparisonFunc(
-		RHICompareOp compareOp) noexcept;
+	[[nodiscard]] D3D12_COMPARISON_FUNC ToD3D12ComparisonFunc(RHICompareOp compareOp) noexcept;
 }

@@ -22,10 +22,8 @@ namespace gglab
 		{
 			if (entry.m_Descriptor.m_Id.GetHash() == descriptor.m_Id.GetHash())
 			{
-				GGLAB_LOG_ERROR(
-					"Lab ID hash collision between '{}' and '{}'.",
-					entry.m_Descriptor.m_Id.GetName(),
-					descriptor.m_Id.GetName());
+				GGLAB_LOG_ERROR("Lab ID hash collision between '{}' and '{}'.",
+					entry.m_Descriptor.m_Id.GetName(), descriptor.m_Id.GetName());
 				return false;
 			}
 		}
@@ -33,7 +31,7 @@ namespace gglab
 		m_Entries.push_back({
 			.m_Descriptor = std::move(descriptor),
 			.m_Factory = factory,
-		});
+			});
 		return true;
 	}
 
@@ -49,8 +47,7 @@ namespace gglab
 	}
 
 	std::unique_ptr<LabSessionBase> LabCatalog::Create(
-		const LabId& id,
-		const LabSessionCreateInfo& createInfo) const noexcept
+		const LabId& id, const LabSessionCreateInfo& createInfo) const noexcept
 	{
 		const Entry* entry = FindEntry(id);
 		return entry ? entry->m_Factory(createInfo) : nullptr;
@@ -58,10 +55,8 @@ namespace gglab
 
 	const LabCatalog::Entry* LabCatalog::FindEntry(const LabId& id) const noexcept
 	{
-		const auto iter = std::ranges::find_if(m_Entries, [&id](const Entry& entry)
-			{
-				return entry.m_Descriptor.m_Id == id;
-			});
+		const auto iter = std::ranges::find_if(
+			m_Entries, [&id](const Entry& entry) { return entry.m_Descriptor.m_Id == id; });
 		return iter != m_Entries.end() ? &*iter : nullptr;
 	}
 }

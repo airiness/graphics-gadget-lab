@@ -17,9 +17,7 @@ namespace gglab
 	}
 
 	void RenderPassIBLClear::AddPass(
-		RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
 		auto* renderer = services.m_Renderer;
@@ -30,12 +28,14 @@ namespace gglab
 			return;
 		}
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
 			[registry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 				auto& resources = builder.GetBlackboard().Get<RGIBLResources>(IBLResourcesName);
-				auto& previewResources = builder.GetBlackboard().Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
+				auto& previewResources =
+					builder.GetBlackboard().Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
 				using TextureIndex = RenderResourceRegistry::TextureIndex;
 				struct Target
 				{
@@ -43,13 +43,17 @@ namespace gglab
 					RGTextureId* m_Texture;
 				};
 				Target targets[] = {
-					{ TextureIndex::IBL_EnvironmentCubemap, &resources.m_EnvironmentCubemap },
-					{ TextureIndex::IBL_IrradianceCubemap, &resources.m_IrradianceCubemap },
-					{ TextureIndex::IBL_PrefilteredSpecularCubemap, &resources.m_PrefilteredSpecularCubemap },
-					{ TextureIndex::IBL_BrdfLut, &resources.m_BrdfLut },
-					{ TextureIndex::Preview_IBL_EnvironmentCubemap, &previewResources.m_EnvironmentCubemapPreview },
-					{ TextureIndex::Preview_IBL_IrradianceCubemap, &previewResources.m_IrradianceCubemapPreview },
-					{ TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, &previewResources.m_PrefilteredSpecularCubemapPreview },
+					{TextureIndex::IBL_EnvironmentCubemap, &resources.m_EnvironmentCubemap},
+					{TextureIndex::IBL_IrradianceCubemap, &resources.m_IrradianceCubemap},
+					{TextureIndex::IBL_PrefilteredSpecularCubemap,
+						&resources.m_PrefilteredSpecularCubemap},
+					{TextureIndex::IBL_BrdfLut, &resources.m_BrdfLut},
+					{TextureIndex::Preview_IBL_EnvironmentCubemap,
+						&previewResources.m_EnvironmentCubemapPreview},
+					{TextureIndex::Preview_IBL_IrradianceCubemap,
+						&previewResources.m_IrradianceCubemapPreview},
+					{TextureIndex::Preview_IBL_PrefilteredSpecularCubemap,
+						&previewResources.m_PrefilteredSpecularCubemapPreview},
 				};
 
 				for (const Target& target : targets)
@@ -61,10 +65,11 @@ namespace gglab
 					{
 						for (uint32_t slice = 0; slice < desc->m_ArraySize; ++slice)
 						{
-							const auto viewDesc = MakeRHITexture2DArrayViewDesc(desc->m_Format, mip, slice, 1);
-							data.m_Rtvs.push_back(builder.CreateView<RHITextureViewType::RenderTarget>(
-								*target.m_Texture,
-								viewDesc));
+							const auto viewDesc =
+								MakeRHITexture2DArrayViewDesc(desc->m_Format, mip, slice, 1);
+							data.m_Rtvs.push_back(
+								builder.CreateView<RHITextureViewType::RenderTarget>(
+									*target.m_Texture, viewDesc));
 						}
 					}
 				}
@@ -75,17 +80,14 @@ namespace gglab
 				for (const RGTextureViewId viewId : data.m_Rtvs)
 				{
 					commandContext->ClearColor(
-						executeContext.GetViewHandle(viewId),
-						{ 0.0f, 0.0f, 0.0f, 1.0f });
+						executeContext.GetViewHandle(viewId), { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				registry->MarkActiveIBLInitialized();
 			});
 	}
 
 	void RenderPassIBLClear::AddBakePass(
-		RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
 		auto* renderer = services.m_Renderer;
@@ -100,7 +102,8 @@ namespace gglab
 
 		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
 		const std::string passName = MakeRenderGraphPassName("BakeTargets");
-		rg.AddPass<PassData>(passName.c_str(),
+		rg.AddPass<PassData>(
+			passName.c_str(),
 			[registry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -112,10 +115,11 @@ namespace gglab
 					RGTextureId* m_Texture;
 				};
 				Target targets[] = {
-					{ TextureIndex::IBL_EnvironmentCubemap, &resources.m_BakeEnvironmentCubemap },
-					{ TextureIndex::IBL_IrradianceCubemap, &resources.m_BakeIrradianceCubemap },
-					{ TextureIndex::IBL_PrefilteredSpecularCubemap, &resources.m_BakePrefilteredSpecularCubemap },
-					{ TextureIndex::IBL_BrdfLut, &resources.m_BakeBrdfLut },
+					{TextureIndex::IBL_EnvironmentCubemap, &resources.m_BakeEnvironmentCubemap},
+					{TextureIndex::IBL_IrradianceCubemap, &resources.m_BakeIrradianceCubemap},
+					{TextureIndex::IBL_PrefilteredSpecularCubemap,
+						&resources.m_BakePrefilteredSpecularCubemap},
+					{TextureIndex::IBL_BrdfLut, &resources.m_BakeBrdfLut},
 				};
 
 				for (const Target& target : targets)
@@ -127,10 +131,11 @@ namespace gglab
 					{
 						for (uint32_t slice = 0; slice < desc->m_ArraySize; ++slice)
 						{
-							const auto viewDesc = MakeRHITexture2DArrayViewDesc(desc->m_Format, mip, slice, 1);
-							data.m_Rtvs.push_back(builder.CreateView<RHITextureViewType::RenderTarget>(
-								*target.m_Texture,
-								viewDesc));
+							const auto viewDesc =
+								MakeRHITexture2DArrayViewDesc(desc->m_Format, mip, slice, 1);
+							data.m_Rtvs.push_back(
+								builder.CreateView<RHITextureViewType::RenderTarget>(
+									*target.m_Texture, viewDesc));
 						}
 					}
 				}
@@ -141,8 +146,7 @@ namespace gglab
 				for (const RGTextureViewId viewId : data.m_Rtvs)
 				{
 					commandContext->ClearColor(
-						executeContext.GetViewHandle(viewId),
-						{ 0.0f, 0.0f, 0.0f, 1.0f });
+						executeContext.GetViewHandle(viewId), { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				bakeScheduler->NotifyBakeResourcesInitialized(bakeGeneration);
 			});

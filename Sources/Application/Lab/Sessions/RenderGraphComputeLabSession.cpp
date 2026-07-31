@@ -32,16 +32,11 @@ namespace gglab
 		constexpr uint32_t WorkTextureHeight = 512;
 		constexpr uint32_t ComputeThreadGroupSize = 8;
 
-		const LabParameterId AnimationSpeedId(
-			"render_graph_compute.animation.speed");
-		const LabParameterId PatternFrequencyId(
-			"render_graph_compute.pattern.frequency");
-		const LabParameterId RingRadiusId(
-			"render_graph_compute.ring.radius");
-		const LabParameterId RingIntensityId(
-			"render_graph_compute.ring.intensity");
-		const LabParameterId CheckerCellSizeId(
-			"render_graph_compute.checker.cell_size");
+		const LabParameterId AnimationSpeedId("render_graph_compute.animation.speed");
+		const LabParameterId PatternFrequencyId("render_graph_compute.pattern.frequency");
+		const LabParameterId RingRadiusId("render_graph_compute.ring.radius");
+		const LabParameterId RingIntensityId("render_graph_compute.ring.intensity");
+		const LabParameterId CheckerCellSizeId("render_graph_compute.checker.cell_size");
 
 		const RenderPassInfo ComputeWritePassInfo{
 			.m_TypeName = "Lab.RenderGraphCompute.Write",
@@ -79,7 +74,9 @@ namespace gglab
 
 		const char* ComputeLabResourcesName = "RenderGraphComputeLab.Resources";
 
-		struct SetupPassData {};
+		struct SetupPassData
+		{
+		};
 
 		struct InitializePassData
 		{
@@ -111,7 +108,9 @@ namespace gglab
 			uint32_t m_Height = 0;
 		};
 
-		struct FinishPassData {};
+		struct FinishPassData
+		{
+		};
 
 		struct ComputeLabPassParameters
 		{
@@ -148,14 +147,9 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(m_State.get());
 			}
 
-			std::string_view GetName() const noexcept override
-			{
-				return "RenderGraph Compute Lab";
-			}
+			std::string_view GetName() const noexcept override { return "RenderGraph Compute Lab"; }
 
-			void BuildRenderGraph(
-				RenderGraph& rg,
-				const RenderFrameContext& context,
+			void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 				const RenderServices& services) noexcept override
 			{
 				GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
@@ -172,41 +166,35 @@ namespace gglab
 				const RenderViewID displayViewId = context.GetDisplayViewId();
 				const float patternFrequency =
 					m_State->m_PatternFrequency.load(std::memory_order_relaxed);
-				const float ringRadius =
-					m_State->m_RingRadius.load(std::memory_order_relaxed);
+				const float ringRadius = m_State->m_RingRadius.load(std::memory_order_relaxed);
 				const float ringIntensity =
 					m_State->m_RingIntensity.load(std::memory_order_relaxed);
 				const uint32_t checkerCellSize =
 					m_State->m_CheckerCellSize.load(std::memory_order_relaxed);
-				const float phase = std::fmod(
-					m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
-					6.28318530718f);
+				const float phase =
+					std::fmod(m_State->m_AnimationTimeSeconds.load(std::memory_order_relaxed),
+						6.28318530718f);
 
-				rg.AddPass<SetupPassData>(
-					"Lab.RenderGraphCompute.Setup",
+				rg.AddPass<SetupPassData>("Lab.RenderGraphCompute.Setup",
 					[swapChain, backBufferIndex, displayWidth, displayHeight, displayViewId](
-						RenderGraph::RGBuilder& builder,
-						SetupPassData&)
+						RenderGraph::RGBuilder& builder, SetupPassData&)
 					{
 						builder.SideEffect();
 
 						auto& resources = builder.GetBlackboard().Create<ComputeLabResources>(
 							ComputeLabResourcesName);
 						resources.m_WorkA = builder.CreateTexture(
-							"RenderGraphCompute.WorkA",
-							MakeWorkTextureDesc());
+							"RenderGraphCompute.WorkA", MakeWorkTextureDesc());
 						resources.m_WorkB = builder.CreateTexture(
-							"RenderGraphCompute.WorkB",
-							MakeWorkTextureDesc());
+							"RenderGraphCompute.WorkB", MakeWorkTextureDesc());
 
 						RHITextureDesc backBufferDesc{};
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						backBufferDesc.m_Extent = { displayWidth, displayHeight, 1u };
-						resources.m_BackBuffer = builder.ImportTexture(
-							"RenderGraphCompute.BackBuffer",
-							swapChain->GetBackBufferHandle(backBufferIndex),
-							backBufferDesc,
-							RGTextureAccess::Present);
+						resources.m_BackBuffer =
+							builder.ImportTexture("RenderGraphCompute.BackBuffer",
+								swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
+								RGTextureAccess::Present);
 
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
@@ -222,68 +210,46 @@ namespace gglab
 					{
 						auto& resources = builder.GetBlackboard().Get<ComputeLabResources>(
 							ComputeLabResourcesName);
-						builder.WriteInPlace(
-							resources.m_WorkA,
-							RGTextureAccess::RenderTarget,
+						builder.WriteInPlace(resources.m_WorkA, RGTextureAccess::RenderTarget,
 							RHIStage::RenderTarget);
 						data.m_WorkRtv =
-							builder.CreateView<RHITextureViewType::RenderTarget>(
-								resources.m_WorkA);
+							builder.CreateView<RHITextureViewType::RenderTarget>(resources.m_WorkA);
 					},
-					[state = m_State](
-						RGExecuteContext& executeContext,
-						InitializePassData& data)
+					[state = m_State](RGExecuteContext& executeContext, InitializePassData& data)
 					{
-						auto* commandContext =
-							executeContext.GetGraphicsCommandContext();
+						auto* commandContext = executeContext.GetGraphicsCommandContext();
 						commandContext->ClearColor(
-							executeContext.GetViewHandle(data.m_WorkRtv),
-							{ 0.0f, 0.0f, 0.0f, 1.0f });
-						state->m_InitializeExecutions.fetch_add(
-							1,
-							std::memory_order_relaxed);
+							executeContext.GetViewHandle(data.m_WorkRtv), { 0.0f, 0.0f, 0.0f, 1.0f });
+						state->m_InitializeExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
 				rg.AddPass<ComputeWritePassData>(
-					ComputeWritePassInfo.m_TypeName.c_str(),
-					RGPassEncoderType::Compute,
+					ComputeWritePassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
 					[](RenderGraph::RGBuilder& builder, ComputeWritePassData& data)
 					{
 						auto& resources = builder.GetBlackboard().Get<ComputeLabResources>(
 							ComputeLabResourcesName);
-						builder.ReadWriteInPlace(
-							resources.m_WorkA,
-							RGTextureAccess::StorageReadWrite,
+						builder.ReadWriteInPlace(resources.m_WorkA,
+							RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+						builder.WriteInPlace(resources.m_WorkB, RGTextureAccess::StorageWrite,
 							RHIStage::ComputeShader);
-						builder.WriteInPlace(
-							resources.m_WorkB,
-							RGTextureAccess::StorageWrite,
-							RHIStage::ComputeShader);
-						data.m_WorkAUav =
-							builder.CreateView<RHITextureViewType::UnorderedAccess>(
-								resources.m_WorkA);
-						data.m_WorkBUav =
-							builder.CreateView<RHITextureViewType::UnorderedAccess>(
-								resources.m_WorkB);
+						data.m_WorkAUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
+							resources.m_WorkA);
+						data.m_WorkBUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
+							resources.m_WorkB);
 					},
 					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
-						RGExecuteContext& executeContext,
-						ComputeWritePassData& data)
+						RGExecuteContext& executeContext, ComputeWritePassData& data)
 					{
-						auto* commandContext =
-							executeContext.GetDirectComputeCommandContext();
-						const auto workAUav =
-							executeContext.GetViewDescriptor(data.m_WorkAUav);
-						const auto workBUav =
-							executeContext.GetViewDescriptor(data.m_WorkBUav);
-						GGLAB_ASSERT_MSG(
-							workAUav.IsValid() && workBUav.IsValid(),
+						auto* commandContext = executeContext.GetDirectComputeCommandContext();
+						const auto workAUav = executeContext.GetViewDescriptor(data.m_WorkAUav);
+						const auto workBUav = executeContext.GetViewDescriptor(data.m_WorkBUav);
+						GGLAB_ASSERT_MSG(workAUav.IsValid() && workBUav.IsValid(),
 							"Compute Lab UAVs must be shader visible.");
 
 						commandContext->SetPipeline(GetOrCreateComputeWritePSO());
 						commandContext->SetPushConstants(
-							static_cast<uint32_t>(
-								CommonRSRootParamIndex::PassConstants),
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							ComputeLabPassParameters{
 								.m_WorkAIndex = workAUav.m_Index,
 								.m_WorkBIndex = workBUav.m_Index,
@@ -295,48 +261,36 @@ namespace gglab
 								.m_RingIntensity = ringIntensity,
 								.m_CheckerCellSize = checkerCellSize,
 							});
-						commandContext->Dispatch(
-							(WorkTextureWidth + ComputeThreadGroupSize - 1) /
-								ComputeThreadGroupSize,
+						commandContext->Dispatch((WorkTextureWidth + ComputeThreadGroupSize - 1) /
+							ComputeThreadGroupSize,
 							(WorkTextureHeight + ComputeThreadGroupSize - 1) /
-								ComputeThreadGroupSize,
+							ComputeThreadGroupSize,
 							1);
-						m_State->m_WriteExecutions.fetch_add(
-							1,
-							std::memory_order_relaxed);
+						m_State->m_WriteExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
 				rg.AddPass<ComputeReadWritePassData>(
-					ComputeReadWritePassInfo.m_TypeName.c_str(),
-					RGPassEncoderType::Compute,
+					ComputeReadWritePassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
 					[](RenderGraph::RGBuilder& builder, ComputeReadWritePassData& data)
 					{
 						auto& resources = builder.GetBlackboard().Get<ComputeLabResources>(
 							ComputeLabResourcesName);
-						builder.ReadWriteInPlace(
-							resources.m_WorkA,
-							RGTextureAccess::StorageReadWrite,
-							RHIStage::ComputeShader);
-						data.m_WorkAUav =
-							builder.CreateView<RHITextureViewType::UnorderedAccess>(
-								resources.m_WorkA);
+						builder.ReadWriteInPlace(resources.m_WorkA,
+							RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+						data.m_WorkAUav = builder.CreateView<RHITextureViewType::UnorderedAccess>(
+							resources.m_WorkA);
 					},
 					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
-						RGExecuteContext& executeContext,
-						ComputeReadWritePassData& data)
+						RGExecuteContext& executeContext, ComputeReadWritePassData& data)
 					{
-						auto* commandContext =
-							executeContext.GetDirectComputeCommandContext();
-						const auto workAUav =
-							executeContext.GetViewDescriptor(data.m_WorkAUav);
-						GGLAB_ASSERT_MSG(
-							workAUav.IsValid(),
+						auto* commandContext = executeContext.GetDirectComputeCommandContext();
+						const auto workAUav = executeContext.GetViewDescriptor(data.m_WorkAUav);
+						GGLAB_ASSERT_MSG(workAUav.IsValid(),
 							"Compute Lab read/write UAV must be shader visible.");
 
 						commandContext->SetPipeline(GetOrCreateComputeReadWritePSO());
 						commandContext->SetPushConstants(
-							static_cast<uint32_t>(
-								CommonRSRootParamIndex::PassConstants),
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							ComputeLabPassParameters{
 								.m_WorkAIndex = workAUav.m_Index,
 								.m_Width = WorkTextureWidth,
@@ -347,52 +301,33 @@ namespace gglab
 								.m_RingIntensity = ringIntensity,
 								.m_CheckerCellSize = checkerCellSize,
 							});
-						commandContext->Dispatch(
-							(WorkTextureWidth + ComputeThreadGroupSize - 1) /
-								ComputeThreadGroupSize,
+						commandContext->Dispatch((WorkTextureWidth + ComputeThreadGroupSize - 1) /
+							ComputeThreadGroupSize,
 							(WorkTextureHeight + ComputeThreadGroupSize - 1) /
-								ComputeThreadGroupSize,
+							ComputeThreadGroupSize,
 							1);
-						m_State->m_ReadWriteExecutions.fetch_add(
-							1,
-							std::memory_order_relaxed);
+						m_State->m_ReadWriteExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
 				rg.AddPass<CulledComputePassData>(
-					"Lab.RenderGraphCompute.Culled",
-					RGPassEncoderType::Compute,
+					"Lab.RenderGraphCompute.Culled", RGPassEncoderType::Compute,
 					[](RenderGraph::RGBuilder& builder, CulledComputePassData& data)
 					{
 						auto output = builder.CreateTexture(
-							"RenderGraphCompute.CulledOutput",
-							MakeWorkTextureDesc());
+							"RenderGraphCompute.CulledOutput", MakeWorkTextureDesc());
 						builder.WriteInPlace(
-							output,
-							RGTextureAccess::StorageWrite,
-							RHIStage::ComputeShader);
+							output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 						data.m_OutputUav =
-							builder.CreateView<RHITextureViewType::UnorderedAccess>(
-								output);
+							builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
 					},
-					[
-						this,
-						phase,
-						patternFrequency,
-						ringRadius,
-						ringIntensity,
-						checkerCellSize
-					](
-						RGExecuteContext& executeContext,
-						CulledComputePassData& data)
+					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
+						RGExecuteContext& executeContext, CulledComputePassData& data)
 					{
-						auto* commandContext =
-							executeContext.GetDirectComputeCommandContext();
-						const auto outputUav =
-							executeContext.GetViewDescriptor(data.m_OutputUav);
+						auto* commandContext = executeContext.GetDirectComputeCommandContext();
+						const auto outputUav = executeContext.GetViewDescriptor(data.m_OutputUav);
 						commandContext->SetPipeline(GetOrCreateComputeWritePSO());
 						commandContext->SetPushConstants(
-							static_cast<uint32_t>(
-								CommonRSRootParamIndex::PassConstants),
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							ComputeLabPassParameters{
 								.m_WorkAIndex = outputUav.m_Index,
 								.m_WorkBIndex = outputUav.m_Index,
@@ -404,22 +339,18 @@ namespace gglab
 								.m_RingIntensity = ringIntensity,
 								.m_CheckerCellSize = checkerCellSize,
 							});
-						commandContext->Dispatch(
-							(WorkTextureWidth + ComputeThreadGroupSize - 1) /
-								ComputeThreadGroupSize,
+						commandContext->Dispatch((WorkTextureWidth + ComputeThreadGroupSize - 1) /
+							ComputeThreadGroupSize,
 							(WorkTextureHeight + ComputeThreadGroupSize - 1) /
-								ComputeThreadGroupSize,
+							ComputeThreadGroupSize,
 							1);
-						m_State->m_CulledExecutions.fetch_add(
-							1,
-							std::memory_order_relaxed);
+						m_State->m_CulledExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
 				rg.AddPass<PreviewPassData>(
 					PreviewPassInfo.m_TypeName.c_str(),
 					[displayWidth, displayHeight, displayViewId](
-						RenderGraph::RGBuilder& builder,
-						PreviewPassData& data)
+						RenderGraph::RGBuilder& builder, PreviewPassData& data)
 					{
 						auto& resources = builder.GetBlackboard().Get<ComputeLabResources>(
 							ComputeLabResourcesName);
@@ -427,67 +358,48 @@ namespace gglab
 							.Get<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
 						data.m_WorkASrv =
-							builder.CreateView<RHITextureViewType::ShaderResource>(
-								builder.Read(
-									resources.m_WorkA,
-									RGTextureAccess::Sample,
-									RHIStage::PixelShader));
+							builder.CreateView<RHITextureViewType::ShaderResource>(builder.Read(
+								resources.m_WorkA, RGTextureAccess::Sample, RHIStage::PixelShader));
 						data.m_WorkBSrv =
-							builder.CreateView<RHITextureViewType::ShaderResource>(
-								builder.Read(
-									resources.m_WorkB,
-									RGTextureAccess::Sample,
-									RHIStage::PixelShader));
-						builder.WriteInPlace(
-							targets.m_BackBuffer,
-							RGTextureAccess::RenderTarget,
+							builder.CreateView<RHITextureViewType::ShaderResource>(builder.Read(
+								resources.m_WorkB, RGTextureAccess::Sample, RHIStage::PixelShader));
+						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget,
 							RHIStage::RenderTarget);
 						resources.m_BackBuffer = targets.m_BackBuffer;
-						data.m_BackBufferRtv =
-							builder.CreateView<RHITextureViewType::RenderTarget>(
-								targets.m_BackBuffer);
+						data.m_BackBufferRtv = builder.CreateView<RHITextureViewType::RenderTarget>(
+							targets.m_BackBuffer);
 						data.m_Width = displayWidth;
 						data.m_Height = displayHeight;
 					},
 					[this, phase, patternFrequency, ringRadius, ringIntensity, checkerCellSize](
-						RGExecuteContext& executeContext,
-						PreviewPassData& data)
+						RGExecuteContext& executeContext, PreviewPassData& data)
 					{
-						auto* commandContext =
-							executeContext.GetGraphicsCommandContext();
-						const auto workASrv =
-							executeContext.GetViewDescriptor(data.m_WorkASrv);
-						const auto workBSrv =
-							executeContext.GetViewDescriptor(data.m_WorkBSrv);
+						auto* commandContext = executeContext.GetGraphicsCommandContext();
+						const auto workASrv = executeContext.GetViewDescriptor(data.m_WorkASrv);
+						const auto workBSrv = executeContext.GetViewDescriptor(data.m_WorkBSrv);
 						const auto backBufferRtv =
 							executeContext.GetViewHandle(data.m_BackBufferRtv);
-						GGLAB_ASSERT_MSG(
-							workASrv.IsValid() && workBSrv.IsValid(),
+						GGLAB_ASSERT_MSG(workASrv.IsValid() && workBSrv.IsValid(),
 							"Compute Lab preview SRVs must be shader visible.");
 
-						commandContext->ClearColor(
-							backBufferRtv,
-							{ 0.005f, 0.008f, 0.015f, 1.0f });
+						commandContext->ClearColor(backBufferRtv, { 0.005f, 0.008f, 0.015f, 1.0f });
 						commandContext->SetPipeline(GetOrCreatePreviewPSO());
 						commandContext->SetRenderTargets(
-							std::span<const RHITextureViewHandle>(
-								&backBufferRtv,
-								1));
+							std::span<const RHITextureViewHandle>(&backBufferRtv, 1));
 						commandContext->SetViewport({
 							0.0f,
 							0.0f,
 							static_cast<float>(data.m_Width),
 							static_cast<float>(data.m_Height),
-						});
+							});
 						commandContext->SetScissorRect({
 							0,
 							0,
 							static_cast<int32_t>(data.m_Width),
 							static_cast<int32_t>(data.m_Height),
-						});
+							});
 						commandContext->SetPushConstants(
-							static_cast<uint32_t>(
-								CommonRSRootParamIndex::PassConstants),
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							ComputeLabPassParameters{
 								.m_WorkAIndex = workASrv.m_Index,
 								.m_WorkBIndex = workBSrv.m_Index,
@@ -500,27 +412,20 @@ namespace gglab
 								.m_CheckerCellSize = checkerCellSize,
 							});
 						commandContext->DrawFullscreenTriangle();
-						m_State->m_PreviewExecutions.fetch_add(
-							1,
-							std::memory_order_relaxed);
+						m_State->m_PreviewExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
 				m_DevelopGuiPass.AddPass(rg, context, services);
 
-				rg.AddPass<FinishPassData>(
-					"Lab.RenderGraphCompute.Finish",
-					[displayViewId](
-						RenderGraph::RGBuilder& builder,
-						FinishPassData&)
+				rg.AddPass<FinishPassData>("Lab.RenderGraphCompute.Finish",
+					[displayViewId](RenderGraph::RGBuilder& builder, FinishPassData&)
 					{
 						builder.SideEffect();
 						auto& targets = builder.GetBlackboard()
 							.Get<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
 						builder.Export(
-							targets.m_BackBuffer,
-							RGTextureAccess::Present,
-							RHIStage::Present);
+							targets.m_BackBuffer, RGTextureAccess::Present, RHIStage::Present);
 					});
 			}
 
@@ -539,24 +444,19 @@ namespace gglab
 				m_Renderer = renderer;
 
 				ShaderDesc shaderDesc{};
-				shaderDesc.m_SourcePath =
-					L"Passes/PassRenderGraphComputeSmoke.hlsl";
+				shaderDesc.m_SourcePath = L"Passes/PassRenderGraphComputeSmoke.hlsl";
 				shaderDesc.m_Stage = ShaderStage::Compute;
 				shaderDesc.m_Entry = L"CSWrite";
-				m_ComputeWriteRecipe.m_CSId =
-					shaderManager->LoadShader(shaderDesc);
+				m_ComputeWriteRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
 				shaderDesc.m_Entry = L"CSReadWrite";
-				m_ComputeReadWriteRecipe.m_CSId =
-					shaderManager->LoadShader(shaderDesc);
+				m_ComputeReadWriteRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
 
 				shaderDesc.m_Stage = ShaderStage::Vertex;
 				shaderDesc.m_Entry = L"VSMain";
-				m_PreviewRecipe.m_VSId =
-					shaderManager->LoadShader(shaderDesc);
+				m_PreviewRecipe.m_VSId = shaderManager->LoadShader(shaderDesc);
 				shaderDesc.m_Stage = ShaderStage::Pixel;
 				shaderDesc.m_Entry = L"PSMain";
-				m_PreviewRecipe.m_PSId =
-					shaderManager->LoadShader(shaderDesc);
+				m_PreviewRecipe.m_PSId = shaderManager->LoadShader(shaderDesc);
 
 				const auto bindingLayout = renderer->GetCommonBindingLayout();
 				m_ComputeWriteRecipe.m_BindingLayout = bindingLayout;
@@ -564,18 +464,14 @@ namespace gglab
 
 				m_PreviewRecipe.m_BindingLayout = bindingLayout;
 				m_PreviewRecipe.m_InputLayoutId = InputLayoutID::None;
-				m_PreviewRecipe.m_TopologyType =
-					RHIPrimitiveTopologyType::Triangle;
-				m_PreviewRecipe.m_PrimitiveTopology =
-					RHIPrimitiveTopology::TriangleList;
+				m_PreviewRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+				m_PreviewRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 				m_PreviewRecipe.m_Formats.m_RenderTargetFormats[0] =
 					renderer->GetSwapChain()->GetFormat();
 				m_PreviewRecipe.m_Formats.m_RenderTargetCount = 1;
-				m_PreviewRecipe.m_Formats.m_DepthStencilFormat =
-					RHIFormat::Unknown;
+				m_PreviewRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
 				m_PreviewRecipe.m_Formats.m_SampleCount = 1;
-				m_PreviewRecipe.m_RasterizerPreset =
-					RasterizerPreset::Default;
+				m_PreviewRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 				m_PreviewRecipe.m_BlendPreset = BlendPreset::Default;
 				m_PreviewRecipe.m_DepthPreset = DepthPreset::DepthDisabled;
 				m_IsInitialized = true;
@@ -586,9 +482,7 @@ namespace gglab
 				auto* pipelineCache = m_Renderer->GetPipelineCache();
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
 				return pipelineCache->Resolve(
-					m_ComputeWriteSlot,
-					m_ComputeWriteRecipe,
-					ComputeWritePassInfo);
+					m_ComputeWriteSlot, m_ComputeWriteRecipe, ComputeWritePassInfo);
 			}
 
 			RHIPipelineHandle GetOrCreateComputeReadWritePSO() noexcept
@@ -596,19 +490,14 @@ namespace gglab
 				auto* pipelineCache = m_Renderer->GetPipelineCache();
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
 				return pipelineCache->Resolve(
-					m_ComputeReadWriteSlot,
-					m_ComputeReadWriteRecipe,
-					ComputeReadWritePassInfo);
+					m_ComputeReadWriteSlot, m_ComputeReadWriteRecipe, ComputeReadWritePassInfo);
 			}
 
 			RHIPipelineHandle GetOrCreatePreviewPSO() noexcept
 			{
 				auto* pipelineCache = m_Renderer->GetPipelineCache();
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
-				return pipelineCache->Resolve(
-					m_PreviewSlot,
-					m_PreviewRecipe,
-					PreviewPassInfo);
+				return pipelineCache->Resolve(m_PreviewSlot, m_PreviewRecipe, PreviewPassInfo);
 			}
 
 			std::shared_ptr<RenderGraphComputeLabState> m_State;
@@ -626,14 +515,10 @@ namespace gglab
 
 	RenderGraphComputeLabSession::RenderGraphComputeLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			nullptr),
+		LabSessionBase(GetDescriptor(), createInfo, nullptr),
 		m_State(std::make_shared<RenderGraphComputeLabState>())
 	{
-		SetRenderPipeline(
-			std::make_unique<RenderGraphComputeLabPipeline>(m_State));
+		SetRenderPipeline(std::make_unique<RenderGraphComputeLabPipeline>(m_State));
 
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -645,7 +530,7 @@ namespace gglab
 			.m_DefaultValue = 1.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(4.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = PatternFrequencyId,
 			.m_Name = "Wave Frequency",
@@ -655,7 +540,7 @@ namespace gglab
 			.m_DefaultValue = 18.0f,
 			.m_MinValue = LabValue(2.0f),
 			.m_MaxValue = LabValue(40.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = RingRadiusId,
 			.m_Name = "Ring Radius",
@@ -665,7 +550,7 @@ namespace gglab
 			.m_DefaultValue = 0.46f,
 			.m_MinValue = LabValue(0.1f),
 			.m_MaxValue = LabValue(0.85f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = RingIntensityId,
 			.m_Name = "Ring Intensity",
@@ -675,7 +560,7 @@ namespace gglab
 			.m_DefaultValue = 0.82f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = CheckerCellSizeId,
 			.m_Name = "Checker Cell Size",
@@ -685,22 +570,19 @@ namespace gglab
 			.m_DefaultValue = uint32_t(32),
 			.m_MinValue = LabValue(uint32_t(4)),
 			.m_MaxValue = LabValue(uint32_t(128)),
-		}));
+			}));
 		ApplyImmediateParameters();
 	}
 
 	void RenderGraphComputeLabSession::Update(float deltaTime) noexcept
 	{
-		const float animationSpeed =
-			m_State->m_AnimationSpeed.load(std::memory_order_relaxed);
+		const float animationSpeed = m_State->m_AnimationSpeed.load(std::memory_order_relaxed);
 		if (std::isfinite(deltaTime) && deltaTime > 0.0f)
 		{
-			m_AnimationTimeSeconds = std::fmod(
-				m_AnimationTimeSeconds + deltaTime * animationSpeed,
-				6.28318530718f);
+			m_AnimationTimeSeconds =
+				std::fmod(m_AnimationTimeSeconds + deltaTime * animationSpeed, 6.28318530718f);
 			m_State->m_AnimationTimeSeconds.store(
-				m_AnimationTimeSeconds,
-				std::memory_order_relaxed);
+				m_AnimationTimeSeconds, std::memory_order_relaxed);
 		}
 		GetCamera().Update();
 	}
@@ -714,20 +596,14 @@ namespace gglab
 
 		const auto& parameters = GetParameters();
 		m_State->m_AnimationSpeed.store(
-			parameters.Get(AnimationSpeedId, 1.0f),
-			std::memory_order_relaxed);
+			parameters.Get(AnimationSpeedId, 1.0f), std::memory_order_relaxed);
 		m_State->m_PatternFrequency.store(
-			parameters.Get(PatternFrequencyId, 18.0f),
-			std::memory_order_relaxed);
-		m_State->m_RingRadius.store(
-			parameters.Get(RingRadiusId, 0.46f),
-			std::memory_order_relaxed);
+			parameters.Get(PatternFrequencyId, 18.0f), std::memory_order_relaxed);
+		m_State->m_RingRadius.store(parameters.Get(RingRadiusId, 0.46f), std::memory_order_relaxed);
 		m_State->m_RingIntensity.store(
-			parameters.Get(RingIntensityId, 0.82f),
-			std::memory_order_relaxed);
+			parameters.Get(RingIntensityId, 0.82f), std::memory_order_relaxed);
 		m_State->m_CheckerCellSize.store(
-			parameters.Get(CheckerCellSizeId, uint32_t(32)),
-			std::memory_order_relaxed);
+			parameters.Get(CheckerCellSizeId, uint32_t(32)), std::memory_order_relaxed);
 	}
 
 	void RenderGraphComputeLabSession::BuildDiagnostics(
@@ -741,8 +617,7 @@ namespace gglab
 
 		const uint64_t initializeExecutions =
 			m_State->m_InitializeExecutions.load(std::memory_order_relaxed);
-		const uint64_t writeExecutions =
-			m_State->m_WriteExecutions.load(std::memory_order_relaxed);
+		const uint64_t writeExecutions = m_State->m_WriteExecutions.load(std::memory_order_relaxed);
 		const uint64_t readWriteExecutions =
 			m_State->m_ReadWriteExecutions.load(std::memory_order_relaxed);
 		const uint64_t previewExecutions =
@@ -750,42 +625,35 @@ namespace gglab
 		const uint64_t culledExecutions =
 			m_State->m_CulledExecutions.load(std::memory_order_relaxed);
 		const bool hasExecuted = previewExecutions > 0;
-		const bool chainBalanced =
-			initializeExecutions == writeExecutions &&
+		const bool chainBalanced = initializeExecutions == writeExecutions &&
 			writeExecutions == readWriteExecutions &&
 			readWriteExecutions == previewExecutions;
 
 		diagnostics.m_Metrics = {
-			{ .m_Name = "Graphics initialize", .m_Value = std::to_string(initializeExecutions) },
-			{ .m_Name = "Compute write", .m_Value = std::to_string(writeExecutions) },
-			{ .m_Name = "Compute read/write", .m_Value = std::to_string(readWriteExecutions) },
-			{ .m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions) },
-			{ .m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions) },
+			{.m_Name = "Graphics initialize", .m_Value = std::to_string(initializeExecutions)},
+			{.m_Name = "Compute write", .m_Value = std::to_string(writeExecutions)},
+			{.m_Name = "Compute read/write", .m_Value = std::to_string(readWriteExecutions)},
+			{.m_Name = "Graphics preview", .m_Value = std::to_string(previewExecutions)},
+			{.m_Name = "Culled dispatches", .m_Value = std::to_string(culledExecutions)},
 		};
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Graphics / direct-compute / graphics chain",
-			.m_Status = !hasExecuted ?
-				LabDiagnosticCheckStatus::Pending :
-				chainBalanced ?
-					LabDiagnosticCheckStatus::Passed :
-					LabDiagnosticCheckStatus::Failed,
-			.m_Detail = !hasExecuted ?
-				"Waiting for the first rendered frame." :
-				chainBalanced ?
-					"All live passes executed exactly once per rendered frame." :
-					"Live pass execution counts diverged.",
-		});
+			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending
+						: chainBalanced ? LabDiagnosticCheckStatus::Passed
+										: LabDiagnosticCheckStatus::Failed,
+			.m_Detail = !hasExecuted ? "Waiting for the first rendered frame."
+						: chainBalanced
+							? "All live passes executed exactly once per rendered frame."
+							: "Live pass execution counts diverged.",
+			});
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Unused compute pass culling",
-			.m_Status = !hasExecuted ?
-				LabDiagnosticCheckStatus::Pending :
-				culledExecutions == 0 ?
-					LabDiagnosticCheckStatus::Passed :
-					LabDiagnosticCheckStatus::Failed,
-			.m_Detail = culledExecutions == 0 ?
-				"The unconsumed UAV writer produced no dispatch." :
-				"An unconsumed UAV writer reached execution.",
-		});
+			.m_Status = !hasExecuted ? LabDiagnosticCheckStatus::Pending
+						: culledExecutions == 0 ? LabDiagnosticCheckStatus::Passed
+												: LabDiagnosticCheckStatus::Failed,
+			.m_Detail = culledExecutions == 0 ? "The unconsumed UAV writer produced no dispatch."
+											  : "An unconsumed UAV writer reached execution.",
+			});
 	}
 
 	LabId RenderGraphComputeLabSession::GetId() noexcept
@@ -799,7 +667,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "RenderGraph Compute",
 			.m_Category = "Rendering",
-			.m_Description = "Validates graphics-to-compute transitions, ordered resource-specific UAV barriers, pass culling, and compute results consumed by graphics.",
+			.m_Description =
+				"Validates graphics-to-compute transitions, ordered resource-specific UAV barriers, pass culling, and compute results consumed by graphics.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 2,
 		};

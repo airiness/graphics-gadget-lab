@@ -16,8 +16,7 @@ namespace gglab
 
 	struct DepthCoverageFramePlan
 	{
-		DepthCoverageExecutionMode m_ExecutionMode =
-			DepthCoverageExecutionMode::SkipGeometry;
+		DepthCoverageExecutionMode m_ExecutionMode = DepthCoverageExecutionMode::SkipGeometry;
 		const RenderQueue* m_SourceRenderQueue = nullptr;
 		const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 		std::string m_Diagnostic;
@@ -26,20 +25,17 @@ namespace gglab
 
 		[[nodiscard]] bool UsesDepthPrepassEqual() const noexcept
 		{
-			return m_ExecutionMode ==
-				DepthCoverageExecutionMode::DepthPrepassEqual;
+			return m_ExecutionMode == DepthCoverageExecutionMode::DepthPrepassEqual;
 		}
 
 		[[nodiscard]] bool UsesForwardDepthWrite() const noexcept
 		{
-			return m_ExecutionMode ==
-				DepthCoverageExecutionMode::ForwardDepthWrite;
+			return m_ExecutionMode == DepthCoverageExecutionMode::ForwardDepthWrite;
 		}
 
 		[[nodiscard]] bool RendersGeometry() const noexcept
 		{
-			return m_ExecutionMode !=
-				DepthCoverageExecutionMode::SkipGeometry;
+			return m_ExecutionMode != DepthCoverageExecutionMode::SkipGeometry;
 		}
 
 		[[nodiscard]] bool AddsForwardOpaquePass() const noexcept
@@ -59,15 +55,10 @@ namespace gglab
 		RenderViewID m_ExpectedViewId = RenderViewID::Unknown;
 		uint32_t m_TargetWidth = 0;
 		uint32_t m_TargetHeight = 0;
-		DepthConvention m_DepthConvention =
-			DepthConvention::Reversed;
-		std::array<
-			std::optional<DepthCoveragePipelineSignature>,
-			RenderQueueBuilder::VariantCount>
+		DepthConvention m_DepthConvention = DepthConvention::Reversed;
+		std::array<std::optional<DepthCoveragePipelineSignature>, RenderQueueBuilder::VariantCount>
 			m_PrepassPipelineSignatures{};
-		std::array<
-			std::optional<DepthCoveragePipelineSignature>,
-			RenderQueueBuilder::VariantCount>
+		std::array<std::optional<DepthCoveragePipelineSignature>, RenderQueueBuilder::VariantCount>
 			m_ForwardPipelineSignatures{};
 	};
 

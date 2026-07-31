@@ -9,9 +9,12 @@ namespace gglab
 		{
 			switch (kind)
 			{
-			case AssetLoadKind::Model: return "Parsing model and decoding textures";
-			case AssetLoadKind::Texture: return "Decoding texture and preparing mip data";
-			case AssetLoadKind::Mesh: return "Building mesh data";
+			case AssetLoadKind::Model:
+				return "Parsing model and decoding textures";
+			case AssetLoadKind::Texture:
+				return "Decoding texture and preparing mip data";
+			case AssetLoadKind::Mesh:
+				return "Building mesh data";
 			case AssetLoadKind::Generic:
 			default:
 				return "Processing asset on CPU";
@@ -22,9 +25,12 @@ namespace gglab
 		{
 			switch (kind)
 			{
-			case AssetLoadKind::Model: return "Uploading model GPU resources";
-			case AssetLoadKind::Texture: return "Uploading texture GPU resources";
-			case AssetLoadKind::Mesh: return "Uploading mesh buffers";
+			case AssetLoadKind::Model:
+				return "Uploading model GPU resources";
+			case AssetLoadKind::Texture:
+				return "Uploading texture GPU resources";
+			case AssetLoadKind::Mesh:
+				return "Uploading mesh buffers";
 			case AssetLoadKind::Generic:
 			default:
 				return "Processing asset on GPU";
@@ -33,9 +39,7 @@ namespace gglab
 	}
 
 	AssetLoadProgress GetAssetLoadProgress(
-		AssetState state,
-		AssetLoadKind kind,
-		const ProgressChannelPtr& progress) noexcept
+		AssetState state, AssetLoadKind kind, const ProgressChannelPtr& progress) noexcept
 	{
 		if (progress)
 		{

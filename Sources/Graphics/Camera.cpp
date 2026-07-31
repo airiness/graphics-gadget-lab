@@ -4,11 +4,8 @@
 namespace gglab
 {
 	Camera::Camera(const CreateInfo& info) noexcept :
-		m_Forward(info.m_Forward),
-		m_Position(info.m_Position),
-		m_Near(info.m_Near),
-		m_Far(info.m_Far),
-		m_Fov(info.m_Fov),
+		m_Forward(info.m_Forward), m_Position(info.m_Position), m_Near(info.m_Near),
+		m_Far(info.m_Far), m_Fov(info.m_Fov),
 		m_ExposureCompensationEV(info.m_ExposureCompensationEV)
 	{
 		// sanitize
@@ -53,8 +50,7 @@ namespace gglab
 
 	void Camera::SetYawPitch(float yawRadians, float pitchRadians) noexcept
 	{
-		if (!math::IsFinite(yawRadians) ||
-			!math::IsFinite(pitchRadians))
+		if (!math::IsFinite(yawRadians) || !math::IsFinite(pitchRadians))
 		{
 			return;
 		}
@@ -67,8 +63,7 @@ namespace gglab
 
 	void Camera::SetNearFar(float nearZ, float farZ) noexcept
 	{
-		if (!math::IsFinite(nearZ) ||
-			!math::IsFinite(farZ))
+		if (!math::IsFinite(nearZ) || !math::IsFinite(farZ))
 		{
 			return;
 		}
@@ -156,8 +151,8 @@ namespace gglab
 
 	void Camera::UpdateProjMatrix() noexcept
 	{
-		m_ProjMatrix = math::CreatePerspectiveFieldOfViewLH(
-			math::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
+		m_ProjMatrix =
+			math::CreatePerspectiveFieldOfViewLH(math::ToRadians(m_Fov), m_Aspect, m_Near, m_Far);
 	}
 
 	void Camera::UpdateViewMatrix() noexcept

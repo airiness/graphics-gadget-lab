@@ -41,9 +41,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassSkybox::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassSkybox::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		if (!context.IsRenderSceneReady())
 		{
@@ -76,10 +75,8 @@ namespace gglab
 				ToTextureId(ReservedTextureIDIndex::FallbackEnvironmentCubemap);
 			const TextureContentRef fallbackContent =
 				assetManager->GetTextureContentRef(fallbackId);
-			const auto fallbackResource =
-				assetManager->GetResidentTextureResource(fallbackContent);
-			GGLAB_ASSERT_MSG(
-				fallbackResource.has_value(),
+			const auto fallbackResource = assetManager->GetResidentTextureResource(fallbackContent);
+			GGLAB_ASSERT_MSG(fallbackResource.has_value(),
 				"Skybox fallback cubemap must be ready before the first frame.");
 			if (!fallbackResource)
 			{
@@ -95,95 +92,73 @@ namespace gglab
 			environmentTextureIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(
 				RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
 		}
-		const uint32_t environmentSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-			SamplerPreset::LinearClamp);
+		const uint32_t environmentSamplerIndex =
+			renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const auto* contextPtr = &context;
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[displayViewId,
-				useFallback,
-				fallbackTextureHandle,
-				fallbackTextureDesc,
-				environmentTextureIndex,
-				environmentSamplerIndex](RenderGraph::RGBuilder& builder, PassData& data)
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
+			[displayViewId, useFallback, fallbackTextureHandle, fallbackTextureDesc,
+			environmentTextureIndex,
+			environmentSamplerIndex](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
 				if (useFallback)
 				{
-					data.m_EnvironmentCubemap = builder.ImportTexture(
-						"Skybox.FallbackEnvironmentCubemap",
-						fallbackTextureHandle,
-						fallbackTextureDesc,
-						RGTextureAccess::Sample);
-					data.m_EnvironmentCubemap = builder.Read(
-						data.m_EnvironmentCubemap,
-						RGTextureAccess::Sample);
+					data.m_EnvironmentCubemap =
+						builder.ImportTexture("Skybox.FallbackEnvironmentCubemap",
+							fallbackTextureHandle, fallbackTextureDesc, RGTextureAccess::Sample);
+					data.m_EnvironmentCubemap =
+						builder.Read(data.m_EnvironmentCubemap, RGTextureAccess::Sample);
 				}
 				else
 				{
 					auto& iblResources = blackboard.Get<RGIBLResources>(IBLResourcesName);
-					data.m_EnvironmentCubemap = builder.Read(
-						iblResources.m_EnvironmentCubemap,
-						RGTextureAccess::Sample);
+					data.m_EnvironmentCubemap =
+						builder.Read(iblResources.m_EnvironmentCubemap, RGTextureAccess::Sample);
 				}
-				auto& targets = blackboard
-					.Get<RGViewTargetsTable>(ViewTargetsTableName)
+				auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
 					.GetViewTargets(displayViewId);
-				auto& sceneDepth =
-					blackboard.Get<RGSceneDepthResources>(
-						SceneDepthResourcesName);
+				auto& sceneDepth = blackboard.Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 				data.m_SceneColor = targets.m_SceneColor;
-				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
-				data.m_Depth = builder.Read(
-					sceneDepth.m_Texture,
-					RGTextureAccess::DepthStencilRead);
-				RHITextureViewDesc readOnlyDsvDesc =
-					sceneDepth.m_DsvDesc;
+				data.m_Rtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
+				data.m_Depth =
+					builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
+				RHITextureViewDesc readOnlyDsvDesc = sceneDepth.m_DsvDesc;
 				readOnlyDsvDesc.m_ReadOnlyDepth = true;
-				data.m_Dsv =
-					builder.CreateView<
-						RHITextureViewType::DepthStencil>(
-						data.m_Depth,
-						readOnlyDsvDesc);
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
+					data.m_Depth, readOnlyDsvDesc);
 				data.m_Width = targets.m_Width;
 				data.m_Height = targets.m_Height;
-				const RHITextureDesc& colorDesc =
-					builder.GetTextureDesc(
-						data.m_SceneColor);
-				const RHITextureDesc& depthDesc =
-					builder.GetTextureDesc(data.m_Depth);
-				GGLAB_ASSERT_MSG(
-					colorDesc.m_Extent.m_Width ==
-						depthDesc.m_Extent.m_Width &&
-					colorDesc.m_Extent.m_Height ==
-						depthDesc.m_Extent.m_Height &&
-					colorDesc.m_Extent.m_Depth ==
-						depthDesc.m_Extent.m_Depth &&
-					colorDesc.m_SampleCount ==
-						depthDesc.m_SampleCount,
+				const RHITextureDesc& colorDesc = builder.GetTextureDesc(data.m_SceneColor);
+				const RHITextureDesc& depthDesc = builder.GetTextureDesc(data.m_Depth);
+				GGLAB_ASSERT_MSG(colorDesc.m_Extent.m_Width == depthDesc.m_Extent.m_Width &&
+					colorDesc.m_Extent.m_Height == depthDesc.m_Extent.m_Height &&
+					colorDesc.m_Extent.m_Depth == depthDesc.m_Extent.m_Depth &&
+					colorDesc.m_SampleCount == depthDesc.m_SampleCount,
 					"Skybox color and depth targets must have matching extents and sample counts.");
 				data.m_EnvironmentTextureIndex = environmentTextureIndex;
 				data.m_EnvironmentSamplerIndex = environmentSamplerIndex;
 			},
-			[this, renderer, contextPtr, displayViewId](RGExecuteContext& executeContext, PassData& data)
+			[this, renderer, contextPtr, displayViewId](
+				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				const auto dsv =
-					executeContext.GetViewHandle(data.m_Dsv);
+				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
 				commandContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(
-						&rtv,
-						1),
-					dsv);
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+					std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
@@ -202,8 +177,7 @@ namespace gglab
 					.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
 				};
 				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					passParameters);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 				commandContext->DrawFullscreenTriangle();
 			});
 	}
@@ -221,7 +195,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Passes/PassSkybox.hlsl";
+		shaderDesc.m_SourcePath = L"Passes/PassSkybox.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Vertex;
 		shaderDesc.m_Entry = L"VSMain";
 		const auto vsId = shaderManager->LoadShader(shaderDesc);
@@ -238,14 +212,12 @@ namespace gglab
 		m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 		m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
 		m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
-		m_BaseRecipe.m_Formats.m_DepthStencilFormat =
-			RHIFormat::D32Float;
+		m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
 		m_BaseRecipe.m_Formats.m_SampleCount = 1;
 		m_BaseRecipe.m_Formats.m_SampleQuality = 0;
 		m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 		m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
-		m_BaseRecipe.m_DepthPreset =
-			DepthPreset::ReversedZEqualReadOnly;
+		m_BaseRecipe.m_DepthPreset = DepthPreset::ReversedZEqualReadOnly;
 		m_IsInitialized = true;
 	}
 

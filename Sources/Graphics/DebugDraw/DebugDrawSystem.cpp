@@ -7,8 +7,7 @@
 namespace gglab
 {
 	DebugDrawSystem::DebugDrawSystem(const CreateInfo& createInfo) noexcept :
-		m_Device(createInfo.m_Device),
-		m_Context(this),
+		m_Device(createInfo.m_Device), m_Context(this),
 		m_FrameSlotCount(createInfo.m_FrameSlotCount),
 		m_MaxVertexCountPerFrame(createInfo.m_MaxVertexCountPerFrame)
 	{
@@ -16,8 +15,8 @@ namespace gglab
 		GGLAB_ASSERT(m_FrameSlotCount > 0);
 		GGLAB_ASSERT(m_MaxVertexCountPerFrame > 0);
 
-		m_FrameSlotSizeInBytes = static_cast<uint64_t>(sizeof(DebugDrawVertex)) *
-			m_MaxVertexCountPerFrame;
+		m_FrameSlotSizeInBytes =
+			static_cast<uint64_t>(sizeof(DebugDrawVertex)) * m_MaxVertexCountPerFrame;
 		m_TotalBufferSizeInBytes = m_FrameSlotSizeInBytes * m_FrameSlotCount;
 
 		RHIBufferDesc desc{};
@@ -25,20 +24,18 @@ namespace gglab
 		desc.m_StrideInBytes = sizeof(DebugDrawVertex);
 		desc.m_Usage = RHIBufferUsage::Vertex;
 		desc.m_MemoryUsage = RHIMemoryUsage::CpuToGpu;
-		const RHIResourceDebugIdentityDesc debugIdentity
-		{
+		const RHIResourceDebugIdentityDesc debugIdentity{
 			.m_Domain = RHIResourceDebugDomain::Renderer,
 			.m_Category = "DebugDraw.VertexBuffer",
 			.m_Label = "FrameVertices",
 		};
-		m_VertexBuffer = RHIBufferOwner(
-			m_Device, m_Device->CreateBuffer(desc, debugIdentity));
+		m_VertexBuffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer(desc, debugIdentity));
 		GGLAB_ASSERT_MSG(m_VertexBuffer, "DebugDraw failed to create its vertex buffer.");
 
 		if (m_VertexBuffer)
 		{
-			m_MappedVertices = static_cast<std::byte*>(
-				m_Device->MapBuffer(m_VertexBuffer.Get(), {}));
+			m_MappedVertices =
+				static_cast<std::byte*>(m_Device->MapBuffer(m_VertexBuffer.Get(), {}));
 		}
 		GGLAB_ASSERT_MSG(m_MappedVertices, "DebugDraw failed to map its vertex buffer.");
 
@@ -58,9 +55,7 @@ namespace gglab
 	}
 
 	const DebugDrawFrameView& DebugDrawSystem::SealFrame(
-		uint32_t frameSlot,
-		float deltaTime,
-		const DebugDrawCullContext& cullContext) noexcept
+		uint32_t frameSlot, float deltaTime, const DebugDrawCullContext& cullContext) noexcept
 	{
 		GGLAB_ASSERT(frameSlot < m_FrameSlotCount);
 		m_FrameView = {};
@@ -79,10 +74,8 @@ namespace gglab
 				m_SealedCommands.push_back(command);
 				command.m_RemainingSeconds -= std::max(deltaTime, 0.0f);
 			}
-			std::erase_if(m_PersistentCommands, [](const Command& command) noexcept
-				{
-					return command.m_RemainingSeconds <= 0.0f;
-				});
+			std::erase_if(m_PersistentCommands,
+				[](const Command& command) noexcept { return command.m_RemainingSeconds <= 0.0f; });
 			m_PersistentVertexCount = 0;
 			for (const Command& command : m_PersistentCommands)
 			{
@@ -118,8 +111,7 @@ namespace gglab
 
 		m_StagingVertices.clear();
 		auto appendRange = [this, &disabledChannels, &cullContext](
-			auto predicate,
-			PrimitiveTopology topology) noexcept
+			auto predicate, PrimitiveTopology topology) noexcept
 			{
 				DebugDrawVertexRange range{};
 				range.m_FirstVertex = static_cast<uint32_t>(m_StagingVertices.size());
@@ -140,13 +132,14 @@ namespace gglab
 						++m_FrameView.m_Statistics.m_CulledCommandCount;
 						continue;
 					}
-					if (m_StagingVertices.size() + command.m_Vertices->size() > m_MaxVertexCountPerFrame)
+					if (m_StagingVertices.size() + command.m_Vertices->size() >
+						m_MaxVertexCountPerFrame)
 					{
 						++m_FrameView.m_Statistics.m_DroppedCommandCount;
 						continue;
 					}
-					m_StagingVertices.insert(
-						m_StagingVertices.end(), command.m_Vertices->begin(), command.m_Vertices->end());
+					m_StagingVertices.insert(m_StagingVertices.end(), command.m_Vertices->begin(),
+						command.m_Vertices->end());
 				}
 				range.m_VertexCount =
 					static_cast<uint32_t>(m_StagingVertices.size()) - range.m_FirstVertex;
@@ -158,20 +151,20 @@ namespace gglab
 				batch.m_Lines = appendRange(predicate, PrimitiveTopology::Lines);
 				batch.m_Triangles = appendRange(predicate, PrimitiveTopology::Triangles);
 			};
-		fillBatch(m_FrameView.m_Scene, [](const DebugDrawStyle& style) noexcept
+		fillBatch(m_FrameView.m_Scene,
+			[](const DebugDrawStyle& style) noexcept
 			{
 				return style.m_Space == DebugDrawSpace::World &&
 					style.m_DepthMode == DebugDrawDepthMode::Tested;
 			});
-		fillBatch(m_FrameView.m_OverlayWorld, [](const DebugDrawStyle& style) noexcept
+		fillBatch(m_FrameView.m_OverlayWorld,
+			[](const DebugDrawStyle& style) noexcept
 			{
 				return style.m_Space == DebugDrawSpace::World &&
 					style.m_DepthMode == DebugDrawDepthMode::Always;
 			});
 		fillBatch(m_FrameView.m_OverlayScreen, [](const DebugDrawStyle& style) noexcept
-			{
-				return style.m_Space == DebugDrawSpace::Screen;
-			});
+			{ return style.m_Space == DebugDrawSpace::Screen; });
 		m_FrameView.m_Statistics.m_LineVertexCount =
 			m_FrameView.m_Scene.m_Lines.m_VertexCount +
 			m_FrameView.m_OverlayWorld.m_Lines.m_VertexCount +
@@ -187,10 +180,8 @@ namespace gglab
 		{
 			const size_t sizeInBytes = m_StagingVertices.size() * sizeof(DebugDrawVertex);
 			GGLAB_ASSERT(sizeInBytes <= m_FrameSlotSizeInBytes);
-			std::memcpy(
-				m_MappedVertices + m_FrameView.m_VertexBufferOffset,
-				m_StagingVertices.data(),
-				sizeInBytes);
+			std::memcpy(m_MappedVertices + m_FrameView.m_VertexBufferOffset,
+				m_StagingVertices.data(), sizeInBytes);
 		}
 
 		return m_FrameView;
@@ -210,9 +201,7 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_Mutex);
 		auto matches = [channel](const Command& command) noexcept
-		{
-			return command.m_Style.m_Channel == channel;
-		};
+			{ return command.m_Style.m_Channel == channel; };
 		std::erase_if(m_PendingCommands, matches);
 		std::erase_if(m_PersistentCommands, matches);
 		m_PendingVertexCount = 0;
@@ -274,10 +263,9 @@ namespace gglab
 			}
 			states.push_back(state);
 		}
-		std::ranges::sort(states, [](const DebugDrawChannelState& lhs, const DebugDrawChannelState& rhs)
-			{
-				return lhs.m_Channel.Value() < rhs.m_Channel.Value();
-			});
+		std::ranges::sort(states,
+			[](const DebugDrawChannelState& lhs, const DebugDrawChannelState& rhs)
+			{ return lhs.m_Channel.Value() < rhs.m_Channel.Value(); });
 		return states;
 	}
 
@@ -294,21 +282,16 @@ namespace gglab
 		{
 			return bounds;
 		}
-		bounds.m_Aabb = math::CreateAabbFromPoints(
-			positions.size(),
-			positions.data(),
-			sizeof(Vector3));
-		bounds.m_Sphere = math::CreateSphereFromPoints(
-			positions.size(),
-			positions.data(),
-			sizeof(Vector3));
+		bounds.m_Aabb =
+			math::CreateAabbFromPoints(positions.size(), positions.data(), sizeof(Vector3));
+		bounds.m_Sphere =
+			math::CreateSphereFromPoints(positions.size(), positions.data(), sizeof(Vector3));
 		bounds.m_Valid = true;
 		return bounds;
 	}
 
 	bool DebugDrawSystem::ShouldCull(
-		const Command& command,
-		const DebugDrawCullContext& cullContext) noexcept
+		const Command& command, const DebugDrawCullContext& cullContext) noexcept
 	{
 		if (!command.m_Bounds.m_Valid || command.m_Style.m_Space == DebugDrawSpace::Screen)
 		{
@@ -322,7 +305,8 @@ namespace gglab
 		{
 			for (uint32_t index = 0; index < cullContext.m_DefaultFrustumCount; ++index)
 			{
-				if (!math::Intersects(cullContext.m_DefaultFrustums[index], command.m_Bounds.m_Aabb))
+				if (!math::Intersects(
+					cullContext.m_DefaultFrustums[index], command.m_Bounds.m_Aabb))
 				{
 					return true;
 				}
@@ -340,17 +324,19 @@ namespace gglab
 		return !math::Intersects(cullContext.m_MainViewFrustum, command.m_Bounds.m_Aabb);
 	}
 
-	void DebugDrawSystem::Submit(PrimitiveTopology topology,
-		std::span<const Vector3> positions, const DebugDrawStyle& style) noexcept
+	void DebugDrawSystem::Submit(PrimitiveTopology topology, std::span<const Vector3> positions,
+		const DebugDrawStyle& style) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 		++m_PendingStatistics.m_SubmittedCommandCount;
 		m_KnownChannels.insert(style.m_Channel);
-		const bool topologyValid = topology == PrimitiveTopology::Lines ?
-			positions.size() % 2 == 0 : positions.size() % 3 == 0;
-		if (positions.empty() || !topologyValid || !math::IsFinite(style.m_Color) ||
+		const bool topologyValid = topology == PrimitiveTopology::Lines ? positions.size() % 2 == 0
+			: positions.size() % 3 == 0;
+		if (positions.empty() || !topologyValid ||
+			!math::IsFinite(style.m_Color) ||
 			!std::isfinite(style.m_DurationSeconds) || style.m_DurationSeconds < 0.0f ||
-			std::ranges::any_of(positions, [](const Vector3& value) noexcept { return !math::IsFinite(value); }))
+			std::ranges::any_of(
+				positions, [](const Vector3& value) noexcept { return !math::IsFinite(value); }))
 		{
 			++m_PendingStatistics.m_InvalidCommandCount;
 			return;
@@ -373,12 +359,8 @@ namespace gglab
 		{
 			vertices->push_back({ position, style.m_Color });
 		}
-		m_PendingCommands.push_back({
-			topology,
-			style,
-			std::move(vertices),
-			BuildBounds(positions),
-			0.0f });
+		m_PendingCommands.push_back(
+			{ topology, style, std::move(vertices), BuildBounds(positions), 0.0f });
 		m_PendingVertexCount += static_cast<uint32_t>(positions.size());
 		++m_PendingStatistics.m_AcceptedCommandCount;
 	}
@@ -390,8 +372,8 @@ namespace gglab
 		++m_PendingStatistics.m_InvalidCommandCount;
 	}
 
-	void DebugDrawContext::Line(const Vector3& start, const Vector3& end,
-		const DebugDrawStyle& style) noexcept
+	void DebugDrawContext::Line(
+		const Vector3& start, const Vector3& end, const DebugDrawStyle& style) noexcept
 	{
 		if (m_System)
 		{
@@ -400,8 +382,8 @@ namespace gglab
 		}
 	}
 
-	void DebugDrawContext::Polyline(std::span<const Vector3> points, bool closed,
-		const DebugDrawStyle& style) noexcept
+	void DebugDrawContext::Polyline(
+		std::span<const Vector3> points, bool closed, const DebugDrawStyle& style) noexcept
 	{
 		if (!m_System || points.size() < 2)
 		{
@@ -422,12 +404,13 @@ namespace gglab
 		m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
 	}
 
-	void DebugDrawContext::Point(const Vector3& position, float size,
-		const DebugDrawStyle& style) noexcept
+	void DebugDrawContext::Point(
+		const Vector3& position, float size, const DebugDrawStyle& style) noexcept
 	{
 		if (!m_System || !std::isfinite(size) || size <= 0.0f)
 		{
-			if (m_System) m_System->RejectInvalid();
+			if (m_System)
+				m_System->RejectInvalid();
 			return;
 		}
 		const Vector3 x(size, 0.0f, 0.0f);
@@ -435,8 +418,10 @@ namespace gglab
 		if (style.m_Space == DebugDrawSpace::Screen)
 		{
 			const std::array positions = {
-				position - x, position + x,
-				position - y, position + y,
+				position - x,
+				position + x,
+				position - y,
+				position + y,
 			};
 			m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
 			return;
@@ -444,19 +429,23 @@ namespace gglab
 
 		const Vector3 z(0.0f, 0.0f, size);
 		const std::array positions = {
-			position - x, position + x,
-			position - y, position + y,
-			position - z, position + z,
+			position - x,
+			position + x,
+			position - y,
+			position + y,
+			position - z,
+			position + z,
 		};
 		m_System->Submit(DebugDrawSystem::PrimitiveTopology::Lines, positions, style);
 	}
 
-	void DebugDrawContext::Arrow(const Vector3& start, const Vector3& end,
-		float headLength, const DebugDrawStyle& style, uint32_t segments) noexcept
+	void DebugDrawContext::Arrow(const Vector3& start, const Vector3& end, float headLength,
+		const DebugDrawStyle& style, uint32_t segments) noexcept
 	{
 		if (!m_System || !std::isfinite(headLength) || headLength <= 0.0f)
 		{
-			if (m_System) m_System->RejectInvalid();
+			if (m_System)
+				m_System->RejectInvalid();
 			return;
 		}
 		Vector3 direction = end - start;
@@ -473,13 +462,15 @@ namespace gglab
 		Cone(end, -direction, headLength, headLength * 0.45f, style, segments);
 	}
 
-	void DebugDrawContext::Axes(const Matrix& transform, float length,
-		float headLength, const DebugDrawStyle& style) noexcept
+	void DebugDrawContext::Axes(const Matrix& transform, float length, float headLength,
+		const DebugDrawStyle& style) noexcept
 	{
-		if (!m_System || !std::isfinite(length) || !std::isfinite(headLength) ||
+		if (!m_System ||
+			!std::isfinite(length) || !std::isfinite(headLength) ||
 			length <= 0.0f || headLength <= 0.0f)
 		{
-			if (m_System) m_System->RejectInvalid();
+			if (m_System)
+				m_System->RejectInvalid();
 			return;
 		}
 		const Vector3 origin = math::TransformPoint(Vector3::Zero, transform);
@@ -495,8 +486,7 @@ namespace gglab
 			axisStyle);
 	}
 
-	void DebugDrawContext::Aabb(const math::Aabb& bounds,
-		const DebugDrawStyle& style) noexcept
+	void DebugDrawContext::Aabb(const math::Aabb& bounds, const DebugDrawStyle& style) noexcept
 	{
 		Box(bounds.m_Center, bounds.m_Extents, style);
 	}

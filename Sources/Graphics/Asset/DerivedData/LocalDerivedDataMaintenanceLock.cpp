@@ -8,29 +8,16 @@ namespace gglab
 	{
 		[[nodiscard]] std::wstring InvariantLowercase(std::wstring_view value) noexcept
 		{
-			if (value.empty()) return {};
-			const int requiredCharacters = ::LCMapStringEx(
-				LOCALE_NAME_INVARIANT,
-				LCMAP_LOWERCASE,
-				value.data(),
-				static_cast<int>(value.size()),
-				nullptr,
-				0,
-				nullptr,
-				nullptr,
-				0);
-			if (requiredCharacters <= 0) return {};
+			if (value.empty())
+				return {};
+			const int requiredCharacters = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE,
+				value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr, 0);
+			if (requiredCharacters <= 0)
+				return {};
 			std::wstring result(static_cast<size_t>(requiredCharacters), L'\0');
-			if (::LCMapStringEx(
-				LOCALE_NAME_INVARIANT,
-				LCMAP_LOWERCASE,
-				value.data(),
-				static_cast<int>(value.size()),
-				result.data(),
-				requiredCharacters,
-				nullptr,
-				nullptr,
-				0) == 0)
+			if (::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(),
+				static_cast<int>(value.size()), result.data(), requiredCharacters, nullptr,
+				nullptr, 0) == 0)
 			{
 				return {};
 			}
@@ -39,26 +26,15 @@ namespace gglab
 
 		[[nodiscard]] std::string WideToUtf8(std::wstring_view value) noexcept
 		{
-			if (value.empty()) return {};
-			const int requiredBytes = ::WideCharToMultiByte(
-				CP_UTF8,
-				WC_ERR_INVALID_CHARS,
-				value.data(),
-				static_cast<int>(value.size()),
-				nullptr,
-				0,
-				nullptr,
-				nullptr);
-			if (requiredBytes <= 0) return {};
+			if (value.empty())
+				return {};
+			const int requiredBytes = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+				value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+			if (requiredBytes <= 0)
+				return {};
 			std::string result(static_cast<size_t>(requiredBytes), '\0');
-			if (::WideCharToMultiByte(
-				CP_UTF8,
-				WC_ERR_INVALID_CHARS,
-				value.data(),
-				static_cast<int>(value.size()),
-				result.data(),
-				requiredBytes,
-				nullptr,
+			if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+				static_cast<int>(value.size()), result.data(), requiredBytes, nullptr,
 				nullptr) == 0)
 			{
 				return {};
@@ -84,7 +60,8 @@ namespace gglab
 	LocalDerivedDataRootIdentity ResolveLocalDerivedDataRootIdentity(
 		const std::filesystem::path& rootDirectory) noexcept
 	{
-		if (rootDirectory.empty()) return {};
+		if (rootDirectory.empty())
+			return {};
 		std::error_code errorCode;
 		std::filesystem::path canonicalRoot =
 			std::filesystem::weakly_canonical(rootDirectory, errorCode);
@@ -93,7 +70,8 @@ namespace gglab
 			errorCode.clear();
 			canonicalRoot = std::filesystem::absolute(rootDirectory, errorCode);
 		}
-		if (errorCode || canonicalRoot.empty()) return {};
+		if (errorCode || canonicalRoot.empty())
+			return {};
 		canonicalRoot = canonicalRoot.lexically_normal().make_preferred();
 
 		std::wstring normalized = canonicalRoot.native();
@@ -105,10 +83,12 @@ namespace gglab
 		}
 		normalized = InvariantLowercase(normalized);
 		const std::string canonicalUtf8 = WideToUtf8(normalized);
-		if (canonicalUtf8.empty()) return {};
-		const Sha256Hash digest = ComputeSha256(
-			std::as_bytes(std::span{ canonicalUtf8.data(), canonicalUtf8.size() }));
-		if (!digest.IsValid()) return {};
+		if (canonicalUtf8.empty())
+			return {};
+		const Sha256Hash digest =
+			ComputeSha256(std::as_bytes(std::span{ canonicalUtf8.data(), canonicalUtf8.size() }));
+		if (!digest.IsValid())
+			return {};
 		return {
 			.m_CanonicalRoot = std::move(canonicalRoot),
 			.m_CanonicalUtf8 = canonicalUtf8,

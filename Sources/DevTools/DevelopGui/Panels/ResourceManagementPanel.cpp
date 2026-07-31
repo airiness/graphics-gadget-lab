@@ -44,9 +44,12 @@ namespace gglab
 		{
 			switch (state)
 			{
-			case DX12ResourceSnapshotState::Free: return "Free";
-			case DX12ResourceSnapshotState::Alive: return "Alive";
-			case DX12ResourceSnapshotState::PendingRetirement: return "PendingRetirement";
+			case DX12ResourceSnapshotState::Free:
+				return "Free";
+			case DX12ResourceSnapshotState::Alive:
+				return "Alive";
+			case DX12ResourceSnapshotState::PendingRetirement:
+				return "PendingRetirement";
 			}
 			return "Unknown";
 		}
@@ -55,16 +58,18 @@ namespace gglab
 		{
 			switch (ownership)
 			{
-			case DX12ResourceSnapshotOwnership::Owned: return "Owned";
-			case DX12ResourceSnapshotOwnership::Borrowed: return "Borrowed";
+			case DX12ResourceSnapshotOwnership::Owned:
+				return "Owned";
+			case DX12ResourceSnapshotOwnership::Borrowed:
+				return "Borrowed";
 			}
 			return "Unknown";
 		}
 
 		std::string DebugIdentityText(const DX12ResourceSlotSnapshot& slot)
 		{
-			std::string result = std::format("{}.{}",
-				RHIResourceDebugDomainText(slot.m_DebugDomain), slot.m_DebugCategory);
+			std::string result = std::format(
+				"{}.{}", RHIResourceDebugDomainText(slot.m_DebugDomain), slot.m_DebugCategory);
 			if (slot.m_HasDebugStableId)
 			{
 				result.append(std::format(" ID={}", slot.m_DebugStableId));
@@ -88,12 +93,11 @@ namespace gglab
 			{
 				return "-";
 			}
-			return std::format("{}{}{} | {} | history={}",
-				slot.m_DebugOwner,
+			return std::format("{}{}{} | {} | history={}", slot.m_DebugOwner,
 				slot.m_HasDebugBindingSerial ? " #" : "",
 				slot.m_HasDebugBindingSerial ? std::to_string(slot.m_DebugBindingSerial) : "",
-				slot.m_DebugBindingMode == RHIResourceDebugBindingMode::Exclusive ?
-					"exclusive" : "aliased",
+				slot.m_DebugBindingMode == RHIResourceDebugBindingMode::Exclusive ? "exclusive"
+				: "aliased",
 				slot.m_DebugBindingHistory.size());
 		}
 
@@ -108,21 +112,18 @@ namespace gglab
 				ImGui::TextUnformatted("Previous bindings");
 				for (const auto& binding : slot.m_DebugBindingHistory)
 				{
-					ImGui::BulletText("%s%s%s | %s",
-						binding.m_Owner.c_str(),
+					ImGui::BulletText("%s%s%s | %s", binding.m_Owner.c_str(),
 						binding.m_HasSerial ? " #" : "",
 						binding.m_HasSerial ? std::to_string(binding.m_Serial).c_str() : "",
-						binding.m_Mode == RHIResourceDebugBindingMode::Exclusive ?
-							"exclusive" : "aliased");
+						binding.m_Mode == RHIResourceDebugBindingMode::Exclusive ? "exclusive"
+						: "aliased");
 				}
 				ImGui::EndTooltip();
 			}
 		}
 
 		RHITextureHandle CreateTestTexture(
-			DX12Device& device,
-			uint32_t serial,
-			std::string* outName = nullptr) noexcept
+			DX12Device& device, uint32_t serial, std::string* outName = nullptr) noexcept
 		{
 			const std::string name = std::format("ResourceManagement.TestTexture.{}", serial);
 			if (outName)
@@ -133,8 +134,7 @@ namespace gglab
 			desc.m_Format = RHIFormat::R8G8B8A8Unorm;
 			desc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest;
 			desc.m_Extent = { 16, 16, 1 };
-			const RHIResourceDebugIdentityDesc debugIdentity
-			{
+			const RHIResourceDebugIdentityDesc debugIdentity{
 				.m_Domain = RHIResourceDebugDomain::DevTools,
 				.m_Category = "TestTexture",
 				.m_Label = name,
@@ -144,9 +144,7 @@ namespace gglab
 		}
 
 		RHIBufferHandle CreateTestBuffer(
-			DX12Device& device,
-			uint32_t serial,
-			std::string* outName = nullptr) noexcept
+			DX12Device& device, uint32_t serial, std::string* outName = nullptr) noexcept
 		{
 			const std::string name = std::format("ResourceManagement.TestBuffer.{}", serial);
 			if (outName)
@@ -157,8 +155,7 @@ namespace gglab
 			desc.m_SizeInBytes = 4096;
 			desc.m_StrideInBytes = 16;
 			desc.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest;
-			const RHIResourceDebugIdentityDesc debugIdentity
-			{
+			const RHIResourceDebugIdentityDesc debugIdentity{
 				.m_Domain = RHIResourceDebugDomain::DevTools,
 				.m_Category = "TestBuffer",
 				.m_Label = name,
@@ -209,9 +206,7 @@ namespace gglab
 			entry.m_DestroyRequested = true;
 		}
 
-		void RecordTestResourcesUse(
-			DX12Device& device,
-			DX12QueueSystem& queueSystem,
+		void RecordTestResourcesUse(DX12Device& device, DX12QueueSystem& queueSystem,
 			ResourceManagementPanelState& state) noexcept
 		{
 			const DX12FencePoint fencePoint =
@@ -235,8 +230,7 @@ namespace gglab
 		}
 
 		const DX12ResourceSlotSnapshot* FindSlot(
-			const TestResourceEntry& entry,
-			const DX12ResourceManagerSnapshot& snapshot) noexcept
+			const TestResourceEntry& entry, const DX12ResourceManagerSnapshot& snapshot) noexcept
 		{
 			if (entry.m_Type == TestResourceType::Texture)
 			{
@@ -248,14 +242,12 @@ namespace gglab
 			return index < snapshot.m_Buffers.size() ? &snapshot.m_Buffers[index] : nullptr;
 		}
 
-		const char* EntryStatusText(
-			const TestResourceEntry& entry,
-			const DX12Device& device,
+		const char* EntryStatusText(const TestResourceEntry& entry, const DX12Device& device,
 			const DX12ResourceManagerSnapshot& snapshot) noexcept
 		{
-			const bool alive = entry.m_Type == TestResourceType::Texture ?
-				device.IsAlive(entry.m_Texture) :
-				device.IsAlive(entry.m_Buffer);
+			const bool alive = entry.m_Type == TestResourceType::Texture
+				? device.IsAlive(entry.m_Texture)
+				: device.IsAlive(entry.m_Buffer);
 			if (alive)
 			{
 				return "Alive";
@@ -283,32 +275,26 @@ namespace gglab
 
 		uint32_t EntryIndex(const TestResourceEntry& entry) noexcept
 		{
-			return entry.m_Type == TestResourceType::Texture ?
-				entry.m_Texture.Index() :
-				entry.m_Buffer.Index();
+			return entry.m_Type == TestResourceType::Texture ? entry.m_Texture.Index()
+				: entry.m_Buffer.Index();
 		}
 
 		uint32_t EntryGeneration(const TestResourceEntry& entry) noexcept
 		{
-			return entry.m_Type == TestResourceType::Texture ?
-				entry.m_Texture.Generation() :
-				entry.m_Buffer.Generation();
+			return entry.m_Type == TestResourceType::Texture ? entry.m_Texture.Generation()
+				: entry.m_Buffer.Generation();
 		}
 
-		void DrawTestResourcesTable(
-			DX12Device& device,
-			const DX12ResourceManagerSnapshot& snapshot,
+		void DrawTestResourcesTable(DX12Device& device, const DX12ResourceManagerSnapshot& snapshot,
 			ResourceManagementPanelState& state) noexcept
 		{
 			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_SizingStretchProp |
-				ImGuiTableFlags_ScrollY;
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY;
 
 			std::optional<size_t> removeIndex;
-			if (ImGui::BeginTable("ResourceManagementTestResources", 8, flags, ImVec2(0.0f, 260.0f)))
+			if (ImGui::BeginTable(
+				"ResourceManagementTestResources", 8, flags, ImVec2(0.0f, 260.0f)))
 			{
 				ImGui::TableSetupColumn("Type");
 				ImGui::TableSetupColumn("Name");
@@ -343,9 +329,7 @@ namespace gglab
 					if (slot)
 					{
 						ImGui::Text(
-							"%s / gen %u",
-							SlotStateText(slot->m_State),
-							slot->m_Generation);
+							"%s / gen %u", SlotStateText(slot->m_State), slot->m_Generation);
 					}
 					else
 					{
@@ -390,12 +374,9 @@ namespace gglab
 		}
 
 		void DrawSlotsTable(
-			const char* tableId,
-			const std::vector<DX12ResourceSlotSnapshot>& slots) noexcept
+			const char* tableId, const std::vector<DX12ResourceSlotSnapshot>& slots) noexcept
 		{
-			const ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
+			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp;
 
@@ -453,11 +434,8 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void RunLifecycleTest(
-			DX12Device& device,
-			DX12QueueSystem& queueSystem,
-			DX12ResourceManager& manager,
-			ResourceManagementPanelState& state) noexcept
+		void RunLifecycleTest(DX12Device& device, DX12QueueSystem& queueSystem,
+			DX12ResourceManager& manager, ResourceManagementPanelState& state) noexcept
 		{
 			const RHITextureHandle first = CreateTestTexture(device, ++state.m_TextureSerial);
 			const bool created = first.IsValid() && device.IsAlive(first);
@@ -477,30 +455,20 @@ namespace gglab
 			queueSystem.WaitIdle();
 			manager.RetireCompletedResources();
 
-			auto wrappedGeneration =
-				std::numeric_limits<RHITextureHandle::GenerationType>::max();
+			auto wrappedGeneration = std::numeric_limits<RHITextureHandle::GenerationType>::max();
 			++wrappedGeneration;
 			if (wrappedGeneration == RHITextureHandle::InvalidGeneration)
 			{
 				++wrappedGeneration;
 			}
-			const bool rolloverValid =
-				wrappedGeneration != RHITextureHandle::InvalidGeneration;
-			const bool passed =
-				created &&
-				invalidatedImmediately &&
-				reusedSlot &&
-				generationChanged &&
-				rolloverValid;
+			const bool rolloverValid = wrappedGeneration != RHITextureHandle::InvalidGeneration;
+			const bool passed = created && invalidatedImmediately && reusedSlot &&
+				generationChanged && rolloverValid;
 
 			state.m_LastTestResult = std::format(
 				"{} | create={} immediate-invalidate={} slot-reuse={} generation-change={} rollover={}",
-				passed ? "PASS" : "FAIL",
-				created,
-				invalidatedImmediately,
-				reusedSlot,
-				generationChanged,
-				rolloverValid);
+				passed ? "PASS" : "FAIL", created, invalidatedImmediately, reusedSlot,
+				generationChanged, rolloverValid);
 		}
 	}
 
@@ -511,9 +479,9 @@ namespace gglab
 		ImGui::TextUnformatted("RHI Resource Management");
 		ImGui::Separator();
 
-		auto* dx12Context = context.m_Renderer ?
-			dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext()) :
-			nullptr;
+		auto* dx12Context = context.m_Renderer
+			? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext())
+			: nullptr;
 		if (!dx12Context)
 		{
 			ImGui::TextColored(devtools::style::ErrorTextColor,
@@ -550,16 +518,14 @@ namespace gglab
 		ImGui::SameLine();
 		if (ImGui::Button("Clear Destroyed Rows"))
 		{
-			std::erase_if(
-				state.m_Resources,
-				[](const TestResourceEntry& entry)
-				{
-					return entry.m_DestroyRequested;
-				});
+			std::erase_if(state.m_Resources,
+				[](const TestResourceEntry& entry) { return entry.m_DestroyRequested; });
 		}
 
-		const auto* snapshot = context.m_Diagnostics ?
-			context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>() : nullptr;
+		const auto* snapshot =
+			context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<DX12ResourceManagerSnapshot>()
+			: nullptr;
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("DX12 resource snapshot provider is not available.");

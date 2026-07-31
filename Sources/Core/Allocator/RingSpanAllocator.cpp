@@ -14,8 +14,7 @@ namespace gglab
 	}
 
 	RingSpanAllocator::AlignedAllocation RingSpanAllocator::AllocateAligned(
-		CountType count,
-		CountType alignment) noexcept
+		CountType count, CountType alignment) noexcept
 	{
 		if (count == 0)
 		{
@@ -26,8 +25,8 @@ namespace gglab
 		alignment = std::max(alignment, CountType{ 1 });
 		if (count > m_FreeCount)
 		{
-			GGLAB_LOG_WARN("RingSpanAllocator: AllocateAligned failed. request={}, free={}",
-				count, m_FreeCount);
+			GGLAB_LOG_WARN("RingSpanAllocator: AllocateAligned failed. request={}, free={}", count,
+				m_FreeCount);
 			return {};
 		}
 
@@ -45,9 +44,7 @@ namespace gglab
 				return remainder ? value + alignment - remainder : value;
 			};
 
-		const auto reserve = [this](
-			OffsetType reservedIndex,
-			CountType reservedCount,
+		const auto reserve = [this](OffsetType reservedIndex, CountType reservedCount,
 			OffsetType alignedIndex) noexcept
 			{
 				m_Tail = static_cast<OffsetType>((reservedIndex + reservedCount) % m_Capacity);
@@ -55,10 +52,11 @@ namespace gglab
 				m_HighWater = std::max(m_HighWater, GetCurrentUsage());
 				GGLAB_ASSERT(m_HighWater <= m_Capacity);
 				return AlignedAllocation{
-					.m_ReservedSpan = {
-						.m_Index = reservedIndex,
-						.m_Count = reservedCount,
-					},
+					.m_ReservedSpan =
+						{
+							.m_Index = reservedIndex,
+							.m_Count = reservedCount,
+						},
 					.m_AlignedIndex = alignedIndex,
 				};
 			};
@@ -83,9 +81,7 @@ namespace gglab
 			// otherwise tail can become equal to head while the ring is only
 			// partially occupied, making the next allocation overlap live data.
 			const CountType wrappedReservedCount = right + count;
-			if (m_Head > 0 &&
-				count <= m_Head &&
-				wrappedReservedCount <= m_FreeCount)
+			if (m_Head > 0 && count <= m_Head && wrappedReservedCount <= m_FreeCount)
 			{
 				return reserve(m_Tail, wrappedReservedCount, 0);
 			}
@@ -106,9 +102,7 @@ namespace gglab
 
 		GGLAB_LOG_WARN(
 			"RingSpanAllocator::AllocateAligned failed: no contiguous space. request={}, alignment={}, free={}.",
-			count,
-			alignment,
-			m_FreeCount);
+			count, alignment, m_FreeCount);
 		return {};
 	}
 

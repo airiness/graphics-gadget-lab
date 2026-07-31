@@ -86,11 +86,11 @@ namespace gglab
 		float m_Near = 0.01f;
 		float m_Far = 1000.0f;
 		float m_Aspect = 1.0f;
-		float m_Fov = 60.0f;	// degrees
+		float m_Fov = 60.0f; // degrees
 		float m_ExposureCompensationEV = 0.0f;
 
-		float m_Pitch = 0.0f;	// radians
-		float m_Yaw = 0.0f;		// radians
+		float m_Pitch = 0.0f; // radians
+		float m_Yaw = 0.0f;	  // radians
 
 		bool m_ViewDirty = true;
 		bool m_ProjDirty = true;

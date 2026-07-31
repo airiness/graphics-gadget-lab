@@ -23,13 +23,13 @@ namespace gglab
 {
 	enum class CommonRSRootParamIndex : uint32_t
 	{
-		SceneCB = 0,	// b0
-		DrawConstants,	// DrawParameters root constants, b1
-		PassConstants,	// Pass-specific root constants, b2
-		ObjectSB,		// g_Objects, t1
-		MaterialSB,		// g_Materials, t2
-		ViewSB,			// g_Views, t3
-		LightSB,		// g_Lights, t4
+		SceneCB = 0,   // b0
+		DrawConstants, // DrawParameters root constants, b1
+		PassConstants, // Pass-specific root constants, b2
+		ObjectSB,	   // g_Objects, t1
+		MaterialSB,	   // g_Materials, t2
+		ViewSB,		   // g_Views, t3
+		LightSB,	   // g_Lights, t4
 
 		Count
 	};
@@ -95,8 +95,7 @@ namespace gglab
 		AssetResidencyPolicy m_ResidencyPolicy = AssetResidencyPolicy::Cacheable;
 	};
 
-	[[nodiscard]] constexpr AssetContentState ProjectAssetContentState(
-		AssetState state) noexcept
+	[[nodiscard]] constexpr AssetContentState ProjectAssetContentState(AssetState state) noexcept
 	{
 		switch (state)
 		{
@@ -158,9 +157,7 @@ namespace gglab
 		lifecycle.m_ResidencyState = residencyState;
 	}
 
-	inline void BeginAssetContentGeneration(
-		AssetLifecycle& lifecycle,
-		uint64_t generation,
+	inline void BeginAssetContentGeneration(AssetLifecycle& lifecycle, uint64_t generation,
 		AssetState initialState,
 		AssetResidencyPolicy policy = AssetResidencyPolicy::Cacheable) noexcept
 	{
@@ -237,12 +234,11 @@ namespace gglab
 	[[nodiscard]] constexpr TextureImportSettings MakeTextureImportSettings(
 		TextureSemantic semantic) noexcept
 	{
-		return
-		{
+		return {
 			.m_Semantic = semantic,
-			.m_MipPolicy = semantic == TextureSemantic::Environment ?
-				TextureMipPolicy::Preserve :
-				TextureMipPolicy::GenerateIfMissing,
+			.m_MipPolicy = semantic == TextureSemantic::Environment
+							   ? TextureMipPolicy::Preserve
+							   : TextureMipPolicy::GenerateIfMissing,
 		};
 	}
 
@@ -309,12 +305,12 @@ namespace gglab
 
 	enum class InputLayoutID : uint32_t
 	{
-		P3,				// Position(3)
-		P3T2,			// Position(3), TexCoord(2)
-		P3N3,			// Position(3), Normal(3)
-		P3N3T2,			// Position(3), Normal(3), TexCoord(2)
-		P3N3T2T2Tan4,	// Position(3), Normal(3), TexCoord0(2), TexCoord1(2), Tangent(4)
-		P3C4,			// Position(3), Color(4)
+		P3,			  // Position(3)
+		P3T2,		  // Position(3), TexCoord(2)
+		P3N3,		  // Position(3), Normal(3)
+		P3N3T2,		  // Position(3), Normal(3), TexCoord(2)
+		P3N3T2T2Tan4, // Position(3), Normal(3), TexCoord0(2), TexCoord1(2), Tangent(4)
+		P3C4,		  // Position(3), Color(4)
 
 		None,
 		Count = None
@@ -335,8 +331,7 @@ namespace gglab
 
 	[[nodiscard]] constexpr bool IsDebugCameraRenderViewID(RenderViewID viewId) noexcept
 	{
-		return viewId == RenderViewID::DebugCamera0 ||
-			viewId == RenderViewID::DebugCamera1 ||
+		return viewId == RenderViewID::DebugCamera0 || viewId == RenderViewID::DebugCamera1 ||
 			viewId == RenderViewID::DebugCamera2;
 	}
 
@@ -398,7 +393,8 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept { return m_Id.Value() != 0; }
 		[[nodiscard]] uint64_t Value() const noexcept { return m_Id.Value(); }
-		friend constexpr auto operator<=>(const RuntimeMaterialKey&, const RuntimeMaterialKey&) = default;
+		friend constexpr auto operator<=>(
+			const RuntimeMaterialKey&, const RuntimeMaterialKey&) = default;
 
 	private:
 		StringID m_Id{};
@@ -430,8 +426,8 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Domain == RenderMaterialDomain::Asset ?
-				m_Value != MaterialID::InvalidValue : m_Value != 0;
+			return m_Domain == RenderMaterialDomain::Asset ? m_Value != MaterialID::InvalidValue
+				: m_Value != 0;
 		}
 
 		[[nodiscard]] constexpr auto AsTuple() const noexcept
@@ -439,7 +435,8 @@ namespace gglab
 			return std::tie(m_Domain, m_Value);
 		}
 
-		friend constexpr auto operator<=>(const RenderMaterialKey&, const RenderMaterialKey&) = default;
+		friend constexpr auto operator<=>(
+			const RenderMaterialKey&, const RenderMaterialKey&) = default;
 
 		uint64_t m_Value = MaterialID::InvalidValue;
 		RenderMaterialDomain m_Domain = RenderMaterialDomain::Asset;
@@ -539,8 +536,7 @@ namespace gglab
 
 namespace std
 {
-	template<>
-	struct hash<gglab::RuntimeMaterialKey>
+	template <> struct hash<gglab::RuntimeMaterialKey>
 	{
 		size_t operator()(gglab::RuntimeMaterialKey key) const noexcept
 		{
@@ -548,8 +544,7 @@ namespace std
 		}
 	};
 
-	template<>
-	struct hash<gglab::RenderMaterialKey>
+	template <> struct hash<gglab::RenderMaterialKey>
 	{
 		size_t operator()(const gglab::RenderMaterialKey& key) const noexcept
 		{

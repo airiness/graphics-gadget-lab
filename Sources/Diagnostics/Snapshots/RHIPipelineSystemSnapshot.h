@@ -118,8 +118,7 @@ namespace gglab
 		std::vector<RHIPipelineSnapshot> m_Pipelines;
 	};
 
-	template<>
-	struct SnapshotTraits<RHIPipelineSystemSnapshot>
+	template <> struct SnapshotTraits<RHIPipelineSystemSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.RHIPipelineSystemSnapshot");
 	};

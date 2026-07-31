@@ -5,8 +5,7 @@
 namespace gglab
 {
 	ResolvedViewRenderSettings ResolveViewRenderSettings(
-		const ViewRenderProfile& profile,
-		const Camera& camera) noexcept
+		const ViewRenderProfile& profile, const Camera& camera) noexcept
 	{
 		BloomSettings bloom = profile.m_PostProcess.m_Bloom;
 		bloom.m_Threshold = std::max(bloom.m_Threshold, 0.0f);
@@ -16,18 +15,20 @@ namespace gglab
 		bloom.m_MaxLevels = std::clamp(bloom.m_MaxLevels, 1u, 8u);
 
 		return {
-			.m_Exposure = {
-				.m_CompensationEV = camera.GetExposureCompensationEV(),
-				.m_ExposureScale = camera.GetExposureMultiplier(),
-			},
-			.m_Lighting = {
-				.m_ForwardPlus =
-					profile.m_Lighting.m_ForwardPlus,
-			},
-			.m_PostProcess = {
-				.m_Bloom = bloom,
-				.m_ToneMapping = profile.m_PostProcess.m_ToneMapping,
-			},
+			.m_Exposure =
+				{
+					.m_CompensationEV = camera.GetExposureCompensationEV(),
+					.m_ExposureScale = camera.GetExposureMultiplier(),
+				},
+			.m_Lighting =
+				{
+					.m_ForwardPlus = profile.m_Lighting.m_ForwardPlus,
+				},
+			.m_PostProcess =
+				{
+					.m_Bloom = bloom,
+					.m_ToneMapping = profile.m_PostProcess.m_ToneMapping,
+				},
 		};
 	}
 }

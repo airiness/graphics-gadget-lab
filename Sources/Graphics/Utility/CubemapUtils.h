@@ -16,7 +16,5 @@ namespace gglab
 	[[nodiscard]] Vector3 GetCubemapFaceDirection(CubemapFace face) noexcept;
 	[[nodiscard]] Vector3 GetCubemapFaceUp(CubemapFace face) noexcept;
 	[[nodiscard]] Vector3 GetCubemapFaceRight(CubemapFace face) noexcept;
-	[[nodiscard]] Vector3 CubemapFaceUvToDirection(
-		CubemapFace face,
-		const Vector2& uv) noexcept;
+	[[nodiscard]] Vector3 CubemapFaceUvToDirection(CubemapFace face, const Vector2& uv) noexcept;
 }

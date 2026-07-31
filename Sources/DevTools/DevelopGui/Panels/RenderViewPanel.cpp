@@ -60,9 +60,8 @@ namespace gglab
 				return devtools::EnumText(RenderViewID::Unknown);
 			}
 			const CameraRig::CameraSlot* slot = context.m_CameraRig->FindRenderViewSlot(viewId);
-			return slot ?
-				devtools::EnumText(slot->m_VisibilityMode) :
-				devtools::EnumText(RenderViewVisibilityMode::None);
+			return slot ? devtools::EnumText(slot->m_VisibilityMode)
+				: devtools::EnumText(RenderViewVisibilityMode::None);
 		}
 
 		std::string RenderViewName(const RenderView& view)
@@ -76,8 +75,7 @@ namespace gglab
 		}
 
 		const RenderQueue* FindRenderQueue(
-			std::span<const RenderQueue> queues,
-			RenderViewID viewId) noexcept
+			std::span<const RenderQueue> queues, RenderViewID viewId) noexcept
 		{
 			const size_t index = utils::ToIndex(viewId);
 			if (index < queues.size() && queues[index].m_ViewId == viewId)
@@ -95,8 +93,7 @@ namespace gglab
 		}
 
 		const RenderView* FindRenderView(
-			std::span<const RenderView> views,
-			RenderViewID viewId) noexcept
+			std::span<const RenderView> views, RenderViewID viewId) noexcept
 		{
 			const size_t index = utils::ToIndex(viewId);
 			if (index < views.size() && views[index].m_ViewId == viewId)
@@ -115,12 +112,12 @@ namespace gglab
 
 		RenderViewID ResolveDisplayViewId(const DevelopGuiContext& context) noexcept
 		{
-			return context.m_CameraRig ? context.m_CameraRig->GetDisplayViewId() : RenderViewID::Main;
+			return context.m_CameraRig ? context.m_CameraRig->GetDisplayViewId()
+				: RenderViewID::Main;
 		}
 
 		RenderViewID ResolveSelectedViewId(
-			const RenderViewPanelState& state,
-			std::span<const RenderView> views) noexcept
+			const RenderViewPanelState& state, std::span<const RenderView> views) noexcept
 		{
 			if (FindRenderView(views, state.m_SelectedViewId))
 			{
@@ -147,18 +144,14 @@ namespace gglab
 				static_cast<float>(stats.m_TotalInstanceCount);
 		}
 
-		void DrawFrustumPlaneRow(
-			const char* label,
-			const Plane& plane) noexcept
+		void DrawFrustumPlaneRow(const char* label, const Plane& plane) noexcept
 		{
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
 			ImGui::TextUnformatted(label);
 			ImGui::TableSetColumnIndex(1);
-			ImGui::Text("(%.4f, %.4f, %.4f)",
-				plane.m_Normal.m_X,
-				plane.m_Normal.m_Y,
-				plane.m_Normal.m_Z);
+			ImGui::Text(
+				"(%.4f, %.4f, %.4f)", plane.m_Normal.m_X, plane.m_Normal.m_Y, plane.m_Normal.m_Z);
 			ImGui::TableSetColumnIndex(2);
 			ImGui::Text("%.4f", plane.m_Distance);
 		}
@@ -167,7 +160,8 @@ namespace gglab
 		{
 			const math::Frustum frustum = math::CreateFrustumFromViewProjection(view.m_ViewProj);
 			if (!ImGui::BeginTable("FrustumPlanes", 3,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_SizingStretchProp))
 			{
 				return;
 			}
@@ -187,19 +181,15 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		template<typename T, typename Predicate>
+		template <typename T, typename Predicate>
 		uint32_t CountUniqueInRange(
-			std::span<const DrawItem> drawItems,
-			const DrawItemsRange& range,
-			Predicate predicate)
+			std::span<const DrawItem> drawItems, const DrawItemsRange& range, Predicate predicate)
 		{
 			std::vector<T> values;
-			const uint32_t start = std::min<uint32_t>(
-				range.m_Start,
-				static_cast<uint32_t>(drawItems.size()));
-			const uint32_t end = std::min<uint32_t>(
-				start + range.m_Count,
-				static_cast<uint32_t>(drawItems.size()));
+			const uint32_t start =
+				std::min<uint32_t>(range.m_Start, static_cast<uint32_t>(drawItems.size()));
+			const uint32_t end =
+				std::min<uint32_t>(start + range.m_Count, static_cast<uint32_t>(drawItems.size()));
 			values.reserve(end - start);
 			for (uint32_t index = start; index < end; ++index)
 			{
@@ -212,9 +202,7 @@ namespace gglab
 			return static_cast<uint32_t>(values.size());
 		}
 
-		void DrawOverview(
-			RenderViewPanelState& state,
-			const DevelopGuiContext& context) noexcept
+		void DrawOverview(RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
 		{
 			ImGui::SeparatorText("RenderView Overview");
 			if (context.m_RenderViews.empty())
@@ -228,11 +216,8 @@ namespace gglab
 			const float overviewHeight =
 				ImGui::GetTextLineHeightWithSpacing() * (VisibleOverviewRowCount + 2.0f);
 			if (!ImGui::BeginTable("RenderViewOverview", 19,
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_ScrollX |
-				ImGuiTableFlags_ScrollY |
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
 				ImGuiTableFlags_SizingFixedFit,
 				ImVec2(0.0f, overviewHeight)))
 			{
@@ -264,16 +249,15 @@ namespace gglab
 			for (const RenderView& view : context.m_RenderViews)
 			{
 				const RenderQueue* queue = FindRenderQueue(context.m_RenderQueues, view.m_ViewId);
-				const RenderQueueStatistics stats = queue ? queue->m_Statistics : RenderQueueStatistics{};
+				const RenderQueueStatistics stats =
+					queue ? queue->m_Statistics : RenderQueueStatistics{};
 				const std::string name = RenderViewName(view);
 
 				ImGui::PushID(static_cast<int>(utils::ToIndex(view.m_ViewId)));
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
 				const bool selected = state.m_SelectedViewId == view.m_ViewId;
-				if (ImGui::Selectable(
-					name.c_str(),
-					selected,
+				if (ImGui::Selectable(name.c_str(), selected,
 					ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
 				{
 					state.m_SelectedViewId = view.m_ViewId;
@@ -331,7 +315,8 @@ namespace gglab
 		{
 			const RenderQueueStatistics& stats = queue.m_Statistics;
 			if (!ImGui::BeginTable("RenderQueueStats", 2,
-				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_SizingStretchProp))
 			{
 				return;
 			}
@@ -367,9 +352,7 @@ namespace gglab
 		void DrawBucketStatistics(const RenderQueue& queue) noexcept
 		{
 			if (!ImGui::BeginTable("RenderQueueBuckets", 5,
-				ImGuiTableFlags_Borders |
-				ImGuiTableFlags_RowBg |
-				ImGuiTableFlags_Resizable |
+				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp))
 			{
 				return;
@@ -382,21 +365,17 @@ namespace gglab
 			ImGui::TableSetupColumn("Unique Materials");
 			ImGui::TableHeadersRow();
 
-			for (size_t bucketIndex = 0; bucketIndex < utils::ToIndex(RenderBucket::Count); ++bucketIndex)
+			for (size_t bucketIndex = 0; bucketIndex < utils::ToIndex(RenderBucket::Count);
+				++bucketIndex)
 			{
 				const RenderBucket bucket = static_cast<RenderBucket>(bucketIndex);
 				const DrawItemsRange& range = queue.m_BucketDrawRanges[bucketIndex];
-				const uint32_t uniqueMeshes = CountUniqueInRange<MeshID>(
-					queue.m_DrawItems,
-					range,
+				const uint32_t uniqueMeshes = CountUniqueInRange<MeshID>(queue.m_DrawItems, range,
 					[](const DrawItem& item) noexcept
-					{
-						return item.m_CoverageDrawPacket.m_Geometry.m_MeshId;
-					});
-				const uint32_t uniqueMaterials = CountUniqueInRange<RenderMaterialKey>(
-					queue.m_DrawItems,
-					range,
-					[](const DrawItem& item) noexcept { return item.m_MaterialKey; });
+					{ return item.m_CoverageDrawPacket.m_Geometry.m_MeshId; });
+				const uint32_t uniqueMaterials =
+					CountUniqueInRange<RenderMaterialKey>(queue.m_DrawItems, range,
+						[](const DrawItem& item) noexcept { return item.m_MaterialKey; });
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -415,8 +394,7 @@ namespace gglab
 		}
 
 		void DrawSelectedRenderView(
-			RenderViewPanelState& state,
-			const DevelopGuiContext& context) noexcept
+			RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
 		{
 			state.m_SelectedViewId = ResolveSelectedViewId(state, context.m_RenderViews);
 			const RenderView* view = FindRenderView(context.m_RenderViews, state.m_SelectedViewId);
@@ -432,11 +410,13 @@ namespace gglab
 			ImGui::SeparatorText("Selected RenderView");
 			ImGui::Text("%s (%s)", name.c_str(), viewIdText.c_str());
 			ImGui::Text("Valid: %s", view->m_IsValid ? "Yes" : "No");
-			ImGui::Text("Display: %s", view->m_ViewId == ResolveDisplayViewId(context) ? "Yes" : "No");
+			ImGui::Text(
+				"Display: %s", view->m_ViewId == ResolveDisplayViewId(context) ? "Yes" : "No");
 			ImGui::Text("Kind: %s", RenderViewKindLabel(view->m_ViewId));
 			ImGui::Text("Projection: %s", ProjectionLabel(view->m_ViewId));
 			ImGui::Text("Culling: %s", cullingText.c_str());
-			ImGui::Text("Size: %u x %u, Aspect: %.4f", view->m_Width, view->m_Height, view->m_Aspect);
+			ImGui::Text(
+				"Size: %u x %u, Aspect: %.4f", view->m_Width, view->m_Height, view->m_Aspect);
 			ImGui::Text("Near/Far: %.4f / %.2f", view->m_Near, view->m_Far);
 			if (view->m_ViewId != RenderViewID::DirectionalShadow)
 			{
@@ -465,10 +445,10 @@ namespace gglab
 		}
 
 		void DrawSelectedQueue(
-			const RenderViewPanelState& state,
-			const DevelopGuiContext& context) noexcept
+			const RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
 		{
-			const RenderQueue* queue = FindRenderQueue(context.m_RenderQueues, state.m_SelectedViewId);
+			const RenderQueue* queue =
+				FindRenderQueue(context.m_RenderQueues, state.m_SelectedViewId);
 			ImGui::SeparatorText("RenderQueue");
 			if (!queue)
 			{

@@ -59,9 +59,9 @@ namespace gglab
 		std::vector<TransientBufferSlotSnapshot> m_Buffers;
 	};
 
-	template<>
-	struct SnapshotTraits<TransientResourcePoolSnapshot>
+	template <> struct SnapshotTraits<TransientResourcePoolSnapshot>
 	{
-		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.TransientResourcePoolSnapshot");
+		static constexpr SnapshotId Id =
+			MakeSnapshotId("Diagnostics.TransientResourcePoolSnapshot");
 	};
 }

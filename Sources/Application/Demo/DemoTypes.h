@@ -27,8 +27,8 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Renderer && m_AssetManager && m_ShaderManager && m_TaskSystem && m_InputManager &&
-				m_Time && m_DebugDraw && m_EnvironmentAssetController;
+			return m_Renderer && m_AssetManager && m_ShaderManager && m_TaskSystem &&
+				m_InputManager && m_Time && m_DebugDraw && m_EnvironmentAssetController;
 		}
 	};
 

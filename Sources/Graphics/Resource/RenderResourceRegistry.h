@@ -102,16 +102,19 @@ namespace gglab
 
 		void EnsureIblResources(const IBLResourceCreateInfo& createInfo = {},
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
-		void EnsureIBLBakeResources(const IBLBakeConfig& config,
-			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
+		void EnsureIBLBakeResources(
+			const IBLBakeConfig& config, const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 		void PublishIBLBakeResources() noexcept;
 		[[nodiscard]] bool HasIBLBakeResources() const noexcept;
-		[[nodiscard]] bool HasInitializedActiveIBL() const noexcept { return m_HasInitializedActiveIBL; }
+		[[nodiscard]] bool HasInitializedActiveIBL() const noexcept
+		{
+			return m_HasInitializedActiveIBL;
+		}
 		void MarkActiveIBLInitialized() noexcept { m_HasInitializedActiveIBL = true; }
-		void EnsureShadowPreviewResources(uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
+		void EnsureShadowPreviewResources(
+			uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
-		void EnsurePostProcessPreviewResources(uint32_t sourceWidth,
-			uint32_t sourceHeight,
+		void EnsurePostProcessPreviewResources(uint32_t sourceWidth, uint32_t sourceHeight,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 
 		void MarkDirty(TextureIndex index) noexcept;
@@ -127,18 +130,30 @@ namespace gglab
 		uint32_t GetIBLBakeShaderVisibleSrvIndex(TextureIndex index) const noexcept;
 
 		void SetIBLEnvironmentPreviewLayout(IBLPreviewLayout layout) noexcept;
-		IBLPreviewLayout GetIBLEnvironmentPreviewLayout() const noexcept { return m_IBLEnvironmentPreviewLayout; }
+		IBLPreviewLayout GetIBLEnvironmentPreviewLayout() const noexcept
+		{
+			return m_IBLEnvironmentPreviewLayout;
+		}
 		void SetIBLEnvironmentPreviewMip(uint32_t mip) noexcept;
 		uint32_t GetIBLEnvironmentPreviewMip() const noexcept { return m_IBLEnvironmentPreviewMip; }
 
 		void SetIBLIrradiancePreviewLayout(IBLPreviewLayout layout) noexcept;
-		IBLPreviewLayout GetIBLIrradiancePreviewLayout() const noexcept { return m_IBLIrradiancePreviewLayout; }
+		IBLPreviewLayout GetIBLIrradiancePreviewLayout() const noexcept
+		{
+			return m_IBLIrradiancePreviewLayout;
+		}
 
 		void SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout layout) noexcept;
-		IBLPreviewLayout GetIBLPrefilteredSpecularPreviewLayout() const noexcept { return m_IBLPrefilteredSpecularPreviewLayout; }
+		IBLPreviewLayout GetIBLPrefilteredSpecularPreviewLayout() const noexcept
+		{
+			return m_IBLPrefilteredSpecularPreviewLayout;
+		}
 
 		void SetIBLPrefilteredSpecularPreviewMip(uint32_t mip) noexcept;
-		uint32_t GetIBLPrefilteredSpecularPreviewMip() const noexcept { return m_IBLPrefilteredSpecularPreviewMip; }
+		uint32_t GetIBLPrefilteredSpecularPreviewMip() const noexcept
+		{
+			return m_IBLPrefilteredSpecularPreviewMip;
+		}
 
 		void RequestIBLPreview(IBLPreviewType type) noexcept;
 		[[nodiscard]] bool ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept;
@@ -170,7 +185,8 @@ namespace gglab
 		{
 			return m_PostProcessPreviewState.m_HasPublished;
 		}
-		[[nodiscard]] PostProcessDebugSelection GetPublishedPostProcessPreviewSelection() const noexcept
+		[[nodiscard]] PostProcessDebugSelection GetPublishedPostProcessPreviewSelection()
+			const noexcept
 		{
 			return m_PostProcessPreviewState.m_PublishedSelection;
 		}
@@ -184,19 +200,15 @@ namespace gglab
 		void ReleaseAll(const RHIFencePoint& fencePoint) noexcept;
 
 	private:
-		void EnsureTexture(TextureIndex index,
-			const RHITextureDesc& desc,
+		void EnsureTexture(TextureIndex index, const RHITextureDesc& desc,
 			const RHITextureViewDesc& srvDesc,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 		void EnsureTexture(std::array<TextureEntry, utils::EnumCount<TextureIndex>()>& entries,
-			TextureIndex index,
-			const RHITextureDesc& desc,
-			const RHITextureViewDesc& srvDesc,
+			TextureIndex index, const RHITextureDesc& desc, const RHITextureViewDesc& srvDesc,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 		void EnsureIBLTextureSet(
 			std::array<TextureEntry, utils::EnumCount<TextureIndex>()>& entries,
-			const IBLBakeConfig& config,
-			const RHIFencePoint* retireFenceOpt) noexcept;
+			const IBLBakeConfig& config, const RHIFencePoint* retireFenceOpt) noexcept;
 
 		void InvalidateDependents(TextureIndex index) noexcept;
 		void InvalidatePreviewForSource(TextureIndex index) noexcept;

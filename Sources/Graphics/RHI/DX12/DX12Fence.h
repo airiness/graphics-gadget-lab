@@ -30,4 +30,3 @@ namespace gglab
 		uint64_t m_NextRequestValue = 0;
 	};
 }
-

@@ -4,9 +4,7 @@
 namespace gglab
 {
 	void ModelPublicationJournal::Reserve(
-		size_t claimCount,
-		size_t materialCount,
-		size_t dependencyCount)
+		size_t claimCount, size_t materialCount, size_t dependencyCount)
 	{
 		m_Claims.reserve(claimCount);
 		m_CreatedMaterials.reserve(materialCount);
@@ -28,8 +26,7 @@ namespace gglab
 		m_CreatedMaterials.push_back(materialId);
 	}
 
-	void ModelPublicationJournal::SetDependencyOwner(
-		ModelPublicationOwnerToken owner) noexcept
+	void ModelPublicationJournal::SetDependencyOwner(ModelPublicationOwnerToken owner) noexcept
 	{
 		GGLAB_ASSERT(!m_Committed && !m_Aborted);
 		GGLAB_ASSERT(owner.IsValid());
@@ -37,8 +34,7 @@ namespace gglab
 		m_DependencyOwner = owner;
 	}
 
-	void ModelPublicationJournal::RecordDependencyLease(
-		ModelPublicationLeaseToken lease)
+	void ModelPublicationJournal::RecordDependencyLease(ModelPublicationLeaseToken lease)
 	{
 		GGLAB_ASSERT(!m_Committed && !m_Aborted);
 		GGLAB_ASSERT(lease.IsValid());
@@ -53,8 +49,7 @@ namespace gglab
 		m_DependencyLeases.clear();
 	}
 
-	bool ModelPublicationJournal::ReleaseNextRetain(
-		AssetPublicationServicesBase& services) noexcept
+	bool ModelPublicationJournal::ReleaseNextRetain(AssetPublicationServicesBase& services) noexcept
 	{
 		GGLAB_ASSERT(m_Committed && !m_Aborted);
 		if (m_ReleaseRetainCursor >= m_Claims.size())
@@ -68,8 +63,7 @@ namespace gglab
 		return m_ReleaseRetainCursor < m_Claims.size();
 	}
 
-	void ModelPublicationJournal::Abort(
-		AssetPublicationServicesBase& services) noexcept
+	void ModelPublicationJournal::Abort(AssetPublicationServicesBase& services) noexcept
 	{
 		if (m_Aborted)
 		{

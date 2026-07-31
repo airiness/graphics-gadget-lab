@@ -58,11 +58,7 @@ namespace gglab
 		DynamicStructuredBufferAllocator<ViewGPU>::Allocation m_Views{};
 		DynamicBufferAllocation m_SceneConstants{};
 
-		bool IsEmpty() const noexcept
-		{
-			return !m_Views.IsValid() &&
-				!m_SceneConstants.IsValid();
-		}
+		bool IsEmpty() const noexcept { return !m_Views.IsValid() && !m_SceneConstants.IsValid(); }
 	};
 
 	enum class RenderSceneBuildStatus : uint8_t
@@ -107,6 +103,5 @@ namespace gglab
 
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
-
 	};
 }

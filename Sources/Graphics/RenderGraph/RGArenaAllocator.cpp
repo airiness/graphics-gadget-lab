@@ -3,8 +3,7 @@
 
 namespace gglab
 {
-	RGArenaAllocator::RGArenaAllocator(size_t initCapacity) noexcept
-		: m_Capacity(initCapacity)
+	RGArenaAllocator::RGArenaAllocator(size_t initCapacity) noexcept : m_Capacity(initCapacity)
 	{
 		m_Base = static_cast<std::byte*>(std::malloc(m_Capacity));
 		GGLAB_ASSERT_MSG(m_Base, "Render Graph Arena Allocator create allocation failed.");
@@ -119,5 +118,3 @@ namespace gglab
 		return reinterpret_cast<std::byte*>(aligned);
 	}
 }
-
-

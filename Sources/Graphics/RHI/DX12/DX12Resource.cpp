@@ -21,27 +21,17 @@ namespace gglab
 		if (createInfo.m_EnhancedInitialLayout)
 		{
 			const CD3DX12_RESOURCE_DESC1 resourceDesc1(m_ResourceDesc);
-			GGLAB_HR(m_Allocator->CreateResource3(
-				&createInfo.m_AllocDesc,
-				&resourceDesc1,
+			GGLAB_HR(m_Allocator->CreateResource3(&createInfo.m_AllocDesc, &resourceDesc1,
 				*createInfo.m_EnhancedInitialLayout,
-				m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
-				0,
-				nullptr,
-				&m_Allocation,
-				IID_PPV_ARGS(&m_Resource)));
+				m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr, 0, nullptr,
+				&m_Allocation, IID_PPV_ARGS(&m_Resource)));
 		}
 		else
 		{
-			GGLAB_HR(m_Allocator->CreateResource(
-				&createInfo.m_AllocDesc,
-				&m_ResourceDesc,
-				createInfo.m_InitStates,
-				m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
-				&m_Allocation,
-				IID_PPV_ARGS(&m_Resource)));
+			GGLAB_HR(m_Allocator->CreateResource(&createInfo.m_AllocDesc, &m_ResourceDesc,
+				createInfo.m_InitStates, m_ClearValue.has_value() ? &m_ClearValue.value() : nullptr,
+				&m_Allocation, IID_PPV_ARGS(&m_Resource)));
 		}
-
 	}
 
 	ID3D12Resource* DX12Resource::Get() const noexcept
@@ -65,7 +55,8 @@ namespace gglab
 		return m_ResourceState != newStates;
 	}
 
-	void DX12Resource::AdoptExternal(ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept
+	void DX12Resource::AdoptExternal(
+		ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept
 	{
 		// Reset old Allocation
 		m_Allocation.Reset();
@@ -81,11 +72,10 @@ namespace gglab
 		m_Resource.Reset();
 		m_Allocation = aliasingInfo.m_Allocation;
 
-		D3D12MA::Allocator* allocator = aliasingInfo.m_Allocator ? aliasingInfo.m_Allocator : m_Allocator;
-		GGLAB_HR(allocator->CreateAliasingResource(m_Allocation.Get(),
-			aliasingInfo.m_LocalOffset,
-			&aliasingInfo.m_ResourceDesc,
-			aliasingInfo.m_InitStates,
+		D3D12MA::Allocator* allocator =
+			aliasingInfo.m_Allocator ? aliasingInfo.m_Allocator : m_Allocator;
+		GGLAB_HR(allocator->CreateAliasingResource(m_Allocation.Get(), aliasingInfo.m_LocalOffset,
+			&aliasingInfo.m_ResourceDesc, aliasingInfo.m_InitStates,
 			aliasingInfo.m_ClearValue.has_value() ? &aliasingInfo.m_ClearValue.value() : nullptr,
 			IID_PPV_ARGS(&m_Resource)));
 
@@ -103,7 +93,8 @@ namespace gglab
 		m_ResourceState = D3D12_RESOURCE_STATE_COMMON;
 	}
 
-	D3D12_RESOURCE_BARRIER DX12Resource::MakeTransition(D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept
+	D3D12_RESOURCE_BARRIER DX12Resource::MakeTransition(
+		D3D12_RESOURCE_STATES newState, uint32_t subResource) const noexcept
 	{
 		D3D12_RESOURCE_BARRIER barrier = {};
 		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -118,7 +109,7 @@ namespace gglab
 
 	void DX12Resource::SetDebugName(const wchar_t* name) noexcept
 	{
-#if defined (BUILD_DEBUG)
+#if defined(BUILD_DEBUG)
 		if (m_Resource)
 		{
 			m_Resource->SetName(name);
@@ -157,11 +148,12 @@ namespace gglab
 		{
 			return &m_ClearValue.value();
 		}
-		
+
 		return nullptr;
 	}
 
-	D3D12_RESOURCE_BARRIER DX12Resource::MakeAliasingBarrier(const DX12Resource* before, const DX12Resource* after) noexcept
+	D3D12_RESOURCE_BARRIER DX12Resource::MakeAliasingBarrier(
+		const DX12Resource* before, const DX12Resource* after) noexcept
 	{
 		D3D12_RESOURCE_BARRIER barrier = {};
 		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;

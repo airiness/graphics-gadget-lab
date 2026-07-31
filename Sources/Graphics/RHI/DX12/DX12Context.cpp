@@ -18,9 +18,7 @@
 namespace gglab
 {
 	DX12FrameContext::DX12FrameContext(DX12Context* context, uint32_t frameIndex) noexcept :
-		m_Context(context),
-		m_FrameIndex(frameIndex),
-		m_BackBufferIndex(frameIndex)
+		m_Context(context), m_FrameIndex(frameIndex), m_BackBufferIndex(frameIndex)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Context);
 	}
@@ -32,15 +30,15 @@ namespace gglab
 
 	RHIGraphicsCommandContext& DX12FrameContext::GetGraphicsContext() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_Active, "DX12FrameContext::GetGraphicsContext requires an active frame.");
+		GGLAB_ASSERT_MSG(
+			m_Active, "DX12FrameContext::GetGraphicsContext requires an active frame.");
 		return m_Context->GetQueueSystem().GetGraphicsContext(m_FrameIndex);
 	}
 
 	RHIComputeCommandContext& DX12FrameContext::GetDirectComputeContext() noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			m_Active,
-			"DX12FrameContext::GetDirectComputeContext requires an active frame.");
+			m_Active, "DX12FrameContext::GetDirectComputeContext requires an active frame.");
 		return m_Context->GetDirectComputeContext(*this);
 	}
 
@@ -53,7 +51,8 @@ namespace gglab
 	DX12Context::DX12Context(const RHIContextDesc& desc) noexcept
 	{
 		GGLAB_ASSERT_MSG(desc.m_WindowHandle != nullptr, "DX12Context requires a window handle.");
-		GGLAB_ASSERT_MSG(desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
+		GGLAB_ASSERT_MSG(
+			desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
 		m_PipelineSystem = std::make_unique<DX12PipelineSystem>(m_Device.get());
@@ -64,22 +63,19 @@ namespace gglab
 		m_QueueSystem = std::make_unique<DX12QueueSystem>(queueSystemInfo);
 		m_Device->SetQueueSystem(m_QueueSystem.get());
 		m_GpuProfiler = std::make_unique<DX12GpuProfiler>(
-			m_Device.get(),
-			&m_QueueSystem->GetQueue(DX12QueueType::Graphics),
-			desc.m_BufferCount);
+			m_Device.get(), &m_QueueSystem->GetQueue(DX12QueueType::Graphics), desc.m_BufferCount);
 		m_DirectComputeContexts.reserve(desc.m_BufferCount);
 		for (uint32_t frameIndex = 0; frameIndex < desc.m_BufferCount; ++frameIndex)
 		{
 			auto& graphicsContext = m_QueueSystem->GetGraphicsContext(frameIndex);
 			graphicsContext.SetGpuProfiler(m_GpuProfiler.get());
 			auto computeContext = std::make_unique<DX12ComputeCommandContext>(
-				graphicsContext,
-				static_cast<DX12PipelineSystem*>(m_PipelineSystem.get()));
+				graphicsContext, static_cast<DX12PipelineSystem*>(m_PipelineSystem.get()));
 			computeContext->SetGpuProfiler(m_GpuProfiler.get());
 			GGLAB_ASSERT_MSG(
 				computeContext->GetHandle() == graphicsContext.GetHandle() &&
-					computeContext->GetQueueType() == RHIQueueType::Graphics &&
-					computeContext->GetCommandList() == graphicsContext.GetCommandList(),
+				computeContext->GetQueueType() == RHIQueueType::Graphics &&
+				computeContext->GetCommandList() == graphicsContext.GetCommandList(),
 				"A direct compute encoder must share its graphics context handle, queue, and command list.");
 			m_DirectComputeContexts.push_back(std::move(computeContext));
 		}
@@ -105,8 +101,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(swapChainInitResult, "DX12Context failed to initialize the swapchain.");
 		GGLAB_UNUSED(swapChainInitResult);
 		m_SwapChain = std::move(swapChain);
-		GGLAB_ASSERT_MSG(m_SwapChain && m_SwapChain->IsValid(),
-			"DX12Context failed to create the swapchain.");
+		GGLAB_ASSERT_MSG(
+			m_SwapChain && m_SwapChain->IsValid(), "DX12Context failed to create the swapchain.");
 
 		m_TransferManager = std::make_unique<TransferManager>(
 			std::make_unique<DX12TransferContext>(m_Device.get(), m_QueueSystem.get()));
@@ -123,18 +119,54 @@ namespace gglab
 		Finalize();
 	}
 
-	RHIDevice& DX12Context::GetDevice() noexcept { return *m_Device; }
-	const RHIDevice& DX12Context::GetDevice() const noexcept { return *m_Device; }
-	RHISwapChain& DX12Context::GetSwapChain() noexcept { return *m_SwapChain; }
-	const RHISwapChain& DX12Context::GetSwapChain() const noexcept { return *m_SwapChain; }
-	TransferManager& DX12Context::GetTransferManager() noexcept { return *m_TransferManager; }
-	RHIPipelineSystem& DX12Context::GetPipelineSystem() noexcept { return *m_PipelineSystem; }
-	GpuProfiler* DX12Context::GetGpuProfiler() noexcept { return m_GpuProfiler.get(); }
-	DX12Device& DX12Context::GetDX12Device() noexcept { return *m_Device; }
-	const DX12Device& DX12Context::GetDX12Device() const noexcept { return *m_Device; }
-	DX12DescriptorManager& DX12Context::GetDescriptorManager() noexcept { return *m_DescriptorManager; }
-	DX12QueueSystem& DX12Context::GetQueueSystem() noexcept { return *m_QueueSystem; }
-	const DX12QueueSystem& DX12Context::GetQueueSystem() const noexcept { return *m_QueueSystem; }
+	RHIDevice& DX12Context::GetDevice() noexcept
+	{
+		return *m_Device;
+	}
+	const RHIDevice& DX12Context::GetDevice() const noexcept
+	{
+		return *m_Device;
+	}
+	RHISwapChain& DX12Context::GetSwapChain() noexcept
+	{
+		return *m_SwapChain;
+	}
+	const RHISwapChain& DX12Context::GetSwapChain() const noexcept
+	{
+		return *m_SwapChain;
+	}
+	TransferManager& DX12Context::GetTransferManager() noexcept
+	{
+		return *m_TransferManager;
+	}
+	RHIPipelineSystem& DX12Context::GetPipelineSystem() noexcept
+	{
+		return *m_PipelineSystem;
+	}
+	GpuProfiler* DX12Context::GetGpuProfiler() noexcept
+	{
+		return m_GpuProfiler.get();
+	}
+	DX12Device& DX12Context::GetDX12Device() noexcept
+	{
+		return *m_Device;
+	}
+	const DX12Device& DX12Context::GetDX12Device() const noexcept
+	{
+		return *m_Device;
+	}
+	DX12DescriptorManager& DX12Context::GetDescriptorManager() noexcept
+	{
+		return *m_DescriptorManager;
+	}
+	DX12QueueSystem& DX12Context::GetQueueSystem() noexcept
+	{
+		return *m_QueueSystem;
+	}
+	const DX12QueueSystem& DX12Context::GetQueueSystem() const noexcept
+	{
+		return *m_QueueSystem;
+	}
 
 	RHIFrameContext& DX12Context::BeginFrame() noexcept
 	{
@@ -154,9 +186,7 @@ namespace gglab
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
 		BeginGraphicsRecording(frame);
-		m_GpuProfiler->BeginFrame(
-			frameIndex,
-			m_QueueSystem->GetGraphicsCommandList(frameIndex));
+		m_GpuProfiler->BeginFrame(frameIndex, m_QueueSystem->GetGraphicsCommandList(frameIndex));
 		return frame;
 	}
 
@@ -188,8 +218,8 @@ namespace gglab
 				m_Device->RecordTextureUse(texture, computeFence);
 			}
 			computeContext->ClearTrackedResourceUses();
-			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute).RecycleCommandAllocator(
-				frame->m_ComputeAllocator, computeFence);
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute)
+				.RecycleCommandAllocator(frame->m_ComputeAllocator, computeFence);
 			m_QueueSystem->WaitForFence(RHIQueueType::Graphics, computeFence.ToRHI());
 		}
 
@@ -209,8 +239,8 @@ namespace gglab
 			m_Device->RecordTextureUse(texture, graphicsFence);
 		}
 		graphicsContext->ClearTrackedResourceUses();
-		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics).RecycleCommandAllocator(
-			frame->m_GraphicsAllocator, graphicsFence);
+		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
+			.RecycleCommandAllocator(frame->m_GraphicsAllocator, graphicsFence);
 
 		m_DescriptorManager->EndFrame(graphicsFence);
 		m_SwapChain->SetFrameCompletionFence(graphicsFence.ToRHI());
@@ -236,8 +266,8 @@ namespace gglab
 			computeList->End();
 			computeContext->ClearTrackedResourceUses();
 			const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Compute).Signal();
-			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute).RecycleCommandAllocator(
-				frame->m_ComputeAllocator, fence);
+			m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute)
+				.RecycleCommandAllocator(frame->m_ComputeAllocator, fence);
 		}
 
 		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
@@ -246,22 +276,22 @@ namespace gglab
 		graphicsList->End();
 		graphicsContext->ClearTrackedResourceUses();
 		const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Graphics).Signal();
-		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics).RecycleCommandAllocator(
-			frame->m_GraphicsAllocator, fence);
+		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
+			.RecycleCommandAllocator(frame->m_GraphicsAllocator, fence);
 		m_DescriptorManager->EndFrame(fence);
 		FinishFrame(*frame, fence.ToRHI());
 	}
 
 	void DX12Context::WaitForFence(
-		RHIQueueType waitingQueue,
-		const RHIFencePoint& fencePoint) noexcept
+		RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept
 	{
 		m_QueueSystem->WaitForFence(waitingQueue, fencePoint);
 	}
 
 	void DX12Context::Resize(uint32_t width, uint32_t height) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_ActiveFrame == nullptr, "DX12Context::Resize cannot run during a frame.");
+		GGLAB_ASSERT_MSG(
+			m_ActiveFrame == nullptr, "DX12Context::Resize cannot run during a frame.");
 		if (width == 0 || height == 0 || !m_SwapChain || !m_SwapChain->IsValid())
 		{
 			return;
@@ -310,8 +340,7 @@ namespace gglab
 	DX12ComputeCommandContext& DX12Context::GetDirectComputeContext(
 		DX12FrameContext& frame) noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			&frame == m_ActiveFrame && frame.m_Active,
+		GGLAB_ASSERT_MSG(&frame == m_ActiveFrame && frame.m_Active,
 			"A direct compute encoder can only be acquired from the active frame.");
 		GGLAB_ASSERT(frame.m_FrameIndex < m_DirectComputeContexts.size());
 		return *m_DirectComputeContexts[frame.m_FrameIndex];

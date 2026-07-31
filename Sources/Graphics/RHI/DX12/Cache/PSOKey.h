@@ -14,18 +14,10 @@ namespace gglab
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(m_RtvFormats.NumRenderTargets,
-				m_RtvFormats.RTFormats[0],
-				m_RtvFormats.RTFormats[1],
-				m_RtvFormats.RTFormats[2],
-				m_RtvFormats.RTFormats[3],
-				m_RtvFormats.RTFormats[4],
-				m_RtvFormats.RTFormats[5],
-				m_RtvFormats.RTFormats[6],
-				m_RtvFormats.RTFormats[7],
-				m_DsvFormat,
-				m_SampleCount,
-				m_SampleQuality);
+			return std::make_tuple(m_RtvFormats.NumRenderTargets, m_RtvFormats.RTFormats[0],
+				m_RtvFormats.RTFormats[1], m_RtvFormats.RTFormats[2], m_RtvFormats.RTFormats[3],
+				m_RtvFormats.RTFormats[4], m_RtvFormats.RTFormats[5], m_RtvFormats.RTFormats[6],
+				m_RtvFormats.RTFormats[7], m_DsvFormat, m_SampleCount, m_SampleQuality);
 		}
 		constexpr bool operator==(const PipelineFormats& rhs) const noexcept
 		{
@@ -41,8 +33,8 @@ namespace gglab
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(m_RootSignatureId.Value(),
-				m_ComputeShader.m_LowBits, m_ComputeShader.m_HighBits);
+			return std::make_tuple(
+				m_RootSignatureId.Value(), m_ComputeShader.m_LowBits, m_ComputeShader.m_HighBits);
 		}
 		constexpr bool operator==(const ComputePSOKey&) const noexcept = default;
 	};

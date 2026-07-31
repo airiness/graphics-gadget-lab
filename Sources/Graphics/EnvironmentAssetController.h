@@ -49,8 +49,7 @@ namespace gglab
 		[[nodiscard]] bool SelectDefaultEnvironment() noexcept;
 		[[nodiscard]] bool SelectEnvironment(size_t entryIndex) noexcept;
 		[[nodiscard]] bool SelectEnvironmentFile(
-			const std::filesystem::path& path,
-			std::string_view displayName = {}) noexcept;
+			const std::filesystem::path& path, std::string_view displayName = {}) noexcept;
 
 		[[nodiscard]] std::span<const EnvironmentMapEntry> GetEntries() const noexcept
 		{

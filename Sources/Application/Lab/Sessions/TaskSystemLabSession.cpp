@@ -24,34 +24,36 @@ namespace gglab
 		{
 			switch (scenario)
 			{
-			case TaskSystemLabSession::Scenario::BurstSuccess: return "Burst Success";
-			case TaskSystemLabSession::Scenario::PriorityOrdering: return "Priority Ordering";
-			case TaskSystemLabSession::Scenario::CancelQueued: return "Cancel Queued";
-			case TaskSystemLabSession::Scenario::CancelRunning: return "Cancel Running";
-			case TaskSystemLabSession::Scenario::ExplicitFailure: return "Explicit Failure";
-			case TaskSystemLabSession::Scenario::ExceptionFailure: return "Exception Failure";
-			case TaskSystemLabSession::Scenario::CompletionBacklog: return "Completion Backlog";
-			case TaskSystemLabSession::Scenario::SessionSwitchSafety: return "Session Switch Safety";
+			case TaskSystemLabSession::Scenario::BurstSuccess:
+				return "Burst Success";
+			case TaskSystemLabSession::Scenario::PriorityOrdering:
+				return "Priority Ordering";
+			case TaskSystemLabSession::Scenario::CancelQueued:
+				return "Cancel Queued";
+			case TaskSystemLabSession::Scenario::CancelRunning:
+				return "Cancel Running";
+			case TaskSystemLabSession::Scenario::ExplicitFailure:
+				return "Explicit Failure";
+			case TaskSystemLabSession::Scenario::ExceptionFailure:
+				return "Exception Failure";
+			case TaskSystemLabSession::Scenario::CompletionBacklog:
+				return "Completion Backlog";
+			case TaskSystemLabSession::Scenario::SessionSwitchSafety:
+				return "Session Switch Safety";
 			}
 			return "Unknown";
 		}
 
-		TaskResult RunDeterministicWork(
-			std::stop_token stopToken,
-			uint32_t workUnits,
-			std::atomic<uint64_t>& checksum,
-			const ProgressReporter& progress = {}) noexcept
+		TaskResult RunDeterministicWork(std::stop_token stopToken, uint32_t workUnits,
+			std::atomic<uint64_t>& checksum, const ProgressReporter& progress = {}) noexcept
 		{
 			uint64_t value = 0x9E3779B97F4A7C15ull;
 			workUnits = std::max(workUnits, 1u);
 			for (uint32_t workUnit = 0; workUnit < workUnits; ++workUnit)
 			{
-				progress.Report(
-					static_cast<float>(workUnit) / static_cast<float>(workUnits),
+				progress.Report(static_cast<float>(workUnit) / static_cast<float>(workUnits),
 					"Executing deterministic work",
-					std::format("Unit {} of {}", workUnit + 1, workUnits),
-					workUnit,
-					workUnits);
+					std::format("Unit {} of {}", workUnit + 1, workUnits), workUnit, workUnits);
 				for (uint32_t iteration = 0; iteration < 4096u; ++iteration)
 				{
 					if ((iteration & 255u) == 0 && stopToken.stop_requested())
@@ -64,30 +66,21 @@ namespace gglab
 					value *= 0x2545F4914F6CDD1Dull;
 				}
 			}
-			progress.Report(
-				1.0f,
-				"Deterministic work complete",
-				std::format("{} units", workUnits),
-				workUnits,
-				workUnits);
+			progress.Report(1.0f, "Deterministic work complete", std::format("{} units", workUnits),
+				workUnits, workUnits);
 			checksum.fetch_xor(value, std::memory_order_relaxed);
 			return TaskResult::Success();
 		}
 
-		bool AcquireGatePermit(
-			std::stop_token stopToken,
-			std::atomic<uint32_t>& permits) noexcept
+		bool AcquireGatePermit(std::stop_token stopToken, std::atomic<uint32_t>& permits) noexcept
 		{
 			while (!stopToken.stop_requested())
 			{
 				uint32_t available = permits.load(std::memory_order_acquire);
 				while (available > 0)
 				{
-					if (permits.compare_exchange_weak(
-						available,
-						available - 1,
-						std::memory_order_acq_rel,
-						std::memory_order_acquire))
+					if (permits.compare_exchange_weak(available, available - 1,
+						std::memory_order_acq_rel, std::memory_order_acquire))
 					{
 						return true;
 					}
@@ -133,12 +126,8 @@ namespace gglab
 		bool m_TimedOut = false;
 	};
 
-	TaskSystemLabSession::TaskSystemLabSession(
-		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
+	TaskSystemLabSession::TaskSystemLabSession(const LabSessionCreateInfo& createInfo) noexcept :
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -148,17 +137,18 @@ namespace gglab
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(0),
-			.m_EnumItems = {
-				{ .m_Value = 0, .m_Name = "Burst Success" },
-				{ .m_Value = 1, .m_Name = "Priority Ordering" },
-				{ .m_Value = 2, .m_Name = "Cancel Queued" },
-				{ .m_Value = 3, .m_Name = "Cancel Running" },
-				{ .m_Value = 4, .m_Name = "Explicit Failure" },
-				{ .m_Value = 5, .m_Name = "Exception Failure" },
-				{ .m_Value = 6, .m_Name = "Completion Backlog" },
-				{ .m_Value = 7, .m_Name = "Session Switch Safety" },
-			},
-		}));
+			.m_EnumItems =
+				{
+					{.m_Value = 0, .m_Name = "Burst Success"},
+					{.m_Value = 1, .m_Name = "Priority Ordering"},
+					{.m_Value = 2, .m_Name = "Cancel Queued"},
+					{.m_Value = 3, .m_Name = "Cancel Running"},
+					{.m_Value = 4, .m_Name = "Explicit Failure"},
+					{.m_Value = 5, .m_Name = "Exception Failure"},
+					{.m_Value = 6, .m_Name = "Completion Backlog"},
+					{.m_Value = 7, .m_Name = "Session Switch Safety"},
+				},
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = TaskCountId,
 			.m_Name = "Task Count",
@@ -168,7 +158,7 @@ namespace gglab
 			.m_DefaultValue = uint32_t(32),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(uint32_t(512)),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = WorkUnitsId,
 			.m_Name = "Work Units",
@@ -178,7 +168,7 @@ namespace gglab
 			.m_DefaultValue = uint32_t(8),
 			.m_MinValue = LabValue(uint32_t(1)),
 			.m_MaxValue = LabValue(uint32_t(64)),
-		}));
+			}));
 		ApplyImmediateParameters();
 	}
 
@@ -205,12 +195,10 @@ namespace gglab
 		m_ElapsedSeconds += deltaTime;
 		TaskSystem& taskSystem = *m_Services.m_TaskSystem;
 		const TaskSystemStatistics statistics = taskSystem.GetStatistics();
-		m_State->m_MaxCompletionBacklog = std::max(
-			m_State->m_MaxCompletionBacklog,
-			statistics.m_PendingCompletionCount);
+		m_State->m_MaxCompletionBacklog =
+			std::max(m_State->m_MaxCompletionBacklog, statistics.m_PendingCompletionCount);
 
-		if ((m_Scenario == Scenario::PriorityOrdering ||
-			m_Scenario == Scenario::CancelQueued) &&
+		if ((m_Scenario == Scenario::PriorityOrdering || m_Scenario == Scenario::CancelQueued) &&
 			!m_GatedTargetsSubmitted &&
 			m_State->m_GateStartedCount.load(std::memory_order_acquire) >= m_State->m_WorkerCount)
 		{
@@ -226,7 +214,7 @@ namespace gglab
 
 		if (m_Scenario == Scenario::CancelRunning && !m_CancelRequested &&
 			m_State->m_TargetStartedCount.load(std::memory_order_acquire) >=
-				m_State->m_RequestedTargetCount)
+			m_State->m_RequestedTargetCount)
 		{
 			for (const TaskHandle handle : m_Handles)
 			{
@@ -235,8 +223,7 @@ namespace gglab
 			m_CancelRequested = true;
 		}
 
-		if (m_Scenario != Scenario::SessionSwitchSafety &&
-			m_State->m_ExpectedCompletions > 0 &&
+		if (m_Scenario != Scenario::SessionSwitchSafety && m_State->m_ExpectedCompletions > 0 &&
 			m_State->m_CompletedCount >= m_State->m_ExpectedCompletions)
 		{
 			EvaluateScenario();
@@ -247,9 +234,7 @@ namespace gglab
 			m_State->m_Finished = true;
 			m_State->m_Passed = false;
 			m_State->m_Errors.push_back("Scenario exceeded the 10 second timeout.");
-			GGLAB_LOG_ERROR(
-				"TaskSystem Lab generation {} ({}) timed out.",
-				m_State->m_Generation,
+			GGLAB_LOG_ERROR("TaskSystem Lab generation {} ({}) timed out.", m_State->m_Generation,
 				ScenarioText(m_State->m_Scenario));
 			m_State->m_GateReleasePermits.store(m_State->m_WorkerCount, std::memory_order_release);
 			for (const TaskHandle handle : m_Handles)
@@ -259,8 +244,7 @@ namespace gglab
 		}
 	}
 
-	void TaskSystemLabSession::BuildDiagnostics(
-		LabDiagnosticsSnapshot& diagnostics) const noexcept
+	void TaskSystemLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		diagnostics.m_Title = "TaskSystem Verification";
 		if (!m_State)
@@ -269,29 +253,29 @@ namespace gglab
 				.m_Name = "Scenario state",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "No active scenario.",
-			});
+				});
 			return;
 		}
 
 		const auto& state = *m_State;
 		diagnostics.m_Metrics = {
-			{ .m_Name = "Scenario", .m_Value = ScenarioText(state.m_Scenario) },
-			{ .m_Name = "Generation", .m_Value = std::to_string(state.m_Generation) },
-			{ .m_Name = "Workers", .m_Value = std::to_string(state.m_WorkerCount) },
-			{ .m_Name = "Submitted / completed",
-				.m_Value = std::format("{} / {}", state.m_SubmittedCount, state.m_CompletedCount) },
-			{ .m_Name = "Succeeded / failed / cancelled",
-				.m_Value = std::format("{} / {} / {}", state.m_SucceededCount,
-					state.m_FailedCount, state.m_CancelledCount) },
-			{ .m_Name = "Started / target executed",
-				.m_Value = std::format("{} / {}",
-					state.m_StartedCount.load(std::memory_order_relaxed),
-					state.m_TargetExecutedCount.load(std::memory_order_relaxed)) },
-			{ .m_Name = "Max completion backlog",
-				.m_Value = std::to_string(state.m_MaxCompletionBacklog) },
-			{ .m_Name = "Max queue / execution",
-				.m_Value = std::format("{:.3f} / {:.3f} ms",
-					state.m_MaxQueueMilliseconds, state.m_MaxExecutionMilliseconds) },
+			{.m_Name = "Scenario", .m_Value = ScenarioText(state.m_Scenario)},
+			{.m_Name = "Generation", .m_Value = std::to_string(state.m_Generation)},
+			{.m_Name = "Workers", .m_Value = std::to_string(state.m_WorkerCount)},
+			{.m_Name = "Submitted / completed",
+				.m_Value = std::format("{} / {}", state.m_SubmittedCount, state.m_CompletedCount)},
+			{.m_Name = "Succeeded / failed / cancelled",
+				.m_Value = std::format("{} / {} / {}", state.m_SucceededCount, state.m_FailedCount,
+					state.m_CancelledCount)},
+			{.m_Name = "Started / target executed",
+				.m_Value =
+					std::format("{} / {}", state.m_StartedCount.load(std::memory_order_relaxed),
+						state.m_TargetExecutedCount.load(std::memory_order_relaxed))},
+			{.m_Name = "Max completion backlog",
+				.m_Value = std::to_string(state.m_MaxCompletionBacklog)},
+			{.m_Name = "Max queue / execution",
+				.m_Value = std::format("{:.3f} / {:.3f} ms", state.m_MaxQueueMilliseconds,
+					state.m_MaxExecutionMilliseconds)},
 		};
 
 		if (state.m_Scenario == Scenario::SessionSwitchSafety)
@@ -299,34 +283,40 @@ namespace gglab
 			diagnostics.m_Checks.push_back({
 				.m_Name = "Switch-away lifetime safety",
 				.m_Status = LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Switch to another Lab while these tasks are running. OnExit cancels all handles; workers and completions do not capture the session object.",
-			});
+				.m_Detail =
+					"Switch to another Lab while these tasks are running. OnExit cancels all handles; workers and completions do not capture the session object.",
+				});
 		}
 		else
 		{
 			diagnostics.m_Checks.push_back({
 				.m_Name = "Scenario result",
-				.m_Status = !state.m_Finished ? LabDiagnosticCheckStatus::Pending :
-					state.m_Passed ? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Failed,
-				.m_Detail = state.m_Finished ?
-					(state.m_Passed ? "All scenario invariants passed." : "One or more scenario invariants failed.") :
-					"Scenario is running.",
-			});
+				.m_Status = !state.m_Finished ? LabDiagnosticCheckStatus::Pending
+							: state.m_Passed ? LabDiagnosticCheckStatus::Passed
+											  : LabDiagnosticCheckStatus::Failed,
+				.m_Detail = state.m_Finished
+								? (state.m_Passed ? "All scenario invariants passed."
+												  : "One or more scenario invariants failed.")
+								: "Scenario is running.",
+				});
 		}
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Owner-thread completions",
-			.m_Status = state.m_WrongThreadCompletionCount > 0 ? LabDiagnosticCheckStatus::Failed :
-				state.m_Finished ? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
-			.m_Detail = std::format("Wrong-thread callbacks: {}", state.m_WrongThreadCompletionCount),
-		});
+			.m_Status = state.m_WrongThreadCompletionCount > 0 ? LabDiagnosticCheckStatus::Failed
+						: state.m_Finished ? LabDiagnosticCheckStatus::Passed
+															   : LabDiagnosticCheckStatus::Pending,
+			.m_Detail =
+				std::format("Wrong-thread callbacks: {}", state.m_WrongThreadCompletionCount),
+			});
 		if (state.m_Scenario == Scenario::PriorityOrdering)
 		{
 			diagnostics.m_Checks.push_back({
 				.m_Name = "Priority ordering",
-				.m_Status = state.m_OrderingViolationCount > 0 ? LabDiagnosticCheckStatus::Failed :
-					state.m_Finished ? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
+				.m_Status = state.m_OrderingViolationCount > 0 ? LabDiagnosticCheckStatus::Failed
+							: state.m_Finished ? LabDiagnosticCheckStatus::Passed
+															   : LabDiagnosticCheckStatus::Pending,
 				.m_Detail = std::format("Ordering violations: {}", state.m_OrderingViolationCount),
-			});
+				});
 		}
 		if (state.m_Finished && !state.m_Passed)
 		{
@@ -336,7 +326,7 @@ namespace gglab
 					.m_Name = "Detail",
 					.m_Status = LabDiagnosticCheckStatus::Failed,
 					.m_Detail = error,
-				});
+					});
 			}
 		}
 	}
@@ -366,8 +356,8 @@ namespace gglab
 		m_CancelRequested = false;
 		m_AllGatesReleased = false;
 
-		const uint32_t targetCount = m_Scenario == Scenario::CompletionBacklog ?
-			std::max(m_TaskCount, 256u) : m_TaskCount;
+		const uint32_t targetCount =
+			m_Scenario == Scenario::CompletionBacklog ? std::max(m_TaskCount, 256u) : m_TaskCount;
 		m_State->m_RequestedTargetCount = targetCount;
 
 		if (m_Scenario == Scenario::PriorityOrdering || m_Scenario == Scenario::CancelQueued)
@@ -375,23 +365,27 @@ namespace gglab
 			for (uint32_t worker = 0; worker < m_State->m_WorkerCount; ++worker)
 			{
 				auto state = m_State;
-				SubmitTask({
-					.m_Name = std::format("TaskLab/{}/Gate/{}", state->m_Generation, worker),
-					.m_Priority = TaskPriority::Critical,
-				}, [state](std::stop_token stopToken) noexcept
+				SubmitTask(
+					{
+						.m_Name = std::format("TaskLab/{}/Gate/{}", state->m_Generation, worker),
+						.m_Priority = TaskPriority::Critical,
+					},
+					[state](std::stop_token stopToken) noexcept
 					{
 						state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_GateStartedCount.fetch_add(1, std::memory_order_release);
 						GGLAB_UNUSED(AcquireGatePermit(stopToken, state->m_GateReleasePermits));
 						return TaskResult::Success();
-					}, false);
+					},
+					false);
 			}
 			return;
 		}
 
-		const uint32_t submittedTargetCount = m_Scenario == Scenario::CancelRunning ||
-			m_Scenario == Scenario::SessionSwitchSafety ?
-			std::min(targetCount, std::max(m_State->m_WorkerCount, 1u)) : targetCount;
+		const uint32_t submittedTargetCount =
+			m_Scenario == Scenario::CancelRunning || m_Scenario == Scenario::SessionSwitchSafety
+			? std::min(targetCount, std::max(m_State->m_WorkerCount, 1u))
+			: targetCount;
 		m_State->m_RequestedTargetCount = submittedTargetCount;
 		for (uint32_t index = 0; index < submittedTargetCount; ++index)
 		{
@@ -403,28 +397,36 @@ namespace gglab
 			};
 			if (m_Scenario == Scenario::ExplicitFailure)
 			{
-				SubmitTask(std::move(desc), [state](std::stop_token) noexcept
+				SubmitTask(
+					std::move(desc),
+					[state](std::stop_token) noexcept
 					{
 						state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetStartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetExecutedCount.fetch_add(1, std::memory_order_relaxed);
 						return TaskResult::Failure("Intentional TaskSystem Lab failure.");
-					}, true);
+					},
+					true);
 			}
 			else if (m_Scenario == Scenario::ExceptionFailure)
 			{
-				SubmitTask(std::move(desc), [state](std::stop_token) -> TaskResult
+				SubmitTask(
+					std::move(desc),
+					[state](std::stop_token) -> TaskResult
 					{
 						state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetStartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetExecutedCount.fetch_add(1, std::memory_order_relaxed);
 						throw std::runtime_error("Intentional TaskSystem Lab exception.");
-					}, true);
+					},
+					true);
 			}
 			else if (m_Scenario == Scenario::CancelRunning ||
 				m_Scenario == Scenario::SessionSwitchSafety)
 			{
-				SubmitTask(std::move(desc), [state](std::stop_token stopToken) noexcept
+				SubmitTask(
+					std::move(desc),
+					[state](std::stop_token stopToken) noexcept
 					{
 						state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetStartedCount.fetch_add(1, std::memory_order_release);
@@ -434,24 +436,25 @@ namespace gglab
 							std::this_thread::sleep_for(std::chrono::milliseconds(1));
 						}
 						return TaskResult::Success();
-					}, true);
+					},
+					true);
 			}
 			else
 			{
-				const uint32_t workUnits = m_Scenario == Scenario::CompletionBacklog ? 1u : m_WorkUnits;
+				const uint32_t workUnits =
+					m_Scenario == Scenario::CompletionBacklog ? 1u : m_WorkUnits;
 				const ProgressChannelPtr taskProgress = desc.m_Progress;
-				SubmitTask(std::move(desc), [state, workUnits, progress = taskProgress](
-					std::stop_token stopToken) noexcept
+				SubmitTask(
+					std::move(desc),
+					[state, workUnits, progress = taskProgress](std::stop_token stopToken) noexcept
 					{
 						state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetStartedCount.fetch_add(1, std::memory_order_relaxed);
 						state->m_TargetExecutedCount.fetch_add(1, std::memory_order_relaxed);
-						return RunDeterministicWork(
-							stopToken,
-							workUnits,
-							state->m_Checksum,
+						return RunDeterministicWork(stopToken, workUnits, state->m_Checksum,
 							ProgressReporter(progress, 0.05f, 0.98f));
-					}, true);
+					},
+					true);
 			}
 		}
 	}
@@ -478,28 +481,33 @@ namespace gglab
 	{
 		GGLAB_ASSERT(m_State);
 		m_GatedTargetsSubmitted = true;
-		const uint32_t targetCount = m_Scenario == Scenario::PriorityOrdering ?
-			std::max(m_State->m_RequestedTargetCount, 4u) : m_State->m_RequestedTargetCount;
+		const uint32_t targetCount = m_Scenario == Scenario::PriorityOrdering
+			? std::max(m_State->m_RequestedTargetCount, 4u)
+			: m_State->m_RequestedTargetCount;
 		m_State->m_RequestedTargetCount = targetCount;
 
 		for (uint32_t index = 0; index < targetCount; ++index)
 		{
 			auto state = m_State;
 			auto progress = std::make_shared<ProgressChannel>();
-			const TaskPriority priority = m_Scenario == Scenario::PriorityOrdering ?
-				PrioritySubmissionOrder[index % PrioritySubmissionOrder.size()] : TaskPriority::Normal;
+			const TaskPriority priority =
+				m_Scenario == Scenario::PriorityOrdering
+				? PrioritySubmissionOrder[index % PrioritySubmissionOrder.size()]
+				: TaskPriority::Normal;
 			if (m_Scenario == Scenario::PriorityOrdering)
 			{
 				std::scoped_lock lock(state->m_PriorityMutex);
 				++state->m_PriorityRemaining[static_cast<size_t>(priority)];
 			}
 
-			const TaskHandle handle = SubmitTask({
-				.m_Name = std::format("TaskLab/{}/Target/{}", state->m_Generation, index),
-				.m_Priority = priority,
-				.m_Progress = progress,
-			}, [state, priority, scenario = m_Scenario, workUnits = m_WorkUnits, progress](
-				std::stop_token stopToken) noexcept
+			const TaskHandle handle = SubmitTask(
+				{
+					.m_Name = std::format("TaskLab/{}/Target/{}", state->m_Generation, index),
+					.m_Priority = priority,
+					.m_Progress = progress,
+				},
+				[state, priority, scenario = m_Scenario, workUnits = m_WorkUnits, progress](
+					std::stop_token stopToken) noexcept
 				{
 					state->m_StartedCount.fetch_add(1, std::memory_order_relaxed);
 					state->m_TargetStartedCount.fetch_add(1, std::memory_order_relaxed);
@@ -519,12 +527,10 @@ namespace gglab
 						GGLAB_ASSERT(state->m_PriorityRemaining[priorityIndex] > 0);
 						--state->m_PriorityRemaining[priorityIndex];
 					}
-					return RunDeterministicWork(
-						stopToken,
-						workUnits,
-						state->m_Checksum,
+					return RunDeterministicWork(stopToken, workUnits, state->m_Checksum,
 						ProgressReporter(progress, 0.05f, 0.98f));
-				}, true);
+				},
+				true);
 
 			if (m_Scenario == Scenario::CancelQueued && handle.IsValid())
 			{
@@ -546,8 +552,7 @@ namespace gglab
 			return;
 		}
 
-		bool passed = state.m_SubmitFailureCount == 0 &&
-			state.m_WrongThreadCompletionCount == 0 &&
+		bool passed = state.m_SubmitFailureCount == 0 && state.m_WrongThreadCompletionCount == 0 &&
 			state.m_CompletedCount == state.m_ExpectedCompletions;
 		switch (state.m_Scenario)
 		{
@@ -570,7 +575,7 @@ namespace gglab
 		case Scenario::CancelRunning:
 			passed &= state.m_TargetCancelledCount == state.m_RequestedTargetCount &&
 				state.m_TargetStartedCount.load(std::memory_order_relaxed) ==
-					state.m_RequestedTargetCount;
+				state.m_RequestedTargetCount;
 			break;
 		case Scenario::ExplicitFailure:
 		case Scenario::ExceptionFailure:
@@ -584,30 +589,22 @@ namespace gglab
 		state.m_Finished = true;
 		if (passed)
 		{
-			GGLAB_LOG_INFO(
-				"TaskSystem Lab generation {} ({}) PASS: submitted={}, completed={}.",
-				state.m_Generation,
-				ScenarioText(state.m_Scenario),
-				state.m_SubmittedCount,
+			GGLAB_LOG_INFO("TaskSystem Lab generation {} ({}) PASS: submitted={}, completed={}.",
+				state.m_Generation, ScenarioText(state.m_Scenario), state.m_SubmittedCount,
 				state.m_CompletedCount);
 		}
 		else
 		{
 			GGLAB_LOG_ERROR(
 				"TaskSystem Lab generation {} ({}) FAIL: submitted={}, completed={}, orderingViolations={}, wrongThreadCallbacks={}.",
-				state.m_Generation,
-				ScenarioText(state.m_Scenario),
-				state.m_SubmittedCount,
-				state.m_CompletedCount,
-				state.m_OrderingViolationCount,
+				state.m_Generation, ScenarioText(state.m_Scenario), state.m_SubmittedCount,
+				state.m_CompletedCount, state.m_OrderingViolationCount,
 				state.m_WrongThreadCompletionCount);
 		}
 	}
 
 	TaskHandle TaskSystemLabSession::SubmitTask(
-		TaskDesc desc,
-		TaskWork work,
-		bool targetTask) noexcept
+		TaskDesc desc, TaskWork work, bool targetTask) noexcept
 	{
 		if (!desc.m_Progress)
 		{
@@ -622,10 +619,9 @@ namespace gglab
 				try
 				{
 					TaskResult result = work(stopToken);
-					progress.Report(
-						0.99f,
-						result.m_Succeeded ?
-							"Verification task work complete" : "Verification task failed",
+					progress.Report(0.99f,
+						result.m_Succeeded ? "Verification task work complete"
+						: "Verification task failed",
 						result.m_Error);
 					return result;
 				}
@@ -636,41 +632,46 @@ namespace gglab
 				}
 			};
 		std::weak_ptr<ScenarioState> weakState = m_State;
-		const TaskHandle handle = m_Services.m_TaskSystem->Submit(
-			std::move(desc),
-			std::move(instrumentedWork),
-			[weakState, targetTask](const TaskCompletionInfo& info)
-			{
-				const auto state = weakState.lock();
-				if (!state)
+		const TaskHandle handle =
+			m_Services.m_TaskSystem->Submit(std::move(desc), std::move(instrumentedWork),
+				[weakState, targetTask](const TaskCompletionInfo& info)
 				{
-					return;
-				}
-				++state->m_CompletedCount;
-				if (targetTask) ++state->m_TargetCompletedCount;
-				if (std::this_thread::get_id() != state->m_OwnerThread)
-				{
-					++state->m_WrongThreadCompletionCount;
-				}
-				state->m_MaxQueueMilliseconds = std::max(
-					state->m_MaxQueueMilliseconds, info.m_QueueMilliseconds);
-				state->m_MaxExecutionMilliseconds = std::max(
-					state->m_MaxExecutionMilliseconds, info.m_ExecutionMilliseconds);
-				switch (info.m_Status)
-				{
-				case TaskStatus::Succeeded: ++state->m_SucceededCount; break;
-				case TaskStatus::Failed:
-					++state->m_FailedCount;
-					state->m_Errors.push_back(info.m_Error.empty() ?
-						"Task failed without an error message." : info.m_Error);
-					break;
-				case TaskStatus::Cancelled:
-					++state->m_CancelledCount;
-					if (targetTask) ++state->m_TargetCancelledCount;
-					break;
-				default: break;
-				}
-			});
+					const auto state = weakState.lock();
+					if (!state)
+					{
+						return;
+					}
+					++state->m_CompletedCount;
+					if (targetTask)
+						++state->m_TargetCompletedCount;
+					if (std::this_thread::get_id() != state->m_OwnerThread)
+					{
+						++state->m_WrongThreadCompletionCount;
+					}
+					state->m_MaxQueueMilliseconds =
+						std::max(state->m_MaxQueueMilliseconds, info.m_QueueMilliseconds);
+					state->m_MaxExecutionMilliseconds =
+						std::max(state->m_MaxExecutionMilliseconds, info.m_ExecutionMilliseconds);
+					switch (info.m_Status)
+					{
+					case TaskStatus::Succeeded:
+						++state->m_SucceededCount;
+						break;
+					case TaskStatus::Failed:
+						++state->m_FailedCount;
+						state->m_Errors.push_back(info.m_Error.empty()
+							? "Task failed without an error message."
+							: info.m_Error);
+						break;
+					case TaskStatus::Cancelled:
+						++state->m_CancelledCount;
+						if (targetTask)
+							++state->m_TargetCancelledCount;
+						break;
+					default:
+						break;
+					}
+				});
 		if (handle.IsValid())
 		{
 			m_Handles.push_back(handle);
@@ -696,7 +697,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Task System Lab",
 			.m_Category = "Systems",
-			.m_Description = "Deterministic scenarios for TaskSystem priority, cancellation, failure, completion budgeting, and session lifetime safety.",
+			.m_Description =
+				"Deterministic scenarios for TaskSystem priority, cancellation, failure, completion budgeting, and session lifetime safety.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

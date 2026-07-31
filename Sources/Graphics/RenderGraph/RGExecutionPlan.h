@@ -100,12 +100,30 @@ namespace gglab
 		RGExecutionPlan& operator=(RGExecutionPlan&&) noexcept = default;
 		~RGExecutionPlan() noexcept = default;
 
-		[[nodiscard]] const std::vector<RGCompiledPass>& GetPasses() const noexcept { return m_Passes; }
-		[[nodiscard]] const std::vector<RGCompiledResource>& GetResources() const noexcept { return m_Resources; }
-		[[nodiscard]] const std::vector<RGCompiledTextureView>& GetTextureViews() const noexcept { return m_TextureViews; }
-		[[nodiscard]] const std::vector<RGPassDependencyEdge>& GetDependencyEdges() const noexcept { return m_DependencyEdges; }
-		[[nodiscard]] const std::vector<RGPassNodeIndex>& GetExecutionOrder() const noexcept { return m_ExecutionOrder; }
-		[[nodiscard]] const std::vector<RGCompileDiagnostic>& GetDiagnostics() const noexcept { return m_Diagnostics; }
+		[[nodiscard]] const std::vector<RGCompiledPass>& GetPasses() const noexcept
+		{
+			return m_Passes;
+		}
+		[[nodiscard]] const std::vector<RGCompiledResource>& GetResources() const noexcept
+		{
+			return m_Resources;
+		}
+		[[nodiscard]] const std::vector<RGCompiledTextureView>& GetTextureViews() const noexcept
+		{
+			return m_TextureViews;
+		}
+		[[nodiscard]] const std::vector<RGPassDependencyEdge>& GetDependencyEdges() const noexcept
+		{
+			return m_DependencyEdges;
+		}
+		[[nodiscard]] const std::vector<RGPassNodeIndex>& GetExecutionOrder() const noexcept
+		{
+			return m_ExecutionOrder;
+		}
+		[[nodiscard]] const std::vector<RGCompileDiagnostic>& GetDiagnostics() const noexcept
+		{
+			return m_Diagnostics;
+		}
 
 	private:
 		RGExecutionPlan() noexcept = default;

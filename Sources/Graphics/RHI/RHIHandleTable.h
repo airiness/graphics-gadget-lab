@@ -23,8 +23,7 @@ namespace gglab
 		NonLive,
 	};
 
-	template<typename Handle, typename Slot>
-	class RHIHandleTable
+	template <typename Handle, typename Slot> class RHIHandleTable
 	{
 	public:
 		using IndexType = typename Handle::IndexType;
@@ -56,7 +55,8 @@ namespace gglab
 			}
 
 			Slot& slot = m_Slots[slotIndex];
-			GGLAB_ASSERT_MSG(slot.m_State == RHIHandleSlotState::Free, "Allocated RHI handle slot is not free.");
+			GGLAB_ASSERT_MSG(
+				slot.m_State == RHIHandleSlotState::Free, "Allocated RHI handle slot is not free.");
 			slot.m_State = RHIHandleSlotState::Alive;
 			return Handle(slotIndex, slot.m_Generation);
 		}
@@ -95,7 +95,8 @@ namespace gglab
 			GGLAB_ASSERT_MSG(slotIndex < m_Slots.size(), "RHI handle slot index is out of range.");
 
 			Slot& slot = m_Slots[slotIndex];
-			GGLAB_ASSERT_MSG(slot.m_State == RHIHandleSlotState::PendingRetirement, "Retired RHI handle slot is not pending retirement.");
+			GGLAB_ASSERT_MSG(slot.m_State == RHIHandleSlotState::PendingRetirement,
+				"Retired RHI handle slot is not pending retirement.");
 			slot.m_State = RHIHandleSlotState::Free;
 			m_FreeSlots.push_back(slotIndex);
 		}
@@ -142,7 +143,10 @@ namespace gglab
 
 		[[nodiscard]] std::vector<Slot>& Slots() noexcept { return m_Slots; }
 		[[nodiscard]] const std::vector<Slot>& Slots() const noexcept { return m_Slots; }
-		[[nodiscard]] uint32_t Size() const noexcept { return static_cast<uint32_t>(m_Slots.size()); }
+		[[nodiscard]] uint32_t Size() const noexcept
+		{
+			return static_cast<uint32_t>(m_Slots.size());
+		}
 
 		void Clear() noexcept
 		{

@@ -53,22 +53,17 @@ namespace gglab
 		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
 
 		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
-		[[nodiscard]] TaskHandle PreloadAsync(
-			TaskSystem& taskSystem,
-			std::vector<ShaderDesc> descList,
-			TaskPriority priority = TaskPriority::High) noexcept;
+		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
+			std::vector<ShaderDesc> descList, TaskPriority priority = TaskPriority::High) noexcept;
 		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
-		
+
 		int32_t RefreshChanged() noexcept;
 		bool RefreshShader(ShaderID shaderId) noexcept;
 		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		std::string GetDebugName(ShaderID shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
-		uint64_t GetRevision() const noexcept
-		{
-			return m_Revision.load(std::memory_order_relaxed);
-		}
+		uint64_t GetRevision() const noexcept { return m_Revision.load(std::memory_order_relaxed); }
 
 	private:
 		struct ShaderPreloadJob;

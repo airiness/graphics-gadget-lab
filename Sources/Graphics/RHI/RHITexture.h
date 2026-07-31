@@ -66,7 +66,8 @@ namespace gglab
 		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
 	};
 
-	[[nodiscard]] constexpr inline RHITextureAspect GetRHITextureAspects(const RHITextureDesc& desc) noexcept
+	[[nodiscard]] constexpr inline RHITextureAspect GetRHITextureAspects(
+		const RHITextureDesc& desc) noexcept
 	{
 		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(desc.m_Format);
 		if (Test(desc.m_Usage, RHITextureUsage::DepthStencil) &&
@@ -77,7 +78,8 @@ namespace gglab
 		return formatInfo.m_Aspects;
 	}
 
-	[[nodiscard]] constexpr inline uint32_t GetRHITexturePlaneCount(const RHITextureDesc& desc) noexcept
+	[[nodiscard]] constexpr inline uint32_t GetRHITexturePlaneCount(
+		const RHITextureDesc& desc) noexcept
 	{
 		return GetRHIFormatInfo(desc.m_Format).m_PlaneCount;
 	}
@@ -102,10 +104,7 @@ namespace gglab
 	{
 		std::vector<RHITextureSubresourceData> m_Subresources;
 
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return !m_Subresources.empty();
-		}
+		[[nodiscard]] bool IsValid() const noexcept { return !m_Subresources.empty(); }
 	};
 
 	struct RHITextureReadbackSubresource
@@ -131,8 +130,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return static_cast<bool>(m_Buffer) &&
-				m_BufferSizeInBytes > 0 &&
+			return static_cast<bool>(m_Buffer) && m_BufferSizeInBytes > 0 &&
 				!m_Subresources.empty();
 		}
 	};
@@ -152,18 +150,10 @@ namespace gglab
 
 		auto AsTuple() const noexcept
 		{
-			return std::make_tuple(
-				m_Type,
-				m_Dimension,
-				m_Format,
-				m_Subresources.m_BaseMip,
-				m_Subresources.m_MipCount,
-				m_Subresources.m_BaseArraySlice,
-				m_Subresources.m_ArraySliceCount,
-				m_Subresources.m_Aspects,
-				m_ResourceMinLODClamp,
-				m_ReadOnlyDepth,
-				m_ReadOnlyStencil);
+			return std::make_tuple(m_Type, m_Dimension, m_Format, m_Subresources.m_BaseMip,
+				m_Subresources.m_MipCount, m_Subresources.m_BaseArraySlice,
+				m_Subresources.m_ArraySliceCount, m_Subresources.m_Aspects, m_ResourceMinLODClamp,
+				m_ReadOnlyDepth, m_ReadOnlyStencil);
 		}
 	};
 }

@@ -7,13 +7,20 @@ namespace gglab
 	{
 		switch (face)
 		{
-		case CubemapFace::PositiveX: return Vector3::UnitX;
-		case CubemapFace::NegativeX: return -Vector3::UnitX;
-		case CubemapFace::PositiveY: return Vector3::UnitY;
-		case CubemapFace::NegativeY: return -Vector3::UnitY;
-		case CubemapFace::PositiveZ: return Vector3::UnitZ;
-		case CubemapFace::NegativeZ: return -Vector3::UnitZ;
-		default: return Vector3::UnitZ;
+		case CubemapFace::PositiveX:
+			return Vector3::UnitX;
+		case CubemapFace::NegativeX:
+			return -Vector3::UnitX;
+		case CubemapFace::PositiveY:
+			return Vector3::UnitY;
+		case CubemapFace::NegativeY:
+			return -Vector3::UnitY;
+		case CubemapFace::PositiveZ:
+			return Vector3::UnitZ;
+		case CubemapFace::NegativeZ:
+			return -Vector3::UnitZ;
+		default:
+			return Vector3::UnitZ;
 		}
 	}
 
@@ -21,9 +28,12 @@ namespace gglab
 	{
 		switch (face)
 		{
-		case CubemapFace::PositiveY: return -Vector3::UnitZ;
-		case CubemapFace::NegativeY: return Vector3::UnitZ;
-		default: return Vector3::UnitY;
+		case CubemapFace::PositiveY:
+			return -Vector3::UnitZ;
+		case CubemapFace::NegativeY:
+			return Vector3::UnitZ;
+		default:
+			return Vector3::UnitY;
 		}
 	}
 
@@ -43,14 +53,11 @@ namespace gglab
 		};
 	}
 
-	Vector3 CubemapFaceUvToDirection(
-		CubemapFace face,
-		const Vector2& uv) noexcept
+	Vector3 CubemapFaceUvToDirection(CubemapFace face, const Vector2& uv) noexcept
 	{
 		const CubemapFaceBasis basis = GetCubemapFaceBasis(face);
-		return (
-			basis.m_Direction +
-			(uv.m_X * 2.0f - 1.0f) * basis.m_Right -
-			(uv.m_Y * 2.0f - 1.0f) * basis.m_Up).Normalized();
+		return (basis.m_Direction + (uv.m_X * 2.0f - 1.0f) * basis.m_Right -
+			(uv.m_Y * 2.0f - 1.0f) * basis.m_Up)
+			.Normalized();
 	}
 }

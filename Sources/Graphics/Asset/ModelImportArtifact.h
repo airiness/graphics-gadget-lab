@@ -25,10 +25,9 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_ImportSettings.m_Semantic == m_Semantic &&
-				m_Artifact && m_Artifact->IsValid() &&
-				m_ContentFingerprint.IsValid() && m_SourceDigest.IsValid() &&
-				m_DerivedDataKey.IsValid();
+			return m_ImportSettings.m_Semantic == m_Semantic && m_Artifact &&
+				m_Artifact->IsValid() && m_ContentFingerprint.IsValid() &&
+				m_SourceDigest.IsValid() && m_DerivedDataKey.IsValid();
 		}
 	};
 
@@ -41,9 +40,8 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Artifact && m_Artifact->IsValid() &&
-				m_ContentFingerprint.IsValid() && m_SourceDigest.IsValid() &&
-				m_DerivedDataKey.IsValid();
+			return m_Artifact && m_Artifact->IsValid() && m_ContentFingerprint.IsValid() &&
+				m_SourceDigest.IsValid() && m_DerivedDataKey.IsValid();
 		}
 	};
 
@@ -76,34 +74,29 @@ namespace gglab
 
 		[[nodiscard]] const ImportedMesh* GetMesh() const noexcept
 		{
-			return m_Owner && m_MeshIndex < m_Owner->m_Meshes.size() ?
-				&m_Owner->m_Meshes[m_MeshIndex] : nullptr;
+			return m_Owner && m_MeshIndex < m_Owner->m_Meshes.size()
+				? &m_Owner->m_Meshes[m_MeshIndex]
+				: nullptr;
 		}
 
 		[[nodiscard]] std::span<const Vertex> GetVertices() const noexcept
 		{
 			const ImportedMesh* mesh = GetMesh();
-			return mesh ? std::span<const Vertex>(mesh->m_Vertices) :
-				std::span<const Vertex>{};
+			return mesh ? std::span<const Vertex>(mesh->m_Vertices) : std::span<const Vertex>{};
 		}
 
 		[[nodiscard]] std::span<const uint32_t> GetIndices() const noexcept
 		{
 			const ImportedMesh* mesh = GetMesh();
-			return mesh ? std::span<const uint32_t>(mesh->m_Indices) :
-				std::span<const uint32_t>{};
+			return mesh ? std::span<const uint32_t>(mesh->m_Indices) : std::span<const uint32_t>{};
 		}
 
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return GetMesh() != nullptr;
-		}
+		[[nodiscard]] bool IsValid() const noexcept { return GetMesh() != nullptr; }
 
 		void Reset() noexcept { *this = {}; }
 	};
 
-	[[nodiscard]] ModelImportArtifactHandle CreateModelImportArtifact(
-		ImportedModel&& importedModel,
+	[[nodiscard]] ModelImportArtifactHandle CreateModelImportArtifact(ImportedModel&& importedModel,
 		std::vector<ResolvedModelImportTexture>&& resolvedTextures,
 		TextureArtifactCache& textureArtifactCache) noexcept;
 }

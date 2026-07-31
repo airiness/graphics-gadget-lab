@@ -23,18 +23,16 @@ namespace gglab
 	struct TextureDerivedDataCoordinatorCore
 	{
 		std::mutex m_Mutex;
-		std::unordered_map<
-			DerivedDataKey,
-			std::shared_ptr<TextureDerivedDataRequestState>,
-			DerivedDataKeyHash> m_Requests;
+		std::unordered_map<DerivedDataKey, std::shared_ptr<TextureDerivedDataRequestState>,
+			DerivedDataKeyHash>
+			m_Requests;
 		TextureDerivedDataCoordinatorStatistics m_Statistics{};
 		uint64_t m_NextBuildSerial = 1;
 	};
 
 	namespace
 	{
-		void EraseCompletedRequestLocked(
-			TextureDerivedDataCoordinatorCore& core,
+		void EraseCompletedRequestLocked(TextureDerivedDataCoordinatorCore& core,
 			const std::shared_ptr<TextureDerivedDataRequestState>& state) noexcept
 		{
 			if (!state->m_Complete || state->m_ParticipantCount != 0)
@@ -49,10 +47,8 @@ namespace gglab
 		}
 	}
 
-	bool FinishTextureDerivedDataBuild(
-		TextureArtifactBuildClaim& claim,
-		TextureDerivedDataArtifact artifact,
-		std::string error) noexcept
+	bool FinishTextureDerivedDataBuild(TextureArtifactBuildClaim& claim,
+		TextureDerivedDataArtifact artifact, std::string error) noexcept
 	{
 		if (!claim.m_Core || !claim.m_State || claim.m_Serial == 0)
 		{
@@ -97,9 +93,9 @@ namespace gglab
 	TextureArtifactWaiterHandle::TextureArtifactWaiterHandle(
 		std::shared_ptr<TextureDerivedDataCoordinatorCore> core,
 		std::shared_ptr<TextureDerivedDataRequestState> state) noexcept :
-		m_Core(std::move(core)),
-		m_State(std::move(state))
-	{}
+		m_Core(std::move(core)), m_State(std::move(state))
+	{
+	}
 
 	TextureArtifactWaiterHandle::TextureArtifactWaiterHandle(
 		TextureArtifactWaiterHandle&& other) noexcept = default;
@@ -165,12 +161,10 @@ namespace gglab
 
 	TextureArtifactBuildClaim::TextureArtifactBuildClaim(
 		std::shared_ptr<TextureDerivedDataCoordinatorCore> core,
-		std::shared_ptr<TextureDerivedDataRequestState> state,
-		uint64_t serial) noexcept :
-		m_Core(std::move(core)),
-		m_State(std::move(state)),
-		m_Serial(serial)
-	{}
+		std::shared_ptr<TextureDerivedDataRequestState> state, uint64_t serial) noexcept :
+		m_Core(std::move(core)), m_State(std::move(state)), m_Serial(serial)
+	{
+	}
 
 	TextureArtifactBuildClaim::TextureArtifactBuildClaim(
 		TextureArtifactBuildClaim&& other) noexcept = default;
@@ -207,14 +201,14 @@ namespace gglab
 		std::filesystem::path cacheDirectory) noexcept :
 		m_Core(std::make_shared<TextureDerivedDataCoordinatorCore>()),
 		m_Store(std::move(cacheDirectory))
-	{}
+	{
+	}
 
 	TextureDerivedDataSystem::~TextureDerivedDataSystem()
 	{
 		std::scoped_lock lock(m_Core->m_Mutex);
 		GGLAB_ASSERT_MSG(
-			m_Core->m_Requests.empty(),
-			"TextureDerivedDataSystem destroyed with active requests.");
+			m_Core->m_Requests.empty(), "TextureDerivedDataSystem destroyed with active requests.");
 	}
 
 	TextureDerivedDataRequestResult TextureDerivedDataSystem::Request(
@@ -228,8 +222,7 @@ namespace gglab
 
 		std::scoped_lock lock(m_Core->m_Mutex);
 		++m_Core->m_Statistics.m_RequestCount;
-		if (const auto request = m_Core->m_Requests.find(key);
-			request != m_Core->m_Requests.end())
+		if (const auto request = m_Core->m_Requests.find(key); request != m_Core->m_Requests.end())
 		{
 			const auto& state = request->second;
 			if (state->m_Complete && state->m_Published)
@@ -257,16 +250,12 @@ namespace gglab
 		++m_Core->m_Statistics.m_BuildRequiredCount;
 		result.m_Disposition = ArtifactRequestDisposition::BuildRequired;
 		result.m_Waiter = TextureArtifactWaiterHandle(m_Core, state);
-		result.m_BuildClaim = TextureArtifactBuildClaim(
-			m_Core,
-			state,
-			state->m_BuildSerial);
+		result.m_BuildClaim = TextureArtifactBuildClaim(m_Core, state, state->m_BuildSerial);
 		return result;
 	}
 
 	TextureArtifactWaitResult TextureDerivedDataSystem::Wait(
-		TextureArtifactWaiterHandle waiter,
-		std::stop_token stopToken) noexcept
+		TextureArtifactWaiterHandle waiter, std::stop_token stopToken) noexcept
 	{
 		TextureArtifactWaitResult result{};
 		if (!waiter.IsValid())
@@ -278,9 +267,7 @@ namespace gglab
 		const auto state = waiter.m_State;
 		std::unique_lock lock(core->m_Mutex);
 		const bool complete = state->m_Completion.wait(
-			lock,
-			stopToken,
-			[&state]() noexcept { return state->m_Complete; });
+			lock, stopToken, [&state]() noexcept { return state->m_Complete; });
 		if (!complete)
 		{
 			lock.unlock();
@@ -290,14 +277,13 @@ namespace gglab
 		}
 		result.m_Artifact = state->m_Artifact;
 		result.m_Error = state->m_Error;
-		result.m_Disposition = state->m_Published ?
-			ArtifactWaitDisposition::Succeeded : ArtifactWaitDisposition::Failed;
+		result.m_Disposition = state->m_Published ? ArtifactWaitDisposition::Succeeded
+			: ArtifactWaitDisposition::Failed;
 		return result;
 	}
 
 	bool TextureDerivedDataSystem::Publish(
-		TextureArtifactBuildClaim claim,
-		TextureDerivedDataArtifact artifact) noexcept
+		TextureArtifactBuildClaim claim, TextureDerivedDataArtifact artifact) noexcept
 	{
 		if (!artifact.IsValid())
 		{
@@ -306,54 +292,38 @@ namespace gglab
 		return FinishTextureDerivedDataBuild(claim, std::move(artifact), {});
 	}
 
-	bool TextureDerivedDataSystem::Fail(
-		TextureArtifactBuildClaim claim,
-		std::string error) noexcept
+	bool TextureDerivedDataSystem::Fail(TextureArtifactBuildClaim claim, std::string error) noexcept
 	{
 		return FinishTextureDerivedDataBuild(claim, {}, std::move(error));
 	}
 
 	TextureDerivedDataArtifact TextureDerivedDataSystem::Read(
-		const DerivedDataKey& key,
-		const TextureImportSettings& importSettings) noexcept
+		const DerivedDataKey& key, const TextureImportSettings& importSettings) noexcept
 	{
 		const LocalDerivedDataReadOptions readOptions{
 			.m_MaxContainerBytes = ComputeLocalDerivedDataContainerByteLimit(
-				TextureArtifactType,
-				TextureArtifactCodec::GetMaximumSerializedBytes()),
+				TextureArtifactType, TextureArtifactCodec::GetMaximumSerializedBytes()),
 		};
-		DerivedDataReadResult cached = m_Store.Read(
-			key,
-			TextureArtifactType,
-			TextureArtifactSchemaVersion,
-			readOptions);
+		DerivedDataReadResult cached =
+			m_Store.Read(key, TextureArtifactType, TextureArtifactSchemaVersion, readOptions);
 		if (cached.m_Disposition != DerivedDataReadDisposition::Hit)
 		{
 			return {};
 		}
-		TextureArtifactDecodeResult decoded = TextureArtifactCodec::Deserialize(
-			cached.m_Payload,
-			cached.m_ArtifactContentDigest);
+		TextureArtifactDecodeResult decoded =
+			TextureArtifactCodec::Deserialize(cached.m_Payload, cached.m_ArtifactContentDigest);
 		if (!decoded.Succeeded())
 		{
-			m_Store.DiscardObservedCorrupt(
-				key,
-				TextureArtifactType,
-				TextureArtifactSchemaVersion,
-				cached.m_ArtifactContentDigest,
-				cached.m_PayloadDigest,
-				readOptions);
-			GGLAB_LOG_GRAPHICS_WARN(
-				"Texture DDC entry '{}' failed codec validation: {}",
-				DerivedDataKeyText(key),
-				decoded.m_Error);
+			m_Store.DiscardObservedCorrupt(key, TextureArtifactType, TextureArtifactSchemaVersion,
+				cached.m_ArtifactContentDigest, cached.m_PayloadDigest, readOptions);
+			GGLAB_LOG_GRAPHICS_WARN("Texture DDC entry '{}' failed codec validation: {}",
+				DerivedDataKeyText(key), decoded.m_Error);
 			return {};
 		}
 		const AssetContentFingerprint contentFingerprint =
 			ComputeTextureContentFingerprint(decoded.m_Artifact.m_Data, importSettings);
 		TextureDerivedDataArtifact result{
-			.m_Artifact = std::make_shared<const TextureArtifact>(
-				std::move(decoded.m_Artifact)),
+			.m_Artifact = std::make_shared<const TextureArtifact>(std::move(decoded.m_Artifact)),
 			.m_ContentFingerprint = contentFingerprint,
 			.m_DerivedDataCacheHit = true,
 		};
@@ -361,20 +331,16 @@ namespace gglab
 	}
 
 	bool TextureDerivedDataSystem::Write(
-		const DerivedDataKey& key,
-		const TextureArtifact& artifact) noexcept
+		const DerivedDataKey& key, const TextureArtifact& artifact) noexcept
 	{
 		const std::vector<std::byte> payload = TextureArtifactCodec::Serialize(artifact);
-		return !payload.empty() && m_Store.Write(
-			key,
-			TextureArtifactType,
-			TextureArtifactSchemaVersion,
-			artifact.m_ContentDigest,
-			payload);
+		return !payload.empty() &&
+			m_Store.Write(key, TextureArtifactType, TextureArtifactSchemaVersion,
+				artifact.m_ContentDigest, payload);
 	}
 
-	TextureDerivedDataCoordinatorStatistics
-	TextureDerivedDataSystem::GetCoordinatorStatistics() const noexcept
+	TextureDerivedDataCoordinatorStatistics TextureDerivedDataSystem::GetCoordinatorStatistics()
+		const noexcept
 	{
 		std::scoped_lock lock(m_Core->m_Mutex);
 		return m_Core->m_Statistics;

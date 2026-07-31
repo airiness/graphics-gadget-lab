@@ -5,23 +5,20 @@
 
 namespace gglab
 {
-	DX12PSOCache::DX12PSOCache(DX12Device* dx12Device, std::unique_ptr<IPSOCreator> creator) noexcept :
-		m_DX12Device(dx12Device),
-		m_Creator(std::move(creator))
+	DX12PSOCache::DX12PSOCache(
+		DX12Device* dx12Device, std::unique_ptr<IPSOCreator> creator) noexcept :
+		m_DX12Device(dx12Device), m_Creator(std::move(creator))
 	{
 	}
 
 	DX12PSOCache::~DX12PSOCache() = default;
 
-	DX12PipelineState* DX12PSOCache::GetOrCreate(
-		const RHIGraphicsPipelineDesc& desc,
+	DX12PipelineState* DX12PSOCache::GetOrCreate(const RHIGraphicsPipelineDesc& desc,
 		const RootSignatureHandle& rootSignature,
 		const DX12GraphicsPipelineShaderInputs& shaderInputs) noexcept
 	{
-		const DX12RHIGraphicsPSOKey key = MakeDX12RHIGraphicsPSOKey(
-			desc,
-			rootSignature.m_Id,
-			shaderInputs);
+		const DX12RHIGraphicsPSOKey key =
+			MakeDX12RHIGraphicsPSOKey(desc, rootSignature.m_Id, shaderInputs);
 
 		{
 			std::shared_lock lock(m_Mutex);
@@ -42,11 +39,8 @@ namespace gglab
 		DX12InputLayoutBuildResult inputLayout{};
 		BuildDX12InputLayoutDesc(desc.m_VertexInput, inputLayout);
 
-		GraphicsPipelineDesc dx12Desc = BuildDX12GraphicsPipelineDesc(
-			desc,
-			rootSignature,
-			shaderInputs,
-			inputLayout);
+		GraphicsPipelineDesc dx12Desc =
+			BuildDX12GraphicsPipelineDesc(desc, rootSignature, shaderInputs, inputLayout);
 
 		GGLAB_ASSERT_MSG(m_Creator, "PSO Creator is null");
 		auto pso = m_Creator->CreateGraphicsPSO(m_DX12Device, dx12Desc);
@@ -57,7 +51,8 @@ namespace gglab
 		return slot.get();
 	}
 
-	DX12PipelineState* DX12PSOCache::GetOrCreate(const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept
+	DX12PipelineState* DX12PSOCache::GetOrCreate(
+		const ComputePSOKey& key, const ComputePipelineDesc& desc) noexcept
 	{
 		{
 			std::shared_lock lock(m_Mutex);

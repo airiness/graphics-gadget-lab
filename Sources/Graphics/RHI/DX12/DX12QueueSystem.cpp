@@ -111,8 +111,7 @@ namespace gglab
 	}
 
 	void DX12QueueSystem::WaitForFence(
-		RHIQueueType waitingQueue,
-		const RHIFencePoint& fencePoint) noexcept
+		RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!fencePoint.IsValid())
 		{
@@ -190,10 +189,14 @@ namespace gglab
 	{
 		switch (type)
 		{
-		case RHIQueueType::Graphics: return DX12QueueType::Graphics;
-		case RHIQueueType::Compute: return DX12QueueType::Compute;
-		case RHIQueueType::Copy: return DX12QueueType::Copy;
-		case RHIQueueType::Transfer: return DX12QueueType::Transfer;
+		case RHIQueueType::Graphics:
+			return DX12QueueType::Graphics;
+		case RHIQueueType::Compute:
+			return DX12QueueType::Compute;
+		case RHIQueueType::Copy:
+			return DX12QueueType::Copy;
+		case RHIQueueType::Transfer:
+			return DX12QueueType::Transfer;
 		}
 		GGLAB_UNREACHABLE("Unhandled RHIQueueType.");
 	}
@@ -248,15 +251,13 @@ namespace gglab
 		for (uint32_t i = 0; i < m_FrameCount; ++i)
 		{
 			auto graphicsList = CreateCommandList(DX12QueueType::Graphics);
-			m_GraphicsContexts.push_back(
-				std::make_unique<DX12GraphicsCommandContext>(
-					m_Device, m_PipelineSystem, graphicsList.get()));
+			m_GraphicsContexts.push_back(std::make_unique<DX12GraphicsCommandContext>(
+				m_Device, m_PipelineSystem, graphicsList.get()));
 			m_GraphicsCommandLists.push_back(std::move(graphicsList));
 
 			auto computeList = CreateCommandList(DX12QueueType::Compute);
-			m_ComputeContexts.push_back(
-				std::make_unique<DX12ComputeCommandContext>(
-					m_Device, m_PipelineSystem, computeList.get()));
+			m_ComputeContexts.push_back(std::make_unique<DX12ComputeCommandContext>(
+				m_Device, m_PipelineSystem, computeList.get()));
 			m_ComputeCommandLists.push_back(std::move(computeList));
 		}
 	}

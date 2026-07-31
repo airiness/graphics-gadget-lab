@@ -62,9 +62,9 @@ namespace gglab
 				const auto demo = ParseDemo(arguments[index]);
 				if (!demo)
 				{
-					result.m_Error = std::format(
-						"Unknown demo '{}'. Expected 'start', 'playground', or 'lab'.",
-						arguments[index]);
+					result.m_Error =
+						std::format("Unknown demo '{}'. Expected 'start', 'playground', or 'lab'.",
+							arguments[index]);
 					return result;
 				}
 				result.m_Options.m_StartupDemo = *demo;
@@ -100,9 +100,7 @@ namespace gglab
 				}
 				if (!IsApplicationSelfTestSuiteRegistered(arguments[index]))
 				{
-					result.m_Error = std::format(
-						"Unknown self-test suite '{}'.",
-						arguments[index]);
+					result.m_Error = std::format("Unknown self-test suite '{}'.", arguments[index]);
 					return result;
 				}
 				result.m_Options.m_SelfTestSuiteId = std::string(arguments[index]);
@@ -115,8 +113,7 @@ namespace gglab
 
 		if (result.m_Options.m_StartupLabId)
 		{
-			if (demoSpecified &&
-				result.m_Options.m_StartupDemo != ApplicationStartupDemo::LabHost)
+			if (demoSpecified && result.m_Options.m_StartupDemo != ApplicationStartupDemo::LabHost)
 			{
 				result.m_Error =
 					"Option '--lab' cannot be combined with a non-LabHost '--demo' value.";
@@ -136,8 +133,7 @@ namespace gglab
 
 	std::string_view GetApplicationLaunchUsage() noexcept
 	{
-		return
-			"Usage: GraphicsGadgetLab.exe [options]\n"
+		return "Usage: GraphicsGadgetLab.exe [options]\n"
 			"\n"
 			"Options:\n"
 			"  --demo <start|playground|lab>   Select the startup demo.\n"

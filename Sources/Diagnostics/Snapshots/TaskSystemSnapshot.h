@@ -22,8 +22,7 @@ namespace gglab
 		std::vector<TaskCompletionInfo> m_RecentTasks;
 	};
 
-	template<>
-	struct SnapshotTraits<TaskSystemSnapshot>
+	template <> struct SnapshotTraits<TaskSystemSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.TaskSystemSnapshot");
 	};

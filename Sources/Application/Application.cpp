@@ -86,12 +86,12 @@ namespace gglab
 	}
 
 	Application::Application(CreateInfo createInfo) noexcept :
-		m_WindowWidth(createInfo.m_WindowWidth),
-		m_WindowHeight(createInfo.m_WindowHeight),
+		m_WindowWidth(createInfo.m_WindowWidth), m_WindowHeight(createInfo.m_WindowHeight),
 		m_WindowName(createInfo.m_WindowName),
 		m_PlatformHost(std::move(createInfo.m_PlatformHost)),
 		m_LaunchOptions(std::move(createInfo.m_LaunchOptions))
-	{}
+	{
+	}
 
 	Application::~Application() = default;
 
@@ -180,7 +180,7 @@ namespace gglab
 		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
 			.m_Device = m_Renderer->GetDevice(),
 			.m_FrameSlotCount = m_Renderer->GetSwapChain()->GetBufferCount(),
-		});
+			});
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
@@ -192,51 +192,44 @@ namespace gglab
 			utils::GetExeOutDir() / "DerivedDataCache" / "Texture";
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
-		m_EnvironmentAssetController = std::make_unique<EnvironmentAssetController>(
-			EnvironmentAssetController::CreateInfo{
+		m_EnvironmentAssetController =
+			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
-			});
+				});
 		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 
 		const DemoCreateInfo demoCreateInfo{
-			.m_Services = {
-				.m_Renderer = m_Renderer.get(),
-				.m_AssetManager = m_AssetManager.get(),
-				.m_ShaderManager = m_ShaderManager.get(),
-				.m_TaskSystem = m_TaskSystem.get(),
-				.m_InputManager = m_InputManager.get(),
-				.m_Time = m_Time.get(),
-				.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
-				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
-			},
+			.m_Services =
+				{
+					.m_Renderer = m_Renderer.get(),
+					.m_AssetManager = m_AssetManager.get(),
+					.m_ShaderManager = m_ShaderManager.get(),
+					.m_TaskSystem = m_TaskSystem.get(),
+					.m_InputManager = m_InputManager.get(),
+					.m_Time = m_Time.get(),
+					.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
+					.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+				},
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
 		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
-		const LabId startupLab = m_LaunchOptions.m_StartupLabId ?
-			LabId(*m_LaunchOptions.m_StartupLabId) : CullingLabSession::GetId();
-		const uint32_t startIndex = m_DemoManager->RegisterDemo(
-			"Demo.Start",
+		const LabId startupLab = m_LaunchOptions.m_StartupLabId
+			? LabId(*m_LaunchOptions.m_StartupLabId)
+			: CullingLabSession::GetId();
+		const uint32_t startIndex = m_DemoManager->RegisterDemo("Demo.Start",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
-			{
-				return std::make_unique<StartDemo>(demoCreateInfo);
-			});
-		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo(
-			"Demo.Playground",
+			{ return std::make_unique<StartDemo>(demoCreateInfo); });
+		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo("Demo.Playground",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
-			{
-				return std::make_unique<DemoPlayground>(demoCreateInfo);
-			});
-		const uint32_t labHostIndex = m_DemoManager->RegisterDemo(
-			"Demo.LabHost",
+			{ return std::make_unique<DemoPlayground>(demoCreateInfo); });
+		const uint32_t labHostIndex = m_DemoManager->RegisterDemo("Demo.LabHost",
 			[demoCreateInfo, startupLab]() noexcept -> std::unique_ptr<DemoBase>
-			{
-				return std::make_unique<DemoLabHost>(demoCreateInfo, startupLab);
-			});
+			{ return std::make_unique<DemoLabHost>(demoCreateInfo, startupLab); });
 		if (startIndex >= m_DemoManager->GetDemoCount() ||
 			playgroundIndex >= m_DemoManager->GetDemoCount() ||
 			labHostIndex >= m_DemoManager->GetDemoCount())
@@ -263,13 +256,10 @@ namespace gglab
 			break;
 		}
 		m_DemoManager->RequestActiveDemo(startupDemoIndex);
-		m_LabRuntimeLocator = std::make_unique<DemoLabRuntimeLocator>(
-			m_DemoManager.get(),
-			labHostIndex);
-		GGLAB_LOG_INFO(
-			"Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
-			startupDemoName,
-			startupLab.GetName(),
+		m_LabRuntimeLocator =
+			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
+		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
+			startupDemoName, startupLab.GetName(),
 			m_LaunchOptions.m_StartWithAbsoluteMouse ? "absolute" : "relative");
 
 		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
@@ -318,7 +308,7 @@ namespace gglab
 		m_TaskSystem->PumpCompletions({
 			.m_MaxCallbacks = 64,
 			.m_MaxMilliseconds = 1.0,
-		});
+			});
 		m_AssetManager->DrainLoadCompletions();
 
 		// Toggle Mouse Input Mode
@@ -328,10 +318,9 @@ namespace gglab
 			{
 				if (const auto mouse = GetMouse())
 				{
-					mouse->SetMouseMode(
-						(mouse->GetMouseMode() == Mouse::MouseMode::Absolute) ?
-						Mouse::MouseMode::Relative :
-						Mouse::MouseMode::Absolute);
+					mouse->SetMouseMode((mouse->GetMouseMode() == Mouse::MouseMode::Absolute)
+						? Mouse::MouseMode::Relative
+						: Mouse::MouseMode::Absolute);
 				}
 			}
 
@@ -352,8 +341,7 @@ namespace gglab
 		}
 
 		// DevelopGui new frame
-		const bool developGuiFrameOpen =
-			m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
+		const bool developGuiFrameOpen = m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
@@ -389,10 +377,8 @@ namespace gglab
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
-		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(
-			backBufferIndex,
-			static_cast<float>(m_Time->GetDeltaTime()),
-			frame.m_DebugDrawCullContext);
+		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(backBufferIndex,
+			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
 		const RenderServices services{
@@ -439,7 +425,8 @@ namespace gglab
 			guiContext.m_AssetManager = m_AssetManager.get();
 			guiContext.m_EnvironmentAssetController = m_EnvironmentAssetController.get();
 			guiContext.m_RenderGraph = &rg;
-			guiContext.m_DirectionalShadowSettings = frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
+			guiContext.m_DirectionalShadowSettings =
+				frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
 			guiContext.m_DebugDrawSystem = m_DebugDrawSystem.get();
 			guiContext.m_DebugDrawFrame = frame.m_DebugDrawFrame;
 
@@ -525,8 +512,7 @@ namespace gglab
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();
 		m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
-		m_AssetManager->PrepareForShutdown(
-			m_Renderer->GetLastSubmittedFencePoint());
+		m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
 		m_AssetManager.reset();
 
 		m_Renderer->Finalize();
@@ -548,46 +534,24 @@ namespace gglab
 		{
 			std::vector<ShaderDesc> shaderDescs;
 			const auto addShader =
-				[&shaderDescs](
-					const wchar_t* sourcePath,
-					ShaderStage stage,
-					const wchar_t* entry)
+				[&shaderDescs](const wchar_t* sourcePath, ShaderStage stage, const wchar_t* entry)
 				{
 					shaderDescs.push_back({
 						.m_SourcePath = sourcePath,
 						.m_Stage = stage,
 						.m_Entry = entry,
-					});
+						});
 				};
-			const auto addGraphicsShader =
-				[&addShader](const wchar_t* sourcePath)
+			const auto addGraphicsShader = [&addShader](const wchar_t* sourcePath)
 				{
-					addShader(
-						sourcePath,
-						ShaderStage::Vertex,
-						L"VSMain");
-					addShader(
-						sourcePath,
-						ShaderStage::Pixel,
-						L"PSMain");
+					addShader(sourcePath, ShaderStage::Vertex, L"VSMain");
+					addShader(sourcePath, ShaderStage::Pixel, L"PSMain");
 				};
 
-			addShader(
-				L"Passes/PassForwardCoverage.hlsl",
-				ShaderStage::Vertex,
-				L"VSMain");
-			addShader(
-				L"Passes/PassForwardPBR.hlsl",
-				ShaderStage::Pixel,
-				L"PSMain");
-			addShader(
-				L"Passes/PassDepthPrepass.hlsl",
-				ShaderStage::Pixel,
-				L"PSAlphaTest");
-			addShader(
-				L"Passes/PassForwardPlusCull.hlsl",
-				ShaderStage::Compute,
-				L"CSMain");
+			addShader(L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain");
+			addShader(L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain");
+			addShader(L"Passes/PassDepthPrepass.hlsl", ShaderStage::Pixel, L"PSAlphaTest");
+			addShader(L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain");
 			addGraphicsShader(L"Passes/PassDirectionalShadowMap.hlsl");
 			addGraphicsShader(L"Passes/PassShadowMapPreview.hlsl");
 			addGraphicsShader(L"Passes/PassFinalColor.hlsl");
@@ -603,18 +567,17 @@ namespace gglab
 			addGraphicsShader(L"Passes/PassIBLCubemapPreview.hlsl");
 
 			GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
-				*m_TaskSystem,
-				std::move(shaderDescs),
-				TaskPriority::Critical));
+				*m_TaskSystem, std::move(shaderDescs), TaskPriority::Critical));
 		}
 	}
 
 	LoadingProgress Application::GetStartupLoadingProgress() const noexcept
 	{
 		const ShaderPreloadStatus status = m_ShaderManager->GetPreloadStatus();
-		const float fraction = status.m_TotalCount > 0 ?
-			static_cast<float>(status.m_CompletedCount) /
-				static_cast<float>(status.m_TotalCount) : 0.0f;
+		const float fraction = status.m_TotalCount > 0
+			? static_cast<float>(status.m_CompletedCount) /
+			static_cast<float>(status.m_TotalCount)
+			: 0.0f;
 		if (status.HasFailed())
 		{
 			return {
@@ -622,8 +585,8 @@ namespace gglab
 				.m_Fraction = fraction,
 				.m_Title = "Starting Graphics Gadget Lab",
 				.m_Stage = "Shader preload failed",
-				.m_Detail = status.m_Error.empty() ?
-					"The shader preload task was cancelled." : status.m_Error,
+				.m_Detail = status.m_Error.empty() ? "The shader preload task was cancelled."
+												   : status.m_Error,
 			};
 		}
 
@@ -632,8 +595,8 @@ namespace gglab
 			.m_Fraction = status.IsReady() ? 1.0f : fraction,
 			.m_Title = "Starting Graphics Gadget Lab",
 			.m_Stage = status.IsReady() ? "Shaders ready" : "Preloading shaders",
-			.m_Detail = status.m_CurrentShader.empty() ?
-				"Waiting for a shader worker." : status.m_CurrentShader,
+			.m_Detail = status.m_CurrentShader.empty() ? "Waiting for a shader worker."
+													   : status.m_CurrentShader,
 		};
 	}
 
@@ -660,10 +623,12 @@ namespace gglab
 	}
 
 	void Application::OnActive() noexcept
-	{}
+	{
+	}
 
 	void Application::OnInactive() noexcept
-	{}
+	{
+	}
 
 	void Application::OnSuspend() noexcept
 	{

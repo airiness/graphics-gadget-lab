@@ -8,26 +8,19 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] bool MatchesTexture(
-			const TextureAssetData& texture,
-			uint32_t size,
-			uint16_t arraySize,
-			uint16_t mipLevels,
-			RHIFormat format) noexcept
+		[[nodiscard]] bool MatchesTexture(const TextureAssetData& texture, uint32_t size,
+			uint16_t arraySize, uint16_t mipLevels, RHIFormat format) noexcept
 		{
-			return texture.IsValid() &&
-				texture.m_Extent.m_Width == size &&
-				texture.m_Extent.m_Height == size &&
-				texture.m_ArraySize == arraySize &&
-				texture.m_MipLevels == mipLevels &&
-				texture.m_ViewFormat == format;
+			return texture.IsValid() && texture.m_Extent.m_Width == size &&
+				texture.m_Extent.m_Height == size && texture.m_ArraySize == arraySize &&
+				texture.m_MipLevels == mipLevels && texture.m_ViewFormat == format;
 		}
 	}
 
 	bool IBLStageArtifact::IsValid() const noexcept
 	{
-		return m_Stage < IBLArtifactStage::Count &&
-			m_Texture.IsValid() && m_ContentDigest.IsValid();
+		return m_Stage < IBLArtifactStage::Count && m_Texture.IsValid() &&
+			m_ContentDigest.IsValid();
 	}
 
 	bool IBLStageArtifact::MatchesConfig(const IBLBakeConfig& config) const noexcept
@@ -37,40 +30,24 @@ namespace gglab
 		case IBLArtifactStage::Environment:
 		{
 			const uint32_t size = std::max(config.m_EnvironmentCubemapSize, 1u);
-			return MatchesTexture(
-				m_Texture,
-				size,
-				static_cast<uint16_t>(CubemapFaceCount),
+			return MatchesTexture(m_Texture, size, static_cast<uint16_t>(CubemapFaceCount),
 				static_cast<uint16_t>(CalculateMipLevelCount(size)),
 				config.m_EnvironmentCubemapFormat);
 		}
 		case IBLArtifactStage::Irradiance:
-			return MatchesTexture(
-				m_Texture,
-				std::max(config.m_IrradianceCubemapSize, 1u),
-				static_cast<uint16_t>(CubemapFaceCount),
-				1,
-				config.m_IrradianceCubemapFormat);
+			return MatchesTexture(m_Texture, std::max(config.m_IrradianceCubemapSize, 1u),
+				static_cast<uint16_t>(CubemapFaceCount), 1, config.m_IrradianceCubemapFormat);
 		case IBLArtifactStage::PrefilteredSpecular:
 		{
 			const uint32_t size = std::max(config.m_PrefilteredSpecularCubemapSize, 1u);
-			return MatchesTexture(
-				m_Texture,
-				size,
-				static_cast<uint16_t>(CubemapFaceCount),
+			return MatchesTexture(m_Texture, size, static_cast<uint16_t>(CubemapFaceCount),
 				static_cast<uint16_t>(std::clamp(
-					config.m_PrefilteredSpecularMipLevels,
-					1u,
-					CalculateMipLevelCount(size))),
+					config.m_PrefilteredSpecularMipLevels, 1u, CalculateMipLevelCount(size))),
 				config.m_PrefilteredSpecularCubemapFormat);
 		}
 		case IBLArtifactStage::BrdfLut:
 			return MatchesTexture(
-				m_Texture,
-				std::max(config.m_BrdfLutSize, 1u),
-				1,
-				1,
-				config.m_BrdfLutFormat);
+				m_Texture, std::max(config.m_BrdfLutSize, 1u), 1, 1, config.m_BrdfLutFormat);
 		case IBLArtifactStage::Count:
 			break;
 		}
@@ -82,19 +59,16 @@ namespace gglab
 		return sizeof(IBLStageArtifact) +
 			static_cast<uint64_t>(m_Texture.m_Pixels.capacity()) * sizeof(std::byte) +
 			static_cast<uint64_t>(m_Texture.m_Subresources.capacity()) *
-				sizeof(TextureAssetSubresource);
+			sizeof(TextureAssetSubresource);
 	}
 
-	const IBLStageArtifactHandle& IBLStageArtifactSet::Get(
-		IBLArtifactStage stage) const noexcept
+	const IBLStageArtifactHandle& IBLStageArtifactSet::Get(IBLArtifactStage stage) const noexcept
 	{
 		GGLAB_ASSERT(stage < IBLArtifactStage::Count);
 		return m_Artifacts[static_cast<size_t>(stage)];
 	}
 
-	void IBLStageArtifactSet::Set(
-		IBLArtifactStage stage,
-		IBLStageArtifactHandle artifact) noexcept
+	void IBLStageArtifactSet::Set(IBLArtifactStage stage, IBLStageArtifactHandle artifact) noexcept
 	{
 		GGLAB_ASSERT(stage < IBLArtifactStage::Count);
 		GGLAB_ASSERT(!artifact || artifact->m_Stage == stage);
@@ -109,12 +83,8 @@ namespace gglab
 
 	bool IBLStageArtifactSet::IsComplete() const noexcept
 	{
-		return std::ranges::all_of(
-			m_Artifacts,
-			[](const IBLStageArtifactHandle& artifact) noexcept
-			{
-				return artifact && artifact->IsValid();
-			});
+		return std::ranges::all_of(m_Artifacts, [](const IBLStageArtifactHandle& artifact) noexcept
+			{ return artifact && artifact->IsValid(); });
 	}
 
 	ArtifactContentDigest ComputeIBLStageArtifactContentDigest(
@@ -142,16 +112,14 @@ namespace gglab
 	}
 
 	IBLStageArtifactHandle CreateIBLStageArtifact(
-		IBLArtifactStage stage,
-		TextureAssetData&& texture) noexcept
+		IBLArtifactStage stage, TextureAssetData&& texture) noexcept
 	{
-		if (stage == IBLArtifactStage::Environment ||
-			stage == IBLArtifactStage::Irradiance ||
+		if (stage == IBLArtifactStage::Environment || stage == IBLArtifactStage::Irradiance ||
 			stage == IBLArtifactStage::PrefilteredSpecular)
 		{
-			texture.m_SrvDimension = texture.m_ArraySize == CubemapFaceCount ?
-				RHITextureViewDimension::TextureCube :
-				RHITextureViewDimension::TextureCubeArray;
+			texture.m_SrvDimension = texture.m_ArraySize == CubemapFaceCount
+				? RHITextureViewDimension::TextureCube
+				: RHITextureViewDimension::TextureCubeArray;
 		}
 		else if (stage == IBLArtifactStage::BrdfLut)
 		{
@@ -163,7 +131,7 @@ namespace gglab
 			.m_Texture = std::move(texture),
 		};
 		artifact.m_ContentDigest = ComputeIBLStageArtifactContentDigest(artifact);
-		return artifact.IsValid() ?
-			std::make_shared<const IBLStageArtifact>(std::move(artifact)) : nullptr;
+		return artifact.IsValid() ? std::make_shared<const IBLStageArtifact>(std::move(artifact))
+			: nullptr;
 	}
 }

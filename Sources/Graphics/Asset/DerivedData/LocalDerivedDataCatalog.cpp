@@ -10,12 +10,12 @@ namespace gglab
 		[[nodiscard]] uint64_t CurrentUnixMilliseconds() noexcept
 		{
 			return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-				std::chrono::system_clock::now().time_since_epoch()).count());
+				std::chrono::system_clock::now().time_since_epoch())
+				.count());
 		}
 	}
 
-	LocalDerivedDataCatalog::LocalDerivedDataCatalog(
-		std::filesystem::path rootDirectory) noexcept :
+	LocalDerivedDataCatalog::LocalDerivedDataCatalog(std::filesystem::path rootDirectory) noexcept :
 		m_RootDirectory(std::move(rootDirectory))
 	{
 	}
@@ -26,9 +26,7 @@ namespace gglab
 		uint64_t storedBytes = 0;
 		std::error_code errorCode;
 		std::filesystem::recursive_directory_iterator iterator(
-			m_RootDirectory,
-			std::filesystem::directory_options::skip_permission_denied,
-			errorCode);
+			m_RootDirectory, std::filesystem::directory_options::skip_permission_denied, errorCode);
 		const std::filesystem::recursive_directory_iterator end;
 		while (!errorCode && iterator != end)
 		{
@@ -62,8 +60,7 @@ namespace gglab
 	}
 
 	void LocalDerivedDataCatalog::RecordEntry(
-		const std::filesystem::path& path,
-		uint64_t bytes) noexcept
+		const std::filesystem::path& path, uint64_t bytes) noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 		auto [iterator, inserted] = m_Entries.try_emplace(path, bytes);
@@ -81,7 +78,8 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_Mutex);
 		const auto iterator = m_Entries.find(path);
-		if (iterator == m_Entries.end()) return;
+		if (iterator == m_Entries.end())
+			return;
 		m_StoredBytes -= iterator->second;
 		m_Entries.erase(iterator);
 	}

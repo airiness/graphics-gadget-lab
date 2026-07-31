@@ -63,7 +63,8 @@ namespace gglab
 							}
 						}
 
-						pixel[3] = std::isfinite(pixel[3]) ? std::clamp(pixel[3], 0.0f, 1.0f) : 1.0f;
+						pixel[3] =
+							std::isfinite(pixel[3]) ? std::clamp(pixel[3], 0.0f, 1.0f) : 1.0f;
 					}
 				}
 			}
@@ -88,11 +89,12 @@ namespace gglab
 			return ToRHIFormat(resourceFormat);
 		}
 
-		[[nodiscard]] RHIFormat ToTextureViewFormat(DXGI_FORMAT format, TextureColorSpace colorSpace) noexcept
+		[[nodiscard]] RHIFormat ToTextureViewFormat(
+			DXGI_FORMAT format, TextureColorSpace colorSpace) noexcept
 		{
-			DXGI_FORMAT viewFormat = colorSpace == TextureColorSpace::SRGB ?
-				DirectX::MakeSRGB(format) :
-				DirectX::MakeLinear(format);
+			DXGI_FORMAT viewFormat = colorSpace == TextureColorSpace::SRGB
+				? DirectX::MakeSRGB(format)
+				: DirectX::MakeLinear(format);
 			if (viewFormat == DXGI_FORMAT_UNKNOWN)
 			{
 				viewFormat = format;
@@ -102,8 +104,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] TextureAssetData ConvertScratchImage(
-			const DirectX::ScratchImage& scratchImage,
-			TextureColorSpace colorSpace,
+			const DirectX::ScratchImage& scratchImage, TextureColorSpace colorSpace,
 			const ProgressReporter& progress) noexcept
 		{
 			TextureAssetData result{};
@@ -111,15 +112,14 @@ namespace gglab
 			const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
 			result.m_ResourceFormat = ToTextureResourceFormat(metadata.format);
 			result.m_ViewFormat = ToTextureViewFormat(metadata.format, colorSpace);
-			result.m_SrvDimension = metadata.IsCubemap() ?
-				(metadata.arraySize == CubemapFaceCount ?
-					RHITextureViewDimension::TextureCube :
-					RHITextureViewDimension::TextureCubeArray) :
-				(metadata.arraySize > 1 ?
-					RHITextureViewDimension::Texture2DArray :
-					RHITextureViewDimension::Texture2D);
-			result.m_Extent =
-			{
+			result.m_SrvDimension =
+				metadata.IsCubemap()
+				? (metadata.arraySize == CubemapFaceCount
+					? RHITextureViewDimension::TextureCube
+					: RHITextureViewDimension::TextureCubeArray)
+				: (metadata.arraySize > 1 ? RHITextureViewDimension::Texture2DArray
+					: RHITextureViewDimension::Texture2D);
+			result.m_Extent = {
 				.m_Width = static_cast<uint32_t>(metadata.width),
 				.m_Height = static_cast<uint32_t>(metadata.height),
 				.m_Depth = static_cast<uint32_t>(std::max<size_t>(metadata.depth, 1)),
@@ -129,19 +129,13 @@ namespace gglab
 			result.m_ColorSpace = colorSpace;
 
 			if (result.m_ResourceFormat == RHIFormat::Unknown ||
-				result.m_ViewFormat == RHIFormat::Unknown ||
-				result.m_Extent.m_Width == 0 ||
-				result.m_Extent.m_Height == 0 ||
-				result.m_ArraySize == 0 ||
-				result.m_MipLevels == 0)
+				result.m_ViewFormat == RHIFormat::Unknown || result.m_Extent.m_Width == 0 ||
+				result.m_Extent.m_Height == 0 || result.m_ArraySize == 0 || result.m_MipLevels == 0)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
 					"TextureLoader: unsupported texture metadata format={} size={}x{} array={} mips={}.",
-					static_cast<uint32_t>(metadata.format),
-					metadata.width,
-					metadata.height,
-					metadata.arraySize,
-					metadata.mipLevels);
+					static_cast<uint32_t>(metadata.format), metadata.width, metadata.height,
+					metadata.arraySize, metadata.mipLevels);
 				return {};
 			}
 
@@ -159,7 +153,8 @@ namespace gglab
 				const DirectX::Image& image = images[imageIndex];
 				if (image.pixels == nullptr || image.slicePitch == 0)
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("TextureLoader: decoded texture contains an empty subresource.");
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"TextureLoader: decoded texture contains an empty subresource.");
 					return {};
 				}
 
@@ -170,32 +165,28 @@ namespace gglab
 
 				const uint32_t mipLevel = static_cast<uint32_t>(imageIndex % result.m_MipLevels);
 				const uint32_t arraySlice = static_cast<uint32_t>(imageIndex / result.m_MipLevels);
-				result.m_Subresources.push_back(
-					{
-						.m_DataOffset = dataOffset,
-						.m_DataSize = dataSize,
-						.m_RowPitch = static_cast<uint64_t>(image.rowPitch),
-						.m_SlicePitch = static_cast<uint64_t>(image.slicePitch),
-						.m_Width = static_cast<uint32_t>(image.width),
-						.m_Height = static_cast<uint32_t>(image.height),
-						.m_Depth = 1,
-						.m_MipLevel = mipLevel,
-						.m_ArraySlice = arraySlice,
+				result.m_Subresources.push_back({
+					.m_DataOffset = dataOffset,
+					.m_DataSize = dataSize,
+					.m_RowPitch = static_cast<uint64_t>(image.rowPitch),
+					.m_SlicePitch = static_cast<uint64_t>(image.slicePitch),
+					.m_Width = static_cast<uint32_t>(image.width),
+					.m_Height = static_cast<uint32_t>(image.height),
+					.m_Depth = 1,
+					.m_MipLevel = mipLevel,
+					.m_ArraySlice = arraySlice,
 					});
-				progress.Report(
-					0.82f + 0.16f * static_cast<float>(imageIndex + 1) /
-						static_cast<float>(imageCount),
+				progress.Report(0.82f + 0.16f * static_cast<float>(imageIndex + 1) /
+					static_cast<float>(imageCount),
 					"Packing texture subresources",
 					std::format("{} of {}", imageIndex + 1, imageCount),
-					static_cast<uint32_t>(imageIndex + 1),
-					static_cast<uint32_t>(imageCount));
+					static_cast<uint32_t>(imageIndex + 1), static_cast<uint32_t>(imageCount));
 			}
 
 			return result;
 		}
 
-		[[nodiscard]] DirectX::TEX_FILTER_FLAGS GetMipFilterFlags(
-			TextureSemantic semantic) noexcept
+		[[nodiscard]] DirectX::TEX_FILTER_FLAGS GetMipFilterFlags(TextureSemantic semantic) noexcept
 		{
 			DirectX::TEX_FILTER_FLAGS flags = DirectX::TEX_FILTER_FANT;
 			if (GetTextureColorSpaceFromSemantic(semantic) == TextureColorSpace::SRGB)
@@ -206,17 +197,12 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool RenormalizeNormalMipChain(
-			DirectX::ScratchImage& mipChain,
-			const std::filesystem::path& texPath) noexcept
+			DirectX::ScratchImage& mipChain, const std::filesystem::path& texPath) noexcept
 		{
 			DirectX::ScratchImage normalized;
 			const HRESULT hr = DirectX::TransformImage(
-				mipChain.GetImages(),
-				mipChain.GetImageCount(),
-				mipChain.GetMetadata(),
-				[](DirectX::XMVECTOR* outPixels,
-					const DirectX::XMVECTOR* inPixels,
-					size_t width,
+				mipChain.GetImages(), mipChain.GetImageCount(), mipChain.GetMetadata(),
+				[](DirectX::XMVECTOR* outPixels, const DirectX::XMVECTOR* inPixels, size_t width,
 					size_t) noexcept
 				{
 					const DirectX::XMVECTOR scale = DirectX::XMVectorReplicate(2.0f);
@@ -224,16 +210,17 @@ namespace gglab
 					const DirectX::XMVECTOR encodeScale = DirectX::XMVectorReplicate(0.5f);
 					for (size_t x = 0; x < width; ++x)
 					{
-						DirectX::XMVECTOR normal = DirectX::XMVectorMultiplyAdd(inPixels[x], scale, bias);
-						const float lengthSquared = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(normal));
-						normal = lengthSquared > 1.0e-8f ?
-							DirectX::XMVector3Normalize(normal) :
-							DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-						DirectX::XMVECTOR encoded = DirectX::XMVectorMultiplyAdd(
-							normal,
-							encodeScale,
-							encodeScale);
-						outPixels[x] = DirectX::XMVectorSetW(encoded, DirectX::XMVectorGetW(inPixels[x]));
+						DirectX::XMVECTOR normal =
+							DirectX::XMVectorMultiplyAdd(inPixels[x], scale, bias);
+						const float lengthSquared =
+							DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(normal));
+						normal = lengthSquared > 1.0e-8f
+							? DirectX::XMVector3Normalize(normal)
+							: DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+						DirectX::XMVECTOR encoded =
+							DirectX::XMVectorMultiplyAdd(normal, encodeScale, encodeScale);
+						outPixels[x] =
+							DirectX::XMVectorSetW(encoded, DirectX::XMVectorGetW(inPixels[x]));
 					}
 				},
 				normalized);
@@ -241,8 +228,7 @@ namespace gglab
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
 					"TextureLoader failed to renormalize normal-map mip chain '{}': {}",
-					texPath.string(),
-					FormatHResult(hr));
+					texPath.string(), FormatHResult(hr));
 				return false;
 			}
 
@@ -250,20 +236,15 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool GenerateMipChainIfNeeded(
-			DirectX::ScratchImage& scratchImage,
-			const std::filesystem::path& texPath,
-			const TextureImportSettings& settings,
+		[[nodiscard]] bool GenerateMipChainIfNeeded(DirectX::ScratchImage& scratchImage,
+			const std::filesystem::path& texPath, const TextureImportSettings& settings,
 			const ProgressReporter& progress) noexcept
 		{
 			const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
 			if (settings.m_MipPolicy != TextureMipPolicy::GenerateIfMissing ||
-				metadata.mipLevels > 1 ||
-				(metadata.width == 1 && metadata.height == 1))
+				metadata.mipLevels > 1 || (metadata.width == 1 && metadata.height == 1))
 			{
-				progress.Report(
-					0.78f,
-					"Using source mip chain",
+				progress.Report(0.78f, "Using source mip chain",
 					std::format("{} mip levels", metadata.mipLevels));
 				return true;
 			}
@@ -275,35 +256,23 @@ namespace gglab
 				largestDimension >>= 1;
 				++targetMipLevels;
 			}
-			progress.Report(
-				0.62f,
-				"Generating mipmaps",
-				std::format("{} target mip levels", targetMipLevels),
-				0,
-				targetMipLevels);
+			progress.Report(0.62f, "Generating mipmaps",
+				std::format("{} target mip levels", targetMipLevels), 0, targetMipLevels);
 
 			DirectX::ScratchImage mipChain;
-			const HRESULT hr = DirectX::GenerateMipMaps(
-				scratchImage.GetImages(),
-				scratchImage.GetImageCount(),
-				metadata,
-				GetMipFilterFlags(settings.m_Semantic),
-				0,
-				mipChain);
+			const HRESULT hr =
+				DirectX::GenerateMipMaps(scratchImage.GetImages(), scratchImage.GetImageCount(),
+					metadata, GetMipFilterFlags(settings.m_Semantic), 0, mipChain);
 			if (FAILED(hr))
 			{
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"TextureLoader failed to generate mip chain '{}': {}",
-					texPath.string(),
-					FormatHResult(hr));
+				GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to generate mip chain '{}': {}",
+					texPath.string(), FormatHResult(hr));
 				return false;
 			}
 
 			if (settings.m_Semantic == TextureSemantic::Normal)
 			{
-				progress.Report(
-					0.72f,
-					"Renormalizing normal-map mipmaps",
+				progress.Report(0.72f, "Renormalizing normal-map mipmaps",
 					std::format("{} mip levels", mipChain.GetMetadata().mipLevels));
 				if (!RenormalizeNormalMipChain(mipChain, texPath))
 				{
@@ -312,9 +281,7 @@ namespace gglab
 			}
 
 			scratchImage = std::move(mipChain);
-			progress.Report(
-				0.78f,
-				"Mip chain ready",
+			progress.Report(0.78f, "Mip chain ready",
 				std::format("{} mip levels", scratchImage.GetMetadata().mipLevels),
 				static_cast<uint32_t>(scratchImage.GetMetadata().mipLevels),
 				static_cast<uint32_t>(scratchImage.GetMetadata().mipLevels));
@@ -322,23 +289,20 @@ namespace gglab
 		}
 	}
 
-	static TextureAssetData LoadTextureDataInternal(
-		const std::filesystem::path& texPath,
-		std::span<const std::byte> sourceBytes,
-		bool decodeFromMemory,
-		const TextureImportSettings& settings,
-		const ProgressReporter& progress) noexcept
+	static TextureAssetData LoadTextureDataInternal(const std::filesystem::path& texPath,
+		std::span<const std::byte> sourceBytes, bool decodeFromMemory,
+		const TextureImportSettings& settings, const ProgressReporter& progress) noexcept
 	{
 		const std::string filename = texPath.filename().generic_string();
 		progress.Report(0.02f, "Validating texture source", filename);
 		const TextureColorSpace colorSpace = GetTextureColorSpaceFromSemantic(settings.m_Semantic);
 		std::error_code errorCode;
 		if (!decodeFromMemory && (!std::filesystem::exists(texPath, errorCode) ||
-			!std::filesystem::is_regular_file(texPath, errorCode))
-			|| (decodeFromMemory && sourceBytes.empty()))
+			!std::filesystem::is_regular_file(texPath, errorCode)) ||
+			(decodeFromMemory && sourceBytes.empty()))
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader received an invalid texture file path: '{}'.",
-				texPath.string());
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureLoader received an invalid texture file path: '{}'.", texPath.string());
 			return {};
 		}
 
@@ -352,20 +316,18 @@ namespace gglab
 
 		if (isDds)
 		{
-			hr = decodeFromMemory ?
-				DirectX::LoadFromDDSMemory(
-					sourceBytes.data(), sourceBytes.size(),
-					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage) :
-				DirectX::LoadFromDDSFile(
-					texPath.c_str(), DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB,
-					&metadata, scratchImage);
+			hr = decodeFromMemory
+				? DirectX::LoadFromDDSMemory(sourceBytes.data(), sourceBytes.size(),
+					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage)
+				: DirectX::LoadFromDDSFile(texPath.c_str(),
+					DirectX::DDS_FLAGS::DDS_FLAGS_FORCE_RGB, &metadata, scratchImage);
 		}
 		else if (isHdr)
 		{
-			hr = decodeFromMemory ?
-				DirectX::LoadFromHDRMemory(
-					sourceBytes.data(), sourceBytes.size(), &metadata, scratchImage) :
-				DirectX::LoadFromHDRFile(texPath.c_str(), &metadata, scratchImage);
+			hr = decodeFromMemory
+				? DirectX::LoadFromHDRMemory(
+					sourceBytes.data(), sourceBytes.size(), &metadata, scratchImage)
+				: DirectX::LoadFromHDRFile(texPath.c_str(), &metadata, scratchImage);
 		}
 		else
 		{
@@ -379,23 +341,20 @@ namespace gglab
 				wicFlags |= DirectX::WIC_FLAGS::WIC_FLAGS_IGNORE_SRGB;
 			}
 
-			hr = decodeFromMemory ?
-				DirectX::LoadFromWICMemory(
-					sourceBytes.data(), sourceBytes.size(), wicFlags, &metadata, scratchImage) :
-				DirectX::LoadFromWICFile(texPath.c_str(), wicFlags, &metadata, scratchImage);
+			hr = decodeFromMemory
+				? DirectX::LoadFromWICMemory(sourceBytes.data(), sourceBytes.size(), wicFlags,
+					&metadata, scratchImage)
+				: DirectX::LoadFromWICFile(texPath.c_str(), wicFlags, &metadata, scratchImage);
 		}
 
 		if (FAILED(hr))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to decode texture '{}': {}",
-				texPath.string(),
-				FormatHResult(hr));
+				texPath.string(), FormatHResult(hr));
 			return {};
 		}
 		progress.Report(
-			0.35f,
-			"Texture decoded",
-			std::format("{}x{}", metadata.width, metadata.height));
+			0.35f, "Texture decoded", std::format("{}x{}", metadata.width, metadata.height));
 
 		if (isHdr)
 		{
@@ -404,18 +363,13 @@ namespace gglab
 			DirectX::ScratchImage* hdrImage = &scratchImage;
 			if (metadata.format != DXGI_FORMAT_R32G32B32A32_FLOAT)
 			{
-				hr = DirectX::Convert(
-					scratchImage.GetImages(),
-					scratchImage.GetImageCount(),
-					metadata,
-					DXGI_FORMAT_R32G32B32A32_FLOAT,
-					DirectX::TEX_FILTER_DEFAULT,
-					DirectX::TEX_THRESHOLD_DEFAULT,
-					floatImage);
+				hr = DirectX::Convert(scratchImage.GetImages(), scratchImage.GetImageCount(),
+					metadata, DXGI_FORMAT_R32G32B32A32_FLOAT, DirectX::TEX_FILTER_DEFAULT,
+					DirectX::TEX_THRESHOLD_DEFAULT, floatImage);
 				if (FAILED(hr))
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to normalize HDR texture '{}': {}",
-						texPath.string(),
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"TextureLoader failed to normalize HDR texture '{}': {}", texPath.string(),
 						FormatHResult(hr));
 					return {};
 				}
@@ -424,35 +378,25 @@ namespace gglab
 
 			progress.Report(0.48f, "Sanitizing HDR radiance", filename);
 			const HdrSanitizationStats stats = SanitizeHdrForHalfFloat(*hdrImage);
-			if (stats.m_NonFiniteChannelCount > 0 ||
-				stats.m_NegativeChannelCount > 0 ||
+			if (stats.m_NonFiniteChannelCount > 0 || stats.m_NegativeChannelCount > 0 ||
 				stats.m_ClampedChannelCount > 0)
 			{
 				GGLAB_LOG_GRAPHICS_WARN(
 					"TextureLoader sanitized HDR '{}' for FP16 storage: maxFiniteChannel={}, nonFiniteChannels={}, negativeChannels={}, clampedChannels={}, clamp={}.",
-					texPath.string(),
-					stats.m_MaxFiniteChannel,
-					stats.m_NonFiniteChannelCount,
-					stats.m_NegativeChannelCount,
-					stats.m_ClampedChannelCount,
+					texPath.string(), stats.m_MaxFiniteChannel, stats.m_NonFiniteChannelCount,
+					stats.m_NegativeChannelCount, stats.m_ClampedChannelCount,
 					MaxHalfFloatRadiance);
 			}
 
 			DirectX::ScratchImage convertedImage;
 			progress.Report(0.55f, "Converting HDR texture to FP16", filename);
-			hr = DirectX::Convert(
-				hdrImage->GetImages(),
-				hdrImage->GetImageCount(),
-				hdrImage->GetMetadata(),
-				DXGI_FORMAT_R16G16B16A16_FLOAT,
-				DirectX::TEX_FILTER_DEFAULT,
-				DirectX::TEX_THRESHOLD_DEFAULT,
-				convertedImage);
+			hr = DirectX::Convert(hdrImage->GetImages(), hdrImage->GetImageCount(),
+				hdrImage->GetMetadata(), DXGI_FORMAT_R16G16B16A16_FLOAT,
+				DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, convertedImage);
 			if (FAILED(hr))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR("TextureLoader failed to convert HDR texture '{}': {}",
-					texPath.string(),
-					FormatHResult(hr));
+					texPath.string(), FormatHResult(hr));
 				return {};
 			}
 
@@ -460,10 +404,8 @@ namespace gglab
 			{
 				return {};
 			}
-			TextureAssetData result = ConvertScratchImage(
-				convertedImage,
-				TextureColorSpace::Linear,
-				progress);
+			TextureAssetData result =
+				ConvertScratchImage(convertedImage, TextureColorSpace::Linear, progress);
 			progress.Report(1.0f, "Texture CPU preparation complete", filename);
 			return result;
 		}
@@ -477,63 +419,47 @@ namespace gglab
 		return result;
 	}
 
-	TextureAssetData TextureLoader::LoadTextureData(
-		const std::filesystem::path& texPath,
-		const TextureImportSettings& settings,
-		const ProgressReporter& progress) noexcept
+	TextureAssetData TextureLoader::LoadTextureData(const std::filesystem::path& texPath,
+		const TextureImportSettings& settings, const ProgressReporter& progress) noexcept
 	{
 		return LoadTextureDataInternal(texPath, {}, false, settings, progress);
 	}
 
-	TextureAssetData TextureLoader::LoadTextureData(
-		const std::filesystem::path& sourceIdentity,
-		std::span<const std::byte> sourceBytes,
-		const TextureImportSettings& settings,
+	TextureAssetData TextureLoader::LoadTextureData(const std::filesystem::path& sourceIdentity,
+		std::span<const std::byte> sourceBytes, const TextureImportSettings& settings,
 		const ProgressReporter& progress) noexcept
 	{
-		return LoadTextureDataInternal(
-			sourceIdentity,
-			sourceBytes,
-			true,
-			settings,
-			progress);
+		return LoadTextureDataInternal(sourceIdentity, sourceBytes, true, settings, progress);
 	}
 
-	TextureAssetData TextureLoader::LoadTextureData(
-		const std::filesystem::path& texPath,
-		TextureColorSpace colorSpace,
-		const ProgressReporter& progress) noexcept
+	TextureAssetData TextureLoader::LoadTextureData(const std::filesystem::path& texPath,
+		TextureColorSpace colorSpace, const ProgressReporter& progress) noexcept
 	{
-		return LoadTextureData(
-			texPath,
-			TextureImportSettings
-			{
-				.m_Semantic = colorSpace == TextureColorSpace::SRGB ?
-					TextureSemantic::GenericColor : TextureSemantic::GenericData,
+		return LoadTextureData(texPath,
+			TextureImportSettings{
+				.m_Semantic = colorSpace == TextureColorSpace::SRGB ? TextureSemantic::GenericColor
+																	: TextureSemantic::GenericData,
 				.m_MipPolicy = TextureMipPolicy::Preserve,
 			},
 			progress);
 	}
 
-	TextureAssetData TextureLoader::MakeTexture2DRgba8(
-		uint32_t width,
-		uint32_t height,
-		std::span<const uint8_t> pixels,
-		TextureColorSpace colorSpace) noexcept
+	TextureAssetData TextureLoader::MakeTexture2DRgba8(uint32_t width, uint32_t height,
+		std::span<const uint8_t> pixels, TextureColorSpace colorSpace) noexcept
 	{
 		TextureAssetData result{};
-		if (width == 0 || height == 0 || pixels.size_bytes() != static_cast<size_t>(width) * height * 4)
+		if (width == 0 || height == 0 ||
+			pixels.size_bytes() != static_cast<size_t>(width) * height * 4)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader::MakeTexture2DRgba8 received invalid texture data.");
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureLoader::MakeTexture2DRgba8 received invalid texture data.");
 			return result;
 		}
 
 		result.m_ResourceFormat = RHIFormat::R8G8B8A8Typeless;
-		result.m_ViewFormat = colorSpace == TextureColorSpace::SRGB ?
-			RHIFormat::R8G8B8A8UnormSrgb :
-			RHIFormat::R8G8B8A8Unorm;
-		result.m_Extent =
-		{
+		result.m_ViewFormat = colorSpace == TextureColorSpace::SRGB ? RHIFormat::R8G8B8A8UnormSrgb
+			: RHIFormat::R8G8B8A8Unorm;
+		result.m_Extent = {
 			.m_Width = width,
 			.m_Height = height,
 			.m_Depth = 1,
@@ -547,25 +473,23 @@ namespace gglab
 
 		const uint64_t rowPitch = static_cast<uint64_t>(width) * 4;
 		const uint64_t slicePitch = rowPitch * height;
-		result.m_Subresources.push_back(
-			{
-				.m_DataOffset = 0,
-				.m_DataSize = slicePitch,
-				.m_RowPitch = rowPitch,
-				.m_SlicePitch = slicePitch,
-				.m_Width = width,
-				.m_Height = height,
-				.m_Depth = 1,
-				.m_MipLevel = 0,
-				.m_ArraySlice = 0,
+		result.m_Subresources.push_back({
+			.m_DataOffset = 0,
+			.m_DataSize = slicePitch,
+			.m_RowPitch = rowPitch,
+			.m_SlicePitch = slicePitch,
+			.m_Width = width,
+			.m_Height = height,
+			.m_Depth = 1,
+			.m_MipLevel = 0,
+			.m_ArraySlice = 0,
 			});
 
 		return result;
 	}
 
 	TextureAssetData TextureLoader::MakeTextureCubeRgba16Float(
-		uint32_t faceSize,
-		std::span<const float> rgbaPixels) noexcept
+		uint32_t faceSize, std::span<const float> rgbaPixels) noexcept
 	{
 		TextureAssetData result{};
 		constexpr size_t channelCount = 4;
@@ -583,8 +507,7 @@ namespace gglab
 		for (size_t channelIndex = 0; channelIndex < expectedChannelCount; ++channelIndex)
 		{
 			const float value = std::clamp(
-				std::isfinite(rgbaPixels[channelIndex]) ? rgbaPixels[channelIndex] : 0.0f,
-				0.0f,
+				std::isfinite(rgbaPixels[channelIndex]) ? rgbaPixels[channelIndex] : 0.0f, 0.0f,
 				MaxHalfFloatRadiance);
 			halfPixels[channelIndex] = DirectX::PackedVector::XMConvertFloatToHalf(value);
 		}
@@ -592,8 +515,7 @@ namespace gglab
 		result.m_ResourceFormat = RHIFormat::R16G16B16A16Float;
 		result.m_ViewFormat = RHIFormat::R16G16B16A16Float;
 		result.m_SrvDimension = RHITextureViewDimension::TextureCube;
-		result.m_Extent =
-		{
+		result.m_Extent = {
 			.m_Width = faceSize,
 			.m_Height = faceSize,
 			.m_Depth = 1,
@@ -608,36 +530,36 @@ namespace gglab
 		const uint64_t slicePitch = rowPitch * faceSize;
 		for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 		{
-			result.m_Subresources.push_back(
-				{
-					.m_DataOffset = slicePitch * face,
-					.m_DataSize = slicePitch,
-					.m_RowPitch = rowPitch,
-					.m_SlicePitch = slicePitch,
-					.m_Width = faceSize,
-					.m_Height = faceSize,
-					.m_Depth = 1,
-					.m_MipLevel = 0,
-					.m_ArraySlice = face,
+			result.m_Subresources.push_back({
+				.m_DataOffset = slicePitch * face,
+				.m_DataSize = slicePitch,
+				.m_RowPitch = rowPitch,
+				.m_SlicePitch = slicePitch,
+				.m_Width = faceSize,
+				.m_Height = faceSize,
+				.m_Depth = 1,
+				.m_MipLevel = 0,
+				.m_ArraySlice = face,
 				});
 		}
 		return result;
 	}
 
 	bool TextureLoader::SaveTextureDataToDDS(
-		const TextureAssetData& textureData,
-		const std::filesystem::path& path) noexcept
+		const TextureAssetData& textureData, const std::filesystem::path& path) noexcept
 	{
 		if (!textureData.IsValid() || !utils::CreateParentDirectoryIfNotExist(path))
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader cannot save invalid texture data to '{}'.", path.string());
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureLoader cannot save invalid texture data to '{}'.", path.string());
 			return false;
 		}
 
 		const DXGI_FORMAT format = ToDXGIFormat(textureData.m_ViewFormat);
 		if (format == DXGI_FORMAT_UNKNOWN)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("TextureLoader cannot save unsupported DDS format to '{}'.", path.string());
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"TextureLoader cannot save unsupported DDS format to '{}'.", path.string());
 			return false;
 		}
 
@@ -649,15 +571,14 @@ namespace gglab
 			{
 				return false;
 			}
-			images.push_back(
-				{
-					.width = subresource.m_Width,
-					.height = subresource.m_Height,
-					.format = format,
-					.rowPitch = static_cast<size_t>(subresource.m_RowPitch),
-					.slicePitch = static_cast<size_t>(subresource.m_SlicePitch),
-					.pixels = reinterpret_cast<uint8_t*>(const_cast<std::byte*>(
-						textureData.m_Pixels.data() + subresource.m_DataOffset)),
+			images.push_back({
+				.width = subresource.m_Width,
+				.height = subresource.m_Height,
+				.format = format,
+				.rowPitch = static_cast<size_t>(subresource.m_RowPitch),
+				.slicePitch = static_cast<size_t>(subresource.m_SlicePitch),
+				.pixels = reinterpret_cast<uint8_t*>(
+					const_cast<std::byte*>(textureData.m_Pixels.data() + subresource.m_DataOffset)),
 				});
 		}
 
@@ -680,18 +601,12 @@ namespace gglab
 			metadata.miscFlags = DirectX::TEX_MISC_TEXTURECUBE;
 		}
 
-		const HRESULT result = DirectX::SaveToDDSFile(
-			images.data(),
-			images.size(),
-			metadata,
-			DirectX::DDS_FLAGS_FORCE_DX10_EXT,
-			path.c_str());
+		const HRESULT result = DirectX::SaveToDDSFile(images.data(), images.size(), metadata,
+			DirectX::DDS_FLAGS_FORCE_DX10_EXT, path.c_str());
 		if (FAILED(result))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"TextureLoader failed to save DDS '{}': {}",
-				path.string(),
-				FormatHResult(result));
+				"TextureLoader failed to save DDS '{}': {}", path.string(), FormatHResult(result));
 			return false;
 		}
 		return true;

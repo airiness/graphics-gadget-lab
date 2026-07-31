@@ -6,7 +6,8 @@ namespace gglab
 	class DX12RootSignature
 	{
 	public:
-		explicit DX12RootSignature(DX12Device* dx12Device, const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept;
+		explicit DX12RootSignature(
+			DX12Device* dx12Device, const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC& desc) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12RootSignature);
 		~DX12RootSignature() = default;
 

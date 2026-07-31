@@ -15,7 +15,8 @@ namespace gglab
 	public:
 		explicit LabPanel(LabRuntimeLocatorBase* runtimeLocator) noexcept :
 			m_RuntimeLocator(runtimeLocator)
-		{}
+		{
+		}
 
 		std::string_view GetPath() const noexcept override { return "Application/Lab"; }
 		std::string_view GetTitle() const noexcept override { return "Lab Control"; }

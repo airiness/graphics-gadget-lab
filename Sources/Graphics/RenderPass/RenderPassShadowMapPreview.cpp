@@ -39,9 +39,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassShadowMapPreview::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassShadowMapPreview::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
@@ -51,24 +50,23 @@ namespace gglab
 
 		EnsureInitialized(services);
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
 			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
 			{
-				auto& shadowRes = builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+				auto& shadowRes =
+					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 
-				data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
+				data.m_ShadowMap =
+					builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
 				builder.WriteInPlace(
-					shadowRes.m_DirectionalShadowMapPreview,
-					RGTextureAccess::RenderTarget);
+					shadowRes.m_DirectionalShadowMapPreview, RGTextureAccess::RenderTarget);
 				data.m_ShadowMapPreview = shadowRes.m_DirectionalShadowMapPreview;
 
-				const auto shadowMapSrvDesc = MakeRHITexture2DViewDesc(
-					RHIFormat::R32Float,
-					0,
-					1,
-					RHITextureAspect::Depth);
-				data.m_ShadowMapSrv =
-					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_ShadowMap, shadowMapSrvDesc);
+				const auto shadowMapSrvDesc =
+					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
+				data.m_ShadowMapSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+					data.m_ShadowMap, shadowMapSrvDesc);
 				data.m_PreviewRtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_ShadowMapPreview);
 
@@ -77,7 +75,8 @@ namespace gglab
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
-				data.m_SamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::PointClamp);
+				data.m_SamplerIndex =
+					renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::PointClamp);
 
 				const auto& settings = contextPtr->GetShadowVisualizationSettings();
 				data.m_MinDepth = std::clamp(settings.m_PreviewMinDepth, 0.0f, 1.0f);
@@ -98,9 +97,12 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(renderer);
 
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&previewRtv, 1));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetRenderTargets(
+					std::span<const RHITextureViewHandle>(&previewRtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
@@ -116,8 +118,7 @@ namespace gglab
 					.PreviewInvert = data.m_Invert,
 				};
 				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					passParameters);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
 				commandContext->DrawFullscreenTriangle();
 			});
@@ -162,7 +163,6 @@ namespace gglab
 
 			m_IsInitialized = true;
 		}
-
 	}
 
 	RHIPipelineHandle RenderPassShadowMapPreview::GetOrCreatePSO(const Renderer& renderer) noexcept

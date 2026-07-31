@@ -14,14 +14,14 @@ namespace gglab
 		};
 	}
 
-	void RenderPassClearViewTargets::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassClearViewTargets::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
 			[displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -32,7 +32,8 @@ namespace gglab
 
 				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
 				data.m_SceneColor = targets.m_SceneColor;
-				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
+				data.m_Rtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
 			},
 			[](RGExecuteContext& executeContext, PassData& data)
 			{

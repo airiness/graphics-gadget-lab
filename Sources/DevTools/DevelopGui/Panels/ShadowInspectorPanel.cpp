@@ -35,11 +35,11 @@ namespace gglab
 			Vector3 m_Direction = -Vector3::UnitY;
 		};
 
-		static Vector3 DirectionFromTransform(const components::TransformComponent& transform) noexcept
+		static Vector3 DirectionFromTransform(
+			const components::TransformComponent& transform) noexcept
 		{
 			Vector3 direction = math::TransformDirection(
-				Vector3::Forward,
-				math::CreateFromQuaternion(transform.m_Rotation));
+				Vector3::Forward, math::CreateFromQuaternion(transform.m_Rotation));
 			if (direction.LengthSquared() <= 1.0e-8f)
 			{
 				return -Vector3::UnitY;
@@ -57,7 +57,8 @@ namespace gglab
 			}
 
 			auto& registry = world->GetRegistry();
-			auto lightView = registry.view<components::TransformComponent, components::LightComponent>();
+			auto lightView =
+				registry.view<components::TransformComponent, components::LightComponent>();
 			for (auto [entity, transform, light] : lightView.each())
 			{
 				GGLAB_UNUSED(entity);
@@ -79,7 +80,8 @@ namespace gglab
 			return binding;
 		}
 
-		static const RenderView* FindRenderView(std::span<RenderView> views, RenderViewID viewId) noexcept
+		static const RenderView* FindRenderView(
+			std::span<RenderView> views, RenderViewID viewId) noexcept
 		{
 			const auto index = utils::ToIndex(viewId);
 			if (index >= views.size())
@@ -96,7 +98,8 @@ namespace gglab
 			DirectionalLightBinding lightBinding = FindDirectionalLight(context.m_World);
 			if (!lightBinding.m_Transform || !lightBinding.m_Light)
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "Directional light is not found.");
+				ImGui::TextColored(
+					devtools::style::ErrorTextColor, "Directional light is not found.");
 				return;
 			}
 
@@ -129,7 +132,8 @@ namespace gglab
 				lightBinding.m_Light->m_Color.m_B = color[2];
 			}
 
-			ImGui::DragFloat("Intensity", &lightBinding.m_Light->m_Intensity, 0.01f, 0.0f, 100.0f, "%.3f");
+			ImGui::DragFloat(
+				"Intensity", &lightBinding.m_Light->m_Intensity, 0.01f, 0.0f, 100.0f, "%.3f");
 		}
 
 		static void DrawDirectionalShadowSettings(DirectionalShadowSettings& settings) noexcept
@@ -146,22 +150,31 @@ namespace gglab
 			}
 
 			ImGui::SeparatorText("Projection");
-			ImGui::DragFloat("Max Shadow Distance", &settings.m_MaxShadowDistance, 1.0f, 1.0f, 10000.0f, "%.1f");
-			ImGui::DragFloat("Caster Extrusion Distance", &settings.m_CasterExtrusionDistance, 1.0f, 0.0f, 10000.0f, "%.1f");
-			ImGui::DragFloat("Ortho Padding", &settings.m_OrthoPadding, 0.1f, 0.0f, 1000.0f, "%.2f");
-			ImGui::DragFloat("Depth Padding", &settings.m_DepthPadding, 0.5f, 0.0f, 10000.0f, "%.1f");
+			ImGui::DragFloat(
+				"Max Shadow Distance", &settings.m_MaxShadowDistance, 1.0f, 1.0f, 10000.0f, "%.1f");
+			ImGui::DragFloat("Caster Extrusion Distance", &settings.m_CasterExtrusionDistance, 1.0f,
+				0.0f, 10000.0f, "%.1f");
+			ImGui::DragFloat(
+				"Ortho Padding", &settings.m_OrthoPadding, 0.1f, 0.0f, 1000.0f, "%.2f");
+			ImGui::DragFloat(
+				"Depth Padding", &settings.m_DepthPadding, 0.5f, 0.0f, 10000.0f, "%.1f");
 
 			ImGui::SeparatorText("Bias / Filtering");
-			ImGui::DragFloat("Receiver Depth Bias", &settings.m_ReceiverDepthBias, 0.0001f, 0.0f, 0.1f, "%.5f");
-			ImGui::DragInt("Rasterizer Depth Bias", &settings.m_RasterizerDepthBias, 1.0f, -100000, 100000);
-			ImGui::DragFloat("Slope Scaled Depth Bias", &settings.m_RasterizerSlopeScaledDepthBias, 0.01f, -100.0f, 100.0f, "%.3f");
+			ImGui::DragFloat(
+				"Receiver Depth Bias", &settings.m_ReceiverDepthBias, 0.0001f, 0.0f, 0.1f, "%.5f");
+			ImGui::DragInt(
+				"Rasterizer Depth Bias", &settings.m_RasterizerDepthBias, 1.0f, -100000, 100000);
+			ImGui::DragFloat("Slope Scaled Depth Bias", &settings.m_RasterizerSlopeScaledDepthBias,
+				0.01f, -100.0f, 100.0f, "%.3f");
 		}
 
 		static void DrawVisualizationSettings(ShadowVisualizationSettings& settings) noexcept
 		{
 			ImGui::SeparatorText("Preview");
-			ImGui::DragFloat("Preview Min Depth", &settings.m_PreviewMinDepth, 0.001f, 0.0f, 1.0f, "%.4f");
-			ImGui::DragFloat("Preview Max Depth", &settings.m_PreviewMaxDepth, 0.001f, 0.0f, 1.0f, "%.4f");
+			ImGui::DragFloat(
+				"Preview Min Depth", &settings.m_PreviewMinDepth, 0.001f, 0.0f, 1.0f, "%.4f");
+			ImGui::DragFloat(
+				"Preview Max Depth", &settings.m_PreviewMaxDepth, 0.001f, 0.0f, 1.0f, "%.4f");
 			settings.m_PreviewMinDepth = std::clamp(settings.m_PreviewMinDepth, 0.0f, 1.0f);
 			settings.m_PreviewMaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
 			if (settings.m_PreviewMaxDepth <= settings.m_PreviewMinDepth)
@@ -178,7 +191,8 @@ namespace gglab
 			DirectionalLightBinding lightBinding = FindDirectionalLight(context.m_World);
 			if (!lightBinding.m_Light)
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "Directional light is not found.");
+				ImGui::TextColored(
+					devtools::style::ErrorTextColor, "Directional light is not found.");
 				return;
 			}
 
@@ -201,25 +215,27 @@ namespace gglab
 				return;
 			}
 
-			context.m_DirectionalShadowSettings = &*lightBinding.m_Light->m_DirectionalShadowSettings;
+			context.m_DirectionalShadowSettings =
+				&*lightBinding.m_Light->m_DirectionalShadowSettings;
 			DrawDirectionalShadowSettings(*context.m_DirectionalShadowSettings);
 		}
 
-		static void DrawShadowCamera(DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
+		static void DrawShadowCamera(
+			DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
 		{
 			ImGui::SeparatorText("Shadow Camera / Frustum");
 
-			const RenderView* shadowView = FindRenderView(context.m_RenderViews, RenderViewID::DirectionalShadow);
+			const RenderView* shadowView =
+				FindRenderView(context.m_RenderViews, RenderViewID::DirectionalShadow);
 			if (!shadowView)
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "Directional shadow render view is not available.");
+				ImGui::TextColored(devtools::style::ErrorTextColor,
+					"Directional shadow render view is not available.");
 				return;
 			}
 
-			ImGui::Text("Position: %.3f, %.3f, %.3f",
-				shadowView->m_CameraPosition.m_X,
-				shadowView->m_CameraPosition.m_Y,
-				shadowView->m_CameraPosition.m_Z);
+			ImGui::Text("Position: %.3f, %.3f, %.3f", shadowView->m_CameraPosition.m_X,
+				shadowView->m_CameraPosition.m_Y, shadowView->m_CameraPosition.m_Z);
 			ImGui::Text("Near/Far: %.3f / %.3f", shadowView->m_Near, shadowView->m_Far);
 			ImGui::Text("Viewport: %u x %u", shadowView->m_Width, shadowView->m_Height);
 			ImGui::Checkbox("Show Matrices", &state.m_ShowMatrices);
@@ -232,7 +248,8 @@ namespace gglab
 			}
 		}
 
-		static void DrawShadowMapResource(DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
+		static void DrawShadowMapResource(
+			DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
 		{
 			ImGui::SeparatorText("ShadowMap Resource");
 
@@ -242,59 +259,69 @@ namespace gglab
 				return;
 			}
 
-			auto* shadowRes = context.m_RenderGraph->GetBlackboard().TryGet<RGShadowResources>(ShadowResourcesName);
+			auto* shadowRes = context.m_RenderGraph->GetBlackboard().TryGet<RGShadowResources>(
+				ShadowResourcesName);
 			if (!shadowRes || !shadowRes->m_DirectionalShadowMap.IsValid())
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap resource is not available.");
+				ImGui::TextColored(
+					devtools::style::ErrorTextColor, "ShadowMap resource is not available.");
 				return;
 			}
 
 			ImGui::TextUnformatted("ShadowMap is a transient RenderGraph texture.");
 			ImGui::Text("RG Size: %u", shadowRes->m_ShadowMapSize);
-			ImGui::Text("Texture Size: %u x %u", shadowRes->m_ShadowMapSize, shadowRes->m_ShadowMapSize);
+			ImGui::Text(
+				"Texture Size: %u x %u", shadowRes->m_ShadowMapSize, shadowRes->m_ShadowMapSize);
 			ImGui::Text("Format: %s", devtools::EnumText(DXGI_FORMAT_R32_TYPELESS).data());
 			ImGui::Text("Preview SRV Format: %s", devtools::EnumText(DXGI_FORMAT_R32_FLOAT).data());
 
 			if (!shadowRes->m_DirectionalShadowMapPreview.IsValid())
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap preview resource is not available.");
+				ImGui::TextColored(devtools::style::ErrorTextColor,
+					"ShadowMap preview resource is not available.");
 				return;
 			}
 
-			auto* renderResourceRegistry = context.m_Renderer ? context.m_Renderer->GetRenderResourceRegistry() : nullptr;
+			auto* renderResourceRegistry =
+				context.m_Renderer ? context.m_Renderer->GetRenderResourceRegistry() : nullptr;
 			if (!renderResourceRegistry)
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "RenderResourceRegistry is null.");
+				ImGui::TextColored(
+					devtools::style::ErrorTextColor, "RenderResourceRegistry is null.");
 				return;
 			}
 
 			using TextureIndex = RenderResourceRegistry::TextureIndex;
-			constexpr TextureIndex ShadowMapPreviewIndex = TextureIndex::Preview_Shadow_DirectionalShadowMap;
+			constexpr TextureIndex ShadowMapPreviewIndex =
+				TextureIndex::Preview_Shadow_DirectionalShadowMap;
 
 			renderResourceRegistry->EnsureShadowPreviewResources(shadowRes->m_ShadowMapPreviewSize);
 			const auto* previewDesc = renderResourceRegistry->GetTextureDesc(ShadowMapPreviewIndex);
 			if (!previewDesc)
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap preview texture is not allocated.");
+				ImGui::TextColored(
+					devtools::style::ErrorTextColor, "ShadowMap preview texture is not allocated.");
 				return;
 			}
 
-			const uint32_t previewSrvIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
+			const uint32_t previewSrvIndex =
+				renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
 			const ImTextureID previewTextureId =
-				devtools::ResolveImGuiTextureId(
-					context.m_DevelopGuiSystem,
+				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
 					renderResourceRegistry->GetSrvDescriptor(ShadowMapPreviewIndex));
 
 			ImGui::Text("Preview RG Size: %u", shadowRes->m_ShadowMapPreviewSize);
 			ImGui::Text("Preview Texture Size: %llu x %u",
 				static_cast<unsigned long long>(previewDesc->m_Extent.m_Width),
 				previewDesc->m_Extent.m_Height);
-			ImGui::Text("Preview Format: %s", devtools::EnumText(ToDXGIFormat(previewDesc->m_Format)).data());
+			ImGui::Text("Preview Format: %s",
+				devtools::EnumText(ToDXGIFormat(previewDesc->m_Format)).data());
 			ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 
 			if (!previewTextureId)
 			{
-				ImGui::TextColored(devtools::style::ErrorTextColor, "ShadowMap preview SRV GPU handle is invalid.");
+				ImGui::TextColored(devtools::style::ErrorTextColor,
+					"ShadowMap preview SRV GPU handle is invalid.");
 				return;
 			}
 
@@ -329,7 +356,8 @@ namespace gglab
 		}
 		else
 		{
-			ImGui::TextColored(devtools::style::ErrorTextColor, "Shadow visualization settings are not available.");
+			ImGui::TextColored(devtools::style::ErrorTextColor,
+				"Shadow visualization settings are not available.");
 		}
 		DrawLightControl(context);
 		DrawShadowCamera(context, state);

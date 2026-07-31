@@ -20,12 +20,9 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Width > 0 &&
-				m_Height > 0 &&
-				m_TileCountX > 0 &&
-				m_TileCountY > 0 &&
-				m_TileCount ==
-					m_TileCountX * m_TileCountY;
+			return m_Width > 0 && m_Height > 0 &&
+				m_TileCountX > 0 && m_TileCountY > 0 &&
+				m_TileCount == m_TileCountX * m_TileCountY;
 		}
 	};
 
@@ -36,24 +33,19 @@ namespace gglab
 
 		[[nodiscard]] uint32_t GetCount() const noexcept
 		{
-			return m_CountAndFlags &
-				ForwardPlusTileCountMask;
+			return m_CountAndFlags & ForwardPlusTileCountMask;
 		}
 	};
 	static_assert(sizeof(ForwardPlusTileHeader) == 8);
 
 	[[nodiscard]] ForwardPlusTileGrid MakeForwardPlusTileGrid(
-		uint32_t width,
-		uint32_t height) noexcept;
+		uint32_t width, uint32_t height) noexcept;
 
-	[[nodiscard]] constexpr uint32_t GetForwardPlusTileOffset(
-		uint32_t tileIndex) noexcept
+	[[nodiscard]] constexpr uint32_t GetForwardPlusTileOffset(uint32_t tileIndex) noexcept
 	{
 		return tileIndex * ForwardPlusTileLightCapacity;
 	}
 
-	[[nodiscard]] std::vector<uint32_t>
-		BuildStableForwardPlusLightList(
-			std::span<const uint8_t> lightHits,
-			uint32_t simulatedWaveSize);
+	[[nodiscard]] std::vector<uint32_t> BuildStableForwardPlusLightList(
+		std::span<const uint8_t> lightHits, uint32_t simulatedWaveSize);
 }

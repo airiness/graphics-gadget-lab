@@ -42,9 +42,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassFinalColor::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassFinalColor::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
@@ -55,16 +54,17 @@ namespace gglab
 		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[contextPtr, servicesPtr, displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
+			[contextPtr, servicesPtr, displayViewId](
+				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
-				auto& postProcess = builder.GetBlackboard()
-					.Get<RGPostProcessResources>(PostProcessResourcesName);
-				GGLAB_ASSERT_MSG(
-					postProcess.m_Inputs.m_SceneColor.m_State ==
-						PostProcessColorState::SceneLinearRec709,
+				auto& postProcess =
+					builder.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
+				GGLAB_ASSERT_MSG(postProcess.m_Inputs.m_SceneColor.m_State ==
+					PostProcessColorState::SceneLinearRec709,
 					"FinalColor requires scene-linear Rec.709 input.");
 				GGLAB_ASSERT_MSG(postProcess.m_Inputs.m_SceneColor.m_PreExposure > 0.0f,
 					"FinalColor requires a positive scene pre-exposure.");
@@ -73,33 +73,27 @@ namespace gglab
 					"FinalColor currently supports only SDR sRGB output.");
 
 				const auto& viewSettings = contextPtr->GetViewRenderSettings(displayViewId);
-				GGLAB_ASSERT_MSG(
-					viewSettings.m_PostProcess.m_ToneMapping.m_Operator ==
-						ToneMappingOperator::AcesFitted,
+				GGLAB_ASSERT_MSG(viewSettings.m_PostProcess.m_ToneMapping.m_Operator ==
+					ToneMappingOperator::AcesFitted,
 					"FinalColor currently supports only ACES fitted tone mapping.");
 
 				data.m_SceneColor = builder.Read(
-					postProcess.m_Inputs.m_SceneColor.m_Texture,
-					RGTextureAccess::Sample);
-				builder.WriteInPlace(
-					postProcess.m_Output.m_Texture,
-					RGTextureAccess::RenderTarget);
+					postProcess.m_Inputs.m_SceneColor.m_Texture, RGTextureAccess::Sample);
+				builder.WriteInPlace(postProcess.m_Output.m_Texture, RGTextureAccess::RenderTarget);
 				data.m_Output = postProcess.m_Output.m_Texture;
 				data.m_SceneColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);
 				data.m_BloomEnabled = postProcess.m_Bloom.m_Result.m_Texture.IsValid();
 				if (data.m_BloomEnabled)
 				{
-					GGLAB_ASSERT_MSG(
-						postProcess.m_Bloom.m_Result.m_State == PostProcessColorState::SceneLinearRec709,
+					GGLAB_ASSERT_MSG(postProcess.m_Bloom.m_Result.m_State ==
+						PostProcessColorState::SceneLinearRec709,
 						"FinalColor requires a scene-linear Rec.709 bloom contribution.");
-					GGLAB_ASSERT_MSG(
-						postProcess.m_Bloom.m_Result.m_PreExposure ==
-							postProcess.m_Inputs.m_SceneColor.m_PreExposure,
+					GGLAB_ASSERT_MSG(postProcess.m_Bloom.m_Result.m_PreExposure ==
+						postProcess.m_Inputs.m_SceneColor.m_PreExposure,
 						"FinalColor requires scene color and bloom to use the same pre-exposure.");
 					data.m_Bloom = builder.Read(
-						postProcess.m_Bloom.m_Result.m_Texture,
-						RGTextureAccess::Sample);
+						postProcess.m_Bloom.m_Result.m_Texture, RGTextureAccess::Sample);
 					data.m_BloomSrv =
 						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_Bloom);
 				}
@@ -117,11 +111,13 @@ namespace gglab
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
-				data.m_SamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+				data.m_SamplerIndex =
+					renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
 				data.m_BloomIntensity = viewSettings.m_PostProcess.m_Bloom.m_Intensity;
 				data.m_ScenePreExposure = postProcess.m_Inputs.m_SceneColor.m_PreExposure;
 			},
-			[this, contextPtr, servicesPtr, displayViewId](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, servicesPtr, displayViewId](
+				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto sceneColorSrv = executeContext.GetViewDescriptor(data.m_SceneColorSrv);
@@ -137,9 +133,12 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(renderer);
 
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&outputRtv, 1));
-				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width), static_cast<float>(data.m_Height) });
-				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width), static_cast<int32_t>(data.m_Height) });
+				commandContext->SetRenderTargets(
+					std::span<const RHITextureViewHandle>(&outputRtv, 1));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
 
 				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
@@ -163,8 +162,7 @@ namespace gglab
 					.ScenePreExposure = data.m_ScenePreExposure,
 				};
 				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-					passParameters);
+					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
 				commandContext->DrawFullscreenTriangle();
 			});
@@ -197,8 +195,7 @@ namespace gglab
 
 			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] =
-				renderer->GetSwapChain()->GetFormat();
+			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = renderer->GetSwapChain()->GetFormat();
 			m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
 			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
 			m_BaseRecipe.m_Formats.m_SampleCount = 1;

@@ -61,6 +61,7 @@ namespace gglab
 
 	private:
 		static constexpr uint32_t FreeInFrameSpansReserveSize = 256;
+
 	private:
 		FreeListSpanAllocator m_Allocator;
 

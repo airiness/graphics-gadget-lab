@@ -10,14 +10,10 @@
 
 namespace gglab
 {
-	LabSessionBase::LabSessionBase(
-		LabDescriptor descriptor,
-		const LabSessionCreateInfo& createInfo,
+	LabSessionBase::LabSessionBase(LabDescriptor descriptor, const LabSessionCreateInfo& createInfo,
 		std::unique_ptr<RenderPipelineBase> renderPipeline) noexcept :
-		m_Services(createInfo.m_Services),
-		m_RunConfig(createInfo.m_RunConfig),
-		m_Descriptor(std::move(descriptor)),
-		m_RenderPipeline(std::move(renderPipeline))
+		m_Services(createInfo.m_Services), m_RunConfig(createInfo.m_RunConfig),
+		m_Descriptor(std::move(descriptor)), m_RenderPipeline(std::move(renderPipeline))
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "LabSessionBase requires valid create info.");
 
@@ -37,22 +33,20 @@ namespace gglab
 		controllerCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
-		m_AssetOwnerScope = std::make_unique<AssetOwnerScope>(
-			m_Services.m_AssetManager->CreateOwnerScope());
+		m_AssetOwnerScope =
+			std::make_unique<AssetOwnerScope>(m_Services.m_AssetManager->CreateOwnerScope());
 	}
 
 	LabSessionBase::~LabSessionBase() = default;
 
 	bool LabSessionBase::IsValid() const noexcept
 	{
-		return m_Descriptor.m_Id.IsValid() && m_Services.IsValid() &&
-			m_Camera && m_CameraController && m_RenderPipeline;
+		return m_Descriptor.m_Id.IsValid() && m_Services.IsValid() && m_Camera &&
+			m_CameraController && m_RenderPipeline;
 	}
 
 	bool LabSessionBase::SetParameter(
-		const LabParameterId& id,
-		const LabValue& value,
-		LabChangeImpact* impact) noexcept
+		const LabParameterId& id, const LabValue& value, LabChangeImpact* impact) noexcept
 	{
 		return m_Parameters.Set(id, value, impact);
 	}

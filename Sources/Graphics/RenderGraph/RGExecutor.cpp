@@ -12,21 +12,24 @@ namespace gglab
 		{
 			GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGTexture,
 				"RenderGraph texture resolution requires a texture resource.");
-			const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
-			return texture->m_Imported ? texture->m_ImportedHandle : texture->m_PhysicalAllocation.m_Texture;
+			const auto* texture =
+				static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
+			return texture->m_Imported ? texture->m_ImportedHandle
+				: texture->m_PhysicalAllocation.m_Texture;
 		}
 
 		RHIBufferHandle ResolveBufferHandle(const RGCompiledResource& resource) noexcept
 		{
 			GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGBuffer,
 				"RenderGraph buffer resolution requires a buffer resource.");
-			const auto* buffer = static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
-			return buffer->m_Imported ? buffer->m_ImportedHandle : buffer->m_PhysicalAllocation.m_Buffer;
+			const auto* buffer =
+				static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
+			return buffer->m_Imported ? buffer->m_ImportedHandle
+				: buffer->m_PhysicalAllocation.m_Buffer;
 		}
 
 		RHICommandContext* SelectPassCommandContext(
-			const RGBackendExecuteContext& backend,
-			RGPassEncoderType encoderType) noexcept
+			const RGBackendExecuteContext& backend, RGPassEncoderType encoderType) noexcept
 		{
 			switch (encoderType)
 			{
@@ -39,9 +42,7 @@ namespace gglab
 			GGLAB_UNREACHABLE("Unhandled RenderGraph pass encoder type.");
 		}
 
-		void TrackPassResourceUses(
-			RHICommandContext* commandContext,
-			const RGExecutionPlan& plan,
+		void TrackPassResourceUses(RHICommandContext* commandContext, const RGExecutionPlan& plan,
 			const RGCompiledPass& pass) noexcept
 		{
 			GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -56,7 +57,8 @@ namespace gglab
 				if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					const RHITextureHandle handle = ResolveTextureHandle(resource);
-					GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture access requires a live RHI handle.");
+					GGLAB_ASSERT_MSG(
+						handle.IsValid(), "RenderGraph texture access requires a live RHI handle.");
 					if (handle.IsValid())
 					{
 						commandContext->TrackTextureUse(handle);
@@ -65,7 +67,8 @@ namespace gglab
 				else
 				{
 					const RHIBufferHandle handle = ResolveBufferHandle(resource);
-					GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer access requires a live RHI handle.");
+					GGLAB_ASSERT_MSG(
+						handle.IsValid(), "RenderGraph buffer access requires a live RHI handle.");
 					if (handle.IsValid())
 					{
 						commandContext->TrackBufferUse(handle);
@@ -74,9 +77,7 @@ namespace gglab
 			}
 		}
 
-		void EmitBarriers(
-			RHICommandContext* commandContext,
-			const RGExecutionPlan& plan,
+		void EmitBarriers(RHICommandContext* commandContext, const RGExecutionPlan& plan,
 			const std::vector<RGBarrierIntent>& barriers) noexcept
 		{
 			if (barriers.empty())
@@ -100,33 +101,33 @@ namespace gglab
 					"RenderGraph barrier references an invalid resource.");
 				GGLAB_ASSERT_MSG(
 					intent.m_Kind != RGBarrierKind::Uav ||
-						(HasUavAccess(intent.m_Before) &&
-							HasUavAccess(intent.m_After) &&
-							!NeedsRHIResourceTransition(intent.m_Before, intent.m_After)),
+					(HasUavAccess(intent.m_Before) && HasUavAccess(intent.m_After) &&
+						!NeedsRHIResourceTransition(intent.m_Before, intent.m_After)),
 					"RenderGraph UAV barriers require a stable UAV state.");
 				const auto& resource = plan.GetResources()[intent.m_Resource.Value()];
 				if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					const RHITextureHandle handle = ResolveTextureHandle(resource);
-					GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph texture barrier requires a live RHI handle.");
+					GGLAB_ASSERT_MSG(handle.IsValid(),
+						"RenderGraph texture barrier requires a live RHI handle.");
 					if (handle.IsValid())
 					{
 						intent.m_HasResolvedPhysicalHandle = true;
 						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
 						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
-						textureBarriers.push_back(
-							{
-								.m_Texture = handle,
-								.m_Before = intent.m_Before,
-								.m_After = intent.m_After,
-								.m_Subresources = intent.m_Subresources,
+						textureBarriers.push_back({
+							.m_Texture = handle,
+							.m_Before = intent.m_Before,
+							.m_After = intent.m_After,
+							.m_Subresources = intent.m_Subresources,
 							});
 					}
 				}
 				else
 				{
 					const RHIBufferHandle handle = ResolveBufferHandle(resource);
-					GGLAB_ASSERT_MSG(handle.IsValid(), "RenderGraph buffer barrier requires a live RHI handle.");
+					GGLAB_ASSERT_MSG(
+						handle.IsValid(), "RenderGraph buffer barrier requires a live RHI handle.");
 					if (handle.IsValid())
 					{
 						intent.m_HasResolvedPhysicalHandle = true;
@@ -156,18 +157,19 @@ namespace gglab
 		const auto& view = m_ExecutionPlan->GetTextureViews()[viewId.Value()];
 		const auto& resource = m_ExecutionPlan->GetResources()[view.m_Resource.Value()];
 		const RHITextureHandle texture = ResolveTextureHandle(resource);
-		return texture.IsValid() ? m_Device->CreateTextureView(texture, view.m_Desc) : RHITextureViewHandle{};
+		return texture.IsValid() ? m_Device->CreateTextureView(texture, view.m_Desc)
+			: RHITextureViewHandle{};
 	}
 
 	RHIDescriptorHandle RGExecuteContext::GetViewDescriptor(RGTextureViewId viewId) const noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		const RHITextureViewHandle view = GetViewHandle(viewId);
-		return m_Device && view.IsValid() ? m_Device->GetTextureViewDescriptor(view) : RHIDescriptorHandle{};
+		return m_Device && view.IsValid() ? m_Device->GetTextureViewDescriptor(view)
+			: RHIDescriptorHandle{};
 	}
 
-	RHIBufferHandle RGExecuteContext::GetBufferHandle(
-		RGBufferId bufferId) const noexcept
+	RHIBufferHandle RGExecuteContext::GetBufferHandle(RGBufferId bufferId) const noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_ExecutionPlan);
 		if (!m_ExecutionPlan || !bufferId.IsValid())
@@ -175,28 +177,19 @@ namespace gglab
 			return {};
 		}
 
-		const size_t resourceIndex =
-			bufferId.GetHandle().Value();
-		GGLAB_ASSERT_MSG(
-			resourceIndex <
-				m_ExecutionPlan->GetResources().size(),
+		const size_t resourceIndex = bufferId.GetHandle().Value();
+		GGLAB_ASSERT_MSG(resourceIndex < m_ExecutionPlan->GetResources().size(),
 			"RenderGraph buffer id must resolve to a compiled resource.");
-		if (resourceIndex >=
-			m_ExecutionPlan->GetResources().size())
+		if (resourceIndex >= m_ExecutionPlan->GetResources().size())
 		{
 			return {};
 		}
 
-		const auto& resource =
-			m_ExecutionPlan->GetResources()[resourceIndex];
-		GGLAB_ASSERT_MSG(
-			resource.m_ResourceType ==
-				RGResourceType::RGBuffer,
+		const auto& resource = m_ExecutionPlan->GetResources()[resourceIndex];
+		GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGBuffer,
 			"RenderGraph buffer resolution requires a buffer resource.");
-		return resource.m_ResourceType ==
-			RGResourceType::RGBuffer ?
-				ResolveBufferHandle(resource) :
-				RHIBufferHandle{};
+		return resource.m_ResourceType == RGResourceType::RGBuffer ? ResolveBufferHandle(resource)
+			: RHIBufferHandle{};
 	}
 
 	RHIGraphicsCommandContext* RGExecuteContext::GetGraphicsCommandContext() const noexcept
@@ -204,8 +197,7 @@ namespace gglab
 		const bool compatible =
 			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Graphics;
 		GGLAB_ASSERT_MSG(
-			compatible,
-			"Graphics command context access requires a Graphics RenderGraph pass.");
+			compatible, "Graphics command context access requires a Graphics RenderGraph pass.");
 		return compatible ? m_Backend.m_GraphicsCommandContext : nullptr;
 	}
 
@@ -213,8 +205,7 @@ namespace gglab
 	{
 		const bool compatible =
 			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Compute;
-		GGLAB_ASSERT_MSG(
-			compatible,
+		GGLAB_ASSERT_MSG(compatible,
 			"Direct compute command context access requires a Compute RenderGraph pass.");
 		return compatible ? m_Backend.m_DirectComputeCommandContext : nullptr;
 	}
@@ -223,30 +214,21 @@ namespace gglab
 	{
 		const bool compatible =
 			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Compute;
-		GGLAB_ASSERT_MSG(
-			compatible,
+		GGLAB_ASSERT_MSG(compatible,
 			"Async compute command context access requires a Compute RenderGraph pass.");
 		return compatible ? m_Backend.m_AsyncComputeCommandContext : nullptr;
 	}
 
-	RHICommandContext*
-		RGExecuteContext::GetCopyCommandContext() const noexcept
+	RHICommandContext* RGExecuteContext::GetCopyCommandContext() const noexcept
 	{
 		const bool compatible =
-			!m_ActiveEncoderType ||
-			*m_ActiveEncoderType ==
-				RGPassEncoderType::Copy;
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Copy;
 		GGLAB_ASSERT_MSG(
-			compatible,
-			"Copy command context access requires a Copy RenderGraph pass.");
-		return compatible ?
-			m_Backend.m_GraphicsCommandContext :
-			nullptr;
+			compatible, "Copy command context access requires a Copy RenderGraph pass.");
+		return compatible ? m_Backend.m_GraphicsCommandContext : nullptr;
 	}
 
-	void RGExecutor::Execute(
-		const RGExecutionPlan& plan,
-		const RGExecutorRuntime& runtime,
+	void RGExecutor::Execute(const RGExecutionPlan& plan, const RGExecutorRuntime& runtime,
 		RGExecuteContext& executeContext) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(runtime.m_Device);
@@ -271,8 +253,7 @@ namespace gglab
 			executeContext.m_ActiveEncoderType = pass.m_EncoderType;
 			RHICommandContext* passCommandContext =
 				SelectPassCommandContext(executeContext.m_Backend, pass.m_EncoderType);
-			GGLAB_ASSERT_MSG(
-				passCommandContext,
+			GGLAB_ASSERT_MSG(passCommandContext,
 				"RenderGraph pass requires an available command context for its encoder type.");
 			const std::string_view passName = pass.m_NameId.Name();
 			if (passCommandContext)
@@ -282,7 +263,8 @@ namespace gglab
 			for (const auto resourceIndex : pass.m_AcquireResources)
 			{
 				const auto& resource = plan.GetResources()[resourceIndex.Value()];
-				resource.m_Resource->Devirtualize(runtime.m_TransientResourcePool, resource.m_UsageBits);
+				resource.m_Resource->Devirtualize(
+					runtime.m_TransientResourcePool, resource.m_UsageBits);
 			}
 
 			TrackPassResourceUses(passCommandContext, plan, pass);
@@ -300,8 +282,7 @@ namespace gglab
 			for (const auto resourceIndex : pass.m_ReleaseResources)
 			{
 				plan.GetResources()[resourceIndex.Value()].m_Resource->Release(
-					*runtime.m_RetireTextures,
-					*runtime.m_RetireBuffers);
+					*runtime.m_RetireTextures, *runtime.m_RetireBuffers);
 			}
 			executeContext.m_ActiveEncoderType = previousEncoderType;
 		}

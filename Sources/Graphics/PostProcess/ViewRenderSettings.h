@@ -75,6 +75,5 @@ namespace gglab
 	};
 
 	[[nodiscard]] ResolvedViewRenderSettings ResolveViewRenderSettings(
-		const ViewRenderProfile& profile,
-		const Camera& camera) noexcept;
+		const ViewRenderProfile& profile, const Camera& camera) noexcept;
 }

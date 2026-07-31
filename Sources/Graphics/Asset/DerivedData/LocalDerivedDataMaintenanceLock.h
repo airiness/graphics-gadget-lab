@@ -17,8 +17,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return !m_CanonicalRoot.empty() && !m_CanonicalUtf8.empty() &&
-				!m_MutexName.empty();
+			return !m_CanonicalRoot.empty() && !m_CanonicalUtf8.empty() && !m_MutexName.empty();
 		}
 	};
 
@@ -34,10 +33,7 @@ namespace gglab
 		~LocalDerivedDataMaintenanceLock() = default;
 
 		[[nodiscard]] bool IsValid() const noexcept { return m_Mutex.IsValid(); }
-		[[nodiscard]] win32::NamedMutexGuard Acquire() const noexcept
-		{
-			return m_Mutex.Acquire();
-		}
+		[[nodiscard]] win32::NamedMutexGuard Acquire() const noexcept { return m_Mutex.Acquire(); }
 
 	private:
 		win32::NamedMutex m_Mutex;

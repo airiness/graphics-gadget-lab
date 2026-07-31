@@ -11,6 +11,5 @@ namespace gglab
 namespace gglab::devtools
 {
 	[[nodiscard]] ImTextureID ResolveImGuiTextureId(
-		const DevelopGuiSystem* developGuiSystem,
-		RHIDescriptorHandle descriptor) noexcept;
+		const DevelopGuiSystem* developGuiSystem, RHIDescriptorHandle descriptor) noexcept;
 }

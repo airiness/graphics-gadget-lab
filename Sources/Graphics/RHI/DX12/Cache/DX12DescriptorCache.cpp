@@ -44,8 +44,7 @@ namespace gglab
 	}
 
 	DX12DescriptorCache::DX12DescriptorCache(const CreateInfo& createInfo) noexcept :
-		m_DX12Device(createInfo.m_DX12Device),
-		m_DescriptorManager(createInfo.m_DescriptorManager)
+		m_DX12Device(createInfo.m_DX12Device), m_DescriptorManager(createInfo.m_DescriptorManager)
 	{
 		GGLAB_ASSERT(m_DX12Device);
 		GGLAB_ASSERT(m_DescriptorManager);
@@ -86,19 +85,17 @@ namespace gglab
 		}
 		m_RHISamplers.Clear();
 		m_RHISamplerCache.clear();
-
 	}
 
-
 	RHITextureViewHandle DX12DescriptorCache::GetOrCreateTextureView(
-		RHITextureHandle texture,
-		const RHITextureViewDesc& desc) noexcept
+		RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
 		RHITextureViewKey key{ .m_Texture = texture, .m_Desc = desc };
 
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto iterator = m_RHITextureViewCache.find(key); iterator != m_RHITextureViewCache.end())
+			if (auto iterator = m_RHITextureViewCache.find(key);
+				iterator != m_RHITextureViewCache.end())
 			{
 				if (m_RHITextureViews.Resolve(iterator->second))
 				{
@@ -110,7 +107,8 @@ namespace gglab
 		DX12Texture* nativeTexture = m_DX12Device->ResolveTexture(texture);
 		if (!nativeTexture)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12DescriptorCache::GetOrCreateTextureView received a non-live texture handle.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12DescriptorCache::GetOrCreateTextureView received a non-live texture handle.");
 			return {};
 		}
 
@@ -121,7 +119,8 @@ namespace gglab
 		}
 
 		std::unique_lock lock(m_Mutex);
-		if (auto iterator = m_RHITextureViewCache.find(key); iterator != m_RHITextureViewCache.end())
+		if (auto iterator = m_RHITextureViewCache.find(key);
+			iterator != m_RHITextureViewCache.end())
 		{
 			if (m_RHITextureViews.Resolve(iterator->second))
 			{
@@ -179,14 +178,14 @@ namespace gglab
 	}
 
 	RHIBufferViewHandle DX12DescriptorCache::GetOrCreateBufferView(
-		RHIBufferHandle buffer,
-		const RHIBufferViewDesc& desc) noexcept
+		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
 		RHIBufferViewKey key{ .m_Buffer = buffer, .m_Desc = desc };
 
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto iterator = m_RHIBufferViewCache.find(key); iterator != m_RHIBufferViewCache.end())
+			if (auto iterator = m_RHIBufferViewCache.find(key);
+				iterator != m_RHIBufferViewCache.end())
 			{
 				if (m_RHIBufferViews.Resolve(iterator->second))
 				{
@@ -198,7 +197,8 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_DX12Device->ResolveBuffer(buffer);
 		if (!nativeBuffer)
 		{
-			GGLAB_LOG_GRAPHICS_WARN("DX12DescriptorCache::GetOrCreateBufferView received a non-live buffer handle.");
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12DescriptorCache::GetOrCreateBufferView received a non-live buffer handle.");
 			return {};
 		}
 
@@ -228,7 +228,8 @@ namespace gglab
 		return view;
 	}
 
-	DX12DescriptorView DX12DescriptorCache::ResolveTextureView(RHITextureViewHandle view) const noexcept
+	DX12DescriptorView DX12DescriptorCache::ResolveTextureView(
+		RHITextureViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
@@ -240,7 +241,8 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
-	DX12DescriptorView DX12DescriptorCache::ResolveBufferView(RHIBufferViewHandle view) const noexcept
+	DX12DescriptorView DX12DescriptorCache::ResolveBufferView(
+		RHIBufferViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
@@ -252,7 +254,8 @@ namespace gglab
 		return slot->m_Descriptor.ToDescriptorView();
 	}
 
-	RHIDescriptorHandle DX12DescriptorCache::ResolveTextureViewDescriptor(RHITextureViewHandle view) const noexcept
+	RHIDescriptorHandle DX12DescriptorCache::ResolveTextureViewDescriptor(
+		RHITextureViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const TextureViewSlot* slot = m_RHITextureViews.Resolve(view);
@@ -264,7 +267,8 @@ namespace gglab
 		return ToRHIDescriptorHandle(slot->m_Descriptor);
 	}
 
-	RHIDescriptorHandle DX12DescriptorCache::ResolveBufferViewDescriptor(RHIBufferViewHandle view) const noexcept
+	RHIDescriptorHandle DX12DescriptorCache::ResolveBufferViewDescriptor(
+		RHIBufferViewHandle view) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
@@ -276,7 +280,8 @@ namespace gglab
 		return ToRHIDescriptorHandle(slot->m_Descriptor);
 	}
 
-	RHIDescriptorHandle DX12DescriptorCache::ResolveSamplerDescriptor(RHISamplerHandle sampler) const noexcept
+	RHIDescriptorHandle DX12DescriptorCache::ResolveSamplerDescriptor(
+		RHISamplerHandle sampler) const noexcept
 	{
 		std::shared_lock lock(m_Mutex);
 		const SamplerSlot* slot = m_RHISamplers.Resolve(sampler);
@@ -312,10 +317,8 @@ namespace gglab
 		return m_RHISamplers.Resolve(sampler) != nullptr;
 	}
 
-
 	void DX12DescriptorCache::RetireTextureViews(
-		RHITextureHandle texture,
-		std::span<const RHIFencePoint> fencePoints) noexcept
+		RHITextureHandle texture, std::span<const RHIFencePoint> fencePoints) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 
@@ -346,8 +349,7 @@ namespace gglab
 	}
 
 	void DX12DescriptorCache::RetireBufferViews(
-		RHIBufferHandle buffer,
-		std::span<const RHIFencePoint> fencePoints) noexcept
+		RHIBufferHandle buffer, std::span<const RHIFencePoint> fencePoints) noexcept
 	{
 		std::unique_lock lock(m_Mutex);
 
@@ -388,12 +390,9 @@ namespace gglab
 				continue;
 			}
 
-			const bool completed = std::ranges::all_of(
-				slot.m_RetirementPoints,
-				[this](const RHIFencePoint& point)
-				{
-					return m_DX12Device && m_DX12Device->IsFencePointCompleted(point);
-				});
+			const bool completed =
+				std::ranges::all_of(slot.m_RetirementPoints, [this](const RHIFencePoint& point)
+					{ return m_DX12Device && m_DX12Device->IsFencePointCompleted(point); });
 			if (!completed)
 			{
 				continue;
@@ -416,12 +415,9 @@ namespace gglab
 				continue;
 			}
 
-			const bool completed = std::ranges::all_of(
-				slot.m_RetirementPoints,
-				[this](const RHIFencePoint& point)
-				{
-					return m_DX12Device && m_DX12Device->IsFencePointCompleted(point);
-				});
+			const bool completed =
+				std::ranges::all_of(slot.m_RetirementPoints, [this](const RHIFencePoint& point)
+					{ return m_DX12Device && m_DX12Device->IsFencePointCompleted(point); });
 			if (!completed)
 			{
 				continue;
@@ -435,7 +431,6 @@ namespace gglab
 			slot.m_RetirementPoints.clear();
 			m_RHIBufferViews.Retire(index);
 		}
-
 	}
 
 	DX12DescriptorHandle DX12DescriptorCache::AllocateHandle(
@@ -447,8 +442,7 @@ namespace gglab
 	}
 
 	DX12DescriptorHandle DX12DescriptorCache::CreateTextureDescriptor(
-		const RHITextureViewKey& key,
-		DX12Texture* texture) const noexcept
+		const RHITextureViewKey& key, DX12Texture* texture) const noexcept
 	{
 		GGLAB_ASSERT(texture != nullptr);
 
@@ -457,30 +451,42 @@ namespace gglab
 		{
 		case RHITextureViewType::RenderTarget:
 		{
-			DX12DescriptorHandle descriptor = AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralRtv);
-			const D3D12_RENDER_TARGET_VIEW_DESC desc = BuildD3D12RenderTargetViewDesc(key.m_Desc, resourceDesc);
-			m_DX12Device->Get()->CreateRenderTargetView(texture->Get(), &desc, descriptor.CpuHandleAt());
+			DX12DescriptorHandle descriptor =
+				AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralRtv);
+			const D3D12_RENDER_TARGET_VIEW_DESC desc =
+				BuildD3D12RenderTargetViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateRenderTargetView(
+				texture->Get(), &desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		case RHITextureViewType::DepthStencil:
 		{
-			DX12DescriptorHandle descriptor = AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralDsv);
-			const D3D12_DEPTH_STENCIL_VIEW_DESC desc = BuildD3D12DepthStencilViewDesc(key.m_Desc, resourceDesc);
-			m_DX12Device->Get()->CreateDepthStencilView(texture->Get(), &desc, descriptor.CpuHandleAt());
+			DX12DescriptorHandle descriptor =
+				AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralDsv);
+			const D3D12_DEPTH_STENCIL_VIEW_DESC desc =
+				BuildD3D12DepthStencilViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateDepthStencilView(
+				texture->Get(), &desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		case RHITextureViewType::ShaderResource:
 		{
-			DX12DescriptorHandle descriptor = AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
-			const D3D12_SHADER_RESOURCE_VIEW_DESC desc = BuildD3D12ShaderResourceViewDesc(key.m_Desc, resourceDesc);
-			m_DX12Device->Get()->CreateShaderResourceView(texture->Get(), &desc, descriptor.CpuHandleAt());
+			DX12DescriptorHandle descriptor =
+				AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
+			const D3D12_SHADER_RESOURCE_VIEW_DESC desc =
+				BuildD3D12ShaderResourceViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateShaderResourceView(
+				texture->Get(), &desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		case RHITextureViewType::UnorderedAccess:
 		{
-			DX12DescriptorHandle descriptor = AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
-			const D3D12_UNORDERED_ACCESS_VIEW_DESC desc = BuildD3D12UnorderedAccessViewDesc(key.m_Desc, resourceDesc);
-			m_DX12Device->Get()->CreateUnorderedAccessView(texture->Get(), nullptr, &desc, descriptor.CpuHandleAt());
+			DX12DescriptorHandle descriptor =
+				AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC desc =
+				BuildD3D12UnorderedAccessViewDesc(key.m_Desc, resourceDesc);
+			m_DX12Device->Get()->CreateUnorderedAccessView(
+				texture->Get(), nullptr, &desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		}
@@ -489,37 +495,35 @@ namespace gglab
 	}
 
 	DX12DescriptorHandle DX12DescriptorCache::CreateBufferDescriptor(
-		const RHIBufferViewKey& key,
-		DX12Buffer* buffer) const noexcept
+		const RHIBufferViewKey& key, DX12Buffer* buffer) const noexcept
 	{
 		GGLAB_ASSERT(buffer != nullptr);
 
-		DX12DescriptorHandle descriptor = AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
+		DX12DescriptorHandle descriptor =
+			AllocateHandle(DX12DescriptorManager::AllocatorType::GeneralCbvSrvUav);
 		switch (key.m_Desc.m_Type)
 		{
 		case RHIBufferViewType::ConstantBuffer:
 		{
 			const D3D12_CONSTANT_BUFFER_VIEW_DESC desc = BuildD3D12ConstantBufferViewDesc(
-				key.m_Desc,
-				buffer->GPUVirtualAddress(),
-				buffer->SizeInBytes());
+				key.m_Desc, buffer->GPUVirtualAddress(), buffer->SizeInBytes());
 			m_DX12Device->Get()->CreateConstantBufferView(&desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		case RHIBufferViewType::ShaderResource:
 		{
-			const D3D12_SHADER_RESOURCE_VIEW_DESC desc = BuildD3D12ShaderResourceViewDesc(
-				key.m_Desc,
-				buffer->SizeInBytes());
-			m_DX12Device->Get()->CreateShaderResourceView(buffer->Get(), &desc, descriptor.CpuHandleAt());
+			const D3D12_SHADER_RESOURCE_VIEW_DESC desc =
+				BuildD3D12ShaderResourceViewDesc(key.m_Desc, buffer->SizeInBytes());
+			m_DX12Device->Get()->CreateShaderResourceView(
+				buffer->Get(), &desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		case RHIBufferViewType::UnorderedAccess:
 		{
-			const D3D12_UNORDERED_ACCESS_VIEW_DESC desc = BuildD3D12UnorderedAccessViewDesc(
-				key.m_Desc,
-				buffer->SizeInBytes());
-			m_DX12Device->Get()->CreateUnorderedAccessView(buffer->Get(), nullptr, &desc, descriptor.CpuHandleAt());
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC desc =
+				BuildD3D12UnorderedAccessViewDesc(key.m_Desc, buffer->SizeInBytes());
+			m_DX12Device->Get()->CreateUnorderedAccessView(
+				buffer->Get(), nullptr, &desc, descriptor.CpuHandleAt());
 			return descriptor;
 		}
 		}
@@ -527,10 +531,13 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RHIBufferViewType.");
 	}
 
-	DX12DescriptorHandle DX12DescriptorCache::CreateSamplerDescriptor(const RHISamplerDesc& desc) const noexcept
+	DX12DescriptorHandle DX12DescriptorCache::CreateSamplerDescriptor(
+		const RHISamplerDesc& desc) const noexcept
 	{
 		DX12DescriptorHandle descriptor =
-			m_DescriptorManager->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::GeneralSampler)->AllocateHandle();
+			m_DescriptorManager
+			->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::GeneralSampler)
+			->AllocateHandle();
 		if (!descriptor.IsValid())
 		{
 			return {};
@@ -551,7 +558,8 @@ namespace gglab
 
 		const RHITextureHandle texture = slot->m_Key.m_Texture;
 		m_RHITextureViewCache.erase(slot->m_Key);
-		if (auto iterator = m_RHITextureResourceViews.find(texture); iterator != m_RHITextureResourceViews.end())
+		if (auto iterator = m_RHITextureResourceViews.find(texture);
+			iterator != m_RHITextureResourceViews.end())
 		{
 			std::erase(iterator->second, view);
 			if (iterator->second.empty())
@@ -577,7 +585,8 @@ namespace gglab
 
 		const RHIBufferHandle buffer = slot->m_Key.m_Buffer;
 		m_RHIBufferViewCache.erase(slot->m_Key);
-		if (auto iterator = m_RHIBufferResourceViews.find(buffer); iterator != m_RHIBufferResourceViews.end())
+		if (auto iterator = m_RHIBufferResourceViews.find(buffer);
+			iterator != m_RHIBufferResourceViews.end())
 		{
 			std::erase(iterator->second, view);
 			if (iterator->second.empty())

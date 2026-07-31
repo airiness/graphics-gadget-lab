@@ -13,13 +13,10 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_TileLightHeaders.IsValid() &&
-				m_TileLightIndices.IsValid() &&
+			return m_TileLightHeaders.IsValid() && m_TileLightIndices.IsValid() &&
 				m_TileGrid.IsValid();
 		}
 	};
 
-	inline constexpr const char*
-		ForwardPlusResourcesName =
-			"ForwardPlus.Resources";
+	inline constexpr const char* ForwardPlusResourcesName = "ForwardPlus.Resources";
 }

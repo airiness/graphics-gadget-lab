@@ -89,48 +89,58 @@ namespace gglab
 	{
 		switch (domain)
 		{
-		case RHIResourceDebugDomain::Unknown: return "RHI";
-		case RHIResourceDebugDomain::Asset: return "Asset";
-		case RHIResourceDebugDomain::RenderGraph: return "RenderGraph";
-		case RHIResourceDebugDomain::Registry: return "Registry";
-		case RHIResourceDebugDomain::Transient: return "Transient";
-		case RHIResourceDebugDomain::Renderer: return "Renderer";
-		case RHIResourceDebugDomain::Transfer: return "Transfer";
-		case RHIResourceDebugDomain::SwapChain: return "SwapChain";
-		case RHIResourceDebugDomain::Diagnostics: return "Diagnostics";
-		case RHIResourceDebugDomain::DevTools: return "DevTools";
+		case RHIResourceDebugDomain::Unknown:
+			return "RHI";
+		case RHIResourceDebugDomain::Asset:
+			return "Asset";
+		case RHIResourceDebugDomain::RenderGraph:
+			return "RenderGraph";
+		case RHIResourceDebugDomain::Registry:
+			return "Registry";
+		case RHIResourceDebugDomain::Transient:
+			return "Transient";
+		case RHIResourceDebugDomain::Renderer:
+			return "Renderer";
+		case RHIResourceDebugDomain::Transfer:
+			return "Transfer";
+		case RHIResourceDebugDomain::SwapChain:
+			return "SwapChain";
+		case RHIResourceDebugDomain::Diagnostics:
+			return "Diagnostics";
+		case RHIResourceDebugDomain::DevTools:
+			return "DevTools";
 		}
 		return "RHI";
 	}
 
-	[[nodiscard]] constexpr std::string_view RHIResourceTypeDebugText(
-		RHIResourceType type) noexcept
+	[[nodiscard]] constexpr std::string_view RHIResourceTypeDebugText(RHIResourceType type) noexcept
 	{
 		switch (type)
 		{
-		case RHIResourceType::Texture: return "Texture";
-		case RHIResourceType::Buffer: return "Buffer";
-		default: return "Resource";
+		case RHIResourceType::Texture:
+			return "Texture";
+		case RHIResourceType::Buffer:
+			return "Buffer";
+		default:
+			return "Resource";
 		}
 	}
 
-	[[nodiscard]] inline std::string FormatRHIResourceDebugName(
-		RHIResourceType type,
-		uint32_t handleIndex,
-		uint32_t handleGeneration,
-		const RHIResourceDebugIdentity& identity,
+	[[nodiscard]] inline std::string FormatRHIResourceDebugName(RHIResourceType type,
+		uint32_t handleIndex, uint32_t handleGeneration, const RHIResourceDebugIdentity& identity,
 		const RHIResourceDebugBinding* binding = nullptr)
 	{
 		std::string result(RHIResourceDebugDomainText(identity.m_Domain));
 		result.push_back('.');
-		result.append(identity.m_Category.empty() ?
-			RHIResourceTypeDebugText(type) : std::string_view(identity.m_Category));
+		result.append(identity.m_Category.empty() ? RHIResourceTypeDebugText(type)
+			: std::string_view(identity.m_Category));
 		result.append("[");
 		if (identity.m_StableId)
 		{
 			result.append(std::format("ID={},", *identity.m_StableId));
 		}
-		if (binding && binding->m_Mode == RHIResourceDebugBindingMode::Exclusive && binding->m_Serial)
+		if (binding && binding->m_Mode == RHIResourceDebugBindingMode::Exclusive &&
+			binding->m_Serial)
 		{
 			result.append(std::format("Bind={},", *binding->m_Serial));
 		}
@@ -141,7 +151,8 @@ namespace gglab
 			result.append(" Name=");
 			result.append(identity.m_Label);
 		}
-		if (binding && binding->m_Mode == RHIResourceDebugBindingMode::Exclusive && !binding->m_Owner.empty())
+		if (binding && binding->m_Mode == RHIResourceDebugBindingMode::Exclusive &&
+			!binding->m_Owner.empty())
 		{
 			result.append(" Owner=");
 			result.append(binding->m_Owner);

@@ -7,8 +7,7 @@
 
 namespace gglab
 {
-	template<typename Tag, typename Rep = uint32_t>
-	class TypedIndex
+	template <typename Tag, typename Rep = uint32_t> class TypedIndex
 	{
 	public:
 		using ValueType = Rep;
@@ -17,12 +16,19 @@ namespace gglab
 		constexpr TypedIndex() = default;
 		explicit constexpr TypedIndex(ValueType value) : m_Value(value) {}
 
-		constexpr TypedIndex& operator=(ValueType v) noexcept { m_Value = v; return *this; }
+		constexpr TypedIndex& operator=(ValueType v) noexcept
+		{
+			m_Value = v;
+			return *this;
+		}
 		constexpr void Reset() noexcept { m_Value = InvalidValue; }
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != InvalidValue; }
 		[[nodiscard]] constexpr ValueType Value() const noexcept { return m_Value; }
-		[[nodiscard]] static constexpr TypedIndex Invalid() noexcept { return TypedIndex{ InvalidValue }; }
+		[[nodiscard]] static constexpr TypedIndex Invalid() noexcept
+		{
+			return TypedIndex{ InvalidValue };
+		}
 
 		friend constexpr auto operator<=>(const TypedIndex&, const TypedIndex&) noexcept = default;
 
@@ -32,18 +38,21 @@ namespace gglab
 		ValueType m_Value = InvalidValue;
 	};
 
-	template<typename IndexType>
-	class IndexCounter
+	template <typename IndexType> class IndexCounter
 	{
 	public:
 		using Rep = typename IndexType::ValueType;
 		static_assert(std::is_unsigned_v<Rep>, "Rep must be unsigned integer type.");
 
-		constexpr IndexCounter(Rep start = 0) noexcept : m_Next((start == IndexType::InvalidValue) ? 0 : start) {}
+		constexpr IndexCounter(Rep start = 0) noexcept :
+			m_Next((start == IndexType::InvalidValue) ? 0 : start)
+		{
+		}
 
 		void Reset(Rep start = 0) noexcept
 		{
-			GGLAB_ASSERT_MSG(start < IndexType::InvalidValue, "Start value must be less than InvalidValue.");
+			GGLAB_ASSERT_MSG(
+				start < IndexType::InvalidValue, "Start value must be less than InvalidValue.");
 			m_Next = (start == IndexType::InvalidValue) ? 0 : start;
 		}
 
@@ -51,7 +60,7 @@ namespace gglab
 
 		[[nodiscard]] IndexType Acquire() noexcept
 		{
-			if (m_Next == IndexType::InvalidValue) 
+			if (m_Next == IndexType::InvalidValue)
 			{
 				GGLAB_ASSERT_MSG(false, "IndexCounter overflowed.");
 				return IndexType::Invalid();
@@ -93,8 +102,7 @@ namespace gglab
 
 namespace std
 {
-	template<typename Tag, typename Rep>
-	struct hash<gglab::TypedIndex<Tag, Rep>>
+	template <typename Tag, typename Rep> struct hash<gglab::TypedIndex<Tag, Rep>>
 	{
 		size_t operator()(gglab::TypedIndex<Tag, Rep> id) const noexcept
 		{

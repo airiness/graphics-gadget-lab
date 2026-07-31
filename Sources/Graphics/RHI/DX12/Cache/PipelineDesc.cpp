@@ -23,10 +23,8 @@ namespace gglab
 					(shader.BytecodeLength > 0 && shader.pShaderBytecode != nullptr);
 			};
 
-		if (!validIfSet(m_PixelShader) ||
-			!validIfSet(m_DomainShader) ||
-			!validIfSet(m_HullShader) ||
-			!validIfSet(m_GeometryShader))
+		if (!validIfSet(m_PixelShader) || !validIfSet(m_DomainShader) ||
+			!validIfSet(m_HullShader) || !validIfSet(m_GeometryShader))
 		{
 			return false;
 		}

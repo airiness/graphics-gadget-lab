@@ -14,26 +14,21 @@ namespace gglab
 		return const_cast<Texture*>(std::as_const(*this).Find(textureId));
 	}
 
-	TextureID TextureStore::FindCached(
-		const std::filesystem::path& canonicalPath,
+	TextureID TextureStore::FindCached(const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings) const noexcept
 	{
 		const auto iterator = m_CacheKeys.find(CacheKey{ canonicalPath, importSettings });
 		return iterator != m_CacheKeys.end() ? iterator->second : TextureID{};
 	}
 
-	bool TextureStore::BindCacheKey(
-		const std::filesystem::path& canonicalPath,
-		const TextureImportSettings& importSettings,
-		TextureID textureId) noexcept
+	bool TextureStore::BindCacheKey(const std::filesystem::path& canonicalPath,
+		const TextureImportSettings& importSettings, TextureID textureId) noexcept
 	{
 		return textureId.IsValid() &&
 			m_CacheKeys.emplace(CacheKey{ canonicalPath, importSettings }, textureId).second;
 	}
 
-	bool TextureStore::Insert(
-		TextureID textureId,
-		std::unique_ptr<Texture>&& texture) noexcept
+	bool TextureStore::Insert(TextureID textureId, std::unique_ptr<Texture>&& texture) noexcept
 	{
 		if (!textureId.IsValid() || !texture)
 		{
@@ -45,12 +40,8 @@ namespace gglab
 	bool TextureStore::Remove(TextureID textureId) noexcept
 	{
 		const bool removed = m_Entries.erase(textureId) > 0;
-		const size_t removedKeys = std::erase_if(
-			m_CacheKeys,
-			[textureId](const auto& entry) noexcept
-			{
-				return entry.second == textureId;
-			});
+		const size_t removedKeys = std::erase_if(m_CacheKeys,
+			[textureId](const auto& entry) noexcept { return entry.second == textureId; });
 		return removed || removedKeys > 0;
 	}
 }

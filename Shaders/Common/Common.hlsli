@@ -27,7 +27,7 @@ float3 SanitizeHDRColor(float3 color)
 
 float3 ACESFitted(float3 x)
 {
-    // Narkowicz 2015
+	// Narkowicz 2015
 	x = SanitizeHDRColor(x);
 	const float a = 2.51;
 	const float b = 0.03;
@@ -86,38 +86,38 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 {
 	N = SafeNormalize(N, float3(0.0, 1.0, 0.0));
 
-    // Screen-space partial derivatives of world position:
-    //   deltaPosX ≈ ∂positionWS / ∂screenX   (difference to the right neighbor pixel)
-    //   deltaPosY ≈ ∂positionWS / ∂screenY   (difference to the bottom neighbor pixel)
+	// Screen-space partial derivatives of world position:
+	//   deltaPosX ≈ ∂positionWS / ∂screenX   (difference to the right neighbor pixel)
+	//   deltaPosY ≈ ∂positionWS / ∂screenY   (difference to the bottom neighbor pixel)
 	float3 deltaPosX = ddx(positionWS);
 	float3 deltaPosY = ddy(positionWS);
 
-    // Screen-space partial derivatives of UV:
-    //   deltaUVX ≈ ∂uv / ∂screenX
-    //   deltaUVY ≈ ∂uv / ∂screenY
+	// Screen-space partial derivatives of UV:
+	//   deltaUVX ≈ ∂uv / ∂screenX
+	//   deltaUVY ≈ ∂uv / ∂screenY
 	float2 deltaUVX = ddx(uv);
 	float2 deltaUVY = ddy(uv);
 
-    // The goal is to estimate Tangent (T = ∂p/∂u) and Bitangent (B = ∂p/∂v).
-    // Using the chain rule (locally, inside a triangle):
-    //   ∂p/∂x = T * ∂u/∂x + B * ∂v/∂x
-    //   ∂p/∂y = T * ∂u/∂y + B * ∂v/∂y
-    //
-    // One can solve this 2x2 linear system for T and B. The following cross-product form
-    // is a numerically stable rearrangement that also tends to keep vectors in the tangent plane.
+	// The goal is to estimate Tangent (T = ∂p/∂u) and Bitangent (B = ∂p/∂v).
+	// Using the chain rule (locally, inside a triangle):
+	//   ∂p/∂x = T * ∂u/∂x + B * ∂v/∂x
+	//   ∂p/∂y = T * ∂u/∂y + B * ∂v/∂y
+	//
+	// One can solve this 2x2 linear system for T and B. The following cross-product form
+	// is a numerically stable rearrangement that also tends to keep vectors in the tangent plane.
 
-    // Build two vectors guaranteed to be perpendicular to N (i.e., lie in the tangent plane).
-    // cross(deltaPosY, N) and cross(N, deltaPosX) are both orthogonal to N.
+	// Build two vectors guaranteed to be perpendicular to N (i.e., lie in the tangent plane).
+	// cross(deltaPosY, N) and cross(N, deltaPosX) are both orthogonal to N.
 	float3 deltaPosYPerp = cross(deltaPosY, N);
 	float3 deltaPosXPerp = cross(N, deltaPosX);
 
-    // Combine them with UV derivatives to produce unnormalized T and B.
-    // Intuition: these terms implement the "adjugate" of the 2x2 UV derivative matrix,
-    // avoiding an explicit inverse, while staying in the tangent plane.
+	// Combine them with UV derivatives to produce unnormalized T and B.
+	// Intuition: these terms implement the "adjugate" of the 2x2 UV derivative matrix,
+	// avoiding an explicit inverse, while staying in the tangent plane.
 	float3 T = deltaPosYPerp * deltaUVX.x + deltaPosXPerp * deltaUVY.x;
 	float3 B = deltaPosYPerp * deltaUVX.y + deltaPosXPerp * deltaUVY.y;
 
-    // If the triangle/UV mapping is degenerate, T/B may become very small.
+	// If the triangle/UV mapping is degenerate, T/B may become very small.
 	float tLen2 = dot(T, T);
 	float bLen2 = dot(B, B);
 	if (max(tLen2, bLen2) <= 1.0e-8)
@@ -128,28 +128,28 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 		return float3x3(T, B, N);
 	}
 
-    // We compute a safe scale to avoid division by zero.
+	// We compute a safe scale to avoid division by zero.
 	float invMax = rsqrt(max(tLen2, bLen2) + 1e-8);
 
 	T *= invMax;
 	B *= invMax;
 
-    // --- Orthonormalize and fix handedness --------------------
-    // 1) Make T orthogonal to N (Gram-Schmidt). This helps reduce skew due to interpolation.
+	// --- Orthonormalize and fix handedness --------------------
+	// 1) Make T orthogonal to N (Gram-Schmidt). This helps reduce skew due to interpolation.
 	T = T - N * dot(N, T);
 	T = SafeNormalize(T, float3(1.0, 0.0, 0.0));
 
-    // 2) Determine handedness sign to handle mirrored UVs:
-    //    If (T,B,N) form a left-handed basis, flip B.
-    //    sign = +1 for right-handed, -1 for left-handed.
+	// 2) Determine handedness sign to handle mirrored UVs:
+	//    If (T,B,N) form a left-handed basis, flip B.
+	//    sign = +1 for right-handed, -1 for left-handed.
 	float handedness = (dot(cross(T, B), N) < 0.0) ? -1.0 : 1.0;
 
-    // 3) Recompute B from N and T to guarantee orthogonality, then apply handedness.
+	// 3) Recompute B from N and T to guarantee orthogonality, then apply handedness.
 	B = SafeNormalize(cross(N, T), float3(0.0, 0.0, 1.0)) * handedness;
 
-    // Return TBN basis.
-    // IMPORTANT: This uses row-vector convention:
-    //   n_ws = normalize(mul(n_ts, float3x3(T,B,N)));
+	// Return TBN basis.
+	// IMPORTANT: This uses row-vector convention:
+	//   n_ws = normalize(mul(n_ts, float3x3(T,B,N)));
 	return float3x3(T, B, N);
 }
 

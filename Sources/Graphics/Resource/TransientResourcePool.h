@@ -20,8 +20,7 @@ namespace gglab
 	class TransientResourcePool;
 	struct TransientResourcePoolSnapshot;
 	void BuildTransientResourcePoolSnapshot(
-		const TransientResourcePool& pool,
-		TransientResourcePoolSnapshot& outSnapshot) noexcept;
+		const TransientResourcePool& pool, TransientResourcePoolSnapshot& outSnapshot) noexcept;
 
 	GGLAB_DEFINE_TYPED_INDEX(TransientResourcePoolSlot, uint32_t);
 
@@ -38,34 +37,27 @@ namespace gglab
 
 		bool operator==(const TransientTextureKey& rhs) const noexcept
 		{
-			return m_Dimension == rhs.m_Dimension &&
-				m_Extent.m_Width == rhs.m_Extent.m_Width &&
+			return m_Dimension == rhs.m_Dimension && m_Extent.m_Width == rhs.m_Extent.m_Width &&
 				m_Extent.m_Height == rhs.m_Extent.m_Height &&
-				m_Extent.m_Depth == rhs.m_Extent.m_Depth &&
-				m_ArraySize == rhs.m_ArraySize &&
-				m_MipLevels == rhs.m_MipLevels &&
-				m_SampleCount == rhs.m_SampleCount &&
-				m_Format == rhs.m_Format &&
-				m_Usage == rhs.m_Usage &&
+				m_Extent.m_Depth == rhs.m_Extent.m_Depth && m_ArraySize == rhs.m_ArraySize &&
+				m_MipLevels == rhs.m_MipLevels && m_SampleCount == rhs.m_SampleCount &&
+				m_Format == rhs.m_Format && m_Usage == rhs.m_Usage &&
 				ClearValuesEqual(m_ClearValue, rhs.m_ClearValue);
 		}
 
 		auto AsTuple() const noexcept
 		{
 			const RHIClearValue clearValue = m_ClearValue.value_or(RHIClearValue{});
-			return std::make_tuple(m_Dimension,
-				m_Extent.m_Width, m_Extent.m_Height, m_Extent.m_Depth,
-				m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage,
+			return std::make_tuple(m_Dimension, m_Extent.m_Width, m_Extent.m_Height,
+				m_Extent.m_Depth, m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage,
 				static_cast<uint8_t>(m_ClearValue.has_value()), clearValue.m_Format,
-				clearValue.m_Color[0], clearValue.m_Color[1],
-				clearValue.m_Color[2], clearValue.m_Color[3],
-				clearValue.m_Depth, clearValue.m_Stencil,
+				clearValue.m_Color[0], clearValue.m_Color[1], clearValue.m_Color[2],
+				clearValue.m_Color[3], clearValue.m_Depth, clearValue.m_Stencil,
 				static_cast<uint8_t>(clearValue.m_IsDepthStencil));
 		}
 
 	private:
-		static bool ClearValuesEqual(
-			const std::optional<RHIClearValue>& lhs,
+		static bool ClearValuesEqual(const std::optional<RHIClearValue>& lhs,
 			const std::optional<RHIClearValue>& rhs) noexcept
 		{
 			if (lhs.has_value() != rhs.has_value())
@@ -77,12 +69,9 @@ namespace gglab
 				return true;
 			}
 
-			return lhs->m_Format == rhs->m_Format &&
-				lhs->m_Color[0] == rhs->m_Color[0] &&
-				lhs->m_Color[1] == rhs->m_Color[1] &&
-				lhs->m_Color[2] == rhs->m_Color[2] &&
-				lhs->m_Color[3] == rhs->m_Color[3] &&
-				lhs->m_Depth == rhs->m_Depth &&
+			return lhs->m_Format == rhs->m_Format && lhs->m_Color[0] == rhs->m_Color[0] &&
+				lhs->m_Color[1] == rhs->m_Color[1] && lhs->m_Color[2] == rhs->m_Color[2] &&
+				lhs->m_Color[3] == rhs->m_Color[3] && lhs->m_Depth == rhs->m_Depth &&
 				lhs->m_Stencil == rhs->m_Stencil &&
 				lhs->m_IsDepthStencil == rhs->m_IsDepthStencil;
 		}
@@ -106,14 +95,11 @@ namespace gglab
 	struct TransientTextureAllocation
 	{
 		TransientTextureAllocation() noexcept = default;
-		TransientTextureAllocation(
-			RHITextureHandle texture,
-			TransientResourcePoolSlot poolSlot,
+		TransientTextureAllocation(RHITextureHandle texture, TransientResourcePoolSlot poolSlot,
 			const TransientTextureKey& key) noexcept :
-			m_Texture(texture),
-			m_PoolSlot(poolSlot),
-			m_Key(key)
-		{}
+			m_Texture(texture), m_PoolSlot(poolSlot), m_Key(key)
+		{
+		}
 
 		GGLAB_DELETE_COPYABLE(TransientTextureAllocation);
 
@@ -154,14 +140,11 @@ namespace gglab
 	struct TransientBufferAllocation
 	{
 		TransientBufferAllocation() noexcept = default;
-		TransientBufferAllocation(
-			RHIBufferHandle buffer,
-			TransientResourcePoolSlot poolSlot,
+		TransientBufferAllocation(RHIBufferHandle buffer, TransientResourcePoolSlot poolSlot,
 			const TransientBufferKey& key) noexcept :
-			m_Buffer(buffer),
-			m_PoolSlot(poolSlot),
-			m_Key(key)
-		{}
+			m_Buffer(buffer), m_PoolSlot(poolSlot), m_Key(key)
+		{
+		}
 
 		GGLAB_DELETE_COPYABLE(TransientBufferAllocation);
 
@@ -203,8 +186,7 @@ namespace gglab
 	{
 	private:
 		friend void BuildTransientResourcePoolSnapshot(
-			const TransientResourcePool& pool,
-			TransientResourcePoolSnapshot& outSnapshot) noexcept;
+			const TransientResourcePool& pool, TransientResourcePoolSnapshot& outSnapshot) noexcept;
 
 		enum class ResourceType : uint8_t
 		{
@@ -243,32 +225,31 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(TransientResourcePool);
 		~TransientResourcePool() noexcept;
 
-		[[nodiscard]] TransientTextureAllocation AcquireTexture(
-			const RHITextureDesc& desc,
+		[[nodiscard]] TransientTextureAllocation AcquireTexture(const RHITextureDesc& desc,
 			std::string_view logicalName = {},
 			RHIResourceDebugBindingMode bindingMode =
-				RHIResourceDebugBindingMode::Exclusive) noexcept;
-		[[nodiscard]] TransientBufferAllocation AcquireBuffer(
-			const RHIBufferDesc& desc,
+			RHIResourceDebugBindingMode::Exclusive) noexcept;
+		[[nodiscard]] TransientBufferAllocation AcquireBuffer(const RHIBufferDesc& desc,
 			std::string_view logicalName = {},
 			RHIResourceDebugBindingMode bindingMode =
-				RHIResourceDebugBindingMode::Exclusive) noexcept;
+			RHIResourceDebugBindingMode::Exclusive) noexcept;
 		void SetTextureLogicalName(
-			const TransientTextureAllocation& allocation,
-			std::string_view logicalName) noexcept;
+			const TransientTextureAllocation& allocation, std::string_view logicalName) noexcept;
 
-		void RetireTexture(TransientTextureAllocation&& allocation, const RHIFencePoint& fencePoint) noexcept;
-		void RetireBuffer(TransientBufferAllocation&& allocation, const RHIFencePoint& fencePoint) noexcept;
+		void RetireTexture(
+			TransientTextureAllocation&& allocation, const RHIFencePoint& fencePoint) noexcept;
+		void RetireBuffer(
+			TransientBufferAllocation&& allocation, const RHIFencePoint& fencePoint) noexcept;
 
 		void Tick() noexcept;
 
 		void TrimPerKey(uint32_t maxCachedPerKey) noexcept;
 
-		[[nodiscard]] bool IsCompatibleTexture(
-			const TransientTextureAllocation& allocation,
+		[[nodiscard]] bool IsCompatibleTexture(const TransientTextureAllocation& allocation,
 			const RHITextureDesc& desc) const noexcept;
 
-		[[nodiscard]] static TransientTextureKey MakeTextureKey(const RHITextureDesc& desc) noexcept;
+		[[nodiscard]] static TransientTextureKey MakeTextureKey(
+			const RHITextureDesc& desc) noexcept;
 		[[nodiscard]] static TransientBufferKey MakeBufferKey(const RHIBufferDesc& desc) noexcept;
 
 	private:
@@ -276,17 +257,15 @@ namespace gglab
 		void DestroyTexture(TransientResourcePoolSlot poolSlot) noexcept;
 		void DestroyBuffer(TransientResourcePoolSlot poolSlot) noexcept;
 
-		[[nodiscard]] TransientTextureAllocation CreateTexture(const RHITextureDesc& textureDesc) noexcept;
-		[[nodiscard]] TransientBufferAllocation CreateBuffer(const RHIBufferDesc& bufferDesc) noexcept;
-		void UpdateTextureDebugIdentity(
-			TransientResourcePoolSlot poolSlot,
-			std::string_view logicalName,
-			bool recordAcquire,
+		[[nodiscard]] TransientTextureAllocation CreateTexture(
+			const RHITextureDesc& textureDesc) noexcept;
+		[[nodiscard]] TransientBufferAllocation CreateBuffer(
+			const RHIBufferDesc& bufferDesc) noexcept;
+		void UpdateTextureDebugIdentity(TransientResourcePoolSlot poolSlot,
+			std::string_view logicalName, bool recordAcquire,
 			RHIResourceDebugBindingMode bindingMode) noexcept;
-		void UpdateBufferDebugIdentity(
-			TransientResourcePoolSlot poolSlot,
-			std::string_view logicalName,
-			bool recordAcquire,
+		void UpdateBufferDebugIdentity(TransientResourcePoolSlot poolSlot,
+			std::string_view logicalName, bool recordAcquire,
 			RHIResourceDebugBindingMode bindingMode) noexcept;
 
 	private:
@@ -295,8 +274,11 @@ namespace gglab
 		std::vector<TextureRecord> m_Textures;
 		std::vector<BufferRecord> m_Buffers;
 
-		std::unordered_map<TransientTextureKey, std::deque<TransientResourcePoolSlot>, TextureKeyHash> m_FreeTextures;
-		std::unordered_map<TransientBufferKey, std::deque<TransientResourcePoolSlot>, BufferKeyHash> m_FreeBuffers;
+		std::unordered_map<TransientTextureKey, std::deque<TransientResourcePoolSlot>,
+			TextureKeyHash>
+			m_FreeTextures;
+		std::unordered_map<TransientBufferKey, std::deque<TransientResourcePoolSlot>, BufferKeyHash>
+			m_FreeBuffers;
 
 		std::deque<PendingRetirement> m_PendingRetirements;
 

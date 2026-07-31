@@ -6,6 +6,5 @@ namespace gglab
 	struct SamplerRegistrySnapshot;
 
 	void BuildSamplerRegistrySnapshot(
-		const SamplerRegistry& registry,
-		SamplerRegistrySnapshot& snapshot) noexcept;
+		const SamplerRegistry& registry, SamplerRegistrySnapshot& snapshot) noexcept;
 }

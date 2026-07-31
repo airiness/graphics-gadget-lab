@@ -13,8 +13,7 @@ namespace gglab
 	{
 		DependencyStatus m_Status{};
 		std::optional<AssetOperationToken> m_Operation;
-		AssetStateEventOperationPhase m_OperationPhase =
-			AssetStateEventOperationPhase::None;
+		AssetStateEventOperationPhase m_OperationPhase = AssetStateEventOperationPhase::None;
 	};
 
 	class AssetStateEventQueue final
@@ -23,17 +22,13 @@ namespace gglab
 		AssetStateEventQueue() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(AssetStateEventQueue);
 
-		void Push(
-			DependencyStatus status,
+		void Push(DependencyStatus status,
 			std::optional<AssetOperationToken> operation = std::nullopt,
 			AssetStateEventOperationPhase operationPhase =
-				AssetStateEventOperationPhase::None) noexcept;
+			AssetStateEventOperationPhase::None) noexcept;
 		void Drain(std::vector<AssetStateEvent>& output) noexcept;
 
-		[[nodiscard]] bool HasPendingEvents() const noexcept
-		{
-			return !m_PendingEvents.empty();
-		}
+		[[nodiscard]] bool HasPendingEvents() const noexcept { return !m_PendingEvents.empty(); }
 
 	private:
 		void AssertOwnerThread() const noexcept;

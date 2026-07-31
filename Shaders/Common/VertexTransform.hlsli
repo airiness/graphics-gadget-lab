@@ -56,9 +56,7 @@ float4 TransformPositionCS(float4 positionVS, ViewData viewData)
 }
 
 RigidCoveragePosition ResolveRigidCoveragePosition(
-	float3 positionOS,
-	ObjectData objData,
-	ViewData viewData)
+	float3 positionOS, ObjectData objData, ViewData viewData)
 {
 	RigidCoveragePosition position;
 	position.PositionWS = TransformPositionWS(positionOS, objData);
@@ -69,16 +67,13 @@ RigidCoveragePosition ResolveRigidCoveragePosition(
 
 float3 TransformNormalWS(float3 normalOS, ObjectData objData)
 {
-	return SafeNormalize(
-		mul(normalOS, (float3x3) objData.NormalMat),
-		float3(0.0, 1.0, 0.0));
+	return SafeNormalize(mul(normalOS, (float3x3) objData.NormalMat), float3(0.0, 1.0, 0.0));
 }
 
 float4 TransformTangentWS(float4 tangentOS, ObjectData objData)
 {
-	const float3 tangentWS = SafeNormalize(
-		mul(tangentOS.xyz, (float3x3) objData.ModelMat),
-		float3(1.0, 0.0, 0.0));
+	const float3 tangentWS =
+		SafeNormalize(mul(tangentOS.xyz, (float3x3) objData.ModelMat), float3(1.0, 0.0, 0.0));
 	const float transformHandedness = determinant((float3x3) objData.ModelMat) < 0.0 ? -1.0 : 1.0;
 	return float4(tangentWS, tangentOS.w * transformHandedness);
 }

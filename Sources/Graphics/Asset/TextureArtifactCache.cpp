@@ -3,25 +3,22 @@
 
 namespace gglab
 {
-	TextureArtifactCache::TextureArtifactCache(
-		const TextureArtifactCacheConfig& config) noexcept :
+	TextureArtifactCache::TextureArtifactCache(const TextureArtifactCacheConfig& config) noexcept :
 		m_Core(config.m_BudgetBytes)
-	{}
+	{
+	}
 
-	TextureArtifactHandle TextureArtifactCache::CreateAndAdmit(
-		TextureAssetData&& data) noexcept
+	TextureArtifactHandle TextureArtifactCache::CreateAndAdmit(TextureAssetData&& data) noexcept
 	{
 		TextureArtifactBuildResult built = CreateTextureArtifact(std::move(data));
 		if (!built.Succeeded())
 		{
 			return {};
 		}
-		return Admit(std::make_shared<const TextureArtifact>(
-			std::move(built.m_Artifact)));
+		return Admit(std::make_shared<const TextureArtifact>(std::move(built.m_Artifact)));
 	}
 
-	TextureArtifactHandle TextureArtifactCache::Admit(
-		TextureArtifactHandle artifact) noexcept
+	TextureArtifactHandle TextureArtifactCache::Admit(TextureArtifactHandle artifact) noexcept
 	{
 		if (!artifact || !artifact->IsValid())
 		{
@@ -39,8 +36,7 @@ namespace gglab
 		return m_Core.Find(contentDigest);
 	}
 
-	bool TextureArtifactCache::Contains(
-		const ArtifactContentDigest& contentDigest) const noexcept
+	bool TextureArtifactCache::Contains(const ArtifactContentDigest& contentDigest) const noexcept
 	{
 		std::scoped_lock lock(m_Mutex);
 		return m_Core.Contains(contentDigest);

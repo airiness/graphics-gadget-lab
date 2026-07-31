@@ -25,21 +25,17 @@ namespace gglab
 		}
 
 		friend constexpr bool operator==(
-			const ArtifactContentDigest&,
-			const ArtifactContentDigest&) noexcept = default;
+			const ArtifactContentDigest&, const ArtifactContentDigest&) noexcept = default;
 	};
 
 	struct ArtifactContentDigestHash
 	{
 		[[nodiscard]] size_t operator()(const ArtifactContentDigest& digest) const noexcept
 		{
-			return FNV1a64::HashBytes64(
-				digest.m_Value.data(),
-				digest.m_Value.size());
+			return FNV1a64::HashBytes64(digest.m_Value.data(), digest.m_Value.size());
 		}
 	};
 
 	[[nodiscard]] std::string ArtifactContentDigestText(
-		const ArtifactContentDigest& digest,
-		size_t byteCount = 8);
+		const ArtifactContentDigest& digest, size_t byteCount = 8);
 }

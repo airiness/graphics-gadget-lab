@@ -51,8 +51,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Buffer.IsValid() &&
-				m_ElementIndex != std::numeric_limits<uint32_t>::max();
+			return m_Buffer.IsValid() && m_ElementIndex != std::numeric_limits<uint32_t>::max();
 		}
 
 		bool operator==(const DepthCoverageBufferSource&) const noexcept = default;
@@ -61,18 +60,14 @@ namespace gglab
 	struct DepthCoveragePipelineSignature
 	{
 		ShaderID m_CoverageVertexShader{};
-		DepthCoverageVertexProgram m_VertexProgram =
-			DepthCoverageVertexProgram::RigidMesh;
-		DepthCoverageDeformationVariant m_Deformation =
-			DepthCoverageDeformationVariant::Rigid;
+		DepthCoverageVertexProgram m_VertexProgram = DepthCoverageVertexProgram::RigidMesh;
+		DepthCoverageDeformationVariant m_Deformation = DepthCoverageDeformationVariant::Rigid;
 		InputLayoutID m_InputLayout = InputLayoutID::None;
 		DepthCoveragePositionPrecision m_PositionPrecision =
 			DepthCoveragePositionPrecision::Float32;
 		RHIFormat m_PositionFormat = RHIFormat::Unknown;
-		RHIPrimitiveTopologyType m_TopologyType =
-			RHIPrimitiveTopologyType::Triangle;
-		RHIPrimitiveTopology m_PrimitiveTopology =
-			RHIPrimitiveTopology::TriangleList;
+		RHIPrimitiveTopologyType m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+		RHIPrimitiveTopology m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 		RHIFillMode m_FillMode = RHIFillMode::Solid;
 		RHICullMode m_CullMode = RHICullMode::Back;
 		bool m_FrontCounterClockwise = false;
@@ -85,21 +80,17 @@ namespace gglab
 		uint32_t m_SampleQuality = 0;
 		uint32_t m_SampleMask = std::numeric_limits<uint32_t>::max();
 		bool m_AlphaToCoverageEnable = false;
-		DepthCoverageAlphaVariant m_AlphaVariant =
-			DepthCoverageAlphaVariant::Opaque;
+		DepthCoverageAlphaVariant m_AlphaVariant = DepthCoverageAlphaVariant::Opaque;
 
 		[[nodiscard]] constexpr bool IsValid() const noexcept
 		{
-			return m_CoverageVertexShader.IsValid() &&
-				m_InputLayout != InputLayoutID::None &&
+			return m_CoverageVertexShader.IsValid() && m_InputLayout != InputLayoutID::None &&
 				m_PositionFormat != RHIFormat::Unknown &&
 				m_TopologyType != RHIPrimitiveTopologyType::Unknown &&
-				m_PrimitiveTopology != RHIPrimitiveTopology::Unknown &&
-				m_SampleCount > 0;
+				m_PrimitiveTopology != RHIPrimitiveTopology::Unknown && m_SampleCount > 0;
 		}
 
-		constexpr bool operator==(
-			const DepthCoveragePipelineSignature&) const noexcept = default;
+		constexpr bool operator==(const DepthCoveragePipelineSignature&) const noexcept = default;
 	};
 
 	struct DepthCoverageRasterDomain
@@ -117,35 +108,24 @@ namespace gglab
 		DepthConvention m_DepthConvention = DepthConvention::Standard;
 
 		[[nodiscard]] constexpr bool MatchesTargetExtent(
-			uint32_t width,
-			uint32_t height) const noexcept
+			uint32_t width, uint32_t height) const noexcept
 		{
 			return m_TargetWidth == width && m_TargetHeight == height;
 		}
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_FrameSerial != 0 &&
-				m_ViewBindingId != std::numeric_limits<uint32_t>::max() &&
-				m_CurrentViewSource.IsValid() &&
-				m_CurrentJitteredProjectionSource.IsValid() &&
-				m_TargetWidth > 0 &&
-				m_TargetHeight > 0 &&
-				m_Viewport.m_X >= 0.0f &&
-				m_Viewport.m_Y >= 0.0f &&
-				m_Viewport.m_Width > 0.0f &&
+			return m_FrameSerial != 0 && m_ViewBindingId != std::numeric_limits<uint32_t>::max() &&
+				m_CurrentViewSource.IsValid() && m_CurrentJitteredProjectionSource.IsValid() &&
+				m_TargetWidth > 0 && m_TargetHeight > 0 && m_Viewport.m_X >= 0.0f &&
+				m_Viewport.m_Y >= 0.0f && m_Viewport.m_Width > 0.0f &&
 				m_Viewport.m_Height > 0.0f &&
-				m_Viewport.m_X + m_Viewport.m_Width <=
-					static_cast<float>(m_TargetWidth) &&
-				m_Viewport.m_Y + m_Viewport.m_Height <=
-					static_cast<float>(m_TargetHeight) &&
+				m_Viewport.m_X + m_Viewport.m_Width <= static_cast<float>(m_TargetWidth) &&
+				m_Viewport.m_Y + m_Viewport.m_Height <= static_cast<float>(m_TargetHeight) &&
 				m_Viewport.m_MinDepth >= 0.0f &&
 				m_Viewport.m_MinDepth <= m_Viewport.m_MaxDepth &&
-				m_Viewport.m_MaxDepth <= 1.0f &&
-				m_Scissor.m_Left >= 0 &&
-				m_Scissor.m_Top >= 0 &&
-				m_Scissor.m_Right > m_Scissor.m_Left &&
-				m_Scissor.m_Bottom > m_Scissor.m_Top &&
+				m_Viewport.m_MaxDepth <= 1.0f && m_Scissor.m_Left >= 0 && m_Scissor.m_Top >= 0 &&
+				m_Scissor.m_Right > m_Scissor.m_Left && m_Scissor.m_Bottom > m_Scissor.m_Top &&
 				m_Scissor.m_Right <= static_cast<int32_t>(m_TargetWidth) &&
 				m_Scissor.m_Bottom <= static_cast<int32_t>(m_TargetHeight);
 		}
@@ -161,12 +141,9 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_MeshId.IsValid() &&
-				m_VertexBuffer.m_Buffer.IsValid() &&
-				m_VertexBuffer.m_Stride > 0 &&
-				m_VertexBuffer.m_SizeInBytes > 0 &&
-				m_IndexBuffer.m_Buffer.IsValid() &&
-				m_IndexBuffer.m_SizeInBytes > 0 &&
+			return m_MeshId.IsValid() && m_VertexBuffer.m_Buffer.IsValid() &&
+				m_VertexBuffer.m_Stride > 0 && m_VertexBuffer.m_SizeInBytes > 0 &&
+				m_IndexBuffer.m_Buffer.IsValid() && m_IndexBuffer.m_SizeInBytes > 0 &&
 				m_IndexBuffer.m_Format != RHIFormat::Unknown;
 		}
 
@@ -186,8 +163,7 @@ namespace gglab
 			return m_IndexCount > 0 && m_InstanceCount > 0;
 		}
 
-		bool operator==(
-			const DepthCoverageIndexedDrawArguments&) const noexcept = default;
+		bool operator==(const DepthCoverageIndexedDrawArguments&) const noexcept = default;
 	};
 
 	struct DepthCoverageDrawPacket
@@ -200,10 +176,8 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Geometry.IsValid() &&
-				m_IndexedDraw.IsValid() &&
-				m_CurrentModelSource.IsValid() &&
-				m_MaterialAlphaSource.IsValid();
+			return m_Geometry.IsValid() && m_IndexedDraw.IsValid() &&
+				m_CurrentModelSource.IsValid() && m_MaterialAlphaSource.IsValid();
 		}
 
 		bool operator==(const DepthCoverageDrawPacket&) const noexcept = default;
@@ -215,37 +189,26 @@ namespace gglab
 		std::string m_Mismatch;
 	};
 
-	[[nodiscard]] DepthCoveragePipelineSignature
-		BuildDepthCoveragePipelineSignature(
-			const GraphicsPhysicalPipelineKey& physicalKey,
-			DepthCoverageVertexProgram vertexProgram,
-			DepthCoverageDeformationVariant deformation,
-			DepthCoveragePositionPrecision positionPrecision,
-			RHIFormat positionFormat,
-			bool doubleSided,
-			DepthCoverageAlphaVariant alphaVariant) noexcept;
+	[[nodiscard]] DepthCoveragePipelineSignature BuildDepthCoveragePipelineSignature(
+		const GraphicsPhysicalPipelineKey& physicalKey, DepthCoverageVertexProgram vertexProgram,
+		DepthCoverageDeformationVariant deformation,
+		DepthCoveragePositionPrecision positionPrecision, RHIFormat positionFormat,
+		bool doubleSided, DepthCoverageAlphaVariant alphaVariant) noexcept;
 
-	[[nodiscard]] DepthCoverageValidationResult
-		CompareDepthCoveragePipelineSignatures(
-			const DepthCoveragePipelineSignature& lhs,
-			const DepthCoveragePipelineSignature& rhs);
+	[[nodiscard]] DepthCoverageValidationResult CompareDepthCoveragePipelineSignatures(
+		const DepthCoveragePipelineSignature& lhs, const DepthCoveragePipelineSignature& rhs);
 
-	[[nodiscard]] DepthCoverageValidationResult
-		CompareDepthCoverageRasterDomains(
-			const DepthCoverageRasterDomain& lhs,
-			const DepthCoverageRasterDomain& rhs);
+	[[nodiscard]] DepthCoverageValidationResult CompareDepthCoverageRasterDomains(
+		const DepthCoverageRasterDomain& lhs, const DepthCoverageRasterDomain& rhs);
 
 	[[nodiscard]] bool IsDepthCoverageTargetExtentCompatible(
-		const DepthCoverageRasterDomain& rasterDomain,
-		const RHITextureDesc& textureDesc) noexcept;
+		const DepthCoverageRasterDomain& rasterDomain, const RHITextureDesc& textureDesc) noexcept;
 	[[nodiscard]] bool AreDepthCoverageTargetExtentsCompatible(
-		const DepthCoverageRasterDomain& rasterDomain,
-		const RHITextureDesc& colorDesc,
+		const DepthCoverageRasterDomain& rasterDomain, const RHITextureDesc& colorDesc,
 		const RHITextureDesc& depthDesc) noexcept;
 
 	[[nodiscard]] bool IsSameDepthCoverageDrawPacket(
-		const DepthCoverageDrawPacket& lhs,
-		const DepthCoverageDrawPacket& rhs) noexcept;
+		const DepthCoverageDrawPacket& lhs, const DepthCoverageDrawPacket& rhs) noexcept;
 
 	[[nodiscard]] std::string DescribeDepthCoveragePipelineSignature(
 		const DepthCoveragePipelineSignature& signature);

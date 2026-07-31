@@ -16,15 +16,9 @@ namespace gglab
 
 	namespace
 	{
-		void AddBindingSlot(
-			RHIBindingLayoutDesc& desc,
-			RHIBindingType type,
-			RHIShaderStage visibility,
-			uint32_t binding,
-			uint32_t space,
-			uint32_t count,
-			uint32_t sizeInBytes,
-			const char* debugName) noexcept
+		void AddBindingSlot(RHIBindingLayoutDesc& desc, RHIBindingType type,
+			RHIShaderStage visibility, uint32_t binding, uint32_t space, uint32_t count,
+			uint32_t sizeInBytes, const char* debugName) noexcept
 		{
 			GGLAB_ASSERT(desc.m_SlotCount < RHIBindingLayoutDesc::MaxSlots);
 			auto& slot = desc.m_Slots[desc.m_SlotCount++];
@@ -48,8 +42,8 @@ namespace gglab
 
 	Renderer::~Renderer()
 	{
-		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
-			"Renderer destroyed while a Renderer::Frame is still active.");
+		GGLAB_ASSERT_MSG(
+			!m_HasActiveFrame, "Renderer destroyed while a Renderer::Frame is still active.");
 	}
 
 	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
@@ -62,11 +56,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_RHIContext != nullptr, "Renderer failed to create an RHI context.");
 
 		auto* device = &m_RHIContext->GetDevice();
-		m_AssetUploadScheduler = std::make_unique<AssetUploadScheduler>(
-			AssetUploadScheduler::CreateInfo{
+		m_AssetUploadScheduler =
+			std::make_unique<AssetUploadScheduler>(AssetUploadScheduler::CreateInfo{
 				.m_Device = device,
 				.m_TransferManager = GetTransferManager(),
-			});
+				});
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 
@@ -89,7 +83,8 @@ namespace gglab
 
 		EnvironmentLightingSystem::CreateInfo environmentLightingCreateInfo{};
 		environmentLightingCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
-		m_EnvironmentLightingSystem = std::make_unique<EnvironmentLightingSystem>(environmentLightingCreateInfo);
+		m_EnvironmentLightingSystem =
+			std::make_unique<EnvironmentLightingSystem>(environmentLightingCreateInfo);
 
 		IBLBakeScheduler::CreateInfo iblBakeSchedulerCreateInfo{};
 		iblBakeSchedulerCreateInfo.m_Device = device;
@@ -148,8 +143,8 @@ namespace gglab
 	Renderer::Frame Renderer::BeginFrame(uint32_t backBufferIndex) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::BeginFrame called before initialization.");
-		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
-			"Renderer::BeginFrame called without ending the previous frame.");
+		GGLAB_ASSERT_MSG(
+			!m_HasActiveFrame, "Renderer::BeginFrame called without ending the previous frame.");
 		GGLAB_ASSERT_NOT_NULL(m_RHIContext.get());
 		RHIFrameContext& rhiFrame = m_RHIContext->BeginFrame();
 		GGLAB_ASSERT(rhiFrame.GetBackBufferIndex() == backBufferIndex);
@@ -163,16 +158,12 @@ namespace gglab
 
 		m_HasActiveFrame = true;
 		const uint64_t frameSerial = m_NextFrameSerial++;
-		GGLAB_ASSERT_MSG(
-			frameSerial != 0,
-			"Renderer frame serial overflowed its valid range.");
+		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
 		return Frame(this, &rhiFrame, frameSerial);
 	}
 
 	void Renderer::Render(
-		Frame& frame,
-		RenderGraph& rg,
-		const RenderFrameContext& renderContext) noexcept
+		Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::Render called before initialization.");
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
@@ -210,13 +201,11 @@ namespace gglab
 			m_RHIContext->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
 		}
 
-		RGExecuteContext executeContext{
-			RGBackendExecuteContext{
-				.m_GraphicsCommandContext = &frame.m_RHIFrame->GetGraphicsContext(),
-				.m_DirectComputeCommandContext = &frame.m_RHIFrame->GetDirectComputeContext(),
-				.m_AsyncComputeCommandContext = nullptr,
-			}
-		};
+		RGExecuteContext executeContext{ RGBackendExecuteContext{
+			.m_GraphicsCommandContext = &frame.m_RHIFrame->GetGraphicsContext(),
+			.m_DirectComputeCommandContext = &frame.m_RHIFrame->GetDirectComputeContext(),
+			.m_AsyncComputeCommandContext = nullptr,
+		} };
 		rg.Execute(executeContext);
 
 		frame.m_State = Frame::State::Recorded;
@@ -242,9 +231,7 @@ namespace gglab
 		m_LastSubmittedFencePoint = m_RHIContext->EndFrame(*frame.m_RHIFrame);
 		m_IBLBakeScheduler->OnFrameSubmitted(m_LastSubmittedFencePoint);
 
-		RetireSceneGpuAllocations(
-			&frame.m_SceneGpuAllocations,
-			m_LastSubmittedFencePoint);
+		RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, m_LastSubmittedFencePoint);
 
 		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
 		EndFrameLifetime(frame);
@@ -273,9 +260,7 @@ namespace gglab
 		{
 			m_RHIContext->AbortFrame(*frame.m_RHIFrame);
 			m_LastSubmittedFencePoint = frame.m_RHIFrame->GetSubmittedFence();
-			RetireSceneGpuAllocations(
-				&frame.m_SceneGpuAllocations,
-				m_LastSubmittedFencePoint);
+			RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, m_LastSubmittedFencePoint);
 
 			if (frame.m_RenderGraph)
 			{
@@ -298,16 +283,15 @@ namespace gglab
 	}
 
 	void Renderer::RetireSceneGpuAllocations(
-		RenderSceneGpuAllocations* allocations,
-		const RHIFencePoint& fencePoint) noexcept
+		RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept
 	{
 		if (!allocations || allocations->IsEmpty())
 		{
 			return;
 		}
 
-		GGLAB_ASSERT_MSG(fencePoint.IsValid(),
-			"Scene GPU allocations require a valid graphics fence point.");
+		GGLAB_ASSERT_MSG(
+			fencePoint.IsValid(), "Scene GPU allocations require a valid graphics fence point.");
 
 		if (allocations->m_Views.IsValid())
 		{
@@ -325,15 +309,24 @@ namespace gglab
 		RHIBindingLayoutDesc desc{};
 		desc.m_DebugName = "RendererCommonBindingLayout";
 
-		AddBindingSlot(desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 1, 0, 1, MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
-		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 2, 0, 1, MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 1, 0, 1, 0, "ObjectSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 2, 0, 1, 0, "MaterialSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
-		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0, "LightSB");
-		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::All, 0, 0, 0, 0, "BindlessTextures");
-		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0, "BindlessSamplers");
+		AddBindingSlot(
+			desc, RHIBindingType::ConstantBuffer, RHIShaderStage::All, 0, 0, 1, 0, "SceneCB");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 1, 0, 1,
+			MaxDrawConstantDWORDs * sizeof(uint32_t), "DrawConstants");
+		AddBindingSlot(desc, RHIBindingType::PushConstants, RHIShaderStage::All, 2, 0, 1,
+			MaxPassConstantDWORDs * sizeof(uint32_t), "PassConstants");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 1, 0, 1, 0,
+			"ObjectSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 2, 0, 1, 0,
+			"MaterialSB");
+		AddBindingSlot(
+			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
+		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
+			"LightSB");
+		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::All, 0, 0,
+			0, 0, "BindlessTextures");
+		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0,
+			"BindlessSamplers");
 		return desc;
 	}
 
@@ -419,7 +412,8 @@ namespace gglab
 			objectSBCreateInfo.m_ElementCapacity = MaxObjectCapacity;
 			objectSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
 			objectSBCreateInfo.m_DebugName = "Renderer.PersistentObjects";
-			m_ObjectSB = std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
+			m_ObjectSB =
+				std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 			m_ObjectTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, ObjectGPU>>(
 				MaxObjectCapacity, GetSwapChain()->GetBufferCount());
 
@@ -428,9 +422,11 @@ namespace gglab
 			materialSBCreateInfo.m_ElementCapacity = MaxMaterialCapacity;
 			materialSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
 			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
-			m_MaterialSB = std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
-			m_MaterialTable = std::make_unique<PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>>(
-				MaxMaterialCapacity, GetSwapChain()->GetBufferCount());
+			m_MaterialSB =
+				std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
+			m_MaterialTable =
+				std::make_unique<PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>>(
+					MaxMaterialCapacity, GetSwapChain()->GetBufferCount());
 
 			PersistentStructuredBuffer<LightGPU>::CreateInfo lightSBCreateInfo{};
 			lightSBCreateInfo.m_Device = GetDevice();
@@ -444,10 +440,10 @@ namespace gglab
 			// View data remains a small per-frame dynamic upload allocation.
 			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};
 			viewSBCreateInfo.m_Device = GetDevice();
-			viewSBCreateInfo.m_ElementCapacity =
-				MaxViewCapacity * GetSwapChain()->GetBufferCount();
+			viewSBCreateInfo.m_ElementCapacity = MaxViewCapacity * GetSwapChain()->GetBufferCount();
 			viewSBCreateInfo.m_DebugName = "Renderer.DynamicViews";
-			m_ViewSB = std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
+			m_ViewSB =
+				std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
 		}
 	}
 }

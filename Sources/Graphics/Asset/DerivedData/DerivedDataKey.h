@@ -16,11 +16,13 @@ namespace gglab
 		{
 			for (const std::byte value : m_Value)
 			{
-				if (value != std::byte{}) return true;
+				if (value != std::byte{})
+					return true;
 			}
 			return false;
 		}
-		friend constexpr bool operator==(const SourceDigest&, const SourceDigest&) noexcept = default;
+		friend constexpr bool operator==(
+			const SourceDigest&, const SourceDigest&) noexcept = default;
 	};
 
 	struct DerivedDataKey
@@ -30,11 +32,13 @@ namespace gglab
 		{
 			for (const std::byte value : m_Value)
 			{
-				if (value != std::byte{}) return true;
+				if (value != std::byte{})
+					return true;
 			}
 			return false;
 		}
-		friend constexpr bool operator==(const DerivedDataKey&, const DerivedDataKey&) noexcept = default;
+		friend constexpr bool operator==(
+			const DerivedDataKey&, const DerivedDataKey&) noexcept = default;
 	};
 
 	struct DerivedDataKeyHash
@@ -68,14 +72,9 @@ namespace gglab
 	inline constexpr uint32_t TextureArtifactSchemaVersion = 2;
 	inline constexpr uint32_t TextureProducerCompatibilityVersion = 1;
 
-	[[nodiscard]] DerivedDataKey BuildTextureDerivedDataKey(
-		const SourceDigest& sourceDigest,
+	[[nodiscard]] DerivedDataKey BuildTextureDerivedDataKey(const SourceDigest& sourceDigest,
 		const std::filesystem::path& sourceIdentity,
 		const TextureImportSettings& importSettings) noexcept;
-	[[nodiscard]] std::string SourceDigestText(
-		const SourceDigest& digest,
-		size_t byteCount = 8);
-	[[nodiscard]] std::string DerivedDataKeyText(
-		const DerivedDataKey& key,
-		size_t byteCount = 8);
+	[[nodiscard]] std::string SourceDigestText(const SourceDigest& digest, size_t byteCount = 8);
+	[[nodiscard]] std::string DerivedDataKeyText(const DerivedDataKey& key, size_t byteCount = 8);
 }

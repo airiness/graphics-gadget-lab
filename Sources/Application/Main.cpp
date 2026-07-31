@@ -19,8 +19,7 @@ int main(int argc, char* argv[])
 	const auto launchResult = gglab::ParseApplicationLaunchOptions(arguments);
 	if (!launchResult.IsValid())
 	{
-		std::fprintf(stderr, "Error: %s\n\n%s",
-			launchResult.m_Error.c_str(),
+		std::fprintf(stderr, "Error: %s\n\n%s", launchResult.m_Error.c_str(),
 			gglab::GetApplicationLaunchUsage().data());
 		return EXIT_FAILURE;
 	}
@@ -31,8 +30,9 @@ int main(int argc, char* argv[])
 	}
 	if (launchResult.m_Options.m_SelfTestSuiteId)
 	{
-		return gglab::RunApplicationSelfTestSuite(
-			*launchResult.m_Options.m_SelfTestSuiteId) ? EXIT_SUCCESS : EXIT_FAILURE;
+		return gglab::RunApplicationSelfTestSuite(*launchResult.m_Options.m_SelfTestSuiteId)
+			? EXIT_SUCCESS
+			: EXIT_FAILURE;
 	}
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);

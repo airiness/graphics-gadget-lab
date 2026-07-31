@@ -77,8 +77,7 @@ namespace gglab
 		bool m_IsHostActive = false;
 	};
 
-	template<>
-	struct SnapshotTraits<LabSnapshot>
+	template <> struct SnapshotTraits<LabSnapshot>
 	{
 		static constexpr SnapshotId Id = MakeSnapshotId("Diagnostics.LabSnapshot");
 	};

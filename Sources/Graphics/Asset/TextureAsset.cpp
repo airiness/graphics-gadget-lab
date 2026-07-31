@@ -6,8 +6,7 @@
 namespace gglab
 {
 	AssetContentFingerprint ComputeTextureContentFingerprint(
-		const TextureAssetData& textureData,
-		const TextureImportSettings& importSettings) noexcept
+		const TextureAssetData& textureData, const TextureImportSettings& importSettings) noexcept
 	{
 		if (!textureData.IsValid())
 		{
@@ -24,9 +23,7 @@ namespace gglab
 		FNV1a64::MixValue(contentHash, textureData.m_ArraySize);
 		FNV1a64::MixValue(contentHash, textureData.m_MipLevels);
 		FNV1a64::MixValue(contentHash, textureData.m_ColorSpace);
-		FNV1a64::MixValue(
-			contentHash,
-			static_cast<uint64_t>(textureData.m_Subresources.size()));
+		FNV1a64::MixValue(contentHash, static_cast<uint64_t>(textureData.m_Subresources.size()));
 		for (const TextureAssetSubresource& subresource : textureData.m_Subresources)
 		{
 			FNV1a64::MixValue(contentHash, subresource.m_DataOffset);
@@ -39,10 +36,7 @@ namespace gglab
 			FNV1a64::MixValue(contentHash, subresource.m_MipLevel);
 			FNV1a64::MixValue(contentHash, subresource.m_ArraySlice);
 		}
-		FNV1a64::MixBytes(
-			contentHash,
-			textureData.m_Pixels.data(),
-			textureData.m_Pixels.size());
+		FNV1a64::MixBytes(contentHash, textureData.m_Pixels.data(), textureData.m_Pixels.size());
 
 		uint64_t settingsHash = FNV1a64::OffsetBasis;
 		FNV1a64::MixValue(settingsHash, importSettings.m_Semantic);
@@ -62,8 +56,7 @@ namespace gglab
 
 	RHITextureUploadData TextureAssetData::MakeUploadData() const noexcept
 	{
-		const TextureStructureValidationResult validation =
-			ValidateTextureAssetStructure(*this);
+		const TextureStructureValidationResult validation = ValidateTextureAssetStructure(*this);
 		if (!validation.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
@@ -77,14 +70,13 @@ namespace gglab
 
 		for (const TextureAssetSubresource& subresource : m_Subresources)
 		{
-			const size_t index = static_cast<size_t>(subresource.m_ArraySlice) *
-				m_MipLevels + subresource.m_MipLevel;
-			uploadData.m_Subresources[index] =
-				{
-					.m_Data = m_Pixels.data() + subresource.m_DataOffset,
-					.m_RowPitch = subresource.m_RowPitch,
-					.m_SlicePitch = subresource.m_SlicePitch,
-				};
+			const size_t index = static_cast<size_t>(subresource.m_ArraySlice) * m_MipLevels +
+				subresource.m_MipLevel;
+			uploadData.m_Subresources[index] = {
+				.m_Data = m_Pixels.data() + subresource.m_DataOffset,
+				.m_RowPitch = subresource.m_RowPitch,
+				.m_SlicePitch = subresource.m_SlicePitch,
+			};
 		}
 
 		return uploadData;

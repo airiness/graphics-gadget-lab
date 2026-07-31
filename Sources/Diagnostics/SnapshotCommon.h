@@ -27,11 +27,9 @@ namespace gglab
 		ManualRefresh,
 	};
 
-	template<typename T>
-	struct SnapshotTraits;
+	template <typename T> struct SnapshotTraits;
 
-	template<typename T>
-	inline constexpr SnapshotId SnapshotIdOf = SnapshotTraits<T>::Id;
+	template <typename T> inline constexpr SnapshotId SnapshotIdOf = SnapshotTraits<T>::Id;
 
 	struct SnapshotProfile
 	{

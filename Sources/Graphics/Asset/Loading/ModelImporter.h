@@ -37,7 +37,8 @@ namespace gglab
 	{
 		std::string m_Name;
 		MaterialProperties m_Properties{};
-		std::array<ImportedMaterialTextureBinding, static_cast<size_t>(MaterialTextureSlot::Count)> m_TextureBindings{};
+		std::array<ImportedMaterialTextureBinding, static_cast<size_t>(MaterialTextureSlot::Count)>
+			m_TextureBindings{};
 	};
 
 	struct ImportedMesh
@@ -86,10 +87,8 @@ namespace gglab
 	class ModelImporter
 	{
 	public:
-		[[nodiscard]] static ModelImportResult Import(
-			const std::filesystem::path& path,
-			const ModelImportSettings& settings,
-			std::stop_token stopToken = {},
+		[[nodiscard]] static ModelImportResult Import(const std::filesystem::path& path,
+			const ModelImportSettings& settings, std::stop_token stopToken = {},
 			const ProgressReporter& progress = {}) noexcept;
 	};
 }

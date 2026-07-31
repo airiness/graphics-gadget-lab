@@ -23,9 +23,8 @@ namespace gglab
 		};
 	}
 
-	void RenderPassDevelopGui::AddPass(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPassDevelopGui::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		auto* developGuiSystem = services.m_DevelopGuiSystem;
 		if (!developGuiSystem || !developGuiSystem->IsFrameOpen())
@@ -34,28 +33,26 @@ namespace gglab
 		}
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
-		rg.AddPass<PassData>(GetRenderGraphPassName(),
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
 			[displayViewId](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
 
-				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targetsTable =
+					blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& viewTargets = targetsTable.GetViewTargets(displayViewId);
-				builder.ReadWriteInPlace(
-					viewTargets.m_BackBuffer,
-					RGTextureAccess::RenderTarget);
+				builder.ReadWriteInPlace(viewTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = viewTargets.m_BackBuffer;
-				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
+				data.m_Rtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 
-				if (const auto* iblRes =
-					blackboard.TryGet<RGIBLResources>(IBLResourcesName);
+				if (const auto* iblRes = blackboard.TryGet<RGIBLResources>(IBLResourcesName);
 					iblRes && iblRes->m_BrdfLut.IsValid())
 				{
-					data.m_BrdfLut = builder.Read(
-						iblRes->m_BrdfLut,
-						RGTextureAccess::Sample);
+					data.m_BrdfLut = builder.Read(iblRes->m_BrdfLut, RGTextureAccess::Sample);
 				}
 
 				if (const auto* iblPreviewRes =
@@ -64,20 +61,18 @@ namespace gglab
 					if (iblPreviewRes->m_EnvironmentCubemapPreview.IsValid())
 					{
 						data.m_EnvironmentCubemapPreview = builder.Read(
-							iblPreviewRes->m_EnvironmentCubemapPreview,
-							RGTextureAccess::Sample);
+							iblPreviewRes->m_EnvironmentCubemapPreview, RGTextureAccess::Sample);
 					}
 					if (iblPreviewRes->m_IrradianceCubemapPreview.IsValid())
 					{
 						data.m_IrradianceCubemapPreview = builder.Read(
-							iblPreviewRes->m_IrradianceCubemapPreview,
-							RGTextureAccess::Sample);
+							iblPreviewRes->m_IrradianceCubemapPreview, RGTextureAccess::Sample);
 					}
 					if (iblPreviewRes->m_PrefilteredSpecularCubemapPreview.IsValid())
 					{
-						data.m_PrefilteredSpecularCubemapPreview = builder.Read(
-							iblPreviewRes->m_PrefilteredSpecularCubemapPreview,
-							RGTextureAccess::Sample);
+						data.m_PrefilteredSpecularCubemapPreview =
+							builder.Read(iblPreviewRes->m_PrefilteredSpecularCubemapPreview,
+								RGTextureAccess::Sample);
 					}
 				}
 
@@ -86,8 +81,7 @@ namespace gglab
 					shadowRes && shadowRes->m_DirectionalShadowMapPreview.IsValid())
 				{
 					data.m_DirectionalShadowMapPreview = builder.Read(
-						shadowRes->m_DirectionalShadowMapPreview,
-						RGTextureAccess::Sample);
+						shadowRes->m_DirectionalShadowMapPreview, RGTextureAccess::Sample);
 				}
 			},
 			[developGuiSystem](RGExecuteContext& executeContext, PassData& data)
@@ -103,8 +97,7 @@ namespace gglab
 					return;
 				}
 
-				developGuiSystem->RenderDrawData(
-					executeContext.GetGraphicsCommandContext(),
+				developGuiSystem->RenderDrawData(executeContext.GetGraphicsCommandContext(),
 					executeContext.GetViewHandle(data.m_Rtv));
 			});
 	}

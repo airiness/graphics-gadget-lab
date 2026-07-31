@@ -52,14 +52,10 @@ namespace gglab
 		AssetOperationToken m_Token{};
 		AssetResidencyOperationKind m_Kind = AssetResidencyOperationKind::Evict;
 
-		[[nodiscard]] constexpr bool IsValid() const noexcept
-		{
-			return m_Token.IsValid();
-		}
+		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Token.IsValid(); }
 
 		friend bool operator==(
-			const AssetResidencyOperation&,
-			const AssetResidencyOperation&) = default;
+			const AssetResidencyOperation&, const AssetResidencyOperation&) = default;
 	};
 
 	struct AssetResidencyInventoryEntry
@@ -73,8 +69,7 @@ namespace gglab
 		bool m_HasPinnedDependentModel = false;
 
 		friend bool operator==(
-			const AssetResidencyInventoryEntry&,
-			const AssetResidencyInventoryEntry&) = default;
+			const AssetResidencyInventoryEntry&, const AssetResidencyInventoryEntry&) = default;
 	};
 
 	struct AssetResidencyInventorySnapshot
@@ -83,8 +78,7 @@ namespace gglab
 		uint64_t m_LogicalResidentBytes = 0;
 		std::vector<AssetResidencyInventoryEntry> m_Entries;
 
-		friend bool operator==(
-			const AssetResidencyInventorySnapshot&,
+		friend bool operator==(const AssetResidencyInventorySnapshot&,
 			const AssetResidencyInventorySnapshot&) = default;
 	};
 

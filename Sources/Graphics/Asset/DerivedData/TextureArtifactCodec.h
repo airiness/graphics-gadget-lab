@@ -14,8 +14,7 @@ namespace gglab
 	{
 		TextureArtifact m_Artifact;
 		std::string m_Error;
-		TextureStructureValidationError m_StructureError =
-			TextureStructureValidationError::None;
+		TextureStructureValidationError m_StructureError = TextureStructureValidationError::None;
 		[[nodiscard]] bool Succeeded() const noexcept { return m_Artifact.IsValid(); }
 	};
 
@@ -29,8 +28,7 @@ namespace gglab
 		[[nodiscard]] static uint64_t GetMaximumSerializedBytes(
 			TextureAssetValidationLimits limits = {}) noexcept;
 		[[nodiscard]] static TextureArtifactDecodeResult Deserialize(
-			std::span<const std::byte> payload,
-			const ArtifactContentDigest& expectedContentDigest,
+			std::span<const std::byte> payload, const ArtifactContentDigest& expectedContentDigest,
 			TextureAssetValidationLimits limits = {}) noexcept;
 	};
 }

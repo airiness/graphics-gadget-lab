@@ -7,6 +7,5 @@ namespace gglab
 	struct PostProcessDiagnosticsSnapshot;
 
 	[[nodiscard]] PostProcessDiagnosticsSnapshot BuildPostProcessDiagnosticsSnapshot(
-		const Renderer& renderer,
-		const RenderGraph& renderGraph) noexcept;
+		const Renderer& renderer, const RenderGraph& renderGraph) noexcept;
 }

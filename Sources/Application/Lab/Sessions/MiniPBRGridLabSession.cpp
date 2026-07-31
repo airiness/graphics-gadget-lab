@@ -53,9 +53,7 @@ namespace gglab
 		}
 
 		bool ComputeModelBounds(
-			const Model& model,
-			const AssetManager& assetManager,
-			math::Aabb& result) noexcept
+			const Model& model, const AssetManager& assetManager, math::Aabb& result) noexcept
 		{
 			bool hasBounds = false;
 			for (const ModelMesh& modelMesh : model.m_MeshInstance)
@@ -66,9 +64,8 @@ namespace gglab
 					continue;
 				}
 
-				const math::Aabb transformedBounds = math::Transform(
-					mesh->m_Aabb,
-					modelMesh.m_LocalTransform);
+				const math::Aabb transformedBounds =
+					math::Transform(mesh->m_Aabb, modelMesh.m_LocalTransform);
 				if (!hasBounds)
 				{
 					result = transformedBounds;
@@ -83,12 +80,8 @@ namespace gglab
 		}
 	}
 
-	MiniPBRGridLabSession::MiniPBRGridLabSession(
-		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(
-			GetDescriptor(),
-			createInfo,
-			std::make_unique<RenderPipelineForwardPBR>())
+	MiniPBRGridLabSession::MiniPBRGridLabSession(const LabSessionCreateInfo& createInfo) noexcept :
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -98,12 +91,15 @@ namespace gglab
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::RebuildScene,
 			.m_DefaultValue = int32_t(SceneSource::ProceduralGrid),
-			.m_EnumItems = {
-				{ .m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid" },
-				{ .m_Value = int32_t(SceneSource::MetalRoughSpheres), .m_Name = "MetalRoughSpheres" },
-				{ .m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures), .m_Name = "MetalRoughSpheresNoTextures" },
-			},
-		}));
+			.m_EnumItems =
+				{
+					{.m_Value = int32_t(SceneSource::ProceduralGrid), .m_Name = "Procedural Grid"},
+					{.m_Value = int32_t(SceneSource::MetalRoughSpheres),
+						.m_Name = "MetalRoughSpheres"},
+					{.m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures),
+						.m_Name = "MetalRoughSpheresNoTextures"},
+				},
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,
 			.m_Name = "Enable Camera Input",
@@ -111,7 +107,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = true,
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = CameraFovId,
 			.m_Name = "Field of View",
@@ -121,7 +117,7 @@ namespace gglab
 			.m_DefaultValue = 50.0f,
 			.m_MinValue = LabValue(30.0f),
 			.m_MaxValue = LabValue(90.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BaseColorId,
 			.m_Name = "Base Color",
@@ -129,7 +125,7 @@ namespace gglab
 			.m_Type = LabParameterType::Color,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = Color(0.82f, 0.18f, 0.08f, 1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = MetallicMinId,
 			.m_Name = "Metallic Min",
@@ -139,7 +135,7 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = MetallicMaxId,
 			.m_Name = "Metallic Max",
@@ -149,7 +145,7 @@ namespace gglab
 			.m_DefaultValue = 1.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = RoughnessMinId,
 			.m_Name = "Roughness Min",
@@ -159,7 +155,7 @@ namespace gglab
 			.m_DefaultValue = 0.05f,
 			.m_MinValue = LabValue(0.04f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = RoughnessMaxId,
 			.m_Name = "Roughness Max",
@@ -169,7 +165,7 @@ namespace gglab
 			.m_DefaultValue = 0.9f,
 			.m_MinValue = LabValue(0.04f),
 			.m_MaxValue = LabValue(1.0f),
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = DebugViewId,
 			.m_Name = "Debug View",
@@ -177,14 +173,15 @@ namespace gglab
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = int32_t(MaterialDebugView::Lit),
-			.m_EnumItems = {
-				{ .m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit" },
-				{ .m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color" },
-				{ .m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic" },
-				{ .m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness" },
-				{ .m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal" },
-			},
-		}));
+			.m_EnumItems =
+				{
+					{.m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit"},
+					{.m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color"},
+					{.m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic"},
+					{.m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal"},
+				},
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
 			.m_Name = "Intensity",
@@ -194,7 +191,7 @@ namespace gglab
 			.m_DefaultValue = 3.0f,
 			.m_MinValue = LabValue(0.0f),
 			.m_MaxValue = LabValue(20.0f),
-		}));
+			}));
 
 		ApplyImmediateParameters();
 	}
@@ -209,9 +206,8 @@ namespace gglab
 		m_PendingModelPath.clear();
 		ApplyCameraPreset();
 
-		const auto sceneSource = static_cast<SceneSource>(GetParameters().Get(
-			SceneSourceId,
-			int32_t(SceneSource::ProceduralGrid)));
+		const auto sceneSource = static_cast<SceneSource>(
+			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
 		if (sceneSource == SceneSource::ProceduralGrid)
 		{
 			m_PrepareMode = PrepareMode::ProceduralGrid;
@@ -224,9 +220,9 @@ namespace gglab
 			return;
 		}
 
-		const std::string_view modelPath =
-			sceneSource == SceneSource::MetalRoughSpheres ?
-			MetalRoughSpheresPath : MetalRoughSpheresNoTexturesPath;
+		const std::string_view modelPath = sceneSource == SceneSource::MetalRoughSpheres
+			? MetalRoughSpheresPath
+			: MetalRoughSpheresNoTexturesPath;
 		m_PrepareMode = PrepareMode::AssetModel;
 		m_LoadingProgress = {
 			.m_Status = LoadingStatus::Preparing,
@@ -260,35 +256,33 @@ namespace gglab
 			LoadingProgressBuilder progress;
 			const float gridFraction =
 				static_cast<float>(m_NextGridRow) / static_cast<float>(GridSize);
-			progress.AddStep(0.85f, {
-				.m_Status = m_NextGridRow == GridSize ?
-					LoadingStatus::Ready : LoadingStatus::Preparing,
-				.m_Fraction = gridFraction,
-				.m_Stage = "Building procedural material grid",
-				.m_Detail = m_NextGridRow < GridSize ?
-					std::format("Preparing row {} of {}.", m_NextGridRow + 1, GridSize) :
-					"Procedural grid complete.",
-			});
+			progress.AddStep(0.85f,
+				{
+					.m_Status =
+						m_NextGridRow == GridSize ? LoadingStatus::Ready : LoadingStatus::Preparing,
+					.m_Fraction = gridFraction,
+					.m_Stage = "Building procedural material grid",
+					.m_Detail = m_NextGridRow < GridSize ? std::format("Preparing row {} of {}.",
+															   m_NextGridRow + 1, GridSize)
+														 : "Procedural grid complete.",
+				});
 			if (m_NextGridRow == GridSize)
 			{
-				const Mesh* sphereMesh = m_Services.m_AssetManager->GetMesh(
-					ProceduralSphereMeshID);
+				const Mesh* sphereMesh = m_Services.m_AssetManager->GetMesh(ProceduralSphereMeshID);
 				if (!sphereMesh)
 				{
 					progress.AddStep(0.15f, {
-						.m_Status = LoadingStatus::Failed,
-						.m_Fraction = 0.0f,
-						.m_Stage = "Procedural mesh unavailable",
-						.m_Detail = "ProceduralSphere",
-					});
+												.m_Status = LoadingStatus::Failed,
+												.m_Fraction = 0.0f,
+												.m_Stage = "Procedural mesh unavailable",
+												.m_Detail = "ProceduralSphere",
+						});
 					m_LoadingProgress = progress.Build();
 					return;
 				}
 
 				const AssetLoadProgress meshProgress = GetAssetLoadProgress(
-					sphereMesh->m_State,
-					AssetLoadKind::Mesh,
-					sphereMesh->m_LoadProgress);
+					sphereMesh->m_State, AssetLoadKind::Mesh, sphereMesh->m_LoadProgress);
 				progress.AddAssetStep(0.15f, meshProgress, "ProceduralSphere");
 				m_LoadingProgress = progress.Build();
 				if (!meshProgress.IsReady())
@@ -303,11 +297,11 @@ namespace gglab
 			else
 			{
 				progress.AddStep(0.15f, {
-					.m_Status = LoadingStatus::Preparing,
-					.m_Fraction = 0.0f,
-					.m_Stage = "Waiting for procedural mesh upload",
-					.m_Detail = "ProceduralSphere",
-				});
+											.m_Status = LoadingStatus::Preparing,
+											.m_Fraction = 0.0f,
+											.m_Stage = "Waiting for procedural mesh upload",
+											.m_Detail = "ProceduralSphere",
+					});
 				m_LoadingProgress = progress.Build();
 			}
 			return;
@@ -330,19 +324,17 @@ namespace gglab
 			return;
 		}
 
-		const AssetLoadProgress modelProgress = GetAssetLoadProgress(
-			model->m_State,
-			AssetLoadKind::Model,
-			model->m_LoadProgress);
+		const AssetLoadProgress modelProgress =
+			GetAssetLoadProgress(model->m_State, AssetLoadKind::Model, model->m_LoadProgress);
 		LoadingProgressBuilder progress;
 		progress.AddCompletedStep(0.05f);
 		progress.AddAssetStep(0.85f, modelProgress, m_PendingModelPath);
 		progress.AddStep(0.10f, {
-			.m_Status = LoadingStatus::Preparing,
-			.m_Fraction = 0.0f,
-			.m_Stage = "Creating scene instance",
-			.m_Detail = m_PendingModelPath,
-		});
+									.m_Status = LoadingStatus::Preparing,
+									.m_Fraction = 0.0f,
+									.m_Stage = "Creating scene instance",
+									.m_Detail = m_PendingModelPath,
+			});
 		m_LoadingProgress = progress.Build();
 		if (!modelProgress.IsReady())
 		{
@@ -395,40 +387,29 @@ namespace gglab
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, true);
 		GetCamera().SetFov(parameters.Get(CameraFovId, 50.0f));
 
-		const Color baseColor = parameters.Get(
-			BaseColorId,
-			Color(0.82f, 0.18f, 0.08f, 1.0f));
-		const float metallicMin = std::min(
-			parameters.Get(MetallicMinId, 0.0f),
-			parameters.Get(MetallicMaxId, 1.0f));
-		const float metallicMax = std::max(
-			parameters.Get(MetallicMinId, 0.0f),
-			parameters.Get(MetallicMaxId, 1.0f));
-		const float roughnessMin = std::min(
-			parameters.Get(RoughnessMinId, 0.05f),
-			parameters.Get(RoughnessMaxId, 0.9f));
-		const float roughnessMax = std::max(
-			parameters.Get(RoughnessMinId, 0.05f),
-			parameters.Get(RoughnessMaxId, 0.9f));
+		const Color baseColor = parameters.Get(BaseColorId, Color(0.82f, 0.18f, 0.08f, 1.0f));
+		const float metallicMin =
+			std::min(parameters.Get(MetallicMinId, 0.0f), parameters.Get(MetallicMaxId, 1.0f));
+		const float metallicMax =
+			std::max(parameters.Get(MetallicMinId, 0.0f), parameters.Get(MetallicMaxId, 1.0f));
+		const float roughnessMin =
+			std::min(parameters.Get(RoughnessMinId, 0.05f), parameters.Get(RoughnessMaxId, 0.9f));
+		const float roughnessMax =
+			std::max(parameters.Get(RoughnessMinId, 0.05f), parameters.Get(RoughnessMaxId, 0.9f));
 		const auto debugView = static_cast<MaterialDebugView>(
 			parameters.Get(DebugViewId, int32_t(MaterialDebugView::Lit)));
 
-		auto materialView = m_World.GetRegistry().view<
-			GridCellComponent,
-			components::MaterialInstanceComponent>();
+		auto materialView =
+			m_World.GetRegistry().view<GridCellComponent, components::MaterialInstanceComponent>();
 		for (const entt::entity entity : materialView)
 		{
 			const auto& cell = materialView.get<GridCellComponent>(entity);
 			auto& material = materialView.get<components::MaterialInstanceComponent>(entity);
 			material.m_Properties.m_BaseColor = baseColor;
-			material.m_Properties.m_MetallicFactor = std::lerp(
-				metallicMin,
-				metallicMax,
-				GridFactor(cell.m_Column));
-			material.m_Properties.m_RoughnessFactor = std::lerp(
-				roughnessMin,
-				roughnessMax,
-				GridFactor(cell.m_Row));
+			material.m_Properties.m_MetallicFactor =
+				std::lerp(metallicMin, metallicMax, GridFactor(cell.m_Column));
+			material.m_Properties.m_RoughnessFactor =
+				std::lerp(roughnessMin, roughnessMax, GridFactor(cell.m_Row));
 			material.m_Properties.m_DebugView = debugView;
 		}
 
@@ -446,8 +427,7 @@ namespace gglab
 		BeginPrepare();
 	}
 
-	void MiniPBRGridLabSession::OnParametersRestoredForPrepare(
-		LabChangeImpact impact) noexcept
+	void MiniPBRGridLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
 	{
 		GGLAB_UNUSED(impact);
 		ApplyImmediateParameters();
@@ -460,17 +440,14 @@ namespace gglab
 		for (uint32_t column = 0; column < GridSize; ++column)
 		{
 			components::TransformComponent transform{};
-			transform.m_Position = Vector3(
-				(static_cast<float>(column) - halfGridSize) * GridSpacing,
-				(halfGridSize - static_cast<float>(row)) * GridSpacing,
-				GridDepth);
+			transform.m_Position =
+				Vector3((static_cast<float>(column) - halfGridSize) * GridSpacing,
+					(halfGridSize - static_cast<float>(row)) * GridSpacing, GridDepth);
 			transform.m_Scale = Vector3::One * 0.95f;
 
 			components::MaterialInstanceComponent material{};
-			const std::string key = std::format(
-				"gglab.lab.mini_pbr_grid.material.{}.{}",
-				row,
-				column);
+			const std::string key =
+				std::format("gglab.lab.mini_pbr_grid.material.{}.{}", row, column);
 			material.m_Key = RuntimeMaterialKey(key);
 
 			const entt::entity sphere = primitive::Sphere::Create({
@@ -479,11 +456,11 @@ namespace gglab
 				.m_World = &m_World,
 				.m_Transform = transform,
 				.m_MaterialInstance = material,
-			});
+				});
 			registry.emplace<GridCellComponent>(sphere, GridCellComponent{
-				.m_Row = row,
-				.m_Column = column,
-			});
+															.m_Row = row,
+															.m_Column = column,
+				});
 		}
 	}
 
@@ -512,18 +489,14 @@ namespace gglab
 		const Model* model = assetManager.GetModel(m_PendingModelId);
 		if (!model)
 		{
-			GGLAB_LOG_ERROR(
-				"Mini PBR Grid lost pending model '{}'.",
-				m_PendingModelPath);
+			GGLAB_LOG_ERROR("Mini PBR Grid lost pending model '{}'.", m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
 			return false;
 		}
 		if (model->m_State == AssetState::Failed || model->m_State == AssetState::Cancelled)
 		{
-			GGLAB_LOG_ERROR(
-				"Mini PBR Grid failed to load model '{}'.",
-				m_PendingModelPath);
+			GGLAB_LOG_ERROR("Mini PBR Grid failed to load model '{}'.", m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
 			return false;
@@ -533,17 +506,13 @@ namespace gglab
 			return false;
 		}
 
-		GGLAB_LOG_INFO(
-			"Mini PBR Grid loaded '{}' with {} mesh instances.",
-			m_PendingModelPath,
+		GGLAB_LOG_INFO("Mini PBR Grid loaded '{}' with {} mesh instances.", m_PendingModelPath,
 			model->m_MeshInstance.size());
 
 		math::Aabb bounds{};
 		if (!ComputeModelBounds(*model, assetManager, bounds))
 		{
-			GGLAB_LOG_ERROR(
-				"Mini PBR Grid model '{}' has no valid bounds.",
-				m_PendingModelPath);
+			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has no valid bounds.", m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
 			return false;
@@ -555,9 +524,7 @@ namespace gglab
 		const float maxExtent = std::max({ fullExtent.m_X, fullExtent.m_Y, fullExtent.m_Z });
 		if (maxExtent <= 0.0f)
 		{
-			GGLAB_LOG_ERROR(
-				"Mini PBR Grid model '{}' has degenerate bounds.",
-				m_PendingModelPath);
+			GGLAB_LOG_ERROR("Mini PBR Grid model '{}' has degenerate bounds.", m_PendingModelPath);
 			m_PendingModelId.Reset();
 			m_PendingModelPath.clear();
 			return false;
@@ -566,15 +533,14 @@ namespace gglab
 		components::TransformComponent transform{};
 		const float scale = TargetAssetModelExtent / maxExtent;
 		transform.m_Scale = Vector3::One * scale;
-		transform.m_Position = Vector3(0.0f, 0.0f, GridDepth) -
-			boundsCenter * scale;
+		transform.m_Position = Vector3(0.0f, 0.0f, GridDepth) - boundsCenter * scale;
 
 		auto& registry = m_World.GetRegistry();
 		const entt::entity entity = registry.create();
 		registry.emplace<components::TransformComponent>(entity, transform);
 		registry.emplace<components::ModelComponent>(entity, components::ModelComponent{
-			.m_ModelId = m_PendingModelId,
-		});
+																 .m_ModelId = m_PendingModelId,
+			});
 		m_PendingModelId.Reset();
 		m_PendingModelPath.clear();
 		return true;
@@ -599,9 +565,7 @@ namespace gglab
 
 	void MiniPBRGridLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(
-			Vector3(0.0f, 1.8f, -20.0f),
-			Vector3(0.0f, 0.0f, GridDepth));
+		GetCamera().LookAt(Vector3(0.0f, 1.8f, -20.0f), Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
 	}
 
@@ -616,7 +580,8 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Mini PBR Grid",
 			.m_Category = "Materials",
-			.m_Description = "Compares runtime, textured and factor-only metallic-roughness sphere grids.",
+			.m_Description =
+				"Compares runtime, textured and factor-only metallic-roughness sphere grids.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

@@ -133,23 +133,19 @@ namespace gglab::math
 
 	Vector3 TransformPoint(const Vector3& value, const Matrix& matrix) noexcept
 	{
-		return StoreVector3(DirectX::XMVector3TransformCoord(
-			LoadVector3(value),
-			LoadMatrix(matrix)));
+		return StoreVector3(
+			DirectX::XMVector3TransformCoord(LoadVector3(value), LoadMatrix(matrix)));
 	}
 
 	Vector4 TransformPointHomogeneous(const Vector3& value, const Matrix& matrix) noexcept
 	{
-		return StoreVector4(DirectX::XMVector3Transform(
-			LoadVector3(value),
-			LoadMatrix(matrix)));
+		return StoreVector4(DirectX::XMVector3Transform(LoadVector3(value), LoadMatrix(matrix)));
 	}
 
 	Vector3 TransformDirection(const Vector3& value, const Matrix& matrix) noexcept
 	{
-		return StoreVector3(DirectX::XMVector3TransformNormal(
-			LoadVector3(value),
-			LoadMatrix(matrix)));
+		return StoreVector3(
+			DirectX::XMVector3TransformNormal(LoadVector3(value), LoadMatrix(matrix)));
 	}
 
 	bool TryNormalize(const Vector3& value, Vector3& result, float tolerance) noexcept
@@ -212,9 +208,7 @@ namespace gglab::math
 
 	Vector4 Transform(const Vector4& value, const Matrix& matrix) noexcept
 	{
-		return StoreVector4(DirectX::XMVector4Transform(
-			LoadVector4(value),
-			LoadMatrix(matrix)));
+		return StoreVector4(DirectX::XMVector4Transform(LoadVector4(value), LoadMatrix(matrix)));
 	}
 
 	bool TryNormalize(const Vector4& value, Vector4& result, float tolerance) noexcept
@@ -250,13 +244,15 @@ namespace gglab::math
 	bool TryInverse(const Matrix& matrix, Matrix& result, float determinantTolerance) noexcept
 	{
 		result = Matrix::Identity;
-		if (!IsFinite(matrix) || !std::isfinite(determinantTolerance) || determinantTolerance < 0.0f)
+		if (!IsFinite(matrix) || !std::isfinite(determinantTolerance) ||
+			determinantTolerance < 0.0f)
 		{
 			return false;
 		}
 
 		DirectX::XMVECTOR determinant;
-		const DirectX::XMMATRIX inverse = DirectX::XMMatrixInverse(&determinant, LoadMatrix(matrix));
+		const DirectX::XMMATRIX inverse =
+			DirectX::XMMatrixInverse(&determinant, LoadMatrix(matrix));
 		const float determinantValue = DirectX::XMVectorGetX(determinant);
 		if (!std::isfinite(determinantValue) || std::abs(determinantValue) <= determinantTolerance)
 		{
@@ -268,9 +264,7 @@ namespace gglab::math
 	}
 
 	Matrix SafeInverse(
-		const Matrix& matrix,
-		const Matrix& fallback,
-		float determinantTolerance) noexcept
+		const Matrix& matrix, const Matrix& fallback, float determinantTolerance) noexcept
 	{
 		Matrix result{};
 		return TryInverse(matrix, result, determinantTolerance) ? result : fallback;
@@ -298,7 +292,8 @@ namespace gglab::math
 
 	Matrix CreateTranslation(const Vector3& translation) noexcept
 	{
-		return StoreMatrix(DirectX::XMMatrixTranslation(translation.m_X, translation.m_Y, translation.m_Z));
+		return StoreMatrix(
+			DirectX::XMMatrixTranslation(translation.m_X, translation.m_Y, translation.m_Z));
 	}
 
 	Matrix CreateFromQuaternion(const Quaternion& rotation) noexcept
@@ -308,33 +303,27 @@ namespace gglab::math
 
 	Matrix CreateLookAtLH(const Vector3& eye, const Vector3& target, const Vector3& up) noexcept
 	{
-		return StoreMatrix(DirectX::XMMatrixLookAtLH(
-			LoadVector3(eye),
-			LoadVector3(target),
-			LoadVector3(up)));
+		return StoreMatrix(
+			DirectX::XMMatrixLookAtLH(LoadVector3(eye), LoadVector3(target), LoadVector3(up)));
 	}
 
-	Matrix CreatePerspectiveFieldOfViewLH(float fovRadians, float aspect, float nearZ, float farZ) noexcept
+	Matrix CreatePerspectiveFieldOfViewLH(
+		float fovRadians, float aspect, float nearZ, float farZ) noexcept
 	{
 		return StoreMatrix(DirectX::XMMatrixPerspectiveFovLH(fovRadians, aspect, nearZ, farZ));
 	}
 
 	Matrix CreatePerspectiveFieldOfViewLHReversedZ(
-		float fovRadians,
-		float aspect,
-		float nearZ,
-		float farZ) noexcept
+		float fovRadians, float aspect, float nearZ, float farZ) noexcept
 	{
-		return StoreMatrix(DirectX::XMMatrixPerspectiveFovLH(
-			fovRadians,
-			aspect,
-			farZ,
-			nearZ));
+		return StoreMatrix(DirectX::XMMatrixPerspectiveFovLH(fovRadians, aspect, farZ, nearZ));
 	}
 
-	Matrix CreateOrthographicOffCenterLH(float left, float right, float bottom, float top, float nearZ, float farZ) noexcept
+	Matrix CreateOrthographicOffCenterLH(
+		float left, float right, float bottom, float top, float nearZ, float farZ) noexcept
 	{
-		return StoreMatrix(DirectX::XMMatrixOrthographicOffCenterLH(left, right, bottom, top, nearZ, farZ));
+		return StoreMatrix(
+			DirectX::XMMatrixOrthographicOffCenterLH(left, right, bottom, top, nearZ, farZ));
 	}
 
 	Quaternion& Quaternion::operator*=(const Quaternion& rhs) noexcept
@@ -384,7 +373,8 @@ namespace gglab::math
 
 	Quaternion CreateFromYawPitchRoll(const Vector3& angles) noexcept
 	{
-		return StoreQuaternion(DirectX::XMQuaternionRotationRollPitchYawFromVector(LoadVector3(angles)));
+		return StoreQuaternion(
+			DirectX::XMQuaternionRotationRollPitchYawFromVector(LoadVector3(angles)));
 	}
 
 	bool TryNormalize(const Quaternion& value, Quaternion& result, float tolerance) noexcept
@@ -395,11 +385,8 @@ namespace gglab::math
 			return false;
 		}
 
-		const float lengthSquared =
-			value.m_X * value.m_X +
-			value.m_Y * value.m_Y +
-			value.m_Z * value.m_Z +
-			value.m_W * value.m_W;
+		const float lengthSquared = value.m_X * value.m_X + value.m_Y * value.m_Y +
+			value.m_Z * value.m_Z + value.m_W * value.m_W;
 		if (lengthSquared <= tolerance * tolerance)
 		{
 			return false;
@@ -409,7 +396,8 @@ namespace gglab::math
 		return IsFinite(result);
 	}
 
-	Quaternion NormalizeOr(const Quaternion& value, const Quaternion& fallback, float tolerance) noexcept
+	Quaternion NormalizeOr(
+		const Quaternion& value, const Quaternion& fallback, float tolerance) noexcept
 	{
 		Quaternion result{};
 		return TryNormalize(value, result, tolerance) ? result : fallback;
@@ -428,7 +416,8 @@ namespace gglab::math
 		if (dot <= -1.0f)
 		{
 			DirectX::XMVECTOR axis = DirectX::XMVector3Cross(from, LoadVector3(Vector3::Right));
-			if (DirectX::XMVector3NearEqual(DirectX::XMVector3LengthSq(axis), DirectX::g_XMZero, DirectX::g_XMEpsilon))
+			if (DirectX::XMVector3NearEqual(
+				DirectX::XMVector3LengthSq(axis), DirectX::g_XMZero, DirectX::g_XMEpsilon))
 			{
 				axis = DirectX::XMVector3Cross(from, LoadVector3(Vector3::Up));
 			}
@@ -446,10 +435,7 @@ namespace gglab::math
 	}
 
 	bool TryRotationFromTo(
-		const Vector3& fromDir,
-		const Vector3& toDir,
-		Quaternion& result,
-		float tolerance) noexcept
+		const Vector3& fromDir, const Vector3& toDir, Quaternion& result, float tolerance) noexcept
 	{
 		result = Quaternion::Identity;
 		Vector3 normalizedFrom{};
@@ -470,16 +456,13 @@ namespace gglab::math
 
 	Quaternion Slerp(const Quaternion& lhs, const Quaternion& rhs, float t) noexcept
 	{
-		return StoreQuaternion(DirectX::XMQuaternionSlerp(
-			LoadQuaternion(lhs),
-			LoadQuaternion(rhs),
-			t));
+		return StoreQuaternion(
+			DirectX::XMQuaternionSlerp(LoadQuaternion(lhs), LoadQuaternion(rhs), t));
 	}
 
 	Quaternion operator*(const Quaternion& lhs, const Quaternion& rhs) noexcept
 	{
-		return StoreQuaternion(DirectX::XMQuaternionMultiply(
-			LoadQuaternion(lhs),
-			LoadQuaternion(rhs)));
+		return StoreQuaternion(
+			DirectX::XMQuaternionMultiply(LoadQuaternion(lhs), LoadQuaternion(rhs)));
 	}
 }

@@ -37,12 +37,10 @@ namespace gglab
 		switch (m_Mode)
 		{
 		case MouseMode::Absolute:
-			return Vector2(
-				static_cast<float>(m_StateTracker.m_AbsoluteX),
+			return Vector2(static_cast<float>(m_StateTracker.m_AbsoluteX),
 				static_cast<float>(m_StateTracker.m_AbsoluteY));
 		case MouseMode::Relative:
-			return Vector2(
-				static_cast<float>(m_StateTracker.m_RelativeX),
+			return Vector2(static_cast<float>(m_StateTracker.m_RelativeX),
 				static_cast<float>(m_StateTracker.m_RelativeY));
 		default:
 			GGLAB_UNREACHABLE("Invalid Mouse Mode.");
@@ -88,10 +86,7 @@ namespace gglab
 	{
 		// Get cursor info
 		CURSORINFO info = {
-			.cbSize = sizeof(CURSORINFO),
-			.flags = 0,
-			.hCursor = nullptr,
-			.ptScreenPos = {} };
+			.cbSize = sizeof(CURSORINFO), .flags = 0, .hCursor = nullptr, .ptScreenPos = {} };
 		if (!GetCursorInfo(&info))
 		{
 			return false;
@@ -119,11 +114,16 @@ namespace gglab
 			GameInputMouseState mouse;
 			if (reading->GetMouseState(&mouse))
 			{
-				state.m_Buttons[MouseButton::LeftButton] = (mouse.buttons & GameInputMouseLeftButton) != 0;
-				state.m_Buttons[MouseButton::MiddleButton] = (mouse.buttons & GameInputMouseMiddleButton) != 0;
-				state.m_Buttons[MouseButton::RightButton] = (mouse.buttons & GameInputMouseRightButton) != 0;
-				state.m_Buttons[MouseButton::X1Button] = (mouse.buttons & GameInputMouseButton4) != 0;
-				state.m_Buttons[MouseButton::X2Button] = (mouse.buttons & GameInputMouseButton5) != 0;
+				state.m_Buttons[MouseButton::LeftButton] =
+					(mouse.buttons & GameInputMouseLeftButton) != 0;
+				state.m_Buttons[MouseButton::MiddleButton] =
+					(mouse.buttons & GameInputMouseMiddleButton) != 0;
+				state.m_Buttons[MouseButton::RightButton] =
+					(mouse.buttons & GameInputMouseRightButton) != 0;
+				state.m_Buttons[MouseButton::X1Button] =
+					(mouse.buttons & GameInputMouseButton4) != 0;
+				state.m_Buttons[MouseButton::X2Button] =
+					(mouse.buttons & GameInputMouseButton5) != 0;
 
 				state.m_CoordX = mouse.positionX;
 				state.m_CoordY = mouse.positionY;
@@ -175,15 +175,16 @@ namespace gglab
 		rect.bottom = lr.y;
 
 		ClipCursor(&rect);
-
 	}
 
 	void Mouse::StateTracker::Update(const State& state, HWND windowHandle) noexcept
 	{
 		for (int32_t buttonIndex = 0; buttonIndex < (int32_t)MouseButtonCount; buttonIndex++)
 		{
-			m_ButtonPressed[buttonIndex] = state.m_Buttons[buttonIndex] && !m_LastState.m_Buttons[buttonIndex];
-			m_ButtonReleased[buttonIndex] = !state.m_Buttons[buttonIndex] && m_LastState.m_Buttons[buttonIndex];
+			m_ButtonPressed[buttonIndex] =
+				state.m_Buttons[buttonIndex] && !m_LastState.m_Buttons[buttonIndex];
+			m_ButtonReleased[buttonIndex] =
+				!state.m_Buttons[buttonIndex] && m_LastState.m_Buttons[buttonIndex];
 			m_ButtonHeld[buttonIndex] = state.m_Buttons[buttonIndex];
 		}
 

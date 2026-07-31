@@ -20,19 +20,15 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(ModelImportArtifactCache);
 		~ModelImportArtifactCache() = default;
 
-		[[nodiscard]] ModelImportArtifactHandle Admit(
-			ModelImportArtifactHandle artifact) noexcept;
+		[[nodiscard]] ModelImportArtifactHandle Admit(ModelImportArtifactHandle artifact) noexcept;
 		[[nodiscard]] ModelImportArtifactHandle Find(
 			const ArtifactContentDigest& contentDigest) noexcept;
-		[[nodiscard]] bool Contains(
-			const ArtifactContentDigest& contentDigest) const noexcept;
+		[[nodiscard]] bool Contains(const ArtifactContentDigest& contentDigest) const noexcept;
 		void Clear() noexcept;
 		[[nodiscard]] ModelImportArtifactCacheStatistics GetStatistics() const noexcept;
 
 	private:
-		using Core = ArtifactCacheCore<
-			ArtifactContentDigest,
-			ModelImportArtifact,
+		using Core = ArtifactCacheCore<ArtifactContentDigest, ModelImportArtifact,
 			ArtifactContentDigestHash>;
 
 		Core m_Core;

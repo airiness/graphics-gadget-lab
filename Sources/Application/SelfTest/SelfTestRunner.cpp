@@ -29,13 +29,10 @@ namespace gglab
 			},
 		};
 
-		[[nodiscard]] const SelfTestSuiteDesc* FindSuite(
-			std::string_view suiteId) noexcept
+		[[nodiscard]] const SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept
 		{
-			const auto iterator = std::ranges::find(
-				RegisteredSuites,
-				suiteId,
-				&SelfTestSuiteDesc::m_Id);
+			const auto iterator =
+				std::ranges::find(RegisteredSuites, suiteId, &SelfTestSuiteDesc::m_Id);
 			return iterator != RegisteredSuites.end() ? &*iterator : nullptr;
 		}
 	}

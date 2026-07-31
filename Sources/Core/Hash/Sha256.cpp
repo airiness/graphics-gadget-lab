@@ -9,7 +9,7 @@ namespace gglab
 {
 	namespace
 	{
-		template<class T>
+		template <class T>
 		[[nodiscard]] std::array<std::byte, sizeof(T)> EncodeLittleEndian(T value) noexcept
 		{
 			static_assert(std::is_unsigned_v<T>);
@@ -26,11 +26,8 @@ namespace gglab
 	Sha256Builder::Sha256Builder() noexcept
 	{
 		BCRYPT_ALG_HANDLE algorithm = nullptr;
-		if (!BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(
-			&algorithm,
-			BCRYPT_SHA256_ALGORITHM,
-			nullptr,
-			0)))
+		if (!BCRYPT_SUCCESS(
+			BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0)))
 		{
 			return;
 		}
@@ -38,26 +35,15 @@ namespace gglab
 
 		DWORD objectBytes = 0;
 		DWORD resultBytes = 0;
-		if (!BCRYPT_SUCCESS(BCryptGetProperty(
-			algorithm,
-			BCRYPT_OBJECT_LENGTH,
-			reinterpret_cast<PUCHAR>(&objectBytes),
-			sizeof(objectBytes),
-			&resultBytes,
-			0)))
+		if (!BCRYPT_SUCCESS(BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH,
+			reinterpret_cast<PUCHAR>(&objectBytes), sizeof(objectBytes), &resultBytes, 0)))
 		{
 			return;
 		}
 		m_Object.resize(objectBytes);
 		BCRYPT_HASH_HANDLE hash = nullptr;
-		if (BCRYPT_SUCCESS(BCryptCreateHash(
-			algorithm,
-			&hash,
-			m_Object.data(),
-			static_cast<ULONG>(m_Object.size()),
-			nullptr,
-			0,
-			0)))
+		if (BCRYPT_SUCCESS(BCryptCreateHash(algorithm, &hash, m_Object.data(),
+			static_cast<ULONG>(m_Object.size()), nullptr, 0, 0)))
 		{
 			m_Hash = hash;
 		}
@@ -71,9 +57,7 @@ namespace gglab
 		}
 		if (m_Algorithm)
 		{
-			BCryptCloseAlgorithmProvider(
-				static_cast<BCRYPT_ALG_HANDLE>(m_Algorithm),
-				0);
+			BCryptCloseAlgorithmProvider(static_cast<BCRYPT_ALG_HANDLE>(m_Algorithm), 0);
 		}
 	}
 
@@ -90,14 +74,11 @@ namespace gglab
 		}
 		while (!bytes.empty())
 		{
-			const size_t chunkSize = std::min<size_t>(
-				bytes.size(),
-				std::numeric_limits<ULONG>::max());
-			if (!BCRYPT_SUCCESS(BCryptHashData(
-				static_cast<BCRYPT_HASH_HANDLE>(m_Hash),
+			const size_t chunkSize =
+				std::min<size_t>(bytes.size(), std::numeric_limits<ULONG>::max());
+			if (!BCRYPT_SUCCESS(BCryptHashData(static_cast<BCRYPT_HASH_HANDLE>(m_Hash),
 				reinterpret_cast<PUCHAR>(const_cast<std::byte*>(bytes.data())),
-				static_cast<ULONG>(chunkSize),
-				0)))
+				static_cast<ULONG>(chunkSize), 0)))
 			{
 				return false;
 			}
@@ -135,11 +116,9 @@ namespace gglab
 	Sha256Hash Sha256Builder::Finish() noexcept
 	{
 		Sha256Hash result{};
-		if (!m_Hash || !BCRYPT_SUCCESS(BCryptFinishHash(
-			static_cast<BCRYPT_HASH_HANDLE>(m_Hash),
+		if (!m_Hash || !BCRYPT_SUCCESS(BCryptFinishHash(static_cast<BCRYPT_HASH_HANDLE>(m_Hash),
 			reinterpret_cast<PUCHAR>(result.m_Value.data()),
-			static_cast<ULONG>(result.m_Value.size()),
-			0)))
+			static_cast<ULONG>(result.m_Value.size()), 0)))
 		{
 			return {};
 		}

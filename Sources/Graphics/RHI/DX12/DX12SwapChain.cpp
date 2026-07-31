@@ -21,12 +21,17 @@ namespace gglab
 			Finalize();
 		}
 
-		GGLAB_ASSERT_MSG(createInfo.m_DX12Device != nullptr, "DX12SwapChain::Initialize: device is null.");
-		GGLAB_ASSERT_MSG(createInfo.m_QueueSystem != nullptr, "DX12SwapChain::Initialize: queue system is null.");
-		GGLAB_ASSERT_MSG(createInfo.m_PresentQueue != nullptr, "DX12SwapChain::Initialize: present queue is null.");
+		GGLAB_ASSERT_MSG(
+			createInfo.m_DX12Device != nullptr, "DX12SwapChain::Initialize: device is null.");
+		GGLAB_ASSERT_MSG(createInfo.m_QueueSystem != nullptr,
+			"DX12SwapChain::Initialize: queue system is null.");
+		GGLAB_ASSERT_MSG(createInfo.m_PresentQueue != nullptr,
+			"DX12SwapChain::Initialize: present queue is null.");
 		GGLAB_ASSERT_MSG(createInfo.m_Hwnd != nullptr, "DX12SwapChain::Initialize: hwnd is null.");
-		GGLAB_ASSERT_MSG(createInfo.m_Width > 0 && createInfo.m_Height > 0, "DX12SwapChain::Initialize: invalid size.");
-		GGLAB_ASSERT_MSG(createInfo.m_BufferCount >= 2, "DX12SwapChain::Initialize: bufferCount must be >= 2.");
+		GGLAB_ASSERT_MSG(createInfo.m_Width > 0 && createInfo.m_Height > 0,
+			"DX12SwapChain::Initialize: invalid size.");
+		GGLAB_ASSERT_MSG(
+			createInfo.m_BufferCount >= 2, "DX12SwapChain::Initialize: bufferCount must be >= 2.");
 
 		m_DX12Device = createInfo.m_DX12Device;
 		m_QueueSystem = createInfo.m_QueueSystem;
@@ -91,7 +96,8 @@ namespace gglab
 		DXGI_SWAP_CHAIN_DESC desc = {};
 		GGLAB_HR(m_DxgiSwapChain->GetDesc(&desc));
 
-		GGLAB_HR(m_DxgiSwapChain->ResizeBuffers(m_BufferCount, m_Width, m_Height, m_Format, desc.Flags));
+		GGLAB_HR(
+			m_DxgiSwapChain->ResizeBuffers(m_BufferCount, m_Width, m_Height, m_Format, desc.Flags));
 
 		RefreshCurrentBackBufferIndex();
 		AcquireBackBuffers();
@@ -100,7 +106,8 @@ namespace gglab
 
 	void DX12SwapChain::WaitFrameCompletion() noexcept
 	{
-		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::WaitFrameCompletion called on invalid swapchain.");
+		GGLAB_ASSERT_MSG(
+			IsValid(), "DX12SwapChain::WaitFrameCompletion called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
 
 		auto& fencePoint = m_SyncObjects[m_BackBufferIndex];
@@ -112,7 +119,8 @@ namespace gglab
 
 	void DX12SwapChain::SetFrameCompletionFence(const RHIFencePoint& fencePoint) noexcept
 	{
-		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::SetFrameCompletionFence called on invalid swapchain.");
+		GGLAB_ASSERT_MSG(
+			IsValid(), "DX12SwapChain::SetFrameCompletionFence called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
 
 		m_SyncObjects[m_BackBufferIndex] = fencePoint;
@@ -147,7 +155,8 @@ namespace gglab
 
 	RHITextureHandle DX12SwapChain::GetBackBufferHandle(uint32_t bufferIndex) const noexcept
 	{
-		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::GetBackBufferHandle called on invalid swapchain.");
+		GGLAB_ASSERT_MSG(
+			IsValid(), "DX12SwapChain::GetBackBufferHandle called on invalid swapchain.");
 		GGLAB_ASSERT_MSG(bufferIndex < m_BackBuffers.size(), "BackBuffer index out of range.");
 
 		return m_BackBuffers[bufferIndex];
@@ -178,17 +187,11 @@ namespace gglab
 
 		ComPtr<IDXGISwapChain1> swapChain1;
 		GGLAB_HR(factory->CreateSwapChainForHwnd(
-			m_PresentQueue->Get(),
-			m_Hwnd,
-			&desc,
-			nullptr,
-			nullptr,
-			&swapChain1));
+			m_PresentQueue->Get(), m_Hwnd, &desc, nullptr, nullptr, &swapChain1));
 
 		// Invalid Alt+Enter Fullscreen
 		GGLAB_HR(factory->MakeWindowAssociation(m_Hwnd,
-			DXGI_MWA_NO_ALT_ENTER |
-			DXGI_MWA_NO_WINDOW_CHANGES));	// TODO: support window changes
+			DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES)); // TODO: support window changes
 
 		ComPtr<IDXGISwapChain4> swapChain4;
 		GGLAB_HR(swapChain1.As(&swapChain4));
@@ -212,9 +215,9 @@ namespace gglab
 			DX12ResourceManager::ImportedTextureDesc importDesc{};
 			importDesc.m_RHI.m_Desc.m_Dimension = RHITextureDimension::Texture2D;
 			importDesc.m_RHI.m_Desc.m_Format = ToRHIFormat(nativeDesc.Format);
-			importDesc.m_RHI.m_Desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Present;
-			importDesc.m_RHI.m_Desc.m_Extent =
-			{
+			importDesc.m_RHI.m_Desc.m_Usage =
+				RHITextureUsage::RenderTarget | RHITextureUsage::Present;
+			importDesc.m_RHI.m_Desc.m_Extent = {
 				.m_Width = static_cast<uint32_t>(nativeDesc.Width),
 				.m_Height = nativeDesc.Height,
 				.m_Depth = 1,
@@ -222,14 +225,12 @@ namespace gglab
 			importDesc.m_RHI.m_Desc.m_ArraySize = nativeDesc.DepthOrArraySize;
 			importDesc.m_RHI.m_Desc.m_MipLevels = nativeDesc.MipLevels;
 			importDesc.m_RHI.m_Desc.m_SampleCount = nativeDesc.SampleDesc.Count;
-			importDesc.m_RHI.m_External.m_InitialState =
-			{
+			importDesc.m_RHI.m_External.m_InitialState = {
 				.m_Stages = RHIStage::Present,
 				.m_Access = RHIAccess::Present,
 				.m_Layout = RHILayout::Present,
 			};
-			importDesc.m_DebugIdentity =
-			{
+			importDesc.m_DebugIdentity = {
 				.m_Domain = RHIResourceDebugDomain::SwapChain,
 				.m_Category = "BackBuffer",
 				.m_Label = "PresentationSurface",
@@ -238,7 +239,8 @@ namespace gglab
 			importDesc.m_Resource = std::move(backBuffer);
 
 			m_BackBuffers[i] = m_DX12Device->ImportTexture(importDesc);
-			GGLAB_ASSERT_MSG(m_BackBuffers[i].IsValid(), "DX12SwapChain failed to import backbuffer.");
+			GGLAB_ASSERT_MSG(
+				m_BackBuffers[i].IsValid(), "DX12SwapChain failed to import backbuffer.");
 		}
 	}
 
@@ -273,7 +275,8 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(IsValid(), "RefreshCurrentBackBufferIndex called on invalid swapchain.");
 		m_BackBufferIndex = m_DxgiSwapChain->GetCurrentBackBufferIndex();
-		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_BufferCount, "DXGI returned invalid back buffer index.");
+		GGLAB_ASSERT_MSG(
+			m_BackBufferIndex < m_BufferCount, "DXGI returned invalid back buffer index.");
 	}
 
 	void DX12SwapChain::WaitAllSyncObjects() noexcept

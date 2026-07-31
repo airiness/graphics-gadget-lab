@@ -13,8 +13,7 @@ namespace gglab
 	namespace
 	{
 		PostProcessTextureDiagnostics BuildTextureDiagnostics(
-			const RenderGraph& renderGraph,
-			const RGPostProcessColor& color) noexcept
+			const RenderGraph& renderGraph, const RGPostProcessColor& color) noexcept
 		{
 			PostProcessTextureDiagnostics diagnostics{};
 			if (!color.m_Texture.IsValid())
@@ -37,18 +36,17 @@ namespace gglab
 	}
 
 	PostProcessDiagnosticsSnapshot BuildPostProcessDiagnosticsSnapshot(
-		const Renderer& renderer,
-		const RenderGraph& renderGraph) noexcept
+		const Renderer& renderer, const RenderGraph& renderGraph) noexcept
 	{
 		PostProcessDiagnosticsSnapshot snapshot{};
-		const auto* resources = renderGraph.GetBlackboard().TryGet<RGPostProcessResources>(
-			PostProcessResourcesName);
+		const auto* resources =
+			renderGraph.GetBlackboard().TryGet<RGPostProcessResources>(PostProcessResourcesName);
 		if (resources)
 		{
-			snapshot.m_SceneColor = BuildTextureDiagnostics(
-				renderGraph, resources->m_Inputs.m_SceneColor);
-			snapshot.m_BloomPrefilter = BuildTextureDiagnostics(
-				renderGraph, resources->m_Bloom.m_Prefilter);
+			snapshot.m_SceneColor =
+				BuildTextureDiagnostics(renderGraph, resources->m_Inputs.m_SceneColor);
+			snapshot.m_BloomPrefilter =
+				BuildTextureDiagnostics(renderGraph, resources->m_Bloom.m_Prefilter);
 			snapshot.m_BloomLevelCount = resources->m_Bloom.m_LevelCount;
 			for (uint32_t level = 0; level < resources->m_Bloom.m_LevelCount; ++level)
 			{
@@ -57,11 +55,11 @@ namespace gglab
 					renderGraph, resources->m_Bloom.m_DownsampledPyramid[level]);
 				snapshot.m_BloomLogicalBytes += levelDiagnostics.m_LogicalBytes;
 			}
-			snapshot.m_BloomResult = BuildTextureDiagnostics(
-				renderGraph, resources->m_Bloom.m_Result);
+			snapshot.m_BloomResult =
+				BuildTextureDiagnostics(renderGraph, resources->m_Bloom.m_Result);
 		}
-		const auto* sceneDepth = renderGraph.GetBlackboard()
-			.TryGet<RGSceneDepthResources>(SceneDepthResourcesName);
+		const auto* sceneDepth =
+			renderGraph.GetBlackboard().TryGet<RGSceneDepthResources>(SceneDepthResourcesName);
 		if (sceneDepth && sceneDepth->m_Texture.IsValid())
 		{
 			const auto& desc = renderGraph.GetTextureDesc(sceneDepth->m_Texture);
@@ -71,8 +69,7 @@ namespace gglab
 				.m_ResourceFormat = desc.m_Format,
 				.m_DsvFormat = sceneDepth->m_DsvDesc.m_Format,
 				.m_SrvFormat = sceneDepth->m_SrvDesc.m_Format,
-				.m_ClearDepth = desc.m_ClearValue ?
-					desc.m_ClearValue->m_Depth : 0.0f,
+				.m_ClearDepth = desc.m_ClearValue ? desc.m_ClearValue->m_Depth : 0.0f,
 				.m_Convention = sceneDepth->m_Convention,
 				.m_HasTypedClear = desc.m_ClearValue.has_value(),
 				.m_Available = true,
@@ -96,7 +93,8 @@ namespace gglab
 				preview.m_Width = static_cast<uint32_t>(previewDesc->m_Extent.m_Width);
 				preview.m_Height = previewDesc->m_Extent.m_Height;
 				preview.m_Format = previewDesc->m_Format;
-				preview.m_SrvDescriptor = registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess);
+				preview.m_SrvDescriptor =
+					registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess);
 			}
 		}
 
@@ -117,7 +115,7 @@ namespace gglab
 					.m_Name = sample.m_Name,
 					.m_Milliseconds = sample.m_Milliseconds,
 					.m_CallCount = sample.m_CallCount,
-				});
+					});
 				snapshot.m_PostProcessGpuMilliseconds += sample.m_Milliseconds;
 				if (sample.m_Name.starts_with("PostProcess.Bloom."))
 				{

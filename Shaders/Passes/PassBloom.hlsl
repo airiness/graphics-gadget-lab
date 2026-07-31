@@ -29,11 +29,8 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 
 float3 SampleSource(float2 uv)
 {
-	return SanitizeHDRColor(SampleTexture2DLevel(
-		g_Pass.SourceTextureIndex,
-		g_Pass.SourceSamplerIndex,
-		uv,
-		0.0).rgb);
+	return SanitizeHDRColor(
+		SampleTexture2DLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, uv, 0.0).rgb);
 }
 
 float3 Downsample(float2 uv)
@@ -41,13 +38,13 @@ float3 Downsample(float2 uv)
 	const float2 texel = g_Pass.SourceTexelSize;
 	float3 result = SampleSource(uv) * 0.25;
 	result += SampleSource(uv + float2(-texel.x, 0.0)) * 0.125;
-	result += SampleSource(uv + float2( texel.x, 0.0)) * 0.125;
+	result += SampleSource(uv + float2(texel.x, 0.0)) * 0.125;
 	result += SampleSource(uv + float2(0.0, -texel.y)) * 0.125;
-	result += SampleSource(uv + float2(0.0,  texel.y)) * 0.125;
+	result += SampleSource(uv + float2(0.0, texel.y)) * 0.125;
 	result += SampleSource(uv + float2(-texel.x, -texel.y)) * 0.0625;
-	result += SampleSource(uv + float2( texel.x, -texel.y)) * 0.0625;
-	result += SampleSource(uv + float2(-texel.x,  texel.y)) * 0.0625;
-	result += SampleSource(uv + float2( texel.x,  texel.y)) * 0.0625;
+	result += SampleSource(uv + float2(texel.x, -texel.y)) * 0.0625;
+	result += SampleSource(uv + float2(-texel.x, texel.y)) * 0.0625;
+	result += SampleSource(uv + float2(texel.x, texel.y)) * 0.0625;
 	return result;
 }
 
@@ -59,8 +56,7 @@ float3 Prefilter(float3 storedColor)
 	float soft = brightness - g_Pass.Threshold + knee;
 	soft = clamp(soft, 0.0, 2.0 * knee);
 	soft = soft * soft / max(4.0 * knee, 1e-5);
-	const float contribution = max(soft, brightness - g_Pass.Threshold) /
-		max(brightness, 1e-5);
+	const float contribution = max(soft, brightness - g_Pass.Threshold) / max(brightness, 1e-5);
 	return storedColor * saturate(contribution);
 }
 
@@ -69,13 +65,13 @@ float3 Upsample(float2 uv)
 	const float2 texel = g_Pass.SourceTexelSize;
 	float3 result = SampleSource(uv) * 4.0;
 	result += SampleSource(uv + float2(-texel.x, 0.0)) * 2.0;
-	result += SampleSource(uv + float2( texel.x, 0.0)) * 2.0;
+	result += SampleSource(uv + float2(texel.x, 0.0)) * 2.0;
 	result += SampleSource(uv + float2(0.0, -texel.y)) * 2.0;
-	result += SampleSource(uv + float2(0.0,  texel.y)) * 2.0;
+	result += SampleSource(uv + float2(0.0, texel.y)) * 2.0;
 	result += SampleSource(uv + float2(-texel.x, -texel.y));
-	result += SampleSource(uv + float2( texel.x, -texel.y));
-	result += SampleSource(uv + float2(-texel.x,  texel.y));
-	result += SampleSource(uv + float2( texel.x,  texel.y));
+	result += SampleSource(uv + float2(texel.x, -texel.y));
+	result += SampleSource(uv + float2(-texel.x, texel.y));
+	result += SampleSource(uv + float2(texel.x, texel.y));
 	return result * (g_Pass.Scatter / 16.0);
 }
 

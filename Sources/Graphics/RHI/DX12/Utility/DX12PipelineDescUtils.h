@@ -26,22 +26,17 @@ namespace gglab
 		uint64_t m_LowBits = 0;
 		uint64_t m_HighBits = 0;
 
-		auto AsTuple() const noexcept
-		{
-			return std::make_tuple(m_LowBits, m_HighBits);
-		}
+		auto AsTuple() const noexcept { return std::make_tuple(m_LowBits, m_HighBits); }
 		constexpr bool operator==(const DX12RHIGraphicsPSOKey&) const noexcept = default;
 	};
 	using DX12RHIGraphicsPSOKeyHash = KeyHash<DX12RHIGraphicsPSOKey>;
 
 	[[nodiscard]] GraphicsPipelineDesc BuildDX12GraphicsPipelineDesc(
-		const RHIGraphicsPipelineDesc& rhiDesc,
-		const RootSignatureHandle& rootSignature,
+		const RHIGraphicsPipelineDesc& rhiDesc, const RootSignatureHandle& rootSignature,
 		const DX12GraphicsPipelineShaderInputs& shaderInputs,
 		const DX12InputLayoutBuildResult& inputLayout) noexcept;
 
 	[[nodiscard]] DX12RHIGraphicsPSOKey MakeDX12RHIGraphicsPSOKey(
-		const RHIGraphicsPipelineDesc& rhiDesc,
-		RootSignatureID rootSignatureId,
+		const RHIGraphicsPipelineDesc& rhiDesc, RootSignatureID rootSignatureId,
 		const DX12GraphicsPipelineShaderInputs& shaderInputs) noexcept;
 }

@@ -23,19 +23,21 @@ namespace gglab
 			{
 				switch (slot.m_Type)
 				{
-				case RHIBindingType::ConstantBuffer: return "RootCBV";
-				case RHIBindingType::ReadOnlyStorageBuffer: return "RootSRV";
-				case RHIBindingType::ReadWriteStorageBuffer: return "RootUAV";
-				default: break;
+				case RHIBindingType::ConstantBuffer:
+					return "RootCBV";
+				case RHIBindingType::ReadOnlyStorageBuffer:
+					return "RootSRV";
+				case RHIBindingType::ReadWriteStorageBuffer:
+					return "RootUAV";
+				default:
+					break;
 				}
 			}
 			return "DescriptorTable";
 		}
 
 		RHIShaderSnapshot MakeShaderSnapshot(
-			RHIShaderHandle handle,
-			ShaderHash128 hash,
-			const ShaderManager* shaderManager) noexcept
+			RHIShaderHandle handle, ShaderHash128 hash, const ShaderManager* shaderManager) noexcept
 		{
 			RHIShaderSnapshot result{};
 			result.m_Handle = handle;
@@ -49,10 +51,8 @@ namespace gglab
 		}
 	}
 
-	void BuildDX12PipelineSystemSnapshot(
-		const DX12PipelineSystem& system,
-		const PipelineCache* pipelineCache,
-		RHIPipelineSystemSnapshot& outSnapshot) noexcept
+	void BuildDX12PipelineSystemSnapshot(const DX12PipelineSystem& system,
+		const PipelineCache* pipelineCache, RHIPipelineSystemSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
 		outSnapshot.m_BackendName = "Direct3D 12";
@@ -71,8 +71,8 @@ namespace gglab
 
 			RHIBindingLayoutSnapshot layout{};
 			layout.m_Handle = binding.m_Handle;
-			layout.m_Alive = binding.m_RootSignature != nullptr &&
-				binding.m_RootSignature->Get() != nullptr;
+			layout.m_Alive =
+				binding.m_RootSignature != nullptr && binding.m_RootSignature->Get() != nullptr;
 			layout.m_DebugName = binding.m_DebugName;
 			layout.m_BackendRootSignatureId = binding.m_Handle.Index();
 			layout.m_BackendRootSignaturePointer = reinterpret_cast<uint64_t>(
@@ -120,17 +120,18 @@ namespace gglab
 			const auto& binding = system.m_Pipelines[index];
 			RHIPipelineSnapshot pipeline{};
 			pipeline.m_Handle = RHIPipelineHandle(index, system.m_PipelineGeneration);
-			pipeline.m_Alive = binding.m_PipelineState != nullptr &&
-				binding.m_PipelineState->Get() != nullptr;
+			pipeline.m_Alive =
+				binding.m_PipelineState != nullptr && binding.m_PipelineState->Get() != nullptr;
 			if (pipelineCache)
 			{
 				pipelineCache->GetPipelineUsages(pipeline.m_Handle, pipeline.m_RenderPasses);
 			}
 			pipeline.m_BackendPipelinePointer = reinterpret_cast<uint64_t>(
 				binding.m_PipelineState ? binding.m_PipelineState->Get() : nullptr);
-			pipeline.m_BackendRootSignatureId = binding.m_Type == DX12PipelineSystem::PipelineType::Graphics ?
-				binding.m_GraphicsDesc.m_BindingLayout.Index() :
-				binding.m_ComputeDesc.m_BindingLayout.Index();
+			pipeline.m_BackendRootSignatureId =
+				binding.m_Type == DX12PipelineSystem::PipelineType::Graphics
+				? binding.m_GraphicsDesc.m_BindingLayout.Index()
+				: binding.m_ComputeDesc.m_BindingLayout.Index();
 			pipeline.m_BackendRootSignaturePointer = reinterpret_cast<uint64_t>(
 				binding.m_RootSignature ? binding.m_RootSignature->Get() : nullptr);
 
@@ -146,13 +147,12 @@ namespace gglab
 					desc.m_PixelShader, binding.m_PixelShaderHash, shaderManager);
 				pipeline.m_DomainShader = MakeShaderSnapshot(
 					desc.m_DomainShader, binding.m_DomainShaderHash, shaderManager);
-				pipeline.m_HullShader = MakeShaderSnapshot(
-					desc.m_HullShader, binding.m_HullShaderHash, shaderManager);
+				pipeline.m_HullShader =
+					MakeShaderSnapshot(desc.m_HullShader, binding.m_HullShaderHash, shaderManager);
 				pipeline.m_GeometryShader = MakeShaderSnapshot(
 					desc.m_GeometryShader, binding.m_GeometryShaderHash, shaderManager);
 				const uint32_t attributeCount = std::min(
-					desc.m_VertexInput.m_AttributeCount,
-					RHIVertexInputLayoutDesc::MaxAttributes);
+					desc.m_VertexInput.m_AttributeCount, RHIVertexInputLayoutDesc::MaxAttributes);
 				pipeline.m_VertexAttributes.reserve(attributeCount);
 				for (uint32_t attributeIndex = 0; attributeIndex < attributeCount; ++attributeIndex)
 				{
@@ -163,23 +163,21 @@ namespace gglab
 						.m_Format = attribute.m_Format,
 						.m_InputSlot = attribute.m_InputSlot,
 						.m_AlignedByteOffset = attribute.m_AlignedByteOffset,
-					});
+						});
 				}
-				const uint32_t vertexBufferCount = std::min(
-					desc.m_VertexInput.m_VertexBufferCount,
+				const uint32_t vertexBufferCount = std::min(desc.m_VertexInput.m_VertexBufferCount,
 					RHIVertexInputLayoutDesc::MaxVertexBuffers);
-				pipeline.m_VertexBuffers.assign(
-					desc.m_VertexInput.m_VertexBuffers.begin(),
+				pipeline.m_VertexBuffers.assign(desc.m_VertexInput.m_VertexBuffers.begin(),
 					desc.m_VertexInput.m_VertexBuffers.begin() + vertexBufferCount);
 				pipeline.m_TopologyType = desc.m_TopologyType;
 				pipeline.m_PrimitiveTopology = desc.m_PrimitiveTopology;
 				pipeline.m_Rasterizer = desc.m_Rasterizer;
 				pipeline.m_DepthStencil = desc.m_DepthStencil;
 				pipeline.m_Blend = desc.m_Blend;
-				pipeline.m_RenderTargetFormats.assign(
-					desc.m_RenderTargetFormats.begin(),
+				pipeline.m_RenderTargetFormats.assign(desc.m_RenderTargetFormats.begin(),
 					desc.m_RenderTargetFormats.begin() +
-						std::min(desc.m_RenderTargetCount, RHIGraphicsPipelineDesc::MaxRenderTargets));
+					std::min(
+						desc.m_RenderTargetCount, RHIGraphicsPipelineDesc::MaxRenderTargets));
 				pipeline.m_DepthStencilFormat = desc.m_DepthStencilFormat;
 				pipeline.m_SampleCount = desc.m_SampleCount;
 				pipeline.m_SampleQuality = desc.m_SampleQuality;
@@ -189,10 +187,8 @@ namespace gglab
 				++outSnapshot.m_Cache.m_RegisteredComputePipelines;
 				pipeline.m_Type = RHIPipelineSnapshotType::Compute;
 				pipeline.m_BindingLayout = binding.m_ComputeDesc.m_BindingLayout;
-				pipeline.m_ComputeShader = MakeShaderSnapshot(
-					binding.m_ComputeDesc.m_ComputeShader,
-					binding.m_ComputeShaderHash,
-					shaderManager);
+				pipeline.m_ComputeShader = MakeShaderSnapshot(binding.m_ComputeDesc.m_ComputeShader,
+					binding.m_ComputeShaderHash, shaderManager);
 			}
 
 			outSnapshot.m_Pipelines.push_back(std::move(pipeline));

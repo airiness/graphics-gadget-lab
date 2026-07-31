@@ -12,8 +12,12 @@ namespace gglab
 {
 	namespace
 	{
-		struct DisplayViewSetupPassData {};
-		struct ShadowSetupPassData {};
+		struct DisplayViewSetupPassData
+		{
+		};
+		struct ShadowSetupPassData
+		{
+		};
 
 		struct PrepareBackBufferPassData
 		{
@@ -21,12 +25,13 @@ namespace gglab
 			RGTextureViewId m_Rtv{};
 		};
 
-		struct FinishBackBufferPassData {};
+		struct FinishBackBufferPassData
+		{
+		};
 	}
 
-	void RenderPipelineForwardPBR::BuildRenderGraph(RenderGraph& rg,
-		const RenderFrameContext& context,
-		const RenderServices& services) noexcept
+	void RenderPipelineForwardPBR::BuildRenderGraph(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
@@ -39,13 +44,10 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const DepthConvention displayDepthConvention =
 			context.GetDisplayRenderView().m_DepthConvention;
-		const uint32_t targetWidth =
-			swapChain->GetBufferWidth();
-		const uint32_t targetHeight =
-			swapChain->GetBufferHeight();
+		const uint32_t targetWidth = swapChain->GetBufferWidth();
+		const uint32_t targetHeight = swapChain->GetBufferHeight();
 		const bool forwardPlusEnabled =
-			context.GetDisplayViewRenderSettings().
-				m_Lighting.m_ForwardPlus.m_Enabled;
+			context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus.m_Enabled;
 
 		PrepareForwardPasses(services);
 		if (forwardPlusEnabled)
@@ -53,40 +55,30 @@ namespace gglab
 			m_ForwardPlusCullPass.Prepare(services);
 		}
 		const DepthCoverageFramePlan depthCoverageFramePlan =
-			BuildDepthCoverageFramePlanForFrame(
-				context,
-				targetWidth,
-				targetHeight);
+			BuildDepthCoverageFramePlanForFrame(context, targetWidth, targetHeight);
 		if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"Depth coverage frame uses Forward-write fallback: {}",
+			GGLAB_LOG_GRAPHICS_WARN("Depth coverage frame uses Forward-write fallback: {}",
 				depthCoverageFramePlan.m_Diagnostic);
 		}
 		else if (!depthCoverageFramePlan.RendersGeometry())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Depth coverage frame rejected scene geometry: {}",
+			GGLAB_LOG_GRAPHICS_ERROR("Depth coverage frame rejected scene geometry: {}",
 				depthCoverageFramePlan.m_Diagnostic);
 		}
 
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
-			[swapChain,
-				frameBackBufferIndex,
-				displayViewId,
-				displayDepthConvention,
-				depthCoverageFramePlan](
-				RenderGraph::RGBuilder& builder,
-				DisplayViewSetupPassData&)
+			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
+			depthCoverageFramePlan](RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
-				auto& targetsTable = blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targetsTable =
+					blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(displayViewId);
-				blackboard.GetOrCreate<DepthCoverageFramePlan>(
-					DepthCoverageFramePlanName) =
+				blackboard.GetOrCreate<DepthCoverageFramePlan>(DepthCoverageFramePlanName) =
 					depthCoverageFramePlan;
 
 				const uint32_t width = swapChain->GetBufferWidth();
@@ -95,24 +87,24 @@ namespace gglab
 				targets.m_Width = width;
 				targets.m_Height = height;
 
-				const RHITextureHandle backTexture = swapChain->GetBackBufferHandle(frameBackBufferIndex);
+				const RHITextureHandle backTexture =
+					swapChain->GetBackBufferHandle(frameBackBufferIndex);
 				GGLAB_ASSERT(backTexture.IsValid());
 
 				// Create HDR scene color
 				RHITextureDesc sceneColorDesc{};
 				sceneColorDesc.m_Extent = { width, height, 1u };
 				sceneColorDesc.m_Format = RHIFormat::R16G16B16A16Float;
-				targets.m_SceneColor = builder.CreateTexture("DisplayView.SceneColor", sceneColorDesc);
+				targets.m_SceneColor =
+					builder.CreateTexture("DisplayView.SceneColor", sceneColorDesc);
 
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
 				backBufferDesc.m_Extent = { width, height, 1u };
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
-				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer",
-					backTexture,
-					backBufferDesc,
-					RGTextureAccess::Present);
+				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
+					backBufferDesc, RGTextureAccess::Present);
 
 				// Create depth buffer
 				RHITextureDesc depthBufferDesc{};
@@ -120,39 +112,26 @@ namespace gglab
 				depthBufferDesc.m_Format = RHIFormat::R32Typeless;
 				depthBufferDesc.m_ClearValue = RHIClearValue{
 					.m_Format = RHIFormat::D32Float,
-					.m_Depth = screen_space::GetDepthBackgroundValue(
-						displayDepthConvention),
+					.m_Depth = screen_space::GetDepthBackgroundValue(displayDepthConvention),
 					.m_IsDepthStencil = true,
 				};
 				GGLAB_ASSERT_MSG(
-					sceneColorDesc.m_Extent.m_Width ==
-						depthBufferDesc.m_Extent.m_Width &&
-					sceneColorDesc.m_Extent.m_Height ==
-						depthBufferDesc.m_Extent.m_Height &&
-					sceneColorDesc.m_Extent.m_Depth ==
-						depthBufferDesc.m_Extent.m_Depth &&
-					sceneColorDesc.m_SampleCount ==
-						depthBufferDesc.m_SampleCount,
+					sceneColorDesc.m_Extent.m_Width == depthBufferDesc.m_Extent.m_Width &&
+					sceneColorDesc.m_Extent.m_Height == depthBufferDesc.m_Extent.m_Height &&
+					sceneColorDesc.m_Extent.m_Depth == depthBufferDesc.m_Extent.m_Depth &&
+					sceneColorDesc.m_SampleCount == depthBufferDesc.m_SampleCount,
 					"Display view color and depth targets must have matching extents and sample counts.");
 
-				auto& sceneDepth = blackboard.GetOrCreate<RGSceneDepthResources>(
-					SceneDepthResourcesName);
-				sceneDepth.m_Texture = builder.CreateTexture(
-					"DisplayView.DepthBuffer",
-					depthBufferDesc);
-				sceneDepth.m_DsvDesc = MakeRHITexture2DViewDesc(
-					RHIFormat::D32Float,
-					0,
-					1,
-					RHITextureAspect::Depth);
+				auto& sceneDepth =
+					blackboard.GetOrCreate<RGSceneDepthResources>(SceneDepthResourcesName);
+				sceneDepth.m_Texture =
+					builder.CreateTexture("DisplayView.DepthBuffer", depthBufferDesc);
+				sceneDepth.m_DsvDesc =
+					MakeRHITexture2DViewDesc(RHIFormat::D32Float, 0, 1, RHITextureAspect::Depth);
 				sceneDepth.m_DsvDesc.m_Type = RHITextureViewType::DepthStencil;
-				sceneDepth.m_SrvDesc = MakeRHITexture2DViewDesc(
-					RHIFormat::R32Float,
-					0,
-					1,
-					RHITextureAspect::Depth);
+				sceneDepth.m_SrvDesc =
+					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
 				sceneDepth.m_Convention = displayDepthConvention;
-
 			});
 
 		// Shadow Setup
@@ -160,20 +139,21 @@ namespace gglab
 			[renderer, &context](RenderGraph::RGBuilder& builder, ShadowSetupPassData&)
 			{
 				const auto& shadowSettings = context.GetDirectionalShadowSettings();
-				auto& shadowRes = builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
+				auto& shadowRes =
+					builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
 				shadowRes.m_ShadowMapSize = std::max(shadowSettings.m_ShadowMapSize, 1u);
 
 				RHITextureDesc shadowMapDesc{};
 				shadowMapDesc.m_Extent = { shadowRes.m_ShadowMapSize, shadowRes.m_ShadowMapSize, 1u };
 				shadowMapDesc.m_Format = RHIFormat::R32Typeless;
-				shadowRes.m_DirectionalShadowMap = builder.CreateTexture(
-					"Shadow.DirectionalShadowMap",
-					shadowMapDesc);
+				shadowRes.m_DirectionalShadowMap =
+					builder.CreateTexture("Shadow.DirectionalShadowMap", shadowMapDesc);
 
 				shadowRes.m_ShadowMapPreviewSize = DefaultDirectionalShadowMapPreviewSize;
 				auto* renderResourceRegistry = renderer->GetRenderResourceRegistry();
 				GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
-				renderResourceRegistry->EnsureShadowPreviewResources(shadowRes.m_ShadowMapPreviewSize);
+				renderResourceRegistry->EnsureShadowPreviewResources(
+					shadowRes.m_ShadowMapPreviewSize);
 
 				const auto* shadowMapPreviewDesc = renderResourceRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
@@ -183,23 +163,24 @@ namespace gglab
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
-					*shadowMapPreviewDesc,
-					RGTextureAccess::None);
+					*shadowMapPreviewDesc, RGTextureAccess::None);
 			});
 
 		// SwapChain prepare backbuffer
-		rg.AddPass<PrepareBackBufferPassData>("SwapChain.PrepareBackBuffer",
+		rg.AddPass<PrepareBackBufferPassData>(
+			"SwapChain.PrepareBackBuffer",
 			[displayViewId](RenderGraph::RGBuilder& builder, PrepareBackBufferPassData& data)
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targetsTable =
+					builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(displayViewId);
 
-				builder.WriteInPlace(targets.m_BackBuffer,
-					RGTextureAccess::RenderTarget);
+				builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 				data.m_BackBuffer = targets.m_BackBuffer;
-				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
+				data.m_Rtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 			},
 			[renderer](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{
@@ -222,37 +203,23 @@ namespace gglab
 
 		if (depthCoverageFramePlan.UsesDepthPrepassEqual())
 		{
-			m_DepthPrepassPass.AddPass(
-				rg,
-				context,
-				services);
-			if (forwardPlusEnabled &&
-				depthCoverageFramePlan.
-					m_HasDepthCoverageDraws &&
+			m_DepthPrepassPass.AddPass(rg, context, services);
+			if (forwardPlusEnabled && depthCoverageFramePlan.m_HasDepthCoverageDraws &&
 				context.IsRenderSceneReady())
 			{
-				m_ForwardPlusCullPass.AddPass(
-					rg,
-					context,
-					services);
+				m_ForwardPlusCullPass.AddPass(rg, context, services);
 			}
 			m_SkyboxPass.AddPass(rg, context, services);
 			if (depthCoverageFramePlan.AddsForwardOpaquePass())
 			{
-				m_ForwardOpaquePass.AddPass(
-					rg,
-					context,
-					services);
+				m_ForwardOpaquePass.AddPass(rg, context, services);
 			}
 		}
 		else if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
 			if (depthCoverageFramePlan.AddsForwardOpaquePass())
 			{
-				m_ForwardOpaquePass.AddPass(
-					rg,
-					context,
-					services);
+				m_ForwardOpaquePass.AddPass(rg, context, services);
 			}
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
@@ -260,19 +227,13 @@ namespace gglab
 		{
 			// Preserve a defined background depth while rejecting unsafe
 			// scene draw packets for this frame.
-			m_DepthPrepassPass.AddPass(
-				rg,
-				context,
-				services);
+			m_DepthPrepassPass.AddPass(rg, context, services);
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
 		if (depthCoverageFramePlan.AddsForwardTransparentPass())
 		{
-			m_ForwardTransparentPass.AddPass(
-				rg,
-				context,
-				services);
+			m_ForwardTransparentPass.AddPass(rg, context, services);
 		}
 
 		// Depth-tested world-space debug geometry is part of HDR scene color.
@@ -303,13 +264,11 @@ namespace gglab
 			{
 				builder.SideEffect();
 
-				auto& targetsTable = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& targetsTable =
+					builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName);
 				auto& targets = targetsTable.GetViewTargets(displayViewId);
-				builder.Export(
-					targets.m_BackBuffer,
-					RGTextureAccess::Present,
-					RHISubresourceRange
-					{
+				builder.Export(targets.m_BackBuffer, RGTextureAccess::Present,
+					RHISubresourceRange{
 						.m_MipCount = 1,
 						.m_ArraySliceCount = 1,
 						.m_Aspects = RHITextureAspect::Color,
@@ -317,8 +276,7 @@ namespace gglab
 			});
 	}
 
-	void RenderPipelineForwardPBR::PrepareForwardPasses(
-		const RenderServices& services) noexcept
+	void RenderPipelineForwardPBR::PrepareForwardPasses(const RenderServices& services) noexcept
 	{
 		auto* shaderManager = services.m_ShaderManager;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
@@ -326,92 +284,59 @@ namespace gglab
 		if (!m_ForwardPBRShaderSet.IsValid())
 		{
 			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath =
-				L"Passes/PassForwardCoverage.hlsl";
+			shaderDesc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Vertex;
 			shaderDesc.m_Entry = L"VSMain";
-			m_ForwardPBRShaderSet.m_CoverageVertexShader =
-				shaderManager->LoadShader(shaderDesc);
+			m_ForwardPBRShaderSet.m_CoverageVertexShader = shaderManager->LoadShader(shaderDesc);
 
-			shaderDesc.m_SourcePath =
-				L"Passes/PassForwardPBR.hlsl";
+			shaderDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Pixel;
 			shaderDesc.m_Entry = L"PSMain";
-			m_ForwardPBRShaderSet.m_ShadingPixelShader =
-				shaderManager->LoadShader(shaderDesc);
+			m_ForwardPBRShaderSet.m_ShadingPixelShader = shaderManager->LoadShader(shaderDesc);
 
-			shaderDesc.m_SourcePath =
-				L"Passes/PassDepthPrepass.hlsl";
+			shaderDesc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Pixel;
 			shaderDesc.m_Entry = L"PSAlphaTest";
-			m_ForwardPBRShaderSet.m_AlphaTestPixelShader =
-				shaderManager->LoadShader(shaderDesc);
+			m_ForwardPBRShaderSet.m_AlphaTestPixelShader = shaderManager->LoadShader(shaderDesc);
 		}
 
 		if (!m_ForwardPBRShaderSet.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Forward renderer failed to prepare its required shared shader set.");
-			GGLAB_UNREACHABLE(
-				"Forward renderer production shaders are unavailable.");
+			GGLAB_UNREACHABLE("Forward renderer production shaders are unavailable.");
 		}
-		m_DepthPrepassPass.Prepare(
-			services,
-			m_ForwardPBRShaderSet);
-		m_ForwardOpaquePass.Prepare(
-			services,
-			m_ForwardPBRShaderSet);
-		m_ForwardTransparentPass.Prepare(
-			services,
-			m_ForwardPBRShaderSet);
+		m_DepthPrepassPass.Prepare(services, m_ForwardPBRShaderSet);
+		m_ForwardOpaquePass.Prepare(services, m_ForwardPBRShaderSet);
+		m_ForwardTransparentPass.Prepare(services, m_ForwardPBRShaderSet);
 	}
 
-	DepthCoverageFramePlan
-		RenderPipelineForwardPBR::
-			BuildDepthCoverageFramePlanForFrame(
-				const RenderFrameContext& context,
-				uint32_t targetWidth,
-				uint32_t targetHeight) const
+	DepthCoverageFramePlan RenderPipelineForwardPBR::BuildDepthCoverageFramePlanForFrame(
+		const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const
 	{
-		const RenderViewID displayViewId =
-			context.GetDisplayViewId();
-		const RenderQueue& renderQueue =
-			context.GetRenderQueue(displayViewId);
+		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const RenderQueue& renderQueue = context.GetRenderQueue(displayViewId);
 		DepthCoverageFramePlanBuildInfo buildInfo{
 			.m_RenderQueue = std::addressof(renderQueue),
 			.m_ExpectedViewId = displayViewId,
 			.m_TargetWidth = targetWidth,
 			.m_TargetHeight = targetHeight,
-			.m_DepthConvention =
-				context.GetDisplayRenderView().
-					m_DepthConvention,
+			.m_DepthConvention = context.GetDisplayRenderView().m_DepthConvention,
 		};
 
-		for (const RenderBucket bucket :
-			{ RenderBucket::Opaque, RenderBucket::AlphaTest })
+		for (const RenderBucket bucket : {RenderBucket::Opaque, RenderBucket::AlphaTest})
 		{
-			for (const bool doubleSided : { false, true })
+			for (const bool doubleSided : {false, true})
 			{
 				const uint64_t variantBits =
-					RenderQueueBuilder::EncodeVariantBits(
-						bucket,
-						doubleSided);
-				const size_t variantIndex =
-					static_cast<size_t>(variantBits);
-				buildInfo.m_PrepassPipelineSignatures[
-					variantIndex] =
-						m_DepthPrepassPass.
-							DescribePipelineVariant(
-								variantBits).
-						m_LogicalMetadata.
-						m_DepthCoveragePipelineSignature;
-				buildInfo.m_ForwardPipelineSignatures[
-					variantIndex] =
-						m_ForwardOpaquePass.
-							DescribePipelineVariant(
-								variantBits).
-						m_LogicalMetadata.
-						m_DepthCoveragePipelineSignature;
+					RenderQueueBuilder::EncodeVariantBits(bucket, doubleSided);
+				const size_t variantIndex = static_cast<size_t>(variantBits);
+				buildInfo.m_PrepassPipelineSignatures[variantIndex] =
+					m_DepthPrepassPass.DescribePipelineVariant(variantBits)
+					.m_LogicalMetadata.m_DepthCoveragePipelineSignature;
+				buildInfo.m_ForwardPipelineSignatures[variantIndex] =
+					m_ForwardOpaquePass.DescribePipelineVariant(variantBits)
+					.m_LogicalMetadata.m_DepthCoveragePipelineSignature;
 			}
 		}
 

@@ -10,13 +10,11 @@ namespace gglab
 	class RenderGraphComputeLabSession final : public LabSessionBase
 	{
 	public:
-		explicit RenderGraphComputeLabSession(
-			const LabSessionCreateInfo& createInfo) noexcept;
+		explicit RenderGraphComputeLabSession(const LabSessionCreateInfo& createInfo) noexcept;
 		~RenderGraphComputeLabSession() override = default;
 
 		void Update(float deltaTime) noexcept override;
-		void BuildDiagnostics(
-			LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;

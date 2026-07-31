@@ -8,9 +8,7 @@
 namespace gglab
 {
 	[[nodiscard]] constexpr uint32_t ResolveSubresourceCount(
-		uint32_t base,
-		uint32_t count,
-		uint32_t total) noexcept
+		uint32_t base, uint32_t count, uint32_t total) noexcept
 	{
 		if (base >= total)
 		{
@@ -18,23 +16,19 @@ namespace gglab
 		}
 
 		const uint32_t remaining = total - base;
-		return count == RHISubresourceRange::Remaining ?
-			remaining :
-			std::min(count, remaining);
+		return count == RHISubresourceRange::Remaining ? remaining : std::min(count, remaining);
 	}
 
-	[[nodiscard]] constexpr uint32_t GetRHITextureMipLevelCount(
-		const RHITextureDesc& desc) noexcept
+	[[nodiscard]] constexpr uint32_t GetRHITextureMipLevelCount(const RHITextureDesc& desc) noexcept
 	{
 		return std::max<uint32_t>(desc.m_MipLevels, 1u);
 	}
 
-	[[nodiscard]] constexpr uint32_t GetRHITextureArraySize(
-		const RHITextureDesc& desc) noexcept
+	[[nodiscard]] constexpr uint32_t GetRHITextureArraySize(const RHITextureDesc& desc) noexcept
 	{
-		return desc.m_Dimension == RHITextureDimension::Texture3D ?
-			1u :
-			std::max<uint32_t>(desc.m_ArraySize, 1u);
+		return desc.m_Dimension == RHITextureDimension::Texture3D
+			? 1u
+			: std::max<uint32_t>(desc.m_ArraySize, 1u);
 	}
 
 	[[nodiscard]] constexpr RHISubresourceRange NormalizeTextureSubresourceRange(
@@ -43,13 +37,9 @@ namespace gglab
 	{
 		RHISubresourceRange range = requested.value_or(RHISubresourceRange{});
 		range.m_MipCount = ResolveSubresourceCount(
-			range.m_BaseMip,
-			range.m_MipCount,
-			GetRHITextureMipLevelCount(desc));
+			range.m_BaseMip, range.m_MipCount, GetRHITextureMipLevelCount(desc));
 		range.m_ArraySliceCount = ResolveSubresourceCount(
-			range.m_BaseArraySlice,
-			range.m_ArraySliceCount,
-			GetRHITextureArraySize(desc));
+			range.m_BaseArraySlice, range.m_ArraySliceCount, GetRHITextureArraySize(desc));
 		range.m_Aspects &= GetRHITextureAspects(desc);
 		return range;
 	}

@@ -28,20 +28,11 @@ namespace gglab
 			return m_Status == LoadingStatus::Preparing;
 		}
 
-		[[nodiscard]] bool IsReady() const noexcept
-		{
-			return m_Status == LoadingStatus::Ready;
-		}
+		[[nodiscard]] bool IsReady() const noexcept { return m_Status == LoadingStatus::Ready; }
 
-		[[nodiscard]] bool HasFailed() const noexcept
-		{
-			return m_Status == LoadingStatus::Failed;
-		}
+		[[nodiscard]] bool HasFailed() const noexcept { return m_Status == LoadingStatus::Failed; }
 
-		[[nodiscard]] static LoadingProgress Ready() noexcept
-		{
-			return {};
-		}
+		[[nodiscard]] static LoadingProgress Ready() noexcept { return {}; }
 	};
 
 	struct LoadingProgressStep
@@ -59,9 +50,7 @@ namespace gglab
 
 		void AddStep(float weight, const LoadingProgressStep& step) noexcept;
 		void AddAssetStep(
-			float weight,
-			const AssetLoadProgress& progress,
-			std::string_view detail = {}) noexcept;
+			float weight, const AssetLoadProgress& progress, std::string_view detail = {}) noexcept;
 		void AddCompletedStep(float weight) noexcept;
 
 		[[nodiscard]] LoadingProgress Build() const noexcept;

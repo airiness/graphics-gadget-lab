@@ -26,7 +26,10 @@ namespace gglab
 
 		DevelopGuiRegistry& GetRegistry() noexcept { return m_Registry; }
 		DiagnosticsRuntime& GetDiagnostics() noexcept { return m_Diagnostics; }
-		RenderVisualizationSettings& GetRenderVisualizationSettings() noexcept { return m_RenderVisualizationSettings; }
+		RenderVisualizationSettings& GetRenderVisualizationSettings() noexcept
+		{
+			return m_RenderVisualizationSettings;
+		}
 
 	private:
 		DevelopGuiRegistry m_Registry;

@@ -56,8 +56,7 @@ namespace gglab
 		[[nodiscard]] std::unique_ptr<DX12CommandList> CreateCommandList(
 			DX12QueueType type) const noexcept;
 
-		void WaitForFence(RHIQueueType waitingQueue,
-			const RHIFencePoint& fencePoint) noexcept;
+		void WaitForFence(RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept;
 		void WaitForFenceCompletion(const RHIFencePoint& fencePoint) noexcept;
 		[[nodiscard]] bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept;
 		[[nodiscard]] const DX12Fence* ResolveFence(RHIFenceHandle fence) const noexcept;

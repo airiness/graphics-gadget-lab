@@ -22,16 +22,11 @@ namespace gglab
 			DerivedDataKey m_DerivedDataKey{};
 		};
 
-		[[nodiscard]] TaskResult ResolveTextureArtifact(
-			TextureDerivedDataSystem& derivedDataSystem,
-			const std::filesystem::path& sourcePath,
-			const TextureImportSettings& importSettings,
-			SourceDigest expectedSourceDigest,
-			DerivedDataKey expectedDerivedDataKey,
-			ArtifactContentDigest expectedArtifactContentDigest,
-			const ProgressReporter& progress,
-			std::stop_token stopToken,
-			TextureDecodeJob& job) noexcept
+		[[nodiscard]] TaskResult ResolveTextureArtifact(TextureDerivedDataSystem& derivedDataSystem,
+			const std::filesystem::path& sourcePath, const TextureImportSettings& importSettings,
+			SourceDigest expectedSourceDigest, DerivedDataKey expectedDerivedDataKey,
+			ArtifactContentDigest expectedArtifactContentDigest, const ProgressReporter& progress,
+			std::stop_token stopToken, TextureDecodeJob& job) noexcept
 		{
 			const auto validateExpectedArtifact =
 				[expectedArtifactContentDigest](
@@ -43,8 +38,9 @@ namespace gglab
 					{
 						return {};
 					}
-					const ArtifactContentDigest actualDigest = artifact.m_Artifact ?
-						artifact.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+					const ArtifactContentDigest actualDigest =
+						artifact.m_Artifact ? artifact.m_Artifact->m_ContentDigest
+						: ArtifactContentDigest{};
 					return std::format(
 						"Texture artifact changed for immutable generation (expected {}, resolved {}).",
 						ArtifactContentDigestText(expectedArtifactContentDigest),
@@ -69,10 +65,8 @@ namespace gglab
 				}
 				hasSourceSnapshot = true;
 				job.m_SourceDigest = snapshot.m_Snapshot.m_Digest;
-				job.m_DerivedDataKey = BuildTextureDerivedDataKey(
-					job.m_SourceDigest,
-					sourcePath,
-					importSettings);
+				job.m_DerivedDataKey =
+					BuildTextureDerivedDataKey(job.m_SourceDigest, sourcePath, importSettings);
 			}
 			if (!job.m_DerivedDataKey.IsValid())
 			{
@@ -88,8 +82,7 @@ namespace gglab
 				{
 					return TaskResult::Failure("Shared texture artifact hit was invalid.");
 				}
-				if (std::string error = validateExpectedArtifact(job.m_Artifact);
-					!error.empty())
+				if (std::string error = validateExpectedArtifact(job.m_Artifact); !error.empty())
 				{
 					return TaskResult::Failure(std::move(error));
 				}
@@ -97,13 +90,10 @@ namespace gglab
 			}
 			if (requestResult.m_Disposition == ArtifactRequestDisposition::Waiting)
 			{
-				progress.Report(
-					0.14f,
-					"Waiting for shared texture artifact",
+				progress.Report(0.14f, "Waiting for shared texture artifact",
 					DerivedDataKeyText(job.m_DerivedDataKey));
-				TextureArtifactWaitResult waitResult = derivedDataSystem.Wait(
-					std::move(requestResult.m_Waiter),
-					stopToken);
+				TextureArtifactWaitResult waitResult =
+					derivedDataSystem.Wait(std::move(requestResult.m_Waiter), stopToken);
 				if (waitResult.m_Disposition == ArtifactWaitDisposition::Cancelled)
 				{
 					return TaskResult::Success();
@@ -113,52 +103,39 @@ namespace gglab
 					return TaskResult::Failure(std::move(waitResult.m_Error));
 				}
 				job.m_Artifact = std::move(waitResult.m_Artifact);
-				if (std::string error = validateExpectedArtifact(job.m_Artifact);
-					!error.empty())
+				if (std::string error = validateExpectedArtifact(job.m_Artifact); !error.empty())
 				{
 					return TaskResult::Failure(std::move(error));
 				}
-				progress.Report(
-					0.60f,
-					"Shared texture artifact resolved",
+				progress.Report(0.60f, "Shared texture artifact resolved",
 					DerivedDataKeyText(job.m_DerivedDataKey));
-				return job.m_Artifact.IsValid() ? TaskResult::Success() :
-					TaskResult::Failure("Shared texture artifact result was invalid.");
+				return job.m_Artifact.IsValid()
+					? TaskResult::Success()
+					: TaskResult::Failure("Shared texture artifact result was invalid.");
 			}
 
-			TextureArtifactWaiterHandle participant =
-				std::move(requestResult.m_Waiter);
-			TextureArtifactBuildClaim buildClaim =
-				std::move(requestResult.m_BuildClaim);
+			TextureArtifactWaiterHandle participant = std::move(requestResult.m_Waiter);
+			TextureArtifactBuildClaim buildClaim = std::move(requestResult.m_BuildClaim);
 			std::stop_callback cancelParticipant(
-				stopToken,
-				[&participant]() noexcept { participant.Cancel(); });
+				stopToken, [&participant]() noexcept { participant.Cancel(); });
 
-			progress.Report(
-				0.12f,
-				"Looking up shared texture derived data",
+			progress.Report(0.12f, "Looking up shared texture derived data",
 				DerivedDataKeyText(job.m_DerivedDataKey));
-			TextureDerivedDataArtifact cached = derivedDataSystem.Read(
-				job.m_DerivedDataKey,
-				importSettings);
+			TextureDerivedDataArtifact cached =
+				derivedDataSystem.Read(job.m_DerivedDataKey, importSettings);
 			if (cached.IsValid())
 			{
 				if (std::string error = validateExpectedArtifact(cached); !error.empty())
 				{
-					GGLAB_UNUSED(derivedDataSystem.Fail(
-						std::move(buildClaim), error));
+					GGLAB_UNUSED(derivedDataSystem.Fail(std::move(buildClaim), error));
 					return TaskResult::Failure(std::move(error));
 				}
 				job.m_Artifact = cached;
-				if (!derivedDataSystem.Publish(
-					std::move(buildClaim),
-					std::move(cached)))
+				if (!derivedDataSystem.Publish(std::move(buildClaim), std::move(cached)))
 				{
 					return TaskResult::Failure("Failed to publish a shared texture DDC hit.");
 				}
-				progress.Report(
-					0.60f,
-					"Shared texture derived data cache hit",
+				progress.Report(0.60f, "Shared texture derived data cache hit",
 					DerivedDataKeyText(job.m_DerivedDataKey));
 				return TaskResult::Success();
 			}
@@ -169,55 +146,41 @@ namespace gglab
 				if (!snapshot.Succeeded())
 				{
 					const std::string error = snapshot.m_Error;
-					GGLAB_UNUSED(derivedDataSystem.Fail(
-						std::move(buildClaim), error));
+					GGLAB_UNUSED(derivedDataSystem.Fail(std::move(buildClaim), error));
 					return TaskResult::Failure(error);
 				}
 				job.m_SourceDigest = snapshot.m_Snapshot.m_Digest;
-				const DerivedDataKey observedKey = BuildTextureDerivedDataKey(
-					job.m_SourceDigest,
-					sourcePath,
-					importSettings);
+				const DerivedDataKey observedKey =
+					BuildTextureDerivedDataKey(job.m_SourceDigest, sourcePath, importSettings);
 				if (observedKey != job.m_DerivedDataKey)
 				{
 					const std::string error = std::format(
 						"Texture source changed for immutable generation (expected key {}, observed {}).",
-						DerivedDataKeyText(job.m_DerivedDataKey),
-						DerivedDataKeyText(observedKey));
-					GGLAB_UNUSED(derivedDataSystem.Fail(
-						std::move(buildClaim), error));
+						DerivedDataKeyText(job.m_DerivedDataKey), DerivedDataKeyText(observedKey));
+					GGLAB_UNUSED(derivedDataSystem.Fail(std::move(buildClaim), error));
 					return TaskResult::Failure(error);
 				}
 			}
-			TextureAssetData textureData = TextureLoader::LoadTextureData(
-				sourcePath,
-				snapshot.m_Snapshot.m_Bytes,
-				importSettings,
-				progress.Subrange(0.18f, 0.62f));
+			TextureAssetData textureData = TextureLoader::LoadTextureData(sourcePath,
+				snapshot.m_Snapshot.m_Bytes, importSettings, progress.Subrange(0.18f, 0.62f));
 			if (!textureData.IsValid())
 			{
-				const std::string error = std::format(
-					"Failed to decode texture '{}'.",
-					sourcePath.string());
-				GGLAB_UNUSED(derivedDataSystem.Fail(
-					std::move(buildClaim), error));
+				const std::string error =
+					std::format("Failed to decode texture '{}'.", sourcePath.string());
+				GGLAB_UNUSED(derivedDataSystem.Fail(std::move(buildClaim), error));
 				return TaskResult::Failure(error);
 			}
 			const AssetContentFingerprint contentFingerprint =
 				ComputeTextureContentFingerprint(textureData, importSettings);
-			TextureArtifactBuildResult built = CreateTextureArtifact(
-				std::move(textureData));
+			TextureArtifactBuildResult built = CreateTextureArtifact(std::move(textureData));
 			if (!built.Succeeded() || !contentFingerprint.IsValid())
 			{
 				const std::string error = std::format(
-					"Failed to build decoded texture artifact '{}'.",
-					sourcePath.string());
-				GGLAB_UNUSED(derivedDataSystem.Fail(
-					std::move(buildClaim), error));
+					"Failed to build decoded texture artifact '{}'.", sourcePath.string());
+				GGLAB_UNUSED(derivedDataSystem.Fail(std::move(buildClaim), error));
 				return TaskResult::Failure(error);
 			}
-			const ArtifactContentDigest artifactContentDigest =
-				built.m_Artifact.m_ContentDigest;
+			const ArtifactContentDigest artifactContentDigest = built.m_Artifact.m_ContentDigest;
 			if (expectedArtifactContentDigest.IsValid() &&
 				artifactContentDigest != expectedArtifactContentDigest)
 			{
@@ -225,16 +188,14 @@ namespace gglab
 					"Texture source rebuild changed immutable generation content (expected artifact {}, rebuilt artifact {}).",
 					ArtifactContentDigestText(expectedArtifactContentDigest),
 					ArtifactContentDigestText(artifactContentDigest));
-				GGLAB_UNUSED(derivedDataSystem.Fail(
-					std::move(buildClaim), error));
+				GGLAB_UNUSED(derivedDataSystem.Fail(std::move(buildClaim), error));
 				return TaskResult::Failure(error);
 			}
-			TextureArtifactHandle artifact = std::make_shared<const TextureArtifact>(
-				std::move(built.m_Artifact));
+			TextureArtifactHandle artifact =
+				std::make_shared<const TextureArtifact>(std::move(built.m_Artifact));
 			if (!derivedDataSystem.Write(job.m_DerivedDataKey, *artifact))
 			{
-				GGLAB_LOG_GRAPHICS_WARN(
-					"Failed to publish texture DDC entry '{}'.",
+				GGLAB_LOG_GRAPHICS_WARN("Failed to publish texture DDC entry '{}'.",
 					DerivedDataKeyText(job.m_DerivedDataKey));
 			}
 			job.m_Artifact = {
@@ -242,9 +203,7 @@ namespace gglab
 				.m_ContentFingerprint = contentFingerprint,
 				.m_DerivedDataCacheHit = false,
 			};
-			if (!derivedDataSystem.Publish(
-				std::move(buildClaim),
-				job.m_Artifact))
+			if (!derivedDataSystem.Publish(std::move(buildClaim), job.m_Artifact))
 			{
 				return TaskResult::Failure("Failed to publish a shared texture artifact.");
 			}
@@ -252,17 +211,14 @@ namespace gglab
 		}
 
 		[[nodiscard]] TaskResult ResolveModelTextureSources(
-			TextureDerivedDataSystem& derivedDataSystem,
-			const ImportedModel& model,
-			const ProgressReporter& progress,
-			std::stop_token stopToken,
+			TextureDerivedDataSystem& derivedDataSystem, const ImportedModel& model,
+			const ProgressReporter& progress, std::stop_token stopToken,
 			std::vector<ResolvedModelImportTexture>& resolvedTextures) noexcept
 		{
 			resolvedTextures.clear();
 			resolvedTextures.reserve(model.m_TextureSources.size());
 			uint32_t derivedDataCacheHitCount = 0;
-			for (size_t textureIndex = 0;
-				textureIndex < model.m_TextureSources.size();
+			for (size_t textureIndex = 0; textureIndex < model.m_TextureSources.size();
 				++textureIndex)
 			{
 				if (stopToken.stop_requested())
@@ -274,50 +230,34 @@ namespace gglab
 					static_cast<float>(model.m_TextureSources.size());
 				const float end = static_cast<float>(textureIndex + 1) /
 					static_cast<float>(model.m_TextureSources.size());
-				progress.Report(
-					begin,
-					"Resolving model texture artifacts",
-					std::format("{} of {}: {}",
-						textureIndex + 1,
-						model.m_TextureSources.size(),
+				progress.Report(begin, "Resolving model texture artifacts",
+					std::format("{} of {}: {}", textureIndex + 1, model.m_TextureSources.size(),
 						source.m_CanonicalPath.filename().generic_string()),
 					static_cast<uint32_t>(textureIndex),
 					static_cast<uint32_t>(model.m_TextureSources.size()));
 				TextureDecodeJob textureJob{};
-				TaskResult result = ResolveTextureArtifact(
-					derivedDataSystem,
-					source.m_CanonicalPath,
-					source.m_ImportSettings,
-					{},
-					{},
-					{},
-					progress.Subrange(begin, end),
-					stopToken,
-					textureJob);
+				TaskResult result = ResolveTextureArtifact(derivedDataSystem,
+					source.m_CanonicalPath, source.m_ImportSettings, {}, {}, {},
+					progress.Subrange(begin, end), stopToken, textureJob);
 				if (!result.m_Succeeded || stopToken.stop_requested())
 				{
 					return result;
 				}
-				if (!textureJob.m_Artifact.IsValid() ||
-					!textureJob.m_SourceDigest.IsValid() ||
+				if (!textureJob.m_Artifact.IsValid() || !textureJob.m_SourceDigest.IsValid() ||
 					!textureJob.m_DerivedDataKey.IsValid())
 				{
 					return TaskResult::Failure(std::format(
-						"Failed to resolve model texture '{}'.",
-						source.m_CanonicalPath.string()));
+						"Failed to resolve model texture '{}'.", source.m_CanonicalPath.string()));
 				}
-				derivedDataCacheHitCount +=
-					textureJob.m_Artifact.m_DerivedDataCacheHit ? 1u : 0u;
+				derivedDataCacheHitCount += textureJob.m_Artifact.m_DerivedDataCacheHit ? 1u : 0u;
 				resolvedTextures.push_back({
 					.m_Artifact = std::move(textureJob.m_Artifact.m_Artifact),
 					.m_ContentFingerprint = textureJob.m_Artifact.m_ContentFingerprint,
 					.m_SourceDigest = textureJob.m_SourceDigest,
 					.m_DerivedDataKey = textureJob.m_DerivedDataKey,
-				});
+					});
 			}
-			progress.Report(
-				1.0f,
-				"Model texture artifacts resolved",
+			progress.Report(1.0f, "Model texture artifacts resolved",
 				std::format("{} textures", resolvedTextures.size()),
 				static_cast<uint32_t>(resolvedTextures.size()),
 				static_cast<uint32_t>(resolvedTextures.size()));
@@ -325,8 +265,7 @@ namespace gglab
 			{
 				GGLAB_LOG_GRAPHICS_INFO(
 					"Model texture artifacts resolved (textures={}, ddcHits={}).",
-					resolvedTextures.size(),
-					derivedDataCacheHitCount);
+					resolvedTextures.size(), derivedDataCacheHitCount);
 			}
 			return TaskResult::Success();
 		}
@@ -345,16 +284,13 @@ namespace gglab
 
 	AssetLoadCoordinator::~AssetLoadCoordinator()
 	{
-		GGLAB_ASSERT_MSG(
-			!HasActiveOperations(),
+		GGLAB_ASSERT_MSG(!HasActiveOperations(),
 			"AssetLoadCoordinator destroyed while load operations are still active.");
-		GGLAB_ASSERT_MSG(
-			!HasPendingCompletions(),
+		GGLAB_ASSERT_MSG(!HasPendingCompletions(),
 			"AssetLoadCoordinator destroyed while load completions are pending.");
 	}
 
-	AssetLoadSubmission AssetLoadCoordinator::SubmitModelImport(
-		ModelImportRequest request) noexcept
+	AssetLoadSubmission AssetLoadCoordinator::SubmitModelImport(ModelImportRequest request) noexcept
 	{
 		if (!request.m_ContentVersion.IsValid() || request.m_SourcePath.empty() ||
 			request.m_Priority == TaskPriority::Count)
@@ -383,39 +319,30 @@ namespace gglab
 		TextureArtifactCache* const textureArtifactCache = m_TextureArtifactCache;
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
-				.m_Name = std::format(
-					"Asset.ModelImport: {}",
-					sourcePath.filename().generic_string()),
+				.m_Name =
+					std::format("Asset.ModelImport: {}", sourcePath.filename().generic_string()),
 				.m_Priority = request.m_Priority,
 				.m_Progress = progress,
 			},
 			[this, sourcePath, importSettings, job, progress, textureArtifactCache](
 				std::stop_token stopToken) noexcept
 			{
-				ModelImportResult result = ModelImporter::Import(
-					sourcePath,
-					importSettings,
-					stopToken,
-					ProgressReporter(progress, 0.05f, 0.48f));
+				ModelImportResult result = ModelImporter::Import(sourcePath, importSettings,
+					stopToken, ProgressReporter(progress, 0.05f, 0.48f));
 				if (!result.Succeeded())
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
 				std::vector<ResolvedModelImportTexture> resolvedTextures;
-				TaskResult textureResult = ResolveModelTextureSources(
-					m_TextureDerivedDataSystem,
-					result.m_Model,
-					ProgressReporter(progress, 0.48f, 0.62f),
-					stopToken,
-					resolvedTextures);
+				TaskResult textureResult =
+					ResolveModelTextureSources(m_TextureDerivedDataSystem, result.m_Model,
+						ProgressReporter(progress, 0.48f, 0.62f), stopToken, resolvedTextures);
 				if (!textureResult.m_Succeeded || stopToken.stop_requested())
 				{
 					return textureResult;
 				}
 				job->m_Artifact = CreateModelImportArtifact(
-					std::move(result.m_Model),
-					std::move(resolvedTextures),
-					*textureArtifactCache);
+					std::move(result.m_Model), std::move(resolvedTextures), *textureArtifactCache);
 				if (!job->m_Artifact)
 				{
 					return TaskResult::Failure("Failed to create model import artifact");
@@ -434,22 +361,21 @@ namespace gglab
 						.m_Operation = operation,
 						.m_Completion = completion,
 						.m_Artifact = std::move(job->m_Artifact),
-					});
+						});
 				}
 				else
 				{
 					m_PendingCompletions.emplace_back(ModelImportFailed{
 						.m_Operation = operation,
 						.m_Completion = completion,
-					});
+						});
 				}
 			});
 		if (!task.IsValid())
 		{
 			return {};
 		}
-		m_ModelImports.emplace(
-			request.m_ContentVersion.m_Key,
+		m_ModelImports.emplace(request.m_ContentVersion.m_Key,
 			OperationRecord{
 				.m_Operation = operation,
 				.m_Task = task,
@@ -457,8 +383,7 @@ namespace gglab
 		return { .m_Operation = operation, .m_Task = task };
 	}
 
-	AssetLoadSubmission AssetLoadCoordinator::SubmitMeshReload(
-		MeshReloadRequest request) noexcept
+	AssetLoadSubmission AssetLoadCoordinator::SubmitMeshReload(MeshReloadRequest request) noexcept
 	{
 		if (!request.m_SourceModelVersion.IsValid() || request.m_SourcePath.empty() ||
 			request.m_Priority == TaskPriority::Count ||
@@ -469,8 +394,7 @@ namespace gglab
 		if (const auto existing = m_MeshReloads.find(request.m_SourceModelVersion.m_Key);
 			existing != m_MeshReloads.end())
 		{
-			if (existing->second.m_Operation.m_ContentVersion ==
-				request.m_SourceModelVersion)
+			if (existing->second.m_Operation.m_ContentVersion == request.m_SourceModelVersion)
 			{
 				return {
 					.m_Operation = existing->second.m_Operation,
@@ -481,13 +405,12 @@ namespace gglab
 			m_MeshReloads.erase(existing);
 		}
 
-		const AssetOperationToken operation = AllocateOperation(
-			request.m_SourceModelVersion);
+		const AssetOperationToken operation = AllocateOperation(request.m_SourceModelVersion);
 		auto job = std::make_shared<ImportJob>();
 		if (request.m_ExpectedArtifactContentDigest.IsValid())
 		{
-			job->m_Artifact = m_ModelImportArtifactCache->Find(
-				request.m_ExpectedArtifactContentDigest);
+			job->m_Artifact =
+				m_ModelImportArtifactCache->Find(request.m_ExpectedArtifactContentDigest);
 		}
 		const std::filesystem::path sourcePath = std::move(request.m_SourcePath);
 		const ModelImportSettings importSettings = request.m_ImportSettings;
@@ -495,20 +418,17 @@ namespace gglab
 			request.m_ExpectedArtifactContentDigest;
 		TextureArtifactCache* const textureArtifactCache = m_TextureArtifactCache;
 		const bool cacheHit = static_cast<bool>(job->m_Artifact);
-		const std::string taskName = cacheHit ?
-			std::format(
-				"Asset.ModelResidencyCacheHit: {}",
-				sourcePath.filename().generic_string()) :
-			std::format(
-				"Asset.ModelResidencyReload: {}",
+		const std::string taskName = cacheHit ? std::format("Asset.ModelResidencyCacheHit: {}",
+			sourcePath.filename().generic_string())
+			: std::format("Asset.ModelResidencyReload: {}",
 				sourcePath.filename().generic_string());
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
 				.m_Name = taskName,
 				.m_Priority = request.m_Priority,
 			},
-			[this, sourcePath, importSettings, expectedArtifactContentDigest,
-				job, cacheHit, textureArtifactCache](std::stop_token stopToken) noexcept
+			[this, sourcePath, importSettings, expectedArtifactContentDigest, job, cacheHit,
+			textureArtifactCache](std::stop_token stopToken) noexcept
 			{
 				if (cacheHit)
 				{
@@ -519,29 +439,21 @@ namespace gglab
 					}
 					return TaskResult::Success();
 				}
-				ModelImportResult result = ModelImporter::Import(
-					sourcePath,
-					importSettings,
-					stopToken);
+				ModelImportResult result =
+					ModelImporter::Import(sourcePath, importSettings, stopToken);
 				if (!result.Succeeded())
 				{
 					return TaskResult::Failure(std::move(result.m_Error));
 				}
 				std::vector<ResolvedModelImportTexture> resolvedTextures;
 				TaskResult textureResult = ResolveModelTextureSources(
-					m_TextureDerivedDataSystem,
-					result.m_Model,
-					{},
-					stopToken,
-					resolvedTextures);
+					m_TextureDerivedDataSystem, result.m_Model, {}, stopToken, resolvedTextures);
 				if (!textureResult.m_Succeeded || stopToken.stop_requested())
 				{
 					return textureResult;
 				}
 				job->m_Artifact = CreateModelImportArtifact(
-					std::move(result.m_Model),
-					std::move(resolvedTextures),
-					*textureArtifactCache);
+					std::move(result.m_Model), std::move(resolvedTextures), *textureArtifactCache);
 				if (!job->m_Artifact)
 				{
 					return TaskResult::Failure("Failed to create model import artifact");
@@ -568,22 +480,21 @@ namespace gglab
 						.m_Operation = operation,
 						.m_Completion = completion,
 						.m_Artifact = std::move(job->m_Artifact),
-					});
+						});
 				}
 				else
 				{
 					m_PendingCompletions.emplace_back(MeshReloadFailed{
 						.m_Operation = operation,
 						.m_Completion = completion,
-					});
+						});
 				}
 			});
 		if (!task.IsValid())
 		{
 			return {};
 		}
-		m_MeshReloads.emplace(
-			request.m_SourceModelVersion.m_Key,
+		m_MeshReloads.emplace(request.m_SourceModelVersion.m_Key,
 			OperationRecord{
 				.m_Operation = operation,
 				.m_Task = task,
@@ -596,9 +507,8 @@ namespace gglab
 	{
 		if (!request.m_ContentVersion.IsValid() || request.m_SourcePath.empty() ||
 			request.m_Priority == TaskPriority::Count ||
-			(request.m_ResidencyReload &&
-				(!request.m_ExpectedArtifactContentDigest.IsValid() ||
-					!request.m_ResidencyOperation.IsValid())))
+			(request.m_ResidencyReload && (!request.m_ExpectedArtifactContentDigest.IsValid() ||
+				!request.m_ResidencyOperation.IsValid())))
 		{
 			return {};
 		}
@@ -621,9 +531,8 @@ namespace gglab
 			}
 			else if (request.m_Priority < existing->second.m_Priority)
 			{
-				GGLAB_UNUSED(m_TaskSystem->UpdatePriority(
-					existing->second.m_Task,
-					request.m_Priority));
+				GGLAB_UNUSED(
+					m_TaskSystem->UpdatePriority(existing->second.m_Task, request.m_Priority));
 			}
 			m_TextureDecodes.erase(existing);
 		}
@@ -642,26 +551,17 @@ namespace gglab
 		const AssetResidencyOperation residencyOperation = request.m_ResidencyOperation;
 		const TaskHandle task = m_TaskSystem->Submit(
 			{
-				.m_Name = std::format(
-					"Asset.TextureDecode: {}",
-					sourcePath.filename().generic_string()),
+				.m_Name =
+					std::format("Asset.TextureDecode: {}", sourcePath.filename().generic_string()),
 				.m_Priority = request.m_Priority,
 				.m_Progress = progress,
 			},
-			[this, sourcePath, importSettings, expectedSourceDigest,
-				expectedDerivedDataKey, expectedArtifactContentDigest,
-				job, progress](std::stop_token stopToken) noexcept
+			[this, sourcePath, importSettings, expectedSourceDigest, expectedDerivedDataKey,
+			expectedArtifactContentDigest, job, progress](std::stop_token stopToken) noexcept
 			{
-				return ResolveTextureArtifact(
-					m_TextureDerivedDataSystem,
-					sourcePath,
-					importSettings,
-					expectedSourceDigest,
-					expectedDerivedDataKey,
-					expectedArtifactContentDigest,
-					ProgressReporter(progress),
-					stopToken,
-					*job);
+				return ResolveTextureArtifact(m_TextureDerivedDataSystem, sourcePath,
+					importSettings, expectedSourceDigest, expectedDerivedDataKey,
+					expectedArtifactContentDigest, ProgressReporter(progress), stopToken, *job);
 			},
 			[this, operation, semantic, residencyReload, residencyOperation, job](
 				const TaskCompletionInfo& completion) mutable noexcept
@@ -683,7 +583,7 @@ namespace gglab
 						.m_DerivedDataCacheHit = job->m_Artifact.m_DerivedDataCacheHit,
 						.m_ResidencyReload = residencyReload,
 						.m_ResidencyOperation = residencyOperation,
-					});
+						});
 				}
 				else
 				{
@@ -693,15 +593,14 @@ namespace gglab
 						.m_Semantic = semantic,
 						.m_ResidencyReload = residencyReload,
 						.m_ResidencyOperation = residencyOperation,
-					});
+						});
 				}
 			});
 		if (!task.IsValid())
 		{
 			return {};
 		}
-		m_TextureDecodes.emplace(
-			request.m_ContentVersion.m_Key,
+		m_TextureDecodes.emplace(request.m_ContentVersion.m_Key,
 			OperationRecord{
 				.m_Operation = operation,
 				.m_Task = task,
@@ -716,12 +615,12 @@ namespace gglab
 	{
 		const auto operation = m_ModelImports.find(contentVersion.m_Key);
 		return operation != m_ModelImports.end() &&
-			operation->second.m_Operation.m_ContentVersion == contentVersion ?
-			operation->second.m_Task : TaskHandle{};
+			operation->second.m_Operation.m_ContentVersion == contentVersion
+			? operation->second.m_Task
+			: TaskHandle{};
 	}
 
-	bool AssetLoadCoordinator::HasMeshReload(
-		AssetContentVersion sourceModelVersion) const noexcept
+	bool AssetLoadCoordinator::HasMeshReload(AssetContentVersion sourceModelVersion) const noexcept
 	{
 		const auto operation = m_MeshReloads.find(sourceModelVersion.m_Key);
 		return operation != m_MeshReloads.end() &&
@@ -733,19 +632,18 @@ namespace gglab
 	{
 		const auto operation = m_TextureDecodes.find(contentVersion.m_Key);
 		return operation != m_TextureDecodes.end() &&
-			operation->second.m_Operation.m_ContentVersion == contentVersion ?
-			operation->second.m_Task : TaskHandle{};
+			operation->second.m_Operation.m_ContentVersion == contentVersion
+			? operation->second.m_Task
+			: TaskHandle{};
 	}
 
-	bool AssetLoadCoordinator::CancelModelImport(
-		AssetContentVersion contentVersion) noexcept
+	bool AssetLoadCoordinator::CancelModelImport(AssetContentVersion contentVersion) noexcept
 	{
 		return m_TaskSystem->Cancel(GetModelImportTask(contentVersion));
 	}
 
 	bool AssetLoadCoordinator::UpdateModelImportPriority(
-		AssetContentVersion contentVersion,
-		TaskPriority priority) noexcept
+		AssetContentVersion contentVersion, TaskPriority priority) noexcept
 	{
 		const auto operation = m_ModelImports.find(contentVersion.m_Key);
 		return operation != m_ModelImports.end() &&
@@ -754,8 +652,7 @@ namespace gglab
 	}
 
 	bool AssetLoadCoordinator::UpdateMeshReloadPriority(
-		AssetContentVersion sourceModelVersion,
-		TaskPriority priority) noexcept
+		AssetContentVersion sourceModelVersion, TaskPriority priority) noexcept
 	{
 		const auto operation = m_MeshReloads.find(sourceModelVersion.m_Key);
 		return operation != m_MeshReloads.end() &&
@@ -763,15 +660,13 @@ namespace gglab
 			m_TaskSystem->UpdatePriority(operation->second.m_Task, priority);
 	}
 
-	bool AssetLoadCoordinator::CancelTextureDecode(
-		AssetContentVersion contentVersion) noexcept
+	bool AssetLoadCoordinator::CancelTextureDecode(AssetContentVersion contentVersion) noexcept
 	{
 		return m_TaskSystem->Cancel(GetTextureDecodeTask(contentVersion));
 	}
 
 	bool AssetLoadCoordinator::UpdateTextureDecodePriority(
-		AssetContentVersion contentVersion,
-		TaskPriority priority) noexcept
+		AssetContentVersion contentVersion, TaskPriority priority) noexcept
 	{
 		const auto operation = m_TextureDecodes.find(contentVersion.m_Key);
 		return operation != m_TextureDecodes.end() &&
@@ -779,38 +674,32 @@ namespace gglab
 			m_TaskSystem->UpdatePriority(operation->second.m_Task, priority);
 	}
 
-	bool AssetLoadCoordinator::IsCurrentModelImport(
-		AssetOperationToken operation) const noexcept
+	bool AssetLoadCoordinator::IsCurrentModelImport(AssetOperationToken operation) const noexcept
 	{
 		return Matches(m_ModelImports, operation);
 	}
 
-	bool AssetLoadCoordinator::IsCurrentMeshReload(
-		AssetOperationToken operation) const noexcept
+	bool AssetLoadCoordinator::IsCurrentMeshReload(AssetOperationToken operation) const noexcept
 	{
 		return Matches(m_MeshReloads, operation);
 	}
 
-	bool AssetLoadCoordinator::IsCurrentTextureDecode(
-		AssetOperationToken operation) const noexcept
+	bool AssetLoadCoordinator::IsCurrentTextureDecode(AssetOperationToken operation) const noexcept
 	{
 		return Matches(m_TextureDecodes, operation);
 	}
 
-	void AssetLoadCoordinator::CompleteModelImport(
-		AssetOperationToken operation) noexcept
+	void AssetLoadCoordinator::CompleteModelImport(AssetOperationToken operation) noexcept
 	{
 		Complete(m_ModelImports, operation);
 	}
 
-	void AssetLoadCoordinator::CompleteMeshReload(
-		AssetOperationToken operation) noexcept
+	void AssetLoadCoordinator::CompleteMeshReload(AssetOperationToken operation) noexcept
 	{
 		Complete(m_MeshReloads, operation);
 	}
 
-	void AssetLoadCoordinator::CompleteTextureDecode(
-		AssetOperationToken operation) noexcept
+	void AssetLoadCoordinator::CompleteTextureDecode(AssetOperationToken operation) noexcept
 	{
 		Complete(m_TextureDecodes, operation);
 	}
@@ -825,8 +714,7 @@ namespace gglab
 		m_TextureDecodes.erase(texture);
 	}
 
-	void AssetLoadCoordinator::DrainCompletions(
-		std::vector<AssetLoadCompletion>& output) noexcept
+	void AssetLoadCoordinator::DrainCompletions(std::vector<AssetLoadCompletion>& output) noexcept
 	{
 		output.clear();
 		output.swap(m_PendingCompletions);
@@ -834,8 +722,7 @@ namespace gglab
 
 	bool AssetLoadCoordinator::HasActiveOperations() const noexcept
 	{
-		return !m_ModelImports.empty() || !m_MeshReloads.empty() ||
-			!m_TextureDecodes.empty();
+		return !m_ModelImports.empty() || !m_MeshReloads.empty() || !m_TextureDecodes.empty();
 	}
 
 	AssetOperationToken AssetLoadCoordinator::AllocateOperation(
@@ -845,17 +732,14 @@ namespace gglab
 	}
 
 	bool AssetLoadCoordinator::Matches(
-		const OperationMap& operations,
-		AssetOperationToken operation) noexcept
+		const OperationMap& operations, AssetOperationToken operation) noexcept
 	{
 		const auto current = operations.find(operation.m_ContentVersion.m_Key);
-		return current != operations.end() &&
-			current->second.m_Operation == operation;
+		return current != operations.end() && current->second.m_Operation == operation;
 	}
 
 	void AssetLoadCoordinator::Complete(
-		OperationMap& operations,
-		AssetOperationToken operation) noexcept
+		OperationMap& operations, AssetOperationToken operation) noexcept
 	{
 		const auto current = operations.find(operation.m_ContentVersion.m_Key);
 		if (current != operations.end() && current->second.m_Operation == operation)
