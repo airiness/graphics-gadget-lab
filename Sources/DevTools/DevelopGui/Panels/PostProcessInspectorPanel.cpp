@@ -37,6 +37,12 @@ namespace gglab
 				return "GTAO / Reconstructed Normal";
 			case PostProcessDebugTap::GTAOSelectedSurfaceOffset:
 				return "GTAO / Selected Surface Offset";
+			case PostProcessDebugTap::GTAODenoiseX:
+				return "GTAO / Denoise X";
+			case PostProcessDebugTap::GTAODenoiseY:
+				return "GTAO / Denoise Y";
+			case PostProcessDebugTap::GTAOFinalAO:
+				return "GTAO / Final AO";
 			default:
 				return "Unknown";
 			}
@@ -58,6 +64,9 @@ namespace gglab
 					PostProcessDebugTap::GTAOHalfDepthViewZ,
 					PostProcessDebugTap::GTAOReconstructedNormal,
 					PostProcessDebugTap::GTAOSelectedSurfaceOffset,
+					PostProcessDebugTap::GTAODenoiseX,
+					PostProcessDebugTap::GTAODenoiseY,
+					PostProcessDebugTap::GTAOFinalAO,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -187,7 +196,10 @@ namespace gglab
 		const bool gtaoSelection = selection.m_Tap == PostProcessDebugTap::GTAORawAO ||
 			selection.m_Tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
 			selection.m_Tap == PostProcessDebugTap::GTAOReconstructedNormal ||
-			selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset;
+			selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
+			selection.m_Tap == PostProcessDebugTap::GTAODenoiseX ||
+			selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
+			selection.m_Tap == PostProcessDebugTap::GTAOFinalAO;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
@@ -197,7 +209,7 @@ namespace gglab
 		}
 		else if (gtaoSelection)
 		{
-			ImGui::TextDisabled("Source: transient half-resolution GTAO evaluation surface.");
+			ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
 		}
 		else if (!selectedTexture || !selectedTexture->m_Available)
 		{

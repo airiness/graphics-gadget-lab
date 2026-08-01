@@ -37,7 +37,7 @@ namespace gglab
 		void ApplyCameraPreset() noexcept;
 		void RequestSelectedPreview() noexcept;
 
-		PostProcessDebugTap m_SelectedTap = PostProcessDebugTap::GTAORawAO;
+		PostProcessDebugTap m_SelectedTap = PostProcessDebugTap::GTAOFinalAO;
 		PostProcessDebugSelection m_PreviousPreviewSelection{};
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};

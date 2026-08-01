@@ -266,6 +266,10 @@ namespace gglab
 			{
 				m_ForwardPlusCullPass.AddPass(rg, context, services);
 			}
+			if (gtaoEnabled && context.IsRenderSceneReady())
+			{
+				m_GTAOPass.AddPass(rg, context, services);
+			}
 			m_SkyboxPass.AddPass(rg, context, services);
 			if (depthCoverageFramePlan.AddsForwardOpaquePass())
 			{
@@ -290,11 +294,6 @@ namespace gglab
 			// scene draw packets for this frame.
 			m_DepthPrepassPass.AddPass(rg, context, services);
 			m_SkyboxPass.AddPass(rg, context, services);
-		}
-
-		if (gtaoEnabled && context.IsRenderSceneReady())
-		{
-			m_GTAOPass.AddPass(rg, context, services);
 		}
 
 		if (depthCoverageFramePlan.AddsForwardTransparentPass())

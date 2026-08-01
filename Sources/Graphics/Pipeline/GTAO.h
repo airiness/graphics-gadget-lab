@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 
 #include <array>
 #include <cstdint>
@@ -11,6 +12,7 @@ namespace gglab
 	inline constexpr uint32_t GTAOThreadGroupSize = 8;
 	inline constexpr uint32_t GTAOMaxDirectionCount = 8;
 	inline constexpr uint32_t GTAOMaxStepCount = 8;
+	inline constexpr uint32_t GTAOMaxDenoiseRadius = 8;
 
 	struct GTAOExtent
 	{
@@ -39,6 +41,50 @@ namespace gglab
 		bool m_IsValid = false;
 	};
 
+	struct GTAONormalAxisNeighborAvailability
+	{
+		bool m_HasNegativeNeighbor = false;
+		bool m_HasPositiveNeighbor = false;
+	};
+
+	struct GTAOFinalAOFormatResolution
+	{
+		RHITextureSupportResult m_PreferredR8Unorm{};
+		RHITextureSupportResult m_FallbackR16Float{};
+		RHIFormat m_Format = RHIFormat::Unknown;
+
+		[[nodiscard]] constexpr bool IsAvailable() const noexcept
+		{
+			return m_Format != RHIFormat::Unknown;
+		}
+
+		[[nodiscard]] constexpr bool UsesFallback() const noexcept
+		{
+			return m_Format == RHIFormat::R16Float;
+		}
+	};
+
+	struct GTAOCapabilityStatus
+	{
+		RHITextureSupportResult m_R16FloatStore{};
+		RHITextureSupportResult m_R32FloatStore{};
+		RHITextureSupportResult m_R16G16FloatStore{};
+		RHITextureSupportResult m_R16G16B16A16FloatStore{};
+		GTAOFinalAOFormatResolution m_FinalAO{};
+
+		[[nodiscard]] constexpr bool IsCoreAvailable() const noexcept
+		{
+			return m_R16FloatStore.IsSupported() && m_R32FloatStore.IsSupported() &&
+				m_FinalAO.IsAvailable();
+		}
+
+		[[nodiscard]] constexpr bool AreDiagnosticOutputsAvailable() const noexcept
+		{
+			return m_R16G16FloatStore.IsSupported() &&
+				m_R16G16B16A16FloatStore.IsSupported();
+		}
+	};
+
 	[[nodiscard]] constexpr GTAOExtent MakeGTAOHalfResolutionExtent(
 		uint32_t fullWidth, uint32_t fullHeight) noexcept
 	{
@@ -55,4 +101,25 @@ namespace gglab
 		DepthConvention convention) noexcept;
 
 	[[nodiscard]] float GTAOInterleavedGradientNoise(uint32_t pixelX, uint32_t pixelY) noexcept;
+
+	[[nodiscard]] constexpr GTAOFinalAOFormatResolution ResolveGTAOFinalAOFormat(
+		RHITextureSupportResult preferredR8Unorm,
+		RHITextureSupportResult fallbackR16Float) noexcept
+	{
+		return {
+			.m_PreferredR8Unorm = preferredR8Unorm,
+			.m_FallbackR16Float = fallbackR16Float,
+			.m_Format = preferredR8Unorm.IsSupported() ? RHIFormat::R8Unorm
+				: fallbackR16Float.IsSupported() ? RHIFormat::R16Float : RHIFormat::Unknown,
+		};
+	}
+
+	[[nodiscard]] constexpr GTAONormalAxisNeighborAvailability
+		GetGTAONormalAxisNeighborAvailability(uint32_t centerCoordinate, uint32_t extent) noexcept
+	{
+		return {
+			.m_HasNegativeNeighbor = centerCoordinate > 0 && centerCoordinate < extent,
+			.m_HasPositiveNeighbor = centerCoordinate < extent && centerCoordinate + 1 < extent,
+		};
+	}
 }

@@ -6,6 +6,7 @@
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/GTAO.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -16,6 +17,7 @@ namespace gglab
 	namespace
 	{
 		const LabParameterId PreviewTapId("gtao.preview_tap");
+		const LabParameterId FinalAOFormatId("gtao.final_ao_format");
 		const LabParameterId EnableCameraInputId("gtao.camera.enable_input");
 		const LabParameterId FovId("gtao.camera.fov");
 		const LabParameterId NearPlaneId("gtao.camera.near");
@@ -44,10 +46,10 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = PreviewTapId,
 			.m_Name = "Preview",
-			.m_Group = "GTAO Evaluate",
+			.m_Group = "GTAO",
 			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = int32_t(PostProcessDebugTap::GTAORawAO),
+			.m_DefaultValue = int32_t(PostProcessDebugTap::GTAOFinalAO),
 			.m_EnumItems =
 				{
 					{.m_Value = int32_t(PostProcessDebugTap::GTAORawAO), .m_Name = "Raw AO"},
@@ -57,6 +59,27 @@ namespace gglab
 						.m_Name = "Reconstructed Normal"},
 					{.m_Value = int32_t(PostProcessDebugTap::GTAOSelectedSurfaceOffset),
 						.m_Name = "Selected Surface Offset"},
+					{.m_Value = int32_t(PostProcessDebugTap::GTAODenoiseX),
+						.m_Name = "Denoise X"},
+					{.m_Value = int32_t(PostProcessDebugTap::GTAODenoiseY),
+						.m_Name = "Denoise Y"},
+					{.m_Value = int32_t(PostProcessDebugTap::GTAOFinalAO),
+						.m_Name = "Final AO"},
+				},
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = FinalAOFormatId,
+			.m_Name = "Final AO Format",
+			.m_Group = "GTAO",
+			.m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm),
+			.m_EnumItems =
+				{
+					{.m_Value = int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm),
+						.m_Name = "Prefer R8 Unorm"},
+					{.m_Value = int32_t(GTAOFinalAOFormatPreference::ForceR16Float),
+						.m_Name = "Force R16 Float"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -174,7 +197,10 @@ namespace gglab
 	{
 		const auto& parameters = GetParameters();
 		m_SelectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
-			PreviewTapId, int32_t(PostProcessDebugTap::GTAORawAO)));
+			PreviewTapId, int32_t(PostProcessDebugTap::GTAOFinalAO)));
+		GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_FinalAOFormatPreference =
+			static_cast<GTAOFinalAOFormatPreference>(parameters.Get(FinalAOFormatId,
+				int32_t(GTAOFinalAOFormatPreference::PreferR8Unorm)));
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, false);
 		m_FovDegrees = parameters.Get(FovId, 50.0f);
 		m_NearPlane = parameters.Get(NearPlaneId, 0.05f);
@@ -229,6 +255,9 @@ namespace gglab
 		const entt::entity thinSlab = createCube("gglab.lab.gtao.thin_slab",
 			Vector3(2.8f, 0.1f, 5.2f), Vector3(0.08f, 1.7f, 1.6f),
 			Color(0.75f, 0.34f, 0.12f, 1.0f));
+		const entt::entity edgeSlab = createCube("gglab.lab.gtao.screen_edge_slab",
+			Vector3(6.0f, 0.2f, 6.5f), Vector3(0.3f, 1.8f, 1.2f),
+			Color(0.68f, 0.58f, 0.12f, 1.0f));
 		const entt::entity tieLeft = createCube("gglab.lab.gtao.tie_left",
 			Vector3(-0.65f, 0.1f, 5.5f), Vector3(0.65f, 1.2f, 0.08f),
 			Color(0.16f, 0.42f, 0.78f, 1.0f));
@@ -248,7 +277,8 @@ namespace gglab
 				"gglab.lab.gtao.silhouette", Color(0.72f, 0.18f, 0.22f, 1.0f), 0.35f),
 			});
 
-		const entt::entity fixtures[] = { floor, cornerWall, thinSlab, tieLeft, tieRight, sphere };
+		const entt::entity fixtures[] = {
+			floor, cornerWall, thinSlab, edgeSlab, tieLeft, tieRight, sphere };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
 			{
 				return registry.valid(entity) &&
@@ -306,13 +336,14 @@ namespace gglab
 		const bool previewExecuted = registry && registry->HasPublishedPostProcessPreview() &&
 			registry->GetPostProcessPreviewUpdateCount() > m_PreviewUpdateCountOnEnter &&
 			registry->GetPublishedPostProcessPreviewSelection().m_Tap == m_SelectedTap;
-		diagnostics.m_Title = "GTAO Half-resolution Evaluate";
+		diagnostics.m_Title = "GTAO Spatial Pipeline";
 		diagnostics.m_Metrics = {
 			{.m_Name = "Full extent",
 				.m_Value = std::format("{} x {}", m_ViewportWidth, m_ViewportHeight)},
 			{.m_Name = "Half extent",
 				.m_Value = std::format("{} x {}", halfExtent.m_Width, halfExtent.m_Height)},
 			{.m_Name = "Evaluate kernel", .m_Value = "2 directions x 4 steps"},
+			{.m_Name = "Denoise kernel", .m_Value = "separable bilateral, radius 3"},
 		};
 		diagnostics.m_Checks = {
 			{
@@ -320,7 +351,8 @@ namespace gglab
 				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
 				.m_Detail =
-					"Plane, corner, thin slab, silhouette, background, and coplanar tie surfaces are configured.",
+					"Plane, corner, thin and screen-edge slabs, silhouette, background, and "
+					"coplanar tie surfaces are configured.",
 			},
 			{
 				.m_Name = "Half-resolution contract",
@@ -332,7 +364,7 @@ namespace gglab
 				.m_Name = "Selected preview published",
 				.m_Status = previewExecuted ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "The selected GTAO evaluation surface was published after Lab entry.",
+				.m_Detail = "The selected GTAO pipeline surface was published after Lab entry.",
 			},
 		};
 	}
@@ -349,7 +381,8 @@ namespace gglab
 			.m_DisplayName = "GTAO",
 			.m_Category = "Rendering",
 			.m_Description =
-				"Validates deterministic half-resolution GTAO surface selection, depth-derived normals, and raw occlusion evaluation.",
+				"Validates deterministic GTAO surface selection, depth-derived normals, "
+				"bilateral denoise, and depth-aware upsample.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

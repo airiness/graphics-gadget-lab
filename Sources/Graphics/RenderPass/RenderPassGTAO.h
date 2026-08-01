@@ -1,7 +1,10 @@
 #pragma once
 
+#include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RenderPass/RenderPassBase.h"
+
+#include <array>
 
 namespace gglab
 {
@@ -28,13 +31,32 @@ namespace gglab
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 		[[nodiscard]] bool IsAvailable() const noexcept { return m_IsAvailable; }
+		[[nodiscard]] const GTAOCapabilityStatus& GetCapabilityStatus() const noexcept
+		{
+			return m_Capabilities;
+		}
 
 	private:
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const Renderer& renderer) noexcept;
+		enum class PipelineVariant : uint8_t
+		{
+			Evaluate,
+			EvaluateDiagnostics,
+			DenoiseX,
+			DenoiseY,
+			Upsample,
+			Count,
+		};
 
-		ComputePipelineRecipe m_PipelineRecipe{};
-		ComputePipelineSlot m_PipelineSlot{};
+		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(
+			const Renderer& renderer, PipelineVariant variant) noexcept;
+
+		std::array<ComputePipelineRecipe, static_cast<size_t>(PipelineVariant::Count)>
+			m_PipelineRecipes{};
+		std::array<ComputePipelineSlot, static_cast<size_t>(PipelineVariant::Count)>
+			m_PipelineSlots{};
+		GTAOCapabilityStatus m_Capabilities{};
 		bool m_IsInitialized = false;
 		bool m_IsAvailable = false;
+		bool m_DiagnosticPipelineAvailable = false;
 	};
 }
