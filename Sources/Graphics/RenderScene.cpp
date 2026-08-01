@@ -4,6 +4,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/MaterialGpuEncoder.h"
+#include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Core/World.h"
 #include "Scene/Components.h"
@@ -220,10 +221,20 @@ namespace gglab
 				const uint64_t lightKey = static_cast<uint64_t>(entt::to_integral(entity));
 				const uint32_t lightSlot = info.m_LightTable.Upsert(lightKey, lightGpu);
 				foundLight = foundLight || lightSlot != LightTable::InvalidSlot;
-				if (lightSlot != LightTable::InvalidSlot &&
-					lightComp.m_Type == LightType::Directional)
+				if (lightSlot != LightTable::InvalidSlot)
 				{
-					result.m_RenderScene.m_GlobalLightIndices.push_back(lightSlot);
+					GGLAB_ASSERT(lightSlot < MaxLightCapacity);
+					result.m_RenderScene.m_LightTypesByIndex[lightSlot] =
+						static_cast<uint32_t>(lightComp.m_Type);
+					if (lightComp.m_Type == LightType::Directional)
+					{
+						++result.m_RenderScene.m_DirectionalLightCount;
+						result.m_RenderScene.m_GlobalLightIndices.push_back(lightSlot);
+					}
+					else
+					{
+						++result.m_RenderScene.m_LocalLightCount;
+					}
 				}
 				if (lightSlot != LightTable::InvalidSlot &&
 					info.m_DirectionalShadowLightKey == lightKey &&
@@ -247,6 +258,10 @@ namespace gglab
 				GGLAB_ASSERT(lightSlot != LightTable::InvalidSlot);
 				if (lightSlot != LightTable::InvalidSlot)
 				{
+					GGLAB_ASSERT(lightSlot < MaxLightCapacity);
+					result.m_RenderScene.m_LightTypesByIndex[lightSlot] =
+						static_cast<uint32_t>(LightType::Directional);
+					++result.m_RenderScene.m_DirectionalLightCount;
 					result.m_RenderScene.m_GlobalLightIndices.push_back(lightSlot);
 				}
 			}
@@ -373,7 +388,7 @@ namespace gglab
 			{
 				globalLightIndex += result.m_RenderScene.m_LightBaseIndex;
 			}
-			std::ranges::sort(result.m_RenderScene.m_GlobalLightIndices);
+			SortForwardPlusGlobalLightIndices(result.m_RenderScene.m_GlobalLightIndices);
 			if (directionalShadowLightSlot != LightTable::InvalidSlot)
 			{
 				result.m_RenderScene.m_DirectionalShadowLightIndex =

@@ -3,6 +3,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RenderPass/RenderPassBase.h"
 
+#include <array>
 #include <memory>
 
 namespace gglab
@@ -34,10 +35,11 @@ namespace gglab
 			const RenderServices& services) noexcept override;
 
 	private:
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const Renderer& renderer) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(
+			const Renderer& renderer, bool diagnosticsEnabled) noexcept;
 
-		ComputePipelineRecipe m_PipelineRecipe{};
-		ComputePipelineSlot m_PipelineSlot{};
+		std::array<ComputePipelineRecipe, 2> m_PipelineRecipes{};
+		std::array<ComputePipelineSlot, 2> m_PipelineSlots{};
 		std::shared_ptr<ForwardPlusDebugReadback> m_DebugReadback;
 		bool m_IsInitialized = false;
 	};

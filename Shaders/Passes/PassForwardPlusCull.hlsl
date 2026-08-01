@@ -18,6 +18,9 @@ StructuredBuffer<ViewData> g_ForwardPlusViews : register(t0);
 StructuredBuffer<LightData> g_ForwardPlusLights : register(t1);
 RWStructuredBuffer<uint2> g_TileLightHeaders : register(u0);
 RWStructuredBuffer<uint> g_TileLightIndices : register(u1);
+#if defined(GGLAB_FORWARD_PLUS_DIAGNOSTICS)
+RWStructuredBuffer<float2> g_TileDepthRanges : register(u2);
+#endif
 
 groupshared uint g_MinViewZBits;
 groupshared uint g_MaxViewZBits;
@@ -92,12 +95,21 @@ void CSMain(
 		if (groupThreadIndex == 0)
 		{
 			g_TileLightHeaders[tileIndex] = uint2(tileOffset, 0u);
+#if defined(GGLAB_FORWARD_PLUS_DIAGNOSTICS)
+			g_TileDepthRanges[tileIndex] = 0.0.xx;
+#endif
 		}
 		return;
 	}
 
 	const float minViewZ = asfloat(g_MinViewZBits);
 	const float maxViewZ = asfloat(g_MaxViewZBits);
+#if defined(GGLAB_FORWARD_PLUS_DIAGNOSTICS)
+	if (groupThreadIndex == 0)
+	{
+		g_TileDepthRanges[tileIndex] = float2(minViewZ, maxViewZ);
+	}
+#endif
 	const float2 tilePixelMin = float2(groupId.xy * FORWARD_PLUS_TILE_SIZE);
 	const float2 tilePixelMax =
 		float2(min((groupId.xy + 1u) * FORWARD_PLUS_TILE_SIZE, g_Pass.Extent));

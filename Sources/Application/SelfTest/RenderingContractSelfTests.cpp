@@ -853,8 +853,17 @@ namespace gglab
 			desc.m_Entry = L"CSMain";
 			const ShaderCompileArtifact forwardPlusArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(forwardPlusArtifact.m_Binary.IsValid(),
-				"Production DXC compiles the fixed-stride Forward+ cull shader");
+			desc.m_Defines = {
+				{
+					.m_Name = L"GGLAB_FORWARD_PLUS_DIAGNOSTICS",
+					.m_Value = L"1",
+				},
+			};
+			const ShaderCompileArtifact forwardPlusDiagnosticsArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			context.Check(forwardPlusArtifact.m_Binary.IsValid() &&
+				forwardPlusDiagnosticsArtifact.m_Binary.IsValid(),
+				"Production DXC compiles fixed-stride Forward+ cull and diagnostics variants");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusValidation.hlsl";
 			desc.m_Entry = L"CSReduceTiles";
@@ -919,10 +928,41 @@ namespace gglab
 			context.Check(IsForwardPlusHdrDiffWithinTolerance(withinTolerance) &&
 				!IsForwardPlusHdrDiffWithinTolerance(outsideTolerance),
 				"Forward+ HDR diff acceptance uses explicit inclusive absolute and relative luminance tolerances");
+			context.Check(IsForwardPlusReadbackGenerationCurrent(9, 9) &&
+				!IsForwardPlusReadbackGenerationCurrent(8, 9) &&
+				!IsForwardPlusReadbackGenerationCurrent(0, 9),
+				"Forward+ diagnostics reject stale and uninitialized readback generations");
+			context.Check(ShouldPublishForwardPlusReadback(9, 103, 9, 9, 102) &&
+				!ShouldPublishForwardPlusReadback(9, 101, 9, 9, 102) &&
+				!ShouldPublishForwardPlusReadback(8, 104, 9, 9, 102),
+				"Forward+ diagnostics publish only current-generation non-regressing frames");
 			context.Check(IsForwardPlusGlobalLightCountSupported(0) &&
 				IsForwardPlusGlobalLightCountSupported(ForwardPlusGlobalLightCapacity) &&
 				!IsForwardPlusGlobalLightCountSupported(ForwardPlusGlobalLightCapacity + 1),
 				"Forward+ uses a bounded global-light loop and fails closed when it overflows");
+			std::array<uint32_t, 4> unsortedGlobalLightIndices{ 31, 4, 19, 7 };
+			SortForwardPlusGlobalLightIndices(unsortedGlobalLightIndices);
+			context.Check(unsortedGlobalLightIndices == std::array<uint32_t, 4>{ 4, 7, 19, 31 },
+				"Forward+ establishes a stable ascending global-light order");
+			const ForwardPlusTileGrid metricsGrid = MakeForwardPlusTileGrid(32, 16);
+			const std::array<ForwardPlusTileHeader, 2> metricHeaders{
+				ForwardPlusTileHeader{.m_Offset = 0, .m_CountAndFlags = 0 },
+				ForwardPlusTileHeader{.m_Offset = 64, .m_CountAndFlags = 3 },
+			};
+			const std::array<ForwardPlusTileDepthRange, 2> metricDepthRanges{
+				ForwardPlusTileDepthRange{},
+				ForwardPlusTileDepthRange{.m_MinViewZ = 2.0f, .m_MaxViewZ = 7.0f },
+			};
+			const ForwardPlusGridMetrics gridMetrics = BuildForwardPlusGridMetrics(
+				metricsGrid, metricHeaders, metricDepthRanges);
+			context.Check(gridMetrics.m_IsValid && gridMetrics.m_ActiveTileCount == 1 &&
+				gridMetrics.m_EmptyTileCount == 1 &&
+				gridMetrics.m_TotalLightReferences == 3 &&
+				gridMetrics.m_AverageLightsPerTile == 1.5 &&
+				gridMetrics.m_MaxLightsPerTile == 3 &&
+				gridMetrics.m_OverflowTileCount == 0 && gridMetrics.m_MinViewZ == 2.0f &&
+				gridMetrics.m_MaxViewZ == 7.0f,
+				"Forward+ full-grid diagnostics aggregate an exact deterministic fixture");
 
 			const ForwardPlusTileGrid grid1080 = MakeForwardPlusTileGrid(1920, 1080);
 			const ForwardPlusTileGrid grid4K = MakeForwardPlusTileGrid(3840, 2160);
@@ -1710,26 +1750,80 @@ namespace gglab
 				[&transitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
 					transitionBuffer = builder.CreateBuffer("TransitionBuffer");
-					builder.WriteInPlace(transitionBuffer, RGBufferAccess::StorageWrite);
+					builder.WriteInPlace(transitionBuffer, RGBufferAccess::StorageWrite,
+						RHIStage::ComputeShader);
 					data.m_Buffer = transitionBuffer;
 				});
 			transitionGraph.AddPass<StorageAccessPassData>("TransitionStructuredRead",
 				[&transitionBuffer](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
 				{
-					data.m_Buffer = builder.Read(transitionBuffer, RGBufferAccess::StructuredRead);
+					data.m_Buffer = builder.Read(transitionBuffer, RGBufferAccess::StructuredRead,
+						RHIStage::PixelShader);
 					builder.SideEffect();
 				});
 			const bool transitionCompiled = transitionGraph.Compile();
-			context.Check(transitionCompiled, "UAV-to-SRV transition fixture compiles");
+			context.Check(transitionCompiled, "Compute UAV-write to pixel SRV-read fixture compiles");
 			if (transitionCompiled)
 			{
 				RGSnapshot transitionSnapshot;
 				BuildRenderGraphSnapshot(transitionGraph, transitionSnapshot);
 				const auto& barriers = transitionSnapshot.m_Passes[1].m_PreBarriers;
 				context.Check(barriers.size() == 1 &&
+					barriers[0].m_ResourceName == "TransitionBuffer" &&
+					barriers[0].m_ResourceType == RGResourceType::RGBuffer &&
 					barriers[0].m_Kind == RGBarrierKind::Transition &&
-					barriers[0].m_Reason == RGBarrierReason::AccessTransition,
-					"UAV-to-SRV edges emit one transition without a duplicate UAV barrier");
+					barriers[0].m_Reason == RGBarrierReason::AccessTransition &&
+					barriers[0].m_Before.m_Stages == RHIStage::ComputeShader &&
+					barriers[0].m_Before.m_Access == RHIAccess::UnorderedAccess &&
+					barriers[0].m_Before.m_Layout == RHILayout::Common &&
+					barriers[0].m_After.m_Stages == RHIStage::PixelShader &&
+					barriers[0].m_After.m_Access == RHIAccess::ShaderResource &&
+					barriers[0].m_After.m_Layout == RHILayout::Common,
+					"Forward+ cull outputs transition exactly from compute UAV-write to pixel SRV-read");
+			}
+
+			RenderGraph computeTransitionGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			RGBufferId computeTransitionBuffer;
+			computeTransitionGraph.AddPass<StorageAccessPassData>("ComputeTransitionStorageWrite",
+				[&computeTransitionBuffer](
+					RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					computeTransitionBuffer = builder.CreateBuffer("ComputeTransitionBuffer");
+					builder.WriteInPlace(computeTransitionBuffer, RGBufferAccess::StorageWrite,
+						RHIStage::ComputeShader);
+					data.m_Buffer = computeTransitionBuffer;
+				});
+			computeTransitionGraph.AddPass<StorageAccessPassData>("ComputeTransitionStructuredRead",
+				[&computeTransitionBuffer](
+					RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.Read(computeTransitionBuffer,
+						RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			const bool computeTransitionCompiled = computeTransitionGraph.Compile();
+			context.Check(
+				computeTransitionCompiled, "Compute UAV-write to compute SRV-read fixture compiles");
+			if (computeTransitionCompiled)
+			{
+				RGSnapshot transitionSnapshot;
+				BuildRenderGraphSnapshot(computeTransitionGraph, transitionSnapshot);
+				const auto& barriers = transitionSnapshot.m_Passes[1].m_PreBarriers;
+				context.Check(barriers.size() == 1 &&
+					barriers[0].m_ResourceName == "ComputeTransitionBuffer" &&
+					barriers[0].m_ResourceType == RGResourceType::RGBuffer &&
+					barriers[0].m_Kind == RGBarrierKind::Transition &&
+					barriers[0].m_Reason == RGBarrierReason::AccessTransition &&
+					barriers[0].m_Before.m_Stages == RHIStage::ComputeShader &&
+					barriers[0].m_Before.m_Access == RHIAccess::UnorderedAccess &&
+					barriers[0].m_Before.m_Layout == RHILayout::Common &&
+					barriers[0].m_After.m_Stages == RHIStage::ComputeShader &&
+					barriers[0].m_After.m_Access == RHIAccess::ShaderResource &&
+					barriers[0].m_After.m_Layout == RHILayout::Common,
+					"HDR diff metrics transition exactly from compute UAV-write to compute SRV-read");
 			}
 
 			RenderGraph resourceSpecificGraph({

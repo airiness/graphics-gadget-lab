@@ -2,6 +2,7 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
+#include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
@@ -13,6 +14,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
+#include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
@@ -153,6 +155,29 @@ namespace gglab
 			}
 		};
 
+		class ForwardPlusDiagnosticsSnapshotProvider final
+			: public SnapshotProvider<ForwardPlusDiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Forward+ Diagnostics";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<ForwardPlusDiagnosticsSnapshot>();
+				if (context.m_Renderer && context.m_RenderGraph)
+				{
+					snapshot = BuildForwardPlusDiagnosticsSnapshot(
+						*context.m_Renderer, *context.m_RenderGraph);
+				}
+				else
+				{
+					snapshot = {};
+				}
+			}
+		};
+
 		class TransientResourcePoolSnapshotProvider final
 			: public SnapshotProvider<TransientResourcePoolSnapshot>
 		{
@@ -267,6 +292,8 @@ namespace gglab
 		runtime.RegisterProvider(
 			std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);

@@ -161,9 +161,9 @@ namespace gglab
 				{
 					data.m_ForwardPlusTileGrid = forwardPlus->m_TileGrid;
 					data.m_TileHeaders = builder.Read(forwardPlus->m_TileLightHeaders,
-						RGBufferAccess::StorageRead, RHIStage::PixelShader);
+						RGBufferAccess::StructuredRead, RHIStage::PixelShader);
 					data.m_TileIndices = builder.Read(forwardPlus->m_TileLightIndices,
-						RGBufferAccess::StorageRead, RHIStage::PixelShader);
+						RGBufferAccess::StructuredRead, RHIStage::PixelShader);
 				}
 
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)

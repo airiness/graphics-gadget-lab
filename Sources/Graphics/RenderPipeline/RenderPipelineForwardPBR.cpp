@@ -3,6 +3,7 @@
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -54,12 +55,50 @@ namespace gglab
 		const bool forwardPlusAvailable = forwardPlusEnabled &&
 			IsForwardPlusGlobalLightCountSupported(
 				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()));
+		PrepareForwardPasses(services);
+		const DepthCoverageFramePlan depthCoverageFramePlan =
+			BuildDepthCoverageFramePlanForFrame(context, targetWidth, targetHeight);
+		ForwardPlusFrameStatus forwardPlusStatus = ForwardPlusFrameStatus::Disabled;
+		if (forwardPlusEnabled)
+		{
+			if (!forwardPlusAvailable)
+			{
+				forwardPlusStatus = ForwardPlusFrameStatus::GlobalLightCapacityExceeded;
+			}
+			else if (!context.IsRenderSceneReady())
+			{
+				forwardPlusStatus = ForwardPlusFrameStatus::RenderSceneUnavailable;
+			}
+			else if (!depthCoverageFramePlan.UsesDepthPrepassEqual())
+			{
+				forwardPlusStatus = ForwardPlusFrameStatus::DepthCoverageUnavailable;
+			}
+			else if (!depthCoverageFramePlan.m_HasDepthCoverageDraws)
+			{
+				forwardPlusStatus = ForwardPlusFrameStatus::NoOpaqueDraws;
+			}
+			else
+			{
+				forwardPlusStatus = ForwardPlusFrameStatus::Active;
+			}
+		}
+		const bool forwardPlusActive = forwardPlusStatus == ForwardPlusFrameStatus::Active;
 		const bool forwardPlusValidationEnabled =
-			forwardPlusAvailable && forwardPlusSettings.m_EnableHdrDiffValidation &&
+			forwardPlusActive && forwardPlusSettings.m_EnableHdrDiffValidation &&
 			m_ForwardPlusValidationPass.IsAvailable();
 
-		PrepareForwardPasses(services);
-		if (forwardPlusAvailable)
+		auto& forwardPlusResources =
+			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);
+		forwardPlusResources.m_Status = forwardPlusStatus;
+		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
+		forwardPlusResources.m_LightTableCapacity = context.m_RenderScene.m_LightCount;
+		forwardPlusResources.m_DirectionalLightCount =
+			context.m_RenderScene.m_DirectionalLightCount;
+		forwardPlusResources.m_LocalLightCount = context.m_RenderScene.m_LocalLightCount;
+		forwardPlusResources.m_LightTypesByIndex = context.m_RenderScene.m_LightTypesByIndex;
+		forwardPlusResources.m_DebugReadback = m_ForwardPlusDebugReadback;
+
+		if (forwardPlusActive)
 		{
 			m_ForwardPlusCullPass.Prepare(services);
 		}
@@ -67,8 +106,6 @@ namespace gglab
 		{
 			m_ForwardPlusValidationPass.Prepare(services);
 		}
-		const DepthCoverageFramePlan depthCoverageFramePlan =
-			BuildDepthCoverageFramePlanForFrame(context, targetWidth, targetHeight);
 		if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
 			GGLAB_LOG_GRAPHICS_WARN("Depth coverage frame uses Forward-write fallback: {}",
@@ -217,8 +254,7 @@ namespace gglab
 		if (depthCoverageFramePlan.UsesDepthPrepassEqual())
 		{
 			m_DepthPrepassPass.AddPass(rg, context, services);
-			if (forwardPlusAvailable && depthCoverageFramePlan.m_HasDepthCoverageDraws &&
-				context.IsRenderSceneReady())
+			if (forwardPlusActive)
 			{
 				m_ForwardPlusCullPass.AddPass(rg, context, services);
 			}

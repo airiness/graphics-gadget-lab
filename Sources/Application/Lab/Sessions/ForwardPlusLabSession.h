@@ -23,6 +23,8 @@ namespace gglab
 		}
 		void CommitPrepare() noexcept override;
 		void CancelPrepare() noexcept override;
+		void OnEnter() noexcept override;
+		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
@@ -42,13 +44,18 @@ namespace gglab
 		void BuildLighting() noexcept;
 		void ApplyCameraPreset() noexcept;
 		void UpdateSelectedTile() noexcept;
+		void CaptureGpuTimings() noexcept;
+		void ArmGpuTimingCaptureWarmup() noexcept;
 
 		std::shared_ptr<ForwardPlusDebugReadback> m_DebugReadback;
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};
 		uint32_t m_ViewportWidth = 0;
 		uint32_t m_ViewportHeight = 0;
+		uint64_t m_LastGpuProfileFrame = 0;
+		uint32_t m_GpuTimingWarmupFrames = 0;
 		bool m_EnableCameraInput = false;
 		bool m_FixtureConfigured = false;
+		bool m_GpuProfilerWasEnabled = false;
 	};
 }

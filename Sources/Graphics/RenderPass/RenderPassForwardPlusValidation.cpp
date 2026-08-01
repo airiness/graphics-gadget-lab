@@ -187,7 +187,6 @@ namespace gglab
 			"Lighting.ForwardPlus.HdrDiffTiles", RGPassEncoderType::Compute,
 			[displayViewId](RenderGraph::RGBuilder& builder, TilePassData& data)
 			{
-				builder.SideEffect();
 				auto& blackboard = builder.GetBlackboard();
 				auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
 					.GetViewTargets(displayViewId);
@@ -265,11 +264,10 @@ namespace gglab
 			"Lighting.ForwardPlus.HdrDiffFrame", RGPassEncoderType::Compute,
 			[](RenderGraph::RGBuilder& builder, FramePassData& data)
 			{
-				builder.SideEffect();
 				auto& validation = builder.GetBlackboard().Get<
 					RGForwardPlusValidationResources>(ForwardPlusValidationResourcesName);
 				data.m_TileMetrics = builder.Read(
-					validation.m_TileMetrics, RGBufferAccess::StorageRead, RHIStage::ComputeShader);
+					validation.m_TileMetrics, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 
 				const RHITextureDesc& referenceDesc =
 					builder.GetTextureDesc(validation.m_LegacyReferenceColor);
