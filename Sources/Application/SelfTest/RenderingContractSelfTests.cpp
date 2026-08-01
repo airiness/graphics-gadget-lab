@@ -5,6 +5,7 @@
 #include "Graphics/Camera.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
+#include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -813,8 +814,24 @@ namespace gglab
 			desc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
-			const ShaderCompileArtifact forwardPixelArtifact =
+			desc.m_Defines.clear();
+			const ShaderCompileArtifact legacyForwardPixelArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines = {
+				{
+					.m_Name = L"GGLAB_FORWARD_PLUS",
+					.m_Value = L"1",
+				},
+			};
+			const ShaderCompileArtifact forwardPlusPixelArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines.push_back({
+				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
+				.m_Value = L"1",
+				});
+			const ShaderCompileArtifact forwardPlusValidationPixelArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines.clear();
 			desc.m_SourcePath = L"Passes/PassSkybox.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
@@ -824,10 +841,12 @@ namespace gglab
 			desc.m_Entry = L"PSMain";
 			const ShaderCompileArtifact skyboxPixelArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(forwardPixelArtifact.m_Binary.IsValid() &&
+			context.Check(legacyForwardPixelArtifact.m_Binary.IsValid() &&
+				forwardPlusPixelArtifact.m_Binary.IsValid() &&
+				forwardPlusValidationPixelArtifact.m_Binary.IsValid() &&
 				skyboxVertexArtifact.m_Binary.IsValid() &&
 				skyboxPixelArtifact.m_Binary.IsValid(),
-				"Production DXC compiles Forward shading and the background-depth Skybox");
+				"Production DXC compiles Legacy, Forward+, HDR-diff Forward shading, and the background-depth Skybox");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
@@ -836,10 +855,75 @@ namespace gglab
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
 			context.Check(forwardPlusArtifact.m_Binary.IsValid(),
 				"Production DXC compiles the fixed-stride Forward+ cull shader");
+
+			desc.m_SourcePath = L"Passes/PassForwardPlusValidation.hlsl";
+			desc.m_Entry = L"CSReduceTiles";
+			desc.m_Defines = {
+				{
+					.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_TILES",
+					.m_Value = L"1",
+				},
+			};
+			const ShaderCompileArtifact hdrDiffTileArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Entry = L"CSReduceFrame";
+			desc.m_Defines = {
+				{
+					.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_FRAME",
+					.m_Value = L"1",
+				},
+			};
+			const ShaderCompileArtifact hdrDiffFrameArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			context.Check(hdrDiffTileArtifact.m_Binary.IsValid() &&
+				hdrDiffFrameArtifact.m_Binary.IsValid(),
+				"Production DXC compiles deterministic Forward+ HDR diff reduction shaders");
 		}
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
+			ForwardPlusSettings legacySettings{};
+			legacySettings.m_Mode = ForwardLightingMode::Legacy;
+			ForwardPlusSettings forwardPlusSettings{};
+			ForwardPlusSettings validationSettings{};
+			validationSettings.m_EnableHdrDiffValidation = true;
+			context.Check(
+				ResolveForwardPBRLightingVariant(
+					ForwardPBRPassKind::Opaque, legacySettings, false) ==
+				ForwardPBRLightingVariant::Legacy &&
+				ResolveForwardPBRLightingVariant(
+					ForwardPBRPassKind::Opaque, forwardPlusSettings, false) ==
+				ForwardPBRLightingVariant::ForwardPlus &&
+				ResolveForwardPBRLightingVariant(
+					ForwardPBRPassKind::Opaque, validationSettings, true) ==
+				ForwardPBRLightingVariant::ForwardPlusValidation &&
+				ResolveForwardPBRLightingVariant(
+					ForwardPBRPassKind::Opaque, validationSettings, false) ==
+				ForwardPBRLightingVariant::ForwardPlus &&
+				ResolveForwardPBRLightingVariant(
+					ForwardPBRPassKind::Transparent, validationSettings, true) ==
+				ForwardPBRLightingVariant::Legacy,
+				"Opaque shading selects Legacy, Forward+, or HDR-diff variants while transparent shading remains Legacy");
+
+			const ForwardPlusHdrDiffReadback withinTolerance{
+				.m_MaxAbsoluteError = ForwardPlusHdrDiffAbsoluteTolerance,
+				.m_MaxRelativeLuminanceError =
+					ForwardPlusHdrDiffRelativeLuminanceTolerance,
+				.m_ComparedPixelCount = 1,
+				.m_IsValid = true,
+			};
+			ForwardPlusHdrDiffReadback outsideTolerance = withinTolerance;
+			outsideTolerance.m_MaxAbsoluteError =
+				std::nextafter(ForwardPlusHdrDiffAbsoluteTolerance,
+					std::numeric_limits<float>::infinity());
+			context.Check(IsForwardPlusHdrDiffWithinTolerance(withinTolerance) &&
+				!IsForwardPlusHdrDiffWithinTolerance(outsideTolerance),
+				"Forward+ HDR diff acceptance uses explicit inclusive absolute and relative luminance tolerances");
+			context.Check(IsForwardPlusGlobalLightCountSupported(0) &&
+				IsForwardPlusGlobalLightCountSupported(ForwardPlusGlobalLightCapacity) &&
+				!IsForwardPlusGlobalLightCountSupported(ForwardPlusGlobalLightCapacity + 1),
+				"Forward+ uses a bounded global-light loop and fails closed when it overflows");
+
 			const ForwardPlusTileGrid grid1080 = MakeForwardPlusTileGrid(1920, 1080);
 			const ForwardPlusTileGrid grid4K = MakeForwardPlusTileGrid(3840, 2160);
 			context.Check(grid1080.IsValid() && grid1080.m_TileCountX == 120 &&

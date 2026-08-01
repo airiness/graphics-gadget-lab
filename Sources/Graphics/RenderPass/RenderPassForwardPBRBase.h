@@ -2,6 +2,7 @@
 #include "Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderQueue.h"
 
 namespace gglab
@@ -12,6 +13,28 @@ namespace gglab
 		Transparent,
 	};
 
+	enum class ForwardPBRLightingVariant : uint8_t
+	{
+		Legacy,
+		ForwardPlus,
+		ForwardPlusValidation,
+		Count,
+	};
+
+	[[nodiscard]] constexpr ForwardPBRLightingVariant ResolveForwardPBRLightingVariant(
+		ForwardPBRPassKind passKind, const ForwardPlusSettings& settings,
+		bool hdrDiffValidationAvailable) noexcept
+	{
+		if (passKind == ForwardPBRPassKind::Transparent ||
+			settings.m_Mode == ForwardLightingMode::Legacy)
+		{
+			return ForwardPBRLightingVariant::Legacy;
+		}
+		return settings.m_EnableHdrDiffValidation && hdrDiffValidationAvailable
+			? ForwardPBRLightingVariant::ForwardPlusValidation
+			: ForwardPBRLightingVariant::ForwardPlus;
+	}
+
 	class RHIGraphicsCommandContext;
 	class RenderPassForwardPBRBase : public RenderPassBase
 	{
@@ -19,6 +42,10 @@ namespace gglab
 		~RenderPassForwardPBRBase() override = default;
 
 		void Prepare(const RenderServices& services, const ForwardPBRShaderSet& shaderSet) noexcept;
+		void SetHdrDiffValidationAvailable(bool available) noexcept
+		{
+			m_HdrDiffValidationAvailable = available;
+		}
 
 		[[nodiscard]] static std::optional<DepthCoveragePipelineSignature>
 			BuildDepthCoveragePipelineSignatureForVariant(
@@ -40,22 +67,30 @@ namespace gglab
 	private:
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
-			const RenderQueue* expectedRenderQueue, bool useDepthEqual) noexcept;
+			const RenderQueue* expectedRenderQueue, bool useDepthEqual,
+			ForwardPBRLightingVariant lightingVariant) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext, const RenderServices& services,
 			const RenderQueue& renderQueue, const DrawItemsRange& range, bool useDepthEqual,
-			const RenderQueue* expectedRenderQueue) noexcept;
+			const RenderQueue* expectedRenderQueue,
+			ForwardPBRLightingVariant lightingVariant) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
-			const Renderer& renderer, uint64_t variantBits, bool useDepthEqual) noexcept;
+			const Renderer& renderer, uint64_t variantBits, bool useDepthEqual,
+			ForwardPBRLightingVariant lightingVariant) noexcept;
 
 		std::tuple<RasterizerPreset, DepthPreset, BlendPreset> GetPresetsFromVariantBits(
 			uint64_t variantBits, bool useDepthEqual) const noexcept;
 
 	private:
+		static constexpr size_t LightingVariantCount =
+			static_cast<size_t>(ForwardPBRLightingVariant::Count);
+
 		ForwardPBRPassKind m_PassKind = ForwardPBRPassKind::Opaque;
-		GraphicsPhysicalPipelineKey m_BasePhysicalKey{};
-		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
+		std::array<GraphicsPhysicalPipelineKey, LightingVariantCount> m_BasePhysicalKeys{};
+		std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>,
+			LightingVariantCount> m_PipelineSlots{};
+		bool m_HdrDiffValidationAvailable = false;
 		bool m_IsInitialized = false;
 	};
 }

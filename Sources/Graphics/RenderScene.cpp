@@ -221,6 +221,11 @@ namespace gglab
 				const uint32_t lightSlot = info.m_LightTable.Upsert(lightKey, lightGpu);
 				foundLight = foundLight || lightSlot != LightTable::InvalidSlot;
 				if (lightSlot != LightTable::InvalidSlot &&
+					lightComp.m_Type == LightType::Directional)
+				{
+					result.m_RenderScene.m_GlobalLightIndices.push_back(lightSlot);
+				}
+				if (lightSlot != LightTable::InvalidSlot &&
 					info.m_DirectionalShadowLightKey == lightKey &&
 					lightComp.m_Type == LightType::Directional)
 				{
@@ -240,6 +245,10 @@ namespace gglab
 				lightGpu.LightType = static_cast<uint32_t>(LightType::Directional);
 				const uint32_t lightSlot = info.m_LightTable.Upsert(DefaultLightKey, lightGpu);
 				GGLAB_ASSERT(lightSlot != LightTable::InvalidSlot);
+				if (lightSlot != LightTable::InvalidSlot)
+				{
+					result.m_RenderScene.m_GlobalLightIndices.push_back(lightSlot);
+				}
 			}
 		}
 
@@ -360,6 +369,11 @@ namespace gglab
 			result.m_RenderScene.m_ViewCount = viewsBufferResult.m_ElementCount;
 			result.m_RenderScene.m_LightBaseIndex = 0;
 			result.m_RenderScene.m_LightCount = info.m_LightTable.GetCapacity();
+			for (uint32_t& globalLightIndex : result.m_RenderScene.m_GlobalLightIndices)
+			{
+				globalLightIndex += result.m_RenderScene.m_LightBaseIndex;
+			}
+			std::ranges::sort(result.m_RenderScene.m_GlobalLightIndices);
 			if (directionalShadowLightSlot != LightTable::InvalidSlot)
 			{
 				result.m_RenderScene.m_DirectionalShadowLightIndex =

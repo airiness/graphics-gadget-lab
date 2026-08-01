@@ -2,6 +2,7 @@
 
 static const uint FORWARD_PLUS_TILE_SIZE = 16u;
 static const uint FORWARD_PLUS_TILE_LIGHT_CAPACITY = 64u;
+static const uint FORWARD_PLUS_GLOBAL_LIGHT_CAPACITY = 4u;
 static const uint FORWARD_PLUS_TILE_COUNT_MASK = 0x0000ffffu;
 
 uint GetForwardPlusTileIndex(uint2 pixel, uint2 tileCount)
@@ -13,5 +14,6 @@ uint GetForwardPlusTileIndex(uint2 pixel, uint2 tileCount)
 
 uint GetForwardPlusTileLightCount(uint countAndFlags)
 {
-	return countAndFlags & FORWARD_PLUS_TILE_COUNT_MASK;
+	return min(countAndFlags & FORWARD_PLUS_TILE_COUNT_MASK,
+		FORWARD_PLUS_TILE_LIGHT_CAPACITY);
 }

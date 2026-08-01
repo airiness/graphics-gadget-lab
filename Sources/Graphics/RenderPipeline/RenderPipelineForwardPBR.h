@@ -7,6 +7,7 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
+#include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
 #include "Graphics/RenderPass/RenderPassForwardTransparent.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
@@ -22,8 +23,11 @@ namespace gglab
 	public:
 		explicit RenderPipelineForwardPBR(
 			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
-			m_ForwardPlusCullPass(std::move(forwardPlusDebugReadback))
+			m_ForwardPlusCullPass(forwardPlusDebugReadback),
+			m_ForwardPlusValidationPass(forwardPlusDebugReadback)
 		{
+			m_ForwardOpaquePass.SetHdrDiffValidationAvailable(
+				forwardPlusDebugReadback != nullptr);
 		}
 		~RenderPipelineForwardPBR() override = default;
 
@@ -42,6 +46,7 @@ namespace gglab
 		RenderPassClearViewTargets m_ClearViewTargetsPass;
 		RenderPassDepthPrepass m_DepthPrepassPass;
 		RenderPassForwardPlusCull m_ForwardPlusCullPass;
+		RenderPassForwardPlusValidation m_ForwardPlusValidationPass;
 		RenderPassSkybox m_SkyboxPass;
 		RenderPassForwardOpaque m_ForwardOpaquePass;
 		RenderPassForwardTransparent m_ForwardTransparentPass;

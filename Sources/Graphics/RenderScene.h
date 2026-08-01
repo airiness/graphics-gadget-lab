@@ -47,6 +47,7 @@ namespace gglab
 		uint32_t m_LightBaseIndex = 0;
 		uint32_t m_LightCount = 0;
 		uint32_t m_DirectionalShadowLightIndex = std::numeric_limits<uint32_t>::max();
+		std::vector<uint32_t> m_GlobalLightIndices;
 
 		uint64_t m_SceneConstantBufferOffset = 0;
 
