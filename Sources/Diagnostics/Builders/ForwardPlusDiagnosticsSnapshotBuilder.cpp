@@ -105,13 +105,13 @@ namespace gglab
 			performance.m_ForwardPlusCullMilliseconds;
 		snapshot.m_ForwardPlusOpaqueGpuMilliseconds =
 			performance.m_ForwardPlusOpaqueMilliseconds;
-		snapshot.m_PerformanceComparisonAvailable =
+		snapshot.m_PerformanceSamplePairAvailable =
 			performance.m_HasLegacySample && performance.m_HasForwardPlusSample;
-		if (snapshot.m_PerformanceComparisonAvailable)
+		if (snapshot.m_PerformanceSamplePairAvailable)
 		{
-			snapshot.m_ForwardPlusFasterThanLegacy =
+			snapshot.m_LatestForwardPlusSampleLower =
 				performance.m_ForwardPlusCullMilliseconds +
-					performance.m_ForwardPlusOpaqueMilliseconds <
+				performance.m_ForwardPlusOpaqueMilliseconds <
 				performance.m_LegacyOpaqueMilliseconds;
 		}
 
@@ -139,7 +139,7 @@ namespace gglab
 					.m_LightType = lightTableIndex < resources->m_LightTypesByIndex.size()
 						? resources->m_LightTypesByIndex[lightTableIndex]
 						: std::numeric_limits<uint32_t>::max(),
-				});
+					});
 			}
 		}
 
@@ -182,8 +182,8 @@ namespace gglab
 			snapshot.m_GridReadbackAvailable = false;
 			return snapshot;
 		}
-		snapshot.m_ActiveTileCount = metrics.m_ActiveTileCount;
-		snapshot.m_EmptyTileCount = metrics.m_EmptyTileCount;
+		snapshot.m_NonEmptyLightListTileCount = metrics.m_NonEmptyLightListTileCount;
+		snapshot.m_EmptyLightListTileCount = metrics.m_EmptyLightListTileCount;
 		snapshot.m_TotalLightReferences = metrics.m_TotalLightReferences;
 		snapshot.m_AverageLightsPerTile = metrics.m_AverageLightsPerTile;
 		snapshot.m_MaxLightsPerTile = metrics.m_MaxLightsPerTile;
@@ -201,7 +201,7 @@ namespace gglab
 				.m_MinViewZ = depthRange.m_MinViewZ,
 				.m_MaxViewZ = depthRange.m_MaxViewZ,
 				.m_HasGeometry = depthRange.IsValid(),
-			});
+				});
 		}
 		return snapshot;
 	}

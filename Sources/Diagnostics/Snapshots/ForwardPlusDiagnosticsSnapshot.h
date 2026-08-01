@@ -30,8 +30,8 @@ namespace gglab
 
 		uint32_t m_DirectionalLightCount = 0;
 		uint32_t m_LocalLightCount = 0;
-		uint32_t m_ActiveTileCount = 0;
-		uint32_t m_EmptyTileCount = 0;
+		uint32_t m_NonEmptyLightListTileCount = 0;
+		uint32_t m_EmptyLightListTileCount = 0;
 		uint64_t m_TotalLightReferences = 0;
 		double m_AverageLightsPerTile = 0.0;
 		uint32_t m_MaxLightsPerTile = 0;
@@ -77,8 +77,8 @@ namespace gglab
 		bool m_HdrDiffWithinTolerance = false;
 		bool m_GpuProfilerEnabled = false;
 		bool m_GpuTimingAvailable = false;
-		bool m_PerformanceComparisonAvailable = false;
-		bool m_ForwardPlusFasterThanLegacy = false;
+		bool m_PerformanceSamplePairAvailable = false;
+		bool m_LatestForwardPlusSampleLower = false;
 	};
 
 	template <> struct SnapshotTraits<ForwardPlusDiagnosticsSnapshot>

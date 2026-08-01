@@ -10,7 +10,9 @@ namespace gglab
 	enum class RHIFormatFamily : uint8_t
 	{
 		Unknown,
+		R8,
 		R8G8B8A8,
+		R16,
 		R16G16,
 		R16G16B16A16,
 		R32G32,
@@ -84,6 +86,12 @@ namespace gglab
 				RHIFormatInfo{RHIFormat::D32Float, "D32Float", RHIFormatFamily::R32,
 					RHITextureAspect::Depth, RHITextureAspect::Depth, RHIFormat::D32Float, 1, 4, 1,
 					1, false},
+				RHIFormatInfo{RHIFormat::R8Unorm, "R8Unorm", RHIFormatFamily::R8,
+					RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 1, 1, 1,
+					false},
+				RHIFormatInfo{RHIFormat::R16Float, "R16Float", RHIFormatFamily::R16,
+					RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 2, 1, 1,
+					false},
 		};
 
 		consteval bool ValidateRHIFormatInfos() noexcept

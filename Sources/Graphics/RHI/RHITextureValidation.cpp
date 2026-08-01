@@ -104,6 +104,34 @@ namespace gglab
 		return "unknown texture validation error";
 	}
 
+	std::string_view RHITextureSupportReasonText(RHITextureSupportReason reason) noexcept
+	{
+		switch (reason)
+		{
+		case RHITextureSupportReason::None:
+			return "none";
+		case RHITextureSupportReason::DeviceUnavailable:
+			return "RHI device unavailable";
+		case RHITextureSupportReason::FormatSupportQueryFailed:
+			return "format-support query failed";
+		case RHITextureSupportReason::TextureDimensionUnsupported:
+			return "texture dimension unsupported";
+		case RHITextureSupportReason::RenderTargetUnsupported:
+			return "render-target format unsupported";
+		case RHITextureSupportReason::DepthStencilUnsupported:
+			return "depth-stencil format unsupported";
+		case RHITextureSupportReason::ShaderResourceUnsupported:
+			return "shader-resource format unsupported";
+		case RHITextureSupportReason::TypedUnorderedAccessUnsupported:
+			return "typed unordered-access format unsupported";
+		case RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported:
+			return "typed unordered-access store unsupported";
+		case RHITextureSupportReason::MultisamplingUnsupported:
+			return "multisampling unsupported";
+		}
+		return "unknown texture support reason";
+	}
+
 	RHITextureValidationResult ValidateRHITextureDesc(const RHITextureDesc& desc) noexcept
 	{
 		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(desc.m_Format);
