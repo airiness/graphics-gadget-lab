@@ -40,6 +40,23 @@ namespace gglab
 				std::isfinite(position.m_Z);
 		}
 
+		[[nodiscard]] bool HasSufficientFloatPrecision(
+			double chunkOrigin, double chunkEnd, double requiredSpacing) noexcept
+		{
+			const double maximumMagnitude = std::max(std::abs(chunkOrigin), std::abs(chunkEnd));
+			const float roundedMagnitude = static_cast<float>(maximumMagnitude);
+			const float nextMagnitude =
+				std::nextafter(roundedMagnitude, std::numeric_limits<float>::infinity());
+			if (!std::isfinite(nextMagnitude))
+			{
+				return false;
+			}
+
+			const double floatSpacing =
+				static_cast<double>(nextMagnitude) - static_cast<double>(roundedMagnitude);
+			return floatSpacing <= requiredSpacing;
+		}
+
 		[[nodiscard]] NapaVoxelMeshAdapterResult ComputeValidatedChunkOrigin(
 			const napa::voxel::VoxelWorldConfig& config, napa::voxel::ChunkCoord chunk,
 			NapaVoxelWorldPosition& chunkOrigin) noexcept
@@ -161,7 +178,7 @@ namespace gglab
 					.m_Material = sourceSection.m_Material,
 					.m_FirstIndex = *firstIndex,
 					.m_IndexCount = *sectionIndexCount,
-				});
+					});
 				converted.m_Indices.insert(converted.m_Indices.end(),
 					sourceSection.m_Indices.begin(), sourceSection.m_Indices.end());
 			}
@@ -203,9 +220,14 @@ namespace gglab
 	}
 
 	NapaVoxelMeshAdapterResult ComputeNapaVoxelRenderTranslation(
-		NapaVoxelWorldPosition chunkOrigin, NapaVoxelWorldPosition renderOrigin,
-		Vector3& translation) noexcept
+		const napa::voxel::VoxelWorldConfig& config, NapaVoxelWorldPosition chunkOrigin,
+		NapaVoxelWorldPosition renderOrigin, Vector3& translation) noexcept
 	{
+		const napa::voxel::ValidationResult configResult = napa::voxel::ValidateConfig(config);
+		if (configResult.Failed())
+		{
+			return MakeCoreError(configResult);
+		}
 		if (!IsFinite(chunkOrigin) || !IsFinite(renderOrigin))
 		{
 			return MakeAdapterError(NapaVoxelMeshAdapterError::NonFiniteWorldPosition);
@@ -222,6 +244,24 @@ namespace gglab
 		{
 			return MakeAdapterError(
 				NapaVoxelMeshAdapterError::UnrepresentableRenderTranslation);
+		}
+
+		const double chunkSize = static_cast<double>(config.m_ChunkCellCount) *
+			static_cast<double>(config.m_VoxelSize);
+		const NapaVoxelWorldPosition chunkEnd{
+			.m_X = difference.m_X + chunkSize,
+			.m_Y = difference.m_Y + chunkSize,
+			.m_Z = difference.m_Z + chunkSize,
+		};
+		const double requiredSpacing = static_cast<double>(config.m_VoxelSize) /
+			napa::voxel::CanonicalPositionQuantizationScale;
+		if (!IsFinite(chunkEnd) ||
+			!HasSufficientFloatPrecision(difference.m_X, chunkEnd.m_X, requiredSpacing) ||
+			!HasSufficientFloatPrecision(difference.m_Y, chunkEnd.m_Y, requiredSpacing) ||
+			!HasSufficientFloatPrecision(difference.m_Z, chunkEnd.m_Z, requiredSpacing))
+		{
+			return MakeAdapterError(
+				NapaVoxelMeshAdapterError::InsufficientRenderTranslationPrecision);
 		}
 
 		const Vector3 prepared{
@@ -300,7 +340,7 @@ namespace gglab
 				return MakeAdapterError(NapaVoxelMeshAdapterError::CountOutOfRange);
 			}
 			if (!AccumulateCount(chunkMesh.m_CoreValidation.m_VertexCount,
-					converted.m_VertexCount) ||
+				converted.m_VertexCount) ||
 				!AccumulateCount(chunkMesh.m_CoreValidation.m_IndexCount,
 					converted.m_IndexCount) ||
 				!AccumulateCount(chunkMesh.m_CoreValidation.m_SectionCount,

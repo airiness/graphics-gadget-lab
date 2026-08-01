@@ -301,7 +301,7 @@ namespace gglab
 				});
 			Vector3 translation{};
 			const NapaVoxelMeshAdapterResult translationResult = ComputeNapaVoxelRenderTranslation(
-				chunk.m_ChunkOrigin, NapaVoxelWorldPosition{}, translation);
+				negativeConfig, chunk.m_ChunkOrigin, NapaVoxelWorldPosition{}, translation);
 			context.Check(chunk.m_Chunk == ChunkCoord{ -1, 0, 0 } &&
 				chunk.m_ChunkOrigin == NapaVoxelWorldPosition{ -16.0, 0.0, 0.0 } &&
 				positionsRemainLocal && translationResult.Succeeded() &&
@@ -311,12 +311,13 @@ namespace gglab
 
 		void TestOriginNarrowing(SelfTestContext& context) noexcept
 		{
+			const napa::voxel::VoxelWorldConfig config = MakeSingleChunkConfig();
 			const Vector3 sentinel{ 7.0f, 8.0f, 9.0f };
 			Vector3 unchanged = sentinel;
 			const NapaVoxelMeshAdapterResult nonFiniteResult = ComputeNapaVoxelRenderTranslation(
-				{}, { std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0 }, unchanged);
+				config, {}, { std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0 }, unchanged);
 			context.Check(nonFiniteResult.m_Error ==
-					NapaVoxelMeshAdapterError::NonFiniteWorldPosition &&
+				NapaVoxelMeshAdapterError::NonFiniteWorldPosition &&
 				unchanged.m_X == sentinel.m_X && unchanged.m_Y == sentinel.m_Y &&
 				unchanged.m_Z == sentinel.m_Z,
 				"GGLab adapter rejects a non-finite Render Origin without modifying output");
@@ -325,12 +326,40 @@ namespace gglab
 			const double unrepresentable =
 				static_cast<double>(std::numeric_limits<float>::max()) * 2.0;
 			const NapaVoxelMeshAdapterResult rangeResult = ComputeNapaVoxelRenderTranslation(
-				{ unrepresentable, 0.0, 0.0 }, {}, unchanged);
+				config, { unrepresentable, 0.0, 0.0 }, {}, unchanged);
 			context.Check(rangeResult.m_Error ==
-					NapaVoxelMeshAdapterError::UnrepresentableRenderTranslation &&
+				NapaVoxelMeshAdapterError::UnrepresentableRenderTranslation &&
 				unchanged.m_X == sentinel.m_X && unchanged.m_Y == sentinel.m_Y &&
 				unchanged.m_Z == sentinel.m_Z,
 				"GGLab adapter rejects an unrepresentable Float translation atomically");
+
+			unchanged = sentinel;
+			const NapaVoxelMeshAdapterResult precisionResult = ComputeNapaVoxelRenderTranslation(
+				config, { 4096.0, 0.0, 0.0 }, {}, unchanged);
+			context.Check(precisionResult.m_Error ==
+				NapaVoxelMeshAdapterError::InsufficientRenderTranslationPrecision &&
+				unchanged.m_X == sentinel.m_X && unchanged.m_Y == sentinel.m_Y &&
+				unchanged.m_Z == sentinel.m_Z,
+				"GGLab adapter rejects a finite Float translation that loses mesh precision");
+
+			Vector3 recentered{};
+			const NapaVoxelMeshAdapterResult recenteredResult = ComputeNapaVoxelRenderTranslation(
+				config, { 4096.0, 0.0, 0.0 }, { 4096.0, 0.0, 0.0 }, recentered);
+			context.Check(recenteredResult.Succeeded() && recentered.m_X == 0.0f &&
+				recentered.m_Y == 0.0f && recentered.m_Z == 0.0f,
+				"GGLab adapter recovers canonical mesh precision after Render Origin recentering");
+
+			napa::voxel::VoxelWorldConfig mixedChunkConfig = MakeSingleChunkConfig();
+			mixedChunkConfig.m_LogicalCellBounds = {
+				.m_Min = { -32, -16, 16 },
+				.m_MaxExclusive = { -16, 0, 32 },
+			};
+			NapaVoxelWorldPosition mixedChunkOrigin{};
+			const NapaVoxelMeshAdapterResult mixedChunkResult = ComputeNapaVoxelChunkOrigin(
+				mixedChunkConfig, napa::voxel::ChunkCoord{ -2, -1, 1 }, mixedChunkOrigin);
+			context.Check(mixedChunkResult.Succeeded() &&
+				mixedChunkOrigin == NapaVoxelWorldPosition{ -32.0, -16.0, 16.0 },
+				"GGLab adapter computes a mixed-sign three-axis Chunk origin in Double");
 		}
 
 		void TestCanonicalRecordConversion(SelfTestContext& context) noexcept
@@ -405,7 +434,7 @@ namespace gglab
 			const NapaVoxelMeshAdapterResult nonFiniteResult =
 				ConvertNapaVoxelChunkMesh(nonFinite, config, unchanged);
 			context.Check(nonFiniteResult.m_Error ==
-					NapaVoxelMeshAdapterError::CoreValidationFailed &&
+				NapaVoxelMeshAdapterError::CoreValidationFailed &&
 				nonFiniteResult.m_CoreError == ValidationError::NonFiniteMeshVertex &&
 				unchanged.m_SourceWorldVoxelRevision == 37,
 				"GGLab adapter revalidates Core normals and preserves output on failure");
@@ -415,7 +444,7 @@ namespace gglab
 			const NapaVoxelMeshAdapterResult mismatchResult =
 				ConvertNapaVoxelChunkMesh(mismatched, config, unchanged);
 			context.Check(mismatchResult.m_Error ==
-					NapaVoxelMeshAdapterError::MismatchedCoreValidation &&
+				NapaVoxelMeshAdapterError::MismatchedCoreValidation &&
 				unchanged.m_SourceWorldVoxelRevision == 37,
 				"GGLab adapter rejects stale Core validation evidence atomically");
 		}

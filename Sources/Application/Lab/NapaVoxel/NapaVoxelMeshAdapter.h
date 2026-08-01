@@ -23,7 +23,8 @@ namespace gglab
 		CountOutOfRange = 5,
 		NonFiniteWorldPosition = 6,
 		UnrepresentableRenderTranslation = 7,
-		MismatchedConvertedData = 8,
+		InsufficientRenderTranslationPrecision = 8,
+		MismatchedConvertedData = 9,
 	};
 
 	struct NapaVoxelMeshAdapterResult
@@ -100,9 +101,10 @@ namespace gglab
 	[[nodiscard]] NapaVoxelMeshAdapterResult ComputeNapaVoxelChunkOrigin(
 		const napa::voxel::VoxelWorldConfig& config, napa::voxel::ChunkCoord chunk,
 		NapaVoxelWorldPosition& chunkOrigin) noexcept;
+	// Validates the complete translated Chunk range against the canonical Core mesh spacing.
 	[[nodiscard]] NapaVoxelMeshAdapterResult ComputeNapaVoxelRenderTranslation(
-		NapaVoxelWorldPosition chunkOrigin, NapaVoxelWorldPosition renderOrigin,
-		Vector3& translation) noexcept;
+		const napa::voxel::VoxelWorldConfig& config, NapaVoxelWorldPosition chunkOrigin,
+		NapaVoxelWorldPosition renderOrigin, Vector3& translation) noexcept;
 	[[nodiscard]] NapaVoxelMeshAdapterResult ConvertNapaVoxelChunkMesh(
 		const napa::voxel::ChunkMeshRecord& source,
 		const napa::voxel::VoxelWorldConfig& config, NapaVoxelCpuChunkMesh& mesh);
