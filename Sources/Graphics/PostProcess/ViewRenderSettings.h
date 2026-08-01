@@ -32,9 +32,16 @@ namespace gglab
 		ToneMappingSettings m_ToneMapping{};
 	};
 
+	enum class ForwardLightingMode : uint8_t
+	{
+		Legacy,
+		ForwardPlus,
+	};
+
 	struct ForwardPlusSettings
 	{
-		bool m_Enabled = true;
+		ForwardLightingMode m_Mode = ForwardLightingMode::ForwardPlus;
+		bool m_EnableHdrDiffValidation = false;
 	};
 
 	struct LightingProfile

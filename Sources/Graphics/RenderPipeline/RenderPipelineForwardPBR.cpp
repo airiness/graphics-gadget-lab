@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
@@ -46,13 +47,25 @@ namespace gglab
 			context.GetDisplayRenderView().m_DepthConvention;
 		const uint32_t targetWidth = swapChain->GetBufferWidth();
 		const uint32_t targetHeight = swapChain->GetBufferHeight();
+		const ForwardPlusSettings& forwardPlusSettings =
+			context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus;
 		const bool forwardPlusEnabled =
-			context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus.m_Enabled;
+			forwardPlusSettings.m_Mode == ForwardLightingMode::ForwardPlus;
+		const bool forwardPlusAvailable = forwardPlusEnabled &&
+			IsForwardPlusGlobalLightCountSupported(
+				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()));
+		const bool forwardPlusValidationEnabled =
+			forwardPlusAvailable && forwardPlusSettings.m_EnableHdrDiffValidation &&
+			m_ForwardPlusValidationPass.IsAvailable();
 
 		PrepareForwardPasses(services);
-		if (forwardPlusEnabled)
+		if (forwardPlusAvailable)
 		{
 			m_ForwardPlusCullPass.Prepare(services);
+		}
+		if (forwardPlusValidationEnabled)
+		{
+			m_ForwardPlusValidationPass.Prepare(services);
 		}
 		const DepthCoverageFramePlan depthCoverageFramePlan =
 			BuildDepthCoverageFramePlanForFrame(context, targetWidth, targetHeight);
@@ -204,7 +217,7 @@ namespace gglab
 		if (depthCoverageFramePlan.UsesDepthPrepassEqual())
 		{
 			m_DepthPrepassPass.AddPass(rg, context, services);
-			if (forwardPlusEnabled && depthCoverageFramePlan.m_HasDepthCoverageDraws &&
+			if (forwardPlusAvailable && depthCoverageFramePlan.m_HasDepthCoverageDraws &&
 				context.IsRenderSceneReady())
 			{
 				m_ForwardPlusCullPass.AddPass(rg, context, services);
@@ -213,6 +226,10 @@ namespace gglab
 			if (depthCoverageFramePlan.AddsForwardOpaquePass())
 			{
 				m_ForwardOpaquePass.AddPass(rg, context, services);
+				if (forwardPlusValidationEnabled)
+				{
+					m_ForwardPlusValidationPass.AddPass(rg, context, services);
+				}
 			}
 		}
 		else if (depthCoverageFramePlan.UsesForwardDepthWrite())
@@ -292,11 +309,29 @@ namespace gglab
 			shaderDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Pixel;
 			shaderDesc.m_Entry = L"PSMain";
-			m_ForwardPBRShaderSet.m_ShadingPixelShader = shaderManager->LoadShader(shaderDesc);
+			m_ForwardPBRShaderSet.m_LegacyShadingPixelShader =
+				shaderManager->LoadShader(shaderDesc);
+
+			shaderDesc.m_Defines = {
+				{
+					.m_Name = L"GGLAB_FORWARD_PLUS",
+					.m_Value = L"1",
+				},
+			};
+			m_ForwardPBRShaderSet.m_ForwardPlusShadingPixelShader =
+				shaderManager->LoadShader(shaderDesc);
+
+			shaderDesc.m_Defines.push_back({
+				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
+				.m_Value = L"1",
+			});
+			m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
+				shaderManager->LoadShader(shaderDesc);
 
 			shaderDesc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
 			shaderDesc.m_Stage = ShaderStage::Pixel;
 			shaderDesc.m_Entry = L"PSAlphaTest";
+			shaderDesc.m_Defines.clear();
 			m_ForwardPBRShaderSet.m_AlphaTestPixelShader = shaderManager->LoadShader(shaderDesc);
 		}
 

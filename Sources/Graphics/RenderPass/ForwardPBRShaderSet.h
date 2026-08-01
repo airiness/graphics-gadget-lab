@@ -6,13 +6,16 @@ namespace gglab
 	struct ForwardPBRShaderSet
 	{
 		ShaderID m_CoverageVertexShader{};
-		ShaderID m_ShadingPixelShader{};
+		ShaderID m_LegacyShadingPixelShader{};
+		ShaderID m_ForwardPlusShadingPixelShader{};
+		ShaderID m_ForwardPlusValidationPixelShader{};
 		ShaderID m_AlphaTestPixelShader{};
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_CoverageVertexShader.IsValid() && m_ShadingPixelShader.IsValid() &&
-				m_AlphaTestPixelShader.IsValid();
+			return m_CoverageVertexShader.IsValid() && m_LegacyShadingPixelShader.IsValid() &&
+				m_ForwardPlusShadingPixelShader.IsValid() &&
+				m_ForwardPlusValidationPixelShader.IsValid() && m_AlphaTestPixelShader.IsValid();
 		}
 	};
 }

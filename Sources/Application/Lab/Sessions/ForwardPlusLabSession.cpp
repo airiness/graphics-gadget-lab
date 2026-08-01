@@ -1,4 +1,5 @@
 #include "Core/Precompiled.h"
+#include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 
 #include "Diagnostics/Snapshots/LabSnapshot.h"
@@ -18,6 +19,7 @@ namespace gglab
 			ZeroLocalLights,
 			OneLocalLight,
 			SixtyFourLocalLights,
+			MixedLightTypes,
 			NearPlaneLight,
 			TileBoundaryLight,
 		};
@@ -29,6 +31,8 @@ namespace gglab
 		};
 
 		const LabParameterId FixtureId("forward_plus.fixture");
+		const LabParameterId LightingModeId("forward_plus.lighting_mode");
+		const LabParameterId ValidateHdrDiffId("forward_plus.validate_hdr_diff");
 		const LabParameterId SelectedTileModeId("forward_plus.selected_tile");
 		const LabParameterId EnableCameraInputId("forward_plus.camera.enable_input");
 
@@ -50,14 +54,42 @@ namespace gglab
 
 	ForwardPlusLabSession::ForwardPlusLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<ForwardPlusDebugReadback> debugReadback) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo,
-			  std::make_unique<RenderPipelineForwardPBR>(debugReadback)),
-		  m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
-		  m_ViewportHeight(createInfo.m_WindowHeight)
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>(debugReadback)),
+		m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
+		m_ViewportHeight(createInfo.m_WindowHeight)
 	{
-		GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus.m_Enabled = true;
+		GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus.m_Mode =
+			ForwardLightingMode::ForwardPlus;
+		GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = true;
 
 		auto& parameters = GetMutableParameters();
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = LightingModeId,
+			.m_Name = "Lighting Mode",
+			.m_Group = "Forward+",
+			.m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = int32_t(ForwardLightingMode::ForwardPlus),
+			.m_EnumItems =
+				{
+					{
+						.m_Value = int32_t(ForwardLightingMode::Legacy),
+						.m_Name = "Legacy",
+					},
+					{
+						.m_Value = int32_t(ForwardLightingMode::ForwardPlus),
+						.m_Name = "Forward+",
+					},
+				},
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = ValidateHdrDiffId,
+			.m_Name = "Validate HDR Diff",
+			.m_Group = "Forward+",
+			.m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = true,
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = FixtureId,
 			.m_Name = "Fixture",
@@ -80,6 +112,10 @@ namespace gglab
 						.m_Name = "64 Local Lights",
 					},
 					{
+						.m_Value = int32_t(ForwardPlusFixture::MixedLightTypes),
+						.m_Name = "Directional + Point + Spot",
+					},
+					{
 						.m_Value = int32_t(ForwardPlusFixture::NearPlaneLight),
 						.m_Name = "Near-plane Light",
 					},
@@ -88,7 +124,7 @@ namespace gglab
 						.m_Name = "Tile-boundary Light",
 					},
 				},
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = SelectedTileModeId,
 			.m_Name = "Selected Tile",
@@ -107,7 +143,7 @@ namespace gglab
 						.m_Name = "Background Top-left",
 					},
 				},
-		}));
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,
 			.m_Name = "Enable Camera Input",
@@ -115,7 +151,7 @@ namespace gglab
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = false,
-		}));
+			}));
 		ApplyImmediateParameters();
 	}
 
@@ -174,6 +210,11 @@ namespace gglab
 
 	void ForwardPlusLabSession::ApplyImmediateParameters() noexcept
 	{
+		auto& forwardPlus = GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus;
+		forwardPlus.m_Mode = static_cast<ForwardLightingMode>(GetParameters().Get(
+			LightingModeId, int32_t(ForwardLightingMode::ForwardPlus)));
+		forwardPlus.m_EnableHdrDiffValidation =
+			GetParameters().Get(ValidateHdrDiffId, true);
 		m_EnableCameraInput = GetParameters().Get(EnableCameraInputId, false);
 		UpdateSelectedTile();
 	}
@@ -211,7 +252,7 @@ namespace gglab
 			.m_Transform = wallTransform,
 			.m_MaterialInstance =
 				MakeMaterial("gglab.lab.forward_plus.wall", Color(0.11f, 0.13f, 0.18f, 1.0f)),
-		});
+			});
 
 		components::TransformComponent sphereTransform{};
 		sphereTransform.m_Position = Vector3(0.0f, 0.5f, 6.5f);
@@ -223,7 +264,7 @@ namespace gglab
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance =
 				MakeMaterial("gglab.lab.forward_plus.sphere", Color(0.22f, 0.48f, 0.92f, 1.0f)),
-		});
+			});
 
 		m_FixtureConfigured = registry.valid(wall) && registry.valid(sphere);
 		BuildLighting();
@@ -244,6 +285,9 @@ namespace gglab
 		case ForwardPlusFixture::SixtyFourLocalLights:
 			lightCount = ForwardPlusTileLightCapacity;
 			break;
+		case ForwardPlusFixture::MixedLightTypes:
+			lightCount = 3;
+			break;
 		case ForwardPlusFixture::OneLocalLight:
 		case ForwardPlusFixture::NearPlaneLight:
 		case ForwardPlusFixture::TileBoundaryLight:
@@ -255,11 +299,29 @@ namespace gglab
 		{
 			const entt::entity entity = registry.create();
 			components::TransformComponent transform{};
-			if (fixture == ForwardPlusFixture::NearPlaneLight ||
+			if (fixture == ForwardPlusFixture::MixedLightTypes && lightIndex == 0)
+			{
+				Vector3 direction(-0.35f, -0.8f, 0.45f);
+				direction.Normalize();
+				transform.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
+			}
+			else if (fixture == ForwardPlusFixture::MixedLightTypes)
+			{
+				transform.m_Position = lightIndex == 1 ? Vector3(-1.5f, 1.5f, 5.5f)
+					: Vector3(1.8f, 2.0f, 5.8f);
+				if (lightIndex == 2)
+				{
+					Vector3 direction = Vector3(0.0f, 0.5f, 6.5f) - transform.m_Position;
+					direction.Normalize();
+					transform.m_Rotation =
+						math::RotationFromTo(Vector3::Forward, direction);
+				}
+			}
+			else if (fixture == ForwardPlusFixture::NearPlaneLight ||
 				(fixture == ForwardPlusFixture::SixtyFourLocalLights && lightIndex == 0))
 			{
 				transform.m_Position = GetCamera().GetPosition() +
-									   GetCamera().GetForward() * (GetCamera().GetNear() + 0.05f);
+					GetCamera().GetForward() * (GetCamera().GetNear() + 0.05f);
 			}
 			else if (fixture == ForwardPlusFixture::TileBoundaryLight)
 			{
@@ -276,13 +338,23 @@ namespace gglab
 			registry.emplace<components::TransformComponent>(entity, transform);
 
 			components::LightComponent light{};
-			light.m_Type = fixture == ForwardPlusFixture::TileBoundaryLight ? LightType::Spot
-																			: LightType::Point;
+			if (fixture == ForwardPlusFixture::MixedLightTypes)
+			{
+				light.m_Type = lightIndex == 0 ? LightType::Directional
+					: lightIndex == 1 ? LightType::Point
+					: LightType::Spot;
+			}
+			else
+			{
+				light.m_Type = fixture == ForwardPlusFixture::TileBoundaryLight
+					? LightType::Spot
+					: LightType::Point;
+			}
 			light.m_Color =
 				Color(0.35f + 0.65f * static_cast<float>((lightIndex * 17u) % 31u) / 30.0f,
 					0.3f + 0.7f * static_cast<float>((lightIndex * 11u) % 29u) / 28.0f,
 					0.4f + 0.6f * static_cast<float>((lightIndex * 7u) % 23u) / 22.0f, 1.0f);
-			light.m_Intensity = 0.08f;
+			light.m_Intensity = fixture == ForwardPlusFixture::MixedLightTypes ? 1.5f : 0.08f;
 			light.m_Range = 20.0f;
 			light.m_SpotAngle = 55.0f;
 			registry.emplace<components::LightComponent>(entity, light);
@@ -340,20 +412,28 @@ namespace gglab
 		{
 			expectedLightCount = ForwardPlusTileLightCapacity;
 		}
-		const RHIDevice* device =
-			m_Services.m_Renderer ? m_Services.m_Renderer->GetDevice() : nullptr;
+		else if (fixture == ForwardPlusFixture::MixedLightTypes)
+		{
+			expectedLightCount = 2;
+		}
+		const ForwardPlusHdrDiffReadback hdrDiff = m_DebugReadback->GetLatestHdrDiff();
+		const ForwardPlusSettings& forwardPlus = GetViewRenderProfile().m_Lighting.m_ForwardPlus;
+		const bool hdrDiffRequested =
+			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
+			forwardPlus.m_EnableHdrDiffValidation;
+		const RHIDevice* device = m_Services.m_Renderer ? m_Services.m_Renderer->GetDevice() : nullptr;
 		const RHIShaderWaveCapabilities waveCapabilities =
 			device ? device->GetShaderWaveCapabilities() : RHIShaderWaveCapabilities{};
 		const std::string waveLaneRange =
 			waveCapabilities.IsValid() ? std::format("{} - {}", waveCapabilities.m_MinLaneCount,
-											 waveCapabilities.m_MaxLaneCount)
-									   : "not reported";
+				waveCapabilities.m_MaxLaneCount)
+			: "not reported";
 		const uint32_t tileIndex =
 			result.m_IsValid ? result.m_TileY * result.m_TileGrid.m_TileCountX + result.m_TileX : 0;
 		const uint32_t lightCount = result.m_Header.GetCount();
 		const bool headerValid = result.m_IsValid &&
-								 result.m_Header.m_Offset == GetForwardPlusTileOffset(tileIndex) &&
-								 lightCount <= ForwardPlusTileLightCapacity;
+			result.m_Header.m_Offset == GetForwardPlusTileOffset(tileIndex) &&
+			lightCount <= ForwardPlusTileLightCapacity;
 		const bool fixtureResultValid = result.m_IsValid && lightCount == expectedLightCount;
 		bool sortedIndices = headerValid;
 		for (uint32_t index = 0; index < lightCount; ++index)
@@ -432,6 +512,25 @@ namespace gglab
 				.m_Name = "Light indices",
 				.m_Value = indexPreview,
 			},
+			{
+				.m_Name = "HDR max absolute error",
+				.m_Value = hdrDiff.m_IsValid
+					? std::format("{:.8f}", hdrDiff.m_MaxAbsoluteError)
+					: "pending",
+			},
+			{
+				.m_Name = "HDR max relative luminance error",
+				.m_Value = hdrDiff.m_IsValid
+					? std::format("{:.8f}", hdrDiff.m_MaxRelativeLuminanceError)
+					: "pending",
+			},
+			{
+				.m_Name = "HDR max-error pixel",
+				.m_Value = hdrDiff.m_IsValid
+					? std::format("({}, {})", hdrDiff.m_MaxErrorPixelX,
+						hdrDiff.m_MaxErrorPixelY)
+					: "pending",
+			},
 		};
 		diagnostics.m_Checks = {
 			{
@@ -443,13 +542,13 @@ namespace gglab
 			{
 				.m_Name = "Fixed-stride address/count",
 				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
-							: headerValid	  ? LabDiagnosticCheckStatus::Passed
+							: headerValid ? LabDiagnosticCheckStatus::Passed
 											  : LabDiagnosticCheckStatus::Failed,
 				.m_Detail = "Offset equals TileIndex * 64 and count does not exceed 64.",
 			},
 			{
 				.m_Name = "Selected fixture result",
-				.m_Status = !result.m_IsValid	 ? LabDiagnosticCheckStatus::Pending
+				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
 							: fixtureResultValid ? LabDiagnosticCheckStatus::Passed
 												 : LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
@@ -458,7 +557,7 @@ namespace gglab
 			{
 				.m_Name = "Stable global light order",
 				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
-							: sortedIndices	  ? LabDiagnosticCheckStatus::Passed
+							: sortedIndices ? LabDiagnosticCheckStatus::Passed
 											  : LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"Readback light indices are strictly increasing and inside the global 64-light table.",
@@ -466,10 +565,23 @@ namespace gglab
 			{
 				.m_Name = "Fixture construction",
 				.m_Status = m_LoadingProgress.IsPreparing() ? LabDiagnosticCheckStatus::Pending
-							: m_FixtureConfigured			? LabDiagnosticCheckStatus::Passed
+							: m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 															: LabDiagnosticCheckStatus::Failed,
 				.m_Detail =
 					"The deterministic geometry and selected local-light fixture were created.",
+			},
+			{
+				.m_Name = "Legacy vs Forward+ HDR diff",
+				.m_Status = !hdrDiffRequested ? LabDiagnosticCheckStatus::Passed
+					: !hdrDiff.m_IsValid ? LabDiagnosticCheckStatus::Pending
+					: IsForwardPlusHdrDiffWithinTolerance(hdrDiff)
+						? LabDiagnosticCheckStatus::Passed
+						: LabDiagnosticCheckStatus::Failed,
+				.m_Detail = !hdrDiffRequested
+					? "HDR diff validation is disabled for the selected lighting mode."
+					: std::format("Compared {} opaque pixels; tolerances are abs <= {} and relative luminance <= {}.",
+						hdrDiff.m_ComparedPixelCount, ForwardPlusHdrDiffAbsoluteTolerance,
+						ForwardPlusHdrDiffRelativeLuminanceTolerance),
 			},
 		};
 	}

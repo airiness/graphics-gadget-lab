@@ -8,6 +8,7 @@ namespace gglab
 {
 	inline constexpr uint32_t ForwardPlusTileSize = 16;
 	inline constexpr uint32_t ForwardPlusTileLightCapacity = 64;
+	inline constexpr uint32_t ForwardPlusGlobalLightCapacity = 4;
 	inline constexpr uint32_t ForwardPlusTileCountMask = 0x0000ffffu;
 
 	struct ForwardPlusTileGrid
@@ -44,6 +45,12 @@ namespace gglab
 	[[nodiscard]] constexpr uint32_t GetForwardPlusTileOffset(uint32_t tileIndex) noexcept
 	{
 		return tileIndex * ForwardPlusTileLightCapacity;
+	}
+
+	[[nodiscard]] constexpr bool IsForwardPlusGlobalLightCountSupported(
+		uint32_t lightCount) noexcept
+	{
+		return lightCount <= ForwardPlusGlobalLightCapacity;
 	}
 
 	[[nodiscard]] std::vector<uint32_t> BuildStableForwardPlusLightList(

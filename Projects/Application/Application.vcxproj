@@ -174,6 +174,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
@@ -623,7 +624,9 @@
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusGraphResources.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusValidationGraphResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPBRShaderSet.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardOpaque.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
@@ -817,6 +820,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardCoverage.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl" />
