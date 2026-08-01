@@ -16,6 +16,9 @@
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 
+#include <memory>
+#include <utility>
+
 namespace gglab
 {
 	class RenderPipelineForwardPBR : public RenderPipelineBase
@@ -23,11 +26,12 @@ namespace gglab
 	public:
 		explicit RenderPipelineForwardPBR(
 			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
-			m_ForwardPlusCullPass(forwardPlusDebugReadback),
-			m_ForwardPlusValidationPass(forwardPlusDebugReadback)
+			m_ForwardPlusDebugReadback(std::move(forwardPlusDebugReadback)),
+			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
+			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
 			m_ForwardOpaquePass.SetHdrDiffValidationAvailable(
-				forwardPlusDebugReadback != nullptr);
+				m_ForwardPlusDebugReadback != nullptr);
 		}
 		~RenderPipelineForwardPBR() override = default;
 
@@ -41,6 +45,7 @@ namespace gglab
 		[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlanForFrame(
 			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
 
+		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassClearViewTargets m_ClearViewTargetsPass;

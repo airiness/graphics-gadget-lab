@@ -6,8 +6,10 @@
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/RHI/RHISwapChain.h"
 #include "Scene/Components.h"
 
 namespace gglab
@@ -181,10 +183,32 @@ namespace gglab
 
 	void ForwardPlusLabSession::CancelPrepare() noexcept
 	{
+		m_DebugReadback->InvalidateResults();
+		m_DebugReadback->ResetPerformance();
 		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		m_World.GetRegistry().clear();
 		m_LoadingProgress = LoadingProgress::Ready();
+	}
+
+	void ForwardPlusLabSession::OnEnter() noexcept
+	{
+		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
+		if (gpuProfiler)
+		{
+			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
+			gpuProfiler->SetEnabled(true);
+		}
+		ArmGpuTimingCaptureWarmup();
+	}
+
+	void ForwardPlusLabSession::OnExit() noexcept
+	{
+		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		{
+			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+		}
+		m_DebugReadback->InvalidateResults();
 	}
 
 	void ForwardPlusLabSession::Update(float deltaTime) noexcept
@@ -198,6 +222,7 @@ namespace gglab
 			GetCamera().Update();
 		}
 		UpdateSelectedTile();
+		CaptureGpuTimings();
 	}
 
 	void ForwardPlusLabSession::OnResize(uint32_t width, uint32_t height) noexcept
@@ -205,16 +230,26 @@ namespace gglab
 		LabSessionBase::OnResize(width, height);
 		m_ViewportWidth = width;
 		m_ViewportHeight = height;
+		m_DebugReadback->InvalidateResults();
+		m_DebugReadback->ResetPerformance();
+		ArmGpuTimingCaptureWarmup();
 		UpdateSelectedTile();
 	}
 
 	void ForwardPlusLabSession::ApplyImmediateParameters() noexcept
 	{
 		auto& forwardPlus = GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus;
-		forwardPlus.m_Mode = static_cast<ForwardLightingMode>(GetParameters().Get(
+		const ForwardLightingMode mode = static_cast<ForwardLightingMode>(GetParameters().Get(
 			LightingModeId, int32_t(ForwardLightingMode::ForwardPlus)));
-		forwardPlus.m_EnableHdrDiffValidation =
-			GetParameters().Get(ValidateHdrDiffId, true);
+		const bool validateHdrDiff = GetParameters().Get(ValidateHdrDiffId, true);
+		if (forwardPlus.m_Mode != mode ||
+			forwardPlus.m_EnableHdrDiffValidation != validateHdrDiff)
+		{
+			m_DebugReadback->InvalidateResults();
+			ArmGpuTimingCaptureWarmup();
+		}
+		forwardPlus.m_Mode = mode;
+		forwardPlus.m_EnableHdrDiffValidation = validateHdrDiff;
 		m_EnableCameraInput = GetParameters().Get(EnableCameraInputId, false);
 		UpdateSelectedTile();
 	}
@@ -233,6 +268,9 @@ namespace gglab
 
 	void ForwardPlusLabSession::BuildScene() noexcept
 	{
+		m_DebugReadback->InvalidateResults();
+		m_DebugReadback->ResetPerformance();
+		ArmGpuTimingCaptureWarmup();
 		ResetAssetInterests();
 		auto& registry = m_World.GetRegistry();
 		registry.clear();
@@ -389,6 +427,64 @@ namespace gglab
 			tileGrid.IsValid() ? tileGrid.m_TileCountY / 2 : 0);
 	}
 
+	void ForwardPlusLabSession::CaptureGpuTimings() noexcept
+	{
+		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
+		if (!gpuProfiler || !gpuProfiler->IsEnabled())
+		{
+			return;
+		}
+		const GpuProfileFrameSnapshot frame = gpuProfiler->GetLatestFrame();
+		if (!frame.IsValid() || frame.m_FrameIndex == m_LastGpuProfileFrame)
+		{
+			return;
+		}
+		m_LastGpuProfileFrame = frame.m_FrameIndex;
+		if (m_GpuTimingWarmupFrames > 0)
+		{
+			--m_GpuTimingWarmupFrames;
+			return;
+		}
+
+		double cullMilliseconds = 0.0;
+		double opaqueMilliseconds = 0.0;
+		bool hasCullSample = false;
+		bool hasOpaqueSample = false;
+		for (const auto& sample : frame.m_Samples)
+		{
+			if (sample.m_Name == "Lighting.ForwardPlus.Cull")
+			{
+				cullMilliseconds += sample.m_Milliseconds;
+				hasCullSample = true;
+			}
+			else if (sample.m_Name == "Geometry.ForwardOpaque")
+			{
+				opaqueMilliseconds += sample.m_Milliseconds;
+				hasOpaqueSample = true;
+			}
+		}
+
+		const ForwardPlusSettings& settings = GetViewRenderProfile().m_Lighting.m_ForwardPlus;
+		if (settings.m_Mode == ForwardLightingMode::Legacy && hasOpaqueSample)
+		{
+			m_DebugReadback->RecordLegacyGpuTiming(frame.m_FrameIndex, opaqueMilliseconds);
+		}
+		else if (settings.m_Mode == ForwardLightingMode::ForwardPlus &&
+			!settings.m_EnableHdrDiffValidation && hasCullSample && hasOpaqueSample)
+		{
+			m_DebugReadback->RecordForwardPlusGpuTiming(
+				frame.m_FrameIndex, cullMilliseconds, opaqueMilliseconds);
+		}
+	}
+
+	void ForwardPlusLabSession::ArmGpuTimingCaptureWarmup() noexcept
+	{
+		const auto* swapChain = m_Services.m_Renderer
+			? m_Services.m_Renderer->GetSwapChain()
+			: nullptr;
+		m_GpuTimingWarmupFrames = swapChain ? swapChain->GetBufferCount() : 3;
+	}
+
 	void ForwardPlusLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		diagnostics.m_Title = "Fixed-stride Forward+ Cull";
@@ -397,7 +493,15 @@ namespace gglab
 			return;
 		}
 
-		const ForwardPlusTileReadback result = m_DebugReadback->GetLatest();
+		const uint64_t requestGeneration = m_DebugReadback->GetCurrentGeneration();
+		ForwardPlusTileReadback result = m_DebugReadback->GetLatest();
+		if (!IsForwardPlusReadbackGenerationCurrent(
+			result.m_RequestGeneration, requestGeneration) ||
+			result.m_TileGrid.m_Width != m_ViewportWidth ||
+			result.m_TileGrid.m_Height != m_ViewportHeight)
+		{
+			result = {};
+		}
 		const auto fixture = static_cast<ForwardPlusFixture>(
 			GetParameters().Get(FixtureId, int32_t(ForwardPlusFixture::SixtyFourLocalLights)));
 		const auto selectedTileMode = static_cast<SelectedTileMode>(
@@ -416,7 +520,25 @@ namespace gglab
 		{
 			expectedLightCount = 2;
 		}
-		const ForwardPlusHdrDiffReadback hdrDiff = m_DebugReadback->GetLatestHdrDiff();
+		ForwardPlusHdrDiffReadback hdrDiff = m_DebugReadback->GetLatestHdrDiff();
+		if (!IsForwardPlusReadbackGenerationCurrent(
+			hdrDiff.m_RequestGeneration, requestGeneration) ||
+			hdrDiff.m_Width != m_ViewportWidth || hdrDiff.m_Height != m_ViewportHeight)
+		{
+			hdrDiff = {};
+		}
+		std::shared_ptr<const ForwardPlusGridReadback> grid = m_DebugReadback->GetLatestGrid();
+		if (!grid || !grid->m_IsValid || !IsForwardPlusReadbackGenerationCurrent(
+			grid->m_RequestGeneration, requestGeneration) ||
+			grid->m_TileGrid.m_Width != m_ViewportWidth ||
+			grid->m_TileGrid.m_Height != m_ViewportHeight)
+		{
+			grid.reset();
+		}
+		const ForwardPlusGridMetrics gridMetrics = grid
+			? BuildForwardPlusGridMetrics(grid->m_TileGrid, grid->m_Headers, grid->m_DepthRanges)
+			: ForwardPlusGridMetrics{};
+		const ForwardPlusPerformanceReadback performance = m_DebugReadback->GetPerformance();
 		const ForwardPlusSettings& forwardPlus = GetViewRenderProfile().m_Lighting.m_ForwardPlus;
 		const bool hdrDiffRequested =
 			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
@@ -483,6 +605,10 @@ namespace gglab
 				.m_Value = std::to_string(m_DebugReadback->GetScheduledCount()),
 			},
 			{
+				.m_Name = "Request generation",
+				.m_Value = std::to_string(requestGeneration),
+			},
+			{
 				.m_Name = "Readback frame",
 				.m_Value = result.m_IsValid ? std::to_string(result.m_FrameSerial) : "pending",
 			},
@@ -513,6 +639,38 @@ namespace gglab
 				.m_Value = indexPreview,
 			},
 			{
+				.m_Name = "Active / empty tiles",
+				.m_Value = gridMetrics.m_IsValid
+					? std::format("{} / {}", gridMetrics.m_ActiveTileCount,
+						gridMetrics.m_EmptyTileCount)
+					: "pending",
+			},
+			{
+				.m_Name = "Light references",
+				.m_Value = gridMetrics.m_IsValid
+					? std::format("{} total, {:.2f} average, {} max",
+						gridMetrics.m_TotalLightReferences,
+						gridMetrics.m_AverageLightsPerTile,
+						gridMetrics.m_MaxLightsPerTile)
+					: "pending",
+			},
+			{
+				.m_Name = "Full-grid View-Z",
+				.m_Value = gridMetrics.m_IsValid
+					? std::format("{:.4f} - {:.4f}", gridMetrics.m_MinViewZ,
+						gridMetrics.m_MaxViewZ)
+					: "pending",
+			},
+			{
+				.m_Name = "Legacy / Forward+ GPU time",
+				.m_Value = performance.m_HasLegacySample && performance.m_HasForwardPlusSample
+					? std::format("{:.3f} / {:.3f} + {:.3f} ms",
+						performance.m_LegacyOpaqueMilliseconds,
+						performance.m_ForwardPlusCullMilliseconds,
+						performance.m_ForwardPlusOpaqueMilliseconds)
+					: "capture both modes",
+			},
+			{
 				.m_Name = "HDR max absolute error",
 				.m_Value = hdrDiff.m_IsValid
 					? std::format("{:.8f}", hdrDiff.m_MaxAbsoluteError)
@@ -538,6 +696,21 @@ namespace gglab
 				.m_Status = !result.m_IsValid ? LabDiagnosticCheckStatus::Pending
 											  : LabDiagnosticCheckStatus::Passed,
 				.m_Detail = "Header and indices are copied from the completed GPU cull frame.",
+			},
+			{
+				.m_Name = "Full-grid diagnostics",
+				.m_Status = !gridMetrics.m_IsValid ? LabDiagnosticCheckStatus::Pending
+					: LabDiagnosticCheckStatus::Passed,
+				.m_Detail =
+					"Current-generation headers and depth ranges cover every tile in the viewport.",
+			},
+			{
+				.m_Name = "Tile-list capacity",
+				.m_Status = !gridMetrics.m_IsValid ? LabDiagnosticCheckStatus::Pending
+					: gridMetrics.m_OverflowTileCount == 0
+						? LabDiagnosticCheckStatus::Passed
+						: LabDiagnosticCheckStatus::Failed,
+				.m_Detail = "No tile may exceed or flag the fixed 64-light capacity.",
 			},
 			{
 				.m_Name = "Fixed-stride address/count",
@@ -598,9 +771,11 @@ namespace gglab
 			.m_DisplayName = "Forward+",
 			.m_Category = "Rendering",
 			.m_Description =
-				"Validates fixed-stride 16x16 tile culling, background rejection, near-plane lights, stable light order, and actual GPU header/index readback.",
+				"Validates fixed-stride 16x16 tile culling, full-grid occupancy and depth "
+				"diagnostics, background rejection, near-plane lights, stable light order, HDR "
+				"equivalence, and GPU timing.",
 			.m_Kind = LabKind::Pipeline,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 

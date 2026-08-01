@@ -28,6 +28,49 @@ namespace gglab
 		};
 	}
 
+	ForwardPlusGridMetrics BuildForwardPlusGridMetrics(const ForwardPlusTileGrid& tileGrid,
+		std::span<const ForwardPlusTileHeader> headers,
+		std::span<const ForwardPlusTileDepthRange> depthRanges) noexcept
+	{
+		if (!tileGrid.IsValid() || headers.size() != tileGrid.m_TileCount ||
+			depthRanges.size() != tileGrid.m_TileCount)
+		{
+			return {};
+		}
+
+		ForwardPlusGridMetrics metrics{};
+		float minimumViewZ = std::numeric_limits<float>::max();
+		for (uint32_t tileIndex = 0; tileIndex < tileGrid.m_TileCount; ++tileIndex)
+		{
+			const ForwardPlusTileHeader& header = headers[tileIndex];
+			const uint32_t lightCount = header.GetCount();
+			metrics.m_ActiveTileCount += lightCount > 0 ? 1u : 0u;
+			metrics.m_TotalLightReferences += lightCount;
+			metrics.m_MaxLightsPerTile = std::max(metrics.m_MaxLightsPerTile, lightCount);
+			metrics.m_OverflowTileCount +=
+				lightCount > ForwardPlusTileLightCapacity ||
+				(header.m_CountAndFlags & ~ForwardPlusTileCountMask) != 0
+				? 1u
+				: 0u;
+
+			const ForwardPlusTileDepthRange& depthRange = depthRanges[tileIndex];
+			if (depthRange.IsValid())
+			{
+				minimumViewZ = std::min(minimumViewZ, depthRange.m_MinViewZ);
+				metrics.m_MaxViewZ = std::max(metrics.m_MaxViewZ, depthRange.m_MaxViewZ);
+			}
+		}
+
+		metrics.m_EmptyTileCount = tileGrid.m_TileCount - metrics.m_ActiveTileCount;
+		metrics.m_AverageLightsPerTile =
+			static_cast<double>(metrics.m_TotalLightReferences) / tileGrid.m_TileCount;
+		metrics.m_MinViewZ = minimumViewZ == std::numeric_limits<float>::max()
+			? 0.0f
+			: minimumViewZ;
+		metrics.m_IsValid = true;
+		return metrics;
+	}
+
 	std::vector<uint32_t> BuildStableForwardPlusLightList(
 		std::span<const uint8_t> lightHits, uint32_t simulatedWaveSize)
 	{
