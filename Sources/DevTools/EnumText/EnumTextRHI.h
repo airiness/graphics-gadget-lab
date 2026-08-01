@@ -6,6 +6,29 @@
 
 namespace gglab::devtools
 {
+	template <> struct EnumTextTraits<RHIFormat>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{RHIFormat::Unknown, "Unknown"},
+			EnumTextEntry{RHIFormat::R8Unorm, "R8Unorm"},
+			EnumTextEntry{RHIFormat::R8G8B8A8Typeless, "R8G8B8A8Typeless"},
+			EnumTextEntry{RHIFormat::R8G8B8A8Unorm, "R8G8B8A8Unorm"},
+			EnumTextEntry{RHIFormat::R8G8B8A8UnormSrgb, "R8G8B8A8UnormSrgb"},
+			EnumTextEntry{RHIFormat::R16Float, "R16Float"},
+			EnumTextEntry{RHIFormat::R16G16Float, "R16G16Float"},
+			EnumTextEntry{RHIFormat::R16G16B16A16Typeless, "R16G16B16A16Typeless"},
+			EnumTextEntry{RHIFormat::R16G16B16A16Float, "R16G16B16A16Float"},
+			EnumTextEntry{RHIFormat::R32G32Float, "R32G32Float"},
+			EnumTextEntry{RHIFormat::R32G32B32Float, "R32G32B32Float"},
+			EnumTextEntry{RHIFormat::R32G32B32A32Float, "R32G32B32A32Float"},
+			EnumTextEntry{RHIFormat::R32Typeless, "R32Typeless"},
+			EnumTextEntry{RHIFormat::R32Float, "R32Float"},
+			EnumTextEntry{RHIFormat::R32Uint, "R32Uint"},
+			EnumTextEntry{RHIFormat::D24UnormS8Uint, "D24UnormS8Uint"},
+			EnumTextEntry{RHIFormat::D32Float, "D32Float"},
+		};
+	};
+
 	template <> struct EnumTextTraits<RHIBindingType>
 	{
 		static constexpr std::array Entries = {

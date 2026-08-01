@@ -44,7 +44,7 @@ namespace gglab
 		{
 			const ForwardPlusTileHeader& header = headers[tileIndex];
 			const uint32_t lightCount = header.GetCount();
-			metrics.m_ActiveTileCount += lightCount > 0 ? 1u : 0u;
+			metrics.m_NonEmptyLightListTileCount += lightCount > 0 ? 1u : 0u;
 			metrics.m_TotalLightReferences += lightCount;
 			metrics.m_MaxLightsPerTile = std::max(metrics.m_MaxLightsPerTile, lightCount);
 			metrics.m_OverflowTileCount +=
@@ -61,7 +61,8 @@ namespace gglab
 			}
 		}
 
-		metrics.m_EmptyTileCount = tileGrid.m_TileCount - metrics.m_ActiveTileCount;
+		metrics.m_EmptyLightListTileCount =
+			tileGrid.m_TileCount - metrics.m_NonEmptyLightListTileCount;
 		metrics.m_AverageLightsPerTile =
 			static_cast<double>(metrics.m_TotalLightReferences) / tileGrid.m_TileCount;
 		metrics.m_MinViewZ = minimumViewZ == std::numeric_limits<float>::max()

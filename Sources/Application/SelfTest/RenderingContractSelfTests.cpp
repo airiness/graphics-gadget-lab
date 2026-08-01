@@ -14,6 +14,7 @@
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
@@ -955,8 +956,9 @@ namespace gglab
 			};
 			const ForwardPlusGridMetrics gridMetrics = BuildForwardPlusGridMetrics(
 				metricsGrid, metricHeaders, metricDepthRanges);
-			context.Check(gridMetrics.m_IsValid && gridMetrics.m_ActiveTileCount == 1 &&
-				gridMetrics.m_EmptyTileCount == 1 &&
+			context.Check(gridMetrics.m_IsValid &&
+				gridMetrics.m_NonEmptyLightListTileCount == 1 &&
+				gridMetrics.m_EmptyLightListTileCount == 1 &&
 				gridMetrics.m_TotalLightReferences == 3 &&
 				gridMetrics.m_AverageLightsPerTile == 1.5 &&
 				gridMetrics.m_MaxLightsPerTile == 3 &&
@@ -1485,6 +1487,84 @@ namespace gglab
 			RunDepthCoverageContractTests(context);
 			RunForwardPlusContractTests(context);
 			RunShaderCompileContractTests(context);
+		}
+
+		void RunTextureFormatCapabilityTests(SelfTestContext& context) noexcept
+		{
+			RHITextureDesc desc{};
+			desc.m_Format = RHIFormat::R8Unorm;
+			desc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::RenderTarget |
+				RHITextureUsage::UnorderedAccess;
+			const auto fullSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
+				D3D12_FORMAT_SUPPORT1_TEXTURE2D | D3D12_FORMAT_SUPPORT1_RENDER_TARGET |
+				D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE |
+				D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW);
+			const auto noTypedUavSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
+				fullSupport1 & ~D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW);
+			const auto noShaderResourceSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
+				fullSupport1 & ~D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE);
+			const auto noRenderTargetSupport1 = static_cast<D3D12_FORMAT_SUPPORT1>(
+				fullSupport1 & ~D3D12_FORMAT_SUPPORT1_RENDER_TARGET);
+			constexpr auto TypedStoreSupport =
+				static_cast<D3D12_FORMAT_SUPPORT2>(D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE);
+
+			RHITextureViewDesc viewDesc{
+				.m_Type = RHITextureViewType::UnorderedAccess,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = RHIFormat::R8Unorm,
+			};
+			context.Check(EvaluateD3D12TextureFormatSupport(desc, fullSupport1) ==
+				RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::None,
+				"R8Unorm accepts the complete GTAO texture and typed-UAV capability set");
+			context.Check(EvaluateD3D12TextureFormatSupport(desc, noTypedUavSupport1) ==
+				RHITextureSupportReason::TypedUnorderedAccessUnsupported &&
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, noTypedUavSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::TypedUnorderedAccessUnsupported &&
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, fullSupport1, D3D12_FORMAT_SUPPORT2_NONE) ==
+				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported,
+				"R8Unorm capability queries distinguish typed-UAV and typed-store fallback causes");
+
+			viewDesc.m_Type = RHITextureViewType::ShaderResource;
+			context.Check(EvaluateD3D12TextureViewFormatSupport(
+				desc, viewDesc, noShaderResourceSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::ShaderResourceUnsupported,
+				"Single-channel SRV capability validation rejects formats without shader access");
+			viewDesc.m_Type = RHITextureViewType::RenderTarget;
+			context.Check(
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, noRenderTargetSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::RenderTargetUnsupported,
+				"Single-channel RTV capability validation requires render-target support");
+
+			desc.m_Format = RHIFormat::R16Float;
+			viewDesc.m_Format = RHIFormat::R16Float;
+			viewDesc.m_Type = RHITextureViewType::UnorderedAccess;
+			const bool r16Supported = EvaluateD3D12TextureFormatSupport(desc, fullSupport1) ==
+				RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::None;
+			desc.m_Format = RHIFormat::R32Float;
+			viewDesc.m_Format = RHIFormat::R32Float;
+			context.Check(r16Supported &&
+				EvaluateD3D12TextureFormatSupport(desc, fullSupport1) ==
+				RHITextureSupportReason::None &&
+				EvaluateD3D12TextureViewFormatSupport(
+					desc, viewDesc, fullSupport1, TypedStoreSupport) ==
+				RHITextureSupportReason::None,
+				"R16Float and existing R32Float use the same typed-UAV capability contract");
+			context.Check(RHITextureSupportReasonText(
+				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported) ==
+				"typed unordered-access store unsupported",
+				"Texture capability failures expose a stable diagnostic reason");
 		}
 
 		[[nodiscard]] bool HasDependencyEdge(const RGSnapshot& snapshot, uint32_t fromPass,
@@ -2169,6 +2249,7 @@ namespace gglab
 	{
 		RunSuiteSmokeTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
+		RunTextureFormatCapabilityTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);
 		RunTemporalCompatibilityAndHistoryContractTests(context);
 	}

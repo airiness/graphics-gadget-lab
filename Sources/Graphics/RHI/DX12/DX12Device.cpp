@@ -7,6 +7,7 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Core/HResult.h"
 
@@ -14,27 +15,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] D3D12_FORMAT_SUPPORT1 TextureDimensionSupport(
-			RHITextureDimension dimension) noexcept
-		{
-			switch (dimension)
-			{
-			case RHITextureDimension::Texture1D:
-				return D3D12_FORMAT_SUPPORT1_TEXTURE1D;
-			case RHITextureDimension::Texture2D:
-				return D3D12_FORMAT_SUPPORT1_TEXTURE2D;
-			case RHITextureDimension::Texture3D:
-				return D3D12_FORMAT_SUPPORT1_TEXTURE3D;
-			}
-			return D3D12_FORMAT_SUPPORT1_NONE;
-		}
-
-		[[nodiscard]] bool HasFormatSupport1(
-			D3D12_FORMAT_SUPPORT1 actual, D3D12_FORMAT_SUPPORT1 required) noexcept
-		{
-			return (actual & required) == required;
-		}
-
 		[[nodiscard]] bool SupportsMultisampling(
 			ID3D12Device* device, DXGI_FORMAT format, uint16_t sampleCount) noexcept
 		{
@@ -118,7 +98,7 @@ namespace gglab
 		}
 		if (!m_D3D12Device)
 		{
-			return {};
+			return { .m_Reason = RHITextureSupportReason::DeviceUnavailable };
 		}
 
 		D3D12_FEATURE_DATA_FORMAT_SUPPORT formatSupport{
@@ -127,30 +107,15 @@ namespace gglab
 		if (FAILED(m_D3D12Device->CheckFeatureSupport(
 			D3D12_FEATURE_FORMAT_SUPPORT, &formatSupport, sizeof(formatSupport))))
 		{
-			return {};
+			return { .m_Reason = RHITextureSupportReason::FormatSupportQueryFailed };
 		}
 
-		D3D12_FORMAT_SUPPORT1 requiredSupport = TextureDimensionSupport(desc.m_Dimension);
 		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(desc.m_Format);
-		if (!formatInfo.m_IsTypeless)
+		const RHITextureSupportReason reason =
+			EvaluateD3D12TextureFormatSupport(desc, formatSupport.Support1);
+		if (reason != RHITextureSupportReason::None)
 		{
-			if (Test(desc.m_Usage, RHITextureUsage::RenderTarget))
-			{
-				requiredSupport |= D3D12_FORMAT_SUPPORT1_RENDER_TARGET;
-			}
-			if (Test(desc.m_Usage, RHITextureUsage::DepthStencil))
-			{
-				requiredSupport |= D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL;
-			}
-			if (Test(desc.m_Usage, RHITextureUsage::UnorderedAccess))
-			{
-				requiredSupport |= D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
-			}
-		}
-
-		if (!HasFormatSupport1(formatSupport.Support1, requiredSupport))
-		{
-			return {};
+			return { .m_Reason = reason };
 		}
 
 		if (desc.m_SampleCount > 1 && !formatInfo.m_IsTypeless)
@@ -158,7 +123,7 @@ namespace gglab
 			if (!SupportsMultisampling(
 				m_D3D12Device.Get(), ToDXGIFormat(desc.m_Format), desc.m_SampleCount))
 			{
-				return {};
+				return { .m_Reason = RHITextureSupportReason::MultisamplingUnsupported };
 			}
 		}
 
@@ -174,9 +139,10 @@ namespace gglab
 		{
 			return { .m_ValidationError = validation.m_Error };
 		}
-		if (!QueryTextureSupport(textureDesc).IsSupported() || !m_D3D12Device)
+		const RHITextureSupportResult textureSupport = QueryTextureSupport(textureDesc);
+		if (!textureSupport.IsSupported())
 		{
-			return {};
+			return textureSupport;
 		}
 
 		const RHIFormat viewFormat =
@@ -187,43 +153,20 @@ namespace gglab
 		if (FAILED(m_D3D12Device->CheckFeatureSupport(
 			D3D12_FEATURE_FORMAT_SUPPORT, &formatSupport, sizeof(formatSupport))))
 		{
-			return {};
+			return { .m_Reason = RHITextureSupportReason::FormatSupportQueryFailed };
 		}
 
-		D3D12_FORMAT_SUPPORT1 requiredSupport = TextureDimensionSupport(textureDesc.m_Dimension);
-		switch (viewDesc.m_Type)
+		const RHITextureSupportReason reason = EvaluateD3D12TextureViewFormatSupport(
+			textureDesc, viewDesc, formatSupport.Support1, formatSupport.Support2);
+		if (reason != RHITextureSupportReason::None)
 		{
-		case RHITextureViewType::RenderTarget:
-			requiredSupport |= D3D12_FORMAT_SUPPORT1_RENDER_TARGET;
-			break;
-		case RHITextureViewType::DepthStencil:
-			requiredSupport |= D3D12_FORMAT_SUPPORT1_DEPTH_STENCIL;
-			break;
-		case RHITextureViewType::ShaderResource:
-			if (!HasFormatSupport1(formatSupport.Support1, D3D12_FORMAT_SUPPORT1_SHADER_LOAD) &&
-				!HasFormatSupport1(formatSupport.Support1, D3D12_FORMAT_SUPPORT1_SHADER_SAMPLE))
-			{
-				return {};
-			}
-			break;
-		case RHITextureViewType::UnorderedAccess:
-			requiredSupport |= D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
-			if ((formatSupport.Support2 & D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE) == 0)
-			{
-				return {};
-			}
-			break;
-		}
-
-		if (!HasFormatSupport1(formatSupport.Support1, requiredSupport))
-		{
-			return {};
+			return { .m_Reason = reason };
 		}
 		if (textureDesc.m_SampleCount > 1 &&
 			!SupportsMultisampling(
 				m_D3D12Device.Get(), ToDXGIFormat(viewFormat), textureDesc.m_SampleCount))
 		{
-			return {};
+			return { .m_Reason = RHITextureSupportReason::MultisamplingUnsupported };
 		}
 
 		return { .m_Supported = true };

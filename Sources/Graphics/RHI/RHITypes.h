@@ -60,6 +60,10 @@ namespace gglab
 		D24UnormS8Uint,
 		D32Float,
 
+		R8Unorm,
+		R16Float,
+
+		// RHIFormat values are serialized by texture artifacts. Append new formats above Count.
 		Count,
 	};
 

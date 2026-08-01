@@ -639,10 +639,10 @@ namespace gglab
 				.m_Value = indexPreview,
 			},
 			{
-				.m_Name = "Active / empty tiles",
+				.m_Name = "Non-empty / empty light lists",
 				.m_Value = gridMetrics.m_IsValid
-					? std::format("{} / {}", gridMetrics.m_ActiveTileCount,
-						gridMetrics.m_EmptyTileCount)
+					? std::format("{} / {}", gridMetrics.m_NonEmptyLightListTileCount,
+						gridMetrics.m_EmptyLightListTileCount)
 					: "pending",
 			},
 			{
@@ -662,7 +662,7 @@ namespace gglab
 					: "pending",
 			},
 			{
-				.m_Name = "Legacy / Forward+ GPU time",
+				.m_Name = "Latest Legacy / Forward+ GPU sample",
 				.m_Value = performance.m_HasLegacySample && performance.m_HasForwardPlusSample
 					? std::format("{:.3f} / {:.3f} + {:.3f} ms",
 						performance.m_LegacyOpaqueMilliseconds,

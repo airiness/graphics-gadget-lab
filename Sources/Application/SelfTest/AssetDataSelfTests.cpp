@@ -11,6 +11,7 @@
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <cwctype>
 #include <fstream>
@@ -868,6 +869,82 @@ namespace gglab
 
 		void RunRHITextureValidationTests(SelfTestContext& context) noexcept
 		{
+			const RHIFormatInfo& r8Info = GetRHIFormatInfo(RHIFormat::R8Unorm);
+			const RHIFormatInfo& r16Info = GetRHIFormatInfo(RHIFormat::R16Float);
+			context.Check(r8Info.m_Family == RHIFormatFamily::R8 &&
+				r8Info.m_BytesPerBlock == 1 && r8Info.m_BlockWidth == 1 &&
+				r8Info.m_BlockHeight == 1 && r16Info.m_Family == RHIFormatFamily::R16 &&
+				r16Info.m_BytesPerBlock == 2 && r16Info.m_BlockWidth == 1 &&
+				r16Info.m_BlockHeight == 1 && ToDXGIFormat(RHIFormat::R8Unorm) == DXGI_FORMAT_R8_UNORM &&
+				ToDXGIFormat(RHIFormat::R16Float) == DXGI_FORMAT_R16_FLOAT &&
+				ToRHIFormat(DXGI_FORMAT_R8_UNORM) == RHIFormat::R8Unorm &&
+				ToRHIFormat(DXGI_FORMAT_R16_FLOAT) == RHIFormat::R16Float,
+				"Single-channel R8 and R16 formats preserve metadata and DXGI mappings");
+
+			RHITextureDesc aoDesc{};
+			aoDesc.m_Format = RHIFormat::R8Unorm;
+			aoDesc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::RenderTarget |
+				RHITextureUsage::UnorderedAccess | RHITextureUsage::CopyDest;
+			aoDesc.m_Extent = { 4, 2, 1 };
+			RHITextureViewDesc aoSrv{
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = RHIFormat::R8Unorm,
+			};
+			RHITextureViewDesc aoUav = aoSrv;
+			aoUav.m_Type = RHITextureViewType::UnorderedAccess;
+			RHITextureViewDesc aoRtv = aoSrv;
+			aoRtv.m_Type = RHITextureViewType::RenderTarget;
+			const D3D12_RESOURCE_DESC nativeAoDesc = ToD3D12ResourceDesc(aoDesc);
+			const D3D12_SHADER_RESOURCE_VIEW_DESC nativeAoSrv =
+				BuildD3D12ShaderResourceViewDesc(aoSrv, nativeAoDesc);
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC nativeAoUav =
+				BuildD3D12UnorderedAccessViewDesc(aoUav, nativeAoDesc);
+			const D3D12_RENDER_TARGET_VIEW_DESC nativeAoRtv =
+				BuildD3D12RenderTargetViewDesc(aoRtv, nativeAoDesc);
+			context.Check(ValidateRHITextureDesc(aoDesc).IsValid() &&
+				ValidateRHITextureViewDesc(aoDesc, aoSrv).IsValid() &&
+				ValidateRHITextureViewDesc(aoDesc, aoUav).IsValid() &&
+				ValidateRHITextureViewDesc(aoDesc, aoRtv).IsValid() &&
+				nativeAoDesc.Format == DXGI_FORMAT_R8_UNORM &&
+				nativeAoSrv.Format == DXGI_FORMAT_R8_UNORM &&
+				nativeAoUav.Format == DXGI_FORMAT_R8_UNORM &&
+				nativeAoRtv.Format == DXGI_FORMAT_R8_UNORM,
+				"R8Unorm validates and translates consistently for SRV, UAV, and RTV usage");
+
+			std::array<std::byte, 8> r8Pixels{};
+			RHITextureUploadData r8Upload{
+				.m_Subresources = {
+					{.m_Data = r8Pixels.data(), .m_RowPitch = 4, .m_SlicePitch = 8},
+				},
+			};
+			RHITextureDesc r16Desc = aoDesc;
+			r16Desc.m_Format = RHIFormat::R16Float;
+			std::array<std::byte, 16> r16Pixels{};
+			RHITextureUploadData r16Upload{
+				.m_Subresources = {
+					{.m_Data = r16Pixels.data(), .m_RowPitch = 8, .m_SlicePitch = 16},
+				},
+			};
+			RHITextureViewDesc r16Uav = aoUav;
+			r16Uav.m_Format = RHIFormat::R16Float;
+			RHITextureViewDesc r16Srv = aoSrv;
+			r16Srv.m_Format = RHIFormat::R16Float;
+			const D3D12_RESOURCE_DESC nativeR16Desc = ToD3D12ResourceDesc(r16Desc);
+			const D3D12_SHADER_RESOURCE_VIEW_DESC nativeR16Srv =
+				BuildD3D12ShaderResourceViewDesc(r16Srv, nativeR16Desc);
+			const D3D12_UNORDERED_ACCESS_VIEW_DESC nativeR16Uav =
+				BuildD3D12UnorderedAccessViewDesc(r16Uav, nativeR16Desc);
+			context.Check(ValidateRHITextureUploadData(aoDesc, r8Upload).IsValid() &&
+				ValidateRHITextureUploadData(r16Desc, r16Upload).IsValid() &&
+				ValidateRHITextureViewDesc(r16Desc, r16Srv).IsValid() &&
+				ValidateRHITextureViewDesc(r16Desc, r16Uav).IsValid() &&
+				nativeR16Srv.Format == DXGI_FORMAT_R16_FLOAT &&
+				nativeR16Uav.Format == DXGI_FORMAT_R16_FLOAT &&
+				ValidateRHITextureViewDesc(aoDesc, r16Uav).m_Error ==
+				RHITextureValidationError::IncompatibleViewFormat,
+				"Single-channel upload pitches and R8/R16 view-family boundaries are exact");
+
 			RHITextureDesc textureDesc{};
 			textureDesc.m_Format = RHIFormat::R8G8B8A8Typeless;
 			textureDesc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest;

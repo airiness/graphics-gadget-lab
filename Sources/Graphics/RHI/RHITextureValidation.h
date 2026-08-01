@@ -37,9 +37,24 @@ namespace gglab
 		}
 	};
 
+	enum class RHITextureSupportReason : uint8_t
+	{
+		None,
+		DeviceUnavailable,
+		FormatSupportQueryFailed,
+		TextureDimensionUnsupported,
+		RenderTargetUnsupported,
+		DepthStencilUnsupported,
+		ShaderResourceUnsupported,
+		TypedUnorderedAccessUnsupported,
+		TypedUnorderedAccessStoreUnsupported,
+		MultisamplingUnsupported,
+	};
+
 	struct RHITextureSupportResult
 	{
 		RHITextureValidationError m_ValidationError = RHITextureValidationError::None;
+		RHITextureSupportReason m_Reason = RHITextureSupportReason::None;
 		bool m_Supported = false;
 
 		[[nodiscard]] constexpr bool IsDescriptionValid() const noexcept
@@ -55,6 +70,8 @@ namespace gglab
 
 	[[nodiscard]] std::string_view RHITextureValidationErrorText(
 		RHITextureValidationError error) noexcept;
+	[[nodiscard]] std::string_view RHITextureSupportReasonText(
+		RHITextureSupportReason reason) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureDesc(
 		const RHITextureDesc& desc) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureViewDesc(

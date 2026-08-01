@@ -213,8 +213,9 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("Tile Statistics", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			ImGui::Text("Active / empty: %u / %u", snapshot->m_ActiveTileCount,
-				snapshot->m_EmptyTileCount);
+			ImGui::Text("Non-empty / empty light lists: %u / %u",
+				snapshot->m_NonEmptyLightListTileCount,
+				snapshot->m_EmptyLightListTileCount);
 			ImGui::Text("References: %llu total, %.2f average, %u max",
 				static_cast<unsigned long long>(snapshot->m_TotalLightReferences),
 				snapshot->m_AverageLightsPerTile, snapshot->m_MaxLightsPerTile);
@@ -304,7 +305,7 @@ namespace gglab
 				ImGui::TextDisabled("HDR diff is disabled or awaiting a current-generation result.");
 			}
 
-			if (snapshot->m_PerformanceComparisonAvailable)
+			if (snapshot->m_PerformanceSamplePairAvailable)
 			{
 				const double forwardPlusTotal = snapshot->m_ForwardPlusCullGpuMilliseconds +
 					snapshot->m_ForwardPlusOpaqueGpuMilliseconds;
@@ -312,12 +313,14 @@ namespace gglab
 					snapshot->m_LegacyOpaqueGpuMilliseconds,
 					snapshot->m_ForwardPlusCullGpuMilliseconds,
 					snapshot->m_ForwardPlusOpaqueGpuMilliseconds, forwardPlusTotal);
-				ImGui::TextColored(snapshot->m_ForwardPlusFasterThanLegacy
+				ImGui::TextColored(snapshot->m_LatestForwardPlusSampleLower
 					? ImVec4(0.35f, 0.9f, 0.45f, 1.0f)
 					: ImVec4(0.95f, 0.75f, 0.25f, 1.0f),
-					snapshot->m_ForwardPlusFasterThanLegacy
-						? "Forward+ crossover observed"
-						: "Forward+ crossover not observed in the latest samples");
+					snapshot->m_LatestForwardPlusSampleLower
+					? "Latest Forward+ sample is lower"
+					: "Latest Forward+ sample is not lower");
+				ImGui::TextDisabled(
+					"Latest completed sample per mode; use a repeatable multi-frame capture to establish crossover.");
 			}
 			else
 			{
