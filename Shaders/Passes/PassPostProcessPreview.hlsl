@@ -25,6 +25,9 @@ static const uint PREVIEW_SOURCE_GTAO_RAW_AO = 6;
 static const uint PREVIEW_SOURCE_GTAO_HALF_DEPTH_VIEW_Z = 7;
 static const uint PREVIEW_SOURCE_GTAO_RECONSTRUCTED_NORMAL = 8;
 static const uint PREVIEW_SOURCE_GTAO_SELECTED_SURFACE_OFFSET = 9;
+static const uint PREVIEW_SOURCE_GTAO_DENOISE_X = 10;
+static const uint PREVIEW_SOURCE_GTAO_DENOISE_Y = 11;
+static const uint PREVIEW_SOURCE_GTAO_FINAL_AO = 12;
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
@@ -36,7 +39,10 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 	SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
-	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_RAW_AO)
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_RAW_AO ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_DENOISE_X ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_DENOISE_Y ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_FINAL_AO)
 	{
 		Texture2D<float> aoTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
 		const float ao = aoTexture.SampleLevel(pointSampler, input.UV, 0.0);

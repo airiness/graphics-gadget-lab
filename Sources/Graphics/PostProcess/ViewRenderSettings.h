@@ -44,6 +44,12 @@ namespace gglab
 		bool m_EnableHdrDiffValidation = false;
 	};
 
+	enum class GTAOFinalAOFormatPreference : uint8_t
+	{
+		PreferR8Unorm,
+		ForceR16Float,
+	};
+
 	struct GTAOSettings
 	{
 		bool m_Enabled = false;
@@ -53,6 +59,9 @@ namespace gglab
 		float m_Thickness = 0.25f;
 		uint32_t m_DirectionCount = 2;
 		uint32_t m_StepCount = 4;
+		uint32_t m_DenoiseRadius = 3;
+		GTAOFinalAOFormatPreference m_FinalAOFormatPreference =
+			GTAOFinalAOFormatPreference::PreferR8Unorm;
 	};
 
 	struct LightingProfile

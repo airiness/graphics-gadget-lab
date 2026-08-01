@@ -44,28 +44,39 @@ bool ReconstructGTAONormal(Texture2D<float> depthTexture, uint2 centerPixel, uin
 	ViewData viewData, float centerViewZ, float3 centerPositionVS, float radius,
 	out float3 normalVS)
 {
-	const uint2 leftPixel = uint2(centerPixel.x > 0 ? centerPixel.x - 1 : 0, centerPixel.y);
-	const uint2 rightPixel = uint2(min(centerPixel.x + 1, fullExtent.x - 1), centerPixel.y);
-	const uint2 upPixel = uint2(centerPixel.x, centerPixel.y > 0 ? centerPixel.y - 1 : 0);
-	const uint2 downPixel = uint2(centerPixel.x, min(centerPixel.y + 1, fullExtent.y - 1));
-
 	float ignoredDepth;
-	float leftViewZ;
-	float rightViewZ;
-	float upViewZ;
-	float downViewZ;
-	float3 leftPosition;
-	float3 rightPosition;
-	float3 upPosition;
-	float3 downPosition;
-	const bool leftValid = LoadGTAOPosition(
-		depthTexture, leftPixel, fullExtent, viewData, ignoredDepth, leftViewZ, leftPosition);
-	const bool rightValid = LoadGTAOPosition(
-		depthTexture, rightPixel, fullExtent, viewData, ignoredDepth, rightViewZ, rightPosition);
-	const bool upValid = LoadGTAOPosition(
-		depthTexture, upPixel, fullExtent, viewData, ignoredDepth, upViewZ, upPosition);
-	const bool downValid = LoadGTAOPosition(
-		depthTexture, downPixel, fullExtent, viewData, ignoredDepth, downViewZ, downPosition);
+	float leftViewZ = 0.0;
+	float rightViewZ = 0.0;
+	float upViewZ = 0.0;
+	float downViewZ = 0.0;
+	float3 leftPosition = 0.0.xxx;
+	float3 rightPosition = 0.0.xxx;
+	float3 upPosition = 0.0.xxx;
+	float3 downPosition = 0.0.xxx;
+	bool leftValid = false;
+	bool rightValid = false;
+	bool upValid = false;
+	bool downValid = false;
+	if (centerPixel.x > 0)
+	{
+		leftValid = LoadGTAOPosition(depthTexture, centerPixel - uint2(1, 0), fullExtent,
+			viewData, ignoredDepth, leftViewZ, leftPosition);
+	}
+	if (centerPixel.x + 1 < fullExtent.x)
+	{
+		rightValid = LoadGTAOPosition(depthTexture, centerPixel + uint2(1, 0), fullExtent,
+			viewData, ignoredDepth, rightViewZ, rightPosition);
+	}
+	if (centerPixel.y > 0)
+	{
+		upValid = LoadGTAOPosition(depthTexture, centerPixel - uint2(0, 1), fullExtent,
+			viewData, ignoredDepth, upViewZ, upPosition);
+	}
+	if (centerPixel.y + 1 < fullExtent.y)
+	{
+		downValid = LoadGTAOPosition(depthTexture, centerPixel + uint2(0, 1), fullExtent,
+			viewData, ignoredDepth, downViewZ, downPosition);
+	}
 
 	float3 derivativeX = 0.0.xxx;
 	float3 derivativeY = 0.0.xxx;
@@ -218,4 +229,92 @@ float EvaluateGTAO(Texture2D<float> depthTexture, GTAOSurface surface, uint2 hal
 	}
 
 	return saturate(1.0 - occlusion / float(directionCount));
+}
+
+float DenoiseGTAO(Texture2D<float> sourceAO, Texture2D<float> halfDepth,
+	uint2 pixel, uint2 extent, int2 axis, uint radius)
+{
+	const float centerDepth = halfDepth.Load(int3(pixel, 0));
+	if (!isfinite(centerDepth) || centerDepth <= 0.0)
+	{
+		return 1.0;
+	}
+
+	const float centerAO = saturate(sourceAO.Load(int3(pixel, 0)));
+	float weightedAO = centerAO;
+	float weightSum = 1.0;
+	const float spatialSigma = max(float(radius) * 0.5, 1.0);
+	const float discontinuityLimit = max(0.05, centerDepth * 0.02);
+	[loop]
+	for (int tap = -int(radius); tap <= int(radius); ++tap)
+	{
+		if (tap == 0)
+		{
+			continue;
+		}
+		const int2 neighborPixel = int2(pixel) + axis * tap;
+		if (any(neighborPixel < 0) || any(neighborPixel >= int2(extent)))
+		{
+			continue;
+		}
+		const float neighborDepth = halfDepth.Load(int3(neighborPixel, 0));
+		if (!isfinite(neighborDepth) || neighborDepth <= 0.0)
+		{
+			continue;
+		}
+		const float depthDelta = abs(neighborDepth - centerDepth);
+		if (depthDelta > discontinuityLimit)
+		{
+			continue;
+		}
+		const float spatialWeight = exp(-0.5 * float(tap * tap) /
+			(spatialSigma * spatialSigma));
+		const float depthWeight = exp2(-32.0 * depthDelta / max(centerDepth, 1.0e-4));
+		const float weight = spatialWeight * depthWeight;
+		weightedAO += saturate(sourceAO.Load(int3(neighborPixel, 0))) * weight;
+		weightSum += weight;
+	}
+	return saturate(weightedAO / max(weightSum, 1.0e-5));
+}
+
+float UpsampleGTAO(Texture2D<float> denoisedAO, Texture2D<float> halfDepth,
+	Texture2D<float> fullDepth, uint2 fullPixel, uint2 fullExtent, uint2 halfExtent,
+	ViewData viewData)
+{
+	float fullRawDepth;
+	float fullViewZ;
+	float3 fullPositionVS;
+	if (!LoadGTAOPosition(fullDepth, fullPixel, fullExtent, viewData,
+		fullRawDepth, fullViewZ, fullPositionVS))
+	{
+		return 1.0;
+	}
+
+	const float2 halfPosition = (float2(fullPixel) + 0.5) * 0.5 - 0.5;
+	const int2 basePixel = int2(floor(halfPosition));
+	float weightedAO = 0.0;
+	float weightSum = 0.0;
+	const float discontinuityLimit = max(0.05, fullViewZ * 0.02);
+	[unroll]
+	for (uint candidateIndex = 0; candidateIndex < 4; ++candidateIndex)
+	{
+		const int2 candidateOffset = int2(candidateIndex & 1, candidateIndex >> 1);
+		const int2 candidatePixel = clamp(basePixel + candidateOffset, int2(0, 0),
+			int2(halfExtent) - 1);
+		const float candidateDepth = halfDepth.Load(int3(candidatePixel, 0));
+		if (!isfinite(candidateDepth) || candidateDepth <= 0.0 ||
+			abs(candidateDepth - fullViewZ) > discontinuityLimit)
+		{
+			continue;
+		}
+		const float2 distanceToCandidate = abs(halfPosition - float2(candidatePixel));
+		const float spatialWeight =
+			max(1.0 - distanceToCandidate.x, 0.0) * max(1.0 - distanceToCandidate.y, 0.0);
+		const float depthWeight = exp2(
+			-32.0 * abs(candidateDepth - fullViewZ) / max(fullViewZ, 1.0e-4));
+		const float weight = spatialWeight * depthWeight;
+		weightedAO += saturate(denoisedAO.Load(int3(candidatePixel, 0))) * weight;
+		weightSum += weight;
+	}
+	return weightSum > 1.0e-5 ? saturate(weightedAO / weightSum) : 1.0;
 }

@@ -27,6 +27,13 @@ namespace gglab
 		static_assert(sizeof(PostProcessPreviewPassParameters) == 32);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthRaw) == 4);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::SceneDepthLinearViewZ) == 5);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAORawAO) == 6);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOHalfDepthViewZ) == 7);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOReconstructedNormal) == 8);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOSelectedSurfaceOffset) == 9);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAODenoiseX) == 10);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAODenoiseY) == 11);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOFinalAO) == 12);
 
 		struct PassData
 		{
@@ -67,7 +74,10 @@ namespace gglab
 			return tap == PostProcessDebugTap::GTAORawAO ||
 				tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
 				tap == PostProcessDebugTap::GTAOReconstructedNormal ||
-				tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset;
+				tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
+				tap == PostProcessDebugTap::GTAODenoiseX ||
+				tap == PostProcessDebugTap::GTAODenoiseY ||
+				tap == PostProcessDebugTap::GTAOFinalAO;
 		}
 
 		RGTextureId ResolveGTAOPreviewSource(
@@ -83,6 +93,12 @@ namespace gglab
 				return resources.m_ReconstructedNormal;
 			case PostProcessDebugTap::GTAOSelectedSurfaceOffset:
 				return resources.m_SelectedSurfaceOffset;
+			case PostProcessDebugTap::GTAODenoiseX:
+				return resources.m_DenoiseX;
+			case PostProcessDebugTap::GTAODenoiseY:
+				return resources.m_DenoiseY;
+			case PostProcessDebugTap::GTAOFinalAO:
+				return resources.m_FinalAO;
 			default:
 				return {};
 			}

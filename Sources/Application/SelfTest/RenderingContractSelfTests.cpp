@@ -895,8 +895,31 @@ namespace gglab
 			desc.m_Defines.clear();
 			const ShaderCompileArtifact gtaoArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(gtaoArtifact.m_Binary.IsValid(),
-				"Production DXC compiles deterministic half-resolution GTAO evaluation");
+			desc.m_Defines = {
+				{.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"},
+			};
+			const ShaderCompileArtifact gtaoDiagnosticsArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines = {
+				{.m_Name = L"GGLAB_GTAO_DENOISE_X", .m_Value = L"1"},
+			};
+			const ShaderCompileArtifact gtaoDenoiseXArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines = {
+				{.m_Name = L"GGLAB_GTAO_DENOISE_Y", .m_Value = L"1"},
+			};
+			const ShaderCompileArtifact gtaoDenoiseYArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines = {
+				{.m_Name = L"GGLAB_GTAO_UPSAMPLE", .m_Value = L"1"},
+			};
+			const ShaderCompileArtifact gtaoUpsampleArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			context.Check(gtaoArtifact.m_Binary.IsValid() &&
+				gtaoDiagnosticsArtifact.m_Binary.IsValid() &&
+				gtaoDenoiseXArtifact.m_Binary.IsValid() &&
+				gtaoDenoiseYArtifact.m_Binary.IsValid() && gtaoUpsampleArtifact.m_Binary.IsValid(),
+				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
 		}
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
@@ -1532,6 +1555,39 @@ namespace gglab
 				noise == GTAOInterleavedGradientNoise(37, 19),
 				"GTAO interleaved-gradient noise is finite, normalized, and deterministic");
 
+			const auto leftBoundaryNeighbors = GetGTAONormalAxisNeighborAvailability(0, 8);
+			const auto interiorNeighbors = GetGTAONormalAxisNeighborAvailability(3, 8);
+			const auto rightBoundaryNeighbors = GetGTAONormalAxisNeighborAvailability(7, 8);
+			const auto singlePixelNeighbors = GetGTAONormalAxisNeighborAvailability(0, 1);
+			context.Check(!leftBoundaryNeighbors.m_HasNegativeNeighbor &&
+				leftBoundaryNeighbors.m_HasPositiveNeighbor &&
+				interiorNeighbors.m_HasNegativeNeighbor &&
+				interiorNeighbors.m_HasPositiveNeighbor &&
+				rightBoundaryNeighbors.m_HasNegativeNeighbor &&
+				!rightBoundaryNeighbors.m_HasPositiveNeighbor &&
+				!singlePixelNeighbors.m_HasNegativeNeighbor &&
+				!singlePixelNeighbors.m_HasPositiveNeighbor,
+				"GTAO normal reconstruction never substitutes the center pixel for a missing edge neighbor");
+
+			const RHITextureSupportResult supportedFormat{ .m_Supported = true };
+			const RHITextureSupportResult unsupportedR8{
+				.m_Reason = RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported,
+				.m_Supported = false,
+			};
+			const GTAOFinalAOFormatResolution preferredFinalAO =
+				ResolveGTAOFinalAOFormat(supportedFormat, supportedFormat);
+			const GTAOFinalAOFormatResolution fallbackFinalAO =
+				ResolveGTAOFinalAOFormat(unsupportedR8, supportedFormat);
+			const GTAOFinalAOFormatResolution unavailableFinalAO =
+				ResolveGTAOFinalAOFormat(unsupportedR8, unsupportedR8);
+			context.Check(preferredFinalAO.m_Format == RHIFormat::R8Unorm &&
+				!preferredFinalAO.UsesFallback() &&
+				fallbackFinalAO.m_Format == RHIFormat::R16Float && fallbackFinalAO.UsesFallback() &&
+				fallbackFinalAO.m_PreferredR8Unorm.m_Reason ==
+				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported &&
+				!unavailableFinalAO.IsAvailable(),
+				"GTAO FinalAO prefers R8, falls back to R16, and preserves the preferred failure reason");
+
 			ViewRenderProfile gtaoProfile{};
 			gtaoProfile.m_Lighting.m_GTAO.m_Radius = -1.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_FalloffStart = 99.0f;
@@ -1539,6 +1595,7 @@ namespace gglab
 			gtaoProfile.m_Lighting.m_GTAO.m_Thickness = 99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_DirectionCount = 0;
 			gtaoProfile.m_Lighting.m_GTAO.m_StepCount = 99;
+			gtaoProfile.m_Lighting.m_GTAO.m_DenoiseRadius = 99;
 			const Camera gtaoCamera(Camera::CreateInfo{});
 			const GTAOSettings resolvedGTAO =
 				ResolveViewRenderSettings(gtaoProfile, gtaoCamera).m_Lighting.m_GTAO;
@@ -1547,8 +1604,9 @@ namespace gglab
 				resolvedGTAO.m_FalloffEnd == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_Thickness == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_DirectionCount == 1 &&
-				resolvedGTAO.m_StepCount == GTAOMaxStepCount,
-				"GTAO authoring inputs resolve to bounded deterministic evaluate settings");
+				resolvedGTAO.m_StepCount == GTAOMaxStepCount &&
+				resolvedGTAO.m_DenoiseRadius == GTAOMaxDenoiseRadius,
+				"GTAO authoring inputs resolve to bounded deterministic spatial settings");
 			RunShaderCompileContractTests(context);
 		}
 
