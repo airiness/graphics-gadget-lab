@@ -14,8 +14,12 @@ namespace gglab
 		BloomResult = 3,
 		SceneDepthRaw = 4,
 		SceneDepthLinearViewZ = 5,
+		GTAORawAO = 6,
+		GTAOHalfDepthViewZ = 7,
+		GTAOReconstructedNormal = 8,
+		GTAOSelectedSurfaceOffset = 9,
 
-		Count = 6
+		Count = 10
 	};
 
 	struct PostProcessDebugSelection

@@ -10,6 +10,11 @@ Texture2D<float> GetTexture2DFloat(uint srvIndex)
 	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];
 }
 
+Texture2D<float2> GetTexture2DFloat2(uint srvIndex)
+{
+	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];
+}
+
 Texture2D<uint> GetTexture2DUint(uint srvIndex)
 {
 	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];
@@ -21,6 +26,21 @@ TextureCube<float4> GetTextureCubeFloat4(uint srvIndex)
 }
 
 RWTexture2D<uint> GetRWTexture2DUint(uint uavIndex)
+{
+	return ResourceDescriptorHeap[NonUniformResourceIndex(uavIndex)];
+}
+
+RWTexture2D<float> GetRWTexture2DFloat(uint uavIndex)
+{
+	return ResourceDescriptorHeap[NonUniformResourceIndex(uavIndex)];
+}
+
+RWTexture2D<float2> GetRWTexture2DFloat2(uint uavIndex)
+{
+	return ResourceDescriptorHeap[NonUniformResourceIndex(uavIndex)];
+}
+
+RWTexture2D<float4> GetRWTexture2DFloat4(uint uavIndex)
 {
 	return ResourceDescriptorHeap[NonUniformResourceIndex(uavIndex)];
 }

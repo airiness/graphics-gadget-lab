@@ -4,6 +4,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
+#include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -86,9 +87,12 @@ namespace gglab
 		const bool forwardPlusValidationEnabled =
 			forwardPlusActive && forwardPlusSettings.m_EnableHdrDiffValidation &&
 			m_ForwardPlusValidationPass.IsAvailable();
+		const bool gtaoEnabled =
+			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled;
 
 		auto& forwardPlusResources =
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);
+		rg.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
 		forwardPlusResources.m_Status = forwardPlusStatus;
 		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
 		forwardPlusResources.m_LightTableCapacity = context.m_RenderScene.m_LightCount;
@@ -105,6 +109,10 @@ namespace gglab
 		if (forwardPlusValidationEnabled)
 		{
 			m_ForwardPlusValidationPass.Prepare(services);
+		}
+		if (gtaoEnabled)
+		{
+			m_GTAOPass.Prepare(services);
 		}
 		if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
@@ -284,6 +292,11 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
+		if (gtaoEnabled && context.IsRenderSceneReady())
+		{
+			m_GTAOPass.AddPass(rg, context, services);
+		}
+
 		if (depthCoverageFramePlan.AddsForwardTransparentPass())
 		{
 			m_ForwardTransparentPass.AddPass(rg, context, services);
@@ -360,7 +373,7 @@ namespace gglab
 			shaderDesc.m_Defines.push_back({
 				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
 				.m_Value = L"1",
-			});
+				});
 			m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
 				shaderManager->LoadShader(shaderDesc);
 

@@ -471,6 +471,9 @@
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\ForwardPlusDebugReadback.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\Pipeline\GTAO.cpp">
+      <Filter>Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
@@ -508,6 +511,9 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassGTAO.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp">
@@ -667,6 +673,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.cpp">
@@ -1505,6 +1514,9 @@
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\ForwardPlusDebugReadback.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\GTAO.h">
+      <Filter>Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelinePresets.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
@@ -1562,10 +1574,16 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusValidationGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\GTAOGraphResources.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassGTAO.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\SceneDepthGraphResources.h">
@@ -1695,6 +1713,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.h">
@@ -2203,6 +2224,9 @@
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\GTAO.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
@@ -2239,6 +2263,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl">

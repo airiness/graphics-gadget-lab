@@ -21,6 +21,10 @@ ConstantBuffer<PostProcessPreviewPassParameters> g_Pass : register(b2);
 
 static const uint PREVIEW_SOURCE_SCENE_DEPTH_RAW = 4;
 static const uint PREVIEW_SOURCE_SCENE_DEPTH_LINEAR_VIEW_Z = 5;
+static const uint PREVIEW_SOURCE_GTAO_RAW_AO = 6;
+static const uint PREVIEW_SOURCE_GTAO_HALF_DEPTH_VIEW_Z = 7;
+static const uint PREVIEW_SOURCE_GTAO_RECONSTRUCTED_NORMAL = 8;
+static const uint PREVIEW_SOURCE_GTAO_SELECTED_SURFACE_OFFSET = 9;
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
@@ -31,11 +35,46 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 {
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
+	SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_RAW_AO)
+	{
+		Texture2D<float> aoTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
+		const float ao = aoTexture.SampleLevel(pointSampler, input.UV, 0.0);
+		return float4(ao.xxx, 1.0);
+	}
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_HALF_DEPTH_VIEW_Z)
+	{
+		Texture2D<float> depthTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
+		const float viewZ = depthTexture.SampleLevel(pointSampler, input.UV, 0.0);
+		if (!isfinite(viewZ) || viewZ <= 0.0)
+		{
+			return float4(0.0, 0.0, 0.0, 1.0);
+		}
+		const float depthRange = max(viewData.Far / max(viewData.Near, 1.0e-6), 1.0);
+		const float normalizedViewZ = saturate(
+			log2(max(viewZ / max(viewData.Near, 1.0e-6), 1.0)) / max(log2(depthRange), 1.0e-6));
+		return float4((1.0 - normalizedViewZ).xxx, 1.0);
+	}
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_RECONSTRUCTED_NORMAL)
+	{
+		Texture2D<float4> normalTexture = GetTexture2DFloat4(g_Pass.SourceTextureIndex);
+		const float4 normalAndValidity = normalTexture.SampleLevel(pointSampler, input.UV, 0.0);
+		return normalAndValidity.w > 0.0
+			? float4(normalAndValidity.xyz * 0.5 + 0.5, 1.0)
+			: float4(0.0, 0.0, 0.0, 1.0);
+	}
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_SELECTED_SURFACE_OFFSET)
+	{
+		Texture2D<float2> offsetTexture = GetTexture2DFloat2(g_Pass.SourceTextureIndex);
+		const float2 offset = offsetTexture.SampleLevel(pointSampler, input.UV, 0.0);
+		return any(offset < 0.0)
+			? float4(0.0, 0.0, 0.0, 1.0)
+			: float4(offset, 1.0 - 0.5 * (offset.x + offset.y), 1.0);
+	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_RAW ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_LINEAR_VIEW_Z)
 	{
 		Texture2D<float> depthTexture = GetTexture2DFloat(g_Pass.SourceTextureIndex);
-		SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
 		const float rawDepth = depthTexture.SampleLevel(pointSampler, input.UV, 0.0);
 		if (g_Pass.SourceMode == PREVIEW_SOURCE_SCENE_DEPTH_RAW)
 		{
