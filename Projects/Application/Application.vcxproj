@@ -177,6 +177,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassGTAO.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
@@ -309,6 +310,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp" />
@@ -326,6 +328,7 @@
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\ForwardPlus.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\Pipeline\GTAO.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\ForwardPlusDebugReadback.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\PipelineCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp" />
@@ -617,6 +620,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
@@ -632,8 +636,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusGraphResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusValidationGraphResources.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\GTAOGraphResources.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassGTAO.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPBRShaderSet.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardOpaque.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
@@ -648,6 +654,7 @@
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\ForwardPlus.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\ForwardPlusDebugReadback.h" />
+    <ClInclude Include="..\..\Sources\Graphics\Pipeline\GTAO.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelineCache.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelinePresets.h" />
     <ClInclude Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.h" />
@@ -814,6 +821,7 @@
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
@@ -828,6 +836,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl" />

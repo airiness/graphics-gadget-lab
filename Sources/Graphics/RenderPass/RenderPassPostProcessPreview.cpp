@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
+#include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -60,6 +61,32 @@ namespace gglab
 			return tap == PostProcessDebugTap::SceneDepthRaw ||
 				tap == PostProcessDebugTap::SceneDepthLinearViewZ;
 		}
+
+		bool IsGTAOPreview(PostProcessDebugTap tap) noexcept
+		{
+			return tap == PostProcessDebugTap::GTAORawAO ||
+				tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
+				tap == PostProcessDebugTap::GTAOReconstructedNormal ||
+				tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset;
+		}
+
+		RGTextureId ResolveGTAOPreviewSource(
+			const RGGTAOResources& resources, PostProcessDebugTap tap) noexcept
+		{
+			switch (tap)
+			{
+			case PostProcessDebugTap::GTAORawAO:
+				return resources.m_RawAO;
+			case PostProcessDebugTap::GTAOHalfDepthViewZ:
+				return resources.m_HalfDepthViewZ;
+			case PostProcessDebugTap::GTAOReconstructedNormal:
+				return resources.m_ReconstructedNormal;
+			case PostProcessDebugTap::GTAOSelectedSurfaceOffset:
+				return resources.m_SelectedSurfaceOffset;
+			default:
+				return {};
+			}
+		}
 	}
 
 	void RenderPassPostProcessPreview::AddPass(
@@ -70,6 +97,18 @@ namespace gglab
 		auto* registry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection();
+		if (IsGTAOPreview(selection.m_Tap))
+		{
+			const auto& gtaoResources =
+				rg.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
+			const RGTextureId source = ResolveGTAOPreviewSource(gtaoResources, selection.m_Tap);
+			if (!source.IsValid() || !registry->ConsumePostProcessPreviewRequest())
+			{
+				return;
+			}
+			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection);
+			return;
+		}
 		if (IsDepthPreview(selection.m_Tap))
 		{
 			if (!registry->ConsumePostProcessPreviewRequest())
@@ -157,9 +196,10 @@ namespace gglab
 		const RGTextureAccess initialAccess = registry->HasPublishedPostProcessPreview()
 			? RGTextureAccess::Sample
 			: RGTextureAccess::None;
-		const bool depthPreview = IsDepthPreview(selection.m_Tap);
+		const bool pointSampledPreview =
+			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap);
 		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
-			depthPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
+			pointSampledPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());
 		const auto* contextPtr = &context;
 

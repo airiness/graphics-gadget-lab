@@ -29,6 +29,14 @@ namespace gglab
 				return "Scene Depth / Raw";
 			case PostProcessDebugTap::SceneDepthLinearViewZ:
 				return "Scene Depth / Linear View Z";
+			case PostProcessDebugTap::GTAORawAO:
+				return "GTAO / Raw AO";
+			case PostProcessDebugTap::GTAOHalfDepthViewZ:
+				return "GTAO / Half Depth View Z";
+			case PostProcessDebugTap::GTAOReconstructedNormal:
+				return "GTAO / Reconstructed Normal";
+			case PostProcessDebugTap::GTAOSelectedSurfaceOffset:
+				return "GTAO / Selected Surface Offset";
 			default:
 				return "Unknown";
 			}
@@ -46,6 +54,10 @@ namespace gglab
 					PostProcessDebugTap::BloomResult,
 					PostProcessDebugTap::SceneDepthRaw,
 					PostProcessDebugTap::SceneDepthLinearViewZ,
+					PostProcessDebugTap::GTAORawAO,
+					PostProcessDebugTap::GTAOHalfDepthViewZ,
+					PostProcessDebugTap::GTAOReconstructedNormal,
+					PostProcessDebugTap::GTAOSelectedSurfaceOffset,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -172,12 +184,20 @@ namespace gglab
 		const auto* selectedTexture = ResolveSelectedTexture(*snapshot, selection);
 		const bool depthSelection = selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
 			selection.m_Tap == PostProcessDebugTap::SceneDepthLinearViewZ;
+		const bool gtaoSelection = selection.m_Tap == PostProcessDebugTap::GTAORawAO ||
+			selection.m_Tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
+			selection.m_Tap == PostProcessDebugTap::GTAOReconstructedNormal ||
+			selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
 				snapshot->m_SceneDepth.m_Width, snapshot->m_SceneDepth.m_Height,
 				GetRHIFormatInfo(snapshot->m_SceneDepth.m_ResourceFormat).m_Name,
 				GetRHIFormatInfo(snapshot->m_SceneDepth.m_SrvFormat).m_Name);
+		}
+		else if (gtaoSelection)
+		{
+			ImGui::TextDisabled("Source: transient half-resolution GTAO evaluation surface.");
 		}
 		else if (!selectedTexture || !selectedTexture->m_Available)
 		{

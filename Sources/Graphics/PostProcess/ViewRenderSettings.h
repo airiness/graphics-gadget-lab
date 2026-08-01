@@ -44,9 +44,21 @@ namespace gglab
 		bool m_EnableHdrDiffValidation = false;
 	};
 
+	struct GTAOSettings
+	{
+		bool m_Enabled = false;
+		float m_Radius = 1.0f;
+		float m_FalloffStart = 0.1f;
+		float m_FalloffEnd = 1.0f;
+		float m_Thickness = 0.25f;
+		uint32_t m_DirectionCount = 2;
+		uint32_t m_StepCount = 4;
+	};
+
 	struct LightingProfile
 	{
 		ForwardPlusSettings m_ForwardPlus{};
+		GTAOSettings m_GTAO{};
 	};
 
 	// Authoring settings owned above the renderer by the active Demo or Lab.
@@ -71,6 +83,7 @@ namespace gglab
 	struct ResolvedLightingSettings
 	{
 		ForwardPlusSettings m_ForwardPlus{};
+		GTAOSettings m_GTAO{};
 	};
 
 	// Immutable settings resolved for one RenderView and one frame.

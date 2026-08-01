@@ -6,6 +6,7 @@
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
+#include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -888,6 +889,14 @@ namespace gglab
 			context.Check(hdrDiffTileArtifact.m_Binary.IsValid() &&
 				hdrDiffFrameArtifact.m_Binary.IsValid(),
 				"Production DXC compiles deterministic Forward+ HDR diff reduction shaders");
+
+			desc.m_SourcePath = L"Passes/PassGTAO.hlsl";
+			desc.m_Entry = L"CSMain";
+			desc.m_Defines.clear();
+			const ShaderCompileArtifact gtaoArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			context.Check(gtaoArtifact.m_Binary.IsValid(),
+				"Production DXC compiles deterministic half-resolution GTAO evaluation");
 		}
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
@@ -1486,6 +1495,60 @@ namespace gglab
 			RunSampleableDepthFormatTests(context);
 			RunDepthCoverageContractTests(context);
 			RunForwardPlusContractTests(context);
+
+			context.Check(MakeGTAOHalfResolutionExtent(1920, 1080) == GTAOExtent{ 960, 540 } &&
+				MakeGTAOHalfResolutionExtent(1919, 1079) == GTAOExtent{ 960, 540 } &&
+				!MakeGTAOHalfResolutionExtent(0, 0).IsValid(),
+				"GTAO half-resolution extents use deterministic per-axis ceiling division");
+
+			const std::array<GTAOSurfaceCandidate, 4> reversedCandidates = {
+				GTAOSurfaceCandidate{.m_RawDepth = 0.0f, .m_ViewZ = 0.0f},
+				GTAOSurfaceCandidate{.m_RawDepth = 0.4f, .m_ViewZ = 3.0f},
+				GTAOSurfaceCandidate{.m_RawDepth = 0.7f, .m_ViewZ = 2.0f},
+				GTAOSurfaceCandidate{.m_RawDepth = 0.7f, .m_ViewZ = 2.0f},
+			};
+			const GTAOSurfaceSelection reversedSelection = SelectGTAOHalfResolutionSurface(
+				reversedCandidates, DepthConvention::Reversed);
+			const std::array<GTAOSurfaceCandidate, 4> standardTieCandidates = {
+				GTAOSurfaceCandidate{.m_RawDepth = 0.25f, .m_ViewZ = 2.0f},
+				GTAOSurfaceCandidate{.m_RawDepth = 0.25f, .m_ViewZ = 2.0f},
+				GTAOSurfaceCandidate{.m_RawDepth = 0.5f, .m_ViewZ = 4.0f},
+				GTAOSurfaceCandidate{.m_RawDepth = 1.0f, .m_ViewZ = 0.0f},
+			};
+			const GTAOSurfaceSelection standardSelection = SelectGTAOHalfResolutionSurface(
+				standardTieCandidates, DepthConvention::Standard);
+			const std::array<GTAOSurfaceCandidate, 4> backgroundCandidates{};
+			const GTAOSurfaceSelection backgroundSelection = SelectGTAOHalfResolutionSurface(
+				backgroundCandidates, DepthConvention::Reversed);
+			context.Check(reversedSelection.m_IsValid &&
+				reversedSelection.m_SelectedIndex == 2 && reversedSelection.m_RawDepth == 0.7f &&
+				standardSelection.m_IsValid && standardSelection.m_SelectedIndex == 0 &&
+				!backgroundSelection.m_IsValid && backgroundSelection.m_RawDepth == 0.0f &&
+				backgroundSelection.m_ViewZ == 0.0f,
+				"GTAO surface selection rejects background, chooses nearest depth, and preserves TL-to-BR ties");
+
+			const float noise = GTAOInterleavedGradientNoise(37, 19);
+			context.Check(noise >= 0.0f && noise < 1.0f &&
+				noise == GTAOInterleavedGradientNoise(37, 19),
+				"GTAO interleaved-gradient noise is finite, normalized, and deterministic");
+
+			ViewRenderProfile gtaoProfile{};
+			gtaoProfile.m_Lighting.m_GTAO.m_Radius = -1.0f;
+			gtaoProfile.m_Lighting.m_GTAO.m_FalloffStart = 99.0f;
+			gtaoProfile.m_Lighting.m_GTAO.m_FalloffEnd = -99.0f;
+			gtaoProfile.m_Lighting.m_GTAO.m_Thickness = 99.0f;
+			gtaoProfile.m_Lighting.m_GTAO.m_DirectionCount = 0;
+			gtaoProfile.m_Lighting.m_GTAO.m_StepCount = 99;
+			const Camera gtaoCamera(Camera::CreateInfo{});
+			const GTAOSettings resolvedGTAO =
+				ResolveViewRenderSettings(gtaoProfile, gtaoCamera).m_Lighting.m_GTAO;
+			context.Check(resolvedGTAO.m_Radius == 0.01f &&
+				resolvedGTAO.m_FalloffStart == resolvedGTAO.m_Radius &&
+				resolvedGTAO.m_FalloffEnd == resolvedGTAO.m_Radius &&
+				resolvedGTAO.m_Thickness == resolvedGTAO.m_Radius &&
+				resolvedGTAO.m_DirectionCount == 1 &&
+				resolvedGTAO.m_StepCount == GTAOMaxStepCount,
+				"GTAO authoring inputs resolve to bounded deterministic evaluate settings");
 			RunShaderCompileContractTests(context);
 		}
 
