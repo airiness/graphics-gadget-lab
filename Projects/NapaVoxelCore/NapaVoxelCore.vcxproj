@@ -81,6 +81,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
@@ -97,11 +98,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalVoxelSerialization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Math\Vector.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.h" />

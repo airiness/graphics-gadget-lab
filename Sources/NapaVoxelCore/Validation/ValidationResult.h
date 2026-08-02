@@ -72,6 +72,12 @@ namespace napa::voxel
 		MismatchedCpuMeshConfig = 63,
 		StaleCpuMeshBatch = 64,
 		VisibleMeshSetUninitialized = 65,
+		NonFiniteEditPosition = 66,
+		NonFiniteEditRadius = 67,
+		NonPositiveEditRadius = 68,
+		NonFiniteEditStrength = 69,
+		InvalidVoxelEditMaterialRules = 70,
+		UnpreparedSphereEditContext = 71,
 	};
 
 	struct ValidationResult

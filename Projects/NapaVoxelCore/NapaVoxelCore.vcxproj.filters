@@ -7,11 +7,17 @@
     <Filter Include="NapaVoxelCore\Validation">
       <UniqueIdentifier>{48DC8EEC-0BAD-4E86-BEFB-C03171361819}</UniqueIdentifier>
     </Filter>
+    <Filter Include="NapaVoxelCore\Edit">
+      <UniqueIdentifier>{A284DC01-C4F8-477D-9130-EAB89FDF4D79}</UniqueIdentifier>
+    </Filter>
     <Filter Include="NapaVoxelCore\Field">
       <UniqueIdentifier>{C6295286-B24D-496D-A66A-A72642FA43BB}</UniqueIdentifier>
     </Filter>
     <Filter Include="NapaVoxelCore\Hash">
       <UniqueIdentifier>{B5A5DA96-05E3-40C4-B504-3B4B2273F83B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NapaVoxelCore\Math">
+      <UniqueIdentifier>{776065A9-44B0-4B36-A4FE-7B2446C5B793}</UniqueIdentifier>
     </Filter>
     <Filter Include="NapaVoxelCore\Meshing">
       <UniqueIdentifier>{E7E65EC5-560F-4D08-A1AD-C751AD25BBF5}</UniqueIdentifier>
@@ -24,10 +30,16 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h">
       <Filter>NapaVoxelCore</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h">
+      <Filter>NapaVoxelCore\Edit</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h">
       <Filter>NapaVoxelCore\Field</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h">
+      <Filter>NapaVoxelCore\Field</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h">
       <Filter>NapaVoxelCore\Field</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h">
@@ -38,6 +50,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h">
       <Filter>NapaVoxelCore\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Math\Vector.h">
+      <Filter>NapaVoxelCore\Math</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h">
       <Filter>NapaVoxelCore\Meshing</Filter>
@@ -88,6 +103,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp">
       <Filter>NapaVoxelCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp">
+      <Filter>NapaVoxelCore\Edit</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp">
       <Filter>NapaVoxelCore\Field</Filter>

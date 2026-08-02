@@ -1,6 +1,7 @@
 #include "NapaVoxelCore/Field/Primitive.h"
 
 #include "NapaVoxelCore/Field/DensityQuantization.h"
+#include "NapaVoxelCore/Field/SignedDistance.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"
@@ -31,10 +32,8 @@ namespace napa::voxel
 		[[nodiscard]] double EvaluateSphere(
 			const SpherePrimitive& sphere, Double3 position) noexcept
 		{
-			const double x = position.m_X - sphere.m_Center.m_X;
-			const double y = position.m_Y - sphere.m_Center.m_Y;
-			const double z = position.m_Z - sphere.m_Center.m_Z;
-			return std::sqrt(x * x + y * y + z * z) - sphere.m_Radius;
+			return detail::EvaluateSphereSignedDistance(
+				sphere.m_Center, sphere.m_Radius, position);
 		}
 
 		[[nodiscard]] double EvaluateBox(

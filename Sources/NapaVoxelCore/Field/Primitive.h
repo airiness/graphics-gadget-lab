@@ -1,5 +1,6 @@
 #pragma once
 
+#include "NapaVoxelCore/Math/Vector.h"
 #include "NapaVoxelCore/Validation/ValidationResult.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 
@@ -12,16 +13,6 @@ namespace napa::voxel
 {
 	class VoxelWorld;
 	struct VoxelWorldConfig;
-
-	struct Double3
-	{
-		double m_X = 0.0;
-		double m_Y = 0.0;
-		double m_Z = 0.0;
-
-		[[nodiscard]] friend constexpr bool operator==(
-			const Double3&, const Double3&) noexcept = default;
-	};
 
 	struct PrimitiveStableId
 	{
@@ -95,8 +86,6 @@ namespace napa::voxel
 		std::span<const PrimitiveDesc> primitives, std::unique_ptr<VoxelWorld>& world,
 		PrimitiveWorldGenerationResult& result);
 
-	static_assert(std::is_standard_layout_v<Double3>);
-	static_assert(std::is_trivially_copyable_v<Double3>);
 	static_assert(std::is_standard_layout_v<SpherePrimitive>);
 	static_assert(std::is_trivially_copyable_v<SpherePrimitive>);
 	static_assert(std::is_standard_layout_v<AxisAlignedBoxPrimitive>);

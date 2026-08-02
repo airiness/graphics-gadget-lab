@@ -37,6 +37,13 @@ namespace gglab
 			EmptyPrimitiveSet,
 		};
 
+		enum class ChunkCellCountOption : int32_t
+		{
+			Cells8 = 8,
+			Cells16 = 16,
+			Cells32 = 32,
+		};
+
 		[[nodiscard]] const char* GetPresetName(StaticPreset preset) noexcept
 		{
 			switch (preset)
@@ -270,11 +277,14 @@ namespace gglab
 			.m_Id = ChunkCellCountId,
 			.m_Name = "Chunk Cell Count",
 			.m_Group = "Scenario",
-			.m_Type = LabParameterType::UInt,
+			.m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::RebuildScene,
-			.m_DefaultValue = uint32_t{ 16 },
-			.m_MinValue = uint32_t{ 8 },
-			.m_MaxValue = uint32_t{ 32 },
+			.m_DefaultValue = static_cast<int32_t>(ChunkCellCountOption::Cells16),
+			.m_EnumItems = {
+				{ static_cast<int32_t>(ChunkCellCountOption::Cells8), "8" },
+				{ static_cast<int32_t>(ChunkCellCountOption::Cells16), "16" },
+				{ static_cast<int32_t>(ChunkCellCountOption::Cells32), "32" },
+			},
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = VoxelSizeId,
@@ -419,9 +429,15 @@ namespace gglab
 		const auto& parameters = GetParameters();
 		const StaticPreset preset = static_cast<StaticPreset>(parameters.Get(
 			PresetId, static_cast<int32_t>(StaticPreset::SingleChunk)));
+		const int32_t chunkCellCount = parameters.Get(ChunkCellCountId,
+			static_cast<int32_t>(ChunkCellCountOption::Cells16));
+		if (!IsSupportedChunkCellCount(static_cast<uint32_t>(chunkCellCount)))
+		{
+			return false;
+		}
 		m_PresetName = GetPresetName(preset);
 		m_CurrentConfig = MakeConfig(preset,
-			parameters.Get(ChunkCellCountId, uint32_t{ 16 }),
+			static_cast<uint32_t>(chunkCellCount),
 			parameters.Get(VoxelSizeId, 0.25f), parameters.Get(SurfaceBandId, 2.0f));
 		if (ValidateConfig(m_CurrentConfig).Failed())
 		{
@@ -655,7 +671,7 @@ namespace gglab
 			.m_Description =
 				"Validates static Napa voxel generation, mesh publication, upload, and rendering.",
 			.m_Kind = LabKind::Scene,
-			.m_SchemaVersion = 1,
+			.m_SchemaVersion = 2,
 		};
 	}
 
