@@ -15,6 +15,44 @@ namespace gglab
 	inline constexpr uint32_t GTAOMaxStepCount = 8;
 	inline constexpr uint32_t GTAOMaxDenoiseRadius = 8;
 
+	enum class GTAOFrameStatus : uint8_t
+	{
+		Disabled,
+		Active,
+		CoreCapabilityUnavailable,
+		PipelineUnavailable,
+		RenderSceneUnavailable,
+		DepthCoverageUnavailable,
+		NoOpaqueDraws,
+	};
+
+	[[nodiscard]] constexpr GTAOFrameStatus ResolveGTAOFrameStatus(bool enabled,
+		bool coreCapabilityAvailable, bool pipelineAvailable, bool renderSceneAvailable,
+		bool depthCoverageAvailable, bool hasOpaqueDraws) noexcept
+	{
+		if (!enabled)
+		{
+			return GTAOFrameStatus::Disabled;
+		}
+		if (!coreCapabilityAvailable)
+		{
+			return GTAOFrameStatus::CoreCapabilityUnavailable;
+		}
+		if (!pipelineAvailable)
+		{
+			return GTAOFrameStatus::PipelineUnavailable;
+		}
+		if (!renderSceneAvailable)
+		{
+			return GTAOFrameStatus::RenderSceneUnavailable;
+		}
+		if (!depthCoverageAvailable)
+		{
+			return GTAOFrameStatus::DepthCoverageUnavailable;
+		}
+		return hasOpaqueDraws ? GTAOFrameStatus::Active : GTAOFrameStatus::NoOpaqueDraws;
+	}
+
 	struct GTAOExtent
 	{
 		uint32_t m_Width = 0;

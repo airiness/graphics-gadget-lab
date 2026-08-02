@@ -6,6 +6,7 @@
 #include "DevTools/DevelopGui/Panels/DebugDrawPanel.h"
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
 #include "DevTools/DevelopGui/Panels/ForwardPlusInspectorPanel.h"
+#include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/Panels/ImGuiToolsPanel.h"
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
@@ -28,6 +29,7 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<DebugDrawPanel>());
 		registry.RegisterPanel(std::make_unique<EntityPanel>());
 		registry.RegisterPanel(std::make_unique<ForwardPlusInspectorPanel>());
+		registry.RegisterPanel(std::make_unique<GTAOInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<ImGuiToolsPanel>());
 		registry.RegisterPanel(std::make_unique<IBLViewerPanel>());
 		registry.RegisterPanel(std::make_unique<RenderGraphInspectorPanel>());

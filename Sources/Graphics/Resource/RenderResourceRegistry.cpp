@@ -625,6 +625,16 @@ namespace gglab
 		m_TextureEntries[utils::ToIndex(TextureIndex::Preview_PostProcess)].m_Dirty = false;
 	}
 
+	void RenderResourceRegistry::InvalidatePostProcessPreview(
+		PostProcessDebugSelection selection) noexcept
+	{
+		if (m_PostProcessPreviewState.m_HasPublished &&
+			m_PostProcessPreviewState.m_PublishedSelection == selection)
+		{
+			m_PostProcessPreviewState.m_HasPublished = false;
+		}
+	}
+
 	RenderResourceRegistry::TextureIndex RenderResourceRegistry::GetPreviewTextureIndex(
 		IBLPreviewType type) noexcept
 	{

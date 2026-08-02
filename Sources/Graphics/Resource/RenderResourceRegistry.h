@@ -177,6 +177,7 @@ namespace gglab
 		void RequestPostProcessPreview() noexcept;
 		[[nodiscard]] bool ConsumePostProcessPreviewRequest() noexcept;
 		void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept;
+		void InvalidatePostProcessPreview(PostProcessDebugSelection selection) noexcept;
 		[[nodiscard]] bool IsPostProcessPreviewRequested() const noexcept
 		{
 			return m_PostProcessPreviewState.m_Requested;

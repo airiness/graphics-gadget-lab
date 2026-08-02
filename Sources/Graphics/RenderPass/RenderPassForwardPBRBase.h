@@ -68,16 +68,19 @@ namespace gglab
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 			const RenderQueue* expectedRenderQueue, bool useDepthEqual,
-			ForwardPBRLightingVariant lightingVariant) noexcept;
+			ForwardPBRLightingVariant lightingVariant,
+			bool gtaoContributionOutputEnabled) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext, const RenderServices& services,
 			const RenderQueue& renderQueue, const DrawItemsRange& range, bool useDepthEqual,
 			const RenderQueue* expectedRenderQueue,
-			ForwardPBRLightingVariant lightingVariant) noexcept;
+			ForwardPBRLightingVariant lightingVariant,
+			bool gtaoContributionOutputEnabled) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
 			const Renderer& renderer, uint64_t variantBits, bool useDepthEqual,
-			ForwardPBRLightingVariant lightingVariant) noexcept;
+			ForwardPBRLightingVariant lightingVariant,
+			bool gtaoContributionOutputEnabled) noexcept;
 
 		std::tuple<RasterizerPreset, DepthPreset, BlendPreset> GetPresetsFromVariantBits(
 			uint64_t variantBits, bool useDepthEqual) const noexcept;
@@ -85,11 +88,13 @@ namespace gglab
 	private:
 		static constexpr size_t LightingVariantCount =
 			static_cast<size_t>(ForwardPBRLightingVariant::Count);
+		static constexpr size_t GTAOContributionVariantCount = 2;
 
 		ForwardPBRPassKind m_PassKind = ForwardPBRPassKind::Opaque;
-		std::array<GraphicsPhysicalPipelineKey, LightingVariantCount> m_BasePhysicalKeys{};
-		std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>,
-			LightingVariantCount> m_PipelineSlots{};
+		std::array<std::array<GraphicsPhysicalPipelineKey, GTAOContributionVariantCount>,
+			LightingVariantCount> m_BasePhysicalKeys{};
+		std::array<std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>,
+			GTAOContributionVariantCount>, LightingVariantCount> m_PipelineSlots{};
 		bool m_HdrDiffValidationAvailable = false;
 		bool m_IsInitialized = false;
 	};

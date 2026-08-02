@@ -63,7 +63,7 @@ namespace gglab
 			uint32_t m_FullHeight = 0;
 			uint32_t m_HalfWidth = 0;
 			uint32_t m_HalfHeight = 0;
-			uint32_t m_Padding0 = 0;
+			float m_Power = 1.0f;
 			uint32_t m_Padding1 = 0;
 			uint32_t m_Padding2 = 0;
 		};
@@ -453,7 +453,7 @@ namespace gglab
 
 		rg.AddPass<UpsamplePassData>(
 			"Lighting.GTAO.Upsample", RGPassEncoderType::Compute,
-			[viewIndex, finalAOFormat](
+			[viewIndex, finalAOFormat, settings](
 				RenderGraph::RGBuilder& builder, UpsamplePassData& data)
 			{
 				auto& blackboard = builder.GetBlackboard();
@@ -487,6 +487,7 @@ namespace gglab
 					.m_FullHeight = resources.m_FullHeight,
 					.m_HalfWidth = resources.m_HalfWidth,
 					.m_HalfHeight = resources.m_HalfHeight,
+					.m_Power = settings.m_Power,
 				};
 			},
 			[this, renderer, &context](RGExecuteContext& executeContext, UpsamplePassData& data)

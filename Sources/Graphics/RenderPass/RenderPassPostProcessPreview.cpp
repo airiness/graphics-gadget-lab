@@ -34,6 +34,8 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAODenoiseX) == 10);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAODenoiseY) == 11);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOFinalAO) == 12);
+		static_assert(static_cast<uint32_t>(
+			PostProcessDebugTap::GTAOAOOnlyLightingContribution) == 13);
 
 		struct PassData
 		{
@@ -77,7 +79,8 @@ namespace gglab
 				tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
 				tap == PostProcessDebugTap::GTAODenoiseX ||
 				tap == PostProcessDebugTap::GTAODenoiseY ||
-				tap == PostProcessDebugTap::GTAOFinalAO;
+				tap == PostProcessDebugTap::GTAOFinalAO ||
+				tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 		}
 
 		RGTextureId ResolveGTAOPreviewSource(
@@ -99,6 +102,8 @@ namespace gglab
 				return resources.m_DenoiseY;
 			case PostProcessDebugTap::GTAOFinalAO:
 				return resources.m_FinalAO;
+			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
+				return resources.m_AOOnlyLightingContribution;
 			default:
 				return {};
 			}
@@ -118,7 +123,12 @@ namespace gglab
 			const auto& gtaoResources =
 				rg.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
 			const RGTextureId source = ResolveGTAOPreviewSource(gtaoResources, selection.m_Tap);
-			if (!source.IsValid() || !registry->ConsumePostProcessPreviewRequest())
+			if (!source.IsValid())
+			{
+				registry->InvalidatePostProcessPreview(selection);
+				return;
+			}
+			if (!registry->ConsumePostProcessPreviewRequest())
 			{
 				return;
 			}

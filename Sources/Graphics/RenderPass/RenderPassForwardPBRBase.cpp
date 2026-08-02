@@ -11,6 +11,7 @@
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
@@ -56,6 +57,7 @@ namespace gglab
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_ShadowMap{};
 			RGTextureId m_GTAOFinalAO{};
+			RGTextureId m_GTAOContribution{};
 			RGTextureId m_LegacyReferenceColor{};
 			RGBufferId m_TileHeaders{};
 			RGBufferId m_TileIndices{};
@@ -64,6 +66,7 @@ namespace gglab
 			RGTextureViewId m_Dsv{};
 			RGTextureViewId m_ShadowSrv{};
 			RGTextureViewId m_GTAOFinalAOSrv{};
+			RGTextureViewId m_GTAOContributionRtv{};
 			RGTextureViewId m_LegacyReferenceRtv{};
 
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
@@ -78,6 +81,7 @@ namespace gglab
 			uint32_t m_ShadowFlags = 0;
 			float m_ShadowReceiverDepthBias = 0.0f;
 			bool m_GTAOEnabled = false;
+			bool m_GTAOContributionOutputEnabled = false;
 		};
 
 		inline constexpr uint32_t GTAOEnabledFlag = 1u;
@@ -122,10 +126,17 @@ namespace gglab
 		const ForwardPBRLightingVariant lightingVariant = ResolveForwardPBRLightingVariant(
 			m_PassKind, context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus,
 			m_HdrDiffValidationAvailable);
+		auto* registry = services.m_Renderer->GetRenderResourceRegistry();
+		GGLAB_ASSERT_NOT_NULL(registry);
+		const bool gtaoContributionRequested = !transparent &&
+			registry->IsPostProcessPreviewRequested() &&
+			registry->GetPostProcessPreviewSelection().m_Tap ==
+				PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[contextPtr, servicesPtr, displayViewId, transparent, lightingVariant](
+			[contextPtr, servicesPtr, displayViewId, transparent, lightingVariant,
+			gtaoContributionRequested](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -170,6 +181,21 @@ namespace gglab
 					data.m_GTAOFinalAOSrv =
 						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_GTAOFinalAO);
 					data.m_GTAOEnabled = true;
+					if (gtaoContributionRequested)
+					{
+						RHITextureDesc contributionDesc = sceneColorDesc;
+						contributionDesc.m_Format = RHIFormat::R16G16B16A16Float;
+						auto& mutableGtao = blackboard.Get<RGGTAOResources>(GTAOResourcesName);
+						mutableGtao.m_AOOnlyLightingContribution = builder.CreateTexture(
+							"GTAO.AOOnlyLightingContribution", contributionDesc);
+						builder.WriteInPlace(mutableGtao.m_AOOnlyLightingContribution,
+							RGTextureAccess::RenderTarget);
+						data.m_GTAOContribution = mutableGtao.m_AOOnlyLightingContribution;
+						data.m_GTAOContributionRtv =
+							builder.CreateView<RHITextureViewType::RenderTarget>(
+								data.m_GTAOContribution);
+						data.m_GTAOContributionOutputEnabled = true;
+					}
 				}
 
 				data.m_Rtv =
@@ -279,7 +305,7 @@ namespace gglab
 
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-				std::array<RHITextureViewHandle, 2> renderTargets{ rtv, {} };
+				std::array<RHITextureViewHandle, 3> renderTargets{ rtv, {}, {} };
 				uint32_t renderTargetCount = 1;
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
@@ -288,11 +314,25 @@ namespace gglab
 						"Forward+ HDR diff requires a legacy reference render target.");
 					renderTargetCount = 2;
 				}
+				if (data.m_GTAOContributionOutputEnabled)
+				{
+					renderTargets[renderTargetCount] =
+						executeContext.GetViewHandle(data.m_GTAOContributionRtv);
+					GGLAB_ASSERT_MSG(renderTargets[renderTargetCount].IsValid(),
+						"GTAO contribution preview requires a render-target view.");
+					++renderTargetCount;
+				}
 				graphicsContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(renderTargets.data(), renderTargetCount), dsv);
+					std::span<const RHITextureViewHandle>(renderTargets.data(), renderTargetCount),
+					dsv);
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
 					graphicsContext->ClearColor(renderTargets[1], { 0.0f, 0.0f, 0.0f, 1.0f });
+				}
+				if (data.m_GTAOContributionOutputEnabled)
+				{
+					graphicsContext->ClearColor(
+						renderTargets[renderTargetCount - 1], { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				if (data.m_ClearDepth)
 				{
@@ -361,7 +401,8 @@ namespace gglab
 				}
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(*renderer,
 					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
-					data.m_UseDepthEqual, data.m_LightingVariant));
+					data.m_UseDepthEqual, data.m_LightingVariant,
+					data.m_GTAOContributionOutputEnabled));
 
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 				GGLAB_ASSERT_MSG(
@@ -441,7 +482,8 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
 				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId,
-					data.m_ExpectedRenderQueue, data.m_UseDepthEqual, data.m_LightingVariant);
+					data.m_ExpectedRenderQueue, data.m_UseDepthEqual, data.m_LightingVariant,
+					data.m_GTAOContributionOutputEnabled);
 			});
 	}
 
@@ -462,7 +504,7 @@ namespace gglab
 
 			// Pipeline recipe
 			auto& legacyKey =
-				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)];
+				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)][0];
 			legacyKey.m_BindingLayout = renderer->GetCommonBindingLayout();
 			legacyKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 			legacyKey.m_VSId = shaderSet.m_CoverageVertexShader;
@@ -490,18 +532,35 @@ namespace gglab
 					"Forward+ opaque shading requires its pass-specific binding layout.");
 
 				auto& forwardPlusKey = m_BasePhysicalKeys[
-					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlus)];
+					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlus)][0];
 				forwardPlusKey = legacyKey;
 				forwardPlusKey.m_BindingLayout = forwardPlusBindingLayout;
 				forwardPlusKey.m_PSId = shaderSet.m_ForwardPlusShadingPixelShader;
 
 				auto& validationKey = m_BasePhysicalKeys[
-					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlusValidation)];
+					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlusValidation)][0];
 				validationKey = forwardPlusKey;
 				validationKey.m_PSId = shaderSet.m_ForwardPlusValidationPixelShader;
 				validationKey.m_Formats.m_RenderTargetFormats[1] =
 					RHIFormat::R16G16B16A16Float;
 				validationKey.m_Formats.m_RenderTargetCount = 2;
+
+				const ShaderID contributionShaders[] = {
+					shaderSet.m_LegacyGTAOContributionPixelShader,
+					shaderSet.m_ForwardPlusGTAOContributionPixelShader,
+					shaderSet.m_ForwardPlusValidationGTAOContributionPixelShader,
+				};
+				for (size_t lightingIndex = 0; lightingIndex < LightingVariantCount; ++lightingIndex)
+				{
+					auto& contributionKey = m_BasePhysicalKeys[lightingIndex][1];
+					contributionKey = m_BasePhysicalKeys[lightingIndex][0];
+					contributionKey.m_PSId = contributionShaders[lightingIndex];
+					const uint32_t targetIndex =
+						contributionKey.m_Formats.m_RenderTargetCount;
+					contributionKey.m_Formats.m_RenderTargetFormats[targetIndex] =
+						RHIFormat::R16G16B16A16Float;
+					++contributionKey.m_Formats.m_RenderTargetCount;
+				}
 			}
 
 			m_IsInitialized = true;
@@ -511,7 +570,7 @@ namespace gglab
 	void RenderPassForwardPBRBase::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 		const RenderQueue* expectedRenderQueue, bool useDepthEqual,
-		ForwardPBRLightingVariant lightingVariant) noexcept
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		const auto& renderQueue = context.GetRenderQueue(viewId);
@@ -527,7 +586,7 @@ namespace gglab
 		{
 			DrawRange(graphicsContext, services, renderQueue,
 				ranges[utils::ToIndex(RenderBucket::Transparent)], false, expectedRenderQueue,
-				lightingVariant);
+				lightingVariant, gtaoContributionOutputEnabled);
 			return;
 		}
 
@@ -540,14 +599,14 @@ namespace gglab
 			}
 			DrawRange(
 				graphicsContext, services, renderQueue, range, useDepthEqual, expectedRenderQueue,
-				lightingVariant);
+				lightingVariant, gtaoContributionOutputEnabled);
 		}
 	}
 
 	void RenderPassForwardPBRBase::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services, const RenderQueue& renderQueue, const DrawItemsRange& range,
 		bool useDepthEqual, const RenderQueue* expectedRenderQueue,
-		ForwardPBRLightingVariant lightingVariant) noexcept
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -580,7 +639,8 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					*services.m_Renderer, drawItem.m_VariantBits, useDepthEqual, lightingVariant));
+					*services.m_Renderer, drawItem.m_VariantBits, useDepthEqual, lightingVariant,
+					gtaoContributionOutputEnabled));
 
 				lastVariantBits = drawItem.m_VariantBits;
 			}
@@ -607,7 +667,7 @@ namespace gglab
 
 	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
 		const Renderer& renderer, uint64_t variantBits, bool useDepthEqual,
-		ForwardPBRLightingVariant lightingVariant) noexcept
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 		auto* pipelineCache = renderer.GetPipelineCache();
@@ -615,10 +675,11 @@ namespace gglab
 
 		const size_t lightingVariantIndex = static_cast<size_t>(lightingVariant);
 		GGLAB_ASSERT(lightingVariantIndex < LightingVariantCount);
+		const size_t contributionVariantIndex = gtaoContributionOutputEnabled ? 1u : 0u;
 		GraphicsPipelineDescription description{
-			.m_PhysicalKey = m_BasePhysicalKeys[lightingVariantIndex],
+			.m_PhysicalKey = m_BasePhysicalKeys[lightingVariantIndex][contributionVariantIndex],
 			.m_LogicalMetadata = BuildLogicalPipelineMetadataForVariant(
-				m_BasePhysicalKeys[lightingVariantIndex], variantBits),
+				m_BasePhysicalKeys[lightingVariantIndex][contributionVariantIndex], variantBits),
 		};
 		auto [rasterizerPreset, depthPreset, blendPreset] =
 			GetPresetsFromVariantBits(variantBits, useDepthEqual);
@@ -627,7 +688,8 @@ namespace gglab
 		description.m_PhysicalKey.m_BlendPreset = blendPreset;
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
-		auto& slot = m_PipelineSlots[lightingVariantIndex][slotIndex];
+		auto& slot =
+			m_PipelineSlots[lightingVariantIndex][contributionVariantIndex][slotIndex];
 		return pipelineCache->Resolve(slot, description.m_PhysicalKey, GetInfo());
 	}
 
@@ -672,7 +734,7 @@ namespace gglab
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 
 		GraphicsPhysicalPipelineKey physicalKey =
-			m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)];
+			m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)][0];
 		auto [rasterizerPreset, depthPreset, blendPreset] =
 			GetPresetsFromVariantBits(variantBits, true);
 		physicalKey.m_RasterizerPreset = rasterizerPreset;

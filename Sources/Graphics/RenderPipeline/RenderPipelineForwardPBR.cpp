@@ -87,12 +87,22 @@ namespace gglab
 		const bool forwardPlusValidationEnabled =
 			forwardPlusActive && forwardPlusSettings.m_EnableHdrDiffValidation &&
 			m_ForwardPlusValidationPass.IsAvailable();
-		const bool gtaoEnabled =
-			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled;
+		const GTAOSettings& gtaoSettings =
+			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO;
+		m_GTAOPass.Prepare(services);
+		const GTAOFrameStatus gtaoStatus = ResolveGTAOFrameStatus(gtaoSettings.m_Enabled,
+			m_GTAOPass.GetCapabilityStatus().IsCoreAvailable(), m_GTAOPass.IsAvailable(),
+			context.IsRenderSceneReady(), depthCoverageFramePlan.UsesDepthPrepassEqual(),
+			depthCoverageFramePlan.m_HasDepthCoverageDraws);
+		const bool gtaoActive = gtaoStatus == GTAOFrameStatus::Active;
 
 		auto& forwardPlusResources =
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);
-		rg.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
+		auto& gtaoResources =
+			rg.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
+		gtaoResources.m_Status = gtaoStatus;
+		gtaoResources.m_Capabilities = m_GTAOPass.GetCapabilityStatus();
+		gtaoResources.m_ResolvedSettings = gtaoSettings;
 		forwardPlusResources.m_Status = forwardPlusStatus;
 		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
 		forwardPlusResources.m_LightTableCapacity = context.m_RenderScene.m_LightCount;
@@ -109,10 +119,6 @@ namespace gglab
 		if (forwardPlusValidationEnabled)
 		{
 			m_ForwardPlusValidationPass.Prepare(services);
-		}
-		if (gtaoEnabled)
-		{
-			m_GTAOPass.Prepare(services);
 		}
 		if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
@@ -266,7 +272,7 @@ namespace gglab
 			{
 				m_ForwardPlusCullPass.AddPass(rg, context, services);
 			}
-			if (gtaoEnabled && context.IsRenderSceneReady())
+			if (gtaoActive)
 			{
 				m_GTAOPass.AddPass(rg, context, services);
 			}
@@ -374,6 +380,27 @@ namespace gglab
 				.m_Value = L"1",
 				});
 			m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
+				shaderManager->LoadShader(shaderDesc);
+
+			shaderDesc.m_Defines = {
+				{
+					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
+					.m_Value = L"1",
+				},
+			};
+			m_ForwardPBRShaderSet.m_LegacyGTAOContributionPixelShader =
+				shaderManager->LoadShader(shaderDesc);
+			shaderDesc.m_Defines.push_back({
+				.m_Name = L"GGLAB_FORWARD_PLUS",
+				.m_Value = L"1",
+				});
+			m_ForwardPBRShaderSet.m_ForwardPlusGTAOContributionPixelShader =
+				shaderManager->LoadShader(shaderDesc);
+			shaderDesc.m_Defines.push_back({
+				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
+				.m_Value = L"1",
+				});
+			m_ForwardPBRShaderSet.m_ForwardPlusValidationGTAOContributionPixelShader =
 				shaderManager->LoadShader(shaderDesc);
 
 			shaderDesc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";

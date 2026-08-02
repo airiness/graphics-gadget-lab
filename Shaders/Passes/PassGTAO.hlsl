@@ -52,7 +52,7 @@ struct GTAOUpsamplePassParameters
 	uint FullHeight;
 	uint HalfWidth;
 	uint HalfHeight;
-	uint Padding0;
+	float Power;
 	uint Padding1;
 	uint Padding2;
 };
@@ -74,8 +74,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	Texture2D<float> fullDepth = GetTexture2DFloat(g_Pass.FullDepthIndex);
 	RWTexture2D<float> finalAO = GetRWTexture2DFloat(g_Pass.FinalAOUavIndex);
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
-	finalAO[fullPixel] = UpsampleGTAO(denoisedAO, halfDepth, fullDepth, fullPixel,
+	const float visibility = UpsampleGTAO(denoisedAO, halfDepth, fullDepth, fullPixel,
 		fullExtent, uint2(g_Pass.HalfWidth, g_Pass.HalfHeight), g_Views[viewIndex]);
+	finalAO[fullPixel] = ApplyGTAOPower(visibility, g_Pass.Power);
 }
 
 #else

@@ -28,6 +28,7 @@ static const uint PREVIEW_SOURCE_GTAO_SELECTED_SURFACE_OFFSET = 9;
 static const uint PREVIEW_SOURCE_GTAO_DENOISE_X = 10;
 static const uint PREVIEW_SOURCE_GTAO_DENOISE_Y = 11;
 static const uint PREVIEW_SOURCE_GTAO_FINAL_AO = 12;
+static const uint PREVIEW_SOURCE_GTAO_AO_ONLY_LIGHTING_CONTRIBUTION = 13;
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {

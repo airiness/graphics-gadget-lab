@@ -10,6 +10,7 @@ namespace gglab
 	class TaskSystem;
 	class World;
 	class RenderGraph;
+	struct ViewRenderProfile;
 
 	struct SnapshotContext
 	{
@@ -21,5 +22,8 @@ namespace gglab
 		RenderGraph* m_RenderGraph = nullptr;
 		std::span<RenderView> m_RenderViews;
 		RenderView* m_MainRenderView = nullptr;
+		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
+		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
+		bool m_GTAOOverrideActive = false;
 	};
 }
