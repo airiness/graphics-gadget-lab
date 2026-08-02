@@ -45,6 +45,7 @@ namespace gglab
 		Model,
 		Texture,
 		Mesh,
+		RuntimeMesh,
 	};
 
 	struct AssetStreamingIdentity
@@ -67,6 +68,7 @@ namespace gglab
 			return AssetKind::Texture;
 		case AssetStreamingWorkKind::Mesh:
 			return AssetKind::Mesh;
+		case AssetStreamingWorkKind::RuntimeMesh:
 		case AssetStreamingWorkKind::Unknown:
 			return AssetKind::Unknown;
 		}

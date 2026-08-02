@@ -9,6 +9,7 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
+#include "Application/Lab/Sessions/NapaVoxelLabSession.h"
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
@@ -81,6 +82,10 @@ namespace gglab
 			EnvironmentAssetLabSession::GetDescriptor(), &EnvironmentAssetLabSession::Create);
 		GGLAB_ASSERT_MSG(
 			environmentAssetRegistered, "Failed to register the Environment Asset Lab session.");
+
+		const bool napaVoxelRegistered = m_Runtime.RegisterLab(
+			NapaVoxelLabSession::GetDescriptor(), &NapaVoxelLabSession::Create);
+		GGLAB_ASSERT_MSG(napaVoxelRegistered, "Failed to register the Napa Voxel Lab session.");
 	}
 
 	void DemoLabHost::BeginPrepare() noexcept

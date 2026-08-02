@@ -149,6 +149,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMesherSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMultiChunkSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelPrimitiveSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelRestoreSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelStorageSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.cpp" />
@@ -312,6 +313,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderPass.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderState.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\EnvironmentAssetLabSession.cpp" />
@@ -319,6 +323,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
@@ -626,6 +631,9 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderPass.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderState.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetResidencyLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\EnvironmentAssetLabSession.h" />
@@ -635,6 +643,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\CullingLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MathFoundationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h" />
@@ -866,6 +875,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />

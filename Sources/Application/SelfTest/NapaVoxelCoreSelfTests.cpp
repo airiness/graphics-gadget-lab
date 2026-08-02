@@ -45,5 +45,6 @@ namespace gglab
 		RunNapaVoxelMesherSelfTests(context);
 		RunNapaVoxelMultiChunkSelfTests(context);
 		RunNapaVoxelGGLabAdapterSelfTests(context);
+		RunNapaVoxelPublicationSelfTests(context);
 	}
 }

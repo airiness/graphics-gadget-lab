@@ -9,6 +9,7 @@ namespace gglab
 	void RunNapaVoxelMesherSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelMultiChunkSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelPrimitiveSelfTests(SelfTestContext& context) noexcept;
+	void RunNapaVoxelPublicationSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelRestoreSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelStorageSelfTests(SelfTestContext& context) noexcept;
 }
