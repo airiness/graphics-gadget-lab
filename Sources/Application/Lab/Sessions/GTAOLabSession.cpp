@@ -16,6 +16,7 @@ namespace gglab
 {
 	namespace
 	{
+		const LabParameterId EnabledId("gtao.enabled");
 		const LabParameterId PreviewTapId("gtao.preview_tap");
 		const LabParameterId FinalAOFormatId("gtao.final_ao_format");
 		const LabParameterId EnableCameraInputId("gtao.camera.enable_input");
@@ -24,12 +25,15 @@ namespace gglab
 		const LabParameterId FarPlaneId("gtao.camera.far");
 
 		components::MaterialInstanceComponent MakeMaterial(
-			std::string_view key, const Color& color, float roughness = 0.7f) noexcept
+			std::string_view key, const Color& color, float roughness = 0.7f,
+			float metallic = 0.0f, const Color& emissive = Color::Black) noexcept
 		{
 			components::MaterialInstanceComponent material{};
 			material.m_Key = RuntimeMaterialKey(key);
 			material.m_Properties.m_BaseColor = color;
 			material.m_Properties.m_RoughnessFactor = roughness;
+			material.m_Properties.m_MetallicFactor = metallic;
+			material.m_Properties.m_EmissiveColor = emissive;
 			return material;
 		}
 	}
@@ -43,6 +47,14 @@ namespace gglab
 		profile.m_PostProcess.m_Bloom.m_Enabled = false;
 
 		auto& parameters = GetMutableParameters();
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = EnabledId,
+			.m_Name = "Enabled",
+			.m_Group = "GTAO",
+			.m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = true,
+			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = PreviewTapId,
 			.m_Name = "Preview",
@@ -196,6 +208,8 @@ namespace gglab
 	void GTAOLabSession::ApplyImmediateParameters() noexcept
 	{
 		const auto& parameters = GetParameters();
+		GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_Enabled =
+			parameters.Get(EnabledId, true);
 		m_SelectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
 			PreviewTapId, int32_t(PostProcessDebugTap::GTAOFinalAO)));
 		GetMutableViewRenderProfile().m_Lighting.m_GTAO.m_FinalAOFormatPreference =
@@ -264,6 +278,29 @@ namespace gglab
 		const entt::entity tieRight = createCube("gglab.lab.gtao.tie_right",
 			Vector3(0.65f, 0.1f, 5.5f), Vector3(0.65f, 1.2f, 0.08f),
 			Color(0.22f, 0.68f, 0.46f, 1.0f));
+		const entt::entity emissiveControl = primitive::Cube::Create({
+			.m_AssetManager = m_Services.m_AssetManager,
+			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_World = &m_World,
+			.m_Transform = components::TransformComponent{
+				.m_Position = Vector3(-3.0f, -0.3f, 4.8f),
+				.m_Scale = Vector3(0.55f, 0.55f, 0.55f),
+				},
+			.m_MaterialInstance = MakeMaterial("gglab.lab.gtao.emissive_control",
+				Color(0.03f, 0.03f, 0.03f, 1.0f), 0.7f, 0.0f,
+				Color(2.0f, 0.4f, 0.08f, 1.0f)),
+			});
+		const entt::entity specularControl = primitive::Cube::Create({
+			.m_AssetManager = m_Services.m_AssetManager,
+			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_World = &m_World,
+			.m_Transform = components::TransformComponent{
+				.m_Position = Vector3(4.0f, -0.25f, 8.2f),
+				.m_Scale = Vector3(0.65f, 0.65f, 0.65f),
+				},
+			.m_MaterialInstance = MakeMaterial("gglab.lab.gtao.specular_control",
+				Color(0.85f, 0.88f, 0.92f, 1.0f), 0.05f, 1.0f),
+			});
 
 		components::TransformComponent sphereTransform{};
 		sphereTransform.m_Position = Vector3(1.4f, -0.1f, 8.0f);
@@ -277,8 +314,8 @@ namespace gglab
 				"gglab.lab.gtao.silhouette", Color(0.72f, 0.18f, 0.22f, 1.0f), 0.35f),
 			});
 
-		const entt::entity fixtures[] = {
-			floor, cornerWall, thinSlab, edgeSlab, tieLeft, tieRight, sphere };
+		const entt::entity fixtures[] = { floor, cornerWall, thinSlab, edgeSlab, tieLeft,
+			tieRight, emissiveControl, specularControl, sphere };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
 			{
 				return registry.valid(entity) &&
@@ -344,6 +381,10 @@ namespace gglab
 				.m_Value = std::format("{} x {}", halfExtent.m_Width, halfExtent.m_Height)},
 			{.m_Name = "Evaluate kernel", .m_Value = "2 directions x 4 steps"},
 			{.m_Name = "Denoise kernel", .m_Value = "separable bilateral, radius 3"},
+			{.m_Name = "PBR integration",
+				.m_Value = GetViewRenderProfile().m_Lighting.m_GTAO.m_Enabled
+					? "indirect diffuse"
+					: "neutral disabled path"},
 		};
 		diagnostics.m_Checks = {
 			{
@@ -351,8 +392,8 @@ namespace gglab
 				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
 				.m_Detail =
-					"Plane, corner, thin and screen-edge slabs, silhouette, background, and "
-					"coplanar tie surfaces are configured.",
+					"Plane, corner, thin and screen-edge slabs, silhouette, emissive and "
+					"specular controls, background, and coplanar tie surfaces are configured.",
 			},
 			{
 				.m_Name = "Half-resolution contract",

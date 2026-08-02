@@ -4,6 +4,7 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/MaterialUtils.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
+#include <Lighting/AmbientOcclusion.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
 #include <PBR/BRDF.hlsli>
@@ -22,7 +23,8 @@ struct ForwardPBRPassParameters
 	uint ForwardPlusGlobalLightCount;
 	uint2 ForwardPlusGlobalLightIndices01;
 	uint2 ForwardPlusGlobalLightIndices23;
-	uint2 Padding;
+	uint GTAOTextureIndex;
+	uint GTAOFlags;
 };
 
 ConstantBuffer<ForwardPBRPassParameters> g_Pass : register(b2);
@@ -61,6 +63,7 @@ static const uint MaterialDebugViewBaseColor = 1u;
 static const uint MaterialDebugViewMetallic = 2u;
 static const uint MaterialDebugViewRoughness = 3u;
 static const uint MaterialDebugViewNormal = 4u;
+static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
 {
@@ -70,6 +73,16 @@ bool IsShadowEnabled()
 bool IsShadowPCFEnabled()
 {
 	return (g_Pass.ShadowFlags & 2u) != 0u;
+}
+
+float LoadGTAO(uint2 pixel)
+{
+	if ((g_Pass.GTAOFlags & GTAOEnabledFlag) == 0u)
+	{
+		return 1.0;
+	}
+	Texture2D<float> gtaoTexture = GetTexture2DFloat(g_Pass.GTAOTextureIndex);
+	return saturate(gtaoTexture.Load(int3(pixel, 0)));
 }
 
 // Sample normal map and compute perturbed normal in world space
@@ -424,15 +437,18 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		SampleTextureBinding(matData.OcclusionBinding.TextureSamplerBinding, occlusionUV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
+	const float gtao = LoadGTAO(uint2(IN.PositionCS.xy));
+	diffuseIBL *= ResolveDiffuseIBLVisibility(ao, gtao);
+	specularIBL *= ResolveSpecularIBLVisibility(ao);
 
 	float3 outputLighting = directLighting;
 	outputLighting += emissive;
-	outputLighting += (diffuseIBL + specularIBL) * ao;
+	outputLighting += diffuseIBL + specularIBL;
 	const float4 outputColor = float4(SanitizeHDRColor(outputLighting), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	float3 legacyOutputLighting = legacyDirectLighting;
 	legacyOutputLighting += emissive;
-	legacyOutputLighting += (diffuseIBL + specularIBL) * ao;
+	legacyOutputLighting += diffuseIBL + specularIBL;
 	const float4 legacyColor = float4(SanitizeHDRColor(legacyOutputLighting), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor);
 #else

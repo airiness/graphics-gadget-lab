@@ -820,6 +820,7 @@
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
+    <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />

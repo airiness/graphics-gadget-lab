@@ -15,11 +15,11 @@ namespace gglab
 	public:
 		RenderPassGTAO() noexcept :
 			RenderPassBase({
-				  .m_TypeName = "Lighting.GTAO.Evaluate",
-				  .m_DisplayName = "GTAO Evaluate",
+				  .m_TypeName = "Lighting.GTAO",
+				  .m_DisplayName = "GTAO",
 				  .m_CategoryName = "Lighting",
 				  .m_Description =
-					  "Evaluates deterministic half-resolution ambient occlusion from display depth.",
+					  "Evaluates, denoises, and upsamples ambient occlusion from display depth.",
 				  .m_Category = RenderPassCategory::Lighting,
 				  .m_Type = RenderPassType::Compute,
 				})
