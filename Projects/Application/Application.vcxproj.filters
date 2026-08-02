@@ -1790,6 +1790,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>

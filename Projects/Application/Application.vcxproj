@@ -682,6 +682,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessColor.h" />
     <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessDebug.h" />
