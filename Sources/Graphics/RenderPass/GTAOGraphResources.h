@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Graphics/Pipeline/GTAO.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>
@@ -18,7 +19,10 @@ namespace gglab
 		RGTextureId m_FinalAO{};
 		RGTextureId m_ReconstructedNormal{};
 		RGTextureId m_SelectedSurfaceOffset{};
+		RGTextureId m_AOOnlyLightingContribution{};
 		GTAOCapabilityStatus m_Capabilities{};
+		GTAOSettings m_ResolvedSettings{};
+		GTAOFrameStatus m_Status = GTAOFrameStatus::Disabled;
 		RHIFormat m_FinalAOFormat = RHIFormat::Unknown;
 		uint32_t m_FullWidth = 0;
 		uint32_t m_FullHeight = 0;

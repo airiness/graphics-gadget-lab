@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
+#include "DevTools/DevToolsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -826,6 +827,14 @@ namespace gglab
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
 			desc.m_Defines = {
 				{
+					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
+					.m_Value = L"1",
+				},
+			};
+			const ShaderCompileArtifact legacyGTAOContributionPixelArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines = {
+				{
 					.m_Name = L"GGLAB_FORWARD_PLUS",
 					.m_Value = L"1",
 				},
@@ -833,10 +842,23 @@ namespace gglab
 			const ShaderCompileArtifact forwardPlusPixelArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
 			desc.m_Defines.push_back({
+				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
+				.m_Value = L"1",
+				});
+			const ShaderCompileArtifact forwardPlusGTAOContributionPixelArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines.pop_back();
+			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
 				.m_Value = L"1",
 				});
 			const ShaderCompileArtifact forwardPlusValidationPixelArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			desc.m_Defines.push_back({
+				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
+				.m_Value = L"1",
+				});
+			const ShaderCompileArtifact forwardPlusValidationGTAOContributionPixelArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
 			desc.m_Defines.clear();
 			desc.m_SourcePath = L"Passes/PassSkybox.hlsl";
@@ -849,11 +871,14 @@ namespace gglab
 			const ShaderCompileArtifact skyboxPixelArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
 			context.Check(legacyForwardPixelArtifact.m_Binary.IsValid() &&
+				legacyGTAOContributionPixelArtifact.m_Binary.IsValid() &&
 				forwardPlusPixelArtifact.m_Binary.IsValid() &&
+				forwardPlusGTAOContributionPixelArtifact.m_Binary.IsValid() &&
 				forwardPlusValidationPixelArtifact.m_Binary.IsValid() &&
+				forwardPlusValidationGTAOContributionPixelArtifact.m_Binary.IsValid() &&
 				skyboxVertexArtifact.m_Binary.IsValid() &&
 				skyboxPixelArtifact.m_Binary.IsValid(),
-				"Production DXC compiles Legacy, Forward+, HDR-diff Forward shading, and the background-depth Skybox");
+				"Production DXC compiles Legacy, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
@@ -1620,11 +1645,31 @@ namespace gglab
 				ResolveGTAODiffuseIBLVisibility(0.5f, 1.0f) == 0.5f,
 				"GTAO modulates material-occluded diffuse IBL without changing specular IBL visibility");
 
+			context.Check(
+				ResolveGTAOFrameStatus(false, false, false, false, false, false) ==
+					GTAOFrameStatus::Disabled &&
+				ResolveGTAOFrameStatus(true, false, false, false, false, false) ==
+					GTAOFrameStatus::CoreCapabilityUnavailable &&
+				ResolveGTAOFrameStatus(true, true, false, false, false, false) ==
+					GTAOFrameStatus::PipelineUnavailable &&
+				ResolveGTAOFrameStatus(true, true, true, false, false, false) ==
+					GTAOFrameStatus::RenderSceneUnavailable &&
+				ResolveGTAOFrameStatus(true, true, true, true, false, false) ==
+					GTAOFrameStatus::DepthCoverageUnavailable &&
+				ResolveGTAOFrameStatus(true, true, true, true, true, false) ==
+					GTAOFrameStatus::NoOpaqueDraws &&
+				ResolveGTAOFrameStatus(true, true, true, true, true, true) ==
+					GTAOFrameStatus::Active,
+				"GTAO frame status preserves deterministic disabled, fallback, idle, and active causes");
+
 			ViewRenderProfile gtaoProfile{};
+			context.Check(gtaoProfile.m_Lighting.m_GTAO.m_Enabled,
+				"GTAO is enabled by the active-view authoring default");
 			gtaoProfile.m_Lighting.m_GTAO.m_Radius = -1.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_FalloffStart = 99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_FalloffEnd = -99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_Thickness = 99.0f;
+			gtaoProfile.m_Lighting.m_GTAO.m_Power = 99.0f;
 			gtaoProfile.m_Lighting.m_GTAO.m_DirectionCount = 0;
 			gtaoProfile.m_Lighting.m_GTAO.m_StepCount = 99;
 			gtaoProfile.m_Lighting.m_GTAO.m_DenoiseRadius = 99;
@@ -1635,10 +1680,32 @@ namespace gglab
 				resolvedGTAO.m_FalloffStart == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_FalloffEnd == resolvedGTAO.m_Radius &&
 				resolvedGTAO.m_Thickness == resolvedGTAO.m_Radius &&
+				resolvedGTAO.m_Power == 8.0f &&
 				resolvedGTAO.m_DirectionCount == 1 &&
 				resolvedGTAO.m_StepCount == GTAOMaxStepCount &&
 				resolvedGTAO.m_DenoiseRadius == GTAOMaxDenoiseRadius,
 				"GTAO authoring inputs resolve to bounded deterministic spatial settings");
+
+			ViewRenderProfile activeProfile{};
+			activeProfile.m_Lighting.m_GTAO.m_Enabled = false;
+			activeProfile.m_Lighting.m_GTAO.m_Radius = 0.75f;
+			DevToolsRuntime devTools;
+			const ViewRenderProfile profileWithoutOverride =
+				devTools.ResolveViewRenderProfile(activeProfile);
+			auto& gtaoOverride = devTools.GetViewRenderSettingsOverrides().m_GTAO;
+			gtaoOverride.m_Settings = activeProfile.m_Lighting.m_GTAO;
+			gtaoOverride.m_Settings.m_Enabled = true;
+			gtaoOverride.m_Settings.m_Radius = 2.5f;
+			gtaoOverride.m_IsActive = true;
+			const ViewRenderProfile profileWithOverride =
+				devTools.ResolveViewRenderProfile(activeProfile);
+			context.Check(!profileWithoutOverride.m_Lighting.m_GTAO.m_Enabled &&
+				profileWithoutOverride.m_Lighting.m_GTAO.m_Radius == 0.75f &&
+				profileWithOverride.m_Lighting.m_GTAO.m_Enabled &&
+				profileWithOverride.m_Lighting.m_GTAO.m_Radius == 2.5f &&
+				!activeProfile.m_Lighting.m_GTAO.m_Enabled &&
+				activeProfile.m_Lighting.m_GTAO.m_Radius == 0.75f,
+				"GTAO DevTools override is explicit and does not mutate the active authoring profile");
 			RunShaderCompileContractTests(context);
 		}
 

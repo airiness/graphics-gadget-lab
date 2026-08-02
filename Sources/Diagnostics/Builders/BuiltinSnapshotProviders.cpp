@@ -3,6 +3,7 @@
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
+#include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
@@ -15,6 +16,7 @@
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
+#include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
@@ -178,6 +180,34 @@ namespace gglab
 			}
 		};
 
+		class GTAODiagnosticsSnapshotProvider final
+			: public SnapshotProvider<GTAODiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "GTAO Diagnostics";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<GTAODiagnosticsSnapshot>();
+				if (!context.m_Renderer || !context.m_RenderGraph)
+				{
+					snapshot = {};
+					return;
+				}
+				const GTAOSettings* authoringSettings = context.m_AuthoringViewRenderProfile
+					? &context.m_AuthoringViewRenderProfile->m_Lighting.m_GTAO
+					: nullptr;
+				const GTAOSettings* requestedSettings = context.m_EffectiveViewRenderProfile
+					? &context.m_EffectiveViewRenderProfile->m_Lighting.m_GTAO
+					: nullptr;
+				snapshot = BuildGTAODiagnosticsSnapshot(*context.m_Renderer,
+					*context.m_RenderGraph, authoringSettings, requestedSettings,
+					context.m_GTAOOverrideActive);
+			}
+		};
+
 		class TransientResourcePoolSnapshotProvider final
 			: public SnapshotProvider<TransientResourcePoolSnapshot>
 		{
@@ -294,6 +324,8 @@ namespace gglab
 		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<GTAODiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);

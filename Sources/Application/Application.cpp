@@ -359,13 +359,17 @@ namespace gglab
 
 		auto& shadowVisualizationSettings =
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
+		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
+		const ViewRenderProfile effectiveViewRenderProfile =
+			m_DevelopGuiSystem->GetDevToolsRuntime().ResolveViewRenderProfile(
+				authoringViewRenderProfile);
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
 			.m_Renderer = *m_Renderer,
 			.m_AssetManager = *m_AssetManager,
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
-			.m_ViewRenderProfile = demo->GetViewRenderProfile(),
+			.m_ViewRenderProfile = effectiveViewRenderProfile,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 			.m_BackBufferIndex = backBufferIndex,
@@ -422,6 +426,8 @@ namespace gglab
 			guiContext.m_RenderViews = std::span<RenderView>(frame.m_RenderViews);
 			guiContext.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues);
 			guiContext.m_MainRenderView = &frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)];
+			guiContext.m_AuthoringViewRenderProfile = &authoringViewRenderProfile;
+			guiContext.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile;
 			guiContext.m_AssetManager = m_AssetManager.get();
 			guiContext.m_EnvironmentAssetController = m_EnvironmentAssetController.get();
 			guiContext.m_RenderGraph = &rg;

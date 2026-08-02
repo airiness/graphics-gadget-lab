@@ -43,6 +43,8 @@ namespace gglab
 				return "GTAO / Denoise Y";
 			case PostProcessDebugTap::GTAOFinalAO:
 				return "GTAO / Final AO";
+			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
+				return "GTAO / AO-only Lighting Contribution";
 			default:
 				return "Unknown";
 			}
@@ -67,6 +69,7 @@ namespace gglab
 					PostProcessDebugTap::GTAODenoiseX,
 					PostProcessDebugTap::GTAODenoiseY,
 					PostProcessDebugTap::GTAOFinalAO,
+					PostProcessDebugTap::GTAOAOOnlyLightingContribution,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -199,7 +202,8 @@ namespace gglab
 			selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
 			selection.m_Tap == PostProcessDebugTap::GTAODenoiseX ||
 			selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
-			selection.m_Tap == PostProcessDebugTap::GTAOFinalAO;
+			selection.m_Tap == PostProcessDebugTap::GTAOFinalAO ||
+			selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",

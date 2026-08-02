@@ -57,6 +57,7 @@ namespace gglab
 		float m_FalloffStart = 0.1f;
 		float m_FalloffEnd = 1.0f;
 		float m_Thickness = 0.25f;
+		float m_Power = 1.0f;
 		uint32_t m_DirectionCount = 2;
 		uint32_t m_StepCount = 4;
 		uint32_t m_DenoiseRadius = 3;

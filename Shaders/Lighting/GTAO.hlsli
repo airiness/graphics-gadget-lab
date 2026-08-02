@@ -5,6 +5,11 @@
 static const uint GTAO_MAX_DIRECTION_COUNT = 8;
 static const uint GTAO_MAX_STEP_COUNT = 8;
 
+float ApplyGTAOPower(float visibility, float power)
+{
+	return pow(saturate(visibility), max(power, 0.1));
+}
+
 struct GTAOSurface
 {
 	uint2 FullPixel;

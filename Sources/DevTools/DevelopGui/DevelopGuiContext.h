@@ -18,6 +18,8 @@ namespace gglab
 	class DiagnosticsRuntime;
 	class DevelopGuiSystem;
 	class DebugDrawSystem;
+	struct ViewRenderProfile;
+	struct ViewRenderSettingsOverrides;
 
 	class DevelopGuiStateStore;
 
@@ -39,6 +41,9 @@ namespace gglab
 		DebugDrawFrameView m_DebugDrawFrame{};
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
+		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
+		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
+		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 
 		DevelopGuiStateStore* m_StateStore = nullptr;

@@ -21,6 +21,7 @@ namespace gglab
 		gtao.m_FalloffEnd = std::clamp(gtao.m_FalloffEnd, gtao.m_FalloffStart,
 			std::max(gtao.m_Radius, gtao.m_FalloffStart));
 		gtao.m_Thickness = std::clamp(gtao.m_Thickness, 0.0f, gtao.m_Radius);
+		gtao.m_Power = std::clamp(gtao.m_Power, 0.1f, 8.0f);
 		gtao.m_DirectionCount = std::clamp(gtao.m_DirectionCount, 1u, GTAOMaxDirectionCount);
 		gtao.m_StepCount = std::clamp(gtao.m_StepCount, 1u, GTAOMaxStepCount);
 		gtao.m_DenoiseRadius = std::clamp(gtao.m_DenoiseRadius, 1u, GTAOMaxDenoiseRadius);

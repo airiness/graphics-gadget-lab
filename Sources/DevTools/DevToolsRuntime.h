@@ -1,6 +1,7 @@
 #pragma once
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
+#include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/ShadowSettings.h"
 
 namespace gglab
@@ -11,6 +12,17 @@ namespace gglab
 	struct RenderVisualizationSettings
 	{
 		ShadowVisualizationSettings m_Shadow;
+	};
+
+	struct GTAOSettingsOverride
+	{
+		GTAOSettings m_Settings{};
+		bool m_IsActive = false;
+	};
+
+	struct ViewRenderSettingsOverrides
+	{
+		GTAOSettingsOverride m_GTAO{};
 	};
 
 	class DevToolsRuntime
@@ -30,11 +42,18 @@ namespace gglab
 		{
 			return m_RenderVisualizationSettings;
 		}
+		ViewRenderSettingsOverrides& GetViewRenderSettingsOverrides() noexcept
+		{
+			return m_ViewRenderSettingsOverrides;
+		}
+		[[nodiscard]] ViewRenderProfile ResolveViewRenderProfile(
+			const ViewRenderProfile& authoringProfile) const noexcept;
 
 	private:
 		DevelopGuiRegistry m_Registry;
 		DiagnosticsRuntime m_Diagnostics;
 		RenderVisualizationSettings m_RenderVisualizationSettings{};
+		ViewRenderSettingsOverrides m_ViewRenderSettingsOverrides{};
 		const TaskSystem* m_TaskSystem = nullptr;
 	};
 }

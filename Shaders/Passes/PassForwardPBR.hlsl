@@ -34,24 +34,57 @@ StructuredBuffer<uint2> g_ForwardPlusTileHeaders : register(t5);
 StructuredBuffer<uint> g_ForwardPlusTileIndices : register(t6);
 #endif
 
-#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+struct ForwardPBRPixelOutput
+{
+	float4 ForwardPlusColor : SV_Target0;
+	float4 LegacyColor : SV_Target1;
+	float4 GTAOContribution : SV_Target2;
+};
+
+ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
+	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
+{
+	ForwardPBRPixelOutput output;
+	output.ForwardPlusColor = forwardPlusColor;
+	output.LegacyColor = legacyColor;
+	output.GTAOContribution = gtaoContribution;
+	return output;
+}
+#elif defined(GGLAB_FORWARD_PLUS_VALIDATION)
 struct ForwardPBRPixelOutput
 {
 	float4 ForwardPlusColor : SV_Target0;
 	float4 LegacyColor : SV_Target1;
 };
 
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 forwardPlusColor, float4 legacyColor)
+ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
+	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
 {
 	ForwardPBRPixelOutput output;
 	output.ForwardPlusColor = forwardPlusColor;
 	output.LegacyColor = legacyColor;
 	return output;
 }
+#elif defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+struct ForwardPBRPixelOutput
+{
+	float4 Color : SV_Target0;
+	float4 GTAOContribution : SV_Target1;
+};
+
+ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
+	float4 color, float4 legacyColor, float4 gtaoContribution)
+{
+	ForwardPBRPixelOutput output;
+	output.Color = color;
+	output.GTAOContribution = gtaoContribution;
+	return output;
+}
 #else
 #define ForwardPBRPixelOutput float4
 
-float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor)
+float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution)
 {
 	return color;
 }
@@ -335,7 +368,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 }
 #endif
 
-#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace)
 #else
 float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
@@ -372,22 +405,23 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 
 	if (matData.DebugView == MaterialDebugViewBaseColor)
 	{
-		return MakeForwardPBRPixelOutput(float4(baseColor, alpha), float4(baseColor, alpha));
+		return MakeForwardPBRPixelOutput(
+			float4(baseColor, alpha), float4(baseColor, alpha), 0.0.xxxx);
 	}
 	if (matData.DebugView == MaterialDebugViewMetallic)
 	{
 		return MakeForwardPBRPixelOutput(float4(metallic.xxx, alpha),
-			float4(metallic.xxx, alpha));
+			float4(metallic.xxx, alpha), 0.0.xxxx);
 	}
 	if (matData.DebugView == MaterialDebugViewRoughness)
 	{
 		return MakeForwardPBRPixelOutput(float4(perceptualRoughness.xxx, alpha),
-			float4(perceptualRoughness.xxx, alpha));
+			float4(perceptualRoughness.xxx, alpha), 0.0.xxxx);
 	}
 	if (matData.DebugView == MaterialDebugViewNormal)
 	{
 		const float4 normalColor = float4(N * 0.5 + 0.5, alpha);
-		return MakeForwardPBRPixelOutput(normalColor, normalColor);
+		return MakeForwardPBRPixelOutput(normalColor, normalColor, 0.0.xxxx);
 	}
 	perceptualRoughness = FilterPerceptualRoughness(perceptualRoughness, N);
 
@@ -438,6 +472,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
 	const float gtao = LoadGTAO(uint2(IN.PositionCS.xy));
+	const float3 materialOccludedDiffuseIBL =
+		diffuseIBL * ResolveSpecularIBLVisibility(ao);
+	const float3 gtaoContribution = materialOccludedDiffuseIBL * (1.0 - gtao);
 	diffuseIBL *= ResolveDiffuseIBLVisibility(ao, gtao);
 	specularIBL *= ResolveSpecularIBLVisibility(ao);
 
@@ -450,8 +487,10 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	legacyOutputLighting += emissive;
 	legacyOutputLighting += diffuseIBL + specularIBL;
 	const float4 legacyColor = float4(SanitizeHDRColor(legacyOutputLighting), alpha);
-	return MakeForwardPBRPixelOutput(outputColor, legacyColor);
+	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
+		float4(SanitizeHDRColor(gtaoContribution), 1.0));
 #else
-	return MakeForwardPBRPixelOutput(outputColor, outputColor);
+	return MakeForwardPBRPixelOutput(outputColor, outputColor,
+		float4(SanitizeHDRColor(gtaoContribution), 1.0));
 #endif
 }
