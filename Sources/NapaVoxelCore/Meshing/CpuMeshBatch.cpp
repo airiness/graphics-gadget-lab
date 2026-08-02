@@ -132,6 +132,11 @@ namespace napa::voxel
 	{
 	}
 
+	const VoxelWorldConfig& PendingCpuMeshBatch::GetConfig() const noexcept
+	{
+		return m_State.m_Config;
+	}
+
 	std::uint64_t PendingCpuMeshBatch::GetTargetWorldVoxelRevision() const noexcept
 	{
 		return m_State.m_TargetWorldVoxelRevision;
@@ -320,8 +325,9 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult PublishCpuMeshBatch(
-		std::unique_ptr<PendingCpuMeshBatch>& pending, VisibleMeshSet& visible) noexcept
+	ValidationResult PrepareCpuMeshBatchPublication(
+		std::unique_ptr<PendingCpuMeshBatch>& pending, const VisibleMeshSet& visible,
+		std::unique_ptr<PreparedCpuMeshPublication>& publication)
 	{
 		if (!pending)
 		{
@@ -337,16 +343,35 @@ namespace napa::voxel
 			pendingState.m_BaseWasPublished == visible.m_State.m_HasPublishedMeshes &&
 			(!pendingState.m_BaseWasPublished ||
 				(pendingState.m_BaseVisibleWorldRevision ==
-						visible.m_State.m_VisibleWorldRevision &&
+					visible.m_State.m_VisibleWorldRevision &&
 					pendingState.m_BaseWorldMeshValidation ==
-						visible.m_State.m_WorldMeshValidation &&
+					visible.m_State.m_WorldMeshValidation &&
 					pendingState.m_BaseBoundaryValidation ==
-						visible.m_State.m_BoundaryValidation));
+					visible.m_State.m_BoundaryValidation));
 		if (!baseMatches)
 		{
 			return { ValidationError::StaleCpuMeshBatch };
 		}
 
+		std::unique_ptr<PreparedCpuMeshPublication> prepared =
+			std::make_unique<PreparedCpuMeshPublication>(
+				PreparedCpuMeshPublication::ConstructionToken{});
+		prepared->m_Pending = std::move(pending);
+		publication = std::move(prepared);
+		return {};
+	}
+
+	void CommitCpuMeshBatchPublication(
+		std::unique_ptr<PreparedCpuMeshPublication>& publication, VisibleMeshSet& visible) noexcept
+	{
+		if (!publication || !publication->m_Pending)
+		{
+			return;
+		}
+
+		std::unique_ptr<PendingCpuMeshBatch> pending =
+			std::move(publication->m_Pending);
+		const PendingCpuMeshBatch::State& pendingState = pending->m_State;
 		VisibleMeshSet::State published{
 			.m_HasPublishedMeshes = true,
 			.m_Config = pendingState.m_Config,
@@ -356,8 +381,7 @@ namespace napa::voxel
 			.m_BoundaryValidation = pendingState.m_BoundaryValidation,
 		};
 		visible.m_State = std::move(published);
-		pending.reset();
-		return {};
+		publication.reset();
 	}
 
 	ValidationResult ComputeVisibleWorldMeshHash(

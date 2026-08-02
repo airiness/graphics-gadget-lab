@@ -17,6 +17,7 @@ namespace napa::voxel
 {
 	struct CpuMeshBatch;
 	class PendingCpuMeshBatch;
+	class PreparedCpuMeshPublication;
 	class VisibleMeshSet;
 
 	[[nodiscard]] ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
@@ -24,8 +25,11 @@ namespace napa::voxel
 		CpuMeshBatch& batch);
 	[[nodiscard]] ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
 		const VisibleMeshSet& visible, std::unique_ptr<PendingCpuMeshBatch>& pending);
-	[[nodiscard]] ValidationResult PublishCpuMeshBatch(
-		std::unique_ptr<PendingCpuMeshBatch>& pending, VisibleMeshSet& visible) noexcept;
+	[[nodiscard]] ValidationResult PrepareCpuMeshBatchPublication(
+		std::unique_ptr<PendingCpuMeshBatch>& pending, const VisibleMeshSet& visible,
+		std::unique_ptr<PreparedCpuMeshPublication>& publication);
+	void CommitCpuMeshBatchPublication(
+		std::unique_ptr<PreparedCpuMeshPublication>& publication, VisibleMeshSet& visible) noexcept;
 	[[nodiscard]] ValidationResult ComputeVisibleWorldMeshHash(
 		const VisibleMeshSet& visible, WorldMeshValidationResult& result);
 
@@ -65,6 +69,7 @@ namespace napa::voxel
 		PendingCpuMeshBatch(const PendingCpuMeshBatch&) = delete;
 		PendingCpuMeshBatch& operator=(const PendingCpuMeshBatch&) = delete;
 
+		[[nodiscard]] const VoxelWorldConfig& GetConfig() const noexcept;
 		[[nodiscard]] std::uint64_t GetTargetWorldVoxelRevision() const noexcept;
 		[[nodiscard]] std::uint64_t GetCandidateChunkCount() const noexcept;
 		[[nodiscard]] std::span<const ChunkMeshRecord> GetChunks() const noexcept;
@@ -75,10 +80,37 @@ namespace napa::voxel
 	private:
 		friend ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
 			const VisibleMeshSet& visible, std::unique_ptr<PendingCpuMeshBatch>& pending);
-		friend ValidationResult PublishCpuMeshBatch(
-			std::unique_ptr<PendingCpuMeshBatch>& pending, VisibleMeshSet& visible) noexcept;
+		friend ValidationResult PrepareCpuMeshBatchPublication(
+			std::unique_ptr<PendingCpuMeshBatch>& pending, const VisibleMeshSet& visible,
+			std::unique_ptr<PreparedCpuMeshPublication>& publication);
+		friend void CommitCpuMeshBatchPublication(
+			std::unique_ptr<PreparedCpuMeshPublication>& publication,
+			VisibleMeshSet& visible) noexcept;
 
 		State m_State;
+	};
+
+	class PreparedCpuMeshPublication final
+	{
+	private:
+		struct ConstructionToken
+		{
+		};
+
+	public:
+		explicit PreparedCpuMeshPublication(ConstructionToken) noexcept {}
+		PreparedCpuMeshPublication(const PreparedCpuMeshPublication&) = delete;
+		PreparedCpuMeshPublication& operator=(const PreparedCpuMeshPublication&) = delete;
+
+	private:
+		friend ValidationResult PrepareCpuMeshBatchPublication(
+			std::unique_ptr<PendingCpuMeshBatch>& pending, const VisibleMeshSet& visible,
+			std::unique_ptr<PreparedCpuMeshPublication>& publication);
+		friend void CommitCpuMeshBatchPublication(
+			std::unique_ptr<PreparedCpuMeshPublication>& publication,
+			VisibleMeshSet& visible) noexcept;
+
+		std::unique_ptr<PendingCpuMeshBatch> m_Pending;
 	};
 
 	class VisibleMeshSet final
@@ -113,8 +145,12 @@ namespace napa::voxel
 	private:
 		friend ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
 			const VisibleMeshSet& visible, std::unique_ptr<PendingCpuMeshBatch>& pending);
-		friend ValidationResult PublishCpuMeshBatch(
-			std::unique_ptr<PendingCpuMeshBatch>& pending, VisibleMeshSet& visible) noexcept;
+		friend ValidationResult PrepareCpuMeshBatchPublication(
+			std::unique_ptr<PendingCpuMeshBatch>& pending, const VisibleMeshSet& visible,
+			std::unique_ptr<PreparedCpuMeshPublication>& publication);
+		friend void CommitCpuMeshBatchPublication(
+			std::unique_ptr<PreparedCpuMeshPublication>& publication,
+			VisibleMeshSet& visible) noexcept;
 		friend ValidationResult ComputeVisibleWorldMeshHash(
 			const VisibleMeshSet& visible, WorldMeshValidationResult& result);
 

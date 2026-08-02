@@ -24,36 +24,22 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool IsValidPublicationInput(
-			const napa::voxel::VoxelWorldConfig& config,
 			const napa::voxel::PendingCpuMeshBatch* pendingCoreMeshes,
-			const NapaVoxelCpuMeshSet& cpuMeshes, uint64_t stableId,
-			uint64_t ownerGeneration) noexcept
+			uint64_t stableId, uint64_t ownerGeneration) noexcept
 		{
-			if (napa::voxel::ValidateConfig(config).Failed() || !pendingCoreMeshes ||
-				stableId == 0 || ownerGeneration == 0 ||
-				pendingCoreMeshes->GetTargetWorldVoxelRevision() == 0 ||
-				pendingCoreMeshes->GetChunks().size() != cpuMeshes.m_Chunks.size())
-			{
-				return false;
-			}
-
-			const uint64_t targetRevision = pendingCoreMeshes->GetTargetWorldVoxelRevision();
-			for (const NapaVoxelCpuChunkMesh& chunk : cpuMeshes.m_Chunks)
-			{
-				if (chunk.m_SourceWorldVoxelRevision != targetRevision)
-				{
-					return false;
-				}
-			}
-			return true;
+			return pendingCoreMeshes && stableId != 0 && ownerGeneration != 0 &&
+				napa::voxel::ValidateConfig(pendingCoreMeshes->GetConfig()).Succeeded() &&
+				pendingCoreMeshes->GetTargetWorldVoxelRevision() != 0;
 		}
 	}
 
 	NapaVoxelInitialPublicationOwner::NapaVoxelInitialPublicationOwner(
-		const napa::voxel::VoxelWorldConfig& config,
+		ConstructionToken,
 		std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pendingCoreMeshes,
 		NapaVoxelCpuMeshSet cpuMeshes, uint64_t stableId, uint64_t ownerGeneration) noexcept :
-		m_Config(config), m_PendingCoreMeshes(std::move(pendingCoreMeshes)),
+		m_Config(pendingCoreMeshes->GetConfig()),
+		m_TargetWorldRevision(pendingCoreMeshes->GetTargetWorldVoxelRevision()),
+		m_PendingCoreMeshes(std::move(pendingCoreMeshes)),
 		m_CpuMeshes(std::move(cpuMeshes)),
 		m_UploadIdentity({
 			.m_Kind = AssetStreamingWorkKind::RuntimeMesh,
@@ -64,23 +50,27 @@ namespace gglab
 	{
 	}
 
-	bool NapaVoxelInitialPublicationOwner::Create(
-		const napa::voxel::VoxelWorldConfig& config,
-		std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pendingCoreMeshes,
-		NapaVoxelCpuMeshSet cpuMeshes, uint64_t stableId, uint64_t ownerGeneration,
+	bool PrepareNapaVoxelInitialPublication(
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+		uint64_t stableId, uint64_t ownerGeneration,
 		std::shared_ptr<NapaVoxelInitialPublicationOwner>& publication) noexcept
 	{
-		if (!IsValidPublicationInput(
-			config, pendingCoreMeshes.get(), cpuMeshes, stableId, ownerGeneration))
+		if (!IsValidPublicationInput(pendingCoreMeshes.get(), stableId, ownerGeneration))
 		{
 			return false;
 		}
 
 		try
 		{
-			auto prepared = std::shared_ptr<NapaVoxelInitialPublicationOwner>(
-				new NapaVoxelInitialPublicationOwner(config, std::move(pendingCoreMeshes),
-					std::move(cpuMeshes), stableId, ownerGeneration));
+			NapaVoxelCpuMeshSet cpuMeshes{};
+			if (ConvertNapaVoxelMeshRecords(pendingCoreMeshes->GetChunks(),
+				pendingCoreMeshes->GetConfig(), cpuMeshes).Failed())
+			{
+				return false;
+			}
+			auto prepared = std::make_shared<NapaVoxelInitialPublicationOwner>(
+				NapaVoxelInitialPublicationOwner::ConstructionToken{},
+				std::move(pendingCoreMeshes), std::move(cpuMeshes), stableId, ownerGeneration);
 			publication = std::move(prepared);
 			return true;
 		}
@@ -334,7 +324,7 @@ namespace gglab
 
 	uint64_t NapaVoxelInitialPublicationOwner::GetTargetWorldRevision() const noexcept
 	{
-		return m_PendingCoreMeshes ? m_PendingCoreMeshes->GetTargetWorldVoxelRevision() : 0;
+		return m_TargetWorldRevision;
 	}
 
 	void NapaVoxelInitialPublicationOwner::MarkCommitted() noexcept
@@ -342,12 +332,14 @@ namespace gglab
 		m_PublicationAllowed = false;
 		m_Status = NapaVoxelInitialPublicationStatus::Committed;
 		m_CpuMeshes = {};
+		m_GpuMeshes.reset();
 	}
 
 	bool NapaVoxelRenderState::PrepareInitialCommit(
-		const std::shared_ptr<NapaVoxelInitialPublicationOwner>& publication) const noexcept
+		const std::shared_ptr<NapaVoxelInitialPublicationOwner>& publication,
+		std::unique_ptr<NapaVoxelPreparedInitialCommit>& preparedCommit) noexcept
 	{
-		return publication && !m_VisibleCoreMeshes.HasPublishedMeshes() &&
+		if (!(publication && !m_VisibleCoreMeshes.HasPublishedMeshes() &&
 			!m_VisibleGpuMeshes && publication->IsReadyForCommit() &&
 			publication->m_PublicationAllowed && !publication->m_OwnerGenerationExhausted &&
 			publication->m_GpuMeshes && publication->m_PendingCoreMeshes &&
@@ -355,43 +347,193 @@ namespace gglab
 			publication->m_OwnerGeneration == publication->m_UploadIdentity.m_Generation &&
 			publication->m_CompletionFence.IsValid() &&
 			publication->m_GpuMeshes->GetVisibleWorldRevision() ==
-			publication->GetTargetWorldRevision();
+			publication->GetTargetWorldRevision()))
+		{
+			return false;
+		}
+
+		try
+		{
+			auto prepared = std::make_unique<NapaVoxelPreparedInitialCommit>(
+				NapaVoxelPreparedInitialCommit::ConstructionToken{});
+			if (napa::voxel::PrepareCpuMeshBatchPublication(
+				publication->m_PendingCoreMeshes, m_VisibleCoreMeshes,
+				prepared->m_CorePublication).Failed())
+			{
+				return false;
+			}
+			prepared->m_GpuMeshes = publication->m_GpuMeshes;
+			prepared->m_Owner = publication;
+			preparedCommit = std::move(prepared);
+			return true;
+		}
+		catch (...)
+		{
+			return false;
+		}
 	}
 
 	void NapaVoxelRenderState::CommitInitial(
-		const std::shared_ptr<NapaVoxelInitialPublicationOwner>& publication) noexcept
+		std::unique_ptr<NapaVoxelPreparedInitialCommit>& preparedCommit) noexcept
 	{
-		const bool prepared = PrepareInitialCommit(publication);
-		GGLAB_ASSERT_MSG(prepared,
-			"Initial Napa voxel commit requires a successfully revalidated publication.");
-		if (!prepared)
+		GGLAB_ASSERT_MSG(preparedCommit && preparedCommit->m_CorePublication &&
+			preparedCommit->m_GpuMeshes && preparedCommit->m_Owner,
+			"Initial Napa voxel commit requires a prepared CPU/GPU token.");
+		if (!preparedCommit || !preparedCommit->m_CorePublication ||
+			!preparedCommit->m_GpuMeshes || !preparedCommit->m_Owner)
 		{
 			return;
 		}
 
-		std::shared_ptr<const NapaVoxelGpuMeshSet> gpuMeshes = publication->m_GpuMeshes;
-		const napa::voxel::ValidationResult result = napa::voxel::PublishCpuMeshBatch(
-			publication->m_PendingCoreMeshes, m_VisibleCoreMeshes);
-		GGLAB_ASSERT_MSG(result.Succeeded(),
-			"A revalidated initial Napa voxel Core publication must commit without failure.");
-		if (result.Failed())
-		{
-			publication->Fail();
-			return;
-		}
+		std::unique_ptr<NapaVoxelPreparedInitialCommit> committed =
+			std::move(preparedCommit);
+		napa::voxel::CommitCpuMeshBatchPublication(
+			committed->m_CorePublication, m_VisibleCoreMeshes);
 		GGLAB_ASSERT_MSG(m_VisibleCoreMeshes.HasPublishedMeshes() &&
 			m_VisibleCoreMeshes.GetVisibleWorldRevision() ==
-			gpuMeshes->GetVisibleWorldRevision(),
+			committed->m_GpuMeshes->GetVisibleWorldRevision(),
 			"Initial Napa voxel Core and GPU publications must share one revision.");
 
-		m_VisibleGpuMeshes = std::move(gpuMeshes);
-		publication->MarkCommitted();
+		m_VisibleGpuMeshes = std::move(committed->m_GpuMeshes);
+		committed->m_Owner->MarkCommitted();
 	}
 
 	void NapaVoxelRenderState::Reset() noexcept
 	{
 		m_VisibleGpuMeshes.reset();
 		m_VisibleCoreMeshes = {};
+	}
+
+	NapaVoxelStaticPublicationSession::NapaVoxelStaticPublicationSession(
+		RHIDevice* device, AssetUploadScheduler* scheduler) noexcept :
+		m_Device(device), m_Scheduler(scheduler)
+	{
+	}
+
+	NapaVoxelStaticPublicationSession::~NapaVoxelStaticPublicationSession()
+	{
+		CancelPrepare();
+	}
+
+	bool NapaVoxelStaticPublicationSession::BeginPrepare(
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+		uint64_t stableId, uint64_t ownerGeneration) noexcept
+	{
+		CancelPrepare();
+		m_HasFailed = true;
+		if (!m_Device || !m_Scheduler ||
+			!PrepareNapaVoxelInitialPublication(
+				pendingCoreMeshes, stableId, ownerGeneration, m_Publication) ||
+			!m_Publication->PrepareGpuResources(m_Device) || !m_Publication->MarkQueued())
+		{
+			if (m_Publication)
+			{
+				m_Publication->Cancel();
+				m_Publication.reset();
+			}
+			return false;
+		}
+
+		m_HasFailed = false;
+		ScheduleUpload();
+		return !m_HasFailed;
+	}
+
+	void NapaVoxelStaticPublicationSession::TickPrepare() noexcept
+	{
+		if (!m_Publication || m_IsReady || m_HasFailed)
+		{
+			return;
+		}
+
+		switch (m_Publication->GetStatus())
+		{
+		case NapaVoxelInitialPublicationStatus::ReadyForCommit:
+		{
+			std::unique_ptr<NapaVoxelPreparedInitialCommit> preparedCommit;
+			if (!m_RenderState.PrepareInitialCommit(m_Publication, preparedCommit))
+			{
+				m_HasFailed = true;
+				return;
+			}
+			m_RenderState.CommitInitial(preparedCommit);
+			m_FrameView = m_RenderState.GetVisibleGpuMeshes();
+			m_IsReady = m_RenderState.HasVisibleMeshes() && m_FrameView &&
+				m_RenderState.GetVisibleWorldRevision() ==
+				m_Publication->GetTargetWorldRevision();
+			m_HasFailed = !m_IsReady;
+		}
+		break;
+		case NapaVoxelInitialPublicationStatus::Failed:
+		case NapaVoxelInitialPublicationStatus::Cancelled:
+			m_HasFailed = true;
+			break;
+		case NapaVoxelInitialPublicationStatus::Uninitialized:
+		case NapaVoxelInitialPublicationStatus::Prepared:
+		case NapaVoxelInitialPublicationStatus::Queued:
+		case NapaVoxelInitialPublicationStatus::Recording:
+		case NapaVoxelInitialPublicationStatus::AwaitingFence:
+		case NapaVoxelInitialPublicationStatus::Committed:
+			break;
+		}
+	}
+
+	void NapaVoxelStaticPublicationSession::CancelPrepare() noexcept
+	{
+		if (m_Publication)
+		{
+			const AssetStreamingIdentity identity = m_Publication->GetUploadIdentity();
+			m_Publication->Cancel();
+			if (m_Scheduler)
+			{
+				GGLAB_UNUSED(m_Scheduler->CancelReadyWork(identity));
+			}
+			m_Publication.reset();
+		}
+		m_FrameView.reset();
+		m_RenderState.Reset();
+		m_IsReady = false;
+		m_HasFailed = false;
+	}
+
+	void NapaVoxelStaticPublicationSession::ScheduleUpload() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_Scheduler);
+		GGLAB_ASSERT_NOT_NULL(m_Publication.get());
+		if (!m_Scheduler || !m_Publication)
+		{
+			m_HasFailed = true;
+			return;
+		}
+
+		const std::shared_ptr<NapaVoxelInitialPublicationOwner> publication = m_Publication;
+		const AssetStreamingIdentity identity = publication->GetUploadIdentity();
+		const AssetStreamingWorkEstimate estimate = publication->GetUploadEstimate();
+		AssetUploadScheduler* scheduler = m_Scheduler;
+		scheduler->EnqueueUploadRecording({
+			.m_Name = "Napa Voxel Initial Mesh Upload",
+			.m_Identity = identity,
+			.m_Estimate = estimate,
+			.m_Priority = TaskPriority::High,
+			},
+			[scheduler, publication, identity, estimate]() noexcept
+			{
+				if (!publication->BeginRecording(identity))
+				{
+					return;
+				}
+				const AssetUploadHandle handle = scheduler->RecordUpload({
+					.m_Name = "Napa Voxel Initial Mesh Publication",
+					.m_Identity = identity,
+					.m_Estimate = estimate,
+					.m_Priority = TaskPriority::High,
+					},
+					[publication](TransferBatch& batch) noexcept
+					{ return publication->RecordUpload(batch); },
+					[publication](const AssetUploadCompletionInfo& completion) noexcept
+					{ GGLAB_UNUSED(publication->CompleteUpload(completion)); });
+				GGLAB_UNUSED(publication->SetUploadHandle(handle));
+			});
 	}
 
 	bool AllocateNapaVoxelPublicationStableId(uint64_t& stableId) noexcept

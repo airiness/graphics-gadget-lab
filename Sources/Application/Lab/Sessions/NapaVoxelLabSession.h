@@ -6,6 +6,8 @@
 
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
+#include <string>
+
 namespace gglab
 {
 	class NapaVoxelLabSession final : public LabSessionBase
@@ -22,7 +24,10 @@ namespace gglab
 		}
 		void CommitPrepare() noexcept override;
 		void CancelPrepare() noexcept override;
+		void OnEnter() noexcept override;
+		void OnExit() noexcept override;
 		void Update(float deltaTime) noexcept override;
+		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -34,14 +39,21 @@ namespace gglab
 			std::shared_ptr<NapaVoxelRenderFrameSource> frameSource) noexcept;
 
 		[[nodiscard]] bool PrepareInitialPublication() noexcept;
-		void ScheduleInitialUpload() noexcept;
+		[[nodiscard]] bool PrepareInitialPublicationInternal();
 		void UpdatePreparationState() noexcept;
+		void DrawChunkBounds() noexcept;
 		void ApplyCameraPreset() noexcept;
+		void ApplyImmediateParameters() noexcept override;
 
 		std::shared_ptr<NapaVoxelRenderFrameSource> m_FrameSource;
 		std::unique_ptr<napa::voxel::VoxelWorld> m_VoxelWorld;
-		std::shared_ptr<NapaVoxelInitialPublicationOwner> m_InitialPublication;
-		NapaVoxelRenderState m_RenderState;
+		std::unique_ptr<NapaVoxelStaticPublicationSession> m_PublicationSession;
+		napa::voxel::VoxelWorldConfig m_CurrentConfig{};
 		LoadingProgress m_LoadingProgress{};
+		std::string m_PresetName = "Single Chunk";
+		uint64_t m_InitialVoxelHash = 0;
+		double m_LastGenerationMilliseconds = 0.0;
+		double m_LastMeshingMilliseconds = 0.0;
+		bool m_ShowChunkBounds = true;
 	};
 }

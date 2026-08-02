@@ -3,17 +3,202 @@
 
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 
+#include "Graphics/RHI/RHIDevice.h"
+#include "Graphics/RHI/RHITransferContext.h"
+#include "Graphics/TransferManager.h"
+
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 
 #include <array>
 #include <limits>
 #include <memory>
+#include <unordered_set>
 
 namespace gglab
 {
 	namespace
 	{
+		class NapaVoxelPublicationTestDevice final : public RHIDevice
+		{
+		public:
+			RHIBackendType GetBackendType() const noexcept override { return {}; }
+			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
+			{
+				return "NapaVoxel.PublicationTestDevice";
+			}
+			RHIShaderWaveCapabilities GetShaderWaveCapabilities() const noexcept override
+			{
+				return {};
+			}
+			RHITextureSupportResult QueryTextureSupport(
+				const RHITextureDesc&) const noexcept override
+			{
+				return {};
+			}
+			RHITextureSupportResult QueryTextureViewSupport(
+				const RHITextureDesc&, const RHITextureViewDesc&) const noexcept override
+			{
+				return {};
+			}
+			RHITextureHandle CreateTexture(
+				const RHITextureDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			{
+				return {};
+			}
+			RHIBufferHandle CreateBuffer(
+				const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			{
+				const RHIBufferHandle handle{ m_NextBufferIndex++, 1 };
+				m_LiveBuffers.insert(handle);
+				++m_CreatedBufferCount;
+				return handle;
+			}
+			RHITextureViewHandle CreateTextureView(
+				RHITextureHandle, const RHITextureViewDesc&) noexcept override
+			{
+				return {};
+			}
+			RHIBufferViewHandle CreateBufferView(
+				RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
+			{
+				return {};
+			}
+			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
+			void DestroyTexture(RHITextureHandle) noexcept override {}
+			void DestroyBuffer(RHIBufferHandle buffer) noexcept override
+			{
+				if (m_LiveBuffers.erase(buffer) != 0)
+				{
+					++m_DestroyedBufferCount;
+				}
+			}
+			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
+			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
+			void DestroySampler(RHISamplerHandle) noexcept override {}
+			void SetTextureDebugBinding(
+				RHITextureHandle, const RHIResourceDebugBindingDesc&) noexcept override
+			{
+			}
+			void SetBufferDebugBinding(
+				RHIBufferHandle, const RHIResourceDebugBindingDesc&) noexcept override
+			{
+			}
+			std::string_view GetTextureDebugName(RHITextureHandle) const noexcept override
+			{
+				return {};
+			}
+			std::string_view GetBufferDebugName(RHIBufferHandle) const noexcept override
+			{
+				return {};
+			}
+			void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
+			{
+				return nullptr;
+			}
+			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
+			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
+			bool IsAlive(RHITextureHandle texture) const noexcept override
+			{
+				return texture.IsValid();
+			}
+			bool IsAlive(RHIBufferHandle buffer) const noexcept override
+			{
+				return m_LiveBuffers.contains(buffer);
+			}
+			bool IsAlive(RHISamplerHandle sampler) const noexcept override
+			{
+				return sampler.IsValid();
+			}
+			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
+			{
+				return m_FenceCompleted && fencePoint.IsValid();
+			}
+			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
+			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
+			RHIDescriptorHandle GetTextureViewDescriptor(
+				RHITextureViewHandle) const noexcept override
+			{
+				return {};
+			}
+			RHIDescriptorHandle GetBufferViewDescriptor(
+				RHIBufferViewHandle) const noexcept override
+			{
+				return {};
+			}
+			RHIDescriptorHandle GetSamplerDescriptor(
+				RHISamplerHandle) const noexcept override
+			{
+				return {};
+			}
+			void RetireCompletedWork() noexcept override {}
+
+			void CompleteFence() noexcept { m_FenceCompleted = true; }
+			uint32_t GetCreatedBufferCount() const noexcept { return m_CreatedBufferCount; }
+			uint32_t GetDestroyedBufferCount() const noexcept { return m_DestroyedBufferCount; }
+
+		private:
+			std::unordered_set<RHIBufferHandle> m_LiveBuffers;
+			uint32_t m_NextBufferIndex = 0;
+			uint32_t m_CreatedBufferCount = 0;
+			uint32_t m_DestroyedBufferCount = 0;
+			bool m_FenceCompleted = false;
+		};
+
+		class NapaVoxelPublicationTestTransferContext final : public RHITransferContext
+		{
+		public:
+			RHICommandContextHandle GetHandle() const noexcept override { return { 1, 1 }; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Copy; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void FlushBarriers() noexcept override {}
+			void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t,
+				uint64_t) noexcept override
+			{
+			}
+			void Begin() noexcept override { m_IsRecording = true; }
+			RHIFencePoint Submit(bool) noexcept override
+			{
+				m_IsRecording = false;
+				++m_SubmissionCount;
+				return { RHIFenceHandle{ 1, 1 }, m_SubmissionCount };
+			}
+			void Abort() noexcept override { m_IsRecording = false; }
+			void ReclaimCompleted() noexcept override { ++m_ReclaimCount; }
+			bool UploadBuffer(const void* data, uint64_t sizeInBytes, RHIBufferHandle destination,
+				uint64_t) noexcept override
+			{
+				if (!m_IsRecording || !data || sizeInBytes == 0 || !destination.IsValid())
+				{
+					return false;
+				}
+				++m_UploadCount;
+				return true;
+			}
+			bool UploadTexture(
+				const RHITextureUploadData&, RHITextureHandle) noexcept override
+			{
+				return false;
+			}
+			RHITextureReadbackRequest ReadbackTexture(
+				RHITextureHandle, const RHITextureDesc&) noexcept override
+			{
+				return {};
+			}
+
+			uint32_t GetSubmissionCount() const noexcept { return m_SubmissionCount; }
+			uint32_t GetUploadCount() const noexcept { return m_UploadCount; }
+
+		private:
+			uint32_t m_SubmissionCount = 0;
+			uint32_t m_UploadCount = 0;
+			uint32_t m_ReclaimCount = 0;
+			bool m_IsRecording = false;
+		};
+
 		[[nodiscard]] napa::voxel::VoxelWorldConfig MakePublicationConfig() noexcept
 		{
 			return {
@@ -65,13 +250,37 @@ namespace gglab
 				return false;
 			}
 
-			NapaVoxelCpuMeshSet cpuMeshes{};
-			if (ConvertNapaVoxelMeshRecords(pending->GetChunks(), config, cpuMeshes).Failed())
-			{
-				return false;
-			}
-			return NapaVoxelInitialPublicationOwner::Create(config, std::move(pending),
-				std::move(cpuMeshes), stableId, ownerGeneration, publication);
+			return PrepareNapaVoxelInitialPublication(
+				pending, stableId, ownerGeneration, publication);
+		}
+
+		[[nodiscard]] bool BuildPublicationPending(bool renderable,
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pending) noexcept
+		{
+			using namespace napa::voxel;
+			const VoxelWorldConfig config = MakePublicationConfig();
+			const PrimitiveDesc sphere{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Soil,
+				.m_Shape = PrimitiveShape::Sphere,
+				.m_Parameters = {
+					.m_Sphere = {
+						.m_Center = { 4.0, 4.0, 4.0 },
+						.m_Radius = 2.0,
+					},
+				},
+			};
+			const std::span<const PrimitiveDesc> primitives = renderable
+				? std::span<const PrimitiveDesc>(&sphere, 1)
+				: std::span<const PrimitiveDesc>{};
+			std::unique_ptr<VoxelWorld> world;
+			PrimitiveWorldGenerationResult generation{};
+			constexpr std::array chunks{ ChunkCoord{} };
+			CpuMeshBatch batch{};
+			VisibleMeshSet visible{};
+			return GeneratePrimitiveVoxelWorld(config, primitives, world, generation).Succeeded() &&
+				world && BuildCpuMeshBatch(*world, 1, chunks, batch).Succeeded() &&
+				ValidateCpuMeshBatch(batch, visible, pending).Succeeded() && pending;
 		}
 
 		[[nodiscard]] AssetUploadCompletionInfo MakeCompletion(
@@ -117,10 +326,12 @@ namespace gglab
 			context.Check(completed && publication->IsReadyForCommit() &&
 				!renderState.HasVisibleMeshes(),
 				"Scheduler completion only marks the durable publication ready for commit");
-			const bool prepared = renderState.PrepareInitialCommit(publication);
+			std::unique_ptr<NapaVoxelPreparedInitialCommit> preparedCommit;
+			const bool prepared =
+				renderState.PrepareInitialCommit(publication, preparedCommit);
 			if (prepared)
 			{
-				renderState.CommitInitial(publication);
+				renderState.CommitInitial(preparedCommit);
 			}
 			context.Check(prepared && renderState.HasVisibleMeshes() &&
 				renderState.GetVisibleWorldRevision() == 1 &&
@@ -133,13 +344,14 @@ namespace gglab
 				stalePublication->CompleteUpload(
 					MakeCompletion(*stalePublication, AssetUploadStatus::Succeeded));
 			context.Check(staleReady &&
-				!renderState.PrepareInitialCommit(stalePublication) &&
+				!renderState.PrepareInitialCommit(stalePublication, preparedCommit) &&
 				renderState.GetVisibleWorldRevision() == 1,
 				"Host revalidation rejects a same-revision initial publication before commit");
 		}
 
 		void RunInitialPublicationFailureTests(SelfTestContext& context) noexcept
 		{
+			std::unique_ptr<NapaVoxelPreparedInitialCommit> preparedCommit;
 			std::shared_ptr<NapaVoxelInitialPublicationOwner> createFailure;
 			NapaVoxelRenderState createFailureState{};
 			const bool builtRenderable = BuildPublicationOwner(true, 1002, 1, createFailure);
@@ -158,7 +370,7 @@ namespace gglab
 				MakeCompletion(*uploadFailure, AssetUploadStatus::Failed));
 			context.Check(failed &&
 				uploadFailure->GetStatus() == NapaVoxelInitialPublicationStatus::Failed &&
-				!uploadFailureState.PrepareInitialCommit(uploadFailure) &&
+				!uploadFailureState.PrepareInitialCommit(uploadFailure, preparedCommit) &&
 				!uploadFailureState.HasVisibleMeshes(),
 				"Upload recording or completion failure cannot publish partial CPU/GPU state");
 		}
@@ -203,7 +415,7 @@ namespace gglab
 				MakeCompletion(*durableCompletionOwner, AssetUploadStatus::Succeeded));
 			context.Check(awaiting && completionAccepted && !weakOwner.expired() &&
 				durableCompletionOwner->GetStatus() ==
-					NapaVoxelInitialPublicationStatus::Cancelled &&
+				NapaVoxelInitialPublicationStatus::Cancelled &&
 				durableCompletionOwner->HasCompletion(),
 				"Recording-after cancellation keeps a durable owner through Copy Fence retirement");
 			durableCompletionOwner.reset();
@@ -246,6 +458,48 @@ namespace gglab
 				!exhausted->BeginRecording(oldIdentity),
 				"Owner generation exhaustion invalidates the old token without wrapping");
 		}
+
+		void RunPublicationSessionCancellationIntegrationTest(SelfTestContext& context) noexcept
+		{
+			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
+			NapaVoxelPublicationTestTransferContext* transferContextView = transferContext.get();
+			TransferManager transferManager(std::move(transferContext));
+			NapaVoxelPublicationTestDevice device;
+			AssetUploadScheduler scheduler({
+				.m_Device = &device,
+				.m_TransferManager = &transferManager,
+				});
+
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pending;
+			NapaVoxelStaticPublicationSession session(&device, &scheduler);
+			const bool began = BuildPublicationPending(true, pending) &&
+				session.BeginPrepare(pending, 3001, 1);
+			scheduler.DrainReadyWork();
+			const AssetUploadStatistics submitted = scheduler.GetStatistics();
+			context.Check(began && !pending &&
+				session.GetPublicationStatus() ==
+				NapaVoxelInitialPublicationStatus::AwaitingFence &&
+				transferContextView->GetSubmissionCount() == 1 &&
+				transferContextView->GetUploadCount() == 2 &&
+				submitted.m_PendingCount == 1 && submitted.m_SubmittedCount == 1 &&
+				device.GetCreatedBufferCount() == 2 &&
+				device.GetDestroyedBufferCount() == 0,
+				"Session preparation submits one durable Scheduler TransferBatch");
+
+			session.CancelPrepare();
+			context.Check(!session.IsReady() && !session.HasVisibleMeshes() &&
+				!session.GetFrameView() && device.GetDestroyedBufferCount() == 0,
+				"Lab switch cancellation releases Session state without retiring in-flight buffers");
+
+			device.CompleteFence();
+			GGLAB_UNUSED(scheduler.Tick());
+			const AssetUploadStatistics completed = scheduler.GetStatistics();
+			context.Check(completed.m_PendingCount == 0 && completed.m_SucceededCount == 1 &&
+				device.GetDestroyedBufferCount() == device.GetCreatedBufferCount() &&
+				!session.IsReady() && !session.HasVisibleMeshes() && !session.GetFrameView(),
+				"Post-cancel Copy Fence completion retires buffers without publication or a dangling frame view");
+			scheduler.Finalize();
+		}
 	}
 
 	void RunNapaVoxelPublicationSelfTests(SelfTestContext& context) noexcept
@@ -254,5 +508,6 @@ namespace gglab
 		RunInitialPublicationFailureTests(context);
 		RunInitialPublicationCancellationTests(context);
 		RunInitialPublicationIdentityTests(context);
+		RunPublicationSessionCancellationIntegrationTest(context);
 	}
 }

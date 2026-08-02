@@ -20,6 +20,20 @@ namespace gglab
 {
 	namespace
 	{
+		[[nodiscard]] napa::voxel::ValidationResult PrepareAndCommitCpuMeshBatch(
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pending,
+			napa::voxel::VisibleMeshSet& visible)
+		{
+			std::unique_ptr<napa::voxel::PreparedCpuMeshPublication> publication;
+			const napa::voxel::ValidationResult result =
+				napa::voxel::PrepareCpuMeshBatchPublication(pending, visible, publication);
+			if (result.Succeeded())
+			{
+				napa::voxel::CommitCpuMeshBatchPublication(publication, visible);
+			}
+			return result;
+		}
+
 		inline constexpr std::array EightChunkDomain{
 			napa::voxel::ChunkCoord{ -1, -1, -1 },
 			napa::voxel::ChunkCoord{ 0, -1, -1 },
@@ -158,8 +172,7 @@ namespace gglab
 					record.m_BoundaryContours)
 				{
 					if (!contour.m_Segments.empty() ||
-						contour
-							.m_SkippedZeroLengthSegmentCount != 0)
+						contour.m_SkippedZeroLengthSegmentCount != 0)
 					{
 						return false;
 					}
@@ -315,10 +328,10 @@ namespace gglab
 			QuantizedMeshNormal& normal = contour.m_Segments[0].m_EndpointA.m_Normal;
 			std::int16_t* component = &normal.m_X;
 			const auto magnitude = [](std::int16_t value) noexcept
-			{
-				const std::int32_t wide = value;
-				return wide >= 0 ? wide : -wide;
-			};
+				{
+					const std::int32_t wide = value;
+					return wide >= 0 ? wide : -wide;
+				};
 			if (magnitude(normal.m_Y) > magnitude(*component))
 			{
 				component = &normal.m_Y;
@@ -368,16 +381,16 @@ namespace gglab
 			};
 			context.Check(
 				ReferenceBoundaryFaceTriangles ==
-					expectedBoundaryFaces,
+				expectedBoundaryFaces,
 				"Boundary faces use the fixed Freudenthal diagonals");
 
 			context.Check(
 				AreBoundaryContourNormalsEquivalent(
 					{ 32767, 0, 0 },
 					{ 32766, 1, -1 }) &&
-					!AreBoundaryContourNormalsEquivalent(
-						{ 32767, 0, 0 },
-						{ 32765, 0, 0 }),
+				!AreBoundaryContourNormalsEquivalent(
+					{ 32767, 0, 0 },
+					{ 32765, 0, 0 }),
 				"Boundary normal comparison uses one SNORM16 step of tolerance");
 		}
 
@@ -400,21 +413,21 @@ namespace gglab
 
 			context.Check(
 				meshed &&
-					IsCanonicalEightChunkOrder(
-						meshing.m_Chunks) &&
-					IsCanonicalEmptyWorldMesh(meshing) &&
-					meshing.m_Validation.m_ChunkCount == 8 &&
-					meshing.m_Validation.m_VertexCount == 0 &&
-					meshing.m_Validation.m_SectionCount == 0 &&
-					meshing.m_Validation.m_IndexCount == 0 &&
-					meshing.m_Validation.m_TriangleCount == 0 &&
-					meshing.m_Validation.m_ValidationHash ==
-						0x572bf6dcaaab0aa0ull &&
-					meshing.m_BoundaryValidation ==
-						BoundaryContourValidationResult{
-							.m_ChunkRecordCount = 8,
-							.m_ComparedFacePairCount = 12,
-						},
+				IsCanonicalEightChunkOrder(
+					meshing.m_Chunks) &&
+				IsCanonicalEmptyWorldMesh(meshing) &&
+				meshing.m_Validation.m_ChunkCount == 8 &&
+				meshing.m_Validation.m_VertexCount == 0 &&
+				meshing.m_Validation.m_SectionCount == 0 &&
+				meshing.m_Validation.m_IndexCount == 0 &&
+				meshing.m_Validation.m_TriangleCount == 0 &&
+				meshing.m_Validation.m_ValidationHash ==
+				0x572bf6dcaaab0aa0ull &&
+				meshing.m_BoundaryValidation ==
+				BoundaryContourValidationResult{
+					.m_ChunkRecordCount = 8,
+					.m_ComparedFacePairCount = 12,
+				},
 				"World meshing traverses every Cell-owner Chunk in canonical order");
 			if (!meshed)
 			{
@@ -437,9 +450,9 @@ namespace gglab
 					std::span(meshing.m_Chunks).first(7),
 					config,
 					unchanged).m_Error ==
-						ValidationError::
-							InvalidWorldMeshRecordSet &&
-					unchanged == sentinel,
+				ValidationError::
+				InvalidWorldMeshRecordSet &&
+				unchanged == sentinel,
 				"World mesh hashing rejects incomplete Chunk Domains atomically");
 
 			std::vector<ChunkMeshRecord> reordered =
@@ -450,9 +463,9 @@ namespace gglab
 					reordered,
 					config,
 					unchanged).m_Error ==
-						ValidationError::
-							InvalidWorldMeshRecordSet &&
-					unchanged == sentinel,
+				ValidationError::
+				InvalidWorldMeshRecordSet &&
+				unchanged == sentinel,
 				"World mesh hashing requires canonical z-y-x record order");
 
 			std::vector<ChunkMeshRecord> duplicated =
@@ -463,9 +476,9 @@ namespace gglab
 					duplicated,
 					config,
 					unchanged).m_Error ==
-						ValidationError::
-							InvalidWorldMeshRecordSet &&
-					unchanged == sentinel,
+				ValidationError::
+				InvalidWorldMeshRecordSet &&
+				unchanged == sentinel,
 				"World mesh hashing requires a complete unique Chunk Domain");
 
 			std::vector<ChunkMeshRecord> mismatched =
@@ -476,9 +489,9 @@ namespace gglab
 					mismatched,
 					config,
 					unchanged).m_Error ==
-						ValidationError::
-							MismatchedChunkMeshValidation &&
-					unchanged == sentinel,
+				ValidationError::
+				MismatchedChunkMeshValidation &&
+				unchanged == sentinel,
 				"World mesh hashing revalidates stored Chunk evidence");
 		}
 
@@ -512,7 +525,7 @@ namespace gglab
 					meshing.m_Chunks) &&
 				sharedCorner.m_Density >= IsoValue &&
 				sharedCorner.m_Material ==
-					VoxelMaterial::Stone;
+				VoxelMaterial::Stone;
 			if (completeBoundaryCoverage)
 			{
 				for (const ChunkMeshRecord& record :
@@ -523,7 +536,7 @@ namespace gglab
 						!record.m_Mesh.m_Vertices.empty() &&
 						record.m_Mesh.m_Sections.size() == 1 &&
 						record.m_Mesh.m_Sections[0].m_Material ==
-							VoxelMaterial::Stone &&
+						VoxelMaterial::Stone &&
 						TouchesSharedPlanesAndEdge(record);
 					if (!completeBoundaryCoverage)
 					{
@@ -540,25 +553,25 @@ namespace gglab
 			}
 			context.Check(
 				meshing.m_BoundaryValidation
-						.m_ChunkRecordCount == 8 &&
-					meshing.m_BoundaryValidation
-							.m_ComparedFacePairCount == 12 &&
-					meshing.m_BoundaryValidation
-							.m_ComparedSegmentCount > 0,
+				.m_ChunkRecordCount == 8 &&
+				meshing.m_BoundaryValidation
+				.m_ComparedFacePairCount == 12 &&
+				meshing.m_BoundaryValidation
+				.m_ComparedSegmentCount > 0,
 				"Boundary sphere contours match across all adjacent Chunks");
 			context.Check(
 				meshing.m_Validation ==
-					WorldMeshValidationResult{
-						.m_ValidationHash =
-							0xb939dfe96d74fe89ull,
-						.m_ChunkCount = 8,
-						.m_VertexCount = 1908,
-						.m_SectionCount = 8,
-						.m_IndexCount = 1908,
-						.m_TriangleCount = 636,
-						.m_SkippedDegenerateTriangleCount =
-							444,
-					},
+				WorldMeshValidationResult{
+					.m_ValidationHash =
+						0xb939dfe96d74fe89ull,
+					.m_ChunkCount = 8,
+					.m_VertexCount = 1908,
+					.m_SectionCount = 8,
+					.m_IndexCount = 1908,
+					.m_TriangleCount = 636,
+					.m_SkippedDegenerateTriangleCount =
+						444,
+				},
 				"A boundary sphere matches the complete World mesh golden");
 
 			bool deterministic = true;
@@ -571,9 +584,9 @@ namespace gglab
 					ReferenceMesher(*world).MeshWorld(
 						repeated).Succeeded() &&
 					repeated.m_Validation ==
-						meshing.m_Validation &&
+					meshing.m_Validation &&
 					repeated.m_BoundaryValidation ==
-						meshing.m_BoundaryValidation &&
+					meshing.m_BoundaryValidation &&
 					HaveIdenticalBoundaryContours(
 						repeated.m_Chunks,
 						meshing.m_Chunks);
@@ -588,12 +601,12 @@ namespace gglab
 				OffsetFirstBoundaryNormal(withinNormalTolerance, 1);
 			context.Check(
 				withinToleranceInjected &&
-					ValidateBoundaryContourSet(
-						withinNormalTolerance,
-						config,
-						withinToleranceValidation).Succeeded() &&
-					withinToleranceValidation ==
-						meshing.m_BoundaryValidation,
+				ValidateBoundaryContourSet(
+					withinNormalTolerance,
+					config,
+					withinToleranceValidation).Succeeded() &&
+				withinToleranceValidation ==
+				meshing.m_BoundaryValidation,
 				"Adjacent boundary contours accept one SNORM16 normal step end to end");
 
 			const BoundaryContourValidationResult sentinel{
@@ -608,13 +621,13 @@ namespace gglab
 				OffsetFirstBoundaryNormal(outsideNormalTolerance, 2);
 			context.Check(
 				outsideToleranceInjected &&
-					ValidateBoundaryContourSet(
-						outsideNormalTolerance,
-						config,
-						unchanged).m_Error ==
-							ValidationError::
-								MismatchedBoundaryContour &&
-					unchanged == sentinel,
+				ValidateBoundaryContourSet(
+					outsideNormalTolerance,
+					config,
+					unchanged).m_Error ==
+				ValidationError::
+				MismatchedBoundaryContour &&
+				unchanged == sentinel,
 				"Adjacent boundary contours reject two SNORM16 normal steps atomically");
 
 			std::vector<ChunkMeshRecord> mismatched =
@@ -631,23 +644,23 @@ namespace gglab
 			}
 			context.Check(
 				injected &&
-					ValidateBoundaryContourSet(
-						mismatched,
-						config,
-						unchanged).m_Error ==
-							ValidationError::
-								MismatchedBoundaryContour &&
-					unchanged == sentinel,
+				ValidateBoundaryContourSet(
+					mismatched,
+					config,
+					unchanged).m_Error ==
+				ValidationError::
+				MismatchedBoundaryContour &&
+				unchanged == sentinel,
 				"Boundary contour mismatch fails atomically");
 			WorldMeshValidationResult renderMeshValidation{};
 			context.Check(
 				injected &&
-					ValidateAndHashWorldMeshRecords(
-						mismatched,
-						config,
-						renderMeshValidation).Succeeded() &&
-					renderMeshValidation ==
-						meshing.m_Validation,
+				ValidateAndHashWorldMeshRecords(
+					mismatched,
+					config,
+					renderMeshValidation).Succeeded() &&
+				renderMeshValidation ==
+				meshing.m_Validation,
 				"Boundary evidence does not enter the render mesh hash");
 
 			ChunkMeshRecord nonCanonical =
@@ -662,18 +675,18 @@ namespace gglab
 			{
 				std::swap(
 					nonCanonicalContour.m_Segments[0]
-						.m_EndpointA,
+					.m_EndpointA,
 					nonCanonicalContour.m_Segments[0]
-						.m_EndpointB);
+					.m_EndpointB);
 			}
 			context.Check(
 				hasSegment &&
-					ValidateChunkBoundaryContourSet(
-						nonCanonical.m_BoundaryContours,
-						nonCanonical.m_Chunk,
-						config).m_Error ==
-							ValidationError::
-								InvalidBoundaryContour,
+				ValidateChunkBoundaryContourSet(
+					nonCanonical.m_BoundaryContours,
+					nonCanonical.m_Chunk,
+					config).m_Error ==
+				ValidationError::
+				InvalidBoundaryContour,
 				"Boundary contour validation rejects non-canonical endpoints");
 		}
 
@@ -786,7 +799,7 @@ namespace gglab
 			if (meshed)
 			{
 				for (const ExpectedCornerFace expected :
-					expectedCornerFaces)
+				expectedCornerFaces)
 				{
 					const BoundaryContourRecord* const contour =
 						FindBoundaryContour(
@@ -812,32 +825,32 @@ namespace gglab
 			}
 			context.Check(
 				meshed &&
-					cornerSample.m_Density == IsoValue &&
-					cornerSample.m_Material ==
-						VoxelMaterial::Stone &&
-					cornerFaceCount ==
-						expectedCornerFaces.size(),
+				cornerSample.m_Density == IsoValue &&
+				cornerSample.m_Material ==
+				VoxelMaterial::Stone &&
+				cornerFaceCount ==
+				expectedCornerFaces.size(),
 				"Box surface contours meet at the shared Chunk corner");
 			context.Check(
 				meshed &&
-					exactEdgeFaceCount == 4,
+				exactEdgeFaceCount == 4,
 				"Exact-iso face edges produce matching nonzero contours");
 			context.Check(
 				meshed &&
-					faceSampleA.m_Density == IsoValue &&
-					faceSampleB.m_Density == IsoValue &&
-					faceSampleC.m_Density == IsoValue &&
-					meshing.m_BoundaryValidation
-							.m_SkippedZeroLengthSegmentCount > 0,
+				faceSampleA.m_Density == IsoValue &&
+				faceSampleB.m_Density == IsoValue &&
+				faceSampleC.m_Density == IsoValue &&
+				meshing.m_BoundaryValidation
+				.m_SkippedZeroLengthSegmentCount > 0,
 				"Exact-iso face vertices discard zero-length contours before normal validation");
 
 			const BoundaryContourRecord* const fullIsoFace =
 				meshed
-					? FindBoundaryContour(
-						meshing.m_Chunks,
-						{},
-						ChunkBoundaryFace::NegativeX)
-					: nullptr;
+				? FindBoundaryContour(
+					meshing.m_Chunks,
+					{},
+					ChunkBoundaryFace::NegativeX)
+				: nullptr;
 			bool hasInteriorSegment = false;
 			if (fullIsoFace)
 			{
@@ -849,18 +862,18 @@ namespace gglab
 					const auto isInterior =
 						[maximumInterior](
 							QuantizedBoundaryContourPosition
-								position)
+							position)
 						{
 							return
 								position.m_Y > 0 &&
 								position.m_Y <
-									maximumInterior &&
+								maximumInterior &&
 								position.m_Z > 0 &&
 								position.m_Z <
-									maximumInterior;
+								maximumInterior;
 						};
 					if (isInterior(
-							segment.m_EndpointA.m_Position) &&
+						segment.m_EndpointA.m_Position) &&
 						isInterior(
 							segment.m_EndpointB.m_Position))
 					{
@@ -871,7 +884,7 @@ namespace gglab
 			}
 			context.Check(
 				fullIsoFace != nullptr &&
-					!hasInteriorSegment,
+				!hasInteriorSegment,
 				"Fully exact-iso boundary triangles emit no interior contour");
 		}
 
@@ -899,12 +912,12 @@ namespace gglab
 			WorldMeshValidationResult unchangedHash = hashSentinel;
 			context.Check(
 				generated &&
-					!visible.HasPublishedMeshes() &&
-					visible.GetVisibleWorldRevision() == 0 &&
-					visible.GetChunks().empty() &&
-					ComputeVisibleWorldMeshHash(visible, unchangedHash).m_Error ==
-						ValidationError::VisibleMeshSetUninitialized &&
-					unchangedHash == hashSentinel,
+				!visible.HasPublishedMeshes() &&
+				visible.GetVisibleWorldRevision() == 0 &&
+				visible.GetChunks().empty() &&
+				ComputeVisibleWorldMeshHash(visible, unchangedHash).m_Error ==
+				ValidationError::VisibleMeshSetUninitialized &&
+				unchangedHash == hashSentinel,
 				"An unpublished Visible Mesh Set has revision zero and no readable hash");
 
 			CpuMeshBatch fullBatch{};
@@ -938,9 +951,9 @@ namespace gglab
 			context.Check(
 				BuildCpuMeshBatch(
 					*world, 0, EightChunkDomain, unchangedBuild).m_Error ==
-						ValidationError::MismatchedCpuMeshTargetRevision &&
-					unchangedBuild.m_TargetWorldVoxelRevision == 1 &&
-					unchangedBuild.m_Candidates.data() == unchangedBuildData,
+				ValidationError::MismatchedCpuMeshTargetRevision &&
+				unchangedBuild.m_TargetWorldVoxelRevision == 1 &&
+				unchangedBuild.m_Candidates.data() == unchangedBuildData,
 				"CPU mesh batch build rejects a mismatched Target revision atomically");
 
 			std::unique_ptr<PendingCpuMeshBatch> pending;
@@ -950,11 +963,11 @@ namespace gglab
 			PendingCpuMeshBatch* const validatedPending = pending.get();
 			context.Check(
 				validated &&
-					pending->GetTargetWorldVoxelRevision() == 1 &&
-					pending->GetCandidateChunkCount() == EightChunkDomain.size() &&
-					pending->GetChunks().size() == EightChunkDomain.size() &&
-					!visible.HasPublishedMeshes() &&
-					visible.GetVisibleWorldRevision() == 0,
+				pending->GetTargetWorldVoxelRevision() == 1 &&
+				pending->GetCandidateChunkCount() == EightChunkDomain.size() &&
+				pending->GetChunks().size() == EightChunkDomain.size() &&
+				!visible.HasPublishedMeshes() &&
+				visible.GetVisibleWorldRevision() == 0,
 				"Validated Pending CPU meshes leave Visible state unchanged");
 			if (!validated)
 			{
@@ -965,27 +978,27 @@ namespace gglab
 			missingCandidate.m_Candidates.pop_back();
 			context.Check(
 				ValidateCpuMeshBatch(missingCandidate, visible, pending).m_Error ==
-						ValidationError::MismatchedCpuMeshCandidateSet &&
-					pending.get() == validatedPending &&
-					!visible.HasPublishedMeshes(),
+				ValidationError::MismatchedCpuMeshCandidateSet &&
+				pending.get() == validatedPending &&
+				!visible.HasPublishedMeshes(),
 				"Missing CPU mesh Candidates fail without replacing Pending or Visible state");
 
 			CpuMeshBatch extraCandidate = fullBatch;
 			extraCandidate.m_Candidates.push_back(fullBatch.m_Candidates.back());
 			context.Check(
 				ValidateCpuMeshBatch(extraCandidate, visible, pending).m_Error ==
-						ValidationError::MismatchedCpuMeshCandidateSet &&
-					pending.get() == validatedPending &&
-					!visible.HasPublishedMeshes(),
+				ValidationError::MismatchedCpuMeshCandidateSet &&
+				pending.get() == validatedPending &&
+				!visible.HasPublishedMeshes(),
 				"Extra CPU mesh Candidates fail without replacing Pending or Visible state");
 
 			CpuMeshBatch sourceRevisionMismatch = fullBatch;
 			sourceRevisionMismatch.m_Candidates[0].m_SourceWorldVoxelRevision = 2;
 			context.Check(
 				ValidateCpuMeshBatch(sourceRevisionMismatch, visible, pending).m_Error ==
-						ValidationError::MismatchedCpuMeshSourceRevision &&
-					pending.get() == validatedPending &&
-					!visible.HasPublishedMeshes(),
+				ValidationError::MismatchedCpuMeshSourceRevision &&
+				pending.get() == validatedPending &&
+				!visible.HasPublishedMeshes(),
 				"CPU mesh Candidate source revisions must match the Batch target");
 
 			constexpr std::array incompleteInitialChunks{
@@ -997,20 +1010,20 @@ namespace gglab
 					*world, 1, incompleteInitialChunks, incompleteInitialBatch).Succeeded();
 			context.Check(
 				incompleteInitialBuilt &&
-					ValidateCpuMeshBatch(
-						incompleteInitialBatch, visible, pending).m_Error ==
-						ValidationError::InvalidWorldMeshRecordSet &&
-					pending.get() == validatedPending &&
-					!visible.HasPublishedMeshes(),
+				ValidateCpuMeshBatch(
+					incompleteInitialBatch, visible, pending).m_Error ==
+				ValidationError::InvalidWorldMeshRecordSet &&
+				pending.get() == validatedPending &&
+				!visible.HasPublishedMeshes(),
 				"Initial CPU mesh publication requires the complete Cell-owner Chunk Domain");
 
 			CpuMeshBatch invalidCandidate = fullBatch;
 			invalidCandidate.m_Candidates[0].m_Validation.m_ValidationHash ^= 1;
 			context.Check(
 				ValidateCpuMeshBatch(invalidCandidate, visible, pending).m_Error ==
-						ValidationError::MismatchedChunkMeshValidation &&
-					pending.get() == validatedPending &&
-					!visible.HasPublishedMeshes(),
+				ValidationError::MismatchedChunkMeshValidation &&
+				pending.get() == validatedPending &&
+				!visible.HasPublishedMeshes(),
 				"One invalid CPU mesh Candidate prevents partial publication");
 
 			CpuMeshBatch candidateSeamFailure = fullBatch;
@@ -1024,10 +1037,10 @@ namespace gglab
 			}
 			context.Check(
 				candidateSeamInjected &&
-					ValidateCpuMeshBatch(candidateSeamFailure, visible, pending).m_Error ==
-						ValidationError::MismatchedBoundaryContour &&
-					pending.get() == validatedPending &&
-					!visible.HasPublishedMeshes(),
+				ValidateCpuMeshBatch(candidateSeamFailure, visible, pending).m_Error ==
+				ValidationError::MismatchedBoundaryContour &&
+				pending.get() == validatedPending &&
+				!visible.HasPublishedMeshes(),
 				"Candidate-to-Candidate seam failure prevents partial publication");
 
 			std::unique_ptr<PendingCpuMeshBatch> competingInitialPending;
@@ -1035,40 +1048,52 @@ namespace gglab
 				ValidateCpuMeshBatch(fullBatch, visible, competingInitialPending).Succeeded();
 			const WorldMeshValidationResult initialValidation =
 				pending->GetWorldMeshValidation();
+			std::unique_ptr<PreparedCpuMeshPublication> initialPublication;
+			const bool initialPrepared = PrepareCpuMeshBatchPublication(
+				pending, visible, initialPublication).Succeeded();
+			context.Check(initialPrepared && !pending && initialPublication &&
+				!visible.HasPublishedMeshes() && visible.GetVisibleWorldRevision() == 0,
+				"CPU mesh publication preparation leaves Visible state unchanged");
+			if (initialPrepared)
+			{
+				CommitCpuMeshBatchPublication(initialPublication, visible);
+			}
 			context.Check(
 				competingInitialValidated &&
-					PublishCpuMeshBatch(pending, visible).Succeeded() &&
-					pending == nullptr &&
-					visible.HasPublishedMeshes() &&
-					visible.GetVisibleWorldRevision() == 1 &&
-					visible.GetChunks().size() == EightChunkDomain.size() &&
-					visible.GetWorldMeshValidation() == initialValidation,
+				initialPrepared && !initialPublication &&
+				visible.HasPublishedMeshes() &&
+				visible.GetVisibleWorldRevision() == 1 &&
+				visible.GetChunks().size() == EightChunkDomain.size() &&
+				visible.GetWorldMeshValidation() == initialValidation,
 				"Publishing replaces the complete Visible Mesh Set at one Safe Point");
 
 			WorldMeshValidationResult visibleValidation{};
 			context.Check(
 				ComputeVisibleWorldMeshHash(visible, visibleValidation).Succeeded() &&
-					visibleValidation == initialValidation &&
-					visibleValidation.m_ValidationHash == 0xb939dfe96d74fe89ull,
+				visibleValidation == initialValidation &&
+				visibleValidation.m_ValidationHash == 0xb939dfe96d74fe89ull,
 				"Visible World mesh hashing reads only the published Mesh Set");
 
 			std::unique_ptr<PendingCpuMeshBatch> sameRevisionPending;
 			context.Check(
 				ValidateCpuMeshBatch(fullBatch, visible, sameRevisionPending).m_Error ==
-						ValidationError::StaleCpuMeshBatch &&
-					sameRevisionPending == nullptr &&
-					visible.GetVisibleWorldRevision() == 1 &&
-					visible.GetWorldMeshValidation() == initialValidation,
+				ValidationError::StaleCpuMeshBatch &&
+				sameRevisionPending == nullptr &&
+				visible.GetVisibleWorldRevision() == 1 &&
+				visible.GetWorldMeshValidation() == initialValidation,
 				"A published Visible revision cannot create another same-revision Pending batch");
 
 			const PendingCpuMeshBatch* const staleInitialPending =
 				competingInitialPending.get();
+			std::unique_ptr<PreparedCpuMeshPublication> staleInitialPublication;
 			context.Check(
-				PublishCpuMeshBatch(competingInitialPending, visible).m_Error ==
-						ValidationError::StaleCpuMeshBatch &&
-					competingInitialPending.get() == staleInitialPending &&
-					visible.GetVisibleWorldRevision() == 1 &&
-					visible.GetWorldMeshValidation() == initialValidation,
+				PrepareCpuMeshBatchPublication(competingInitialPending, visible,
+					staleInitialPublication).m_Error ==
+				ValidationError::StaleCpuMeshBatch &&
+				competingInitialPending.get() == staleInitialPending &&
+				!staleInitialPublication &&
+				visible.GetVisibleWorldRevision() == 1 &&
+				visible.GetWorldMeshValidation() == initialValidation,
 				"A Pending batch cannot publish over a different Visible base");
 
 			CpuMeshBatch mismatchedConfig = fullBatch;
@@ -1077,9 +1102,9 @@ namespace gglab
 			context.Check(
 				ValidateCpuMeshBatch(
 					mismatchedConfig, visible, mismatchedConfigPending).m_Error ==
-						ValidationError::MismatchedCpuMeshConfig &&
-					mismatchedConfigPending == nullptr &&
-					visible.GetVisibleWorldRevision() == 1,
+				ValidationError::MismatchedCpuMeshConfig &&
+				mismatchedConfigPending == nullptr &&
+				visible.GetVisibleWorldRevision() == 1,
 				"CPU mesh batches cannot merge into a differently configured Visible Set");
 
 			bool changed = false;
@@ -1122,12 +1147,12 @@ namespace gglab
 			std::unique_ptr<PendingCpuMeshBatch> partialPending;
 			context.Check(
 				currentNeighborFaultInjected &&
-					ValidateCpuMeshBatch(
-						currentNeighborFailure, visible, partialPending).m_Error ==
-						ValidationError::MismatchedBoundaryContour &&
-					partialPending == nullptr &&
-					visible.GetVisibleWorldRevision() == 1 &&
-					visible.GetWorldMeshValidation() == initialValidation,
+				ValidateCpuMeshBatch(
+					currentNeighborFailure, visible, partialPending).m_Error ==
+				ValidationError::MismatchedBoundaryContour &&
+				partialPending == nullptr &&
+				visible.GetVisibleWorldRevision() == 1 &&
+				visible.GetWorldMeshValidation() == initialValidation,
 				"Candidate-to-current Neighbor seam failure leaves Visible state unchanged");
 
 			const bool partialValidated =
@@ -1139,16 +1164,16 @@ namespace gglab
 					partialBatch, visible, competingPartialPending).Succeeded();
 			context.Check(
 				partialValidated &&
-					competingPartialValidated &&
-					partialPending->GetTargetWorldVoxelRevision() == 2 &&
-					partialPending->GetCandidateChunkCount() == 1 &&
-					visible.GetVisibleWorldRevision() == 1 &&
-					visible.GetWorldMeshValidation() == initialValidation,
+				competingPartialValidated &&
+				partialPending->GetTargetWorldVoxelRevision() == 2 &&
+				partialPending->GetCandidateChunkCount() == 1 &&
+				visible.GetVisibleWorldRevision() == 1 &&
+				visible.GetWorldMeshValidation() == initialValidation,
 				"Partial Pending validation compares retained current Neighbors without publishing");
 
 			const bool partialPublished =
 				partialValidated &&
-				PublishCpuMeshBatch(partialPending, visible).Succeeded();
+				PrepareAndCommitCpuMeshBatch(partialPending, visible).Succeeded();
 			const ChunkMeshRecord* const rebuiltRecord =
 				FindChunkMeshRecord(visible.GetChunks(), { -1, -1, -1 });
 			const ChunkMeshRecord* const retainedRecord =
@@ -1156,24 +1181,27 @@ namespace gglab
 			WorldMeshValidationResult editedValidation{};
 			context.Check(
 				partialPublished &&
-					visible.GetVisibleWorldRevision() == 2 &&
-					rebuiltRecord != nullptr &&
-					rebuiltRecord->m_SourceWorldVoxelRevision == 2 &&
-					retainedRecord != nullptr &&
-					retainedRecord->m_SourceWorldVoxelRevision == 1 &&
-					ComputeVisibleWorldMeshHash(visible, editedValidation).Succeeded() &&
-					editedValidation.m_ValidationHash !=
-						initialValidation.m_ValidationHash,
+				visible.GetVisibleWorldRevision() == 2 &&
+				rebuiltRecord != nullptr &&
+				rebuiltRecord->m_SourceWorldVoxelRevision == 2 &&
+				retainedRecord != nullptr &&
+				retainedRecord->m_SourceWorldVoxelRevision == 1 &&
+				ComputeVisibleWorldMeshHash(visible, editedValidation).Succeeded() &&
+				editedValidation.m_ValidationHash !=
+				initialValidation.m_ValidationHash,
 				"Partial publication advances Visible revision while retaining valid older records");
 
 			const PendingCpuMeshBatch* const stalePartialPending =
 				competingPartialPending.get();
+			std::unique_ptr<PreparedCpuMeshPublication> stalePartialPublication;
 			context.Check(
-				PublishCpuMeshBatch(competingPartialPending, visible).m_Error ==
-						ValidationError::StaleCpuMeshBatch &&
-					competingPartialPending.get() == stalePartialPending &&
-					visible.GetVisibleWorldRevision() == 2 &&
-					visible.GetWorldMeshValidation() == editedValidation,
+				PrepareCpuMeshBatchPublication(competingPartialPending, visible,
+					stalePartialPublication).m_Error ==
+				ValidationError::StaleCpuMeshBatch &&
+				competingPartialPending.get() == stalePartialPending &&
+				!stalePartialPublication &&
+				visible.GetVisibleWorldRevision() == 2 &&
+				visible.GetWorldMeshValidation() == editedValidation,
 				"Concurrent Pending publication is rejected atomically after the base changes");
 
 			VoxelSample damageOnlyEdit{};
@@ -1205,11 +1233,11 @@ namespace gglab
 			WorldMeshValidationResult damageOnlyValidation{};
 			context.Check(
 				damageOnlyValidated &&
-					PublishCpuMeshBatch(damageOnlyPending, visible).Succeeded() &&
-					visible.GetVisibleWorldRevision() == 3 &&
-					ComputeVisibleWorldMeshHash(
-						visible, damageOnlyValidation).Succeeded() &&
-					damageOnlyValidation == editedValidation,
+				PrepareAndCommitCpuMeshBatch(damageOnlyPending, visible).Succeeded() &&
+				visible.GetVisibleWorldRevision() == 3 &&
+				ComputeVisibleWorldMeshHash(
+					visible, damageOnlyValidation).Succeeded() &&
+				damageOnlyValidation == editedValidation,
 				"Damage-only World revisions publish without remeshing any Chunk");
 		}
 
@@ -1227,7 +1255,7 @@ namespace gglab
 				GenerateWorld(config, {}, world) &&
 				BuildCpuMeshBatch(*world, 1, EightChunkDomain, batch).Succeeded() &&
 				ValidateCpuMeshBatch(batch, visible, pending).Succeeded() &&
-				PublishCpuMeshBatch(pending, visible).Succeeded() &&
+				PrepareAndCommitCpuMeshBatch(pending, visible).Succeeded() &&
 				ComputeVisibleWorldMeshHash(visible, validation).Succeeded();
 			bool allChunksEmpty = published && visible.GetChunks().size() == EightChunkDomain.size();
 			for (const ChunkMeshRecord& record : visible.GetChunks())
@@ -1238,8 +1266,8 @@ namespace gglab
 			}
 			context.Check(
 				allChunksEmpty &&
-					validation.m_ChunkCount == EightChunkDomain.size() &&
-					validation.m_ValidationHash == 0x572bf6dcaaab0aa0ull,
+				validation.m_ChunkCount == EightChunkDomain.size() &&
+				validation.m_ValidationHash == 0x572bf6dcaaab0aa0ull,
 				"Visible World mesh hashing includes every Empty Mesh Chunk");
 		}
 
@@ -1265,8 +1293,8 @@ namespace gglab
 					guardWorld);
 			const std::size_t baselineResidentCount =
 				generated
-					? guardWorld->GetResidentChunkCount()
-					: 0;
+				? guardWorld->GetResidentChunkCount()
+				: 0;
 			bool allocated = false;
 			ReferenceWorldMeshingResult baselineMeshing{};
 			ReferenceWorldMeshingResult guardMeshing{};
@@ -1277,19 +1305,19 @@ namespace gglab
 					allocated).Succeeded() &&
 				allocated &&
 				guardWorld->GetResidentChunkCount() ==
-					baselineResidentCount + 1 &&
+				baselineResidentCount + 1 &&
 				ReferenceMesher(*baselineWorld).MeshWorld(
 					baselineMeshing).Succeeded() &&
 				ReferenceMesher(*guardWorld).MeshWorld(
 					guardMeshing).Succeeded();
 			context.Check(
 				meshed &&
-					baselineMeshing.m_Chunks.size() == 1 &&
-					guardMeshing.m_Chunks.size() == 1 &&
-					guardMeshing.m_Chunks[0].m_Chunk ==
-						ChunkCoord{} &&
-					guardMeshing.m_Validation ==
-						baselineMeshing.m_Validation,
+				baselineMeshing.m_Chunks.size() == 1 &&
+				guardMeshing.m_Chunks.size() == 1 &&
+				guardMeshing.m_Chunks[0].m_Chunk ==
+				ChunkCoord{} &&
+				guardMeshing.m_Validation ==
+				baselineMeshing.m_Validation,
 				"Guard Sample allocation creates no Cell mesh and changes no World mesh hash");
 		}
 	}
