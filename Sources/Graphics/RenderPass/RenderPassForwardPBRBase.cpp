@@ -7,6 +7,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
+#include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
@@ -40,7 +41,8 @@ namespace gglab
 			uint32_t m_ForwardPlusGlobalLightCount = 0;
 			std::array<uint32_t, 2> m_ForwardPlusGlobalLightIndices01{};
 			std::array<uint32_t, 2> m_ForwardPlusGlobalLightIndices23{};
-			std::array<uint32_t, 2> m_Padding{};
+			uint32_t m_GTAOTextureIndex = 0;
+			uint32_t m_GTAOFlags = 0;
 		};
 		static_assert(IsPassRootConstantStruct<ForwardPBRPassParameters>);
 		static_assert(sizeof(ForwardPBRPassParameters) == 64);
@@ -53,6 +55,7 @@ namespace gglab
 			RGTextureId m_PrefilteredSpecularCubemap{};
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_ShadowMap{};
+			RGTextureId m_GTAOFinalAO{};
 			RGTextureId m_LegacyReferenceColor{};
 			RGBufferId m_TileHeaders{};
 			RGBufferId m_TileIndices{};
@@ -60,6 +63,7 @@ namespace gglab
 			RGTextureViewId m_Rtv{};
 			RGTextureViewId m_Dsv{};
 			RGTextureViewId m_ShadowSrv{};
+			RGTextureViewId m_GTAOFinalAOSrv{};
 			RGTextureViewId m_LegacyReferenceRtv{};
 
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
@@ -73,7 +77,10 @@ namespace gglab
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
 			float m_ShadowReceiverDepthBias = 0.0f;
+			bool m_GTAOEnabled = false;
 		};
+
+		inline constexpr uint32_t GTAOEnabledFlag = 1u;
 
 		void AppendForwardPBRBindingSlot(RHIBindingLayoutDesc& desc, uint32_t binding,
 			const char* debugName) noexcept
@@ -145,6 +152,25 @@ namespace gglab
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
 				data.m_ShadowMap =
 					builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
+				const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
+				if (!transparent && gtao && gtao->IsComplete())
+				{
+					const RHITextureDesc& gtaoDesc = builder.GetTextureDesc(gtao->m_FinalAO);
+					const RHITextureDesc& sceneColorDesc =
+						builder.GetTextureDesc(displayTargets.m_SceneColor);
+					GGLAB_ASSERT_MSG(gtaoDesc.m_Dimension == RHITextureDimension::Texture2D &&
+						(gtaoDesc.m_Format == RHIFormat::R8Unorm ||
+							gtaoDesc.m_Format == RHIFormat::R16Float) &&
+						gtaoDesc.m_Extent.m_Width == sceneColorDesc.m_Extent.m_Width &&
+						gtaoDesc.m_Extent.m_Height == sceneColorDesc.m_Extent.m_Height,
+						"GTAO FinalAO must use its resolved single-channel format and match the opaque "
+						"display target extent.");
+					data.m_GTAOFinalAO = builder.Read(
+						gtao->m_FinalAO, RGTextureAccess::Sample, RHIStage::PixelShader);
+					data.m_GTAOFinalAOSrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_GTAOFinalAO);
+					data.m_GTAOEnabled = true;
+				}
 
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
@@ -278,6 +304,14 @@ namespace gglab
 					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
 
 				auto* renderer = servicesPtr->m_Renderer;
+				uint32_t gtaoTextureIndex = 0;
+				if (data.m_GTAOEnabled)
+				{
+					const auto gtaoSrv = executeContext.GetViewDescriptor(data.m_GTAOFinalAOSrv);
+					GGLAB_ASSERT_MSG(gtaoSrv.IsValid(),
+						"GTAO FinalAO must expose a shader-resource descriptor before opaque shading.");
+					gtaoTextureIndex = gtaoSrv.m_Index;
+				}
 				const auto& globalLightIndices = contextPtr->m_RenderScene.m_GlobalLightIndices;
 				std::array<uint32_t, ForwardPlusGlobalLightCapacity> packedGlobalLightIndices{};
 				if (data.m_LightingVariant != ForwardPBRLightingVariant::Legacy)
@@ -400,6 +434,8 @@ namespace gglab
 						packedGlobalLightIndices[0], packedGlobalLightIndices[1] },
 					.m_ForwardPlusGlobalLightIndices23 = {
 						packedGlobalLightIndices[2], packedGlobalLightIndices[3] },
+					.m_GTAOTextureIndex = gtaoTextureIndex,
+					.m_GTAOFlags = data.m_GTAOEnabled ? GTAOEnabledFlag : 0u,
 				};
 				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);

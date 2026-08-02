@@ -51,6 +51,11 @@ namespace gglab
 			RGTextureId m_Texture;
 		};
 
+		struct GTAODataflowPassData
+		{
+			std::array<RGTextureViewId, 3> m_Views{};
+		};
+
 		struct BarrierBatchingPassData
 		{
 			RGTextureId m_Texture;
@@ -1569,24 +1574,51 @@ namespace gglab
 				!singlePixelNeighbors.m_HasPositiveNeighbor,
 				"GTAO normal reconstruction never substitutes the center pixel for a missing edge neighbor");
 
-			const RHITextureSupportResult supportedFormat{ .m_Supported = true };
-			const RHITextureSupportResult unsupportedR8{
+			const RHITextureSupportResult supportedRequirement{ .m_Supported = true };
+			const RHITextureSupportResult unsupportedTypedStore{
 				.m_Reason = RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported,
 				.m_Supported = false,
 			};
+			const RHITextureSupportResult unsupportedShaderResource{
+				.m_Reason = RHITextureSupportReason::ShaderResourceUnsupported,
+				.m_Supported = false,
+			};
+			const GTAOSurfaceFormatSupport supportedFormat{
+				.m_ShaderResource = supportedRequirement,
+				.m_TypedUavStore = supportedRequirement,
+			};
+			const GTAOSurfaceFormatSupport unsupportedR8Store{
+				.m_ShaderResource = supportedRequirement,
+				.m_TypedUavStore = unsupportedTypedStore,
+			};
+			const GTAOSurfaceFormatSupport unsupportedR8Srv{
+				.m_ShaderResource = unsupportedShaderResource,
+				.m_TypedUavStore = supportedRequirement,
+			};
 			const GTAOFinalAOFormatResolution preferredFinalAO =
 				ResolveGTAOFinalAOFormat(supportedFormat, supportedFormat);
-			const GTAOFinalAOFormatResolution fallbackFinalAO =
-				ResolveGTAOFinalAOFormat(unsupportedR8, supportedFormat);
+			const GTAOFinalAOFormatResolution storeFallbackFinalAO =
+				ResolveGTAOFinalAOFormat(unsupportedR8Store, supportedFormat);
+			const GTAOFinalAOFormatResolution srvFallbackFinalAO =
+				ResolveGTAOFinalAOFormat(unsupportedR8Srv, supportedFormat);
 			const GTAOFinalAOFormatResolution unavailableFinalAO =
-				ResolveGTAOFinalAOFormat(unsupportedR8, unsupportedR8);
+				ResolveGTAOFinalAOFormat(unsupportedR8Store, unsupportedR8Srv);
 			context.Check(preferredFinalAO.m_Format == RHIFormat::R8Unorm &&
 				!preferredFinalAO.UsesFallback() &&
-				fallbackFinalAO.m_Format == RHIFormat::R16Float && fallbackFinalAO.UsesFallback() &&
-				fallbackFinalAO.m_PreferredR8Unorm.m_Reason ==
-				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported &&
+				storeFallbackFinalAO.m_Format == RHIFormat::R16Float &&
+				storeFallbackFinalAO.UsesFallback() &&
+				storeFallbackFinalAO.m_PreferredR8Unorm.m_TypedUavStore.m_Reason ==
+					RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported &&
+				srvFallbackFinalAO.m_Format == RHIFormat::R16Float &&
+				srvFallbackFinalAO.m_PreferredR8Unorm.m_ShaderResource.m_Reason ==
+					RHITextureSupportReason::ShaderResourceUnsupported &&
 				!unavailableFinalAO.IsAvailable(),
-				"GTAO FinalAO prefers R8, falls back to R16, and preserves the preferred failure reason");
+				"GTAO FinalAO requires both SRV and typed UAV store support and preserves failures");
+
+			context.Check(ResolveGTAODiffuseIBLVisibility(0.5f, 0.25f) == 0.125f &&
+				ResolveGTAOSpecularIBLVisibility(0.5f) == 0.5f &&
+				ResolveGTAODiffuseIBLVisibility(0.5f, 1.0f) == 0.5f,
+				"GTAO modulates material-occluded diffuse IBL without changing specular IBL visibility");
 
 			ViewRenderProfile gtaoProfile{};
 			gtaoProfile.m_Lighting.m_GTAO.m_Radius = -1.0f;
@@ -1698,6 +1730,137 @@ namespace gglab
 						edge.m_ToPassIndex == static_cast<int32_t>(toPass) &&
 						edge.m_Reason == reason;
 				});
+		}
+
+		void RunGTAORenderGraphDataflowTests(SelfTestContext& context) noexcept
+		{
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			const RHITextureDesc halfAODesc{
+				.m_Format = RHIFormat::R16Float,
+				.m_Extent = { 640, 360, 1 },
+			};
+			RHITextureDesc halfDepthDesc = halfAODesc;
+			halfDepthDesc.m_Format = RHIFormat::R32Float;
+			const RHITextureDesc finalAODesc{
+				.m_Format = RHIFormat::R8Unorm,
+				.m_Extent = { 1280, 720, 1 },
+			};
+
+			RGTextureId rawAO;
+			RGTextureId halfDepth;
+			RGTextureId denoiseX;
+			RGTextureId denoiseY;
+			RGTextureId finalAO;
+			graph.AddPass<GTAODataflowPassData>("Lighting.GTAO", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
+				{
+					rawAO = builder.CreateTexture("GTAO.RawAO", halfAODesc);
+					halfDepth = builder.CreateTexture("GTAO.HalfDepthViewZ", halfDepthDesc);
+					builder.WriteInPlace(
+						rawAO, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					builder.WriteInPlace(
+						halfDepth, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] =
+						builder.CreateView<RHITextureViewType::UnorderedAccess>(rawAO);
+					data.m_Views[1] =
+						builder.CreateView<RHITextureViewType::UnorderedAccess>(halfDepth);
+				});
+			graph.AddPass<GTAODataflowPassData>(
+				"Lighting.GTAO.DenoiseX", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
+				{
+					const RGTextureId rawAOSrv = builder.Read(
+						rawAO, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId halfDepthSrv = builder.Read(
+						halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					denoiseX = builder.CreateTexture("GTAO.DenoiseX", halfAODesc);
+					builder.WriteInPlace(
+						denoiseX, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(rawAOSrv);
+					data.m_Views[1] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
+					data.m_Views[2] =
+						builder.CreateView<RHITextureViewType::UnorderedAccess>(denoiseX);
+				});
+			graph.AddPass<GTAODataflowPassData>(
+				"Lighting.GTAO.DenoiseY", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
+				{
+					const RGTextureId denoiseXSrv = builder.Read(
+						denoiseX, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId halfDepthSrv = builder.Read(
+						halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					denoiseY = builder.CreateTexture("GTAO.DenoiseY", halfAODesc);
+					builder.WriteInPlace(
+						denoiseY, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(denoiseXSrv);
+					data.m_Views[1] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
+					data.m_Views[2] =
+						builder.CreateView<RHITextureViewType::UnorderedAccess>(denoiseY);
+				});
+			graph.AddPass<GTAODataflowPassData>(
+				"Lighting.GTAO.Upsample", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
+				{
+					const RGTextureId denoiseYSrv = builder.Read(
+						denoiseY, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					const RGTextureId halfDepthSrv = builder.Read(
+						halfDepth, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					finalAO = builder.CreateTexture("GTAO.FinalAO", finalAODesc);
+					builder.WriteInPlace(
+						finalAO, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Views[0] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(denoiseYSrv);
+					data.m_Views[1] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(halfDepthSrv);
+					data.m_Views[2] =
+						builder.CreateView<RHITextureViewType::UnorderedAccess>(finalAO);
+				});
+			graph.AddPass<GTAODataflowPassData>("Geometry.ForwardPBR.Opaque",
+				[&](RenderGraph::RGBuilder& builder, GTAODataflowPassData& data)
+				{
+					const RGTextureId finalAOSrv = builder.Read(
+						finalAO, RGTextureAccess::Sample, RHIStage::PixelShader);
+					data.m_Views[0] =
+						builder.CreateView<RHITextureViewType::ShaderResource>(finalAOSrv);
+					builder.SideEffect();
+				});
+
+			const bool compiled = graph.Compile();
+			context.Check(compiled, "GTAO production RenderGraph dataflow fixture compiles");
+			if (!compiled)
+			{
+				return;
+			}
+
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			const bool allPassesLive = snapshot.m_Passes.size() == 5 &&
+				std::ranges::none_of(snapshot.m_Passes,
+					[](const RGSnapshotPassInfo& pass) noexcept { return pass.m_Culled; });
+			context.Check(allPassesLive &&
+				HasDependencyEdge(snapshot, 0, 1, RGDependencyReason::WriterToReader) &&
+				HasDependencyEdge(snapshot, 1, 2, RGDependencyReason::WriterToReader) &&
+				HasDependencyEdge(snapshot, 2, 3, RGDependencyReason::WriterToReader) &&
+				HasDependencyEdge(snapshot, 3, 4, RGDependencyReason::WriterToReader),
+				"GTAO evaluate, denoise, upsample, and opaque consumption remain one live chain");
+
+			const auto& opaqueBarriers = snapshot.m_Passes[4].m_PreBarriers;
+			context.Check(opaqueBarriers.size() == 1 &&
+				opaqueBarriers[0].m_ResourceName == "GTAO.FinalAO" &&
+				opaqueBarriers[0].m_Kind == RGBarrierKind::Transition &&
+				opaqueBarriers[0].m_Reason == RGBarrierReason::AccessTransition &&
+				opaqueBarriers[0].m_Before.m_Stages == RHIStage::ComputeShader &&
+				opaqueBarriers[0].m_Before.m_Access == RHIAccess::UnorderedAccess &&
+				opaqueBarriers[0].m_After.m_Stages == RHIStage::PixelShader &&
+				opaqueBarriers[0].m_After.m_Access == RHIAccess::ShaderResource,
+				"GTAO FinalAO transitions exactly from compute UAV-write to opaque pixel SRV-read");
 		}
 
 		void RunRenderGraphAccessAndBarrierContractTests(SelfTestContext& context) noexcept
@@ -2371,6 +2534,7 @@ namespace gglab
 		RunSuiteSmokeTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
+		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);
 		RunTemporalCompatibilityAndHistoryContractTests(context);
 	}

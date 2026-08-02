@@ -3,6 +3,7 @@
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 
@@ -47,10 +48,21 @@ namespace gglab
 		bool m_HasPositiveNeighbor = false;
 	};
 
+	struct GTAOSurfaceFormatSupport
+	{
+		RHITextureSupportResult m_ShaderResource{};
+		RHITextureSupportResult m_TypedUavStore{};
+
+		[[nodiscard]] constexpr bool IsSupported() const noexcept
+		{
+			return m_ShaderResource.IsSupported() && m_TypedUavStore.IsSupported();
+		}
+	};
+
 	struct GTAOFinalAOFormatResolution
 	{
-		RHITextureSupportResult m_PreferredR8Unorm{};
-		RHITextureSupportResult m_FallbackR16Float{};
+		GTAOSurfaceFormatSupport m_PreferredR8Unorm{};
+		GTAOSurfaceFormatSupport m_FallbackR16Float{};
 		RHIFormat m_Format = RHIFormat::Unknown;
 
 		[[nodiscard]] constexpr bool IsAvailable() const noexcept
@@ -66,22 +78,21 @@ namespace gglab
 
 	struct GTAOCapabilityStatus
 	{
-		RHITextureSupportResult m_R16FloatStore{};
-		RHITextureSupportResult m_R32FloatStore{};
-		RHITextureSupportResult m_R16G16FloatStore{};
-		RHITextureSupportResult m_R16G16B16A16FloatStore{};
+		GTAOSurfaceFormatSupport m_R16Float{};
+		GTAOSurfaceFormatSupport m_R32Float{};
+		GTAOSurfaceFormatSupport m_R16G16Float{};
+		GTAOSurfaceFormatSupport m_R16G16B16A16Float{};
 		GTAOFinalAOFormatResolution m_FinalAO{};
 
 		[[nodiscard]] constexpr bool IsCoreAvailable() const noexcept
 		{
-			return m_R16FloatStore.IsSupported() && m_R32FloatStore.IsSupported() &&
+			return m_R16Float.IsSupported() && m_R32Float.IsSupported() &&
 				m_FinalAO.IsAvailable();
 		}
 
 		[[nodiscard]] constexpr bool AreDiagnosticOutputsAvailable() const noexcept
 		{
-			return m_R16G16FloatStore.IsSupported() &&
-				m_R16G16B16A16FloatStore.IsSupported();
+			return m_R16G16Float.IsSupported() && m_R16G16B16A16Float.IsSupported();
 		}
 	};
 
@@ -101,10 +112,20 @@ namespace gglab
 		DepthConvention convention) noexcept;
 
 	[[nodiscard]] float GTAOInterleavedGradientNoise(uint32_t pixelX, uint32_t pixelY) noexcept;
+	[[nodiscard]] constexpr float ResolveGTAODiffuseIBLVisibility(
+		float materialAO, float gtao) noexcept
+	{
+		return std::clamp(materialAO * gtao, 0.0f, 1.0f);
+	}
+
+	[[nodiscard]] constexpr float ResolveGTAOSpecularIBLVisibility(float materialAO) noexcept
+	{
+		return std::clamp(materialAO, 0.0f, 1.0f);
+	}
 
 	[[nodiscard]] constexpr GTAOFinalAOFormatResolution ResolveGTAOFinalAOFormat(
-		RHITextureSupportResult preferredR8Unorm,
-		RHITextureSupportResult fallbackR16Float) noexcept
+		GTAOSurfaceFormatSupport preferredR8Unorm,
+		GTAOSurfaceFormatSupport fallbackR16Float) noexcept
 	{
 		return {
 			.m_PreferredR8Unorm = preferredR8Unorm,

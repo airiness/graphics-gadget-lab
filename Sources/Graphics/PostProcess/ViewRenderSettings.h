@@ -52,7 +52,7 @@ namespace gglab
 
 	struct GTAOSettings
 	{
-		bool m_Enabled = false;
+		bool m_Enabled = true;
 		float m_Radius = 1.0f;
 		float m_FalloffStart = 0.1f;
 		float m_FalloffEnd = 1.0f;

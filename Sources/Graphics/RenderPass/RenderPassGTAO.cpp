@@ -98,31 +98,48 @@ namespace gglab
 			GTAOUpsamplePassParameters m_Parameters{};
 		};
 
-		RHITextureSupportResult QueryTypedUavStore(
+		GTAOSurfaceFormatSupport QueryGTAOSurfaceFormatSupport(
 			RHIDevice& device, RHIFormat format) noexcept
 		{
 			const RHITextureDesc textureDesc{
+				.m_Dimension = RHITextureDimension::Texture2D,
 				.m_Format = format,
 				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess,
 				.m_Extent = { 1, 1, 1 },
 			};
 			auto viewDesc = MakeRHITexture2DViewDesc(format);
+			viewDesc.m_Type = RHITextureViewType::ShaderResource;
+			const RHITextureSupportResult shaderResource =
+				device.QueryTextureViewSupport(textureDesc, viewDesc);
 			viewDesc.m_Type = RHITextureViewType::UnorderedAccess;
-			return device.QueryTextureViewSupport(textureDesc, viewDesc);
+			return {
+				.m_ShaderResource = shaderResource,
+				.m_TypedUavStore = device.QueryTextureViewSupport(textureDesc, viewDesc),
+			};
 		}
 
 		void LogCapabilityFailure(
-			std::string_view surfaceName, RHIFormat format, RHITextureSupportResult result) noexcept
+			std::string_view surfaceName, std::string_view requirement, RHIFormat format,
+			RHITextureSupportResult result) noexcept
 		{
 			if (result.IsSupported())
 			{
 				return;
 			}
 			GGLAB_LOG_GRAPHICS_WARN(
-				"GTAO surface '{}' cannot use {}: validation={}, support={}.", surfaceName,
-				GetRHIFormatInfo(format).m_Name,
+				"GTAO surface '{}' cannot satisfy {} with {}: validation={}, support={}.",
+				surfaceName, requirement, GetRHIFormatInfo(format).m_Name,
 				RHITextureValidationErrorText(result.m_ValidationError),
 				RHITextureSupportReasonText(result.m_Reason));
+		}
+
+		void LogSurfaceCapabilityFailures(std::string_view surfaceName, RHIFormat format,
+			const GTAOSurfaceFormatSupport& support) noexcept
+		{
+			LogCapabilityFailure(
+				surfaceName, "Texture2D shader-resource Load/Sample", format, support.m_ShaderResource);
+			LogCapabilityFailure(surfaceName, "Texture2D typed UAV view/store", format,
+				support.m_TypedUavStore);
 		}
 
 		bool RequiresGTAODiagnosticOutputs(PostProcessDebugTap tap) noexcept
@@ -147,28 +164,31 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(device);
 
 		m_IsInitialized = true;
-		m_Capabilities.m_R16FloatStore = QueryTypedUavStore(*device, RHIFormat::R16Float);
-		m_Capabilities.m_R32FloatStore = QueryTypedUavStore(*device, RHIFormat::R32Float);
-		m_Capabilities.m_R16G16FloatStore = QueryTypedUavStore(*device, RHIFormat::R16G16Float);
-		m_Capabilities.m_R16G16B16A16FloatStore =
-			QueryTypedUavStore(*device, RHIFormat::R16G16B16A16Float);
+		m_Capabilities.m_R16Float =
+			QueryGTAOSurfaceFormatSupport(*device, RHIFormat::R16Float);
+		m_Capabilities.m_R32Float =
+			QueryGTAOSurfaceFormatSupport(*device, RHIFormat::R32Float);
+		m_Capabilities.m_R16G16Float =
+			QueryGTAOSurfaceFormatSupport(*device, RHIFormat::R16G16Float);
+		m_Capabilities.m_R16G16B16A16Float =
+			QueryGTAOSurfaceFormatSupport(*device, RHIFormat::R16G16B16A16Float);
 		m_Capabilities.m_FinalAO = ResolveGTAOFinalAOFormat(
-			QueryTypedUavStore(*device, RHIFormat::R8Unorm),
-			m_Capabilities.m_R16FloatStore);
+			QueryGTAOSurfaceFormatSupport(*device, RHIFormat::R8Unorm),
+			m_Capabilities.m_R16Float);
 
-		if (!m_Capabilities.m_R16FloatStore.IsSupported())
+		if (!m_Capabilities.m_R16Float.IsSupported())
 		{
-			LogCapabilityFailure(
-				"half-resolution AO", RHIFormat::R16Float, m_Capabilities.m_R16FloatStore);
+			LogSurfaceCapabilityFailures(
+				"half-resolution AO", RHIFormat::R16Float, m_Capabilities.m_R16Float);
 		}
-		if (!m_Capabilities.m_R32FloatStore.IsSupported())
+		if (!m_Capabilities.m_R32Float.IsSupported())
 		{
-			LogCapabilityFailure(
-				"half-resolution view Z", RHIFormat::R32Float, m_Capabilities.m_R32FloatStore);
+			LogSurfaceCapabilityFailures(
+				"half-resolution view Z", RHIFormat::R32Float, m_Capabilities.m_R32Float);
 		}
 		if (!m_Capabilities.m_FinalAO.m_PreferredR8Unorm.IsSupported())
 		{
-			LogCapabilityFailure("full-resolution AO preferred format", RHIFormat::R8Unorm,
+			LogSurfaceCapabilityFailures("full-resolution AO preferred format", RHIFormat::R8Unorm,
 				m_Capabilities.m_FinalAO.m_PreferredR8Unorm);
 			if (m_Capabilities.m_FinalAO.UsesFallback())
 			{
@@ -180,7 +200,7 @@ namespace gglab
 		{
 			if (!m_Capabilities.m_FinalAO.IsAvailable())
 			{
-				LogCapabilityFailure("full-resolution AO fallback", RHIFormat::R16Float,
+				LogSurfaceCapabilityFailures("full-resolution AO fallback", RHIFormat::R16Float,
 					m_Capabilities.m_FinalAO.m_FallbackR16Float);
 			}
 			return;
@@ -217,10 +237,10 @@ namespace gglab
 		}
 		if (!m_Capabilities.AreDiagnosticOutputsAvailable())
 		{
-			LogCapabilityFailure("selected surface offset", RHIFormat::R16G16Float,
-				m_Capabilities.m_R16G16FloatStore);
-			LogCapabilityFailure("reconstructed normal", RHIFormat::R16G16B16A16Float,
-				m_Capabilities.m_R16G16B16A16FloatStore);
+			LogSurfaceCapabilityFailures("selected surface offset", RHIFormat::R16G16Float,
+				m_Capabilities.m_R16G16Float);
+			LogSurfaceCapabilityFailures("reconstructed normal", RHIFormat::R16G16B16A16Float,
+				m_Capabilities.m_R16G16B16A16Float);
 		}
 	}
 
@@ -507,6 +527,10 @@ namespace gglab
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		const size_t index = static_cast<size_t>(variant);
-		return pipelineCache->Resolve(m_PipelineSlots[index], m_PipelineRecipes[index], GetInfo());
+		GGLAB_ASSERT(index < m_PipelineRecipes.size());
+		const RHIPipelineHandle pipeline =
+			pipelineCache->Resolve(m_PipelineSlots[index], m_PipelineRecipes[index], GetInfo());
+		GGLAB_ASSERT_MSG(pipeline.IsValid(), "GTAO pipeline resolution returned an invalid handle.");
+		return pipeline;
 	}
 }
