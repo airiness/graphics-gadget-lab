@@ -1086,10 +1086,12 @@ namespace gglab
 			ShaderDesc desc{
 				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
 				.m_Stage = ShaderStage::Compute,
-				.m_Model = ShaderModel::SM_6_7,
+				.m_Target = {
+					.m_Model = ShaderModel::SM_6_7,
+					.m_HlslVersion = L"2021",
+				},
 				.m_Entry = L"CSMain",
 				.m_IncludeDirs = {L"."},
-				.m_HlslVersion = L"2021",
 			};
 			const ShaderDesc normalizedDesc = compiler.NormalizeShaderDesc(desc);
 			const ShaderCompileArtifact artifact = compiler.CompileOrLoadArtifact(normalizedDesc);

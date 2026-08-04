@@ -51,7 +51,7 @@ namespace gglab
 	{
 		m_Compiler = std::make_unique<ShaderCompiler>();
 
-		m_DefaultShaderConfig.m_Flags |=
+		m_DefaultShaderConfig.m_Target.m_Flags |=
 			IsDebuggerPresent() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
 		m_DefaultShaderConfig.m_IncludeDirs = { m_Compiler->GetSourceRootDirectory() };
 		m_DefaultShaderConfig.m_Defines = {};

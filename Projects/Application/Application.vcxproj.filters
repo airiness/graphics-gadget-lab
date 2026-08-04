@@ -327,6 +327,9 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -1149,6 +1152,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.h">

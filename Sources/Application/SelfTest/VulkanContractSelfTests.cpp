@@ -1,17 +1,162 @@
 #include "Core/Precompiled.h"
+#include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "Graphics/Shader/ShaderCompiler.h"
 
 namespace gglab
 {
 	namespace
 	{
+		class ScopedTestDirectory
+		{
+		public:
+			explicit ScopedTestDirectory(std::filesystem::path path) noexcept : m_Path(std::move(path))
+			{
+				std::error_code errorCode;
+				std::filesystem::remove_all(m_Path, errorCode);
+			}
+			~ScopedTestDirectory()
+			{
+				std::error_code errorCode;
+				std::filesystem::remove_all(m_Path, errorCode);
+			}
+
+			const std::filesystem::path& GetPath() const noexcept { return m_Path; }
+
+		private:
+			std::filesystem::path m_Path;
+		};
+
+		[[nodiscard]] bool ContainsArgument(
+			const std::vector<std::wstring>& arguments, std::wstring_view expected) noexcept
+		{
+			return std::ranges::find(arguments, expected) != arguments.end();
+		}
+
+		[[nodiscard]] bool ContainsArgumentSequence(const std::vector<std::wstring>& arguments,
+			std::initializer_list<std::wstring_view> expected) noexcept
+		{
+			if (expected.size() > arguments.size())
+			{
+				return false;
+			}
+			for (size_t offset = 0; offset + expected.size() <= arguments.size(); ++offset)
+			{
+				bool matches = true;
+				size_t index = offset;
+				for (std::wstring_view value : expected)
+				{
+					matches &= arguments[index++] == value;
+				}
+				if (matches)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		[[nodiscard]] bool HasDescriptorBinding(const SpirVDecorationReflection& reflection,
+			uint32_t descriptorSet, uint32_t binding) noexcept
+		{
+			return std::ranges::any_of(reflection.m_DescriptorBindings,
+				[descriptorSet, binding](const SpirVDescriptorBindingReflection& descriptor) noexcept
+				{
+					return descriptor.m_DescriptorSet == descriptorSet &&
+						descriptor.m_Binding == binding;
+				});
+		}
+
+		[[nodiscard]] std::filesystem::path FindSpirVValidator() noexcept
+		{
+			std::array<wchar_t, 32'768> buffer{};
+			const DWORD sdkLength = GetEnvironmentVariableW(
+				L"VULKAN_SDK", buffer.data(), static_cast<DWORD>(buffer.size()));
+			if (sdkLength > 0 && sdkLength < buffer.size())
+			{
+				const std::filesystem::path fromSdk =
+					std::filesystem::path(buffer.data()) / L"Bin" / L"spirv-val.exe";
+				std::error_code errorCode;
+				if (std::filesystem::exists(fromSdk, errorCode))
+				{
+					return fromSdk;
+				}
+			}
+
+			const DWORD pathLength = SearchPathW(nullptr, L"spirv-val.exe", nullptr,
+				static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
+			return pathLength > 0 && pathLength < buffer.size()
+				? std::filesystem::path(buffer.data())
+				: std::filesystem::path{};
+		}
+
+		[[nodiscard]] bool ValidateSpirVBinary(
+			const std::filesystem::path& validator, const std::filesystem::path& binary) noexcept
+		{
+			if (validator.empty() || binary.empty())
+			{
+				return false;
+			}
+			std::wstring commandLine = std::format(L"\"{}\" --target-env vulkan1.3 \"{}\"",
+				validator.wstring(), binary.wstring());
+			STARTUPINFOW startupInfo{
+				.cb = sizeof(STARTUPINFOW),
+			};
+			PROCESS_INFORMATION processInfo{};
+			if (!CreateProcessW(validator.c_str(), commandLine.data(), nullptr, nullptr, FALSE,
+				CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, &processInfo))
+			{
+				return false;
+			}
+
+			const DWORD waitResult = WaitForSingleObject(processInfo.hProcess, 30'000);
+			if (waitResult == WAIT_TIMEOUT)
+			{
+				TerminateProcess(processInfo.hProcess, ERROR_TIMEOUT);
+				WaitForSingleObject(processInfo.hProcess, INFINITE);
+			}
+			DWORD exitCode = ERROR_GEN_FAILURE;
+			GetExitCodeProcess(processInfo.hProcess, &exitCode);
+			CloseHandle(processInfo.hThread);
+			CloseHandle(processInfo.hProcess);
+			return waitResult == WAIT_OBJECT_0 && exitCode == 0;
+		}
+
+		[[nodiscard]] bool ReplaceMetadataValue(const std::filesystem::path& path,
+			std::string_view key, std::string_view replacement) noexcept
+		{
+			std::ifstream input(path, std::ios::binary);
+			if (!input)
+			{
+				return false;
+			}
+			std::string content((std::istreambuf_iterator<char>(input)),
+				std::istreambuf_iterator<char>());
+			const std::string prefix = std::string(key) + "=";
+			const size_t begin = content.find(prefix);
+			const size_t end = begin == std::string::npos ? std::string::npos : content.find('\n', begin);
+			if (begin == std::string::npos || end == std::string::npos)
+			{
+				return false;
+			}
+			content.replace(begin, end - begin, prefix + std::string(replacement));
+			std::ofstream output(path, std::ios::binary | std::ios::trunc);
+			output.write(content.data(), static_cast<std::streamsize>(content.size()));
+			return output.good();
+		}
+
 		VulkanDeviceProfileCapabilities MakeSupportedCapabilities() noexcept
 		{
+			const uint32_t resourceCount =
+				GGLabDescriptorCapacityContract.m_ResourceDescriptorCount;
+			const uint32_t samplerCount =
+				GGLabDescriptorCapacityContract.m_SamplerDescriptorCount;
+			const uint32_t combinedCount = resourceCount + samplerCount;
 			return {
 				.m_IsWindowsX64 = true,
 				.m_HasVulkanLoader = true,
@@ -34,10 +179,16 @@ namespace gglab
 				.m_ShaderStorageImageArrayNonUniformIndexing = true,
 				.m_HasMutableDescriptorTypeExtension = true,
 				.m_MutableDescriptorType = true,
-				.m_ResourceDescriptorCapacity =
-					GGLabDescriptorCapacityContract.m_ResourceDescriptorCount,
-				.m_SamplerDescriptorCapacity =
-					GGLabDescriptorCapacityContract.m_SamplerDescriptorCount,
+				.m_DescriptorCapacityLimits = {
+					.m_MaxDescriptorSetUpdateAfterBindSampledImages = resourceCount,
+					.m_MaxPerStageDescriptorUpdateAfterBindSampledImages = resourceCount,
+					.m_MaxDescriptorSetUpdateAfterBindStorageImages = resourceCount,
+					.m_MaxPerStageDescriptorUpdateAfterBindStorageImages = resourceCount,
+					.m_MaxDescriptorSetUpdateAfterBindSamplers = samplerCount,
+					.m_MaxPerStageDescriptorUpdateAfterBindSamplers = samplerCount,
+					.m_MaxPerStageUpdateAfterBindResources = combinedCount,
+					.m_MaxUpdateAfterBindDescriptorsInAllPools = combinedCount,
+				},
 				.m_GlobalDescriptorSetLayoutSupported = true,
 				.m_RequiredFormatFeaturesSupported = true,
 			};
@@ -61,36 +212,66 @@ namespace gglab
 			context.Check(GGLabVulkanShaderBindingABI.m_Revision == 1,
 				"Vulkan shader binding ABI revision is fixed at 1");
 
-			struct FixedBindingCase
+			struct FixedRegisterClassCase
 			{
 				VulkanShaderRegisterClass m_RegisterClass;
-				uint32_t m_ExpectedBinding;
-				std::string_view m_CheckName;
+				VulkanFixedRegisterRange m_ExpectedRange;
 			};
-			constexpr std::array FixedBindingCases{
-				FixedBindingCase{ VulkanShaderRegisterClass::ConstantBuffer, 3,
-					"Vulkan b-register shift is 0" },
-				FixedBindingCase{ VulkanShaderRegisterClass::ShaderResource, 35,
-					"Vulkan t-register shift is 32" },
-				FixedBindingCase{ VulkanShaderRegisterClass::UnorderedAccess, 67,
-					"Vulkan u-register shift is 64" },
-				FixedBindingCase{ VulkanShaderRegisterClass::Sampler, 99,
-					"Vulkan s-register shift is 96" },
+			constexpr std::array FixedRegisterClassCases{
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::ConstantBuffer, { 0, 32 } },
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::ShaderResource, { 32, 32 } },
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::UnorderedAccess, { 64, 32 } },
+				FixedRegisterClassCase{ VulkanShaderRegisterClass::Sampler, { 96, 32 } },
 			};
-			for (const auto& testCase : FixedBindingCases)
+			bool rangesMatch = true;
+			bool allBindingsUnique = true;
+			bool allOutOfRangeIndicesRejected = true;
+			std::array<bool, 128> occupiedBindings{};
+			for (const auto& testCase : FixedRegisterClassCases)
 			{
-				const auto result = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass, 3, 0);
-				context.Check(result.IsSupported() && result.m_Location.m_DescriptorSet == 0 &&
-					result.m_Location.m_Binding == testCase.m_ExpectedBinding, testCase.m_CheckName);
+				const VulkanFixedRegisterRange range =
+					GetVulkanFixedRegisterRange(testCase.m_RegisterClass);
+				rangesMatch &= range.m_BindingShift == testCase.m_ExpectedRange.m_BindingShift &&
+					range.m_RegisterCount == testCase.m_ExpectedRange.m_RegisterCount;
+				for (uint32_t registerIndex = 0; registerIndex < range.m_RegisterCount;
+					++registerIndex)
+				{
+					const auto result = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
+						registerIndex, GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
+					const uint32_t expectedBinding = range.m_BindingShift + registerIndex;
+					allBindingsUnique &= result.IsSupported() &&
+						result.m_Location.m_DescriptorSet ==
+							GGLabVulkanShaderBindingABI.m_FixedDescriptorSet &&
+						result.m_Location.m_Binding == expectedBinding &&
+						expectedBinding < occupiedBindings.size() && !occupiedBindings[expectedBinding];
+					if (expectedBinding < occupiedBindings.size())
+					{
+						occupiedBindings[expectedBinding] = true;
+					}
+				}
+				const auto outOfRange = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
+					range.m_RegisterCount, GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
+				allOutOfRangeIndicesRejected &= !outOfRange.IsSupported() &&
+					outOfRange.m_RejectionReason ==
+						VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
 			}
+			context.Check(rangesMatch,
+				"Vulkan fixed-register ranges lock 32 bindings at shifts 0, 32, 64, and 96");
+			context.Check(allBindingsUnique && std::ranges::all_of(occupiedBindings,
+				[](bool occupied) noexcept { return occupied; }),
+				"Every Vulkan v1 fixed binding is accepted exactly once without collisions");
+			context.Check(allOutOfRangeIndicesRejected,
+				"Every Vulkan fixed-register class rejects index 32 as out of range");
 
 			const auto reservedSpace = EvaluateVulkanFixedShaderBinding(
-				VulkanShaderRegisterClass::ShaderResource, 0, 1);
+				VulkanShaderRegisterClass::ShaderResource, 0,
+				GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace);
 			context.Check(!reservedSpace.IsSupported() && reservedSpace.m_RejectionReason ==
 					VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
 				"Fixed bindings reject HLSL space1 reserved for global heaps");
 			const auto unsupportedSpace = EvaluateVulkanFixedShaderBinding(
-				VulkanShaderRegisterClass::ShaderResource, 0, 2);
+				VulkanShaderRegisterClass::ShaderResource, 0,
+				GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace + 1);
 			context.Check(!unsupportedSpace.IsSupported() && unsupportedSpace.m_RejectionReason ==
 					VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace,
 				"Fixed bindings reject unsupported HLSL register spaces explicitly");
@@ -277,19 +458,79 @@ namespace gglab
 				VulkanDeviceProfileRejectionReason::ApiVersionTooLow),
 				"Vulkan profile rejects API versions below 1.3 explicitly");
 
-			auto insufficientResources = supported;
-			--insufficientResources.m_ResourceDescriptorCapacity;
-			const auto resourceEvaluation = EvaluateVulkanV1DeviceProfile(insufficientResources);
-			context.Check(resourceEvaluation.m_RejectionReasonCount == 1 && resourceEvaluation.HasReason(
-				VulkanDeviceProfileRejectionReason::ResourceDescriptorCapacityInsufficient),
-				"Vulkan profile rejects resource descriptor capacity below 65,536");
+			struct CapacityLimitCase
+			{
+				uint32_t VulkanDescriptorCapacityLimits::* m_Field;
+				uint32_t m_RequiredValue;
+				VulkanDeviceProfileRejectionReason m_Reason;
+				std::string_view m_CheckName;
+			};
+			const uint32_t resourceCount =
+				GGLabDescriptorCapacityContract.m_ResourceDescriptorCount;
+			const uint32_t samplerCount =
+				GGLabDescriptorCapacityContract.m_SamplerDescriptorCount;
+			const uint32_t combinedCount = resourceCount + samplerCount;
+			const std::array CapacityLimitCases{
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindSampledImages,
+					resourceCount,
+					VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient,
+					"Vulkan profile checks the descriptor-set sampled-image limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindSampledImages,
+					resourceCount,
+					VulkanDeviceProfileRejectionReason::PerStageSampledImageLimitInsufficient,
+					"Vulkan profile checks the per-stage sampled-image limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindStorageImages,
+					resourceCount,
+					VulkanDeviceProfileRejectionReason::DescriptorSetStorageImageLimitInsufficient,
+					"Vulkan profile checks the descriptor-set storage-image limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindStorageImages,
+					resourceCount,
+					VulkanDeviceProfileRejectionReason::PerStageStorageImageLimitInsufficient,
+					"Vulkan profile checks the per-stage storage-image limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxDescriptorSetUpdateAfterBindSamplers,
+					samplerCount,
+					VulkanDeviceProfileRejectionReason::DescriptorSetSamplerLimitInsufficient,
+					"Vulkan profile checks the descriptor-set sampler limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxPerStageDescriptorUpdateAfterBindSamplers,
+					samplerCount,
+					VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient,
+					"Vulkan profile checks the per-stage sampler limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxPerStageUpdateAfterBindResources,
+					combinedCount,
+					VulkanDeviceProfileRejectionReason::
+						PerStageUpdateAfterBindResourceLimitInsufficient,
+					"Vulkan profile checks the combined per-stage update-after-bind limit" },
+				CapacityLimitCase{
+					&VulkanDescriptorCapacityLimits::m_MaxUpdateAfterBindDescriptorsInAllPools,
+					combinedCount,
+					VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient,
+					"Vulkan profile checks the update-after-bind pool limit" },
+			};
+			for (const auto& testCase : CapacityLimitCases)
+			{
+				auto insufficient = supported;
+				insufficient.m_DescriptorCapacityLimits.*testCase.m_Field = testCase.m_RequiredValue - 1;
+				const auto evaluation = EvaluateVulkanV1DeviceProfile(insufficient);
+				context.Check(evaluation.m_RejectionReasonCount == 1 &&
+					evaluation.HasReason(testCase.m_Reason), testCase.m_CheckName);
+			}
 
-			auto insufficientSamplers = supported;
-			--insufficientSamplers.m_SamplerDescriptorCapacity;
-			const auto samplerEvaluation = EvaluateVulkanV1DeviceProfile(insufficientSamplers);
-			context.Check(samplerEvaluation.m_RejectionReasonCount == 1 && samplerEvaluation.HasReason(
-				VulkanDeviceProfileRejectionReason::SamplerDescriptorCapacityInsufficient),
-				"Vulkan profile rejects sampler descriptor capacity below 2,048");
+			auto asymmetricLimits = supported.m_DescriptorCapacityLimits;
+			asymmetricLimits.m_MaxPerStageDescriptorUpdateAfterBindStorageImages = resourceCount - 7;
+			asymmetricLimits.m_MaxPerStageUpdateAfterBindResources = combinedCount - 3;
+			const auto availability =
+				CalculateVulkanDescriptorCapacityAvailability(asymmetricLimits);
+			context.Check(availability.m_ResourceDescriptorCount == resourceCount - 7 &&
+				availability.m_SamplerDescriptorCount == samplerCount &&
+				availability.m_CombinedDescriptorCount == combinedCount - 3,
+				"Vulkan descriptor capacity is the minimum across every relevant native limit");
 		}
 
 		void RunCoordinatePolicyTests(SelfTestContext& context) noexcept
@@ -308,6 +549,260 @@ namespace gglab
 				!GGLabVulkanCoordinatePolicy.m_BackendAppliesAdditionalReversedZ,
 				"Vulkan coordinate lowering applies each required correction exactly once");
 		}
+
+		void RunShaderArtifactContractTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabVulkanShaderContracts-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Vulkan shader contract test resolves a temporary cache root");
+			if (errorCode)
+			{
+				return;
+			}
+
+			ScopedTestDirectory scopedDirectory(tempRoot);
+			ShaderCompiler compiler;
+			compiler.SetCacheRootDirectory(scopedDirectory.GetPath());
+			const std::filesystem::path validator = FindSpirVValidator();
+			context.Check(!validator.empty(),
+				"Pinned Vulkan SDK provides spirv-val for SPIR-V contract validation");
+
+			ShaderDesc coverageDesc{
+				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Entry = L"VSMain",
+				.m_IncludeDirs = {L"."},
+			};
+			const ShaderDesc normalizedDxil = compiler.NormalizeShaderDesc(coverageDesc);
+			const ShaderCompileArtifact dxilArtifact =
+				compiler.CompileOrLoadArtifact(normalizedDxil);
+
+			coverageDesc.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(coverageDesc.m_Stage);
+			const ShaderDesc normalizedSpirV = compiler.NormalizeShaderDesc(coverageDesc);
+			const ShaderCompileArtifact spirVArtifact =
+				compiler.CompileOrLoadArtifact(normalizedSpirV);
+			const ShaderCompileArtifact cachedSpirVArtifact =
+				compiler.CompileOrLoadArtifact(normalizedSpirV);
+
+			const std::wstring dxilPath = dxilArtifact.m_BinaryPath.generic_wstring();
+			const std::wstring spirVPath = spirVArtifact.m_BinaryPath.generic_wstring();
+			context.Check(dxilArtifact.m_Binary.IsValid() && spirVArtifact.m_Binary.IsValid() &&
+				dxilArtifact.m_Format == ShaderBinaryFormat::Dxil &&
+				spirVArtifact.m_Format == ShaderBinaryFormat::SpirV,
+				"One normalized HLSL recipe produces valid DXIL and SPIR-V artifacts");
+			context.Check(dxilPath.find(L"/dxil/") != std::wstring::npos &&
+				spirVPath.find(L"/spirv/") != std::wstring::npos &&
+				dxilArtifact.m_BinaryPath.extension() == L".dxil" &&
+				spirVArtifact.m_BinaryPath.extension() == L".spv" &&
+				dxilArtifact.m_BinaryPath != spirVArtifact.m_BinaryPath,
+				"Shader cache partitions DXIL and SPIR-V by directory and extension");
+			context.Check(!spirVArtifact.m_FromCache && cachedSpirVArtifact.m_FromCache,
+				"SPIR-V artifact cache reuses an exact normalized target");
+			context.Check(normalizedSpirV.m_Target.m_DxcVersion == compiler.GetCompilerVersion() &&
+				!compiler.GetCompilerVersion().empty() && compiler.GetCompilerVersion() != L"unknown",
+				"Normalized shader target records the concrete DXC compiler identity");
+
+			const ShaderHash128 dxilRecipe = ShaderCompiler::ComputeRecipeHash(normalizedDxil);
+			const ShaderHash128 spirVRecipe = ShaderCompiler::ComputeRecipeHash(normalizedSpirV);
+			auto changedABI = normalizedSpirV;
+			++changedABI.m_Target.m_BindingABIRevision;
+			auto changedDxc = normalizedSpirV;
+			changedDxc.m_Target.m_DxcVersion += L"-different";
+			auto changedCoordinates = normalizedSpirV;
+			changedCoordinates.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
+			auto changedArguments = normalizedSpirV;
+			changedArguments.m_ExtraArgs.push_back(L"-GGLAB_TEST_ARGUMENT");
+			context.Check(dxilRecipe != spirVRecipe && spirVRecipe !=
+					ShaderCompiler::ComputeRecipeHash(changedABI) && spirVRecipe !=
+					ShaderCompiler::ComputeRecipeHash(changedDxc) && spirVRecipe !=
+					ShaderCompiler::ComputeRecipeHash(changedCoordinates) && spirVRecipe !=
+					ShaderCompiler::ComputeRecipeHash(changedArguments),
+				"Shader recipe identity includes format, ABI, DXC, coordinates, and compile arguments");
+
+			const std::vector<std::wstring> vertexArguments =
+				ShaderCompiler::BuildCompileArguments(normalizedSpirV);
+			bool registerShiftsMatch = true;
+			const std::array registerShiftOptions{
+				std::pair{ L"-fvk-b-shift", VulkanShaderRegisterClass::ConstantBuffer },
+				std::pair{ L"-fvk-t-shift", VulkanShaderRegisterClass::ShaderResource },
+				std::pair{ L"-fvk-u-shift", VulkanShaderRegisterClass::UnorderedAccess },
+				std::pair{ L"-fvk-s-shift", VulkanShaderRegisterClass::Sampler },
+			};
+			for (const auto& [option, registerClass] : registerShiftOptions)
+			{
+				const VulkanFixedRegisterRange range = GetVulkanFixedRegisterRange(registerClass);
+				const std::wstring shift = std::to_wstring(range.m_BindingShift);
+				const std::wstring hlslSpace =
+					std::to_wstring(GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
+				registerShiftsMatch &=
+					ContainsArgumentSequence(vertexArguments, {option, shift, hlslSpace});
+			}
+			const std::wstring resourceBinding =
+				std::to_wstring(GGLabVulkanShaderBindingABI.m_ResourceHeapBinding);
+			const std::wstring samplerBinding =
+				std::to_wstring(GGLabVulkanShaderBindingABI.m_SamplerHeapBinding);
+			const std::wstring descriptorSet =
+				std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet);
+			context.Check(registerShiftsMatch && ContainsArgumentSequence(vertexArguments,
+				{L"-fvk-bind-resource-heap", resourceBinding, descriptorSet}) &&
+				ContainsArgumentSequence(vertexArguments,
+					{L"-fvk-bind-sampler-heap", samplerBinding, descriptorSet}),
+				"SPIR-V compile arguments consume the centralized HLSL-space and descriptor-set ABI");
+			context.Check(ContainsArgument(vertexArguments, L"-spirv") &&
+				ContainsArgument(vertexArguments, L"-fspv-target-env=vulkan1.3") &&
+				ContainsArgument(vertexArguments, L"-fvk-use-dx-layout") &&
+				ContainsArgument(vertexArguments, L"-fvk-invert-y") &&
+				!ContainsArgument(vertexArguments, L"-fvk-use-dx-position-w"),
+				"Vertex SPIR-V compile policy targets Vulkan 1.3 with DX layout and one Y inversion");
+
+			ShaderDesc forwardPixelDesc{
+				.m_SourcePath = L"Passes/PassForwardPBR.hlsl",
+				.m_Stage = ShaderStage::Pixel,
+				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Pixel),
+				.m_Entry = L"PSMain",
+				.m_IncludeDirs = {L"."},
+			};
+			const ShaderDesc normalizedForwardPixel = compiler.NormalizeShaderDesc(forwardPixelDesc);
+			const auto pixelArguments =
+				ShaderCompiler::BuildCompileArguments(normalizedForwardPixel);
+			context.Check(ContainsArgument(pixelArguments, L"-fvk-use-dx-position-w") &&
+				!ContainsArgument(pixelArguments, L"-fvk-invert-y"),
+				"Pixel SPIR-V compile policy preserves the HLSL SV_Position.w contract");
+
+			std::ifstream metadataInput(spirVArtifact.m_MetaPath, std::ios::binary);
+			const std::string metadata((std::istreambuf_iterator<char>(metadataInput)),
+				std::istreambuf_iterator<char>());
+			context.Check(metadata.find("schema=2") != std::string::npos &&
+				metadata.find("binary_format=spirv") != std::string::npos &&
+				metadata.find("target_environment=vulkan1.3") != std::string::npos &&
+				metadata.find("binding_abi_revision=1") != std::string::npos &&
+				metadata.find("dxc_version=") != std::string::npos,
+				"Shader artifact metadata records target format, environment, ABI, and DXC identity");
+			const bool metadataChanged = ReplaceMetadataValue(
+				spirVArtifact.m_MetaPath, "binding_abi_revision", "999");
+			const ShaderCompileArtifact rejectedCacheArtifact =
+				compiler.CompileOrLoadArtifact(normalizedSpirV);
+			context.Check(metadataChanged && !rejectedCacheArtifact.m_FromCache,
+				"Shader cache rejects metadata whose target contract does not match the recipe");
+
+			SpirVDecorationReflection coverageReflection;
+			const bool coverageReflected =
+				ReadSpirVDecorations(spirVArtifact.m_Binary, coverageReflection);
+			const SpirVEntryPointReflection* coverageEntry =
+				coverageReflection.FindEntryPoint("VSMain");
+			const std::vector<uint32_t> expectedVertexLocations{ 0, 1, 2, 3, 4 };
+			context.Check(coverageReflected && coverageEntry &&
+				coverageEntry->m_ExecutionModel == SpirVExecutionModel::Vertex &&
+				coverageEntry->m_InputLocations == expectedVertexLocations &&
+				coverageEntry->m_OutputBuiltInCount > 0,
+				"SPIR-V reader resolves vertex stage, user locations, and member BuiltIns");
+			context.Check(HasDescriptorBinding(coverageReflection, 0, 2),
+				"Forward coverage SPIR-V maps b2 to set 0 binding 2");
+
+			const ShaderCompileArtifact forwardPixelArtifact =
+				compiler.CompileOrLoadArtifact(normalizedForwardPixel);
+			SpirVDecorationReflection forwardPixelReflection;
+			const bool forwardPixelReflected =
+				ReadSpirVDecorations(forwardPixelArtifact.m_Binary, forwardPixelReflection);
+			const SpirVEntryPointReflection* forwardPixelEntry =
+				forwardPixelReflection.FindEntryPoint("PSMain");
+			context.Check(forwardPixelReflected && forwardPixelEntry &&
+				forwardPixelEntry->m_ExecutionModel == SpirVExecutionModel::Fragment &&
+				forwardPixelEntry->m_InputBuiltInCount > 0 &&
+				HasDescriptorBinding(forwardPixelReflection, 1, 0) &&
+				HasDescriptorBinding(forwardPixelReflection, 1, 1),
+				"Forward PBR SPIR-V exposes fragment stage and both global heap bindings");
+
+			ShaderDesc cullDesc{
+				.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl",
+				.m_Stage = ShaderStage::Compute,
+				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Compute),
+				.m_Entry = L"CSMain",
+				.m_IncludeDirs = {L"."},
+			};
+			const ShaderCompileArtifact cullArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(cullDesc));
+			SpirVDecorationReflection cullReflection;
+			const bool cullReflected = ReadSpirVDecorations(cullArtifact.m_Binary, cullReflection);
+			const SpirVEntryPointReflection* cullEntry = cullReflection.FindEntryPoint("CSMain");
+			const std::array cullFixedBindings{ 0u, 32u, 33u, 64u, 65u };
+			const bool cullBindingsMatch = std::ranges::all_of(cullFixedBindings,
+				[&cullReflection](uint32_t binding) noexcept
+				{
+					return HasDescriptorBinding(cullReflection, 0, binding);
+				});
+			context.Check(cullReflected && cullEntry &&
+				cullEntry->m_ExecutionModel == SpirVExecutionModel::Compute &&
+				cullBindingsMatch && HasDescriptorBinding(cullReflection, 1, 0),
+				"Forward+ SPIR-V locks fixed CBV/SRV/UAV shifts and the global resource heap");
+
+			ShaderDesc gtaoDesc{
+				.m_SourcePath = L"Passes/PassGTAO.hlsl",
+				.m_Stage = ShaderStage::Compute,
+				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Compute),
+				.m_Entry = L"CSMain",
+				.m_IncludeDirs = {L"."},
+			};
+			const ShaderCompileArtifact gtaoArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(gtaoDesc));
+			gtaoDesc.m_Defines = {
+				{.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"},
+			};
+			const ShaderCompileArtifact gtaoDiagnosticsArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(gtaoDesc));
+
+			ShaderDesc storageDesc{
+				.m_SourcePath = L"Passes/PassRenderGraphComputeSmoke.hlsl",
+				.m_Stage = ShaderStage::Compute,
+				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Compute),
+				.m_Entry = L"CSWrite",
+				.m_IncludeDirs = {L"."},
+			};
+			const ShaderCompileArtifact storageArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(storageDesc));
+			SpirVDecorationReflection storageReflection;
+			const bool storageReflected =
+				ReadSpirVDecorations(storageArtifact.m_Binary, storageReflection);
+			context.Check(storageReflected && HasDescriptorBinding(storageReflection, 0, 2) &&
+				HasDescriptorBinding(storageReflection, 1, 0),
+				"RenderGraph storage-write SPIR-V maps fixed constants and the mutable resource heap");
+
+			ShaderDesc fullscreenDesc = storageDesc;
+			fullscreenDesc.m_Stage = ShaderStage::Vertex;
+			fullscreenDesc.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex);
+			fullscreenDesc.m_Entry = L"VSMain";
+			const ShaderCompileArtifact fullscreenArtifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(fullscreenDesc));
+			SpirVDecorationReflection fullscreenReflection;
+			const bool fullscreenReflected =
+				ReadSpirVDecorations(fullscreenArtifact.m_Binary, fullscreenReflection);
+			const SpirVEntryPointReflection* fullscreenEntry =
+				fullscreenReflection.FindEntryPoint("VSMain");
+			context.Check(fullscreenReflected && fullscreenEntry &&
+				fullscreenEntry->m_InputLocations.empty() &&
+				fullscreenEntry->m_InputBuiltInCount > 0 &&
+				fullscreenEntry->m_OutputBuiltInCount > 0,
+				"SPIR-V reader excludes SV_VertexID and SV_Position from user locations");
+
+			const std::array artifactsToValidate{
+				&spirVArtifact,
+				&forwardPixelArtifact,
+				&cullArtifact,
+				&gtaoArtifact,
+				&gtaoDiagnosticsArtifact,
+				&storageArtifact,
+				&fullscreenArtifact,
+			};
+			const bool allValidated = !validator.empty() && std::ranges::all_of(artifactsToValidate,
+				[&validator](const ShaderCompileArtifact* artifact) noexcept
+				{
+					return artifact->m_Binary.IsValid() &&
+						ValidateSpirVBinary(validator, artifact->m_BinaryPath);
+				});
+			context.Check(allValidated,
+				"Pinned spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
+		}
 	}
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
@@ -316,5 +811,6 @@ namespace gglab
 		RunShaderBindingABITests(context);
 		RunDeviceProfileTests(context);
 		RunCoordinatePolicyTests(context);
+		RunShaderArtifactContractTests(context);
 	}
 }

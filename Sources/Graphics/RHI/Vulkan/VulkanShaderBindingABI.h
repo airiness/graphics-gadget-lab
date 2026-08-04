@@ -3,7 +3,6 @@
 
 #include <array>
 #include <cstdint>
-#include <limits>
 #include <string_view>
 
 namespace gglab
@@ -43,8 +42,14 @@ namespace gglab
 		None,
 		ReservedGlobalHeapRegisterSpace,
 		UnsupportedFixedRegisterSpace,
-		FixedRegisterIndexOverflow,
+		FixedRegisterIndexOutOfRange,
 		UnsupportedBindlessResourceClass,
+	};
+
+	struct VulkanFixedRegisterRange
+	{
+		uint32_t m_BindingShift = 0;
+		uint32_t m_RegisterCount = 0;
 	};
 
 	struct VulkanShaderBindingLocation
@@ -68,15 +73,20 @@ namespace gglab
 	struct VulkanShaderBindingABI
 	{
 		uint32_t m_Revision = 1;
-		uint32_t m_FixedDescriptorSet = 0;
-		uint32_t m_ConstantBufferShift = 0;
-		uint32_t m_ShaderResourceShift = 32;
-		uint32_t m_UnorderedAccessShift = 64;
-		uint32_t m_SamplerShift = 96;
 
+		uint32_t m_FixedHlslRegisterSpace = 0;
+		uint32_t m_GlobalHeapHlslRegisterSpace = 1;
+
+		uint32_t m_FixedDescriptorSet = 0;
 		uint32_t m_GlobalDescriptorSet = 1;
 		uint32_t m_ResourceHeapBinding = 0;
 		uint32_t m_SamplerHeapBinding = 1;
+
+		VulkanFixedRegisterRange m_ConstantBufferRange{ 0, 32 };
+		VulkanFixedRegisterRange m_ShaderResourceRange{ 32, 32 };
+		VulkanFixedRegisterRange m_UnorderedAccessRange{ 64, 32 };
+		VulkanFixedRegisterRange m_SamplerRange{ 96, 32 };
+
 		VulkanDescriptorType m_ResourceHeapDescriptorType = VulkanDescriptorType::Mutable;
 		std::array<VulkanDescriptorType, 2> m_ResourceHeapMutableAllowedTypes{
 			VulkanDescriptorType::SampledImage,
@@ -91,35 +101,35 @@ namespace gglab
 
 	inline constexpr VulkanShaderBindingABI GGLabVulkanShaderBindingABI{};
 
-	[[nodiscard]] constexpr uint32_t GetVulkanShaderRegisterShift(
+	[[nodiscard]] constexpr VulkanFixedRegisterRange GetVulkanFixedRegisterRange(
 		VulkanShaderRegisterClass registerClass) noexcept
 	{
 		switch (registerClass)
 		{
 		case VulkanShaderRegisterClass::ConstantBuffer:
-			return GGLabVulkanShaderBindingABI.m_ConstantBufferShift;
+			return GGLabVulkanShaderBindingABI.m_ConstantBufferRange;
 		case VulkanShaderRegisterClass::ShaderResource:
-			return GGLabVulkanShaderBindingABI.m_ShaderResourceShift;
+			return GGLabVulkanShaderBindingABI.m_ShaderResourceRange;
 		case VulkanShaderRegisterClass::UnorderedAccess:
-			return GGLabVulkanShaderBindingABI.m_UnorderedAccessShift;
+			return GGLabVulkanShaderBindingABI.m_UnorderedAccessRange;
 		case VulkanShaderRegisterClass::Sampler:
-			return GGLabVulkanShaderBindingABI.m_SamplerShift;
+			return GGLabVulkanShaderBindingABI.m_SamplerRange;
 		}
-		return 0;
+		return {};
 	}
 
 	[[nodiscard]] constexpr VulkanShaderBindingResult EvaluateVulkanFixedShaderBinding(
 		VulkanShaderRegisterClass registerClass, uint32_t registerIndex,
 		uint32_t registerSpace) noexcept
 	{
-		if (registerSpace == GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet)
+		if (registerSpace == GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace)
 		{
 			return {
 				.m_RejectionReason =
 					VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
 			};
 		}
-		if (registerSpace != GGLabVulkanShaderBindingABI.m_FixedDescriptorSet)
+		if (registerSpace != GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace)
 		{
 			return {
 				.m_RejectionReason =
@@ -127,19 +137,19 @@ namespace gglab
 			};
 		}
 
-		const uint32_t shift = GetVulkanShaderRegisterShift(registerClass);
-		if (registerIndex > std::numeric_limits<uint32_t>::max() - shift)
+		const VulkanFixedRegisterRange range = GetVulkanFixedRegisterRange(registerClass);
+		if (registerIndex >= range.m_RegisterCount)
 		{
 			return {
 				.m_RejectionReason =
-					VulkanShaderBindingRejectionReason::FixedRegisterIndexOverflow,
+					VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange,
 			};
 		}
 
 		return {
 			.m_Location = {
 				.m_DescriptorSet = GGLabVulkanShaderBindingABI.m_FixedDescriptorSet,
-				.m_Binding = shift + registerIndex,
+				.m_Binding = range.m_BindingShift + registerIndex,
 			},
 		};
 	}
@@ -206,8 +216,8 @@ namespace gglab
 			return "HLSL space1 is reserved for the global descriptor heaps";
 		case VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace:
 			return "fixed shader bindings only support HLSL space0";
-		case VulkanShaderBindingRejectionReason::FixedRegisterIndexOverflow:
-			return "shifted shader register index exceeds the Vulkan binding range";
+		case VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange:
+			return "shader register index exceeds its Vulkan v1 fixed-binding range";
 		case VulkanShaderBindingRejectionReason::UnsupportedBindlessResourceClass:
 			return "bindless resource class is not supported by Vulkan binding ABI revision 1";
 		}

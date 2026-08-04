@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -58,12 +59,57 @@ namespace gglab
 		ShaderStorageImageArrayNonUniformIndexingUnavailable,
 		MutableDescriptorTypeExtensionUnavailable,
 		MutableDescriptorTypeUnavailable,
-		ResourceDescriptorCapacityInsufficient,
-		SamplerDescriptorCapacityInsufficient,
+		DescriptorSetSampledImageLimitInsufficient,
+		PerStageSampledImageLimitInsufficient,
+		DescriptorSetStorageImageLimitInsufficient,
+		PerStageStorageImageLimitInsufficient,
+		DescriptorSetSamplerLimitInsufficient,
+		PerStageSamplerLimitInsufficient,
+		PerStageUpdateAfterBindResourceLimitInsufficient,
+		UpdateAfterBindPoolLimitInsufficient,
 		GlobalDescriptorSetLayoutUnsupported,
 		RequiredFormatFeaturesUnavailable,
 		Count,
 	};
+
+	struct VulkanDescriptorCapacityLimits
+	{
+		uint32_t m_MaxDescriptorSetUpdateAfterBindSampledImages = 0;
+		uint32_t m_MaxPerStageDescriptorUpdateAfterBindSampledImages = 0;
+		uint32_t m_MaxDescriptorSetUpdateAfterBindStorageImages = 0;
+		uint32_t m_MaxPerStageDescriptorUpdateAfterBindStorageImages = 0;
+		uint32_t m_MaxDescriptorSetUpdateAfterBindSamplers = 0;
+		uint32_t m_MaxPerStageDescriptorUpdateAfterBindSamplers = 0;
+		uint32_t m_MaxPerStageUpdateAfterBindResources = 0;
+		uint32_t m_MaxUpdateAfterBindDescriptorsInAllPools = 0;
+	};
+
+	struct VulkanDescriptorCapacityAvailability
+	{
+		uint32_t m_ResourceDescriptorCount = 0;
+		uint32_t m_SamplerDescriptorCount = 0;
+		uint32_t m_CombinedDescriptorCount = 0;
+	};
+
+	[[nodiscard]] constexpr VulkanDescriptorCapacityAvailability
+		CalculateVulkanDescriptorCapacityAvailability(
+			const VulkanDescriptorCapacityLimits& limits) noexcept
+	{
+		return {
+			.m_ResourceDescriptorCount = std::min({
+				limits.m_MaxDescriptorSetUpdateAfterBindSampledImages,
+				limits.m_MaxPerStageDescriptorUpdateAfterBindSampledImages,
+				limits.m_MaxDescriptorSetUpdateAfterBindStorageImages,
+				limits.m_MaxPerStageDescriptorUpdateAfterBindStorageImages,
+			}),
+			.m_SamplerDescriptorCount = std::min(
+				limits.m_MaxDescriptorSetUpdateAfterBindSamplers,
+				limits.m_MaxPerStageDescriptorUpdateAfterBindSamplers),
+			.m_CombinedDescriptorCount = std::min(
+				limits.m_MaxPerStageUpdateAfterBindResources,
+				limits.m_MaxUpdateAfterBindDescriptorsInAllPools),
+		};
+	}
 
 	struct VulkanDeviceProfileCapabilities
 	{
@@ -90,8 +136,7 @@ namespace gglab
 		bool m_HasMutableDescriptorTypeExtension = false;
 		bool m_MutableDescriptorType = false;
 
-		uint32_t m_ResourceDescriptorCapacity = 0;
-		uint32_t m_SamplerDescriptorCapacity = 0;
+		VulkanDescriptorCapacityLimits m_DescriptorCapacityLimits{};
 		bool m_GlobalDescriptorSetLayoutSupported = false;
 		bool m_RequiredFormatFeaturesSupported = false;
 
@@ -191,12 +236,29 @@ namespace gglab
 			VulkanDeviceProfileRejectionReason::MutableDescriptorTypeExtensionUnavailable);
 		require(capabilities.m_MutableDescriptorType,
 			VulkanDeviceProfileRejectionReason::MutableDescriptorTypeUnavailable);
-		require(capabilities.m_ResourceDescriptorCapacity >=
-			GGLabVulkanV1DeviceProfile.m_DescriptorCapacity.m_ResourceDescriptorCount,
-			VulkanDeviceProfileRejectionReason::ResourceDescriptorCapacityInsufficient);
-		require(capabilities.m_SamplerDescriptorCapacity >=
-			GGLabVulkanV1DeviceProfile.m_DescriptorCapacity.m_SamplerDescriptorCount,
-			VulkanDeviceProfileRejectionReason::SamplerDescriptorCapacityInsufficient);
+		const auto& limits = capabilities.m_DescriptorCapacityLimits;
+		const uint32_t requiredResources =
+			GGLabVulkanV1DeviceProfile.m_DescriptorCapacity.m_ResourceDescriptorCount;
+		const uint32_t requiredSamplers =
+			GGLabVulkanV1DeviceProfile.m_DescriptorCapacity.m_SamplerDescriptorCount;
+		require(limits.m_MaxDescriptorSetUpdateAfterBindSampledImages >= requiredResources,
+			VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient);
+		require(limits.m_MaxPerStageDescriptorUpdateAfterBindSampledImages >= requiredResources,
+			VulkanDeviceProfileRejectionReason::PerStageSampledImageLimitInsufficient);
+		require(limits.m_MaxDescriptorSetUpdateAfterBindStorageImages >= requiredResources,
+			VulkanDeviceProfileRejectionReason::DescriptorSetStorageImageLimitInsufficient);
+		require(limits.m_MaxPerStageDescriptorUpdateAfterBindStorageImages >= requiredResources,
+			VulkanDeviceProfileRejectionReason::PerStageStorageImageLimitInsufficient);
+		require(limits.m_MaxDescriptorSetUpdateAfterBindSamplers >= requiredSamplers,
+			VulkanDeviceProfileRejectionReason::DescriptorSetSamplerLimitInsufficient);
+		require(limits.m_MaxPerStageDescriptorUpdateAfterBindSamplers >= requiredSamplers,
+			VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient);
+		const uint64_t requiredCombined =
+			static_cast<uint64_t>(requiredResources) + requiredSamplers;
+		require(limits.m_MaxPerStageUpdateAfterBindResources >= requiredCombined,
+			VulkanDeviceProfileRejectionReason::PerStageUpdateAfterBindResourceLimitInsufficient);
+		require(limits.m_MaxUpdateAfterBindDescriptorsInAllPools >= requiredCombined,
+			VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient);
 		require(capabilities.m_GlobalDescriptorSetLayoutSupported,
 			VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported);
 		require(capabilities.m_RequiredFormatFeaturesSupported,
@@ -254,10 +316,22 @@ namespace gglab
 			return "VK_EXT_mutable_descriptor_type is unavailable";
 		case VulkanDeviceProfileRejectionReason::MutableDescriptorTypeUnavailable:
 			return "mutableDescriptorType is unavailable";
-		case VulkanDeviceProfileRejectionReason::ResourceDescriptorCapacityInsufficient:
-			return "resource descriptor capacity is below 65,536";
-		case VulkanDeviceProfileRejectionReason::SamplerDescriptorCapacityInsufficient:
-			return "sampler descriptor capacity is below 2,048";
+		case VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient:
+			return "maxDescriptorSetUpdateAfterBindSampledImages is below 65,536";
+		case VulkanDeviceProfileRejectionReason::PerStageSampledImageLimitInsufficient:
+			return "maxPerStageDescriptorUpdateAfterBindSampledImages is below 65,536";
+		case VulkanDeviceProfileRejectionReason::DescriptorSetStorageImageLimitInsufficient:
+			return "maxDescriptorSetUpdateAfterBindStorageImages is below 65,536";
+		case VulkanDeviceProfileRejectionReason::PerStageStorageImageLimitInsufficient:
+			return "maxPerStageDescriptorUpdateAfterBindStorageImages is below 65,536";
+		case VulkanDeviceProfileRejectionReason::DescriptorSetSamplerLimitInsufficient:
+			return "maxDescriptorSetUpdateAfterBindSamplers is below 2,048";
+		case VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient:
+			return "maxPerStageDescriptorUpdateAfterBindSamplers is below 2,048";
+		case VulkanDeviceProfileRejectionReason::PerStageUpdateAfterBindResourceLimitInsufficient:
+			return "maxPerStageUpdateAfterBindResources is below the combined v1 capacity";
+		case VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient:
+			return "maxUpdateAfterBindDescriptorsInAllPools is below the combined v1 capacity";
 		case VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported:
 			return "the Vulkan v1 global descriptor-set layout is unsupported";
 		case VulkanDeviceProfileRejectionReason::RequiredFormatFeaturesUnavailable:
