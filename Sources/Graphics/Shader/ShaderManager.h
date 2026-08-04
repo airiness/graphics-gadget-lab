@@ -2,6 +2,7 @@
 #include "Core/Hash/KeyHash.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/RHI/RHITypes.h"
 #include "Graphics/Shader/Shader.h"
 
 #include <atomic>
@@ -46,11 +47,12 @@ namespace gglab
 	class ShaderManager
 	{
 	public:
-		ShaderManager() noexcept;
+		explicit ShaderManager(RHIBackendType activeBackend) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
 		~ShaderManager();
 
 		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
+		RHIBackendType GetActiveBackend() const noexcept { return m_ActiveBackend; }
 
 		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
@@ -71,6 +73,9 @@ namespace gglab
 		bool RefreshShaderInternal(Shader& shader) noexcept;
 		bool RefreshShaderInternal(Shader& shader, const ShaderDesc& normalizedDesc) noexcept;
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
+		ShaderDesc NormalizeForActiveBackend(const ShaderDesc& desc) const noexcept;
+		static void ApplyActiveBackendTarget(
+			ShaderDesc& desc, RHIBackendType activeBackend) noexcept;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
@@ -78,6 +83,7 @@ namespace gglab
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
 
 		std::unique_ptr<ShaderCompiler> m_Compiler;
+		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
 		ShaderDesc m_DefaultShaderConfig{};
 		std::shared_ptr<ShaderPreloadJob> m_PreloadJob;
 		TaskHandle m_PreloadTask{};

@@ -3,6 +3,9 @@
 
 namespace gglab
 {
+	[[nodiscard]] ShaderCompileValidationResult ValidateShaderDesc(
+		const ShaderDesc& desc, std::wstring_view activeDxcVersion) noexcept;
+
 	class ShaderCompiler
 	{
 	public:
@@ -54,6 +57,8 @@ namespace gglab
 		std::wstring QueryDxcVersion() const noexcept;
 		static bool GetContainerHash(
 			const void* data, size_t size, ShaderHash128& outHash) noexcept;
+		static bool IsBinaryFormat(
+			const ShaderBinary& binary, ShaderBinaryFormat format) noexcept;
 		static ShaderHash128 ComputeHashFromBinary(
 			const ShaderBinary& binary, ShaderBinaryFormat format) noexcept;
 

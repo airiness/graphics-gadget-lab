@@ -182,7 +182,7 @@ namespace gglab
 		}
 	}
 
-	[[nodiscard]] constexpr bool IsVulkanV1BindlessResourceClassSupported(
+	[[nodiscard]] constexpr bool IsVulkanBindlessResourceClassSupported(
 		VulkanBindlessResourceClass resourceClass) noexcept
 	{
 		return EvaluateVulkanBindlessShaderBinding(resourceClass).IsSupported();
@@ -217,7 +217,7 @@ namespace gglab
 		case VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace:
 			return "fixed shader bindings only support HLSL space0";
 		case VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange:
-			return "shader register index exceeds its Vulkan v1 fixed-binding range";
+			return "shader register index exceeds its fixed Vulkan binding range";
 		case VulkanShaderBindingRejectionReason::UnsupportedBindlessResourceClass:
 			return "bindless resource class is not supported by Vulkan binding ABI revision 1";
 		}

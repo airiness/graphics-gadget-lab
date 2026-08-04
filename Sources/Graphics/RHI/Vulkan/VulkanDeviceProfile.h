@@ -29,8 +29,8 @@ namespace gglab
 		RHIDescriptorCapacityContract m_DescriptorCapacity;
 	};
 
-	inline constexpr VulkanDeviceProfile GGLabVulkanV1DeviceProfile{
-		.m_Name = "GGLab Vulkan v1 Device Profile",
+	inline constexpr VulkanDeviceProfile GGLabVulkanDeviceProfile{
+		.m_Name = "GGLab Vulkan Device Profile",
 		.m_MinimumApiVersion = { 1, 3 },
 		.m_DescriptorCapacity = GGLabDescriptorCapacityContract,
 	};
@@ -180,7 +180,7 @@ namespace gglab
 		}
 	};
 
-	[[nodiscard]] constexpr VulkanDeviceProfileEvaluation EvaluateVulkanV1DeviceProfile(
+	[[nodiscard]] constexpr VulkanDeviceProfileEvaluation EvaluateVulkanDeviceProfile(
 		const VulkanDeviceProfileCapabilities& capabilities) noexcept
 	{
 		VulkanDeviceProfileEvaluation evaluation{};
@@ -198,7 +198,7 @@ namespace gglab
 		require(capabilities.m_HasVulkanLoader,
 			VulkanDeviceProfileRejectionReason::VulkanLoaderUnavailable);
 		require(IsVulkanApiVersionAtLeast(
-			capabilities.m_ApiVersion, GGLabVulkanV1DeviceProfile.m_MinimumApiVersion),
+			capabilities.m_ApiVersion, GGLabVulkanDeviceProfile.m_MinimumApiVersion),
 			VulkanDeviceProfileRejectionReason::ApiVersionTooLow);
 		require(capabilities.m_HasWin32SurfaceExtension,
 			VulkanDeviceProfileRejectionReason::Win32SurfaceExtensionUnavailable);
@@ -238,9 +238,9 @@ namespace gglab
 			VulkanDeviceProfileRejectionReason::MutableDescriptorTypeUnavailable);
 		const auto& limits = capabilities.m_DescriptorCapacityLimits;
 		const uint32_t requiredResources =
-			GGLabVulkanV1DeviceProfile.m_DescriptorCapacity.m_ResourceDescriptorCount;
+			GGLabVulkanDeviceProfile.m_DescriptorCapacity.m_ResourceDescriptorCount;
 		const uint32_t requiredSamplers =
-			GGLabVulkanV1DeviceProfile.m_DescriptorCapacity.m_SamplerDescriptorCount;
+			GGLabVulkanDeviceProfile.m_DescriptorCapacity.m_SamplerDescriptorCount;
 		require(limits.m_MaxDescriptorSetUpdateAfterBindSampledImages >= requiredResources,
 			VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient);
 		require(limits.m_MaxPerStageDescriptorUpdateAfterBindSampledImages >= requiredResources,
@@ -275,7 +275,7 @@ namespace gglab
 		case VulkanDeviceProfileRejectionReason::None:
 			return "none";
 		case VulkanDeviceProfileRejectionReason::UnsupportedPlatform:
-			return "Vulkan v1 is limited to Windows x64";
+			return "the Vulkan backend is limited to Windows x64";
 		case VulkanDeviceProfileRejectionReason::VulkanLoaderUnavailable:
 			return "Vulkan loader is unavailable";
 		case VulkanDeviceProfileRejectionReason::ApiVersionTooLow:
@@ -329,11 +329,11 @@ namespace gglab
 		case VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient:
 			return "maxPerStageDescriptorUpdateAfterBindSamplers is below 2,048";
 		case VulkanDeviceProfileRejectionReason::PerStageUpdateAfterBindResourceLimitInsufficient:
-			return "maxPerStageUpdateAfterBindResources is below the combined v1 capacity";
+			return "maxPerStageUpdateAfterBindResources is below the required combined capacity";
 		case VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient:
-			return "maxUpdateAfterBindDescriptorsInAllPools is below the combined v1 capacity";
+			return "maxUpdateAfterBindDescriptorsInAllPools is below the required combined capacity";
 		case VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported:
-			return "the Vulkan v1 global descriptor-set layout is unsupported";
+			return "the required Vulkan global descriptor-set layout is unsupported";
 		case VulkanDeviceProfileRejectionReason::RequiredFormatFeaturesUnavailable:
 			return "required rendering format features are unavailable";
 		case VulkanDeviceProfileRejectionReason::Count:

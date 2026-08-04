@@ -47,12 +47,14 @@ namespace gglab
 		}
 	}
 
-	ShaderManager::ShaderManager() noexcept
+	ShaderManager::ShaderManager(RHIBackendType activeBackend) noexcept :
+		m_ActiveBackend(activeBackend)
 	{
 		m_Compiler = std::make_unique<ShaderCompiler>();
 
 		m_DefaultShaderConfig.m_Target.m_Flags |=
 			IsDebuggerPresent() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
+		ApplyActiveBackendTarget(m_DefaultShaderConfig, m_ActiveBackend);
 		m_DefaultShaderConfig.m_IncludeDirs = { m_Compiler->GetSourceRootDirectory() };
 		m_DefaultShaderConfig.m_Defines = {};
 		m_Compiler->SetDefaultShaderConfig(m_DefaultShaderConfig);
@@ -64,12 +66,13 @@ namespace gglab
 	{
 		std::unique_lock lock(m_Mutex);
 		m_DefaultShaderConfig = defaultDesc;
-		m_Compiler->SetDefaultShaderConfig(defaultDesc);
+		ApplyActiveBackendTarget(m_DefaultShaderConfig, m_ActiveBackend);
+		m_Compiler->SetDefaultShaderConfig(m_DefaultShaderConfig);
 	}
 
 	ShaderID ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
 	{
-		ShaderDesc norm = m_Compiler->NormalizeShaderDesc(desc);
+		ShaderDesc norm = NormalizeForActiveBackend(desc);
 
 		const auto keyHash = ShaderCompiler::ComputeRecipeHash(norm);
 		ShaderKey key{ .m_KeyHash = keyHash };
@@ -131,9 +134,11 @@ namespace gglab
 		}
 
 		ShaderDesc defaultConfig;
+		RHIBackendType activeBackend = RHIBackendType::Unknown;
 		{
 			std::shared_lock lock(m_Mutex);
 			defaultConfig = m_DefaultShaderConfig;
+			activeBackend = m_ActiveBackend;
 		}
 
 		auto job = std::make_shared<ShaderPreloadJob>();
@@ -155,7 +160,7 @@ namespace gglab
 				.m_Name = "Shader.Preload",
 				.m_Priority = priority,
 			},
-			[defaultConfig = std::move(defaultConfig), job](std::stop_token stopToken) noexcept
+			[defaultConfig = std::move(defaultConfig), activeBackend, job](std::stop_token stopToken) noexcept
 			{
 				ShaderCompiler compiler;
 				compiler.SetDefaultShaderConfig(defaultConfig);
@@ -169,6 +174,7 @@ namespace gglab
 					job->m_CurrentIndex.store(index, std::memory_order_relaxed);
 					ShaderPreloadJob::Entry entry{};
 					entry.m_Desc = job->m_Descs[index];
+					ApplyActiveBackendTarget(entry.m_Desc, activeBackend);
 					entry.m_NormalizedDesc = compiler.NormalizeShaderDesc(entry.m_Desc);
 					if (!std::filesystem::exists(entry.m_NormalizedDesc.m_SourcePath))
 					{
@@ -360,7 +366,7 @@ namespace gglab
 
 	bool ShaderManager::RefreshShaderInternal(Shader& shader) noexcept
 	{
-		ShaderDesc norm = m_Compiler->NormalizeShaderDesc(shader.GetDesc());
+		ShaderDesc norm = NormalizeForActiveBackend(shader.GetDesc());
 		return RefreshShaderInternal(shader, norm);
 	}
 
@@ -368,6 +374,10 @@ namespace gglab
 		Shader& shader, const ShaderDesc& normalizedDesc) noexcept
 	{
 		ShaderCompileArtifact artifact = m_Compiler->CompileOrLoadArtifact(normalizedDesc);
+		if (!artifact.m_Binary.IsValid())
+		{
+			return false;
+		}
 
 		const auto changed = (shader.GetGeneration() == 0) ||
 			(artifact.m_Hash != shader.GetCompileArtifact().m_Hash);
@@ -380,5 +390,43 @@ namespace gglab
 
 		shader.SetCompileArtifact(std::move(artifact), changed);
 		return changed;
+	}
+
+	ShaderDesc ShaderManager::NormalizeForActiveBackend(const ShaderDesc& desc) const noexcept
+	{
+		ShaderDesc activeDesc = desc;
+		ApplyActiveBackendTarget(activeDesc, m_ActiveBackend);
+		return m_Compiler->NormalizeShaderDesc(activeDesc);
+	}
+
+	void ShaderManager::ApplyActiveBackendTarget(
+		ShaderDesc& desc, RHIBackendType activeBackend) noexcept
+	{
+		switch (activeBackend)
+		{
+		case RHIBackendType::DX12:
+			desc.m_Target.m_BinaryFormat = ShaderBinaryFormat::Dxil;
+			desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
+			desc.m_Target.m_BindingABIRevision = 0;
+			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
+			break;
+		case RHIBackendType::Vulkan:
+		{
+			const ShaderCompileTarget target =
+				ShaderCompiler::MakeVulkanSpirVTarget(desc.m_Stage);
+			desc.m_Target.m_BinaryFormat = target.m_BinaryFormat;
+			desc.m_Target.m_SpirVTargetEnvironment = target.m_SpirVTargetEnvironment;
+			desc.m_Target.m_BindingABIRevision = target.m_BindingABIRevision;
+			desc.m_Target.m_CoordinateOptions = target.m_CoordinateOptions;
+			break;
+		}
+		case RHIBackendType::Unknown:
+			desc.m_Target.m_BinaryFormat = ShaderBinaryFormat::Unknown;
+			desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
+			desc.m_Target.m_BindingABIRevision = 0;
+			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
+			break;
+		}
+		desc.m_Target.m_DxcVersion.clear();
 	}
 }

@@ -168,13 +168,16 @@ namespace gglab
 			m_InputManager->GetMouse()->SetMouseMode(Mouse::MouseMode::Absolute);
 		}
 
+		const RHIBackendType activeBackend = RHIBackendType::DX12;
+
 		// ShaderManager
-		m_ShaderManager = std::make_unique<ShaderManager>();
+		m_ShaderManager = std::make_unique<ShaderManager>(activeBackend);
 		InitializeAssets();
 
 		// Renderer
 		m_Renderer = std::make_unique<Renderer>();
 		Renderer::CreateInfo rendererCreateInfo{};
+		rendererCreateInfo.m_Backend = activeBackend;
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
 		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();

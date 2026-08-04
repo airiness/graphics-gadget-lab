@@ -9,6 +9,8 @@
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 
+#include <cwctype>
+
 namespace gglab
 {
 	struct ShaderCompiler::Impl
@@ -51,6 +53,54 @@ namespace gglab
 		{
 			return stage == ShaderStage::Vertex || stage == ShaderStage::Domain ||
 				stage == ShaderStage::Geometry || stage == ShaderStage::Mesh;
+		}
+
+		[[nodiscard]] bool IsCompilerOwnedExtraArgument(std::wstring_view argument) noexcept
+		{
+			if (argument.empty())
+			{
+				return false;
+			}
+			if (argument.front() == L'@')
+			{
+				return true;
+			}
+
+			std::wstring lower(argument);
+			std::ranges::transform(lower, lower.begin(),
+				[](wchar_t value) noexcept { return static_cast<wchar_t>(::towlower(value)); });
+			const auto isOption = [&lower](std::wstring_view option) noexcept
+				{
+					return lower == option ||
+						(lower.size() > option.size() && lower.starts_with(option) &&
+							lower[option.size()] == L'=');
+				};
+
+			if (lower.starts_with(L"-fvk-") || lower.starts_with(L"/fvk-") ||
+				lower.starts_with(L"-fspv-") || lower.starts_with(L"/fspv-"))
+			{
+				return true;
+			}
+
+			constexpr std::array CompilerOwnedOptions{
+				L"-e", L"/e", L"-t", L"/t", L"-hv", L"/hv", L"-spirv", L"/spirv",
+				L"-zi", L"/zi", L"-qembed_debug", L"/qembed_debug", L"-qstrip_debug",
+				L"/qstrip_debug", L"-qstrip_reflect", L"/qstrip_reflect", L"-fcgl",
+				L"/fcgl", L"-ast-dump", L"/ast-dump", L"-dumpbin", L"/dumpbin",
+			};
+			if (std::ranges::any_of(CompilerOwnedOptions, isOption))
+			{
+				return true;
+			}
+
+			constexpr std::array OptimizationOptions{
+				L"-o0", L"/o0",
+				L"-o1", L"/o1",
+				L"-o2", L"/o2",
+				L"-o3", L"/o3",
+				L"-od", L"/od",
+			};
+			return std::ranges::find(OptimizationOptions, lower) != OptimizationOptions.end();
 		}
 
 		class ShaderIncludeHandler final
@@ -118,6 +168,83 @@ namespace gglab
 		}
 	}
 
+	ShaderCompileValidationResult ValidateShaderDesc(
+		const ShaderDesc& desc, std::wstring_view activeDxcVersion) noexcept
+	{
+		const auto reject = [](ShaderCompileValidationError error, std::wstring message) noexcept
+			{
+				return ShaderCompileValidationResult{
+					.m_Error = error,
+					.m_Message = std::move(message),
+				};
+			};
+
+		if (desc.m_Target.m_BinaryFormat != ShaderBinaryFormat::Dxil &&
+			desc.m_Target.m_BinaryFormat != ShaderBinaryFormat::SpirV)
+		{
+			return reject(ShaderCompileValidationError::UnsupportedBinaryFormat,
+				L"Shader binary format is unsupported.");
+		}
+		if (desc.m_SourcePath.empty())
+		{
+			return reject(
+				ShaderCompileValidationError::EmptySourcePath, L"Shader source path is empty.");
+		}
+		if (utils::Canonical(desc.m_SourcePath) != desc.m_SourcePath)
+		{
+			return reject(ShaderCompileValidationError::SourcePathNotCanonical,
+				L"Shader source path is not canonical; normalize the descriptor before compiling.");
+		}
+		if (desc.m_Entry.empty())
+		{
+			return reject(ShaderCompileValidationError::EmptyEntryPoint,
+				L"Shader entry point is empty; normalize the descriptor before compiling.");
+		}
+		if (activeDxcVersion.empty() || desc.m_Target.m_DxcVersion != activeDxcVersion)
+		{
+			return reject(ShaderCompileValidationError::CompilerIdentityMismatch,
+				L"Shader target DXC identity does not match the active compiler.");
+		}
+
+		if (desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV)
+		{
+			const ShaderCompileTarget expected = ShaderCompiler::MakeVulkanSpirVTarget(desc.m_Stage);
+			if (desc.m_Target.m_SpirVTargetEnvironment != expected.m_SpirVTargetEnvironment)
+			{
+				return reject(ShaderCompileValidationError::UnsupportedSpirVTargetEnvironment,
+					L"SPIR-V target environment does not match the active Vulkan shader contract.");
+			}
+			if (desc.m_Target.m_BindingABIRevision != expected.m_BindingABIRevision)
+			{
+				return reject(ShaderCompileValidationError::UnsupportedBindingABIRevision,
+					L"Shader binding ABI revision does not match the active Vulkan contract.");
+			}
+			if (desc.m_Target.m_CoordinateOptions != expected.m_CoordinateOptions)
+			{
+				return reject(ShaderCompileValidationError::InvalidCoordinateOptions,
+					L"Shader coordinate options do not match the active stage and backend.");
+			}
+		}
+		else if (desc.m_Target.m_SpirVTargetEnvironment != ShaderSpirVTargetEnvironment::None ||
+			desc.m_Target.m_BindingABIRevision != 0 ||
+			desc.m_Target.m_CoordinateOptions != ShaderCoordinateOptions::None)
+		{
+			return reject(ShaderCompileValidationError::UnexpectedSpirVTargetState,
+				L"DXIL shader target contains SPIR-V-only state.");
+		}
+
+		for (const std::wstring& argument : desc.m_ExtraArgs)
+		{
+			if (IsCompilerOwnedExtraArgument(argument))
+			{
+				return reject(ShaderCompileValidationError::ReservedExtraArgument,
+					std::format(L"Shader extra argument '{}' is owned by the normalized target.",
+						argument));
+			}
+		}
+		return {};
+	}
+
 	ShaderCompiler::ShaderCompiler() noexcept : m_Impl(std::make_unique<Impl>())
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
@@ -146,23 +273,10 @@ namespace gglab
 
 	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
 	{
-		GGLAB_ASSERT_MSG(desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::Dxil ||
-			desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV,
-			"Unsupported shader binary format.");
-		GGLAB_ASSERT_MSG(
-			!desc.m_Entry.empty(), "Shader entry is empty, ShaderDesc may not be normalized.");
-		GGLAB_ASSERT_MSG(utils::Canonical(desc.m_SourcePath) == desc.m_SourcePath,
-			"Shader source path is not be canonical, ShaderDesc may not be normalized.");
-		GGLAB_ASSERT_MSG(desc.m_Target.m_DxcVersion == m_DxcVersion,
-			"Shader compiler identity mismatch, ShaderDesc may not be normalized.");
-		if (desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV)
+		const ShaderCompileValidationResult validation = ValidateShaderDesc(desc, m_DxcVersion);
+		if (!validation.IsValid())
 		{
-			GGLAB_ASSERT_MSG(
-				desc.m_Target.m_SpirVTargetEnvironment == ShaderSpirVTargetEnvironment::Vulkan1_3,
-				"Unsupported SPIR-V target environment.");
-			GGLAB_ASSERT_MSG(
-				desc.m_Target.m_BindingABIRevision == GGLabVulkanShaderBindingABI.m_Revision,
-				"Unsupported Vulkan shader binding ABI revision.");
+			return {};
 		}
 
 		ShaderCompileArtifact artifact{};
@@ -176,7 +290,6 @@ namespace gglab
 
 		artifact.m_BinaryPath = binaryPath;
 		artifact.m_MetaPath = meta;
-		artifact.m_Format = desc.m_Target.m_BinaryFormat;
 		artifact.m_Target = desc.m_Target;
 
 		// Exist
@@ -188,17 +301,25 @@ namespace gglab
 			{
 				ComPtr<IDxcBlobEncoding> blobEncoding;
 				GGLAB_HR(m_Impl->m_Utils->LoadFile(binaryPath.c_str(), nullptr, &blobEncoding));
-				artifact.m_Binary = CopyShaderBinary(blobEncoding.Get());
-				artifact.m_FromCache = true;
-				artifact.m_Hash =
-					ComputeHashFromBinary(artifact.m_Binary, artifact.m_Format);
-				return artifact;
+				ShaderBinary cachedBinary = CopyShaderBinary(blobEncoding.Get());
+				if (IsBinaryFormat(cachedBinary, artifact.GetBinaryFormat()))
+				{
+					artifact.m_Binary = std::move(cachedBinary);
+					artifact.m_FromCache = true;
+					artifact.m_Hash = ComputeHashFromBinary(
+						artifact.m_Binary, artifact.GetBinaryFormat());
+					return artifact;
+				}
 			}
 		}
 
 		// Compile is not exist
 		std::vector<std::filesystem::path> deps;
 		auto binary = CompileShader(desc, deps);
+		if (!IsBinaryFormat(binary, artifact.GetBinaryFormat()))
+		{
+			return {};
+		}
 
 		// Save binary
 		utils::WriteFileBinary(binaryPath, binary.Data(), binary.SizeInBytes());
@@ -207,7 +328,8 @@ namespace gglab
 		// result
 		artifact.m_Binary = std::move(binary);
 		artifact.m_FromCache = false;
-		artifact.m_Hash = ComputeHashFromBinary(artifact.m_Binary, artifact.m_Format);
+		artifact.m_Hash = ComputeHashFromBinary(
+			artifact.m_Binary, artifact.GetBinaryFormat());
 		return artifact;
 	}
 
@@ -832,7 +954,6 @@ namespace gglab
 		}
 
 		// magic number for DirectX Container
-		// https://llvm.org/docs/DirectX/DXContainer.html?utm_source=chatgpt.com#file-header
 		static const unsigned char DXBCMagicNumber[] = { 'D', 'X', 'B', 'C' };
 		if (std::memcmp(data, DXBCMagicNumber, 4) != 0)
 		{
@@ -843,6 +964,36 @@ namespace gglab
 		std::memcpy(&outHash.m_HighBits, ptr + 12, sizeof(uint64_t));
 
 		return true;
+	}
+
+	bool ShaderCompiler::IsBinaryFormat(
+		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept
+	{
+		if (!binary.IsValid())
+		{
+			return false;
+		}
+
+		const auto* data = static_cast<const uint8_t*>(binary.Data());
+		const size_t size = binary.SizeInBytes();
+		switch (format)
+		{
+		case ShaderBinaryFormat::Dxil:
+			return size >= 20 && std::memcmp(data, "DXBC", 4) == 0;
+		case ShaderBinaryFormat::SpirV:
+		{
+			if (size < 5 * sizeof(uint32_t) || size % sizeof(uint32_t) != 0)
+			{
+				return false;
+			}
+			uint32_t magic = 0;
+			std::memcpy(&magic, data, sizeof(magic));
+			return magic == 0x07230203u;
+		}
+		case ShaderBinaryFormat::Unknown:
+			break;
+		}
+		return false;
 	}
 
 	ShaderHash128 ShaderCompiler::ComputeHashFromBinary(

@@ -64,6 +64,7 @@ namespace gglab
 
 		struct CreateInfo
 		{
+			RHIBackendType m_Backend = RHIBackendType::Unknown;
 			ShaderManager* m_ShaderManager = nullptr;
 			TaskSystem* m_TaskSystem = nullptr;
 			void* m_NativeWindowHandle = nullptr;

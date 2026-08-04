@@ -60,6 +60,32 @@ namespace gglab
 		bool operator==(const ShaderCompileTarget&) const noexcept = default;
 	};
 
+	enum class ShaderCompileValidationError : uint8_t
+	{
+		None,
+		UnsupportedBinaryFormat,
+		EmptySourcePath,
+		SourcePathNotCanonical,
+		EmptyEntryPoint,
+		CompilerIdentityMismatch,
+		UnsupportedSpirVTargetEnvironment,
+		UnsupportedBindingABIRevision,
+		InvalidCoordinateOptions,
+		UnexpectedSpirVTargetState,
+		ReservedExtraArgument,
+	};
+
+	struct ShaderCompileValidationResult
+	{
+		ShaderCompileValidationError m_Error = ShaderCompileValidationError::None;
+		std::wstring m_Message;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Error == ShaderCompileValidationError::None;
+		}
+	};
+
 	struct ShaderDefine
 	{
 		std::wstring m_Name{};
@@ -85,19 +111,23 @@ namespace gglab
 		std::filesystem::path m_BinaryPath{};
 		std::filesystem::path m_MetaPath{};
 		ShaderBinary m_Binary{};
-		ShaderBinaryFormat m_Format = ShaderBinaryFormat::Unknown;
-		ShaderCompileTarget m_Target{};
+		ShaderCompileTarget m_Target{ .m_BinaryFormat = ShaderBinaryFormat::Unknown };
 		ShaderHash128 m_Hash{};
 		std::filesystem::file_time_type m_SourceTimeStamp{};
 		bool m_FromCache = false;
+
+		[[nodiscard]] ShaderBinaryFormat GetBinaryFormat() const noexcept
+		{
+			return m_Target.m_BinaryFormat;
+		}
 
 		void Reset() noexcept
 		{
 			m_BinaryPath.clear();
 			m_MetaPath.clear();
 			m_Binary.Reset();
-			m_Format = ShaderBinaryFormat::Unknown;
 			m_Target = {};
+			m_Target.m_BinaryFormat = ShaderBinaryFormat::Unknown;
 			m_Hash = {};
 			m_SourceTimeStamp = {};
 			m_FromCache = false;

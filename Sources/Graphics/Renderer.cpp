@@ -49,6 +49,7 @@ namespace gglab
 	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		RHIContextDesc contextDesc{};
+		contextDesc.m_Backend = createInfo.m_Backend;
 		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;

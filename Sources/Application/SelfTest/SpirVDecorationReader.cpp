@@ -69,9 +69,11 @@ namespace gglab
 				return SpirVExecutionModel::Fragment;
 			case 5:
 				return SpirVExecutionModel::Compute;
-			case 5267:
+			case 5267: // TaskNV
+			case 5364: // TaskEXT
 				return SpirVExecutionModel::Task;
-			case 5268:
+			case 5268: // MeshNV
+			case 5365: // MeshEXT
 				return SpirVExecutionModel::Mesh;
 			default:
 				return SpirVExecutionModel::Unknown;

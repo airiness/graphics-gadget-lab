@@ -7,6 +7,7 @@
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
 {
@@ -72,27 +73,134 @@ namespace gglab
 				});
 		}
 
-		[[nodiscard]] std::filesystem::path FindSpirVValidator() noexcept
+		[[nodiscard]] ShaderBinary MakeExecutionModelModule(uint32_t executionModel) noexcept
 		{
+			const std::array<uint32_t, 10> words{
+				0x07230203u,
+				0x00010600u,
+				0u,
+				2u,
+				0u,
+				(5u << 16) | 15u,
+				executionModel,
+				1u,
+				0x6e69616du,
+				0u,
+			};
+			ShaderBinary binary(sizeof(words));
+			std::memcpy(binary.Data(), words.data(), sizeof(words));
+			return binary;
+		}
+
+		[[nodiscard]] bool OverwriteBinaryFile(
+			const std::filesystem::path& path, const ShaderBinary& binary) noexcept
+		{
+			std::ofstream output(path, std::ios::binary | std::ios::trunc);
+			output.write(static_cast<const char*>(binary.Data()),
+				static_cast<std::streamsize>(binary.SizeInBytes()));
+			return output.good();
+		}
+
+		constexpr std::wstring_view VulkanSdkValidationBaseline = L"1.3.296.0";
+		constexpr std::string_view SpirVToolsValidationBaseline =
+			"SPIRV-Tools v2024.4 v2024.4.rc1-0-g6dcc7e35";
+
+		struct SpirVValidatorInfo
+		{
+			std::filesystem::path m_Path;
+			std::wstring m_SdkVersion;
+			std::string m_ToolIdentity;
+
+			[[nodiscard]] bool MatchesValidationBaseline() const noexcept
+			{
+				return !m_Path.empty() && m_SdkVersion == VulkanSdkValidationBaseline &&
+					m_ToolIdentity.starts_with(SpirVToolsValidationBaseline);
+			}
+		};
+
+		[[nodiscard]] bool QuerySpirVValidatorIdentity(
+			const std::filesystem::path& validator, std::string& outIdentity) noexcept
+		{
+			outIdentity.clear();
+			SECURITY_ATTRIBUTES securityAttributes{
+				.nLength = sizeof(SECURITY_ATTRIBUTES),
+				.bInheritHandle = TRUE,
+			};
+			HANDLE readPipe = nullptr;
+			HANDLE writePipe = nullptr;
+			if (!CreatePipe(&readPipe, &writePipe, &securityAttributes, 0))
+			{
+				return false;
+			}
+			if (!SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0))
+			{
+				CloseHandle(writePipe);
+				CloseHandle(readPipe);
+				return false;
+			}
+
+			std::wstring commandLine = std::format(L"\"{}\" --version", validator.wstring());
+			STARTUPINFOW startupInfo{
+				.cb = sizeof(STARTUPINFOW),
+				.dwFlags = STARTF_USESTDHANDLES,
+				.hStdInput = GetStdHandle(STD_INPUT_HANDLE),
+				.hStdOutput = writePipe,
+				.hStdError = writePipe,
+			};
+			PROCESS_INFORMATION processInfo{};
+			const BOOL created = CreateProcessW(validator.c_str(), commandLine.data(), nullptr,
+				nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, &processInfo);
+			CloseHandle(writePipe);
+			if (!created)
+			{
+				CloseHandle(readPipe);
+				return false;
+			}
+
+			const DWORD waitResult = WaitForSingleObject(processInfo.hProcess, 30'000);
+			if (waitResult == WAIT_TIMEOUT)
+			{
+				TerminateProcess(processInfo.hProcess, ERROR_TIMEOUT);
+				WaitForSingleObject(processInfo.hProcess, INFINITE);
+			}
+
+			std::array<char, 1'024> buffer{};
+			DWORD bytesRead = 0;
+			while (ReadFile(readPipe, buffer.data(), static_cast<DWORD>(buffer.size()),
+				&bytesRead, nullptr) && bytesRead > 0)
+			{
+				outIdentity.append(buffer.data(), bytesRead);
+			}
+
+			DWORD exitCode = ERROR_GEN_FAILURE;
+			GetExitCodeProcess(processInfo.hProcess, &exitCode);
+			CloseHandle(processInfo.hThread);
+			CloseHandle(processInfo.hProcess);
+			CloseHandle(readPipe);
+			return waitResult == WAIT_OBJECT_0 && exitCode == 0 && !outIdentity.empty();
+		}
+
+		[[nodiscard]] SpirVValidatorInfo FindSpirVValidator() noexcept
+		{
+			SpirVValidatorInfo info{};
 			std::array<wchar_t, 32'768> buffer{};
 			const DWORD sdkLength = GetEnvironmentVariableW(
 				L"VULKAN_SDK", buffer.data(), static_cast<DWORD>(buffer.size()));
 			if (sdkLength > 0 && sdkLength < buffer.size())
 			{
-				const std::filesystem::path fromSdk =
-					std::filesystem::path(buffer.data()) / L"Bin" / L"spirv-val.exe";
+				const std::filesystem::path sdkRoot =
+					std::filesystem::path(buffer.data()).lexically_normal();
+				info.m_SdkVersion = sdkRoot.filename().wstring();
+				const std::filesystem::path fromSdk = sdkRoot / L"Bin" / L"spirv-val.exe";
 				std::error_code errorCode;
-				if (std::filesystem::exists(fromSdk, errorCode))
+				if (info.m_SdkVersion == VulkanSdkValidationBaseline &&
+					std::filesystem::exists(fromSdk, errorCode) &&
+					QuerySpirVValidatorIdentity(fromSdk, info.m_ToolIdentity))
 				{
-					return fromSdk;
+					info.m_Path = fromSdk;
 				}
 			}
-
-			const DWORD pathLength = SearchPathW(nullptr, L"spirv-val.exe", nullptr,
-				static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
-			return pathLength > 0 && pathLength < buffer.size()
-				? std::filesystem::path(buffer.data())
-				: std::filesystem::path{};
+			return info;
 		}
 
 		[[nodiscard]] bool ValidateSpirVBinary(
@@ -259,7 +367,7 @@ namespace gglab
 				"Vulkan fixed-register ranges lock 32 bindings at shifts 0, 32, 64, and 96");
 			context.Check(allBindingsUnique && std::ranges::all_of(occupiedBindings,
 				[](bool occupied) noexcept { return occupied; }),
-				"Every Vulkan v1 fixed binding is accepted exactly once without collisions");
+				"Every fixed Vulkan binding is accepted exactly once without collisions");
 			context.Check(allOutOfRangeIndicesRejected,
 				"Every Vulkan fixed-register class rejects index 32 as out of range");
 
@@ -336,20 +444,20 @@ namespace gglab
 		void RunDeviceProfileTests(SelfTestContext& context) noexcept
 		{
 			const VulkanDeviceProfileCapabilities supported = MakeSupportedCapabilities();
-			context.Check(EvaluateVulkanV1DeviceProfile(supported).IsAccepted(),
-				"Vulkan v1 profile accepts its exact minimum required capabilities");
+			context.Check(EvaluateVulkanDeviceProfile(supported).IsAccepted(),
+				"Vulkan profile accepts its exact minimum required capabilities");
 			context.Check(!supported.m_DescriptorBindingVariableDescriptorCount &&
 				!supported.m_DescriptorBindingUniformBufferUpdateAfterBind &&
 				!supported.m_DescriptorBindingStorageBufferUpdateAfterBind &&
 				!supported.m_ShaderUniformBufferArrayNonUniformIndexing &&
 				!supported.m_ShaderStorageBufferArrayNonUniformIndexing &&
-				EvaluateVulkanV1DeviceProfile(supported).IsAccepted(),
-				"Vulkan v1 profile does not require variable-count or bindless-buffer features");
+				EvaluateVulkanDeviceProfile(supported).IsAccepted(),
+				"Vulkan profile does not require variable-count or bindless-buffer features");
 
 			auto multipleMissing = supported;
 			multipleMissing.m_DynamicRendering = false;
 			multipleMissing.m_SamplerAnisotropy = false;
-			const auto multipleMissingEvaluation = EvaluateVulkanV1DeviceProfile(multipleMissing);
+			const auto multipleMissingEvaluation = EvaluateVulkanDeviceProfile(multipleMissing);
 			context.Check(multipleMissingEvaluation.m_RejectionReasonCount == 2 &&
 				multipleMissingEvaluation.HasReason(
 					VulkanDeviceProfileRejectionReason::DynamicRenderingUnavailable) &&
@@ -446,14 +554,14 @@ namespace gglab
 			{
 				auto missing = supported;
 				missing.*testCase.m_Field = false;
-				const auto evaluation = EvaluateVulkanV1DeviceProfile(missing);
+				const auto evaluation = EvaluateVulkanDeviceProfile(missing);
 				context.Check(!evaluation.IsAccepted() && evaluation.m_RejectionReasonCount == 1 &&
 					evaluation.HasReason(testCase.m_Reason), testCase.m_CheckName);
 			}
 
 			auto oldApi = supported;
 			oldApi.m_ApiVersion = { 1, 2 };
-			const auto oldApiEvaluation = EvaluateVulkanV1DeviceProfile(oldApi);
+			const auto oldApiEvaluation = EvaluateVulkanDeviceProfile(oldApi);
 			context.Check(oldApiEvaluation.m_RejectionReasonCount == 1 && oldApiEvaluation.HasReason(
 				VulkanDeviceProfileRejectionReason::ApiVersionTooLow),
 				"Vulkan profile rejects API versions below 1.3 explicitly");
@@ -517,7 +625,7 @@ namespace gglab
 			{
 				auto insufficient = supported;
 				insufficient.m_DescriptorCapacityLimits.*testCase.m_Field = testCase.m_RequiredValue - 1;
-				const auto evaluation = EvaluateVulkanV1DeviceProfile(insufficient);
+				const auto evaluation = EvaluateVulkanDeviceProfile(insufficient);
 				context.Check(evaluation.m_RejectionReasonCount == 1 &&
 					evaluation.HasReason(testCase.m_Reason), testCase.m_CheckName);
 			}
@@ -564,9 +672,9 @@ namespace gglab
 			ScopedTestDirectory scopedDirectory(tempRoot);
 			ShaderCompiler compiler;
 			compiler.SetCacheRootDirectory(scopedDirectory.GetPath());
-			const std::filesystem::path validator = FindSpirVValidator();
-			context.Check(!validator.empty(),
-				"Pinned Vulkan SDK provides spirv-val for SPIR-V contract validation");
+			const SpirVValidatorInfo validator = FindSpirVValidator();
+			context.Check(validator.MatchesValidationBaseline(),
+				"Vulkan SDK and SPIR-V Tools match the configured validation baseline");
 
 			ShaderDesc coverageDesc{
 				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
@@ -584,12 +692,17 @@ namespace gglab
 				compiler.CompileOrLoadArtifact(normalizedSpirV);
 			const ShaderCompileArtifact cachedSpirVArtifact =
 				compiler.CompileOrLoadArtifact(normalizedSpirV);
+			const ShaderCompileValidationResult dxilValidation =
+				ValidateShaderDesc(normalizedDxil, compiler.GetCompilerVersion());
+			const ShaderCompileValidationResult spirVValidation =
+				ValidateShaderDesc(normalizedSpirV, compiler.GetCompilerVersion());
 
 			const std::wstring dxilPath = dxilArtifact.m_BinaryPath.generic_wstring();
 			const std::wstring spirVPath = spirVArtifact.m_BinaryPath.generic_wstring();
-			context.Check(dxilArtifact.m_Binary.IsValid() && spirVArtifact.m_Binary.IsValid() &&
-				dxilArtifact.m_Format == ShaderBinaryFormat::Dxil &&
-				spirVArtifact.m_Format == ShaderBinaryFormat::SpirV,
+			context.Check(dxilValidation.IsValid() && spirVValidation.IsValid() &&
+				dxilArtifact.m_Binary.IsValid() && spirVArtifact.m_Binary.IsValid() &&
+				dxilArtifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil &&
+				spirVArtifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV,
 				"One normalized HLSL recipe produces valid DXIL and SPIR-V artifacts");
 			context.Check(dxilPath.find(L"/dxil/") != std::wstring::npos &&
 				spirVPath.find(L"/spirv/") != std::wstring::npos &&
@@ -599,9 +712,35 @@ namespace gglab
 				"Shader cache partitions DXIL and SPIR-V by directory and extension");
 			context.Check(!spirVArtifact.m_FromCache && cachedSpirVArtifact.m_FromCache,
 				"SPIR-V artifact cache reuses an exact normalized target");
+			const bool cacheBlobOverwritten =
+				OverwriteBinaryFile(spirVArtifact.m_BinaryPath, dxilArtifact.m_Binary);
+			const ShaderCompileArtifact recoveredSpirVArtifact =
+				compiler.CompileOrLoadArtifact(normalizedSpirV);
+			SpirVDecorationReflection recoveredReflection;
+			context.Check(cacheBlobOverwritten && !recoveredSpirVArtifact.m_FromCache &&
+				ReadSpirVDecorations(recoveredSpirVArtifact.m_Binary, recoveredReflection),
+				"Shader cache rejects a blob whose actual format disagrees with its target metadata");
 			context.Check(normalizedSpirV.m_Target.m_DxcVersion == compiler.GetCompilerVersion() &&
 				!compiler.GetCompilerVersion().empty() && compiler.GetCompilerVersion() != L"unknown",
 				"Normalized shader target records the concrete DXC compiler identity");
+
+			ShaderDesc managerDesc{
+				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
+				.m_Entry = L"VSMain",
+			};
+			ShaderManager dxilManager(RHIBackendType::DX12);
+			const ShaderID dxilManagerShader = dxilManager.LoadShader(managerDesc);
+			managerDesc.m_Target = {};
+			ShaderManager spirVManager(RHIBackendType::Vulkan);
+			const ShaderID spirVManagerShader = spirVManager.LoadShader(managerDesc);
+			context.Check(dxilManager.GetActiveBackend() == RHIBackendType::DX12 &&
+				spirVManager.GetActiveBackend() == RHIBackendType::Vulkan &&
+				dxilManagerShader.IsValid() && spirVManagerShader.IsValid() &&
+				dxilManager.GetBytecode(dxilManagerShader).m_Format == ShaderBinaryFormat::Dxil &&
+				spirVManager.GetBytecode(spirVManagerShader).m_Format == ShaderBinaryFormat::SpirV,
+				"ShaderManager derives shader format from its active RHI backend");
 
 			const ShaderHash128 dxilRecipe = ShaderCompiler::ComputeRecipeHash(normalizedDxil);
 			const ShaderHash128 spirVRecipe = ShaderCompiler::ComputeRecipeHash(normalizedSpirV);
@@ -619,6 +758,51 @@ namespace gglab
 					ShaderCompiler::ComputeRecipeHash(changedCoordinates) && spirVRecipe !=
 					ShaderCompiler::ComputeRecipeHash(changedArguments),
 				"Shader recipe identity includes format, ABI, DXC, coordinates, and compile arguments");
+
+			constexpr std::array ReservedArguments{
+				L"-spirv",
+				L"-fspv-target-env=vulkan1.0",
+				L"-fvk-invert-y",
+				L"-T",
+				L"-O0",
+				L"@shader-options.rsp",
+			};
+			bool allReservedArgumentsRejected = true;
+			for (std::wstring_view argument : ReservedArguments)
+			{
+				auto bypassDesc = normalizedSpirV;
+				bypassDesc.m_ExtraArgs = { std::wstring(argument) };
+				const ShaderCompileValidationResult result =
+					ValidateShaderDesc(bypassDesc, compiler.GetCompilerVersion());
+				allReservedArgumentsRejected &= !result.IsValid() &&
+					result.m_Error == ShaderCompileValidationError::ReservedExtraArgument;
+			}
+			context.Check(allReservedArgumentsRejected,
+				"Shader validation prevents extra arguments from overriding normalized target options");
+
+			auto mismatchedDxcDesc = normalizedSpirV;
+			mismatchedDxcDesc.m_Target.m_DxcVersion += L"-mismatch";
+			auto mismatchedAbiDesc = normalizedSpirV;
+			++mismatchedAbiDesc.m_Target.m_BindingABIRevision;
+			auto mismatchedCoordinatesDesc = normalizedSpirV;
+			mismatchedCoordinatesDesc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
+			const ShaderCompileValidationResult dxcError =
+				ValidateShaderDesc(mismatchedDxcDesc, compiler.GetCompilerVersion());
+			const ShaderCompileValidationResult abiError =
+				ValidateShaderDesc(mismatchedAbiDesc, compiler.GetCompilerVersion());
+			const ShaderCompileValidationResult coordinateError =
+				ValidateShaderDesc(mismatchedCoordinatesDesc, compiler.GetCompilerVersion());
+			context.Check(dxcError.m_Error == ShaderCompileValidationError::CompilerIdentityMismatch &&
+				abiError.m_Error == ShaderCompileValidationError::UnsupportedBindingABIRevision &&
+				coordinateError.m_Error == ShaderCompileValidationError::InvalidCoordinateOptions,
+				"Shader validation reports structured DXC, binding ABI, and coordinate errors");
+
+			auto rejectedCompileDesc = normalizedSpirV;
+			rejectedCompileDesc.m_ExtraArgs = { L"-fspv-target-env=vulkan1.0" };
+			const ShaderCompileArtifact rejectedCompileArtifact =
+				compiler.CompileOrLoadArtifact(rejectedCompileDesc);
+			context.Check(!rejectedCompileArtifact.m_Binary.IsValid(),
+				"Shader compiler rejects invalid target contracts without relying on assertions");
 
 			const std::vector<std::wstring> vertexArguments =
 				ShaderCompiler::BuildCompileArguments(normalizedSpirV);
@@ -785,6 +969,24 @@ namespace gglab
 				fullscreenEntry->m_OutputBuiltInCount > 0,
 				"SPIR-V reader excludes SV_VertexID and SV_Position from user locations");
 
+			const std::array executionModelCases{
+				std::pair{ 5267u, SpirVExecutionModel::Task },
+				std::pair{ 5268u, SpirVExecutionModel::Mesh },
+				std::pair{ 5364u, SpirVExecutionModel::Task },
+				std::pair{ 5365u, SpirVExecutionModel::Mesh },
+			};
+			bool executionModelsRecognized = true;
+			for (const auto& [model, expected] : executionModelCases)
+			{
+				SpirVDecorationReflection reflection;
+				const ShaderBinary binary = MakeExecutionModelModule(model);
+				executionModelsRecognized &= ReadSpirVDecorations(binary, reflection) &&
+					reflection.FindEntryPoint("main") &&
+					reflection.FindEntryPoint("main")->m_ExecutionModel == expected;
+			}
+			context.Check(executionModelsRecognized,
+				"SPIR-V reader recognizes both EXT and NV task and mesh execution models");
+
 			const std::array artifactsToValidate{
 				&spirVArtifact,
 				&forwardPixelArtifact,
@@ -794,14 +996,15 @@ namespace gglab
 				&storageArtifact,
 				&fullscreenArtifact,
 			};
-			const bool allValidated = !validator.empty() && std::ranges::all_of(artifactsToValidate,
+			const bool allValidated = validator.MatchesValidationBaseline() &&
+				std::ranges::all_of(artifactsToValidate,
 				[&validator](const ShaderCompileArtifact* artifact) noexcept
 				{
 					return artifact->m_Binary.IsValid() &&
-						ValidateSpirVBinary(validator, artifact->m_BinaryPath);
+						ValidateSpirVBinary(validator.m_Path, artifact->m_BinaryPath);
 				});
 			context.Check(allValidated,
-				"Pinned spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
+				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
 		}
 	}
 
