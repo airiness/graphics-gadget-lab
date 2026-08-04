@@ -6,6 +6,7 @@
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
+#include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Core/Log/Logger.h"
 
 namespace gglab
@@ -32,6 +33,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "rendering-contracts",
 				.m_Run = &RunRenderingContractSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "vulkan-contracts",
+				.m_Run = &RunVulkanContractSelfTests,
 			},
 		};
 

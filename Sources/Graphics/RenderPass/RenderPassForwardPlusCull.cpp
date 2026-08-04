@@ -105,7 +105,7 @@ namespace gglab
 					"ForwardPlusTileDepthRanges");
 			}
 			AppendBindingSlot(
-				desc, RHIBindingType::BindlessSampledTextureTable, 0, 0, "BindlessTextures");
+				desc, RHIBindingType::BindlessResourceTable, 0, 0, "BindlessResources");
 			return desc;
 		}
 	}

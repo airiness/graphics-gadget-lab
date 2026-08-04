@@ -160,6 +160,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
@@ -443,6 +444,7 @@
     <ClInclude Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32MessageHandler.h" />
@@ -538,8 +540,10 @@
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBindingLayout.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICoordinatePolicy.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptorCapacityContract.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
@@ -558,6 +562,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureValidation.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDeviceProfile.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />

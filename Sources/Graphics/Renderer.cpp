@@ -323,8 +323,8 @@ namespace gglab
 			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
 			"LightSB");
-		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::All, 0, 0,
-			0, 0, "BindlessTextures");
+		AddBindingSlot(desc, RHIBindingType::BindlessResourceTable, RHIShaderStage::All, 0, 0, 0, 0,
+			"BindlessResources");
 		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0,
 			"BindlessSamplers");
 		return desc;

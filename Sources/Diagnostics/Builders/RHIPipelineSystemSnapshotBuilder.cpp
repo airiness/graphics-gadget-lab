@@ -98,7 +98,7 @@ namespace gglab
 					slot.m_BackendMapping = RHIBindingBackendMapping::DirectlyIndexed;
 					slot.m_BackendBindingType = "DIRECTLY_INDEXED";
 					layout.m_DirectlyIndexedResources |=
-						source.m_Type == RHIBindingType::BindlessSampledTextureTable;
+						source.m_Type == RHIBindingType::BindlessResourceTable;
 					layout.m_DirectlyIndexedSamplers |=
 						source.m_Type == RHIBindingType::BindlessSamplerTable;
 				}

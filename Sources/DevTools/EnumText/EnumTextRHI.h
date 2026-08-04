@@ -40,7 +40,7 @@ namespace gglab::devtools
 			EnumTextEntry{RHIBindingType::StorageTexture, "StorageTexture"},
 			EnumTextEntry{RHIBindingType::Sampler, "Sampler"},
 			EnumTextEntry{RHIBindingType::PushConstants, "PushConstants"},
-			EnumTextEntry{RHIBindingType::BindlessSampledTextureTable, "BindlessTextureTable"},
+			EnumTextEntry{RHIBindingType::BindlessResourceTable, "BindlessResourceTable"},
 			EnumTextEntry{RHIBindingType::BindlessSamplerTable, "BindlessSamplerTable"},
 		};
 	};

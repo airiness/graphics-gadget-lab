@@ -43,6 +43,9 @@
     <Filter Include="Graphics\RHI\DX12">
       <UniqueIdentifier>{f5b4b727-4377-4dc7-8d7e-b4405ebffc37}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\RHI\Vulkan">
+      <UniqueIdentifier>{A170F21B-5551-4B43-9307-27ED6987CB49}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Externals">
       <UniqueIdentifier>{6c9be8e9-f3c0-480e-b08c-55933a3aeb4c}</UniqueIdentifier>
     </Filter>
@@ -322,6 +325,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp">
@@ -1145,6 +1151,9 @@
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h">
       <Filter>Application\Platform</Filter>
     </ClInclude>
@@ -1942,6 +1951,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBindingLayout.h">
       <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICoordinatePolicy.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptorCapacityContract.h">
+      <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDeviceProfile.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h">
       <Filter>Graphics\RHI</Filter>

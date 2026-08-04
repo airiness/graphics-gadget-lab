@@ -97,8 +97,8 @@ namespace gglab
 				sizeof(HdrDiffParameters), "HdrDiffConstants");
 			AppendBindingSlot(desc, RHIBindingType::ReadWriteStorageBuffer,
 				RHIShaderStage::Compute, 0, 0, "TileMetrics");
-			AppendBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable,
-				RHIShaderStage::Compute, 0, 0, "BindlessTextures");
+			AppendBindingSlot(desc, RHIBindingType::BindlessResourceTable,
+				RHIShaderStage::Compute, 0, 0, "BindlessResources");
 			return desc;
 		}
 
