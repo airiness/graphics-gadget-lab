@@ -126,13 +126,6 @@ namespace gglab
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
-				commandContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
-				commandContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
 
 				const uint32_t lastVertex = std::max({
 					RangeEnd(data.m_World.m_Lines),
@@ -150,7 +143,7 @@ namespace gglab
 					0, std::span<const RHIVertexBufferBinding>(&binding, 1));
 
 				auto draw =
-					[this, commandContext, renderer, displayViewId](
+					[this, contextPtr, commandContext, renderer, displayViewId](
 						const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
 					{
 						if (range.IsEmpty())
@@ -158,6 +151,13 @@ namespace gglab
 							return;
 						}
 						commandContext->SetPipeline(GetPipeline(*renderer, triangles));
+						commandContext->SetConstantBuffer(
+							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+							renderer->GetSceneConstantBuffer()->GetBufferHandle(),
+							contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+						commandContext->SetReadOnlyBuffer(
+							static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+							renderer->GetViewStructuredBuffer()->GetBufferHandle());
 						commandContext->SetPrimitiveTopology(triangles
 							? RHIPrimitiveTopology::TriangleList
 							: RHIPrimitiveTopology::LineList);
