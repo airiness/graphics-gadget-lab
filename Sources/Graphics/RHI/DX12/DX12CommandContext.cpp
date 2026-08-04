@@ -203,6 +203,8 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetDescriptorTable(
 		const RHIDescriptorTableBinding& binding) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
+			"SetPipeline must bind a graphics root signature before root arguments.");
 		const D3D12_GPU_DESCRIPTOR_HANDLE table =
 			m_Backend.GetDevice()->ResolveShaderVisibleDescriptor(
 				binding.m_HeapType, binding.m_TableIndex);
@@ -296,6 +298,8 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
+			"SetPipeline must bind a graphics root signature before root arguments.");
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
@@ -311,6 +315,8 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetReadOnlyBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
+			"SetPipeline must bind a graphics root signature before root arguments.");
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
@@ -326,6 +332,8 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetPushConstants(
 		uint32_t parameterIndex, std::span<const uint32_t> values, uint32_t destOffset) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_CurrentRootSignature,
+			"SetPipeline must bind a graphics root signature before root arguments.");
 		m_Backend.GetCommandList()->SetGraphicsRoot32BitConstants(
 			parameterIndex, values, destOffset);
 	}
