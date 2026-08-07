@@ -57,9 +57,9 @@ namespace gglab
 		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
 		using MaterialTable = PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>;
 		using LightTable = PersistentStructuredBufferTable<uint64_t, LightGPU>;
-		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_ObjectsSB.GetBufferCount());
-		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_MaterialsSB.GetBufferCount());
-		GGLAB_ASSERT(info.m_CurrentBackBufferIndex < info.m_LightsSB.GetBufferCount());
+		GGLAB_ASSERT(info.m_FrameSlotIndex < info.m_ObjectsSB.GetBufferCount());
+		GGLAB_ASSERT(info.m_FrameSlotIndex < info.m_MaterialsSB.GetBufferCount());
+		GGLAB_ASSERT(info.m_FrameSlotIndex < info.m_LightsSB.GetBufferCount());
 		info.m_ObjectTable.BeginUpdate();
 		info.m_MaterialTable.BeginUpdate();
 		info.m_LightTable.BeginUpdate();
@@ -300,23 +300,23 @@ namespace gglab
 		}
 
 		const auto objectDirtyRanges =
-			info.m_ObjectTable.BuildDirtyRanges(info.m_CurrentBackBufferIndex);
+			info.m_ObjectTable.BuildDirtyRanges(info.m_FrameSlotIndex);
 		const auto materialDirtyRanges =
-			info.m_MaterialTable.BuildDirtyRanges(info.m_CurrentBackBufferIndex);
+			info.m_MaterialTable.BuildDirtyRanges(info.m_FrameSlotIndex);
 		const auto lightDirtyRanges =
-			info.m_LightTable.BuildDirtyRangesIncludingFreeSlots(info.m_CurrentBackBufferIndex);
+			info.m_LightTable.BuildDirtyRangesIncludingFreeSlots(info.m_FrameSlotIndex);
 		bool objectsUploadSucceeded = true;
 		bool materialsUploadSucceeded = true;
 		bool lightsUploadSucceeded = true;
 
 		// Only upload changed contiguous ranges into the physical buffer version
-		// associated with the current backbuffer.
+		// associated with the current frame slot.
 		if (!objectDirtyRanges.empty() || !materialDirtyRanges.empty() || !lightDirtyRanges.empty())
 		{
 			auto batch = transferManager.BeginBatch();
 
 			const RHIBufferHandle objectBuffer =
-				info.m_ObjectsSB.GetBufferHandle(info.m_CurrentBackBufferIndex);
+				info.m_ObjectsSB.GetBufferHandle(info.m_FrameSlotIndex);
 			for (const auto& range : objectDirtyRanges)
 			{
 				const std::span<const ObjectGPU> data = info.m_ObjectTable.GetData(range);
@@ -326,7 +326,7 @@ namespace gglab
 			}
 
 			const RHIBufferHandle materialBuffer =
-				info.m_MaterialsSB.GetBufferHandle(info.m_CurrentBackBufferIndex);
+				info.m_MaterialsSB.GetBufferHandle(info.m_FrameSlotIndex);
 			for (const auto& range : materialDirtyRanges)
 			{
 				const std::span<const MaterialGPU> data = info.m_MaterialTable.GetData(range);
@@ -336,7 +336,7 @@ namespace gglab
 			}
 
 			const RHIBufferHandle lightBuffer =
-				info.m_LightsSB.GetBufferHandle(info.m_CurrentBackBufferIndex);
+				info.m_LightsSB.GetBufferHandle(info.m_FrameSlotIndex);
 			for (const auto& range : lightDirtyRanges)
 			{
 				const std::span<const LightGPU> data = info.m_LightTable.GetData(range);
@@ -348,22 +348,22 @@ namespace gglab
 			uploadFencePoint = batch.Submit(false);
 			if (objectsUploadSucceeded)
 			{
-				info.m_ObjectTable.Commit(info.m_CurrentBackBufferIndex, objectDirtyRanges);
+				info.m_ObjectTable.Commit(info.m_FrameSlotIndex, objectDirtyRanges);
 			}
 			if (materialsUploadSucceeded)
 			{
-				info.m_MaterialTable.Commit(info.m_CurrentBackBufferIndex, materialDirtyRanges);
+				info.m_MaterialTable.Commit(info.m_FrameSlotIndex, materialDirtyRanges);
 			}
 			if (lightsUploadSucceeded)
 			{
-				info.m_LightTable.Commit(info.m_CurrentBackBufferIndex, lightDirtyRanges);
+				info.m_LightTable.Commit(info.m_FrameSlotIndex, lightDirtyRanges);
 			}
 		}
 		else
 		{
-			info.m_ObjectTable.Commit(info.m_CurrentBackBufferIndex, {});
-			info.m_MaterialTable.Commit(info.m_CurrentBackBufferIndex, {});
-			info.m_LightTable.Commit(info.m_CurrentBackBufferIndex, {});
+			info.m_ObjectTable.Commit(info.m_FrameSlotIndex, {});
+			info.m_MaterialTable.Commit(info.m_FrameSlotIndex, {});
+			info.m_LightTable.Commit(info.m_FrameSlotIndex, {});
 		}
 
 		result.m_UploadFencePoint = uploadFencePoint;

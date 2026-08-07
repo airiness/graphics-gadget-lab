@@ -42,6 +42,9 @@ namespace gglab
 		void ClearTrackedResourceUses() noexcept;
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept;
 		void TrackTextureUse(RHITextureHandle texture) noexcept;
+		void BeginRenderingScope() noexcept;
+		void EndRenderingScope() noexcept;
+		[[nodiscard]] bool IsRendering() const noexcept { return m_IsRendering; }
 
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
@@ -60,6 +63,7 @@ namespace gglab
 		DX12Device* m_Device = nullptr;
 		DX12CommandList* m_CommandList = nullptr;
 		RHIQueueType m_QueueType = RHIQueueType::Graphics;
+		bool m_IsRendering = false;
 		std::vector<RHIBufferHandle> m_UsedBuffers;
 		std::vector<RHITextureHandle> m_UsedTextures;
 	};
@@ -112,8 +116,9 @@ namespace gglab
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
-		void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
-			RHITextureViewHandle depthStencil = {}) noexcept override;
+		void BeginRendering(const RHIRenderingInfo& info) noexcept override;
+		void EndRendering() noexcept override;
+		bool IsRendering() const noexcept override { return m_Backend.IsRendering(); }
 		void ClearColor(
 			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept override;
 		void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,

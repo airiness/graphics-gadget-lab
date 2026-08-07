@@ -167,12 +167,14 @@ namespace gglab
 		if (m_DebugReadback)
 		{
 			auto* device = renderer->GetDevice();
+			auto* rhiContext = renderer->GetRHIContext();
 			auto* swapChain = renderer->GetSwapChain();
 			GGLAB_ASSERT_NOT_NULL(device);
+			GGLAB_ASSERT_NOT_NULL(rhiContext);
 			GGLAB_ASSERT_NOT_NULL(swapChain);
-			m_DebugReadback->Initialize(*device, swapChain->GetBufferCount());
-			m_DebugReadback->ConsumeCompletedSlot(context.m_BackBufferIndex);
-			m_DebugReadback->PrepareGridBuffer(*device, context.m_BackBufferIndex,
+			m_DebugReadback->Initialize(*device, rhiContext->GetFrameSlotCount());
+			m_DebugReadback->ConsumeCompletedSlot(context.m_FrameSlotIndex);
+			m_DebugReadback->PrepareGridBuffer(*device, context.m_FrameSlotIndex,
 				MakeForwardPlusTileGrid(
 					swapChain->GetBufferWidth(), swapChain->GetBufferHeight()));
 		}
@@ -266,7 +268,7 @@ namespace gglab
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::LightBuffer),
 					renderer->GetLightStructuredBuffer()->GetBufferHandle(
-						context.m_BackBufferIndex));
+						context.m_FrameSlotIndex));
 				commandContext->SetReadWriteBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::TileHeaders), headers);
 				commandContext->SetReadWriteBuffer(
@@ -302,7 +304,7 @@ namespace gglab
 		}
 
 		const auto debugReadback = m_DebugReadback;
-		const uint32_t bufferIndex = context.m_BackBufferIndex;
+		const uint32_t bufferIndex = context.m_FrameSlotIndex;
 		const uint64_t frameSerial = context.m_FrameSerial;
 		rg.AddPass<ReadbackPassData>(
 			"Lighting.ForwardPlus.Readback", RGPassEncoderType::Copy,

@@ -18,6 +18,7 @@ namespace gglab
 	class DX12Resource;
 	class DX12DescriptorCache;
 	struct DX12DescriptorView;
+	struct RHITextureViewKey;
 	class DX12Device : public RHIDevice
 	{
 	public:
@@ -115,6 +116,8 @@ namespace gglab
 			RHIBufferViewHandle view) const noexcept override;
 		RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
+		bool ResolveTextureViewInfo(RHITextureViewHandle view, DX12DescriptorView& descriptor,
+			RHITextureViewKey& key) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE ResolveShaderVisibleDescriptor(
 			RHIDescriptorHeapType heapType, uint32_t descriptorIndex) const noexcept;
 

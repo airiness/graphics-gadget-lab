@@ -84,9 +84,15 @@ namespace gglab
 					},
 					[renderer](RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{
-						executeContext.GetGraphicsCommandContext()->ClearColor(
-							executeContext.GetViewHandle(data.m_Rtv),
-							renderer->GetBackBufferClearColor());
+						auto* commandContext = executeContext.GetGraphicsCommandContext();
+						const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+						const RHIRenderingAttachment colorAttachment{
+							.m_View = rtv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						};
+						commandContext->BeginRendering({ .m_ColorAttachments =
+							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+						commandContext->ClearColor(rtv, renderer->GetBackBufferClearColor());
 					});
 
 				m_IBLPass.AddPass(rg, context, services);

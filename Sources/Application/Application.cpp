@@ -187,7 +187,7 @@ namespace gglab
 
 		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
 			.m_Device = m_Renderer->GetDevice(),
-			.m_FrameSlotCount = m_Renderer->GetSwapChain()->GetBufferCount(),
+			.m_FrameSlotCount = m_Renderer->GetRHIContext()->GetFrameSlotCount(),
 			});
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
@@ -360,11 +360,12 @@ namespace gglab
 
 		auto& world = demo->GetWorld();
 		auto& camera = demo->GetCamera();
-		const uint32_t backBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex();
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
-		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
+		auto rendererFrame = m_Renderer->BeginFrame();
+		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
+		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
 
@@ -383,6 +384,7 @@ namespace gglab
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
+			.m_FrameSlotIndex = frameSlotIndex,
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
@@ -392,7 +394,7 @@ namespace gglab
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
-		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(backBufferIndex,
+		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 

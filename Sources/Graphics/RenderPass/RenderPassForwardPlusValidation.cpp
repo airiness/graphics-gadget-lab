@@ -310,7 +310,7 @@ namespace gglab
 			});
 
 		const auto debugReadback = m_DebugReadback;
-		const uint32_t bufferIndex = context.m_BackBufferIndex;
+		const uint32_t bufferIndex = context.m_FrameSlotIndex;
 		const uint64_t frameSerial = context.m_FrameSerial;
 		rg.AddPass<ReadbackPassData>(
 			"Lighting.ForwardPlus.HdrDiffReadback", RGPassEncoderType::Copy,

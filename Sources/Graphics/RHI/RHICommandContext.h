@@ -89,6 +89,24 @@ namespace gglab
 		bool operator==(const RHIScissorRect&) const noexcept = default;
 	};
 
+	enum class RHIContentLoadOp : uint8_t
+	{
+		Load,
+		DontCare,
+	};
+
+	struct RHIRenderingAttachment
+	{
+		RHITextureViewHandle m_View{};
+		RHIContentLoadOp m_LoadOp = RHIContentLoadOp::Load;
+	};
+
+	struct RHIRenderingInfo
+	{
+		std::span<const RHIRenderingAttachment> m_ColorAttachments{};
+		std::optional<RHIRenderingAttachment> m_DepthAttachment = std::nullopt;
+	};
+
 	class RHICommandContext
 	{
 	public:
@@ -116,8 +134,9 @@ namespace gglab
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
-		virtual void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
-			RHITextureViewHandle depthStencil = {}) noexcept = 0;
+		virtual void BeginRendering(const RHIRenderingInfo& info) noexcept = 0;
+		virtual void EndRendering() noexcept = 0;
+		[[nodiscard]] virtual bool IsRendering() const noexcept = 0;
 		virtual void ClearColor(
 			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept = 0;
 		virtual void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,

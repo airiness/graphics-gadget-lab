@@ -38,6 +38,7 @@ namespace gglab
 	{
 		const char* m_SemanticName = nullptr;
 		uint32_t m_SemanticIndex = 0;
+		uint32_t m_Location = 0;
 		RHIFormat m_Format = RHIFormat::Unknown;
 		uint32_t m_InputSlot = 0;
 		uint32_t m_AlignedByteOffset = 0;

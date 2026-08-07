@@ -62,6 +62,8 @@ namespace gglab
 
 		R8Unorm,
 		R16Float,
+		B8G8R8A8Unorm,
+		B8G8R8A8UnormSrgb,
 
 		// RHIFormat values are serialized by texture artifacts. Append new formats above Count.
 		Count,

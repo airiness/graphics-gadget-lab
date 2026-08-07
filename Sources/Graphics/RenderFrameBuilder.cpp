@@ -124,6 +124,7 @@ namespace gglab
 			.m_DebugDrawFrame = m_DebugDrawFrame,
 			.m_DirectionalShadowSettings = m_WorldData.GetMainDirectionalShadowSettings(),
 			.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
+			.m_FrameSlotIndex = m_FrameSlotIndex,
 			.m_BackBufferIndex = m_BackBufferIndex,
 			.m_FrameSerial = m_FrameSerial,
 			.m_UploadFencePoint = m_UploadFencePoint,
@@ -135,6 +136,7 @@ namespace gglab
 	RenderFrameBuilder::BuildResult RenderFrameBuilder::Build(const BuildInfo& info) noexcept
 	{
 		BuildResult result{};
+		result.m_FrameSlotIndex = info.m_FrameSlotIndex;
 		result.m_BackBufferIndex = info.m_BackBufferIndex;
 		result.m_FrameSerial = info.m_FrameSerial;
 		result.m_ShadowVisualizationSettings = &info.m_ShadowVisualizationSettings;
@@ -227,7 +229,7 @@ namespace gglab
 				shadowSettings.m_Enable ? result.m_WorldData.m_MainDirectionalLight.m_EntityKey
 										: std::nullopt,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
-			.m_CurrentBackBufferIndex = info.m_BackBufferIndex,
+			.m_FrameSlotIndex = info.m_FrameSlotIndex,
 		};
 		RenderSceneBuilder::BuildResult sceneBuildResult;
 		{
@@ -306,9 +308,9 @@ namespace gglab
 							},
 						.m_DepthConvention = renderView.m_DepthConvention,
 					},
-				.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_BackBufferIndex),
+				.m_ObjectBuffer = objectBuffer->GetBufferHandle(info.m_FrameSlotIndex),
 				.m_ObjectBaseIndex = result.m_RenderScene.m_ObjectBaseIndex,
-				.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_BackBufferIndex),
+				.m_MaterialBuffer = materialBuffer->GetBufferHandle(info.m_FrameSlotIndex),
 				.m_MaterialBaseIndex = result.m_RenderScene.m_MaterialBaseIndex,
 			};
 			renderQueue = m_QueueBuilder.Build(queueBuildInfo);

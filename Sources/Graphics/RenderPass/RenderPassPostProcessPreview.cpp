@@ -269,10 +269,14 @@ namespace gglab
 				GGLAB_ASSERT_MSG(
 					sourceSrv.IsValid(), "Post-process preview source SRV must be shader visible.");
 
+				const RHIRenderingAttachment colorAttachment{
+					.m_View = outputRtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				commandContext->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				commandContext->ClearColor(outputRtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
-				commandContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(&outputRtv, 1));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

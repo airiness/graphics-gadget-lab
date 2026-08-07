@@ -273,6 +273,14 @@ namespace gglab
 			{
 				pass.m_Executor->Execute(executeContext);
 			}
+			if (pass.m_EncoderType == RGPassEncoderType::Graphics)
+			{
+				auto* graphicsContext = executeContext.m_Backend.m_GraphicsCommandContext;
+				if (graphicsContext && graphicsContext->IsRendering())
+				{
+					graphicsContext->EndRendering();
+				}
+			}
 			EmitBarriers(passCommandContext, plan, pass.m_PostBarriers);
 			if (passCommandContext)
 			{

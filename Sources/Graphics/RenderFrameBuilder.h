@@ -26,6 +26,7 @@ namespace gglab
 			const ViewRenderProfile& m_ViewRenderProfile;
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;
+			uint32_t m_FrameSlotIndex = 0;
 			uint32_t m_BackBufferIndex = 0;
 			uint64_t m_FrameSerial = 0;
 		};
@@ -44,6 +45,7 @@ namespace gglab
 			RHIFencePoint m_UploadFencePoint{};
 			RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
+			uint32_t m_FrameSlotIndex = 0;
 			uint32_t m_BackBufferIndex = 0;
 			uint64_t m_FrameSerial = 0;
 			ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;

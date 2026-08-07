@@ -39,6 +39,12 @@ namespace gglab
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+				const RHIRenderingAttachment colorAttachment{
+					.m_View = rtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				commandContext->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
 			});
 	}

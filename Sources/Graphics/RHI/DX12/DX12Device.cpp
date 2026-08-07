@@ -450,6 +450,12 @@ namespace gglab
 			: DX12DescriptorView{};
 	}
 
+	bool DX12Device::ResolveTextureViewInfo(RHITextureViewHandle view,
+		DX12DescriptorView& descriptor, RHITextureViewKey& key) const noexcept
+	{
+		return m_DescriptorCache && m_DescriptorCache->ResolveTextureViewInfo(view, descriptor, key);
+	}
+
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(
 		RHIDescriptorHeapType heapType, uint32_t descriptorIndex) const noexcept
 	{

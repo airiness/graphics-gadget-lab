@@ -31,6 +31,7 @@ namespace gglab
 		DirectionalShadowSettings m_DirectionalShadowSettings = DisabledDirectionalShadowSettings();
 		const ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 
+		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
 		uint64_t m_FrameSerial = 0;
 

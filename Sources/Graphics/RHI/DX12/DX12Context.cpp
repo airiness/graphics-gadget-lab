@@ -17,8 +17,8 @@
 
 namespace gglab
 {
-	DX12FrameContext::DX12FrameContext(DX12Context* context, uint32_t frameIndex) noexcept :
-		m_Context(context), m_FrameIndex(frameIndex), m_BackBufferIndex(frameIndex)
+	DX12FrameContext::DX12FrameContext(DX12Context* context, uint32_t frameSlotIndex) noexcept :
+		m_Context(context), m_FrameSlotIndex(frameSlotIndex)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Context);
 	}
@@ -32,7 +32,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(
 			m_Active, "DX12FrameContext::GetGraphicsContext requires an active frame.");
-		return m_Context->GetQueueSystem().GetGraphicsContext(m_FrameIndex);
+		return m_Context->GetQueueSystem().GetGraphicsContext(m_FrameSlotIndex);
 	}
 
 	RHIComputeCommandContext& DX12FrameContext::GetDirectComputeContext() noexcept
@@ -53,21 +53,23 @@ namespace gglab
 		GGLAB_ASSERT_MSG(desc.m_WindowHandle != nullptr, "DX12Context requires a window handle.");
 		GGLAB_ASSERT_MSG(
 			desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
+		GGLAB_ASSERT_MSG(desc.m_FrameSlotCount >= 2,
+			"DX12Context currently requires at least two frame slots for its swapchain.");
 		m_Device = std::make_unique<DX12Device>();
 		m_Device->Initialize();
 		m_PipelineSystem = std::make_unique<DX12PipelineSystem>(m_Device.get());
 		DX12QueueSystem::CreateInfo queueSystemInfo{};
 		queueSystemInfo.m_Device = m_Device.get();
-		queueSystemInfo.m_FrameCount = desc.m_BufferCount;
+		queueSystemInfo.m_FrameCount = desc.m_FrameSlotCount;
 		queueSystemInfo.m_PipelineSystem = static_cast<DX12PipelineSystem*>(m_PipelineSystem.get());
 		m_QueueSystem = std::make_unique<DX12QueueSystem>(queueSystemInfo);
 		m_Device->SetQueueSystem(m_QueueSystem.get());
-		m_GpuProfiler = std::make_unique<DX12GpuProfiler>(
-			m_Device.get(), &m_QueueSystem->GetQueue(DX12QueueType::Graphics), desc.m_BufferCount);
-		m_DirectComputeContexts.reserve(desc.m_BufferCount);
-		for (uint32_t frameIndex = 0; frameIndex < desc.m_BufferCount; ++frameIndex)
+		m_GpuProfiler = std::make_unique<DX12GpuProfiler>(m_Device.get(),
+			&m_QueueSystem->GetQueue(DX12QueueType::Graphics), desc.m_FrameSlotCount);
+		m_DirectComputeContexts.reserve(desc.m_FrameSlotCount);
+		for (uint32_t frameSlotIndex = 0; frameSlotIndex < desc.m_FrameSlotCount; ++frameSlotIndex)
 		{
-			auto& graphicsContext = m_QueueSystem->GetGraphicsContext(frameIndex);
+			auto& graphicsContext = m_QueueSystem->GetGraphicsContext(frameSlotIndex);
 			graphicsContext.SetGpuProfiler(m_GpuProfiler.get());
 			auto computeContext = std::make_unique<DX12ComputeCommandContext>(
 				graphicsContext, static_cast<DX12PipelineSystem*>(m_PipelineSystem.get()));
@@ -93,7 +95,9 @@ namespace gglab
 		swapChainInfo.m_Width = desc.m_Width;
 		swapChainInfo.m_Height = desc.m_Height;
 		swapChainInfo.m_Format = ToDXGIFormat(desc.m_BackBufferFormat);
-		swapChainInfo.m_BufferCount = desc.m_BufferCount;
+		// DX12 currently requests one swapchain image per frame slot. The counts remain
+		// semantically independent so another backend may choose a surface-compatible count.
+		swapChainInfo.m_BufferCount = desc.m_FrameSlotCount;
 		swapChainInfo.m_AllowTearing = desc.m_AllowTearing && m_Device->SupportTearing();
 		swapChainInfo.m_Vsync = desc.m_Vsync;
 		auto swapChain = std::make_unique<DX12SwapChain>();
@@ -106,8 +110,8 @@ namespace gglab
 
 		m_TransferManager = std::make_unique<TransferManager>(
 			std::make_unique<DX12TransferContext>(m_Device.get(), m_QueueSystem.get()));
-		m_Frames.reserve(desc.m_BufferCount);
-		for (uint32_t i = 0; i < desc.m_BufferCount; ++i)
+		m_Frames.reserve(desc.m_FrameSlotCount);
+		for (uint32_t i = 0; i < desc.m_FrameSlotCount; ++i)
 		{
 			m_Frames.push_back(std::make_unique<DX12FrameContext>(this, i));
 		}
@@ -174,19 +178,26 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_ActiveFrame == nullptr, "DX12Context only supports one active frame.");
 
 		m_SwapChain->WaitFrameCompletion();
+
+		GGLAB_ASSERT(m_NextFrameSlotIndex < m_Frames.size());
+		auto& frame = *m_Frames[m_NextFrameSlotIndex];
+		GGLAB_ASSERT_MSG(!frame.m_Active, "DX12 frame slot is already active.");
+		if (frame.m_SubmittedFence.IsValid())
+		{
+			m_QueueSystem->WaitForFenceCompletion(frame.m_SubmittedFence);
+		}
 		RetireCompletedWork();
 
-		const uint32_t frameIndex = m_SwapChain->GetCurrentBackBufferIndex();
-		GGLAB_ASSERT(frameIndex < m_Frames.size());
-		auto& frame = *m_Frames[frameIndex];
-		GGLAB_ASSERT_MSG(!frame.m_Active, "DX12 frame slot is already active.");
-		frame.m_BackBufferIndex = frameIndex;
+		frame.m_BackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
+		GGLAB_ASSERT(frame.m_BackBufferIndex < m_SwapChain->GetBufferCount());
 		frame.m_SubmittedFence = {};
 		frame.m_ComputeAllocator = nullptr;
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
+		m_NextFrameSlotIndex = (m_NextFrameSlotIndex + 1) % GetFrameSlotCount();
 		BeginGraphicsRecording(frame);
-		m_GpuProfiler->BeginFrame(frameIndex, m_QueueSystem->GetGraphicsCommandList(frameIndex));
+		m_GpuProfiler->BeginFrame(frame.m_FrameSlotIndex,
+			m_QueueSystem->GetGraphicsCommandList(frame.m_FrameSlotIndex));
 		return frame;
 	}
 
@@ -203,8 +214,8 @@ namespace gglab
 		DX12FencePoint computeFence{};
 		if (frame->m_ComputeAllocator)
 		{
-			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameIndex);
-			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameIndex);
+			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameSlotIndex);
+			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex);
 			auto* computeQueue = &m_QueueSystem->GetQueue(DX12QueueType::Compute);
 			computeList->End();
 			const DX12CommandList* lists[] = { computeList };
@@ -223,10 +234,10 @@ namespace gglab
 			m_QueueSystem->WaitForFence(RHIQueueType::Graphics, computeFence.ToRHI());
 		}
 
-		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
-		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameIndex);
+		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameSlotIndex);
+		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex);
 		auto* graphicsQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
-		m_GpuProfiler->EndFrame(frame->m_FrameIndex, *graphicsList);
+		m_GpuProfiler->EndFrame(frame->m_FrameSlotIndex, *graphicsList);
 		graphicsList->End();
 		const DX12CommandList* lists[] = { graphicsList };
 		const DX12FencePoint graphicsFence = graphicsQueue->Execute(lists);
@@ -261,8 +272,8 @@ namespace gglab
 
 		if (frame->m_ComputeAllocator)
 		{
-			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameIndex);
-			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameIndex);
+			auto* computeList = &m_QueueSystem->GetComputeCommandList(frame->m_FrameSlotIndex);
+			auto* computeContext = &m_QueueSystem->GetComputeContext(frame->m_FrameSlotIndex);
 			computeList->End();
 			computeContext->ClearTrackedResourceUses();
 			const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Compute).Signal();
@@ -270,9 +281,9 @@ namespace gglab
 				.RecycleCommandAllocator(frame->m_ComputeAllocator, fence);
 		}
 
-		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameIndex);
-		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameIndex);
-		m_GpuProfiler->AbortFrame(frame->m_FrameIndex);
+		auto* graphicsList = &m_QueueSystem->GetGraphicsCommandList(frame->m_FrameSlotIndex);
+		auto* graphicsContext = &m_QueueSystem->GetGraphicsContext(frame->m_FrameSlotIndex);
+		m_GpuProfiler->AbortFrame(frame->m_FrameSlotIndex);
 		graphicsList->End();
 		graphicsContext->ClearTrackedResourceUses();
 		const DX12FencePoint fence = m_QueueSystem->GetQueue(DX12QueueType::Graphics).Signal();
@@ -315,21 +326,21 @@ namespace gglab
 		m_Device->RetireCompletedWork();
 	}
 
-	uint32_t DX12Context::GetCurrentFrameIndex() const noexcept
+	uint32_t DX12Context::GetFrameSlotCount() const noexcept
 	{
-		return m_SwapChain->GetCurrentBackBufferIndex();
+		return static_cast<uint32_t>(m_Frames.size());
 	}
 
 	DX12ComputeCommandContext* DX12Context::AcquireComputeContext(DX12FrameContext& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(&frame == m_ActiveFrame && frame.m_Active,
 			"Compute context can only be acquired from the active frame.");
-		auto* context = &m_QueueSystem->GetComputeContext(frame.m_FrameIndex);
+		auto* context = &m_QueueSystem->GetComputeContext(frame.m_FrameSlotIndex);
 		if (!frame.m_ComputeAllocator)
 		{
 			frame.m_ComputeAllocator =
 				m_QueueSystem->GetAllocatorPool(DX12QueueType::Compute).RequestCommandAllocator();
-			auto* commandList = &m_QueueSystem->GetComputeCommandList(frame.m_FrameIndex);
+			auto* commandList = &m_QueueSystem->GetComputeCommandList(frame.m_FrameSlotIndex);
 			commandList->Begin(frame.m_ComputeAllocator);
 			context->ClearTrackedResourceUses();
 			BindGlobalDescriptorHeaps(*commandList);
@@ -342,18 +353,18 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(&frame == m_ActiveFrame && frame.m_Active,
 			"A direct compute encoder can only be acquired from the active frame.");
-		GGLAB_ASSERT(frame.m_FrameIndex < m_DirectComputeContexts.size());
-		return *m_DirectComputeContexts[frame.m_FrameIndex];
+		GGLAB_ASSERT(frame.m_FrameSlotIndex < m_DirectComputeContexts.size());
+		return *m_DirectComputeContexts[frame.m_FrameSlotIndex];
 	}
 
 	void DX12Context::BeginGraphicsRecording(DX12FrameContext& frame) noexcept
 	{
 		frame.m_GraphicsAllocator =
 			m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics).RequestCommandAllocator();
-		auto* commandList = &m_QueueSystem->GetGraphicsCommandList(frame.m_FrameIndex);
+		auto* commandList = &m_QueueSystem->GetGraphicsCommandList(frame.m_FrameSlotIndex);
 		commandList->Begin(frame.m_GraphicsAllocator);
-		m_QueueSystem->GetGraphicsContext(frame.m_FrameIndex).ClearTrackedResourceUses();
-		m_DirectComputeContexts[frame.m_FrameIndex]->ResetEncoderState();
+		m_QueueSystem->GetGraphicsContext(frame.m_FrameSlotIndex).ClearTrackedResourceUses();
+		m_DirectComputeContexts[frame.m_FrameSlotIndex]->ResetEncoderState();
 		BindGlobalDescriptorHeaps(*commandList);
 	}
 

@@ -9,6 +9,7 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
@@ -16,8 +17,10 @@
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
@@ -220,27 +223,43 @@ namespace gglab
 			void TrackBufferUse(RHIBufferHandle) noexcept override {}
 			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
 				m_TextureBarrierCount += static_cast<uint32_t>(barriers.size());
 				m_TextureBarriers.insert(m_TextureBarriers.end(), barriers.begin(), barriers.end());
 			}
 			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
 				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
 			}
-			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
+			void FlushBarriers() noexcept override
+			{
+				GGLAB_ASSERT(!m_IsRendering);
+				++m_FlushBarrierCount;
+			}
 			void CopyBuffer(
 				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
 				++m_CopyBufferCount;
 			}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
-			void SetRenderTargets(
-				std::span<const RHITextureViewHandle>, RHITextureViewHandle) noexcept override
+			void BeginRendering(const RHIRenderingInfo&) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
+				m_IsRendering = true;
+				++m_BeginRenderingCount;
 			}
+			void EndRendering() noexcept override
+			{
+				GGLAB_ASSERT(m_IsRendering);
+				m_IsRendering = false;
+				++m_EndRenderingCount;
+			}
+			bool IsRendering() const noexcept override { return m_IsRendering; }
 			void ClearColor(RHITextureViewHandle, const std::array<float, 4>&) noexcept override {}
 			void ClearDepthStencil(
 				RHITextureViewHandle, float, std::optional<uint8_t>) noexcept override
@@ -268,6 +287,9 @@ namespace gglab
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
 			uint32_t m_CopyBufferCount = 0;
+			uint32_t m_BeginRenderingCount = 0;
+			uint32_t m_EndRenderingCount = 0;
+			bool m_IsRendering = false;
 			std::vector<RHITextureBarrier> m_TextureBarriers;
 		};
 
@@ -597,6 +619,79 @@ namespace gglab
 			}
 			context.Check(barrierContractMatches,
 				"Napa voxel mesh buffers transition from Common for draw and return to Common");
+		}
+
+		void RunRHIFrameAndGraphicsScopeContractTests(SelfTestContext& context) noexcept
+		{
+			constexpr uint32_t FrameSlotCount = 2;
+			constexpr uint32_t SwapChainImageCount = 3;
+			RenderFrameBuilder::BuildResult syntheticFrame{};
+			syntheticFrame.m_FrameSlotIndex = 1;
+			syntheticFrame.m_BackBufferIndex = 2;
+			syntheticFrame.m_FrameSerial = 17;
+			const RenderFrameContext renderContext = syntheticFrame.MakeRenderFrameContext();
+			std::array<uint32_t, FrameSlotCount> frameSlotStorage{};
+			std::array<uint32_t, SwapChainImageCount> swapChainImageStorage{};
+			frameSlotStorage[renderContext.m_FrameSlotIndex] = 11;
+			swapChainImageStorage[renderContext.m_BackBufferIndex] = 29;
+			context.Check(renderContext.m_FrameSlotIndex < FrameSlotCount &&
+				renderContext.m_BackBufferIndex < SwapChainImageCount &&
+				renderContext.m_FrameSlotIndex != renderContext.m_BackBufferIndex &&
+				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
+				"Frame context preserves independent frame-slot and swapchain-image indices");
+
+			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
+			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);
+			context.Check(bgraUnorm.m_Family == RHIFormatFamily::B8G8R8A8 &&
+				bgraSrgb.m_Family == RHIFormatFamily::B8G8R8A8 &&
+				AreRHIFormatsInSameFamily(bgraUnorm.m_Format, bgraSrgb.m_Format) &&
+				!AreRHIFormatsInSameFamily(
+					RHIFormat::B8G8R8A8Unorm, RHIFormat::R8G8B8A8Unorm) &&
+				bgraUnorm.m_BytesPerBlock == 4,
+				"Pure RHI format metadata keeps BGRA8 in its own color-view family");
+
+			bool locationsAreExplicit = true;
+			for (uint32_t layoutIndex = 0;
+				layoutIndex < static_cast<uint32_t>(InputLayoutID::Count); ++layoutIndex)
+			{
+				const auto vertexLayout =
+					BuildRHIVertexInputLayoutDesc(static_cast<InputLayoutID>(layoutIndex));
+				locationsAreExplicit &= vertexLayout.m_AttributeCount > 0;
+				for (uint32_t attributeIndex = 0;
+					attributeIndex < vertexLayout.m_AttributeCount; ++attributeIndex)
+				{
+					locationsAreExplicit &=
+						vertexLayout.m_Attributes[attributeIndex].m_Location == attributeIndex;
+				}
+			}
+			context.Check(locationsAreExplicit,
+				"Built-in RHI vertex layouts assign deterministic explicit attribute locations");
+		}
+
+		void RunDX12GraphicsContractLoweringTests(SelfTestContext& context) noexcept
+		{
+			const bool bgraRoundTrips =
+				ToDXGIFormat(RHIFormat::B8G8R8A8Unorm) == DXGI_FORMAT_B8G8R8A8_UNORM &&
+				ToDXGIFormat(RHIFormat::B8G8R8A8UnormSrgb) ==
+				DXGI_FORMAT_B8G8R8A8_UNORM_SRGB &&
+				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM) == RHIFormat::B8G8R8A8Unorm &&
+				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB) ==
+				RHIFormat::B8G8R8A8UnormSrgb;
+			context.Check(bgraRoundTrips,
+				"DX12 preserves actual BGRA8 swapchain formats through RHI conversion");
+
+			GraphicsPhysicalPipelineKey recipe{};
+			recipe.m_InputLayoutId = InputLayoutID::P3N3T2;
+			const RHIGraphicsPipelineDesc baseDesc = BuildRHIGraphicsPipelineDesc(recipe);
+			RHIGraphicsPipelineDesc changedDesc = baseDesc;
+			++changedDesc.m_VertexInput.m_Attributes[1].m_Location;
+			const DX12GraphicsPipelineShaderInputs shaders{};
+			const auto baseKey =
+				MakeDX12RHIGraphicsPSOKey(baseDesc, RootSignatureID{ 3 }, shaders);
+			const auto changedKey =
+				MakeDX12RHIGraphicsPSOKey(changedDesc, RootSignatureID{ 3 }, shaders);
+			context.Check(baseKey != changedKey,
+				"DX12 normalized graphics keys include explicit RHI vertex locations");
 		}
 
 		void RunProjectionConventionTests(SelfTestContext& context) noexcept
@@ -2762,8 +2857,14 @@ namespace gglab
 				[&](RGExecuteContext& executeContext)
 				{
 					++graphicsExecutions;
-					graphicsContextSelected =
-						executeContext.GetGraphicsCommandContext() == &graphicsContext;
+					auto* selectedContext = executeContext.GetGraphicsCommandContext();
+					graphicsContextSelected = selectedContext == &graphicsContext;
+					const RHIRenderingAttachment colorAttachment{
+						.m_View = RHITextureViewHandle{ 31, 1 },
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					selectedContext->BeginRendering({ .m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				});
 			encoderGraph.AddTrivialSideEffectPass("ComputeEncoder", RGPassEncoderType::Compute,
 				[&](RGExecuteContext& executeContext)
@@ -2838,8 +2939,11 @@ namespace gglab
 					graphicsContextSelected && directComputeContextSelected &&
 					copyContextSelected && copyResourcesResolved &&
 					graphicsContext.m_CopyBufferCount == 1 &&
+					graphicsContext.m_BeginRenderingCount == 1 &&
+					graphicsContext.m_EndRenderingCount == 1 &&
+					!graphicsContext.IsRendering() &&
 					asyncComputeRemainsUnavailable,
-					"RenderGraph executes each live pass with its declared direct-list encoder");
+					"RenderGraph closes graphics rendering before the next direct-list encoder");
 				context.Check(graphicsContext.m_BeginProfileCount == 2 &&
 					graphicsContext.m_EndProfileCount == 2 &&
 					directComputeContext.m_BeginProfileCount == 1 &&
@@ -2908,6 +3012,8 @@ namespace gglab
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
+		RunRHIFrameAndGraphicsScopeContractTests(context);
+		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunGTAORenderGraphDataflowTests(context);

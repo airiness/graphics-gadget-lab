@@ -19,6 +19,15 @@ namespace gglab
 {
 	namespace
 	{
+		struct RenderingAttachmentProperties
+		{
+			uint64_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_SampleCount = 0;
+
+			bool operator==(const RenderingAttachmentProperties&) const noexcept = default;
+		};
+
 		D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(RHIPrimitiveTopology topology) noexcept
 		{
 			switch (topology)
@@ -37,6 +46,36 @@ namespace gglab
 			default:
 				return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 			}
+		}
+
+		bool ResolveRenderingAttachment(DX12Device& device,
+			const RHIRenderingAttachment& attachment, RHITextureViewType expectedType,
+			DX12DescriptorView& nativeView, RenderingAttachmentProperties& properties) noexcept
+		{
+			RHITextureViewKey key{};
+			if (!device.ResolveTextureViewInfo(attachment.m_View, nativeView, key) ||
+				key.m_Desc.m_Type != expectedType)
+			{
+				return false;
+			}
+
+			const DX12Texture* texture = device.ResolveTexture(key.m_Texture);
+			if (!texture)
+			{
+				return false;
+			}
+
+			const D3D12_RESOURCE_DESC desc = texture->GetDesc();
+			const uint32_t mip = key.m_Desc.m_Subresources.m_BaseMip;
+			if (mip >= desc.MipLevels)
+			{
+				return false;
+			}
+
+			properties.m_Width = std::max<uint64_t>(1, desc.Width >> mip);
+			properties.m_Height = std::max<uint32_t>(1, desc.Height >> mip);
+			properties.m_SampleCount = desc.SampleDesc.Count;
+			return true;
 		}
 	}
 
@@ -63,12 +102,38 @@ namespace gglab
 
 	void DX12CommandContext::ClearTrackedResourceUses() noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"DX12 command context reset requires the active rendering scope to be ended.");
+		m_IsRendering = false;
 		m_UsedBuffers.clear();
 		m_UsedTextures.clear();
 	}
 
+	void DX12CommandContext::BeginRenderingScope() noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"DX12CommandContext::BeginRenderingScope does not allow nested rendering scopes.");
+		if (!m_IsRendering)
+		{
+			m_IsRendering = true;
+		}
+	}
+
+	void DX12CommandContext::EndRenderingScope() noexcept
+	{
+		GGLAB_ASSERT_MSG(m_IsRendering,
+			"DX12CommandContext::EndRenderingScope requires an active rendering scope.");
+		m_IsRendering = false;
+	}
+
 	void DX12CommandContext::TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"Texture barriers cannot be encoded inside an active rendering scope.");
+		if (m_IsRendering)
+		{
+			return;
+		}
 		if (!m_Device || !m_CommandList || barriers.empty())
 		{
 			return;
@@ -92,6 +157,12 @@ namespace gglab
 
 	void DX12CommandContext::BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"Buffer barriers cannot be encoded inside an active rendering scope.");
+		if (m_IsRendering)
+		{
+			return;
+		}
 		if (!m_Device || !m_CommandList || barriers.empty())
 		{
 			return;
@@ -118,6 +189,12 @@ namespace gglab
 
 	void DX12CommandContext::FlushBarriers() noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"Barrier flushing cannot occur inside an active rendering scope.");
+		if (m_IsRendering)
+		{
+			return;
+		}
 		if (m_CommandList)
 		{
 			m_CommandList->FlushBarriers();
@@ -127,6 +204,12 @@ namespace gglab
 	void DX12CommandContext::CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 		RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"Buffer copies cannot be encoded inside an active rendering scope.");
+		if (m_IsRendering)
+		{
+			return;
+		}
 		DX12Buffer* destinationBuffer = m_Device ? m_Device->ResolveBuffer(destination) : nullptr;
 		DX12Buffer* sourceBuffer = m_Device ? m_Device->ResolveBuffer(source) : nullptr;
 		if (!destinationBuffer || !sourceBuffer || sizeInBytes == 0 ||
@@ -217,28 +300,82 @@ namespace gglab
 		m_Backend.Get()->SetGraphicsRootDescriptorTable(binding.m_ParameterIndex, table);
 	}
 
-	void DX12GraphicsCommandContext::SetRenderTargets(
-		std::span<const RHITextureViewHandle> renderTargets,
-		RHITextureViewHandle depthStencil) noexcept
+	void DX12GraphicsCommandContext::BeginRendering(const RHIRenderingInfo& info) noexcept
 	{
-		std::vector<DX12DescriptorView> nativeRenderTargets;
-		nativeRenderTargets.reserve(renderTargets.size());
-		for (const RHITextureViewHandle view : renderTargets)
+		GGLAB_ASSERT_MSG(!m_Backend.IsRendering(),
+			"DX12GraphicsCommandContext::BeginRendering does not allow nested scopes.");
+		if (m_Backend.IsRendering())
 		{
-			const DX12DescriptorView nativeView = m_Backend.GetDevice()->ResolveTextureView(view);
-			if (nativeView.IsValid())
-			{
-				nativeRenderTargets.push_back(nativeView);
-			}
+			return;
 		}
 
-		if (depthStencil.IsValid())
+		DX12Device* device = m_Backend.GetDevice();
+		GGLAB_ASSERT_NOT_NULL(device);
+		if (!device)
 		{
-			const DX12DescriptorView nativeDepth =
-				m_Backend.GetDevice()->ResolveTextureView(depthStencil);
-			GGLAB_ASSERT_MSG(
-				nativeDepth.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
-			m_Backend.GetCommandList()->SetRenderTargets(nativeRenderTargets, nativeDepth);
+			return;
+		}
+
+		std::vector<DX12DescriptorView> nativeRenderTargets;
+		nativeRenderTargets.reserve(info.m_ColorAttachments.size());
+		std::optional<RenderingAttachmentProperties> attachmentProperties;
+		for (const RHIRenderingAttachment& attachment : info.m_ColorAttachments)
+		{
+			DX12DescriptorView nativeView{};
+			RenderingAttachmentProperties properties{};
+			const bool resolved = ResolveRenderingAttachment(*device, attachment,
+				RHITextureViewType::RenderTarget, nativeView, properties);
+			GGLAB_ASSERT_MSG(resolved,
+				"A rendering color attachment must resolve to a live render-target view.");
+			if (!resolved)
+			{
+				return;
+			}
+			const bool compatible = !attachmentProperties || *attachmentProperties == properties;
+			GGLAB_ASSERT_MSG(compatible,
+				"All rendering attachments must have matching mip extents and sample counts.");
+			if (!compatible)
+			{
+				return;
+			}
+			attachmentProperties = properties;
+			nativeRenderTargets.push_back(nativeView);
+		}
+
+		GGLAB_ASSERT_MSG(!nativeRenderTargets.empty() || info.m_DepthAttachment.has_value(),
+			"DX12GraphicsCommandContext::BeginRendering requires an attachment.");
+		if (nativeRenderTargets.empty() && !info.m_DepthAttachment)
+		{
+			return;
+		}
+
+		std::optional<DX12DescriptorView> nativeDepth;
+		if (info.m_DepthAttachment)
+		{
+			DX12DescriptorView nativeView{};
+			RenderingAttachmentProperties properties{};
+			const bool resolved = ResolveRenderingAttachment(*device, *info.m_DepthAttachment,
+				RHITextureViewType::DepthStencil, nativeView, properties);
+			GGLAB_ASSERT_MSG(resolved,
+				"A rendering depth attachment must resolve to a live depth-stencil view.");
+			if (!resolved)
+			{
+				return;
+			}
+			const bool compatible = !attachmentProperties || *attachmentProperties == properties;
+			GGLAB_ASSERT_MSG(compatible,
+				"All rendering attachments must have matching mip extents and sample counts.");
+			if (!compatible)
+			{
+				return;
+			}
+			nativeDepth = nativeView;
+		}
+
+		m_Backend.BeginRenderingScope();
+		if (nativeDepth)
+		{
+			m_Backend.GetCommandList()->SetRenderTargets(nativeRenderTargets, *nativeDepth);
 		}
 		else
 		{
@@ -246,9 +383,20 @@ namespace gglab
 		}
 	}
 
+	void DX12GraphicsCommandContext::EndRendering() noexcept
+	{
+		m_Backend.EndRenderingScope();
+	}
+
 	void DX12GraphicsCommandContext::ClearColor(
 		RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			m_Backend.IsRendering(), "ClearColor requires an active rendering scope.");
+		if (!m_Backend.IsRendering())
+		{
+			return;
+		}
 		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(renderTarget);
 		GGLAB_ASSERT_MSG(view.IsValid(), "Render-target view must resolve to a DX12 descriptor.");
 		if (view.IsValid())
@@ -260,6 +408,12 @@ namespace gglab
 	void DX12GraphicsCommandContext::ClearDepthStencil(
 		RHITextureViewHandle depthStencil, float depth, std::optional<uint8_t> stencil) noexcept
 	{
+		GGLAB_ASSERT_MSG(
+			m_Backend.IsRendering(), "ClearDepthStencil requires an active rendering scope.");
+		if (!m_Backend.IsRendering())
+		{
+			return;
+		}
 		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(depthStencil);
 		GGLAB_ASSERT_MSG(view.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
 		if (view.IsValid())
@@ -401,6 +555,11 @@ namespace gglab
 		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_Backend.IsRendering(), "DrawIndexed requires an active rendering scope.");
+		if (!m_Backend.IsRendering())
+		{
+			return;
+		}
 		m_Backend.Get()->DrawIndexedInstanced(indexCount, instanceCount, startIndexLocation,
 			baseVertexLocation, startInstanceLocation);
 	}
@@ -408,6 +567,11 @@ namespace gglab
 	void DX12GraphicsCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
 		uint32_t startVertexLocation, uint32_t startInstanceLocation) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_Backend.IsRendering(), "Draw requires an active rendering scope.");
+		if (!m_Backend.IsRendering())
+		{
+			return;
+		}
 		m_Backend.Get()->DrawInstanced(
 			vertexCount, instanceCount, startVertexLocation, startInstanceLocation);
 	}
@@ -565,6 +729,12 @@ namespace gglab
 	void DX12ComputeCommandContext::Dispatch(
 		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_Backend->IsRendering(),
+			"Dispatch cannot be encoded inside an active rendering scope.");
+		if (m_Backend->IsRendering())
+		{
+			return;
+		}
 		m_Backend->GetCommandList()->Dispatch(groupCountX, groupCountY, groupCountZ);
 	}
 
