@@ -11,6 +11,17 @@ namespace gglab
 {
 	namespace
 	{
+		constexpr RHIPortabilityCapabilities DX12PortabilityCapabilities{
+			.m_ImageViewMinLod = true,
+			.m_CustomBorderColor = true,
+			.m_VertexAttributeDivisor = true,
+			.m_FillModeNonSolid = true,
+			.m_DepthClamp = true,
+			.m_DepthBiasClamp = true,
+			.m_IndependentBlend = true,
+			.m_SampleQuality = true,
+		};
+
 		D3D12_SHADER_BYTECODE ToDX12Bytecode(const ShaderBytecode& bytecode) noexcept
 		{
 			return {
@@ -79,6 +90,13 @@ namespace gglab
 	RHIPipelineHandle DX12PipelineSystem::CreateGraphicsPipeline(
 		const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
 	{
+		if (!ValidateRHIGraphicsPipelinePortability(
+			createInfo.m_Desc, DX12PortabilityCapabilities).IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DX12PipelineSystem::CreateGraphicsPipeline rejected a non-portable description.");
+			return {};
+		}
 		DX12RootSignature* rootSignature = ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
 		if (!rootSignature || !createInfo.m_VertexShader.IsValid() ||
 			!IsDX12ShaderBytecode(createInfo.m_VertexShader) ||

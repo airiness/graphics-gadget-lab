@@ -74,6 +74,7 @@ namespace gglab
 			.m_SampleCount = desc.m_SampleCount,
 			.m_Format = desc.m_Format,
 			.m_Usage = desc.m_Usage,
+			.m_CreateFlags = desc.m_CreateFlags,
 			.m_ClearValue = desc.m_ClearValue ? desc.m_ClearValue : DefaultClearValue(desc),
 		};
 	}
@@ -180,7 +181,7 @@ namespace gglab
 			.m_Label = "PoolSlot",
 			.m_StableId = poolSlot.Value(),
 		};
-		RHITextureHandle texture = m_Device->CreateTexture(textureDesc, debugIdentity);
+		RHITextureHandle texture = m_Device->CreateTexture({ .m_Desc = textureDesc }, debugIdentity);
 		GGLAB_ASSERT_MSG(texture.IsValid(), "TransientResourcePool: CreateTexture failed.");
 		if (!texture.IsValid())
 		{

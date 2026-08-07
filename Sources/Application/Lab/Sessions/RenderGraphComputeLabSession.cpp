@@ -194,7 +194,7 @@ namespace gglab
 						resources.m_BackBuffer =
 							builder.ImportTexture("RenderGraphCompute.BackBuffer",
 								swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-								RGTextureAccess::Present);
+								RGTextureAccess::Present, RGContentValidity::Undefined);
 
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)

@@ -27,6 +27,12 @@ namespace gglab
 		ReadWrite,
 	};
 
+	enum class RGContentValidity : uint8_t
+	{
+		Undefined,
+		Defined,
+	};
+
 	enum class RGOrderingRequirement : uint8_t
 	{
 		Ordered,

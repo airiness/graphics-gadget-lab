@@ -345,7 +345,7 @@ namespace gglab
 					data.size_bytes());
 			}
 
-			uploadFencePoint = batch.Submit(false);
+			uploadFencePoint = batch.Submit(false).m_Completion;
 			if (objectsUploadSucceeded)
 			{
 				info.m_ObjectTable.Commit(info.m_FrameSlotIndex, objectDirtyRanges);

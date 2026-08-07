@@ -131,6 +131,8 @@ namespace gglab
 		CopySource,
 		CopyDest,
 		Present,
+		// Texture initial/barrier-before only. Existing enum values are serialized by diagnostics.
+		Undefined,
 	};
 
 	struct RHIResourceState
@@ -140,6 +142,89 @@ namespace gglab
 		RHILayout m_Layout = RHILayout::Common;
 
 		bool operator==(const RHIResourceState&) const noexcept = default;
+	};
+
+	[[nodiscard]] constexpr inline RHIResourceState UndefinedRHITextureState() noexcept
+	{
+		return {
+			.m_Stages = RHIStage::None,
+			.m_Access = RHIAccess::None,
+			.m_Layout = RHILayout::Undefined,
+		};
+	}
+
+	[[nodiscard]] constexpr inline RHIResourceState PresentRHITextureState() noexcept
+	{
+		return {
+			.m_Stages = RHIStage::Present,
+			.m_Access = RHIAccess::Present,
+			.m_Layout = RHILayout::Present,
+		};
+	}
+
+	enum class RHIResourceStateUsage : uint8_t
+	{
+		TextureInitial,
+		TextureBarrierBefore,
+		TextureBarrierAfter,
+		Buffer,
+	};
+
+	[[nodiscard]] constexpr inline bool IsRHIResourceStateValid(
+		const RHIResourceState& state, RHIResourceStateUsage usage) noexcept
+	{
+		if (state.m_Layout == RHILayout::Unknown)
+		{
+			return false;
+		}
+		if (state.m_Layout == RHILayout::Undefined)
+		{
+			return usage != RHIResourceStateUsage::TextureBarrierAfter &&
+				usage != RHIResourceStateUsage::Buffer && state.m_Stages == RHIStage::None &&
+				state.m_Access == RHIAccess::None;
+		}
+		if (state.m_Layout == RHILayout::Present || state.m_Stages == RHIStage::Present ||
+			Test(state.m_Access, RHIAccess::Present))
+		{
+			return usage != RHIResourceStateUsage::Buffer && state == PresentRHITextureState();
+		}
+		return state.m_Stages != RHIStage::None && state.m_Access != RHIAccess::None;
+	}
+
+	struct RHIPortabilityCapabilities
+	{
+		bool m_ImageViewMinLod = false;
+		bool m_CustomBorderColor = false;
+		bool m_VertexAttributeDivisor = false;
+		bool m_FillModeNonSolid = false;
+		bool m_DepthClamp = false;
+		bool m_DepthBiasClamp = false;
+		bool m_IndependentBlend = false;
+		bool m_SampleQuality = false;
+	};
+
+	enum class RHIPortabilityValidationError : uint8_t
+	{
+		None,
+		ImageViewMinLodUnsupported,
+		CustomBorderColorUnsupported,
+		InvalidVertexInputRate,
+		InstanceDivisorUnsupported,
+		WireframeUnsupported,
+		DepthClampUnsupported,
+		DepthBiasClampUnsupported,
+		IndependentBlendUnsupported,
+		SampleQualityUnsupported,
+	};
+
+	struct RHIPortabilityValidationResult
+	{
+		RHIPortabilityValidationError m_Error = RHIPortabilityValidationError::None;
+
+		[[nodiscard]] constexpr bool IsValid() const noexcept
+		{
+			return m_Error == RHIPortabilityValidationError::None;
+		}
 	};
 
 	enum class RHICompareOp : uint8_t

@@ -110,7 +110,8 @@ namespace gglab
 				{
 					data.m_EnvironmentCubemap =
 						builder.ImportTexture("Skybox.FallbackEnvironmentCubemap",
-							fallbackTextureHandle, fallbackTextureDesc, RGTextureAccess::Sample);
+							fallbackTextureHandle, fallbackTextureDesc, RGTextureAccess::Sample,
+							RGContentValidity::Defined);
 					data.m_EnvironmentCubemap =
 						builder.Read(data.m_EnvironmentCubemap, RGTextureAccess::Sample);
 				}

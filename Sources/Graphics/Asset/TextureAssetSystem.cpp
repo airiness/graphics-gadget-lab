@@ -158,7 +158,8 @@ namespace gglab
 					uploadedTextureIds.push_back(data.m_TextureId);
 				}
 			}
-			const RHIFencePoint uploadFence = batch.Submit(true);
+			const RHITransferSubmission submission = batch.Submit(true);
+			const RHIFencePoint uploadFence = submission.m_Completion;
 			uploadsSucceeded &= uploadFence.IsValid();
 			for (const TextureID textureId : uploadedTextureIds)
 			{
@@ -855,7 +856,8 @@ namespace gglab
 			.m_StableId = uploadData.m_TextureId.Value(),
 		};
 
-		texture->m_Gpu.m_Texture = m_Device->CreateTexture(textureDesc, debugIdentity);
+		texture->m_Gpu.m_Texture =
+			m_Device->CreateTexture({ .m_Desc = textureDesc }, debugIdentity);
 		GGLAB_ASSERT_MSG(texture->m_Gpu.m_Texture.IsValid(),
 			"TextureAssetSystem::UploadTexture: failed to create RHI texture.");
 		if (!texture->m_Gpu.m_Texture.IsValid())
@@ -877,30 +879,19 @@ namespace gglab
 		}
 
 		const RHITextureUploadData textureUploadData = textureData.MakeUploadData();
-		if (!transferBatch.UploadTexture(texture->m_Gpu.m_Texture, textureUploadData))
+		const RHIResourceState shaderResourceState{
+			.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
+			.m_Access = RHIAccess::ShaderResource,
+			.m_Layout = RHILayout::ShaderResource,
+		};
+		if (!transferBatch.UploadTexture(texture->m_Gpu.m_Texture, textureUploadData,
+			UndefinedRHITextureState(), shaderResourceState))
 		{
 			SetTextureState(*texture, AssetState::Failed, residencyOperation, operationPhase);
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"TextureAssetSystem::UploadTexture failed to record the texture upload.");
 			return false;
 		}
-
-		const RHITextureBarrier barrier{
-			.m_Texture = texture->m_Gpu.m_Texture,
-			.m_Before =
-				{
-					.m_Stages = RHIStage::Copy,
-					.m_Access = RHIAccess::CopyDest,
-					.m_Layout = RHILayout::CopyDest,
-				},
-			.m_After =
-				{
-					.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
-					.m_Access = RHIAccess::ShaderResource,
-					.m_Layout = RHILayout::ShaderResource,
-				},
-		};
-		transferBatch.TextureBarrier(std::span{ &barrier, 1 });
 
 		const RHITextureViewDesc srvDesc = BuildTextureRHISRVDesc(textureData);
 

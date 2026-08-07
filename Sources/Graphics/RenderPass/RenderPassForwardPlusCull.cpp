@@ -341,7 +341,8 @@ namespace gglab
 				readbackDesc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
 				readbackDesc.m_DebugName = "ForwardPlus.DebugReadback";
 				data.m_Readback = builder.ImportBuffer("ForwardPlus.DebugReadback",
-					debugReadback->GetBuffer(bufferIndex), readbackDesc, RGBufferAccess::CopyDest);
+					debugReadback->GetBuffer(bufferIndex), readbackDesc, RGBufferAccess::CopyDest,
+					RGContentValidity::Undefined);
 				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 
 				RHIBufferDesc gridReadbackDesc{};
@@ -353,7 +354,7 @@ namespace gglab
 				gridReadbackDesc.m_DebugName = "ForwardPlus.GridReadback";
 				data.m_GridReadback = builder.ImportBuffer("ForwardPlus.GridReadback",
 					debugReadback->GetGridBuffer(bufferIndex), gridReadbackDesc,
-					RGBufferAccess::CopyDest);
+					RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 				builder.WriteInPlace(
 					data.m_GridReadback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;

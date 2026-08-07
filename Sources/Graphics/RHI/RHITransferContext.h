@@ -4,8 +4,25 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHITexture.h"
 
+#include <vector>
+
 namespace gglab
 {
+	struct RHITransferResourcePublication
+	{
+		RHIResourceType m_Type = RHIResourceType::Unknown;
+		RHITextureHandle m_Texture{};
+		RHIBufferHandle m_Buffer{};
+		std::optional<RHISubresourceRange> m_Subresources = std::nullopt;
+		RHIResourceState m_PublishedState{};
+	};
+
+	struct RHITransferSubmission
+	{
+		RHIFencePoint m_Completion;
+		std::vector<RHITransferResourcePublication> m_Publications;
+	};
+
 	class RHITransferContext : public RHICommandContext
 	{
 	public:

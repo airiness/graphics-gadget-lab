@@ -26,6 +26,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Graphics/TransferBatch.h"
 
 #include <type_traits>
 
@@ -132,8 +133,8 @@ namespace gglab
 			{
 				return {};
 			}
-			RHITextureHandle CreateTexture(
-				const RHITextureDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
+				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
 				return {};
 			}
@@ -329,6 +330,46 @@ namespace gglab
 			uint32_t m_FlushBarrierCount = 0;
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
+		};
+
+		class RecordingTransferContext final : public RHITransferContext
+		{
+		public:
+			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Copy; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
+			{
+				m_TextureBarriers.insert(m_TextureBarriers.end(), barriers.begin(), barriers.end());
+			}
+			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void FlushBarriers() noexcept override {}
+			void CopyBuffer(
+				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
+			{
+			}
+			void Begin() noexcept override {}
+			RHIFencePoint Submit(bool) noexcept override { return { RHIFenceHandle{ 1, 1 }, 7 }; }
+			void Abort() noexcept override {}
+			void ReclaimCompleted() noexcept override {}
+			bool UploadBuffer(
+				const void*, uint64_t, RHIBufferHandle, uint64_t) noexcept override
+			{
+				return true;
+			}
+			bool UploadTexture(
+				const RHITextureUploadData&, RHITextureHandle) noexcept override
+			{
+				return true;
+			}
+			RHITextureReadbackRequest ReadbackTexture(
+				RHITextureHandle, const RHITextureDesc&) noexcept override
+			{
+				return {};
+			}
+
+			std::vector<RHITextureBarrier> m_TextureBarriers;
 		};
 
 		[[nodiscard]] bool NearlyEqual(
@@ -976,7 +1017,7 @@ namespace gglab
 					RenderGraph::RGBuilder& builder, SampleableDepthPassData& data)
 				{
 					graphDepth = builder.ImportTexture("DisplayView.DepthBuffer", graphDepthHandle,
-						graphDepthDesc, RGTextureAccess::None);
+						graphDepthDesc, CommonRHIResourceState(), RGContentValidity::Undefined);
 					builder.WriteInPlace(graphDepth, RGTextureAccess::DepthStencilWrite);
 					data.m_View =
 						builder.CreateView<RHITextureViewType::DepthStencil>(graphDepth, dsvDesc);
@@ -1153,7 +1194,8 @@ namespace gglab
 					RenderGraph::RGBuilder& builder, DepthAccessChainPassData&)
 				{
 					accessChainDepth = builder.ImportTexture("DepthAccessChain.Depth",
-						graphDepthHandle, graphDepthDesc, RGTextureAccess::None);
+						graphDepthHandle, graphDepthDesc, RGTextureAccess::None,
+						RGContentValidity::Undefined);
 					builder.WriteInPlace(accessChainDepth, RGTextureAccess::DepthStencilWrite);
 				});
 			accessChainGraph.AddPass<DepthAccessChainPassData>("DepthAccessChain.Sample",
@@ -2910,9 +2952,10 @@ namespace gglab
 						.m_Usage = RHIBufferUsage::CopySource | RHIBufferUsage::CopyDest,
 					};
 					data.m_FirstBuffer = builder.ImportBuffer("CopySource", RHIBufferHandle{ 21, 1 },
-						copyBufferDesc, RGBufferAccess::CopySource);
+						copyBufferDesc, RGBufferAccess::CopySource, RGContentValidity::Defined);
 					data.m_SecondBuffer = builder.ImportBuffer("CopyDestination",
-						RHIBufferHandle{ 22, 1 }, copyBufferDesc, RGBufferAccess::CopyDest);
+						RHIBufferHandle{ 22, 1 }, copyBufferDesc, RGBufferAccess::CopyDest,
+						RGContentValidity::Undefined);
 					data.m_FirstBuffer = builder.Read(
 						data.m_FirstBuffer, RGBufferAccess::CopySource, RHIStage::Copy);
 					builder.WriteInPlace(
@@ -2997,9 +3040,10 @@ namespace gglab
 						.m_StrideInBytes = 16,
 					};
 					data.m_Texture = builder.ImportTexture("BatchingTexture",
-						RHITextureHandle{ 1, 1 }, textureDesc, RGTextureAccess::CopyDest);
+						RHITextureHandle{ 1, 1 }, textureDesc, RGTextureAccess::CopyDest,
+						RGContentValidity::Defined);
 					data.m_Buffer = builder.ImportBuffer("BatchingBuffer", RHIBufferHandle{ 1, 1 },
-						bufferDesc, RGBufferAccess::CopyDest);
+						bufferDesc, RGBufferAccess::CopyDest, RGContentValidity::Defined);
 					data.m_Texture = builder.Read(
 						data.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					data.m_Buffer = builder.Read(
@@ -3028,6 +3072,200 @@ namespace gglab
 			}
 		}
 
+		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
+		{
+			const RHIOwnedTextureCreateInfo ownedCreateInfo{};
+			context.Check(ownedCreateInfo.m_InitialState == UndefinedRHITextureState(),
+				"Owned texture create info defaults to Undefined");
+			context.Check(IsRHIResourceStateValid(
+				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureInitial),
+				"Undefined is a valid owned texture initial state");
+			context.Check(IsRHIResourceStateValid(
+				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierBefore),
+				"Undefined is a valid texture barrier source state");
+			context.Check(!IsRHIResourceStateValid(
+				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierAfter),
+				"Undefined is rejected as a texture barrier destination state");
+			context.Check(!IsRHIResourceStateValid(
+				RHIResourceState{ .m_Layout = RHILayout::Unknown },
+				RHIResourceStateUsage::TextureInitial),
+				"Owned textures default to initial-only Undefined while Unknown remains invalid");
+			context.Check(IsRHIResourceStateValid(
+				PresentRHITextureState(), RHIResourceStateUsage::TextureBarrierAfter) &&
+				!IsRHIResourceStateValid(
+					PresentRHITextureState(), RHIResourceStateUsage::Buffer),
+				"Present is an exact texture-only special state");
+			context.Check(ToD3D12BarrierLayout(RHILayout::Undefined) ==
+				D3D12_BARRIER_LAYOUT_COMMON &&
+				ToD3D12ResourceStates(UndefinedRHITextureState()) == D3D12_RESOURCE_STATE_COMMON,
+				"DX12 lowers logical Undefined texture state to COMMON");
+
+			const RHITextureDesc graphTextureDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 8, 8, 1 },
+			};
+			RenderGraph initializedGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			initializedGraph.AddPass<TextureStorageAccessPassData>("InitializeTexture",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					data.m_Texture = builder.CreateTexture("UndefinedTexture", graphTextureDesc);
+					builder.WriteInPlace(data.m_Texture, RGTextureAccess::StorageWrite);
+					builder.SideEffect();
+				});
+			const bool initializedCompiled = initializedGraph.Compile();
+			RGSnapshot initializedSnapshot;
+			BuildRenderGraphSnapshot(initializedGraph, initializedSnapshot);
+			context.Check(initializedCompiled && initializedSnapshot.m_Resources.size() == 1 &&
+				initializedSnapshot.m_Resources[0].m_InitialBarrierState == UndefinedRHITextureState(),
+				"RenderGraph-created textures begin in Undefined state and Write defines contents");
+
+			auto hasUndefinedRead = [](const RenderGraph& graph) noexcept
+				{
+					return std::ranges::any_of(graph.GetCompileDiagnostics(),
+						[](const RGCompileDiagnostic& diagnostic) noexcept
+						{
+							return diagnostic.m_Code == RGCompileDiagnosticCode::UndefinedContentRead;
+						});
+				};
+			RenderGraph transientReadGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			transientReadGraph.AddPass<StorageAccessPassData>("ReadUndefinedBuffer",
+				[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.CreateBuffer("UndefinedBuffer");
+					data.m_Buffer = builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead);
+					builder.SideEffect();
+				});
+			context.Check(!transientReadGraph.Compile() && hasUndefinedRead(transientReadGraph),
+				"RenderGraph reports release-visible texture/buffer read-before-write diagnostics");
+
+			RecordingDevice recordingDevice;
+			const RHITextureDesc importedDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::Sampled,
+				.m_Extent = { 8, 8, 1 },
+			};
+			auto buildImportedRead = [&](RGContentValidity validity)
+				{
+					auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
+						.m_Device = &recordingDevice,
+						.m_TransientResourcePool =
+							reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+						});
+					graph->AddPass<TextureStorageAccessPassData>("ReadImportedTexture",
+						[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+						{
+							data.m_Texture = builder.ImportTexture("ImportedTexture",
+								RHITextureHandle{ 9, 1 }, importedDesc, UndefinedRHITextureState(), validity);
+							data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample);
+							builder.SideEffect();
+						});
+					return graph;
+				};
+			auto undefinedImportGraph = buildImportedRead(RGContentValidity::Undefined);
+			auto definedImportGraph = buildImportedRead(RGContentValidity::Defined);
+			context.Check(!undefinedImportGraph->Compile() && hasUndefinedRead(*undefinedImportGraph) &&
+				definedImportGraph->Compile(),
+				"Imported state and content validity are explicit, independent contracts");
+
+			RHITextureDesc cubeDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::Sampled,
+				.m_Extent = { 8, 8, 1 },
+				.m_ArraySize = 6,
+			};
+			const RHITextureViewDesc cubeView{
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::TextureCube,
+				.m_Subresources = {.m_ArraySliceCount = 6 },
+			};
+			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).m_Error ==
+				RHITextureValidationError::MissingCubeCompatible,
+				"Cube views require an explicit CubeCompatible resource flag");
+			cubeDesc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
+			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).IsValid(),
+				"CubeCompatible resources accept complete cube views");
+
+			const RHIPortabilityCapabilities vulkanV1Capabilities{};
+			RHITextureViewDesc minLodView{};
+			minLodView.m_ResourceMinLODClamp = 1.0f;
+			RHISamplerDesc customBorderSampler{};
+			customBorderSampler.m_AddressU = RHITextureAddressMode::Border;
+			customBorderSampler.m_BorderColor[0] = 0.5f;
+			RHIGraphicsPipelineDesc pipelineDesc{};
+			pipelineDesc.m_VertexInput.m_VertexBufferCount = 1;
+			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InputRate =
+				RHIVertexInputRate::PerInstance;
+			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InstanceStepRate = 2;
+			context.Check(
+				ValidateRHITextureViewPortability(minLodView, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::ImageViewMinLodUnsupported &&
+				ValidateRHISamplerPortability(customBorderSampler, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::CustomBorderColorUnsupported &&
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::InstanceDivisorUnsupported,
+				"Vulkan v1 profile rejects unsupported view, sampler, and instance-divisor semantics");
+			pipelineDesc = {};
+			pipelineDesc.m_Rasterizer.m_FillMode = RHIFillMode::Wireframe;
+			const bool rejectsWireframe =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::WireframeUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_Rasterizer.m_DepthClipEnable = false;
+			const bool rejectsDepthClamp =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::DepthClampUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_Rasterizer.m_DepthBiasClamp = 1.0f;
+			const bool rejectsBiasClamp =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::DepthBiasClampUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_RenderTargetCount = 2;
+			pipelineDesc.m_Blend.m_RenderTargets[1].m_BlendEnable = true;
+			const bool rejectsIndependentBlend =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::IndependentBlendUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_SampleQuality = 1;
+			const bool rejectsSampleQuality =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::SampleQualityUnsupported;
+			context.Check(rejectsWireframe && rejectsDepthClamp && rejectsBiasClamp &&
+				rejectsIndependentBlend && rejectsSampleQuality,
+				"Vulkan v1 profile rejects unsupported rasterizer, blend, and sample-quality semantics");
+
+			RecordingTransferContext transferContext;
+			TransferBatch batch(transferContext);
+			const RHIResourceState shaderReadState{
+				.m_Stages = RHIStage::PixelShader,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
+			};
+			const RHITextureHandle uploadedTexture{ 3, 1 };
+			const RHIBufferHandle uploadedBuffer{ 4, 1 };
+			const uint32_t bufferData = 17;
+			const bool transferRecorded = batch.UploadTexture(uploadedTexture, {},
+				UndefinedRHITextureState(), shaderReadState) &&
+				batch.UploadBuffer(uploadedBuffer, 0, &bufferData, sizeof(bufferData)) &&
+				batch.UploadBuffer(uploadedBuffer, sizeof(bufferData), &bufferData,
+					sizeof(bufferData));
+			const RHITransferSubmission submission = batch.Submit(false);
+			context.Check(transferRecorded && transferContext.m_TextureBarriers.size() == 2 &&
+				transferContext.m_TextureBarriers[0].m_Before == UndefinedRHITextureState() &&
+				transferContext.m_TextureBarriers[1].m_After == shaderReadState &&
+				submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
+				submission.m_Publications[0].m_Type == RHIResourceType::Texture &&
+				submission.m_Publications[0].m_PublishedState == shaderReadState &&
+				submission.m_Publications[1].m_Type == RHIResourceType::Buffer,
+				"Transfer submission publishes one terminal state per resource with its completion fence");
+		}
+
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept
 		{
 		}
@@ -3042,6 +3280,7 @@ namespace gglab
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
+		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);
 		RunTemporalCompatibilityAndHistoryContractTests(context);

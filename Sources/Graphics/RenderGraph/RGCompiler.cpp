@@ -29,6 +29,11 @@ namespace gglab
 		{
 			return { nullptr, std::move(m_Diagnostics) };
 		}
+		ValidateContentValidity();
+		if (HasErrors())
+		{
+			return { nullptr, std::move(m_Diagnostics) };
+		}
 		BuildDependencyGraph();
 		if (HasErrors())
 		{
@@ -44,6 +49,32 @@ namespace gglab
 
 		m_Plan->m_Diagnostics = m_Diagnostics;
 		return { std::move(m_Plan), std::move(m_Diagnostics) };
+	}
+
+	void RGCompiler::ValidateContentValidity() noexcept
+	{
+		for (uint32_t passIndex = 0; passIndex < m_Graph.m_PassNodes.size(); ++passIndex)
+		{
+			const auto& pass = m_Graph.m_PassNodes[passIndex];
+			for (const auto& access : pass.m_Accesses)
+			{
+				if (access.m_DependencyAccess == RGDependencyAccess::Write)
+				{
+					continue;
+				}
+				const auto& node = m_Graph.m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
+				if (node.m_ContentValidity == RGContentValidity::Defined)
+				{
+					continue;
+				}
+				const auto resourceIter = m_ResourceIndices.find(node.m_VirtualResource);
+				AddDiagnostic(RGCompileDiagnosticCode::UndefinedContentRead,
+					"RenderGraph pass reads undefined resource contents. Initialize with Write or import as Defined.",
+					RGPassNodeIndex{ passIndex }, resourceIter != m_ResourceIndices.end()
+						? resourceIter->second
+						: InvalidRGVirtualResourceIndex);
+			}
+		}
 	}
 
 	void RGCompiler::InitializePlan() noexcept

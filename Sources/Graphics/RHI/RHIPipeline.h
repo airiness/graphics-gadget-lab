@@ -139,6 +139,8 @@ namespace gglab
 		RHIBlendFactor m_DstAlpha = RHIBlendFactor::Zero;
 		RHIBlendOp m_AlphaOp = RHIBlendOp::Add;
 		RHIColorWriteMask m_WriteMask = RHIColorWriteMask::All;
+
+		constexpr bool operator==(const RHIRenderTargetBlendDesc&) const noexcept = default;
 	};
 
 	struct RHIBlendDesc
@@ -180,4 +182,50 @@ namespace gglab
 		RHIBindingLayoutHandle m_BindingLayout{};
 		RHIShaderHandle m_ComputeShader{};
 	};
+
+	[[nodiscard]] constexpr inline RHIPortabilityValidationResult
+		ValidateRHIGraphicsPipelinePortability(const RHIGraphicsPipelineDesc& desc,
+			const RHIPortabilityCapabilities& capabilities) noexcept
+	{
+		for (uint32_t layoutIndex = 0; layoutIndex < desc.m_VertexInput.m_VertexBufferCount;
+			++layoutIndex)
+		{
+			const auto& layout = desc.m_VertexInput.m_VertexBuffers[layoutIndex];
+			if (layout.m_InputRate == RHIVertexInputRate::PerVertex && layout.m_InstanceStepRate != 0)
+			{
+				return { .m_Error = RHIPortabilityValidationError::InvalidVertexInputRate };
+			}
+			if (layout.m_InputRate == RHIVertexInputRate::PerInstance &&
+				layout.m_InstanceStepRate > 1 && !capabilities.m_VertexAttributeDivisor)
+			{
+				return { .m_Error = RHIPortabilityValidationError::InstanceDivisorUnsupported };
+			}
+		}
+		if (desc.m_Rasterizer.m_FillMode == RHIFillMode::Wireframe &&
+			!capabilities.m_FillModeNonSolid)
+		{
+			return { .m_Error = RHIPortabilityValidationError::WireframeUnsupported };
+		}
+		if (!desc.m_Rasterizer.m_DepthClipEnable && !capabilities.m_DepthClamp)
+		{
+			return { .m_Error = RHIPortabilityValidationError::DepthClampUnsupported };
+		}
+		if (desc.m_Rasterizer.m_DepthBiasClamp != 0.0f && !capabilities.m_DepthBiasClamp)
+		{
+			return { .m_Error = RHIPortabilityValidationError::DepthBiasClampUnsupported };
+		}
+		for (uint32_t targetIndex = 1; targetIndex < desc.m_RenderTargetCount; ++targetIndex)
+		{
+			if (desc.m_Blend.m_RenderTargets[targetIndex] != desc.m_Blend.m_RenderTargets[0] &&
+				!capabilities.m_IndependentBlend)
+			{
+				return { .m_Error = RHIPortabilityValidationError::IndependentBlendUnsupported };
+			}
+		}
+		if (desc.m_SampleQuality != 0 && !capabilities.m_SampleQuality)
+		{
+			return { .m_Error = RHIPortabilityValidationError::SampleQualityUnsupported };
+		}
+		return {};
+	}
 }

@@ -65,7 +65,7 @@ namespace gglab
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						targets.m_BackBuffer = builder.ImportTexture("LoadingShell.BackBuffer",
 							swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-							RGTextureAccess::Present);
+							RGTextureAccess::Present, RGContentValidity::Undefined);
 						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 						data.m_BackBuffer = targets.m_BackBuffer;
 						data.m_Rtv =
@@ -80,7 +80,7 @@ namespace gglab
 						shadow.m_DirectionalShadowMapPreview =
 							builder.ImportTexture("LoadingShell.ShadowPreview",
 								resourceRegistry->GetTextureHandle(shadowIndex), *shadowDesc,
-								RGTextureAccess::None);
+								RGTextureAccess::None, RGContentValidity::Defined);
 					},
 					[renderer](RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{

@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Core/Log/Logger.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
 
@@ -26,11 +27,12 @@ namespace gglab
 		m_CompileDiagnostics = std::move(result.m_Diagnostics);
 		if (!result)
 		{
+			auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics);
 			for (const auto& diagnostic : m_CompileDiagnostics)
 			{
-				if (diagnostic.m_Severity == RGCompileDiagnosticSeverity::Error)
+				if (logger && diagnostic.m_Severity == RGCompileDiagnosticSeverity::Error)
 				{
-					GGLAB_LOG_GRAPHICS_ERROR("{}", diagnostic.m_Message);
+					logger->error("{}", diagnostic.m_Message);
 				}
 			}
 			return false;

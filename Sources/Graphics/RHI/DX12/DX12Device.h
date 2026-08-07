@@ -69,7 +69,7 @@ namespace gglab
 		RHITextureSupportResult QueryTextureViewSupport(const RHITextureDesc& textureDesc,
 			const RHITextureViewDesc& viewDesc) const noexcept override;
 
-		RHITextureHandle CreateTexture(const RHITextureDesc& desc,
+		RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept override;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept override;

@@ -154,6 +154,15 @@ namespace gglab
 
 		for (const RHITextureBarrier& barrier : barriers)
 		{
+			if (!IsRHIResourceStateValid(
+				barrier.m_Before, RHIResourceStateUsage::TextureBarrierBefore) ||
+				!IsRHIResourceStateValid(
+					barrier.m_After, RHIResourceStateUsage::TextureBarrierAfter))
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12CommandContext::TextureBarrier rejected an invalid resource state.");
+				continue;
+			}
 			DX12Texture* texture = m_Device->ResolveTexture(barrier.m_Texture);
 			if (!texture)
 			{
@@ -183,6 +192,13 @@ namespace gglab
 
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
+			if (!IsRHIResourceStateValid(barrier.m_Before, RHIResourceStateUsage::Buffer) ||
+				!IsRHIResourceStateValid(barrier.m_After, RHIResourceStateUsage::Buffer))
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12CommandContext::BufferBarrier rejected an invalid resource state.");
+				continue;
+			}
 			DX12Buffer* buffer = m_Device->ResolveBuffer(barrier.m_Buffer);
 			if (!buffer)
 			{

@@ -33,6 +33,7 @@ namespace gglab
 		uint16_t m_SampleCount = 1;
 		RHIFormat m_Format = RHIFormat::Unknown;
 		RHITextureUsage m_Usage = RHITextureUsage::None;
+		RHITextureCreateFlags m_CreateFlags = RHITextureCreateFlags::None;
 		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
 
 		bool operator==(const TransientTextureKey& rhs) const noexcept
@@ -42,6 +43,7 @@ namespace gglab
 				m_Extent.m_Depth == rhs.m_Extent.m_Depth && m_ArraySize == rhs.m_ArraySize &&
 				m_MipLevels == rhs.m_MipLevels && m_SampleCount == rhs.m_SampleCount &&
 				m_Format == rhs.m_Format && m_Usage == rhs.m_Usage &&
+				m_CreateFlags == rhs.m_CreateFlags &&
 				ClearValuesEqual(m_ClearValue, rhs.m_ClearValue);
 		}
 
@@ -50,6 +52,7 @@ namespace gglab
 			const RHIClearValue clearValue = m_ClearValue.value_or(RHIClearValue{});
 			return std::make_tuple(m_Dimension, m_Extent.m_Width, m_Extent.m_Height,
 				m_Extent.m_Depth, m_ArraySize, m_MipLevels, m_SampleCount, m_Format, m_Usage,
+				m_CreateFlags,
 				static_cast<uint8_t>(m_ClearValue.has_value()), clearValue.m_Format,
 				clearValue.m_Color[0], clearValue.m_Color[1], clearValue.m_Color[2],
 				clearValue.m_Color[3], clearValue.m_Depth, clearValue.m_Stencil,

@@ -334,7 +334,7 @@ namespace gglab
 				readbackDesc.m_DebugName = "ForwardPlus.HdrDiffReadback";
 				data.m_Readback = builder.ImportBuffer("ForwardPlus.HdrDiffReadback",
 					debugReadback->GetHdrDiffBuffer(bufferIndex), readbackDesc,
-					RGBufferAccess::CopyDest);
+					RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;
 				data.m_FrameSerial = frameSerial;

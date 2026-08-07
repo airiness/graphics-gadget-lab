@@ -27,6 +27,7 @@ namespace gglab
 
 		[[nodiscard]] RGCompileResult Build() noexcept;
 		void InitializePlan() noexcept;
+		void ValidateContentValidity() noexcept;
 		void BuildDependencyGraph() noexcept;
 		void CullPasses() noexcept;
 		[[nodiscard]] bool TopologicalSortPasses() noexcept;

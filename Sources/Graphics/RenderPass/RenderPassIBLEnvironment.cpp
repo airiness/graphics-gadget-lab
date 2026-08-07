@@ -102,7 +102,8 @@ namespace gglab
 				if (hasSource)
 				{
 					data.m_SourceTexture = builder.ImportTexture("IBL.SourceEnvironment",
-						sourceTextureHandle, sourceTextureDesc, RGTextureAccess::Sample);
+						sourceTextureHandle, sourceTextureDesc, RGTextureAccess::Sample,
+						RGContentValidity::Defined);
 					data.m_SourceTexture =
 						builder.Read(data.m_SourceTexture, RGTextureAccess::Sample);
 				}

@@ -240,7 +240,8 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_RecordingBatch.get());
 		const uint32_t uploadCount = static_cast<uint32_t>(m_RecordedUploads.size());
 		const auto submittedAt = std::chrono::steady_clock::now();
-		const RHIFencePoint fencePoint = m_RecordingBatch->Submit(false);
+		const RHITransferSubmission submission = m_RecordingBatch->Submit(false);
+		const RHIFencePoint fencePoint = submission.m_Completion;
 		m_RecordingBatch.reset();
 		++m_BatchSubmissionCount;
 		m_LastBatchUploadCount = uploadCount;

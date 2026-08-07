@@ -15,6 +15,17 @@ namespace gglab
 {
 	namespace
 	{
+		constexpr RHIPortabilityCapabilities DX12PortabilityCapabilities{
+			.m_ImageViewMinLod = true,
+			.m_CustomBorderColor = true,
+			.m_VertexAttributeDivisor = true,
+			.m_FillModeNonSolid = true,
+			.m_DepthClamp = true,
+			.m_DepthBiasClamp = true,
+			.m_IndependentBlend = true,
+			.m_SampleQuality = true,
+		};
+
 		[[nodiscard]] bool SupportsMultisampling(
 			ID3D12Device* device, DXGI_FORMAT format, uint16_t sampleCount) noexcept
 		{
@@ -139,6 +150,10 @@ namespace gglab
 		{
 			return { .m_ValidationError = validation.m_Error };
 		}
+		if (!ValidateRHITextureViewPortability(viewDesc, DX12PortabilityCapabilities).IsValid())
+		{
+			return { .m_Supported = false };
+		}
 		const RHITextureSupportResult textureSupport = QueryTextureSupport(textureDesc);
 		if (!textureSupport.IsSupported())
 		{
@@ -172,10 +187,10 @@ namespace gglab
 		return { .m_Supported = true };
 	}
 
-	RHITextureHandle DX12Device::CreateTexture(
-		const RHITextureDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+	RHITextureHandle DX12Device::CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
-		return m_ResourceManager.CreateTexture(desc, debugIdentity);
+		return m_ResourceManager.CreateTexture(createInfo, debugIdentity);
 	}
 
 	RHIBufferHandle DX12Device::CreateBuffer(
@@ -224,6 +239,11 @@ namespace gglab
 
 	RHISamplerHandle DX12Device::CreateSampler(const RHISamplerDesc& desc) noexcept
 	{
+		if (!ValidateRHISamplerPortability(desc, DX12PortabilityCapabilities).IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateSampler rejected a non-portable sampler.");
+			return {};
+		}
 		if (!m_DescriptorCache)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(

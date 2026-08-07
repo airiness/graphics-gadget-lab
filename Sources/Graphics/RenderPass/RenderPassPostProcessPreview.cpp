@@ -238,7 +238,7 @@ namespace gglab
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
 				data.m_Output = builder.ImportTexture("PostProcess.Preview.SelectedTap",
 					registry->GetTextureHandle(TextureIndex::Preview_PostProcess), *outputDesc,
-					initialAccess);
+					initialAccess, RGContentValidity::Defined);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
 				if (!sourceViewDesc)
 				{

@@ -70,7 +70,7 @@ namespace gglab
 			m_DescriptorCache = descriptorCache;
 		}
 
-		RHITextureHandle CreateTexture(const RHITextureDesc& desc,
+		RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;

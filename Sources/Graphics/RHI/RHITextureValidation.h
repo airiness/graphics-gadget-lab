@@ -16,6 +16,8 @@ namespace gglab
 		InvalidMipLevelCount,
 		InvalidSampleCount,
 		InvalidDimension,
+		InvalidCreateFlags,
+		MissingCubeCompatible,
 		InvalidClearValue,
 		IncompatibleViewFormat,
 		IncompatibleViewDimension,

@@ -168,7 +168,7 @@ namespace gglab
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
-					backBufferDesc, RGTextureAccess::Present);
+					backBufferDesc, RGTextureAccess::Present, RGContentValidity::Undefined);
 
 				// Create depth buffer
 				RHITextureDesc depthBufferDesc{};
@@ -227,7 +227,7 @@ namespace gglab
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
-					*shadowMapPreviewDesc, RGTextureAccess::None);
+					*shadowMapPreviewDesc, RGTextureAccess::None, RGContentValidity::Defined);
 			});
 
 		// SwapChain prepare backbuffer
