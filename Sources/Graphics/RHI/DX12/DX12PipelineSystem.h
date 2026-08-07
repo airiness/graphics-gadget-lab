@@ -41,7 +41,8 @@ namespace gglab
 
 		bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,
-			DX12RootSignature*& outRootSignature) const noexcept;
+			DX12RootSignature*& outRootSignature,
+			RHIGraphicsPipelineDesc& outDesc) const noexcept;
 		bool ResolveComputePipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,
 			DX12RootSignature*& outRootSignature) const noexcept;

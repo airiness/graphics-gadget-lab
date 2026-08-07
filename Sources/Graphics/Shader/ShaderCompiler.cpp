@@ -276,6 +276,8 @@ namespace gglab
 		const ShaderCompileValidationResult validation = ValidateShaderDesc(desc, m_DxcVersion);
 		if (!validation.IsValid())
 		{
+			GGLAB_LOG_GRAPHICS_ERROR("Shader compile descriptor validation failed: {}",
+				utils::ToString(validation.m_Message));
 			return {};
 		}
 

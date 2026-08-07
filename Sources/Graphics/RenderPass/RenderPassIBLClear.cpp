@@ -86,7 +86,7 @@ namespace gglab
 					};
 					commandContext->BeginRendering({ .m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-					commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+					commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 					commandContext->EndRendering();
 				}
 				registry->MarkActiveIBLInitialized();
@@ -159,7 +159,7 @@ namespace gglab
 					};
 					commandContext->BeginRendering({ .m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-					commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+					commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 					commandContext->EndRendering();
 				}
 				bakeScheduler->NotifyBakeResourcesInitialized(bakeGeneration);

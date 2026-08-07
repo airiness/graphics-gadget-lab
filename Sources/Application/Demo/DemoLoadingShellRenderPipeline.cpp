@@ -92,7 +92,7 @@ namespace gglab
 						};
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-						commandContext->ClearColor(rtv, renderer->GetBackBufferClearColor());
+						commandContext->ClearColorAttachment(0, renderer->GetBackBufferClearColor());
 					});
 
 				m_IBLPass.AddPass(rg, context, services);

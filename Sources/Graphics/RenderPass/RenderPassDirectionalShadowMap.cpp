@@ -79,7 +79,7 @@ namespace gglab
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
 				});
-				graphicsContext->ClearDepthStencil(dsv, 1.0f, 0);
+				graphicsContext->ClearDepthAttachment(1.0f, 0);
 
 				const auto& renderQueue =
 					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);

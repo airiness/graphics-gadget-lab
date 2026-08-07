@@ -260,9 +260,8 @@ namespace gglab
 				++m_EndRenderingCount;
 			}
 			bool IsRendering() const noexcept override { return m_IsRendering; }
-			void ClearColor(RHITextureViewHandle, const std::array<float, 4>&) noexcept override {}
-			void ClearDepthStencil(
-				RHITextureViewHandle, float, std::optional<uint8_t>) noexcept override
+			void ClearColorAttachment(uint32_t, const std::array<float, 4>&) noexcept override {}
+			void ClearDepthAttachment(float, std::optional<uint8_t>) noexcept override
 			{
 			}
 			void SetViewport(const RHIViewport&) noexcept override {}
@@ -666,6 +665,33 @@ namespace gglab
 			}
 			context.Check(locationsAreExplicit,
 				"Built-in RHI vertex layouts assign deterministic explicit attribute locations");
+
+			RHIRenderingSignature renderingSignature{};
+			renderingSignature.m_ColorFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			renderingSignature.m_ColorAttachmentCount = 1;
+			renderingSignature.m_DepthFormat = RHIFormat::D32Float;
+			renderingSignature.m_SampleCount = 4;
+			RHIGraphicsPipelineDesc pipelineDesc{};
+			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			pipelineDesc.m_RenderTargetCount = 1;
+			pipelineDesc.m_DepthStencilFormat = RHIFormat::D32Float;
+			pipelineDesc.m_SampleCount = 4;
+			const bool matchingSignature =
+				IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::B8G8R8A8Unorm;
+			const bool rejectsColorMismatch =
+				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			pipelineDesc.m_DepthStencilFormat = RHIFormat::Unknown;
+			const bool rejectsDepthMismatch =
+				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			pipelineDesc.m_DepthStencilFormat = RHIFormat::D32Float;
+			pipelineDesc.m_SampleCount = 1;
+			const bool rejectsSampleMismatch =
+				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			context.Check(matchingSignature && rejectsColorMismatch && rejectsDepthMismatch &&
+				rejectsSampleMismatch,
+				"Graphics pipeline compatibility covers active color, depth, and sample signature");
 		}
 
 		void RunDX12GraphicsContractLoweringTests(SelfTestContext& context) noexcept

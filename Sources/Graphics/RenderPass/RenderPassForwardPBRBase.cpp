@@ -336,17 +336,16 @@ namespace gglab
 				});
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
-					graphicsContext->ClearColor(
-						renderTargets[1].m_View, { 0.0f, 0.0f, 0.0f, 1.0f });
+					graphicsContext->ClearColorAttachment(1, { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				if (data.m_GTAOContributionOutputEnabled)
 				{
-					graphicsContext->ClearColor(
-						renderTargets[renderTargetCount - 1].m_View, { 0.0f, 0.0f, 0.0f, 1.0f });
+					graphicsContext->ClearColorAttachment(
+						renderTargetCount - 1, { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				if (data.m_ClearDepth)
 				{
-					graphicsContext->ClearDepthStencil(dsv, data.m_ClearDepthValue);
+					graphicsContext->ClearDepthAttachment(data.m_ClearDepthValue);
 				}
 
 				const auto shadowSrv = executeContext.GetViewDescriptor(data.m_ShadowSrv);

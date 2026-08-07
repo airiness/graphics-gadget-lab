@@ -107,6 +107,35 @@ namespace gglab
 		std::optional<RHIRenderingAttachment> m_DepthAttachment = std::nullopt;
 	};
 
+	struct RHIRenderingSignature
+	{
+		std::array<RHIFormat, RHIGraphicsPipelineDesc::MaxRenderTargets> m_ColorFormats{};
+		uint32_t m_ColorAttachmentCount = 0;
+		RHIFormat m_DepthFormat = RHIFormat::Unknown;
+		uint32_t m_SampleCount = 0;
+
+		bool operator==(const RHIRenderingSignature&) const noexcept = default;
+	};
+
+	[[nodiscard]] constexpr inline bool IsGraphicsPipelineCompatible(
+		const RHIGraphicsPipelineDesc& pipeline, const RHIRenderingSignature& rendering) noexcept
+	{
+		if (pipeline.m_RenderTargetCount != rendering.m_ColorAttachmentCount ||
+			pipeline.m_DepthStencilFormat != rendering.m_DepthFormat ||
+			pipeline.m_SampleCount != rendering.m_SampleCount)
+		{
+			return false;
+		}
+		for (uint32_t index = 0; index < rendering.m_ColorAttachmentCount; ++index)
+		{
+			if (pipeline.m_RenderTargetFormats[index] != rendering.m_ColorFormats[index])
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	class RHICommandContext
 	{
 	public:
@@ -134,12 +163,14 @@ namespace gglab
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
+		// A graphics pass may end rendering explicitly to open multiple rendering scopes;
+		// otherwise RGExecutor closes the final active scope at the pass boundary.
 		virtual void BeginRendering(const RHIRenderingInfo& info) noexcept = 0;
 		virtual void EndRendering() noexcept = 0;
 		[[nodiscard]] virtual bool IsRendering() const noexcept = 0;
-		virtual void ClearColor(
-			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept = 0;
-		virtual void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,
+		virtual void ClearColorAttachment(
+			uint32_t colorAttachmentIndex, const std::array<float, 4>& color) noexcept = 0;
+		virtual void ClearDepthAttachment(float depth,
 			std::optional<uint8_t> stencil = std::nullopt) noexcept = 0;
 		virtual void SetViewport(const RHIViewport& viewport) noexcept = 0;
 		virtual void SetScissorRect(const RHIScissorRect& rect) noexcept = 0;

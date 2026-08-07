@@ -275,6 +275,8 @@ namespace gglab
 			}
 			if (pass.m_EncoderType == RGPassEncoderType::Graphics)
 			{
+				// Passes may close scopes explicitly to encode multiple scopes. RenderGraph owns
+				// closure of only the final active scope before the pass boundary barriers.
 				auto* graphicsContext = executeContext.m_Backend.m_GraphicsCommandContext;
 				if (graphicsContext && graphicsContext->IsRendering())
 				{

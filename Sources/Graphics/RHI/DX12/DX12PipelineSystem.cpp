@@ -166,10 +166,29 @@ namespace gglab
 	}
 
 	bool DX12PipelineSystem::ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
-		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature) const noexcept
+		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature,
+		RHIGraphicsPipelineDesc& outDesc) const noexcept
 	{
-		return ResolvePipeline(
-			pipeline, PipelineType::Graphics, outPipelineState, outRootSignature);
+		outPipelineState = nullptr;
+		outRootSignature = nullptr;
+		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration)
+		{
+			return false;
+		}
+		std::shared_lock lock(m_Mutex);
+		if (pipeline.Index() >= m_Pipelines.size())
+		{
+			return false;
+		}
+		const PipelineBinding& binding = m_Pipelines[pipeline.Index()];
+		if (binding.m_Type != PipelineType::Graphics)
+		{
+			return false;
+		}
+		outPipelineState = binding.m_PipelineState;
+		outRootSignature = binding.m_RootSignature;
+		outDesc = binding.m_GraphicsDesc;
+		return outPipelineState != nullptr && outRootSignature != nullptr;
 	}
 
 	bool DX12PipelineSystem::ResolveComputePipeline(RHIPipelineHandle pipeline,

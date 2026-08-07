@@ -225,8 +225,7 @@ namespace gglab
 						};
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-						commandContext->ClearColor(
-							workRtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+						commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 						state->m_InitializeExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
@@ -395,8 +394,8 @@ namespace gglab
 						};
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-						commandContext->ClearColor(
-							backBufferRtv, { 0.005f, 0.008f, 0.015f, 1.0f });
+						commandContext->ClearColorAttachment(
+							0, { 0.005f, 0.008f, 0.015f, 1.0f });
 						commandContext->SetPipeline(GetOrCreatePreviewPSO());
 						commandContext->SetViewport({
 							0.0f,

@@ -95,7 +95,7 @@ namespace gglab
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
 				});
-				graphicsContext->ClearDepthStencil(dsv, data.m_ClearDepth);
+				graphicsContext->ClearDepthAttachment(data.m_ClearDepth);
 
 				if (!data.m_DrawCoverage)
 				{

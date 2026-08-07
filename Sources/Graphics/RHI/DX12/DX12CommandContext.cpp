@@ -24,9 +24,15 @@ namespace gglab
 			uint64_t m_Width = 0;
 			uint32_t m_Height = 0;
 			uint32_t m_SampleCount = 0;
-
-			bool operator==(const RenderingAttachmentProperties&) const noexcept = default;
 		};
+
+		[[nodiscard]] bool AreAttachmentPropertiesCompatible(
+			const RenderingAttachmentProperties& lhs,
+			const RenderingAttachmentProperties& rhs) noexcept
+		{
+			return lhs.m_Width == rhs.m_Width && lhs.m_Height == rhs.m_Height &&
+				lhs.m_SampleCount == rhs.m_SampleCount;
+		}
 
 		D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(RHIPrimitiveTopology topology) noexcept
 		{
@@ -50,7 +56,8 @@ namespace gglab
 
 		bool ResolveRenderingAttachment(DX12Device& device,
 			const RHIRenderingAttachment& attachment, RHITextureViewType expectedType,
-			DX12DescriptorView& nativeView, RenderingAttachmentProperties& properties) noexcept
+			DX12DescriptorView& nativeView, RenderingAttachmentProperties& properties,
+			RHIFormat& format) noexcept
 		{
 			RHITextureViewKey key{};
 			if (!device.ResolveTextureViewInfo(attachment.m_View, nativeView, key) ||
@@ -75,6 +82,12 @@ namespace gglab
 			properties.m_Width = std::max<uint64_t>(1, desc.Width >> mip);
 			properties.m_Height = std::max<uint32_t>(1, desc.Height >> mip);
 			properties.m_SampleCount = desc.SampleDesc.Count;
+			format = key.m_Desc.m_Format == RHIFormat::Unknown ?
+				ToRHIFormat(desc.Format) : key.m_Desc.m_Format;
+			if (format == RHIFormat::Unknown)
+			{
+				return false;
+			}
 			return true;
 		}
 	}
@@ -267,11 +280,14 @@ namespace gglab
 	{
 		DX12PipelineState* pipelineState = nullptr;
 		DX12RootSignature* rootSignature = nullptr;
+		RHIGraphicsPipelineDesc pipelineDesc{};
 		if (!m_PipelineSystem ||
-			!m_PipelineSystem->ResolveGraphicsPipeline(pipeline, pipelineState, rootSignature))
+			!m_PipelineSystem->ResolveGraphicsPipeline(
+				pipeline, pipelineState, rootSignature, pipelineDesc))
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"DX12GraphicsCommandContext::SetPipeline received an invalid pipeline handle.");
+			m_CurrentPipelineDesc.reset();
 			return;
 		}
 
@@ -281,6 +297,7 @@ namespace gglab
 			m_CurrentRootSignature = rootSignature;
 		}
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
+		m_CurrentPipelineDesc = pipelineDesc;
 	}
 
 	void DX12GraphicsCommandContext::SetDescriptorTable(
@@ -315,23 +332,32 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_MSG(info.m_ColorAttachments.size() <= RHIGraphicsPipelineDesc::MaxRenderTargets,
+			"BeginRendering color attachment count exceeds the RHI limit.");
+		if (info.m_ColorAttachments.size() > RHIGraphicsPipelineDesc::MaxRenderTargets)
+		{
+			return;
+		}
 
 		std::vector<DX12DescriptorView> nativeRenderTargets;
 		nativeRenderTargets.reserve(info.m_ColorAttachments.size());
 		std::optional<RenderingAttachmentProperties> attachmentProperties;
+		RHIRenderingSignature renderingSignature{};
 		for (const RHIRenderingAttachment& attachment : info.m_ColorAttachments)
 		{
 			DX12DescriptorView nativeView{};
 			RenderingAttachmentProperties properties{};
+			RHIFormat format = RHIFormat::Unknown;
 			const bool resolved = ResolveRenderingAttachment(*device, attachment,
-				RHITextureViewType::RenderTarget, nativeView, properties);
+				RHITextureViewType::RenderTarget, nativeView, properties, format);
 			GGLAB_ASSERT_MSG(resolved,
 				"A rendering color attachment must resolve to a live render-target view.");
 			if (!resolved)
 			{
 				return;
 			}
-			const bool compatible = !attachmentProperties || *attachmentProperties == properties;
+			const bool compatible = !attachmentProperties ||
+				AreAttachmentPropertiesCompatible(*attachmentProperties, properties);
 			GGLAB_ASSERT_MSG(compatible,
 				"All rendering attachments must have matching mip extents and sample counts.");
 			if (!compatible)
@@ -339,6 +365,8 @@ namespace gglab
 				return;
 			}
 			attachmentProperties = properties;
+			renderingSignature.m_ColorFormats[renderingSignature.m_ColorAttachmentCount++] =
+				format;
 			nativeRenderTargets.push_back(nativeView);
 		}
 
@@ -354,25 +382,33 @@ namespace gglab
 		{
 			DX12DescriptorView nativeView{};
 			RenderingAttachmentProperties properties{};
+			RHIFormat format = RHIFormat::Unknown;
 			const bool resolved = ResolveRenderingAttachment(*device, *info.m_DepthAttachment,
-				RHITextureViewType::DepthStencil, nativeView, properties);
+				RHITextureViewType::DepthStencil, nativeView, properties, format);
 			GGLAB_ASSERT_MSG(resolved,
 				"A rendering depth attachment must resolve to a live depth-stencil view.");
 			if (!resolved)
 			{
 				return;
 			}
-			const bool compatible = !attachmentProperties || *attachmentProperties == properties;
+			const bool compatible = !attachmentProperties ||
+				AreAttachmentPropertiesCompatible(*attachmentProperties, properties);
 			GGLAB_ASSERT_MSG(compatible,
 				"All rendering attachments must have matching mip extents and sample counts.");
 			if (!compatible)
 			{
 				return;
 			}
+			renderingSignature.m_DepthFormat = format;
+			attachmentProperties = properties;
 			nativeDepth = nativeView;
 		}
+		renderingSignature.m_SampleCount = attachmentProperties->m_SampleCount;
 
 		m_Backend.BeginRenderingScope();
+		m_ActiveRenderingSignature = renderingSignature;
+		m_ActiveColorAttachments = nativeRenderTargets;
+		m_ActiveDepthAttachment = nativeDepth;
 		if (nativeDepth)
 		{
 			m_Backend.GetCommandList()->SetRenderTargets(nativeRenderTargets, *nativeDepth);
@@ -386,40 +422,73 @@ namespace gglab
 	void DX12GraphicsCommandContext::EndRendering() noexcept
 	{
 		m_Backend.EndRenderingScope();
+		m_ActiveRenderingSignature.reset();
+		m_ActiveColorAttachments.clear();
+		m_ActiveDepthAttachment.reset();
 	}
 
-	void DX12GraphicsCommandContext::ClearColor(
-		RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept
+	bool DX12GraphicsCommandContext::ValidateActivePipelineCompatibility(
+		std::string_view operation) const noexcept
+	{
+		const bool compatible = m_CurrentPipelineDesc && m_ActiveRenderingSignature &&
+			IsGraphicsPipelineCompatible(*m_CurrentPipelineDesc, *m_ActiveRenderingSignature);
+		if (compatible)
+		{
+			return true;
+		}
+
+		if (!m_CurrentPipelineDesc || !m_ActiveRenderingSignature)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"{} requires a bound graphics pipeline and an active rendering signature.", operation);
+			return false;
+		}
+
+		const auto& pipeline = *m_CurrentPipelineDesc;
+		const auto& rendering = *m_ActiveRenderingSignature;
+		GGLAB_LOG_GRAPHICS_ERROR(
+			"{} pipeline/rendering mismatch: colorCount={}/{}, depth={}/{}, samples={}/{}.",
+			operation, pipeline.m_RenderTargetCount, rendering.m_ColorAttachmentCount,
+			static_cast<uint32_t>(pipeline.m_DepthStencilFormat),
+			static_cast<uint32_t>(rendering.m_DepthFormat), pipeline.m_SampleCount,
+			rendering.m_SampleCount);
+		for (uint32_t index = 0;
+			index < std::max(pipeline.m_RenderTargetCount, rendering.m_ColorAttachmentCount); ++index)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("{} color format {}: pipeline={}, rendering={}.", operation,
+				index, static_cast<uint32_t>(pipeline.m_RenderTargetFormats[index]),
+				static_cast<uint32_t>(rendering.m_ColorFormats[index]));
+		}
+		return false;
+	}
+
+	void DX12GraphicsCommandContext::ClearColorAttachment(
+		uint32_t colorAttachmentIndex, const std::array<float, 4>& color) noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			m_Backend.IsRendering(), "ClearColor requires an active rendering scope.");
-		if (!m_Backend.IsRendering())
+			m_Backend.IsRendering(), "ClearColorAttachment requires an active rendering scope.");
+		GGLAB_ASSERT_MSG(colorAttachmentIndex < m_ActiveColorAttachments.size(),
+			"ClearColorAttachment index must identify an active color attachment.");
+		if (!m_Backend.IsRendering() || colorAttachmentIndex >= m_ActiveColorAttachments.size())
 		{
 			return;
 		}
-		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(renderTarget);
-		GGLAB_ASSERT_MSG(view.IsValid(), "Render-target view must resolve to a DX12 descriptor.");
-		if (view.IsValid())
-		{
-			m_Backend.Get()->ClearRenderTargetView(view.m_CpuHandle, color.data(), 0, nullptr);
-		}
+		m_Backend.Get()->ClearRenderTargetView(
+			m_ActiveColorAttachments[colorAttachmentIndex].m_CpuHandle, color.data(), 0, nullptr);
 	}
 
-	void DX12GraphicsCommandContext::ClearDepthStencil(
-		RHITextureViewHandle depthStencil, float depth, std::optional<uint8_t> stencil) noexcept
+	void DX12GraphicsCommandContext::ClearDepthAttachment(
+		float depth, std::optional<uint8_t> stencil) noexcept
 	{
 		GGLAB_ASSERT_MSG(
-			m_Backend.IsRendering(), "ClearDepthStencil requires an active rendering scope.");
-		if (!m_Backend.IsRendering())
+			m_Backend.IsRendering(), "ClearDepthAttachment requires an active rendering scope.");
+		GGLAB_ASSERT_MSG(m_ActiveDepthAttachment.has_value(),
+			"ClearDepthAttachment requires an active depth attachment.");
+		if (!m_Backend.IsRendering() || !m_ActiveDepthAttachment)
 		{
 			return;
 		}
-		const DX12DescriptorView view = m_Backend.GetDevice()->ResolveTextureView(depthStencil);
-		GGLAB_ASSERT_MSG(view.IsValid(), "Depth-stencil view must resolve to a DX12 descriptor.");
-		if (view.IsValid())
-		{
-			m_Backend.GetCommandList()->ClearDepthStencil(view, depth, stencil);
-		}
+		m_Backend.GetCommandList()->ClearDepthStencil(*m_ActiveDepthAttachment, depth, stencil);
 	}
 
 	void DX12GraphicsCommandContext::SetViewport(const RHIViewport& viewport) noexcept
@@ -560,6 +629,13 @@ namespace gglab
 		{
 			return;
 		}
+		const bool compatible = ValidateActivePipelineCompatibility("DrawIndexed");
+		GGLAB_ASSERT_MSG(compatible,
+			"DrawIndexed requires a pipeline compatible with the active rendering signature.");
+		if (!compatible)
+		{
+			return;
+		}
 		m_Backend.Get()->DrawIndexedInstanced(indexCount, instanceCount, startIndexLocation,
 			baseVertexLocation, startInstanceLocation);
 	}
@@ -569,6 +645,13 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_Backend.IsRendering(), "Draw requires an active rendering scope.");
 		if (!m_Backend.IsRendering())
+		{
+			return;
+		}
+		const bool compatible = ValidateActivePipelineCompatibility("Draw");
+		GGLAB_ASSERT_MSG(compatible,
+			"Draw requires a pipeline compatible with the active rendering signature.");
+		if (!compatible)
 		{
 			return;
 		}

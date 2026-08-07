@@ -69,7 +69,7 @@ namespace gglab
 				};
 				commandContext->BeginRendering({ .m_ColorAttachments =
 					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
