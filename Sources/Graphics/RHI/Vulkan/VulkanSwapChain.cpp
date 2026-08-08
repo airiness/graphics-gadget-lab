@@ -127,20 +127,15 @@ namespace gglab
 					return std::ranges::find(modes, mode) != modes.end();
 				};
 
-			if (vsync)
+			const VkPresentModeKHR selected = SelectVulkanPresentModeFromList(modes, vsync);
+			if (vsync || has(selected))
 			{
-				// FIFO is guaranteed by the Vulkan spec.
-				return VK_PRESENT_MODE_FIFO_KHR;
+				return selected;
 			}
-			if (has(VK_PRESENT_MODE_MAILBOX_KHR))
-			{
-				return VK_PRESENT_MODE_MAILBOX_KHR;
-			}
-			if (has(VK_PRESENT_MODE_IMMEDIATE_KHR))
-			{
-				return VK_PRESENT_MODE_IMMEDIATE_KHR;
-			}
-			return VK_PRESENT_MODE_FIFO_KHR;
+			// Unreachable for the documented policy, but keep the error path
+			// explicit.
+			outError = "No supported present mode is available for the requested VSync policy.";
+			return std::nullopt;
 		}
 	}
 
@@ -282,7 +277,6 @@ namespace gglab
 		{
 			VulkanSwapchainImage record{};
 			record.m_Image = image;
-			record.m_TrackedLayout = VulkanPresentImageLayout::Undefined;
 
 			viewCreateInfo.image = image;
 			const VkResult viewResult =
@@ -384,7 +378,6 @@ namespace gglab
 				image.m_RenderingFinished = VK_NULL_HANDLE;
 			}
 			image.m_Image = VK_NULL_HANDLE;
-			image.m_TrackedLayout = VulkanPresentImageLayout::Undefined;
 		}
 		m_Images.clear();
 	}
@@ -438,5 +431,28 @@ namespace gglab
 		default:
 			return RHIFormat::Unknown;
 		}
+	}
+
+	VkPresentModeKHR SelectVulkanPresentModeFromList(
+		const std::vector<VkPresentModeKHR>& availableModes, bool vsync) noexcept
+	{
+		const auto has = [&availableModes](VkPresentModeKHR mode)
+			{
+				return std::ranges::find(availableModes, mode) != availableModes.end();
+			};
+		if (vsync)
+		{
+			// FIFO is guaranteed by the Vulkan spec.
+			return VK_PRESENT_MODE_FIFO_KHR;
+		}
+		if (has(VK_PRESENT_MODE_MAILBOX_KHR))
+		{
+			return VK_PRESENT_MODE_MAILBOX_KHR;
+		}
+		if (has(VK_PRESENT_MODE_IMMEDIATE_KHR))
+		{
+			return VK_PRESENT_MODE_IMMEDIATE_KHR;
+		}
+		return VK_PRESENT_MODE_FIFO_KHR;
 	}
 }

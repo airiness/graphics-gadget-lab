@@ -23,13 +23,14 @@ namespace gglab
 
 	// One swapchain image with its WSI-special infrastructure. The VkImage
 	// memory is owned by the presentation engine; GGLab owns the image view
-	// and the per-image rendering-finished binary semaphore.
+	// and the per-image rendering-finished binary semaphore. The tracked
+	// presentation layout for these images has a single authority:
+	// VulkanImageLayoutTracker in the frame runtime.
 	struct VulkanSwapchainImage
 	{
 		VkImage m_Image = VK_NULL_HANDLE;
 		VkImageView m_ImageView = VK_NULL_HANDLE;
 		VkSemaphore m_RenderingFinished = VK_NULL_HANDLE;
-		VulkanPresentImageLayout m_TrackedLayout = VulkanPresentImageLayout::Undefined;
 	};
 
 	struct VulkanSwapChainCreateInfo
@@ -115,4 +116,10 @@ namespace gglab
 	// are supported; HDR and other color spaces are never silently remapped.
 	[[nodiscard]] std::optional<VkFormat> ToVulkanSurfaceFormat(RHIFormat format) noexcept;
 	[[nodiscard]] RHIFormat FromVulkanSurfaceFormat(VkFormat format) noexcept;
+
+	// Pure present-mode policy over the surface's available modes: VSync on
+	// always selects FIFO; VSync off prefers MAILBOX, then IMMEDIATE, then
+	// FIFO. FIFO is guaranteed by the Vulkan spec.
+	[[nodiscard]] VkPresentModeKHR SelectVulkanPresentModeFromList(
+		const std::vector<VkPresentModeKHR>& availableModes, bool vsync) noexcept;
 }

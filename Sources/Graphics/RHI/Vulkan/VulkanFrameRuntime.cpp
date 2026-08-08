@@ -52,7 +52,10 @@ namespace gglab
 		case VK_SUBOPTIMAL_KHR:
 			return VulkanAcquireOutcome::RecreatePending;
 		case VK_ERROR_OUT_OF_DATE_KHR:
-			return VulkanAcquireOutcome::OutOfDateRetry;
+			// No image was handed over; the caller recreates the swapchain
+			// with the real drawable extent and retries. The runtime never
+			// recreates from its own cached extent.
+			return VulkanAcquireOutcome::OutOfDate;
 		default:
 			return VulkanAcquireOutcome::Fatal;
 		}
@@ -72,6 +75,36 @@ namespace gglab
 		default:
 			return VulkanPresentOutcome::Failed;
 		}
+	}
+
+	VulkanFrameTransactionOutcome ClassifySubmitPresentTransaction(
+		const VkResult submitResult, const VkResult presentResult) noexcept
+	{
+		if (submitResult != VK_SUCCESS)
+		{
+			return VulkanFrameTransactionOutcome::SubmitFailed;
+		}
+		switch (presentResult)
+		{
+		case VK_SUCCESS:
+			return VulkanFrameTransactionOutcome::Completed;
+		case VK_SUBOPTIMAL_KHR:
+		case VK_ERROR_OUT_OF_DATE_KHR:
+			// The graphics submission and its timeline signal are still
+			// valid; only the swapchain needs recreation.
+			return VulkanFrameTransactionOutcome::RecreatePending;
+		default:
+			return VulkanFrameTransactionOutcome::PresentFailed;
+		}
+	}
+
+	uint64_t UpdateSlotReuseGate(const uint64_t previousGate,
+		const VkResult submitResult, const uint64_t candidateValue) noexcept
+	{
+		// Only a successfully submitted timeline value may become the reuse
+		// gate: a failed submission must never leave a future frame waiting
+		// on a value that was never signaled.
+		return submitResult == VK_SUCCESS ? candidateValue : previousGate;
 	}
 
 	VulkanFrameIndexModel::VulkanFrameIndexModel(uint32_t frameSlotCount) noexcept
@@ -167,6 +200,27 @@ namespace gglab
 
 	VulkanFrameRuntime::~VulkanFrameRuntime()
 	{
+		// Defensive quiesce: an early-return failure path must never destroy
+		// command pools, semaphores or the swapchain while their GPU work is
+		// still in flight. Finalize is idempotent.
+		Finalize();
+	}
+
+	void VulkanFrameRuntime::Finalize() noexcept
+	{
+		if (m_Finalized)
+		{
+			return;
+		}
+		m_Finalized = true;
+		// In the fatal state (including device loss) every wait on the
+		// device returns immediately with an error, so skipping the waits is
+		// a defensive choice, not a correctness shortcut.
+		if (m_Device != nullptr && !m_Fatal)
+		{
+			vkQueueWaitIdle(m_Device->GetGraphicsQueue());
+			m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+		}
 		DestroyFrameSlots();
 	}
 
@@ -254,6 +308,7 @@ namespace gglab
 		swapChainInfo.m_Device = createInfo.m_Device->Get();
 		swapChainInfo.m_Surface = createInfo.m_Surface->Get();
 		swapChainInfo.m_RequestedFormat = createInfo.m_RequestedFormat;
+		swapChainInfo.m_Vsync = createInfo.m_Vsync;
 		swapChainInfo.m_Width = createInfo.m_Width;
 		swapChainInfo.m_Height = createInfo.m_Height;
 		VulkanSwapChain::Result swapChainResult = VulkanSwapChain::Create(swapChainInfo);
@@ -277,8 +332,19 @@ namespace gglab
 	VulkanBeginFrameResult VulkanFrameRuntime::BeginFrame() noexcept
 	{
 		VulkanBeginFrameResult result{};
-		if (m_SwapChain == nullptr)
+		if (m_Fatal || m_SwapChain == nullptr)
 		{
+			result.m_Result = m_Fatal ? VK_ERROR_DEVICE_LOST : VK_ERROR_INITIALIZATION_FAILED;
+			return result;
+		}
+
+		// A new frame must never be started while a previous transaction is
+		// still active: an acquire with an unconsumed imageAvailable
+		// semaphore would leak the acquire transaction. This is checked
+		// before vkAcquireNextImageKHR is called.
+		if (m_ActiveFrame.has_value())
+		{
+			result.m_Result = VK_ERROR_DEVICE_LOST;
 			return result;
 		}
 
@@ -287,15 +353,16 @@ namespace gglab
 		const VkExtent2D extent = m_SwapChain->GetExtent();
 		if (extent.width == 0 || extent.height == 0)
 		{
+			result.m_Result = VK_ERROR_OUT_OF_DATE_KHR;
 			return result;
 		}
 
 		const uint32_t frameSlotIndex = m_IndexModel.NextFrameSlot();
 		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
 
-		// Reuse gate: the slot may not be reused until its last submitted
-		// timeline value has completed. No frame may ever be recorded into a
-		// command buffer that is still being executed.
+		// Reuse gate: the slot may not be reused until its last successfully
+		// submitted timeline value has completed. No frame may ever be
+		// recorded into a command buffer that is still being executed.
 		if (slot.m_LastSubmittedTimelineValue != 0)
 		{
 			m_Timeline->Wait(slot.m_LastSubmittedTimelineValue);
@@ -303,19 +370,8 @@ namespace gglab
 		vkResetCommandPool(m_Device->Get(), slot.m_CommandPool, 0);
 
 		uint32_t backBufferIndex = 0;
-		VkResult acquireResult = vkAcquireNextImageKHR(m_Device->Get(), m_SwapChain->Get(),
+		const VkResult acquireResult = vkAcquireNextImageKHR(m_Device->Get(), m_SwapChain->Get(),
 			UINT64_MAX, slot.m_ImageAvailable, VK_NULL_HANDLE, &backBufferIndex);
-		if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
-		{
-			// Retry once after recreating at the same extent.
-			std::string error;
-			const VkExtent2D currentExtent = m_SwapChain->GetExtent();
-			if (RecreateSwapChain(currentExtent.width, currentExtent.height, m_Vsync, error))
-			{
-				acquireResult = vkAcquireNextImageKHR(m_Device->Get(), m_SwapChain->Get(),
-					UINT64_MAX, slot.m_ImageAvailable, VK_NULL_HANDLE, &backBufferIndex);
-			}
-		}
 
 		const VulkanAcquireOutcome outcome = ClassifyVulkanAcquireResult(acquireResult);
 		switch (outcome)
@@ -324,60 +380,107 @@ namespace gglab
 		case VulkanAcquireOutcome::RecreatePending:
 			if (!m_StateMachine.TryBegin(frameSlotIndex))
 			{
-				// A slot still active from a previous frame is a runtime bug;
-				// do not present from a corrupted state.
+				// Defensive: the active-frame check above already prevents a
+				// double Begin, so a rejected slot indicates a corrupted
+				// transaction state.
+				m_Fatal = true;
+				result.m_Result = VK_ERROR_DEVICE_LOST;
 				return result;
 			}
 			m_IndexModel.CommitFrame(frameSlotIndex, backBufferIndex);
-			result.m_Acquired = true;
+			m_ActiveFrame = VulkanActiveFrame{ frameSlotIndex, backBufferIndex };
+			result.m_Status = outcome;
 			result.m_FrameSlotIndex = frameSlotIndex;
 			result.m_BackBufferIndex = backBufferIndex;
 			result.m_RecreatePending = outcome == VulkanAcquireOutcome::RecreatePending;
+			result.m_Result = acquireResult;
+			return result;
+		case VulkanAcquireOutcome::OutOfDate:
+			// No image was handed over and no frame transaction started.
+			// The caller owns the drawable extent and must recreate the
+			// swapchain with the real extent before retrying; the runtime
+			// never picks an extent itself.
+			result.m_Status = VulkanAcquireOutcome::OutOfDate;
+			result.m_Result = acquireResult;
 			return result;
 		default:
+			m_Fatal = true;
+			result.m_Status = VulkanAcquireOutcome::Fatal;
+			result.m_Result = acquireResult;
 			return result;
 		}
 	}
 
-	void VulkanFrameRuntime::EndFrame(uint32_t frameSlotIndex, uint32_t backBufferIndex,
+	VulkanSubmitPresentResult VulkanFrameRuntime::EndFrame(
 		const std::array<float, 4>& clearColor) noexcept
 	{
-		if (frameSlotIndex >= m_FrameSlots.size())
+		VulkanSubmitPresentResult result{};
+		if (!m_ActiveFrame.has_value())
 		{
-			return;
+			// No active frame: the transaction is already complete or was
+			// never started.
+			return result;
 		}
-		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
-		if (!m_StateMachine.TryEnd(frameSlotIndex))
+		const VulkanActiveFrame active = *m_ActiveFrame;
+		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
+		if (!m_StateMachine.TryEnd(active.m_FrameSlotIndex))
 		{
-			return;
+			// End after Abort is rejected; the abort already released the
+			// image.
+			m_ActiveFrame.reset();
+			return result;
 		}
-		RecordNormalFrame(slot.m_NormalCommandBuffer, backBufferIndex, clearColor);
-		SubmitAndPresent(frameSlotIndex, backBufferIndex, slot.m_NormalCommandBuffer);
-		m_LayoutTracker.Set(backBufferIndex, VulkanPresentImageLayout::Present);
+		RecordNormalFrame(slot.m_NormalCommandBuffer, active.m_BackBufferIndex, clearColor);
+		VulkanSubmitPresentResult submitPresent =
+			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
+				slot.m_NormalCommandBuffer);
+		m_ActiveFrame.reset();
+		if (submitPresent.m_Presented)
+		{
+			m_LayoutTracker.Set(active.m_BackBufferIndex, VulkanPresentImageLayout::Present);
+		}
+		return submitPresent;
 	}
 
-	void VulkanFrameRuntime::AbortFrame(uint32_t frameSlotIndex, uint32_t backBufferIndex) noexcept
+	VulkanSubmitPresentResult VulkanFrameRuntime::AbortFrame() noexcept
 	{
-		if (frameSlotIndex >= m_FrameSlots.size())
+		VulkanSubmitPresentResult result{};
+		if (!m_ActiveFrame.has_value())
 		{
-			return;
+			// No active frame: the transaction is already complete or was
+			// never started.
+			return result;
 		}
-		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
-		if (!m_StateMachine.TryAbort(frameSlotIndex))
+		const VulkanActiveFrame active = *m_ActiveFrame;
+		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
+		if (!m_StateMachine.TryAbort(active.m_FrameSlotIndex))
 		{
-			return;
+			// Abort after End is rejected; the frame was already presented.
+			m_ActiveFrame.reset();
+			return result;
 		}
-		RecordAbortFrame(slot.m_AbortCommandBuffer, backBufferIndex);
-		SubmitAndPresent(frameSlotIndex, backBufferIndex, slot.m_AbortCommandBuffer);
-		m_LayoutTracker.Set(backBufferIndex, VulkanPresentImageLayout::Present);
+		// The partially recorded normal command buffer is never submitted;
+		// the dedicated abort command buffer releases the acquired image.
+		RecordAbortFrame(slot.m_AbortCommandBuffer, active.m_BackBufferIndex);
+		VulkanSubmitPresentResult submitPresent =
+			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
+				slot.m_AbortCommandBuffer);
+		m_ActiveFrame.reset();
+		if (submitPresent.m_Presented)
+		{
+			m_LayoutTracker.Set(active.m_BackBufferIndex, VulkanPresentImageLayout::Present);
+		}
+		return submitPresent;
 	}
 
 	bool VulkanFrameRuntime::RecreateSwapChain(uint32_t width, uint32_t height,
 		bool vsync, std::string& outError) noexcept
 	{
-		if (m_SwapChain == nullptr)
+		if (m_Fatal || m_SwapChain == nullptr)
 		{
-			outError = "No swapchain to recreate.";
+			outError = m_Fatal
+				? "Cannot recreate the swapchain after a fatal runtime error."
+				: "No swapchain to recreate.";
 			return false;
 		}
 		if (width == 0 || height == 0)
@@ -387,13 +490,10 @@ namespace gglab
 		}
 		// Swapchain recreation is a safe point: no frame may be active and no
 		// queued work may reference old swapchain images.
-		for (uint32_t slot = 0; slot < m_StateMachine.GetSlotCount(); ++slot)
+		if (m_ActiveFrame.has_value())
 		{
-			if (m_StateMachine.IsActive(slot))
-			{
-				outError = "Cannot recreate the swapchain while a frame is active.";
-				return false;
-			}
+			outError = "Cannot recreate the swapchain while a frame is active.";
+			return false;
 		}
 		WaitIdle();
 		const bool recreated = m_SwapChain->Recreate(width, height, vsync, outError);
@@ -402,6 +502,10 @@ namespace gglab
 			m_Vsync = vsync;
 			m_LayoutTracker.Reset(m_SwapChain->GetImageCount());
 			m_IndexModel.ResetFramePairs();
+		}
+		else
+		{
+			m_Fatal = true;
 		}
 		return recreated;
 	}
@@ -501,11 +605,15 @@ namespace gglab
 		vkEndCommandBuffer(commandBuffer);
 	}
 
-	void VulkanFrameRuntime::SubmitAndPresent(uint32_t frameSlotIndex,
+	VulkanSubmitPresentResult VulkanFrameRuntime::SubmitAndPresent(uint32_t frameSlotIndex,
 		uint32_t backBufferIndex, VkCommandBuffer commandBuffer) noexcept
 	{
+		VulkanSubmitPresentResult result{};
 		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
-		const uint64_t timelineValue = m_Timeline->AllocateSignalValue();
+
+		// Reserve a candidate timeline value; it only becomes a valid wait
+		// target (and the slot reuse gate) when the submission succeeds.
+		const uint64_t timelineValue = m_Timeline->ReserveSignalValue();
 
 		VkCommandBufferSubmitInfo commandBufferInfo{};
 		commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
@@ -537,13 +645,20 @@ namespace gglab
 
 		const VkResult submitResult =
 			vkQueueSubmit2(m_Device->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-		slot.m_LastSubmittedTimelineValue = submitResult == VK_SUCCESS
-			? timelineValue
-			: m_Timeline->GetCurrentSignalValue();
+		result.m_Result = submitResult;
 		if (submitResult != VK_SUCCESS)
 		{
-			return;
+			// The reserved value was never signaled; the reuse gate must not
+			// move to it. The runtime enters the fatal state so no further
+			// frame can wait on it.
+			result.m_Fatal = true;
+			m_Fatal = true;
+			return result;
 		}
+		result.m_Submitted = true;
+		m_Timeline->CommitSubmittedValue(timelineValue);
+		slot.m_LastSubmittedTimelineValue =
+			UpdateSlotReuseGate(slot.m_LastSubmittedTimelineValue, submitResult, timelineValue);
 
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -555,7 +670,32 @@ namespace gglab
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &swapChainHandle;
 		presentInfo.pImageIndices = &backBufferIndex;
-		vkQueuePresentKHR(m_Device->GetGraphicsQueue(), &presentInfo);
+		const VkResult presentResult =
+			vkQueuePresentKHR(m_Device->GetGraphicsQueue(), &presentInfo);
+		result.m_Result = presentResult;
+
+		switch (ClassifySubmitPresentTransaction(submitResult, presentResult))
+		{
+		case VulkanFrameTransactionOutcome::Completed:
+			result.m_Presented = true;
+			break;
+		case VulkanFrameTransactionOutcome::RecreatePending:
+			// The submission and its timeline signal stand; only the
+			// swapchain needs recreation at the next safe point.
+			result.m_Presented = true;
+			result.m_RecreatePending = true;
+			break;
+		case VulkanFrameTransactionOutcome::PresentFailed:
+			result.m_Fatal = true;
+			m_Fatal = true;
+			break;
+		case VulkanFrameTransactionOutcome::SubmitFailed:
+			// Unreachable: handled before present.
+			result.m_Fatal = true;
+			m_Fatal = true;
+			break;
+		}
+		return result;
 	}
 
 	VkSemaphore VulkanFrameRuntime::GetImageAvailableSemaphore(uint32_t frameSlotIndex) const noexcept

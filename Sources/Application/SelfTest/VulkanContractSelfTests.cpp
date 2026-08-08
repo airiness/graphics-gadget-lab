@@ -1344,14 +1344,14 @@ namespace gglab
 				context.Check(tracker.GetImageCount() == 3,
 					"layout tracker sizes to the image count");
 				context.Check(tracker.Get(0) == VulkanPresentImageLayout::Undefined &&
-						tracker.Get(2) == VulkanPresentImageLayout::Undefined,
+					tracker.Get(2) == VulkanPresentImageLayout::Undefined,
 					"new swapchain images start Undefined");
 				tracker.Set(1, VulkanPresentImageLayout::Present);
 				context.Check(tracker.Get(1) == VulkanPresentImageLayout::Present,
 					"successful present updates the tracked state");
 				tracker.Reset(2);
 				context.Check(tracker.GetImageCount() == 2 &&
-						tracker.Get(1) == VulkanPresentImageLayout::Undefined,
+					tracker.Get(1) == VulkanPresentImageLayout::Undefined,
 					"recreate resets the tracked state to Undefined");
 				context.Check(tracker.Get(9) == VulkanPresentImageLayout::Undefined,
 					"out-of-range reads degrade to Undefined");
@@ -1389,29 +1389,93 @@ namespace gglab
 			// Acquire/present result classification.
 			{
 				context.Check(ClassifyVulkanAcquireResult(VK_SUCCESS) ==
-						VulkanAcquireOutcome::Acquired,
+					VulkanAcquireOutcome::Acquired,
 					"acquire SUCCESS hands over an image");
 				context.Check(ClassifyVulkanAcquireResult(VK_SUBOPTIMAL_KHR) ==
-						VulkanAcquireOutcome::RecreatePending,
+					VulkanAcquireOutcome::RecreatePending,
 					"acquire SUBOPTIMAL hands over an image and schedules recreate");
 				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_OUT_OF_DATE_KHR) ==
-						VulkanAcquireOutcome::OutOfDateRetry,
-					"acquire OUT_OF_DATE retries after recreate");
+					VulkanAcquireOutcome::OutOfDate,
+					"acquire OUT_OF_DATE hands over no image; the caller recreates and retries");
 				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_DEVICE_LOST) ==
-						VulkanAcquireOutcome::Fatal,
+					VulkanAcquireOutcome::Fatal,
 					"other acquire results are fatal");
 				context.Check(ClassifyVulkanPresentResult(VK_SUCCESS) ==
-						VulkanPresentOutcome::Presented,
+					VulkanPresentOutcome::Presented,
 					"present SUCCESS");
 				context.Check(ClassifyVulkanPresentResult(VK_SUBOPTIMAL_KHR) ==
-						VulkanPresentOutcome::RecreatePending,
+					VulkanPresentOutcome::RecreatePending,
 					"present SUBOPTIMAL is non-fatal and schedules recreate");
 				context.Check(ClassifyVulkanPresentResult(VK_ERROR_OUT_OF_DATE_KHR) ==
-						VulkanPresentOutcome::RecreatePending,
+					VulkanPresentOutcome::RecreatePending,
 					"present OUT_OF_DATE keeps the submission valid");
 				context.Check(ClassifyVulkanPresentResult(VK_ERROR_SURFACE_LOST_KHR) ==
-						VulkanPresentOutcome::Failed,
+					VulkanPresentOutcome::Failed,
 					"other present results are failures");
+			}
+
+			// The combined submit+present transaction drives the runtime:
+			// a failed submit never presents, and a non-fatal present keeps
+			// the frame completed.
+			{
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_SUCCESS) ==
+					VulkanFrameTransactionOutcome::Completed,
+					"submit+present SUCCESS completes the frame");
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_SUBOPTIMAL_KHR) ==
+					VulkanFrameTransactionOutcome::RecreatePending,
+					"submit SUCCESS + present SUBOPTIMAL completes and schedules recreate");
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_ERROR_OUT_OF_DATE_KHR) ==
+					VulkanFrameTransactionOutcome::RecreatePending,
+					"submit SUCCESS + present OUT_OF_DATE keeps the submission valid");
+				context.Check(ClassifySubmitPresentTransaction(VK_SUCCESS, VK_ERROR_SURFACE_LOST_KHR) ==
+					VulkanFrameTransactionOutcome::PresentFailed,
+					"submit SUCCESS + fatal present fails the runtime");
+				context.Check(ClassifySubmitPresentTransaction(VK_ERROR_DEVICE_LOST, VK_SUCCESS) ==
+					VulkanFrameTransactionOutcome::SubmitFailed,
+					"a failed submit never reaches present");
+			}
+
+			// The frame-slot reuse gate only ever moves to a successfully
+			// submitted timeline value; a failed submit leaves the previous
+			// gate untouched so no future frame waits on an unsignaled value.
+			{
+				context.Check(UpdateSlotReuseGate(5, VK_SUCCESS, 6) == 6,
+					"successful submit advances the reuse gate");
+				context.Check(UpdateSlotReuseGate(5, VK_ERROR_DEVICE_LOST, 6) == 5,
+					"failed submit never advances the reuse gate");
+				context.Check(UpdateSlotReuseGate(0, VK_ERROR_INITIALIZATION_FAILED, 1) == 0,
+					"a never-submitted value can never become a wait target");
+			}
+
+			// Present-mode policy: VSync on always selects FIFO; VSync off
+			// prefers MAILBOX, then IMMEDIATE, then FIFO. This is the pure
+			// selection the swapchain creation path feeds with the surface's
+			// actual mode list.
+			{
+				const std::vector<VkPresentModeKHR> full{
+					VK_PRESENT_MODE_FIFO_KHR,
+					VK_PRESENT_MODE_IMMEDIATE_KHR,
+					VK_PRESENT_MODE_MAILBOX_KHR,
+				};
+				const std::vector<VkPresentModeKHR> noMailbox{
+					VK_PRESENT_MODE_FIFO_KHR,
+					VK_PRESENT_MODE_IMMEDIATE_KHR,
+				};
+				const std::vector<VkPresentModeKHR> fifoOnly{
+					VK_PRESENT_MODE_FIFO_KHR,
+				};
+				context.Check(SelectVulkanPresentModeFromList(full, true) ==
+					VK_PRESENT_MODE_FIFO_KHR,
+					"vsync on always selects FIFO");
+				context.Check(SelectVulkanPresentModeFromList(full, false) ==
+					VK_PRESENT_MODE_MAILBOX_KHR,
+					"vsync off prefers MAILBOX");
+				context.Check(SelectVulkanPresentModeFromList(noMailbox, false) ==
+					VK_PRESENT_MODE_IMMEDIATE_KHR,
+					"vsync off falls back to IMMEDIATE");
+				context.Check(SelectVulkanPresentModeFromList(fifoOnly, false) ==
+					VK_PRESENT_MODE_FIFO_KHR,
+					"vsync off falls back to FIFO");
 			}
 		}
 #endif

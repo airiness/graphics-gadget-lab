@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -30,17 +31,19 @@ namespace gglab
 	};
 
 	// Classifies vkAcquireNextImageKHR results. Only SUCCESS/SUBOPTIMAL hand
-	// over an image; OUT_OF_DATE and fatal results are separated.
+	// over an image; OUT_OF_DATE hands over nothing and the caller must
+	// recreate the swapchain with the real drawable extent and retry.
 	enum class VulkanAcquireOutcome : uint8_t
 	{
 		Acquired,
 		RecreatePending,   // SUBOPTIMAL: image valid, schedule recreate
-		OutOfDateRetry,    // OUT_OF_DATE: recreate and retry
+		OutOfDate,         // OUT_OF_DATE: no image; caller recreates and retries
 		Fatal,
 	};
 
-	// Classifies vkQueuePresentKHR results. OUT_OF_DATE is not fatal: the
-	// submission already happened and the frame-slot timeline stays valid.
+	// Classifies the frame transaction produced by a successful submission
+	// followed by vkQueuePresentKHR. OUT_OF_DATE is not fatal: the graphics
+	// submission already completed and the frame-slot timeline stays valid.
 	enum class VulkanPresentOutcome : uint8_t
 	{
 		Presented,
@@ -50,6 +53,25 @@ namespace gglab
 
 	[[nodiscard]] VulkanAcquireOutcome ClassifyVulkanAcquireResult(VkResult result) noexcept;
 	[[nodiscard]] VulkanPresentOutcome ClassifyVulkanPresentResult(VkResult result) noexcept;
+
+	// Combined submit+present transaction result. A failed submit never
+	// reaches present and never updates the frame-slot reuse gate; a
+	// non-fatal present result keeps the submission valid.
+	enum class VulkanFrameTransactionOutcome : uint8_t
+	{
+		Completed,        // submit and present succeeded
+		RecreatePending,  // submit succeeded, present SUBOPTIMAL/OUT_OF_DATE
+		SubmitFailed,     // fatal: queue submit rejected
+		PresentFailed,    // fatal: queue present rejected
+	};
+
+	[[nodiscard]] VulkanFrameTransactionOutcome ClassifySubmitPresentTransaction(
+		VkResult submitResult, VkResult presentResult) noexcept;
+
+	// Frame-slot reuse gate update rule: only a successfully submitted
+	// timeline value may become the gate a later frame waits on.
+	[[nodiscard]] uint64_t UpdateSlotReuseGate(uint64_t previousGate,
+		VkResult submitResult, uint64_t candidateValue) noexcept;
 
 	// Frame-slot ring selection and frame pairing bookkeeping. The
 	// imageAvailable semaphore identity always follows the frame slot and the
@@ -140,12 +162,48 @@ namespace gglab
 		uint32_t m_Height = 0;
 	};
 
-	struct VulkanBeginFrameResult
+	// The exact acquired pair of one active frame. The public RHI contract
+	// allows at most one active frame; EndFrame/AbortFrame consume the pair
+	// bound here and never accept caller-supplied indices.
+	struct VulkanActiveFrame
 	{
-		bool m_Acquired = false;
 		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
+	};
+
+	struct VulkanBeginFrameResult
+	{
+		VulkanAcquireOutcome m_Status = VulkanAcquireOutcome::Fatal;
+		// Valid when m_Status is Acquired or RecreatePending.
+		uint32_t m_FrameSlotIndex = 0;
+		uint32_t m_BackBufferIndex = 0;
+		// True when the acquire reported SUBOPTIMAL: the image is valid and
+		// the swapchain should be recreated at a safe point.
 		bool m_RecreatePending = false;
+		VkResult m_Result = VK_SUCCESS;
+
+		[[nodiscard]] bool IsAcquired() const noexcept
+		{
+			return m_Status == VulkanAcquireOutcome::Acquired ||
+				m_Status == VulkanAcquireOutcome::RecreatePending;
+		}
+	};
+
+	struct VulkanSubmitPresentResult
+	{
+		// True when the graphics submission was accepted and the timeline
+		// signal plus the frame-slot reuse gate are valid.
+		bool m_Submitted = false;
+		// True when the present call was made and reported a non-fatal
+		// result; the frame transaction is complete.
+		bool m_Presented = false;
+		// True when the present reported SUBOPTIMAL/OUT_OF_DATE: recreation
+		// is scheduled at the next safe point.
+		bool m_RecreatePending = false;
+		// True when the runtime entered the fatal state; no further
+		// BeginFrame is allowed.
+		bool m_Fatal = false;
+		VkResult m_Result = VK_SUCCESS;
 	};
 
 	// Minimal swapchain frame lifecycle: acquire, record a known-color clear,
@@ -154,7 +212,10 @@ namespace gglab
 	// a dedicated minimal command buffer; the partially recorded application
 	// command buffer is never submitted. The runtime is single-owner on one
 	// graphics/present queue, which satisfies Vulkan queue external
-	// synchronization.
+	// synchronization. Only one frame may be active at a time, and the
+	// acquired (frameSlotIndex, backBufferIndex) pair is bound internally:
+	// EndFrame/AbortFrame consume the active pair and never accept
+	// caller-supplied indices.
 	class VulkanFrameRuntime
 	{
 	public:
@@ -175,13 +236,17 @@ namespace gglab
 		[[nodiscard]] static Result Create(const VulkanFrameRuntimeCreateInfo& createInfo) noexcept;
 
 		// Acquires the next image. The caller must not call BeginFrame while
-		// the drawable extent is zero.
+		// the drawable extent is zero. An OUT_OF_DATE result hands over no
+		// image: the caller owns the drawable extent and must recreate the
+		// swapchain with the real extent before retrying.
 		[[nodiscard]] VulkanBeginFrameResult BeginFrame() noexcept;
-		// Records the known-color clear, submits and presents.
-		void EndFrame(uint32_t frameSlotIndex, uint32_t backBufferIndex,
+		// Records the known-color clear, submits and presents the active
+		// frame.
+		[[nodiscard]] VulkanSubmitPresentResult EndFrame(
 			const std::array<float, 4>& clearColor) noexcept;
-		// Releases the acquired image with the dedicated abort command buffer.
-		void AbortFrame(uint32_t frameSlotIndex, uint32_t backBufferIndex) noexcept;
+		// Releases the active frame's image with the dedicated abort command
+		// buffer.
+		[[nodiscard]] VulkanSubmitPresentResult AbortFrame() noexcept;
 
 		// Safe-point swapchain recreation (requires no active frame).
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height,
@@ -189,7 +254,15 @@ namespace gglab
 		void SetVsync(bool vsync) noexcept { m_Vsync = vsync; }
 		[[nodiscard]] bool GetVsync() const noexcept { return m_Vsync; }
 
+		// Explicit quiesce: waits for the graphics queue and the committed
+		// timeline before releasing GPU-owned children. The destructor calls
+		// it defensively so early-return failure paths never destroy command
+		// pools or semaphores that are still in flight.
+		void Finalize() noexcept;
 		void WaitIdle() noexcept;
+
+		[[nodiscard]] bool IsFatal() const noexcept { return m_Fatal; }
+		[[nodiscard]] bool HasActiveFrame() const noexcept { return m_ActiveFrame.has_value(); }
 
 		[[nodiscard]] VulkanSwapChain& GetSwapChain() noexcept { return *m_SwapChain; }
 		[[nodiscard]] const VulkanSwapChain& GetSwapChain() const noexcept { return *m_SwapChain; }
@@ -225,7 +298,8 @@ namespace gglab
 			VkCommandBuffer commandBuffer, uint32_t backBufferIndex,
 			const std::array<float, 4>& clearColor) noexcept;
 		void RecordAbortFrame(VkCommandBuffer commandBuffer, uint32_t backBufferIndex) noexcept;
-		void SubmitAndPresent(uint32_t frameSlotIndex, uint32_t backBufferIndex,
+		[[nodiscard]] VulkanSubmitPresentResult SubmitAndPresent(
+			uint32_t frameSlotIndex, uint32_t backBufferIndex,
 			VkCommandBuffer commandBuffer) noexcept;
 		void DestroyFrameSlots() noexcept;
 
@@ -236,6 +310,9 @@ namespace gglab
 		VulkanFrameIndexModel m_IndexModel{ 2 };
 		VulkanImageLayoutTracker m_LayoutTracker;
 		VulkanFrameSlotStateMachine m_StateMachine;
+		std::optional<VulkanActiveFrame> m_ActiveFrame;
 		bool m_Vsync = false;
+		bool m_Fatal = false;
+		bool m_Finalized = false;
 	};
 }

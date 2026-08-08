@@ -118,15 +118,36 @@ namespace gglab
 		}
 
 		// Runs one frame of the script and logs the two-index domains plus
-		// the semaphore identities that own each of them.
-		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, uint32_t step,
-			bool abort, QualificationFrameStats& stats) noexcept
+		// the semaphore identities that own each of them. An OUT_OF_DATE
+		// acquire is retried once after recreating with the real window
+		// extent: the platform owns the drawable extent, the runtime only
+		// owns the recreation mechanics.
+		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
+			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept;
+		[[nodiscard]] bool RunQualificationRecreate(VulkanFrameRuntime& runtime, HWND hwnd,
+			bool vsync, QualificationFrameStats& stats) noexcept;
+
+		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
+			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept
 		{
 			VulkanBeginFrameResult begin = runtime.BeginFrame();
-			if (!begin.m_Acquired)
+			if (begin.m_Status == VulkanAcquireOutcome::OutOfDate)
 			{
-				LogQualificationError(
-					std::format("qualify[{:03d}] BeginFrame failed to acquire an image.", step));
+				LogQualificationInfo(std::format(
+					"qualify[{:03d}] acquire OUT_OF_DATE; recreating with the real extent and "
+					"retrying once.",
+					step));
+				if (!RunQualificationRecreate(runtime, hwnd, runtime.GetVsync(), stats))
+				{
+					return false;
+				}
+				begin = runtime.BeginFrame();
+			}
+			if (!begin.IsAcquired())
+			{
+				LogQualificationError(std::format(
+					"qualify[{:03d}] BeginFrame failed (status={}, result={}).", step,
+					static_cast<int>(begin.m_Status), static_cast<int>(begin.m_Result)));
 				return false;
 			}
 			if (begin.m_RecreatePending)
@@ -137,16 +158,27 @@ namespace gglab
 			{
 				++stats.m_MismatchedFrames;
 			}
+			VulkanSubmitPresentResult endResult{};
 			if (abort)
 			{
 				++stats.m_AbortFrames;
-				runtime.AbortFrame(begin.m_FrameSlotIndex, begin.m_BackBufferIndex);
+				endResult = runtime.AbortFrame();
 			}
 			else
 			{
 				++stats.m_NormalFrames;
-				runtime.EndFrame(begin.m_FrameSlotIndex, begin.m_BackBufferIndex,
-					StepColor(step));
+				endResult = runtime.EndFrame(StepColor(step));
+			}
+			if (endResult.m_Fatal)
+			{
+				LogQualificationError(std::format(
+					"qualify[{:03d}] frame transaction failed (result={}).", step,
+					static_cast<int>(endResult.m_Result)));
+				return false;
+			}
+			if (endResult.m_RecreatePending)
+			{
+				++stats.m_SuboptimalCount;
 			}
 			LogQualificationInfo(std::format(
 				"qualify[{:03d}] {:5s} frameSlot={} backBuffer={} imageAvailable=0x{:016x} "
@@ -225,13 +257,13 @@ namespace gglab
 		{
 			QualificationFrameStats stats;
 			uint32_t step = 0;
-			const auto runNormal = [&runtime, &stats, &step]()
+			const auto runNormal = [&runtime, hwnd, &stats, &step]()
 				{
-					return RunQualificationStep(runtime, step++, false, stats);
+					return RunQualificationStep(runtime, hwnd, step++, false, stats);
 				};
-			const auto runAbort = [&runtime, &stats, &step]()
+			const auto runAbort = [&runtime, hwnd, &stats, &step]()
 				{
-					return RunQualificationStep(runtime, step++, true, stats);
+					return RunQualificationStep(runtime, hwnd, step++, true, stats);
 				};
 
 			LogQualificationInfo("Vulkan minimal-frame qualification started.");
