@@ -411,7 +411,20 @@ namespace gglab
 	void NapaVoxelLabSession::Update(float deltaTime) noexcept
 	{
 		UpdateCamera(deltaTime);
+		if (m_PublicationSession)
+		{
+			m_PublicationSession->RetireCompletedGpuMeshes();
+		}
 		DrawChunkBounds();
+	}
+
+	void NapaVoxelLabSession::OnFrameSubmitted(
+		const DemoFrameFeedback& feedback) noexcept
+	{
+		if (m_PublicationSession)
+		{
+			m_PublicationSession->OnFrameSubmitted(feedback.m_SubmittedFence);
+		}
 	}
 
 	bool NapaVoxelLabSession::PrepareInitialPublication() noexcept

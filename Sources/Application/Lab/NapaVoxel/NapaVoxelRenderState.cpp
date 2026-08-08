@@ -6,14 +6,24 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferBatch.h"
 
+#include "NapaVoxelCore/Edit/VoxelMutation.h"
+
 #include <atomic>
 #include <limits>
+#include <type_traits>
 
 namespace gglab
 {
 	namespace
 	{
 		std::atomic<uint64_t> NextNapaVoxelPublicationStableId = 1;
+
+		static_assert(std::is_nothrow_move_assignable_v<
+			std::shared_ptr<const NapaVoxelGpuMeshSet>>);
+		static_assert(std::is_nothrow_move_assignable_v<
+			std::unique_ptr<const napa::voxel::VoxelDamageMarkerSnapshot>>);
+		static_assert(std::is_nothrow_move_assignable_v<
+			std::unique_ptr<NapaVoxelRetiredGpuMeshSet>>);
 
 		[[nodiscard]] bool CheckedAccumulate(uint64_t value, uint64_t& total) noexcept
 		{
@@ -139,6 +149,8 @@ namespace gglab
 		m_CpuReplacements(std::move(cpuReplacements)),
 		m_BaseGpuMeshes(std::move(baseGpuMeshes)),
 		m_Identity(identity),
+		m_BaseWorldRevision(m_PendingCoreMeshes->GetBaseWorldVoxelRevision()),
+		m_TargetWorldRevision(m_PendingCoreMeshes->GetTargetWorldVoxelRevision()),
 		m_UploadIdentity({
 			.m_Kind = AssetStreamingWorkKind::RuntimeMesh,
 			.m_StableId = schedulerStableId,
@@ -435,12 +447,22 @@ namespace gglab
 
 	uint64_t GGLabMeshPublicationBatch::GetBaseWorldRevision() const noexcept
 	{
-		return m_PendingCoreMeshes ? m_PendingCoreMeshes->GetBaseWorldVoxelRevision() : 0;
+		return m_BaseWorldRevision;
 	}
 
 	uint64_t GGLabMeshPublicationBatch::GetTargetWorldRevision() const noexcept
 	{
-		return m_PendingCoreMeshes ? m_PendingCoreMeshes->GetTargetWorldVoxelRevision() : 0;
+		return m_TargetWorldRevision;
+	}
+
+	void GGLabMeshPublicationBatch::MarkCommitted() noexcept
+	{
+		m_PublicationAllowed = false;
+		m_Status = GGLabMeshPublicationStatus::Committed;
+		m_CpuReplacements = {};
+		m_BaseGpuMeshes.reset();
+		m_ProspectiveGpuMeshes.reset();
+		m_Replacements.clear();
 	}
 
 	NapaVoxelInitialPublicationOwner::NapaVoxelInitialPublicationOwner(
@@ -713,14 +735,19 @@ namespace gglab
 		{
 			auto prepared = std::make_unique<NapaVoxelPreparedInitialCommit>(
 				NapaVoxelPreparedInitialCommit::ConstructionToken{});
+			auto damageSnapshot =
+				std::make_unique<napa::voxel::VoxelDamageMarkerSnapshot>();
+			damageSnapshot->m_SourceWorldVoxelRevision =
+				publication->GetTargetWorldRevision();
+			prepared->m_GpuMeshes = publication->m_GpuMeshes;
+			prepared->m_DamageSnapshot = std::move(damageSnapshot);
+			prepared->m_Owner = publication;
 			if (napa::voxel::PrepareCpuMeshBatchPublication(
 				publication->m_PendingCoreMeshes, m_VisibleCoreMeshes,
 				prepared->m_CorePublication).Failed())
 			{
 				return false;
 			}
-			prepared->m_GpuMeshes = publication->m_GpuMeshes;
-			prepared->m_Owner = publication;
 			preparedCommit = std::move(prepared);
 			return true;
 		}
@@ -734,10 +761,12 @@ namespace gglab
 		std::unique_ptr<NapaVoxelPreparedInitialCommit>& preparedCommit) noexcept
 	{
 		GGLAB_ASSERT_MSG(preparedCommit && preparedCommit->m_CorePublication &&
-			preparedCommit->m_GpuMeshes && preparedCommit->m_Owner,
+			preparedCommit->m_GpuMeshes && preparedCommit->m_DamageSnapshot &&
+			preparedCommit->m_Owner,
 			"Initial Napa voxel commit requires a prepared CPU/GPU token.");
 		if (!preparedCommit || !preparedCommit->m_CorePublication ||
-			!preparedCommit->m_GpuMeshes || !preparedCommit->m_Owner)
+			!preparedCommit->m_GpuMeshes || !preparedCommit->m_DamageSnapshot ||
+			!preparedCommit->m_Owner)
 		{
 			return;
 		}
@@ -752,11 +781,207 @@ namespace gglab
 			"Initial Napa voxel Core and GPU publications must share one revision.");
 
 		m_VisibleGpuMeshes = std::move(committed->m_GpuMeshes);
+		m_VisibleDamageSnapshot = std::move(committed->m_DamageSnapshot);
 		committed->m_Owner->MarkCommitted();
+	}
+
+	bool NapaVoxelRenderState::IsNextIdentity(
+		GGLabMeshPublicationIdentity identity) const noexcept
+	{
+		return identity.m_OperationSerial != 0 && identity.m_PublicationSerial != 0 &&
+			identity.m_OwnerGeneration != 0 &&
+			identity.m_OperationSerial > m_LastCommittedIdentity.m_OperationSerial &&
+			identity.m_PublicationSerial > m_LastCommittedIdentity.m_PublicationSerial &&
+			(m_LastCommittedIdentity.m_OwnerGeneration == 0 ||
+				identity.m_OwnerGeneration == m_LastCommittedIdentity.m_OwnerGeneration);
+	}
+
+	bool NapaVoxelRenderState::PrepareMeshCommit(
+		const std::shared_ptr<GGLabMeshPublicationBatch>& publication,
+		GGLabMeshPublicationIdentity expectedIdentity,
+		std::unique_ptr<napa::voxel::VoxelDamageMarkerSnapshot>& damageSnapshot,
+		std::unique_ptr<NapaVoxelPreparedMeshCommit>& preparedCommit) noexcept
+	{
+		if (!HasVisibleMeshes() || !m_LastSubmittedGraphicsFence.IsValid() ||
+			!publication || !publication->IsReadyForCommit() ||
+			!publication->m_PublicationAllowed || publication->m_OwnerGenerationExhausted ||
+			publication->m_Identity != expectedIdentity || !IsNextIdentity(expectedIdentity) ||
+			publication->m_BaseGpuMeshes != m_VisibleGpuMeshes ||
+			!publication->m_ProspectiveGpuMeshes || !publication->m_PendingCoreMeshes ||
+			publication->m_CompletionFence.IsValid() == false ||
+			publication->GetBaseWorldRevision() != GetVisibleWorldRevision() ||
+			publication->GetTargetWorldRevision() <= GetVisibleWorldRevision() ||
+			publication->m_ProspectiveGpuMeshes->GetVisibleWorldRevision() !=
+			publication->GetTargetWorldRevision() ||
+			publication->m_ProspectiveGpuMeshes->GetConfig() !=
+			m_VisibleCoreMeshes.GetConfig() ||
+			!damageSnapshot || damageSnapshot->m_SourceWorldVoxelRevision !=
+			publication->GetTargetWorldRevision())
+		{
+			return false;
+		}
+
+		try
+		{
+			auto prepared = std::make_unique<NapaVoxelPreparedMeshCommit>(
+				NapaVoxelPreparedMeshCommit::ConstructionToken{});
+			prepared->m_GpuMeshes = publication->m_ProspectiveGpuMeshes;
+			prepared->m_Owner = publication;
+			prepared->m_Identity = expectedIdentity;
+			prepared->m_Retirement = std::make_unique<NapaVoxelRetiredGpuMeshSet>();
+			prepared->m_Retirement->m_Meshes = m_VisibleGpuMeshes;
+			prepared->m_Retirement->m_LastUseFence = m_LastSubmittedGraphicsFence;
+			if (napa::voxel::PrepareCpuMeshBatchPublication(
+				publication->m_PendingCoreMeshes, m_VisibleCoreMeshes,
+				prepared->m_CorePublication).Failed())
+			{
+				return false;
+			}
+			prepared->m_DamageSnapshot = std::move(damageSnapshot);
+			preparedCommit = std::move(prepared);
+			return true;
+		}
+		catch (...)
+		{
+			return false;
+		}
+	}
+
+	void NapaVoxelRenderState::CommitMesh(
+		std::unique_ptr<NapaVoxelPreparedMeshCommit>& preparedCommit) noexcept
+	{
+		GGLAB_ASSERT_MSG(preparedCommit && preparedCommit->m_CorePublication &&
+			preparedCommit->m_GpuMeshes && preparedCommit->m_DamageSnapshot &&
+			preparedCommit->m_Owner && preparedCommit->m_Retirement,
+			"Napa voxel mesh commit requires one complete prepared token.");
+
+		std::unique_ptr<NapaVoxelPreparedMeshCommit> committed =
+			std::move(preparedCommit);
+		napa::voxel::CommitCpuMeshBatchPublication(
+			committed->m_CorePublication, m_VisibleCoreMeshes);
+		m_VisibleGpuMeshes = std::move(committed->m_GpuMeshes);
+		m_VisibleDamageSnapshot = std::move(committed->m_DamageSnapshot);
+		committed->m_Retirement->m_Next = std::move(m_RetiredGpuMeshes);
+		m_RetiredGpuMeshes = std::move(committed->m_Retirement);
+		m_LastCommittedIdentity = committed->m_Identity;
+		committed->m_Owner->MarkCommitted();
+	}
+
+	bool NapaVoxelRenderState::PrepareDataOnlyCommit(
+		const napa::voxel::VoxelWorld& authoritativeWorld,
+		const napa::voxel::VoxelMutationResult& mutation,
+		GGLabMeshPublicationIdentity identity,
+		std::unique_ptr<napa::voxel::VoxelDamageMarkerSnapshot>& damageSnapshot,
+		std::unique_ptr<NapaVoxelPreparedDataOnlyCommit>& preparedCommit) noexcept
+	{
+		if (!HasVisibleMeshes() || !m_LastSubmittedGraphicsFence.IsValid() ||
+			!IsNextIdentity(identity) || !damageSnapshot ||
+			damageSnapshot->m_SourceWorldVoxelRevision !=
+			mutation.m_TargetWorldVoxelRevision)
+		{
+			return false;
+		}
+
+		try
+		{
+			auto prepared = std::make_unique<NapaVoxelPreparedDataOnlyCommit>(
+				NapaVoxelPreparedDataOnlyCommit::ConstructionToken{});
+			auto prospective = std::make_shared<NapaVoxelGpuMeshSet>();
+			prospective->m_Config = m_VisibleGpuMeshes->m_Config;
+			prospective->m_VisibleWorldRevision = mutation.m_TargetWorldVoxelRevision;
+			prospective->m_Chunks = m_VisibleGpuMeshes->m_Chunks;
+			prepared->m_GpuMeshes = std::move(prospective);
+			prepared->m_Identity = identity;
+			prepared->m_Retirement = std::make_unique<NapaVoxelRetiredGpuMeshSet>();
+			prepared->m_Retirement->m_Meshes = m_VisibleGpuMeshes;
+			prepared->m_Retirement->m_LastUseFence = m_LastSubmittedGraphicsFence;
+			if (napa::voxel::PrepareDataOnlyPublication(
+				authoritativeWorld, mutation, m_VisibleCoreMeshes,
+				prepared->m_CorePublication).Failed())
+			{
+				return false;
+			}
+			prepared->m_DamageSnapshot = std::move(damageSnapshot);
+			preparedCommit = std::move(prepared);
+			return true;
+		}
+		catch (...)
+		{
+			return false;
+		}
+	}
+
+	void NapaVoxelRenderState::CommitDataOnly(
+		std::unique_ptr<NapaVoxelPreparedDataOnlyCommit>& preparedCommit) noexcept
+	{
+		GGLAB_ASSERT_MSG(preparedCommit && preparedCommit->m_CorePublication &&
+			preparedCommit->m_GpuMeshes && preparedCommit->m_DamageSnapshot &&
+			preparedCommit->m_Retirement,
+			"Napa voxel data-only commit requires one complete prepared token.");
+
+		std::unique_ptr<NapaVoxelPreparedDataOnlyCommit> committed =
+			std::move(preparedCommit);
+		napa::voxel::CommitDataOnlyPublication(
+			committed->m_CorePublication, m_VisibleCoreMeshes);
+		m_VisibleGpuMeshes = std::move(committed->m_GpuMeshes);
+		m_VisibleDamageSnapshot = std::move(committed->m_DamageSnapshot);
+		committed->m_Retirement->m_Next = std::move(m_RetiredGpuMeshes);
+		m_RetiredGpuMeshes = std::move(committed->m_Retirement);
+		m_LastCommittedIdentity = committed->m_Identity;
+	}
+
+	void NapaVoxelRenderState::OnFrameSubmitted(RHIFencePoint fencePoint) noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return;
+		}
+		if (m_LastSubmittedGraphicsFence.IsValid() &&
+			m_LastSubmittedGraphicsFence.m_Fence == fencePoint.m_Fence &&
+			fencePoint.m_Value <= m_LastSubmittedGraphicsFence.m_Value)
+		{
+			return;
+		}
+		m_LastSubmittedGraphicsFence = fencePoint;
+	}
+
+	void NapaVoxelRenderState::RetireCompletedGpuMeshes(RHIDevice* device) noexcept
+	{
+		if (!device)
+		{
+			return;
+		}
+		auto* retirement = &m_RetiredGpuMeshes;
+		while (*retirement)
+		{
+			if (device->IsFencePointCompleted((*retirement)->m_LastUseFence))
+			{
+				*retirement = std::move((*retirement)->m_Next);
+			}
+			else
+			{
+				retirement = &(*retirement)->m_Next;
+			}
+		}
+	}
+
+	size_t NapaVoxelRenderState::GetRetiredGpuMeshSetCount() const noexcept
+	{
+		size_t count = 0;
+		for (const NapaVoxelRetiredGpuMeshSet* retirement = m_RetiredGpuMeshes.get();
+			retirement; retirement = retirement->m_Next.get())
+		{
+			++count;
+		}
+		return count;
 	}
 
 	void NapaVoxelRenderState::Reset() noexcept
 	{
+		m_LastSubmittedGraphicsFence.Reset();
+		m_LastCommittedIdentity = {};
+		m_RetiredGpuMeshes.reset();
+		m_VisibleDamageSnapshot.reset();
 		m_VisibleGpuMeshes.reset();
 		m_VisibleCoreMeshes = {};
 	}
@@ -824,6 +1049,8 @@ namespace gglab
 		{
 		case GGLabMeshPublicationStatus::ReadyForCommit:
 			m_IsReady = true;
+			break;
+		case GGLabMeshPublicationStatus::Committed:
 			break;
 		case GGLabMeshPublicationStatus::Failed:
 			FailHostPreparation(false);
@@ -1001,6 +1228,17 @@ namespace gglab
 		m_RenderState.Reset();
 		m_IsReady = false;
 		m_HasFailed = false;
+	}
+
+	void NapaVoxelStaticPublicationSession::OnFrameSubmitted(
+		RHIFencePoint fencePoint) noexcept
+	{
+		m_RenderState.OnFrameSubmitted(fencePoint);
+	}
+
+	void NapaVoxelStaticPublicationSession::RetireCompletedGpuMeshes() noexcept
+	{
+		m_RenderState.RetireCompletedGpuMeshes(m_Device);
 	}
 
 	void NapaVoxelStaticPublicationSession::ScheduleUpload() noexcept

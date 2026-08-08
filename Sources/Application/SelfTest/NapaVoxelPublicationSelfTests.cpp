@@ -9,8 +9,11 @@
 #include "Graphics/TransferManager.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
+#include "NapaVoxelCore/Edit/VoxelDamage.h"
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
+#include "NapaVoxelCore/Meshing/DataOnlyPublication.h"
+#include "NapaVoxelCore/Testing/DataOnlyPublicationTestAccess.h"
 
 #include <array>
 #include <limits>
@@ -406,6 +409,120 @@ namespace gglab
 			return !replacementChunks.empty();
 		}
 
+		[[nodiscard]] bool BuildDamageOnlyPublicationInput(
+			NapaVoxelPublicationTestDevice& device, NapaVoxelRenderState& renderState,
+			std::unique_ptr<napa::voxel::VoxelWorld>& world,
+			napa::voxel::VoxelMutationResult& mutation) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config = MakePublicationConfig();
+			const PrimitiveDesc sphere{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::Sphere,
+				.m_Parameters = {
+					.m_Sphere = {
+						.m_Center = { 4.0, 4.0, 4.0 },
+						.m_Radius = 2.0,
+						},
+					},
+			};
+			PrimitiveWorldGenerationResult generation{};
+			if (GeneratePrimitiveVoxelWorld(config,
+				std::span<const PrimitiveDesc>(&sphere, 1), world, generation).Failed() ||
+				!world)
+			{
+				return false;
+			}
+
+			constexpr std::array chunks{ ChunkCoord{} };
+			CpuMeshBatch initialBatch{};
+			VisibleMeshSet emptyVisible{};
+			std::unique_ptr<PendingCpuMeshBatch> initialPending;
+			std::shared_ptr<NapaVoxelInitialPublicationOwner> initialPublication;
+			if (BuildCpuMeshBatch(*world, world->GetWorldVoxelRevision(), chunks,
+				initialBatch).Failed() ||
+				ValidateCpuMeshBatch(initialBatch, emptyVisible, initialPending).Failed() ||
+				!PrepareNapaVoxelInitialPublication(initialPending, 9001, 1,
+					initialPublication) ||
+				!initialPublication->PrepareGpuResources(&device) ||
+				!initialPublication->MarkQueued() ||
+				!initialPublication->BeginRecording(initialPublication->GetUploadIdentity()) ||
+				!initialPublication->SetUploadHandle({ 901 }) ||
+				!initialPublication->CompleteUpload({
+					.m_Handle = initialPublication->GetUploadHandle(),
+					.m_Identity = initialPublication->GetUploadIdentity(),
+					.m_Status = AssetUploadStatus::Succeeded,
+					.m_FencePoint = { RHIFenceHandle{ 9, 1 }, 1 },
+					}))
+			{
+				return false;
+			}
+
+			std::unique_ptr<NapaVoxelPreparedInitialCommit> initialCommit;
+			if (!renderState.PrepareInitialCommit(initialPublication, initialCommit))
+			{
+				return false;
+			}
+			renderState.CommitInitial(initialCommit);
+
+			const SphereEditRequest edit{
+				.m_Brush = {
+					.m_CenterWorld = { 4.0, 4.0, 4.0 },
+					.m_Radius = 2.0,
+					.m_Strength = 0.5,
+					},
+			};
+			return ApplySphereEdit(*world, edit, mutation).Succeeded() &&
+				mutation.GetChangeKind() == VoxelMutationChangeKind::DamageOnly;
+		}
+
+		[[nodiscard]] bool BuildCoreDataOnlyPublicationInput(
+			std::unique_ptr<napa::voxel::VoxelWorld>& world,
+			napa::voxel::VisibleMeshSet& visible,
+			napa::voxel::VoxelMutationResult& mutation) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config = MakePublicationConfig();
+			const PrimitiveDesc sphere{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::Sphere,
+				.m_Parameters = {
+					.m_Sphere = {
+						.m_Center = { 4.0, 4.0, 4.0 },
+						.m_Radius = 2.0,
+						},
+					},
+			};
+			PrimitiveWorldGenerationResult generation{};
+			constexpr std::array chunks{ ChunkCoord{} };
+			CpuMeshBatch initialBatch{};
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			std::unique_ptr<PreparedCpuMeshPublication> publication;
+			if (GeneratePrimitiveVoxelWorld(config,
+				std::span<const PrimitiveDesc>(&sphere, 1), world, generation).Failed() ||
+				!world || BuildCpuMeshBatch(*world, 1, chunks, initialBatch).Failed() ||
+				ValidateCpuMeshBatch(initialBatch, visible, pending).Failed() ||
+				PrepareCpuMeshBatchPublication(pending, visible, publication).Failed())
+			{
+				return false;
+			}
+			CommitCpuMeshBatchPublication(publication, visible);
+
+			const SphereEditRequest edit{
+				.m_Brush = {
+					.m_CenterWorld = { 4.0, 4.0, 4.0 },
+					.m_Radius = 2.0,
+					.m_Strength = 0.5,
+					},
+			};
+			return ApplySphereEdit(*world, edit, mutation).Succeeded() &&
+				mutation.GetChangeKind() == VoxelMutationChangeKind::DamageOnly;
+		}
+
 		[[nodiscard]] AssetUploadCompletionInfo MakeCompletion(
 			const NapaVoxelInitialPublicationOwner& publication, AssetUploadStatus status,
 			RHIFencePoint fence = { RHIFenceHandle{ 1, 1 }, 7 }) noexcept
@@ -640,7 +757,7 @@ namespace gglab
 					.m_OperationSerial = 11,
 					.m_PublicationSerial = 1,
 					.m_OwnerGeneration = 3,
-					}, 8001, publication) && publication &&
+				}, 8001, publication) && publication &&
 				publication->PrepareGpuResources(&device);
 
 			bool exactReplacementSet = prepared && !pending &&
@@ -695,7 +812,7 @@ namespace gglab
 						.m_OperationSerial = 12,
 						.m_PublicationSerial = 2,
 						.m_OwnerGeneration = std::numeric_limits<uint64_t>::max(),
-						}, 8002, exhausted);
+					}, 8002, exhausted);
 			const AssetStreamingIdentity exhaustedIdentity = exhaustedPrepared
 				? exhausted->GetUploadIdentity()
 				: AssetStreamingIdentity{};
@@ -971,6 +1088,275 @@ namespace gglab
 				scheduler.Finalize();
 			}
 		}
+
+		void RunDataOnlyPublicationContractTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			std::unique_ptr<VoxelWorld> world;
+			VisibleMeshSet visible{};
+			VoxelMutationResult mutation{};
+			if (!BuildCoreDataOnlyPublicationInput(world, visible, mutation))
+			{
+				context.Check(false, "Data-only publication fixture builds a Damage-only mutation");
+				return;
+			}
+
+			const auto chunksBefore = visible.GetChunks();
+			const ChunkMeshRecord* chunkStorageBefore = chunksBefore.data();
+			const WorldMeshValidationResult validationBefore = visible.GetWorldMeshValidation();
+			const BoundaryContourValidationResult boundaryBefore =
+				visible.GetBoundaryValidation();
+
+			std::unique_ptr<PendingDataOnlyPublication> pending;
+			const ValidationResult prepared = PrepareDataOnlyPublication(
+				*world, mutation, visible, pending);
+			PendingDataOnlyPublication* preservedPending = pending.get();
+			VoxelMutationResult invalidSurface = mutation;
+			const std::uint8_t originalDensity =
+				invalidSurface.m_SampleChanges.front().m_After.m_Density;
+			invalidSurface.m_SampleChanges.front().m_After.m_Density =
+				originalDensity == std::numeric_limits<std::uint8_t>::max()
+				? static_cast<std::uint8_t>(originalDensity - 1)
+				: static_cast<std::uint8_t>(originalDensity + 1);
+			const ValidationResult surfaceRejected = PrepareDataOnlyPublication(
+				*world, invalidSurface, visible, pending);
+			VoxelMutationResult invalidDirty = mutation;
+			invalidDirty.m_DataDirtyChunks.clear();
+			const ValidationResult dirtyRejected = PrepareDataOnlyPublication(
+				*world, invalidDirty, visible, pending);
+			VoxelMutationResult invalidBase = mutation;
+			invalidBase.m_BaseWorldVoxelRevision =
+				invalidBase.m_TargetWorldVoxelRevision;
+			const ValidationResult baseRejected = PrepareDataOnlyPublication(
+				*world, invalidBase, visible, pending);
+			VoxelMutationResult invalidTarget = mutation;
+			++invalidTarget.m_TargetWorldVoxelRevision;
+			const ValidationResult targetRejected = PrepareDataOnlyPublication(
+				*world, invalidTarget, visible, pending);
+			VoxelMutationResult invalidAfter = mutation;
+			invalidAfter.m_SampleChanges.front().m_After.m_Damage =
+				static_cast<std::uint8_t>(
+					invalidAfter.m_SampleChanges.front().m_After.m_Damage - 1);
+			const ValidationResult afterRejected = PrepareDataOnlyPublication(
+				*world, invalidAfter, visible, pending);
+			VoxelMutationResult invalidMeshDirty = mutation;
+			invalidMeshDirty.m_MeshDirtyChunks.push_back({});
+			const ValidationResult meshDirtyRejected = PrepareDataOnlyPublication(
+				*world, invalidMeshDirty, visible, pending);
+			VoxelMutationResult emptyMutation{
+				.m_BaseWorldVoxelRevision = mutation.m_BaseWorldVoxelRevision,
+				.m_TargetWorldVoxelRevision = mutation.m_TargetWorldVoxelRevision,
+			};
+			const ValidationResult emptyRejected = PrepareDataOnlyPublication(
+				*world, emptyMutation, visible, pending);
+			context.Check(prepared.Succeeded() && pending && preservedPending == pending.get() &&
+				surfaceRejected.m_Error == ValidationError::InvalidDataOnlyPublication &&
+				dirtyRejected.m_Error == ValidationError::MismatchedDataOnlyPublication &&
+				baseRejected.m_Error == ValidationError::StaleDataOnlyPublication &&
+				targetRejected.m_Error == ValidationError::MismatchedDataOnlyPublication &&
+				afterRejected.m_Error == ValidationError::MismatchedDataOnlyPublication &&
+				meshDirtyRejected.m_Error == ValidationError::MismatchedDataOnlyPublication &&
+				emptyRejected.m_Error == ValidationError::InvalidDataOnlyPublication,
+				"Data-only preparation rejects Surface, Dirty, Base, Target, and "
+				"authoritative-sample mismatches without replacing a valid token");
+
+			CommitDataOnlyPublication(pending, visible);
+			context.Check(!pending && visible.GetVisibleWorldRevision() ==
+				mutation.m_TargetWorldVoxelRevision &&
+				visible.GetChunks().data() == chunkStorageBefore &&
+				visible.GetChunks().size() == chunksBefore.size() &&
+				visible.GetWorldMeshValidation() == validationBefore &&
+				visible.GetBoundaryValidation() == boundaryBefore,
+				"Data-only commit advances only the visible revision and preserves immutable mesh evidence");
+
+			std::unique_ptr<VoxelWorld> maximumWorld;
+			VisibleMeshSet maximumVisible{};
+			VoxelMutationResult maximumMutation{};
+			const bool maximumFixture = BuildCoreDataOnlyPublicationInput(
+				maximumWorld, maximumVisible, maximumMutation);
+			maximumMutation.m_TargetWorldVoxelRevision =
+				std::numeric_limits<std::uint64_t>::max();
+			std::unique_ptr<PendingDataOnlyPublication> maximumPending;
+			const ValidationResult maximumPrepared = maximumFixture
+				? testing::DataOnlyPublicationTestAccess::PrepareWithAuthoritativeRevision(
+					*maximumWorld, maximumMutation, maximumVisible,
+					std::numeric_limits<std::uint64_t>::max(), maximumPending)
+				: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
+			if (maximumPrepared.Succeeded())
+			{
+				CommitDataOnlyPublication(maximumPending, maximumVisible);
+			}
+			context.Check(maximumPrepared.Succeeded() && !maximumPending &&
+				maximumVisible.GetVisibleWorldRevision() ==
+				std::numeric_limits<std::uint64_t>::max(),
+				"Data-only publication accepts a maximum Target revision without requiring another increment");
+
+			std::unique_ptr<VoxelWorld> allocationWorld;
+			VisibleMeshSet allocationVisible{};
+			VoxelMutationResult allocationMutation{};
+			const bool allocationFixture = BuildCoreDataOnlyPublicationInput(
+				allocationWorld, allocationVisible, allocationMutation);
+			std::unique_ptr<PendingDataOnlyPublication> allocationPending;
+			const ValidationResult allocationFailure = allocationFixture
+				? testing::DataOnlyPublicationTestAccess::PrepareWithAllocationFailure(
+					*allocationWorld, allocationMutation, allocationVisible,
+					allocationPending)
+				: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
+			context.Check(allocationFailure.m_Error ==
+				ValidationError::DataOnlyPublicationAllocationFailure && !allocationPending &&
+				allocationVisible.GetVisibleWorldRevision() ==
+				allocationMutation.m_BaseWorldVoxelRevision,
+				"Data-only token allocation failure preserves the complete visible state and output");
+		}
+
+		void RunAtomicDataOnlyPublicationTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			NapaVoxelPublicationTestDevice device;
+			NapaVoxelRenderState renderState{};
+			std::unique_ptr<VoxelWorld> world;
+			VoxelMutationResult mutation{};
+			if (!BuildDamageOnlyPublicationInput(device, renderState, world, mutation))
+			{
+				context.Check(false, "Atomic data-only publication fixture initializes Visible state");
+				return;
+			}
+
+			const auto oldFrameView = renderState.CaptureFrameView();
+			std::vector<std::shared_ptr<const NapaVoxelGpuChunkMesh>> oldChunks =
+				oldFrameView->GetChunks();
+			auto damageSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
+			const bool snapshotBuilt = BuildVoxelDamageMarkerSnapshot(
+				*world, mutation.m_TargetWorldVoxelRevision, *damageSnapshot).Succeeded();
+			renderState.OnFrameSubmitted({ RHIFenceHandle{ 10, 1 }, 5 });
+			std::unique_ptr<NapaVoxelPreparedDataOnlyCommit> preparedCommit;
+			const uint32_t createdBeforePrepare = device.GetCreatedBufferCount();
+			const bool prepared = snapshotBuilt && renderState.PrepareDataOnlyCommit(
+				*world, mutation, { 1, 1, 1 }, damageSnapshot, preparedCommit);
+			const uint32_t createdBeforeCommit = device.GetCreatedBufferCount();
+			if (prepared)
+			{
+				renderState.CommitDataOnly(preparedCommit);
+			}
+
+			bool reusedEveryBuffer = renderState.GetVisibleGpuMeshes() &&
+				renderState.GetVisibleGpuMeshes()->GetChunks().size() == oldChunks.size();
+			if (reusedEveryBuffer)
+			{
+				for (size_t index = 0; index < oldChunks.size(); ++index)
+				{
+					reusedEveryBuffer &=
+						renderState.GetVisibleGpuMeshes()->GetChunks()[index] == oldChunks[index];
+				}
+			}
+			const VoxelDamageMarkerSnapshot* visibleDamage =
+				renderState.GetVisibleDamageSnapshot();
+			context.Check(prepared && !preparedCommit && !damageSnapshot &&
+				renderState.GetVisibleWorldRevision() == mutation.m_TargetWorldVoxelRevision &&
+				renderState.GetVisibleGpuMeshes()->GetVisibleWorldRevision() ==
+				mutation.m_TargetWorldVoxelRevision && visibleDamage &&
+				visibleDamage->m_SourceWorldVoxelRevision == mutation.m_TargetWorldVoxelRevision &&
+				reusedEveryBuffer && createdBeforePrepare == createdBeforeCommit &&
+				createdBeforeCommit == device.GetCreatedBufferCount() &&
+				oldFrameView->GetVisibleWorldRevision() == mutation.m_BaseWorldVoxelRevision &&
+				renderState.GetRetiredGpuMeshSetCount() == 1,
+				"One no-fail owner commit publishes Damage-only Core, GPU, and debug revisions "
+				"while preserving buffers and the old frame view");
+
+			auto staleSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
+			GGLAB_UNUSED(BuildVoxelDamageMarkerSnapshot(
+				*world, mutation.m_TargetWorldVoxelRevision, *staleSnapshot));
+			std::unique_ptr<NapaVoxelPreparedDataOnlyCommit> staleCommit;
+			const bool staleRejected = !renderState.PrepareDataOnlyCommit(
+				*world, mutation, { 2, 2, 1 }, staleSnapshot, staleCommit);
+			const bool ownerRejected = !renderState.PrepareDataOnlyCommit(
+				*world, mutation, { 2, 2, 2 }, staleSnapshot, staleCommit);
+			context.Check(staleRejected && ownerRejected && staleSnapshot && !staleCommit &&
+				renderState.GetLastCommittedIdentity() ==
+				GGLabMeshPublicationIdentity{ 1, 1, 1 },
+				"Same-revision and mismatched-owner data-only work cannot overwrite newer Visible state");
+
+			renderState.RetireCompletedGpuMeshes(&device);
+			const bool retainedBeforeFence = renderState.GetRetiredGpuMeshSetCount() == 1;
+			device.CompleteFence();
+			renderState.RetireCompletedGpuMeshes(&device);
+			context.Check(retainedBeforeFence && renderState.GetRetiredGpuMeshSetCount() == 0 &&
+				oldFrameView->GetVisibleWorldRevision() == mutation.m_BaseWorldVoxelRevision,
+				"Old GPU draw sets retire only after their Graphics Fence while captured frame views remain immutable");
+		}
+
+		void RunAtomicMeshPublicationTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			NapaVoxelPublicationTestDevice device;
+			NapaVoxelRenderState renderState{};
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			std::vector<ChunkCoord> replacementChunks;
+			if (!BuildReplacementPublicationInput(
+				device, 0.1, renderState, pending, replacementChunks))
+			{
+				context.Check(false, "Atomic mesh publication fixture initializes Visible state");
+				return;
+			}
+
+			const GGLabMeshPublicationIdentity identity{ 3, 4, 1 };
+			std::shared_ptr<GGLabMeshPublicationBatch> publication;
+			const bool uploaded = PrepareGGLabMeshPublicationBatch(
+				pending, renderState.GetVisibleGpuMeshes(), identity, 9101, publication) &&
+				publication->PrepareGpuResources(&device) && publication->MarkQueued() &&
+				publication->BeginRecording(publication->GetUploadIdentity()) &&
+				publication->SetUploadHandle({ 911 }) && publication->CompleteUpload({
+					.m_Handle = publication->GetUploadHandle(),
+					.m_Identity = publication->GetUploadIdentity(),
+					.m_Status = AssetUploadStatus::Succeeded,
+					.m_FencePoint = { RHIFenceHandle{ 9, 1 }, 2 },
+					});
+			const auto oldFrameView = renderState.CaptureFrameView();
+			const auto prospective = publication
+				? publication->GetProspectiveGpuMeshes()
+				: nullptr;
+			auto damageSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
+			damageSnapshot->m_SourceWorldVoxelRevision = publication
+				? publication->GetTargetWorldRevision()
+				: 0;
+			renderState.OnFrameSubmitted({ RHIFenceHandle{ 10, 1 }, 6 });
+			std::unique_ptr<NapaVoxelPreparedMeshCommit> preparedCommit;
+			const uint32_t createdBeforeCommit = device.GetCreatedBufferCount();
+			const bool prepared = uploaded && renderState.PrepareMeshCommit(
+				publication, identity, damageSnapshot, preparedCommit);
+			if (prepared)
+			{
+				renderState.CommitMesh(preparedCommit);
+			}
+			const VoxelDamageMarkerSnapshot* visibleDamage =
+				renderState.GetVisibleDamageSnapshot();
+			context.Check(prepared && !preparedCommit && !damageSnapshot &&
+				publication->GetStatus() == GGLabMeshPublicationStatus::Committed &&
+				renderState.GetVisibleGpuMeshes() == prospective &&
+				renderState.GetVisibleWorldRevision() == publication->GetTargetWorldRevision() &&
+				prospective && prospective->GetVisibleWorldRevision() ==
+				renderState.GetVisibleWorldRevision() && visibleDamage &&
+				visibleDamage->m_SourceWorldVoxelRevision ==
+				renderState.GetVisibleWorldRevision() &&
+				renderState.GetLastCommittedIdentity() == identity &&
+				device.GetCreatedBufferCount() == createdBeforeCommit &&
+				oldFrameView->GetVisibleWorldRevision() == 1 &&
+				renderState.GetRetiredGpuMeshSetCount() == 1,
+				"One proof-carrying mesh token atomically publishes its exact Core, GPU, and "
+				"debug batch without mixed chunks");
+
+			auto repeatedSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
+			repeatedSnapshot->m_SourceWorldVoxelRevision = publication->GetTargetWorldRevision();
+			std::unique_ptr<NapaVoxelPreparedMeshCommit> repeatedCommit;
+			context.Check(!renderState.PrepareMeshCommit(
+				publication, identity, repeatedSnapshot, repeatedCommit) &&
+				repeatedSnapshot && !repeatedCommit &&
+				renderState.GetVisibleGpuMeshes() == prospective,
+				"A committed same-revision mesh publication cannot be prepared or applied twice");
+		}
 	}
 
 	void RunNapaVoxelPublicationSelfTests(SelfTestContext& context) noexcept
@@ -985,5 +1371,8 @@ namespace gglab
 		RunEmptyReplacementUploadTest(context);
 		RunReplacementUploadFailureTests(context);
 		RunReplacementUploadCancellationTests(context);
+		RunDataOnlyPublicationContractTests(context);
+		RunAtomicDataOnlyPublicationTests(context);
+		RunAtomicMeshPublicationTests(context);
 	}
 }

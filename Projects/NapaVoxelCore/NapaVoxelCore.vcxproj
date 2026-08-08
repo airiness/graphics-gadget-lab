@@ -91,6 +91,7 @@
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.cpp" />
@@ -115,11 +116,13 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\DataOnlyPublicationTestAccess.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelRestoreTestAccess.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />

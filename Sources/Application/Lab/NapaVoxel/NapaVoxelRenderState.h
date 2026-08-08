@@ -5,7 +5,9 @@
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIResource.h"
 
+#include "NapaVoxelCore/Edit/VoxelDamage.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
+#include "NapaVoxelCore/Meshing/DataOnlyPublication.h"
 
 #include <cstdint>
 #include <memory>
@@ -16,6 +18,8 @@ namespace gglab
 	class NapaVoxelCommandQueue;
 	class NapaVoxelInitialPublicationOwner;
 	class NapaVoxelPreparedInitialCommit;
+	class NapaVoxelPreparedMeshCommit;
+	class NapaVoxelPreparedDataOnlyCommit;
 	class GGLabMeshPublicationBatch;
 
 	[[nodiscard]] bool PrepareNapaVoxelInitialPublication(
@@ -102,6 +106,7 @@ namespace gglab
 		Recording,
 		AwaitingFence,
 		ReadyForCommit,
+		Committed,
 		Failed,
 		Cancelled,
 	};
@@ -205,6 +210,8 @@ namespace gglab
 			const std::shared_ptr<const NapaVoxelGpuMeshSet>& visibleGpuMeshes,
 			GGLabMeshPublicationIdentity identity, uint64_t schedulerStableId,
 			std::shared_ptr<GGLabMeshPublicationBatch>& publication) noexcept;
+		friend class NapaVoxelRenderState;
+		void MarkCommitted() noexcept;
 
 		std::unique_ptr<napa::voxel::PendingCpuMeshBatch> m_PendingCoreMeshes;
 		NapaVoxelCpuMeshSet m_CpuReplacements;
@@ -212,6 +219,8 @@ namespace gglab
 		std::shared_ptr<NapaVoxelGpuMeshSet> m_ProspectiveGpuMeshes;
 		std::vector<NapaVoxelGpuChunkReplacement> m_Replacements;
 		GGLabMeshPublicationIdentity m_Identity{};
+		uint64_t m_BaseWorldRevision = 0;
+		uint64_t m_TargetWorldRevision = 0;
 		AssetStreamingIdentity m_UploadIdentity{};
 		AssetStreamingWorkEstimate m_UploadEstimate{};
 		AssetUploadHandle m_UploadHandle{};
@@ -367,7 +376,58 @@ namespace gglab
 
 		std::unique_ptr<napa::voxel::PreparedCpuMeshPublication> m_CorePublication;
 		std::shared_ptr<const NapaVoxelGpuMeshSet> m_GpuMeshes;
+		std::unique_ptr<const napa::voxel::VoxelDamageMarkerSnapshot> m_DamageSnapshot;
 		std::shared_ptr<NapaVoxelInitialPublicationOwner> m_Owner;
+	};
+
+	struct NapaVoxelRetiredGpuMeshSet
+	{
+		std::shared_ptr<const NapaVoxelGpuMeshSet> m_Meshes;
+		RHIFencePoint m_LastUseFence{};
+		std::unique_ptr<NapaVoxelRetiredGpuMeshSet> m_Next;
+	};
+
+	class NapaVoxelPreparedMeshCommit final
+	{
+	private:
+		struct ConstructionToken
+		{
+		};
+
+	public:
+		explicit NapaVoxelPreparedMeshCommit(ConstructionToken) noexcept {}
+		GGLAB_DELETE_COPYABLE_MOVABLE(NapaVoxelPreparedMeshCommit);
+
+	private:
+		friend class NapaVoxelRenderState;
+
+		std::unique_ptr<napa::voxel::PreparedCpuMeshPublication> m_CorePublication;
+		std::shared_ptr<const NapaVoxelGpuMeshSet> m_GpuMeshes;
+		std::unique_ptr<const napa::voxel::VoxelDamageMarkerSnapshot> m_DamageSnapshot;
+		std::shared_ptr<GGLabMeshPublicationBatch> m_Owner;
+		std::unique_ptr<NapaVoxelRetiredGpuMeshSet> m_Retirement;
+		GGLabMeshPublicationIdentity m_Identity{};
+	};
+
+	class NapaVoxelPreparedDataOnlyCommit final
+	{
+	private:
+		struct ConstructionToken
+		{
+		};
+
+	public:
+		explicit NapaVoxelPreparedDataOnlyCommit(ConstructionToken) noexcept {}
+		GGLAB_DELETE_COPYABLE_MOVABLE(NapaVoxelPreparedDataOnlyCommit);
+
+	private:
+		friend class NapaVoxelRenderState;
+
+		std::unique_ptr<napa::voxel::PendingDataOnlyPublication> m_CorePublication;
+		std::shared_ptr<const NapaVoxelGpuMeshSet> m_GpuMeshes;
+		std::unique_ptr<const napa::voxel::VoxelDamageMarkerSnapshot> m_DamageSnapshot;
+		std::unique_ptr<NapaVoxelRetiredGpuMeshSet> m_Retirement;
+		GGLabMeshPublicationIdentity m_Identity{};
 	};
 
 	class NapaVoxelRenderState final
@@ -378,11 +438,28 @@ namespace gglab
 			std::unique_ptr<NapaVoxelPreparedInitialCommit>& preparedCommit) noexcept;
 		void CommitInitial(
 			std::unique_ptr<NapaVoxelPreparedInitialCommit>& preparedCommit) noexcept;
+		[[nodiscard]] bool PrepareMeshCommit(
+			const std::shared_ptr<GGLabMeshPublicationBatch>& publication,
+			GGLabMeshPublicationIdentity expectedIdentity,
+			std::unique_ptr<napa::voxel::VoxelDamageMarkerSnapshot>& damageSnapshot,
+			std::unique_ptr<NapaVoxelPreparedMeshCommit>& preparedCommit) noexcept;
+		void CommitMesh(
+			std::unique_ptr<NapaVoxelPreparedMeshCommit>& preparedCommit) noexcept;
+		[[nodiscard]] bool PrepareDataOnlyCommit(const napa::voxel::VoxelWorld& authoritativeWorld,
+			const napa::voxel::VoxelMutationResult& mutation,
+			GGLabMeshPublicationIdentity identity,
+			std::unique_ptr<napa::voxel::VoxelDamageMarkerSnapshot>& damageSnapshot,
+			std::unique_ptr<NapaVoxelPreparedDataOnlyCommit>& preparedCommit) noexcept;
+		void CommitDataOnly(
+			std::unique_ptr<NapaVoxelPreparedDataOnlyCommit>& preparedCommit) noexcept;
+		void OnFrameSubmitted(RHIFencePoint fencePoint) noexcept;
+		void RetireCompletedGpuMeshes(RHIDevice* device) noexcept;
 		void Reset() noexcept;
 
 		[[nodiscard]] bool HasVisibleMeshes() const noexcept
 		{
-			return m_VisibleCoreMeshes.HasPublishedMeshes() && m_VisibleGpuMeshes != nullptr;
+			return m_VisibleCoreMeshes.HasPublishedMeshes() && m_VisibleGpuMeshes != nullptr &&
+				m_VisibleDamageSnapshot != nullptr;
 		}
 		[[nodiscard]] uint64_t GetVisibleWorldRevision() const noexcept
 		{
@@ -397,10 +474,32 @@ namespace gglab
 		{
 			return m_VisibleGpuMeshes;
 		}
+		[[nodiscard]] const napa::voxel::VoxelDamageMarkerSnapshot*
+			GetVisibleDamageSnapshot() const noexcept
+		{
+			return m_VisibleDamageSnapshot.get();
+		}
+		[[nodiscard]] std::shared_ptr<const NapaVoxelGpuMeshSet> CaptureFrameView() const noexcept
+		{
+			return m_VisibleGpuMeshes;
+		}
+		[[nodiscard]] size_t GetRetiredGpuMeshSetCount() const noexcept;
+		[[nodiscard]] const GGLabMeshPublicationIdentity&
+			GetLastCommittedIdentity() const noexcept
+		{
+			return m_LastCommittedIdentity;
+		}
 
 	private:
+		[[nodiscard]] bool IsNextIdentity(
+			GGLabMeshPublicationIdentity identity) const noexcept;
+
 		napa::voxel::VisibleMeshSet m_VisibleCoreMeshes;
 		std::shared_ptr<const NapaVoxelGpuMeshSet> m_VisibleGpuMeshes;
+		std::unique_ptr<const napa::voxel::VoxelDamageMarkerSnapshot> m_VisibleDamageSnapshot;
+		std::unique_ptr<NapaVoxelRetiredGpuMeshSet> m_RetiredGpuMeshes;
+		GGLabMeshPublicationIdentity m_LastCommittedIdentity{};
+		RHIFencePoint m_LastSubmittedGraphicsFence{};
 	};
 
 	class NapaVoxelStaticPublicationSession final
@@ -416,6 +515,8 @@ namespace gglab
 			uint64_t stableId, uint64_t ownerGeneration) noexcept;
 		void TickPrepare() noexcept;
 		void CancelPrepare() noexcept;
+		void OnFrameSubmitted(RHIFencePoint fencePoint) noexcept;
+		void RetireCompletedGpuMeshes() noexcept;
 
 		[[nodiscard]] bool IsReady() const noexcept { return m_IsReady; }
 		[[nodiscard]] bool HasFailed() const noexcept { return m_HasFailed; }

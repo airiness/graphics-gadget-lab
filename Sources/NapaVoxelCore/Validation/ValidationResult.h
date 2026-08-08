@@ -82,6 +82,10 @@ namespace napa::voxel
 		VoxelMutationAllocationFailure = 73,
 		InvalidVoxelSampleChange = 74,
 		MismatchedDamageMarkerSourceRevision = 75,
+		InvalidDataOnlyPublication = 76,
+		StaleDataOnlyPublication = 77,
+		MismatchedDataOnlyPublication = 78,
+		DataOnlyPublicationAllocationFailure = 79,
 	};
 
 	struct ValidationResult

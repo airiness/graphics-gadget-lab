@@ -75,6 +75,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.h">
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.h">
+      <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h">
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClInclude>
@@ -88,6 +91,9 @@
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h">
+      <Filter>NapaVoxelCore\Testing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\DataOnlyPublicationTestAccess.h">
       <Filter>NapaVoxelCore\Testing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelRestoreTestAccess.h">
@@ -150,6 +156,9 @@
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.cpp">
+      <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.cpp">
       <Filter>NapaVoxelCore\Meshing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp">

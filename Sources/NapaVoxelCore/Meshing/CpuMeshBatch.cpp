@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -480,10 +481,9 @@ namespace napa::voxel
 	void CommitCpuMeshBatchPublication(
 		std::unique_ptr<PreparedCpuMeshPublication>& publication, VisibleMeshSet& visible) noexcept
 	{
-		if (!publication || !publication->m_Pending)
-		{
-			return;
-		}
+		static_assert(std::is_nothrow_move_assignable_v<VisibleMeshSet::State>);
+		static_assert(std::is_nothrow_move_assignable_v<
+			std::unique_ptr<PendingCpuMeshBatch>>);
 
 		std::unique_ptr<PendingCpuMeshBatch> pending =
 			std::move(publication->m_Pending);

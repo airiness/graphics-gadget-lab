@@ -20,6 +20,7 @@ namespace napa::voxel
 	struct VoxelMutationResult;
 	class PendingCpuMeshBatch;
 	class PreparedCpuMeshPublication;
+	class PendingDataOnlyPublication;
 	class VisibleMeshSet;
 	class CpuMeshReplacementView;
 
@@ -179,6 +180,9 @@ namespace napa::voxel
 			VisibleMeshSet& visible) noexcept;
 		friend ValidationResult ComputeVisibleWorldMeshHash(
 			const VisibleMeshSet& visible, WorldMeshValidationResult& result);
+		friend void CommitDataOnlyPublication(
+			std::unique_ptr<PendingDataOnlyPublication>& pending,
+			VisibleMeshSet& visible) noexcept;
 
 		State m_State;
 	};
