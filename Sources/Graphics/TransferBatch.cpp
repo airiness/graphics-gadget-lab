@@ -230,11 +230,15 @@ namespace gglab
 			return false;
 		}
 
-		// A nullopt range represents the whole texture and overlaps every
-		// partial range. Overlapping ranges must agree on the terminal state.
+		// Phase 1: validate the candidate against the complete existing manifest
+		// of this texture before mutating anything. An exact-range update must
+		// also stay consistent with every other overlapping publication, so the
+		// manifest can never end up with two terminal states for one subresource.
 		const RHISubresourceRange effectiveRange = subresources.value_or(RHISubresourceRange{});
-		for (auto& publication : m_Publications)
+		std::optional<size_t> exactEntryIndex;
+		for (size_t index = 0; index < m_Publications.size(); ++index)
 		{
+			const auto& publication = m_Publications[index];
 			if (publication.m_Type != RHIResourceType::Texture ||
 				publication.m_Texture != texture)
 			{
@@ -244,27 +248,33 @@ namespace gglab
 				publication.m_Subresources.value_or(RHISubresourceRange{});
 			if (existingRange == effectiveRange)
 			{
-				publication.m_PublishedState = publishedState;
-				return true;
+				exactEntryIndex = index;
+				continue;
 			}
-			if (RangesOverlap(existingRange, effectiveRange))
+			if (RangesOverlap(existingRange, effectiveRange) &&
+				publication.m_PublishedState != publishedState)
 			{
-				if (publication.m_PublishedState == publishedState)
-				{
-					continue;
-				}
 				LogTransferBatchError(
-					"TransferBatch rejected overlapping texture publications with conflicting terminal states.");
+					"TransferBatch rejected texture publications whose overlapping ranges would end with conflicting terminal states.");
 				Fail();
 				return false;
 			}
 		}
-		m_Publications.push_back({
-			.m_Type = RHIResourceType::Texture,
-			.m_Texture = texture,
-			.m_Subresources = subresources,
-			.m_PublishedState = publishedState,
-			});
+
+		// Phase 2: mutate only after the candidate passed the complete check.
+		if (exactEntryIndex)
+		{
+			m_Publications[*exactEntryIndex].m_PublishedState = publishedState;
+		}
+		else
+		{
+			m_Publications.push_back({
+				.m_Type = RHIResourceType::Texture,
+				.m_Texture = texture,
+				.m_Subresources = subresources,
+				.m_PublishedState = publishedState,
+				});
+		}
 		return true;
 	}
 

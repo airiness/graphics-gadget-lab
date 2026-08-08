@@ -3721,6 +3721,117 @@ namespace gglab
 				context.Check(remainingConflictRejected && remainingBatch.IsFailed(),
 					"Remaining-count ranges overlap explicit partial ranges");
 			}
+
+			// --- Exact-range updates must stay consistent with overlapping
+			// publications (validate-first, mutate-second) ---
+			const RHIResourceState copySourceState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopySource,
+				.m_Layout = RHILayout::CopySource,
+			};
+			const RHISubresourceRange colorMips3{
+				.m_MipCount = 3,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			{
+				// A narrow exact-range update must be rejected when a broader
+				// overlapping publication keeps a different terminal state.
+				RecordingTransferContext narrowUpdateContext;
+				TransferBatch narrowUpdateBatch(narrowUpdateContext);
+				GGLAB_UNUSED(
+					narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				const bool narrowUpdateRejected =
+					!narrowUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(narrowUpdateRejected && narrowUpdateBatch.IsFailed(),
+					"Exact-range updates cannot contradict a broader overlapping publication");
+			}
+			{
+				// A broader exact-range update must be rejected when a narrower
+				// overlapping publication keeps a different terminal state.
+				RecordingTransferContext broadUpdateContext;
+				TransferBatch broadUpdateBatch(broadUpdateContext);
+				GGLAB_UNUSED(
+					broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				GGLAB_UNUSED(
+					broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool broadUpdateRejected =
+					!broadUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
+				context.Check(broadUpdateRejected && broadUpdateBatch.IsFailed(),
+					"Broader exact-range updates cannot contradict a narrower overlapping publication");
+			}
+			{
+				// A disjoint exact-range update must succeed without poisoning.
+				RecordingTransferContext disjointUpdateContext;
+				TransferBatch disjointUpdateBatch(disjointUpdateContext);
+				GGLAB_UNUSED(
+					disjointUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					disjointUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip1));
+				const bool disjointUpdateSucceeded =
+					disjointUpdateBatch.PublishTexture(overlapTexture, copySourceState, colorMip0);
+				context.Check(disjointUpdateSucceeded && !disjointUpdateBatch.IsFailed(),
+					"Disjoint exact-range updates succeed without poisoning the batch");
+			}
+			{
+				// An exact-range update must succeed when every overlapping
+				// publication agrees with the updated terminal state.
+				RecordingTransferContext agreeingOverlapContext;
+				TransferBatch agreeingOverlapBatch(agreeingOverlapContext);
+				GGLAB_UNUSED(
+					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				const bool agreeingOverlapAccepted =
+					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips3);
+				context.Check(agreeingOverlapAccepted && !agreeingOverlapBatch.IsFailed(),
+					"Exact-range updates succeed when all overlapping entries agree on the state");
+			}
+			{
+				// A partial exact-range update must be rejected when a
+				// whole-resource publication keeps a different terminal state.
+				RecordingTransferContext partialUpdateContext;
+				TransferBatch partialUpdateBatch(partialUpdateContext);
+				GGLAB_UNUSED(
+					partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				GGLAB_UNUSED(
+					partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool partialUpdateRejected =
+					!partialUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(partialUpdateRejected && partialUpdateBatch.IsFailed(),
+					"Partial exact-range updates cannot contradict a whole-resource publication");
+			}
+			{
+				// A whole-resource exact-range update must be rejected when a
+				// partial publication keeps a different terminal state.
+				RecordingTransferContext wholeUpdateContext;
+				TransferBatch wholeUpdateBatch(wholeUpdateContext);
+				GGLAB_UNUSED(
+					wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				const bool wholeUpdateRejected =
+					!wholeUpdateBatch.PublishTexture(overlapTexture, copyDestState, std::nullopt);
+				context.Check(wholeUpdateRejected && wholeUpdateBatch.IsFailed(),
+					"Whole-resource exact-range updates cannot contradict a partial publication");
+			}
+			{
+				// A Remaining-count exact-range update must be rejected when a
+				// narrower overlapping publication keeps a different terminal state.
+				RecordingTransferContext remainingUpdateContext;
+				TransferBatch remainingUpdateBatch(remainingUpdateContext);
+				const RHISubresourceRange remainingRange{ .m_Aspects = RHITextureAspect::Color };
+				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(
+					overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(
+					overlapTexture, shaderReadState, remainingRange));
+				const bool remainingUpdateRejected =
+					!remainingUpdateBatch.PublishTexture(
+						overlapTexture, copyDestState, remainingRange);
+				context.Check(remainingUpdateRejected && remainingUpdateBatch.IsFailed(),
+					"Remaining-count exact-range updates cannot contradict a narrower overlapping publication");
+			}
 		}
 
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept
