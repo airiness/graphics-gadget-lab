@@ -301,6 +301,33 @@ namespace gglab
 				ValidateCpuMeshBatch(batch, visible, pending).Succeeded() && pending;
 		}
 
+		[[nodiscard]] bool BuildInteractivePublicationInput(
+			std::unique_ptr<napa::voxel::VoxelWorld>& world,
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pending) noexcept
+		{
+			using namespace napa::voxel;
+			const VoxelWorldConfig config = MakePublicationConfig();
+			const PrimitiveDesc sphere{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::Sphere,
+				.m_Parameters = {
+					.m_Sphere = {
+						.m_Center = { 4.0, 4.0, 4.0 },
+						.m_Radius = 2.0,
+					},
+				},
+			};
+			PrimitiveWorldGenerationResult generation{};
+			constexpr std::array chunks{ ChunkCoord{} };
+			CpuMeshBatch batch{};
+			VisibleMeshSet visible{};
+			return GeneratePrimitiveVoxelWorld(config,
+				std::span<const PrimitiveDesc>(&sphere, 1), world, generation).Succeeded() &&
+				world && BuildCpuMeshBatch(*world, 1, chunks, batch).Succeeded() &&
+				ValidateCpuMeshBatch(batch, visible, pending).Succeeded() && pending;
+		}
+
 		[[nodiscard]] bool BuildReplacementPublicationInput(
 			NapaVoxelPublicationTestDevice& device, double strength,
 			NapaVoxelRenderState& renderState,
@@ -711,7 +738,8 @@ namespace gglab
 				});
 
 			std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pending;
-			NapaVoxelStaticPublicationSession session(&device, &scheduler);
+			NapaVoxelCommandQueue commandQueue;
+			NapaVoxelPublicationSession session(&device, &scheduler, &commandQueue);
 			const bool began = BuildPublicationPending(true, pending) &&
 				session.BeginPrepare(pending, 3001, 1);
 			scheduler.DrainReadyWork();
@@ -738,6 +766,100 @@ namespace gglab
 				device.GetDestroyedBufferCount() == device.GetCreatedBufferCount() &&
 				!session.IsReady() && !session.HasVisibleMeshes() && !session.GetFrameView(),
 				"Post-cancel Copy Fence completion retires buffers without publication or a dangling frame view");
+			scheduler.Finalize();
+		}
+
+		void RunInteractivePublicationIntegrationTest(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
+			TransferManager transferManager(std::move(transferContext));
+			NapaVoxelPublicationTestDevice device;
+			AssetUploadScheduler scheduler({
+				.m_Device = &device,
+				.m_TransferManager = &transferManager,
+				});
+			NapaVoxelCommandQueue commandQueue;
+			NapaVoxelPublicationSession session(&device, &scheduler, &commandQueue);
+			std::unique_ptr<VoxelWorld> world;
+			std::unique_ptr<PendingCpuMeshBatch> initialPending;
+			const bool began = BuildInteractivePublicationInput(world, initialPending) &&
+				session.BeginPrepare(initialPending, 4001, 1);
+			scheduler.DrainReadyWork();
+			device.CompleteFence();
+			GGLAB_UNUSED(scheduler.Tick());
+			session.TickPrepare();
+			session.OnFrameSubmitted({ RHIFenceHandle{ 14, 1 }, 1 });
+			const auto initialGpu = session.GetFrameView();
+
+			const SphereEditRequest edit{
+				.m_Brush = {
+					.m_CenterWorld = { 3.0, 4.0, 4.0 },
+					.m_Radius = 0.5,
+					.m_Strength = 1.0,
+				},
+			};
+			VoxelMutationResult damageMutation{};
+			auto damageSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
+			const bool damaged = began && session.IsReady() && world &&
+				ApplySphereEdit(*world, edit, damageMutation).Succeeded() &&
+				damageMutation.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				BuildVoxelDamageMarkerSnapshot(*world,
+					damageMutation.m_TargetWorldVoxelRevision, *damageSnapshot).Succeeded() &&
+				session.PublishDataOnly(*world, damageMutation, 1, 1, damageSnapshot);
+			const auto damagedGpu = session.GetFrameView();
+			bool preservedBuffers = initialGpu && damagedGpu &&
+				initialGpu->GetChunks().size() == damagedGpu->GetChunks().size();
+			if (preservedBuffers)
+			{
+				for (size_t index = 0; index < initialGpu->GetChunks().size(); ++index)
+				{
+					preservedBuffers &= initialGpu->GetChunks()[index] ==
+						damagedGpu->GetChunks()[index];
+				}
+			}
+			context.Check(damaged && !damageSnapshot && preservedBuffers &&
+				session.GetVisibleWorldRevision() == damageMutation.m_TargetWorldVoxelRevision &&
+				session.GetLastPublicationSerial() == 1,
+				"Interactive damage-only flow advances CPU/GPU/debug revision without replacing geometry");
+
+			VoxelMutationResult surfaceMutation{};
+			CpuMeshBatch replacementBatch{};
+			std::unique_ptr<PendingCpuMeshBatch> replacementPending;
+			auto surfaceSnapshot = std::make_unique<VoxelDamageMarkerSnapshot>();
+			const bool surfaceApplied = damaged &&
+				ApplySphereEdit(*world, edit, surfaceMutation).Succeeded() &&
+				surfaceMutation.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged;
+			const ValidationResult buildResult = surfaceApplied
+				? BuildCpuMeshBatch(*world, surfaceMutation, replacementBatch)
+				: ValidationResult{ ValidationError::InvalidVoxelMutation };
+			const bool batchBuilt = buildResult.Succeeded();
+			const bool batchValidated = batchBuilt &&
+				ValidateCpuMeshBatch(replacementBatch, session.GetVisibleCoreMeshes(),
+					replacementPending).Succeeded() && replacementPending;
+			const bool snapshotBuilt = batchValidated && BuildVoxelDamageMarkerSnapshot(*world,
+				surfaceMutation.m_TargetWorldVoxelRevision, *surfaceSnapshot).Succeeded();
+			const bool replacementBegan = snapshotBuilt && session.BeginMeshPrepare(
+				replacementPending, 2, 1, surfaceSnapshot);
+			context.Check(surfaceApplied,
+				"Interactive second Stone hit produces a surface mutation");
+			context.Check(batchBuilt,
+				"Interactive surface mutation builds its exact replacement batch");
+			context.Check(batchValidated,
+				"Interactive surface mutation validates its exact replacement batch");
+			context.Check(snapshotBuilt,
+				"Interactive surface mutation prepares its revision-bound damage snapshot");
+			context.Check(replacementBegan,
+				"Interactive surface mutation begins one replacement publication");
+			scheduler.DrainReadyWork();
+			GGLAB_UNUSED(scheduler.Tick());
+			const bool published = replacementBegan && session.TickMeshPrepare();
+			context.Check(published && !replacementPending && !surfaceSnapshot &&
+				!session.HasActiveMeshPrepare() && !session.HasFailed() &&
+				session.GetVisibleWorldRevision() == surfaceMutation.m_TargetWorldVoxelRevision &&
+				session.GetLastPublicationSerial() == 2 &&
+				session.GetFrameView() != damagedGpu,
+				"Interactive surface flow publishes one proof-bound replacement after Copy Fence completion");
 			scheduler.Finalize();
 		}
 
@@ -1395,6 +1517,7 @@ namespace gglab
 		RunInitialPublicationCancellationTests(context);
 		RunInitialPublicationIdentityTests(context);
 		RunPublicationSessionCancellationIntegrationTest(context);
+		RunInteractivePublicationIntegrationTest(context);
 		RunReplacementBatchContractTests(context);
 		RunReplacementUploadCompletionTests(context);
 		RunEmptyReplacementUploadTest(context);

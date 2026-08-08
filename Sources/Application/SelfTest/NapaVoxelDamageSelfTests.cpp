@@ -664,7 +664,7 @@ namespace gglab
 					secondHit.m_SampleChanges.size() == 1 &&
 					secondHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ 1, 0, 0 } &&
 					secondHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { 0, 0, 0 } } &&
-					secondHit.m_MeshDirtyChunks.size() == 4 &&
+					secondHit.m_MeshDirtyChunks.size() == 8 &&
 					ApplySphereEdit(*world, markerRequest, markerHit).Succeeded() &&
 					markerHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
 					markerHit.m_BaseWorldVoxelRevision == cycleBaseRevision + 2 &&

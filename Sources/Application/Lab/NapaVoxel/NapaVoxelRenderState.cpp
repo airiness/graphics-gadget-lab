@@ -1138,18 +1138,19 @@ namespace gglab
 		}
 	}
 
-	NapaVoxelStaticPublicationSession::NapaVoxelStaticPublicationSession(
-		RHIDevice* device, AssetUploadScheduler* scheduler) noexcept :
-		m_Device(device), m_Scheduler(scheduler)
+	NapaVoxelPublicationSession::NapaVoxelPublicationSession(
+		RHIDevice* device, AssetUploadScheduler* scheduler,
+		NapaVoxelCommandQueue* commandQueue) noexcept :
+		m_Device(device), m_Scheduler(scheduler), m_CommandQueue(commandQueue)
 	{
 	}
 
-	NapaVoxelStaticPublicationSession::~NapaVoxelStaticPublicationSession()
+	NapaVoxelPublicationSession::~NapaVoxelPublicationSession()
 	{
 		CancelPrepare();
 	}
 
-	bool NapaVoxelStaticPublicationSession::BeginPrepare(
+	bool NapaVoxelPublicationSession::BeginPrepare(
 		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
 		uint64_t stableId, uint64_t ownerGeneration) noexcept
 	{
@@ -1173,7 +1174,7 @@ namespace gglab
 		return !m_HasFailed;
 	}
 
-	void NapaVoxelStaticPublicationSession::TickPrepare() noexcept
+	void NapaVoxelPublicationSession::TickPrepare() noexcept
 	{
 		if (!m_Publication || m_IsReady || m_HasFailed)
 		{
@@ -1212,8 +1213,129 @@ namespace gglab
 		}
 	}
 
-	void NapaVoxelStaticPublicationSession::CancelPrepare() noexcept
+	bool NapaVoxelPublicationSession::BeginMeshPrepare(
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+		uint64_t operationSerial, uint64_t ownerGeneration,
+		std::unique_ptr<napa::voxel::VoxelDamageMarkerSnapshot>& damageSnapshot) noexcept
 	{
+		if (!CanPublishDynamic() || m_MeshUploadSession || !pendingCoreMeshes ||
+			!damageSnapshot || damageSnapshot->m_SourceWorldVoxelRevision !=
+			pendingCoreMeshes->GetTargetWorldVoxelRevision())
+		{
+			return false;
+		}
+
+		try
+		{
+			m_MeshUploadSession = std::make_unique<NapaVoxelMeshReplacementUploadSession>(
+				m_Device, m_Scheduler, m_CommandQueue,
+				NapaVoxelPublicationSerialState{ m_LastPublicationSerial });
+		}
+		catch (...)
+		{
+			if (m_CommandQueue)
+			{
+				m_CommandQueue->Freeze(NapaVoxelCommandQueueError::HostPreparationFailed);
+			}
+			m_HasFailed = true;
+			return false;
+		}
+		if (!m_MeshUploadSession->BeginPrepare(pendingCoreMeshes,
+			m_RenderState.GetVisibleGpuMeshes(), operationSerial, ownerGeneration))
+		{
+			m_LastPublicationSerial = m_MeshUploadSession->GetLastPublicationSerial();
+			m_HasFailed = true;
+			return false;
+		}
+		m_LastPublicationSerial = m_MeshUploadSession->GetLastPublicationSerial();
+		m_PendingDamageSnapshot = std::move(damageSnapshot);
+		return true;
+	}
+
+	bool NapaVoxelPublicationSession::TickMeshPrepare() noexcept
+	{
+		if (!m_MeshUploadSession)
+		{
+			return false;
+		}
+
+		m_MeshUploadSession->TickPrepare();
+		if (m_MeshUploadSession->HasFailed())
+		{
+			m_HasFailed = true;
+			return false;
+		}
+		if (!m_MeshUploadSession->IsReady())
+		{
+			return false;
+		}
+
+		const std::shared_ptr<GGLabMeshPublicationBatch> publication =
+			m_MeshUploadSession->GetPublication();
+		std::unique_ptr<NapaVoxelPreparedMeshCommit> preparedCommit;
+		if (!publication || !m_RenderState.PrepareMeshCommit(publication,
+			publication->GetIdentity(), m_PendingDamageSnapshot, preparedCommit))
+		{
+			if (m_CommandQueue)
+			{
+				m_CommandQueue->Freeze(NapaVoxelCommandQueueError::HostPreparationFailed);
+			}
+			m_HasFailed = true;
+			return false;
+		}
+
+		m_RenderState.CommitMesh(preparedCommit);
+		m_FrameView = m_RenderState.CaptureFrameView();
+		m_MeshUploadSession.reset();
+		return true;
+	}
+
+	bool NapaVoxelPublicationSession::PublishDataOnly(
+		const napa::voxel::VoxelWorld& authoritativeWorld,
+		const napa::voxel::VoxelMutationResult& mutation, uint64_t operationSerial,
+		uint64_t ownerGeneration,
+		std::unique_ptr<napa::voxel::VoxelDamageMarkerSnapshot>& damageSnapshot) noexcept
+	{
+		if (!CanPublishDynamic() || m_MeshUploadSession ||
+			m_LastPublicationSerial == std::numeric_limits<uint64_t>::max())
+		{
+			if (m_LastPublicationSerial == std::numeric_limits<uint64_t>::max() && m_CommandQueue)
+			{
+				m_CommandQueue->Freeze(NapaVoxelCommandQueueError::PublicationSerialExhausted);
+			}
+			return false;
+		}
+
+		const GGLabMeshPublicationIdentity identity{
+			.m_OperationSerial = operationSerial,
+			.m_PublicationSerial = ++m_LastPublicationSerial,
+			.m_OwnerGeneration = ownerGeneration,
+		};
+		std::unique_ptr<NapaVoxelPreparedDataOnlyCommit> preparedCommit;
+		if (!m_RenderState.PrepareDataOnlyCommit(authoritativeWorld, mutation, identity,
+			damageSnapshot, preparedCommit))
+		{
+			if (m_CommandQueue)
+			{
+				m_CommandQueue->Freeze(NapaVoxelCommandQueueError::HostPreparationFailed);
+			}
+			m_HasFailed = true;
+			return false;
+		}
+		m_RenderState.CommitDataOnly(preparedCommit);
+		m_FrameView = m_RenderState.CaptureFrameView();
+		return true;
+	}
+
+	void NapaVoxelPublicationSession::CancelDynamicPrepare() noexcept
+	{
+		m_MeshUploadSession.reset();
+		m_PendingDamageSnapshot.reset();
+	}
+
+	void NapaVoxelPublicationSession::CancelPrepare() noexcept
+	{
+		CancelDynamicPrepare();
 		if (m_Publication)
 		{
 			const AssetStreamingIdentity identity = m_Publication->GetUploadIdentity();
@@ -1228,20 +1350,21 @@ namespace gglab
 		m_RenderState.Reset();
 		m_IsReady = false;
 		m_HasFailed = false;
+		m_LastPublicationSerial = 0;
 	}
 
-	void NapaVoxelStaticPublicationSession::OnFrameSubmitted(
+	void NapaVoxelPublicationSession::OnFrameSubmitted(
 		RHIFencePoint fencePoint) noexcept
 	{
 		m_RenderState.OnFrameSubmitted(fencePoint);
 	}
 
-	void NapaVoxelStaticPublicationSession::RetireCompletedGpuMeshes() noexcept
+	void NapaVoxelPublicationSession::RetireCompletedGpuMeshes() noexcept
 	{
 		m_RenderState.RetireCompletedGpuMeshes(m_Device);
 	}
 
-	void NapaVoxelStaticPublicationSession::ScheduleUpload() noexcept
+	void NapaVoxelPublicationSession::ScheduleUpload() noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Scheduler);
 		GGLAB_ASSERT_NOT_NULL(m_Publication.get());

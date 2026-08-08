@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderPass.h"
+#include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -60,6 +61,7 @@ namespace gglab
 		const RenderFrameContext& frameContext, const RenderServices& services)
 	{
 		const std::shared_ptr<const NapaVoxelGpuMeshSet> frameView = m_FrameView;
+		const NapaVoxelSurfaceMode surfaceMode = m_SurfaceMode;
 		if (!frameView || frameView->GetVisibleWorldRevision() == 0 ||
 			frameView->GetChunks().empty() || !frameContext.IsRenderSceneReady())
 		{
@@ -139,7 +141,7 @@ namespace gglab
 					data.m_Chunks.push_back(std::move(chunk));
 				}
 			},
-			[this, frameContextPtr, servicesPtr, displayViewId](
+			[this, frameContextPtr, servicesPtr, displayViewId, surfaceMode](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
@@ -151,8 +153,9 @@ namespace gglab
 				const RHITextureViewHandle dsv = executeContext.GetViewHandle(data.m_Dsv);
 				graphicsContext->SetRenderTargets(
 					std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				const size_t pipelineIndex = static_cast<size_t>(surfaceMode);
 				graphicsContext->SetPipeline(renderer->GetPipelineCache()->Resolve(
-					m_PipelineSlot, m_PipelineKey, GetInfo()));
+					m_PipelineSlots[pipelineIndex], m_PipelineKeys[pipelineIndex], GetInfo()));
 				graphicsContext->SetViewport(data.m_RasterDomain.m_Viewport);
 				graphicsContext->SetScissorRect(data.m_RasterDomain.m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
@@ -213,25 +216,33 @@ namespace gglab
 		shaderDesc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 		shaderDesc.m_Stage = ShaderStage::Vertex;
 		shaderDesc.m_Entry = L"VSMain";
-		m_PipelineKey.m_VSId = services.m_ShaderManager->LoadShader(shaderDesc);
+		const ShaderID vertexShader = services.m_ShaderManager->LoadShader(shaderDesc);
 		shaderDesc.m_Stage = ShaderStage::Pixel;
 		shaderDesc.m_Entry = L"PSMain";
-		m_PipelineKey.m_PSId = services.m_ShaderManager->LoadShader(shaderDesc);
-		if (!m_PipelineKey.m_VSId.IsValid() || !m_PipelineKey.m_PSId.IsValid())
+		const ShaderID pixelShader = services.m_ShaderManager->LoadShader(shaderDesc);
+		if (!vertexShader.IsValid() || !pixelShader.IsValid())
 		{
 			return;
 		}
 
-		m_PipelineKey.m_BindingLayout = services.m_Renderer->GetCommonBindingLayout();
-		m_PipelineKey.m_InputLayoutId = InputLayoutID::P3N3;
-		m_PipelineKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
-		m_PipelineKey.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-		m_PipelineKey.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
-		m_PipelineKey.m_Formats.m_RenderTargetCount = 1;
-		m_PipelineKey.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
-		m_PipelineKey.m_RasterizerPreset = RasterizerPreset::Default;
-		m_PipelineKey.m_DepthPreset = DepthPreset::ReversedZWrite;
-		m_PipelineKey.m_BlendPreset = BlendPreset::Default;
+		for (size_t index = 0; index < m_PipelineKeys.size(); ++index)
+		{
+			auto& key = m_PipelineKeys[index];
+			key.m_VSId = vertexShader;
+			key.m_PSId = pixelShader;
+			key.m_BindingLayout = services.m_Renderer->GetCommonBindingLayout();
+			key.m_InputLayoutId = InputLayoutID::P3N3;
+			key.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			key.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			key.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
+			key.m_Formats.m_RenderTargetCount = 1;
+			key.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
+			key.m_RasterizerPreset = index == static_cast<size_t>(NapaVoxelSurfaceMode::Wireframe)
+				? RasterizerPreset::Wireframe
+				: RasterizerPreset::Default;
+			key.m_DepthPreset = DepthPreset::ReversedZWrite;
+			key.m_BlendPreset = BlendPreset::Default;
+		}
 		m_IsInitialized = true;
 	}
 }

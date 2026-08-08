@@ -6,11 +6,13 @@
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
 #include <memory>
+#include <span>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -207,50 +209,77 @@ namespace napa::voxel
 					return dataAppendResult;
 				}
 
-				const bool affectsMesh = change.m_Before.m_Density != change.m_After.m_Density ||
+				const bool densityChanged =
+					change.m_Before.m_Density != change.m_After.m_Density;
+				const bool materialChanged =
 					change.m_Before.m_Material != change.m_After.m_Material;
+				const bool affectsMesh = densityChanged || materialChanged;
 				if (!affectsMesh)
 				{
 					continue;
 				}
 
-				for (std::int64_t zOffset = -1; zOffset <= 0; ++zOffset)
+				constexpr std::array<std::array<std::int64_t, 3>, 7> DensityDependencyOffsets{
+					std::array<std::int64_t, 3>{ 0, 0, 0 },
+					std::array<std::int64_t, 3>{ -1, 0, 0 },
+					std::array<std::int64_t, 3>{ 1, 0, 0 },
+					std::array<std::int64_t, 3>{ 0, -1, 0 },
+					std::array<std::int64_t, 3>{ 0, 1, 0 },
+					std::array<std::int64_t, 3>{ 0, 0, -1 },
+					std::array<std::int64_t, 3>{ 0, 0, 1 },
+				};
+				// A density write changes central-difference gradients at the six adjacent
+				// Samples. Every Cell consuming those gradients must rebuild its normals and
+				// Boundary Contours even when its own corner densities remain unchanged.
+				const std::span<const std::array<std::int64_t, 3>> dependencyOffsets{
+					DensityDependencyOffsets.data(), densityChanged
+						? DensityDependencyOffsets.size()
+						: std::size_t{ 1 },
+				};
+				for (const auto& dependencyOffset : dependencyOffsets)
 				{
-					for (std::int64_t yOffset = -1; yOffset <= 0; ++yOffset)
+					for (std::int64_t zOffset = -1; zOffset <= 0; ++zOffset)
 					{
-						for (std::int64_t xOffset = -1; xOffset <= 0; ++xOffset)
+						for (std::int64_t yOffset = -1; yOffset <= 0; ++yOffset)
 						{
-							const std::int64_t x =
-								static_cast<std::int64_t>(change.m_Coordinate.m_X) + xOffset;
-							const std::int64_t y =
-								static_cast<std::int64_t>(change.m_Coordinate.m_Y) + yOffset;
-							const std::int64_t z =
-								static_cast<std::int64_t>(change.m_Coordinate.m_Z) + zOffset;
-							const CellAabb& bounds = config.m_LogicalCellBounds;
-							if (x < bounds.m_Min.m_X || y < bounds.m_Min.m_Y ||
-								z < bounds.m_Min.m_Z || x >= bounds.m_MaxExclusive.m_X ||
-								y >= bounds.m_MaxExclusive.m_Y || z >= bounds.m_MaxExclusive.m_Z)
+							for (std::int64_t xOffset = -1; xOffset <= 0; ++xOffset)
 							{
-								continue;
-							}
+								const std::int64_t x =
+									static_cast<std::int64_t>(change.m_Coordinate.m_X) +
+									dependencyOffset[0] + xOffset;
+								const std::int64_t y =
+									static_cast<std::int64_t>(change.m_Coordinate.m_Y) +
+									dependencyOffset[1] + yOffset;
+								const std::int64_t z =
+									static_cast<std::int64_t>(change.m_Coordinate.m_Z) +
+									dependencyOffset[2] + zOffset;
+								const CellAabb& bounds = config.m_LogicalCellBounds;
+								if (x < bounds.m_Min.m_X || y < bounds.m_Min.m_Y ||
+									z < bounds.m_Min.m_Z || x >= bounds.m_MaxExclusive.m_X ||
+									y >= bounds.m_MaxExclusive.m_Y ||
+									z >= bounds.m_MaxExclusive.m_Z)
+								{
+									continue;
+								}
 
-							OwnedCellAddress cellAddress{};
-							const CellCoord cell{
-								static_cast<std::int32_t>(x),
-								static_cast<std::int32_t>(y),
-								static_cast<std::int32_t>(z),
-							};
-							const ValidationResult cellAddressResult = ResolveCellOwner(
-								cell, config.m_ChunkCellCount, cellAddress);
-							if (cellAddressResult.Failed())
-							{
-								return cellAddressResult;
-							}
-							const ValidationResult meshAppendResult = AppendTracked(
-								preparedMeshDirtyChunks, cellAddress.m_Owner);
-							if (meshAppendResult.Failed())
-							{
-								return meshAppendResult;
+								OwnedCellAddress cellAddress{};
+								const CellCoord cell{
+									static_cast<std::int32_t>(x),
+									static_cast<std::int32_t>(y),
+									static_cast<std::int32_t>(z),
+								};
+								const ValidationResult cellAddressResult = ResolveCellOwner(
+									cell, config.m_ChunkCellCount, cellAddress);
+								if (cellAddressResult.Failed())
+								{
+									return cellAddressResult;
+								}
+								const ValidationResult meshAppendResult = AppendTracked(
+									preparedMeshDirtyChunks, cellAddress.m_Owner);
+								if (meshAppendResult.Failed())
+								{
+									return meshAppendResult;
+								}
 							}
 						}
 					}

@@ -17,9 +17,15 @@ namespace gglab
 		{
 			return m_FrameView;
 		}
+		void SetSurfaceMode(NapaVoxelSurfaceMode mode) noexcept { m_SurfaceMode = mode; }
+		[[nodiscard]] NapaVoxelSurfaceMode GetSurfaceMode() const noexcept
+		{
+			return m_SurfaceMode;
+		}
 
 	private:
 		std::shared_ptr<const NapaVoxelGpuMeshSet> m_FrameView;
+		NapaVoxelSurfaceMode m_SurfaceMode = NapaVoxelSurfaceMode::Shaded;
 	};
 
 	class NapaVoxelRenderExtension final : public RenderPipelineSceneExtensionBase
