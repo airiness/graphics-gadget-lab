@@ -856,6 +856,36 @@ namespace gglab
 				ValidateCpuMeshBatch(dirtyBatch, visible, sameRevisionPending).m_Error ==
 				ValidationError::StaleCpuMeshBatch && !sameRevisionPending,
 				"Published and competing same-revision Soil batches cannot overwrite newer Visible state");
+
+			std::unique_ptr<VoxelWorld> skippedWorld;
+			VisibleMeshSet skippedVisible;
+			CpuMeshBatch skippedInitialBatch{};
+			std::unique_ptr<PendingCpuMeshBatch> skippedInitialPending;
+			VoxelMutationResult skippedMutationA{};
+			VoxelMutationResult skippedMutationB{};
+			CpuMeshBatch skippedBatch{};
+			std::unique_ptr<PendingCpuMeshBatch> skippedPending;
+			const bool skippedBatchBuilt = CreateSoilWorld(skippedWorld) &&
+				BuildCpuMeshBatch(*skippedWorld, skippedWorld->GetWorldVoxelRevision(),
+					MutationChunkDomain, skippedInitialBatch).Succeeded() &&
+				ValidateCpuMeshBatch(
+					skippedInitialBatch, skippedVisible, skippedInitialPending).Succeeded() &&
+				PrepareAndCommitMutationMeshBatch(
+					skippedInitialPending, skippedVisible).Succeeded() &&
+				ApplySphereEdit(*skippedWorld,
+					MakeSoilEdit({ 3.0, 0.0, 0.0 }, 0.5, 1.0), skippedMutationA).Succeeded() &&
+				skippedMutationA.Changed() &&
+				ApplySphereEdit(*skippedWorld,
+					MakeSoilEdit({ -3.0, 0.0, 0.0 }, 0.5, 1.0), skippedMutationB).Succeeded() &&
+				skippedMutationB.Changed() &&
+				BuildCpuMeshBatch(*skippedWorld, skippedMutationB, skippedBatch).Succeeded();
+			context.Check(skippedBatchBuilt &&
+				skippedBatch.m_BaseWorldVoxelRevision == 2 &&
+				skippedBatch.m_TargetWorldVoxelRevision == 3 &&
+				ValidateCpuMeshBatch(skippedBatch, skippedVisible, skippedPending).m_Error ==
+					ValidationError::StaleCpuMeshBatch &&
+				!skippedPending && skippedVisible.GetVisibleWorldRevision() == 1,
+				"A replacement Batch cannot skip an unpublished intermediate World revision");
 		}
 
 		void RunFullDomainMutationOracleTests(SelfTestContext& context) noexcept

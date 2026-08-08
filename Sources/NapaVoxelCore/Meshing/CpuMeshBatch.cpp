@@ -128,11 +128,13 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] ValidationResult BuildCpuMeshBatchFromValidatedRequest(
-			const VoxelWorld& world, std::uint64_t targetWorldVoxelRevision,
+			const VoxelWorld& world, std::uint64_t baseWorldVoxelRevision,
+			std::uint64_t targetWorldVoxelRevision,
 			std::span<const ChunkCoord> requestedChunks, CpuMeshBatch& batch)
 		{
 			CpuMeshBatch prepared{
 				.m_Config = world.GetConfig(),
+				.m_BaseWorldVoxelRevision = baseWorldVoxelRevision,
 				.m_TargetWorldVoxelRevision = targetWorldVoxelRevision,
 			};
 			prepared.m_RequestedChunks.assign(requestedChunks.begin(), requestedChunks.end());
@@ -194,6 +196,11 @@ namespace napa::voxel
 	const VoxelWorldConfig& PendingCpuMeshBatch::GetConfig() const noexcept
 	{
 		return m_State.m_Config;
+	}
+
+	std::uint64_t PendingCpuMeshBatch::GetBaseWorldVoxelRevision() const noexcept
+	{
+		return m_State.m_BaseVisibleWorldRevision;
 	}
 
 	std::uint64_t PendingCpuMeshBatch::GetTargetWorldVoxelRevision() const noexcept
@@ -283,7 +290,7 @@ namespace napa::voxel
 		}
 
 		return BuildCpuMeshBatchFromValidatedRequest(
-			world, targetWorldVoxelRevision, requestedChunks, batch);
+			world, 0, targetWorldVoxelRevision, requestedChunks, batch);
 	}
 
 	ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
@@ -315,8 +322,14 @@ namespace napa::voxel
 			return { ValidationError::InvalidVoxelMutation };
 		}
 
+		if (meshDirtyChunks.empty())
+		{
+			return { ValidationError::InvalidCpuMeshCandidateSet };
+		}
+
 		return BuildCpuMeshBatchFromValidatedRequest(
-			world, mutation.m_TargetWorldVoxelRevision, meshDirtyChunks, batch);
+			world, mutation.m_BaseWorldVoxelRevision,
+			mutation.m_TargetWorldVoxelRevision, meshDirtyChunks, batch);
 	}
 
 	ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
@@ -346,10 +359,25 @@ namespace napa::voxel
 		{
 			return { ValidationError::MismatchedCpuMeshConfig };
 		}
-		if (visible.m_State.m_HasPublishedMeshes &&
-			batch.m_TargetWorldVoxelRevision <= visible.m_State.m_VisibleWorldRevision)
+		if (!visible.m_State.m_HasPublishedMeshes)
+		{
+			if (batch.m_BaseWorldVoxelRevision != 0)
+			{
+				return { ValidationError::StaleCpuMeshBatch };
+			}
+		}
+		else if (batch.m_BaseWorldVoxelRevision !=
+			visible.m_State.m_VisibleWorldRevision)
 		{
 			return { ValidationError::StaleCpuMeshBatch };
+		}
+		if (batch.m_TargetWorldVoxelRevision <= batch.m_BaseWorldVoxelRevision)
+		{
+			return { ValidationError::StaleCpuMeshBatch };
+		}
+		if (visible.m_State.m_HasPublishedMeshes && batch.m_RequestedChunks.empty())
+		{
+			return { ValidationError::InvalidCpuMeshCandidateSet };
 		}
 
 		std::vector<ChunkMeshRecord> chunks;
@@ -382,7 +410,7 @@ namespace napa::voxel
 		}
 		PendingCpuMeshBatch::State state{
 			.m_BaseWasPublished = visible.m_State.m_HasPublishedMeshes,
-			.m_BaseVisibleWorldRevision = visible.m_State.m_VisibleWorldRevision,
+			.m_BaseVisibleWorldRevision = batch.m_BaseWorldVoxelRevision,
 			.m_BaseWorldMeshValidation = visible.m_State.m_WorldMeshValidation,
 			.m_BaseBoundaryValidation = visible.m_State.m_BoundaryValidation,
 			.m_Config = batch.m_Config,

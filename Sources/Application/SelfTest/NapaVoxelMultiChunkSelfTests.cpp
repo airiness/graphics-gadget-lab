@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
+#include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/BoundaryContour.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
@@ -925,6 +926,7 @@ namespace gglab
 				BuildCpuMeshBatch(*world, world->GetWorldVoxelRevision(),
 					EightChunkDomain, fullBatch).Succeeded();
 			bool canonicalCandidates = built &&
+				fullBatch.m_BaseWorldVoxelRevision == 0 &&
 				fullBatch.m_TargetWorldVoxelRevision == 1 &&
 				fullBatch.m_RequestedChunks.size() == EightChunkDomain.size() &&
 				fullBatch.m_Candidates.size() == EightChunkDomain.size();
@@ -963,6 +965,7 @@ namespace gglab
 			PendingCpuMeshBatch* const validatedPending = pending.get();
 			context.Check(
 				validated &&
+				pending->GetBaseWorldVoxelRevision() == 0 &&
 				pending->GetTargetWorldVoxelRevision() == 1 &&
 				pending->GetCandidateChunkCount() == EightChunkDomain.size() &&
 				pending->GetChunks().size() == EightChunkDomain.size() &&
@@ -1114,6 +1117,7 @@ namespace gglab
 				world->ReadCurrentSample({ -1, -1, -1 }, materialEdit).Succeeded() &&
 				materialEdit.m_Density >= IsoValue &&
 				materialEdit.m_Material == VoxelMaterial::Stone;
+			const VoxelSample materialBefore = materialEdit;
 			if (materialRead)
 			{
 				materialEdit.m_Material = VoxelMaterial::Soil;
@@ -1126,9 +1130,26 @@ namespace gglab
 			constexpr std::array partialChunks{
 				ChunkCoord{ -1, -1, -1 },
 			};
+			VoxelMutationResult materialMutation{
+				.m_BaseWorldVoxelRevision = 1,
+				.m_TargetWorldVoxelRevision = 2,
+				.m_SampleChanges = {
+					{
+						.m_Coordinate = { -1, -1, -1 },
+						.m_Before = materialBefore,
+						.m_After = materialEdit,
+					},
+				},
+			};
+			const bool materialDirtyDerived = edited &&
+				DeriveVoxelMutationDirtyChunks(config, materialMutation.m_SampleChanges,
+					materialMutation.m_DataDirtyChunks,
+					materialMutation.m_MeshDirtyChunks).Succeeded() &&
+				materialMutation.m_MeshDirtyChunks.size() == 1 &&
+				materialMutation.m_MeshDirtyChunks[0] == partialChunks[0];
 			CpuMeshBatch partialBatch{};
-			const bool partialBuilt = edited &&
-				BuildCpuMeshBatch(*world, 2, partialChunks, partialBatch).Succeeded();
+			const bool partialBuilt = materialDirtyDerived &&
+				BuildCpuMeshBatch(*world, materialMutation, partialBatch).Succeeded();
 			if (!partialBuilt)
 			{
 				context.Check(false, "A local edit builds an explicit partial CPU mesh batch");
@@ -1166,6 +1187,7 @@ namespace gglab
 			context.Check(
 				partialValidated &&
 				competingPartialValidated &&
+				partialPending->GetBaseWorldVoxelRevision() == 1 &&
 				partialPending->GetTargetWorldVoxelRevision() == 2 &&
 				partialPending->GetCandidateChunkCount() == 1 &&
 				partialPending->GetReplacementChunks().size() == 1 &&
@@ -1225,24 +1247,25 @@ namespace gglab
 				world->GetWorldVoxelRevision() == 3;
 			CpuMeshBatch damageOnlyBatch{};
 			std::unique_ptr<PendingCpuMeshBatch> damageOnlyPending;
-			const bool damageOnlyValidated =
-				damageOnlyWritten &&
-				BuildCpuMeshBatch(
-					*world, 3, std::span<const ChunkCoord>{}, damageOnlyBatch).Succeeded() &&
-				ValidateCpuMeshBatch(
-					damageOnlyBatch, visible, damageOnlyPending).Succeeded() &&
-				damageOnlyPending != nullptr &&
-				damageOnlyPending->GetCandidateChunkCount() == 0 &&
-				damageOnlyPending->GetReplacementChunks().empty();
+			const bool emptyBatchBuilt = damageOnlyWritten &&
+				BuildCpuMeshBatch(*world, 3, std::span<const ChunkCoord>{},
+					damageOnlyBatch).Succeeded();
+			if (emptyBatchBuilt)
+			{
+				damageOnlyBatch.m_BaseWorldVoxelRevision = visible.GetVisibleWorldRevision();
+			}
+			const bool damageOnlyValidated = emptyBatchBuilt &&
+				ValidateCpuMeshBatch(damageOnlyBatch, visible, damageOnlyPending).m_Error ==
+					ValidationError::InvalidCpuMeshCandidateSet &&
+				damageOnlyPending == nullptr;
 			WorldMeshValidationResult damageOnlyValidation{};
 			context.Check(
 				damageOnlyValidated &&
-				PrepareAndCommitCpuMeshBatch(damageOnlyPending, visible).Succeeded() &&
-				visible.GetVisibleWorldRevision() == 3 &&
+				visible.GetVisibleWorldRevision() == 2 &&
 				ComputeVisibleWorldMeshHash(
 					visible, damageOnlyValidation).Succeeded() &&
 				damageOnlyValidation == editedValidation,
-				"Damage-only World revisions publish without remeshing any Chunk");
+				"An empty Mesh Batch cannot advance a published Visible revision");
 		}
 
 		void RunEmptyCpuMeshBatchTests(SelfTestContext& context)

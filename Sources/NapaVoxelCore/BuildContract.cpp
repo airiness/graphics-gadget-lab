@@ -7,7 +7,7 @@ namespace napa::voxel
 	namespace
 	{
 		constexpr BuildContract CurrentBuildContract{
-			.m_CoreApiVersion = 21,
+			.m_CoreApiVersion = 22,
 			.m_VoxelHashSchemaVersion = 1,
 			.m_MeshHashSchemaVersion = 1,
 			.m_ReferenceMesherVersion = 3,

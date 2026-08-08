@@ -41,6 +41,7 @@ namespace napa::voxel
 	struct CpuMeshBatch
 	{
 		VoxelWorldConfig m_Config{};
+		std::uint64_t m_BaseWorldVoxelRevision = 0;
 		std::uint64_t m_TargetWorldVoxelRevision = 0;
 		std::vector<ChunkCoord> m_RequestedChunks;
 		std::vector<ChunkMeshRecord> m_Candidates;
@@ -93,6 +94,7 @@ namespace napa::voxel
 		PendingCpuMeshBatch& operator=(const PendingCpuMeshBatch&) = delete;
 
 		[[nodiscard]] const VoxelWorldConfig& GetConfig() const noexcept;
+		[[nodiscard]] std::uint64_t GetBaseWorldVoxelRevision() const noexcept;
 		[[nodiscard]] std::uint64_t GetTargetWorldVoxelRevision() const noexcept;
 		[[nodiscard]] std::uint64_t GetCandidateChunkCount() const noexcept;
 		[[nodiscard]] std::span<const ChunkMeshRecord> GetChunks() const noexcept;
