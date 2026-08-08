@@ -1,6 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/SelfTest/VulkanContractSelfTests.h"
+#include "Application/ApplicationLaunchOptions.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
@@ -312,9 +313,9 @@ namespace gglab
 			context.Check(GGLabDescriptorCapacityContract.m_SamplerDescriptorCount == 2'048,
 				"Sampler descriptor capacity is fixed at 2,048");
 			context.Check(GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_ResourceDescriptorCount ==
-					GGLabDescriptorCapacityContract.m_ResourceDescriptorCount &&
+				GGLabDescriptorCapacityContract.m_ResourceDescriptorCount &&
 				GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_SamplerDescriptorCount ==
-					GGLabDescriptorCapacityContract.m_SamplerDescriptorCount,
+				GGLabDescriptorCapacityContract.m_SamplerDescriptorCount,
 				"Vulkan binding ABI consumes the backend-neutral descriptor capacity contract");
 		}
 
@@ -352,7 +353,7 @@ namespace gglab
 					const uint32_t expectedBinding = range.m_BindingShift + registerIndex;
 					allBindingsUnique &= result.IsSupported() &&
 						result.m_Location.m_DescriptorSet ==
-							GGLabVulkanShaderBindingABI.m_FixedDescriptorSet &&
+						GGLabVulkanShaderBindingABI.m_FixedDescriptorSet &&
 						result.m_Location.m_Binding == expectedBinding &&
 						expectedBinding < occupiedBindings.size() && !occupiedBindings[expectedBinding];
 					if (expectedBinding < occupiedBindings.size())
@@ -364,7 +365,7 @@ namespace gglab
 					range.m_RegisterCount, GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
 				allOutOfRangeIndicesRejected &= !outOfRange.IsSupported() &&
 					outOfRange.m_RejectionReason ==
-						VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
+					VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
 			}
 			context.Check(rangesMatch,
 				"Vulkan fixed-register ranges lock 32 bindings at shifts 0, 32, 64, and 96");
@@ -378,13 +379,13 @@ namespace gglab
 				VulkanShaderRegisterClass::ShaderResource, 0,
 				GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace);
 			context.Check(!reservedSpace.IsSupported() && reservedSpace.m_RejectionReason ==
-					VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
+				VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
 				"Fixed bindings reject HLSL space1 reserved for global heaps");
 			const auto unsupportedSpace = EvaluateVulkanFixedShaderBinding(
 				VulkanShaderRegisterClass::ShaderResource, 0,
 				GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace + 1);
 			context.Check(!unsupportedSpace.IsSupported() && unsupportedSpace.m_RejectionReason ==
-					VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace,
+				VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace,
 				"Fixed bindings reject unsupported HLSL register spaces explicitly");
 
 			const auto sampledTexture =
@@ -410,14 +411,14 @@ namespace gglab
 				mutableTypes[1] == VulkanDescriptorType::StorageImage,
 				"Vulkan mutable resource binding allows exactly sampled and storage images");
 			context.Check(GGLabVulkanShaderBindingABI.m_ResourceHeapDescriptorType ==
-					VulkanDescriptorType::Mutable &&
+				VulkanDescriptorType::Mutable &&
 				GGLabVulkanShaderBindingABI.m_SamplerHeapDescriptorType ==
-					VulkanDescriptorType::Sampler,
+				VulkanDescriptorType::Sampler,
 				"Vulkan global heap descriptor types match binding ABI revision 1");
 			context.Check(VulkanDescriptorTypeName(mutableTypes[0]) ==
-					"VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE" &&
+				"VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE" &&
 				VulkanDescriptorTypeName(mutableTypes[1]) ==
-					"VK_DESCRIPTOR_TYPE_STORAGE_IMAGE",
+				"VK_DESCRIPTOR_TYPE_STORAGE_IMAGE",
 				"Vulkan mutable resource binding locks the exact native descriptor types");
 			context.Check(GGLabVulkanShaderBindingABI.m_PartiallyBound &&
 				GGLabVulkanShaderBindingABI.m_UpdateAfterBind &&
@@ -651,7 +652,7 @@ namespace gglab
 				GGLabCoordinatePolicy.m_TextureUVOrigin == RHICoordinateOrigin::UpperLeft,
 				"RHI coordinate policy uses zero-to-one depth and upper-left origins");
 			context.Check(GGLabCoordinatePolicy.m_FrontFaceDefinition ==
-					RHIFrontFaceDefinition::AfterViewportTransform &&
+				RHIFrontFaceDefinition::AfterViewportTransform &&
 				!GGLabCoordinatePolicy.m_BackendAppliesReversedZ,
 				"RHI front face is post-viewport and reversed-Z is not backend-added");
 			context.Check(GGLabVulkanCoordinatePolicy.m_UsePositiveViewportHeight &&
@@ -756,10 +757,10 @@ namespace gglab
 			auto changedArguments = normalizedSpirV;
 			changedArguments.m_ExtraArgs.push_back(L"-GGLAB_TEST_ARGUMENT");
 			context.Check(dxilRecipe != spirVRecipe && spirVRecipe !=
-					ShaderCompiler::ComputeRecipeHash(changedABI) && spirVRecipe !=
-					ShaderCompiler::ComputeRecipeHash(changedDxc) && spirVRecipe !=
-					ShaderCompiler::ComputeRecipeHash(changedCoordinates) && spirVRecipe !=
-					ShaderCompiler::ComputeRecipeHash(changedArguments),
+				ShaderCompiler::ComputeRecipeHash(changedABI) && spirVRecipe !=
+				ShaderCompiler::ComputeRecipeHash(changedDxc) && spirVRecipe !=
+				ShaderCompiler::ComputeRecipeHash(changedCoordinates) && spirVRecipe !=
+				ShaderCompiler::ComputeRecipeHash(changedArguments),
 				"Shader recipe identity includes format, ABI, DXC, coordinates, and compile arguments");
 
 			constexpr std::array ReservedArguments{
@@ -823,7 +824,7 @@ namespace gglab
 				const std::wstring hlslSpace =
 					std::to_wstring(GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
 				registerShiftsMatch &=
-					ContainsArgumentSequence(vertexArguments, {option, shift, hlslSpace});
+					ContainsArgumentSequence(vertexArguments, { option, shift, hlslSpace });
 			}
 			const std::wstring resourceBinding =
 				std::to_wstring(GGLabVulkanShaderBindingABI.m_ResourceHeapBinding);
@@ -832,9 +833,9 @@ namespace gglab
 			const std::wstring descriptorSet =
 				std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet);
 			context.Check(registerShiftsMatch && ContainsArgumentSequence(vertexArguments,
-				{L"-fvk-bind-resource-heap", resourceBinding, descriptorSet}) &&
+				{ L"-fvk-bind-resource-heap", resourceBinding, descriptorSet }) &&
 				ContainsArgumentSequence(vertexArguments,
-					{L"-fvk-bind-sampler-heap", samplerBinding, descriptorSet}),
+					{ L"-fvk-bind-sampler-heap", samplerBinding, descriptorSet }),
 				"SPIR-V compile arguments consume the centralized HLSL-space and descriptor-set ABI");
 			context.Check(ContainsArgument(vertexArguments, L"-spirv") &&
 				ContainsArgument(vertexArguments, L"-fspv-target-env=vulkan1.3") &&
@@ -1001,11 +1002,11 @@ namespace gglab
 			};
 			const bool allValidated = validator.MatchesValidationBaseline() &&
 				std::ranges::all_of(artifactsToValidate,
-				[&validator](const ShaderCompileArtifact* artifact) noexcept
-				{
-					return artifact->m_Binary.IsValid() &&
-						ValidateSpirVBinary(validator.m_Path, artifact->m_BinaryPath);
-				});
+					[&validator](const ShaderCompileArtifact* artifact) noexcept
+					{
+						return artifact->m_Binary.IsValid() &&
+							ValidateSpirVBinary(validator.m_Path, artifact->m_BinaryPath);
+					});
 			context.Check(allValidated,
 				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
 		}
@@ -1109,6 +1110,8 @@ namespace gglab
 				rejectedCapabilities.m_DescriptorBindingUpdateUnusedWhilePending = false;
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
 				snapshots.push_back(MakeAdapterSnapshot(0, "Rejected", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
+				// The rejected snapshot models a completed layout determination.
+				snapshots[0].m_GlobalDescriptorSetLayoutProbed = true;
 				const VulkanAdapterSelectionResult result =
 					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Index, .m_Index = 0 });
 				context.Check(result.m_Status == VulkanAdapterSelectionStatus::RejectedAdapter &&
@@ -1171,6 +1174,8 @@ namespace gglab
 				rejectedCapabilities.m_ApiVersion = { 1, 2 };
 				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
 				snapshots.push_back(MakeAdapterSnapshot(0, "Old API", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
+				// The rejected snapshot models a completed layout determination.
+				snapshots[0].m_GlobalDescriptorSetLayoutProbed = true;
 				const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
 				context.Check(result.m_Status == VulkanAdapterSelectionStatus::NoAcceptedAdapter &&
 					snapshots[0].m_ProfileEvaluation.HasReason(
@@ -1195,6 +1200,9 @@ namespace gglab
 
 				VulkanAdapterCapabilitySnapshot snapshot =
 					MakeAdapterSnapshot(0, "Degraded", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, degraded);
+				// The degraded snapshot models an adapter whose layout probe
+				// ran and reported unsupported.
+				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
 				const auto& evaluation = snapshot.m_ProfileEvaluation;
 				context.Check(!evaluation.IsAccepted() &&
 					evaluation.HasReason(VulkanDeviceProfileRejectionReason::ApiVersionTooLow) &&
@@ -1211,8 +1219,116 @@ namespace gglab
 					evaluation.HasReason(VulkanDeviceProfileRejectionReason::RequiredFormatFeaturesUnavailable),
 					"A degraded adapter preserves every missing capability rejection reason");
 			}
+			// Not-probed must not report as unsupported: an adapter that fails
+			// a non-layout requirement is rejected by the preliminary
+			// evaluation without a layout reason.
+			{
+				auto missingTimeline = satisfied;
+				missingTimeline.m_TimelineSemaphore = false;
+				VulkanAdapterCapabilitySnapshot snapshot = MakeAdapterSnapshot(0, "MissingTimeline",
+					VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, missingTimeline);
+				const VulkanDeviceProfileEvaluation preliminary =
+					EvaluateVulkanAdapterProfilePreliminary(snapshot);
+				context.Check(!preliminary.IsAccepted() &&
+					preliminary.HasReason(
+						VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable) &&
+					!preliminary.HasReason(
+						VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported),
+					"Preliminary rejection never reports an unprobed layout as unsupported");
+			}
+			// All preliminary requirements pass and the layout probe reports
+			// unsupported: the final evaluation carries the layout reason.
+			{
+				VulkanAdapterCapabilitySnapshot snapshot =
+					MakeAdapterSnapshot(0, "LayoutUnsupported",
+						VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
+				const VulkanDeviceProfileEvaluation preliminary =
+					EvaluateVulkanAdapterProfilePreliminary(snapshot);
+				context.Check(preliminary.IsAccepted(),
+					"All non-layout requirements pass the preliminary evaluation");
+				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
+				snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported = false;
+				EvaluateVulkanAdapterProfile(snapshot);
+				context.Check(!snapshot.m_ProfileEvaluation.IsAccepted() &&
+					snapshot.m_ProfileEvaluation.HasReason(
+						VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported),
+					"A real layout probe result of unsupported rejects the adapter");
+			}
+			// All requirements pass and the layout probe reports supported.
+			{
+				VulkanAdapterCapabilitySnapshot snapshot =
+					MakeAdapterSnapshot(0, "LayoutSupported",
+						VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
+				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
+				snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported = true;
+				EvaluateVulkanAdapterProfile(snapshot);
+				context.Check(snapshot.m_ProfileEvaluation.IsAccepted(),
+					"A supported layout probe result accepts the adapter");
+			}
+			// Adapter indexing regression: a rejected adapter before an
+			// accepted one must not shift selection bookkeeping.
+			{
+				auto rejectedCapabilities = satisfied;
+				rejectedCapabilities.m_DescriptorBindingUpdateUnusedWhilePending = false;
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "Rejected First",
+					VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
+				snapshots.push_back(MakeAdapterSnapshot(1, "Accepted Second",
+					VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
+				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
+					"Default selection skips a rejected adapter and picks the accepted one");
+			}
 		}
 #endif
+
+		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
+		{
+			const auto parse = [](std::initializer_list<std::string_view> arguments)
+				{
+					const std::vector<std::string_view> args(arguments);
+					return ParseApplicationLaunchOptions(args);
+				};
+
+			// --adapter requires an explicit --rhi vulkan.
+			{
+				const auto result = parse({ "--adapter", "0" });
+				context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") !=
+					std::string::npos,
+					"--adapter without --rhi vulkan is a parse error");
+			}
+			{
+				const auto result = parse({ "--rhi", "dx12", "--adapter", "0" });
+				context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") !=
+					std::string::npos,
+					"--rhi dx12 with --adapter is a parse error");
+			}
+			{
+				const auto result = parse({ "--rhi", "vulkan", "--adapter", "0" });
+				context.Check(result.IsValid() &&
+					result.m_Options.m_RhiBackend == RHIBackendType::Vulkan &&
+					result.m_Options.m_AdapterSelector == "0",
+					"--rhi vulkan with --adapter is valid");
+			}
+			// --list-adapters stands alone; combining it with --adapter fails.
+			{
+				const auto result = parse({ "--list-adapters" });
+				context.Check(result.IsValid() && result.m_Options.m_ListAdapters,
+					"--list-adapters is valid without --rhi vulkan");
+			}
+			{
+				const auto result = parse({ "--list-adapters", "--adapter", "0" });
+				context.Check(!result.IsValid() && result.m_Error.find("--list-adapters") !=
+					std::string::npos,
+					"--list-adapters with --adapter is a parse error");
+			}
+			{
+				const auto result = parse({ "--rhi", "vulkan", "--list-adapters" });
+				context.Check(result.IsValid() && result.m_Options.m_ListAdapters &&
+					result.m_Options.m_RhiBackend == RHIBackendType::Vulkan,
+					"--rhi vulkan with --list-adapters is valid");
+			}
+		}
 	}
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
@@ -1222,6 +1338,7 @@ namespace gglab
 		RunDeviceProfileTests(context);
 		RunCoordinatePolicyTests(context);
 		RunShaderArtifactContractTests(context);
+		RunVulkanCliContractTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);
 #endif

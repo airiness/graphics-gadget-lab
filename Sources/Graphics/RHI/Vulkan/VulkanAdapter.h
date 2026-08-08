@@ -58,6 +58,11 @@ namespace gglab
 		VulkanDescriptorCapacityAvailability m_DescriptorCapacityAvailability{};
 		std::vector<VulkanFormatSupportDiagnostic> m_FormatDiagnostics;
 		VulkanDeviceProfileEvaluation m_ProfileEvaluation{};
+		// Distinguishes "the layout probe was never executed" from "support
+		// was determined unavailable". A probe is only performed for adapters
+		// that pass every other profile requirement; when the temporary probe
+		// device cannot be created, support is determined as unavailable.
+		bool m_GlobalDescriptorSetLayoutProbed = false;
 	};
 
 	// Fills the physical-device level part of the capability snapshot. The
@@ -81,5 +86,19 @@ namespace gglab
 	{
 		snapshot.m_ProfileEvaluation =
 			EvaluateVulkanDeviceProfile(snapshot.m_ProfileCapabilities);
+	}
+
+	// Preliminary evaluation used before the descriptor-set layout probe:
+	// the layout-support gate is neutralized because the probe has not run
+	// yet, so "not probed" never reports as "unsupported". An adapter that
+	// fails every other requirement is rejected without creating a probe
+	// device; the final evaluation only reports
+	// GlobalDescriptorSetLayoutUnsupported after an actual probe.
+	[[nodiscard]] inline VulkanDeviceProfileEvaluation EvaluateVulkanAdapterProfilePreliminary(
+		const VulkanAdapterCapabilitySnapshot& snapshot) noexcept
+	{
+		auto capabilities = snapshot.m_ProfileCapabilities;
+		capabilities.m_GlobalDescriptorSetLayoutSupported = true;
+		return EvaluateVulkanDeviceProfile(capabilities);
 	}
 }

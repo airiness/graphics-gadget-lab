@@ -185,6 +185,20 @@ namespace gglab
 		{
 			result.m_Error =
 				"Option '--self-test' cannot be combined with interactive startup options.";
+			return result;
+		}
+		if (result.m_Options.m_AdapterSelector && result.m_Options.m_ListAdapters)
+		{
+			result.m_Error = "Option '--adapter' cannot be combined with '--list-adapters'.";
+			return result;
+		}
+		if (result.m_Options.m_AdapterSelector &&
+			(!result.m_Options.m_RhiBackendSpecified ||
+				result.m_Options.m_RhiBackend != RHIBackendType::Vulkan))
+		{
+			result.m_Error =
+				"Option '--adapter' requires an explicit '--rhi vulkan'.";
+			return result;
 		}
 		return result;
 	}
@@ -203,6 +217,7 @@ namespace gglab
 			"                                  evaluation and exit.\n"
 			"  --adapter <index|prefix>        Select a Vulkan adapter by enumeration\n"
 			"                                  index or device UUID/name prefix.\n"
+			"                                  Requires an explicit --rhi vulkan.\n"
 			"  --self-test <suite-id>          Run a headless self-test suite.\n"
 			"                                  Available: artifact-cache, asset-data,\n"
 			"                                  publication-accounting, rendering-contracts,\n"

@@ -22,6 +22,8 @@
     <GGLabVulkanSdkRoot Condition="'$(GGLAB_VULKAN_SDK_ROOT)'!=''">$(GGLAB_VULKAN_SDK_ROOT)</GGLabVulkanSdkRoot>
     <GGLabVulkanSdkRoot Condition="'$(GGLabVulkanSdkRoot)'==''">$(VULKAN_SDK)</GGLabVulkanSdkRoot>
     <GGLabVulkanSdkPinnedVersion>1.3.296</GGLabVulkanSdkPinnedVersion>
+    <GGLabVulkanSdkRootTrimmed>$([System.String]::new('$(GGLabVulkanSdkRoot)').TrimEnd('\'))</GGLabVulkanSdkRootTrimmed>
+    <GGLabVulkanSdkVersion>$([System.IO.Path]::GetFileName('$(GGLabVulkanSdkRootTrimmed)'))</GGLabVulkanSdkVersion>
   </PropertyGroup>
   <Target Name="GGLabValidateVulkanSdk" BeforeTargets="ClCompile" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'">
     <Error Condition="'$(GGLabVulkanSdkRoot)'==''"
@@ -30,7 +32,9 @@
            Text="Vulkan SDK include not found at '$(GGLabVulkanSdkRoot)'. The pinned SDK root must contain Include\vulkan\vulkan.h. Set GGLAB_VULKAN_SDK_ROOT or VULKAN_SDK to the pinned SDK, or set GGLAB_ENABLE_VULKAN=0." />
     <Error Condition="!Exists('$(GGLabVulkanSdkRoot)\Lib\vulkan-1.lib')"
            Text="Vulkan SDK library vulkan-1.lib not found at '$(GGLabVulkanSdkRoot)'. Set GGLAB_VULKAN_SDK_ROOT or VULKAN_SDK to the pinned SDK, or set GGLAB_ENABLE_VULKAN=0." />
-    <Message Importance="High" Text="GGLab Vulkan backend enabled with SDK root '$(GGLabVulkanSdkRoot)' (pinned $(GGLabVulkanSdkPinnedVersion))." />
+    <Error Condition="'$(GGLabVulkanSdkVersion)' != '1.3.296' and !$(GGLabVulkanSdkVersion.StartsWith('1.3.296.'))"
+           Text="Expected Vulkan SDK 1.3.296, but '$(GGLabVulkanSdkRoot)' reports version '$(GGLabVulkanSdkVersion)'. Set VULKAN_SDK or GGLAB_VULKAN_SDK_ROOT to the pinned 1.3.296 SDK, or set GGLAB_ENABLE_VULKAN=0 for a DX12-only build." />
+    <Message Importance="High" Text="GGLab Vulkan backend enabled with SDK root '$(GGLabVulkanSdkRoot)' (version $(GGLabVulkanSdkVersion), pinned $(GGLabVulkanSdkPinnedVersion))." />
   </Target>
   <ItemDefinitionGroup Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'">
     <ClCompile>

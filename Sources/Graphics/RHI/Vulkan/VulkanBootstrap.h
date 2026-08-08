@@ -60,7 +60,6 @@ namespace gglab
 		HINSTANCE m_HInstance = nullptr;
 		HWND m_Hwnd = nullptr;
 		bool m_RequestValidation = false;
-		bool m_IsDebugBuild = false;
 		VulkanAdapterSelectionRequest m_SelectionRequest{};
 	};
 

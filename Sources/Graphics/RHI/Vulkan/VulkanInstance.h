@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 
@@ -18,9 +18,6 @@ namespace gglab
 			// Enables the Khronos validation layer and debug messenger when
 			// VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils are available.
 			bool m_RequestValidation = false;
-			// True for Debug builds; controls the diagnostic when requested
-			// validation is unavailable.
-			bool m_IsDebugBuild = false;
 		};
 
 		struct Result

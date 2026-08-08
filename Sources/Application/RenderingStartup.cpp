@@ -49,14 +49,15 @@ namespace gglab
 		VulkanBootstrapOptions bootstrapOptions{};
 		bootstrapOptions.m_HInstance = GetModuleHandle(nullptr);
 		bootstrapOptions.m_Hwnd = hwnd;
+		// Validation is a Debug-build policy: Debug requests the Khronos
+		// validation layer when available, Release never requests it.
+#if defined(BUILD_DEBUG)
 		bootstrapOptions.m_RequestValidation = true;
-		bootstrapOptions.m_IsDebugBuild = true;
+#else
+		bootstrapOptions.m_RequestValidation = false;
+#endif
 		bootstrapOptions.m_SelectionRequest =
 			MakeVulkanSelectionRequest(options.m_AdapterSelector);
-		if (options.m_ListAdapters)
-		{
-			bootstrapOptions.m_SelectionRequest = {};
-		}
 
 		VulkanBootstrapReport report;
 		return RunVulkanBootstrap(bootstrapOptions, report);

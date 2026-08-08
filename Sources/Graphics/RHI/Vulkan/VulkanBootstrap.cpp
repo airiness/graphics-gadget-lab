@@ -1,4 +1,4 @@
-﻿#include "Core/Precompiled.h"
+#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "Core/Log/Logger.h"
@@ -112,9 +112,12 @@ namespace gglab
 				"    descriptor capacity available: resources={}, samplers={}, combined={}",
 				availability.m_ResourceDescriptorCount, availability.m_SamplerDescriptorCount,
 				availability.m_CombinedDescriptorCount));
-			LogBootstrapInfo(std::format("    globalSet1LayoutSupported={} requiredFormatFeatures={}",
-				capabilities.m_GlobalDescriptorSetLayoutSupported ? "yes" : "no",
-				capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
+			const std::string_view layoutState =
+				!snapshot.m_GlobalDescriptorSetLayoutProbed
+				? "not-probed"
+				: capabilities.m_GlobalDescriptorSetLayoutSupported ? "supported" : "unsupported";
+			LogBootstrapInfo(std::format("    globalSet1LayoutSupport={} requiredFormatFeatures={}",
+				layoutState, capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
 			for (const VulkanFormatSupportDiagnostic& format : snapshot.m_FormatDiagnostics)
 			{
 				LogBootstrapInfo(std::format("    format {} ({}) supported={}",
@@ -186,18 +189,18 @@ namespace gglab
 				capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
 		}
 
-		[[nodiscard]] bool OnlyMissingLayoutSupport(
-			const VulkanDeviceProfileEvaluation& evaluation) noexcept
+		[[nodiscard]] VulkanDevice::CreateInfo MakeDeviceCreateInfo(
+			VkPhysicalDevice physicalDevice,
+			const VulkanAdapterCapabilitySnapshot& snapshot) noexcept
 		{
-			for (size_t index = 0; index < evaluation.m_RejectionReasonCount; ++index)
-			{
-				if (evaluation.m_RejectionReasons[index] !=
-					VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported)
-				{
-					return false;
-				}
-			}
-			return true;
+			VulkanDevice::CreateInfo deviceCreateInfo{};
+			deviceCreateInfo.m_PhysicalDevice = physicalDevice;
+			deviceCreateInfo.m_ProfileCapabilities = &snapshot.m_ProfileCapabilities;
+			deviceCreateInfo.m_GraphicsPresentQueueFamilyIndex =
+				snapshot.m_GraphicsPresentQueueFamilyIndex;
+			deviceCreateInfo.m_GraphicsPresentQueueCount =
+				snapshot.m_GraphicsPresentQueueCount;
+			return deviceCreateInfo;
 		}
 	}
 
@@ -208,17 +211,17 @@ namespace gglab
 		VulkanAdapterSelectionResult result{};
 
 		const auto acceptedIndices = [&snapshots]()
-		{
-			std::vector<uint32_t> indices;
-			for (uint32_t index = 0; index < snapshots.size(); ++index)
 			{
-				if (snapshots[index].m_ProfileEvaluation.IsAccepted())
+				std::vector<uint32_t> indices;
+				for (uint32_t index = 0; index < snapshots.size(); ++index)
 				{
-					indices.push_back(index);
+					if (snapshots[index].m_ProfileEvaluation.IsAccepted())
+					{
+						indices.push_back(index);
+					}
 				}
-			}
-			return indices;
-		}();
+				return indices;
+			}();
 
 		switch (request.m_Kind)
 		{
@@ -313,7 +316,6 @@ namespace gglab
 
 		VulkanInstance::CreateInfo instanceCreateInfo{};
 		instanceCreateInfo.m_RequestValidation = options.m_RequestValidation;
-		instanceCreateInfo.m_IsDebugBuild = options.m_IsDebugBuild;
 		VulkanInstance::Result instanceResult = VulkanInstance::Create(instanceCreateInfo);
 		if (!instanceResult.Succeeded())
 		{
@@ -362,8 +364,6 @@ namespace gglab
 
 		std::vector<VulkanAdapterCapabilitySnapshot>& snapshots = outReport.m_Adapters;
 		snapshots.reserve(physicalDevices.size());
-		std::vector<std::unique_ptr<VulkanDevice>> probeDevices;
-		probeDevices.reserve(physicalDevices.size());
 
 		for (uint32_t index = 0; index < physicalDevices.size(); ++index)
 		{
@@ -373,31 +373,45 @@ namespace gglab
 			snapshot.m_ProfileCapabilities.m_HasVulkanLoader = true;
 			snapshot.m_ProfileCapabilities.m_HasWin32SurfaceExtension = true;
 
-			EvaluateVulkanAdapterProfile(snapshot);
-			if (OnlyMissingLayoutSupport(snapshot.m_ProfileEvaluation))
+			// Preliminary evaluation neutralizes the descriptor-set layout
+			// gate because the probe has not run yet; "not probed" must never
+			// report as "unsupported". Adapters that fail any other
+			// requirement never create a probe device.
+			const VulkanDeviceProfileEvaluation preliminary =
+				EvaluateVulkanAdapterProfilePreliminary(snapshot);
+			if (!preliminary.IsAccepted())
 			{
-				VulkanDevice::CreateInfo deviceCreateInfo{};
-				deviceCreateInfo.m_PhysicalDevice = physicalDevices[index];
-				deviceCreateInfo.m_ProfileCapabilities = &snapshot.m_ProfileCapabilities;
-				deviceCreateInfo.m_GraphicsPresentQueueFamilyIndex =
-					snapshot.m_GraphicsPresentQueueFamilyIndex;
-				deviceCreateInfo.m_GraphicsPresentQueueCount =
-					snapshot.m_GraphicsPresentQueueCount;
-				VulkanDevice::Result deviceResult = VulkanDevice::Create(deviceCreateInfo);
-				if (deviceResult.Succeeded())
+				snapshot.m_ProfileEvaluation = preliminary;
+				snapshots.push_back(std::move(snapshot));
+				continue;
+			}
+
+			// The adapter passes every non-layout requirement: run the layout
+			// probe with a local temporary device that is destroyed before the
+			// next adapter is examined.
+			bool layoutSupported = false;
+			{
+				VulkanDevice::Result probeResult = VulkanDevice::Create(
+					MakeDeviceCreateInfo(physicalDevices[index], snapshot));
+				if (probeResult.Succeeded())
 				{
-					snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported =
-						ProbeGlobalDescriptorSetLayoutSupport(deviceResult.m_Device->Get());
-					probeDevices.push_back(std::move(deviceResult.m_Device));
+					layoutSupported = ProbeGlobalDescriptorSetLayoutSupport(
+						probeResult.m_Device->Get());
 				}
 				else
 				{
 					LogBootstrapError(std::format(
-						"Adapter [{}] device creation for layout probe failed: {}.",
-						index, deviceResult.m_Error));
+						"Adapter [{}] temporary layout-probe device creation failed: {}.",
+						index, probeResult.m_Error));
+					// The probe could not be executed; support is determined
+					// as unavailable rather than left ambiguous.
+					layoutSupported = false;
 				}
-				EvaluateVulkanAdapterProfile(snapshot);
 			}
+			snapshot.m_GlobalDescriptorSetLayoutProbed = true;
+			snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported = layoutSupported;
+
+			EvaluateVulkanAdapterProfile(snapshot);
 			snapshots.push_back(std::move(snapshot));
 		}
 
@@ -449,32 +463,27 @@ namespace gglab
 		const auto& selectedSnapshot = snapshots[selection.m_SelectedIndex];
 		LogSelectedAdapter(selectedSnapshot);
 
-		// Destroy the probe devices of adapters that were not selected; the
-		// selected adapter keeps its probe device as the qualification device.
-		for (uint32_t index = 0; index < probeDevices.size(); ++index)
+		// Create the final qualification device for the selected adapter with
+		// the same configuration as the temporary probe device. It proves that
+		// the selected VkDevice and VkQueue can be created, and is destroyed
+		// before the surface and instance during cleanup.
 		{
-			if (index != selection.m_SelectedIndex)
+			VulkanDevice::Result deviceResult = VulkanDevice::Create(
+				MakeDeviceCreateInfo(physicalDevices[selection.m_SelectedIndex], selectedSnapshot));
+			if (!deviceResult.Succeeded())
 			{
-				probeDevices[index].reset();
+				LogBootstrapError(std::format(
+					"Selected adapter [{}] '{}' device creation failed: {}.",
+					selectedSnapshot.m_Identity.m_EnumerationIndex,
+					selectedSnapshot.m_Identity.m_DeviceName, deviceResult.m_Error));
+				return 1;
 			}
-		}
-		if (selection.m_SelectedIndex < probeDevices.size() &&
-			probeDevices[selection.m_SelectedIndex])
-		{
 			LogBootstrapInfo(std::format("Vulkan device created on adapter [{}] '{}'.",
 				selectedSnapshot.m_Identity.m_EnumerationIndex,
 				selectedSnapshot.m_Identity.m_DeviceName));
 		}
-		else
-		{
-			LogBootstrapError(std::format(
-				"Selected adapter [{}] has no logical device; profile acceptance is inconsistent.",
-				selection.m_SelectedIndex));
-			return 1;
-		}
 
 		LogBootstrapInfo("Vulkan bootstrap qualification succeeded; cleaning up.");
-		probeDevices.clear();
 		surface.reset();
 		instance.reset();
 		return 0;
