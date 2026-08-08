@@ -26,12 +26,19 @@ Requirements:
 - Visual Studio 18 Insiders with the v143 toolset
 - Windows SDK
 - Git submodules initialized
+- Vulkan SDK 1.3.296 (optional; required for the Vulkan backend)
 
 Open `GraphicsGadgetLab.sln`, then build the `Application` project for x64.
 
 The main executable is written to:
 
     Build/Output/x64/Debug/GraphicsGadgetLab.exe
+
+The Vulkan backend is enabled by default (`GGLAB_ENABLE_VULKAN=1`). It uses
+the Vulkan SDK discovered through the `VULKAN_SDK` environment variable and
+links `vulkan-1.lib`; the runtime uses the system Vulkan loader. Set
+`GGLAB_ENABLE_VULKAN=0` for a DX12-only build that does not require the
+Vulkan SDK.
 
 ## Run a Lab
 
@@ -41,6 +48,20 @@ Run with `--help` to see the available startup options.
 
 The application starts in FPS mouse mode. Press `T` to release the cursor and
 interact with the developer UI.
+
+## RHI backend selection
+
+    GraphicsGadgetLab.exe --rhi vulkan
+    GraphicsGadgetLab.exe --rhi dx12
+    GraphicsGadgetLab.exe --list-adapters
+    GraphicsGadgetLab.exe --rhi vulkan --adapter <index|identity-prefix>
+
+The default backend is DX12. An explicit `--rhi vulkan` creates a Vulkan
+instance, Win32 surface, enumerates and evaluates every physical device
+against the GGLab Vulkan device profile, and creates a logical device and
+graphics queue; it never falls back to DX12. `--list-adapters` prints the
+profile evaluation for every adapter. Swapchain and rendering on Vulkan are
+not implemented yet.
 
 ## Status
 

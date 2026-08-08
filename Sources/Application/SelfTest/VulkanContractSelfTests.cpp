@@ -8,6 +8,9 @@
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderManager.h"
+#if GGLAB_ENABLE_VULKAN
+#include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
+#endif
 
 namespace gglab
 {
@@ -1006,6 +1009,210 @@ namespace gglab
 			context.Check(allValidated,
 				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
 		}
+
+#if GGLAB_ENABLE_VULKAN
+		[[nodiscard]] VulkanDeviceProfileCapabilities MakeSatisfiedProfileCapabilities() noexcept
+		{
+			VulkanDeviceProfileCapabilities caps{};
+			caps.m_IsWindowsX64 = true;
+			caps.m_HasVulkanLoader = true;
+			caps.m_ApiVersion = { 1, 3 };
+			caps.m_HasWin32SurfaceExtension = true;
+			caps.m_HasSwapchainExtension = true;
+			caps.m_HasGraphicsPresentQueue = true;
+			caps.m_DynamicRendering = true;
+			caps.m_Synchronization2 = true;
+			caps.m_TimelineSemaphore = true;
+			caps.m_ScalarBlockLayout = true;
+			caps.m_SamplerAnisotropy = true;
+			caps.m_ShaderStorageImageExtendedFormats = true;
+			caps.m_RuntimeDescriptorArray = true;
+			caps.m_DescriptorBindingPartiallyBound = true;
+			caps.m_DescriptorBindingUpdateUnusedWhilePending = true;
+			caps.m_DescriptorBindingSampledImageUpdateAfterBind = true;
+			caps.m_DescriptorBindingStorageImageUpdateAfterBind = true;
+			caps.m_ShaderSampledImageArrayNonUniformIndexing = true;
+			caps.m_ShaderStorageImageArrayNonUniformIndexing = true;
+			caps.m_HasMutableDescriptorTypeExtension = true;
+			caps.m_MutableDescriptorType = true;
+			caps.m_DescriptorCapacityLimits = {
+				.m_MaxDescriptorSetUpdateAfterBindSampledImages = 65'536,
+				.m_MaxPerStageDescriptorUpdateAfterBindSampledImages = 65'536,
+				.m_MaxDescriptorSetUpdateAfterBindStorageImages = 65'536,
+				.m_MaxPerStageDescriptorUpdateAfterBindStorageImages = 65'536,
+				.m_MaxDescriptorSetUpdateAfterBindSamplers = 2'048,
+				.m_MaxPerStageDescriptorUpdateAfterBindSamplers = 2'048,
+				.m_MaxPerStageUpdateAfterBindResources = 67'584,
+				.m_MaxUpdateAfterBindDescriptorsInAllPools = 67'584,
+			};
+			caps.m_GlobalDescriptorSetLayoutSupported = true;
+			caps.m_RequiredFormatFeaturesSupported = true;
+			return caps;
+		}
+
+		[[nodiscard]] VulkanAdapterCapabilitySnapshot MakeAdapterSnapshot(uint32_t index,
+			std::string name, VkPhysicalDeviceType type,
+			const VulkanDeviceProfileCapabilities& capabilities) noexcept
+		{
+			VulkanAdapterCapabilitySnapshot snapshot{};
+			snapshot.m_Identity.m_EnumerationIndex = index;
+			snapshot.m_Identity.m_DeviceName = std::move(name);
+			snapshot.m_Identity.m_DeviceType = type;
+			for (uint32_t byte = 0; byte < snapshot.m_Identity.m_DeviceUuid.size(); ++byte)
+			{
+				snapshot.m_Identity.m_DeviceUuid[byte] =
+					static_cast<uint8_t>((index + 1) * 17 + byte);
+			}
+			snapshot.m_ProfileCapabilities = capabilities;
+			snapshot.m_ProfileEvaluation =
+				EvaluateVulkanDeviceProfile(snapshot.m_ProfileCapabilities);
+			return snapshot;
+		}
+
+		void RunVulkanBootstrapSelectionTests(SelfTestContext& context) noexcept
+		{
+			const VulkanDeviceProfileCapabilities satisfied = MakeSatisfiedProfileCapabilities();
+
+			// Default selection prefers a discrete accepted adapter.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "Intel Integrated", VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, satisfied));
+				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Discrete", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, {});
+				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
+					"Default adapter selection prefers a discrete GPU over integrated");
+			}
+			// Default selection is stable by enumeration index within one rank.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA First", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Second", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, {});
+				context.Check(result.IsSelected() && result.m_SelectedIndex == 0,
+					"Default adapter selection is deterministic by enumeration index");
+			}
+			// Explicit index selects the requested adapter.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "First", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				snapshots.push_back(MakeAdapterSnapshot(1, "Second", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Index, .m_Index = 1 });
+				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
+					"Explicit adapter index selects the requested adapter");
+			}
+			// Explicit index of a rejected adapter reports the rejection.
+			{
+				auto rejectedCapabilities = satisfied;
+				rejectedCapabilities.m_DescriptorBindingUpdateUnusedWhilePending = false;
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "Rejected", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Index, .m_Index = 0 });
+				context.Check(result.m_Status == VulkanAdapterSelectionStatus::RejectedAdapter &&
+					snapshots[0].m_ProfileEvaluation.HasReason(
+						VulkanDeviceProfileRejectionReason::DescriptorBindingUpdateUnusedWhilePendingUnavailable),
+					"Explicit selection of a rejected adapter reports its rejection reason");
+			}
+			// Index out of range fails without fallback.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "Only", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Index, .m_Index = 7 });
+				context.Check(result.m_Status == VulkanAdapterSelectionStatus::IndexOutOfRange,
+					"Adapter index out of range fails without fallback");
+			}
+			// Unique identity prefix selects exactly one adapter.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA Alpha", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Beta", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const std::string uuidPrefix =
+					snapshots[1].m_Identity.UuidHex().substr(0, 6);
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Prefix, .m_Prefix = uuidPrefix });
+				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
+					"Unique identity prefix selects exactly one adapter");
+			}
+			// Name prefix matches case-insensitively.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA GeForce RTX", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Prefix, .m_Prefix = "nvidia geforce" });
+				context.Check(result.IsSelected() && result.m_SelectedIndex == 0,
+					"Name prefix selection is case-insensitive");
+			}
+			// No match fails with an explicit status.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Prefix, .m_Prefix = "amd" });
+				context.Check(result.m_Status == VulkanAdapterSelectionStatus::SelectorNoMatch,
+					"Adapter prefix with no match reports an explicit status");
+			}
+			// Ambiguous prefix fails.
+			{
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "NVIDIA One", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				snapshots.push_back(MakeAdapterSnapshot(1, "NVIDIA Two", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied));
+				const VulkanAdapterSelectionResult result =
+					SelectVulkanAdapter(snapshots, { .m_Kind = VulkanAdapterSelectionKind::Prefix, .m_Prefix = "nvidia" });
+				context.Check(result.m_Status == VulkanAdapterSelectionStatus::SelectorAmbiguous,
+					"Adapter prefix with multiple matches fails as ambiguous");
+			}
+			// No accepted adapters fails the default selection.
+			{
+				auto rejectedCapabilities = satisfied;
+				rejectedCapabilities.m_ApiVersion = { 1, 2 };
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(MakeAdapterSnapshot(0, "Old API", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, rejectedCapabilities));
+				const VulkanAdapterSelectionResult result = SelectVulkanAdapter(snapshots, {});
+				context.Check(result.m_Status == VulkanAdapterSelectionStatus::NoAcceptedAdapter &&
+					snapshots[0].m_ProfileEvaluation.HasReason(
+						VulkanDeviceProfileRejectionReason::ApiVersionTooLow),
+					"Default selection without accepted adapters reports the profile rejection");
+			}
+			// A rejected adapter preserves every missing capability reason.
+			{
+				auto degraded = satisfied;
+				degraded.m_ApiVersion = { 1, 2 };
+				degraded.m_HasGraphicsPresentQueue = false;
+				degraded.m_HasSwapchainExtension = false;
+				degraded.m_DescriptorBindingUpdateUnusedWhilePending = false;
+				degraded.m_DescriptorCapacityLimits.m_MaxDescriptorSetUpdateAfterBindSampledImages = 1'024;
+				degraded.m_DescriptorCapacityLimits.m_MaxPerStageDescriptorUpdateAfterBindSampledImages = 1'024;
+				degraded.m_DescriptorCapacityLimits.m_MaxDescriptorSetUpdateAfterBindSamplers = 256;
+				degraded.m_DescriptorCapacityLimits.m_MaxPerStageDescriptorUpdateAfterBindSamplers = 256;
+				degraded.m_DescriptorCapacityLimits.m_MaxPerStageUpdateAfterBindResources = 1'024;
+				degraded.m_DescriptorCapacityLimits.m_MaxUpdateAfterBindDescriptorsInAllPools = 1'024;
+				degraded.m_GlobalDescriptorSetLayoutSupported = false;
+				degraded.m_RequiredFormatFeaturesSupported = false;
+
+				VulkanAdapterCapabilitySnapshot snapshot =
+					MakeAdapterSnapshot(0, "Degraded", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, degraded);
+				const auto& evaluation = snapshot.m_ProfileEvaluation;
+				context.Check(!evaluation.IsAccepted() &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::ApiVersionTooLow) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::GraphicsPresentQueueUnavailable) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::SwapchainExtensionUnavailable) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::DescriptorBindingUpdateUnusedWhilePendingUnavailable) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::DescriptorSetSampledImageLimitInsufficient) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::PerStageSampledImageLimitInsufficient) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::DescriptorSetSamplerLimitInsufficient) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::PerStageSamplerLimitInsufficient) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::PerStageUpdateAfterBindResourceLimitInsufficient) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::UpdateAfterBindPoolLimitInsufficient) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::GlobalDescriptorSetLayoutUnsupported) &&
+					evaluation.HasReason(VulkanDeviceProfileRejectionReason::RequiredFormatFeaturesUnavailable),
+					"A degraded adapter preserves every missing capability rejection reason");
+			}
+		}
+#endif
 	}
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
@@ -1015,5 +1222,8 @@ namespace gglab
 		RunDeviceProfileTests(context);
 		RunCoordinatePolicyTests(context);
 		RunShaderArtifactContractTests(context);
+#if GGLAB_ENABLE_VULKAN
+		RunVulkanBootstrapSelectionTests(context);
+#endif
 	}
 }

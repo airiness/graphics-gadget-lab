@@ -2,6 +2,7 @@
 #include "Application/Application.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
+#include "Application/RenderingStartup.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoLoadingShell.h"
@@ -97,7 +98,7 @@ namespace gglab
 
 	void Application::Run() noexcept
 	{
-		if (!m_IsInitialized || !m_PlatformHost)
+		if (!m_IsInitialized || !m_PlatformHost || m_ExitAfterInitialize)
 		{
 			return;
 		}
@@ -151,6 +152,20 @@ namespace gglab
 		m_WindowWidth = mainWindow.GetWidth();
 		m_WindowHeight = mainWindow.GetHeight();
 
+		// The backend is resolved before the ShaderManager preload starts.
+		// Explicit Vulkan selection runs the bootstrap qualification
+		// (instance, surface, adapters, profile gate, device, queue) and then
+		// exits; it never falls back to DX12.
+		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
+		if (m_LaunchOptions.m_ListAdapters || activeBackend == RHIBackendType::Vulkan)
+		{
+			m_ExitCode = RunRenderingStartupPath(
+				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
+			m_ExitAfterInitialize = true;
+			m_IsInitialized = true;
+			return;
+		}
+
 		// Time
 		m_Time = std::make_unique<Time>();
 		m_Time->Initialize();
@@ -167,8 +182,6 @@ namespace gglab
 		{
 			m_InputManager->GetMouse()->SetMouseMode(Mouse::MouseMode::Absolute);
 		}
-
-		const RHIBackendType activeBackend = RHIBackendType::DX12;
 
 		// ShaderManager
 		m_ShaderManager = std::make_unique<ShaderManager>(activeBackend);
@@ -491,6 +504,21 @@ namespace gglab
 	{
 		if (!m_IsInitialized)
 		{
+			return;
+		}
+
+		// Bootstrap/qualification mode never created the renderer subsystems.
+		if (m_ExitAfterInitialize)
+		{
+			if (m_TaskSystem)
+			{
+				m_TaskSystem->Shutdown();
+			}
+			if (m_PlatformHost)
+			{
+				m_PlatformHost->Finalize();
+			}
+			m_IsInitialized = false;
 			return;
 		}
 

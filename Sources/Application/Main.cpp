@@ -52,7 +52,8 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 	}
 	application->Run();
+	const int exitCode = application->GetExitCode();
 	gglab::Application::DestroyApplicationInstance();
 
-	return EXIT_SUCCESS;
+	return exitCode == 0 ? EXIT_SUCCESS : exitCode;
 }
