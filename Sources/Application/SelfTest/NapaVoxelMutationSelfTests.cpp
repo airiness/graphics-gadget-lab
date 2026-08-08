@@ -829,7 +829,7 @@ namespace gglab
 				editedValidation.m_ValidationHash != initialValidation.m_ValidationHash,
 				"Headless CPU publication atomically advances every Gradient-aware replacement");
 			context.Check(editedValidation == WorldMeshValidationResult{
-				.m_ValidationHash = 710722746226056059ull,
+				.m_ValidationHash = 0x623a998fd4ecadf9ull,
 				.m_ChunkCount = 8,
 				.m_VertexCount = 4902,
 				.m_SectionCount = 8,

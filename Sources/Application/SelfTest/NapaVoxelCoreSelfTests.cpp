@@ -36,8 +36,8 @@ namespace gglab
 			contract.m_MeshHashSchemaVersion == 1,
 			"Mesh hash schema version is 1");
 		context.Check(
-			contract.m_ReferenceMesherVersion == 3,
-			"Reference mesher version is 3");
+			contract.m_ReferenceMesherVersion == 4,
+			"Reference mesher version is 4");
 		context.Check(contract.m_EditContractVersion == 3,
 			"Sphere edit contract version is 3");
 		context.Check(contract.m_MutationContractVersion == 4,

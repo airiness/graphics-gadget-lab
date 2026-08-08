@@ -702,39 +702,11 @@ namespace napa::voxel
 				abX * acY - abY * acX,
 			};
 
-			DensityGradient triangleGradient{};
-			for (const ReferenceEdgeVertex& vertex : triangle.m_Vertices)
-			{
-				triangleGradient.m_X += vertex.m_DensityGradient.m_X;
-				triangleGradient.m_Y += vertex.m_DensityGradient.m_Y;
-				triangleGradient.m_Z += vertex.m_DensityGradient.m_Z;
-			}
-			if (!IsFinite(triangleGradient))
-			{
-				return { ValidationError::NonFiniteDensityGradient };
-			}
-
-			const double gradientLengthSquared = triangleGradient.m_X * triangleGradient.m_X +
-				triangleGradient.m_Y * triangleGradient.m_Y +
-				triangleGradient.m_Z * triangleGradient.m_Z;
-			if (!std::isfinite(gradientLengthSquared))
-			{
-				return { ValidationError::NonFiniteDensityGradient };
-			}
-			DensityGradient outwardDirection{};
-			if (gradientLengthSquared > 0.0)
-			{
-				outwardDirection = {
-					-triangleGradient.m_X,
-					-triangleGradient.m_Y,
-					-triangleGradient.m_Z,
-				};
-			}
-			else
-			{
-				outwardDirection = ComputeSolidToEmptyDirection(cubeCorners, tetrahedron);
-			}
-
+			// Winding is a topology contract. Density gradients remain suitable for
+			// smooth vertex normals, but discontinuous edits can make them disagree with
+			// this tetrahedron's actual solid/empty classification.
+			const DensityGradient outwardDirection =
+				ComputeSolidToEmptyDirection(cubeCorners, tetrahedron);
 			if (!IsFinite(outwardDirection))
 			{
 				return { ValidationError::NonFiniteDensityGradient };

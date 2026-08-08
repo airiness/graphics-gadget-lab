@@ -734,7 +734,7 @@ namespace gglab
 					{},
 					emptyResult).Succeeded() &&
 					emptyResult.m_ValidationHash ==
-						0x629858d4ca269402ull &&
+						0x975c842617a7f737ull &&
 					emptyResult.m_VertexCount == 0 &&
 					emptyResult.m_SectionCount == 0 &&
 					emptyResult.m_IndexCount == 0 &&
@@ -754,7 +754,7 @@ namespace gglab
 			context.Check(
 				triangleValid &&
 					triangleResult.m_ValidationHash ==
-						0x178890cb90dd3f73ull &&
+						0x21aed4c96ec6a864ull &&
 					triangleResult.m_VertexCount == 3 &&
 					triangleResult.m_SectionCount == 1 &&
 					triangleResult.m_IndexCount == 3 &&
@@ -776,7 +776,7 @@ namespace gglab
 					{},
 					multiMaterialResult).Succeeded() &&
 					multiMaterialResult.m_ValidationHash ==
-						0xb8ae3a0f7d7e8b9bull &&
+						0xfac2dfe1f66f2a3aull &&
 					multiMaterialResult.m_VertexCount == 4 &&
 					multiMaterialResult.m_SectionCount == 2 &&
 					multiMaterialResult.m_IndexCount == 6 &&
@@ -1892,6 +1892,23 @@ namespace gglab
 				"Surviving triangles still reject zero interpolated gradients");
 
 			std::array<ReferenceEdgeEndpoint, 8>
+				misleadingGradientCorners = MakeReferenceCubeCorners(0b0001);
+			constexpr DensityGradient solidToEmptyDirection{
+				1.0, 2.0 / 3.0, 1.0 / 3.0,
+			};
+			for (ReferenceEdgeEndpoint& corner : misleadingGradientCorners)
+			{
+				corner.m_DensityGradient = solidToEmptyDirection;
+			}
+			ReferenceTetrahedronPolygonization misleadingGradient{};
+			context.Check(mesher.PolygonizeTetrahedron(misleadingGradientCorners, 0,
+				quantizationContext, misleadingGradient).Succeeded() &&
+				misleadingGradient.m_TriangleCount == 1 &&
+				HasDirectionWinding(
+					misleadingGradient.m_Triangles[0], solidToEmptyDirection),
+				"Tetrahedron topology keeps winding outward when edited-field gradients disagree");
+
+			std::array<ReferenceEdgeEndpoint, 8>
 				fallbackCorners = MakeReferenceCubeCorners(0b0001);
 			fallbackCorners[0].m_DensityGradient =
 				{ 1.0, 0.0, 0.0 };
@@ -1914,7 +1931,7 @@ namespace gglab
 					HasDirectionWinding(
 						fallback.m_Triangles[0],
 						{ 1.0, 2.0 / 3.0, 1.0 / 3.0 }),
-				"Degenerate triangle gradients use the centroid winding fallback");
+				"Tetrahedron centroid classification determines canonical winding");
 			if (fallbackSucceeded &&
 				fallback.m_TriangleCount == 1)
 			{
@@ -1955,9 +1972,11 @@ namespace gglab
 					roundedDirectionCorners,
 					0,
 					quantizationContext,
-					roundedDirectionPolygonization).m_Error ==
-					ValidationError::InvalidMeshWinding,
-				"Polygonization orients with the same canonical float direction used by final validation");
+					roundedDirectionPolygonization).Succeeded() &&
+				roundedDirectionPolygonization.m_TriangleCount == 1 &&
+				HasDirectionWinding(roundedDirectionPolygonization.m_Triangles[0],
+					solidToEmptyDirection),
+				"Topology winding remains representable when smooth gradients round toward zero");
 
 			ReferenceTetrahedronPolygonization unchanged{
 				.m_Material = VoxelMaterial::Soil,
@@ -2047,7 +2066,7 @@ namespace gglab
 					emptyMeshing.m_Validation.m_TriangleCount == 0 &&
 					emptyMeshing
 						.m_Validation.m_ValidationHash ==
-						0x629858d4ca269402ull &&
+						0x975c842617a7f737ull &&
 					emptyMeshing
 						.m_SkippedDegenerateTriangleCount == 0,
 				"An empty primitive set produces the canonical empty chunk mesh");
@@ -2117,7 +2136,7 @@ namespace gglab
 				planeMeshed &&
 					planeMeshing
 						.m_Validation.m_ValidationHash ==
-						0x18f0039ac6adfc44ull &&
+						0xec35ebe82f6c064bull &&
 					planeMeshing.m_Validation.m_VertexCount == 384 &&
 					planeMeshing.m_Validation.m_SectionCount == 1 &&
 					planeMeshing.m_Validation.m_IndexCount == 384 &&
@@ -2303,7 +2322,7 @@ namespace gglab
 							.m_Validation.m_TriangleCount &&
 					sphereMeshing
 						.m_Validation.m_ValidationHash ==
-						0x2d964740bb3cc6adull &&
+						0x6b4a8ee0313b31f6ull &&
 					sphereMeshing.m_Validation.m_VertexCount == 864 &&
 					sphereMeshing.m_Validation.m_IndexCount == 864 &&
 					sphereMeshing.m_Validation.m_TriangleCount == 288 &&
@@ -2358,7 +2377,7 @@ namespace gglab
 				negativeSphereMeshed &&
 					negativeSphereMeshing
 						.m_Validation.m_ValidationHash ==
-						0xdf24cca8c64ba64eull &&
+						0xbfe56abe9f0e96a5ull &&
 					negativeSphereMeshing
 						.m_Validation.m_VertexCount == 864 &&
 					negativeSphereMeshing
@@ -2460,7 +2479,7 @@ namespace gglab
 				boxMeshed &&
 					boxMeshing
 						.m_Validation.m_ValidationHash ==
-						0x2aa977bd0bff155bull &&
+						0xd5eaedea9f7e6af4ull &&
 					boxMeshing.m_Validation.m_VertexCount == 1080 &&
 					boxMeshing.m_Validation.m_IndexCount == 1080 &&
 					boxMeshing.m_Validation.m_TriangleCount == 360 &&
@@ -2567,7 +2586,7 @@ namespace gglab
 				multiMaterialMeshed &&
 					multiMaterialMeshing
 						.m_Validation.m_ValidationHash ==
-						0x6300e1b20091c65cull &&
+						0x2b062e7394d3c3b9ull &&
 					multiMaterialMeshing
 						.m_Validation.m_VertexCount == 1104 &&
 					multiMaterialMeshing

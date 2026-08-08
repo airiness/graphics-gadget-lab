@@ -10,7 +10,7 @@ namespace napa::voxel
 			.m_CoreApiVersion = 27,
 			.m_VoxelHashSchemaVersion = 1,
 			.m_MeshHashSchemaVersion = 1,
-			.m_ReferenceMesherVersion = 3,
+			.m_ReferenceMesherVersion = 4,
 			.m_EditContractVersion = 3,
 			.m_MutationContractVersion = 4,
 			.m_DirtyContractVersion = 1,

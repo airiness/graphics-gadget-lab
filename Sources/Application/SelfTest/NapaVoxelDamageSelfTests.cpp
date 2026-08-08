@@ -699,11 +699,11 @@ namespace gglab
 						destroyedVisible.GetChunks().end(), [](const ChunkMeshRecord& record) noexcept
 						{ return record.m_Chunk == ChunkCoord{}; });
 					firstCycleDestroyedGolden = destroyedVoxelHash == 0x299d47db12f692aeull &&
-						validation.m_ValidationHash == 0x9498f89c5c146f0aull &&
+						validation.m_ValidationHash == 0x258d430301532e18ull &&
 						validation.m_VertexCount == 2952 && validation.m_IndexCount == 2952 &&
 						validation.m_TriangleCount == 984 &&
 						chunk != destroyedVisible.GetChunks().end() &&
-						chunk->m_Validation.m_ValidationHash == 0x459d13d8fe45f701ull &&
+						chunk->m_Validation.m_ValidationHash == 0x3017114a9fe6a1d6ull &&
 						chunk->m_Validation.m_TriangleCount == 128 &&
 						chunk->m_Validation.m_QuantizedBounds == QuantizedMeshAabb{
 							.m_Min = {},
