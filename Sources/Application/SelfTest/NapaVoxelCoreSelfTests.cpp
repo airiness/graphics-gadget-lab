@@ -27,7 +27,7 @@ namespace gglab
 			static_cast<unsigned>(contract.m_DirtyContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 22, "Core API version is 22");
+		context.Check(contract.m_CoreApiVersion == 23, "Core API version is 23");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -37,10 +37,10 @@ namespace gglab
 		context.Check(
 			contract.m_ReferenceMesherVersion == 3,
 			"Reference mesher version is 3");
-		context.Check(contract.m_EditContractVersion == 1,
-			"Sphere edit contract version is 1");
-		context.Check(contract.m_MutationContractVersion == 1,
-			"Voxel mutation contract version is 1");
+		context.Check(contract.m_EditContractVersion == 2,
+			"Sphere edit contract version is 2");
+		context.Check(contract.m_MutationContractVersion == 2,
+			"Voxel mutation contract version is 2");
 		context.Check(contract.m_DirtyContractVersion == 1,
 			"Voxel dirty contract version is 1");
 		context.Check(
@@ -49,6 +49,7 @@ namespace gglab
 
 		RunNapaVoxelCoordinateSelfTests(context);
 		RunNapaVoxelEditSelfTests(context);
+		RunNapaVoxelDamageSelfTests(context);
 		RunNapaVoxelMutationSelfTests(context);
 		RunNapaVoxelStorageSelfTests(context);
 		RunNapaVoxelHashSelfTests(context);

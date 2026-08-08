@@ -115,39 +115,66 @@ namespace napa::voxel
 				return validationResult;
 			}
 
+			const auto applyDensitySubtract = [&request, &evaluation](VoxelSample& sample) noexcept
+				{
+					const std::int32_t currentSigned =
+						static_cast<std::int32_t>(sample.m_Density) -
+						static_cast<std::int32_t>(IsoValue);
+					const std::int32_t brushSigned =
+						static_cast<std::int32_t>(evaluation.m_BrushDensity) -
+						static_cast<std::int32_t>(IsoValue);
+					const std::int32_t targetSigned = std::min(currentSigned, -brushSigned);
+
+					std::int32_t resultSigned = currentSigned;
+					if (request.m_Brush.m_Strength == 1.0)
+					{
+						resultSigned = targetSigned;
+					}
+					else if (request.m_Brush.m_Strength > 0.0)
+					{
+						const double interpolated = static_cast<double>(currentSigned) +
+							static_cast<double>(targetSigned - currentSigned) *
+							request.m_Brush.m_Strength;
+						std::int64_t rounded = 0;
+						const ValidationResult roundingResult =
+							RoundHalfAwayFromZero(interpolated, rounded);
+						if (roundingResult.Failed())
+						{
+							return roundingResult;
+						}
+						resultSigned = static_cast<std::int32_t>(rounded);
+					}
+
+					resultSigned = std::clamp(resultSigned, -128, 127);
+					sample.m_Density = static_cast<std::uint8_t>(resultSigned + IsoValue);
+					return ValidationResult{};
+				};
+
 			VoxelSample prepared = before;
 			if (before.m_Material == VoxelMaterial::Soil && evaluation.m_DensityPathEligible)
 			{
-				const std::int32_t currentSigned =
-					static_cast<std::int32_t>(before.m_Density) -
-					static_cast<std::int32_t>(IsoValue);
-				const std::int32_t brushSigned =
-					static_cast<std::int32_t>(evaluation.m_BrushDensity) -
-					static_cast<std::int32_t>(IsoValue);
-				const std::int32_t targetSigned = std::min(currentSigned, -brushSigned);
-
-				std::int32_t resultSigned = currentSigned;
-				if (request.m_Brush.m_Strength == 1.0)
+				const ValidationResult subtractResult = applyDensitySubtract(prepared);
+				if (subtractResult.Failed())
 				{
-					resultSigned = targetSigned;
+					return subtractResult;
 				}
-				else if (request.m_Brush.m_Strength > 0.0)
+			}
+			else if (before.m_Material == VoxelMaterial::Stone &&
+				evaluation.m_DamagePathEligible)
+			{
+				const std::uint16_t accumulatedDamage = std::min<std::uint16_t>(
+					std::numeric_limits<std::uint8_t>::max(),
+					static_cast<std::uint16_t>(before.m_Damage) +
+					static_cast<std::uint16_t>(request.m_MaterialRules.m_DamagePerHit));
+				prepared.m_Damage = static_cast<std::uint8_t>(accumulatedDamage);
+				if (accumulatedDamage >= request.m_MaterialRules.m_StoneBreakThreshold)
 				{
-					const double interpolated = static_cast<double>(currentSigned) +
-						static_cast<double>(targetSigned - currentSigned) *
-						request.m_Brush.m_Strength;
-					std::int64_t rounded = 0;
-					const ValidationResult roundingResult =
-						RoundHalfAwayFromZero(interpolated, rounded);
-					if (roundingResult.Failed())
+					const ValidationResult subtractResult = applyDensitySubtract(prepared);
+					if (subtractResult.Failed())
 					{
-						return roundingResult;
+						return subtractResult;
 					}
-					resultSigned = static_cast<std::int32_t>(rounded);
 				}
-
-				resultSigned = std::clamp(resultSigned, -128, 127);
-				prepared.m_Density = static_cast<std::uint8_t>(resultSigned + IsoValue);
 			}
 
 			VoxelSample storageSample{};

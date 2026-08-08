@@ -82,6 +82,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
@@ -100,6 +101,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />

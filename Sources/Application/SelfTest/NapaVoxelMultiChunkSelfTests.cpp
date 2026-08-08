@@ -1256,7 +1256,7 @@ namespace gglab
 			}
 			const bool damageOnlyValidated = emptyBatchBuilt &&
 				ValidateCpuMeshBatch(damageOnlyBatch, visible, damageOnlyPending).m_Error ==
-					ValidationError::InvalidCpuMeshCandidateSet &&
+				ValidationError::InvalidCpuMeshCandidateSet &&
 				damageOnlyPending == nullptr;
 			WorldMeshValidationResult damageOnlyValidation{};
 			context.Check(

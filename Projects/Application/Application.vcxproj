@@ -144,6 +144,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelDamageSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelHashSelfTests.cpp" />

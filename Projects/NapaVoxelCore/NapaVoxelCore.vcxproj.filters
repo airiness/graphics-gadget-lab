@@ -36,6 +36,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h">
       <Filter>NapaVoxelCore\Edit</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.h">
+      <Filter>NapaVoxelCore\Edit</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h">
       <Filter>NapaVoxelCore\Edit</Filter>
     </ClInclude>
@@ -114,6 +117,9 @@
       <Filter>NapaVoxelCore</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp">
+      <Filter>NapaVoxelCore\Edit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.cpp">
       <Filter>NapaVoxelCore\Edit</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp">

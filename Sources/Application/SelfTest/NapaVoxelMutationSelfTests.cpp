@@ -883,7 +883,7 @@ namespace gglab
 				skippedBatch.m_BaseWorldVoxelRevision == 2 &&
 				skippedBatch.m_TargetWorldVoxelRevision == 3 &&
 				ValidateCpuMeshBatch(skippedBatch, skippedVisible, skippedPending).m_Error ==
-					ValidationError::StaleCpuMeshBatch &&
+				ValidationError::StaleCpuMeshBatch &&
 				!skippedPending && skippedVisible.GetVisibleWorldRevision() == 1,
 				"A replacement Batch cannot skip an unpublished intermediate World revision");
 		}

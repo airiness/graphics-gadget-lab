@@ -4,6 +4,7 @@
 namespace gglab
 {
 	void RunNapaVoxelCoordinateSelfTests(SelfTestContext& context) noexcept;
+	void RunNapaVoxelDamageSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelEditSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelGGLabAdapterSelfTests(SelfTestContext& context) noexcept;
 	void RunNapaVoxelHashSelfTests(SelfTestContext& context) noexcept;
