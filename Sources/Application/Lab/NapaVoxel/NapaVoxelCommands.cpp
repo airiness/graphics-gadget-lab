@@ -131,6 +131,23 @@ namespace gglab
 		return NapaVoxelCommandQueueError::None;
 	}
 
+	void NapaVoxelCommandQueue::Freeze(NapaVoxelCommandQueueError error) noexcept
+	{
+		if (m_TerminalError != NapaVoxelCommandQueueError::None)
+		{
+			return;
+		}
+
+		GGLAB_ASSERT_MSG(error == NapaVoxelCommandQueueError::HostPreparationFailed ||
+			error == NapaVoxelCommandQueueError::PublicationSerialExhausted,
+			"Only host publication failures may freeze the Napa voxel command queue externally.");
+		if (error == NapaVoxelCommandQueueError::HostPreparationFailed ||
+			error == NapaVoxelCommandQueueError::PublicationSerialExhausted)
+		{
+			m_TerminalError = error;
+		}
+	}
+
 	void NapaVoxelCommandQueue::ResetForNewSession() noexcept
 	{
 		m_Commands.clear();

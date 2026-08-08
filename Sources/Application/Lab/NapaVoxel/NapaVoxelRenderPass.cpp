@@ -109,7 +109,12 @@ namespace gglab
 				data.m_Chunks.reserve(frameView->GetChunks().size());
 				for (size_t chunkIndex = 0; chunkIndex < frameView->GetChunks().size(); ++chunkIndex)
 				{
-					const NapaVoxelGpuChunkMesh& source = frameView->GetChunks()[chunkIndex];
+					const auto& sourceOwner = frameView->GetChunks()[chunkIndex];
+					if (!sourceOwner)
+					{
+						continue;
+					}
+					const NapaVoxelGpuChunkMesh& source = *sourceOwner;
 					const std::string vertexName =
 						std::format("NapaVoxel.Vertex.{}", chunkIndex);
 					const std::string indexName =

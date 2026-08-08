@@ -30,6 +30,8 @@ namespace gglab
 		AllocationFailure,
 		EnqueueSerialExhausted,
 		OperationSerialExhausted,
+		HostPreparationFailed,
+		PublicationSerialExhausted,
 	};
 
 	struct NapaVoxelFireParameters
@@ -147,6 +149,7 @@ namespace gglab
 			const napa::voxel::SphereEditRequest& edit) noexcept;
 		[[nodiscard]] NapaVoxelCommandQueueError Dequeue(
 			NapaVoxelDequeuedCommand& command) noexcept;
+		void Freeze(NapaVoxelCommandQueueError error) noexcept;
 
 		void ResetForNewSession() noexcept;
 		[[nodiscard]] bool IsTerminal() const noexcept

@@ -11,6 +11,11 @@
 #include <type_traits>
 #include <vector>
 
+namespace napa::voxel
+{
+	class CpuMeshReplacementView;
+}
+
 namespace gglab
 {
 	enum class NapaVoxelMeshAdapterError : std::uint8_t
@@ -110,6 +115,9 @@ namespace gglab
 		const napa::voxel::VoxelWorldConfig& config, NapaVoxelCpuChunkMesh& mesh);
 	[[nodiscard]] NapaVoxelMeshAdapterResult ConvertNapaVoxelMeshRecords(
 		std::span<const napa::voxel::ChunkMeshRecord> sources,
+		const napa::voxel::VoxelWorldConfig& config, NapaVoxelCpuMeshSet& meshSet);
+	[[nodiscard]] NapaVoxelMeshAdapterResult ConvertNapaVoxelMeshReplacements(
+		const napa::voxel::CpuMeshReplacementView& sources,
 		const napa::voxel::VoxelWorldConfig& config, NapaVoxelCpuMeshSet& meshSet);
 
 	static_assert(std::is_standard_layout_v<NapaVoxelWorldPosition>);

@@ -1,6 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 
+#include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
+
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferBatch.h"
 
@@ -31,6 +33,414 @@ namespace gglab
 				napa::voxel::ValidateConfig(pendingCoreMeshes->GetConfig()).Succeeded() &&
 				pendingCoreMeshes->GetTargetWorldVoxelRevision() != 0;
 		}
+
+		[[nodiscard]] bool IsChunkLess(
+			napa::voxel::ChunkCoord lhs, napa::voxel::ChunkCoord rhs) noexcept
+		{
+			return napa::voxel::ChunkCoordZYXLess{}(lhs, rhs);
+		}
+
+		[[nodiscard]] bool PrepareGpuChunkMesh(RHIDevice* device,
+			const napa::voxel::VoxelWorldConfig& config,
+			const NapaVoxelCpuChunkMesh& cpuChunk, const AssetStreamingIdentity& uploadIdentity,
+			std::string_view label, std::shared_ptr<const NapaVoxelGpuChunkMesh>& mesh,
+			uint64_t& vertexBytes, uint64_t& indexBytes) noexcept
+		{
+			if (!device || cpuChunk.IsEmpty())
+			{
+				return false;
+			}
+
+			const uint64_t preparedVertexBytes =
+				static_cast<uint64_t>(cpuChunk.m_Vertices.size()) * sizeof(NapaVoxelRenderVertex);
+			const uint64_t preparedIndexBytes =
+				static_cast<uint64_t>(cpuChunk.m_Indices.size()) * sizeof(uint32_t);
+			if (preparedVertexBytes == 0 || preparedIndexBytes == 0 ||
+				preparedVertexBytes > std::numeric_limits<uint32_t>::max() ||
+				preparedIndexBytes > std::numeric_limits<uint32_t>::max())
+			{
+				return false;
+			}
+
+			Vector3 translation{};
+			if (ComputeNapaVoxelRenderTranslation(
+				config, cpuChunk.m_ChunkOrigin, {}, translation).Failed())
+			{
+				return false;
+			}
+
+			try
+			{
+				auto prepared = std::make_shared<NapaVoxelGpuChunkMesh>();
+				prepared->m_Chunk = cpuChunk.m_Chunk;
+				prepared->m_Translation = translation;
+				prepared->m_VertexBufferDesc = {
+					.m_SizeInBytes = preparedVertexBytes,
+					.m_StrideInBytes = sizeof(NapaVoxelRenderVertex),
+					.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest,
+					.m_DebugName = "NapaVoxel.VertexBuffer",
+				};
+				prepared->m_IndexBufferDesc = {
+					.m_SizeInBytes = preparedIndexBytes,
+					.m_StrideInBytes = sizeof(uint32_t),
+					.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest,
+					.m_DebugName = "NapaVoxel.IndexBuffer",
+				};
+
+				const RHIResourceDebugIdentityDesc vertexIdentity{
+					.m_Domain = RHIResourceDebugDomain::Renderer,
+					.m_Category = "NapaVoxel.VertexBuffer",
+					.m_Label = label,
+					.m_StableId = uploadIdentity.m_StableId,
+				};
+				const RHIResourceDebugIdentityDesc indexIdentity{
+					.m_Domain = RHIResourceDebugDomain::Renderer,
+					.m_Category = "NapaVoxel.IndexBuffer",
+					.m_Label = label,
+					.m_StableId = uploadIdentity.m_StableId,
+				};
+				prepared->m_VertexBuffer = RHIBufferOwner(
+					device, device->CreateBuffer(prepared->m_VertexBufferDesc, vertexIdentity));
+				prepared->m_IndexBuffer = RHIBufferOwner(
+					device, device->CreateBuffer(prepared->m_IndexBufferDesc, indexIdentity));
+				if (!prepared->m_VertexBuffer || !prepared->m_IndexBuffer)
+				{
+					return false;
+				}
+
+				prepared->m_Sections.reserve(cpuChunk.m_SectionDrawRanges.size());
+				for (const NapaVoxelSectionDrawRange& section : cpuChunk.m_SectionDrawRanges)
+				{
+					prepared->m_Sections.push_back({
+						.m_Material = section.m_Material,
+						.m_FirstIndex = section.m_FirstIndex,
+						.m_IndexCount = section.m_IndexCount,
+						});
+				}
+
+				vertexBytes = preparedVertexBytes;
+				indexBytes = preparedIndexBytes;
+				mesh = std::move(prepared);
+				return true;
+			}
+			catch (...)
+			{
+				return false;
+			}
+		}
+	}
+
+	GGLabMeshPublicationBatch::GGLabMeshPublicationBatch(ConstructionToken,
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pendingCoreMeshes,
+		NapaVoxelCpuMeshSet cpuReplacements,
+		std::shared_ptr<const NapaVoxelGpuMeshSet> baseGpuMeshes,
+		GGLabMeshPublicationIdentity identity, uint64_t schedulerStableId) noexcept :
+		m_PendingCoreMeshes(std::move(pendingCoreMeshes)),
+		m_CpuReplacements(std::move(cpuReplacements)),
+		m_BaseGpuMeshes(std::move(baseGpuMeshes)),
+		m_Identity(identity),
+		m_UploadIdentity({
+			.m_Kind = AssetStreamingWorkKind::RuntimeMesh,
+			.m_StableId = schedulerStableId,
+			.m_Generation = identity.m_OwnerGeneration,
+			})
+	{
+	}
+
+	bool PrepareGGLabMeshPublicationBatch(
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+		const std::shared_ptr<const NapaVoxelGpuMeshSet>& visibleGpuMeshes,
+		GGLabMeshPublicationIdentity identity, uint64_t schedulerStableId,
+		std::shared_ptr<GGLabMeshPublicationBatch>& publication) noexcept
+	{
+		if (!pendingCoreMeshes || !visibleGpuMeshes || identity.m_OperationSerial == 0 ||
+			identity.m_PublicationSerial == 0 || identity.m_OwnerGeneration == 0 ||
+			schedulerStableId == 0 ||
+			pendingCoreMeshes->GetBaseWorldVoxelRevision() == 0 ||
+			pendingCoreMeshes->GetBaseWorldVoxelRevision() !=
+			visibleGpuMeshes->GetVisibleWorldRevision() ||
+			pendingCoreMeshes->GetTargetWorldVoxelRevision() <=
+			pendingCoreMeshes->GetBaseWorldVoxelRevision() ||
+			pendingCoreMeshes->GetConfig() != visibleGpuMeshes->GetConfig())
+		{
+			return false;
+		}
+
+		try
+		{
+			NapaVoxelCpuMeshSet cpuReplacements{};
+			if (ConvertNapaVoxelMeshReplacements(pendingCoreMeshes->GetReplacementChunks(),
+				pendingCoreMeshes->GetConfig(), cpuReplacements).Failed())
+			{
+				return false;
+			}
+
+			auto prepared = std::make_shared<GGLabMeshPublicationBatch>(
+				GGLabMeshPublicationBatch::ConstructionToken{}, std::move(pendingCoreMeshes),
+				std::move(cpuReplacements), visibleGpuMeshes, identity, schedulerStableId);
+			publication = std::move(prepared);
+			return true;
+		}
+		catch (...)
+		{
+			return false;
+		}
+	}
+
+	bool GGLabMeshPublicationBatch::PrepareGpuResources(RHIDevice* device) noexcept
+	{
+		if (m_Status != GGLabMeshPublicationStatus::Uninitialized || !m_PendingCoreMeshes ||
+			!m_BaseGpuMeshes || (!device && m_CpuReplacements.m_RenderableChunkCount != 0))
+		{
+			m_Status = GGLabMeshPublicationStatus::Failed;
+			return false;
+		}
+
+		try
+		{
+			m_Replacements.clear();
+			m_Replacements.reserve(m_CpuReplacements.m_Chunks.size());
+			uint64_t totalBytes = 0;
+			uint64_t operationCount = 0;
+			for (const NapaVoxelCpuChunkMesh& cpuChunk : m_CpuReplacements.m_Chunks)
+			{
+				std::shared_ptr<const NapaVoxelGpuChunkMesh> gpuChunk;
+				if (!cpuChunk.IsEmpty())
+				{
+					uint64_t vertexBytes = 0;
+					uint64_t indexBytes = 0;
+					if (!PrepareGpuChunkMesh(device, m_PendingCoreMeshes->GetConfig(),
+						cpuChunk, m_UploadIdentity, "Replacement Chunk", gpuChunk,
+						vertexBytes, indexBytes) ||
+						!CheckedAccumulate(vertexBytes, totalBytes) ||
+						!CheckedAccumulate(indexBytes, totalBytes) ||
+						!CheckedAccumulate(2, operationCount))
+					{
+						m_Status = GGLabMeshPublicationStatus::Failed;
+						return false;
+					}
+				}
+				m_Replacements.push_back({
+					.m_Chunk = cpuChunk.m_Chunk,
+					.m_Mesh = std::move(gpuChunk),
+					});
+			}
+
+			if (operationCount > std::numeric_limits<uint32_t>::max() ||
+				m_Replacements.size() != m_CpuReplacements.m_Chunks.size())
+			{
+				m_Status = GGLabMeshPublicationStatus::Failed;
+				return false;
+			}
+
+			auto prospective = std::make_shared<NapaVoxelGpuMeshSet>();
+			prospective->m_Config = m_PendingCoreMeshes->GetConfig();
+			prospective->m_VisibleWorldRevision = GetTargetWorldRevision();
+			prospective->m_Chunks.reserve(
+				m_BaseGpuMeshes->m_Chunks.size() + m_Replacements.size());
+
+			size_t baseIndex = 0;
+			size_t replacementIndex = 0;
+			while (baseIndex < m_BaseGpuMeshes->m_Chunks.size() ||
+				replacementIndex < m_Replacements.size())
+			{
+				const auto& base = baseIndex < m_BaseGpuMeshes->m_Chunks.size()
+					? m_BaseGpuMeshes->m_Chunks[baseIndex]
+					: std::shared_ptr<const NapaVoxelGpuChunkMesh>{};
+				const NapaVoxelGpuChunkReplacement* replacement =
+					replacementIndex < m_Replacements.size()
+					? &m_Replacements[replacementIndex]
+					: nullptr;
+				if (!base && baseIndex < m_BaseGpuMeshes->m_Chunks.size())
+				{
+					m_Status = GGLabMeshPublicationStatus::Failed;
+					return false;
+				}
+
+				if (base && (!replacement || IsChunkLess(base->m_Chunk, replacement->m_Chunk)))
+				{
+					prospective->m_Chunks.push_back(base);
+					++baseIndex;
+				}
+				else if (replacement && (!base ||
+					IsChunkLess(replacement->m_Chunk, base->m_Chunk)))
+				{
+					if (replacement->m_Mesh)
+					{
+						prospective->m_Chunks.push_back(replacement->m_Mesh);
+					}
+					++replacementIndex;
+				}
+				else
+				{
+					if (replacement->m_Mesh)
+					{
+						prospective->m_Chunks.push_back(replacement->m_Mesh);
+					}
+					++baseIndex;
+					++replacementIndex;
+				}
+			}
+
+			for (size_t index = 1; index < prospective->m_Chunks.size(); ++index)
+			{
+				if (!IsChunkLess(prospective->m_Chunks[index - 1]->m_Chunk,
+					prospective->m_Chunks[index]->m_Chunk))
+				{
+					m_Status = GGLabMeshPublicationStatus::Failed;
+					return false;
+				}
+			}
+
+			m_UploadEstimate = {
+				.m_SourceBytes = totalBytes,
+				.m_StagingBytes = totalBytes,
+				.m_OperationCount = static_cast<uint32_t>(operationCount),
+			};
+			m_ProspectiveGpuMeshes = std::move(prospective);
+			m_Status = GGLabMeshPublicationStatus::Prepared;
+			return true;
+		}
+		catch (...)
+		{
+			m_Status = GGLabMeshPublicationStatus::Failed;
+			return false;
+		}
+	}
+
+	bool GGLabMeshPublicationBatch::MarkQueued() noexcept
+	{
+		if (m_Status != GGLabMeshPublicationStatus::Prepared || !m_PublicationAllowed)
+		{
+			return false;
+		}
+		m_Status = GGLabMeshPublicationStatus::Queued;
+		return true;
+	}
+
+	bool GGLabMeshPublicationBatch::BeginRecording(
+		const AssetStreamingIdentity& identity) noexcept
+	{
+		if (m_Status != GGLabMeshPublicationStatus::Queued || !m_PublicationAllowed ||
+			identity != m_UploadIdentity ||
+			m_Identity.m_OwnerGeneration != identity.m_Generation)
+		{
+			return false;
+		}
+		m_Status = GGLabMeshPublicationStatus::Recording;
+		return true;
+	}
+
+	bool GGLabMeshPublicationBatch::RecordUpload(TransferBatch& batch) noexcept
+	{
+		if (m_Status != GGLabMeshPublicationStatus::Recording ||
+			m_Replacements.size() != m_CpuReplacements.m_Chunks.size())
+		{
+			return false;
+		}
+
+		bool succeeded = true;
+		for (size_t index = 0; index < m_CpuReplacements.m_Chunks.size(); ++index)
+		{
+			const NapaVoxelCpuChunkMesh& cpuChunk = m_CpuReplacements.m_Chunks[index];
+			const std::shared_ptr<const NapaVoxelGpuChunkMesh>& gpuChunk =
+				m_Replacements[index].m_Mesh;
+			if (cpuChunk.IsEmpty())
+			{
+				if (gpuChunk)
+				{
+					return false;
+				}
+				continue;
+			}
+			if (!gpuChunk || gpuChunk->m_Chunk != cpuChunk.m_Chunk)
+			{
+				return false;
+			}
+
+			succeeded &= batch.UploadBuffer(gpuChunk->m_VertexBuffer.Get(), 0,
+				cpuChunk.m_Vertices.data(), gpuChunk->m_VertexBufferDesc.m_SizeInBytes);
+			succeeded &= batch.UploadBuffer(gpuChunk->m_IndexBuffer.Get(), 0,
+				cpuChunk.m_Indices.data(), gpuChunk->m_IndexBufferDesc.m_SizeInBytes);
+		}
+		return succeeded;
+	}
+
+	bool GGLabMeshPublicationBatch::SetUploadHandle(AssetUploadHandle handle) noexcept
+	{
+		if (m_Status != GGLabMeshPublicationStatus::Recording || !handle.IsValid())
+		{
+			m_Status = GGLabMeshPublicationStatus::Failed;
+			return false;
+		}
+		m_UploadHandle = handle;
+		m_Status = GGLabMeshPublicationStatus::AwaitingFence;
+		return true;
+	}
+
+	bool GGLabMeshPublicationBatch::CompleteUpload(
+		const AssetUploadCompletionInfo& completion) noexcept
+	{
+		if (completion.m_Identity != m_UploadIdentity || completion.m_Handle != m_UploadHandle ||
+			m_HasCompletion)
+		{
+			return false;
+		}
+
+		m_HasCompletion = true;
+		m_CompletionFence = completion.m_FencePoint;
+		if (m_Status == GGLabMeshPublicationStatus::Cancelled)
+		{
+			return true;
+		}
+		if (m_Status != GGLabMeshPublicationStatus::AwaitingFence ||
+			completion.m_Status != AssetUploadStatus::Succeeded ||
+			!completion.m_FencePoint.IsValid() || !m_PublicationAllowed ||
+			m_Identity.m_OwnerGeneration != m_UploadIdentity.m_Generation)
+		{
+			m_Status = GGLabMeshPublicationStatus::Failed;
+			return true;
+		}
+
+		m_Status = GGLabMeshPublicationStatus::ReadyForCommit;
+		return true;
+	}
+
+	void GGLabMeshPublicationBatch::Fail() noexcept
+	{
+		m_PublicationAllowed = false;
+		if (m_Status != GGLabMeshPublicationStatus::Cancelled)
+		{
+			m_Status = GGLabMeshPublicationStatus::Failed;
+		}
+	}
+
+	void GGLabMeshPublicationBatch::Cancel() noexcept
+	{
+		if (m_Status == GGLabMeshPublicationStatus::Cancelled)
+		{
+			return;
+		}
+		m_PublicationAllowed = false;
+		if (m_Identity.m_OwnerGeneration == std::numeric_limits<uint64_t>::max())
+		{
+			m_OwnerGenerationExhausted = true;
+		}
+		else
+		{
+			++m_Identity.m_OwnerGeneration;
+		}
+		m_Status = GGLabMeshPublicationStatus::Cancelled;
+	}
+
+	uint64_t GGLabMeshPublicationBatch::GetBaseWorldRevision() const noexcept
+	{
+		return m_PendingCoreMeshes ? m_PendingCoreMeshes->GetBaseWorldVoxelRevision() : 0;
+	}
+
+	uint64_t GGLabMeshPublicationBatch::GetTargetWorldRevision() const noexcept
+	{
+		return m_PendingCoreMeshes ? m_PendingCoreMeshes->GetTargetWorldVoxelRevision() : 0;
 	}
 
 	NapaVoxelInitialPublicationOwner::NapaVoxelInitialPublicationOwner(
@@ -105,13 +515,11 @@ namespace gglab
 					continue;
 				}
 
-				const uint64_t vertexBytes =
-					static_cast<uint64_t>(cpuChunk.m_Vertices.size()) * sizeof(NapaVoxelRenderVertex);
-				const uint64_t indexBytes =
-					static_cast<uint64_t>(cpuChunk.m_Indices.size()) * sizeof(uint32_t);
-				if (vertexBytes == 0 || indexBytes == 0 ||
-					vertexBytes > std::numeric_limits<uint32_t>::max() ||
-					indexBytes > std::numeric_limits<uint32_t>::max() ||
+				uint64_t vertexBytes = 0;
+				uint64_t indexBytes = 0;
+				std::shared_ptr<const NapaVoxelGpuChunkMesh> gpuChunk;
+				if (!PrepareGpuChunkMesh(device, m_Config, cpuChunk, m_UploadIdentity,
+					"Static Chunk", gpuChunk, vertexBytes, indexBytes) ||
 					!CheckedAccumulate(vertexBytes, totalBytes) ||
 					!CheckedAccumulate(indexBytes, totalBytes) ||
 					!CheckedAccumulate(2, operationCount))
@@ -120,61 +528,6 @@ namespace gglab
 					return false;
 				}
 
-				Vector3 translation{};
-				if (ComputeNapaVoxelRenderTranslation(
-					m_Config, cpuChunk.m_ChunkOrigin, {}, translation).Failed())
-				{
-					m_Status = NapaVoxelInitialPublicationStatus::Failed;
-					return false;
-				}
-
-				NapaVoxelGpuChunkMesh gpuChunk{};
-				gpuChunk.m_Chunk = cpuChunk.m_Chunk;
-				gpuChunk.m_Translation = translation;
-				gpuChunk.m_VertexBufferDesc = {
-					.m_SizeInBytes = vertexBytes,
-					.m_StrideInBytes = sizeof(NapaVoxelRenderVertex),
-					.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest,
-					.m_DebugName = "NapaVoxel.VertexBuffer",
-				};
-				gpuChunk.m_IndexBufferDesc = {
-					.m_SizeInBytes = indexBytes,
-					.m_StrideInBytes = sizeof(uint32_t),
-					.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest,
-					.m_DebugName = "NapaVoxel.IndexBuffer",
-				};
-
-				const RHIResourceDebugIdentityDesc vertexIdentity{
-					.m_Domain = RHIResourceDebugDomain::Renderer,
-					.m_Category = "NapaVoxel.VertexBuffer",
-					.m_Label = "Static Chunk",
-					.m_StableId = m_UploadIdentity.m_StableId,
-				};
-				const RHIResourceDebugIdentityDesc indexIdentity{
-					.m_Domain = RHIResourceDebugDomain::Renderer,
-					.m_Category = "NapaVoxel.IndexBuffer",
-					.m_Label = "Static Chunk",
-					.m_StableId = m_UploadIdentity.m_StableId,
-				};
-				gpuChunk.m_VertexBuffer = RHIBufferOwner(
-					device, device->CreateBuffer(gpuChunk.m_VertexBufferDesc, vertexIdentity));
-				gpuChunk.m_IndexBuffer = RHIBufferOwner(
-					device, device->CreateBuffer(gpuChunk.m_IndexBufferDesc, indexIdentity));
-				if (!gpuChunk.m_VertexBuffer || !gpuChunk.m_IndexBuffer)
-				{
-					m_Status = NapaVoxelInitialPublicationStatus::Failed;
-					return false;
-				}
-
-				gpuChunk.m_Sections.reserve(cpuChunk.m_SectionDrawRanges.size());
-				for (const NapaVoxelSectionDrawRange& section : cpuChunk.m_SectionDrawRanges)
-				{
-					gpuChunk.m_Sections.push_back({
-						.m_Material = section.m_Material,
-						.m_FirstIndex = section.m_FirstIndex,
-						.m_IndexCount = section.m_IndexCount,
-						});
-				}
 				gpuMeshes->m_Chunks.push_back(std::move(gpuChunk));
 			}
 
@@ -243,11 +596,15 @@ namespace gglab
 				return false;
 			}
 
-			const NapaVoxelGpuChunkMesh& gpuChunk = m_GpuMeshes->m_Chunks[gpuChunkIndex++];
-			succeeded &= batch.UploadBuffer(gpuChunk.m_VertexBuffer.Get(), 0,
-				cpuChunk.m_Vertices.data(), gpuChunk.m_VertexBufferDesc.m_SizeInBytes);
-			succeeded &= batch.UploadBuffer(gpuChunk.m_IndexBuffer.Get(), 0,
-				cpuChunk.m_Indices.data(), gpuChunk.m_IndexBufferDesc.m_SizeInBytes);
+			const auto& gpuChunk = m_GpuMeshes->m_Chunks[gpuChunkIndex++];
+			if (!gpuChunk)
+			{
+				return false;
+			}
+			succeeded &= batch.UploadBuffer(gpuChunk->m_VertexBuffer.Get(), 0,
+				cpuChunk.m_Vertices.data(), gpuChunk->m_VertexBufferDesc.m_SizeInBytes);
+			succeeded &= batch.UploadBuffer(gpuChunk->m_IndexBuffer.Get(), 0,
+				cpuChunk.m_Indices.data(), gpuChunk->m_IndexBufferDesc.m_SizeInBytes);
 		}
 		return succeeded && gpuChunkIndex == m_GpuMeshes->m_Chunks.size();
 	}
@@ -402,6 +759,156 @@ namespace gglab
 	{
 		m_VisibleGpuMeshes.reset();
 		m_VisibleCoreMeshes = {};
+	}
+
+	NapaVoxelMeshReplacementUploadSession::NapaVoxelMeshReplacementUploadSession(
+		RHIDevice* device, AssetUploadScheduler* scheduler,
+		NapaVoxelCommandQueue* commandQueue,
+		NapaVoxelPublicationSerialState serialState) noexcept :
+		m_Device(device), m_Scheduler(scheduler), m_CommandQueue(commandQueue),
+		m_LastPublicationSerial(serialState.m_LastPublicationSerial)
+	{
+	}
+
+	NapaVoxelMeshReplacementUploadSession::~NapaVoxelMeshReplacementUploadSession()
+	{
+		CancelPrepare();
+	}
+
+	bool NapaVoxelMeshReplacementUploadSession::BeginPrepare(
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+		const std::shared_ptr<const NapaVoxelGpuMeshSet>& visibleGpuMeshes,
+		uint64_t operationSerial, uint64_t ownerGeneration) noexcept
+	{
+		CancelPrepare();
+		m_HasFailed = false;
+		if (m_LastPublicationSerial == std::numeric_limits<uint64_t>::max())
+		{
+			FailHostPreparation(true);
+			return false;
+		}
+
+		const uint64_t publicationSerial = m_LastPublicationSerial + 1;
+		uint64_t stableId = 0;
+		if (!m_Device || !m_Scheduler || !m_CommandQueue ||
+			!AllocateNapaVoxelPublicationStableId(stableId) ||
+			!PrepareGGLabMeshPublicationBatch(pendingCoreMeshes, visibleGpuMeshes, {
+				.m_OperationSerial = operationSerial,
+				.m_PublicationSerial = publicationSerial,
+				.m_OwnerGeneration = ownerGeneration,
+				}, stableId, m_Publication))
+		{
+			FailHostPreparation(false);
+			return false;
+		}
+
+		m_LastPublicationSerial = publicationSerial;
+		if (!m_Publication->PrepareGpuResources(m_Device) || !m_Publication->MarkQueued())
+		{
+			FailHostPreparation(false);
+			return false;
+		}
+
+		ScheduleUpload();
+		return !m_HasFailed;
+	}
+
+	void NapaVoxelMeshReplacementUploadSession::TickPrepare() noexcept
+	{
+		if (!m_Publication || m_IsReady || m_HasFailed)
+		{
+			return;
+		}
+
+		switch (m_Publication->GetStatus())
+		{
+		case GGLabMeshPublicationStatus::ReadyForCommit:
+			m_IsReady = true;
+			break;
+		case GGLabMeshPublicationStatus::Failed:
+			FailHostPreparation(false);
+			break;
+		case GGLabMeshPublicationStatus::Cancelled:
+		case GGLabMeshPublicationStatus::Uninitialized:
+		case GGLabMeshPublicationStatus::Prepared:
+		case GGLabMeshPublicationStatus::Queued:
+		case GGLabMeshPublicationStatus::Recording:
+		case GGLabMeshPublicationStatus::AwaitingFence:
+			break;
+		}
+	}
+
+	void NapaVoxelMeshReplacementUploadSession::CancelPrepare() noexcept
+	{
+		if (m_Publication)
+		{
+			const AssetStreamingIdentity identity = m_Publication->GetUploadIdentity();
+			m_Publication->Cancel();
+			if (m_Scheduler)
+			{
+				GGLAB_UNUSED(m_Scheduler->CancelReadyWork(identity));
+			}
+			m_Publication.reset();
+		}
+		m_IsReady = false;
+		m_HasFailed = false;
+	}
+
+	void NapaVoxelMeshReplacementUploadSession::ScheduleUpload() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_Scheduler);
+		GGLAB_ASSERT_NOT_NULL(m_Publication.get());
+		if (!m_Scheduler || !m_Publication)
+		{
+			FailHostPreparation(false);
+			return;
+		}
+
+		const std::shared_ptr<GGLabMeshPublicationBatch> publication = m_Publication;
+		const AssetStreamingIdentity identity = publication->GetUploadIdentity();
+		const AssetStreamingWorkEstimate estimate = publication->GetUploadEstimate();
+		AssetUploadScheduler* scheduler = m_Scheduler;
+		scheduler->EnqueueUploadRecording({
+			.m_Name = "Napa Voxel Mesh Replacement Upload",
+			.m_Identity = identity,
+			.m_Estimate = estimate,
+			.m_Priority = TaskPriority::High,
+			},
+			[scheduler, publication, identity, estimate]() noexcept
+			{
+				if (!publication->BeginRecording(identity))
+				{
+					return;
+				}
+				const AssetUploadHandle handle = scheduler->RecordUpload({
+					.m_Name = "Napa Voxel Mesh Replacement Publication",
+					.m_Identity = identity,
+					.m_Estimate = estimate,
+					.m_Priority = TaskPriority::High,
+					},
+					[publication](TransferBatch& batch) noexcept
+					{ return publication->RecordUpload(batch); },
+					[publication](const AssetUploadCompletionInfo& completion) noexcept
+					{ GGLAB_UNUSED(publication->CompleteUpload(completion)); });
+				GGLAB_UNUSED(publication->SetUploadHandle(handle));
+			});
+	}
+
+	void NapaVoxelMeshReplacementUploadSession::FailHostPreparation(
+		bool publicationSerialExhausted) noexcept
+	{
+		if (m_Publication)
+		{
+			m_Publication->Fail();
+		}
+		m_IsReady = false;
+		m_HasFailed = true;
+		if (m_CommandQueue)
+		{
+			m_CommandQueue->Freeze(publicationSerialExhausted
+				? NapaVoxelCommandQueueError::PublicationSerialExhausted
+				: NapaVoxelCommandQueueError::HostPreparationFailed);
+		}
 	}
 
 	NapaVoxelStaticPublicationSession::NapaVoxelStaticPublicationSession(

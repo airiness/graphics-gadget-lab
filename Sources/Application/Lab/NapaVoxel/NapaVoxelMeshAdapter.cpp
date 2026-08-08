@@ -1,6 +1,8 @@
 #include "Core/Precompiled.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelMeshAdapter.h"
 
+#include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
+
 #include "Core/Math/MathFunctions.h"
 
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
@@ -205,6 +207,58 @@ namespace gglab
 			total = *sum;
 			return true;
 		}
+
+		NapaVoxelMeshAdapterResult ConvertMeshRecordPointers(
+			std::vector<const napa::voxel::ChunkMeshRecord*> orderedSources,
+			const napa::voxel::VoxelWorldConfig& config, NapaVoxelCpuMeshSet& meshSet)
+		{
+			using namespace napa::voxel;
+			std::sort(orderedSources.begin(), orderedSources.end(),
+				[](const ChunkMeshRecord* lhs, const ChunkMeshRecord* rhs) noexcept
+				{
+					return ChunkCoordZYXLess{}(lhs->m_Chunk, rhs->m_Chunk);
+				});
+			for (std::size_t index = 1; index < orderedSources.size(); ++index)
+			{
+				if (orderedSources[index - 1]->m_Chunk == orderedSources[index]->m_Chunk)
+				{
+					return MakeAdapterError(NapaVoxelMeshAdapterError::DuplicateChunk);
+				}
+			}
+
+			NapaVoxelCpuMeshSet converted;
+			converted.m_Chunks.reserve(orderedSources.size());
+			for (const ChunkMeshRecord* source : orderedSources)
+			{
+				NapaVoxelCpuChunkMesh chunkMesh;
+				const NapaVoxelMeshAdapterResult convertResult =
+					ConvertValidatedChunkMesh(*source, config, chunkMesh);
+				if (convertResult.Failed())
+				{
+					return convertResult;
+				}
+
+				if (!chunkMesh.IsEmpty() &&
+					!AccumulateCount(std::uint64_t{ 1 }, converted.m_RenderableChunkCount))
+				{
+					return MakeAdapterError(NapaVoxelMeshAdapterError::CountOutOfRange);
+				}
+				if (!AccumulateCount(chunkMesh.m_CoreValidation.m_VertexCount,
+					converted.m_VertexCount) ||
+					!AccumulateCount(chunkMesh.m_CoreValidation.m_IndexCount,
+						converted.m_IndexCount) ||
+					!AccumulateCount(chunkMesh.m_CoreValidation.m_SectionCount,
+						converted.m_SectionCount))
+				{
+					return MakeAdapterError(NapaVoxelMeshAdapterError::CountOutOfRange);
+				}
+
+				converted.m_Chunks.push_back(std::move(chunkMesh));
+			}
+
+			meshSet = std::move(converted);
+			return {};
+		}
 	}
 
 	NapaVoxelMeshAdapterResult ComputeNapaVoxelChunkOrigin(
@@ -309,50 +363,25 @@ namespace gglab
 		{
 			orderedSources.push_back(&source);
 		}
-		std::sort(orderedSources.begin(), orderedSources.end(),
-			[](const ChunkMeshRecord* lhs, const ChunkMeshRecord* rhs) noexcept
-			{
-				return ChunkCoordZYXLess{}(lhs->m_Chunk, rhs->m_Chunk);
-			});
-		for (std::size_t index = 1; index < orderedSources.size(); ++index)
+		return ConvertMeshRecordPointers(std::move(orderedSources), config, meshSet);
+	}
+
+	NapaVoxelMeshAdapterResult ConvertNapaVoxelMeshReplacements(
+		const napa::voxel::CpuMeshReplacementView& sources,
+		const napa::voxel::VoxelWorldConfig& config, NapaVoxelCpuMeshSet& meshSet)
+	{
+		const napa::voxel::ValidationResult configResult = napa::voxel::ValidateConfig(config);
+		if (configResult.Failed())
 		{
-			if (orderedSources[index - 1]->m_Chunk == orderedSources[index]->m_Chunk)
-			{
-				return MakeAdapterError(NapaVoxelMeshAdapterError::DuplicateChunk);
-			}
+			return MakeCoreError(configResult);
 		}
 
-		NapaVoxelCpuMeshSet converted;
-		converted.m_Chunks.reserve(orderedSources.size());
-		for (const ChunkMeshRecord* source : orderedSources)
+		std::vector<const napa::voxel::ChunkMeshRecord*> orderedSources;
+		orderedSources.reserve(sources.size());
+		for (std::size_t index = 0; index < sources.size(); ++index)
 		{
-			NapaVoxelCpuChunkMesh chunkMesh;
-			const NapaVoxelMeshAdapterResult convertResult =
-				ConvertValidatedChunkMesh(*source, config, chunkMesh);
-			if (convertResult.Failed())
-			{
-				return convertResult;
-			}
-
-			if (!chunkMesh.IsEmpty() &&
-				!AccumulateCount(std::uint64_t{ 1 }, converted.m_RenderableChunkCount))
-			{
-				return MakeAdapterError(NapaVoxelMeshAdapterError::CountOutOfRange);
-			}
-			if (!AccumulateCount(chunkMesh.m_CoreValidation.m_VertexCount,
-				converted.m_VertexCount) ||
-				!AccumulateCount(chunkMesh.m_CoreValidation.m_IndexCount,
-					converted.m_IndexCount) ||
-				!AccumulateCount(chunkMesh.m_CoreValidation.m_SectionCount,
-					converted.m_SectionCount))
-			{
-				return MakeAdapterError(NapaVoxelMeshAdapterError::CountOutOfRange);
-			}
-
-			converted.m_Chunks.push_back(std::move(chunkMesh));
+			orderedSources.push_back(&sources[index]);
 		}
-
-		meshSet = std::move(converted);
-		return {};
+		return ConvertMeshRecordPointers(std::move(orderedSources), config, meshSet);
 	}
 }

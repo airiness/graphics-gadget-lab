@@ -13,8 +13,10 @@
 
 namespace gglab
 {
+	class NapaVoxelCommandQueue;
 	class NapaVoxelInitialPublicationOwner;
 	class NapaVoxelPreparedInitialCommit;
+	class GGLabMeshPublicationBatch;
 
 	[[nodiscard]] bool PrepareNapaVoxelInitialPublication(
 		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
@@ -52,6 +54,14 @@ namespace gglab
 		std::vector<NapaVoxelGpuSectionDraw> m_Sections;
 	};
 
+	struct NapaVoxelGpuChunkReplacement
+	{
+		napa::voxel::ChunkCoord m_Chunk{};
+		std::shared_ptr<const NapaVoxelGpuChunkMesh> m_Mesh;
+
+		[[nodiscard]] bool IsDelete() const noexcept { return !m_Mesh; }
+	};
+
 	class NapaVoxelGpuMeshSet final
 	{
 	public:
@@ -68,17 +78,194 @@ namespace gglab
 		{
 			return m_Config;
 		}
-		[[nodiscard]] const std::vector<NapaVoxelGpuChunkMesh>& GetChunks() const noexcept
+		[[nodiscard]] const std::vector<std::shared_ptr<const NapaVoxelGpuChunkMesh>>&
+			GetChunks() const noexcept
 		{
 			return m_Chunks;
 		}
 
 	private:
 		friend class NapaVoxelInitialPublicationOwner;
+		friend class GGLabMeshPublicationBatch;
+		friend class NapaVoxelRenderState;
 
 		napa::voxel::VoxelWorldConfig m_Config{};
 		uint64_t m_VisibleWorldRevision = 0;
-		std::vector<NapaVoxelGpuChunkMesh> m_Chunks;
+		std::vector<std::shared_ptr<const NapaVoxelGpuChunkMesh>> m_Chunks;
+	};
+
+	enum class GGLabMeshPublicationStatus : uint8_t
+	{
+		Uninitialized,
+		Prepared,
+		Queued,
+		Recording,
+		AwaitingFence,
+		ReadyForCommit,
+		Failed,
+		Cancelled,
+	};
+
+	struct GGLabMeshPublicationIdentity
+	{
+		uint64_t m_OperationSerial = 0;
+		uint64_t m_PublicationSerial = 0;
+		uint64_t m_OwnerGeneration = 0;
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const GGLabMeshPublicationIdentity&,
+			const GGLabMeshPublicationIdentity&) noexcept = default;
+	};
+
+	[[nodiscard]] bool PrepareGGLabMeshPublicationBatch(
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+		const std::shared_ptr<const NapaVoxelGpuMeshSet>& visibleGpuMeshes,
+		GGLabMeshPublicationIdentity identity, uint64_t schedulerStableId,
+		std::shared_ptr<GGLabMeshPublicationBatch>& publication) noexcept;
+
+	class GGLabMeshPublicationBatch final
+	{
+	private:
+		struct ConstructionToken
+		{
+		};
+
+	public:
+		GGLabMeshPublicationBatch(ConstructionToken,
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pendingCoreMeshes,
+			NapaVoxelCpuMeshSet cpuReplacements,
+			std::shared_ptr<const NapaVoxelGpuMeshSet> baseGpuMeshes,
+			GGLabMeshPublicationIdentity identity, uint64_t schedulerStableId) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(GGLabMeshPublicationBatch);
+
+		[[nodiscard]] bool PrepareGpuResources(RHIDevice* device) noexcept;
+		[[nodiscard]] bool MarkQueued() noexcept;
+		[[nodiscard]] bool BeginRecording(const AssetStreamingIdentity& identity) noexcept;
+		[[nodiscard]] bool RecordUpload(TransferBatch& batch) noexcept;
+		[[nodiscard]] bool SetUploadHandle(AssetUploadHandle handle) noexcept;
+		[[nodiscard]] bool CompleteUpload(
+			const AssetUploadCompletionInfo& completion) noexcept;
+		void Fail() noexcept;
+		void Cancel() noexcept;
+
+		[[nodiscard]] GGLabMeshPublicationStatus GetStatus() const noexcept
+		{
+			return m_Status;
+		}
+		[[nodiscard]] const GGLabMeshPublicationIdentity& GetIdentity() const noexcept
+		{
+			return m_Identity;
+		}
+		[[nodiscard]] AssetStreamingIdentity GetUploadIdentity() const noexcept
+		{
+			return m_UploadIdentity;
+		}
+		[[nodiscard]] AssetUploadHandle GetUploadHandle() const noexcept
+		{
+			return m_UploadHandle;
+		}
+		[[nodiscard]] RHIFencePoint GetCompletionFence() const noexcept
+		{
+			return m_CompletionFence;
+		}
+		[[nodiscard]] const AssetStreamingWorkEstimate& GetUploadEstimate() const noexcept
+		{
+			return m_UploadEstimate;
+		}
+		[[nodiscard]] uint64_t GetBaseWorldRevision() const noexcept;
+		[[nodiscard]] uint64_t GetTargetWorldRevision() const noexcept;
+		[[nodiscard]] const std::vector<NapaVoxelGpuChunkReplacement>&
+			GetReplacements() const noexcept
+		{
+			return m_Replacements;
+		}
+		[[nodiscard]] const std::shared_ptr<const NapaVoxelGpuMeshSet>&
+			GetBaseGpuMeshes() const noexcept
+		{
+			return m_BaseGpuMeshes;
+		}
+		[[nodiscard]] std::shared_ptr<const NapaVoxelGpuMeshSet>
+			GetProspectiveGpuMeshes() const noexcept
+		{
+			return m_ProspectiveGpuMeshes;
+		}
+		[[nodiscard]] bool IsReadyForCommit() const noexcept
+		{
+			return m_Status == GGLabMeshPublicationStatus::ReadyForCommit;
+		}
+		[[nodiscard]] bool HasCompletion() const noexcept { return m_HasCompletion; }
+		[[nodiscard]] bool IsOwnerGenerationExhausted() const noexcept
+		{
+			return m_OwnerGenerationExhausted;
+		}
+
+	private:
+		friend bool PrepareGGLabMeshPublicationBatch(
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+			const std::shared_ptr<const NapaVoxelGpuMeshSet>& visibleGpuMeshes,
+			GGLabMeshPublicationIdentity identity, uint64_t schedulerStableId,
+			std::shared_ptr<GGLabMeshPublicationBatch>& publication) noexcept;
+
+		std::unique_ptr<napa::voxel::PendingCpuMeshBatch> m_PendingCoreMeshes;
+		NapaVoxelCpuMeshSet m_CpuReplacements;
+		std::shared_ptr<const NapaVoxelGpuMeshSet> m_BaseGpuMeshes;
+		std::shared_ptr<NapaVoxelGpuMeshSet> m_ProspectiveGpuMeshes;
+		std::vector<NapaVoxelGpuChunkReplacement> m_Replacements;
+		GGLabMeshPublicationIdentity m_Identity{};
+		AssetStreamingIdentity m_UploadIdentity{};
+		AssetStreamingWorkEstimate m_UploadEstimate{};
+		AssetUploadHandle m_UploadHandle{};
+		RHIFencePoint m_CompletionFence{};
+		GGLabMeshPublicationStatus m_Status = GGLabMeshPublicationStatus::Uninitialized;
+		bool m_PublicationAllowed = true;
+		bool m_OwnerGenerationExhausted = false;
+		bool m_HasCompletion = false;
+	};
+
+	struct NapaVoxelPublicationSerialState
+	{
+		uint64_t m_LastPublicationSerial = 0;
+	};
+
+	class NapaVoxelMeshReplacementUploadSession final
+	{
+	public:
+		NapaVoxelMeshReplacementUploadSession(RHIDevice* device,
+			AssetUploadScheduler* scheduler, NapaVoxelCommandQueue* commandQueue,
+			NapaVoxelPublicationSerialState serialState = {}) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(NapaVoxelMeshReplacementUploadSession);
+		~NapaVoxelMeshReplacementUploadSession();
+
+		[[nodiscard]] bool BeginPrepare(
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pendingCoreMeshes,
+			const std::shared_ptr<const NapaVoxelGpuMeshSet>& visibleGpuMeshes,
+			uint64_t operationSerial, uint64_t ownerGeneration) noexcept;
+		void TickPrepare() noexcept;
+		void CancelPrepare() noexcept;
+
+		[[nodiscard]] bool IsReady() const noexcept { return m_IsReady; }
+		[[nodiscard]] bool HasFailed() const noexcept { return m_HasFailed; }
+		[[nodiscard]] uint64_t GetLastPublicationSerial() const noexcept
+		{
+			return m_LastPublicationSerial;
+		}
+		[[nodiscard]] const std::shared_ptr<GGLabMeshPublicationBatch>&
+			GetPublication() const noexcept
+		{
+			return m_Publication;
+		}
+
+	private:
+		void ScheduleUpload() noexcept;
+		void FailHostPreparation(bool publicationSerialExhausted) noexcept;
+
+		RHIDevice* m_Device = nullptr;
+		AssetUploadScheduler* m_Scheduler = nullptr;
+		NapaVoxelCommandQueue* m_CommandQueue = nullptr;
+		std::shared_ptr<GGLabMeshPublicationBatch> m_Publication;
+		uint64_t m_LastPublicationSerial = 0;
+		bool m_IsReady = false;
+		bool m_HasFailed = false;
 	};
 
 	class NapaVoxelInitialPublicationOwner final
