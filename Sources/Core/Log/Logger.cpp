@@ -1,31 +1,56 @@
 #include "Core/Log/Logger.h"
+#include "Core/CoreMacros.h"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/basic_file_sink.h>
+
+#include <string>
+#include <string_view>
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] std::string_view LoggerName(Logger::LoggerType type) noexcept
+		{
+			return type == Logger::LoggerType::Application ? "APPLICATION" : "GRAPHICS";
+		}
+
+		std::shared_ptr<spdlog::logger> CreateDefaultLogger(Logger::LoggerType type)
+		{
+			auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+			consoleSink->set_pattern("[%T] [%^%l%$] [PID %P] [%n] %v");
+
+			auto logger =
+				std::make_shared<spdlog::logger>(std::string(LoggerName(type)), consoleSink);
+			logger->set_level(spdlog::level::trace);
+			spdlog::register_logger(logger);
+			return logger;
+		}
+	}
+
 	std::array<std::shared_ptr<spdlog::logger>, static_cast<uint32_t>(Logger::LoggerType::Count)>
 		Logger::s_Loggers;
 
+	std::array<std::once_flag, static_cast<uint32_t>(Logger::LoggerType::Count)>
+		Logger::s_LoggerCreationFlags;
+
 	void Logger::Initialize() noexcept
 	{
-		auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-		console_sink->set_pattern("[%T] [%^%l%$] [PID %P] [%n] %v");
-
-		s_Loggers[static_cast<uint32_t>(LoggerType::Application)] =
-			std::make_shared<spdlog::logger>("APPLICATION", console_sink);
-		s_Loggers[static_cast<uint32_t>(LoggerType::Application)]->set_level(spdlog::level::trace);
-		spdlog::register_logger(s_Loggers[static_cast<uint32_t>(LoggerType::Application)]);
-
-		s_Loggers[static_cast<uint32_t>(LoggerType::Graphics)] =
-			std::make_shared<spdlog::logger>("GRAPHICS", console_sink);
-		s_Loggers[static_cast<uint32_t>(LoggerType::Graphics)]->set_level(spdlog::level::trace);
-		spdlog::register_logger(s_Loggers[static_cast<uint32_t>(LoggerType::Graphics)]);
+		// Loggers are available without initialization; this only guarantees
+		// they exist before the main loop starts.
+		GGLAB_UNUSED(GetLogger(LoggerType::Application));
+		GGLAB_UNUSED(GetLogger(LoggerType::Graphics));
 	}
 
 	std::shared_ptr<spdlog::logger>& Logger::GetLogger(LoggerType type) noexcept
 	{
-		return s_Loggers[static_cast<uint32_t>(type)];
+		const uint32_t index = static_cast<uint32_t>(type);
+		auto& logger = s_Loggers[index];
+		if (!logger)
+		{
+			std::call_once(
+				s_LoggerCreationFlags[index], [&logger, type] { logger = CreateDefaultLogger(type); });
+		}
+		return logger;
 	}
 }

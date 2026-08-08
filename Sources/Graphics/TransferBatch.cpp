@@ -1,6 +1,5 @@
 #include "Core/Precompiled.h"
 #include "Graphics/TransferBatch.h"
-#include "Core/Log/Logger.h"
 
 namespace gglab
 {
@@ -46,22 +45,6 @@ namespace gglab
 				RangesOverlapDimension(lhs.m_BaseArraySlice, lhs.m_ArraySliceCount,
 					rhs.m_BaseArraySlice, rhs.m_ArraySliceCount);
 		}
-
-		void LogTransferBatchWarning(std::string_view message) noexcept
-		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-			{
-				logger->warn("{}", message);
-			}
-		}
-
-		void LogTransferBatchError(std::string_view message) noexcept
-		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-			{
-				logger->error("{}", message);
-			}
-		}
 	}
 
 	TransferBatch::TransferBatch(RHITransferContext& transferContext) noexcept :
@@ -101,7 +84,7 @@ namespace gglab
 		}
 		if (!dstBuffer.IsValid() || !src || numBytes == 0)
 		{
-			LogTransferBatchWarning("TransferBatch rejected an invalid RHI buffer write.");
+			GGLAB_LOG_GRAPHICS_WARN("TransferBatch rejected an invalid RHI buffer write.");
 			return false;
 		}
 
@@ -126,7 +109,7 @@ namespace gglab
 			!IsRHIResourceStateValid(initialState, RHIResourceStateUsage::TextureInitial) ||
 			!IsRHIResourceStateValid(publishedState, RHIResourceStateUsage::TextureBarrierAfter))
 		{
-			LogTransferBatchWarning(
+			GGLAB_LOG_GRAPHICS_WARN(
 				"TransferBatch rejected invalid texture publication states.");
 			return false;
 		}
@@ -254,7 +237,7 @@ namespace gglab
 			if (RangesOverlap(existingRange, effectiveRange) &&
 				publication.m_PublishedState != publishedState)
 			{
-				LogTransferBatchError(
+				GGLAB_LOG_GRAPHICS_ERROR(
 					"TransferBatch rejected texture publications whose overlapping ranges would end with conflicting terminal states.");
 				Fail();
 				return false;

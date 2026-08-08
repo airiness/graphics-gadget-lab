@@ -1,4 +1,4 @@
-#include "Core/Precompiled.h"
+﻿#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Core/Hash/Sha256.h"
 #include "Core/Log/Logger.h"
@@ -25,11 +25,6 @@ namespace gglab
 			ContainerMagic.size() + 3 * sizeof(uint32_t) + sizeof(uint64_t) +
 			DerivedDataKey{}.m_Value.size() + ArtifactContentDigest{}.m_Value.size() +
 			Sha256Hash{}.m_Value.size();
-
-		[[nodiscard]] bool HasGraphicsLogger() noexcept
-		{
-			return static_cast<bool>(Logger::GetLogger(Logger::LoggerType::Graphics));
-		}
 
 		class BinaryWriter
 		{
@@ -264,10 +259,7 @@ namespace gglab
 		{
 			m_Catalog.RemoveEntry(path);
 		}
-		if (HasGraphicsLogger())
-		{
-			GGLAB_LOG_GRAPHICS_WARN("Discarded corrupt local DDC entry '{}'.", path.string());
-		}
+		GGLAB_LOG_GRAPHICS_WARN("Discarded corrupt local DDC entry '{}'.", path.string());
 		return result;
 	}
 
@@ -352,14 +344,11 @@ namespace gglab
 				}
 
 				m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
-				if (HasGraphicsLogger())
-				{
-					GGLAB_LOG_GRAPHICS_ERROR(
-						"Rejected non-deterministic local DDC write for key '{}' (existing artifact {}, produced artifact {}).",
-						DerivedDataKeyText(key),
-						ArtifactContentDigestText(existing.m_ArtifactContentDigest),
-						ArtifactContentDigestText(artifactContentDigest));
-				}
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Rejected non-deterministic local DDC write for key '{}' (existing artifact {}, produced artifact {}).",
+					DerivedDataKeyText(key),
+					ArtifactContentDigestText(existing.m_ArtifactContentDigest),
+					ArtifactContentDigestText(artifactContentDigest));
 				return false;
 			}
 
@@ -370,12 +359,9 @@ namespace gglab
 				{
 					m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
 					m_Catalog.RemoveEntry(path);
-					if (HasGraphicsLogger())
-					{
-						GGLAB_LOG_GRAPHICS_WARN(
-							"Discarded corrupt local DDC entry '{}' before immutable publication.",
-							path.string());
-					}
+					GGLAB_LOG_GRAPHICS_WARN(
+						"Discarded corrupt local DDC entry '{}' before immutable publication.",
+						path.string());
 					continue;
 				}
 			}
@@ -466,12 +452,9 @@ namespace gglab
 				std::filesystem::rename(m_RootDirectory, trashPath, errorCode);
 				if (errorCode)
 				{
-					if (HasGraphicsLogger())
-					{
-						GGLAB_LOG_GRAPHICS_WARN(
-							"Local DDC clear could not rename '{}' to '{}': {}.",
-							m_RootDirectory.string(), trashPath.string(), errorCode.message());
-					}
+					GGLAB_LOG_GRAPHICS_WARN(
+						"Local DDC clear could not rename '{}' to '{}': {}.",
+						m_RootDirectory.string(), trashPath.string(), errorCode.message());
 					return false;
 				}
 
@@ -479,12 +462,9 @@ namespace gglab
 				{
 					errorCode.clear();
 					std::filesystem::rename(trashPath, m_RootDirectory, errorCode);
-					if (HasGraphicsLogger())
-					{
-						GGLAB_LOG_GRAPHICS_ERROR(
-							"Local DDC clear could not create replacement root '{}'; rollback {}.",
-							m_RootDirectory.string(), errorCode ? "failed" : "succeeded");
-					}
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"Local DDC clear could not create replacement root '{}'; rollback {}.",
+						m_RootDirectory.string(), errorCode ? "failed" : "succeeded");
 					return false;
 				}
 				trashPaths.push_back(trashPath);
@@ -535,11 +515,8 @@ namespace gglab
 		win32::NamedMutexGuard maintenance = m_MaintenanceLock.Acquire();
 		if (!maintenance.WasAbandoned())
 			return maintenance;
-		if (HasGraphicsLogger())
-		{
-			GGLAB_LOG_GRAPHICS_WARN("Recovered an abandoned local DDC maintenance lock for '{}'.",
-				m_RootDirectory.string());
-		}
+		GGLAB_LOG_GRAPHICS_WARN("Recovered an abandoned local DDC maintenance lock for '{}'.",
+			m_RootDirectory.string());
 		GGLAB_UNUSED(m_Catalog.Reconcile());
 		CleanupOrphanTemporaryFilesLocked();
 		return maintenance;
