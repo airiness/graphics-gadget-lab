@@ -118,6 +118,11 @@ namespace gglab
 				: capabilities.m_GlobalDescriptorSetLayoutSupported ? "supported" : "unsupported";
 			LogBootstrapInfo(std::format("    globalSet1LayoutSupport={} requiredFormatFeatures={}",
 				layoutState, capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
+			if (!snapshot.m_LayoutProbeError.empty())
+			{
+				LogBootstrapInfo(std::format("    layout probe failed: {}",
+					snapshot.m_LayoutProbeError));
+			}
 			for (const VulkanFormatSupportDiagnostic& format : snapshot.m_FormatDiagnostics)
 			{
 				LogBootstrapInfo(std::format("    format {} ({}) supported={}",
@@ -215,7 +220,11 @@ namespace gglab
 				std::vector<uint32_t> indices;
 				for (uint32_t index = 0; index < snapshots.size(); ++index)
 				{
-					if (snapshots[index].m_ProfileEvaluation.IsAccepted())
+					// An accepted profile alone is not enough: the layout support
+					// must have been verified by an actual probe, otherwise the
+					// adapter cannot be selected.
+					if (snapshots[index].m_ProfileEvaluation.IsAccepted() &&
+						snapshots[index].m_GlobalDescriptorSetLayoutProbed)
 					{
 						indices.push_back(index);
 					}
@@ -258,7 +267,8 @@ namespace gglab
 				result.m_Status = VulkanAdapterSelectionStatus::IndexOutOfRange;
 				return result;
 			}
-			if (!snapshots[request.m_Index].m_ProfileEvaluation.IsAccepted())
+			if (!snapshots[request.m_Index].m_ProfileEvaluation.IsAccepted() ||
+				!snapshots[request.m_Index].m_GlobalDescriptorSetLayoutProbed)
 			{
 				result.m_Status = VulkanAdapterSelectionStatus::RejectedAdapter;
 				result.m_SelectedIndex = request.m_Index;
@@ -288,7 +298,8 @@ namespace gglab
 				result.m_Status = VulkanAdapterSelectionStatus::SelectorAmbiguous;
 				return result;
 			}
-			if (!snapshots[matches[0]].m_ProfileEvaluation.IsAccepted())
+			if (!snapshots[matches[0]].m_ProfileEvaluation.IsAccepted() ||
+				!snapshots[matches[0]].m_GlobalDescriptorSetLayoutProbed)
 			{
 				result.m_Status = VulkanAdapterSelectionStatus::RejectedAdapter;
 				result.m_SelectedIndex = matches[0];
@@ -388,30 +399,26 @@ namespace gglab
 
 			// The adapter passes every non-layout requirement: run the layout
 			// probe with a local temporary device that is destroyed before the
-			// next adapter is examined.
-			bool layoutSupported = false;
+			// next adapter is examined. A failed probe device leaves the
+			// adapter unverified (probed stays false), so it cannot be selected.
 			{
 				VulkanDevice::Result probeResult = VulkanDevice::Create(
 					MakeDeviceCreateInfo(physicalDevices[index], snapshot));
-				if (probeResult.Succeeded())
+				if (!probeResult.Succeeded())
 				{
-					layoutSupported = ProbeGlobalDescriptorSetLayoutSupport(
-						probeResult.m_Device->Get());
-				}
-				else
-				{
+					snapshot.m_LayoutProbeError = probeResult.m_Error;
 					LogBootstrapError(std::format(
 						"Adapter [{}] temporary layout-probe device creation failed: {}.",
 						index, probeResult.m_Error));
-					// The probe could not be executed; support is determined
-					// as unavailable rather than left ambiguous.
-					layoutSupported = false;
+					snapshots.push_back(std::move(snapshot));
+					continue;
 				}
-			}
-			snapshot.m_GlobalDescriptorSetLayoutProbed = true;
-			snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported = layoutSupported;
 
-			EvaluateVulkanAdapterProfile(snapshot);
+				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
+				snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported =
+					ProbeGlobalDescriptorSetLayoutSupport(probeResult.m_Device->Get());
+				EvaluateVulkanAdapterProfile(snapshot);
+			}
 			snapshots.push_back(std::move(snapshot));
 		}
 

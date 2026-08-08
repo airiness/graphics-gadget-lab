@@ -60,9 +60,11 @@ namespace gglab
 		VulkanDeviceProfileEvaluation m_ProfileEvaluation{};
 		// Distinguishes "the layout probe was never executed" from "support
 		// was determined unavailable". A probe is only performed for adapters
-		// that pass every other profile requirement; when the temporary probe
-		// device cannot be created, support is determined as unavailable.
+		// that pass every other profile requirement. An adapter whose probe
+		// device could not be created is not selectable: probed stays false
+		// and the failure reason is recorded in m_LayoutProbeError.
 		bool m_GlobalDescriptorSetLayoutProbed = false;
+		std::string m_LayoutProbeError;
 	};
 
 	// Fills the physical-device level part of the capability snapshot. The

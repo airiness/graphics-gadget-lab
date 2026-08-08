@@ -192,6 +192,13 @@ namespace gglab
 			result.m_Error = "Option '--adapter' cannot be combined with '--list-adapters'.";
 			return result;
 		}
+		if (result.m_Options.m_ListAdapters && result.m_Options.m_RhiBackendSpecified &&
+			result.m_Options.m_RhiBackend != RHIBackendType::Vulkan)
+		{
+			result.m_Error =
+				"Option '--list-adapters' requires the Vulkan backend and cannot be combined with '--rhi dx12'.";
+			return result;
+		}
 		if (result.m_Options.m_AdapterSelector &&
 			(!result.m_Options.m_RhiBackendSpecified ||
 				result.m_Options.m_RhiBackend != RHIBackendType::Vulkan))

@@ -1065,6 +1065,8 @@ namespace gglab
 					static_cast<uint8_t>((index + 1) * 17 + byte);
 			}
 			snapshot.m_ProfileCapabilities = capabilities;
+			// A well-formed snapshot models an adapter whose layout probe ran.
+			snapshot.m_GlobalDescriptorSetLayoutProbed = true;
 			snapshot.m_ProfileEvaluation =
 				EvaluateVulkanDeviceProfile(snapshot.m_ProfileCapabilities);
 			return snapshot;
@@ -1279,6 +1281,23 @@ namespace gglab
 				context.Check(result.IsSelected() && result.m_SelectedIndex == 1,
 					"Default selection skips a rejected adapter and picks the accepted one");
 			}
+			// An adapter whose layout probe failed (probed stays false, but the
+			// preliminary evaluation passed) is never selectable.
+			{
+				VulkanAdapterCapabilitySnapshot unverified = MakeAdapterSnapshot(0,
+					"ProbeFailed", VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, satisfied);
+				unverified.m_GlobalDescriptorSetLayoutProbed = false;
+				unverified.m_LayoutProbeError = "vkCreateDevice failed";
+				std::vector<VulkanAdapterCapabilitySnapshot> snapshots;
+				snapshots.push_back(std::move(unverified));
+				const VulkanAdapterSelectionResult defaultResult = SelectVulkanAdapter(snapshots, {});
+				const VulkanAdapterSelectionResult indexResult = SelectVulkanAdapter(snapshots,
+					{ .m_Kind = VulkanAdapterSelectionKind::Index, .m_Index = 0 });
+				context.Check(
+					defaultResult.m_Status == VulkanAdapterSelectionStatus::NoAcceptedAdapter &&
+					indexResult.m_Status == VulkanAdapterSelectionStatus::RejectedAdapter,
+					"An adapter with a failed layout probe is never selectable");
+			}
 		}
 #endif
 
@@ -1327,6 +1346,14 @@ namespace gglab
 				context.Check(result.IsValid() && result.m_Options.m_ListAdapters &&
 					result.m_Options.m_RhiBackend == RHIBackendType::Vulkan,
 					"--rhi vulkan with --list-adapters is valid");
+			}
+			// --list-adapters is Vulkan inspection; an explicit DX12 backend
+			// conflicts with it.
+			{
+				const auto result = parse({ "--rhi", "dx12", "--list-adapters" });
+				context.Check(!result.IsValid() && result.m_Error.find("--list-adapters") !=
+					std::string::npos,
+					"--rhi dx12 with --list-adapters is a parse error");
 			}
 		}
 	}
