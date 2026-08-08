@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <format>
 #include <string_view>
 
 namespace gglab
@@ -207,6 +208,207 @@ namespace gglab
 				snapshot.m_GraphicsPresentQueueCount;
 			return deviceCreateInfo;
 		}
+
+		// Objects created by the qualification run that outlive the report:
+		// the final selected device plus the instance and surface it runs on.
+		// Destruction order (reverse declaration order) is surface, device,
+		// instance.
+		struct VulkanBootstrapQualification
+		{
+			std::unique_ptr<VulkanInstance> m_Instance;
+			std::unique_ptr<VulkanDevice> m_Device;
+			std::unique_ptr<VulkanWin32Surface> m_Surface;
+			VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+		};
+
+		// Runs the full qualification (instance, debug messenger, surface,
+		// enumeration, layout probes, selection, final device). Returns a
+		// process exit code; on success the selected objects are moved into
+		// outObjects and the caller owns their lifetime.
+		[[nodiscard]] int RunVulkanBootstrapQualification(
+			const VulkanBootstrapOptions& options, VulkanBootstrapReport& outReport,
+			VulkanBootstrapQualification& outObjects) noexcept
+		{
+			outReport = {};
+			outObjects = {};
+
+			if (sizeof(void*) != 8)
+			{
+				LogBootstrapError("Vulkan backend requires Windows x64.");
+				return 1;
+			}
+
+			VulkanInstance::CreateInfo instanceCreateInfo{};
+			instanceCreateInfo.m_RequestValidation = options.m_RequestValidation;
+			VulkanInstance::Result instanceResult = VulkanInstance::Create(instanceCreateInfo);
+			if (!instanceResult.Succeeded())
+			{
+				LogBootstrapError(
+					std::format("Vulkan instance creation failed: {}", instanceResult.m_Error));
+				return 1;
+			}
+			std::unique_ptr<VulkanInstance> instance = std::move(instanceResult.m_Instance);
+			outReport.m_HasDebugMessenger = instanceResult.m_HasDebugMessenger;
+
+			LogBootstrapInfo(std::format("Vulkan instance created (validation={}).",
+				outReport.m_HasDebugMessenger ? "enabled" : "disabled"));
+
+			VulkanWin32Surface::Result surfaceResult =
+				VulkanWin32Surface::Create(instance->Get(), options.m_HInstance, options.m_Hwnd);
+			if (!surfaceResult.Succeeded())
+			{
+				LogBootstrapError(
+					std::format("Vulkan surface creation failed: {}", surfaceResult.m_Error));
+				return 1;
+			}
+			std::unique_ptr<VulkanWin32Surface> surface = std::move(surfaceResult.m_Surface);
+			LogBootstrapInfo("Vulkan Win32 surface created.");
+
+			uint32_t physicalDeviceCount = 0;
+			VkResult enumerateResult =
+				vkEnumeratePhysicalDevices(instance->Get(), &physicalDeviceCount, nullptr);
+			if (enumerateResult != VK_SUCCESS)
+			{
+				LogBootstrapError(std::format(
+					"vkEnumeratePhysicalDevices failed with {}.", ToString(enumerateResult)));
+				return 1;
+			}
+			std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+			if (physicalDeviceCount > 0)
+			{
+				enumerateResult = vkEnumeratePhysicalDevices(
+					instance->Get(), &physicalDeviceCount, physicalDevices.data());
+				if (enumerateResult != VK_SUCCESS)
+				{
+					LogBootstrapError(std::format(
+						"vkEnumeratePhysicalDevices failed with {}.", ToString(enumerateResult)));
+					return 1;
+				}
+			}
+
+			std::vector<VulkanAdapterCapabilitySnapshot>& snapshots = outReport.m_Adapters;
+			snapshots.reserve(physicalDevices.size());
+
+			for (uint32_t index = 0; index < physicalDevices.size(); ++index)
+			{
+				VulkanAdapterCapabilitySnapshot snapshot = QueryVulkanAdapterCapabilitySnapshot(
+					instance->Get(), physicalDevices[index], surface->Get(), index);
+				snapshot.m_ProfileCapabilities.m_IsWindowsX64 = true;
+				snapshot.m_ProfileCapabilities.m_HasVulkanLoader = true;
+				snapshot.m_ProfileCapabilities.m_HasWin32SurfaceExtension = true;
+
+				// Preliminary evaluation neutralizes the descriptor-set layout
+				// gate because the probe has not run yet; "not probed" must never
+				// report as "unsupported". Adapters that fail any other
+				// requirement never create a probe device.
+				const VulkanDeviceProfileEvaluation preliminary =
+					EvaluateVulkanAdapterProfilePreliminary(snapshot);
+				if (!preliminary.IsAccepted())
+				{
+					snapshot.m_ProfileEvaluation = preliminary;
+					snapshots.push_back(std::move(snapshot));
+					continue;
+				}
+
+				// The adapter passes every non-layout requirement: run the layout
+				// probe with a local temporary device that is destroyed before the
+				// next adapter is examined. A failed probe device leaves the
+				// adapter unverified (probed stays false), so it cannot be selected.
+				{
+					VulkanDevice::Result probeResult = VulkanDevice::Create(
+						MakeDeviceCreateInfo(physicalDevices[index], snapshot));
+					if (!probeResult.Succeeded())
+					{
+						snapshot.m_LayoutProbeError = probeResult.m_Error;
+						LogBootstrapError(std::format(
+							"Adapter [{}] temporary layout-probe device creation failed: {}.",
+							index, probeResult.m_Error));
+						snapshots.push_back(std::move(snapshot));
+						continue;
+					}
+
+					snapshot.m_GlobalDescriptorSetLayoutProbed = true;
+					snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported =
+						ProbeGlobalDescriptorSetLayoutSupport(probeResult.m_Device->Get());
+					EvaluateVulkanAdapterProfile(snapshot);
+				}
+				snapshots.push_back(std::move(snapshot));
+			}
+
+			for (const auto& snapshot : snapshots)
+			{
+				LogAdapterSummary(snapshot);
+				LogAdapterProfile(snapshot);
+				LogAdapterEvaluation(snapshot);
+			}
+
+			const VulkanAdapterSelectionResult selection =
+				SelectVulkanAdapter(snapshots, options.m_SelectionRequest);
+			switch (selection.m_Status)
+			{
+			case VulkanAdapterSelectionStatus::Selected:
+				break;
+			case VulkanAdapterSelectionStatus::NoAcceptedAdapter:
+				LogBootstrapError("No adapter satisfies the GGLab Vulkan device profile.");
+				return 1;
+			case VulkanAdapterSelectionStatus::IndexOutOfRange:
+				LogBootstrapError(std::format("Adapter index {} is out of range ({} adapters enumerated).",
+					options.m_SelectionRequest.m_Index, snapshots.size()));
+				return 1;
+			case VulkanAdapterSelectionStatus::RejectedAdapter:
+			{
+				const auto& rejected = snapshots[selection.m_SelectedIndex];
+				LogBootstrapError(std::format("Selected adapter [{}] '{}' does not satisfy the profile:",
+					rejected.m_Identity.m_EnumerationIndex, rejected.m_Identity.m_DeviceName));
+				for (size_t reasonIndex = 0;
+					reasonIndex < rejected.m_ProfileEvaluation.m_RejectionReasonCount; ++reasonIndex)
+				{
+					LogBootstrapError(std::format("  - {}",
+						VulkanDeviceProfileRejectionReasonText(
+							rejected.m_ProfileEvaluation.m_RejectionReasons[reasonIndex])));
+				}
+				return 1;
+			}
+			case VulkanAdapterSelectionStatus::SelectorNoMatch:
+				LogBootstrapError(std::format("Adapter selector '{}' matched no adapter.",
+					options.m_SelectionRequest.m_Prefix));
+				return 1;
+			case VulkanAdapterSelectionStatus::SelectorAmbiguous:
+				LogBootstrapError(std::format("Adapter selector '{}' matched multiple adapters.",
+					options.m_SelectionRequest.m_Prefix));
+				return 1;
+			}
+
+			outReport.m_SelectedAdapterIndex = selection.m_SelectedIndex;
+			const auto& selectedSnapshot = snapshots[selection.m_SelectedIndex];
+			LogSelectedAdapter(selectedSnapshot);
+
+			// Create the final qualification device for the selected adapter
+			// with the same configuration as the temporary probe device. It is
+			// moved to the caller instead of being destroyed immediately, so a
+			// minimal frame runtime can run on it later.
+			{
+				VulkanDevice::Result deviceResult = VulkanDevice::Create(
+					MakeDeviceCreateInfo(physicalDevices[selection.m_SelectedIndex], selectedSnapshot));
+				if (!deviceResult.Succeeded())
+				{
+					LogBootstrapError(std::format(
+						"Selected adapter [{}] '{}' device creation failed: {}.",
+						selectedSnapshot.m_Identity.m_EnumerationIndex,
+						selectedSnapshot.m_Identity.m_DeviceName, deviceResult.m_Error));
+					return 1;
+				}
+				LogBootstrapInfo(std::format("Vulkan device created on adapter [{}] '{}'.",
+					selectedSnapshot.m_Identity.m_EnumerationIndex,
+					selectedSnapshot.m_Identity.m_DeviceName));
+				outObjects.m_Device = std::move(deviceResult.m_Device);
+			}
+
+			outObjects.m_PhysicalDevice = physicalDevices[selection.m_SelectedIndex];
+			outObjects.m_Surface = std::move(surface);
+			outObjects.m_Instance = std::move(instance);
+			return 0;
+		}
 	}
 
 	VulkanAdapterSelectionResult SelectVulkanAdapter(
@@ -317,182 +519,66 @@ namespace gglab
 	int RunVulkanBootstrap(
 		const VulkanBootstrapOptions& options, VulkanBootstrapReport& outReport) noexcept
 	{
-		outReport = {};
-
-		if (sizeof(void*) != 8)
+		VulkanBootstrapQualification objects;
+		const int exitCode = RunVulkanBootstrapQualification(options, outReport, objects);
+		if (exitCode == 0)
 		{
-			LogBootstrapError("Vulkan backend requires Windows x64.");
-			return 1;
+			LogBootstrapInfo("Vulkan bootstrap qualification succeeded; cleaning up.");
+		}
+		// Destruction order is enforced by member order: device, surface,
+		// instance. The frame runtime is never created on this path.
+		return exitCode;
+	}
+
+	VulkanBootstrapRuntimeResult CreateVulkanBootstrapRuntime(
+		const VulkanBootstrapRuntimeCreateInfo& createInfo) noexcept
+	{
+		VulkanBootstrapRuntimeResult result{};
+		if (createInfo.m_Width == 0 || createInfo.m_Height == 0)
+		{
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "CreateVulkanBootstrapRuntime requires a nonzero drawable extent.";
+			return result;
 		}
 
-		VulkanInstance::CreateInfo instanceCreateInfo{};
-		instanceCreateInfo.m_RequestValidation = options.m_RequestValidation;
-		VulkanInstance::Result instanceResult = VulkanInstance::Create(instanceCreateInfo);
-		if (!instanceResult.Succeeded())
+		VulkanBootstrapReport report;
+		VulkanBootstrapQualification objects;
+		const int exitCode =
+			RunVulkanBootstrapQualification(createInfo.m_BootstrapOptions, report, objects);
+		if (exitCode != 0)
 		{
-			LogBootstrapError(
-				std::format("Vulkan instance creation failed: {}", instanceResult.m_Error));
-			return 1;
-		}
-		std::unique_ptr<VulkanInstance> instance = std::move(instanceResult.m_Instance);
-		outReport.m_HasDebugMessenger = instanceResult.m_HasDebugMessenger;
-
-		LogBootstrapInfo(std::format("Vulkan instance created (validation={}).",
-			outReport.m_HasDebugMessenger ? "enabled" : "disabled"));
-
-		VulkanWin32Surface::Result surfaceResult =
-			VulkanWin32Surface::Create(instance->Get(), options.m_HInstance, options.m_Hwnd);
-		if (!surfaceResult.Succeeded())
-		{
-			LogBootstrapError(
-				std::format("Vulkan surface creation failed: {}", surfaceResult.m_Error));
-			return 1;
-		}
-		std::unique_ptr<VulkanWin32Surface> surface = std::move(surfaceResult.m_Surface);
-		LogBootstrapInfo("Vulkan Win32 surface created.");
-
-		uint32_t physicalDeviceCount = 0;
-		VkResult enumerateResult =
-			vkEnumeratePhysicalDevices(instance->Get(), &physicalDeviceCount, nullptr);
-		if (enumerateResult != VK_SUCCESS)
-		{
-			LogBootstrapError(std::format(
-				"vkEnumeratePhysicalDevices failed with {}.", ToString(enumerateResult)));
-			return 1;
-		}
-		std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
-		if (physicalDeviceCount > 0)
-		{
-			enumerateResult = vkEnumeratePhysicalDevices(
-				instance->Get(), &physicalDeviceCount, physicalDevices.data());
-			if (enumerateResult != VK_SUCCESS)
-			{
-				LogBootstrapError(std::format(
-					"vkEnumeratePhysicalDevices failed with {}.", ToString(enumerateResult)));
-				return 1;
-			}
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "Vulkan bootstrap qualification failed; see the log for rejection reasons.";
+			return result;
 		}
 
-		std::vector<VulkanAdapterCapabilitySnapshot>& snapshots = outReport.m_Adapters;
-		snapshots.reserve(physicalDevices.size());
+		result.m_SelectedSnapshot = report.m_Adapters[report.m_SelectedAdapterIndex];
+		result.m_HasDebugMessenger = report.m_HasDebugMessenger;
+		result.m_PhysicalDevice = objects.m_PhysicalDevice;
 
-		for (uint32_t index = 0; index < physicalDevices.size(); ++index)
+		VulkanFrameRuntimeCreateInfo frameInfo{};
+		frameInfo.m_Instance = objects.m_Instance.get();
+		frameInfo.m_Surface = objects.m_Surface.get();
+		frameInfo.m_PhysicalDevice = objects.m_PhysicalDevice;
+		frameInfo.m_Device = objects.m_Device.get();
+		frameInfo.m_Snapshot = &result.m_SelectedSnapshot;
+		frameInfo.m_FrameSlotCount = createInfo.m_FrameSlotCount;
+		frameInfo.m_RequestedFormat = createInfo.m_RequestedFormat;
+		frameInfo.m_Vsync = createInfo.m_Vsync;
+		frameInfo.m_Width = createInfo.m_Width;
+		frameInfo.m_Height = createInfo.m_Height;
+		VulkanFrameRuntime::Result frameResult = VulkanFrameRuntime::Create(frameInfo);
+		if (!frameResult.Succeeded())
 		{
-			VulkanAdapterCapabilitySnapshot snapshot = QueryVulkanAdapterCapabilitySnapshot(
-				instance->Get(), physicalDevices[index], surface->Get(), index);
-			snapshot.m_ProfileCapabilities.m_IsWindowsX64 = true;
-			snapshot.m_ProfileCapabilities.m_HasVulkanLoader = true;
-			snapshot.m_ProfileCapabilities.m_HasWin32SurfaceExtension = true;
-
-			// Preliminary evaluation neutralizes the descriptor-set layout
-			// gate because the probe has not run yet; "not probed" must never
-			// report as "unsupported". Adapters that fail any other
-			// requirement never create a probe device.
-			const VulkanDeviceProfileEvaluation preliminary =
-				EvaluateVulkanAdapterProfilePreliminary(snapshot);
-			if (!preliminary.IsAccepted())
-			{
-				snapshot.m_ProfileEvaluation = preliminary;
-				snapshots.push_back(std::move(snapshot));
-				continue;
-			}
-
-			// The adapter passes every non-layout requirement: run the layout
-			// probe with a local temporary device that is destroyed before the
-			// next adapter is examined. A failed probe device leaves the
-			// adapter unverified (probed stays false), so it cannot be selected.
-			{
-				VulkanDevice::Result probeResult = VulkanDevice::Create(
-					MakeDeviceCreateInfo(physicalDevices[index], snapshot));
-				if (!probeResult.Succeeded())
-				{
-					snapshot.m_LayoutProbeError = probeResult.m_Error;
-					LogBootstrapError(std::format(
-						"Adapter [{}] temporary layout-probe device creation failed: {}.",
-						index, probeResult.m_Error));
-					snapshots.push_back(std::move(snapshot));
-					continue;
-				}
-
-				snapshot.m_GlobalDescriptorSetLayoutProbed = true;
-				snapshot.m_ProfileCapabilities.m_GlobalDescriptorSetLayoutSupported =
-					ProbeGlobalDescriptorSetLayoutSupport(probeResult.m_Device->Get());
-				EvaluateVulkanAdapterProfile(snapshot);
-			}
-			snapshots.push_back(std::move(snapshot));
+			result.m_Result = frameResult.m_Result;
+			result.m_Error = frameResult.m_Error;
+			return result;
 		}
 
-		for (const auto& snapshot : snapshots)
-		{
-			LogAdapterSummary(snapshot);
-			LogAdapterProfile(snapshot);
-			LogAdapterEvaluation(snapshot);
-		}
-
-		const VulkanAdapterSelectionResult selection =
-			SelectVulkanAdapter(snapshots, options.m_SelectionRequest);
-		switch (selection.m_Status)
-		{
-		case VulkanAdapterSelectionStatus::Selected:
-			break;
-		case VulkanAdapterSelectionStatus::NoAcceptedAdapter:
-			LogBootstrapError("No adapter satisfies the GGLab Vulkan device profile.");
-			return 1;
-		case VulkanAdapterSelectionStatus::IndexOutOfRange:
-			LogBootstrapError(std::format("Adapter index {} is out of range ({} adapters enumerated).",
-				options.m_SelectionRequest.m_Index, snapshots.size()));
-			return 1;
-		case VulkanAdapterSelectionStatus::RejectedAdapter:
-		{
-			const auto& rejected = snapshots[selection.m_SelectedIndex];
-			LogBootstrapError(std::format("Selected adapter [{}] '{}' does not satisfy the profile:",
-				rejected.m_Identity.m_EnumerationIndex, rejected.m_Identity.m_DeviceName));
-			for (size_t reasonIndex = 0;
-				reasonIndex < rejected.m_ProfileEvaluation.m_RejectionReasonCount; ++reasonIndex)
-			{
-				LogBootstrapError(std::format("  - {}",
-					VulkanDeviceProfileRejectionReasonText(
-						rejected.m_ProfileEvaluation.m_RejectionReasons[reasonIndex])));
-			}
-			return 1;
-		}
-		case VulkanAdapterSelectionStatus::SelectorNoMatch:
-			LogBootstrapError(std::format("Adapter selector '{}' matched no adapter.",
-				options.m_SelectionRequest.m_Prefix));
-			return 1;
-		case VulkanAdapterSelectionStatus::SelectorAmbiguous:
-			LogBootstrapError(std::format("Adapter selector '{}' matched multiple adapters.",
-				options.m_SelectionRequest.m_Prefix));
-			return 1;
-		}
-
-		outReport.m_SelectedAdapterIndex = selection.m_SelectedIndex;
-		const auto& selectedSnapshot = snapshots[selection.m_SelectedIndex];
-		LogSelectedAdapter(selectedSnapshot);
-
-		// Create the final qualification device for the selected adapter with
-		// the same configuration as the temporary probe device. It proves that
-		// the selected VkDevice and VkQueue can be created, and is destroyed
-		// before the surface and instance during cleanup.
-		{
-			VulkanDevice::Result deviceResult = VulkanDevice::Create(
-				MakeDeviceCreateInfo(physicalDevices[selection.m_SelectedIndex], selectedSnapshot));
-			if (!deviceResult.Succeeded())
-			{
-				LogBootstrapError(std::format(
-					"Selected adapter [{}] '{}' device creation failed: {}.",
-					selectedSnapshot.m_Identity.m_EnumerationIndex,
-					selectedSnapshot.m_Identity.m_DeviceName, deviceResult.m_Error));
-				return 1;
-			}
-			LogBootstrapInfo(std::format("Vulkan device created on adapter [{}] '{}'.",
-				selectedSnapshot.m_Identity.m_EnumerationIndex,
-				selectedSnapshot.m_Identity.m_DeviceName));
-		}
-
-		LogBootstrapInfo("Vulkan bootstrap qualification succeeded; cleaning up.");
-		surface.reset();
-		instance.reset();
-		return 0;
+		result.m_Device = std::move(objects.m_Device);
+		result.m_Surface = std::move(objects.m_Surface);
+		result.m_Instance = std::move(objects.m_Instance);
+		result.m_FrameRuntime = std::move(frameResult.m_Runtime);
+		return result;
 	}
 }

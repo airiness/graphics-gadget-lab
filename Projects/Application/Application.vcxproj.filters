@@ -675,6 +675,15 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSwapChain.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
@@ -2013,6 +2022,15 @@
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSwapChain.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.h">

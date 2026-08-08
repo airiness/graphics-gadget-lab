@@ -1301,6 +1301,121 @@ namespace gglab
 		}
 #endif
 
+#if GGLAB_ENABLE_VULKAN
+		void RunVulkanFrameContractTests(SelfTestContext& context) noexcept
+		{
+			// Frame-slot ring selection and frame pairing domains. The slot
+			// sequence is a ring over frameSlotCount; image indices come from
+			// acquire and are recorded, never derived from the slot.
+			{
+				VulkanFrameIndexModel model(2);
+				context.Check(model.GetFrameSlotCount() == 2,
+					"frame-slot count is fixed at construction");
+				const std::array<uint32_t, 5> slotSequence = { 0, 1, 0, 1, 0 };
+				const std::array<uint32_t, 5> imageSequence = { 0, 1, 2, 0, 1 };
+				for (uint32_t i = 0; i < 5; ++i)
+				{
+					const uint32_t slot = model.NextFrameSlot();
+					context.Check(slot == slotSequence[i],
+						"frame-slot ring returns slots in order");
+					model.CommitFrame(slot, imageSequence[i]);
+				}
+				const auto& pairs = model.GetFramePairs();
+				context.Check(pairs.size() == 5,
+					"frame pairs are recorded per commit");
+				bool domainsSeparate = true;
+				for (uint32_t i = 0; i < 5; ++i)
+				{
+					domainsSeparate &= pairs[i].first == slotSequence[i] &&
+						pairs[i].second == imageSequence[i];
+				}
+				context.Check(domainsSeparate,
+					"frame-slot and backbuffer domains never cross");
+				model.ResetFramePairs();
+				context.Check(model.GetFramePairs().empty() && model.NextFrameSlot() == 0,
+					"reset clears pairs and restarts the ring");
+			}
+
+			// Per-image tracked layout: new images start Undefined, present
+			// leaves Present, recreate resets everything to Undefined.
+			{
+				VulkanImageLayoutTracker tracker;
+				tracker.Reset(3);
+				context.Check(tracker.GetImageCount() == 3,
+					"layout tracker sizes to the image count");
+				context.Check(tracker.Get(0) == VulkanPresentImageLayout::Undefined &&
+						tracker.Get(2) == VulkanPresentImageLayout::Undefined,
+					"new swapchain images start Undefined");
+				tracker.Set(1, VulkanPresentImageLayout::Present);
+				context.Check(tracker.Get(1) == VulkanPresentImageLayout::Present,
+					"successful present updates the tracked state");
+				tracker.Reset(2);
+				context.Check(tracker.GetImageCount() == 2 &&
+						tracker.Get(1) == VulkanPresentImageLayout::Undefined,
+					"recreate resets the tracked state to Undefined");
+				context.Check(tracker.Get(9) == VulkanPresentImageLayout::Undefined,
+					"out-of-range reads degrade to Undefined");
+			}
+
+			// Active-frame transaction: Begin must terminate in exactly one
+			// End or Abort; illegal transitions are rejected.
+			{
+				VulkanFrameSlotStateMachine machine;
+				machine.Reset(2);
+				context.Check(!machine.TryEnd(0) && !machine.TryAbort(0),
+					"End/Abort without Begin are rejected");
+				context.Check(machine.TryBegin(0) && machine.IsActive(0),
+					"Begin activates the slot");
+				context.Check(!machine.TryBegin(0),
+					"double Begin is rejected");
+				context.Check(machine.TryEnd(0) && !machine.IsActive(0),
+					"End deactivates the slot");
+				context.Check(!machine.TryEnd(0) && !machine.TryAbort(0),
+					"double End and End after End are rejected");
+				context.Check(machine.TryBegin(0) && machine.TryAbort(0),
+					"a slot is reusable after End and aborts after Begin");
+				context.Check(!machine.TryAbort(0) && !machine.TryEnd(0),
+					"double Abort and End after Abort are rejected");
+				context.Check(machine.TryBegin(0) && machine.TryEnd(0) && machine.TryBegin(0),
+					"reuse after a completed transaction");
+				context.Check(machine.TryAbort(0),
+					"abort after Begin");
+				context.Check(machine.TryBegin(0),
+					"a slot starts a fresh transaction after Abort");
+				context.Check(!machine.TryBegin(9),
+					"out-of-range slots are rejected");
+			}
+
+			// Acquire/present result classification.
+			{
+				context.Check(ClassifyVulkanAcquireResult(VK_SUCCESS) ==
+						VulkanAcquireOutcome::Acquired,
+					"acquire SUCCESS hands over an image");
+				context.Check(ClassifyVulkanAcquireResult(VK_SUBOPTIMAL_KHR) ==
+						VulkanAcquireOutcome::RecreatePending,
+					"acquire SUBOPTIMAL hands over an image and schedules recreate");
+				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_OUT_OF_DATE_KHR) ==
+						VulkanAcquireOutcome::OutOfDateRetry,
+					"acquire OUT_OF_DATE retries after recreate");
+				context.Check(ClassifyVulkanAcquireResult(VK_ERROR_DEVICE_LOST) ==
+						VulkanAcquireOutcome::Fatal,
+					"other acquire results are fatal");
+				context.Check(ClassifyVulkanPresentResult(VK_SUCCESS) ==
+						VulkanPresentOutcome::Presented,
+					"present SUCCESS");
+				context.Check(ClassifyVulkanPresentResult(VK_SUBOPTIMAL_KHR) ==
+						VulkanPresentOutcome::RecreatePending,
+					"present SUBOPTIMAL is non-fatal and schedules recreate");
+				context.Check(ClassifyVulkanPresentResult(VK_ERROR_OUT_OF_DATE_KHR) ==
+						VulkanPresentOutcome::RecreatePending,
+					"present OUT_OF_DATE keeps the submission valid");
+				context.Check(ClassifyVulkanPresentResult(VK_ERROR_SURFACE_LOST_KHR) ==
+						VulkanPresentOutcome::Failed,
+					"other present results are failures");
+			}
+		}
+#endif
+
 		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
@@ -1368,6 +1483,7 @@ namespace gglab
 		RunVulkanCliContractTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);
+		RunVulkanFrameContractTests(context);
 #endif
 	}
 }

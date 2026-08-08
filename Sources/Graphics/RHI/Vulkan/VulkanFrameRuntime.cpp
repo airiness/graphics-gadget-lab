@@ -1,0 +1,590 @@
+#include "Core/Precompiled.h"
+#include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
+#include "Graphics/RHI/Vulkan/VulkanUtility.h"
+
+#include <format>
+
+namespace gglab
+{
+	namespace
+	{
+		// Shared by both command buffers: stage/access selection keeps the
+		// timeline-edge policy simple (ALL_COMMANDS in -> COLOR_ATTACHMENT for
+		// writes). The final transition to PRESENT_SRC_KHR needs no write
+		// access; the presenting semaphore orders the handoff.
+		constexpr VkPipelineStageFlags2 kAllStages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		constexpr VkAccessFlags2 kAllAccess =
+			VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+		constexpr VkPipelineStageFlags2 kColorWriteStage =
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		constexpr VkAccessFlags2 kColorWriteAccess = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+		VkImageMemoryBarrier2 MakeLayoutTransitionBarrier(VkImage image,
+			VkImageLayout oldLayout, VkImageLayout newLayout, bool hasWriteSource,
+			bool hasWriteDestination)
+		{
+			VkImageMemoryBarrier2 barrier{};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+			barrier.srcStageMask = hasWriteSource ? kAllStages : VK_PIPELINE_STAGE_2_NONE;
+			barrier.srcAccessMask = hasWriteSource ? kAllAccess : VK_ACCESS_2_NONE;
+			barrier.dstStageMask = hasWriteDestination ? kColorWriteStage : VK_PIPELINE_STAGE_2_NONE;
+			barrier.dstAccessMask = hasWriteDestination ? kColorWriteAccess : VK_ACCESS_2_NONE;
+			barrier.oldLayout = oldLayout;
+			barrier.newLayout = newLayout;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.image = image;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = 1;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			return barrier;
+		}
+	}
+
+	VulkanAcquireOutcome ClassifyVulkanAcquireResult(const VkResult result) noexcept
+	{
+		switch (result)
+		{
+		case VK_SUCCESS:
+			return VulkanAcquireOutcome::Acquired;
+		case VK_SUBOPTIMAL_KHR:
+			return VulkanAcquireOutcome::RecreatePending;
+		case VK_ERROR_OUT_OF_DATE_KHR:
+			return VulkanAcquireOutcome::OutOfDateRetry;
+		default:
+			return VulkanAcquireOutcome::Fatal;
+		}
+	}
+
+	VulkanPresentOutcome ClassifyVulkanPresentResult(const VkResult result) noexcept
+	{
+		switch (result)
+		{
+		case VK_SUCCESS:
+			return VulkanPresentOutcome::Presented;
+		case VK_SUBOPTIMAL_KHR:
+		case VK_ERROR_OUT_OF_DATE_KHR:
+			// The submission already completed; the frame is done. Surface
+			// recreation is scheduled at the next safe point.
+			return VulkanPresentOutcome::RecreatePending;
+		default:
+			return VulkanPresentOutcome::Failed;
+		}
+	}
+
+	VulkanFrameIndexModel::VulkanFrameIndexModel(uint32_t frameSlotCount) noexcept
+		: m_FrameSlotCount(std::max(frameSlotCount, 1u))
+	{
+	}
+
+	uint32_t VulkanFrameIndexModel::NextFrameSlot() noexcept
+	{
+		const uint32_t slot = m_NextSlotIndex;
+		m_NextSlotIndex = (m_NextSlotIndex + 1) % m_FrameSlotCount;
+		return slot;
+	}
+
+	void VulkanFrameIndexModel::CommitFrame(uint32_t frameSlot, uint32_t backBufferIndex) noexcept
+	{
+		m_FramePairs.emplace_back(frameSlot, backBufferIndex);
+	}
+
+	void VulkanFrameIndexModel::ResetFramePairs() noexcept
+	{
+		m_FramePairs.clear();
+		m_NextSlotIndex = 0;
+	}
+
+	void VulkanImageLayoutTracker::Reset(uint32_t imageCount) noexcept
+	{
+		m_Layouts.assign(imageCount, VulkanPresentImageLayout::Undefined);
+	}
+
+	VulkanPresentImageLayout VulkanImageLayoutTracker::Get(uint32_t image) const noexcept
+	{
+		return image < m_Layouts.size()
+			? m_Layouts[image]
+			: VulkanPresentImageLayout::Undefined;
+	}
+
+	void VulkanImageLayoutTracker::Set(uint32_t image, VulkanPresentImageLayout layout) noexcept
+	{
+		if (image < m_Layouts.size())
+		{
+			m_Layouts[image] = layout;
+		}
+	}
+
+	void VulkanFrameSlotStateMachine::Reset(uint32_t slotCount) noexcept
+	{
+		m_Phases.assign(slotCount, VulkanFrameSlotPhase::Idle);
+	}
+
+	bool VulkanFrameSlotStateMachine::TryBegin(uint32_t slot) noexcept
+	{
+		// A slot begins a fresh transaction from Idle or after a completed
+		// End/Abort of the previous transaction; only a Begin while the
+		// transaction is still active is rejected.
+		if (slot >= m_Phases.size() || m_Phases[slot] == VulkanFrameSlotPhase::Begun)
+		{
+			return false;
+		}
+		m_Phases[slot] = VulkanFrameSlotPhase::Begun;
+		return true;
+	}
+
+	bool VulkanFrameSlotStateMachine::TryEnd(uint32_t slot) noexcept
+	{
+		if (slot >= m_Phases.size() || m_Phases[slot] != VulkanFrameSlotPhase::Begun)
+		{
+			return false;
+		}
+		m_Phases[slot] = VulkanFrameSlotPhase::Ended;
+		return true;
+	}
+
+	bool VulkanFrameSlotStateMachine::TryAbort(uint32_t slot) noexcept
+	{
+		if (slot >= m_Phases.size() || m_Phases[slot] != VulkanFrameSlotPhase::Begun)
+		{
+			return false;
+		}
+		m_Phases[slot] = VulkanFrameSlotPhase::Aborted;
+		return true;
+	}
+
+	bool VulkanFrameSlotStateMachine::IsActive(uint32_t slot) const noexcept
+	{
+		return slot < m_Phases.size() && m_Phases[slot] == VulkanFrameSlotPhase::Begun;
+	}
+
+	VulkanFrameSlotPhase VulkanFrameSlotStateMachine::GetPhase(uint32_t slot) const noexcept
+	{
+		return slot < m_Phases.size() ? m_Phases[slot] : VulkanFrameSlotPhase::Idle;
+	}
+
+	VulkanFrameRuntime::~VulkanFrameRuntime()
+	{
+		DestroyFrameSlots();
+	}
+
+	VulkanFrameRuntime::Result VulkanFrameRuntime::Create(
+		const VulkanFrameRuntimeCreateInfo& createInfo) noexcept
+	{
+		Result result{};
+		if (createInfo.m_Device == nullptr || createInfo.m_Surface == nullptr
+			|| createInfo.m_Instance == nullptr || createInfo.m_Snapshot == nullptr
+			|| createInfo.m_Width == 0 || createInfo.m_Height == 0)
+		{
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "VulkanFrameRuntime requires instance, surface, device, snapshot "
+				"and a nonzero drawable extent.";
+			return result;
+		}
+
+		auto runtime = std::make_unique<VulkanFrameRuntime>();
+		runtime->m_Device = createInfo.m_Device;
+		runtime->m_Vsync = createInfo.m_Vsync;
+
+		// Graphics timeline gate.
+		VulkanTimelineFence::CreateInfo timelineInfo{};
+		timelineInfo.m_Device = createInfo.m_Device->Get();
+		VulkanTimelineFence::Result timelineResult = VulkanTimelineFence::Create(timelineInfo);
+		if (!timelineResult.Succeeded())
+		{
+			result.m_Result = timelineResult.m_Result;
+			result.m_Error = std::format("Timeline fence creation failed: {}", timelineResult.m_Error);
+			return result;
+		}
+		runtime->m_Timeline = std::move(timelineResult.m_Fence);
+
+		// Frame slots: binary imageAvailable semaphore, command pool and the
+		// two-purpose command buffers.
+		runtime->m_StateMachine.Reset(createInfo.m_FrameSlotCount);
+		runtime->m_FrameSlots.resize(createInfo.m_FrameSlotCount);
+		VkSemaphoreCreateInfo semaphoreInfo{};
+		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		VkCommandPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		poolInfo.queueFamilyIndex = createInfo.m_Snapshot->m_GraphicsPresentQueueFamilyIndex;
+		VkCommandBufferAllocateInfo allocateInfo{};
+		allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocateInfo.commandBufferCount = 2;
+		for (uint32_t i = 0; i < createInfo.m_FrameSlotCount; ++i)
+		{
+			VulkanFrameSlot& slot = runtime->m_FrameSlots[i];
+			slot.m_Index = i;
+			if (vkCreateSemaphore(createInfo.m_Device->Get(), &semaphoreInfo, nullptr,
+				&slot.m_ImageAvailable)
+				!= VK_SUCCESS)
+			{
+				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+				result.m_Error = std::format("vkCreateSemaphore for frame slot {} failed.", i);
+				return result;
+			}
+			if (vkCreateCommandPool(createInfo.m_Device->Get(), &poolInfo, nullptr,
+				&slot.m_CommandPool)
+				!= VK_SUCCESS)
+			{
+				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+				result.m_Error = std::format("vkCreateCommandPool for frame slot {} failed.", i);
+				return result;
+			}
+			allocateInfo.commandPool = slot.m_CommandPool;
+			VkCommandBuffer commandBuffers[2] = {};
+			if (vkAllocateCommandBuffers(createInfo.m_Device->Get(), &allocateInfo,
+				commandBuffers)
+				!= VK_SUCCESS)
+			{
+				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+				result.m_Error = std::format("vkAllocateCommandBuffers for frame slot {} failed.", i);
+				return result;
+			}
+			slot.m_NormalCommandBuffer = commandBuffers[0];
+			slot.m_AbortCommandBuffer = commandBuffers[1];
+		}
+
+		// Swapchain.
+		VulkanSwapChainCreateInfo swapChainInfo{};
+		swapChainInfo.m_PhysicalDevice = createInfo.m_PhysicalDevice;
+		swapChainInfo.m_Device = createInfo.m_Device->Get();
+		swapChainInfo.m_Surface = createInfo.m_Surface->Get();
+		swapChainInfo.m_RequestedFormat = createInfo.m_RequestedFormat;
+		swapChainInfo.m_Width = createInfo.m_Width;
+		swapChainInfo.m_Height = createInfo.m_Height;
+		VulkanSwapChain::Result swapChainResult = VulkanSwapChain::Create(swapChainInfo);
+		if (!swapChainResult.Succeeded())
+		{
+			result.m_Result = swapChainResult.m_Result;
+			result.m_Error =
+				std::format("Swapchain creation failed: {}", swapChainResult.m_Error);
+			return result;
+		}
+		runtime->m_SwapChain = std::move(swapChainResult.m_SwapChain);
+
+		// Model state sized to the runtime.
+		runtime->m_IndexModel = VulkanFrameIndexModel(createInfo.m_FrameSlotCount);
+		runtime->m_LayoutTracker.Reset(runtime->m_SwapChain->GetImageCount());
+
+		result.m_Runtime = std::move(runtime);
+		return result;
+	}
+
+	VulkanBeginFrameResult VulkanFrameRuntime::BeginFrame() noexcept
+	{
+		VulkanBeginFrameResult result{};
+		if (m_SwapChain == nullptr)
+		{
+			return result;
+		}
+
+		// The caller must not call BeginFrame at a zero extent; enforce as a
+		// cheap guard so the acquire never hangs on an impossible image.
+		const VkExtent2D extent = m_SwapChain->GetExtent();
+		if (extent.width == 0 || extent.height == 0)
+		{
+			return result;
+		}
+
+		const uint32_t frameSlotIndex = m_IndexModel.NextFrameSlot();
+		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
+
+		// Reuse gate: the slot may not be reused until its last submitted
+		// timeline value has completed. No frame may ever be recorded into a
+		// command buffer that is still being executed.
+		if (slot.m_LastSubmittedTimelineValue != 0)
+		{
+			m_Timeline->Wait(slot.m_LastSubmittedTimelineValue);
+		}
+		vkResetCommandPool(m_Device->Get(), slot.m_CommandPool, 0);
+
+		uint32_t backBufferIndex = 0;
+		VkResult acquireResult = vkAcquireNextImageKHR(m_Device->Get(), m_SwapChain->Get(),
+			UINT64_MAX, slot.m_ImageAvailable, VK_NULL_HANDLE, &backBufferIndex);
+		if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			// Retry once after recreating at the same extent.
+			std::string error;
+			const VkExtent2D currentExtent = m_SwapChain->GetExtent();
+			if (RecreateSwapChain(currentExtent.width, currentExtent.height, m_Vsync, error))
+			{
+				acquireResult = vkAcquireNextImageKHR(m_Device->Get(), m_SwapChain->Get(),
+					UINT64_MAX, slot.m_ImageAvailable, VK_NULL_HANDLE, &backBufferIndex);
+			}
+		}
+
+		const VulkanAcquireOutcome outcome = ClassifyVulkanAcquireResult(acquireResult);
+		switch (outcome)
+		{
+		case VulkanAcquireOutcome::Acquired:
+		case VulkanAcquireOutcome::RecreatePending:
+			if (!m_StateMachine.TryBegin(frameSlotIndex))
+			{
+				// A slot still active from a previous frame is a runtime bug;
+				// do not present from a corrupted state.
+				return result;
+			}
+			m_IndexModel.CommitFrame(frameSlotIndex, backBufferIndex);
+			result.m_Acquired = true;
+			result.m_FrameSlotIndex = frameSlotIndex;
+			result.m_BackBufferIndex = backBufferIndex;
+			result.m_RecreatePending = outcome == VulkanAcquireOutcome::RecreatePending;
+			return result;
+		default:
+			return result;
+		}
+	}
+
+	void VulkanFrameRuntime::EndFrame(uint32_t frameSlotIndex, uint32_t backBufferIndex,
+		const std::array<float, 4>& clearColor) noexcept
+	{
+		if (frameSlotIndex >= m_FrameSlots.size())
+		{
+			return;
+		}
+		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		if (!m_StateMachine.TryEnd(frameSlotIndex))
+		{
+			return;
+		}
+		RecordNormalFrame(slot.m_NormalCommandBuffer, backBufferIndex, clearColor);
+		SubmitAndPresent(frameSlotIndex, backBufferIndex, slot.m_NormalCommandBuffer);
+		m_LayoutTracker.Set(backBufferIndex, VulkanPresentImageLayout::Present);
+	}
+
+	void VulkanFrameRuntime::AbortFrame(uint32_t frameSlotIndex, uint32_t backBufferIndex) noexcept
+	{
+		if (frameSlotIndex >= m_FrameSlots.size())
+		{
+			return;
+		}
+		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		if (!m_StateMachine.TryAbort(frameSlotIndex))
+		{
+			return;
+		}
+		RecordAbortFrame(slot.m_AbortCommandBuffer, backBufferIndex);
+		SubmitAndPresent(frameSlotIndex, backBufferIndex, slot.m_AbortCommandBuffer);
+		m_LayoutTracker.Set(backBufferIndex, VulkanPresentImageLayout::Present);
+	}
+
+	bool VulkanFrameRuntime::RecreateSwapChain(uint32_t width, uint32_t height,
+		bool vsync, std::string& outError) noexcept
+	{
+		if (m_SwapChain == nullptr)
+		{
+			outError = "No swapchain to recreate.";
+			return false;
+		}
+		if (width == 0 || height == 0)
+		{
+			outError = "Recreate requires a nonzero extent.";
+			return false;
+		}
+		// Swapchain recreation is a safe point: no frame may be active and no
+		// queued work may reference old swapchain images.
+		for (uint32_t slot = 0; slot < m_StateMachine.GetSlotCount(); ++slot)
+		{
+			if (m_StateMachine.IsActive(slot))
+			{
+				outError = "Cannot recreate the swapchain while a frame is active.";
+				return false;
+			}
+		}
+		WaitIdle();
+		const bool recreated = m_SwapChain->Recreate(width, height, vsync, outError);
+		if (recreated)
+		{
+			m_Vsync = vsync;
+			m_LayoutTracker.Reset(m_SwapChain->GetImageCount());
+			m_IndexModel.ResetFramePairs();
+		}
+		return recreated;
+	}
+
+	void VulkanFrameRuntime::WaitIdle() noexcept
+	{
+		if (m_Device == nullptr)
+		{
+			return;
+		}
+		vkQueueWaitIdle(m_Device->GetGraphicsQueue());
+		m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+	}
+
+	void VulkanFrameRuntime::RecordNormalFrame(VkCommandBuffer commandBuffer,
+		uint32_t backBufferIndex, const std::array<float, 4>& clearColor) noexcept
+	{
+		const VkImage swapchainImage = m_SwapChain->GetImage(backBufferIndex).m_Image;
+		const VkImageView swapchainView = m_SwapChain->GetImageView(backBufferIndex);
+		const VkExtent2D extent = m_SwapChain->GetExtent();
+
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+		const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(backBufferIndex);
+		const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present
+			? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+			: VK_IMAGE_LAYOUT_UNDEFINED;
+		const VkImageMemoryBarrier2 firstBarrier = MakeLayoutTransitionBarrier(swapchainImage,
+			oldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true, true);
+		VkDependencyInfo dependencyInfo{};
+		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		dependencyInfo.imageMemoryBarrierCount = 1;
+		dependencyInfo.pImageMemoryBarriers = &firstBarrier;
+		vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+
+		VkRenderingAttachmentInfo colorAttachment{};
+		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		colorAttachment.imageView = swapchainView;
+		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachment.clearValue.color.float32[0] = clearColor[0];
+		colorAttachment.clearValue.color.float32[1] = clearColor[1];
+		colorAttachment.clearValue.color.float32[2] = clearColor[2];
+		colorAttachment.clearValue.color.float32[3] = clearColor[3];
+
+		VkRenderingInfo renderingInfo{};
+		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		renderingInfo.renderArea.offset = { 0, 0 };
+		renderingInfo.renderArea.extent = extent;
+		renderingInfo.layerCount = 1;
+		renderingInfo.colorAttachmentCount = 1;
+		renderingInfo.pColorAttachments = &colorAttachment;
+		vkCmdBeginRendering(commandBuffer, &renderingInfo);
+		vkCmdEndRendering(commandBuffer);
+
+		const VkImageMemoryBarrier2 lastBarrier = MakeLayoutTransitionBarrier(swapchainImage,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, true, false);
+		dependencyInfo.pImageMemoryBarriers = &lastBarrier;
+		vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+
+		vkEndCommandBuffer(commandBuffer);
+	}
+
+	void VulkanFrameRuntime::RecordAbortFrame(
+		VkCommandBuffer commandBuffer, uint32_t backBufferIndex) noexcept
+	{
+		const VkImage swapchainImage = m_SwapChain->GetImage(backBufferIndex).m_Image;
+
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+		// A skipped frame leaves the image in whatever layout the previous
+		// frame chose; only a layout other than PRESENT_SRC_KHR needs a
+		// transition. Undefined is a full discard.
+		const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(backBufferIndex);
+		if (tracked != VulkanPresentImageLayout::Present)
+		{
+			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::ColorAttachment
+				? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+				: VK_IMAGE_LAYOUT_UNDEFINED;
+			const VkImageMemoryBarrier2 barrier = MakeLayoutTransitionBarrier(swapchainImage,
+				oldLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, tracked == VulkanPresentImageLayout::ColorAttachment,
+				false);
+			VkDependencyInfo dependencyInfo{};
+			dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			dependencyInfo.imageMemoryBarrierCount = 1;
+			dependencyInfo.pImageMemoryBarriers = &barrier;
+			vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+		}
+
+		vkEndCommandBuffer(commandBuffer);
+	}
+
+	void VulkanFrameRuntime::SubmitAndPresent(uint32_t frameSlotIndex,
+		uint32_t backBufferIndex, VkCommandBuffer commandBuffer) noexcept
+	{
+		VulkanFrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		const uint64_t timelineValue = m_Timeline->AllocateSignalValue();
+
+		VkCommandBufferSubmitInfo commandBufferInfo{};
+		commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		commandBufferInfo.commandBuffer = commandBuffer;
+
+		VkSemaphoreSubmitInfo waitInfo{};
+		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+		waitInfo.semaphore = slot.m_ImageAvailable;
+		waitInfo.stageMask = kAllStages;
+
+		VkSemaphoreSubmitInfo timelineSignal{};
+		timelineSignal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+		timelineSignal.semaphore = m_Timeline->Get();
+		timelineSignal.value = timelineValue;
+		timelineSignal.stageMask = kAllStages;
+
+		VkSemaphoreSubmitInfo presentSignal = timelineSignal;
+		presentSignal.semaphore = m_SwapChain->GetRenderingFinished(backBufferIndex);
+		std::array<VkSemaphoreSubmitInfo, 2> signalInfos = { timelineSignal, presentSignal };
+
+		VkSubmitInfo2 submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		submitInfo.waitSemaphoreInfoCount = 1;
+		submitInfo.pWaitSemaphoreInfos = &waitInfo;
+		submitInfo.commandBufferInfoCount = 1;
+		submitInfo.pCommandBufferInfos = &commandBufferInfo;
+		submitInfo.signalSemaphoreInfoCount = 2;
+		submitInfo.pSignalSemaphoreInfos = signalInfos.data();
+
+		const VkResult submitResult =
+			vkQueueSubmit2(m_Device->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+		slot.m_LastSubmittedTimelineValue = submitResult == VK_SUCCESS
+			? timelineValue
+			: m_Timeline->GetCurrentSignalValue();
+		if (submitResult != VK_SUCCESS)
+		{
+			return;
+		}
+
+		VkPresentInfoKHR presentInfo{};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		const VkSemaphore renderingFinished =
+			m_SwapChain->GetRenderingFinished(backBufferIndex);
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &renderingFinished;
+		const VkSwapchainKHR swapChainHandle = m_SwapChain->Get();
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &swapChainHandle;
+		presentInfo.pImageIndices = &backBufferIndex;
+		vkQueuePresentKHR(m_Device->GetGraphicsQueue(), &presentInfo);
+	}
+
+	VkSemaphore VulkanFrameRuntime::GetImageAvailableSemaphore(uint32_t frameSlotIndex) const noexcept
+	{
+		return frameSlotIndex < m_FrameSlots.size()
+			? m_FrameSlots[frameSlotIndex].m_ImageAvailable
+			: VK_NULL_HANDLE;
+	}
+
+	VkSemaphore VulkanFrameRuntime::GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept
+	{
+		return m_SwapChain ? m_SwapChain->GetRenderingFinished(backBufferIndex) : VK_NULL_HANDLE;
+	}
+
+	void VulkanFrameRuntime::DestroyFrameSlots() noexcept
+	{
+		for (VulkanFrameSlot& slot : m_FrameSlots)
+		{
+			if (slot.m_CommandPool != VK_NULL_HANDLE)
+			{
+				vkDestroyCommandPool(m_Device->Get(), slot.m_CommandPool, nullptr);
+				slot.m_CommandPool = VK_NULL_HANDLE;
+			}
+			if (slot.m_ImageAvailable != VK_NULL_HANDLE)
+			{
+				vkDestroySemaphore(m_Device->Get(), slot.m_ImageAvailable, nullptr);
+				slot.m_ImageAvailable = VK_NULL_HANDLE;
+			}
+		}
+		m_FrameSlots.clear();
+	}
+}
