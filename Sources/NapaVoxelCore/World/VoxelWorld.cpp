@@ -217,6 +217,7 @@ namespace napa::voxel
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
+		const std::uint64_t targetWorldVoxelRevision = m_WorldVoxelRevision + 1;
 
 		VoxelChunk* chunk = nullptr;
 		bool allocated = false;
@@ -240,7 +241,8 @@ namespace napa::voxel
 			return {};
 		}
 
-		++m_WorldVoxelRevision;
+		chunk->m_VoxelRevision = targetWorldVoxelRevision;
+		m_WorldVoxelRevision = targetWorldVoxelRevision;
 		changed = true;
 		return {};
 	}
@@ -322,6 +324,7 @@ namespace napa::voxel
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
+		const std::uint64_t targetWorldVoxelRevision = m_WorldVoxelRevision + 1;
 
 		VoxelChunk* chunk = nullptr;
 		bool allocated = false;
@@ -345,7 +348,8 @@ namespace napa::voxel
 			return {};
 		}
 
-		++m_WorldVoxelRevision;
+		chunk->m_VoxelRevision = targetWorldVoxelRevision;
+		m_WorldVoxelRevision = targetWorldVoxelRevision;
 		changed = true;
 		return {};
 	}
@@ -475,6 +479,7 @@ namespace napa::voxel
 		{
 			return { ValidationError::ArithmeticOverflow };
 		}
+		const std::uint64_t targetWorldVoxelRevision = m_WorldVoxelRevision + 1;
 		for (const auto& [chunkCoordinate, coordinates] : chunkRestores)
 		{
 			static_cast<void>(coordinates);
@@ -496,9 +501,10 @@ namespace napa::voxel
 				return restoreResult;
 			}
 			static_cast<void>(chunkChanged);
+			chunk->m_VoxelRevision = targetWorldVoxelRevision;
 		}
 
-		++m_WorldVoxelRevision;
+		m_WorldVoxelRevision = targetWorldVoxelRevision;
 		result = std::move(restored);
 		return {};
 	}

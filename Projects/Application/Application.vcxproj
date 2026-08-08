@@ -149,6 +149,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelHashSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMesherSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMultiChunkSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMutationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelPrimitiveSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelRestoreSelfTests.cpp" />

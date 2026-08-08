@@ -78,6 +78,7 @@ namespace napa::voxel
 		NonFiniteEditStrength = 69,
 		InvalidVoxelEditMaterialRules = 70,
 		UnpreparedSphereEditContext = 71,
+		InvalidVoxelMutation = 72,
 	};
 
 	struct ValidationResult

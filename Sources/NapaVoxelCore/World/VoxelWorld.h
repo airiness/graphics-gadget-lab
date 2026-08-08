@@ -17,6 +17,8 @@ namespace napa::voxel
 {
 	struct PrimitiveDesc;
 	struct PrimitiveWorldGenerationResult;
+	struct SphereEditRequest;
+	struct VoxelMutationResult;
 
 	class VoxelWorld final
 	{
@@ -63,6 +65,11 @@ namespace napa::voxel
 			const SampleAabb& region, RestoreResult& result);
 
 	private:
+		using ChunkMap =
+			std::map<ChunkCoord, std::unique_ptr<VoxelChunk>, ChunkCoordZYXLess>;
+
+		friend ValidationResult ApplySphereEdit(VoxelWorld& world,
+			const SphereEditRequest& request, VoxelMutationResult& result);
 		friend ValidationResult GeneratePrimitiveVoxelWorld(const VoxelWorldConfig& config,
 			std::span<const PrimitiveDesc> primitives, std::unique_ptr<VoxelWorld>& world,
 			PrimitiveWorldGenerationResult& result);
@@ -82,7 +89,7 @@ namespace napa::voxel
 		VoxelWorldConfig m_Config{};
 		LogicalDomainMetrics m_LogicalDomainMetrics{};
 		SampleAabb m_LogicalSampleBounds{};
-		std::map<ChunkCoord, std::unique_ptr<VoxelChunk>, ChunkCoordZYXLess> m_Chunks;
+		ChunkMap m_Chunks;
 		std::uint64_t m_WorldVoxelRevision = 0;
 		bool m_OriginalStateSealed = false;
 	};

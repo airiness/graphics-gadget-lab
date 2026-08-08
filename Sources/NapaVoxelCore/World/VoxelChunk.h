@@ -13,6 +13,8 @@
 namespace napa::voxel
 {
 	class VoxelWorld;
+	struct SphereEditRequest;
+	struct VoxelMutationResult;
 
 	class VoxelChunk final
 	{
@@ -47,6 +49,8 @@ namespace napa::voxel
 			LocalCoord local, VoxelSample input, bool& changed) noexcept;
 
 	private:
+		friend ValidationResult ApplySphereEdit(VoxelWorld& world,
+			const SphereEditRequest& request, VoxelMutationResult& result);
 		friend class VoxelWorld;
 
 		[[nodiscard]] ValidationResult ResolveFlatIndex(

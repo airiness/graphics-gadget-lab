@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -82,6 +82,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
@@ -99,6 +100,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h" />

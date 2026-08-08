@@ -85,11 +85,11 @@ namespace gglab
 			std::unique_ptr<VoxelWorld> world;
 			context.Check(
 				VoxelWorld::Create(MakeRestoreConfig(), world).Succeeded() &&
-					world &&
-					InitializeSample(*world, regionCoordinate, stone) &&
-					InitializeSample(*world, firstChunkCoordinate, stone) &&
-					InitializeSample(*world, secondChunkCoordinate, soil) &&
-					InitializeSample(*world, guardCoordinate, soil),
+				world &&
+				InitializeSample(*world, regionCoordinate, stone) &&
+				InitializeSample(*world, firstChunkCoordinate, stone) &&
+				InitializeSample(*world, secondChunkCoordinate, soil) &&
+				InitializeSample(*world, guardCoordinate, soil),
 				"Restore test data initializes original and current samples");
 			if (!world)
 			{
@@ -108,18 +108,18 @@ namespace gglab
 					*world,
 					regionCoordinate,
 					damagedStone) &&
-					MutateSample(
-						*world,
-						firstChunkCoordinate,
-						damagedStone) &&
-					MutateSample(
-						*world,
-						secondChunkCoordinate,
-						damagedSoil) &&
-					MutateSample(
-						*world,
-						guardCoordinate,
-						damagedSoil),
+				MutateSample(
+					*world,
+					firstChunkCoordinate,
+					damagedStone) &&
+				MutateSample(
+					*world,
+					secondChunkCoordinate,
+					damagedSoil) &&
+				MutateSample(
+					*world,
+					guardCoordinate,
+					damagedSoil),
 				"Restore test data diverges current samples from original");
 
 			RestoreResult result{};
@@ -133,9 +133,9 @@ namespace gglab
 					},
 					result).Succeeded() &&
 					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{ regionCoordinate } &&
-					world->GetWorldVoxelRevision() ==
-						regionRevision + 1,
+				std::vector<SampleCoord>{ regionCoordinate }&&
+				world->GetWorldVoxelRevision() ==
+				regionRevision + 1,
 				"Region restore reports exact changes and advances world revision once");
 
 			VoxelSample original{};
@@ -144,11 +144,11 @@ namespace gglab
 				world->ReadOriginalSample(
 					regionCoordinate,
 					original).Succeeded() &&
-					world->ReadCurrentSample(
-						regionCoordinate,
-						current).Succeeded() &&
-					original == stone &&
-					current == stone,
+				world->ReadCurrentSample(
+					regionCoordinate,
+					current).Succeeded() &&
+				original == stone &&
+				current == stone,
 				"Region restore copies original bytes without changing original data");
 
 			const std::uint64_t noOpRevision =
@@ -161,30 +161,28 @@ namespace gglab
 					},
 					result).Succeeded() &&
 					!result.Changed() &&
-					world->GetWorldVoxelRevision() == noOpRevision,
+				world->GetWorldVoxelRevision() == noOpRevision,
 				"A no-op region restore clears its result without advancing revision");
 
 			const VoxelChunk* const sharedChunk =
 				world->FindChunk({ 0, 0, 0 });
-			const std::uint64_t sharedChunkRevision =
-				sharedChunk ? sharedChunk->GetVoxelRevision() : 0;
 			const std::uint64_t chunkRestoreRevision =
 				world->GetWorldVoxelRevision();
 			context.Check(
 				sharedChunk &&
-					world->RestoreSampleOwnerChunk(
-						{ 0, 0, 0 },
-						result).Succeeded() &&
-					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{
-							firstChunkCoordinate,
-							secondChunkCoordinate,
-						} &&
-					world->GetWorldVoxelRevision() ==
-						chunkRestoreRevision + 1 &&
+				world->RestoreSampleOwnerChunk(
+					{ 0, 0, 0 },
+					result).Succeeded() &&
+				result.m_ChangedSampleCoordinates ==
+				std::vector<SampleCoord>{
+				firstChunkCoordinate,
+					secondChunkCoordinate,
+			}&&
+				world->GetWorldVoxelRevision() ==
+					chunkRestoreRevision + 1 &&
 					sharedChunk->GetVoxelRevision() ==
-						sharedChunkRevision + 1,
-				"Chunk restore batches changes in canonical order and advances revisions once");
+					chunkRestoreRevision + 1,
+					"Chunk restore batches changes in canonical order and advances revisions once");
 
 			const std::size_t residentBeforeNoOp =
 				world->GetResidentChunkCount();
@@ -194,11 +192,11 @@ namespace gglab
 				world->RestoreSampleOwnerChunk(
 					{ 0, 1, 0 },
 					result).Succeeded() &&
-					!result.Changed() &&
-					world->GetResidentChunkCount() ==
-						residentBeforeNoOp &&
-					world->GetWorldVoxelRevision() ==
-						revisionBeforeNoOp,
+				!result.Changed() &&
+				world->GetResidentChunkCount() ==
+				residentBeforeNoOp &&
+				world->GetWorldVoxelRevision() ==
+				revisionBeforeNoOp,
 				"Restoring an unallocated logical owner does not allocate storage");
 
 			result.m_ChangedSampleCoordinates = {
@@ -210,14 +208,14 @@ namespace gglab
 				world->RestoreSampleOwnerChunk(
 					{ 3, 0, 0 },
 					result).m_Error ==
-					ValidationError::ChunkOutsideLogicalSampleDomain &&
-					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{
-							firstChunkCoordinate,
-						} &&
-					world->GetWorldVoxelRevision() ==
-						revisionBeforeRejectedRestore,
-				"A rejected chunk restore leaves its result and world unchanged");
+				ValidationError::ChunkOutsideLogicalSampleDomain &&
+				result.m_ChangedSampleCoordinates ==
+				std::vector<SampleCoord>{
+				firstChunkCoordinate,
+			}&&
+				world->GetWorldVoxelRevision() ==
+					revisionBeforeRejectedRestore,
+					"A rejected chunk restore leaves its result and world unchanged");
 
 			const std::uint64_t guardRestoreRevision =
 				world->GetWorldVoxelRevision();
@@ -225,10 +223,10 @@ namespace gglab
 				world->RestoreSampleOwnerChunk(
 					{ 2, 0, 0 },
 					result).Succeeded() &&
-					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{ guardCoordinate } &&
-					world->GetWorldVoxelRevision() ==
-						guardRestoreRevision + 1,
+				result.m_ChangedSampleCoordinates ==
+				std::vector<SampleCoord>{ guardCoordinate }&&
+				world->GetWorldVoxelRevision() ==
+				guardRestoreRevision + 1,
 				"Sample-owner guard chunk restore includes only logical samples");
 
 			context.Check(
@@ -236,10 +234,10 @@ namespace gglab
 					*world,
 					regionCoordinate,
 					damagedStone) &&
-					MutateSample(
-						*world,
-						guardCoordinate,
-						damagedSoil),
+				MutateSample(
+					*world,
+					guardCoordinate,
+					damagedSoil),
 				"Restore-all test data diverges samples in separate chunks");
 
 			const std::uint64_t restoreAllRevision =
@@ -247,18 +245,18 @@ namespace gglab
 			std::uint64_t restoredHash = 0;
 			context.Check(
 				world->RestoreAll(result).Succeeded() &&
-					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{
-							regionCoordinate,
-							guardCoordinate,
-						} &&
-					world->GetWorldVoxelRevision() ==
-						restoreAllRevision + 1 &&
+				result.m_ChangedSampleCoordinates ==
+				std::vector<SampleCoord>{
+				regionCoordinate,
+					guardCoordinate,
+			}&&
+				world->GetWorldVoxelRevision() ==
+					restoreAllRevision + 1 &&
 					ComputeLogicalVoxelWorldHash(
 						*world,
 						restoredHash).Succeeded() &&
 					restoredHash == initialHash,
-				"Restore all returns canonical changes and recovers the initial hash");
+					"Restore all returns canonical changes and recovers the initial hash");
 
 			result.m_ChangedSampleCoordinates = {
 				guardCoordinate,
@@ -271,8 +269,8 @@ namespace gglab
 					},
 					result).m_Error ==
 					ValidationError::SampleOutsideLogicalBounds &&
-					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{ guardCoordinate },
+				result.m_ChangedSampleCoordinates ==
+				std::vector<SampleCoord>{ guardCoordinate },
 				"An out-of-bounds restore region leaves its result unchanged");
 
 			context.Check(
@@ -283,8 +281,8 @@ namespace gglab
 					},
 					result).m_Error ==
 					ValidationError::EmptySampleBounds &&
-					result.m_ChangedSampleCoordinates ==
-						std::vector<SampleCoord>{ guardCoordinate },
+				result.m_ChangedSampleCoordinates ==
+				std::vector<SampleCoord>{ guardCoordinate },
 				"An empty restore region is rejected without changing its result");
 
 			std::unique_ptr<VoxelWorld> currentFirstWorld;
@@ -297,12 +295,12 @@ namespace gglab
 				VoxelWorld::Create(
 					MakeRestoreConfig(),
 					currentFirstWorld).Succeeded() &&
-					currentFirstWorld &&
-					currentFirstWorld->WriteCurrentSample(
-						currentFirstCoordinate,
-						stone,
-						currentFirstChanged).Succeeded() &&
-					currentFirstChanged,
+				currentFirstWorld &&
+				currentFirstWorld->WriteCurrentSample(
+					currentFirstCoordinate,
+					stone,
+					currentFirstChanged).Succeeded() &&
+				currentFirstChanged,
 				"Current-first restore data starts without an original write");
 			if (currentFirstWorld)
 			{
@@ -313,14 +311,14 @@ namespace gglab
 				context.Check(
 					currentFirstWorld->RestoreAll(
 						currentFirstResult).Succeeded() &&
-						currentFirstResult.m_ChangedSampleCoordinates ==
-							std::vector<SampleCoord>{
-								currentFirstCoordinate,
-							} &&
-						currentFirstWorld->GetWorldVoxelRevision() ==
-							currentFirstRevision + 1 &&
+					currentFirstResult.m_ChangedSampleCoordinates ==
+					std::vector<SampleCoord>{
+					currentFirstCoordinate,
+				}&&
+					currentFirstWorld->GetWorldVoxelRevision() ==
+						currentFirstRevision + 1 &&
 						currentFirstWorld->GetResidentChunkCount() ==
-							currentFirstResidentCount &&
+						currentFirstResidentCount &&
 						currentFirstWorld->ReadOriginalSample(
 							currentFirstCoordinate,
 							currentFirstOriginal).Succeeded() &&
@@ -329,7 +327,7 @@ namespace gglab
 							currentFirstCurrent).Succeeded() &&
 						currentFirstOriginal == DefaultVoxelSample &&
 						currentFirstCurrent == DefaultVoxelSample,
-					"Current-first restore recovers the implicit original baseline");
+						"Current-first restore recovers the implicit original baseline");
 			}
 		}
 	}

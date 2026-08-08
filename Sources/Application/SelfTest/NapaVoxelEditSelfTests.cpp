@@ -182,7 +182,7 @@ namespace gglab
 			const VoxelWorldConfig clippedConfig = MakeEditConfig(1.0f, 2.0f, {
 				.m_Min = { -4, -4, -4 },
 				.m_MaxExclusive = { 4, 4, 4 },
-			});
+				});
 			SphereEditContext clippedContext{};
 			const bool clippedPrepared = PrepareSphereEditContext(clippedConfig,
 				MakeEditRequest({ -4.0, -4.0, -4.0 }, 1.0, 1.0, 0), clippedContext).Succeeded();
@@ -192,20 +192,29 @@ namespace gglab
 					clippedContext.GetScanBounds().m_MaxExclusive.m_X - 1,
 					clippedContext.GetScanBounds().m_MaxExclusive.m_Y - 1,
 					clippedContext.GetScanBounds().m_MaxExclusive.m_Z - 1,
-				}),
-				"Sphere edit scan bounds clip to the logical Sample Domain");
+					}),
+					"Sphere edit scan bounds clip to the logical Sample Domain");
 
 			const SampleAabb preservedBounds = densityContext.GetScanBounds();
 			const double preservedStrength = densityContext.GetSanitizedStrength();
 			const SphereEditRequest overflow = MakeEditRequest({
 				static_cast<double>(std::numeric_limits<std::int32_t>::max()), 0.0, 0.0,
-			}, 2.0, 1.0, 0);
+				}, 2.0, 1.0, 0);
 			const ValidationResult overflowResult =
 				PrepareSphereEditContext(config, overflow, densityContext);
 			context.Check(overflowResult.m_Error == ValidationError::ArithmeticOverflow &&
 				densityContext.GetScanBounds() == preservedBounds &&
 				densityContext.GetSanitizedStrength() == preservedStrength,
 				"Coordinate-limit overflow leaves a prepared edit context unchanged");
+
+			const SphereEditRequest radiusAdditionOverflow = MakeEditRequest(
+				{}, std::numeric_limits<double>::max(), 1.0, 0);
+			const ValidationResult radiusAdditionResult = PrepareSphereEditContext(
+				config, radiusAdditionOverflow, densityContext);
+			context.Check(radiusAdditionResult.m_Error == ValidationError::ArithmeticOverflow &&
+				densityContext.GetScanBounds() == preservedBounds &&
+				densityContext.GetSanitizedStrength() == preservedStrength,
+				"A finite radius whose support addition overflows leaves the context unchanged");
 		}
 
 		void RunEditEligibilityTests(SelfTestContext& context) noexcept
@@ -230,7 +239,7 @@ namespace gglab
 			const VoxelWorldConfig supportConfig = MakeEditConfig(1.0f, 127.0f, {
 				.m_Min = { -128, -128, -128 },
 				.m_MaxExclusive = { 128, 128, 128 },
-			});
+				});
 			SphereEditContext densityContext{};
 			const bool densityPrepared = PrepareSphereEditContext(supportConfig,
 				MakeEditRequest({}, 0.5, 1.0, 0), densityContext).Succeeded();

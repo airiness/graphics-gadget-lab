@@ -279,6 +279,9 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelEditSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMutationSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>

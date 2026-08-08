@@ -16,15 +16,16 @@ namespace gglab
 
 		std::printf(
 			"NapaVoxelCore build contract: core-api=%u, voxel-hash-schema=%u, "
-			"mesh-hash-schema=%u, reference-mesher=%u, edit=%u, iso=%u\n",
+			"mesh-hash-schema=%u, reference-mesher=%u, edit=%u, mutation=%u, iso=%u\n",
 			static_cast<unsigned>(contract.m_CoreApiVersion),
 			static_cast<unsigned>(contract.m_VoxelHashSchemaVersion),
 			static_cast<unsigned>(contract.m_MeshHashSchemaVersion),
 			static_cast<unsigned>(contract.m_ReferenceMesherVersion),
 			static_cast<unsigned>(contract.m_EditContractVersion),
+			static_cast<unsigned>(contract.m_MutationContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 18, "Core API version is 18");
+		context.Check(contract.m_CoreApiVersion == 19, "Core API version is 19");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -36,12 +37,15 @@ namespace gglab
 			"Reference mesher version is 3");
 		context.Check(contract.m_EditContractVersion == 1,
 			"Sphere edit contract version is 1");
+		context.Check(contract.m_MutationContractVersion == 1,
+			"Voxel mutation contract version is 1");
 		context.Check(
 			contract.m_IsoValue == napa::voxel::IsoValue,
 			"Build contract reports the canonical iso value");
 
 		RunNapaVoxelCoordinateSelfTests(context);
 		RunNapaVoxelEditSelfTests(context);
+		RunNapaVoxelMutationSelfTests(context);
 		RunNapaVoxelStorageSelfTests(context);
 		RunNapaVoxelHashSelfTests(context);
 		RunNapaVoxelRestoreSelfTests(context);

@@ -10,6 +10,10 @@
 
 namespace napa::voxel
 {
+	class VoxelWorld;
+	struct VoxelMutationResult;
+	struct VoxelSample;
+
 	struct SphereEdit
 	{
 		Double3 m_CenterWorld{};
@@ -62,6 +66,11 @@ namespace napa::voxel
 		}
 
 	private:
+		friend ValidationResult ApplySphereEdit(VoxelWorld& world,
+			const SphereEditRequest& request, VoxelMutationResult& result);
+		friend ValidationResult EvaluateSphereEditSampleTransition(
+			const SphereEditContext& context, SampleCoord sample,
+			VoxelSample before, VoxelSample& after) noexcept;
 		friend ValidationResult PrepareSphereEditContext(const VoxelWorldConfig& config,
 			const SphereEditRequest& request, SphereEditContext& context) noexcept;
 		friend ValidationResult EvaluateSphereEditSample(const SphereEditContext& context,
