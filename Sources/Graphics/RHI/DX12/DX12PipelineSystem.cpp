@@ -6,22 +6,12 @@
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12PortabilityUtils.h"
 
 namespace gglab
 {
 	namespace
 	{
-		constexpr RHIPortabilityCapabilities DX12PortabilityCapabilities{
-			.m_ImageViewMinLod = true,
-			.m_CustomBorderColor = true,
-			.m_VertexAttributeDivisor = true,
-			.m_FillModeNonSolid = true,
-			.m_DepthClamp = true,
-			.m_DepthBiasClamp = true,
-			.m_IndependentBlend = true,
-			.m_SampleQuality = true,
-		};
-
 		D3D12_SHADER_BYTECODE ToDX12Bytecode(const ShaderBytecode& bytecode) noexcept
 		{
 			return {

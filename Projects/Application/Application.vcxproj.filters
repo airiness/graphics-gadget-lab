@@ -1256,6 +1256,9 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h">
+      <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>

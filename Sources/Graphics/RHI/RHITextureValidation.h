@@ -57,6 +57,9 @@ namespace gglab
 	{
 		RHITextureValidationError m_ValidationError = RHITextureValidationError::None;
 		RHITextureSupportReason m_Reason = RHITextureSupportReason::None;
+		// Filled when a description is rejected by the portability contract
+		// rather than by backend format support. See GetRHIPortabilityValidationErrorText.
+		RHIPortabilityValidationError m_PortabilityError = RHIPortabilityValidationError::None;
 		bool m_Supported = false;
 
 		[[nodiscard]] constexpr bool IsDescriptionValid() const noexcept

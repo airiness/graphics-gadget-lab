@@ -30,10 +30,18 @@ namespace gglab
 
 		[[nodiscard]] RHITransferSubmission Submit(bool wait = false) noexcept;
 
+		// A failed batch must not be submitted: after a high-level operation
+		// fails following recorded command/state mutation, Submit aborts the
+		// transfer context and returns an invalid submission instead of
+		// committing half a command stream with an incomplete publication manifest.
+		[[nodiscard]] bool IsFailed() const noexcept { return m_Poisoned; }
+
 	private:
 		void AbortIfActive() noexcept;
+		void Fail() noexcept { m_Poisoned = true; }
 
 		RHITransferContext* m_TransferContext = nullptr;
 		std::vector<RHITransferResourcePublication> m_Publications;
+		bool m_Poisoned = false;
 	};
 }

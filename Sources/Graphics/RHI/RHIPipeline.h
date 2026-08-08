@@ -187,6 +187,15 @@ namespace gglab
 		ValidateRHIGraphicsPipelinePortability(const RHIGraphicsPipelineDesc& desc,
 			const RHIPortabilityCapabilities& capabilities) noexcept
 	{
+		if (desc.m_VertexInput.m_VertexBufferCount >
+			RHIVertexInputLayoutDesc::MaxVertexBuffers)
+		{
+			return { .m_Error = RHIPortabilityValidationError::VertexBufferCountExceedsLimit };
+		}
+		if (desc.m_RenderTargetCount > RHIGraphicsPipelineDesc::MaxRenderTargets)
+		{
+			return { .m_Error = RHIPortabilityValidationError::RenderTargetCountExceedsLimit };
+		}
 		for (uint32_t layoutIndex = 0; layoutIndex < desc.m_VertexInput.m_VertexBufferCount;
 			++layoutIndex)
 		{

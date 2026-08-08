@@ -7,6 +7,7 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Utility/DX12PortabilityUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Core/HResult.h"
@@ -15,17 +16,6 @@ namespace gglab
 {
 	namespace
 	{
-		constexpr RHIPortabilityCapabilities DX12PortabilityCapabilities{
-			.m_ImageViewMinLod = true,
-			.m_CustomBorderColor = true,
-			.m_VertexAttributeDivisor = true,
-			.m_FillModeNonSolid = true,
-			.m_DepthClamp = true,
-			.m_DepthBiasClamp = true,
-			.m_IndependentBlend = true,
-			.m_SampleQuality = true,
-		};
-
 		[[nodiscard]] bool SupportsMultisampling(
 			ID3D12Device* device, DXGI_FORMAT format, uint16_t sampleCount) noexcept
 		{
@@ -150,9 +140,11 @@ namespace gglab
 		{
 			return { .m_ValidationError = validation.m_Error };
 		}
-		if (!ValidateRHITextureViewPortability(viewDesc, DX12PortabilityCapabilities).IsValid())
+		const RHIPortabilityValidationResult portability =
+			ValidateRHITextureViewPortability(viewDesc, DX12PortabilityCapabilities);
+		if (!portability.IsValid())
 		{
-			return { .m_Supported = false };
+			return { .m_PortabilityError = portability.m_Error };
 		}
 		const RHITextureSupportResult textureSupport = QueryTextureSupport(textureDesc);
 		if (!textureSupport.IsSupported())

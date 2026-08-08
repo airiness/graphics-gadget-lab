@@ -2,6 +2,7 @@
 #include "Core/EnumFlags.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace gglab
 {
@@ -215,6 +216,8 @@ namespace gglab
 		DepthBiasClampUnsupported,
 		IndependentBlendUnsupported,
 		SampleQualityUnsupported,
+		VertexBufferCountExceedsLimit,
+		RenderTargetCountExceedsLimit,
 	};
 
 	struct RHIPortabilityValidationResult
@@ -226,6 +229,39 @@ namespace gglab
 			return m_Error == RHIPortabilityValidationError::None;
 		}
 	};
+
+	[[nodiscard]] constexpr inline std::string_view GetRHIPortabilityValidationErrorText(
+		RHIPortabilityValidationError error) noexcept
+	{
+		switch (error)
+		{
+		case RHIPortabilityValidationError::None:
+			return "no portability validation error";
+		case RHIPortabilityValidationError::ImageViewMinLodUnsupported:
+			return "image view min LOD clamp is not supported";
+		case RHIPortabilityValidationError::CustomBorderColorUnsupported:
+			return "custom sampler border color is not supported";
+		case RHIPortabilityValidationError::InvalidVertexInputRate:
+			return "per-vertex input layouts must use instance step rate 0";
+		case RHIPortabilityValidationError::InstanceDivisorUnsupported:
+			return "instance step rate greater than 1 is not supported";
+		case RHIPortabilityValidationError::WireframeUnsupported:
+			return "rasterizer wireframe fill is not supported";
+		case RHIPortabilityValidationError::DepthClampUnsupported:
+			return "rasterizer depth clamp is not supported";
+		case RHIPortabilityValidationError::DepthBiasClampUnsupported:
+			return "rasterizer depth bias clamp is not supported";
+		case RHIPortabilityValidationError::IndependentBlendUnsupported:
+			return "independent render target blend states are not supported";
+		case RHIPortabilityValidationError::SampleQualityUnsupported:
+			return "non-zero sample quality is not supported";
+		case RHIPortabilityValidationError::VertexBufferCountExceedsLimit:
+			return "vertex buffer count exceeds the input layout limit";
+		case RHIPortabilityValidationError::RenderTargetCountExceedsLimit:
+			return "render target count exceeds the pipeline limit";
+		}
+		return "unknown portability validation error";
+	}
 
 	enum class RHICompareOp : uint8_t
 	{

@@ -612,6 +612,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h" />

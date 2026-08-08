@@ -1,4 +1,4 @@
-﻿#include "Core/Precompiled.h"
+#include "Core/Precompiled.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
 #include "DevTools/DevToolsRuntime.h"
@@ -350,18 +350,22 @@ namespace gglab
 			{
 			}
 			void Begin() noexcept override {}
-			RHIFencePoint Submit(bool) noexcept override { return { RHIFenceHandle{ 1, 1 }, 7 }; }
-			void Abort() noexcept override {}
+			RHIFencePoint Submit(bool) noexcept override
+			{
+				++m_SubmitCallCount;
+				return { RHIFenceHandle{ 1, 1 }, 7 };
+			}
+			void Abort() noexcept override { ++m_AbortCallCount; }
 			void ReclaimCompleted() noexcept override {}
 			bool UploadBuffer(
 				const void*, uint64_t, RHIBufferHandle, uint64_t) noexcept override
 			{
-				return true;
+				return !m_FailUploads;
 			}
 			bool UploadTexture(
 				const RHITextureUploadData&, RHITextureHandle) noexcept override
 			{
-				return true;
+				return !m_FailUploads;
 			}
 			RHITextureReadbackRequest ReadbackTexture(
 				RHITextureHandle, const RHITextureDesc&) noexcept override
@@ -370,6 +374,9 @@ namespace gglab
 			}
 
 			std::vector<RHITextureBarrier> m_TextureBarriers;
+			bool m_FailUploads = false;
+			uint32_t m_SubmitCallCount = 0;
+			uint32_t m_AbortCallCount = 0;
 		};
 
 		[[nodiscard]] bool NearlyEqual(
@@ -3580,6 +3587,139 @@ namespace gglab
 					});
 				context.Check(!cullableReadGraph.Compile() && hasUndefinedRead(cullableReadGraph),
 					"Cullable passes still report read-before-write declarations");
+			}
+
+			// --- Portability fixed-array boundaries ---
+			RHIGraphicsPipelineDesc maxCountPipeline{};
+			maxCountPipeline.m_VertexInput.m_VertexBufferCount =
+				RHIVertexInputLayoutDesc::MaxVertexBuffers;
+			maxCountPipeline.m_RenderTargetCount = RHIGraphicsPipelineDesc::MaxRenderTargets;
+			context.Check(ValidateRHIGraphicsPipelinePortability(
+				maxCountPipeline, vulkanV1Capabilities).IsValid(),
+				"Pipeline portability accepts maximum vertex buffer and render target counts");
+			RHIGraphicsPipelineDesc vertexOverflowPipeline{};
+			vertexOverflowPipeline.m_VertexInput.m_VertexBufferCount =
+				RHIVertexInputLayoutDesc::MaxVertexBuffers + 1;
+			context.Check(ValidateRHIGraphicsPipelinePortability(
+				vertexOverflowPipeline, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::VertexBufferCountExceedsLimit,
+				"Pipeline portability rejects vertex buffer counts above the input layout limit");
+			RHIGraphicsPipelineDesc targetOverflowPipeline{};
+			targetOverflowPipeline.m_RenderTargetCount =
+				RHIGraphicsPipelineDesc::MaxRenderTargets + 1;
+			context.Check(ValidateRHIGraphicsPipelinePortability(
+				targetOverflowPipeline, vulkanV1Capabilities).m_Error ==
+				RHIPortabilityValidationError::RenderTargetCountExceedsLimit,
+				"Pipeline portability rejects render target counts above the pipeline limit");
+
+			// --- Portability rejection reason text ---
+			context.Check(
+				GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::ImageViewMinLodUnsupported) ==
+				"image view min LOD clamp is not supported" &&
+				!GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::None).empty() &&
+				GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::ImageViewMinLodUnsupported) !=
+				GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::None),
+				"Portability rejection reasons expose stable, distinct text");
+
+			// --- TransferBatch poisoned state ---
+			{
+				RecordingTransferContext failingContext;
+				TransferBatch failingBatch(failingContext);
+				const RHITextureHandle failTexture{ 5, 1 };
+				const bool firstUpload = failingBatch.UploadTexture(
+					failTexture, {}, UndefinedRHITextureState(), shaderReadState);
+				failingContext.m_FailUploads = true;
+				const bool failedUpload = failingBatch.UploadTexture(
+					failTexture, {}, UndefinedRHITextureState(), shaderReadState);
+				context.Check(firstUpload && !failedUpload && failingBatch.IsFailed() &&
+					failingContext.m_TextureBarriers.size() == 3,
+					"UploadTexture failure after recorded barriers poisons the batch");
+				const RHITransferSubmission failedSubmission = failingBatch.Submit(false);
+				context.Check(failingContext.m_SubmitCallCount == 0 &&
+					failingContext.m_AbortCallCount == 1 &&
+					!failedSubmission.m_Completion.IsValid() &&
+					failedSubmission.m_Publications.empty(),
+					"Poisoned batches abort without submitting and return an invalid submission");
+			}
+			{
+				RecordingTransferContext moveContext;
+				TransferBatch moveSource(moveContext);
+				const RHITextureHandle moveTexture{ 7, 1 };
+				GGLAB_UNUSED(moveSource.UploadTexture(
+					moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
+				moveContext.m_FailUploads = true;
+				GGLAB_UNUSED(moveSource.UploadTexture(
+					moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
+				TransferBatch moveTarget(std::move(moveSource));
+				context.Check(moveTarget.IsFailed(),
+					"Move construction preserves the poisoned state");
+				const RHITransferSubmission moveSubmission = moveTarget.Submit(false);
+				context.Check(moveContext.m_SubmitCallCount == 0 &&
+					moveContext.m_AbortCallCount == 1 && !moveSubmission.m_Completion.IsValid(),
+					"Moved poisoned batches still abort without submitting");
+			}
+
+			// --- TransferBatch overlapping publication validation ---
+			const RHIResourceState copyDestState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::CopyDest,
+			};
+			const RHITextureHandle overlapTexture{ 6, 1 };
+			const RHISubresourceRange colorMips{
+				.m_MipCount = 2,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			{
+				RecordingTransferContext overlapContext;
+				TransferBatch overlapBatch(overlapContext);
+				const bool sameRangeAccepted =
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0) &&
+					overlapBatch.PublishTexture(overlapTexture, copyDestState, colorMip0) &&
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0);
+				const bool disjointAccepted =
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip1);
+				const bool sameStateOverlapAccepted =
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips);
+				context.Check(sameRangeAccepted && disjointAccepted && sameStateOverlapAccepted &&
+					!overlapBatch.IsFailed(),
+					"Exact, disjoint, and same-state overlapping texture publications are accepted");
+				const RHITransferSubmission overlapSubmission = overlapBatch.Submit(false);
+				context.Check(overlapSubmission.m_Completion.IsValid(),
+					"Non-conflicting publications submit normally");
+			}
+			{
+				RecordingTransferContext conflictContext;
+				TransferBatch conflictBatch(conflictContext);
+				GGLAB_UNUSED(conflictBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool conflictRejected =
+					!conflictBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
+				context.Check(conflictRejected && conflictBatch.IsFailed(),
+					"Overlapping publications with conflicting terminal states poison the batch");
+			}
+			{
+				RecordingTransferContext wholeContext;
+				TransferBatch wholeBatch(wholeContext);
+				GGLAB_UNUSED(
+					wholeBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				const bool wholeConflictRejected =
+					!wholeBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(wholeConflictRejected && wholeBatch.IsFailed(),
+					"Whole-resource publications overlap every partial range");
+			}
+			{
+				RecordingTransferContext remainingContext;
+				TransferBatch remainingBatch(remainingContext);
+				const RHISubresourceRange remainingRange{ .m_Aspects = RHITextureAspect::Color };
+				GGLAB_UNUSED(remainingBatch.PublishTexture(overlapTexture, shaderReadState, remainingRange));
+				const bool remainingConflictRejected =
+					!remainingBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(remainingConflictRejected && remainingBatch.IsFailed(),
+					"Remaining-count ranges overlap explicit partial ranges");
 			}
 		}
 
