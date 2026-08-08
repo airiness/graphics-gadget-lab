@@ -70,6 +70,11 @@ namespace napa::voxel
 		return m_WorldVoxelRevision;
 	}
 
+	std::uint64_t VoxelWorld::GetSurfaceStateRevision() const noexcept
+	{
+		return m_SurfaceStateRevision;
+	}
+
 	bool VoxelWorld::IsOriginalStateSealed() const noexcept
 	{
 		return m_OriginalStateSealed;
@@ -140,10 +145,10 @@ namespace napa::voxel
 			return {};
 		}
 
+		VoxelSample current = DefaultVoxelSample;
 		if (iterator != m_Chunks.end())
 		{
 			VoxelSample original{};
-			VoxelSample current{};
 			const ValidationResult originalResult =
 				iterator->second->ReadOriginalSample(address.m_Local, original);
 			const ValidationResult currentResult =
@@ -193,6 +198,11 @@ namespace napa::voxel
 
 		chunk->m_VoxelRevision = targetWorldVoxelRevision;
 		m_WorldVoxelRevision = targetWorldVoxelRevision;
+		if (current.m_Density != prepared.m_Density ||
+			current.m_Material != prepared.m_Material)
+		{
+			m_SurfaceStateRevision = targetWorldVoxelRevision;
+		}
 		changed = true;
 		return {};
 	}
@@ -221,9 +231,9 @@ namespace napa::voxel
 			return {};
 		}
 
+		VoxelSample current = DefaultVoxelSample;
 		if (iterator != m_Chunks.end())
 		{
-			VoxelSample current{};
 			const ValidationResult readResult =
 				iterator->second->ReadCurrentSample(address.m_Local, current);
 			if (readResult.Failed())
@@ -267,6 +277,11 @@ namespace napa::voxel
 
 		chunk->m_VoxelRevision = targetWorldVoxelRevision;
 		m_WorldVoxelRevision = targetWorldVoxelRevision;
+		if (current.m_Density != prepared.m_Density ||
+			current.m_Material != prepared.m_Material)
+		{
+			m_SurfaceStateRevision = targetWorldVoxelRevision;
+		}
 		changed = true;
 		return {};
 	}
@@ -363,6 +378,7 @@ namespace napa::voxel
 		}
 
 		m_WorldVoxelRevision = 1;
+		m_SurfaceStateRevision = 1;
 		m_OriginalStateSealed = true;
 	}
 }

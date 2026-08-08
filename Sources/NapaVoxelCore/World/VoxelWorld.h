@@ -42,6 +42,7 @@ namespace napa::voxel
 		[[nodiscard]] SampleAabb GetLogicalSampleBounds() const noexcept;
 		[[nodiscard]] std::size_t GetResidentChunkCount() const noexcept;
 		[[nodiscard]] std::uint64_t GetWorldVoxelRevision() const noexcept;
+		[[nodiscard]] std::uint64_t GetSurfaceStateRevision() const noexcept;
 		[[nodiscard]] bool IsOriginalStateSealed() const noexcept;
 		void SealOriginalState() noexcept;
 
@@ -91,6 +92,7 @@ namespace napa::voxel
 		SampleAabb m_LogicalSampleBounds{};
 		ChunkMap m_Chunks;
 		std::uint64_t m_WorldVoxelRevision = 0;
+		std::uint64_t m_SurfaceStateRevision = 0;
 		bool m_OriginalStateSealed = false;
 	};
 }

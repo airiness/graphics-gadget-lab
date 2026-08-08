@@ -35,7 +35,12 @@ namespace napa::voxel
 		std::unique_ptr<PendingDataOnlyPublication>& pending)
 	{
 		if (!visible.HasPublishedMeshes() || mutation.m_SampleChanges.empty() ||
-			authoritativeWorld.GetConfig() != visible.GetConfig())
+			authoritativeWorld.GetConfig() != visible.GetConfig() ||
+			visible.GetSurfaceStateRevision() == 0 ||
+			visible.GetSurfaceStateRevision() > visible.GetVisibleWorldRevision() ||
+			authoritativeWorld.GetSurfaceStateRevision() == 0 ||
+			authoritativeWorld.GetSurfaceStateRevision() >
+			authoritativeWorld.GetWorldVoxelRevision())
 		{
 			return { ValidationError::InvalidDataOnlyPublication };
 		}
@@ -48,7 +53,9 @@ namespace napa::voxel
 			? SimulatedAuthoritativeRevision
 			: authoritativeWorld.GetWorldVoxelRevision();
 		if (mutation.m_TargetWorldVoxelRevision != authoritativeRevision ||
-			!mutation.m_MeshDirtyChunks.empty())
+			!mutation.m_MeshDirtyChunks.empty() ||
+			authoritativeWorld.GetSurfaceStateRevision() !=
+			visible.GetSurfaceStateRevision())
 		{
 			return { ValidationError::MismatchedDataOnlyPublication };
 		}

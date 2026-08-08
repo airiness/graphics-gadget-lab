@@ -345,6 +345,11 @@ namespace napa::voxel
 				}
 
 				world.m_WorldVoxelRevision = preparedResult.m_TargetWorldVoxelRevision;
+				if (!preparedResult.m_MeshDirtyChunks.empty())
+				{
+					world.m_SurfaceStateRevision =
+						preparedResult.m_TargetWorldVoxelRevision;
+				}
 				result.m_BaseWorldVoxelRevision = preparedResult.m_BaseWorldVoxelRevision;
 				result.m_TargetWorldVoxelRevision = preparedResult.m_TargetWorldVoxelRevision;
 				result.m_SampleChanges.swap(preparedResult.m_SampleChanges);

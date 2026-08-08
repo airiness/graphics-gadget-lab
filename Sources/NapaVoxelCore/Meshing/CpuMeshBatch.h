@@ -46,6 +46,18 @@ namespace napa::voxel
 		std::uint64_t m_TargetWorldVoxelRevision = 0;
 		std::vector<ChunkCoord> m_RequestedChunks;
 		std::vector<ChunkMeshRecord> m_Candidates;
+
+	private:
+		friend ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
+			std::uint64_t targetWorldVoxelRevision,
+			std::span<const ChunkCoord> requestedChunks, CpuMeshBatch& batch);
+		friend ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
+			const VoxelMutationResult& mutation, CpuMeshBatch& batch);
+		friend ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
+			const VisibleMeshSet& visible,
+			std::unique_ptr<PendingCpuMeshBatch>& pending);
+
+		std::uint64_t m_TargetSurfaceStateRevision = 0;
 	};
 
 	class CpuMeshReplacementView final
@@ -76,11 +88,13 @@ namespace napa::voxel
 		{
 			bool m_BaseWasPublished = false;
 			std::uint64_t m_BaseVisibleWorldRevision = 0;
+			std::uint64_t m_BaseSurfaceStateRevision = 0;
 			WorldMeshValidationResult m_BaseWorldMeshValidation{};
 			BoundaryContourValidationResult m_BaseBoundaryValidation{};
 
 			VoxelWorldConfig m_Config{};
 			std::uint64_t m_TargetWorldVoxelRevision = 0;
+			std::uint64_t m_TargetSurfaceStateRevision = 0;
 			std::uint64_t m_CandidateChunkCount = 0;
 			std::vector<ChunkMeshRecord> m_Chunks;
 			std::vector<std::size_t> m_ReplacementChunkIndices;
@@ -148,6 +162,7 @@ namespace napa::voxel
 			bool m_HasPublishedMeshes = false;
 			VoxelWorldConfig m_Config{};
 			std::uint64_t m_VisibleWorldRevision = 0;
+			std::uint64_t m_SurfaceStateRevision = 0;
 			std::vector<ChunkMeshRecord> m_Chunks;
 			WorldMeshValidationResult m_WorldMeshValidation{};
 			BoundaryContourValidationResult m_BoundaryValidation{};
@@ -164,6 +179,7 @@ namespace napa::voxel
 		[[nodiscard]] bool HasPublishedMeshes() const noexcept;
 		[[nodiscard]] const VoxelWorldConfig& GetConfig() const noexcept;
 		[[nodiscard]] std::uint64_t GetVisibleWorldRevision() const noexcept;
+		[[nodiscard]] std::uint64_t GetSurfaceStateRevision() const noexcept;
 		[[nodiscard]] std::span<const ChunkMeshRecord> GetChunks() const noexcept;
 		[[nodiscard]] const WorldMeshValidationResult& GetWorldMeshValidation() const noexcept;
 		[[nodiscard]] const BoundaryContourValidationResult&

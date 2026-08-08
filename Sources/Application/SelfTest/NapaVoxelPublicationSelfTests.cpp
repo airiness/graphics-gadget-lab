@@ -1208,6 +1208,35 @@ namespace gglab
 				allocationVisible.GetVisibleWorldRevision() ==
 				allocationMutation.m_BaseWorldVoxelRevision,
 				"Data-only token allocation failure preserves the complete visible state and output");
+
+			std::unique_ptr<VoxelWorld> forgedWorld;
+			VisibleMeshSet forgedVisible{};
+			VoxelMutationResult incompleteMutation{};
+			const bool forgedFixture = BuildCoreDataOnlyPublicationInput(
+				forgedWorld, forgedVisible, incompleteMutation);
+			bool surfaceChanged = false;
+			const ValidationResult surfaceWrite = forgedFixture
+				? forgedWorld->WriteCurrentSample({ 0, 0, 0 }, {
+						.m_Density = IsoValue,
+						.m_Material = VoxelMaterial::Stone,
+						.m_Damage = 0,
+					}, surfaceChanged)
+					: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
+			if (surfaceWrite.Succeeded())
+			{
+				incompleteMutation.m_TargetWorldVoxelRevision =
+					forgedWorld->GetWorldVoxelRevision();
+			}
+			std::unique_ptr<PendingDataOnlyPublication> forgedPending;
+			const ValidationResult forgedResult = surfaceWrite.Succeeded()
+				? PrepareDataOnlyPublication(
+					*forgedWorld, incompleteMutation, forgedVisible, forgedPending)
+				: surfaceWrite;
+			context.Check(surfaceChanged && forgedResult.m_Error ==
+				ValidationError::MismatchedDataOnlyPublication && !forgedPending &&
+				forgedWorld->GetSurfaceStateRevision() !=
+				forgedVisible.GetSurfaceStateRevision(),
+				"Data-only preparation rejects an incomplete Mutation that hides a newer Surface state");
 		}
 
 		void RunAtomicDataOnlyPublicationTests(SelfTestContext& context) noexcept

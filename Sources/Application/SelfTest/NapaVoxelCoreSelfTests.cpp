@@ -28,7 +28,7 @@ namespace gglab
 			static_cast<unsigned>(contract.m_RestoreContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 26, "Core API version is 26");
+		context.Check(contract.m_CoreApiVersion == 27, "Core API version is 27");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
