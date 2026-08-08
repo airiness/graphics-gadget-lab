@@ -400,7 +400,8 @@ namespace napa::voxel
 					{
 						return evaluationResult;
 					}
-					if (!evaluation.m_DensityPathEligible)
+					if (!evaluation.m_DensityPathEligible &&
+						!evaluation.m_DamagePathEligible)
 					{
 						continue;
 					}

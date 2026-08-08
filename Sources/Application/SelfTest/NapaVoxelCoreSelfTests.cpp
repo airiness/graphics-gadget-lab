@@ -37,10 +37,10 @@ namespace gglab
 		context.Check(
 			contract.m_ReferenceMesherVersion == 3,
 			"Reference mesher version is 3");
-		context.Check(contract.m_EditContractVersion == 2,
-			"Sphere edit contract version is 2");
-		context.Check(contract.m_MutationContractVersion == 2,
-			"Voxel mutation contract version is 2");
+		context.Check(contract.m_EditContractVersion == 3,
+			"Sphere edit contract version is 3");
+		context.Check(contract.m_MutationContractVersion == 3,
+			"Voxel mutation contract version is 3");
 		context.Check(contract.m_DirtyContractVersion == 1,
 			"Voxel dirty contract version is 1");
 		context.Check(

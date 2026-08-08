@@ -6,6 +6,7 @@
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
+#include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
 #include <algorithm>
@@ -344,6 +345,58 @@ namespace gglab
 			context.Check(allBoundaryCasesMatched,
 				"Chunk-face and Chunk-edge Stone hits derive their exact Mesh owners");
 
+			std::unique_ptr<VoxelWorld> zeroStrengthWorld;
+			ReferenceWorldMeshingResult initialMesh{};
+			ReferenceWorldMeshingResult damageOnlyMesh{};
+			VoxelMutationResult zeroStrengthFirst{};
+			VoxelMutationResult zeroStrengthSecond{};
+			VoxelMutationResult zeroStrengthThird{};
+			VoxelSample zeroStrengthInitialSample{};
+			VoxelSample zeroStrengthSample{};
+			const SphereEditRequest zeroStrengthRequest =
+				MakeStoneEdit({ 3.0, 0.0, 0.0 }, 0.5, 0.0);
+			const bool zeroStrengthMutated = CreateStoneWorld(zeroStrengthWorld) &&
+				zeroStrengthWorld->ReadCurrentSample(
+					{ 3, 0, 0 }, zeroStrengthInitialSample).Succeeded() &&
+				ReferenceMesher(*zeroStrengthWorld).MeshWorld(initialMesh).Succeeded() &&
+				ApplySphereEdit(*zeroStrengthWorld,
+					zeroStrengthRequest, zeroStrengthFirst).Succeeded() &&
+				ReferenceMesher(*zeroStrengthWorld).MeshWorld(damageOnlyMesh).Succeeded() &&
+				ApplySphereEdit(*zeroStrengthWorld,
+					zeroStrengthRequest, zeroStrengthSecond).Succeeded() &&
+				ApplySphereEdit(*zeroStrengthWorld,
+					zeroStrengthRequest, zeroStrengthThird).Succeeded() &&
+				zeroStrengthWorld->ReadCurrentSample(
+					{ 3, 0, 0 }, zeroStrengthSample).Succeeded();
+			context.Check(zeroStrengthMutated &&
+				zeroStrengthFirst.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				zeroStrengthFirst.m_BaseWorldVoxelRevision == 1 &&
+				zeroStrengthFirst.m_TargetWorldVoxelRevision == 2 &&
+				zeroStrengthFirst.m_SampleChanges.size() == 1 &&
+				zeroStrengthFirst.m_DataDirtyChunks.size() == 1 &&
+				zeroStrengthFirst.m_MeshDirtyChunks.empty() &&
+				zeroStrengthSecond.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				zeroStrengthSecond.m_BaseWorldVoxelRevision == 2 &&
+				zeroStrengthSecond.m_TargetWorldVoxelRevision == 3 &&
+				zeroStrengthSecond.m_SampleChanges.size() == 1 &&
+				zeroStrengthSecond.m_DataDirtyChunks.size() == 1 &&
+				zeroStrengthSecond.m_MeshDirtyChunks.empty() &&
+				zeroStrengthThird.GetChangeKind() == VoxelMutationChangeKind::None &&
+				zeroStrengthThird.m_BaseWorldVoxelRevision == 3 &&
+				zeroStrengthThird.m_TargetWorldVoxelRevision == 3 &&
+				zeroStrengthThird.m_SampleChanges.empty() &&
+				zeroStrengthThird.m_DataDirtyChunks.empty() &&
+				zeroStrengthThird.m_MeshDirtyChunks.empty() &&
+				zeroStrengthWorld->GetWorldVoxelRevision() == 3 &&
+				zeroStrengthSample.m_Density == zeroStrengthInitialSample.m_Density &&
+				zeroStrengthSample.m_Material == zeroStrengthInitialSample.m_Material &&
+				zeroStrengthSample.m_Damage == 255,
+				"Zero Strength applies Damage-only hits until saturation without changing Density");
+			context.Check(zeroStrengthMutated &&
+				initialMesh.m_Validation == damageOnlyMesh.m_Validation &&
+				initialMesh.m_BoundaryValidation == damageOnlyMesh.m_BoundaryValidation,
+				"A Damage-only Stone hit preserves world mesh hash, counts, bounds, and contours");
+
 			std::unique_ptr<VoxelWorld> disjointWorld;
 			VoxelMutationResult positiveHit{};
 			VoxelMutationResult disjointHit{};
@@ -362,76 +415,84 @@ namespace gglab
 		void RunStoneFullDomainOracleTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
-			std::unique_ptr<VoxelWorld> boundedWorld;
-			std::unique_ptr<VoxelWorld> oracleWorld;
-			if (!CreateStoneWorld(boundedWorld) || !CreateStoneWorld(oracleWorld))
+			struct OracleCase
 			{
-				context.Check(false, "Stone Oracle fixtures create their primitive worlds");
-				return;
-			}
-
-			const SphereEditRequest request = MakeStoneEdit({ -0.25, 0.5, -0.75 }, 1.75);
-			bool allHitsMatched = true;
-			for (std::size_t hit = 0; hit < 2 && allHitsMatched; ++hit)
+				SphereEditRequest m_Request{};
+				std::size_t m_HitCount = 0;
+			};
+			const std::array oracleCases{
+				OracleCase{ MakeStoneEdit({ -0.25, 0.5, -0.75 }, 1.75), 2 },
+				OracleCase{ MakeStoneEdit({ 3.0, 0.0, 0.0 }, 0.5, 0.0), 3 },
+			};
+			bool allCasesMatched = true;
+			for (const OracleCase& oracleCase : oracleCases)
 			{
-				VoxelMutationResult boundedMutation{};
-				SphereEditContext editContext{};
-				allHitsMatched = ApplySphereEdit(
-					*boundedWorld, request, boundedMutation).Succeeded() &&
-					PrepareSphereEditContext(
-						oracleWorld->GetConfig(), request, editContext).Succeeded();
-				std::vector<VoxelSampleChange> oracleChanges;
-				const SampleAabb bounds = oracleWorld->GetLogicalSampleBounds();
-				for (std::int32_t z = bounds.m_Min.m_Z;
-					z < bounds.m_MaxExclusive.m_Z && allHitsMatched; ++z)
+				std::unique_ptr<VoxelWorld> boundedWorld;
+				std::unique_ptr<VoxelWorld> oracleWorld;
+				allCasesMatched = allCasesMatched &&
+					CreateStoneWorld(boundedWorld) && CreateStoneWorld(oracleWorld);
+				for (std::size_t hit = 0;
+					hit < oracleCase.m_HitCount && allCasesMatched; ++hit)
 				{
-					for (std::int32_t y = bounds.m_Min.m_Y;
-						y < bounds.m_MaxExclusive.m_Y && allHitsMatched; ++y)
+					VoxelMutationResult boundedMutation{};
+					SphereEditContext editContext{};
+					allCasesMatched = ApplySphereEdit(*boundedWorld,
+						oracleCase.m_Request, boundedMutation).Succeeded() &&
+						PrepareSphereEditContext(oracleWorld->GetConfig(),
+							oracleCase.m_Request, editContext).Succeeded();
+					std::vector<VoxelSampleChange> oracleChanges;
+					const SampleAabb bounds = oracleWorld->GetLogicalSampleBounds();
+					for (std::int32_t z = bounds.m_Min.m_Z;
+						z < bounds.m_MaxExclusive.m_Z && allCasesMatched; ++z)
 					{
-						for (std::int32_t x = bounds.m_Min.m_X;
-							x < bounds.m_MaxExclusive.m_X; ++x)
+						for (std::int32_t y = bounds.m_Min.m_Y;
+							y < bounds.m_MaxExclusive.m_Y && allCasesMatched; ++y)
 						{
-							const SampleCoord coordinate{ x, y, z };
-							VoxelSample before{};
-							VoxelSample after{};
-							bool changed = false;
-							if (oracleWorld->ReadCurrentSample(coordinate, before).Failed() ||
-								EvaluateSphereEditSampleTransition(
-									editContext, coordinate, before, after).Failed())
+							for (std::int32_t x = bounds.m_Min.m_X;
+								x < bounds.m_MaxExclusive.m_X; ++x)
 							{
-								allHitsMatched = false;
-								break;
-							}
-							if (before != after)
-							{
-								oracleChanges.push_back({ coordinate, before, after });
-								if (oracleWorld->WriteCurrentSample(
-									coordinate, after, changed).Failed() || !changed)
+								const SampleCoord coordinate{ x, y, z };
+								VoxelSample before{};
+								VoxelSample after{};
+								bool changed = false;
+								if (oracleWorld->ReadCurrentSample(coordinate, before).Failed() ||
+									EvaluateSphereEditSampleTransition(
+										editContext, coordinate, before, after).Failed())
 								{
-									allHitsMatched = false;
+									allCasesMatched = false;
 									break;
+								}
+								if (before != after)
+								{
+									oracleChanges.push_back({ coordinate, before, after });
+									if (oracleWorld->WriteCurrentSample(
+										coordinate, after, changed).Failed() || !changed)
+									{
+										allCasesMatched = false;
+										break;
+									}
 								}
 							}
 						}
 					}
-				}
 
-				std::vector<ChunkCoord> oracleDataDirty;
-				std::vector<ChunkCoord> oracleMeshDirty;
-				std::uint64_t boundedHash = 0;
-				std::uint64_t oracleHash = 0;
-				allHitsMatched = allHitsMatched &&
-					DeriveVoxelMutationDirtyChunks(oracleWorld->GetConfig(), oracleChanges,
-						oracleDataDirty, oracleMeshDirty).Succeeded() &&
-					boundedMutation.m_SampleChanges == oracleChanges &&
-					boundedMutation.m_DataDirtyChunks == oracleDataDirty &&
-					boundedMutation.m_MeshDirtyChunks == oracleMeshDirty &&
-					CompareDamageWorlds(*boundedWorld, *oracleWorld) &&
-					HashDamageWorld(*boundedWorld, boundedHash) &&
-					HashDamageWorld(*oracleWorld, oracleHash) && boundedHash == oracleHash;
+					std::vector<ChunkCoord> oracleDataDirty;
+					std::vector<ChunkCoord> oracleMeshDirty;
+					std::uint64_t boundedHash = 0;
+					std::uint64_t oracleHash = 0;
+					allCasesMatched = allCasesMatched &&
+						DeriveVoxelMutationDirtyChunks(oracleWorld->GetConfig(), oracleChanges,
+							oracleDataDirty, oracleMeshDirty).Succeeded() &&
+						boundedMutation.m_SampleChanges == oracleChanges &&
+						boundedMutation.m_DataDirtyChunks == oracleDataDirty &&
+						boundedMutation.m_MeshDirtyChunks == oracleMeshDirty &&
+						CompareDamageWorlds(*boundedWorld, *oracleWorld) &&
+						HashDamageWorld(*boundedWorld, boundedHash) &&
+						HashDamageWorld(*oracleWorld, oracleHash) && boundedHash == oracleHash;
+				}
 			}
-			context.Check(allHitsMatched,
-				"Both Stone hits match the full-domain transition and Dirty Oracle exactly");
+			context.Check(allCasesMatched,
+				"Stone density and zero-Strength Damage hits match the full-domain Oracle exactly");
 		}
 
 		void RunDamageMarkerSnapshotTests(SelfTestContext& context) noexcept
