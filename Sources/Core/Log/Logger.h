@@ -28,7 +28,7 @@ namespace gglab
 
 		// Never returns null. The returned logger is stable for the process
 		// lifetime after the first call.
-		static std::shared_ptr<spdlog::logger>& GetLogger(LoggerType type) noexcept;
+		static const std::shared_ptr<spdlog::logger>& GetLogger(LoggerType type) noexcept;
 
 	private:
 		static std::array<std::shared_ptr<spdlog::logger>, static_cast<uint32_t>(LoggerType::Count)>

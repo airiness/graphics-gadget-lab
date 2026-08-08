@@ -42,15 +42,15 @@ namespace gglab
 		GGLAB_UNUSED(GetLogger(LoggerType::Graphics));
 	}
 
-	std::shared_ptr<spdlog::logger>& Logger::GetLogger(LoggerType type) noexcept
+	const std::shared_ptr<spdlog::logger>& Logger::GetLogger(LoggerType type) noexcept
 	{
 		const uint32_t index = static_cast<uint32_t>(type);
-		auto& logger = s_Loggers[index];
-		if (!logger)
-		{
-			std::call_once(
-				s_LoggerCreationFlags[index], [&logger, type] { logger = CreateDefaultLogger(type); });
-		}
-		return logger;
+		std::call_once(s_LoggerCreationFlags[index],
+			[index, type]
+			{
+				s_Loggers[index] = CreateDefaultLogger(type);
+			});
+
+		return s_Loggers[index];
 	}
 }
